@@ -1,0 +1,62 @@
+import { createHmac, hkdfSync, timingSafeEqual } from "node:crypto";
+
+// Short-lived signed session issued after the host page proves who the user is (SSO).
+// The embedded page keeps it in memory and sends it as a Bearer token, because third-party
+// cookies are unreliable inside an iframe. Key is derived from TOKEN_ENCRYPTION_KEY.
+
+export type Session = {
+  companyId: string;
+  userId: string | null;
+  role: string | null;
+  userName: string | null;
+  demo: boolean;
+  exp: number;
+};
+
+const DEFAULT_TTL_SECONDS = 60 * 60;
+
+function key(): Buffer {
+  const raw = process.env.TOKEN_ENCRYPTION_KEY;
+  if (!raw) throw new Error("Missing environment variable TOKEN_ENCRYPTION_KEY");
+  const material = Buffer.from(raw, "base64");
+  if (material.length !== 32) throw new Error("TOKEN_ENCRYPTION_KEY must be 32 bytes, base64 encoded");
+  return Buffer.from(hkdfSync("sha256", material, Buffer.alloc(0), "subsync-session-v1", 32));
+}
+
+function mac(body: string): Buffer {
+  return createHmac("sha256", key()).update(body).digest();
+}
+
+export function signSession(
+  session: Omit<Session, "exp">,
+  ttlSeconds = DEFAULT_TTL_SECONDS,
+  now = Date.now(),
+): string {
+  const payload: Session = { ...session, exp: Math.floor(now / 1000) + ttlSeconds };
+  const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
+  return `${body}.${mac(body).toString("base64url")}`;
+}
+
+export function verifySession(token: string | null | undefined, now = Date.now()): Session | null {
+  if (!token) return null;
+  const [body, signature] = token.split(".");
+  if (!body || !signature) return null;
+  try {
+    const expected = mac(body);
+    const given = Buffer.from(signature, "base64url");
+    if (given.length !== expected.length || !timingSafeEqual(given, expected)) return null;
+    const session = JSON.parse(Buffer.from(body, "base64url").toString("utf8")) as Session;
+    if (typeof session.companyId !== "string" || !session.companyId) return null;
+    if (typeof session.exp !== "number" || session.exp * 1000 < now) return null;
+    return session;
+  } catch {
+    return null;
+  }
+}
+
+export function bearerToken(request: Request): string | null {
+  const header = request.headers.get("authorization");
+  if (!header) return null;
+  const [scheme, token] = header.split(" ");
+  return scheme?.toLowerCase() === "bearer" && token ? token : null;
+}
