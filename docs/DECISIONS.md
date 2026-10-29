@@ -21,3 +21,10 @@ Format: date, decision, reason.
 - **Deployment Protection must be turned off for production.** Vercel Authentication currently puts the URL behind a Vercel login, which would block the GHL iframe and marketplace review. It is a security setting, so King changes it (Project > Settings > Deployment Protection).
 - **Still to add in Vercel:** `NEXT_PUBLIC_APP_URL`, `TOKEN_ENCRYPTION_KEY` (generate at step 5), and the `GHL_*` values (step 4).
 - **Logo:** hub-and-three-spokes mark, `public/brand/subsync-logo.svg` and `subsync-logo-512.png` (512x512, 18 kB). No platform names in it.
+
+## 2026-10-29
+
+- **Roadmap saved to `docs/ROADMAP.md`.** It matches the brief's phases except the DNS check, which King's roadmap lists in the Phase 1 onboarding checklist while the brief has it in Phase 4. Kept in Phase 4 for now: it needs external DNS lookups, not just the GHL API.
+- **BLOCKER: the portal draft app has Target User = Sub-Account, and that field is locked.** The portal says "8 scopes unavailable, Target User is Sub-Account, so Agency-only scopes are not applicable." `POST /oauth/locationToken` needs the `oauth.write` scope and an Agency access token (checked in the GHL docs), so the brief's agency-level design needs an app whose Target User is **Agency**. Plan: create a new draft app with Target User = Agency and copy the settings over, then delete the old draft.
+- **Portal fields saved on the current draft (to be redone on the new app):** Who can install = Agency only; listing type White-label (the portal's recommended default, differs from the brief's "Standard"; chosen because white-label agencies are the target customers); redirect URLs for production and localhost; scopes `locations.readonly`, `contacts.readonly`, `opportunities.readonly`, `calendars.readonly`, `conversations.readonly` (all tagged Sub-Account in the portal, which is fine for location tokens).
+- **Not done in the portal yet:** logo (needs a native file-picker click, file is `public/brand/subsync-logo-512.png`), Support Details (a support phone number is required and King has not given one), Getting Started / listing copy, Modules (Custom Pages and SSO), Client Keys.
