@@ -22,10 +22,15 @@ export type Settings = AccountSettings & {
 
 export async function getSettings(installationId: string): Promise<Settings> {
   const db = sql();
-  await db`insert into settings (installation_id) values (${installationId}) on conflict do nothing`;
-  const [r] = await db`
+  const read = () => db`
     select stale_deal_days, dormant_days, sla_hours, slack_webhook_url, ghl_app_domain, digest_enabled, custom_checklist
     from settings where installation_id = ${installationId}`;
+  let [r] = await read();
+  if (!r) {
+    // First read for this agency: create the default row (rare), then read it back.
+    await db`insert into settings (installation_id) values (${installationId}) on conflict do nothing`;
+    [r] = await read();
+  }
   const days = Array.isArray(r.stale_deal_days) && r.stale_deal_days.length ? Number(r.stale_deal_days[0]) : 30;
   return {
     staleDays: days,
@@ -51,6 +56,15 @@ export async function updateSettings(installationId: string, p: Partial<Settings
       digest_enabled = coalesce(${p.digestEnabled ?? null}::boolean, digest_enabled),
       custom_checklist = coalesce(${p.customChecklist !== undefined ? db.json(p.customChecklist) : null}::jsonb, custom_checklist)
     where installation_id = ${installationId}`;
+}
+
+// The accounts a plan may see (name order, ignored accounts excluded). Used to enforce the free
+// plan's account limit without loading and scoring every account.
+export async function visibleLocationIds(installationId: string, limit: number): Promise<string[]> {
+  const rows = await sql()`
+    select location_id from locations where installation_id = ${installationId} and not ignored
+    order by lower(coalesce(name, '')), location_id limit ${limit}`;
+  return rows.map((r) => r.location_id as string);
 }
 
 // ---------------- per-account stats ----------------

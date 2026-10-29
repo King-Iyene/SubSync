@@ -1,192 +1,199 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { NAV, type GoFn, type ViewId } from "./nav";
+import { ApiProvider, makeApi, type Api } from "./session";
+import { Badge } from "./ui";
+import { AccountDetailView } from "./views/account-detail";
+import { AccountsView } from "./views/accounts";
+import { AlertsView } from "./views/alerts";
+import { DealsView } from "./views/deals";
+import { DuplicatesView } from "./views/duplicates";
+import { EmailHealthView } from "./views/email-health";
+import { InboxView } from "./views/inbox";
+import { OnboardingView } from "./views/onboarding";
+import { OverviewView } from "./views/overview";
+import { SearchView } from "./views/search";
+import { SettingsView } from "./views/settings";
 
-type SsoUser = {
-  userId: string | null;
-  companyId: string | null;
-  role: string | null;
-  type: string | null;
-  userName: string | null;
-  activeLocation: string | null;
+type Auth =
+  | { status: "waiting" }
+  | { status: "outside" }
+  | { status: "error"; message: string }
+  | { status: "not_installed" }
+  | { status: "ready"; api: Api; demo: boolean; userName: string | null; features: Record<string, boolean> };
+
+type SsoResponse = {
+  error?: string;
+  installed?: boolean;
+  demo?: boolean;
+  session?: string;
+  user?: { userName?: string | null };
+  entitlements?: { features: Record<string, boolean> };
 };
 
-type State =
-  | { status: "waiting" }
-  | { status: "error"; message: string }
-  | { status: "ready"; user: SsoUser; installed: boolean | null };
-
-const sections = [
-  {
-    id: "search",
-    label: "Search",
-    title: "Search every client account",
-    empty:
-      "Search contacts by name, email or phone across all of your client accounts. Available once the first sync finishes.",
-  },
-  {
-    id: "health",
-    label: "Data health",
-    title: "Data health by client account",
-    empty:
-      "See missing emails, missing phones, untagged and inactive contacts for each account. Available once the first sync finishes.",
-  },
-  {
-    id: "stale",
-    label: "Stale deals",
-    title: "Stale deals",
-    empty:
-      "Open deals that have not moved in 30, 60 or 90 days, across every pipeline. Available once the first sync finishes.",
-  },
-  {
-    id: "onboarding",
-    label: "Onboarding",
-    title: "Client onboarding progress",
-    empty:
-      "Track which client accounts have a pipeline, contacts and a calendar set up. Available once the first sync finishes.",
-  },
-] as const;
-
-export function Dashboard() {
-  const [state, setState] = useState<State>({ status: "waiting" });
-  const [active, setActive] = useState<(typeof sections)[number]["id"]>("search");
-  // The host page embeds us in an iframe. Without a parent frame there is nothing to ask.
-  // Assume embedded during server render so the first paint matches.
-  const embedded = useSyncExternalStore(
-    () => () => {},
-    () => window.parent !== window,
-    () => true,
-  );
-
-  useEffect(() => {
-    if (!embedded) return;
-
-    let settled = false;
-
-    async function onMessage(event: MessageEvent) {
-      if (event.source !== window.parent) return;
-      const data = event.data as { message?: string; payload?: unknown } | null;
-      if (!data || data.message !== "REQUEST_USER_DATA_RESPONSE") return;
-      if (typeof data.payload !== "string") return;
-
-      settled = true;
-      try {
-        const response = await fetch("/api/sso", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ payload: data.payload }),
-        });
-        const body = await response.json();
-        if (!response.ok) {
-          setState({ status: "error", message: body.error ?? "Could not verify your account" });
-          return;
-        }
-        setState({ status: "ready", user: body.user, installed: body.installed });
-      } catch {
-        setState({ status: "error", message: "Could not reach SubSync. Please refresh." });
-      }
-    }
-
-    window.addEventListener("message", onMessage);
-    window.parent.postMessage({ message: "REQUEST_USER_DATA" }, "*");
-
-    const timeout = window.setTimeout(() => {
-      if (!settled) {
-        setState({ status: "error", message: "No response from the host page. Please refresh." });
-      }
-    }, 6000);
-
-    return () => {
-      window.removeEventListener("message", onMessage);
-      window.clearTimeout(timeout);
-    };
-  }, [embedded]);
-
-  if (!embedded) {
-    return (
-      <Centered
-        title="Open SubSync from your account menu"
-        body="This page is built to run inside your account. Open SubSync from the left menu of one of your client accounts."
-      />
-    );
-  }
-  if (state.status === "waiting") {
-    return <Centered title="Loading SubSync" body="Checking your account..." />;
-  }
-  if (state.status === "error") {
-    return <Centered title="We could not sign you in" body={state.message} />;
-  }
-
-  const section = sections.find((s) => s.id === active) ?? sections[0];
-
-  return (
-    <div className="flex min-h-screen bg-background text-foreground">
-      <aside className="hidden w-56 shrink-0 flex-col border-r p-4 sm:flex">
-        <p className="px-2 text-lg font-semibold tracking-tight">SubSync</p>
-        <nav className="mt-6 flex flex-col gap-1" aria-label="Sections">
-          {sections.map((s) => (
-            <button
-              key={s.id}
-              type="button"
-              onClick={() => setActive(s.id)}
-              aria-current={s.id === active ? "page" : undefined}
-              className={`rounded-lg px-3 py-2 text-left text-sm transition-colors ${
-                s.id === active
-                  ? "bg-muted font-medium"
-                  : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
-              }`}
-            >
-              {s.label}
-            </button>
-          ))}
-        </nav>
-      </aside>
-
-      <main className="flex-1 p-6 sm:p-10">
-        <header className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">{section.title}</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {state.user.userName ? `Signed in as ${state.user.userName}` : "Signed in"}
-            </p>
-          </div>
-          <StatusPill installed={state.installed} />
-        </header>
-
-        <nav className="mt-6 flex gap-2 overflow-x-auto sm:hidden" aria-label="Sections">
-          {sections.map((s) => (
-            <button
-              key={s.id}
-              type="button"
-              onClick={() => setActive(s.id)}
-              className={`shrink-0 rounded-full border px-3 py-1 text-sm ${
-                s.id === active ? "bg-muted font-medium" : "text-muted-foreground"
-              }`}
-            >
-              {s.label}
-            </button>
-          ))}
-        </nav>
-
-        <section className="mt-8 rounded-xl border border-dashed p-10 text-center">
-          <p className="mx-auto max-w-md text-sm leading-6 text-muted-foreground">
-            {section.empty}
-          </p>
-          <p className="mt-4 text-xs text-muted-foreground">Last synced: never</p>
-        </section>
-      </main>
-    </div>
-  );
+async function exchange(body: unknown): Promise<{ ok: boolean; status: number; data: SsoResponse }> {
+  const res = await fetch("/api/sso", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  return { ok: res.ok, status: res.status, data: (await res.json().catch(() => ({}))) as SsoResponse };
 }
 
-function StatusPill({ installed }: { installed: boolean | null }) {
-  const label =
-    installed === true ? "Agency connected" : installed === false ? "Not installed" : "Status unknown";
-  const tone =
-    installed === true
-      ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
-      : "bg-amber-500/15 text-amber-700 dark:text-amber-300";
-  return <span className={`rounded-full px-3 py-1 text-xs font-medium ${tone}`}>{label}</span>;
+export function Dashboard() {
+  const [auth, setAuth] = useState<Auth>({ status: "waiting" });
+  const [view, setView] = useState<{ id: ViewId; locationId?: string }>({ id: "overview" });
+  // Embedded in the host page: ask the parent who the user is. Assume embedded during server
+  // render so the first paint matches.
+  const embedded = useSyncExternalStore(() => () => {}, () => window.parent !== window, () => true);
+  const pending = useRef<((payload: string | null) => void) | null>(null);
+  const refreshRef = useRef<() => Promise<string | null>>(async () => null);
+
+  const apply = useCallback((r: { ok: boolean; status: number; data: SsoResponse }): string | null => {
+    if (r.ok && r.data.installed === false) {
+      setAuth({ status: "not_installed" });
+      return null;
+    }
+    if (r.ok && r.data.session) {
+      const demo = r.data.demo === true;
+      setAuth({
+        status: "ready", api: makeApi(r.data.session, () => refreshRef.current(), demo), demo,
+        userName: r.data.user?.userName ?? null, features: r.data.entitlements?.features ?? {},
+      });
+      return r.data.session;
+    }
+    setAuth({ status: "error", message: r.data.error ?? "Could not sign you in." });
+    return null;
+  }, []);
+
+  // Ask the host page for fresh encrypted user context and exchange it for a session.
+  const signIn = useCallback(async (): Promise<string | null> => {
+    const payload = await new Promise<string | null>((resolve) => {
+      pending.current = resolve;
+      window.parent.postMessage({ message: "REQUEST_USER_DATA" }, "*");
+      setTimeout(() => {
+        if (pending.current === resolve) {
+          pending.current = null;
+          resolve(null);
+        }
+      }, 6000);
+    });
+    if (!payload) {
+      // The host did not answer. With demo mode on (never in production) show sample data
+      // instead of dead-ending, which also covers previews that frame the page.
+      const demo = await exchange({ demo: true }).catch(() => null);
+      if (demo?.ok) return apply(demo);
+      setAuth({ status: "error", message: "No response from the host page. Please refresh." });
+      return null;
+    }
+    try {
+      return apply(await exchange({ payload }));
+    } catch {
+      setAuth({ status: "error", message: "Could not reach SubSync. Please refresh." });
+      return null;
+    }
+  }, [apply]);
+
+  useEffect(() => {
+    const onMessage = (event: MessageEvent) => {
+      if (event.source !== window.parent) return;
+      const data = event.data as { message?: string; payload?: unknown } | null;
+      if (data?.message === "REQUEST_USER_DATA_RESPONSE" && typeof data.payload === "string" && pending.current) {
+        const resolve = pending.current;
+        pending.current = null;
+        resolve(data.payload);
+      }
+    };
+    window.addEventListener("message", onMessage);
+
+    if (!embedded) {
+      // Opened directly (not inside the host page). Demo mode, when enabled, shows sample data.
+      void exchange({ demo: true }).then((r) => {
+        if (r.ok) apply(r);
+        else setAuth({ status: "outside" });
+      }).catch(() => setAuth({ status: "outside" }));
+    } else {
+      // signIn only sets state after awaiting the host page's reply, never synchronously.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      void signIn();
+    }
+    return () => window.removeEventListener("message", onMessage);
+  }, [embedded, apply, signIn]);
+
+  const go: GoFn = useCallback((id, locationId) => {
+    setView({ id, locationId });
+    window.scrollTo({ top: 0 });
+  }, []);
+
+  // The API client asks for a fresh session through this when a request comes back 401.
+  useEffect(() => {
+    refreshRef.current = () => (embedded ? signIn() : exchange({ demo: true }).then(apply));
+  }, [embedded, signIn, apply]);
+
+  const api = auth.status === "ready" ? auth.api : null;
+
+  if (auth.status === "waiting") return <Centered title="Loading SubSync" body="Checking your account..." />;
+  if (auth.status === "outside") {
+    return <Centered title="Open SubSync from your account menu" body="This page is built to run inside your account. Open SubSync from the left menu of one of your client accounts." />;
+  }
+  if (auth.status === "not_installed") {
+    return <Centered title="SubSync is not set up for this agency yet" body="Install SubSync from the app marketplace for your agency, then open it again from the menu." />;
+  }
+  if (auth.status === "error" || !api) {
+    return <Centered title="We could not sign you in" body={auth.status === "error" ? auth.message : "Please refresh."} />;
+  }
+
+  const active = view.id === "account" ? "accounts" : view.id;
+  const locked = (feature: string) => auth.features[feature] === false;
+  const agency = auth.demo ? "Demo Agency" : "Your agency";
+
+  const content = (() => {
+    switch (view.id) {
+      case "overview": return <OverviewView go={go} />;
+      case "accounts": return <AccountsView go={go} />;
+      case "account": return view.locationId ? <AccountDetailView key={view.locationId} locationId={view.locationId} go={go} agency={agency} /> : <AccountsView go={go} />;
+      case "search": return <SearchView />;
+      case "deals": return <DealsView />;
+      case "inbox": return <InboxView />;
+      case "onboarding": return <OnboardingView go={go} />;
+      case "email": return <EmailHealthView />;
+      case "duplicates": return <DuplicatesView />;
+      case "alerts": return <AlertsView go={go} />;
+      case "settings": return <SettingsView />;
+    }
+  })();
+
+  return (
+    <ApiProvider value={api}>
+      <div className="flex min-h-screen bg-background text-foreground">
+        <aside className="hidden w-60 shrink-0 flex-col border-r p-4 md:flex print:hidden">
+          <p className="px-2 text-lg font-semibold tracking-tight">SubSync</p>
+          <nav className="mt-6 flex flex-col gap-0.5" aria-label="Sections">
+            {NAV.map((n) => (
+              <button key={n.id} type="button" onClick={() => go(n.id)} aria-current={n.id === active ? "page" : undefined}
+                className={`flex items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors ${n.id === active ? "bg-muted font-medium" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"}`}>
+                {n.label}
+                {locked(n.feature) && <Badge tone="info">Paid</Badge>}
+              </button>
+            ))}
+          </nav>
+          <p className="mt-auto px-2 pt-6 text-xs text-muted-foreground">{auth.userName ? `Signed in as ${auth.userName}` : "Signed in"}</p>
+        </aside>
+
+        <div className="flex min-w-0 flex-1 flex-col">
+          {auth.demo && (
+            <div className="border-b bg-amber-500/10 px-4 py-2 text-center text-xs text-amber-800 dark:text-amber-200 print:hidden" role="note">
+              Demo mode: this is sample data for a fictional agency, not real clients.
+            </div>
+          )}
+          <nav className="flex gap-1 overflow-x-auto border-b p-2 md:hidden print:hidden" aria-label="Sections">
+            {NAV.map((n) => (
+              <button key={n.id} type="button" onClick={() => go(n.id)} aria-current={n.id === active ? "page" : undefined}
+                className={`shrink-0 rounded-full px-3 py-1 text-sm ${n.id === active ? "bg-muted font-medium" : "text-muted-foreground"}`}>{n.label}</button>
+            ))}
+          </nav>
+          <main className="flex-1 p-4 sm:p-8">{content}</main>
+        </div>
+      </div>
+    </ApiProvider>
+  );
 }
 
 function Centered({ title, body }: { title: string; body: string }) {

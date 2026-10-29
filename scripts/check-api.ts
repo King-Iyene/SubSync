@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { closeDb, sql } from "../src/lib/db";
 
 // End-to-end check of the HTTP API against a running dev server in demo mode.
 // Usage: BASE_URL=http://localhost:3100 node --env-file=.env.local --import tsx scripts/check-api.ts
@@ -22,7 +23,7 @@ async function main() {
   assert.ok(token && sso.body.demo === true);
   console.log("sign-in (demo): ok");
 
-  assert.equal((await call("/api/sso", { method: "POST", body: JSON.stringify({}) })).status, 503 === 503 ? (await call("/api/sso", { method: "POST", body: "{}" })).status : 0);
+
   assert.equal((await call("/api/app/overview")).status, 401, "no token is refused");
   assert.equal((await call("/api/app/overview", { token: token.slice(0, -3) + "xyz" })).status, 401, "tampered token is refused");
   const [b64] = token.split(".");
@@ -139,6 +140,9 @@ async function main() {
   assert.match(dg.body.text, /Demo Agency/);
   console.log("exports + digest: ok");
 
+  // Leave the demo data as we found it.
+  await sql()`delete from domain_checks where domain in ('example-demo.com', 'other-demo.org')`;
+  await closeDb();
   console.log("\nAll API checks passed.");
 }
 

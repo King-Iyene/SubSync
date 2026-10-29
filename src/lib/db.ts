@@ -6,9 +6,18 @@ import postgres from "postgres";
 
 const PROJECT_REF = "ugfvzcbkqnhtejgcqhsb";
 
+// The Vercel integration's URLs carry extra query parameters (sslmode, supa=...). The driver
+// would forward unknown ones to the server as connection settings, which the pooler can reject,
+// so keep only scheme, credentials, host, port and database. TLS is requested separately.
+export function cleanConnectionString(url: string): string {
+  const parsed = new URL(url);
+  parsed.search = "";
+  return parsed.toString();
+}
+
 export function connectionString(): string {
   const explicit = process.env.DATABASE_URL ?? process.env.POSTGRES_URL;
-  if (explicit) return explicit;
+  if (explicit) return cleanConnectionString(explicit);
   const password = process.env.SUPABASE_DB_PASSWORD;
   if (!password) throw new Error("Database credentials are not configured");
   return `postgresql://postgres:${encodeURIComponent(password)}@db.${PROJECT_REF}.supabase.co:5432/postgres`;

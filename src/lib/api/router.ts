@@ -1,8 +1,8 @@
 import { buildDigest, onboardingChecklist, toCsv, type DerivedAccount } from "../analytics/derive";
 import {
-  dismissAlert, domainCandidates, duplicateGroups, inbox, listAlerts, listDomainChecks, manualTasks, metricsTrend,
-  pipelineCells, saveDomainCheck, searchContacts, setLocationFlags, setManualTask, staleDeals, updateSettings,
-  type Settings,
+  allManualTasks, dismissAlert, domainCandidates, duplicateGroups, inbox, listAlerts, listDomainChecks, manualTasks, metricsTrend,
+  getSettings, pipelineCells, saveDomainCheck, searchContacts, setLocationFlags, setManualTask, staleDeals, updateSettings,
+  visibleLocationIds, type Settings,
 } from "../analytics/queries";
 import { loadAccounts, refreshInsights } from "../analytics/service";
 import { isSlackWebhook } from "../analytics/derive";
@@ -37,6 +37,18 @@ async function accountsFor(ctx: Ctx) {
   return { settings, accounts: visible, hidden: accounts.length - visible.length, links: deepLinks(settings.appDomain) };
 }
 
+// Lightweight scope for endpoints that do not need every account scored: just the settings and,
+// only when the plan limits accounts, which ones are visible.
+async function scope(ctx: Ctx) {
+  const limit = accountLimit(ctx.plan, ctx.entitlements.enforced);
+  const [settings, ids] = await Promise.all([
+    getSettings(ctx.installationId),
+    limit === null ? Promise.resolve(null) : visibleLocationIds(ctx.installationId, limit),
+  ]);
+  const allowed = ids ? new Set(ids) : null;
+  return { settings, permits: (locationId: string) => allowed === null || allowed.has(locationId), links: deepLinks(settings.appDomain) };
+}
+
 const gate = (ctx: Ctx, feature: Feature) =>
   canUse(feature, ctx.plan, ctx.entitlements.enforced)
     ? null
@@ -57,7 +69,10 @@ function slim(a: DerivedAccount, links: ReturnType<typeof deepLinks>) {
 // ---------------- handlers ----------------
 
 async function overview(ctx: Ctx) {
-  const { settings, accounts, hidden, links } = await accountsFor(ctx);
+  // Independent queries run together so the page does not wait on them one after another.
+  const [{ settings, accounts, hidden, links }, alerts, sync] = await Promise.all([
+    accountsFor(ctx), listAlerts(ctx.installationId, false, 500), syncStatus(ctx.installationId),
+  ]);
   const live = accounts.filter((a) => !a.ignored);
   const sum = (f: (a: DerivedAccount) => number) => live.reduce((s, a) => s + f(a), 0);
   const bands = { thriving: 0, healthy: 0, watch: 0, at_risk: 0 };
@@ -75,7 +90,6 @@ async function overview(ctx: Ctx) {
     .sort((x, y) => x.rank - y.rank)
     .slice(0, 8)
     .map(({ a, reasons }) => ({ locationId: a.locationId, name: a.name, score: a.score, band: a.band, churn: a.churn.level, reasons, url: links.account(a.locationId) }));
-  const alerts = await listAlerts(ctx.installationId, false, 500);
   return json({
     demo: ctx.demo,
     plan: ctx.plan,
@@ -92,13 +106,30 @@ async function overview(ctx: Ctx) {
     },
     bands,
     attention,
-    sync: await syncStatus(ctx.installationId),
+    sync,
   });
 }
 
 async function accounts(ctx: Ctx) {
   const { settings, accounts: list, links } = await accountsFor(ctx);
   return json({ accounts: list.map((a) => slim(a, links)), settings: { staleDays: settings.staleDays, dormantDays: settings.dormantDays, slaHours: settings.slaHours } });
+}
+
+async function onboardingOverview(ctx: Ctx) {
+  const { settings, accounts: list, links } = await accountsFor(ctx);
+  const [manual, domains] = await Promise.all([allManualTasks(ctx.installationId), listDomainChecks(ctx.installationId)]);
+  const rows = list
+    .filter((a) => !a.ignored)
+    .map((a) => {
+      const mine = domains.filter((d) => d.locationId === a.locationId);
+      const worst = mine.find((d) => d.status === "critical") ?? mine.find((d) => d.status === "warning") ?? mine[0] ?? null;
+      const { items, completionPct } = onboardingChecklist(a, {
+        domainStatus: worst?.status ?? null, manual: manual.get(a.locationId) ?? {}, custom: settings.customChecklist,
+      });
+      return { locationId: a.locationId, name: a.name, owner: a.owner, url: links.account(a.locationId), completionPct, items };
+    })
+    .sort((x, y) => x.completionPct - y.completionPct);
+  return json({ accounts: rows });
 }
 
 async function accountDetail(ctx: Ctx, locationId: string) {
@@ -131,18 +162,15 @@ async function search(ctx: Ctx) {
   const q = ctx.url.searchParams.get("q") ?? "";
   const loc = ctx.url.searchParams.get("location");
   if (loc && !LOCATION_ID.test(loc)) return json({ error: "Bad location" }, 400);
-  const { settings, accounts: visible } = await accountsFor(ctx);
-  const allowed = new Set(visible.map((a) => a.locationId));
-  const links = deepLinks(settings.appDomain);
-  const hits = (await searchContacts(ctx.installationId, q, 60, loc ?? undefined)).filter((h) => allowed.has(h.locationId));
+  const [{ permits, links }, found] = await Promise.all([scope(ctx), searchContacts(ctx.installationId, q, 60, loc ?? undefined)]);
+  const hits = found.filter((h) => permits(h.locationId));
   return json({ query: q, hits: hits.map((h) => ({ ...h, url: links.contact(h.locationId, h.contactId) })) });
 }
 
 async function stale(ctx: Ctx) {
-  const { settings, accounts: visible, links } = await accountsFor(ctx);
+  const { settings, permits, links } = await scope(ctx);
   const days = Math.min(365, Math.max(1, Number(ctx.url.searchParams.get("days")) || settings.staleDays));
-  const allowed = new Set(visible.map((a) => a.locationId));
-  const rows = (await staleDeals(ctx.installationId, days, 500)).filter((d) => allowed.has(d.locationId));
+  const rows = (await staleDeals(ctx.installationId, days, 500)).filter((d) => permits(d.locationId));
   return json({
     days,
     totalValue: rows.reduce((s, d) => s + d.value, 0),
@@ -151,10 +179,8 @@ async function stale(ctx: Ctx) {
 }
 
 async function inboxView(ctx: Ctx) {
-  const { settings, accounts: visible } = await accountsFor(ctx);
-  const allowed = new Set(visible.map((a) => a.locationId));
-  const links = deepLinks(settings.appDomain);
-  const rows = (await inbox(ctx.installationId, settings.slaHours, 300)).filter((r) => allowed.has(r.locationId));
+  const { settings, permits, links } = await scope(ctx);
+  const rows = (await inbox(ctx.installationId, settings.slaHours, 300)).filter((r) => permits(r.locationId));
   return json({
     slaHours: settings.slaHours,
     overSla: rows.filter((r) => r.overSla).length,
@@ -198,10 +224,8 @@ async function pipelines(ctx: Ctx) {
 }
 
 async function duplicates(ctx: Ctx) {
-  const { settings, accounts: visible } = await accountsFor(ctx);
-  const allowed = new Set(visible.map((a) => a.locationId));
-  const links = deepLinks(settings.appDomain);
-  const groups = (await duplicateGroups(ctx.installationId, 300)).filter((g) => allowed.has(g.locationId));
+  const { permits, links } = await scope(ctx);
+  const groups = (await duplicateGroups(ctx.installationId, 300)).filter((g) => permits(g.locationId));
   return json({
     groups: groups.map((g) => ({
       ...g, key: g.kind === "phone" ? g.key : g.key,
@@ -318,12 +342,12 @@ async function taskUpdate(ctx: Ctx, locationId: string) {
 }
 
 async function exportCsv(ctx: Ctx, kind: string) {
-  const { settings, accounts: visible } = await accountsFor(ctx);
-  const allowed = new Set(visible.map((a) => a.locationId));
+  const { settings, permits } = await scope(ctx);
   const file = (name: string, csv: string) =>
     new Response(csv, { headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": `attachment; filename="${name}.csv"`, "Cache-Control": "no-store" } });
   switch (kind) {
-    case "accounts":
+    case "accounts": {
+      const { accounts: visible } = await accountsFor(ctx);
       return file("subsync-accounts", toCsv(visible, [
         { label: "Account", value: (a) => a.name }, { label: "Owner", value: (a) => a.owner }, { label: "Score", value: (a) => a.score },
         { label: "Health band", value: (a) => a.band }, { label: "Churn risk", value: (a) => a.churn.level },
@@ -334,8 +358,9 @@ async function exportCsv(ctx: Ctx, kind: string) {
         { label: "Stale deal value", value: (a) => a.revenueAtRisk }, { label: "Unanswered conversations", value: (a) => a.unanswered },
         { label: "Win rate %", value: (a) => (a.winRate === null ? "" : Math.round(a.winRate * 100)) },
       ]));
+    }
     case "stale": {
-      const rows = (await staleDeals(ctx.installationId, settings.staleDays, 5000)).filter((d) => allowed.has(d.locationId));
+      const rows = (await staleDeals(ctx.installationId, settings.staleDays, 5000)).filter((d) => permits(d.locationId));
       return file("subsync-stale-deals", toCsv(rows, [
         { label: "Account", value: (d) => d.locationName }, { label: "Deal", value: (d) => d.name }, { label: "Contact", value: (d) => d.contactName },
         { label: "Value", value: (d) => d.value }, { label: "Pipeline", value: (d) => d.pipelineName }, { label: "Stage", value: (d) => d.stageName },
@@ -343,14 +368,14 @@ async function exportCsv(ctx: Ctx, kind: string) {
       ]));
     }
     case "duplicates": {
-      const rows = (await duplicateGroups(ctx.installationId, 5000)).filter((g) => allowed.has(g.locationId));
+      const rows = (await duplicateGroups(ctx.installationId, 5000)).filter((g) => permits(g.locationId));
       return file("subsync-duplicates", toCsv(rows, [
         { label: "Account", value: (g) => g.locationName }, { label: "Matched on", value: (g) => g.kind }, { label: "Value", value: (g) => g.key },
         { label: "Contacts", value: (g) => g.count }, { label: "Names", value: (g) => g.names.join("; ") }, { label: "Contact ids", value: (g) => g.contactIds.join("; ") },
       ]));
     }
     case "inbox": {
-      const rows = (await inbox(ctx.installationId, settings.slaHours, 2000)).filter((r) => allowed.has(r.locationId));
+      const rows = (await inbox(ctx.installationId, settings.slaHours, 2000)).filter((r) => permits(r.locationId));
       return file("subsync-inbox", toCsv(rows, [
         { label: "Account", value: (r) => r.locationName }, { label: "Contact", value: (r) => r.contactName }, { label: "Channel", value: (r) => r.lastMessageType },
         { label: "Last message", value: (r) => r.lastMessageAt }, { label: "Direction", value: (r) => r.lastMessageDirection },
@@ -395,7 +420,7 @@ async function digestPreview(ctx: Ctx) {
 // ---------------- routing ----------------
 
 const FEATURE_FOR: Record<string, Feature> = {
-  search: "search", stale: "stale", inbox: "inbox", pipelines: "pipelines", duplicates: "duplicates", email: "email",
+  search: "search", onboarding: "onboarding", stale: "stale", inbox: "inbox", pipelines: "pipelines", duplicates: "duplicates", email: "email",
   alerts: "alerts", settings: "settings", export: "exports", digest: "reports",
 };
 
@@ -413,6 +438,7 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
     if (method === "GET") {
       if (a === "overview") return await overview(ctx);
       if (a === "accounts" && !b) return await accounts(ctx);
+      if (a === "onboarding") return await onboardingOverview(ctx);
       if (a === "accounts" && b && LOCATION_ID.test(b) && !c) return await accountDetail(ctx, b);
       if (a === "search") return await search(ctx);
       if (a === "stale") return await stale(ctx);

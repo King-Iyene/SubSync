@@ -322,11 +322,11 @@ export async function runSlice(budgetMs = 45_000): Promise<SliceResult> {
 
 export async function syncStatus(installationId: string) {
   const db = sql();
-  const jobs = await db`
-    select status, count(*)::int n from sync_jobs where installation_id = ${installationId} group by status`;
-  const [last] = await db`select max(finished_at) f from sync_jobs where installation_id = ${installationId} and status = 'done'`;
-  const failures = await db`
-    select type, location_id, error from sync_jobs where installation_id = ${installationId} and status = 'failed' order by finished_at desc limit 5`;
+  const [jobs, [last], failures] = await Promise.all([
+    db`select status, count(*)::int n from sync_jobs where installation_id = ${installationId} group by status`,
+    db`select max(finished_at) f from sync_jobs where installation_id = ${installationId} and status = 'done'`,
+    db`select type, location_id, error from sync_jobs where installation_id = ${installationId} and status = 'failed' order by finished_at desc limit 5`,
+  ]);
   return {
     pending: jobs.filter((j) => j.status === "pending" || j.status === "running").reduce((s, j) => s + j.n, 0),
     failed: jobs.filter((j) => j.status === "failed").reduce((s, j) => s + j.n, 0),
