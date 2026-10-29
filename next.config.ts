@@ -20,7 +20,7 @@ const nextConfig: NextConfig = {
         // may frame it. Identity comes from SSO verification, not the origin.
         source: "/app/:path*",
         headers: [
-          { key: "Content-Security-Policy", value: "frame-ancestors https:" },
+          { key: "Content-Security-Policy", value: "frame-ancestors 'self' https:" },
         ],
       },
       {
