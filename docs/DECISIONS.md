@@ -59,3 +59,9 @@ Format: date, decision, reason.
 - **`/app` framing is now `frame-ancestors 'self' https:`** (added `'self'` so the page can be framed from the same origin when testing locally).
 - **Not done yet:** `TOKEN_ENCRYPTION_KEY`, `GHL_CLIENT_ID`, `GHL_CLIENT_SECRET`, `GHL_SSO_KEY`, `GHL_REDIRECT_URI` and `NEXT_PUBLIC_APP_URL` are not set in Vercel, so installs and SSO return a safe "not configured" response in production until they are. The refresh-token rotation lock and the installed-locations sync are step 7.
 - **Next:** a research pass on gaps in the platform's native tooling to extend the roadmap (King's request), then the sync engine.
+
+## 2026-10-29 (research findings that affect the build)
+
+- **Sync design:** the platform's rate limits are per app **per resource** (one location or one company), not shared, so per-account sync workers can run in parallel with a separate burst budget per client account. Read the `X-RateLimit-*` headers; the docs give no 429 guidance, so we add our own backoff. This corrects the brief's reading of "100 per 10 seconds" as a single shared budget.
+- **Webhooks:** verify `X-GHL-Signature` (Ed25519) only; the legacy `X-WH-Signature` was deprecated on 2026-09-01. Handlers must be fast and idempotent because non-2xx is retried up to 12 times.
+- **Roadmap proposals** from the research are listed in `docs/ROADMAP.md` for King's decision. No roadmap order was changed.

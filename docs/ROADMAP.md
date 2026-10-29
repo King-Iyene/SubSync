@@ -37,3 +37,12 @@ Cross-account search alone is something every agency with 10+ client accounts wa
 20. Natural language queries across accounts
 21. AI-generated weekly client summaries
 22. Smart workflow suggestions per account
+
+## Research-driven proposals (not yet decided by King)
+
+See `docs/FEATURE_RESEARCH.md` for evidence and confidence levels.
+
+- Consider pulling a read-only "unread across accounts" view forward from Phase 2 (only item with direct demand evidence).
+- Add "setup comparison" (tags, custom fields, custom values across accounts, read-only first) as a Phase 2 candidate.
+- Narrow item 10 (duplicate finder and merge) to duplicates within one account, because contacts in different client accounts belong to different businesses.
+- Build the engagement flag from data activity, not logins, because login data does not appear to be exposed.
