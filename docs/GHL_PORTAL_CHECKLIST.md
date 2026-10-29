@@ -50,7 +50,7 @@ Public text must say "client accounts", never "sub-accounts", and must not use t
 ## 4. App settings
 
 - App type: Private (switch to Public only at the end).
-- Who can install: **Agencies Only**. The draft currently says "Agency And Sub-Account" under Installed By and "Sub-Account" under Target User. Change these so the app is agency-level (company-level OAuth). If Target User offers an Agency option, pick it.
+- Target User: leave as **Sub-Account** (locked, and correct: Agency-target apps cannot use the contacts, opportunities, calendars or conversations scopes). Who can install: **Agency only** for now (agencies install once; bulk install gives a Company token). Use the app with id `6ae2a79309eaa881c1eb419e`, not `6ae2b7db6c40014528683d67` (a mistaken Agency-target copy, to be deleted).
 - Listing type: Standard (the docs recommend White-label for marketing agencies; confirm with King).
 
 ## 5. Build > Advanced Settings > Auth
@@ -58,7 +58,7 @@ Public text must say "client accounts", never "sub-accounts", and must not use t
 - Redirect URL (type each, click **Add**):
   - `http://localhost:3000/api/oauth/callback`
   - `https://subsync-king-iyenes-projects.vercel.app/api/oauth/callback`
-- Scopes (**Select Scope** dropdown): `locations.readonly`, `contacts.readonly`, `opportunities.readonly`, `calendars.readonly`, `conversations.readonly`. Add more only when a feature needs them. Whether minting location tokens or listing installed locations needs extra scopes is still unconfirmed.
+- Scopes (**Select Scope** dropdown): `locations.readonly`, `contacts.readonly`, `opportunities.readonly`, `calendars.readonly`, `conversations.readonly`, plus `oauth.write` (mint location tokens) and `oauth.readonly` (list installed locations). Add more only when a feature needs them.
 
 ## 6. Modules
 
