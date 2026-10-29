@@ -66,3 +66,16 @@ Format: date, decision, reason.
 - **Webhooks:** verify `X-GHL-Signature` (Ed25519) only; the legacy `X-WH-Signature` was deprecated on 2026-09-01. Handlers must be fast and idempotent because non-2xx is retried up to 12 times.
 - **Roadmap proposals** from the research are listed in `docs/ROADMAP.md` for King's decision. No roadmap order was changed.
 - **Roadmap decision (King, 2026-10-29): keep the order as planned.** Applied only the duplicate-finder narrowing (within one account) and the activity-based engagement flag. King then asked for deeper research that also weighs how hard each feature would be for GHL to build quickly (defensibility), not only whether customers would pay. That pass is tracked in `docs/FEATURE_RESEARCH.md`.
+
+## 2026-10-29 (deep research results; full detail in `docs/DEEP_RESEARCH.md`)
+
+- **CORRECTION: no 15% revenue share today.** The official pricing help article (modified 2026-06-23) says no commission is deducted and the developer receives the entire payment, "currently". Earlier notes that assumed 15% (net about $4.25 at $5) are superseded: plan on $5.00 gross, and model 15% only as a downside case.
+- **Private apps are capped at 5 agencies** (installs blocked from the 6th, for apps created after 2025-11-18; sub-accounts and bulk installs count as one agency). Real growth needs a Public listing and marketplace review, so plan the Public submission earlier than the brief's final step.
+- **Public listing needs** 3-6 real screenshots, a demo video including uninstall, a stated data-retention behaviour on disconnect, privacy and terms URLs, and a 24-hour support reply. Scope changes can trigger re-review: add the scopes we will need while still private, then freeze the list before submitting.
+- **Unified inbox demand is weaker than first reported** (two posts, about 6 votes each). Keeping the roadmap order stands on firmer ground.
+- **Login and user-activity data is unresolved:** one source says the API does not expose it, another notes a competitor sells login tracking. Engagement stays data-activity-based; test whether the Users API exposes last login.
+- **Webhook event names are now confirmed** (see DEEP_RESEARCH section 7), including `LCEmailStats`, which is available only to location-level apps and fits our Sub-Account-target app.
+- **To check before step 7:** the location-token endpoint path. One researcher cites `POST /oauth/location-token`, while our client and the official template use `/oauth/locationToken`. Confirm against the live API spec.
+- **Pricing risk:** GoCSM (health scoring for these agencies) lists flat tiers that work out to roughly $1.60-$2 per account per month at 100 accounts, against our $5. Vendor claim, unverified. Overlap is partial; revisit tiered or flat pricing for engagement features before launch.
+- **Workflow features are speculative:** the Workflows API is a closed beta enabled per sub-account (others get a 403) and execution logs are UI-only. Roadmap items 14-17 and any workflow-failure monitoring should not be promised.
+- **Proposals from the deep research are listed in `docs/ROADMAP.md` for King's decision. No roadmap order was changed.**

@@ -46,4 +46,15 @@ Decided: **keep the roadmap order as planned.** Applied above:
 - Item 7 is built from data activity, not logins, because login data does not appear to be exposed.
 - Item 10 is limited to duplicates within one account, because contacts in different client accounts belong to different businesses.
 
-Not adopted for now (can be revisited): pulling the read-only "unread across accounts" view forward from Phase 2, and adding "setup comparison" as a Phase 2 candidate.
+Not adopted for now (can be revisited): pulling the read-only "unread across accounts" view forward from Phase 2, and adding "setup comparison" as a Phase 2 candidate. The deep research found the unified-inbox demand weaker than first thought, which supports leaving it in Phase 2.
+
+## Deep research proposals (not yet decided by King)
+
+Evidence and scoring in `docs/DEEP_RESEARCH.md`. Order is unchanged until King decides.
+
+- **Move the dormant-account flag earlier** (built from data activity). Strongest demand in the research (ideas-board requests of 70, 109 and 191 votes) and cross-tenant reads are hard for GHL. A competitor, GoCSM, sells health scoring, so aim to be faster and cheaper, not broader.
+- **Upgrade item 18 (DNS health checker) into a continuous email authentication and deliverability monitor.** Uses the `LCEmailStats` webhook plus external SPF, DKIM, DMARC and blacklist lookups. External data makes it hard for GHL to copy. Strongest new idea.
+- **Add a messaging delivery-outcome monitor as a candidate** (failure and opt-out rates, DND changes). A2P registration status is not in the API, so it cannot be a registration monitor.
+- **Treat Phase 4 workflow items (14-17) as speculative.** They depend on a closed-beta Workflows API enabled per sub-account.
+- **Plan the Public listing earlier**, because private apps are capped at 5 agencies.
+- **Revisit pricing** against GoCSM's flat tiers before launch.
