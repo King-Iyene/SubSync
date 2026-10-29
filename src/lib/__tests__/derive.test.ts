@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
-  buildDigest, computeAlerts, deriveAccount, isSlackWebhook, onboardingChecklist, toCsv,
+  buildDigest, computeAlerts, deriveAccount, isSlackWebhook, leadFlowDrop, onboardingChecklist, toCsv,
   type AccountRow, type AccountSettings,
 } from "../analytics/derive.ts";
 
@@ -86,6 +86,25 @@ test("alert rules fire for dormant, SLA, stale and email problems, and skip igno
   assert.equal(alerts.find((a) => a.dedupeKey === "dormant:D")?.severity, "critical");
   assert.equal(alerts.find((a) => a.dedupeKey === "sla:S")?.severity, "critical");
   assert.match(alerts.find((a) => a.dedupeKey === "stale:T")?.title ?? "", /\$12,345/);
+});
+
+test("lead flow drop needs a real baseline and at least a 50% fall", () => {
+  const steady = Array.from({ length: 14 }, () => 20);
+  assert.equal(leadFlowDrop(18, steady), null);
+  assert.equal(leadFlowDrop(10, steady), 50);
+  assert.equal(leadFlowDrop(2, steady), 90);
+  assert.equal(leadFlowDrop(0, Array.from({ length: 14 }, () => 5)), null, "small accounts are ignored");
+  assert.equal(leadFlowDrop(0, [30, 30, 30]), null, "too little history");
+});
+
+test("a lead flow drop raises one warning, but not on an account already flagged dormant", () => {
+  const falling = deriveAccount(row({ locationId: "F", name: "Falling Co", new30d: 3 }), settings, [], NOW, Array.from({ length: 14 }, () => 24));
+  assert.equal(falling.leadFlowDropPct, 88);
+  const dormant = deriveAccount(row({ locationId: "D", name: "Dormant Co", new30d: 0, lastActivityAt: iso(80) }), settings, [], NOW, Array.from({ length: 14 }, () => 24));
+  const keys = computeAlerts([falling, dormant], [], settings).map((a) => a.dedupeKey);
+  assert.ok(keys.includes("leadflow:F"));
+  assert.ok(!keys.includes("leadflow:D"));
+  assert.ok(keys.includes("dormant:D"));
 });
 
 test("the digest lists at-risk accounts and totals", () => {

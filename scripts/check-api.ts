@@ -140,6 +140,57 @@ async function main() {
   assert.match(dg.body.text, /Demo Agency/);
   console.log("exports + digest: ok");
 
+  // --- hygiene + keys + AI connector
+  const hy = await call("/api/app/hygiene", { token });
+  assert.ok(hy.body.accounts.length > 0 && hy.body.totals.open > 0);
+  assert.equal((await call("/api/app/api-keys", { method: "POST", token, body: JSON.stringify({ name: "" }) })).status, 400);
+  const made = await call("/api/app/api-keys", { method: "POST", token, body: JSON.stringify({ name: "check-api" }) });
+  assert.equal(made.status, 200);
+  const apiKey = made.body.key as string;
+  assert.ok(apiKey.startsWith("sk_subsync_"));
+  const listed = await call("/api/app/api-keys", { token });
+  assert.ok(listed.body.keys.some((k: { id: string }) => k.id === made.body.row.id));
+  assert.ok(!JSON.stringify(listed.body).includes(apiKey), "the key is never shown again");
+  assert.equal((await call(`/api/app/api-keys/not-a-uuid/revoke`, { method: "POST", token })).status, 404);
+
+  const mcp = (body: unknown, key: string | null = apiKey) => call("/api/mcp", { method: "POST", token: key, body: JSON.stringify(body) });
+  assert.equal((await call("/api/mcp")).status, 405);
+  assert.equal((await mcp({ jsonrpc: "2.0", id: 1, method: "ping" }, null)).status, 401);
+  assert.equal((await mcp({ jsonrpc: "2.0", id: 1, method: "ping" }, "sk_subsync_" + "x".repeat(43))).status, 401);
+  assert.equal((await mcp({ jsonrpc: "2.0", id: 1, method: "ping" }, token)).status, 401, "a session token is not an API key");
+  const init = await mcp({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-03-26" } });
+  assert.equal(init.status, 200);
+  assert.equal(init.body.result.serverInfo.name, "subsync");
+  assert.equal((await mcp({ jsonrpc: "2.0", method: "notifications/initialized" })).status, 202);
+  const tl = await mcp({ jsonrpc: "2.0", id: 2, method: "tools/list" });
+  assert.ok(tl.body.result.tools.length >= 7);
+  const call1 = async (name: string, args: Record<string, unknown> = {}) => {
+    const r = await mcp({ jsonrpc: "2.0", id: 3, method: "tools/call", params: { name, arguments: args } });
+    assert.equal(r.status, 200);
+    return r.body.result as { isError?: boolean; content: Array<{ text: string }> };
+  };
+  const ps = JSON.parse((await call1("portfolio_summary")).content[0].text);
+  assert.equal(ps.clientAccounts, 13);
+  assert.ok(ps.dormantAccounts.includes("Summit HVAC Services"));
+  const la = JSON.parse((await call1("list_accounts", { filter: "dormant" })).content[0].text);
+  assert.ok(la.length >= 2 && la.every((a: { dormant: boolean }) => a.dormant));
+  const ga = JSON.parse((await call1("get_account", { name: "sunrise" })).content[0].text);
+  assert.equal(ga.name, "Sunrise Roofing Co");
+  assert.equal(ga.scoreBreakdown.length, 5);
+  assert.equal((await call1("get_account", { name: "zzzz-nothing" })).isError, true);
+  assert.equal((await call1("search_contacts", { query: "a" })).isError, true);
+  const sc = JSON.parse((await call1("search_contacts", { query: "walker" })).content[0].text);
+  assert.ok(sc.length > 0 && sc.length <= 20);
+  const sd = JSON.parse((await call1("list_stale_deals", { limit: 5, min_days: 45 })).content[0].text);
+  assert.ok(sd.length === 5 && sd.every((d: { daysStale: number }) => d.daysStale >= 45));
+  assert.ok(JSON.parse((await call1("list_waiting_conversations")).content[0].text).length >= 7);
+  assert.ok(JSON.parse((await call1("list_alerts", { severity: "critical" })).content[0].text).every((a: { severity: string }) => a.severity === "critical"));
+  assert.equal((await mcp({ jsonrpc: "2.0", id: 4, method: "tools/call", params: { name: "drop_tables" } })).body.error.code, -32602);
+
+  assert.equal((await call(`/api/app/api-keys/${made.body.row.id}/revoke`, { method: "POST", token })).status, 200);
+  assert.equal((await mcp({ jsonrpc: "2.0", id: 1, method: "ping" })).status, 401, "a revoked key stops working at once");
+  console.log("hygiene + api keys + AI connector: ok");
+
   // Leave the demo data as we found it.
   await sql()`delete from domain_checks where domain in ('example-demo.com', 'other-demo.org')`;
   await closeDb();

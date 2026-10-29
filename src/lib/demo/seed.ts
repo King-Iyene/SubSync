@@ -234,7 +234,9 @@ export async function seedDemo(): Promise<{ installationId: string; accounts: nu
       const score = Math.max(0, Math.min(100, Math.round(start + (current - start) * t + (r() - 0.5) * 4)));
       history.push({
         installation_id: installationId, location_id: locationId, day: new Date(now - d * DAY).toISOString().slice(0, 10),
-        contacts: Math.round(p.contacts * (0.9 + 0.1 * t)), new_contacts_30d: Math.round(p.newPerMonth * (0.6 + 0.4 * t)),
+        contacts: Math.round(p.contacts * (0.9 + 0.1 * t)),
+        // Declining accounts used to bring in far more new contacts than they do now.
+        new_contacts_30d: Math.round(p.newPerMonth * (p.trend === "down" ? 6 - 5 * t : 0.6 + 0.4 * t)),
         open_opportunities: p.open, open_value: Math.round(p.open * (p.value[0] + p.value[1]) / 2),
         stale_opportunities: Math.round(p.open * p.staleShare), unread_conversations: p.unread,
         completeness_pct: Math.round(p.quality * 100 * 0.85), engagement_score: score,

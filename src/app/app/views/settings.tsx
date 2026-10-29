@@ -11,6 +11,10 @@ export function SettingsView() {
   const api = useApiClient();
   const { data, error, loading, reload } = useData<{ settings: S; slackConfigured: boolean }>("settings");
   const sync = useData<SyncStatus>("sync");
+  const keys = useData<{ keys: Array<{ id: string; name: string; prefix: string; createdAt: string; lastUsedAt: string | null }>; max: number; endpoint: string }>("api-keys");
+  const [keyName, setKeyName] = useState("");
+  const [newKey, setNewKey] = useState<string | null>(null);
+  const [confirmText, setConfirmText] = useState("");
   const [form, setForm] = useState<S | null>(null);
   const [slack, setSlack] = useState("");
   const [checklist, setChecklist] = useState("");
@@ -114,6 +118,54 @@ export function SettingsView() {
           {digest && <pre className="mt-3 overflow-x-auto whitespace-pre-wrap rounded-lg bg-muted p-3 text-xs">{digest}</pre>}
         </Card>
 
+        <Card title="AI assistant connector">
+          <p className="mb-3 text-sm text-muted-foreground">
+            Let Claude, ChatGPT or any assistant that supports MCP answer questions about all your clients at once, for example
+            &quot;which accounts are at risk this week?&quot; or &quot;find John Smith across my clients&quot;. Access is read-only and limited to your agency.
+          </p>
+          {keys.error?.status === 402 ? (
+            <p className="rounded-lg border border-sky-500/40 bg-sky-500/5 p-3 text-sm">The AI connector is part of the paid plan.</p>
+          ) : (
+            <>
+              {keys.data && (
+                <dl className="mb-3 space-y-1 text-sm">
+                  <div className="flex flex-wrap gap-x-2"><dt className="text-muted-foreground">Server address:</dt><dd><code className="rounded bg-muted px-1.5 py-0.5 text-xs">{keys.data.endpoint}</code></dd></div>
+                  <div className="flex flex-wrap gap-x-2"><dt className="text-muted-foreground">Authentication:</dt><dd>send your key as <code className="rounded bg-muted px-1.5 py-0.5 text-xs">Authorization: Bearer &lt;key&gt;</code></dd></div>
+                </dl>
+              )}
+              {newKey && (
+                <div className="mb-3 rounded-lg border border-emerald-500/40 bg-emerald-500/5 p-3 text-sm" role="status">
+                  <p className="font-medium">Copy your new key now. It is shown only once.</p>
+                  <code className="mt-2 block break-all rounded bg-muted p-2 text-xs">{newKey}</code>
+                  <Btn variant="ghost" onClick={() => setNewKey(null)}>I have copied it</Btn>
+                </div>
+              )}
+              {keys.data && keys.data.keys.length > 0 && (
+                <ul className="mb-3 divide-y rounded-lg border">
+                  {keys.data.keys.map((k) => (
+                    <li key={k.id} className="flex flex-wrap items-center justify-between gap-2 p-3 text-sm">
+                      <span><span className="font-medium">{k.name}</span> <span className="text-muted-foreground">· {k.prefix}… · created {timeAgo(k.createdAt)} · {k.lastUsedAt ? `used ${timeAgo(k.lastUsedAt)}` : "never used"}</span></span>
+                      <Btn disabled={busy} onClick={() => call(async () => { await api.post(`api-keys/${k.id}/revoke`); await keys.reload(); }, "Key revoked. It no longer works.")}>Revoke</Btn>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <form className="flex flex-wrap gap-2" onSubmit={(e) => {
+                e.preventDefault();
+                void call(async () => {
+                  const res = await api.post<{ key: string }>("api-keys", { name: keyName.trim() });
+                  setNewKey(res.key);
+                  setKeyName("");
+                  await keys.reload();
+                }, "Key created.");
+              }}>
+                <input className={`${inputClass} max-w-xs`} placeholder="Name, e.g. Claude desktop" maxLength={60} value={keyName} onChange={(e) => setKeyName(e.target.value)} aria-label="Name for the new key" />
+                <Btn type="submit" disabled={busy || !keyName.trim()}>Create key</Btn>
+              </form>
+            </>
+          )}
+        </Card>
+
         <Card title="Links">
           <label htmlFor="domain" className="mb-1 block text-sm font-medium">The address you log in to</label>
           <input id="domain" className={inputClass} value={form.appDomain} onChange={(e) => setForm({ ...form, appDomain: e.target.value })} />
@@ -133,6 +185,18 @@ export function SettingsView() {
             <li>Deals: name, value, stage and dates. Conversations: who wrote, when and through which channel; never message text.</li>
             <li>Everything is deleted when you uninstall SubSync, and tokens are encrypted at rest.</li>
           </ul>
+        </Card>
+
+        <Card title="Delete my data">
+          <p className="mb-3 text-sm text-muted-foreground">
+            Permanently removes everything SubSync has copied from your client accounts: contacts, deals, conversation summaries, scores, alerts and history.
+            Your settings and keys stay, and the next sync starts from scratch. Uninstalling the app deletes it all automatically.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <input className={`${inputClass} max-w-48`} placeholder="Type DELETE" value={confirmText} onChange={(e) => setConfirmText(e.target.value)} aria-label="Type DELETE to confirm" />
+            <Btn disabled={busy || confirmText !== "DELETE" || api.demo} onClick={() => call(async () => { await api.post("settings/purge", { confirm: "DELETE" }); setConfirmText(""); }, "All synced data deleted.")}>Delete all synced data</Btn>
+          </div>
+          {api.demo && <p className="mt-2 text-xs text-muted-foreground">Disabled in demo mode.</p>}
         </Card>
 
         <div><Btn variant="primary" disabled={busy} onClick={save}>{busy ? "Saving..." : "Save settings"}</Btn></div>

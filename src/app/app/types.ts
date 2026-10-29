@@ -11,7 +11,7 @@ export type Account = {
   emailPct: number; phonePct: number; tagPct: number; activePct: number; completenessPct: number;
   daysInactive: number | null; lastActivityAt: string | null; dormant: boolean; score: number; band: Band; churn: Churn;
   winRate: number | null; expectedRevenue: number | null; followUpRevenueAtRisk: number | null;
-  syncError: string | null; contactsSyncedAt: string | null;
+  leadFlowDropPct: number | null; syncError: string | null; contactsSyncedAt: string | null;
 };
 
 export type ScoreComponent = { key: string; label: string; points: number; max: number; why: string };

@@ -1,7 +1,7 @@
 import { buildDigest, onboardingChecklist, toCsv, type DerivedAccount } from "../analytics/derive";
 import {
   allManualTasks, dismissAlert, domainCandidates, duplicateGroups, inbox, listAlerts, listDomainChecks, manualTasks, metricsTrend,
-  getSettings, pipelineCells, saveDomainCheck, searchContacts, setLocationFlags, setManualTask, staleDeals, updateSettings,
+  dealHygiene, getSettings, pipelineCells, saveDomainCheck, searchContacts, setLocationFlags, setManualTask, staleDeals, updateSettings,
   visibleLocationIds, type Settings,
 } from "../analytics/queries";
 import { loadAccounts, refreshInsights } from "../analytics/service";
@@ -9,6 +9,8 @@ import { isSlackWebhook } from "../analytics/derive";
 import { demoDomainReport } from "../demo/seed";
 import { checkDomain, extractDomain } from "../dns/email-auth";
 import { accountLimit, canUse, type Feature } from "../entitlements";
+import { purgeSyncedData } from "../ghl/installations";
+import { createKey, listKeys, MAX_KEYS, revokeKey } from "../mcp/store";
 import { postToSlack } from "../notify";
 import { enqueueFullSync, runSlice, syncStatus } from "../sync/engine";
 import { authenticate, isResponse, json, type AuthContext } from "./auth";
@@ -62,7 +64,7 @@ function slim(a: DerivedAccount, links: ReturnType<typeof deepLinks>) {
     emailPct: a.emailPct, phonePct: a.phonePct, tagPct: a.tagPct, activePct: a.activePct, completenessPct: a.completenessPct,
     daysInactive: a.daysInactive, lastActivityAt: a.lastActivityAt, dormant: a.dormant, score: a.score, band: a.band,
     churn: a.churn, winRate: a.winRate, expectedRevenue: a.expectedRevenue, followUpRevenueAtRisk: a.followUpRevenueAtRisk,
-    syncError: a.syncError, contactsSyncedAt: a.contactsSyncedAt,
+    leadFlowDropPct: a.leadFlowDropPct, syncError: a.syncError, contactsSyncedAt: a.contactsSyncedAt,
   };
 }
 
@@ -393,6 +395,47 @@ async function exportCsv(ctx: Ctx, kind: string) {
   }
 }
 
+async function hygiene(ctx: Ctx) {
+  const { permits } = await scope(ctx);
+  const rows = (await dealHygiene(ctx.installationId)).filter((r) => permits(r.locationId));
+  return json({
+    accounts: rows,
+    totals: {
+      open: rows.reduce((s, r) => s + r.open, 0), noValue: rows.reduce((s, r) => s + r.noValue, 0),
+      noContact: rows.reduce((s, r) => s + r.noContact, 0), ancient: rows.reduce((s, r) => s + r.ancient, 0),
+    },
+  });
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+async function keysList(ctx: Ctx) {
+  return json({ keys: await listKeys(ctx.installationId), max: MAX_KEYS, endpoint: `${ctx.url.origin}/api/mcp` });
+}
+
+async function keysCreate(ctx: Ctx) {
+  const body = (await ctx.request.json().catch(() => null)) as { name?: unknown } | null;
+  const name = typeof body?.name === "string" ? body.name.trim() : "";
+  if (name.length < 1 || name.length > 60) return json({ error: "Give the key a name of up to 60 characters" }, 400);
+  const created = await createKey(ctx.installationId, name);
+  if (created === "limit") return json({ error: `You can have up to ${MAX_KEYS} active keys. Revoke one first.` }, 400);
+  // The key is returned this one time only; we keep just a hash.
+  return json({ key: created.key, row: created.row });
+}
+
+async function keysRevoke(ctx: Ctx, id: string) {
+  if (!UUID.test(id)) return json({ error: "Key not found" }, 404);
+  return (await revokeKey(ctx.installationId, id)) ? json({ ok: true }) : json({ error: "Key not found" }, 404);
+}
+
+async function purgeData(ctx: Ctx) {
+  if (ctx.demo) return json({ error: "Demo data cannot be deleted" }, 403);
+  const body = (await ctx.request.json().catch(() => null)) as { confirm?: unknown } | null;
+  if (body?.confirm !== "DELETE") return json({ error: 'Type DELETE to confirm' }, 400);
+  await purgeSyncedData(ctx.installationId);
+  return json({ ok: true });
+}
+
 async function syncStart(ctx: Ctx) {
   if (ctx.demo) {
     await refreshInsights(ctx.installationId);
@@ -421,7 +464,7 @@ async function digestPreview(ctx: Ctx) {
 
 const FEATURE_FOR: Record<string, Feature> = {
   search: "search", onboarding: "onboarding", stale: "stale", inbox: "inbox", pipelines: "pipelines", duplicates: "duplicates", email: "email",
-  alerts: "alerts", settings: "settings", export: "exports", digest: "reports",
+  alerts: "alerts", settings: "settings", export: "exports", digest: "reports", "api-keys": "ai", hygiene: "stale",
 };
 
 export async function handle(request: Request, segments: string[]): Promise<Response> {
@@ -442,6 +485,8 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       if (a === "accounts" && b && LOCATION_ID.test(b) && !c) return await accountDetail(ctx, b);
       if (a === "search") return await search(ctx);
       if (a === "stale") return await stale(ctx);
+      if (a === "hygiene") return await hygiene(ctx);
+      if (a === "api-keys") return await keysList(ctx);
       if (a === "inbox") return await inboxView(ctx);
       if (a === "pipelines") return await pipelines(ctx);
       if (a === "duplicates") return await duplicates(ctx);
@@ -460,6 +505,9 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       }
       if (a === "sync") return await syncStart(ctx);
       if (a === "settings" && b === "test-slack") return await testSlack(ctx);
+      if (a === "settings" && b === "purge") return await purgeData(ctx);
+      if (a === "api-keys" && !b) return await keysCreate(ctx);
+      if (a === "api-keys" && b && c === "revoke") return await keysRevoke(ctx, b);
     }
     if (method === "PUT") {
       if (a === "settings") return await settingsUpdate(ctx);

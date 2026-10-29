@@ -55,9 +55,21 @@ export type DerivedAccount = AccountRow & {
   expectedRevenue: number | null;
   revenueAtRisk: number;
   followUpRevenueAtRisk: number | null;
+  /** How far new-contact volume has fallen against the account's own recent average (percent), if meaningful. */
+  leadFlowDropPct: number | null;
 };
 
 const DAY = 86_400_000;
+
+// Compare this month's new contacts with the account's own recent average. Needs a baseline of at
+// least 10 so small accounts do not trigger noise, and a drop of at least 50%.
+export function leadFlowDrop(current: number, history: number[]): number | null {
+  if (history.length < 7) return null;
+  const baseline = history.reduce((a, b) => a + b, 0) / history.length;
+  if (baseline < 10) return null;
+  const drop = Math.round((1 - current / baseline) * 100);
+  return drop >= 50 ? drop : null;
+}
 const pct = (part: number, whole: number) => (whole > 0 ? Math.round((part / whole) * 100) : 0);
 
 export function deriveAccount(
@@ -65,6 +77,7 @@ export function deriveAccount(
   settings: AccountSettings,
   history: number[] = [],
   now = Date.now(),
+  newContactsHistory: number[] = [],
 ): DerivedAccount {
   const emailPct = pct(row.withEmail, row.contacts);
   const phonePct = pct(row.withPhone, row.contacts);
@@ -107,6 +120,7 @@ export function deriveAccount(
       row.unanswered > 0 && winRate !== null && avgDealValue !== null
         ? Math.round(row.unanswered * avgDealValue * winRate)
         : null,
+    leadFlowDropPct: leadFlowDrop(row.new30d, newContactsHistory),
   };
 }
 
@@ -205,6 +219,13 @@ export function computeAlerts(accounts: DerivedAccount[], domains: DomainStatus[
         dedupeKey: `sla:${loc}`, kind: "sla", severity: a.unanswered >= 5 ? "critical" : "warning", locationId: loc,
         title: `${label(a)} has ${a.unanswered} conversation${a.unanswered === 1 ? "" : "s"} waiting over ${settings.slaHours}h`,
         detail: { unanswered: a.unanswered, slaHours: settings.slaHours },
+      });
+    }
+    if (a.leadFlowDropPct !== null && !a.dormant) {
+      out.push({
+        dedupeKey: `leadflow:${loc}`, kind: "leadflow", severity: "warning", locationId: loc,
+        title: `${label(a)}: new contacts are down ${a.leadFlowDropPct}% on their recent average`,
+        detail: { newContacts30d: a.new30d, dropPct: a.leadFlowDropPct },
       });
     }
     if (a.staleOpps >= 3 && a.openOpps > 0 && a.staleOpps / a.openOpps >= 0.3) {

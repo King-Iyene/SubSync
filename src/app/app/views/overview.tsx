@@ -38,7 +38,12 @@ export function OverviewView({ go }: { go: GoFn }) {
       <PageHeader
         title="Overview"
         subtitle="Every client account at a glance: who needs attention, where money is stuck, and what changed."
-        actions={<Btn variant="primary" onClick={sync} disabled={syncing}>{syncing ? "Syncing..." : api.demo ? "Refresh insights" : "Sync now"}</Btn>}
+        actions={
+          <>
+            <Btn onClick={() => window.print()}>Print summary</Btn>
+            <Btn variant="primary" onClick={sync} disabled={syncing}>{syncing ? "Syncing..." : api.demo ? "Refresh insights" : "Sync now"}</Btn>
+          </>
+        }
       />
       {note && <p className="mb-4 rounded-lg border bg-muted/40 px-3 py-2 text-sm" role="status">{note}</p>}
       {data.hiddenAccounts > 0 && (

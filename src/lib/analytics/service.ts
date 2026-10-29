@@ -9,7 +9,13 @@ export async function loadAccounts(installationId: string): Promise<{ settings: 
   const settings = await getSettings(installationId);
   const [rows, history] = await Promise.all([accountRows(installationId, settings), scoreHistory(installationId, 30)]);
   const now = Date.now();
-  return { settings, accounts: rows.map((r) => deriveAccount(r, settings, history.get(r.locationId) ?? [], now)) };
+  return {
+    settings,
+    accounts: rows.map((r) => {
+      const h = history.get(r.locationId);
+      return deriveAccount(r, settings, h?.scores ?? [], now, h?.newContacts ?? []);
+    }),
+  };
 }
 
 // Write today's snapshot for every account (feeds trends and churn detection).

@@ -155,13 +155,39 @@ export async function accountRows(installationId: string, s: AccountSettings): P
 }
 
 // Score history per account, oldest first, excluding today (used as the churn baseline).
-export async function scoreHistory(installationId: string, days = 30): Promise<Map<string, number[]>> {
+export type AccountHistory = { scores: number[]; newContacts: number[] };
+
+export async function scoreHistory(installationId: string, days = 30): Promise<Map<string, AccountHistory>> {
   const rows = await sql()`
-    select location_id, array_agg(engagement_score order by day) scores
+    select location_id, array_agg(engagement_score order by day) scores, array_agg(new_contacts_30d order by day) new_contacts
     from account_metrics_daily
     where installation_id = ${installationId} and day >= current_date - ${days}::int and day < current_date
     group by location_id`;
-  return new Map(rows.map((r) => [r.location_id as string, r.scores as number[]]));
+  return new Map(rows.map((r) => [r.location_id as string, { scores: r.scores as number[], newContacts: r.new_contacts as number[] }]));
+}
+
+// Deal hygiene per account: open deals that are missing a value or a contact, or have sat for 90+ days.
+export type HygieneRow = { locationId: string; locationName: string | null; open: number; noValue: number; noContact: number; ancient: number };
+
+export async function dealHygiene(installationId: string): Promise<HygieneRow[]> {
+  const rows = await sql()`
+    select l.location_id, l.name,
+      count(*) filter (where o.status = 'open')::int open_n,
+      count(*) filter (where o.status = 'open' and coalesce(o.monetary_value, 0) = 0)::int no_value,
+      count(*) filter (where o.status = 'open' and coalesce(o.contact_id, '') = '')::int no_contact,
+      count(*) filter (where o.status = 'open' and o.act < now() - interval '90 days')::int ancient
+    from locations l
+    join (
+      select *, coalesce(greatest(last_stage_change_at, last_action_at, updated_remote_at, last_status_change_at), created_remote_at, synced_at) act
+      from cached_opportunities where installation_id = ${installationId}
+    ) o on o.installation_id = l.installation_id and o.location_id = l.location_id
+    where l.installation_id = ${installationId} and not l.ignored
+    group by l.location_id, l.name
+    having count(*) filter (where o.status = 'open') > 0
+    order by (count(*) filter (where o.status = 'open' and coalesce(o.monetary_value, 0) = 0)
+            + count(*) filter (where o.status = 'open' and coalesce(o.contact_id, '') = '')
+            + count(*) filter (where o.status = 'open' and o.act < now() - interval '90 days')) desc, l.name`;
+  return rows.map((r) => ({ locationId: r.location_id, locationName: r.name, open: r.open_n, noValue: r.no_value, noContact: r.no_contact, ancient: r.ancient }));
 }
 
 export async function metricsTrend(installationId: string, locationId: string, days = 60) {

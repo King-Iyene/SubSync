@@ -12,17 +12,54 @@ type Pipelines = {
 };
 
 export function DealsView() {
-  const [tab, setTab] = useState<"stale" | "pipeline">("stale");
+  const [tab, setTab] = useState<"stale" | "pipeline" | "hygiene">("stale");
   return (
     <div>
       <PageHeader title="Deals" subtitle="Where money is stuck and where it is flowing, across every client account." />
       <div className="mb-4 flex gap-1 border-b" role="tablist">
-        {([["stale", "Stale deals"], ["pipeline", "Pipeline roll-up"]] as const).map(([id, label]) => (
+        {([["stale", "Stale deals"], ["pipeline", "Pipeline roll-up"], ["hygiene", "Deal hygiene"]] as const).map(([id, label]) => (
           <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => setTab(id)}
             className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium ${tab === id ? "border-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>{label}</button>
         ))}
       </div>
-      {tab === "stale" ? <Stale /> : <Pipeline />}
+      {tab === "stale" ? <Stale /> : tab === "pipeline" ? <Pipeline /> : <Hygiene />}
+    </div>
+  );
+}
+
+type HygieneData = {
+  accounts: Array<{ locationId: string; locationName: string | null; open: number; noValue: number; noContact: number; ancient: number }>;
+  totals: { open: number; noValue: number; noContact: number; ancient: number };
+};
+
+function Hygiene() {
+  const { data, error, loading, reload } = useData<HygieneData>("hygiene");
+  if (loading && !data) return <Loading />;
+  if (error) return <ErrorBox error={error} onRetry={reload} />;
+  if (!data) return null;
+  const cell = (n: number) => (n > 0 ? <span className="text-amber-600 dark:text-amber-400">{fmtInt(n)}</span> : "0");
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Stat label="Open deals" value={fmtInt(data.totals.open)} />
+        <Stat label="No value set" value={fmtInt(data.totals.noValue)} tone={data.totals.noValue > 0 ? "warn" : undefined} sub="forecasts miss these" />
+        <Stat label="No contact attached" value={fmtInt(data.totals.noContact)} tone={data.totals.noContact > 0 ? "warn" : undefined} />
+        <Stat label="Open over 90 days" value={fmtInt(data.totals.ancient)} tone={data.totals.ancient > 0 ? "warn" : undefined} />
+      </div>
+      {data.accounts.length === 0 ? <Empty title="No open deals yet" /> : (
+        <Table head={<tr><Th>Account</Th><Th className="text-right">Open</Th><Th className="text-right">No value</Th><Th className="text-right">No contact</Th><Th className="text-right">Over 90 days</Th></tr>}>
+          {data.accounts.map((a) => (
+            <tr key={a.locationId} className="hover:bg-muted/40">
+              <Td className="font-medium">{a.locationName ?? "Unnamed account"}</Td>
+              <Td className="text-right tabular-nums">{fmtInt(a.open)}</Td>
+              <Td className="text-right tabular-nums">{cell(a.noValue)}</Td>
+              <Td className="text-right tabular-nums">{cell(a.noContact)}</Td>
+              <Td className="text-right tabular-nums">{cell(a.ancient)}</Td>
+            </tr>
+          ))}
+        </Table>
+      )}
+      <p className="text-xs text-muted-foreground">Deals without a value or a contact make pipeline forecasts and follow-up unreliable. Fix them in the platform.</p>
     </div>
   );
 }

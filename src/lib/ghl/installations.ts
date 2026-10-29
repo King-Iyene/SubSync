@@ -79,6 +79,19 @@ export async function purgeLocationData(installationId: string, locationId: stri
   });
 }
 
+// The agency asked us to delete everything we have synced. Tokens, settings and API keys stay (the
+// app keeps working and the next sync starts from scratch); all copied customer data goes.
+export async function purgeSyncedData(installationId: string): Promise<void> {
+  await sql().begin(async (tx) => {
+    for (const table of [
+      "cached_contacts", "cached_opportunities", "cached_conversations", "pipelines",
+      "account_metrics_daily", "alerts", "domain_checks", "onboarding_tasks", "sync_jobs", "locations",
+    ]) {
+      await tx`delete from ${tx(table)} where installation_id = ${installationId}`;
+    }
+  });
+}
+
 // The agency uninstalled the app: delete tokens at once and purge all cached data. The
 // installation row is kept (marked uninstalled) so a reinstall starts clean.
 export async function purgeInstallation(companyId: string): Promise<void> {
