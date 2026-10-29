@@ -89,3 +89,17 @@ Format: date, decision, reason.
 - **Request backoff** (`src/lib/ghl/http.ts`): retries 429 and 5xx with exponential backoff and jitter, honours `Retry-After`, and exposes `X-RateLimit-*` header parsing. The docs give no 429 guidance, so this is our own policy.
 - **Install now also pulls the list of client accounts** (`src/lib/sync/sync-locations.ts`): after saving the install, the callback lists installed locations (paged) and upserts them into `locations`. It is best effort: a failure is logged and does not fail the install. Not yet exercised against the real API (needs the keys).
 - **Tests:** 29 unit tests (`npm test`), covering encryption, SSO decryption, token refresh including the race cases, backoff and paging.
+
+## 2026-10-29 (overnight build, King asleep: "build all the features")
+
+- **Database access** switched from the Supabase REST client to direct SQL (`postgres` with `prepare:false`, pooled URL). RLS stays on with no policies, so only the server can read or write. Reason: joins, `FOR UPDATE SKIP LOCKED` for the sync queue, and fewer round trips.
+- **Sessions:** the dashboard signs in through the host app's postMessage handshake, the server decrypts the SSO payload, and returns an HMAC-signed Bearer token kept in memory only (no cookies in the iframe). **Agency users only**; account-level users are refused.
+- **Sync design:** `sync_jobs` queue, time-budgeted slices, cron every 5 minutes, metrics snapshot job last so history is consistent. Daily full refresh.
+- **Scoring is explainable by design:** five components, each with a plain-language reason. No black-box number.
+- **AI connector (MCP):** read-only, hashed `sk_subsync_` keys, 5 per agency, 60 requests a minute, paid feature. Chosen because it is hard for the platform to copy quickly and costs us little.
+- **Free plan gating exists but is off by default** (`ENFORCE_PLANS=true` enables it) so testing is not blocked. Price stays a setting.
+- **Demo mode** (`DEMO_MODE=true`) seeds 14 fictional accounts for screenshots and the portal video. Must stay off in production.
+- **Data deletion:** Settings "Delete my data" requires typing `DELETE`; uninstall purges everything. Blocked in demo.
+- **Lead-flow alert** thresholds (50% drop, baseline of at least 10, at least 7 days of history) are my defaults; tune from real data.
+- **Unverified against the real platform** (listed in `MORNING_CHECKLIST.md`): contact endpoint field names, SSO `type` value for agency users, bulk-install token flow, Starter-plan install, Users API last login, conversation "waiting" detection.
+- **Tests:** 79 unit tests, a DB integration check and an HTTP integration check (including the AI connector end to end) all pass.
