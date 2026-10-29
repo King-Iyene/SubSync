@@ -15,12 +15,12 @@ Cross-account search alone is something every agency with 10+ client accounts wa
 ## Phase 2 - "Retention" (weeks 5-8)
 5. Unified inbox (all unread across accounts in one view)
 6. Lead response time tracking and SLA monitoring
-7. Client engagement scoring (1-100 per account)
+7. Client engagement scoring (1-100 per account), built from data activity (new contacts, deals, conversations), not logins
 8. Churn risk alerts based on engagement decline
 
 ## Phase 3 - "Intelligence" (weeks 9-14)
 9. Multi-pipeline dashboard (all pipelines across all accounts, key metrics)
-10. Cross-account duplicate finder and merge
+10. Duplicate finder and merge, within a single client account only (never across different clients' accounts)
 11. Centralized task queue
 12. Data export scheduler (weekly automated CSV/Sheets)
 13. Global DND/blacklist management
@@ -38,11 +38,12 @@ Cross-account search alone is something every agency with 10+ client accounts wa
 21. AI-generated weekly client summaries
 22. Smart workflow suggestions per account
 
-## Research-driven proposals (not yet decided by King)
+## Research decisions (King, 2026-10-29)
 
 See `docs/FEATURE_RESEARCH.md` for evidence and confidence levels.
 
-- Consider pulling a read-only "unread across accounts" view forward from Phase 2 (only item with direct demand evidence).
-- Add "setup comparison" (tags, custom fields, custom values across accounts, read-only first) as a Phase 2 candidate.
-- Narrow item 10 (duplicate finder and merge) to duplicates within one account, because contacts in different client accounts belong to different businesses.
-- Build the engagement flag from data activity, not logins, because login data does not appear to be exposed.
+Decided: **keep the roadmap order as planned.** Applied above:
+- Item 7 is built from data activity, not logins, because login data does not appear to be exposed.
+- Item 10 is limited to duplicates within one account, because contacts in different client accounts belong to different businesses.
+
+Not adopted for now (can be revisited): pulling the read-only "unread across accounts" view forward from Phase 2, and adding "setup comparison" as a Phase 2 candidate.
