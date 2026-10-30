@@ -103,3 +103,8 @@ Format: date, decision, reason.
 - **Lead-flow alert** thresholds (50% drop, baseline of at least 10, at least 7 days of history) are my defaults; tune from real data.
 - **Unverified against the real platform** (listed in `MORNING_CHECKLIST.md`): contact endpoint field names, SSO `type` value for agency users, bulk-install token flow, Starter-plan install, Users API last login, conversation "waiting" detection.
 - **Tests:** 79 unit tests, a DB integration check and an HTTP integration check (including the AI connector end to end) all pass.
+
+## 2026-10-29 (production address)
+
+- **Our production address is `https://subsync-king-iyenes-projects.vercel.app`.** `https://subsync.vercel.app` belongs to someone else (it redirects to another site); never put it in the portal or env vars. Plan a custom domain before going Public.
+- Site is still behind Vercel Authentication (302 to a Vercel login); King turns it off. Step-by-step: `docs/LAUNCH_GUIDE.md`.
