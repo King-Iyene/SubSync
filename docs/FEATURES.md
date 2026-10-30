@@ -46,6 +46,16 @@ Tools: `portfolio_summary`, `list_accounts`, `get_account`, `search_contacts`, `
 - **Data control**: "Delete my data" in Settings (typed confirmation) wipes synced data; uninstall purges everything.
 - **Demo mode** (`DEMO_MODE=true`): 14 fictional agencies' worth of accounts with realistic history, for screenshots and the portal demo video. Off in production.
 
+## Added in the overnight build (see REPORT.md for the full list and what is blocked)
+
+- **Pipeline:** forecast bands, coverage target, stage bottlenecks, deal risk scores, aging, sizes, wins and losses, abandoned and dead deals, account comparison.
+- **Leads:** quality score, lifecycle, aging, going quiet, VIPs, growth, tag clean-up, invalid emails and phones, large imports, cross-account overlap, monthly cohorts.
+- **Call lists:** preset and custom queues, priority score, saved lists, call outcome logger, follow-ups, speed-to-lead alert, power hour.
+- **Clients:** fees, value created, renewals, last-spoken tracker, notes, industry segments, compare two, printable QBR, setup score.
+- **Overview:** executive summary with goals and unusual-change flags, Today's priorities.
+- **Inbox:** reply aging, deals with no contact, after-hours lead analysis.
+- **Trust:** data freshness strip, connection health, per-account Resync, more CSV exports.
+
 ## Not built (ideas from research, not promised)
 
 Scheduled client report emails (needs an email provider), configurable score weights, per-account goals and alert rules, AI-written weekly digest, cross-agency benchmarks (needs many installs), setup comparison between accounts, anything touching workflows (API is closed beta).

@@ -227,6 +227,7 @@ async function main() {
   assert.ok(ci.body.inactive.d30 >= ci.body.inactive.d60 && ci.body.inactive.d60 >= ci.body.inactive.d90, "inactive buckets nest");
   assert.equal(ci.body.growth.weekly.length > 0, true);
   assert.ok(ci.body.quality.total === ci.body.lifecycle.total);
+  assert.ok(ci.body.cohorts.length >= 1 && ci.body.cohorts.every((x: { leads: number; converted: number }) => x.converted <= x.leads), "cohorts sane");
   console.log("contact intelligence: ok");
 
   // --- call queue, saved lists, outcomes

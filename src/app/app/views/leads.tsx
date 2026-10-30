@@ -5,6 +5,7 @@ import { Badge, Card, Empty, ErrorBox, ExtLink, fmtInt, fmtMoney, Loading, PageH
 
 type Person = { contactId: string; locationId: string; locationName: string | null; name: string; url: string };
 type Data = {
+  cohorts: Array<{ month: string; leads: number; converted: number; revenue: number; conversionPct: number | null }>;
   lifecycle: { total: number; leads: number; opportunities: number; customers: number; lost: number };
   leadAging: { over30: number; over60: number; over90: number };
   inactive: { total: number; never: number; silent: number; d30: number; d60: number; d90: number; d180: number };
@@ -77,6 +78,20 @@ export function LeadsView() {
           </p>
         </Card>
       </div>
+
+      {data.cohorts.length > 0 && (
+        <Card title="Lead cohorts (by the month they arrived)">
+          <Table head={<tr><Th>Month</Th><Th className="text-right">New contacts</Th><Th className="text-right">Became customers</Th><Th className="text-right">Conversion</Th><Th className="text-right">Revenue won</Th></tr>}>
+            {data.cohorts.map((c) => (
+              <tr key={c.month}>
+                <Td className="font-medium">{c.month}</Td><Td className="text-right tabular-nums">{fmtInt(c.leads)}</Td><Td className="text-right tabular-nums">{fmtInt(c.converted)}</Td>
+                <Td className="text-right tabular-nums">{c.conversionPct === null ? "n/a" : c.conversionPct + "%"}</Td><Td className="text-right tabular-nums">{fmtMoney(c.revenue)}</Td>
+              </tr>
+            ))}
+          </Table>
+          <p className="mt-2 text-xs text-muted-foreground">Newer months have had less time to convert, so compare like with like. Shows whether lead quality is improving.</p>
+        </Card>
+      )}
 
       <Card title="Best leads to work now">
         {data.topLeads.length === 0 ? <Empty title="No active leads yet" /> : (

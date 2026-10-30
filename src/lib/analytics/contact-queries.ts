@@ -23,7 +23,7 @@ export type ContactOverview = Awaited<ReturnType<typeof contactOverview>>;
 
 export async function contactOverview(installationId: string, allowed: string[] | null) {
   const db = sql();
-  const [[life], [aging], [quiet], growth, accountGrowth, tags, [quality], imports, [overlapTotal], overlap] = await Promise.all([
+  const [[life], [aging], [quiet], growth, accountGrowth, tags, [quality], imports, [overlapTotal], overlap, cohorts] = await Promise.all([
     // lifecycle: where each contact sits, from the deals they have
     db`
       with loc as (${visible(installationId, allowed)}),
@@ -111,10 +111,25 @@ export async function contactOverview(installationId: string, allowed: string[] 
       from cached_contacts c join loc on loc.location_id = c.location_id
       where c.installation_id = ${installationId} and nullif(c.email, '') is not null
       group by lower(c.email) having count(distinct c.location_id) > 1 order by accounts desc, email limit 25`,
+    // 7.8 cohorts: contacts grouped by the month they arrived, and how many have since won a deal
+    db`
+      with loc as (${visible(installationId, allowed)}),
+      won as (select location_id, contact_id, sum(monetary_value) v from cached_opportunities
+        where installation_id = ${installationId} and status = 'won' and contact_id is not null group by location_id, contact_id)
+      select to_char(date_trunc('month', c.date_added), 'YYYY-MM') as month, count(*)::int leads, count(w.contact_id)::int converted, coalesce(sum(w.v), 0)::float8 revenue
+      from cached_contacts c join loc on loc.location_id = c.location_id
+      left join won w on w.location_id = c.location_id and w.contact_id = c.contact_id
+      where c.installation_id = ${installationId} and c.date_added >= date_trunc('month', now()) - interval '5 months'
+      group by 1 order by 1`,
   ]);
 
+  const cohortRows = cohorts.map((c) => ({
+    month: c.month as string, leads: c.leads as number, converted: c.converted as number, revenue: c.revenue as number,
+    conversionPct: c.leads > 0 ? Math.round((c.converted / c.leads) * 1000) / 10 : null,
+  }));
   const tagCounts = tags.map((t) => ({ tag: t.tag as string, count: t.n as number }));
   return {
+    cohorts: cohortRows,
     lifecycle: { total: life.total, leads: life.leads, opportunities: life.opportunities, customers: life.customers, lost: life.lost },
     leadAging: { over30: aging.over30, over60: aging.over60, over90: aging.over90 },
     inactive: { total: quiet.total, never: quiet.never, silent: quiet.silent, d30: quiet.d30, d60: quiet.d60, d90: quiet.d90, d180: quiet.d180 },

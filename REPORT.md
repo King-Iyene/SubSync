@@ -1,43 +1,78 @@
-# Overnight report: SubSync feature encyclopedia (in progress)
+# Overnight report: SubSync feature encyclopedia
 
-Source spec: `SubSync_Full_Feature_Encyclopedia.md` (184 features, 14 sections). This file is updated as work lands.
-Rules followed: small commits to `main`, deploy checked after every push, no destructive database changes, no env var, secret, billing or payment changes.
+Spec: `docs/FEATURE_ENCYCLOPEDIA.md` (184 features in 14 sections, plus a second app mode and a pricing table). Read in full.
 
-## How each item was triaged
+**Short version:** I built what the data we already sync can honestly support: about 55 features done, about 12 partly done. Most of the rest cannot be built until new data is synced (appointments, users, workflows, lead source, custom fields, message history), which needs new permissions on the GHL app that I did not change tonight. Nothing is broken, and everything shipped was checked on the live site and on your real KD Squares Test data inside GHL.
 
-Every feature was checked against the data SubSync actually syncs today: contacts (name, email, phone, tags, dates), deals (pipeline, stage, value, status, stage dates), conversations (last message type, direction, time, unread) and daily account metrics. It does **not** sync appointments, users, tasks, workflows, lead source, custom fields, DND flags, call logs or message bodies.
+Rules I kept: small commits straight to `main`, build checked after every push, no destructive database changes, no env vars, secrets, billing or payment settings touched.
 
-| Section | Status |
-| --- | --- |
-| 1. Appointments (28) | **Blocked**: needs calendar events data and the `calendars/events.readonly` permission, which the app has not been granted. |
-| 2. Pipeline and deals (22) | Mostly buildable. See progress below. |
-| 3. Contacts and leads (20) | Partly buildable. Source, custom fields, DND and birthdays are not synced. |
-| 4. Communication (18) | Partly buildable from last-message data. Response times, sentiment, message content search are not. |
-| 5. Team performance (16) | **Mostly blocked**: needs the users data and `users.readonly`, plus per-user activity. |
-| 6. Client success (14) | Mostly buildable with manual inputs (fees, renewal dates, notes). Email delivery needs an email provider key. |
-| 7. Reporting (12) | Partly buildable. Scheduled email delivery needs an email provider key. |
-| 8. Smart call lists (10) | Mostly buildable. Territory queues need users data. |
-| 9. Workflows (8) | **Blocked**: Workflows API is closed beta (per-account 403). |
-| 10. Compliance (8) | DNS checker already built. The rest needs A2P, email stats or phone data we do not sync. |
-| 11. Platform (6) | Partly buildable. |
-| 12. AI (10) | **Blocked** where it needs an AI provider key. 12.1 to 12.5 point to `MOAT_FEATURES.md`, which was not attached. |
-| 13. Gamification (6) | **Blocked**: needs per-user data; 13.1 to 13.3 point to the missing `MOAT_FEATURES.md`. |
-| 14. Client-facing (6) | 14.1 to 14.3 point to the missing `MOAT_FEATURES.md`. A public client link also needs a security decision. |
-| Business Mode (second app mode) and the revised pricing table | **Not touched**: needs a second app in the portal, and pricing is billing, which is off limits tonight. |
+---
 
-## Progress
+## What I completed
 
-(filled in below as batches land)
+Every commit below built successfully on Vercel and passed `scripts/deploy-check.sh` (11 live probes) right after the push.
 
-### Landed and verified (commit, deploy build success, live probes ok, and checked on real KD Squares Test data inside GHL)
-
-| Batch | Commit | What shipped |
+| Commit | What shipped | Spec items |
 | --- | --- | --- |
-| 1 | `20a2cba` | 7.11 data freshness strip with a stale warning after 6 hours; 11.4 connection health card (failed jobs, last sync, token refresh); 11.5 per-account sync status with a Resync button. Also fixed a bug found by the new tests: a malformed account id on the resync route fell through and started a full sync. |
-| 2 | `6d65273` | New **Pipeline** page: 2.1 stage funnel (estimated from current positions, no stage history is kept), 2.2 average time to win, 2.3 stage dwell and bottleneck flag, 2.4 revenue forecast with worst/likely/best and 30/60/90 day view, 2.5 wins and losses by month, 2.6 deal risk score (0 to 100, with reasons), 2.8 deal size distribution, 2.9 pipeline value trend, 2.11 aging buckets, 2.15 account comparison, 2.16 abandoned deals worth reopening, 2.20 pipeline coverage against a saved monthly target, 2.21 dead pipeline cleanup list, 2.22 every pipeline in one table. |
-| 3 | `284a36e` | New **Leads** page: 3.4 lead quality score (rule-based, fixed weights), 3.5 lifecycle, 3.6 lead aging, 3.9 inactive contacts (never engaged vs went silent), 3.10 contact growth with per-account change, 3.11 tag usage plus duplicate-looking tags, 3.15 invalid and disposable email and invalid phone detection with examples, 3.18 VIP contacts with a "reach out" flag, 3.19 large import detection, 3.20 same person in several client accounts. |
-| 4 | `eb5f75a` | New **Call lists** page: 8.1 eight preset queues plus a custom filter builder, 8.2 saved lists, 8.3 priority score, 8.4 call outcome logger with auto-advance, 8.5 follow-up queue, 8.6 power hour timer with session stats, 8.8 newest-leads queue with a speed-to-lead alert, 8.9 win-back list, 8.10 recent customers for referral requests. |
+| `20a2cba` | Data freshness strip on every page with a stale warning after 6 hours. Connection health card (failed jobs, last sync, token refresh). Per-account sync table with a Resync button. | 7.11, 11.4, 11.5 |
+| `6d65273` | **Pipeline** page: forecast (worst, likely, best, 30/60/90 days), pipeline coverage against a saved monthly target, stage table with bottleneck flags and estimated conversion, deal risk score (0 to 100, with reasons), aging buckets, deal sizes, wins and losses by month, abandoned deals worth reopening, dead pipeline list, account comparison, every pipeline in one table, pipeline value trend. | 2.1 to 2.6, 2.8, 2.9, 2.11, 2.15, 2.16, 2.20 to 2.22 |
+| `284a36e` | **Leads** page: lead quality score, lifecycle, lead aging, going-quiet buckets, VIP contacts with a "reach out" flag, growth with per-account change, tag usage and duplicate-looking tags, invalid and disposable email and invalid phone detection with examples, large import detection, same person in several client accounts. | 3.4 to 3.6, 3.9 to 3.11, 3.15, 3.18 to 3.20 |
+| `eb5f75a` | **Call lists** page: eight preset queues plus a custom builder, priority score, saved lists, call outcome logger with auto-advance, follow-up queue, speed-to-lead alert, power hour timer with session stats, win-back and recent-customer lists. | 8.1 to 8.6, 8.8, 8.9, 8.10 (partly) |
+| `64eb5c0` | **Clients** page: monthly fee, value-created multiple, renewal countdown, last-spoken tracker, notes, industry segments, compare two clients with a plain-language summary, printable quarterly review (QBR), "needs a conversation" flag. **Executive summary** on the Overview with period comparison, monthly goals with pace, and unusual-change highlighting (also red dots on the pipeline chart). | 6.5, 6.7 to 6.11, 6.13, 6.14, 7.6 (partly), 7.7, 7.10, 7.12, 14.5, 14.6 |
+| `b88c32a` | Reply aging buckets with a 24-hour critical count, deals with no contact for 7+ days, after-hours lead analysis in each account's own time zone, setup score per client, **Today's priorities** card (plain rules, not AI), CSV exports of open deals and clients. | 4.3, 4.9, 4.18, 11.1, 12.1 (rule-based), 7.5 (partly) |
+| latest | Lead cohorts by month with conversion. Wording fix. | 7.8 |
 
-Tests: 111 unit tests and an expanded HTTP integration check (`npm run check:api`, now run through `scripts/with-dev-server.mjs`) pass. `scripts/deploy-check.sh` runs after every push.
+Also fixed along the way: a malformed account id on the resync route used to fall through and start a full sync (caught by the new integration check, fixed before it shipped). A regex escape slip in the data-quality SQL flagged a third of demo emails as invalid (caught by looking at the numbers, fixed with a backslash-free pattern).
 
-Database change: one **additive** migration (`20261030000000_insights_tables.sql`: account_profiles, goals, call_lists, call_outcomes). No existing data was changed or removed.
+**Database:** one additive migration, `20261030000000_insights_tables.sql` (account_profiles, goals, call_lists, call_outcomes). No existing data changed or removed.
+
+**Tests:** 125 unit tests and a 13-section HTTP integration check (`node --env-file=.env.local scripts/with-dev-server.mjs`) all pass.
+
+## What I verified live
+
+- After every push: Vercel build `success` and 11 probes on `https://subsync.kdsquares.com` (home, app, legal pages, install redirect, MCP, webhook rejects unsigned requests, cron rejects no secret, API rejects no session).
+- Inside GHL, on the real KD Squares Test account (view only, nothing written): Pipeline (189 open deals, 60% win rate, forecast bands), Leads (332 contacts, lifecycle adds up to 332), Call lists (146 on the hot list), Executive summary (correctly says "no earlier data" where history is missing), Clients, Today's priorities (real items: messages waiting 376 hours, valuable contacts to reach, $2M in stale deals), Inbox sections (quiet deals, after-hours 47% of new contacts).
+- I did **not** log any calls, set any fees or goals, or change anything on your real data.
+
+## Blocked or skipped, and why
+
+"Blocked" means the data does not exist in SubSync yet. Each needs a new permission (scope) added to the GHL app, and a re-sync, which changes what agencies approve on install. I did not touch app permissions, so these wait for your decision.
+
+| Spec | Items | Reason |
+| --- | --- | --- |
+| 1. Appointments | all 28 (1.1 to 1.28), plus the no-show preset in 8.1 and 12.3 | No appointment data. Needs the `calendars/events.readonly` scope and a calendar events sync. This is the biggest single unlock. |
+| 5. Team performance | all 16, plus 2.10, 4.10, 4.15, 8.7, 11.6, 13.1 to 13.6 | No users, tasks or per-user activity. Needs `users.readonly` and assignment fields synced. |
+| 9. Workflows | all 8 | Workflows API is closed beta (403 for most accounts). Not promised. |
+| 10. Compliance | 10.2 to 10.8 | Needs A2P registration, email delivery stats, phone data and consent fields we do not sync. 10.1 (DNS checker) was already built. |
+| 12. AI | 12.6, 12.8, 12.9, 12.10, 12.3, 12.4 | Needs an AI provider key (secret, so off limits tonight) and in some cases message text, which SubSync deliberately does not store. 12.1, 12.2, 12.5, 12.7 exist as plain rules instead (Today's priorities, risk score, unusual-change flags, per-client activity sentence). |
+| Lead source and custom fields | 2.7, 3.7, 3.12, 3.16, 7.9, 2.13 | Source, custom fields and referral data are not synced. |
+| Do-not-disturb, birthdays | 3.14, 3.17 | Not synced. |
+| Message detail | 4.2, 4.4 to 4.8, 4.11, 4.12, 4.14, 4.16, 4.17, 4.5 | We keep only who wrote, when and through which channel. First-response time, volume trends, sentiment and message search need message history. Reply aging and gaps (4.3, 4.9) were possible and are done. |
+| Email delivery | 6.3 (email version), 6.4, 7.2 | Needs an email provider key (secret). The Slack weekly digest already exists. |
+| Client-facing | 14.1 to 14.4 | The spec points to `MOAT_FEATURES.md`, which was not attached. A public client link also exposes client data, so it needs your security decision first. 14.4 needs a survey sender. |
+| Missing spec file | 12.1 to 12.5, 13.1 to 13.3, 14.1 to 14.3 | All reference `MOAT_FEATURES.md`, which was not attached. |
+| Business Mode | the whole second app mode | It is a separate app in the GHL portal (sub-account install). Not started. |
+| Pricing table in the spec | revised tiers | Billing settings are off limits tonight. Nothing changed. |
+
+## Not done, but possible next (no new data needed)
+
+2.12 deal movement log (needs recording stage changes from now on), 2.17 seasonal patterns (needs 6+ months), 2.19 proposal-to-close, 3.8 contact timeline, 4.13 communication cadence, 6.6 timeline annotations, 7.1 custom report builder, 7.3 white-label reports, 7.4 report templates, Excel/PDF/Sheets export for 7.5, 11.3 app usage analytics, 8.10 satisfaction signals, configurable lead score weights.
+
+## Partly done, so you know what is missing
+
+- **2.1 funnel and conversion** is estimated from where deals are now, because stage history is not kept.
+- **2.4 forecast** uses open value times the win rate (needs 5+ closed deals); there are no per-stage probabilities.
+- **2.5 win/loss** has no split by source or user (not synced).
+- **6.7** onboarding progress has days since install, first lead and first deal; "first appointment" needs appointment data.
+- **6.8 QBR** prints or saves as PDF from the browser; there is no shareable link.
+- **6.10** shows fees and fees at risk; churned clients and net retention are not tracked.
+- **7.5** exports are CSV only.
+- **3.4** lead score uses fixed weights, not configurable per account.
+
+## Decisions for you when you are back
+
+1. **Add permissions to the app?** Calendar events and users would unlock Section 1 (28 features) and most of Section 5. This changes the install approval, so decide before more agencies install.
+2. **Attach `MOAT_FEATURES.md`** if you want the AI and gamification items built to that spec.
+3. **AI and email keys** (secrets, only you can add them) would unlock the AI items and emailed reports.
+4. **Pricing** is untouched. The spec's revised table (Business and Agency modes) conflicts with the $5 per account plan already saved in the portal.
+5. The demo data was reseeded at the end, so screenshots and the demo mode are clean.
