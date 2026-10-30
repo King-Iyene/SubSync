@@ -142,11 +142,66 @@ async function dailyView(ctx: Ctx) {
   const sc = await scope(ctx);
   const d = await buildDailyDigest(ctx.installationId, { limitTo: ctx.limitTo, planLimit: accountLimit(ctx.plan, ctx.entitlements.enforced) });
   return json({
-    generatedAt: d.generatedAt, freshness: d.freshness, headlines: d.headlines, accounts: d.accounts, limited: ctx.limitTo !== null,
+    generatedAt: d.generatedAt, freshness: d.freshness, connection: d.connection, headlines: d.headlines, accounts: d.accounts, limited: ctx.limitTo !== null,
     attention: d.attention.map((a) => ({ ...a, url: sc.links.account(a.locationId) })),
     fine: d.fine, notWatched: NOT_WATCHED,
     schedule: { hour: d.settings.digestHour ?? 8, timezone: d.settings.digestTimezone, slack: Boolean(d.settings.slackWebhookUrl) && d.settings.digestEnabled },
   });
+}
+
+function agoText(iso: string): string {
+  const mins = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60_000));
+  return mins < 2 ? "just now" : mins < 120 ? mins + " minutes ago" : Math.round(mins / 60) + " hours ago";
+}
+
+const USAGE_VIEWS = new Set(["today", "overview", "accounts", "clients", "team", "search", "deals", "pipeline", "leads", "calls", "inbox", "onboarding", "email", "duplicates", "alerts", "settings", "help", "account"]);
+
+// A counter of which pages get opened (no personal data), so the getting-started checklist can
+// tick itself off and so the agency can see what its team uses.
+async function usagePing(ctx: Ctx) {
+  const body = (await ctx.request.json().catch(() => null)) as { view?: unknown } | null;
+  if (typeof body?.view !== "string" || !USAGE_VIEWS.has(body.view)) return json({ error: "Unknown page" }, 400);
+  await sql()`
+    insert into usage_events (installation_id, day, view) values (${ctx.installationId}, current_date, ${body.view})
+    on conflict (installation_id, day, view) do update set n = usage_events.n + 1`;
+  return json({ ok: true });
+}
+
+// The getting-started checklist, with each step's real state.
+async function startView(ctx: Ctx) {
+  const db = sql();
+  const [views, [locs], status, settings, [clientOn]] = await Promise.all([
+    db`select distinct view from usage_events where installation_id = ${ctx.installationId}`,
+    db`select count(*)::int total, count(*) filter (where contacts_synced_at is not null)::int synced from locations
+        where installation_id = ${ctx.installationId} ${ctx.limitTo ? db`and location_id = ${ctx.limitTo}` : db``}`,
+    syncStatus(ctx.installationId, ctx.limitTo),
+    getSettings(ctx.installationId),
+    ctx.kind === "agency" ? db`select count(*)::int n from locations where installation_id = ${ctx.installationId} and client_view` : Promise.resolve([{ n: 0 }]),
+  ]);
+  const seen = new Set(views.map((v) => v.view as string));
+  const agency = ctx.kind === "agency";
+  const synced = locs.total > 0 && locs.synced === locs.total && status.pending === 0;
+  const syncDetail = locs.total === 0
+    ? (status.pending > 0 ? "Looking for your accounts..." : "No accounts found yet. The platform can take a minute after an install: press Sync now on the home page.")
+    : synced ? `${locs.total} account${locs.total === 1 ? "" : "s"} read. Last sync finished ${status.lastFinishedAt ? agoText(status.lastFinishedAt) : "recently"}.`
+    : `${locs.synced} of ${locs.total} account${locs.total === 1 ? "" : "s"} read, ${status.pending} job${status.pending === 1 ? "" : "s"} left.`;
+  const steps = [
+    { id: "connected", title: "Connect SubSync", done: true, detail: agency ? "Connected to your agency." : "Connected to your account.",
+      body: "You are signed in through the platform, so there is nothing to type. SubSync only reads your data.", view: null, cta: null },
+    { id: "synced", title: "Let the first sync finish", done: synced, detail: syncDetail,
+      body: "SubSync reads your " + (agency ? "client accounts" : "account") + " in the background. The first sync takes a few minutes, longer with many contacts. Numbers fill in as it goes.", view: "overview", cta: "See sync progress" },
+    { id: "today", title: "See what needs you today", done: seen.has("today"),
+      detail: null, body: "Today ranks what to do first, with the reason and a link, and compares each account with its own normal.", view: "today", cta: "Open Today" },
+    { id: "search", title: "Find any contact", done: seen.has("search"),
+      detail: null, body: "Search by name, email or phone" + (agency ? " across every client account at once" : "") + ", and open a contact's timeline.", view: "search", cta: "Open contact search" },
+    { id: "duplicates", title: "Review likely duplicates", done: seen.has("duplicates"),
+      detail: null, body: "See likely duplicate contacts with a confidence score, decide which record to keep, then merge them in the platform.", view: "duplicates", cta: "Open Duplicates" },
+    { id: "brief", title: "Get the daily brief in Slack", done: Boolean(settings.slackWebhookUrl) && settings.digestEnabled,
+      detail: null, body: "Paste a Slack incoming webhook in Settings and choose the hour. It arrives once a day in your time zone.", view: "settings", cta: "Open Settings" },
+    ...(agency ? [{ id: "clients", title: "Let a client see their own account", done: (clientOn?.n ?? 0) > 0, optional: true,
+      detail: null, body: "Switch on a read-only view for a client's own staff. They see only their own account: never other clients, fees or notes.", view: "settings", cta: "Open Settings" }] : []),
+  ];
+  return json({ kind: ctx.kind, steps, doneCount: steps.filter((s) => s.done).length, total: steps.length });
 }
 
 async function accounts(ctx: Ctx) {
@@ -960,6 +1015,7 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
     if (method === "GET") {
       if (a === "overview") return await overview(ctx);
       if (a === "daily") return await dailyView(ctx);
+      if (a === "start") return await startView(ctx);
       if (a === "accounts" && !b) return await accounts(ctx);
       if (a === "onboarding") return await onboardingOverview(ctx);
       if (a === "accounts" && b && LOCATION_ID.test(b) && !c) return await accountDetail(ctx, b);
@@ -995,6 +1051,7 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
     }
     if (method === "POST") {
       if (a === "email" && b === "check") return await emailCheck(ctx);
+      if (a === "usage" && !b) return await usagePing(ctx);
       if (a === "duplicates" && b === "review") return await duplicateReview(ctx);
       if (a === "duplicates" && b === "bulk") return await duplicateBulk(ctx);
       if (a === "duplicates" && b === "undo") return await duplicateUndo(ctx);

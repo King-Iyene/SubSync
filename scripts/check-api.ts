@@ -522,6 +522,29 @@ async function main() {
   assert.equal((await call("/api/cron/daily")).status, 401, "the hourly job needs its secret");
   console.log("daily brief: own-history comparison, ranking, scoping, schedule: ok");
 
+  // --- getting started reflects real state; page usage is counted without personal data
+  await sql()`delete from usage_events where installation_id = (select id from installations where is_demo)`;
+  const st1 = await call("/api/app/start", { token });
+  assert.equal(st1.status, 200);
+  assert.equal(st1.body.steps.length, 7, "agency sees seven steps including client view");
+  assert.ok(st1.body.steps.every((s: { title: string; body: string }) => s.title && s.body));
+  assert.equal(st1.body.steps.find((s: { id: string }) => s.id === "connected").done, true);
+  assert.equal(st1.body.steps.find((s: { id: string }) => s.id === "duplicates").done, false, "not done until the page has been opened");
+  assert.equal(st1.body.steps.find((s: { id: string }) => s.id === "synced").detail.includes("account"), true);
+  const views = st1.body.steps.map((s: { view: string | null }) => s.view).filter(Boolean);
+  assert.equal(new Set(views.filter((v: string) => v === "overview")).size <= 1 && views.filter((v: string) => v === "overview").length <= 1, true, "no two steps open the same page twice");
+  const ping = (view: string, tok = token) => call("/api/app/usage", { token: tok, method: "POST", body: JSON.stringify({ view }) });
+  assert.equal((await ping("duplicates")).status, 200);
+  assert.equal((await ping("not-a-page")).status, 400);
+  assert.equal((await ping("today", ct)).status, 200, "a client view can be counted too");
+  const st2 = await call("/api/app/start", { token });
+  assert.equal(st2.body.steps.find((s: { id: string }) => s.id === "duplicates").done, true);
+  assert.equal(st2.body.doneCount, st1.body.doneCount + 2, "the duplicates and today steps tick themselves off");
+  assert.equal((await call("/api/app/start", { token: bt })).body.steps.length, 6, "a business has no client-view step");
+  assert.equal((await call("/api/app/daily", { token })).body.connection.ok, true);
+  await sql()`delete from usage_events where installation_id = (select id from installations where is_demo)`;
+  console.log("getting started + usage + connection: ok");
+
   // Leave the demo data as we found it.
   await sql()`delete from domain_checks where domain in ('example-demo.com', 'other-demo.org')`;
   await closeDb();

@@ -6,6 +6,7 @@ import { Badge, Btn, Card, Empty, ErrorBox, ExtLink, fmtInt, fmtMoney, Loading, 
 
 type Change = { today: number; yesterday: number | null; avg7: number | null; vsYesterday: number | null; vsAvg: number | null; unusual: "up" | "down" | null; samples: number };
 type Data = {
+  connection: { ok: boolean; message: string | null };
   freshness: { hours: number | null; ok: boolean; label: string; pending: number };
   headlines: Array<{ key: string; label: string; money: boolean; change: Change }>;
   attention: Array<{ locationId: string; name: string; severity: "critical" | "warning" | "info"; url: string; items: Array<{ kind: string; title: string; detail: string }> }>;
@@ -38,6 +39,7 @@ export function TodayView({ go }: { go: GoFn }) {
         actions={<Badge tone={data.freshness.ok ? "good" : "warn"}>{data.freshness.label}</Badge>}
       />
 
+      {!data.connection.ok && <p className="mb-4 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">{data.connection.message}</p>}
       {data.freshness.pending > 0 && <p className="mb-4 rounded-lg border bg-muted/40 px-3 py-2 text-sm" role="status">A sync is still running, so some numbers may change in a few minutes.</p>}
 
       <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -82,6 +84,8 @@ export function TodayView({ go }: { go: GoFn }) {
           </ul>
         )}
       </Card>
+
+      <div className="mb-6"><Btn variant="ghost" onClick={() => go("alerts")}>See every open alert and dismiss resolved ones</Btn></div>
 
       {data.fine.length > 0 && (
         <Card title={`Fine today (${data.fine.length})`} className="mb-6">

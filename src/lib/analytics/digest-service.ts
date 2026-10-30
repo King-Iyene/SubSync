@@ -43,6 +43,10 @@ export async function buildDailyDigest(installationId: string, opts: { limitTo?:
     const allowed = new Set(await visibleLocationIds(installationId, opts.planLimit));
     live = live.filter((a) => allowed.has(a.locationId));
   }
+  const [lastLocations] = await sql()`select status, error from sync_jobs where installation_id = ${installationId} and type = 'locations' order by coalesce(finished_at, created_at) desc limit 1`;
+  const connection = lastLocations?.status === "failed"
+    ? { ok: false, message: "SubSync could not connect to the platform to refresh your accounts. Access may have been removed. If this continues, reinstall SubSync from the app marketplace." }
+    : { ok: true, message: null as string | null };
   const ids = live.map((a) => a.locationId);
   const [series, waiting, domains] = await Promise.all([
     seriesByLocation(installationId, ids),
@@ -67,6 +71,6 @@ export async function buildDailyDigest(installationId: string, opts: { limitTo?:
     generatedAt: new Date().toISOString(),
     freshness: { ...freshness(status.lastFinishedAt), lastSyncAt: status.lastFinishedAt, pending: status.pending },
     headlines: portfolioHeadlines([...series.values()]),
-    attention, fine, accounts: live.length, settings,
+    attention, fine, accounts: live.length, settings, connection,
   };
 }

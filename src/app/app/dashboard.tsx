@@ -158,6 +158,11 @@ export function Dashboard() {
 
   const api = auth.status === "ready" ? auth.api : null;
 
+  // Count which pages get opened, so the getting-started checklist can tick itself off.
+  useEffect(() => {
+    if (api) void api.post("usage", { view: view.id }).catch(() => {});
+  }, [api, view.id]);
+
   if (auth.status === "waiting") return <Centered title="Loading SubSync" body="Checking your account..." />;
   if (auth.status === "outside") {
     return <Centered title="Open SubSync from your account menu" body="This page is built to run inside your account. Open SubSync from the left menu of one of your client accounts." />;
@@ -172,10 +177,15 @@ export function Dashboard() {
   const limited = auth.kind !== "agency";
   const menu = NAV.filter((n) => NAV_FOR[auth.kind].has(n.id));
   const labelFor = (n: (typeof NAV)[number]) => (limited && n.id === "overview" ? "My account" : n.label);
-  const active = view.id === "account" ? "accounts" : view.id;
+  // Pages that live inside another page highlight their parent in the menu.
+  const PARENT: Partial<Record<ViewId, ViewId>> = { account: "accounts", deals: "pipeline", email: "onboarding", alerts: "today" };
+  const active = PARENT[view.id] ?? view.id;
   const locked = (feature: string) => auth.features[feature] === false;
   const agency = auth.demo ? "Demo Agency" : limited ? "Your business" : "Your agency";
   const own = auth.locationId;
+
+  const pipeTabs = [{ label: "Forecast and stages", node: <><PipelineView /><DealMoves /></> }, { label: "Stale deals and hygiene", node: <DealsView /> }];
+  const setupTabs = [{ label: "Setup checklists", node: <OnboardingView go={go} /> }, { label: "Email sender health", node: <EmailHealthView /> }];
 
   const content = (() => {
     // A business or a client sees its own account as the home page, never an accounts list.
@@ -190,15 +200,15 @@ export function Dashboard() {
       case "accounts": return <AccountsView go={go} />;
       case "account": return view.locationId ? <AccountDetailView key={view.locationId} locationId={view.locationId} go={go} agency={agency} /> : <AccountsView go={go} />;
       case "search": return <SearchView />;
-      case "deals": return <DealsView />;
+      case "deals": return <Tabs key="pipe" start={1} tabs={pipeTabs} />;
       case "inbox": return <InboxView />;
-      case "onboarding": return <OnboardingView go={go} />;
-      case "email": return <EmailHealthView />;
+      case "onboarding": return <Tabs key="setup" start={0} tabs={setupTabs} />;
+      case "email": return <Tabs key="setup" start={1} tabs={setupTabs} />;
       case "duplicates": return <DuplicatesView />;
       case "alerts": return <AlertsView go={go} />;
       case "settings": return <SettingsView />;
       case "help": return <HelpView go={go} />;
-      case "pipeline": return <><PipelineView /><DealMoves /></>;
+      case "pipeline": return <Tabs key="pipe" start={0} tabs={pipeTabs} />;
       case "team": return <TeamView />;
       case "leads": return <LeadsView />;
       case "calls": return <CallsView />;
@@ -239,6 +249,21 @@ export function Dashboard() {
         </div>
       </div>
     </ApiProvider>
+  );
+}
+
+function Tabs({ tabs, start }: { tabs: Array<{ label: string; node: React.ReactNode }>; start: number }) {
+  const [i, setI] = useState(start);
+  return (
+    <div>
+      <div className="mb-4 flex gap-1 border-b print:hidden" role="tablist">
+        {tabs.map(({ label }, n) => (
+          <button key={label} type="button" role="tab" aria-selected={n === i} onClick={() => setI(n)}
+            className={`-mb-px border-b-2 px-3 py-2 text-sm ${n === i ? "border-primary font-medium" : "border-transparent text-muted-foreground hover:text-foreground"}`}>{label}</button>
+        ))}
+      </div>
+      {tabs[i].node}
+    </div>
   );
 }
 
