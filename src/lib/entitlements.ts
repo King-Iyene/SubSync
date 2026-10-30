@@ -1,10 +1,9 @@
-// What each plan can use. One price per client account per month (the marketplace bills each
-// install), in three tiers that both agencies and single businesses share:
-//   free    - the basics, up to 5 client accounts when an agency installs
-//   starter - the daily working tools
-//   pro     - everything, including reports, exports and the AI connector
-// Enforcement is OFF by default (ENFORCE_PLANS=true turns it on at launch) so pilots and testing
-// see every feature. "paid" is the old single paid tier and is treated as pro.
+// One product, one price, every feature open. SubSync is billed by the marketplace per client account
+// per month, so the app has no tiers and never locks anything: an agency that has installed it has
+// everything. (Earlier versions had free, starter and pro tiers; those are gone. Old database values
+// of "starter", "pro" and "paid" are all read as the one plan.)
+//
+// The shapes below are kept so the rest of the app and the sign-in response do not need to change.
 
 export type Plan = "free" | "starter" | "pro";
 
@@ -29,21 +28,12 @@ export const FEATURES = [
   "team",
   "builder",
   "meetings",
+  "cleanup",
 ] as const;
 export type Feature = (typeof FEATURES)[number];
 
-export const FREE_ACCOUNT_LIMIT = 5;
-
-const FREE_FEATURES: ReadonlySet<Feature> = new Set(["overview", "search", "onboarding", "settings"]);
-const STARTER_FEATURES: ReadonlySet<Feature> = new Set([
-  ...FREE_FEATURES, "health", "stale", "activity", "inbox", "pipelines", "duplicates", "email", "alerts", "calls", "appointments",
-]);
-// pro = everything
-
-const BY_PLAN: Record<Plan, ReadonlySet<Feature> | "all"> = { free: FREE_FEATURES, starter: STARTER_FEATURES, pro: "all" };
-
-export function enforcementOn(env: Record<string, string | undefined> = process.env): boolean {
-  return env.ENFORCE_PLANS === "true";
+export function enforcementOn(): boolean {
+  return false;
 }
 
 export function normalisePlan(value: string | null | undefined): Plan {
@@ -52,8 +42,7 @@ export function normalisePlan(value: string | null | undefined): Plan {
   return "free";
 }
 
-// Turn the marketplace's plan id into a tier. The ids come from GHL_PLAN_IDS, a JSON object such
-// as {"6650...":"starter","6651...":"pro"}. An unknown or missing id is "free".
+// The marketplace tells us which plan an install is on. We keep the value for reference only.
 export function planFromMarketplaceId(planId: string | null | undefined, env: Record<string, string | undefined> = process.env): Plan | null {
   if (!planId || !env.GHL_PLAN_IDS) return null;
   try {
@@ -64,23 +53,19 @@ export function planFromMarketplaceId(planId: string | null | undefined, env: Re
   }
 }
 
-export function canUse(feature: Feature, plan: Plan, enforce = enforcementOn()): boolean {
-  if (!enforce) return true;
-  const allowed = BY_PLAN[normalisePlan(plan)];
-  return allowed === "all" || allowed.has(feature);
+export function canUse(_feature: Feature, _plan: Plan = "pro", _enforce = false): boolean {
+  return true;
 }
 
-// Only the free tier limits how many client accounts an agency can see.
-export function accountLimit(plan: Plan, enforce = enforcementOn()): number | null {
-  if (!enforce || normalisePlan(plan) !== "free") return null;
-  return FREE_ACCOUNT_LIMIT;
+export function accountLimit(_plan: Plan = "pro", _enforce = false): number | null {
+  return null;
 }
 
-export function entitlements(plan: Plan, enforce = enforcementOn()) {
+export function entitlements(plan: Plan, enforce = false) {
   return {
     plan,
     enforced: enforce,
-    accountLimit: accountLimit(plan, enforce),
-    features: Object.fromEntries(FEATURES.map((f) => [f, canUse(f, plan, enforce)])) as Record<Feature, boolean>,
+    accountLimit: null as number | null,
+    features: Object.fromEntries(FEATURES.map((f) => [f, true])) as Record<Feature, boolean>,
   };
 }

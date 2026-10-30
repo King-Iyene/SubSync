@@ -30,6 +30,13 @@ import { afterHours, communicationGaps } from "../analytics/comms-queries";
 import { badDataSamples, contactOverview, topLeads, vips } from "../analytics/contact-queries";
 import { appointmentView } from "../analytics/appointment-queries";
 import { compareSetup, describe as describeDiff } from "../analytics/setup-intel";
+import { applyRun, createPreview, getRun, installationHasScope, listRuns, PREVIEW_VALID_HOURS, sampleChanges, undoRun } from "../analytics/cleanup-queries";
+import { parseParams } from "../analytics/cleanup-intel";
+import { demoWriter, platformWriter } from "../analytics/cleanup-writer";
+import { availability, disconnect, startLink } from "../connections/flow";
+import { getConnection, listConnections, setDefaultAccount } from "../connections/queries";
+import { isProvider } from "../connections/state";
+import { locationAccessToken } from "../sync/engine";
 import { createHook, listHooks, listMeetings, MAX_HOOKS_PER_ACCOUNT, revokeHook, setMeetingStatus } from "../analytics/meeting-queries";
 import { buildDailyDigest, NOT_WATCHED } from "../analytics/digest-service";
 import { digestText, localParts } from "../analytics/digest-intel";
@@ -239,6 +246,107 @@ async function meetingUpdate(ctx: Ctx, id: string) {
   const body = (await ctx.request.json().catch(() => null)) as { status?: unknown } | null;
   if (body?.status !== "new" && body?.status !== "filed" && body?.status !== "dismissed") return json({ error: "Unknown status" }, 400);
   return (await setMeetingStatus(ctx.installationId, await allowedIds(ctx), id, body.status)) ? json({ ok: true }) : json({ error: "Not found" }, 404);
+}
+
+// ---------------- data cleanup: preview, confirm, apply, undo ----------------
+// The only feature that changes a client's contacts. It always shows the exact changes first, needs the
+// number of changes typed back to confirm, re-checks each contact right before changing it, keeps the
+// value it replaced, and can be undone. It never runs for a client view.
+
+async function cleanupView(ctx: Ctx) {
+  const allowed = await allowedIds(ctx);
+  const [runs, locs, canWrite] = await Promise.all([
+    listRuns(ctx.installationId, allowed),
+    sql()`select location_id, name from locations where installation_id = ${ctx.installationId} and not ignored ${allowed ? sql()`and location_id = any(${allowed}::text[])` : sql()``} order by name`,
+    ctx.demo ? Promise.resolve(true) : installationHasScope(ctx.installationId, "contacts.write"),
+  ]);
+  return json({
+    runs, canWrite, accounts: locs.map((l) => ({ locationId: l.location_id as string, name: (l.name as string | null) ?? "Unnamed account" })),
+    previewValidHours: PREVIEW_VALID_HOURS,
+    writeNote: canWrite ? null : "Previewing is always safe. To apply changes, SubSync needs permission to edit contacts, which this install has not approved yet.",
+  });
+}
+
+async function cleanupPreview(ctx: Ctx) {
+  const body = (await ctx.request.json().catch(() => null)) as Record<string, unknown> | null;
+  const loc = ctx.limitTo ?? body?.locationId;
+  if (typeof loc !== "string" || !LOCATION_ID.test(loc)) return json({ error: "Choose a client account" }, 400);
+  const allowed = await allowedIds(ctx);
+  if (allowed && !allowed.includes(loc)) return json({ error: "Account not found" }, 404);
+  const [known] = await sql()`select 1 from locations where installation_id = ${ctx.installationId} and location_id = ${loc} and not ignored`;
+  if (!known) return json({ error: "Account not found" }, 404);
+  const parsed = parseParams(body);
+  if (!parsed.ok) return json({ error: parsed.error }, 400);
+  const made = await createPreview(ctx.installationId, loc, actorOf(ctx), parsed.params);
+  return json({ ok: true, ...made });
+}
+
+async function cleanupRunView(ctx: Ctx, id: string) {
+  if (!UUID.test(id)) return json({ error: "Not found" }, 404);
+  const run = await getRun(ctx.installationId, await allowedIds(ctx), id);
+  if (!run) return json({ error: "Not found" }, 404);
+  return json({ run, changes: await sampleChanges(id) });
+}
+
+async function cleanupWork(ctx: Ctx, id: string, mode: "apply" | "undo") {
+  if (!UUID.test(id)) return json({ error: "Not found" }, 404);
+  const run = await getRun(ctx.installationId, await allowedIds(ctx), id);
+  if (!run) return json({ error: "Not found" }, 404);
+  const body = (await ctx.request.json().catch(() => null)) as { confirm?: unknown } | null;
+
+  if (mode === "apply") {
+    if (run.status === "applied" || run.status === "undone" || run.status === "undoing") return json({ error: "This run has already been applied" }, 409);
+    if (run.total === 0) return json({ error: "There is nothing to change" }, 400);
+    const starting = run.status === "previewed" || run.status === "needs_permission";
+    if (starting) {
+      if (Number(body?.confirm) !== run.total) return json({ error: `Type ${run.total} to confirm that you want to make ${run.total} change${run.total === 1 ? "" : "s"}` }, 400);
+      if (run.createdAt && Date.now() - Date.parse(run.createdAt) > PREVIEW_VALID_HOURS * 3_600_000) return json({ error: "This preview is more than a day old. Run the preview again so it reflects today's data." }, 410);
+    }
+  } else if (!(run.status === "applied" || run.status === "partial" || run.status === "applying" || run.status === "undoing") || run.applied === 0 && run.status !== "undoing") {
+    return json({ error: "There is nothing to undo" }, 409);
+  }
+
+  if (!ctx.demo && !(await installationHasScope(ctx.installationId, "contacts.write"))) {
+    return json({ error: "SubSync does not have permission to change contacts in this account yet. Nothing was changed.", needsPermission: true }, 403);
+  }
+  const writer = ctx.demo ? demoWriter(ctx.installationId, run.locationId) : platformWriter(await locationAccessToken(ctx.session.companyId, run.locationId));
+  const done = mode === "apply" ? await applyRun(ctx.installationId, run, writer, !ctx.demo, actorOf(ctx)) : await undoRun(ctx.installationId, run, writer, !ctx.demo, actorOf(ctx));
+  return json({ run: done, finished: done.status !== "applying" && done.status !== "undoing" });
+}
+
+// ---------------- connections: sign in to Slack, Fathom and Zoom ----------------
+async function connectionsView(ctx: Ctx) {
+  const allowed = await allowedIds(ctx);
+  const [connections, locs] = await Promise.all([
+    listConnections(ctx.installationId),
+    sql()`select location_id, name from locations where installation_id = ${ctx.installationId} and not ignored ${allowed ? sql()`and location_id = any(${allowed}::text[])` : sql()``} order by name`,
+  ]);
+  return json({
+    connections, available: availability(), single: ctx.limitTo !== null,
+    accounts: locs.map((l) => ({ locationId: l.location_id as string, name: (l.name as string | null) ?? "Unnamed account" })),
+  });
+}
+
+async function connectionStart(ctx: Ctx, provider: string) {
+  if (!isProvider(provider)) return json({ error: "Not found" }, 404);
+  if (ctx.demo) return json({ error: "Connecting is not available in the demo. It needs a real install." }, 400);
+  const link = startLink(provider, { provider, installationId: ctx.installationId, onlyLocationId: ctx.limitTo, actor: actorOf(ctx) });
+  return link.ok ? json({ url: link.url }) : json({ error: link.error }, 503);
+}
+
+async function connectionRemove(ctx: Ctx, id: string) {
+  if (!UUID.test(id)) return json({ error: "Not found" }, 404);
+  return (await disconnect(ctx.installationId, id, actorOf(ctx))) ? json({ ok: true }) : json({ error: "Not found" }, 404);
+}
+
+async function connectionUpdate(ctx: Ctx, id: string) {
+  if (!UUID.test(id)) return json({ error: "Not found" }, 404);
+  const body = (await ctx.request.json().catch(() => null)) as { defaultLocationId?: unknown } | null;
+  const loc = body?.defaultLocationId;
+  if (loc !== null && !(typeof loc === "string" && LOCATION_ID.test(loc))) return json({ error: "Choose an account, or none" }, 400);
+  const row = await getConnection(ctx.installationId, id);
+  if (!row) return json({ error: "Not found" }, 404);
+  return (await setDefaultAccount(ctx.installationId, row, loc as string | null)) ? json({ ok: true }) : json({ error: "That account cannot be used" }, 400);
 }
 
 async function dailyView(ctx: Ctx) {
@@ -1154,7 +1262,7 @@ async function digestPreview(ctx: Ctx) {
 
 const FEATURE_FOR: Record<string, Feature> = {
   search: "search", onboarding: "onboarding", stale: "stale", inbox: "inbox", pipelines: "pipelines", duplicates: "duplicates", email: "email",
-  alerts: "alerts", appointments: "appointments", meetings: "meetings", "setup-compare": "onboarding", playbooks: "onboarding", daily: "overview", team: "team", "deal-events": "pipelines", contact: "search", settings: "settings", export: "exports", digest: "reports", "api-keys": "ai", hygiene: "stale", "pipeline-intel": "pipelines", "contact-intel": "activity", clients: "reports", qbr: "reports", "comms-intel": "inbox", "call-queue": "calls", "call-lists": "calls", "call-outcomes": "calls",
+  alerts: "alerts", appointments: "appointments", meetings: "meetings", connections: "settings", cleanup: "cleanup", "setup-compare": "onboarding", playbooks: "onboarding", daily: "overview", team: "team", "deal-events": "pipelines", contact: "search", settings: "settings", export: "exports", digest: "reports", "api-keys": "ai", hygiene: "stale", "pipeline-intel": "pipelines", "contact-intel": "activity", clients: "reports", qbr: "reports", "comms-intel": "inbox", "call-queue": "calls", "call-lists": "calls", "call-outcomes": "calls",
 };
 
 export async function handle(request: Request, segments: string[]): Promise<Response> {
@@ -1175,6 +1283,9 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       if (a === "setup-compare") return await setupCompare(ctx);
       if (a === "segments") return await segmentsView(ctx);
       if (a === "meetings") return await meetingsView(ctx);
+      if (a === "connections" && !b) return await connectionsView(ctx);
+      if (a === "cleanup" && !b) return await cleanupView(ctx);
+      if (a === "cleanup" && b) return await cleanupRunView(ctx, b);
       if (a === "playbooks") return await playbooksView(ctx);
       if (a === "start") return await startView(ctx);
       if (a === "accounts" && !b) return await accounts(ctx);
@@ -1213,6 +1324,10 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
     if (method === "POST") {
       if (a === "email" && b === "check") return await emailCheck(ctx);
       if (a === "usage" && !b) return await usagePing(ctx);
+      if (a === "cleanup" && b === "preview") return await cleanupPreview(ctx);
+      if (a === "cleanup" && b && c === "apply") return await cleanupWork(ctx, b, "apply");
+      if (a === "cleanup" && b && c === "undo") return await cleanupWork(ctx, b, "undo");
+      if (a === "connections" && b && c === "start") return await connectionStart(ctx, b);
       if (a === "meetings" && b === "hooks" && !c) return await meetingHookCreate(ctx);
       if (a === "meetings" && b === "hooks" && c && segments[3] === "revoke") return await meetingHookRevoke(ctx, c);
       if (a === "duplicates" && b === "review") return await duplicateReview(ctx);
@@ -1232,12 +1347,14 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       if (a === "api-keys" && b && c === "revoke") return await keysRevoke(ctx, b);
     }
     if (method === "DELETE") {
+      if (a === "connections" && b && !c) return await connectionRemove(ctx, b);
       if (a === "call-lists" && b && /^[0-9a-fA-F-]{36}$/.test(b)) return await callListDelete(ctx, b);
     }
     if (method === "PUT") {
       if (a === "settings") return await settingsUpdate(ctx);
       if (a === "goals") return await goalsUpdate(ctx);
       if (a === "meetings" && b) return await meetingUpdate(ctx, b);
+      if (a === "connections" && b && !c) return await connectionUpdate(ctx, b);
       if (a === "team" && b && LOCATION_ID.test(b)) return await teamName(ctx, b);
       if (a === "clients" && b && LOCATION_ID.test(b)) return await clientUpdate(ctx, b);
       if (a === "accounts" && b && LOCATION_ID.test(b) && c === "flags") return await flags(ctx, b);

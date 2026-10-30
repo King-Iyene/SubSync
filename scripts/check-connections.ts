@@ -1,0 +1,189 @@
+import assert from "node:assert/strict";
+import { createHmac } from "node:crypto";
+import { encryptSecret } from "../src/lib/crypto";
+import { closeDb, sql } from "../src/lib/db";
+
+// Checks connections end to end against a running dev server in demo mode, with a pretend Fathom and a
+// pretend Zoom that sign their deliveries the way the real ones do. It touches the demo copy only.
+// Usage: BASE_URL=http://localhost:3100 node --env-file=.env.local --import tsx scripts/check-connections.ts
+const BASE = process.env.BASE_URL ?? "http://localhost:3100";
+const ZOOM_SECRET = process.env.ZOOM_WEBHOOK_SECRET_TOKEN ?? "demo-zoom-secret-token";
+
+async function main() {
+  const call = async (path: string, init: RequestInit & { token?: string | null } = {}) => {
+    const { token, ...rest } = init;
+    const res = await fetch(`${BASE}${path}`, { ...rest, headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(rest.headers ?? {}) } });
+    const type = res.headers.get("content-type") ?? "";
+    return { status: res.status, body: type.includes("json") ? await res.json() : await res.text() };
+  };
+  const signIn = async (as?: string) => (await call("/api/sso", { method: "POST", body: JSON.stringify({ demo: true, ...(as ? { as } : {}) }) })).body;
+  const token = (await signIn()).session as string;
+  const biz = await signIn("business");
+  const bt = biz.session as string;
+  const own = biz.user.activeLocation as string;
+  const ct = (await signIn("client")).session as string;
+
+  const [inst] = await sql()`select id from installations where is_demo`;
+  const accounts = (await call("/api/app/accounts", { token })).body.accounts as Array<{ locationId: string; name: string; ignored: boolean }>;
+  const live = accounts.filter((a) => !a.ignored);
+  const A = live[0].locationId;
+  const B = live.find((a) => a.locationId !== A)!.locationId;
+  const clean = async () => {
+    await sql()`delete from meeting_notes where installation_id = ${inst.id} and (source in ('zoom', 'fathom') or title like 'CONN-%')`;
+    await sql()`delete from connections where installation_id = ${inst.id}`;
+    await sql()`delete from cached_contacts where installation_id = ${inst.id} and contact_id like 'conn-t%'`;
+  };
+  await clean();
+
+  // --- the screen's data: nothing switched on, nothing connected, no secrets
+  const list0 = await call("/api/app/connections", { token });
+  assert.equal(list0.status, 200);
+  assert.deepEqual(list0.body.connections, []);
+  assert.equal(typeof list0.body.available.slack, "boolean");
+  assert.ok(list0.body.accounts.length >= 13);
+  assert.equal((await call("/api/app/connections", { token: ct })).status, 403, "a client view has no connections");
+  assert.equal((await call("/api/app/connections/slack/start", { token: ct, method: "POST", body: "{}" })).status, 403);
+  assert.equal((await call("/api/app/connections", { token: bt })).status, 200, "a business can connect its own tools");
+  assert.equal((await call("/api/app/connections/nope/start", { token, method: "POST", body: "{}" })).status, 404, "unknown app");
+  assert.equal((await call("/api/app/connections/slack/start", { token, method: "POST", body: "{}" })).status, 400, "the demo cannot start a real sign-in");
+  assert.equal((await call("/api/integrations/slack/callback?code=x&state=forged")).status, 400, "a forged return is refused");
+  assert.equal((await call("/api/integrations/nope/callback")).status, 404);
+
+  // --- a person who knows a contact in account A
+  await sql()`insert into cached_contacts (installation_id, location_id, contact_id, first_name, last_name, email, tags, date_added)
+    values (${inst.id}, ${A}, 'conn-t1', 'Dana', 'Lee', 'dana.conn@x.test', '{}', now())`;
+
+  // --- Fathom: a connection with a known secret, and signed deliveries
+  const secretRaw = Buffer.from("fathom-test-signing-secret-0123456789").toString("base64");
+  const key = "fathomkey" + "A".repeat(20);
+  await sql()`insert into connections (installation_id, provider, label, external_id, access_token_enc, refresh_token_enc, token_expires_at, webhook_secret_enc, public_key, default_location_id, connected_by)
+    values (${inst.id}, 'fathom', 'Fathom', 'wh_test', ${encryptSecret("at")}, ${encryptSecret("rt")}, now() + interval '1 hour', ${encryptSecret("whsec_" + secretRaw)}, ${key}, null, 'check')`;
+  const deliver = (payload: unknown, o: { id?: string; ts?: number; sign?: boolean; path?: string } = {}) => {
+    const body = JSON.stringify(payload);
+    const id = o.id ?? "msg_" + Math.random().toString(36).slice(2);
+    const ts = String(o.ts ?? Math.floor(Date.now() / 1000));
+    const sig = createHmac("sha256", Buffer.from(secretRaw, "base64")).update(`${id}.${ts}.${body}`).digest("base64");
+    return call(o.path ?? `/api/hooks/fathom/${key}`, { method: "POST", body, headers: { "webhook-id": id, "webhook-timestamp": ts, "webhook-signature": o.sign === false ? "v1,AAAA" : `v1,${sig}` } });
+  };
+  const meeting = (extra: Record<string, unknown> = {}) => ({
+    title: "CONN-QBR", meeting_title: "CONN-QBR", recording_id: "rec-1", share_url: "https://fathom.video/share/abc", created_at: "2026-10-30T10:00:00Z",
+    default_summary: { template_name: "general", markdown_formatted: "## Summary\nDana wants a quote by Friday." },
+    action_items: [{ description: "Send the quote" }, { description: "Book a site visit" }],
+    calendar_invitees: [{ name: "Dana Lee", email: "Dana.Conn@X.test", is_external: true }],
+    transcript: [{ speaker: { display_name: "Dana" }, text: "Hello there", timestamp: "00:00:01" }], ...extra,
+  });
+
+  const first = await deliver(meeting());
+  assert.equal(first.status, 200, JSON.stringify(first.body));
+  assert.equal(first.body.saved, true);
+  const [note] = await sql()`select location_id, contact_id, source, summary, action_items, transcript from meeting_notes where installation_id = ${inst.id} and title = 'CONN-QBR'`;
+  assert.equal(note.location_id, A, "filed in the account that knows the attendee");
+  assert.equal(note.contact_id, "conn-t1", "and matched to that contact");
+  assert.equal(note.source, "fathom");
+  assert.match(note.summary, /quote by Friday/);
+  assert.equal(note.transcript, null, "no transcript is kept unless the account chose to keep them");
+  assert.equal((note.action_items as string[]).length, 2);
+
+  const again = await deliver(meeting(), { id: "msg_retry" });
+  assert.equal(again.status, 200);
+  assert.equal(again.body.saved, false);
+  assert.equal(again.body.reason, "duplicate", "Fathom retries do not create a second note");
+  assert.equal((await sql()`select count(*)::int n from meeting_notes where installation_id = ${inst.id} and title = 'CONN-QBR'`)[0].n, 1);
+
+  assert.equal((await deliver(meeting({ recording_id: "rec-2" }), { sign: false })).status, 401, "a wrong signature is refused");
+  assert.equal((await deliver(meeting({ recording_id: "rec-3" }), { ts: Math.floor(Date.now() / 1000) - 3600 })).status, 401, "a signed but old delivery is refused");
+  assert.equal((await deliver(meeting({ recording_id: "rec-4" }), { path: `/api/hooks/fathom/${"B".repeat(30)}` })).status, 404, "a wrong address");
+  assert.equal((await call("/api/hooks/fathom/short", { method: "POST", body: "{}" })).status, 404);
+  assert.equal((await deliver({ nothing: "useful" })).body.ignored, true, "something that is not a meeting is acknowledged and dropped");
+
+  // nobody known in the meeting: counted, not saved, unless an account was chosen
+  const stranger = meeting({ recording_id: "rec-5", title: "CONN-STRANGER", calendar_invitees: [{ name: "Nobody", email: "nobody@nowhere.test" }] });
+  const skipped = await deliver(stranger);
+  assert.equal(skipped.body.saved, false);
+  assert.equal(skipped.body.reason, "no_account", "never a guessed account");
+  assert.equal((await sql()`select count(*)::int n from meeting_notes where installation_id = ${inst.id} and title = 'CONN-STRANGER'`)[0].n, 0);
+  const conn = (await call("/api/app/connections", { token })).body.connections[0];
+  assert.equal(conn.provider, "fathom");
+  assert.equal(conn.saved, 1);
+  assert.equal(conn.skipped, 1);
+  assert.equal(JSON.stringify(conn).includes("whsec"), false, "no secret ever reaches the browser");
+  assert.equal(Object.keys(conn).some((k) => /token|secret|enc/i.test(k)), false);
+
+  assert.equal((await call(`/api/app/connections/${conn.id}`, { token, method: "PUT", body: JSON.stringify({ defaultLocationId: B }) })).status, 200);
+  assert.equal((await call(`/api/app/connections/${conn.id}`, { token, method: "PUT", body: JSON.stringify({ defaultLocationId: "no-such-account-x" }) })).status, 400, "only an account of this install");
+  assert.equal((await call(`/api/app/connections/${conn.id}`, { token, method: "PUT", body: JSON.stringify({}) })).status, 400);
+  const chosen = await deliver({ ...stranger, recording_id: "rec-6" });
+  assert.equal(chosen.body.saved, true);
+  assert.equal((await sql()`select location_id from meeting_notes where installation_id = ${inst.id} and title = 'CONN-STRANGER'`)[0].location_id, B, "falls back to the account the person chose");
+
+  // a single business never leaves its own account, even when the attendee is known elsewhere
+  await sql()`update connections set only_location_id = ${B} where installation_id = ${inst.id} and provider = 'fathom'`;
+  await deliver(meeting({ recording_id: "rec-7", title: "CONN-ONLY-B" }));
+  assert.equal((await sql()`select location_id from meeting_notes where installation_id = ${inst.id} and title = 'CONN-ONLY-B'`)[0].location_id, B);
+  assert.equal((await call(`/api/app/connections/${conn.id}`, { token, method: "PUT", body: JSON.stringify({ defaultLocationId: A }) })).status, 400, "and cannot choose another account");
+  await sql()`update connections set only_location_id = null where installation_id = ${inst.id} and provider = 'fathom'`;
+
+  const mv = await call("/api/app/meetings", { token });
+  assert.ok(mv.body.meetings.some((m: { title: string; source: string }) => m.title === "CONN-QBR" && m.source === "fathom"), "it shows in Meeting notes");
+  const bm = await call("/api/app/meetings", { token: bt });
+  assert.ok(bm.body.meetings.every((m: { locationId: string }) => m.locationId === own), "a business sees only its own account's notes");
+
+  // --- Zoom: the address check, signed summaries, removal
+  const zoomPost = (payload: unknown, o: { sign?: boolean; ts?: number } = {}) => {
+    const body = JSON.stringify(payload);
+    const ts = String(o.ts ?? Math.floor(Date.now() / 1000));
+    const sig = "v0=" + createHmac("sha256", ZOOM_SECRET).update(`v0:${ts}:${body}`).digest("hex");
+    return call("/api/hooks/zoom", { method: "POST", body, headers: { "x-zm-request-timestamp": ts, "x-zm-signature": o.sign === false ? "v0=bad" : sig } });
+  };
+  const challenge = await call("/api/hooks/zoom", { method: "POST", body: JSON.stringify({ event: "endpoint.url_validation", payload: { plainToken: "abc123" } }) });
+  assert.equal(challenge.status, 200);
+  assert.equal(challenge.body.plainToken, "abc123");
+  assert.equal(challenge.body.encryptedToken, createHmac("sha256", ZOOM_SECRET).update("abc123").digest("hex"), "answers Zoom's address check");
+
+  await sql()`insert into connections (installation_id, provider, label, external_id, access_token_enc, refresh_token_enc, token_expires_at, default_location_id, connected_by)
+    values (${inst.id}, 'zoom', 'host@agency.test', 'zoomhost-1', ${encryptSecret("at")}, ${encryptSecret("rt")}, now() + interval '1 hour', ${A}, 'check')`;
+  const summary = (uuid: string, host = "zoomhost-1") => ({
+    event: "meeting.summary_completed", event_ts: Date.now(),
+    payload: { account_id: "acct", object: { meeting_host_id: host, meeting_host_email: "host@agency.test", meeting_uuid: uuid, meeting_id: 1, meeting_topic: "CONN-ZOOM-CALL", meeting_start_time: "2026-10-30T09:00:00Z",
+      summary_content: "## Overview\nAgreed on a $500 plan.", summary_doc_url: "https://docs.zoom.us/doc/xyz", next_steps: ["Send the contract"] } },
+  });
+  assert.equal((await zoomPost(summary("u-1"), { sign: false })).status, 401, "an unsigned Zoom event is refused");
+  assert.equal((await zoomPost(summary("u-1"), { ts: Math.floor(Date.now() / 1000) - 3600 })).status, 401, "an old one too");
+  const z1 = await zoomPost(summary("u-1"));
+  assert.equal(z1.status, 200, JSON.stringify(z1.body));
+  assert.equal(z1.body.saved, 1);
+  const [zn] = await sql()`select location_id, source, summary, action_items, transcript, recording_url from meeting_notes where installation_id = ${inst.id} and title = 'CONN-ZOOM-CALL'`;
+  assert.equal(zn.location_id, A, "no attendee list from Zoom: it goes to the chosen account");
+  assert.equal(zn.source, "zoom");
+  assert.match(zn.summary, /\$500 plan/);
+  assert.deepEqual(zn.action_items, ["Send the contract"]);
+  assert.equal(zn.transcript, null);
+  assert.equal((await zoomPost(summary("u-1"))).body.saved, 0, "the same meeting twice is kept once");
+  assert.equal((await zoomPost(summary("u-9", "someone-else"))).body.saved, 0, "a host nobody connected is ignored");
+  assert.equal((await zoomPost({ event: "meeting.started", payload: {} })).body.ignored, true);
+  assert.equal((await sql()`select count(*)::int n from meeting_notes where installation_id = ${inst.id} and title = 'CONN-ZOOM-CALL'`)[0].n, 1);
+  const zc = (await call("/api/app/connections", { token })).body.connections.find((c: { provider: string }) => c.provider === "zoom");
+  assert.equal(zc.saved, 1);
+  assert.equal((await zoomPost({ event: "app_deauthorized", payload: { user_id: "zoomhost-1", account_id: "acct" } })).status, 200);
+  assert.equal((await sql()`select count(*)::int n from connections where installation_id = ${inst.id} and provider = 'zoom'`)[0].n, 0, "removing the app in Zoom removes the connection here");
+
+  // --- disconnecting
+  const fcon = (await call("/api/app/connections", { token })).body.connections.find((c: { provider: string }) => c.provider === "fathom");
+  assert.equal((await call(`/api/app/connections/${fcon.id}`, { token: ct, method: "DELETE" })).status, 403);
+  assert.equal((await call(`/api/app/connections/not-an-id`, { token, method: "DELETE" })).status, 404);
+  assert.equal((await call(`/api/app/connections/${fcon.id}`, { token, method: "DELETE" })).status, 200);
+  assert.deepEqual((await call("/api/app/connections", { token })).body.connections, []);
+  assert.equal((await deliver(meeting({ recording_id: "rec-8" }))).status, 404, "after disconnecting, the address stops working");
+  const [audit] = await sql()`select count(*)::int n from audit_log where installation_id = ${inst.id} and action like 'connections.%'`;
+  assert.ok(audit.n >= 1, "disconnecting is logged");
+
+  await clean();
+  await sql()`delete from audit_log where installation_id = ${inst.id} and action like 'connections.%'`;
+  await closeDb();
+  console.log("connections: sign-in guards, Fathom and Zoom signed deliveries, routing, duplicates, isolation, disconnect: ok");
+}
+
+main().catch((error) => {
+  console.error("FAILED:", error instanceof Error ? error.stack : error);
+  process.exit(1);
+});

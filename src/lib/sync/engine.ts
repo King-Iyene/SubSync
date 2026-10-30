@@ -89,6 +89,9 @@ export async function scheduleDailyRefresh(): Promise<number> {
 
 const tokenCache = new Map<string, { token: string; expiresAt: number }>();
 
+// Used by the data cleanup tool, which needs a token for one account.
+export const locationAccessToken = (companyKey: string, locationId: string) => tokenForLocation(companyKey, locationId);
+
 async function tokenForLocation(companyId: string, locationId: string): Promise<string> {
   // A client account that installed the app for itself holds its own location token.
   if (isBusinessKey(companyId)) return getCompanyAccessToken(companyId);

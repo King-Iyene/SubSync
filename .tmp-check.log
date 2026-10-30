@@ -1,0 +1,34 @@
+(node:35352) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+sign-in (demo): ok
+auth guards: ok
+overview: ok (avg score 71, 25 alerts, $593250 stale)
+accounts + detail: ok
+search: ok
+stale / inbox / pipelines / duplicates / email / alerts: ok
+email check: ok
+settings + validation: ok
+account controls: ok
+exports + digest: ok
+hygiene + api keys + AI connector: ok
+health + resync: ok
+pipeline intelligence + goals: ok
+contact intelligence: ok
+call queue + lists + outcomes: ok
+clients + QBR + executive summary: ok
+communication + priorities + setup + exports: ok
+business view: ok (one account, agency pages refused)
+client view: ok (read-only, own account only)
+agency switch for client view: ok
+sources + DND + birthdays + teamRes + movement + timeline: ok
+duplicates: scored queue, snapshots, audit log, dry run, undo, isolation: ok
+daily brief: own-history comparison, ranking, scoping, schedule: ok
+getting started + usage + connection: ok
+appointments: rates, to-do lists, permission state, scoping, recovery list: ok
+branding + setup comparison: ok
+filter + playbooks + industry targets: ok
+meeting notes: private address, matching, privacy default, limits, revoke, isolation: ok
+data cleanup: preview, confirm, apply, re-check, undo, audit, isolation: ok
+
+All API checks passed.
+EXIT 0

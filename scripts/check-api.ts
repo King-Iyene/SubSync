@@ -711,6 +711,85 @@ async function main() {
   await sql()`delete from meeting_hooks where installation_id = (select id from installations where is_demo)`;
   console.log("meeting notes: private address, matching, privacy default, limits, revoke, isolation: ok");
 
+  // --- data cleanup: preview, typed confirmation, apply, re-check, undo, isolation (demo copy only)
+  const [demoInst] = await sql()`select id from installations where is_demo`;
+  const clLoc = roofing.locationId as string;
+  const seed = async () => {
+    await sql()`delete from cached_contacts where installation_id = ${demoInst.id} and contact_id like 'cleanup-t%'`;
+    const rows = [
+      { contact_id: "cleanup-t1", first_name: "JOHN", last_name: "smith", phone: "(555) 010-2030", email: "j@x.test", tags: ["cleanup-test"] },
+      { contact_id: "cleanup-t2", first_name: "Ada", last_name: "Lovelace", phone: "555 010 4040", email: "a@x.test", tags: ["cleanup-test"] },
+      { contact_id: "cleanup-t3", first_name: "mary-jane", last_name: "McDonald", phone: "+15550105050", email: "m@x.test", tags: [] },
+    ].map((r) => ({ installation_id: demoInst.id, location_id: clLoc, date_added: new Date(), ...r }));
+    await sql()`insert into cached_contacts ${sql()(rows as never)}`;
+  };
+  await seed();
+  const prev = (b: unknown, tok = token) => call("/api/app/cleanup/preview", { token: tok, method: "POST", body: JSON.stringify(b) });
+  assert.equal((await prev({ locationId: clLoc, rules: [] })).status, 400);
+  assert.equal((await prev({ locationId: clLoc, rules: ["tag"], tag: { action: "add", name: "x", where: {} } })).status, 400, "a tag always needs a filter");
+  assert.equal((await prev({ locationId: "nope-nope-nope", rules: ["phone"] })).status, 404);
+  const pv = await prev({ locationId: clLoc, rules: ["phone", "name"], defaultCountryCode: "+1" });
+  assert.equal(pv.status, 200);
+  assert.equal(pv.body.total, 5, "two phones and three names are planned: nothing else in the account needs tidying");
+  assert.equal(pv.body.summary.contacts, 3);
+  const [untouched] = await sql()`select phone, first_name from cached_contacts where contact_id = 'cleanup-t1'`;
+  assert.equal(untouched.phone, "(555) 010-2030", "a preview changes nothing");
+  const det = await call(`/api/app/cleanup/${pv.body.runId}`, { token });
+  assert.equal(det.body.run.status, "previewed");
+  assert.ok(det.body.changes.some((c: { before: string; after: string }) => c.before === "(555) 010-2030" && c.after === "+15550102030"));
+  const apply = (id: string, confirm?: number, tok = token) => call(`/api/app/cleanup/${id}/apply`, { token: tok, method: "POST", body: JSON.stringify(confirm === undefined ? {} : { confirm }) });
+  assert.equal((await apply(pv.body.runId)).status, 400, "applying needs the number typed back");
+  assert.equal((await apply(pv.body.runId, 4)).status, 400, "the wrong number is refused");
+  assert.equal((await apply(pv.body.runId, 5, ct)).status, 403, "a client view can never change anything");
+  const done = await apply(pv.body.runId, 5);
+  assert.equal(done.status, 200);
+  assert.equal(done.body.run.status, "applied");
+  assert.equal(done.body.run.applied, 5);
+  const [after1] = await sql()`select first_name, last_name, phone from cached_contacts where contact_id = 'cleanup-t1'`;
+  assert.deepEqual([after1.first_name, after1.last_name, after1.phone], ["John", "Smith", "+15550102030"]);
+  assert.equal((await sql()`select last_name from cached_contacts where contact_id = 'cleanup-t3'`)[0].last_name, "McDonald", "a name typed on purpose is not touched");
+  assert.equal((await apply(pv.body.runId, 5)).status, 409, "a run cannot be applied twice");
+  const undone = await call(`/api/app/cleanup/${pv.body.runId}/undo`, { token, method: "POST", body: "{}" });
+  assert.equal(undone.body.run.status, "undone");
+  assert.equal(undone.body.run.undone, 5);
+  const [back] = await sql()`select first_name, last_name, phone from cached_contacts where contact_id = 'cleanup-t1'`;
+  assert.deepEqual([back.first_name, back.last_name, back.phone], ["JOHN", "smith", "(555) 010-2030"], "undo restores the original values");
+  assert.equal((await call(`/api/app/cleanup/${pv.body.runId}/undo`, { token, method: "POST", body: "{}" })).status, 409, "nothing left to undo");
+
+  // someone edits a contact between the preview and the apply: that one is skipped, never overwritten
+  const pv2 = await prev({ locationId: clLoc, rules: ["phone"], defaultCountryCode: "+1" });
+  assert.equal(pv2.body.total, 2);
+  await sql()`update cached_contacts set phone = '+442071234567' where contact_id = 'cleanup-t1'`;
+  const part = await apply(pv2.body.runId, 2);
+  assert.equal(part.body.run.status, "partial");
+  assert.deepEqual([part.body.run.applied, part.body.run.skipped], [1, 1]);
+  assert.equal((await sql()`select phone from cached_contacts where contact_id = 'cleanup-t1'`)[0].phone, "+442071234567", "the newer edit survived");
+
+  // tags: only who matches, only once
+  const pv3 = await prev({ locationId: clLoc, rules: ["tag"], tag: { action: "add", name: "Checked", where: { hasTag: "cleanup-test" } } });
+  assert.equal(pv3.body.total, 2);
+  assert.equal((await apply(pv3.body.runId, 2)).body.run.applied, 2);
+  assert.deepEqual((await sql()`select tags from cached_contacts where contact_id = 'cleanup-t2'`)[0].tags, ["cleanup-test", "Checked"]);
+  await call(`/api/app/cleanup/${pv3.body.runId}/undo`, { token, method: "POST", body: "{}" });
+  assert.deepEqual((await sql()`select tags from cached_contacts where contact_id = 'cleanup-t2'`)[0].tags, ["cleanup-test"]);
+
+  // listing, audit trail, isolation
+  const clList = await call("/api/app/cleanup", { token });
+  assert.equal(clList.status, 200);
+  assert.ok(clList.body.runs.length >= 4 && clList.body.canWrite === true && clList.body.accounts.length >= 13);
+  const [auditRows] = await sql()`select count(*)::int n from audit_log where installation_id = ${demoInst.id} and action like 'cleanup.%'`;
+  assert.ok(auditRows.n >= 8, "every preview, apply and undo is logged");
+  assert.equal((await call("/api/app/cleanup", { token: ct })).status, 403);
+  assert.equal((await prev({ locationId: clLoc, rules: ["phone"] }, ct)).status, 403);
+  assert.equal((await prev({ locationId: otherAcc.locationId, rules: ["phone"] }, bt)).body.total !== undefined, true, "a business previews its own account whatever it asks for");
+  const mineRuns = await call("/api/app/cleanup", { token: bt });
+  assert.ok(mineRuns.body.runs.every((r: { locationId: string }) => r.locationId === own), "a business sees only its own runs");
+  assert.equal((await call(`/api/app/cleanup/${pv.body.runId}`, { token: bt })).status, own === clLoc ? 200 : 404, "and cannot open another account's run");
+  await sql()`delete from cached_contacts where installation_id = ${demoInst.id} and contact_id like 'cleanup-t%'`;
+  await sql()`delete from cleanup_runs where installation_id = ${demoInst.id}`;
+  await sql()`delete from audit_log where installation_id = ${demoInst.id}`;
+  console.log("data cleanup: preview, confirm, apply, re-check, undo, audit, isolation: ok");
+
   // Leave the demo data as we found it.
   await sql()`delete from domain_checks where domain in ('example-demo.com', 'other-demo.org')`;
   await closeDb();

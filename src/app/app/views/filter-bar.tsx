@@ -12,10 +12,10 @@ export function FilterBar({ filter, onChange }: { filter: { industry: string; ow
   const kinds = data.industries.filter((i) => i.key !== "unset" || data.industries.length > 1);
   if (data.total < 2 || (kinds.length < 2 && data.owners.length < 1)) return null;
   const active = Boolean(filter.industry || filter.owner);
-  const select = "rounded-lg border bg-background px-2 py-1.5 text-sm";
+  const select = "rounded-lg border bg-card px-2.5 py-1.5 text-sm shadow-sm outline-none hover:border-primary/30 focus-visible:ring-2 focus-visible:ring-ring/30";
 
   return (
-    <div className={`mb-4 flex flex-wrap items-center gap-2 rounded-xl border px-3 py-2 text-sm print:hidden ${active ? "border-primary/40 bg-primary/5" : "bg-muted/30"}`} role="group" aria-label="Show only">
+    <div className={`mb-4 flex flex-wrap items-center gap-2 rounded-2xl border px-4 py-2.5 text-sm shadow-[var(--shadow-card)] print:hidden ${active ? "border-primary/40 bg-accent/60" : "bg-card"}`} role="group" aria-label="Show only">
       <span className="font-medium">Show only</span>
       <select className={select} aria-label="Industry" value={filter.industry} onChange={(e) => onChange({ ...filter, industry: e.target.value })}>
         <option value="">All industries ({data.total})</option>

@@ -9,7 +9,8 @@ const CHROME = process.env.CHROME_PATH ?? "C:/Program Files/Google/Chrome/Applic
 
 const PORT = 3100;
 const server = spawn("npx", ["next", "dev", "-p", String(PORT)], {
-  env: { ...process.env, DEMO_MODE: "true" },
+  // A made-up Zoom secret lets the checks sign a pretend Zoom notification; it never leaves this machine.
+  env: { ...process.env, DEMO_MODE: "true", ZOOM_WEBHOOK_SECRET_TOKEN: process.env.ZOOM_WEBHOOK_SECRET_TOKEN ?? "demo-zoom-secret-token" },
   shell: true,
   stdio: "ignore",
 });
@@ -33,8 +34,12 @@ async function waitUp() {
 let code = 1;
 try {
   if (!(await waitUp())) throw new Error("Dev server did not start");
-  const run = spawnSync("node", ["--env-file=.env.local", "--import", "tsx", "scripts/check-api.ts"], { stdio: "inherit", shell: true });
-  code = run.status ?? 1;
+  // CHECKS=check-connections runs just one script while iterating; the default runs them all.
+  for (const name of (process.env.CHECKS ?? "check-api,check-connections").split(",")) {
+    const run = spawnSync("node", ["--env-file=.env.local", "--import", "tsx", `scripts/${name}.ts`], { stdio: "inherit", shell: true });
+    code = run.status ?? 1;
+    if (code !== 0) break;
+  }
   const dir = `${process.cwd()}/.tmp-shots`;
   if (shots.length) mkdirSync(dir, { recursive: true });
   // "view" or "view@business" / "view@client" to open the demo as a single business or a client.

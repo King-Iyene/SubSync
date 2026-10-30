@@ -2,6 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { NAV_FOR, type AccessKind } from "@/lib/access";
+import {
+  Briefcase, CalendarCheck, CircleHelp, Copy, Eraser, Inbox, Kanban, LayoutDashboard, Mic, PhoneCall, Search, Settings, Sun, Target, UserRound, Users, Wrench, type LucideIcon,
+} from "lucide-react";
 import { NAV, type GoFn, type ViewId } from "./nav";
 import { ApiProvider, makeApi, type Api } from "./session";
 import { Badge } from "./ui";
@@ -9,6 +12,7 @@ import { AccountDetailView } from "./views/account-detail";
 import { AccountsView } from "./views/accounts";
 import { AlertsView } from "./views/alerts";
 import { AppointmentsView } from "./views/appointments";
+import { CleanupView } from "./views/cleanup";
 import { MeetingsView } from "./views/meetings";
 import { PlaybooksView } from "./views/playbooks";
 import { CallsView } from "./views/calls";
@@ -221,6 +225,7 @@ export function Dashboard() {
       case "team": return <TeamView />;
       case "appointments": return <AppointmentsView go={go} />;
       case "meetings": return <MeetingsView />;
+      case "cleanup": return <CleanupView />;
       case "leads": return <LeadsView />;
       case "calls": return <CallsView />;
       case "clients": return <ClientsView />;
@@ -230,36 +235,44 @@ export function Dashboard() {
   return (
     <ApiProvider value={api}>
       <div className="flex min-h-screen bg-background text-foreground">
-        <aside className="hidden w-60 shrink-0 flex-col border-r p-4 md:flex print:hidden">
-          <p className="px-2 text-lg font-semibold tracking-tight">SubSync</p>
-          <nav className="mt-4 flex flex-col gap-0.5" aria-label="Sections">
+        <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col self-start border-r border-sidebar-border bg-sidebar p-4 text-sidebar-foreground md:flex print:hidden">
+          <div className="flex items-center gap-2.5 px-2 pt-1">
+            <span aria-hidden className="flex size-8 items-center justify-center rounded-xl bg-sidebar-primary text-sidebar-primary-foreground shadow-md"><svg viewBox="0 0 24 24" className="size-[18px]" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M4 8h10a4 4 0 0 1 0 8H8" /><path d="M20 16H10a4 4 0 0 1 0-8h6" opacity="0.55" /></svg></span>
+            <span className="text-[1.05rem] font-semibold tracking-tight text-sidebar-accent-foreground">SubSync</span>
+          </div>
+          <nav className="mt-3 flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto pr-1" aria-label="Sections">
             {menu.map((n, i) => (
               <div key={n.id}>
-                {n.group !== (menu[i - 1]?.group ?? null) && (n.group ? <p className="px-3 pb-1 pt-4 text-[11px] font-medium uppercase tracking-wider text-muted-foreground/70">{n.group}</p> : <div className="my-2 border-t" />)}
+                {n.group !== (menu[i - 1]?.group ?? null) && (n.group ? <p className="px-3 pb-1 pt-5 text-[10.5px] font-semibold uppercase tracking-[0.14em] text-sidebar-foreground/45">{n.group}</p> : <div className="my-2 border-t border-sidebar-border" />)}
                 <button type="button" onClick={() => go(n.id)} aria-current={n.id === active ? "page" : undefined}
-                  className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors ${n.id === active ? "bg-muted font-medium" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"}`}>
-                  {labelFor(n)}
+                  className={`group relative flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[0.86rem] transition-colors ${n.id === active ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground" : "text-sidebar-foreground/75 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"}`}>
+                  {n.id === active && <span aria-hidden className="absolute inset-y-1.5 left-0 w-[3px] rounded-full bg-sidebar-primary" />}
+                  {(() => { const Icon = ICONS[n.id]; return Icon ? <Icon aria-hidden className={`size-[17px] shrink-0 ${n.id === active ? "text-sidebar-primary" : "opacity-70 group-hover:opacity-100"}`} /> : null; })()}
+                  <span className="flex-1">{labelFor(n)}</span>
                   {locked(n.feature) && <Badge tone="info">Paid</Badge>}
                 </button>
               </div>
             ))}
           </nav>
-          <p className="mt-auto px-2 pt-6 text-xs text-muted-foreground">{auth.userName ? `Signed in as ${auth.userName}` : "Signed in"}</p>
+          <div className="mt-3 flex items-center gap-2.5 rounded-xl bg-sidebar-accent/50 px-3 py-2.5">
+            <span aria-hidden className="flex size-7 items-center justify-center rounded-full bg-sidebar-primary/20 text-xs font-semibold text-sidebar-primary">{(auth.userName ?? "?").slice(0, 1).toUpperCase()}</span>
+            <span className="min-w-0 text-xs leading-4"><span className="block truncate font-medium text-sidebar-accent-foreground">{auth.userName ?? "Signed in"}</span><span className="block text-sidebar-foreground/55">{auth.kind === "agency" ? "Agency view" : auth.kind === "business" ? "Your business" : "Read-only view"}</span></span>
+          </div>
         </aside>
 
         <div className="flex min-w-0 flex-1 flex-col">
           {auth.demo && (
-            <div className="border-b bg-amber-500/10 px-4 py-2 text-center text-xs text-amber-800 dark:text-amber-200 print:hidden" role="note">
+            <div className="border-b border-amber-500/20 bg-amber-400/15 px-4 py-2 text-center text-xs font-medium text-amber-900 dark:text-amber-200 print:hidden" role="note">
               Demo mode: this is sample data for a fictional agency, not real clients.
             </div>
           )}
           <nav className="flex gap-1 overflow-x-auto border-b p-2 md:hidden print:hidden" aria-label="Sections">
             {menu.map((n) => (
               <button key={n.id} type="button" onClick={() => go(n.id)} aria-current={n.id === active ? "page" : undefined}
-                className={`shrink-0 rounded-full px-3 py-1 text-sm ${n.id === active ? "bg-muted font-medium" : "text-muted-foreground"}`}>{labelFor(n)}</button>
+                className={`shrink-0 rounded-full px-3.5 py-1.5 text-sm transition-colors ${n.id === active ? "bg-primary font-medium text-primary-foreground shadow-sm" : "bg-muted text-muted-foreground"}`}>{labelFor(n)}</button>
             ))}
           </nav>
-          <main className="flex-1 p-4 sm:p-8">
+          <main className="mx-auto w-full max-w-[1400px] flex-1 p-4 sm:px-10 sm:py-8">
             {auth.kind === "agency" && baseApi && <ApiProvider value={baseApi}><FilterBar filter={filter} onChange={setFilter} /></ApiProvider>}
             <FreshnessStrip />{content}
           </main>
@@ -269,14 +282,19 @@ export function Dashboard() {
   );
 }
 
+const ICONS: Record<string, LucideIcon> = {
+  today: Sun, overview: LayoutDashboard, inbox: Inbox, appointments: CalendarCheck, meetings: Mic, search: Search, pipeline: Kanban, leads: Target, calls: PhoneCall,
+  accounts: Briefcase, clients: UserRound, team: Users, onboarding: Wrench, duplicates: Copy, cleanup: Eraser, settings: Settings, help: CircleHelp,
+};
+
 function Tabs({ tabs, start }: { tabs: Array<{ label: string; node: React.ReactNode }>; start: number }) {
   const [i, setI] = useState(start);
   return (
     <div>
-      <div className="mb-4 flex gap-1 border-b print:hidden" role="tablist">
+      <div className="mb-5 inline-flex gap-1 rounded-xl bg-muted p-1 print:hidden" role="tablist">
         {tabs.map(({ label }, n) => (
           <button key={label} type="button" role="tab" aria-selected={n === i} onClick={() => setI(n)}
-            className={`-mb-px border-b-2 px-3 py-2 text-sm ${n === i ? "border-primary font-medium" : "border-transparent text-muted-foreground hover:text-foreground"}`}>{label}</button>
+            className={`rounded-lg px-3.5 py-1.5 text-sm transition-all ${n === i ? "bg-card font-medium text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>{label}</button>
         ))}
       </div>
       {tabs[i].node}

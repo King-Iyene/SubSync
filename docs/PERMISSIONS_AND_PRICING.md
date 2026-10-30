@@ -29,35 +29,41 @@ How it is enforced (not just hidden links):
 
 If an agency user opens the app in an account that installed it for itself (and the agency has not installed it), they get that account's business view.
 
-## 3. Pricing: how the marketplace bills, and what to set
+## 3. Pricing: one flat price, everything included (decided 30 Oct 2026)
 
-Facts from the marketplace documentation:
+SubSync is **$5 per client account per month, with a 14 day free trial, no tiers, no free plan and no locked features**. The code
+reflects this: every feature is open for every install, and there is no billing code at all, because the marketplace collects the money.
 
-- The app's target is **Sub-account** and it cannot be changed after creation. A sub-account app is billed **per install**, so an agency with 20 clients installed pays for 20 installs, and a business pays for its own one. Agencies can resell it with their own markup.
-- The marketplace keeps 15%. Payouts are monthly (Tipalti).
-- Tiered pricing by number of accounts (for example "up to 15 accounts for $29") is not possible on a sub-account app. It would need a second app with an Agency target. Not recommended until there is demand.
+How the marketplace bills (from its documentation):
 
-Recommended plans (price per client account per month, each paid plan with a 14 day trial):
+- The app's target is **Sub-account** and cannot be changed. It is billed **per install**, so an agency with 20 clients pays for 20 installs and a business pays for its own one.
+- **Differential pricing** lets an agency charge its own client more than it pays you: you charge the agency $5, the agency charges the client $15 to $29 (its choice) and keeps the difference. The marketplace does that billing. This is what turns SubSync from a cost into income for the agency.
+- The marketplace keeps 15% (about $4.25 of each $5 reaches you). Payouts are monthly.
+- Tiered pricing by number of accounts is not possible on a sub-account app, which fits the flat model.
 
-| Plan | Price | What it unlocks |
-| --- | --- | --- |
-| Free | $0 | Overview / My account, contact search, onboarding checklist, settings. Agencies: up to 5 client accounts. |
-| Starter | $9 | + health, stale deals, leads, inbox, pipeline, call lists, duplicates, email health, alerts |
-| Pro | $19 | + Clients page and reports, exports, AI connector, Team, report builder |
+What an agency earns at $15 per client:
 
-Your saved portal plan is a single paid plan at $5 per account. Both work with the code; the
-feature split lives in `src/lib/entitlements.ts`. Decide by how you want to sell:
-the single $5 plan is simplest to explain to agencies; two paid plans earn more from the
-businesses that use the call lists and pipeline tools every day. Whatever you pick, the price
-itself is only a setting in the portal, never in code.
+| Clients | Agency pays | Agency charges | Agency keeps |
+| --- | --- | --- | --- |
+| 5 | $25 | $75 | $50 |
+| 10 | $50 | $150 | $100 |
+| 25 | $125 | $375 | $250 |
+| 50 | $250 | $750 | $500 |
 
-### Steps in the portal (you do these; I do not touch billing)
+**Raising the price later** is a change in the developer portal only (for example to $7 after 500 installs; existing installs keep the price they started on). No code change.
 
-1. Developer portal > SubSync > Pricing: create the plans above (names must be exactly Free, Starter, Pro so they are easy to map).
-2. After saving, open each plan and copy its plan id.
-3. In Vercel > subsync > Settings > Environment Variables add `GHL_PLAN_IDS` with JSON like `{"<free id>":"free","<starter id>":"starter","<pro id>":"pro"}`. This is how a purchase turns into a tier.
-4. When you are ready to charge, add `ENFORCE_PLANS` = `true`. Until then every install sees every feature (so testers are never blocked).
-5. Re-deploy, then install on a test account and confirm the right tier shows.
+### What the portal looks like right now, and what has to change (you do this; I have not touched billing)
+
+Read on 30 Oct 2026: the app is set to **Freemium**, with a "Free Plan" ($0, plan id `6ae40eb4f65e3c03823476b8`) and "Pro" (monthly $5, plan id `6ae42703f65e3c03823bb53b`), and no billing meters. To match the decision above:
+
+1. Developer portal > SubSync > **Pricing**.
+2. Change "Is your app free or paid?" from Freemium to **Paid**.
+3. Keep one plan, **Pro, Monthly, $5**. Remove the Free Plan. (Deleting a plan is permanent, so this is yours to click.)
+4. Set the free trial to **14 days**.
+5. Turn on **differential pricing** (the setting that lets an agency set its own client price) if the portal shows it for your app type.
+6. Save.
+
+The app does not read plan ids any more, so changing the portal plans will not break anything. Existing test installs keep working.
 
 ## 4. Permissions (scopes)
 
@@ -71,25 +77,19 @@ marketplace and approves. Nothing is lost by doing so.
 
 Nothing writes to a client's CRM data. Meeting notes are stored inside SubSync only; "Copy note" puts a ready-made note on the clipboard.
 
-Not requested, and what each would unlock (each is your call, because it changes what people approve):
+Not requested yet, and what each would unlock (each is your call, because it changes what people approve):
 
 | Scope | Unlocks | Cost of asking |
 | --- | --- | --- |
-| Notes or contacts write | One-click "file this meeting note into the contact" (with preview, confirm and a saved copy) | Large: SubSync could then change client data. Only with explicit confirmation on every note, and tested on the test account first |
+| `contacts.write` (optional) | **Data cleanup can apply its changes** (phone numbers, name casing, bulk tags), and later one-click filing of meeting notes | Large: SubSync could then change client data. Every change is previewed, confirmed by typing the number, re-checked per contact, saved with its original value and can be undone. Without it the tool still previews, and says plainly that applying needs approval |
 | `contacts.write` | Tidying duplicates inside the CRM | Large; not recommended: the platform has no safe merge call |
 
 Note: sub-account installs must not ask for agency-only scopes. `oauth.readonly` and `oauth.write` are only used on the agency path; if the
 platform ever rejects them for a business install, remove them from the app and keep agency installs on bulk install.
 
-## 5. Which plan gets which feature
+## 5. What every install gets
 
-| Feature | Free | Starter | Pro |
-| --- | --- | --- | --- |
-| Overview, contact search, setup checklist, settings | yes | yes | yes |
-| Today (daily brief), inbox, pipeline and deals, leads, alerts, duplicates, email health, call lists, appointments | | yes | yes |
-| Clients page and quarterly review, exports, team, AI connector, **meeting notes** | | | yes |
-
-Enforcement stays off until you add `ENFORCE_PLANS=true`, so testers see everything.
+Everything. There are no tiers: Today, Appointments, Meeting notes, Data cleanup, Clients, Team, call lists, duplicates, exports, the AI connector and the rest are on for every install, and the agency's clients get the same pages in their own read-only view if the agency switches it on.
 
 ## 6. Selling it by industry
 

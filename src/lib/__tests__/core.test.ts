@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { generateKeyPairSync, sign } from "node:crypto";
 import { test } from "node:test";
-import { accountLimit, canUse, entitlements, normalisePlan, planFromMarketplaceId } from "../entitlements.ts";
+import { accountLimit, canUse, entitlements, FEATURES, normalisePlan, planFromMarketplaceId } from "../entitlements.ts";
 import { actionFor, parseWebhook, verifyWebhook } from "../ghl/webhook.ts";
 import { churnRisk, engagementScore, isDormant, scoreBand, type AccountMetrics } from "../scoring.ts";
 import { bearerToken, signSession, verifySession } from "../session.ts";
@@ -42,28 +42,16 @@ test("bearerToken reads the Authorization header", () => {
 });
 
 // --- entitlements
-test("plans are only enforced when switched on", () => {
-  assert.equal(canUse("inbox", "free", false), true);
-  assert.equal(canUse("inbox", "free", true), false);
-  assert.equal(canUse("search", "free", true), true);
-  assert.equal(canUse("inbox", "pro", true), true);
-  assert.equal(accountLimit("free", true), 5);
-  assert.equal(accountLimit("free", false), null);
-  assert.equal(accountLimit("pro", true), null);
-  assert.equal(accountLimit("starter", true), null);
-  assert.equal(normalisePlan("paid"), "pro");
+test("one plan, every feature open: nothing is ever locked", () => {
+  for (const plan of ["free", "starter", "pro"] as const) {
+    for (const feature of FEATURES) assert.equal(canUse(feature, plan, true), true, plan + " " + feature);
+    assert.equal(accountLimit(plan, true), null);
+    assert.equal(Object.values(entitlements(plan, true).features).every(Boolean), true);
+  }
+  assert.equal(entitlements("free").accountLimit, null);
+  assert.equal(entitlements("free").enforced, false);
+  assert.equal(normalisePlan("paid"), "pro", "old stored values are still understood");
   assert.equal(normalisePlan("anything"), "free");
-  assert.equal(entitlements("free", true).features.pipelines, false);
-});
-
-test("starter unlocks the daily tools, pro unlocks everything", () => {
-  assert.equal(canUse("pipelines", "starter", true), true);
-  assert.equal(canUse("calls", "starter", true), true);
-  assert.equal(canUse("reports", "starter", true), false);
-  assert.equal(canUse("exports", "starter", true), false);
-  assert.equal(canUse("ai", "starter", true), false);
-  assert.equal(canUse("reports", "pro", true), true);
-  assert.equal(canUse("builder", "pro", true), true);
 });
 
 test("marketplace plan ids map to tiers through GHL_PLAN_IDS", () => {

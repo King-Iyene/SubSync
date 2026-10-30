@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useApiClient, useData } from "../session";
 import type { SyncStatus } from "../types";
 import { Btn, Card, ErrorBox, inputClass, Loading, PageHeader, timeAgo } from "../ui";
+import { ConnectionsCard } from "./connections";
 import { HealthCard } from "./health-card";
 
 type S = { staleDays: number; dormantDays: number; slaHours: number; appDomain: string; digestEnabled: boolean; customChecklist: string[]; digestHour: number | null; digestTimezone: string | null; brandName: string | null; brandColor: string | null; industryTargets?: boolean; keepTranscripts: boolean };
@@ -140,12 +141,14 @@ export function SettingsView() {
           </div>
         </Card>
 
-        <Card title="Slack">
+        <ConnectionsCard />
+
+        <Card title="Slack alerts and daily brief">
           <p className="mb-3 text-sm text-muted-foreground">
-            New critical and warning alerts are posted to a Slack channel, and a weekly summary can go out on Mondays.
-            {data.slackConfigured ? " A webhook is saved (it is never shown again)." : " Create an incoming webhook in Slack and paste its URL here."}
+            New critical and warning alerts are posted to your Slack channel, and a weekly summary can go out on Mondays.
+            {data.slackConfigured ? " A channel is saved (its address is never shown again)." : " Connect Slack above, or paste a Slack web address below."}
           </p>
-          <label htmlFor="slack" className="mb-1 block text-sm font-medium">Webhook URL</label>
+          <label htmlFor="slack" className="mb-1 block text-sm font-medium">Or paste a Slack web address (advanced)</label>
           <input id="slack" className={inputClass} type="password" autoComplete="off" placeholder={data.slackConfigured ? "Saved. Paste a new URL to replace it" : "https://hooks.slack.com/services/..."} value={slack} onChange={(e) => setSlack(e.target.value)} />
           <label className="mt-3 flex items-center gap-2 text-sm"><input type="checkbox" className="size-4" checked={form.digestEnabled} onChange={(e) => setForm({ ...form, digestEnabled: e.target.checked })} /> Send the daily brief to Slack</label>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">

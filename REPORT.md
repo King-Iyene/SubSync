@@ -337,3 +337,75 @@ Verified by tests: 195 unit tests, plus the integration check covering appointme
 1. **Approve the app again on your test agency** so appointments and real names flow in (reinstall from the marketplace; the two new permissions are optional).
 2. **Filing meeting notes straight into the contact's record.** The current version stores the summary inside SubSync and offers "Copy note", with matching shown first. A one-click "file into the contact" would need a write permission and would change client data, so it should be a separate, explicit decision, tested on the test account first.
 3. **Industry on each client.** The filter and playbooks only know what is typed on the Clients page. A quick pass to set it for each client makes the whole app sharper.
+
+---
+
+# Round 4: the pricing, tiers and expanded features document
+
+The attached file is named "AgencyKit - Complete Build Prompt (CFO-Reviewed)" but its contents are the SubSync pricing and expanded-features continuation prompt, so I treated it as that. Below: each thing it asks for, what already existed, what I did, and what is left for you.
+
+## Pricing and distribution
+
+| The document says | State |
+| --- | --- |
+| $5 per client account per month, 14 day free trial, **no tiers, no free tier, no locked features** | **Code done**: every feature is open for every install; the old free, starter and pro tiers and the account limit are gone, and there is still no billing code (the marketplace collects the money). **Portal not changed by me**: the app is still set to Freemium with a $0 Free Plan and a $5 Pro plan. Moving it to Paid, removing the Free Plan, and setting the 14 day trial are the steps in `docs/PERMISSIONS_AND_PRICING.md`, because deleting a plan is permanent and it is billing |
+| Agencies resell with differential pricing ($5 to them, $15 to $29 to their client) | A portal setting, not code. Steps and the earnings table are in the guide |
+| Raise to $7 after 500 installs | A portal change only. No code |
+| Sub-account visible, agency and client both can open it | Done. The listing already says both Agency and Sub-Account can install, and the agency can switch on a read-only client view per account |
+| **Contradiction inside the document**: it asks for "sub-account visible" distribution, then in the notes says "Agency Only for Phase 1" and to flip to "Agency and Sub-account" in Phase 3 | I left the portal as it is (both can install), which already matches the first description. If you want the second, it is one setting, but it would stop businesses installing it for themselves |
+
+## Features it asks for
+
+| Item | State |
+| --- | --- |
+| Cross-account contact search, completeness report, stale deals, onboarding checklist (Phase 1) | Already built and live |
+| Agency view: overview, "needs attention today", client health and churn alerts, CSV export | Built (Today, Accounts, Alerts, exports) |
+| Weekly email digest per sub-account | Not built: needs an email service key. The daily brief goes to Slack |
+| Sub-account view: own dashboard, data health, stale deals, onboarding, pipeline | Built (business and client views) |
+| **Duplicates with one-click merge** | The review queue is built; **one-click merge is not possible**: the platform has no public merge call (documented in Round 2). The queue links to each contact and the person merges in the platform |
+| **Contact cleanup tools: bulk tag, bulk update** (the "Insycle gap") | **Built this round: Data cleanup.** Standard phone numbers, fix ALL CAPS or lower case names, add or remove a tag for contacts matching a filter. See below |
+| Scopes `contacts.write`, `locations/customFields.readonly`, `conversations/message.readonly` | Not added. `contacts.write` is only needed for Data cleanup to apply (and later filing meeting notes); I did not add it to the portal because it lets the app change client data, which should be your explicit click. Custom fields are not used by any feature. Message text is deliberately never stored, which is the privacy promise for clinics, so that scope stays off |
+| Phase 2: Zoom, Meet, Fathom recordings into contact records | Built as the Meeting notes inbox (private address per account, summary and action items, matched to the contact, transcripts off by default, copy note). Filing straight into the contact record needs `contacts.write` and is the next step once you approve it |
+| Phase 2: white-label branding | Partly: your name and colour on printed reports and quarterly reviews. Not a logo on the client view |
+| Phase 2: API access | The read-only AI connector (MCP) already exists |
+| Phase 2: pipeline velocity and forecast, win/loss | Already built (Pipeline) |
+| Phase 2: phone validation | Built (invalid and disposable numbers flagged on Leads); Data cleanup now also fixes the format |
+| Phase 2: email deliverability (bounce and spam rates) | DNS sender checks only. Bounce and spam rates are not available to this app |
+| Faster sync | A cron setting, unchanged |
+
+## Claims in the document I could not confirm
+
+- "No existing marketplace app does cross-sub-account intelligence" and a competitor with "197K installs": my searches found reporting connectors and per-account tools, and I could not read marketplace listing pages, so neither claim is verified. I would not use them in the listing copy.
+- "Refresh tokens expire in 30 days": the platform's documentation says a refresh token lasts up to a year and rotates on every use; the app follows the documentation.
+- The tech stack (Next.js 14, anon Supabase key in the browser, a billing page in settings) differs from what is built (Next.js 16; the database is only reachable from the server; no billing page by design).
+
+## Data cleanup (new)
+
+The one feature that changes a client's contacts, so it is built around safety:
+
+1. **Preview first.** You choose the clean-ups, the tool lists every change with its before and after. Nothing in the client's account changes.
+2. **Typed confirmation.** To apply you type the number of changes (for example 148). A preview older than a day must be run again.
+3. **Re-checked per contact.** Right before each change the contact is read again. If anyone edited it since the preview, it is skipped, never overwritten.
+4. **Saved original values** for every change, and an **Undo this run** that puts them back (again only where the value is still the one we set).
+5. **Only what you asked.** Phones are written as +digits and a bare local number is left alone unless you give a country code (it is never guessed); names are only fixed when entirely CAPITALS or lower case, so McDonald is left alone; a tag always needs a filter and can never go to everyone.
+6. **Logged.** Every preview, apply and undo is in the action log. One account at a time. Never available in the client view.
+7. **Without the write permission it still previews**, and says plainly that applying needs approval. Nothing is attempted.
+
+Tested: 6 unit tests for the planning rules, 8 against a fake platform that records every request (reads before it writes, skips a changed contact, undo only if still ours, tags use the add and remove calls and never replace other tags, permission refusals, missing contacts, errors), and the integration check: preview changes nothing, wrong or missing confirmation refused, a client view refused, apply, a run cannot be applied twice, undo restores the originals, an edit made between preview and apply survives, tags apply once, every step logged, a business sees only its own runs. **Not tested against the real platform**: the install has not approved the write permission, and I may not add it. The first real run should be on the KD Squares Test account.
+
+---
+
+# Round 5: sign-in connections for Slack, Fathom and Zoom
+
+Replaces pasted web addresses with real sign-ins. Steps for you are in `docs/CONNECTIONS_SETUP.md`.
+
+| Item | State |
+| --- | --- |
+| Slack "Add to Slack" | Built. The person picks a channel on Slack's own page; SubSync keeps the channel's address as the install's Slack setting, so alerts and the daily brief work unchanged. Needs a Slack app (yours to create) |
+| Fathom sign-in | Built. SubSync signs in, registers its own webhook (summary and action items, no transcript), verifies every delivery's signature, and files each meeting in the account that knows the most attendees. Needs Fathom's app form (yours) |
+| Zoom sign-in | Built around Zoom's own AI meeting summary event, so no AI key is needed. Needs the host on a paid plan with meeting summaries on. Needs a Zoom app (yours) |
+| Verified here | 11 unit tests (signatures, sign-in state, token exchange, refresh, routing, parsing) and a 40-step integration check with signed pretend deliveries: wrong, changed and old signatures refused; duplicates kept once; a business never leaves its own account; no secret in anything a browser receives; disconnect works and kills the address |
+| **Not verified** | A real sign-in at any of the three, and a real Fathom delivery or Zoom summary. That needs the three apps above |
+| Bug found and fixed on the way | Data cleanup's preview accepted an account id that did not exist for an agency session. It now returns "Account not found" |
+| Tokens | Encrypted with the same key as the platform tokens; refresh tokens are saved the moment they are rotated; a provider that refuses a refresh marks the connection "needs to be connected again" instead of retrying forever |
+| Design | New sidebar (dark, icons, pinned to the screen so it no longer scrolls away), pill tabs, warmer palette and card styling |

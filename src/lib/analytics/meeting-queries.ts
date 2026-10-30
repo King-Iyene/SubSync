@@ -56,7 +56,7 @@ export async function recentCount(installationId: string, locationId: string): P
 }
 
 // Store what arrived. The transcript is dropped unless the account chose to keep transcripts.
-export async function recordMeeting(hook: NonNullable<Awaited<ReturnType<typeof resolveHook>>>, m: Meeting): Promise<{ id: string; matched: boolean }> {
+export async function recordMeeting(hook: NonNullable<Awaited<ReturnType<typeof resolveHook>>>, m: Meeting, externalId: string | null = null): Promise<{ id: string | null; matched: boolean; duplicate: boolean }> {
   const db = sql();
   const emails = m.attendees.map((a) => a.email).filter((e): e is string => !!e);
   const candidates = emails.length
@@ -64,11 +64,13 @@ export async function recordMeeting(hook: NonNullable<Awaited<ReturnType<typeof 
     : [];
   const hit = matchContact(m.attendees, candidates.map((c) => ({ contactId: c.contact_id as string, email: c.email as string })));
   const [row] = await db`
-    insert into meeting_notes (installation_id, location_id, source, title, started_at, attendees, summary, action_items, transcript, recording_url, contact_id)
+    insert into meeting_notes (installation_id, location_id, source, title, started_at, attendees, summary, action_items, transcript, recording_url, contact_id, external_id)
     values (${hook.installationId}, ${hook.locationId}, ${m.source}, ${m.title}, ${m.startedAt}, ${db.json(m.attendees as never)}, ${m.summary}, ${db.json(m.actionItems as never)},
-      ${hook.keepTranscripts ? m.transcript : null}, ${m.recordingUrl}, ${hit?.contactId ?? null}) returning id`;
-  await db`update meeting_hooks set last_used_at = now() where id = ${hook.id}`;
-  return { id: row.id as string, matched: hit !== null };
+      ${hook.keepTranscripts ? m.transcript : null}, ${m.recordingUrl}, ${hit?.contactId ?? null}, ${externalId})
+    on conflict do nothing returning id`;
+  // A connection (Fathom, Zoom) has no private address to stamp, and a repeat delivery of the same meeting is not saved twice.
+  if (hook.id) await db`update meeting_hooks set last_used_at = now() where id = ${hook.id}`;
+  return { id: (row?.id as string | undefined) ?? null, matched: hit !== null, duplicate: !row };
 }
 
 export type MeetingRow = {

@@ -1,5 +1,6 @@
 "use client";
 
+import { Sparkles } from "lucide-react";
 import type { ReactNode } from "react";
 import type { ApiError } from "./session";
 import type { Band } from "./types";
@@ -29,15 +30,16 @@ export const daysLabel = (d: number | null) => (d === null ? "never" : d === 0 ?
 export type Tone = "good" | "warn" | "bad" | "info" | "neutral";
 
 const toneClass: Record<Tone, string> = {
-  good: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
-  warn: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
-  bad: "bg-red-500/15 text-red-700 dark:text-red-300",
-  info: "bg-sky-500/15 text-sky-700 dark:text-sky-300",
-  neutral: "bg-muted text-muted-foreground",
+  good: "bg-emerald-500/12 text-emerald-800 ring-1 ring-inset ring-emerald-600/15 dark:text-emerald-300",
+  warn: "bg-amber-500/14 text-amber-900 ring-1 ring-inset ring-amber-600/20 dark:text-amber-300",
+  bad: "bg-red-500/10 text-red-800 ring-1 ring-inset ring-red-600/15 dark:text-red-300",
+  info: "bg-primary/10 text-primary ring-1 ring-inset ring-primary/15",
+  neutral: "bg-muted text-muted-foreground ring-1 ring-inset ring-border",
 };
+const dotClass: Record<Tone, string> = { good: "bg-emerald-500", warn: "bg-amber-500", bad: "bg-red-500", info: "bg-primary", neutral: "bg-muted-foreground/50" };
 
 export function Badge({ tone = "neutral", children }: { tone?: Tone; children: ReactNode }) {
-  return <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap ${toneClass[tone]}`}>{children}</span>;
+  return <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap ${toneClass[tone]}`}><span aria-hidden className={`size-1.5 rounded-full ${dotClass[tone]}`} />{children}</span>;
 }
 
 const bandTone: Record<Band, Tone> = { thriving: "good", healthy: "good", watch: "warn", at_risk: "bad" };
@@ -56,34 +58,35 @@ export const severityTone = (s: string): Tone => (s === "critical" ? "bad" : s =
 
 export function Card({ title, action, children, className = "" }: { title?: string; action?: ReactNode; children: ReactNode; className?: string }) {
   return (
-    <section className={`rounded-xl border bg-card text-card-foreground print:break-inside-avoid ${className}`}>
+    <section className={`rounded-2xl border bg-card text-card-foreground shadow-[var(--shadow-card)] print:break-inside-avoid print:shadow-none ${className}`}>
       {(title || action) && (
-        <header className="flex items-center justify-between gap-3 border-b px-4 py-3">
-          {title && <h2 className="text-sm font-semibold">{title}</h2>}
+        <header className="flex items-center justify-between gap-3 border-b px-5 py-3.5">
+          {title && <h2 className="text-[0.9rem] font-semibold">{title}</h2>}
           {action}
         </header>
       )}
-      <div className="p-4">{children}</div>
+      <div className="p-5">{children}</div>
     </section>
   );
 }
 
 export function Stat({ label, value, sub, tone }: { label: string; value: ReactNode; sub?: ReactNode; tone?: Tone }) {
   return (
-    <div className="rounded-xl border bg-card p-4">
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className={`mt-1 text-2xl font-semibold tracking-tight ${tone === "bad" ? "text-red-600 dark:text-red-400" : tone === "warn" ? "text-amber-600 dark:text-amber-400" : ""}`}>{value}</p>
-      {sub && <p className="mt-1 text-xs text-muted-foreground">{sub}</p>}
+    <div className={`relative overflow-hidden rounded-2xl border bg-card p-4 pl-5 shadow-[var(--shadow-card)] print:shadow-none`}>
+      <span aria-hidden className={`absolute inset-y-0 left-0 w-1 ${tone === "bad" ? "bg-red-500" : tone === "warn" ? "bg-amber-500" : tone === "good" ? "bg-emerald-500" : "bg-primary/70"}`} />
+      <p className="text-xs font-medium text-muted-foreground">{label}</p>
+      <p className={`tnum mt-1.5 text-[1.7rem] font-semibold leading-none tracking-tight ${tone === "bad" ? "text-red-700 dark:text-red-400" : tone === "warn" ? "text-amber-700 dark:text-amber-400" : tone === "good" ? "text-emerald-700 dark:text-emerald-400" : ""}`}>{value}</p>
+      {sub && <p className="mt-2 text-xs leading-5 text-muted-foreground">{sub}</p>}
     </div>
   );
 }
 
 export function PageHeader({ title, subtitle, actions }: { title: string; subtitle?: string; actions?: ReactNode }) {
   return (
-    <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+    <div className="mb-7 flex flex-wrap items-start justify-between gap-3 border-b pb-5">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-        {subtitle && <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{subtitle}</p>}
+        <h1 className="text-[1.65rem] font-semibold leading-tight tracking-tight">{title}</h1>
+        {subtitle && <p className="mt-1.5 max-w-2xl text-sm leading-6 text-muted-foreground">{subtitle}</p>}
       </div>
       {actions && <div className="flex flex-wrap gap-2 print:hidden">{actions}</div>}
     </div>
@@ -92,21 +95,26 @@ export function PageHeader({ title, subtitle, actions }: { title: string; subtit
 
 export function Empty({ title, body }: { title: string; body?: string }) {
   return (
-    <div className="rounded-xl border border-dashed p-10 text-center">
-      <p className="text-sm font-medium">{title}</p>
+    <div className="rounded-2xl border border-dashed bg-card/60 p-10 text-center">
+      <span aria-hidden className="mx-auto mb-3 flex size-10 items-center justify-center rounded-full bg-accent text-accent-foreground"><Sparkles className="size-5" /></span>
+      <p className="text-sm font-semibold">{title}</p>
       {body && <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">{body}</p>}
     </div>
   );
 }
 
 export function Loading({ label = "Loading..." }: { label?: string }) {
-  return <p className="py-10 text-center text-sm text-muted-foreground" role="status">{label}</p>;
+  return (
+    <p className="flex items-center justify-center gap-2 py-10 text-center text-sm text-muted-foreground" role="status">
+      <span aria-hidden className="size-4 animate-spin rounded-full border-2 border-primary/25 border-t-primary" />{label}
+    </p>
+  );
 }
 
 export function ErrorBox({ error, onRetry }: { error: ApiError | Error; onRetry?: () => void }) {
   const upgrade = (error as ApiError).status === 402;
   return (
-    <div className={`rounded-xl border p-6 text-center ${upgrade ? "border-sky-500/40 bg-sky-500/5" : "border-red-500/40 bg-red-500/5"}`}>
+    <div className={`rounded-2xl border p-6 text-center ${upgrade ? "border-primary/30 bg-primary/5" : "border-red-500/30 bg-red-500/5"}`}>
       <p className="text-sm font-medium">{upgrade ? "This feature is part of the paid plan" : "Something went wrong"}</p>
       <p className="mt-1 text-sm text-muted-foreground">{error.message}</p>
       {onRetry && !upgrade && (
@@ -123,19 +131,19 @@ export function Btn({
 }: { children: ReactNode; onClick?: () => void; variant?: "primary" | "secondary" | "ghost"; disabled?: boolean; type?: "button" | "submit"; title?: string }) {
   const style =
     variant === "primary"
-      ? "bg-primary text-primary-foreground hover:bg-primary/85"
+      ? "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 active:translate-y-px"
       : variant === "ghost"
-        ? "hover:bg-muted"
-        : "border hover:bg-muted";
+        ? "text-muted-foreground hover:bg-muted hover:text-foreground"
+        : "border bg-card shadow-sm hover:border-primary/40 hover:bg-accent/50 active:translate-y-px";
   return (
     <button type={type} title={title} disabled={disabled} onClick={onClick}
-      className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors disabled:opacity-50 ${style}`}>
+      className={`inline-flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 ${style}`}>
       {children}
     </button>
   );
 }
 
-export const inputClass = "w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/50";
+export const inputClass = "w-full rounded-lg border bg-card px-3 py-2 text-sm shadow-sm outline-none transition-colors hover:border-primary/30 focus-visible:border-primary/50 focus-visible:ring-2 focus-visible:ring-ring/30";
 
 export function ExtLink({ href, children }: { href: string; children: ReactNode }) {
   return <a href={href} target="_blank" rel="noopener noreferrer" className="font-medium text-primary underline-offset-4 hover:underline">{children}</a>;
@@ -193,19 +201,19 @@ export function Table({ head, children }: { head: ReactNode; children: ReactNode
   return (
     <div className="overflow-x-auto rounded-xl border bg-card print:overflow-visible">
       <table className="w-full min-w-[640px] text-sm">
-        <thead className="border-b bg-muted/40 text-left text-xs text-muted-foreground">{head}</thead>
-        <tbody className="divide-y">{children}</tbody>
+        <thead className="border-b bg-muted/60 text-left text-[0.7rem] uppercase tracking-wide text-muted-foreground">{head}</thead>
+        <tbody className="divide-y [&>tr]:transition-colors [&>tr:hover]:bg-accent/40">{children}</tbody>
       </table>
     </div>
   );
 }
 
 export const Th = ({ children, onClick, active, className = "" }: { children: ReactNode; onClick?: () => void; active?: boolean; className?: string }) => (
-  <th scope="col" className={`px-3 py-2 font-medium ${className}`} aria-sort={active ? "descending" : undefined}>
+  <th scope="col" className={`px-3 py-2.5 font-semibold ${className}`} aria-sort={active ? "descending" : undefined}>
     {onClick ? (
       <button type="button" onClick={onClick} className={`inline-flex items-center gap-1 hover:text-foreground ${active ? "text-foreground" : ""}`}>{children}{active ? " ↓" : ""}</button>
     ) : children}
   </th>
 );
 
-export const Td = ({ children, className = "" }: { children: ReactNode; className?: string }) => <td className={`px-3 py-2 align-top ${className}`}>{children}</td>;
+export const Td = ({ children, className = "" }: { children: ReactNode; className?: string }) => <td className={`px-3 py-2.5 align-top ${className}`}>{children}</td>;

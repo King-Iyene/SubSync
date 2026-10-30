@@ -1,5 +1,5 @@
 export type ViewId =
-  | "today" | "overview" | "accounts" | "account" | "search" | "deals" | "inbox" | "onboarding" | "email" | "duplicates" | "alerts" | "settings" | "help" | "pipeline" | "leads" | "calls" | "clients" | "team" | "appointments" | "meetings";
+  | "today" | "overview" | "accounts" | "account" | "search" | "deals" | "inbox" | "onboarding" | "email" | "duplicates" | "alerts" | "settings" | "help" | "pipeline" | "leads" | "calls" | "clients" | "team" | "appointments" | "meetings" | "cleanup";
 
 export type GoFn = (view: ViewId, locationId?: string) => void;
 
@@ -20,6 +20,7 @@ export const NAV: Array<{ id: Exclude<ViewId, "account">; label: string; feature
   { id: "team", label: "Team", feature: "team", group: "Clients" },
   { id: "onboarding", label: "Setup", feature: "onboarding", group: "Tidy up" },
   { id: "duplicates", label: "Duplicates", feature: "duplicates", group: "Tidy up" },
+  { id: "cleanup", label: "Data cleanup", feature: "cleanup", group: "Tidy up" },
   { id: "settings", label: "Settings", feature: "settings", group: "" },
   { id: "help", label: "Getting started", feature: "overview", group: "" },
 ];
