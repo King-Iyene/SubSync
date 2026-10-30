@@ -14,6 +14,7 @@ type Client = {
   contactGap: { days: number | null; flagged: boolean };
   progress: { daysSinceInstall: number | null; firstLeadAt: string | null; firstWonAt: string | null; needsIntervention: boolean };
   activity: string;
+  setup: { score: number; missing: string[] };
 };
 type Clients = {
   clients: Client[];
@@ -47,6 +48,7 @@ function Editor({ c, onSaved }: { c: Client; onSaved: () => void }) {
   return (
     <div className="mt-3 rounded-xl border bg-muted/20 p-4">
       <p className="text-sm text-muted-foreground">{c.activity}</p>
+      <p className="mt-2 text-sm">Setup score <strong>{c.setup.score}/100</strong>{c.setup.missing.length > 0 ? <span className="text-muted-foreground">. Missing: {c.setup.missing.join(", ")}.</span> : <span className="text-muted-foreground">. Fully set up.</span>}</p>
       <div className="mt-3 grid gap-3 sm:grid-cols-3">
         <div><label htmlFor={`fee-${c.locationId}`} className="mb-1 block text-xs text-muted-foreground">What they pay you per month ($)</label><input id={`fee-${c.locationId}`} className={inputClass} inputMode="decimal" value={fee} onChange={(e) => setFee(e.target.value.replace(/[^0-9.]/g, ""))} /></div>
         <div><label htmlFor={`ren-${c.locationId}`} className="mb-1 block text-xs text-muted-foreground">Contract renews on</label><input id={`ren-${c.locationId}`} type="date" className={inputClass} value={renewal} onChange={(e) => setRenewal(e.target.value)} /></div>
@@ -89,7 +91,7 @@ function ClientsTab({ data, reload }: { data: Clients; reload: () => void }) {
         </Card>
       )}
 
-      <Table head={<tr><Th>Client</Th><Th>Health</Th><Th className="text-right">Fee</Th><Th className="text-right">Value created</Th><Th>Renewal</Th><Th>Last spoken</Th><Th>{""}</Th></tr>}>
+      <Table head={<tr><Th>Client</Th><Th>Health</Th><Th className="text-right">Fee</Th><Th className="text-right">Value created</Th><Th>Renewal</Th><Th>Last spoken</Th><Th className="text-right">Setup</Th><Th>{""}</Th></tr>}>
         {data.clients.flatMap((c) => [
           <tr key={c.locationId} className="hover:bg-muted/40">
             <Td className="font-medium">{c.name ?? "Unnamed account"}
@@ -100,9 +102,10 @@ function ClientsTab({ data, reload }: { data: Clients; reload: () => void }) {
             <Td className="text-right tabular-nums">{c.roi ? `${c.roi.pipelineMultiple}x pipeline` : <span className="text-muted-foreground">needs a fee</span>}</Td>
             <Td>{c.renewal ? (c.renewal.daysLeft < 0 ? "Overdue" : `${c.renewal.daysLeft} days`) : <span className="text-muted-foreground">not set</span>}</Td>
             <Td>{c.contactGap.days === null ? <Badge tone="warn">Never logged</Badge> : c.contactGap.flagged ? <Badge tone="warn">{c.contactGap.days} days ago</Badge> : `${c.contactGap.days} days ago`}</Td>
+            <Td className="text-right tabular-nums">{c.setup.score}</Td>
             <Td><button type="button" className="text-sm underline" onClick={() => setOpen(open === c.locationId ? null : c.locationId)}>{open === c.locationId ? "Close" : "Details"}</button></Td>
           </tr>,
-          ...(open === c.locationId ? [<tr key={`${c.locationId}-e`}><td colSpan={7} className="px-3 pb-3"><Editor c={c} onSaved={reload} /></td></tr>] : []),
+          ...(open === c.locationId ? [<tr key={`${c.locationId}-e`}><td colSpan={8} className="px-3 pb-3"><Editor c={c} onSaved={reload} /></td></tr>] : []),
         ])}
       </Table>
       <p className="text-xs text-muted-foreground">Value created is the new pipeline from the last 30 days divided by the monthly fee. Fees, renewals and notes are what you enter here; SubSync does not read them from anywhere.</p>
@@ -202,6 +205,7 @@ function QbrTab({ accounts }: { accounts: Array<{ locationId: string; name: stri
 }
 
 export function ClientsView() {
+  const api = useApiClient();
   const { data, error, loading, reload } = useData<Clients>("clients");
   const [tab, setTab] = useState<"clients" | "compare" | "qbr">("clients");
   if (loading && !data) return <Loading />;
@@ -210,7 +214,7 @@ export function ClientsView() {
   return (
     <div>
       <div className="print:hidden">
-        <PageHeader title="Clients" subtitle="Fees, renewals, value delivered and who needs a conversation. Built to help you keep clients." />
+        <PageHeader title="Clients" subtitle="Fees, renewals, value delivered and who needs a conversation. Built to help you keep clients." actions={<Btn onClick={() => api.download("export/clients", "subsync-clients.csv")}>Export CSV</Btn>} />
         <div className="mb-4 flex gap-1 border-b" role="tablist">
           {([["clients", "Clients"], ["compare", "Compare two"], ["qbr", "Review (QBR)"]] as const).map(([id, label]) => (
             <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => setTab(id)}

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useApiClient, useData } from "../session";
 import { Badge, Btn, Card, fmtInt, fmtMoney, inputClass } from "../ui";
+import type { GoFn, ViewId } from "../nav";
 
 type Kpi = { key: string; label: string; current: number; previous: number | null; pct: number | null; money: boolean };
 type Goal = { metric: string; label: string; target: number; actual: number; pct: number; projected: number; status: "achieved" | "on_track" | "at_risk" | "behind" };
@@ -102,6 +103,30 @@ export function ExecSummary() {
           <div className="mt-3 flex items-center gap-3"><Btn variant="primary" onClick={save}>Save goals</Btn>{msg && <span className="text-sm text-red-600" role="alert">{msg}</span>}</div>
         </div>
       )}
+    </Card>
+  );
+}
+
+type Priority = { key: string; title: string; detail: string; go: string };
+
+// Plain rules over your own data (not an AI): the handful of things most worth doing today.
+export function DailyBrief({ go }: { go: GoFn }) {
+  const { data } = useData<{ priorities: Priority[] }>("daily-brief");
+  if (!data || data.priorities.length === 0) return null;
+  return (
+    <Card title="Today's priorities" className="mb-4">
+      <ol className="space-y-3">
+        {data.priorities.map((p, i) => (
+          <li key={p.key} className="flex gap-3">
+            <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium">{i + 1}</span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium">{p.title}</p>
+              <p className="text-xs text-muted-foreground">{p.detail}</p>
+            </div>
+            <Btn variant="ghost" onClick={() => go(p.go as ViewId)}>Open</Btn>
+          </li>
+        ))}
+      </ol>
     </Card>
   );
 }

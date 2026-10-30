@@ -102,7 +102,7 @@ export function PipelineView() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Pipeline" subtitle="Forecast, bottlenecks and deal risk across every client account. Everything here is calculated from deals we have synced." />
+      <PageHeader title="Pipeline" subtitle="Forecast, bottlenecks and deal risk across every client account. Everything here is calculated from deals we have synced." actions={<Btn onClick={() => api.download("export/deals", "subsync-open-deals.csv")}>Export open deals</Btn>} />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat label="Open pipeline" value={fmtMoney(data.totals.openValue)} sub={`${fmtInt(data.totals.open)} open deals`} />

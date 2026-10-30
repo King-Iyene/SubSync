@@ -7,7 +7,7 @@ import {
   Badge, BandBadge, Btn, Card, ChurnBadge, Empty, ErrorBox, ExtLink, fmtInt, fmtMoney, Loading, PageHeader, Stat, StackedBar, timeAgo,
 } from "../ui";
 import type { GoFn } from "../nav";
-import { ExecSummary } from "./exec-summary";
+import { DailyBrief, ExecSummary } from "./exec-summary";
 
 export function OverviewView({ go }: { go: GoFn }) {
   const api = useApiClient();
@@ -63,6 +63,7 @@ export function OverviewView({ go }: { go: GoFn }) {
         </p>
       )}
 
+      <DailyBrief go={go} />
       <ExecSummary />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">

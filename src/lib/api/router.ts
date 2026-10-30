@@ -25,6 +25,8 @@ import {
   activitySummary, anomalyIndices, compareAccounts, contactGap, goalProgress, periodChange, renewalStatus, roi, segmentStats, zAnomaly,
 } from "../analytics/client-intel";
 import { accountHistory, clientExtras, periodFigures, saveProfile, type ClientExtra, type ProfilePatch } from "../analytics/client-queries";
+import { dailyPriorities, replyAging, setupScore, worstDomainStatus, type SetupFacts } from "../analytics/comms-intel";
+import { afterHours, communicationGaps } from "../analytics/comms-queries";
 import { badDataSamples, contactOverview, topLeads, vips } from "../analytics/contact-queries";
 import { getGoals, GOAL_METRICS, loadDeals, pipelineTrend, setGoal, type GoalMetric } from "../analytics/pipeline-queries";
 import { authenticate, isResponse, json, type AuthContext } from "./auth";
@@ -398,6 +400,29 @@ async function exportCsv(ctx: Ctx, kind: string) {
         { label: "Unread", value: (r) => r.unreadCount }, { label: "Over SLA", value: (r) => (r.overSla ? "yes" : "no") }, { label: "Waiting hours", value: (r) => r.waitingHours },
       ]));
     }
+    case "deals": {
+      const deals = await loadDeals(ctx.installationId, await allowedIds(ctx));
+      const risky = riskyDeals(deals, Date.now(), 100000);
+      return file("subsync-open-deals", toCsv(risky, [
+        { label: "Account", value: (d) => d.locationName }, { label: "Pipeline", value: (d) => d.pipelineName }, { label: "Stage", value: (d) => d.stageName },
+        { label: "Deal", value: (d) => d.name }, { label: "Contact", value: (d) => d.contactName }, { label: "Value", value: (d) => d.value },
+        { label: "Created", value: (d) => (d.createdAt ? new Date(d.createdAt).toISOString() : "") },
+        { label: "Risk score", value: (d) => d.score }, { label: "Why", value: (d) => d.reasons.join("; ") },
+      ]));
+    }
+    case "clients": {
+      const now = Date.now();
+      const allowed = await allowedIds(ctx);
+      const [{ accounts, links }, extras, domainOf] = await Promise.all([accountsFor(ctx), clientExtras(ctx.installationId, allowed), domainStatusByAccount(ctx.installationId)]);
+      const rows = accounts.filter((a) => !a.ignored).map((a) => clientRow(a, extras.get(a.locationId), null, links, now, domainOf(a.locationId)));
+      return file("subsync-clients", toCsv(rows, [
+        { label: "Client", value: (c) => c.name }, { label: "Health", value: (c) => c.band }, { label: "Score", value: (c) => c.score }, { label: "Churn risk", value: (c) => c.churn },
+        { label: "Monthly fee", value: (c) => c.profile.monthlyFee }, { label: "Renewal date", value: (c) => c.profile.renewalDate },
+        { label: "Days to renewal", value: (c) => c.renewal?.daysLeft ?? "" }, { label: "Last spoken", value: (c) => c.profile.lastContactedAt },
+        { label: "Pipeline value created (30d)", value: (c) => c.roi?.pipelineMultiple ?? "" }, { label: "Setup score", value: (c) => c.setup.score },
+        { label: "Industry", value: (c) => c.profile.industry }, { label: "Open pipeline", value: (c) => Math.round(c.openValue) },
+      ]));
+    }
     case "alerts": {
       const rows = await listAlerts(ctx.installationId, false, 2000);
       return file("subsync-alerts", toCsv(rows, [
@@ -563,7 +588,13 @@ async function callOutcomesView(ctx: Ctx) {
 
 const GOAL_LABEL: Record<string, string> = { monthly_revenue: "Revenue won this month", monthly_leads: "New contacts this month", monthly_deals_won: "Deals won this month" };
 
-function clientRow(a: DerivedAccount, e: ClientExtra | undefined, avgCycle: number | null, links: ReturnType<typeof deepLinks>, now: number) {
+async function domainStatusByAccount(installationId: string) {
+  const by = new Map<string, string[]>();
+  for (const d of await listDomainChecks(installationId)) if (d.locationId) by.set(d.locationId, [...(by.get(d.locationId) ?? []), d.status]);
+  return (id: string) => worstDomainStatus(by.get(id) ?? []);
+}
+
+function clientRow(a: DerivedAccount, e: ClientExtra | undefined, avgCycle: number | null, links: ReturnType<typeof deepLinks>, now: number, emailAuth: SetupFacts["emailAuth"] = "unchecked") {
   const fee = e?.monthlyFee ?? null;
   const installed = e?.installedAt ?? null;
   const daysIn = installed === null ? null : Math.floor((now - installed) / 86_400_000);
@@ -580,6 +611,7 @@ function clientRow(a: DerivedAccount, e: ClientExtra | undefined, avgCycle: numb
       // 6.7: a client well past setup with no won deal needs a conversation.
       needsIntervention: daysIn !== null && daysIn >= 30 && !hasWon,
     },
+    setup: setupScore({ pipelines: a.pipelines, calendars: a.calendars, contacts: a.contacts, completenessPct: a.completenessPct, emailAuth, daysInactive: a.daysInactive }),
     activity: activitySummary({ name: a.name ?? "this account", newContacts: e?.newContacts30d ?? a.new30d, dealsWon: e?.wonCount30d ?? 0, wonValue: e?.wonValue30d ?? 0, pipelineCreated: e?.pipelineCreated30d ?? 0, days: 30 }),
   };
 }
@@ -587,9 +619,9 @@ function clientRow(a: DerivedAccount, e: ClientExtra | undefined, avgCycle: numb
 async function clientsView(ctx: Ctx) {
   const now = Date.now();
   const allowed = await allowedIds(ctx);
-  const [{ accounts, links }, extras, deals] = await Promise.all([accountsFor(ctx), clientExtras(ctx.installationId, allowed), loadDeals(ctx.installationId, allowed)]);
+  const [{ accounts, links }, extras, deals, domainOf] = await Promise.all([accountsFor(ctx), clientExtras(ctx.installationId, allowed), loadDeals(ctx.installationId, allowed), domainStatusByAccount(ctx.installationId)]);
   const cycles = new Map(accountSummaries(deals, now).map((s) => [s.locationId, s.avgCycleDays]));
-  const rows = accounts.filter((a) => !a.ignored).map((a) => clientRow(a, extras.get(a.locationId), cycles.get(a.locationId) ?? null, links, now));
+  const rows = accounts.filter((a) => !a.ignored).map((a) => clientRow(a, extras.get(a.locationId), cycles.get(a.locationId) ?? null, links, now, domainOf(a.locationId)));
   const withFee = rows.filter((x) => x.profile.monthlyFee !== null);
   const atRisk = (x: (typeof rows)[number]) => x.band === "at_risk" || x.churn === "high" || x.dormant;
   return json({
@@ -661,14 +693,14 @@ async function clientUpdate(ctx: Ctx, locationId: string) {
 async function qbrView(ctx: Ctx, locationId: string) {
   const now = Date.now();
   const allowed = await allowedIds(ctx);
-  const [{ accounts, links }, extras, deals, history] = await Promise.all([
-    accountsFor(ctx), clientExtras(ctx.installationId, allowed), loadDeals(ctx.installationId, allowed, locationId), accountHistory(ctx.installationId, locationId),
+  const [{ accounts, links }, extras, deals, history, domainOf] = await Promise.all([
+    accountsFor(ctx), clientExtras(ctx.installationId, allowed), loadDeals(ctx.installationId, allowed, locationId), accountHistory(ctx.installationId, locationId), domainStatusByAccount(ctx.installationId),
   ]);
   const a = accounts.find((x) => x.locationId === locationId && !x.ignored);
   if (!a) return json({ error: "Account not found" }, 404);
   const avgCycle = accountSummaries(deals, now)[0]?.avgCycleDays ?? null;
   const open = (await listAlerts(ctx.installationId, false, 500)).filter((al) => al.locationId === locationId);
-  return json({ client: clientRow(a, extras.get(locationId), avgCycle, links, now), history, openAlerts: open.length, generatedAt: new Date(now).toISOString() });
+  return json({ client: clientRow(a, extras.get(locationId), avgCycle, links, now, domainOf(locationId)), history, openAlerts: open.length, generatedAt: new Date(now).toISOString() });
 }
 
 async function execSummary(ctx: Ctx) {
@@ -699,6 +731,40 @@ async function execSummary(ctx: Ctx) {
     kpis, goals: goalRows, anomalies, targets: goals,
     trend: { days: f.series.map((s) => s.day), openValue: f.series.map((s) => s.openValue), openValueAnomalies: anomalyIndices(f.series.map((s) => s.openValue)) },
   });
+}
+
+async function commsIntel(ctx: Ctx) {
+  const sc = await scope(ctx);
+  const allowed = await allowedIds(ctx);
+  const [rows, gaps, after] = await Promise.all([inbox(ctx.installationId, sc.settings.slaHours, 2000), communicationGaps(ctx.installationId, allowed), afterHours(ctx.installationId, allowed)]);
+  const waiting = rows.filter((x) => sc.permits(x.locationId) && x.lastMessageDirection === "inbound" && x.waitingHours !== null).map((x) => x.waitingHours as number);
+  return json({
+    aging: replyAging(waiting),
+    gaps: { ...gaps, deals: gaps.deals.map((d) => ({ ...d, url: sc.links.opportunities(d.locationId) })) },
+    afterHours: after,
+  });
+}
+
+async function dailyBrief(ctx: Ctx) {
+  const now = Date.now();
+  const sc = await scope(ctx);
+  const allowed = await allowedIds(ctx);
+  const [{ accounts }, speed, deals, vipList, extras, rows] = await Promise.all([
+    accountsFor(ctx), speedToLead(ctx.installationId, allowed), loadDeals(ctx.installationId, allowed), vips(ctx.installationId, allowed),
+    clientExtras(ctx.installationId, allowed), inbox(ctx.installationId, sc.settings.slaHours, 300),
+  ]);
+  const live = accounts.filter((a) => !a.ignored);
+  const late = rows.filter((x) => sc.permits(x.locationId) && x.overSla);
+  const top = riskyDeals(deals, now, 1)[0];
+  const trouble = live.filter((a) => a.band === "at_risk" || a.churn.level === "high" || a.dormant).length;
+  const renewals = [...extras.values()].filter((e) => { const s = renewalStatus(e.renewalDate, now); return s !== null && s.daysLeft <= 30; }).length;
+  const priorities = dailyPriorities({
+    newLeadsLastHour: speed.last60, overSla: late.length, oldestWaitingHours: late.reduce((m, x) => Math.max(m, x.waitingHours ?? 0), 0) || null,
+    topDeal: top && top.score >= 60 && top.value > 0 ? { name: top.name ?? top.contactName ?? "A deal", account: top.locationName, value: top.value, score: top.score, reason: top.reasons[0] ?? "It needs attention" } : null,
+    vipsNeedingContact: vipList.filter((v) => v.needsContact).length, atRiskAccounts: trouble, dormantAccounts: 0, renewalsWithin30: renewals,
+    staleValue: live.reduce((s, a) => s + a.revenueAtRisk, 0), staleDeals: live.reduce((s, a) => s + a.staleOpps, 0),
+  });
+  return json({ priorities });
 }
 
 async function goalsView(ctx: Ctx) {
@@ -748,7 +814,7 @@ async function digestPreview(ctx: Ctx) {
 
 const FEATURE_FOR: Record<string, Feature> = {
   search: "search", onboarding: "onboarding", stale: "stale", inbox: "inbox", pipelines: "pipelines", duplicates: "duplicates", email: "email",
-  alerts: "alerts", settings: "settings", export: "exports", digest: "reports", "api-keys": "ai", hygiene: "stale", "pipeline-intel": "pipelines", "contact-intel": "activity", clients: "reports", qbr: "reports", "call-queue": "calls", "call-lists": "calls", "call-outcomes": "calls",
+  alerts: "alerts", settings: "settings", export: "exports", digest: "reports", "api-keys": "ai", hygiene: "stale", "pipeline-intel": "pipelines", "contact-intel": "activity", clients: "reports", qbr: "reports", "comms-intel": "inbox", "call-queue": "calls", "call-lists": "calls", "call-outcomes": "calls",
 };
 
 export async function handle(request: Request, segments: string[]): Promise<Response> {
@@ -787,6 +853,8 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       if (a === "call-outcomes") return await callOutcomesView(ctx);
       if (a === "goals") return await goalsView(ctx);
       if (a === "exec-summary") return await execSummary(ctx);
+      if (a === "daily-brief") return await dailyBrief(ctx);
+      if (a === "comms-intel") return await commsIntel(ctx);
       if (a === "clients" && !b) return await clientsView(ctx);
       if (a === "clients" && b === "compare") return await clientsCompare(ctx);
       if (a === "qbr" && b && LOCATION_ID.test(b)) return await qbrView(ctx, b);

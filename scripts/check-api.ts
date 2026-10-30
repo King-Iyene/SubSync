@@ -308,6 +308,29 @@ async function main() {
   assert.equal((await upd({ monthlyFee: null, renewalDate: null, industry: null, notes: null })).status, 200);
   console.log("clients + QBR + executive summary: ok");
 
+  // --- communication analysis, daily priorities, setup score, exports
+  const ci2 = await call("/api/app/comms-intel", { token });
+  assert.equal(ci2.status, 200);
+  assert.equal(ci2.body.aging.buckets.length, 6);
+  assert.equal(ci2.body.aging.buckets.reduce((s: number, b: { count: number }) => s + b.count, 0), ci2.body.aging.total);
+  assert.ok(ci2.body.gaps.total > 0 && ci2.body.gaps.stages.length > 0, "quiet deals found");
+  assert.ok(ci2.body.afterHours.leads > 100 && ci2.body.afterHours.afterHoursPct >= 0);
+  const db2 = await call("/api/app/daily-brief", { token });
+  assert.equal(db2.status, 200);
+  assert.ok(Array.isArray(db2.body.priorities) && db2.body.priorities.length <= 5);
+  assert.ok(db2.body.priorities.every((p: { go: string; title: string }) => p.go && p.title));
+  const cl3 = await call("/api/app/clients", { token });
+  assert.ok(cl3.body.clients.every((x: { setup: { score: number } }) => x.setup.score >= 0 && x.setup.score <= 100));
+  for (const kind of ["deals", "clients"]) {
+    const res = await fetch(BASE + "/api/app/export/" + kind, { headers: { Authorization: "Bearer " + token } });
+    assert.equal(res.status, 200, kind);
+    assert.ok((res.headers.get("content-type") ?? "").includes("text/csv"), kind + " is a CSV");
+    const text = await res.text();
+    assert.ok(text.split("\r\n").length > 5, kind + " has rows");
+  }
+  assert.equal((await call("/api/app/export/nope", { token })).status, 404);
+  console.log("communication + priorities + setup + exports: ok");
+
   // Leave the demo data as we found it.
   await sql()`delete from domain_checks where domain in ('example-demo.com', 'other-demo.org')`;
   await closeDb();

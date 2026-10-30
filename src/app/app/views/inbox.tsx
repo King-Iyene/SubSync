@@ -1,6 +1,7 @@
 "use client";
 
 import { useApiClient, useData } from "../session";
+import { CommsSections } from "./comms-sections";
 import { Badge, Btn, Card, Empty, ErrorBox, ExtLink, Loading, PageHeader, timeAgo } from "../ui";
 
 type Item = {
@@ -58,6 +59,7 @@ export function InboxView() {
           </Card>
         </div>
       )}
+      <CommsSections />
       <p className="mt-4 text-xs text-muted-foreground">We store only who wrote, when and through which channel. Message text is never copied.</p>
     </div>
   );
