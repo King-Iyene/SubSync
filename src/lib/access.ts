@@ -71,7 +71,7 @@ type Method = "GET" | "POST" | "PUT" | "DELETE";
 // optionally the second. Everything not listed is refused for that kind (default deny).
 type Rule = [Method, string, string?];
 
-const GET_VIEWS = ["overview", "accounts", "onboarding", "search", "stale", "hygiene", "inbox", "pipelines", "duplicates", "alerts", "pipeline-intel", "contact-intel", "comms-intel"];
+const GET_VIEWS = ["overview", "accounts", "onboarding", "search", "stale", "hygiene", "inbox", "pipelines", "duplicates", "alerts", "pipeline-intel", "contact-intel", "comms-intel", "deal-events", "contact"];
 
 const CLIENT_RULES: Rule[] = GET_VIEWS.map((a) => ["GET", a] as Rule);
 
@@ -83,7 +83,7 @@ const BUSINESS_RULES: Rule[] = [
   ["POST", "email", "check"], ["POST", "alerts"], ["POST", "sync"], ["POST", "call-lists"], ["POST", "call-outcomes"],
   ["POST", "settings", "test-slack"], ["POST", "settings", "purge"], ["POST", "api-keys"],
   ["DELETE", "call-lists"],
-  ["PUT", "settings"], ["PUT", "goals"], ["PUT", "accounts"],
+  ["GET", "team"], ["PUT", "team"], ["PUT", "settings"], ["PUT", "goals"], ["PUT", "accounts"],
 ];
 
 export function routeAllowed(kind: AccessKind, method: string, segments: string[]): boolean {
@@ -100,7 +100,7 @@ export function routeAllowed(kind: AccessKind, method: string, segments: string[
 
 // Pages (by nav id) each kind sees. The server enforces the same boundary; this only hides links.
 export const NAV_FOR: Record<AccessKind, ReadonlySet<string>> = {
-  agency: new Set(["overview", "accounts", "clients", "search", "deals", "pipeline", "leads", "calls", "inbox", "onboarding", "email", "duplicates", "alerts", "settings", "help"]),
-  business: new Set(["overview", "search", "deals", "pipeline", "leads", "calls", "inbox", "onboarding", "email", "duplicates", "alerts", "settings", "help"]),
+  agency: new Set(["overview", "accounts", "clients", "team", "search", "deals", "pipeline", "leads", "calls", "inbox", "onboarding", "email", "duplicates", "alerts", "settings", "help"]),
+  business: new Set(["overview", "team", "search", "deals", "pipeline", "leads", "calls", "inbox", "onboarding", "email", "duplicates", "alerts", "settings", "help"]),
   client: new Set(["overview", "search", "deals", "pipeline", "leads", "inbox", "duplicates", "onboarding", "alerts", "help"]),
 };

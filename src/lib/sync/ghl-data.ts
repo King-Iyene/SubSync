@@ -34,7 +34,18 @@ export type ContactRow = {
   dateAdded: string | null;
   lastActivityAt: string | null;
   updatedAt: string | null;
+  source: string | null;
+  dnd: boolean;
+  /** Calendar date (YYYY-MM-DD) or null. Only month and day matter to us. */
+  birthDate: string | null;
+  assignedTo: string | null;
 };
+
+// A birth date as YYYY-MM-DD, or null when it is not a real date.
+export function toDateOnly(value: unknown): string | null {
+  const iso = toIso(value);
+  return iso ? iso.slice(0, 10) : null;
+}
 
 export function mapContact(raw: unknown): ContactRow | null {
   const r = rec(raw);
@@ -60,6 +71,10 @@ export function mapContact(raw: unknown): ContactRow | null {
     dateAdded: toIso(r.dateAdded) ?? toIso(r.createdAt),
     lastActivityAt: toIso(r.lastActivity) ?? toIso(r.lastActivityDate),
     updatedAt: toIso(r.dateUpdated) ?? toIso(r.updatedAt),
+    source: str(r.source),
+    dnd: r.dnd === true,
+    birthDate: toDateOnly(r.dateOfBirth),
+    assignedTo: str(r.assignedTo),
   };
 }
 
@@ -77,6 +92,8 @@ export type OpportunityRow = {
   lastActionAt: string | null;
   createdAt: string | null;
   updatedAt: string | null;
+  assignedTo: string | null;
+  source: string | null;
 };
 
 export function mapOpportunity(raw: unknown): OpportunityRow | null {
@@ -100,6 +117,8 @@ export function mapOpportunity(raw: unknown): OpportunityRow | null {
     lastActionAt: toIso(r.lastActionDate) ?? toIso(r.lastActionAt),
     createdAt: toIso(r.createdAt),
     updatedAt: toIso(r.updatedAt),
+    assignedTo: str(r.assignedTo),
+    source: str(r.source),
   };
 }
 

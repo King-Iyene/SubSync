@@ -109,6 +109,9 @@ export async function purgeLocationData(installationId: string, locationId: stri
     await tx`delete from alerts where installation_id = ${installationId} and location_id = ${locationId}`;
     await tx`delete from domain_checks where installation_id = ${installationId} and location_id = ${locationId}`;
     await tx`delete from onboarding_tasks where installation_id = ${installationId} and location_id = ${locationId}`;
+    await tx`delete from deal_events where installation_id = ${installationId} and location_id = ${locationId}`;
+    await tx`delete from call_outcomes where installation_id = ${installationId} and location_id = ${locationId}`;
+    await tx`delete from account_profiles where installation_id = ${installationId} and location_id = ${locationId}`;
     await tx`delete from sync_jobs where installation_id = ${installationId} and location_id = ${locationId}`;
     await tx`delete from locations where installation_id = ${installationId} and location_id = ${locationId}`;
   });
@@ -120,7 +123,7 @@ export async function purgeSyncedData(installationId: string): Promise<void> {
   await sql().begin(async (tx) => {
     for (const table of [
       "cached_contacts", "cached_opportunities", "cached_conversations", "pipelines",
-      "account_metrics_daily", "alerts", "domain_checks", "onboarding_tasks", "sync_jobs", "locations",
+      "account_metrics_daily", "alerts", "domain_checks", "onboarding_tasks", "deal_events", "call_outcomes", "sync_jobs", "locations",
     ]) {
       await tx`delete from ${tx(table)} where installation_id = ${installationId}`;
     }
@@ -139,7 +142,8 @@ export async function purgeInstallation(companyId: string): Promise<void> {
     if (!row) return;
     for (const table of [
       "cached_contacts", "cached_opportunities", "cached_conversations", "pipelines",
-      "account_metrics_daily", "alerts", "domain_checks", "onboarding_tasks", "sync_jobs", "locations",
+      "account_metrics_daily", "alerts", "domain_checks", "onboarding_tasks", "deal_events", "call_outcomes", "call_lists",
+      "account_profiles", "goals", "annotations", "usage_events", "team_names", "report_templates", "sync_jobs", "locations",
     ]) {
       await tx`delete from ${tx(table)} where installation_id = ${row.id}`;
     }

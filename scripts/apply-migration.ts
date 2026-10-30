@@ -10,7 +10,7 @@ if (!file) {
   process.exit(1);
 }
 const text = readFileSync(file, "utf8");
-if (/\b(drop|truncate|delete)\b/i.test(text.replace(/--.*$/gm, ""))) {
+if (/\b(drop|truncate|delete)\b/i.test(text.replace(/--.*$/gm, "").replace(/on delete (cascade|set null)/gi, ""))) {
   console.error("Refusing to run a migration that drops, truncates or deletes. Review it and run it by hand.");
   process.exit(1);
 }

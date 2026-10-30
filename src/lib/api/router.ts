@@ -28,6 +28,8 @@ import { accountHistory, clientExtras, periodFigures, saveProfile, type ClientEx
 import { dailyPriorities, replyAging, setupScore, worstDomainStatus, type SetupFacts } from "../analytics/comms-intel";
 import { afterHours, communicationGaps } from "../analytics/comms-queries";
 import { badDataSamples, contactOverview, topLeads, vips } from "../analytics/contact-queries";
+import { contactTimeline, dndSummary, leadSources, recentDealMoves, setTeamName, teamStats, upcomingBirthdays } from "../analytics/people-queries";
+import { sourceConversion, teamLabel, teamWinRate } from "../analytics/people-intel";
 import { getGoals, GOAL_METRICS, loadDeals, pipelineTrend, setGoal, type GoalMetric } from "../analytics/pipeline-queries";
 import { authenticate, isResponse, json, type AuthContext } from "./auth";
 
@@ -538,9 +540,10 @@ async function pipelineIntel(ctx: Ctx) {
 
 async function contactIntel(ctx: Ctx) {
   const allowed = await allowedIds(ctx);
-  const [overview, leads, vipList, samples, sc] = await Promise.all([
+  const [overview, leads, vipList, samples, sc, sources, dnd, birthdays] = await Promise.all([
     contactOverview(ctx.installationId, allowed), topLeads(ctx.installationId, allowed), vips(ctx.installationId, allowed),
     badDataSamples(ctx.installationId, allowed), scope(ctx),
+    leadSources(ctx.installationId, allowed), dndSummary(ctx.installationId, allowed), upcomingBirthdays(ctx.installationId, allowed),
   ]);
   const link = (c: { locationId: string; contactId: string }) => sc.links.contact(c.locationId, c.contactId);
   return json({
@@ -548,7 +551,44 @@ async function contactIntel(ctx: Ctx) {
     topLeads: leads.map((c) => ({ ...c, url: link(c) })),
     vips: vipList.map((c) => ({ ...c, url: link(c) })),
     badData: samples.map((c) => ({ ...c, url: link(c) })),
+    sources: sources.map((s) => ({ ...s, conversion: sourceConversion(s) })),
+    dnd,
+    birthdays: birthdays.map((b) => ({ ...b, url: link(b) })),
   });
+}
+
+async function teamView(ctx: Ctx) {
+  const sc = await scope(ctx);
+  const rows = await teamStats(ctx.installationId, await allowedIds(ctx), sc.settings.staleDays);
+  return json({
+    staleDays: sc.settings.staleDays,
+    members: rows.map((r) => ({ ...r, label: teamLabel(r.userId, r.name), winRate: teamWinRate(r) })),
+  });
+}
+
+async function teamName(ctx: Ctx, userId: string) {
+  const body = (await ctx.request.json().catch(() => null)) as { name?: unknown } | null;
+  const raw = body?.name;
+  if (raw === null || raw === "") {
+    await setTeamName(ctx.installationId, userId, null);
+    return json({ ok: true });
+  }
+  if (typeof raw !== "string" || raw.trim().length === 0 || raw.length > 60) return json({ error: "Enter a name up to 60 characters" }, 400);
+  await setTeamName(ctx.installationId, userId, raw.trim());
+  return json({ ok: true });
+}
+
+async function dealMoves(ctx: Ctx) {
+  const sc = await scope(ctx);
+  const moves = await recentDealMoves(ctx.installationId, await allowedIds(ctx));
+  return json({ moves: moves.map((m) => ({ ...m, url: sc.links.opportunities(m.locationId) })) });
+}
+
+async function contactDetail(ctx: Ctx, locationId: string, contactId: string) {
+  const sc = await scope(ctx);
+  const found = await contactTimeline(ctx.installationId, await allowedIds(ctx), locationId, contactId);
+  if (!found) return json({ error: "Contact not found" }, 404);
+  return json({ ...found, url: sc.links.contact(locationId, contactId) });
 }
 
 async function callQueueView(ctx: Ctx) {
@@ -830,7 +870,7 @@ async function digestPreview(ctx: Ctx) {
 
 const FEATURE_FOR: Record<string, Feature> = {
   search: "search", onboarding: "onboarding", stale: "stale", inbox: "inbox", pipelines: "pipelines", duplicates: "duplicates", email: "email",
-  alerts: "alerts", settings: "settings", export: "exports", digest: "reports", "api-keys": "ai", hygiene: "stale", "pipeline-intel": "pipelines", "contact-intel": "activity", clients: "reports", qbr: "reports", "comms-intel": "inbox", "call-queue": "calls", "call-lists": "calls", "call-outcomes": "calls",
+  alerts: "alerts", team: "team", "deal-events": "pipelines", contact: "search", settings: "settings", export: "exports", digest: "reports", "api-keys": "ai", hygiene: "stale", "pipeline-intel": "pipelines", "contact-intel": "activity", clients: "reports", qbr: "reports", "comms-intel": "inbox", "call-queue": "calls", "call-lists": "calls", "call-outcomes": "calls",
 };
 
 export async function handle(request: Request, segments: string[]): Promise<Response> {
@@ -864,6 +904,9 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       if (a === "health") return await healthView(ctx);
       if (a === "pipeline-intel") return await pipelineIntel(ctx);
       if (a === "contact-intel") return await contactIntel(ctx);
+      if (a === "team") return await teamView(ctx);
+      if (a === "deal-events") return await dealMoves(ctx);
+      if (a === "contact" && b && c && LOCATION_ID.test(b) && LOCATION_ID.test(c)) return await contactDetail(ctx, b, c);
       if (a === "call-queue") return await callQueueView(ctx);
       if (a === "call-lists") return await callListsView(ctx);
       if (a === "call-outcomes") return await callOutcomesView(ctx);
@@ -897,6 +940,7 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
     if (method === "PUT") {
       if (a === "settings") return await settingsUpdate(ctx);
       if (a === "goals") return await goalsUpdate(ctx);
+      if (a === "team" && b && LOCATION_ID.test(b)) return await teamName(ctx, b);
       if (a === "clients" && b && LOCATION_ID.test(b)) return await clientUpdate(ctx, b);
       if (a === "accounts" && b && LOCATION_ID.test(b) && c === "flags") return await flags(ctx, b);
       if (a === "accounts" && b && LOCATION_ID.test(b) && c === "tasks") return await taskUpdate(ctx, b);

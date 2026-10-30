@@ -91,7 +91,7 @@ export async function callQueue(installationId: string, allowed: string[] | null
     from cached_contacts c join loc on loc.location_id = c.location_id
     left join deals d on d.location_id = c.location_id and d.contact_id = c.contact_id
     left join lo on lo.location_id = c.location_id and lo.contact_id = c.contact_id
-    where c.installation_id = ${installationId} and ${cond}
+    where c.installation_id = ${installationId} and ${cond} and not c.dnd
       and coalesce(lo.outcome, '') not in ('wrong_number', 'not_interested')
       and (lo.created_at is null or lo.created_at < now() - interval '12 hours' or ${followUps}::boolean)
     order by ${order}

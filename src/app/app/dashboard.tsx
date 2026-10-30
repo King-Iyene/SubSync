@@ -20,6 +20,7 @@ import { OnboardingView } from "./views/onboarding";
 import { LeadsView } from "./views/leads";
 import { OverviewView } from "./views/overview";
 import { PipelineView } from "./views/pipeline";
+import { DealMoves, TeamView } from "./views/people";
 import { SearchView } from "./views/search";
 import { SettingsView } from "./views/settings";
 
@@ -195,7 +196,8 @@ export function Dashboard() {
       case "alerts": return <AlertsView go={go} />;
       case "settings": return <SettingsView />;
       case "help": return <HelpView go={go} />;
-      case "pipeline": return <PipelineView />;
+      case "pipeline": return <><PipelineView /><DealMoves /></>;
+      case "team": return <TeamView />;
       case "leads": return <LeadsView />;
       case "calls": return <CallsView />;
       case "clients": return <ClientsView />;

@@ -406,6 +406,40 @@ async function main() {
   assert.equal((await call(`/api/app/accounts/${roofing.locationId}`, { token })).body.clientView, false);
   console.log("agency switch for client view: ok");
 
+  // --- sources, do-not-disturb, birthdays, teamRes, deal movement, contact timeline
+  const ci3 = await call("/api/app/contact-intel", { token });
+  assert.ok(ci3.body.sources.length >= 4 && ci3.body.sources.every((s: { contacts: number; source: string }) => s.contacts > 0 && s.source));
+  assert.equal(ci3.body.sources.reduce((s: number, x: { contacts: number }) => s + x.contacts, 0), ci3.body.lifecycle ? ci3.body.sources.reduce((s: number, x: { contacts: number }) => s + x.contacts, 0) : 0);
+  assert.ok(ci3.body.dnd.dnd > 50 && ci3.body.dnd.dnd < ci3.body.dnd.total, "some contacts are do-not-disturb");
+  assert.ok(ci3.body.birthdays.every((b: { days: number }) => b.days >= 0 && b.days <= 30));
+  const queueRes = await call("/api/app/call-queue", { token });
+  const [dndRow] = await sql()`select contact_id from cached_contacts where dnd limit 1`;
+  assert.ok(!queueRes.body.rows.some((r: { contactId: string }) => r.contactId === dndRow.contact_id), "do-not-disturb contacts never reach a call list");
+  const teamRes = await call("/api/app/team", { token });
+  assert.equal(teamRes.status, 200);
+  assert.ok(teamRes.body.members.length >= 4 && teamRes.body.members.some((m: { name: string | null }) => m.name === "Dana Brooks"));
+  assert.ok(teamRes.body.members.every((m: { label: string }) => m.label));
+  const unnamed = teamRes.body.members.find((m: { name: string | null; userId: string }) => m.name === null && m.userId !== "unassigned");
+  assert.equal((await call(`/api/app/team/${unnamed.userId}`, { token, method: "PUT", body: JSON.stringify({ name: "Test Person" }) })).status, 200);
+  assert.ok((await call("/api/app/team", { token })).body.members.some((m: { name: string | null }) => m.name === "Test Person"));
+  assert.equal((await call(`/api/app/team/${unnamed.userId}`, { token, method: "PUT", body: JSON.stringify({ name: null }) })).status, 200);
+  assert.equal((await call(`/api/app/team/${unnamed.userId}`, { token, method: "PUT", body: JSON.stringify({ name: "x".repeat(61) }) })).status, 400);
+  const moveRes = await call("/api/app/deal-events", { token });
+  assert.ok(moveRes.body.moves.length > 10 && moveRes.body.moves.every((m: { toLabel: string | null }) => m.toLabel));
+  const [oneContact] = await sql()`select location_id, contact_id from cached_contacts where location_id = ${roofing.locationId} limit 1`;
+  const timelineRes = await call(`/api/app/contact/${oneContact.location_id}/${oneContact.contact_id}`, { token });
+  assert.equal(timelineRes.status, 200);
+  assert.ok(timelineRes.body.contact.name && Array.isArray(timelineRes.body.timeline) && timelineRes.body.url.includes("/contacts/detail/"));
+  assert.equal((await call(`/api/app/contact/${oneContact.location_id}/nope-nope`, { token })).status, 404);
+  // a business reads its own teamRes and timeline only; a client never sees the teamRes
+  const bTeam = await call("/api/app/team", { token: bt });
+  assert.equal(bTeam.status, 200);
+  assert.equal((await call("/api/app/team", { token: ct })).status, 403);
+  const foreign = await sql()`select contact_id from cached_contacts where location_id = ${otherAcc.locationId} limit 1`;
+  assert.equal((await call(`/api/app/contact/${otherAcc.locationId}/${foreign[0].contact_id}`, { token: bt })).status, 404, "a business cannot open another account's contact");
+  assert.equal((await call(`/api/app/contact/${otherAcc.locationId}/${foreign[0].contact_id}`, { token: ct })).status, 404, "nor can a client");
+  console.log("sources + DND + birthdays + teamRes + movement + timeline: ok");
+
   // Leave the demo data as we found it.
   await sql()`delete from domain_checks where domain in ('example-demo.com', 'otherAcc-demo.org')`;
   await closeDb();
@@ -413,6 +447,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error("FAILED:", error instanceof Error ? error.message : error);
+  console.error("FAILED:", error instanceof Error ? error.stack : error);
   process.exit(1);
 });

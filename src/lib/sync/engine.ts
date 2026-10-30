@@ -5,8 +5,9 @@ import { getInstalledLocations, getLocationToken } from "../ghl/client";
 import { getCompanyAccessToken, purgeLocationData } from "../ghl/installations";
 import {
   fetchCalendarCount, fetchContactsPage, fetchConversationsPage, fetchLocationDetails, fetchOpportunitiesPage, fetchPipelines,
-  type ContactCursor, type ConversationRow,
+  type ContactCursor, type ConversationRow, type OpportunityRow,
 } from "./ghl-data";
+import { diffDealEvents } from "./deal-events";
 import { listAllInstalledLocations } from "./installed-locations";
 
 // Resumable sync. Work is a queue of jobs in `sync_jobs`; a cron route calls runSlice() which
@@ -185,13 +186,15 @@ async function handleContacts(job: Job, deadline: number): Promise<Outcome> {
         installation_id: job.installationId, location_id: loc, contact_id: c.contactId, first_name: c.firstName, last_name: c.lastName,
         email: c.email, phone: c.phone, tags: c.tags, date_added: c.dateAdded, last_activity_at: c.lastActivityAt,
         updated_remote_at: c.updatedAt, synced_at: new Date(),
+        source: c.source, dnd: c.dnd, birth_date: c.birthDate, assigned_to: c.assignedTo,
       }));
       await db`
         insert into cached_contacts ${db(rows as never)}
         on conflict (installation_id, location_id, contact_id) do update set
           first_name = excluded.first_name, last_name = excluded.last_name, email = excluded.email, phone = excluded.phone,
           tags = excluded.tags, date_added = excluded.date_added, last_activity_at = excluded.last_activity_at,
-          updated_remote_at = excluded.updated_remote_at, synced_at = excluded.synced_at`;
+          updated_remote_at = excluded.updated_remote_at, synced_at = excluded.synced_at,
+          source = excluded.source, dnd = excluded.dnd, birth_date = excluded.birth_date, assigned_to = excluded.assigned_to`;
     }
     if (!next) {
       // Finished a full pass: anything not seen during it was deleted upstream.
@@ -205,6 +208,27 @@ async function handleContacts(job: Job, deadline: number): Promise<Outcome> {
   return { done: false, cursor: (cursor ?? {}) as Record<string, unknown> };
 }
 
+// Compare this page of deals with what we hold and keep a log of what changed (a stage move, a
+// won or lost). The first sync of an account only records changes, never a flood of "created".
+async function recordDealEvents(installationId: string, loc: string, incoming: OpportunityRow[]): Promise<void> {
+  const db = sql();
+  const ids = incoming.map((o) => o.opportunityId);
+  const [before, [prior]] = await Promise.all([
+    db`select opportunity_id, stage_id, status from cached_opportunities where installation_id = ${installationId} and location_id = ${loc} and opportunity_id = any(${ids})`,
+    db`select opportunities_synced_at from locations where installation_id = ${installationId} and location_id = ${loc}`,
+  ]);
+  const known = new Map(before.map((r) => [r.opportunity_id as string, r]));
+  const firstSyncDone = prior?.opportunities_synced_at != null;
+  const events = diffDealEvents(
+    incoming.map((o) => ({ id: o.opportunityId, stageId: o.stageId, status: o.status, value: o.monetaryValue })),
+    new Map([...known].map(([id, r]) => [id, { stageId: r.stage_id as string | null, status: r.status as string | null }])),
+    firstSyncDone,
+  );
+  if (events.length === 0) return;
+  const rows = events.map((e) => ({ installation_id: installationId, location_id: loc, opportunity_id: e.id, kind: e.kind, from_value: e.from, to_value: e.to, value: e.value }));
+  await db`insert into deal_events ${db(rows as never)}`;
+}
+
 async function handleOpportunities(job: Job, deadline: number): Promise<Outcome> {
   const db = sql();
   const loc = job.locationId as string;
@@ -214,11 +238,13 @@ async function handleOpportunities(job: Job, deadline: number): Promise<Outcome>
     const { opportunities, nextPage } = await fetchOpportunitiesPage(token, loc, pageNo);
     const unique = [...new Map(opportunities.map((o) => [o.opportunityId, o])).values()];
     if (unique.length > 0) {
+      await recordDealEvents(job.installationId, loc, unique);
       const rows = unique.map((o) => ({
         installation_id: job.installationId, location_id: loc, opportunity_id: o.opportunityId, pipeline_id: o.pipelineId,
         stage_id: o.stageId, contact_id: o.contactId, contact_name: o.contactName, name: o.name, monetary_value: o.monetaryValue,
         status: o.status, last_stage_change_at: o.lastStageChangeAt, last_status_change_at: o.lastStatusChangeAt,
         last_action_at: o.lastActionAt, created_remote_at: o.createdAt, updated_remote_at: o.updatedAt, synced_at: new Date(),
+        assigned_to: o.assignedTo, source: o.source,
       }));
       await db`
         insert into cached_opportunities ${db(rows as never)}
@@ -227,7 +253,8 @@ async function handleOpportunities(job: Job, deadline: number): Promise<Outcome>
           contact_name = excluded.contact_name, name = excluded.name, monetary_value = excluded.monetary_value, status = excluded.status,
           last_stage_change_at = excluded.last_stage_change_at, last_status_change_at = excluded.last_status_change_at,
           last_action_at = excluded.last_action_at, created_remote_at = excluded.created_remote_at,
-          updated_remote_at = excluded.updated_remote_at, synced_at = excluded.synced_at`;
+          updated_remote_at = excluded.updated_remote_at, synced_at = excluded.synced_at,
+          assigned_to = excluded.assigned_to, source = excluded.source`;
     }
     if (nextPage === null) {
       await db`delete from cached_opportunities where installation_id = ${job.installationId} and location_id = ${loc} and synced_at < ${job.startedAt}`;

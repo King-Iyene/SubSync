@@ -5,6 +5,9 @@ import { Badge, Card, Empty, ErrorBox, ExtLink, fmtInt, fmtMoney, Loading, PageH
 
 type Person = { contactId: string; locationId: string; locationName: string | null; name: string; url: string };
 type Data = {
+  sources: Array<{ source: string; contacts: number; new30: number; won: number; wonValue: number; conversion: number | null }>;
+  dnd: { total: number; dnd: number; dndWithPhone: number };
+  birthdays: Array<{ contactId: string; name: string; locationName: string | null; days: number; url: string; phone: string | null }>;
   cohorts: Array<{ month: string; leads: number; converted: number; revenue: number; conversionPct: number | null }>;
   lifecycle: { total: number; leads: number; opportunities: number; customers: number; lost: number };
   leadAging: { over30: number; over60: number; over90: number };
@@ -173,6 +176,31 @@ export function LeadsView() {
             </ul>
           )}
         </Card>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-3">
+        <Card title="Where leads come from" className="lg:col-span-2">
+          {data.sources.length === 0 ? <p className="text-sm text-muted-foreground">No source information yet.</p> : (
+            <Table head={<tr><Th>Source</Th><Th className="text-right">Contacts</Th><Th className="text-right">New (30d)</Th><Th className="text-right">Became customers</Th><Th className="text-right">Revenue won</Th></tr>}>
+              {data.sources.map((s) => (
+                <tr key={s.source}><Td>{s.source}</Td><Td className="text-right tabular-nums">{fmtInt(s.contacts)}</Td><Td className="text-right tabular-nums">{fmtInt(s.new30)}</Td>
+                  <Td className="text-right tabular-nums">{fmtInt(s.won)}{s.conversion !== null ? ` (${Math.round(s.conversion * 100)}%)` : ""}</Td><Td className="text-right tabular-nums">${fmtInt(s.wonValue)}</Td></tr>
+              ))}
+            </Table>
+          )}
+          <p className="mt-2 text-xs text-muted-foreground">The best source is the one that brings customers, not just contacts. Percentages need at least 10 contacts.</p>
+        </Card>
+        <div className="space-y-4">
+          <Card title="Do not disturb">
+            <p className="text-2xl font-semibold tabular-nums">{fmtInt(data.dnd.dnd)}</p>
+            <p className="text-sm text-muted-foreground">contacts asked not to be contacted ({data.dnd.total ? Math.round((data.dnd.dnd / data.dnd.total) * 100) : 0}%). They are left out of every call list.</p>
+          </Card>
+          <Card title="Birthdays in the next 30 days">
+            {data.birthdays.length === 0 ? <p className="text-sm text-muted-foreground">None coming up, or no birth dates on file.</p> : (
+              <ul className="space-y-1 text-sm">{data.birthdays.slice(0, 8).map((b) => <li key={b.contactId} className="flex justify-between gap-2"><a href={b.url} target="_blank" rel="noreferrer" className="underline">{b.name}</a><span className="text-muted-foreground">{b.days === 0 ? "today" : `in ${b.days}d`}</span></li>)}</ul>
+            )}
+          </Card>
+        </div>
       </div>
 
       {data.imports.length > 0 && (

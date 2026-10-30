@@ -20,6 +20,10 @@ function rng(seed: number) {
   };
 }
 
+// The new fields are derived from the loop counters (never from r()) so adding them does not change
+// any of the existing random demo numbers.
+const SOURCES = ["Facebook Ads", "Google Search", "Referral", "Website form", "Facebook Ads", "Walk-in", "Google Search"];
+const TEAM = ["user-4a1c", "user-9b2e", "user-c3d7", "user-e5f0"];
 const FIRST = ["Ava", "Liam", "Noah", "Emma", "Olivia", "Mason", "Sophia", "Lucas", "Mia", "Ethan", "Isabella", "Logan", "Amelia", "James", "Harper", "Henry", "Evelyn", "Jack", "Ella", "Owen", "Grace", "Leo", "Chloe", "Ryan", "Zoe", "Dylan", "Nora", "Aaron", "Lily", "Caleb"];
 const LAST = ["Walker", "Hughes", "Patel", "Nguyen", "Brooks", "Rivera", "Foster", "Bennett", "Coleman", "Reyes", "Shaw", "Hayes", "Murray", "Price", "Ward", "Cole", "Jensen", "Park", "Santos", "Reid", "Khan", "Morgan", "Fisher", "Ortiz", "Lane", "Dunn", "Webb", "Hale", "Stone", "Bell"];
 const TAGS = ["lead", "customer", "vip", "newsletter", "referral", "follow-up"];
@@ -168,6 +172,10 @@ export async function seedDemo(): Promise<{ installationId: string; accounts: nu
         date_added: added,
         last_activity_at: lastActivityDays !== null ? ago(lastActivityDays) : null,
         updated_remote_at: added,
+        source: SOURCES[(j * 5 + (j % 3)) % SOURCES.length],
+        dnd: j % 29 === 3,
+        birth_date: j % 5 === 0 ? `19${70 + (j % 30)}-${String(1 + (j % 12)).padStart(2, "0")}-${String(1 + ((j * 3) % 28)).padStart(2, "0")}` : null,
+        assigned_to: TEAM[j % TEAM.length],
       });
     }
     // deliberate duplicates (same email within the account)
@@ -193,6 +201,7 @@ export async function seedDemo(): Promise<{ installationId: string; accounts: nu
         monetary_value: Math.round(lo + r() * (hi - lo)), status,
         last_stage_change_at: ago(lastChangeDays), last_action_at: ago(lastChangeDays), last_status_change_at: ago(lastChangeDays),
         created_remote_at: ago(lastChangeDays + 20 + r() * 60), updated_remote_at: ago(lastChangeDays),
+        assigned_to: k % 5 === 4 ? null : TEAM[k % TEAM.length], source: SOURCES[k % SOURCES.length],
       });
     };
     if (p.pipelines > 0) {
@@ -205,6 +214,16 @@ export async function seedDemo(): Promise<{ installationId: string; accounts: nu
       for (let k = 0; k < p.lost; k++) mk("lost", k, p.activeDays + 5 + r() * 150);
     }
     for (const part of chunk(opps, 500)) await db`insert into cached_opportunities ${db(part as never)}`;
+    // a little recent movement for the activity log
+    const moves = opps.slice(0, 8).map((o, i) => ({
+      installation_id: installationId, location_id: locationId, opportunity_id: o.opportunity_id,
+      kind: o.status === "open" ? "stage" : "status", from_value: o.status === "open" ? STAGES[0].id : "open",
+      to_value: o.status === "open" ? o.stage_id : o.status, value: o.monetary_value, at: ago(1 + i * 2),
+    }));
+    if (moves.length) await db`insert into deal_events ${db(moves as never)}`;
+    for (const [i, name] of ["Dana Brooks", "Marcus Lee", "Priya Shah"].entries()) {
+      await db`insert into team_names (installation_id, user_id, name) values (${installationId}, ${TEAM[i]}, ${name}) on conflict do nothing`;
+    }
 
     // conversations (summaries only)
     const convs: Record<string, unknown>[] = [];

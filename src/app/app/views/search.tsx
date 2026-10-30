@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useData } from "../session";
+import { ContactTimeline } from "./people";
 import { Badge, Empty, ErrorBox, ExtLink, inputClass, Loading, PageHeader, Table, Td, Th, timeAgo } from "../ui";
 
 type Hit = {
@@ -17,12 +18,14 @@ export function SearchView() {
     return () => clearTimeout(t);
   }, [q]);
 
+  const [open, setOpen] = useState<{ locationId: string; contactId: string } | null>(null);
   const { data, error, loading, reload } = useData<{ hits: Hit[] }>(debounced.length >= 2 ? `search?q=${encodeURIComponent(debounced)}` : null);
 
   return (
     <div>
       <PageHeader title="Contact search" subtitle="Find any contact across every client account at once. Search by name, email or phone number; results open in the right account." />
       <input className={`${inputClass} max-w-xl py-3 text-base`} placeholder="Name, email or phone..." value={q} onChange={(e) => setQ(e.target.value)} autoFocus aria-label="Search contacts across all client accounts" />
+      {open && <div className="mt-4"><ContactTimeline key={open.contactId} locationId={open.locationId} contactId={open.contactId} onClose={() => setOpen(null)} /></div>}
       <div className="mt-6">
         {debounced.length < 2 ? (
           <Empty title="Start typing to search" body="Type at least two characters. Partial names, emails and the last digits of a phone number all work." />
@@ -43,7 +46,7 @@ export function SearchView() {
                   <Td>{h.phone ?? <span className="text-muted-foreground">none</span>}</Td>
                   <Td><div className="flex flex-wrap gap-1">{h.tags.length ? h.tags.slice(0, 3).map((t) => <Badge key={t}>{t}</Badge>) : <span className="text-muted-foreground">none</span>}</div></Td>
                   <Td>{timeAgo(h.lastActivityAt ?? h.dateAdded)}</Td>
-                  <Td><ExtLink href={h.url}>Open</ExtLink></Td>
+                  <Td><div className="flex gap-3"><button type="button" className="text-sm underline" onClick={() => setOpen({ locationId: h.locationId, contactId: h.contactId })}>Timeline</button><ExtLink href={h.url}>Open</ExtLink></div></Td>
                 </tr>
               ))}
             </Table>
