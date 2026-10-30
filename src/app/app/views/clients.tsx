@@ -205,7 +205,7 @@ function QbrTab({ accounts }: { accounts: Array<{ locationId: string; name: stri
   );
 }
 
-export function ClientsView() {
+export function ClientsView({ reports = true }: { reports?: boolean }) {
   const api = useApiClient();
   const { data, error, loading, reload } = useData<Clients>("clients");
   const [tab, setTab] = useState<"clients" | "compare" | "qbr">("clients");
@@ -217,7 +217,7 @@ export function ClientsView() {
       <div className="print:hidden">
         <PageHeader title="Clients" subtitle="Fees, renewals, value delivered and who needs a conversation. Built to help you keep clients." actions={<Btn onClick={() => api.download("export/clients", "subsync-clients.csv")}>Export CSV</Btn>} />
         <div className="mb-4 flex gap-1 border-b" role="tablist">
-          {([["clients", "Clients"], ["compare", "Compare two"], ["qbr", "Review (QBR)"]] as const).map(([id, label]) => (
+          {([["clients", "Clients"], ["compare", "Compare two"], ["qbr", "Review (QBR)"]] as const).filter(([id]) => reports || id === "clients").map(([id, label]) => (
             <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => setTab(id)}
               className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium ${tab === id ? "border-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>{label}</button>
           ))}

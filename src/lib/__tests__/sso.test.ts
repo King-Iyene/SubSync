@@ -26,6 +26,7 @@ test("a payload that is not in the expected format is rejected", () => {
 test("parseSsoUser keeps only the fields we use", () => {
   const user = parseSsoUser(decryptSsoPayload(PAYLOAD, SECRET));
   assert.deepEqual(user, {
+    whitelabelDomain: null,
     userId: "u1",
     companyId: "c1",
     role: "admin",

@@ -11,7 +11,7 @@ type S = { staleDays: number; dormantDays: number; slaHours: number; appDomain: 
 
 export function SettingsView() {
   const api = useApiClient();
-  const { data, error, loading, reload } = useData<{ settings: S; slackConfigured: boolean; kind?: string; clientView?: { on: number; total: number } | null }>("settings");
+  const { data, error, loading, reload } = useData<{ features?: Record<string, boolean>; settings: S; slackConfigured: boolean; kind?: string; clientView?: { on: number; total: number } | null }>("settings");
   const sync = useData<SyncStatus>("sync");
   const keys = useData<{ keys: Array<{ id: string; name: string; prefix: string; createdAt: string; lastUsedAt: string | null }>; max: number; endpoint: string }>("api-keys");
   const [keyName, setKeyName] = useState("");
@@ -119,10 +119,12 @@ export function SettingsView() {
           </Card>
         )}
 
+        {data.features?.meetings !== false && (
         <Card title="Meeting notes privacy">
           <label className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-0.5 size-4" checked={form.keepTranscripts} onChange={(e) => setForm({ ...form, keepTranscripts: e.target.checked })} />
             <span>Keep full transcripts when a meeting tool sends them. Off by default: only the summary and action items are stored, which is safer for clinics and anyone handling private conversations.</span></label>
         </Card>
+        )}
 
         <Card title="Your name on reports">
           <p className="mb-3 text-sm text-muted-foreground">Shown at the top of printed client reports and quarterly reviews, so what you hand to a client carries your name, not ours.</p>
@@ -141,7 +143,7 @@ export function SettingsView() {
           </div>
         </Card>
 
-        <ConnectionsCard />
+        {data.features?.connections !== false && <ConnectionsCard />}
 
         <Card title="Slack alerts and daily brief">
           <p className="mb-3 text-sm text-muted-foreground">
@@ -174,6 +176,7 @@ export function SettingsView() {
           {digest && <pre className="mt-3 overflow-x-auto whitespace-pre-wrap rounded-lg bg-muted p-3 text-xs">{digest}</pre>}
         </Card>
 
+        {data.features?.ai !== false && (
         <Card title="AI assistant connector">
           <p className="mb-3 text-sm text-muted-foreground">
             Let Claude, ChatGPT or any assistant that supports MCP answer questions about all your clients at once, for example
@@ -221,6 +224,7 @@ export function SettingsView() {
             </>
           )}
         </Card>
+        )}
 
         <Card title="Links">
           <label htmlFor="domain" className="mb-1 block text-sm font-medium">The address you log in to</label>

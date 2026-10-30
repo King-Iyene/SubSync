@@ -2,16 +2,18 @@
 
 import { useData } from "../session";
 
-type Options = { total: number; industries: Array<{ key: string; label: string; accounts: number }>; owners: Array<{ name: string; accounts: number }> };
+type Options = { total: number; testAccounts?: number; industries: Array<{ key: string; label: string; accounts: number }>; owners: Array<{ name: string; accounts: number }> };
 
 // "Show only": narrow the whole app to one kind of client or one person's clients. Hidden until there
 // is something to choose between.
-export function FilterBar({ filter, onChange }: { filter: { industry: string; owner: string }; onChange: (f: { industry: string; owner: string }) => void }) {
+type Filter = { industry: string; owner: string; hideTest: boolean };
+export function FilterBar({ filter, onChange }: { filter: Filter; onChange: (f: Filter) => void }) {
   const { data } = useData<Options>("segments");
   if (!data) return null;
   const kinds = data.industries.filter((i) => i.key !== "unset" || data.industries.length > 1);
-  if (data.total < 2 || (kinds.length < 2 && data.owners.length < 1)) return null;
-  const active = Boolean(filter.industry || filter.owner);
+  const tests = data.testAccounts ?? 0;
+  if (data.total < 2 || (kinds.length < 2 && data.owners.length < 1 && tests < 1)) return null;
+  const active = Boolean(filter.industry || filter.owner || filter.hideTest);
   const select = "rounded-lg border bg-card px-2.5 py-1.5 text-sm shadow-sm outline-none hover:border-primary/30 focus-visible:ring-2 focus-visible:ring-ring/30";
 
   return (
@@ -27,7 +29,13 @@ export function FilterBar({ filter, onChange }: { filter: { industry: string; ow
           {data.owners.map((o) => <option key={o.name} value={o.name}>{o.name} ({o.accounts})</option>)}
         </select>
       )}
-      {active && <button type="button" className="text-xs underline" onClick={() => onChange({ industry: "", owner: "" })}>Show everything</button>}
+      {tests > 0 && (
+        <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <input type="checkbox" className="size-3.5" checked={filter.hideTest} onChange={(e) => onChange({ ...filter, hideTest: e.target.checked })} />
+          Hide {tests} test account{tests === 1 ? "" : "s"}
+        </label>
+      )}
+      {active && <button type="button" className="text-xs underline" onClick={() => onChange({ industry: "", owner: "", hideTest: false })}>Show everything</button>}
       {active && <span className="text-xs text-muted-foreground">Every page below is limited to these clients.</span>}
     </div>
   );

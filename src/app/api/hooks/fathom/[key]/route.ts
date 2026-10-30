@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { parseMeeting } from "@/lib/analytics/meeting-intel";
+import { featureOn } from "@/lib/flags";
 import { findFathomByKey, ingestMeeting } from "@/lib/connections/queries";
 import { verifyFathom } from "@/lib/connections/signatures";
 import { decryptSecret } from "@/lib/crypto";
@@ -14,6 +15,7 @@ const KEY = /^[A-Za-z0-9_-]{20,64}$/;
 
 export async function POST(request: Request, ctx: { params: Promise<{ key: string }> }) {
   const { key } = await ctx.params;
+  if (!(await featureOn("connections"))) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const conn = KEY.test(key) ? await findFathomByKey(key).catch(() => null) : null;
   // The same answer for a wrong address and a disconnected one.
   if (!conn || !conn.webhookSecretEnc) return NextResponse.json({ error: "Not found" }, { status: 404 });

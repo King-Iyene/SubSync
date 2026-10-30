@@ -6,10 +6,12 @@ import {
   visibleLocationIds, type Settings,
 } from "../analytics/queries";
 import { loadAccounts, refreshInsights } from "../analytics/service";
-import { isSlackWebhook } from "../analytics/derive";
+import { isSlackWebhook, MIN_CLOSED_DEALS } from "../analytics/derive";
 import { demoDomainReport } from "../demo/seed";
 import { checkDomain, extractDomain } from "../dns/email-auth";
-import { accountLimit, canUse, type Feature } from "../entitlements";
+import { deepLinks } from "../links";
+import { isTestName } from "../analytics/test-data";
+import { accountLimit, type Feature } from "../entitlements";
 import { purgeSyncedData } from "../ghl/installations";
 import { createKey, listKeys, MAX_KEYS, revokeKey } from "../mcp/store";
 import { postToSlack } from "../notify";
@@ -63,27 +65,18 @@ async function segmentSet(ctx: Ctx): Promise<Set<string> | null> {
   if (ctx.limitTo) return ctx.seg;
   const industry = ctx.url.searchParams.get("industry");
   const owner = ctx.url.searchParams.get("owner");
-  if ((!industry || !/^[a-z_]{2,30}$/.test(industry)) && (!owner || owner.length > 60)) return ctx.seg;
+  const hideTest = ctx.url.searchParams.get("hideTest") === "1";
+  if ((!industry || !/^[a-z_]{2,30}$/.test(industry)) && (!owner || owner.length > 60) && !hideTest) return ctx.seg;
   const rows = await sql()`
-    select l.location_id, l.owner, p.industry from locations l
+    select l.location_id, l.name, l.owner, p.industry from locations l
     left join account_profiles p on p.installation_id = l.installation_id and p.location_id = l.location_id
     where l.installation_id = ${ctx.installationId}`;
   const filter = { industry: industry && /^[a-z_]{2,30}$/.test(industry) ? industry : null, owner: owner && owner.length <= 60 ? owner : null };
-  ctx.seg = new Set(rows.filter((r) => matchesSegment({ industry: r.industry as string | null, owner: r.owner as string | null }, filter)).map((r) => r.location_id as string));
+  ctx.seg = new Set(rows.filter((r) => matchesSegment({ industry: r.industry as string | null, owner: r.owner as string | null }, filter) && !(hideTest && isTestName(r.name as string | null))).map((r) => r.location_id as string));
   return ctx.seg;
 }
 
 const LOCATION_ID = /^[A-Za-z0-9_-]{3,64}$/;
-
-function deepLinks(appDomain: string) {
-  const base = `https://${appDomain}/v2/location`;
-  return {
-    account: (loc: string) => `${base}/${loc}/dashboard`,
-    contact: (loc: string, id: string) => `${base}/${loc}/contacts/detail/${id}`,
-    opportunities: (loc: string) => `${base}/${loc}/opportunities/list`,
-    conversation: (loc: string, id: string) => `${base}/${loc}/conversations/conversations/${id}`,
-  };
-}
 
 async function accountsFor(ctx: Ctx) {
   const { settings, accounts } = await loadAccounts(ctx.installationId);
@@ -110,10 +103,9 @@ async function scope(ctx: Ctx) {
   return { settings, permits, links: deepLinks(settings.appDomain) };
 }
 
+// A feature that is switched off (see flags.ts) does not exist as far as the caller can tell.
 const gate = (ctx: Ctx, feature: Feature) =>
-  canUse(feature, ctx.plan, ctx.entitlements.enforced)
-    ? null
-    : json({ error: "This feature is part of the paid plan", feature, upgrade: true }, 402);
+  ctx.entitlements.features[feature] === false ? json({ error: "This feature is switched off", feature, off: true }, 404) : null;
 
 function slim(a: DerivedAccount, links: ReturnType<typeof deepLinks>) {
   return {
@@ -164,8 +156,11 @@ async function overview(ctx: Ctx) {
       accounts: live.length, ignored: accounts.length - live.length, contacts: sum((a) => a.contacts),
       openOpps: sum((a) => a.openOpps), openValue: sum((a) => a.openValue), staleValue: sum((a) => a.revenueAtRisk),
       staleOpps: sum((a) => a.staleOpps), dormant: live.filter((a) => a.dormant).length, unread: sum((a) => a.unread),
-      unanswered: sum((a) => a.unanswered), expectedRevenue: sum((a) => a.expectedRevenue ?? 0),
-      followUpRevenueAtRisk: sum((a) => a.followUpRevenueAtRisk ?? 0),
+      unanswered: sum((a) => a.unanswered),
+      // An estimate is shown only when at least one account has enough closed deals; otherwise it is null ("not enough data").
+      expectedRevenue: live.some((a) => a.winRate !== null) ? sum((a) => a.expectedRevenue ?? 0) : null,
+      followUpRevenueAtRisk: live.some((a) => a.winRate !== null) ? sum((a) => a.followUpRevenueAtRisk ?? 0) : null,
+      estimateAccounts: live.filter((a) => a.winRate !== null).length, minClosedDeals: MIN_CLOSED_DEALS, excludedDeals: sum((a) => a.excludedOpen ?? 0),
       avgScore: live.length ? Math.round(sum((a) => a.score) / live.length) : 0,
       openAlerts: alerts.length, criticalAlerts: alerts.filter((x) => x.severity === "critical").length,
     },
@@ -433,13 +428,14 @@ async function startView(ctx: Ctx) {
 // Options for the filter bar. Not narrowed by the filter itself, so you can always change it.
 async function segmentsView(ctx: Ctx) {
   const rows = await sql()`
-    select l.location_id, l.owner, p.industry from locations l
+    select l.location_id, l.name, l.owner, p.industry from locations l
     left join account_profiles p on p.installation_id = l.installation_id and p.location_id = l.location_id
     where l.installation_id = ${ctx.installationId} and not l.ignored`;
   const owners = new Map<string, number>();
   for (const r of rows) if (r.owner) owners.set(r.owner as string, (owners.get(r.owner as string) ?? 0) + 1);
   return json({
     total: rows.length,
+    testAccounts: rows.filter((r) => isTestName(r.name as string | null)).length,
     industries: industryOptions(rows.map((r) => r.industry as string | null)),
     owners: [...owners.entries()].map(([name, accounts]) => ({ name, accounts })).sort((a, b) => b.accounts - a.accounts || a.name.localeCompare(b.name)),
   });
@@ -691,7 +687,7 @@ async function alertsView(ctx: Ctx) {
 const settingsView = async (ctx: Ctx) => {
   const { settings } = await loadAccounts(ctx.installationId);
   const [counts] = ctx.kind === "agency" ? await sql()`select count(*)::int total, count(*) filter (where client_view)::int on_ from locations where installation_id = ${ctx.installationId}` : [null];
-  return json({ settings: publicSettings(settings), slackConfigured: Boolean(settings.slackWebhookUrl), kind: ctx.kind, clientView: counts ? { on: counts.on_ as number, total: counts.total as number } : null });
+  return json({ features: ctx.entitlements.features, settings: publicSettings(settings), slackConfigured: Boolean(settings.slackWebhookUrl), kind: ctx.kind, clientView: counts ? { on: counts.on_ as number, total: counts.total as number } : null });
 };
 
 function publicSettings(s: Settings) {
@@ -734,7 +730,7 @@ async function settingsUpdate(ctx: Ctx) {
   }
   if ("appDomain" in body) {
     const d = typeof body.appDomain === "string" ? extractDomain(body.appDomain) : null;
-    if (!d) return json({ error: "Enter the domain you log in to, for example app.gohighlevel.com" }, 400);
+    if (!d) return json({ error: "Enter the domain you log in to, for example app.youragency.com" }, 400);
     patch.appDomain = d;
   }
   if ("slackWebhookUrl" in body) {
@@ -1277,7 +1273,7 @@ async function digestPreview(ctx: Ctx) {
 
 const FEATURE_FOR: Record<string, Feature> = {
   search: "search", onboarding: "onboarding", stale: "stale", inbox: "inbox", pipelines: "pipelines", duplicates: "duplicates", email: "email",
-  alerts: "alerts", appointments: "appointments", "appointment-insights": "appointments", meetings: "meetings", connections: "settings", cleanup: "cleanup", "setup-compare": "onboarding", playbooks: "onboarding", daily: "overview", team: "team", "deal-events": "pipelines", contact: "search", settings: "settings", export: "exports", digest: "reports", "api-keys": "ai", hygiene: "stale", "pipeline-intel": "pipelines", "contact-intel": "activity", clients: "reports", qbr: "reports", "comms-intel": "inbox", "call-queue": "calls", "call-lists": "calls", "call-outcomes": "calls",
+  alerts: "alerts", appointments: "appointments", "appointment-insights": "appointments", meetings: "meetings", connections: "connections", cleanup: "cleanup", "setup-compare": "setup_compare", playbooks: "playbooks", daily: "overview", team: "team", "deal-events": "pipelines", contact: "search", settings: "settings", export: "exports", digest: "overview", "api-keys": "ai", hygiene: "stale", "pipeline-intel": "pipelines", "contact-intel": "activity", clients: "clients", qbr: "reports", "comms-intel": "inbox", "call-queue": "calls", "call-lists": "calls", "call-outcomes": "calls",
 };
 
 export async function handle(request: Request, segments: string[]): Promise<Response> {
@@ -1333,7 +1329,7 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       if (a === "daily-brief") return await dailyBrief(ctx);
       if (a === "comms-intel") return await commsIntel(ctx);
       if (a === "clients" && !b) return await clientsView(ctx);
-      if (a === "clients" && b === "compare") return await clientsCompare(ctx);
+      if (a === "clients" && b === "compare") return ctx.entitlements.features.reports === false ? json({ error: "This feature is switched off", feature: "reports", off: true }, 404) : await clientsCompare(ctx);
       if (a === "qbr" && b && LOCATION_ID.test(b)) return await qbrView(ctx, b);
       if (a === "digest") return await digestPreview(ctx);
     }

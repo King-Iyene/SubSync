@@ -1,0 +1,47 @@
+# Feature status
+
+One row per feature. **Class** is the brief's call (section 7 wave, or "defer" / "avoid" from section 8 and
+13A). **Visible** is the default switch state (see `docs/DECISIONS.md`, 2026-10-31). **Live data** says
+whether it has been checked against the connected test agency, not only demo data and automated tests.
+Be sceptical of any "yes" that has no date: the only live audit so far is round 2 of `REPORT.md` (30 Oct
+2026), which covered what each page showed on real synced data for contacts, deals and conversations.
+
+Automated checks that run on every full run: unit tests (244), then HTTP checks for the whole API, the
+connections, appointment insights, two-agency tenant isolation, feature switches and the Overview numbers.
+
+| Feature | Class | Visible | Data source | Live data |
+| --- | --- | --- | --- | --- |
+| Today (daily brief, priorities) | Wave 1 #6 (digest) | yes | contacts, deals, conversations, own history | Shown on real data in round 2; own-history comparison needs more days of history |
+| Overview | Wave 0 (fixed, see METRICS) | yes | contacts, deals, conversations | Real data audited in round 2; the new rules (deals without value or owner left out, 20-deal minimum) are checked on demo data only |
+| Inbox and SLA | Wave 1 #1 and #3 | yes | conversation summaries (no message text, no sender user) | Real in round 2. Not yet true speed-to-lead: it has no first-touch time or who answered. Needs the conversation messages permission |
+| Appointments (to do) | Wave 1 #2 | yes | calendar events | **No.** The real agency has not approved the calendar permission yet (all three accounts show "needs permission") |
+| Appointment insights | Wave 1 #2 | yes | calendar events, contacts, deals, conversations | **No**, same reason. Demo data and unit tests only |
+| Call lists | Wave 1 #4 | yes | contacts, deals, appointments, conversations | Real in round 2 (lists); no-show list waits on appointments |
+| Contact search | Free tier (brief section 6) | yes | contacts | Real, round 2 |
+| Pipeline and deals | Needed for Instant Audit (stale value) | yes | deals | Real, round 2 |
+| Accounts and account detail | Core | yes | all synced data | Real, round 2 |
+| Setup checklist and email sender health | Core / Instant Audit | yes | calendars, pipelines, DNS | Real, round 2 |
+| Alerts | Wave 1 #1 | yes | derived | Real, round 2 |
+| Settings (thresholds, branding, daily brief, Slack web address) | Core, Wave 1 #7 (partly) | yes | settings | Real |
+| Getting started | Wave 1 #8 (in-app help) | yes | derived | Real |
+| Duplicates | Defer (13A) | no | contacts | Real data in round 2. The list is now grouped by name, searchable and paginated (20 rows a page) |
+| Data cleanup | Defer (13A) | no | contacts, writes with typed confirmation | Never run on the real account (needs a write permission SubSync does not request) |
+| Meeting notes | Not in v3 | no | meeting tools | No |
+| Connections (Slack, Fathom, Zoom sign-in) | Avoid (connector catalog) | no | provider apps | **No.** Provider apps do not exist yet. Tested with signed pretend deliveries only |
+| Leads | Not in Wave 1 | no | contacts | Real, round 2 |
+| Clients (fees, renewals, QBR, compare) | Defer (QBR, renewal calendars) | no | typed by hand | Real but empty until typed |
+| Team | Not in Wave 1 (Wave 2 leaderboard) | no | deals, appointments, user names | Names need the users permission, not yet approved on the real agency |
+| Industry playbooks, compare setups | Defer | no | pipelines, calendars | Real, round 2 |
+| AI assistant connector and keys | Not in v3 (AI is Wave 2) | no | all | No |
+| Branded reports and exports | Defer (white-label PDF reports) | partly | derived | Exports of stale deals, duplicates, inbox, deals and alerts remain on; branded reports are behind the reports switch |
+| Show only filter (industry, owner, hide test accounts) | Not in v3 | yes | settings | Industry needs typing on the Clients page, which is now hidden |
+
+## Not built yet (Wave 0 and Wave 1 gaps)
+
+- Speed-to-lead with first human touch and SLA breach alerts per lead (Wave 1 #1): needs conversation messages.
+- Instant Audit within minutes of install, with dollars at risk and a shareable summary (Wave 1 #5).
+- Weekly digest email per agency and account owner (Wave 1 #6): the daily brief goes to Slack only; no email service key.
+- White-label UI: agency logo and colours with the SubSync name hidden (Wave 1 #7). Only a business name and colour for printed reports exist.
+- Roadmap with voting and a change log page (Wave 1 #8).
+- Entitlements table, enforced mode, plan swap procedure (section 6).
+- Verification of every PRIORITIZE feature against live data and a manual count: blocked on the calendar and users permissions being approved on the real agency, and not yet repeated for the new Overview rules.

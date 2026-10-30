@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { completeSignIn, NAMES } from "@/lib/connections/flow";
+import { featureOn } from "@/lib/flags";
 import { isProvider, verifyState } from "@/lib/connections/state";
 
 // Where Slack, Fathom and Zoom send a person back after they approve (or refuse) SubSync. This page is
@@ -21,7 +22,7 @@ h1{font-size:1.25rem;margin:.5rem 0}p{color:#516060;line-height:1.5}.mark{font-s
 
 export async function GET(request: Request, ctx: { params: Promise<{ provider: string }> }) {
   const { provider } = await ctx.params;
-  if (!isProvider(provider)) return new NextResponse("Not found", { status: 404 });
+  if (!isProvider(provider) || !(await featureOn("connections"))) return new NextResponse("Not found", { status: 404 });
   const url = new URL(request.url);
   const state = verifyState(url.searchParams.get("state"), provider);
   if (!state) return page(false, "This link has expired", "Go back to SubSync and press Connect again.", provider);

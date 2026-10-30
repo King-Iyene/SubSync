@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { parseMeeting } from "@/lib/analytics/meeting-intel";
+import { featureOn } from "@/lib/flags";
 import { MAX_PER_HOUR, recentCount, recordMeeting, resolveHook } from "@/lib/analytics/meeting-queries";
 
 // The address a meeting tool posts to (Fathom's webhook, or Zoom through an automation). The secret
@@ -10,6 +11,8 @@ const MAX_BYTES = 400_000;
 
 export async function POST(request: Request, ctx: { params: Promise<{ token: string }> }) {
   const { token } = await ctx.params;
+  // Switched off: the address behaves as if it does not exist.
+  if (!(await featureOn("meetings"))) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const hook = await resolveHook(token).catch(() => null);
   // Same answer for a wrong address and a revoked one.
   if (!hook) return NextResponse.json({ error: "Not found" }, { status: 404 });

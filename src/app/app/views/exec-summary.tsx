@@ -27,7 +27,7 @@ function Arrow({ pct }: { pct: number | null }) {
   return <span className={`text-xs font-medium ${up ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>{up ? "▲" : "▼"} {Math.abs(pct)}% vs before</span>;
 }
 
-// The one card to glance at: five numbers with their direction, goal progress, and anything unusual.
+// The one card to glance at: three numbers with their direction, goal progress, and anything unusual.
 export function ExecSummary() {
   const api = useApiClient();
   const { data, reload } = useData<Data>("exec-summary");
@@ -54,8 +54,8 @@ export function ExecSummary() {
 
   return (
     <Card title="Executive summary" className="mb-4" action={<Btn variant="ghost" onClick={() => setEditing((v) => !v)}>{editing ? "Cancel" : "Set goals"}</Btn>}>
-      <dl className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-        {data.kpis.map((k) => (
+      <dl className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        {data.kpis.filter((k) => ["contacts", "revenue", "pipeline"].includes(k.key)).map((k) => (
           <div key={k.key}>
             <dt className="text-xs text-muted-foreground">{k.label}</dt>
             <dd className="text-xl font-semibold tabular-nums">{k.money ? fmtMoney(k.current) : fmtInt(k.current)}</dd>

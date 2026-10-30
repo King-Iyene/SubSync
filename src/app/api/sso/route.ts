@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { decideAccess, type AccessKind } from "@/lib/access";
 import { demoEnabled } from "@/lib/api/auth";
-import { entitlements } from "@/lib/entitlements";
+import { captureWhitelabelDomain } from "@/lib/analytics/queries";
+import { resolveEntitlements } from "@/lib/flags";
 import { businessInstalled, clientViewOn, getInstallation } from "@/lib/ghl/installations";
 import { decryptSsoPayload, parseSsoUser } from "@/lib/ghl/sso";
 import { signSession } from "@/lib/session";
@@ -29,7 +30,7 @@ export async function POST(request: Request) {
       userName: kind === "agency" ? "Demo Admin" : "Demo Owner", activeLocation: locationId,
     };
     const session = signSession({ companyId: DEMO_COMPANY_ID, userId: user.userId, role: user.role, userName: user.userName, demo: true, kind, locationId });
-    return NextResponse.json({ user, installed: true, demo: true, kind, session, entitlements: entitlements("pro") });
+    return NextResponse.json({ user, installed: true, demo: true, kind, session, entitlements: await resolveEntitlements("pro") });
   }
 
   const sharedSecret = process.env.GHL_SSO_KEY;
@@ -68,10 +69,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Could not reach the database. Please refresh." }, { status: 503 });
   }
   if (!installation) return NextResponse.json({ user, installed: false });
+  // An agency that resells the platform under its own domain gets links on that domain.
+  if (user.whitelabelDomain) await captureWhitelabelDomain(installation.id, user.whitelabelDomain).catch(() => undefined);
 
   const session = signSession({
     companyId: decision.companyKey, userId: user.userId, role: user.role, userName: user.userName, demo: false,
     kind: decision.kind, locationId: decision.locationId,
   });
-  return NextResponse.json({ user, installed: true, kind: decision.kind, session, entitlements: entitlements(installation.plan) });
+  return NextResponse.json({ user, installed: true, kind: decision.kind, session, entitlements: await resolveEntitlements(installation.plan) });
 }

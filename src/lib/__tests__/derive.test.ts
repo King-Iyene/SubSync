@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
-  buildDigest, computeAlerts, deriveAccount, isSlackWebhook, leadFlowDrop, onboardingChecklist, toCsv,
+  buildDigest, computeAlerts, deriveAccount, isSlackWebhook, leadFlowDrop, MIN_CLOSED_DEALS, onboardingChecklist, toCsv,
   type AccountRow, type AccountSettings,
 } from "../analytics/derive.ts";
 
@@ -14,7 +14,7 @@ function row(over: Partial<AccountRow> = {}): AccountRow {
     locationId: "L1", name: "Acme Dental", email: "a@acme.com", phone: "555", website: null,
     ignored: false, owner: null, contacts: 200, withEmail: 180, withPhone: 160, withTags: 100,
     new30d: 20, active90d: 150, openOpps: 10, openValue: 10_000, staleOpps: 1, staleValue: 500,
-    wonCount: 8, lostCount: 4, wonValue: 16_000, unread: 2, unanswered: 0,
+    wonCount: 16, lostCount: 8, wonValue: 32_000, unread: 2, unanswered: 0,
     calendars: 2, pipelines: 1, lastActivityAt: iso(1), syncError: null, contactsSyncedAt: iso(0), ...over,
   };
 }
@@ -54,8 +54,15 @@ test("unanswered conversations estimate follow-up revenue at risk", () => {
   assert.equal(a.followUpRevenueAtRisk, Math.round(3 * 2000 * (8 / 12)));
 });
 
-test("win rate needs at least five closed deals", () => {
-  assert.equal(deriveAccount(row({ wonCount: 2, lostCount: 2 }), settings, [], NOW).winRate, null);
+test("a win rate needs at least twenty closed deals, and so does every estimate built on it", () => {
+  assert.equal(MIN_CLOSED_DEALS, 20);
+  const few = deriveAccount(row({ wonCount: 10, lostCount: 9, unanswered: 3 }), settings, [], NOW);
+  assert.equal(few.winRate, null, "19 closed deals is not enough");
+  assert.equal(few.expectedRevenue, null);
+  assert.equal(few.followUpRevenueAtRisk, null);
+  const enough = deriveAccount(row({ wonCount: 10, lostCount: 10 }), settings, [], NOW);
+  assert.equal(enough.winRate, 0.5, "exactly twenty is enough");
+  assert.equal(enough.expectedRevenue, 5_000);
 });
 
 test("onboarding checklist mixes automatic, manual and unknown items", () => {

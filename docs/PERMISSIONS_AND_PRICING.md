@@ -1,5 +1,11 @@
 # Who sees what, how they get in, and how to price it
 
+> **Pricing in this document is superseded (31 Oct 2026).** Master Brief v3 (`CLAUDE.md`, section 6) decides:
+> Freemium, a Free Plan at $0 and ONE paid plan, Pro, at **$9 per client account per month**, 14 day trial,
+> installable by everyone. Where this document says flat $5, no free plan or no locked features, v3 wins. The
+> sections on who sees what and on permissions still hold. Steps for the portal are in the section "Before any
+> outside agency installs" at the end of this file. Nothing needs to change in the portal while we are building.
+
 SubSync is one app that three kinds of people can open. Most of your customers will be the
 second and third kind (a business inside a client account), because an agency has many of them.
 
@@ -100,3 +106,28 @@ see each group on its own. Resale ideas that fit the paid tiers:
 - **Estate agents and trades:** "lead response guarantee" (reply target of an hour or less, shown on the daily brief).
 - **Boutiques and retail:** "win-back and birthday offers" (win-back call list, birthdays on the Leads page).
 - **Any client:** the client view (read-only, their own account only) as a "your results dashboard", and the branded printable report as a monthly deliverable.
+
+## Before any outside agency installs (the pre-pilot gate, from Master Brief v3 section 6)
+
+Not needed while we build. Today the portal has a Free Plan at $0 and a temporary Pro at $5, and the app
+unlocks everything for both, so your own testing is unaffected. Use the Free Plan for your own test installs
+so nobody sits on the $5 plan. Do these, in this order, only when you are about to invite a pilot agency:
+
+1. Developer portal, SubSync, **Pricing**. Keep "Freemium".
+2. **Add a plan**: name "Pro", billing **Monthly**, price **$9** (per client account). A plan's price cannot be
+   edited, which is why this is a new plan and not a change to the $5 one.
+3. Give each plan honest feature lines. Only promise what is live on the day you do this. As of today that is:
+   Free Plan: "Overview of every client account", "Contact search across client accounts", "Data health checks".
+   Pro: "Everything in Free", "Appointment show-rate and no-show recovery", "Unanswered conversation inbox",
+   "Call lists". Do not add Instant Audit, speed-to-lead alerts or the weekly email until they have shipped.
+4. Keep the **14 day** free trial on Pro.
+5. Send me the new Pro plan's id (it appears in the plan's row or the plan page). I add it to the entitlements
+   table. Never paste anything secret.
+6. **Delete the $5 plan.** Deleting is permanent and is yours to click. First make sure nobody is on it: only
+   your own test installs should exist, and they should be on the Free Plan. CHECK with the platform what
+   happens to an install that is still on a deleted plan; that is why it must be empty first.
+7. I switch the app from "open" to "enforced", then run the entitlement tests and the tenant isolation tests.
+
+What is not built yet on our side for this gate: the entitlements table, the open or enforced setting, and the
+function that decides what each plan gets (`can(identity, feature)`). They are next, and they are the reason
+this gate is closed. Cross-agency isolation, which the gate also names, is already tested on every full run.

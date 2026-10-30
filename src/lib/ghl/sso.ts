@@ -36,7 +36,11 @@ export function decryptSsoPayload(payload: string, sharedSecret: string): unknow
   return JSON.parse(text);
 }
 
+import { validDomain } from "../links.ts";
+
 export type SsoUser = {
+  /** The agency's own domain when it resells the platform under its brand, from the white-label details. */
+  whitelabelDomain: string | null;
   userId: string | null;
   companyId: string | null;
   role: string | null;
@@ -49,7 +53,9 @@ export type SsoUser = {
 export function parseSsoUser(data: unknown): SsoUser {
   const source = (data && typeof data === "object" ? data : {}) as Record<string, unknown>;
   const str = (value: unknown) => (typeof value === "string" && value ? value : null);
+  const wl = (source.whitelabelDetails && typeof source.whitelabelDetails === "object" ? source.whitelabelDetails : {}) as Record<string, unknown>;
   return {
+    whitelabelDomain: validDomain(wl.domain),
     userId: str(source.userId),
     companyId: str(source.companyId),
     role: str(source.role),

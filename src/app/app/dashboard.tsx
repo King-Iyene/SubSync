@@ -7,7 +7,6 @@ import {
 } from "lucide-react";
 import { NAV, type GoFn, type ViewId } from "./nav";
 import { ApiProvider, makeApi, type Api } from "./session";
-import { Badge } from "./ui";
 import { AccountDetailView } from "./views/account-detail";
 import { AccountsView } from "./views/accounts";
 import { AlertsView } from "./views/alerts";
@@ -167,8 +166,8 @@ export function Dashboard() {
   }, [embedded, signIn, apply]);
 
   // The "show only" filter (industry and/or owner) narrows every page for agencies.
-  const [filter, setFilter] = useState<{ industry: string; owner: string }>({ industry: "", owner: "" });
-  const filterQuery = [filter.industry && `industry=${encodeURIComponent(filter.industry)}`, filter.owner && `owner=${encodeURIComponent(filter.owner)}`].filter(Boolean).join("&");
+  const [filter, setFilter] = useState<{ industry: string; owner: string; hideTest: boolean }>({ industry: "", owner: "", hideTest: false });
+  const filterQuery = [filter.industry && `industry=${encodeURIComponent(filter.industry)}`, filter.owner && `owner=${encodeURIComponent(filter.owner)}`, filter.hideTest && "hideTest=1"].filter(Boolean).join("&");
   const baseApi = auth.status === "ready" ? auth.api : null;
   const api = useMemo(() => (baseApi ? (filterQuery ? baseApi.filtered(filterQuery) : baseApi) : null), [baseApi, filterQuery]);
 
@@ -189,17 +188,18 @@ export function Dashboard() {
   }
 
   const limited = auth.kind !== "agency";
-  const menu = NAV.filter((n) => NAV_FOR[auth.kind].has(n.id));
+  // Features that are switched off (flags) are not shown at all.
+  const off = (feature: string) => auth.features[feature] === false;
+  const menu = NAV.filter((n) => NAV_FOR[auth.kind].has(n.id) && !off(n.feature));
   const labelFor = (n: (typeof NAV)[number]) => (limited && n.id === "overview" ? "My account" : n.label);
   // Pages that live inside another page highlight their parent in the menu.
   const PARENT: Partial<Record<ViewId, ViewId>> = { account: "accounts", deals: "pipeline", email: "onboarding", alerts: "today" };
   const active = PARENT[view.id] ?? view.id;
-  const locked = (feature: string) => auth.features[feature] === false;
   const agency = auth.demo ? "Demo Agency" : limited ? "Your business" : "Your agency";
   const own = auth.locationId;
 
   const pipeTabs = [{ label: "Forecast and stages", node: <><PipelineView /><DealMoves /></> }, { label: "Stale deals and hygiene", node: <DealsView /> }];
-  const setupTabs = [{ label: "Setup checklists", node: <OnboardingView go={go} /> }, { label: "Email sender health", node: <EmailHealthView /> }, ...(limited ? [] : [{ label: "Compare setups", node: <SetupCompareView /> }, { label: "Industry playbooks", node: <PlaybooksView go={go} /> }])];
+  const setupTabs = [{ label: "Setup checklists", node: <OnboardingView go={go} /> }, { label: "Email sender health", node: <EmailHealthView /> }, ...(limited ? [] : [...(off("setup_compare") ? [] : [{ label: "Compare setups", node: <SetupCompareView /> }]), ...(off("playbooks") ? [] : [{ label: "Industry playbooks", node: <PlaybooksView go={go} /> }])])];
 
   const content = (() => {
     // A business or a client sees its own account as the home page, never an accounts list.
@@ -208,6 +208,8 @@ export function Dashboard() {
       if (!NAV_FOR[auth.kind].has(id)) return <Centered title="Not available" body="This page is not part of your view of SubSync." />;
       if (id === "overview") return own ? <AccountDetailView key={own} locationId={own} go={go} agency={agency} limited /> : <Centered title="Open SubSync from inside your account" body="We could not tell which account you are in." />;
     }
+    const feature = NAV.find((n) => n.id === view.id)?.feature;
+    if (feature && off(feature)) return <Centered title="Not available" body="This page is switched off right now." />;
     switch (view.id) {
       case "today": return <TodayView go={go} />;
       case "overview": return <OverviewView go={go} />;
@@ -229,7 +231,7 @@ export function Dashboard() {
       case "cleanup": return <CleanupView />;
       case "leads": return <LeadsView />;
       case "calls": return <CallsView />;
-      case "clients": return <ClientsView />;
+      case "clients": return <ClientsView reports={!off("reports")} />;
     }
   })();
 
@@ -250,7 +252,6 @@ export function Dashboard() {
                   {n.id === active && <span aria-hidden className="absolute inset-y-1.5 left-0 w-[3px] rounded-full bg-sidebar-primary" />}
                   {(() => { const Icon = ICONS[n.id]; return Icon ? <Icon aria-hidden className={`size-[17px] shrink-0 ${n.id === active ? "text-sidebar-primary" : "opacity-70 group-hover:opacity-100"}`} /> : null; })()}
                   <span className="flex-1">{labelFor(n)}</span>
-                  {locked(n.feature) && <Badge tone="info">Paid</Badge>}
                 </button>
               </div>
             ))}

@@ -409,3 +409,53 @@ Replaces pasted web addresses with real sign-ins. Steps for you are in `docs/CON
 | Bug found and fixed on the way | Data cleanup's preview accepted an account id that did not exist for an agency session. It now returns "Account not found" |
 | Tokens | Encrypted with the same key as the platform tokens; refresh tokens are saved the moment they are rotated; a provider that refuses a refresh marks the connection "needs to be connected again" instead of retrying forever |
 | Design | New sidebar (dark, icons, pinned to the screen so it no longer scrolls away), pill tabs, warmer palette and card styling |
+
+---
+
+# Wave 0 (Master Brief v3): stabilise before anything new
+
+`CLAUDE.md` is now Master Brief v3 including section 13A. Detail lives in `docs/FEATURE_STATUS.md`, `docs/METRICS.md`,
+`docs/DECISIONS.md` (2026-10-31) and `docs/SCOPE_PLAN.md`.
+
+## Done and tested
+
+| Brief item | What I did | How it is checked |
+| --- | --- | --- |
+| 1. Classify every feature | Table in `FEATURE_STATUS.md`: Wave 1 / defer / avoid, with data source and live-data status | Reviewed against sections 7, 8 and 13A |
+| 3. Flag off DEFER and AVOID | Real switches in the database. Off: reports (QBR, compare two), builder, meeting notes, data cleanup, AI connector, compare setups, playbooks, connections (Slack, Fathom, Zoom sign-in), duplicates, clients, team, leads. Menu entry, page, API and public addresses all go away. Code and data kept; any row in `feature_flags` turns one back on with no deploy | `check-flags.ts` flips each switch and confirms the API, sign-in response and public addresses agree, then restores them |
+| 4. Cross-tenant tests | Two real agencies in the database; each, plus a business view, a client view and a forged session, tries 48 read routes with the other's ids and names (384 reads), then write attacks | `check-tenancy.ts`: nothing leaked, every attack refused, nothing changed. One route's expectation in my first draft was wrong (team names are keyed by user, not account) and I corrected the test, not the app |
+| 5. Event store | `appointment_events` added next to `deal_events`; written during the appointment sync (first seen, status change, move of a minute or more) | 3 unit tests. **Nothing is recorded yet** for the real agency: appointments are waiting on the calendar permission being approved |
+| 6. Docs | `METRICS.md`, `FEATURE_STATUS.md`, decisions log | Each definition names its code and test |
+| 7. Duplicates UI debt | One compact row per name and account (record count, confidence, status), searchable, 20 per page, detail opens on click | Opened in a browser and clicked through. (Duplicates is also switched off by default, per 13A) |
+| 13A white-label | One helper builds every "open in your CRM" link from the agency's own domain (taken from sign-in unless typed in Settings); the platform's domain is only the fallback. An automated scan of every screen, message, email and tool text for the platform's name | 5 unit tests including a self-check that the scanner catches a violation. The scan found one visible example (a settings error message) and nothing else |
+| 13A metric trust | Deals with no value or no owner left out of dollar figures (and counted: 37 in the demo); win rate and both estimates need 20 closed deals else "Not enough data"; estimates labelled with the formula one tap away; stale value, open alerts, waiting past SLA plus three summary numbers (six tiles, no repeats); "Hide test accounts" switch | `check-metrics.ts` recomputes the figures from raw rows and compares; 4 unit tests |
+| 13A scope plan | `SCOPE_PLAN.md`: every current scope justified; three proposed optional read scopes with portal steps; a unit test now pins the list | 2 unit tests |
+
+Totals now: 244 unit tests, plus the HTTP checks for the whole API, connections, appointment insights, tenant isolation, feature switches and the Overview numbers.
+
+## A correction to the brief's reading of the Overview
+
+The round figures ($2.4M open, $1.2M expected) are not a default win rate. They come from a large block of imported test deals in
+the KD Squares LTD account, and that data won exactly half. The real problem the brief names is still real: with junk or test
+data, several tiles collapse into one number. That is what the changes above address.
+
+## Not done in Wave 0, and why
+
+| Item | State |
+| --- | --- |
+| 2. Verify each kept feature against live data | **Blocked.** Appointments, insights and team names need the calendar and users permissions approved on the real agency (reinstall in progress). The new Overview rules are checked on demo data only; a manual count against the real test account is still to do |
+| Stale per pipeline stage (13A metric rule 2) | **Not done.** It needs how long deals normally sit in each stage, which only the event store can tell us once it has weeks of data. One global threshold stays, and the screen says "have not moved" |
+| Test deals (13A metric rule 5, deals half) | Only accounts can be hidden so far, not individual test deals |
+| `plan_entitlements`, `ENTITLEMENTS_MODE`, `can(identity, feature)` | Not built. The app behaves as "open". Needed before any outside install |
+| Real SSO payload logging, agency staff access via the Users API, `isAgencyOwner` (sections 4.1 and 13 items 2, 12, 13) | Not done. Needs real sign-ins of each kind of user |
+| Section 13 research checklist (webhook names, installer details endpoint, white-label install flow, commission, etc.) | Not run yet. Sources I read this session: the platform's scope list |
+| White-label install flow and the install page address | Not checked. The install link itself contains the platform's own address (outside our screens) |
+| Error tracker and an errors table; separate development database; visible data-access log | Not done. One database serves both today |
+| Instant Audit, speed-to-lead with first human touch, weekly email, white-label UI, roadmap and change log | Wave 1, not started (the brief says Wave 0 first) |
+
+## What I need from you
+
+1. Finish approving the new permissions on the three accounts (the reinstall you are doing), then tell me. Then I can check appointments on real data and confirm the event store is recording.
+2. In the portal, add the optional read permissions in `docs/SCOPE_PLAN.md` (three clicks, steps in the file) and send a screenshot. I must not change the install link first.
+3. The brief asks you to generate a Shared Secret and store it as `GHL_APP_SHARED_SECRET`. **Do not.** The app already has this secret and it works (it is stored as `GHL_SSO_KEY`; the install and sign-in were verified on 30 Oct). Generating a new one would break sign-in until the variable is changed. If you want the name changed, tell me and I will do it as a planned swap.
+4. The Pricing tab steps are at the end of `docs/PERMISSIONS_AND_PRICING.md`. Nothing is needed until you are about to invite a pilot agency.

@@ -6,7 +6,12 @@ import {
   type ChurnRisk, type ScoreBand, type ScoreBreakdown,
 } from "../scoring.ts";
 
+// A win rate built on a handful of deals is noise, so none is shown (or used in an estimate) below this.
+export const MIN_CLOSED_DEALS = 20;
+
 export type AccountRow = {
+  /** Open deals left out of every dollar figure because they have no value or no owner. */
+  excludedOpen?: number;
   locationId: string;
   name: string | null;
   email: string | null;
@@ -100,7 +105,7 @@ export function deriveAccount(
   const score = breakdown.total;
 
   const closed = row.wonCount + row.lostCount;
-  const winRate = closed >= 5 ? row.wonCount / closed : null;
+  const winRate = closed >= MIN_CLOSED_DEALS ? row.wonCount / closed : null;
   const avgDealValue =
     row.wonCount > 0 ? row.wonValue / row.wonCount : row.openOpps > 0 ? row.openValue / row.openOpps : null;
 

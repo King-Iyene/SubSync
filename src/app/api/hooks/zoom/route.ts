@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { featureOn } from "@/lib/flags";
 import { fetchZoomParticipants } from "@/lib/connections/oauth";
 import { accessTokenFor, findZoomByHost, ingestMeeting, removeZoomByHost } from "@/lib/connections/queries";
 import { verifyZoom, zoomChallenge } from "@/lib/connections/signatures";
@@ -12,6 +13,7 @@ export const maxDuration = 30;
 const MAX_BYTES = 400_000;
 
 export async function POST(request: Request) {
+  if (!(await featureOn("connections"))) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const secretToken = process.env.ZOOM_WEBHOOK_SECRET_TOKEN;
   if (!secretToken) return NextResponse.json({ error: "Not switched on" }, { status: 503 });
   const text = await request.text();

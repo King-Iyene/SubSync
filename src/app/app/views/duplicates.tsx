@@ -32,6 +32,9 @@ export function DuplicatesView() {
   const [range, setRange] = useState<"high" | "mid" | "low">("high");
   const [bulkAction, setBulkAction] = useState<"keep" | "not_duplicate">("keep");
   const [preview, setPreview] = useState<Preview | null>(null);
+  const [page, setPage] = useState(0);
+  const [open, setOpen] = useState<Record<string, boolean>>({});
+  const [q, setQ] = useState("");
 
   if (loading && !data) return <Loading label="Checking contacts for duplicates..." />;
   if (error) return <ErrorBox error={error} onRetry={reload} />;
@@ -56,6 +59,29 @@ export function DuplicatesView() {
 
   const decide = (g: Group, decision: "keep" | "not_duplicate" | "merged_in_platform", text: string) =>
     run(() => api.post("duplicates/review", { locationId: g.locationId, contactIds: g.people.map((p) => p.contactId), decision, keepContactId: decision === "not_duplicate" ? null : keep[g.key] ?? g.survivorId }), text);
+
+  // One row per name in each account, with how many groups and records sit behind it. The detail only
+  // appears when a row is opened, so a big account no longer prints thousands of cards.
+  const nameOf = (g: Group) => (g.people.find((p) => p.contactId === g.survivorId) ?? g.people[0])?.name?.trim() || "No name";
+  const byName = new Map<string, { key: string; name: string; locationName: string | null; groups: Group[]; records: number; top: number; reviewed: number }>();
+  for (const g of data.groups) {
+    const norm = nameOf(g).toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    const key = g.locationId + "|" + norm;
+    const row = byName.get(key) ?? { key, name: nameOf(g), locationName: g.locationName, groups: [], records: 0, top: 0, reviewed: 0 };
+    row.groups.push(g);
+    row.records += g.people.length;
+    row.top = Math.max(row.top, g.confidence);
+    if (g.review) row.reviewed += 1;
+    byName.set(key, row);
+  }
+  const needle = q.trim().toLowerCase();
+  const rows = [...byName.values()]
+    .filter((r) => !needle || r.name.toLowerCase().includes(needle) || (r.locationName ?? "").toLowerCase().includes(needle))
+    .sort((a, b) => b.top - a.top || b.records - a.records || a.name.localeCompare(b.name));
+  const PAGE = 20;
+  const pages = Math.max(1, Math.ceil(rows.length / PAGE));
+  const at = Math.min(page, pages - 1);
+  const pageRows = rows.slice(at * PAGE, at * PAGE + PAGE);
 
   const bulkBody = (dryRun: boolean) => ({ decision: bulkAction, minConfidence: bounds[0], maxConfidence: bounds[1], dryRun });
 
@@ -143,8 +169,31 @@ export function DuplicatesView() {
       {data.groups.length === 0 ? (
         <Empty title="Nothing to review" body="No two contacts in the same account look like the same person, or you have reviewed them all." />
       ) : (
-        <ul className="space-y-4">
-          {data.groups.map((g) => {
+        <div>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <input className="w-full max-w-xs rounded-lg border bg-card px-3 py-2 text-sm shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/30" placeholder="Find a name or account" aria-label="Find a name or account" value={q} onChange={(e) => { setQ(e.target.value); setPage(0); }} />
+            <span className="text-xs text-muted-foreground">{fmtInt(rows.length)} name{rows.length === 1 ? "" : "s"} · {fmtInt(data.groups.length)} group{data.groups.length === 1 ? "" : "s"}</span>
+          </div>
+          {rows.length === 0 ? <Empty title="No match" body="Nothing in the queue matches that search." /> : (
+          <ul className="divide-y rounded-xl border bg-card">
+            {pageRows.map((row) => (
+              <li key={row.key}>
+                <button type="button" aria-expanded={!!open[row.key]} onClick={() => setOpen({ ...open, [row.key]: !open[row.key] })}
+                  className="flex w-full flex-wrap items-center justify-between gap-2 px-4 py-3 text-left text-sm transition-colors hover:bg-muted/40">
+                  <span className="min-w-0">
+                    <span className="font-medium">{row.name}</span>
+                    <span className="text-muted-foreground"> · {row.locationName ?? "Unnamed account"}</span>
+                  </span>
+                  <span className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs text-muted-foreground">{row.groups.length > 1 ? `${row.groups.length} groups, ` : ""}{row.records} records</span>
+                    <Badge tone={tone(row.top)}>{row.top}% sure</Badge>
+                    {row.reviewed > 0 && <Badge tone="good">{row.reviewed === row.groups.length ? "Reviewed" : `${row.reviewed} reviewed`}</Badge>}
+                    <span aria-hidden className="text-muted-foreground">{open[row.key] ? "Hide" : "Review"}</span>
+                  </span>
+                </button>
+                {open[row.key] && (
+          <ul className="space-y-4 border-t bg-muted/20 p-3">
+          {row.groups.map((g) => {
             const chosen = keep[g.key] ?? g.review?.keepContactId ?? g.survivorId;
             return (
               <li key={g.locationId + g.key} className="rounded-xl border bg-card p-4">
@@ -217,7 +266,22 @@ export function DuplicatesView() {
               </li>
             );
           })}
-        </ul>
+          </ul>
+                )}
+              </li>
+            ))}
+          </ul>
+          )}
+          {pages > 1 && (
+            <div className="mt-3 flex items-center justify-between text-sm">
+              <span className="text-xs text-muted-foreground">Showing {at * PAGE + 1} to {Math.min(rows.length, at * PAGE + PAGE)} of {fmtInt(rows.length)}</span>
+              <span className="flex gap-2">
+                <Btn variant="secondary" disabled={at === 0} onClick={() => setPage(at - 1)}>Previous</Btn>
+                <Btn variant="secondary" disabled={at >= pages - 1} onClick={() => setPage(at + 1)}>Next</Btn>
+              </span>
+            </div>
+          )}
+        </div>
       )}
     </div>
   );

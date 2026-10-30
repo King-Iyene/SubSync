@@ -1,273 +1,341 @@
-# SubSync - Build Brief (v2)
+# SubSync - Master Brief v3 (long-term source of truth)
 
-Save this file as `CLAUDE.md` in the root of the `subsync` project folder so every Claude Code session reads it. You can also paste it whole into a chat.
+Save this as `CLAUDE.md` in the repo root. It replaces Build Brief v2 as the main instruction file.
+Move the older documents into `docs/reference/` and treat them as background only:
+- `SubSync_Build_Brief.md` (v2, setup details still valid)
+- `SubSync_Advanced_Features.md`, `SubSync_Moat_Features.md`, `SubSync_Full_Feature_Encyclopedia.md` (idea banks, NOT a to-do list)
+- `SubSync_Competitive_Intelligence_AllTheApps.md` (full research behind this brief)
 
----
-
-## 0. WORKING AGREEMENT (read first)
-
-I am King. I am a non-traditional builder who vibe-codes with you. You are the lead engineer on this project.
-
-- This brief is a starting point, not a cage. If you find a better structure, library, schema, or build order, use it and tell me why in two lines. If the GHL API docs contradict this brief, trust the docs and tell me.
-- Make small decisions yourself. Ask me only when a choice is expensive, irreversible, or needs a login/click only I can do. One question at a time.
-- Keep a running log in `docs/DECISIONS.md` (date, decision, reason). Keep commits small and clear.
-- Never commit secrets. `.env*` files are gitignored. Never expose the Supabase service role key to the browser.
-- When you need me to do something in a browser (GHL developer portal, Supabase dashboard, Vercel dashboard), give me a numbered list with the exact button labels and the exact text to paste, then tell me what to send back. Do not assume I know where anything is.
-- Before you rely on any GHL API detail from this brief, check the live docs. Docs are available as markdown by appending `.md` to many pages under https://marketplace.gohighlevel.com/docs/ (for example https://marketplace.gohighlevel.com/docs/oauth/CreateMarketplaceApp.md).
-- Verified facts below are marked VERIFIED. Anything marked CHECK is my best understanding and must be confirmed against the docs before you build on it.
-
-**Git workflow (standing instruction from King):** commit and push straight to `main` on GitHub every time code is written, no feature branches or PRs, so Vercel auto-deploys.
+Where this brief and an older document disagree, this brief wins.
 
 ---
 
-## 1. WHAT WE ARE BUILDING
+## 0. WORKING AGREEMENT
 
-**SubSync** is a GoHighLevel (GHL) Marketplace app for agencies. It gives an agency one dashboard across ALL of its client accounts (GHL calls them sub-accounts or locations).
+I am King. I vibe-code with you. You are the lead engineer.
 
-Why it should win:
-- GHL's native tools work inside one account at a time. Nothing native crosses account boundaries.
-- Closest marketplace competitor ("All The Apps", about 197K installs) does onboarding checklists and support, not cross-account intelligence.
-- Insycle (data quality tool) does not support GHL.
-- Our moat is cross-account intelligence. Do NOT build features GHL already has natively (bulk tag, basic reporting, dark mode, shortcuts).
-
-Business model: agency-level app, paid per client account per month, sold through the GHL Marketplace. Details in section 8.
-
-Scope decision: SubSync is an AGENCY-level app first (company-level OAuth, "Agency only" install). A sub-account-level variant may come later. Cost tracking and margin features are explicitly OUT of scope.
+- This brief sets direction and guardrails, not every detail. Choose better structures, libraries and schemas when you find them, and tell me why in two lines.
+- Make small decisions yourself. Ask me only when a choice is expensive, irreversible, or needs a login or click only I can do. One question at a time.
+- Facts are labeled VERIFIED (read in a primary source), INFERENCE (reasoning, could be wrong), or CHECK (confirm in GHL docs or the live API before building on it). Never build on a CHECK item without confirming it first.
+- When the GHL docs or live API contradict this brief, trust the docs and tell me.
+- Keep `docs/DECISIONS.md` (date, decision, reason) and `docs/FEATURE_STATUS.md` (every feature: status, data source, tested against live data yes/no).
+- When I must act in a browser (GHL developer portal, Supabase, Vercel), give me numbered steps with exact button labels and exact text to paste, and tell me what to send back.
+- Never commit secrets. Never expose the Supabase service role key to the browser.
+- Do not rewrite working code to tidy it. Extend it. See section 5.
 
 ---
 
-## 2. NAMING AND IDENTIFIERS (use exactly these)
+## 1. WHAT SUBSYNC IS (and the wedge)
 
-| Thing | Value |
+SubSync is a GoHighLevel (GHL) Marketplace app that shows agencies, and the businesses they serve, what is happening across their client accounts and tells them what to do about it.
+
+**Positioning:** "Know what is happening in every client account before your client does."
+
+**The wedge (INFERENCE from research):** sales-floor operations intelligence for appointment-driven agencies (home services, med spas, solar, real estate, coaches). It is alerts-first and action-first, not another reporting tool.
+
+**Why this lane (VERIFIED unless noted):**
+- The biggest marketplace player, All The Apps (196.6K installs, 4.7 stars from 61 reviews, $129 / $299 / $499 per month), owns white-label branding, onboarding, support desk, knowledge base, and integration connectors. Its "Measure" section tracks its own platform (add-ons, tickets, payments, SaaS subscriptions). It does not visibly track show rate, speed-to-lead, setter performance, or pipeline conversion. It does have a blank-canvas multi-location dashboard builder, so they could enter our lane (assume 12 to 18 months, INFERENCE).
+- GHL's native reports already cover appointments, agent performance, pipeline, and an aggregate agency dashboard, but per account, with limited history, and reviewers call it "wide rather than deep".
+- Client-facing reporting is a commodity (AgencyAnalytics at about $12 to $15 per client per month, Two Minute Reports, Looker Studio, Databox).
+- Their weaknesses: complexity (1,315 features), 165 permission scopes, a support-heavy model, and a $129 entry price.
+
+**What we win with:** alerts and queues (push, not pull), our own historical record (stage and status changes, appointment outcomes), cross-account setter and closer visibility, speed to value (Instant Audit), minimal permissions, and focus (8 to 12 outcomes done deeply, not 184 features).
+
+---
+
+## 2. LOCKED DECISIONS
+
+From the GHL developer portal (King's screenshots) and GHL docs:
+
+| Setting | Value | Status |
+|---|---|---|
+| Who is the target user | Sub-account | LOCKED (cannot be changed) |
+| Can agency bulk install | Yes | LOCKED |
+| Listing type | White-label | Chosen |
+| GHL app to use | SubSync (ID 6ae2a79309eaa881c1eb419e). Do NOT use the older "KD Squares" app (ID 66be40372c3d9943f28ea0ba) | From King's screenshot. Make sure the Client ID and Secret in env vars come from the SubSync app |
+| App type | Private for now (cap: 5 agencies) | Chosen |
+| Who can install | Everyone (keep as set) | Decided. GHL's recommended default for maximum reach. CHECK whether it can be changed after saving |
+| Billing | GHL internal billing (never an external payment page; external pages cannot be resold and cannot be switched back once internal billing is live) | Decided |
+| Pricing model | Differential pricing: agency base fee plus per-client-account fee, with a free tier | Section 6 |
+| Free trial | 14 days (GHL allows 1 to 90) | Decided |
+
+Why "Everyone": the target user is Sub-account, so the businesses (client accounts) are the market. "Everyone" lets a business install SubSync itself and also lets an agency bulk install it across all its clients and resell it at a markup. It is GHL's recommended setting for reach, it reaches small accounts as well as agencies, and it keeps the setup simple.
+
+What we give up: GHL documents the "agency base fee plus per-account fee" (differential pricing) only for Agency Only installs, so we price per client account only (section 6). We may also hit card-on-file friction on bulk installs (section 6). Both are acceptable at launch. If we later want an agency base fee, we can add a separate Agency-only listing.
+
+---
+
+## 3. RESEARCH DIGEST (so you do not need to redo it, but verify anything marked CHECK)
+
+**GHL distribution and billing (VERIFIED, help.gohighlevel.com, Mar to Oct 2026):**
+- Sub-account target with Agency Only install: agency pays base price plus per-sub-account price (differential pricing). Agencies can set a flat markup on the per-account part when reselling. The agency base fee is not resold.
+- Pricing models: Free, Paid subscription, Paid one-time, Freemium. Free trial 1 to 90 days, once per user per app per 90 days.
+- Usage-based pricing exists: billing meters (Custom Event API, dynamic price) charged through the Create Wallet Charge API. Good for AI features.
+- Failed payment: 30-day grace period with automatic retries.
+- Payouts through Tipalti, monthly on the 15th. **Commission: GHL's pricing help article (modified June 23, 2026) says "We currently do not deduct any commission". An earlier source I gave King said 15%. UNRESOLVED. Model both.**
+- Private apps: max 5 agencies, then installs are blocked until Public or Security Review passes.
+
+**Install events (VERIFIED, AppInstall webhook docs):** the INSTALL webhook includes `appId`, `companyId`, `locationId` (for location installs), `userId`, `planId`, `trial {onTrial, trialDuration, trialStartDate}`, `isWhitelabelCompany`, `whitelabelDetails {domain, logoUrl}`, `companyName`. For future locations added after a bulk install, `userId` and `companyId` may be missing. A "Get Installer Details" endpoint (`GET /marketplace/app/{appId}/installations`, OAuth token, scope `marketplace-installer-details.readonly`) returns installer info including plan, useful for reconciliation. **GHL does not turn features on or off. It bills, installs, and tells you the plan. Our code decides what each user gets.**
+
+**Bulk install token flow (VERIFIED):** an agency bulk install returns `userType: Company` and `isBulkInstallation: true`. Then: (1) call Get Installed Locations, (2) mint a Location token for each installed location from the agency token, (3) listen to AppInstall for future installs and mint tokens for new locations.
+
+**Competitor pricing anchors:** All The Apps $129 / $299 / $499 per month; HubSpot Sales Hub Professional about $100 per seat per month; AgencyAnalytics about $12 to $15 per client.
+
+**What I got wrong earlier (do not repeat):** All The Apps is paid, not free; GHL has native appointment and agent reports; "nobody does cross-account reporting" was overstated; buyers need Unlimited or Founder plans; feature count is a weakness, not a selling point.
+
+**Full evidence and sources:** `docs/reference/SubSync_Competitive_Intelligence_AllTheApps.md`.
+
+---
+
+## 4. TENANCY, IDENTITY AND ENTITLEMENTS (the most important design in this brief)
+
+### 4.1 One app, two experiences
+SubSync is one app that shows:
+- **Agency view** to agency users: all of that agency's installed client accounts.
+- **Account view** to sub-account users: only their own account.
+
+Identity comes from GHL SSO in the embedded iframe (not our own login). VERIFIED (GHL "User Context in Marketplace Apps" doc): the app asks the parent window for user data (`postMessage` with `REQUEST_USER_DATA`), receives an encrypted payload, and our backend decrypts it with the app's Shared Secret (generated in the portal under Advanced Settings > Auth). The decrypted payload contains `userId`, `companyId`, `role` ("admin" or "user"), `type` ("agency" or "location"), `userName`, `email`, `isAgencyOwner` (true or false), `versionId`, `appStatus`, `whitelabelDetails`, and `activeLocation` when the user is inside a client account. CHECK: the docs' location-context example shows `type: agency` even with `activeLocation` set, so log real payloads in test installs and confirm exactly what each kind of user sends.
+
+**Same features for everyone. Scope and permissions differ by identity. GHL does not decide this, our backend does, from the verified payload:**
+
+| Who | How we know | What they see |
+|---|---|---|
+| Agency owner or agency admin | `type` agency, with `isAgencyOwner` true or `role` admin | All of that agency's installed client accounts, plus plan and billing status |
+| Agency staff user | `type` agency, `role` user | Only the client accounts that user can access in GHL (CHECK the Users API for each user's location access). If we cannot verify access, show nothing until we can |
+| Client account admin | `type` location, `role` admin | Only their own account (all views, alert settings) |
+| Client account user (for example a setter) | `type` location, `role` user | Only their own account, limited to their own queue and performance. No settings or plan info (proposal, King can adjust) |
+
+An agency user who is inside a specific client account (`activeLocation` set) opens that account by default and can switch to the agency view. If an agency-wide screen cannot be shown from inside a client account menu, tell King and propose the fallback (agency dashboard reached by a link or a second small listing).
+
+Token note for "Everyone" installs: a business that installs directly gives us only a Location token, so it gets the Account view. An agency that bulk installs gives us the Company token (`userType: Company`, `isBulkInstallation: true`), and we then mint Location tokens, so the Agency view works. Support both paths.
+
+### 4.2 NON-NEGOTIABLE security rule
+**A sub-account user must never see data from any other client account. An agency must never see another agency's data.**
+- Enforce on the server in one place (middleware). Never trust IDs sent from the browser.
+- Derive `companyId`, `locationId`, and user type from the verified SSO payload on every request. Decide what to return from those, not from request parameters.
+- Write tests with two fake agencies and several locations that try cross-tenant reads (changing IDs in requests). They must fail. Run them on every deploy.
+- Add a visible audit log table of data access for support and trust.
+
+### 4.3 Entitlements: GHL does not know features, we do
+- Table `plan_entitlements`: GHL `planId` to tier name to feature flags and limits.
+- Table `installations` stores `planId`, trial info, status, per company and per location.
+- A single function `can(identity, feature)` decides access. Every module calls it. No feature check is scattered in UI code.
+- Keep feature flags in the database so any module can be turned off per tier or globally without a deploy.
+- CHECK how plan changes and cancellations are signaled (webhook event name, or reconcile by polling Get Installer Details on a schedule). Build the reconcile job regardless; webhooks can be missed.
+- CHECK how the free tier works with bulk install and per-account billing (which accounts are "free" when an agency has more than 3). If GHL cannot express "first 3 accounts free", fall back to a free plan with limits enforced in our code and an upgrade prompt, and tell King.
+
+### 4.4 Tokens
+- Store the agency (Company) token and mint Location tokens on demand. Refresh tokens rotate on every use: always save the new refresh token, use a lock so two parallel refreshes cannot break the chain, encrypt at rest, never log tokens.
+- On uninstall: stop syncing, delete that tenant's tokens and cached data on a defined schedule, and keep a minimal audit record.
+
+---
+
+## 5. ARCHITECTURE FOR STABILITY (so building does not keep breaking things)
+
+Build a small stable core and plug features into it.
+
+**Stable core (change rarely, test heavily):**
+1. Auth and tenancy middleware (section 4)
+2. Token service
+3. Install lifecycle and entitlements
+4. Sync engine (webhooks plus reconciliation, rate-limited queue, resumable jobs)
+5. **Event store:** an append-only table where we record changes ourselves (opportunity stage and status changes, appointment status changes, first-response times, conversation assignment). GHL does not give clean history, so this is both a quality fix and our long-term data moat. Start recording now; history cannot be recreated later.
+6. Alert engine (rules, thresholds per account, quiet hours, dedupe, digests; channels: in-app, email, Slack later)
+7. Notification and email service
+
+**Feature modules (plug-ins on top of the core):** each module owns its tables, endpoints, UI route, and a feature flag. A module may read from the core and event store. It may not write to another module's tables.
+
+**Rules:**
+- Additive migrations only (new columns and tables). No destructive schema change without a written plan and a backup.
+- Idempotent sync and webhook handlers (the same event twice causes no double counting).
+- Every metric has one written definition in `docs/METRICS.md` and a unit test using fixtures.
+- Every shipped feature is verified against live data and a manual count in the GHL UI (like the 332 contacts / 189 deals check). Record it in `FEATURE_STATUS.md`.
+- Feature flag every new module. Rollback means flag off, not a revert.
+- Separate dev and production Supabase projects. Vercel preview deployments for every change.
+- Errors go to a log table and an error tracker. Every screen has loading, empty, and error states.
+- Small commits. No big-bang refactors. If a core change is needed, write the plan in DECISIONS.md first.
+
+---
+
+## 6. PRICING (what to configure and how it maps to features)
+
+With "Everyone" install there is ONE price line: a price per client account per month. GHL documents the "agency base fee plus per-account fee" model only for Agency Only installs, so we skip the base fee for now. CHECK in the Pricing tab which options are available for this configuration.
+
+**Start simple: a free plan and ONE paid plan.** Fewer tiers means fewer entitlement bugs.
+
+| Plan | Price | Includes |
+|---|---|---|
+| Free | $0 | Instant Audit, overview, contact search, data health |
+| Pro (final, still to be created) | $9 per client account per month | Everything in Wave 1 |
+| Higher tier (later, as a new plan) | $9 to $19 per client account per month (hypothesis) | AI brief, anomaly detection, forecasts |
+
+**How it works:**
+- A business that installs directly pays the price itself.
+- An agency that bulk installs and resells pays the developer price per account and charges its clients a marked-up price. GHL's documented example: developer price $10, the client pays the agency $10.50 with a 5% markup, the developer earns $10.
+- Each install carries a `planId`. Entitlements are per location. Proposed rule: the agency-wide view unlocks when at least one of the agency's installed accounts is on a paid plan. Tell King if GHL's model makes a better rule easier.
+- CHECK card-on-file friction: GHL docs say a paid app is charged to each sub-account's card on file, and accounts without a card are skipped on bulk install. CHECK how reselling changes this. If agencies would have to chase clients for cards, tell King.
+
+**Configured in the portal (King, Oct 30, 2026):** Freemium, Free Plan $0, Pro $5 monthly, 14-day free trial, no billing meters yet. The Pro feature line reads "All views, alerts and exports for every client account". Keep that line honest: do not promise exports or alerts until they ship. Add one or two feature lines to the Free Plan so the difference is clear (Instant Audit, overview, search). King confirmed a plan's price cannot be edited: to change it, add a new plan and delete the old one. Final decision: Pro at $9 per client account per month. See the plan swap procedure below.
+
+**Math (hypotheses to test with the pilot agencies):** an agency with 20 accounts pays $180 per month at $9. If it charges clients $18, it earns $360 and keeps $180. At 1,000 paid accounts that is $9,000 per month before any commission, about $7,650 if GHL took 15%. Competitor anchors: AgencyAnalytics about $12 to $15 per client per month, All The Apps from $129 per month.
+
+**Plan swap procedure and development mode**
+- Today the portal has Free Plan $0 and a temporary Pro plan at $5. Both unlock the same features while we build, so King can test.
+- Never hardcode plan IDs. Deleting and re-adding a plan creates a new `planId`. Use the `plan_entitlements` table (`planId` to tier). Add an env setting `ENTITLEMENTS_MODE`: `open` (everything unlocked, for development and until pricing is final) or `enforced`.
+- King uses the Free Plan for his own test installs, so nothing is billed and nobody sits on the $5 plan. Test paid-plan behavior by replaying simulated INSTALL webhook payloads with different `planId` values. Do one real paid install only on the final plan.
+- **Pre-pilot gate (must be done before ANY outside agency installs):** (1) King adds Pro at $9 monthly with honest feature lines, (2) King deletes the $5 plan, (3) you add the new plan ID to `plan_entitlements`, (4) switch to `enforced`, then run the entitlement tests and the tenant isolation tests, (5) CHECK what happens to existing installs on a deleted plan, and make sure there are none.
+
+**This is not "same price for agency and sub-account".** There is one price per account. The agency can mark it up.
+
+Usage meters for AI features (when built): bill per AI brief or per batch of AI checks through a billing meter and the Create Wallet Charge API, so API cost is passed through.
+
+**Task for you:** read GHL's pricing doc, then give King exact portal steps for the Pricing tab (free plan, paid plan, free trial) and build the `plan_entitlements` mapping.
+
+---
+
+## 7. WHAT TO SHIP
+
+### Wave 0: Stabilize the overnight build (do this first, before anything new)
+1. Read `REPORT.md` from the overnight run. For every shipped feature, classify: **PRIORITIZE, DEFER, or AVOID** using sections 7 and 8.
+2. Verify each PRIORITIZE feature against live data. Fix or flag off anything wrong or shallow.
+3. Flag off DEFER and AVOID features (do not delete; keep the code).
+4. Add the cross-tenant security tests (section 4.2).
+5. Add the event store and start recording changes now.
+6. Write `docs/METRICS.md`, `docs/FEATURE_STATUS.md`.
+7. Fix UI debt: the Duplicates page prints every name; group by name and show counts, paginate, and cap list length.
+Done when: all remaining visible features are verified, tenant tests pass, and the event store is recording.
+
+### Wave 1: The wedge (about 3 to 4 weeks)
+Each item: data source (CHECK endpoints), metric definition, edge cases, tests, flag, verification.
+
+1. **Speed-to-lead monitor with SLA alerts.** Definition (write it in METRICS.md): time from a new lead (contact created or first inbound) to the first human outbound touch (message or call by a user). Make "count automated touches" a setting. SLA target per account. Alert when a lead breaches SLA with no touch (email and in-app; Slack later). Agency view ranks accounts; account view ranks users. CHECK message fields for direction, source, and userId.
+2. **Appointment hygiene and true show rate.** Flag appointments whose time has passed but status was never set to showed or no-show (reports lie when staff forget). Show true show rate once statuses are fixed. No-show recovery list: no-shows in the last 7 days not rebooked. CHECK appointment status values and change events.
+3. **Unanswered conversations and unified inbox.** Aging buckets (1h, 4h, 24h, 48h plus). Agency view across accounts, account view for one. Deep link to open the conversation in GHL.
+4. **Smart call queues.** Pre-built lists (yesterday's no-shows, new leads with no touch, hot leads untouched for 3 days, stale deals) plus saved custom filters. Ranked by priority. Opens the contact in GHL (we do not build a dialer).
+5. **Instant Audit.** Within minutes of install: problems found and dollars at risk (stale deal value, leads unanswered over an hour, unrecovered no-shows, unmarked appointments). Shareable summary. This is the onboarding hook and the main marketing asset.
+6. **Weekly digest email** per agency and per account owner: what happened, what needs attention.
+7. **White-label SubSync UI.** Agency logo and colors, SubSync name hidden. Needed for white-label verification and resale.
+8. **Roadmap with voting, change log page, in-app help.** Cheap trust builders competitors use well.
+
+### Wave 2 (after Wave 1 is verified and pilots are using it)
+- Cross-account setter and closer leaderboard, activity and idle detection
+- Anomaly detection (lead volume or response time versus the account's own normal) and client engagement score
+- Stage history based metrics from our event store: deal velocity, stage dwell time
+- AI daily action brief (usage-metered)
+
+### Wave 3
+- Forecast, win/loss, source attribution, churn risk alerts, Slack integration
+- Reconsider a "usage and margin guard" if the API exposes per-location usage or wallet data (CHECK). Reviews list surprise usage bills among the top GHL complaints.
+- A second listing for direct small businesses ("Everyone" can install), if demand shows up.
+
+---
+
+## 8. DO NOT BUILD (or defer)
+
+**Defer (crowded or commodity):** custom report builder, white-label PDF reports, QBR generator, client portal links, workflow inventory and template sync, gamification extras (badges, TV mode), contract renewal calendars, satisfaction surveys.
+
+**Avoid (competitors own it, or hard and risky):**
+- Dialers and telephony engines (GHL has its own; Hot Prospector, Kixie, Aloware, PhoneBurner exist; compliance and infrastructure burden)
+- White-label theming of GHL itself, login page builder, support ticket desk, knowledge base, onboarding portal, snapshot or service stores
+- Integration connector catalog
+- Anything GHL already does natively in the same way: bulk tagging, basic contact management, basic pipeline view, calendar booking, workflow builder
+
+---
+
+## 9. MARKETING AND SITE (build after Wave 1 is demoable)
+
+Message: "Know what is happening in every client account before your client does."
+
+Page flow: hero with one button ("Run your free audit"), live counters from real data, interactive demo with sample data (no install needed), three outcome blocks (Speed to lead, Show rate, Setter performance), profit calculator (base fee plus per account, client price, agency margin), trust block (minimal permissions, read-only by default, data deleted on uninstall), roadmap and change log links, FAQ with trial terms.
+
+Look: dark, premium, one accent color, animated counters, a live alert feed ticking in, smooth scroll sections. Inspired by the competitor's glow-and-gradient dark style but with SubSync's own colors and identity. Keep it fast.
+
+Lead magnets: speed-to-lead cost calculator, shareable Agency Health Audit.
+
+Required pages for marketplace review: `/privacy`, `/terms`, `/support`. Write honest drafts and flag that a human must review them before going Public (the app stores other businesses' customer data).
+
+Public-facing wording rule: say "client accounts" and "business accounts", not "sub-accounts"; do not use the GHL name or logo in the app logo, website, or listing images (the portal form warns about this).
+
+---
+
+## 10. COSTS AND OPERATIONS
+
+As far as I know, and CHECK the pricing pages before launch: Vercel Hobby is non-commercial and has tight cron and function limits, so plan on Vercel Pro before charging customers. Supabase free projects can pause and have small storage limits, so plan on Supabase Pro at launch. Realistic launch infrastructure is about $45 to $100 per month plus AI usage. Estimate storage for a large agency (for example 30 accounts x 20,000 contacts) and tell King if free tiers will not hold it.
+
+---
+
+## 11. WHAT ONLY KING CAN DO (give King exact steps for each)
+
+1. Listing Configuration: no change needed. Leave Who can install as Everyone. Also generate the Shared Secret (Advanced Settings > Auth > Shared Secret > Generate) and store it only as an env var `GHL_APP_SHARED_SECRET`, never in chat or git.
+2. Pricing tab: not needed while we build. Before ANY pilot agency installs, add the $9 Pro plan and delete the $5 plan (steps in section 6).
+3. Create a Tipalti account when invited; confirm payouts work for King's bank (UNVERIFIED).
+4. Recruit 3 to 5 pilot agencies (private cap is 5), ideally appointment-driven agencies with setter teams.
+5. Get privacy policy and terms reviewed by a human before Public.
+6. Decide on Security Review versus going Public after the pilot.
+7. Later: pursue GHL's developer partner program (invite-only per All The Apps; CHECK how to apply).
+
+---
+
+## 12. GATES AND KILL CRITERIA
+
+| Gate | Target |
 |---|---|
-| Product name | SubSync |
-| Git repo | `subsync` (private) |
-| Local folder | `subsync` |
-| Supabase project | `subsync` |
-| Vercel project | `subsync` |
-| GHL marketplace app name | SubSync |
-| GHL app version | 1.0.0 |
-| Company on listing | KD Squares Ltd |
-| Support email | code@kdsquares.com (I can change this) |
-| Production URL | whatever Vercel assigns first (for example https://subsync.vercel.app), custom domain later |
+| End of Wave 0 | All visible features verified; tenant tests pass; event store recording |
+| Before any pilot install | $9 plan created, $5 plan deleted, plan IDs mapped, entitlements enforced, all tests pass |
+| 30 days | 3 or more pilot agencies connected and opening it weekly |
+| 60 days | 2 or more agencies say they would pay the proposed price |
+| 90 days | Public listing live; 20 agencies installed; 10 paying |
 
-Public-facing naming rule (important for marketplace approval): the GHL developer form says to avoid "highlevel" or "gohighlevel" references in the logo and website, and GHL's app review guidelines say to avoid internal terms like "sub-account" in listing text and images. So in anything public (listing text, screenshots, logo, landing page) say "client accounts" or "business accounts", not "sub-accounts", and do not use the GHL name or logo. Inside our own dashboard UI, "client accounts" is also the preferred wording.
+If pilots say they already get this from AgencyAnalytics or GHL native reports and will not pay, narrow to speed-to-lead and appointment hygiene only. If All The Apps ships sales-ops dashboards, speed up and lean into alerts and setter ops. If the API cannot supply call and appointment data well, shift weight toward pipeline and conversation features.
 
 ---
 
-## 3. TECH STACK
+## 13. VERIFICATION CHECKLIST (research tasks for you, in this order)
 
-- Next.js (App Router), TypeScript, Tailwind, shadcn/ui
-- Supabase (Postgres) for tokens, cached data, settings
-- Vercel for hosting
-- GitHub for source
-- GHL OAuth 2.0 and GHL API v2 (base URL `https://services.leadconnectorhq.com`, header `Version: 2021-07-28` on most endpoints, CHECK per endpoint)
-- Billing: GHL Marketplace native billing (see section 8). Do NOT integrate Lemon Squeezy or Stripe for marketplace installs.
-
----
-
-## 4. WHO DOES WHAT
-
-**You (Claude Code) can do with CLIs, after I log in once:**
-- git and GitHub: `gh auth login`, then `gh repo create subsync --private`
-- Supabase: `supabase login`, `supabase link`, `supabase db push` (I may create the empty project in the dashboard first and give you the project ref and DB password, either route is fine)
-- Vercel: `vercel login`, `vercel link`, `vercel env add`, `vercel deploy`
-- Generating the logo as SVG and exporting PNG
-
-**Only I can do (web only):**
-- Creating/editing the app in the GHL Marketplace developer portal (marketplace.gohighlevel.com). Section 6 gives you the exact values to hand me.
-- Copying the Client ID, Client Secret, and SSO key out of the portal.
-- Installing the private app into my accounts using the Test Link.
-
-GHL also has a Marketplace CLI and MCP server (https://marketplace.gohighlevel.com/docs/sdk/marketplace-cli/mcp). CHECK whether it can create or update app settings. If it can, use it. Do not depend on it.
+1. What target user, install, and listing settings does the current SubSync app have in the portal? (King's screenshots show Sub-account target, Everyone, bulk Yes, White-label, Private.)
+2. SSO payload fields and whether an agency user can see an agency-wide screen from a sub-account menu.
+3. Webhook event names for: contact create/update, opportunity create/stage/status change, appointment create/update, inbound and outbound messages, install and uninstall, plan change.
+4. Get Installed Locations and location-token minting endpoints; rate limits per app and per resource.
+5. Appointment status values; message fields (direction, source, userId, timestamp); call records and what they contain.
+6. How free tier plus per-account billing behaves with bulk install.
+7. Create Wallet Charge API and billing meter setup for AI features.
+8. Whether the API exposes per-location usage or wallet data.
+9. Commission and payout facts from the developer portal docs.
+10. Whether Who can install can be changed after saving (Everyone to Agency only, or back).
+11. Whether agency-level apps can be tested from King's Starter plan or only via sandbox or Test Link.
+12. Log real SSO payloads for each kind of user (agency owner, agency admin, agency staff, client admin, client user, with and without `activeLocation`) and record exactly what `type`, `role`, and `isAgencyOwner` return.
+13. How to read which client accounts an agency staff user can access (Users API).
 
 ---
 
-## 5. BUILD ORDER
+## 13A. FIRST-LOOK FINDINGS (King's review, Oct 30) - FIX THESE IN WAVE 0
 
-Work in this order. Each step has a "done when". Reorder if you find a better path.
+**White-label hygiene (agencies resell this app under their own brand):**
+- Never hardcode `app.gohighlevel.com` or `leadconnectorhq.com`. Build every "Open in your CRM" link, email link, and reinstall prompt with one helper that uses `whitelabelDetails.domain` from the SSO payload and the INSTALL event (store it per company). Fall back to the default domain only when the company is not white-labeled. CHECK the exact deep-link URL patterns for contacts, conversations, opportunities, and appointments.
+- Never show the words "GoHighLevel", "HighLevel", or "GHL" in any UI text, email, empty state, error message, or help page. Say "your CRM" or "your platform". Add an automated test that scans UI strings and email templates for those words.
+- CHECK the white-label OAuth install flow and what URL a white-labeled agency sees during install. Report what you find to King.
 
-**Step 0 - Preflight.** Check node, git, gh, supabase CLI, vercel CLI are installed and logged in. Tell me exactly what to install or log into. Done when all CLIs respond.
+**Scope plan:**
+- Today: 7 required read-only scopes plus 2 optional. Few scopes is a trust advantage (the biggest competitor requests 165). Keep it lean.
+- Catch: every scope added later forces every installed agency to re-approve and reinstall (the Appointments banner shows this). Before any pilot installs, list every read scope Waves 1 and 2 will need and add them now as OPTIONAL scopes, with graceful degradation when not granted. Candidates (confirm exact names in the docs): conversation messages, calendar events, users, tags, custom fields. Add write scopes only for features we keep, and keep them optional. Remove any scope no feature uses.
 
-**Step 1 - Repo and skeleton.** Create the Next.js project with shadcn/ui, init git, create the private GitHub repo `subsync`, push. Add `.gitignore`, `.env.example`, `docs/DECISIONS.md`. Done when the repo exists on GitHub and `npm run dev` works.
+**Metric trust rules (the Overview currently shows $2,400,000 on three different tiles and $1,200,000 on two):**
+- With test data, almost every deal is stale, so "stale deal value", "open pipeline", and "revenue at risk" collapse into one number. "Expected revenue" and "slow follow-up cost" are both exactly $1,200,000, which suggests a default win rate near 50% and a shared formula. Real agency accounts are also full of junk deals, so this will happen with real data.
+- Fix: (1) exclude $0 and ownerless deals from dollar tiles, (2) define "stale" per pipeline stage, not one global age, (3) never show a win rate built on fewer than a minimum number of closed deals; show "not enough data" instead, (4) label every estimate as an estimate, with the formula one tap away, (5) add a filter to hide obvious test accounts and test deals, (6) cap the Overview at about 6 tiles. Write each definition in `docs/METRICS.md` and unit-test it.
 
-**Step 2 - Supabase.** Create (or link) the Supabase project, put migrations in `supabase/migrations/`, run them. Schema guidance in section 9. Done when tables exist and a test insert/select works from server code.
+**Scope creep triage:**
+- Classify Duplicates, Data cleanup, Meeting notes, Leads, Clients, and Team against sections 7 and 8. Flag off anything not in Wave 1. Duplicates and Data cleanup are DEFER (they overlap native GHL and paid tools). Keep the code, hide the navigation.
+- Group the Duplicates list by name with counts and paginate it.
 
-**Step 3 - Vercel.** Link the repo, set env vars, deploy placeholder pages: `/` (landing), `/app` (the dashboard that GHL will iframe), `/privacy`, `/terms`, `/support`. The marketplace needs support, privacy, and terms URLs. Write honest placeholder privacy and terms text and tell me they need a human review before we go Public (the app stores client contact data). Done when the production URL loads all pages.
-
-**Step 4 - GHL developer portal setup (me, with your help).** Give me the portal checklist from section 6 with the Vercel URL filled in. Generate the logo. Done when I send you the Client ID, Client Secret, and SSO key and you have stored them as env vars locally and in Vercel.
-
-**Step 5 - OAuth install flow.** See section 7. Done when I can install the private app into my own account via the Test Link and a row appears in `installations`.
-
-**Step 6 - Embedded app and identity.** The app appears inside GHL via the Custom Pages module (iframe) and identifies the agency through GHL SSO. See section 7. Done when opening SubSync from inside GHL shows the right agency name without a separate login.
-
-**Step 7 - Sync engine.** Pull the list of client accounts, then contacts and opportunities per account into Supabase, with rate limiting and resumable jobs. See section 10.
-
-**Step 8 - Feature 1: Cross-account contact search.** One search box (name, email, phone). Results show contact, which client account, tags, last activity, and a deep link into that contact in GHL. Done when searching returns correct matches across at least 2 accounts quickly (target under 1 second from cache).
-
-**Step 9 - Feature 2: Data completeness report.** Per client account: total contacts, % with email, % with phone, % with tags, % active in last 90 days. Color coded, sortable. Done when numbers match a manual spot check on one account.
-
-**Step 10 - Feature 3: Stale deal alerts.** All open opportunities across accounts that have not changed in 30/60/90 days (configurable). Sortable, with deep link into GHL. Done when it matches a manual check.
-
-**Step 11 - Feature 4: Client onboarding checklist.** Per client account: has pipeline, has contacts, has calendar, has workflow (if workflow API is available for that account, otherwise show "unknown", never guess). Completion percentage.
-
-**Step 12 - Test and ship.** Test on the GHL sandbox account and on my real account. Then pricing setup, privacy/terms review, switch Private to Public and submit for review.
-
-**Roadmap after Phase 1 (do not build yet):**
-- Phase 2: unified inbox across accounts, lead response time tracking, client engagement score, churn risk alerts.
-- Phase 3: multi-pipeline dashboard, cross-account duplicate finder, central task queue, scheduled data exports, global DND.
-- Phase 4: workflow audit and trigger conflict detection (workflow API is limited availability, see below), batch settings propagation, workflow template sync, DNS health checker (external DNS lookups), team performance.
-- Phase 5: natural language queries and AI weekly client summaries.
+**Design pass (after Wave 0):** one consistent layout, fewer tiles per screen, one clear primary action per screen, a distinct visual identity (dark premium shell with one accent color), and a "what should I do next" panel at the top of Today. Inspiration, not copying.
 
 ---
 
-## 6. GHL DEVELOPER PORTAL SETUP (exact values)
+## 14. KICKOFF
 
-I already have a developer account. I have a blank draft app named SubSync open (version "vdraft", status DRAFT). The form shows a "Mandatory steps (0/5)" box: Basic info, Profile details, Support details, Pricing details, Publish.
-
-Give me this as a checklist and fill in the URL once Vercel is live.
-
-**Build > Profile > Basic Info**
-- App name: SubSync
-- App logo: 1:1, PNG/SVG/JPEG/JPG/GIF, min 400x400, max 800x800, max 500 kB. No HighLevel or GoHighLevel references. You generate it (simple, clean mark, works on light and dark backgrounds) and export a 512x512 PNG under 500 kB.
-- Category: Data management, Analytics and data, CRM (already selected)
-- Tagline: "One dashboard for all your client accounts" (shorten if there is a character limit)
-- Business niche: pick the closest to agencies or marketing agencies from the dropdown
-- Company: KD Squares Ltd
-- Website: the Vercel production URL (no GHL references on the page)
-
-**Listing Configuration / App Profiles / Getting Started Guide**
-Use this copy, adjust to the field limits:
-
-Short description:
-"SubSync gives teams that manage many client accounts one place to search contacts across every account, spot stale deals, check data quality, and track onboarding progress."
-
-Long description:
-"Managing dozens of client accounts means jumping between dashboards all day. SubSync connects to your accounts and brings the important signals into one view.
-- Search any contact across all client accounts at once
-- See data health per account: missing emails, missing phones, untagged and inactive contacts
-- Catch stale deals before they go cold, across every pipeline
-- Track onboarding progress for each new client account
-Built for agencies and teams that manage many client accounts. Install once, see everything."
-
-Getting started (3 steps): 1) Install SubSync and approve access. 2) Wait a few minutes for the first sync. 3) Open SubSync from your menu and start with Search.
-
-**Support Details**
-- Support email: code@kdsquares.com
-- Support URL: https://<production-url>/support
-- Privacy policy URL: https://<production-url>/privacy
-- Terms URL: https://<production-url>/terms
-
-**Advanced Settings > Auth**
-- Who can install: Agency only (CHECK the exact label in the form)
-- Listing type: Standard
-- Redirect URLs: `http://localhost:3000/api/oauth/callback` and `https://<production-url>/api/oauth/callback`
-- Scopes (request the minimum, add more only when a feature needs them): `locations.readonly`, `contacts.readonly`, `opportunities.readonly`, `calendars.readonly`, `conversations.readonly`. CHECK which scopes are needed to list installed locations and to mint location tokens (the oauth/locationToken and installed locations endpoints). Add `contacts.write` only when we actually write.
-- Client keys: I copy the Client ID and Client Secret and send them to you.
-
-**Modules**
-- Custom Pages: enable, point the iframe URL at `https://<production-url>/app`. Enable SSO and give me the SSO key. CHECK the exact module settings in the docs.
-- Webhooks: subscribe to app install and uninstall events and contact/opportunity change events if available. CHECK event names.
-
-**Pricing:** fill in last, see section 8.
-
-**Testing:** Developer portal > My Apps > SubSync > Manage > Versions > three dots > Test Link, enter my Location ID, open the link, click Install. I will test on my own agency and on the GHL sandbox account (CHECK how to request a sandbox; the sandbox allows 2 sub-accounts).
-
-Open question to test early: my own agency is on the $97 Starter plan (3 accounts). GHL docs say the agency-level app marketplace is limited to certain plans and use older plan names. CHECK whether an agency-level private app can be installed and tested on my Starter plan. If not, use the sandbox account. Report back what you find.
-
----
-
-## 7. OAUTH AND AUTH DETAILS
-
-VERIFIED from GHL docs:
-- Authorization Code flow. Access token lasts about 24 hours (about 86,399 seconds).
-- Refresh token is valid for up to ONE YEAR or until used. Every refresh returns a NEW refresh token and the old one stops working. You must save the new refresh token on every refresh. Reusing an old one fails. Use a lock or atomic update so two parallel requests do not both refresh and break the token chain.
-- Token endpoint: `POST https://services.leadconnectorhq.com/oauth/token` (form-encoded). Include `user_type` ("Company" for agency installs, "Location" for single account installs).
-- Rate limit: burst 100 requests per 10 seconds, 200,000 per day, per app per resource. Handle 429 with backoff and read rate limit headers.
-
-CHECK in docs (important, easy to miss):
-- Agency installs give a Company-level token. To call contacts or opportunities for a specific client account, mint a location token with `POST /oauth/locationToken` (companyId + locationId). The community starter repo uses this. Do not assume the company token can read location data directly.
-- Listing which client accounts have the app installed (`/oauth/installedLocations` or similar).
-- Install page flow: `https://marketplace.gohighlevel.com/oauth/chooselocation?...` with `response_type=code`, `redirect_uri`, `client_id`, `scope`.
-
-Reference starters (read them, do not copy blindly):
-- https://github.com/GoHighLevel/ghl-marketplace-app-template (official, Node/Express, includes SSO)
-- https://github.com/malikyousaf-0/gohighlevel-oauth-starter (TypeScript, rotation-safe refresh, signed webhooks)
-
-SSO and embedding:
-- The app runs in an iframe through Custom Pages. GHL passes encrypted user context to the iframe via postMessage; decrypt it server-side with the SSO key. CHECK the SSO docs for the exact message names and decryption method.
-- Do not use NextAuth, Clerk, or our own login for the embedded app. Identity comes from GHL SSO.
-- Framing headers: allow embedding from GHL domains. Many white-label agencies use their own custom domains, so a strict allowlist can break real customers. Decide an approach (for example `frame-ancestors https:` plus SSO verification), tell me the tradeoff, and record it in DECISIONS.md.
-
-Webhooks: verify the signature on the RAW request body (GHL signs webhook payloads, reportedly Ed25519 in the `X-GHL-Signature` header, CHECK). Acknowledge fast, process via a queue/job.
-
-On uninstall: stop syncing and delete that agency's cached data and tokens.
-
----
-
-## 8. BILLING AND PRICING
-
-VERIFIED from GHL materials:
-- GHL Marketplace has native billing. Agencies (and optionally sub-accounts) pay inside the GHL platform. It supports free plans, paid plans, free trials, and usage-based pricing. GHL takes a 15% revenue share. Developer payouts go through Tipalti, monthly, on the 15th for the previous month's earnings.
-- Therefore do not build external billing for marketplace installs. Do not add Lemon Squeezy or Stripe for this.
-
-Decision: start at $3 per client account per month, with a free tier up to 5 client accounts. Net to us at $3 is about $2.55 after GHL's 15%. We will revisit after the first 10 paying agencies.
-
-Your job at pricing time:
-- Read https://help.gohighlevel.com/support/solutions/articles/155000001217-set-up-your-marketplace-app-pricing and the pricing section of the developer form.
-- Propose how to represent "free up to 5 client accounts, then $3 per account" inside GHL's pricing model. If the marketplace cannot express a free allowance on a per-account plan, propose the nearest option (for example a free plan plus a paid plan, with limits enforced in our app). Tell me clearly what is not possible.
-- Enforce plan limits in our own code, not just in the listing.
-- Free trial: propose 14 days.
-- Do not go Public until pricing, privacy policy, and terms are done.
-
----
-
-## 9. DATABASE GUIDANCE (suggestion, improve it)
-
-Tables (names flexible):
-- `installations`: company_id (unique), encrypted access_token, encrypted refresh_token, token_expires_at, plan/limits, installed_at, uninstalled_at
-- `locations`: installation_id, location_id, name, email, phone, timezone, last_synced_at
-- `cached_contacts`: installation_id, location_id, contact_id, first_name, last_name, email, phone, tags[], date_added, last_activity_at, synced_at
-- `cached_opportunities`: installation_id, location_id, opportunity_id, pipeline_id/name, stage_id/name, contact_id/name, monetary_value, status, last_stage_change_at, last_status_change_at, synced_at
-- `sync_jobs`: installation_id, location_id, type, cursor, status, error, started_at, finished_at
-- `settings`: installation_id, stale thresholds and other preferences
-
-Security requirements:
-- Enable RLS on every table. All access happens server-side with the service role. No public policies.
-- Encrypt tokens at rest (Supabase Vault or app-level AES-GCM). Never log tokens.
-- Data minimization: store only the fields features need. This is other businesses' customer data.
-- Add indexes for search (email, phone, name; consider trigram search for names).
-- Write the schema as migration files in `supabase/migrations/`, not by hand in the dashboard.
-
----
-
-## 10. SYNC ENGINE REQUIREMENTS
-
-- Cross-account search cannot be done live. Calling every account on every keystroke would blow the rate limit. Cache in Supabase and serve search from the cache.
-- First sync: page through each account's contacts and opportunities with a queue, respecting 100 requests per 10 seconds, resumable if it fails halfway (cursor in `sync_jobs`).
-- Keep fresh using webhooks for contact and opportunity changes (if available) plus a periodic reconciliation sync. Show "last synced" in the UI.
-- Estimate storage for a large agency (for example 30 accounts x 20,000 contacts) and tell me if the free Supabase tier will not hold it.
-- Vercel function time limits and cron limits apply. Long syncs must be chunked and resumable. Tell me which Vercel plan the sync design needs.
-
----
-
-## 11. HOSTING AND COST REALITY (tell me before launch)
-
-As far as I know, and CHECK current terms on the pricing pages before launch:
-- Vercel Hobby (free) is for non-commercial use and has tight cron and function limits. We can develop on it, but before charging real customers we likely need Vercel Pro.
-- Supabase free projects can pause after inactivity and have small storage limits. A live paid product should be on Supabase Pro.
-- Realistic launch infrastructure cost is roughly $45 per month, not $0. Confirm the real numbers and tell me.
-
----
-
-## 12. KNOWN API LIMITS TO RESPECT
-
-- Workflows API v3 is limited availability. Quote from GHL docs: it is "currently enabled for selected sub-accounts only; any other sub-account receives 403 WORKFLOW_API_NOT_ENABLED_FOR_LOCATION". Any workflow feature must handle 403 gracefully and show "not available for this account", never fail silently or guess.
-- Some UI features have no API. Do not promise a feature until you have confirmed the endpoint exists and works with our scopes.
-- GHL audit logs only keep 60 days. If we ever want change history, we must record it ourselves from the day of install.
-
----
-
-## 13. KICKOFF
-
-Start now with Step 0 and Step 1. Tell me what I need to log into. Then move through the steps in order, stopping at Step 4 so I can complete the developer portal setup with you.
+Read this whole file. Then:
+1. Do Wave 0 first, including everything in section 13A. Report what you found in `REPORT.md` and tell me what is verified, what you flagged off, and what is blocked.
+2. Run the verification checklist (section 13) and update DECISIONS.md.
+3. Give me exact portal steps for the Pricing tab (section 11.2).
+4. Then start Wave 1 in order, one module at a time, each verified on live data before the next.
+Do not add features not listed here without asking.

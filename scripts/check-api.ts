@@ -714,6 +714,8 @@ async function main() {
   // --- data cleanup: preview, typed confirmation, apply, re-check, undo, isolation (demo copy only)
   const [demoInst] = await sql()`select id from installations where is_demo`;
   const clLoc = roofing.locationId as string;
+  // Start clean: rows left by an aborted earlier run must not be able to hide or fake a result.
+  await sql()`delete from cleanup_runs where installation_id = ${demoInst.id}`;
   const seed = async () => {
     await sql()`delete from cached_contacts where installation_id = ${demoInst.id} and contact_id like 'cleanup-t%'`;
     const rows = [
@@ -776,7 +778,7 @@ async function main() {
   // listing, audit trail, isolation
   const clList = await call("/api/app/cleanup", { token });
   assert.equal(clList.status, 200);
-  assert.ok(clList.body.runs.length >= 4 && clList.body.canWrite === true && clList.body.accounts.length >= 13);
+  assert.ok(clList.body.runs.length === 3 && clList.body.canWrite === true && clList.body.accounts.length >= 13);
   const [auditRows] = await sql()`select count(*)::int n from audit_log where installation_id = ${demoInst.id} and action like 'cleanup.%'`;
   assert.ok(auditRows.n >= 8, "every preview, apply and undo is logged");
   assert.equal((await call("/api/app/cleanup", { token: ct })).status, 403);

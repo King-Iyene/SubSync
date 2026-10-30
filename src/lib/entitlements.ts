@@ -29,6 +29,10 @@ export const FEATURES = [
   "builder",
   "meetings",
   "cleanup",
+  "setup_compare",
+  "playbooks",
+  "connections",
+  "clients",
 ] as const;
 export type Feature = (typeof FEATURES)[number];
 
@@ -67,5 +71,7 @@ export function entitlements(plan: Plan, enforce = false) {
     enforced: enforce,
     accountLimit: null as number | null,
     features: Object.fromEntries(FEATURES.map((f) => [f, true])) as Record<Feature, boolean>,
+    /** Features that are switched off (see flags.ts). */
+    off: [] as string[],
   };
 }

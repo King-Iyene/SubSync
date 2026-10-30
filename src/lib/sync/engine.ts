@@ -7,6 +7,7 @@ import {
   fetchAppointments, fetchCalendars, fetchUsers, isPermissionError, fetchCalendarCount, fetchContactsPage, fetchConversationsPage, fetchLocationDetails, fetchOpportunitiesPage, fetchPipelines,
   type ContactCursor, type ConversationRow, type OpportunityRow,
 } from "./ghl-data";
+import { diffAppointmentEvents } from "./appointment-events";
 import { diffDealEvents } from "./deal-events";
 import { listAllInstalledLocations } from "./installed-locations";
 
@@ -307,6 +308,12 @@ const MAX_CALENDARS = 80;
 
 // Appointments and the account's team names. Both depend on permissions an existing install may not
 // have approved yet; in that case we record "needs permission" for the account and carry on.
+// A time as the sync holds it (an ISO string from the platform, a Date from the database) in milliseconds.
+const asMs = (v: unknown): number | null => {
+  const ms = v instanceof Date ? v.getTime() : typeof v === "string" ? Date.parse(v) : typeof v === "number" ? v : NaN;
+  return Number.isFinite(ms) ? ms : null;
+};
+
 async function handleAppointments(job: Job): Promise<Outcome> {
   const db = sql();
   const loc = job.locationId as string;
@@ -353,6 +360,19 @@ async function handleAppointments(job: Job): Promise<Outcome> {
 
   if (access === "ok") {
     const unique = [...new Map(rows.map((r) => [r.appointment_id as string, r])).values()];
+    // Keep our own history: what each appointment looked like before this read, compared with now.
+    const [seen] = await db`select appointments_synced_at from locations where installation_id = ${job.installationId} and location_id = ${loc}`;
+    const known = new Map<string, { status: string | null; startAt: number | null }>();
+    for (let i = 0; i < unique.length; i += 500) {
+      const ids = unique.slice(i, i + 500).map((r) => r.appointment_id as string);
+      const before = await db`select appointment_id, status, start_at from cached_appointments where installation_id = ${job.installationId} and location_id = ${loc} and appointment_id = any(${ids}::text[])`;
+      for (const b of before) known.set(b.appointment_id as string, { status: b.status as string | null, startAt: asMs(b.start_at) });
+    }
+    const events = diffAppointmentEvents(unique.map((r) => ({ id: r.appointment_id as string, status: (r.status as string | null) ?? null, startAt: asMs(r.start_at) })), known, seen?.appointments_synced_at != null);
+    for (let i = 0; i < events.length; i += 500) {
+      const batch = events.slice(i, i + 500).map((e) => ({ installation_id: job.installationId, location_id: loc, appointment_id: e.id, kind: e.kind, from_value: e.from, to_value: e.to, start_at: e.startAt === null ? null : new Date(e.startAt) }));
+      await db`insert into appointment_events ${db(batch as never)}`;
+    }
     for (let i = 0; i < unique.length; i += 500) {
       await db`
         insert into cached_appointments ${db(unique.slice(i, i + 500) as never)}

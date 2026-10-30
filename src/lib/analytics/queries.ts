@@ -58,6 +58,13 @@ export async function getSettings(installationId: string): Promise<Settings> {
   };
 }
 
+// Take the agency's own domain from sign-in, unless it typed one in Settings (which always wins).
+export async function captureWhitelabelDomain(installationId: string, domain: string): Promise<void> {
+  const db = sql();
+  await db`insert into settings (installation_id) values (${installationId}) on conflict do nothing`;
+  await db`update settings set ghl_app_domain = ${domain}, app_domain_source = 'sso' where installation_id = ${installationId} and app_domain_source <> 'manual' and ghl_app_domain is distinct from ${domain}`;
+}
+
 export async function updateSettings(installationId: string, p: Partial<Settings>): Promise<void> {
   const db = sql();
   await db`insert into settings (installation_id) values (${installationId}) on conflict do nothing`;
@@ -68,6 +75,7 @@ export async function updateSettings(installationId: string, p: Partial<Settings
       sla_hours = coalesce(${p.slaHours ?? null}::int, sla_hours),
       slack_webhook_url = case when ${p.slackWebhookUrl !== undefined} then ${p.slackWebhookUrl ?? null} else slack_webhook_url end,
       ghl_app_domain = coalesce(${p.appDomain ?? null}, ghl_app_domain),
+      app_domain_source = case when ${p.appDomain !== undefined} then 'manual' else app_domain_source end,
       digest_enabled = coalesce(${p.digestEnabled ?? null}::boolean, digest_enabled),
       digest_hour = case when ${p.digestHour !== undefined} then ${p.digestHour ?? null}::int else digest_hour end,
       digest_timezone = case when ${p.digestTimezone !== undefined} then ${p.digestTimezone ?? null} else digest_timezone end,
@@ -104,16 +112,19 @@ export async function accountRows(installationId: string, s: AccountSettings): P
       from cached_contacts where installation_id = ${installationId} group by location_id
     ), o as (
       select location_id,
-        count(*) filter (where status = 'open')::int open_opps,
-        coalesce(sum(monetary_value) filter (where status = 'open'), 0)::float8 open_value,
-        count(*) filter (where status = 'open' and act < now() - make_interval(days => ${s.staleDays}::int))::int stale_opps,
-        coalesce(sum(monetary_value) filter (where status = 'open' and act < now() - make_interval(days => ${s.staleDays}::int)), 0)::float8 stale_value,
+        count(*) filter (where status = 'open' and counted)::int open_opps,
+        coalesce(sum(monetary_value) filter (where status = 'open' and counted), 0)::float8 open_value,
+        count(*) filter (where status = 'open' and counted and act < now() - make_interval(days => ${s.staleDays}::int))::int stale_opps,
+        coalesce(sum(monetary_value) filter (where status = 'open' and counted and act < now() - make_interval(days => ${s.staleDays}::int)), 0)::float8 stale_value,
+        count(*) filter (where status = 'open' and not counted)::int excluded_open,
         count(*) filter (where status = 'won')::int won_count,
         count(*) filter (where status = 'lost')::int lost_count,
         coalesce(sum(monetary_value) filter (where status = 'won'), 0)::float8 won_value,
         max(act) last_opp_at
       from (
         select location_id, status, monetary_value,
+          -- A deal counts toward dollar figures only with a value above zero and a person it belongs to.
+          (coalesce(monetary_value, 0) > 0 and assigned_to is not null) counted,
           coalesce(greatest(last_stage_change_at, last_action_at, updated_remote_at, last_status_change_at), created_remote_at, synced_at) act
         from cached_opportunities where installation_id = ${installationId}
       ) x group by location_id
@@ -134,7 +145,7 @@ export async function accountRows(installationId: string, s: AccountSettings): P
       coalesce(o.open_opps, 0)::int open_opps, coalesce(o.open_value, 0)::float8 open_value,
       coalesce(o.stale_opps, 0)::int stale_opps, coalesce(o.stale_value, 0)::float8 stale_value,
       coalesce(o.won_count, 0)::int won_count, coalesce(o.lost_count, 0)::int lost_count,
-      coalesce(o.won_value, 0)::float8 won_value,
+      coalesce(o.won_value, 0)::float8 won_value, coalesce(o.excluded_open, 0)::int excluded_open,
       coalesce(v.unread, 0)::int unread, coalesce(v.unanswered, 0)::int unanswered,
       greatest(c.last_contact_at, o.last_opp_at, v.last_msg_at) last_activity_at
     from locations l
@@ -165,6 +176,7 @@ export async function accountRows(installationId: string, s: AccountSettings): P
     wonCount: r.won_count,
     lostCount: r.lost_count,
     wonValue: r.won_value,
+    excludedOpen: r.excluded_open,
     unread: r.unread,
     unanswered: r.unanswered,
     calendars: r.calendar_count,

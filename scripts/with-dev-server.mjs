@@ -10,7 +10,7 @@ const CHROME = process.env.CHROME_PATH ?? "C:/Program Files/Google/Chrome/Applic
 const PORT = 3100;
 const server = spawn("npx", ["next", "dev", "-p", String(PORT)], {
   // A made-up Zoom secret lets the checks sign a pretend Zoom notification; it never leaves this machine.
-  env: { ...process.env, DEMO_MODE: "true", ZOOM_WEBHOOK_SECRET_TOKEN: process.env.ZOOM_WEBHOOK_SECRET_TOKEN ?? "demo-zoom-secret-token" },
+  env: { ...process.env, DEMO_MODE: "true", FLAGS_ALL_ON: process.env.FLAGS_ALL_ON ?? "true", ZOOM_WEBHOOK_SECRET_TOKEN: process.env.ZOOM_WEBHOOK_SECRET_TOKEN ?? "demo-zoom-secret-token" },
   shell: true,
   stdio: "ignore",
 });
@@ -35,7 +35,7 @@ let code = 1;
 try {
   if (!(await waitUp())) throw new Error("Dev server did not start");
   // CHECKS=check-connections runs just one script while iterating; the default runs them all.
-  for (const name of (process.env.CHECKS ?? "check-api,check-connections,check-insights").split(",").filter(Boolean)) {
+  for (const name of (process.env.CHECKS ?? "check-api,check-connections,check-insights,check-tenancy,check-flags,check-metrics").split(",").filter(Boolean)) {
     const run = spawnSync("node", ["--env-file=.env.local", "--import", "tsx", `scripts/${name}.ts`], { stdio: "inherit", shell: true });
     code = run.status ?? 1;
     if (code !== 0) break;

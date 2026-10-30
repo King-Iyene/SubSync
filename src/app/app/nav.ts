@@ -16,7 +16,7 @@ export const NAV: Array<{ id: Exclude<ViewId, "account">; label: string; feature
   { id: "leads", label: "Leads", feature: "activity", group: "Sell" },
   { id: "calls", label: "Call lists", feature: "calls", group: "Sell" },
   { id: "accounts", label: "Accounts", feature: "health", group: "Clients" },
-  { id: "clients", label: "Clients", feature: "reports", group: "Clients" },
+  { id: "clients", label: "Clients", feature: "clients", group: "Clients" },
   { id: "team", label: "Team", feature: "team", group: "Clients" },
   { id: "onboarding", label: "Setup", feature: "onboarding", group: "Tidy up" },
   { id: "duplicates", label: "Duplicates", feature: "duplicates", group: "Tidy up" },

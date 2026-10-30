@@ -1,5 +1,5 @@
 import { demoEnabled } from "@/lib/api/auth";
-import { canUse, normalisePlan } from "@/lib/entitlements";
+import { featureOn } from "@/lib/flags";
 import { looksLikeKey } from "@/lib/mcp/keys";
 import { handleRpc } from "@/lib/mcp/protocol";
 import { resolveKey } from "@/lib/mcp/store";
@@ -37,7 +37,7 @@ export async function POST(request: Request) {
   }
   if (!owner) return unauthorized("Missing or invalid API key");
   if (owner.isDemo && !demoEnabled()) return unauthorized("Demo mode is off", 403);
-  if (!canUse("ai", normalisePlan(owner.plan))) return Response.json({ error: "The AI connector is part of the paid plan" }, { status: 402 });
+  if (!(await featureOn("ai"))) return Response.json({ error: "Not found" }, { status: 404 });
   if (!allowed(owner.keyId)) return Response.json({ error: "Too many requests. Try again in a minute." }, { status: 429 });
 
   const raw = await request.text();
