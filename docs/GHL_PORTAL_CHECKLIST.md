@@ -1,6 +1,6 @@
 # GHL developer portal checklist (Step 4)
 
-Production URL used below: `https://subsync-topaz.vercel.app`
+Production URL used below: `https://subsync.kdsquares.com`
 Portal: https://marketplace.gohighlevel.com > My Apps > SubSync (draft, vdraft)
 
 Before you start: the site is already public (no login wall) at the address above.
@@ -15,7 +15,7 @@ Label names below were checked against the GHL docs on 2026-10-28; the portal UI
 | App logo | upload `public/brand/subsync-logo-512.png` (512x512, 18 kB) |
 | Tagline | One dashboard for all your client accounts |
 | Company | KD Squares Ltd |
-| Website | https://subsync-topaz.vercel.app |
+| Website | https://subsync.kdsquares.com |
 | Category | Data management, Analytics and data, CRM (already selected) |
 | Business niche | closest to "agencies" / "marketing agencies" |
 
@@ -43,9 +43,9 @@ Public text must say "client accounts", never "sub-accounts", and must not use t
 | Field | Value |
 |---|---|
 | Support email | code@kdsquares.com |
-| Support URL | https://subsync-topaz.vercel.app/support |
-| Privacy policy URL | https://subsync-topaz.vercel.app/privacy |
-| Terms URL | https://subsync-topaz.vercel.app/terms |
+| Support URL | https://subsync.kdsquares.com/support |
+| Privacy policy URL | https://subsync.kdsquares.com/privacy |
+| Terms URL | https://subsync.kdsquares.com/terms |
 
 ## 4. App settings
 
@@ -57,12 +57,12 @@ Public text must say "client accounts", never "sub-accounts", and must not use t
 
 - Redirect URL (type each, click **Add**):
   - `http://localhost:3000/api/oauth/callback`
-  - `https://subsync-topaz.vercel.app/api/oauth/callback`
+  - `https://subsync.kdsquares.com/api/oauth/callback`
 - Scopes (**Select Scope** dropdown): `locations.readonly`, `contacts.readonly`, `opportunities.readonly`, `calendars.readonly`, `conversations.readonly`, plus `oauth.write` (mint location tokens) and `oauth.readonly` (list installed locations). Add more only when a feature needs them.
 
 ## 6. Modules
 
-- Custom Pages: enable, iframe URL `https://subsync-topaz.vercel.app/app`, enable SSO.
+- Custom Pages: enable, iframe URL `https://subsync.kdsquares.com/app`, enable SSO.
 - Webhooks: add the webhook URL once `/api/webhooks` exists (later step). Subscribe to install/uninstall first.
 
 ## 7. Manage > Versions and Secrets

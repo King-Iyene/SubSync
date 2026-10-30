@@ -4,15 +4,15 @@ Do the parts in order. Each step says who does it. "Tell Claude" means paste the
 
 ## Where things stand (2026-10-29)
 
-- The code is finished and tested on fake data. The site is **live and public** at `https://subsync-topaz.vercel.app`, but install and sign-in say "not configured" until the keys are added (Parts 2 and 3).
-- Your real address is `https://subsync-topaz.vercel.app`. **Do not use `https://subsync.vercel.app`**: that belongs to someone else and redirects to another website.
+- The code is finished and tested on fake data. The site is **live and public** at `https://subsync.kdsquares.com`, but install and sign-in say "not configured" until the keys are added (Parts 2 and 3).
+- Your real address is `https://subsync.kdsquares.com`. **Do not use `https://subsync.vercel.app`**: that belongs to someone else and redirects to another website.
 - Nothing has been tested against a real GHL agency yet. That is Part 3.
 
 ---
 
 ## Part 1. Make the site reachable (already done)
 
-The public address `https://subsync-topaz.vercel.app` loads with no login wall (checked 2026-10-29). Nothing to do here.
+The public address `https://subsync.kdsquares.com` loads with no login wall (checked 2026-10-29). Nothing to do here.
 
 ## Part 2. Give the site its secrets (about 20 minutes, you)
 
@@ -23,9 +23,9 @@ You cannot paste secrets to me, so you add them in Vercel yourself.
 
 | Name | Value |
 | --- | --- |
-| `NEXT_PUBLIC_APP_URL` | `https://subsync-topaz.vercel.app` |
+| `NEXT_PUBLIC_APP_URL` | `https://subsync.kdsquares.com` |
 | `GHL_APP_ID` | `6ae2a79309eaa881c1eb419e` |
-| `GHL_REDIRECT_URI` | `https://subsync-topaz.vercel.app/api/oauth/callback` |
+| `GHL_REDIRECT_URI` | `https://subsync.kdsquares.com/api/oauth/callback` |
 | `TOKEN_ENCRYPTION_KEY` | a new random key (see below) |
 | `CRON_SECRET` | a long random string (see below) |
 | `GHL_CLIENT_ID` | from GHL, Part 3 step 4 |
@@ -44,11 +44,11 @@ Everything to type is in `docs/GHL_PORTAL_CHECKLIST.md`. The short version:
 1. marketplace.gohighlevel.com, **My Apps**, **SubSync** (the correct one, version 1.0.0, **Sub-Account** target, **Agency only** install).
 2. **Delete the extra app** `6ae2b7db6c40014528683d67` (it is the wrong, Agency-target one).
 3. **Build, Advanced Settings, Auth**:
-   - Redirect URL: `https://subsync-topaz.vercel.app/api/oauth/callback`
+   - Redirect URL: `https://subsync.kdsquares.com/api/oauth/callback`
    - Scopes ticked: `locations.readonly`, `contacts.readonly`, `opportunities.readonly`, `calendars.readonly`, `conversations.readonly`, `oauth.write`, `oauth.readonly`
 4. Copy the **Client ID**, **Client Secret** and the **Shared Secret** (SSO key). Put them in Vercel (Part 2), then redeploy again.
-5. **Modules, Custom Pages**: URL `https://subsync-topaz.vercel.app/app`, SSO on.
-6. **Webhooks**: URL `https://subsync-topaz.vercel.app/api/webhooks/ghl`.
+5. **Modules, Custom Pages**: URL `https://subsync.kdsquares.com/app`, SSO on.
+6. **Webhooks**: URL `https://subsync.kdsquares.com/api/webhooks/ghl`.
 7. **Support**: email `code@kdsquares.com`, and the `/support`, `/privacy`, `/terms` URLs on the same address.
 8. Upload your logo (the black shop pin) under App logo.
 

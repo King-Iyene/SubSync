@@ -108,3 +108,10 @@ Format: date, decision, reason.
 
 - **Our production address is `https://subsync-topaz.vercel.app` (King confirmed; the earlier team-scoped address was a protected alias).** `https://subsync.vercel.app` belongs to someone else (it redirects to another site); never put it in the portal or env vars. Plan a custom domain before going Public.
 - The topaz address is public (no login wall). Install and SSO return 503 until the GHL env vars are added. Step-by-step: `docs/LAUNCH_GUIDE.md`.
+
+## 2026-10-30 (custom domain)
+
+- **Production address is now `https://subsync.kdsquares.com`** (CNAME at GoDaddy to Vercel, added to the Vercel project as a Production domain). The old `subsync-topaz.vercel.app` address still works as an alias but must not be used in the GHL portal.
+- Changed: Vercel `NEXT_PUBLIC_APP_URL`, and in the GHL portal the redirect URL, webhook URL, Custom Page URL and the support/privacy/terms links. The OAuth redirect address is built from `NEXT_PUBLIC_APP_URL`, so that is the only variable that changes on a future move.
+- **Lesson:** the portal's Test Link uses the FIRST redirect URL on the list. A leftover `http://localhost:3000/...` entry sent the first test install to localhost (blank page). Keep only live redirect URLs in the portal.
+- Vercel needs an email code to reveal a stored variable; to change a value, delete and re-add it.
