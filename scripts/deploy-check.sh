@@ -28,4 +28,7 @@ probe /api/webhooks/ghl 401 POST
 probe /api/cron/sync 401
 probe /api/cron/daily 401
 probe /api/app/overview 401
+probe /api/app/connections 401
+probe /api/hooks/fathom/AAAAAAAAAAAAAAAAAAAAAAAAAAAA 404 POST
+probe "/api/integrations/slack/callback?state=forged" 400
 exit $bad
