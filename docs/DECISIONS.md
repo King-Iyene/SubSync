@@ -115,3 +115,10 @@ Format: date, decision, reason.
 - Changed: Vercel `NEXT_PUBLIC_APP_URL`, and in the GHL portal the redirect URL, webhook URL, Custom Page URL and the support/privacy/terms links. The OAuth redirect address is built from `NEXT_PUBLIC_APP_URL`, so that is the only variable that changes on a future move.
 - **Lesson:** the portal's Test Link uses the FIRST redirect URL on the list. A leftover `http://localhost:3000/...` entry sent the first test install to localhost (blank page). Keep only live redirect URLs in the portal.
 - Vercel needs an email code to reveal a stored variable; to change a value, delete and re-add it.
+
+## 2026-10-30 (first real install, verified)
+
+- **First real install worked end to end** on the KD Squares Test sub-account: OAuth callback saved the agency and tokens, SSO opened the live dashboard inside GHL, and a sync pulled structure, contacts (332), opportunities (189) and conversations with no errors.
+- **Fact learned:** the platform's installed-locations list can be empty for a few seconds after an install, so the first sync found 0 accounts until "Sync now". Fix: `scheduleDailyRefresh` now retries every 3 minutes for any install that still has no client accounts.
+- **Fact learned:** the portal's Test Link installs on a single sub-account (a location install), and the final handoff opens our site in a new tab; automated browsers block that pop-up, so a person must click the last Confirm.
+- Assumptions now confirmed: the `type === "agency"` SSO check, the contact/opportunity endpoints and field names, the oauth.write and oauth.readonly scopes, and the Starter-plan private install. Still unverified: bulk install across several sub-accounts, the Users API last login, uninstall webhook purge.

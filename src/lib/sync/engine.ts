@@ -58,13 +58,21 @@ export async function enqueueAreaSync(installationId: string, locationId: string
   return enqueueJobs(installationId, [locationId], [area]);
 }
 
-// Start a daily refresh for installs that have not synced in the last ~20 hours.
+// Start a daily refresh for installs that have not synced in the last ~20 hours. An install that
+// still has no client accounts is retried every few minutes: the platform can take a moment to
+// list a fresh install, so the first sync right after installing may find nothing.
 export async function scheduleDailyRefresh(): Promise<number> {
   const rows = await sql()`
     select i.id from installations i
     where i.uninstalled_at is null and not i.is_demo and i.refresh_token_enc is not null
       and not exists (select 1 from sync_jobs j where j.installation_id = i.id and j.status in ('pending', 'running'))
-      and coalesce((select max(j.finished_at) from sync_jobs j where j.installation_id = i.id and j.type = 'locations' and j.status = 'done'), 'epoch') < now() - interval '20 hours'`;
+      and (
+        coalesce((select max(j.finished_at) from sync_jobs j where j.installation_id = i.id and j.type = 'locations' and j.status = 'done'), 'epoch') < now() - interval '20 hours'
+        or (
+          not exists (select 1 from locations l where l.installation_id = i.id)
+          and coalesce((select max(j.finished_at) from sync_jobs j where j.installation_id = i.id and j.type = 'locations' and j.status = 'done'), 'epoch') < now() - interval '3 minutes'
+        )
+      )`;
   let n = 0;
   for (const r of rows) n += await enqueueFullSync(r.id as string);
   return n;
