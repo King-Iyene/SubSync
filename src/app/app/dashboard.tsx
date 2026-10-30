@@ -10,6 +10,7 @@ import { AlertsView } from "./views/alerts";
 import { DealsView } from "./views/deals";
 import { DuplicatesView } from "./views/duplicates";
 import { EmailHealthView } from "./views/email-health";
+import { HelpView } from "./views/help";
 import { InboxView } from "./views/inbox";
 import { OnboardingView } from "./views/onboarding";
 import { OverviewView } from "./views/overview";
@@ -167,6 +168,7 @@ export function Dashboard() {
       case "duplicates": return <DuplicatesView />;
       case "alerts": return <AlertsView go={go} />;
       case "settings": return <SettingsView />;
+      case "help": return <HelpView go={go} />;
     }
   })();
 

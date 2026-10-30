@@ -46,6 +46,16 @@ export function OverviewView({ go }: { go: GoFn }) {
         }
       />
       {note && <p className="mb-4 rounded-lg border bg-muted/40 px-3 py-2 text-sm" role="status">{note}</p>}
+      {!data.demo && (data.sync.lastFinishedAt === null || data.sync.pending > 0) && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-sky-500/40 bg-sky-500/5 px-3 py-2 text-sm" role="status">
+          <span>
+            {k.accounts === 0
+              ? "Your first sync is running. Client accounts and numbers appear here over the next few minutes."
+              : "Still syncing your accounts. Numbers fill in as each one finishes."}
+          </span>
+          <Btn variant="ghost" onClick={() => go("help")}>New here? Getting started</Btn>
+        </div>
+      )}
       {data.hiddenAccounts > 0 && (
         <p className="mb-4 rounded-lg border border-sky-500/40 bg-sky-500/5 px-3 py-2 text-sm">
           Your free plan covers {data.entitlements.accountLimit} client accounts. {data.hiddenAccounts} more are hidden until you upgrade.

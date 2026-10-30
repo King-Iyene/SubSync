@@ -1,5 +1,5 @@
 export type ViewId =
-  | "overview" | "accounts" | "account" | "search" | "deals" | "inbox" | "onboarding" | "email" | "duplicates" | "alerts" | "settings";
+  | "overview" | "accounts" | "account" | "search" | "deals" | "inbox" | "onboarding" | "email" | "duplicates" | "alerts" | "settings" | "help";
 
 export type GoFn = (view: ViewId, locationId?: string) => void;
 
@@ -14,4 +14,5 @@ export const NAV: Array<{ id: Exclude<ViewId, "account">; label: string; feature
   { id: "duplicates", label: "Duplicates", feature: "duplicates" },
   { id: "alerts", label: "Alerts", feature: "alerts" },
   { id: "settings", label: "Settings", feature: "settings" },
+  { id: "help", label: "Getting started", feature: "overview" },
 ];
