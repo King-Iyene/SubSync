@@ -24,12 +24,15 @@ export type Settings = AccountSettings & {
   /** Name and colour shown at the top of printed client reports. */
   brandName: string | null;
   brandColor: string | null;
+  /** Use each industry's own reply target in the daily brief instead of one number for everyone. */
+  industryTargets: boolean;
+  keepTranscripts: boolean;
 };
 
 export async function getSettings(installationId: string): Promise<Settings> {
   const db = sql();
   const read = () => db`
-    select stale_deal_days, dormant_days, sla_hours, slack_webhook_url, ghl_app_domain, digest_enabled, custom_checklist, digest_hour, digest_timezone, brand_name, brand_color
+    select stale_deal_days, dormant_days, sla_hours, slack_webhook_url, ghl_app_domain, digest_enabled, custom_checklist, digest_hour, digest_timezone, brand_name, brand_color, industry_targets, keep_transcripts
     from settings where installation_id = ${installationId}`;
   let [r] = await read();
   if (!r) {
@@ -50,6 +53,8 @@ export async function getSettings(installationId: string): Promise<Settings> {
     digestTimezone: (r.digest_timezone as string | null) ?? null,
     brandName: (r.brand_name as string | null) ?? null,
     brandColor: (r.brand_color as string | null) ?? null,
+    industryTargets: r.industry_targets === true,
+    keepTranscripts: r.keep_transcripts === true,
   };
 }
 
@@ -66,6 +71,8 @@ export async function updateSettings(installationId: string, p: Partial<Settings
       digest_enabled = coalesce(${p.digestEnabled ?? null}::boolean, digest_enabled),
       digest_hour = case when ${p.digestHour !== undefined} then ${p.digestHour ?? null}::int else digest_hour end,
       digest_timezone = case when ${p.digestTimezone !== undefined} then ${p.digestTimezone ?? null} else digest_timezone end,
+      industry_targets = coalesce(${p.industryTargets ?? null}::boolean, industry_targets),
+      keep_transcripts = coalesce(${p.keepTranscripts ?? null}::boolean, keep_transcripts),
       brand_name = case when ${p.brandName !== undefined} then ${p.brandName ?? null} else brand_name end,
       brand_color = case when ${p.brandColor !== undefined} then ${p.brandColor ?? null} else brand_color end,
       custom_checklist = coalesce(${p.customChecklist !== undefined ? db.json(p.customChecklist) : null}::jsonb, custom_checklist)

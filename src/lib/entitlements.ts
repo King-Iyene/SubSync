@@ -28,6 +28,7 @@ export const FEATURES = [
   "appointments",
   "team",
   "builder",
+  "meetings",
 ] as const;
 export type Feature = (typeof FEATURES)[number];
 

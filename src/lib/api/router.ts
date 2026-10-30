@@ -30,8 +30,10 @@ import { afterHours, communicationGaps } from "../analytics/comms-queries";
 import { badDataSamples, contactOverview, topLeads, vips } from "../analytics/contact-queries";
 import { appointmentView } from "../analytics/appointment-queries";
 import { compareSetup, describe as describeDiff } from "../analytics/setup-intel";
+import { createHook, listHooks, listMeetings, MAX_HOOKS_PER_ACCOUNT, revokeHook, setMeetingStatus } from "../analytics/meeting-queries";
 import { buildDailyDigest, NOT_WATCHED } from "../analytics/digest-service";
 import { digestText, localParts } from "../analytics/digest-intel";
+import { industryOptions, matchesSegment, PLAYBOOKS } from "../analytics/playbooks";
 import { buildQueue, recordBulk, recordDecision, summarise, undoDecision } from "../analytics/dedupe-queries";
 import { bulkSelect, groupKey } from "../analytics/dedupe";
 import { contactTimeline, dndSummary, leadSources, recentDealMoves, setTeamName, teamStats, upcomingBirthdays } from "../analytics/people-queries";
@@ -42,7 +44,26 @@ import { authenticate, isResponse, json, type AuthContext } from "./auth";
 // All authenticated data endpoints live behind /api/app/<path>. Each one needs a valid signed
 // session, is scoped to the caller's installation, and is checked against the plan.
 
-type Ctx = AuthContext & { request: Request; url: URL; segments: string[] };
+type Ctx = AuthContext & { request: Request; url: URL; segments: string[]; seg?: Set<string> | null };
+
+// The "show me only..." filter an agency can set at the top of the app: a kind of industry and/or an
+// owner. Every page honours it, so the whole app can be narrowed to, say, the clinics or one account
+// manager's clients. A business or client view ignores it (it only ever sees its own account).
+async function segmentSet(ctx: Ctx): Promise<Set<string> | null> {
+  if (ctx.seg !== undefined) return ctx.seg;
+  ctx.seg = null;
+  if (ctx.limitTo) return ctx.seg;
+  const industry = ctx.url.searchParams.get("industry");
+  const owner = ctx.url.searchParams.get("owner");
+  if ((!industry || !/^[a-z_]{2,30}$/.test(industry)) && (!owner || owner.length > 60)) return ctx.seg;
+  const rows = await sql()`
+    select l.location_id, l.owner, p.industry from locations l
+    left join account_profiles p on p.installation_id = l.installation_id and p.location_id = l.location_id
+    where l.installation_id = ${ctx.installationId}`;
+  const filter = { industry: industry && /^[a-z_]{2,30}$/.test(industry) ? industry : null, owner: owner && owner.length <= 60 ? owner : null };
+  ctx.seg = new Set(rows.filter((r) => matchesSegment({ industry: r.industry as string | null, owner: r.owner as string | null }, filter)).map((r) => r.location_id as string));
+  return ctx.seg;
+}
 
 const LOCATION_ID = /^[A-Za-z0-9_-]{3,64}$/;
 
@@ -62,6 +83,8 @@ async function accountsFor(ctx: Ctx) {
   let visible = limit === null ? accounts : accounts.filter((a) => !a.ignored).slice(0, limit);
   // A business or client view only ever sees its own account.
   if (ctx.limitTo) visible = accounts.filter((a) => a.locationId === ctx.limitTo);
+  const seg = await segmentSet(ctx);
+  if (seg) visible = visible.filter((a) => seg.has(a.locationId));
   return { settings, accounts: visible, hidden: accounts.length - visible.length, links: deepLinks(settings.appDomain) };
 }
 
@@ -74,7 +97,8 @@ async function scope(ctx: Ctx) {
     limit === null ? Promise.resolve(null) : visibleLocationIds(ctx.installationId, limit),
   ]);
   const allowed = ids ? new Set(ids) : null;
-  const permits = (locationId: string) => (ctx.limitTo ? locationId === ctx.limitTo : allowed === null || allowed.has(locationId));
+  const seg = await segmentSet(ctx);
+  const permits = (locationId: string) => (ctx.limitTo ? locationId === ctx.limitTo : (allowed === null || allowed.has(locationId)) && (seg === null || seg.has(locationId)));
   return { settings, permits, links: deepLinks(settings.appDomain) };
 }
 
@@ -99,10 +123,13 @@ function slim(a: DerivedAccount, links: ReturnType<typeof deepLinks>) {
 
 async function overview(ctx: Ctx) {
   // Independent queries run together so the page does not wait on them one after another.
-  const [{ settings, accounts, hidden, links }, alerts, sync] = await Promise.all([
+  const [{ settings, accounts, hidden, links }, allAlerts, sync] = await Promise.all([
+
     accountsFor(ctx), listAlerts(ctx.installationId, false, 500, ctx.limitTo ?? undefined), syncStatus(ctx.installationId, ctx.limitTo),
   ]);
+  const overviewSeg = await segmentSet(ctx);
   const live = accounts.filter((a) => !a.ignored);
+  const alerts = overviewSeg ? allAlerts.filter((a) => a.locationId !== null && overviewSeg.has(a.locationId)) : allAlerts;
   const sum = (f: (a: DerivedAccount) => number) => live.reduce((s, a) => s + f(a), 0);
   const bands = { thriving: 0, healthy: 0, watch: 0, at_risk: 0 };
   for (const a of live) bands[a.band]++;
@@ -173,9 +200,50 @@ async function setupCompare(ctx: Ctx) {
   });
 }
 
+async function meetingsView(ctx: Ctx) {
+  const sc = await scope(ctx);
+  const allowed = await allowedIds(ctx);
+  const [meetings, hooks, locs] = await Promise.all([
+    listMeetings(ctx.installationId, allowed),
+    listHooks(ctx.installationId, allowed),
+    sql()`select location_id, name from locations where installation_id = ${ctx.installationId} and not ignored ${allowed ? sql()`and location_id = any(${allowed}::text[])` : sql()``} order by name`,
+  ]);
+  return json({
+    meetings: meetings.map((m) => ({ ...m, contactUrl: m.contactId ? sc.links.contact(m.locationId, m.contactId) : null })),
+    hooks, accounts: locs.map((l) => ({ locationId: l.location_id as string, name: (l.name as string | null) ?? "Unnamed account" })),
+    maxHooks: MAX_HOOKS_PER_ACCOUNT, keepTranscripts: sc.settings.keepTranscripts, canManage: ctx.kind !== "client",
+  });
+}
+
+async function meetingHookCreate(ctx: Ctx) {
+  const body = (await ctx.request.json().catch(() => null)) as { locationId?: unknown; label?: unknown } | null;
+  const loc = ctx.limitTo ?? body?.locationId;
+  if (typeof loc !== "string" || !LOCATION_ID.test(loc)) return json({ error: "Choose a client account" }, 400);
+  const allowed = await allowedIds(ctx);
+  if (allowed && !allowed.includes(loc)) return json({ error: "Account not found" }, 404);
+  const label = typeof body?.label === "string" && body.label.trim() ? body.label.trim().slice(0, 60) : null;
+  const made = await createHook(ctx.installationId, loc, label);
+  if (made === "no_account") return json({ error: "Account not found" }, 404);
+  if (made === "limit") return json({ error: `An account can have up to ${MAX_HOOKS_PER_ACCOUNT} addresses. Turn one off first.` }, 400);
+  // The address is shown this one time: only a hash is stored.
+  return json({ ok: true, id: made.id, url: `${ctx.url.origin}/api/hooks/meeting/${made.token}` });
+}
+
+async function meetingHookRevoke(ctx: Ctx, id: string) {
+  if (!UUID.test(id)) return json({ error: "Not found" }, 404);
+  return (await revokeHook(ctx.installationId, await allowedIds(ctx), id)) ? json({ ok: true }) : json({ error: "Not found" }, 404);
+}
+
+async function meetingUpdate(ctx: Ctx, id: string) {
+  if (!UUID.test(id)) return json({ error: "Not found" }, 404);
+  const body = (await ctx.request.json().catch(() => null)) as { status?: unknown } | null;
+  if (body?.status !== "new" && body?.status !== "filed" && body?.status !== "dismissed") return json({ error: "Unknown status" }, 400);
+  return (await setMeetingStatus(ctx.installationId, await allowedIds(ctx), id, body.status)) ? json({ ok: true }) : json({ error: "Not found" }, 404);
+}
+
 async function dailyView(ctx: Ctx) {
   const sc = await scope(ctx);
-  const d = await buildDailyDigest(ctx.installationId, { limitTo: ctx.limitTo, planLimit: accountLimit(ctx.plan, ctx.entitlements.enforced) });
+  const d = await buildDailyDigest(ctx.installationId, { limitTo: ctx.limitTo, planLimit: accountLimit(ctx.plan, ctx.entitlements.enforced), onlyIds: await segmentSet(ctx) });
   return json({
     generatedAt: d.generatedAt, freshness: d.freshness, connection: d.connection, headlines: d.headlines, accounts: d.accounts, limited: ctx.limitTo !== null,
     attention: d.attention.map((a) => ({ ...a, url: sc.links.account(a.locationId) })),
@@ -237,6 +305,39 @@ async function startView(ctx: Ctx) {
       detail: null, body: "Switch on a read-only view for a client's own staff. They see only their own account: never other clients, fees or notes.", view: "settings", cta: "Open Settings" }] : []),
   ];
   return json({ kind: ctx.kind, steps, doneCount: steps.filter((s) => s.done).length, total: steps.length });
+}
+
+// Options for the filter bar. Not narrowed by the filter itself, so you can always change it.
+async function segmentsView(ctx: Ctx) {
+  const rows = await sql()`
+    select l.location_id, l.owner, p.industry from locations l
+    left join account_profiles p on p.installation_id = l.installation_id and p.location_id = l.location_id
+    where l.installation_id = ${ctx.installationId} and not l.ignored`;
+  const owners = new Map<string, number>();
+  for (const r of rows) if (r.owner) owners.set(r.owner as string, (owners.get(r.owner as string) ?? 0) + 1);
+  return json({
+    total: rows.length,
+    industries: industryOptions(rows.map((r) => r.industry as string | null)),
+    owners: [...owners.entries()].map(([name, accounts]) => ({ name, accounts })).sort((a, b) => b.accounts - a.accounts || a.name.localeCompare(b.name)),
+  });
+}
+
+// What each kind of client cares about, and which of your accounts fall under it.
+async function playbooksView(ctx: Ctx) {
+  const [rows, settings] = await Promise.all([
+    sql()`select l.location_id, l.name, p.industry from locations l
+      left join account_profiles p on p.installation_id = l.installation_id and p.location_id = l.location_id
+      where l.installation_id = ${ctx.installationId} and not l.ignored`,
+    getSettings(ctx.installationId),
+  ]);
+  const unset = rows.filter((r) => !((r.industry as string | null) ?? "").trim()).length;
+  return json({
+    industryTargets: settings.industryTargets, globalReplyHours: settings.slaHours, accountsWithoutIndustry: unset,
+    playbooks: PLAYBOOKS.map((p) => ({
+      id: p.id, label: p.label, replyHours: p.replyHours, replyWhy: p.replyWhy, staleDays: p.staleDays, watch: p.watch, callLists: p.callLists, checklist: p.checklist, privacy: p.privacy ?? null,
+      accounts: rows.filter((r) => p.match.test(((r.industry as string | null) ?? "").trim() || "\u0000")).map((r) => ({ locationId: r.location_id as string, name: r.name as string | null })),
+    })),
+  });
 }
 
 async function accounts(ctx: Ctx) {
@@ -418,8 +519,10 @@ async function duplicateUndo(ctx: Ctx) {
 
 async function emailHealth(ctx: Ctx) {
   const [allChecks, allCandidates] = await Promise.all([listDomainChecks(ctx.installationId), domainCandidates(ctx.installationId)]);
-  const checks = ctx.limitTo ? allChecks.filter((c) => c.locationId === ctx.limitTo) : allChecks;
-  const candidates = ctx.limitTo ? allCandidates.filter((c) => c.locationId === ctx.limitTo) : allCandidates;
+  const seg = await segmentSet(ctx);
+  const keep = (id: string | null) => (ctx.limitTo ? id === ctx.limitTo : !seg || (id !== null && seg.has(id)));
+  const checks = allChecks.filter((c) => keep(c.locationId));
+  const candidates = allCandidates.filter((c) => keep(c.locationId));
   const checked = new Set(checks.map((c) => c.domain));
   const unchecked: Array<{ domain: string; locationId: string; locationName: string | null }> = [];
   const seen = new Set<string>();
@@ -457,7 +560,8 @@ async function emailCheck(ctx: Ctx) {
 async function alertsView(ctx: Ctx) {
   const includeResolved = ctx.url.searchParams.get("resolved") === "1";
   const names = new Map((await loadAccounts(ctx.installationId)).accounts.map((a) => [a.locationId, a.name]));
-  const rows = await listAlerts(ctx.installationId, includeResolved, 300, ctx.limitTo ?? undefined);
+  const seg = await segmentSet(ctx);
+  const rows = (await listAlerts(ctx.installationId, includeResolved, 300, ctx.limitTo ?? undefined)).filter((a) => !seg || (a.locationId !== null && seg.has(a.locationId)));
   return json({ alerts: rows.map((a) => ({ ...a, locationName: a.locationId ? names.get(a.locationId) ?? null : null })) });
 }
 
@@ -469,7 +573,7 @@ const settingsView = async (ctx: Ctx) => {
 
 function publicSettings(s: Settings) {
   // Never send the webhook URL back to the browser: it is a secret.
-  return { staleDays: s.staleDays, dormantDays: s.dormantDays, slaHours: s.slaHours, appDomain: s.appDomain, digestEnabled: s.digestEnabled, customChecklist: s.customChecklist, digestHour: s.digestHour, digestTimezone: s.digestTimezone, brandName: s.brandName, brandColor: s.brandColor };
+  return { staleDays: s.staleDays, dormantDays: s.dormantDays, slaHours: s.slaHours, appDomain: s.appDomain, digestEnabled: s.digestEnabled, customChecklist: s.customChecklist, digestHour: s.digestHour, digestTimezone: s.digestTimezone, brandName: s.brandName, brandColor: s.brandColor, industryTargets: s.industryTargets, keepTranscripts: s.keepTranscripts };
 }
 
 async function settingsUpdate(ctx: Ctx) {
@@ -481,6 +585,8 @@ async function settingsUpdate(ctx: Ctx) {
   if ("dormantDays" in body) { const v = int(body.dormantDays, 7, 365); if (v === null) return json({ error: "Dormant days must be between 7 and 365" }, 400); patch.dormantDays = v; }
   if ("slaHours" in body) { const v = int(body.slaHours, 1, 168); if (v === null) return json({ error: "SLA hours must be between 1 and 168" }, 400); patch.slaHours = v; }
   if ("digestEnabled" in body) patch.digestEnabled = body.digestEnabled === true;
+  if ("industryTargets" in body) patch.industryTargets = body.industryTargets === true;
+  if ("keepTranscripts" in body) patch.keepTranscripts = body.keepTranscripts === true;
   if ("brandName" in body) {
     if (body.brandName === null || body.brandName === "") patch.brandName = null;
     else if (typeof body.brandName === "string" && body.brandName.trim().length <= 60) patch.brandName = body.brandName.trim();
@@ -680,7 +786,10 @@ async function syncStart(ctx: Ctx) {
 async function allowedIds(ctx: Ctx): Promise<string[] | null> {
   if (ctx.limitTo) return [ctx.limitTo];
   const limit = accountLimit(ctx.plan, ctx.entitlements.enforced);
-  return limit === null ? null : visibleLocationIds(ctx.installationId, limit);
+  const base = limit === null ? null : await visibleLocationIds(ctx.installationId, limit);
+  const seg = await segmentSet(ctx);
+  if (!seg) return base;
+  return base === null ? [...seg] : base.filter((id) => seg.has(id));
 }
 
 async function pipelineIntel(ctx: Ctx) {
@@ -1045,7 +1154,7 @@ async function digestPreview(ctx: Ctx) {
 
 const FEATURE_FOR: Record<string, Feature> = {
   search: "search", onboarding: "onboarding", stale: "stale", inbox: "inbox", pipelines: "pipelines", duplicates: "duplicates", email: "email",
-  alerts: "alerts", appointments: "appointments", "setup-compare": "onboarding", daily: "overview", team: "team", "deal-events": "pipelines", contact: "search", settings: "settings", export: "exports", digest: "reports", "api-keys": "ai", hygiene: "stale", "pipeline-intel": "pipelines", "contact-intel": "activity", clients: "reports", qbr: "reports", "comms-intel": "inbox", "call-queue": "calls", "call-lists": "calls", "call-outcomes": "calls",
+  alerts: "alerts", appointments: "appointments", meetings: "meetings", "setup-compare": "onboarding", playbooks: "onboarding", daily: "overview", team: "team", "deal-events": "pipelines", contact: "search", settings: "settings", export: "exports", digest: "reports", "api-keys": "ai", hygiene: "stale", "pipeline-intel": "pipelines", "contact-intel": "activity", clients: "reports", qbr: "reports", "comms-intel": "inbox", "call-queue": "calls", "call-lists": "calls", "call-outcomes": "calls",
 };
 
 export async function handle(request: Request, segments: string[]): Promise<Response> {
@@ -1064,6 +1173,9 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       if (a === "daily") return await dailyView(ctx);
       if (a === "appointments") return await appointmentsView(ctx);
       if (a === "setup-compare") return await setupCompare(ctx);
+      if (a === "segments") return await segmentsView(ctx);
+      if (a === "meetings") return await meetingsView(ctx);
+      if (a === "playbooks") return await playbooksView(ctx);
       if (a === "start") return await startView(ctx);
       if (a === "accounts" && !b) return await accounts(ctx);
       if (a === "onboarding") return await onboardingOverview(ctx);
@@ -1101,6 +1213,8 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
     if (method === "POST") {
       if (a === "email" && b === "check") return await emailCheck(ctx);
       if (a === "usage" && !b) return await usagePing(ctx);
+      if (a === "meetings" && b === "hooks" && !c) return await meetingHookCreate(ctx);
+      if (a === "meetings" && b === "hooks" && c && segments[3] === "revoke") return await meetingHookRevoke(ctx, c);
       if (a === "duplicates" && b === "review") return await duplicateReview(ctx);
       if (a === "duplicates" && b === "bulk") return await duplicateBulk(ctx);
       if (a === "duplicates" && b === "undo") return await duplicateUndo(ctx);
@@ -1123,6 +1237,7 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
     if (method === "PUT") {
       if (a === "settings") return await settingsUpdate(ctx);
       if (a === "goals") return await goalsUpdate(ctx);
+      if (a === "meetings" && b) return await meetingUpdate(ctx, b);
       if (a === "team" && b && LOCATION_ID.test(b)) return await teamName(ctx, b);
       if (a === "clients" && b && LOCATION_ID.test(b)) return await clientUpdate(ctx, b);
       if (a === "accounts" && b && LOCATION_ID.test(b) && c === "flags") return await flags(ctx, b);

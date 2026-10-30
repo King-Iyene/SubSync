@@ -282,3 +282,58 @@ Sidebar sections merged or removed because they stayed shallow: Deals now lives 
 | REPORT commits | b0406d6, 174a1e6 and this one |
 
 Tests at the end: 169 unit tests and the full HTTP integration check pass. Every push built on Vercel and passed the live probes (12 URLs, including the two protected cron routes).
+
+---
+
+# Round 3: new permissions, appointments, and features aimed at what others do not do
+
+## Permissions added in the developer portal (draft version, saved)
+
+I added two read-only permissions to the SubSync draft in the developer portal, both marked **optional** so an installer can decline them without blocking the install: `calendars/events.readonly` (appointments) and `users.readonly` (real team names). The app now asks for 9 permissions in total. The portal showed "Saved!". The code asks for the same list.
+
+What this means in practice: an install made before today keeps its old, narrower permissions until it is approved again (reinstall from the marketplace and approve). Until then SubSync shows "needs approval" for appointments instead of failing, and nothing else changes. This is built in and tested.
+
+## What I built
+
+| Feature | What it does | Who gets it |
+| --- | --- | --- |
+| **Appointments** | Show rate against the previous 30 days, no-shows, who to remind (booked but unconfirmed in the next 2 days), no-shows to rebook, past appointments with no outcome recorded (so the real show rate is not guessed), breakdown by calendar, person and account. The daily brief flags no-shows and unconfirmed bookings | Agency and each business; a client view sees its own |
+| **No-show recovery call list** | Contacts who missed an appointment in the last 14 days and were not booked again. Never includes do-not-disturb contacts | Same |
+| **Real team names** | Names now come from the platform and never overwrite a name someone typed | Same |
+| **Show only (global filter)** | Pick an industry kind and/or an account owner once, and every page narrows to those clients: overview, accounts, deals, inbox, alerts, call lists, appointments, duplicates, the daily brief, search. A business or client view ignores it and can never widen its own view | Agency |
+| **Industry playbooks** | Six kinds (medical and dental, real estate, fashion and retail, legal and finance, home services, fitness and beauty). Each says what matters, which call lists to use, a reply target that fits, and setup steps (one click adds them to your onboarding checklist). A switch makes the daily brief judge each client by its own industry's reply target | Agency |
+| **Meeting notes inbox** | A private address per client account that Fathom (webhook) or Zoom (through Zapier or Make) posts to. Each meeting becomes a summary and action items, matched to the contact by the attendee's email, with one-click "Copy note", mark filed, dismiss. Transcripts are not kept unless switched on | Agency and business |
+| **Your name on reports** | Business name and colour on printed client reports and quarterly reviews | Agency and business |
+| **Compare setups** | Pick a baseline client and see which others differ in pipelines, stages or stage order | Agency |
+| **Inbox ranking** | Last 7 days newest first; older dead threads collected separately | All |
+| **Rate limits** | The sync pauses for the rest of the window when the platform says the burst allowance is nearly used | Engine |
+| **Grouped menu** | Daily, Sell, Clients, Tidy up | All |
+
+## What already exists, so I did not copy it
+
+I searched for each idea before building it. Honest comparison:
+
+- **Reporting and white-label reports** are well covered by connectors (AgencyAnalytics, Two Minute Reports, Windsor.ai). I added only your name and colour on the printable report, not a report builder.
+- **Meeting recordings into the CRM** already exist as recipes and tools: Make and Relay have steps that add a note to a contact, Fireflies has a connector, an n8n template does it for platform call recordings, and the platform's own ideas board has open requests for a native Fathom and a Zoom transcript integration with no sign they shipped. So the idea is not new. What those leave open, and what I built around: (1) **matching the right contact** (one source says a perfect summary on the wrong contact is worse than no note), shown to the person before anything is filed; (2) **privacy by default** (transcripts not kept unless the account chooses, which matters for clinics); (3) **one private address per client account** so an agency can run it for many clients without a separate automation each; (4) **an inbox with action items**, not a silent write.
+- **Industry-specific dashboards for clinics or estate agents inside the marketplace**: the searches found agency blog posts and vendor setups (reminder sequences, recall campaigns, one account per location with a group view) but **no marketplace app** that does industry-aware monitoring across accounts. That is the gap the playbooks, the filter and the industry reply targets aim at. I could not browse the marketplace listings themselves, so I cannot promise nobody has one.
+
+## What I did not build, and why
+
+| Item | Reason |
+| --- | --- |
+| Writing the meeting note straight into the contact's record | Needs a write permission (the portal's contact and notes write scopes) that changes what every installer approves, and it would modify a client's CRM. It must be tested on the dedicated test account first, and the current install does not hold the permission. The design is ready: a preview, an explicit confirm, a saved copy of what was added and an audit entry, only for a matched contact. Decision needed from King |
+| Pulling Zoom recordings directly | Zoom's own transcript access depends on the customer's Zoom plan and an app approval on Zoom's side. The Zapier or Make route works for any plan that can trigger on a recording with a transcript |
+| Fathom and Zoom accounts | I have no accounts there and may not add keys. The address and parser are tested with sample payloads of both shapes; a real Fathom webhook has not been sent |
+| Live check of the new real-account appointment sync | A sync was queued for the real agency, and large accounts take a while. Result noted below |
+
+## Verified on the real agency
+
+A read-only sync was queued for the connected test agency after the new permissions were added in the portal. All three appointment jobs finished with no failures and no account was flagged as unreadable: each recorded "needs approval" for appointments and team names, because the existing install predates the new permissions. This is the designed behaviour for older installs, and it is what the Appointments page shows them. Once the app is approved again (reinstall from the marketplace), the next sync reads real appointments and names; that step needs you and was not done.
+
+Verified by tests: 195 unit tests, plus the integration check covering appointments (rates, lists, permission state, scoping), the call list, the filter (every page narrowed, a business or client cannot widen it), playbooks, industry reply targets, branding, setup comparison, and meeting notes (private address stored only as a hash, wrong and revoked addresses refused, oversized bodies refused, contact matching, transcripts off by default, limits, review actions, isolation).
+
+## What needs a decision from King
+
+1. **Approve the app again on your test agency** so appointments and real names flow in (reinstall from the marketplace; the two new permissions are optional).
+2. **Filing meeting notes straight into the contact's record.** The current version stores the summary inside SubSync and offers "Copy note", with matching shown first. A one-click "file into the contact" would need a write permission and would change client data, so it should be a separate, explicit decision, tested on the test account first.
+3. **Industry on each client.** The filter and playbooks only know what is typed on the Clients page. A quick pass to set it for each client makes the whole app sharper.

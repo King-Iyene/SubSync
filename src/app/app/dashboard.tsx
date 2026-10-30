@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { NAV_FOR, type AccessKind } from "@/lib/access";
 import { NAV, type GoFn, type ViewId } from "./nav";
 import { ApiProvider, makeApi, type Api } from "./session";
@@ -9,6 +9,8 @@ import { AccountDetailView } from "./views/account-detail";
 import { AccountsView } from "./views/accounts";
 import { AlertsView } from "./views/alerts";
 import { AppointmentsView } from "./views/appointments";
+import { MeetingsView } from "./views/meetings";
+import { PlaybooksView } from "./views/playbooks";
 import { CallsView } from "./views/calls";
 import { ClientsView } from "./views/clients";
 import { DealsView } from "./views/deals";
@@ -22,6 +24,7 @@ import { LeadsView } from "./views/leads";
 import { OverviewView } from "./views/overview";
 import { PipelineView } from "./views/pipeline";
 import { DealMoves, TeamView } from "./views/people";
+import { FilterBar } from "./views/filter-bar";
 import { SearchView } from "./views/search";
 import { SettingsView } from "./views/settings";
 import { SetupCompareView } from "./views/setup-compare";
@@ -158,7 +161,11 @@ export function Dashboard() {
     refreshRef.current = () => (embedded ? signIn() : exchange({ demo: true, as: demoView() }).then(apply));
   }, [embedded, signIn, apply]);
 
-  const api = auth.status === "ready" ? auth.api : null;
+  // The "show only" filter (industry and/or owner) narrows every page for agencies.
+  const [filter, setFilter] = useState<{ industry: string; owner: string }>({ industry: "", owner: "" });
+  const filterQuery = [filter.industry && `industry=${encodeURIComponent(filter.industry)}`, filter.owner && `owner=${encodeURIComponent(filter.owner)}`].filter(Boolean).join("&");
+  const baseApi = auth.status === "ready" ? auth.api : null;
+  const api = useMemo(() => (baseApi ? (filterQuery ? baseApi.filtered(filterQuery) : baseApi) : null), [baseApi, filterQuery]);
 
   // Count which pages get opened, so the getting-started checklist can tick itself off.
   useEffect(() => {
@@ -187,7 +194,7 @@ export function Dashboard() {
   const own = auth.locationId;
 
   const pipeTabs = [{ label: "Forecast and stages", node: <><PipelineView /><DealMoves /></> }, { label: "Stale deals and hygiene", node: <DealsView /> }];
-  const setupTabs = [{ label: "Setup checklists", node: <OnboardingView go={go} /> }, { label: "Email sender health", node: <EmailHealthView /> }, ...(limited ? [] : [{ label: "Compare setups", node: <SetupCompareView /> }])];
+  const setupTabs = [{ label: "Setup checklists", node: <OnboardingView go={go} /> }, { label: "Email sender health", node: <EmailHealthView /> }, ...(limited ? [] : [{ label: "Compare setups", node: <SetupCompareView /> }, { label: "Industry playbooks", node: <PlaybooksView go={go} /> }])];
 
   const content = (() => {
     // A business or a client sees its own account as the home page, never an accounts list.
@@ -213,6 +220,7 @@ export function Dashboard() {
       case "pipeline": return <Tabs key="pipe" start={0} tabs={pipeTabs} />;
       case "team": return <TeamView />;
       case "appointments": return <AppointmentsView go={go} />;
+      case "meetings": return <MeetingsView />;
       case "leads": return <LeadsView />;
       case "calls": return <CallsView />;
       case "clients": return <ClientsView />;
@@ -251,7 +259,10 @@ export function Dashboard() {
                 className={`shrink-0 rounded-full px-3 py-1 text-sm ${n.id === active ? "bg-muted font-medium" : "text-muted-foreground"}`}>{labelFor(n)}</button>
             ))}
           </nav>
-          <main className="flex-1 p-4 sm:p-8"><FreshnessStrip />{content}</main>
+          <main className="flex-1 p-4 sm:p-8">
+            {auth.kind === "agency" && baseApi && <ApiProvider value={baseApi}><FilterBar filter={filter} onChange={setFilter} /></ApiProvider>}
+            <FreshnessStrip />{content}
+          </main>
         </div>
       </div>
     </ApiProvider>

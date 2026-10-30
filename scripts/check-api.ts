@@ -306,7 +306,7 @@ async function main() {
   assert.ok(qbr.body.history.length > 10 && qbr.body.client.activity.startsWith("In the last 30 days"));
   assert.equal((await call("/api/app/qbr/nope-not-here", { token })).status, 404);
   // put the demo account back the way it was
-  assert.equal((await upd({ monthlyFee: null, renewalDate: null, industry: null, notes: null })).status, 200);
+  assert.equal((await upd({ monthlyFee: null, renewalDate: null, industry: "Roofing", notes: null })).status, 200);
   console.log("clients + QBR + executive summary: ok");
 
   // --- communication analysis, daily priorities, setup score, exports
@@ -593,6 +593,123 @@ async function main() {
   assert.equal((await call("/api/app/setup-compare", { token: bt })).status, 403, "agency only");
   assert.equal((await call("/api/app/setup-compare", { token: ct })).status, 403);
   console.log("branding + setup comparison: ok");
+
+  // --- the "show only" filter and industry playbooks
+  const sg = await call("/api/app/segments", { token });
+  assert.equal(sg.status, 200);
+  assert.equal(sg.body.total, 13);
+  const count = (key: string) => sg.body.industries.find((i: { key: string }) => i.key === key)?.accounts;
+  assert.deepEqual([count("medical"), count("home_services"), count("fitness_beauty"), count("real_estate"), count("legal_finance"), count("other")], [3, 4, 2, 1, 1, 2]);
+  assert.ok(sg.body.owners.some((o: { name: string; accounts: number }) => o.name === "Sam" && o.accounts === 5));
+  const q = "?industry=medical";
+  const kpi = async (extra: string, tok = token) => (await call(`/api/app/overview${extra}`, { token: tok })).body.kpis.accounts;
+  assert.equal(await kpi(""), 13);
+  assert.equal(await kpi(q), 3, "overview narrows to the clinics");
+  assert.equal(await kpi("?industry=home_services"), 4);
+  assert.equal(await kpi("?owner=Sam"), 5);
+  const medAccounts = (await call("/api/app/accounts?industry=medical", { token })).body.accounts as Array<{ owner: string | null }>;
+  assert.equal(await kpi("?industry=medical&owner=Sam"), medAccounts.filter((a) => a.owner === "Sam").length, "industry and owner combine");
+  assert.equal(await kpi("?industry=nothing_here"), 0, "a kind with no clients shows none");
+  assert.equal(await kpi("?industry=BAD!&owner="), 13, "an invalid filter is ignored, never an error");
+  assert.equal((await call(`/api/app/accounts${q}`, { token })).body.accounts.length, 3);
+  const medIds = new Set((await call(`/api/app/accounts${q}`, { token })).body.accounts.map((a: { locationId: string }) => a.locationId));
+  const onlyMedical = (rowsList: Array<{ locationId: string | null }>) => rowsList.every((r) => r.locationId !== null && medIds.has(r.locationId));
+  assert.ok(onlyMedical((await call(`/api/app/stale?days=30&industry=medical`, { token })).body.deals), "stale deals");
+  assert.ok(onlyMedical((await call(`/api/app/inbox${q}`, { token })).body.items), "inbox");
+  assert.ok(onlyMedical((await call(`/api/app/alerts${q}`, { token })).body.alerts), "alerts");
+  assert.ok(onlyMedical((await call(`/api/app/call-queue${q}`, { token })).body.rows), "call queue");
+  assert.ok(onlyMedical((await call(`/api/app/contact-intel${q}`, { token })).body.topLeads), "leads");
+  assert.ok(onlyMedical((await call(`/api/app/pipeline-intel${q}`, { token })).body.accounts), "pipeline accounts");
+  assert.ok(onlyMedical((await call(`/api/app/appointments${q}`, { token })).body.perAccount), "appointments");
+  assert.ok(onlyMedical((await call(`/api/app/duplicates${q}`, { token })).body.groups), "duplicates");
+  const fdaily = await call(`/api/app/daily${q}`, { token });
+  assert.equal(fdaily.body.accounts, 3);
+  assert.ok(onlyMedical([...fdaily.body.attention, ...fdaily.body.fine]), "the daily brief");
+  assert.equal((await call(`/api/app/search?q=a${q}`, { token })).body.hits.every((h: { locationId: string }) => medIds.has(h.locationId)), true, "contact search");
+  // the filter never widens a limited view
+  assert.equal(await kpi("?industry=real_estate", bt), 1, "a business ignores the filter");
+  assert.equal(await kpi("?industry=medical", ct), 1, "so does a client view");
+  assert.equal((await call("/api/app/segments", { token: bt })).status, 403, "only agencies see the filter options");
+
+  const pb = await call("/api/app/playbooks", { token });
+  assert.equal(pb.status, 200);
+  assert.equal(pb.body.playbooks.length, 6);
+  const med = pb.body.playbooks.find((p: { id: string }) => p.id === "medical");
+  assert.equal(med.accounts.length, 3);
+  assert.ok(med.privacy && med.checklist.length >= 3 && med.callLists.some((c: { id: string }) => c.id === "noshow_recovery"));
+  assert.equal(pb.body.industryTargets, false);
+  assert.equal((await call("/api/app/playbooks", { token: ct })).status, 403);
+  // industry reply targets change the brief: switch on, it still builds, then switch off again
+  const flip = (v: boolean) => call("/api/app/settings", { token, method: "PUT", body: JSON.stringify({ industryTargets: v }) });
+  assert.equal((await flip(true)).body.settings.industryTargets, true);
+  const withTargets = await call("/api/app/daily", { token });
+  assert.equal(withTargets.status, 200);
+  assert.equal(withTargets.body.attention.length + withTargets.body.fine.length, 13);
+  assert.equal((await flip(false)).body.settings.industryTargets, false);
+  console.log("filter + playbooks + industry targets: ok");
+
+  // --- meeting notes: a private address per account, tidy summaries, matched contacts, privacy by default
+  await sql()`delete from meeting_notes where installation_id = (select id from installations where is_demo)`;
+  await sql()`delete from meeting_hooks where installation_id = (select id from installations where is_demo)`;
+  const mk = await call("/api/app/meetings/hooks", { token, method: "POST", body: JSON.stringify({ locationId: roofing.locationId }) });
+  assert.equal(mk.status, 200);
+  assert.match(mk.body.url, /\/api\/hooks\/meeting\/mh_[A-Za-z0-9_-]{40,}$/);
+  const hookToken = mk.body.url.split("/").pop() as string;
+  const [stored] = await sql()`select token_hash from meeting_hooks where id = ${mk.body.id}`;
+  assert.ok(stored.token_hash !== hookToken && stored.token_hash.length === 64, "only a hash of the address is stored");
+  const post = (tok: string, payload: unknown, raw?: string) => fetch(`${BASE}/api/hooks/meeting/${tok}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: raw ?? JSON.stringify(payload) });
+  assert.equal((await post("mh_" + "A".repeat(43), { title: "x" })).status, 404, "a wrong address is not found");
+  assert.equal((await post("short", { title: "x" })).status, 404);
+  assert.equal((await post(hookToken, null, "not json")).status, 400);
+  assert.equal((await post(hookToken, { nothing: 1 })).status, 422, "nothing to save");
+  assert.equal((await post(hookToken, null, JSON.stringify({ title: "x", summary: "y".repeat(450_000) }))).status, 413, "oversized bodies are refused");
+  const [known] = await sql()`select email from cached_contacts where location_id = ${roofing.locationId} and email like '%@example.com' limit 1`;
+  const okPost = await post(hookToken, {
+    title: "Kitchen consult", scheduled_start_time: "2026-10-29T14:00:00Z", share_url: "https://fathom.video/share/demo",
+    calendar_invitees: [{ name: "Customer", email: known.email.toUpperCase() }, { name: "Dana", email: "dana@agency.test" }],
+    default_summary: { markdown_formatted: "Wants a new kitchen by March." }, action_items: [{ description: "Send a quote" }],
+    transcript: [{ speaker: { display_name: "Customer" }, text: "PRIVATE WORDS" }],
+  });
+  assert.equal(okPost.status, 200);
+  assert.equal((await okPost.json()).matchedContact, true, "matched to the contact by attendee email");
+  const ml = await call("/api/app/meetings", { token });
+  assert.equal(ml.status, 200);
+  const meet = ml.body.meetings.find((m: { title: string }) => m.title === "Kitchen consult");
+  assert.ok(meet && meet.contactName && meet.contactUrl.includes("/contacts/detail/") && meet.source === "fathom" && meet.actionItems[0] === "Send a quote");
+  assert.equal(meet.hasTranscript, false, "transcripts are not kept by default");
+  assert.ok(meet.note.includes("Wants a new kitchen") && !meet.note.includes("PRIVATE WORDS"));
+  assert.equal(ml.body.hooks.length, 1);
+  assert.ok(ml.body.hooks[0].lastUsedAt, "the address records when it was last used");
+  // keeping transcripts is an explicit choice
+  await call("/api/app/settings", { token, method: "PUT", body: JSON.stringify({ keepTranscripts: true }) });
+  await post(hookToken, { title: "Second", summary: "s", transcript: "KEPT WORDS" });
+  const [kept] = await sql()`select transcript from meeting_notes where title = 'Second'`;
+  assert.equal(kept.transcript, "KEPT WORDS");
+  await call("/api/app/settings", { token, method: "PUT", body: JSON.stringify({ keepTranscripts: false }) });
+  // limits and review actions
+  for (let i = 0; i < 2; i++) assert.equal((await call("/api/app/meetings/hooks", { token, method: "POST", body: JSON.stringify({ locationId: roofing.locationId }) })).status, 200);
+  assert.equal((await call("/api/app/meetings/hooks", { token, method: "POST", body: JSON.stringify({ locationId: roofing.locationId }) })).status, 400, "at most three addresses per account");
+  assert.equal((await call("/api/app/meetings/hooks", { token, method: "POST", body: JSON.stringify({ locationId: "nope-nope-nope" }) })).status, 404);
+  assert.equal((await call(`/api/app/meetings/${meet.id}`, { token, method: "PUT", body: JSON.stringify({ status: "filed" }) })).status, 200);
+  assert.equal((await call(`/api/app/meetings/${meet.id}`, { token, method: "PUT", body: JSON.stringify({ status: "deleted" }) })).status, 400);
+  assert.equal((await call("/api/app/meetings", { token })).body.meetings.find((m: { id: string }) => m.id === meet.id).status, "filed");
+  assert.equal((await call(`/api/app/meetings/${meet.id}`, { token, method: "PUT", body: JSON.stringify({ status: "dismissed" }) })).status, 200);
+  assert.ok(!(await call("/api/app/meetings", { token })).body.meetings.some((m: { id: string }) => m.id === meet.id), "dismissed meetings leave the list");
+  // revoking stops the address working at once
+  assert.equal((await call(`/api/app/meetings/hooks/${mk.body.id}/revoke`, { token, method: "POST" })).status, 200);
+  assert.equal((await post(hookToken, { title: "after revoke" })).status, 404);
+  // isolation: a business sees and manages its own account only; a client view has none of it
+  const bm = await call("/api/app/meetings", { token: bt });
+  assert.equal(bm.status, 200);
+  assert.ok(bm.body.meetings.every((m: { locationId: string }) => m.locationId === own) && bm.body.hooks.every((h: { locationId: string }) => h.locationId === own));
+  assert.equal((await call("/api/app/meetings/hooks", { token: bt, method: "POST", body: JSON.stringify({ locationId: otherAcc.locationId }) })).status, 200, "a business always gets an address for its own account");
+  const ownMeetings = await call("/api/app/meetings", { token: bt });
+  assert.ok(ownMeetings.body.hooks.length >= 1 && ownMeetings.body.hooks.every((h: { locationId: string }) => h.locationId === own), "never for another account");
+  assert.equal((await call("/api/app/meetings", { token: ct })).status, 403);
+  assert.equal((await call("/api/app/meetings/hooks", { token: ct, method: "POST", body: "{}" })).status, 403);
+  await sql()`delete from meeting_notes where installation_id = (select id from installations where is_demo)`;
+  await sql()`delete from meeting_hooks where installation_id = (select id from installations where is_demo)`;
+  console.log("meeting notes: private address, matching, privacy default, limits, revoke, isolation: ok");
 
   // Leave the demo data as we found it.
   await sql()`delete from domain_checks where domain in ('example-demo.com', 'other-demo.org')`;

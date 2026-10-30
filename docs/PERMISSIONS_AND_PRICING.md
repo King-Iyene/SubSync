@@ -61,19 +61,42 @@ itself is only a setting in the portal, never in code.
 
 ## 4. Permissions (scopes)
 
-Requested today (read only, plus the two used for agency installs): `locations.readonly`, `contacts.readonly`,
-`opportunities.readonly`, `calendars.readonly`, `conversations.readonly`, `oauth.readonly`, `oauth.write`.
-Nothing writes to a client's CRM data. Everything shipped in this round (sources, do-not-disturb,
-birthdays, team, deal movement, timelines) uses these same permissions.
+Requested now (30 Oct 2026, saved on the draft in the developer portal): `locations.readonly`, `contacts.readonly`,
+`opportunities.readonly`, `calendars.readonly`, `conversations.readonly`, `oauth.readonly`, `oauth.write`, and two new optional,
+read-only ones: **`calendars/events.readonly`** (appointments) and **`users.readonly`** (real team names). Optional means an installer can
+decline them and the install still works; the Appointments page then shows "needs approval".
 
-Not requested, and what they would unlock (each is your call, because it changes what people approve):
+An install made before these were added keeps its old permissions. To pick up the new ones, the account (or the agency) reinstalls from the
+marketplace and approves. Nothing is lost by doing so.
+
+Nothing writes to a client's CRM data. Meeting notes are stored inside SubSync only; "Copy note" puts a ready-made note on the clipboard.
+
+Not requested, and what each would unlock (each is your call, because it changes what people approve):
 
 | Scope | Unlocks | Cost of asking |
 | --- | --- | --- |
-| `calendars/events.readonly` | Appointments: show rate, no-shows, bookings | Adds a line to every install approval |
-| `users.readonly` | Real team names instead of typed ones | Small |
-| `contacts.write` | Merging or tidying duplicates inside the CRM | Large: SubSync would then be able to change client data. Only with preview, confirmation and a saved snapshot |
+| Notes or contacts write | One-click "file this meeting note into the contact" (with preview, confirm and a saved copy) | Large: SubSync could then change client data. Only with explicit confirmation on every note, and tested on the test account first |
+| `contacts.write` | Tidying duplicates inside the CRM | Large; not recommended: the platform has no safe merge call |
 
-Note: sub-account installs must not ask for agency-only scopes. `oauth.readonly` and `oauth.write` are only used on the
-agency path; if the platform ever rejects them for a business install, remove them from the app and keep agency installs
-on bulk install.
+Note: sub-account installs must not ask for agency-only scopes. `oauth.readonly` and `oauth.write` are only used on the agency path; if the
+platform ever rejects them for a business install, remove them from the app and keep agency installs on bulk install.
+
+## 5. Which plan gets which feature
+
+| Feature | Free | Starter | Pro |
+| --- | --- | --- | --- |
+| Overview, contact search, setup checklist, settings | yes | yes | yes |
+| Today (daily brief), inbox, pipeline and deals, leads, alerts, duplicates, email health, call lists, appointments | | yes | yes |
+| Clients page and quarterly review, exports, team, AI connector, **meeting notes** | | | yes |
+
+Enforcement stays off until you add `ENFORCE_PLANS=true`, so testers see everything.
+
+## 6. Selling it by industry
+
+The global "Show only" filter and the industry playbooks let an agency sell one app to, say, twelve dental clinics and eight estate agents and
+see each group on its own. Resale ideas that fit the paid tiers:
+
+- **Clinics and dental groups:** "no-show recovery and recall" as a monthly add-on (appointments, no-show call list, recall list). Message text is never stored, which is the first question a clinic asks.
+- **Estate agents and trades:** "lead response guarantee" (reply target of an hour or less, shown on the daily brief).
+- **Boutiques and retail:** "win-back and birthday offers" (win-back call list, birthdays on the Leads page).
+- **Any client:** the client view (read-only, their own account only) as a "your results dashboard", and the branded printable report as a monthly deliverable.

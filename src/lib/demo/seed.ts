@@ -22,6 +22,12 @@ function rng(seed: number) {
 
 // The new fields are derived from the loop counters (never from r()) so adding them does not change
 // any of the existing random demo numbers.
+// What each fictional client does, typed the way an agency would type it.
+const INDUSTRY: Record<string, string> = {
+  "Blue Door Realty": "Real estate", "Bright Smile Dental": "Dental", "Green Leaf Landscaping": "Landscaping", "Harbor Law Group": "Law firm",
+  "Metro Auto Repair": "Auto repair", "Northside Chiropractic": "Chiropractic", "Oak & Ember Bistro": "Restaurant", "Paws & Claws Vet": "Veterinary clinic",
+  "Peak Fitness Studio": "Fitness studio", "Pure Glow Med Spa": "Med spa", "Starlight Cleaning": "Cleaning", "Summit HVAC Services": "HVAC", "Sunrise Roofing Co": "Roofing",
+};
 const SOURCES = ["Facebook Ads", "Google Search", "Referral", "Website form", "Facebook Ads", "Walk-in", "Google Search"];
 const TEAM = ["user-4a1c", "user-9b2e", "user-c3d7", "user-e5f0"];
 const FIRST = ["Ava", "Liam", "Noah", "Emma", "Olivia", "Mason", "Sophia", "Lucas", "Mia", "Ethan", "Isabella", "Logan", "Amelia", "James", "Harper", "Henry", "Evelyn", "Jack", "Ella", "Owen", "Grace", "Leo", "Chloe", "Ryan", "Zoe", "Dylan", "Nora", "Aaron", "Lily", "Caleb"];
@@ -223,6 +229,10 @@ export async function seedDemo(): Promise<{ installationId: string; accounts: nu
     if (moves.length) await db`insert into deal_events ${db(moves as never)}`;
     for (const [i, name] of ["Dana Brooks", "Marcus Lee", "Priya Shah"].entries()) {
       await db`insert into team_names (installation_id, user_id, name) values (${installationId}, ${TEAM[i]}, ${name}) on conflict do nothing`;
+    }
+
+    if (INDUSTRY[p.name]) {
+      await db`insert into account_profiles (installation_id, location_id, industry) values (${installationId}, ${locationId}, ${INDUSTRY[p.name]}) on conflict do nothing`;
     }
 
     // appointments, derived from counters (never from r()) so no existing demo number moves. One account

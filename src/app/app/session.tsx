@@ -23,6 +23,8 @@ export type Api = {
   del: <T>(path: string) => Promise<T>;
   download: (path: string, filename: string) => Promise<void>;
   demo: boolean;
+  /** The same client with a filter (like industry=medical) added to every read. */
+  filtered: (query: string) => Api;
 };
 
 const ApiContext = createContext<Api | null>(null);
@@ -34,18 +36,19 @@ export function useApiClient(): Api {
   return api;
 }
 
-export function makeApi(initialToken: string, refresh: () => Promise<string | null>, demo: boolean): Api {
-  let token = initialToken;
+export function makeApi(initialToken: string, refresh: () => Promise<string | null>, demo: boolean, filterQuery = "", shared: { token: string } = { token: initialToken }): Api {
   const request = async (method: string, path: string, body?: unknown, retried = false): Promise<Response> => {
-    const res = await fetch(`/api/app/${path}`, {
+    // A filter only narrows what is read; it is added to every GET.
+    const url = method === "GET" && filterQuery && !path.startsWith("segments") ? `${path}${path.includes("?") ? "&" : "?"}${filterQuery}` : path;
+    const res = await fetch(`/api/app/${url}`, {
       method,
-      headers: { Authorization: `Bearer ${token}`, ...(body !== undefined ? { "Content-Type": "application/json" } : {}) },
+      headers: { Authorization: `Bearer ${shared.token}`, ...(body !== undefined ? { "Content-Type": "application/json" } : {}) },
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
     if (res.status === 401 && !retried) {
       const fresh = await refresh();
       if (fresh) {
-        token = fresh;
+        shared.token = fresh;
         return request(method, path, body, true);
       }
     }
@@ -58,6 +61,7 @@ export function makeApi(initialToken: string, refresh: () => Promise<string | nu
   };
   return {
     demo,
+    filtered: (query: string) => makeApi(initialToken, refresh, demo, query, shared),
     get: async (path) => parse(await request("GET", path)),
     post: async (path, body) => parse(await request("POST", path, body ?? {})),
     put: async (path, body) => parse(await request("PUT", path, body ?? {})),
