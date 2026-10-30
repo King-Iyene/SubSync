@@ -28,3 +28,16 @@ Every feature was checked against the data SubSync actually syncs today: contact
 ## Progress
 
 (filled in below as batches land)
+
+### Landed and verified (commit, deploy build success, live probes ok, and checked on real KD Squares Test data inside GHL)
+
+| Batch | Commit | What shipped |
+| --- | --- | --- |
+| 1 | `20a2cba` | 7.11 data freshness strip with a stale warning after 6 hours; 11.4 connection health card (failed jobs, last sync, token refresh); 11.5 per-account sync status with a Resync button. Also fixed a bug found by the new tests: a malformed account id on the resync route fell through and started a full sync. |
+| 2 | `6d65273` | New **Pipeline** page: 2.1 stage funnel (estimated from current positions, no stage history is kept), 2.2 average time to win, 2.3 stage dwell and bottleneck flag, 2.4 revenue forecast with worst/likely/best and 30/60/90 day view, 2.5 wins and losses by month, 2.6 deal risk score (0 to 100, with reasons), 2.8 deal size distribution, 2.9 pipeline value trend, 2.11 aging buckets, 2.15 account comparison, 2.16 abandoned deals worth reopening, 2.20 pipeline coverage against a saved monthly target, 2.21 dead pipeline cleanup list, 2.22 every pipeline in one table. |
+| 3 | `284a36e` | New **Leads** page: 3.4 lead quality score (rule-based, fixed weights), 3.5 lifecycle, 3.6 lead aging, 3.9 inactive contacts (never engaged vs went silent), 3.10 contact growth with per-account change, 3.11 tag usage plus duplicate-looking tags, 3.15 invalid and disposable email and invalid phone detection with examples, 3.18 VIP contacts with a "reach out" flag, 3.19 large import detection, 3.20 same person in several client accounts. |
+| 4 | `eb5f75a` | New **Call lists** page: 8.1 eight preset queues plus a custom filter builder, 8.2 saved lists, 8.3 priority score, 8.4 call outcome logger with auto-advance, 8.5 follow-up queue, 8.6 power hour timer with session stats, 8.8 newest-leads queue with a speed-to-lead alert, 8.9 win-back list, 8.10 recent customers for referral requests. |
+
+Tests: 111 unit tests and an expanded HTTP integration check (`npm run check:api`, now run through `scripts/with-dev-server.mjs`) pass. `scripts/deploy-check.sh` runs after every push.
+
+Database change: one **additive** migration (`20261030000000_insights_tables.sql`: account_profiles, goals, call_lists, call_outcomes). No existing data was changed or removed.
