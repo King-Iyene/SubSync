@@ -309,7 +309,9 @@ async function handleAppointments(job: Job): Promise<Outcome> {
   const loc = job.locationId as string;
   const token = await tokenForLocation(job.companyId, loc);
 
-  let usersAccess: "ok" | "needs_permission" = "ok";
+  // Nothing here may mark the whole account as failing: core data (contacts, deals, conversations) is
+  // separate. An unexpected error is recorded as "error" and logged, a missing permission as "needs_permission".
+  let usersAccess: "ok" | "needs_permission" | "error" = "ok";
   try {
     const users = await fetchUsers(token, loc);
     for (const u of users) {
@@ -320,14 +322,14 @@ async function handleAppointments(job: Job): Promise<Outcome> {
         on conflict (installation_id, user_id) do update set name = excluded.name where team_names.source = 'platform'`;
     }
   } catch (error) {
-    if (!isPermissionError(error)) throw error;
-    usersAccess = "needs_permission";
+    usersAccess = isPermissionError(error) ? "needs_permission" : "error";
+    if (usersAccess === "error") console.error("Reading team names failed", error instanceof Error ? error.message : "unknown");
   }
 
   const now = Date.now();
   const fromMs = now - APPOINTMENT_PAST_DAYS * 86_400_000;
   const toMs = now + APPOINTMENT_FUTURE_DAYS * 86_400_000;
-  let access: "ok" | "needs_permission" = "ok";
+  let access: "ok" | "needs_permission" | "error" = "ok";
   const rows: Array<Record<string, unknown>> = [];
   try {
     const calendars = (await fetchCalendars(token, loc)).slice(0, MAX_CALENDARS);
@@ -342,8 +344,8 @@ async function handleAppointments(job: Job): Promise<Outcome> {
       }
     }
   } catch (error) {
-    if (!isPermissionError(error)) throw error;
-    access = "needs_permission";
+    access = isPermissionError(error) ? "needs_permission" : "error";
+    if (access === "error") console.error("Reading appointments failed", error instanceof Error ? error.message : "unknown");
   }
 
   if (access === "ok") {
