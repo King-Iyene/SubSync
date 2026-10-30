@@ -30,5 +30,7 @@ probe /api/cron/daily 401
 probe /api/app/overview 401
 probe /api/app/connections 401
 probe /api/hooks/fathom/AAAAAAAAAAAAAAAAAAAAAAAAAAAA 404 POST
-probe "/api/integrations/slack/callback?state=forged" 400
+# Connections are switched off by default, so the sign-in return address does not exist (404). Turn them on and this becomes 400.
+probe "/api/integrations/slack/callback?state=forged" 404
+probe /api/hooks/zoom 404 POST
 exit $bad
