@@ -122,3 +122,10 @@ Format: date, decision, reason.
 - **Fact learned:** the platform's installed-locations list can be empty for a few seconds after an install, so the first sync found 0 accounts until "Sync now". Fix: `scheduleDailyRefresh` now retries every 3 minutes for any install that still has no client accounts.
 - **Fact learned:** the portal's Test Link installs on a single sub-account (a location install), and the final handoff opens our site in a new tab; automated browsers block that pop-up, so a person must click the last Confirm.
 - Assumptions now confirmed: the `type === "agency"` SSO check, the contact/opportunity endpoints and field names, the oauth.write and oauth.readonly scopes, and the Starter-plan private install. Still unverified: bulk install across several sub-accounts, the Users API last login, uninstall webhook purge.
+
+## 2026-10-30 (pricing set up in the portal, draft)
+
+- **King confirmed $5 per client account per month.** Portal pricing is Freemium: **Free Plan ($0)** and **Pro ($5 monthly)**, plus a **14-day free trial**. Saved on the draft version; nothing is charged until the app is published.
+- **For testing, free and paid give the same access:** `ENFORCE_PLANS` is unset, so every feature is open. Turn it on (`ENFORCE_PLANS=true` in Vercel) only when the free plan should be limited to 5 client accounts and the core views. The portal cannot express "free for the first 5 accounts", so our app enforces that limit.
+- The Free Plan row cannot be edited after saving (no feature text). Cosmetic only.
+- **Open:** payout account setup (King, GHL's payout provider), and the price against GoCSM (revisit after the first 10 paying agencies).
