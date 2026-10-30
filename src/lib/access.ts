@@ -77,7 +77,7 @@ const CLIENT_RULES: Rule[] = GET_VIEWS.map((a) => ["GET", a] as Rule);
 
 const BUSINESS_RULES: Rule[] = [
   ...GET_VIEWS.map((a) => ["GET", a] as Rule),
-  ["GET", "email"], ["GET", "settings"], ["GET", "api-keys"], ["GET", "sync"], ["GET", "health"], ["GET", "call-queue"],
+  ["GET", "email"], ["GET", "daily"], ["GET", "settings"], ["GET", "api-keys"], ["GET", "sync"], ["GET", "health"], ["GET", "call-queue"],
   ["GET", "call-lists"], ["GET", "call-outcomes"], ["GET", "goals"], ["GET", "exec-summary"], ["GET", "daily-brief"], ["GET", "digest"],
   ["GET", "export", "stale"], ["GET", "export", "duplicates"], ["GET", "export", "inbox"], ["GET", "export", "deals"], ["GET", "export", "alerts"],
   ["POST", "email", "check"], ["POST", "alerts"], ["POST", "duplicates"], ["POST", "sync"], ["POST", "call-lists"], ["POST", "call-outcomes"],
@@ -100,7 +100,7 @@ export function routeAllowed(kind: AccessKind, method: string, segments: string[
 
 // Pages (by nav id) each kind sees. The server enforces the same boundary; this only hides links.
 export const NAV_FOR: Record<AccessKind, ReadonlySet<string>> = {
-  agency: new Set(["overview", "accounts", "clients", "team", "search", "deals", "pipeline", "leads", "calls", "inbox", "onboarding", "email", "duplicates", "alerts", "settings", "help"]),
-  business: new Set(["overview", "team", "search", "deals", "pipeline", "leads", "calls", "inbox", "onboarding", "email", "duplicates", "alerts", "settings", "help"]),
+  agency: new Set(["today", "overview", "accounts", "clients", "team", "search", "deals", "pipeline", "leads", "calls", "inbox", "onboarding", "email", "duplicates", "alerts", "settings", "help"]),
+  business: new Set(["today", "overview", "team", "search", "deals", "pipeline", "leads", "calls", "inbox", "onboarding", "email", "duplicates", "alerts", "settings", "help"]),
   client: new Set(["overview", "search", "deals", "pipeline", "leads", "inbox", "duplicates", "onboarding", "alerts", "help"]),
 };

@@ -26,5 +26,6 @@ probe /api/oauth/install 307
 probe /api/mcp 405
 probe /api/webhooks/ghl 401 POST
 probe /api/cron/sync 401
+probe /api/cron/daily 401
 probe /api/app/overview 401
 exit $bad

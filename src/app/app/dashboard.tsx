@@ -23,6 +23,7 @@ import { PipelineView } from "./views/pipeline";
 import { DealMoves, TeamView } from "./views/people";
 import { SearchView } from "./views/search";
 import { SettingsView } from "./views/settings";
+import { TodayView } from "./views/today";
 
 type Auth =
   | { status: "waiting" }
@@ -49,11 +50,11 @@ async function exchange(body: unknown): Promise<{ ok: boolean; status: number; d
 // `/app#deals` or `/app#account=<id>` opens that view first. Handy for demos and screenshots;
 // the signed-in session is still required to see any data.
 function viewFromHash(): { id: ViewId; locationId?: string } {
-  if (typeof window === "undefined") return { id: "overview" };
+  if (typeof window === "undefined") return { id: "today" };
   const hash = window.location.hash.slice(1);
   if (hash.startsWith("account=") && hash.length > 8) return { id: "account", locationId: decodeURIComponent(hash.slice(8)) };
   const match = NAV.find((n) => n.id === hash);
-  return { id: match ? match.id : "overview" };
+  return { id: match ? match.id : "today" };
 }
 
 // `?as=business` or `?as=client` opens the demo as a single business or as a client's staff.
@@ -179,11 +180,12 @@ export function Dashboard() {
   const content = (() => {
     // A business or a client sees its own account as the home page, never an accounts list.
     if (limited) {
-      const id = view.id === "account" ? "overview" : view.id;
+      const id = view.id === "account" || (view.id === "today" && auth.kind === "client") ? "overview" : view.id;
       if (!NAV_FOR[auth.kind].has(id)) return <Centered title="Not available" body="This page is not part of your view of SubSync." />;
       if (id === "overview") return own ? <AccountDetailView key={own} locationId={own} go={go} agency={agency} limited /> : <Centered title="Open SubSync from inside your account" body="We could not tell which account you are in." />;
     }
     switch (view.id) {
+      case "today": return <TodayView go={go} />;
       case "overview": return <OverviewView go={go} />;
       case "accounts": return <AccountsView go={go} />;
       case "account": return view.locationId ? <AccountDetailView key={view.locationId} locationId={view.locationId} go={go} agency={agency} /> : <AccountsView go={go} />;

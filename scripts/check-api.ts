@@ -486,6 +486,42 @@ async function main() {
   await sql()`delete from audit_log where installation_id = (select id from installations where is_demo)`;
   console.log("duplicates: scored queue, snapshots, audit log, dry run, undo, isolation: ok");
 
+  // --- the daily brief: changes against each account's own history, ranked attention, schedule
+  const daily = await call("/api/app/daily", { token });
+  assert.equal(daily.status, 200);
+  assert.equal(daily.body.headlines.length, 4);
+  for (const h of daily.body.headlines as Array<{ change: { today: number; yesterday: number | null; avg7: number | null; samples: number } }>) {
+    assert.ok(h.change.yesterday !== null && h.change.avg7 !== null && h.change.samples >= 4, "history exists for yesterday and the 7 day average");
+  }
+  assert.ok(daily.body.attention.length > 0 && daily.body.fine.length > 0, "some accounts need attention and some are fine");
+  assert.equal(daily.body.attention.length + daily.body.fine.length, daily.body.accounts);
+  const weights = daily.body.attention.map((a: { weight: number }) => a.weight);
+  assert.deepEqual(weights, [...weights].sort((x: number, y: number) => y - x), "ranked most urgent first");
+  for (const a of daily.body.attention as Array<{ items: Array<{ title: string; detail: string }>; url: string; severity: string }>) {
+    assert.ok(a.items.length >= 1 && a.items.every((i) => i.title && i.detail) && a.url.includes("/dashboard") && ["critical", "warning", "info"].includes(a.severity));
+  }
+  assert.ok(daily.body.fine.every((f: { checked: string[] }) => f.checked.length >= 5), "fine accounts say what was checked");
+  assert.equal(daily.body.notWatched.length, 4);
+  assert.equal(daily.body.limited, false);
+  assert.ok(typeof daily.body.freshness.label === "string" && daily.body.freshness.label.length > 5);
+  const bd = await call("/api/app/daily", { token: bt });
+  assert.equal(bd.status, 200);
+  assert.equal(bd.body.limited, true);
+  assert.ok([...bd.body.attention, ...bd.body.fine].every((x: { locationId: string }) => x.locationId === own) && bd.body.attention.length + bd.body.fine.length === 1);
+  assert.equal((await call("/api/app/daily", { token: ct })).status, 403, "a client view has no daily brief");
+  const putS = (b: unknown) => call("/api/app/settings", { token, method: "PUT", body: JSON.stringify(b) });
+  assert.equal((await putS({ digestHour: 25 })).status, 400);
+  assert.equal((await putS({ digestTimezone: "Mars/Olympus" })).status, 400);
+  const okSet = await putS({ digestHour: 9, digestTimezone: "Africa/Lagos" });
+  assert.equal(okSet.status, 200);
+  assert.equal(okSet.body.settings.digestHour, 9);
+  assert.equal(okSet.body.settings.digestTimezone, "Africa/Lagos");
+  assert.equal((await call("/api/app/daily", { token })).body.schedule.timezone, "Africa/Lagos");
+  assert.equal((await putS({ digestHour: null, digestTimezone: null })).body.settings.digestHour, null);
+  assert.match((await call("/api/app/digest", { token })).body.text, /daily brief/);
+  assert.equal((await call("/api/cron/daily")).status, 401, "the hourly job needs its secret");
+  console.log("daily brief: own-history comparison, ranking, scoping, schedule: ok");
+
   // Leave the demo data as we found it.
   await sql()`delete from domain_checks where domain in ('example-demo.com', 'other-demo.org')`;
   await closeDb();

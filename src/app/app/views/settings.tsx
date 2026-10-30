@@ -6,7 +6,7 @@ import type { SyncStatus } from "../types";
 import { Btn, Card, ErrorBox, inputClass, Loading, PageHeader, timeAgo } from "../ui";
 import { HealthCard } from "./health-card";
 
-type S = { staleDays: number; dormantDays: number; slaHours: number; appDomain: string; digestEnabled: boolean; customChecklist: string[] };
+type S = { staleDays: number; dormantDays: number; slaHours: number; appDomain: string; digestEnabled: boolean; customChecklist: string[]; digestHour: number | null; digestTimezone: string | null };
 
 export function SettingsView() {
   const api = useApiClient();
@@ -44,7 +44,7 @@ export function SettingsView() {
     try {
       const body: Record<string, unknown> = {
         staleDays: form.staleDays, dormantDays: form.dormantDays, slaHours: form.slaHours, appDomain: form.appDomain,
-        digestEnabled: form.digestEnabled,
+        digestEnabled: form.digestEnabled, digestHour: form.digestHour, digestTimezone: form.digestTimezone,
         customChecklist: checklist.split("\n").map((l) => l.trim()).filter(Boolean),
       };
       if (slack.trim()) body.slackWebhookUrl = slack.trim();
@@ -125,10 +125,26 @@ export function SettingsView() {
           </p>
           <label htmlFor="slack" className="mb-1 block text-sm font-medium">Webhook URL</label>
           <input id="slack" className={inputClass} type="password" autoComplete="off" placeholder={data.slackConfigured ? "Saved. Paste a new URL to replace it" : "https://hooks.slack.com/services/..."} value={slack} onChange={(e) => setSlack(e.target.value)} />
-          <label className="mt-3 flex items-center gap-2 text-sm"><input type="checkbox" className="size-4" checked={form.digestEnabled} onChange={(e) => setForm({ ...form, digestEnabled: e.target.checked })} /> Send a weekly summary on Mondays</label>
+          <label className="mt-3 flex items-center gap-2 text-sm"><input type="checkbox" className="size-4" checked={form.digestEnabled} onChange={(e) => setForm({ ...form, digestEnabled: e.target.checked })} /> Send the daily brief to Slack</label>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <div>
+              <label htmlFor="digest-hour" className="mb-1 block text-sm font-medium">Send at</label>
+              <select id="digest-hour" className={inputClass} value={form.digestHour ?? 8} onChange={(e) => setForm({ ...form, digestHour: Number(e.target.value) })}>
+                {Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>{String(h).padStart(2, "0")}:00</option>)}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="digest-zone" className="mb-1 block text-sm font-medium">Time zone</label>
+              <div className="flex gap-2">
+                <input id="digest-zone" className={inputClass} placeholder="Africa/Lagos" value={form.digestTimezone ?? ""} onChange={(e) => setForm({ ...form, digestTimezone: e.target.value.trim() || null })} />
+                <Btn onClick={() => setForm({ ...form, digestTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone })}>Use mine</Btn>
+              </div>
+            </div>
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">Goes out once a day at that hour. Left blank, it uses 08:00 in the time zone of your first client account.</p>
           <div className="mt-3 flex flex-wrap gap-2">
             <Btn disabled={busy || !data.slackConfigured} onClick={() => call(() => api.post("settings/test-slack"), "Test message sent to Slack.")}>Send test message</Btn>
-            <Btn onClick={async () => setDigest((await api.get<{ text: string }>("digest")).text)}>Preview weekly summary</Btn>
+            <Btn onClick={async () => setDigest((await api.get<{ text: string }>("digest")).text)}>Preview the daily brief</Btn>
           </div>
           {digest && <pre className="mt-3 overflow-x-auto whitespace-pre-wrap rounded-lg bg-muted p-3 text-xs">{digest}</pre>}
         </Card>

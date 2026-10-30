@@ -28,6 +28,8 @@ import { accountHistory, clientExtras, periodFigures, saveProfile, type ClientEx
 import { dailyPriorities, replyAging, setupScore, worstDomainStatus, type SetupFacts } from "../analytics/comms-intel";
 import { afterHours, communicationGaps } from "../analytics/comms-queries";
 import { badDataSamples, contactOverview, topLeads, vips } from "../analytics/contact-queries";
+import { buildDailyDigest, NOT_WATCHED } from "../analytics/digest-service";
+import { digestText, localParts } from "../analytics/digest-intel";
 import { buildQueue, recordBulk, recordDecision, summarise, undoDecision } from "../analytics/dedupe-queries";
 import { bulkSelect, groupKey } from "../analytics/dedupe";
 import { contactTimeline, dndSummary, leadSources, recentDealMoves, setTeamName, teamStats, upcomingBirthdays } from "../analytics/people-queries";
@@ -133,6 +135,17 @@ async function overview(ctx: Ctx) {
     bands,
     attention,
     sync,
+  });
+}
+
+async function dailyView(ctx: Ctx) {
+  const sc = await scope(ctx);
+  const d = await buildDailyDigest(ctx.installationId, { limitTo: ctx.limitTo, planLimit: accountLimit(ctx.plan, ctx.entitlements.enforced) });
+  return json({
+    generatedAt: d.generatedAt, freshness: d.freshness, headlines: d.headlines, accounts: d.accounts, limited: ctx.limitTo !== null,
+    attention: d.attention.map((a) => ({ ...a, url: sc.links.account(a.locationId) })),
+    fine: d.fine, notWatched: NOT_WATCHED,
+    schedule: { hour: d.settings.digestHour ?? 8, timezone: d.settings.digestTimezone, slack: Boolean(d.settings.slackWebhookUrl) && d.settings.digestEnabled },
   });
 }
 
@@ -365,7 +378,7 @@ const settingsView = async (ctx: Ctx) => {
 
 function publicSettings(s: Settings) {
   // Never send the webhook URL back to the browser: it is a secret.
-  return { staleDays: s.staleDays, dormantDays: s.dormantDays, slaHours: s.slaHours, appDomain: s.appDomain, digestEnabled: s.digestEnabled, customChecklist: s.customChecklist };
+  return { staleDays: s.staleDays, dormantDays: s.dormantDays, slaHours: s.slaHours, appDomain: s.appDomain, digestEnabled: s.digestEnabled, customChecklist: s.customChecklist, digestHour: s.digestHour, digestTimezone: s.digestTimezone };
 }
 
 async function settingsUpdate(ctx: Ctx) {
@@ -377,6 +390,15 @@ async function settingsUpdate(ctx: Ctx) {
   if ("dormantDays" in body) { const v = int(body.dormantDays, 7, 365); if (v === null) return json({ error: "Dormant days must be between 7 and 365" }, 400); patch.dormantDays = v; }
   if ("slaHours" in body) { const v = int(body.slaHours, 1, 168); if (v === null) return json({ error: "SLA hours must be between 1 and 168" }, 400); patch.slaHours = v; }
   if ("digestEnabled" in body) patch.digestEnabled = body.digestEnabled === true;
+  if ("digestHour" in body) {
+    if (body.digestHour === null) patch.digestHour = null;
+    else { const v = int(body.digestHour, 0, 23); if (v === null) return json({ error: "Choose an hour between 0 and 23" }, 400); patch.digestHour = v; }
+  }
+  if ("digestTimezone" in body) {
+    if (body.digestTimezone === null || body.digestTimezone === "") patch.digestTimezone = null;
+    else if (typeof body.digestTimezone === "string" && body.digestTimezone.length <= 64 && localParts(new Date(), body.digestTimezone) !== null) patch.digestTimezone = body.digestTimezone;
+    else return json({ error: "That is not a time zone we recognise, for example Africa/Lagos or America/New_York" }, 400);
+  }
   if ("clientViewAll" in body && ctx.kind === "agency") {
     await sql()`update locations set client_view = ${body.clientViewAll === true} where installation_id = ${ctx.installationId}`;
   }
@@ -913,16 +935,15 @@ async function testSlack(ctx: Ctx) {
 }
 
 async function digestPreview(ctx: Ctx) {
-  const { accounts: list } = await accountsFor(ctx);
-  const open = await listAlerts(ctx.installationId, false, 500);
-  return json({ text: buildDigest(ctx.demo ? "Demo Agency" : "your agency", list, open.length) });
+  const d = await buildDailyDigest(ctx.installationId, { limitTo: ctx.limitTo, planLimit: accountLimit(ctx.plan, ctx.entitlements.enforced) });
+  return json({ text: digestText(ctx.demo ? "Demo Agency" : "your agency", { attention: d.attention, fine: d.fine.length, headlines: d.headlines, freshnessLabel: d.freshness.label }, ctx.url.origin) });
 }
 
 // ---------------- routing ----------------
 
 const FEATURE_FOR: Record<string, Feature> = {
   search: "search", onboarding: "onboarding", stale: "stale", inbox: "inbox", pipelines: "pipelines", duplicates: "duplicates", email: "email",
-  alerts: "alerts", team: "team", "deal-events": "pipelines", contact: "search", settings: "settings", export: "exports", digest: "reports", "api-keys": "ai", hygiene: "stale", "pipeline-intel": "pipelines", "contact-intel": "activity", clients: "reports", qbr: "reports", "comms-intel": "inbox", "call-queue": "calls", "call-lists": "calls", "call-outcomes": "calls",
+  alerts: "alerts", daily: "overview", team: "team", "deal-events": "pipelines", contact: "search", settings: "settings", export: "exports", digest: "reports", "api-keys": "ai", hygiene: "stale", "pipeline-intel": "pipelines", "contact-intel": "activity", clients: "reports", qbr: "reports", "comms-intel": "inbox", "call-queue": "calls", "call-lists": "calls", "call-outcomes": "calls",
 };
 
 export async function handle(request: Request, segments: string[]): Promise<Response> {
@@ -938,6 +959,7 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
   try {
     if (method === "GET") {
       if (a === "overview") return await overview(ctx);
+      if (a === "daily") return await dailyView(ctx);
       if (a === "accounts" && !b) return await accounts(ctx);
       if (a === "onboarding") return await onboardingOverview(ctx);
       if (a === "accounts" && b && LOCATION_ID.test(b) && !c) return await accountDetail(ctx, b);
