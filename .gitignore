@@ -43,3 +43,6 @@ next-env.d.ts
 !.env.example
 .supabase
 .tmp-shots/
+
+# scratch files from local checks
+.tmp-*

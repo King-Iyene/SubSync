@@ -1,4 +1,0 @@
-(node:7768) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
-(Use `node --trace-deprecation ...` to show where the warning was created)
-connections: sign-in guards, Fathom and Zoom signed deliveries, routing, duplicates, isolation, disconnect: ok
-EXIT 0
