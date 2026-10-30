@@ -14,6 +14,7 @@ import { HelpView } from "./views/help";
 import { FreshnessStrip } from "./views/health-card";
 import { InboxView } from "./views/inbox";
 import { OnboardingView } from "./views/onboarding";
+import { LeadsView } from "./views/leads";
 import { OverviewView } from "./views/overview";
 import { PipelineView } from "./views/pipeline";
 import { SearchView } from "./views/search";
@@ -172,6 +173,7 @@ export function Dashboard() {
       case "settings": return <SettingsView />;
       case "help": return <HelpView go={go} />;
       case "pipeline": return <PipelineView />;
+      case "leads": return <LeadsView />;
     }
   })();
 

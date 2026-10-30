@@ -106,7 +106,7 @@ export function PipelineView() {
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat label="Open pipeline" value={fmtMoney(data.totals.openValue)} sub={`${fmtInt(data.totals.open)} open deals`} />
         <Stat label="Win rate" value={pct(data.totals.winRate)} sub={`${data.totals.won} won, ${data.totals.lost} lost`} />
-        <Stat label="Average time to win" value={data.totals.avgCycleDays === null ? "n/a" : `${data.totals.avgCycleDays} days`} sub="created to won" />
+        <Stat label="Average time to win" value={data.totals.avgCycleDays === null ? "n/a" : `${data.totals.avgCycleDays} ${data.totals.avgCycleDays === 1 ? "day" : "days"}`} sub="created to won" />
         <Stat label="Likely revenue" value={f.winRate === null ? "n/a" : fmtMoney(f.likely)} sub="open value x win rate" />
       </div>
 

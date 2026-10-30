@@ -217,6 +217,18 @@ async function main() {
   assert.equal((await call("/api/app/goals", { method: "PUT", token, body: JSON.stringify({ metric: "monthly_revenue", target: null }) })).status, 200);
   console.log("pipeline intelligence + goals: ok");
 
+  // --- contact intelligence
+  const ci = await call("/api/app/contact-intel", { token });
+  assert.equal(ci.status, 200);
+  assert.ok(ci.body.lifecycle.total > 3000, "contacts counted");
+  assert.equal(ci.body.lifecycle.leads + ci.body.lifecycle.opportunities + ci.body.lifecycle.customers + ci.body.lifecycle.lost, ci.body.lifecycle.total, "lifecycle adds up");
+  assert.ok(ci.body.topLeads.length > 0 && ci.body.topLeads[0].score >= ci.body.topLeads[ci.body.topLeads.length - 1].score, "leads sorted by score");
+  assert.ok(ci.body.vips.length > 0);
+  assert.ok(ci.body.inactive.d30 >= ci.body.inactive.d60 && ci.body.inactive.d60 >= ci.body.inactive.d90, "inactive buckets nest");
+  assert.equal(ci.body.growth.weekly.length > 0, true);
+  assert.ok(ci.body.quality.total === ci.body.lifecycle.total);
+  console.log("contact intelligence: ok");
+
   // Leave the demo data as we found it.
   await sql()`delete from domain_checks where domain in ('example-demo.com', 'other-demo.org')`;
   await closeDb();

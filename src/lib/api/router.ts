@@ -19,6 +19,7 @@ import {
   abandonedDeals, accountSummaries, agingBuckets, avgCycleDays, coverage, deadPipeline, forecast, pipelineSummaries, riskyDeals, stageTable,
   valueDistribution, winLossByMonth, winRate,
 } from "../analytics/pipeline-intel";
+import { badDataSamples, contactOverview, topLeads, vips } from "../analytics/contact-queries";
 import { getGoals, GOAL_METRICS, loadDeals, pipelineTrend, setGoal, type GoalMetric } from "../analytics/pipeline-queries";
 import { authenticate, isResponse, json, type AuthContext } from "./auth";
 
@@ -489,6 +490,21 @@ async function pipelineIntel(ctx: Ctx) {
   });
 }
 
+async function contactIntel(ctx: Ctx) {
+  const allowed = await allowedIds(ctx);
+  const [overview, leads, vipList, samples, sc] = await Promise.all([
+    contactOverview(ctx.installationId, allowed), topLeads(ctx.installationId, allowed), vips(ctx.installationId, allowed),
+    badDataSamples(ctx.installationId, allowed), scope(ctx),
+  ]);
+  const link = (c: { locationId: string; contactId: string }) => sc.links.contact(c.locationId, c.contactId);
+  return json({
+    ...overview,
+    topLeads: leads.map((c) => ({ ...c, url: link(c) })),
+    vips: vipList.map((c) => ({ ...c, url: link(c) })),
+    badData: samples.map((c) => ({ ...c, url: link(c) })),
+  });
+}
+
 async function goalsView(ctx: Ctx) {
   return json({ goals: await getGoals(ctx.installationId) });
 }
@@ -536,7 +552,7 @@ async function digestPreview(ctx: Ctx) {
 
 const FEATURE_FOR: Record<string, Feature> = {
   search: "search", onboarding: "onboarding", stale: "stale", inbox: "inbox", pipelines: "pipelines", duplicates: "duplicates", email: "email",
-  alerts: "alerts", settings: "settings", export: "exports", digest: "reports", "api-keys": "ai", hygiene: "stale", "pipeline-intel": "pipelines",
+  alerts: "alerts", settings: "settings", export: "exports", digest: "reports", "api-keys": "ai", hygiene: "stale", "pipeline-intel": "pipelines", "contact-intel": "activity",
 };
 
 export async function handle(request: Request, segments: string[]): Promise<Response> {
@@ -569,6 +585,7 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       if (a === "sync") return json(await syncStatus(ctx.installationId));
       if (a === "health") return await healthView(ctx);
       if (a === "pipeline-intel") return await pipelineIntel(ctx);
+      if (a === "contact-intel") return await contactIntel(ctx);
       if (a === "goals") return await goalsView(ctx);
       if (a === "digest") return await digestPreview(ctx);
     }
