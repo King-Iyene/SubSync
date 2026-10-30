@@ -28,6 +28,7 @@ import { accountHistory, clientExtras, periodFigures, saveProfile, type ClientEx
 import { dailyPriorities, replyAging, setupScore, worstDomainStatus, type SetupFacts } from "../analytics/comms-intel";
 import { afterHours, communicationGaps } from "../analytics/comms-queries";
 import { badDataSamples, contactOverview, topLeads, vips } from "../analytics/contact-queries";
+import { appointmentView } from "../analytics/appointment-queries";
 import { buildDailyDigest, NOT_WATCHED } from "../analytics/digest-service";
 import { digestText, localParts } from "../analytics/digest-intel";
 import { buildQueue, recordBulk, recordDecision, summarise, undoDecision } from "../analytics/dedupe-queries";
@@ -135,6 +136,16 @@ async function overview(ctx: Ctx) {
     bands,
     attention,
     sync,
+  });
+}
+
+async function appointmentsView(ctx: Ctx) {
+  const sc = await scope(ctx);
+  const v = await appointmentView(ctx.installationId, await allowedIds(ctx));
+  const link = (p: { locationId: string; contactId: string }) => sc.links.contact(p.locationId, p.contactId);
+  return json({
+    ...v, canSeeAccounts: ctx.limitTo === null,
+    unconfirmed: v.unconfirmed.map((p) => ({ ...p, url: link(p) })), recover: v.recover.map((p) => ({ ...p, url: link(p) })), unmarked: v.unmarked.map((p) => ({ ...p, url: link(p) })),
   });
 }
 
@@ -998,7 +1009,7 @@ async function digestPreview(ctx: Ctx) {
 
 const FEATURE_FOR: Record<string, Feature> = {
   search: "search", onboarding: "onboarding", stale: "stale", inbox: "inbox", pipelines: "pipelines", duplicates: "duplicates", email: "email",
-  alerts: "alerts", daily: "overview", team: "team", "deal-events": "pipelines", contact: "search", settings: "settings", export: "exports", digest: "reports", "api-keys": "ai", hygiene: "stale", "pipeline-intel": "pipelines", "contact-intel": "activity", clients: "reports", qbr: "reports", "comms-intel": "inbox", "call-queue": "calls", "call-lists": "calls", "call-outcomes": "calls",
+  alerts: "alerts", appointments: "appointments", daily: "overview", team: "team", "deal-events": "pipelines", contact: "search", settings: "settings", export: "exports", digest: "reports", "api-keys": "ai", hygiene: "stale", "pipeline-intel": "pipelines", "contact-intel": "activity", clients: "reports", qbr: "reports", "comms-intel": "inbox", "call-queue": "calls", "call-lists": "calls", "call-outcomes": "calls",
 };
 
 export async function handle(request: Request, segments: string[]): Promise<Response> {
@@ -1015,6 +1026,7 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
     if (method === "GET") {
       if (a === "overview") return await overview(ctx);
       if (a === "daily") return await dailyView(ctx);
+      if (a === "appointments") return await appointmentsView(ctx);
       if (a === "start") return await startView(ctx);
       if (a === "accounts" && !b) return await accounts(ctx);
       if (a === "onboarding") return await onboardingOverview(ctx);

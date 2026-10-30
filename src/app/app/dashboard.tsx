@@ -8,6 +8,7 @@ import { Badge } from "./ui";
 import { AccountDetailView } from "./views/account-detail";
 import { AccountsView } from "./views/accounts";
 import { AlertsView } from "./views/alerts";
+import { AppointmentsView } from "./views/appointments";
 import { CallsView } from "./views/calls";
 import { ClientsView } from "./views/clients";
 import { DealsView } from "./views/deals";
@@ -210,6 +211,7 @@ export function Dashboard() {
       case "help": return <HelpView go={go} />;
       case "pipeline": return <Tabs key="pipe" start={0} tabs={pipeTabs} />;
       case "team": return <TeamView />;
+      case "appointments": return <AppointmentsView go={go} />;
       case "leads": return <LeadsView />;
       case "calls": return <CallsView />;
       case "clients": return <ClientsView />;

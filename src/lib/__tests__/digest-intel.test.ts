@@ -69,6 +69,13 @@ test("failing email setup and dormancy are surfaced with severity", () => {
   assert.ok(attention[0].items.some((i) => i.kind === "dormant"));
 });
 
+test("no-shows and unconfirmed appointments become attention items only when they are meaningful", () => {
+  assert.ok(attentionItems(base({ noShows3d: 3 })).some((i) => i.kind === "noshow"));
+  assert.ok(!attentionItems(base({ noShows3d: 1 })).some((i) => i.kind === "noshow"));
+  assert.ok(attentionItems(base({ unconfirmed48: 4 })).some((i) => i.kind === "unconfirmed"));
+  assert.ok(!attentionItems(base({ unconfirmed48: 2 })).some((i) => i.kind === "unconfirmed"));
+});
+
 test("portfolio headlines add the accounts together day by day", () => {
   const a = week({ openValue: 100 }, { openValue: 200 });
   const b = week({ openValue: 50 }, { openValue: 50 });

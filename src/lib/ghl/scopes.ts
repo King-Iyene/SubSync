@@ -4,7 +4,9 @@ export const GHL_SCOPES = [
   "contacts.readonly",
   "opportunities.readonly",
   "calendars.readonly",
+  "calendars/events.readonly",
   "conversations.readonly",
+  "users.readonly",
   "oauth.write",
   "oauth.readonly",
 ] as const;

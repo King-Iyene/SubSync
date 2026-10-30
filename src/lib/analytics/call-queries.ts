@@ -47,6 +47,13 @@ export async function callQueue(installationId: string, allowed: string[] | null
       and(db`d.won_count > 0 and coalesce(d.open_count, 0) = 0 and d.last_won_at < now() - interval '180 days'`);
       order = db`d.won_value desc`;
       break;
+    case "noshow_recovery":
+      and(db`exists (select 1 from cached_appointments x where x.installation_id = c.installation_id and x.location_id = c.location_id and x.contact_id = c.contact_id
+          and x.status = 'noshow' and x.start_at > now() - interval '14 days' and x.start_at <= now()
+          and not exists (select 1 from cached_appointments y where y.installation_id = x.installation_id and y.location_id = x.location_id and y.contact_id = x.contact_id
+            and y.status not in ('cancelled', 'invalid', 'noshow') and y.start_at > x.start_at))`);
+      order = db`c.last_activity_at desc nulls last`;
+      break;
     case "recent_customers":
       and(db`d.won_count > 0 and d.last_won_at > now() - interval '90 days'`);
       order = db`d.last_won_at desc`;

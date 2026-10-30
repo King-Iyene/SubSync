@@ -190,6 +190,53 @@ export function mapLocationDetails(raw: unknown): LocationDetails {
   };
 }
 
+export type AppointmentRow = {
+  appointmentId: string;
+  calendarId: string | null;
+  contactId: string | null;
+  title: string | null;
+  status: string;
+  startAt: string | null;
+  endAt: string | null;
+  assignedTo: string | null;
+  createdAt: string | null;
+};
+
+export function mapAppointment(raw: unknown): AppointmentRow | null {
+  const r = rec(raw);
+  const id = str(r.id) ?? str(r._id);
+  if (!id) return null;
+  return {
+    appointmentId: id,
+    calendarId: str(r.calendarId),
+    contactId: str(r.contactId),
+    title: str(r.title),
+    status: (str(r.appointmentStatus) ?? str(r.status) ?? "new").toLowerCase().replace(/[^a-z]/g, ""),
+    startAt: toIso(r.startTime),
+    endAt: toIso(r.endTime),
+    assignedTo: str(r.assignedUserId),
+    createdAt: toIso(r.dateAdded) ?? toIso(r.createdAt),
+  };
+}
+
+export type CalendarRow = { id: string; name: string | null };
+
+export function mapCalendar(raw: unknown): CalendarRow | null {
+  const r = rec(raw);
+  const id = str(r.id) ?? str(r._id);
+  return id ? { id, name: str(r.name) } : null;
+}
+
+export type UserRow = { id: string; name: string | null };
+
+export function mapUser(raw: unknown): UserRow | null {
+  const r = rec(raw);
+  const id = str(r.id) ?? str(r._id);
+  if (!id) return null;
+  const name = str(r.name) ?? [str(r.firstName), str(r.lastName)].filter(Boolean).join(" ");
+  return { id, name: name || null };
+}
+
 // ---- fetchers (location-scoped token required) ----
 
 async function getJson(path: string, params: Record<string, string>, token: string, version: string): Promise<unknown> {
@@ -200,6 +247,29 @@ async function getJson(path: string, params: Record<string, string>, token: stri
   });
   if (!response.ok) throw new GhlError(response.status, `${path} returned ${response.status}`);
   return response.json();
+}
+
+// A 401 or 403 on a newer endpoint means the install has not approved that permission yet. It is
+// reported as a state to show, not as a failure.
+export function isPermissionError(error: unknown): boolean {
+  return error instanceof GhlError && (error.status === 401 || error.status === 403);
+}
+
+export async function fetchCalendars(token: string, locationId: string): Promise<CalendarRow[]> {
+  const body = rec(await getJson("/calendars/", { locationId }, token, "2021-04-15"));
+  return (Array.isArray(body.calendars) ? body.calendars : []).map(mapCalendar).filter((c): c is CalendarRow => c !== null);
+}
+
+// Appointments in a window (milliseconds since 1970) for one calendar. Needs calendars/events.readonly.
+export async function fetchAppointments(token: string, locationId: string, calendarId: string, fromMs: number, toMs: number): Promise<AppointmentRow[]> {
+  const body = rec(await getJson("/calendars/events", { locationId, calendarId, startTime: String(fromMs), endTime: String(toMs) }, token, "2021-04-15"));
+  return (Array.isArray(body.events) ? body.events : []).map(mapAppointment).filter((a): a is AppointmentRow => a !== null);
+}
+
+// The people on the account (names only). Needs users.readonly.
+export async function fetchUsers(token: string, locationId: string): Promise<UserRow[]> {
+  const body = rec(await getJson("/users/", { locationId }, token, "2021-07-28"));
+  return (Array.isArray(body.users) ? body.users : []).map(mapUser).filter((u): u is UserRow => u !== null);
 }
 
 export type ContactCursor = { startAfter?: number; startAfterId?: string } | null;

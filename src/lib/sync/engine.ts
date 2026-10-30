@@ -4,7 +4,7 @@ import { sql } from "../db";
 import { getInstalledLocations, getLocationToken } from "../ghl/client";
 import { getCompanyAccessToken, purgeLocationData } from "../ghl/installations";
 import {
-  fetchCalendarCount, fetchContactsPage, fetchConversationsPage, fetchLocationDetails, fetchOpportunitiesPage, fetchPipelines,
+  fetchAppointments, fetchCalendars, fetchUsers, isPermissionError, fetchCalendarCount, fetchContactsPage, fetchConversationsPage, fetchLocationDetails, fetchOpportunitiesPage, fetchPipelines,
   type ContactCursor, type ConversationRow, type OpportunityRow,
 } from "./ghl-data";
 import { diffDealEvents } from "./deal-events";
@@ -16,8 +16,8 @@ import { listAllInstalledLocations } from "./installed-locations";
 // A full sync is: one `locations` job, which fans out to per-account jobs, then one `metrics`
 // job that only runs once everything else has finished.
 
-export type JobType = "locations" | "structure" | "contacts" | "opportunities" | "conversations" | "metrics";
-const PER_LOCATION: JobType[] = ["structure", "contacts", "opportunities", "conversations"];
+export type JobType = "locations" | "structure" | "contacts" | "opportunities" | "conversations" | "appointments" | "metrics";
+const PER_LOCATION: JobType[] = ["structure", "contacts", "opportunities", "conversations", "appointments"];
 
 type Job = {
   id: string;
@@ -298,6 +298,76 @@ async function handleConversations(job: Job): Promise<Outcome> {
   return DONE;
 }
 
+const APPOINTMENT_PAST_DAYS = 90;
+const APPOINTMENT_FUTURE_DAYS = 60;
+const MAX_CALENDARS = 80;
+
+// Appointments and the account's team names. Both depend on permissions an existing install may not
+// have approved yet; in that case we record "needs permission" for the account and carry on.
+async function handleAppointments(job: Job): Promise<Outcome> {
+  const db = sql();
+  const loc = job.locationId as string;
+  const token = await tokenForLocation(job.companyId, loc);
+
+  let usersAccess: "ok" | "needs_permission" = "ok";
+  try {
+    const users = await fetchUsers(token, loc);
+    for (const u of users) {
+      if (!u.name) continue;
+      // A name someone typed is never overwritten by the platform's.
+      await db`
+        insert into team_names (installation_id, user_id, name, source) values (${job.installationId}, ${u.id}, ${u.name}, 'platform')
+        on conflict (installation_id, user_id) do update set name = excluded.name where team_names.source = 'platform'`;
+    }
+  } catch (error) {
+    if (!isPermissionError(error)) throw error;
+    usersAccess = "needs_permission";
+  }
+
+  const now = Date.now();
+  const fromMs = now - APPOINTMENT_PAST_DAYS * 86_400_000;
+  const toMs = now + APPOINTMENT_FUTURE_DAYS * 86_400_000;
+  let access: "ok" | "needs_permission" = "ok";
+  const rows: Array<Record<string, unknown>> = [];
+  try {
+    const calendars = (await fetchCalendars(token, loc)).slice(0, MAX_CALENDARS);
+    for (const cal of calendars) {
+      const events = await fetchAppointments(token, loc, cal.id, fromMs, toMs);
+      for (const a of events) {
+        rows.push({
+          installation_id: job.installationId, location_id: loc, appointment_id: a.appointmentId, calendar_id: a.calendarId ?? cal.id, calendar_name: cal.name,
+          contact_id: a.contactId, title: a.title, status: a.status, start_at: a.startAt, end_at: a.endAt, assigned_to: a.assignedTo, created_remote_at: a.createdAt,
+          synced_at: new Date(),
+        });
+      }
+    }
+  } catch (error) {
+    if (!isPermissionError(error)) throw error;
+    access = "needs_permission";
+  }
+
+  if (access === "ok") {
+    const unique = [...new Map(rows.map((r) => [r.appointment_id as string, r])).values()];
+    for (let i = 0; i < unique.length; i += 500) {
+      await db`
+        insert into cached_appointments ${db(unique.slice(i, i + 500) as never)}
+        on conflict (installation_id, location_id, appointment_id) do update set
+          calendar_id = excluded.calendar_id, calendar_name = excluded.calendar_name, contact_id = excluded.contact_id, title = excluded.title,
+          status = excluded.status, start_at = excluded.start_at, end_at = excluded.end_at, assigned_to = excluded.assigned_to,
+          created_remote_at = excluded.created_remote_at, synced_at = excluded.synced_at`;
+    }
+    // Anything in the window that we did not see this time was cancelled and removed, or moved out of it.
+    await db`
+      delete from cached_appointments where installation_id = ${job.installationId} and location_id = ${loc}
+        and synced_at < ${job.startedAt} and start_at between ${new Date(fromMs)} and ${new Date(toMs)}`;
+  }
+  await db`
+    update locations set appointments_access = ${access}, users_access = ${usersAccess},
+      appointments_synced_at = case when ${access} = 'ok' then now() else appointments_synced_at end
+    where installation_id = ${job.installationId} and location_id = ${loc}`;
+  return DONE;
+}
+
 async function runJob(job: Job, deadline: number): Promise<Outcome> {
   switch (job.type) {
     case "locations": return handleLocations(job);
@@ -305,6 +375,7 @@ async function runJob(job: Job, deadline: number): Promise<Outcome> {
     case "contacts": return handleContacts(job, deadline);
     case "opportunities": return handleOpportunities(job, deadline);
     case "conversations": return handleConversations(job);
+    case "appointments": return handleAppointments(job);
     case "metrics":
       await refreshInsights(job.installationId);
       return DONE;

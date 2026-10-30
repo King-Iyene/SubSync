@@ -66,6 +66,8 @@ export type AccountInput = {
   syncError: string | null;
   lastSyncedAt: string | null;
   pipelines: number | null;
+  noShows3d?: number;
+  unconfirmed48?: number;
 };
 
 const money = (n: number) => "$" + Math.round(n).toLocaleString("en-US");
@@ -106,6 +108,12 @@ export function attentionItems(a: AccountInput, now = Date.now()): Item[] {
   }
   if (a.emailStatus === "critical" || a.emailStatus === "warning") {
     items.push({ kind: "email", weight: a.emailStatus === "critical" ? 65 : 40, title: "Email sending setup needs fixing", detail: "Sender authentication is failing or incomplete, so emails may land in spam." });
+  }
+  if ((a.noShows3d ?? 0) >= 2) {
+    items.push({ kind: "noshow", weight: 52 + Math.min(20, (a.noShows3d ?? 0) * 3), title: `${a.noShows3d} no-shows in the last 3 days`, detail: "Call them while the booking is fresh: most will rebook if asked today." });
+  }
+  if ((a.unconfirmed48 ?? 0) >= 3) {
+    items.push({ kind: "unconfirmed", weight: 38, title: `${a.unconfirmed48} appointments in the next 2 days are unconfirmed`, detail: "A reminder now cuts no-shows." });
   }
   if (a.pipelines === 0) items.push({ kind: "setup", weight: 25, title: "No pipeline set up yet", detail: "Without a pipeline there is no deal tracking for this client." });
   return items.sort((x, y) => y.weight - x.weight);

@@ -225,6 +225,35 @@ export async function seedDemo(): Promise<{ installationId: string; accounts: nu
       await db`insert into team_names (installation_id, user_id, name) values (${installationId}, ${TEAM[i]}, ${name}) on conflict do nothing`;
     }
 
+    // appointments, derived from counters (never from r()) so no existing demo number moves. One account
+    // is left as "needs approval" to show what an install that predates the new permission sees.
+    if (i === 5 || p.ignored) {
+      await db`update locations set appointments_access = 'needs_permission', users_access = 'needs_permission' where installation_id = ${installationId} and location_id = ${locationId}`;
+    } else {
+      const total = Math.min(60, Math.max(4, Math.round(p.contacts / 14)));
+      const bias = (i * 3) % 5; // more no-shows in some accounts than others
+      const now = Date.now();
+      const appts: Record<string, unknown>[] = [];
+      for (let k = 0; k < total; k++) {
+        const startMs = now - (82 - Math.floor((k * 100) / total)) * 86_400_000 + (k % 8) * 3_600_000;
+        const past = startMs < now - 3 * 3_600_000;
+        let status: string;
+        if (past) {
+          const m = (k * 7 + i) % 20;
+          status = m < 11 - bias ? "showed" : m < 16 - Math.floor(bias / 2) ? "noshow" : m < 18 ? "cancelled" : "confirmed";
+        } else {
+          status = k % 3 === 0 ? "new" : k % 7 === 0 ? "cancelled" : "confirmed";
+        }
+        appts.push({
+          installation_id: installationId, location_id: locationId, appointment_id: `${locationId}-ap${k}`, calendar_id: `${locationId}-cal${k % 3}`,
+          calendar_name: ["Free consultation", "Estimate visit", "Follow-up call"][k % 3], contact_id: `${locationId}-c${1 + ((k * 11) % Math.max(1, p.contacts))}`,
+          title: "Appointment", status, start_at: new Date(startMs), end_at: new Date(startMs + 1_800_000), assigned_to: TEAM[k % 4], created_remote_at: new Date(startMs - 3 * 86_400_000),
+        });
+      }
+      await db`insert into cached_appointments ${db(appts as never)}`;
+      await db`update locations set appointments_access = 'ok', users_access = 'ok', appointments_synced_at = now() where installation_id = ${installationId} and location_id = ${locationId}`;
+    }
+
     // conversations (summaries only)
     const convs: Record<string, unknown>[] = [];
     const total = p.activeDays > 30 ? 6 : 24 + Math.floor(r() * 25);

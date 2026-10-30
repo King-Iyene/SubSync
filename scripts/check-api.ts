@@ -545,6 +545,32 @@ async function main() {
   await sql()`delete from usage_events where installation_id = (select id from installations where is_demo)`;
   console.log("getting started + usage + connection: ok");
 
+  // --- appointments: rates, to-do lists, permission state, scoping, no-show recovery call list
+  const ap = await call("/api/app/appointments", { token });
+  assert.equal(ap.status, 200);
+  assert.ok(ap.body.last30.booked > 20 && ap.body.prior30.booked > 10, "bookings exist in both 30 day windows");
+  assert.ok(ap.body.last30.showRate > 0.2 && ap.body.last30.showRate < 1, "a believable show rate");
+  assert.equal(ap.body.last30.held + ap.body.last30.noShow + ap.body.last30.cancelled <= ap.body.last30.booked, true);
+  assert.ok(ap.body.upcoming7 > 0 && ap.body.unmarkedTotal > 0 && ap.body.recoverTotal > 0 && ap.body.unconfirmedTotal > 0, "every to-do list has something");
+  assert.ok(ap.body.recover.every((p: { url: string; name: string }) => p.name && p.url.includes("/contacts/detail/")));
+  assert.equal(ap.body.access.needsPermission.length, 1, "the account that predates the permission is called out");
+  assert.ok(ap.body.byCalendar.length >= 3 && ap.body.byPerson.some((p: { label: string }) => p.label === "Dana Brooks"), "people use their names");
+  assert.equal(ap.body.canSeeAccounts, true);
+  assert.ok(ap.body.perAccount.some((a: { access: string }) => a.access === "needs_permission"));
+  const bap = await call("/api/app/appointments", { token: bt });
+  assert.equal(bap.status, 200);
+  assert.equal(bap.body.canSeeAccounts, false);
+  assert.ok(bap.body.perAccount.length === 1 && bap.body.perAccount[0].locationId === own, "a business sees only its own appointments");
+  assert.ok([...bap.body.recover, ...bap.body.unmarked, ...bap.body.unconfirmed].every((p: { locationName: string | null }) => p.locationName === bap.body.perAccount[0].name));
+  assert.equal((await call("/api/app/appointments", { token: ct })).status, 200, "a client view can see its own appointments");
+  const nsq = await call("/api/app/call-queue?preset=noshow_recovery", { token });
+  assert.equal(nsq.status, 200);
+  assert.ok(nsq.body.total > 0 && nsq.body.rows.every((r: { contactId: string }) => r.contactId));
+  assert.ok(!nsq.body.rows.some((r: { contactId: string }) => r.contactId === dndRow.contact_id), "still never a do-not-disturb contact");
+  assert.ok(nsq.body.presets.some((p: { id: string }) => p.id === "noshow_recovery"));
+  assert.equal((await call("/api/app/daily", { token })).status, 200, "the brief still builds with appointment signals");
+  console.log("appointments: rates, to-do lists, permission state, scoping, recovery list: ok");
+
   // Leave the demo data as we found it.
   await sql()`delete from domain_checks where domain in ('example-demo.com', 'other-demo.org')`;
   await closeDb();

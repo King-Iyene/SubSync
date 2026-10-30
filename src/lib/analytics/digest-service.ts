@@ -2,6 +2,7 @@ import { sql } from "../db";
 import { syncStatus } from "../sync/engine";
 import { freshness, portfolioHeadlines, rank, type AccountInput, type SeriesPoint } from "./digest-intel";
 import { inbox, listDomainChecks, visibleLocationIds } from "./queries";
+import { appointmentSignals } from "./appointment-queries";
 import { loadAccounts } from "./service";
 
 // Things a daily brief could say but cannot yet, with the honest reason. Shown in the app so
@@ -48,10 +49,11 @@ export async function buildDailyDigest(installationId: string, opts: { limitTo?:
     ? { ok: false, message: "SubSync could not connect to the platform to refresh your accounts. Access may have been removed. If this continues, reinstall SubSync from the app marketplace." }
     : { ok: true, message: null as string | null };
   const ids = live.map((a) => a.locationId);
-  const [series, waiting, domains] = await Promise.all([
+  const [series, waiting, domains, signals] = await Promise.all([
     seriesByLocation(installationId, ids),
     inbox(installationId, settings.slaHours, 2000, opts.limitTo ?? undefined),
     listDomainChecks(installationId),
+    appointmentSignals(installationId, ids),
   ]);
   const oldest = new Map<string, number>();
   for (const r of waiting) if (r.overSla && r.waitingHours !== null) oldest.set(r.locationId, Math.max(oldest.get(r.locationId) ?? 0, r.waitingHours));
@@ -65,6 +67,7 @@ export async function buildDailyDigest(installationId: string, opts: { limitTo?:
     unanswered: a.unanswered, oldestWaitingHours: oldest.get(a.locationId) ?? null, slaHours: settings.slaHours,
     staleCount: a.staleOpps, staleValue: a.revenueAtRisk, dormant: a.dormant, daysInactive: a.daysInactive,
     emailStatus: worstDomain(a.locationId), syncError: a.syncError, lastSyncedAt: a.contactsSyncedAt, pipelines: a.pipelines,
+    noShows3d: signals.get(a.locationId)?.noShows3d ?? 0, unconfirmed48: signals.get(a.locationId)?.unconfirmed48 ?? 0,
   }));
   const { attention, fine } = rank(inputs);
   return {

@@ -8,6 +8,7 @@ export const PRESETS = [
   { id: "customers_followup", label: "Customers due a check-in", help: "Customers with no activity for 60 days or more." },
   { id: "lead_recency", label: "Newest leads (last 24 hours)", help: "Fresh leads with no deal yet, newest first. Speed to lead wins deals." },
   { id: "win_back", label: "Win-back: customers gone quiet", help: "Won a deal over 180 days ago and have nothing open now, biggest first." },
+  { id: "noshow_recovery", label: "No-shows to rebook (last 14 days)", help: "Missed an appointment in the last two weeks and have not been booked again. Call to rebook." },
   { id: "recent_customers", label: "Recent customers (referral requests)", help: "Won a deal in the last 90 days. A good moment to ask for a referral." },
   { id: "follow_ups_due", label: "Follow-ups due", help: "Contacts you marked 'follow up' whose date has arrived." },
   { id: "custom", label: "Build your own", help: "Filter by tag, account, how long since contact, and deal status." },
