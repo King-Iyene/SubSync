@@ -76,3 +76,97 @@ Also fixed along the way: a malformed account id on the resync route used to fal
 3. **AI and email keys** (secrets, only you can add them) would unlock the AI items and emailed reports.
 4. **Pricing** is untouched. The spec's revised table (Business and Agency modes) conflicts with the $5 per account plan already saved in the portal.
 5. The demo data was reseeded at the end, so screenshots and the demo mode are clean.
+
+---
+
+# Round 2: sub-account mode, then the audit and deepening pass
+
+This round has two parts. Part A (done first) added the sub-account side of the app and answered the
+permissions and pricing questions. Part B followed the second brief: honest audit, Duplicates, daily
+digest, research, engineering quality. Each part is logged below in the order it happened.
+
+## Part A: sub-account mode (commits 89ccbd3, 3644945)
+
+Built and live: a client account can install SubSync for itself and sees only its own account; an
+agency can switch on a read-only view for each client's own staff; three plan tiers (free, starter, pro);
+the access rules are enforced by a signed session plus a default-deny route list plus per-account
+query limits. Lead sources, do-not-disturb, birthdays, team stats, deal movement log and a contact
+timeline were added using only the permissions the app already has. Full detail and the pricing
+recommendation: `docs/PERMISSIONS_AND_PRICING.md`.
+
+Verified: 158 unit tests and the HTTP integration check (including 40+ assertions that a business or
+client view can never reach another account or an agency page). Live: agency sign-in through the real
+GHL single sign-on still works after the sign-in rewrite; the new Team menu item is live.
+
+Not verified live (needs a real second account): an actual install by a client account (the token
+exchange asks for a Company token first and falls back to a Location token, which follows the docs
+but has not been exercised), and a real client-staff sign-in. Both are covered by unit tests of the
+decision logic only. `docs/PERMISSIONS_AND_PRICING.md` lists the portal steps King needs for plans.
+
+## Step 1: honest audit of every section (live app, real synced data, 30 Oct 2026)
+
+Real data right now: 3 client accounts in the connected test agency (KD Squares LTD about 9,500
+contacts and about 10,000 open deals, KD Squares Test 332 contacts and 194 deals, one empty account).
+The very round numbers ($2,400,000 open pipeline, $1,200,000 expected) come from the large block of
+imported test deals in the LTD account, not from a bug.
+
+| Section | What it shows | Real and fresh? | Can the user act on it? | Answers "what do I do today?" | Label |
+| --- | --- | --- | --- | --- | --- |
+| Overview | KPIs, Today's priorities, executive summary, account health, sync status | Real; the last-synced strip is accurate | Open buttons on priorities | Partly: 3 ranked priorities, but no change against the account's own normal | Working, needs the digest (Step 3) |
+| Accounts | Table of accounts with score, risk, contacts, stale deals, waiting; filters; CSV | Real | Open an account, export | Partly (sort by risk) | Working |
+| Account detail | Score breakdown, trend, stale deals, checklist, email auth, alerts, controls | Real | Tick checklist, set owner, ignore, client view switch | Yes for that account | Working |
+| Clients | Fees, value created, renewals, last spoken, QBR | Real but empty until the agency types fees and renewal dates ("n/a", "Never logged") | Edit profile, print QBR | No until filled in | Shallow (depends on manual input) |
+| Team | Open and won value, stale deals, win rate per person | Real; names are typed by the user until the users permission exists | Rename people | Partly | Working (new) |
+| Contact search | Name, email, phone search across accounts, contact timeline | Real | Open contact, view timeline | n/a (lookup tool) | Working |
+| Deals | Stale deals, pipeline roll-up, hygiene | Real | Open in the platform | Lists, no ranking by what to chase first | Shallow |
+| Pipeline | Forecast bands, coverage, stage bottlenecks, risk, aging, win/loss, movement log | Real; history charts say "not enough history yet" | Open deal; set a monthly target | Partly | Working |
+| Leads | Lifecycle, quality score, quiet leads, VIPs, sources, cohorts, data quality | Real; sources fill in after the next sync of each account | Open contact | Partly | Working |
+| Call lists | Preset and custom queues, priority score, outcome logger, power hour | Real | Yes: log outcomes, follow-ups | Yes (who to call next) | Working |
+| Inbox & SLA | Conversations waiting past the reply target | Real, but conversation summaries only, no message text; long-dead threads (700+ hours) crowd the top | Open and reply in the platform | Partly | Shallow |
+| Onboarding | Per-account setup checklist with percent complete | Real checks plus manual ticks; "workflows built" is always unknown (API closed beta) | Tick manual items | Partly | Shallow |
+| Email health | SPF, DKIM, DMARC, MX checks per domain | Real DNS lookups, but the user has to add domains; nothing about bounce rate | Run check | Partly | Shallow |
+| Duplicates (before) | Wall of repeated names with "N contacts share a phone ending 9755" | Real | None: no compare, no choose, no dismiss | No | Shallow |
+| Alerts | Deduplicated alerts (stale deals, SLA, domain, data) | Real | View and dismiss | Partly: says what, not what to do first | Shallow |
+| Settings | Thresholds, Slack, checklist, client access, AI keys, delete data | Real | Yes | n/a | Working |
+| Getting started | Static how-to with an "Open" button in each step | Not real state: never changes | Navigation only | No; steps 1 and 2 both say "Open Overview" | Shallow |
+
+Findings that changed the plan: (1) Duplicates was the weakest screen; the real data shows 2,535
+exact-match groups (6,914 contacts), almost all in the one account that took a large import, so a
+wall of names is useless there. (2) Counts-only screens (Deals, Alerts, Inbox) rank nothing against
+the account's own normal. (3) Getting started does not know whether the install is connected,
+synced, or whether the user has seen an alert.
+
+## Step 2: Duplicates (commit e8e48fb, live)
+
+2a. What the old screen flagged, on real data (read-only counts):
+
+| Class | KD Squares LTD | KD Squares Test | What it means |
+| --- | --- | --- | --- |
+| Same email, same account | 2 groups | 15 groups (192 contacts) | Exact duplicates; the account allowed duplicates or the contacts predate the block |
+| Same phone, same account | 3,634 groups (8,996 contacts) | 16 groups (188 contacts) | Mostly one large test import repeating the same people and numbers |
+| Same phone, different format | 5 groups | 0 | Near matches the old screen could not see as one person |
+| Same email in different client accounts | 23 people | | Normal for an agency; now shown as information only, never offered for merging |
+
+2b. What the platform API supports (checked in its documentation): there is a read-only
+`GET /contacts/search/duplicate` (finds the existing contact for an email or phone, scope
+`contacts.readonly`), update and delete endpoints exist, and there is **no public merge endpoint**
+(merging is a screen in the platform; community tools fake it by deleting the loser, with no undo).
+Whether the location record exposes the "allow duplicate contact" flag is not documented; the sync
+now reads it if present (the live screen shows "Setting not shown by the platform" until a sync
+returns it, which is what the first live check showed). I could not probe it from my machine because
+production tokens are encrypted with a key I do not hold, which is correct.
+
+2c. Built: normalised matching (phone last 10 digits, email case and gmail dot and plus tricks, name),
+a 0 to 100 confidence with the reasons, a recommended record to keep (deals, conversations,
+completeness, activity), a field plan for what the kept record should contain, a side-by-side
+review queue, recorded decisions with a saved snapshot of the records and an audit log, undo, and
+bulk actions that default to a dry run. SubSync never merges or deletes: the platform has no safe
+merge call, so the user merges in the platform's own Merge screen and tells us ("I merged these").
+2d. Duplicate protection per account: shown when the platform returns it, otherwise a short guide.
+Cross-account matches are only counted and explained.
+
+Verified: 9 unit tests for the matching and 20 integration assertions (scoring ranges, unknown
+decisions refused, contacts from another account refused, snapshot saved, audit row written, queue
+shrinks then restores on undo, dry run records nothing, client view cannot decide, business limited
+to its own account). Live on real data: loads in a few seconds with 2,535 groups; shows the three
+accounts with their group counts.
