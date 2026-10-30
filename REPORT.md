@@ -170,3 +170,60 @@ decisions refused, contacts from another account refused, snapshot saved, audit 
 shrinks then restores on undo, dry run records nothing, client view cannot decide, business limited
 to its own account). Live on real data: loads in a few seconds with 2,535 groups; shows the three
 accounts with their group counts.
+
+## Step 3: the daily brief (commit e2466f2, live)
+
+A new first page, **Today**, replaces "counts and a global threshold" with a decision list:
+
+- Every account is compared with **its own** last 7 days (mean and spread), so a quiet account is not flagged for being quiet and a busy one is flagged when it drops. A change only counts as unusual when it is outside the account's own range and above a minimum size.
+- Four portfolio headlines (open pipeline, stale deals, new contacts, unread) with the change against yesterday and against the 7 day average.
+- A ranked "needs attention today" list. Each item says what, why and what to do, with a button into the account and a link into the platform: conversations waiting past the reply target (ranked by how many and how old), a jump in stale deals against the account's normal, new leads below normal, an engagement score drop, dormancy, failing email sender setup, and "SubSync cannot read this account" (disconnected or sync error, or data over 36 hours old, ranked highest because the other numbers cannot be trusted).
+- Accounts that are fine are listed as fine, with what was checked, and marked "still learning" while there is under a week of history.
+- Data freshness is shown at the top. A sync-in-progress notice appears when jobs are pending.
+- **Delivery**: Slack, once a day, at the hour and time zone the agency chooses in Settings (default 08:00 in the first client's time zone). An hourly job sends it once per local day, tolerates a late or missed run, and never sends twice. The old weekly Monday summary schedule was replaced. The preview button shows exactly what will be sent.
+- Shown in the app for agencies and for single businesses (their own account only). Client staff do not get it.
+
+**Not built, and why** (also listed in the app under "Not watched yet" so nobody assumes they are covered):
+missed calls (no call log access), failing workflows (closed beta API), low wallet balance and failed payments (needs billing access the app does not request, and I may not change scopes), A2P registration status (not exposed by the API this app uses), **email delivery** (needs an email service key, a secret I may not add; the Slack path is complete and the email path only needs a provider plugged in).
+
+Verified: 11 unit tests (own-range comparison, ranking, sync trouble outranks business signals, once-a-day scheduling across time zones) and 15 integration assertions (history exists for yesterday and the 7 day average, ranked order, scoping for a business, none for a client, schedule validation, cron needs its secret). Live on real data: the Today page loads in the connected test agency, ranks KD Squares LTD (25 conversations waiting, oldest 30 days; 9,055 stale deals) first, and honestly says "no earlier day" for the changes because this install has only one day of history; comparisons fill in as days pass.
+
+## Step 4: research, then what was chosen
+
+**How I researched.** Web searches on what agencies use and complain about (reporting tools, speed-to-lead, A2P rejections, churn tools, snapshot drift). Caveats stated plainly: most results were vendor or agency blogs rather than primary sources, I could not read marketplace listing pages or r/gohighlevel threads directly (they need a browser session), and the build brief's claim about a competitor's install count was not independently verified. Treat the table as informed, not proven.
+
+| What exists | What it does | Where it is weak |
+| --- | --- | --- |
+| The platform's own agency dashboard | Totals of contacts, conversations, appointments and pipeline counts across sub-accounts | Basic, counts only; custom reporting is plan-limited; no "what do I do today" and nothing compared with an account's own normal |
+| Reporting connectors (Two Minute Reports, Windsor.ai, AgencyAnalytics) | Pull data out to Sheets, Looker Studio or branded reports, scheduled to clients | Live outside the platform, per-seat or per-client fees, set up per client, report on the past rather than point at today's problems |
+| Churn and health tools for platform-based agencies (for example GoCSM) | Client health scoring and retention workflows | Mostly for the agency's own SaaS customers; "quiet reads as healthy" is a known flaw of activity-only scores |
+| Speed-to-lead and missed-call tools (dialers, text-back workflows) | Act on a single lead in the moment | Have to be built or bought per sub-account; nothing watches all accounts for the ones that failed |
+| Compliance help (A2P registration services, many one-off gigs) | Fix rejected SMS registrations | Manual, per sub-account, usually after the problem |
+| DIY workflows and snapshots | Copy a proven setup to a new account | Drift: later edits and pushes are not reconciled, nobody can see which accounts have drifted |
+
+**What agencies still do by hand:** open each client account to check it, rebuild the same alert workflow in every account, export to spreadsheets for monthly reports, hunt for dormant clients before they cancel, and check email and SMS setup account by account.
+
+**Scoring** (1 to 5; pain = how often agencies feel it, value = hours saved or revenue protected, resell = sells to the agency's own clients, feasible = possible with the API and webhooks we have today):
+
+| Candidate | Pain | Value | Resell | Feasible | Total | Decision |
+| --- | --- | --- | --- | --- | --- | --- |
+| Cross-account health monitor and daily brief | 5 | 5 | 4 | 4 | 18 | Built (Step 3). Calls, workflows, wallet and A2P parts are not feasible today |
+| Speed-to-lead and unanswered-conversation alerts | 5 | 5 | 5 | 4 | 19 | Deepen: push alert for new leads nobody has answered |
+| Stale pipeline and revenue leak detection | 4 | 5 | 4 | 5 | 18 | Deepen: merge Deals into Pipeline as one ranked "chase first" view |
+| Automated white-label monthly client report | 5 | 4 | 5 | 3 | 17 | Partly: branded printable report exists; automatic emailing is blocked on an email service |
+| Dormant lead reactivation lists | 4 | 4 | 5 | 5 | 18 | Already covered by Call lists (win-back and quiet-contact lists, do-not-disturb excluded) |
+| Config drift against a baseline | 3 | 3 | 2 | 3 | 11 | Not built: the API only exposes pipelines and calendar counts, so drift would be a thin pipeline-name check |
+| Duplicate review | 4 | 3 | 3 | 4 | 14 | Built (Step 2) |
+
+**How each feature splits and how an agency can resell it**
+
+| Feature | Agency use | Business (sub-account) use | Resell angle |
+| --- | --- | --- | --- |
+| Today (daily brief) | One ranked list across all clients | The same list for the one account, shown whenever they open the app | Agency tells each client "we watch your account every day"; the client view is read-only and costs the client nothing extra |
+| Speed-to-lead alert | Which clients are losing leads to slow replies | Their own Slack ping when a new lead sits unanswered | Sell as a "lead response guarantee" add-on |
+| Pipeline: chase first | Revenue at risk per client | Their own ranked deals to chase | Include in the monthly report as "money we found" |
+| Call lists | Not primary | Daily calling queue with do-not-disturb excluded | Pro-tier feature for the business |
+| Duplicates | Clean-up service per client | Their own review queue | One-off clean-up fee |
+| Printable client report | White-label per client | Their own summary | Monthly retainer deliverable |
+
+Billing was not changed; plans are described in `docs/PERMISSIONS_AND_PRICING.md`.
