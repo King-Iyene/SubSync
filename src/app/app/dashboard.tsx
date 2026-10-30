@@ -8,6 +8,7 @@ import { AccountDetailView } from "./views/account-detail";
 import { AccountsView } from "./views/accounts";
 import { AlertsView } from "./views/alerts";
 import { CallsView } from "./views/calls";
+import { ClientsView } from "./views/clients";
 import { DealsView } from "./views/deals";
 import { DuplicatesView } from "./views/duplicates";
 import { EmailHealthView } from "./views/email-health";
@@ -176,6 +177,7 @@ export function Dashboard() {
       case "pipeline": return <PipelineView />;
       case "leads": return <LeadsView />;
       case "calls": return <CallsView />;
+      case "clients": return <ClientsView />;
     }
   })();
 

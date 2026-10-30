@@ -21,6 +21,10 @@ import {
 } from "../analytics/pipeline-intel";
 import { OUTCOME_LABEL, PRESETS, parseFilters, parseOutcome } from "../analytics/call-intel";
 import { callQueue, createCallList, deleteCallList, listCallLists, logOutcome, MAX_LISTS, outcomeSummary, speedToLead } from "../analytics/call-queries";
+import {
+  activitySummary, anomalyIndices, compareAccounts, contactGap, goalProgress, periodChange, renewalStatus, roi, segmentStats, zAnomaly,
+} from "../analytics/client-intel";
+import { accountHistory, clientExtras, periodFigures, saveProfile, type ClientExtra, type ProfilePatch } from "../analytics/client-queries";
 import { badDataSamples, contactOverview, topLeads, vips } from "../analytics/contact-queries";
 import { getGoals, GOAL_METRICS, loadDeals, pipelineTrend, setGoal, type GoalMetric } from "../analytics/pipeline-queries";
 import { authenticate, isResponse, json, type AuthContext } from "./auth";
@@ -557,6 +561,146 @@ async function callOutcomesView(ctx: Ctx) {
   return json(await outcomeSummary(ctx.installationId, since));
 }
 
+const GOAL_LABEL: Record<string, string> = { monthly_revenue: "Revenue won this month", monthly_leads: "New contacts this month", monthly_deals_won: "Deals won this month" };
+
+function clientRow(a: DerivedAccount, e: ClientExtra | undefined, avgCycle: number | null, links: ReturnType<typeof deepLinks>, now: number) {
+  const fee = e?.monthlyFee ?? null;
+  const installed = e?.installedAt ?? null;
+  const daysIn = installed === null ? null : Math.floor((now - installed) / 86_400_000);
+  const hasWon = (e?.firstWonAt ?? null) !== null;
+  return {
+    locationId: a.locationId, name: a.name, url: links.account(a.locationId), score: a.score, band: a.band, churn: a.churn.level, dormant: a.dormant,
+    new30d: a.new30d, openValue: a.openValue, unanswered: a.unanswered, completenessPct: a.completenessPct, winRate: a.winRate, avgCycleDays: avgCycle,
+    profile: { monthlyFee: fee, renewalDate: e?.renewalDate ?? null, industry: e?.industry ?? null, notes: e?.notes ?? null, lastContactedAt: e?.lastContactedAt ? new Date(e.lastContactedAt).toISOString() : null },
+    roi: roi({ monthlyFee: fee, pipelineCreated30d: e?.pipelineCreated30d ?? 0, wonValue30d: e?.wonValue30d ?? 0 }),
+    renewal: renewalStatus(e?.renewalDate ?? null, now),
+    contactGap: contactGap(e?.lastContactedAt ?? null, now),
+    progress: {
+      daysSinceInstall: daysIn, firstLeadAt: e?.firstLeadAt ? new Date(e.firstLeadAt).toISOString() : null, firstWonAt: e?.firstWonAt ? new Date(e.firstWonAt).toISOString() : null,
+      // 6.7: a client well past setup with no won deal needs a conversation.
+      needsIntervention: daysIn !== null && daysIn >= 30 && !hasWon,
+    },
+    activity: activitySummary({ name: a.name ?? "this account", newContacts: e?.newContacts30d ?? a.new30d, dealsWon: e?.wonCount30d ?? 0, wonValue: e?.wonValue30d ?? 0, pipelineCreated: e?.pipelineCreated30d ?? 0, days: 30 }),
+  };
+}
+
+async function clientsView(ctx: Ctx) {
+  const now = Date.now();
+  const allowed = await allowedIds(ctx);
+  const [{ accounts, links }, extras, deals] = await Promise.all([accountsFor(ctx), clientExtras(ctx.installationId, allowed), loadDeals(ctx.installationId, allowed)]);
+  const cycles = new Map(accountSummaries(deals, now).map((s) => [s.locationId, s.avgCycleDays]));
+  const rows = accounts.filter((a) => !a.ignored).map((a) => clientRow(a, extras.get(a.locationId), cycles.get(a.locationId) ?? null, links, now));
+  const withFee = rows.filter((x) => x.profile.monthlyFee !== null);
+  const atRisk = (x: (typeof rows)[number]) => x.band === "at_risk" || x.churn === "high" || x.dormant;
+  return json({
+    clients: rows.sort((a, b) => a.score - b.score),
+    revenue: {
+      monthly: withFee.reduce((s, x) => s + (x.profile.monthlyFee ?? 0), 0),
+      atRisk: withFee.filter(atRisk).reduce((s, x) => s + (x.profile.monthlyFee ?? 0), 0),
+      clientsWithFee: withFee.length,
+    },
+    renewals: rows.filter((x) => x.renewal && x.renewal.bucket !== "later").sort((a, b) => (a.renewal?.daysLeft ?? 0) - (b.renewal?.daysLeft ?? 0))
+      .map((x) => ({ locationId: x.locationId, name: x.name, daysLeft: x.renewal?.daysLeft ?? 0, bucket: x.renewal?.bucket ?? "later", fee: x.profile.monthlyFee })),
+    segments: segmentStats(rows.map((x) => ({ industry: x.profile.industry, score: x.score, winRate: x.winRate, openValue: x.openValue }))),
+    compare: rows.map((x) => ({ locationId: x.locationId, name: x.name ?? "Unnamed account", new30d: x.new30d, winRate: x.winRate, avgCycleDays: x.avgCycleDays, unanswered: x.unanswered, completenessPct: x.completenessPct, score: x.score, openValue: x.openValue })),
+  });
+}
+
+async function clientsCompare(ctx: Ctx) {
+  const a = ctx.url.searchParams.get("a") ?? "";
+  const b = ctx.url.searchParams.get("b") ?? "";
+  if (!LOCATION_ID.test(a) || !LOCATION_ID.test(b) || a === b) return json({ error: "Pick two different accounts" }, 400);
+  const now = Date.now();
+  const allowed = await allowedIds(ctx);
+  const [{ accounts }, deals] = await Promise.all([accountsFor(ctx), loadDeals(ctx.installationId, allowed)]);
+  const cycles = new Map(accountSummaries(deals, now).map((s) => [s.locationId, s.avgCycleDays]));
+  const facts = (id: string) => {
+    const x = accounts.find((acc) => acc.locationId === id && !acc.ignored);
+    return x ? { name: x.name ?? "Unnamed account", new30d: x.new30d, winRate: x.winRate, avgCycleDays: cycles.get(id) ?? null, unanswered: x.unanswered, completenessPct: x.completenessPct, score: x.score, openValue: x.openValue } : null;
+  };
+  const fa = facts(a);
+  const fb = facts(b);
+  if (!fa || !fb) return json({ error: "Account not found" }, 404);
+  return json({ a: fa, b: fb, notes: compareAccounts(fa, fb) });
+}
+
+async function clientUpdate(ctx: Ctx, locationId: string) {
+  const body = (await ctx.request.json().catch(() => null)) as Record<string, unknown> | null;
+  if (!body) return json({ error: "Send a JSON body" }, 400);
+  const patch: ProfilePatch = {};
+  const blank = (v: unknown) => v === null || v === undefined || v === "";
+  if ("monthlyFee" in body) {
+    if (blank(body.monthlyFee)) patch.monthlyFee = null;
+    else {
+      const n = Number(body.monthlyFee);
+      if (!Number.isFinite(n) || n < 0 || n > 10_000_000) return json({ error: "Enter a monthly fee between 0 and 10,000,000" }, 400);
+      patch.monthlyFee = n;
+    }
+  }
+  if ("renewalDate" in body) {
+    if (blank(body.renewalDate)) patch.renewalDate = null;
+    else if (typeof body.renewalDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(body.renewalDate) || Number.isNaN(Date.parse(body.renewalDate + "T00:00:00Z"))) return json({ error: "Use a date like 2027-03-31" }, 400);
+    else patch.renewalDate = body.renewalDate;
+  }
+  if ("industry" in body) {
+    if (blank(body.industry)) patch.industry = null;
+    else if (typeof body.industry !== "string" || body.industry.length > 60) return json({ error: "Industry is too long (60 characters)" }, 400);
+    else patch.industry = body.industry.trim();
+  }
+  if ("notes" in body) {
+    if (blank(body.notes)) patch.notes = null;
+    else if (typeof body.notes !== "string" || body.notes.length > 2000) return json({ error: "Notes are too long (2000 characters)" }, 400);
+    else patch.notes = body.notes;
+  }
+  if (body.markContacted === true) patch.markContacted = true;
+  if (Object.keys(patch).length === 0) return json({ error: "Nothing to save" }, 400);
+  const ok = await saveProfile(ctx.installationId, await allowedIds(ctx), locationId, patch);
+  return ok ? json({ ok: true }) : json({ error: "Account not found" }, 404);
+}
+
+async function qbrView(ctx: Ctx, locationId: string) {
+  const now = Date.now();
+  const allowed = await allowedIds(ctx);
+  const [{ accounts, links }, extras, deals, history] = await Promise.all([
+    accountsFor(ctx), clientExtras(ctx.installationId, allowed), loadDeals(ctx.installationId, allowed, locationId), accountHistory(ctx.installationId, locationId),
+  ]);
+  const a = accounts.find((x) => x.locationId === locationId && !x.ignored);
+  if (!a) return json({ error: "Account not found" }, 404);
+  const avgCycle = accountSummaries(deals, now)[0]?.avgCycleDays ?? null;
+  const open = (await listAlerts(ctx.installationId, false, 500)).filter((al) => al.locationId === locationId);
+  return json({ client: clientRow(a, extras.get(locationId), avgCycle, links, now), history, openAlerts: open.length, generatedAt: new Date(now).toISOString() });
+}
+
+async function execSummary(ctx: Ctx) {
+  const now = Date.now();
+  const allowed = await allowedIds(ctx);
+  const [f, goals] = await Promise.all([periodFigures(ctx.installationId, allowed), getGoals(ctx.installationId)]);
+  const pct = (cur: number, prev: number | null) => (prev === null ? null : periodChange(cur, prev).pct);
+  const kpis = [
+    { key: "contacts", label: "New contacts, 30 days", current: f.contacts.cur, previous: f.contacts.prev, pct: pct(f.contacts.cur, f.contacts.prev), money: false },
+    { key: "won", label: "Deals won, 30 days", current: f.won.curCount, previous: f.won.prevCount, pct: pct(f.won.curCount, f.won.prevCount), money: false },
+    { key: "revenue", label: "Revenue won, 30 days", current: f.won.curValue, previous: f.won.prevValue, pct: pct(f.won.curValue, f.won.prevValue), money: true },
+    { key: "pipeline", label: "Open pipeline", current: f.pipeline.now, previous: f.pipeline.then, pct: pct(f.pipeline.now, f.pipeline.then), money: true },
+    { key: "score", label: "Average engagement score", current: f.score.now, previous: f.score.then, pct: pct(f.score.now, f.score.then), money: false },
+  ];
+  const actual = { monthly_revenue: f.month.revenue, monthly_leads: f.month.leads, monthly_deals_won: f.month.deals } as Record<string, number>;
+  const goalRows = GOAL_METRICS.filter((m) => goals[m]).map((m) => ({ metric: m, label: GOAL_LABEL[m], ...goalProgress(goals[m] as number, actual[m], now) }));
+  const money = (n: number) => "$" + Math.round(n).toLocaleString("en-US");
+  const series = [
+    { key: "newContacts", label: "New contacts (30 day total)", values: f.series.map((s) => s.newContacts), fmt: (n: number) => String(Math.round(n)) },
+    { key: "openValue", label: "Open pipeline", values: f.series.map((s) => s.openValue), fmt: money },
+    { key: "score", label: "Average engagement score", values: f.series.map((s) => s.score), fmt: (n: number) => String(Math.round(n)) },
+  ];
+  const anomalies = series.flatMap((s) => {
+    const z = zAnomaly(s.values);
+    return z ? [{ key: s.key, label: s.label, direction: z.direction, latest: s.fmt(z.latest), average: s.fmt(z.mean), message: s.label + " today (" + s.fmt(z.latest) + ") is unusually " + z.direction + " its 90 day average (" + s.fmt(z.mean) + ")." }] : [];
+  });
+  return json({
+    kpis, goals: goalRows, anomalies, targets: goals,
+    trend: { days: f.series.map((s) => s.day), openValue: f.series.map((s) => s.openValue), openValueAnomalies: anomalyIndices(f.series.map((s) => s.openValue)) },
+  });
+}
+
 async function goalsView(ctx: Ctx) {
   return json({ goals: await getGoals(ctx.installationId) });
 }
@@ -604,7 +748,7 @@ async function digestPreview(ctx: Ctx) {
 
 const FEATURE_FOR: Record<string, Feature> = {
   search: "search", onboarding: "onboarding", stale: "stale", inbox: "inbox", pipelines: "pipelines", duplicates: "duplicates", email: "email",
-  alerts: "alerts", settings: "settings", export: "exports", digest: "reports", "api-keys": "ai", hygiene: "stale", "pipeline-intel": "pipelines", "contact-intel": "activity", "call-queue": "calls", "call-lists": "calls", "call-outcomes": "calls",
+  alerts: "alerts", settings: "settings", export: "exports", digest: "reports", "api-keys": "ai", hygiene: "stale", "pipeline-intel": "pipelines", "contact-intel": "activity", clients: "reports", qbr: "reports", "call-queue": "calls", "call-lists": "calls", "call-outcomes": "calls",
 };
 
 export async function handle(request: Request, segments: string[]): Promise<Response> {
@@ -642,6 +786,10 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       if (a === "call-lists") return await callListsView(ctx);
       if (a === "call-outcomes") return await callOutcomesView(ctx);
       if (a === "goals") return await goalsView(ctx);
+      if (a === "exec-summary") return await execSummary(ctx);
+      if (a === "clients" && !b) return await clientsView(ctx);
+      if (a === "clients" && b === "compare") return await clientsCompare(ctx);
+      if (a === "qbr" && b && LOCATION_ID.test(b)) return await qbrView(ctx, b);
       if (a === "digest") return await digestPreview(ctx);
     }
     if (method === "POST") {
@@ -665,6 +813,7 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
     if (method === "PUT") {
       if (a === "settings") return await settingsUpdate(ctx);
       if (a === "goals") return await goalsUpdate(ctx);
+      if (a === "clients" && b && LOCATION_ID.test(b)) return await clientUpdate(ctx, b);
       if (a === "accounts" && b && LOCATION_ID.test(b) && c === "flags") return await flags(ctx, b);
       if (a === "accounts" && b && LOCATION_ID.test(b) && c === "tasks") return await taskUpdate(ctx, b);
     }

@@ -1,11 +1,12 @@
 export type ViewId =
-  | "overview" | "accounts" | "account" | "search" | "deals" | "inbox" | "onboarding" | "email" | "duplicates" | "alerts" | "settings" | "help" | "pipeline" | "leads" | "calls";
+  | "overview" | "accounts" | "account" | "search" | "deals" | "inbox" | "onboarding" | "email" | "duplicates" | "alerts" | "settings" | "help" | "pipeline" | "leads" | "calls" | "clients";
 
 export type GoFn = (view: ViewId, locationId?: string) => void;
 
 export const NAV: Array<{ id: Exclude<ViewId, "account">; label: string; feature: string }> = [
   { id: "overview", label: "Overview", feature: "overview" },
   { id: "accounts", label: "Accounts", feature: "health" },
+  { id: "clients", label: "Clients", feature: "reports" },
   { id: "search", label: "Contact search", feature: "search" },
   { id: "deals", label: "Deals", feature: "stale" },
   { id: "pipeline", label: "Pipeline", feature: "pipelines" },

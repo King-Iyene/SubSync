@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useApiClient, useData } from "../session";
+import { anomalyIndices } from "../../../lib/analytics/client-intel";
 import {
   Badge, Btn, Card, Empty, ErrorBox, ExtLink, fmtInt, fmtMoney, inputClass, Loading, PageHeader, Sparkline, Stat, Table, Td, Th,
 } from "../ui";
@@ -145,10 +146,10 @@ export function PipelineView() {
       </div>
 
       <Card title="Open pipeline over time">
-        <Sparkline values={data.trend.map((t) => t.openValue)} label="Open pipeline value" />
+        <Sparkline values={data.trend.map((t) => t.openValue)} label="Open pipeline value" marks={anomalyIndices(data.trend.map((t) => t.openValue))} />
         {data.trend.length >= 2 && (
           <p className="mt-1 text-xs text-muted-foreground">
-            {fmtMoney(data.trend[0].openValue)} to {fmtMoney(data.trend[data.trend.length - 1].openValue)} over {data.trend.length} days
+            {fmtMoney(data.trend[0].openValue)} to {fmtMoney(data.trend[data.trend.length - 1].openValue)} over {data.trend.length} days. Red dots mark days that were unusual for this pipeline.
           </p>
         )}
       </Card>

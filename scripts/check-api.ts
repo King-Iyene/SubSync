@@ -262,6 +262,52 @@ async function main() {
   assert.equal((await call("/api/app/call-lists/not-a-uuid", { method: "DELETE", token })).status, 404);
   console.log("call queue + lists + outcomes: ok");
 
+  // --- clients, QBR, executive summary
+  const es = await call("/api/app/exec-summary", { token });
+  assert.equal(es.status, 200);
+  assert.equal(es.body.kpis.length, 5);
+  assert.ok(es.body.kpis[0].current >= 0);
+  assert.equal((await call("/api/app/goals", { method: "PUT", token, body: JSON.stringify({ metric: "monthly_leads", target: 100 }) })).status, 200);
+  const es2 = await call("/api/app/exec-summary", { token });
+  assert.equal(es2.body.goals.length, 1);
+  assert.ok(["achieved", "on_track", "at_risk", "behind"].includes(es2.body.goals[0].status));
+  assert.equal((await call("/api/app/goals", { method: "PUT", token, body: JSON.stringify({ metric: "monthly_leads", target: null }) })).status, 200);
+
+  const cl = await call("/api/app/clients", { token });
+  assert.equal(cl.status, 200);
+  assert.ok(cl.body.clients.length >= 13);
+  const target = cl.body.clients[0];
+  const upd = (body: unknown) => call(`/api/app/clients/${target.locationId}`, { method: "PUT", token, body: JSON.stringify(body) });
+  assert.equal((await upd({})).status, 400);
+  assert.equal((await upd({ monthlyFee: -5 })).status, 400);
+  assert.equal((await upd({ renewalDate: "31/03/2027" })).status, 400);
+  assert.equal((await upd({ industry: "x".repeat(61) })).status, 400);
+  assert.equal((await upd({ notes: "x".repeat(2001) })).status, 400);
+  assert.equal((await call("/api/app/clients/nope-not-here", { method: "PUT", token, body: JSON.stringify({ industry: "Dental" }) })).status, 404);
+  const soon = new Date(Date.now() + 20 * 86400000).toISOString().slice(0, 10);
+  assert.equal((await upd({ monthlyFee: 2500, renewalDate: soon, industry: "Roofing", notes: "Prefers no calls after 6pm", markContacted: true })).status, 200);
+  const cl2 = await call("/api/app/clients", { token });
+  const mine = cl2.body.clients.find((x: { locationId: string }) => x.locationId === target.locationId);
+  assert.equal(mine.profile.monthlyFee, 2500);
+  assert.equal(mine.renewal.bucket, "30");
+  assert.equal(mine.contactGap.flagged, false);
+  assert.ok(mine.roi && mine.roi.pipelineMultiple >= 0);
+  assert.ok(cl2.body.revenue.monthly >= 2500);
+  assert.ok(cl2.body.renewals.some((r: { locationId: string }) => r.locationId === target.locationId));
+  assert.ok(cl2.body.segments.some((s: { industry: string }) => s.industry === "Roofing"));
+  const other = cl.body.clients[1];
+  const cmp = await call(`/api/app/clients/compare?a=${target.locationId}&b=${other.locationId}`, { token });
+  assert.equal(cmp.status, 200);
+  assert.ok(cmp.body.notes.length >= 1);
+  assert.equal((await call(`/api/app/clients/compare?a=${target.locationId}&b=${target.locationId}`, { token })).status, 400);
+  const qbr = await call(`/api/app/qbr/${target.locationId}`, { token });
+  assert.equal(qbr.status, 200);
+  assert.ok(qbr.body.history.length > 10 && qbr.body.client.activity.startsWith("In the last 30 days"));
+  assert.equal((await call("/api/app/qbr/nope-not-here", { token })).status, 404);
+  // put the demo account back the way it was
+  assert.equal((await upd({ monthlyFee: null, renewalDate: null, industry: null, notes: null })).status, 200);
+  console.log("clients + QBR + executive summary: ok");
+
   // Leave the demo data as we found it.
   await sql()`delete from domain_checks where domain in ('example-demo.com', 'other-demo.org')`;
   await closeDb();

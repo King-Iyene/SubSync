@@ -153,7 +153,7 @@ export function ScoreBar({ score }: { score: number }) {
   );
 }
 
-export function Sparkline({ values, width = 240, height = 56, label }: { values: number[]; width?: number; height?: number; label: string }) {
+export function Sparkline({ values, width = 240, height = 56, label, marks = [] }: { values: number[]; width?: number; height?: number; label: string; marks?: number[] }) {
   if (values.length < 2) return <p className="text-xs text-muted-foreground">Not enough history yet</p>;
   const min = Math.min(...values);
   const max = Math.max(...values);
@@ -164,6 +164,9 @@ export function Sparkline({ values, width = 240, height = 56, label }: { values:
   return (
     <svg viewBox={`0 0 ${width} ${height}`} className="h-14 w-full max-w-xs" role="img" aria-label={`${label}: from ${Math.round(first)} to ${Math.round(last)}`}>
       <polyline points={pts} fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" className={last >= first ? "text-emerald-500" : "text-red-500"} />
+      {marks.filter((i) => i >= 0 && i < values.length).map((i) => (
+        <circle key={i} cx={(i / (values.length - 1)) * width} cy={height - 4 - ((values[i] - min) / span) * (height - 8)} r="3.5" className="fill-red-500 stroke-background" strokeWidth="1.5"><title>Unusual point</title></circle>
+      ))}
     </svg>
   );
 }

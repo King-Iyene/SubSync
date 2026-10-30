@@ -7,6 +7,7 @@ import {
   Badge, BandBadge, Btn, Card, ChurnBadge, Empty, ErrorBox, ExtLink, fmtInt, fmtMoney, Loading, PageHeader, Stat, StackedBar, timeAgo,
 } from "../ui";
 import type { GoFn } from "../nav";
+import { ExecSummary } from "./exec-summary";
 
 export function OverviewView({ go }: { go: GoFn }) {
   const api = useApiClient();
@@ -61,6 +62,8 @@ export function OverviewView({ go }: { go: GoFn }) {
           Your free plan covers {data.entitlements.accountLimit} client accounts. {data.hiddenAccounts} more are hidden until you upgrade.
         </p>
       )}
+
+      <ExecSummary />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
         <Stat label="Client accounts" value={fmtInt(k.accounts)} sub={k.ignored ? `${k.ignored} ignored` : undefined} />
