@@ -70,4 +70,5 @@ export type AccountDetail = {
   alerts: AlertItem[];
   settings: { staleDays: number; dormantDays: number; slaHours: number };
   clientView?: boolean;
+  brand?: { name: string | null; color: string | null };
 };

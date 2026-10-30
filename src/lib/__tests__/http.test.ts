@@ -80,3 +80,17 @@ test("reads the rate limit headers", () => {
     burstIntervalMs: null,
   });
 });
+
+test("slows down before a refusal when the burst allowance is nearly used", async () => {
+  const slept: number[] = [];
+  const { fetchImpl } = scripted([res(200, { "X-RateLimit-Remaining": "3", "X-RateLimit-Interval-Milliseconds": "10000" })]);
+  await ghlFetch("https://x", {}, { fetchImpl, sleep: async (ms) => { slept.push(ms); } });
+  assert.deepEqual(slept, [10000]);
+});
+
+test("does not slow down while there is plenty of allowance", async () => {
+  const slept: number[] = [];
+  const { fetchImpl } = scripted([res(200, { "X-RateLimit-Remaining": "80", "X-RateLimit-Interval-Milliseconds": "10000" })]);
+  await ghlFetch("https://x", {}, { fetchImpl, sleep: async (ms) => { slept.push(ms); } });
+  assert.deepEqual(slept, []);
+});

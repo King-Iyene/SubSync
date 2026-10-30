@@ -23,7 +23,7 @@ type Clients = {
   segments: Array<{ industry: string; accounts: number; avgScore: number; avgWinRate: number | null; openValue: number }>;
   compare: Array<{ locationId: string; name: string }>;
 };
-type Qbr = { client: Client; history: Array<{ day: string; contacts: number; newContacts30d: number; openValue: number; score: number }>; openAlerts: number; generatedAt: string };
+type Qbr = { client: Client; history: Array<{ day: string; contacts: number; newContacts30d: number; openValue: number; score: number }>; openAlerts: number; generatedAt: string; brand?: { name: string | null; color: string | null } };
 type Compare = { a: Record<string, number | string | null>; b: Record<string, number | string | null>; notes: string[] };
 
 const pct = (n: number | null) => (n === null ? "n/a" : `${Math.round(n * 100)}%`);
@@ -176,7 +176,8 @@ function QbrTab({ accounts }: { accounts: Array<{ locationId: string; name: stri
       {!id && <Empty title="Choose a client" body="You get a one-page review for a client meeting: what we delivered, the value created, and how their health has moved." />}
       {c && data && (
         <article className="space-y-5 rounded-xl border bg-card p-6 print:border-0 print:p-0">
-          <header>
+          <header className="border-b-4 pb-3" style={{ borderColor: data.brand?.color ?? "#111827" }}>
+            {data.brand?.name && <p className="mb-2 text-lg font-semibold" style={{ color: data.brand.color ?? undefined }}>{data.brand.name}</p>}
             <p className="text-xs uppercase tracking-wide text-muted-foreground">Quarterly business review</p>
             <h2 className="text-2xl font-semibold tracking-tight">{c.name ?? "Client"}</h2>
             <p className="text-sm text-muted-foreground">Prepared {new Date(data.generatedAt).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</p>

@@ -24,6 +24,7 @@ import { PipelineView } from "./views/pipeline";
 import { DealMoves, TeamView } from "./views/people";
 import { SearchView } from "./views/search";
 import { SettingsView } from "./views/settings";
+import { SetupCompareView } from "./views/setup-compare";
 import { TodayView } from "./views/today";
 
 type Auth =
@@ -186,7 +187,7 @@ export function Dashboard() {
   const own = auth.locationId;
 
   const pipeTabs = [{ label: "Forecast and stages", node: <><PipelineView /><DealMoves /></> }, { label: "Stale deals and hygiene", node: <DealsView /> }];
-  const setupTabs = [{ label: "Setup checklists", node: <OnboardingView go={go} /> }, { label: "Email sender health", node: <EmailHealthView /> }];
+  const setupTabs = [{ label: "Setup checklists", node: <OnboardingView go={go} /> }, { label: "Email sender health", node: <EmailHealthView /> }, ...(limited ? [] : [{ label: "Compare setups", node: <SetupCompareView /> }])];
 
   const content = (() => {
     // A business or a client sees its own account as the home page, never an accounts list.
@@ -223,13 +224,16 @@ export function Dashboard() {
       <div className="flex min-h-screen bg-background text-foreground">
         <aside className="hidden w-60 shrink-0 flex-col border-r p-4 md:flex print:hidden">
           <p className="px-2 text-lg font-semibold tracking-tight">SubSync</p>
-          <nav className="mt-6 flex flex-col gap-0.5" aria-label="Sections">
-            {menu.map((n) => (
-              <button key={n.id} type="button" onClick={() => go(n.id)} aria-current={n.id === active ? "page" : undefined}
-                className={`flex items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors ${n.id === active ? "bg-muted font-medium" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"}`}>
-                {labelFor(n)}
-                {locked(n.feature) && <Badge tone="info">Paid</Badge>}
-              </button>
+          <nav className="mt-4 flex flex-col gap-0.5" aria-label="Sections">
+            {menu.map((n, i) => (
+              <div key={n.id}>
+                {n.group !== (menu[i - 1]?.group ?? null) && (n.group ? <p className="px-3 pb-1 pt-4 text-[11px] font-medium uppercase tracking-wider text-muted-foreground/70">{n.group}</p> : <div className="my-2 border-t" />)}
+                <button type="button" onClick={() => go(n.id)} aria-current={n.id === active ? "page" : undefined}
+                  className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors ${n.id === active ? "bg-muted font-medium" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"}`}>
+                  {labelFor(n)}
+                  {locked(n.feature) && <Badge tone="info">Paid</Badge>}
+                </button>
+              </div>
             ))}
           </nav>
           <p className="mt-auto px-2 pt-6 text-xs text-muted-foreground">{auth.userName ? `Signed in as ${auth.userName}` : "Signed in"}</p>

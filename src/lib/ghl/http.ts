@@ -50,6 +50,11 @@ export async function ghlFetch(
 
   for (let attempt = 0; ; attempt++) {
     const response = await fetchImpl(url, init);
+    // Close to the burst limit: pause for the rest of the window instead of waiting to be refused.
+    const limit = readRateLimit(response.headers);
+    if (limit.burstRemaining !== null && limit.burstRemaining <= 5 && limit.burstIntervalMs !== null) {
+      await sleep(Math.min(maxDelayMs, limit.burstIntervalMs));
+    }
     const retryable = response.status === 429 || response.status >= 500;
     if (!retryable || attempt >= maxRetries) return response;
 

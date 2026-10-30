@@ -48,8 +48,9 @@ export function AccountDetailView({ locationId, go, agency, limited = false }: {
       )}
 
       {/* Printed reports start with a clear header. */}
-      <div className="mb-6 hidden print:block">
-        <p className="text-sm text-muted-foreground">{agency} · Client performance report · {today}</p>
+      <div className="mb-6 hidden border-b-4 pb-3 print:block" style={{ borderColor: data.brand?.color ?? "#111827" }}>
+        <p className="text-lg font-semibold" style={{ color: data.brand?.color ?? undefined }}>{data.brand?.name ?? agency}</p>
+        <p className="text-sm text-muted-foreground">Client performance report · {today}</p>
       </div>
 
       <PageHeader

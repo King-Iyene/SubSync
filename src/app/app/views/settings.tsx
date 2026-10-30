@@ -6,7 +6,7 @@ import type { SyncStatus } from "../types";
 import { Btn, Card, ErrorBox, inputClass, Loading, PageHeader, timeAgo } from "../ui";
 import { HealthCard } from "./health-card";
 
-type S = { staleDays: number; dormantDays: number; slaHours: number; appDomain: string; digestEnabled: boolean; customChecklist: string[]; digestHour: number | null; digestTimezone: string | null };
+type S = { staleDays: number; dormantDays: number; slaHours: number; appDomain: string; digestEnabled: boolean; customChecklist: string[]; digestHour: number | null; digestTimezone: string | null; brandName: string | null; brandColor: string | null };
 
 export function SettingsView() {
   const api = useApiClient();
@@ -44,7 +44,7 @@ export function SettingsView() {
     try {
       const body: Record<string, unknown> = {
         staleDays: form.staleDays, dormantDays: form.dormantDays, slaHours: form.slaHours, appDomain: form.appDomain,
-        digestEnabled: form.digestEnabled, digestHour: form.digestHour, digestTimezone: form.digestTimezone,
+        digestEnabled: form.digestEnabled, digestHour: form.digestHour, digestTimezone: form.digestTimezone, brandName: form.brandName, brandColor: form.brandColor,
         customChecklist: checklist.split("\n").map((l) => l.trim()).filter(Boolean),
       };
       if (slack.trim()) body.slackWebhookUrl = slack.trim();
@@ -117,6 +117,23 @@ export function SettingsView() {
             </div>
           </Card>
         )}
+
+        <Card title="Your name on reports">
+          <p className="mb-3 text-sm text-muted-foreground">Shown at the top of printed client reports and quarterly reviews, so what you hand to a client carries your name, not ours.</p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label htmlFor="brand-name" className="mb-1 block text-sm font-medium">Business name</label>
+              <input id="brand-name" className={inputClass} maxLength={60} placeholder="Acme Marketing" value={form.brandName ?? ""} onChange={(e) => setForm({ ...form, brandName: e.target.value || null })} />
+            </div>
+            <div>
+              <label htmlFor="brand-color" className="mb-1 block text-sm font-medium">Colour</label>
+              <div className="flex items-center gap-2">
+                <input id="brand-color" type="color" className="h-9 w-14 cursor-pointer rounded-lg border bg-background p-1" value={form.brandColor ?? "#1d4ed8"} onChange={(e) => setForm({ ...form, brandColor: e.target.value })} />
+                {form.brandColor && <Btn variant="ghost" onClick={() => setForm({ ...form, brandColor: null })}>Clear</Btn>}
+              </div>
+            </div>
+          </div>
+        </Card>
 
         <Card title="Slack">
           <p className="mb-3 text-sm text-muted-foreground">

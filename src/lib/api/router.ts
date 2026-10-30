@@ -29,6 +29,7 @@ import { dailyPriorities, replyAging, setupScore, worstDomainStatus, type SetupF
 import { afterHours, communicationGaps } from "../analytics/comms-queries";
 import { badDataSamples, contactOverview, topLeads, vips } from "../analytics/contact-queries";
 import { appointmentView } from "../analytics/appointment-queries";
+import { compareSetup, describe as describeDiff } from "../analytics/setup-intel";
 import { buildDailyDigest, NOT_WATCHED } from "../analytics/digest-service";
 import { digestText, localParts } from "../analytics/digest-intel";
 import { buildQueue, recordBulk, recordDecision, summarise, undoDecision } from "../analytics/dedupe-queries";
@@ -149,6 +150,29 @@ async function appointmentsView(ctx: Ctx) {
   });
 }
 
+// Agency only (the route is not in any limited view's allow-list): compare each account's pipelines and
+// stages with a baseline account.
+async function setupCompare(ctx: Ctx) {
+  const requested = ctx.url.searchParams.get("baseline");
+  if (requested && !LOCATION_ID.test(requested)) return json({ error: "Invalid account" }, 400);
+  const allowed = await allowedIds(ctx);
+  const [locs, pipes] = await Promise.all([
+    sql()`select location_id, name, calendar_count from locations where installation_id = ${ctx.installationId} and not ignored order by name`,
+    sql()`select location_id, name, stages from pipelines where installation_id = ${ctx.installationId}`,
+  ]);
+  const visible = locs.filter((l) => allowed === null || allowed.includes(l.location_id as string));
+  const setups = visible.map((l) => ({
+    locationId: l.location_id as string, name: (l.name as string | null) ?? "Unnamed account", calendars: l.calendar_count as number | null,
+    pipelines: pipes.filter((p) => p.location_id === l.location_id).map((p) => ({ name: (p.name as string | null) ?? "Pipeline", stages: ((p.stages as Array<{ name: string }> | null) ?? []).map((s) => s.name) })),
+  }));
+  const base = setups.find((s) => s.locationId === requested) ?? setups.find((s) => s.pipelines.length > 0) ?? null;
+  return json({
+    accounts: setups.map((s) => ({ locationId: s.locationId, name: s.name })),
+    baseline: base ? { locationId: base.locationId, name: base.name, pipelines: base.pipelines.length, calendars: base.calendars } : null,
+    rows: base ? setups.filter((s) => s.locationId !== base.locationId).map((s) => { const d = compareSetup(base, s); return { locationId: s.locationId, name: s.name, matches: d.matches, notes: describeDiff(d) }; }) : [],
+  });
+}
+
 async function dailyView(ctx: Ctx) {
   const sc = await scope(ctx);
   const d = await buildDailyDigest(ctx.installationId, { limitTo: ctx.limitTo, planLimit: accountLimit(ctx.plan, ctx.entitlements.enforced) });
@@ -254,6 +278,7 @@ async function accountDetail(ctx: Ctx, locationId: string) {
   const [flagRow] = ctx.kind === "agency" ? await sql()`select client_view from locations where installation_id = ${ctx.installationId} and location_id = ${locationId}` : [];
   return json({
     clientView: flagRow?.client_view === true,
+    brand: { name: settings.brandName, color: settings.brandColor },
     account: slim(a, links),
     breakdown: a.breakdown,
     trend,
@@ -444,7 +469,7 @@ const settingsView = async (ctx: Ctx) => {
 
 function publicSettings(s: Settings) {
   // Never send the webhook URL back to the browser: it is a secret.
-  return { staleDays: s.staleDays, dormantDays: s.dormantDays, slaHours: s.slaHours, appDomain: s.appDomain, digestEnabled: s.digestEnabled, customChecklist: s.customChecklist, digestHour: s.digestHour, digestTimezone: s.digestTimezone };
+  return { staleDays: s.staleDays, dormantDays: s.dormantDays, slaHours: s.slaHours, appDomain: s.appDomain, digestEnabled: s.digestEnabled, customChecklist: s.customChecklist, digestHour: s.digestHour, digestTimezone: s.digestTimezone, brandName: s.brandName, brandColor: s.brandColor };
 }
 
 async function settingsUpdate(ctx: Ctx) {
@@ -456,6 +481,16 @@ async function settingsUpdate(ctx: Ctx) {
   if ("dormantDays" in body) { const v = int(body.dormantDays, 7, 365); if (v === null) return json({ error: "Dormant days must be between 7 and 365" }, 400); patch.dormantDays = v; }
   if ("slaHours" in body) { const v = int(body.slaHours, 1, 168); if (v === null) return json({ error: "SLA hours must be between 1 and 168" }, 400); patch.slaHours = v; }
   if ("digestEnabled" in body) patch.digestEnabled = body.digestEnabled === true;
+  if ("brandName" in body) {
+    if (body.brandName === null || body.brandName === "") patch.brandName = null;
+    else if (typeof body.brandName === "string" && body.brandName.trim().length <= 60) patch.brandName = body.brandName.trim();
+    else return json({ error: "Your name can be up to 60 characters" }, 400);
+  }
+  if ("brandColor" in body) {
+    if (body.brandColor === null || body.brandColor === "") patch.brandColor = null;
+    else if (typeof body.brandColor === "string" && /^#[0-9a-fA-F]{6}$/.test(body.brandColor)) patch.brandColor = body.brandColor.toLowerCase();
+    else return json({ error: "Choose a colour like #1d4ed8" }, 400);
+  }
   if ("digestHour" in body) {
     if (body.digestHour === null) patch.digestHour = null;
     else { const v = int(body.digestHour, 0, 23); if (v === null) return json({ error: "Choose an hour between 0 and 23" }, 400); patch.digestHour = v; }
@@ -895,7 +930,8 @@ async function qbrView(ctx: Ctx, locationId: string) {
   if (!a) return json({ error: "Account not found" }, 404);
   const avgCycle = accountSummaries(deals, now)[0]?.avgCycleDays ?? null;
   const open = (await listAlerts(ctx.installationId, false, 500)).filter((al) => al.locationId === locationId);
-  return json({ client: clientRow(a, extras.get(locationId), avgCycle, links, now, domainOf(locationId)), history, openAlerts: open.length, generatedAt: new Date(now).toISOString() });
+  const { settings: brandSettings } = await accountsFor(ctx);
+  return json({ brand: { name: brandSettings.brandName, color: brandSettings.brandColor }, client: clientRow(a, extras.get(locationId), avgCycle, links, now, domainOf(locationId)), history, openAlerts: open.length, generatedAt: new Date(now).toISOString() });
 }
 
 async function execSummary(ctx: Ctx) {
@@ -1009,7 +1045,7 @@ async function digestPreview(ctx: Ctx) {
 
 const FEATURE_FOR: Record<string, Feature> = {
   search: "search", onboarding: "onboarding", stale: "stale", inbox: "inbox", pipelines: "pipelines", duplicates: "duplicates", email: "email",
-  alerts: "alerts", appointments: "appointments", daily: "overview", team: "team", "deal-events": "pipelines", contact: "search", settings: "settings", export: "exports", digest: "reports", "api-keys": "ai", hygiene: "stale", "pipeline-intel": "pipelines", "contact-intel": "activity", clients: "reports", qbr: "reports", "comms-intel": "inbox", "call-queue": "calls", "call-lists": "calls", "call-outcomes": "calls",
+  alerts: "alerts", appointments: "appointments", "setup-compare": "onboarding", daily: "overview", team: "team", "deal-events": "pipelines", contact: "search", settings: "settings", export: "exports", digest: "reports", "api-keys": "ai", hygiene: "stale", "pipeline-intel": "pipelines", "contact-intel": "activity", clients: "reports", qbr: "reports", "comms-intel": "inbox", "call-queue": "calls", "call-lists": "calls", "call-outcomes": "calls",
 };
 
 export async function handle(request: Request, segments: string[]): Promise<Response> {
@@ -1027,6 +1063,7 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       if (a === "overview") return await overview(ctx);
       if (a === "daily") return await dailyView(ctx);
       if (a === "appointments") return await appointmentsView(ctx);
+      if (a === "setup-compare") return await setupCompare(ctx);
       if (a === "start") return await startView(ctx);
       if (a === "accounts" && !b) return await accounts(ctx);
       if (a === "onboarding") return await onboardingOverview(ctx);

@@ -571,6 +571,29 @@ async function main() {
   assert.equal((await call("/api/app/daily", { token })).status, 200, "the brief still builds with appointment signals");
   console.log("appointments: rates, to-do lists, permission state, scoping, recovery list: ok");
 
+  // --- branded reports and setup comparison
+  const putBrand = (b: unknown) => call("/api/app/settings", { token, method: "PUT", body: JSON.stringify(b) });
+  assert.equal((await putBrand({ brandColor: "red" })).status, 400);
+  assert.equal((await putBrand({ brandColor: "#12345" })).status, 400);
+  assert.equal((await putBrand({ brandName: "x".repeat(61) })).status, 400);
+  const brandOk = await putBrand({ brandName: "Acme Marketing", brandColor: "#1D4ED8" });
+  assert.equal(brandOk.status, 200);
+  assert.equal(brandOk.body.settings.brandName, "Acme Marketing");
+  assert.equal(brandOk.body.settings.brandColor, "#1d4ed8", "colours are stored in lower case");
+  const qb = await call(`/api/app/qbr/${roofing.locationId}`, { token });
+  assert.deepEqual(qb.body.brand, { name: "Acme Marketing", color: "#1d4ed8" });
+  assert.deepEqual((await call(`/api/app/accounts/${roofing.locationId}`, { token })).body.brand, { name: "Acme Marketing", color: "#1d4ed8" });
+  assert.equal((await putBrand({ brandName: null, brandColor: null })).body.settings.brandName, null);
+
+  const sc2 = await call("/api/app/setup-compare", { token });
+  assert.equal(sc2.status, 200);
+  assert.ok(sc2.body.baseline && sc2.body.accounts.length >= 13 && sc2.body.rows.length === sc2.body.accounts.length - 1);
+  assert.ok(sc2.body.rows.every((r: { matches: boolean; notes: string[] }) => r.matches || r.notes.length > 0), "a differing account always says what differs");
+  assert.equal((await call("/api/app/setup-compare?baseline=bad%20id!", { token })).status, 400);
+  assert.equal((await call("/api/app/setup-compare", { token: bt })).status, 403, "agency only");
+  assert.equal((await call("/api/app/setup-compare", { token: ct })).status, 403);
+  console.log("branding + setup comparison: ok");
+
   // Leave the demo data as we found it.
   await sql()`delete from domain_checks where domain in ('example-demo.com', 'other-demo.org')`;
   await closeDb();
