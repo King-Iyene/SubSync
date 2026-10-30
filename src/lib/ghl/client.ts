@@ -46,6 +46,16 @@ export class GhlError extends Error {
   }
 }
 
+// The redirect address is built from the one site address setting, so moving to a
+// custom domain means changing NEXT_PUBLIC_APP_URL only. GHL_REDIRECT_URI still wins if set.
+export function redirectUri(): string {
+  const explicit = process.env.GHL_REDIRECT_URI;
+  if (explicit) return explicit;
+  const base = process.env.NEXT_PUBLIC_APP_URL;
+  if (!base) throw new Error("Missing environment variable: NEXT_PUBLIC_APP_URL");
+  return base.replace(/\/+$/, "") + "/api/oauth/callback";
+}
+
 function required(name: string): string {
   const value = process.env[name];
   if (!value) throw new Error(`Missing environment variable ${name}`);
@@ -78,7 +88,7 @@ export function exchangeCode(code: string): Promise<TokenResponse> {
     grant_type: "authorization_code",
     code,
     user_type: "Company",
-    redirect_uri: required("GHL_REDIRECT_URI"),
+    redirect_uri: redirectUri(),
   });
 }
 
