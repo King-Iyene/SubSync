@@ -35,11 +35,13 @@ let code = 1;
 try {
   if (!(await waitUp())) throw new Error("Dev server did not start");
   // CHECKS=check-connections runs just one script while iterating; the default runs them all.
-  for (const name of (process.env.CHECKS ?? "check-api,check-connections").split(",")) {
+  for (const name of (process.env.CHECKS ?? "check-api,check-connections,check-insights").split(",").filter(Boolean)) {
     const run = spawnSync("node", ["--env-file=.env.local", "--import", "tsx", `scripts/${name}.ts`], { stdio: "inherit", shell: true });
     code = run.status ?? 1;
     if (code !== 0) break;
   }
+  // HOLD=1 keeps the demo server running for manual browsing (stop it with Ctrl+C or by ending the task).
+  if (process.env.HOLD) await new Promise(() => {});
   const dir = `${process.cwd()}/.tmp-shots`;
   if (shots.length) mkdirSync(dir, { recursive: true });
   // "view" or "view@business" / "view@client" to open the demo as a single business or a client.

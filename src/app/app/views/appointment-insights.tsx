@@ -1,7 +1,7 @@
 "use client";
 
 import { useData } from "../session";
-import { Badge, Card, Empty, ErrorBox, fmtInt, fmtMoney, Loading, Stat, Table, Td, Th } from "../ui";
+import { Badge, Card, Empty, ErrorBox, ExtLink, fmtInt, fmtMoney, Loading, Stat, Table, Td, Th } from "../ui";
 
 type Heat = { weekday: number; hour: number; booked: number; held: number; noShow: number; showRate: number | null };
 type Data = {
@@ -9,7 +9,7 @@ type Data = {
   funnel: { steps: Array<{ step: string; count: number; kept: number | null }>; biggestLeak: string | null };
   heat: { cells: Heat[]; best: { label: string; showRate: number | null } | null; worst: { label: string; showRate: number | null } | null; ratio: number | null };
   recovery: { noShows: number; rebooked: number; showedAgain: number; rebookRate: number | null; showAgainRate: number | null; avgDaysToRebook: number | null };
-  repeatNoShows: Array<{ contactId: string; locationId: string; name: string; locationName: string | null; phone: string | null; count: number; lastAt: number }>;
+  repeatNoShows: Array<{ contactId: string; locationId: string; name: string; locationName: string | null; phone: string | null; count: number; lastAt: number; url: string }>;
   velocity: { booked: number; medianDays: number | null; averageDays: number | null; bySource: Array<{ source: string; count: number; medianDays: number }> };
   bySource: Array<{ source: string; booked: number; held: number; noShow: number; showRate: number | null }>;
   confirmations: { next48: number; confirmed: number; unconfirmed: number; tomorrowAdvice: string | null };
@@ -18,8 +18,8 @@ type Data = {
   doubleBookings: Array<{ kind: string; at: number; locationName: string | null; who: string }>;
   value: { showed: number; revenue: number; perAppointment: number | null; upcoming: number };
   forecast: { low: number; high: number; expected: number; basedOnWeeks: number } | null;
-  followUp: { held: number; withoutFollowUp: number; gapRate: number | null; contacts: Array<{ contactId: string; name: string; locationName: string | null; at: number }> };
-  briefs: Array<{ contactId: string; name: string; locationName: string | null; at: number; brief: string }>;
+  followUp: { held: number; withoutFollowUp: number; gapRate: number | null; contacts: Array<{ contactId: string; name: string; locationName: string | null; at: number; url: string }> };
+  briefs: Array<{ contactId: string; name: string; locationName: string | null; at: number; brief: string; url: string }>;
   sampleSize: number;
 };
 
@@ -95,7 +95,7 @@ export function AppointmentInsights() {
         <p className="mt-2 text-xs text-muted-foreground">The number is how many were booked; colour is the show rate (red low, green high, grey when there are fewer than 5 recorded outcomes). Times are in each account&apos;s own time zone.</p>
       </Card>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 xl:grid-cols-2">
         <Card title="No-show recovery (last 90 days)">
           <div className="grid grid-cols-2 gap-3">
             <Stat label="Rebooked" value={pct(d.recovery.rebookRate)} sub={`${d.recovery.rebooked} of ${d.recovery.noShows} no-shows`} />
@@ -105,12 +105,12 @@ export function AppointmentInsights() {
         </Card>
         <Card title={`Repeat no-shows (${d.repeatNoShows.length})`}>
           {d.repeatNoShows.length === 0 ? <p className="text-sm text-muted-foreground">Nobody has missed two or more appointments.</p> : (
-            <ul className="divide-y text-sm">{d.repeatNoShows.map((r) => <li key={r.contactId + r.locationId} className="flex flex-wrap items-center justify-between gap-2 py-2"><span><span className="font-medium">{r.name}</span> <span className="text-muted-foreground">· {r.count} no-shows{r.locationName ? ` · ${r.locationName}` : ""}</span></span>{r.phone && <a className="text-xs underline" href={`tel:${r.phone}`}>Call {r.phone}</a>}</li>)}</ul>
+            <ul className="divide-y text-sm">{d.repeatNoShows.map((r) => <li key={r.contactId + r.locationId} className="flex flex-wrap items-center justify-between gap-2 py-2"><span><span className="font-medium">{r.name}</span> <span className="text-muted-foreground">· {r.count} no-shows{r.locationName ? ` · ${r.locationName}` : ""}</span></span><span className="flex items-center gap-3 text-xs">{r.phone && <a className="underline" href={`tel:${r.phone}`}>Call {r.phone}</a>}<ExtLink href={r.url}>Open contact</ExtLink></span></li>)}</ul>
           )}
         </Card>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 xl:grid-cols-2">
         <Card title="Show rate by lead source">
           {d.bySource.length === 0 ? <p className="text-sm text-muted-foreground">Needs at least 3 appointments from a source, with the source recorded on the contact.</p> : (
             <Table head={<tr><Th>Source</Th><Th className="text-right">Booked</Th><Th className="text-right">Showed</Th><Th className="text-right">Show rate</Th></tr>}>
@@ -141,10 +141,10 @@ export function AppointmentInsights() {
         </Card>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 xl:grid-cols-2">
         <Card title={`No follow-up after the appointment (${d.followUp.withoutFollowUp})`}>
           <p className="mb-2 text-sm text-muted-foreground">{d.followUp.gapRate !== null ? `${d.followUp.withoutFollowUp} of ${d.followUp.held} appointments held in the last two weeks have had no message from your team since (${pct(d.followUp.gapRate)}).` : "Needs at least 5 held appointments in the last two weeks."}</p>
-          <ul className="divide-y text-sm">{d.followUp.contacts.map((c) => <li key={c.contactId + c.at} className="py-1.5"><span className="font-medium">{c.name}</span> <span className="text-muted-foreground">· {when(c.at)}{c.locationName ? ` · ${c.locationName}` : ""}</span></li>)}</ul>
+          <ul className="divide-y text-sm">{d.followUp.contacts.map((c) => <li key={c.contactId + c.at} className="flex flex-wrap items-center justify-between gap-2 py-1.5"><span><span className="font-medium">{c.name}</span> <span className="text-muted-foreground">· {when(c.at)}{c.locationName ? ` · ${c.locationName}` : ""}</span></span><ExtLink href={c.url}>Open contact</ExtLink></li>)}</ul>
         </Card>
         <Card title={`Double bookings (${d.doubleBookings.length})`}>
           {d.doubleBookings.length === 0 ? <p className="text-sm text-muted-foreground">No one is booked twice at the same time in the next two weeks.</p> : (
@@ -155,7 +155,7 @@ export function AppointmentInsights() {
 
       <Card title="Before your next appointments">
         {d.briefs.length === 0 ? <p className="text-sm text-muted-foreground">Nothing booked with a known contact in the next 7 days.</p> : (
-          <ul className="divide-y">{d.briefs.map((b) => <li key={b.contactId + b.at} className="py-3 text-sm first:pt-0 last:pb-0"><p className="leading-6">{b.brief}</p>{b.locationName && <p className="mt-0.5 text-xs text-muted-foreground">{b.locationName}</p>}</li>)}</ul>
+          <ul className="divide-y">{d.briefs.map((b) => <li key={b.contactId + b.at} className="py-3 text-sm first:pt-0 last:pb-0"><p className="leading-6">{b.brief}</p><p className="mt-0.5 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">{b.locationName && <span>{b.locationName}</span>}<ExtLink href={b.url}>Open contact</ExtLink></p></li>)}</ul>
         )}
         <p className="mt-2 text-xs text-muted-foreground">Written from what SubSync already knows about the contact: source, deals, earlier appointments and last message. Nothing is guessed.</p>
       </Card>

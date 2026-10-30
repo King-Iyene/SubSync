@@ -11,6 +11,7 @@ import { Badge } from "./ui";
 import { AccountDetailView } from "./views/account-detail";
 import { AccountsView } from "./views/accounts";
 import { AlertsView } from "./views/alerts";
+import { AppointmentInsights } from "./views/appointment-insights";
 import { AppointmentsView } from "./views/appointments";
 import { CleanupView } from "./views/cleanup";
 import { MeetingsView } from "./views/meetings";
@@ -223,7 +224,7 @@ export function Dashboard() {
       case "help": return <HelpView go={go} />;
       case "pipeline": return <Tabs key="pipe" start={0} tabs={pipeTabs} />;
       case "team": return <TeamView />;
-      case "appointments": return <AppointmentsView go={go} />;
+      case "appointments": return <Tabs key="appts" start={0} tabs={[{ label: "To do", node: <AppointmentsView go={go} /> }, { label: "Insights", node: <AppointmentInsights /> }]} />;
       case "meetings": return <MeetingsView />;
       case "cleanup": return <CleanupView />;
       case "leads": return <LeadsView />;
@@ -240,7 +241,7 @@ export function Dashboard() {
             <span aria-hidden className="flex size-8 items-center justify-center rounded-xl bg-sidebar-primary text-sidebar-primary-foreground shadow-md"><svg viewBox="0 0 24 24" className="size-[18px]" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M4 8h10a4 4 0 0 1 0 8H8" /><path d="M20 16H10a4 4 0 0 1 0-8h6" opacity="0.55" /></svg></span>
             <span className="text-[1.05rem] font-semibold tracking-tight text-sidebar-accent-foreground">SubSync</span>
           </div>
-          <nav className="mt-3 flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto pr-1" aria-label="Sections">
+          <nav className="sidebar-scroll mt-3 flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto pr-1" aria-label="Sections">
             {menu.map((n, i) => (
               <div key={n.id}>
                 {n.group !== (menu[i - 1]?.group ?? null) && (n.group ? <p className="px-3 pb-1 pt-5 text-[10.5px] font-semibold uppercase tracking-[0.14em] text-sidebar-foreground/45">{n.group}</p> : <div className="my-2 border-t border-sidebar-border" />)}
