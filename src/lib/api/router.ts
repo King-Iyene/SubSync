@@ -51,7 +51,9 @@ function deepLinks(appDomain: string) {
 async function accountsFor(ctx: Ctx) {
   const { settings, accounts } = await loadAccounts(ctx.installationId);
   const limit = accountLimit(ctx.plan, ctx.entitlements.enforced);
-  const visible = limit === null ? accounts : accounts.filter((a) => !a.ignored).slice(0, limit);
+  let visible = limit === null ? accounts : accounts.filter((a) => !a.ignored).slice(0, limit);
+  // A business or client view only ever sees its own account.
+  if (ctx.limitTo) visible = accounts.filter((a) => a.locationId === ctx.limitTo);
   return { settings, accounts: visible, hidden: accounts.length - visible.length, links: deepLinks(settings.appDomain) };
 }
 
@@ -64,7 +66,8 @@ async function scope(ctx: Ctx) {
     limit === null ? Promise.resolve(null) : visibleLocationIds(ctx.installationId, limit),
   ]);
   const allowed = ids ? new Set(ids) : null;
-  return { settings, permits: (locationId: string) => allowed === null || allowed.has(locationId), links: deepLinks(settings.appDomain) };
+  const permits = (locationId: string) => (ctx.limitTo ? locationId === ctx.limitTo : allowed === null || allowed.has(locationId));
+  return { settings, permits, links: deepLinks(settings.appDomain) };
 }
 
 const gate = (ctx: Ctx, feature: Feature) =>
@@ -89,7 +92,7 @@ function slim(a: DerivedAccount, links: ReturnType<typeof deepLinks>) {
 async function overview(ctx: Ctx) {
   // Independent queries run together so the page does not wait on them one after another.
   const [{ settings, accounts, hidden, links }, alerts, sync] = await Promise.all([
-    accountsFor(ctx), listAlerts(ctx.installationId, false, 500), syncStatus(ctx.installationId),
+    accountsFor(ctx), listAlerts(ctx.installationId, false, 500, ctx.limitTo ?? undefined), syncStatus(ctx.installationId, ctx.limitTo),
   ]);
   const live = accounts.filter((a) => !a.ignored);
   const sum = (f: (a: DerivedAccount) => number) => live.reduce((s, a) => s + f(a), 0);
@@ -110,6 +113,7 @@ async function overview(ctx: Ctx) {
     .map(({ a, reasons }) => ({ locationId: a.locationId, name: a.name, score: a.score, band: a.band, churn: a.churn.level, reasons, url: links.account(a.locationId) }));
   return json({
     demo: ctx.demo,
+    kind: ctx.kind,
     plan: ctx.plan,
     entitlements: ctx.entitlements,
     hiddenAccounts: hidden,
@@ -164,7 +168,9 @@ async function accountDetail(ctx: Ctx, locationId: string) {
   const mine = domains.filter((d) => d.locationId === locationId);
   const worst = mine.find((d) => d.status === "critical") ?? mine.find((d) => d.status === "warning") ?? mine[0] ?? null;
   const checklist = onboardingChecklist(a, { domainStatus: worst?.status ?? null, manual, custom: settings.customChecklist });
+  const [flagRow] = ctx.kind === "agency" ? await sql()`select client_view from locations where installation_id = ${ctx.installationId} and location_id = ${locationId}` : [];
   return json({
+    clientView: flagRow?.client_view === true,
     account: slim(a, links),
     breakdown: a.breakdown,
     trend,
@@ -178,7 +184,7 @@ async function accountDetail(ctx: Ctx, locationId: string) {
 
 async function search(ctx: Ctx) {
   const q = ctx.url.searchParams.get("q") ?? "";
-  const loc = ctx.url.searchParams.get("location");
+  const loc = ctx.limitTo ?? ctx.url.searchParams.get("location");
   if (loc && !LOCATION_ID.test(loc)) return json({ error: "Bad location" }, 400);
   const [{ permits, links }, found] = await Promise.all([scope(ctx), searchContacts(ctx.installationId, q, 60, loc ?? undefined)]);
   const hits = found.filter((h) => permits(h.locationId));
@@ -188,7 +194,7 @@ async function search(ctx: Ctx) {
 async function stale(ctx: Ctx) {
   const { settings, permits, links } = await scope(ctx);
   const days = Math.min(365, Math.max(1, Number(ctx.url.searchParams.get("days")) || settings.staleDays));
-  const rows = (await staleDeals(ctx.installationId, days, 500)).filter((d) => permits(d.locationId));
+  const rows = (await staleDeals(ctx.installationId, days, 500, ctx.limitTo ?? undefined)).filter((d) => permits(d.locationId));
   return json({
     days,
     totalValue: rows.reduce((s, d) => s + d.value, 0),
@@ -198,7 +204,7 @@ async function stale(ctx: Ctx) {
 
 async function inboxView(ctx: Ctx) {
   const { settings, permits, links } = await scope(ctx);
-  const rows = (await inbox(ctx.installationId, settings.slaHours, 300)).filter((r) => permits(r.locationId));
+  const rows = (await inbox(ctx.installationId, settings.slaHours, 300, ctx.limitTo ?? undefined)).filter((r) => permits(r.locationId));
   return json({
     slaHours: settings.slaHours,
     overSla: rows.filter((r) => r.overSla).length,
@@ -243,7 +249,7 @@ async function pipelines(ctx: Ctx) {
 
 async function duplicates(ctx: Ctx) {
   const { permits, links } = await scope(ctx);
-  const groups = (await duplicateGroups(ctx.installationId, 300)).filter((g) => permits(g.locationId));
+  const groups = (await duplicateGroups(ctx.installationId, 300, ctx.limitTo ?? undefined)).filter((g) => permits(g.locationId));
   return json({
     groups: groups.map((g) => ({
       ...g, key: g.kind === "phone" ? g.key : g.key,
@@ -253,7 +259,9 @@ async function duplicates(ctx: Ctx) {
 }
 
 async function emailHealth(ctx: Ctx) {
-  const [checks, candidates] = await Promise.all([listDomainChecks(ctx.installationId), domainCandidates(ctx.installationId)]);
+  const [allChecks, allCandidates] = await Promise.all([listDomainChecks(ctx.installationId), domainCandidates(ctx.installationId)]);
+  const checks = ctx.limitTo ? allChecks.filter((c) => c.locationId === ctx.limitTo) : allChecks;
+  const candidates = ctx.limitTo ? allCandidates.filter((c) => c.locationId === ctx.limitTo) : allCandidates;
   const checked = new Set(checks.map((c) => c.domain));
   const unchecked: Array<{ domain: string; locationId: string; locationName: string | null }> = [];
   const seen = new Set<string>();
@@ -291,13 +299,14 @@ async function emailCheck(ctx: Ctx) {
 async function alertsView(ctx: Ctx) {
   const includeResolved = ctx.url.searchParams.get("resolved") === "1";
   const names = new Map((await loadAccounts(ctx.installationId)).accounts.map((a) => [a.locationId, a.name]));
-  const rows = await listAlerts(ctx.installationId, includeResolved, 300);
+  const rows = await listAlerts(ctx.installationId, includeResolved, 300, ctx.limitTo ?? undefined);
   return json({ alerts: rows.map((a) => ({ ...a, locationName: a.locationId ? names.get(a.locationId) ?? null : null })) });
 }
 
 const settingsView = async (ctx: Ctx) => {
   const { settings } = await loadAccounts(ctx.installationId);
-  return json({ settings: publicSettings(settings), slackConfigured: Boolean(settings.slackWebhookUrl) });
+  const [counts] = ctx.kind === "agency" ? await sql()`select count(*)::int total, count(*) filter (where client_view)::int on_ from locations where installation_id = ${ctx.installationId}` : [null];
+  return json({ settings: publicSettings(settings), slackConfigured: Boolean(settings.slackWebhookUrl), kind: ctx.kind, clientView: counts ? { on: counts.on_ as number, total: counts.total as number } : null });
 };
 
 function publicSettings(s: Settings) {
@@ -314,6 +323,9 @@ async function settingsUpdate(ctx: Ctx) {
   if ("dormantDays" in body) { const v = int(body.dormantDays, 7, 365); if (v === null) return json({ error: "Dormant days must be between 7 and 365" }, 400); patch.dormantDays = v; }
   if ("slaHours" in body) { const v = int(body.slaHours, 1, 168); if (v === null) return json({ error: "SLA hours must be between 1 and 168" }, 400); patch.slaHours = v; }
   if ("digestEnabled" in body) patch.digestEnabled = body.digestEnabled === true;
+  if ("clientViewAll" in body && ctx.kind === "agency") {
+    await sql()`update locations set client_view = ${body.clientViewAll === true} where installation_id = ${ctx.installationId}`;
+  }
   if ("appDomain" in body) {
     const d = typeof body.appDomain === "string" ? extractDomain(body.appDomain) : null;
     if (!d) return json({ error: "Enter the domain you log in to, for example app.gohighlevel.com" }, 400);
@@ -337,10 +349,11 @@ async function settingsUpdate(ctx: Ctx) {
 }
 
 async function flags(ctx: Ctx, locationId: string) {
-  const body = (await ctx.request.json().catch(() => null)) as { ignored?: unknown; owner?: unknown } | null;
+  const body = (await ctx.request.json().catch(() => null)) as { ignored?: unknown; owner?: unknown; clientView?: unknown } | null;
   if (!body) return json({ error: "Invalid request" }, 400);
-  const patch: { ignored?: boolean; owner?: string | null } = {};
+  const patch: { ignored?: boolean; owner?: string | null; clientView?: boolean } = {};
   if ("ignored" in body) patch.ignored = body.ignored === true;
+  if ("clientView" in body) patch.clientView = body.clientView === true;
   if ("owner" in body) {
     if (body.owner === null || body.owner === "") patch.owner = null;
     else if (typeof body.owner === "string" && body.owner.length <= 60) patch.owner = body.owner.trim();
@@ -355,6 +368,7 @@ async function taskUpdate(ctx: Ctx, locationId: string) {
   const body = (await ctx.request.json().catch(() => null)) as { task?: unknown; done?: unknown } | null;
   const task = typeof body?.task === "string" ? body.task : "";
   if (!/^(manual|custom):.{1,80}$/.test(task)) return json({ error: "Invalid task" }, 400);
+  if (ctx.limitTo && ctx.limitTo !== locationId) return json({ error: "Account not found" }, 404);
   await setManualTask(ctx.installationId, locationId, task, body?.done === true);
   return json({ ok: true });
 }
@@ -378,7 +392,7 @@ async function exportCsv(ctx: Ctx, kind: string) {
       ]));
     }
     case "stale": {
-      const rows = (await staleDeals(ctx.installationId, settings.staleDays, 5000)).filter((d) => permits(d.locationId));
+      const rows = (await staleDeals(ctx.installationId, settings.staleDays, 5000, ctx.limitTo ?? undefined)).filter((d) => permits(d.locationId));
       return file("subsync-stale-deals", toCsv(rows, [
         { label: "Account", value: (d) => d.locationName }, { label: "Deal", value: (d) => d.name }, { label: "Contact", value: (d) => d.contactName },
         { label: "Value", value: (d) => d.value }, { label: "Pipeline", value: (d) => d.pipelineName }, { label: "Stage", value: (d) => d.stageName },
@@ -386,14 +400,14 @@ async function exportCsv(ctx: Ctx, kind: string) {
       ]));
     }
     case "duplicates": {
-      const rows = (await duplicateGroups(ctx.installationId, 5000)).filter((g) => permits(g.locationId));
+      const rows = (await duplicateGroups(ctx.installationId, 5000, ctx.limitTo ?? undefined)).filter((g) => permits(g.locationId));
       return file("subsync-duplicates", toCsv(rows, [
         { label: "Account", value: (g) => g.locationName }, { label: "Matched on", value: (g) => g.kind }, { label: "Value", value: (g) => g.key },
         { label: "Contacts", value: (g) => g.count }, { label: "Names", value: (g) => g.names.join("; ") }, { label: "Contact ids", value: (g) => g.contactIds.join("; ") },
       ]));
     }
     case "inbox": {
-      const rows = (await inbox(ctx.installationId, settings.slaHours, 2000)).filter((r) => permits(r.locationId));
+      const rows = (await inbox(ctx.installationId, settings.slaHours, 2000, ctx.limitTo ?? undefined)).filter((r) => permits(r.locationId));
       return file("subsync-inbox", toCsv(rows, [
         { label: "Account", value: (r) => r.locationName }, { label: "Contact", value: (r) => r.contactName }, { label: "Channel", value: (r) => r.lastMessageType },
         { label: "Last message", value: (r) => r.lastMessageAt }, { label: "Direction", value: (r) => r.lastMessageDirection },
@@ -424,7 +438,7 @@ async function exportCsv(ctx: Ctx, kind: string) {
       ]));
     }
     case "alerts": {
-      const rows = await listAlerts(ctx.installationId, false, 2000);
+      const rows = await listAlerts(ctx.installationId, false, 2000, ctx.limitTo ?? undefined);
       return file("subsync-alerts", toCsv(rows, [
         { label: "Severity", value: (a) => a.severity }, { label: "Alert", value: (a) => a.title }, { label: "Type", value: (a) => a.kind }, { label: "Raised", value: (a) => a.createdAt },
       ]));
@@ -487,6 +501,7 @@ async function syncStart(ctx: Ctx) {
 }
 
 async function allowedIds(ctx: Ctx): Promise<string[] | null> {
+  if (ctx.limitTo) return [ctx.limitTo];
   const limit = accountLimit(ctx.plan, ctx.entitlements.enforced);
   return limit === null ? null : visibleLocationIds(ctx.installationId, limit);
 }
@@ -494,7 +509,7 @@ async function allowedIds(ctx: Ctx): Promise<string[] | null> {
 async function pipelineIntel(ctx: Ctx) {
   const location = ctx.url.searchParams.get("location") ?? undefined;
   if (location && !LOCATION_ID.test(location)) return json({ error: "Invalid account" }, 400);
-  const [allowed, goals] = await Promise.all([allowedIds(ctx), getGoals(ctx.installationId)]);
+  const [allowed, goals] = await Promise.all([allowedIds(ctx), ctx.kind === "client" ? Promise.resolve({} as Awaited<ReturnType<typeof getGoals>>) : getGoals(ctx.installationId)]);
   const [deals, trend, sc] = await Promise.all([loadDeals(ctx.installationId, allowed, location), pipelineTrend(ctx.installationId, allowed), scope(ctx)]);
   const now = Date.now();
   const opens = deals.filter((d) => d.status === "open");
@@ -790,6 +805,7 @@ async function healthView(ctx: Ctx) {
 
 async function resyncOne(ctx: Ctx, locationId: string) {
   if (ctx.demo) return json({ ok: true, demo: true });
+  if (ctx.limitTo && ctx.limitTo !== locationId) return json({ error: "Account not found" }, 404);
   const known = await sql()`select 1 from locations where installation_id = ${ctx.installationId} and location_id = ${locationId}`;
   if (known.length === 0) return json({ error: "Account not found" }, 404);
   await enqueueLocationSync(ctx.installationId, locationId);
@@ -818,7 +834,7 @@ const FEATURE_FOR: Record<string, Feature> = {
 };
 
 export async function handle(request: Request, segments: string[]): Promise<Response> {
-  const auth = await authenticate(request);
+  const auth = await authenticate(request, segments);
   if (isResponse(auth)) return auth;
   const ctx: Ctx = { ...auth, request, url: new URL(request.url), segments };
   const [a, b, c] = segments;

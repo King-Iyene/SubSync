@@ -353,7 +353,7 @@ export type InboxRow = {
   waitingHours: number | null;
 };
 
-export async function inbox(installationId: string, slaHours: number, limit = 200): Promise<InboxRow[]> {
+export async function inbox(installationId: string, slaHours: number, limit = 200, locationId?: string): Promise<InboxRow[]> {
   const rows = await sql()`
     select * from (
       select c.conversation_id, c.location_id, l.name location_name, c.contact_name, c.last_message_type,
@@ -364,7 +364,7 @@ export async function inbox(installationId: string, slaHours: number, limit = 20
           then floor(extract(epoch from (now() - c.last_message_at)) / 3600)::int end waiting_hours
       from cached_conversations c
       join locations l on l.installation_id = c.installation_id and l.location_id = c.location_id and not l.ignored
-      where c.installation_id = ${installationId}
+      where c.installation_id = ${installationId} and (${locationId ?? null}::text is null or c.location_id = ${locationId ?? null})
         and (c.unread_count > 0 or (c.last_message_direction = 'inbound' and c.last_message_at > now() - interval '30 days'))
     ) x
     order by over_sla desc, case when over_sla then last_message_at end asc, last_message_at desc nulls last
@@ -388,17 +388,17 @@ export type DuplicateGroup = {
   names: string[];
 };
 
-export async function duplicateGroups(installationId: string, limit = 200): Promise<DuplicateGroup[]> {
+export async function duplicateGroups(installationId: string, limit = 200, locationId?: string): Promise<DuplicateGroup[]> {
   const rows = await sql()`
     select d.*, l.name location_name from (
       select location_id, 'email' kind, lower(email) k, count(*)::int n,
         array_agg(contact_id order by date_added) ids, array_agg(coalesce(nullif(full_name, ''), '(no name)') order by date_added) names
-      from cached_contacts where installation_id = ${installationId} and email is not null and email <> ''
+      from cached_contacts where installation_id = ${installationId} and (${locationId ?? null}::text is null or location_id = ${locationId ?? null}) and email is not null and email <> ''
       group by location_id, lower(email) having count(*) > 1
       union all
       select location_id, 'phone', phone_digits, count(*)::int,
         array_agg(contact_id order by date_added), array_agg(coalesce(nullif(full_name, ''), '(no name)') order by date_added)
-      from cached_contacts where installation_id = ${installationId} and length(phone_digits) >= 7
+      from cached_contacts where installation_id = ${installationId} and (${locationId ?? null}::text is null or location_id = ${locationId ?? null}) and length(phone_digits) >= 7
       group by location_id, phone_digits having count(*) > 1
     ) d
     join locations l on l.installation_id = ${installationId} and l.location_id = d.location_id and not l.ignored
@@ -462,10 +462,11 @@ function mapAlert(r: AlertDbRow): AlertRow {
   };
 }
 
-export async function listAlerts(installationId: string, includeResolved = false, limit = 200): Promise<AlertRow[]> {
+export async function listAlerts(installationId: string, includeResolved = false, limit = 200, locationId?: string): Promise<AlertRow[]> {
   const rows = await sql()`
     select id, location_id, kind, severity, title, detail, created_at, resolved_at from alerts
     where installation_id = ${installationId} and (${includeResolved} or resolved_at is null)
+      and (${locationId ?? null}::text is null or location_id = ${locationId ?? null})
     order by (resolved_at is null) desc,
       case severity when 'critical' then 0 when 'warning' then 1 else 2 end, created_at desc
     limit ${limit}`;
@@ -522,10 +523,11 @@ export async function domainCandidates(installationId: string): Promise<Array<{ 
 
 // ---------------- account controls and onboarding tasks ----------------
 
-export async function setLocationFlags(installationId: string, locationId: string, flags: { ignored?: boolean; owner?: string | null }): Promise<boolean> {
+export async function setLocationFlags(installationId: string, locationId: string, flags: { ignored?: boolean; owner?: string | null; clientView?: boolean }): Promise<boolean> {
   const rows = await sql()`
     update locations set
       ignored = coalesce(${flags.ignored ?? null}::boolean, ignored),
+      client_view = coalesce(${flags.clientView ?? null}::boolean, client_view),
       owner = case when ${flags.owner !== undefined} then ${flags.owner ?? null} else owner end
     where installation_id = ${installationId} and location_id = ${locationId} returning id`;
   return rows.length === 1;

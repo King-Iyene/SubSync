@@ -1,5 +1,6 @@
+import { routeAllowed, type AccessKind } from "../access";
 import { entitlements, type Plan } from "../entitlements";
-import { getInstallation } from "../ghl/installations";
+import { clientViewOn, getInstallation } from "../ghl/installations";
 import { bearerToken, verifySession, type Session } from "../session";
 
 export type AuthContext = {
@@ -8,6 +9,10 @@ export type AuthContext = {
   plan: Plan;
   demo: boolean;
   entitlements: ReturnType<typeof entitlements>;
+  /** agency (everything), business (one account, full tools) or client (one account, read-only). */
+  kind: AccessKind;
+  /** For a business or client session, the one account every query is limited to. Otherwise null. */
+  limitTo: string | null;
 };
 
 export const json = (body: unknown, status = 200) =>
@@ -16,8 +21,9 @@ export const json = (body: unknown, status = 200) =>
 export const demoEnabled = () => process.env.DEMO_MODE === "true";
 
 // Resolve the caller from the signed Bearer session, then load their installation.
-// Everything downstream is scoped by the installation id returned here.
-export async function authenticate(request: Request): Promise<AuthContext | Response> {
+// Everything downstream is scoped by the installation id returned here, and for a business or
+// client session also by the single account id in `limitTo`.
+export async function authenticate(request: Request, segments: string[] = []): Promise<AuthContext | Response> {
   let session: Session | null = null;
   try {
     session = verifySession(bearerToken(request));
@@ -26,21 +32,35 @@ export async function authenticate(request: Request): Promise<AuthContext | Resp
   }
   if (!session) return json({ error: "Please sign in again" }, 401);
 
+  const kind: AccessKind = session.kind === "business" || session.kind === "client" ? session.kind : "agency";
+  const limitTo = kind === "agency" ? null : session.locationId ?? null;
+  // A limited session without an account is malformed: refuse rather than fall back to everything.
+  if (kind !== "agency" && !limitTo) return json({ error: "Please sign in again" }, 401);
+  if (!routeAllowed(kind, request.method, segments)) {
+    return json({ error: "This page is not available in your view of SubSync", forbidden: true }, 403);
+  }
+
   if (session.demo) {
     if (!demoEnabled()) return json({ error: "Demo mode is off" }, 403);
     const { ensureDemo } = await import("../demo/seed");
     const installationId = await ensureDemo();
-    return { session, installationId, plan: "paid", demo: true, entitlements: entitlements("paid") };
+    return { session, installationId, plan: "pro", demo: true, entitlements: entitlements("pro"), kind, limitTo };
   }
 
   const installation = await getInstallation(session.companyId);
-  if (!installation) return json({ error: "SubSync is not installed for this agency" }, 403);
+  if (!installation) return json({ error: "SubSync is not installed for this account", forbidden: true }, 403);
+  // The agency can switch a client's view off at any time; do not wait for the session to expire.
+  if (kind === "client" && !(await clientViewOn(session.companyId, limitTo as string))) {
+    return json({ error: "Your agency has turned this view off", forbidden: true }, 403);
+  }
   return {
     session,
     installationId: installation.id,
     plan: installation.plan,
     demo: false,
     entitlements: entitlements(installation.plan),
+    kind,
+    limitTo,
   };
 }
 

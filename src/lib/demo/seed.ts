@@ -277,6 +277,16 @@ export async function seedDemo(): Promise<{ installationId: string; accounts: nu
   return { installationId, accounts: profiles.length, contacts: totalContacts };
 }
 
+// The demo account that business and client demo sessions are limited to (the largest one).
+export async function demoFirstLocation(): Promise<string> {
+  const installationId = await ensureDemo();
+  const [row] = await sql()`
+    select l.location_id from locations l
+    left join (select location_id, count(*) n from cached_contacts where installation_id = ${installationId} group by location_id) c on c.location_id = l.location_id
+    where l.installation_id = ${installationId} order by coalesce(c.n, 0) desc, l.location_id limit 1`;
+  return row.location_id as string;
+}
+
 export async function ensureDemo(): Promise<string> {
   const [row] = await sql()`select id from installations where company_id = ${DEMO_COMPANY_ID} and is_demo`;
   if (row) return row.id as string;

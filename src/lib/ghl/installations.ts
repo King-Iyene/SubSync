@@ -1,6 +1,7 @@
 import { decryptSecret, encryptSecret } from "../crypto";
 import { sql } from "../db";
-import { normalisePlan, type Plan } from "../entitlements";
+import { businessKey, isBusinessKey } from "../access";
+import { normalisePlan, planFromMarketplaceId, type Plan } from "../entitlements";
 import { refreshTokens, type TokenResponse } from "./client";
 import { getFreshAccessToken, type TokenStore } from "./token-manager";
 
@@ -10,22 +11,31 @@ export type Installation = {
   plan: Plan;
   isDemo: boolean;
   locationLimit: number;
+  mode: "agency" | "business";
+  locationId: string | null;
 };
 
-// Store (or refresh) an agency install. Only Company-level installs are supported;
-// the app is installable by agencies only.
+// Store (or refresh) an install. An agency install is a Company token keyed by the company id. A
+// client account installing for itself is a Location token, keyed "loc:<locationId>" so it can
+// never collide with an agency.
 export async function saveInstallation(tokens: TokenResponse): Promise<string> {
-  if (tokens.userType !== "Company" || !tokens.companyId) {
-    throw new Error("Only agency (Company) installs are supported");
+  const business = tokens.userType === "Location";
+  if (business ? !tokens.locationId : tokens.userType !== "Company" || !tokens.companyId) {
+    throw new Error("Unsupported install type");
   }
+  const key = business ? businessKey(tokens.locationId as string) : (tokens.companyId as string);
+  const mode = business ? "business" : "agency";
+  const plan = planFromMarketplaceId(tokens.planId);
   const db = sql();
   const expiresAt = new Date(Date.now() + tokens.expires_in * 1000).toISOString();
   const [row] = await db`
     insert into installations
-      (company_id, access_token_enc, refresh_token_enc, token_expires_at, scope, user_type, user_id, is_bulk_installation)
+      (company_id, access_token_enc, refresh_token_enc, token_expires_at, scope, user_type, user_id, is_bulk_installation,
+       mode, location_id, agency_company_id, plan_id, plan)
     values
-      (${tokens.companyId}, ${encryptSecret(tokens.access_token)}, ${encryptSecret(tokens.refresh_token)},
-       ${expiresAt}, ${tokens.scope ?? null}, ${tokens.userType}, ${tokens.userId ?? null}, ${tokens.isBulkInstallation ?? null})
+      (${key}, ${encryptSecret(tokens.access_token)}, ${encryptSecret(tokens.refresh_token)},
+       ${expiresAt}, ${tokens.scope ?? null}, ${tokens.userType ?? null}, ${tokens.userId ?? null}, ${tokens.isBulkInstallation ?? null},
+       ${mode}, ${business ? (tokens.locationId as string) : null}, ${business ? tokens.companyId ?? null : null}, ${tokens.planId ?? null}, ${plan ?? "free"})
     on conflict (company_id) do update set
       access_token_enc = excluded.access_token_enc,
       refresh_token_enc = excluded.refresh_token_enc,
@@ -34,16 +44,26 @@ export async function saveInstallation(tokens: TokenResponse): Promise<string> {
       user_type = excluded.user_type,
       user_id = excluded.user_id,
       is_bulk_installation = excluded.is_bulk_installation,
+      mode = excluded.mode,
+      location_id = excluded.location_id,
+      agency_company_id = excluded.agency_company_id,
+      plan_id = excluded.plan_id,
+      plan = case when ${plan}::text is null then installations.plan else ${plan}::text end,
       uninstalled_at = null
     returning id`;
   await db`insert into settings (installation_id) values (${row.id}) on conflict do nothing`;
+  if (business) {
+    await db`
+      insert into locations (installation_id, location_id) values (${row.id}, ${tokens.locationId as string})
+      on conflict (installation_id, location_id) do nothing`;
+  }
   return row.id as string;
 }
 
-export async function getInstallation(companyId: string): Promise<Installation | null> {
+export async function getInstallation(companyKey: string): Promise<Installation | null> {
   const [row] = await sql()`
-    select id, company_id, plan, is_demo, location_limit
-    from installations where company_id = ${companyId} and uninstalled_at is null`;
+    select id, company_id, plan, is_demo, location_limit, mode, location_id
+    from installations where company_id = ${companyKey} and uninstalled_at is null`;
   if (!row) return null;
   return {
     id: row.id,
@@ -51,7 +71,22 @@ export async function getInstallation(companyId: string): Promise<Installation |
     plan: normalisePlan(row.plan),
     isDemo: row.is_demo,
     locationLimit: row.location_limit,
+    mode: row.mode === "business" ? "business" : "agency",
+    locationId: (row.location_id as string | null) ?? null,
   };
+}
+
+// Has this client account installed the app for itself?
+export async function businessInstalled(locationId: string): Promise<boolean> {
+  return (await getInstallation(businessKey(locationId))) !== null;
+}
+
+// Has this agency switched the app on for this client's own staff?
+export async function clientViewOn(companyId: string, locationId: string): Promise<boolean> {
+  const [row] = await sql()`
+    select l.client_view from locations l join installations i on i.id = l.installation_id
+    where i.company_id = ${companyId} and i.uninstalled_at is null and l.location_id = ${locationId}`;
+  return row?.client_view === true;
 }
 
 export async function isInstalled(companyId: string): Promise<boolean> {
@@ -140,7 +175,9 @@ function sqlTokenStore(): TokenStore {
   };
 }
 
-// A valid agency access token, refreshed (and the rotated refresh token saved) when needed.
-export function getCompanyAccessToken(companyId: string): Promise<string> {
-  return getFreshAccessToken(sqlTokenStore(), refreshTokens, companyId);
+// A valid access token for the install, refreshed (and the rotated refresh token saved) when needed.
+// For an agency this is the Company token; for a business install it is that account's own token.
+export function getCompanyAccessToken(companyKey: string): Promise<string> {
+  const userType = isBusinessKey(companyKey) ? "Location" : "Company";
+  return getFreshAccessToken(sqlTokenStore(), (refreshToken) => refreshTokens(refreshToken, userType), companyKey);
 }

@@ -332,8 +332,82 @@ async function main() {
   assert.equal((await call("/api/app/export/nope", { token })).status, 404);
   console.log("communication + priorities + setup + exports: ok");
 
+  // --- business and client views: one account only, never the agency pages
+  const biz = await call("/api/sso", { method: "POST", body: JSON.stringify({ demo: true, as: "business" }) });
+  assert.equal(biz.status, 200);
+  assert.equal(biz.body.kind, "business");
+  const bt = biz.body.session as string;
+  const own = biz.body.user.activeLocation as string;
+  assert.ok(own);
+  const otherAcc = acc.body.accounts.find((a: { locationId: string; ignored: boolean }) => a.locationId !== own && !a.ignored);
+  const bov = await call("/api/app/overview", { token: bt });
+  assert.equal(bov.status, 200);
+  assert.equal(bov.body.kind, "business");
+  assert.equal(bov.body.kpis.accounts, 1, "a business sees one account");
+  const bacc = await call("/api/app/accounts", { token: bt });
+  assert.equal(bacc.body.accounts.length, 1);
+  assert.equal(bacc.body.accounts[0].locationId, own);
+  assert.equal((await call(`/api/app/accounts/${otherAcc.locationId}`, { token: bt })).status, 404, "another account is not found");
+  assert.equal((await call(`/api/app/accounts/${own}`, { token: bt })).status, 200);
+  for (const p of ["clients", `qbr/${own}`, "export/clients", "clients/compare?a=x1x&b=y2y"]) {
+    assert.equal((await call(`/api/app/${p}`, { token: bt })).status, 403, `${p} is agency only`);
+  }
+  assert.equal((await call(`/api/app/accounts/${own}/flags`, { token: bt, method: "PUT", body: JSON.stringify({ ignored: true }) })).status, 403);
+  assert.equal((await call(`/api/app/clients/${own}`, { token: bt, method: "PUT", body: JSON.stringify({ monthlyFee: 5 }) })).status, 403);
+  const [sample] = await sql()`select first_name from cached_contacts where location_id = ${own} and length(first_name) >= 3 limit 1`;
+  const bs = await call(`/api/app/search?q=${encodeURIComponent(sample.first_name)}&location=${otherAcc.locationId}`, { token: bt });
+  assert.ok(bs.body.hits.length > 0 && bs.body.hits.every((h: { locationId: string }) => h.locationId === own), "search stays in the account even if another is asked for");
+  const rows = (res: { body: Record<string, unknown> }, key: string) => (res.body[key] as Array<{ locationId: string | null }>);
+  assert.ok(rows(await call("/api/app/stale?days=30", { token: bt }), "deals").every((d) => d.locationId === own), "stale deals");
+  assert.ok(rows(await call("/api/app/inbox", { token: bt }), "items").every((d) => d.locationId === own), "inbox");
+  assert.ok(rows(await call("/api/app/duplicates", { token: bt }), "groups").every((d) => d.locationId === own), "duplicates");
+  assert.ok(rows(await call("/api/app/alerts", { token: bt }), "alerts").every((d) => d.locationId === own), "alerts");
+  assert.ok(rows(await call("/api/app/call-queue", { token: bt }), "rows").every((d) => d.locationId === own), "call queue");
+  assert.ok(rows(await call("/api/app/hygiene", { token: bt }), "accounts").every((d) => d.locationId === own), "hygiene");
+  const bpi = await call("/api/app/pipeline-intel", { token: bt });
+  assert.equal(bpi.status, 200);
+  assert.ok(bpi.body.accounts.every((a: { locationId: string }) => a.locationId === own), "pipeline accounts");
+  const bci = await call("/api/app/contact-intel", { token: bt });
+  assert.equal(bci.status, 200);
+  assert.ok(bci.body.topLeads.every((c: { locationId: string }) => c.locationId === own), "leads");
+  assert.equal((await call("/api/app/settings", { token: bt })).body.kind, "business");
+  console.log("business view: ok (one account, agency pages refused)");
+
+  const cli4 = await call("/api/sso", { method: "POST", body: JSON.stringify({ demo: true, as: "client" }) });
+  assert.equal(cli4.body.kind, "client");
+  const ct = cli4.body.session as string;
+  const cown = cli4.body.user.activeLocation as string;
+  const cov = await call("/api/app/overview", { token: ct });
+  assert.equal(cov.status, 200);
+  assert.equal(cov.body.kpis.accounts, 1);
+  for (const [m, p] of [
+    ["GET", "settings"], ["GET", "export/stale"], ["GET", "call-queue"], ["GET", "goals"], ["GET", "api-keys"], ["GET", "exec-summary"],
+    ["GET", "daily-brief"], ["GET", "clients"], ["GET", "health"], ["POST", "sync"], ["PUT", "settings"], ["POST", "call-outcomes"],
+  ] as const) {
+    assert.equal((await call(`/api/app/${p}`, { token: ct, method: m, ...(m === "GET" ? {} : { body: "{}" }) })).status, 403, `${m} ${p} refused for a client`);
+  }
+  const cpi = await call("/api/app/pipeline-intel", { token: ct });
+  assert.equal(cpi.status, 200);
+  assert.equal(Object.keys(cpi.body.goals).length, 0, "a client never sees the agency's targets");
+  assert.ok(cpi.body.accounts.every((a: { locationId: string }) => a.locationId === cown));
+  // a session cannot be upgraded by editing it
+  const [cBody, cSig] = ct.split(".");
+  const forged = Buffer.from(JSON.stringify({ ...JSON.parse(Buffer.from(cBody, "base64url").toString()), kind: "agency", locationId: null })).toString("base64url");
+  assert.equal((await call("/api/app/clients", { token: `${forged}.${cSig}` })).status, 401, "an edited session is refused");
+  console.log("client view: ok (read-only, own account only)");
+
+  // The agency can switch a client's view on and off.
+  const flagOn = await call(`/api/app/accounts/${roofing.locationId}/flags`, { token, method: "PUT", body: JSON.stringify({ clientView: true }) });
+  assert.equal(flagOn.status, 200);
+  assert.equal((await call(`/api/app/accounts/${roofing.locationId}`, { token })).body.clientView, true);
+  const stg = await call("/api/app/settings", { token });
+  assert.ok(stg.body.clientView.on >= 1 && stg.body.clientView.total >= 14);
+  await call(`/api/app/accounts/${roofing.locationId}/flags`, { token, method: "PUT", body: JSON.stringify({ clientView: false }) });
+  assert.equal((await call(`/api/app/accounts/${roofing.locationId}`, { token })).body.clientView, false);
+  console.log("agency switch for client view: ok");
+
   // Leave the demo data as we found it.
-  await sql()`delete from domain_checks where domain in ('example-demo.com', 'other-demo.org')`;
+  await sql()`delete from domain_checks where domain in ('example-demo.com', 'otherAcc-demo.org')`;
   await closeDb();
   console.log("\nAll API checks passed.");
 }

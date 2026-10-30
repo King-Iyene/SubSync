@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { NAV_FOR, type AccessKind } from "@/lib/access";
 import { NAV, type GoFn, type ViewId } from "./nav";
 import { ApiProvider, makeApi, type Api } from "./session";
 import { Badge } from "./ui";
@@ -27,14 +28,15 @@ type Auth =
   | { status: "outside" }
   | { status: "error"; message: string }
   | { status: "not_installed" }
-  | { status: "ready"; api: Api; demo: boolean; userName: string | null; features: Record<string, boolean> };
+  | { status: "ready"; api: Api; demo: boolean; userName: string | null; features: Record<string, boolean>; kind: AccessKind; locationId: string | null };
 
 type SsoResponse = {
   error?: string;
   installed?: boolean;
   demo?: boolean;
   session?: string;
-  user?: { userName?: string | null };
+  kind?: AccessKind;
+  user?: { userName?: string | null; activeLocation?: string | null };
   entitlements?: { features: Record<string, boolean> };
 };
 
@@ -51,6 +53,14 @@ function viewFromHash(): { id: ViewId; locationId?: string } {
   if (hash.startsWith("account=") && hash.length > 8) return { id: "account", locationId: decodeURIComponent(hash.slice(8)) };
   const match = NAV.find((n) => n.id === hash);
   return { id: match ? match.id : "overview" };
+}
+
+// `?as=business` or `?as=client` opens the demo as a single business or as a client's staff.
+// Only demo mode honours it; real sign-in decides the view from the host's user context.
+function demoView(): "business" | "client" | undefined {
+  if (typeof window === "undefined") return undefined;
+  const as = new URLSearchParams(window.location.search).get("as");
+  return as === "business" || as === "client" ? as : undefined;
 }
 
 export function Dashboard() {
@@ -72,6 +82,7 @@ export function Dashboard() {
       setAuth({
         status: "ready", api: makeApi(r.data.session, () => refreshRef.current(), demo), demo,
         userName: r.data.user?.userName ?? null, features: r.data.entitlements?.features ?? {},
+        kind: r.data.kind ?? "agency", locationId: r.data.user?.activeLocation ?? null,
       });
       return r.data.session;
     }
@@ -94,7 +105,7 @@ export function Dashboard() {
     if (!payload) {
       // The host did not answer. With demo mode on (never in production) show sample data
       // instead of dead-ending, which also covers previews that frame the page.
-      const demo = await exchange({ demo: true }).catch(() => null);
+      const demo = await exchange({ demo: true, as: demoView() }).catch(() => null);
       if (demo?.ok) return apply(demo);
       setAuth({ status: "error", message: "No response from the host page. Please refresh." });
       return null;
@@ -121,7 +132,7 @@ export function Dashboard() {
 
     if (!embedded) {
       // Opened directly (not inside the host page). Demo mode, when enabled, shows sample data.
-      void exchange({ demo: true }).then((r) => {
+      void exchange({ demo: true, as: demoView() }).then((r) => {
         if (r.ok) apply(r);
         else setAuth({ status: "outside" });
       }).catch(() => setAuth({ status: "outside" }));
@@ -140,7 +151,7 @@ export function Dashboard() {
 
   // The API client asks for a fresh session through this when a request comes back 401.
   useEffect(() => {
-    refreshRef.current = () => (embedded ? signIn() : exchange({ demo: true }).then(apply));
+    refreshRef.current = () => (embedded ? signIn() : exchange({ demo: true, as: demoView() }).then(apply));
   }, [embedded, signIn, apply]);
 
   const api = auth.status === "ready" ? auth.api : null;
@@ -156,11 +167,21 @@ export function Dashboard() {
     return <Centered title="We could not sign you in" body={auth.status === "error" ? auth.message : "Please refresh."} />;
   }
 
+  const limited = auth.kind !== "agency";
+  const menu = NAV.filter((n) => NAV_FOR[auth.kind].has(n.id));
+  const labelFor = (n: (typeof NAV)[number]) => (limited && n.id === "overview" ? "My account" : n.label);
   const active = view.id === "account" ? "accounts" : view.id;
   const locked = (feature: string) => auth.features[feature] === false;
-  const agency = auth.demo ? "Demo Agency" : "Your agency";
+  const agency = auth.demo ? "Demo Agency" : limited ? "Your business" : "Your agency";
+  const own = auth.locationId;
 
   const content = (() => {
+    // A business or a client sees its own account as the home page, never an accounts list.
+    if (limited) {
+      const id = view.id === "account" ? "overview" : view.id;
+      if (!NAV_FOR[auth.kind].has(id)) return <Centered title="Not available" body="This page is not part of your view of SubSync." />;
+      if (id === "overview") return own ? <AccountDetailView key={own} locationId={own} go={go} agency={agency} limited /> : <Centered title="Open SubSync from inside your account" body="We could not tell which account you are in." />;
+    }
     switch (view.id) {
       case "overview": return <OverviewView go={go} />;
       case "accounts": return <AccountsView go={go} />;
@@ -187,10 +208,10 @@ export function Dashboard() {
         <aside className="hidden w-60 shrink-0 flex-col border-r p-4 md:flex print:hidden">
           <p className="px-2 text-lg font-semibold tracking-tight">SubSync</p>
           <nav className="mt-6 flex flex-col gap-0.5" aria-label="Sections">
-            {NAV.map((n) => (
+            {menu.map((n) => (
               <button key={n.id} type="button" onClick={() => go(n.id)} aria-current={n.id === active ? "page" : undefined}
                 className={`flex items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors ${n.id === active ? "bg-muted font-medium" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"}`}>
-                {n.label}
+                {labelFor(n)}
                 {locked(n.feature) && <Badge tone="info">Paid</Badge>}
               </button>
             ))}
@@ -205,9 +226,9 @@ export function Dashboard() {
             </div>
           )}
           <nav className="flex gap-1 overflow-x-auto border-b p-2 md:hidden print:hidden" aria-label="Sections">
-            {NAV.map((n) => (
+            {menu.map((n) => (
               <button key={n.id} type="button" onClick={() => go(n.id)} aria-current={n.id === active ? "page" : undefined}
-                className={`shrink-0 rounded-full px-3 py-1 text-sm ${n.id === active ? "bg-muted font-medium" : "text-muted-foreground"}`}>{n.label}</button>
+                className={`shrink-0 rounded-full px-3 py-1 text-sm ${n.id === active ? "bg-muted font-medium" : "text-muted-foreground"}`}>{labelFor(n)}</button>
             ))}
           </nav>
           <main className="flex-1 p-4 sm:p-8"><FreshnessStrip />{content}</main>

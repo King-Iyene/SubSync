@@ -37,9 +37,11 @@ try {
   code = run.status ?? 1;
   const dir = `${process.cwd()}/.tmp-shots`;
   if (shots.length) mkdirSync(dir, { recursive: true });
-  for (const hash of shots) {
+  // "view" or "view@business" / "view@client" to open the demo as a single business or a client.
+  for (const spec of shots) {
+    const [hash, as] = spec.split("@");
     const r = spawnSync(CHROME, ["--headless=new", "--disable-gpu", "--hide-scrollbars", "--window-size=1600,2600", "--virtual-time-budget=40000",
-      `--screenshot=${dir}/${hash.replace(/[^a-z0-9=-]/gi, "_")}.png`, `http://localhost:${PORT}/app#${hash}`], { encoding: "utf8" });
+      `--screenshot=${dir}/${spec.replace(/[^a-z0-9=@-]/gi, "_").replace("@", "-as-")}.png`, `http://localhost:${PORT}/app${as ? "?as=" + as : ""}#${hash}`], { encoding: "utf8" });
     if (r.error || r.status) console.error("screenshot failed", hash, r.error?.message ?? r.status, (r.stderr ?? "").slice(-200));
   }
 } catch (e) {

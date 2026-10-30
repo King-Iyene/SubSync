@@ -9,7 +9,9 @@ import {
   severityTone, Sparkline, Stat, Table, Td, Th,
 } from "../ui";
 
-export function AccountDetailView({ locationId, go, agency }: { locationId: string; go: GoFn; agency: string }) {
+// `limited` is the business and client view of their own account: no way back to an accounts list
+// and none of the agency's controls.
+export function AccountDetailView({ locationId, go, agency, limited = false }: { locationId: string; go: GoFn; agency: string; limited?: boolean }) {
   const api = useApiClient();
   const { data, error, loading, reload } = useData<AccountDetail>(`accounts/${locationId}`);
   const [owner, setOwner] = useState<string | null>(null);
@@ -39,9 +41,11 @@ export function AccountDetailView({ locationId, go, agency }: { locationId: stri
 
   return (
     <div>
-      <div className="mb-4 print:hidden">
-        <Btn variant="ghost" onClick={() => go("accounts")}>← All accounts</Btn>
-      </div>
+      {!limited && (
+        <div className="mb-4 print:hidden">
+          <Btn variant="ghost" onClick={() => go("accounts")}>← All accounts</Btn>
+        </div>
+      )}
 
       {/* Printed reports start with a clear header. */}
       <div className="mb-6 hidden print:block">
@@ -160,9 +164,10 @@ export function AccountDetailView({ locationId, go, agency }: { locationId: stri
         </Card>
       </div>
 
+      {!limited && (
       <div className="mt-4 print:hidden">
         <Card title="Account controls">
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-3">
             <div>
               <label htmlFor="owner" className="mb-1 block text-sm font-medium">Account owner</label>
               <div className="flex gap-2">
@@ -175,9 +180,15 @@ export function AccountDetailView({ locationId, go, agency }: { locationId: stri
               <p className="mb-2 text-xs text-muted-foreground">Use for snapshot templates and test accounts. Ignored accounts are left out of totals, alerts and reports.</p>
               <Btn disabled={busy} onClick={() => act(() => api.put(`accounts/${locationId}/flags`, { ignored: !a.ignored }), a.ignored ? "Account is counted again." : "Account ignored.")}>{a.ignored ? "Stop ignoring" : "Ignore account"}</Btn>
             </div>
+            <div>
+              <p className="mb-1 text-sm font-medium">Let this client open SubSync</p>
+              <p className="mb-2 text-xs text-muted-foreground">Their own staff get a read-only view of this account only: no other clients, no fees, no notes. {data.clientView ? "It is on." : "It is off."}</p>
+              <Btn disabled={busy} onClick={() => act(() => api.put(`accounts/${locationId}/flags`, { clientView: !data.clientView }), data.clientView ? "Client view switched off." : "Client view switched on.")}>{data.clientView ? "Switch off" : "Switch on"}</Btn>
+            </div>
           </div>
         </Card>
       </div>
+      )}
     </div>
   );
 }

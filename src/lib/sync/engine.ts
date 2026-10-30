@@ -1,3 +1,4 @@
+import { isBusinessKey, locationOfBusinessKey } from "../access";
 import { refreshInsights } from "../analytics/service";
 import { sql } from "../db";
 import { getInstalledLocations, getLocationToken } from "../ghl/client";
@@ -88,6 +89,8 @@ export async function scheduleDailyRefresh(): Promise<number> {
 const tokenCache = new Map<string, { token: string; expiresAt: number }>();
 
 async function tokenForLocation(companyId: string, locationId: string): Promise<string> {
+  // A client account that installed the app for itself holds its own location token.
+  if (isBusinessKey(companyId)) return getCompanyAccessToken(companyId);
   const key = `${companyId}:${locationId}`;
   const hit = tokenCache.get(key);
   if (hit && hit.expiresAt - Date.now() > 5 * 60_000) return hit.token;
@@ -104,6 +107,16 @@ const DONE: Outcome = { done: true };
 
 async function handleLocations(job: Job): Promise<Outcome> {
   const db = sql();
+  // A business install has exactly one account: itself.
+  if (isBusinessKey(job.companyId)) {
+    const only = locationOfBusinessKey(job.companyId);
+    await db`
+      insert into locations (installation_id, location_id) values (${job.installationId}, ${only})
+      on conflict (installation_id, location_id) do nothing`;
+    await enqueueJobs(job.installationId, [only], PER_LOCATION);
+    await enqueueJobs(job.installationId, [null], ["metrics"]);
+    return DONE;
+  }
   const agencyToken = await getCompanyAccessToken(job.companyId);
   const appId = process.env.GHL_APP_ID;
   if (!appId) throw new Error("Missing environment variable GHL_APP_ID");
@@ -333,12 +346,14 @@ export async function runSlice(budgetMs = 45_000): Promise<SliceResult> {
   return { jobs, failed, moreWork: pending.n > 0 };
 }
 
-export async function syncStatus(installationId: string) {
+// `onlyLocation` limits the report to one account (a business or client view), keeping other accounts' jobs out of it.
+export async function syncStatus(installationId: string, onlyLocation?: string | null) {
   const db = sql();
+  const loc = onlyLocation ?? null;
   const [jobs, [last], failures] = await Promise.all([
-    db`select status, count(*)::int n from sync_jobs where installation_id = ${installationId} group by status`,
-    db`select max(finished_at) f from sync_jobs where installation_id = ${installationId} and status = 'done'`,
-    db`select type, location_id, error from sync_jobs where installation_id = ${installationId} and status = 'failed' order by finished_at desc limit 5`,
+    db`select status, count(*)::int n from sync_jobs where installation_id = ${installationId} and (${loc}::text is null or location_id = ${loc} or location_id is null) group by status`,
+    db`select max(finished_at) f from sync_jobs where installation_id = ${installationId} and status = 'done' and (${loc}::text is null or location_id = ${loc} or location_id is null)`,
+    db`select type, location_id, error from sync_jobs where installation_id = ${installationId} and status = 'failed' and (${loc}::text is null or location_id = ${loc}) order by finished_at desc limit 5`,
   ]);
   return {
     pending: jobs.filter((j) => j.status === "pending" || j.status === "running").reduce((s, j) => s + j.n, 0),

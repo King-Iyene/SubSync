@@ -10,6 +10,9 @@ export type Session = {
   role: string | null;
   userName: string | null;
   demo: boolean;
+  /** "agency" when absent (older sessions). A business or client session is limited to one account. */
+  kind?: "agency" | "business" | "client";
+  locationId?: string | null;
   exp: number;
 };
 

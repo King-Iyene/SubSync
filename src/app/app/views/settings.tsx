@@ -10,7 +10,7 @@ type S = { staleDays: number; dormantDays: number; slaHours: number; appDomain: 
 
 export function SettingsView() {
   const api = useApiClient();
-  const { data, error, loading, reload } = useData<{ settings: S; slackConfigured: boolean }>("settings");
+  const { data, error, loading, reload } = useData<{ settings: S; slackConfigured: boolean; kind?: string; clientView?: { on: number; total: number } | null }>("settings");
   const sync = useData<SyncStatus>("sync");
   const keys = useData<{ keys: Array<{ id: string; name: string; prefix: string; createdAt: string; lastUsedAt: string | null }>; max: number; endpoint: string }>("api-keys");
   const [keyName, setKeyName] = useState("");
@@ -64,6 +64,7 @@ export function SettingsView() {
     setMsg(null);
     try {
       await fn();
+      void reload();
       setMsg({ ok: true, text: done });
     } catch (e) {
       setMsg({ ok: false, text: (e as Error).message });
@@ -103,6 +104,19 @@ export function SettingsView() {
           <textarea id="custom" rows={4} className={inputClass} value={checklist} onChange={(e) => setChecklist(e.target.value)} placeholder={"Send welcome gift\nCollect testimonial"} />
           <p className="mt-1 text-xs text-muted-foreground">These appear on every account&apos;s checklist next to the automatic checks.</p>
         </Card>
+
+        {data.clientView && (
+          <Card title="Client access">
+            <p className="mb-3 text-sm text-muted-foreground">
+              Let your clients&apos; own staff open SubSync inside their account. They see a read-only view of that one account only: never other clients, your fees, notes or settings.
+              Right now it is on for {data.clientView.on} of {data.clientView.total} accounts. You can also switch it on per client from the account page.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Btn disabled={busy} onClick={() => call(() => api.put("settings", { clientViewAll: true }), "Client view is on for every account.")}>Switch on for all</Btn>
+              <Btn disabled={busy} onClick={() => call(() => api.put("settings", { clientViewAll: false }), "Client view is off for every account.")}>Switch off for all</Btn>
+            </div>
+          </Card>
+        )}
 
         <Card title="Slack">
           <p className="mb-3 text-sm text-muted-foreground">

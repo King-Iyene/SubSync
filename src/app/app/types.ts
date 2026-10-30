@@ -18,7 +18,7 @@ export type ScoreComponent = { key: string; label: string; points: number; max: 
 
 export type Overview = {
   demo: boolean;
-  plan: "free" | "paid";
+  plan: "free" | "starter" | "pro";
   entitlements: { enforced: boolean; accountLimit: number | null; features: Record<string, boolean> };
   hiddenAccounts: number;
   kpis: {
@@ -69,4 +69,5 @@ export type AccountDetail = {
   domains: DomainCheck[];
   alerts: AlertItem[];
   settings: { staleDays: number; dormantDays: number; slaHours: number };
+  clientView?: boolean;
 };

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { businessKey } from "@/lib/access";
 import { sql } from "@/lib/db";
 import { getInstallation, purgeInstallation, purgeLocationData } from "@/lib/ghl/installations";
 import { actionFor, parseWebhook, verifyWebhook } from "@/lib/ghl/webhook";
@@ -31,15 +32,23 @@ export async function POST(request: Request) {
     const action = actionFor(event.type);
     if (action.kind === "ignore" || !event.companyId) return NextResponse.json({ ok: true });
 
+    // A client account that installed the app for itself has its own install, keyed by its location.
+    const own = event.locationId ? await getInstallation(businessKey(event.locationId)) : null;
     const installation = await getInstallation(event.companyId);
     if (action.kind === "uninstall") {
-      // A single client account removing the app deletes just its data; the agency removing it
-      // deletes everything and the tokens.
+      // A client account that installed for itself and removed the app: drop its own install.
+      if (own) await purgeInstallation(own.companyId);
+      // A single client account removing the app deletes just its data from the agency's install;
+      // the agency removing it deletes everything and the tokens.
       if (event.locationId && installation) await purgeLocationData(installation.id, event.locationId);
-      else await purgeInstallation(event.companyId);
-    } else if (installation) {
-      if (action.kind === "install") await enqueueFullSync(installation.id);
-      else if (action.kind === "resync" && event.locationId) await enqueueAreaSync(installation.id, event.locationId, action.scope);
+      else if (!own) await purgeInstallation(event.companyId);
+    } else {
+      // The account may be covered by its own install, the agency's, or both.
+      for (const target of [own, installation]) {
+        if (!target) continue;
+        if (action.kind === "install") await enqueueFullSync(target.id);
+        else if (action.kind === "resync" && event.locationId) await enqueueAreaSync(target.id, event.locationId, action.scope);
+      }
     }
     return NextResponse.json({ ok: true });
   } catch (error) {

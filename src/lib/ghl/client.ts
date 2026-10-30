@@ -81,25 +81,39 @@ async function postForm<T>(
   return (await response.json()) as T;
 }
 
-export function exchangeCode(code: string): Promise<TokenResponse> {
+export type TokenKind = "Company" | "Location";
+
+function exchangeAs(code: string, userType: TokenKind): Promise<TokenResponse> {
   return postForm<TokenResponse>("/oauth/token", {
     client_id: required("GHL_CLIENT_ID"),
     client_secret: required("GHL_CLIENT_SECRET"),
     grant_type: "authorization_code",
     code,
-    user_type: "Company",
+    user_type: userType,
     redirect_uri: redirectUri(),
   });
 }
 
+// An agency install returns a Company token; a client account installing for itself returns a
+// Location token. The code does not say which, so ask for a Company token first and, if the
+// platform refuses it, ask for a Location token.
+export async function exchangeCode(code: string): Promise<TokenResponse> {
+  try {
+    return await exchangeAs(code, "Company");
+  } catch (error) {
+    if (error instanceof GhlError && error.status >= 400 && error.status < 500) return exchangeAs(code, "Location");
+    throw error;
+  }
+}
+
 // Every refresh returns a NEW refresh token and invalidates the old one.
-export function refreshTokens(refreshToken: string): Promise<TokenResponse> {
+export function refreshTokens(refreshToken: string, userType: TokenKind = "Company"): Promise<TokenResponse> {
   return postForm<TokenResponse>("/oauth/token", {
     client_id: required("GHL_CLIENT_ID"),
     client_secret: required("GHL_CLIENT_SECRET"),
     grant_type: "refresh_token",
     refresh_token: refreshToken,
-    user_type: "Company",
+    user_type: userType,
   });
 }
 

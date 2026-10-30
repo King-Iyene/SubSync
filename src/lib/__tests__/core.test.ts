@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { generateKeyPairSync, sign } from "node:crypto";
 import { test } from "node:test";
-import { accountLimit, canUse, entitlements, normalisePlan } from "../entitlements.ts";
+import { accountLimit, canUse, entitlements, normalisePlan, planFromMarketplaceId } from "../entitlements.ts";
 import { actionFor, parseWebhook, verifyWebhook } from "../ghl/webhook.ts";
 import { churnRisk, engagementScore, isDormant, scoreBand, type AccountMetrics } from "../scoring.ts";
 import { bearerToken, signSession, verifySession } from "../session.ts";
@@ -46,13 +46,34 @@ test("plans are only enforced when switched on", () => {
   assert.equal(canUse("inbox", "free", false), true);
   assert.equal(canUse("inbox", "free", true), false);
   assert.equal(canUse("search", "free", true), true);
-  assert.equal(canUse("inbox", "paid", true), true);
+  assert.equal(canUse("inbox", "pro", true), true);
   assert.equal(accountLimit("free", true), 5);
   assert.equal(accountLimit("free", false), null);
-  assert.equal(accountLimit("paid", true), null);
-  assert.equal(normalisePlan("paid"), "paid");
+  assert.equal(accountLimit("pro", true), null);
+  assert.equal(accountLimit("starter", true), null);
+  assert.equal(normalisePlan("paid"), "pro");
   assert.equal(normalisePlan("anything"), "free");
   assert.equal(entitlements("free", true).features.pipelines, false);
+});
+
+test("starter unlocks the daily tools, pro unlocks everything", () => {
+  assert.equal(canUse("pipelines", "starter", true), true);
+  assert.equal(canUse("calls", "starter", true), true);
+  assert.equal(canUse("reports", "starter", true), false);
+  assert.equal(canUse("exports", "starter", true), false);
+  assert.equal(canUse("ai", "starter", true), false);
+  assert.equal(canUse("reports", "pro", true), true);
+  assert.equal(canUse("builder", "pro", true), true);
+});
+
+test("marketplace plan ids map to tiers through GHL_PLAN_IDS", () => {
+  const env = { GHL_PLAN_IDS: JSON.stringify({ abc: "starter", def: "pro" }) };
+  assert.equal(planFromMarketplaceId("abc", env), "starter");
+  assert.equal(planFromMarketplaceId("def", env), "pro");
+  assert.equal(planFromMarketplaceId("zzz", env), null);
+  assert.equal(planFromMarketplaceId(undefined, env), null);
+  assert.equal(planFromMarketplaceId("abc", {}), null);
+  assert.equal(planFromMarketplaceId("abc", { GHL_PLAN_IDS: "not json" }), null);
 });
 
 // --- scoring
