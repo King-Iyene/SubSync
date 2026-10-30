@@ -37,9 +37,19 @@ async function exchange(body: unknown): Promise<{ ok: boolean; status: number; d
   return { ok: res.ok, status: res.status, data: (await res.json().catch(() => ({}))) as SsoResponse };
 }
 
+// `/app#deals` or `/app#account=<id>` opens that view first. Handy for demos and screenshots;
+// the signed-in session is still required to see any data.
+function viewFromHash(): { id: ViewId; locationId?: string } {
+  if (typeof window === "undefined") return { id: "overview" };
+  const hash = window.location.hash.slice(1);
+  if (hash.startsWith("account=") && hash.length > 8) return { id: "account", locationId: decodeURIComponent(hash.slice(8)) };
+  const match = NAV.find((n) => n.id === hash);
+  return { id: match ? match.id : "overview" };
+}
+
 export function Dashboard() {
   const [auth, setAuth] = useState<Auth>({ status: "waiting" });
-  const [view, setView] = useState<{ id: ViewId; locationId?: string }>({ id: "overview" });
+  const [view, setView] = useState<{ id: ViewId; locationId?: string }>(viewFromHash);
   // Embedded in the host page: ask the parent who the user is. Assume embedded during server
   // render so the first paint matches.
   const embedded = useSyncExternalStore(() => () => {}, () => window.parent !== window, () => true);

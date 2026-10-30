@@ -114,6 +114,10 @@ export async function seedDemo(): Promise<{ installationId: string; accounts: nu
     values (${DEMO_COMPANY_ID}, 'Demo Agency', 'paid', true, ${ago(90)}) returning id`;
   const installationId = inst.id as string;
   await db`insert into settings (installation_id) values (${installationId})`;
+  // So the "Data sync" card shows a recent completed sync instead of "never".
+  await db`
+    insert into sync_jobs (installation_id, type, status, started_at, finished_at)
+    values (${installationId}, 'locations', 'done', ${ago(0.01)}, ${ago(0.008)})`;
 
   // An account with fresh unread inbound messages is, by definition, active today.
   const profiles = PROFILES.map((p) => (p.unread > 0 ? { ...p, activeDays: 0 } : p));
@@ -229,6 +233,21 @@ export async function seedDemo(): Promise<{ installationId: string; accounts: nu
     const current = { up: 84, flat: 70, down: 44, dead: 12 }[p.trend];
     const start = { up: 58, flat: 70, down: 82, dead: 55 }[p.trend];
     const history: Record<string, unknown>[] = [];
+    // Ramp the other trend lines toward what is really stored, so charts join up with today.
+    const [real] = await db`
+      select
+        count(*) filter (where status = 'open')::int as open_n,
+        coalesce(sum(monetary_value) filter (where status = 'open'), 0)::float8 as open_v
+      from cached_opportunities where installation_id = ${installationId} and location_id = ${locationId}`;
+    const [mix] = await db`
+      select
+        count(*)::float8 as n,
+        count(*) filter (where nullif(email, '') is not null)::float8 as e,
+        count(*) filter (where nullif(phone, '') is not null)::float8 as p,
+        count(*) filter (where cardinality(tags) > 0)::float8 as t
+      from cached_contacts where installation_id = ${installationId} and location_id = ${locationId}`;
+    const realCompleteness = mix.n > 0 ? ((mix.e + mix.p + mix.t) / (3 * mix.n)) * 100 : 0;
+    const valueStart = { up: 0.7, flat: 0.95, down: 1.1, dead: 1.0 }[p.trend];
     for (let d = 30; d >= 1; d--) {
       const t = (30 - d) / 29;
       const score = Math.max(0, Math.min(100, Math.round(start + (current - start) * t + (r() - 0.5) * 4)));
@@ -237,9 +256,10 @@ export async function seedDemo(): Promise<{ installationId: string; accounts: nu
         contacts: Math.round(p.contacts * (0.9 + 0.1 * t)),
         // Declining accounts used to bring in far more new contacts than they do now.
         new_contacts_30d: Math.round(p.newPerMonth * (p.trend === "down" ? 6 - 5 * t : 0.6 + 0.4 * t)),
-        open_opportunities: p.open, open_value: Math.round(p.open * (p.value[0] + p.value[1]) / 2),
-        stale_opportunities: Math.round(p.open * p.staleShare), unread_conversations: p.unread,
-        completeness_pct: Math.round(p.quality * 100 * 0.85), engagement_score: score,
+        open_opportunities: real.open_n,
+        open_value: Math.round(real.open_v * (valueStart + (1 - valueStart) * t) * (1 + (r() - 0.5) * 0.04)),
+        stale_opportunities: Math.round(real.open_n * p.staleShare), unread_conversations: p.unread,
+        completeness_pct: Math.round(realCompleteness * (0.93 + 0.07 * t)), engagement_score: score,
       });
     }
     if (history.length) await db`insert into account_metrics_daily ${db(history as never)}`;
