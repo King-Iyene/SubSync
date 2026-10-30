@@ -1,6 +1,11 @@
 // Starts the app in demo mode on port 3100, runs the API integration checks, then stops the server.
 // Usage: node --env-file=.env.local scripts/with-dev-server.mjs
 import { spawn, spawnSync } from "node:child_process";
+import { mkdirSync } from "node:fs";
+
+// Optional: SHOTS=pipeline,contacts captures those views (full height) into .tmp-shots/ for a visual check.
+const shots = (process.env.SHOTS ?? "").split(",").filter(Boolean);
+const CHROME = process.env.CHROME_PATH ?? "C:/Program Files/Google/Chrome/Application/chrome.exe";
 
 const PORT = 3100;
 const server = spawn("npx", ["next", "dev", "-p", String(PORT)], {
@@ -30,6 +35,13 @@ try {
   if (!(await waitUp())) throw new Error("Dev server did not start");
   const run = spawnSync("node", ["--env-file=.env.local", "--import", "tsx", "scripts/check-api.ts"], { stdio: "inherit", shell: true });
   code = run.status ?? 1;
+  const dir = `${process.cwd()}/.tmp-shots`;
+  if (shots.length) mkdirSync(dir, { recursive: true });
+  for (const hash of shots) {
+    const r = spawnSync(CHROME, ["--headless=new", "--disable-gpu", "--hide-scrollbars", "--window-size=1600,2600", "--virtual-time-budget=40000",
+      `--screenshot=${dir}/${hash.replace(/[^a-z0-9=-]/gi, "_")}.png`, `http://localhost:${PORT}/app#${hash}`], { encoding: "utf8" });
+    if (r.error || r.status) console.error("screenshot failed", hash, r.error?.message ?? r.status, (r.stderr ?? "").slice(-200));
+  }
 } catch (e) {
   console.error(e instanceof Error ? e.message : e);
 } finally {

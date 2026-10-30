@@ -1,0 +1,68 @@
+import { sql } from "../db";
+import type { Deal } from "./pipeline-intel";
+
+const ms = (v: unknown) => (v instanceof Date ? v.getTime() : null);
+
+// All deals for the installation (ignored accounts left out), with pipeline and stage names. When
+// the plan limits accounts, `allowed` lists the visible ones. Capped so one huge agency cannot
+// exhaust memory; the cap keeps the most recently active deals.
+export async function loadDeals(installationId: string, allowed: string[] | null, locationId?: string): Promise<Deal[]> {
+  const db = sql();
+  const only = locationId ? db`and o.location_id = ${locationId}` : db``;
+  const limited = allowed ? db`and o.location_id = any(${allowed}::text[])` : db``;
+  const rows = await db`
+    select o.opportunity_id, o.location_id, l.name location_name, coalesce(o.pipeline_id, '') pipeline_id,
+      coalesce(pl.name, 'Pipeline') pipeline_name, o.stage_id, coalesce(st.nm, 'Unknown stage') stage_name, coalesce(st.ord, 999)::int stage_order,
+      o.name, o.contact_name, coalesce(o.monetary_value, 0)::float8 value, o.status,
+      o.created_remote_at, o.last_stage_change_at, o.last_status_change_at,
+      greatest(o.last_action_at, o.updated_remote_at) last_activity_at
+    from cached_opportunities o
+    join locations l on l.installation_id = o.installation_id and l.location_id = o.location_id and not l.ignored
+    left join pipelines pl on pl.installation_id = o.installation_id and pl.location_id = o.location_id and pl.pipeline_id = o.pipeline_id
+    left join lateral (
+      select s->>'name' nm, t.ord from jsonb_array_elements(coalesce(pl.stages, '[]'::jsonb)) with ordinality t(s, ord)
+      where s->>'id' = o.stage_id limit 1
+    ) st on true
+    where o.installation_id = ${installationId} ${only} ${limited}
+    order by coalesce(greatest(o.last_action_at, o.updated_remote_at, o.last_stage_change_at), o.created_remote_at, o.synced_at) desc nulls last
+    limit 60000`;
+  return rows.map((r) => ({
+    opportunityId: r.opportunity_id, locationId: r.location_id, locationName: r.location_name, pipelineId: r.pipeline_id,
+    pipelineName: r.pipeline_name, stageId: r.stage_id, stageName: r.stage_name, stageOrder: r.stage_order, name: r.name,
+    contactName: r.contact_name, value: r.value, status: r.status, createdAt: ms(r.created_remote_at),
+    stageChangedAt: ms(r.last_stage_change_at), statusChangedAt: ms(r.last_status_change_at), lastActivityAt: ms(r.last_activity_at),
+  }));
+}
+
+export async function pipelineTrend(installationId: string, allowed: string[] | null, days = 60) {
+  const db = sql();
+  const limited = allowed ? db`and m.location_id = any(${allowed}::text[])` : db``;
+  const rows = await db`
+    select m.day, sum(m.open_value)::float8 open_value, sum(m.open_opportunities)::int open_opps
+    from account_metrics_daily m
+    join locations l on l.installation_id = m.installation_id and l.location_id = m.location_id and not l.ignored
+    where m.installation_id = ${installationId} and m.day > current_date - ${days}::int ${limited}
+    group by m.day order by m.day`;
+  return rows.map((r) => ({ day: (r.day instanceof Date ? r.day.toISOString() : String(r.day)).slice(0, 10), openValue: r.open_value as number, openOpps: r.open_opps as number }));
+}
+
+export const GOAL_METRICS = ["monthly_revenue", "monthly_leads", "monthly_deals_won"] as const;
+export type GoalMetric = (typeof GOAL_METRICS)[number];
+
+export async function getGoals(installationId: string): Promise<Partial<Record<GoalMetric, number>>> {
+  const rows = await sql()`select metric, target::float8 target from goals where installation_id = ${installationId}`;
+  const out: Partial<Record<GoalMetric, number>> = {};
+  for (const r of rows) if ((GOAL_METRICS as readonly string[]).includes(r.metric)) out[r.metric as GoalMetric] = r.target;
+  return out;
+}
+
+export async function setGoal(installationId: string, metric: GoalMetric, target: number | null) {
+  const db = sql();
+  if (target === null) {
+    await db`delete from goals where installation_id = ${installationId} and metric = ${metric}`;
+    return;
+  }
+  await db`
+    insert into goals (installation_id, metric, target) values (${installationId}, ${metric}, ${target})
+    on conflict (installation_id, metric) do update set target = excluded.target, updated_at = now()`;
+}

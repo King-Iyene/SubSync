@@ -15,6 +15,11 @@ import { createKey, listKeys, MAX_KEYS, revokeKey } from "../mcp/store";
 import { postToSlack } from "../notify";
 import { enqueueFullSync, enqueueLocationSync, runSlice, syncStatus } from "../sync/engine";
 import { integrationHealth } from "../analytics/health";
+import {
+  abandonedDeals, accountSummaries, agingBuckets, avgCycleDays, coverage, deadPipeline, forecast, pipelineSummaries, riskyDeals, stageTable,
+  valueDistribution, winLossByMonth, winRate,
+} from "../analytics/pipeline-intel";
+import { getGoals, GOAL_METRICS, loadDeals, pipelineTrend, setGoal, type GoalMetric } from "../analytics/pipeline-queries";
 import { authenticate, isResponse, json, type AuthContext } from "./auth";
 
 // All authenticated data endpoints live behind /api/app/<path>. Each one needs a valid signed
@@ -449,6 +454,58 @@ async function syncStart(ctx: Ctx) {
   return json({ ok: true, ...slice, status: await syncStatus(ctx.installationId) });
 }
 
+async function allowedIds(ctx: Ctx): Promise<string[] | null> {
+  const limit = accountLimit(ctx.plan, ctx.entitlements.enforced);
+  return limit === null ? null : visibleLocationIds(ctx.installationId, limit);
+}
+
+async function pipelineIntel(ctx: Ctx) {
+  const location = ctx.url.searchParams.get("location") ?? undefined;
+  if (location && !LOCATION_ID.test(location)) return json({ error: "Invalid account" }, 400);
+  const [allowed, goals] = await Promise.all([allowedIds(ctx), getGoals(ctx.installationId)]);
+  const [deals, trend, sc] = await Promise.all([loadDeals(ctx.installationId, allowed, location), pipelineTrend(ctx.installationId, allowed), scope(ctx)]);
+  const now = Date.now();
+  const opens = deals.filter((d) => d.status === "open");
+  const openValue = opens.reduce((s, d) => s + d.value, 0);
+  const link = (d: { locationId: string }) => sc.links.opportunities(d.locationId);
+  const risky = riskyDeals(deals, now, 20).map((d) => ({ ...d, url: link(d) }));
+  const aband = abandonedDeals(deals, now);
+  const dead = deadPipeline(deals, now);
+  return json({
+    totals: { open: opens.length, openValue, won: deals.filter((d) => d.status === "won").length, lost: deals.filter((d) => d.status === "lost").length, winRate: winRate(deals), avgCycleDays: avgCycleDays(deals) },
+    forecast: forecast(deals, now),
+    coverage: coverage(openValue, goals.monthly_revenue ?? null),
+    stages: stageTable(deals, now),
+    aging: agingBuckets(deals, now),
+    distribution: valueDistribution(deals),
+    winLoss: winLossByMonth(deals, now),
+    risky,
+    abandoned: { total: aband.total, value: aband.value, deals: aband.deals.slice(0, 15).map((d) => ({ ...d, url: link(d) })) },
+    dead: { total: dead.total, rows: dead.rows.slice(0, 15).map((row) => ({ ...row.deal, reasons: row.reasons, url: link(row.deal) })) },
+    accounts: location ? [] : accountSummaries(deals, now),
+    pipelines: pipelineSummaries(deals).slice(0, 40),
+    trend,
+    goals,
+  });
+}
+
+async function goalsView(ctx: Ctx) {
+  return json({ goals: await getGoals(ctx.installationId) });
+}
+
+async function goalsUpdate(ctx: Ctx) {
+  const body = (await ctx.request.json().catch(() => null)) as { metric?: unknown; target?: unknown } | null;
+  if (!body || typeof body.metric !== "string" || !(GOAL_METRICS as readonly string[]).includes(body.metric)) return json({ error: "Unknown goal" }, 400);
+  if (body.target === null) {
+    await setGoal(ctx.installationId, body.metric as GoalMetric, null);
+    return json({ ok: true });
+  }
+  const target = Number(body.target);
+  if (!Number.isFinite(target) || target <= 0 || target > 1_000_000_000) return json({ error: "Enter a positive number" }, 400);
+  await setGoal(ctx.installationId, body.metric as GoalMetric, target);
+  return json({ ok: true });
+}
+
 async function healthView(ctx: Ctx) {
   return json(await integrationHealth(ctx.installationId, ctx.demo));
 }
@@ -479,7 +536,7 @@ async function digestPreview(ctx: Ctx) {
 
 const FEATURE_FOR: Record<string, Feature> = {
   search: "search", onboarding: "onboarding", stale: "stale", inbox: "inbox", pipelines: "pipelines", duplicates: "duplicates", email: "email",
-  alerts: "alerts", settings: "settings", export: "exports", digest: "reports", "api-keys": "ai", hygiene: "stale",
+  alerts: "alerts", settings: "settings", export: "exports", digest: "reports", "api-keys": "ai", hygiene: "stale", "pipeline-intel": "pipelines",
 };
 
 export async function handle(request: Request, segments: string[]): Promise<Response> {
@@ -511,6 +568,8 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       if (a === "export" && b) return await exportCsv(ctx, b);
       if (a === "sync") return json(await syncStatus(ctx.installationId));
       if (a === "health") return await healthView(ctx);
+      if (a === "pipeline-intel") return await pipelineIntel(ctx);
+      if (a === "goals") return await goalsView(ctx);
       if (a === "digest") return await digestPreview(ctx);
     }
     if (method === "POST") {
@@ -528,6 +587,7 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
     }
     if (method === "PUT") {
       if (a === "settings") return await settingsUpdate(ctx);
+      if (a === "goals") return await goalsUpdate(ctx);
       if (a === "accounts" && b && LOCATION_ID.test(b) && c === "flags") return await flags(ctx, b);
       if (a === "accounts" && b && LOCATION_ID.test(b) && c === "tasks") return await taskUpdate(ctx, b);
     }

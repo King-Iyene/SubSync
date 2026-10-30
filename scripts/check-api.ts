@@ -200,6 +200,23 @@ async function main() {
   assert.equal((await call("/api/app/sync/not valid!", { method: "POST", token })).status, 404);
   console.log("health + resync: ok");
 
+  // --- pipeline intelligence + goals
+  const pi = await call("/api/app/pipeline-intel", { token });
+  assert.equal(pi.status, 200);
+  assert.ok(pi.body.totals.open > 100, "open deals");
+  assert.ok(pi.body.risky.length > 0 && pi.body.risky[0].score >= pi.body.risky[pi.body.risky.length - 1].score, "risk sorted");
+  assert.equal(pi.body.aging.buckets.length, 4);
+  assert.ok(pi.body.stages.length >= 5);
+  assert.ok(pi.body.accounts.length >= 10);
+  assert.equal((await call("/api/app/pipeline-intel?location=bad id!", { token })).status, 400);
+  assert.equal((await call("/api/app/goals", { method: "PUT", token, body: JSON.stringify({ metric: "monthly_revenue", target: -5 }) })).status, 400);
+  assert.equal((await call("/api/app/goals", { method: "PUT", token, body: JSON.stringify({ metric: "nope", target: 5 }) })).status, 400);
+  assert.equal((await call("/api/app/goals", { method: "PUT", token, body: JSON.stringify({ metric: "monthly_revenue", target: 50000 }) })).status, 200);
+  const covered = await call("/api/app/pipeline-intel", { token });
+  assert.equal(covered.body.coverage.target, 50000);
+  assert.equal((await call("/api/app/goals", { method: "PUT", token, body: JSON.stringify({ metric: "monthly_revenue", target: null }) })).status, 200);
+  console.log("pipeline intelligence + goals: ok");
+
   // Leave the demo data as we found it.
   await sql()`delete from domain_checks where domain in ('example-demo.com', 'other-demo.org')`;
   await closeDb();
