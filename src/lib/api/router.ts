@@ -28,6 +28,8 @@ import { accountHistory, clientExtras, periodFigures, saveProfile, type ClientEx
 import { dailyPriorities, replyAging, setupScore, worstDomainStatus, type SetupFacts } from "../analytics/comms-intel";
 import { afterHours, communicationGaps } from "../analytics/comms-queries";
 import { badDataSamples, contactOverview, topLeads, vips } from "../analytics/contact-queries";
+import { buildQueue, recordBulk, recordDecision, summarise, undoDecision } from "../analytics/dedupe-queries";
+import { bulkSelect, groupKey } from "../analytics/dedupe";
 import { contactTimeline, dndSummary, leadSources, recentDealMoves, setTeamName, teamStats, upcomingBirthdays } from "../analytics/people-queries";
 import { sourceConversion, teamLabel, teamWinRate } from "../analytics/people-intel";
 import { getGoals, GOAL_METRICS, loadDeals, pipelineTrend, setGoal, type GoalMetric } from "../analytics/pipeline-queries";
@@ -250,14 +252,64 @@ async function pipelines(ctx: Ctx) {
 }
 
 async function duplicates(ctx: Ctx) {
-  const { permits, links } = await scope(ctx);
-  const groups = (await duplicateGroups(ctx.installationId, 300, ctx.limitTo ?? undefined)).filter((g) => permits(g.locationId));
+  const sc = await scope(ctx);
+  const allowed = await allowedIds(ctx);
+  const showReviewed = ctx.url.searchParams.get("reviewed") === "1";
+  const q = await buildQueue(ctx.installationId, allowed);
+  const summary = await summarise(ctx.installationId, allowed, q.open, q.reviews.size);
+  const list = (showReviewed ? q.all : q.open).slice(0, 60);
   return json({
-    groups: groups.map((g) => ({
-      ...g, key: g.kind === "phone" ? g.key : g.key,
-      contacts: g.contactIds.map((id, i) => ({ id, name: g.names[i], url: links.contact(g.locationId, id) })),
+    summary, truncated: q.truncated, canReview: ctx.kind !== "client",
+    groups: list.map((g) => ({
+      key: g.key, locationId: g.locationId, locationName: g.locationName, confidence: g.confidence, reasons: g.reasons, kind: g.kind,
+      survivorId: g.survivorId, plan: g.plan, review: q.reviews.get(g.locationId + ":" + g.key) ?? null,
+      people: g.people.map((p) => ({ ...p, url: sc.links.contact(g.locationId, p.contactId) })),
     })),
   });
+}
+
+const actorOf = (ctx: Ctx) => ctx.session.userName ?? ctx.session.userId ?? null;
+
+async function duplicateReview(ctx: Ctx) {
+  const body = (await ctx.request.json().catch(() => null)) as { locationId?: unknown; contactIds?: unknown; decision?: unknown; keepContactId?: unknown } | null;
+  const ids = Array.isArray(body?.contactIds) ? body.contactIds : [];
+  if (typeof body?.locationId !== "string" || !LOCATION_ID.test(body.locationId) || ids.length < 2 || ids.length > 40 || ids.some((i) => typeof i !== "string" || !LOCATION_ID.test(i))) {
+    return json({ error: "Send the account and the contacts in the group" }, 400);
+  }
+  const decision = body.decision;
+  if (decision !== "keep" && decision !== "not_duplicate" && decision !== "merged_in_platform") return json({ error: "Unknown decision" }, 400);
+  const keep = typeof body.keepContactId === "string" ? body.keepContactId : null;
+  if (decision !== "not_duplicate" && !keep) return json({ error: "Choose the record to keep" }, 400);
+  const contactIds = ids as string[];
+  const result = await recordDecision(ctx.installationId, await allowedIds(ctx), actorOf(ctx), {
+    locationId: body.locationId, key: groupKey(contactIds), decision, keepContactId: decision === "not_duplicate" ? null : keep, contactIds,
+  });
+  return result === "ok" ? json({ ok: true }) : json({ error: "Those contacts were not found" }, 404);
+}
+
+async function duplicateBulk(ctx: Ctx) {
+  const body = (await ctx.request.json().catch(() => null)) as { decision?: unknown; minConfidence?: unknown; maxConfidence?: unknown; dryRun?: unknown } | null;
+  const decision = body?.decision;
+  if (decision !== "not_duplicate" && decision !== "keep") return json({ error: "Unknown action" }, 400);
+  const min = Number(body?.minConfidence);
+  const max = body?.maxConfidence === undefined ? 100 : Number(body.maxConfidence);
+  if (!Number.isFinite(min) || !Number.isFinite(max) || min < 0 || max > 100 || min > max) return json({ error: "Choose a confidence range between 0 and 100" }, 400);
+  const q = await buildQueue(ctx.installationId, await allowedIds(ctx));
+  const chosen = bulkSelect(q.open, new Set(), min, max).slice(0, 500);
+  // A dry run (the default) changes nothing: it only says what would be recorded.
+  if (body?.dryRun !== false) {
+    return json({
+      dryRun: true, count: chosen.length, contacts: chosen.reduce((s, g) => s + g.people.length, 0),
+      sample: chosen.slice(0, 8).map((g) => ({ locationName: g.locationName, confidence: g.confidence, reasons: g.reasons, names: g.people.map((p) => p.name) })),
+    });
+  }
+  return json({ ok: true, count: await recordBulk(ctx.installationId, actorOf(ctx), decision, chosen) });
+}
+
+async function duplicateUndo(ctx: Ctx) {
+  const body = (await ctx.request.json().catch(() => null)) as { locationId?: unknown; key?: unknown } | null;
+  if (typeof body?.locationId !== "string" || !LOCATION_ID.test(body.locationId) || typeof body.key !== "string" || !/^[0-9a-f]{8}-\d{1,3}$/.test(body.key)) return json({ error: "Invalid request" }, 400);
+  return (await undoDecision(ctx.installationId, await allowedIds(ctx), actorOf(ctx), body.locationId, body.key)) ? json({ ok: true }) : json({ error: "Decision not found" }, 404);
 }
 
 async function emailHealth(ctx: Ctx) {
@@ -921,6 +973,9 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
     }
     if (method === "POST") {
       if (a === "email" && b === "check") return await emailCheck(ctx);
+      if (a === "duplicates" && b === "review") return await duplicateReview(ctx);
+      if (a === "duplicates" && b === "bulk") return await duplicateBulk(ctx);
+      if (a === "duplicates" && b === "undo") return await duplicateUndo(ctx);
       if (a === "alerts" && b && c === "dismiss") {
         await dismissAlert(ctx.installationId, b);
         return json({ ok: true });

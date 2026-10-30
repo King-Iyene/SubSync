@@ -159,6 +159,7 @@ async function handleStructure(job: Job): Promise<Outcome> {
         name = coalesce(${details.name}, name), email = coalesce(${details.email}, email), phone = coalesce(${details.phone}, phone),
         website = coalesce(${details.website}, website), timezone = coalesce(${details.timezone}, timezone),
         address = coalesce(${details.address}, address), calendar_count = ${calendars}, pipeline_count = ${pipelines.length},
+        allow_duplicate_contact = coalesce(${details.allowDuplicateContact}::boolean, allow_duplicate_contact),
         structure_synced_at = now(), sync_error = null
       where installation_id = ${job.installationId} and location_id = ${loc}`;
     await tx`delete from pipelines where installation_id = ${job.installationId} and location_id = ${loc}`;

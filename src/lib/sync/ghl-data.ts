@@ -172,6 +172,8 @@ export type LocationDetails = {
   website: string | null;
   timezone: string | null;
   address: string | null;
+  /** The account's "allow duplicate contact" setting, when the platform returns it. */
+  allowDuplicateContact: boolean | null;
 };
 
 export function mapLocationDetails(raw: unknown): LocationDetails {
@@ -183,6 +185,7 @@ export function mapLocationDetails(raw: unknown): LocationDetails {
     phone: str(r.phone),
     website: str(r.website),
     timezone: str(r.timezone),
+    allowDuplicateContact: typeof rec(r.settings).allowDuplicateContact === "boolean" ? (rec(r.settings).allowDuplicateContact as boolean) : null,
     address: address || null,
   };
 }
