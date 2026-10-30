@@ -1,3 +1,4 @@
+import { sql } from "../db";
 import { buildDigest, onboardingChecklist, toCsv, type DerivedAccount } from "../analytics/derive";
 import {
   allManualTasks, dismissAlert, domainCandidates, duplicateGroups, inbox, listAlerts, listDomainChecks, manualTasks, metricsTrend,
@@ -12,7 +13,8 @@ import { accountLimit, canUse, type Feature } from "../entitlements";
 import { purgeSyncedData } from "../ghl/installations";
 import { createKey, listKeys, MAX_KEYS, revokeKey } from "../mcp/store";
 import { postToSlack } from "../notify";
-import { enqueueFullSync, runSlice, syncStatus } from "../sync/engine";
+import { enqueueFullSync, enqueueLocationSync, runSlice, syncStatus } from "../sync/engine";
+import { integrationHealth } from "../analytics/health";
 import { authenticate, isResponse, json, type AuthContext } from "./auth";
 
 // All authenticated data endpoints live behind /api/app/<path>. Each one needs a valid signed
@@ -447,6 +449,19 @@ async function syncStart(ctx: Ctx) {
   return json({ ok: true, ...slice, status: await syncStatus(ctx.installationId) });
 }
 
+async function healthView(ctx: Ctx) {
+  return json(await integrationHealth(ctx.installationId, ctx.demo));
+}
+
+async function resyncOne(ctx: Ctx, locationId: string) {
+  if (ctx.demo) return json({ ok: true, demo: true });
+  const known = await sql()`select 1 from locations where installation_id = ${ctx.installationId} and location_id = ${locationId}`;
+  if (known.length === 0) return json({ error: "Account not found" }, 404);
+  await enqueueLocationSync(ctx.installationId, locationId);
+  const slice = await runSlice(15_000);
+  return json({ ok: true, ...slice });
+}
+
 async function testSlack(ctx: Ctx) {
   const { settings } = await loadAccounts(ctx.installationId);
   if (!settings.slackWebhookUrl) return json({ error: "Add a Slack webhook URL first" }, 400);
@@ -495,6 +510,7 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       if (a === "settings") return await settingsView(ctx);
       if (a === "export" && b) return await exportCsv(ctx, b);
       if (a === "sync") return json(await syncStatus(ctx.installationId));
+      if (a === "health") return await healthView(ctx);
       if (a === "digest") return await digestPreview(ctx);
     }
     if (method === "POST") {
@@ -503,7 +519,8 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
         await dismissAlert(ctx.installationId, b);
         return json({ ok: true });
       }
-      if (a === "sync") return await syncStart(ctx);
+      if (a === "sync" && b && LOCATION_ID.test(b)) return await resyncOne(ctx, b);
+      if (a === "sync" && !b) return await syncStart(ctx);
       if (a === "settings" && b === "test-slack") return await testSlack(ctx);
       if (a === "settings" && b === "purge") return await purgeData(ctx);
       if (a === "api-keys" && !b) return await keysCreate(ctx);

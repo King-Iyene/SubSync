@@ -52,6 +52,11 @@ export async function enqueueFullSync(installationId: string): Promise<number> {
   return enqueueJobs(installationId, [null], ["locations"]);
 }
 
+// Re-sync everything for one account (the "Resync" button). No-op while jobs are already queued.
+export async function enqueueLocationSync(installationId: string, locationId: string): Promise<number> {
+  return enqueueJobs(installationId, [locationId], PER_LOCATION);
+}
+
 // Re-sync one area of one account (used by webhooks). Cheap to call repeatedly: it is a no-op
 // while an identical job is already queued.
 export async function enqueueAreaSync(installationId: string, locationId: string, area: "contacts" | "opportunities" | "conversations" | "structure"): Promise<number> {

@@ -11,6 +11,7 @@ import { DealsView } from "./views/deals";
 import { DuplicatesView } from "./views/duplicates";
 import { EmailHealthView } from "./views/email-health";
 import { HelpView } from "./views/help";
+import { FreshnessStrip } from "./views/health-card";
 import { InboxView } from "./views/inbox";
 import { OnboardingView } from "./views/onboarding";
 import { OverviewView } from "./views/overview";
@@ -201,7 +202,7 @@ export function Dashboard() {
                 className={`shrink-0 rounded-full px-3 py-1 text-sm ${n.id === active ? "bg-muted font-medium" : "text-muted-foreground"}`}>{n.label}</button>
             ))}
           </nav>
-          <main className="flex-1 p-4 sm:p-8">{content}</main>
+          <main className="flex-1 p-4 sm:p-8"><FreshnessStrip />{content}</main>
         </div>
       </div>
     </ApiProvider>

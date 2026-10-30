@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useApiClient, useData } from "../session";
 import type { SyncStatus } from "../types";
 import { Btn, Card, ErrorBox, inputClass, Loading, PageHeader, timeAgo } from "../ui";
+import { HealthCard } from "./health-card";
 
 type S = { staleDays: number; dormantDays: number; slaHours: number; appDomain: string; digestEnabled: boolean; customChecklist: string[] };
 
@@ -172,6 +173,7 @@ export function SettingsView() {
           <p className="mt-1 text-xs text-muted-foreground">White-label agencies: use your own domain so &quot;Open&quot; links land in your branded app.</p>
         </Card>
 
+        <div className="lg:col-span-2"><HealthCard /></div>
         <Card title="Data sync">
           {sync.data ? (
             <p className="text-sm text-muted-foreground">Last completed {timeAgo(sync.data.lastFinishedAt)} · {sync.data.pending} queued · {sync.data.failed} failed. Data refreshes automatically about once a day and as changes arrive.</p>

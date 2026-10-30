@@ -191,6 +191,15 @@ async function main() {
   assert.equal((await mcp({ jsonrpc: "2.0", id: 1, method: "ping" })).status, 401, "a revoked key stops working at once");
   console.log("hygiene + api keys + AI connector: ok");
 
+  // --- health + per-account resync
+  const hl = await call("/api/app/health", { token });
+  assert.equal(hl.status, 200);
+  assert.equal(hl.body.level, "healthy");
+  assert.ok(hl.body.accounts.length >= 13);
+  assert.equal((await call(`/api/app/sync/${hl.body.accounts[0].locationId}`, { method: "POST", token })).status, 200);
+  assert.equal((await call("/api/app/sync/not valid!", { method: "POST", token })).status, 404);
+  console.log("health + resync: ok");
+
   // Leave the demo data as we found it.
   await sql()`delete from domain_checks where domain in ('example-demo.com', 'other-demo.org')`;
   await closeDb();
