@@ -13,3 +13,7 @@ export async function POST(request: Request, ctx: Ctx) {
 export async function PUT(request: Request, ctx: Ctx) {
   return handle(request, (await ctx.params).path);
 }
+
+export async function DELETE(request: Request, ctx: Ctx) {
+  return handle(request, (await ctx.params).path);
+}

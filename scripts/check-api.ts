@@ -229,6 +229,39 @@ async function main() {
   assert.ok(ci.body.quality.total === ci.body.lifecycle.total);
   console.log("contact intelligence: ok");
 
+  // --- call queue, saved lists, outcomes
+  const cq = await call("/api/app/call-queue?preset=hot_uncontacted", { token });
+  assert.equal(cq.status, 200);
+  assert.ok(cq.body.rows.length > 0, "hot list has people");
+  assert.ok(cq.body.rows[0].priority >= cq.body.rows[cq.body.rows.length - 1].priority, "sorted by priority");
+  for (const p of cq.body.presets) {
+    const r = await call(`/api/app/call-queue?preset=${p.id}`, { token });
+    assert.equal(r.status, 200, p.id);
+  }
+  assert.equal((await call("/api/app/call-queue?preset=nope", { token })).status, 400);
+  assert.equal((await call("/api/app/call-queue?preset=custom&idleDays=-3", { token })).status, 400);
+  assert.equal((await call("/api/app/call-queue?preset=custom&tag=vip&deal=open", { token })).status, 200);
+  const first = cq.body.rows[0];
+  assert.equal((await call("/api/app/call-outcomes", { method: "POST", token, body: JSON.stringify({ locationId: first.locationId, contactId: "does-not-exist", outcome: "booked" }) })).status, 404);
+  assert.equal((await call("/api/app/call-outcomes", { method: "POST", token, body: JSON.stringify({ locationId: first.locationId, contactId: first.contactId, outcome: "ghosted" }) })).status, 400);
+  assert.equal((await call("/api/app/call-outcomes", { method: "POST", token, body: JSON.stringify({ locationId: first.locationId, contactId: first.contactId, outcome: "voicemail" }) })).status, 200);
+  const after = await call("/api/app/call-queue?preset=hot_uncontacted", { token });
+  assert.ok(!after.body.rows.some((r: { contactId: string; locationId: string }) => r.contactId === first.contactId && r.locationId === first.locationId), "called contact is hidden");
+  const sum = await call(`/api/app/call-outcomes?since=${encodeURIComponent(new Date(Date.now() - 600000).toISOString())}`, { token });
+  assert.equal(sum.status, 200);
+  assert.ok(sum.body.session.calls >= 1);
+  assert.equal((await call("/api/app/call-outcomes?since=2001-01-01", { token })).status, 400);
+  const made2 = await call("/api/app/call-lists", { method: "POST", token, body: JSON.stringify({ name: "check-api list", filters: { preset: "custom", tag: "vip" } }) });
+  assert.equal(made2.status, 200);
+  assert.equal((await call("/api/app/call-lists", { method: "POST", token, body: JSON.stringify({ name: "", filters: {} }) })).status, 400);
+  assert.equal((await call("/api/app/call-lists", { method: "POST", token, body: JSON.stringify({ name: "x", filters: { preset: "hack" } }) })).status, 400);
+  const ls = await call("/api/app/call-lists", { token });
+  assert.ok(ls.body.lists.some((l: { id: string }) => l.id === made2.body.id));
+  assert.equal((await call(`/api/app/call-lists/${made2.body.id}`, { method: "DELETE", token })).status, 200);
+  assert.equal((await call(`/api/app/call-lists/${made2.body.id}`, { method: "DELETE", token })).status, 404);
+  assert.equal((await call("/api/app/call-lists/not-a-uuid", { method: "DELETE", token })).status, 404);
+  console.log("call queue + lists + outcomes: ok");
+
   // Leave the demo data as we found it.
   await sql()`delete from domain_checks where domain in ('example-demo.com', 'other-demo.org')`;
   await closeDb();

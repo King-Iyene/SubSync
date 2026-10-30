@@ -19,6 +19,7 @@ export const FEATURES = [
   "reports",
   "exports",
   "ai",
+  "calls",
   "settings",
 ] as const;
 export type Feature = (typeof FEATURES)[number];

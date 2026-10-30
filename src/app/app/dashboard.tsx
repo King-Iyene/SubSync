@@ -7,6 +7,7 @@ import { Badge } from "./ui";
 import { AccountDetailView } from "./views/account-detail";
 import { AccountsView } from "./views/accounts";
 import { AlertsView } from "./views/alerts";
+import { CallsView } from "./views/calls";
 import { DealsView } from "./views/deals";
 import { DuplicatesView } from "./views/duplicates";
 import { EmailHealthView } from "./views/email-health";
@@ -174,6 +175,7 @@ export function Dashboard() {
       case "help": return <HelpView go={go} />;
       case "pipeline": return <PipelineView />;
       case "leads": return <LeadsView />;
+      case "calls": return <CallsView />;
     }
   })();
 

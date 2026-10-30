@@ -19,6 +19,8 @@ import {
   abandonedDeals, accountSummaries, agingBuckets, avgCycleDays, coverage, deadPipeline, forecast, pipelineSummaries, riskyDeals, stageTable,
   valueDistribution, winLossByMonth, winRate,
 } from "../analytics/pipeline-intel";
+import { OUTCOME_LABEL, PRESETS, parseFilters, parseOutcome } from "../analytics/call-intel";
+import { callQueue, createCallList, deleteCallList, listCallLists, logOutcome, MAX_LISTS, outcomeSummary, speedToLead } from "../analytics/call-queries";
 import { badDataSamples, contactOverview, topLeads, vips } from "../analytics/contact-queries";
 import { getGoals, GOAL_METRICS, loadDeals, pipelineTrend, setGoal, type GoalMetric } from "../analytics/pipeline-queries";
 import { authenticate, isResponse, json, type AuthContext } from "./auth";
@@ -505,6 +507,56 @@ async function contactIntel(ctx: Ctx) {
   });
 }
 
+async function callQueueView(ctx: Ctx) {
+  const params = Object.fromEntries(ctx.url.searchParams.entries());
+  const parsed = parseFilters(params);
+  if (!parsed.ok) return json({ error: parsed.error }, 400);
+  const allowed = await allowedIds(ctx);
+  const [queue, speed, summary, sc] = await Promise.all([
+    callQueue(ctx.installationId, allowed, parsed.filters), speedToLead(ctx.installationId, allowed), outcomeSummary(ctx.installationId), scope(ctx),
+  ]);
+  return json({
+    presets: PRESETS, filters: parsed.filters, outcomes: OUTCOME_LABEL, total: queue.total, speedToLead: speed, summary,
+    rows: queue.rows.map((row) => ({ ...row, url: sc.links.contact(row.locationId, row.contactId) })),
+  });
+}
+
+async function callListsView(ctx: Ctx) {
+  return json({ lists: await listCallLists(ctx.installationId), max: MAX_LISTS });
+}
+
+async function callListCreate(ctx: Ctx) {
+  const body = (await ctx.request.json().catch(() => null)) as { name?: unknown; filters?: unknown } | null;
+  const name = typeof body?.name === "string" ? body.name.trim() : "";
+  if (name.length < 1 || name.length > 60) return json({ error: "Give the list a name (up to 60 characters)" }, 400);
+  const parsed = parseFilters(body?.filters);
+  if (!parsed.ok) return json({ error: parsed.error }, 400);
+  const made = await createCallList(ctx.installationId, name, parsed.filters);
+  if (made === "too_many") return json({ error: `You can save up to ${MAX_LISTS} lists. Delete one first.` }, 400);
+  return json({ ok: true, id: made.id });
+}
+
+async function callListDelete(ctx: Ctx, id: string) {
+  return (await deleteCallList(ctx.installationId, id)) ? json({ ok: true }) : json({ error: "List not found" }, 404);
+}
+
+async function callOutcomeCreate(ctx: Ctx) {
+  const parsed = parseOutcome(await ctx.request.json().catch(() => null));
+  if (!parsed.ok) return json({ error: parsed.error }, 400);
+  const ok = await logOutcome(ctx.installationId, await allowedIds(ctx), parsed.value);
+  return ok ? json({ ok: true }) : json({ error: "Contact not found" }, 404);
+}
+
+async function callOutcomesView(ctx: Ctx) {
+  const raw = ctx.url.searchParams.get("since");
+  let since: Date | undefined;
+  if (raw) {
+    since = new Date(raw);
+    if (Number.isNaN(since.getTime()) || Date.now() - since.getTime() > 86_400_000 || since.getTime() > Date.now() + 60_000) return json({ error: "Invalid start time" }, 400);
+  }
+  return json(await outcomeSummary(ctx.installationId, since));
+}
+
 async function goalsView(ctx: Ctx) {
   return json({ goals: await getGoals(ctx.installationId) });
 }
@@ -552,7 +604,7 @@ async function digestPreview(ctx: Ctx) {
 
 const FEATURE_FOR: Record<string, Feature> = {
   search: "search", onboarding: "onboarding", stale: "stale", inbox: "inbox", pipelines: "pipelines", duplicates: "duplicates", email: "email",
-  alerts: "alerts", settings: "settings", export: "exports", digest: "reports", "api-keys": "ai", hygiene: "stale", "pipeline-intel": "pipelines", "contact-intel": "activity",
+  alerts: "alerts", settings: "settings", export: "exports", digest: "reports", "api-keys": "ai", hygiene: "stale", "pipeline-intel": "pipelines", "contact-intel": "activity", "call-queue": "calls", "call-lists": "calls", "call-outcomes": "calls",
 };
 
 export async function handle(request: Request, segments: string[]): Promise<Response> {
@@ -586,6 +638,9 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       if (a === "health") return await healthView(ctx);
       if (a === "pipeline-intel") return await pipelineIntel(ctx);
       if (a === "contact-intel") return await contactIntel(ctx);
+      if (a === "call-queue") return await callQueueView(ctx);
+      if (a === "call-lists") return await callListsView(ctx);
+      if (a === "call-outcomes") return await callOutcomesView(ctx);
       if (a === "goals") return await goalsView(ctx);
       if (a === "digest") return await digestPreview(ctx);
     }
@@ -597,10 +652,15 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       }
       if (a === "sync" && b && LOCATION_ID.test(b)) return await resyncOne(ctx, b);
       if (a === "sync" && !b) return await syncStart(ctx);
+      if (a === "call-lists" && !b) return await callListCreate(ctx);
+      if (a === "call-outcomes" && !b) return await callOutcomeCreate(ctx);
       if (a === "settings" && b === "test-slack") return await testSlack(ctx);
       if (a === "settings" && b === "purge") return await purgeData(ctx);
       if (a === "api-keys" && !b) return await keysCreate(ctx);
       if (a === "api-keys" && b && c === "revoke") return await keysRevoke(ctx, b);
+    }
+    if (method === "DELETE") {
+      if (a === "call-lists" && b && /^[0-9a-fA-F-]{36}$/.test(b)) return await callListDelete(ctx, b);
     }
     if (method === "PUT") {
       if (a === "settings") return await settingsUpdate(ctx);

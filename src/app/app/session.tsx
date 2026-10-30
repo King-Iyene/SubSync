@@ -20,6 +20,7 @@ export type Api = {
   get: <T>(path: string) => Promise<T>;
   post: <T>(path: string, body?: unknown) => Promise<T>;
   put: <T>(path: string, body?: unknown) => Promise<T>;
+  del: <T>(path: string) => Promise<T>;
   download: (path: string, filename: string) => Promise<void>;
   demo: boolean;
 };
@@ -60,6 +61,7 @@ export function makeApi(initialToken: string, refresh: () => Promise<string | nu
     get: async (path) => parse(await request("GET", path)),
     post: async (path, body) => parse(await request("POST", path, body ?? {})),
     put: async (path, body) => parse(await request("PUT", path, body ?? {})),
+    del: async (path) => parse(await request("DELETE", path)),
     download: async (path, filename) => {
       const res = await request("GET", path);
       if (!res.ok) throw new ApiError(res.status, await res.json().catch(() => ({})));
