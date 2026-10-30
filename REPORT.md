@@ -227,3 +227,58 @@ Verified: 11 unit tests (own-range comparison, ranking, sync trouble outranks bu
 | Printable client report | White-label per client | Their own summary | Monthly retainer deliverable |
 
 Billing was not changed; plans are described in `docs/PERMISSIONS_AND_PRICING.md`.
+
+## Step 5: engineering quality (commit eaa4102, live) and what I checked
+
+| Item | State | Evidence |
+| --- | --- | --- |
+| Webhooks for incremental sync plus periodic reconciliation | Already in place: signed webhooks queue a re-sync of just the area that changed (contacts, deals, conversations); a daily refresh and the 5 minute worker reconcile. New: deal stage and status changes are now logged between syncs | `src/app/api/webhooks/ghl/route.ts`, `src/lib/sync/engine.ts`, `src/lib/sync/deal-events.ts` |
+| GHL rate limits | Documented limits are 100 requests per 10 seconds and 200,000 a day per app per account. Calls go through one wrapper with exponential backoff, jitter and Retry-After, and the sync works one account at a time, about 5 calls a second at most. The rate-limit headers are read but not yet used to slow down early | `src/lib/ghl/http.ts` |
+| Token refresh, revoked access, uninstall | Refresh tokens rotate with a compare-and-swap so two workers cannot break the chain. Uninstall now also deletes fees, notes, goals, call logs, team names and review decisions (before, only synced data went). New: if SubSync loses its connection to the agency, Today shows a red notice instead of silently showing old numbers. A business install refreshes its own token | `src/lib/ghl/installations.ts`, digest-service |
+| Large agencies | Indexes exist on contact search, account and installation keys. Duplicate detection reads at most 8,000 candidate contacts per run and says when it truncated. Measured on real data: one account with about 9,500 contacts and 2,535 duplicate groups loads in a few seconds. **Not load-tested at 100+ accounts or 100,000+ contacts**; the Today and Accounts screens score every account in memory, which is fine at hundreds of accounts but should be measured | audit run, 30 Oct 2026 |
+| Scopes | Requested: locations, contacts, opportunities, calendars and conversations (read only) plus oauth read and write for the agency install. Nothing in this round needed a new one. Each unlock needs a decision by King: appointments need calendar events, real team names need users, a one-click merge would need contacts write and is not recommended | `docs/PERMISSIONS_AND_PRICING.md` |
+| Loading, empty and error states, accurate "last synced" | Every new screen has all three. "Last synced" comes from the last finished sync job; sync progress (accounts read, jobs left) shows on Getting started and as a notice on Today | integration tests, screenshots |
+| Getting started | Rebuilt: ticks itself off from real state (connected, sync progress, opened Today, searched, reviewed duplicates, daily brief scheduled, client view). Steps 1 and 2 no longer both say "Open Overview". The FAQ no longer says "agency users only" | `src/app/app/views/help.tsx`, integration test |
+
+Sidebar sections merged or removed because they stayed shallow: Deals now lives inside Pipeline ("Pipeline and deals"), Email health inside Onboarding (now "Setup"), Alerts under Today, and the Overview's "Today's priorities" card was removed because Today does it better. The menu went from 17 items to 14.
+
+## What I could not verify live, and why
+
+- **Getting started click-through on the real account.** The browser pane kept being resized and hidden while I was working (its screenshots timed out and clicks stopped landing), so I could not drive the live page past the first screen. What I did see live: the new 13-item menu and the Today page on the real accounts, built from the deployed version. The checklist itself is covered by integration tests and a screenshot on demo data.
+- **Duplicate protection setting on the real accounts.** The live screen shows "Setting not shown by the platform" because no sync has returned the flag yet; I could not call the platform from my machine (production tokens are encrypted with a key I do not have, which is correct). Whether the platform exposes the flag at all remains unconfirmed. The guide covers the case where it does not.
+- **A real second account installing or a client's staff signing in** (see Part A).
+- **The Slack delivery of the daily brief** was not sent live: no Slack webhook is set on the test agency, and I may not add one. The text is unit tested and the hourly job returns 401 without its secret.
+
+## Skipped or blocked, and why
+
+| Item | Reason |
+| --- | --- |
+| Email delivery of the daily brief and monthly reports | Needs an email service key (a secret). The Slack path is complete; email only needs a provider connected |
+| Automatic monthly white-label report email | Same email blocker. A branded printable client report exists (QBR); automatic sending and a public share link were not built because a public link exposes client data and needs a security decision |
+| Missed calls, failing workflows, wallet balance, failed payments, A2P registration status | The APIs or scopes are not available to this app (workflows are closed beta). Listed in the app under "Not watched yet" |
+| Appointments (28 features) and real team names | Need `calendars/events.readonly` and `users.readonly`, a change to what installers approve. Not changed |
+| Merging duplicates from inside SubSync | The platform has no safe public merge call. The review queue records decisions and the user merges in the platform |
+| Config drift against a baseline | The API exposes little more than pipeline names and calendar counts, so it would be a thin check; scored low and left out |
+| Configurable lead score weights, custom report builder, Excel export | Lower priority than the items above; not started |
+| 100+ account and 100,000+ contact load test | Not run |
+
+## Recommended next, in order
+
+1. Decide on the calendar events and users permissions (unlocks appointments and real team names). Add them to the app in the portal first, then the code can follow.
+2. Connect an email service (a Resend or Postmark key added by King as a secret) so the daily brief and a monthly client report can go by email; then build the monthly report with the agency's name and colour.
+3. Make the Inbox rank by recency and value: it still lists month-old dead threads first. Cap them or move them to a "stale conversations" tab.
+4. Plug the rate-limit headers into the sync so it slows down before a 429, then run a load test at 100 accounts and 100,000 contacts.
+5. Do one real sub-account install end to end (a second test account) to confirm the token exchange fallback, then switch on plan enforcement once the plans exist in the portal (steps in `docs/PERMISSIONS_AND_PRICING.md`).
+
+## Everything shipped in Round 2
+
+| Commit | What |
+| --- | --- |
+| 89ccbd3 | Sub-account mode: business install, client view, three plan tiers, access rules |
+| 3644945 | Lead sources, do-not-disturb, birthdays, team, deal movement log, contact timeline, permissions and pricing guide |
+| e8e48fb | Duplicates review queue |
+| e2466f2 | Daily brief (Today) with Slack schedule |
+| eaa4102 | Getting started with real state, merged sidebar sections, lost-connection notice |
+| REPORT commits | b0406d6, 174a1e6 and this one |
+
+Tests at the end: 169 unit tests and the full HTTP integration check pass. Every push built on Vercel and passed the live probes (12 URLs, including the two protected cron routes).
