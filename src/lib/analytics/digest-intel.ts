@@ -177,7 +177,7 @@ export function freshness(lastSyncAt: string | null, now = Date.now()): { hours:
 // ---------- text for Slack ----------
 
 export function digestText(agency: string, d: { attention: Attention[]; fine: number; headlines: Headline[]; freshnessLabel: string }, appUrl: string): string {
-  const lines = [`*SubSync daily brief for ${agency}*`];
+  const lines = [`*Daily brief for ${agency}*`];
   const bit = (h: Headline) => {
     const c = h.change;
     const v = h.money ? money(c.today) : String(Math.round(c.today));

@@ -100,3 +100,26 @@ test("white-label check: an unknown share link", async ({ page }) => {
   await page.goto("/audit/not-a-real-share-id");
   check("unknown share link", await surface(page), false);
 });
+
+// A company that sets its own business name never sees the product name on the screens, in the tab title or in tooltips.
+test("white-label check: the product name is replaced by the company's own name", async ({ page }) => {
+  test.setTimeout(240_000);
+  const token = await demoSession(page);
+  const headers = { Authorization: `Bearer ${token}` };
+  const put = await page.request.put("/api/app/settings", { headers, data: { brandName: "Acme Marketing" } });
+  expect(put.ok(), await put.text()).toBeTruthy();
+  try {
+    for (const view of ["today", "audit", "speed", "appointments", "accounts", "onboarding", "settings", "help"]) {
+      await page.goto(`/app#${view}`);
+      await page.reload();
+      await expect(page.getByText("Demo mode", { exact: false }).first()).toBeVisible();
+      await page.waitForLoadState("networkidle").catch(() => undefined);
+      await page.waitForTimeout(1500);
+      const s = await surface(page);
+      expect(s.text, `#${view} still shows the product name`).not.toMatch(/subsync/i);
+      expect(s.text, `#${view} does not show the company's own name`).toContain("Acme Marketing");
+    }
+  } finally {
+    await page.request.put("/api/app/settings", { headers, data: { brandName: null } });
+  }
+});

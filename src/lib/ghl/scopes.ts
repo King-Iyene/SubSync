@@ -26,12 +26,17 @@ export const GHL_SCOPES = [
   "locations/tasks.write",
 ] as const;
 
-export function buildInstallUrl(clientId: string, redirectUri: string): string {
+// The platform's own help article (OAuth consent for marketplace apps) says branded installs use the leadconnectorhq host, which
+// the platform allows under its white-label rules. The standard host names the platform, so it is only used when asked for.
+export const BRANDED_INSTALL_HOST = "marketplace.leadconnectorhq.com";
+export const STANDARD_INSTALL_HOST = "marketplace.gohighlevel.com";
+
+export function buildInstallUrl(clientId: string, redirectUri: string, host: string = BRANDED_INSTALL_HOST): string {
   const params = new URLSearchParams({
     response_type: "code",
     redirect_uri: redirectUri,
     client_id: clientId,
     scope: GHL_SCOPES.join(" "),
   });
-  return `https://marketplace.gohighlevel.com/oauth/chooselocation?${params.toString()}`;
+  return `https://${host}/oauth/chooselocation?${params.toString()}`;
 }

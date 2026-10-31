@@ -289,7 +289,7 @@ export function buildDigest(agency: string, accounts: DerivedAccount[], openAler
   const stale = live.reduce((s, a) => s + a.revenueAtRisk, 0);
   const waiting = live.reduce((s, a) => s + a.unanswered, 0);
   const lines = [
-    `*SubSync weekly summary for ${agency}*`,
+    `*Weekly summary for ${agency}*`,
     `${live.length} client accounts, ${live.filter((a) => a.dormant).length} dormant, ${openAlerts} open alerts`,
     `${money(stale)} sitting in stale deals, ${waiting} conversations waiting past the SLA`,
   ];

@@ -44,7 +44,9 @@ export async function POST(request: Request) {
       userName: kind === "agency" ? "Demo Admin" : "Demo Owner", activeLocation: locationId,
     };
     const session = signSession({ companyId: DEMO_COMPANY_ID, userId: user.userId, role: user.role, userName: user.userName, demo: true, kind, locationId });
-    return NextResponse.json({ user, installed: true, demo: true, kind, session, entitlements: await resolveEntitlements("pro", undefined, true) });
+    const demoInstall = await getInstallation(DEMO_COMPANY_ID).catch(() => null);
+    const brand = demoInstall ? await brandOf(demoInstall.id) : { name: null, color: null };
+    return NextResponse.json({ user, installed: true, demo: true, kind, session, entitlements: await resolveEntitlements("pro", undefined, true), brand });
   }
 
   const sharedSecret = process.env.GHL_SSO_KEY;

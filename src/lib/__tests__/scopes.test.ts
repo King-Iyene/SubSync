@@ -28,3 +28,9 @@ test("the install link carries every permission and the redirect address", () =>
   assert.equal(url.searchParams.get("response_type"), "code");
   assert.deepEqual((url.searchParams.get("scope") ?? "").split(" ").sort(), [...GHL_SCOPES].sort());
 });
+
+test("the install link uses the branded host by default and the standard host only when asked", () => {
+  assert.equal(new URL(buildInstallUrl("c", "https://x.test/cb")).hostname, "marketplace.leadconnectorhq.com");
+  assert.equal(new URL(buildInstallUrl("c", "https://x.test/cb")).pathname, "/oauth/chooselocation");
+  assert.equal(new URL(buildInstallUrl("c", "https://x.test/cb", "marketplace.gohighlevel.com")).hostname, "marketplace.gohighlevel.com");
+});

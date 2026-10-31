@@ -7,6 +7,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { NAV, type GoFn, type ViewId } from "./nav";
+import { useBrandedText } from "./brand-text";
 import { ApiProvider, makeApi, type Api } from "./session";
 import { AccountDetailView } from "./views/account-detail";
 import { AccountsView } from "./views/accounts";
@@ -193,6 +194,7 @@ export function Dashboard() {
   const [filter, setFilter] = useState<{ industry: string; owner: string; hideTest: boolean }>({ industry: "", owner: "", hideTest: false });
   const filterQuery = [filter.industry && `industry=${encodeURIComponent(filter.industry)}`, filter.owner && `owner=${encodeURIComponent(filter.owner)}`, filter.hideTest && "hideTest=1"].filter(Boolean).join("&");
   const baseApi = auth.status === "ready" ? auth.api : null;
+  useBrandedText(auth.status === "ready" ? auth.brand.name : null);
   const api = useMemo(() => (baseApi ? (filterQuery ? baseApi.filtered(filterQuery) : baseApi) : null), [baseApi, filterQuery]);
 
   // Count which pages get opened, so the getting-started checklist can tick itself off.

@@ -5,7 +5,7 @@ Read this first when a session restarts. Rules: `docs/RUNBOOK.md` section 0 (one
 ## Current stage
 
 **S0.3 White-label hygiene: BUILT AND VERIFIED (31 Oct 2026).** King said to keep going without PASS or NEXT; next stage: **F1 Numbers truth**.
-Evidence: `docs/features/S0.3.md` (S0.2: `docs/features/S0.2.md`). From S0.3 on King does not need to type PASS or NEXT; every stage still writes its evidence and King's 5 checks.
+Evidence: `docs/features/S0.3.md` (S0.2: `docs/features/S0.2.md`; F1 spec: `docs/features/F1.md`). From S0.3 on King does not need to type PASS or NEXT; every stage still writes its evidence and King's 5 checks.
 
 ## Stage list (Milestone M1 first)
 
