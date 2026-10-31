@@ -7,9 +7,9 @@ import type { Feature } from "./entitlements.ts";
 
 // Brief v3, sections 7 and 8: these are deferred or avoided for now. See docs/FEATURE_STATUS.md for why.
 export const DEFAULT_OFF: ReadonlySet<Feature> = new Set<Feature>([
-  // King switched everything built back on (31 Oct). Only these stay off: Connections needs the Slack, Zoom and
-  // Fathom apps created first, and AI has no screen yet.
-  "connections", "ai",
+  // King switched everything built back on (31 Oct). Only AI stays off (no screen yet). Connections is on; a provider shows as not available until its keys are set (Slack, Zoom and
+  // Fathom apps created).
+  "ai",
 ]);
 
 export function resolveFeatures(all: readonly Feature[], overrides: Record<string, boolean>, allOn = false): Record<Feature, boolean> {
