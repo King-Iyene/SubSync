@@ -33,6 +33,7 @@ export const FEATURES = [
   "playbooks",
   "connections",
   "clients",
+  "audit",
 ] as const;
 export type Feature = (typeof FEATURES)[number];
 

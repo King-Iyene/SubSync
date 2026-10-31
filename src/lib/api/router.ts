@@ -31,6 +31,7 @@ import { dailyPriorities, replyAging, setupScore, worstDomainStatus, type SetupF
 import { afterHours, communicationGaps } from "../analytics/comms-queries";
 import { badDataSamples, contactOverview, topLeads, vips } from "../analytics/contact-queries";
 import { appointmentInsights } from "../analytics/appointment-insight-queries";
+import { auditSummary, buildAudit } from "../analytics/audit-intel";
 import { appointmentView } from "../analytics/appointment-queries";
 import { compareSetup, describe as describeDiff } from "../analytics/setup-intel";
 import { applyRun, createPreview, getRun, installationHasScope, listRuns, PREVIEW_VALID_HOURS, sampleChanges, undoRun } from "../analytics/cleanup-queries";
@@ -169,6 +170,23 @@ async function overview(ctx: Ctx) {
     attention,
     sync,
   });
+}
+
+// The instant audit: what is wrong right now, what it costs, and where to start.
+async function auditViewData(ctx: Ctx) {
+  const { settings, accounts } = await accountsFor(ctx);
+  const live = accounts.filter((a) => !a.ignored);
+  const v = await appointmentView(ctx.installationId, await allowedIds(ctx));
+  const appts = v.access.total === 0 ? null : {
+    readable: v.access.ok, total: v.access.total, needPermission: v.access.needsPermission.length,
+    unmarked: v.unmarkedTotal, noShowsToRecover: v.recoverTotal, unconfirmed48: v.unconfirmedTotal,
+  };
+  const audit = buildAudit(live.map((a) => ({
+    locationId: a.locationId, name: a.name, staleValue: a.staleValue, staleOpps: a.staleOpps, openValue: a.openValue, openOpps: a.openOpps, excludedOpen: a.excludedOpen ?? 0,
+    unanswered: a.unanswered, winRate: a.winRate, avgDealValue: a.avgDealValue, completenessPct: a.completenessPct, contacts: a.contacts,
+  })), appts);
+  const who = settings.brandName ?? (ctx.limitTo ? "Your business" : "Your agency");
+  return json({ audit, summary: auditSummary(audit, who) });
 }
 
 async function appointmentsView(ctx: Ctx) {
@@ -1274,7 +1292,7 @@ async function digestPreview(ctx: Ctx) {
 
 const FEATURE_FOR: Record<string, Feature> = {
   search: "search", onboarding: "onboarding", stale: "stale", inbox: "inbox", pipelines: "pipelines", duplicates: "duplicates", email: "email",
-  alerts: "alerts", appointments: "appointments", "appointment-insights": "appointments", meetings: "meetings", connections: "connections", cleanup: "cleanup", "setup-compare": "setup_compare", playbooks: "playbooks", daily: "overview", team: "team", "deal-events": "pipelines", contact: "search", settings: "settings", export: "exports", digest: "overview", "api-keys": "ai", hygiene: "stale", "pipeline-intel": "pipelines", "contact-intel": "activity", clients: "clients", qbr: "reports", "comms-intel": "inbox", "call-queue": "calls", "call-lists": "calls", "call-outcomes": "calls",
+  alerts: "alerts", appointments: "appointments", audit: "audit", "appointment-insights": "appointments", meetings: "meetings", connections: "connections", cleanup: "cleanup", "setup-compare": "setup_compare", playbooks: "playbooks", daily: "overview", team: "team", "deal-events": "pipelines", contact: "search", settings: "settings", export: "exports", digest: "overview", "api-keys": "ai", hygiene: "stale", "pipeline-intel": "pipelines", "contact-intel": "activity", clients: "clients", qbr: "reports", "comms-intel": "inbox", "call-queue": "calls", "call-lists": "calls", "call-outcomes": "calls",
 };
 
 export async function handle(request: Request, segments: string[]): Promise<Response> {
@@ -1292,6 +1310,7 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       if (a === "overview") return await overview(ctx);
       if (a === "daily") return await dailyView(ctx);
       if (a === "appointments") return await appointmentsView(ctx);
+      if (a === "audit") return await auditViewData(ctx);
       if (a === "appointment-insights") return await appointmentInsightsView(ctx);
       if (a === "setup-compare") return await setupCompare(ctx);
       if (a === "segments") return await segmentsView(ctx);

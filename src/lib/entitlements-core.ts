@@ -12,9 +12,8 @@ import type { Feature } from "./entitlements.ts";
 export type Tier = "free" | "pro";
 export type Mode = "open" | "enforced";
 
-// Brief section 6: Free is Instant Audit, overview, contact search and data health. Instant Audit is not
-// built yet; "overview" carries the daily brief and the audit-style numbers until it is.
-export const FREE_FEATURES: ReadonlySet<Feature> = new Set<Feature>(["overview", "search", "health", "settings"]);
+// Brief section 6: Free is Instant Audit, overview, contact search and data health.
+export const FREE_FEATURES: ReadonlySet<Feature> = new Set<Feature>(["overview", "audit", "search", "health", "settings"]);
 
 export const modeFrom = (value: string | undefined): Mode => (value === "enforced" ? "enforced" : "open");
 

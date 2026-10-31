@@ -1,5 +1,5 @@
 export type ViewId =
-  | "today" | "overview" | "accounts" | "account" | "search" | "deals" | "inbox" | "onboarding" | "email" | "duplicates" | "alerts" | "settings" | "help" | "pipeline" | "leads" | "calls" | "clients" | "team" | "appointments" | "meetings" | "cleanup";
+  | "today" | "audit" | "overview" | "accounts" | "account" | "search" | "deals" | "inbox" | "onboarding" | "email" | "duplicates" | "alerts" | "settings" | "help" | "pipeline" | "leads" | "calls" | "clients" | "team" | "appointments" | "meetings" | "cleanup";
 
 export type GoFn = (view: ViewId, locationId?: string) => void;
 
@@ -7,6 +7,7 @@ export type NavGroup = "Daily" | "Sell" | "Clients" | "Tidy up" | "";
 
 export const NAV: Array<{ id: Exclude<ViewId, "account">; label: string; feature: string; group: NavGroup }> = [
   { id: "today", label: "Today", feature: "overview", group: "Daily" },
+  { id: "audit", label: "Account audit", feature: "audit", group: "Daily" },
   { id: "overview", label: "Overview", feature: "overview", group: "Daily" },
   { id: "inbox", label: "Inbox & SLA", feature: "inbox", group: "Daily" },
   { id: "appointments", label: "Appointments", feature: "appointments", group: "Daily" },

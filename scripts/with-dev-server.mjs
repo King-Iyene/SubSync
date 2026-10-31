@@ -35,7 +35,7 @@ let code = 1;
 try {
   if (!(await waitUp())) throw new Error("Dev server did not start");
   // CHECKS=check-connections runs just one script while iterating; the default runs them all.
-  for (const name of (process.env.CHECKS ?? "check-api,check-connections,check-insights,check-tenancy,check-flags,check-metrics").split(",").filter(Boolean)) {
+  for (const name of (process.env.CHECKS ?? "check-api,check-connections,check-insights,check-tenancy,check-flags,check-metrics,check-audit").split(",").filter(Boolean)) {
     const run = spawnSync("node", ["--env-file=.env.local", "--import", "tsx", `scripts/${name}.ts`], { stdio: "inherit", shell: true });
     code = run.status ?? 1;
     if (code !== 0) break;
