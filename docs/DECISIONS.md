@@ -206,3 +206,5 @@ Format: date, decision, reason.
 - Kill switch `APP_MODE=maintenance` stops queuing, the worker, crons, sign-in and data calls but deliberately leaves install and uninstall webhooks working, so an uninstall during maintenance still deletes data.
 - Fixed a phone and tablet overflow found by the first browser run: `min-w-0` on Card and an explicit one-column base on every responsive grid.
 - Installed Vitest with `--legacy-peer-deps` (peer conflict on `@types/node`). To be resolved by upgrading `@types/node` to 22 or later.
+
+- (S0.1 incident) First push failed on Vercel: dependency peer conflict hidden by `--legacy-peer-deps`. Fixed by upgrading `@types/node` to 24. Rule added: any stage that changes dependencies must pass `npm install --dry-run` (no flags) before pushing.

@@ -27,7 +27,7 @@ Evidence: `docs/features/S0.1.md`. Next stage after PASS and NEXT: **S0.2 Identi
 - `docs/READINESS_AND_TEST_PLAN.md` is referenced by `CLAUDE.md`, the runbook and the review plan but does not exist. King to supply, or ask for it to be written.
 - The repo folder sits inside OneDrive, which locks files and breaks `next build` and `next dev` with `EPERM` errors from time to time. Moving the repo outside OneDrive is recommended (King's call).
 - Tests and the demo tenant use the same Supabase project as production. Demo rows are flagged `is_demo`, but the brief wants separate dev and production projects (King's step).
-- Vitest was installed with `--legacy-peer-deps` because `@types/node` is at 20 while Vitest 5 wants 22 or later. Production runs Node 24. Upgrade `@types/node` in a later stage.
+- (Resolved) Vitest first needed `--legacy-peer-deps`, which made the Vercel build fail. Fixed by upgrading `@types/node` to 24 (production runs Node 24); a plain `npm install` now works.
 - The 21-item Review (`docs/FULL_REVIEW_REPORT.md`, `UX_REVIEW.md`, `METRIC_AUDIT.md`, `COPY_AUDIT.md`) lists the S1 problems that F1 and F5 will fix.
 - Local database access depends on the machine having IPv6 (Supabase's direct host is IPv6 only). It was down for several hours on 31 Oct.
 
