@@ -192,3 +192,9 @@ Format: date, decision, reason.
   - Brief 13B: internal terms ("agency", "sub-account", "location") must not appear in end-user-facing content, and the UI label "Agency view" must be renamed. The app still says "Agency view" and uses "agency" in places. To be listed in the COPY_AUDIT and fixed.
   - Brief 14: "do not add features not listed here without asking". King has since asked for more (the 184-feature list in batches, real-estate source targets, shareable audit link, 15-minute refresh). Treated as King's instruction; each is flagged and reversible.
   - Brief 2A: a push to `main` goes live for every install at once. Followed: unfinished work stays behind flags, and a full production build now runs before each push.
+
+## 2026-10-31 (runbook saved)
+
+- `docs/RUNBOOK.md` saved from King's file. One stage at a time, STOP after each, wait for King's NEXT. `CLAUDE.md` wins where they disagree.
+- Still missing from the repo: `docs/READINESS_AND_TEST_PLAN.md` (referenced by the brief, the review plan and the runbook).
+- Where the repo already differs from what the runbook assumes (to settle at S0.1): tests run with Node's own test runner (283 tests), not Vitest; there is no Playwright suite; a demo tenant and a `DEMO_MODE` flag already exist; feature flags, `ENTITLEMENTS_MODE` and tenant isolation tests (384 cross-reads) already exist; there is no `APP_MODE=maintenance` kill switch, no `npm run verify` or `npm run e2e`, and no `docs/PROGRESS.md` yet.
