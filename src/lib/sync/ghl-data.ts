@@ -273,8 +273,17 @@ export async function fetchConversationMessages(token: string, locationId: strin
   const body = rec(await getJson(`/conversations/${encodeURIComponent(conversationId)}/messages`, { limit: "100", locationId }, token, "2021-04-15"));
   const inner = rec(body.messages);
   const list = Array.isArray(inner.messages) ? inner.messages : Array.isArray(body.messages) ? body.messages : [];
+  // A one-off look at what a call message carries (field names only, never content), so call recordings can be built on
+  // the real shape rather than a guess. Shows in the server logs.
+  const call = list.find((x) => /call/i.test(String(rec(x).messageType ?? rec(x).type ?? "")));
+  if (call && !callShapeLogged) {
+    callShapeLogged = true;
+    const c = rec(call);
+    console.log("probe: call message fields", { keys: Object.keys(c).sort(), meta: Object.keys(rec(c.meta)).sort(), callMeta: Object.keys(rec(rec(c.meta).call)).sort(), type: c.messageType ?? c.type });
+  }
   return list.map(mapMessage).filter((m): m is Msg => m !== null);
 }
+let callShapeLogged = false;
 
 // The people on the account (names only). Needs users.readonly.
 export async function fetchUsers(token: string, locationId: string): Promise<UserRow[]> {
