@@ -178,6 +178,11 @@ async function main() {
     assert.equal(pageA.status, 200);
     assert.ok(!htmlA.includes(B.marker), "the other agency's name is not in this agency's shared page");
     assert.ok(!htmlA.includes(`${A.marker} Location`), "its own account names are scrubbed");
+    // White-label: a prospect who opens the shared page must never read the platform's name or our internal words.
+    const noScripts = htmlA.replace(/<script[\s\S]*?<\/script>/g, " ");
+    const readable = noScripts.replace(/<style[\s\S]*?<\/style>/g, " ").replace(/<[^>]+>/g, " ");
+    assert.ok(!/gohighlevel|highlevel|leadconnector|\bghl\b/i.test(noScripts), "the shared page does not name the platform");
+    assert.ok(!/\b(agenc(y|ies)|sub-?accounts?|locations?)\b/i.test(readable), "the shared page does not use our internal words");
     const shareB = await call("/api/app/audit/share", tokenB, { method: "POST", body: "{}" });
     const idB = (JSON.parse(shareB.text).url as string).split("/").pop() as string;
     assert.notEqual(idA, idB, "every link is unique");

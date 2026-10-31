@@ -31,7 +31,7 @@ export async function handleRpc(body: unknown, tools: ToolDef[], serverVersion =
         protocolVersion: SUPPORTED.has(asked) ? asked : PROTOCOL_VERSION,
         capabilities: { tools: {} },
         serverInfo: { name: "subsync", version: serverVersion },
-        instructions: "Read-only access to an agency's client accounts: health scores, stale deals, waiting conversations, alerts and contact search.",
+        instructions: "Read-only access to your client accounts: health scores, stale deals, waiting conversations, alerts and contact search.",
       });
     }
     case "notifications/initialized":

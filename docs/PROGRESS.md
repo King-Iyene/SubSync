@@ -4,8 +4,8 @@ Read this first when a session restarts. Rules: `docs/RUNBOOK.md` section 0 (one
 
 ## Current stage
 
-**S0.2 Identity, roles and tenant isolation: PASSED by King (31 Oct 2026). Waiting for NEXT to start S0.3.**
-Evidence: `docs/features/S0.2.md` (S0.1: `docs/features/S0.1.md`). Next stage after PASS and NEXT: **S0.3 White-label hygiene**.
+**S0.3 White-label hygiene: BUILT AND VERIFIED (31 Oct 2026).** King said to keep going without PASS or NEXT; next stage: **F1 Numbers truth**.
+Evidence: `docs/features/S0.3.md` (S0.2: `docs/features/S0.2.md`). From S0.3 on King does not need to type PASS or NEXT; every stage still writes its evidence and King's 5 checks.
 
 ## Stage list (Milestone M1 first)
 
@@ -13,7 +13,7 @@ Evidence: `docs/features/S0.2.md` (S0.1: `docs/features/S0.1.md`). Next stage af
 | --- | --- | --- |
 | S0.1 | Test harness and safety rails | Passed |
 | S0.2 | Identity, roles, tenant isolation | Passed |
-| S0.3 | White-label hygiene | Not started |
+| S0.3 | White-label hygiene | Built, verified (King's checks pending, no wait) |
 | F1 | Numbers truth | Not started |
 | F2 | Speed to lead | Not started |
 | F3 | Appointments | Not started |
@@ -33,7 +33,7 @@ Evidence: `docs/features/S0.2.md` (S0.1: `docs/features/S0.1.md`). Next stage af
 
 ## Facts a fresh session needs
 
-- Run everything with `npm run verify` (typecheck, lint, build, 283 Node tests, 78 Vitest tests, plus a build-output secret scan) and `npm run e2e` (24 browser tests: 8 tests at 3 widths).
+- Run everything with `npm run verify` (typecheck, lint, build, 286 Node tests, 78 Vitest tests, plus a build-output secret scan) and `npm run e2e` (24 layout tests at 3 widths plus 30 white-label tests at desktop width).
 - Run `npx next build` before every push; a failed Vercel build keeps the last good deploy live silently.
 - Never run two test runs at once; they fight over port 3100 and the `.next` folder.
 - The demo login works only with `DEMO_MODE=true` and never when `NODE_ENV` or `VERCEL_ENV` is `production`. `APP_MODE=maintenance` is the kill switch.

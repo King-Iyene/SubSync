@@ -63,7 +63,7 @@ export async function refreshInsights(installationId: string): Promise<{ account
   }
   if (worth.length > 0 && settings.digestEmail && emailConfigured()) {
     const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/+$/, "");
-    const who = settings.brandName ?? "Your agency";
+    const who = settings.brandName ?? "Your company";
     if (await sendEmail(settings.digestEmail, alertEmail(who, worth.map((a) => ({ severity: a.severity, title: a.title })), appUrl))) await markNotified(worth.map((a) => a.id));
   }
   return { accounts: accounts.length, openAlerts: drafts.length, created: created.length };

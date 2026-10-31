@@ -18,7 +18,7 @@ const WORDS: Array<[string, string]> = [
 
 const FAQ: Array<[string, string]> = [
   ["Does SubSync change anything in my accounts?", "Almost never. It mostly reads data. The one thing it adds on its own is a note on a contact when a meeting summary arrives from a tool you connected (you can switch this off in Settings). Anything else that changes your data, such as Data cleanup, only happens after a preview and a typed confirmation, and can be undone. SubSync never deletes contacts or deals on its own."],
-  ["Who can open it?", "Agency users see every client account. A client account that installs SubSync for itself sees only its own account. A client's staff see a read-only view of their own account only if their agency switches it on."],
+  ["Who can open it?", "The people who manage your company see every client account. A client account that installs SubSync for itself sees only its own account. A client's staff see a read-only view of their own account only if your company switches it on."],
   ["Why is a number empty or zero?", "That account has not finished syncing yet, or it genuinely has no data. Step 2 above shows sync progress."],
   ["Why does Today say \"still learning\"?", "Changes are judged against an account's own last week, so a new account needs a few days of history first."],
   ["How do I hide a test account?", "Open the account and choose Ignore. It stops counting in totals and alerts."],

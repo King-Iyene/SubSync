@@ -192,7 +192,7 @@ async function computeAudit(ctx: Ctx) {
     locationId: a.locationId, name: a.name, staleValue: a.staleValue, staleOpps: a.staleOpps, openValue: a.openValue, openOpps: a.openOpps, excludedOpen: a.excludedOpen ?? 0,
     unanswered: a.unanswered, winRate: a.winRate, avgDealValue: a.avgDealValue, completenessPct: a.completenessPct, contacts: a.contacts,
   })), appts);
-  const who = settings.brandName ?? (ctx.limitTo ? "Your business" : "Your agency");
+  const who = settings.brandName ?? (ctx.limitTo ? "Your business" : "Your company");
   return { audit, who, names: live.map((a) => a.name ?? "").filter(Boolean) };
 }
 
@@ -473,7 +473,7 @@ async function startView(ctx: Ctx) {
     : synced ? `${locs.total} account${locs.total === 1 ? "" : "s"} read. Last sync finished ${status.lastFinishedAt ? agoText(status.lastFinishedAt) : "recently"}.`
     : `${locs.synced} of ${locs.total} account${locs.total === 1 ? "" : "s"} read, ${status.pending} job${status.pending === 1 ? "" : "s"} left.`;
   const steps = [
-    { id: "connected", title: "Connect SubSync", done: true, detail: agency ? "Connected to your agency." : "Connected to your account.",
+    { id: "connected", title: "Connect SubSync", done: true, detail: agency ? "Connected to all your client accounts." : "Connected to your account.",
       body: "You are signed in through the platform, so there is nothing to type. SubSync only reads your data.", view: null, cta: null },
     { id: "synced", title: "Let the first sync finish", done: synced, detail: syncDetail,
       body: "SubSync reads your " + (agency ? "client accounts" : "account") + " in the background. The first sync takes a few minutes, longer with many contacts. Numbers fill in as it goes.", view: "overview", cta: "See sync progress" },
@@ -583,7 +583,7 @@ async function accountDetail(ctx: Ctx, locationId: string) {
 async function search(ctx: Ctx) {
   const q = ctx.url.searchParams.get("q") ?? "";
   const loc = ctx.limitTo ?? ctx.url.searchParams.get("location");
-  if (loc && !LOCATION_ID.test(loc)) return json({ error: "Bad location" }, 400);
+  if (loc && !LOCATION_ID.test(loc)) return json({ error: "Bad account" }, 400);
   const [{ permits, links }, found] = await Promise.all([scope(ctx), searchContacts(ctx.installationId, q, 60, loc ?? undefined)]);
   const hits = found.filter((h) => permits(h.locationId));
   return json({ query: q, hits: hits.map((h) => ({ ...h, url: links.contact(h.locationId, h.contactId) })) });
@@ -1350,7 +1350,7 @@ async function testSlack(ctx: Ctx) {
 
 async function digestPreview(ctx: Ctx) {
   const d = await buildDailyDigest(ctx.installationId, { limitTo: ctx.limitTo, planLimit: accountLimit(ctx.plan, ctx.entitlements.enforced) });
-  return json({ text: digestText(ctx.demo ? "Demo Agency" : "your agency", { attention: d.attention, fine: d.fine.length, headlines: d.headlines, freshnessLabel: d.freshness.label }, ctx.url.origin) });
+  return json({ text: digestText(ctx.demo ? "Demo Company" : "your company", { attention: d.attention, fine: d.fine.length, headlines: d.headlines, freshnessLabel: d.freshness.label }, ctx.url.origin) });
 }
 
 // ---------------- routing ----------------

@@ -82,3 +82,12 @@ connections, appointment insights, two-agency tenant isolation, feature switches
 | Uninstall and "delete my data" purge every tenant table | Built | Real database, fixture company; schema-drift test |
 | Route guard registry and `docs/TENANCY.md` | Built | Test fails on any unlisted route |
 | Safe logging, bundle scan, history scan | Built | Scripts green; gitleaks not used (not installed) |
+
+## Runbook stage S0.3 (31 Oct 2026)
+
+| Item | Status | Tested |
+| --- | --- | --- |
+| `crmUrl` helper; every CRM link built from the white-label domain | Built | Unit tests; browser run with a fake white-label domain; not yet with a real white-label login |
+| No platform name or internal words (agency, sub-account, location) on any screen, email, error or install page | Built | Syntax-tree scan (fails the build) and 30 browser tests over 20 screens plus public pages |
+| Shared audit page wording | Built | Real shared page checked in the tenancy script |
+| Platform's own install consent screen | Not ours | Not changeable; the white-label install URL is still a CHECK |

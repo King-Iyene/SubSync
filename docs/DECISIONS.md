@@ -218,3 +218,10 @@ Format: date, decision, reason.
 - Errors are logged through `safeError`, which strips row values, emails, phone numbers and token-like strings.
 - Unknown share ids render not-found content with HTTP 200 (soft 404). Accepted for now; no data leaks. Revisit in F6.
 - gitleaks is not installed; a value search plus shape search over the full history is used instead. Installing it needs King's yes.
+
+## 2026-10-31 (runbook stage S0.3)
+
+- One link helper, `crmUrl(source, path)`: domain typed in Settings, then the sign-in domain, then the default host only when neither exists. The path cannot change the host.
+- "Agency" becomes "company" in all in-app text, emails, errors and install pages; "Agency view" becomes "All client accounts"; "location" becomes "account". Public pages that address agencies as their audience (home, privacy, terms, support) may still say "agency".
+- The banned-terms test reads the code's syntax tree (strings, template text, page markup) instead of lines, so multi-line text is caught and queries, comments and identifiers are not. Two narrow machine-only exceptions are listed in the test.
+- King (31 Oct 2026): stop waiting for PASS or NEXT between stages. Evidence and King's 5 checks are still written for each stage; stages proceed in runbook order.

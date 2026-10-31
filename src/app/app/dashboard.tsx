@@ -206,7 +206,7 @@ export function Dashboard() {
   }
   if (auth.status === "maintenance") return <Centered title="Back shortly" body={auth.message} />;
   if (auth.status === "not_installed") {
-    return <Centered title="SubSync is not set up for this agency yet" body="Install SubSync from the app marketplace for your agency, then open it again from the menu." />;
+    return <Centered title="SubSync is not set up for your company yet" body="Install SubSync from the app marketplace for your company, then open it again from the menu." />;
   }
   if (auth.status === "error" || !api) {
     return <Centered title="We could not sign you in" body={auth.status === "error" ? auth.message : "Please refresh."} />;
@@ -222,7 +222,7 @@ export function Dashboard() {
   // Pages that live inside another page highlight their parent in the menu.
   const PARENT: Partial<Record<ViewId, ViewId>> = { account: "accounts", deals: "pipeline", email: "onboarding", alerts: "today" };
   const active = PARENT[view.id] ?? view.id;
-  const agency = auth.demo ? "Demo Agency" : limited ? "Your business" : "Your agency";
+  const agency = auth.demo ? "Demo Company" : limited ? "Your business" : "Your company";
   const own = auth.locationId;
 
   const pipeTabs = [{ label: "Forecast and stages", node: <><PipelineView /><DealMoves /></> }, { label: "Stale deals and hygiene", node: <DealsView /> }];
@@ -290,14 +290,14 @@ export function Dashboard() {
           </nav>
           <div className="mt-3 flex items-center gap-2.5 rounded-xl bg-sidebar-accent/50 px-3 py-2.5">
             <span aria-hidden className="flex size-7 items-center justify-center rounded-full bg-sidebar-primary/20 text-xs font-semibold text-sidebar-primary">{(auth.userName ?? "?").slice(0, 1).toUpperCase()}</span>
-            <span className="min-w-0 text-xs leading-4"><span className="block truncate font-medium text-sidebar-accent-foreground">{auth.userName ?? "Signed in"}</span><span className="block text-sidebar-foreground/55">{auth.kind === "agency" ? "Agency view" : auth.kind === "business" ? "Your business" : "Read-only view"}</span></span>
+            <span className="min-w-0 text-xs leading-4"><span className="block truncate font-medium text-sidebar-accent-foreground">{auth.userName ?? "Signed in"}</span><span className="block text-sidebar-foreground/55">{auth.kind === "agency" ? "All client accounts" : auth.kind === "business" ? "Your business" : "Read-only view"}</span></span>
           </div>
         </aside>
 
         <div className="flex min-w-0 flex-1 flex-col">
           {auth.demo && (
             <div className="border-b border-amber-500/20 bg-amber-400/15 px-4 py-2 text-center text-xs font-medium text-amber-900 dark:text-amber-200 print:hidden" role="note">
-              Demo mode: this is sample data for a fictional agency, not real clients.
+              Demo mode: this is sample data for a fictional company, not real clients.
             </div>
           )}
           <nav className="flex gap-1 overflow-x-auto border-b p-2 md:hidden print:hidden" aria-label="Sections">

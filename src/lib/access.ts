@@ -34,7 +34,7 @@ export type Decision =
   | { ok: false; status: 200 | 403; installed: boolean; message: string };
 
 const NOT_ENABLED =
-  "SubSync is not turned on for your account yet. Ask your agency to switch it on for you, or install SubSync for your own account from the app marketplace.";
+  "SubSync is not turned on for your account yet. Ask the company that manages your account to switch it on for you, or install SubSync for your own account from the app marketplace.";
 
 export async function decideAccess(who: Who, lookups: Lookups): Promise<Decision> {
   const type = (who.type ?? "").toLowerCase();
@@ -42,13 +42,13 @@ export async function decideAccess(who: Who, lookups: Lookups): Promise<Decision
   const location = who.activeLocation;
 
   if (type === "agency") {
-    if (!company) return { ok: false, status: 403, installed: false, message: "No agency in the user context" };
+    if (!company) return { ok: false, status: 403, installed: false, message: "No company in the user context" };
     if (await lookups.agencyInstalled(company)) return { ok: true, kind: "agency", companyKey: company, locationId: null };
     // An agency user opening a client account that installed the app for itself.
     if (location && (await lookups.businessInstalled(location))) {
       return { ok: true, kind: "business", companyKey: businessKey(location), locationId: location };
     }
-    return { ok: false, status: 200, installed: false, message: "SubSync is not installed for this agency" };
+    return { ok: false, status: 200, installed: false, message: "SubSync is not installed for this company" };
   }
 
   if (type === "account" || type === "location") {
@@ -68,7 +68,7 @@ export async function decideAccess(who: Who, lookups: Lookups): Promise<Decision
 // ---------------- role rules (CLAUDE.md 4.1) ----------------
 
 const STAFF_MESSAGE =
-  "Your agency administrator needs to give you access to SubSync. Until your access to each client account can be verified, SubSync shows nothing to staff accounts.";
+  "Your company administrator needs to give you access to SubSync. Until your access to each client account can be verified, SubSync shows nothing to staff accounts.";
 
 // The decision for a verified identity. Agency staff are refused (default deny: their access to each client account cannot
 // be verified yet). An account user is always read-only, even when their business installed the app.

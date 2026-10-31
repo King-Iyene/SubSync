@@ -11,7 +11,7 @@ export default function InstallError() {
           We could not finish the install
         </h1>
         <p>
-          Something went wrong while connecting your agency. Nothing was changed
+          Something went wrong while connecting your company. Nothing was changed
           on your accounts. Please try installing again, and if it keeps
           happening, email{" "}
           <a

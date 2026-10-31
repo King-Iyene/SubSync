@@ -40,7 +40,7 @@ export async function GET(request: Request) {
           sent++;
         }
       } catch (error) {
-        console.error("Daily brief failed for one agency", safeError(error));
+        console.error("Daily brief failed for one company", safeError(error));
       }
     }
     return NextResponse.json({ agencies: rows.length, sent });

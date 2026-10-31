@@ -109,7 +109,7 @@ export function buildTools(installationId: string): ToolDef[] {
     },
     {
       name: "list_waiting_conversations",
-      description: "Customer messages that have gone unanswered longer than the agency's reply SLA, across all client accounts.",
+      description: "Customer messages that have gone unanswered longer than your reply target, across all client accounts.",
       inputSchema: { type: "object", properties: { limit: { type: "number", description: "Maximum conversations (1-50, default 20)" } } },
       run: async (args) => {
         const { settings } = await live();

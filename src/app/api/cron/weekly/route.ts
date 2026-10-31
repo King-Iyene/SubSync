@@ -59,7 +59,7 @@ export async function GET(request: Request) {
           sent++;
         }
       } catch (error) {
-        console.error("Weekly email failed for one agency", safeError(error));
+        console.error("Weekly email failed for one company", safeError(error));
       }
     }
     return NextResponse.json({ agencies: rows.length, sent });

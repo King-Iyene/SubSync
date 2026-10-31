@@ -14,8 +14,18 @@ export function validDomain(value: unknown): string | null {
   return d.length <= 253 && HOST.test(d) ? d : null;
 }
 
-export function deepLinks(appDomain: string | null | undefined) {
-  const base = `https://${validDomain(appDomain) ?? DEFAULT_APP_DOMAIN}/v2/location`;
+// The one place a CRM address is made. `source` is a domain, or anything that carries one: the signed-in identity
+// (whitelabelDomain) or the saved settings (appDomain, which wins because the agency typed it).
+export type DomainSource = string | null | undefined | { appDomain?: string | null; whitelabelDomain?: string | null };
+
+export function crmUrl(source: DomainSource, path: string): string {
+  const domain = source && typeof source === "object" ? validDomain(source.appDomain) ?? validDomain(source.whitelabelDomain) : validDomain(source);
+  const clean = /[\s\\]/.test(path) ? "/" : path.replace(/^\/*/, "/"); // always one leading slash; the host can never be changed by the path
+  return `https://${domain ?? DEFAULT_APP_DOMAIN}${clean}`;
+}
+
+export function deepLinks(source: DomainSource) {
+  const base = crmUrl(source, "/v2/location");
   return {
     account: (loc: string) => `${base}/${loc}/dashboard`,
     contact: (loc: string, id: string) => `${base}/${loc}/contacts/detail/${id}`,

@@ -15,7 +15,7 @@ export default function Installed() {
     <SiteShell>
       <div className="max-w-xl space-y-5 leading-7">
         <h1 className="text-3xl font-semibold tracking-tight">SubSync is installed</h1>
-        <p>Your agency is connected. You can close this tab. Here is how to open it:</p>
+        <p>Your company is connected. You can close this tab. Here is how to open it:</p>
         <ol className="list-decimal space-y-2 pl-5">
           {STEPS.map((s) => (
             <li key={s}>{s}</li>

@@ -98,7 +98,7 @@ export function DuplicatesView() {
         <Stat label="Exact matches" value={fmtInt(s.exact)} sub="same email or phone" tone={s.exact > 0 ? "bad" : undefined} />
         <Stat label="Written differently" value={fmtInt(s.format)} sub="phone format, email case" tone={s.format > 0 ? "warn" : undefined} />
         <Stat label="Contacts involved" value={fmtInt(s.contacts)} sub={`${s.reviewed} groups already reviewed`} />
-        <Stat label="Same person, other clients" value={fmtInt(s.crossAccount)} sub="normal for an agency" />
+        <Stat label="Same person, other clients" value={fmtInt(s.crossAccount)} sub="normal when one person buys from several clients" />
       </div>
 
       <Card title="Is duplicate protection on?" className="mb-6">

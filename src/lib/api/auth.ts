@@ -54,7 +54,7 @@ export async function authenticate(request: Request, segments: string[] = []): P
   if (!installation) return json({ error: "SubSync is not installed for this account", forbidden: true }, 403);
   // The agency can switch a client's view off at any time; do not wait for the session to expire.
   if (kind === "client" && !(await clientViewOn(session.companyId, limitTo as string))) {
-    return json({ error: "Your agency has turned this view off", forbidden: true }, 403);
+    return json({ error: "The company that manages your account has turned this view off", forbidden: true }, 403);
   }
   return {
     session,

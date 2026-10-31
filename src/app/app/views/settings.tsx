@@ -76,7 +76,7 @@ export function SettingsView() {
 
   return (
     <div className="max-w-3xl">
-      <PageHeader title="Settings" subtitle="Tune what counts as stale, dormant or overdue for your agency." />
+      <PageHeader title="Settings" subtitle="Tune what counts as stale, dormant or overdue for your company." />
       {msg && <p className={`mb-4 rounded-lg border px-3 py-2 text-sm ${msg.ok ? "" : "border-red-500/40 bg-red-500/5"}`} role={msg.ok ? "status" : "alert"}>{msg.text}</p>}
 
       <div className="space-y-4">
@@ -183,7 +183,7 @@ export function SettingsView() {
           <label className="mt-3 flex items-center gap-2 text-sm"><input type="checkbox" className="size-4" checked={form.digestEnabled} onChange={(e) => setForm({ ...form, digestEnabled: e.target.checked })} /> Send the daily brief to Slack</label>
           <div className="mt-3">
             <label htmlFor="digest-email" className="mb-1 block text-sm font-medium">Weekly email (Mondays)</label>
-            <input id="digest-email" type="email" className={inputClass} placeholder="you@youragency.com" value={form.digestEmail ?? ""} onChange={(e) => setForm({ ...form, digestEmail: e.target.value.trim() || null })} />
+            <input id="digest-email" type="email" className={inputClass} placeholder="you@yourcompany.com" value={form.digestEmail ?? ""} onChange={(e) => setForm({ ...form, digestEmail: e.target.value.trim() || null })} />
             <p className="mt-1 text-xs text-muted-foreground">{data.settings.emailReady ? "One address. Sent Monday at the hour below, in your time zone." : "Saved now, but nothing is sent until an email service is connected to the app."}</p>
           </div>
           <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -213,7 +213,7 @@ export function SettingsView() {
         <Card title="AI assistant connector">
           <p className="mb-3 text-sm text-muted-foreground">
             Let Claude, ChatGPT or any assistant that supports MCP answer questions about all your clients at once, for example
-            &quot;which accounts are at risk this week?&quot; or &quot;find John Smith across my clients&quot;. Access is read-only and limited to your agency.
+            &quot;which accounts are at risk this week?&quot; or &quot;find John Smith across my clients&quot;. Access is read-only and limited to your company&apos;s accounts.
           </p>
           {keys.error?.status === 402 ? (
             <p className="rounded-lg border border-sky-500/40 bg-sky-500/5 p-3 text-sm">The AI connector is part of the paid plan.</p>
@@ -262,7 +262,7 @@ export function SettingsView() {
         <Card title="Links">
           <label htmlFor="domain" className="mb-1 block text-sm font-medium">The address you log in to</label>
           <input id="domain" className={inputClass} value={form.appDomain} onChange={(e) => setForm({ ...form, appDomain: e.target.value })} />
-          <p className="mt-1 text-xs text-muted-foreground">White-label agencies: use your own domain so &quot;Open&quot; links land in your branded app.</p>
+          <p className="mt-1 text-xs text-muted-foreground">White-label companies: use your own domain so &quot;Open&quot; links land in your branded app.</p>
         </Card>
 
         <div className="lg:col-span-2"><HealthCard /></div>
