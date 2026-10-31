@@ -27,3 +27,12 @@ test("the maintenance screen shows when sign-in answers that the app is down", a
   await expect(page.getByRole("heading", { name: "Back shortly" })).toBeVisible();
   await expect(page.getByText("short maintenance", { exact: false })).toBeVisible();
 });
+
+test("a plain browser tab keeps the 'open from your account menu' message and never flips to a sign-in error", async ({ page }) => {
+  await page.route("**/api/sso", (route) => route.fulfill({ status: 403, contentType: "application/json", body: JSON.stringify({ error: "Demo mode is off" }) }));
+  await page.goto("/app");
+  await expect(page.getByRole("heading", { name: "Open SubSync from your account menu" })).toBeVisible();
+  await page.waitForTimeout(9000); // longer than the 6 second wait for the host page
+  await expect(page.getByRole("heading", { name: "Open SubSync from your account menu" })).toBeVisible();
+  await expect(page.getByText("We could not sign you in")).toHaveCount(0);
+});

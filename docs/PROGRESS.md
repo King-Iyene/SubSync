@@ -33,7 +33,7 @@ Evidence: `docs/features/S0.1.md`. Next stage after PASS and NEXT: **S0.2 Identi
 
 ## Facts a fresh session needs
 
-- Run everything with `npm run verify` (typecheck, lint, build, 283 Node tests, 18 Vitest tests) and `npm run e2e` (21 browser tests: 3 widths).
+- Run everything with `npm run verify` (typecheck, lint, build, 283 Node tests, 18 Vitest tests) and `npm run e2e` (24 browser tests: 8 tests at 3 widths).
 - Run `npx next build` before every push; a failed Vercel build keeps the last good deploy live silently.
 - Never run two test runs at once; they fight over port 3100 and the `.next` folder.
 - The demo login works only with `DEMO_MODE=true` and never when `NODE_ENV` or `VERCEL_ENV` is `production`. `APP_MODE=maintenance` is the kill switch.

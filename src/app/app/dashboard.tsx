@@ -94,6 +94,8 @@ export function Dashboard() {
   // render so the first paint matches.
   const embedded = useSyncExternalStore(() => () => {}, () => window.parent !== window, () => true);
   const pending = useRef<((payload: string | null) => void) | null>(null);
+  // Bumped whenever the sign-in effect restarts, so a wait that began earlier cannot overwrite the current screen.
+  const epoch = useRef(0);
   const refreshRef = useRef<() => Promise<string | null>>(async () => null);
 
   const apply = useCallback((r: { ok: boolean; status: number; data: SsoResponse }): string | null => {
@@ -117,6 +119,7 @@ export function Dashboard() {
 
   // Ask the host page for fresh encrypted user context and exchange it for a session.
   const signIn = useCallback(async (): Promise<string | null> => {
+    const mine = epoch.current;
     const payload = await new Promise<string | null>((resolve) => {
       pending.current = resolve;
       window.parent.postMessage({ message: "REQUEST_USER_DATA" }, "*");
@@ -127,6 +130,9 @@ export function Dashboard() {
         }
       }, 6000);
     });
+    // The page decided meanwhile that it is not embedded (or the effect restarted): this wait is stale, so it must not
+    // overwrite what the page shows now.
+    if (mine !== epoch.current) return null;
     if (!payload) {
       // The host did not answer. With demo mode on (never in production) show sample data
       // instead of dead-ending, which also covers previews that frame the page.
@@ -167,7 +173,10 @@ export function Dashboard() {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       void signIn();
     }
-    return () => window.removeEventListener("message", onMessage);
+    return () => {
+      epoch.current += 1;
+      window.removeEventListener("message", onMessage);
+    };
   }, [embedded, apply, signIn]);
 
   const go: GoFn = useCallback((id, locationId) => {
