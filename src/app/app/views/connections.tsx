@@ -134,7 +134,7 @@ export function ConnectionsCard() {
         })}
       </ul>
       {msg && <p role="status" className={`mt-3 text-sm ${msg.ok ? "text-emerald-700 dark:text-emerald-400" : "text-red-700 dark:text-red-400"}`}>{msg.text}</p>}
-      <p className="mt-3 text-xs text-muted-foreground">SubSync only reads what each app sends and saves a summary inside SubSync. It never posts to a client&apos;s records from here.</p>
+      <p className="mt-3 text-xs text-muted-foreground">SubSync saves each meeting summary inside SubSync. When it matches a contact by email, it also adds the summary to that contact&apos;s notes in your CRM (you can switch this off under Meeting notes privacy). It sends nothing to the people in the meeting.</p>
     </Card>
   );
 }

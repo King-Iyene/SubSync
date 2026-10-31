@@ -22,7 +22,7 @@ export default function Installed() {
           ))}
         </ol>
         <p className="text-sm text-muted-foreground">
-          SubSync only reads your data. It never changes contacts, deals or settings. Questions? Email code@kdsquares.com.
+          SubSync mostly reads your data. The one thing it adds on its own is a note on a contact when a meeting summary arrives from a tool you connect, and you can switch that off. Anything else that changes your data needs your preview and confirmation. Questions? Email code@kdsquares.com.
         </p>
       </div>
     </SiteShell>
