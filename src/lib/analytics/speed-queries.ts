@@ -1,5 +1,5 @@
 import { sql } from "../db";
-import { rankPeople, summarise, type Summary, type TouchRow } from "./speed-intel";
+import { bySource, rankPeople, summarise, type Summary, type TouchRow } from "./speed-intel";
 
 // Everything the speed-to-lead screen shows, for the accounts the caller may see. Leads older than the
 // window are left out: a lead from three weeks ago says nothing about how the team answers today.
@@ -12,13 +12,15 @@ export async function speedView(installationId: string, allowed: string[] | null
   const [locs, rows, people] = await Promise.all([
     db`select location_id, name, speed_access from locations where installation_id = ${installationId} and not ignored ${allowed ? db`and location_id = any(${allowed}::text[])` : db``} order by lower(coalesce(name, ''))`,
     db`
-      select t.location_id, t.contact_id, t.lead_at, t.touch_at, t.touch_user_id
-      from lead_touches t join locations l on l.installation_id = t.installation_id and l.location_id = t.location_id and not l.ignored
+      select t.location_id, t.contact_id, t.lead_at, t.touch_at, t.touch_user_id, c.source, (nullif(c.assigned_to, '') is not null) assigned
+      from lead_touches t
+      left join cached_contacts c on c.installation_id = t.installation_id and c.location_id = t.location_id and c.contact_id = t.contact_id
+      join locations l on l.installation_id = t.installation_id and l.location_id = t.location_id and not l.ignored
       where t.installation_id = ${installationId} and t.lead_at > ${new Date(now - SPEED_WINDOW_DAYS * DAY)}
         ${allowed ? db`and t.location_id = any(${allowed}::text[])` : db``} limit 20000`,
     db`select user_id, name from team_names where installation_id = ${installationId}`,
   ]);
-  const touches: TouchRow[] = rows.map((r) => ({ locationId: r.location_id as string, contactId: r.contact_id as string, leadAt: ms(r.lead_at) ?? 0, touchAt: ms(r.touch_at), userId: r.touch_user_id as string | null }));
+  const touches: TouchRow[] = rows.map((r) => ({ locationId: r.location_id as string, contactId: r.contact_id as string, leadAt: ms(r.lead_at) ?? 0, touchAt: ms(r.touch_at), userId: r.touch_user_id as string | null, source: (r.source as string | null) ?? null, assigned: r.assigned === true }));
   const names = new Map(locs.map((l) => [l.location_id as string, (l.name as string | null) ?? "Unnamed account"]));
   const who = new Map(people.map((p) => [p.user_id as string, p.name as string]));
 
@@ -39,8 +41,10 @@ export async function speedView(installationId: string, allowed: string[] | null
     targetMinutes, windowDays: SPEED_WINDOW_DAYS,
     access: { ok: locs.filter((l) => l.speed_access === "ok").length, needsPermission: locs.filter((l) => l.speed_access === "needs_permission").map((l) => ({ locationId: l.location_id as string, name: names.get(l.location_id as string) as string })), total: locs.length },
     overall: summarise(touches, targetMinutes, now),
+    bySource: bySource(touches, targetMinutes, now),
+    unassignedWaiting: touches.filter((t) => t.touchAt === null && !t.assigned && (now - t.leadAt) / 60_000 > targetMinutes).length,
     perAccount,
     people: rankPeople(touches).slice(0, 12).map((p) => ({ ...p, label: who.get(p.userId) ?? "Team member " + p.userId.slice(-4) })),
-    waiting: waitingRows.map((w) => ({ locationId: w.locationId, locationName: names.get(w.locationId) ?? "Account", contactId: w.contactId, name: cname.get(`${w.locationId}:${w.contactId}`) ?? "Contact", waitingMinutes: Math.round((now - w.leadAt) / 60_000) })),
+    waiting: waitingRows.map((w) => ({ locationId: w.locationId, locationName: names.get(w.locationId) ?? "Account", contactId: w.contactId, name: cname.get(`${w.locationId}:${w.contactId}`) ?? "Contact", waitingMinutes: Math.round((now - w.leadAt) / 60_000), unassigned: !w.assigned })),
   };
 }

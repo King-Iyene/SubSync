@@ -10,9 +10,11 @@ type Data = {
   targetMinutes: number; windowDays: number;
   access: { ok: number; needsPermission: Array<{ locationId: string; name: string }>; total: number };
   overall: Summary;
+  bySource?: Array<Summary & { cls: "portal" | "form" | "social" | "other"; targetMinutes: number }>;
+  unassignedWaiting?: number;
   perAccount: Array<Summary & { locationId: string; name: string; access: string | null }>;
   people: Array<{ userId: string; label: string; replies: number; medianSeconds: number }>;
-  waiting: Array<{ locationId: string; locationName: string; contactId: string; name: string; waitingMinutes: number; url: string }>;
+  waiting: Array<{ locationId: string; locationName: string; contactId: string; name: string; waitingMinutes: number; url: string; unassigned?: boolean }>;
 };
 
 const dur = (s: number | null) => {
@@ -65,10 +67,33 @@ export function SpeedView({ go }: { go: GoFn }) {
                 {(all ? data.waiting : data.waiting.slice(0, 10)).map((w) => (
                   <li key={w.locationId + w.contactId} className="flex flex-wrap items-center justify-between gap-2 py-2.5">
                     <span><span className="font-medium">{w.name}</span> <span className="text-muted-foreground">· {w.locationName}</span></span>
-                    <span className="flex items-center gap-3"><Badge tone="bad">waiting {dur(w.waitingMinutes * 60)}</Badge><ExtLink href={w.url}>Open contact</ExtLink></span>
+                    <span className="flex items-center gap-3"><Badge tone="bad">waiting {dur(w.waitingMinutes * 60)}</Badge>{w.unassigned && <Badge tone="warn">no owner</Badge>}<ExtLink href={w.url}>Open contact</ExtLink></span>
                   </li>
                 ))}
               </ul>
+            </Card>
+          )}
+
+          {(data.unassignedWaiting ?? 0) > 0 && (
+            <p className="mt-4 rounded-xl border border-amber-500/40 bg-amber-400/10 px-4 py-3 text-sm" role="note">
+              <strong>{data.unassignedWaiting} waiting lead{data.unassignedWaiting === 1 ? " has" : "s have"} no owner.</strong> Nobody is responsible for answering {data.unassignedWaiting === 1 ? "it" : "them"}. Assign them, or fix the routing so new leads always reach a person.
+            </p>
+          )}
+
+          {data.bySource && data.bySource.length > 0 && (
+            <Card title="By where the lead came from" className="mt-6">
+              <p className="mb-2 text-xs text-muted-foreground">Each source is judged against its own target: portal and phone leads 5 minutes, web forms 15, social messages 60. These are common practice targets, not rules.</p>
+              <Table head={<tr><Th>Source</Th><Th className="text-right">Target</Th><Th className="text-right">Typical</Th><Th className="text-right">In target</Th><Th className="text-right">Waiting</Th></tr>}>
+                {data.bySource.map((s) => (
+                  <tr key={s.cls}>
+                    <Td className="font-medium">{({ portal: "Portals and phone", form: "Web forms and chat", social: "Social messages", other: "Other sources" } as const)[s.cls]}</Td>
+                    <Td className="text-right tabular-nums">{s.targetMinutes} min</Td>
+                    <Td className="text-right tabular-nums">{dur(s.medianSeconds)}</Td>
+                    <Td className="text-right"><Badge tone={rateTone(s.hitRate)}>{pct(s.hitRate)}</Badge></Td>
+                    <Td className="text-right tabular-nums">{s.stillWaiting}</Td>
+                  </tr>
+                ))}
+              </Table>
             </Card>
           )}
 

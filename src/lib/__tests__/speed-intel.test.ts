@@ -85,3 +85,19 @@ test("durations read like a person would say them", () => {
   assert.equal(fmtDuration(86_400), "1 d");
   assert.equal(fmtDuration(86_400 + 3 * 3600), "1 d 3 h");
 });
+
+test("lead sources are grouped into portal, form, social and other, each with its own target", async () => {
+  const { classifySource, bySource } = await import("../analytics/speed-intel.ts");
+  assert.equal(classifySource("Zillow Premier Agent"), "portal");
+  assert.equal(classifySource("Website form"), "form");
+  assert.equal(classifySource("Facebook Lead Ads"), "social");
+  assert.equal(classifySource("Referral"), "other");
+  assert.equal(classifySource(null), "other");
+  const now = Date.parse("2026-10-31T12:00:00Z");
+  const mk = (source: string, mins: number | null): TouchRow => ({ locationId: "L", contactId: source + mins, leadAt: now - 3 * 3_600_000, touchAt: mins === null ? null : now - 3 * 3_600_000 + mins * 60_000, userId: "u", source });
+  const rows = [...[2, 3, 4, 8, 9, 30].map((m) => mk("Zillow", m)), ...[10, 12, 14, 40, 50, 90].map((m) => mk("Facebook", m))];
+  const out = bySource(rows, 15, now);
+  assert.deepEqual(out.map((o) => [o.cls, o.targetMinutes]), [["portal", 5], ["social", 60]]);
+  assert.equal(out[0].withinTarget, 3, "portal: 2, 3 and 4 minutes beat the 5 minute target");
+  assert.equal(out[1].withinTarget, 5, "social: 10, 12, 14, 40 and 50 minutes beat 60; only 90 is late");
+});

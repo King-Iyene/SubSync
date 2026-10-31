@@ -41,7 +41,31 @@ export function leadFromMessages(msgs: Msg[], contactCreatedAt: number | null, c
 
 export const responseSeconds = (l: Pick<Lead, "leadAt" | "touchAt">): number | null => (l.touchAt === null ? null : Math.max(0, Math.round((l.touchAt - l.leadAt) / 1000)));
 
-export type TouchRow = { locationId: string; contactId: string; leadAt: number; touchAt: number | null; userId: string | null };
+export type TouchRow = { locationId: string; contactId: string; leadAt: number; touchAt: number | null; userId: string | null; source?: string | null; assigned?: boolean };
+
+// Where a lead came from decides how fast it must be answered. Portal and phone leads go cold in minutes, web forms a little
+// slower, social messages slower still. The windows are common practice in real estate and are shown as targets, not facts.
+export type SourceClass = "portal" | "form" | "social" | "other";
+export const SOURCE_TARGET_MINUTES: Record<Exclude<SourceClass, "other">, number> = { portal: 5, form: 15, social: 60 };
+export function classifySource(source: string | null | undefined): SourceClass {
+  const s = (source ?? "").toLowerCase();
+  if (/zillow|realtor|trulia|redfin|homes\.com|rightmove|zoopla|portal|open house|call|phone|sign/.test(s)) return "portal";
+  if (/form|website|web|landing|funnel|ppc|google|chat|widget|email/.test(s)) return "form";
+  if (/facebook|instagram|fb|meta|tiktok|linkedin|dm|social|messenger|whatsapp/.test(s)) return "social";
+  return "other";
+}
+
+// Reply speed per source class, each judged against its own target (other leads use the account target).
+export function bySource(rows: TouchRow[], accountTarget: number, now: number): Array<{ cls: SourceClass; targetMinutes: number } & Summary> {
+  const out: Array<{ cls: SourceClass; targetMinutes: number } & Summary> = [];
+  for (const cls of ["portal", "form", "social", "other"] as SourceClass[]) {
+    const mine = rows.filter((r) => classifySource(r.source) === cls);
+    if (mine.length === 0) continue;
+    const targetMinutes = cls === "other" ? accountTarget : SOURCE_TARGET_MINUTES[cls];
+    out.push({ cls, targetMinutes, ...summarise(mine, targetMinutes, now) });
+  }
+  return out;
+}
 
 const MIN_FOR_MEDIAN = 5;
 const MIN_PER_PERSON = 3;
