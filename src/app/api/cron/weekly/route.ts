@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { buildDailyDigest } from "@/lib/analytics/digest-service";
-import { weeklyDue, weeklyEmail } from "@/lib/analytics/weekly-email";
+import { weekFacts, weeklyDue, weeklyEmail } from "@/lib/analytics/weekly-email";
+import { appointmentView } from "@/lib/analytics/appointment-queries";
+import { getSettings } from "@/lib/analytics/queries";
+import { speedView } from "@/lib/analytics/speed-queries";
 import { sql } from "@/lib/db";
 import { emailConfigured, sendEmail } from "@/lib/email";
 
@@ -36,8 +39,15 @@ export async function GET(request: Request) {
       if (!weeklyDue(when, (r.digest_hour as number | null) ?? 8, r.last_on as string | null)) continue;
       try {
         const d = await buildDailyDigest(r.id as string);
+        // The week's facts. If any of these reads fails, the email still goes out without that part.
+        const target = (await getSettings(r.id as string).catch(() => null))?.speedTargetMinutes ?? 15;
+        const [sp, ap] = await Promise.all([speedView(r.id as string, null, target).catch(() => null), appointmentView(r.id as string, null).catch(() => null)]);
+        const facts = weekFacts({
+          leads: sp ? sp.overall.leads : 0, withinTarget: sp ? sp.overall.withinTarget : 0, targetMinutes: target, neverAnswered: sp ? sp.neverAnswered : 0,
+          noShowsToRecover: ap ? ap.recoverTotal : null, unmarked: ap ? ap.unmarkedTotal : null,
+        });
         const mail = weeklyEmail({
-          who: r.label as string, appUrl, fine: d.fine.length,
+          facts, who: r.label as string, appUrl, fine: d.fine.length,
           headlines: d.headlines.map((h) => ({ label: h.label, money: h.money, today: h.change.today, vsAvg: h.change.vsAvg })),
           attention: d.attention.map((a) => ({ name: a.name, title: a.items[0]?.title ?? "Needs a look" })),
         });

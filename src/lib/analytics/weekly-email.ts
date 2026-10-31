@@ -5,7 +5,23 @@ export type WeeklyInput = {
   attention: Array<{ name: string; title: string }>;
   fine: number;
   appUrl: string;
+  /** Plain facts about the week, already worded (for example "9 of 12 new leads were answered inside 15 minutes"). */
+  facts?: string[];
 };
+
+// The week's facts, worded once so the email and any future screen say the same thing. Only what can be counted is stated.
+export function weekFacts(i: {
+  leads: number; withinTarget: number; targetMinutes: number; neverAnswered: number;
+  noShowsToRecover: number | null; unmarked: number | null;
+}): string[] {
+  const out: string[] = [];
+  if (i.leads >= 5) out.push(`${i.withinTarget} of ${i.leads} new leads (last 14 days) were answered by a person inside ${i.targetMinutes} minutes (${Math.round((i.withinTarget / i.leads) * 100)}%).`);
+  else if (i.leads > 0) out.push(`${i.leads} new lead${i.leads === 1 ? "" : "s"} in the last 14 days, too few to give a reply-speed percentage.`);
+  if (i.neverAnswered > 0) out.push(`${i.neverAnswered} lead${i.neverAnswered === 1 ? " has" : "s have"} never been answered (waiting more than 3 days).`);
+  if (i.noShowsToRecover) out.push(`${i.noShowsToRecover} no-show${i.noShowsToRecover === 1 ? " is" : "s are"} still waiting to be rebooked.`);
+  if (i.unmarked) out.push(`${i.unmarked} past appointment${i.unmarked === 1 ? " has" : "s have"} no outcome marked, so show rate is understated.`);
+  return out;
+}
 
 const money = (n: number) => "$" + Math.round(n).toLocaleString("en-US");
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -17,8 +33,10 @@ export function weeklyEmail(i: WeeklyInput): { subject: string; text: string; ht
   const bits = i.headlines.map((h) => `${h.label}: ${h.money ? money(h.today) : Math.round(h.today)}${h.vsAvg === null ? "" : ` (${h.vsAvg > 0 ? "+" : ""}${h.vsAvg}% vs the last 7 days)`}`);
   const top = i.attention.slice(0, 8);
   const link = `${i.appUrl}/app#today`;
+  const facts = i.facts ?? [];
   const text = [
     subject, "", ...bits, "",
+    ...(facts.length ? ["The last 14 days:", ...facts.map((f) => `- ${f}`), ""] : []),
     count === 0 ? "Every account is within its own normal range." : "Needs attention:",
     ...top.map((a) => `- ${a.name}: ${a.title}`),
     ...(count > top.length ? [`...and ${count - top.length} more in the app`] : []),
@@ -28,6 +46,7 @@ export function weeklyEmail(i: WeeklyInput): { subject: string; text: string; ht
   const html = `<div style="font-family:system-ui,sans-serif;max-width:560px;margin:0 auto;color:#111">
 <h2 style="margin:0 0 12px">${esc(subject)}</h2>
 <ul style="padding-left:18px;color:#444">${bits.map((b) => `<li>${esc(b)}</li>`).join("")}</ul>
+${facts.length ? `<h3 style="margin:20px 0 6px">The last 14 days</h3><ul style="padding-left:18px">${facts.map((f) => `<li>${esc(f)}</li>`).join("")}</ul>` : ""}
 <h3 style="margin:20px 0 6px">${count === 0 ? "Nothing needs you" : "Needs attention"}</h3>
 <ul style="padding-left:18px">${top.map((a) => `<li><strong>${esc(a.name)}</strong>: ${esc(a.title)}</li>`).join("")}</ul>
 ${count > top.length ? `<p>...and ${count - top.length} more in the app.</p>` : ""}

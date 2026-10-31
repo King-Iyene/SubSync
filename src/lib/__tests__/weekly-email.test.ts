@@ -47,3 +47,20 @@ test("the note written into the CRM is capped so one long summary cannot flood a
   assert.ok(long.length <= CRM_NOTE_MAX);
   assert.match(crmNoteBody({ title: "Kickoff", startedAt: null, attendees: [{ name: "Ada", email: "a@b.co" }], summary: "Agreed scope", actionItems: ["Send quote"], recordingUrl: null }), /Kickoff[\s\S]*Ada[\s\S]*Agreed scope[\s\S]*Send quote/);
 });
+
+test("the week's facts state only what can be counted, and skip what is zero", async () => {
+  const { weekFacts, weeklyEmail } = await import("../analytics/weekly-email.ts");
+  const full = weekFacts({ leads: 12, withinTarget: 9, targetMinutes: 15, neverAnswered: 2, noShowsToRecover: 1, unmarked: 3 });
+  assert.deepEqual(full, [
+    "9 of 12 new leads (last 14 days) were answered by a person inside 15 minutes (75%).",
+    "2 leads have never been answered (waiting more than 3 days).",
+    "1 no-show is still waiting to be rebooked.",
+    "3 past appointments have no outcome marked, so show rate is understated.",
+  ]);
+  assert.deepEqual(weekFacts({ leads: 3, withinTarget: 3, targetMinutes: 15, neverAnswered: 0, noShowsToRecover: 0, unmarked: null }), ["3 new leads in the last 14 days, too few to give a reply-speed percentage."]);
+  assert.deepEqual(weekFacts({ leads: 0, withinTarget: 0, targetMinutes: 15, neverAnswered: 0, noShowsToRecover: null, unmarked: null }), []);
+  const m = weeklyEmail({ who: "Acme", appUrl: "https://x.test", fine: 0, headlines: [], attention: [], facts: full });
+  assert.match(m.text, /The last 14 days:[\s\S]*9 of 12/);
+  assert.match(m.html, /The last 14 days/);
+  assert.ok(!/The last 14 days/.test(weeklyEmail({ who: "Acme", appUrl: "https://x.test", fine: 0, headlines: [], attention: [] }).text), "no facts, no section");
+});
