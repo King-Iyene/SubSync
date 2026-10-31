@@ -1,11 +1,21 @@
 import { NextResponse } from "next/server";
 import { decideAccess, type AccessKind } from "@/lib/access";
 import { demoEnabled } from "@/lib/api/auth";
-import { captureWhitelabelDomain } from "@/lib/analytics/queries";
+import { captureWhitelabelDomain, getSettings } from "@/lib/analytics/queries";
 import { resolveEntitlements } from "@/lib/flags";
 import { businessInstalled, clientViewOn, getInstallation } from "@/lib/ghl/installations";
 import { decryptSsoPayload, parseSsoUser } from "@/lib/ghl/sso";
 import { signSession } from "@/lib/session";
+
+// The agency's own name and colour, shown in place of ours. Only a plain hex colour is passed on.
+async function brandOf(installationId: string) {
+  try {
+    const s = await getSettings(installationId);
+    return { name: s.brandName, color: s.brandColor && /^#[0-9a-f]{6}$/i.test(s.brandColor) ? s.brandColor : null };
+  } catch {
+    return { name: null, color: null };
+  }
+}
 
 // The embedded page posts the encrypted user context it received from its parent frame.
 // Decryption happens here, server side, so the shared secret never reaches the browser.
@@ -76,5 +86,5 @@ export async function POST(request: Request) {
     companyId: decision.companyKey, userId: user.userId, role: user.role, userName: user.userName, demo: false,
     kind: decision.kind, locationId: decision.locationId,
   });
-  return NextResponse.json({ user, installed: true, kind: decision.kind, session, entitlements: await resolveEntitlements(installation.plan, installation.id) });
+  return NextResponse.json({ user, installed: true, kind: decision.kind, session, entitlements: await resolveEntitlements(installation.plan, installation.id), brand: await brandOf(installation.id) });
 }

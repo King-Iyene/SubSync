@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import { NAV_FOR, type AccessKind } from "@/lib/access";
 import {
   Briefcase, CalendarCheck, ClipboardCheck, Zap, CircleHelp, Copy, Eraser, Inbox, Kanban, LayoutDashboard, Mic, PhoneCall, Search, Settings, Sun, Target, UserRound, Users, Wrench, type LucideIcon,
+  Sparkles,
 } from "lucide-react";
 import { NAV, type GoFn, type ViewId } from "./nav";
 import { ApiProvider, makeApi, type Api } from "./session";
@@ -23,6 +24,7 @@ import { DealsView } from "./views/deals";
 import { DuplicatesView } from "./views/duplicates";
 import { EmailHealthView } from "./views/email-health";
 import { HelpView } from "./views/help";
+import { RoadmapView } from "./views/roadmap";
 import { FreshnessStrip } from "./views/health-card";
 import { InboxView } from "./views/inbox";
 import { OnboardingView } from "./views/onboarding";
@@ -41,7 +43,7 @@ type Auth =
   | { status: "outside" }
   | { status: "error"; message: string }
   | { status: "not_installed" }
-  | { status: "ready"; api: Api; demo: boolean; userName: string | null; features: Record<string, boolean>; locked: string[]; kind: AccessKind; locationId: string | null };
+  | { status: "ready"; api: Api; demo: boolean; userName: string | null; features: Record<string, boolean>; locked: string[]; kind: AccessKind; locationId: string | null; brand: { name: string | null; color: string | null } };
 
 type SsoResponse = {
   error?: string;
@@ -51,6 +53,13 @@ type SsoResponse = {
   kind?: AccessKind;
   user?: { userName?: string | null; activeLocation?: string | null };
   entitlements?: { features: Record<string, boolean>; locked?: string[] };
+  brand?: { name: string | null; color: string | null };
+};
+
+// Black or white text, whichever reads on the agency's chosen colour.
+const onColour = (hex: string) => {
+  const n = parseInt(hex.slice(1), 16);
+  return (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) > 150 ? "#111111" : "#ffffff";
 };
 
 async function exchange(body: unknown): Promise<{ ok: boolean; status: number; data: SsoResponse }> {
@@ -95,7 +104,7 @@ export function Dashboard() {
       setAuth({
         status: "ready", api: makeApi(r.data.session, () => refreshRef.current(), demo), demo,
         userName: r.data.user?.userName ?? null, features: r.data.entitlements?.features ?? {}, locked: r.data.entitlements?.locked ?? [],
-        kind: r.data.kind ?? "agency", locationId: r.data.user?.activeLocation ?? null,
+        kind: r.data.kind ?? "agency", locationId: r.data.user?.activeLocation ?? null, brand: r.data.brand ?? { name: null, color: null },
       });
       return r.data.session;
     }
@@ -231,6 +240,7 @@ export function Dashboard() {
       case "alerts": return <AlertsView go={go} />;
       case "settings": return <SettingsView />;
       case "help": return <HelpView go={go} />;
+      case "roadmap": return <RoadmapView />;
       case "pipeline": return <Tabs key="pipe" start={0} tabs={pipeTabs} />;
       case "team": return <TeamView />;
       case "appointments": return <Tabs key="appts" start={0} tabs={[{ label: "To do", node: <AppointmentsView go={go} /> }, { label: "Insights", node: <AppointmentInsights /> }]} />;
@@ -244,11 +254,11 @@ export function Dashboard() {
 
   return (
     <ApiProvider value={api}>
-      <div className="flex min-h-screen bg-background text-foreground">
+      <div className="dark flex min-h-screen bg-background text-foreground" style={auth.brand.color ? ({ "--primary": auth.brand.color, "--primary-foreground": onColour(auth.brand.color), "--sidebar-primary": auth.brand.color, "--sidebar-primary-foreground": onColour(auth.brand.color), "--ring": auth.brand.color } as React.CSSProperties) : undefined}>
         <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col self-start border-r border-sidebar-border bg-sidebar p-4 text-sidebar-foreground md:flex print:hidden">
           <div className="flex items-center gap-2.5 px-2 pt-1">
             <span aria-hidden className="flex size-8 items-center justify-center rounded-xl bg-sidebar-primary text-sidebar-primary-foreground shadow-md"><svg viewBox="0 0 24 24" className="size-[18px]" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M4 8h10a4 4 0 0 1 0 8H8" /><path d="M20 16H10a4 4 0 0 1 0-8h6" opacity="0.55" /></svg></span>
-            <span className="text-[1.05rem] font-semibold tracking-tight text-sidebar-accent-foreground">SubSync</span>
+            <span className="text-[1.05rem] font-semibold tracking-tight text-sidebar-accent-foreground">{auth.brand.name ?? "SubSync"}</span>
           </div>
           <nav className="sidebar-scroll mt-3 flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto pr-1" aria-label="Sections">
             {menu.map((n, i) => (
@@ -294,7 +304,7 @@ export function Dashboard() {
 
 const ICONS: Record<string, LucideIcon> = {
   today: Sun, audit: ClipboardCheck, speed: Zap, overview: LayoutDashboard, inbox: Inbox, appointments: CalendarCheck, meetings: Mic, search: Search, pipeline: Kanban, leads: Target, calls: PhoneCall,
-  accounts: Briefcase, clients: UserRound, team: Users, onboarding: Wrench, duplicates: Copy, cleanup: Eraser, settings: Settings, help: CircleHelp,
+  accounts: Briefcase, clients: UserRound, team: Users, onboarding: Wrench, duplicates: Copy, cleanup: Eraser, settings: Settings, help: CircleHelp, roadmap: Sparkles,
 };
 
 function Tabs({ tabs, start }: { tabs: Array<{ label: string; node: React.ReactNode }>; start: number }) {

@@ -1,0 +1,57 @@
+import { NextResponse } from "next/server";
+import { buildDailyDigest } from "@/lib/analytics/digest-service";
+import { weeklyDue, weeklyEmail } from "@/lib/analytics/weekly-email";
+import { sql } from "@/lib/db";
+import { emailConfigured, sendEmail } from "@/lib/email";
+
+// Runs every hour. Sends the weekly email to each agency that set an address, on Monday at the hour it chose
+// in its own time zone, once a week. Does nothing until an email service key is set.
+export const maxDuration = 60;
+
+function local(now: Date, timeZone: string) {
+  try {
+    const p = new Intl.DateTimeFormat("en-CA", { timeZone, hour: "2-digit", hour12: false, weekday: "short", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(now);
+    const g = (t: string) => p.find((x) => x.type === t)?.value ?? "";
+    return { hour: Number(g("hour")) % 24, date: `${g("year")}-${g("month")}-${g("day")}`, weekday: g("weekday") };
+  } catch {
+    return null;
+  }
+}
+
+export async function GET(request: Request) {
+  const secret = process.env.CRON_SECRET;
+  if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!emailConfigured()) return NextResponse.json({ sent: 0, reason: "email service not configured" });
+  const now = new Date();
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/+$/, "");
+  try {
+    const rows = await sql()`
+      select i.id, coalesce(s.brand_name, i.company_name, 'Your agency') label, s.digest_email, s.digest_hour, s.digest_timezone, s.last_weekly_digest_on::text last_on,
+        (select l.timezone from locations l where l.installation_id = i.id and l.timezone is not null order by l.name limit 1) first_zone
+      from installations i join settings s on s.installation_id = i.id
+      where i.uninstalled_at is null and not i.is_demo and s.digest_email is not null`;
+    let sent = 0;
+    for (const r of rows) {
+      const when = local(now, (r.digest_timezone as string | null) ?? (r.first_zone as string | null) ?? "UTC");
+      if (!weeklyDue(when, (r.digest_hour as number | null) ?? 8, r.last_on as string | null)) continue;
+      try {
+        const d = await buildDailyDigest(r.id as string);
+        const mail = weeklyEmail({
+          who: r.label as string, appUrl, fine: d.fine.length,
+          headlines: d.headlines.map((h) => ({ label: h.label, money: h.money, today: h.change.today, vsAvg: h.change.vsAvg })),
+          attention: d.attention.map((a) => ({ name: a.name, title: a.items[0]?.title ?? "Needs a look" })),
+        });
+        if (await sendEmail(r.digest_email as string, mail) && when) {
+          await sql()`update settings set last_weekly_digest_on = ${when.date}::date where installation_id = ${r.id}`;
+          sent++;
+        }
+      } catch (error) {
+        console.error("Weekly email failed for one agency", error instanceof Error ? error.message : "unknown");
+      }
+    }
+    return NextResponse.json({ agencies: rows.length, sent });
+  } catch (error) {
+    console.error("Cron weekly failed", error instanceof Error ? error.message : "unknown");
+    return NextResponse.json({ error: "Weekly email failed" }, { status: 500 });
+  }
+}

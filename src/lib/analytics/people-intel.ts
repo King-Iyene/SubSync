@@ -46,6 +46,18 @@ export function teamWinRate(row: Pick<TeamRow, "wonCount" | "lostCount">): numbe
   return closed >= 5 ? row.wonCount / closed : null;
 }
 
+// Pace figures over the last 30 days. A rate or a typical time built on a handful of cases is noise, so each needs a minimum.
+export const MIN_REPLIES_FOR_PACE = 3;
+export const MIN_OUTCOMES_FOR_SHOW_RATE = 5;
+export type PaceRow = { replies: number; medianSeconds: number | null; held: number; noShow: number };
+export const paceOf = (r: PaceRow) => ({
+  replies: r.replies,
+  medianReplySeconds: r.replies >= MIN_REPLIES_FOR_PACE ? r.medianSeconds : null,
+  held: r.held,
+  noShow: r.noShow,
+  showRate: r.held + r.noShow >= MIN_OUTCOMES_FOR_SHOW_RATE ? r.held / (r.held + r.noShow) : null,
+});
+
 // What to call someone we only know by id.
 export function teamLabel(userId: string, name: string | null): string {
   if (name) return name;

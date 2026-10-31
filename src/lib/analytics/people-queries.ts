@@ -1,5 +1,5 @@
 import { sql } from "../db";
-import { daysUntilBirthday, type SourceRow, type TeamRow } from "./people-intel";
+import { daysUntilBirthday, type PaceRow, type SourceRow, type TeamRow } from "./people-intel";
 
 const iso = (v: unknown) => (v instanceof Date ? v.toISOString() : null);
 
@@ -92,6 +92,26 @@ export async function teamStats(installationId: string, allowed: string[] | null
     wonCount: r.won_count, wonValue: r.won_value, lostCount: r.lost_count, contacts: r.contacts,
     avgCycleDays: r.avg_cycle === null ? null : Math.round(r.avg_cycle * 10) / 10,
   }));
+}
+
+// First-reply speed and appointment outcomes per person, last 30 days, for the accounts the caller may see.
+export async function teamPace(installationId: string, allowed: string[] | null): Promise<Map<string, PaceRow>> {
+  const db = sql();
+  const [replies, appts] = await Promise.all([
+    db`select t.touch_user_id user_id, count(*)::int n, percentile_cont(0.5) within group (order by extract(epoch from t.touch_at - t.lead_at))::float8 med
+        from lead_touches t join locations l on l.installation_id = t.installation_id and l.location_id = t.location_id and not l.ignored
+        where t.installation_id = ${installationId} and t.touch_at is not null and t.touch_user_id is not null and t.lead_at > now() - interval '30 days'
+          ${allowed ? db`and t.location_id = any(${allowed}::text[])` : db``} group by 1`,
+    db`select a.assigned_to user_id, count(*) filter (where a.status = 'showed')::int held, count(*) filter (where a.status = 'noshow')::int no_show
+        from cached_appointments a join locations l on l.installation_id = a.installation_id and l.location_id = a.location_id and not l.ignored
+        where a.installation_id = ${installationId} and a.assigned_to is not null and a.assigned_to <> '' and a.start_at > now() - interval '30 days'
+          ${allowed ? db`and a.location_id = any(${allowed}::text[])` : db``} group by 1`,
+  ]);
+  const out = new Map<string, PaceRow>();
+  const row = (id: string) => out.get(id) ?? (out.set(id, { replies: 0, medianSeconds: null, held: 0, noShow: 0 }), out.get(id) as PaceRow);
+  for (const r of replies) { const x = row(r.user_id as string); x.replies = r.n as number; x.medianSeconds = r.med === null ? null : Math.round(r.med as number); }
+  for (const r of appts) { const x = row(r.user_id as string); x.held = r.held as number; x.noShow = r.no_show as number; }
+  return out;
 }
 
 export async function setTeamName(installationId: string, userId: string, name: string | null): Promise<void> {

@@ -3,15 +3,15 @@
 import { useEffect, useState } from "react";
 import { useApiClient, useData } from "../session";
 import type { SyncStatus } from "../types";
-import { Btn, Card, ErrorBox, inputClass, Loading, PageHeader, timeAgo } from "../ui";
+import { Badge, Btn, Card, ErrorBox, inputClass, Loading, PageHeader, timeAgo } from "../ui";
 import { ConnectionsCard } from "./connections";
 import { HealthCard } from "./health-card";
 
-type S = { staleDays: number; dormantDays: number; slaHours: number; appDomain: string; digestEnabled: boolean; customChecklist: string[]; digestHour: number | null; digestTimezone: string | null; brandName: string | null; brandColor: string | null; industryTargets?: boolean; keepTranscripts: boolean; speedTargetMinutes: number; countAutomatedTouches: boolean };
+type S = { staleDays: number; dormantDays: number; slaHours: number; appDomain: string; digestEnabled: boolean; customChecklist: string[]; digestHour: number | null; digestTimezone: string | null; digestEmail: string | null; emailReady?: boolean; brandName: string | null; brandColor: string | null; industryTargets?: boolean; keepTranscripts: boolean; speedTargetMinutes: number; countAutomatedTouches: boolean };
 
 export function SettingsView() {
   const api = useApiClient();
-  const { data, error, loading, reload } = useData<{ features?: Record<string, boolean>; settings: S; slackConfigured: boolean; kind?: string; clientView?: { on: number; total: number } | null }>("settings");
+  const { data, error, loading, reload } = useData<{ features?: Record<string, boolean>; settings: S; slackConfigured: boolean; kind?: string; clientView?: { on: number; total: number } | null; clientAccounts?: Array<{ locationId: string; name: string; on: boolean }> }>("settings");
   const sync = useData<SyncStatus>("sync");
   const keys = useData<{ keys: Array<{ id: string; name: string; prefix: string; createdAt: string; lastUsedAt: string | null }>; max: number; endpoint: string }>("api-keys");
   const [keyName, setKeyName] = useState("");
@@ -45,7 +45,7 @@ export function SettingsView() {
     try {
       const body: Record<string, unknown> = {
         staleDays: form.staleDays, dormantDays: form.dormantDays, slaHours: form.slaHours, appDomain: form.appDomain,
-        digestEnabled: form.digestEnabled, digestHour: form.digestHour, digestTimezone: form.digestTimezone, brandName: form.brandName, brandColor: form.brandColor, keepTranscripts: form.keepTranscripts, speedTargetMinutes: form.speedTargetMinutes, countAutomatedTouches: form.countAutomatedTouches,
+        digestEnabled: form.digestEnabled, digestHour: form.digestHour, digestTimezone: form.digestTimezone, digestEmail: form.digestEmail, brandName: form.brandName, brandColor: form.brandColor, keepTranscripts: form.keepTranscripts, speedTargetMinutes: form.speedTargetMinutes, countAutomatedTouches: form.countAutomatedTouches,
         customChecklist: checklist.split("\n").map((l) => l.trim()).filter(Boolean),
       };
       if (slack.trim()) body.slackWebhookUrl = slack.trim();
@@ -108,6 +108,21 @@ export function SettingsView() {
 
         {data.clientView && (
           <Card title="Client access">
+            <ul className="mb-4 divide-y rounded-lg border text-sm" aria-label="Client access by account">
+              {(data.clientAccounts ?? []).map((a) => (
+                <li key={a.locationId} className="flex items-center justify-between gap-3 px-3 py-2">
+                  <span className="font-medium">{a.name}</span>
+                  <span className="flex items-center gap-3">
+                    <Badge tone={a.on ? "good" : "neutral"}>{a.on ? "On" : "Off"}</Badge>
+                    <button type="button" role="switch" aria-checked={a.on} aria-label={`Client access for ${a.name}`} disabled={busy}
+                      onClick={() => call(() => api.put(`accounts/${a.locationId}/flags`, { clientView: !a.on }), `Client access ${a.on ? "off" : "on"} for ${a.name}.`)}
+                      className={`relative h-6 w-11 rounded-full transition-colors disabled:opacity-50 ${a.on ? "bg-primary" : "bg-muted-foreground/40"}`}>
+                      <span className={`absolute top-0.5 size-5 rounded-full bg-white shadow transition-all ${a.on ? "left-[22px]" : "left-0.5"}`} />
+                    </button>
+                  </span>
+                </li>
+              ))}
+            </ul>
             <p className="mb-3 text-sm text-muted-foreground">
               Let your clients&apos; own staff open SubSync inside their account. They see a read-only view of that one account only: never other clients, your fees, notes or settings.
               Right now it is on for {data.clientView.on} of {data.clientView.total} accounts. You can also switch it on per client from the account page.
@@ -164,6 +179,11 @@ export function SettingsView() {
           <label htmlFor="slack" className="mb-1 block text-sm font-medium">Or paste a Slack web address (advanced)</label>
           <input id="slack" className={inputClass} type="password" autoComplete="off" placeholder={data.slackConfigured ? "Saved. Paste a new URL to replace it" : "https://hooks.slack.com/services/..."} value={slack} onChange={(e) => setSlack(e.target.value)} />
           <label className="mt-3 flex items-center gap-2 text-sm"><input type="checkbox" className="size-4" checked={form.digestEnabled} onChange={(e) => setForm({ ...form, digestEnabled: e.target.checked })} /> Send the daily brief to Slack</label>
+          <div className="mt-3">
+            <label htmlFor="digest-email" className="mb-1 block text-sm font-medium">Weekly email (Mondays)</label>
+            <input id="digest-email" type="email" className={inputClass} placeholder="you@youragency.com" value={form.digestEmail ?? ""} onChange={(e) => setForm({ ...form, digestEmail: e.target.value.trim() || null })} />
+            <p className="mt-1 text-xs text-muted-foreground">{data.settings.emailReady ? "One address. Sent Monday at the hour below, in your time zone." : "Saved now, but nothing is sent until an email service is connected to the app."}</p>
+          </div>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <div>
               <label htmlFor="digest-hour" className="mb-1 block text-sm font-medium">Send at</label>

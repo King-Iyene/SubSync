@@ -21,6 +21,8 @@ export type Settings = AccountSettings & {
   /** Local hour (0 to 23) the daily brief is sent, and the time zone it is judged in. Null means the defaults. */
   digestHour: number | null;
   digestTimezone: string | null;
+  /** Where the weekly email goes. Null means it is not sent. */
+  digestEmail: string | null;
   /** Name and colour shown at the top of printed client reports. */
   brandName: string | null;
   brandColor: string | null;
@@ -35,7 +37,7 @@ export type Settings = AccountSettings & {
 export async function getSettings(installationId: string): Promise<Settings> {
   const db = sql();
   const read = () => db`
-    select stale_deal_days, dormant_days, sla_hours, slack_webhook_url, ghl_app_domain, digest_enabled, custom_checklist, digest_hour, digest_timezone, brand_name, brand_color, industry_targets, keep_transcripts, speed_target_minutes, count_automated_touches
+    select stale_deal_days, dormant_days, sla_hours, slack_webhook_url, ghl_app_domain, digest_enabled, custom_checklist, digest_hour, digest_timezone, digest_email, brand_name, brand_color, industry_targets, keep_transcripts, speed_target_minutes, count_automated_touches
     from settings where installation_id = ${installationId}`;
   let [r] = await read();
   if (!r) {
@@ -54,6 +56,7 @@ export async function getSettings(installationId: string): Promise<Settings> {
     customChecklist: Array.isArray(r.custom_checklist) ? r.custom_checklist.filter((x: unknown): x is string => typeof x === "string") : [],
     digestHour: (r.digest_hour as number | null) ?? null,
     digestTimezone: (r.digest_timezone as string | null) ?? null,
+    digestEmail: (r.digest_email as string | null) ?? null,
     brandName: (r.brand_name as string | null) ?? null,
     brandColor: (r.brand_color as string | null) ?? null,
     industryTargets: r.industry_targets === true,
@@ -84,6 +87,7 @@ export async function updateSettings(installationId: string, p: Partial<Settings
       digest_enabled = coalesce(${p.digestEnabled ?? null}::boolean, digest_enabled),
       digest_hour = case when ${p.digestHour !== undefined} then ${p.digestHour ?? null}::int else digest_hour end,
       digest_timezone = case when ${p.digestTimezone !== undefined} then ${p.digestTimezone ?? null} else digest_timezone end,
+      digest_email = case when ${p.digestEmail !== undefined} then ${p.digestEmail ?? null} else digest_email end,
       industry_targets = coalesce(${p.industryTargets ?? null}::boolean, industry_targets),
       keep_transcripts = coalesce(${p.keepTranscripts ?? null}::boolean, keep_transcripts),
       speed_target_minutes = coalesce(${p.speedTargetMinutes ?? null}::int, speed_target_minutes),

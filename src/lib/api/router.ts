@@ -33,6 +33,9 @@ import { badDataSamples, contactOverview, topLeads, vips } from "../analytics/co
 import { appointmentInsights } from "../analytics/appointment-insight-queries";
 import { auditSummary, buildAudit } from "../analytics/audit-intel";
 import { speedView } from "../analytics/speed-queries";
+import { CHANGELOG, ROADMAP } from "../roadmap";
+import { emailConfigured } from "../email";
+import { validEmail } from "../analytics/weekly-email";
 import { appointmentView } from "../analytics/appointment-queries";
 import { compareSetup, describe as describeDiff } from "../analytics/setup-intel";
 import { applyRun, createPreview, getRun, installationHasScope, listRuns, PREVIEW_VALID_HOURS, sampleChanges, undoRun } from "../analytics/cleanup-queries";
@@ -48,8 +51,8 @@ import { digestText, localParts } from "../analytics/digest-intel";
 import { industryOptions, matchesSegment, PLAYBOOKS } from "../analytics/playbooks";
 import { buildQueue, recordBulk, recordDecision, summarise, undoDecision } from "../analytics/dedupe-queries";
 import { bulkSelect, groupKey } from "../analytics/dedupe";
-import { contactTimeline, dndSummary, leadSources, recentDealMoves, setTeamName, teamStats, upcomingBirthdays } from "../analytics/people-queries";
-import { sourceConversion, teamLabel, teamWinRate } from "../analytics/people-intel";
+import { contactTimeline, dndSummary, leadSources, recentDealMoves, setTeamName, teamPace, teamStats, upcomingBirthdays } from "../analytics/people-queries";
+import { paceOf, sourceConversion, teamLabel, teamWinRate } from "../analytics/people-intel";
 import { getGoals, GOAL_METRICS, loadDeals, pipelineTrend, setGoal, type GoalMetric } from "../analytics/pipeline-queries";
 import { authenticate, isResponse, json, type AuthContext } from "./auth";
 
@@ -195,6 +198,24 @@ async function speedViewData(ctx: Ctx) {
   const sc = await scope(ctx);
   const v = await speedView(ctx.installationId, await allowedIds(ctx), sc.settings.speedTargetMinutes);
   return json({ ...v, waiting: v.waiting.map((w) => ({ ...w, url: sc.links.contact(w.locationId, w.contactId) })) });
+}
+
+// Voting is per person and counted inside the one installation, so one agency never sees another's votes.
+const voterOf = (ctx: Ctx) => `${ctx.kind}:${ctx.limitTo ?? "agency"}:${ctx.session.userId ?? ""}`;
+
+async function roadmapView(ctx: Ctx) {
+  const rows = await sql()`select item_key, count(*)::int n, bool_or(voter = ${voterOf(ctx)}) mine from roadmap_votes where installation_id = ${ctx.installationId} group by item_key`;
+  const by = new Map(rows.map((r) => [r.item_key as string, { n: r.n as number, mine: Boolean(r.mine) }]));
+  return json({ items: ROADMAP.map((i) => ({ ...i, votes: by.get(i.key)?.n ?? 0, voted: by.get(i.key)?.mine ?? false })), changelog: CHANGELOG });
+}
+
+async function roadmapVote(ctx: Ctx) {
+  const body = (await ctx.request.json().catch(() => null)) as { key?: unknown } | null;
+  if (typeof body?.key !== "string" || !ROADMAP.some((i) => i.key === body.key)) return json({ error: "Unknown item" }, 400);
+  const voter = voterOf(ctx);
+  const gone = await sql()`delete from roadmap_votes where installation_id = ${ctx.installationId} and item_key = ${body.key} and voter = ${voter} returning 1`;
+  if (gone.length === 0) await sql()`insert into roadmap_votes (installation_id, item_key, voter) values (${ctx.installationId}, ${body.key}, ${voter})`;
+  return json({ ok: true, voted: gone.length === 0 });
 }
 
 async function appointmentsView(ctx: Ctx) {
@@ -714,12 +735,13 @@ async function alertsView(ctx: Ctx) {
 const settingsView = async (ctx: Ctx) => {
   const { settings } = await loadAccounts(ctx.installationId);
   const [counts] = ctx.kind === "agency" ? await sql()`select count(*)::int total, count(*) filter (where client_view)::int on_ from locations where installation_id = ${ctx.installationId}` : [null];
-  return json({ features: ctx.entitlements.features, settings: publicSettings(settings), slackConfigured: Boolean(settings.slackWebhookUrl), kind: ctx.kind, clientView: counts ? { on: counts.on_ as number, total: counts.total as number } : null });
+  const accts = ctx.kind === "agency" ? await sql()`select location_id, name, client_view from locations where installation_id = ${ctx.installationId} and not ignored order by lower(coalesce(name, ''))` : [];
+  return json({ features: ctx.entitlements.features, settings: publicSettings(settings), slackConfigured: Boolean(settings.slackWebhookUrl), kind: ctx.kind, clientView: counts ? { on: counts.on_ as number, total: counts.total as number } : null, clientAccounts: accts.map((r) => ({ locationId: r.location_id as string, name: (r.name as string | null) ?? "Unnamed account", on: r.client_view === true })) });
 };
 
 function publicSettings(s: Settings) {
   // Never send the webhook URL back to the browser: it is a secret.
-  return { staleDays: s.staleDays, dormantDays: s.dormantDays, slaHours: s.slaHours, appDomain: s.appDomain, digestEnabled: s.digestEnabled, customChecklist: s.customChecklist, digestHour: s.digestHour, digestTimezone: s.digestTimezone, brandName: s.brandName, brandColor: s.brandColor, industryTargets: s.industryTargets, keepTranscripts: s.keepTranscripts, speedTargetMinutes: s.speedTargetMinutes, countAutomatedTouches: s.countAutomatedTouches };
+  return { staleDays: s.staleDays, dormantDays: s.dormantDays, slaHours: s.slaHours, appDomain: s.appDomain, digestEnabled: s.digestEnabled, customChecklist: s.customChecklist, digestHour: s.digestHour, digestTimezone: s.digestTimezone, digestEmail: s.digestEmail, emailReady: emailConfigured(), brandName: s.brandName, brandColor: s.brandColor, industryTargets: s.industryTargets, keepTranscripts: s.keepTranscripts, speedTargetMinutes: s.speedTargetMinutes, countAutomatedTouches: s.countAutomatedTouches };
 }
 
 async function settingsUpdate(ctx: Ctx) {
@@ -752,6 +774,11 @@ async function settingsUpdate(ctx: Ctx) {
   if ("digestHour" in body) {
     if (body.digestHour === null) patch.digestHour = null;
     else { const v = int(body.digestHour, 0, 23); if (v === null) return json({ error: "Choose an hour between 0 and 23" }, 400); patch.digestHour = v; }
+  }
+  if ("digestEmail" in body) {
+    if (body.digestEmail === null || body.digestEmail === "") patch.digestEmail = null;
+    else if (typeof body.digestEmail === "string" && validEmail(body.digestEmail.trim())) patch.digestEmail = body.digestEmail.trim();
+    else return json({ error: "Enter one email address" }, 400);
   }
   if ("digestTimezone" in body) {
     if (body.digestTimezone === null || body.digestTimezone === "") patch.digestTimezone = null;
@@ -995,10 +1022,11 @@ async function contactIntel(ctx: Ctx) {
 
 async function teamView(ctx: Ctx) {
   const sc = await scope(ctx);
-  const rows = await teamStats(ctx.installationId, await allowedIds(ctx), sc.settings.staleDays);
+  const allowed = await allowedIds(ctx);
+  const [rows, pace] = await Promise.all([teamStats(ctx.installationId, allowed, sc.settings.staleDays), teamPace(ctx.installationId, allowed)]);
   return json({
     staleDays: sc.settings.staleDays,
-    members: rows.map((r) => ({ ...r, label: teamLabel(r.userId, r.name), winRate: teamWinRate(r) })),
+    members: rows.map((r) => ({ ...r, label: teamLabel(r.userId, r.name), winRate: teamWinRate(r), pace: paceOf(pace.get(r.userId) ?? { replies: 0, medianSeconds: null, held: 0, noShow: 0 }) })),
   });
 }
 
@@ -1323,6 +1351,7 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
     if (method === "GET") {
       if (a === "overview") return await overview(ctx);
       if (a === "daily") return await dailyView(ctx);
+      if (a === "roadmap") return await roadmapView(ctx);
       if (a === "appointments") return await appointmentsView(ctx);
       if (a === "audit") return await auditViewData(ctx);
       if (a === "speed") return await speedViewData(ctx);
@@ -1371,6 +1400,7 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
     if (method === "POST") {
       if (a === "email" && b === "check") return await emailCheck(ctx);
       if (a === "usage" && !b) return await usagePing(ctx);
+      if (a === "roadmap" && !b) return await roadmapVote(ctx);
       if (a === "cleanup" && b === "preview") return await cleanupPreview(ctx);
       if (a === "cleanup" && b && c === "apply") return await cleanupWork(ctx, b, "apply");
       if (a === "cleanup" && b && c === "undo") return await cleanupWork(ctx, b, "undo");

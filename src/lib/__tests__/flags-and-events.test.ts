@@ -4,11 +4,11 @@ import { FEATURES } from "../entitlements.ts";
 import { DEFAULT_OFF, resolveFeatures } from "../flags-core.ts";
 import { diffAppointmentEvents } from "../sync/appointment-events.ts";
 
-test("deferred features are off by default and everything else is on", () => {
+test("only the unfinished features are off by default and everything else is on", () => {
   const f = resolveFeatures(FEATURES, {});
-  for (const off of ["reports", "meetings", "cleanup", "ai", "setup_compare", "playbooks", "connections", "builder", "duplicates", "clients", "team", "activity"] as const) assert.equal(f[off], false, off);
-  for (const on of ["overview", "search", "inbox", "appointments", "calls", "alerts", "pipelines", "stale", "onboarding", "settings", "health"] as const) assert.equal(f[on], true, on);
-  assert.ok(DEFAULT_OFF.size >= 12);
+  for (const off of ["ai", "connections"] as const) assert.equal(f[off], false, off);
+  for (const on of ["overview", "search", "inbox", "appointments", "calls", "alerts", "pipelines", "stale", "onboarding", "settings", "health", "reports", "meetings", "cleanup", "setup_compare", "playbooks", "builder", "duplicates", "clients", "team", "activity"] as const) assert.equal(f[on], true, on);
+  assert.equal(DEFAULT_OFF.size, 2);
   assert.ok([...DEFAULT_OFF].every((x) => (FEATURES as readonly string[]).includes(x)), "every switched-off name is a real feature");
 });
 
