@@ -73,5 +73,7 @@ export function entitlements(plan: Plan, enforce = false) {
     features: Object.fromEntries(FEATURES.map((f) => [f, true])) as Record<Feature, boolean>,
     /** Features that are switched off (see flags.ts). */
     off: [] as string[],
+    /** Features this install's plan does not include (enforced mode only). */
+    locked: [] as string[],
   };
 }

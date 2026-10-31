@@ -45,7 +45,7 @@ export async function authenticate(request: Request, segments: string[] = []): P
     if (!demoEnabled()) return json({ error: "Demo mode is off" }, 403);
     const { ensureDemo } = await import("../demo/seed");
     const installationId = await ensureDemo();
-    return { session, installationId, plan: "pro", demo: true, entitlements: await resolveEntitlements("pro"), kind, limitTo };
+    return { session, installationId, plan: "pro", demo: true, entitlements: await resolveEntitlements("pro", installationId, true), kind, limitTo };
   }
 
   const installation = await getInstallation(session.companyId);
@@ -59,7 +59,7 @@ export async function authenticate(request: Request, segments: string[] = []): P
     installationId: installation.id,
     plan: installation.plan,
     demo: false,
-    entitlements: await resolveEntitlements(installation.plan),
+    entitlements: await resolveEntitlements(installation.plan, installation.id),
     kind,
     limitTo,
   };

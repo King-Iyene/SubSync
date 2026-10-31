@@ -30,7 +30,7 @@ export async function POST(request: Request) {
       userName: kind === "agency" ? "Demo Admin" : "Demo Owner", activeLocation: locationId,
     };
     const session = signSession({ companyId: DEMO_COMPANY_ID, userId: user.userId, role: user.role, userName: user.userName, demo: true, kind, locationId });
-    return NextResponse.json({ user, installed: true, demo: true, kind, session, entitlements: await resolveEntitlements("pro") });
+    return NextResponse.json({ user, installed: true, demo: true, kind, session, entitlements: await resolveEntitlements("pro", undefined, true) });
   }
 
   const sharedSecret = process.env.GHL_SSO_KEY;
@@ -76,5 +76,5 @@ export async function POST(request: Request) {
     companyId: decision.companyKey, userId: user.userId, role: user.role, userName: user.userName, demo: false,
     kind: decision.kind, locationId: decision.locationId,
   });
-  return NextResponse.json({ user, installed: true, kind: decision.kind, session, entitlements: await resolveEntitlements(installation.plan) });
+  return NextResponse.json({ user, installed: true, kind: decision.kind, session, entitlements: await resolveEntitlements(installation.plan, installation.id) });
 }

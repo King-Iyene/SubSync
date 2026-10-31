@@ -3,6 +3,7 @@ import { businessKey } from "@/lib/access";
 import { sql } from "@/lib/db";
 import { getInstallation, purgeInstallation, purgeLocationData } from "@/lib/ghl/installations";
 import { actionFor, parseWebhook, verifyWebhook } from "@/lib/ghl/webhook";
+import { recordPlanEvent } from "@/lib/entitlements-queries";
 import { enqueueAreaSync, enqueueFullSync } from "@/lib/sync/engine";
 
 // Receives platform webhooks. Verify the Ed25519 signature on the body, drop duplicates (failed
@@ -15,8 +16,10 @@ export async function POST(request: Request) {
   }
 
   let event;
+  let parsed: unknown;
   try {
-    event = parseWebhook(JSON.parse(raw));
+    parsed = JSON.parse(raw);
+    event = parseWebhook(parsed);
   } catch {
     return NextResponse.json({ error: "Invalid body" }, { status: 400 });
   }
@@ -30,6 +33,13 @@ export async function POST(request: Request) {
     }
 
     const action = actionFor(event.type);
+    // A plan change, or the plan an install starts on, is recorded for whichever install it belongs to.
+    if ((event.type === "PlanChange" || event.type === "AppInstall") && event.companyId) {
+      const target = (event.locationId ? await getInstallation(businessKey(event.locationId)) : null) ?? (await getInstallation(event.companyId));
+      // Recording the plan must never stop an install from syncing (the table may not exist yet).
+      if (target) await recordPlanEvent(target.id, parsed).catch((e) => console.error("Recording a plan failed", e instanceof Error ? e.message : "unknown"));
+      if (event.type === "PlanChange") return NextResponse.json({ ok: true });
+    }
     if (action.kind === "ignore" || !event.companyId) return NextResponse.json({ ok: true });
 
     // A client account that installed the app for itself has its own install, keyed by its location.

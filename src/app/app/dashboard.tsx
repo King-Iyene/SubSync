@@ -39,7 +39,7 @@ type Auth =
   | { status: "outside" }
   | { status: "error"; message: string }
   | { status: "not_installed" }
-  | { status: "ready"; api: Api; demo: boolean; userName: string | null; features: Record<string, boolean>; kind: AccessKind; locationId: string | null };
+  | { status: "ready"; api: Api; demo: boolean; userName: string | null; features: Record<string, boolean>; locked: string[]; kind: AccessKind; locationId: string | null };
 
 type SsoResponse = {
   error?: string;
@@ -48,7 +48,7 @@ type SsoResponse = {
   session?: string;
   kind?: AccessKind;
   user?: { userName?: string | null; activeLocation?: string | null };
-  entitlements?: { features: Record<string, boolean> };
+  entitlements?: { features: Record<string, boolean>; locked?: string[] };
 };
 
 async function exchange(body: unknown): Promise<{ ok: boolean; status: number; data: SsoResponse }> {
@@ -92,7 +92,7 @@ export function Dashboard() {
       const demo = r.data.demo === true;
       setAuth({
         status: "ready", api: makeApi(r.data.session, () => refreshRef.current(), demo), demo,
-        userName: r.data.user?.userName ?? null, features: r.data.entitlements?.features ?? {},
+        userName: r.data.user?.userName ?? null, features: r.data.entitlements?.features ?? {}, locked: r.data.entitlements?.locked ?? [],
         kind: r.data.kind ?? "agency", locationId: r.data.user?.activeLocation ?? null,
       });
       return r.data.session;
@@ -189,7 +189,9 @@ export function Dashboard() {
 
   const limited = auth.kind !== "agency";
   // Features that are switched off (flags) are not shown at all.
-  const off = (feature: string) => auth.features[feature] === false;
+  // Switched off for everyone: not shown. Locked by plan: shown with a Pro note, and the page explains.
+  const locked = (feature: string) => auth.locked.includes(feature);
+  const off = (feature: string) => auth.features[feature] === false && !locked(feature);
   const menu = NAV.filter((n) => NAV_FOR[auth.kind].has(n.id) && !off(n.feature));
   const labelFor = (n: (typeof NAV)[number]) => (limited && n.id === "overview" ? "My account" : n.label);
   // Pages that live inside another page highlight their parent in the menu.
@@ -210,6 +212,7 @@ export function Dashboard() {
     }
     const feature = NAV.find((n) => n.id === view.id)?.feature;
     if (feature && off(feature)) return <Centered title="Not available" body="This page is switched off right now." />;
+    if (feature && locked(feature)) return <Centered title="Part of the paid plan" body="This page is included in the Pro plan. Ask whoever manages your SubSync plan to upgrade, and it appears here straight away." />;
     switch (view.id) {
       case "today": return <TodayView go={go} />;
       case "overview": return <OverviewView go={go} />;
@@ -252,6 +255,7 @@ export function Dashboard() {
                   {n.id === active && <span aria-hidden className="absolute inset-y-1.5 left-0 w-[3px] rounded-full bg-sidebar-primary" />}
                   {(() => { const Icon = ICONS[n.id]; return Icon ? <Icon aria-hidden className={`size-[17px] shrink-0 ${n.id === active ? "text-sidebar-primary" : "opacity-70 group-hover:opacity-100"}`} /> : null; })()}
                   <span className="flex-1">{labelFor(n)}</span>
+                  {locked(n.feature) && <span className="rounded-full bg-sidebar-primary/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sidebar-primary">Pro</span>}
                 </button>
               </div>
             ))}

@@ -105,7 +105,8 @@ async function scope(ctx: Ctx) {
 
 // A feature that is switched off (see flags.ts) does not exist as far as the caller can tell.
 const gate = (ctx: Ctx, feature: Feature) =>
-  ctx.entitlements.features[feature] === false ? json({ error: "This feature is switched off", feature, off: true }, 404) : null;
+  ctx.entitlements.locked.includes(feature) ? json({ error: "This feature is part of the paid plan", feature, upgrade: true }, 402)
+  : ctx.entitlements.features[feature] === false ? json({ error: "This feature is switched off", feature, off: true }, 404) : null;
 
 function slim(a: DerivedAccount, links: ReturnType<typeof deepLinks>) {
   return {
