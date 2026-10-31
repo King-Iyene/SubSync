@@ -198,3 +198,11 @@ Format: date, decision, reason.
 - `docs/RUNBOOK.md` saved from King's file. One stage at a time, STOP after each, wait for King's NEXT. `CLAUDE.md` wins where they disagree.
 - Still missing from the repo: `docs/READINESS_AND_TEST_PLAN.md` (referenced by the brief, the review plan and the runbook).
 - Where the repo already differs from what the runbook assumes (to settle at S0.1): tests run with Node's own test runner (283 tests), not Vitest; there is no Playwright suite; a demo tenant and a `DEMO_MODE` flag already exist; feature flags, `ENTITLEMENTS_MODE` and tenant isolation tests (384 cross-reads) already exist; there is no `APP_MODE=maintenance` kill switch, no `npm run verify` or `npm run e2e`, and no `docs/PROGRESS.md` yet.
+
+## 2026-10-31 (runbook stage S0.1)
+
+- Vitest for new tests, Node's runner kept for the 283 existing ones; `npm run verify` runs both. Reason: rewriting working tests adds risk and no customer value.
+- Demo allowed only when `DEMO_MODE=true` and neither `NODE_ENV` nor `VERCEL_ENV` is production. Preview builds (NODE_ENV production) therefore have no demo. Reason: runbook S0.1.
+- Kill switch `APP_MODE=maintenance` stops queuing, the worker, crons, sign-in and data calls but deliberately leaves install and uninstall webhooks working, so an uninstall during maintenance still deletes data.
+- Fixed a phone and tablet overflow found by the first browser run: `min-w-0` on Card and an explicit one-column base on every responsive grid.
+- Installed Vitest with `--legacy-peer-deps` (peer conflict on `@types/node`). To be resolved by upgrading `@types/node` to 22 or later.

@@ -81,7 +81,7 @@ export function SettingsView() {
 
       <div className="space-y-4">
         <Card title="Thresholds">
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div>
               <label htmlFor="stale" className="mb-1 block text-sm font-medium">Stale deal after (days)</label>
               <input id="stale" type="number" min={7} max={365} className={inputClass} value={form.staleDays} onChange={num("staleDays")} />
@@ -156,7 +156,7 @@ export function SettingsView() {
 
         <Card title="Your name on reports">
           <p className="mb-3 text-sm text-muted-foreground">Shown at the top of printed client reports and quarterly reviews, so what you hand to a client carries your name, not ours.</p>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label htmlFor="brand-name" className="mb-1 block text-sm font-medium">Business name</label>
               <input id="brand-name" className={inputClass} maxLength={60} placeholder="Acme Marketing" value={form.brandName ?? ""} onChange={(e) => setForm({ ...form, brandName: e.target.value || null })} />
@@ -186,7 +186,7 @@ export function SettingsView() {
             <input id="digest-email" type="email" className={inputClass} placeholder="you@youragency.com" value={form.digestEmail ?? ""} onChange={(e) => setForm({ ...form, digestEmail: e.target.value.trim() || null })} />
             <p className="mt-1 text-xs text-muted-foreground">{data.settings.emailReady ? "One address. Sent Monday at the hour below, in your time zone." : "Saved now, but nothing is sent until an email service is connected to the app."}</p>
           </div>
-          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label htmlFor="digest-hour" className="mb-1 block text-sm font-medium">Send at</label>
               <select id="digest-hour" className={inputClass} value={form.digestHour ?? 8} onChange={(e) => setForm({ ...form, digestHour: Number(e.target.value) })}>

@@ -49,7 +49,7 @@ function Editor({ c, onSaved }: { c: Client; onSaved: () => void }) {
     <div className="mt-3 rounded-xl border bg-muted/20 p-4">
       <p className="text-sm text-muted-foreground">{c.activity}</p>
       <p className="mt-2 text-sm">Setup score <strong>{c.setup.score}/100</strong>{c.setup.missing.length > 0 ? <span className="text-muted-foreground">. Missing: {c.setup.missing.join(", ")}.</span> : <span className="text-muted-foreground">. Fully set up.</span>}</p>
-      <div className="mt-3 grid gap-3 sm:grid-cols-3">
+      <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div><label htmlFor={`fee-${c.locationId}`} className="mb-1 block text-xs text-muted-foreground">What they pay you per month ($)</label><input id={`fee-${c.locationId}`} className={inputClass} inputMode="decimal" value={fee} onChange={(e) => setFee(e.target.value.replace(/[^0-9.]/g, ""))} /></div>
         <div><label htmlFor={`ren-${c.locationId}`} className="mb-1 block text-xs text-muted-foreground">Contract renews on</label><input id={`ren-${c.locationId}`} type="date" className={inputClass} value={renewal} onChange={(e) => setRenewal(e.target.value)} /></div>
         <div><label htmlFor={`ind-${c.locationId}`} className="mb-1 block text-xs text-muted-foreground">Industry</label><input id={`ind-${c.locationId}`} className={inputClass} value={industry} maxLength={60} onChange={(e) => setIndustry(e.target.value)} placeholder="e.g. Dental" /></div>
@@ -131,7 +131,7 @@ function CompareTab({ accounts }: { accounts: Array<{ locationId: string; name: 
   const show = (k: string, v: number | string | null | undefined) => (v === null || v === undefined ? "n/a" : k === "winRate" ? `${Math.round(Number(v) * 100)}%` : k === "openValue" ? fmtMoney(Number(v)) : String(v));
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {[["First client", a, setA], ["Second client", b, setB]].map(([label, value, set]) => (
           <div key={label as string}>
             <label className="mb-1 block text-sm font-medium">{label as string}</label>
@@ -189,7 +189,7 @@ function QbrTab({ accounts }: { accounts: Array<{ locationId: string; name: stri
             <Stat label="Win rate" value={pct(c.winRate)} />
             <Stat label="Value created" value={c.roi ? `${c.roi.pipelineMultiple}x` : "n/a"} sub={c.roi ? "pipeline vs monthly fee" : "add their fee to see this"} />
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div><p className="mb-1 text-sm font-medium">Engagement score, 90 days</p><Sparkline values={data.history.map((h) => h.score)} label="Engagement score" /></div>
             <div><p className="mb-1 text-sm font-medium">Open pipeline, 90 days</p><Sparkline values={data.history.map((h) => h.openValue)} label="Open pipeline value" /></div>
           </div>

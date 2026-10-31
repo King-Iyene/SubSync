@@ -55,7 +55,7 @@ export function SpeedView({ go }: { go: GoFn }) {
         <Empty title={none ? "Waiting for permission" : "No new leads to time yet"} body={none ? "Approve the new permissions when SubSync asks, then run a sync. First replies appear here after that." : "A lead appears here once a new contact has a conversation. Check back after the next sync."} />
       ) : (
         <>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <Stat label="Typical first reply" value={o.medianSeconds === null ? "Not enough data" : dur(o.medianSeconds)} sub={o.p90Seconds !== null ? `9 in 10 were answered within ${dur(o.p90Seconds)}` : "Needs at least 5 replies"} />
             <Stat label={`Answered within ${data.targetMinutes} min`} value={pct(o.hitRate)} tone={o.hitRate === null ? undefined : o.hitRate >= 0.8 ? undefined : "warn"} sub={`${fmtInt(o.withinTarget)} of ${fmtInt(o.withinTarget + o.answeredLate + o.stillWaiting)} leads`} />
             <Stat label="Waiting right now" value={fmtInt(Math.max(0, o.stillWaiting - (data.neverAnswered ?? 0)))} tone={o.stillWaiting - (data.neverAnswered ?? 0) > 0 ? "bad" : undefined} sub={(data.neverAnswered ?? 0) > 0 ? `past the target, under 3 days old. Plus ${data.neverAnswered} never answered (older than 3 days)` : "no person has replied, past the target"} />
@@ -114,7 +114,7 @@ export function SpeedView({ go }: { go: GoFn }) {
             </Card>
           )}
 
-          <div className="mt-6 grid gap-4 lg:grid-cols-3">
+          <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
             <Card title="By account, slowest first" className="lg:col-span-2">
               <Table head={<tr><Th>Account</Th><Th className="text-right">Typical</Th><Th className="text-right">In target</Th><Th className="text-right">Waiting</Th></tr>}>
                 {data.perAccount.map((a) => (

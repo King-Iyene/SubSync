@@ -6,6 +6,7 @@ import { resolveEntitlements } from "@/lib/flags";
 import { businessInstalled, clientViewOn, getInstallation } from "@/lib/ghl/installations";
 import { decryptSsoPayload, parseSsoUser } from "@/lib/ghl/sso";
 import { signSession } from "@/lib/session";
+import { MAINTENANCE_MESSAGE, maintenanceOn } from "@/lib/runtime-guards";
 
 // The agency's own name and colour, shown in place of ours. Only a plain hex colour is passed on.
 async function brandOf(installationId: string) {
@@ -27,6 +28,7 @@ async function brandOf(installationId: string) {
 //                                the app, or a read-only view if their agency switched it on
 // Anyone else is refused. The user type comes from the decrypted payload, never from the browser.
 export async function POST(request: Request) {
+  if (maintenanceOn(process.env)) return NextResponse.json({ error: MAINTENANCE_MESSAGE, maintenance: true }, { status: 503 });
   const body = (await request.json().catch(() => null)) as { payload?: unknown; demo?: unknown; as?: unknown } | null;
 
   if (body?.demo === true) {

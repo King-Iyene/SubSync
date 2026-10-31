@@ -59,7 +59,7 @@ export function HelpView({ go }: { go: GoFn }) {
         ))}
       </ol>
 
-      <div className="mt-8 grid gap-4 lg:grid-cols-2">
+      <div className="mt-8 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card title="What the words mean">
           <dl className="space-y-3 text-sm">
             {WORDS.map(([term, text]) => (

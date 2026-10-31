@@ -61,7 +61,7 @@ export function LeadsView() {
         <Stat label="Bad email or phone" value={fmtInt(q.badEmail + q.badPhone + q.disposable)} tone={q.badEmail + q.badPhone > 0 ? "warn" : undefined} sub="will bounce or not connect" />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card title="Contact lifecycle">
           <Funnel items={[
             { label: "Leads (no deal yet)", n: l.leads }, { label: "In an open deal", n: l.opportunities },
@@ -130,7 +130,7 @@ export function LeadsView() {
         )}
       </Card>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card title="New contacts per week">
           <Sparkline values={data.growth.weekly.map((w) => w.count)} label="New contacts per week" />
           <p className="mt-1 text-xs text-muted-foreground">Last 12 weeks, all client accounts.</p>
@@ -149,7 +149,7 @@ export function LeadsView() {
         </Card>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card title="Tags">
           <ul className="space-y-1 text-sm">{data.tags.top.map((t) => <li key={t.tag} className="flex justify-between"><span>{t.tag}</span><span className="tabular-nums text-muted-foreground">{fmtInt(t.count)}</span></li>)}</ul>
           {data.tags.variants.length > 0 && (
@@ -178,7 +178,7 @@ export function LeadsView() {
         </Card>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card title="Where leads come from" className="lg:col-span-2">
           {data.sources.length === 0 ? <p className="text-sm text-muted-foreground">No source information yet.</p> : (
             <Table head={<tr><Th>Source</Th><Th className="text-right">Contacts</Th><Th className="text-right">New (30d)</Th><Th className="text-right">Became customers</Th><Th className="text-right">Revenue won</Th></tr>}>

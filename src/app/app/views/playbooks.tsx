@@ -49,7 +49,7 @@ export function PlaybooksView({ go }: { go: GoFn }) {
 
   const card = (p: Playbook) => (
     <Card key={p.id} title={p.label} action={p.accounts.length > 0 ? <Badge tone="info">{p.accounts.length} of your clients</Badge> : undefined}>
-      <div className="grid gap-4 md:grid-cols-2 text-sm">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 text-sm">
         <div>
           <p className="font-medium">What matters most</p>
           <ul className="mt-1 list-disc space-y-0.5 pl-5 text-muted-foreground">{p.watch.map((w) => <li key={w}>{w}</li>)}</ul>

@@ -43,11 +43,13 @@ type Auth =
   | { status: "outside" }
   | { status: "error"; message: string }
   | { status: "not_installed" }
+  | { status: "maintenance"; message: string }
   | { status: "ready"; api: Api; demo: boolean; userName: string | null; features: Record<string, boolean>; locked: string[]; kind: AccessKind; locationId: string | null; brand: { name: string | null; color: string | null } };
 
 type SsoResponse = {
   error?: string;
   installed?: boolean;
+  maintenance?: boolean;
   demo?: boolean;
   session?: string;
   kind?: AccessKind;
@@ -108,6 +110,7 @@ export function Dashboard() {
       });
       return r.data.session;
     }
+    if (r.data.maintenance) { setAuth({ status: "maintenance", message: r.data.error ?? "SubSync is down for a short maintenance. It will be back shortly." }); return null; }
     setAuth({ status: "error", message: r.data.error ?? "Could not sign you in." });
     return null;
   }, []);
@@ -156,6 +159,7 @@ export function Dashboard() {
       // Opened directly (not inside the host page). Demo mode, when enabled, shows sample data.
       void exchange({ demo: true, as: demoView() }).then((r) => {
         if (r.ok) apply(r);
+        else if (r.data.maintenance) setAuth({ status: "maintenance", message: r.data.error ?? "SubSync is down for a short maintenance. It will be back shortly." });
         else setAuth({ status: "outside" });
       }).catch(() => setAuth({ status: "outside" }));
     } else {
@@ -191,6 +195,7 @@ export function Dashboard() {
   if (auth.status === "outside") {
     return <Centered title="Open SubSync from your account menu" body="This page is built to run inside your account. Open SubSync from the left menu of one of your client accounts." />;
   }
+  if (auth.status === "maintenance") return <Centered title="Back shortly" body={auth.message} />;
   if (auth.status === "not_installed") {
     return <Centered title="SubSync is not set up for this agency yet" body="Install SubSync from the app marketplace for your agency, then open it again from the menu." />;
   }

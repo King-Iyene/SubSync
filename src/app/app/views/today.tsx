@@ -133,7 +133,7 @@ export function TodayView({ go }: { go: GoFn }) {
         </Card>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card title="When this is sent">
           {data.limited ? (
             <p className="text-sm text-muted-foreground">Your daily brief is shown here each time you open SubSync.</p>

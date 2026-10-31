@@ -58,3 +58,15 @@ connections, appointment insights, two-agency tenant isolation, feature switches
 | Settings: client access per account | Works: switch and On/Off badge per account |
 | Zoom sign-in | Connect Zoom button live; real sign-in and a real summary not yet tested (needs paid host) |
 | Weekly and alert email | Keys present in production; first real send not yet observed |
+
+## Runbook stage S0.1 (31 Oct 2026)
+
+| Item | Status | Tested |
+| --- | --- | --- |
+| `npm run verify` | Built | Green |
+| `npm run e2e` (3 widths, demo tenant) | Built | 21 pass |
+| Demo login blocked in production | Built | Unit tests plus a live check (HTTP 403) |
+| Kill switch `APP_MODE=maintenance` | Built | Unit tests and browser test; not yet flipped on the real site |
+| New features default off (guard test) | Built | Unit test |
+| Golden dataset (speed) | Built | 4 unit tests |
+| Phone and tablet layout fix (wide tables) | Built | Browser tests on 5 pages |

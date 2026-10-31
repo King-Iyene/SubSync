@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { maintenanceOn } from "@/lib/runtime-guards";
 import { sql } from "@/lib/db";
 import { runSlice, scheduleDailyRefresh, scheduleFastRefresh } from "@/lib/sync/engine";
 
@@ -12,6 +13,7 @@ export async function GET(request: Request) {
   if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  if (maintenanceOn(process.env)) return NextResponse.json({ skipped: "maintenance" });
   try {
     const scheduled = (await scheduleDailyRefresh()) + (await scheduleFastRefresh());
     const slice = await runSlice(240_000);

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { maintenanceOn } from "@/lib/runtime-guards";
 import { buildDailyDigest } from "@/lib/analytics/digest-service";
 import { weekFacts, weeklyDue, weeklyEmail } from "@/lib/analytics/weekly-email";
 import { appointmentView } from "@/lib/analytics/appointment-queries";
@@ -24,6 +25,7 @@ function local(now: Date, timeZone: string) {
 export async function GET(request: Request) {
   const secret = process.env.CRON_SECRET;
   if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (maintenanceOn(process.env)) return NextResponse.json({ skipped: "maintenance" });
   if (!emailConfigured()) return NextResponse.json({ sent: 0, reason: "email service not configured" });
   const now = new Date();
   const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/+$/, "");

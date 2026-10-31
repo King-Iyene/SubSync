@@ -48,7 +48,7 @@ export function AppointmentInsights() {
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card title="Calendar health" className="lg:col-span-1">
           <p className="text-4xl font-semibold tabular-nums">{d.health.score}<span className="text-base font-normal text-muted-foreground"> / 100</span></p>
           <p className="mb-3 mt-1"><Badge tone={d.health.band === "healthy" ? "good" : d.health.band === "watch" ? "warn" : "bad"}>{d.health.band}</Badge></p>
@@ -125,7 +125,7 @@ export function AppointmentInsights() {
         </Card>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card title="Reminders and confirmations">
           <p className="text-sm">{d.confirmations.tomorrowAdvice ?? (d.confirmations.next48 === 0 ? "Nothing is booked for the next two days." : `All ${d.confirmations.next48} appointments in the next two days are confirmed.`)}</p>
         </Card>

@@ -91,7 +91,7 @@ export function ExecSummary() {
       {editing && (
         <div className="mt-4 rounded-lg border p-3">
           <p className="mb-2 text-sm font-medium">Monthly goals (leave blank to keep, enter 0 to remove)</p>
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             {GOALS.map((g) => (
               <div key={g.metric}>
                 <label htmlFor={g.metric} className="mb-1 block text-xs text-muted-foreground">{g.label}</label>

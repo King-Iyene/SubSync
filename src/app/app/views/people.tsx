@@ -127,7 +127,7 @@ export function ContactTimeline({ locationId, contactId, onClose }: { locationId
   return (
     <Card title="Contact timeline" action={<Btn variant="ghost" onClick={onClose}>Close</Btn>}>
       {loading && !data ? <Loading /> : error ? <ErrorBox error={error} onRetry={reload} /> : data ? (
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div className="space-y-2 text-sm">
             <p className="text-base font-medium">{data.contact.name} {data.contact.dnd && <Badge tone="bad">Do not disturb</Badge>}</p>
             <p className="text-muted-foreground">{data.contact.email ?? "no email"} · {data.contact.phone ?? "no phone"}</p>

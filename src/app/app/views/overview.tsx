@@ -78,7 +78,7 @@ export function OverviewView({ go }: { go: GoFn }) {
       )}
 
       <Card title="Estimates" className="mt-4" action={<Badge tone="info">Estimate, not a fact</Badge>}>
-        <div className="grid gap-6 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
           <div>
             <p className="text-xs text-muted-foreground">Expected revenue from open deals</p>
             <p className="text-2xl font-semibold tabular-nums">{k.expectedRevenue === null ? <span className="text-base font-normal text-muted-foreground">Not enough data</span> : fmtMoney(k.expectedRevenue)}</p>
@@ -103,7 +103,7 @@ export function OverviewView({ go }: { go: GoFn }) {
         </details>
       </Card>
 
-      <div className="mt-6 grid gap-4 lg:grid-cols-3">
+      <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card title="Needs attention" className="lg:col-span-2" action={<Btn variant="ghost" onClick={() => go("accounts")}>All accounts</Btn>}>
           {data.attention.length === 0 ? (
             <Empty title="Nothing needs attention" body="Every account is active and on track." />

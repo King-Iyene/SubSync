@@ -58,7 +58,7 @@ export const severityTone = (s: string): Tone => (s === "critical" ? "bad" : s =
 
 export function Card({ title, action, children, className = "" }: { title?: string; action?: ReactNode; children: ReactNode; className?: string }) {
   return (
-    <section className={`rounded-2xl border bg-card text-card-foreground shadow-[var(--shadow-card)] print:break-inside-avoid print:shadow-none ${className}`}>
+    <section className={`min-w-0 rounded-2xl border bg-card text-card-foreground shadow-[var(--shadow-card)] print:break-inside-avoid print:shadow-none ${className}`}>
       {(title || action) && (
         <header className="flex items-center justify-between gap-3 border-b px-5 py-3.5">
           {title && <h2 className="text-[0.9rem] font-semibold">{title}</h2>}

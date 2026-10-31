@@ -1,4 +1,5 @@
 import { routeAllowed, type AccessKind } from "../access";
+import { demoAllowed, MAINTENANCE_MESSAGE, maintenanceOn } from "../runtime-guards";
 import { type entitlements, type Plan } from "../entitlements";
 import { resolveEntitlements } from "../flags";
 import { clientViewOn, getInstallation } from "../ghl/installations";
@@ -19,12 +20,13 @@ export type AuthContext = {
 export const json = (body: unknown, status = 200) =>
   Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
 
-export const demoEnabled = () => process.env.DEMO_MODE === "true";
+export const demoEnabled = () => demoAllowed(process.env);
 
 // Resolve the caller from the signed Bearer session, then load their installation.
 // Everything downstream is scoped by the installation id returned here, and for a business or
 // client session also by the single account id in `limitTo`.
 export async function authenticate(request: Request, segments: string[] = []): Promise<AuthContext | Response> {
+  if (maintenanceOn(process.env)) return json({ error: MAINTENANCE_MESSAGE, maintenance: true }, 503);
   let session: Session | null = null;
   try {
     session = verifySession(bearerToken(request));

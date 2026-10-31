@@ -46,3 +46,7 @@ next-env.d.ts
 
 # scratch files from local checks
 .tmp-*
+
+# test output
+/test-results/
+/playwright-report/

@@ -80,7 +80,7 @@ export function AccountDetailView({ locationId, go, agency, limited = false }: {
         <Stat label="Stale deals" value={a.staleOpps} tone={a.staleOpps > 0 ? "warn" : undefined} sub={fmtMoney(a.revenueAtRisk) + " at risk"} />
       </div>
 
-      <div className="mt-6 grid gap-4 lg:grid-cols-2">
+      <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card title="How the score is built">
           <ul className="space-y-3">
             {breakdown.components.map((c) => (
@@ -95,7 +95,7 @@ export function AccountDetailView({ locationId, go, agency, limited = false }: {
         </Card>
 
         <Card title="Trend (last 60 days)">
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div><p className="mb-1 text-xs text-muted-foreground">Engagement score</p><Sparkline label="Engagement score" values={trend.map((t) => t.engagementScore)} /></div>
             <div><p className="mb-1 text-xs text-muted-foreground">Open pipeline value</p><Sparkline label="Open pipeline value" values={trend.map((t) => t.openValue)} /></div>
             <div><p className="mb-1 text-xs text-muted-foreground">Contacts</p><Sparkline label="Contacts" values={trend.map((t) => t.contacts)} /></div>
@@ -104,7 +104,7 @@ export function AccountDetailView({ locationId, go, agency, limited = false }: {
         </Card>
       </div>
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card title={`Onboarding checklist · ${checklist.completionPct}% done`}>
           <ul className="space-y-2">
             {checklist.items.map((i) => (
@@ -168,7 +168,7 @@ export function AccountDetailView({ locationId, go, agency, limited = false }: {
       {!limited && (
       <div className="mt-4 print:hidden">
         <Card title="Account controls">
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div>
               <label htmlFor="owner" className="mb-1 block text-sm font-medium">Account owner</label>
               <div className="flex gap-2">

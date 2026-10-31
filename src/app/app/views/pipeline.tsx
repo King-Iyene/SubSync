@@ -111,7 +111,7 @@ export function PipelineView() {
         <Stat label="Likely revenue" value={f.winRate === null ? "n/a" : fmtMoney(f.likely)} sub="open value x win rate" />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card title="Revenue forecast" className="lg:col-span-2">
           {f.winRate === null ? <p className="text-sm text-muted-foreground">{f.basis}</p> : (
             <>
@@ -179,7 +179,7 @@ export function PipelineView() {
         <p className="mt-2 text-xs text-muted-foreground">Risk (0 to 100) adds up four things: days without activity, time stuck in the current stage, how old the deal is compared with deals that were won, and a missing value.</p>
       </Card>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card title="How old is the pipeline">
           <Bars items={data.aging.buckets} />
           {data.aging.valueOlderThan60Pct !== null && <p className="mt-3 text-sm">{data.aging.valueOlderThan60Pct}% of open value is in deals older than 60 days.</p>}

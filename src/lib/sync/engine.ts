@@ -1,4 +1,5 @@
 import { isBusinessKey, locationOfBusinessKey } from "../access";
+import { maintenanceOn } from "../runtime-guards";
 import { refreshInsights } from "../analytics/service";
 import { sql } from "../db";
 import { getInstalledLocations, getLocationToken } from "../ghl/client";
@@ -34,6 +35,7 @@ type Job = {
 // ---------------- queueing ----------------
 
 export async function enqueueJobs(installationId: string, locationIds: Array<string | null>, types: JobType[]): Promise<number> {
+  if (maintenanceOn(process.env)) return 0; // kill switch: nothing is queued
   const db = sql();
   let created = 0;
   for (const type of types) {
@@ -512,6 +514,7 @@ function safeMessage(error: unknown): string {
 export type SliceResult = { jobs: number; failed: number; moreWork: boolean };
 
 export async function runSlice(budgetMs = 45_000): Promise<SliceResult> {
+  if (maintenanceOn(process.env)) return { jobs: 0, failed: 0, moreWork: false }; // kill switch: nothing runs
   const db = sql();
   const deadline = Date.now() + budgetMs;
   let jobs = 0;

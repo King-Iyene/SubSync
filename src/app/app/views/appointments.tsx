@@ -81,7 +81,7 @@ export function AppointmentsView({ go }: { go: GoFn }) {
             <Stat label="No outcome recorded" value={fmtInt(d.unmarkedTotal)} sub="past, still new or confirmed" tone={d.unmarkedTotal > 0 ? "warn" : undefined} />
           </div>
 
-          <div className="mb-6 grid gap-4 lg:grid-cols-3">
+          <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
             <Card title={`Remind today (${d.unconfirmedTotal})`}>
               <Contacts rows={d.unconfirmed} empty="Everything in the next two days is confirmed." action="Call" />
               <p className="mt-2 text-xs text-muted-foreground">Booked but never confirmed, starting within two days. A reminder cuts no-shows.</p>
@@ -96,7 +96,7 @@ export function AppointmentsView({ go }: { go: GoFn }) {
             </Card>
           </div>
 
-          <div className="mb-6 grid gap-4 lg:grid-cols-2">
+          <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
             <BreakdownCard title="By calendar (30 days)" rows={d.byCalendar} />
             <BreakdownCard title="By person (30 days)" rows={d.byPerson} />
           </div>

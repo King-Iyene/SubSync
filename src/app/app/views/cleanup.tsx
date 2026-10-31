@@ -92,7 +92,7 @@ export function CleanupView() {
       {msg && <p className={`mb-4 rounded-lg border px-3 py-2 text-sm ${msg.ok ? "bg-muted/40" : "border-red-300 bg-red-50 text-red-800"}`} role={msg.ok ? "status" : "alert"}>{msg.text}</p>}
 
       <Card title="1. Choose what to tidy" className="mb-6">
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {data.accounts.length > 1 && (
             <div>
               <label htmlFor="cl-acct" className="mb-1 block text-sm font-medium">Client account</label>
@@ -112,7 +112,7 @@ export function CleanupView() {
             <label className="flex items-start gap-2"><input type="checkbox" className="mt-0.5 size-4" checked={name} onChange={(e) => setName(e.target.checked)} /><span><strong>Fix names</strong>: only those typed entirely in CAPITALS or lower case. Names like McDonald are left alone.</span></label>
             <label className="flex items-start gap-2"><input type="checkbox" className="mt-0.5 size-4" checked={tag} onChange={(e) => setTag(e.target.checked)} /><span><strong>Add or remove a tag</strong> for the contacts that match a filter.</span></label>
             {tag && (
-              <div className="ml-6 grid gap-3 sm:grid-cols-4">
+              <div className="ml-6 grid grid-cols-1 gap-3 sm:grid-cols-4">
                 <div><label className="mb-1 block text-xs text-muted-foreground">Action</label><select className={inputClass} value={tagAction} onChange={(e) => setTagAction(e.target.value as "add" | "remove")}><option value="add">Add</option><option value="remove">Remove</option></select></div>
                 <div><label className="mb-1 block text-xs text-muted-foreground">Tag</label><input className={inputClass} maxLength={60} value={tagName} onChange={(e) => setTagName(e.target.value)} placeholder="No email" /></div>
                 <div><label className="mb-1 block text-xs text-muted-foreground">Who</label><select className={inputClass} value={missing} onChange={(e) => setMissing(e.target.value)}><option value="">Anyone matching below</option><option value="email">No email</option><option value="phone">No phone</option><option value="either">No email or no phone</option></select></div>

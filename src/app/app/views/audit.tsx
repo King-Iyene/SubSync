@@ -62,7 +62,7 @@ export function AuditView({ go }: { go: GoFn }) {
         </p>
       )}
 
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Stat label="Stale deal value" value={fmtMoney(a.staleDollars)} tone={a.staleDollars > 0 ? "warn" : undefined} sub="Fact: counted from open deals that have not moved" />
         <div className="rounded-2xl border bg-card p-4 shadow-[var(--shadow-card)]">
           <div className="flex items-center justify-between"><p className="text-xs text-muted-foreground">Cost of slow follow-up</p><Badge tone="info">Estimate</Badge></div>
