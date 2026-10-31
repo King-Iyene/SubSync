@@ -87,6 +87,26 @@ export async function scheduleDailyRefresh(): Promise<number> {
   return n;
 }
 
+// Every 15 minutes, re-read only what goes stale fastest: conversations, appointments and reply times, then recompute alerts.
+// A slow-reply alert that arrives hours late is worthless, so this does not wait for the daily full sync (contacts and deals
+// stay on the daily schedule, and webhooks cover changes in between).
+export const FAST_REFRESH_MINUTES = 15;
+export async function scheduleFastRefresh(): Promise<number> {
+  const rows = await sql()`
+    select i.id from installations i
+    where i.uninstalled_at is null and not i.is_demo and i.refresh_token_enc is not null
+      and exists (select 1 from locations l where l.installation_id = i.id and not l.ignored)
+      and not exists (select 1 from sync_jobs j where j.installation_id = i.id and j.status in ('pending', 'running'))
+      and coalesce((select max(j.finished_at) from sync_jobs j where j.installation_id = i.id and j.type = 'metrics' and j.status = 'done'), 'epoch') < now() - make_interval(mins => ${FAST_REFRESH_MINUTES}::int)`;
+  let n = 0;
+  for (const r of rows) {
+    const locs = await sql()`select location_id from locations where installation_id = ${r.id} and not ignored`;
+    n += await enqueueJobs(r.id as string, locs.map((l) => l.location_id as string), ["conversations", "appointments", "speed"]);
+    n += await enqueueJobs(r.id as string, [null], ["metrics"]);
+  }
+  return n;
+}
+
 // ---------------- location tokens ----------------
 
 const tokenCache = new Map<string, { token: string; expiresAt: number }>();

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
-import { runSlice, scheduleDailyRefresh } from "@/lib/sync/engine";
+import { runSlice, scheduleDailyRefresh, scheduleFastRefresh } from "@/lib/sync/engine";
 
 // Called by Vercel Cron every five minutes. Each run works for up to four minutes, so a large account finishes in a few runs.
 // Called by Vercel Cron. Vercel sends `Authorization: Bearer $CRON_SECRET`
@@ -13,7 +13,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {
-    const scheduled = await scheduleDailyRefresh();
+    const scheduled = (await scheduleDailyRefresh()) + (await scheduleFastRefresh());
     const slice = await runSlice(240_000);
     // Keep the de-duplication table small.
     await sql()`delete from webhook_events where received_at < now() - interval '3 days'`;
