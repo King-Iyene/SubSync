@@ -43,6 +43,29 @@ SubSync is a GoHighLevel (GHL) Marketplace app that shows agencies, and the busi
 
 ---
 
+## 1A. PRODUCT THESIS: THE SMOKE DETECTOR FOR LEAD HANDLING (refined Oct 30 after a competitor check)
+
+**What the competitor check found (third-party sources, 2026; INFERENCE where noted):**
+- GHL natively supports speed-to-lead workflows, internal alerts with escalation, stale-lead alerts, missed-call text-back, no-response follow-up ladders, appointment reminders and no-show follow-up. A July 2026 third-party summary says "User Replied" triggers with SLA timeouts were added (wait for a rep to reply, escalate on timeout). All of this is per account, built by the agency.
+- Mature outside tools cover pieces of the loop: Chili Piper (routing, booking, SLA), Kixie (alerts, dialing, response-time reports), Convoso, LeanData, Lead Source (response-time measurement), AI responders, and AgencyAnalytics and Two Minute Reports (client reporting, metric-change alerts).
+- So: **detecting a problem and sending an automatic reply are NOT our differentiator. Never claim they are.** I found no single marketplace app that measures actual lead-handling outcomes across all of an agency's client accounts and proves them to clients, but the search was limited (the marketplace cannot be browsed from here). King or Claude Code must verify in the marketplace UI before launch.
+
+**The thesis:** agencies build automations and hire setters, but nobody checks that lead handling actually works in every client account. Workflows fail silently, leads have no owner, setters forget to mark outcomes, and the client finds out first. SubSync is the independent check. It watches **outcomes, not workflows**, across accounts, whatever tools each account uses.
+
+1. **Measure** true outcomes from the data: first-response time (median, P90, SLA attainment), leads never answered, appointment outcomes, no-shows not recovered, stale deals. Definitions in `docs/METRICS.md`.
+2. **Detect silent failures** and alert, for example: "14 new leads in the last 24 hours with no outbound message", "SLA attainment fell from 92% to 61%", "9 appointments are past their time with no outcome recorded".
+3. **Prove it** with weekly Receipts per account and per agency: what we caught, what was fixed, trends, so the agency can show its clients.
+4. **Learn** from the account's own history: personalized insights, shown only when there is enough data.
+
+**Build rules:**
+- Read-only by default. We do not send messages to leads. Native workflows and specialist tools do that better, and it creates consent and compliance risk. At most, optional write scopes to create internal tasks or record appointment outcomes, always behind preview and confirm.
+- Outcome-based, not workflow-based. The Workflows API is limited availability, so we infer failures from conversation and appointment data instead.
+- Record every measurement and alert in the event store from day one. History cannot be rebuilt later and is the long-term moat.
+- Push, do not pull: a short daily brief by email first, Slack and WhatsApp later.
+- Validate before building past Wave 1: King interviews at least 5 agency owners ("How do you know your clients' leads are getting answered? What happened the last time one was not?") and checks the marketplace for existing apps (search "speed to lead", "response time", "no show", "SLA", "monitor").
+
+---
+
 ## 2. LOCKED DECISIONS
 
 From the GHL developer portal (King's screenshots) and GHL docs:
@@ -53,7 +76,7 @@ From the GHL developer portal (King's screenshots) and GHL docs:
 | Can agency bulk install | Yes | LOCKED |
 | Listing type | White-label | Chosen |
 | GHL app to use | SubSync (ID 6ae2a79309eaa881c1eb419e). Do NOT use the older "KD Squares" app (ID 66be40372c3d9943f28ea0ba) | From King's screenshot. Make sure the Client ID and Secret in env vars come from the SubSync app |
-| App type | Private for now (cap: 5 agencies) | Chosen |
+| App type | Private for now (cap: 5 agencies). Private apps skip review and go live immediately, so nothing is waiting for approval | Chosen |
 | Who can install | Everyone (keep as set) | Decided. GHL's recommended default for maximum reach. CHECK whether it can be changed after saving |
 | Billing | GHL internal billing (never an external payment page; external pages cannot be resold and cannot be switched back once internal billing is live) | Decided |
 | Pricing model | Differential pricing: agency base fee plus per-client-account fee, with a free tier | Section 6 |
@@ -62,6 +85,21 @@ From the GHL developer portal (King's screenshots) and GHL docs:
 Why "Everyone": the target user is Sub-account, so the businesses (client accounts) are the market. "Everyone" lets a business install SubSync itself and also lets an agency bulk install it across all its clients and resell it at a markup. It is GHL's recommended setting for reach, it reaches small accounts as well as agencies, and it keeps the setup simple.
 
 What we give up: GHL documents the "agency base fee plus per-account fee" (differential pricing) only for Agency Only installs, so we price per client account only (section 6). We may also hit card-on-file friction on bulk installs (section 6). Both are acceptable at launch. If we later want an agency base fee, we can add a separate Agency-only listing.
+
+---
+
+## 2A. RELEASES AND VERSIONS (VERIFIED: GHL "How to Update Your App" doc and King's portal screenshot, Oct 30)
+
+- SubSync is a Private app. Private apps skip review and go live immediately. Version 1.0.0 is Live with 3 installs (King's own accounts, probably 3 locations of one agency). Nothing is waiting for approval.
+- **Two kinds of update:**
+  1. **Our code (Vercel).** A push to `main` deploys to production and is live for every install at once. No GHL version is needed. Because this reaches real installs, unfinished work stays behind feature flags that default to off, and typecheck, build, and the tenant tests run before each push.
+  2. **GHL app settings (scopes, listing, modules, pricing, version).** A live version cannot be edited. Use **Clone as Draft**, edit the draft, choose Major, Minor, or Patch, write the mandatory Agency Release Notes, and publish. For a Private app it goes live immediately. Existing installs see an **Update** button with the release notes. Major updates need the user to confirm.
+- **Modules:** module edits apply to the whole app immediately, not to one version, so editing a module on the live app is production-impacting. Module changes (except Custom Page) must ship as a Major update, and existing installs do not update automatically. Test module changes in a separate private test app first.
+- **Version limits:** only one draft or disapproved version at a time. The docs say a maximum of 5 versions per app, while the portal says 8, so assume 5. With 3 versions you must deprecate one before releasing a patch. Do not burn versions. Batch scope, pricing, and listing changes into one release.
+- **Deprecation:** minimum 3 days notice. The docs say installs on a deprecated version are uninstalled on the deprecation date, but the portal text says installs stay until the version is deleted. Never deprecate a version with real installs until this is confirmed.
+- **Pricing:** price changes apply to new installs only. Existing installs keep their old price. So finish the plan swap before any pilot installs (the pre-pilot gate in section 6).
+- **Private install cap** applies at the app level. CHECK how GHL counts it (agencies or locations).
+- **Release plan:** the next GHL version (1.1.0) is one batch: add the optional scopes from section 13A, swap the plan to $9, update the listing copy and Getting Started guide, write release notes. Then King reinstalls or re-approves in his own accounts to grant the new scopes. CHECK whether pricing changes live in the draft or are app-wide.
 
 ---
 
@@ -206,7 +244,7 @@ Usage meters for AI features (when built): bill per AI brief or per batch of AI 
 Done when: all remaining visible features are verified, tenant tests pass, and the event store is recording.
 
 ### Wave 1: The wedge (about 3 to 4 weeks)
-Each item: data source (CHECK endpoints), metric definition, edge cases, tests, flag, verification.
+Each item: data source (CHECK endpoints), metric definition, edge cases, tests, flag, verification. Build items 1 and 2 as outcome monitors per section 1A (measure, detect silent failures). Do not build message sending.
 
 1. **Speed-to-lead monitor with SLA alerts.** Definition (write it in METRICS.md): time from a new lead (contact created or first inbound) to the first human outbound touch (message or call by a user). Make "count automated touches" a setting. SLA target per account. Alert when a lead breaches SLA with no touch (email and in-app; Slack later). Agency view ranks accounts; account view ranks users. CHECK message fields for direction, source, and userId.
 2. **Appointment hygiene and true show rate.** Flag appointments whose time has passed but status was never set to showed or no-show (reports lie when staff forget). Show true show rate once statuses are fixed. No-show recovery list: no-shows in the last 7 days not rebooked. CHECK appointment status values and change events.
@@ -238,6 +276,7 @@ Each item: data source (CHECK endpoints), metric definition, edge cases, tests, 
 - Dialers and telephony engines (GHL has its own; Hot Prospector, Kixie, Aloware, PhoneBurner exist; compliance and infrastructure burden)
 - White-label theming of GHL itself, login page builder, support ticket desk, knowledge base, onboarding portal, snapshot or service stores
 - Integration connector catalog
+- Sending messages to leads on an agency's behalf (native workflows already do this, and it creates consent and compliance risk)
 - Anything GHL already does natively in the same way: bulk tagging, basic contact management, basic pipeline view, calendar booking, workflow builder
 
 ---
@@ -252,7 +291,7 @@ Look: dark, premium, one accent color, animated counters, a live alert feed tick
 
 Lead magnets: speed-to-lead cost calculator, shareable Agency Health Audit.
 
-Required pages for marketplace review: `/privacy`, `/terms`, `/support`. Write honest drafts and flag that a human must review them before going Public (the app stores other businesses' customer data).
+Support is mandatory for marketplace review (a direct email or phone channel, first response within 24 hours). GHL's guidelines say a privacy policy and terms are not mandatory fields, but developers remain responsible for legal compliance and GHL may ask for them. So keep `/privacy`, `/terms`, and `/support` pages. Write honest drafts and flag that a human must review them before going Public (the app stores other businesses' customer data).
 
 Public-facing wording rule: say "client accounts" and "business accounts", not "sub-accounts"; do not use the GHL name or logo in the app logo, website, or listing images (the portal form warns about this).
 
@@ -328,6 +367,23 @@ If pilots say they already get this from AgencyAnalytics or GHL native reports a
 - Group the Duplicates list by name with counts and paginate it.
 
 **Design pass (after Wave 0):** one consistent layout, fewer tiles per screen, one clear primary action per screen, a distinct visual identity (dark premium shell with one accent color), and a "what should I do next" panel at the top of Today. Inspiration, not copying.
+
+---
+
+## 13B. GHL REVIEW STANDARD (VERIFIED: marketplace.gohighlevel.com/docs/oauth/AppReviewGuidelines and AppTestingGuide, Oct 2026)
+
+Full checklist, test plan, and review prompt: `docs/READINESS_AND_TEST_PLAN.md`. Rules that affect the build:
+- **White-label:** no HighLevel or GHL branding, logos, or URLs on any user-facing surface (listing, screenshots, OAuth screens, setup pages, the embedded app, support docs, emails). Use neutral terms ("CRM", "your CRM", "business account", "client account"). Internal terms ("agency", "sub-account", "location") must not appear in marketplace-facing or end-user-facing content. Rename the UI label "Agency view".
+- **Redirect URLs:** HTTPS, verified domain, stable. Remove the localhost redirect before going Public.
+- **Embedded app:** fully responsive with no horizontal scroll, does not override parent navigation, validates the parent frame, and does not trust client-side context alone for authorization.
+- **Security:** no secrets in client-side code, tokens stored securely, no customer data in logs, browser console, public URLs, or client storage.
+- **Support:** direct email or phone, first response within 24 hours, handled by us.
+- **Loom demo** is required at submission: install, setup, main flows, errors and edge cases, uninstall. For data sync apps it must also show what syncs, source and destination, how duplicates and corruption are prevented, and sync timing.
+- **Data sync integrity:** no duplicates, clear failed-sync handling and retry.
+- **Disclosure:** state clearly what data we store and why (undisclosed data extraction and hidden costs are prohibited). Be able to justify every scope.
+- **Uninstall:** handle the uninstall event and tell users what happens to their data.
+- **Testing:** use a Sandbox (App Test) account per GHL's App Testing Guide.
+- **Buyer and UX review:** the brutal persona, UX, copy, metric, and code-UI review is in `docs/BUYER_AND_UX_REVIEW.md`. AI personas find confusion and trust problems but cannot prove demand. Real buyer evidence comes only from real people and paid audits.
 
 ---
 

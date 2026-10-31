@@ -182,3 +182,13 @@ Format: date, decision, reason.
 - Privacy policy and terms do not yet mention that SubSync writes a meeting note to a contact. A human must review and update them before going Public.
 - Call recordings: not built. A one-off log of call message field names was added so the build uses the real shape. Look for "probe: call message fields" in the production logs after the next sync.
 - Sync queue now runs appointment and speed jobs first, and the cron works for four minutes per run.
+
+## 2026-10-31 (new Master Brief v3 saved, buyer and UX review plan saved)
+
+- `CLAUDE.md` replaced with the updated Master Brief v3 (adds 1A the "smoke detector" thesis, 2A releases and versions, 13B GHL review standard). `docs/BUYER_AND_UX_REVIEW.md` saved from King's file.
+- `docs/READINESS_AND_TEST_PLAN.md` is referenced by the brief and the review plan but does not exist in the repo yet. Not invented; King to supply it, or ask for it to be written.
+- Where the new brief and what was built or asked since disagree, recorded here so nothing is silent:
+  - Brief 1A and section 8: read-only by default, never message leads. Built: meeting summaries are also written into the matched contact's notes (King's explicit instruction, 31 Oct, with a switch in Settings, default on). This is an internal note, not a message to a lead.
+  - Brief 13B: internal terms ("agency", "sub-account", "location") must not appear in end-user-facing content, and the UI label "Agency view" must be renamed. The app still says "Agency view" and uses "agency" in places. To be listed in the COPY_AUDIT and fixed.
+  - Brief 14: "do not add features not listed here without asking". King has since asked for more (the 184-feature list in batches, real-estate source targets, shareable audit link, 15-minute refresh). Treated as King's instruction; each is flagged and reversible.
+  - Brief 2A: a push to `main` goes live for every install at once. Followed: unfinished work stays behind flags, and a full production build now runs before each push.
