@@ -76,7 +76,7 @@ export function Stat({ label, value, sub, tone }: { label: string; value: ReactN
       <span aria-hidden className={`absolute inset-y-0 left-0 w-1 ${tone === "bad" ? "bg-red-500" : tone === "warn" ? "bg-amber-500" : tone === "good" ? "bg-emerald-500" : "bg-primary/70"}`} />
       <p className="text-xs font-medium text-muted-foreground">{label}</p>
       <p className={`tnum mt-1.5 text-[1.7rem] font-semibold leading-none tracking-tight ${tone === "bad" ? "text-red-700 dark:text-red-400" : tone === "warn" ? "text-amber-700 dark:text-amber-400" : tone === "good" ? "text-emerald-700 dark:text-emerald-400" : ""}`}>{value}</p>
-      {sub && <p className="mt-2 text-xs leading-5 text-muted-foreground">{sub}</p>}
+      {sub && <div className="mt-2 text-xs leading-5 text-muted-foreground">{sub}</div>}
     </div>
   );
 }

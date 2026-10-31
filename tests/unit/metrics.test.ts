@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { countedOpen, isCounted, looksLikeTestAccount, MIN_CLOSED_DEALS, openPipeline, outlier, winRate, winRateOf, type DealLike } from "@/lib/analytics/metrics";
+import { countedOpen, isCounted, MIN_CLOSED_DEALS, openPipeline, outlier, winRate, winRateOf, type DealLike } from "@/lib/analytics/metrics";
 
 // Golden dataset: every answer below is known by hand.
 //   open and counted:  $1,000 (a), $2,000 (a), $500 (b), $100 (b)  -> 4 deals, $3,600
@@ -76,9 +76,4 @@ describe("outlier guard on dollar figures", () => {
   });
 
   it("exactly half is flagged", () => expect(outlier([d("open", 300), d("open", 100), d("open", 100), d("open", 100)])).not.toBeNull());
-});
-
-describe("test accounts are recognised by name", () => {
-  it.each(["KD Squares Test", "Demo Dental", "Sandbox", "ZZ-Test account", "Acme (test)", "Sample Realty"])("%s looks like a test", (n) => expect(looksLikeTestAccount(n)).toBe(true));
-  it.each(["Bright Smile Dental", "Contest Winners Ltd", "Attestation Law", "Latest Homes", null, undefined, ""])("%s does not", (n) => expect(looksLikeTestAccount(n as string | null)).toBe(false));
 });

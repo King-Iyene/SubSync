@@ -56,7 +56,8 @@ import { buildQueue, recordBulk, recordDecision, summarise, undoDecision } from 
 import { bulkSelect, groupKey } from "../analytics/dedupe";
 import { contactTimeline, dndSummary, leadSources, recentDealMoves, setTeamName, teamPace, teamStats, upcomingBirthdays } from "../analytics/people-queries";
 import { paceOf, sourceConversion, teamLabel, teamWinRate } from "../analytics/people-intel";
-import { getGoals, GOAL_METRICS, loadDeals, pipelineTrend, setGoal, type GoalMetric } from "../analytics/pipeline-queries";
+import { excludedOpenDeals, getGoals, GOAL_METRICS, loadDeals, pipelineTrend, setGoal, type GoalMetric } from "../analytics/pipeline-queries";
+import { MIN_CLOSED_DEALS as MIN_CLOSED, OUTLIER_MIN_DEALS, OUTLIER_SHARE, outlier as dealOutlier, winRateOf } from "../analytics/metrics";
 import { authenticate, isResponse, json, type AuthContext } from "./auth";
 
 // All authenticated data endpoints live behind /api/app/<path>. Each one needs a valid signed
@@ -169,7 +170,7 @@ async function overview(ctx: Ctx) {
       // An estimate is shown only when at least one account has enough closed deals; otherwise it is null ("not enough data").
       expectedRevenue: live.some((a) => a.winRate !== null) ? sum((a) => a.expectedRevenue ?? 0) : null,
       followUpRevenueAtRisk: live.some((a) => a.winRate !== null) ? sum((a) => a.followUpRevenueAtRisk ?? 0) : null,
-      estimateAccounts: live.filter((a) => a.winRate !== null).length, minClosedDeals: MIN_CLOSED_DEALS, excludedDeals: sum((a) => a.excludedOpen ?? 0),
+      estimateAccounts: live.filter((a) => a.winRate !== null).length, minClosedDeals: MIN_CLOSED_DEALS, outlier: overviewOutlier(live), excludedDeals: sum((a) => a.excludedOpen ?? 0),
       avgScore: live.length ? Math.round(sum((a) => a.score) / live.length) : 0,
       openAlerts: alerts.length, criticalAlerts: alerts.filter((x) => x.severity === "critical").length,
     },
@@ -177,6 +178,14 @@ async function overview(ctx: Ctx) {
     attention,
     sync,
   });
+}
+
+// One counted deal that is at least half of the agency-wide open pipeline is called out on the card (metrics.ts, OUTLIER_SHARE).
+function overviewOutlier(live: DerivedAccount[]) {
+  const count = live.reduce((s, a) => s + a.openOpps, 0);
+  const value = live.reduce((s, a) => s + a.openValue, 0);
+  const top = live.reduce((m, a) => Math.max(m, a.topDeal ?? 0), 0);
+  return count >= OUTLIER_MIN_DEALS && value > 0 && top / value >= OUTLIER_SHARE ? { value: top, share: Math.round((top / value) * 100) / 100, of: count } : null;
 }
 
 // The instant audit: what is wrong right now, what it costs, and where to start.
@@ -632,7 +641,7 @@ async function pipelines(ctx: Ctx) {
   }
   const byAccount = [...perAccount.values()].map((a) => ({
     ...a, url: links.opportunities(a.locationId),
-    winRate: a.won.count + a.lost.count >= 5 ? a.won.count / (a.won.count + a.lost.count) : null,
+    winRate: winRateOf(a.won.count, a.lost.count).rate,
   })).sort((x, y) => y.open.value - x.open.value);
   return json({
     stages: [...stageMap.values()].sort((x, y) => x.pipeline.localeCompare(y.pipeline) || x.order - y.order),
@@ -998,7 +1007,7 @@ async function pipelineIntel(ctx: Ctx) {
   const location = ctx.url.searchParams.get("location") ?? undefined;
   if (location && !LOCATION_ID.test(location)) return json({ error: "Invalid account" }, 400);
   const [allowed, goals] = await Promise.all([allowedIds(ctx), ctx.kind === "client" ? Promise.resolve({} as Awaited<ReturnType<typeof getGoals>>) : getGoals(ctx.installationId)]);
-  const [deals, trend, sc] = await Promise.all([loadDeals(ctx.installationId, allowed, location), pipelineTrend(ctx.installationId, allowed), scope(ctx)]);
+  const [deals, trend, sc, excluded] = await Promise.all([loadDeals(ctx.installationId, allowed, location), pipelineTrend(ctx.installationId, allowed), scope(ctx), excludedOpenDeals(ctx.installationId, allowed, location)]);
   const now = Date.now();
   const opens = deals.filter((d) => d.status === "open");
   const openValue = opens.reduce((s, d) => s + d.value, 0);
@@ -1009,6 +1018,7 @@ async function pipelineIntel(ctx: Ctx) {
   return json({
     totals: { open: opens.length, openValue, won: deals.filter((d) => d.status === "won").length, lost: deals.filter((d) => d.status === "lost").length, winRate: winRate(deals), avgCycleDays: avgCycleDays(deals) },
     forecast: forecast(deals, now),
+    excluded, outlier: dealOutlier(deals), minClosedDeals: MIN_CLOSED,
     coverage: coverage(openValue, goals.monthly_revenue ?? null),
     stages: stageTable(deals, now),
     aging: agingBuckets(deals, now),

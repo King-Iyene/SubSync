@@ -91,3 +91,14 @@ connections, appointment insights, two-agency tenant isolation, feature switches
 | No platform name or internal words (agency, sub-account, location) on any screen, email, error or install page | Built | Syntax-tree scan (fails the build) and 30 browser tests over 20 screens plus public pages |
 | Shared audit page wording | Built | Real shared page checked in the tenancy script |
 | Platform's own install consent screen | Not ours | Not changeable; the white-label install URL is still a CHECK |
+
+## Runbook stage F1 (31 Oct 2026)
+
+| Item | Status | Tested |
+| --- | --- | --- |
+| One definition of open pipeline on every screen (counted deals) | Built | Consistency browser tests on the demo tenant; database check on KD Squares Test |
+| One minimum of 20 closed deals for every win rate and forecast | Built | Golden dataset unit tests; old tests moved from 5 to 20 |
+| Outlier note, left-out deals sentence, estimate label with formula | Built | Browser tests; unit tests for the rule |
+| Leads "Quiet over 90 days" | Hidden ("Not measured") | Database: no contact has recorded activity |
+| Currency | Not stored, labelled | Open issue |
+| CRM comparisons (new contacts, unread conversations) | Pending | King's checks |

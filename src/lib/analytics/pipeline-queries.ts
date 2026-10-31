@@ -13,7 +13,7 @@ export async function loadDeals(installationId: string, allowed: string[] | null
   const rows = await db`
     select o.opportunity_id, o.location_id, l.name location_name, coalesce(o.pipeline_id, '') pipeline_id,
       coalesce(pl.name, 'Pipeline') pipeline_name, o.stage_id, coalesce(st.nm, 'Unknown stage') stage_name, coalesce(st.ord, 999)::int stage_order,
-      o.name, o.contact_name, coalesce(o.monetary_value, 0)::float8 value, o.status,
+      o.name, o.contact_name, coalesce(o.monetary_value, 0)::float8 value, o.status, o.assigned_to,
       o.created_remote_at, o.last_stage_change_at, o.last_status_change_at,
       greatest(o.last_action_at, o.updated_remote_at) last_activity_at
     from cached_opportunities o
@@ -24,14 +24,32 @@ export async function loadDeals(installationId: string, allowed: string[] | null
       where s->>'id' = o.stage_id limit 1
     ) st on true
     where o.installation_id = ${installationId} ${only} ${limited}
+      and not (o.status = 'open' and not (coalesce(o.monetary_value, 0) > 0 and o.assigned_to is not null))
     order by coalesce(greatest(o.last_action_at, o.updated_remote_at, o.last_stage_change_at), o.created_remote_at, o.synced_at) desc nulls last
     limit 60000`;
   return rows.map((r) => ({
     opportunityId: r.opportunity_id, locationId: r.location_id, locationName: r.location_name, pipelineId: r.pipeline_id,
     pipelineName: r.pipeline_name, stageId: r.stage_id, stageName: r.stage_name, stageOrder: r.stage_order, name: r.name,
-    contactName: r.contact_name, value: r.value, status: r.status, createdAt: ms(r.created_remote_at),
+    contactName: r.contact_name, value: r.value, status: r.status, assignedTo: r.assigned_to ?? null, createdAt: ms(r.created_remote_at),
     stageChangedAt: ms(r.last_stage_change_at), statusChangedAt: ms(r.last_status_change_at), lastActivityAt: ms(r.last_activity_at),
   }));
+}
+
+// Open deals left out of every dollar figure and count (metrics.ts: a counted deal has a value above zero and an owner).
+// loadDeals above never returns them, so each screen that shows a total says how many were left out.
+export async function excludedOpenDeals(installationId: string, allowed: string[] | null, locationId?: string) {
+  const db = sql();
+  const only = locationId ? db`and o.location_id = ${locationId}` : db``;
+  const limited = allowed ? db`and o.location_id = any(${allowed}::text[])` : db``;
+  const [r] = await db`
+    select count(*)::int total,
+      count(*) filter (where not (coalesce(o.monetary_value, 0) > 0))::int no_value,
+      count(*) filter (where coalesce(o.monetary_value, 0) > 0 and o.assigned_to is null)::int no_owner
+    from cached_opportunities o
+    join locations l on l.installation_id = o.installation_id and l.location_id = o.location_id and not l.ignored
+    where o.installation_id = ${installationId} ${only} ${limited}
+      and o.status = 'open' and not (coalesce(o.monetary_value, 0) > 0 and o.assigned_to is not null)`;
+  return { count: (r?.total as number) ?? 0, noValue: (r?.no_value as number) ?? 0, noOwner: (r?.no_owner as number) ?? 0 };
 }
 
 export async function pipelineTrend(installationId: string, allowed: string[] | null, days = 60) {

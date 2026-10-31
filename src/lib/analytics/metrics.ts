@@ -50,8 +50,3 @@ export function outlier(deals: DealLike[]): { value: number; share: number; of: 
   const share = total > 0 ? top / total : 0;
   return share >= OUTLIER_SHARE ? { value: top, share: Math.round(share * 100) / 100, of: counted.length } : null;
 }
-
-/** An account whose name says it is a test, demo or sandbox. Flagged on screen so it is not mistaken for a client. */
-export function looksLikeTestAccount(name: string | null | undefined): boolean {
-  return typeof name === "string" && /(^|[^a-z0-9])(test|testing|demo|sandbox|sample|dummy|zz[-_ ]?test)([^a-z0-9]|$)/i.test(name);
-}

@@ -25,7 +25,7 @@ export type Overview = {
     accounts: number; ignored: number; contacts: number; openOpps: number; openValue: number; staleValue: number;
     staleOpps: number; dormant: number; unread: number; unanswered: number; expectedRevenue: number | null;
     followUpRevenueAtRisk: number | null; avgScore: number; openAlerts: number; criticalAlerts: number;
-    estimateAccounts: number; minClosedDeals: number; excludedDeals: number;
+    estimateAccounts: number; minClosedDeals: number; excludedDeals: number; outlier: { value: number; share: number; of: number } | null;
   };
   bands: Record<Band, number>;
   attention: Array<{ locationId: string; name: string | null; score: number; band: Band; churn: string; reasons: string[]; url: string }>;

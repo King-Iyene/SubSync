@@ -48,6 +48,8 @@ export function LeadsView() {
 
   const l = data.lifecycle;
   const q = data.quality;
+  // Contact activity is only known when the platform sent it. With none recorded, "quiet" would just mean "added long ago".
+  const activityKnown = data.inactive.never < data.inactive.total;
   const growthTotal = data.growth.weekly.reduce((s, w) => s + w.count, 0);
 
   return (
@@ -57,7 +59,9 @@ export function LeadsView() {
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat label="Contacts" value={fmtInt(l.total)} sub={`${fmtInt(growthTotal)} added in 12 weeks`} />
         <Stat label="Customers" value={fmtInt(l.customers)} sub="have a won deal" />
-        <Stat label="Quiet over 90 days" value={fmtInt(data.inactive.d90)} tone={data.inactive.d90 > 0 ? "warn" : undefined} sub={pct(data.inactive.d90, data.inactive.total) + " of contacts"} />
+        {activityKnown
+          ? <Stat label="Quiet over 90 days" value={fmtInt(data.inactive.d90)} tone={data.inactive.d90 > 0 ? "warn" : undefined} sub={pct(data.inactive.d90, data.inactive.total) + " of contacts"} />
+          : <Stat label="Quiet over 90 days" value="Not measured" sub="Contact activity has not been synced yet, so silence cannot be told apart from age" />}
         <Stat label="Bad email or phone" value={fmtInt(q.badEmail + q.badPhone + q.disposable)} tone={q.badEmail + q.badPhone > 0 ? "warn" : undefined} sub="will bounce or not connect" />
       </div>
 
@@ -71,7 +75,7 @@ export function LeadsView() {
             {fmtInt(data.leadAging.over60)} leads are older than 60 days with no deal ({fmtInt(data.leadAging.over30)} older than 30, {fmtInt(data.leadAging.over90)} older than 90). They are going cold.
           </p>
         </Card>
-        <Card title="Going quiet">
+        {activityKnown && <Card title="Going quiet">
           <Funnel items={[
             { label: "No activity for 30+ days", n: data.inactive.d30 }, { label: "60+ days", n: data.inactive.d60 },
             { label: "90+ days", n: data.inactive.d90 }, { label: "180+ days", n: data.inactive.d180 },
@@ -79,7 +83,7 @@ export function LeadsView() {
           <p className="mt-3 text-sm text-muted-foreground">
             {fmtInt(data.inactive.never)} contacts never engaged at all; {fmtInt(data.inactive.silent)} engaged once, then went silent for 90+ days. Consider a re-engagement campaign or archiving.
           </p>
-        </Card>
+        </Card>}
       </div>
 
       {data.cohorts.length > 0 && (

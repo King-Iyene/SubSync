@@ -77,6 +77,12 @@ export function OverviewView({ go }: { go: GoFn }) {
         </p>
       )}
 
+      {k.outlier && (
+        <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">
+          One deal ({fmtMoney(k.outlier.value)}) is {Math.round(k.outlier.share * 100)}% of the open pipeline of {fmtInt(k.outlier.of)} deals, so the dollar figures above move with it. Amounts are as entered in each account; different currencies are not converted.
+        </p>
+      )}
+
       <Card title="Estimates" className="mt-4" action={<Badge tone="info">Estimate, not a fact</Badge>}>
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
           <div>

@@ -204,7 +204,8 @@ export async function seedDemo(): Promise<{ installationId: string; accounts: nu
         contact_id: `${locationId}-c${1 + Math.floor(r() * Math.max(1, p.contacts))}`,
         contact_name: `${FIRST[Math.floor(r() * FIRST.length)]} ${LAST[Math.floor(r() * LAST.length)]}`,
         name: `${["Consultation", "Install", "Service plan", "Annual contract", "Package"][Math.floor(r() * 5)]} #${k + 1}`,
-        monetary_value: Math.round(lo + r() * (hi - lo)), status,
+        // Messy on purpose (runbook test data kit): about one open deal in seven has no value.
+        monetary_value: status === "open" && k % 7 === 6 ? 0 : Math.round(lo + r() * (hi - lo)), status,
         last_stage_change_at: ago(lastChangeDays), last_action_at: ago(lastChangeDays), last_status_change_at: ago(lastChangeDays),
         created_remote_at: ago(lastChangeDays + 20 + r() * 60), updated_remote_at: ago(lastChangeDays),
         assigned_to: k % 5 === 4 ? null : TEAM[k % TEAM.length], source: SOURCES[k % SOURCES.length],
@@ -219,6 +220,9 @@ export async function seedDemo(): Promise<{ installationId: string; accounts: nu
       for (let k = 0; k < p.won; k++) mk("won", k, p.activeDays + 5 + r() * 150);
       for (let k = 0; k < p.lost; k++) mk("lost", k, p.activeDays + 5 + r() * 150);
     }
+    // One $1,000,000 outlier in the first account with an open pipeline, so the outlier note and the guards are always exercised.
+    const firstOpen = i === profiles.findIndex((q) => q.pipelines > 0 && q.open > 2) ? opps.find((o) => o.status === "open") : undefined;
+    if (firstOpen) { firstOpen.monetary_value = 1_000_000; firstOpen.assigned_to = TEAM[0]; }
     for (const part of chunk(opps, 500)) await db`insert into cached_opportunities ${db(part as never)}`;
     // a little recent movement for the activity log
     const moves = opps.slice(0, 8).map((o, i) => ({

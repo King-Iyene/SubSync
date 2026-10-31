@@ -1,5 +1,6 @@
 // Pure helpers for lead sources, birthdays and team figures. No database imports, so they can be
 // unit tested.
+import { winRateOf } from "./metrics.ts";
 
 // Days from `today` until the next birthday (0 = today). A 29 February birthday is celebrated on
 // 28 February in years without one. Returns null for a value that is not a real date.
@@ -40,10 +41,9 @@ export type TeamRow = {
   avgCycleDays: number | null;
 };
 
-// Win rate needs at least 5 closed deals, so a quiet month does not read as a 100% record.
+// One minimum for every win rate in the product (metrics.ts): 20 closed deals, so a quiet month never reads as a 100% record.
 export function teamWinRate(row: Pick<TeamRow, "wonCount" | "lostCount">): number | null {
-  const closed = row.wonCount + row.lostCount;
-  return closed >= 5 ? row.wonCount / closed : null;
+  return winRateOf(row.wonCount, row.lostCount).rate;
 }
 
 // Pace figures over the last 30 days. A rate or a typical time built on a handful of cases is noise, so each needs a minimum.

@@ -225,3 +225,12 @@ Format: date, decision, reason.
 - "Agency" becomes "company" in all in-app text, emails, errors and install pages; "Agency view" becomes "All client accounts"; "location" becomes "account". Public pages that address agencies as their audience (home, privacy, terms, support) may still say "agency".
 - The banned-terms test reads the code's syntax tree (strings, template text, page markup) instead of lines, so multi-line text is caught and queries, comments and identifiers are not. Two narrow machine-only exceptions are listed in the test.
 - King (31 Oct 2026): stop waiting for PASS or NEXT between stages. Evidence and King's 5 checks are still written for each stage; stages proceed in runbook order.
+
+## 2026-10-31 (runbook stage F1)
+
+- Open pipeline means counted open deals (value above 0 and an owner) on every screen; the Pipeline screen no longer sums every open deal. Deals left out are counted and explained on screen. Reason: Pipeline said $2.4M while Overview said $1.0M for the same accounts.
+- One minimum of 20 closed deals for every win rate and anything built on one (account, all-accounts Pipeline, team member, deals view, forecast). The older minimum of 5 is gone. Reason: "50%" from 3 won and 3 lost was shown as a forecast basis.
+- Outlier note at 50% of a dollar figure with at least 3 deals.
+- The existing "Hide test accounts" switch is kept; no second test-account rule.
+- Leads "Quiet over 90 days" is hidden until contact activity is synced (none of the 103,404 synced contacts has any), because it only measured how long ago contacts were added.
+- Currency is not stored; dollar figures say "as entered in each account". Storing currency at sync is an open issue.

@@ -4,8 +4,8 @@ Read this first when a session restarts. Rules: `docs/RUNBOOK.md` section 0 (one
 
 ## Current stage
 
-**S0.3 White-label hygiene: BUILT AND VERIFIED (31 Oct 2026).** King said to keep going without PASS or NEXT; next stage: **F1 Numbers truth**.
-Evidence: `docs/features/S0.3.md` (S0.2: `docs/features/S0.2.md`; F1 spec: `docs/features/F1.md`). From S0.3 on King does not need to type PASS or NEXT; every stage still writes its evidence and King's 5 checks.
+**F1 Numbers truth: BUILT AND VERIFIED (31 Oct 2026).** Next stage: **F2 Speed to lead** (no PASS or NEXT needed).
+Evidence: `docs/features/F1.md` and `docs/METRIC_AUDIT.md` (S0.3: `docs/features/S0.3.md`). From S0.3 on King does not need to type PASS or NEXT; every stage still writes its evidence and King's 5 checks.
 
 ## Stage list (Milestone M1 first)
 
@@ -13,8 +13,8 @@ Evidence: `docs/features/S0.3.md` (S0.2: `docs/features/S0.2.md`; F1 spec: `docs
 | --- | --- | --- |
 | S0.1 | Test harness and safety rails | Passed |
 | S0.2 | Identity, roles, tenant isolation | Passed |
-| S0.3 | White-label hygiene | Built, verified (King's checks pending, no wait) |
-| F1 | Numbers truth | Not started |
+| S0.3 | White-label hygiene | Built, verified, follow-up done (branded install link, company name replaces product name) |
+| F1 | Numbers truth | Built, verified (King's CRM checks pending, no wait) |
 | F2 | Speed to lead | Not started |
 | F3 | Appointments | Not started |
 | F6 | Account audit and Share link | Not started (M1 complete after this) |
@@ -33,7 +33,7 @@ Evidence: `docs/features/S0.3.md` (S0.2: `docs/features/S0.2.md`; F1 spec: `docs
 
 ## Facts a fresh session needs
 
-- Run everything with `npm run verify` (typecheck, lint, build, 286 Node tests, 78 Vitest tests, plus a build-output secret scan) and `npm run e2e` (24 layout tests at 3 widths plus 30 white-label tests at desktop width).
+- Run everything with `npm run verify` (typecheck, lint, build, 286 Node tests, 78 Vitest tests, plus a build-output secret scan) and `npm run e2e` (24 layout tests at 3 widths plus 37 desktop-only content and consistency tests; the full run takes about 12 minutes).
 - Run `npx next build` before every push; a failed Vercel build keeps the last good deploy live silently.
 - Never run two test runs at once; they fight over port 3100 and the `.next` folder.
 - The demo login works only with `DEMO_MODE=true` and never when `NODE_ENV` or `VERCEL_ENV` is `production`. `APP_MODE=maintenance` is the kill switch.

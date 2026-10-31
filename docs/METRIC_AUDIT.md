@@ -1,39 +1,42 @@
-# Metric audit (live app, KD Squares Test, 31 Oct 2026)
+# Metric audit (F1, 31 Oct 2026)
 
-Every number below was seen on screen. "Source check" says what it was compared with. Trust: **OK** (verified or well founded), **WEAK** (too little data or unclear), **WRONG** (disagrees with another screen or breaks a stated rule), **UNCHECKED**.
+Every number a screen shows, its definition (in `docs/METRICS.md`), how it was checked, and its status. "Database" means a query against the synced rows on 31 Oct 2026. "CRM" means a count in the platform's own screens; those are King's checks (the embedded browser in this session cannot render the CRM's list pages, so no CRM count was read by me in F1 except the contact count and deal count King and I took earlier).
 
-| Number (screen) | Shown | Source check | Trust |
+Status: **OK** (verified, or follows a tested definition), **FIXED** (was wrong or inconsistent, fixed in F1 with a test), **HIDDEN** (not measurable yet, now says so), **KING** (needs King's CRM check), **OPEN** (known gap).
+
+## Deal numbers
+
+| Number (screens) | Definition | Check | Status |
 | --- | --- | --- | --- |
-| Contacts, KD Squares Test (Accounts) | 332 | CRM contact list for the same account: 332 | **OK** |
-| Contacts, all accounts (Leads) | 52,926 | Database read earlier: 52,925 (one added since) | OK |
-| Open pipeline (Today, Overview, Audit) | $1,000,000 | Counted deals only: open, value above 0, has an owner | OK as defined, but see UX-04 |
-| Open pipeline (Pipeline) | $2,400,000, 10,374 open deals | Database: 10,374 open deals worth $2.4M, 1,228 with an owner | **WRONG** against the line above (UX-02) |
-| Win rate (Pipeline) | 50%, 3 won 3 lost | Database: 3 won, 3 lost. Rule in `derive.ts` needs 20 closed deals | **WRONG** (UX-01) |
-| Likely revenue / forecast (Pipeline) | $1,200,000; $600k to $1.8M | Open value times the 50% above | **WRONG**: an estimate built on a rule it breaks |
-| Average time to win (Pipeline) | 1 day | 3 won deals only | WEAK |
-| Stale deals (Today) | 1 | One counted deal, $1,000,000 | OK as defined |
-| Unread conversations (Today) | 285 | Database count not re-checked | UNCHECKED |
-| New contacts, 30 days (Today) | 22 | Not checked against the CRM | UNCHECKED |
-| Waiting right now / never answered (Speed to lead) | 1 / 8 | Lead rows read from the database earlier: 10 leads, 1 answered | OK |
-| Answered within 15 min (Speed to lead) | 10%, 1 of 10 leads | Same rows | WEAK (10 leads), shown with its count so it is honest |
-| Typical first reply (Speed to lead) | "Not enough data" | Needs 5 replies, has 1 | OK, correct behavior |
-| Appointments 24 booked in the 30 days before, none in the last 30 | 0 / 24 | Database: 38 appointments, 23 confirmed, 5 showed, 1 no-show | OK |
-| Show rate | "n/a", was 60% | 5 showed of 8 with outcomes | OK, shows n/a when under 5 outcomes |
-| Quiet over 90 days (Leads) | 52,735, 100% of contacts | Not checked. Looks inconsistent with 22 new contacts in 30 days | **UNCHECKED, suspicious** (a brand-new contact cannot be quiet for 90 days) |
-| Duplicates exact matches | 2,535 groups, 6,914 contacts | Not verified against the CRM | UNCHECKED |
-| Waiting past 4h (Inbox) | 13 conversations | Alert text elsewhere says 24 for the same account | **UNCHECKED**: different windows (7 days vs all), not labelled |
-| Client revenue, revenue at risk (Clients) | n/a | No fees entered | OK (honest n/a) |
-| Stale deal value tile (Overview) | $1,000,000 clipped | Display clipping only | S2 |
+| Open pipeline value and count (Today, Overview, Accounts, Account audit, Pipeline, Clients, exports) | Counted open deals: value above 0 and an owner | Database, KD Squares Test: 189 open deals, 1 counted, $1,000,000. All real accounts: 19,430 open, 1 counted, $1,000,000. `consistency.spec.ts` proves Overview, Accounts and Pipeline agree to the dollar on the demo tenant | **FIXED** (Pipeline showed $2.4M over 10,374 deals, Overview $1.0M: two definitions) |
+| Open deals left out (Overview, Pipeline) | Open deals with no value or no owner, split by reason | Database: 188 of 189 in KD Squares Test. Overview and Pipeline report the same count (test) | OK |
+| Currency | Amounts as entered; not converted | The database stores no currency | **OPEN** (labelled on Overview and Pipeline; store each account's currency at sync) |
+| Outlier note on dollar cards | One counted deal at least 50% of the total, 3 or more deals | Unit tests on the golden dataset; the demo tenant carries a $1,000,000 deal, checked on both screens | OK |
+| Win rate (Pipeline, account, Clients, Team, deals view) | Won / (won + lost), only with 20 or more closed deals | KD Squares Test: 3 won, 2 lost = 5 closed, so none is shown. All accounts together: 7 closed. Unit tests (19 vs 20), browser test | **FIXED** (Pipeline showed 50% from 3 won and 3 lost; the Team and deals view used 5) |
+| Likely revenue / forecast (Pipeline) | Counted open value x win rate; "Not enough data" below 20 closed | Follows from the win rate above. Labelled "Estimate, not a fact" with the formula under it | **FIXED** (was $1,200,000 built on a 50% rate it should not have had) |
+| Expected revenue, cost of slow follow-up (Overview, Account audit) | Per account: counted open value (or waiting conversations x average deal) x that account's win rate; needs at least one account with 20 closed deals | Unchanged definition; never above open pipeline (test) | OK |
+| Stale deals and stale value (Today, Overview, Audit) | Counted open deals not moved for 30 days (settable) | Database: 1 counted deal, $1,000,000, stale | OK (one threshold for every stage is a known gap, see METRICS.md) |
+| Average time to win (Pipeline) | Mean days from created to won, won deals only | 3 won deals in KD Squares Test | OK, thin: shown with its basis, not gated |
 
-## Findings
+## Contacts and conversations
 
-- **MET-01 (S1):** one definition of "open pipeline". Choose counted deals and say so, or show both numbers side by side with a sentence.
-- **MET-02 (S1):** one minimum for win rate. Use the shared constant (20) everywhere, including the Pipeline forecast.
-- **MET-03 (S2):** "Quiet over 90 days" must be checked before any customer sees it. A contact created 30 days ago cannot be quiet for 90.
-- **MET-04 (S2):** waiting conversations show 13 in Inbox and 24 on Today for the same account. The window is different and neither screen says so.
-- **MET-05 (S2):** every estimate needs its formula one tap away (brief 13A rule 4). The audit has it; Pipeline, Leads and Clients do not.
+| Number | Definition | Check | Status |
+| --- | --- | --- | --- |
+| Contacts, KD Squares Test (Accounts) | Synced contacts | Database 332. CRM 332 (counted earlier by King) | OK |
+| New contacts, 30 days | Contacts created in the last 30 days | Database, KD Squares Test: 3. (The 22 on an earlier Today screen was the all-accounts figure.) | KING (compare with the CRM's contacts created filter) |
+| Unread conversations | Conversations with an unread count above 0 | Database, KD Squares Test: 39 of 265 conversations | KING (compare with the CRM's Unread filter in Conversations) |
+| Waiting past SLA (Today, Inbox) | Last message inbound, older than the reply target, newer than 30 days | Same definition on both screens; the Inbox also shows a longer window and says so | OK |
+| Quiet over 90 days (Leads) | Last recorded activity (or created date) older than 90 days | Database: none of the 103,404 synced contacts has a recorded activity time, so the card measured age, not silence (52,735 of 52,926, "100%") | **HIDDEN** until contact activity is synced (shows "Not measured") |
+| Duplicates (Duplicates) | Exact and likely matches inside one client account | Not re-verified in F1 (hidden page, a Wave 1 non-goal) | OPEN |
 
-## Not done
+## Not covered by F1 (later stages)
 
-- No manual count in the CRM for deals, unread conversations or new contacts. Test deals were not created in the CRM yet, so seeded-versus-shown checks have not run.
-- `docs/METRICS.md` definitions were not re-read line by line against each screen.
+Speed to lead and appointments are verified in F2 and F3. The metric definitions for those are already in `docs/METRICS.md`.
+
+## King's 5 checks for F1 (also in `docs/features/F1.md`)
+
+1. **Contacts:** KD Squares Test shows 332 on Accounts. The CRM's Contacts count should match.
+2. **Open deals:** the CRM's Opportunities list for KD Squares Test (status Open) should show 189; SubSync's Pipeline for that account counts 1 deal worth $1,000,000 and says 188 are not counted.
+3. **One pipeline value:** Overview and Pipeline should show the same open pipeline value ($1,000,000 on the real accounts today).
+4. **New contacts, 30 days:** Today's figure for KD Squares Test (3) against the CRM's contacts added in the last 30 days.
+5. **Unread conversations:** 39 for KD Squares Test against the CRM's Unread filter in Conversations.

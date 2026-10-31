@@ -8,7 +8,8 @@ import {
 import { fmtDuration } from "./speed-intel.ts";
 
 // A win rate built on a handful of deals is noise, so none is shown (or used in an estimate) below this.
-export const MIN_CLOSED_DEALS = 20;
+import { MIN_CLOSED_DEALS } from "./metrics.ts";
+export { MIN_CLOSED_DEALS };
 
 export type AccountRow = {
   /** New leads from the last two days that no person has replied to within the target, and how long the oldest has waited. */
@@ -16,6 +17,8 @@ export type AccountRow = {
   oldestWaitMinutes?: number | null;
   /** Open deals left out of every dollar figure because they have no value or no owner. */
   excludedOpen?: number;
+  /** The largest counted open deal in the account, for the outlier note on dollar cards. */
+  topDeal?: number;
   locationId: string;
   name: string | null;
   email: string | null;

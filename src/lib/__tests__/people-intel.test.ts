@@ -28,7 +28,8 @@ test("source conversion needs enough contacts", () => {
 
 test("team win rate needs five closed deals", () => {
   assert.equal(teamWinRate({ wonCount: 3, lostCount: 1 }), null);
-  assert.equal(teamWinRate({ wonCount: 3, lostCount: 2 }), 0.6);
+  assert.equal(teamWinRate({ wonCount: 3, lostCount: 2 }), null, "5 closed deals is below the one shared minimum of 20");
+  assert.equal(teamWinRate({ wonCount: 12, lostCount: 8 }), 0.6);
 });
 
 test("people we only know by id still get a readable label", () => {

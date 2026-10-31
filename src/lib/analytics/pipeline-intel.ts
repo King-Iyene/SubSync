@@ -1,5 +1,6 @@
 // Pipeline and deal intelligence (spec section 2). Pure functions over cached deal rows, so every
 // number is explainable and unit tested. Nothing here talks to the database.
+import { MIN_CLOSED_DEALS, winRate } from "./metrics.ts";
 
 export type Deal = {
   opportunityId: string;
@@ -18,6 +19,7 @@ export type Deal = {
   stageChangedAt: number | null;
   statusChangedAt: number | null;
   lastActivityAt: number | null;
+  assignedTo?: string | null;
 };
 
 const DAY = 86_400_000;
@@ -49,13 +51,8 @@ export function avgCycleDays(deals: Deal[]): number | null {
   return m === null ? null : round(m, 1);
 }
 
-export const MIN_CLOSED_FOR_WIN_RATE = 5;
-
-export function winRate(deals: Deal[]): number | null {
-  const won = deals.filter((d) => d.status === "won").length;
-  const lost = deals.filter((d) => d.status === "lost").length;
-  return won + lost >= MIN_CLOSED_FOR_WIN_RATE ? won / (won + lost) : null;
-}
+// One minimum and one definition for the whole product (metrics.ts): 20 closed deals before any win rate.
+export { winRate };
 
 export type MonthRow = { month: string; won: number; lost: number; winRate: number | null; wonValue: number; lostValue: number };
 
@@ -240,7 +237,7 @@ export function forecast(deals: Deal[], now: number, fallbackWinRate: number | n
   const openValue = sum(opens.map((d) => d.value));
   const rate = winRate(deals) ?? fallbackWinRate;
   if (rate === null) {
-    return { openValue, likely: 0, best: 0, worst: 0, winRate: null, basis: "Not enough closed deals yet (needs at least 5) to estimate a win rate.", horizons: null };
+    return { openValue, likely: 0, best: 0, worst: 0, winRate: null, basis: `Not enough closed deals yet (needs at least ${MIN_CLOSED_DEALS}) to estimate a win rate.`, horizons: null };
   }
   const cycle = avgCycleDays(deals);
   const likely = openValue * rate;

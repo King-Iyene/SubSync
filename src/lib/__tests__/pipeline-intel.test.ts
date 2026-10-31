@@ -20,9 +20,14 @@ function deal(over: Partial<Deal> = {}): Deal {
 const won = (cycle: number, value = 1000) => deal({ status: "won", value, createdAt: ago(cycle + 10), statusChangedAt: ago(10) });
 const lost = (value = 500, when = 10) => deal({ status: "lost", value, statusChangedAt: ago(when) });
 
-test("win rate needs five closed deals", () => {
-  assert.equal(winRate([won(5), won(5), lost(), lost()]), null);
-  assert.equal(winRate([won(5), won(5), won(5), lost(), lost()]), 0.6);
+// One minimum for the whole product: 20 closed deals (metrics.ts). `closed(12, 8)` is 12 won and 8 lost.
+const closed = (w: number, l: number, age = 10) => [...Array.from({ length: w }, () => won(age)), ...Array.from({ length: l }, () => lost())];
+
+test("win rate needs twenty closed deals", () => {
+  assert.equal(winRate(closed(2, 2)), null);
+  assert.equal(winRate(closed(3, 3)), null, "3 won and 3 lost is never shown as 50%");
+  assert.equal(winRate(closed(10, 9)), null, "19 closed is not enough");
+  assert.equal(winRate(closed(12, 8)), 0.6);
 });
 
 test("average sales cycle uses won deals only", () => {
@@ -89,8 +94,7 @@ test("risky deals are sorted most at risk first and only list open deals", () =>
 });
 
 test("forecast: likely, best and worst bands, with the not-enough-data case", () => {
-  const closed = [won(10), won(10), won(10), lost(), lost()];
-  const f = forecast([...closed, deal({ value: 10_000 }), deal({ value: 10_000 })], NOW);
+  const f = forecast([...closed(12, 8), deal({ value: 10_000 }), deal({ value: 10_000 })], NOW);
   assert.equal(f.winRate, 0.6);
   assert.equal(f.likely, 12_000);
   assert.equal(f.best, 18_000);
@@ -101,7 +105,7 @@ test("forecast: likely, best and worst bands, with the not-enough-data case", ()
 });
 
 test("forecast horizons count overdue deals in the first window", () => {
-  const f = forecast([won(60), won(60), won(60), lost(), lost(), deal({ value: 1000, createdAt: ago(50) }), deal({ value: 1000, createdAt: ago(1) })], NOW);
+  const f = forecast([...closed(12, 8, 60), deal({ value: 1000, createdAt: ago(50) }), deal({ value: 1000, createdAt: ago(1) })], NOW);
   assert.ok(f.horizons);
   assert.equal(f.horizons![0].likely, 600); // the 50 day old deal is due within 30 days; the new one is not
   assert.equal(f.horizons![2].likely, 1200); // both are due within 90 days

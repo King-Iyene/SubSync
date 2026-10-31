@@ -65,7 +65,7 @@ export function TeamView() {
                 <Td className="text-right tabular-nums">{fmtMoney(m.openValue)}</Td>
                 <Td className="text-right tabular-nums">{m.staleCount > 0 ? <Badge tone="warn">{m.staleCount}</Badge> : "0"}</Td>
                 <Td className="text-right tabular-nums">{fmtInt(m.wonCount)} · {fmtMoney(m.wonValue)}</Td>
-                <Td className="text-right tabular-nums">{m.winRate === null ? <span className="text-muted-foreground" title="Needs 5 closed deals">n/a</span> : `${Math.round(m.winRate * 100)}%`}</Td>
+                <Td className="text-right tabular-nums">{m.winRate === null ? <span className="text-muted-foreground" title="Needs 20 closed deals">n/a</span> : `${Math.round(m.winRate * 100)}%`}</Td>
                 <Td className="text-right tabular-nums">{m.pace.lastReplyHoursAgo === null ? <span className="text-muted-foreground">none</span> : m.pace.idle ? <Badge tone="warn">idle {m.pace.lastReplyHoursAgo} h</Badge> : `${m.pace.lastReplyHoursAgo} h ago`}</Td>
                 <Td className="text-right tabular-nums">{m.pace.medianReplySeconds === null ? <span className="text-muted-foreground" title="Needs 3 replies">n/a</span> : paceText(m.pace.medianReplySeconds)}</Td>
                 <Td className="text-right tabular-nums">{m.pace.showRate === null ? <span className="text-muted-foreground" title="Needs 5 recorded outcomes">n/a</span> : `${Math.round(m.pace.showRate * 100)}% (${m.pace.held}/${m.pace.held + m.pace.noShow})`}</Td>

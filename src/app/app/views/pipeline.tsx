@@ -13,6 +13,9 @@ type DealRow = {
 };
 type Bucket = { label: string; count: number; value: number };
 type Data = {
+  excluded: { count: number; noValue: number; noOwner: number };
+  outlier: { value: number; share: number; of: number } | null;
+  minClosedDeals: number;
   totals: { open: number; openValue: number; won: number; lost: number; winRate: number | null; avgCycleDays: number | null };
   forecast: { likely: number; best: number; worst: number; winRate: number | null; basis: string; horizons: Array<{ days: number; likely: number }> | null };
   coverage: { target: number; needed: number; openValue: number; gap: number; ratio: number; healthy: boolean } | null;
@@ -105,11 +108,16 @@ export function PipelineView() {
       <PageHeader title="Pipeline" subtitle="Forecast, bottlenecks and deal risk across every client account. Everything here is calculated from deals we have synced." actions={<Btn onClick={() => api.download("export/deals", "subsync-open-deals.csv")}>Export open deals</Btn>} />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Stat label="Open pipeline" value={fmtMoney(data.totals.openValue)} sub={`${fmtInt(data.totals.open)} open deals`} />
-        <Stat label="Win rate" value={pct(data.totals.winRate)} sub={`${data.totals.won} won, ${data.totals.lost} lost`} />
+        <Stat label="Open pipeline" value={fmtMoney(data.totals.openValue)} sub={<>{fmtInt(data.totals.open)} open deals{data.outlier && <span className="mt-1 block text-amber-700 dark:text-amber-400">One deal ({fmtMoney(data.outlier.value)}) is {Math.round(data.outlier.share * 100)}% of this.</span>}</>} />
+        <Stat label="Win rate" value={pct(data.totals.winRate)} sub={data.totals.winRate === null ? `${data.totals.won + data.totals.lost} closed so far; a win rate needs ${data.minClosedDeals}` : `${data.totals.won} won, ${data.totals.lost} lost`} />
         <Stat label="Average time to win" value={data.totals.avgCycleDays === null ? "n/a" : `${data.totals.avgCycleDays} ${data.totals.avgCycleDays === 1 ? "day" : "days"}`} sub="created to won" />
-        <Stat label="Likely revenue" value={f.winRate === null ? "n/a" : fmtMoney(f.likely)} sub="open value x win rate" />
+        <Stat label="Likely revenue (estimate)" value={f.winRate === null ? "Not enough data" : fmtMoney(f.likely)} sub={<details><summary className="cursor-pointer">Estimate, not a fact. How it is worked out</summary><span className="mt-1 block">Open pipeline x win rate. {f.winRate === null ? `Needs ${data.minClosedDeals} closed deals.` : `${Math.round(f.winRate * 100)}% win rate.`}</span></details>} />
       </div>
+      {data.excluded.count > 0 && (
+        <p className="text-xs text-muted-foreground">
+          {fmtInt(data.excluded.count)} open {data.excluded.count === 1 ? "deal is" : "deals are"} not counted in these figures ({fmtInt(data.excluded.noValue)} with no value, {fmtInt(data.excluded.noOwner)} with no owner). Amounts are as entered in each account; different currencies are not converted.
+        </p>
+      )}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card title="Revenue forecast" className="lg:col-span-2">

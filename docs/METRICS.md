@@ -15,7 +15,13 @@ deals feed any dollar figure or open/stale count. Deals without a value or witho
 or hidden from the Stale deals list; they are left out of the totals, and the Overview says how many
 (`excludedDeals`). Code: `queries.ts` (`counted`). Test: `scripts/check-metrics.ts` recomputes it from raw rows.
 
-**Open pipeline** (FACT). Sum of value over counted open deals. Count of counted open deals.
+**Open pipeline** (FACT). Sum of value over counted open deals. Count of counted open deals. This is the only definition:
+Today, Overview, Accounts, Account audit, Pipeline, Clients and the exports all use it, and a browser test
+(`tests/e2e/consistency.spec.ts`) checks that they agree. Every screen that shows the total also says how many open
+deals were left out and why (no value, no owner). The rule lives in `metrics.ts` (`isCounted`, `openPipeline`) and
+once in SQL for the account tiles (`queries.ts`) and the deal list (`pipeline-queries.ts`); `scripts/check-metrics.ts`
+recomputes it from raw rows. Amounts are as entered in each account. The database stores no currency, so nothing
+is converted and a note on the Overview and Pipeline says so (open issue: store each account's currency at sync).
 
 **Stale deal** (FACT). A counted open deal whose last movement is older than the stale threshold (30 days by
 default). Movement is the latest of: last stage change, last action, last update, last status change; if the
@@ -25,9 +31,16 @@ a part of Open pipeline, never more than it.
 That needs stage history (how long deals normally sit in each stage), which only exists once the event store
 has collected enough moves. Until then one number is used, and the screen says "have not moved", not "lost".
 
-**Win rate** (FACT, with a minimum). Won deals divided by won plus lost deals, per account, shown only when
-the account has at least **20** closed deals (`MIN_CLOSED_DEALS`). Below that there is no win rate and nothing
-is built on it. Test: `derive.test.ts`, `metrics-trust.test.ts`.
+**Win rate** (FACT, with a minimum). Won deals divided by won plus lost deals, shown only when there are at least
+**20** closed deals (`MIN_CLOSED_DEALS` in `metrics.ts`). Below that there is no win rate and nothing is built on it.
+This one minimum applies to an account, to the all-accounts Pipeline total, to each team member and to the deals
+view; an earlier minimum of 5 on the Pipeline screen produced "50%" from 3 won and 3 lost and is gone. The screen
+says how many closed deals there are and how many are needed. Tests: `metrics.test.ts` (golden dataset),
+`derive.test.ts`, `metrics-trust.test.ts`, `people-intel.test.ts`, `consistency.spec.ts`.
+
+**Outlier note** (FACT). When one counted open deal is at least half (`OUTLIER_SHARE`, 50%) of the open pipeline and
+there are at least 3 counted deals, the card says "One deal ($X) is N% of this". Shown on Overview and Pipeline.
+Code: `outlier` in `metrics.ts`. Test: `metrics.test.ts`.
 
 **Average deal value.** Average value of won deals; when there are none, open value divided by open deals.
 
@@ -36,6 +49,9 @@ is built on it. Test: `derive.test.ts`, `metrics-trust.test.ts`.
 **Expected revenue** (ESTIMATE). For each account that has a win rate: counted open value times that
 account's win rate; added across accounts. If no account has a win rate the Overview shows "Not enough data".
 It can never exceed Open pipeline.
+
+**Likely revenue, Pipeline screen** (ESTIMATE). Open pipeline times the win rate; "Not enough data" below 20 closed
+deals. Labelled "Estimate, not a fact" with the formula under the number (a tap on the label).
 
 **Cost of slow follow-up** (ESTIMATE). Conversations waiting past the reply target, times the account's
 average deal value, times its win rate. It is the rough size of the problem, not money lost. "Not enough
@@ -83,6 +99,14 @@ Code: `appointment-intel.ts`, `appointment-deep.ts`. Tests: `appointment-intel.t
 or more. Both are append-only and are never edited. The first sync of an account records nothing, because
 every record would look new. Nothing yet reads these tables for a screen. Planned readers (Wave 2): deal
 velocity, stage dwell time (which will also give per-stage stale thresholds), true show-rate history.
+
+## Leads: quiet contacts
+
+**Quiet over 90 days** (FACT, only when activity is known). Contacts whose last recorded activity (or, with none, their created
+date) is more than 90 days old. The platform does not send a contact's last activity to us yet: on 31 Oct 2026 all
+103,404 synced contacts had none, so "quiet" would only have meant "added long ago" (52,735 of 52,926 on the screen at
+the time, 100%). The tile and the Going quiet card now show "Not measured" until at least one contact has recorded
+activity. Code: `activityKnown` in `leads.tsx`.
 
 ## Test accounts
 
