@@ -20,10 +20,15 @@ Read this first. Everything below is pushed to `main` and live unless it says ot
 - **Shareable audit link tested live end to end:** the public page showed totals and finding titles only, no account names.
 - Home page "trust" line and the in-app help answer now say honestly that SubSync writes a meeting note into a contact.
 
+- **Getting started** now has two new steps that tick themselves off: add an email for alerts, and connect a meeting tool.
+- **Weekly trend on Speed to lead:** share of leads answered inside target, week by week (facts only; a week with fewer than 5 leads shows no percentage).
+- Wording fixed in the Connections card and the install page, which still claimed SubSync never writes anything.
+- Verified live on real data: Today, Team, Inbox & SLA, Speed to lead (never answered and no owner badges).
+
 ## Needs you (blocked on a login, a decision or a click)
 
 1. **Type your email in Settings, Weekly email,** so alerts and the Monday email can reach you. Tell me if one arrives.
-2. **Press Connect Zoom** once to test the real sign-in. A real summary needs a paid Zoom host.
+2. **Press Connect Zoom yourself** (Settings, Connections): the browser pane blocks sign-in popups that I trigger, so only your click works. A real summary needs a paid Zoom host.
 3. **Slack and Fathom apps** (steps in docs/CONNECTIONS_SETUP.md). Skipped as agreed.
 4. **Public demo:** needs your yes, because it turns on sample data in production.
 5. **Privacy policy and terms:** they do not yet say that SubSync writes a meeting note into a contact. A human must update and review them before Public.
@@ -44,3 +49,7 @@ Read this first. Everything below is pushed to `main` and live unless it says ot
 - Two installs exist for KD Squares LTD (one agency, one business); the business one lacks calendar events and users permissions. Harmless to the agency view.
 - **Two pushes failed to build tonight** (the shared audit page used a setting this project does not allow). The live site stayed on the last good version the whole time. Fixed and confirmed live. New rule saved: run `npx next build` before every push.
 - Checks: unit tests 281 pass. The full automated suite passed (tenant isolation with 384 cross-reads, feature switches, Overview numbers, audit, speed to lead, roadmap, plus all earlier modules). Live deploy check passes.
+
+## Strategy note: will customers pay?
+
+Strong pain with evidence: speed to lead alerts, appointment hygiene. Good for selling, weaker for keeping: the audit and share link. Real but unproven: setter accountability. Nice to have, not a reason to buy: meeting notes, roadmap, theme. Not a reason to buy (the research says so): duplicates, cleanup, reports, portals. Nobody has paid yet. The brief's gate is 3 to 5 pilot agencies; ask: how fast do you reply today and how do you know, have you lost a client over missed leads, would you pay $9 per client account? Next build to retain customers: a monthly proof of what was caught. Next integration idea (King): Facebook lead form and ad data, so reply speed can be shown by campaign (needs one more contact field from the CRM).
