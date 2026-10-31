@@ -17,6 +17,27 @@ type Data = {
   limited: boolean;
 };
 
+type AuditData = { audit: { headline: string; estimatedDollars: number | null; staleDollars: number; findings: Array<{ key: string; severity: string; title: string; detail: string; dollars: number | null; kind: string; view: string; fix: string }> } };
+
+// The one thing to do first, taken from the account audit, with the money it is costing when that can be stated honestly.
+function DoFirst({ go }: { go: GoFn }) {
+  const { data } = useData<AuditData>("audit");
+  const f = data?.audit.findings.find((x) => x.severity !== "info" && x.key !== "permission") ?? null;
+  if (!f) return null;
+  return (
+    <section className="mb-6 rounded-2xl border border-primary/40 bg-primary/5 p-5" aria-label="Do this first">
+      <p className="text-xs font-semibold uppercase tracking-wide text-primary">Do this first</p>
+      <h2 className="mt-1 text-lg font-semibold">{f.title}</h2>
+      <p className="mt-1 text-sm text-muted-foreground">{f.detail}</p>
+      {f.dollars !== null && <p className="mt-2 text-sm"><strong>{fmtMoney(f.dollars)}</strong> <span className="text-muted-foreground">{f.kind === "estimate" ? "estimated at risk" : "counted at risk"}</span></p>}
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        <Btn onClick={() => go(f.view as never)}>{f.fix}</Btn>
+        <Btn variant="ghost" onClick={() => go("audit" as never)}>See the full audit</Btn>
+      </div>
+    </section>
+  );
+}
+
 const tone = (s: string): Tone => (s === "critical" ? "bad" : s === "warning" ? "warn" : "info");
 const signed = (n: number | null) => (n === null ? "no earlier day" : `${n > 0 ? "+" : ""}${n}%`);
 // For these, up is bad (more stale deals, more unread); for the others, up is good.
@@ -41,6 +62,8 @@ export function TodayView({ go }: { go: GoFn }) {
 
       {!data.connection.ok && <p className="mb-4 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">{data.connection.message}</p>}
       {data.freshness.pending > 0 && <p className="mb-4 rounded-lg border bg-muted/40 px-3 py-2 text-sm" role="status">A sync is still running, so some numbers may change in a few minutes.</p>}
+
+      <DoFirst go={go} />
 
       <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
         {data.headlines.map((h) => {
