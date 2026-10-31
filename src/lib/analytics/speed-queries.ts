@@ -1,5 +1,5 @@
 import { sql } from "../db";
-import { bySource, rankPeople, summarise, type Summary, type TouchRow } from "./speed-intel";
+import { bySource, isNeverAnswered, rankPeople, summarise, type Summary, type TouchRow } from "./speed-intel";
 
 // Everything the speed-to-lead screen shows, for the accounts the caller may see. Leads older than the
 // window are left out: a lead from three weeks ago says nothing about how the team answers today.
@@ -42,9 +42,10 @@ export async function speedView(installationId: string, allowed: string[] | null
     access: { ok: locs.filter((l) => l.speed_access === "ok").length, needsPermission: locs.filter((l) => l.speed_access === "needs_permission").map((l) => ({ locationId: l.location_id as string, name: names.get(l.location_id as string) as string })), total: locs.length },
     overall: summarise(touches, targetMinutes, now),
     bySource: bySource(touches, targetMinutes, now),
+    neverAnswered: touches.filter((t) => t.touchAt === null && isNeverAnswered((now - t.leadAt) / 60_000)).length,
     unassignedWaiting: touches.filter((t) => t.touchAt === null && !t.assigned && (now - t.leadAt) / 60_000 > targetMinutes).length,
     perAccount,
     people: rankPeople(touches).slice(0, 12).map((p) => ({ ...p, label: who.get(p.userId) ?? "Team member " + p.userId.slice(-4) })),
-    waiting: waitingRows.map((w) => ({ locationId: w.locationId, locationName: names.get(w.locationId) ?? "Account", contactId: w.contactId, name: cname.get(`${w.locationId}:${w.contactId}`) ?? "Contact", waitingMinutes: Math.round((now - w.leadAt) / 60_000), unassigned: !w.assigned })),
+    waiting: waitingRows.map((w) => ({ locationId: w.locationId, locationName: names.get(w.locationId) ?? "Account", contactId: w.contactId, name: cname.get(`${w.locationId}:${w.contactId}`) ?? "Contact", waitingMinutes: Math.round((now - w.leadAt) / 60_000), unassigned: !w.assigned, neverAnswered: isNeverAnswered(Math.round((now - w.leadAt) / 60_000)) })),
   };
 }

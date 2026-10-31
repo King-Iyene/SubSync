@@ -45,6 +45,11 @@ export type TouchRow = { locationId: string; contactId: string; leadAt: number; 
 
 // Where a lead came from decides how fast it must be answered. Portal and phone leads go cold in minutes, web forms a little
 // slower, social messages slower still. The windows are common practice in real estate and are shown as targets, not facts.
+// A lead nobody has answered for this long is not "waiting" any more: it was missed. Showing it as waiting makes the screen
+// look broken, and hides the real message ("these were never answered").
+export const NEVER_ANSWERED_MINUTES = 3 * 24 * 60;
+export const isNeverAnswered = (waitingMinutes: number) => waitingMinutes > NEVER_ANSWERED_MINUTES;
+
 export type SourceClass = "portal" | "form" | "social" | "other";
 export const SOURCE_TARGET_MINUTES: Record<Exclude<SourceClass, "other">, number> = { portal: 5, form: 15, social: 60 };
 export function classifySource(source: string | null | undefined): SourceClass {

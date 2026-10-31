@@ -101,3 +101,10 @@ test("lead sources are grouped into portal, form, social and other, each with it
   assert.equal(out[0].withinTarget, 3, "portal: 2, 3 and 4 minutes beat the 5 minute target");
   assert.equal(out[1].withinTarget, 5, "social: 10, 12, 14, 40 and 50 minutes beat 60; only 90 is late");
 });
+
+test("a lead unanswered for more than three days counts as never answered, not waiting", async () => {
+  const { isNeverAnswered } = await import("../analytics/speed-intel.ts");
+  assert.equal(isNeverAnswered(60), false);
+  assert.equal(isNeverAnswered(3 * 24 * 60), false);
+  assert.equal(isNeverAnswered(3 * 24 * 60 + 1), true);
+});

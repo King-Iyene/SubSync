@@ -12,9 +12,10 @@ type Data = {
   overall: Summary;
   bySource?: Array<Summary & { cls: "portal" | "form" | "social" | "other"; targetMinutes: number }>;
   unassignedWaiting?: number;
+  neverAnswered?: number;
   perAccount: Array<Summary & { locationId: string; name: string; access: string | null }>;
   people: Array<{ userId: string; label: string; replies: number; medianSeconds: number }>;
-  waiting: Array<{ locationId: string; locationName: string; contactId: string; name: string; waitingMinutes: number; url: string; unassigned?: boolean }>;
+  waiting: Array<{ locationId: string; locationName: string; contactId: string; name: string; waitingMinutes: number; url: string; unassigned?: boolean; neverAnswered?: boolean }>;
 };
 
 const dur = (s: number | null) => {
@@ -56,18 +57,18 @@ export function SpeedView({ go }: { go: GoFn }) {
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <Stat label="Typical first reply" value={o.medianSeconds === null ? "Not enough data" : dur(o.medianSeconds)} sub={o.p90Seconds !== null ? `9 in 10 were answered within ${dur(o.p90Seconds)}` : "Needs at least 5 replies"} />
             <Stat label={`Answered within ${data.targetMinutes} min`} value={pct(o.hitRate)} tone={o.hitRate === null ? undefined : o.hitRate >= 0.8 ? undefined : "warn"} sub={`${fmtInt(o.withinTarget)} of ${fmtInt(o.withinTarget + o.answeredLate + o.stillWaiting)} leads`} />
-            <Stat label="Waiting right now" value={fmtInt(o.stillWaiting)} tone={o.stillWaiting > 0 ? "bad" : undefined} sub="no person has replied, past the target" />
+            <Stat label="Waiting right now" value={fmtInt(Math.max(0, o.stillWaiting - (data.neverAnswered ?? 0)))} tone={o.stillWaiting - (data.neverAnswered ?? 0) > 0 ? "bad" : undefined} sub={(data.neverAnswered ?? 0) > 0 ? `past the target, under 3 days old. Plus ${data.neverAnswered} never answered (older than 3 days)` : "no person has replied, past the target"} />
             <Stat label="Answered late" value={fmtInt(o.answeredLate)} sub="a person replied, after the target" />
           </div>
 
           {data.waiting.length > 0 && (
-            <Card title={`Leads waiting now (${o.stillWaiting})`} className="mt-6" action={data.waiting.length > 10 ? <Btn variant="ghost" onClick={() => setAll(!all)}>{all ? "Show fewer" : `Show all ${data.waiting.length}`}</Btn> : undefined}>
+            <Card title={`Leads waiting or missed (${o.stillWaiting})`} className="mt-6" action={data.waiting.length > 10 ? <Btn variant="ghost" onClick={() => setAll(!all)}>{all ? "Show fewer" : `Show all ${data.waiting.length}`}</Btn> : undefined}>
               <p className="mb-2 text-xs text-muted-foreground">Longest waiting first.</p>
               <ul className="divide-y text-sm">
                 {(all ? data.waiting : data.waiting.slice(0, 10)).map((w) => (
                   <li key={w.locationId + w.contactId} className="flex flex-wrap items-center justify-between gap-2 py-2.5">
                     <span><span className="font-medium">{w.name}</span> <span className="text-muted-foreground">· {w.locationName}</span></span>
-                    <span className="flex items-center gap-3"><Badge tone="bad">waiting {dur(w.waitingMinutes * 60)}</Badge>{w.unassigned && <Badge tone="warn">no owner</Badge>}<ExtLink href={w.url}>Open contact</ExtLink></span>
+                    <span className="flex items-center gap-3"><Badge tone="bad">{w.neverAnswered ? "never answered" : "waiting"} {dur(w.waitingMinutes * 60)}</Badge>{w.unassigned && <Badge tone="warn">no owner</Badge>}<ExtLink href={w.url}>Open contact</ExtLink></span>
                   </li>
                 ))}
               </ul>
