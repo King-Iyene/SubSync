@@ -1,16 +1,25 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { sql } from "@/lib/db";
 import type { SharePayload } from "@/lib/analytics/share-intel";
 
 // A shared account audit: totals and finding titles only. Never indexed, expires after 30 days.
 export const metadata: Metadata = { title: "Account audit", robots: { index: false, follow: false } };
-export const dynamic = "force-dynamic";
 
 const usd = (n: number) => "$" + Math.round(n).toLocaleString("en-US");
 
-export default async function SharedAudit({ params }: { params: Promise<{ id: string }> }) {
+// The data is read per request, so it sits behind a Suspense boundary (required by this project's rendering mode).
+export default function SharedAudit({ params }: { params: Promise<{ id: string }> }) {
+  return (
+    <Suspense fallback={<div className="dark min-h-screen bg-[oklch(0.15_0.025_220)]" />}>
+      <AuditBody params={params} />
+    </Suspense>
+  );
+}
+
+async function AuditBody({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   if (!/^[A-Za-z0-9_-]{20,64}$/.test(id)) notFound();
   const [row] = await sql()`select payload from shared_audits where id = ${id} and expires_at > now()`;
