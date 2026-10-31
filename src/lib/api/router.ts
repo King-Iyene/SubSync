@@ -32,6 +32,7 @@ import { afterHours, communicationGaps } from "../analytics/comms-queries";
 import { badDataSamples, contactOverview, topLeads, vips } from "../analytics/contact-queries";
 import { appointmentInsights } from "../analytics/appointment-insight-queries";
 import { auditSummary, buildAudit } from "../analytics/audit-intel";
+import { speedView } from "../analytics/speed-queries";
 import { appointmentView } from "../analytics/appointment-queries";
 import { compareSetup, describe as describeDiff } from "../analytics/setup-intel";
 import { applyRun, createPreview, getRun, installationHasScope, listRuns, PREVIEW_VALID_HOURS, sampleChanges, undoRun } from "../analytics/cleanup-queries";
@@ -187,6 +188,13 @@ async function auditViewData(ctx: Ctx) {
   })), appts);
   const who = settings.brandName ?? (ctx.limitTo ? "Your business" : "Your agency");
   return json({ audit, summary: auditSummary(audit, who) });
+}
+
+// How fast new leads get a first reply from a person.
+async function speedViewData(ctx: Ctx) {
+  const sc = await scope(ctx);
+  const v = await speedView(ctx.installationId, await allowedIds(ctx), sc.settings.speedTargetMinutes);
+  return json({ ...v, waiting: v.waiting.map((w) => ({ ...w, url: sc.links.contact(w.locationId, w.contactId) })) });
 }
 
 async function appointmentsView(ctx: Ctx) {
@@ -711,7 +719,7 @@ const settingsView = async (ctx: Ctx) => {
 
 function publicSettings(s: Settings) {
   // Never send the webhook URL back to the browser: it is a secret.
-  return { staleDays: s.staleDays, dormantDays: s.dormantDays, slaHours: s.slaHours, appDomain: s.appDomain, digestEnabled: s.digestEnabled, customChecklist: s.customChecklist, digestHour: s.digestHour, digestTimezone: s.digestTimezone, brandName: s.brandName, brandColor: s.brandColor, industryTargets: s.industryTargets, keepTranscripts: s.keepTranscripts };
+  return { staleDays: s.staleDays, dormantDays: s.dormantDays, slaHours: s.slaHours, appDomain: s.appDomain, digestEnabled: s.digestEnabled, customChecklist: s.customChecklist, digestHour: s.digestHour, digestTimezone: s.digestTimezone, brandName: s.brandName, brandColor: s.brandColor, industryTargets: s.industryTargets, keepTranscripts: s.keepTranscripts, speedTargetMinutes: s.speedTargetMinutes, countAutomatedTouches: s.countAutomatedTouches };
 }
 
 async function settingsUpdate(ctx: Ctx) {
@@ -725,6 +733,12 @@ async function settingsUpdate(ctx: Ctx) {
   if ("digestEnabled" in body) patch.digestEnabled = body.digestEnabled === true;
   if ("industryTargets" in body) patch.industryTargets = body.industryTargets === true;
   if ("keepTranscripts" in body) patch.keepTranscripts = body.keepTranscripts === true;
+  if ("speedTargetMinutes" in body) {
+    const n = Number(body.speedTargetMinutes);
+    if (!Number.isInteger(n) || n < 1 || n > 1440) return json({ error: "Enter a reply target between 1 and 1440 minutes" }, 400);
+    patch.speedTargetMinutes = n;
+  }
+  if ("countAutomatedTouches" in body) patch.countAutomatedTouches = body.countAutomatedTouches === true;
   if ("brandName" in body) {
     if (body.brandName === null || body.brandName === "") patch.brandName = null;
     else if (typeof body.brandName === "string" && body.brandName.trim().length <= 60) patch.brandName = body.brandName.trim();
@@ -1292,7 +1306,7 @@ async function digestPreview(ctx: Ctx) {
 
 const FEATURE_FOR: Record<string, Feature> = {
   search: "search", onboarding: "onboarding", stale: "stale", inbox: "inbox", pipelines: "pipelines", duplicates: "duplicates", email: "email",
-  alerts: "alerts", appointments: "appointments", audit: "audit", "appointment-insights": "appointments", meetings: "meetings", connections: "connections", cleanup: "cleanup", "setup-compare": "setup_compare", playbooks: "playbooks", daily: "overview", team: "team", "deal-events": "pipelines", contact: "search", settings: "settings", export: "exports", digest: "overview", "api-keys": "ai", hygiene: "stale", "pipeline-intel": "pipelines", "contact-intel": "activity", clients: "clients", qbr: "reports", "comms-intel": "inbox", "call-queue": "calls", "call-lists": "calls", "call-outcomes": "calls",
+  alerts: "alerts", appointments: "appointments", audit: "audit", speed: "speed", "appointment-insights": "appointments", meetings: "meetings", connections: "connections", cleanup: "cleanup", "setup-compare": "setup_compare", playbooks: "playbooks", daily: "overview", team: "team", "deal-events": "pipelines", contact: "search", settings: "settings", export: "exports", digest: "overview", "api-keys": "ai", hygiene: "stale", "pipeline-intel": "pipelines", "contact-intel": "activity", clients: "clients", qbr: "reports", "comms-intel": "inbox", "call-queue": "calls", "call-lists": "calls", "call-outcomes": "calls",
 };
 
 export async function handle(request: Request, segments: string[]): Promise<Response> {
@@ -1311,6 +1325,7 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       if (a === "daily") return await dailyView(ctx);
       if (a === "appointments") return await appointmentsView(ctx);
       if (a === "audit") return await auditViewData(ctx);
+      if (a === "speed") return await speedViewData(ctx);
       if (a === "appointment-insights") return await appointmentInsightsView(ctx);
       if (a === "setup-compare") return await setupCompare(ctx);
       if (a === "segments") return await segmentsView(ctx);

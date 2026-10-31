@@ -4,9 +4,10 @@ import { sql } from "../db";
 import { getInstalledLocations, getLocationToken } from "../ghl/client";
 import { getCompanyAccessToken, purgeLocationData } from "../ghl/installations";
 import {
-  fetchAppointments, fetchCalendars, fetchUsers, isPermissionError, fetchCalendarCount, fetchContactsPage, fetchConversationsPage, fetchLocationDetails, fetchOpportunitiesPage, fetchPipelines,
+  fetchAppointments, fetchCalendars, fetchConversationMessages, fetchUsers, isPermissionError, fetchCalendarCount, fetchContactsPage, fetchConversationsPage, fetchLocationDetails, fetchOpportunitiesPage, fetchPipelines,
   type ContactCursor, type ConversationRow, type OpportunityRow,
 } from "./ghl-data";
+import { leadFromMessages } from "../analytics/speed-intel";
 import { diffAppointmentEvents } from "./appointment-events";
 import { diffDealEvents } from "./deal-events";
 import { listAllInstalledLocations } from "./installed-locations";
@@ -17,8 +18,8 @@ import { listAllInstalledLocations } from "./installed-locations";
 // A full sync is: one `locations` job, which fans out to per-account jobs, then one `metrics`
 // job that only runs once everything else has finished.
 
-export type JobType = "locations" | "structure" | "contacts" | "opportunities" | "conversations" | "appointments" | "metrics";
-const PER_LOCATION: JobType[] = ["structure", "contacts", "opportunities", "conversations", "appointments"];
+export type JobType = "locations" | "structure" | "contacts" | "opportunities" | "conversations" | "appointments" | "speed" | "metrics";
+const PER_LOCATION: JobType[] = ["structure", "contacts", "opportunities", "conversations", "appointments", "speed"];
 
 type Job = {
   id: string;
@@ -393,6 +394,49 @@ async function handleAppointments(job: Job): Promise<Outcome> {
   return DONE;
 }
 
+// Speed to lead: for each recent lead (a new contact with a conversation) read the messages once and keep
+// when it started and when a person first replied. Leads already answered are not read again. Nothing here
+// may fail the account: a missing permission is recorded as such and the rest of the sync carries on.
+const SPEED_WINDOW_DAYS = 14;
+const SPEED_PER_RUN = 100;
+
+async function handleSpeed(job: Job): Promise<Outcome> {
+  const db = sql();
+  const loc = job.locationId as string;
+  const [s] = await db`select count_automated_touches from settings where installation_id = ${job.installationId}`;
+  const countAutomated = s?.count_automated_touches === true;
+  const candidates = await db`
+    select c.contact_id, c.date_added, v.conversation_id
+    from cached_contacts c
+    join cached_conversations v on v.installation_id = c.installation_id and v.location_id = c.location_id and v.contact_id = c.contact_id
+    left join lead_touches t on t.installation_id = c.installation_id and t.location_id = c.location_id and t.conversation_id = v.conversation_id
+    where c.installation_id = ${job.installationId} and c.location_id = ${loc} and c.date_added >= ${new Date(Date.now() - SPEED_WINDOW_DAYS * 86_400_000)}
+      and (t.id is null or t.touch_at is null)
+    order by (t.id is null) desc, c.date_added desc limit ${SPEED_PER_RUN}`;
+  if (candidates.length === 0) return DONE;
+
+  const token = await tokenForLocation(job.companyId, loc);
+  let access: "ok" | "needs_permission" = "ok";
+  for (const c of candidates) {
+    try {
+      const msgs = await fetchConversationMessages(token, loc, c.conversation_id as string);
+      const lead = leadFromMessages(msgs, c.date_added instanceof Date ? c.date_added.getTime() : null, countAutomated);
+      if (!lead) continue;
+      await db`
+        insert into lead_touches (installation_id, location_id, contact_id, conversation_id, lead_at, touch_at, touch_user_id)
+        values (${job.installationId}, ${loc}, ${c.contact_id}, ${c.conversation_id}, ${new Date(lead.leadAt)}, ${lead.touchAt === null ? null : new Date(lead.touchAt)}, ${lead.touchUserId})
+        on conflict (installation_id, location_id, conversation_id) do update set lead_at = excluded.lead_at, touch_at = excluded.touch_at, touch_user_id = excluded.touch_user_id, checked_at = now()`;
+    } catch (error) {
+      if (isPermissionError(error)) { access = "needs_permission"; break; }
+      console.error("Reading a conversation failed", error instanceof Error ? error.message : "unknown");
+    }
+  }
+  await db`
+    update locations set speed_access = ${access}, speed_synced_at = case when ${access} = 'ok' then now() else speed_synced_at end
+    where installation_id = ${job.installationId} and location_id = ${loc}`;
+  return DONE;
+}
+
 async function runJob(job: Job, deadline: number): Promise<Outcome> {
   switch (job.type) {
     case "locations": return handleLocations(job);
@@ -401,6 +445,7 @@ async function runJob(job: Job, deadline: number): Promise<Outcome> {
     case "opportunities": return handleOpportunities(job, deadline);
     case "conversations": return handleConversations(job);
     case "appointments": return handleAppointments(job);
+    case "speed": return handleSpeed(job);
     case "metrics":
       await refreshInsights(job.installationId);
       return DONE;

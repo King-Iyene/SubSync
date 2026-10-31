@@ -34,6 +34,7 @@ export const FEATURES = [
   "connections",
   "clients",
   "audit",
+  "speed",
 ] as const;
 export type Feature = (typeof FEATURES)[number];
 

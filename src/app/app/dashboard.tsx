@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { NAV_FOR, type AccessKind } from "@/lib/access";
 import {
-  Briefcase, CalendarCheck, ClipboardCheck, CircleHelp, Copy, Eraser, Inbox, Kanban, LayoutDashboard, Mic, PhoneCall, Search, Settings, Sun, Target, UserRound, Users, Wrench, type LucideIcon,
+  Briefcase, CalendarCheck, ClipboardCheck, Zap, CircleHelp, Copy, Eraser, Inbox, Kanban, LayoutDashboard, Mic, PhoneCall, Search, Settings, Sun, Target, UserRound, Users, Wrench, type LucideIcon,
 } from "lucide-react";
 import { NAV, type GoFn, type ViewId } from "./nav";
 import { ApiProvider, makeApi, type Api } from "./session";
@@ -12,6 +12,7 @@ import { AccountsView } from "./views/accounts";
 import { AlertsView } from "./views/alerts";
 import { AppointmentInsights } from "./views/appointment-insights";
 import { AuditView } from "./views/audit";
+import { SpeedView } from "./views/speed";
 import { AppointmentsView } from "./views/appointments";
 import { CleanupView } from "./views/cleanup";
 import { MeetingsView } from "./views/meetings";
@@ -217,6 +218,7 @@ export function Dashboard() {
     switch (view.id) {
       case "today": return <TodayView go={go} />;
       case "audit": return <AuditView go={go} />;
+      case "speed": return <SpeedView go={go} />;
       case "overview": return <OverviewView go={go} />;
       case "accounts": return <AccountsView go={go} />;
       case "account": return view.locationId ? <AccountDetailView key={view.locationId} locationId={view.locationId} go={go} agency={agency} /> : <AccountsView go={go} />;
@@ -291,7 +293,7 @@ export function Dashboard() {
 }
 
 const ICONS: Record<string, LucideIcon> = {
-  today: Sun, audit: ClipboardCheck, overview: LayoutDashboard, inbox: Inbox, appointments: CalendarCheck, meetings: Mic, search: Search, pipeline: Kanban, leads: Target, calls: PhoneCall,
+  today: Sun, audit: ClipboardCheck, speed: Zap, overview: LayoutDashboard, inbox: Inbox, appointments: CalendarCheck, meetings: Mic, search: Search, pipeline: Kanban, leads: Target, calls: PhoneCall,
   accounts: Briefcase, clients: UserRound, team: Users, onboarding: Wrench, duplicates: Copy, cleanup: Eraser, settings: Settings, help: CircleHelp,
 };
 

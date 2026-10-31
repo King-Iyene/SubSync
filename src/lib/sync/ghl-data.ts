@@ -4,6 +4,7 @@
 
 import { GHL_API, GhlError } from "../ghl/client.ts";
 import { ghlFetch } from "../ghl/http.ts";
+import { mapMessage, type Msg } from "../analytics/speed-intel.ts";
 
 export function toIso(value: unknown): string | null {
   if (value === null || value === undefined || value === "") return null;
@@ -264,6 +265,15 @@ export async function fetchCalendars(token: string, locationId: string): Promise
 export async function fetchAppointments(token: string, locationId: string, calendarId: string, fromMs: number, toMs: number): Promise<AppointmentRow[]> {
   const body = rec(await getJson("/calendars/events", { locationId, calendarId, startTime: String(fromMs), endTime: String(toMs) }, token, "2021-04-15"));
   return (Array.isArray(body.events) ? body.events : []).map(mapAppointment).filter((a): a is AppointmentRow => a !== null);
+}
+
+// The messages in one conversation, newest page only. Needs conversations/message.readonly. Each message
+// carries who sent it and from where, which is what tells a person's reply from an automatic one.
+export async function fetchConversationMessages(token: string, locationId: string, conversationId: string): Promise<Msg[]> {
+  const body = rec(await getJson(`/conversations/${encodeURIComponent(conversationId)}/messages`, { limit: "100", locationId }, token, "2021-04-15"));
+  const inner = rec(body.messages);
+  const list = Array.isArray(inner.messages) ? inner.messages : Array.isArray(body.messages) ? body.messages : [];
+  return list.map(mapMessage).filter((m): m is Msg => m !== null);
 }
 
 // The people on the account (names only). Needs users.readonly.

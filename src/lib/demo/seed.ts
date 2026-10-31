@@ -345,8 +345,43 @@ export async function demoFirstLocation(): Promise<string> {
   return row.location_id as string;
 }
 
+// Speed-to-lead sample data, added to a demo that does not have it yet. Built from counters only (no random
+// numbers), so nothing else in the demo moves. Some accounts answer in minutes, some in over an hour, a few
+// leads are never answered, and one account is left as "needs permission".
+async function ensureSpeedDemo(installationId: string): Promise<void> {
+  const db = sql();
+  const [have] = await db`select count(*)::int n from lead_touches where installation_id = ${installationId}`;
+  if (have.n > 0) return;
+  const locs = await db`select location_id, ignored from locations where installation_id = ${installationId} order by location_id`;
+  const now = Date.now();
+  const rows: Record<string, unknown>[] = [];
+  let live = -1;
+  for (const l of locs) {
+    if (l.ignored) continue;
+    live += 1;
+    const i = live;
+    if (i === 5) {
+      await db`update locations set speed_access = 'needs_permission' where installation_id = ${installationId} and location_id = ${l.location_id}`;
+      continue;
+    }
+    const base = [4, 18, 75][i % 3];
+    for (let k = 0; k < 30; k++) {
+      const leadAt = now - (25 + k * 660 + i * 37) * 60_000;
+      const never = k % (6 + (i % 3)) === 0;
+      const reply = (base + ((k * 5) % 23)) * 60_000;
+      rows.push({
+        installation_id: installationId, location_id: l.location_id, contact_id: `${l.location_id}-c${1 + k}`, conversation_id: `${l.location_id}-sp${k}`,
+        lead_at: new Date(leadAt), touch_at: never ? null : new Date(leadAt + reply), touch_user_id: never ? null : TEAM[(k + i) % TEAM.length],
+      });
+    }
+    await db`update locations set speed_access = 'ok', speed_synced_at = now() where installation_id = ${installationId} and location_id = ${l.location_id}`;
+  }
+  for (let i = 0; i < rows.length; i += 400) await db`insert into lead_touches ${db(rows.slice(i, i + 400) as never)}`;
+}
+
 export async function ensureDemo(): Promise<string> {
   const [row] = await sql()`select id from installations where company_id = ${DEMO_COMPANY_ID} and is_demo`;
-  if (row) return row.id as string;
-  return (await seedDemo()).installationId;
+  const id = row ? (row.id as string) : (await seedDemo()).installationId;
+  await ensureSpeedDemo(id).catch(() => undefined);
+  return id;
 }

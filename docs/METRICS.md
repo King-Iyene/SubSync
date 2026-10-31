@@ -89,3 +89,24 @@ velocity, stage dwell time (which will also give per-stage stale thresholds), tr
 An account is "test data" when its name contains test, testing, demo, sample, sandbox or dummy as a whole
 word. The "Hide test accounts" switch removes them from every page. It works on accounts only, not on
 individual deals. Code: `test-data.ts`.
+
+## Speed to lead (Wave 1 #1)
+
+**Lead.** A new contact (created in the last 14 days) that has a conversation. A contact with no conversation is not
+timed: bulk imports would otherwise look like thousands of unanswered leads.
+**Start of the clock.** The earlier of the contact being created and the first inbound message.
+**First touch.** The first outbound message at or after the start that a person sent from the app: an outbound message
+with a user attached and the source `app`. Messages from workflows, campaigns, bulk actions or the API are automation
+and do not stop the clock, unless the account switches on "Count automatic messages as a reply" (off by default).
+**Response time.** First touch minus start. **Target.** Per install, default 15 minutes, set in Settings (1 to 1,440).
+**Hit rate.** Leads answered within the target divided by leads answered within it, answered late, or still waiting past
+it. A lead still inside its target window is not judged yet. Shown only with at least 5 judged leads.
+**Typical first reply and 9 in 10.** The median and 90th percentile of response times, only with at least 5 replies.
+**Waiting now.** No first touch and older than the target. **Who replies fastest.** Median response per person, only
+people with at least 3 replies, and only a named sender (a reply with no user is not a person).
+Limits: the first 100 messages of a conversation are read, so a very long thread could hide an early reply; up to 100
+unanswered leads per account are re-read each sync; leads answered once are never read again.
+Code: `speed-intel.ts` (the rules), `speed-queries.ts` (the screen), `handleSpeed` in the sync engine. Tests:
+`speed-intel.test.ts`, `scripts/check-speed.ts` (recomputes from raw rows). Not yet verified on real data: the
+conversation messages permission has not been approved on the real accounts, so the real sync will record
+"needs permission" until it is. No alert fires yet for a breached lead; that is the next step.

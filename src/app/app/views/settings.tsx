@@ -7,7 +7,7 @@ import { Btn, Card, ErrorBox, inputClass, Loading, PageHeader, timeAgo } from ".
 import { ConnectionsCard } from "./connections";
 import { HealthCard } from "./health-card";
 
-type S = { staleDays: number; dormantDays: number; slaHours: number; appDomain: string; digestEnabled: boolean; customChecklist: string[]; digestHour: number | null; digestTimezone: string | null; brandName: string | null; brandColor: string | null; industryTargets?: boolean; keepTranscripts: boolean };
+type S = { staleDays: number; dormantDays: number; slaHours: number; appDomain: string; digestEnabled: boolean; customChecklist: string[]; digestHour: number | null; digestTimezone: string | null; brandName: string | null; brandColor: string | null; industryTargets?: boolean; keepTranscripts: boolean; speedTargetMinutes: number; countAutomatedTouches: boolean };
 
 export function SettingsView() {
   const api = useApiClient();
@@ -45,7 +45,7 @@ export function SettingsView() {
     try {
       const body: Record<string, unknown> = {
         staleDays: form.staleDays, dormantDays: form.dormantDays, slaHours: form.slaHours, appDomain: form.appDomain,
-        digestEnabled: form.digestEnabled, digestHour: form.digestHour, digestTimezone: form.digestTimezone, brandName: form.brandName, brandColor: form.brandColor, keepTranscripts: form.keepTranscripts,
+        digestEnabled: form.digestEnabled, digestHour: form.digestHour, digestTimezone: form.digestTimezone, brandName: form.brandName, brandColor: form.brandColor, keepTranscripts: form.keepTranscripts, speedTargetMinutes: form.speedTargetMinutes, countAutomatedTouches: form.countAutomatedTouches,
         customChecklist: checklist.split("\n").map((l) => l.trim()).filter(Boolean),
       };
       if (slack.trim()) body.slackWebhookUrl = slack.trim();
@@ -125,6 +125,17 @@ export function SettingsView() {
             <span>Keep full transcripts when a meeting tool sends them. Off by default: only the summary and action items are stored, which is safer for clinics and anyone handling private conversations.</span></label>
         </Card>
         )}
+
+        <Card title="Speed to lead">
+          <p className="mb-3 text-sm text-muted-foreground">How fast a new lead should hear from a person. A lead cools in minutes, so the target is short. Messages from workflows and campaigns are not replies unless you say so.</p>
+          <div className="flex flex-wrap items-end gap-4">
+            <div>
+              <label htmlFor="speed-target" className="mb-1 block text-sm font-medium">Reply target (minutes)</label>
+              <input id="speed-target" type="number" min={1} max={1440} className={`${inputClass} !w-32`} value={form.speedTargetMinutes} onChange={(e) => setForm({ ...form, speedTargetMinutes: Number(e.target.value) })} />
+            </div>
+            <label className="flex items-center gap-2 pb-2 text-sm"><input type="checkbox" className="size-4" checked={form.countAutomatedTouches} onChange={(e) => setForm({ ...form, countAutomatedTouches: e.target.checked })} /> Count automatic messages as a reply</label>
+          </div>
+        </Card>
 
         <Card title="Your name on reports">
           <p className="mb-3 text-sm text-muted-foreground">Shown at the top of printed client reports and quarterly reviews, so what you hand to a client carries your name, not ours.</p>
