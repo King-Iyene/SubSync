@@ -1,7 +1,8 @@
 "use client";
 
 import type { GoFn } from "../nav";
-import { useData } from "../session";
+import { useState } from "react";
+import { useApiClient, useData } from "../session";
 import { Badge, Btn, Card, Empty, ErrorBox, ExtLink, fmtInt, fmtMoney, Loading, PageHeader, Stat, type Tone } from "../ui";
 
 type Change = { today: number; yesterday: number | null; avg7: number | null; vsYesterday: number | null; vsAvg: number | null; unusual: "up" | "down" | null; samples: number };
@@ -44,7 +45,13 @@ const signed = (n: number | null) => (n === null ? "no earlier day" : `${n > 0 ?
 const UP_IS_BAD = new Set(["stale", "unread"]);
 
 export function TodayView({ go }: { go: GoFn }) {
+  const api = useApiClient();
   const { data, error, loading, reload } = useData<Data>("daily");
+  const [syncing, setSyncing] = useState(false);
+  const sync = async () => {
+    setSyncing(true);
+    try { await api.post("sync"); await reload(); } finally { setSyncing(false); }
+  };
   if (loading && !data) return <Loading label="Working out what needs you today..." />;
   if (error) return <ErrorBox error={error} onRetry={reload} />;
   if (!data) return null;
@@ -57,7 +64,7 @@ export function TodayView({ go }: { go: GoFn }) {
       <PageHeader
         title="Today"
         subtitle={`What changed, and what to do first. Every account is compared with its own last week, so a quiet account is not flagged just for being quiet.`}
-        actions={<Badge tone={data.freshness.ok ? "good" : "warn"}>{data.freshness.label}</Badge>}
+        actions={<><Badge tone={data.freshness.ok ? "good" : "warn"}>{data.freshness.label}</Badge><Btn variant="primary" onClick={sync} disabled={syncing}>{syncing ? "Syncing..." : "Sync now"}</Btn></>}
       />
 
       {!data.connection.ok && <p className="mb-4 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">{data.connection.message}</p>}
