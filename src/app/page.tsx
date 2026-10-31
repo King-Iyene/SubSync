@@ -9,7 +9,7 @@ const outcomes = [
 ];
 
 const trust = [
-  "Read-only by default. Nothing changes in a client account without a preview, a typed confirmation and an undo.",
+  "Read-only by default. The one thing SubSync writes on its own is a meeting note on a matched contact, and you can switch that off. Every other change needs a preview, a typed confirmation and an undo.",
   "A client account can only ever see its own data. Another agency's data is never reachable, and this is tested on every release.",
   "A small, clearly listed set of permissions, not hundreds.",
   "Your data is deleted when you uninstall.",

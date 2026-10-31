@@ -175,3 +175,10 @@ Format: date, decision, reason.
 
 - King asked for everything built-but-off to be switched on and for the 184-feature list to be built in batches. Defaults now: only `connections` (provider apps not created) and `ai` (no screen) are off. Rollback is a flag row, not a revert.
 - Batch 1 findings: inbox aging buckets, smart call queues (new leads, hot leads, no-show recovery, stale proposals) and stage dwell already existed, so they were not rebuilt. Built: weekly Monday email (needs `RESEND_API_KEY` and `EMAIL_FROM`; address set in Settings; hourly cron `/api/cron/weekly`), per-person first-reply time and show rate on Team (minimums 3 replies, 5 outcomes), roadmap with voting, dark shell with agency name and colour, per-account client access switches.
+
+## 2026-10-31 (night, King asleep)
+
+- King asked for meeting notes to also be written into the matched contact in the CRM. Built (`meeting-crm.ts`): once per meeting, claimed before writing so repeat deliveries cannot duplicate, capped at 8,000 characters, never throws, setting `push_notes_to_crm` (on by default) in Settings. Brief section 0 says writes only behind a preview; this is the one deliberate exception, on King's explicit instruction. Home page and in-app help wording were corrected to say so.
+- Privacy policy and terms do not yet mention that SubSync writes a meeting note to a contact. A human must review and update them before going Public.
+- Call recordings: not built. A one-off log of call message field names was added so the build uses the real shape. Look for "probe: call message fields" in the production logs after the next sync.
+- Sync queue now runs appointment and speed jobs first, and the cron works for four minutes per run.
