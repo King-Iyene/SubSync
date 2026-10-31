@@ -4,7 +4,7 @@ Read this first when a session restarts. Rules: `docs/RUNBOOK.md` section 0 (one
 
 ## Current stage
 
-**S0.2 Identity, roles and tenant isolation: BUILT AND VERIFIED, waiting for King's PASS or FAIL.** (S0.1 passed.)
+**S0.2 Identity, roles and tenant isolation: PASSED by King (31 Oct 2026). Waiting for NEXT to start S0.3.**
 Evidence: `docs/features/S0.2.md` (S0.1: `docs/features/S0.1.md`). Next stage after PASS and NEXT: **S0.3 White-label hygiene**.
 
 ## Stage list (Milestone M1 first)
@@ -12,7 +12,7 @@ Evidence: `docs/features/S0.2.md` (S0.1: `docs/features/S0.1.md`). Next stage af
 | Stage | Name | Status |
 | --- | --- | --- |
 | S0.1 | Test harness and safety rails | Passed |
-| S0.2 | Identity, roles, tenant isolation | Built, verified, waiting for King |
+| S0.2 | Identity, roles, tenant isolation | Passed |
 | S0.3 | White-label hygiene | Not started |
 | F1 | Numbers truth | Not started |
 | F2 | Speed to lead | Not started |
