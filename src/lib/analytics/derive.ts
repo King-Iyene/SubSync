@@ -5,11 +5,15 @@ import {
   churnRisk, engagementBreakdown, isDormant, scoreBand,
   type ChurnRisk, type ScoreBand, type ScoreBreakdown,
 } from "../scoring.ts";
+import { fmtDuration } from "./speed-intel.ts";
 
 // A win rate built on a handful of deals is noise, so none is shown (or used in an estimate) below this.
 export const MIN_CLOSED_DEALS = 20;
 
 export type AccountRow = {
+  /** New leads from the last two days that no person has replied to within the target, and how long the oldest has waited. */
+  speedWaiting?: number;
+  oldestWaitMinutes?: number | null;
   /** Open deals left out of every dollar figure because they have no value or no owner. */
   excludedOpen?: number;
   locationId: string;
@@ -41,7 +45,7 @@ export type AccountRow = {
   contactsSyncedAt: string | null;
 };
 
-export type AccountSettings = { staleDays: number; dormantDays: number; slaHours: number };
+export type AccountSettings = { staleDays: number; dormantDays: number; slaHours: number; /** Minutes a new lead may wait for a first reply (default 15). */ speedTargetMinutes?: number };
 
 export type DerivedAccount = AccountRow & {
   emailPct: number;
@@ -224,6 +228,17 @@ export function computeAlerts(accounts: DerivedAccount[], domains: DomainStatus[
         dedupeKey: `sla:${loc}`, kind: "sla", severity: a.unanswered >= 5 ? "critical" : "warning", locationId: loc,
         title: `${label(a)} has ${a.unanswered} conversation${a.unanswered === 1 ? "" : "s"} waiting over ${settings.slaHours}h`,
         detail: { unanswered: a.unanswered, slaHours: settings.slaHours },
+      });
+    }
+    // New leads left waiting. Three or more is a pattern, not one missed text; only the last two days count,
+    // because an older lead is not something to rush to any more.
+    if ((a.speedWaiting ?? 0) >= 3) {
+      const n = a.speedWaiting as number;
+      const target = settings.speedTargetMinutes ?? 15;
+      out.push({
+        dedupeKey: `speed:${loc}`, kind: "speed", severity: n >= 8 ? "critical" : "warning", locationId: loc,
+        title: `${label(a)}: ${n} new leads have waited more than ${target} minutes for a reply${a.oldestWaitMinutes ? ` (longest ${fmtDuration(Math.round(a.oldestWaitMinutes * 60))})` : ""}`,
+        detail: { waiting: n, targetMinutes: target, oldestWaitMinutes: a.oldestWaitMinutes ?? null },
       });
     }
     if (a.leadFlowDropPct !== null && !a.dormant) {

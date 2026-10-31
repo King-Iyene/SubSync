@@ -74,8 +74,33 @@ async function main() {
   }
   assert.equal((await call("/api/app/speed?industry=bad!x&hideTest=1", agency)).status, 200);
 
+  // A breach alert: fresh leads nobody has answered raise one alert for the account, with the right count,
+  // and it goes away on its own once they are answered or removed.
+  const target = (await sql()`select l.location_id, l.name from locations l where l.installation_id = ${inst.id} and not l.ignored and l.location_id not in (select location_id from lead_touches where installation_id = ${inst.id} and touch_at is null and lead_at > now() - interval '2 days') order by l.location_id limit 1`)[0];
+  const ids = [0, 1, 2, 3].map((n) => `xtest-speed-${n}`);
+  const cleanup = () => sql()`delete from lead_touches where installation_id = ${inst.id} and conversation_id like 'xtest-speed-%'`;
+  await cleanup();
+  const speedAlerts = async (tok: string) => ((await call("/api/app/alerts", tok)).body.alerts as Array<{ kind: string; locationId: string | null; title: string; severity: string }>).filter((a) => a.kind === "speed");
+  try {
+    assert.equal((await speedAlerts(agency)).filter((a) => a.locationId === target.location_id).length, 0, "no alert before there is a reason");
+    for (const [n, id] of ids.entries()) await sql()`insert into lead_touches (installation_id, location_id, contact_id, conversation_id, lead_at) values (${inst.id}, ${target.location_id}, ${"xtest-c" + n}, ${id}, now() - interval '90 minutes')`;
+    assert.equal((await call("/api/app/sync", agency, { method: "POST", body: "{}" })).status, 200);
+    const raised = (await speedAlerts(agency)).filter((a) => a.locationId === target.location_id);
+    assert.equal(raised.length, 1, "exactly one alert for the account");
+    assert.match(raised[0].title, /4 new leads have waited more than 15 minutes for a reply \(longest 1 h 30 min\)/);
+    assert.equal(raised[0].severity, "warning");
+    await call("/api/app/sync", agency, { method: "POST", body: "{}" });
+    assert.equal((await speedAlerts(agency)).filter((a) => a.locationId === target.location_id).length, 1, "running it again does not duplicate it");
+    assert.ok(!(await speedAlerts(biz.session)).some((a) => a.locationId !== biz.user.activeLocation), "a business never sees another account's alert");
+    await cleanup();
+    await call("/api/app/sync", agency, { method: "POST", body: "{}" });
+    assert.equal((await speedAlerts(agency)).filter((a) => a.locationId === target.location_id).length, 0, "it resolves once the leads are gone");
+  } finally {
+    await cleanup();
+  }
+
   await closeDb();
-  console.log(`speed to lead: numbers match the raw rows (${raw.on_time} on time, ${raw.late_n} late, ${raw.waiting_n} waiting), target is a setting and bad targets are refused, nobody ranked on too few replies, scoped to one account for business and client: ok`);
+  console.log(`speed to lead: numbers match the raw rows (${raw.on_time} on time, ${raw.late_n} late, ${raw.waiting_n} waiting), target is a setting and bad targets are refused, nobody ranked on too few replies, scoped to one account for business and client, breach alert raised once with the right numbers and resolved: ok`);
 }
 
 main().catch((error) => {

@@ -106,6 +106,7 @@ export async function visibleLocationIds(installationId: string, limit: number):
 // ---------------- per-account stats ----------------
 
 export async function accountRows(installationId: string, s: AccountSettings): Promise<AccountRow[]> {
+  const target = s.speedTargetMinutes ?? 15;
   const rows = await sql()`
     with c as (
       select location_id,
@@ -143,6 +144,11 @@ export async function accountRows(installationId: string, s: AccountSettings): P
                            and last_message_at > now() - interval '30 days')::int unanswered,
         max(last_message_at) last_msg_at
       from cached_conversations where installation_id = ${installationId} group by location_id
+    ), sp as (
+      select location_id,
+        count(*) filter (where touch_at is null and lead_at < now() - make_interval(mins => ${target}::int) and lead_at > now() - interval '2 days')::int speed_waiting,
+        extract(epoch from now() - min(lead_at) filter (where touch_at is null and lead_at < now() - make_interval(mins => ${target}::int) and lead_at > now() - interval '2 days')) / 60 oldest_wait_min
+      from lead_touches where installation_id = ${installationId} group by location_id
     )
     select l.location_id, l.name, l.email, l.phone, l.website, l.ignored, l.owner,
       l.calendar_count, l.pipeline_count, l.sync_error, l.contacts_synced_at,
@@ -153,12 +159,14 @@ export async function accountRows(installationId: string, s: AccountSettings): P
       coalesce(o.stale_opps, 0)::int stale_opps, coalesce(o.stale_value, 0)::float8 stale_value,
       coalesce(o.won_count, 0)::int won_count, coalesce(o.lost_count, 0)::int lost_count,
       coalesce(o.won_value, 0)::float8 won_value, coalesce(o.excluded_open, 0)::int excluded_open,
+      coalesce(sp.speed_waiting, 0)::int speed_waiting, sp.oldest_wait_min,
       coalesce(v.unread, 0)::int unread, coalesce(v.unanswered, 0)::int unanswered,
       greatest(c.last_contact_at, o.last_opp_at, v.last_msg_at) last_activity_at
     from locations l
     left join c on c.location_id = l.location_id
     left join o on o.location_id = l.location_id
     left join v on v.location_id = l.location_id
+    left join sp on sp.location_id = l.location_id
     where l.installation_id = ${installationId}
     order by lower(coalesce(l.name, '')), l.location_id`;
 
@@ -184,6 +192,8 @@ export async function accountRows(installationId: string, s: AccountSettings): P
     lostCount: r.lost_count,
     wonValue: r.won_value,
     excludedOpen: r.excluded_open,
+    speedWaiting: r.speed_waiting,
+    oldestWaitMinutes: r.oldest_wait_min === null || r.oldest_wait_min === undefined ? null : Math.round(Number(r.oldest_wait_min)),
     unread: r.unread,
     unanswered: r.unanswered,
     calendars: r.calendar_count,

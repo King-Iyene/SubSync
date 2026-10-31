@@ -109,4 +109,10 @@ unanswered leads per account are re-read each sync; leads answered once are neve
 Code: `speed-intel.ts` (the rules), `speed-queries.ts` (the screen), `handleSpeed` in the sync engine. Tests:
 `speed-intel.test.ts`, `scripts/check-speed.ts` (recomputes from raw rows). Not yet verified on real data: the
 conversation messages permission has not been approved on the real accounts, so the real sync will record
-"needs permission" until it is. No alert fires yet for a breached lead; that is the next step.
+"needs permission" until it is. 
+
+**Breach alert.** One in-app alert per account (Slack too, when connected) when 3 or more new leads from the last two days
+have no person reply past the target: a warning at 3, critical at 8. It names the count, the target and the longest wait,
+is one open alert per account (a rerun never duplicates it) and resolves by itself when the leads are answered. Older
+leads are not alerted on: they are no longer something to rush to. Email delivery is not built (no email service key).
+Tests: `speed-alerts.test.ts`, and `scripts/check-speed.ts` raises, repeats and resolves one end to end.
