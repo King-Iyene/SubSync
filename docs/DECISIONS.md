@@ -157,3 +157,10 @@ Format: date, decision, reason.
 - **Not tested end to end:** the unit tests cover the decision logic (5 tests). The database parts and enforced mode were not run, because there is no database here. Run them with the full suite once credentials are back, then simulate installs with different plan ids before switching to enforced.
 - **Payload fields for `PlanChange` are unconfirmed** (names read from the docs index only). The reader accepts `planId` or `newPlanId`, top level or under `data`. Check against a real event.
 - **Swapping a plan:** `node --env-file=.env.local --import tsx scripts/set-plan.ts <planId> <free|pro>`. Pre-pilot gate steps 3 and 4 are now: run that for the new $9 plan id, then set `ENTITLEMENTS_MODE=enforced` in Vercel (King's click) and run the full suite.
+
+## 2026-10-31 (entitlements applied and tested)
+
+- **Correction to the entry above:** the project's real folder is `C:\Users\KING\OneDrive\Desktop\SubSync` (OneDrive redirects the Desktop). The empty `C:\Users\KING\Desktop\SubSync` seen earlier is a different, empty path, so nothing was lost and `.env.local` was never missing. Work happens in the OneDrive folder.
+- **The entitlements, flags, events and domain migrations are applied to the live database.**
+- **Enforced mode is tested end to end** (`scripts/check-entitlements.ts`, real non-demo installs, simulated plan ids): the free list works, everything else answers 402, re-mapping a plan takes effect at once, an unknown or missing plan id fails closed, a paid account unlocks its agency and a downgrade locks it again, two agencies do not affect each other, the demo stays unlocked. It needs `ENTITLEMENTS_MODE=enforced` on the server, so it is run on its own and is not in the default run: `ENTITLEMENTS_MODE=enforced CHECKS=check-entitlements node --env-file=.env.local scripts/with-dev-server.mjs`.
+- **Production is still in open mode.** The only things left before enforcing are the ones that need the portal: the $9 plan and its plan id, then `set-plan.ts`, then `ENTITLEMENTS_MODE=enforced` in Vercel.

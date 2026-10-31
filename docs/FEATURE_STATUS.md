@@ -43,5 +43,5 @@ connections, appointment insights, two-agency tenant isolation, feature switches
 - Weekly digest email per agency and account owner (Wave 1 #6): the daily brief goes to Slack only; no email service key.
 - White-label UI: agency logo and colours with the SubSync name hidden (Wave 1 #7). Only a business name and colour for printed reports exist.
 - Roadmap with voting and a change log page (Wave 1 #8).
-- Entitlements table, enforced mode, plan swap procedure (section 6).
+- Plan entitlements are built and tested (open by default). Still needed: the $9 plan in the portal, its id mapped, and enforced mode switched on (section 6).
 - Verification of every PRIORITIZE feature against live data and a manual count: blocked on the calendar and users permissions being approved on the real agency, and not yet repeated for the new Overview rules.
