@@ -55,3 +55,24 @@ The `contacts.write` permission that Data cleanup needs stays out while that fea
 
 `scopes.ts` is the single list used for the install link; a unit test pins it. Features that depend on an
 optional scope store `needs_permission` for that account and show a plain banner, never an error.
+
+## Done on 31 Oct 2026: version 2.0.0 published with 12 new optional scopes
+
+King asked for broad access so advanced features can be built on it, including change access, always behind
+verification. In the portal I cloned the live 1.0.0 as a draft, added the scopes below as **Optional**, and
+published it as **2.0.0** (the platform only offers a major bump when scopes are added; a private app goes live
+at once). Existing installs approve the new version once. The install link in `scopes.ts` now asks for the same
+21 scopes, and a unit test pins the list.
+
+New optional read: `conversations/message.readonly` (first human touch, speed-to-lead),
+`conversations/reports.readonly`, `locations/tags.readonly`, `locations/customFields.readonly`,
+`locations/tasks.readonly`, `calendars/groups.readonly`, `calendars/resources.readonly`.
+New optional change: `calendars/events.write` (mark an appointment showed or no-show), `contacts.write`,
+`opportunities.write`, `locations/tags.write`, `locations/tasks.write`.
+
+Deliberately NOT added: sending messages (`conversations/message.write`), editing users, deleting anything,
+and the 165-scope sprawl the brief warns about. Rule for every change scope: show exactly what will change,
+require a typed confirmation, snapshot the old values, allow undo, and refuse when the scope was declined.
+Nothing uses the change scopes yet except Data cleanup (switched off).
+
+The earlier list above that says `marketplace-installer-details.readonly` was not found is unchanged.

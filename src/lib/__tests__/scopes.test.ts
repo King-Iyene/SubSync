@@ -5,14 +5,20 @@ import { buildInstallUrl, GHL_SCOPES } from "../ghl/scopes.ts";
 // The list of permissions an install asks for is pinned here on purpose: adding one makes every installed
 // agency approve again, and asking for one the listing does not have makes the install fail. Changing the
 // list means changing this test too, which makes the change a decision rather than an accident.
-test("the permissions requested are exactly the agreed list, all read-only except one", () => {
+test("the permissions requested are exactly the agreed list", () => {
   assert.deepEqual([...GHL_SCOPES].sort(), [
-    "calendars.readonly", "calendars/events.readonly", "contacts.readonly", "conversations.readonly", "locations.readonly",
-    "oauth.readonly", "oauth.write", "opportunities.readonly", "users.readonly",
-  ]);
+    "calendars.readonly", "calendars/events.readonly", "calendars/events.write", "calendars/groups.readonly", "calendars/resources.readonly",
+    "contacts.readonly", "contacts.write", "conversations.readonly", "conversations/message.readonly", "conversations/reports.readonly",
+    "locations.readonly", "locations/customFields.readonly", "locations/tags.readonly", "locations/tags.write", "locations/tasks.readonly", "locations/tasks.write",
+    "oauth.readonly", "oauth.write", "opportunities.readonly", "opportunities.write", "users.readonly",
+  ].sort());
   assert.equal(new Set(GHL_SCOPES).size, GHL_SCOPES.length, "no duplicates");
-  const writes = GHL_SCOPES.filter((s) => !s.endsWith(".readonly"));
-  assert.deepEqual(writes, ["oauth.write"], "the only non-read permission is the one that mints a per-account token");
+});
+
+test("change access is limited to the agreed few, and nothing can send a message or manage people", () => {
+  const writes = GHL_SCOPES.filter((s) => !s.endsWith(".readonly")).sort();
+  assert.deepEqual(writes, ["calendars/events.write", "contacts.write", "locations/tags.write", "locations/tasks.write", "oauth.write", "opportunities.write"]);
+  assert.ok(!GHL_SCOPES.some((s) => /message\.write|users\.write|conversations\.write/.test(s)), "no sending messages, no editing users");
 });
 
 test("the install link carries every permission and the redirect address", () => {
