@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { safeError } from "@/lib/safe-log";
 import { featureOn } from "@/lib/flags";
 import { fetchZoomParticipants } from "@/lib/connections/oauth";
 import { accessTokenFor, findZoomByHost, ingestMeeting, removeZoomByHost } from "@/lib/connections/queries";
@@ -56,7 +57,7 @@ export async function POST(request: Request) {
     }
     return NextResponse.json({ ok: true, saved });
   } catch (error) {
-    console.error("Handling a Zoom event failed", error instanceof Error ? error.message : "unknown");
+    console.error("Handling a Zoom event failed", safeError(error));
     return NextResponse.json({ error: "Could not save that. Try again." }, { status: 500 });
   }
 }

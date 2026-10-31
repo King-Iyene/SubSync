@@ -154,12 +154,55 @@ async function main() {
     const after = await before(B);
     assert.deepEqual(after, snap, "nothing in the other agency changed");
 
+    // An account user (read-only client view of one account) cannot change anything, share anything, or read settings.
+    const tokenAccountUser = session(A, "client", A.locs[0]);
+    const refused: Array<[string, string, unknown]> = [
+      ["PUT", "/api/app/settings", { staleDays: 5 }], ["POST", "/api/app/audit/share", {}], ["POST", "/api/app/sync", {}],
+      ["PUT", `/api/app/accounts/${A.locs[0]}/flags`, { ignored: true }], ["GET", "/api/app/settings", undefined], ["GET", "/api/app/connections", undefined],
+      ["POST", "/api/app/meetings/hooks", { locationId: A.locs[0] }], ["POST", "/api/app/cleanup/preview", { locationId: A.locs[0], rules: ["name"] }],
+    ];
+    for (const [method, path, body] of refused) {
+      const r = await call(path, tokenAccountUser, { method, body: body === undefined ? undefined : JSON.stringify(body) });
+      assert.equal(r.status, 403, `an account user must be refused ${method} ${path}, got ${r.status}`);
+    }
+
+    // The share link: made from one agency's data it carries none of the other's, hides its own account names, the id
+    // cannot be guessed, and an account user cannot create one.
+    const shareA = await call("/api/app/audit/share", tokenA, { method: "POST", body: "{}" });
+    assert.equal(shareA.status, 200, shareA.text.slice(0, 200));
+    const urlA = JSON.parse(shareA.text).url as string;
+    const idA = urlA.split("/").pop() as string;
+    assert.ok(idA.length >= 32, "the id is long");
+    const pageA = await fetch(`${BASE}/audit/${idA}`);
+    const htmlA = await pageA.text();
+    assert.equal(pageA.status, 200);
+    assert.ok(!htmlA.includes(B.marker), "the other agency's name is not in this agency's shared page");
+    assert.ok(!htmlA.includes(`${A.marker} Location`), "its own account names are scrubbed");
+    const shareB = await call("/api/app/audit/share", tokenB, { method: "POST", body: "{}" });
+    const idB = (JSON.parse(shareB.text).url as string).split("/").pop() as string;
+    assert.notEqual(idA, idB, "every link is unique");
+    assert.ok(!(await (await fetch(`${BASE}/audit/${idB}`)).text()).includes(A.marker), "the other agency's share carries none of this one's data");
+    // An unknown id shows the not-found page and none of a snapshot. (The status can be 200: the page streams before the lookup
+    // finishes in this project's rendering mode; that is recorded as a known soft-404 in docs/features/S0.2.md.)
+    for (const bad of ["Z".repeat(32), "short", idA.slice(0, -1) + (idA.endsWith("A") ? "B" : "A")]) {
+      const res = await fetch(`${BASE}/audit/${bad}`);
+      const html = await res.text();
+      assert.ok(!html.includes("Run your own free audit") && !html.includes("counted") && !html.includes("Stale deal value"), `an unknown share id must show no snapshot (${bad.slice(0, 6)}...)`);
+      assert.ok(res.status === 404 || html.toLowerCase().includes("could not be found") || html.includes("404"), "an unknown id shows the not-found page");
+    }
+
+    // The webhook: unsigned or wrongly signed deliveries change nothing.
+    const body = JSON.stringify({ type: "UNINSTALL", companyId: B.company, webhookId: "xtest-wh-1" });
+    assert.equal((await fetch(`${BASE}/api/webhooks/ghl`, { method: "POST", body })).status, 401, "unsigned");
+    assert.equal((await fetch(`${BASE}/api/webhooks/ghl`, { method: "POST", body, headers: { "x-ghl-signature": "AAAA" } })).status, 401, "wrong signature");
+    assert.deepEqual(await before(B), snap, "a refused webhook changed nothing");
+
     // Public addresses: a delivery for one agency's connection cannot reach the other's data, and a guess finds nothing.
     const guess = await fetch(`${BASE}/api/hooks/fathom/${"Z".repeat(24)}`, { method: "POST", body: "{}" });
     assert.equal(guess.status, 404);
     assert.equal((await fetch(`${BASE}/api/hooks/meeting/mh_${"Z".repeat(43)}`, { method: "POST", body: "{}" })).status, 404);
 
-    console.log(`tenant isolation: two agencies, ${sweeps} cross-reads as agency, business, client and forged sessions, attacks refused, nothing changed: ok`);
+    console.log(`tenant isolation: two agencies, ${sweeps} cross-reads as agency, business, client and forged sessions, attacks refused, account user read-only, share link and webhook safe, nothing changed: ok`);
   } finally {
     await sql()`delete from installations where company_id in ('xtest-agency-a', 'xtest-agency-b')`;
     await closeDb();

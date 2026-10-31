@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { safeError } from "@/lib/safe-log";
 import { businessKey } from "@/lib/access";
 import { sql } from "@/lib/db";
 import { getInstallation, purgeInstallation, purgeLocationData } from "@/lib/ghl/installations";
@@ -37,7 +38,7 @@ export async function POST(request: Request) {
     if ((event.type === "PlanChange" || event.type === "AppInstall") && event.companyId) {
       const target = (event.locationId ? await getInstallation(businessKey(event.locationId)) : null) ?? (await getInstallation(event.companyId));
       // Recording the plan must never stop an install from syncing (the table may not exist yet).
-      if (target) await recordPlanEvent(target.id, parsed).catch((e) => console.error("Recording a plan failed", e instanceof Error ? e.message : "unknown"));
+      if (target) await recordPlanEvent(target.id, parsed).catch((e) => console.error("Recording a plan failed", safeError(e)));
       if (event.type === "PlanChange") return NextResponse.json({ ok: true });
     }
     if (action.kind === "ignore" || !event.companyId) return NextResponse.json({ ok: true });
@@ -63,7 +64,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true });
   } catch (error) {
     // A non-2xx makes the platform retry, which is what we want for transient failures.
-    console.error("Webhook handling failed", { type: event.type, message: error instanceof Error ? error.message : "unknown" });
+    console.error("Webhook handling failed", { type: event.type, message: safeError(error) });
     return NextResponse.json({ error: "Temporary failure" }, { status: 500 });
   }
 }

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { safeError } from "@/lib/safe-log";
 import { parseMeeting } from "@/lib/analytics/meeting-intel";
 import { featureOn } from "@/lib/flags";
 import { findFathomByKey, ingestMeeting } from "@/lib/connections/queries";
@@ -43,7 +44,7 @@ export async function POST(request: Request, ctx: { params: Promise<{ key: strin
     const result = await ingestMeeting(conn, meeting, externalId);
     return NextResponse.json({ ok: true, saved: result.saved, reason: result.reason ?? null });
   } catch (error) {
-    console.error("Saving a Fathom meeting failed", error instanceof Error ? error.message : "unknown");
+    console.error("Saving a Fathom meeting failed", safeError(error));
     return NextResponse.json({ error: "Could not save that. Try again." }, { status: 500 });
   }
 }

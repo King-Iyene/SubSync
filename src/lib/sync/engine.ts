@@ -1,4 +1,5 @@
 import { isBusinessKey, locationOfBusinessKey } from "../access";
+import { safeError } from "../safe-log";
 import { maintenanceOn } from "../runtime-guards";
 import { refreshInsights } from "../analytics/service";
 import { sql } from "../db";
@@ -356,7 +357,7 @@ async function handleAppointments(job: Job): Promise<Outcome> {
     }
   } catch (error) {
     usersAccess = isPermissionError(error) ? "needs_permission" : "error";
-    if (usersAccess === "error") console.error("Reading team names failed", error instanceof Error ? error.message : "unknown");
+    if (usersAccess === "error") console.error("Reading team names failed", safeError(error));
   }
 
   const now = Date.now();
@@ -378,7 +379,7 @@ async function handleAppointments(job: Job): Promise<Outcome> {
     }
   } catch (error) {
     access = isPermissionError(error) ? "needs_permission" : "error";
-    if (access === "error") console.error("Reading appointments failed", error instanceof Error ? error.message : "unknown");
+    if (access === "error") console.error("Reading appointments failed", safeError(error));
   }
 
   if (access === "ok") {
@@ -450,7 +451,7 @@ async function handleSpeed(job: Job): Promise<Outcome> {
         on conflict (installation_id, location_id, conversation_id) do update set lead_at = excluded.lead_at, touch_at = excluded.touch_at, touch_user_id = excluded.touch_user_id, checked_at = now()`;
     } catch (error) {
       if (isPermissionError(error)) { access = "needs_permission"; break; }
-      console.error("Reading a conversation failed", error instanceof Error ? error.message : "unknown");
+      console.error("Reading a conversation failed", safeError(error));
     }
   }
   await db`
@@ -508,7 +509,7 @@ async function claimJob(): Promise<Job | null> {
 }
 
 function safeMessage(error: unknown): string {
-  return (error instanceof Error ? error.message : "Unknown error").slice(0, 300);
+  return safeError(error);
 }
 
 export type SliceResult = { jobs: number; failed: number; moreWork: boolean };

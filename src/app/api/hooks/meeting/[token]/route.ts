@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { safeError } from "@/lib/safe-log";
 import { parseMeeting } from "@/lib/analytics/meeting-intel";
 import { featureOn } from "@/lib/flags";
 import { MAX_PER_HOUR, recentCount, recordMeeting, resolveHook } from "@/lib/analytics/meeting-queries";
@@ -33,7 +34,7 @@ export async function POST(request: Request, ctx: { params: Promise<{ token: str
     const saved = await recordMeeting(hook, meeting);
     return NextResponse.json({ ok: true, matchedContact: saved.matched });
   } catch (error) {
-    console.error("Saving a meeting failed", error instanceof Error ? error.message : "unknown");
+    console.error("Saving a meeting failed", safeError(error));
     return NextResponse.json({ error: "Could not save that. Try again." }, { status: 500 });
   }
 }

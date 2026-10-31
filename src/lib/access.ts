@@ -8,6 +8,8 @@
 //   client   - a client's staff opening the app inside their own account because their agency
 //              switched it on. A read-only view of that one account.
 
+import type { Identity } from "./identity.ts";
+
 export type AccessKind = "agency" | "business" | "client";
 
 export const BUSINESS_PREFIX = "loc:";
@@ -61,6 +63,20 @@ export async function decideAccess(who: Who, lookups: Lookups): Promise<Decision
   }
 
   return { ok: false, status: 403, installed: false, message: "This user type cannot open SubSync." };
+}
+
+// ---------------- role rules (CLAUDE.md 4.1) ----------------
+
+const STAFF_MESSAGE =
+  "Your agency administrator needs to give you access to SubSync. Until your access to each client account can be verified, SubSync shows nothing to staff accounts.";
+
+// The decision for a verified identity. Agency staff are refused (default deny: their access to each client account cannot
+// be verified yet). An account user is always read-only, even when their business installed the app.
+export async function decideForIdentity(identity: Identity, lookups: Lookups): Promise<Decision> {
+  if (identity.role === "agency_staff") return { ok: false, status: 403, installed: false, message: STAFF_MESSAGE };
+  const decision = await decideAccess({ type: identity.userType, companyId: identity.companyId, activeLocation: identity.activeLocation }, lookups);
+  if (decision.ok && identity.role === "account_user" && decision.kind === "business") return { ...decision, kind: "client" };
+  return decision;
 }
 
 // ---------------- route policy ----------------

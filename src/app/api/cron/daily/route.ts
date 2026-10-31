@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { safeError } from "@/lib/safe-log";
 import { maintenanceOn } from "@/lib/runtime-guards";
 import { buildDailyDigest } from "@/lib/analytics/digest-service";
 import { digestText, dueNow, localParts } from "@/lib/analytics/digest-intel";
@@ -39,12 +40,12 @@ export async function GET(request: Request) {
           sent++;
         }
       } catch (error) {
-        console.error("Daily brief failed for one agency", error instanceof Error ? error.message : "unknown");
+        console.error("Daily brief failed for one agency", safeError(error));
       }
     }
     return NextResponse.json({ agencies: rows.length, sent });
   } catch (error) {
-    console.error("Cron daily failed", error instanceof Error ? error.message : "unknown");
+    console.error("Cron daily failed", safeError(error));
     return NextResponse.json({ error: "Daily brief failed" }, { status: 500 });
   }
 }

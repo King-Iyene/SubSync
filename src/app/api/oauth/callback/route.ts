@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { safeError } from "@/lib/safe-log";
 import { exchangeCode, GhlError } from "@/lib/ghl/client";
 import { saveInstallation } from "@/lib/ghl/installations";
 import { enqueueFullSync, runSlice } from "@/lib/sync/engine";
@@ -20,15 +21,15 @@ export async function GET(request: Request) {
       await enqueueFullSync(installationId);
       await runSlice(15_000);
     } catch (error) {
-      console.error("Initial sync did not start", error instanceof Error ? error.message : "unknown error");
+      console.error("Initial sync did not start", safeError(error));
     }
     return done("/installed");
   } catch (error) {
     // Log what failed without echoing tokens, codes or request bodies.
     if (error instanceof GhlError) {
-      console.error("OAuth code exchange failed", { status: error.status, detail: error.detail });
+      console.error("OAuth code exchange failed", { status: error.status, detail: safeError(new Error(typeof error.detail === "string" ? error.detail : "see status")) });
     } else {
-      console.error("Install failed", error instanceof Error ? error.message : "unknown error");
+      console.error("Install failed", safeError(error));
     }
     return done("/installed/error");
   }

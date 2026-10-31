@@ -1,4 +1,5 @@
 import { sql } from "../db";
+import { safeError } from "../safe-log";
 import { planChanges, summarise, type ContactLite, type Params } from "./cleanup-intel";
 import type { ChangeRow, Outcome, Writer } from "./cleanup-writer";
 
@@ -94,7 +95,7 @@ async function work(installationId: string, run: RunRow, mode: "apply" | "undo",
       try {
         outcome = mode === "apply" ? await writer.apply(change) : await writer.revert(change);
       } catch (error) {
-        outcome = { result: "failed", detail: error instanceof Error ? error.message.slice(0, 200) : "Unknown error" };
+        outcome = { result: "failed", detail: safeError(error) };
       }
       if (outcome.result === "permission") { permissionStop = true; break; }
       const status = outcome.result === "applied" ? (mode === "apply" ? "applied" : "undone") : outcome.result === "skipped" ? "skipped" : "failed";

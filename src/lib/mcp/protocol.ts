@@ -1,5 +1,6 @@
 // Minimal Model Context Protocol server over HTTP (JSON-RPC 2.0, one request per POST).
 // Pure protocol handling with injected tools, so it is unit tested without a database.
+import { safeError } from "../safe-log.ts";
 
 export type ToolDef = {
   name: string;
@@ -50,7 +51,7 @@ export async function handleRpc(body: unknown, tools: ToolDef[], serverVersion =
         return result(req.id, { content: [{ type: "text", text: JSON.stringify(out, null, 2) }] });
       } catch (e) {
         // Tool failures are reported to the model, not as protocol errors.
-        return result(req.id, { isError: true, content: [{ type: "text", text: e instanceof Error ? e.message : "Tool failed" }] });
+        return result(req.id, { isError: true, content: [{ type: "text", text: e instanceof Error ? safeError(e) : "Tool failed" }] });
       }
     }
     default:

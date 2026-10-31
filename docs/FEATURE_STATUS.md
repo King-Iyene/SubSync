@@ -70,3 +70,15 @@ connections, appointment insights, two-agency tenant isolation, feature switches
 | New features default off (guard test) | Built | Unit test |
 | Golden dataset (speed) | Built | 4 unit tests |
 | Phone and tablet layout fix (wide tables) | Built | Browser tests on 5 pages |
+
+## Runbook stage S0.2 (31 Oct 2026)
+
+| Item | Status | Tested |
+| --- | --- | --- |
+| Identity from the verified SSO payload, five roles | Built | Unit tests (all roles and edge cases) and sign-in route tests with fixtures; not yet with real users in the CRM |
+| Agency staff refused (default deny until Users API check) | Built | Unit and route tests; live check is King's check 4 |
+| Account user read-only | Built | Unit, route and 9 attack tests |
+| Tenant isolation, two agencies | Built | 384 cross-reads plus share link and webhook attacks, all refused |
+| Uninstall and "delete my data" purge every tenant table | Built | Real database, fixture company; schema-drift test |
+| Route guard registry and `docs/TENANCY.md` | Built | Test fails on any unlisted route |
+| Safe logging, bundle scan, history scan | Built | Scripts green; gitleaks not used (not installed) |

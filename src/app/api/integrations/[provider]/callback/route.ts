@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { safeError } from "@/lib/safe-log";
 import { completeSignIn, NAMES } from "@/lib/connections/flow";
 import { featureOn } from "@/lib/flags";
 import { isProvider, verifyState } from "@/lib/connections/state";
@@ -32,7 +33,7 @@ export async function GET(request: Request, ctx: { params: Promise<{ provider: s
     const done = await completeSignIn(provider, code, state);
     return done.ok ? page(true, `${NAMES[provider]} connected`, done.message, provider) : page(false, `${NAMES[provider]} was not connected`, done.error, provider);
   } catch (error) {
-    console.error("Connecting failed", provider, error instanceof Error ? error.message : "unknown");
+    console.error("Connecting failed", provider, safeError(error));
     return page(false, `${NAMES[provider]} was not connected`, "Something went wrong on our side. Nothing was changed. Try again in a moment.", provider);
   }
 }

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { safeError } from "@/lib/safe-log";
 import { sql } from "@/lib/db";
 import { sendDigest } from "@/lib/analytics/service";
 
@@ -19,7 +20,7 @@ export async function GET(request: Request) {
     for (const r of rows) if (await sendDigest(r.id as string, r.label as string)) sent++;
     return NextResponse.json({ agencies: rows.length, sent });
   } catch (error) {
-    console.error("Cron digest failed", error instanceof Error ? error.message : "unknown");
+    console.error("Cron digest failed", safeError(error));
     return NextResponse.json({ error: "Digest failed" }, { status: 500 });
   }
 }

@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
-import { decideAccess, type AccessKind } from "@/lib/access";
+import { decideForIdentity, type AccessKind } from "@/lib/access";
+import { deriveIdentity } from "@/lib/identity";
+import { logIdentity } from "@/lib/identity-log";
 import { demoEnabled } from "@/lib/api/auth";
 import { captureWhitelabelDomain, getSettings } from "@/lib/analytics/queries";
 import { resolveEntitlements } from "@/lib/flags";
@@ -52,15 +54,22 @@ export async function POST(request: Request) {
   }
 
   let user;
+  let identity;
   try {
-    user = parseSsoUser(decryptSsoPayload(body.payload, sharedSecret));
+    const decrypted = decryptSsoPayload(body.payload, sharedSecret);
+    user = parseSsoUser(decrypted);
+    identity = deriveIdentity(decrypted);
   } catch {
     return NextResponse.json({ error: "Could not verify the user" }, { status: 401 });
+  }
+  if (!identity) {
+    await logIdentity(null, null, "bad_payload");
+    return NextResponse.json({ error: "This user type cannot open SubSync." }, { status: 403 });
   }
 
   let decision;
   try {
-    decision = await decideAccess(user, {
+    decision = await decideForIdentity(identity, {
       agencyInstalled: async (companyId) => (await getInstallation(companyId)) !== null,
       businessInstalled,
       clientViewOn,
@@ -69,6 +78,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Could not reach the database. Please refresh." }, { status: 503 });
   }
   if (!decision.ok) {
+    const known = identity.companyId ? await getInstallation(identity.companyId).catch(() => null) : null;
+    await logIdentity(known?.id ?? null, identity, decision.status === 200 ? "not_installed" : "denied");
     // "Not installed" is a normal first-run state the page explains; everything else is a refusal.
     if (decision.status === 200) return NextResponse.json({ user, installed: false });
     return NextResponse.json({ error: decision.message }, { status: 403 });
@@ -80,7 +91,11 @@ export async function POST(request: Request) {
   } catch {
     return NextResponse.json({ error: "Could not reach the database. Please refresh." }, { status: 503 });
   }
-  if (!installation) return NextResponse.json({ user, installed: false });
+  if (!installation) {
+    await logIdentity(null, identity, "not_installed");
+    return NextResponse.json({ user, installed: false });
+  }
+  await logIdentity(installation.id, identity, "ok");
   // An agency that resells the platform under its own domain gets links on that domain.
   if (user.whitelabelDomain) await captureWhitelabelDomain(installation.id, user.whitelabelDomain).catch(() => undefined);
 

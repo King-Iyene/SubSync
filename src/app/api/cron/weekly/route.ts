@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { safeError } from "@/lib/safe-log";
 import { maintenanceOn } from "@/lib/runtime-guards";
 import { buildDailyDigest } from "@/lib/analytics/digest-service";
 import { weekFacts, weeklyDue, weeklyEmail } from "@/lib/analytics/weekly-email";
@@ -58,12 +59,12 @@ export async function GET(request: Request) {
           sent++;
         }
       } catch (error) {
-        console.error("Weekly email failed for one agency", error instanceof Error ? error.message : "unknown");
+        console.error("Weekly email failed for one agency", safeError(error));
       }
     }
     return NextResponse.json({ agencies: rows.length, sent });
   } catch (error) {
-    console.error("Cron weekly failed", error instanceof Error ? error.message : "unknown");
+    console.error("Cron weekly failed", safeError(error));
     return NextResponse.json({ error: "Weekly email failed" }, { status: 500 });
   }
 }

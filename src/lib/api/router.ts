@@ -1,4 +1,5 @@
 import { sql } from "../db";
+import { safeError } from "../safe-log";
 import { buildDigest, onboardingChecklist, toCsv, type DerivedAccount } from "../analytics/derive";
 import {
   allManualTasks, dismissAlert, domainCandidates, duplicateGroups, inbox, listAlerts, listDomainChecks, manualTasks, metricsTrend,
@@ -1462,7 +1463,7 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
     }
     return json({ error: "Not found" }, 404);
   } catch (error) {
-    console.error("API error", { path: segments.join("/"), message: error instanceof Error ? error.message : "unknown" });
+    console.error("API error", { path: segments.join("/"), message: safeError(error) });
     return json({ error: "Something went wrong. Please try again." }, 500);
   }
 }

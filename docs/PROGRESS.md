@@ -4,15 +4,15 @@ Read this first when a session restarts. Rules: `docs/RUNBOOK.md` section 0 (one
 
 ## Current stage
 
-**S0.1 Test harness and safety rails: BUILT AND VERIFIED, waiting for King's PASS or FAIL.**
-Evidence: `docs/features/S0.1.md`. Next stage after PASS and NEXT: **S0.2 Identity, roles and tenant isolation**.
+**S0.2 Identity, roles and tenant isolation: BUILT AND VERIFIED, waiting for King's PASS or FAIL.** (S0.1 passed.)
+Evidence: `docs/features/S0.2.md` (S0.1: `docs/features/S0.1.md`). Next stage after PASS and NEXT: **S0.3 White-label hygiene**.
 
 ## Stage list (Milestone M1 first)
 
 | Stage | Name | Status |
 | --- | --- | --- |
-| S0.1 | Test harness and safety rails | Built, verified, waiting for King |
-| S0.2 | Identity, roles, tenant isolation | Not started |
+| S0.1 | Test harness and safety rails | Passed |
+| S0.2 | Identity, roles, tenant isolation | Built, verified, waiting for King |
 | S0.3 | White-label hygiene | Not started |
 | F1 | Numbers truth | Not started |
 | F2 | Speed to lead | Not started |
@@ -33,7 +33,7 @@ Evidence: `docs/features/S0.1.md`. Next stage after PASS and NEXT: **S0.2 Identi
 
 ## Facts a fresh session needs
 
-- Run everything with `npm run verify` (typecheck, lint, build, 283 Node tests, 18 Vitest tests) and `npm run e2e` (24 browser tests: 8 tests at 3 widths).
+- Run everything with `npm run verify` (typecheck, lint, build, 283 Node tests, 78 Vitest tests, plus a build-output secret scan) and `npm run e2e` (24 browser tests: 8 tests at 3 widths).
 - Run `npx next build` before every push; a failed Vercel build keeps the last good deploy live silently.
 - Never run two test runs at once; they fight over port 3100 and the `.next` folder.
 - The demo login works only with `DEMO_MODE=true` and never when `NODE_ENV` or `VERCEL_ENV` is `production`. `APP_MODE=maintenance` is the kill switch.

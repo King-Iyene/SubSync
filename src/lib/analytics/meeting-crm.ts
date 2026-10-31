@@ -1,4 +1,5 @@
 import { GHL_API } from "../ghl/client";
+import { safeError } from "../safe-log";
 import { ghlFetch } from "../ghl/http";
 import { sql } from "../db";
 import { locationAccessToken } from "../sync/engine";
@@ -44,7 +45,7 @@ export async function pushMeetingToCrm(meetingId: string): Promise<"saved" | "sk
     await db`update meeting_notes set crm_note_id = ${json.note?.id ?? json.id ?? "saved"}, crm_note_status = 'saved' where id = ${meetingId}`;
     return "saved";
   } catch (error) {
-    console.error("Writing a meeting note to the CRM failed", error instanceof Error ? error.message : "unknown");
+    console.error("Writing a meeting note to the CRM failed", safeError(error));
     await db`update meeting_notes set crm_note_status = 'failed' where id = ${meetingId} and crm_note_id is null`.catch(() => undefined);
     return "failed";
   }

@@ -1,4 +1,5 @@
 import { decryptSecret, encryptSecret } from "../crypto";
+import { LOCATION_DELETE, SYNCED_DELETE, UNINSTALL_DELETE } from "../tenant-tables";
 import { sql } from "../db";
 import { businessKey, isBusinessKey } from "../access";
 import { normalisePlan, planFromMarketplaceId, type Plan } from "../entitlements";
@@ -101,20 +102,9 @@ export async function setPlan(installationId: string, plan: Plan): Promise<void>
 export async function purgeLocationData(installationId: string, locationId: string): Promise<void> {
   const db = sql();
   await db.begin(async (tx) => {
-    await tx`delete from cached_contacts where installation_id = ${installationId} and location_id = ${locationId}`;
-    await tx`delete from cached_opportunities where installation_id = ${installationId} and location_id = ${locationId}`;
-    await tx`delete from cached_conversations where installation_id = ${installationId} and location_id = ${locationId}`;
-    await tx`delete from pipelines where installation_id = ${installationId} and location_id = ${locationId}`;
-    await tx`delete from account_metrics_daily where installation_id = ${installationId} and location_id = ${locationId}`;
-    await tx`delete from alerts where installation_id = ${installationId} and location_id = ${locationId}`;
-    await tx`delete from domain_checks where installation_id = ${installationId} and location_id = ${locationId}`;
-    await tx`delete from onboarding_tasks where installation_id = ${installationId} and location_id = ${locationId}`;
-    await tx`delete from deal_events where installation_id = ${installationId} and location_id = ${locationId}`;
-    await tx`delete from cached_appointments where installation_id = ${installationId} and location_id = ${locationId}`;
-    await tx`delete from call_outcomes where installation_id = ${installationId} and location_id = ${locationId}`;
-    await tx`delete from account_profiles where installation_id = ${installationId} and location_id = ${locationId}`;
-    await tx`delete from sync_jobs where installation_id = ${installationId} and location_id = ${locationId}`;
-    await tx`delete from locations where installation_id = ${installationId} and location_id = ${locationId}`;
+    for (const table of LOCATION_DELETE) {
+      await tx`delete from ${tx(table)} where installation_id = ${installationId} and location_id = ${locationId}`;
+    }
   });
 }
 
@@ -122,17 +112,15 @@ export async function purgeLocationData(installationId: string, locationId: stri
 // app keeps working and the next sync starts from scratch); all copied customer data goes.
 export async function purgeSyncedData(installationId: string): Promise<void> {
   await sql().begin(async (tx) => {
-    for (const table of [
-      "cached_contacts", "cached_opportunities", "cached_conversations", "pipelines",
-      "account_metrics_daily", "alerts", "domain_checks", "onboarding_tasks", "deal_events", "call_outcomes", "cached_appointments", "sync_jobs", "locations",
-    ]) {
+    for (const table of SYNCED_DELETE) {
       await tx`delete from ${tx(table)} where installation_id = ${installationId}`;
     }
   });
 }
 
 // The agency uninstalled the app: delete tokens at once and purge all cached data. The
-// installation row is kept (marked uninstalled) so a reinstall starts clean.
+// installation row is kept (marked uninstalled) so a reinstall starts clean. What is kept, and why,
+// is written in src/lib/tenant-tables.ts.
 export async function purgeInstallation(companyId: string): Promise<void> {
   const db = sql();
   await db.begin(async (tx) => {
@@ -141,14 +129,9 @@ export async function purgeInstallation(companyId: string): Promise<void> {
       set access_token_enc = null, refresh_token_enc = null, token_expires_at = null, uninstalled_at = now()
       where company_id = ${companyId} returning id`;
     if (!row) return;
-    for (const table of [
-      "cached_contacts", "cached_opportunities", "cached_conversations", "pipelines",
-      "account_metrics_daily", "alerts", "domain_checks", "onboarding_tasks", "deal_events", "call_outcomes", "call_lists", "cached_appointments",
-      "account_profiles", "goals", "annotations", "usage_events", "team_names", "report_templates", "sync_jobs", "locations",
-    ]) {
+    for (const table of UNINSTALL_DELETE) {
       await tx`delete from ${tx(table)} where installation_id = ${row.id}`;
     }
-    await tx`delete from settings where installation_id = ${row.id}`;
   });
 }
 

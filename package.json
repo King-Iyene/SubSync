@@ -10,7 +10,9 @@
     "test": "node --test src/lib/__tests__/",
     "test:unit": "vitest run",
     "e2e": "playwright test",
-    "verify": "next typegen && tsc --noEmit && eslint && next build && node --test src/lib/__tests__/ && vitest run",
+    "check:bundle": "node scripts/check-bundle.mjs",
+    "check:history": "node scripts/check-history.mjs",
+    "verify": "next typegen && tsc --noEmit && eslint && next build && node scripts/check-bundle.mjs && node --test src/lib/__tests__/ && vitest run",
     "seed:demo": "node --env-file=.env.local --import tsx scripts/seed-demo.ts",
     "check:db": "node --env-file=.env.local --import tsx scripts/check-queries.ts",
     "check:api": "node --env-file=.env.local --import tsx scripts/check-api.ts"

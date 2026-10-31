@@ -208,3 +208,13 @@ Format: date, decision, reason.
 - Installed Vitest with `--legacy-peer-deps` (peer conflict on `@types/node`). To be resolved by upgrading `@types/node` to 22 or later.
 
 - (S0.1 incident) First push failed on Vercel: dependency peer conflict hidden by `--legacy-peer-deps`. Fixed by upgrading `@types/node` to 24. Rule added: any stage that changes dependencies must pass `npm install --dry-run` (no flags) before pushing.
+
+## 2026-10-31 (runbook stage S0.2)
+
+- Role comes only from the decrypted SSO payload (`deriveIdentity`); five roles. Reason: runbook S0.2 and CLAUDE.md 4.1.
+- Agency staff are refused until the Users API can prove which accounts they may open. Reason: default deny; showing every account was a cross-tenant leak inside one agency. Cost: pilot agencies with staff need the owner to open it first.
+- Account users get the read-only client session even when their business installed the app. Reason: brief 4.1 (no settings or plan information).
+- One list of tenant tables (`src/lib/tenant-tables.ts`) drives uninstall and delete; a schema-drift test fails when a table is unclassified. Kept on uninstall: `audit_log`, `install_plans`, `identity_log` (no customer contacts, messages or credentials).
+- Errors are logged through `safeError`, which strips row values, emails, phone numbers and token-like strings.
+- Unknown share ids render not-found content with HTTP 200 (soft 404). Accepted for now; no data leaks. Revisit in F6.
+- gitleaks is not installed; a value search plus shape search over the full history is used instead. Installing it needs King's yes.

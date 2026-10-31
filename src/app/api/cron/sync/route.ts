@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { safeError } from "@/lib/safe-log";
 import { maintenanceOn } from "@/lib/runtime-guards";
 import { sql } from "@/lib/db";
 import { runSlice, scheduleDailyRefresh, scheduleFastRefresh } from "@/lib/sync/engine";
@@ -21,7 +22,7 @@ export async function GET(request: Request) {
     await sql()`delete from webhook_events where received_at < now() - interval '3 days'`;
     return NextResponse.json({ scheduled, ...slice });
   } catch (error) {
-    console.error("Cron sync failed", error instanceof Error ? error.message : "unknown");
+    console.error("Cron sync failed", safeError(error));
     return NextResponse.json({ error: "Sync failed" }, { status: 500 });
   }
 }
