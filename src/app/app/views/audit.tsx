@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useData } from "../session";
+import { useApiClient, useData } from "../session";
 import type { GoFn } from "../nav";
 import { Badge, Btn, Card, Empty, ErrorBox, fmtMoney, Loading, PageHeader, Stat, type Tone } from "../ui";
 
@@ -24,11 +24,19 @@ const label: Record<Finding["severity"], string> = { critical: "Fix first", warn
 // from deals is labelled a fact; money inferred from a win rate is labelled an estimate and kept apart.
 export function AuditView({ go }: { go: GoFn }) {
   const { data, error, loading, reload } = useData<Data>("audit");
+  const api = useApiClient();
   const [copied, setCopied] = useState(false);
+  const [link, setLink] = useState<string | null>(null);
+  const [sharing, setSharing] = useState(false);
   if (loading && !data) return <Loading label="Auditing your accounts..." />;
   if (error) return <ErrorBox error={error} onRetry={reload} />;
   if (!data) return null;
   const a = data.audit;
+
+  const share = async () => {
+    setSharing(true);
+    try { setLink((await api.post<{ url: string }>("audit/share")).url); } catch { setLink("Could not create a link. Try again."); } finally { setSharing(false); }
+  };
 
   const copy = async () => {
     try {
@@ -45,8 +53,14 @@ export function AuditView({ go }: { go: GoFn }) {
       <PageHeader
         title="Account audit"
         subtitle={a.headline}
-        actions={<><Btn onClick={() => window.print()}>Print</Btn><Btn variant="primary" onClick={copy}>{copied ? "Copied" : "Copy summary"}</Btn></>}
+        actions={<><Btn onClick={share} disabled={sharing}>{sharing ? "Creating link..." : "Share link"}</Btn><Btn onClick={() => window.print()}>Print</Btn><Btn variant="primary" onClick={copy}>{copied ? "Copied" : "Copy summary"}</Btn></>}
       />
+
+      {link && (
+        <p className="mb-4 break-all rounded-xl border border-primary/40 bg-primary/5 px-4 py-3 text-sm" role="status">
+          {link.startsWith("http") ? <>Share this link. It shows totals and finding titles only, no account names, and expires in 30 days: <a className="font-medium underline" href={link} target="_blank" rel="noreferrer">{link}</a></> : link}
+        </p>
+      )}
 
       <div className="grid gap-3 sm:grid-cols-2">
         <Stat label="Stale deal value" value={fmtMoney(a.staleDollars)} tone={a.staleDollars > 0 ? "warn" : undefined} sub="Fact: counted from open deals that have not moved" />

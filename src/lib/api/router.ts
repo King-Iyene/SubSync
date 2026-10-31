@@ -34,6 +34,8 @@ import { appointmentInsights } from "../analytics/appointment-insight-queries";
 import { auditSummary, buildAudit } from "../analytics/audit-intel";
 import { speedView } from "../analytics/speed-queries";
 import { CHANGELOG, ROADMAP } from "../roadmap";
+import { buildSharePayload } from "../analytics/share-intel";
+import { randomBytes } from "node:crypto";
 import { emailConfigured } from "../email";
 import { validEmail } from "../analytics/weekly-email";
 import { appointmentView } from "../analytics/appointment-queries";
@@ -177,7 +179,7 @@ async function overview(ctx: Ctx) {
 }
 
 // The instant audit: what is wrong right now, what it costs, and where to start.
-async function auditViewData(ctx: Ctx) {
+async function computeAudit(ctx: Ctx) {
   const { settings, accounts } = await accountsFor(ctx);
   const live = accounts.filter((a) => !a.ignored);
   const v = await appointmentView(ctx.installationId, await allowedIds(ctx));
@@ -190,7 +192,22 @@ async function auditViewData(ctx: Ctx) {
     unanswered: a.unanswered, winRate: a.winRate, avgDealValue: a.avgDealValue, completenessPct: a.completenessPct, contacts: a.contacts,
   })), appts);
   const who = settings.brandName ?? (ctx.limitTo ? "Your business" : "Your agency");
+  return { audit, who, names: live.map((a) => a.name ?? "").filter(Boolean) };
+}
+
+async function auditViewData(ctx: Ctx) {
+  const { audit, who } = await computeAudit(ctx);
   return json({ audit, summary: auditSummary(audit, who) });
+}
+
+// A snapshot of the audit someone can send on: totals and finding titles only, account names scrubbed, expires in 30 days.
+async function auditShare(ctx: Ctx) {
+  if (ctx.demo) return json({ error: "Sharing is not available in the demo" }, 400);
+  const { audit, who, names } = await computeAudit(ctx);
+  const id = randomBytes(24).toString("base64url");
+  await sql()`insert into shared_audits (installation_id, id, payload) values (${ctx.installationId}, ${id}, ${sql().json(buildSharePayload(audit, who, names) as never)})`;
+  const origin = (process.env.NEXT_PUBLIC_APP_URL ?? ctx.url.origin).replace(/\/+$/, "");
+  return json({ url: `${origin}/audit/${id}`, expiresInDays: 30 });
 }
 
 // How fast new leads get a first reply from a person.
@@ -1401,6 +1418,7 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
     if (method === "POST") {
       if (a === "email" && b === "check") return await emailCheck(ctx);
       if (a === "usage" && !b) return await usagePing(ctx);
+      if (a === "audit" && b === "share") return await auditShare(ctx);
       if (a === "roadmap" && !b) return await roadmapVote(ctx);
       if (a === "cleanup" && b === "preview") return await cleanupPreview(ctx);
       if (a === "cleanup" && b && c === "apply") return await cleanupWork(ctx, b, "apply");
