@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { LeadCostCalculator } from "@/components/lead-cost-calculator";
 import { ProfitCalculator } from "@/components/profit-calculator";
 
 const outcomes = [
@@ -51,6 +52,12 @@ export default function Home() {
               <p className="mt-2 text-sm leading-6 text-white/70">{o.body}</p>
             </div>
           ))}
+        </section>
+
+        <section id="lead-cost" className="space-y-5">
+          <h2 className="text-3xl font-semibold tracking-tight">What slow replies cost you</h2>
+          <p className="max-w-2xl text-white/70">A lead that waits cools fast. Put in your own numbers.</p>
+          <LeadCostCalculator />
         </section>
 
         <section id="calculator" className="space-y-5">

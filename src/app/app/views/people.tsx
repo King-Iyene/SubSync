@@ -8,7 +8,7 @@ import { Badge, Btn, Card, Empty, ErrorBox, ExtLink, fmtInt, fmtMoney, inputClas
 
 type Member = {
   userId: string; label: string; name: string | null; openCount: number; openValue: number; staleCount: number;
-  wonCount: number; wonValue: number; lostCount: number; contacts: number; avgCycleDays: number | null; winRate: number | null; pace: { replies: number; medianReplySeconds: number | null; held: number; noShow: number; showRate: number | null };
+  wonCount: number; wonValue: number; lostCount: number; contacts: number; avgCycleDays: number | null; winRate: number | null; pace: { lastReplyHoursAgo: number | null; idle: boolean; replies: number; medianReplySeconds: number | null; held: number; noShow: number; showRate: number | null };
 };
 
 const paceText = (s: number) => (s < 90 ? `${s} sec` : s < 5400 ? `${Math.round(s / 60)} min` : s < 172800 ? `${Math.round(s / 3600)} h` : `${Math.round(s / 86400)} d`);
@@ -43,7 +43,7 @@ export function TeamView() {
         <Empty title="No assigned deals yet" body="Once deals or contacts have an owner in your CRM, each person appears here." />
       ) : (
         <Card>
-          <Table head={<tr><Th>Person</Th><Th className="text-right">Open deals</Th><Th className="text-right">Open value</Th><Th className="text-right">Stale ({data.staleDays}d+)</Th><Th className="text-right">Won</Th><Th className="text-right">Win rate</Th><Th className="text-right">First reply (30d)</Th><Th className="text-right">Show rate (30d)</Th><Th className="text-right">Avg days to win</Th><Th className="text-right">Contacts</Th></tr>}>
+          <Table head={<tr><Th>Person</Th><Th className="text-right">Open deals</Th><Th className="text-right">Open value</Th><Th className="text-right">Stale ({data.staleDays}d+)</Th><Th className="text-right">Won</Th><Th className="text-right">Win rate</Th><Th className="text-right">Last reply</Th><Th className="text-right">First reply (30d)</Th><Th className="text-right">Show rate (30d)</Th><Th className="text-right">Avg days to win</Th><Th className="text-right">Contacts</Th></tr>}>
             {data.members.map((m) => (
               <tr key={m.userId} className="hover:bg-muted/40">
                 <Td>
@@ -66,6 +66,7 @@ export function TeamView() {
                 <Td className="text-right tabular-nums">{m.staleCount > 0 ? <Badge tone="warn">{m.staleCount}</Badge> : "0"}</Td>
                 <Td className="text-right tabular-nums">{fmtInt(m.wonCount)} · {fmtMoney(m.wonValue)}</Td>
                 <Td className="text-right tabular-nums">{m.winRate === null ? <span className="text-muted-foreground" title="Needs 5 closed deals">n/a</span> : `${Math.round(m.winRate * 100)}%`}</Td>
+                <Td className="text-right tabular-nums">{m.pace.lastReplyHoursAgo === null ? <span className="text-muted-foreground">none</span> : m.pace.idle ? <Badge tone="warn">idle {m.pace.lastReplyHoursAgo} h</Badge> : `${m.pace.lastReplyHoursAgo} h ago`}</Td>
                 <Td className="text-right tabular-nums">{m.pace.medianReplySeconds === null ? <span className="text-muted-foreground" title="Needs 3 replies">n/a</span> : paceText(m.pace.medianReplySeconds)}</Td>
                 <Td className="text-right tabular-nums">{m.pace.showRate === null ? <span className="text-muted-foreground" title="Needs 5 recorded outcomes">n/a</span> : `${Math.round(m.pace.showRate * 100)}% (${m.pace.held}/${m.pace.held + m.pace.noShow})`}</Td>
                 <Td className="text-right tabular-nums">{m.avgCycleDays ?? "n/a"}</Td>

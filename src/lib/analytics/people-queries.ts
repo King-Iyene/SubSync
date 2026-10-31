@@ -98,7 +98,7 @@ export async function teamStats(installationId: string, allowed: string[] | null
 export async function teamPace(installationId: string, allowed: string[] | null): Promise<Map<string, PaceRow>> {
   const db = sql();
   const [replies, appts] = await Promise.all([
-    db`select t.touch_user_id user_id, count(*)::int n, percentile_cont(0.5) within group (order by extract(epoch from t.touch_at - t.lead_at))::float8 med
+    db`select t.touch_user_id user_id, count(*)::int n, percentile_cont(0.5) within group (order by extract(epoch from t.touch_at - t.lead_at))::float8 med, max(t.touch_at) last_at
         from lead_touches t join locations l on l.installation_id = t.installation_id and l.location_id = t.location_id and not l.ignored
         where t.installation_id = ${installationId} and t.touch_at is not null and t.touch_user_id is not null and t.lead_at > now() - interval '30 days'
           ${allowed ? db`and t.location_id = any(${allowed}::text[])` : db``} group by 1`,
@@ -109,7 +109,7 @@ export async function teamPace(installationId: string, allowed: string[] | null)
   ]);
   const out = new Map<string, PaceRow>();
   const row = (id: string) => out.get(id) ?? (out.set(id, { replies: 0, medianSeconds: null, held: 0, noShow: 0 }), out.get(id) as PaceRow);
-  for (const r of replies) { const x = row(r.user_id as string); x.replies = r.n as number; x.medianSeconds = r.med === null ? null : Math.round(r.med as number); }
+  for (const r of replies) { const x = row(r.user_id as string); x.replies = r.n as number; x.medianSeconds = r.med === null ? null : Math.round(r.med as number); x.lastReplyAt = r.last_at instanceof Date ? r.last_at.getTime() : null; }
   for (const r of appts) { const x = row(r.user_id as string); x.held = r.held as number; x.noShow = r.no_show as number; }
   return out;
 }

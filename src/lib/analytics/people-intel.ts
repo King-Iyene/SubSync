@@ -49,8 +49,12 @@ export function teamWinRate(row: Pick<TeamRow, "wonCount" | "lostCount">): numbe
 // Pace figures over the last 30 days. A rate or a typical time built on a handful of cases is noise, so each needs a minimum.
 export const MIN_REPLIES_FOR_PACE = 3;
 export const MIN_OUTCOMES_FOR_SHOW_RATE = 5;
-export type PaceRow = { replies: number; medianSeconds: number | null; held: number; noShow: number };
-export const paceOf = (r: PaceRow) => ({
+export type PaceRow = { replies: number; medianSeconds: number | null; held: number; noShow: number; lastReplyAt?: number | null };
+// A person who has replied to leads in the last 30 days but not for this many hours is flagged as idle.
+export const IDLE_HOURS = 24;
+export const paceOf = (r: PaceRow, now = Date.now()) => ({
+  lastReplyHoursAgo: r.lastReplyAt == null ? null : Math.max(0, Math.round((now - r.lastReplyAt) / 3_600_000)),
+  idle: r.lastReplyAt != null && (now - r.lastReplyAt) / 3_600_000 >= IDLE_HOURS,
   replies: r.replies,
   medianReplySeconds: r.replies >= MIN_REPLIES_FOR_PACE ? r.medianSeconds : null,
   held: r.held,
