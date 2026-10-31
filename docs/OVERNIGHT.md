@@ -15,6 +15,10 @@ Read this first. Everything below is pushed to `main` and live unless it says ot
 - Speed to lead by source (portal 5 min, form 15, social 60) and a count of waiting leads with no owner.
 - Roadmap and change log with voting.
 - Dark shell, agency name and colour shown in place of SubSync.
+- **Fresh data every 15 minutes** for conversations, appointments and reply times (was once a day). Confirmed live: jobs queued and finished within seconds. Speed alerts are no longer hours late.
+- **Speed to lead splits "waiting right now" from "never answered"** (older than 3 days), so old leads no longer make the screen look broken.
+- **Shareable audit link tested live end to end:** the public page showed totals and finding titles only, no account names.
+- Home page "trust" line and the in-app help answer now say honestly that SubSync writes a meeting note into a contact.
 
 ## Needs you (blocked on a login, a decision or a click)
 
@@ -38,4 +42,5 @@ Read this first. Everything below is pushed to `main` and live unless it says ot
 - 9 of your 10 timed leads are still waiting because they are old test contacts, so Speed to lead looks bad. A "mark as test lead" control would fix the picture.
 - The Zoom client secret and secret token passed through my screen reads during setup. I did not repeat them. If you want to be safe, regenerate both in Zoom and update the Vercel values.
 - Two installs exist for KD Squares LTD (one agency, one business); the business one lacks calendar events and users permissions. Harmless to the agency view.
-- Checks: unit tests 280 pass. The full automated suite passed through the appointment insights check; tenancy, flags, metrics, audit, speed and roadmap are re-running against the latest code.
+- **Two pushes failed to build tonight** (the shared audit page used a setting this project does not allow). The live site stayed on the last good version the whole time. Fixed and confirmed live. New rule saved: run `npx next build` before every push.
+- Checks: unit tests 281 pass. The full automated suite passed (tenant isolation with 384 cross-reads, feature switches, Overview numbers, audit, speed to lead, roadmap, plus all earlier modules). Live deploy check passes.
