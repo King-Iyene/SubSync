@@ -47,3 +47,14 @@ connections, appointment insights, two-agency tenant isolation, feature switches
 - Roadmap with voting and a change log page (Wave 1 #8).
 - Plan entitlements are built and tested (open by default). Still needed: the $9 plan in the portal, its id mapped, and enforced mode switched on (section 6).
 - Verification of every PRIORITIZE feature against live data and a manual count: blocked on the calendar and users permissions being approved on the real agency, and not yet repeated for the new Overview rules.
+
+## Live check on real accounts (31 Oct 2026, after the permissions update)
+
+| Feature | Result on the three real accounts |
+| --- | --- |
+| Today and Do this first | Works: real pipeline, 284 unread, ranked attention list |
+| Appointments | Works: 38 appointments read, 24 booked in the 30 days before, show rate 60%, none booked in the last 30 days |
+| Speed to lead | Works: 10 leads timed, 9 still waiting, 1 answered inside 15 minutes; median shows "not enough data" until 5 replies, as designed |
+| Settings: client access per account | Works: switch and On/Off badge per account |
+| Zoom sign-in | Connect Zoom button live; real sign-in and a real summary not yet tested (needs paid host) |
+| Weekly and alert email | Keys present in production; first real send not yet observed |
