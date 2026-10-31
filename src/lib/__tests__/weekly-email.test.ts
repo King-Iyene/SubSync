@@ -40,3 +40,10 @@ test("alert email names the count, flags a critical one, escapes titles", async 
   assert.ok(m.html.includes("&lt;x&gt;") && !m.html.includes("<x>"));
   assert.match(m.text, /https:\/\/x.test\/app#alerts/);
 });
+
+test("the note written into the CRM is capped so one long summary cannot flood a contact", async () => {
+  const { crmNoteBody, CRM_NOTE_MAX } = await import("../analytics/meeting-intel.ts");
+  const long = crmNoteBody({ title: "Call", startedAt: null, attendees: [], summary: "x".repeat(20000), actionItems: [], recordingUrl: null });
+  assert.ok(long.length <= CRM_NOTE_MAX);
+  assert.match(crmNoteBody({ title: "Kickoff", startedAt: null, attendees: [{ name: "Ada", email: "a@b.co" }], summary: "Agreed scope", actionItems: ["Send quote"], recordingUrl: null }), /Kickoff[\s\S]*Ada[\s\S]*Agreed scope[\s\S]*Send quote/);
+});

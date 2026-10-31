@@ -741,7 +741,7 @@ const settingsView = async (ctx: Ctx) => {
 
 function publicSettings(s: Settings) {
   // Never send the webhook URL back to the browser: it is a secret.
-  return { staleDays: s.staleDays, dormantDays: s.dormantDays, slaHours: s.slaHours, appDomain: s.appDomain, digestEnabled: s.digestEnabled, customChecklist: s.customChecklist, digestHour: s.digestHour, digestTimezone: s.digestTimezone, digestEmail: s.digestEmail, emailReady: emailConfigured(), brandName: s.brandName, brandColor: s.brandColor, industryTargets: s.industryTargets, keepTranscripts: s.keepTranscripts, speedTargetMinutes: s.speedTargetMinutes, countAutomatedTouches: s.countAutomatedTouches };
+  return { staleDays: s.staleDays, dormantDays: s.dormantDays, slaHours: s.slaHours, appDomain: s.appDomain, digestEnabled: s.digestEnabled, customChecklist: s.customChecklist, digestHour: s.digestHour, digestTimezone: s.digestTimezone, digestEmail: s.digestEmail, emailReady: emailConfigured(), brandName: s.brandName, brandColor: s.brandColor, industryTargets: s.industryTargets, keepTranscripts: s.keepTranscripts, pushNotesToCrm: s.pushNotesToCrm, speedTargetMinutes: s.speedTargetMinutes, countAutomatedTouches: s.countAutomatedTouches };
 }
 
 async function settingsUpdate(ctx: Ctx) {
@@ -755,6 +755,7 @@ async function settingsUpdate(ctx: Ctx) {
   if ("digestEnabled" in body) patch.digestEnabled = body.digestEnabled === true;
   if ("industryTargets" in body) patch.industryTargets = body.industryTargets === true;
   if ("keepTranscripts" in body) patch.keepTranscripts = body.keepTranscripts === true;
+  if ("pushNotesToCrm" in body) patch.pushNotesToCrm = body.pushNotesToCrm === true;
   if ("speedTargetMinutes" in body) {
     const n = Number(body.speedTargetMinutes);
     if (!Number.isInteger(n) || n < 1 || n > 1440) return json({ error: "Enter a reply target between 1 and 1440 minutes" }, 400);

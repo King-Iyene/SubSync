@@ -7,7 +7,7 @@ import { Badge, Btn, Card, ErrorBox, inputClass, Loading, PageHeader, timeAgo } 
 import { ConnectionsCard } from "./connections";
 import { HealthCard } from "./health-card";
 
-type S = { staleDays: number; dormantDays: number; slaHours: number; appDomain: string; digestEnabled: boolean; customChecklist: string[]; digestHour: number | null; digestTimezone: string | null; digestEmail: string | null; emailReady?: boolean; brandName: string | null; brandColor: string | null; industryTargets?: boolean; keepTranscripts: boolean; speedTargetMinutes: number; countAutomatedTouches: boolean };
+type S = { staleDays: number; dormantDays: number; slaHours: number; appDomain: string; digestEnabled: boolean; customChecklist: string[]; digestHour: number | null; digestTimezone: string | null; digestEmail: string | null; emailReady?: boolean; brandName: string | null; brandColor: string | null; industryTargets?: boolean; keepTranscripts: boolean; pushNotesToCrm: boolean; speedTargetMinutes: number; countAutomatedTouches: boolean };
 
 export function SettingsView() {
   const api = useApiClient();
@@ -45,7 +45,7 @@ export function SettingsView() {
     try {
       const body: Record<string, unknown> = {
         staleDays: form.staleDays, dormantDays: form.dormantDays, slaHours: form.slaHours, appDomain: form.appDomain,
-        digestEnabled: form.digestEnabled, digestHour: form.digestHour, digestTimezone: form.digestTimezone, digestEmail: form.digestEmail, brandName: form.brandName, brandColor: form.brandColor, keepTranscripts: form.keepTranscripts, speedTargetMinutes: form.speedTargetMinutes, countAutomatedTouches: form.countAutomatedTouches,
+        digestEnabled: form.digestEnabled, digestHour: form.digestHour, digestTimezone: form.digestTimezone, digestEmail: form.digestEmail, brandName: form.brandName, brandColor: form.brandColor, keepTranscripts: form.keepTranscripts, pushNotesToCrm: form.pushNotesToCrm, speedTargetMinutes: form.speedTargetMinutes, countAutomatedTouches: form.countAutomatedTouches,
         customChecklist: checklist.split("\n").map((l) => l.trim()).filter(Boolean),
       };
       if (slack.trim()) body.slackWebhookUrl = slack.trim();
@@ -138,6 +138,8 @@ export function SettingsView() {
         <Card title="Meeting notes privacy">
           <label className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-0.5 size-4" checked={form.keepTranscripts} onChange={(e) => setForm({ ...form, keepTranscripts: e.target.checked })} />
             <span>Keep full transcripts when a meeting tool sends them. Off by default: only the summary and action items are stored, which is safer for clinics and anyone handling private conversations.</span></label>
+          <label className="mt-3 flex items-start gap-2 text-sm"><input type="checkbox" className="mt-0.5 size-4" checked={form.pushNotesToCrm} onChange={(e) => setForm({ ...form, pushNotesToCrm: e.target.checked })} />
+            <span>Also add each meeting to the matched contact&apos;s notes in your CRM. It is written once per meeting, only for a contact SubSync matched by email.</span></label>
         </Card>
         )}
 

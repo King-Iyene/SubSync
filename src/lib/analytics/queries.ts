@@ -29,6 +29,8 @@ export type Settings = AccountSettings & {
   /** Use each industry's own reply target in the daily brief instead of one number for everyone. */
   industryTargets: boolean;
   keepTranscripts: boolean;
+  /** Also write each matched meeting into the contact's notes in the CRM. */
+  pushNotesToCrm: boolean;
   /** Minutes a new lead may wait for a first reply from a person, and whether automatic messages count as one. */
   speedTargetMinutes: number;
   countAutomatedTouches: boolean;
@@ -37,7 +39,7 @@ export type Settings = AccountSettings & {
 export async function getSettings(installationId: string): Promise<Settings> {
   const db = sql();
   const read = () => db`
-    select stale_deal_days, dormant_days, sla_hours, slack_webhook_url, ghl_app_domain, digest_enabled, custom_checklist, digest_hour, digest_timezone, digest_email, brand_name, brand_color, industry_targets, keep_transcripts, speed_target_minutes, count_automated_touches
+    select stale_deal_days, dormant_days, sla_hours, slack_webhook_url, ghl_app_domain, digest_enabled, custom_checklist, digest_hour, digest_timezone, digest_email, brand_name, brand_color, industry_targets, push_notes_to_crm, keep_transcripts, speed_target_minutes, count_automated_touches
     from settings where installation_id = ${installationId}`;
   let [r] = await read();
   if (!r) {
@@ -61,6 +63,7 @@ export async function getSettings(installationId: string): Promise<Settings> {
     brandColor: (r.brand_color as string | null) ?? null,
     industryTargets: r.industry_targets === true,
     keepTranscripts: r.keep_transcripts === true,
+    pushNotesToCrm: r.push_notes_to_crm !== false,
     speedTargetMinutes: typeof r.speed_target_minutes === "number" ? r.speed_target_minutes : 15,
     countAutomatedTouches: r.count_automated_touches === true,
   };
@@ -90,6 +93,7 @@ export async function updateSettings(installationId: string, p: Partial<Settings
       digest_email = case when ${p.digestEmail !== undefined} then ${p.digestEmail ?? null} else digest_email end,
       industry_targets = coalesce(${p.industryTargets ?? null}::boolean, industry_targets),
       keep_transcripts = coalesce(${p.keepTranscripts ?? null}::boolean, keep_transcripts),
+      push_notes_to_crm = coalesce(${p.pushNotesToCrm ?? null}::boolean, push_notes_to_crm),
       speed_target_minutes = coalesce(${p.speedTargetMinutes ?? null}::int, speed_target_minutes),
       count_automated_touches = coalesce(${p.countAutomatedTouches ?? null}::boolean, count_automated_touches),
       brand_name = case when ${p.brandName !== undefined} then ${p.brandName ?? null} else brand_name end,

@@ -157,6 +157,13 @@ export function matchContact<T extends { email: string | null }>(attendees: Atte
 const when = (iso: string | null) => (iso ? new Date(iso).toLocaleString("en-US", { year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "UTC" }) + " UTC" : "date unknown");
 
 // A note ready to paste into a contact. Summary and action items only: the full transcript stays out.
+// The note as it is written into the contact in the CRM: the same text, capped so one long summary cannot flood a contact.
+export const CRM_NOTE_MAX = 8000;
+export function crmNoteBody(m: Pick<Meeting, "title" | "startedAt" | "attendees" | "summary" | "actionItems" | "recordingUrl">): string {
+  const text = noteText(m);
+  return text.length <= CRM_NOTE_MAX ? text : text.slice(0, CRM_NOTE_MAX - 1) + "…";
+}
+
 export function noteText(m: Pick<Meeting, "title" | "startedAt" | "attendees" | "summary" | "actionItems" | "recordingUrl">): string {
   const lines = [`Meeting: ${m.title ?? "Untitled"} (${when(m.startedAt)})`];
   const who = m.attendees.map((a) => a.name ?? a.email).filter(Boolean);

@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { sql } from "../db";
 import { matchContact, noteText, type Meeting } from "./meeting-intel";
+import { pushMeetingToCrm } from "./meeting-crm";
 
 // Meeting addresses look like mh_<43 url-safe characters>. Only a hash is stored, so an address can be
 // shown once and never read back.
@@ -70,6 +71,8 @@ export async function recordMeeting(hook: NonNullable<Awaited<ReturnType<typeof 
     on conflict do nothing returning id`;
   // A connection (Fathom, Zoom) has no private address to stamp, and a repeat delivery of the same meeting is not saved twice.
   if (hook.id) await db`update meeting_hooks set last_used_at = now() where id = ${hook.id}`;
+  // Also write it into the matched contact in the CRM (never throws; the meeting is saved here either way).
+  if (row?.id && hit) await pushMeetingToCrm(row.id as string);
   return { id: (row?.id as string | undefined) ?? null, matched: hit !== null, duplicate: !row };
 }
 
