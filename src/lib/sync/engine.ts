@@ -463,7 +463,13 @@ async function claimJob(): Promise<Job | null> {
         and (j.type <> 'metrics' or not exists (
           select 1 from sync_jobs o
           where o.installation_id = j.installation_id and o.id <> j.id and o.type <> 'metrics' and o.status in ('pending', 'running')))
-      order by (j.type = 'metrics'), j.created_at, j.id
+      order by (j.type = 'metrics'),
+        -- Small jobs first, so a new permission shows results in minutes instead of waiting behind the big reads.
+        -- Speed only jumps the queue where that account's conversations are already cached.
+        case when j.type = 'appointments' then 0
+             when j.type = 'speed' and exists (select 1 from cached_conversations v where v.installation_id = j.installation_id and v.location_id = j.location_id) then 1
+             else 2 end,
+        j.created_at, j.id
       limit 1 for update skip locked)
     returning id, installation_id, location_id, type, cursor, started_at`;
   if (rows.length === 0) return null;
