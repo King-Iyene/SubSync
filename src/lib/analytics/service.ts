@@ -1,5 +1,7 @@
 import { sql } from "../db";
 import { postToSlack } from "../notify";
+import { emailConfigured, sendEmail } from "../email";
+import { alertEmail } from "./weekly-email";
 import { buildDigest, computeAlerts, deriveAccount, type DerivedAccount, type DomainStatus } from "./derive";
 import {
   accountRows, getSettings, listAlerts, listDomainChecks, markNotified, scoreHistory, syncAlerts, type Settings,
@@ -58,6 +60,11 @@ export async function refreshInsights(installationId: string): Promise<{ account
     if (await postToSlack(settings.slackWebhookUrl, `*SubSync alerts*\n${lines.join("\n")}${more}`)) {
       await markNotified(worth.map((a) => a.id));
     }
+  }
+  if (worth.length > 0 && settings.digestEmail && emailConfigured()) {
+    const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/+$/, "");
+    const who = settings.brandName ?? "Your agency";
+    if (await sendEmail(settings.digestEmail, alertEmail(who, worth.map((a) => ({ severity: a.severity, title: a.title })), appUrl))) await markNotified(worth.map((a) => a.id));
   }
   return { accounts: accounts.length, openAlerts: drafts.length, created: created.length };
 }

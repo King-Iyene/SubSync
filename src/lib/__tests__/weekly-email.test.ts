@@ -32,3 +32,11 @@ test("address check rejects lists and junk", () => {
   assert.ok(validEmail("a@b.co"));
   for (const bad of ["a@b", "a b@c.com", "a@b.com,c@d.com", "", "x".repeat(130) + "@b.com"]) assert.ok(!validEmail(bad), bad);
 });
+
+test("alert email names the count, flags a critical one, escapes titles", async () => {
+  const { alertEmail } = await import("../analytics/weekly-email.ts");
+  const m = alertEmail("Acme", [{ severity: "critical", title: "<x> 5 leads waiting" }, { severity: "warning", title: "b" }], "https://x.test");
+  assert.match(m.subject, /2 new alerts \(one is critical\)/);
+  assert.ok(m.html.includes("&lt;x&gt;") && !m.html.includes("<x>"));
+  assert.match(m.text, /https:\/\/x.test\/app#alerts/);
+});

@@ -36,6 +36,17 @@ ${count > top.length ? `<p>...and ${count - top.length} more in the app.</p>` : 
   return { subject, text, html };
 }
 
+// An email for newly raised alerts, so the problem reaches the agency without opening the app.
+export function alertEmail(who: string, alerts: Array<{ severity: string; title: string }>, appUrl: string): { subject: string; text: string; html: string } {
+  const n = alerts.length;
+  const subject = `${who}: ${n} new alert${n === 1 ? "" : "s"}${alerts.some((a) => a.severity === "critical") ? " (one is critical)" : ""}`;
+  const top = alerts.slice(0, 10);
+  const link = `${appUrl}/app#alerts`;
+  const text = [subject, "", ...top.map((a) => `- ${a.title}`), ...(n > top.length ? [`...and ${n - top.length} more`] : []), "", `Open it: ${link}`].join("\n");
+  const html = `<div style="font-family:system-ui,sans-serif;max-width:560px;margin:0 auto;color:#111"><h2>${esc(subject)}</h2><ul style="padding-left:18px">${top.map((a) => `<li>${esc(a.title)}</li>`).join("")}</ul>${n > top.length ? `<p>...and ${n - top.length} more.</p>` : ""}<p><a href="${esc(link)}">Open it</a></p></div>`;
+  return { subject, text, html };
+}
+
 // Monday morning in the account's own zone, once per week: true from the chosen hour on, so a late run still sends.
 export function weeklyDue(local: { hour: number; date: string; weekday: string } | null, hour: number, lastSentOn: string | null): boolean {
   return Boolean(local) && local!.weekday === "Mon" && local!.hour >= hour && lastSentOn !== local!.date;
