@@ -29,12 +29,12 @@ read one client account at a time with a token limited to that account.
 
 | Scope | Needed for | Wave | Status |
 | --- | --- | --- | --- |
-| `conversations/message.readonly` | The messages inside a conversation: who sent each one, a person or automation, and when. This is the only way to measure true speed-to-lead (first human touch) and who answered | 1 (#1, #3) | CHECK that the "list messages in a conversation" endpoint accepts this scope; the platform lists it for message recordings and transcriptions and the message webhooks |
+| `conversations/message.readonly` | The messages inside a conversation: who sent each one, a person or automation, and when. This is the only way to measure true speed-to-lead (first human touch) and who answered | 1 (#1, #3) | CONFIRMED (31 Oct): the list-messages endpoint requires exactly this scope and returns direction, userId, source and dateAdded |
 | `locations/tags.readonly` | Tag names for hot-lead queues and lead source grouping | 1 (#4), 2 | confirmed to exist |
 | `locations/customFields.readonly` | Reading a lead-source custom field for source attribution | 3 | confirmed to exist; not needed before Wave 3, so can wait |
-| `marketplace-installer-details.readonly` | Reconcile each install's plan (the brief's "Get installer details") | pricing gate | confirmed in the brief; CHECK the exact name in the portal |
+| `marketplace-installer-details.readonly` | Reconcile each install's plan (the brief's "Get installer details") | pricing gate | NOT confirmed: my searches of the docs did not find this endpoint or scope name. Do not add until the exact name is seen in the portal |
 
-Recommendation: add the first, second and fourth now (they unblock Wave 1 and the pricing reconcile) and
+Recommendation: add the first and second now (they unblock Wave 1; the fourth waits until its name is confirmed) and
 leave custom fields until Wave 3. Not recommended: `voice-ai-dashboard.readonly` (it only covers the
 platform's Voice AI call logs, not ordinary calls, so it would not give call data), and any write scope.
 The `contacts.write` permission that Data cleanup needs stays out while that feature is switched off.
