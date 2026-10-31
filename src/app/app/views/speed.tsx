@@ -12,6 +12,7 @@ type Data = {
   overall: Summary;
   bySource?: Array<Summary & { cls: "portal" | "form" | "social" | "other"; targetMinutes: number }>;
   unassignedWaiting?: number;
+  trend?: Array<{ weekStart: number; leads: number; withinTarget: number; hitRate: number | null }>;
   neverAnswered?: number;
   perAccount: Array<Summary & { locationId: string; name: string; access: string | null }>;
   people: Array<{ userId: string; label: string; replies: number; medianSeconds: number }>;
@@ -79,6 +80,21 @@ export function SpeedView({ go }: { go: GoFn }) {
             <p className="mt-4 rounded-xl border border-amber-500/40 bg-amber-400/10 px-4 py-3 text-sm" role="note">
               <strong>{data.unassignedWaiting} waiting lead{data.unassignedWaiting === 1 ? " has" : "s have"} no owner.</strong> Nobody is responsible for answering {data.unassignedWaiting === 1 ? "it" : "them"}. Assign them, or fix the routing so new leads always reach a person.
             </p>
+          )}
+
+          {data.trend && data.trend.some((w) => w.leads > 0) && (
+            <Card title="Are replies getting faster? Last 8 weeks" className="mt-6">
+              <p className="mb-3 text-xs text-muted-foreground">The share of new leads answered by a person inside your {data.targetMinutes}-minute target, by the week the lead came in. A week with fewer than 5 leads shows no percentage.</p>
+              <ul className="space-y-1.5 text-sm">
+                {data.trend.map((w) => (
+                  <li key={w.weekStart} className="flex items-center gap-3">
+                    <span className="w-24 shrink-0 text-xs text-muted-foreground">{new Date(w.weekStart).toLocaleDateString(undefined, { day: "numeric", month: "short" })}</span>
+                    <span className="h-2 flex-1 overflow-hidden rounded-full bg-muted"><span className="block h-full rounded-full bg-primary" style={{ width: `${Math.round((w.hitRate ?? 0) * 100)}%` }} /></span>
+                    <span className="w-28 shrink-0 text-right tabular-nums text-xs">{w.hitRate === null ? <span className="text-muted-foreground">{w.leads} lead{w.leads === 1 ? "" : "s"}, too few</span> : `${Math.round(w.hitRate * 100)}% of ${w.leads}`}</span>
+                  </li>
+                ))}
+              </ul>
+            </Card>
           )}
 
           {data.bySource && data.bySource.length > 0 && (

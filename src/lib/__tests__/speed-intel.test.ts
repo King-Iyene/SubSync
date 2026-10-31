@@ -108,3 +108,18 @@ test("a lead unanswered for more than three days counts as never answered, not w
   assert.equal(isNeverAnswered(3 * 24 * 60), false);
   assert.equal(isNeverAnswered(3 * 24 * 60 + 1), true);
 });
+
+test("the weekly trend counts each week's leads and hides a percentage built on fewer than five", async () => {
+  const { weeklyTrend } = await import("../analytics/speed-intel.ts");
+  const now = Date.parse("2026-10-31T12:00:00Z"), D = 86_400_000;
+  const lead = (daysAgo: number, replyMin: number | null, i: number): TouchRow => ({ locationId: "L", contactId: "c" + daysAgo + i, leadAt: now - daysAgo * D, touchAt: replyMin === null ? null : now - daysAgo * D + replyMin * 60_000, userId: "u" });
+  const rows = [...[1, 2, 2, 3, 3].map((d, i) => lead(d, i < 4 ? 5 : 90, i)), lead(10, 5, 0), lead(10, 90, 1)];
+  const t = weeklyTrend(rows, 15, now, 3);
+  assert.equal(t.length, 3);
+  assert.equal(t[2].leads, 5);
+  assert.equal(t[2].withinTarget, 4);
+  assert.equal(t[2].hitRate, 0.8);
+  assert.equal(t[1].leads, 2);
+  assert.equal(t[1].hitRate, null, "two leads is too few for a percentage");
+  assert.equal(t[0].leads, 0);
+});

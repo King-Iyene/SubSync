@@ -45,6 +45,22 @@ export type TouchRow = { locationId: string; contactId: string; leadAt: number; 
 
 // Where a lead came from decides how fast it must be answered. Portal and phone leads go cold in minutes, web forms a little
 // slower, social messages slower still. The windows are common practice in real estate and are shown as targets, not facts.
+// Week by week: how many leads, and what share was answered inside the target. Facts only: it shows whether the team is getting
+// faster, and says nothing about why. A week with fewer than 5 judged leads shows no percentage rather than a noisy one.
+export type TrendWeek = { weekStart: number; leads: number; withinTarget: number; hitRate: number | null };
+export function weeklyTrend(rows: TouchRow[], targetMinutes: number, now: number, weeks = 8): TrendWeek[] {
+  const WEEK = 7 * 86_400_000;
+  const out: TrendWeek[] = [];
+  for (let i = weeks - 1; i >= 0; i--) {
+    const end = now - i * WEEK, start = end - WEEK;
+    const mine = rows.filter((r) => r.leadAt > start && r.leadAt <= end);
+    const s = summarise(mine, targetMinutes, now);
+    const judged = s.withinTarget + s.answeredLate + s.stillWaiting;
+    out.push({ weekStart: start, leads: judged, withinTarget: s.withinTarget, hitRate: judged >= 5 ? s.withinTarget / judged : null });
+  }
+  return out;
+}
+
 // A lead nobody has answered for this long is not "waiting" any more: it was missed. Showing it as waiting makes the screen
 // look broken, and hides the real message ("these were never answered").
 export const NEVER_ANSWERED_MINUTES = 3 * 24 * 60;

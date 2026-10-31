@@ -1,5 +1,5 @@
 import { sql } from "../db";
-import { bySource, isNeverAnswered, rankPeople, summarise, type Summary, type TouchRow } from "./speed-intel";
+import { bySource, isNeverAnswered, rankPeople, summarise, weeklyTrend, type Summary, type TouchRow } from "./speed-intel";
 
 // Everything the speed-to-lead screen shows, for the accounts the caller may see. Leads older than the
 // window are left out: a lead from three weeks ago says nothing about how the team answers today.
@@ -31,6 +31,14 @@ export async function speedView(installationId: string, allowed: string[] | null
   }).filter((a) => a.leads > 0 || a.access === "needs_permission")
     .sort((a, b) => b.stillWaiting - a.stillWaiting || (a.hitRate ?? 2) - (b.hitRate ?? 2));
 
+  // The trend is an extra: if this read ever fails, the rest of the screen must still load.
+  const history = await db`
+    select t.location_id, t.contact_id, t.lead_at, t.touch_at, t.touch_user_id
+    from lead_touches t join locations l on l.installation_id = t.installation_id and l.location_id = t.location_id and not l.ignored
+    where t.installation_id = ${installationId} and t.lead_at > ${new Date(now - 56 * DAY)}
+      ${allowed ? db`and t.location_id = any(${allowed}::text[])` : db``} limit 50000`.catch(() => []);
+  const trend = weeklyTrend(history.map((r) => ({ locationId: r.location_id as string, contactId: r.contact_id as string, leadAt: ms(r.lead_at) ?? 0, touchAt: ms(r.touch_at), userId: r.touch_user_id as string | null })), targetMinutes, now);
+
   const waitingRows = touches.filter((t) => t.touchAt === null && (now - t.leadAt) / 60_000 > targetMinutes).sort((a, b) => a.leadAt - b.leadAt).slice(0, 30);
   const contactNames = waitingRows.length === 0 ? [] : await db`
     select location_id, contact_id, coalesce(nullif(full_name, ''), email, 'Unnamed contact') name from cached_contacts
@@ -42,6 +50,7 @@ export async function speedView(installationId: string, allowed: string[] | null
     access: { ok: locs.filter((l) => l.speed_access === "ok").length, needsPermission: locs.filter((l) => l.speed_access === "needs_permission").map((l) => ({ locationId: l.location_id as string, name: names.get(l.location_id as string) as string })), total: locs.length },
     overall: summarise(touches, targetMinutes, now),
     bySource: bySource(touches, targetMinutes, now),
+    trend,
     neverAnswered: touches.filter((t) => t.touchAt === null && isNeverAnswered((now - t.leadAt) / 60_000)).length,
     unassignedWaiting: touches.filter((t) => t.touchAt === null && !t.assigned && (now - t.leadAt) / 60_000 > targetMinutes).length,
     perAccount,
