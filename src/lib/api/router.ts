@@ -440,7 +440,7 @@ function agoText(iso: string): string {
   return mins < 2 ? "just now" : mins < 120 ? mins + " minutes ago" : Math.round(mins / 60) + " hours ago";
 }
 
-const USAGE_VIEWS = new Set(["today", "overview", "accounts", "clients", "team", "search", "deals", "pipeline", "leads", "calls", "inbox", "onboarding", "email", "duplicates", "alerts", "settings", "help", "account"]);
+const USAGE_VIEWS = new Set(["today", "overview", "accounts", "clients", "team", "search", "deals", "pipeline", "leads", "calls", "inbox", "onboarding", "email", "duplicates", "alerts", "settings", "help", "account", "meetings", "audit", "speed", "appointments"]);
 
 // A counter of which pages get opened (no personal data), so the getting-started checklist can
 // tick itself off and so the agency can see what its team uses.
@@ -484,6 +484,10 @@ async function startView(ctx: Ctx) {
       detail: null, body: "See likely duplicate contacts with a confidence score, decide which record to keep, then merge them in the platform.", view: "duplicates", cta: "Open Duplicates" },
     { id: "brief", title: "Get the daily brief in Slack", done: Boolean(settings.slackWebhookUrl) && settings.digestEnabled,
       detail: null, body: "Paste a Slack incoming webhook in Settings and choose the hour. It arrives once a day in your time zone.", view: "settings", cta: "Open Settings" },
+    { id: "email", title: "Get alerts and the Monday email", done: Boolean(settings.digestEmail),
+      detail: null, body: "Type one email address in Settings. New critical and warning alerts are emailed to it straight away, and a short summary arrives every Monday. Nothing is sent until you add an address.", view: "settings", cta: "Open Settings" },
+    { id: "meetings", title: "Connect a meeting tool (optional)", done: seen.has("meetings"), optional: true,
+      detail: null, body: "Connect Zoom or Fathom in Settings and each meeting summary is saved in SubSync and added to the matching contact's notes in your CRM.", view: "meetings", cta: "Open Meeting notes" },
     ...(agency ? [{ id: "clients", title: "Let a client see their own account", done: (clientOn?.n ?? 0) > 0, optional: true,
       detail: null, body: "Switch on a read-only view for a client's own staff. They see only their own account: never other clients, fees or notes.", view: "settings", cta: "Open Settings" }] : []),
   ];
