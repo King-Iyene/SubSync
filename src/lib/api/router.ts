@@ -45,7 +45,8 @@ import { appointmentInsights } from "../analytics/appointment-insight-queries";
 import { auditSummary, buildAudit } from "../analytics/audit-intel";
 import { appointmentList, staleDealList, waitingList, type AuditList } from "../analytics/audit-queries";
 import { DEAL_RULES_VERSION } from "../analytics/definitions";
-import { speedView } from "../analytics/speed-queries";
+import { speedPart, speedView } from "../analytics/speed-queries";
+import { isPart, parseWindow } from "../analytics/speed-window";
 import { CHANGELOG, ROADMAP } from "../roadmap";
 import { buildSharePayload } from "../analytics/share-intel";
 import { randomBytes } from "node:crypto";
@@ -292,11 +293,41 @@ async function auditRevoke(ctx: Ctx) {
 }
 
 // How fast new leads get a first reply from a person.
+// Every lead row (anything with a client account and a contact) gets the white-label link that opens it in the CRM, wherever it sits in the answer.
+function withContactUrls<T>(value: T, link: (locationId: string, contactId: string) => string): T {
+  if (Array.isArray(value)) return value.map((v) => withContactUrls(v, link)) as T;
+  if (value && typeof value === "object") {
+    const o = value as Record<string, unknown>;
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(o)) out[k] = withContactUrls(v, link);
+    if (typeof o.locationId === "string" && typeof o.contactId === "string") out.url = link(o.locationId, o.contactId);
+    return out as T;
+  }
+  return value;
+}
+
 async function speedViewData(ctx: Ctx) {
   const sc = await scope(ctx);
-  const v = await speedView(ctx.installationId, await allowedIds(ctx), sc.settings.speedTargetMinutes);
+  const allowed = await allowedIds(ctx);
+  const part = ctx.url.searchParams.get("part");
+  // One card of the screen over the range that card chose (KF-4). Same accounts, same rows, same judging as the main answer; the dates are checked here, never trusted.
+  if (part !== null) {
+    if (!isPart(part)) return json({ error: "Unknown part of this screen" }, 400);
+    const now = Date.now();
+    const win = parseWindow(ctx.url.searchParams.get("from"), ctx.url.searchParams.get("to"), now);
+    if (!win.ok) return json({ error: win.error }, 400);
+    const cmpFrom = ctx.url.searchParams.get("cmpFrom"), cmpTo = ctx.url.searchParams.get("cmpTo");
+    const cmp = cmpFrom || cmpTo ? parseWindow(cmpFrom, cmpTo, now) : null;
+    if (cmp && !cmp.ok) return json({ error: "The comparison range is not valid: " + cmp.error }, 400);
+    const out = await speedPart(ctx.installationId, allowed, sc.settings.speedTargetMinutes, part, win.win, cmp && cmp.ok ? cmp.win : null, now);
+    return json(withContactUrls(out, sc.links.contact));
+  }
+  const v = await speedView(ctx.installationId, allowed, sc.settings.speedTargetMinutes);
   return json({
-    ...v, waiting: v.waiting.map((w) => ({ ...w, url: sc.links.contact(w.locationId, w.contactId) })),
+    ...v,
+    // How the numbers are measured, shown on the page itself (N78): the reply target and whether automatic messages count. A client's staff can read it, not change it.
+    measuring: { targetMinutes: sc.settings.speedTargetMinutes, countAutomated: sc.settings.countAutomatedTouches, businessHours: sc.settings.speedBusinessHours, canChange: ctx.kind !== "client" },
+    waiting: v.waiting.map((w) => ({ ...w, url: sc.links.contact(w.locationId, w.contactId) })),
     // The leads behind each week of the trend, with the same white-label link as every other list (KF-6).
     trend: v.trend.map((w) => ({ ...w, members: w.members.map((m) => ({ ...m, url: sc.links.contact(m.locationId, m.contactId) })) })),
   });
@@ -1309,10 +1340,16 @@ async function contactIntel(ctx: Ctx) {
 async function teamView(ctx: Ctx) {
   const sc = await scope(ctx);
   const allowed = await allowedIds(ctx);
-  const [rows, pace] = await Promise.all([teamStats(ctx.installationId, allowed, sc.settings.staleDays), teamPace(ctx.installationId, allowed)]);
+  const [rows, pace, [acc]] = await Promise.all([
+    teamStats(ctx.installationId, allowed, sc.settings.staleDays), teamPace(ctx.installationId, allowed),
+    // How the last read of the team list went for the accounts in view, so a person who has no name can be explained instead of shown as an id.
+    sql()`select count(*) filter (where users_access = 'ok')::int ok, count(*) filter (where users_access = 'needs_permission')::int blocked from locations
+      where installation_id = ${ctx.installationId} and not ignored ${allowed ? sql()`and location_id = any(${allowed}::text[])` : sql()``}`,
+  ]);
+  const usersState = Number(acc?.ok) > 0 ? "ok" : Number(acc?.blocked) > 0 ? "needs_permission" : null;
   return json({
     staleDays: sc.settings.staleDays,
-    members: rows.map((r) => ({ ...r, label: teamLabel(r.userId, r.name), winRate: teamWinRate(r), pace: paceOf(pace.get(r.userId) ?? { replies: 0, medianSeconds: null, held: 0, noShow: 0 }) })),
+    members: rows.map((r) => ({ ...r, label: teamLabel(r.userId, r.name, usersState), winRate: teamWinRate(r), pace: paceOf(pace.get(r.userId) ?? { replies: 0, medianSeconds: null, held: 0, noShow: 0 }) })),
   });
 }
 

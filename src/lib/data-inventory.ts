@@ -107,7 +107,7 @@ export const INVENTORY: Record<string, TableInfo> = {
   goals: { noun: "goals", line: "yours" },
   annotations: { noun: "chart notes", line: "yours", personal: { text: "notes you add to charts" } },
   usage_events: { noun: "page-view counts", line: "records" },
-  team_names: { noun: "team member names", line: "yours", personal: { user_id: "a team member's sign-in id", name: "team member names you type" }, notPersonal: ["source"] },
+  team_names: { noun: "team member names", line: "yours", personal: { user_id: "a team member's sign-in id", name: "team member names you type", photo_url: "a team member's picture address from your CRM" }, notPersonal: ["source"] },
   stage_rules: { noun: "how you treat pipelines and stages", line: "yours", personal: { pipeline_key: "the names of your pipelines", stage_key: "the names of your pipeline stages", updated_by: "the name of the person who changed a rule" } },
   report_templates: { noun: "saved report layouts", line: "yours", personal: { name: "saved report names", spec: "the layout of a saved report" } },
   saved_views: { noun: "your saved views of a page", line: "yours", personal: { owner: "who saved the view (a sign-in id)", name: "the name you gave a saved view", filters: "the choices in a saved view (client account, channel, person)" }, notPersonal: ["page"] },
