@@ -45,6 +45,9 @@ const FILTERS: Array<{ label: string; query: string; shown: string[] }> = [
   { label: "one account manager (Sam)", query: "owner=Sam", shown: ["xtestFltrA", "xtestFltrC"] },
   { label: "one kind of business (medical)", query: "industry=medical", shown: ["xtestFltrA", "xtestFltrB"] },
   { label: "Sam, and hide test accounts", query: "owner=Sam&hideTest=1", shown: ["xtestFltrA"] },
+  // The client-account picker in the filter bar (D0). An id from another company in the list changes nothing: only this company's own accounts can be picked.
+  { label: "two client accounts picked", query: "accounts=xtestFltrB,xtestFltrC", shown: ["xtestFltrB", "xtestFltrC"] },
+  { label: "one picked, plus a stranger's id, and hide test accounts", query: "accounts=xtestFltrA,xtestFltrC,someone-elses-id&hideTest=1", shown: ["xtestFltrA"] },
 ];
 
 // Pages whose job is to manage every account (the filter options, the settings that switch access per account) or that describe the connection as a

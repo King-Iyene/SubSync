@@ -1,7 +1,7 @@
 "use client";
 
-import { Sparkles } from "lucide-react";
 import type { ReactNode } from "react";
+import { EmptyState, ErrorState } from "./ds/states";
 import type { ApiError } from "./session";
 import type { Band } from "./types";
 
@@ -29,17 +29,18 @@ export const daysLabel = (d: number | null) => (d === null ? "never" : d === 0 ?
 
 export type Tone = "good" | "warn" | "bad" | "info" | "neutral";
 
+// A status is plain text in the status colour with a thin rule on its left (no dot, no tinted fill, no pill). The words carry the meaning, so colour is
+// never the only signal; every text colour here is checked for contrast on the page and card surfaces (src/lib/__tests__/design-tokens.test.ts).
 const toneClass: Record<Tone, string> = {
-  good: "bg-emerald-500/12 text-emerald-800 ring-1 ring-inset ring-emerald-600/15 dark:text-emerald-300",
-  warn: "bg-amber-500/14 text-amber-900 ring-1 ring-inset ring-amber-600/20 dark:text-amber-300",
-  bad: "bg-red-500/10 text-red-800 ring-1 ring-inset ring-red-600/15 dark:text-red-300",
-  info: "bg-primary/10 text-primary ring-1 ring-inset ring-primary/15",
-  neutral: "bg-muted text-muted-foreground ring-1 ring-inset ring-border",
+  good: "border-success text-success",
+  warn: "border-warning text-warning",
+  bad: "border-destructive text-destructive",
+  info: "border-primary text-primary",
+  neutral: "border-border text-muted-foreground",
 };
-const dotClass: Record<Tone, string> = { good: "bg-emerald-500", warn: "bg-amber-500", bad: "bg-red-500", info: "bg-primary", neutral: "bg-muted-foreground/50" };
 
 export function Badge({ tone = "neutral", children }: { tone?: Tone; children: ReactNode }) {
-  return <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap ${toneClass[tone]}`}><span aria-hidden className={`size-1.5 rounded-full ${dotClass[tone]}`} />{children}</span>;
+  return <span data-tone={tone} className={`inline-block border-l-2 pl-2 text-xs font-medium leading-4 whitespace-nowrap ${toneClass[tone]}`}>{children}</span>;
 }
 
 const bandTone: Record<Band, Tone> = { thriving: "good", healthy: "good", watch: "warn", at_risk: "bad" };
@@ -58,24 +59,24 @@ export const severityTone = (s: string): Tone => (s === "critical" ? "bad" : s =
 
 export function Card({ title, action, children, className = "" }: { title?: string; action?: ReactNode; children: ReactNode; className?: string }) {
   return (
-    <section className={`min-w-0 rounded-2xl border bg-card text-card-foreground shadow-[var(--shadow-card)] print:break-inside-avoid print:shadow-none ${className}`}>
+    <section className={`min-w-0 rounded-lg border bg-card text-card-foreground print:break-inside-avoid ${className}`}>
       {(title || action) && (
-        <header className="flex items-center justify-between gap-3 border-b px-5 py-3.5">
+        <header className="flex items-center justify-between gap-3 border-b px-4 py-3">
           {title && <h2 className="text-[0.9rem] font-semibold">{title}</h2>}
           {action}
         </header>
       )}
-      <div className="p-5">{children}</div>
+      <div className="p-4">{children}</div>
     </section>
   );
 }
 
-export function Stat({ label, value, sub, tone }: { label: string; value: ReactNode; sub?: ReactNode; tone?: Tone }) {
+export function Stat({ label, value, sub, tone }: { label: ReactNode; value: ReactNode; sub?: ReactNode; tone?: Tone }) {
   return (
-    <div className={`relative overflow-hidden rounded-2xl border bg-card p-4 pl-5 shadow-[var(--shadow-card)] print:shadow-none`}>
-      <span aria-hidden className={`absolute inset-y-0 left-0 w-1 ${tone === "bad" ? "bg-red-500" : tone === "warn" ? "bg-amber-500" : tone === "good" ? "bg-emerald-500" : "bg-primary/70"}`} />
+    <div className="relative overflow-hidden rounded-lg border bg-card p-4 pl-5">
+      <span aria-hidden className={`absolute inset-y-0 left-0 w-0.5 ${tone === "bad" ? "bg-destructive" : tone === "warn" ? "bg-warning" : tone === "good" ? "bg-success" : "bg-border"}`} />
       <p className="text-xs font-medium text-muted-foreground">{label}</p>
-      <p className={`tnum mt-1.5 text-[1.7rem] font-semibold leading-none tracking-tight ${tone === "bad" ? "text-red-700 dark:text-red-400" : tone === "warn" ? "text-amber-700 dark:text-amber-400" : tone === "good" ? "text-emerald-700 dark:text-emerald-400" : ""}`}>{value}</p>
+      <p className={`tnum mt-1.5 text-[1.7rem] font-semibold leading-none tracking-tight ${tone === "bad" ? "text-destructive" : tone === "warn" ? "text-warning" : tone === "good" ? "text-success" : ""}`}>{value}</p>
       {sub && <div className="mt-2 text-xs leading-5 text-muted-foreground">{sub}</div>}
     </div>
   );
@@ -94,13 +95,7 @@ export function PageHeader({ title, subtitle, actions }: { title: string; subtit
 }
 
 export function Empty({ title, body }: { title: string; body?: string }) {
-  return (
-    <div className="rounded-2xl border border-dashed bg-card/60 p-10 text-center">
-      <span aria-hidden className="mx-auto mb-3 flex size-10 items-center justify-center rounded-full bg-accent text-accent-foreground"><Sparkles className="size-5" /></span>
-      <p className="text-sm font-semibold">{title}</p>
-      {body && <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">{body}</p>}
-    </div>
-  );
+  return <EmptyState title={title} body={body} />;
 }
 
 export function Loading({ label = "Loading..." }: { label?: string }) {
@@ -111,17 +106,9 @@ export function Loading({ label = "Loading..." }: { label?: string }) {
   );
 }
 
+// Shows what went wrong with an error ID for support (the shared ErrorState, stage D0).
 export function ErrorBox({ error, onRetry }: { error: ApiError | Error; onRetry?: () => void }) {
-  const upgrade = (error as ApiError).status === 402;
-  return (
-    <div className={`rounded-2xl border p-6 text-center ${upgrade ? "border-primary/30 bg-primary/5" : "border-red-500/30 bg-red-500/5"}`}>
-      <p className="text-sm font-medium">{upgrade ? "This feature is part of the paid plan" : "Something went wrong"}</p>
-      <p className="mt-1 text-sm text-muted-foreground">{error.message}</p>
-      {onRetry && !upgrade && (
-        <button type="button" onClick={onRetry} className="mt-3 rounded-lg border px-3 py-1.5 text-sm hover:bg-muted">Try again</button>
-      )}
-    </div>
-  );
+  return <ErrorState error={error} onRetry={onRetry} />;
 }
 
 // ---------- controls ----------
@@ -131,10 +118,10 @@ export function Btn({
 }: { children: ReactNode; onClick?: () => void; variant?: "primary" | "secondary" | "ghost"; disabled?: boolean; type?: "button" | "submit"; title?: string }) {
   const style =
     variant === "primary"
-      ? "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 active:translate-y-px"
+      ? "bg-primary text-primary-foreground hover:bg-primary/90 active:translate-y-px"
       : variant === "ghost"
         ? "text-muted-foreground hover:bg-muted hover:text-foreground"
-        : "border bg-card shadow-sm hover:border-primary/40 hover:bg-accent/50 active:translate-y-px";
+        : "border bg-card hover:border-primary/40 hover:bg-accent/50 active:translate-y-px";
   return (
     <button type={type} title={title} disabled={disabled} onClick={onClick}
       className={`inline-flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 ${style}`}>

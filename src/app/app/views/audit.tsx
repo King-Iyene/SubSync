@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { useApiClient, useData } from "../session";
 import type { GoFn } from "../nav";
-import { Badge, Btn, Card, Empty, ErrorBox, fmtMoney, Loading, PageHeader, Stat, type Tone } from "../ui";
+import { DataList, InlineAlert, Page, SkeletonRows } from "../ds";
+import { Badge, Btn, Card, Empty, ErrorBox, fmtMoney, Stat, type Tone } from "../ui";
 
 type Finding = {
   key: string; severity: "critical" | "warning" | "info"; title: string; detail: string; count: number | null; dollars: number | null;
@@ -35,7 +36,7 @@ export function AuditView({ go }: { go: GoFn }) {
   const loadLinks = useCallback(() => { api.get<{ links: ShareLink[] }>("audit/shares").then((r) => setLinks(r.links)).catch(() => setLinks([])); }, [api]);
   useEffect(() => { loadLinks(); }, [loadLinks]);
   const revoke = async (id: string) => { try { await api.post("audit/revoke", { id }); } finally { loadLinks(); } };
-  if (loading && !data) return <Loading label="Auditing your accounts..." />;
+  if (loading && !data) return <Page title="Account audit" subtitle="Checking every account you can see."><SkeletonRows rows={4} label="Auditing your accounts..." /></Page>;
   if (error) return <ErrorBox error={error} onRetry={reload} />;
   if (!data) return null;
   const a = data.audit;
@@ -56,17 +57,15 @@ export function AuditView({ go }: { go: GoFn }) {
   };
 
   return (
-    <div>
-      <PageHeader
-        title="Account audit"
-        subtitle={a.headline}
-        actions={<><Btn onClick={share} disabled={sharing}>{sharing ? "Creating link..." : "Share link"}</Btn><Btn onClick={() => window.print()}>Print</Btn><Btn variant="primary" onClick={copy}>{copied ? "Copied" : "Copy summary"}</Btn></>}
-      />
-
+    <Page
+      title="Account audit"
+      subtitle={a.headline}
+      actions={<><Btn onClick={share} disabled={sharing}>{sharing ? "Creating link..." : "Share link"}</Btn><Btn onClick={() => window.print()}>Print</Btn><Btn variant="primary" onClick={copy}>{copied ? "Copied" : "Copy summary"}</Btn></>}
+    >
       {link && (
-        <p className="mb-4 break-all rounded-xl border border-primary/40 bg-primary/5 px-4 py-3 text-sm" role="status">
+        <InlineAlert tone={link.startsWith("http") ? "success" : "danger"} className="mb-4 break-all">
           {link.startsWith("http") ? <>Share this link. It shows totals and finding titles only, no account names, and works for 14 days. You can switch it off at any time below: <a className="font-medium underline" href={link} target="_blank" rel="noreferrer">{link}</a></> : link}
-        </p>
+        </InlineAlert>
       )}
 
       {links.length > 0 && (
@@ -121,19 +120,16 @@ export function AuditView({ go }: { go: GoFn }) {
 
       {a.rows.length > 0 && (
         <Card title="Where to start" className="mt-6">
-          <ul className="divide-y text-sm">
-            {a.rows.map((r) => (
-              <li key={r.locationId} className="flex flex-wrap items-center justify-between gap-2 py-2.5">
-                <button type="button" className="font-medium hover:underline print:no-underline" onClick={() => go("account", r.locationId)}>{r.name}</button>
-                <span className="text-muted-foreground">
-                  {fmtMoney(r.staleValue)} stale in {r.staleOpps} {r.staleOpps === 1 ? "deal" : "deals"} · {r.waiting} waiting{r.estimated !== null ? ` · about ${fmtMoney(r.estimated)} (estimate)` : ""}
-                </span>
-              </li>
-            ))}
-          </ul>
+          <DataList rows={a.rows} rowKey={(r) => r.locationId} onOpen={(r) => go("account", r.locationId)} caption="Where to start"
+            columns={[
+              { key: "name", header: "Client account", primary: true, width: "minmax(0,1.5fr)", cell: (r) => r.name },
+              { key: "stale", header: "Stale deals", width: "minmax(0,1.5fr)", cell: (r) => <span className="text-muted-foreground">{fmtMoney(r.staleValue)} stale in {r.staleOpps} {r.staleOpps === 1 ? "deal" : "deals"}</span> },
+              { key: "waiting", header: "Waiting", width: "6rem", cell: (r) => <span className="text-muted-foreground">{r.waiting} waiting</span> },
+              { key: "est", header: "Estimate", width: "minmax(0,1.2fr)", cell: (r) => <span className="text-muted-foreground">{r.estimated !== null ? `about ${fmtMoney(r.estimated)} (estimate)` : "no estimate"}</span> },
+            ]} />
         </Card>
       )}
       <p className="mt-4 text-xs text-muted-foreground">{a.accountsScanned} account{a.accountsScanned === 1 ? "" : "s"} checked just now from the latest sync. Nothing here changes anything in your accounts.</p>
-    </div>
+    </Page>
   );
 }

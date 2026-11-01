@@ -1,29 +1,42 @@
 export type ViewId =
-  | "today" | "audit" | "speed" | "overview" | "accounts" | "account" | "search" | "deals" | "inbox" | "onboarding" | "email" | "duplicates" | "alerts" | "settings" | "help" | "pipeline" | "leads" | "calls" | "clients" | "team" | "appointments" | "meetings" | "cleanup" | "roadmap";
+  | "today" | "myday" | "audit" | "speed" | "overview" | "accounts" | "account" | "search" | "deals" | "inbox" | "onboarding" | "email" | "duplicates" | "alerts" | "settings" | "help" | "pipeline" | "leads" | "calls" | "clients" | "team" | "appointments" | "meetings" | "cleanup" | "roadmap" | "people";
 
 export type GoFn = (view: ViewId, locationId?: string) => void;
 
-export type NavGroup = "Daily" | "Sell" | "Clients" | "Tidy up" | "";
+// The pilot menu (stage D0, N43 and UX-11): a short list of plain groups. Everything else the app already shows stays reachable under "More"
+// (or inside a module as a tab); nothing that was visible has been removed, and a page behind a switch stays behind it (the `feature` below).
+export type NavGroup = "" | "Daily work" | "Clients and people" | "More" | "Settings and help";
 
-export const NAV: Array<{ id: Exclude<ViewId, "account">; label: string; feature: string; group: NavGroup }> = [
-  { id: "today", label: "Today", feature: "overview", group: "Daily" },
-  { id: "audit", label: "Account audit", feature: "audit", group: "Daily" },
-  { id: "overview", label: "Overview", feature: "overview", group: "Daily" },
-  { id: "inbox", label: "Inbox & SLA", feature: "inbox", group: "Daily" },
-  { id: "speed", label: "Speed to lead", feature: "speed", group: "Daily" },
-  { id: "appointments", label: "Appointments", feature: "appointments", group: "Daily" },
-  { id: "meetings", label: "Meeting notes", feature: "meetings", group: "Daily" },
-  { id: "search", label: "Contact search", feature: "search", group: "Sell" },
-  { id: "pipeline", label: "Pipeline and deals", feature: "pipelines", group: "Sell" },
-  { id: "leads", label: "Leads", feature: "activity", group: "Sell" },
-  { id: "calls", label: "Call lists", feature: "calls", group: "Sell" },
-  { id: "accounts", label: "Accounts", feature: "health", group: "Clients" },
-  { id: "clients", label: "Clients", feature: "clients", group: "Clients" },
-  { id: "team", label: "Team", feature: "team", group: "Clients" },
-  { id: "onboarding", label: "Setup", feature: "onboarding", group: "Tidy up" },
-  { id: "duplicates", label: "Duplicates", feature: "duplicates", group: "Tidy up" },
-  { id: "cleanup", label: "Data cleanup", feature: "cleanup", group: "Tidy up" },
-  { id: "settings", label: "Settings", feature: "settings", group: "" },
-  { id: "help", label: "Getting started", feature: "overview", group: "" },
-  { id: "roadmap", label: "What's new and next", feature: "overview", group: "" },
+export type NavItem = {
+  id: Exclude<ViewId, "account">; label: string; feature: string; group: NavGroup;
+  /** A page that lives inside another module as a tab. It has no menu entry of its own; the parent's entry stays highlighted. */
+  parent?: Exclude<ViewId, "account">;
+};
+
+export const NAV: NavItem[] = [
+  { id: "today", label: "Today", feature: "overview", group: "" },
+  { id: "myday", label: "My day", feature: "overview", group: "" },
+  { id: "speed", label: "Speed to lead", feature: "speed", group: "Daily work" },
+  { id: "appointments", label: "Appointments", feature: "appointments", group: "Daily work" },
+  { id: "inbox", label: "Unanswered messages", feature: "inbox", group: "Daily work" },
+  { id: "audit", label: "Account audit", feature: "audit", group: "Daily work" },
+  { id: "clients", label: "Clients", feature: "clients", group: "Clients and people" },
+  { id: "people", label: "People", feature: "search", group: "Clients and people" },
+  { id: "search", label: "Contact search", feature: "search", group: "Clients and people", parent: "people" },
+  { id: "leads", label: "Leads", feature: "activity", group: "Clients and people", parent: "people" },
+  { id: "calls", label: "Call lists", feature: "calls", group: "Clients and people", parent: "people" },
+  { id: "overview", label: "Overview", feature: "overview", group: "More" },
+  { id: "accounts", label: "Accounts", feature: "health", group: "More" },
+  { id: "team", label: "Team", feature: "team", group: "More" },
+  { id: "pipeline", label: "Pipeline and deals", feature: "pipelines", group: "More" },
+  { id: "onboarding", label: "Setup", feature: "onboarding", group: "More" },
+  { id: "duplicates", label: "Duplicates", feature: "duplicates", group: "More" },
+  { id: "cleanup", label: "Data cleanup", feature: "cleanup", group: "More" },
+  { id: "meetings", label: "Meeting notes", feature: "meetings", group: "More" },
+  { id: "settings", label: "Settings", feature: "settings", group: "Settings and help" },
+  { id: "help", label: "Getting started", feature: "overview", group: "Settings and help" },
+  { id: "roadmap", label: "What's new", feature: "overview", group: "Settings and help" },
 ];
+
+// Where a page that lives inside another page highlights in the menu, and where "back" lands when there is no trail.
+export const PARENT: Partial<Record<ViewId, ViewId>> = { account: "accounts", deals: "pipeline", email: "onboarding", alerts: "today", search: "people", leads: "people", calls: "people" };

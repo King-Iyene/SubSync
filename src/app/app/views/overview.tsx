@@ -3,8 +3,9 @@
 import { useState } from "react";
 import { useApiClient, useData } from "../session";
 import type { Overview } from "../types";
+import { DataList, InlineAlert, Page, SkeletonCards } from "../ds";
 import {
-  Badge, BandBadge, Btn, Card, ChurnBadge, Empty, ErrorBox, ExtLink, fmtInt, fmtMoney, Loading, PageHeader, Stat, StackedBar,
+  Badge, BandBadge, Btn, Card, ChurnBadge, Empty, ErrorBox, ExtLink, fmtInt, fmtMoney, Stat, StackedBar,
 } from "../ui";
 import type { GoFn } from "../nav";
 import { ExecSummary } from "./exec-summary";
@@ -15,7 +16,7 @@ export function OverviewView({ go }: { go: GoFn }) {
   const [syncing, setSyncing] = useState(false);
   const [note, setNote] = useState<string | null>(null);
 
-  if (loading && !data) return <Loading />;
+  if (loading && !data) return <Page title="Overview"><SkeletonCards cards={3} label="Loading the overview..." /></Page>;
   if (error) return <ErrorBox error={error} onRetry={reload} />;
   if (!data) return null;
   const k = data.kpis;
@@ -35,8 +36,7 @@ export function OverviewView({ go }: { go: GoFn }) {
   };
 
   return (
-    <div>
-      <PageHeader
+    <Page
         title="Overview"
         subtitle="Every client account at a glance: who needs attention, where money is stuck, and what changed."
         actions={
@@ -45,12 +45,12 @@ export function OverviewView({ go }: { go: GoFn }) {
             <Btn variant="primary" onClick={sync} disabled={syncing}>{syncing ? "Syncing..." : api.demo ? "Refresh insights" : "Sync now"}</Btn>
           </>
         }
-      />
-      {note && <p className="mb-4 rounded-lg border bg-muted/40 px-3 py-2 text-sm" role="status">{note}</p>}
+    >
+      {note && <InlineAlert tone="info" className="mb-4">{note}</InlineAlert>}
       {data.hiddenAccounts > 0 && (
-        <p className="mb-4 rounded-lg border border-sky-500/40 bg-sky-500/5 px-3 py-2 text-sm">
+        <InlineAlert tone="info" className="mb-4">
           Your free plan covers {data.entitlements.accountLimit} client accounts. {data.hiddenAccounts} more are hidden until you upgrade.
-        </p>
+        </InlineAlert>
       )}
 
       <ExecSummary />
@@ -67,12 +67,12 @@ export function OverviewView({ go }: { go: GoFn }) {
         </p>
       )}
 
-      {k.readLimit && <p className="mt-2 text-xs text-muted-foreground" data-testid="read-limit">{k.readLimit}</p>}
+      {k.readLimit && <div className="mt-2" data-testid="read-limit"><InlineAlert tone="info">{k.readLimit}</InlineAlert></div>}
 
       {k.outlier && (
-        <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">
+        <InlineAlert tone="warning" className="mt-2">
           One deal ({fmtMoney(k.outlier.value)}) is {Math.round(k.outlier.share * 100)}% of the open pipeline of {fmtInt(k.outlier.of)} deals, so the dollar figures above move with it. Amounts are as entered in each account; different currencies are not converted.
-        </p>
+        </InlineAlert>
       )}
 
       <Card title="Estimates" className="mt-4" action={<Badge tone="info">Estimate, not a fact</Badge>}>
@@ -106,22 +106,16 @@ export function OverviewView({ go }: { go: GoFn }) {
           {data.attention.length === 0 ? (
             <Empty title="Nothing needs attention" body="Every account is active and on track." />
           ) : (
-            <ul className="divide-y">
-              {data.attention.map((a) => (
-                <li key={a.locationId} className="flex flex-wrap items-start justify-between gap-3 py-3 first:pt-0 last:pb-0">
-                  <div className="min-w-0">
-                    <button type="button" onClick={() => go("account", a.locationId)} className="text-left text-sm font-medium hover:underline">{a.name ?? "Unnamed account"}</button>
-                    <ul className="mt-1 space-y-0.5 text-xs text-muted-foreground">{a.reasons.slice(0, 3).map((r) => <li key={r}>{r}</li>)}</ul>
-                    {a.bandNote && <p className="mt-1 text-xs text-muted-foreground">{a.bandNote}</p>}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <BandBadge band={a.band} />
-                    <ChurnBadge level={a.churn} />
-                    <ExtLink href={a.url}>Open</ExtLink>
-                  </div>
-                </li>
-              ))}
-            </ul>
+            <DataList rows={data.attention} rowKey={(a) => a.locationId} caption="Accounts that need attention"
+              columns={[
+                { key: "name", header: "Client account", primary: true, width: "minmax(0,2fr)", cell: (a) => (
+                  <span className="block">
+                    <button type="button" onClick={() => go("account", a.locationId)} className="min-h-9 text-left text-sm font-medium hover:underline">{a.name ?? "Unnamed account"}</button>
+                    <span className="block text-xs font-normal text-muted-foreground">{a.reasons.slice(0, 3).join(" · ")}{a.bandNote ? ` · ${a.bandNote}` : ""}</span>
+                  </span>) },
+                { key: "health", header: "Health", width: "9rem", cell: (a) => <span className="flex flex-wrap items-center gap-1.5"><BandBadge band={a.band} /><ChurnBadge level={a.churn} /></span> },
+                { key: "open", header: "", width: "5rem", align: "right", cell: (a) => <ExtLink href={a.url}>Open</ExtLink> },
+              ]} />
           )}
         </Card>
 
@@ -141,6 +135,6 @@ export function OverviewView({ go }: { go: GoFn }) {
           </Card>
         </div>
       </div>
-    </div>
+    </Page>
   );
 }

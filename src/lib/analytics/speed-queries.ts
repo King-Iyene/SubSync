@@ -1,10 +1,12 @@
 import { sql } from "../db";
 import { EXCLUSION_LABEL, type Exclusion } from "./lead-rules";
-import { bySource, isNeverAnswered, rankPeople, summarise, weeklyTrend, type Summary, type TouchRow } from "./speed-intel";
+import { bySource, isNeverAnswered, rankPeople, summarise, weekMembers, weeklyTrend, type Judged, type Summary, type TouchRow } from "./speed-intel";
 
 // Everything the speed-to-lead screen shows, for the accounts the caller may see. Leads older than the
 // window are left out: a lead from three weeks ago says nothing about how the team answers today.
 export const SPEED_WINDOW_DAYS = 14;
+/** How many leads are listed behind one week of the trend. The week says how many there really were. */
+export const TREND_MEMBER_CAP = 60;
 const DAY = 86_400_000;
 const ms = (v: unknown) => (v instanceof Date ? v.getTime() : null);
 
@@ -41,7 +43,20 @@ export async function speedView(installationId: string, allowed: string[] | null
     from lead_touches t join locations l on l.installation_id = t.installation_id and l.location_id = t.location_id and not l.ignored
     where t.installation_id = ${installationId} and t.excluded is null and t.lead_at > ${new Date(now - 56 * DAY)}
       ${allowed ? db`and t.location_id = any(${allowed}::text[])` : db``} limit 50000`.catch(() => []);
-  const trend = weeklyTrend(history.map((r) => ({ locationId: r.location_id as string, contactId: r.contact_id as string, leadAt: ms(r.lead_at) ?? 0, touchAt: ms(r.touch_at), userId: r.touch_user_id as string | null })), targetMinutes, now);
+  // The same rows feed the bars and the lists behind them (KF-6): the trend and weekMembers both come from judgedInWeek.
+  const historyRows: TouchRow[] = history.map((r) => ({ locationId: r.location_id as string, contactId: r.contact_id as string, leadAt: ms(r.lead_at) ?? 0, touchAt: ms(r.touch_at), userId: r.touch_user_id as string | null }));
+  const trendBase = weeklyTrend(historyRows, targetMinutes, now);
+  const WEEKS = trendBase.length;
+  const membersByWeek = trendBase.map((_, k) => weekMembers(historyRows, targetMinutes, now, WEEKS - 1 - k, TREND_MEMBER_CAP));
+  const memberIds = [...new Set(membersByWeek.flat().map((m) => m.row.contactId))];
+  const memberNames = memberIds.length === 0 ? [] : await db`
+    select location_id, contact_id, coalesce(nullif(full_name, ''), email, 'Unnamed contact') name from cached_contacts
+    where installation_id = ${installationId} and contact_id = any(${memberIds}::text[])`.catch(() => []);
+  const memberName = new Map(memberNames.map((c) => [`${c.location_id}:${c.contact_id}`, c.name as string]));
+  const trend = trendBase.map((w, k) => ({ ...w, members: membersByWeek[k].map((m) => ({
+    locationId: m.row.locationId, locationName: names.get(m.row.locationId) ?? "Account", contactId: m.row.contactId, name: memberName.get(`${m.row.locationId}:${m.row.contactId}`) ?? "Contact",
+    status: m.status as Judged, minutes: Math.round(((m.row.touchAt ?? now) - m.row.leadAt) / 60_000),
+  })) }));
 
   const waitingRows = touches.filter((t) => t.touchAt === null && (now - t.leadAt) / 60_000 > targetMinutes).sort((a, b) => a.leadAt - b.leadAt).slice(0, 30);
   const contactNames = waitingRows.length === 0 ? [] : await db`

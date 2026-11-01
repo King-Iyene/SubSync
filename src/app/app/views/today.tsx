@@ -3,7 +3,8 @@
 import type { GoFn } from "../nav";
 import { useState } from "react";
 import { useApiClient, useData } from "../session";
-import { Badge, Btn, Card, Empty, ErrorBox, ExtLink, fmtInt, fmtMoney, Loading, PageHeader, Stat, type Tone } from "../ui";
+import { DataList, InlineAlert, Page, SkeletonRows } from "../ds";
+import { Badge, Btn, Card, Empty, ErrorBox, ExtLink, fmtInt, fmtMoney, Stat, type Tone } from "../ui";
 
 type Change = { today: number; yesterday: number | null; avg7: number | null; vsYesterday: number | null; vsAvg: number | null; unusual: "up" | "down" | null; samples: number; diffYesterday?: number | null; smallBase?: boolean };
 type Data = {
@@ -34,9 +35,9 @@ function FrontDoor({ go, attention, limited }: { go: GoFn; attention: number | n
     : `${waiting} ${waiting === 1 ? "lead is" : "leads are"} waiting for a reply${never > 0 ? `, and ${never} ${never === 1 ? "was" : "were"} never answered` : ""}.`;
   const urgent = (waiting ?? 0) > 0;
   return (
-    <section className="mb-6 rounded-2xl border bg-card p-5 shadow-[var(--shadow-card)]" aria-label="What needs you right now" data-testid="front-door">
+    <section className="mb-6 border-y py-5" aria-label="What needs you right now" data-testid="front-door">
       <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">What needs you right now</p>
-      <h2 className={`mt-1 text-xl font-semibold ${urgent ? "text-red-700 dark:text-red-400" : ""}`} data-testid="leads-headline">{leadLine}</h2>
+      <h2 className={`mt-1 text-xl font-semibold ${urgent ? "text-destructive" : ""}`} data-testid="leads-headline">{leadLine}</h2>
       <ul className="mt-3 space-y-2 text-sm">
         <li className="flex flex-wrap items-center justify-between gap-2">
           <span>{unmarked === null ? "Checking appointments..." : unmarked === 0 ? "Every past appointment has an outcome recorded." : `${unmarked} past ${unmarked === 1 ? "appointment has" : "appointments have"} no outcome recorded, so the show rate is a guess.`}</span>
@@ -57,7 +58,7 @@ function OutlierNote() {
   const { data } = useData<{ kpis: { outlier: { value: number; share: number; of: number } | null } }>("overview");
   const o = data?.kpis.outlier;
   if (!o) return null;
-  return <p className="mb-6 text-xs text-amber-700 dark:text-amber-400">One deal ({fmtMoney(o.value)}) is {Math.round(o.share * 100)}% of the open pipeline of {fmtInt(o.of)} deals, so the dollar figures move with it. Amounts are as entered in each account.</p>;
+  return <InlineAlert tone="warning" className="mb-6">One deal ({fmtMoney(o.value)}) is {Math.round(o.share * 100)}% of the open pipeline of {fmtInt(o.of)} deals, so the dollar figures move with it. Amounts are as entered in each account.</InlineAlert>;
 }
 
 // The one thing to do first, taken from the account audit, with the money it is costing when that can be stated honestly.
@@ -66,7 +67,7 @@ function DoFirst({ go }: { go: GoFn }) {
   const f = data?.audit.findings.find((x) => x.severity !== "info" && x.key !== "permission") ?? null;
   if (!f) return null;
   return (
-    <section className="mb-6 rounded-2xl border border-primary/40 bg-primary/5 p-5" aria-label="Do this first">
+    <section className="mb-6 border-l-2 border-primary py-1 pl-4" aria-label="Do this first">
       <p className="text-xs font-semibold uppercase tracking-wide text-primary">Do this first</p>
       <h2 className="mt-1 text-lg font-semibold">{f.title}</h2>
       <p className="mt-1 text-sm text-muted-foreground">{f.detail}</p>
@@ -103,11 +104,10 @@ export function TodayView({ go }: { go: GoFn }) {
   };
   // The leads line does not wait for the slower daily read: it appears as soon as its own number arrives.
   if (loading && !data) return (
-    <div>
-      <PageHeader title="Today" subtitle="What needs you right now, then what changed." />
+    <Page title="Today" subtitle="What needs you right now, then what changed.">
       <FrontDoor go={go} attention={null} limited={false} />
-      <Loading label="Working out what needs you today..." />
-    </div>
+      <SkeletonRows rows={4} label="Working out what needs you today..." />
+    </Page>
   );
   if (error) return <ErrorBox error={error} onRetry={reload} />;
   if (!data) return null;
@@ -116,14 +116,8 @@ export function TodayView({ go }: { go: GoFn }) {
   const noun = data.limited ? "your account" : "your client accounts";
 
   return (
-    <div>
-      <PageHeader
-        title="Today"
-        subtitle="What needs you right now, then what changed."
-        actions={<Btn variant="primary" onClick={sync} disabled={syncing}>{syncing ? "Syncing..." : "Sync now"}</Btn>}
-      />
-
-      {!data.connection.ok && <p className="mb-4 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">{data.connection.message}</p>}
+    <Page title="Today" subtitle="What needs you right now, then what changed." actions={<Btn variant="primary" onClick={sync} disabled={syncing}>{syncing ? "Syncing..." : "Sync now"}</Btn>}>
+      {!data.connection.ok && <InlineAlert tone="danger" className="mb-4">{data.connection.message}</InlineAlert>}
 
       <FrontDoor go={go} attention={data.attention.length} limited={data.limited} />
       <DoFirst go={go} />
@@ -145,7 +139,7 @@ export function TodayView({ go }: { go: GoFn }) {
       </div>
 
       <OutlierNote />
-      {data.readLimit && <p className="mb-6 text-xs text-muted-foreground" data-testid="read-limit">{data.readLimit}</p>}
+      {data.readLimit && <div className="mb-6" data-testid="read-limit"><InlineAlert tone="info">{data.readLimit}</InlineAlert></div>}
 
       <div id="needs-attention" />
       <Card title={data.attention.length ? `Needs attention today (${data.attention.length})` : "Needs attention today"} className="mb-6">
@@ -179,16 +173,11 @@ export function TodayView({ go }: { go: GoFn }) {
 
       {data.fine.length > 0 && (
         <Card title={`Fine today (${data.fine.length})`} className="mb-6">
-          <ul className="divide-y text-sm">
-            {data.fine.map((f) => (
-              <li key={f.locationId} className="flex flex-wrap items-center justify-between gap-2 py-2">
-                <span className="font-medium">{f.name}</span>
-                <span className="text-muted-foreground">
-                  {f.learning ? "Nothing wrong, but still learning what is normal here (less than a week of history)" : "Nothing unusual compared with its last week"}
-                </span>
-              </li>
-            ))}
-          </ul>
+          <DataList rows={data.fine} rowKey={(f) => f.locationId} caption="Client accounts that are fine today"
+            columns={[
+              { key: "name", header: "Client account", primary: true, width: "minmax(0,1fr)", cell: (f) => f.name },
+              { key: "why", header: "Status", width: "minmax(0,2fr)", cell: (f) => <span className="text-muted-foreground">{f.learning ? "Nothing wrong, but still learning what is normal here (less than a week of history)" : "Nothing unusual compared with its last week"}</span> },
+            ]} />
           <p className="mt-3 text-xs text-muted-foreground">Checked for each: {data.fine[0].checked.join(", ")}.</p>
         </Card>
       )}
@@ -214,6 +203,6 @@ export function TodayView({ go }: { go: GoFn }) {
           <p className="mt-3 text-xs text-muted-foreground">We list these so you never assume something is being watched when it is not.</p>
         </Card>
       </div>
-    </div>
+    </Page>
   );
 }

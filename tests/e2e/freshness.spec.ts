@@ -7,9 +7,9 @@ import { NAV } from "../../src/app/app/nav";
 // rows by scripts/check-sync.ts and tests/unit/sync-reliability-db.test.ts.)
 const PAGES = NAV.filter((n) => n.id !== "meetings"); // Meeting notes is switched off by default (S0.2b)
 const GROUPS: Array<[string, string[]]> = [
-  ["Daily", ["today", "audit", "overview", "inbox", "speed", "appointments"]],
-  ["Sell", ["search", "pipeline", "leads", "calls"]],
-  ["Clients and tidy up", ["accounts", "clients", "team", "onboarding", "duplicates", "cleanup"]],
+  ["Daily work", ["today", "audit", "overview", "inbox", "speed", "appointments"]],
+  ["People and pipeline", ["search", "pipeline", "leads", "calls"]],
+  ["Clients and more", ["accounts", "clients", "team", "onboarding", "duplicates", "cleanup"]],
   ["Settings and help", ["settings", "help", "roadmap"]],
 ];
 const BANNED = [/Data is under an hour old/i, /A sync is still running/i, /Last synced/, /Last completed/, /Still syncing your accounts/i, /Data is \d+ hours? old/i];
@@ -22,7 +22,13 @@ async function serverSentence(page: Page): Promise<string> {
   return ((await r.json()) as { freshness: { text: string } }).freshness.text;
 }
 
-async function open(page: Page, label: string) {
+async function open(page: Page, label: string, parent?: string) {
+  // A page inside a module (People holds Contact search, Leads and Call lists) is reached through its module's menu entry, then its tab.
+  if (parent) {
+    await page.getByRole("button", { name: parent, exact: true }).filter({ visible: true }).first().click();
+    await page.getByRole("tab", { name: label, exact: true }).click();
+    return;
+  }
   await page.getByRole("button", { name: label, exact: true }).filter({ visible: true }).first().click();
 }
 
@@ -33,7 +39,7 @@ for (const [group, ids] of GROUPS) {
     await expect(page.getByTestId("freshness")).toBeVisible();
     for (const id of ids) {
       const nav = PAGES.find((n) => n.id === id)!;
-      if (id !== "today") await open(page, nav.label);
+      if (id !== "today") await open(page, nav.label, nav.parent ? PAGES.find((n) => n.id === nav.parent)!.label : undefined);
       await expect(page.getByTestId("freshness"), `${nav.label}: exactly one freshness line`).toHaveCount(1);
       await expect(page.getByTestId("freshness-text"), `${nav.label}: the same words as the server`).toHaveText(wanted);
       const body = (await page.locator("main").innerText()) + "\n" + (await page.locator("body").innerText());

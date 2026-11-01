@@ -192,3 +192,13 @@ connections, appointment insights, two-agency tenant isolation, feature switches
 | Percentage change only on a base of 10 (5,000 dollars) (N6) | Built | daily numbers | Yes: unit tests, demo API test |
 | The same filter gives the same numbers on every page (N1, N8) | Built | all pages | Yes: 5 filters, 37 pages, 3 pages that ignored the filter fixed |
 | Data point audit (N44) and capability matrix (N64) | Written; the cut list awaits King | docs | Capability live column NOT VERIFIED LIVE (one call after the merge: `/api/admin/capabilities`) |
+
+## Stage D0: structure, design tokens, shared components (1 Nov 2026)
+| Feature | Status | Data source | Tested against live data |
+| --- | --- | --- | --- |
+| Design tokens, light and dark, company colour on top | built (BUILT, awaiting King's checks) | src/app/globals.css | contrast unit test reads the real CSS; browser checked at 3 widths on the demo company |
+| /design style guide | built | made-up sample data in the page | no (no real data involved) |
+| Pilot menu, People tabs, My day | built | existing endpoints | demo company only |
+| Filter bar with account names and left-out reasons | built | segments (agency) | demo company; it has no test or ignored account |
+| List, lead panel, notices, states, charts | built | existing endpoints | demo company only |
+| Clickable charts, card ranges | built, on the Speed to lead trend | speed trend with the leads behind each week | count equals rows by unit test; demo company in the browser |

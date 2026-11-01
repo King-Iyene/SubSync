@@ -52,17 +52,39 @@ export type TouchRow = { locationId: string; contactId: string; leadAt: number; 
 // Week by week: how many leads, and what share was answered inside the target. Facts only: it shows whether the team is getting
 // faster, and says nothing about why. A week with fewer than 5 judged leads shows no percentage rather than a noisy one.
 export type TrendWeek = { weekStart: number; leads: number; withinTarget: number; hitRate: number | null };
-export function weeklyTrend(rows: TouchRow[], targetMinutes: number, now: number, weeks = 8): TrendWeek[] {
-  const WEEK = 7 * 86_400_000;
-  const out: TrendWeek[] = [];
-  for (let i = weeks - 1; i >= 0; i--) {
-    const end = now - i * WEEK, start = end - WEEK;
-    const mine = rows.filter((r) => r.leadAt > start && r.leadAt <= end);
-    const s = summarise(mine, targetMinutes, now);
-    const judged = s.withinTarget + s.answeredLate + s.stillWaiting;
-    out.push({ weekStart: start, leads: judged, withinTarget: s.withinTarget, hitRate: judged >= 5 ? s.withinTarget / judged : null });
+const WEEK_MS = 7 * 86_400_000;
+// The leads that came in during week `i` (0 is the latest) and were judged: answered inside the target, answered late, or still waiting past it. This is
+// the ONE place a week's leads are chosen, used by the bar (weeklyTrend) and by the list behind the bar (weekMembers), so the count on the chart is the
+// number of rows in the list by construction (KF-6), and a test checks it.
+export type Judged = "within" | "late" | "waiting";
+export function judgedInWeek(rows: TouchRow[], targetMinutes: number, now: number, i: number): Array<{ row: TouchRow; status: Judged }> {
+  const end = now - i * WEEK_MS, start = end - WEEK_MS;
+  const target = targetMinutes * 60;
+  const out: Array<{ row: TouchRow; status: Judged }> = [];
+  for (const r of rows) {
+    if (!(r.leadAt > start && r.leadAt <= end)) continue;
+    const s = responseSeconds(r);
+    if (s !== null) out.push({ row: r, status: s <= target ? "within" : "late" });
+    else if ((now - r.leadAt) / 1000 > target) out.push({ row: r, status: "waiting" });
   }
   return out;
+}
+
+export function weeklyTrend(rows: TouchRow[], targetMinutes: number, now: number, weeks = 8): TrendWeek[] {
+  const out: TrendWeek[] = [];
+  for (let i = weeks - 1; i >= 0; i--) {
+    const judged = judgedInWeek(rows, targetMinutes, now, i);
+    const within = judged.filter((j) => j.status === "within").length;
+    out.push({ weekStart: now - (i + 1) * WEEK_MS, leads: judged.length, withinTarget: within, hitRate: judged.length >= 5 ? within / judged.length : null });
+  }
+  return out;
+}
+
+// The leads behind a week's bar, the ones that need attention first (waiting, then late, then in time), newest first inside each. Capped; the caller
+// says how many were left out.
+const ORDER: Record<Judged, number> = { waiting: 0, late: 1, within: 2 };
+export function weekMembers(rows: TouchRow[], targetMinutes: number, now: number, i: number, cap = 60): Array<{ row: TouchRow; status: Judged }> {
+  return judgedInWeek(rows, targetMinutes, now, i).sort((a, b) => ORDER[a.status] - ORDER[b.status] || b.row.leadAt - a.row.leadAt).slice(0, cap);
 }
 
 // A lead nobody has answered for this long is not "waiting" any more: it was missed. Showing it as waiting makes the screen

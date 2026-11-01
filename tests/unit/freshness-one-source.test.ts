@@ -46,8 +46,12 @@ describe("freshness has one source and one place on screen", () => {
 
   it("the strip is drawn once, above every page, outside the page switch", () => {
     const dash = read("src/app/app/dashboard.tsx");
-    expect(dash.match(/<FreshnessStrip/g)).toHaveLength(1);
-    expect(dash).toMatch(/<FreshnessStrip \/>\{content\}/);
+    // D0 renamed it for the shell: StatusLine is the same FreshnessStrip (src/app/app/ds/index.ts), still drawn exactly once, above the page.
+    expect(dash).toMatch(/import \{ FreshnessStrip as StatusLine \} from "\.\/views\/sync-status"/);
+    expect(dash.match(/<StatusLine/g)).toHaveLength(1);
+    expect(dash).not.toMatch(/<FreshnessStrip/);
+    expect(dash).toMatch(/<StatusLine \/><BackProvider value=\{back\}>\{content\}<\/BackProvider>/);
+    expect(read("src/app/app/ds/index.ts")).toMatch(/FreshnessStrip as StatusLine/);
     // No other view asks for the freshness data.
     const askers = files.filter((f) => slash(f).startsWith("src/app/") && /useData<[^>]*>\("(freshness|sync-status)"\)|useData\("(freshness|sync-status)"\)/.test(read(f))).map(slash);
     expect(askers).toEqual(["src/app/app/views/sync-status.tsx"]);

@@ -54,8 +54,8 @@ export function InboxView() {
   return (
     <div>
       <PageHeader
-        title="Inbox & SLA"
-        subtitle={`Customer messages waiting across every client account. Anything unanswered for more than ${data.slaHours} hours counts as an SLA breach; change the target in Settings.`}
+        title="Unanswered messages"
+        subtitle={`Customer messages waiting across every client account. Waiting longer than your ${data.slaHours} hour reply target is late; change the target in Settings.`}
         actions={<Btn onClick={() => api.download("export/inbox", "subsync-inbox.csv")}>Export CSV</Btn>}
       />
       <p className="mb-3 text-sm font-medium" data-testid="waiting-headline">

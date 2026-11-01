@@ -25,6 +25,7 @@ export const ROUTE_GUARDS: RouteGuard[] = [
   { route: "/audit/[id]", kind: "public_by_design", guard: "A shared audit snapshot: a 192-bit random id, expires after 14 days, can be switched off by its owner, is rate limited, and shows totals, finding titles and a fix plan only, with account names removed." },
   { route: "/", kind: "public_static", guard: "Marketing page; no tenant data." },
   { route: "/app", kind: "public_static", guard: "The app shell; contains no data. All data comes from /api/app with a signed session." },
+  { route: "/design", kind: "public_static", guard: "The style guide: tokens and shared components shown on made-up sample data from the page's own code. No sign-in, no tenant data, no API calls (a stand-in replaces the network), and kept out of search results." },
   { route: "/installed", kind: "public_static", guard: "Static confirmation page." },
   { route: "/installed/error", kind: "public_static", guard: "Static error page." },
   { route: "/privacy", kind: "public_static", guard: "Legal page with no tenant data. Its lists of what is stored and deleted come from src/lib/data-inventory.ts (checked against the schema); the one thing read per request is the global switch for Zoom and Google Meet." },

@@ -161,3 +161,42 @@ Status: F1 BUILT, awaiting King's checks. Tag for the lead: `stage-F1`.
 
 #### King's instruction during the run: commit to main
 King wrote in the chat: "also please make sure to commit to main branch please". This replaces the safety rule "never push to main, never merge" for this run. How it is applied (DECIDED FOR KING, please review): the branch is merged into `main` and pushed only after the full test run for a milestone passes (M1, then M2), because `main` deploys to the live app for the real installs and the live database already carries this run's additive migrations. Never force-pushed; a merge commit or fast-forward only. Items in NEEDS_KING that take effect on merge (cron watchdog, real uninstall deletion, scopes) are listed in the morning report.
+
+### Stage D0: Structure, design tokens, shared components (1 Nov 2026): BUILT, awaiting King's checks
+
+Full instruction list, the five evaluation lines, the three-direction comparison, the component reference (props for the F2, F3 and F6 agents), the customer-eyes table, the evidence table and King's 5 checks are in `docs/features/D0.md`. Notes handled: N28, N34, UX-11 and N74 (DONE-TONIGHT); the D0 parts of N3, N7, N8, N9, N10, N14, N19, N29, N36, N50, N52, N63, N76, N89, UX-07, UX-09, UX-10, UX-13. King's live feedback KF-1 to KF-6 applied. Nothing was committed or pushed. No migration, no permission, nothing sent (0 of 5 test emails used).
+
+**What was built (short).** KD Squares tokens in light and dark (every text pair 4.5:1, marks 3:1, tested from the real CSS; the company's own colour sits on top and is made readable). The look King approved with his one change: plain status words (text in the status colour with a thin left rule; no dot, no pill), plain one-row notices and error text with an error ID, empty states between two rules, underline tabs, cards with no soft shadow. The pilot menu in plain groups with Contact search, Leads and Call lists as tabs inside People and everything else under More (nothing removed). One page template, one role-aware filter bar (it names the accounts in, removable, and the accounts left out with a reason), one list (10 rows, View all, pages of 25, copy, arrow keys), the lead panel (arrows through the list it was opened from, "Call in your CRM", no tel: links), one HTML chart approach with scales, tooltips and placeholders, clickable charts (a bar opens exactly the leads behind it; the count is the same by construction and by test; Back keeps the bar marked), a range and comparison on each card (stated in words, in the address, remembered, no percentage on a tiny base), My day for a client's staff, a how-to note and next-step buttons, a working browser Back button and a Back link, light/dark/auto choice, and the style guide at /design. Applied to Today, Speed to lead, Appointments, Account audit and Overview.
+
+**Decisions made for King (also in docs/DECISIONS.md).**
+1. DECIDED FOR KING, please review: dark stays the default look (what people had); Light and Match my device are one tap away.
+2. DECIDED FOR KING, please review: the filter and each card's range are remembered in this browser and carried in the page address.
+3. DECIDED FOR KING (stable core touched lightly, read-only): every read endpoint accepts `accounts=id,id`; the filter options list ignored accounts (flagged, never counted); the Speed to lead answer carries up to 60 leads behind each week of the trend. Reverting means removing those fields.
+4. Test changes, not loosening: menu.spec and freshness.spec for the new labels and People tabs; freshness-one-source for the StatusLine rename; route-registry for the public /design page.
+5. No frontend-design skill is installed; I used the dataviz skill's palette validator. Install hint in D0.md section 8.
+
+**UNSURE.**
+- UNSURE: the leftover server on port 3100 serves stale server code (it showed the old menu), so I tested on my own server on port 3102; the lead should use a clean server.
+- UNSURE: whether a CRM link opens the dialer for a contact (KF-3); the UI says it opens the contact in the CRM. Remaining tel: links are in the Appointments Insights tab and Call lists (F3, F10).
+- UNSURE: the light theme of pages D0 did not touch (D1 verifies both themes).
+- UNSURE: the remembered filter may surprise someone who forgets it; the drawer says (on) and names what is hidden.
+
+**NOT VERIFIED LIVE.** The new `accounts=` filter and the extended `scripts/check-filter.ts` (integration chain not run); the filter list with a real test or ignored account (the demo has none); the trend rows for a real client session (scoped by the same `allowed` as the number, not exercised).
+
+**Migrations.** None.
+
+**Tests run, real result lines** (the full suite was NOT run, per the lead's speed mode).
+- `npx tsc --noEmit`: exit 0. `npx eslint src tests scripts`: 0 errors, 6 warnings (the same six).
+- `node --test` on design-tokens, ui-logic, range, trend-drill, banned-terms, zoom-hidden, access, speed-intel, speed-alerts: `ℹ tests 80, ℹ pass 80, ℹ fail 0`.
+- `npx vitest run` on ds-components, ds-drill-range, route-registry, client-access, data-inventory: `Test Files 5 passed (5), Tests 57 passed (57)`; freshness-one-source: `Tests 7 passed (7)`.
+- `npx playwright test tests/e2e/d0.spec.ts` (own server, port 3102): desktop first pass `12 passed, 1 skipped, 1 failed` (my test's fault, fixed); new KF tests at desktop `7 passed`; phone-390 plus tablet-768 `32 passed, 2 skipped, 2 failed (12.5m)`: two real bugs at 768 px (a 1050 px wide Appointments page; an uncovered name) fixed with container queries and rerun `2 passed`; later subset rerun at desktop and phone `8 passed`. Not run: menu, freshness, today, speed, appointments specs; npm run verify; the integration chain.
+
+**Files changed (summary).** New: `src/app/app/ds/*` (template, filters, alert, states, data-list, lead-drawer, charts, drill, card-range, how-to, my-day, remember, theme, index), `src/app/design/*`, `src/lib/design/{color,filters,route,range,trend-bars,ui-logic}.ts`, tests `src/lib/__tests__/{design-tokens,ui-logic,range,trend-drill}.test.ts`, `tests/unit/{ds-components,ds-drill-range}.test.ts`, `tests/e2e/d0.spec.ts`, `docs/features/D0.md`. Changed: `src/app/globals.css`, `dashboard.tsx`, `nav.ts`, `ui.tsx`, the five M1 views plus `inbox.tsx` (title), `sync-status.tsx`, `src/lib/{access,route-guards}.ts`, `src/lib/api/router.ts`, `src/lib/analytics/{speed-intel,speed-queries}.ts`, `scripts/check-filter.ts`, `tests/e2e/{menu,freshness}.spec.ts`, `tests/unit/{route-registry,freshness-one-source}.test.ts`, docs (DECISIONS, FEATURE_STATUS, PROGRESS, NEEDS_KING section 9, NOTES_COVERAGE, PROPOSALS, TENANCY). Removed: `src/app/app/views/filter-bar.tsx` (replaced by the shared filter bar).
+
+Status: D0 BUILT, awaiting King's checks. Tag for the lead: `stage-D0`.
+
+#### D0: lead engineer's note
+- Speed mode: the agent ran `npx tsc --noEmit` (exit 0), `npx eslint src tests scripts` (0 errors, 6 warnings), `node --test` on 9 test files (tests 80, pass 80, fail 0), vitest on 6 files (57 + 7 passed) and its own e2e spec `tests/e2e/d0.spec.ts` on its own port (desktop 12+7 passed, phone and tablet 32 passed, 2 skipped, 2 failed that were real 768px bugs and were fixed; the tablet rerun passed). The full suite, integration chain, and menu/freshness/today/speed/appointments e2e specs were NOT run: they run in the M1 full test.
+- King's feedback KF-1 to KF-6 applied by the agent (plain status text and banners, filter lists account names, card ranges, clickable charts). KF-7 (Clients) belongs to C1.
+- UNSURE (agent): the leftover `next dev` on 3100 serves stale server code; the lead must start from a clean server for the M1 run. No frontend-design skill is installed; dataviz skill used.
+- Status: D0 BUILT, awaiting King's checks (style approved by King in chat with one change, applied). Tag `stage-D0`.

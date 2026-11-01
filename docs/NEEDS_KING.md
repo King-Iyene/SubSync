@@ -51,11 +51,12 @@ Each item: (a) what it is, (b) why it was skipped, (c) the exact click or comman
 - (c) Reply "use the default" or give the rule.
 - (d) T1 cannot start.
 
-## 9. Style approval (D0)
-- (a) The /design style guide tokens and directions (KD Squares palette) are built and marked "style awaiting King's approval".
-- (b) Needs King's eyes.
-- (c) Open `/design` in the app after the merge and say "approved" or what to change.
-- (d) D1 polish builds on it.
+## 9. Style approval (D0): approved by King (with this one change, applied)
+- (a) The style (KD Squares palette, calm and exact, light and dark) is **approved by King, with one change: plain status words and plain banners (no dot, no tinted pill, no icon-in-a-circle box). That change is applied** (docs/features/D0.md, KF-1). The /design page still says "style awaiting King's approval" until you press approved once on the live address, because only the live page can be seen by you; a one-word reply changes the label.
+- (b) The label is yours to clear; the written comparison with two alternatives is in docs/features/D0.md section 3.
+- (c) After the merge, open `/design` on the live address and reply "approved" or what to change. Also reply "keep" or "change" for these decisions I made for you: dark stays the default look with Light and Match my device one tap away; the menu is the pilot menu with everything else under "More" and Contact search, Leads and Call lists as tabs inside People; the filter and each card's range are remembered in the browser and carried in the address.
+- (d) D1 polish builds on it; the light theme of pages D0 did not touch is checked in D1.
+- (e) New from D0 for the merge: the filter list now includes the client accounts you set to ignore (flagged, never counted) so the screen can say they are left out and why; the Speed to lead answer now carries the leads behind each week of the trend (up to 60 per week). No migration, no new permission.
 
 ## 10. Merge of the overnight branch and any held migrations
 - (a) All work is on branch `overnight/2026-11-01`. Nothing is on `main`.

@@ -59,13 +59,14 @@ import { locationAccessToken } from "../sync/engine";
 import { createHook, listHooks, listMeetings, MAX_HOOKS_PER_ACCOUNT, revokeHook, setMeetingStatus } from "../analytics/meeting-queries";
 import { buildDailyDigest, NOT_WATCHED } from "../analytics/digest-service";
 import { digestText, localParts } from "../analytics/digest-intel";
-import { industryOptions, matchesSegment, PLAYBOOKS } from "../analytics/playbooks";
+import { industryKey, industryOptions, matchesSegment, PLAYBOOKS } from "../analytics/playbooks";
 import { buildQueue, recordBulk, recordDecision, summarise, undoDecision } from "../analytics/dedupe-queries";
 import { bulkSelect, groupKey } from "../analytics/dedupe";
 import { contactTimeline, dndSummary, leadSources, recentDealMoves, setTeamName, teamPace, teamStats, upcomingBirthdays } from "../analytics/people-queries";
 import { paceOf, sourceConversion, teamLabel, teamWinRate } from "../analytics/people-intel";
 import { excludedOpenDeals, getGoals, GOAL_METRICS, loadDeals, pipelineTrend, setGoal, type GoalMetric } from "../analytics/pipeline-queries";
 import { MIN_CLOSED_DEALS as MIN_CLOSED, OUTLIER_MIN_DEALS, OUTLIER_SHARE, outlier as dealOutlier, winRateOf } from "../analytics/metrics";
+import { parsePickedAccounts } from "../design/filters";
 import { authenticate, isResponse, json, type AuthContext } from "./auth";
 
 // All authenticated data endpoints live behind /api/app/<path>. Each one needs a valid signed
@@ -83,13 +84,15 @@ async function segmentSet(ctx: Ctx): Promise<Set<string> | null> {
   const industry = ctx.url.searchParams.get("industry");
   const owner = ctx.url.searchParams.get("owner");
   const hideTest = ctx.url.searchParams.get("hideTest") === "1";
-  if ((!industry || !/^[a-z_]{2,30}$/.test(industry)) && (!owner || owner.length > 60) && !hideTest) return ctx.seg;
+  // Client accounts picked in the filter bar (D0). Only ids that are well formed are kept, and they are matched against this company's own accounts below, so an id from anywhere else changes nothing.
+  const picked = parsePickedAccounts(ctx.url.searchParams.get("accounts"));
+  if ((!industry || !/^[a-z_]{2,30}$/.test(industry)) && (!owner || owner.length > 60) && !hideTest && picked.length === 0) return ctx.seg;
   const rows = await sql()`
     select l.location_id, l.name, l.owner, p.industry from locations l
     left join account_profiles p on p.installation_id = l.installation_id and p.location_id = l.location_id
     where l.installation_id = ${ctx.installationId}`;
   const filter = { industry: industry && /^[a-z_]{2,30}$/.test(industry) ? industry : null, owner: owner && owner.length <= 60 ? owner : null };
-  ctx.seg = new Set(rows.filter((r) => matchesSegment({ industry: r.industry as string | null, owner: r.owner as string | null }, filter) && !(hideTest && isTestName(r.name as string | null))).map((r) => r.location_id as string));
+  ctx.seg = new Set(rows.filter((r) => matchesSegment({ industry: r.industry as string | null, owner: r.owner as string | null }, filter) && !(hideTest && isTestName(r.name as string | null)) && (picked.length === 0 || picked.includes(r.location_id as string))).map((r) => r.location_id as string));
   return ctx.seg;
 }
 
@@ -263,7 +266,11 @@ async function auditRevoke(ctx: Ctx) {
 async function speedViewData(ctx: Ctx) {
   const sc = await scope(ctx);
   const v = await speedView(ctx.installationId, await allowedIds(ctx), sc.settings.speedTargetMinutes);
-  return json({ ...v, waiting: v.waiting.map((w) => ({ ...w, url: sc.links.contact(w.locationId, w.contactId) })) });
+  return json({
+    ...v, waiting: v.waiting.map((w) => ({ ...w, url: sc.links.contact(w.locationId, w.contactId) })),
+    // The leads behind each week of the trend, with the same white-label link as every other list (KF-6).
+    trend: v.trend.map((w) => ({ ...w, members: w.members.map((m) => ({ ...m, url: sc.links.contact(m.locationId, m.contactId) })) })),
+  });
 }
 
 // Voting is per person and counted inside the one installation, so one agency never sees another's votes.
@@ -536,14 +543,18 @@ async function startView(ctx: Ctx) {
 
 // Options for the filter bar. Not narrowed by the filter itself, so you can always change it.
 async function segmentsView(ctx: Ctx) {
-  const rows = await sql()`
-    select l.location_id, l.name, l.owner, p.industry from locations l
+  const all = await sql()`
+    select l.location_id, l.name, l.owner, l.ignored, p.industry from locations l
     left join account_profiles p on p.installation_id = l.installation_id and p.location_id = l.location_id
-    where l.installation_id = ${ctx.installationId} and not l.ignored`;
+    where l.installation_id = ${ctx.installationId}`;
+  // Ignored accounts are listed (so the filter bar can say they are left out and why) but never counted in the totals, industries or owners.
+  const rows = all.filter((r) => !r.ignored);
   const owners = new Map<string, number>();
   for (const r of rows) if (r.owner) owners.set(r.owner as string, (owners.get(r.owner as string) ?? 0) + 1);
   return json({
     total: rows.length,
+    // The client accounts an agency can pick between in the filter bar (this endpoint is agency only; a business or client session is refused by the route policy).
+    accounts: all.map((r) => ({ id: r.location_id as string, name: (r.name as string | null) ?? "Unnamed account", test: isTestName(r.name as string | null), ignored: r.ignored === true, industry: industryKey(r.industry as string | null), owner: (r.owner as string | null) ?? null })).sort((a, b) => a.name.localeCompare(b.name)),
     testAccounts: rows.filter((r) => isTestName(r.name as string | null)).length,
     industries: industryOptions(rows.map((r) => r.industry as string | null)),
     owners: [...owners.entries()].map(([name, accounts]) => ({ name, accounts })).sort((a, b) => b.accounts - a.accounts || a.name.localeCompare(b.name)),

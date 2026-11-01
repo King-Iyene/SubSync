@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { Freshness, FreshnessState } from "@/lib/sync/freshness";
 import type { SyncPanel } from "@/lib/sync/freshness-queries";
 import { useApiClient, useData } from "../session";
+import { InlineAlert } from "../ds/alert";
 import { Badge, Btn, Card, type Tone } from "../ui";
 
 // The ONE place the screen says how fresh the data is: a thin line above every page, fed by `GET freshness`, which is the same function the
@@ -15,21 +16,26 @@ export function FreshnessStrip() {
   const f = data?.freshness;
   if (!f) return null;
   const warn = f.state === "delayed" || f.state === "failing" || f.state === "never";
+  // Quiet text in the page header, not a card (N9). Only a delayed, failing or never-synced state becomes a notice, in the one lightweight alert style.
+  const words = (
+    <>
+      <span data-testid="freshness-text" className={warn ? "font-medium text-foreground" : ""}>{f.text}</span>
+      {f.detail && <span> · {f.detail}</span>}
+    </>
+  );
+  const accounts = f.accounts.length > 1 && (
+    <details className="mt-1 text-xs text-muted-foreground">
+      <summary className="cursor-pointer select-none">Each account</summary>
+      <ul className="mt-1 space-y-0.5">
+        {f.accounts.map((a) => <li key={a.locationId}>{a.name ?? "Unnamed account"}: {a.text}{a.problem ? ` (${a.problem})` : ""}</li>)}
+      </ul>
+    </details>
+  );
   return (
-    <div className={`mb-4 rounded-lg border px-3 py-1.5 text-xs print:hidden ${warn ? "border-amber-500/40 bg-amber-500/5" : "text-muted-foreground"}`} role="status" data-testid="freshness" data-state={f.state}>
-      <p>
-        <span data-testid="freshness-text" className={warn ? "font-medium text-foreground" : ""}>{f.text}</span>
-        {f.detail && <span> · {f.detail}</span>}
-      </p>
-      {f.syncingNote && <p className="mt-1" data-testid="syncing-note">{f.syncingNote}</p>}
-      {f.accounts.length > 1 && (
-        <details className="mt-1">
-          <summary className="cursor-pointer select-none">Each account</summary>
-          <ul className="mt-1 space-y-0.5">
-            {f.accounts.map((a) => <li key={a.locationId}>{a.name ?? "Unnamed account"}: {a.text}{a.problem ? ` (${a.problem})` : ""}</li>)}
-          </ul>
-        </details>
-      )}
+    <div className="mb-4 print:hidden" data-testid="freshness" data-state={f.state}>
+      {warn ? <InlineAlert tone={f.state === "failing" ? "danger" : "warning"}>{words}</InlineAlert> : <p role="status" className="text-xs text-muted-foreground">{words}</p>}
+      {f.syncingNote && <p className="mt-1 text-xs text-muted-foreground" data-testid="syncing-note">{f.syncingNote}</p>}
+      {accounts}
     </div>
   );
 }

@@ -27,6 +27,10 @@
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-gold: var(--gold);
+  --color-gold-foreground: var(--gold-foreground);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -48,78 +52,96 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/*
+  Design tokens (stage D0). STYLE AWAITING KING'S APPROVAL: see /design.
+  The palette is KD Squares: navy #000C25 to #02244F, brand teal #0A658B, gold #D4AD58.
+  - Light theme: cool paper, navy ink, teal buttons and links.
+  - Dark theme (.dark): navy surfaces, a lighter tint of the brand teal for buttons and links (the exact brand teal is too dark to read on navy).
+  - Gold is a highlight only (the one recommended action, plan marks). It is never a status colour.
+  - Status colours (success, warning, danger) are only ever used for status, always with an icon or a word.
+  - An agency's own accent colour overrides --primary, --ring and --sidebar-primary at run time (see accentTokens in src/lib/design/color.ts).
+  Every text pair below is checked for contrast in both themes by src/lib/__tests__/design-tokens.test.ts, which reads this file.
+  Values are written as plain hex so the test and the style guide read exactly what the browser reads.
+*/
 :root {
-  /* warm paper background, ink text, deep teal brand, amber for the odd highlight */
-  --background: oklch(0.982 0.005 88);
-  --foreground: oklch(0.215 0.02 235);
-  --card: oklch(1 0.002 88);
-  --card-foreground: oklch(0.215 0.02 235);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.215 0.02 235);
-  --primary: oklch(0.43 0.09 185);
-  --primary-foreground: oklch(0.99 0.005 88);
-  --secondary: oklch(0.955 0.012 175);
-  --secondary-foreground: oklch(0.3 0.05 190);
-  --muted: oklch(0.962 0.007 88);
-  --muted-foreground: oklch(0.5 0.022 235);
-  --accent: oklch(0.945 0.03 178);
-  --accent-foreground: oklch(0.3 0.07 188);
-  --destructive: oklch(0.55 0.2 27);
-  --border: oklch(0.905 0.01 88);
-  --input: oklch(0.89 0.012 88);
-  --ring: oklch(0.58 0.1 185);
-  --chart-1: oklch(0.58 0.1 185);
-  --chart-2: oklch(0.72 0.14 75);
-  --chart-3: oklch(0.5 0.08 235);
-  --chart-4: oklch(0.65 0.13 150);
-  --chart-5: oklch(0.6 0.15 30);
+  --background: #f4f6fa;
+  --foreground: #000c25;
+  --card: #ffffff;
+  --card-foreground: #000c25;
+  --popover: #ffffff;
+  --popover-foreground: #000c25;
+  --primary: #0a658b;
+  --primary-foreground: #ffffff;
+  --secondary: #e6eef5;
+  --secondary-foreground: #02244f;
+  --muted: #edf1f6;
+  --muted-foreground: #44546f;
+  --accent: #dcebf3;
+  --accent-foreground: #02244f;
+  --destructive: #b3261e;
+  --success: #0e7a53;
+  --warning: #8a5a00;
+  --gold: #d4ad58;
+  --gold-foreground: #000c25;
+  --border: #d5dce6;
+  --input: #c4cdda;
+  --ring: #0a658b;
+  /* Categorical chart colours, always used in this order, validated for colour-blind separation (docs/features/D0.md). */
+  --chart-1: #0878a6;
+  --chart-2: #b07f16;
+  --chart-3: #5b5bd6;
+  --chart-4: #1f8f5f;
+  --chart-5: #c2410c;
   --radius: 0.75rem;
-  --sidebar: oklch(0.205 0.03 215);
-  --sidebar-foreground: oklch(0.92 0.012 200);
-  --sidebar-primary: oklch(0.76 0.13 178);
-  --sidebar-primary-foreground: oklch(0.2 0.03 215);
-  --sidebar-accent: oklch(0.28 0.04 200);
-  --sidebar-accent-foreground: oklch(0.98 0.005 200);
-  --sidebar-border: oklch(0.3 0.03 210);
-  --sidebar-ring: oklch(0.7 0.1 178);
-  --shadow-card: 0 1px 2px oklch(0.25 0.03 220 / 0.05), 0 6px 20px -10px oklch(0.25 0.03 220 / 0.14);
-  --shadow-lift: 0 2px 4px oklch(0.25 0.03 220 / 0.06), 0 12px 28px -12px oklch(0.25 0.03 220 / 0.22);
+  /* The side menu is navy in both themes. */
+  --sidebar: #000c25;
+  --sidebar-foreground: #dfe7f3;
+  --sidebar-primary: #5cbce3;
+  --sidebar-primary-foreground: #000c25;
+  --sidebar-accent: #02244f;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: #ffffff1a;
+  --sidebar-ring: #5cbce3;
+  --shadow-card: 0 1px 2px #000c2510, 0 6px 20px -10px #000c2524;
+  --shadow-lift: 0 2px 4px #000c2512, 0 12px 28px -12px #000c2538;
+  /* Motion: short, calm. Reduced-motion users get none (below). */
+  --motion-fast: 120ms;
+  --motion-base: 200ms;
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .dark {
-  --background: oklch(0.17 0.02 225);
-  --foreground: oklch(0.96 0.008 200);
-  --card: oklch(0.215 0.025 222);
-  --card-foreground: oklch(0.96 0.008 200);
-  --popover: oklch(0.215 0.025 222);
-  --popover-foreground: oklch(0.96 0.008 200);
-  --primary: oklch(0.74 0.12 178);
-  --primary-foreground: oklch(0.18 0.03 215);
-  --secondary: oklch(0.27 0.03 215);
-  --secondary-foreground: oklch(0.96 0.008 200);
-  --muted: oklch(0.255 0.025 220);
-  --muted-foreground: oklch(0.72 0.02 215);
-  --accent: oklch(0.3 0.045 200);
-  --accent-foreground: oklch(0.97 0.008 200);
-  --destructive: oklch(0.7 0.18 25);
-  --border: oklch(1 0 0 / 11%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.65 0.1 180);
-  --chart-1: oklch(0.74 0.12 178);
-  --chart-2: oklch(0.8 0.14 78);
-  --chart-3: oklch(0.7 0.08 235);
-  --chart-4: oklch(0.75 0.13 150);
-  --chart-5: oklch(0.72 0.15 30);
-  --sidebar: oklch(0.15 0.025 220);
-  --sidebar-foreground: oklch(0.92 0.012 200);
-  --sidebar-primary: oklch(0.76 0.13 178);
-  --sidebar-primary-foreground: oklch(0.2 0.03 215);
-  --sidebar-accent: oklch(0.25 0.035 210);
-  --sidebar-accent-foreground: oklch(0.98 0.005 200);
-  --sidebar-border: oklch(1 0 0 / 9%);
-  --sidebar-ring: oklch(0.65 0.1 180);
-  --shadow-card: 0 1px 2px oklch(0 0 0 / 0.3), 0 6px 20px -10px oklch(0 0 0 / 0.5);
-  --shadow-lift: 0 2px 4px oklch(0 0 0 / 0.35), 0 12px 28px -12px oklch(0 0 0 / 0.6);
+  --background: #000c25;
+  --foreground: #f1f5fb;
+  --card: #031636;
+  --card-foreground: #f1f5fb;
+  --popover: #05214a;
+  --popover-foreground: #f1f5fb;
+  --primary: #4db3dc;
+  --primary-foreground: #000c25;
+  --secondary: #0b2147;
+  --secondary-foreground: #f1f5fb;
+  --muted: #0b2147;
+  --muted-foreground: #9fb0cb;
+  --accent: #02244f;
+  --accent-foreground: #ffffff;
+  --destructive: #ff7a85;
+  --success: #3dd598;
+  --warning: #f59e3f;
+  --gold: #d4ad58;
+  --gold-foreground: #000c25;
+  --border: #ffffff1f;
+  --input: #ffffff29;
+  --ring: #4db3dc;
+  --chart-1: #2f98c4;
+  --chart-2: #b2893a;
+  --chart-3: #8678e8;
+  --chart-4: #2aa876;
+  --chart-5: #e8662f;
+  --sidebar: #000a1e;
+  --sidebar-border: #ffffff17;
+  --shadow-card: 0 1px 2px #0000004d, 0 6px 20px -10px #00000080;
+  --shadow-lift: 0 2px 4px #00000059, 0 12px 28px -12px #00000099;
 }
 
 @layer base {
@@ -145,7 +167,15 @@
   }
 }
 /* A slim scrollbar for the dark sidebar, so it does not draw a heavy light track. */
-.sidebar-scroll { scrollbar-width: thin; scrollbar-color: oklch(1 0 0 / 0.22) transparent; }
+.sidebar-scroll { scrollbar-width: thin; scrollbar-color: #ffffff38 transparent; }
 .sidebar-scroll::-webkit-scrollbar { width: 6px; }
-.sidebar-scroll::-webkit-scrollbar-thumb { background: oklch(1 0 0 / 0.22); border-radius: 9999px; }
+.sidebar-scroll::-webkit-scrollbar-thumb { background: #ffffff38; border-radius: 9999px; }
 .sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
+
+/* Loading placeholders: a soft pulse that stops for people who ask their device for less motion. */
+@keyframes ds-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+.ds-skeleton { background: var(--muted); border-radius: 0.5rem; animation: ds-pulse 1.6s var(--ease-out) infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .ds-skeleton { animation: none; }
+  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+}

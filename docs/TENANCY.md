@@ -56,6 +56,7 @@ A person in one client account never sees another client account's data. An agen
 | `/audit/[id]` | public_by_design | Shared audit snapshot: 192-bit random id, 14-day expiry, switch-off by its owner, rate limited, totals, finding titles and a fix plan only, account names removed |
 | `/` | public_static | Marketing page |
 | `/app` | public_static | App shell with no data; data comes from `api/app` with a session |
+| `/design` | public_static | The style guide (stage D0): tokens and shared components on made-up sample data produced in the page's own code; no sign-in, no tenant data, no API calls, noindex |
 | `/installed` | public_static | Static page |
 | `/installed/error` | public_static | Static page |
 | `/privacy` | public_static | Legal page with no tenant data. Its lists of what is stored and deleted come from `src/lib/data-inventory.ts`, checked against the schema; the one thing read per request is the global switch for Zoom and Google Meet |

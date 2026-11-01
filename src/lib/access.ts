@@ -124,7 +124,7 @@ export function routeAllowed(kind: AccessKind, method: string, segments: string[
 
 // Pages (by nav id) each kind sees. The server enforces the same boundary; this only hides links.
 export const NAV_FOR: Record<AccessKind, ReadonlySet<string>> = {
-  agency: new Set(["today", "audit", "speed", "overview", "accounts", "clients", "team", "appointments", "meetings", "cleanup", "search", "deals", "pipeline", "leads", "calls", "inbox", "onboarding", "email", "duplicates", "alerts", "settings", "help", "roadmap"]),
-  business: new Set(["today", "audit", "speed", "overview", "team", "appointments", "meetings", "cleanup", "search", "deals", "pipeline", "leads", "calls", "inbox", "onboarding", "email", "duplicates", "alerts", "settings", "help", "roadmap"]),
-  client: new Set(["audit", "speed", "overview", "appointments", "search", "deals", "pipeline", "leads", "inbox", "duplicates", "onboarding", "alerts", "help", "roadmap"]),
+  agency: new Set(["today", "people", "audit", "speed", "overview", "accounts", "clients", "team", "appointments", "meetings", "cleanup", "search", "deals", "pipeline", "leads", "calls", "inbox", "onboarding", "email", "duplicates", "alerts", "settings", "help", "roadmap"]),
+  business: new Set(["today", "myday", "people", "audit", "speed", "overview", "team", "appointments", "meetings", "cleanup", "search", "deals", "pipeline", "leads", "calls", "inbox", "onboarding", "email", "duplicates", "alerts", "settings", "help", "roadmap"]),
+  client: new Set(["myday", "people", "audit", "speed", "overview", "appointments", "search", "deals", "pipeline", "leads", "inbox", "duplicates", "onboarding", "alerts", "help", "roadmap"]),
 };
