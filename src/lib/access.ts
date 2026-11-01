@@ -108,7 +108,7 @@ const BUSINESS_RULES: Rule[] = [
   ["POST", "email", "check"], ["POST", "alerts"], ["POST", "duplicates"], ["POST", "usage"], ["POST", "roadmap"], ["POST", "audit", "share"], ["POST", "audit", "revoke"], ["POST", "sync"], ["POST", "call-lists"], ["POST", "call-outcomes"],
   ["POST", "settings", "test-slack"], ["POST", "settings", "purge"], ["POST", "api-keys"],
   ["DELETE", "call-lists"], ["POST", "inbox", "views"], ["DELETE", "inbox", "views"],
-  ["GET", "team"], ["PUT", "team"], ["PUT", "settings"], ["PUT", "goals"], ["PUT", "accounts"], ["PUT", "stage-rules"],
+  ["GET", "team"], ["PUT", "team"], ["PUT", "settings"], ["PUT", "goals"], ["PUT", "appointments", "targets"], ["PUT", "accounts"], ["PUT", "stage-rules"],
 ];
 
 export function routeAllowed(kind: AccessKind, method: string, segments: string[]): boolean {

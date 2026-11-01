@@ -51,7 +51,8 @@ import { buildSharePayload } from "../analytics/share-intel";
 import { randomBytes } from "node:crypto";
 import { emailConfigured } from "../email";
 import { validEmail } from "../analytics/weekly-email";
-import { appointmentView } from "../analytics/appointment-queries";
+import { appointmentBreakdown, appointmentDetail, appointmentView, setShowRateTarget } from "../analytics/appointment-queries";
+import { clampTarget, parseFilters as parseApptFilters, parseWindow as parseApptWindow } from "../analytics/appointment-f3";
 import { compareSetup, describe as describeDiff } from "../analytics/setup-intel";
 import { applyRun, createPreview, getRun, installationHasScope, listRuns, PREVIEW_VALID_HOURS, sampleChanges, undoRun } from "../analytics/cleanup-queries";
 import { parseParams } from "../analytics/cleanup-intel";
@@ -319,24 +320,71 @@ async function roadmapVote(ctx: Ctx) {
   return json({ ok: true, voted: gone.length === 0 });
 }
 
+// The date window and the three filters come from the address (from, to, cmpFrom, cmpTo, calendar, user, source). They only narrow what the caller is
+// already allowed to see: the accounts are fixed by allowedIds, never by anything sent here.
+function apptParams(ctx: Ctx) {
+  const q = ctx.url.searchParams;
+  return {
+    window: parseApptWindow({ from: q.get("from"), to: q.get("to"), cmpFrom: q.get("cmpFrom"), cmpTo: q.get("cmpTo") }, Date.now()),
+    filters: parseApptFilters({ calendar: q.get("calendar"), user: q.get("user"), source: q.get("source") }),
+  };
+}
+
+// A list row with its white-label link to the contact. A booking with no contact has no link.
+function withLink<T extends { locationId: string; contactId: string | null }>(sc: Awaited<ReturnType<typeof scope>>) {
+  return (p: T) => ({ ...p, url: p.contactId ? sc.links.contact(p.locationId, p.contactId) : null });
+}
+
 async function appointmentsView(ctx: Ctx) {
   const sc = await scope(ctx);
-  const v = await appointmentView(ctx.installationId, await allowedIds(ctx));
-  const link = (p: { locationId: string; contactId: string }) => sc.links.contact(p.locationId, p.contactId);
+  const v = await appointmentView(ctx.installationId, await allowedIds(ctx), Date.now(), apptParams(ctx));
+  const link = withLink(sc);
   return json({
-    ...v, canSeeAccounts: ctx.limitTo === null,
-    unconfirmed: v.unconfirmed.map((p) => ({ ...p, url: link(p) })), recover: v.recover.map((p) => ({ ...p, url: link(p) })), unmarked: v.unmarked.map((p) => ({ ...p, url: link(p) })),
+    ...v, canSeeAccounts: ctx.limitTo === null, canEditTargets: ctx.kind !== "client",
+    items: v.items.map(link), upcoming: v.upcoming.map(link), unmarked: v.unmarked.map(link), recover: v.recover.map(link),
+    // The "My day" page and the audit read this older shape: the people to remind (booked, not confirmed, within two days).
+    unconfirmed: v.upcoming.filter((r) => r.unconfirmed).slice(0, 15).map(link),
   });
+}
+
+// The calendar, person and client-account breakdowns: their own window, the same three filters.
+async function appointmentsBreakdownView(ctx: Ctx) {
+  const sc = await scope(ctx);
+  const v = await appointmentBreakdown(ctx.installationId, await allowedIds(ctx), Date.now(), apptParams(ctx));
+  return json({ ...v, canSeeAccounts: ctx.limitTo === null, items: v.items.map(withLink(sc)) });
+}
+
+// One appointment. The account it belongs to must be one the caller may see; anything else is "not found", the same answer as an id that does not exist.
+async function appointmentDetailView(ctx: Ctx, locationId: string, appointmentId: string) {
+  const sc = await scope(ctx);
+  const found = await appointmentDetail(ctx.installationId, await allowedIds(ctx), locationId, appointmentId);
+  if (!found || !sc.permits(locationId)) return json({ error: "Appointment not found" }, 404);
+  return json({ ...found, url: found.contact ? sc.links.contact(locationId, found.contact.contactId) : null });
+}
+
+// The show-rate target is the account's own setting. A client's staff cannot change it (the route policy refuses them too); the change is written to the audit log.
+async function appointmentTargetUpdate(ctx: Ctx) {
+  if (ctx.kind === "client") return json({ error: "Not available in this view" }, 403);
+  const body = (await ctx.request.json().catch(() => null)) as { showRate?: unknown } | null;
+  const value = body?.showRate === null ? null : clampTarget(body?.showRate);
+  if (body === null || (body.showRate !== null && value === null)) return json({ error: "Choose a show-rate target between 30% and 100%" }, 400);
+  if (ctx.demo) return json({ error: "Targets cannot be changed in the demo" }, 400);
+  await setShowRateTarget(ctx.installationId, value);
+  await sql()`insert into audit_log (installation_id, actor, action, detail) values (${ctx.installationId}, ${ctx.session.userId ?? ctx.kind}, 'appointments.target_changed', ${sql().json({ showRate: value } as never)})`;
+  return json({ ok: true, showRate: value });
 }
 
 // The deeper read of the same calendars: show rate by time and source, recovery, fairness, follow-up gaps and
 // a short brief before each upcoming appointment. Limited to the accounts the caller may see.
 async function appointmentInsightsView(ctx: Ctx) {
   const sc = await scope(ctx);
-  const v = await appointmentInsights(ctx.installationId, await allowedIds(ctx));
+  const v = await appointmentInsights(ctx.installationId, await allowedIds(ctx), Date.now(), apptParams(ctx));
   const link = (p: { locationId: string; contactId: string }) => sc.links.contact(p.locationId, p.contactId);
+  const itemLink = withLink(sc);
   return json({
-    ...v,
+    ...v, canEditTargets: ctx.kind !== "client",
+    items: v.items.map(itemLink),
+    funnel: { ...v.funnel, steps: v.funnel.steps.map((s) => ({ ...s, members: s.members.map((m) => ({ ...m, url: link(m) })) })) },
     repeatNoShows: v.repeatNoShows.map((p) => ({ ...p, url: link(p) })),
     followUp: { ...v.followUp, contacts: v.followUp.contacts.map((p) => ({ ...p, url: link(p) })) },
     briefs: v.briefs.map((p) => ({ ...p, url: link(p) })),
@@ -1611,6 +1659,8 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       if (a === "overview") return await overview(ctx);
       if (a === "daily") return await dailyView(ctx);
       if (a === "roadmap") return await roadmapView(ctx);
+      if (a === "appointments" && b === "breakdown") return await appointmentsBreakdownView(ctx);
+      if (a === "appointments" && b && c && LOCATION_ID.test(b) && LOCATION_ID.test(c)) return await appointmentDetailView(ctx, b, c);
       if (a === "appointments") return await appointmentsView(ctx);
       if (a === "audit" && b === "shares") return await auditShares(ctx);
       if (a === "audit") return await auditViewData(ctx);
@@ -1695,6 +1745,7 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
     }
     if (method === "PUT") {
       if (a === "settings") return await settingsUpdate(ctx);
+      if (a === "appointments" && b === "targets") return await appointmentTargetUpdate(ctx);
       if (a === "goals") return await goalsUpdate(ctx);
       if (a === "stage-rules") return await stageRuleSave(ctx);
       if (a === "meetings" && b) return await meetingUpdate(ctx, b);

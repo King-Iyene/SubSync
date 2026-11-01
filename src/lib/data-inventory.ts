@@ -56,7 +56,8 @@ export const INVENTORY: Record<string, TableInfo> = {
   },
   cached_appointments: {
     noun: "appointments", line: "appointments",
-    personal: { title: "appointment title", calendar_name: "calendar name", assigned_to: "the team member it is assigned to" },
+    personal: { title: "appointment title", calendar_name: "calendar name", assigned_to: "the team member it is assigned to", booked_by_user: "the team member who booked it" },
+    notPersonal: ["booking_channel"],
   },
   appointment_events: { noun: "appointment history", line: "appointments" },
   locations: {
