@@ -16,3 +16,14 @@ Re-read those files and `docs/PROGRESS.md` in full at the start of every stage a
 2. DECIDED FOR KING, please review: the review notes N1 to N26 were read in full tonight; N27 to N104 headings and stage lines were read for the ledger, and each note is read in full when the stage that handles it starts (logged per stage).
 
 ## Stage log
+
+### Baseline close-out (S0.3 treated as PASSED by King's pre-approval; King still does his 5 checks)
+
+Commands and real results (1 Nov 2026, on `overnight/2026-11-01`):
+- `node scripts/with-dev-server.mjs` (nine integration checks, run in two parts because of the fixture fix): check-api passed ("All API checks passed"), check-connections passed, check-insights passed; then `CHECKS=check-tenancy,check-flags,check-metrics,check-audit,check-speed,check-roadmap`: tenant isolation (384 cross-reads) ok, feature switches ok, overview numbers ok, account audit ok, speed to lead ok, roadmap ok, `checks exit: 0`.
+- `npm run verify`: `verify exit: 0`; Node tests `ℹ tests 329, pass 329, fail 0`; Vitest `Test Files 17 passed (17), Tests 116 passed (116)`; lint 0 errors, 6 warnings.
+- `npm run e2e` (Playwright, three widths): `156 passed (45.1m)`, `1 failed`, `146 skipped` (the review-capture spec only runs with REVIEW=1), `3 did not run` (the three tests after the failure in the same serial file).
+- The 1 failure (phone-390, settings spec "brand name"): TWO causes, both fixed. (1) Saving a setting ran a full recompute of every account (22 seconds on the demo tenant) even for a brand name; `settingsUpdate` in `src/lib/api/router.ts` now recomputes only when a setting that feeds a number or alert changed (`INSIGHT_SETTINGS`). That is a real fix: a 22 second save on a brand name would also have hurt customers. (2) The test looked at the first element containing the brand name, which on a phone is the hidden desktop sidebar: the test is wrong, now `.filter({ visible: true })`. Rerun on phone-390: brand test, Getting started, What's new, five groups: `4 passed (1.0m)`; the whole settings spec had 5 passing before the brand test ran. The demo tenant's brand name was restored (the test restores it; a manual PUT also restored it).
+- Fixtures: the tenancy fixture lost its refresh token so the production cron cannot queue jobs for it (this had caused `jobs: 2 !== 1` once). A stale `next dev` server on port 3100 had caused a 503 on the Zoom check.
+
+DECIDED FOR KING, please review: the stage agents (sub-agents, one at a time) build each stage from `docs/OVERNIGHT_AGENT_BRIEF.md`; I (the lead engineer) re-run the full suite and commit/tag each stage myself.

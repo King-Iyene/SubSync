@@ -809,6 +809,8 @@ function publicSettings(s: Settings) {
   return { staleDays: s.staleDays, dormantDays: s.dormantDays, slaHours: s.slaHours, appDomain: s.appDomain, digestEnabled: s.digestEnabled, customChecklist: s.customChecklist, digestHour: s.digestHour, digestTimezone: s.digestTimezone, digestEmail: s.digestEmail, emailReady: emailConfigured(), brandName: s.brandName, brandColor: s.brandColor, industryTargets: s.industryTargets, keepTranscripts: s.keepTranscripts, pushNotesToCrm: s.pushNotesToCrm, speedTargetMinutes: s.speedTargetMinutes, countAutomatedTouches: s.countAutomatedTouches, speedBusinessHours: s.speedBusinessHours, speedOpenHour: s.speedOpenHour, speedCloseHour: s.speedCloseHour, alertQuietHours: s.alertQuietHours };
 }
 
+const INSIGHT_SETTINGS = new Set(["staleDays", "dormantDays", "slaHours", "speedTargetMinutes", "countAutomatedTouches", "speedBusinessHours", "speedOpenHour", "speedCloseHour", "industryTargets", "alertQuietHours"]);
+
 async function settingsUpdate(ctx: Ctx) {
   const body = (await ctx.request.json().catch(() => null)) as Record<string, unknown> | null;
   if (!body) return json({ error: "Invalid request" }, 400);
@@ -881,7 +883,9 @@ async function settingsUpdate(ctx: Ctx) {
     patch.customChecklist = [...new Set(list.map((x: string) => x.trim()))];
   }
   await updateSettings(ctx.installationId, patch);
-  await refreshInsights(ctx.installationId);
+  // Recomputing every account takes many seconds. Only settings that feed a number or an alert need it; a brand name, an email address or a
+  // Slack address changes no figure, so saving those returns at once.
+  if (Object.keys(patch).some((k) => INSIGHT_SETTINGS.has(k))) await refreshInsights(ctx.installationId);
   return settingsView(ctx);
 }
 

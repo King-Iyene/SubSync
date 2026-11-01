@@ -84,7 +84,8 @@ test("brand name: sign-in carries it and the screens show it instead of ours", a
     expect(((await sso.json()) as Json).brand.name).toBe("Acme Marketing");
     await page.goto("/app#help");
     await page.reload();
-    await expect(page.getByText("Acme Marketing").first()).toBeVisible();
+    // On a phone the sidebar that also carries the name is hidden, so look for a match a person can see, not just the first one in the page.
+    await expect(page.getByText("Acme Marketing").filter({ visible: true }).first()).toBeVisible();
     expect(await page.locator("body").innerText()).not.toMatch(/subsync/i);
   } finally { await c.put("settings", { brandName: null }); }
 });
