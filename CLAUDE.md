@@ -395,3 +395,21 @@ Read this whole file. Then:
 3. Give me exact portal steps for the Pricing tab (section 11.2).
 4. Then start Wave 1 in order, one module at a time, each verified on live data before the next.
 Do not add features not listed here without asking.
+
+<!-- SUBSYNC OPERATING PRINCIPLES START -->
+OPERATING PRINCIPLES (apply to every stage)
+1. Evaluate before building. Before any build, write 5 lines in the stage file: (a) the decision this feature supports and for whom, (b) whether the data is truly available in the live API with our scopes (test it, do not assume), (c) whether the CRM already does it natively or a competitor does it well, (d) the simplest version that proves value, (e) the risk (data, privacy, scope, cost). If the answer to (b) is no, find the best available alternative. If there is still no way, do not build it: record it in docs/BLOCKED.md with what you tried and what would unlock it.
+2. Do not build something just because it was asked. If you think a requested feature is a bad idea, say so and propose the better one. King decides.
+3. Verify after building: real data, real roles (agency owner, agency staff, client admin, client user), real browser. A feature is not done until it works, not until it compiles.
+4. Innovation: for each module, offer one or two differentiated proposals with evidence for why they would matter. Label them PROPOSAL. Never build a proposal without King's approval.
+5. Never promise in the UI, in a listing, or in a plan description anything that is not live and verified. If a screen states what the product does or stores, an automated check must prove it.
+6. Say exactly why something is unavailable: "Needs permission: reconnect", "Not available from the platform yet", or show the data. Never blur these.
+7. Plain words for non-technical users (setters, realtors, small business owners). No internal terms. Explain every score and estimate in one line.
+8. Protect people: DND and unsubscribed contacts are never deleted or messaged. Contacts with active payments, workflows, open deals, or upcoming appointments are protected from bulk deletes and merges.
+9. Respect trust: SubSync is built in Nigeria and sold abroad, so accuracy and transparency matter more. Be upfront about who we are, what we read, and what we store.
+10. Use the frontend-design (or UI/UX) skill for any UI work if it is installed. If it is not, tell King how to install it.
+11. King's standing decision on write permissions (stated many times): write scopes MAY be requested whenever a feature needs them, as OPTIONAL scopes, with guardrails (preview, confirm, undo, audit log, role permission, caps, idempotent writes, DND and active-payment protection). Do not ask King again whether write is allowed. Ask only about the specific guardrails or wording.
+12. Connections have an owner. A personal tool (Fathom, Zoom, Google Meet) belongs to the person who connected it: one connection per user, tokens never visible to anyone else, no shared or agency-assigned connections. A workspace tool (Slack, the sending domain) belongs to the account and needs an admin (the agency may also have its own agency-level Slack for its own cross-account digest; a client's Slack never receives another client's data). Admins see status and counts, never content.
+13. Never place data by guessing. A meeting, note, or message goes to a contact only when it is matched with certainty; otherwise it waits in the person's private inbox. No setting may route one client's data into another client's account.
+14. Our own writes must never change our own numbers. Anything SubSync creates (notes, internal comments) is logged and excluded from reply, activity, and engagement metrics, and from webhook echoes.
+<!-- SUBSYNC OPERATING PRINCIPLES END -->
