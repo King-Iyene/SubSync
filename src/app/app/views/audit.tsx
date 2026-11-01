@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useApiClient, useData } from "../session";
 import type { GoFn } from "../nav";
 import { Badge, Btn, Card, Empty, ErrorBox, fmtMoney, Loading, PageHeader, Stat, type Tone } from "../ui";
@@ -9,6 +9,9 @@ type Finding = {
   key: string; severity: "critical" | "warning" | "info"; title: string; detail: string; count: number | null; dollars: number | null;
   kind: "fact" | "estimate" | "none"; view: "deals" | "inbox" | "appointments" | "accounts" | "settings"; fix: string;
 };
+type ShareLink = { id: string; url: string; createdAt: string; expiresAt: string; revoked: boolean; expired: boolean; views: number; lastViewedAt: string | null };
+const shortDate = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
+
 type Data = {
   audit: {
     accountsScanned: number; staleDollars: number; estimatedDollars: number | null; headline: string; findings: Finding[];
@@ -28,6 +31,10 @@ export function AuditView({ go }: { go: GoFn }) {
   const [copied, setCopied] = useState(false);
   const [link, setLink] = useState<string | null>(null);
   const [sharing, setSharing] = useState(false);
+  const [links, setLinks] = useState<ShareLink[]>([]);
+  const loadLinks = useCallback(() => { api.get<{ links: ShareLink[] }>("audit/shares").then((r) => setLinks(r.links)).catch(() => setLinks([])); }, [api]);
+  useEffect(() => { loadLinks(); }, [loadLinks]);
+  const revoke = async (id: string) => { try { await api.post("audit/revoke", { id }); } finally { loadLinks(); } };
   if (loading && !data) return <Loading label="Auditing your accounts..." />;
   if (error) return <ErrorBox error={error} onRetry={reload} />;
   if (!data) return null;
@@ -35,7 +42,7 @@ export function AuditView({ go }: { go: GoFn }) {
 
   const share = async () => {
     setSharing(true);
-    try { setLink((await api.post<{ url: string }>("audit/share")).url); } catch { setLink("Could not create a link. Try again."); } finally { setSharing(false); }
+    try { setLink((await api.post<{ url: string }>("audit/share")).url); loadLinks(); } catch { setLink("Could not create a link. Try again."); } finally { setSharing(false); }
   };
 
   const copy = async () => {
@@ -58,8 +65,24 @@ export function AuditView({ go }: { go: GoFn }) {
 
       {link && (
         <p className="mb-4 break-all rounded-xl border border-primary/40 bg-primary/5 px-4 py-3 text-sm" role="status">
-          {link.startsWith("http") ? <>Share this link. It shows totals and finding titles only, no account names, and expires in 30 days: <a className="font-medium underline" href={link} target="_blank" rel="noreferrer">{link}</a></> : link}
+          {link.startsWith("http") ? <>Share this link. It shows totals and finding titles only, no account names, and works for 14 days. You can switch it off at any time below: <a className="font-medium underline" href={link} target="_blank" rel="noreferrer">{link}</a></> : link}
         </p>
+      )}
+
+      {links.length > 0 && (
+        <Card title="Your share links" className="mb-4 print:hidden">
+          <ul className="divide-y text-sm">
+            {links.map((l) => (
+              <li key={l.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                <span>
+                  Made {shortDate(l.createdAt)} · {l.revoked ? "switched off" : l.expired ? "expired" : `works until ${shortDate(l.expiresAt)}`} · opened {l.views} {l.views === 1 ? "time" : "times"}
+                  <span className="ml-2 text-xs text-muted-foreground">ends ...{l.id.slice(-6)}</span>
+                </span>
+                {!l.revoked && !l.expired && <Btn variant="ghost" onClick={() => revoke(l.id)}>Switch off</Btn>}
+              </li>
+            ))}
+          </ul>
+        </Card>
       )}
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

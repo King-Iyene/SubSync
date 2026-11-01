@@ -123,3 +123,13 @@ connections, appointment insights, two-agency tenant isolation, feature switches
 | Insights tab | Verified working on the demo at 3 widths | Browser test with screenshots; real windows are empty (all 38 real appointments are from September) |
 | AI assistant connector switched on (no feature is off by default now) | Built | Flag tests; read-only, per-client-account, API key required |
 | Menu: Settings, Getting started and What's new pinned so they are always visible; spacing compacted | Built | Browser test on a short window |
+
+## Runbook stage F6 (31 Oct 2026)
+
+| Item | Status | Tested |
+| --- | --- | --- |
+| Share link: 14-day expiry, view count, owner-only switch off, audit log entry | Built | Tenant isolation script (real server and database) |
+| Public page: noindex, generic preview, no names, rate limit, snapshot and expiry dates | Built | Tenant isolation script, logged-out browser test |
+| One-page fix plan and "What we found" on the public page | Built | Browser test; sample audit carries fix steps |
+| Print on A4 and Letter | Built | Browser test: real PDFs of 2 pages or fewer |
+| Real estate sample audit (fictional) | Live at /audit/sample-real-estate-team-audit | Browser test |

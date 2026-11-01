@@ -215,9 +215,34 @@ async function auditShare(ctx: Ctx) {
   if (ctx.demo) return json({ error: "Sharing is not available in the demo" }, 400);
   const { audit, who, names } = await computeAudit(ctx);
   const id = randomBytes(24).toString("base64url");
-  await sql()`insert into shared_audits (installation_id, id, payload) values (${ctx.installationId}, ${id}, ${sql().json(buildSharePayload(audit, who, names) as never)})`;
+  await sql()`insert into shared_audits (installation_id, id, payload, expires_at) values (${ctx.installationId}, ${id}, ${sql().json(buildSharePayload(audit, who, names) as never)}, now() + interval '14 days')`;
   const origin = (process.env.NEXT_PUBLIC_APP_URL ?? ctx.url.origin).replace(/\/+$/, "");
-  return json({ url: `${origin}/audit/${id}`, expiresInDays: 30 });
+  return json({ url: `${origin}/audit/${id}`, expiresInDays: 14 });
+}
+
+// The links this installation has made, newest first, with how often each was opened. Never available to a client's own staff.
+async function auditShares(ctx: Ctx) {
+  if (ctx.kind === "client") return json({ error: "Not available in this view" }, 403);
+  if (ctx.demo) return json({ links: [] }); // the demo installation holds the public sample audit; it is never listed or switched off from here
+  const rows = await sql()`select id, created_at, expires_at, revoked_at, views, last_viewed_at from shared_audits where installation_id = ${ctx.installationId} order by created_at desc limit 20`;
+  const origin = (process.env.NEXT_PUBLIC_APP_URL ?? ctx.url.origin).replace(/\/+$/, "");
+  const now = Date.now();
+  return json({ links: rows.map((r) => ({
+    id: r.id as string, url: `${origin}/audit/${r.id}`, createdAt: (r.created_at as Date).toISOString(), expiresAt: (r.expires_at as Date).toISOString(),
+    revoked: r.revoked_at !== null, expired: (r.expires_at as Date).getTime() <= now, views: r.views as number, lastViewedAt: r.last_viewed_at instanceof Date ? r.last_viewed_at.toISOString() : null,
+  })) });
+}
+
+// Switching a link off. Only this installation's own links can be revoked: the id alone is not enough.
+async function auditRevoke(ctx: Ctx) {
+  if (ctx.kind === "client") return json({ error: "Not available in this view" }, 403);
+  if (ctx.demo) return json({ error: "Sharing is not available in the demo" }, 400);
+  const body = (await ctx.request.json().catch(() => null)) as { id?: unknown } | null;
+  if (typeof body?.id !== "string" || !/^[A-Za-z0-9_-]{20,64}$/.test(body.id)) return json({ error: "Unknown link" }, 400);
+  const done = await sql()`update shared_audits set revoked_at = now() where id = ${body.id} and installation_id = ${ctx.installationId} and revoked_at is null returning id`;
+  if (done.length === 0) return json({ error: "That link was not found or is already switched off" }, 404);
+  await sql()`insert into audit_log (installation_id, actor, action, detail) values (${ctx.installationId}, ${ctx.session.userId ?? ctx.kind}, 'audit.share_revoked', ${sql().json({ ref: body.id.slice(-6) } as never)})`;
+  return json({ ok: true });
 }
 
 // How fast new leads get a first reply from a person.
@@ -1394,6 +1419,7 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       if (a === "daily") return await dailyView(ctx);
       if (a === "roadmap") return await roadmapView(ctx);
       if (a === "appointments") return await appointmentsView(ctx);
+      if (a === "audit" && b === "shares") return await auditShares(ctx);
       if (a === "audit") return await auditViewData(ctx);
       if (a === "speed") return await speedViewData(ctx);
       if (a === "appointment-insights") return await appointmentInsightsView(ctx);
@@ -1442,6 +1468,7 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       if (a === "email" && b === "check") return await emailCheck(ctx);
       if (a === "usage" && !b) return await usagePing(ctx);
       if (a === "audit" && b === "share") return await auditShare(ctx);
+      if (a === "audit" && b === "revoke") return await auditRevoke(ctx);
       if (a === "roadmap" && !b) return await roadmapVote(ctx);
       if (a === "cleanup" && b === "preview") return await cleanupPreview(ctx);
       if (a === "cleanup" && b && c === "apply") return await cleanupWork(ctx, b, "apply");

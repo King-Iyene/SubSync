@@ -69,8 +69,9 @@ async function main() {
       `/api/app/overview?industry=medical&owner=${other.marker}`, `/api/app/search?q=${me.marker}`,
     ];
 
+    // TENANCY_FAST=1 skips the long cross-read sweep (while iterating on the share link and write attacks); the full run does not.
     let sweeps = 0;
-    for (const [me, other] of sides) {
+    for (const [me, other] of process.env.TENANCY_FAST === "1" ? [] : sides) {
       const tokens = [
         ["agency", session(me, "agency")],
         ["business", session(me, "business", me.locs[0])],
@@ -160,6 +161,7 @@ async function main() {
       ["PUT", "/api/app/settings", { staleDays: 5 }], ["POST", "/api/app/audit/share", {}], ["POST", "/api/app/sync", {}],
       ["PUT", `/api/app/accounts/${A.locs[0]}/flags`, { ignored: true }], ["GET", "/api/app/settings", undefined], ["GET", "/api/app/connections", undefined],
       ["POST", "/api/app/meetings/hooks", { locationId: A.locs[0] }], ["POST", "/api/app/cleanup/preview", { locationId: A.locs[0], rules: ["name"] }],
+      ["POST", "/api/app/audit/revoke", { id: "x".repeat(30) }], ["GET", "/api/app/audit/shares", undefined],
     ];
     for (const [method, path, body] of refused) {
       const r = await call(path, tokenAccountUser, { method, body: body === undefined ? undefined : JSON.stringify(body) });
@@ -196,6 +198,46 @@ async function main() {
       assert.ok(res.status === 404 || html.toLowerCase().includes("could not be found") || html.includes("404"), "an unknown id shows the not-found page");
     }
 
+    // Share link lifecycle (F6): 14 day expiry, a view count, generic previews, noindex, revoke only by the owner, a rate limit.
+    {
+      const listA = async () => JSON.parse((await call("/api/app/audit/shares", tokenA)).text).links as Array<{ id: string; createdAt: string; expiresAt: string; revoked: boolean; views: number }>;
+      const mine = (await listA()).find((l) => l.id === idA);
+      assert.ok(mine, "the new link is in its owner's list");
+      const days = (Date.parse(mine.expiresAt) - Date.parse(mine.createdAt)) / 86_400_000;
+      assert.ok(days > 13.9 && days < 14.1, `a new link works for 14 days (got ${days.toFixed(2)})`);
+      assert.ok(!(await (await call("/api/app/audit/shares", tokenB)).text).includes(idA), "another agency's list never shows this link");
+      assert.equal((await call("/api/app/audit/shares", session(A, "client", A.locs[0]))).status, 403, "an account user cannot list links");
+
+      // The public page: noindex, no name in the preview tags, and a view is counted.
+      const before = (await listA()).find((l) => l.id === idA)?.views ?? 0;
+      const html2 = await (await fetch(`${BASE}/audit/${idA}`)).text();
+      assert.match(html2, /<meta name="robots" content="[^"]*noindex/i, "the page asks not to be indexed");
+      assert.match(html2, /property="og:title" content="Account audit"/, "the preview title is generic");
+      for (const marker of [A.marker, B.marker]) assert.ok(!html2.includes(marker), "no agency name anywhere in the page or its preview tags");
+      const after = (await listA()).find((l) => l.id === idA)?.views ?? 0;
+      assert.ok(after > before, `a view is counted (${before} to ${after})`);
+
+      // Only the owner can switch a link off: another agency, an account user and a made-up id all fail, and the link keeps working.
+      assert.equal((await call("/api/app/audit/revoke", tokenB, { method: "POST", body: JSON.stringify({ id: idA }) })).status, 404, "another agency cannot revoke it");
+      assert.equal((await call("/api/app/audit/revoke", session(A, "client", A.locs[0]), { method: "POST", body: JSON.stringify({ id: idA }) })).status, 403, "an account user cannot revoke it");
+      assert.equal((await call("/api/app/audit/revoke", tokenA, { method: "POST", body: JSON.stringify({ id: "short" }) })).status, 400, "a malformed id is refused");
+      assert.ok((await (await fetch(`${BASE}/audit/${idA}`)).text()).includes("Snapshot taken"), "still works after the failed attempts");
+
+      // The owner switches it off: the public page no longer shows it, the list says so, and a second revoke finds nothing to do.
+      assert.equal((await call("/api/app/audit/revoke", tokenA, { method: "POST", body: JSON.stringify({ id: idA }) })).status, 200);
+      const gone = await (await fetch(`${BASE}/audit/${idA}`)).text();
+      assert.ok(!gone.includes("Snapshot taken") && !gone.includes("What we found"), "a switched-off link shows nothing");
+      assert.equal((await listA()).find((l) => l.id === idA)?.revoked, true);
+      assert.equal((await call("/api/app/audit/revoke", tokenA, { method: "POST", body: JSON.stringify({ id: idA }) })).status, 404, "revoking twice is a no-op");
+
+      // Rate limit: past 30 lookups a minute from one address even a valid link is refused. (A link made just for this.)
+      const idC = (JSON.parse((await call("/api/app/audit/share", tokenA, { method: "POST", body: "{}" })).text).url as string).split("/").pop() as string; // the link's own origin may be another host, so ask this server
+      let refusedAt = 0;
+      for (let i = 1; i <= 45 && !refusedAt; i++) if (!(await (await fetch(`${BASE}/audit/${idC}`)).text()).includes("Snapshot taken")) refusedAt = i;
+      assert.ok(refusedAt > 0 && refusedAt <= 45, "a burst of lookups is eventually refused");
+      await call("/api/app/audit/revoke", tokenA, { method: "POST", body: JSON.stringify({ id: idC }) });
+    }
+
     // The webhook: unsigned or wrongly signed deliveries change nothing.
     const body = JSON.stringify({ type: "UNINSTALL", companyId: B.company, webhookId: "xtest-wh-1" });
     assert.equal((await fetch(`${BASE}/api/webhooks/ghl`, { method: "POST", body })).status, 401, "unsigned");
@@ -215,7 +257,7 @@ async function main() {
 }
 
 main().catch(async (error) => {
-  console.error("FAILED:", error instanceof Error ? error.stack : error);
+  console.error("FAILED:", error instanceof Error ? error.stack : error, error instanceof Error && error.cause ? `\ncause: ${String(error.cause)}` : "");
   try { await sql()`delete from installations where company_id in ('xtest-agency-a', 'xtest-agency-b')`; await closeDb(); } catch { /* best effort */ }
   process.exit(1);
 });

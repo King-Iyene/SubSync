@@ -248,3 +248,10 @@ Format: date, decision, reason.
 - Appointment rules: invalid appointments are in no figure; a claim about change needs 10 recorded outcomes (rates) or 10 bookings (volume) in the earlier period; group events are not clashes; "same day" uses the client account's time zone.
 - King asked that no page be hidden. Nothing is switched off by default now (the AI assistant connector was the last). The runbook's F5 step "hide the Overview page" is not done: Overview stays in the menu. The only pages not shown are the ones a client account's own staff must not see (Settings, Accounts, Clients, Team and similar), which is a security rule, not a feature switch.
 - The sidebar keeps Settings, Getting started and What's new pinned under the scrolling sections, because the lower items looked hidden on a short window.
+
+## 2026-10-31 (runbook stage F6)
+
+- Share links last 14 days, can be switched off by the installation that made them (and only by it), count opens, and are rate limited per address on the public page. Previews carry no name.
+- The public page prints light and compact so it fits two pages on A4 and Letter.
+- The demo installation holds the public sample audit; its links are never listed or switched off from the demo.
+- Process (King, 31 Oct): fast and still accurate. Iterate with the one relevant test file or the quick mode of the tenancy script, run the full gates in the background while writing the next stage, and run the full suite once before each push and once at the end. Source edits are not made while a build or browser run is in progress.
