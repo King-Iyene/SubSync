@@ -50,6 +50,26 @@ async function main() {
   assert.equal((await call("/api/integrations/slack/callback?code=x&state=forged")).status, 400, "a forged return is refused");
   assert.equal((await call("/api/integrations/nope/callback")).status, 404);
 
+  // --- stage E0: personal connections. Every kind of session may list and start ITS OWN connections; the status table and the rules are for administrators.
+  for (const [name, tk] of [["agency", token], ["business", bt], ["client", ct]] as const) {
+    const mine = await call("/api/app/my-connections", { token: tk });
+    assert.equal(mine.status, 200, `${name}: my connections`);
+    assert.deepEqual(mine.body.connections, [], `${name}: nothing connected yet`);
+    assert.ok(mine.body.cards.some((c: { provider: string }) => c.provider === "fathom"), `${name}: Fathom is offered`);
+    assert.equal(JSON.stringify(mine.body).includes("zoom"), mine.body.cards.some((c: { provider: string }) => c.provider === "zoom"), `${name}: this server has every switch on`);
+    assert.equal((await call("/api/app/my-connections/fathom/start", { token: tk, method: "POST", body: "{}" })).status, 400, `${name}: the demo cannot start a real sign-in`);
+    assert.equal((await call("/api/app/my-connections/nope/start", { token: tk, method: "POST", body: "{}" })).status, 404, `${name}: unknown tool`);
+    assert.equal((await call("/api/app/my-connections/not-an-id", { token: tk, method: "DELETE" })).status, 404, `${name}: a made-up id`);
+  }
+  const teamView = await call("/api/app/team-connections", { token });
+  assert.equal(teamView.status, 200, "an administrator sees the team page");
+  assert.deepEqual(teamView.body.team, []);
+  assert.equal(JSON.stringify(teamView.body).match(/_enc|webhook_secret|public_key/), null, "no secret column name in the answer");
+  assert.equal((await call("/api/app/meeting-policy", { token, method: "PUT", body: JSON.stringify({ scope: "agency", flags: {} }) })).status, 403, "only the company owner saves the company rule (the demo person is an administrator)");
+  assert.equal((await call("/api/app/meeting-policy", { token, method: "PUT", body: "not json" })).status, 400);
+  assert.equal((await call("/api/app/team-connections/not-an-id/revoke", { token, method: "POST", body: "{}" })).status, 404);
+  assert.equal((await call("/api/app/my-connections")).status, 401, "no session, no answer");
+
   // --- a person who knows a contact in account A
   await sql()`insert into cached_contacts (installation_id, location_id, contact_id, first_name, last_name, email, tags, date_added)
     values (${inst.id}, ${A}, 'conn-t1', 'Dana', 'Lee', 'dana.conn@x.test', '{}', now())`;

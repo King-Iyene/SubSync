@@ -8,7 +8,7 @@ import { rangesOf } from "@/lib/design/range";
 import { THEME_PREFS, type ThemePref } from "@/lib/design/ui-logic";
 import { NAV_FOR, type AccessKind } from "@/lib/access";
 import {
-  Briefcase, CalendarCheck, ClipboardCheck, Zap, CircleHelp, Copy, Eraser, Inbox, Kanban, LayoutDashboard, Mic, Monitor, Moon, PhoneCall, Search, Settings, Sun, Target, UserRound, Users, Wrench, type LucideIcon,
+  Briefcase, CalendarCheck, ClipboardCheck, Zap, CircleHelp, Copy, Eraser, Inbox, Kanban, LayoutDashboard, Mic, Monitor, Moon, PhoneCall, Plug, Search, Settings, Sun, Target, UserRound, Users, Wrench, type LucideIcon,
   Sparkles, UsersRound,
 } from "lucide-react";
 import { NAV, PARENT, type GoFn, type ViewId } from "./nav";
@@ -46,6 +46,7 @@ import { PipelineView } from "./views/pipeline";
 import { DealMoves, TeamView } from "./views/people";
 import { SearchView } from "./views/search";
 import { SettingsView } from "./views/settings";
+import { ConnectionsPage } from "./views/connections";
 import { SetupCompareView } from "./views/setup-compare";
 import { TodayView } from "./views/today";
 
@@ -323,6 +324,7 @@ export function Dashboard() {
       case "duplicates": return <DuplicatesView />;
       case "alerts": return <AlertsView go={go} />;
       case "settings": return <SettingsView />;
+      case "connections": return <ConnectionsPage />;
       case "help": return <HelpView go={go} />;
       case "roadmap": return <RoadmapView />;
       case "pipeline": return <ModuleTabs key="pipe" start={0} tabs={pipeTabs} />;
@@ -404,7 +406,7 @@ const THEME_LABEL: Record<ThemePref, string> = { dark: "Dark appearance", light:
 
 const ICONS: Record<string, LucideIcon> = {
   today: Sun, myday: Sun, people: UsersRound, audit: ClipboardCheck, speed: Zap, overview: LayoutDashboard, inbox: Inbox, appointments: CalendarCheck, meetings: Mic, search: Search, pipeline: Kanban, leads: Target, calls: PhoneCall,
-  accounts: Briefcase, clients: UserRound, team: Users, onboarding: Wrench, duplicates: Copy, cleanup: Eraser, settings: Settings, help: CircleHelp, roadmap: Sparkles,
+  accounts: Briefcase, clients: UserRound, team: Users, onboarding: Wrench, duplicates: Copy, cleanup: Eraser, settings: Settings, connections: Plug, help: CircleHelp, roadmap: Sparkles,
 };
 
 function Centered({ title, body }: { title: string; body: string }) {

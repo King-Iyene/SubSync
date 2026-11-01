@@ -16,6 +16,7 @@ import { applyLeadRules } from "./lead-rules-apply";
 import { diffDealEvents } from "./deal-events";
 import { listAllInstalledLocations } from "./installed-locations";
 import { REFRESH_DUE_AFTER_MINUTES, REFRESH_EVERY_MINUTES } from "./schedule";
+import { OUR_WRITE_LEAD_MS, OUR_WRITE_WINDOW_MS } from "../connections/echo";
 
 // Resumable sync. Work is a queue of jobs in `sync_jobs`; a cron route calls runSlice() which
 // claims jobs one at a time (FOR UPDATE SKIP LOCKED, so parallel invocations never collide),
@@ -234,7 +235,12 @@ async function handleContacts(job: Job, deadline: number): Promise<Outcome> {
         insert into cached_contacts ${db(rows as never)}
         on conflict (installation_id, location_id, contact_id) do update set
           first_name = excluded.first_name, last_name = excluded.last_name, email = excluded.email, phone = excluded.phone,
-          tags = excluded.tags, date_added = excluded.date_added, last_activity_at = excluded.last_activity_at,
+          tags = excluded.tags, date_added = excluded.date_added,
+          -- A note or field SubSync wrote can move the contact activity date. Within the window after one of our writes the older date is kept (spec 10).
+          last_activity_at = case when exists (
+            select 1 from crm_writes w where w.installation_id = excluded.installation_id and w.location_id = excluded.location_id and w.contact_id = excluded.contact_id
+              and w.undone_at is null and excluded.last_activity_at >= w.created_at - make_interval(secs => ${OUR_WRITE_LEAD_MS / 1000}) and excluded.last_activity_at <= w.created_at + make_interval(secs => ${OUR_WRITE_WINDOW_MS / 1000}))
+            then cached_contacts.last_activity_at else excluded.last_activity_at end,
           updated_remote_at = excluded.updated_remote_at, synced_at = excluded.synced_at,
           source = excluded.source, dnd = excluded.dnd, birth_date = excluded.birth_date, assigned_to = excluded.assigned_to`;
     }

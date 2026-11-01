@@ -50,7 +50,12 @@ describe("meetings reach a contact only through the email matcher (read of the c
     expect(callers).toEqual(["src/lib/analytics/meeting-queries.ts"]);
     const writer = all.find((f) => f.rel === "src/lib/analytics/meeting-crm.ts")!.text;
     expect(writer).toMatch(/!m\.contact_id/);
-    expect(writer.match(/contacts\/\$\{encodeURIComponent\(([^)]*)\)\}\/notes/g)).toEqual(["contacts/${encodeURIComponent(m.contact_id as string)}/notes"]);
+    // The note request is built by the one CRM write client (stage E0): the writer hands it the stored row's contact and nothing else, and that client is
+    // the only file that knows the notes path.
+    expect(writer.match(/buildNote\(\{ contactId: ([^,]*),/g)).toEqual(["buildNote({ contactId: m.contact_id as string,"]);
+    expect(writer).not.toMatch(/\/notes/);
+    const client = all.find((f) => f.rel === "src/lib/ghl/crm-writes.ts")!.text;
+    expect(client.match(/\/contacts\/\$\{seg\(a\.contactId\)\}\/notes/g)).toHaveLength(1);
   });
 
   it("no setting, API route or screen can choose the account an unmatched meeting goes to", () => {
@@ -76,7 +81,10 @@ describe.skipIf(!HAS_DB)("against real rows", () => {
   });
   const rows = async () => await sql()`select location_id, contact_id, title from meeting_notes where installation_id = ${inst} order by title`;
 
+  // The CRM write client is a dry run unless WRITE_GHL_LIVE is "true" (stage E0). These tests are about WHICH contact is written, so they switch it on, with the
+  // HTTP call replaced above; the dry-run behaviour itself is tested in e0-live-flags.test.ts and e0-ingest.test.ts.
   beforeAll(async () => {
+    vi.stubEnv("WRITE_GHL_LIVE", "true");
     await sql()`delete from installations where company_id = ${CO}`;
     // No tokens at all: the production scheduler only queues jobs for installs with a refresh token.
     const [i] = await sql()`insert into installations (company_id, company_name, plan) values (${CO}, 'zzMeetMatch', 'pro') returning id`;
@@ -93,7 +101,7 @@ describe.skipIf(!HAS_DB)("against real rows", () => {
     await contact(B, "c-bo-b", "Bo", "bo@meet.test");
   });
   beforeEach(async () => { crmCalls.length = 0; await sql()`delete from meeting_notes where installation_id = ${inst}`; });
-  afterAll(async () => { await sql()`delete from installations where company_id = ${CO}`; await closeDb(); });
+  afterAll(async () => { vi.unstubAllEnvs(); await sql()`delete from installations where company_id = ${CO}`; await closeDb(); });
 
   it("an unknown email, a name alone, a shared email and two records with one email are not saved and write nothing to the CRM", async () => {
     const cases: Array<[string, Array<{ name: string | null; email: string | null }>]> = [

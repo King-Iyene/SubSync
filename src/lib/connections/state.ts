@@ -14,6 +14,8 @@ export type OAuthState = {
   /** Set for a single business: everything the connection does stays inside this account. */
   onlyLocationId: string | null;
   actor: string | null;
+  /** Set when a person connects their OWN tool (Fathom, Zoom): who they are, taken from the signed session when the sign-in started. A workspace tool (Slack) has none. */
+  person?: { userId: string; companyKey: string; name: string | null; home: string | null; role: string | null };
 };
 
 const TTL_SECONDS = 10 * 60;
@@ -44,7 +46,11 @@ export function verifyState(token: string | null | undefined, expected: Provider
     const s = JSON.parse(Buffer.from(body, "base64url").toString("utf8")) as OAuthState & { exp: number };
     if (s.provider !== expected || typeof s.installationId !== "string" || !s.installationId) return null;
     if (typeof s.exp !== "number" || s.exp * 1000 < now) return null;
-    return { provider: s.provider, installationId: s.installationId, onlyLocationId: typeof s.onlyLocationId === "string" ? s.onlyLocationId : null, actor: typeof s.actor === "string" ? s.actor : null };
+    const p = s.person as Record<string, unknown> | undefined;
+    const person = p && typeof p.userId === "string" && p.userId && typeof p.companyKey === "string" && p.companyKey
+      ? { userId: p.userId, companyKey: p.companyKey, name: typeof p.name === "string" ? p.name : null, home: typeof p.home === "string" ? p.home : null, role: typeof p.role === "string" ? p.role : null }
+      : undefined;
+    return { provider: s.provider, installationId: s.installationId, onlyLocationId: typeof s.onlyLocationId === "string" ? s.onlyLocationId : null, actor: typeof s.actor === "string" ? s.actor : null, ...(person ? { person } : {}) };
   } catch {
     return null;
   }

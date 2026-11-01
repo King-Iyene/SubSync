@@ -77,6 +77,30 @@ There are several hundred queries; they are not listed one by one. They are all 
 
 `src/lib/data-inventory.ts` lists every table, and every column that holds personal data, with a plain-words label. `tests/unit/data-inventory.test.ts` compares it with the migration files and the live database and fails for a table or a personal-looking column that is not listed. The Settings card "What we store", the privacy page and the help answer about removing data are produced from it, and `tests/unit/uninstall-purge.test.ts` checks what they say against real rows.
 
+## Connections (stage E0)
+
+A personal tool (Fathom; Zoom and Google Meet later) belongs to the PERSON who connected it. A workspace tool (Slack) belongs to the installation and needs an administrator. Nothing is shared, assigned or connected on someone's behalf.
+
+| New table | Holds | Who can read it | On uninstall | On "Delete my data" |
+| --- | --- | --- | --- | --- |
+| `user_connections` | one row per CRM user and tool: the connected account's email, status, counts, and the encrypted tokens and delivery secret | the person (their own row, through `personFromSession`); an administrator sees status and counts only, within their scope. No screen query selects a token column (`SAFE_COLUMNS`) | deleted (after the provider subscription is dropped) | kept |
+| `meeting_note_settings` | one person's choices (what to save and where) | the person | deleted | kept |
+| `meeting_policies` | the company rule and each client account's rule | administrators (company owner for the company rule; an account's administrator for their own account) | deleted | kept |
+| `meetings` | meetings that arrived through ONE person's tool: title, attendee emails, summary, action items, recording link | only the person who recorded them. Nobody else, whatever their role, can read another person's meeting in SubSync | deleted | deleted |
+| `crm_writes` | every note, comment or field SubSync itself put in the CRM, with the id the CRM gave it (ids and times only) | server code only (it keeps our writes out of our numbers) | deleted | deleted |
+
+All five have row level security ON and no policy, and the public (anon) and signed-in database roles hold no privilege on them (`scripts/supabase-proof.ts` proves it against the live project with a real `set role` attempt). Only server code, which connects as the database owner, can use them. Every row carries the installation id; `user_connections` and `meeting_note_settings` are also unique per CRM user id, `meetings` per (person, tool, meeting id) and `crm_writes` per (meeting, contact, kind, part), in the database itself.
+
+Who the person is comes only from the signed session (`personFromSession`: user id, role derived at sign-in and carried as `personRole`, kind, the one account a limited session is bound to). The routes `my-connections`, `team-connections` and `meeting-policy` live under `api/app` (no new route file):
+
+- `my-connections` (GET, POST start and test, DELETE): every role, only ever the signed-in person's own rows. A third user asking for another person's id gets 404.
+- `team-connections` (GET, POST revoke): administrators only (an account user gets 403). The company owner and administrators see every person in the company; a business's administrator sees its people; a client's administrator sees only the people whose home account is theirs; company staff see nothing until the Users list proves which accounts they can open. An administrator can revoke (provider subscription dropped, tokens erased, the person must connect again) and can never connect for someone, read their tokens or read their meetings.
+- `meeting-policy` (PUT): the company rule is for the company owner only; an account's rule is for that account's administrator or for the company's administrators. The effective rule is always the most restrictive of company, account and person.
+
+Where a meeting is saved is decided by an exact email match among the accounts the person can open and nowhere else (`src/lib/connections/meeting-plan.ts`): the same email on two records, or in two client accounts, never picks one; it waits in the person's private Meeting inbox. A client's staff are matched in their own account only. Company staff match only accounts the Users list proves they can open (unproven: none).
+
+Outward actions (a CRM write, a meeting-tool subscription created or deleted) go through `src/lib/live-flags.ts`: with the switch off (the committed default) they are only recorded as "WOULD ..." lines (ids and field names only).
+
 ## Known gaps (not hidden)
 
 - Agency staff are refused rather than limited to their accounts, because the Users API check is not built. If an agency has staff who need SubSync today, the owner and admins can use it; staff cannot.

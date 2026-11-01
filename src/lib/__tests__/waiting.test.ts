@@ -19,11 +19,19 @@ test("one window: older than 30 days is stale, not waiting, everywhere", () => {
   assert.equal(waitingState(conv("inbound", 31 * 24), NOW, 4), "stale");
 });
 
-test("a reply, an auto-reply, an internal note or a call we placed after the customer means answered (not waiting)", () => {
+test("a reply, an auto-reply or a call we placed after the customer means answered (not waiting)", () => {
   assert.equal(waitingState(conv("outbound", 2), NOW, 4), "answered");
   assert.equal(waitingState(conv("outbound", 10, "TYPE_SMS"), NOW, 4), "answered", "an automatic reply looks like a reply: known limit, see METRICS.md");
-  assert.equal(waitingState(conv(null, 10, "TYPE_INTERNAL_COMMENT"), NOW, 4), "answered", "an internal note is never the customer waiting");
   assert.equal(waitingState(conv("outbound", 10, "TYPE_CALL"), NOW, 4), "answered");
+});
+
+// Stage E0 (INTEGRATIONS_SPEC section 10, principle 14): an internal comment is a team note, never a reply to the customer, and SubSync writes some itself.
+// The old rule called it "answered", so our own comment could make a waiting customer look answered. The list only knows the LAST entry, so when that is an
+// internal comment SubSync cannot tell whether the customer is still waiting and does not judge it, instead of guessing "answered".
+test("an internal comment as the latest entry is not judged: neither waiting nor answered", () => {
+  assert.equal(waitingState(conv(null, 10, "TYPE_INTERNAL_COMMENT"), NOW, 4), "none");
+  assert.equal(waitingState(conv("outbound", 10, "InternalComment"), NOW, 4), "none");
+  assert.equal(waitingState(conv("outbound", 10, "TYPE_SMS"), NOW, 4), "answered", "a real reply still answers");
 });
 
 test("missing or broken data is not guessed", () => {

@@ -67,6 +67,8 @@ import { paceOf, sourceConversion, teamLabel, teamWinRate } from "../analytics/p
 import { excludedOpenDeals, getGoals, GOAL_METRICS, loadDeals, pipelineTrend, setGoal, type GoalMetric } from "../analytics/pipeline-queries";
 import { MIN_CLOSED_DEALS as MIN_CLOSED, OUTLIER_MIN_DEALS, OUTLIER_SHARE, outlier as dealOutlier, winRateOf } from "../analytics/metrics";
 import { parsePickedAccounts } from "../design/filters";
+import { myConnectionRemove, myConnectionsView, myConnectionStart, myConnectionTest, policySave, teamConnectionRevoke, teamConnectionsView } from "./connections-api";
+import { can, personFromSession } from "../connections/person";
 import { authenticate, isResponse, json, type AuthContext } from "./auth";
 
 // All authenticated data endpoints live behind /api/app/<path>. Each one needs a valid signed
@@ -460,7 +462,11 @@ async function connectionsView(ctx: Ctx) {
 }
 
 async function connectionStart(ctx: Ctx, provider: string) {
-  if (!isProvider(provider) || (provider === "zoom" && !zoomOn(ctx))) return json({ error: "Not found" }, 404);
+  // Only a workspace tool (Slack) is connected here, and only by an administrator. Personal tools are connected by each person under my-connections.
+  if (provider !== "slack") return json({ error: "Connect your own tools from My connections" }, 404);
+  const person = personFromSession(ctx.session, ctx.kind, ctx.limitTo);
+  if (!person || !can(person.role, "connect_workspace")) return json({ error: "Only an administrator can connect Slack", forbidden: true }, 403);
+  if (!isProvider(provider)) return json({ error: "Not found" }, 404);
   if (ctx.demo) return json({ error: "Connecting is not available in the demo. It needs a real install." }, 400);
   const link = startLink(provider, { provider, installationId: ctx.installationId, onlyLocationId: ctx.limitTo, actor: actorOf(ctx) });
   return link.ok ? json({ url: link.url }) : json({ error: link.error }, 503);
@@ -531,7 +537,7 @@ async function startView(ctx: Ctx) {
     { id: "email", title: "Get alerts and the Monday email", done: Boolean(settings.digestEmail),
       detail: null, body: "Type one email address in Settings. New critical and warning alerts are emailed to it straight away, and a short summary arrives every Monday. Nothing is sent until you add an address.", view: "settings", cta: "Open Settings" },
     ...(ctx.entitlements.features.meetings !== false ? [{ id: "meetings", title: "Connect a meeting tool (optional)", done: seen.has("meetings"), optional: true,
-      detail: null, body: `Connect ${zoomOn(ctx) ? "Zoom or Fathom" : "Fathom"} in Settings and each meeting summary is saved in SubSync and added to the matching contact's notes in your CRM.`, view: "meetings", cta: "Open Meeting notes" }] : []),
+      detail: null, body: `Each person connects their own ${zoomOn(ctx) ? "Zoom or Fathom" : "Fathom"} under Connections. A meeting summary goes only to that person, and is added to the matching contact's notes in your CRM when the contact is matched by exact email.`, view: "meetings", cta: "Open Meeting notes" }] : []),
     ...(agency ? [{ id: "clients", title: "Let a client see their own account", done: (clientOn?.n ?? 0) > 0, optional: true,
       detail: null, body: "Switch on a read-only view for a client's own staff. They see only their own account: never other clients, fees or notes.", view: "settings", cta: "Open Settings" }] : []),
   ];
@@ -1514,7 +1520,7 @@ async function digestPreview(ctx: Ctx) {
 
 const FEATURE_FOR: Record<string, Feature> = {
   search: "search", onboarding: "onboarding", stale: "stale", inbox: "inbox", pipelines: "pipelines", duplicates: "duplicates", email: "email",
-  alerts: "alerts", appointments: "appointments", audit: "audit", speed: "speed", "appointment-insights": "appointments", meetings: "meetings", connections: "connections", cleanup: "cleanup", "setup-compare": "setup_compare", playbooks: "playbooks", daily: "overview", team: "team", "deal-events": "pipelines", contact: "search", settings: "settings", export: "exports", digest: "overview", "api-keys": "ai", hygiene: "stale", "pipeline-intel": "pipelines", "contact-intel": "activity", clients: "clients", qbr: "reports", "comms-intel": "inbox", "call-queue": "calls", "call-lists": "calls", "call-outcomes": "calls",
+  "my-connections": "connections", "team-connections": "connections", "meeting-policy": "connections", alerts: "alerts", appointments: "appointments", audit: "audit", speed: "speed", "appointment-insights": "appointments", meetings: "meetings", connections: "connections", cleanup: "cleanup", "setup-compare": "setup_compare", playbooks: "playbooks", daily: "overview", team: "team", "deal-events": "pipelines", contact: "search", settings: "settings", export: "exports", digest: "overview", "api-keys": "ai", hygiene: "stale", "pipeline-intel": "pipelines", "contact-intel": "activity", clients: "clients", qbr: "reports", "comms-intel": "inbox", "call-queue": "calls", "call-lists": "calls", "call-outcomes": "calls",
 };
 
 export async function handle(request: Request, segments: string[]): Promise<Response> {
@@ -1541,6 +1547,8 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       if (a === "segments") return await segmentsView(ctx);
       if (a === "meetings") return await meetingsView(ctx);
       if (a === "connections" && !b) return await connectionsView(ctx);
+      if (a === "my-connections" && !b) return await myConnectionsView(ctx);
+      if (a === "team-connections" && !b) return await teamConnectionsView(ctx);
       if (a === "cleanup" && !b) return await cleanupView(ctx);
       if (a === "cleanup" && b) return await cleanupRunView(ctx, b);
       if (a === "playbooks") return await playbooksView(ctx);
@@ -1588,6 +1596,9 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       if (a === "cleanup" && b && c === "apply") return await cleanupWork(ctx, b, "apply");
       if (a === "cleanup" && b && c === "undo") return await cleanupWork(ctx, b, "undo");
       if (a === "connections" && b && c === "start") return await connectionStart(ctx, b);
+      if (a === "my-connections" && b && c === "start") return await myConnectionStart(ctx, b);
+      if (a === "my-connections" && b && c === "test") return await myConnectionTest(ctx, b);
+      if (a === "team-connections" && b && c === "revoke") return await teamConnectionRevoke(ctx, b);
       if (a === "meetings" && b === "hooks" && !c) return await meetingHookCreate(ctx);
       if (a === "meetings" && b === "hooks" && c && segments[3] === "revoke") return await meetingHookRevoke(ctx, c);
       if (a === "duplicates" && b === "review") return await duplicateReview(ctx);
@@ -1608,12 +1619,14 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
     }
     if (method === "DELETE") {
       if (a === "connections" && b && !c) return await connectionRemove(ctx, b);
+      if (a === "my-connections" && b && !c) return await myConnectionRemove(ctx, b);
       if (a === "call-lists" && b && /^[0-9a-fA-F-]{36}$/.test(b)) return await callListDelete(ctx, b);
     }
     if (method === "PUT") {
       if (a === "settings") return await settingsUpdate(ctx);
       if (a === "goals") return await goalsUpdate(ctx);
       if (a === "stage-rules") return await stageRuleSave(ctx);
+      if (a === "meeting-policy" && !b) return await policySave(ctx);
       if (a === "meetings" && b) return await meetingUpdate(ctx, b);
       if (a === "team" && b && LOCATION_ID.test(b)) return await teamName(ctx, b);
       if (a === "clients" && b && LOCATION_ID.test(b)) return await clientUpdate(ctx, b);
