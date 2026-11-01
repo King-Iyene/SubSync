@@ -7,13 +7,14 @@ import { getInstalledLocations, getLocationToken } from "../ghl/client";
 import { getCompanyAccessToken, purgeLocationData } from "../ghl/installations";
 import {
   fetchAppointments, fetchCalendars, fetchConversationMessages, fetchUsers, isPermissionError, fetchCalendarCount, fetchContactsPage, fetchConversationsPage, fetchLocationDetails, fetchOpportunitiesPage, fetchPipelines,
-  type ContactCursor, type ConversationRow, type OpportunityRow,
+  type ContactCursor, type ContactRow, type ConversationRow, type OpportunityRow,
 } from "./ghl-data";
 import { leadFromMessages } from "../analytics/speed-intel";
 import { CONVERSATIONS_READ_PER_ACCOUNT, CONVERSATION_PAGE_SIZE } from "../analytics/waiting";
 import { diffAppointmentEvents } from "./appointment-events";
 import { applyLeadRules } from "./lead-rules-apply";
 import { diffDealEvents } from "./deal-events";
+import { diffTagEvents } from "./tag-events";
 import { listAllInstalledLocations } from "./installed-locations";
 import { REFRESH_DUE_AFTER_MINUTES, REFRESH_EVERY_MINUTES } from "./schedule";
 
@@ -224,6 +225,7 @@ async function handleContacts(job: Job, deadline: number): Promise<Outcome> {
     const { contacts, next } = await fetchContactsPage(token, loc, cursor);
     const unique = [...new Map(contacts.map((c) => [c.contactId, c])).values()];
     if (unique.length > 0) {
+      await recordTagEvents(job.installationId, loc, unique);
       const rows = unique.map((c) => ({
         installation_id: job.installationId, location_id: loc, contact_id: c.contactId, first_name: c.firstName, last_name: c.lastName,
         email: c.email, phone: c.phone, tags: c.tags, date_added: c.dateAdded, last_activity_at: c.lastActivityAt,
@@ -248,6 +250,29 @@ async function handleContacts(job: Job, deadline: number): Promise<Outcome> {
     if (Date.now() > deadline) break;
   }
   return { done: false, cursor: (cursor ?? {}) as Record<string, unknown> };
+}
+
+// Compare this page of contacts' tags with what we hold and keep a log of every tag seen added or removed (stage F10). The platform does not say when a tag was
+// added, so the day is the day SubSync noticed. The first read of an account records nothing (every tag would look new). A failure here never stops the sync.
+async function recordTagEvents(installationId: string, loc: string, incoming: ContactRow[]): Promise<void> {
+  try {
+    const db = sql();
+    const ids = incoming.map((c) => c.contactId);
+    const [before, [prior]] = await Promise.all([
+      db`select contact_id, tags from cached_contacts where installation_id = ${installationId} and location_id = ${loc} and contact_id = any(${ids})`,
+      db`select contacts_synced_at from locations where installation_id = ${installationId} and location_id = ${loc}`,
+    ]);
+    const events = diffTagEvents(
+      incoming.map((c) => ({ contactId: c.contactId, tags: c.tags })),
+      new Map(before.map((r) => [r.contact_id as string, r.tags as string[] | null])),
+      prior?.contacts_synced_at != null,
+    );
+    if (events.length === 0) return;
+    const rows = events.map((e) => ({ installation_id: installationId, location_id: loc, contact_id: e.contactId, tag: e.tag, kind: e.kind }));
+    await db`insert into contact_tag_events ${db(rows as never)}`;
+  } catch (error) {
+    console.error("tag history not recorded", { message: safeError(error) });
+  }
 }
 
 // Compare this page of deals with what we hold and keep a log of what changed (a stage move, a

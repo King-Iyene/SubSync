@@ -25,7 +25,7 @@ import {
   valueDistribution, winLossByMonth, winRate,
 } from "../analytics/pipeline-intel";
 import { OUTCOME_LABEL, PRESETS, parseFilters, parseOutcome } from "../analytics/call-intel";
-import { callQueue, createCallList, deleteCallList, listCallLists, logOutcome, MAX_LISTS, outcomeSummary, speedToLead } from "../analytics/call-queries";
+import { callQueueAll, createCallList, deleteCallList, listCallLists, logOutcome, MAX_LISTS, outcomeSummary, speedToLead } from "../analytics/call-queries";
 import {
   activitySummary, anomalyIndices, compareAccounts, contactGap, goalProgress, renewalStatus, roi, segmentStats, zAnomaly,
 } from "../analytics/client-intel";
@@ -71,6 +71,7 @@ import { paceOf, sourceConversion, teamLabel, teamWinRate } from "../analytics/p
 import { excludedOpenDeals, getGoals, GOAL_METRICS, loadDeals, pipelineTrend, setGoal, type GoalMetric } from "../analytics/pipeline-queries";
 import { MIN_CLOSED_DEALS as MIN_CLOSED, OUTLIER_MIN_DEALS, OUTLIER_SHARE, outlier as dealOutlier, winRateOf } from "../analytics/metrics";
 import { parsePickedAccounts } from "../design/filters";
+import { handlePeople, timeoutResponse } from "./people-routes";
 import { authenticate, isResponse, json, type AuthContext } from "./auth";
 
 // All authenticated data endpoints live behind /api/app/<path>. Each one needs a valid signed
@@ -512,7 +513,7 @@ async function dailyView(ctx: Ctx) {
   });
 }
 
-const USAGE_VIEWS = new Set(["today", "overview", "accounts", "clients", "team", "search", "deals", "pipeline", "leads", "calls", "inbox", "onboarding", "email", "duplicates", "alerts", "settings", "help", "account", "meetings", "audit", "speed", "appointments"]);
+const USAGE_VIEWS = new Set(["today", "overview", "accounts", "clients", "team", "search", "deals", "pipeline", "leads", "calls", "inbox", "onboarding", "email", "duplicates", "alerts", "settings", "help", "account", "meetings", "audit", "speed", "appointments", "people"]);
 
 // A counter of which pages get opened (no personal data), so the getting-started checklist can
 // tick itself off and so the agency can see what its team uses.
@@ -1298,14 +1299,25 @@ async function callQueueView(ctx: Ctx) {
   const parsed = parseFilters(params);
   if (!parsed.ok) return json({ error: parsed.error }, 400);
   const allowed = await allowedIds(ctx);
-  const [queue, speed, summary, sc] = await Promise.all([
-    callQueue(ctx.installationId, allowed, parsed.filters), speedToLead(ctx.installationId, allowed), outcomeSummary(ctx.installationId), scope(ctx),
-  ]);
-  return json({
-    presets: PRESETS, filters: parsed.filters, outcomes: OUTCOME_LABEL, total: queue.total, speedToLead: speed, summary,
-    rows: queue.rows.map((row) => ({ ...row, url: sc.links.contact(row.locationId, row.contactId) })),
-  });
+  // One page of up to CALL_PAGE rows (the list holds at most 400 candidates); the whole list is read once and kept for a short time, so turning the page is instant.
+  const page = Math.min(4, Math.max(1, Math.floor(Number(params.page)) || 1));
+  const started = Date.now();
+  try {
+    const [queue, speed, summary, sc] = await Promise.all([
+      callQueueAll(ctx.installationId, allowed, parsed.filters), speedToLead(ctx.installationId, allowed), outcomeSummary(ctx.installationId), scope(ctx),
+    ]);
+    return json({
+      presets: PRESETS, filters: parsed.filters, outcomes: OUTCOME_LABEL, total: queue.total, capped: queue.total >= 400, page, pages: Math.max(1, Math.ceil(queue.total / CALL_PAGE)), pageSize: CALL_PAGE,
+      speedToLead: speed, summary, tookMs: Date.now() - started, cached: queue.cached === true,
+      rows: queue.rows.slice((page - 1) * CALL_PAGE, page * CALL_PAGE).map((row) => ({ ...row, url: sc.links.contact(row.locationId, row.contactId) })),
+    });
+  } catch (error) {
+    const t = timeoutResponse(error, "call-queue");
+    if (t) return t;
+    throw error;
+  }
 }
+const CALL_PAGE = 100;
 
 async function callListsView(ctx: Ctx) {
   return json({ lists: await listCallLists(ctx.installationId), max: MAX_LISTS });
@@ -1593,7 +1605,7 @@ async function digestPreview(ctx: Ctx) {
 
 const FEATURE_FOR: Record<string, Feature> = {
   search: "search", onboarding: "onboarding", stale: "stale", inbox: "inbox", pipelines: "pipelines", duplicates: "duplicates", email: "email",
-  alerts: "alerts", appointments: "appointments", audit: "audit", speed: "speed", "appointment-insights": "appointments", meetings: "meetings", connections: "connections", cleanup: "cleanup", "setup-compare": "setup_compare", playbooks: "playbooks", daily: "overview", team: "team", "deal-events": "pipelines", contact: "search", settings: "settings", export: "exports", digest: "overview", "api-keys": "ai", hygiene: "stale", "pipeline-intel": "pipelines", "contact-intel": "activity", clients: "clients", qbr: "reports", "comms-intel": "inbox", "deal-gaps": "pipelines", "call-queue": "calls", "call-lists": "calls", "call-outcomes": "calls",
+  alerts: "alerts", appointments: "appointments", audit: "audit", speed: "speed", "appointment-insights": "appointments", meetings: "meetings", connections: "connections", cleanup: "cleanup", "setup-compare": "setup_compare", playbooks: "playbooks", daily: "overview", team: "team", "deal-events": "pipelines", contact: "search", settings: "settings", export: "exports", digest: "overview", "api-keys": "ai", hygiene: "stale", "pipeline-intel": "pipelines", "contact-intel": "activity", clients: "clients", qbr: "reports", "comms-intel": "inbox", "deal-gaps": "pipelines", "call-queue": "calls", "call-lists": "calls", "call-outcomes": "calls", people: "search",
 };
 
 export async function handle(request: Request, segments: string[]): Promise<Response> {
@@ -1607,6 +1619,15 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
   if (blocked) return blocked;
 
   try {
+    if (a === "people") {
+      return await handlePeople(ctx, {
+        allowed: () => allowedIds(ctx),
+        links: async () => (await scope(ctx)).links,
+        coldChoice: async () => (ctx.kind === "client" ? null : (await getSettings(ctx.installationId)).coldTags),
+        voter: voterOf(ctx),
+        locationToken: (locationId) => locationAccessToken(ctx.session.companyId, locationId),
+      });
+    }
     if (method === "GET") {
       if (a === "overview") return await overview(ctx);
       if (a === "daily") return await dailyView(ctx);

@@ -185,9 +185,11 @@ test.describe("the screens", () => {
     await expect(page.getByText("Cold lists", { exact: true }).first()).toBeVisible();
     await expect(page.getByText("Working leads: who has engaged")).toBeVisible();
     await expect(page.getByTestId("counted-note")).toContainText("with a value and an owner");
+    await expect(page.getByText("Engaged, then quiet", { exact: false }).first()).toBeVisible();
+    // Data quality moved to the Imports and sources tab of People (F10).
+    await page.getByRole("tab", { name: "Imports and sources", exact: true }).click();
     await expect(page.getByTestId("quality")).toContainText("checked");
     await expect(page.getByText("Missing emails")).toBeVisible();
-    await expect(page.getByText("Engaged, then quiet", { exact: false }).first()).toBeVisible();
   });
 
   test("Overview: the left-out sentence names the closed-out deals; an account in Needs attention is never Healthy", async ({ page }) => {

@@ -103,13 +103,16 @@ function ColdLists({ e, tags, canEdit, onChanged }: { e: Engagement; tags: strin
   );
 }
 
-export function LeadsView() {
+// `part` shows one piece of the old long page inside the People module (stage F10): "cold" (lifecycle and cold lists), "more" (cohorts, best leads, valuable contacts,
+// growth, do not disturb, birthdays) or "sources" (data quality, sources, imports). With no part it is the whole page, as before.
+export function LeadsView({ part }: { part?: "cold" | "more" | "sources" } = {}) {
   const { data, error, loading, reload } = useData<Data>("contact-intel");
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox error={error} onRetry={reload} />;
   if (!data) return null;
   if (data.lifecycle.total === 0) return <div><PageHeader title="Leads" subtitle="Who to call, who is going quiet and where your contact data is weak." /><Empty title="No contacts yet" body="Contacts appear here once the first sync finishes." /></div>;
 
+  const show = (p: "cold" | "more" | "sources") => !part || part === p;
   const l = data.lifecycle;
   const q = data.quality;
   const eg = data.engagement;
@@ -121,9 +124,9 @@ export function LeadsView() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Leads" subtitle="Who to work first, who is going quiet, and where your contact data is weak, across every client account." />
+      {!part && <PageHeader title="Leads" subtitle="Who to work first, who is going quiet, and where your contact data is weak, across every client account." />}
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      {!part && <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat label="Contacts" value={fmtInt(l.total)} sub={<>{fmtInt(growthTotal)} added in 12 weeks{eg ? <span className="block">{fmtInt(eg.working)} working leads, {fmtInt(eg.cold)} on cold lists</span> : null}</>} />
         <Stat label="Customers" value={fmtInt(l.customers)} sub="have a won deal" />
         {eg
@@ -132,9 +135,9 @@ export function LeadsView() {
           : <Stat label="Engaged, then quiet" value="Not measured" sub="Not available right now" />}
         <Stat label="Invalid email or phone" value={bothChecked ? fmtInt(badTotal) : "Not checked"} tone={bothChecked && badTotal > 0 ? "warn" : undefined}
           sub={bothChecked ? "will bounce or not connect (a missing value is counted separately)" : (badEmail.note || badPhone.note)} />
-      </div>
+      </div>}
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      {show("cold") && <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card title="Contact lifecycle">
           <Funnel items={[
             { label: "Leads (no deal yet)", n: l.leads }, { label: "In an open deal (any value)", n: l.opportunities },
@@ -157,11 +160,11 @@ export function LeadsView() {
             &quot;Engaged&quot; means the customer wrote last in a conversation, booked an appointment, or has a deal. It comes from the newest conversations of each account, so &quot;nothing seen&quot; does not mean they never replied. Cold lists are counted separately.
           </p>
         </Card>}
-      </div>
+      </div>}
 
-      {eg && <ColdLists e={eg} tags={data.tags.top.map((t) => t.tag)} canEdit={data.canEditCold === true} onChanged={reload} />}
+      {eg && show("cold") && <ColdLists e={eg} tags={data.tags.top.map((t) => t.tag)} canEdit={data.canEditCold === true} onChanged={reload} />}
 
-      {data.cohorts.length > 0 && (
+      {show("more") && data.cohorts.length > 0 && (
         <Card title="Lead cohorts (by the month they arrived)">
           <Table head={<tr><Th>Month</Th><Th className="text-right">New contacts</Th><Th className="text-right">Became customers</Th><Th className="text-right">Conversion</Th><Th className="text-right">Revenue won</Th></tr>}>
             {data.cohorts.map((c) => (
@@ -175,6 +178,7 @@ export function LeadsView() {
         </Card>
       )}
 
+      {show("more") && <>
       <Card title="Best leads to work now">
         {data.topLeads.length === 0 ? <Empty title="No active leads yet" /> : (
           <Table head={<tr><Th>Contact</Th><Th>Account</Th><Th>Score</Th><Th>Why</Th><Th>{""}</Th></tr>}>
@@ -227,9 +231,10 @@ export function LeadsView() {
           </ul>
         </Card>
       </div>
+      </>}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Card title="Tags">
+        {!part && <Card title="Tags">
           <ul className="space-y-1 text-sm">{data.tags.top.map((t) => <li key={t.tag} className="flex justify-between"><span>{t.tag}</span><span className="tabular-nums text-muted-foreground">{fmtInt(t.count)}</span></li>)}</ul>
           {data.tags.variants.length > 0 && (
             <div className="mt-4 rounded-lg bg-amber-500/10 p-3 text-sm">
@@ -240,8 +245,8 @@ export function LeadsView() {
             </div>
           )}
           {data.tags.rare.length > 0 && <p className="mt-3 text-xs text-muted-foreground">Barely used: {data.tags.rare.map((t) => t.tag).join(", ")}</p>}
-        </Card>
-        <Card title="Contact data quality">
+        </Card>}
+        {show("sources") && <Card title="Contact data quality">
           <dl className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-3" data-testid="quality">
             {([["Invalid emails", q.invalidEmails, q.badEmail], ["Disposable emails", q.disposableEmails, q.disposable], ["Invalid phones", q.invalidPhones, q.badPhone]] as const).map(([label, fig, fallback]) => {
               const f = figure(fig, fallback);
@@ -260,11 +265,11 @@ export function LeadsView() {
               ))}
             </ul>
           )}
-        </Card>
+        </Card>}
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <Card title="Where leads come from" className="lg:col-span-2">
+        {show("sources") && <Card title="Where leads come from" className="lg:col-span-2">
           {data.sourceSummary?.action && (
             <div className="mb-4 rounded-lg bg-amber-500/10 p-3 text-sm" data-testid="source-action">
               <p className="font-medium">{data.sourceSummary.action.headline}</p>
@@ -285,8 +290,8 @@ export function LeadsView() {
             </Table>
           )}
           <p className="mt-2 text-xs text-muted-foreground">The best source is the one that brings customers, not just contacts. Percentages need at least 10 contacts.</p>
-        </Card>
-        <div className="space-y-4">
+        </Card>}
+        {show("more") && <div className="space-y-4">
           <Card title="Do not disturb">
             <p className="text-2xl font-semibold tabular-nums">{fmtInt(data.dnd.dnd)}</p>
             <p className="text-sm text-muted-foreground">{data.dnd.dnd === 1 ? "contact asked" : "contacts asked"} not to be contacted ({data.dnd.total ? Math.round((data.dnd.dnd / data.dnd.total) * 100) : 0}%). {data.dnd.dnd === 1 ? "That person is" : "They are"} left out of every call list.</p>
@@ -296,10 +301,10 @@ export function LeadsView() {
               <ul className="space-y-1 text-sm">{data.birthdays.slice(0, 8).map((b) => <li key={b.contactId} className="flex justify-between gap-2"><a href={b.url} target="_blank" rel="noreferrer" className="underline">{b.name}</a><span className="text-muted-foreground">{b.days === 0 ? "today" : `in ${b.days}d`}</span></li>)}</ul>
             )}
           </Card>
-        </div>
+        </div>}
       </div>
 
-      {data.imports.length > 0 && (
+      {show("sources") && data.imports.length > 0 && (
         <Card title="Large imports">
           <Table head={<tr><Th>Account</Th><Th>Day</Th><Th className="text-right">Contacts added</Th><Th className="text-right">No email</Th><Th className="text-right">No phone</Th></tr>}>
             {data.imports.map((i) => (

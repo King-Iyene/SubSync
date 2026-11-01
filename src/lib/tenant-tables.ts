@@ -8,7 +8,7 @@ export const SYNCED_DELETE = [
   "cleanup_changes", "cleanup_runs", "duplicate_reviews",
   "cached_contacts", "cached_opportunities", "cached_conversations", "cached_appointments", "pipelines",
   "account_metrics_daily", "alerts", "domain_checks", "onboarding_tasks",
-  "deal_events", "appointment_events", "lead_touches", "call_outcomes",
+  "deal_events", "appointment_events", "lead_touches", "call_outcomes", "contact_tag_events",
   "meeting_notes", "shared_audits", "sync_jobs", "locations",
 ] as const;
 
@@ -33,7 +33,7 @@ export const LOCATION_DELETE = [
   "cleanup_changes", "cleanup_runs", "duplicate_reviews",
   "cached_contacts", "cached_opportunities", "cached_conversations", "cached_appointments", "pipelines",
   "account_metrics_daily", "alerts", "domain_checks", "onboarding_tasks",
-  "deal_events", "appointment_events", "lead_touches", "call_outcomes",
+  "deal_events", "appointment_events", "lead_touches", "call_outcomes", "contact_tag_events",
   "meeting_notes", "meeting_hooks", "account_profiles", "sync_jobs", "locations",
 ] as const;
 
