@@ -106,3 +106,9 @@ S0.2b needs none (nothing new is read or written in the CRM). S0.4 needs none (i
 - Check after the first real sync: open any appointment on a real account and see whether the panel says who booked it and how (the field names for "booked by" were not verified against a live event; if the platform uses other names the panel says "Not recorded by your CRM").
 - Release 2.2.0: marking an appointment showed or no-show from SubSync would need the calendar-events write permission. Not requested, proposal only.
 - Migration `20261102040000_f3_appointments.sql` (3 new nullable columns) is already APPLIED to the live database (backups `cached_appointments-2026-11-01T21-53-07-114Z.json` 320 rows, `settings-2026-11-01T21-53-07-114Z.json` 3 rows; counts unchanged after). If the live database were ever restored from before 1 Nov 21:53 UTC, re-run the file.
+
+## 19. From stage F2 (speed to lead)
+- **Optional live check (Facebook/Instagram lead forms):** send one real lead-form lead through a TEST account so the source can be checked live. Until then "recognises Facebook and Instagram forms" is NOT VERIFIED LIVE. Live read-only counts today: 19 counted leads, 17 with no recorded source; the only source value seen is a website form.
+- **Missed calls (N5)** stay blocked (no call result stored). After the merge the sync re-reads recent leads and logs "probe: call message fields" (names only); read that line in the Vercel log and tell me the field names.
+- **The same person in King's own three test accounts counts three times** (one shared test contact). Mark the test accounts in Settings (F8 adds the control) so they are left out.
+- Migration `20261102030000_speed_f2.sql` (new columns `lead_touches.auto_touch_at`, `human_touch_at`, `read_version`, `team_names.photo_url`) is already APPLIED to the live database (backups `lead_touches-2026-11-01T21-33-43-694Z.json` 379 rows and `team_names-2026-11-01T21-33-43-694Z.json` 43 rows; counts unchanged after).

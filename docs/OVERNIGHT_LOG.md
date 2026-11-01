@@ -212,3 +212,10 @@ Status: D0 BUILT, awaiting King's checks. Tag for the lead: `stage-D0`.
 - Merge: one conflict in `src/lib/access.ts` (both sides added rules; kept both) and one type fix in `src/lib/analytics/audit-queries.ts` (F3's appointment contact id can be null; F6's audit list accepts null). `npx tsc --noEmit` on the merged tree: clean.
 - Migration applied by the agent (additive, backups first): `20261102040000_f3_appointments.sql`.
 - DECIDED FOR KING (F3): rows open the appointment panel first, "See the lead" one press away (D0's rule said lead drawer first; one-line change); default show-rate target 75%; a source that equals a calendar name is treated as a calendar.
+
+#### F2 (parallel worktree; merged, tag stage-F2)
+- Agent ran: `npx tsc --noEmit` exit 0; eslint 0 errors; `node --test` (13 files) tests 110 pass 110; vitest (6 files) 93 passed (45 new). `data-inventory.test.ts` live-schema comparison fails only because the live database already has other stages' tables (expected until all branches are merged). Not run: DB and browser tests (`tests/unit/speed-f2-db.test.ts`, `tests/e2e/speed.spec.ts`, extended `scripts/check-speed.ts`), verify, integration chain.
+- Merge: one import conflict in `src/lib/api/router.ts` (kept both); `npx tsc --noEmit` on the merged tree: clean.
+- Migration applied by the agent (additive, backups first): `20261102030000_speed_f2.sql`.
+- Merge follow-up (not done): F3's `personLabel` still shows "Team member (name not available)" where F2's `resolveUser` (in `people-labels.ts`) would say "Former team member" or "Needs permission: reconnect"; unify in D1 if time allows.
+- UNSURE (agent): card windows are UTC days; the headline stays "last 14 days, now" while cards default to 30 days; 100 leads per account per run are re-read to fill the new columns.
