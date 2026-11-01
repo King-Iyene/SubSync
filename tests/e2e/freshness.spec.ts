@@ -55,6 +55,7 @@ test("Settings has one Sync status panel in place of the old Connection health a
   const wanted = await serverSentence(page);
   await page.goto("/app");
   await open(page, "Settings");
+  await page.getByTestId("settings-nav").getByRole("button", { name: "Sync status", exact: true }).click(); // Settings is in sections (stage F8)
   await expect(page.getByTestId("sync-panel-text")).toHaveText(wanted);
   await expect(page.getByRole("heading", { name: "Sync status" })).toHaveCount(1);
   await expect(page.getByRole("heading", { name: "Connection health" })).toHaveCount(0);

@@ -15,7 +15,7 @@ export const SYNCED_DELETE = [
 /** Settings, credentials and the agency's own notes. Kept by "delete my data" (the app keeps working), removed on uninstall. */
 export const CONFIG_DELETE_ON_UNINSTALL = [
   "call_lists", "account_profiles", "goals", "annotations", "usage_events", "team_names", "report_templates",
-  "api_keys", "connections", "user_connections", "meeting_note_settings", "meeting_policies", "meeting_hooks", "roadmap_votes", "saved_views", "stage_rules", "settings",
+  "api_keys", "connections", "user_connections", "meeting_note_settings", "meeting_policies", "meeting_hooks", "roadmap_votes", "saved_views", "feedback_items", "roadmap_suggestions", "stage_rules", "settings",
 ] as const;
 
 /** Everything an uninstall deletes. The installation row itself stays with its tokens emptied, so a reinstall starts clean. */

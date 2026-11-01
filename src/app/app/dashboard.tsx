@@ -14,6 +14,7 @@ import {
 import { NAV, PARENT, type GoFn, type ViewId } from "./nav";
 import { useBrandedText } from "./brand-text";
 import { Btn } from "./ui";
+import { FeedbackBox } from "./feedback-box";
 import { BackLink, BackProvider, ModuleTabs, type ModuleTab } from "./ds/template";
 import { InlineAlert } from "./ds/alert";
 import { FilterDrawer } from "./ds/filters";
@@ -256,6 +257,8 @@ export function Dashboard() {
   // Count which pages get opened, so the getting-started checklist can tick itself off.
   useEffect(() => {
     if (api) void api.post("usage", { view: view.id }).catch(() => {});
+    // Also remembered in this browser, so a client's staff (whose steps cannot be ticked from the company counter) see their own progress in Getting started.
+    remember(`seen-${view.id}`, "1");
   }, [api, view.id]);
 
   if (auth.status === "waiting") return <Centered title="Loading SubSync" body="Checking your account..." />;
@@ -407,6 +410,7 @@ export function Dashboard() {
             {back && <BackLink label={back.label} onClick={back.go} />}
             {NAV_FOR[auth.kind].has("search") && !off("search") && <GlobalSearch go={go} />}
             <StatusLine /><BackProvider value={back}>{content}</BackProvider>
+            <FeedbackBox page={view.id} />
           </main>
         </div>
       </div>

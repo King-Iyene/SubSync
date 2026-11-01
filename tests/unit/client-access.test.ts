@@ -15,7 +15,7 @@ const CLIENT_GET = new Set(["my-connections", "team-connections", "overview", "a
 // Stage E0: every role connects its OWN tools, so these doors are open to a client's staff too. They only ever touch the signed-in person's own rows
 // (my-connections), or, for an account administrator only, the status of the people of their own account (team-connections) and that account's rule
 // (meeting-policy). The handlers refuse an account user for the last two; tests/unit/e0-connections-db.test.ts asks them with real sessions.
-const CLIENT_POST = new Set(["usage", "roadmap", "my-connections", "team-connections"]);
+const CLIENT_POST = new Set(["usage", "roadmap", "my-connections", "team-connections", "feedback", "problem"]);
 const CLIENT_PUT = new Set(["meeting-policy"]);
 const CLIENT_DELETE = new Set(["my-connections"]);
 
