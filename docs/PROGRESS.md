@@ -4,8 +4,8 @@ Read this first when a session restarts. Rules: `docs/RUNBOOK.md` section 0 (one
 
 ## Current stage
 
-**F2 Speed to lead: BUILT AND VERIFIED (31 Oct 2026).** Next stage: **F3 Appointments** (no PASS or NEXT needed).
-Evidence: `docs/features/F2.md` (F1: `docs/features/F1.md`, S0.3: `docs/features/S0.3.md`). From S0.3 on King does not need to type PASS or NEXT; every stage still writes its evidence and King's 5 checks.
+**F3 Appointments: BUILT AND VERIFIED (31 Oct 2026).** King asked to do everything left: next is **F6 Account audit and Share link**, then F4, F5, F7 and on.
+Evidence: `docs/features/F3.md` (F2: `docs/features/F2.md`, F1: `docs/features/F1.md`). From S0.3 on King does not need to type PASS or NEXT; every stage still writes its evidence and King's 5 checks.
 
 ## Stage list (Milestone M1 first)
 
@@ -16,7 +16,7 @@ Evidence: `docs/features/F2.md` (F1: `docs/features/F1.md`, S0.3: `docs/features
 | S0.3 | White-label hygiene | Built, verified, follow-up done (branded install link, company name replaces product name) |
 | F1 | Numbers truth | Built, verified (King's CRM checks pending, no wait) |
 | F2 | Speed to lead | Built, verified (King's CRM checks pending, no wait) |
-| F3 | Appointments | Not started |
+| F3 | Appointments | Built, verified (King's CRM checks pending, no wait) |
 | F6 | Account audit and Share link | Not started (M1 complete after this) |
 | F4, F5, F7 to F10 | M2 pilot menu | Not started |
 | E1 to E4 | Zoom, Fathom, Slack, hidden pages | Not started |

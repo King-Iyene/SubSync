@@ -242,3 +242,9 @@ Format: date, decision, reason.
 - Facebook and Instagram lead forms are timed at 10 minutes and shown as their own source; messages to the page stay social at 60.
 - example.com is not a test-contact signal (it is the placeholder in sample data).
 - The real estate sample audit is a fictional published snapshot under the demo installation, created by a script; it is not a real customer's data.
+
+## 2026-10-31 (runbook stage F3 and "do not hide pages")
+
+- Appointment rules: invalid appointments are in no figure; a claim about change needs 10 recorded outcomes (rates) or 10 bookings (volume) in the earlier period; group events are not clashes; "same day" uses the client account's time zone.
+- King asked that no page be hidden. Nothing is switched off by default now (the AI assistant connector was the last). The runbook's F5 step "hide the Overview page" is not done: Overview stays in the menu. The only pages not shown are the ones a client account's own staff must not see (Settings, Accounts, Clients, Team and similar), which is a security rule, not a feature switch.
+- The sidebar keeps Settings, Getting started and What's new pinned under the scrolling sections, because the lower items looked hidden on a short window.

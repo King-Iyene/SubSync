@@ -114,3 +114,12 @@ connections, appointment insights, two-agency tenant isolation, feature switches
 | Plain-words headline, left-out sentence | Built | Browser tests at 3 widths, screenshots |
 | Real estate sample audit page | Built | Browser test; fictional data |
 | Figures match raw rows | Verified | `check-speed.ts` against the database |
+
+## Runbook stage F3 (31 Oct 2026) and King's "show every page" request
+
+| Item | Status | Tested |
+| --- | --- | --- |
+| Appointment rules: invalid excluded, 10-appointment baseline for change claims, group events, time-zone same-day, status folding | Built | 8 golden tests, demo browser tests |
+| Insights tab | Verified working on the demo at 3 widths | Browser test with screenshots; real windows are empty (all 38 real appointments are from September) |
+| AI assistant connector switched on (no feature is off by default now) | Built | Flag tests; read-only, per-client-account, API key required |
+| Menu: Settings, Getting started and What's new pinned so they are always visible; spacing compacted | Built | Browser test on a short window |

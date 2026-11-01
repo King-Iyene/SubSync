@@ -62,8 +62,8 @@ test("breakdowns group by calendar and person with their own show rates", () => 
 });
 
 test("the headline leads with what moved", () => {
-  const last = { held: 6, noShow: 4, cancelled: 0, booked: 20, unmarked: 3, showRate: 0.6, noShowRate: 0.4, cancelRate: 0 };
-  const prior = { held: 8, noShow: 2, cancelled: 0, booked: 10, unmarked: 0, showRate: 0.8, noShowRate: 0.2, cancelRate: 0 };
+  const last = { held: 6, noShow: 4, cancelled: 0, booked: 20, outcomes: 10, unmarked: 3, showRate: 0.6, noShowRate: 0.4, cancelRate: 0 };
+  const prior = { held: 8, noShow: 2, cancelled: 0, booked: 10, outcomes: 10, unmarked: 0, showRate: 0.8, noShowRate: 0.2, cancelRate: 0 };
   const lines = headline(last, prior);
   assert.match(lines[0], /fell 20 points to 60%/);
   assert.match(lines[1], /up 100%/);

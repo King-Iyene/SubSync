@@ -4,11 +4,12 @@ import { FEATURES } from "../entitlements.ts";
 import { DEFAULT_OFF, resolveFeatures } from "../flags-core.ts";
 import { diffAppointmentEvents } from "../sync/appointment-events.ts";
 
-test("only the unfinished features are off by default and everything else is on", () => {
+test("every built feature is on by default; a row in the database can still switch one off", () => {
   const f = resolveFeatures(FEATURES, {});
-  for (const off of ["ai"] as const) assert.equal(f[off], false, off);
+  assert.equal(f.ai, true);
+  assert.equal(resolveFeatures(FEATURES, { ai: false }).ai, false, "a database row still switches it off without a deploy");
   for (const on of ["overview", "search", "inbox", "appointments", "calls", "alerts", "pipelines", "stale", "onboarding", "settings", "health", "connections", "reports", "meetings", "cleanup", "setup_compare", "playbooks", "builder", "duplicates", "clients", "team", "activity"] as const) assert.equal(f[on], true, on);
-  assert.equal(DEFAULT_OFF.size, 1);
+  assert.equal(DEFAULT_OFF.size, 0);
   assert.ok([...DEFAULT_OFF].every((x) => (FEATURES as readonly string[]).includes(x)), "every switched-off name is a real feature");
 });
 

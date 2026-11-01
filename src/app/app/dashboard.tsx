@@ -220,6 +220,21 @@ export function Dashboard() {
   const locked = (feature: string) => auth.locked.includes(feature);
   const off = (feature: string) => auth.features[feature] === false && !locked(feature);
   const menu = NAV.filter((n) => NAV_FOR[auth.kind].has(n.id) && !off(n.feature));
+  // The sidebar: sections that scroll, and Settings, Getting started and What's new pinned underneath so they are always visible.
+  const mainMenu = menu.filter((n) => n.group !== "");
+  const footMenu = menu.filter((n) => n.group === "");
+  const renderNav = (list: typeof menu) => list.map((n, i) => (
+      <div key={n.id}>
+        {n.group !== (list[i - 1]?.group ?? null) && (n.group ? <p className="px-3 pb-1 pt-3 text-[10.5px] font-semibold uppercase tracking-[0.14em] text-sidebar-foreground/45">{n.group}</p> : <div className="my-2 border-t border-sidebar-border" />)}
+        <button type="button" onClick={() => go(n.id)} aria-current={n.id === active ? "page" : undefined}
+          className={`group relative flex w-full items-center gap-2.5 rounded-lg px-3 py-1.5 text-left text-[0.86rem] transition-colors ${n.id === active ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground" : "text-sidebar-foreground/75 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"}`}>
+          {n.id === active && <span aria-hidden className="absolute inset-y-1.5 left-0 w-[3px] rounded-full bg-sidebar-primary" />}
+          {(() => { const Icon = ICONS[n.id]; return Icon ? <Icon aria-hidden className={`size-[17px] shrink-0 ${n.id === active ? "text-sidebar-primary" : "opacity-70 group-hover:opacity-100"}`} /> : null; })()}
+          <span className="flex-1">{labelFor(n)}</span>
+          {locked(n.feature) && <span className="rounded-full bg-sidebar-primary/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sidebar-primary">Pro</span>}
+        </button>
+      </div>
+  ));
   const labelFor = (n: (typeof NAV)[number]) => (limited && n.id === "overview" ? "My account" : n.label);
   // Pages that live inside another page highlight their parent in the menu.
   const PARENT: Partial<Record<ViewId, ViewId>> = { account: "accounts", deals: "pipeline", email: "onboarding", alerts: "today" };
@@ -277,19 +292,9 @@ export function Dashboard() {
             <span className="text-[1.05rem] font-semibold tracking-tight text-sidebar-accent-foreground">{auth.brand.name ?? "SubSync"}</span>
           </div>
           <nav className="sidebar-scroll mt-3 flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto pr-1" aria-label="Sections">
-            {menu.map((n, i) => (
-              <div key={n.id}>
-                {n.group !== (menu[i - 1]?.group ?? null) && (n.group ? <p className="px-3 pb-1 pt-5 text-[10.5px] font-semibold uppercase tracking-[0.14em] text-sidebar-foreground/45">{n.group}</p> : <div className="my-2 border-t border-sidebar-border" />)}
-                <button type="button" onClick={() => go(n.id)} aria-current={n.id === active ? "page" : undefined}
-                  className={`group relative flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[0.86rem] transition-colors ${n.id === active ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground" : "text-sidebar-foreground/75 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"}`}>
-                  {n.id === active && <span aria-hidden className="absolute inset-y-1.5 left-0 w-[3px] rounded-full bg-sidebar-primary" />}
-                  {(() => { const Icon = ICONS[n.id]; return Icon ? <Icon aria-hidden className={`size-[17px] shrink-0 ${n.id === active ? "text-sidebar-primary" : "opacity-70 group-hover:opacity-100"}`} /> : null; })()}
-                  <span className="flex-1">{labelFor(n)}</span>
-                  {locked(n.feature) && <span className="rounded-full bg-sidebar-primary/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sidebar-primary">Pro</span>}
-                </button>
-              </div>
-            ))}
+            {renderNav(mainMenu)}
           </nav>
+          {footMenu.length > 0 && <nav className="mt-1 flex flex-col gap-0.5" aria-label="Settings and help">{renderNav(footMenu)}</nav>}
           <div className="mt-3 flex items-center gap-2.5 rounded-xl bg-sidebar-accent/50 px-3 py-2.5">
             <span aria-hidden className="flex size-7 items-center justify-center rounded-full bg-sidebar-primary/20 text-xs font-semibold text-sidebar-primary">{(auth.userName ?? "?").slice(0, 1).toUpperCase()}</span>
             <span className="min-w-0 text-xs leading-4"><span className="block truncate font-medium text-sidebar-accent-foreground">{auth.userName ?? "Signed in"}</span><span className="block text-sidebar-foreground/55">{auth.kind === "agency" ? "All client accounts" : auth.kind === "business" ? "Your business" : "Read-only view"}</span></span>

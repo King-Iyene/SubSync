@@ -83,14 +83,30 @@ waiting past SLA) plus Data quality 10 (completeness divided by 10). Code: `scor
 
 ## Appointments
 
-Platform statuses: new, confirmed, cancelled, showed, noshow, invalid. **Held** is showed. An appointment is
-**active** unless cancelled or invalid.
-**Show rate** (FACT, with a minimum): showed divided by showed plus no-show, only with at least 5 recorded
-outcomes in the window; otherwise "not enough outcomes".
-**Unmarked.** An active appointment whose time has passed (after a short grace period) with no showed or
-no-show recorded. These make a show rate lie, so they are listed rather than guessed.
+**Status mapping.** The platform sends new, confirmed, cancelled, showed, noshow and invalid. Spelling and spacing are folded to one
+form ("No Show", "no_show" and "NoShow" are noshow; "canceled" is cancelled; "booked" and "scheduled" are new). In words: new is
+booked, not yet confirmed; confirmed is booked and confirmed; showed is held; noshow is a no-show; cancelled is cancelled; invalid is a
+mistaken, spam or test booking. A status we do not know (for example "rescheduled") is kept as it is and treated like new: active, with
+no outcome. Code: `normaliseAppointmentStatus` in `ghl-data.ts`.
+**Active.** Not cancelled and not invalid.
+**Booked** (in a window). Every appointment that was due to start in the window, cancelled ones included, **invalid ones never**
+(they were not real). A rescheduled appointment is one appointment, counted once at its current start time; the old time is not counted.
+**No outcome recorded** (the "unmarked" list). An active appointment whose start was more than 3 hours ago (a grace period for it to
+run) and whose status is not showed or noshow. Cancelled and invalid appointments are not on this list.
+**Show rate** (FACT, with a minimum). showed / (showed + noshow), over appointments **with a recorded outcome only**: the unmarked ones
+are not guessed at and are not in it. Shown only with at least **5** recorded outcomes in the window (`MIN_OUTCOMES_FOR_RATE`), and the
+screen shows the count it is built on; otherwise "not enough outcomes".
+**Claims about change need a baseline.** "Show rate fell N points" needs at least **10** recorded outcomes in both periods, and "Bookings
+are down N%" needs at least **10** bookings in the earlier period (`MIN_BASELINE_FOR_CLAIM`). Under that the page states the numbers and
+makes no claim, so a quiet account never reads "down 100%".
+**Time zones.** Windows are rolling (30 days is 30 times 24 hours), so they have no midnight or daylight-saving edge. Anything by day or
+hour (the best-times map, "booked twice on the same day") uses the client account's own time zone, so 23:30 and 00:30 local are different
+days, and the same wall clock time is the same cell either side of a daylight-saving change. An unknown time zone is read as UTC.
+**Group events.** Several contacts booked into one session (same person, same calendar, same start) are one session, not a clash. One
+person on two different calendars within 30 minutes is a clash.
 **No-show recovery.** No-shows in the last N days where the contact has no later active appointment.
-Code: `appointment-intel.ts`, `appointment-deep.ts`. Tests: `appointment-intel.test.ts`, `appointment-deep.test.ts`.
+Code: `appointment-intel.ts`, `appointment-deep.ts`. Tests: `appointment-intel.test.ts`, `appointment-deep.test.ts`, `appointment-f3.test.ts`
+(golden cases), `tests/e2e/appointments.spec.ts` (demo tenant, Insights tab).
 
 ## Our own history (event store, recording now)
 

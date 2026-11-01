@@ -203,6 +203,15 @@ export type AppointmentRow = {
   createdAt: string | null;
 };
 
+// The platform's statuses are new, confirmed, cancelled, showed, noshow and invalid. Spelling and spacing vary between its endpoints
+// ("No Show", "no_show", "canceled"), so they are folded to one form; anything else is kept as it is and treated as an active
+// appointment with no outcome (docs/METRICS.md).
+const STATUS_ALIASES: Record<string, string> = { canceled: "cancelled", booked: "new", scheduled: "new" };
+export function normaliseAppointmentStatus(raw: string): string {
+  const s = raw.toLowerCase().replace(/[^a-z]/g, "");
+  return STATUS_ALIASES[s] ?? s;
+}
+
 export function mapAppointment(raw: unknown): AppointmentRow | null {
   const r = rec(raw);
   const id = str(r.id) ?? str(r._id);
@@ -212,7 +221,7 @@ export function mapAppointment(raw: unknown): AppointmentRow | null {
     calendarId: str(r.calendarId),
     contactId: str(r.contactId),
     title: str(r.title),
-    status: (str(r.appointmentStatus) ?? str(r.status) ?? "new").toLowerCase().replace(/[^a-z]/g, ""),
+    status: normaliseAppointmentStatus(str(r.appointmentStatus) ?? str(r.status) ?? "new"),
     startAt: toIso(r.startTime),
     endAt: toIso(r.endTime),
     assignedTo: str(r.assignedUserId),

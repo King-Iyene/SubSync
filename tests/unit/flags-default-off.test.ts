@@ -6,7 +6,7 @@ import { DEFAULT_OFF } from "@/lib/flags-core";
 // DEFAULT_OFF (the normal case) or, for a bug fix to something already live, consciously add it to this reviewed list.
 const REVIEWED_ALWAYS_ON_BASELINE = new Set([
   "overview", "search", "onboarding", "health", "stale", "activity", "inbox", "pipelines", "duplicates", "email", "alerts", "reports", "builder",
-  "exports", "meetings", "connections", "cleanup", "setup_compare", "playbooks", "clients", "team", "calls", "appointments", "audit", "speed", "settings",
+  "exports", "ai", "meetings", "connections", "cleanup", "setup_compare", "playbooks", "clients", "team", "calls", "appointments", "audit", "speed", "settings",
 ]);
 
 describe("new features default off", () => {

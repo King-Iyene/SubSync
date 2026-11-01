@@ -19,12 +19,18 @@ export type Appt = {
 const DAY = 86_400_000;
 const GRACE_MS = 3 * 3_600_000; // an appointment is "over" a few hours after it starts
 
+/** A recorded outcome count of at least this many gives a rate; a CHANGE in a rate or in bookings needs this many in the period it is compared with. */
+export const MIN_OUTCOMES_FOR_RATE = 5;
+export const MIN_BASELINE_FOR_CLAIM = 10;
+
 export const isActive = (a: Appt) => a.status !== "cancelled" && a.status !== "invalid";
 export const hasOutcome = (a: Appt) => a.status === "showed" || a.status === "noshow";
 export const needsOutcome = (a: Appt, now: number) => isActive(a) && !hasOutcome(a) && a.startAt < now - GRACE_MS;
 
 export type Rates = {
   held: number; noShow: number; cancelled: number; booked: number; unmarked: number;
+  /** Appointments with a recorded outcome (showed or no-show): what a show rate is built on. */
+  outcomes: number;
   /** showed / (showed + noshow), or null with fewer than 5 recorded outcomes. */
   showRate: number | null;
   noShowRate: number | null;
@@ -35,15 +41,16 @@ export type Rates = {
 // Appointments that were due to start inside [from, to). `booked` counts everything scheduled, not
 // just what was held.
 export function rates(appts: Appt[], from: number, to: number, now: number): Rates {
-  const inWindow = appts.filter((a) => a.startAt >= from && a.startAt < to);
+  // Invalid appointments (spam, test or mistaken bookings) were never real, so they are in no figure.
+  const inWindow = appts.filter((a) => a.startAt >= from && a.startAt < to && a.status !== "invalid");
   const held = inWindow.filter((a) => a.status === "showed").length;
   const noShow = inWindow.filter((a) => a.status === "noshow").length;
   const cancelled = inWindow.filter((a) => a.status === "cancelled").length;
   const decided = held + noShow;
   return {
-    held, noShow, cancelled, booked: inWindow.length, unmarked: inWindow.filter((a) => needsOutcome(a, now)).length,
-    showRate: decided >= 5 ? held / decided : null,
-    noShowRate: decided >= 5 ? noShow / decided : null,
+    held, noShow, cancelled, booked: inWindow.length, outcomes: decided, unmarked: inWindow.filter((a) => needsOutcome(a, now)).length,
+    showRate: decided >= MIN_OUTCOMES_FOR_RATE ? held / decided : null,
+    noShowRate: decided >= MIN_OUTCOMES_FOR_RATE ? noShow / decided : null,
     cancelRate: inWindow.length >= 5 ? cancelled / inWindow.length : null,
   };
 }
@@ -95,11 +102,12 @@ export function breakdown(appts: Appt[], now: number, by: "calendar" | "person")
 // What changed, in words, so the page can lead with it.
 export function headline(last: Rates, prior: Rates): string[] {
   const out: string[] = [];
-  if (last.showRate !== null && prior.showRate !== null) {
+  // A claim about change needs a real baseline in both periods: "down 100%" from three appointments is noise, not news.
+  if (last.showRate !== null && prior.showRate !== null && last.outcomes >= MIN_BASELINE_FOR_CLAIM && prior.outcomes >= MIN_BASELINE_FOR_CLAIM) {
     const d = Math.round((last.showRate - prior.showRate) * 100);
     if (Math.abs(d) >= 5) out.push(`Show rate ${d > 0 ? "rose" : "fell"} ${Math.abs(d)} points to ${Math.round(last.showRate * 100)}%.`);
   }
-  if (prior.booked >= 5) {
+  if (prior.booked >= MIN_BASELINE_FOR_CLAIM) {
     const d = Math.round(((last.booked - prior.booked) / prior.booked) * 100);
     if (Math.abs(d) >= 15) out.push(`Bookings are ${d > 0 ? "up" : "down"} ${Math.abs(d)}% on the 30 days before.`);
   }

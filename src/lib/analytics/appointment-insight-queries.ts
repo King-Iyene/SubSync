@@ -104,7 +104,7 @@ export async function appointmentInsights(installationId: string, allowed: strin
     confirmations: conf,
     sameDay: sameDayPerformance(appts, now),
     fairness: { ...fair, rows: fair.rows.map((r) => ({ ...r, label: person(r.key) })) },
-    doubleBookings: doubleBookings(appts, now).slice(0, 10).map((d) => ({ kind: d.kind, at: d.at, locationName: names.get(d.locationId) ?? null, who: d.kind === "person" ? person(d.key.split(":")[1] ?? "") : nameOf(d.locationId, d.key.split(":")[1] ?? "") })),
+    doubleBookings: doubleBookings(appts, now, undefined, (id) => tz.get(id) ?? "UTC").slice(0, 10).map((d) => ({ kind: d.kind, at: d.at, locationName: names.get(d.locationId) ?? null, who: d.kind === "person" ? person(d.key.split(":")[1] ?? "") : nameOf(d.locationId, d.key.split(":")[1] ?? "") })),
     value: appointmentValue(appts, wonValue, now),
     forecast: volumeForecast(appts, now),
     followUp: { held: fu.held, withoutFollowUp: fu.withoutFollowUp, gapRate: fu.gapRate, contacts: fu.contacts.map((c) => ({ ...c, name: nameOf(c.locationId, c.contactId), locationName: names.get(c.locationId) ?? null })) },

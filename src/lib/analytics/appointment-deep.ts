@@ -3,6 +3,7 @@
 import { hasOutcome, isActive, rates, type Appt } from "./appointment-intel.ts";
 
 const DAY = 86_400_000;
+const validZone = (z: string) => { try { new Intl.DateTimeFormat("en", { timeZone: z }); return z; } catch { return "UTC"; } };
 
 export type Lead = { id: string; locationId: string; createdAt: number | null; source: string | null };
 
@@ -178,7 +179,9 @@ export function fairness(appts: Appt[], now: number, days = 30) {
 }
 
 // People or contacts booked twice at nearly the same time (1.14).
-export function doubleBookings(appts: Appt[], now: number, windowMs = 30 * 60_000) {
+// A group event (the same person, the same calendar, the same start, several contacts) is one session, not a clash. "Same day" for the
+// same contact is judged in the account's own time zone, so 23:30 and 00:30 are two days.
+export function doubleBookings(appts: Appt[], now: number, windowMs = 30 * 60_000, tzOf: (locationId: string) => string = () => "UTC") {
   const live = appts.filter((a) => isActive(a) && a.startAt >= now - DAY && a.startAt < now + 14 * DAY).sort((a, b) => a.startAt - b.startAt);
   const out: Array<{ kind: "person" | "contact"; key: string; locationId: string; at: number; ids: string[] }> = [];
   const groupBy = (keyOf: (a: Appt) => string | null, kind: "person" | "contact") => {
@@ -187,7 +190,9 @@ export function doubleBookings(appts: Appt[], now: number, windowMs = 30 * 60_00
     for (const [k, list] of by) {
       for (let i = 1; i < list.length; i++) {
         const gap = list[i].startAt - list[i - 1].startAt;
-        const sameDay = kind === "contact" && Math.abs(gap) < DAY && new Date(list[i].startAt).toDateString() === new Date(list[i - 1].startAt).toDateString();
+        if (kind === "person" && list[i].calendarId === list[i - 1].calendarId && gap === 0) continue; // group event
+        const day = (x: Appt) => new Intl.DateTimeFormat("en-CA", { timeZone: validZone(tzOf(x.locationId)) }).format(new Date(x.startAt));
+        const sameDay = kind === "contact" && Math.abs(gap) < DAY && day(list[i]) === day(list[i - 1]);
         if (gap < windowMs || sameDay) out.push({ kind, key: k, locationId: list[i].locationId, at: list[i].startAt, ids: [list[i - 1].id, list[i].id] });
       }
     }
