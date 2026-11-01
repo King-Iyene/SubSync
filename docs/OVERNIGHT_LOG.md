@@ -226,3 +226,7 @@ Status: D0 BUILT, awaiting King's checks. Tag for the lead: `stage-D0`.
 - Migration applied (additive, new empty tables, counts 0 before and after): `20261102070000_user_connections.sql`.
 - NOT VERIFIED LIVE: real Fathom delivery writing a `meetings` row, simultaneous retries giving one note, a real provider refresh, a note id matching one in the CRM, the real GHL note/comment length limits, what the platform's user list shows for company staff.
 - DECIDED FOR KING: the old shared Fathom path no longer writes CRM notes unless WRITE_GHL_LIVE=true; the existing shared Fathom connection is marked "legacy, reconnect to make it personal" and was not migrated (tokens never touched).
+
+#### F5 (parallel worktree; merged cleanly, tag stage-F5)
+- Agent ran: `npx tsc --noEmit` exit 0; eslint 0 errors; `node --test` (10 files) tests 120 pass 120; vitest (5 files) 67 passed. Written, NOT run: `tests/e2e/today.spec.ts` (12), `tests/unit/f5-today-db.test.ts` (3). No migration.
+- DECIDED FOR KING: see NEEDS_KING section 21 (every page narrows to the active account for an agency person opened inside a client account).

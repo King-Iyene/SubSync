@@ -120,3 +120,8 @@ S0.2b needs none (nothing new is read or written in the CRM). S0.4 needs none (i
 - **Scopes for release 2.2.0:** optional `conversations/message.write` (internal comments). Already requested and enough: `contacts.write`, `users.readonly`, `locations/customFields.readonly`.
 - **Housekeeping:** remove the unused `SUPABASE_SERVICE_ROLE_KEY` and the unused `NEXT_PUBLIC_SUPABASE_*` pair from every Vercel environment and from your `.env.local` (no code uses them); decide whether to backfill the Supabase migration ledger (5 of 30 recorded).
 - Migration `20261102070000_user_connections.sql` is already APPLIED (5 new empty tables, row level security on, no policy, public roles refused, proved by `scripts/supabase-proof.ts`: 28 passed, 0 failed, 6 not verified live).
+
+## 21. From stage F5 (Today)
+- **Decision to approve:** an agency person who opens SubSync from inside a client account now sees EVERY page narrowed to that account until they press "See all client accounts" (before: they landed on the account page and other pages stayed unfiltered). Say "narrow only Today" if you prefer; it is a one-line change in `dashboard.tsx`.
+- **Load:** Today now makes six reads. If the 53,000-contact account feels slow, tell me and I will cache or trim them.
+- The Today filter help says "Owners can change which accounts count as test accounts in Settings": true only after F8's Settings control is merged (check in the morning).
