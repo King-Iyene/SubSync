@@ -143,3 +143,12 @@ connections, appointment insights, two-agency tenant isolation, feature switches
 | Internal notes, automatic replies, deleted conversations | Documented and tested (notes never wait, automatic replies count as replies, the sync replaces the list) | Unit and database tests |
 | Ignore automatic replies setting | Not built (needs the message source) | n/a |
 | Conversation sync cap (1,000 per account) | Known limit | Real accounts hit it |
+
+## Runbook stage F5 (31 Oct 2026)
+
+| Item | Status | Tested |
+| --- | --- | --- |
+| Today front door: leads waiting, appointments to fix, accounts needing attention, in plain words | Built | 15 browser tests at 3 widths |
+| First-sync-only banner, filter drawer, one-sentence subtitle, outlier note | Built | Browser tests |
+| Opens on the launching client account, with a way back to all accounts | Built | Browser test (simulated launch) |
+| Overview merged into Today and hidden | Not done on purpose (King: do not hide pages) | n/a |

@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { NAV, type GoFn, type ViewId } from "./nav";
 import { useBrandedText } from "./brand-text";
+import { Btn } from "./ui";
 import { ApiProvider, makeApi, type Api } from "./session";
 import { AccountDetailView } from "./views/account-detail";
 import { AccountsView } from "./views/accounts";
@@ -194,6 +195,15 @@ export function Dashboard() {
   const [filter, setFilter] = useState<{ industry: string; owner: string; hideTest: boolean }>({ industry: "", owner: "", hideTest: false });
   const filterQuery = [filter.industry && `industry=${encodeURIComponent(filter.industry)}`, filter.owner && `owner=${encodeURIComponent(filter.owner)}`, filter.hideTest && "hideTest=1"].filter(Boolean).join("&");
   const baseApi = auth.status === "ready" ? auth.api : null;
+  // Opened from inside one client account (the platform sends that account with the sign-in): start on it, with a way back to all of them.
+  const launched = useRef(false);
+  useEffect(() => {
+    if (auth.status !== "ready" || launched.current) return;
+    launched.current = true;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (auth.kind === "agency" && auth.locationId && !window.location.hash) setView({ id: "account", locationId: auth.locationId });
+  }, [auth]);
+  const fromAccount = auth.status === "ready" && auth.kind === "agency" && Boolean(auth.locationId) && view.id === "account" && view.locationId === auth.locationId;
   useBrandedText(auth.status === "ready" ? auth.brand.name : null);
   const api = useMemo(() => (baseApi ? (filterQuery ? baseApi.filtered(filterQuery) : baseApi) : null), [baseApi, filterQuery]);
 
@@ -314,7 +324,18 @@ export function Dashboard() {
             ))}
           </nav>
           <main className="mx-auto w-full max-w-[1400px] flex-1 p-4 sm:px-10 sm:py-8">
-            {auth.kind === "agency" && baseApi && <ApiProvider value={baseApi}><FilterBar filter={filter} onChange={setFilter} /></ApiProvider>}
+            {fromAccount && (
+              <p className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-primary/30 bg-primary/5 px-3 py-2 text-sm print:hidden" role="note">
+                <span>You opened this from inside a client account, so it shows that account.</span>
+                <Btn variant="ghost" onClick={() => go("accounts")}>See all client accounts</Btn>
+              </p>
+            )}
+            {auth.kind === "agency" && baseApi && (
+              <details className="mb-3 rounded-xl border bg-card px-3 py-2 print:hidden" data-testid="filter-drawer">
+                <summary className="cursor-pointer text-sm font-medium">Filter accounts{filter.industry || filter.owner || filter.hideTest ? " (on)" : ""}</summary>
+                <div className="mt-2"><ApiProvider value={baseApi}><FilterBar filter={filter} onChange={setFilter} /></ApiProvider></div>
+              </details>
+            )}
             <FreshnessStrip />{content}
           </main>
         </div>

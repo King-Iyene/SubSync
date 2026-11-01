@@ -260,3 +260,8 @@ Format: date, decision, reason.
 
 - "Waiting" means the customer wrote last, past the reply target, within 30 days, on every screen; the Inbox says the window in words and its parts add up to the headline. The inbox list limit rose from 300 to 2,000 and the screen says when it is hit.
 - Internal notes and system activity never make a conversation waiting; an automatic reply counts as a reply (no setting to ignore it yet, because the conversation list does not carry the sender).
+
+## 2026-10-31 (runbook stage F5 and the build order)
+
+- Today leads with the leads-waiting sentence; Overview stays as its own page (King: do not hide pages).
+- Process change (King, 31 Oct): build the remaining stages (F7 to F10, E1 to E4, Z1 to Z3) first and push each, then run the full tests and fix what they find. Before every push the quick gate (typecheck and lint) still runs so a broken build never reaches the live site.

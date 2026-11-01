@@ -20,6 +20,46 @@ type Data = {
 
 type AuditData = { audit: { headline: string; estimatedDollars: number | null; staleDollars: number; findings: Array<{ key: string; severity: string; title: string; detail: string; dollars: number | null; kind: string; view: string; fix: string }> } };
 
+// The front door: three plain sentences that answer "what needs me right now", leads first because a lead goes cold in minutes.
+// Each number is the same one its own page shows (Speed to lead, Appointments, and the attention list below).
+function FrontDoor({ go, attention, limited }: { go: GoFn; attention: number | null; limited: boolean }) {
+  const speed = useData<{ overall: { stillWaiting: number }; neverAnswered?: number; access: { ok: number; total: number } }>("speed");
+  const appts = useData<{ unmarkedTotal?: number }>("appointments");
+  const waiting = speed.data ? Math.max(0, speed.data.overall.stillWaiting - (speed.data.neverAnswered ?? 0)) : null;
+  const never = speed.data?.neverAnswered ?? 0;
+  const unmarked = appts.data?.unmarkedTotal ?? null;
+  const leadLine = speed.loading && !speed.data ? "Checking for leads waiting for a reply..."
+    : waiting === null ? "Leads waiting for a reply could not be loaded."
+    : waiting === 0 && never === 0 ? "No leads are waiting for a reply right now."
+    : `${waiting} ${waiting === 1 ? "lead is" : "leads are"} waiting for a reply${never > 0 ? `, and ${never} ${never === 1 ? "was" : "were"} never answered` : ""}.`;
+  const urgent = (waiting ?? 0) > 0;
+  return (
+    <section className="mb-6 rounded-2xl border bg-card p-5 shadow-[var(--shadow-card)]" aria-label="What needs you right now" data-testid="front-door">
+      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">What needs you right now</p>
+      <h2 className={`mt-1 text-xl font-semibold ${urgent ? "text-red-700 dark:text-red-400" : ""}`} data-testid="leads-headline">{leadLine}</h2>
+      <ul className="mt-3 space-y-2 text-sm">
+        <li className="flex flex-wrap items-center justify-between gap-2">
+          <span>{unmarked === null ? "Checking appointments..." : unmarked === 0 ? "Every past appointment has an outcome recorded." : `${unmarked} past ${unmarked === 1 ? "appointment has" : "appointments have"} no outcome recorded, so the show rate is a guess.`}</span>
+          <Btn variant="ghost" onClick={() => go("appointments")}>Fix appointments</Btn>
+        </li>
+        <li className="flex flex-wrap items-center justify-between gap-2">
+          <span>{attention === null ? "Checking your accounts..." : attention === 0 ? (limited ? "Your account is within its normal range." : "No client account needs you today.") : `${attention} ${limited ? (attention === 1 ? "thing needs" : "things need") : attention === 1 ? "client account needs" : "client accounts need"} attention today.`}</span>
+          {(attention ?? 0) > 0 && <a href="#needs-attention" className="text-sm font-medium text-primary underline-offset-2 hover:underline">See which</a>}
+        </li>
+      </ul>
+      {urgent && <div className="mt-3"><Btn variant="primary" onClick={() => go("speed")}>Open Speed to lead</Btn></div>}
+    </section>
+  );
+}
+
+// One deal worth at least half of the open pipeline is called out, so the dollar figures are not read as a normal spread.
+function OutlierNote() {
+  const { data } = useData<{ kpis: { outlier: { value: number; share: number; of: number } | null } }>("overview");
+  const o = data?.kpis.outlier;
+  if (!o) return null;
+  return <p className="mb-6 text-xs text-amber-700 dark:text-amber-400">One deal ({fmtMoney(o.value)}) is {Math.round(o.share * 100)}% of the open pipeline of {fmtInt(o.of)} deals, so the dollar figures move with it. Amounts are as entered in each account.</p>;
+}
+
 // The one thing to do first, taken from the account audit, with the money it is costing when that can be stated honestly.
 function DoFirst({ go }: { go: GoFn }) {
   const { data } = useData<AuditData>("audit");
@@ -52,7 +92,14 @@ export function TodayView({ go }: { go: GoFn }) {
     setSyncing(true);
     try { await api.post("sync"); await reload(); } finally { setSyncing(false); }
   };
-  if (loading && !data) return <Loading label="Working out what needs you today..." />;
+  // The leads line does not wait for the slower daily read: it appears as soon as its own number arrives.
+  if (loading && !data) return (
+    <div>
+      <PageHeader title="Today" subtitle="What needs you right now, then what changed." />
+      <FrontDoor go={go} attention={null} limited={false} />
+      <Loading label="Working out what needs you today..." />
+    </div>
+  );
   if (error) return <ErrorBox error={error} onRetry={reload} />;
   if (!data) return null;
   const s = data.schedule;
@@ -63,16 +110,17 @@ export function TodayView({ go }: { go: GoFn }) {
     <div>
       <PageHeader
         title="Today"
-        subtitle={`What changed, and what to do first. Every account is compared with its own last week, so a quiet account is not flagged just for being quiet.`}
+        subtitle="What needs you right now, then what changed."
         actions={<><Badge tone={data.freshness.ok ? "good" : "warn"}>{data.freshness.label}</Badge><Btn variant="primary" onClick={sync} disabled={syncing}>{syncing ? "Syncing..." : "Sync now"}</Btn></>}
       />
 
       {!data.connection.ok && <p className="mb-4 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">{data.connection.message}</p>}
-      {data.freshness.pending > 0 && <p className="mb-4 rounded-lg border bg-muted/40 px-3 py-2 text-sm" role="status">A sync is still running, so some numbers may change in a few minutes.</p>}
+      {data.freshness.hours === null && data.freshness.pending > 0 && <p className="mb-4 rounded-lg border bg-muted/40 px-3 py-2 text-sm" role="status">First sync in progress: the numbers fill in over the next few minutes.</p>}
 
+      <FrontDoor go={go} attention={data.attention.length} limited={data.limited} />
       <DoFirst go={go} />
 
-      <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="mb-2 grid grid-cols-2 gap-3 lg:grid-cols-4">
         {data.headlines.map((h) => {
           const c = h.change;
           const bad = c.unusual !== null && (c.unusual === "up") === UP_IS_BAD.has(h.key);
@@ -88,6 +136,9 @@ export function TodayView({ go }: { go: GoFn }) {
         })}
       </div>
 
+      <OutlierNote />
+
+      <div id="needs-attention" />
       <Card title={data.attention.length ? `Needs attention today (${data.attention.length})` : "Needs attention today"} className="mb-6">
         {data.attention.length === 0 ? (
           <Empty title="Nothing needs you today" body={`${noun[0].toUpperCase() + noun.slice(1)} ${data.limited ? "is" : "are"} all within ${data.limited ? "its" : "their"} own normal range. Replies, deals, new leads and setup were all checked.`} />

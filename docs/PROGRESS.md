@@ -4,7 +4,7 @@ Read this first when a session restarts. Rules: `docs/RUNBOOK.md` section 0 (one
 
 ## Current stage
 
-**F4 Inbox and SLA: BUILT AND VERIFIED (31 Oct 2026).** Next: F5 Today, then F7 and on.
+**F5 Today: BUILT AND VERIFIED (31 Oct 2026).** King asked to build F7 to F10, E1 to E4 and Z1 to Z3 first, push as built, then run the full tests.
 Evidence: `docs/features/F4.md` (F6: `docs/features/F6.md`). From S0.3 on King does not need to type PASS or NEXT; every stage still writes its evidence and King's 5 checks.
 
 ## Stage list (Milestone M1 first)
@@ -19,7 +19,8 @@ Evidence: `docs/features/F4.md` (F6: `docs/features/F6.md`). From S0.3 on King d
 | F3 | Appointments | Built, verified (King's CRM checks pending, no wait) |
 | F6 | Account audit and Share link | Built, verified (M1 complete) |
 | F4 | Inbox and SLA | Built, verified |
-| F5, F7 to F10 | M2 pilot menu | Not started |
+| F5 | Today | Built, verified |
+| F7 to F10 | M2 pilot menu | In progress |
 | E1 to E4 | Zoom, Fathom, Slack, hidden pages | Not started |
 | Z1 to Z3 | Re-review, release 1.1.0, first pilot | Not started |
 
