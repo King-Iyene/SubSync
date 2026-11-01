@@ -271,3 +271,7 @@ Format: date, decision, reason.
 - Plain words on screen (Health, Steady, Could leave, Likely to leave, Gone quiet); the internal code names are unchanged.
 - Settings are in five groups with a jump list; a logo for the company brand is not built (name and colour are).
 - Alert emails are driven by what is still waiting (email_notified_at), not by what was raised in one run, so failures are retried and nothing is sent twice. Quiet hours hold warnings between 21:00 and 07:00; criticals always go at once. Every email has a signed stop link and one-click unsubscribe headers.
+
+## 2026-10-31 (runbook stage F10)
+
+- Call lists pick their candidates from the selective side of each list and look contacts up by key, with two additive indexes; the large account went from a database timeout to under 2 seconds. Deal dollars on a row use counted deals only.

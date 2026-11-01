@@ -145,6 +145,26 @@ or more. Both are append-only and are never edited. The first sync of an account
 every record would look new. Nothing yet reads these tables for a screen. Planned readers (Wave 2): deal
 velocity, stage dwell time (which will also give per-stage stale thresholds), true show-rate history.
 
+## Call lists
+
+Nobody is messaged from Call lists and there is no dialer: each row opens the person in the CRM (link built from the company's own domain). A list
+shows the top 100 of up to 400 candidates, ranked by priority (deal value, quiet time, newness), and says "Showing the top N of M". A person is
+left out of every list when they asked not to be contacted (do not contact), were marked wrong number or not interested, or were called in the last 12
+hours (follow-ups that are due are the exception). Deal dollars on a row are counted deals only (value above zero and an owner), as everywhere.
+The nine pre-built lists, each defined here once (code: `call-queries.ts`, test: `tests/unit/call-lists-db.test.ts` on a golden dataset):
+- **Hot leads not contacted in 3+ days:** an open deal, and no activity for 3 days or more.
+- **New leads with no reply (4 hours):** created in the last 4 hours and nobody on the team has messaged them yet.
+- **Proposal stage, quiet for 7+ days:** an open deal in a stage named proposal, quote, negotiation or contract with no activity for a week.
+- **Customers due a check-in:** won a deal, and no activity for 60 days or more.
+- **Newest leads (24 hours):** created in the last 24 hours and no deal yet.
+- **Win-back:** won a deal over 180 days ago and nothing open now.
+- **No-show recovery:** a no-show in the last 14 days and not booked again since.
+- **Recent customers:** won a deal in the last 90 days.
+- **Follow-ups due:** a call outcome of follow-up whose date has passed.
+Speed: each list is looked up from its small side (the deals, the appointments, the outcomes or the newest contacts) rather than by reading every
+contact, with two added indexes; on the largest connected account (52,926 contacts) a list went from timing out (over 8 seconds) to 0.4 to 2.0 seconds
+including a round trip of about 0.4 seconds from the test machine. `scripts/profile-calls.ts` repeats the measurement.
+
 ## Leads: quiet contacts
 
 **Quiet over 90 days** (FACT, only when activity is known). Contacts whose last recorded activity (or, with none, their created

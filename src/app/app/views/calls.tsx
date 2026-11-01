@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useApiClient, useData } from "../session";
-import { Badge, Btn, Card, Empty, ErrorBox, ExtLink, fmtMoney, inputClass, Loading, PageHeader, Stat } from "../ui";
+import { Badge, Btn, Card, Empty, ErrorBox, ExtLink, fmtMoney, inputClass, PageHeader, Stat } from "../ui";
 
 type Preset = { id: string; label: string; help: string };
 type Row = {
@@ -95,7 +95,12 @@ export function CallsView() {
     setLocation(String(f.location ?? ""));
   };
 
-  if (queue.loading && !data) return <Loading />;
+  if (queue.loading && !data) return (
+    <div aria-busy="true" aria-label="Loading your call list" data-testid="calls-skeleton">
+      <PageHeader title="Call lists" subtitle="Who to call next, ranked, with a link to open each person." />
+      <div className="space-y-2">{Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-14 animate-pulse rounded-xl border bg-muted/40" />)}</div>
+    </div>
+  );
   if (queue.error) return <ErrorBox error={queue.error} onRetry={queue.reload} />;
   if (!data) return null;
   const help = data.presets.find((p) => p.id === preset)?.help;
@@ -167,6 +172,7 @@ export function CallsView() {
         {msg && <p className="mt-2 text-sm text-muted-foreground" role="status">{msg}</p>}
       </Card>
 
+      {data.rows.length > 0 && <p className="mb-2 text-xs text-muted-foreground" data-testid="calls-count">Showing the top {data.rows.length} of {data.total}{data.total >= 400 ? " or more" : ""}, ranked. Nobody is messaged from here: each row opens the person in your CRM.</p>}
       {data.rows.length === 0 ? <Empty title="Nobody on this list right now" body="Try another list, or sync again. People you just called are hidden for 12 hours." /> : (
         <>
           {current && (

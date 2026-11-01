@@ -21,30 +21,39 @@ export async function callQueue(installationId: string, allowed: string[] | null
   // The preset decides who is in the list and how the database orders it before we score them.
   let cond = db`true`;
   let order = db`c.date_added desc nulls last`;
+  // Which contacts to look at, chosen from the small, selective side of each list (deals, appointments, outcomes or the newest contacts) so the
+  // database never reads all of a large account's contacts. The conditions below still decide who is in the list; this only narrows the search.
+  let drive: ReturnType<typeof db> | null = null;
   const and = (frag: ReturnType<typeof db>) => { cond = db`${cond} and ${frag}`; };
   switch (f.preset) {
     case "hot_uncontacted":
       and(db`coalesce(d.open_count, 0) > 0 and coalesce(c.last_activity_at, c.date_added) < now() - interval '3 days'`);
+      drive = db`select d0.location_id, d0.contact_id from deals d0 where d0.open_count > 0`;
       order = db`d.open_value desc`;
       break;
     case "new_unanswered":
       and(db`c.date_added > now() - interval '4 hours'
         and not exists (select 1 from cached_conversations v where v.installation_id = c.installation_id and v.location_id = c.location_id
           and v.contact_id = c.contact_id and v.last_message_direction = 'outbound')`);
+      drive = db`select c0.location_id, c0.contact_id from cached_contacts c0 where c0.installation_id = ${installationId} and c0.date_added > now() - interval '4 hours'`;
       break;
     case "proposal_stale":
       and(db`coalesce(d.proposal_stale, false)`);
+      drive = db`select d0.location_id, d0.contact_id from deals d0 where d0.proposal_stale`;
       order = db`d.open_value desc`;
       break;
     case "customers_followup":
       and(db`d.won_count > 0 and coalesce(c.last_activity_at, c.date_added) < now() - interval '60 days'`);
+      drive = db`select d0.location_id, d0.contact_id from deals d0 where d0.won_count > 0`;
       order = db`d.won_value desc`;
       break;
     case "lead_recency":
       and(db`c.date_added > now() - interval '24 hours' and d.contact_id is null`);
+      drive = db`select c0.location_id, c0.contact_id from cached_contacts c0 where c0.installation_id = ${installationId} and c0.date_added > now() - interval '24 hours'`;
       break;
     case "win_back":
       and(db`d.won_count > 0 and coalesce(d.open_count, 0) = 0 and d.last_won_at < now() - interval '180 days'`);
+      drive = db`select d0.location_id, d0.contact_id from deals d0 where d0.won_count > 0 and d0.open_count = 0`;
       order = db`d.won_value desc`;
       break;
     case "noshow_recovery":
@@ -52,14 +61,17 @@ export async function callQueue(installationId: string, allowed: string[] | null
           and x.status = 'noshow' and x.start_at > now() - interval '14 days' and x.start_at <= now()
           and not exists (select 1 from cached_appointments y where y.installation_id = x.installation_id and y.location_id = x.location_id and y.contact_id = x.contact_id
             and y.status not in ('cancelled', 'invalid', 'noshow') and y.start_at > x.start_at))`);
+      drive = db`select distinct x0.location_id, x0.contact_id from cached_appointments x0 where x0.installation_id = ${installationId} and x0.status = 'noshow' and x0.start_at > now() - interval '14 days' and x0.start_at <= now() and x0.contact_id is not null`;
       order = db`c.last_activity_at desc nulls last`;
       break;
     case "recent_customers":
       and(db`d.won_count > 0 and d.last_won_at > now() - interval '90 days'`);
+      drive = db`select d0.location_id, d0.contact_id from deals d0 where d0.won_count > 0`;
       order = db`d.last_won_at desc`;
       break;
     case "follow_ups_due":
       and(db`lo.outcome = 'follow_up' and lo.follow_up_at is not null and lo.follow_up_at <= now()`);
+      drive = db`select distinct o0.location_id, o0.contact_id from call_outcomes o0 where o0.installation_id = ${installationId} and o0.follow_up_at is not null and o0.follow_up_at <= now()`;
       order = db`lo.follow_up_at asc`;
       break;
     case "custom":
@@ -78,7 +90,8 @@ export async function callQueue(installationId: string, allowed: string[] | null
     deals as (
       select o.location_id, o.contact_id,
         count(*) filter (where o.status = 'open')::int open_count,
-        coalesce(sum(o.monetary_value) filter (where o.status = 'open'), 0)::float8 open_value,
+        -- Dollar figures use counted deals only (docs/METRICS.md): a value above zero and an owner. The contact is still listed for any open deal.
+        coalesce(sum(o.monetary_value) filter (where o.status = 'open' and coalesce(o.monetary_value, 0) > 0 and o.assigned_to is not null), 0)::float8 open_value,
         count(*) filter (where o.status = 'won')::int won_count,
         coalesce(sum(o.monetary_value) filter (where o.status = 'won'), 0)::float8 won_value,
         max(o.last_status_change_at) filter (where o.status = 'won') last_won_at,
@@ -88,17 +101,20 @@ export async function callQueue(installationId: string, allowed: string[] | null
       left join pipelines pl on pl.installation_id = o.installation_id and pl.location_id = o.location_id and pl.pipeline_id = o.pipeline_id
       left join lateral (select s->>'name' nm from jsonb_array_elements(coalesce(pl.stages, '[]'::jsonb)) s where s->>'id' = o.stage_id limit 1) st on true
       where o.installation_id = ${installationId} and o.contact_id is not null group by o.location_id, o.contact_id),
-    lo as (
-      select distinct on (location_id, contact_id) location_id, contact_id, outcome, created_at, follow_up_at
-      from call_outcomes where installation_id = ${installationId} order by location_id, contact_id, created_at desc)
+    cand as (${drive ?? db`select c0.location_id, c0.contact_id from cached_contacts c0 where c0.installation_id = ${installationId}`})
     select c.contact_id, c.location_id, loc.name location_name, coalesce(nullif(c.full_name, ''), nullif(c.email, ''), 'Unnamed contact') name,
       c.phone, c.email, c.date_added, c.last_activity_at,
       coalesce(d.open_count, 0) open_count, coalesce(d.open_value, 0) open_value, coalesce(d.won_value, 0) won_value,
       lo.outcome last_outcome, lo.follow_up_at
-    from cached_contacts c join loc on loc.location_id = c.location_id
+    from cand
+    join cached_contacts c on c.installation_id = ${installationId} and c.location_id = cand.location_id and c.contact_id = cand.contact_id
+    join loc on loc.location_id = c.location_id
     left join deals d on d.location_id = c.location_id and d.contact_id = c.contact_id
-    left join lo on lo.location_id = c.location_id and lo.contact_id = c.contact_id
-    where c.installation_id = ${installationId} and ${cond} and not c.dnd
+    left join lateral (
+      select o2.outcome, o2.created_at, o2.follow_up_at from call_outcomes o2
+      where o2.installation_id = ${installationId} and o2.location_id = c.location_id and o2.contact_id = c.contact_id
+      order by o2.created_at desc limit 1) lo on true
+    where ${cond} and not c.dnd
       and coalesce(lo.outcome, '') not in ('wrong_number', 'not_interested')
       and (lo.created_at is null or lo.created_at < now() - interval '12 hours' or ${followUps}::boolean)
     order by ${order}

@@ -23,7 +23,7 @@ Evidence: `docs/features/F4.md` (F6: `docs/features/F6.md`). From S0.3 on King d
 | F7 | Accounts | Built (tests run at the end) |
 | F8 | Settings, Getting started, What's new | Built (tests run at the end) |
 | F9 | Alerts and emails | Built (tests and real sends at the end) |
-| F10 | Call lists | In progress |
+| F10 | Call lists | Built (tests at the end) |
 | E1 to E4 | Zoom, Fathom, Slack, hidden pages | Not started |
 | Z1 to Z3 | Re-review, release 1.1.0, first pilot | Not started |
 
