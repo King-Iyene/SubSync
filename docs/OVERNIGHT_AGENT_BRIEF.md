@@ -1,0 +1,37 @@
+# Overnight stage brief (every stage agent follows this; the lead engineer re-reads it too)
+
+You are building ONE stage of SubSync overnight. King is asleep and cannot answer. Repo: `C:\Users\KING\OneDrive\Desktop\SubSync` (never `C:\Users\KING\Desktop\SubSync`). Branch: `overnight/2026-11-01` (never main, never merge, never force-push).
+
+## Read first, in full (not by keyword search)
+1. `docs/OVERNIGHT_RULES.md` (the rules; the M2 add-on overrides conflicting lines), `docs/OVERNIGHT_LOG.md`, `docs/NEEDS_KING.md`, `docs/NOTES_COVERAGE.md`, `docs/PROGRESS.md`.
+2. `CLAUDE.md` (master brief and the operating principles 1 to 14), `docs/RUNBOOK.md` (the routine), `docs/TENANCY.md`.
+3. The stage prompt and its addendum in `docs/ROADMAP_V2.md` (sections 6 and 7), every note it names in `docs/KING_REVIEW_NOTES.md` (read each named note start to finish), and any section of `docs/INTEGRATIONS_SPEC.md` it names.
+4. The previous feature file for the same area if it exists (`docs/features/<ID>.md`): the stage may already be partly built under the old runbook. Build the DELTA the new prompt requires, and verify the old parts still hold.
+
+## Before you build
+Write into `docs/features/<ID>.md` (create or extend): (a) the numbered list of EVERY instruction and acceptance clause in the stage prompt and its notes, in your own words (if it has fewer items than the prompt has sentences with must/do/add/test/acceptance, read again); (b) the five evaluation lines from principle 1 (decision and for whom; is the data truly available in the live API with our scopes, tested not assumed; does the CRM already do it; the simplest version that proves value; the risk).
+
+## Build rules
+- Tests first where practical. No placeholders, TODO stubs, mocked numbers shown as real, empty tests, loosened or deleted or skipped tests. If a test is wrong, say so and fix it properly.
+- No new feature beyond the stage. Anything you leave out is a SKIPPED row, not silence.
+- Plain words in the UI (no "SLA", "sub-account", "agency view", "location", "GHL", "HighLevel", "Zoom"/"Google Meet" while their flag is off). White-label links only through `crmUrl`/`deepLinks` in `src/lib/links.ts`.
+- Tenancy: derive identity on the server from the verified session; never trust ids from the browser. Every new table is classified in `src/lib/tenant-tables.ts` and listed in `docs/TENANCY.md`; every new API route is in the route-guard registry.
+- Additive migrations only (`supabase/migrations/<timestamp>_<name>.sql`, idempotent). BEFORE applying one to the live database: save the affected tables to `backups/` (gitignored) and record row counts; verify the counts after. Anything that tightens access (RLS or policies) or could break the live app: write the file, do NOT apply it, and add it to `docs/NEEDS_KING.md` section 11 as "King applies with the merge". The old `main` code must keep working against the migrated database.
+- Dry-run for anything outward: flags `SEND_EMAIL_LIVE`, `SEND_SLACK_LIVE`, `WRITE_GHL_LIVE`, `FATHOM_WEBHOOK_LIVE` default to false (committed as false) in one config module; with them off the code builds the exact request, writes "WOULD SEND" / "WOULD WRITE" (ids and field names only, no secrets, no message text) to the audit table and log, and sends nothing. Tests use fake transports and signed fixtures. The only live exception: transactional test emails to `king@kdsquares.com` (allowlist guard in code, tested to reject any other address, at most 5 in the whole night; count them in `docs/OVERNIGHT_LOG.md`).
+- Never: send a real email/text/Slack message, write to a real CRM contact/note/comment/field, create a real Fathom/Slack/Zoom connection or webhook, print or rotate a secret (names of variables only), change the marketplace app, scopes, prices or listing, delete real data, touch the Vercel environment variables. Reading real data is fine.
+- A feature needing a scope we do not have: build it so the screen says "Needs permission: reconnect", and list the scope for release 2.2.0 in `docs/NEEDS_KING.md` section 12.
+- New UI: use the shared components from D0 once D0 exists (`docs/features/D0.md`). Every screen has loading, empty and error states.
+
+## Machine quirks (learned the hard way)
+- The Bash tool eats backslashes and chokes on apostrophes in heredocs; write files with the Write tool, or use node scripts. Source files are CRLF; keep their endings (the Edit tool handles single-line edits).
+- Next 16 with cache components: `Date.now()` before uncached data errors (use `await connection()`); database reads inside `<Suspense>`.
+- Never run two test runs at once (port 3100 and `.next` collide). Before a run check nothing listens on 3100 (`netstat -ano | grep LISTENING | grep :3100`); kill a stale `next dev` first. Run long commands in the background and wait with bounded loops; never `sleep` for minutes in the foreground.
+- Tests and the demo tenant share ONE Supabase project with production. Fixtures must be deleted after a test, must have no refresh token (the production cron queues jobs for installs that have one), and any demo setting a test changes must be restored.
+- Commands: `npm run verify` (typegen, tsc, eslint, build, bundle scan, `node --test`, vitest); `node scripts/with-dev-server.mjs` (integration chain, `CHECKS=a,b` selects); `npm run e2e` (Playwright, 3 widths, port 3100). A feature is not done until it works in the browser too.
+
+## Finish
+1. Run what you need while developing (targeted is fine), but at the end run the FULL suite once and paste the real result lines into the log: `npm run verify`, the full integration chain, and `npm run e2e` when any UI changed.
+2. Evidence table in `docs/features/<ID>.md`: one row per numbered item, DONE with evidence (file and line, test name, or command and its real output), or SKIPPED/BLOCKED with the reason, plus the "King's 5 checks" in plain words.
+3. Append one stage entry to `docs/OVERNIGHT_LOG.md` (decisions for King, UNSURE items, NOT VERIFIED LIVE items, migrations applied with backup file names and row counts). Update `docs/NEEDS_KING.md`. Update statuses with `node scripts/notes-coverage.mjs set <ID> <STATUS> "evidence"` for every note the stage handles (DONE-TONIGHT only with real evidence). Update `docs/PROGRESS.md`, `docs/FEATURE_STATUS.md`, `docs/METRICS.md` when a metric changes, `docs/DECISIONS.md` when you chose something.
+4. Mark the stage "BUILT, awaiting King's checks". Never write PASSED.
+5. Do NOT commit and do NOT push; leave the working tree for the lead engineer. Final reply (short): what was built, the real test result lines, the SKIPPED/BLOCKED rows, UNSURE items, migrations, files changed.

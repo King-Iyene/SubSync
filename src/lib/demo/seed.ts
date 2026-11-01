@@ -409,8 +409,8 @@ async function ensureSpeedDemo(installationId: string): Promise<void> {
 // reply after the customer, and an internal note. Only the four past the target are waiting.
 async function ensureInboxDemo(installationId: string): Promise<void> {
   const db = sql();
-  const [have] = await db`select count(*)::int n from cached_conversations where installation_id = ${installationId} and conversation_id like 'inbox-sample-%'`;
-  if (have.n > 0) return;
+  // The sample threads are re-made on every demo load so their ages stay what their names say (2 hours stays 2 hours, not 10 hours a day later).
+  await db`delete from cached_conversations where installation_id = ${installationId} and conversation_id like 'inbox-sample-%'`;
   const [loc] = await db`select location_id from locations where installation_id = ${installationId} and not ignored order by location_id limit 1`;
   if (!loc) return;
   const now = Date.now();

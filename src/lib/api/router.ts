@@ -815,7 +815,7 @@ async function settingsUpdate(ctx: Ctx) {
   const patch: Partial<Settings> = {};
   const int = (v: unknown, lo: number, hi: number) => (typeof v === "number" && Number.isInteger(v) && v >= lo && v <= hi ? v : null);
   if ("staleDays" in body) { const v = int(body.staleDays, 7, 365); if (v === null) return json({ error: "Stale days must be between 7 and 365" }, 400); patch.staleDays = v; }
-  if ("dormantDays" in body) { const v = int(body.dormantDays, 7, 365); if (v === null) return json({ error: "Dormant days must be between 7 and 365" }, 400); patch.dormantDays = v; }
+  if ("dormantDays" in body) { const v = int(body.dormantDays, 7, 365); if (v === null) return json({ error: "Days before an account counts as gone quiet must be between 7 and 365" }, 400); patch.dormantDays = v; }
   if ("slaHours" in body) { const v = int(body.slaHours, 1, 168); if (v === null) return json({ error: "SLA hours must be between 1 and 168" }, 400); patch.slaHours = v; }
   if ("digestEnabled" in body) patch.digestEnabled = body.digestEnabled === true;
   if ("industryTargets" in body) patch.industryTargets = body.industryTargets === true;

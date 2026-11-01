@@ -52,8 +52,11 @@ function check(where: string, s: { text: string; links: string[] }, agencyAllowe
   for (const l of s.links) expect(l, `${where} has a link to the platform: ${l}`).not.toMatch(PLATFORM);
 }
 
+let originalDomain = "app.gohighlevel.com"; // the demo tenant's own address, put back at the end so other checks see it as it was
+
 test("the demo tenant carries a white-label domain, and every Open link uses it", async ({ page }) => {
   const token = await demoSession(page);
+  originalDomain = (((await (await page.request.get("/api/app/settings", { headers: { Authorization: `Bearer ${token}` } })).json()) as { settings: { appDomain: string } }).settings.appDomain);
   const put = await page.request.put("/api/app/settings", { headers: { Authorization: `Bearer ${token}` }, data: { appDomain: DOMAIN } });
   expect(put.ok(), await put.text()).toBeTruthy();
   const accounts = await page.request.get("/api/app/accounts", { headers: { Authorization: `Bearer ${token}` } });
@@ -122,4 +125,13 @@ test("white-label check: the product name is replaced by the company's own name"
   } finally {
     await page.request.put("/api/app/settings", { headers, data: { brandName: null } });
   }
+});
+
+// The demo tenant is shared with every other check: its own login address is put back, so nothing else sees the fake white-label domain.
+test("the demo tenant's own login address is put back", async ({ page }) => {
+  const token = await demoSession(page);
+  const put = await page.request.put("/api/app/settings", { headers: { Authorization: `Bearer ${token}` }, data: { appDomain: originalDomain } });
+  expect(put.ok(), await put.text()).toBeTruthy();
+  const links = await (await page.request.get("/api/app/accounts", { headers: { Authorization: `Bearer ${token}` } })).text();
+  expect(links).toContain(`https://${originalDomain}/v2/location/`);
 });

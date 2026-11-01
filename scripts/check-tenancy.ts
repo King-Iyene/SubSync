@@ -25,8 +25,10 @@ async function main() {
     const company = `xtest-agency-${key}`;
     const marker = `zzTenant${K}`;
     await sql()`delete from installations where company_id = ${company}`;
-    const [inst] = await sql()`insert into installations (company_id, company_name, plan, access_token_enc, refresh_token_enc, token_expires_at)
-      values (${company}, ${marker + " Agency"}, 'pro', ${encryptSecret("not-a-real-token")}, ${encryptSecret("not-a-real-token")}, now() + interval '1 hour') returning id`;
+    // No refresh token on purpose: the production scheduler (every 5 minutes, same database) only queues sync jobs for installations that
+    // have one, so a fixture with one would get jobs from the cron in the middle of the "nothing changed" comparison below.
+    const [inst] = await sql()`insert into installations (company_id, company_name, plan, access_token_enc, token_expires_at)
+      values (${company}, ${marker + " Agency"}, 'pro', ${encryptSecret("not-a-real-token")}, now() + interval '1 hour') returning id`;
     const locs = [`xtestLoc${K}0001`, `xtestLoc${K}0002`];
     const contacts: string[] = [];
     const opps: string[] = [];

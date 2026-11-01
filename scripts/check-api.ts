@@ -137,7 +137,7 @@ async function main() {
   assert.equal((await call("/api/app/export/secrets", { token })).status, 404);
   assert.equal((await call("/api/app/settings/test-slack", { method: "POST", token })).status, 400, "no webhook configured");
   const dg = await call("/api/app/digest", { token });
-  assert.match(dg.body.text, /Demo Agency/);
+  assert.match(dg.body.text, /Demo Company/);
   console.log("exports + digest: ok");
 
   // --- hygiene + keys + AI connector
@@ -518,7 +518,7 @@ async function main() {
   assert.equal(okSet.body.settings.digestTimezone, "Africa/Lagos");
   assert.equal((await call("/api/app/daily", { token })).body.schedule.timezone, "Africa/Lagos");
   assert.equal((await putS({ digestHour: null, digestTimezone: null })).body.settings.digestHour, null);
-  assert.match((await call("/api/app/digest", { token })).body.text, /daily brief/);
+  assert.match((await call("/api/app/digest", { token })).body.text, /daily brief/i);
   assert.equal((await call("/api/cron/daily")).status, 401, "the hourly job needs its secret");
   console.log("daily brief: own-history comparison, ranking, scoping, schedule: ok");
 

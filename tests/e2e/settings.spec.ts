@@ -18,7 +18,7 @@ test.describe.configure({ mode: "serial" });
 
 test("stale threshold: a shorter limit marks at least as many deals stale, a longer one at most as many", async ({ request }) => {
   const c = await client(request);
-  const original = (await c.get("settings")).staleDays as number;
+  const original = (await c.get("settings")).settings.staleDays as number;
   try {
     await c.put("settings", { staleDays: 7 });
     const short = (await c.get("overview")).kpis.staleOpps as number;
@@ -30,7 +30,7 @@ test("stale threshold: a shorter limit marks at least as many deals stale, a lon
 
 test("reply target: a tighter target counts at least as many conversations as waiting, a looser one at most as many", async ({ request }) => {
   const c = await client(request);
-  const original = (await c.get("settings")).slaHours as number;
+  const original = (await c.get("settings")).settings.slaHours as number;
   try {
     await c.put("settings", { slaHours: 1 });
     const tight = (await c.get("overview")).kpis.unanswered as number;
@@ -44,7 +44,7 @@ test("reply target: a tighter target counts at least as many conversations as wa
 
 test("speed target: the screen is judged against the target you set", async ({ request }) => {
   const c = await client(request);
-  const original = (await c.get("settings")).speedTargetMinutes as number;
+  const original = (await c.get("settings")).settings.speedTargetMinutes as number;
   try {
     await c.put("settings", { speedTargetMinutes: 5 });
     const tight = await c.get("speed");
@@ -68,10 +68,10 @@ test("bad values are refused with a plain message and change nothing", async ({ 
 
 test("business hours and the automatic-message option are saved and read back", async ({ request }) => {
   const c = await client(request);
-  const before = await c.get("settings");
+  const before = (await c.get("settings")).settings as Json;
   try {
     await c.put("settings", { speedBusinessHours: true, speedOpenHour: 8, speedCloseHour: 18, countAutomatedTouches: true });
-    const s = await c.get("settings");
+    const s = (await c.get("settings")).settings as Json;
     expect([s.speedBusinessHours, s.speedOpenHour, s.speedCloseHour, s.countAutomatedTouches]).toEqual([true, 8, 18, true]);
   } finally { await c.put("settings", { speedBusinessHours: before.speedBusinessHours, speedOpenHour: before.speedOpenHour, speedCloseHour: before.speedCloseHour, countAutomatedTouches: before.countAutomatedTouches }); }
 });

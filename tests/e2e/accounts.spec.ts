@@ -35,7 +35,7 @@ test("the Accounts page has no clipped text and no jargon, and says what its wor
   expect(await clipped(page)).toEqual([]);
   const text = await page.locator("main").innerText();
   expect(text).not.toMatch(/churn|engagement score|dormant/i);
-  expect(text).toContain("Leave risk");
+  expect(text).toMatch(/leave risk/i); // the column heading is shown in capitals
   await page.getByText("What do these words mean?").click();
   await expect(page.getByTestId("what-this-means")).toContainText("Likely to leave");
   const { scrollWidth, innerWidth } = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth }));

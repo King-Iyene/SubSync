@@ -26,7 +26,9 @@ export function signUnsubscribe(installationId: string, email: string): string {
 /** The installation and address tag a valid token names, or null for anything else (wrong signature, damaged, empty). */
 export function readUnsubscribe(token: unknown): Unsubscribe | null {
   if (typeof token !== "string" || token.length > 400 || !token.includes(".")) return null;
-  const [body, sig] = token.split(".");
+  const parts = token.split(".");
+  if (parts.length !== 2) return null; // exactly a body and a signature: anything trailing the signature is refused
+  const [body, sig] = parts;
   try {
     const want = createHmac("sha256", key()).update(body).digest();
     const got = Buffer.from(sig, "base64url");
