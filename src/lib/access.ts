@@ -98,10 +98,15 @@ type Rule = [Method, string, string?];
 const GET_VIEWS = ["overview", "accounts", "onboarding", "search", "stale", "hygiene", "inbox", "pipelines", "duplicates", "alerts", "pipeline-intel", "contact-intel", "comms-intel", "deal-gaps", "deal-events", "contact", "start", "appointments", "appointment-insights", "audit", "speed", "roadmap", "freshness"];
 
 // A person may keep their own saved views of the Unanswered messages page (inbox/views): they hold only filter choices, scoped to the person.
-const CLIENT_RULES: Rule[] = [...GET_VIEWS.map((a) => ["GET", a] as Rule), ["POST", "usage"], ["POST", "roadmap"], ["POST", "inbox", "views"], ["DELETE", "inbox", "views"]];
+// Connections (stage E0): EVERY role connects its own tools, so my-connections is open to all kinds; it only ever touches the signed-in person's own rows.
+// team-connections and meeting-policy are open to the kinds too, but the handler lets only administrators in (a client's account user gets 403) and limits an
+// account administrator to the people and the rule of their own account.
+const PERSONAL_RULES: Rule[] = [["GET", "my-connections"], ["POST", "my-connections"], ["DELETE", "my-connections"], ["GET", "team-connections"], ["POST", "team-connections"], ["PUT", "meeting-policy"]];
+
+const CLIENT_RULES: Rule[] = [...GET_VIEWS.map((a) => ["GET", a] as Rule), ["POST", "usage"], ["POST", "roadmap"], ["POST", "inbox", "views"], ["DELETE", "inbox", "views"], ...PERSONAL_RULES];
 
 const BUSINESS_RULES: Rule[] = [
-  ...GET_VIEWS.map((a) => ["GET", a] as Rule),
+  ...GET_VIEWS.map((a) => ["GET", a] as Rule), ...PERSONAL_RULES,
   ["GET", "email"], ["GET", "daily"], ["GET", "cleanup"], ["POST", "cleanup"], ["GET", "meetings"], ["POST", "meetings"], ["PUT", "meetings"], ["GET", "connections"], ["POST", "connections"], ["DELETE", "connections"], ["GET", "settings"], ["GET", "api-keys"], ["GET", "sync-status"], ["GET", "call-queue"],
   ["GET", "call-lists"], ["GET", "call-outcomes"], ["GET", "goals"], ["GET", "exec-summary"], ["GET", "daily-brief"], ["GET", "digest"],
   ["GET", "export", "stale"], ["GET", "export", "duplicates"], ["GET", "export", "inbox"], ["GET", "export", "deals"], ["GET", "export", "alerts"],
@@ -125,7 +130,7 @@ export function routeAllowed(kind: AccessKind, method: string, segments: string[
 
 // Pages (by nav id) each kind sees. The server enforces the same boundary; this only hides links.
 export const NAV_FOR: Record<AccessKind, ReadonlySet<string>> = {
-  agency: new Set(["today", "people", "audit", "speed", "overview", "accounts", "clients", "team", "appointments", "meetings", "cleanup", "search", "deals", "pipeline", "leads", "calls", "inbox", "onboarding", "email", "duplicates", "alerts", "settings", "help", "roadmap"]),
-  business: new Set(["today", "myday", "people", "audit", "speed", "overview", "team", "appointments", "meetings", "cleanup", "search", "deals", "pipeline", "leads", "calls", "inbox", "onboarding", "email", "duplicates", "alerts", "settings", "help", "roadmap"]),
-  client: new Set(["myday", "people", "audit", "speed", "overview", "appointments", "search", "deals", "pipeline", "leads", "inbox", "duplicates", "onboarding", "alerts", "help", "roadmap"]),
+  agency: new Set(["today", "people", "audit", "speed", "overview", "accounts", "clients", "team", "appointments", "meetings", "cleanup", "search", "deals", "pipeline", "leads", "calls", "inbox", "onboarding", "email", "duplicates", "alerts", "settings", "connections", "help", "roadmap"]),
+  business: new Set(["today", "myday", "people", "audit", "speed", "overview", "team", "appointments", "meetings", "cleanup", "search", "deals", "pipeline", "leads", "calls", "inbox", "onboarding", "email", "duplicates", "alerts", "settings", "connections", "help", "roadmap"]),
+  client: new Set(["myday", "people", "audit", "speed", "overview", "appointments", "search", "deals", "pipeline", "leads", "inbox", "duplicates", "onboarding", "alerts", "connections", "help", "roadmap"]),
 };

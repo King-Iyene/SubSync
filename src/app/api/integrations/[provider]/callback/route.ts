@@ -3,6 +3,8 @@ import { safeError } from "@/lib/safe-log";
 import { completeSignIn, NAMES } from "@/lib/connections/flow";
 import { featureOn } from "@/lib/flags";
 import { isProvider, verifyState } from "@/lib/connections/state";
+import { completePersonal } from "@/lib/connections/personal-flow";
+import { MESSAGE } from "@/lib/connections/messages";
 
 // Where Slack, Fathom and Zoom send a person back after they approve (or refuse) SubSync. This page is
 // opened in a small window from Settings. The signed "state" says which install started it, so no login
@@ -26,11 +28,14 @@ export async function GET(request: Request, ctx: { params: Promise<{ provider: s
   if (!isProvider(provider) || !(await featureOn("connections"))) return new NextResponse("Not found", { status: 404 });
   const url = new URL(request.url);
   const state = verifyState(url.searchParams.get("state"), provider);
-  if (!state) return page(false, "This link has expired", "Go back to SubSync and press Connect again.", provider);
+  if (!state) return page(false, "This link has expired", MESSAGE.expiredLink, provider);
   const code = url.searchParams.get("code");
-  if (url.searchParams.get("error") || !code) return page(false, `${NAMES[provider]} was not connected`, "The request was cancelled, so nothing was changed.", provider);
+  if (url.searchParams.get("error") || !code) return page(false, `${NAMES[provider]} was not connected`, MESSAGE.cancelled, provider);
   try {
-    const done = await completeSignIn(provider, code, state);
+    // A personal tool (Fathom, Zoom) is connected by the person who started it, named in the signed state. Slack is the one workspace tool.
+    const done = state.person && (provider === "fathom" || provider === "zoom") ? await completePersonal(provider, code, state) : await completeSignIn(provider, code, state);
+    // The real provider error is logged by code only: never a token, an address, a name or any text the provider sent.
+    if (!done.ok) console.error("Connecting failed", { provider, code: done.code ?? null, providerCode: done.providerCode ?? null });
     return done.ok ? page(true, `${NAMES[provider]} connected`, done.message, provider) : page(false, `${NAMES[provider]} was not connected`, done.error, provider);
   } catch (error) {
     console.error("Connecting failed", provider, safeError(error));

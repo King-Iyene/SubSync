@@ -103,7 +103,7 @@ export async function POST(request: Request) {
 
   const session = signSession({
     companyId: decision.companyKey, userId: user.userId, role: user.role, userName: user.userName, demo: false,
-    kind: decision.kind, locationId: decision.locationId, dataOwner: mayDeleteData(identity, decision.kind),
+    kind: decision.kind, locationId: decision.locationId, dataOwner: mayDeleteData(identity, decision.kind), personRole: identity.role,
   });
   return NextResponse.json({ user, installed: true, kind: decision.kind, session, entitlements: await resolveEntitlements(installation.plan, installation.id), brand: await brandOf(installation.id) });
 }

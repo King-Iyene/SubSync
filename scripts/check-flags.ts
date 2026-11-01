@@ -70,7 +70,9 @@ async function main() {
         assert.equal((off.connections.body.connections as Array<{ provider: string }>).some((c) => c.provider === "zoom"), false, "switch off: a stored Zoom connection is hidden");
         assert.equal((await call("/api/app/connections/zoom/start", token, { method: "POST", body: "{}" })).status, 404, "switch off: a Zoom sign-in cannot be started");
         assert.equal((await call("/api/app/connections/slack/start", token, { method: "POST", body: "{}" })).status, 400, "Slack is untouched (the demo cannot start a real sign-in)");
-        assert.equal((await call("/api/app/connections/fathom/start", token, { method: "POST", body: "{}" })).status, 400, "and so is Fathom");
+        assert.equal((await call("/api/app/connections/fathom/start", token, { method: "POST", body: "{}" })).status, 404, "Fathom is a personal tool now (stage E0): the shared sign-in is gone");
+        assert.equal((await call("/api/app/my-connections/fathom/start", token, { method: "POST", body: "{}" })).status, 400, "and a person's own Fathom sign-in is untouched (the demo cannot start a real one)");
+        assert.equal((await call("/api/app/my-connections/zoom/start", token, { method: "POST", body: "{}" })).status, 404, "switch off: a personal Zoom sign-in cannot be started either");
         assert.ok((off.connections.body.connections as Array<{ provider: string }>).every((c) => c.provider !== "zoom"));
         // The addresses the Zoom app registration points at still answer.
         assert.equal((await call("/api/integrations/zoom/callback?state=forged")).status, 400, "the Zoom return address still answers (a forged return gets its usual refusal, not a 404)");

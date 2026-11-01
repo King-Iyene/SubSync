@@ -21,13 +21,20 @@ async function open(page: Page, hash: string, heading: string) {
 
 const bodyText = async (page: Page) => flat(await page.locator("body").innerText());
 
-test("Settings names neither Zoom nor Google Meet, and Slack and Fathom stay on Connections", async ({ page }) => {
+test("Settings names neither Zoom nor Google Meet, and points to Connections", async ({ page }) => {
   await open(page, "settings", "Settings");
   await expect(page.getByText("Delete my data").first()).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Fathom", exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Slack", exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: /zoom/i })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Connections", exact: true })).toBeVisible();
   expect(await bodyText(page), "Settings names Zoom or Google Meet").not.toMatch(NAMED);
+});
+
+// Stage E0 moved the connections out of Settings into their own page: Slack and Fathom stay visible, Zoom and Google Meet stay hidden.
+test("Connections names neither Zoom nor Google Meet, and Slack and Fathom stay on it", async ({ page }) => {
+  await open(page, "connections", "Connections");
+  await expect(page.getByRole("heading", { name: "Fathom", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /^Slack/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /zoom/i })).toHaveCount(0);
+  expect(await bodyText(page), "Connections names Zoom or Google Meet").not.toMatch(NAMED);
 });
 
 for (const [hash, heading] of [["help", "Getting started"], ["roadmap", "What's new and next"], ["today", "Today"], ["accounts", "Accounts"], ["duplicates", "Duplicate contacts"]] as const) {

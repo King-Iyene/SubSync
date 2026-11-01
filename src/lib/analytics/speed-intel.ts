@@ -9,6 +9,8 @@
 // SubSync MEASURES replies; it never sends one. The automatic first message (a workflow's instant text) is recorded separately from the person's
 // reply, because the gap between the two ("answered by a robot in 10 seconds, by a person after 3 hours") is the real finding (N78).
 
+import { isInternalComment } from "./message-kinds.ts";
+
 export type Msg = { at: number; direction: "inbound" | "outbound" | null; userId: string | null; source: string | null; type: string | null };
 
 const str = (v: unknown, max = 100) => (typeof v === "string" && v.trim() ? v.trim().slice(0, max) : null);
@@ -28,6 +30,8 @@ export function mapMessage(raw: unknown): Msg | null {
 export const isCall = (m: Pick<Msg, "type">) => /call/i.test(m.type ?? "");
 
 export function isHumanTouch(m: Msg, countAutomated: boolean): boolean {
+  // An internal comment is an outbound message that never reaches the customer (SubSync writes some itself). It is never a touch, whatever the setting.
+  if (isInternalComment(m.type)) return false;
   if (m.direction !== "outbound") return false;
   if (countAutomated) return true;
   return m.userId !== null && (m.source === "app" || isCall(m));

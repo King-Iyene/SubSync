@@ -96,9 +96,25 @@ export const INVENTORY: Record<string, TableInfo> = {
     },
     notPersonal: ["crm_note_id", "crm_note_status"],
   },
+  meetings: {
+    noun: "meetings from connected tools", line: "meetings",
+    personal: {
+      owner_ghl_user_id: "which team member recorded it", title: "the meeting title", attendee_emails: "who attended (email addresses)", summary: "the summary", action_items: "action items",
+      recording_url: "a link to the recording", transcript_ref: "a reference to the full transcript at the tool that made it (the text itself is not kept unless you switch that on)",
+    },
+    notPersonal: ["provider_meeting_id"],
+  },
+  crm_writes: {
+    noun: "a log of what SubSync wrote to your CRM", line: "meetings",
+    personal: { authored_by: "which team member a note or comment was written as" },
+  },
   shared_audits: { noun: "share links", line: "shares", personal: { payload: "a snapshot of totals, finding titles, fix steps and how each number is counted, with client names removed, plus your business name and colour" } },
 
   // ---- what you add, and your settings (kept by "Delete my data", removed by an uninstall)
+  meeting_note_settings: {
+    noun: "each person's meeting-note choices", line: "yours",
+    personal: { ghl_user_id: "which team member the choices belong to" }, notPersonal: ["content_matrix", "source_priority"],
+  },
   call_lists: { noun: "saved call lists", line: "yours", personal: { name: "saved call list names", filters: "the filters of a saved list" } },
   account_profiles: {
     noun: "your notes and fees for each client", line: "yours",
@@ -129,6 +145,14 @@ export const INVENTORY: Record<string, TableInfo> = {
     personal: { label: "the account or channel a tool is connected as", external_id: "the id the tool uses for you", connected_by: "the name of the person who connected it" },
     secrets: { access_token_enc: "encrypted", refresh_token_enc: "encrypted", webhook_secret_enc: "encrypted" }, notPersonal: ["public_key", "token_expires_at"],
   },
+  user_connections: {
+    noun: "each person's connected tools", line: "sign_in",
+    personal: {
+      ghl_user_id: "the sign-in id of the person who connected a tool", person_name: "the name of the person who connected a tool", provider_account_email: "the email of the account a person connected",
+    },
+    secrets: { access_token_enc: "encrypted", refresh_token_enc: "encrypted", webhook_secret_enc: "encrypted" }, notPersonal: ["company_key", "public_key", "token_expires_at"],
+  },
+  meeting_policies: { noun: "the rules for meeting notes", line: "sign_in" },
   meeting_hooks: { noun: "private meeting addresses", line: "sign_in", personal: { label: "the label you gave an address" }, secrets: { token_hash: "hashed" } },
 
   // ---- kept after an uninstall on purpose (no contacts, messages or credentials)
@@ -171,7 +195,7 @@ export const LINES: Record<LineId, Line> = {
   appointments: { title: "Appointments", lead: "The time, status and", tail: ", plus a history of status changes we record from the day you install" },
   accounts: { title: "Your client accounts", lead: "", tail: ", plus a daily set of counts for each account, the alerts we raise, and sync status" },
   actions: { title: "What you did with contacts", lead: "" },
-  meetings: { title: "Meeting notes (only if you connect a meeting tool)", lead: "", closing: "Only a matched contact gets a note in your CRM, and only when SubSync has permission to add notes. A meeting nobody can be matched to is counted, not saved." },
+  meetings: { title: "Meeting notes (only if you connect a meeting tool)", lead: "", closing: "A meeting is private to the person who recorded it. Only a contact matched with certainty by exact email gets a note in your CRM, and only when SubSync has permission to add notes. A meeting nobody can be matched to is never saved to a guessed contact: it is only counted, or it waits in that person's private Meeting inbox for up to 14 days and is then removed. Everything SubSync writes to your CRM is logged, so it never counts as a reply or as activity in the numbers." },
   shares: { title: "Share links", lead: "", closing: `A link works for ${SHARE_LINK_DAYS} days and you can switch it off at any time.` },
   yours: { title: "Things you add", lead: "" },
   sign_in: { title: "Your company, settings and connections", lead: "", closing: "Access tokens are encrypted at rest. API keys are kept only as a one-way hash." },

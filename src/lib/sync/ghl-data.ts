@@ -4,6 +4,7 @@
 
 import { GHL_API, GhlError } from "../ghl/client.ts";
 import { ghlFetch } from "../ghl/http.ts";
+import { isInternalComment } from "../analytics/message-kinds.ts";
 import { mapMessage, type Msg } from "../analytics/speed-intel.ts";
 import { safePhotoUrl } from "../analytics/people-labels.ts";
 
@@ -145,7 +146,8 @@ export function mapConversation(raw: unknown): ConversationRow | null {
     contactId: str(r.contactId),
     contactName: str(r.fullName) ?? str(r.contactName),
     lastMessageType: str(r.lastMessageType),
-    lastMessageDirection: dir === "inbound" || dir === "outbound" ? dir : null,
+    // An internal comment is stored as an outbound message but is not a reply to the customer (spec section 10), so it never becomes "outbound" here.
+    lastMessageDirection: isInternalComment(str(r.lastMessageType)) ? null : dir === "inbound" || dir === "outbound" ? dir : null,
     lastMessageAt: toIso(r.lastMessageDate) ?? toIso(r.lastMessageAt),
     unreadCount: Number.isFinite(unread) && unread > 0 ? Math.floor(unread) : 0,
   };

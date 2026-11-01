@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { useApiClient, useData } from "../session";
 import { Badge, Btn, Card, ErrorBox, inputClass, Loading, PageHeader, timeAgo } from "../ui";
 import { storeLines, deleteMyDataText, uninstallText } from "@/lib/data-inventory";
-import { ConnectionsCard } from "./connections";
 import { SyncStatusPanel } from "./sync-status";
 
 type S = { staleDays: number; dormantDays: number; slaHours: number; appDomain: string; appDomainSource: "manual" | "sso" | "install" | "default"; detectedDomain: string | null; digestEnabled: boolean; customChecklist: string[]; digestHour: number | null; digestTimezone: string | null; digestEmail: string | null; emailReady?: boolean; brandName: string | null; brandColor: string | null; industryTargets?: boolean; keepTranscripts: boolean; pushNotesToCrm: boolean; speedTargetMinutes: number; countAutomatedTouches: boolean; speedBusinessHours: boolean; speedOpenHour: number; speedCloseHour: number; alertQuietHours: boolean };
@@ -243,7 +242,11 @@ export function SettingsView() {
           {digest && <pre className="mt-3 overflow-x-auto whitespace-pre-wrap rounded-lg bg-muted p-3 text-xs">{digest}</pre>}
         </Card>
 
-        {data.features?.connections !== false && <ConnectionsCard meetingSettings={data.features?.meetings !== false || data.meetingTool === true} />}
+        {data.features?.connections !== false && (
+          <Card title="Connections">
+            <p className="text-sm text-muted-foreground">Each person connects their own tools, and admins see who has connected. Open <a className="font-medium text-foreground underline underline-offset-2" href="#connections">Connections</a> in the menu (Settings and help).</p>
+          </Card>
+        )}
 
         {data.features?.ai !== false && (
         <Card title="AI assistant connector">

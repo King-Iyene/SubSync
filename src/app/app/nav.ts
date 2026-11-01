@@ -1,5 +1,5 @@
 export type ViewId =
-  | "today" | "myday" | "audit" | "speed" | "overview" | "accounts" | "account" | "search" | "deals" | "inbox" | "onboarding" | "email" | "duplicates" | "alerts" | "settings" | "help" | "pipeline" | "leads" | "calls" | "clients" | "team" | "appointments" | "meetings" | "cleanup" | "roadmap" | "people";
+  | "today" | "myday" | "audit" | "speed" | "overview" | "accounts" | "account" | "search" | "deals" | "inbox" | "onboarding" | "email" | "duplicates" | "alerts" | "settings" | "help" | "pipeline" | "leads" | "calls" | "clients" | "team" | "appointments" | "meetings" | "cleanup" | "roadmap" | "people" | "connections";
 
 export type GoFn = (view: ViewId, locationId?: string) => void;
 
@@ -34,6 +34,7 @@ export const NAV: NavItem[] = [
   { id: "cleanup", label: "Data cleanup", feature: "cleanup", group: "More" },
   { id: "meetings", label: "Meeting notes", feature: "meetings", group: "More" },
   { id: "settings", label: "Settings", feature: "settings", group: "Settings and help" },
+  { id: "connections", label: "Connections", feature: "connections", group: "Settings and help" },
   { id: "help", label: "Getting started", feature: "overview", group: "Settings and help" },
   { id: "roadmap", label: "What's new", feature: "overview", group: "Settings and help" },
 ];

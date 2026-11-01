@@ -234,7 +234,8 @@ describe("the menu structure", () => {
   });
   it("the pilot menu is on top, in order", () => {
     const top = NAV.filter((n) => !n.parent && n.group !== "More").map((n) => n.label);
-    expect(top).toEqual(["Today", "My day", "Speed to lead", "Appointments", "Unanswered messages", "Account audit", "Clients", "People", "Settings", "Getting started", "What's new"]);
+    expect(top).toEqual(["Today", "My day", "Speed to lead", "Appointments", "Unanswered messages", "Account audit", "Clients", "People", "Settings", "Connections", "Getting started", "What's new"]);
+    // Connections (stage E0) sits with Settings: every role connects its own tools, so it is in every kind's menu.
   });
   it("nothing that was visible has gone: every page is still in the menu, under More, or a tab of its parent", () => {
     for (const id of ["overview", "accounts", "team", "pipeline", "onboarding", "duplicates", "cleanup", "meetings"]) expect(NAV.find((n) => n.id === id)?.group, id).toBe("More");
