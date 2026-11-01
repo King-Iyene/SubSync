@@ -238,6 +238,9 @@ describe("the menu structure", () => {
   });
   it("nothing that was visible has gone: every page is still in the menu, under More, or a tab of its parent", () => {
     for (const id of ["overview", "accounts", "team", "pipeline", "onboarding", "duplicates", "cleanup", "meetings"]) expect(NAV.find((n) => n.id === id)?.group, id).toBe("More");
+    // Stage C1: Accounts and Setup became tabs of the Clients module (their addresses still open it), so an agency finds them there, not in the menu.
+    for (const id of ["accounts", "onboarding"]) expect(NAV.find((n) => n.id === id)?.parent, id).toBe("clients");
+    expect(NAV.find((n) => n.id === "onboarding")?.showWhenLimited, "a business keeps its own Setup in its menu").toBe(true);
     for (const id of ["search", "leads", "calls"]) expect(NAV.find((n) => n.id === id)?.parent, id).toBe("people");
     for (const n of NAV) if (n.parent) expect(NAV.some((p) => p.id === n.parent), n.id).toBe(true);
     for (const id of NAV.map((n) => n.id)) if (id !== "myday") expect(NAV_FOR.agency.has(id), `agency sees ${id}`).toBe(true);

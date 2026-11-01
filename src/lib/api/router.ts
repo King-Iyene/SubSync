@@ -27,9 +27,9 @@ import {
 import { OUTCOME_LABEL, PRESETS, parseFilters, parseOutcome } from "../analytics/call-intel";
 import { callQueue, createCallList, deleteCallList, listCallLists, logOutcome, MAX_LISTS, outcomeSummary, speedToLead } from "../analytics/call-queries";
 import {
-  activitySummary, anomalyIndices, compareAccounts, contactGap, goalProgress, renewalStatus, roi, segmentStats, zAnomaly,
+  activitySummary, anomalyIndices, contactGap, goalProgress, renewalStatus, roi, segmentStats, zAnomaly,
 } from "../analytics/client-intel";
-import { accountHistory, clientExtras, periodFigures, saveProfile, type ClientExtra, type ProfilePatch } from "../analytics/client-queries";
+import { clientExtras, periodFigures, saveProfile, type ClientExtra, type ProfilePatch } from "../analytics/client-queries";
 import { dailyPriorities, replyAging, setupScore, worstDomainStatus, type SetupFacts } from "../analytics/comms-intel";
 import { channelCounts, channelLabel, CONVERSATIONS_READ_PER_ACCOUNT, readLimitNote, unreadSummary, WAITING_WINDOW_DAYS } from "../analytics/waiting";
 import { attentionBand } from "../scoring";
@@ -53,6 +53,12 @@ import { emailConfigured } from "../email";
 import { validEmail } from "../analytics/weekly-email";
 import { appointmentView } from "../analytics/appointment-queries";
 import { compareSetup, describe as describeDiff } from "../analytics/setup-intel";
+import {
+  baselineShare, compareTable, dealFigures, driftRows, endpoints, INDUSTRY_PICKER, lastSpokenMs, parseCompareIds, parseQuarter, pointsIn, previousQuarter, proofSummary,
+  qbrFindings, quarterOf, quarterProgress, recentQuarters, SHARED_BASELINE, type Quarter,
+} from "../analytics/client-success";
+import { alertsOf, historyStart, noteSummaries, quarterFacts } from "../analytics/client-success-queries";
+import * as clientRoutes from "./client-routes";
 import { applyRun, createPreview, getRun, installationHasScope, listRuns, PREVIEW_VALID_HOURS, sampleChanges, undoRun } from "../analytics/cleanup-queries";
 import { parseParams } from "../analytics/cleanup-intel";
 import { demoWriter, platformWriter } from "../analytics/cleanup-writer";
@@ -362,7 +368,9 @@ async function setupCompare(ctx: Ctx) {
   return json({
     accounts: setups.map((s) => ({ locationId: s.locationId, name: s.name })),
     baseline: base ? { locationId: base.locationId, name: base.name, pipelines: base.pipelines.length, calendars: base.calendars } : null,
-    rows: base ? setups.filter((s) => s.locationId !== base.locationId).map((s) => { const d = compareSetup(base, s); return { locationId: s.locationId, name: s.name, matches: d.matches, notes: describeDiff(d) }; }) : [],
+    rows: base ? setups.filter((s) => s.locationId !== base.locationId && baselineShare(base, s) >= SHARED_BASELINE).map((s) => { const d = compareSetup(base, s); return { locationId: s.locationId, name: s.name, matches: d.matches, notes: describeDiff(d), share: baselineShare(base, s), drift: driftRows(base, s) }; }) : [],
+    // Accounts that did not start from the baseline's template are not compared with it: a list of differences between two unrelated clients says nothing.
+    unrelated: base ? setups.filter((s) => s.locationId !== base.locationId && baselineShare(base, s) < SHARED_BASELINE).map((s) => ({ locationId: s.locationId, name: s.name, pipelines: s.pipelines.length })) : [],
   });
 }
 
@@ -528,13 +536,14 @@ async function usagePing(ctx: Ctx) {
 // The getting-started checklist, with each step's real state.
 async function startView(ctx: Ctx) {
   const db = sql();
-  const [views, [locs], status, settings, [clientOn]] = await Promise.all([
+  const [views, [locs], status, settings, [clientOn], [feeOn]] = await Promise.all([
     db`select distinct view from usage_events where installation_id = ${ctx.installationId}`,
     db`select count(*)::int total, count(*) filter (where contacts_synced_at is not null)::int synced from locations
         where installation_id = ${ctx.installationId} ${ctx.limitTo ? db`and location_id = ${ctx.limitTo}` : db``}`,
     syncStatus(ctx.installationId, ctx.limitTo),
     getSettings(ctx.installationId),
     ctx.kind === "agency" ? db`select count(*)::int n from locations where installation_id = ${ctx.installationId} and client_view` : Promise.resolve([{ n: 0 }]),
+    ctx.kind === "agency" ? db`select count(*)::int n from account_profiles where installation_id = ${ctx.installationId} and monthly_fee is not null` : Promise.resolve([{ n: 0 }]),
   ]);
   const seen = new Set(views.map((v) => v.view as string));
   const agency = ctx.kind === "agency";
@@ -560,6 +569,8 @@ async function startView(ctx: Ctx) {
       detail: null, body: "Type one email address in Settings. New critical and warning alerts are emailed to it straight away, and a short summary arrives every Monday. Nothing is sent until you add an address.", view: "settings", cta: "Open Settings" },
     ...(ctx.entitlements.features.meetings !== false ? [{ id: "meetings", title: "Connect a meeting tool (optional)", done: seen.has("meetings"), optional: true,
       detail: null, body: `Connect ${zoomOn(ctx) ? "Zoom or Fathom" : "Fathom"} in Settings and each meeting summary is saved in SubSync and added to the matching contact's notes in your CRM.`, view: "meetings", cta: "Open Meeting notes" }] : []),
+    ...(agency && ctx.entitlements.features.clients !== false ? [{ id: "client_fees", title: "Add what each client pays you (optional)", done: (feeOn?.n ?? 0) > 0, optional: true,
+      detail: null, body: "Type each client's monthly fee and renewal date on the Clients page, in the row itself. SubSync cannot read them from your CRM, so you enter them once and the revenue, renewal and value-created figures fill in.", view: "clients", cta: "Open Clients" }] : []),
     ...(agency ? [{ id: "clients", title: "Let a client see their own account", done: (clientOn?.n ?? 0) > 0, optional: true,
       detail: null, body: "Switch on a read-only view for a client's own staff. They see only their own account: never other clients, fees or notes.", view: "settings", cta: "Open Settings" }] : []),
   ];
@@ -1351,18 +1362,23 @@ async function domainStatusByAccount(installationId: string) {
   return (id: string) => worstDomainStatus(by.get(id) ?? []);
 }
 
-function clientRow(a: DerivedAccount, e: ClientExtra | undefined, avgCycle: number | null, links: ReturnType<typeof deepLinks>, now: number, emailAuth: SetupFacts["emailAuth"] = "unchecked") {
+type ClientNotes = { count: number; lastConversationOn: string | null; lastNote: { body: string; author: string | null; on: string } | null };
+// money and notes are the counted-deal figures and the log of conversations (stage C1): Value created uses the same counted deals as every other screen, and
+// "last spoken" is the later of the "I spoke to them today" press and the newest logged conversation.
+function clientRow(a: DerivedAccount, e: ClientExtra | undefined, avgCycle: number | null, links: ReturnType<typeof deepLinks>, now: number, emailAuth: SetupFacts["emailAuth"] = "unchecked", money?: { pipelineCreated: number; wonValue: number; wonCount: number }, notes?: ClientNotes) {
   const fee = e?.monthlyFee ?? null;
+  const spoken = lastSpokenMs(e?.lastContactedAt ?? null, notes?.lastConversationOn ? [notes.lastConversationOn] : []);
   const installed = e?.installedAt ?? null;
   const daysIn = installed === null ? null : Math.floor((now - installed) / 86_400_000);
   const hasWon = (e?.firstWonAt ?? null) !== null;
   return {
     locationId: a.locationId, name: a.name, url: links.account(a.locationId), score: a.score, band: a.band, churn: a.churn.level, dormant: a.dormant,
     new30d: a.new30d, openValue: a.openValue, unanswered: a.unanswered, completenessPct: a.completenessPct, winRate: a.winRate, avgCycleDays: avgCycle,
-    profile: { monthlyFee: fee, renewalDate: e?.renewalDate ?? null, industry: e?.industry ?? null, notes: e?.notes ?? null, lastContactedAt: e?.lastContactedAt ? new Date(e.lastContactedAt).toISOString() : null },
-    roi: roi({ monthlyFee: fee, pipelineCreated30d: e?.pipelineCreated30d ?? 0, wonValue30d: e?.wonValue30d ?? 0 }),
+    profile: { monthlyFee: fee, renewalDate: e?.renewalDate ?? null, industry: e?.industry ?? null, notes: e?.notes ?? null, lastContactedAt: spoken === null ? null : new Date(spoken).toISOString() },
+    log: { count: notes?.count ?? 0, lastNote: notes?.lastNote ?? null },
+    roi: roi({ monthlyFee: fee, pipelineCreated30d: money?.pipelineCreated ?? e?.pipelineCreated30d ?? 0, wonValue30d: money?.wonValue ?? e?.wonValue30d ?? 0 }),
     renewal: renewalStatus(e?.renewalDate ?? null, now),
-    contactGap: contactGap(e?.lastContactedAt ?? null, now),
+    contactGap: contactGap(spoken, now),
     progress: {
       daysSinceInstall: daysIn, firstLeadAt: e?.firstLeadAt ? new Date(e.firstLeadAt).toISOString() : null, firstWonAt: e?.firstWonAt ? new Date(e.firstWonAt).toISOString() : null,
       // 6.7: a client well past setup with no won deal needs a conversation.
@@ -1376,9 +1392,10 @@ function clientRow(a: DerivedAccount, e: ClientExtra | undefined, avgCycle: numb
 async function clientsView(ctx: Ctx) {
   const now = Date.now();
   const allowed = await allowedIds(ctx);
-  const [{ accounts, links }, extras, deals, domainOf] = await Promise.all([accountsFor(ctx), clientExtras(ctx.installationId, allowed), loadDeals(ctx.installationId, allowed), domainStatusByAccount(ctx.installationId)]);
+  const [{ accounts, links }, extras, deals, domainOf, notes] = await Promise.all([accountsFor(ctx), clientExtras(ctx.installationId, allowed), loadDeals(ctx.installationId, allowed), domainStatusByAccount(ctx.installationId), noteSummaries(ctx.installationId, allowed)]);
   const cycles = new Map(accountSummaries(deals, now).map((s) => [s.locationId, s.avgCycleDays]));
-  const rows = accounts.filter((a) => !a.ignored).map((a) => clientRow(a, extras.get(a.locationId), cycles.get(a.locationId) ?? null, links, now, domainOf(a.locationId)));
+  const money = dealFigures(deals, now - 30 * 86_400_000, now);
+  const rows = accounts.filter((a) => !a.ignored).map((a) => clientRow(a, extras.get(a.locationId), cycles.get(a.locationId) ?? null, links, now, domainOf(a.locationId), money.get(a.locationId) ?? { pipelineCreated: 0, wonValue: 0, wonCount: 0 }, notes.get(a.locationId)));
   const withFee = rows.filter((x) => x.profile.monthlyFee !== null);
   const atRisk = (x: (typeof rows)[number]) => x.band === "at_risk" || x.churn === "high" || x.dormant;
   return json({
@@ -1388,6 +1405,9 @@ async function clientsView(ctx: Ctx) {
       atRisk: withFee.filter(atRisk).reduce((s, x) => s + (x.profile.monthlyFee ?? 0), 0),
       clientsWithFee: withFee.length,
     },
+    // First-use guidance (KF-7): nobody has typed a fee, a renewal date or an industry yet, so the screen explains what to do instead of showing bare "n/a".
+    firstUse: { noFees: withFee.length === 0, noRenewals: rows.every((x) => !x.profile.renewalDate), noIndustry: rows.every((x) => !x.profile.industry), noLog: rows.every((x) => x.log.count === 0) },
+    industryChoices: INDUSTRY_PICKER.map((p) => p.value),
     renewals: rows.filter((x) => x.renewal && x.renewal.bucket !== "later").sort((a, b) => (a.renewal?.daysLeft ?? 0) - (b.renewal?.daysLeft ?? 0))
       .map((x) => ({ locationId: x.locationId, name: x.name, daysLeft: x.renewal?.daysLeft ?? 0, bucket: x.renewal?.bucket ?? "later", fee: x.profile.monthlyFee })),
     segments: segmentStats(rows.map((x) => ({ industry: x.profile.industry, score: x.score, winRate: x.winRate, openValue: x.openValue }))),
@@ -1395,22 +1415,22 @@ async function clientsView(ctx: Ctx) {
   });
 }
 
+// Two or more clients side by side (ids=a,b,c; the older a and b still work), each figure against the average of the clients picked, with the
+// clients that are far apart highlighted (client-success.ts). Missing figures stay missing: no guessing.
 async function clientsCompare(ctx: Ctx) {
-  const a = ctx.url.searchParams.get("a") ?? "";
-  const b = ctx.url.searchParams.get("b") ?? "";
-  if (!LOCATION_ID.test(a) || !LOCATION_ID.test(b) || a === b) return json({ error: "Pick two different accounts" }, 400);
+  const ids = parseCompareIds(ctx.url.searchParams.get("ids"), ctx.url.searchParams.get("a"), ctx.url.searchParams.get("b"), (x) => LOCATION_ID.test(x));
+  if (ids.length < 2) return json({ error: "Pick at least two different clients" }, 400);
   const now = Date.now();
   const allowed = await allowedIds(ctx);
   const [{ accounts }, deals] = await Promise.all([accountsFor(ctx), loadDeals(ctx.installationId, allowed)]);
   const cycles = new Map(accountSummaries(deals, now).map((s) => [s.locationId, s.avgCycleDays]));
-  const facts = (id: string) => {
-    const x = accounts.find((acc) => acc.locationId === id && !acc.ignored);
-    return x ? { name: x.name ?? "Unnamed account", new30d: x.new30d, winRate: x.winRate, avgCycleDays: cycles.get(id) ?? null, unanswered: x.unanswered, completenessPct: x.completenessPct, score: x.score, openValue: x.openValue } : null;
-  };
-  const fa = facts(a);
-  const fb = facts(b);
-  if (!fa || !fb) return json({ error: "Account not found" }, 404);
-  return json({ a: fa, b: fb, notes: compareAccounts(fa, fb) });
+  const picked = ids.map((id) => accounts.find((acc) => acc.locationId === id && !acc.ignored)).filter((x): x is DerivedAccount => Boolean(x));
+  if (picked.length !== ids.length) return json({ error: "Account not found" }, 404);
+  const clients = picked.map((x) => ({
+    locationId: x.locationId, name: x.name ?? "Unnamed account",
+    values: { score: x.score, new30d: x.new30d, openValue: x.openValue, winRate: x.winRate, avgCycleDays: cycles.get(x.locationId) ?? null, unanswered: x.unanswered, completenessPct: x.completenessPct },
+  }));
+  return json({ clients, ...compareTable(clients) });
 }
 
 async function clientUpdate(ctx: Ctx, locationId: string) {
@@ -1447,18 +1467,45 @@ async function clientUpdate(ctx: Ctx, locationId: string) {
   return ok ? json({ ok: true }) : json({ error: "Account not found" }, 404);
 }
 
+// A quarterly review of one client (stage C1): the quarter asked for (default: the current one, which is said to be still running), the quarter before it,
+// their numbers, wins and issues, the daily series behind the charts, and "what SubSync caught". Everything is read from what SubSync holds; where its record
+// does not reach back (it only knows what it saw since it started watching), the review says so instead of drawing an empty chart.
 async function qbrView(ctx: Ctx, locationId: string) {
   const now = Date.now();
   const allowed = await allowedIds(ctx);
-  const [{ accounts, links }, extras, deals, history, domainOf] = await Promise.all([
-    accountsFor(ctx), clientExtras(ctx.installationId, allowed), loadDeals(ctx.installationId, allowed, locationId), accountHistory(ctx.installationId, locationId), domainStatusByAccount(ctx.installationId),
+  const asked = ctx.url.searchParams.get("quarter");
+  const quarter: Quarter | null = asked ? parseQuarter(asked) : quarterOf(now);
+  if (!quarter) return json({ error: "Pick a quarter like 2026-Q4" }, 400);
+  const previous = previousQuarter(quarter);
+  const [{ accounts, links, settings }, extras, deals, domainOf, notes, alerts, start, days] = await Promise.all([
+    accountsFor(ctx), clientExtras(ctx.installationId, allowed), loadDeals(ctx.installationId, allowed, locationId), domainStatusByAccount(ctx.installationId),
+    noteSummaries(ctx.installationId, allowed), alertsOf(ctx.installationId, locationId), historyStart(ctx.installationId, locationId), clientRoutes.trendDays(ctx.installationId, locationId, 400),
   ]);
   const a = accounts.find((x) => x.locationId === locationId && !x.ignored);
   if (!a) return json({ error: "Account not found" }, 404);
   const avgCycle = accountSummaries(deals, now)[0]?.avgCycleDays ?? null;
-  const open = (await listAlerts(ctx.installationId, false, 500)).filter((al) => al.locationId === locationId);
-  const { settings: brandSettings } = await accountsFor(ctx);
-  return json({ brand: { name: brandSettings.brandName, color: brandSettings.brandColor }, client: clientRow(a, extras.get(locationId), avgCycle, links, now, domainOf(locationId)), history, openAlerts: open.length, generatedAt: new Date(now).toISOString() });
+  const money = dealFigures(deals, now - 30 * 86_400_000, now);
+  const client = clientRow(a, extras.get(locationId), avgCycle, links, now, domainOf(locationId), money.get(locationId), notes.get(locationId));
+  const [cur, prev, speed] = await Promise.all([
+    quarterFacts(ctx.installationId, locationId, quarter, deals), quarterFacts(ctx.installationId, locationId, previous, deals),
+    speedView(ctx.installationId, [locationId], settings.speedTargetMinutes).catch(() => null),
+  ]);
+  const openAlerts = alerts.filter((x) => !x.resolvedAt).length;
+  const findings = qbrFindings(cur, prev.healthDays > 0 || prev.contactsAdded > 0 ? prev : null, {
+    dormant: a.dormant, unanswered: a.unanswered, staleOpps: a.staleOpps, completenessPct: a.completenessPct, openAlerts, monthlyFee: client.profile.monthlyFee,
+    replyHitRate: speed?.overall.hitRate ?? null, replyLeads: speed?.overall.leads ?? 0,
+  });
+  const progress = quarterProgress(quarter, now);
+  const current = pointsIn(days, quarter.from, quarter.to);
+  return json({
+    brand: { name: settings.brandName, color: settings.brandColor }, client, openAlerts, generatedAt: new Date(now).toISOString(),
+    quarter: { ...quarter, ...progress }, previous, quarters: recentQuarters(now, 6).map((q) => ({ key: q.key, label: q.label })),
+    facts: cur, previousFacts: prev, findings, proof: proofSummary(alerts, quarter), historyStartsOn: start,
+    series: { current, previous: pointsIn(days, previous.from, previous.to) },
+    health: endpoints(current.map((p) => p.healthScore)),
+    // How fast new leads got a first reply lately (the Speed to lead page's own figure, last two weeks); its history is shorter than a quarter, so it is said as such.
+    reply: speed ? { hitRate: speed.overall.hitRate, leads: speed.overall.leads, targetMinutes: speed.targetMinutes, windowDays: speed.windowDays } : null,
+  });
 }
 
 async function execSummary(ctx: Ctx) {
@@ -1591,9 +1638,12 @@ async function digestPreview(ctx: Ctx) {
 
 // ---------------- routing ----------------
 
+// What the Clients module's own routes (client-routes.ts) need from this file.
+const clientDeps: clientRoutes.Deps = { allowedIds, accountsFor, actorOf, locationId: LOCATION_ID };
+
 const FEATURE_FOR: Record<string, Feature> = {
   search: "search", onboarding: "onboarding", stale: "stale", inbox: "inbox", pipelines: "pipelines", duplicates: "duplicates", email: "email",
-  alerts: "alerts", appointments: "appointments", audit: "audit", speed: "speed", "appointment-insights": "appointments", meetings: "meetings", connections: "connections", cleanup: "cleanup", "setup-compare": "setup_compare", playbooks: "playbooks", daily: "overview", team: "team", "deal-events": "pipelines", contact: "search", settings: "settings", export: "exports", digest: "overview", "api-keys": "ai", hygiene: "stale", "pipeline-intel": "pipelines", "contact-intel": "activity", clients: "clients", qbr: "reports", "comms-intel": "inbox", "deal-gaps": "pipelines", "call-queue": "calls", "call-lists": "calls", "call-outcomes": "calls",
+  alerts: "alerts", appointments: "appointments", audit: "audit", speed: "speed", "appointment-insights": "appointments", meetings: "meetings", connections: "connections", cleanup: "cleanup", "setup-compare": "setup_compare", playbooks: "playbooks", daily: "overview", team: "team", "deal-events": "pipelines", contact: "search", settings: "settings", export: "exports", digest: "overview", "api-keys": "ai", hygiene: "stale", "pipeline-intel": "pipelines", "contact-intel": "activity", clients: "clients", "client-onboarding": "onboarding", "client-trends": "clients", qbr: "reports", "comms-intel": "inbox", "deal-gaps": "pipelines", "call-queue": "calls", "call-lists": "calls", "call-outcomes": "calls",
 };
 
 export async function handle(request: Request, segments: string[]): Promise<Response> {
@@ -1655,12 +1705,19 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       if (a === "comms-intel") return await commsIntel(ctx);
       if (a === "deal-gaps") return await dealGaps(ctx);
       if (a === "clients" && !b) return await clientsView(ctx);
+      if (a === "clients" && b && LOCATION_ID.test(b) && c === "notes") return await clientRoutes.notesView(ctx, clientDeps, b);
+      if (a === "client-onboarding" && !b) return await clientRoutes.onboardingView(ctx, clientDeps);
+      if (a === "client-onboarding" && b && LOCATION_ID.test(b) && c === "history") return await clientRoutes.historyView(ctx, clientDeps, b);
+      if (a === "client-trends") return await clientRoutes.trendsView(ctx, clientDeps, b && LOCATION_ID.test(b) ? b : undefined);
       if (a === "clients" && b === "compare") return ctx.entitlements.features.reports === false ? json({ error: "This feature is switched off", feature: "reports", off: true }, 404) : await clientsCompare(ctx);
       if (a === "qbr" && b && LOCATION_ID.test(b)) return await qbrView(ctx, b);
       if (a === "digest") return await digestPreview(ctx);
     }
     if (method === "POST") {
       if (a === "email" && b === "check") return await emailCheck(ctx);
+      if (a === "clients" && b && LOCATION_ID.test(b) && c === "notes") return await clientRoutes.noteAdd(ctx, clientDeps, b);
+      if (a === "client-onboarding" && b === "templates" && c === "starter") return await clientRoutes.templateStarter(ctx);
+      if (a === "client-onboarding" && b && b !== "templates" && LOCATION_ID.test(b) && c === "steps") return await clientRoutes.stepAdd(ctx, clientDeps, b);
       if (a === "usage" && !b) return await usagePing(ctx);
       if (a === "inbox" && b === "views") return await inboxViewSave(ctx);
       if (a === "audit" && b === "share") return await auditShare(ctx);
@@ -1690,6 +1747,9 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
     }
     if (method === "DELETE") {
       if (a === "inbox" && b === "views" && c && /^[0-9a-fA-F-]{36}$/.test(c)) return await inboxViewRemove(ctx, c);
+      if (a === "clients" && b && LOCATION_ID.test(b) && c === "notes") return await clientRoutes.noteRemove(ctx, clientDeps, b);
+      if (a === "client-onboarding" && b === "templates") return await clientRoutes.templateRemove(ctx);
+      if (a === "client-onboarding" && b && LOCATION_ID.test(b) && c === "steps") return await clientRoutes.stepRemove(ctx, clientDeps, b);
       if (a === "connections" && b && !c) return await connectionRemove(ctx, b);
       if (a === "call-lists" && b && /^[0-9a-fA-F-]{36}$/.test(b)) return await callListDelete(ctx, b);
     }
@@ -1700,6 +1760,8 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       if (a === "meetings" && b) return await meetingUpdate(ctx, b);
       if (a === "team" && b && LOCATION_ID.test(b)) return await teamName(ctx, b);
       if (a === "clients" && b && LOCATION_ID.test(b)) return await clientUpdate(ctx, b);
+      if (a === "client-onboarding" && b === "templates") return await clientRoutes.templateSave(ctx);
+      if (a === "client-onboarding" && b && LOCATION_ID.test(b) && c === "steps") return await clientRoutes.stepUpdate(ctx, clientDeps, b);
       if (a === "accounts" && b && LOCATION_ID.test(b) && c === "flags") return await flags(ctx, b);
       if (a === "accounts" && b && LOCATION_ID.test(b) && c === "tasks") return await taskUpdate(ctx, b);
     }

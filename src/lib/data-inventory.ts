@@ -111,6 +111,11 @@ export const INVENTORY: Record<string, TableInfo> = {
   report_templates: { noun: "saved report layouts", line: "yours", personal: { name: "saved report names", spec: "the layout of a saved report" } },
   saved_views: { noun: "your saved views of a page", line: "yours", personal: { owner: "who saved the view (a sign-in id)", name: "the name you gave a saved view", filters: "the choices in a saved view (client account, channel, person)" }, notPersonal: ["page"] },
   roadmap_votes: { noun: "roadmap votes", line: "yours", personal: { voter: "who voted on the roadmap (a sign-in id)" }, notPersonal: ["item_key"] },
+  // Stage C1 (Clients): what you write about a client, and how far each client is through onboarding.
+  client_notes: { noun: "notes and conversations you log about a client", line: "yours", personal: { body: "the notes and conversations you log about a client", author: "who wrote a client note" }, notPersonal: ["kind"] },
+  onboarding_templates: { noun: "onboarding checklist templates", line: "yours", personal: { name: "the names of your onboarding templates", steps: "the steps of your onboarding templates" }, notPersonal: ["industry_key"] },
+  client_steps: { noun: "who is on each onboarding step and when it is due", line: "yours", personal: { label: "the steps you add to one client", assignee: "who an onboarding step is given to", done_by: "who finished an onboarding step" }, notPersonal: ["step_key"] },
+  client_step_history: { noun: "the history of onboarding steps", line: "yours", personal: { step_label: "the names of onboarding steps", detail: "what changed on an onboarding step", actor: "who changed an onboarding step" }, notPersonal: ["step_key"] },
   settings: {
     noun: "settings", line: "sign_in",
     personal: {

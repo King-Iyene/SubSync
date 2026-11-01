@@ -11,7 +11,7 @@ import type { Identity, Role } from "@/lib/identity";
 const METHODS = ["GET", "POST", "PUT", "DELETE"] as const;
 
 // Everything a client's staff may call. Anything else is refused, whatever it is called.
-const CLIENT_GET = new Set(["overview", "accounts", "onboarding", "search", "stale", "hygiene", "inbox", "pipelines", "duplicates", "alerts", "pipeline-intel", "contact-intel", "comms-intel", "deal-gaps", "deal-events", "contact", "start", "appointments", "appointment-insights", "audit", "speed", "roadmap", "freshness"]);
+const CLIENT_GET = new Set(["overview", "accounts", "onboarding", "search", "stale", "hygiene", "inbox", "pipelines", "duplicates", "alerts", "pipeline-intel", "contact-intel", "comms-intel", "deal-gaps", "deal-events", "contact", "start", "appointments", "appointment-insights", "audit", "speed", "roadmap", "freshness", "client-trends"]);
 const CLIENT_POST = new Set(["usage", "roadmap"]);
 
 // Every first path segment the API handles, read from the router itself, plus names of things that must never reach a client even if they are built later.

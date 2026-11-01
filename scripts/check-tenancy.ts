@@ -75,6 +75,9 @@ async function main() {
       "/api/app/daily", "/api/app/email", "/api/app/sync-status", "/api/app/freshness", "/api/app/call-queue", "/api/app/call-lists", "/api/app/call-outcomes", "/api/app/goals",
       "/api/app/exec-summary", "/api/app/digest", "/api/app/settings", "/api/app/api-keys", `/api/app/setup-compare?baseline=${other.locs[0]}`, "/api/app/playbooks", "/api/app/start",
       "/api/app/export/stale", "/api/app/export/duplicates", "/api/app/export/inbox", "/api/app/export/deals", "/api/app/export/alerts",
+      // Stage C1 (Clients): onboarding, the log of conversations, trends, compare and the review, each aimed at the other side.
+      "/api/app/client-onboarding", `/api/app/client-onboarding/${other.locs[0]}/history`, `/api/app/clients/${other.locs[0]}/notes`, `/api/app/client-trends/${other.locs[0]}`,
+      `/api/app/client-trends?ids=${other.locs[0]},${other.locs[1]}`, `/api/app/clients/compare?ids=${other.locs[0]},${other.locs[1]}`, `/api/app/qbr/${other.locs[0]}?quarter=2026-Q4`,
       `/api/app/overview?industry=medical&owner=${other.marker}`, `/api/app/search?q=${me.marker}`,
     ];
 
@@ -133,6 +136,9 @@ async function main() {
       (select count(*)::int from sync_jobs where installation_id = ${s.inst}) jobs,
       (select count(*)::int from audit_log where installation_id = ${s.inst}) audits,
       (select count(*)::int from team_names where installation_id = ${s.inst}) names,
+      (select count(*)::int from client_notes where installation_id = ${s.inst}) client_notes,
+      (select count(*)::int from client_steps where installation_id = ${s.inst}) client_steps,
+      (select count(*)::int from client_step_history where installation_id = ${s.inst}) client_step_history,
       (select coalesce(sum(case when ignored then 1 else 0 end), 0)::int from locations where installation_id = ${s.inst}) ignored,
       (select count(*)::int from cached_contacts where installation_id = ${s.inst}) contacts`)[0];
     const snap = await before(B);
@@ -144,6 +150,10 @@ async function main() {
       ["PUT", `/api/app/accounts/${B.locs[0]}/flags`, { ignored: true }],
       ["PUT", `/api/app/clients/${B.locs[0]}`, { industry: "medical" }],
       ["POST", `/api/app/accounts/${B.locs[0]}/tasks`, {}],
+      ["PUT", `/api/app/client-onboarding/${B.locs[0]}/steps`, { key: "manual:kickoff", done: true }],
+      ["POST", `/api/app/client-onboarding/${B.locs[0]}/steps`, { label: "hacked" }],
+      ["POST", `/api/app/clients/${B.locs[0]}/notes`, { body: "hacked" }],
+      ["DELETE", `/api/app/clients/${B.locs[0]}/notes?id=00000000-0000-0000-0000-000000000000`, {}],
     ];
     for (const [method, path, body] of attacks) {
       const r = await call(path, tokenA, { method, body: JSON.stringify(body) });
@@ -281,7 +291,7 @@ async function main() {
         "/api/app/call-queue", "/api/app/call-outcomes", "/api/app/exec-summary", "/api/app/daily", "/api/app/daily-brief", "/api/app/digest", "/api/app/export/stale", "/api/app/sync-status", "/api/app/freshness", "/api/app/segments", "/api/app/playbooks",
         "/api/app/setup-compare", "/api/app/email", "/api/app/audit/shares", "/api/app/tickets", "/api/app/tickets/1", "/api/app/fees", "/api/app/notes",
       ];
-      const allowedForClient = new Set(["overview", "accounts", "onboarding", "search", "stale", "hygiene", "inbox", "pipelines", "duplicates", "alerts", "pipeline-intel", "contact-intel", "comms-intel", "deal-gaps", "deal-events", "start", "appointments", "appointment-insights", "audit", "speed", "roadmap", "freshness"]);
+      const allowedForClient = new Set(["overview", "accounts", "onboarding", "search", "stale", "hygiene", "inbox", "pipelines", "duplicates", "alerts", "pipeline-intel", "contact-intel", "comms-intel", "deal-gaps", "deal-events", "start", "appointments", "appointment-insights", "audit", "speed", "roadmap", "freshness", "client-trends"]);
       let answered = 0;
       let refusedCount = 0;
       for (const [me, other] of sides) {

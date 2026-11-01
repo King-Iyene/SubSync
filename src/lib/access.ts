@@ -95,7 +95,7 @@ type Method = "GET" | "POST" | "PUT" | "DELETE";
 // optionally the second. Everything not listed is refused for that kind (default deny).
 type Rule = [Method, string, string?];
 
-const GET_VIEWS = ["overview", "accounts", "onboarding", "search", "stale", "hygiene", "inbox", "pipelines", "duplicates", "alerts", "pipeline-intel", "contact-intel", "comms-intel", "deal-gaps", "deal-events", "contact", "start", "appointments", "appointment-insights", "audit", "speed", "roadmap", "freshness"];
+const GET_VIEWS = ["overview", "accounts", "onboarding", "search", "stale", "hygiene", "inbox", "pipelines", "duplicates", "alerts", "pipeline-intel", "contact-intel", "comms-intel", "deal-gaps", "deal-events", "contact", "start", "appointments", "appointment-insights", "audit", "speed", "roadmap", "freshness", "client-trends"];
 
 // A person may keep their own saved views of the Unanswered messages page (inbox/views): they hold only filter choices, scoped to the person.
 const CLIENT_RULES: Rule[] = [...GET_VIEWS.map((a) => ["GET", a] as Rule), ["POST", "usage"], ["POST", "roadmap"], ["POST", "inbox", "views"], ["DELETE", "inbox", "views"]];
