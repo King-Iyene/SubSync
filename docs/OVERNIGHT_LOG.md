@@ -230,3 +230,9 @@ Status: D0 BUILT, awaiting King's checks. Tag for the lead: `stage-D0`.
 #### F5 (parallel worktree; merged cleanly, tag stage-F5)
 - Agent ran: `npx tsc --noEmit` exit 0; eslint 0 errors; `node --test` (10 files) tests 120 pass 120; vitest (5 files) 67 passed. Written, NOT run: `tests/e2e/today.spec.ts` (12), `tests/unit/f5-today-db.test.ts` (3). No migration.
 - DECIDED FOR KING: see NEEDS_KING section 21 (every page narrows to the active account for an agency person opened inside a client account).
+
+#### F10 (parallel worktree; merged, tag stage-F10)
+- Agent ran: `npx tsc --noEmit` exit 0; eslint 0 errors; `node --test` (people-f10 and banned-terms) tests 26 pass 26 (+46 pass 46 on another set); vitest (3 files) 44 passed; read-only `scripts/profile-people.ts` (every call list 1.2 to 2.1 s from this machine, DB time 13 to 94 ms) and `scripts/check-people.ts` ("All checks agree": everyone 52,926=52,926; tag 49,622=49,622; engaged-then-quiet 275, seen recently 152, nothing seen 1,541 equal the Leads figures; it found and fixed one 1,544 vs 1,541 difference). Written, NOT run: `tests/unit/people-lists-db.test.ts` (9), `tests/e2e/f10.spec.ts` (10).
+- Merge: six conflict files (TENANCY.md, dashboard.tsx, access.ts, router.ts, ghl-data.ts, tenant-tables.ts), all additive; resolved by keeping both sides; `npx tsc --noEmit` on the merged tree: clean.
+- Migration applied by the agent (additive, backup first): `20261102100000_f10_people.sql`.
+- UNSURE (agent): the Dialer setting is stored as a second kind of row in `saved_views`; timings not measured on the hosted app.
