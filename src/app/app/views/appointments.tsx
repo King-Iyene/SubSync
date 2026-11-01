@@ -120,7 +120,7 @@ const accountColumns = (go: GoFn): Array<Column<Data["perAccount"][number]>> => 
   { key: "rate", header: "Show rate", width: "5.5rem", align: "right", cell: (a) => <span className="tabular-nums">{pct(a.showRate)}</span> },
   { key: "next", header: "Next 7 days", width: "6rem", align: "right", cell: (a) => <span className="tabular-nums">{a.upcoming7}</span> },
   { key: "none", header: "No outcome", width: "6rem", align: "right", cell: (a) => <span className="tabular-nums">{a.unmarked}</span> },
-  { key: "open", header: "", width: "7rem", align: "right", cell: (a) => (a.access === "needs_permission" ? <Badge tone="warn">Needs approval</Badge> : <button type="button" className="min-h-9 text-xs underline" onClick={() => go("account", a.locationId)}>Open</button>) },
+  { key: "open", header: "", width: "7rem", align: "right", cell: (a) => (a.access === "needs_permission" ? <Badge tone="warn">Needs permission: reconnect</Badge> : <button type="button" className="min-h-9 text-xs underline" onClick={() => go("account", a.locationId)}>Open</button>) },
 ];
 
 const breakdownColumns: Array<Column<Row>> = [

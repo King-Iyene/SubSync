@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { SiteShell } from "@/components/legal-page";
+import { COMPANY } from "@/lib/company";
+import { CRM_WRITE_SUMMARY } from "@/lib/meeting-wording";
 
 export const metadata: Metadata = { title: "SubSync is installed" };
 
@@ -22,7 +24,7 @@ export default function Installed() {
           ))}
         </ol>
         <p className="text-sm text-muted-foreground">
-          SubSync mostly reads your data. The one thing it adds on its own is a note on a contact when a meeting summary arrives from a tool you connect, and you can switch that off. Anything else that changes your data needs your preview and confirmation. Questions? Email code@kdsquares.com.
+          {CRM_WRITE_SUMMARY} Anything else that changes your data needs your preview and confirmation. Questions? Email {COMPANY.supportEmail}.
         </p>
       </div>
     </SiteShell>

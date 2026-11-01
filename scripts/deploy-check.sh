@@ -19,6 +19,7 @@ probe() { # path expected [method]
 probe / 200
 probe /app 200
 probe /privacy 200
+probe /trust 200
 probe /terms 200
 probe /support 200
 probe /installed 200

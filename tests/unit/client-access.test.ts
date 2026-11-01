@@ -12,7 +12,7 @@ const METHODS = ["GET", "POST", "PUT", "DELETE"] as const;
 
 // Everything a client's staff may call. Anything else is refused, whatever it is called.
 const CLIENT_GET = new Set(["overview", "accounts", "onboarding", "search", "stale", "hygiene", "inbox", "pipelines", "duplicates", "alerts", "pipeline-intel", "contact-intel", "comms-intel", "deal-gaps", "deal-events", "contact", "start", "appointments", "appointment-insights", "audit", "speed", "roadmap", "freshness"]);
-const CLIENT_POST = new Set(["usage", "roadmap"]);
+const CLIENT_POST = new Set(["usage", "roadmap", "feedback", "problem"]);
 
 // Every first path segment the API handles, read from the router itself, plus names of things that must never reach a client even if they are built later.
 const router = readFileSync(join(process.cwd(), "src/lib/api/router.ts"), "utf8");

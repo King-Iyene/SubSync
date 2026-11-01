@@ -30,7 +30,7 @@ const ALLOWED: Record<string, { count: number; why: string }> = {
   "src/app/app/views/connections.tsx": { count: 2, why: "gated: the Zoom card is drawn only when the API lists Zoom, and the API leaves it out while the switch is off" },
   "src/app/app/views/meetings.tsx": { count: 3, why: "gated: each mention is behind moreTools, which is the switch" },
   "src/app/privacy/page.tsx": { count: 1, why: "gated: the sentence about connected services picks its words from the switch" },
-  "src/lib/api/router.ts": { count: 1, why: "gated: the Getting started step picks its words from the switch" },
+  "src/lib/getting-started.ts": { count: 1, why: "gated: the meeting step picks its words from the switch (the facts say whether Zoom is on)" },
   "src/app/api/hooks/zoom/route.ts": { count: 1, why: "plumbing: a log line when a Zoom notification fails" },
   "src/lib/connections/flow.ts": { count: 1, why: "plumbing: the provider's name for messages that follow a Zoom sign-in" },
   "src/lib/connections/oauth.ts": { count: 4, why: "plumbing: errors from Zoom's own sign-in and API calls" },

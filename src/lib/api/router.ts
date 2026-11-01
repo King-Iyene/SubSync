@@ -46,7 +46,7 @@ import { auditSummary, buildAudit } from "../analytics/audit-intel";
 import { appointmentList, staleDealList, waitingList, type AuditList } from "../analytics/audit-queries";
 import { DEAL_RULES_VERSION } from "../analytics/definitions";
 import { speedView } from "../analytics/speed-queries";
-import { CHANGELOG, ROADMAP } from "../roadmap";
+import { CHANGELOG, ROADMAP, STATUS_LABEL, STATUS_MEANING } from "../roadmap";
 import { buildSharePayload } from "../analytics/share-intel";
 import { randomBytes } from "node:crypto";
 import { emailConfigured } from "../email";
@@ -71,6 +71,11 @@ import { paceOf, sourceConversion, teamLabel, teamWinRate } from "../analytics/p
 import { excludedOpenDeals, getGoals, GOAL_METRICS, loadDeals, pipelineTrend, setGoal, type GoalMetric } from "../analytics/pipeline-queries";
 import { MIN_CLOSED_DEALS as MIN_CLOSED, OUTLIER_MIN_DEALS, OUTLIER_SHARE, outlier as dealOutlier, winRateOf } from "../analytics/metrics";
 import { parsePickedAccounts } from "../design/filters";
+import { buildSteps, guideRoleOf } from "../getting-started";
+import { changedSettingKeys, feedbackGivenBy, logAccountFlags, logKeyChange, logSettingsChange, recordVote } from "../feedback-queries";
+import { groupStatus, parseGranted } from "../scope-groups";
+import { NOTE_SCOPE } from "../meeting-wording";
+import { giveFeedback, history as settingsHistoryView, ownSuggestions, reportProblem, suggest, whoOf } from "./f8-routes";
 import { authenticate, isResponse, json, type AuthContext } from "./auth";
 
 // All authenticated data endpoints live behind /api/app/<path>. Each one needs a valid signed
@@ -307,15 +312,24 @@ const voterOf = (ctx: Ctx) => `${ctx.kind}:${ctx.limitTo ?? "agency"}:${ctx.sess
 async function roadmapView(ctx: Ctx) {
   const rows = await sql()`select item_key, count(*)::int n, bool_or(voter = ${voterOf(ctx)}) mine from roadmap_votes where installation_id = ${ctx.installationId} group by item_key`;
   const by = new Map(rows.map((r) => [r.item_key as string, { n: r.n as number, mine: Boolean(r.mine) }]));
-  return json({ items: ROADMAP.map((i) => ({ ...i, votes: by.get(i.key)?.n ?? 0, voted: by.get(i.key)?.mine ?? false })), changelog: CHANGELOG });
+  // Statuses are words, with what each means; a shipped item has nothing left to vote for. Your own suggestions come with it (never anyone else's).
+  return json({
+    items: ROADMAP.map((i) => ({ ...i, label: STATUS_LABEL[i.status], votes: by.get(i.key)?.n ?? 0, voted: by.get(i.key)?.mine ?? false })),
+    statusMeaning: STATUS_MEANING, changelog: CHANGELOG, mine: await ownSuggestions(ctx),
+  });
 }
 
 async function roadmapVote(ctx: Ctx) {
   const body = (await ctx.request.json().catch(() => null)) as { key?: unknown } | null;
-  if (typeof body?.key !== "string" || !ROADMAP.some((i) => i.key === body.key)) return json({ error: "Unknown item" }, 400);
+  const item = typeof body?.key === "string" ? ROADMAP.find((i) => i.key === body.key) : undefined;
+  if (!item) return json({ error: "Unknown item" }, 400);
+  if (item.status === "shipped") return json({ error: "That one is already live, so there is nothing left to vote for." }, 400);
   const voter = voterOf(ctx);
-  const gone = await sql()`delete from roadmap_votes where installation_id = ${ctx.installationId} and item_key = ${body.key} and voter = ${voter} returning 1`;
-  if (gone.length === 0) await sql()`insert into roadmap_votes (installation_id, item_key, voter) values (${ctx.installationId}, ${body.key}, ${voter})`;
+  const gone = await sql()`delete from roadmap_votes where installation_id = ${ctx.installationId} and item_key = ${item.key} and voter = ${voter} returning 1`;
+  if (gone.length === 0) {
+    await sql()`insert into roadmap_votes (installation_id, item_key, voter) values (${ctx.installationId}, ${item.key}, ${voter}) on conflict do nothing`;
+    await recordVote(ctx.installationId, actorOf(ctx), item.key); // a dry-run line for King's daily digest: ids only
+  }
   return json({ ok: true, voted: gone.length === 0 });
 }
 
@@ -378,6 +392,7 @@ async function meetingsView(ctx: Ctx) {
     meetings: meetings.map((m) => ({ ...m, contactUrl: m.contactId ? sc.links.contact(m.locationId, m.contactId) : null })),
     hooks, accounts: locs.map((l) => ({ locationId: l.location_id as string, name: (l.name as string | null) ?? "Unnamed account" })),
     maxHooks: MAX_HOOKS_PER_ACCOUNT, keepTranscripts: sc.settings.keepTranscripts, canManage: ctx.kind !== "client", moreTools: zoomOn(ctx),
+    pushNotesToCrm: sc.settings.pushNotesToCrm, noteWriteGranted: ctx.demo ? null : await installationHasScope(ctx.installationId, NOTE_SCOPE),
   });
 }
 
@@ -512,7 +527,7 @@ async function dailyView(ctx: Ctx) {
   });
 }
 
-const USAGE_VIEWS = new Set(["today", "overview", "accounts", "clients", "team", "search", "deals", "pipeline", "leads", "calls", "inbox", "onboarding", "email", "duplicates", "alerts", "settings", "help", "account", "meetings", "audit", "speed", "appointments"]);
+const USAGE_VIEWS = new Set(["today", "overview", "accounts", "clients", "team", "search", "deals", "pipeline", "leads", "calls", "inbox", "onboarding", "email", "duplicates", "alerts", "settings", "help", "account", "meetings", "audit", "speed", "appointments", "people", "myday", "roadmap"]);
 
 // A counter of which pages get opened (no personal data), so the getting-started checklist can
 // tick itself off and so the agency can see what its team uses.
@@ -525,48 +540,38 @@ async function usagePing(ctx: Ctx) {
   return json({ ok: true });
 }
 
-// The getting-started checklist, with each step's real state.
+// The Getting started guide for this person's role, with each step's real state. The steps and when they tick are in src/lib/getting-started.ts (unit tested);
+// this only gathers the facts, all from the signed session's own installation. A client's staff get steps ticked from their own browser, not the company counter.
 async function startView(ctx: Ctx) {
   const db = sql();
-  const [views, [locs], status, settings, [clientOn]] = await Promise.all([
+  const agency = ctx.kind === "agency";
+  const [views, [locs], status, settings, [clientOn], accountRows, [shares], changed, given] = await Promise.all([
     db`select distinct view from usage_events where installation_id = ${ctx.installationId}`,
     db`select count(*)::int total, count(*) filter (where contacts_synced_at is not null)::int synced from locations
         where installation_id = ${ctx.installationId} ${ctx.limitTo ? db`and location_id = ${ctx.limitTo}` : db``}`,
     syncStatus(ctx.installationId, ctx.limitTo),
     getSettings(ctx.installationId),
-    ctx.kind === "agency" ? db`select count(*)::int n from locations where installation_id = ${ctx.installationId} and client_view` : Promise.resolve([{ n: 0 }]),
+    agency ? db`select count(*)::int n from locations where installation_id = ${ctx.installationId} and client_view` : Promise.resolve([{ n: 0 }]),
+    agency ? db`select name, ignored from locations where installation_id = ${ctx.installationId}` : Promise.resolve([]),
+    agency ? db`select count(*)::int n from shared_audits where installation_id = ${ctx.installationId}` : Promise.resolve([{ n: 0 }]),
+    ctx.kind === "client" ? Promise.resolve(new Set<string>()) : changedSettingKeys(ctx.installationId),
+    feedbackGivenBy(ctx.installationId, whoOf(ctx).who),
   ]);
-  const seen = new Set(views.map((v) => v.view as string));
-  const agency = ctx.kind === "agency";
   const synced = locs.total > 0 && locs.synced === locs.total && status.pending === 0;
   const syncDetail = locs.total === 0
     ? (status.pending > 0 ? "Looking for your accounts..." : "No accounts found yet. The platform can take a minute after an install: press Sync now on the home page.")
     : synced ? `${locs.total} account${locs.total === 1 ? "" : "s"} read. ${(await freshnessFor(ctx.installationId, { limitTo: ctx.limitTo })).text}.`
     : `${locs.synced} of ${locs.total} account${locs.total === 1 ? "" : "s"} read, ${status.pending} job${status.pending === 1 ? "" : "s"} left.`;
-  const steps = [
-    { id: "connected", title: "Connect SubSync", done: true, detail: agency ? "Connected to all your client accounts." : "Connected to your account.",
-      body: "You are signed in through the platform, so there is nothing to type. SubSync only reads your data.", view: null, cta: null },
-    { id: "synced", title: "Let the first sync finish", done: synced, detail: syncDetail,
-      body: "SubSync reads your " + (agency ? "client accounts" : "account") + " in the background. The first sync takes a few minutes, longer with many contacts. Numbers fill in as it goes.", view: "overview", cta: "See how fresh your data is" },
-    { id: "today", title: "See what needs you today", done: seen.has("today"),
-      detail: null, body: "Today ranks what to do first, with the reason and a link, and compares each account with its own normal.", view: "today", cta: "Open Today" },
-    { id: "search", title: "Find any contact", done: seen.has("search"),
-      detail: null, body: "Search by name, email or phone" + (agency ? " across every client account at once" : "") + ", and open a contact's timeline.", view: "search", cta: "Open contact search" },
-    { id: "duplicates", title: "Review likely duplicates", done: seen.has("duplicates"),
-      detail: null, body: "See likely duplicate contacts with a confidence score, decide which record to keep, then merge them in the platform.", view: "duplicates", cta: "Open Duplicates" },
-    { id: "brief", title: "Get the daily brief in Slack", done: Boolean(settings.slackWebhookUrl) && settings.digestEnabled,
-      detail: null, body: "Paste a Slack incoming webhook in Settings and choose the hour. It arrives once a day in your time zone.", view: "settings", cta: "Open Settings" },
-    { id: "email", title: "Get alerts and the Monday email", done: Boolean(settings.digestEmail),
-      detail: null, body: "Type one email address in Settings. New critical and warning alerts are emailed to it straight away, and a short summary arrives every Monday. Nothing is sent until you add an address.", view: "settings", cta: "Open Settings" },
-    ...(ctx.entitlements.features.meetings !== false ? [{ id: "meetings", title: "Connect a meeting tool (optional)", done: seen.has("meetings"), optional: true,
-      detail: null, body: `Connect ${zoomOn(ctx) ? "Zoom or Fathom" : "Fathom"} in Settings and each meeting summary is saved in SubSync and added to the matching contact's notes in your CRM.`, view: "meetings", cta: "Open Meeting notes" }] : []),
-    ...(agency ? [{ id: "clients", title: "Let a client see their own account", done: (clientOn?.n ?? 0) > 0, optional: true,
-      detail: null, body: "Switch on a read-only view for a client's own staff. They see only their own account: never other clients, fees or notes.", view: "settings", cta: "Open Settings" }] : []),
-  ];
-  // A client's own staff get the steps about using SubSync. The steps about alerts, email, meeting tools and client access report what the company
-  // set up in Settings (whether a Slack channel or an email address is saved), which a client never receives (N84).
-  const shown = ctx.kind === "client" ? steps.filter((s) => !["brief", "email", "meetings", "clients"].includes(s.id)) : steps;
-  return json({ kind: ctx.kind, steps: shown, doneCount: shown.filter((s) => s.done).length, total: shown.length });
+  const role = guideRoleOf(ctx.kind, ctx.session.role);
+  const steps = buildSteps(role, {
+    synced, syncDetail, seen: new Set(views.map((v) => v.view as string)), companyUsage: ctx.kind !== "client",
+    slackBrief: Boolean(settings.slackWebhookUrl) && settings.digestEnabled, emailSet: Boolean(settings.digestEmail), clientViewOn: clientOn?.n ?? 0,
+    ignoredCount: accountRows.filter((r) => r.ignored === true).length, testLookingCount: accountRows.filter((r) => r.ignored !== true && isTestName(r.name as string | null)).length,
+    changedKeys: changed, sharedAudits: shares?.n ?? 0, feedbackGiven: given,
+    meetingsPage: ctx.entitlements.features.meetings !== false, zoomOn: zoomOn(ctx),
+  });
+  // A client's staff never receive what the company set up in Settings (N84): their guide has no such step, and the facts above for it are empty.
+  return json({ kind: ctx.kind, role, steps, doneCount: steps.filter((s) => s.done).length, total: steps.length });
 }
 
 // Options for the filter bar. Not narrowed by the filter itself, so you can always change it.
@@ -891,7 +896,17 @@ const settingsView = async (ctx: Ctx) => {
   const accts = ctx.kind === "agency" ? await sql()`select location_id, name, client_view from locations where installation_id = ${ctx.installationId} and not ignored order by lower(coalesce(name, ''))` : [];
   // Is a meeting tool connected? Its privacy switches stay visible even while the Meeting notes page is off.
   const [meetingTool] = await sql()`select 1 from connections where installation_id = ${ctx.installationId} and provider in ('fathom', 'zoom') ${zoomOn(ctx) ? sql()`` : sql()`and provider <> 'zoom'`} limit 1`;
-  return json({ features: ctx.entitlements.features, settings: publicSettings(settings), slackConfigured: Boolean(settings.slackWebhookUrl), kind: ctx.kind, canDeleteData: ctx.session.dataOwner === true, meetingTool: Boolean(meetingTool), clientView: counts ? { on: counts.on_ as number, total: counts.total as number } : null, clientAccounts: accts.map((r) => ({ locationId: r.location_id as string, name: (r.name as string | null) ?? "Unnamed account", on: r.client_view === true })) });
+  // Which permissions this install granted (names only), grouped by what they are for (N64). Not known for the demo, so nothing is marked missing there.
+  const [inst] = await sql()`select scope from installations where id = ${ctx.installationId}`;
+  const granted = ctx.demo || typeof inst?.scope !== "string" || inst.scope.trim() === "" ? null : parseGranted(inst.scope as string);
+  // Every client account, ignored ones too, so the owner can leave a test account out of every number or put it back (N1). Agency sessions only.
+  const everyAccount = ctx.kind === "agency" ? await sql()`select location_id, name, ignored from locations where installation_id = ${ctx.installationId} order by lower(coalesce(name, ''))` : [];
+  return json({
+    features: ctx.entitlements.features, settings: publicSettings(settings), slackConfigured: Boolean(settings.slackWebhookUrl), kind: ctx.kind, canDeleteData: ctx.session.dataOwner === true, meetingTool: Boolean(meetingTool),
+    clientView: counts ? { on: counts.on_ as number, total: counts.total as number } : null, clientAccounts: accts.map((r) => ({ locationId: r.location_id as string, name: (r.name as string | null) ?? "Unnamed account", on: r.client_view === true })),
+    permissions: groupStatus(granted), noteWriteGranted: granted === null ? null : granted.includes(NOTE_SCOPE),
+    testAccounts: everyAccount.map((r) => ({ locationId: r.location_id as string, name: (r.name as string | null) ?? "Unnamed account", ignored: r.ignored === true, looksTest: isTestName(r.name as string | null) })),
+  });
 };
 
 function publicSettings(s: Settings) {
@@ -988,6 +1003,8 @@ async function settingsUpdate(ctx: Ctx) {
     patch.customChecklist = [...new Set(list.map((x: string) => x.trim()))];
   }
   await updateSettings(ctx.installationId, patch);
+  // Every change to a setting is written to the audit log: the names of the settings, never their values (a Slack address is a secret).
+  await logSettingsChange(ctx.installationId, actorOf(ctx), ctx.kind, [...Object.keys(patch), ...("clientViewAll" in body && ctx.kind === "agency" ? ["clientViewAll"] : [])]);
   // Recomputing every account takes many seconds. Only settings that feed a number or an alert need it; a brand name, an email address or a
   // Slack address changes no figure, so saving those returns at once.
   if (Object.keys(patch).some((k) => INSIGHT_SETTINGS.has(k))) await refreshInsights(ctx.installationId);
@@ -1006,6 +1023,7 @@ async function flags(ctx: Ctx, locationId: string) {
     else return json({ error: "Owner must be up to 60 characters" }, 400);
   }
   if (!(await setLocationFlags(ctx.installationId, locationId, patch))) return json({ error: "Account not found" }, 404);
+  await logAccountFlags(ctx.installationId, actorOf(ctx), ctx.kind, locationId, Object.keys(patch));
   await refreshInsights(ctx.installationId);
   return json({ ok: true });
 }
@@ -1123,12 +1141,15 @@ async function keysCreate(ctx: Ctx) {
   const created = await createKey(ctx.installationId, name);
   if (created === "limit") return json({ error: `You can have up to ${MAX_KEYS} active keys. Revoke one first.` }, 400);
   // The key is returned this one time only; we keep just a hash.
+  await logKeyChange(ctx.installationId, actorOf(ctx), ctx.kind, true);
   return json({ key: created.key, row: created.row });
 }
 
 async function keysRevoke(ctx: Ctx, id: string) {
   if (!UUID.test(id)) return json({ error: "Key not found" }, 404);
-  return (await revokeKey(ctx.installationId, id)) ? json({ ok: true }) : json({ error: "Key not found" }, 404);
+  if (!(await revokeKey(ctx.installationId, id))) return json({ error: "Key not found" }, 404);
+  await logKeyChange(ctx.installationId, actorOf(ctx), ctx.kind, false);
+  return json({ ok: true });
 }
 
 // "Delete my data": only the owner (see mayDeleteData), only with the typed word, and always written to the audit log, refused or done.
@@ -1637,6 +1658,7 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       if (a === "duplicates") return await duplicates(ctx);
       if (a === "email" && !b) return await emailHealth(ctx);
       if (a === "alerts") return await alertsView(ctx);
+      if (a === "settings" && b === "history") return await settingsHistoryView(ctx);
       if (a === "settings") return await settingsView(ctx);
       if (a === "export" && b) return await exportCsv(ctx, b);
       if (a === "sync-status") return await syncStatusView(ctx);
@@ -1666,6 +1688,9 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       if (a === "audit" && b === "share") return await auditShare(ctx);
       if (a === "audit" && b === "revoke") return await auditRevoke(ctx);
       if (a === "roadmap" && !b) return await roadmapVote(ctx);
+      if (a === "roadmap" && b === "suggest" && !c) return await suggest(ctx, request);
+      if (a === "feedback" && !b) return await giveFeedback(ctx, request);
+      if (a === "problem" && !b) return await reportProblem(ctx, request);
       if (a === "cleanup" && b === "preview") return await cleanupPreview(ctx);
       if (a === "cleanup" && b && c === "apply") return await cleanupWork(ctx, b, "apply");
       if (a === "cleanup" && b && c === "undo") return await cleanupWork(ctx, b, "undo");

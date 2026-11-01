@@ -25,7 +25,7 @@ A person in one client account never sees another client account's data. An agen
 ## The guards on every request to `/api/app`
 
 - `authenticate` (`src/lib/api/auth.ts`) verifies the session signature and expiry, resolves the installation, and refuses a limited session that has no location.
-- `routeAllowed` (`src/lib/access.ts`) is default deny: each session kind has an explicit list of method and path pairs. Client sessions are read-only plus two harmless writes (the page-view counter and roadmap votes).
+- `routeAllowed` (`src/lib/access.ts`) is default deny: each session kind has an explicit list of method and path pairs. Client sessions are read-only plus four harmless writes (feedback, a problem report, a roadmap vote or suggestion, the page-view counter and roadmap votes).
 - Every query takes the installation id from the session. For business and client sessions every query is also restricted to the single location id (`limitTo`). The id in a URL is only ever used to pick one of the caller's own records, and an id belonging to someone else returns 404.
 - Agency-only controls on an account (ignore, owner, client view) are refused for business and client sessions.
 - "Delete my data" (`POST settings/purge`) is for one person only: the agency owner, or the administrator of a business that installed the app for itself (`mayDeleteData` in `src/lib/access.ts`, set at sign-in and carried in the signed session as `dataOwner`; a session without it can never delete). It needs the typed word DELETE, and every attempt, refused or done, is written to the audit log, which the deletion itself does not remove.
@@ -52,6 +52,7 @@ A person in one client account never sees another client account's data. An agen
 | `api/cron/weekly` | secret | Bearer CRON_SECRET; idle while the kill switch is on |
 | `api/cron/watchdog` | secret | Bearer CRON_SECRET; the internal sync alarm, writes audit lines (ids, times, counts) and sends nothing; idle while the kill switch is on |
 | `api/admin/diagnostics` | secret | Bearer CRON_SECRET only, read only; sync health of every real install (short ids, times, counts), no customer data |
+| `api/admin/feedback` | secret | Bearer CRON_SECRET only, read only; the feedback, problem reports, roadmap suggestions and vote counts people sent, companies as short ids |
 | `api/admin/capabilities` | secret | Bearer CRON_SECRET only, read only; which data the platform gives the app, install by install (field names, counts and statuses, never a value or a token); at most 70 GET requests per call |
 | `/audit/[id]` | public_by_design | Shared audit snapshot: 192-bit random id, 14-day expiry, switch-off by its owner, rate limited, totals, finding titles and a fix plan only, account names removed |
 | `/` | public_static | Marketing page |
@@ -59,6 +60,7 @@ A person in one client account never sees another client account's data. An agen
 | `/design` | public_static | The style guide (stage D0): tokens and shared components on made-up sample data produced in the page's own code; no sign-in, no tenant data, no API calls, noindex |
 | `/installed` | public_static | Static page |
 | `/installed/error` | public_static | Static page |
+| `/trust` | public_static | Trust page (stage F8): what is read, stored, requested and processed, produced from the inventory and the scope list and checked claim by claim by a test; no tenant data |
 | `/privacy` | public_static | Legal page with no tenant data. Its lists of what is stored and deleted come from `src/lib/data-inventory.ts`, checked against the schema; the one thing read per request is the global switch for Zoom and Google Meet |
 | `/support` | public_static | Static page |
 | `/terms` | public_static | Static legal page |
@@ -78,6 +80,8 @@ There are several hundred queries; they are not listed one by one. They are all 
 `src/lib/data-inventory.ts` lists every table, and every column that holds personal data, with a plain-words label. `tests/unit/data-inventory.test.ts` compares it with the migration files and the live database and fails for a table or a personal-looking column that is not listed. The Settings card "What we store", the privacy page and the help answer about removing data are produced from it, and `tests/unit/uninstall-purge.test.ts` checks what they say against real rows.
 
 `saved_views` (stage F4) holds a person's own named choices on the Unanswered messages page. It carries `installation_id` and an `owner` key made on the server from the verified session (kind, account, sign-in id), so a person reads and removes only their own views (`tests/unit/inbox-views-db.test.ts`); it holds filter choices only, never customer data. Kept by "Delete my data", removed on uninstall. Its routes are `inbox/views` under `api/app` (the one catch-all, already guarded); a client's staff may keep their own (`src/lib/access.ts`).
+
+`feedback_items` and `roadmap_suggestions` (stage F8) hold what a person typed to us: feedback, a problem report (with the error ID shown on the screen) and a roadmap suggestion. Each row carries `installation_id`, a `who` key made on the server from the verified session, and the person’s kind of session; a person reads back only their own suggestions (the What’s new page), and nobody reads feedback in the app at all: King reads it through `api/admin/feedback` (the server secret only). Nothing is sent anywhere tonight: telling King is a dry-run `notify.king.would_send` line in `audit_log` with ids only. Both are kept by "Delete my data" and removed on uninstall, and both are listed in "What we store".
 
 ## Known gaps (not hidden)
 

@@ -165,7 +165,7 @@ export function SpeedView({ go }: { go: GoFn }) {
                 {data.perAccount.map((a) => (
                   <tr key={a.locationId}>
                     <Td><button type="button" className="font-medium hover:underline" onClick={() => go("account", a.locationId)}>{a.name}</button></Td>
-                    <Td className="text-right tabular-nums">{a.access === "needs_permission" ? "needs permission" : dur(a.medianSeconds)}</Td>
+                    <Td className="text-right tabular-nums">{a.access === "needs_permission" ? "Needs permission: reconnect" : dur(a.medianSeconds)}</Td>
                     <Td className="text-right"><Badge tone={rateTone(a.hitRate)}>{pct(a.hitRate)}</Badge></Td>
                     <Td className="text-right tabular-nums">{a.stillWaiting}</Td>
                   </tr>

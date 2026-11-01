@@ -2,6 +2,7 @@
 
 import { Hash, Mic, Video, type LucideIcon } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { CRM_NOTE_RULE } from "@/lib/meeting-wording";
 import { useApiClient, useData } from "../session";
 import { Badge, Btn, Card, timeAgo } from "../ui";
 
@@ -122,7 +123,7 @@ export function ConnectionsCard({ meetingSettings = false }: { meetingSettings?:
         })}
       </ul>
       {msg && <p role="status" className={`mt-3 text-sm ${msg.ok ? "text-emerald-700 dark:text-emerald-400" : "text-red-700 dark:text-red-400"}`}>{msg.text}</p>}
-      <p className="mt-3 text-xs text-muted-foreground">SubSync saves each meeting summary inside SubSync. When it matches a contact by exact email, it also adds the summary to that contact&apos;s notes in your CRM{meetingSettings ? " (you can switch this off under Meeting notes privacy)" : ""}. It sends nothing to the people in the meeting.</p>
+      <p className="mt-3 text-xs text-muted-foreground" data-testid="crm-note-rule">{CRM_NOTE_RULE}{meetingSettings ? " You can switch the note off under Meeting notes privacy in Settings." : ""}</p>
     </Card>
   );
 }

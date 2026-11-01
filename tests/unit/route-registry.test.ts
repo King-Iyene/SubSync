@@ -40,6 +40,6 @@ describe("route registry", () => {
   });
   it("the only routes with no secret of any kind are static pages and the one public snapshot", () => {
     const open = ROUTE_GUARDS.filter((r) => r.kind === "public_static" || r.kind === "public_by_design").map((r) => r.route).sort();
-    expect(open).toEqual(["/", "/app", "/audit/[id]", "/design", "/installed", "/installed/error", "/privacy", "/support", "/terms"]);
+    expect(open).toEqual(["/", "/app", "/audit/[id]", "/design", "/installed", "/installed/error", "/privacy", "/support", "/terms", "/trust"]);
   });
 });
