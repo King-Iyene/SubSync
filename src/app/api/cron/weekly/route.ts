@@ -7,7 +7,8 @@ import { appointmentView } from "@/lib/analytics/appointment-queries";
 import { getSettings } from "@/lib/analytics/queries";
 import { speedView } from "@/lib/analytics/speed-queries";
 import { sql } from "@/lib/db";
-import { emailConfigured, sendEmail } from "@/lib/email";
+import { emailConfigured, sendEmail, unsubscribeHeaders } from "@/lib/email";
+import { unsubscribeUrl } from "@/lib/unsubscribe";
 
 // Runs every hour. Sends the weekly email to each agency that set an address, on Monday at the hour it chose
 // in its own time zone, once a week. Does nothing until an email service key is set.
@@ -32,7 +33,7 @@ export async function GET(request: Request) {
   const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/+$/, "");
   try {
     const rows = await sql()`
-      select i.id, coalesce(s.brand_name, i.company_name, 'Your agency') label, s.digest_email, s.digest_hour, s.digest_timezone, s.last_weekly_digest_on::text last_on,
+      select i.id, coalesce(s.brand_name, i.company_name, 'Your company') label, s.digest_email, s.digest_hour, s.digest_timezone, s.last_weekly_digest_on::text last_on,
         (select l.timezone from locations l where l.installation_id = i.id and l.timezone is not null order by l.name limit 1) first_zone
       from installations i join settings s on s.installation_id = i.id
       where i.uninstalled_at is null and not i.is_demo and s.digest_email is not null`;
@@ -49,12 +50,13 @@ export async function GET(request: Request) {
           leads: sp ? sp.overall.leads : 0, withinTarget: sp ? sp.overall.withinTarget : 0, targetMinutes: target, neverAnswered: sp ? sp.neverAnswered : 0,
           noShowsToRecover: ap ? ap.recoverTotal : null, unmarked: ap ? ap.unmarkedTotal : null,
         });
+        const stop = unsubscribeUrl(appUrl, r.id as string, r.digest_email as string);
         const mail = weeklyEmail({
-          facts, who: r.label as string, appUrl, fine: d.fine.length,
+          facts, who: r.label as string, appUrl, stopUrl: stop, fine: d.fine.length,
           headlines: d.headlines.map((h) => ({ label: h.label, money: h.money, today: h.change.today, vsAvg: h.change.vsAvg })),
           attention: d.attention.map((a) => ({ name: a.name, title: a.items[0]?.title ?? "Needs a look" })),
         });
-        if (await sendEmail(r.digest_email as string, mail) && when) {
+        if (await sendEmail(r.digest_email as string, { ...mail, headers: unsubscribeHeaders(stop) }) && when) {
           await sql()`update settings set last_weekly_digest_on = ${when.date}::date where installation_id = ${r.id}`;
           sent++;
         }

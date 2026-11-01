@@ -1,7 +1,9 @@
 import { sql } from "../db";
 import { postToSlack } from "../notify";
-import { emailConfigured, sendEmail } from "../email";
-import { alertEmail } from "./weekly-email";
+import { emailConfigured, sendEmail, unsubscribeHeaders } from "../email";
+import { unsubscribeUrl } from "../unsubscribe";
+import { localParts } from "./digest-intel";
+import { alertEmail, alertsToSendNow } from "./weekly-email";
 import { buildDigest, computeAlerts, deriveAccount, type DerivedAccount, type DomainStatus } from "./derive";
 import {
   accountRows, getSettings, listAlerts, listDomainChecks, markNotified, scoreHistory, syncAlerts, type Settings,
@@ -45,6 +47,28 @@ export async function domainStatuses(installationId: string): Promise<DomainStat
   return checks.map((c) => ({ locationId: c.locationId, domain: c.domain, status: c.status }));
 }
 
+// Email every open critical or warning alert that has not been emailed yet (and is under a week old). Because this reads what is still
+// waiting, not just what was raised in this run, a send that failed is retried on the next run, a warning that arrived in quiet hours goes
+// out in the morning, and each alert is emailed exactly once (email_notified_at, kept apart from Slack's notified_at).
+export async function emailPendingAlerts(installationId: string, settings: Settings, now = new Date(), send: typeof sendEmail = sendEmail): Promise<number> {
+  if (!settings.digestEmail || !emailConfigured()) return 0;
+  const rows = await sql()`
+    select id, severity, title from alerts
+    where installation_id = ${installationId} and resolved_at is null and severity <> 'info' and email_notified_at is null and created_at > now() - interval '7 days'
+    order by case severity when 'critical' then 0 else 1 end, created_at limit 50`;
+  if (rows.length === 0) return 0;
+  const [first] = await sql()`select timezone from locations where installation_id = ${installationId} and timezone is not null order by name limit 1`;
+  const hour = localParts(now, settings.digestTimezone ?? (first?.timezone as string | null) ?? "UTC")?.hour ?? null;
+  const due = alertsToSendNow(rows.map((r) => ({ id: r.id as string, severity: r.severity as string, title: r.title as string })), hour, settings.alertQuietHours);
+  if (due.length === 0) return 0;
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/+$/, "");
+  const stop = unsubscribeUrl(appUrl, installationId, settings.digestEmail);
+  const mail = alertEmail(settings.brandName ?? "Your company", due.map((a) => ({ severity: a.severity, title: a.title })), appUrl, stop);
+  if (!(await send(settings.digestEmail, { ...mail, headers: unsubscribeHeaders(stop) }))) return 0;
+  await sql()`update alerts set email_notified_at = now() where id = any(${due.map((a) => a.id)}::uuid[])`;
+  return due.length;
+}
+
 // Recompute alerts and today's snapshot, and push newly raised critical/warning alerts to
 // Slack if the agency configured a webhook. Returns a small summary.
 export async function refreshInsights(installationId: string): Promise<{ accounts: number; openAlerts: number; created: number }> {
@@ -61,11 +85,7 @@ export async function refreshInsights(installationId: string): Promise<{ account
       await markNotified(worth.map((a) => a.id));
     }
   }
-  if (worth.length > 0 && settings.digestEmail && emailConfigured()) {
-    const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/+$/, "");
-    const who = settings.brandName ?? "Your company";
-    if (await sendEmail(settings.digestEmail, alertEmail(who, worth.map((a) => ({ severity: a.severity, title: a.title })), appUrl))) await markNotified(worth.map((a) => a.id));
-  }
+  await emailPendingAlerts(installationId, settings);
   return { accounts: accounts.length, openAlerts: drafts.length, created: created.length };
 }
 

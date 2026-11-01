@@ -152,3 +152,11 @@ connections, appointment insights, two-agency tenant isolation, feature switches
 | First-sync-only banner, filter drawer, one-sentence subtitle, outlier note | Built | Browser tests |
 | Opens on the launching client account, with a way back to all accounts | Built | Browser test (simulated launch) |
 | Overview merged into Today and hidden | Not done on purpose (King: do not hide pages) | n/a |
+
+## Runbook stages F7 to F9 (31 Oct 2026, built; tests run at the end)
+
+| Item | Status | Tested |
+| --- | --- | --- |
+| Accounts and account detail in plain words, defined health rules, what-this-means panel | Built | Tests written, not yet run |
+| Settings in five groups, change log updated, behavior tests for every setting, client access enforced and brand name on the shared page (tenancy script) | Built | Tests written, not yet run |
+| Alert emails sent once, retried, quiet hours, stop link and one-click header, unmarked appointments alert | Built | Tests written, not yet run; real send and sending-domain check pending |

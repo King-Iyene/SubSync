@@ -265,3 +265,9 @@ Format: date, decision, reason.
 
 - Today leads with the leads-waiting sentence; Overview stays as its own page (King: do not hide pages).
 - Process change (King, 31 Oct): build the remaining stages (F7 to F10, E1 to E4, Z1 to Z3) first and push each, then run the full tests and fix what they find. Before every push the quick gate (typecheck and lint) still runs so a broken build never reaches the live site.
+
+## 2026-10-31 (runbook stages F7 to F9)
+
+- Plain words on screen (Health, Steady, Could leave, Likely to leave, Gone quiet); the internal code names are unchanged.
+- Settings are in five groups with a jump list; a logo for the company brand is not built (name and colour are).
+- Alert emails are driven by what is still waiting (email_notified_at), not by what was raised in one run, so failures are retried and nothing is sent twice. Quiet hours hold warnings between 21:00 and 07:00; criticals always go at once. Every email has a signed stop link and one-click unsubscribe headers.

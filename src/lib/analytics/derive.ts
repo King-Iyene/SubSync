@@ -14,6 +14,8 @@ export { MIN_CLOSED_DEALS };
 export type AccountRow = {
   /** New leads from the last two days that no person has replied to within the target, and how long the oldest has waited. */
   speedWaiting?: number;
+  /** Past appointments with no outcome recorded in the last 30 days. */
+  unmarkedAppointments?: number;
   oldestWaitMinutes?: number | null;
   /** Open deals left out of every dollar figure because they have no value or no owner. */
   excludedOpen?: number;
@@ -242,6 +244,15 @@ export function computeAlerts(accounts: DerivedAccount[], domains: DomainStatus[
         dedupeKey: `speed:${loc}`, kind: "speed", severity: n >= 8 ? "critical" : "warning", locationId: loc,
         title: `${label(a)}: ${n} new leads have waited more than ${target} minutes for a reply${a.oldestWaitMinutes ? ` (longest ${fmtDuration(Math.round(a.oldestWaitMinutes * 60))})` : ""}`,
         detail: { waiting: n, targetMinutes: target, oldestWaitMinutes: a.oldestWaitMinutes ?? null },
+      });
+    }
+    // Past appointments nobody marked as held or no-show make the show rate a guess. Five or more is a habit, not one forgotten click.
+    if ((a.unmarkedAppointments ?? 0) >= 5) {
+      const n = a.unmarkedAppointments as number;
+      out.push({
+        dedupeKey: `appts:${loc}`, kind: "appointments", severity: n >= 20 ? "critical" : "warning", locationId: loc,
+        title: `${label(a)}: ${n} past appointments have no outcome recorded, so the show rate is a guess`,
+        detail: { unmarked: n },
       });
     }
     if (a.leadFlowDropPct !== null && !a.dormant) {

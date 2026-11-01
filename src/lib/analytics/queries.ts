@@ -36,6 +36,8 @@ export type Settings = AccountSettings & {
   countAutomatedTouches: boolean;
   /** When on, a lead that arrives while the team is closed starts its clock at the next opening (Monday to Friday, open to close hour). */
   speedBusinessHours: boolean;
+  /** Warning alerts are emailed only between 07:00 and 21:00 local time; critical ones at any hour. */
+  alertQuietHours: boolean;
   speedOpenHour: number;
   speedCloseHour: number;
 };
@@ -43,7 +45,7 @@ export type Settings = AccountSettings & {
 export async function getSettings(installationId: string): Promise<Settings> {
   const db = sql();
   const read = () => db`
-    select stale_deal_days, dormant_days, sla_hours, slack_webhook_url, ghl_app_domain, digest_enabled, custom_checklist, digest_hour, digest_timezone, digest_email, brand_name, brand_color, industry_targets, push_notes_to_crm, keep_transcripts, speed_target_minutes, count_automated_touches, speed_business_hours, speed_open_hour, speed_close_hour
+    select stale_deal_days, dormant_days, sla_hours, slack_webhook_url, ghl_app_domain, digest_enabled, custom_checklist, digest_hour, digest_timezone, digest_email, brand_name, brand_color, industry_targets, push_notes_to_crm, keep_transcripts, speed_target_minutes, count_automated_touches, speed_business_hours, speed_open_hour, speed_close_hour, alert_quiet_hours
     from settings where installation_id = ${installationId}`;
   let [r] = await read();
   if (!r) {
@@ -71,6 +73,7 @@ export async function getSettings(installationId: string): Promise<Settings> {
     speedTargetMinutes: typeof r.speed_target_minutes === "number" ? r.speed_target_minutes : 15,
     countAutomatedTouches: r.count_automated_touches === true,
     speedBusinessHours: r.speed_business_hours === true,
+    alertQuietHours: r.alert_quiet_hours !== false,
     speedOpenHour: typeof r.speed_open_hour === "number" ? r.speed_open_hour : 9,
     speedCloseHour: typeof r.speed_close_hour === "number" ? r.speed_close_hour : 17,
   };
@@ -104,6 +107,7 @@ export async function updateSettings(installationId: string, p: Partial<Settings
       speed_target_minutes = coalesce(${p.speedTargetMinutes ?? null}::int, speed_target_minutes),
       count_automated_touches = coalesce(${p.countAutomatedTouches ?? null}::boolean, count_automated_touches),
       speed_business_hours = coalesce(${p.speedBusinessHours ?? null}::boolean, speed_business_hours),
+      alert_quiet_hours = coalesce(${p.alertQuietHours ?? null}::boolean, alert_quiet_hours),
       speed_open_hour = coalesce(${p.speedOpenHour ?? null}::int, speed_open_hour),
       speed_close_hour = coalesce(${p.speedCloseHour ?? null}::int, speed_close_hour),
       brand_name = case when ${p.brandName !== undefined} then ${p.brandName ?? null} else brand_name end,
@@ -168,6 +172,11 @@ export async function accountRows(installationId: string, s: AccountSettings): P
         count(*) filter (where touch_at is null and coalesce(clock_start, lead_at) < now() - make_interval(mins => ${target}::int) and lead_at > now() - interval '2 days')::int speed_waiting,
         extract(epoch from now() - min(coalesce(clock_start, lead_at)) filter (where touch_at is null and coalesce(clock_start, lead_at) < now() - make_interval(mins => ${target}::int) and lead_at > now() - interval '2 days')) / 60 oldest_wait_min
       from lead_touches where installation_id = ${installationId} and excluded is null group by location_id
+    ), ap as (
+      -- Past appointments with no outcome recorded (docs/METRICS.md, Appointments): active, started over 3 hours ago, last 30 days.
+      select location_id, count(*)::int unmarked from cached_appointments
+      where installation_id = ${installationId} and status not in ('cancelled', 'invalid', 'showed', 'noshow')
+        and start_at < now() - interval '3 hours' and start_at > now() - interval '30 days' group by location_id
     )
     select l.location_id, l.name, l.email, l.phone, l.website, l.ignored, l.owner,
       l.calendar_count, l.pipeline_count, l.sync_error, l.contacts_synced_at,
@@ -178,7 +187,7 @@ export async function accountRows(installationId: string, s: AccountSettings): P
       coalesce(o.stale_opps, 0)::int stale_opps, coalesce(o.stale_value, 0)::float8 stale_value,
       coalesce(o.won_count, 0)::int won_count, coalesce(o.lost_count, 0)::int lost_count,
       coalesce(o.won_value, 0)::float8 won_value, coalesce(o.excluded_open, 0)::int excluded_open, coalesce(o.top_deal, 0)::float8 top_deal,
-      coalesce(sp.speed_waiting, 0)::int speed_waiting, sp.oldest_wait_min,
+      coalesce(sp.speed_waiting, 0)::int speed_waiting, coalesce(ap.unmarked, 0)::int unmarked_appts, sp.oldest_wait_min,
       coalesce(v.unread, 0)::int unread, coalesce(v.unanswered, 0)::int unanswered,
       greatest(c.last_contact_at, o.last_opp_at, v.last_msg_at) last_activity_at
     from locations l
@@ -186,6 +195,7 @@ export async function accountRows(installationId: string, s: AccountSettings): P
     left join o on o.location_id = l.location_id
     left join v on v.location_id = l.location_id
     left join sp on sp.location_id = l.location_id
+    left join ap on ap.location_id = l.location_id
     where l.installation_id = ${installationId}
     order by lower(coalesce(l.name, '')), l.location_id`;
 
@@ -212,6 +222,7 @@ export async function accountRows(installationId: string, s: AccountSettings): P
     wonValue: r.won_value,
     excludedOpen: r.excluded_open,
     topDeal: r.top_deal,
+    unmarkedAppointments: r.unmarked_appts,
     speedWaiting: r.speed_waiting,
     oldestWaitMinutes: r.oldest_wait_min === null || r.oldest_wait_min === undefined ? null : Math.round(Number(r.oldest_wait_min)),
     unread: r.unread,

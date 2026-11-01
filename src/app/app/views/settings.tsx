@@ -7,7 +7,7 @@ import { Badge, Btn, Card, ErrorBox, inputClass, Loading, PageHeader, timeAgo } 
 import { ConnectionsCard } from "./connections";
 import { HealthCard } from "./health-card";
 
-type S = { staleDays: number; dormantDays: number; slaHours: number; appDomain: string; digestEnabled: boolean; customChecklist: string[]; digestHour: number | null; digestTimezone: string | null; digestEmail: string | null; emailReady?: boolean; brandName: string | null; brandColor: string | null; industryTargets?: boolean; keepTranscripts: boolean; pushNotesToCrm: boolean; speedTargetMinutes: number; countAutomatedTouches: boolean; speedBusinessHours: boolean; speedOpenHour: number; speedCloseHour: number };
+type S = { staleDays: number; dormantDays: number; slaHours: number; appDomain: string; digestEnabled: boolean; customChecklist: string[]; digestHour: number | null; digestTimezone: string | null; digestEmail: string | null; emailReady?: boolean; brandName: string | null; brandColor: string | null; industryTargets?: boolean; keepTranscripts: boolean; pushNotesToCrm: boolean; speedTargetMinutes: number; countAutomatedTouches: boolean; speedBusinessHours: boolean; speedOpenHour: number; speedCloseHour: number; alertQuietHours: boolean };
 
 export function SettingsView() {
   const api = useApiClient();
@@ -46,7 +46,7 @@ export function SettingsView() {
       const body: Record<string, unknown> = {
         staleDays: form.staleDays, dormantDays: form.dormantDays, slaHours: form.slaHours, appDomain: form.appDomain,
         digestEnabled: form.digestEnabled, digestHour: form.digestHour, digestTimezone: form.digestTimezone, digestEmail: form.digestEmail, brandName: form.brandName, brandColor: form.brandColor, keepTranscripts: form.keepTranscripts, pushNotesToCrm: form.pushNotesToCrm, speedTargetMinutes: form.speedTargetMinutes, countAutomatedTouches: form.countAutomatedTouches,
-        speedBusinessHours: form.speedBusinessHours, speedOpenHour: form.speedOpenHour, speedCloseHour: form.speedCloseHour,
+        alertQuietHours: form.alertQuietHours, speedBusinessHours: form.speedBusinessHours, speedOpenHour: form.speedOpenHour, speedCloseHour: form.speedCloseHour,
         customChecklist: checklist.split("\n").map((l) => l.trim()).filter(Boolean),
       };
       if (slack.trim()) body.slackWebhookUrl = slack.trim();
@@ -193,6 +193,7 @@ export function SettingsView() {
         <h2 id="g-alerts" className="scroll-mt-4 pt-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Alerts and connections</h2>
 
         <Card title="Slack alerts and daily brief">
+          <label className="mb-3 flex items-start gap-2 text-sm"><input type="checkbox" className="mt-0.5 size-4" checked={form.alertQuietHours} onChange={(e) => setForm({ ...form, alertQuietHours: e.target.checked })} /> <span>Quiet hours: warnings are emailed between 07:00 and 21:00 in your time zone, and wait for the morning otherwise. Critical alerts are always sent at once. Every email has a link to stop it.</span></label>
           <p className="mb-3 text-sm text-muted-foreground">
             New critical and warning alerts are posted to your Slack channel, and a weekly summary can go out on Mondays.
             {data.slackConfigured ? " A channel is saved (its address is never shown again)." : " Connect Slack above, or paste a Slack web address below."}

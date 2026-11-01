@@ -42,12 +42,13 @@ A person in one client account never sees another client account's data. An agen
 | `api/integrations/[provider]/callback` | state | Signed, expiring state tied to the installation; forged state gets 400 |
 | `api/oauth/callback` | state | One-time authorization code from the platform |
 | `api/oauth/install` | redirect_only | Redirects to the platform's install screen; returns no data |
+| `api/email/unsubscribe` | token | Signed token naming the installation and the address the email went to; a GET only shows a button, the POST removes that one address |
 | `api/mcp` | api_key | Per-installation API key stored hashed; every tool scoped to that installation |
 | `api/cron/sync` | secret | Bearer CRON_SECRET; idle while the kill switch is on |
 | `api/cron/daily` | secret | Bearer CRON_SECRET; idle while the kill switch is on |
 | `api/cron/digest` | secret | Bearer CRON_SECRET |
 | `api/cron/weekly` | secret | Bearer CRON_SECRET; idle while the kill switch is on |
-| `/audit/[id]` | public_by_design | Shared audit snapshot: 192-bit random id, 30-day expiry, totals and finding titles only, account names removed |
+| `/audit/[id]` | public_by_design | Shared audit snapshot: 192-bit random id, 14-day expiry, switch-off by its owner, rate limited, totals, finding titles and a fix plan only, account names removed |
 | `/` | public_static | Marketing page |
 | `/app` | public_static | App shell with no data; data comes from `api/app` with a session |
 | `/installed` | public_static | Static page |

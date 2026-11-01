@@ -5,6 +5,8 @@ export type WeeklyInput = {
   attention: Array<{ name: string; title: string }>;
   fine: number;
   appUrl: string;
+  /** The one-click "stop these emails" address, added to the foot of the email when given. */
+  stopUrl?: string;
   /** Plain facts about the week, already worded (for example "9 of 12 new leads were answered inside 15 minutes"). */
   facts?: string[];
 };
@@ -42,6 +44,7 @@ export function weeklyEmail(i: WeeklyInput): { subject: string; text: string; ht
     ...(count > top.length ? [`...and ${count - top.length} more in the app`] : []),
     ...(i.fine > 0 ? ["", `${i.fine} account${i.fine === 1 ? " is" : "s are"} fine.`] : []),
     "", `Open it: ${link}`,
+    ...(i.stopUrl ? ["", `Stop these emails: ${i.stopUrl}`] : []),
   ].join("\n");
   const html = `<div style="font-family:system-ui,sans-serif;max-width:560px;margin:0 auto;color:#111">
 <h2 style="margin:0 0 12px">${esc(subject)}</h2>
@@ -51,19 +54,30 @@ ${facts.length ? `<h3 style="margin:20px 0 6px">The last 14 days</h3><ul style="
 <ul style="padding-left:18px">${top.map((a) => `<li><strong>${esc(a.name)}</strong>: ${esc(a.title)}</li>`).join("")}</ul>
 ${count > top.length ? `<p>...and ${count - top.length} more in the app.</p>` : ""}
 <p><a href="${esc(link)}" style="display:inline-block;background:#0f766e;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none">Open it</a></p>
+${i.stopUrl ? `<p style="font-size:12px;color:#666"><a href="${esc(i.stopUrl)}" style="color:#666">Stop these emails</a></p>` : ""}
 </div>`;
   return { subject, text, html };
 }
 
 // An email for newly raised alerts, so the problem reaches the agency without opening the app.
-export function alertEmail(who: string, alerts: Array<{ severity: string; title: string }>, appUrl: string): { subject: string; text: string; html: string } {
+export function alertEmail(who: string, alerts: Array<{ severity: string; title: string }>, appUrl: string, stopUrl?: string): { subject: string; text: string; html: string } {
   const n = alerts.length;
   const subject = `${who}: ${n} new alert${n === 1 ? "" : "s"}${alerts.some((a) => a.severity === "critical") ? " (one is critical)" : ""}`;
   const top = alerts.slice(0, 10);
   const link = `${appUrl}/app#alerts`;
-  const text = [subject, "", ...top.map((a) => `- ${a.title}`), ...(n > top.length ? [`...and ${n - top.length} more`] : []), "", `Open it: ${link}`].join("\n");
-  const html = `<div style="font-family:system-ui,sans-serif;max-width:560px;margin:0 auto;color:#111"><h2>${esc(subject)}</h2><ul style="padding-left:18px">${top.map((a) => `<li>${esc(a.title)}</li>`).join("")}</ul>${n > top.length ? `<p>...and ${n - top.length} more.</p>` : ""}<p><a href="${esc(link)}">Open it</a></p></div>`;
+  const text = [subject, "", ...top.map((a) => `- ${a.title}`), ...(n > top.length ? [`...and ${n - top.length} more`] : []), "", `Open it: ${link}`, ...(stopUrl ? ["", `Stop these emails: ${stopUrl}`] : [])].join("\n");
+  const html = `<div style="font-family:system-ui,sans-serif;max-width:560px;margin:0 auto;color:#111"><h2>${esc(subject)}</h2><ul style="padding-left:18px">${top.map((a) => `<li>${esc(a.title)}</li>`).join("")}</ul>${n > top.length ? `<p>...and ${n - top.length} more.</p>` : ""}<p><a href="${esc(link)}">Open it</a></p>${stopUrl ? `<p style="font-size:12px;color:#666"><a href="${esc(stopUrl)}" style="color:#666">Stop these emails</a></p>` : ""}</div>`;
   return { subject, text, html };
+}
+
+// Quiet hours: from 21:00 to 07:00 local time a warning waits for the morning; a critical alert is always sent at once.
+export const QUIET_START_HOUR = 21;
+export const QUIET_END_HOUR = 7;
+export const isQuietHour = (hour: number) => hour >= QUIET_START_HOUR || hour < QUIET_END_HOUR;
+/** Which of the waiting alerts may be emailed now. Criticals always; the rest only outside quiet hours (or with quiet hours switched off). */
+export function alertsToSendNow<T extends { severity: string }>(alerts: T[], localHour: number | null, quietHoursOn: boolean): T[] {
+  if (!quietHoursOn || localHour === null || !isQuietHour(localHour)) return alerts;
+  return alerts.filter((a) => a.severity === "critical");
 }
 
 // Monday morning in the account's own zone, once per week: true from the chosen hour on, so a late run still sends.
