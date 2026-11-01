@@ -101,3 +101,8 @@ S0.2b needs none (nothing new is read or written in the CRM). S0.4 needs none (i
 - **Decision to approve (F6): a sender who has set their own business name shows no product sign-up link on the shared audit page** (white-label owners resell the page); an unbranded page keeps the link. Say "keep the link" if you want it on every page.
 - **Logo on audits:** no white-label logo address is saved anywhere, so reports carry the name and colour only. F8/D1 decide how to save it (it comes from the sign-in/install data).
 - **After the merge (lead does this, nothing for King):** apply `supabase/migrations/20261102060000_f4_saved_views.sql` (new empty table `saved_views`, nothing tightened) and rerun `scripts/make-sample-audit.ts` so the sample audit shows the new layout.
+
+## 18. From stage F3 (appointments)
+- Check after the first real sync: open any appointment on a real account and see whether the panel says who booked it and how (the field names for "booked by" were not verified against a live event; if the platform uses other names the panel says "Not recorded by your CRM").
+- Release 2.2.0: marking an appointment showed or no-show from SubSync would need the calendar-events write permission. Not requested, proposal only.
+- Migration `20261102040000_f3_appointments.sql` (3 new nullable columns) is already APPLIED to the live database (backups `cached_appointments-2026-11-01T21-53-07-114Z.json` 320 rows, `settings-2026-11-01T21-53-07-114Z.json` 3 rows; counts unchanged after). If the live database were ever restored from before 1 Nov 21:53 UTC, re-run the file.

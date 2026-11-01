@@ -206,3 +206,9 @@ Status: D0 BUILT, awaiting King's checks. Tag for the lead: `stage-D0`.
 - DECIDED FOR KING (F6): a branded sender's shared page drops the product sign-up link. DECIDED FOR KING (F4): "Assigned to" is the contact's assigned team member; the chip "7 days, older" is one chip equal to the Older tab; the Unread tab counts every unread conversation so a conversation can sit in two tabs.
 - NOT VERIFIED LIVE: call-message result fields (missed calls blocked); every count against the CRM. Details: `docs/features/F4.md` and `docs/features/F6.md`.
 - Migrations: F6 none. F4 `20261102060000_f4_saved_views.sql` written, held; the lead applies it (new empty table) at the test phase.
+
+#### F3 (parallel worktree; merged, tag stage-F3)
+- Agent ran: `npx tsc --noEmit` exit 0; eslint no output; `node --test` appointment files tests 50 pass 50; `node --test src/lib/__tests__/` tests 472 pass 472; vitest f3-appointments-ui 9 passed. Not run: DB and browser tests (`tests/unit/f3-appointments-db.test.ts`, `tests/e2e/appointments.spec.ts`), verify, integration chain. Known and expected: `tenant-tables.test.ts` and `data-inventory.test.ts` still fail until E0 (tables from E0) is merged.
+- Merge: one conflict in `src/lib/access.ts` (both sides added rules; kept both) and one type fix in `src/lib/analytics/audit-queries.ts` (F3's appointment contact id can be null; F6's audit list accepts null). `npx tsc --noEmit` on the merged tree: clean.
+- Migration applied by the agent (additive, backups first): `20261102040000_f3_appointments.sql`.
+- DECIDED FOR KING (F3): rows open the appointment panel first, "See the lead" one press away (D0's rule said lead drawer first; one-line change); default show-rate target 75%; a source that equals a calendar name is treated as a calendar.
