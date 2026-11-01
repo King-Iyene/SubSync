@@ -133,3 +133,13 @@ connections, appointment insights, two-agency tenant isolation, feature switches
 | One-page fix plan and "What we found" on the public page | Built | Browser test; sample audit carries fix steps |
 | Print on A4 and Letter | Built | Browser test: real PDFs of 2 pages or fewer |
 | Real estate sample audit (fictional) | Live at /audit/sample-real-estate-team-audit | Browser test |
+
+## Runbook stage F4 (31 Oct 2026)
+
+| Item | Status | Tested |
+| --- | --- | --- |
+| One waiting definition and window (customer wrote last, past the target, 30 days) on every screen | Built | Rule tests, database agreement test, browser test (Inbox total equals Overview) |
+| Headline in words, window named, channel counts, CSV channel column, list limit 2,000 | Built | Browser tests at 3 widths |
+| Internal notes, automatic replies, deleted conversations | Documented and tested (notes never wait, automatic replies count as replies, the sync replaces the list) | Unit and database tests |
+| Ignore automatic replies setting | Not built (needs the message source) | n/a |
+| Conversation sync cap (1,000 per account) | Known limit | Real accounts hit it |

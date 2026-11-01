@@ -29,6 +29,7 @@ import {
 } from "../analytics/client-intel";
 import { accountHistory, clientExtras, periodFigures, saveProfile, type ClientExtra, type ProfilePatch } from "../analytics/client-queries";
 import { dailyPriorities, replyAging, setupScore, worstDomainStatus, type SetupFacts } from "../analytics/comms-intel";
+import { channelCounts, channelLabel, WAITING_WINDOW_DAYS } from "../analytics/waiting";
 import { afterHours, communicationGaps } from "../analytics/comms-queries";
 import { badDataSamples, contactOverview, topLeads, vips } from "../analytics/contact-queries";
 import { appointmentInsights } from "../analytics/appointment-insight-queries";
@@ -636,11 +637,19 @@ async function stale(ctx: Ctx) {
 
 async function inboxView(ctx: Ctx) {
   const { settings, permits, links } = await scope(ctx);
-  const rows = (await inbox(ctx.installationId, settings.slaHours, 300, ctx.limitTo ?? undefined)).filter((r) => permits(r.locationId));
+  // The same list and the same window as the Today and Overview counts: nothing is cut short at a few hundred, and if the list ever is
+  // (more than the limit), the screen says so instead of showing a smaller number as if it were the total.
+  const LIMIT = 2000;
+  const rows = (await inbox(ctx.installationId, settings.slaHours, LIMIT, ctx.limitTo ?? undefined)).filter((r) => permits(r.locationId));
+  const late = rows.filter((r) => r.overSla);
   return json({
     slaHours: settings.slaHours,
-    overSla: rows.filter((r) => r.overSla).length,
-    items: rows.map((r) => ({ ...r, url: links.conversation(r.locationId, r.conversationId) })),
+    windowDays: WAITING_WINDOW_DAYS,
+    overSla: late.length,
+    waitingTotal: late.length,
+    channels: channelCounts(late.map((r) => r.lastMessageType)),
+    truncated: rows.length >= LIMIT,
+    items: rows.map((r) => ({ ...r, channel: channelLabel(r.lastMessageType), url: links.conversation(r.locationId, r.conversationId) })),
   });
 }
 
@@ -938,7 +947,7 @@ async function exportCsv(ctx: Ctx, kind: string) {
       return file("subsync-inbox", toCsv(rows, [
         { label: "Account", value: (r) => r.locationName }, { label: "Contact", value: (r) => r.contactName }, { label: "Channel", value: (r) => r.lastMessageType },
         { label: "Last message", value: (r) => r.lastMessageAt }, { label: "Direction", value: (r) => r.lastMessageDirection },
-        { label: "Unread", value: (r) => r.unreadCount }, { label: "Over SLA", value: (r) => (r.overSla ? "yes" : "no") }, { label: "Waiting hours", value: (r) => r.waitingHours },
+        { label: "Channel", value: (r) => channelLabel(r.lastMessageType) }, { label: "Unread", value: (r) => r.unreadCount }, { label: "Over SLA", value: (r) => (r.overSla ? "yes" : "no") }, { label: "Waiting hours", value: (r) => r.waitingHours },
       ]));
     }
     case "deals": {
@@ -1337,7 +1346,7 @@ async function dailyBrief(ctx: Ctx) {
   const allowed = await allowedIds(ctx);
   const [{ accounts }, speed, deals, vipList, extras, rows] = await Promise.all([
     accountsFor(ctx), speedToLead(ctx.installationId, allowed), loadDeals(ctx.installationId, allowed), vips(ctx.installationId, allowed),
-    clientExtras(ctx.installationId, allowed), inbox(ctx.installationId, sc.settings.slaHours, 300),
+    clientExtras(ctx.installationId, allowed), inbox(ctx.installationId, sc.settings.slaHours, 2000),
   ]);
   const live = accounts.filter((a) => !a.ignored);
   const late = rows.filter((x) => sc.permits(x.locationId) && x.overSla);

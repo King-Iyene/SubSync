@@ -404,9 +404,37 @@ async function ensureSpeedDemo(installationId: string): Promise<void> {
   for (const loc of live2) await applyLeadRules(installationId, loc).catch(() => undefined);
 }
 
+// Messy inbox cases on purpose (runbook test data kit), added once to the first live account: the customer wrote last on five channels
+// (four are past the 4 hour target, one is still inside it), a thread nobody answered for 40 days (dead, not waiting), an automatic
+// reply after the customer, and an internal note. Only the four past the target are waiting.
+async function ensureInboxDemo(installationId: string): Promise<void> {
+  const db = sql();
+  const [have] = await db`select count(*)::int n from cached_conversations where installation_id = ${installationId} and conversation_id like 'inbox-sample-%'`;
+  if (have.n > 0) return;
+  const [loc] = await db`select location_id from locations where installation_id = ${installationId} and not ignored order by location_id limit 1`;
+  if (!loc) return;
+  const now = Date.now();
+  const h = (hours: number) => new Date(now - hours * 3_600_000);
+  const rows: Array<[string, string, string | null, Date | null, number, string]> = [
+    ["inbox-sample-1", "TYPE_SMS", "inbound", h(30), 1, "Inbox sample: text, 30 hours"],
+    ["inbox-sample-2", "TYPE_EMAIL", "inbound", h(6), 1, "Inbox sample: email, 6 hours"],
+    ["inbox-sample-3", "TYPE_WHATSAPP", "inbound", h(2), 1, "Inbox sample: WhatsApp, 2 hours (inside the target)"],
+    ["inbox-sample-4", "TYPE_FB", "inbound", h(50), 2, "Inbox sample: Facebook, 50 hours"],
+    ["inbox-sample-5", "TYPE_IG", "inbound", h(5 * 24), 1, "Inbox sample: Instagram, 5 days"],
+    ["inbox-sample-6", "TYPE_SMS", "inbound", h(40 * 24), 0, "Inbox sample: text, 40 days (dead)"],
+    ["inbox-sample-7", "TYPE_SMS", "outbound", h(3), 0, "Inbox sample: automatic reply after the customer"],
+    ["inbox-sample-8", "TYPE_INTERNAL_COMMENT", null, h(5), 0, "Inbox sample: internal note"],
+  ];
+  await db`insert into cached_conversations ${db(rows.map(([id, type, dir, at, unread, name]) => ({
+    installation_id: installationId, location_id: loc.location_id, conversation_id: id, contact_id: `${loc.location_id}-c${rows.findIndex((r) => r[0] === id) + 1}`,
+    contact_name: name, last_message_type: type, last_message_direction: dir, last_message_at: at, unread_count: unread, synced_at: new Date(),
+  })) as never)}`;
+}
+
 export async function ensureDemo(): Promise<string> {
   const [row] = await sql()`select id from installations where company_id = ${DEMO_COMPANY_ID} and is_demo`;
   const id = row ? (row.id as string) : (await seedDemo()).installationId;
   await ensureSpeedDemo(id).catch(() => undefined);
+  await ensureInboxDemo(id).catch(() => undefined);
   return id;
 }

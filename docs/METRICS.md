@@ -64,8 +64,27 @@ identical. They are now separate, gated and labelled.
 
 ## Conversations and contacts
 
-**Waiting past SLA** (FACT). Conversations whose last message was inbound, older than the reply target, and
-newer than 30 days (older threads are treated as dead, not as waiting).
+**Waiting for a reply** (FACT), also called "waiting past the reply target". A conversation whose **last message is from the
+customer** (inbound), older than the reply target (Settings, default 4 hours), and **newer than 30 days** (`WAITING_WINDOW_DAYS`). Older
+inbound threads are "stale": nobody is still expecting an answer, so they are not counted. One window and one target are used on every
+screen: Today, Overview, Inbox, Account audit and the exports all count the same conversations, and the Inbox says the window in words
+("in the last 30 days") and splits the same total into "newer than a week" and "older than a week", so the parts add up to the headline.
+- **Internal notes and system activity** are never the customer waiting: they are not inbound, so a conversation whose last message is one
+  is not counted as waiting. *Known limit:* if a note or activity was added after the customer's last message, that conversation drops out
+  until the platform's list shows the customer's message as last; we only store the last message, not the whole thread.
+- **Automatic replies** (a workflow answering the customer) look like a reply, so the conversation is treated as answered. *Not built:* a
+  setting to ignore automatic replies, because the conversation list does not say who or what sent the last message (Speed to lead reads
+  messages and does; the Inbox does not).
+- **Pending** (inside the target) and **answered** are not waiting. **Missing data** is not guessed.
+- **Channels** are named in words from the message type (Text message, Email, WhatsApp, Facebook, Instagram, Live chat, Call) and counted
+  for the waiting conversations only.
+- **Deleted conversations:** the sync replaces an account's conversation list on every run, so a conversation the platform no longer
+  returns disappears at the next sync.
+- **Limit:** the sync reads up to the most recent conversations per account (a fixed number of pages; 1,000 on the largest connected
+  account). If an account has more, older conversations are not read; because the platform lists the newest first, the 30 day window is
+  normally covered, but this is not proven.
+Code: `waiting.ts` (the rule), `queries.ts` (`inbox`, the SQL). Tests: `waiting.test.ts`, `tests/unit/inbox-waiting-db.test.ts` (the SQL and the rule
+agree on every demo account), `tests/e2e/inbox.spec.ts`.
 
 **New contacts, 30 days.** Contacts created in the last 30 days.
 

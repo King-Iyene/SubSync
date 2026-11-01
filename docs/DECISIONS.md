@@ -255,3 +255,8 @@ Format: date, decision, reason.
 - The public page prints light and compact so it fits two pages on A4 and Letter.
 - The demo installation holds the public sample audit; its links are never listed or switched off from the demo.
 - Process (King, 31 Oct): fast and still accurate. Iterate with the one relevant test file or the quick mode of the tenancy script, run the full gates in the background while writing the next stage, and run the full suite once before each push and once at the end. Source edits are not made while a build or browser run is in progress.
+
+## 2026-10-31 (runbook stage F4)
+
+- "Waiting" means the customer wrote last, past the reply target, within 30 days, on every screen; the Inbox says the window in words and its parts add up to the headline. The inbox list limit rose from 300 to 2,000 and the screen says when it is hit.
+- Internal notes and system activity never make a conversation waiting; an automatic reply counts as a reply (no setting to ignore it yet, because the conversation list does not carry the sender).

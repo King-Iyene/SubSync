@@ -4,8 +4,8 @@ Read this first when a session restarts. Rules: `docs/RUNBOOK.md` section 0 (one
 
 ## Current stage
 
-**F6 Account audit and Share link: BUILT AND VERIFIED (31 Oct 2026). Milestone M1 (sellable audit) is complete.** Next: F4 Inbox, F5 Today, F7 and on.
-Evidence: `docs/features/F6.md` (F3: `docs/features/F3.md`, F2: `docs/features/F2.md`). From S0.3 on King does not need to type PASS or NEXT; every stage still writes its evidence and King's 5 checks.
+**F4 Inbox and SLA: BUILT AND VERIFIED (31 Oct 2026).** Next: F5 Today, then F7 and on.
+Evidence: `docs/features/F4.md` (F6: `docs/features/F6.md`). From S0.3 on King does not need to type PASS or NEXT; every stage still writes its evidence and King's 5 checks.
 
 ## Stage list (Milestone M1 first)
 
@@ -18,7 +18,8 @@ Evidence: `docs/features/F6.md` (F3: `docs/features/F3.md`, F2: `docs/features/F
 | F2 | Speed to lead | Built, verified (King's CRM checks pending, no wait) |
 | F3 | Appointments | Built, verified (King's CRM checks pending, no wait) |
 | F6 | Account audit and Share link | Built, verified (M1 complete) |
-| F4, F5, F7 to F10 | M2 pilot menu | Not started |
+| F4 | Inbox and SLA | Built, verified |
+| F5, F7 to F10 | M2 pilot menu | Not started |
 | E1 to E4 | Zoom, Fathom, Slack, hidden pages | Not started |
 | Z1 to Z3 | Re-review, release 1.1.0, first pilot | Not started |
 
