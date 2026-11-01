@@ -1,4 +1,5 @@
-// Pure health rules (no database), so they can be unit tested.
+// Pure health rules (no database), so they can be unit tested. NOT used by any screen since stage S0.4: the one freshness rule is
+// src/lib/sync/freshness.ts (its own 30 minute limit). This older 6 hour rule is kept only so its tests keep guarding it until it is removed.
 
 export type HealthLevel = "healthy" | "degraded" | "down" | "idle";
 

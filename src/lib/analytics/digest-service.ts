@@ -1,6 +1,6 @@
 import { sql } from "../db";
-import { syncStatus } from "../sync/engine";
-import { freshness, portfolioHeadlines, rank, type AccountInput, type SeriesPoint } from "./digest-intel";
+import { freshnessFor } from "../sync/freshness-queries";
+import { portfolioHeadlines, rank, type AccountInput, type SeriesPoint } from "./digest-intel";
 import { inbox, listDomainChecks, visibleLocationIds } from "./queries";
 import { appointmentSignals } from "./appointment-queries";
 import { replyHoursFor } from "./playbooks";
@@ -38,7 +38,7 @@ async function seriesByLocation(installationId: string, locationIds: string[]): 
 // Everything the daily brief needs for one install. `limitTo` restricts it to a single account
 // (a business or client view); `planLimit` applies the free plan's account limit.
 export async function buildDailyDigest(installationId: string, opts: { limitTo?: string | null; planLimit?: number | null; onlyIds?: Set<string> | null } = {}) {
-  const [{ settings, accounts }, status] = await Promise.all([loadAccounts(installationId), syncStatus(installationId, opts.limitTo)]);
+  const [{ settings, accounts }, freshness] = await Promise.all([loadAccounts(installationId), freshnessFor(installationId, { limitTo: opts.limitTo })]);
   let live = accounts.filter((a) => !a.ignored);
   if (opts.limitTo) live = live.filter((a) => a.locationId === opts.limitTo);
   else if (opts.planLimit) {
@@ -88,7 +88,7 @@ export async function buildDailyDigest(installationId: string, opts: { limitTo?:
   const { attention, fine } = rank(inputs);
   return {
     generatedAt: new Date().toISOString(),
-    freshness: { ...freshness(status.lastFinishedAt), lastSyncAt: status.lastFinishedAt, pending: status.pending },
+    freshness,
     headlines: portfolioHeadlines([...series.values()]),
     attention, fine, accounts: live.length, settings, connection,
   };

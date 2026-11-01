@@ -4,6 +4,8 @@
 // Every comparison is against THAT account's own recent history, not one global threshold, so a
 // quiet account is not flagged for being quiet and a busy account is flagged when it drops.
 
+import { inSendWindow } from "../sync/schedule.ts";
+
 export type SeriesPoint = {
   day: string; // YYYY-MM-DD, oldest first; the last point is today
   contacts: number; new30: number; openOpps: number; openValue: number; stale: number; unread: number; completeness: number; score: number;
@@ -166,14 +168,6 @@ export function portfolioHeadlines(perAccount: SeriesPoint[][]): Headline[] {
   ];
 }
 
-// ---------- freshness ----------
-
-export function freshness(lastSyncAt: string | null, now = Date.now()): { hours: number | null; ok: boolean; label: string } {
-  if (!lastSyncAt) return { hours: null, ok: false, label: "No sync has finished yet" };
-  const hours = Math.max(0, Math.round((now - Date.parse(lastSyncAt)) / 3_600_000));
-  return { hours, ok: hours < 6, label: hours < 1 ? "Data is under an hour old" : hours < 6 ? `Data is ${hours} hour${hours === 1 ? "" : "s"} old` : `Data is ${hours} hours old: some of this may be out of date` };
-}
-
 // ---------- text for Slack ----------
 
 export function digestText(agency: string, d: { attention: Attention[]; fine: number; headlines: Headline[]; freshnessLabel: string }, appUrl: string): string {
@@ -201,21 +195,29 @@ export function digestText(agency: string, d: { attention: Attention[]; fine: nu
 
 // ---------- scheduling ----------
 
-// The local hour (0 to 23) and calendar date in a time zone, or null when the zone is not valid.
-export function localParts(now: Date, timeZone: string): { hour: number; date: string } | null {
+// The local hour (0 to 23), calendar date and weekday in a time zone, or null when the zone is not valid. Daylight-saving changes are the
+// platform's own (Intl), so a spring-forward day has no 02:00 hour and a fall-back day has 01:00 twice; the callers cope (see inSendWindow and the
+// once-a-day check on the date).
+export function localClock(now: Date, timeZone: string): { hour: number; date: string; weekday: string } | null {
   try {
-    const parts = new Intl.DateTimeFormat("en-CA", { timeZone, hour: "2-digit", hour12: false, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(now);
+    const parts = new Intl.DateTimeFormat("en-CA", { timeZone, hour: "2-digit", hour12: false, weekday: "short", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(now);
     const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
-    return { hour: Number(get("hour")) % 24, date: `${get("year")}-${get("month")}-${get("day")}` };
+    return { hour: Number(get("hour")) % 24, date: `${get("year")}-${get("month")}-${get("day")}`, weekday: get("weekday") };
   } catch {
     return null;
   }
 }
 
-// Is it time to send? True from the chosen hour onward if today's digest has not gone out yet, so
-// a cron run that is a few minutes late (or skipped) still sends the same day.
+// The local hour (0 to 23) and calendar date in a time zone, or null when the zone is not valid.
+export function localParts(now: Date, timeZone: string): { hour: number; date: string } | null {
+  const c = localClock(now, timeZone);
+  return c ? { hour: c.hour, date: c.date } : null;
+}
+
+// Is it time to send? True from the chosen local hour until SEND_CATCHUP_HOURS later if today's digest has not gone out yet, so a scheduler run
+// that is a few minutes late (or skipped once) still sends the same morning, but a brief chosen for 08:00 is never sent in the evening.
 export function dueNow(now: Date, timeZone: string, hour: number, lastSentOn: string | null): boolean {
   const local = localParts(now, timeZone);
   if (!local) return false;
-  return local.hour >= hour && lastSentOn !== local.date;
+  return inSendWindow(local.hour, hour) && lastSentOn !== local.date;
 }

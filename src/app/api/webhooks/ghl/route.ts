@@ -3,7 +3,7 @@ import { safeError } from "@/lib/safe-log";
 import { businessKey } from "@/lib/access";
 import { sql } from "@/lib/db";
 import { getInstallation, purgeInstallation, purgeLocationData } from "@/lib/ghl/installations";
-import { actionFor, parseWebhook, verifyWebhook } from "@/lib/ghl/webhook";
+import { actionFor, canonicalType, parseWebhook, verifyWebhook } from "@/lib/ghl/webhook";
 import { recordPlanEvent } from "@/lib/entitlements-queries";
 import { captureWhitelabelDomain } from "@/lib/analytics/queries";
 import { enqueueAreaSync, enqueueFullSync } from "@/lib/sync/engine";
@@ -34,6 +34,8 @@ export async function POST(request: Request) {
       if (fresh.length === 0) return NextResponse.json({ ok: true, duplicate: true });
     }
 
+    // The live deliveries call install and uninstall INSTALL and UNINSTALL; the rest of this handler knows the documented names.
+    event = { ...event, type: canonicalType(event.type) };
     const action = actionFor(event.type);
     // A plan change, or the plan an install starts on, is recorded for whichever install it belongs to.
     if ((event.type === "PlanChange" || event.type === "AppInstall") && event.companyId) {

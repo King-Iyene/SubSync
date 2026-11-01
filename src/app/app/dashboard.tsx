@@ -27,7 +27,7 @@ import { DuplicatesView } from "./views/duplicates";
 import { EmailHealthView } from "./views/email-health";
 import { HelpView } from "./views/help";
 import { RoadmapView } from "./views/roadmap";
-import { FreshnessStrip } from "./views/health-card";
+import { FreshnessStrip } from "./views/sync-status";
 import { InboxView } from "./views/inbox";
 import { OnboardingView } from "./views/onboarding";
 import { LeadsView } from "./views/leads";

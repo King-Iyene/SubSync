@@ -14,6 +14,7 @@ import { diffAppointmentEvents } from "./appointment-events";
 import { applyLeadRules } from "./lead-rules-apply";
 import { diffDealEvents } from "./deal-events";
 import { listAllInstalledLocations } from "./installed-locations";
+import { REFRESH_DUE_AFTER_MINUTES, REFRESH_EVERY_MINUTES } from "./schedule";
 
 // Resumable sync. Work is a queue of jobs in `sync_jobs`; a cron route calls runSlice() which
 // claims jobs one at a time (FOR UPDATE SKIP LOCKED, so parallel invocations never collide),
@@ -67,8 +68,13 @@ export async function enqueueLocationSync(installationId: string, locationId: st
 
 // Re-sync one area of one account (used by webhooks). Cheap to call repeatedly: it is a no-op
 // while an identical job is already queued.
-export async function enqueueAreaSync(installationId: string, locationId: string, area: "contacts" | "opportunities" | "conversations" | "structure"): Promise<number> {
-  return enqueueJobs(installationId, [locationId], [area]);
+// A change in conversations also re-reads the reply times (a lead is "answered" by an outbound message), and an appointment change has its own read.
+export type SyncArea = "contacts" | "opportunities" | "conversations" | "structure" | "appointments";
+export const JOBS_FOR_AREA: Record<SyncArea, JobType[]> = {
+  contacts: ["contacts"], opportunities: ["opportunities"], conversations: ["conversations", "speed"], structure: ["structure"], appointments: ["appointments"],
+};
+export async function enqueueAreaSync(installationId: string, locationId: string, area: SyncArea): Promise<number> {
+  return enqueueJobs(installationId, [locationId], JOBS_FOR_AREA[area]);
 }
 
 // Start a daily refresh for installs that have not synced in the last ~20 hours. An install that
@@ -91,17 +97,22 @@ export async function scheduleDailyRefresh(): Promise<number> {
   return n;
 }
 
-// Every 15 minutes, re-read only what goes stale fastest: conversations, appointments and reply times, then recompute alerts.
+// Every REFRESH_EVERY_MINUTES, re-read only what goes stale fastest: conversations, appointments and reply times, then recompute alerts.
 // A slow-reply alert that arrives hours late is worthless, so this does not wait for the daily full sync (contacts and deals
 // stay on the daily schedule, and webhooks cover changes in between).
-export const FAST_REFRESH_MINUTES = 15;
-export async function scheduleFastRefresh(): Promise<number> {
+// A cycle is due when the previous one was QUEUED (not finished) REFRESH_DUE_AFTER_MINUTES ago: measured from the finish with a plain 15 the
+// real cadence was 20 minutes, because the scheduler ticks every 5 (see src/lib/sync/schedule.ts and docs/features/S0.4.md).
+export const FAST_REFRESH_MINUTES = REFRESH_EVERY_MINUTES;
+// `only` and `requireToken: false` exist for tests on a fixture installation (a fixture has no refresh token, so the production scheduler leaves it alone).
+export async function scheduleFastRefresh(opts: { only?: string; requireToken?: boolean } = {}): Promise<number> {
+  const requireToken = opts.requireToken ?? true;
   const rows = await sql()`
     select i.id from installations i
-    where i.uninstalled_at is null and not i.is_demo and i.refresh_token_enc is not null
+    where i.uninstalled_at is null and not i.is_demo and (${!requireToken} or i.refresh_token_enc is not null)
+      and (${opts.only ?? null}::uuid is null or i.id = ${opts.only ?? null}::uuid)
       and exists (select 1 from locations l where l.installation_id = i.id and not l.ignored)
       and not exists (select 1 from sync_jobs j where j.installation_id = i.id and j.status in ('pending', 'running'))
-      and coalesce((select max(j.finished_at) from sync_jobs j where j.installation_id = i.id and j.type = 'metrics' and j.status = 'done'), 'epoch') < now() - make_interval(mins => ${FAST_REFRESH_MINUTES}::int)`;
+      and coalesce((select max(j.created_at) from sync_jobs j where j.installation_id = i.id and j.type = 'metrics'), 'epoch') < now() - make_interval(mins => ${REFRESH_DUE_AFTER_MINUTES}::int)`;
   let n = 0;
   for (const r of rows) {
     const locs = await sql()`select location_id from locations where installation_id = ${r.id} and not ignored`;
@@ -515,6 +526,18 @@ function safeMessage(error: unknown): string {
   return safeError(error);
 }
 
+// A location's `sync_error` is the last failure of any of its jobs. It used to be cleared only by the daily structure and contacts reads, so one
+// failed 15-minute read left "Sync issue" on screen for up to 20 hours after the next read had succeeded. Clear it once the latest job of every
+// type for that account is no longer a failure.
+export async function clearResolvedError(installationId: string, locationId: string): Promise<void> {
+  await sql()`
+    update locations set sync_error = null
+    where installation_id = ${installationId} and location_id = ${locationId} and sync_error is not null
+      and not exists (
+        select 1 from (select distinct on (type) type, status from sync_jobs where installation_id = ${installationId} and location_id = ${locationId} and status in ('done', 'failed') order by type, created_at desc) t
+        where t.status = 'failed')`;
+}
+
 export type SliceResult = { jobs: number; failed: number; moreWork: boolean };
 
 export async function runSlice(budgetMs = 45_000): Promise<SliceResult> {
@@ -531,6 +554,7 @@ export async function runSlice(budgetMs = 45_000): Promise<SliceResult> {
       const outcome = await runJob(job, deadline);
       if (outcome.done) {
         await db`update sync_jobs set status = 'done', cursor = null, error = null, finished_at = now(), updated_at = now() where id = ${job.id}`;
+        if (job.locationId) await clearResolvedError(job.installationId, job.locationId).catch((e) => console.error("Clearing a resolved sync error failed", safeError(e)));
       } else {
         await db`update sync_jobs set status = 'pending', cursor = ${db.json(outcome.cursor as never)}, updated_at = now() where id = ${job.id}`;
       }

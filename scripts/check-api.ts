@@ -192,13 +192,14 @@ async function main() {
   console.log("hygiene + api keys + AI connector: ok");
 
   // --- health + per-account resync
-  const hl = await call("/api/app/health", { token });
+  const hl = await call("/api/app/sync-status", { token });
   assert.equal(hl.status, 200);
-  assert.equal(hl.body.level, "healthy");
-  assert.ok(hl.body.accounts.length >= 13);
-  assert.equal((await call(`/api/app/sync/${hl.body.accounts[0].locationId}`, { method: "POST", token })).status, 200);
+  assert.equal(hl.body.freshness.state, "demo", "the demo company says its data is sample data, with no made-up time");
+  assert.ok(hl.body.freshness.accounts.length >= 13);
+  assert.equal(hl.body.problems.length, 0);
+  assert.equal((await call(`/api/app/sync/${hl.body.freshness.accounts[0].locationId}`, { method: "POST", token })).status, 200);
   assert.equal((await call("/api/app/sync/not valid!", { method: "POST", token })).status, 404);
-  console.log("health + resync: ok");
+  console.log("sync status + resync: ok");
 
   // --- pipeline intelligence + goals
   const pi = await call("/api/app/pipeline-intel", { token });
@@ -382,7 +383,7 @@ async function main() {
   assert.equal(cov.body.kpis.accounts, 1);
   for (const [m, p] of [
     ["GET", "settings"], ["GET", "export/stale"], ["GET", "call-queue"], ["GET", "goals"], ["GET", "api-keys"], ["GET", "exec-summary"],
-    ["GET", "daily-brief"], ["GET", "clients"], ["GET", "health"], ["POST", "sync"], ["PUT", "settings"], ["POST", "call-outcomes"],
+    ["GET", "daily-brief"], ["GET", "clients"], ["GET", "sync-status"], ["POST", "sync"], ["PUT", "settings"], ["POST", "call-outcomes"],
   ] as const) {
     assert.equal((await call(`/api/app/${p}`, { token: ct, method: m, ...(m === "GET" ? {} : { body: "{}" }) })).status, 403, `${m} ${p} refused for a client`);
   }
@@ -503,7 +504,7 @@ async function main() {
   assert.ok(daily.body.fine.every((f: { checked: string[] }) => f.checked.length >= 5), "fine accounts say what was checked");
   assert.equal(daily.body.notWatched.length, 4);
   assert.equal(daily.body.limited, false);
-  assert.ok(typeof daily.body.freshness.label === "string" && daily.body.freshness.label.length > 5);
+  assert.ok(typeof daily.body.freshness.text === "string" && daily.body.freshness.text.length > 5);
   const bd = await call("/api/app/daily", { token: bt });
   assert.equal(bd.status, 200);
   assert.equal(bd.body.limited, true);

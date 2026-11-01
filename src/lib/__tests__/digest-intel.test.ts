@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { attentionItems, compare, digestText, dueNow, freshness, localParts, portfolioHeadlines, rank, type AccountInput, type SeriesPoint } from "../analytics/digest-intel.ts";
+import { attentionItems, compare, digestText, dueNow, localParts, portfolioHeadlines, rank, type AccountInput, type SeriesPoint } from "../analytics/digest-intel.ts";
 
 const point = (day: number, o: Partial<SeriesPoint> = {}): SeriesPoint => ({
   day: `2026-10-${String(day).padStart(2, "0")}`, contacts: 100, new30: 40, openOpps: 20, openValue: 50_000, stale: 2, unread: 1, completeness: 80, score: 70, ...o,
@@ -85,13 +85,7 @@ test("portfolio headlines add the accounts together day by day", () => {
   assert.equal(h.change.vsYesterday, 67);
 });
 
-test("freshness says plainly when data is old", () => {
-  const now = Date.parse("2026-10-30T12:00:00Z");
-  assert.equal(freshness("2026-10-30T11:30:00Z", now).ok, true);
-  assert.equal(freshness("2026-10-30T02:00:00Z", now).ok, false);
-  assert.match(freshness("2026-10-30T02:00:00Z", now).label, /10 hours old/);
-  assert.equal(freshness(null, now).ok, false);
-});
+// The old vague "Data is under an hour old" helper was removed in stage S0.4: the one freshness rule is src/lib/sync/freshness.ts, tested in freshness.test.ts.
 
 test("the Slack text names the accounts, what is wrong, and says when all is fine", () => {
   const { attention, fine } = rank([base({ unanswered: 3, oldestWaitingHours: 30 }), base({ locationId: "L2", name: "Calm Co" })]);

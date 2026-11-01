@@ -15,6 +15,7 @@ Evidence: `docs/features/F4.md` (F6: `docs/features/F6.md`). From S0.3 on King d
 | S0.2 | Identity, roles, tenant isolation | Passed |
 | S0.3 | White-label hygiene | Built, verified, follow-up done (branded install link, company name replaces product name) |
 | S0.2b | Tenancy follow-ups (overnight run, 1 Nov) | BUILT, awaiting King's checks: no cross-client matching, client staff never receive agency-only data (tested), "What we store" generated from the schema and "Delete my data" owner-only, login domain found automatically, no "save a meeting in an account" setting, Zoom and Google Meet hidden, Meeting notes page off until E2a. Evidence: `docs/features/S0.2b.md` |
+| S0.4 | Sync reliability and scheduler (overnight run, 1 Nov) | BUILT, awaiting King's checks: refresh cadence fixed to a real 15 minutes (it ran every 20), one freshness line above every page ("Updated 7 min ago", stale and failed wording), one Sync status panel replaces Connection health and Data sync, the "sync is running" banner only for a first or long sync, internal alarm and a secret-only diagnostics address, "Send at" honoured per time zone with fake-clock tests, real INSTALL and UNINSTALL webhook names understood. Evidence: `docs/features/S0.4.md` |
 | F1 | Numbers truth | Built, verified (King's CRM checks pending, no wait) |
 | F2 | Speed to lead | Built, verified (King's CRM checks pending, no wait) |
 | F3 | Appointments | Built, verified (King's CRM checks pending, no wait) |

@@ -3,6 +3,7 @@ import { safeError } from "@/lib/safe-log";
 import { maintenanceOn } from "@/lib/runtime-guards";
 import { buildDailyDigest } from "@/lib/analytics/digest-service";
 import { weekFacts, weeklyDue, weeklyEmail } from "@/lib/analytics/weekly-email";
+import { localClock } from "@/lib/analytics/digest-intel";
 import { appointmentView } from "@/lib/analytics/appointment-queries";
 import { getSettings } from "@/lib/analytics/queries";
 import { speedView } from "@/lib/analytics/speed-queries";
@@ -13,16 +14,6 @@ import { unsubscribeUrl } from "@/lib/unsubscribe";
 // Runs every hour. Sends the weekly email to each agency that set an address, on Monday at the hour it chose
 // in its own time zone, once a week. Does nothing until an email service key is set.
 export const maxDuration = 60;
-
-function local(now: Date, timeZone: string) {
-  try {
-    const p = new Intl.DateTimeFormat("en-CA", { timeZone, hour: "2-digit", hour12: false, weekday: "short", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(now);
-    const g = (t: string) => p.find((x) => x.type === t)?.value ?? "";
-    return { hour: Number(g("hour")) % 24, date: `${g("year")}-${g("month")}-${g("day")}`, weekday: g("weekday") };
-  } catch {
-    return null;
-  }
-}
 
 export async function GET(request: Request) {
   const secret = process.env.CRON_SECRET;
@@ -39,7 +30,7 @@ export async function GET(request: Request) {
       where i.uninstalled_at is null and not i.is_demo and s.digest_email is not null`;
     let sent = 0;
     for (const r of rows) {
-      const when = local(now, (r.digest_timezone as string | null) ?? (r.first_zone as string | null) ?? "UTC");
+      const when = localClock(now, (r.digest_timezone as string | null) ?? (r.first_zone as string | null) ?? "UTC");
       if (!weeklyDue(when, (r.digest_hour as number | null) ?? 8, r.last_on as string | null)) continue;
       try {
         const d = await buildDailyDigest(r.id as string);

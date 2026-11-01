@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useApiClient, useData } from "../session";
 import type { Overview } from "../types";
 import {
-  Badge, BandBadge, Btn, Card, ChurnBadge, Empty, ErrorBox, ExtLink, fmtInt, fmtMoney, Loading, PageHeader, Stat, StackedBar, timeAgo,
+  Badge, BandBadge, Btn, Card, ChurnBadge, Empty, ErrorBox, ExtLink, fmtInt, fmtMoney, Loading, PageHeader, Stat, StackedBar,
 } from "../ui";
 import type { GoFn } from "../nav";
 import { ExecSummary } from "./exec-summary";
@@ -47,16 +47,6 @@ export function OverviewView({ go }: { go: GoFn }) {
         }
       />
       {note && <p className="mb-4 rounded-lg border bg-muted/40 px-3 py-2 text-sm" role="status">{note}</p>}
-      {!data.demo && (data.sync.lastFinishedAt === null || data.sync.pending > 0) && (
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-sky-500/40 bg-sky-500/5 px-3 py-2 text-sm" role="status">
-          <span>
-            {k.accounts === 0
-              ? "Your first sync is running. Client accounts and numbers appear here over the next few minutes."
-              : "Still syncing your accounts. Numbers fill in as each one finishes."}
-          </span>
-          <Btn variant="ghost" onClick={() => go("help")}>New here? Getting started</Btn>
-        </div>
-      )}
       {data.hiddenAccounts > 0 && (
         <p className="mb-4 rounded-lg border border-sky-500/40 bg-sky-500/5 px-3 py-2 text-sm">
           Your free plan covers {data.entitlements.accountLimit} client accounts. {data.hiddenAccounts} more are hidden until you upgrade.
@@ -145,19 +135,6 @@ export function OverviewView({ go }: { go: GoFn }) {
               <div className="flex justify-between"><dt className="text-muted-foreground">Average health score</dt><dd>{k.avgScore} / 100</dd></div>
               <div className="flex justify-between"><dt className="text-muted-foreground">Accounts gone quiet</dt><dd>{k.dormant}</dd></div>
             </dl>
-          </Card>
-          <Card title="Data sync">
-            <dl className="space-y-1.5 text-sm">
-              <div className="flex justify-between"><dt className="text-muted-foreground">Last completed</dt><dd>{timeAgo(data.sync.lastFinishedAt)}</dd></div>
-              <div className="flex justify-between"><dt className="text-muted-foreground">Jobs queued</dt><dd>{data.sync.pending}</dd></div>
-              <div className="flex justify-between"><dt className="text-muted-foreground">Contacts tracked</dt><dd>{fmtInt(k.contacts)}</dd></div>
-            </dl>
-            {data.sync.failed > 0 && (
-              <div className="mt-3 rounded-lg bg-red-500/10 p-2 text-xs">
-                <Badge tone="bad">{data.sync.failed} failed</Badge>
-                <ul className="mt-1 space-y-0.5 text-muted-foreground">{data.sync.recentFailures.slice(0, 3).map((f, i) => <li key={i}>{f.type}: {f.error ?? "unknown error"}</li>)}</ul>
-              </div>
-            )}
           </Card>
         </div>
       </div>

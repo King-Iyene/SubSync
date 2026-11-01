@@ -225,3 +225,43 @@ have no person reply past the target: a warning at 3, critical at 8. It names th
 is one open alert per account (a rerun never duplicates it) and resolves by itself when the leads are answered. Older
 leads are not alerted on: they are no longer something to rush to. Email delivery is not built (no email service key).
 Tests: `speed-alerts.test.ts`, and `scripts/check-speed.ts` raises, repeats and resolves one end to end.
+
+## Freshness and refresh (stage S0.4)
+
+**Freshness** (FACT). How old the copy of the CRM that SubSync shows is. One definition, one function (`freshnessOf` in
+`src/lib/sync/freshness.ts`), one place on screen (the line above every page), and the same words in the daily brief:
+- An account's last successful refresh is the last time its conversations were read (`locations.conversations_synced_at`;
+  that read happens in every 15 minute cycle). Until that exists, the first time anything was read for it (`last_synced_at`).
+- The one value shown is the OLDEST of the accounts the person may see (a client's staff see their own account only), so the
+  screen never claims to be fresher than its stalest account. Each account's own time is listed under "Each account".
+- Wording: "Updated 7 min ago" (up to and including 30 minutes). Over 30 minutes: "Updated 45 min ago, refresh is delayed".
+  If the latest read of an account failed after its last success: "Updated 9 min ago, but the latest refresh failed for 1 account"
+  (or "..., refresh is failing" when also over 30 minutes) and a plain reason. Before anything has finished: "First sync in progress"
+  or "Not synced yet". Demo data: "Sample data. Nothing here is refreshed from a real account."
+- A failure counts only while it is the latest finished job of its kind for that account (`distinct on (location_id, type)`), so a
+  later success clears it. A failure of the job that lists the accounts, or an access token not renewed for 3 days, is a connection
+  problem for the whole install.
+- The note "a sync is running" is shown only for a first sync, or when a job has been queued or running for 10 minutes or more
+  (`LONG_RUNNING_MINUTES`). A normal refresh, which takes seconds, never shows it.
+- Not affected by a filter chosen on screen.
+Code: `src/lib/sync/freshness.ts` (words), `freshness-queries.ts` (the one read). Tests: `src/lib/__tests__/freshness.test.ts`,
+`tests/unit/sync-reliability-db.test.ts` (real rows), `tests/unit/freshness-one-source.test.ts` (one place in the source),
+`scripts/check-sync.ts` (every answer says the same sentence), `tests/e2e/freshness.spec.ts` (every page in a browser).
+
+**Refresh cadence** (FACT about the system, not a number on screen). Every 15 minutes each account's conversations, appointments and reply
+times are re-read and alerts are recomputed; once a day the contacts and deals are re-read in full; a change in the CRM queues the matching
+read at once. The scheduler wakes every 5 minutes. A cycle is due when the previous one was QUEUED 14 minutes ago (measured from the start with a
+one minute allowance); measured from the finish with a plain 15 the real cadence was 20 minutes (live history, 31 Oct to 1 Nov). Code:
+`src/lib/sync/schedule.ts`, `scheduleFastRefresh` in `engine.ts`. Tests: `schedule.test.ts` (fake clock, outage, duplicate wake-up),
+`sync-reliability-db.test.ts`.
+
+**Send window** (the daily brief and the Monday email). Sent once per local day, when the scheduler's hourly check falls in the chosen local hour
+or the next 3 hours (`SEND_CATCHUP_HOURS`), never past the end of that local day; later than that the day is skipped. The Monday email also needs
+Monday in the chosen time zone. Daylight-saving days: a chosen hour that does not exist goes out at the next hour; an hour that happens twice
+sends once (one send per local date). Code: `dueNow` (`digest-intel.ts`), `weeklyDue` (`weekly-email.ts`), `inSendWindow` (`schedule.ts`).
+Tests: `src/lib/__tests__/dispatch-time.test.ts`.
+
+**Sync alarm** (internal, not a customer number). An install whose oldest account was last refreshed more than 30 minutes ago, or which has had
+no finished refresh and no progress. Written to the audit log (`sync.alarm`, at most once an hour while it stands; `sync.recovered` when it
+clears) and shown at `/api/admin/diagnostics` (server secret only). Code: `src/lib/sync/alarm.ts`, `watchdog.ts`. Tests: `alarm.test.ts`,
+`sync-reliability-db.test.ts`.

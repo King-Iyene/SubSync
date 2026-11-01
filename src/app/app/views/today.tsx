@@ -8,7 +8,6 @@ import { Badge, Btn, Card, Empty, ErrorBox, ExtLink, fmtInt, fmtMoney, Loading, 
 type Change = { today: number; yesterday: number | null; avg7: number | null; vsYesterday: number | null; vsAvg: number | null; unusual: "up" | "down" | null; samples: number };
 type Data = {
   connection: { ok: boolean; message: string | null };
-  freshness: { hours: number | null; ok: boolean; label: string; pending: number };
   headlines: Array<{ key: string; label: string; money: boolean; change: Change }>;
   attention: Array<{ locationId: string; name: string; severity: "critical" | "warning" | "info"; url: string; items: Array<{ kind: string; title: string; detail: string }> }>;
   fine: Array<{ locationId: string; name: string; checked: string[]; learning: boolean }>;
@@ -111,11 +110,10 @@ export function TodayView({ go }: { go: GoFn }) {
       <PageHeader
         title="Today"
         subtitle="What needs you right now, then what changed."
-        actions={<><Badge tone={data.freshness.ok ? "good" : "warn"}>{data.freshness.label}</Badge><Btn variant="primary" onClick={sync} disabled={syncing}>{syncing ? "Syncing..." : "Sync now"}</Btn></>}
+        actions={<Btn variant="primary" onClick={sync} disabled={syncing}>{syncing ? "Syncing..." : "Sync now"}</Btn>}
       />
 
       {!data.connection.ok && <p className="mb-4 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">{data.connection.message}</p>}
-      {data.freshness.hours === null && data.freshness.pending > 0 && <p className="mb-4 rounded-lg border bg-muted/40 px-3 py-2 text-sm" role="status">First sync in progress: the numbers fill in over the next few minutes.</p>}
 
       <FrontDoor go={go} attention={data.attention.length} limited={data.limited} />
       <DoFirst go={go} />

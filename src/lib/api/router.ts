@@ -19,7 +19,7 @@ import { SHARE_LINK_DAYS } from "../data-inventory";
 import { createKey, listKeys, MAX_KEYS, revokeKey } from "../mcp/store";
 import { postToSlack } from "../notify";
 import { enqueueFullSync, enqueueLocationSync, runSlice, syncStatus } from "../sync/engine";
-import { integrationHealth } from "../analytics/health";
+import { freshnessFor, syncPanel } from "../sync/freshness-queries";
 import {
   abandonedDeals, accountSummaries, agingBuckets, avgCycleDays, coverage, deadPipeline, forecast, pipelineSummaries, riskyDeals, stageTable,
   valueDistribution, winLossByMonth, winRate,
@@ -137,9 +137,9 @@ function slim(a: DerivedAccount, links: ReturnType<typeof deepLinks>, forClient 
 
 async function overview(ctx: Ctx) {
   // Independent queries run together so the page does not wait on them one after another.
-  const [{ settings, accounts, hidden, links }, allAlerts, sync] = await Promise.all([
+  const [{ settings, accounts, hidden, links }, allAlerts, freshness] = await Promise.all([
 
-    accountsFor(ctx), listAlerts(ctx.installationId, false, 500, ctx.limitTo ?? undefined), syncStatus(ctx.installationId, ctx.limitTo),
+    accountsFor(ctx), listAlerts(ctx.installationId, false, 500, ctx.limitTo ?? undefined), freshnessFor(ctx.installationId, { limitTo: ctx.limitTo }),
   ]);
   const overviewSeg = await segmentSet(ctx);
   const live = accounts.filter((a) => !a.ignored);
@@ -180,7 +180,7 @@ async function overview(ctx: Ctx) {
     },
     bands,
     attention,
-    sync,
+    freshness,
   });
 }
 
@@ -465,11 +465,6 @@ async function dailyView(ctx: Ctx) {
   });
 }
 
-function agoText(iso: string): string {
-  const mins = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60_000));
-  return mins < 2 ? "just now" : mins < 120 ? mins + " minutes ago" : Math.round(mins / 60) + " hours ago";
-}
-
 const USAGE_VIEWS = new Set(["today", "overview", "accounts", "clients", "team", "search", "deals", "pipeline", "leads", "calls", "inbox", "onboarding", "email", "duplicates", "alerts", "settings", "help", "account", "meetings", "audit", "speed", "appointments"]);
 
 // A counter of which pages get opened (no personal data), so the getting-started checklist can
@@ -499,13 +494,13 @@ async function startView(ctx: Ctx) {
   const synced = locs.total > 0 && locs.synced === locs.total && status.pending === 0;
   const syncDetail = locs.total === 0
     ? (status.pending > 0 ? "Looking for your accounts..." : "No accounts found yet. The platform can take a minute after an install: press Sync now on the home page.")
-    : synced ? `${locs.total} account${locs.total === 1 ? "" : "s"} read. Last sync finished ${status.lastFinishedAt ? agoText(status.lastFinishedAt) : "recently"}.`
+    : synced ? `${locs.total} account${locs.total === 1 ? "" : "s"} read. ${(await freshnessFor(ctx.installationId, { limitTo: ctx.limitTo })).text}.`
     : `${locs.synced} of ${locs.total} account${locs.total === 1 ? "" : "s"} read, ${status.pending} job${status.pending === 1 ? "" : "s"} left.`;
   const steps = [
     { id: "connected", title: "Connect SubSync", done: true, detail: agency ? "Connected to all your client accounts." : "Connected to your account.",
       body: "You are signed in through the platform, so there is nothing to type. SubSync only reads your data.", view: null, cta: null },
     { id: "synced", title: "Let the first sync finish", done: synced, detail: syncDetail,
-      body: "SubSync reads your " + (agency ? "client accounts" : "account") + " in the background. The first sync takes a few minutes, longer with many contacts. Numbers fill in as it goes.", view: "overview", cta: "See sync progress" },
+      body: "SubSync reads your " + (agency ? "client accounts" : "account") + " in the background. The first sync takes a few minutes, longer with many contacts. Numbers fill in as it goes.", view: "overview", cta: "See how fresh your data is" },
     { id: "today", title: "See what needs you today", done: seen.has("today"),
       detail: null, body: "Today ranks what to do first, with the reason and a link, and compares each account with its own normal.", view: "today", cta: "Open Today" },
     { id: "search", title: "Find any contact", done: seen.has("search"),
@@ -1401,8 +1396,14 @@ async function goalsUpdate(ctx: Ctx) {
   return json({ ok: true });
 }
 
-async function healthView(ctx: Ctx) {
-  return json(await integrationHealth(ctx.installationId, ctx.demo));
+// The one freshness sentence, for every kind of person (a client sees its own account's only). A filter on screen never changes it.
+async function freshnessView(ctx: Ctx) {
+  return json({ freshness: await freshnessFor(ctx.installationId, { limitTo: ctx.limitTo }) });
+}
+
+// The Sync status panel: freshness, next run, failures with reasons, what runs when. Agency and business only.
+async function syncStatusView(ctx: Ctx) {
+  return json(await syncPanel(ctx.installationId, { limitTo: ctx.limitTo }));
 }
 
 async function resyncOne(ctx: Ctx, locationId: string) {
@@ -1424,7 +1425,7 @@ async function testSlack(ctx: Ctx) {
 
 async function digestPreview(ctx: Ctx) {
   const d = await buildDailyDigest(ctx.installationId, { limitTo: ctx.limitTo, planLimit: accountLimit(ctx.plan, ctx.entitlements.enforced) });
-  return json({ text: digestText(ctx.demo ? "Demo Company" : "your company", { attention: d.attention, fine: d.fine.length, headlines: d.headlines, freshnessLabel: d.freshness.label }, ctx.url.origin) });
+  return json({ text: digestText(ctx.demo ? "Demo Company" : "your company", { attention: d.attention, fine: d.fine.length, headlines: d.headlines, freshnessLabel: d.freshness.text }, ctx.url.origin) });
 }
 
 // ---------------- routing ----------------
@@ -1476,8 +1477,8 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       if (a === "alerts") return await alertsView(ctx);
       if (a === "settings") return await settingsView(ctx);
       if (a === "export" && b) return await exportCsv(ctx, b);
-      if (a === "sync") return json(await syncStatus(ctx.installationId));
-      if (a === "health") return await healthView(ctx);
+      if (a === "sync-status") return await syncStatusView(ctx);
+      if (a === "freshness") return await freshnessView(ctx);
       if (a === "pipeline-intel") return await pipelineIntel(ctx);
       if (a === "contact-intel") return await contactIntel(ctx);
       if (a === "team") return await teamView(ctx);

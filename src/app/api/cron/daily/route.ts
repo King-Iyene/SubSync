@@ -33,7 +33,7 @@ export async function GET(request: Request) {
       if (!dueNow(now, zone, hour, r.last_on as string | null)) continue;
       try {
         const d = await buildDailyDigest(r.id as string);
-        const text = digestText(r.label as string, { attention: d.attention, fine: d.fine.length, headlines: d.headlines, freshnessLabel: d.freshness.label }, appUrl);
+        const text = digestText(r.label as string, { attention: d.attention, fine: d.fine.length, headlines: d.headlines, freshnessLabel: d.freshness.text }, appUrl);
         if (await postToSlack(r.slack_webhook_url as string, text)) {
           const today = localParts(now, zone)?.date;
           if (today) await sql()`update settings set last_daily_digest_on = ${today}::date where installation_id = ${r.id}`;

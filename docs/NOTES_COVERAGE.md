@@ -12,7 +12,7 @@ ORPHANS (notes with no stage in docs/ROADMAP_V2.md): none found.
 | N3 | UI/UX redesign: "it looks somehow not sweet" | D0, D1 | PLANNED-LATER |  |
 | N4 | Today: the "When this is sent" card at the bottom | F9, F5, F8 | PLANNED-LATER |  |
 | N5 | Today: "Not watched yet" card, ship what is doable | F2, F4, F9, F8 | PLANNED-LATER |  |
-| N6 | Things I noticed in the same screenshots | F1, F5 | PLANNED-LATER |  |
+| N6 | Things I noticed in the same screenshots | F1, F5 | PLANNED-LATER | Freshness part DONE in S0.4 (one status line, no three contradicting messages). The percent-change tiles, the single-deal hero and the counted-at-risk wording stay F1 and F5 |
 | N7 | Dead ends: no way back | F5, F6, D1 | PLANNED-LATER |  |
 | N8 | A client-account filter wherever data is shown | F1, F5, D0 | PLANNED-LATER |  |
 | N9 | Status text and notifications should not sit in cards | D1, F5 | PLANNED-LATER |  |
@@ -39,7 +39,7 @@ ORPHANS (notes with no stage in docs/ROADMAP_V2.md): none found.
 | N30 | More observations on Speed to lead | F2 | PLANNED-LATER |  |
 | N31 | Good things worth keeping | none (keep list) | NOT-A-CODE-ITEM | things to keep, no change |
 | N32 | Meeting notes: what is it, from what, and what do the switches do? | E2a (E1 later), D0 | PLANNED-LATER |  |
-| N33 | Auto-sync is not running: "Last synced" keeps growing | S0.4 | PLANNED-LATER |  |
+| N33 | Auto-sync is not running: "Last synced" keeps growing | S0.4 | DONE-TONIGHT | S0.4: diagnosed from the live job table (bursts of 82 to 489 min before 06:25 UTC on 31 Oct: the 5 minute cron could not run on the Hobby plan; then a steady 20 min, not 15, from a finish-based due rule): due rule fixed, simulated-scheduler tests, one freshness line, internal alarm and diagnostics. The 15 minute cadence is NOT VERIFIED LIVE until the merge (docs/features/S0.4.md, docs/NEEDS_KING.md section 15) |
 | N34 | Filters must adapt to who is looking | D0 | PLANNED-LATER |  |
 | N35 | Contact search is plain: merge it and build paying features around it | F10, D0 | PLANNED-LATER |  |
 | N36 | Pipeline is one endless page | P1 (never tonight), D0 pattern | PLANNED-LATER |  |
@@ -68,7 +68,7 @@ ORPHANS (notes with no stage in docs/ROADMAP_V2.md): none found.
 | N59 | Client requests (support tickets) | C1b (never tonight) | PLANNED-LATER |  |
 | N60 | Compare two is weak, and what is the QBR for? | C1 | PLANNED-LATER |  |
 | N61 | Team module: a real directory with activity | T1 (never tonight) | PLANNED-LATER |  |
-| N62 | More observations | F1, C1 (observations) | PLANNED-LATER |  |
+| N62 | More observations | F1, C1 (observations) | PLANNED-LATER | The N33 update DONE in S0.4 (it ran about hourly in the early period, then every 20 min; now fixed to 15). The Accounts health label and other observations stay F1 and C1 |
 | N63 | Setup is thin: it needs a real checklist system | C1, D0 | PLANNED-LATER |  |
 | N64 | "Why is an API marked unavailable when it is available?" and "turn on all scopes" | F1 (capability matrix), F8 (scope experience); release in Z2 (King) | PLANNED-LATER |  |
 | N65 | Email sender health: vague, no data | E5 (never tonight) | PLANNED-LATER |  |
@@ -80,14 +80,14 @@ ORPHANS (notes with no stage in docs/ROADMAP_V2.md): none found.
 | N71 | Data cleanup: what is it for? Merge Duplicates into it | C2 | PLANNED-LATER |  |
 | N72 | Compare setups and Industry playbooks (King did not comment) | C1, D1 | PLANNED-LATER |  |
 | N73 | Observations on these screens | S0.2b (N48), C1, C2 | PLANNED-LATER |  |
-| N74 | Freshness: two statements, and only one can be the truth | S0.4, D0 | PLANNED-LATER |  |
+| N74 | Freshness: two statements, and only one can be the truth | S0.4, D0 | DONE-TONIGHT | S0.4: one function (src/lib/sync/freshness.ts), one line above every page, exact wording and stale wording, vague badge and banner removed; tests/unit/freshness-one-source.test.ts, scripts/check-sync.ts, tests/e2e/freshness.spec.ts. D0 only restyles the status line |
 | N75 | Trust for a Nigerian-built product selling abroad | F8 (Trust page); Z2, Z3 (King) | PLANNED-LATER |  |
 | N76 | Settings: one long page, and it needs advanced features | F8, D0, D1 | PLANNED-LATER |  |
 | N77 | Meeting notes privacy and how meetings work: what each setting does, and a contradiction | F8 (wording), E2a | PLANNED-LATER |  |
 | N78 | Speed to lead settings: who does the replying, and is it working? | F2 | PLANNED-LATER |  |
 | N79 | Slack: do we still need the pasted web address? Notification options and editable copy | F9 | PLANNED-LATER |  |
-| N80 | "Send at" cannot work with a once-a-day refresh | S0.4, F9 | PLANNED-LATER |  |
-| N81 | Connection health and Data sync cards | S0.4, F8 | PLANNED-LATER |  |
+| N80 | "Send at" cannot work with a once-a-day refresh | S0.4, F9 | PLANNED-LATER | S0.4 part DONE: hourly dispatchers, Send at honoured in the chosen time zone with a 3 hour catch-up and one send per local date (src/lib/__tests__/dispatch-time.test.ts: Lagos, New York clock changes, Tokyo, Kolkata, Sydney); the Sync status panel says exactly what runs and when. Preferences matrix and per-type scheduling remain F9 |
+| N81 | Connection health and Data sync cards | S0.4, F8 | PLANNED-LATER | S0.4 part DONE: one Sync status panel (last refresh per account, next refresh, failures with plain reasons, what a check is, what runs when) replaces Connection health and Data sync. F8 reorganises Settings and may re-word it |
 | N82 | Links: the login address is a manual field | S0.2b (item 4) | DONE-TONIGHT | S0.2b: domain found at sign-in and in the install event, stored per company, Settings field is only an override (and a save no longer freezes it); wording scan widened. NOT VERIFIED LIVE: a real signed install event (docs/NEEDS_KING.md section 13) |
 | N83 | "What we store" and "Delete my data": good for trust, but check they are true | S0.2b, F8 | DONE-TONIGHT | S0.2b: src/lib/data-inventory.ts checked against the live schema, Settings card, privacy page and help text produced from it, uninstall and Delete my data tested against real rows, Delete my data owner-only with typed word and audit entry. The Trust page wording stays with F8 |
 | N84 | Client access: the promise must be proven | S0.2b, F8 | DONE-TONIGHT | S0.2b: tests/unit/client-access.test.ts and the N84 block of scripts/check-tenancy.ts (two real companies, secrets searched in every client answer, access off is immediate); found and fixed two leaks. F8 only re-words the promise |
@@ -116,7 +116,7 @@ ORPHANS (notes with no stage in docs/ROADMAP_V2.md): none found.
 | UX-03 | [S1] Meeting notes page states something no longer true | F8 | PLANNED-LATER |  |
 | UX-04 | [S1] First screen headline is one test deal | F1, F5 | PLANNED-LATER |  |
 | UX-05 | [S1] Agency user opened inside a client account lands on the agency view | F5 | PLANNED-LATER |  |
-| UX-06 | [S2] Sync-running banner on almost every load | S0.4 | PLANNED-LATER |  |
+| UX-06 | [S2] Sync-running banner on almost every load | S0.4 | DONE-TONIGHT | S0.4: the note shows only for a first sync or one queued or running 10 min or longer (freshness.test.ts, sync-reliability-db.test.ts, check-sync.ts, tests/e2e/freshness.spec.ts asserts none on any page) |
 | UX-07 | [S2] Clipping at narrow widths | D0, D1 | PLANNED-LATER |  |
 | UX-08 | [S2] Clients page mostly n/a | C1 | PLANNED-LATER |  |
 | UX-09 | [S2] Visual sameness | D0, D1 | PLANNED-LATER |  |

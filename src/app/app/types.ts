@@ -1,3 +1,4 @@
+import type { Freshness } from "@/lib/sync/freshness";
 // Shapes returned by /api/app/*. Kept in one place so every view agrees with the server.
 
 export type Band = "thriving" | "healthy" | "watch" | "at_risk";
@@ -29,12 +30,7 @@ export type Overview = {
   };
   bands: Record<Band, number>;
   attention: Array<{ locationId: string; name: string | null; score: number; band: Band; churn: string; reasons: string[]; url: string }>;
-  sync: SyncStatus;
-};
-
-export type SyncStatus = {
-  pending: number; failed: number; lastFinishedAt: string | null;
-  recentFailures: Array<{ type: string; locationId: string | null; error: string | null }>;
+  freshness: Freshness;
 };
 
 export type ChecklistItem = { key: string; label: string; status: "done" | "todo" | "unknown"; auto: boolean; detail?: string };

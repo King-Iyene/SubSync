@@ -20,9 +20,12 @@ try {
   process.exit(2);
 } catch { /* nothing answered: the port is free */ }
 
+// A made-up secret for the cron and diagnostics addresses, so the checks can open them; it never leaves this machine. (The real one is a Vercel setting.)
+const CRON_SECRET = process.env.CRON_SECRET ?? "local-test-cron-secret";
+
 const server = spawn("npx", ["next", "dev", "-p", String(PORT)], {
   // A made-up Zoom secret lets the checks sign a pretend Zoom notification; it never leaves this machine.
-  env: { ...process.env, ...(DIST ? { NEXT_DIST_DIR: DIST } : {}), DEMO_MODE: "true", FLAGS_ALL_ON: process.env.FLAGS_ALL_ON ?? "true", ENTITLEMENTS_MODE: process.env.ENTITLEMENTS_MODE ?? "open", ZOOM_WEBHOOK_SECRET_TOKEN: process.env.ZOOM_WEBHOOK_SECRET_TOKEN ?? "demo-zoom-secret-token" },
+  env: { ...process.env, ...(DIST ? { NEXT_DIST_DIR: DIST } : {}), DEMO_MODE: "true", CRON_SECRET, FLAGS_ALL_ON: process.env.FLAGS_ALL_ON ?? "true", ENTITLEMENTS_MODE: process.env.ENTITLEMENTS_MODE ?? "open", ZOOM_WEBHOOK_SECRET_TOKEN: process.env.ZOOM_WEBHOOK_SECRET_TOKEN ?? "demo-zoom-secret-token" },
   shell: true,
   stdio: "ignore",
 });
@@ -47,8 +50,8 @@ let code = 1;
 try {
   if (!(await waitUp())) throw new Error("Dev server did not start");
   // CHECKS=check-connections runs just one script while iterating; the default runs them all.
-  for (const name of (process.env.CHECKS ?? "check-api,check-connections,check-insights,check-tenancy,check-flags,check-metrics,check-audit,check-speed,check-roadmap").split(",").filter(Boolean)) {
-    const run = spawnSync("node", ["--env-file=.env.local", "--import", "tsx", `scripts/${name}.ts`], { stdio: "inherit", shell: true, env: { ...process.env, BASE_URL: `http://localhost:${PORT}` } });
+  for (const name of (process.env.CHECKS ?? "check-api,check-connections,check-insights,check-tenancy,check-sync,check-flags,check-metrics,check-audit,check-speed,check-roadmap").split(",").filter(Boolean)) {
+    const run = spawnSync("node", ["--env-file=.env.local", "--import", "tsx", `scripts/${name}.ts`], { stdio: "inherit", shell: true, env: { ...process.env, CRON_SECRET, BASE_URL: `http://localhost:${PORT}` } });
     code = run.status ?? 1;
     if (code !== 0) break;
   }

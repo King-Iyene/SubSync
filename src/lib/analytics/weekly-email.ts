@@ -1,4 +1,6 @@
 // The weekly email: pure composition, no database or network, so it is unit tested.
+import { inSendWindow } from "../sync/schedule.ts";
+
 export type WeeklyInput = {
   who: string;
   headlines: Array<{ label: string; money: boolean; today: number; vsAvg: number | null }>;
@@ -80,7 +82,7 @@ export function alertsToSendNow<T extends { severity: string }>(alerts: T[], loc
   return alerts.filter((a) => a.severity === "critical");
 }
 
-// Monday morning in the account's own zone, once per week: true from the chosen hour on, so a late run still sends.
+// Monday morning in the account's own zone, once per week: true from the chosen hour until SEND_CATCHUP_HOURS later, so a late run still sends.
 export function weeklyDue(local: { hour: number; date: string; weekday: string } | null, hour: number, lastSentOn: string | null): boolean {
-  return Boolean(local) && local!.weekday === "Mon" && local!.hour >= hour && lastSentOn !== local!.date;
+  return Boolean(local) && local!.weekday === "Mon" && inSendWindow(local!.hour, hour) && lastSentOn !== local!.date;
 }

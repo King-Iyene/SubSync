@@ -68,8 +68,19 @@ function whitelabelOf(source: Record<string, unknown>): string | null {
 export type WebhookAction =
   | { kind: "uninstall" }
   | { kind: "install" }
-  | { kind: "resync"; scope: "contacts" | "opportunities" | "conversations" | "structure" }
+  | { kind: "resync"; scope: "contacts" | "opportunities" | "conversations" | "structure" | "appointments" }
   | { kind: "ignore" };
+
+// The platform's app events are named AppInstall and AppUninstall in its documentation and its event list, but the `type` the live deliveries
+// carry is INSTALL, UNINSTALL (and UPDATE for an app version update). The live webhook log showed INSTALL and UNINSTALL arriving while the code
+// only knew the long names, so those events were silently ignored. Both spellings mean the same thing.
+export function canonicalType(type: string | null): string | null {
+  switch (type) {
+    case "INSTALL": return "AppInstall";
+    case "UNINSTALL": return "AppUninstall";
+    default: return type;
+  }
+}
 
 // What each event should do to our cache. Names confirmed from the published API specs.
 export function actionFor(type: string | null): WebhookAction {
@@ -94,9 +105,15 @@ export function actionFor(type: string | null): WebhookAction {
     case "InboundMessage":
     case "OutboundMessage":
     case "ConversationUnreadWebhook":
+    case "ConversationUpdate":
       return { kind: "resync", scope: "conversations" };
-    case "LocationUpdate":
+    case "ContactDndUpdate":
+      return { kind: "resync", scope: "contacts" };
     case "AppointmentCreate":
+    case "AppointmentUpdate":
+    case "AppointmentDelete":
+      return { kind: "resync", scope: "appointments" };
+    case "LocationUpdate":
       return { kind: "resync", scope: "structure" };
     default:
       return { kind: "ignore" };

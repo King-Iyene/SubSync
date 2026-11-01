@@ -2,18 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { useApiClient, useData } from "../session";
-import type { SyncStatus } from "../types";
 import { Badge, Btn, Card, ErrorBox, inputClass, Loading, PageHeader, timeAgo } from "../ui";
 import { storeLines, deleteMyDataText, uninstallText } from "@/lib/data-inventory";
 import { ConnectionsCard } from "./connections";
-import { HealthCard } from "./health-card";
+import { SyncStatusPanel } from "./sync-status";
 
 type S = { staleDays: number; dormantDays: number; slaHours: number; appDomain: string; appDomainSource: "manual" | "sso" | "install" | "default"; detectedDomain: string | null; digestEnabled: boolean; customChecklist: string[]; digestHour: number | null; digestTimezone: string | null; digestEmail: string | null; emailReady?: boolean; brandName: string | null; brandColor: string | null; industryTargets?: boolean; keepTranscripts: boolean; pushNotesToCrm: boolean; speedTargetMinutes: number; countAutomatedTouches: boolean; speedBusinessHours: boolean; speedOpenHour: number; speedCloseHour: number; alertQuietHours: boolean };
 
 export function SettingsView() {
   const api = useApiClient();
   const { data, error, loading, reload } = useData<{ features?: Record<string, boolean>; settings: S; slackConfigured: boolean; canDeleteData?: boolean; meetingTool?: boolean; kind?: string; clientView?: { on: number; total: number } | null; clientAccounts?: Array<{ locationId: string; name: string; on: boolean }> }>("settings");
-  const sync = useData<SyncStatus>("sync");
   const keys = useData<{ keys: Array<{ id: string; name: string; prefix: string; createdAt: string; lastUsedAt: string | null }>; max: number; endpoint: string }>("api-keys");
   const [keyName, setKeyName] = useState("");
   const [newKey, setNewKey] = useState<string | null>(null);
@@ -237,7 +235,7 @@ export function SettingsView() {
               </div>
             </div>
           </div>
-          <p className="mt-1 text-xs text-muted-foreground">Goes out once a day at that hour. Left blank, it uses 08:00 in the time zone of your first client account.</p>
+          <p className="mt-1 text-xs text-muted-foreground">Checked every hour and sent once a day at that hour in that time zone (the Monday email only on Mondays). If a check is late it still goes out within 3 hours of it; after that the day is skipped instead of sending a morning message in the evening. Left blank, it uses 08:00 in the time zone of your first client account.</p>
           <div className="mt-3 flex flex-wrap gap-2">
             <Btn disabled={busy || !data.slackConfigured} onClick={() => call(() => api.post("settings/test-slack"), "Test message sent to Slack.")}>Send test message</Btn>
             <Btn onClick={async () => setDigest((await api.get<{ text: string }>("digest")).text)}>Preview the daily brief</Btn>
@@ -308,14 +306,7 @@ export function SettingsView() {
         </Card>
         )}
 
-        <div className="lg:col-span-2"><HealthCard /></div>
-
-        <Card title="Data sync">
-          {sync.data ? (
-            <p className="text-sm text-muted-foreground">Last completed {timeAgo(sync.data.lastFinishedAt)} · {sync.data.pending} queued · {sync.data.failed} failed. Data refreshes automatically about once a day and as changes arrive.</p>
-          ) : <p className="text-sm text-muted-foreground">Checking...</p>}
-          <div className="mt-3"><Btn disabled={busy} onClick={() => call(async () => { await api.post("sync"); await sync.reload(); }, api.demo ? "Insights refreshed." : "Sync started.")}>{api.demo ? "Refresh insights" : "Sync now"}</Btn></div>
-        </Card>
+        <SyncStatusPanel />
 
         <Card title="What we store">
           <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground" data-testid="what-we-store">
