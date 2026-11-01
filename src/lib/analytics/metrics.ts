@@ -61,3 +61,12 @@ export function percentChange(current: number, previous: number | null | undefin
   if (previous === null || previous === undefined || !Number.isFinite(previous) || previous < minBase) return null;
   return Math.round(((current - previous) / previous) * 100);
 }
+
+/**
+ * Cost of slow follow-up (ESTIMATE): conversations waiting past the reply target x the account's average deal x its win rate. Null when nothing
+ * is waiting or the account has no win rate (fewer than MIN_CLOSED_DEALS closed deals) or no average deal. The one formula: the account tiles
+ * (`followUpRevenueAtRisk`) and the Account audit both call this and nothing else.
+ */
+export function followUpEstimate(a: { unanswered: number; winRate: number | null; avgDealValue: number | null }): number | null {
+  return a.unanswered > 0 && a.winRate !== null && a.avgDealValue !== null ? Math.round(a.unanswered * a.avgDealValue * a.winRate) : null;
+}

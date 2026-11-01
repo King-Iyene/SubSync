@@ -41,6 +41,8 @@ import { afterHours, communicationGaps } from "../analytics/comms-queries";
 import { badDataSamples, contactOverview, topLeads, vips } from "../analytics/contact-queries";
 import { appointmentInsights } from "../analytics/appointment-insight-queries";
 import { auditSummary, buildAudit } from "../analytics/audit-intel";
+import { appointmentList, staleDealList, waitingList, type AuditList } from "../analytics/audit-queries";
+import { DEAL_RULES_VERSION } from "../analytics/definitions";
 import { speedView } from "../analytics/speed-queries";
 import { CHANGELOG, ROADMAP } from "../roadmap";
 import { buildSharePayload } from "../analytics/share-intel";
@@ -205,34 +207,58 @@ function overviewOutlier(live: DerivedAccount[]) {
   return count >= OUTLIER_MIN_DEALS && value > 0 && top / value >= OUTLIER_SHARE ? { value: top, share: Math.round((top / value) * 100) / 100, of: count } : null;
 }
 
-// The instant audit: what is wrong right now, what it costs, and where to start.
-async function computeAudit(ctx: Ctx) {
-  const { settings, accounts } = await accountsFor(ctx);
+// The instant audit: what is wrong right now, what it costs, and where to start. It covers exactly the accounts every other page covers under the same
+// filter (the page filter is carried on the request, N8); the lists behind its numbers (KF-6) and the snapshot a share link keeps are both built from
+// that same set of accounts, never from anything the browser names.
+async function computeAudit(ctx: Ctx, withLists = false) {
+  const { settings, accounts, hidden, links } = await accountsFor(ctx);
   const live = accounts.filter((a) => !a.ignored);
-  const v = await appointmentView(ctx.installationId, await allowedIds(ctx));
+  const liveIds = live.map((a) => a.locationId);
+  const liveSet = new Set(liveIds);
+  const [v, coverageRows] = await Promise.all([appointmentView(ctx.installationId, liveIds), conversationCoverage(ctx.installationId)]);
   const appts = v.access.total === 0 ? null : {
     readable: v.access.ok, total: v.access.total, needPermission: v.access.needsPermission.length,
     unmarked: v.unmarkedTotal, noShowsToRecover: v.recoverTotal, unconfirmed48: v.unconfirmedTotal,
   };
+  // SubSync reads the newest conversations of an account up to a limit; the waiting count says so when any account is at it (N15).
+  const readLimit = readLimitNote(coverageRows.filter((c) => liveSet.has(c.locationId) && c.stored >= CONVERSATIONS_READ_PER_ACCOUNT).length, live.length);
   const audit = buildAudit(live.map((a) => ({
     locationId: a.locationId, name: a.name, staleValue: a.staleValue, staleOpps: a.staleOpps, openValue: a.openValue, openOpps: a.openOpps, excludedOpen: a.excludedOpen ?? 0,
     unanswered: a.unanswered, winRate: a.winRate, avgDealValue: a.avgDealValue, completenessPct: a.completenessPct, contacts: a.contacts, topStaleDeal: a.topStaleDeal ?? 0,
-  })), appts);
+    wonCount: a.wonCount, lostCount: a.lostCount,
+  })), appts, { staleDays: settings.staleDays, slaHours: settings.slaHours, readLimit });
   const who = settings.brandName ?? (ctx.limitTo ? "Your business" : "Your company");
-  return { audit, who, names: live.map((a) => a.name ?? "").filter(Boolean) };
+  let lists: Record<string, AuditList> | null = null;
+  if (withLists) {
+    const [stale, waiting] = await Promise.all([staleDealList(ctx.installationId, liveIds, settings.staleDays), waitingList(ctx.installationId, liveIds, settings.slaHours)]);
+    const withUrl = (l: AuditList) => ({ ...l, rows: l.rows.map((r) => ({ ...r, url: r.contactId ? links.contact(r.locationId, r.contactId) : links.opportunities(r.locationId) })) });
+    lists = { stale: withUrl(stale), slow: withUrl(waiting) };
+    if (appts) { lists.unmarked = withUrl(appointmentList(v.unmarked, v.unmarkedTotal, "Started")); lists.noshows = withUrl(appointmentList(v.recover, v.recoverTotal, "No-show on")); }
+  }
+  return { audit, who, names: live.map((a) => a.name ?? "").filter(Boolean), settings, hidden, lists, readLimit };
 }
 
 async function auditViewData(ctx: Ctx) {
-  const { audit, who } = await computeAudit(ctx);
-  return json({ audit, summary: auditSummary(audit, who) });
+  const { audit, who, settings, hidden, lists, readLimit } = await computeAudit(ctx, true);
+  return json({
+    audit, summary: auditSummary(audit, who), lists, readLimit, hiddenAccounts: hidden,
+    // The sender's own name and colour, for the printed page (N85). No logo: none is stored.
+    brand: { name: settings.brandName, color: settings.brandColor },
+    // Sharing is for an agency or a business, never a client's own staff; the demo holds only the public sample.
+    canShare: ctx.kind !== "client" && !ctx.demo, demo: ctx.demo, shareDays: SHARE_LINK_DAYS,
+    generatedAt: new Date().toISOString(),
+  });
 }
 
-// A snapshot of the audit someone can send on: totals and finding titles only, account names scrubbed, expires in 30 days.
+// A snapshot of the audit someone can send on: totals, finding titles, fix steps and definitions only, account names scrubbed, expires in SHARE_LINK_DAYS.
+// It covers the accounts of the page filter that was on when it was made, and never holds a contact, a deal or a conversation.
 async function auditShare(ctx: Ctx) {
+  if (ctx.kind === "client") return json({ error: "Not available in this view" }, 403);
   if (ctx.demo) return json({ error: "Sharing is not available in the demo" }, 400);
-  const { audit, who, names } = await computeAudit(ctx);
+  const { audit, who, names, settings } = await computeAudit(ctx);
   const id = randomBytes(24).toString("base64url");
-  await sql()`insert into shared_audits (installation_id, id, payload, expires_at) values (${ctx.installationId}, ${id}, ${sql().json(buildSharePayload(audit, who, names) as never)}, now() + make_interval(days => ${SHARE_LINK_DAYS}))`;
+  const payload = buildSharePayload(audit, who, names, new Date(), { branded: settings.brandName !== null, brandColor: settings.brandColor, rulesVersion: DEAL_RULES_VERSION });
+  await sql()`insert into shared_audits (installation_id, id, payload, expires_at) values (${ctx.installationId}, ${id}, ${sql().json(payload as never)}, now() + make_interval(days => ${SHARE_LINK_DAYS}))`;
   const origin = (process.env.NEXT_PUBLIC_APP_URL ?? ctx.url.origin).replace(/\/+$/, "");
   return json({ url: `${origin}/audit/${id}`, expiresInDays: SHARE_LINK_DAYS });
 }

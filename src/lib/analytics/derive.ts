@@ -8,7 +8,7 @@ import {
 import { fmtDuration } from "./speed-intel.ts";
 
 // A win rate built on a handful of deals is noise, so none is shown (or used in an estimate) below this.
-import { MIN_CLOSED_DEALS } from "./metrics.ts";
+import { followUpEstimate, MIN_CLOSED_DEALS } from "./metrics.ts";
 export { MIN_CLOSED_DEALS };
 
 export type AccountRow = {
@@ -142,10 +142,7 @@ export function deriveAccount(
     avgDealValue,
     expectedRevenue: winRate !== null ? Math.round(row.openValue * winRate) : null,
     revenueAtRisk: Math.round(row.staleValue),
-    followUpRevenueAtRisk:
-      row.unanswered > 0 && winRate !== null && avgDealValue !== null
-        ? Math.round(row.unanswered * avgDealValue * winRate)
-        : null,
+    followUpRevenueAtRisk: followUpEstimate({ unanswered: row.unanswered, winRate, avgDealValue }),
     leadFlowDropPct: leadFlowDrop(row.new30d, newContactsHistory),
   };
 }

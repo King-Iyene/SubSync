@@ -95,7 +95,7 @@ export const INVENTORY: Record<string, TableInfo> = {
     },
     notPersonal: ["crm_note_id", "crm_note_status"],
   },
-  shared_audits: { noun: "share links", line: "shares", personal: { payload: "a snapshot of totals and finding titles, with client names removed" } },
+  shared_audits: { noun: "share links", line: "shares", personal: { payload: "a snapshot of totals, finding titles, fix steps and how each number is counted, with client names removed, plus your business name and colour" } },
 
   // ---- what you add, and your settings (kept by "Delete my data", removed by an uninstall)
   call_lists: { noun: "saved call lists", line: "yours", personal: { name: "saved call list names", filters: "the filters of a saved list" } },
