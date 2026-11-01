@@ -5,27 +5,25 @@ import { inbox, listDomainChecks, visibleLocationIds } from "./queries";
 import { appointmentSignals } from "./appointment-queries";
 import { replyHoursFor } from "./playbooks";
 import { loadAccounts } from "./service";
+import { notWatchedRows } from "./coverage";
 import { currentSnapshotVersion, snapshotOk } from "./definitions-sql";
 
 // Things a daily brief could say but cannot yet, with the honest reason. Shown in the app so
 // nobody assumes they are being watched.
 // The reasons use the three causes of docs/CAPABILITIES.md (N64), never one blurred sentence: something SubSync has not built yet although the data
 // is there, something that needs a permission SubSync does not ask for, and something the platform does not give.
-export const NOT_WATCHED = [
-  { what: "Missed calls", why: "calls do appear in the platform's data (as messages of type call), so this can be built; it is not built yet" },
-  { what: "Failing workflows", why: "needs a permission SubSync does not ask for, and the platform limits who can use the workflows interface" },
-  { what: "Low wallet balance and failed payments", why: "needs billing permissions SubSync does not ask for" },
-  { what: "Phone registration (A2P) status", why: "not available from the platform through the interface SubSync uses" },
-];
+// The list itself lives in coverage.ts (it is shown as the "What SubSync watches" panel in Settings, not on Today).
+export const NOT_WATCHED = notWatchedRows();
 
-async function seriesByLocation(installationId: string, locationIds: string[]): Promise<Map<string, SeriesPoint[]>> {
+// `days` is how far back to read: ten days for the daily brief, longer when Today's card range asks for it.
+export async function seriesByLocation(installationId: string, locationIds: string[], days = 10): Promise<Map<string, SeriesPoint[]>> {
   if (locationIds.length === 0) return new Map();
   const version = await currentSnapshotVersion(installationId);
   const rows = await sql()`
     select m.location_id, m.day::text as day, m.contacts, m.new_contacts_30d, m.open_opportunities, m.open_value::float8 open_value,
       m.stale_opportunities, m.unread_conversations, m.completeness_pct, m.engagement_score, ${snapshotOk("m", version)} deals_ok
     from account_metrics_daily m
-    where m.installation_id = ${installationId} and m.location_id = any(${locationIds}::text[]) and m.day >= current_date - 10
+    where m.installation_id = ${installationId} and m.location_id = any(${locationIds}::text[]) and m.day >= current_date - ${days}::int
     order by m.day`;
   const by = new Map<string, SeriesPoint[]>();
   for (const r of rows) {

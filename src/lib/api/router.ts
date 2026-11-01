@@ -63,7 +63,8 @@ import { listConnections } from "../connections/queries";
 import { isProvider } from "../connections/state";
 import { locationAccessToken } from "../sync/engine";
 import { createHook, listHooks, listMeetings, MAX_HOOKS_PER_ACCOUNT, revokeHook, setMeetingStatus } from "../analytics/meeting-queries";
-import { buildDailyDigest, NOT_WATCHED } from "../analytics/digest-service";
+import { buildDailyDigest, NOT_WATCHED, seriesByLocation } from "../analytics/digest-service";
+import { portfolioRangeChanges, validFromDay, validToDay } from "../analytics/today-intel";
 import { digestText, localParts } from "../analytics/digest-intel";
 import { industryKey, industryOptions, matchesSegment, PLAYBOOKS } from "../analytics/playbooks";
 import { buildQueue, recordBulk, recordDecision, summarise, undoDecision } from "../analytics/dedupe-queries";
@@ -245,7 +246,8 @@ async function computeAudit(ctx: Ctx, withLists = false) {
 }
 
 async function auditViewData(ctx: Ctx) {
-  const { audit, who, settings, hidden, lists, readLimit } = await computeAudit(ctx, true);
+  // Today asks for the audit without the rows behind each number (lists=0): it needs only the first finding, and the lists are the slow part.
+  const { audit, who, settings, hidden, lists, readLimit } = await computeAudit(ctx, ctx.url.searchParams.get("lists") !== "0");
   return json({
     audit, summary: auditSummary(audit, who), lists, readLimit, hiddenAccounts: hidden,
     // The sender's own name and colour, for the printed page (N85). No logo: none is stored.
@@ -595,6 +597,21 @@ async function dailyView(ctx: Ctx) {
     fine: d.fine, notWatched: NOT_WATCHED,
     schedule: { hour: d.settings.digestHour ?? 8, timezone: d.settings.digestTimezone, slack: Boolean(d.settings.slackWebhookUrl) && d.settings.digestEnabled },
   });
+}
+
+// How the four headline figures on Today changed since the start of the window a card asked for (stage F5, KF-4). Same accounts as every other read
+// (plan limit, the page filter, one account for a business); the only thing taken from the request is a start date, checked before it is used.
+async function dailyChanges(ctx: Ctx) {
+  const [{ today }] = await sql()`select current_date::text as today`;
+  const from = validFromDay(ctx.url.searchParams.get("from"), today as string);
+  if (!from) return json({ error: "Pick a start date within the last year and before today" }, 400);
+  const to = validToDay(ctx.url.searchParams.get("to"), from, today as string);
+  if (!to) return json({ error: "Pick an end date that is not before the start and not in the future" }, 400);
+  const { accounts } = await accountsFor(ctx);
+  const ids = accounts.filter((a) => !a.ignored).map((a) => a.locationId);
+  const span = Math.round((Date.parse(`${today}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000) + 2;
+  const series = await seriesByLocation(ctx.installationId, ids, span);
+  return json({ from, to, accounts: ids.length, changes: portfolioRangeChanges([...series.values()], from, to) });
 }
 
 const USAGE_VIEWS = new Set(["today", "overview", "accounts", "clients", "team", "search", "deals", "pipeline", "leads", "calls", "inbox", "onboarding", "email", "duplicates", "alerts", "settings", "help", "account", "meetings", "audit", "speed", "appointments"]);
@@ -1700,6 +1717,7 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
   try {
     if (method === "GET") {
       if (a === "overview") return await overview(ctx);
+      if (a === "daily" && b === "changes") return await dailyChanges(ctx);
       if (a === "daily") return await dailyView(ctx);
       if (a === "roadmap") return await roadmapView(ctx);
       if (a === "appointments" && b === "breakdown") return await appointmentsBreakdownView(ctx);
