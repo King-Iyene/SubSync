@@ -5,6 +5,7 @@ import { sql } from "@/lib/db";
 import { getInstallation, purgeInstallation, purgeLocationData } from "@/lib/ghl/installations";
 import { actionFor, parseWebhook, verifyWebhook } from "@/lib/ghl/webhook";
 import { recordPlanEvent } from "@/lib/entitlements-queries";
+import { captureWhitelabelDomain } from "@/lib/analytics/queries";
 import { enqueueAreaSync, enqueueFullSync } from "@/lib/sync/engine";
 
 // Receives platform webhooks. Verify the Ed25519 signature on the body, drop duplicates (failed
@@ -39,6 +40,11 @@ export async function POST(request: Request) {
       const target = (event.locationId ? await getInstallation(businessKey(event.locationId)) : null) ?? (await getInstallation(event.companyId));
       // Recording the plan must never stop an install from syncing (the table may not exist yet).
       if (target) await recordPlanEvent(target.id, parsed).catch((e) => console.error("Recording a plan failed", safeError(e)));
+      // An install event from a company that resells the platform carries its own login domain: keep it, so "Open" links land on that domain
+      // from the first screen (a domain typed in Settings still wins). Sign-in captures it too, so a missed event is made up at the first open.
+      if (event.type === "AppInstall" && event.whitelabelDomain && target) {
+        await captureWhitelabelDomain(target.id, event.whitelabelDomain, "install").catch((e) => console.error("Keeping the login domain failed", safeError(e)));
+      }
       if (event.type === "PlanChange") return NextResponse.json({ ok: true });
     }
     if (action.kind === "ignore" || !event.companyId) return NextResponse.json({ ok: true });

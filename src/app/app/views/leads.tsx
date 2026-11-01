@@ -16,7 +16,6 @@ type Data = {
   tags: { top: Array<{ tag: string; count: number }>; rare: Array<{ tag: string; count: number }>; variants: Array<{ total: number; variants: Array<{ tag: string; count: number }> }> };
   quality: { total: number; badEmail: number; disposable: number; badPhone: number };
   imports: Array<{ account: string; day: string; count: number; noEmailPct: number; noPhonePct: number }>;
-  overlap: { total: number; people: Array<{ email: string; accounts: number; names: string[] }> };
   topLeads: Array<Person & { email: string | null; phone: string | null; score: number; reasons: string[]; lastActivityAt: string | null }>;
   vips: Array<Person & { wonValue: number; openValue: number; wonCount: number; idleDays: number | null; needsContact: boolean }>;
   badData: Array<Person & { email: string | null; phone: string | null; emailProblem: string | null }>;
@@ -215,15 +214,6 @@ export function LeadsView() {
             ))}
           </Table>
           <p className="mt-2 text-xs text-muted-foreground">Days when 50 or more contacts were added at once, which is usually an import. High gaps mean the import file was incomplete.</p>
-        </Card>
-      )}
-
-      {data.overlap.total > 0 && (
-        <Card title={`Same person in several client accounts (${fmtInt(data.overlap.total)})`}>
-          <ul className="space-y-1 text-sm">
-            {data.overlap.people.map((p) => <li key={p.email}><span className="font-medium">{p.email}</span> <span className="text-muted-foreground">is in {p.accounts} accounts: {p.names.join(", ")}</span></li>)}
-          </ul>
-          <p className="mt-2 text-xs text-muted-foreground">Check that two of your clients are not working the same lead.</p>
         </Card>
       )}
     </div>

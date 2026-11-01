@@ -1,4 +1,5 @@
 import { createPublicKey, verify } from "node:crypto";
+import { validDomain } from "../links.ts";
 
 // GHL signs webhooks with Ed25519 in the X-GHL-Signature header. The key below is the public
 // key published in the official webhook guide. The legacy X-WH-Signature (RSA) header was
@@ -38,6 +39,8 @@ export type WebhookEvent = {
   webhookId: string | null;
   companyId: string | null;
   locationId: string | null;
+  /** The company's own login domain when it resells the platform under its brand (install events carry it). Only a plain host name. */
+  whitelabelDomain: string | null;
 };
 
 // Payloads put ids at the top level; some event types nest fields under `data`.
@@ -53,7 +56,13 @@ export function parseWebhook(body: unknown): WebhookEvent {
     webhookId: str(root.webhookId, root.id),
     companyId: str(root.companyId, data.companyId),
     locationId: str(root.locationId, data.locationId),
+    whitelabelDomain: whitelabelOf(root) ?? whitelabelOf(data),
   };
+}
+
+function whitelabelOf(source: Record<string, unknown>): string | null {
+  const details = source.whitelabelDetails;
+  return details && typeof details === "object" ? validDomain((details as Record<string, unknown>).domain) : null;
 }
 
 export type WebhookAction =

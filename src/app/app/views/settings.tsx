@@ -4,19 +4,21 @@ import { useEffect, useState } from "react";
 import { useApiClient, useData } from "../session";
 import type { SyncStatus } from "../types";
 import { Badge, Btn, Card, ErrorBox, inputClass, Loading, PageHeader, timeAgo } from "../ui";
+import { storeLines, deleteMyDataText, uninstallText } from "@/lib/data-inventory";
 import { ConnectionsCard } from "./connections";
 import { HealthCard } from "./health-card";
 
-type S = { staleDays: number; dormantDays: number; slaHours: number; appDomain: string; digestEnabled: boolean; customChecklist: string[]; digestHour: number | null; digestTimezone: string | null; digestEmail: string | null; emailReady?: boolean; brandName: string | null; brandColor: string | null; industryTargets?: boolean; keepTranscripts: boolean; pushNotesToCrm: boolean; speedTargetMinutes: number; countAutomatedTouches: boolean; speedBusinessHours: boolean; speedOpenHour: number; speedCloseHour: number; alertQuietHours: boolean };
+type S = { staleDays: number; dormantDays: number; slaHours: number; appDomain: string; appDomainSource: "manual" | "sso" | "install" | "default"; detectedDomain: string | null; digestEnabled: boolean; customChecklist: string[]; digestHour: number | null; digestTimezone: string | null; digestEmail: string | null; emailReady?: boolean; brandName: string | null; brandColor: string | null; industryTargets?: boolean; keepTranscripts: boolean; pushNotesToCrm: boolean; speedTargetMinutes: number; countAutomatedTouches: boolean; speedBusinessHours: boolean; speedOpenHour: number; speedCloseHour: number; alertQuietHours: boolean };
 
 export function SettingsView() {
   const api = useApiClient();
-  const { data, error, loading, reload } = useData<{ features?: Record<string, boolean>; settings: S; slackConfigured: boolean; kind?: string; clientView?: { on: number; total: number } | null; clientAccounts?: Array<{ locationId: string; name: string; on: boolean }> }>("settings");
+  const { data, error, loading, reload } = useData<{ features?: Record<string, boolean>; settings: S; slackConfigured: boolean; canDeleteData?: boolean; meetingTool?: boolean; kind?: string; clientView?: { on: number; total: number } | null; clientAccounts?: Array<{ locationId: string; name: string; on: boolean }> }>("settings");
   const sync = useData<SyncStatus>("sync");
   const keys = useData<{ keys: Array<{ id: string; name: string; prefix: string; createdAt: string; lastUsedAt: string | null }>; max: number; endpoint: string }>("api-keys");
   const [keyName, setKeyName] = useState("");
   const [newKey, setNewKey] = useState<string | null>(null);
   const [confirmText, setConfirmText] = useState("");
+  const [override, setOverride] = useState("");
   const [form, setForm] = useState<S | null>(null);
   const [slack, setSlack] = useState("");
   const [checklist, setChecklist] = useState("");
@@ -44,14 +46,17 @@ export function SettingsView() {
     setMsg(null);
     try {
       const body: Record<string, unknown> = {
-        staleDays: form.staleDays, dormantDays: form.dormantDays, slaHours: form.slaHours, appDomain: form.appDomain,
+        staleDays: form.staleDays, dormantDays: form.dormantDays, slaHours: form.slaHours,
         digestEnabled: form.digestEnabled, digestHour: form.digestHour, digestTimezone: form.digestTimezone, digestEmail: form.digestEmail, brandName: form.brandName, brandColor: form.brandColor, keepTranscripts: form.keepTranscripts, pushNotesToCrm: form.pushNotesToCrm, speedTargetMinutes: form.speedTargetMinutes, countAutomatedTouches: form.countAutomatedTouches,
         alertQuietHours: form.alertQuietHours, speedBusinessHours: form.speedBusinessHours, speedOpenHour: form.speedOpenHour, speedCloseHour: form.speedCloseHour,
         customChecklist: checklist.split("\n").map((l) => l.trim()).filter(Boolean),
       };
       if (slack.trim()) body.slackWebhookUrl = slack.trim();
+      // The login address is found automatically. Only a typed one is sent, and it is an override.
+      if (override.trim() && override.trim().toLowerCase() !== form.appDomain) body.appDomainOverride = override.trim();
       await api.put("settings", body);
       setSlack("");
+      setOverride("");
       await reload();
       setMsg({ ok: true, text: "Saved. Alerts and scores have been recalculated." });
     } catch (e) {
@@ -155,9 +160,20 @@ export function SettingsView() {
         </Card>
 
         <Card title="Links">
-          <label htmlFor="domain" className="mb-1 block text-sm font-medium">The address you log in to</label>
-          <input id="domain" className={inputClass} value={form.appDomain} onChange={(e) => setForm({ ...form, appDomain: e.target.value })} />
-          <p className="mt-1 text-xs text-muted-foreground">White-label companies: use your own domain so &quot;Open&quot; links land in your branded app.</p>
+          <p className="text-sm">&quot;Open&quot; links go to <strong>{data.settings.appDomain}</strong>.</p>
+          <p className="mt-1 text-xs text-muted-foreground" data-testid="domain-source">
+            {data.settings.appDomainSource === "manual" ? "You set this address yourself below."
+              : data.settings.appDomainSource === "default" ? "SubSync has not seen your own login address yet, so links use the standard one. Open SubSync from your CRM menu once and it fills in by itself."
+              : "SubSync found this address by itself when you opened it from your CRM. You do not need to do anything."}
+          </p>
+          <label htmlFor="domain" className="mb-1 mt-3 block text-sm font-medium">Use a different address (only if the links above are wrong)</label>
+          <input id="domain" className={inputClass} placeholder="app.youragency.com" value={override} onChange={(e) => setOverride(e.target.value)} />
+          {data.settings.appDomainSource === "manual" && (
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <Btn disabled={busy} onClick={() => call(() => api.put("settings", { appDomainOverride: null }), data.settings.detectedDomain ? "Links use the address SubSync found." : "Links use the standard address until SubSync sees yours.")}>Stop using my address</Btn>
+              {data.settings.detectedDomain && <span className="text-xs text-muted-foreground">SubSync found {data.settings.detectedDomain}.</span>}
+            </div>
+          )}
         </Card>
 
         {data.clientView && <h2 id="g-clients" className="scroll-mt-4 pt-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Your clients</h2>}
@@ -229,7 +245,7 @@ export function SettingsView() {
           {digest && <pre className="mt-3 overflow-x-auto whitespace-pre-wrap rounded-lg bg-muted p-3 text-xs">{digest}</pre>}
         </Card>
 
-        {data.features?.connections !== false && <ConnectionsCard />}
+        {data.features?.connections !== false && <ConnectionsCard meetingSettings={data.features?.meetings !== false || data.meetingTool === true} />}
 
         {data.features?.ai !== false && (
         <Card title="AI assistant connector">
@@ -283,7 +299,7 @@ export function SettingsView() {
 
         <h2 id="g-privacy" className="scroll-mt-4 pt-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Privacy and data</h2>
 
-        {data.features?.meetings !== false && (
+        {(data.features?.meetings !== false || data.meetingTool === true) && (
         <Card title="Meeting notes privacy">
           <label className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-0.5 size-4" checked={form.keepTranscripts} onChange={(e) => setForm({ ...form, keepTranscripts: e.target.checked })} />
             <span>Keep full transcripts when a meeting tool sends them. Off by default: only the summary and action items are stored, which is safer for clinics and anyone handling private conversations.</span></label>
@@ -302,22 +318,19 @@ export function SettingsView() {
         </Card>
 
         <Card title="What we store">
-          <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
-            <li>Contacts: name, email, phone, tags and dates, only to power search and data-quality checks.</li>
-            <li>Deals: name, value, stage and dates. Conversations: who wrote, when and through which channel; never message text.</li>
-            <li>Everything is deleted when you uninstall SubSync, and tokens are encrypted at rest.</li>
+          <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground" data-testid="what-we-store">
+            {storeLines({ meetings: data.features?.meetings !== false || data.meetingTool === true }).map((l) => <li key={l.id}><strong className="font-medium text-foreground">{l.title}:</strong> {l.text}</li>)}
           </ul>
+          <p className="mt-3 text-xs text-muted-foreground">{uninstallText()}</p>
         </Card>
 
         <Card title="Delete my data">
-          <p className="mb-3 text-sm text-muted-foreground">
-            Permanently removes everything SubSync has copied from your client accounts: contacts, deals, conversation summaries, scores, alerts and history.
-            Your settings and keys stay, and the next sync starts from scratch. Uninstalling the app deletes it all automatically.
-          </p>
+          <p className="mb-3 text-sm text-muted-foreground">{deleteMyDataText()}</p>
           <div className="flex flex-wrap gap-2">
-            <input className={`${inputClass} max-w-48`} placeholder="Type DELETE" value={confirmText} onChange={(e) => setConfirmText(e.target.value)} aria-label="Type DELETE to confirm" />
-            <Btn disabled={busy || confirmText !== "DELETE" || api.demo} onClick={() => call(async () => { await api.post("settings/purge", { confirm: "DELETE" }); setConfirmText(""); }, "All synced data deleted.")}>Delete all synced data</Btn>
+            <input className={`${inputClass} max-w-48`} placeholder="Type DELETE" value={confirmText} onChange={(e) => setConfirmText(e.target.value)} aria-label="Type DELETE to confirm" disabled={!data.canDeleteData} />
+            <Btn disabled={busy || confirmText !== "DELETE" || api.demo || !data.canDeleteData} onClick={() => call(async () => { await api.post("settings/purge", { confirm: "DELETE" }); setConfirmText(""); }, "All synced data deleted.")}>Delete all synced data</Btn>
           </div>
+          {!data.canDeleteData && !api.demo && <p className="mt-2 text-xs text-muted-foreground">Only the owner of your company account can delete all the data. Ask them to do it. The attempt is written to the activity record.</p>}
           {api.demo && <p className="mt-2 text-xs text-muted-foreground">Disabled in demo mode.</p>}
         </Card>
         <div><Btn variant="primary" disabled={busy} onClick={save}>{busy ? "Saving..." : "Save settings"}</Btn></div>

@@ -14,6 +14,8 @@ import { deepLinks } from "../links";
 import { isTestName } from "../analytics/test-data";
 import { accountLimit, type Feature } from "../entitlements";
 import { purgeSyncedData } from "../ghl/installations";
+import { SYNCED_DELETE } from "../tenant-tables";
+import { SHARE_LINK_DAYS } from "../data-inventory";
 import { createKey, listKeys, MAX_KEYS, revokeKey } from "../mcp/store";
 import { postToSlack } from "../notify";
 import { enqueueFullSync, enqueueLocationSync, runSlice, syncStatus } from "../sync/engine";
@@ -46,7 +48,7 @@ import { applyRun, createPreview, getRun, installationHasScope, listRuns, PREVIE
 import { parseParams } from "../analytics/cleanup-intel";
 import { demoWriter, platformWriter } from "../analytics/cleanup-writer";
 import { availability, disconnect, startLink } from "../connections/flow";
-import { getConnection, listConnections, setDefaultAccount } from "../connections/queries";
+import { listConnections } from "../connections/queries";
 import { isProvider } from "../connections/state";
 import { locationAccessToken } from "../sync/engine";
 import { createHook, listHooks, listMeetings, MAX_HOOKS_PER_ACCOUNT, revokeHook, setMeetingStatus } from "../analytics/meeting-queries";
@@ -118,9 +120,10 @@ const gate = (ctx: Ctx, feature: Feature) =>
   ctx.entitlements.locked.includes(feature) ? json({ error: "This feature is part of the paid plan", feature, upgrade: true }, 402)
   : ctx.entitlements.features[feature] === false ? json({ error: "This feature is switched off", feature, off: true }, 404) : null;
 
-function slim(a: DerivedAccount, links: ReturnType<typeof deepLinks>) {
+// The owner label is who at the company looks after the client: the company's own internal note, never sent to the client's staff (N84).
+function slim(a: DerivedAccount, links: ReturnType<typeof deepLinks>, forClient = false) {
   return {
-    locationId: a.locationId, name: a.name, ignored: a.ignored, owner: a.owner, url: links.account(a.locationId),
+    locationId: a.locationId, name: a.name, ignored: a.ignored, owner: forClient ? null : a.owner, url: links.account(a.locationId),
     contacts: a.contacts, new30d: a.new30d, openOpps: a.openOpps, openValue: a.openValue, staleOpps: a.staleOpps,
     revenueAtRisk: a.revenueAtRisk, unread: a.unread, unanswered: a.unanswered, calendars: a.calendars, pipelines: a.pipelines,
     emailPct: a.emailPct, phonePct: a.phonePct, tagPct: a.tagPct, activePct: a.activePct, completenessPct: a.completenessPct,
@@ -216,9 +219,9 @@ async function auditShare(ctx: Ctx) {
   if (ctx.demo) return json({ error: "Sharing is not available in the demo" }, 400);
   const { audit, who, names } = await computeAudit(ctx);
   const id = randomBytes(24).toString("base64url");
-  await sql()`insert into shared_audits (installation_id, id, payload, expires_at) values (${ctx.installationId}, ${id}, ${sql().json(buildSharePayload(audit, who, names) as never)}, now() + interval '14 days')`;
+  await sql()`insert into shared_audits (installation_id, id, payload, expires_at) values (${ctx.installationId}, ${id}, ${sql().json(buildSharePayload(audit, who, names) as never)}, now() + make_interval(days => ${SHARE_LINK_DAYS}))`;
   const origin = (process.env.NEXT_PUBLIC_APP_URL ?? ctx.url.origin).replace(/\/+$/, "");
-  return json({ url: `${origin}/audit/${id}`, expiresInDays: 14 });
+  return json({ url: `${origin}/audit/${id}`, expiresInDays: SHARE_LINK_DAYS });
 }
 
 // The links this installation has made, newest first, with how often each was opened. Never available to a client's own staff.
@@ -329,7 +332,7 @@ async function meetingsView(ctx: Ctx) {
   return json({
     meetings: meetings.map((m) => ({ ...m, contactUrl: m.contactId ? sc.links.contact(m.locationId, m.contactId) : null })),
     hooks, accounts: locs.map((l) => ({ locationId: l.location_id as string, name: (l.name as string | null) ?? "Unnamed account" })),
-    maxHooks: MAX_HOOKS_PER_ACCOUNT, keepTranscripts: sc.settings.keepTranscripts, canManage: ctx.kind !== "client",
+    maxHooks: MAX_HOOKS_PER_ACCOUNT, keepTranscripts: sc.settings.keepTranscripts, canManage: ctx.kind !== "client", moreTools: zoomOn(ctx),
   });
 }
 
@@ -426,20 +429,21 @@ async function cleanupWork(ctx: Ctx, id: string, mode: "apply" | "undo") {
 }
 
 // ---------------- connections: sign in to Slack, Fathom and Zoom ----------------
+// Zoom and Google Meet are hidden behind the zoom_meet switch (off by default): the card, the stored connections and the sign-in start all vanish.
+const zoomOn = (ctx: Ctx) => ctx.entitlements.features.zoom_meet !== false;
+
 async function connectionsView(ctx: Ctx) {
-  const allowed = await allowedIds(ctx);
-  const [connections, locs] = await Promise.all([
-    listConnections(ctx.installationId),
-    sql()`select location_id, name from locations where installation_id = ${ctx.installationId} and not ignored ${allowed ? sql()`and location_id = any(${allowed}::text[])` : sql()``} order by name`,
-  ]);
+  const connections = await listConnections(ctx.installationId);
+  const available = availability();
+  const showZoom = zoomOn(ctx);
   return json({
-    connections, available: availability(), single: ctx.limitTo !== null,
-    accounts: locs.map((l) => ({ locationId: l.location_id as string, name: (l.name as string | null) ?? "Unnamed account" })),
+    connections: showZoom ? connections : connections.filter((c) => c.provider !== "zoom"),
+    available: showZoom ? available : { slack: available.slack, fathom: available.fathom },
   });
 }
 
 async function connectionStart(ctx: Ctx, provider: string) {
-  if (!isProvider(provider)) return json({ error: "Not found" }, 404);
+  if (!isProvider(provider) || (provider === "zoom" && !zoomOn(ctx))) return json({ error: "Not found" }, 404);
   if (ctx.demo) return json({ error: "Connecting is not available in the demo. It needs a real install." }, 400);
   const link = startLink(provider, { provider, installationId: ctx.installationId, onlyLocationId: ctx.limitTo, actor: actorOf(ctx) });
   return link.ok ? json({ url: link.url }) : json({ error: link.error }, 503);
@@ -448,16 +452,6 @@ async function connectionStart(ctx: Ctx, provider: string) {
 async function connectionRemove(ctx: Ctx, id: string) {
   if (!UUID.test(id)) return json({ error: "Not found" }, 404);
   return (await disconnect(ctx.installationId, id, actorOf(ctx))) ? json({ ok: true }) : json({ error: "Not found" }, 404);
-}
-
-async function connectionUpdate(ctx: Ctx, id: string) {
-  if (!UUID.test(id)) return json({ error: "Not found" }, 404);
-  const body = (await ctx.request.json().catch(() => null)) as { defaultLocationId?: unknown } | null;
-  const loc = body?.defaultLocationId;
-  if (loc !== null && !(typeof loc === "string" && LOCATION_ID.test(loc))) return json({ error: "Choose an account, or none" }, 400);
-  const row = await getConnection(ctx.installationId, id);
-  if (!row) return json({ error: "Not found" }, 404);
-  return (await setDefaultAccount(ctx.installationId, row, loc as string | null)) ? json({ ok: true }) : json({ error: "That account cannot be used" }, 400);
 }
 
 async function dailyView(ctx: Ctx) {
@@ -522,12 +516,15 @@ async function startView(ctx: Ctx) {
       detail: null, body: "Paste a Slack incoming webhook in Settings and choose the hour. It arrives once a day in your time zone.", view: "settings", cta: "Open Settings" },
     { id: "email", title: "Get alerts and the Monday email", done: Boolean(settings.digestEmail),
       detail: null, body: "Type one email address in Settings. New critical and warning alerts are emailed to it straight away, and a short summary arrives every Monday. Nothing is sent until you add an address.", view: "settings", cta: "Open Settings" },
-    { id: "meetings", title: "Connect a meeting tool (optional)", done: seen.has("meetings"), optional: true,
-      detail: null, body: "Connect Zoom or Fathom in Settings and each meeting summary is saved in SubSync and added to the matching contact's notes in your CRM.", view: "meetings", cta: "Open Meeting notes" },
+    ...(ctx.entitlements.features.meetings !== false ? [{ id: "meetings", title: "Connect a meeting tool (optional)", done: seen.has("meetings"), optional: true,
+      detail: null, body: `Connect ${zoomOn(ctx) ? "Zoom or Fathom" : "Fathom"} in Settings and each meeting summary is saved in SubSync and added to the matching contact's notes in your CRM.`, view: "meetings", cta: "Open Meeting notes" }] : []),
     ...(agency ? [{ id: "clients", title: "Let a client see their own account", done: (clientOn?.n ?? 0) > 0, optional: true,
       detail: null, body: "Switch on a read-only view for a client's own staff. They see only their own account: never other clients, fees or notes.", view: "settings", cta: "Open Settings" }] : []),
   ];
-  return json({ kind: ctx.kind, steps, doneCount: steps.filter((s) => s.done).length, total: steps.length });
+  // A client's own staff get the steps about using SubSync. The steps about alerts, email, meeting tools and client access report what the company
+  // set up in Settings (whether a Slack channel or an email address is saved), which a client never receives (N84).
+  const shown = ctx.kind === "client" ? steps.filter((s) => !["brief", "email", "meetings", "clients"].includes(s.id)) : steps;
+  return json({ kind: ctx.kind, steps: shown, doneCount: shown.filter((s) => s.done).length, total: shown.length });
 }
 
 // Options for the filter bar. Not narrowed by the filter itself, so you can always change it.
@@ -566,7 +563,7 @@ async function playbooksView(ctx: Ctx) {
 
 async function accounts(ctx: Ctx) {
   const { settings, accounts: list, links } = await accountsFor(ctx);
-  return json({ accounts: list.map((a) => slim(a, links)), settings: { staleDays: settings.staleDays, dormantDays: settings.dormantDays, slaHours: settings.slaHours } });
+  return json({ accounts: list.map((a) => slim(a, links, ctx.kind === "client")), settings: { staleDays: settings.staleDays, dormantDays: settings.dormantDays, slaHours: settings.slaHours } });
 }
 
 async function onboardingOverview(ctx: Ctx) {
@@ -580,7 +577,7 @@ async function onboardingOverview(ctx: Ctx) {
       const { items, completionPct } = onboardingChecklist(a, {
         domainStatus: worst?.status ?? null, manual: manual.get(a.locationId) ?? {}, custom: settings.customChecklist,
       });
-      return { locationId: a.locationId, name: a.name, owner: a.owner, url: links.account(a.locationId), completionPct, items };
+      return { locationId: a.locationId, name: a.name, owner: ctx.kind === "client" ? null : a.owner, url: links.account(a.locationId), completionPct, items };
     })
     .sort((x, y) => x.completionPct - y.completionPct);
   return json({ accounts: rows });
@@ -604,7 +601,7 @@ async function accountDetail(ctx: Ctx, locationId: string) {
   return json({
     clientView: flagRow?.client_view === true,
     brand: { name: settings.brandName, color: settings.brandColor },
-    account: slim(a, links),
+    account: slim(a, links, ctx.kind === "client"),
     breakdown: a.breakdown,
     trend,
     staleDeals: deals.map((d) => ({ ...d, url: links.opportunities(d.locationId) })),
@@ -801,12 +798,14 @@ const settingsView = async (ctx: Ctx) => {
   const { settings } = await loadAccounts(ctx.installationId);
   const [counts] = ctx.kind === "agency" ? await sql()`select count(*)::int total, count(*) filter (where client_view)::int on_ from locations where installation_id = ${ctx.installationId}` : [null];
   const accts = ctx.kind === "agency" ? await sql()`select location_id, name, client_view from locations where installation_id = ${ctx.installationId} and not ignored order by lower(coalesce(name, ''))` : [];
-  return json({ features: ctx.entitlements.features, settings: publicSettings(settings), slackConfigured: Boolean(settings.slackWebhookUrl), kind: ctx.kind, clientView: counts ? { on: counts.on_ as number, total: counts.total as number } : null, clientAccounts: accts.map((r) => ({ locationId: r.location_id as string, name: (r.name as string | null) ?? "Unnamed account", on: r.client_view === true })) });
+  // Is a meeting tool connected? Its privacy switches stay visible even while the Meeting notes page is off.
+  const [meetingTool] = await sql()`select 1 from connections where installation_id = ${ctx.installationId} and provider in ('fathom', 'zoom') ${zoomOn(ctx) ? sql()`` : sql()`and provider <> 'zoom'`} limit 1`;
+  return json({ features: ctx.entitlements.features, settings: publicSettings(settings), slackConfigured: Boolean(settings.slackWebhookUrl), kind: ctx.kind, canDeleteData: ctx.session.dataOwner === true, meetingTool: Boolean(meetingTool), clientView: counts ? { on: counts.on_ as number, total: counts.total as number } : null, clientAccounts: accts.map((r) => ({ locationId: r.location_id as string, name: (r.name as string | null) ?? "Unnamed account", on: r.client_view === true })) });
 };
 
 function publicSettings(s: Settings) {
   // Never send the webhook URL back to the browser: it is a secret.
-  return { staleDays: s.staleDays, dormantDays: s.dormantDays, slaHours: s.slaHours, appDomain: s.appDomain, digestEnabled: s.digestEnabled, customChecklist: s.customChecklist, digestHour: s.digestHour, digestTimezone: s.digestTimezone, digestEmail: s.digestEmail, emailReady: emailConfigured(), brandName: s.brandName, brandColor: s.brandColor, industryTargets: s.industryTargets, keepTranscripts: s.keepTranscripts, pushNotesToCrm: s.pushNotesToCrm, speedTargetMinutes: s.speedTargetMinutes, countAutomatedTouches: s.countAutomatedTouches, speedBusinessHours: s.speedBusinessHours, speedOpenHour: s.speedOpenHour, speedCloseHour: s.speedCloseHour, alertQuietHours: s.alertQuietHours };
+  return { staleDays: s.staleDays, dormantDays: s.dormantDays, slaHours: s.slaHours, appDomain: s.appDomain, appDomainSource: s.appDomainSource, detectedDomain: s.detectedDomain, digestEnabled: s.digestEnabled, customChecklist: s.customChecklist, digestHour: s.digestHour, digestTimezone: s.digestTimezone, digestEmail: s.digestEmail, emailReady: emailConfigured(), brandName: s.brandName, brandColor: s.brandColor, industryTargets: s.industryTargets, keepTranscripts: s.keepTranscripts, pushNotesToCrm: s.pushNotesToCrm, speedTargetMinutes: s.speedTargetMinutes, countAutomatedTouches: s.countAutomatedTouches, speedBusinessHours: s.speedBusinessHours, speedOpenHour: s.speedOpenHour, speedCloseHour: s.speedCloseHour, alertQuietHours: s.alertQuietHours };
 }
 
 const INSIGHT_SETTINGS = new Set(["staleDays", "dormantDays", "slaHours", "speedTargetMinutes", "countAutomatedTouches", "speedBusinessHours", "speedOpenHour", "speedCloseHour", "industryTargets", "alertQuietHours"]);
@@ -814,7 +813,7 @@ const INSIGHT_SETTINGS = new Set(["staleDays", "dormantDays", "slaHours", "speed
 async function settingsUpdate(ctx: Ctx) {
   const body = (await ctx.request.json().catch(() => null)) as Record<string, unknown> | null;
   if (!body) return json({ error: "Invalid request" }, 400);
-  const patch: Partial<Settings> = {};
+  const patch: Partial<Settings> & { appDomainOverride?: string | null } = {};
   const int = (v: unknown, lo: number, hi: number) => (typeof v === "number" && Number.isInteger(v) && v >= lo && v <= hi ? v : null);
   if ("staleDays" in body) { const v = int(body.staleDays, 7, 365); if (v === null) return json({ error: "Stale days must be between 7 and 365" }, 400); patch.staleDays = v; }
   if ("dormantDays" in body) { const v = int(body.dormantDays, 7, 365); if (v === null) return json({ error: "Days before an account counts as gone quiet must be between 7 and 365" }, 400); patch.dormantDays = v; }
@@ -865,10 +864,19 @@ async function settingsUpdate(ctx: Ctx) {
   if ("clientViewAll" in body && ctx.kind === "agency") {
     await sql()`update locations set client_view = ${body.clientViewAll === true} where installation_id = ${ctx.installationId}`;
   }
-  if ("appDomain" in body) {
+  // The login domain is found automatically (sign-in and install event). What is typed here is only an override: an empty value takes it off.
+  if ("appDomainOverride" in body) {
+    if (body.appDomainOverride === null || body.appDomainOverride === "") patch.appDomainOverride = null;
+    else {
+      const d = typeof body.appDomainOverride === "string" ? extractDomain(body.appDomainOverride) : null;
+      if (!d) return json({ error: "Enter the domain you log in to, for example app.youragency.com" }, 400);
+      patch.appDomainOverride = d;
+    }
+  } else if ("appDomain" in body) {
+    // Older screens send the domain on every save. It only counts as an override when it is not what the links already use.
     const d = typeof body.appDomain === "string" ? extractDomain(body.appDomain) : null;
     if (!d) return json({ error: "Enter the domain you log in to, for example app.youragency.com" }, 400);
-    patch.appDomain = d;
+    if (d !== (await getSettings(ctx.installationId)).appDomain) patch.appDomainOverride = d;
   }
   if ("slackWebhookUrl" in body) {
     if (body.slackWebhookUrl === null || body.slackWebhookUrl === "") patch.slackWebhookUrl = null;
@@ -1022,11 +1030,20 @@ async function keysRevoke(ctx: Ctx, id: string) {
   return (await revokeKey(ctx.installationId, id)) ? json({ ok: true }) : json({ error: "Key not found" }, 404);
 }
 
+// "Delete my data": only the owner (see mayDeleteData), only with the typed word, and always written to the audit log, refused or done.
+// The audit log is not part of what is deleted, so the record outlives the data.
 async function purgeData(ctx: Ctx) {
   if (ctx.demo) return json({ error: "Demo data cannot be deleted" }, 403);
+  const audit = (action: string, detail: Record<string, unknown>) =>
+    sql()`insert into audit_log (installation_id, actor, action, detail) values (${ctx.installationId}, ${actorOf(ctx)}, ${action}, ${sql().json(detail as never)})`;
+  if (ctx.session.dataOwner !== true) {
+    await audit("data.purge_refused", { kind: ctx.kind });
+    return json({ error: "Only the owner of your company account can delete all the data. Ask them to do it.", forbidden: true }, 403);
+  }
   const body = (await ctx.request.json().catch(() => null)) as { confirm?: unknown } | null;
   if (body?.confirm !== "DELETE") return json({ error: 'Type DELETE to confirm' }, 400);
   await purgeSyncedData(ctx.installationId);
+  await audit("data.purged", { tables: SYNCED_DELETE.length, kind: ctx.kind });
   return json({ ok: true });
 }
 
@@ -1514,7 +1531,6 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       if (a === "settings") return await settingsUpdate(ctx);
       if (a === "goals") return await goalsUpdate(ctx);
       if (a === "meetings" && b) return await meetingUpdate(ctx, b);
-      if (a === "connections" && b && !c) return await connectionUpdate(ctx, b);
       if (a === "team" && b && LOCATION_ID.test(b)) return await teamName(ctx, b);
       if (a === "clients" && b && LOCATION_ID.test(b)) return await clientUpdate(ctx, b);
       if (a === "accounts" && b && LOCATION_ID.test(b) && c === "flags") return await flags(ctx, b);

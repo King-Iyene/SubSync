@@ -14,11 +14,11 @@ Each item: (a) what it is, (b) why it was skipped, (c) the exact click or comman
 - (c) marketplace.zoom.us, the SubSync app, **Scopes**, add **View a user** (`user:read:user`), save. Anyone who connected before must reconnect.
 - (d) Only matters when Zoom is turned on (stage E1, not tonight).
 
-## 3. Fathom: keep unmatched meetings from being saved anywhere
-- (a) In the existing Fathom connection, leave "If nobody in a meeting is a known contact" on "Do not save it".
-- (b) It is King's own connection settings.
-- (c) Do nothing new if it already says that; tonight's S0.2b removes the option from the app.
-- (d) Low: the option is removed in code.
+## 3. Fathom: keep unmatched meetings from being saved anywhere (DONE in code by S0.2b, nothing left to click)
+- (a) The option "If nobody in a meeting is a known contact, save it in [client account]" is gone from the app, the API and the code, and the one stored value (none was set) was migrated to "do not save it".
+- (b) It was King's own connection setting.
+- (c) Nothing to do. If you want to look: Settings, Connections, Fathom has no "save it in" choice any more.
+- (d) None.
 
 ## 4. Pre-pilot pricing gate (before ANY outside agency installs)
 - (a) Add the $9 Pro plan, delete the $5 plan, map the new plan id in `plan_entitlements`, switch `ENTITLEMENTS_MODE` to `enforced`.
@@ -64,7 +64,18 @@ Each item: (a) what it is, (b) why it was skipped, (c) the exact click or comman
 - (d) Production keeps running the previous code until then.
 
 ## 11. Held migrations (written, NOT applied)
-Filled in as they are created (none yet).
+None so far. (Stage S0.2b wrote and APPLIED two additive migrations to the live database after saving the tables to backups/: `20261101010000_detected_app_domain.sql` and `20261101020000_meeting_default_account_retired.sql`. Both are in docs/features/S0.2b.md with the backup file names and row counts. The old main code keeps working against them.)
 
 ## 12. Scopes the overnight stages need for release 2.2.0
-Filled in as stages are built (none yet).
+S0.2b needs none (nothing new is read or written in the CRM). Filled in as later stages are built.
+
+## 13. Checks from stage S0.2b (nothing is skipped; these need King or a real signed event)
+- (a) **The install event carries the company's login domain (N82).** We read `whitelabelDetails.domain` from the install event and keep it; this is proven by tests with made-up events and by the sign-in capture already working on your real agency (it stored app.kdsquares.com), but no real signed install event was available overnight. (b) A real event can only come from the platform. (c) At the next real install (or when you reinstall on KD Squares Test), open Settings, Links: it should say "found by itself" with the right address, and Open links should use it. (d) Low: sign-in fills the same field at the first open, so a missed event only delays it.
+- (a) **Three decisions made for you, please confirm or change (docs/DECISIONS.md):** the Meeting notes privacy switches stay visible while a meeting tool is connected even though the page is off; "Delete my data" may be pressed by the agency owner, or by the administrator of a business that installed it for itself (nobody else); a meeting nobody can be matched to is only counted, even for a single business, until the private Meeting inbox exists (E0, E2a). (b) They are your call. (c) Reply "keep" or say what to change. (d) Low.
+- (a) **Real-world check of "Delete my data" as owner and as administrator.** (b) It deletes real data, so it was only tested on fixture companies. (c) Already in section 6 (data-deletion test on KD Squares Test). (d) The button's role rule is proven by test, not by a live press.
+
+## 14. A leftover test server on port 3100 (harmless, but please stop it)
+- (a) A `next dev -p 3100` process (PID 53848, parent 53508) from my own debugging is idle on your machine.
+- (b) The permission layer refused my request to stop it, so I left it alone and ran the tests on port 3101 instead.
+- (c) In a PowerShell window: `Stop-Process -Id 53508 -Force` (or restart the computer).
+- (d) None for the app. It only blocks `npm run e2e` and the default test harness from starting their own server on port 3100.

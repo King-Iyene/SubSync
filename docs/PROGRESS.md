@@ -14,6 +14,7 @@ Evidence: `docs/features/F4.md` (F6: `docs/features/F6.md`). From S0.3 on King d
 | S0.1 | Test harness and safety rails | Passed |
 | S0.2 | Identity, roles, tenant isolation | Passed |
 | S0.3 | White-label hygiene | Built, verified, follow-up done (branded install link, company name replaces product name) |
+| S0.2b | Tenancy follow-ups (overnight run, 1 Nov) | BUILT, awaiting King's checks: no cross-client matching, client staff never receive agency-only data (tested), "What we store" generated from the schema and "Delete my data" owner-only, login domain found automatically, no "save a meeting in an account" setting, Zoom and Google Meet hidden, Meeting notes page off until E2a. Evidence: `docs/features/S0.2b.md` |
 | F1 | Numbers truth | Built, verified (King's CRM checks pending, no wait) |
 | F2 | Speed to lead | Built, verified (King's CRM checks pending, no wait) |
 | F3 | Appointments | Built, verified (King's CRM checks pending, no wait) |

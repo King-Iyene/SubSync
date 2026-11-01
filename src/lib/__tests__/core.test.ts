@@ -125,7 +125,7 @@ test("a signature over the re-serialised body also verifies", () => {
 
 test("webhook parsing and actions", () => {
   const e = parseWebhook({ type: "AppUninstall", webhookId: "w", companyId: "c", locationId: "l" });
-  assert.deepEqual(e, { type: "AppUninstall", webhookId: "w", companyId: "c", locationId: "l" });
+  assert.deepEqual(e, { type: "AppUninstall", webhookId: "w", companyId: "c", locationId: "l", whitelabelDomain: null });
   assert.equal(parseWebhook({ data: { companyId: "c2" } }).companyId, "c2");
   assert.equal(parseWebhook(null).type, null);
   assert.deepEqual(actionFor("AppUninstall"), { kind: "uninstall" });

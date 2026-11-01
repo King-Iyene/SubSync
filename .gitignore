@@ -53,3 +53,4 @@ next-env.d.ts
 
 # local database backups taken before live migrations (never committed)
 backups/
+.next-int

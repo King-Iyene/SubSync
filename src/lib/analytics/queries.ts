@@ -1,6 +1,7 @@
 import { sql } from "../db";
 import type { AccountRow, AccountSettings, AlertDraft } from "./derive";
 import type { DomainReport } from "../dns/email-auth";
+import { DEFAULT_APP_DOMAIN } from "../links";
 
 // Every query is scoped by installation_id. Counts are cast to int/float8 so the driver does
 // not hand back strings.
@@ -15,7 +16,12 @@ export const pgTextArray = (items: string[]): string =>
 
 export type Settings = AccountSettings & {
   slackWebhookUrl: string | null;
+  /** The domain every "Open in your CRM" link uses: the one typed in Settings if any, else the one seen at sign-in or install, else the standard one. */
   appDomain: string;
+  /** Where appDomain came from: "manual" (typed in Settings), "sso" or "install" (detected), "default" (nothing seen yet). */
+  appDomainSource: "manual" | "sso" | "install" | "default";
+  /** The login domain last seen at sign-in or install, kept even while an override is set so the override can be taken off. */
+  detectedDomain: string | null;
   digestEnabled: boolean;
   customChecklist: string[];
   /** Local hour (0 to 23) the daily brief is sent, and the time zone it is judged in. Null means the defaults. */
@@ -45,7 +51,7 @@ export type Settings = AccountSettings & {
 export async function getSettings(installationId: string): Promise<Settings> {
   const db = sql();
   const read = () => db`
-    select stale_deal_days, dormant_days, sla_hours, slack_webhook_url, ghl_app_domain, digest_enabled, custom_checklist, digest_hour, digest_timezone, digest_email, brand_name, brand_color, industry_targets, push_notes_to_crm, keep_transcripts, speed_target_minutes, count_automated_touches, speed_business_hours, speed_open_hour, speed_close_hour, alert_quiet_hours
+    select stale_deal_days, dormant_days, sla_hours, slack_webhook_url, ghl_app_domain, app_domain_source, detected_app_domain, digest_enabled, custom_checklist, digest_hour, digest_timezone, digest_email, brand_name, brand_color, industry_targets, push_notes_to_crm, keep_transcripts, speed_target_minutes, count_automated_touches, speed_business_hours, speed_open_hour, speed_close_hour, alert_quiet_hours
     from settings where installation_id = ${installationId}`;
   let [r] = await read();
   if (!r) {
@@ -60,6 +66,8 @@ export async function getSettings(installationId: string): Promise<Settings> {
     slaHours: r.sla_hours,
     slackWebhookUrl: r.slack_webhook_url,
     appDomain: r.ghl_app_domain,
+    appDomainSource: r.app_domain_source === "manual" || r.app_domain_source === "sso" || r.app_domain_source === "install" ? r.app_domain_source : "default",
+    detectedDomain: (r.detected_app_domain as string | null) ?? null,
     digestEnabled: r.digest_enabled,
     customChecklist: Array.isArray(r.custom_checklist) ? r.custom_checklist.filter((x: unknown): x is string => typeof x === "string") : [],
     digestHour: (r.digest_hour as number | null) ?? null,
@@ -79,14 +87,22 @@ export async function getSettings(installationId: string): Promise<Settings> {
   };
 }
 
-// Take the agency's own domain from sign-in, unless it typed one in Settings (which always wins).
-export async function captureWhitelabelDomain(installationId: string, domain: string): Promise<void> {
+// Keep the company's own login domain, seen at sign-in or in the install event (stored per install, so per company). It is always remembered as
+// "detected"; it becomes the domain links use unless the company typed one in Settings, which always wins.
+export async function captureWhitelabelDomain(installationId: string, domain: string, from: "sso" | "install" = "sso"): Promise<void> {
   const db = sql();
   await db`insert into settings (installation_id) values (${installationId}) on conflict do nothing`;
-  await db`update settings set ghl_app_domain = ${domain}, app_domain_source = 'sso' where installation_id = ${installationId} and app_domain_source <> 'manual' and ghl_app_domain is distinct from ${domain}`;
+  await db`
+    update settings set
+      detected_app_domain = ${domain},
+      ghl_app_domain = case when app_domain_source = 'manual' then ghl_app_domain else ${domain} end,
+      app_domain_source = case when app_domain_source = 'manual' then 'manual' else ${from} end
+    where installation_id = ${installationId}
+      and (detected_app_domain is distinct from ${domain} or (app_domain_source <> 'manual' and ghl_app_domain is distinct from ${domain}))`;
 }
 
-export async function updateSettings(installationId: string, p: Partial<Settings>): Promise<void> {
+// `appDomainOverride`: a domain typed in Settings (wins over a detected one), or null to take the override off and go back to the detected one.
+export async function updateSettings(installationId: string, p: Partial<Settings> & { appDomainOverride?: string | null }): Promise<void> {
   const db = sql();
   await db`insert into settings (installation_id) values (${installationId}) on conflict do nothing`;
   await db`
@@ -95,8 +111,8 @@ export async function updateSettings(installationId: string, p: Partial<Settings
       dormant_days = coalesce(${p.dormantDays ?? null}::int, dormant_days),
       sla_hours = coalesce(${p.slaHours ?? null}::int, sla_hours),
       slack_webhook_url = case when ${p.slackWebhookUrl !== undefined} then ${p.slackWebhookUrl ?? null} else slack_webhook_url end,
-      ghl_app_domain = coalesce(${p.appDomain ?? null}, ghl_app_domain),
-      app_domain_source = case when ${p.appDomain !== undefined} then 'manual' else app_domain_source end,
+      ghl_app_domain = case when ${p.appDomainOverride === null} then coalesce(detected_app_domain, ${DEFAULT_APP_DOMAIN}) when ${typeof p.appDomainOverride === "string"} then ${p.appDomainOverride ?? null} else ghl_app_domain end,
+      app_domain_source = case when ${p.appDomainOverride === null} then (case when detected_app_domain is not null then 'sso' else 'default' end) when ${typeof p.appDomainOverride === "string"} then 'manual' else app_domain_source end,
       digest_enabled = coalesce(${p.digestEnabled ?? null}::boolean, digest_enabled),
       digest_hour = case when ${p.digestHour !== undefined} then ${p.digestHour ?? null}::int else digest_hour end,
       digest_timezone = case when ${p.digestTimezone !== undefined} then ${p.digestTimezone ?? null} else digest_timezone end,

@@ -122,7 +122,7 @@ export async function seedDemo(): Promise<{ installationId: string; accounts: nu
   await db`delete from installations where company_id = ${DEMO_COMPANY_ID}`;
   const [inst] = await db`
     insert into installations (company_id, company_name, plan, is_demo, installed_at)
-    values (${DEMO_COMPANY_ID}, 'Demo Agency', 'paid', true, ${ago(90)}) returning id`;
+    values (${DEMO_COMPANY_ID}, 'Demo Company', 'paid', true, ${ago(90)}) returning id`;
   const installationId = inst.id as string;
   await db`insert into settings (installation_id) values (${installationId})`;
   // So the "Data sync" card shows a recent completed sync instead of "never".

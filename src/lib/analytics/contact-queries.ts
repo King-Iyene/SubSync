@@ -23,7 +23,7 @@ export type ContactOverview = Awaited<ReturnType<typeof contactOverview>>;
 
 export async function contactOverview(installationId: string, allowed: string[] | null) {
   const db = sql();
-  const [[life], [aging], [quiet], growth, accountGrowth, tags, [quality], imports, [overlapTotal], overlap, cohorts] = await Promise.all([
+  const [[life], [aging], [quiet], growth, accountGrowth, tags, [quality], imports, cohorts] = await Promise.all([
     // lifecycle: where each contact sits, from the deals they have
     db`
       with loc as (${visible(installationId, allowed)}),
@@ -97,20 +97,6 @@ export async function contactOverview(installationId: string, allowed: string[] 
       from cached_contacts c join loc on loc.location_id = c.location_id
       where c.installation_id = ${installationId} and c.date_added > now() - interval '180 days'
       group by loc.name, c.date_added::date having count(*) >= 50 order by day desc limit 12`,
-    // the same person in more than one client account
-    db`
-      with loc as (${visible(installationId, allowed)}),
-      shared as (
-        select lower(c.email) e from cached_contacts c join loc on loc.location_id = c.location_id
-        where c.installation_id = ${installationId} and nullif(c.email, '') is not null
-        group by lower(c.email) having count(distinct c.location_id) > 1)
-      select count(*)::int n from shared`,
-    db`
-      with loc as (${visible(installationId, allowed)})
-      select lower(c.email) email, count(distinct c.location_id)::int accounts, array_agg(distinct loc.name) names
-      from cached_contacts c join loc on loc.location_id = c.location_id
-      where c.installation_id = ${installationId} and nullif(c.email, '') is not null
-      group by lower(c.email) having count(distinct c.location_id) > 1 order by accounts desc, email limit 25`,
     // 7.8 cohorts: contacts grouped by the month they arrived, and how many have since won a deal
     db`
       with loc as (${visible(installationId, allowed)}),
@@ -147,10 +133,6 @@ export async function contactOverview(installationId: string, allowed: string[] 
     },
     quality: { total: quality.total, badEmail: quality.bad_email, disposable: quality.disposable, badPhone: quality.bad_phone },
     imports: imports.map((i) => ({ account: i.name as string, day: (iso(i.day) ?? String(i.day)).slice(0, 10), count: i.n as number, noEmailPct: i.no_email as number, noPhonePct: i.no_phone as number })),
-    overlap: {
-      total: overlapTotal.n as number,
-      people: overlap.map((o) => ({ email: o.email as string, accounts: o.accounts as number, names: o.names as string[] })),
-    },
   };
 }
 

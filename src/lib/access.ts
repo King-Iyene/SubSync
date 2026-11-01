@@ -79,6 +79,14 @@ export async function decideForIdentity(identity: Identity, lookups: Lookups): P
   return decision;
 }
 
+// Who may delete everything SubSync copied ("Delete my data"): the owner of the company that installed it, or, for a business that
+// installed it for its own account, that account's administrator. An agency administrator, agency staff and a client's staff may not, and
+// neither may an agency person who is only visiting a business that installed it for itself. Decided from the verified identity at sign-in
+// and carried in the signed session, never from anything the browser sends.
+export function mayDeleteData(identity: Identity, kind: AccessKind): boolean {
+  return (kind === "agency" && identity.role === "agency_owner") || (kind === "business" && identity.role === "account_admin");
+}
+
 // ---------------- route policy ----------------
 
 type Method = "GET" | "POST" | "PUT" | "DELETE";
@@ -93,7 +101,7 @@ const CLIENT_RULES: Rule[] = [...GET_VIEWS.map((a) => ["GET", a] as Rule), ["POS
 
 const BUSINESS_RULES: Rule[] = [
   ...GET_VIEWS.map((a) => ["GET", a] as Rule),
-  ["GET", "email"], ["GET", "daily"], ["GET", "cleanup"], ["POST", "cleanup"], ["GET", "meetings"], ["POST", "meetings"], ["PUT", "meetings"], ["GET", "connections"], ["POST", "connections"], ["PUT", "connections"], ["DELETE", "connections"], ["GET", "settings"], ["GET", "api-keys"], ["GET", "sync"], ["GET", "health"], ["GET", "call-queue"],
+  ["GET", "email"], ["GET", "daily"], ["GET", "cleanup"], ["POST", "cleanup"], ["GET", "meetings"], ["POST", "meetings"], ["PUT", "meetings"], ["GET", "connections"], ["POST", "connections"], ["DELETE", "connections"], ["GET", "settings"], ["GET", "api-keys"], ["GET", "sync"], ["GET", "health"], ["GET", "call-queue"],
   ["GET", "call-lists"], ["GET", "call-outcomes"], ["GET", "goals"], ["GET", "exec-summary"], ["GET", "daily-brief"], ["GET", "digest"],
   ["GET", "export", "stale"], ["GET", "export", "duplicates"], ["GET", "export", "inbox"], ["GET", "export", "deals"], ["GET", "export", "alerts"],
   ["POST", "email", "check"], ["POST", "alerts"], ["POST", "duplicates"], ["POST", "usage"], ["POST", "roadmap"], ["POST", "audit", "share"], ["POST", "audit", "revoke"], ["POST", "sync"], ["POST", "call-lists"], ["POST", "call-outcomes"],

@@ -22,7 +22,7 @@ export async function GET(request: Request) {
   const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/+$/, "");
   try {
     const rows = await sql()`
-      select i.id, coalesce(i.company_name, 'your agency') label, s.slack_webhook_url, s.digest_hour, s.digest_timezone, s.last_daily_digest_on::text last_on,
+      select i.id, coalesce(i.company_name, 'your company') label, s.slack_webhook_url, s.digest_hour, s.digest_timezone, s.last_daily_digest_on::text last_on,
         (select l.timezone from locations l where l.installation_id = i.id and l.timezone is not null order by l.name limit 1) first_zone
       from installations i join settings s on s.installation_id = i.id
       where i.uninstalled_at is null and not i.is_demo and i.mode = 'agency' and s.digest_enabled and s.slack_webhook_url is not null`;

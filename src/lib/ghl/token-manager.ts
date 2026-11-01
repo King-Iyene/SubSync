@@ -35,7 +35,7 @@ export type RefreshFn = (refreshToken: string) => Promise<{
 
 export class NotInstalledError extends Error {
   constructor() {
-    super("No installation found for this agency");
+    super("No installation found for this company");
   }
 }
 

@@ -24,7 +24,7 @@ export const ROUTE_GUARDS: RouteGuard[] = [
   { route: "/app", kind: "public_static", guard: "The app shell; contains no data. All data comes from /api/app with a signed session." },
   { route: "/installed", kind: "public_static", guard: "Static confirmation page." },
   { route: "/installed/error", kind: "public_static", guard: "Static error page." },
-  { route: "/privacy", kind: "public_static", guard: "Static legal page." },
+  { route: "/privacy", kind: "public_static", guard: "Legal page with no tenant data. Its lists of what is stored and deleted come from src/lib/data-inventory.ts (checked against the schema); the one thing read per request is the global switch for Zoom and Google Meet." },
   { route: "/support", kind: "public_static", guard: "Static page." },
   { route: "/terms", kind: "public_static", guard: "Static legal page." },
 ];

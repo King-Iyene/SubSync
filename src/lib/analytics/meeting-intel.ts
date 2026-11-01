@@ -144,12 +144,18 @@ export function parseMeeting(input: unknown, hint?: string | null): Meeting | nu
   };
 }
 
-// The first attendee email that belongs to a known contact decides who the meeting was with.
+// The first attendee email that belongs to exactly one known contact decides who the meeting was with. Only an exact email counts: never a
+// name, never a phone number. An email that two records share is not certain, so it is skipped (the meeting is not put on either record).
 export function matchContact<T extends { email: string | null }>(attendees: Attendee[], contacts: T[]): T | null {
-  const by = new Map(contacts.filter((c) => c.email).map((c) => [c.email!.toLowerCase(), c]));
+  const by = new Map<string, T[]>();
+  for (const c of contacts) {
+    if (!c.email) continue;
+    const key = c.email.toLowerCase();
+    by.set(key, [...(by.get(key) ?? []), c]);
+  }
   for (const a of attendees) {
-    const hit = a.email ? by.get(a.email) : undefined;
-    if (hit) return hit;
+    const hits = a.email ? by.get(a.email.toLowerCase()) : undefined;
+    if (hits && hits.length === 1) return hits[0];
   }
   return null;
 }

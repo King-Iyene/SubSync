@@ -13,7 +13,7 @@ export async function GET(request: Request) {
   }
   try {
     const rows = await sql()`
-      select i.id, coalesce(i.company_name, 'your agency') label
+      select i.id, coalesce(i.company_name, 'your company') label
       from installations i join settings s on s.installation_id = i.id
       where i.uninstalled_at is null and not i.is_demo and s.digest_enabled and s.slack_webhook_url is not null`;
     let sent = 0;

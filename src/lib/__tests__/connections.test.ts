@@ -187,15 +187,24 @@ test("a Zoom AI summary becomes a meeting note", () => {
   assert.equal(parseZoomSummary("nope"), null);
 });
 
-test("a meeting goes to the account that knows the most attendees, never a guess", () => {
+// N93 and principle 13: a meeting goes to an account only when an exact email says so with certainty. There is no "default account" any more, and
+// an email that two clients (or two records) share never decides anything. (An earlier version of this test expected the account that knew the most
+// attendees to win a tie, and a chosen fallback account for strangers; both were guesses and are gone.)
+test("a meeting goes to an account only when exact emails say so with certainty", () => {
   const known = [
-    { locationId: "B", email: "dana@client.com" }, { locationId: "A", email: "dana@client.com" }, { locationId: "A", email: "lee@client.com" }, { locationId: "C", email: "other@x.com" },
+    { locationId: "B", email: "dana@client.com", contactId: "b1" }, { locationId: "A", email: "dana@client.com", contactId: "a1" }, { locationId: "A", email: "lee@client.com", contactId: "a2" }, { locationId: "C", email: "other@x.com", contactId: "c1" },
   ];
-  const at = [{ name: null, email: "Dana@Client.com" }, { name: null, email: "lee@client.com" }];
-  assert.deepEqual(chooseAccount(at, known, null), { locationId: "A", how: "matched" }, "A knows both attendees");
-  assert.deepEqual(chooseAccount([at[0]], known, null), { locationId: "A", how: "matched" }, "a tie goes to the same account every time");
-  assert.deepEqual(chooseAccount([{ name: "Stranger", email: "x@nowhere.com" }], known, "C"), { locationId: "C", how: "chosen" }, "no match: the account the person chose");
-  assert.equal(chooseAccount([{ name: "Stranger", email: null }], known, null), null, "no match and no choice: not saved");
-  assert.deepEqual(chooseAccount(at, known, null, "C"), { locationId: "C", how: "chosen" }, "a single business never leaves its own account");
-  assert.deepEqual(chooseAccount(at, known, null, "B"), { locationId: "B", how: "matched" });
+  const dana = { name: null, email: "Dana@Client.com" };
+  const lee = { name: null, email: "lee@client.com" };
+  assert.deepEqual(chooseAccount([dana, lee], known), { locationId: "A", how: "matched" }, "Dana is in two clients so she decides nothing; Lee is only in A");
+  assert.equal(chooseAccount([dana], known), null, "an email two clients share is never auto-picked");
+  assert.deepEqual(chooseAccount([lee], known), { locationId: "A", how: "matched" });
+  assert.equal(chooseAccount([lee, { name: null, email: "other@x.com" }], known), null, "matches in two different clients: not certain, not saved");
+  assert.equal(chooseAccount([{ name: "Stranger", email: "x@nowhere.com" }], known), null, "no match: not saved, only counted (there is no account to fall back to)");
+  assert.equal(chooseAccount([{ name: "Stranger", email: null }], known), null, "a name alone never matches");
+  assert.equal(chooseAccount([lee], known, "B"), null, "a single business only looks in its own account, where Lee is not known");
+  assert.deepEqual(chooseAccount([dana], known, "B"), { locationId: "B", how: "matched" }, "inside one business Dana is one record, so she matches");
+  const dup = [{ locationId: "A", email: "twin@client.com", contactId: "t1" }, { locationId: "A", email: "twin@client.com", contactId: "t2" }];
+  assert.equal(chooseAccount([{ name: null, email: "twin@client.com" }], dup), null, "two records in one account with the same email: not certain");
+  assert.deepEqual(chooseAccount([{ name: null, email: "twin@client.com" }], [dup[0], dup[0]]), { locationId: "A", how: "matched" }, "the same record listed twice is one record");
 });

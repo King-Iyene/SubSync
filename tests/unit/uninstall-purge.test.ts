@@ -2,6 +2,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { encryptSecret } from "@/lib/crypto";
 import { closeDb, sql } from "@/lib/db";
 import { purgeInstallation, purgeLocationData, purgeSyncedData } from "@/lib/ghl/installations";
+import { deletion, INVENTORY } from "@/lib/data-inventory";
 import { CONFIG_DELETE_ON_UNINSTALL, KEEP_ON_UNINSTALL, LOCATION_DELETE, SYNCED_DELETE, UNINSTALL_DELETE } from "@/lib/tenant-tables";
 
 // The real purge functions against the real database, with a fixture company that has one row in every tenant table.
@@ -123,6 +124,34 @@ describe.skipIf(!HAS_DB)("uninstall and deletion against the real database", () 
       expect(one[t], `${t}: removed account must be gone`).toBe(0);
       expect(two[t], `${t}: the other account must remain`).toBeGreaterThan(0);
     }
+  });
+
+  // N83: the words on the Settings card, the privacy page and the help text come from data-inventory.ts. This proves each claim in them against
+  // real rows: what the text says Delete my data removes is gone afterwards, what it says is kept is still there, and an uninstall then removes
+  // that too and keeps only what the text says it keeps.
+  it("what the Delete my data and uninstall texts promise is what really happens to real rows", async () => {
+    const d = deletion();
+    const tablesFor = (nouns: string[]) => Object.entries(INVENTORY).filter(([, i]) => nouns.includes(i.noun)).map(([t]) => t).filter((t) => t !== "installations");
+    const inst = await fixture();
+    await fill(inst, "xtestPurgeLoc1", [...UNINSTALL_DELETE, ...KEEP_ON_UNINSTALL]);
+    const claimedGone = tablesFor(d.synced);
+    const claimedKept = tablesFor(d.kept);
+    const claimedRemains = tablesFor(d.remains);
+    expect(claimedGone.length, "the text names tables").toBeGreaterThan(10);
+    expect(new Set(claimedGone.concat(claimedKept)).size, "no table is both deleted and kept by Delete my data").toBe(claimedGone.length + claimedKept.length);
+
+    await purgeSyncedData(inst);
+    const afterPurge = await countAll([...claimedGone, ...claimedKept], inst);
+    for (const t of claimedGone) expect(afterPurge[t], `Delete my data says it removes ${INVENTORY[t].noun} (${t})`).toBe(0);
+    for (const t of claimedKept) expect(afterPurge[t], `Delete my data says it keeps ${INVENTORY[t].noun} (${t})`).toBeGreaterThan(0);
+
+    await purgeInstallation(CO);
+    const afterUninstall = await countAll([...claimedGone, ...claimedKept, ...claimedRemains], inst);
+    for (const t of [...claimedGone, ...claimedKept]) expect(afterUninstall[t], `an uninstall removes ${INVENTORY[t].noun} (${t})`).toBe(0);
+    for (const t of claimedRemains) expect(afterUninstall[t], `an uninstall keeps ${INVENTORY[t].noun} (${t}), as the text says`).toBeGreaterThan(0);
+    const [row] = await sql()`select access_token_enc, refresh_token_enc from installations where id = ${inst}`;
+    expect(row.access_token_enc, "tokens are emptied at once").toBeNull();
+    expect(row.refresh_token_enc).toBeNull();
   });
 
   it("closes the connection", async () => { await closeDb(); });

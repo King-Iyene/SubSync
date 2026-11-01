@@ -4,18 +4,22 @@ import { FEATURES } from "../entitlements.ts";
 import { DEFAULT_OFF, resolveFeatures } from "../flags-core.ts";
 import { diffAppointmentEvents } from "../sync/appointment-events.ts";
 
-test("every built feature is on by default; a row in the database can still switch one off", () => {
+test("every built feature is on by default except the two King switched off on 1 Nov; a row in the database can still switch one off", () => {
   const f = resolveFeatures(FEATURES, {});
   assert.equal(f.ai, true);
   assert.equal(resolveFeatures(FEATURES, { ai: false }).ai, false, "a database row still switches it off without a deploy");
-  for (const on of ["overview", "search", "inbox", "appointments", "calls", "alerts", "pipelines", "stale", "onboarding", "settings", "health", "connections", "reports", "meetings", "cleanup", "setup_compare", "playbooks", "builder", "duplicates", "clients", "team", "activity"] as const) assert.equal(f[on], true, on);
-  assert.equal(DEFAULT_OFF.size, 0);
+  for (const on of ["overview", "search", "inbox", "appointments", "calls", "alerts", "pipelines", "stale", "onboarding", "settings", "health", "connections", "reports", "cleanup", "setup_compare", "playbooks", "builder", "duplicates", "clients", "team", "activity"] as const) assert.equal(f[on], true, on);
+  // Stage S0.2b (King, 1 Nov 2026): the Meeting notes page waits for stage E2a, and Zoom and Google Meet are hidden everywhere.
+  assert.deepEqual([...DEFAULT_OFF].sort(), ["meetings", "zoom_meet"]);
+  assert.equal(f.meetings, false);
+  assert.equal(f.zoom_meet, false);
   assert.ok([...DEFAULT_OFF].every((x) => (FEATURES as readonly string[]).includes(x)), "every switched-off name is a real feature");
 });
 
 test("a database row beats the default in both directions, and FLAGS_ALL_ON only changes defaults", () => {
   const on = resolveFeatures(FEATURES, { meetings: true, inbox: false });
   assert.equal(on.meetings, true, "a row can switch a deferred feature on");
+  assert.equal(on.zoom_meet, false, "and only that one");
   assert.equal(on.inbox, false, "or a normal one off");
   const all = resolveFeatures(FEATURES, { inbox: false }, true);
   assert.equal(all.cleanup, true, "all-on turns the deferred ones on");

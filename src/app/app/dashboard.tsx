@@ -260,6 +260,9 @@ export function Dashboard() {
     if (limited) {
       const id = view.id === "account" || (view.id === "today" && auth.kind === "client") ? "overview" : view.id;
       if (!NAV_FOR[auth.kind].has(id)) return <Centered title="Not available" body="This page is not part of your view of SubSync." />;
+      // A page that is switched off is switched off for a business too (the menu already leaves it out; this covers a typed address).
+      const pageFeature = NAV.find((n) => n.id === id)?.feature;
+      if (pageFeature && off(pageFeature)) return <Centered title="Not available" body="This page is switched off right now." />;
       if (id === "overview") return own ? <AccountDetailView key={own} locationId={own} go={go} agency={agency} limited /> : <Centered title="Open SubSync from inside your account" body="We could not tell which account you are in." />;
     }
     const feature = NAV.find((n) => n.id === view.id)?.feature;

@@ -1,5 +1,6 @@
 "use client";
 
+import { removalAnswer } from "@/lib/data-inventory";
 import type { GoFn, ViewId } from "../nav";
 import { useData } from "../session";
 import { Badge, Btn, Card, ErrorBox, Loading, PageHeader } from "../ui";
@@ -22,7 +23,7 @@ const FAQ: Array<[string, string]> = [
   ["Why is a number empty or zero?", "That account has not finished syncing yet, or it genuinely has no data. Step 2 above shows sync progress."],
   ["Why does Today say \"still learning\"?", "Changes are judged against an account's own last week, so a new account needs a few days of history first."],
   ["How do I hide a test account?", "Open the account and choose Ignore. It stops counting in totals and alerts."],
-  ["How do I remove SubSync and my data?", "Settings has a Delete my data button: it removes everything we copied from your accounts and keeps your settings. Uninstalling the app goes further: your connection to your CRM is cut at once, and we delete every copy of your contacts, deals, conversations, appointments, meeting notes, settings, connections and API keys. We keep only a short record of who did what and when, with no customer data, and the billing record of your plan."],
+  ["How do I remove SubSync and my data?", removalAnswer()],
   ["Who do I contact?", "code@kdsquares.com. We reply within one business day."],
 ];
 

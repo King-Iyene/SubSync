@@ -51,6 +51,17 @@ test("the meeting is matched to a contact by attendee email", () => {
   assert.equal(matchContact([{ name: "Nobody", email: null }], contacts), null);
 });
 
+// N93: a meeting is put on a contact only when an exact email says so. Never a name, never a guess between two records.
+test("only an exact email matches: never a name, and never one of two records that share an email", () => {
+  const contacts = [{ id: "c1", email: "sarah@example.com", name: "Sarah Jones" }, { id: "c2", email: "twin@example.com", name: "Twin" }, { id: "c3", email: "twin@example.com", name: "Twin" }, { id: "c4", email: null, name: "Dana Lee" }];
+  assert.equal(matchContact([{ name: "Dana Lee", email: null }], contacts), null, "the same name is not a match");
+  assert.equal(matchContact([{ name: "Sarah Jones", email: "other@example.com" }], contacts), null, "a matching name with a different email is not a match");
+  assert.equal(matchContact([{ name: "Twin", email: "twin@example.com" }], contacts), null, "two records with this email: not certain, so neither gets it");
+  assert.equal(matchContact([{ name: "Twin", email: "twin@example.com" }, { name: "Sarah", email: "SARAH@example.com" }], contacts)?.id, "c1", "a certain match later in the list still counts");
+  assert.equal(matchContact([], contacts), null);
+  assert.equal(matchContact([{ name: "x", email: "sarah@example.com" }], []), null);
+});
+
 test("the pasteable note has summary and action items but never the transcript", () => {
   const m = parseMeeting({ title: "Kitchen consult", started_at: "2026-10-29T14:00:00Z", summary: "Wants a new kitchen.", action_items: ["Send a quote"], transcript: "SECRET WORDS", attendees: ["s@e.com"], share_url: "https://fathom.video/x" })!;
   const text = noteText(m);

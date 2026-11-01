@@ -160,3 +160,18 @@ connections, appointment insights, two-agency tenant isolation, feature switches
 | Accounts and account detail in plain words, defined health rules, what-this-means panel | Built | Tests written, not yet run |
 | Settings in five groups, change log updated, behavior tests for every setting, client access enforced and brand name on the shared page (tenancy script) | Built | Tests written, not yet run |
 | Alert emails sent once, retried, quiet hours, stop link and one-click header, unmarked appointments alert | Built | Tests written, not yet run; real send and sending-domain check pending |
+
+
+## Stage S0.2b: Tenancy follow-ups (1 Nov 2026, built; awaiting King's checks)
+
+| Item | Status | Data source | Tested against live data |
+| --- | --- | --- | --- |
+| Cross-client "same person" card and count removed (N48) | Built | none (removed) | Unit and integration tests; no query compares people across accounts |
+| "What we store" generated from the schema; privacy page and help text produced from it (N83) | Built | database schema (migration files and live database) | Yes: compared with the live schema, 39 tables |
+| "Delete my data": owner only, typed word, audit entry (N83) | Built | session identity | Yes: two real fixture companies over HTTP |
+| Uninstall and "Delete my data" delete what the text says (N83) | Built | real rows | Yes: fixture company with a row in every table |
+| Client accounts' staff never receive fees, notes, settings, tickets or other clients' data; access off is immediate (N84) | Built | two real fixture companies | Yes (HTTP, every route a client may and may not call) |
+| Login domain found at sign-in and install event; Settings field is an override (N82) | Built | sign-in and install event | Database tests yes; a real signed install event NOT VERIFIED LIVE |
+| Setting "save unmatched meetings in an account" removed; stored values migrated (N93) | Built | none (removed) | Yes: live table backed up, counts before and after; matching tests on real rows |
+| Zoom and Google Meet hidden behind a switch, off by default | Built | feature switches | Yes: API check with the switch off, browser run at the default state |
+| Meeting notes page behind its own switch, off until E2a | Built | feature switches | Yes (menu test updated to the new rule) |

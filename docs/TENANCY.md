@@ -14,7 +14,7 @@ A person in one client account never sees another client account's data. An agen
 
 | Role | Who | Session kind | What they get |
 | --- | --- | --- | --- |
-| agency_owner | Agency owner | agency | Every client account of that agency, plus plan and settings |
+| agency_owner | Agency owner | agency | Every client account of that agency, plus plan and settings, and the only role that may press "Delete my data" |
 | agency_admin | Agency administrator | agency | The same |
 | agency_staff | Agency staff (role user, not owner) | none | **Refused.** Until their access to each client account can be verified through the Users API (a CHECK item in the brief), staff see nothing. Default deny |
 | account_admin | A client account's administrator | business, or client | Their own account only. Business kind (full tools) when their business installed the app; client kind (read-only) when the agency switched client view on |
@@ -28,6 +28,8 @@ A person in one client account never sees another client account's data. An agen
 - `routeAllowed` (`src/lib/access.ts`) is default deny: each session kind has an explicit list of method and path pairs. Client sessions are read-only plus two harmless writes (the page-view counter and roadmap votes).
 - Every query takes the installation id from the session. For business and client sessions every query is also restricted to the single location id (`limitTo`). The id in a URL is only ever used to pick one of the caller's own records, and an id belonging to someone else returns 404.
 - Agency-only controls on an account (ignore, owner, client view) are refused for business and client sessions.
+- "Delete my data" (`POST settings/purge`) is for one person only: the agency owner, or the administrator of a business that installed the app for itself (`mayDeleteData` in `src/lib/access.ts`, set at sign-in and carried in the signed session as `dataOwner`; a session without it can never delete). It needs the typed word DELETE, and every attempt, refused or done, is written to the audit log, which the deletion itself does not remove.
+- A client's staff are refused everything outside a short list of read-only views of their own account, and the list is the only door: `tests/unit/client-access.test.ts` asks every route the router handles, and `scripts/check-tenancy.ts` asks them over HTTP against two real companies that have fees, notes, owner labels, keys and saved lists, and searches every answer for those secrets. Switching a client's access off is checked on the very next request (`clientViewOn` runs on every call, not only at sign-in).
 
 ## Every route and page
 
@@ -53,7 +55,7 @@ A person in one client account never sees another client account's data. An agen
 | `/app` | public_static | App shell with no data; data comes from `api/app` with a session |
 | `/installed` | public_static | Static page |
 | `/installed/error` | public_static | Static page |
-| `/privacy` | public_static | Static legal page |
+| `/privacy` | public_static | Legal page with no tenant data. Its lists of what is stored and deleted come from `src/lib/data-inventory.ts`, checked against the schema; the one thing read per request is the global switch for Zoom and Google Meet |
 | `/support` | public_static | Static page |
 | `/terms` | public_static | Static legal page |
 
@@ -66,6 +68,10 @@ There are several hundred queries; they are not listed one by one. They are all 
 ## What happens at uninstall
 
 `purgeInstallation` empties the stored tokens at once and deletes every table in `UNINSTALL_DELETE` (`src/lib/tenant-tables.ts`): all copied customer data, settings, API keys, connection tokens, meeting notes, cleanup snapshots, share links and sign-in links. Kept on purpose: `audit_log`, `install_plans`, `identity_log` (no customer data) and the installation row with its tokens emptied. The kill switch does not stop this: install and uninstall bookkeeping keeps running during maintenance.
+
+## What is stored, and what each button removes
+
+`src/lib/data-inventory.ts` lists every table, and every column that holds personal data, with a plain-words label. `tests/unit/data-inventory.test.ts` compares it with the migration files and the live database and fails for a table or a personal-looking column that is not listed. The Settings card "What we store", the privacy page and the help answer about removing data are produced from it, and `tests/unit/uninstall-purge.test.ts` checks what they say against real rows.
 
 ## Known gaps (not hidden)
 

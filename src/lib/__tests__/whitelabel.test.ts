@@ -43,3 +43,18 @@ test("a white-label domain never leaks the default host into any deep link", () 
     assert.ok(!url.includes(DEFAULT_APP_DOMAIN), url);
   }
 });
+
+// N82: the company's own login domain is found automatically, from sign-in and from the install event.
+test("the install event carries the company's own login domain, read only when it is a plain host name", async () => {
+  const { parseWebhook } = await import("../ghl/webhook.ts");
+  const installed = (details: unknown, where: "top" | "data" = "top") => parseWebhook(where === "top"
+    ? { type: "AppInstall", companyId: "c1", whitelabelDetails: details }
+    : { type: "AppInstall", data: { companyId: "c1", whitelabelDetails: details } });
+  assert.equal(installed({ domain: "CRM.Brand.io", logoUrl: "https://x/logo.png" }).whitelabelDomain, "crm.brand.io");
+  assert.equal(installed({ domain: "crm.brand.io" }, "data").whitelabelDomain, "crm.brand.io", "the details may sit under data");
+  for (const bad of [{ domain: "https://crm.brand.io" }, { domain: "crm.brand.io/path" }, { domain: "localhost" }, { domain: 42 }, { domain: "" }, "not an object", null, {}]) {
+    assert.equal(installed(bad).whitelabelDomain, null, JSON.stringify(bad));
+  }
+  assert.equal(parseWebhook({ type: "AppInstall", companyId: "c1" }).whitelabelDomain, null, "a company that is not white-labelled has none");
+  assert.equal(parseWebhook({ type: "AppInstall", companyId: "c1", whitelabelDetails: { domain: "crm.brand.io" } }).companyId, "c1", "the ids are read as before");
+});

@@ -7,10 +7,22 @@ import { mkdirSync } from "node:fs";
 const shots = (process.env.SHOTS ?? "").split(",").filter(Boolean);
 const CHROME = process.env.CHROME_PATH ?? "C:/Program Files/Google/Chrome/Application/chrome.exe";
 
-const PORT = 3100;
+// TEST_PORT and TEST_DIST_DIR let this run beside the browser-test server (which holds port 3100 and the .next folder).
+const PORT = Number(process.env.TEST_PORT ?? 3100);
+const DIST = process.env.TEST_DIST_DIR;
+
+// A server already listening on the port (for example one left behind by a browser-test run) would answer the checks instead of the one this script
+// starts, with different settings (no FLAGS_ALL_ON, no Zoom test secret), and the checks would fail or, worse, pass against the wrong server.
+// Refuse to start rather than test the wrong thing.
+try {
+  await fetch(`http://localhost:${PORT}/privacy`, { signal: AbortSignal.timeout(3000) });
+  console.error(`Port ${PORT} already has a server on it. Stop it first (look for a node process running "next dev -p ${PORT}"), then run this again.`);
+  process.exit(2);
+} catch { /* nothing answered: the port is free */ }
+
 const server = spawn("npx", ["next", "dev", "-p", String(PORT)], {
   // A made-up Zoom secret lets the checks sign a pretend Zoom notification; it never leaves this machine.
-  env: { ...process.env, DEMO_MODE: "true", FLAGS_ALL_ON: process.env.FLAGS_ALL_ON ?? "true", ENTITLEMENTS_MODE: process.env.ENTITLEMENTS_MODE ?? "open", ZOOM_WEBHOOK_SECRET_TOKEN: process.env.ZOOM_WEBHOOK_SECRET_TOKEN ?? "demo-zoom-secret-token" },
+  env: { ...process.env, ...(DIST ? { NEXT_DIST_DIR: DIST } : {}), DEMO_MODE: "true", FLAGS_ALL_ON: process.env.FLAGS_ALL_ON ?? "true", ENTITLEMENTS_MODE: process.env.ENTITLEMENTS_MODE ?? "open", ZOOM_WEBHOOK_SECRET_TOKEN: process.env.ZOOM_WEBHOOK_SECRET_TOKEN ?? "demo-zoom-secret-token" },
   shell: true,
   stdio: "ignore",
 });
@@ -36,7 +48,7 @@ try {
   if (!(await waitUp())) throw new Error("Dev server did not start");
   // CHECKS=check-connections runs just one script while iterating; the default runs them all.
   for (const name of (process.env.CHECKS ?? "check-api,check-connections,check-insights,check-tenancy,check-flags,check-metrics,check-audit,check-speed,check-roadmap").split(",").filter(Boolean)) {
-    const run = spawnSync("node", ["--env-file=.env.local", "--import", "tsx", `scripts/${name}.ts`], { stdio: "inherit", shell: true });
+    const run = spawnSync("node", ["--env-file=.env.local", "--import", "tsx", `scripts/${name}.ts`], { stdio: "inherit", shell: true, env: { ...process.env, BASE_URL: `http://localhost:${PORT}` } });
     code = run.status ?? 1;
     if (code !== 0) break;
   }

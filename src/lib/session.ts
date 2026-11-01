@@ -13,6 +13,8 @@ export type Session = {
   /** "agency" when absent (older sessions). A business or client session is limited to one account. */
   kind?: "agency" | "business" | "client";
   locationId?: string | null;
+  /** True only for the person who may delete all the data (see mayDeleteData in access.ts). Missing means no. */
+  dataOwner?: boolean;
   exp: number;
 };
 

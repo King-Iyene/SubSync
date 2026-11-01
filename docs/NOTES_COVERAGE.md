@@ -54,7 +54,7 @@ ORPHANS (notes with no stage in docs/ROADMAP_V2.md): none found.
 | N45 | "Quiet over 90 days: 100%" and "never engaged: 52,926" look wrong | F1 | PLANNED-LATER |  |
 | N46 | Zero invalid emails and phones across 52,926 contacts is implausible | F1 | PLANNED-LATER |  |
 | N47 | Source data is 99% "Unknown" | F1, F2 | PLANNED-LATER |  |
-| N48 | "Same person in several client accounts (23)" is a privacy problem | S0.2b, F1 | PLANNED-LATER |  |
+| N48 | "Same person in several client accounts (23)" is a privacy problem | S0.2b, F1 | DONE-TONIGHT | S0.2b: card, query, tile and count removed, nothing compares people across clients; meeting matching never picks between clients (docs/features/S0.2b.md items 1, 19, 20) |
 | N49 | Tags: what do they mean, and can I see the leads that were tagged? | F10 | PLANNED-LATER |  |
 | N50 | Lead side panel, the Kit model | D0, F10 | PLANNED-LATER |  |
 | N51 | Leads as a working surface | F10 (read-only part), W1 (never tonight) | PLANNED-LATER |  |
@@ -88,9 +88,9 @@ ORPHANS (notes with no stage in docs/ROADMAP_V2.md): none found.
 | N79 | Slack: do we still need the pasted web address? Notification options and editable copy | F9 | PLANNED-LATER |  |
 | N80 | "Send at" cannot work with a once-a-day refresh | S0.4, F9 | PLANNED-LATER |  |
 | N81 | Connection health and Data sync cards | S0.4, F8 | PLANNED-LATER |  |
-| N82 | Links: the login address is a manual field | S0.2b (item 4) | PLANNED-LATER |  |
-| N83 | "What we store" and "Delete my data": good for trust, but check they are true | S0.2b, F8 | PLANNED-LATER |  |
-| N84 | Client access: the promise must be proven | S0.2b, F8 | PLANNED-LATER |  |
+| N82 | Links: the login address is a manual field | S0.2b (item 4) | DONE-TONIGHT | S0.2b: domain found at sign-in and in the install event, stored per company, Settings field is only an override (and a save no longer freezes it); wording scan widened. NOT VERIFIED LIVE: a real signed install event (docs/NEEDS_KING.md section 13) |
+| N83 | "What we store" and "Delete my data": good for trust, but check they are true | S0.2b, F8 | DONE-TONIGHT | S0.2b: src/lib/data-inventory.ts checked against the live schema, Settings card, privacy page and help text produced from it, uninstall and Delete my data tested against real rows, Delete my data owner-only with typed word and audit entry. The Trust page wording stays with F8 |
+| N84 | Client access: the promise must be proven | S0.2b, F8 | DONE-TONIGHT | S0.2b: tests/unit/client-access.test.ts and the N84 block of scripts/check-tenancy.ts (two real companies, secrets searched in every client answer, access off is immediate); found and fixed two leaks. F8 only re-words the promise |
 | N85 | Brand settings exist | F8, F6, D1 | PLANNED-LATER |  |
 | N86 | Roadmap page: how does "Coming next" work, does it notify me? | F8 | PLANNED-LATER |  |
 | N87 | Getting started needs a real guide, and a feedback field | F8 | PLANNED-LATER |  |
@@ -99,7 +99,7 @@ ORPHANS (notes with no stage in docs/ROADMAP_V2.md): none found.
 | N90 | Status of the old work | none (status note) | NOT-A-CODE-ITEM | a status note |
 | N91 | Zoom connect fails: "Zoom did not say who signed in" | E0 (copy), E1 later | PLANNED-LATER |  |
 | N92 | Slack connect fails again, and Connections is stuck on "Waiting for you..." | E0, F9 | PLANNED-LATER |  |
-| N93 | "If nobody in a meeting is a known contact, save it in [client account]" makes no sense | S0.2b, E0, E2a | PLANNED-LATER |  |
+| N93 | "If nobody in a meeting is a known contact, save it in [client account]" makes no sense | S0.2b, E0, E2a | PLANNED-LATER | S0.2b part DONE: setting removed everywhere, stored value migrated (backup and counts in docs/features/S0.2b.md), tested that no path writes a meeting to a contact not matched by exact email. The private Meeting inbox is E0 and E2a |
 | N94 | Connections must be personal, not assigned by the agency | E0 | PLANNED-LATER |  |
 | N95 | Every role must be able to connect | E0 | PLANNED-LATER |  |
 | N96 | Where to save: contact note or conversation comment, and note size limits | E0, E2b | PLANNED-LATER |  |

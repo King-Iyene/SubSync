@@ -10,9 +10,10 @@ type Meeting = {
   attendees: Array<{ name: string | null; email: string | null }>; summary: string | null; actionItems: string[]; hasTranscript: boolean; recordingUrl: string | null;
   contactId: string | null; contactName: string | null; status: string; note: string; contactUrl: string | null;
 };
-type Data = { meetings: Meeting[]; hooks: Hook[]; accounts: Array<{ locationId: string; name: string }>; maxHooks: number; keepTranscripts: boolean; canManage: boolean };
+// `moreTools` is true only while Zoom and Google Meet are switched on; otherwise nothing on this page names them.
+type Data = { meetings: Meeting[]; hooks: Hook[]; accounts: Array<{ locationId: string; name: string }>; maxHooks: number; keepTranscripts: boolean; canManage: boolean; moreTools: boolean };
 
-const SOURCE = { fathom: "Fathom", zoom: "Zoom", other: "Meeting tool" } as Record<string, string>;
+const sourceName = (source: string, zoom: boolean) => (source === "fathom" ? "Fathom" : source === "zoom" && zoom ? "Zoom" : "Meeting tool");
 
 export function MeetingsView() {
   const api = useApiClient();
@@ -48,7 +49,7 @@ export function MeetingsView() {
 
   return (
     <div>
-      <PageHeader title="Meeting notes" subtitle="Recordings from Fathom or Zoom, turned into a summary and action items, matched to the right contact, ready to put in their record. Transcripts are not kept unless you switch that on." />
+      <PageHeader title="Meeting notes" subtitle={`Recordings from ${data.moreTools ? "Fathom or Zoom" : "Fathom"}, turned into a summary and action items, matched to the right contact, ready to put in their record. Transcripts are not kept unless you switch that on.`} />
       {msg && <p className="mb-4 rounded-lg border bg-muted/40 px-3 py-2 text-sm" role="status">{msg}</p>}
 
       {data.canManage && (
@@ -56,7 +57,7 @@ export function MeetingsView() {
           <ol className="mb-4 list-decimal space-y-1 pl-5 text-sm text-muted-foreground">
             <li>Create a private address for a client account below.</li>
             <li><strong>Fathom:</strong> Settings, API Access, add a webhook, paste the address, and tick the new meeting content option.</li>
-            <li><strong>Zoom:</strong> in Zapier or Make, use the trigger for a new cloud recording with transcript, then a step that sends the data to a webhook with that address.</li>
+            {data.moreTools && <li><strong>Zoom:</strong> in Zapier or Make, use the trigger for a new cloud recording with transcript, then a step that sends the data to a webhook with that address.</li>}
             <li>Each finished meeting appears here within seconds, matched to the contact by the attendee&apos;s email.</li>
           </ol>
           <div className="flex flex-wrap items-end gap-3">
@@ -104,7 +105,7 @@ export function MeetingsView() {
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
                   <p className="font-medium">{m.title ?? "Untitled meeting"}</p>
-                  <p className="text-xs text-muted-foreground">{SOURCE[m.source] ?? "Meeting tool"} · {m.startedAt ? new Date(m.startedAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "date unknown"}{m.locationName ? ` · ${m.locationName}` : ""}</p>
+                  <p className="text-xs text-muted-foreground">{sourceName(m.source, data.moreTools)} · {m.startedAt ? new Date(m.startedAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "date unknown"}{m.locationName ? ` · ${m.locationName}` : ""}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   {m.contactName ? <Badge tone="good">With {m.contactName}</Badge> : <Badge tone="warn">No matching contact</Badge>}

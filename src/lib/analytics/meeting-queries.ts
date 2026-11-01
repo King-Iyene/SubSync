@@ -59,7 +59,7 @@ export async function recentCount(installationId: string, locationId: string): P
 // Store what arrived. The transcript is dropped unless the account chose to keep transcripts.
 export async function recordMeeting(hook: NonNullable<Awaited<ReturnType<typeof resolveHook>>>, m: Meeting, externalId: string | null = null): Promise<{ id: string | null; matched: boolean; duplicate: boolean }> {
   const db = sql();
-  const emails = m.attendees.map((a) => a.email).filter((e): e is string => !!e);
+  const emails = m.attendees.map((a) => a.email?.toLowerCase()).filter((e): e is string => !!e);
   const candidates = emails.length
     ? await db`select contact_id, lower(email) email from cached_contacts where installation_id = ${hook.installationId} and location_id = ${hook.locationId} and lower(email) = any(${emails}::text[]) limit 20`
     : [];
