@@ -314,7 +314,7 @@ export function buildDigest(agency: string, accounts: DerivedAccount[], openAler
   const lines = [
     `*Weekly summary for ${agency}*`,
     `${live.length} client accounts, ${live.filter((a) => a.dormant).length} dormant, ${openAlerts} open alerts`,
-    `${money(stale)} sitting in stale deals, ${waiting} conversations waiting past the SLA`,
+    `${money(stale)} sitting in stale deals, ${waiting} conversations waiting past your reply target`,
   ];
   if (atRisk.length) {
     lines.push("", "*Needs attention*");

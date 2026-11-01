@@ -16,7 +16,7 @@ export type GapDeal = {
 // 4.9: counted open deals (a value, an owner, in play: docs/METRICS.md) whose contact has not been touched (activity or a message) for `days` days
 // or more. The total, the dollars and the stage breakdown are counted in the database over every such deal, never over a capped list, so the
 // numbers are the real ones; only the rows shown are limited, and the screen says how many there are in all.
-export async function communicationGaps(installationId: string, allowed: string[] | null, days = 7) {
+export async function communicationGaps(installationId: string, allowed: string[] | null, days = 7, rowLimit = 15) {
   const db = sql();
   const from = db`
     from cached_opportunities o join (${visible(installationId, allowed)}) loc on loc.location_id = o.location_id
@@ -34,7 +34,7 @@ export async function communicationGaps(installationId: string, allowed: string[
     db`select o.opportunity_id, o.location_id, loc.name location_name, o.contact_id, o.contact_name, o.name,
          coalesce(sc_pl.name, 'Pipeline') pipeline_name, coalesce(sc_st.nm, 'Unknown stage') stage_name, coalesce(o.monetary_value, 0)::float8 value,
          floor(extract(epoch from (now() - touch.t)) / 86400)::int days_since ${from}
-       order by o.monetary_value desc nulls last limit 15`,
+       order by o.monetary_value desc nulls last limit ${rowLimit}`,
   ]);
   const deals: GapDeal[] = rows.map((r) => ({
     opportunityId: r.opportunity_id, locationId: r.location_id, locationName: r.location_name, contactId: r.contact_id, contactName: r.contact_name,

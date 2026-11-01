@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useApiClient, useData } from "../session";
 import type { Deal } from "../types";
 import { Btn, Card, Empty, ErrorBox, ExtLink, fmtInt, fmtMoney, fmtPct, Loading, PageHeader, Stat, Table, Td, Th } from "../ui";
+import { QuietDeals } from "./quiet-deals";
 
 type Pipelines = {
   stages: Array<{ pipeline: string; stage: string; order: number; count: number; value: number }>;
@@ -12,17 +13,17 @@ type Pipelines = {
 };
 
 export function DealsView() {
-  const [tab, setTab] = useState<"stale" | "pipeline" | "hygiene">("stale");
+  const [tab, setTab] = useState<"stale" | "quiet" | "pipeline" | "hygiene">("stale");
   return (
     <div>
       <PageHeader title="Deals" subtitle="Where money is stuck and where it is flowing, across every client account." />
       <div className="mb-4 flex gap-1 border-b" role="tablist">
-        {([["stale", "Stale deals"], ["pipeline", "Pipeline roll-up"], ["hygiene", "Deal hygiene"]] as const).map(([id, label]) => (
+        {([["stale", "Stale deals"], ["quiet", "No recent contact"], ["pipeline", "Pipeline roll-up"], ["hygiene", "Deal hygiene"]] as const).map(([id, label]) => (
           <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => setTab(id)}
             className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium ${tab === id ? "border-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>{label}</button>
         ))}
       </div>
-      {tab === "stale" ? <Stale /> : tab === "pipeline" ? <Pipeline /> : <Hygiene />}
+      {tab === "stale" ? <Stale /> : tab === "quiet" ? <QuietDeals /> : tab === "pipeline" ? <Pipeline /> : <Hygiene />}
     </div>
   );
 }

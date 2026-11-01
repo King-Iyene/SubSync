@@ -47,7 +47,8 @@ test("the Inbox screen leads with the waiting count in plain words, names the wi
   await expect(headline).toBeVisible();
   await expect(headline).toContainText(/conversations? (is|are) waiting for a reply/);
   await expect(headline).toContainText("in the last 30 days");
-  await expect(page.getByLabel("Waiting by channel")).toBeVisible();
+  // Stage F4: the channel is a choice (with a count for each) instead of a row of badges.
+  await expect(page.getByLabel("Channel", { exact: true })).toBeVisible();
   await page.waitForLoadState("networkidle").catch(() => undefined);
   await page.screenshot({ path: `docs/review/f4-inbox-${testInfo.project.name}.png`, fullPage: true });
 });

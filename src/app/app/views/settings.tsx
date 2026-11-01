@@ -102,9 +102,9 @@ export function SettingsView() {
               <p className="mt-1 text-xs text-muted-foreground">No new contacts, deal changes or messages for this long.</p>
             </div>
             <div>
-              <label htmlFor="sla" className="mb-1 block text-sm font-medium">Reply SLA (hours)</label>
+              <label htmlFor="sla" className="mb-1 block text-sm font-medium">Reply target (hours)</label>
               <input id="sla" type="number" min={1} max={168} className={inputClass} value={form.slaHours} onChange={num("slaHours")} />
-              <p className="mt-1 text-xs text-muted-foreground">An inbound message unanswered this long is a breach.</p>
+              <p className="mt-1 text-xs text-muted-foreground">A customer message unanswered this long is late.</p>
             </div>
           </div>
         </Card>

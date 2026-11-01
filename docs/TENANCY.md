@@ -77,6 +77,8 @@ There are several hundred queries; they are not listed one by one. They are all 
 
 `src/lib/data-inventory.ts` lists every table, and every column that holds personal data, with a plain-words label. `tests/unit/data-inventory.test.ts` compares it with the migration files and the live database and fails for a table or a personal-looking column that is not listed. The Settings card "What we store", the privacy page and the help answer about removing data are produced from it, and `tests/unit/uninstall-purge.test.ts` checks what they say against real rows.
 
+`saved_views` (stage F4) holds a person's own named choices on the Unanswered messages page. It carries `installation_id` and an `owner` key made on the server from the verified session (kind, account, sign-in id), so a person reads and removes only their own views (`tests/unit/inbox-views-db.test.ts`); it holds filter choices only, never customer data. Kept by "Delete my data", removed on uninstall. Its routes are `inbox/views` under `api/app` (the one catch-all, already guarded); a client's staff may keep their own (`src/lib/access.ts`).
+
 ## Known gaps (not hidden)
 
 - Agency staff are refused rather than limited to their accounts, because the Users API check is not built. If an agency has staff who need SubSync today, the owner and admins can use it; staff cannot.
