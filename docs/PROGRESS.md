@@ -20,7 +20,9 @@ Evidence: `docs/features/F4.md` (F6: `docs/features/F6.md`). From S0.3 on King d
 | F6 | Account audit and Share link | Built, verified (M1 complete) |
 | F4 | Inbox and SLA | Built, verified |
 | F5 | Today | Built, verified |
-| F7 to F10 | M2 pilot menu | In progress |
+| F7 | Accounts | Built (tests run at the end) |
+| F8 | Settings, Getting started, What's new | Built (tests run at the end) |
+| F9, F10 | M2 pilot menu | In progress |
 | E1 to E4 | Zoom, Fathom, Slack, hidden pages | Not started |
 | Z1 to Z3 | Re-review, release 1.1.0, first pilot | Not started |
 

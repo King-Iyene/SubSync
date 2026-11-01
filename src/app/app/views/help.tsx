@@ -8,8 +8,8 @@ type Step = { id: string; title: string; body: string; done: boolean; detail: st
 type Start = { kind: "agency" | "business" | "client"; steps: Step[]; doneCount: number; total: number };
 
 const WORDS: Array<[string, string]> = [
-  ["Engagement score", "0 to 100, from five parts: recent activity, new contacts, pipeline health, reply speed and data quality. Each part shows why it scored as it did."],
-  ["Dormant", "No real activity in the account for longer than your dormant setting (30 days by default)."],
+  ["Health score", "0 to 100, from five parts: recent activity, new contacts, pipeline health, reply speed and data quality. Each part shows why it scored as it did."],
+  ["Gone quiet", "No real activity in the account for longer than your quiet-account setting (30 days by default)."],
   ["Stale deal", "An open deal with no movement for longer than your stale setting (30 days by default)."],
   ["Waiting past reply target", "A customer message that is still unanswered after your reply target (4 hours by default)."],
   ["Unusual", "Outside that account's own normal range over the last week, not a fixed number for everyone."],

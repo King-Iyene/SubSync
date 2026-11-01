@@ -127,7 +127,7 @@ function CompareTab({ accounts }: { accounts: Array<{ locationId: string; name: 
   const [b, setB] = useState("");
   const ready = a && b && a !== b;
   const { data, error } = useData<Compare>(ready ? `clients/compare?a=${a}&b=${b}` : null);
-  const rows: Array<[string, string]> = [["new30d", "New contacts, 30 days"], ["score", "Engagement score"], ["winRate", "Win rate"], ["avgCycleDays", "Days to win"], ["unanswered", "Waiting past reply target"], ["completenessPct", "Contact data complete (%)"], ["openValue", "Open pipeline"]];
+  const rows: Array<[string, string]> = [["new30d", "New contacts, 30 days"], ["score", "Health score"], ["winRate", "Win rate"], ["avgCycleDays", "Days to win"], ["unanswered", "Waiting past reply target"], ["completenessPct", "Contact data complete (%)"], ["openValue", "Open pipeline"]];
   const show = (k: string, v: number | string | null | undefined) => (v === null || v === undefined ? "n/a" : k === "winRate" ? `${Math.round(Number(v) * 100)}%` : k === "openValue" ? fmtMoney(Number(v)) : String(v));
   return (
     <div className="space-y-4">
@@ -184,13 +184,13 @@ function QbrTab({ accounts }: { accounts: Array<{ locationId: string; name: stri
           </header>
           <p className="text-base leading-7">{c.activity}</p>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <Stat label="Engagement score" value={c.score} sub="0 to 100" />
+            <Stat label="Health score" value={c.score} sub="0 to 100" />
             <Stat label="Open pipeline" value={fmtMoney(c.openValue)} />
             <Stat label="Win rate" value={pct(c.winRate)} />
             <Stat label="Value created" value={c.roi ? `${c.roi.pipelineMultiple}x` : "n/a"} sub={c.roi ? "pipeline vs monthly fee" : "add their fee to see this"} />
           </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div><p className="mb-1 text-sm font-medium">Engagement score, 90 days</p><Sparkline values={data.history.map((h) => h.score)} label="Engagement score" /></div>
+            <div><p className="mb-1 text-sm font-medium">Health score, 90 days</p><Sparkline values={data.history.map((h) => h.score)} label="Engagement score" /></div>
             <div><p className="mb-1 text-sm font-medium">Open pipeline, 90 days</p><Sparkline values={data.history.map((h) => h.openValue)} label="Open pipeline value" /></div>
           </div>
           <ul className="list-disc space-y-1 pl-5 text-sm">

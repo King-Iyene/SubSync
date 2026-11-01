@@ -68,12 +68,12 @@ export function AccountDetailView({ locationId, go, agency, limited = false }: {
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <BandBadge band={a.band} />
         <ChurnBadge level={a.churn.level} />
-        {a.dormant && <Badge tone="bad">Dormant · {daysLabel(a.daysInactive)}</Badge>}
+        {a.dormant && <Badge tone="bad">Gone quiet · {daysLabel(a.daysInactive)}</Badge>}
         {a.ignored && <Badge>Ignored</Badge>}
       </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-        <Stat label="Engagement score" value={a.score} sub="of 100" />
+        <Stat label="Health score" value={a.score} sub="of 100" />
         <Stat label="Contacts" value={fmtInt(a.contacts)} sub={`+${a.new30d} in 30 days`} />
         <Stat label="Data completeness" value={`${a.completenessPct}%`} sub={`email ${a.emailPct}% · phone ${a.phonePct}% · tags ${a.tagPct}%`} />
         <Stat label="Open pipeline" value={fmtMoney(a.openValue)} sub={`${a.openOpps} deals · win rate ${fmtPct(a.winRate)}`} />
@@ -96,7 +96,7 @@ export function AccountDetailView({ locationId, go, agency, limited = false }: {
 
         <Card title="Trend (last 60 days)">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div><p className="mb-1 text-xs text-muted-foreground">Engagement score</p><Sparkline label="Engagement score" values={trend.map((t) => t.engagementScore)} /></div>
+            <div><p className="mb-1 text-xs text-muted-foreground">Health score</p><Sparkline label="Health score" values={trend.map((t) => t.engagementScore)} /></div>
             <div><p className="mb-1 text-xs text-muted-foreground">Open pipeline value</p><Sparkline label="Open pipeline value" values={trend.map((t) => t.openValue)} /></div>
             <div><p className="mb-1 text-xs text-muted-foreground">Contacts</p><Sparkline label="Contacts" values={trend.map((t) => t.contacts)} /></div>
             <div><p className="mb-1 text-xs text-muted-foreground">Data completeness</p><Sparkline label="Data completeness" values={trend.map((t) => t.completenessPct)} /></div>

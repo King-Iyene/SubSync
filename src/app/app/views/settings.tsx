@@ -80,7 +80,12 @@ export function SettingsView() {
       <PageHeader title="Settings" subtitle="Tune what counts as stale, dormant or overdue for your company." />
       {msg && <p className={`mb-4 rounded-lg border px-3 py-2 text-sm ${msg.ok ? "" : "border-red-500/40 bg-red-500/5"}`} role={msg.ok ? "status" : "alert"}>{msg.text}</p>}
 
+      <nav aria-label="Settings sections" className="mb-4 flex flex-wrap gap-2 text-sm" data-testid="settings-jump">
+        {[["g-rules", "Rules and targets"], ["g-brand", "Your brand"], ["g-clients", "Your clients"], ["g-alerts", "Alerts and connections"], ["g-privacy", "Privacy and data"]].map(([id, label]) => <a key={id} href={"#" + id} className="rounded-full border px-3 py-1 hover:bg-muted">{label}</a>)}
+      </nav>
       <div className="space-y-4">
+        <h2 id="g-rules" className="scroll-mt-4 pt-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Rules and targets</h2>
+
         <Card title="Thresholds">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div>
@@ -89,7 +94,7 @@ export function SettingsView() {
               <p className="mt-1 text-xs text-muted-foreground">An open deal with no movement for this long is stale.</p>
             </div>
             <div>
-              <label htmlFor="dormant" className="mb-1 block text-sm font-medium">Dormant after (days)</label>
+              <label htmlFor="dormant" className="mb-1 block text-sm font-medium">Gone quiet after (days)</label>
               <input id="dormant" type="number" min={7} max={365} className={inputClass} value={form.dormantDays} onChange={num("dormantDays")} />
               <p className="mt-1 text-xs text-muted-foreground">No new contacts, deal changes or messages for this long.</p>
             </div>
@@ -101,11 +106,61 @@ export function SettingsView() {
           </div>
         </Card>
 
+        <Card title="Speed to lead">
+          <p className="mb-3 text-sm text-muted-foreground">How fast a new lead should hear from a person. A lead cools in minutes, so the target is short. Messages from workflows and campaigns are not replies unless you say so.</p>
+          <div className="flex flex-wrap items-end gap-4">
+            <div>
+              <label htmlFor="speed-target" className="mb-1 block text-sm font-medium">Reply target (minutes)</label>
+              <input id="speed-target" type="number" min={1} max={1440} className={`${inputClass} !w-32`} value={form.speedTargetMinutes} onChange={(e) => setForm({ ...form, speedTargetMinutes: Number(e.target.value) })} />
+            </div>
+            <label className="flex items-center gap-2 pb-2 text-sm"><input type="checkbox" className="size-4" checked={form.countAutomatedTouches} onChange={(e) => setForm({ ...form, countAutomatedTouches: e.target.checked })} /> Count automatic messages as a reply</label>
+          </div>
+          <div className="mt-4 flex flex-wrap items-end gap-4">
+            <label className="flex items-center gap-2 pb-2 text-sm"><input type="checkbox" className="size-4" checked={form.speedBusinessHours} onChange={(e) => setForm({ ...form, speedBusinessHours: e.target.checked })} /> Only count business hours</label>
+            <div>
+              <label htmlFor="speed-open" className="mb-1 block text-sm font-medium">Opens (hour)</label>
+              <input id="speed-open" type="number" min={0} max={23} className={`${inputClass} !w-24`} disabled={!form.speedBusinessHours} value={form.speedOpenHour} onChange={(e) => setForm({ ...form, speedOpenHour: Number(e.target.value) })} />
+            </div>
+            <div>
+              <label htmlFor="speed-close" className="mb-1 block text-sm font-medium">Closes (hour)</label>
+              <input id="speed-close" type="number" min={1} max={24} className={`${inputClass} !w-24`} disabled={!form.speedBusinessHours} value={form.speedCloseHour} onChange={(e) => setForm({ ...form, speedCloseHour: Number(e.target.value) })} />
+            </div>
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">With this on, a lead that arrives when your team is closed (evenings, weekends) starts its reply clock at the next opening time in that account&apos;s own time zone, Monday to Friday. A lead that arrives during opening hours and is still unanswered at closing keeps counting overnight.</p>
+        </Card>
+
         <Card title="Onboarding checklist">
           <label htmlFor="custom" className="mb-1 block text-sm font-medium">Your own steps (one per line, up to 10)</label>
           <textarea id="custom" rows={4} className={inputClass} value={checklist} onChange={(e) => setChecklist(e.target.value)} placeholder={"Send welcome gift\nCollect testimonial"} />
           <p className="mt-1 text-xs text-muted-foreground">These appear on every account&apos;s checklist next to the automatic checks.</p>
         </Card>
+
+        <h2 id="g-brand" className="scroll-mt-4 pt-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Your brand</h2>
+
+        <Card title="Your name on reports">
+          <p className="mb-3 text-sm text-muted-foreground">Shown at the top of printed client reports and quarterly reviews, so what you hand to a client carries your name, not ours.</p>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <label htmlFor="brand-name" className="mb-1 block text-sm font-medium">Business name</label>
+              <input id="brand-name" className={inputClass} maxLength={60} placeholder="Acme Marketing" value={form.brandName ?? ""} onChange={(e) => setForm({ ...form, brandName: e.target.value || null })} />
+            </div>
+            <div>
+              <label htmlFor="brand-color" className="mb-1 block text-sm font-medium">Colour</label>
+              <div className="flex items-center gap-2">
+                <input id="brand-color" type="color" className="h-9 w-14 cursor-pointer rounded-lg border bg-background p-1" value={form.brandColor ?? "#1d4ed8"} onChange={(e) => setForm({ ...form, brandColor: e.target.value })} />
+                {form.brandColor && <Btn variant="ghost" onClick={() => setForm({ ...form, brandColor: null })}>Clear</Btn>}
+              </div>
+            </div>
+          </div>
+        </Card>
+
+        <Card title="Links">
+          <label htmlFor="domain" className="mb-1 block text-sm font-medium">The address you log in to</label>
+          <input id="domain" className={inputClass} value={form.appDomain} onChange={(e) => setForm({ ...form, appDomain: e.target.value })} />
+          <p className="mt-1 text-xs text-muted-foreground">White-label companies: use your own domain so &quot;Open&quot; links land in your branded app.</p>
+        </Card>
+
+        {data.clientView && <h2 id="g-clients" className="scroll-mt-4 pt-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Your clients</h2>}
 
         {data.clientView && (
           <Card title="Client access">
@@ -135,56 +190,7 @@ export function SettingsView() {
           </Card>
         )}
 
-        {data.features?.meetings !== false && (
-        <Card title="Meeting notes privacy">
-          <label className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-0.5 size-4" checked={form.keepTranscripts} onChange={(e) => setForm({ ...form, keepTranscripts: e.target.checked })} />
-            <span>Keep full transcripts when a meeting tool sends them. Off by default: only the summary and action items are stored, which is safer for clinics and anyone handling private conversations.</span></label>
-          <label className="mt-3 flex items-start gap-2 text-sm"><input type="checkbox" className="mt-0.5 size-4" checked={form.pushNotesToCrm} onChange={(e) => setForm({ ...form, pushNotesToCrm: e.target.checked })} />
-            <span>Also add each meeting to the matched contact&apos;s notes in your CRM. It is written once per meeting, only for a contact SubSync matched by email.</span></label>
-        </Card>
-        )}
-
-        <Card title="Speed to lead">
-          <p className="mb-3 text-sm text-muted-foreground">How fast a new lead should hear from a person. A lead cools in minutes, so the target is short. Messages from workflows and campaigns are not replies unless you say so.</p>
-          <div className="flex flex-wrap items-end gap-4">
-            <div>
-              <label htmlFor="speed-target" className="mb-1 block text-sm font-medium">Reply target (minutes)</label>
-              <input id="speed-target" type="number" min={1} max={1440} className={`${inputClass} !w-32`} value={form.speedTargetMinutes} onChange={(e) => setForm({ ...form, speedTargetMinutes: Number(e.target.value) })} />
-            </div>
-            <label className="flex items-center gap-2 pb-2 text-sm"><input type="checkbox" className="size-4" checked={form.countAutomatedTouches} onChange={(e) => setForm({ ...form, countAutomatedTouches: e.target.checked })} /> Count automatic messages as a reply</label>
-          </div>
-          <div className="mt-4 flex flex-wrap items-end gap-4">
-            <label className="flex items-center gap-2 pb-2 text-sm"><input type="checkbox" className="size-4" checked={form.speedBusinessHours} onChange={(e) => setForm({ ...form, speedBusinessHours: e.target.checked })} /> Only count business hours</label>
-            <div>
-              <label htmlFor="speed-open" className="mb-1 block text-sm font-medium">Opens (hour)</label>
-              <input id="speed-open" type="number" min={0} max={23} className={`${inputClass} !w-24`} disabled={!form.speedBusinessHours} value={form.speedOpenHour} onChange={(e) => setForm({ ...form, speedOpenHour: Number(e.target.value) })} />
-            </div>
-            <div>
-              <label htmlFor="speed-close" className="mb-1 block text-sm font-medium">Closes (hour)</label>
-              <input id="speed-close" type="number" min={1} max={24} className={`${inputClass} !w-24`} disabled={!form.speedBusinessHours} value={form.speedCloseHour} onChange={(e) => setForm({ ...form, speedCloseHour: Number(e.target.value) })} />
-            </div>
-          </div>
-          <p className="mt-2 text-xs text-muted-foreground">With this on, a lead that arrives when your team is closed (evenings, weekends) starts its reply clock at the next opening time in that account&apos;s own time zone, Monday to Friday. A lead that arrives during opening hours and is still unanswered at closing keeps counting overnight.</p>
-        </Card>
-
-        <Card title="Your name on reports">
-          <p className="mb-3 text-sm text-muted-foreground">Shown at the top of printed client reports and quarterly reviews, so what you hand to a client carries your name, not ours.</p>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div>
-              <label htmlFor="brand-name" className="mb-1 block text-sm font-medium">Business name</label>
-              <input id="brand-name" className={inputClass} maxLength={60} placeholder="Acme Marketing" value={form.brandName ?? ""} onChange={(e) => setForm({ ...form, brandName: e.target.value || null })} />
-            </div>
-            <div>
-              <label htmlFor="brand-color" className="mb-1 block text-sm font-medium">Colour</label>
-              <div className="flex items-center gap-2">
-                <input id="brand-color" type="color" className="h-9 w-14 cursor-pointer rounded-lg border bg-background p-1" value={form.brandColor ?? "#1d4ed8"} onChange={(e) => setForm({ ...form, brandColor: e.target.value })} />
-                {form.brandColor && <Btn variant="ghost" onClick={() => setForm({ ...form, brandColor: null })}>Clear</Btn>}
-              </div>
-            </div>
-          </div>
-        </Card>
-
-        {data.features?.connections !== false && <ConnectionsCard />}
+        <h2 id="g-alerts" className="scroll-mt-4 pt-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Alerts and connections</h2>
 
         <Card title="Slack alerts and daily brief">
           <p className="mb-3 text-sm text-muted-foreground">
@@ -221,6 +227,8 @@ export function SettingsView() {
           </div>
           {digest && <pre className="mt-3 overflow-x-auto whitespace-pre-wrap rounded-lg bg-muted p-3 text-xs">{digest}</pre>}
         </Card>
+
+        {data.features?.connections !== false && <ConnectionsCard />}
 
         {data.features?.ai !== false && (
         <Card title="AI assistant connector">
@@ -272,13 +280,19 @@ export function SettingsView() {
         </Card>
         )}
 
-        <Card title="Links">
-          <label htmlFor="domain" className="mb-1 block text-sm font-medium">The address you log in to</label>
-          <input id="domain" className={inputClass} value={form.appDomain} onChange={(e) => setForm({ ...form, appDomain: e.target.value })} />
-          <p className="mt-1 text-xs text-muted-foreground">White-label companies: use your own domain so &quot;Open&quot; links land in your branded app.</p>
+        <h2 id="g-privacy" className="scroll-mt-4 pt-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Privacy and data</h2>
+
+        {data.features?.meetings !== false && (
+        <Card title="Meeting notes privacy">
+          <label className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-0.5 size-4" checked={form.keepTranscripts} onChange={(e) => setForm({ ...form, keepTranscripts: e.target.checked })} />
+            <span>Keep full transcripts when a meeting tool sends them. Off by default: only the summary and action items are stored, which is safer for clinics and anyone handling private conversations.</span></label>
+          <label className="mt-3 flex items-start gap-2 text-sm"><input type="checkbox" className="mt-0.5 size-4" checked={form.pushNotesToCrm} onChange={(e) => setForm({ ...form, pushNotesToCrm: e.target.checked })} />
+            <span>Also add each meeting to the matched contact&apos;s notes in your CRM. It is written once per meeting, only for a contact SubSync matched by email.</span></label>
         </Card>
+        )}
 
         <div className="lg:col-span-2"><HealthCard /></div>
+
         <Card title="Data sync">
           {sync.data ? (
             <p className="text-sm text-muted-foreground">Last completed {timeAgo(sync.data.lastFinishedAt)} · {sync.data.pending} queued · {sync.data.failed} failed. Data refreshes automatically about once a day and as changes arrive.</p>
@@ -305,7 +319,6 @@ export function SettingsView() {
           </div>
           {api.demo && <p className="mt-2 text-xs text-muted-foreground">Disabled in demo mode.</p>}
         </Card>
-
         <div><Btn variant="primary" disabled={busy} onClick={save}>{busy ? "Saving..." : "Save settings"}</Btn></div>
       </div>
     </div>

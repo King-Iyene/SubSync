@@ -47,9 +47,9 @@ const bandLabel: Record<Band, string> = { thriving: "Thriving", healthy: "Health
 export const BandBadge = ({ band }: { band: Band }) => <Badge tone={bandTone[band]}>{bandLabel[band]}</Badge>;
 
 export function ChurnBadge({ level }: { level: string }) {
-  if (level === "high") return <Badge tone="bad">High churn risk</Badge>;
-  if (level === "medium") return <Badge tone="warn">Medium risk</Badge>;
-  return <Badge tone="neutral">Low risk</Badge>;
+  if (level === "high") return <Badge tone="bad">Likely to leave</Badge>;
+  if (level === "medium") return <Badge tone="warn">Could leave</Badge>;
+  return <Badge tone="neutral">Steady</Badge>;
 }
 
 export const severityTone = (s: string): Tone => (s === "critical" ? "bad" : s === "warning" ? "warn" : s === "info" ? "info" : "good");
@@ -154,7 +154,7 @@ export function ExtLink({ href, children }: { href: string; children: ReactNode 
 export function ScoreBar({ score }: { score: number }) {
   const color = score >= 75 ? "bg-emerald-500" : score >= 55 ? "bg-emerald-400" : score >= 35 ? "bg-amber-500" : "bg-red-500";
   return (
-    <div className="flex items-center gap-2" title={`Engagement score ${score} of 100`}>
+    <div className="flex items-center gap-2" title={`Health score ${score} of 100`}>
       <div className="h-2 w-16 overflow-hidden rounded-full bg-muted"><div className={`h-full ${color}`} style={{ width: `${score}%` }} /></div>
       <span className="w-7 text-right text-sm font-medium tabular-nums">{score}</span>
     </div>

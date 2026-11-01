@@ -238,6 +238,35 @@ async function main() {
       await call("/api/app/audit/revoke", tokenA, { method: "POST", body: JSON.stringify({ id: idC }) });
     }
 
+    // Client access is enforced on the server: switched off, a client's own session is refused at once; switched on, it works; and it
+    // is put back as it was found.
+    {
+      const clientToken = session(A, "client", A.locs[1]);
+      const was = (await sql()`select client_view from locations where installation_id = ${A.inst} and location_id = ${A.locs[1]}`)[0].client_view as boolean;
+      const setView = async (on: boolean) => assert.equal((await call(`/api/app/accounts/${A.locs[1]}/flags`, tokenA, { method: "PUT", body: JSON.stringify({ clientView: on }) })).status, 200);
+      try {
+        await setView(true);
+        assert.equal((await call("/api/app/overview", clientToken)).status, 200, "client access on: the client's own session works");
+        await setView(false);
+        assert.equal((await call("/api/app/overview", clientToken)).status, 403, "client access off: the same session is refused straight away");
+        assert.equal((await call("/api/app/inbox", clientToken)).status, 403, "and on every other page");
+        await setView(true);
+        assert.equal((await call("/api/app/overview", clientToken)).status, 200, "switched back on, it works again");
+      } finally { await setView(was); }
+    }
+
+    // The company name set in Settings is the name on the shared page.
+    {
+      await call("/api/app/settings", tokenA, { method: "PUT", body: JSON.stringify({ brandName: "ZZ Brand Alpha" }) });
+      try {
+        const idBrand = (JSON.parse((await call("/api/app/audit/share", tokenA, { method: "POST", body: "{}" })).text).url as string).split("/").pop() as string;
+        const page = await (await fetch(`${BASE}/audit/${idBrand}`)).text();
+        assert.ok(page.includes("ZZ Brand Alpha"), "the shared page carries the company's own name");
+        assert.ok(!page.includes("Your company"), "and not the placeholder");
+        await call("/api/app/audit/revoke", tokenA, { method: "POST", body: JSON.stringify({ id: idBrand }) });
+      } finally { await call("/api/app/settings", tokenA, { method: "PUT", body: JSON.stringify({ brandName: null }) }); }
+    }
+
     // The webhook: unsigned or wrongly signed deliveries change nothing.
     const body = JSON.stringify({ type: "UNINSTALL", companyId: B.company, webhookId: "xtest-wh-1" });
     assert.equal((await fetch(`${BASE}/api/webhooks/ghl`, { method: "POST", body })).status, 401, "unsigned");

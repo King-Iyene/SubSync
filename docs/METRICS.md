@@ -93,12 +93,22 @@ with at least one tag.
 
 **Dormant account.** No contact, deal or message activity for the dormant threshold (30 days by default).
 
-## Engagement score (0 to 100, FACT-based, shown with where every point came from)
+## Health score and risk (0 to 100; "engagement score" in the code)
 
-Recent activity 40 (3 days or fewer 40, up to 7 days 34, 14 days 26, 30 days 16, 60 days 6, else 0) plus New
-contacts 20 (new in 30 days against about 5% of the list, minimum 5) plus Pipeline health 20 (share of counted
-open deals that are not stale; 8 with no open deals) plus Responsiveness 10 (10 minus 2 per conversation
-waiting past SLA) plus Data quality 10 (completeness divided by 10). Code: `scoring.ts`.
+**Health score** (FACT, shown with where every point came from). The sum of five parts, nothing hidden, maximum exactly 100:
+- Recent activity, 40: last activity 3 days ago or less 40, up to 7 days 34, 14 days 26, 30 days 16, 60 days 6, older or never 0.
+- New contacts, 20: new in the last 30 days against about 5% of the contact list (at least 5 for a small list), capped at 20.
+- Deals that are moving, 20: the share of counted open deals that are not stale; 8 when there are no open deals.
+- Replies kept up with, 10: 10 minus 2 for each conversation waiting past the reply target, never below 0.
+- Complete contact data, 10: the completeness percentage divided by 10.
+**Bands** (shown as Thriving, Healthy, Watch, At risk): 75 and above, 55 to 74, 35 to 54, under 35.
+**Gone quiet** ("dormant" in the code): no contact, deal or message activity for the quiet setting (30 days by default), or no activity ever recorded.
+**Leave risk** (shown as Steady, Could leave, Likely to leave; "churn risk" in the code). A warning sign, not a prediction. It is "Could leave" when
+the account has been quiet for the quiet setting or more, or its health is under 40, or its health fell 12 points from its recent average; and
+"Likely to leave" when it has been quiet for twice the setting or never been active, or its health is under 25, or it fell 25 points. The
+fall needs at least 3 days of score history. Each screen says the reasons in words.
+Plain words on screen: Health, Steady, Could leave, Likely to leave, Gone quiet. The Accounts page has a "What do these words mean?" panel.
+Code: `scoring.ts`. Tests: `core.test.ts`, `scoring-f7.test.ts` (golden cases at every threshold), `tests/e2e/accounts.spec.ts`.
 
 ## Appointments
 

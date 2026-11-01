@@ -142,8 +142,8 @@ export function OverviewView({ go }: { go: GoFn }) {
             ]} />
             <dl className="mt-3 space-y-1.5 text-sm">
               <div className="flex justify-between"><dt className="text-muted-foreground">Client accounts</dt><dd>{fmtInt(k.accounts)}{k.ignored ? ` (${k.ignored} ignored)` : ""}</dd></div>
-              <div className="flex justify-between"><dt className="text-muted-foreground">Average engagement score</dt><dd>{k.avgScore} / 100</dd></div>
-              <div className="flex justify-between"><dt className="text-muted-foreground">Dormant accounts</dt><dd>{k.dormant}</dd></div>
+              <div className="flex justify-between"><dt className="text-muted-foreground">Average health score</dt><dd>{k.avgScore} / 100</dd></div>
+              <div className="flex justify-between"><dt className="text-muted-foreground">Accounts gone quiet</dt><dd>{k.dormant}</dd></div>
             </dl>
           </Card>
           <Card title="Data sync">
