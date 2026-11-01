@@ -407,6 +407,17 @@ async function ensureSpeedDemo(installationId: string): Promise<void> {
   for (const loc of live2) await applyLeadRules(installationId, loc).catch(() => undefined);
 }
 
+// F2: the automatic first message and the person's reply, recorded apart (N78). Two in three demo leads got an automatic text a few seconds after
+// they arrived, the person's reply is the existing first touch. Built from the contact number only (no random numbers), and only for rows that have not
+// been given this yet, so nothing else in the demo moves. User "user-e5f0" has no name in the team list on purpose: the screen shows "Former team member".
+async function ensureSpeedDemoF2(installationId: string): Promise<void> {
+  const db = sql();
+  await db`
+    update lead_touches set read_version = 1, human_touch_at = touch_at,
+      auto_touch_at = case when (substring(contact_id from '[0-9]+$')::int % 3) <> 0 then lead_at + ((5 + (substring(contact_id from '[0-9]+$')::int % 40)) * interval '1 second') end
+    where installation_id = ${installationId} and read_version < 1 and conversation_id like '%-sp%' and contact_id ~ '[0-9]+$'`;
+}
+
 // Messy inbox cases on purpose (runbook test data kit), added once to the first live account: the customer wrote last on five channels
 // (four are past the 4 hour target, one is still inside it), a thread nobody answered for 40 days (dead, not waiting), an automatic
 // reply after the customer, and an internal note. Only the four past the target are waiting.
@@ -484,6 +495,7 @@ export async function ensureDemo(): Promise<string> {
   const id = row ? (row.id as string) : (await seedDemo()).installationId;
   await stampDemoHistory(id);
   await ensureSpeedDemo(id).catch(() => undefined);
+  await ensureSpeedDemoF2(id).catch(() => undefined);
   await ensureInboxDemo(id).catch(() => undefined);
   await ensureStageDemo(id).catch(() => undefined);
   await ensureColdDemo(id).catch(() => undefined);

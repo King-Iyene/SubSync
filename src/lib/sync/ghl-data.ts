@@ -5,6 +5,7 @@
 import { GHL_API, GhlError } from "../ghl/client.ts";
 import { ghlFetch } from "../ghl/http.ts";
 import { mapMessage, type Msg } from "../analytics/speed-intel.ts";
+import { safePhotoUrl } from "../analytics/people-labels.ts";
 
 export function toIso(value: unknown): string | null {
   if (value === null || value === undefined || value === "") return null;
@@ -237,14 +238,14 @@ export function mapCalendar(raw: unknown): CalendarRow | null {
   return id ? { id, name: str(r.name) } : null;
 }
 
-export type UserRow = { id: string; name: string | null };
+export type UserRow = { id: string; name: string | null; photoUrl: string | null };
 
 export function mapUser(raw: unknown): UserRow | null {
   const r = rec(raw);
   const id = str(r.id) ?? str(r._id);
   if (!id) return null;
   const name = str(r.name) ?? [str(r.firstName), str(r.lastName)].filter(Boolean).join(" ");
-  return { id, name: name || null };
+  return { id, name: name || null, photoUrl: safePhotoUrl(r.profilePhoto) };
 }
 
 // ---- fetchers (location-scoped token required) ----

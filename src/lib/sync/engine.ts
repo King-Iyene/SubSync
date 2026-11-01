@@ -9,7 +9,7 @@ import {
   fetchAppointments, fetchCalendars, fetchConversationMessages, fetchUsers, isPermissionError, fetchCalendarCount, fetchContactsPage, fetchConversationsPage, fetchLocationDetails, fetchOpportunitiesPage, fetchPipelines,
   type ContactCursor, type ConversationRow, type OpportunityRow,
 } from "./ghl-data";
-import { leadFromMessages } from "../analytics/speed-intel";
+import { firstTouches, leadFromMessages } from "../analytics/speed-intel";
 import { CONVERSATIONS_READ_PER_ACCOUNT, CONVERSATION_PAGE_SIZE } from "../analytics/waiting";
 import { diffAppointmentEvents } from "./appointment-events";
 import { applyLeadRules } from "./lead-rules-apply";
@@ -365,9 +365,12 @@ async function handleAppointments(job: Job): Promise<Outcome> {
     for (const u of users) {
       if (!u.name) continue;
       // A name someone typed is never overwritten by the platform's.
+      // The picture comes with the name from the same read (no extra permission). It is refreshed every time; the name only when it was not typed.
       await db`
-        insert into team_names (installation_id, user_id, name, source) values (${job.installationId}, ${u.id}, ${u.name}, 'platform')
-        on conflict (installation_id, user_id) do update set name = excluded.name where team_names.source = 'platform'`;
+        insert into team_names (installation_id, user_id, name, source, photo_url, seen_at) values (${job.installationId}, ${u.id}, ${u.name}, 'platform', ${u.photoUrl}, now())
+        on conflict (installation_id, user_id) do update set
+          name = case when team_names.source = 'platform' then excluded.name else team_names.name end,
+          photo_url = excluded.photo_url, seen_at = now()`;
     }
   } catch (error) {
     usersAccess = isPermissionError(error) ? "needs_permission" : "error";
@@ -448,7 +451,7 @@ async function handleSpeed(job: Job): Promise<Outcome> {
     join cached_conversations v on v.installation_id = c.installation_id and v.location_id = c.location_id and v.contact_id = c.contact_id
     left join lead_touches t on t.installation_id = c.installation_id and t.location_id = c.location_id and t.conversation_id = v.conversation_id
     where c.installation_id = ${job.installationId} and c.location_id = ${loc} and c.date_added >= ${new Date(Date.now() - SPEED_WINDOW_DAYS * 86_400_000)}
-      and (t.id is null or t.touch_at is null)
+      and (t.id is null or t.touch_at is null or t.read_version < 1)
     order by (t.id is null) desc, c.date_added desc limit ${SPEED_PER_RUN}`;
   const rules = () => applyLeadRules(job.installationId, loc).catch((e) => console.error("Applying the lead rules failed", safeError(e)));
   if (candidates.length === 0) { await rules(); return DONE; }
@@ -460,10 +463,20 @@ async function handleSpeed(job: Job): Promise<Outcome> {
       const msgs = await fetchConversationMessages(token, loc, c.conversation_id as string);
       const lead = leadFromMessages(msgs, c.date_added instanceof Date ? c.date_added.getTime() : null, countAutomated);
       if (!lead) continue;
+      // The automatic first message and the person's first reply, kept apart whatever the setting counts (N78).
+      const ft = firstTouches(msgs, lead.leadAt);
+      const at = (ms: number | null) => (ms === null ? null : new Date(ms));
+      // A conversation longer than one page (100 messages) was read from its newest end only, so its first messages were not seen: 2 means "read, not complete",
+      // and the screen does not use those leads for the automatic-versus-person view. 1 means read in full.
+      const version = msgs.length >= 100 ? 2 : 1;
+      // A reply already recorded is never taken back by a later read that saw fewer messages (touch_at and its user are kept once set).
       await db`
-        insert into lead_touches (installation_id, location_id, contact_id, conversation_id, lead_at, touch_at, touch_user_id)
-        values (${job.installationId}, ${loc}, ${c.contact_id}, ${c.conversation_id}, ${new Date(lead.leadAt)}, ${lead.touchAt === null ? null : new Date(lead.touchAt)}, ${lead.touchUserId})
-        on conflict (installation_id, location_id, conversation_id) do update set lead_at = excluded.lead_at, touch_at = excluded.touch_at, touch_user_id = excluded.touch_user_id, checked_at = now()`;
+        insert into lead_touches (installation_id, location_id, contact_id, conversation_id, lead_at, touch_at, touch_user_id, auto_touch_at, human_touch_at, read_version)
+        values (${job.installationId}, ${loc}, ${c.contact_id}, ${c.conversation_id}, ${new Date(lead.leadAt)}, ${at(lead.touchAt)}, ${lead.touchUserId}, ${at(ft.autoAt)}, ${at(ft.humanAt)}, ${version})
+        on conflict (installation_id, location_id, conversation_id) do update set lead_at = excluded.lead_at,
+          touch_at = coalesce(lead_touches.touch_at, excluded.touch_at),
+          touch_user_id = case when lead_touches.touch_at is not null then lead_touches.touch_user_id else excluded.touch_user_id end,
+          auto_touch_at = excluded.auto_touch_at, human_touch_at = excluded.human_touch_at, read_version = excluded.read_version, checked_at = now()`;
     } catch (error) {
       if (isPermissionError(error)) { access = "needs_permission"; break; }
       console.error("Reading a conversation failed", safeError(error));
