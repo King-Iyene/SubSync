@@ -20,10 +20,14 @@ export function mapMessage(raw: unknown): Msg | null {
   return { at, direction: d === "inbound" || d === "outbound" ? d : null, userId: str(o.userId), source: str(o.source)?.toLowerCase() ?? null, type: str(o.messageType ?? o.type) };
 }
 
+// A phone call a person placed from the platform is a touch too (the platform records calls as messages of type TYPE_CALL), whether or
+// not it was picked up: the lead was reached for, which is what the clock measures. Calls with no person attached are automation.
+export const isCall = (m: Pick<Msg, "type">) => /call/i.test(m.type ?? "");
+
 export function isHumanTouch(m: Msg, countAutomated: boolean): boolean {
   if (m.direction !== "outbound") return false;
   if (countAutomated) return true;
-  return m.userId !== null && m.source === "app";
+  return m.userId !== null && (m.source === "app" || isCall(m));
 }
 
 export type Lead = { leadAt: number; touchAt: number | null; touchUserId: string | null };
@@ -66,20 +70,25 @@ export function weeklyTrend(rows: TouchRow[], targetMinutes: number, now: number
 export const NEVER_ANSWERED_MINUTES = 3 * 24 * 60;
 export const isNeverAnswered = (waitingMinutes: number) => waitingMinutes > NEVER_ANSWERED_MINUTES;
 
-export type SourceClass = "portal" | "form" | "social" | "other";
-export const SOURCE_TARGET_MINUTES: Record<Exclude<SourceClass, "other">, number> = { portal: 5, form: 15, social: 60 };
+// "meta" is a lead who filled in a Facebook or Instagram lead form: they asked for contact, so they are timed like a web form but
+// tighter, because the form is one tap. "social" is a person who messaged first (direct message, Messenger, WhatsApp).
+export type SourceClass = "portal" | "meta" | "form" | "social" | "other";
+export const SOURCE_TARGET_MINUTES: Record<Exclude<SourceClass, "other">, number> = { portal: 5, meta: 10, form: 15, social: 60 };
 export function classifySource(source: string | null | undefined): SourceClass {
   const s = (source ?? "").toLowerCase();
   if (/zillow|realtor|trulia|redfin|homes\.com|rightmove|zoopla|portal|open house|call|phone|sign/.test(s)) return "portal";
+  // Order matters: a message to a page ("Instagram DM") is social, a Facebook or Instagram form is meta, and only then is a plain
+  // form a web form ("Facebook Lead Form" must not be filed as a web form).
+  if (/\b(dm|dms|messenger|whatsapp|tiktok|linkedin|direct message|social)\b/.test(s)) return "social";
+  if (/facebook|instagram|\bfb\b|\big\b|\bmeta\b|lead ad/.test(s)) return "meta";
   if (/form|website|web|landing|funnel|ppc|google|chat|widget|email/.test(s)) return "form";
-  if (/facebook|instagram|fb|meta|tiktok|linkedin|dm|social|messenger|whatsapp/.test(s)) return "social";
   return "other";
 }
 
 // Reply speed per source class, each judged against its own target (other leads use the account target).
 export function bySource(rows: TouchRow[], accountTarget: number, now: number): Array<{ cls: SourceClass; targetMinutes: number } & Summary> {
   const out: Array<{ cls: SourceClass; targetMinutes: number } & Summary> = [];
-  for (const cls of ["portal", "form", "social", "other"] as SourceClass[]) {
+  for (const cls of ["portal", "meta", "form", "social", "other"] as SourceClass[]) {
     const mine = rows.filter((r) => classifySource(r.source) === cls);
     if (mine.length === 0) continue;
     const targetMinutes = cls === "other" ? accountTarget : SOURCE_TARGET_MINUTES[cls];

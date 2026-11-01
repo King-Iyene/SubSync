@@ -11,6 +11,7 @@ import {
 } from "./ghl-data";
 import { leadFromMessages } from "../analytics/speed-intel";
 import { diffAppointmentEvents } from "./appointment-events";
+import { applyLeadRules } from "./lead-rules-apply";
 import { diffDealEvents } from "./deal-events";
 import { listAllInstalledLocations } from "./installed-locations";
 
@@ -436,7 +437,8 @@ async function handleSpeed(job: Job): Promise<Outcome> {
     where c.installation_id = ${job.installationId} and c.location_id = ${loc} and c.date_added >= ${new Date(Date.now() - SPEED_WINDOW_DAYS * 86_400_000)}
       and (t.id is null or t.touch_at is null)
     order by (t.id is null) desc, c.date_added desc limit ${SPEED_PER_RUN}`;
-  if (candidates.length === 0) return DONE;
+  const rules = () => applyLeadRules(job.installationId, loc).catch((e) => console.error("Applying the lead rules failed", safeError(e)));
+  if (candidates.length === 0) { await rules(); return DONE; }
 
   const token = await tokenForLocation(job.companyId, loc);
   let access: "ok" | "needs_permission" = "ok";
@@ -457,6 +459,7 @@ async function handleSpeed(job: Job): Promise<Outcome> {
   await db`
     update locations set speed_access = ${access}, speed_synced_at = case when ${access} = 'ok' then now() else speed_synced_at end
     where installation_id = ${job.installationId} and location_id = ${loc}`;
+  await rules();
   return DONE;
 }
 

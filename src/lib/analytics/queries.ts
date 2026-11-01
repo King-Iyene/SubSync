@@ -34,12 +34,16 @@ export type Settings = AccountSettings & {
   /** Minutes a new lead may wait for a first reply from a person, and whether automatic messages count as one. */
   speedTargetMinutes: number;
   countAutomatedTouches: boolean;
+  /** When on, a lead that arrives while the team is closed starts its clock at the next opening (Monday to Friday, open to close hour). */
+  speedBusinessHours: boolean;
+  speedOpenHour: number;
+  speedCloseHour: number;
 };
 
 export async function getSettings(installationId: string): Promise<Settings> {
   const db = sql();
   const read = () => db`
-    select stale_deal_days, dormant_days, sla_hours, slack_webhook_url, ghl_app_domain, digest_enabled, custom_checklist, digest_hour, digest_timezone, digest_email, brand_name, brand_color, industry_targets, push_notes_to_crm, keep_transcripts, speed_target_minutes, count_automated_touches
+    select stale_deal_days, dormant_days, sla_hours, slack_webhook_url, ghl_app_domain, digest_enabled, custom_checklist, digest_hour, digest_timezone, digest_email, brand_name, brand_color, industry_targets, push_notes_to_crm, keep_transcripts, speed_target_minutes, count_automated_touches, speed_business_hours, speed_open_hour, speed_close_hour
     from settings where installation_id = ${installationId}`;
   let [r] = await read();
   if (!r) {
@@ -66,6 +70,9 @@ export async function getSettings(installationId: string): Promise<Settings> {
     pushNotesToCrm: r.push_notes_to_crm !== false,
     speedTargetMinutes: typeof r.speed_target_minutes === "number" ? r.speed_target_minutes : 15,
     countAutomatedTouches: r.count_automated_touches === true,
+    speedBusinessHours: r.speed_business_hours === true,
+    speedOpenHour: typeof r.speed_open_hour === "number" ? r.speed_open_hour : 9,
+    speedCloseHour: typeof r.speed_close_hour === "number" ? r.speed_close_hour : 17,
   };
 }
 
@@ -96,6 +103,9 @@ export async function updateSettings(installationId: string, p: Partial<Settings
       push_notes_to_crm = coalesce(${p.pushNotesToCrm ?? null}::boolean, push_notes_to_crm),
       speed_target_minutes = coalesce(${p.speedTargetMinutes ?? null}::int, speed_target_minutes),
       count_automated_touches = coalesce(${p.countAutomatedTouches ?? null}::boolean, count_automated_touches),
+      speed_business_hours = coalesce(${p.speedBusinessHours ?? null}::boolean, speed_business_hours),
+      speed_open_hour = coalesce(${p.speedOpenHour ?? null}::int, speed_open_hour),
+      speed_close_hour = coalesce(${p.speedCloseHour ?? null}::int, speed_close_hour),
       brand_name = case when ${p.brandName !== undefined} then ${p.brandName ?? null} else brand_name end,
       brand_color = case when ${p.brandColor !== undefined} then ${p.brandColor ?? null} else brand_color end,
       custom_checklist = coalesce(${p.customChecklist !== undefined ? db.json(p.customChecklist) : null}::jsonb, custom_checklist)
@@ -155,9 +165,9 @@ export async function accountRows(installationId: string, s: AccountSettings): P
       from cached_conversations where installation_id = ${installationId} group by location_id
     ), sp as (
       select location_id,
-        count(*) filter (where touch_at is null and lead_at < now() - make_interval(mins => ${target}::int) and lead_at > now() - interval '2 days')::int speed_waiting,
-        extract(epoch from now() - min(lead_at) filter (where touch_at is null and lead_at < now() - make_interval(mins => ${target}::int) and lead_at > now() - interval '2 days')) / 60 oldest_wait_min
-      from lead_touches where installation_id = ${installationId} group by location_id
+        count(*) filter (where touch_at is null and coalesce(clock_start, lead_at) < now() - make_interval(mins => ${target}::int) and lead_at > now() - interval '2 days')::int speed_waiting,
+        extract(epoch from now() - min(coalesce(clock_start, lead_at)) filter (where touch_at is null and coalesce(clock_start, lead_at) < now() - make_interval(mins => ${target}::int) and lead_at > now() - interval '2 days')) / 60 oldest_wait_min
+      from lead_touches where installation_id = ${installationId} and excluded is null group by location_id
     )
     select l.location_id, l.name, l.email, l.phone, l.website, l.ignored, l.owner,
       l.calendar_count, l.pipeline_count, l.sync_error, l.contacts_synced_at,

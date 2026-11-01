@@ -86,20 +86,27 @@ test("durations read like a person would say them", () => {
   assert.equal(fmtDuration(86_400 + 3 * 3600), "1 d 3 h");
 });
 
-test("lead sources are grouped into portal, form, social and other, each with its own target", async () => {
+test("lead sources are grouped into portal, meta, form, social and other, each with its own target", async () => {
   const { classifySource, bySource } = await import("../analytics/speed-intel.ts");
   assert.equal(classifySource("Zillow Premier Agent"), "portal");
   assert.equal(classifySource("Website form"), "form");
-  assert.equal(classifySource("Facebook Lead Ads"), "social");
+  assert.equal(classifySource("Facebook Lead Ads"), "meta");
+  assert.equal(classifySource("Facebook Lead Form"), "meta", "a Facebook form is not filed as a web form");
+  assert.equal(classifySource("Instagram lead ad"), "meta");
+  assert.equal(classifySource("Meta Instant Form"), "meta");
+  assert.equal(classifySource("Instagram DM"), "social", "a message to the page is social, not a lead form");
+  assert.equal(classifySource("Facebook Messenger"), "social");
+  assert.equal(classifySource("JC-WCM-01 | New Lead Form"), "form", "a form name that only contains lead form is a web form");
+  assert.equal(classifySource("linkedin outreach partners survey"), "social");
   assert.equal(classifySource("Referral"), "other");
   assert.equal(classifySource(null), "other");
   const now = Date.parse("2026-10-31T12:00:00Z");
   const mk = (source: string, mins: number | null): TouchRow => ({ locationId: "L", contactId: source + mins, leadAt: now - 3 * 3_600_000, touchAt: mins === null ? null : now - 3 * 3_600_000 + mins * 60_000, userId: "u", source });
-  const rows = [...[2, 3, 4, 8, 9, 30].map((m) => mk("Zillow", m)), ...[10, 12, 14, 40, 50, 90].map((m) => mk("Facebook", m))];
+  const rows = [...[2, 3, 4, 8, 9, 30].map((m) => mk("Zillow", m)), ...[5, 8, 10, 12, 40, 90].map((m) => mk("Facebook Lead Form", m))];
   const out = bySource(rows, 15, now);
-  assert.deepEqual(out.map((o) => [o.cls, o.targetMinutes]), [["portal", 5], ["social", 60]]);
+  assert.deepEqual(out.map((o) => [o.cls, o.targetMinutes]), [["portal", 5], ["meta", 10]]);
   assert.equal(out[0].withinTarget, 3, "portal: 2, 3 and 4 minutes beat the 5 minute target");
-  assert.equal(out[1].withinTarget, 5, "social: 10, 12, 14, 40 and 50 minutes beat 60; only 90 is late");
+  assert.equal(out[1].withinTarget, 3, "meta: 5, 8 and 10 minutes are inside the 10 minute target; 12, 40 and 90 are late");
 });
 
 test("a lead unanswered for more than three days counts as never answered, not waiting", async () => {
@@ -122,4 +129,16 @@ test("the weekly trend counts each week's leads and hides a percentage built on 
   assert.equal(t[1].leads, 2);
   assert.equal(t[1].hitRate, null, "two leads is too few for a percentage");
   assert.equal(t[0].leads, 0);
+});
+
+test("an outbound call placed by a person is a first touch; a call with no person is automation", () => {
+  const call = (userId: string | null, source: string | null): Msg => ({ at: 1, direction: "outbound", userId, source, type: "TYPE_CALL" });
+  assert.equal(isHumanTouch(call("u1", null), false), true, "a call from the dialer has no 'app' source but has a person");
+  assert.equal(isHumanTouch(call("u1", "workflow"), false), true);
+  assert.equal(isHumanTouch(call(null, "workflow"), false), false);
+  assert.equal(isHumanTouch({ ...call("u1", "app"), direction: "inbound" }, false), false, "an inbound call is the lead calling, not a reply");
+  assert.equal(isHumanTouch({ at: 1, direction: "outbound", userId: "u1", source: "workflow", type: "TYPE_SMS" }, false), false, "a workflow text is still automation");
+  const lead = leadFromMessages([{ at: 1000, direction: "inbound", userId: null, source: null, type: "TYPE_SMS" }, { at: 61_000, direction: "outbound", userId: "u2", source: null, type: "TYPE_CALL" }], null);
+  assert.equal(lead?.touchAt, 61_000);
+  assert.equal(lead?.touchUserId, "u2");
 });

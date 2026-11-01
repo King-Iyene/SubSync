@@ -102,3 +102,15 @@ connections, appointment insights, two-agency tenant isolation, feature switches
 | Leads "Quiet over 90 days" | Hidden ("Not measured") | Database: no contact has recorded activity |
 | Currency | Not stored, labelled | Open issue |
 | CRM comparisons (new contacts, unread conversations) | Pending | King's checks |
+
+## Runbook stage F2 (31 Oct 2026)
+
+| Item | Status | Tested |
+| --- | --- | --- |
+| Lead rules: bulk import, spam, test, do not contact, duplicate left out | Built | Unit tests, real-database test, browser test on the messy demo |
+| Calls count as a first touch | Built | Unit tests only (no live call seen) |
+| Business hours and time zones (off by default) | Built | Unit tests (incl. daylight saving), real-database test; not yet on a real account |
+| Meta lead forms as their own source | Built | Unit and browser tests; live recording of Meta leads unconfirmed |
+| Plain-words headline, left-out sentence | Built | Browser tests at 3 widths, screenshots |
+| Real estate sample audit page | Built | Browser test; fictional data |
+| Figures match raw rows | Verified | `check-speed.ts` against the database |

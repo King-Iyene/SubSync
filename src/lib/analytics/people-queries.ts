@@ -98,9 +98,9 @@ export async function teamStats(installationId: string, allowed: string[] | null
 export async function teamPace(installationId: string, allowed: string[] | null): Promise<Map<string, PaceRow>> {
   const db = sql();
   const [replies, appts] = await Promise.all([
-    db`select t.touch_user_id user_id, count(*)::int n, percentile_cont(0.5) within group (order by extract(epoch from t.touch_at - t.lead_at))::float8 med, max(t.touch_at) last_at
+    db`select t.touch_user_id user_id, count(*)::int n, percentile_cont(0.5) within group (order by greatest(0, extract(epoch from t.touch_at - coalesce(t.clock_start, t.lead_at))))::float8 med, max(t.touch_at) last_at
         from lead_touches t join locations l on l.installation_id = t.installation_id and l.location_id = t.location_id and not l.ignored
-        where t.installation_id = ${installationId} and t.touch_at is not null and t.touch_user_id is not null and t.lead_at > now() - interval '30 days'
+        where t.installation_id = ${installationId} and t.excluded is null and t.touch_at is not null and t.touch_user_id is not null and t.lead_at > now() - interval '30 days'
           ${allowed ? db`and t.location_id = any(${allowed}::text[])` : db``} group by 1`,
     db`select a.assigned_to user_id, count(*) filter (where a.status = 'showed')::int held, count(*) filter (where a.status = 'noshow')::int no_show
         from cached_appointments a join locations l on l.installation_id = a.installation_id and l.location_id = a.location_id and not l.ignored

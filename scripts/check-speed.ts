@@ -30,11 +30,11 @@ async function main() {
   // Recompute from raw rows: leads past the target window, answered within it, answered late, still waiting.
   const raw = (await sql()`
     select
-      count(*) filter (where touch_at is not null and extract(epoch from touch_at - lead_at) <= 900)::int as on_time,
-      count(*) filter (where touch_at is not null and extract(epoch from touch_at - lead_at) > 900)::int as late_n,
-      count(*) filter (where touch_at is null and lead_at < now() - interval '15 minutes')::int as waiting_n
+      count(*) filter (where touch_at is not null and greatest(0, extract(epoch from touch_at - coalesce(clock_start, lead_at))) <= 900)::int as on_time,
+      count(*) filter (where touch_at is not null and greatest(0, extract(epoch from touch_at - coalesce(clock_start, lead_at))) > 900)::int as late_n,
+      count(*) filter (where touch_at is null and coalesce(clock_start, lead_at) < now() - interval '15 minutes')::int as waiting_n
     from lead_touches t join locations l on l.installation_id = t.installation_id and l.location_id = t.location_id and not l.ignored
-    where t.installation_id = ${inst.id} and t.lead_at > now() - interval '14 days'`)[0];
+    where t.installation_id = ${inst.id} and t.excluded is null and t.lead_at > now() - interval '14 days'`)[0];
   assert.deepEqual([o.withinTarget, o.answeredLate, o.stillWaiting], [raw.on_time, raw.late_n, raw.waiting_n], "the screen agrees with the raw rows");
   assert.equal(o.answered, o.withinTarget + o.answeredLate);
   assert.ok(o.hitRate >= 0 && o.hitRate <= 1 && o.medianSeconds <= o.p90Seconds);

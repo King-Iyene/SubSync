@@ -234,3 +234,11 @@ Format: date, decision, reason.
 - The existing "Hide test accounts" switch is kept; no second test-account rule.
 - Leads "Quiet over 90 days" is hidden until contact activity is synced (none of the 103,404 synced contacts has any), because it only measured how long ago contacts were added.
 - Currency is not stored; dollar figures say "as entered in each account". Storing currency at sync is an open issue.
+
+## 2026-10-31 (runbook stage F2)
+
+- Lead rules live in `lead-rules.ts` and are stored on each lead (`excluded`, `clock_start`) after every speed sync, so every reader agrees. Reasons in order: bulk import, spam, test, do not contact, duplicate.
+- Business hours is a clock-start shift (next opening in the account's time zone, Monday to Friday), off by default. Reason: a business-minutes clock would need the same logic in SQL and in code; the shift covers the night and weekend leads that cause the false alerts. A lead that arrives in hours and is unanswered at closing keeps counting overnight.
+- Facebook and Instagram lead forms are timed at 10 minutes and shown as their own source; messages to the page stay social at 60.
+- example.com is not a test-contact signal (it is the placeholder in sample data).
+- The real estate sample audit is a fictional published snapshot under the demo installation, created by a script; it is not a real customer's data.

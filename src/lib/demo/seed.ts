@@ -1,5 +1,6 @@
 import { refreshInsights } from "../analytics/service";
 import { sql } from "../db";
+import { applyLeadRules } from "../sync/lead-rules-apply";
 import { checkDomain, type DnsResolver } from "../dns/email-auth";
 
 // Demo data: a fictional agency with 14 client accounts of deliberately different health, so
@@ -381,6 +382,26 @@ async function ensureSpeedDemo(installationId: string): Promise<void> {
     await db`update locations set speed_access = 'ok', speed_synced_at = now() where installation_id = ${installationId} and location_id = ${l.location_id}`;
   }
   for (let i = 0; i < rows.length; i += 400) await db`insert into lead_touches ${db(rows.slice(i, i + 400) as never)}`;
+
+  // Messy contacts on purpose (runbook test data kit): in every live account, three of the 30 leads are a spam tag, a test name
+  // and a CSV import, and one is a repeat of the first contact's email. They must be left out of every speed figure.
+  const live2 = locs.filter((l) => !l.ignored).map((l) => l.location_id as string);
+  for (const loc of live2) {
+    await db`update cached_contacts set tags = array['spam'] where installation_id = ${installationId} and location_id = ${loc} and contact_id = ${loc + "-c27"}`;
+    await db`update cached_contacts set first_name = 'Test', last_name = 'Lead' where installation_id = ${installationId} and location_id = ${loc} and contact_id = ${loc + "-c28"}`;
+    await db`update cached_contacts set source = 'CSV import' where installation_id = ${installationId} and location_id = ${loc} and contact_id = ${loc + "-c30"}`;
+    await db`update cached_contacts d set email = f.email, date_added = f.date_added + interval '1 hour'
+      from cached_contacts f where d.installation_id = ${installationId} and d.location_id = ${loc} and d.contact_id = ${loc + "-c26"}
+        and f.installation_id = d.installation_id and f.location_id = d.location_id and f.contact_id = ${loc + "-c1"} and nullif(f.email, '') is not null`;
+  }
+  // The real estate sample: Blue Door Realty gets the sources a real estate team really sees, and its appointments are showings.
+  const [blue] = await db`select location_id from locations where installation_id = ${installationId} and name = 'Blue Door Realty'`;
+  if (blue) {
+    await db`update cached_contacts set source = (array['Facebook Lead Form', 'Instagram Lead Ad', 'Zillow Premier Agent', 'Open House Sign-in', 'Realtor.com Lead', 'Website form', 'Facebook Lead Form'])[1 + (substring(contact_id from '[0-9]+$')::int % 7)]
+      where installation_id = ${installationId} and location_id = ${blue.location_id} and contact_id ~ '-c[0-9]+$' and substring(contact_id from '[0-9]+$')::int <= 30`;
+    await db`update cached_appointments set title = 'Showing' where installation_id = ${installationId} and location_id = ${blue.location_id}`;
+  }
+  for (const loc of live2) await applyLeadRules(installationId, loc).catch(() => undefined);
 }
 
 export async function ensureDemo(): Promise<string> {

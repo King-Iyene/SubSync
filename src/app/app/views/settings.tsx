@@ -7,7 +7,7 @@ import { Badge, Btn, Card, ErrorBox, inputClass, Loading, PageHeader, timeAgo } 
 import { ConnectionsCard } from "./connections";
 import { HealthCard } from "./health-card";
 
-type S = { staleDays: number; dormantDays: number; slaHours: number; appDomain: string; digestEnabled: boolean; customChecklist: string[]; digestHour: number | null; digestTimezone: string | null; digestEmail: string | null; emailReady?: boolean; brandName: string | null; brandColor: string | null; industryTargets?: boolean; keepTranscripts: boolean; pushNotesToCrm: boolean; speedTargetMinutes: number; countAutomatedTouches: boolean };
+type S = { staleDays: number; dormantDays: number; slaHours: number; appDomain: string; digestEnabled: boolean; customChecklist: string[]; digestHour: number | null; digestTimezone: string | null; digestEmail: string | null; emailReady?: boolean; brandName: string | null; brandColor: string | null; industryTargets?: boolean; keepTranscripts: boolean; pushNotesToCrm: boolean; speedTargetMinutes: number; countAutomatedTouches: boolean; speedBusinessHours: boolean; speedOpenHour: number; speedCloseHour: number };
 
 export function SettingsView() {
   const api = useApiClient();
@@ -46,6 +46,7 @@ export function SettingsView() {
       const body: Record<string, unknown> = {
         staleDays: form.staleDays, dormantDays: form.dormantDays, slaHours: form.slaHours, appDomain: form.appDomain,
         digestEnabled: form.digestEnabled, digestHour: form.digestHour, digestTimezone: form.digestTimezone, digestEmail: form.digestEmail, brandName: form.brandName, brandColor: form.brandColor, keepTranscripts: form.keepTranscripts, pushNotesToCrm: form.pushNotesToCrm, speedTargetMinutes: form.speedTargetMinutes, countAutomatedTouches: form.countAutomatedTouches,
+        speedBusinessHours: form.speedBusinessHours, speedOpenHour: form.speedOpenHour, speedCloseHour: form.speedCloseHour,
         customChecklist: checklist.split("\n").map((l) => l.trim()).filter(Boolean),
       };
       if (slack.trim()) body.slackWebhookUrl = slack.trim();
@@ -152,6 +153,18 @@ export function SettingsView() {
             </div>
             <label className="flex items-center gap-2 pb-2 text-sm"><input type="checkbox" className="size-4" checked={form.countAutomatedTouches} onChange={(e) => setForm({ ...form, countAutomatedTouches: e.target.checked })} /> Count automatic messages as a reply</label>
           </div>
+          <div className="mt-4 flex flex-wrap items-end gap-4">
+            <label className="flex items-center gap-2 pb-2 text-sm"><input type="checkbox" className="size-4" checked={form.speedBusinessHours} onChange={(e) => setForm({ ...form, speedBusinessHours: e.target.checked })} /> Only count business hours</label>
+            <div>
+              <label htmlFor="speed-open" className="mb-1 block text-sm font-medium">Opens (hour)</label>
+              <input id="speed-open" type="number" min={0} max={23} className={`${inputClass} !w-24`} disabled={!form.speedBusinessHours} value={form.speedOpenHour} onChange={(e) => setForm({ ...form, speedOpenHour: Number(e.target.value) })} />
+            </div>
+            <div>
+              <label htmlFor="speed-close" className="mb-1 block text-sm font-medium">Closes (hour)</label>
+              <input id="speed-close" type="number" min={1} max={24} className={`${inputClass} !w-24`} disabled={!form.speedBusinessHours} value={form.speedCloseHour} onChange={(e) => setForm({ ...form, speedCloseHour: Number(e.target.value) })} />
+            </div>
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">With this on, a lead that arrives when your team is closed (evenings, weekends) starts its reply clock at the next opening time in that account&apos;s own time zone, Monday to Friday. A lead that arrives during opening hours and is still unanswered at closing keeps counting overnight.</p>
         </Card>
 
         <Card title="Your name on reports">

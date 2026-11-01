@@ -10,10 +10,11 @@ type Data = {
   targetMinutes: number; windowDays: number;
   access: { ok: number; needsPermission: Array<{ locationId: string; name: string }>; total: number };
   overall: Summary;
-  bySource?: Array<Summary & { cls: "portal" | "form" | "social" | "other"; targetMinutes: number }>;
+  bySource?: Array<Summary & { cls: "portal" | "meta" | "form" | "social" | "other"; targetMinutes: number }>;
   unassignedWaiting?: number;
   trend?: Array<{ weekStart: number; leads: number; withinTarget: number; hitRate: number | null }>;
   neverAnswered?: number;
+  leftOut?: Array<{ reason: string; label: string; n: number }>;
   perAccount: Array<Summary & { locationId: string; name: string; access: string | null }>;
   people: Array<{ userId: string; label: string; replies: number; medianSeconds: number }>;
   waiting: Array<{ locationId: string; locationName: string; contactId: string; name: string; waitingMinutes: number; url: string; unassigned?: boolean; neverAnswered?: boolean }>;
@@ -38,6 +39,12 @@ export function SpeedView({ go }: { go: GoFn }) {
   if (error) return <ErrorBox error={error} onRetry={reload} />;
   if (!data) return null;
   const o = data.overall;
+  // One plain sentence first: how many leads are waiting for a reply right now, and how many were missed.
+  const never = data.neverAnswered ?? 0;
+  const waitingNow = Math.max(0, o.stillWaiting - never);
+  const headline = waitingNow === 0 && never === 0
+    ? "No leads are waiting for a reply right now."
+    : `${waitingNow} ${waitingNow === 1 ? "lead is" : "leads are"} waiting for a reply${never > 0 ? `, and ${never} ${never === 1 ? "was" : "were"} never answered` : ""}.`;
   const none = data.access.total > 0 && data.access.ok === 0;
 
   return (
@@ -55,12 +62,19 @@ export function SpeedView({ go }: { go: GoFn }) {
         <Empty title={none ? "Waiting for permission" : "No new leads to time yet"} body={none ? "Approve the new permissions when SubSync asks, then run a sync. First replies appear here after that." : "A lead appears here once a new contact has a conversation. Check back after the next sync."} />
       ) : (
         <>
+          <p className="mb-3 text-sm font-medium">{headline}</p>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <Stat label="Typical first reply" value={o.medianSeconds === null ? "Not enough data" : dur(o.medianSeconds)} sub={o.p90Seconds !== null ? `9 in 10 were answered within ${dur(o.p90Seconds)}` : "Needs at least 5 replies"} />
             <Stat label={`Answered within ${data.targetMinutes} min`} value={pct(o.hitRate)} tone={o.hitRate === null ? undefined : o.hitRate >= 0.8 ? undefined : "warn"} sub={`${fmtInt(o.withinTarget)} of ${fmtInt(o.withinTarget + o.answeredLate + o.stillWaiting)} leads`} />
             <Stat label="Waiting right now" value={fmtInt(Math.max(0, o.stillWaiting - (data.neverAnswered ?? 0)))} tone={o.stillWaiting - (data.neverAnswered ?? 0) > 0 ? "bad" : undefined} sub={(data.neverAnswered ?? 0) > 0 ? `past the target, under 3 days old. Plus ${data.neverAnswered} never answered (older than 3 days)` : "no person has replied, past the target"} />
             <Stat label="Answered late" value={fmtInt(o.answeredLate)} sub="a person replied, after the target" />
           </div>
+
+          {(data.leftOut ?? []).length > 0 && (
+            <p className="mt-2 text-xs text-muted-foreground">
+              {fmtInt((data.leftOut ?? []).reduce((s, x) => s + x.n, 0))} new contacts were not counted as leads: {(data.leftOut ?? []).map((x) => `${fmtInt(x.n)} ${x.label}`).join(", ")}.
+            </p>
+          )}
 
           {data.waiting.length > 0 && (
             <Card title={`Leads waiting or missed (${o.stillWaiting})`} className="mt-6" action={data.waiting.length > 10 ? <Btn variant="ghost" onClick={() => setAll(!all)}>{all ? "Show fewer" : `Show all ${data.waiting.length}`}</Btn> : undefined}>
@@ -99,11 +113,11 @@ export function SpeedView({ go }: { go: GoFn }) {
 
           {data.bySource && data.bySource.length > 0 && (
             <Card title="By where the lead came from" className="mt-6">
-              <p className="mb-2 text-xs text-muted-foreground">Each source is judged against its own target: portal and phone leads 5 minutes, web forms 15, social messages 60. These are common practice targets, not rules.</p>
+              <p className="mb-2 text-xs text-muted-foreground">Each source is judged against its own target: portal and phone leads 5 minutes, Facebook and Instagram lead forms 10, web forms 15, social messages 60. These are common practice targets, not rules.</p>
               <Table head={<tr><Th>Source</Th><Th className="text-right">Target</Th><Th className="text-right">Typical</Th><Th className="text-right">In target</Th><Th className="text-right">Waiting</Th></tr>}>
                 {data.bySource.map((s) => (
                   <tr key={s.cls}>
-                    <Td className="font-medium">{({ portal: "Portals and phone", form: "Web forms and chat", social: "Social messages", other: "Other sources" } as const)[s.cls]}</Td>
+                    <Td className="font-medium">{({ portal: "Portals and phone", meta: "Facebook and Instagram lead forms", form: "Web forms and chat", social: "Social messages", other: "Other sources" } as const)[s.cls]}</Td>
                     <Td className="text-right tabular-nums">{s.targetMinutes} min</Td>
                     <Td className="text-right tabular-nums">{dur(s.medianSeconds)}</Td>
                     <Td className="text-right"><Badge tone={rateTone(s.hitRate)}>{pct(s.hitRate)}</Badge></Td>

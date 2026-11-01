@@ -116,12 +116,32 @@ individual deals. Code: `test-data.ts`.
 
 ## Speed to lead (Wave 1 #1)
 
-**Lead.** A new contact (created in the last 14 days) that has a conversation. A contact with no conversation is not
-timed: bulk imports would otherwise look like thousands of unanswered leads.
+**Lead.** A new contact (created in the last 14 days) that has a conversation and is not left out for one of these reasons
+(`lead-rules.ts`, applied after every speed sync, first match wins, and shown on screen as "N new contacts were not
+counted as leads: ..."):
+- *bulk import*: the source or a tag says import, csv, upload, bulk or migration, or 20 or more contacts in the account were
+  created in the same minute;
+- *spam*: the source or a tag says spam, junk, bot or fake;
+- *test*: the name or a tag says test, demo, sample, sandbox or dummy as a whole word, or the email is a throwaway test
+  address (test.com, mailinator, guerrillamail, yopmail). example.com is not a signal (it is the placeholder in sample data);
+- *do not contact*: the contact has asked not to be contacted;
+- *duplicate*: an earlier contact in the same account has the same email or the same phone number (a merged or repeated
+  contact is counted once, as the earlier one).
+A contact with no conversation is not timed either: bulk imports would otherwise look like thousands of unanswered leads.
 **Start of the clock.** The earlier of the contact being created and the first inbound message.
-**First touch.** The first outbound message at or after the start that a person sent from the app: an outbound message
-with a user attached and the source `app`. Messages from workflows, campaigns, bulk actions or the API are automation
+**First touch.** The first outbound message or call at or after the start that a person sent from the app: an outbound message
+with a user attached and the source `app`, or an outbound call (the platform records calls as messages of type TYPE_CALL) with a
+user attached, answered or not. An inbound call is the lead calling, not a reply. Messages from workflows, campaigns, bulk actions or the API are automation
 and do not stop the clock, unless the account switches on "Count automatic messages as a reply" (off by default).
+**Business hours** (off by default, Settings). When on, a lead that arrives while the team is closed starts its clock at the next
+opening time in that account's own time zone: Monday to Friday, from the opening hour to the closing hour (default 9 to 17), so a
+Saturday lead is timed from Monday 09:00 and daylight-saving changes are handled. A lead that arrives during opening hours starts at
+its own time; if it is still unanswered at closing it keeps counting overnight (it shows as waiting, never hidden). Stored as
+`clock_start` on each lead; every screen, alert and the team figures read it. Code: `clockStart` in `lead-rules.ts`.
+**Sources and targets.** portal and phone 5 minutes, Facebook and Instagram lead forms 10, web forms 15, social messages (DM, Messenger,
+WhatsApp, TikTok, LinkedIn) 60, anything else the account target. "Facebook Lead Form" is a Meta lead form, "Instagram DM" is a social
+message. How the CRM records Meta leads is not yet confirmed on live data: none of the connected accounts has any. The classifier reads
+the contact's source text; attribution fields are not synced.
 **Response time.** First touch minus start. **Target.** Per install, default 15 minutes, set in Settings (1 to 1,440).
 **Hit rate.** Leads answered within the target divided by leads answered within it, answered late, or still waiting past
 it. A lead still inside its target window is not judged yet. Shown only with at least 5 judged leads.

@@ -1,4 +1,5 @@
 import { sql } from "../db";
+import { EXCLUSION_LABEL, type Exclusion } from "./lead-rules";
 import { bySource, isNeverAnswered, rankPeople, summarise, weeklyTrend, type Summary, type TouchRow } from "./speed-intel";
 
 // Everything the speed-to-lead screen shows, for the accounts the caller may see. Leads older than the
@@ -9,16 +10,19 @@ const ms = (v: unknown) => (v instanceof Date ? v.getTime() : null);
 
 export async function speedView(installationId: string, allowed: string[] | null, targetMinutes: number, now = Date.now()) {
   const db = sql();
-  const [locs, rows, people] = await Promise.all([
+  const [locs, rows, people, left] = await Promise.all([
     db`select location_id, name, speed_access from locations where installation_id = ${installationId} and not ignored ${allowed ? db`and location_id = any(${allowed}::text[])` : db``} order by lower(coalesce(name, ''))`,
     db`
-      select t.location_id, t.contact_id, t.lead_at, t.touch_at, t.touch_user_id, c.source, (nullif(c.assigned_to, '') is not null) assigned
+      select t.location_id, t.contact_id, coalesce(t.clock_start, t.lead_at) lead_at, t.touch_at, t.touch_user_id, c.source, (nullif(c.assigned_to, '') is not null) assigned
       from lead_touches t
       left join cached_contacts c on c.installation_id = t.installation_id and c.location_id = t.location_id and c.contact_id = t.contact_id
       join locations l on l.installation_id = t.installation_id and l.location_id = t.location_id and not l.ignored
-      where t.installation_id = ${installationId} and t.lead_at > ${new Date(now - SPEED_WINDOW_DAYS * DAY)}
+      where t.installation_id = ${installationId} and t.excluded is null and t.lead_at > ${new Date(now - SPEED_WINDOW_DAYS * DAY)}
         ${allowed ? db`and t.location_id = any(${allowed}::text[])` : db``} limit 20000`,
     db`select user_id, name from team_names where installation_id = ${installationId}`,
+    db`select t.excluded, count(*)::int n from lead_touches t join locations l on l.installation_id = t.installation_id and l.location_id = t.location_id and not l.ignored
+       where t.installation_id = ${installationId} and t.excluded is not null and t.lead_at > ${new Date(now - SPEED_WINDOW_DAYS * DAY)}
+         ${allowed ? db`and t.location_id = any(${allowed}::text[])` : db``} group by 1 order by 2 desc`.catch(() => []),
   ]);
   const touches: TouchRow[] = rows.map((r) => ({ locationId: r.location_id as string, contactId: r.contact_id as string, leadAt: ms(r.lead_at) ?? 0, touchAt: ms(r.touch_at), userId: r.touch_user_id as string | null, source: (r.source as string | null) ?? null, assigned: r.assigned === true }));
   const names = new Map(locs.map((l) => [l.location_id as string, (l.name as string | null) ?? "Unnamed account"]));
@@ -33,9 +37,9 @@ export async function speedView(installationId: string, allowed: string[] | null
 
   // The trend is an extra: if this read ever fails, the rest of the screen must still load.
   const history = await db`
-    select t.location_id, t.contact_id, t.lead_at, t.touch_at, t.touch_user_id
+    select t.location_id, t.contact_id, coalesce(t.clock_start, t.lead_at) lead_at, t.touch_at, t.touch_user_id
     from lead_touches t join locations l on l.installation_id = t.installation_id and l.location_id = t.location_id and not l.ignored
-    where t.installation_id = ${installationId} and t.lead_at > ${new Date(now - 56 * DAY)}
+    where t.installation_id = ${installationId} and t.excluded is null and t.lead_at > ${new Date(now - 56 * DAY)}
       ${allowed ? db`and t.location_id = any(${allowed}::text[])` : db``} limit 50000`.catch(() => []);
   const trend = weeklyTrend(history.map((r) => ({ locationId: r.location_id as string, contactId: r.contact_id as string, leadAt: ms(r.lead_at) ?? 0, touchAt: ms(r.touch_at), userId: r.touch_user_id as string | null })), targetMinutes, now);
 
@@ -47,6 +51,8 @@ export async function speedView(installationId: string, allowed: string[] | null
 
   return {
     targetMinutes, windowDays: SPEED_WINDOW_DAYS,
+    // Contacts that were not counted as leads, and why (bulk imports, spam, test contacts, do not contact, duplicates).
+    leftOut: left.map((r) => ({ reason: r.excluded as string, label: EXCLUSION_LABEL[r.excluded as Exclusion] ?? (r.excluded as string), n: r.n as number })),
     access: { ok: locs.filter((l) => l.speed_access === "ok").length, needsPermission: locs.filter((l) => l.speed_access === "needs_permission").map((l) => ({ locationId: l.location_id as string, name: names.get(l.location_id as string) as string })), total: locs.length },
     overall: summarise(touches, targetMinutes, now),
     bySource: bySource(touches, targetMinutes, now),

@@ -772,7 +772,7 @@ const settingsView = async (ctx: Ctx) => {
 
 function publicSettings(s: Settings) {
   // Never send the webhook URL back to the browser: it is a secret.
-  return { staleDays: s.staleDays, dormantDays: s.dormantDays, slaHours: s.slaHours, appDomain: s.appDomain, digestEnabled: s.digestEnabled, customChecklist: s.customChecklist, digestHour: s.digestHour, digestTimezone: s.digestTimezone, digestEmail: s.digestEmail, emailReady: emailConfigured(), brandName: s.brandName, brandColor: s.brandColor, industryTargets: s.industryTargets, keepTranscripts: s.keepTranscripts, pushNotesToCrm: s.pushNotesToCrm, speedTargetMinutes: s.speedTargetMinutes, countAutomatedTouches: s.countAutomatedTouches };
+  return { staleDays: s.staleDays, dormantDays: s.dormantDays, slaHours: s.slaHours, appDomain: s.appDomain, digestEnabled: s.digestEnabled, customChecklist: s.customChecklist, digestHour: s.digestHour, digestTimezone: s.digestTimezone, digestEmail: s.digestEmail, emailReady: emailConfigured(), brandName: s.brandName, brandColor: s.brandColor, industryTargets: s.industryTargets, keepTranscripts: s.keepTranscripts, pushNotesToCrm: s.pushNotesToCrm, speedTargetMinutes: s.speedTargetMinutes, countAutomatedTouches: s.countAutomatedTouches, speedBusinessHours: s.speedBusinessHours, speedOpenHour: s.speedOpenHour, speedCloseHour: s.speedCloseHour };
 }
 
 async function settingsUpdate(ctx: Ctx) {
@@ -793,6 +793,14 @@ async function settingsUpdate(ctx: Ctx) {
     patch.speedTargetMinutes = n;
   }
   if ("countAutomatedTouches" in body) patch.countAutomatedTouches = body.countAutomatedTouches === true;
+  if ("speedBusinessHours" in body) patch.speedBusinessHours = body.speedBusinessHours === true;
+  if ("speedOpenHour" in body || "speedCloseHour" in body) {
+    const open = Number(body.speedOpenHour);
+    const close = Number(body.speedCloseHour);
+    if (!Number.isInteger(open) || !Number.isInteger(close) || open < 0 || close > 24 || close <= open) return json({ error: "Choose opening and closing hours between 0 and 24, with closing after opening" }, 400);
+    patch.speedOpenHour = open;
+    patch.speedCloseHour = close;
+  }
   if ("brandName" in body) {
     if (body.brandName === null || body.brandName === "") patch.brandName = null;
     else if (typeof body.brandName === "string" && body.brandName.trim().length <= 60) patch.brandName = body.brandName.trim();
