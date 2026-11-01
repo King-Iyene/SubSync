@@ -7,23 +7,23 @@ ORPHANS (notes with no stage in docs/ROADMAP_V2.md): none found.
 <!-- TABLE -->
 | ID | Title | Stage | Status | Evidence or reason |
 | --- | --- | --- | --- | --- |
-| N1 | Today: the filter bar is unclear | F5, F1, F8 | PLANNED-LATER |  |
+| N1 | Today: the filter bar is unclear | F5, F1, F8 | PLANNED-LATER | F1 part DONE: a hidden test account (or any filtered-out account) is excluded from every number on every page, proven by scripts/check-filter.ts (5 filters, 37 pages, three pages that ignored the filter fixed). Still F5 and F8: show what is hidden and why, plain filter help, the owner marking test accounts in Settings |
 | N2 | Today needs a client-account (sub-account) version | F5 | PLANNED-LATER |  |
 | N3 | UI/UX redesign: "it looks somehow not sweet" | D0, D1 | PLANNED-LATER |  |
 | N4 | Today: the "When this is sent" card at the bottom | F9, F5, F8 | PLANNED-LATER |  |
 | N5 | Today: "Not watched yet" card, ship what is doable | F2, F4, F9, F8 | PLANNED-LATER |  |
-| N6 | Things I noticed in the same screenshots | F1, F5 | PLANNED-LATER | Freshness part DONE in S0.4 (one status line, no three contradicting messages). The percent-change tiles, the single-deal hero and the counted-at-risk wording stay F1 and F5 |
+| N6 | Things I noticed in the same screenshots | F1, F5 | DONE-TONIGHT | F1: no percentage change below a base of 10 (5,000 dollars) on Today, the executive summary and Leads growth (f1-rules.test.ts, digest-intel.test.ts, tests/e2e/f1.spec.ts); the single-deal headline now says when one deal is most of the figure (audit-intel.test.ts, UX-04); 'counted at risk' is now plain words; the freshness part was S0.4 |
 | N7 | Dead ends: no way back | F5, F6, D1 | PLANNED-LATER |  |
-| N8 | A client-account filter wherever data is shown | F1, F5, D0 | PLANNED-LATER |  |
+| N8 | A client-account filter wherever data is shown | F1, F5, D0 | PLANNED-LATER | F1 part DONE: every number, list and export respects the filter and one test proves the same filter gives the same numbers on every page (scripts/check-filter.ts, 5 filters x 37 pages; tests/e2e/f1.spec.ts for the demo). The persistent selector and its design are F5, D0 |
 | N9 | Status text and notifications should not sit in cards | D1, F5 | PLANNED-LATER |  |
 | N10 | Design quality: "not human built", "the gauge looks child built" | D0, D1 | PLANNED-LATER |  |
 | N11 | "SLA" is jargon | F4, F5 | PLANNED-LATER |  |
 | N12 | Filter by how long someone has waited, with a better view | F4 | PLANNED-LATER |  |
 | N13 | Why is "Older than a week (13)" hidden? | F4 | PLANNED-LATER |  |
 | N14 | Long lists make the page unusable | F4, D0 | PLANNED-LATER |  |
-| N15 | The Inbox page contradicts itself on numbers | F1, F4 | PLANNED-LATER |  |
-| N16 | Health labels contradict "Needs attention" | F1 (item 3), F5 | PLANNED-LATER |  |
-| N17 | Progress seen | none (progress note) | NOT-A-CODE-ITEM | an observation that earlier fixes landed |
+| N15 | The Inbox page contradicts itself on numbers | F1, F4 | DONE-TONIGHT | F1: one waiting definition and window; unread counted separately (the 285 vs 259 explained: the Inbox card subtracted the 24 to 26 that are also waiting, nothing was added); the wait chart counts the same set as the list (255 vs 26 fixed); Critical only for more than a day and under a week, older is its own bucket; the 500-conversation read limit is stated; the quiet-deals total is counted in the database, not over a capped 3,000 (docs/METRICS.md, f1-rules.test.ts, comms-intel.test.ts, f1.spec.ts, check-filter.ts) |
+| N16 | Health labels contradict "Needs attention" | F1 (item 3), F5 | DONE-TONIGHT | F1: the health label is held down by waiting customers (5 waiting: at best Watch, 15: At risk) and nothing in a Needs attention list is Healthy or Thriving; real: KD Squares LTD 21 waiting was Healthy, now At risk (f1-rules.test.ts, tests/e2e/f1.spec.ts) |
+| N17 | Progress seen | none (progress note) | NOT-A-CODE-ITEM | an observation that earlier fixes landed; the item it left open (the stale-deal tile driven by one deal) is now handled by the single-deal guard, see N6 and UX-04 |
 | N18 | Same conversation appears in three accounts | F2 | PLANNED-LATER |  |
 | N19 | Design still "not mature" on Speed to lead, Appointments and Insights | D0, D1 | PLANNED-LATER |  |
 | N20 | Smart Lists and dialing | F10 | PLANNED-LATER |  |
@@ -43,17 +43,17 @@ ORPHANS (notes with no stage in docs/ROADMAP_V2.md): none found.
 | N34 | Filters must adapt to who is looking | D0 | PLANNED-LATER |  |
 | N35 | Contact search is plain: merge it and build paying features around it | F10, D0 | PLANNED-LATER |  |
 | N36 | Pipeline is one endless page | P1 (never tonight), D0 pattern | PLANNED-LATER |  |
-| N37 | Forecast trust: "why should they trust your forecast? how are you calculating?" | F1, P1 | PLANNED-LATER |  |
-| N38 | Stage awareness: closed-out stages and junk pipelines flagged as dead or risky | F1, P1 | PLANNED-LATER |  |
-| N39 | The pipeline-over-time chart shows a definition change as a trend | F1, P1 | PLANNED-LATER |  |
+| N37 | Forecast trust: "why should they trust your forecast? how are you calculating?" | F1, P1 | PLANNED-LATER | F1 part DONE: minimum sample, a How this is calculated drawer, owner-set stage probabilities (labelled as assumptions), timing from each pipeline's real sales cycle, a range with a stated confidence, deals out of play excluded (pipeline-intel.test.ts, check-stage-rules.ts, tests/e2e/f1.spec.ts). NOT built: forecast versus actual each month (needs a month of recorded forecasts and 20 closed deals: P1) |
+| N38 | Stage awareness: closed-out stages and junk pipelines flagged as dead or risky | F1, P1 | DONE-TONIGHT | F1: the owner classifies stages (active, closed out, ignore) and pipelines (in use, not in use), starting from name suggestions the screen states; excluded stages never count as open pipeline, stale, dead or forecast; absurd ratio texts dropped. Real: 13 of 80 stage pairs closed out by name, 1,033 open deals (f1-rules.test.ts, tests/unit/f1-deal-scope-db.test.ts, scripts/check-stage-rules.ts) |
+| N39 | The pipeline-over-time chart shows a definition change as a trend | F1, P1 | PLANNED-LATER | F1 part DONE: snapshots carry a definition version and history is only compared inside one version; the chart says what it left out (tests/unit/f1-deal-scope-db.test.ts, f1-rules.test.ts). Axes, labels and a tooltip on the chart are P1 and D1 |
 | N40 | "Clients should live in SubSync": a safe actions layer with write scopes | W1 (never tonight) | PLANNED-LATER |  |
 | N41 | Payments module idea | R1 | PARKED | waits for evidence and King's decision |
 | N42 | In-app notification centre | F9 | PLANNED-LATER |  |
 | N43 | More observations on these screens | none (observations; menu in D0, junk data in F1) | NOT-A-CODE-ITEM | observations folded into D0 and F1 |
-| N44 | Leads page: too many cards, and what is each data point for? | F1, D0, D1 | PLANNED-LATER |  |
-| N45 | "Quiet over 90 days: 100%" and "never engaged: 52,926" look wrong | F1 | PLANNED-LATER |  |
-| N46 | Zero invalid emails and phones across 52,926 contacts is implausible | F1 | PLANNED-LATER |  |
-| N47 | Source data is 99% "Unknown" | F1, F2 | PLANNED-LATER |  |
+| N44 | Leads page: too many cards, and what is each data point for? | F1, D0, D1 | NEEDS-KING | docs/DATA_POINTS.md written: 116 rows with a recommendation each; nothing was cut. King approves the cut list (docs/NEEDS_KING.md section 16); sub-tabs for Leads are D0 and D1 |
+| N45 | "Quiet over 90 days: 100%" and "never engaged: 52,926" look wrong | F1 | DONE-TONIGHT | F1: cold lists (tags the owner marked, or named like cold outreach) are counted apart; working leads are split into seen in 90 days, engaged then quiet, nothing seen, from conversations, appointments and deals, with the limit stated. Real: 50,958 of 52,926 contacts on cold lists, 275 working leads engaged then quiet (tests/unit/f1-deal-scope-db.test.ts, f1.spec.ts) |
+| N46 | Zero invalid emails and phones across 52,926 contacts is implausible | F1 | DONE-TONIGHT | F1: invalid, disposable and missing are counted apart as N of M checked, with Not checked and the reason when a check could not run; the SQL and JavaScript validity rules are proven identical by a database test (it fixed two differences). Real: 0 invalid emails of 50,891 checked, 2,035 missing |
+| N47 | Source data is 99% "Unknown" | F1, F2 | PLANNED-LATER | F1 part DONE: sources grouped by kind and 99% no source opens with an action and three steps (f1-rules.test.ts). The Speed to lead side and the Meta lead-form recognition on live data are F2 |
 | N48 | "Same person in several client accounts (23)" is a privacy problem | S0.2b, F1 | DONE-TONIGHT | S0.2b: card, query, tile and count removed, nothing compares people across clients; meeting matching never picks between clients (docs/features/S0.2b.md items 1, 19, 20) |
 | N49 | Tags: what do they mean, and can I see the leads that were tagged? | F10 | PLANNED-LATER |  |
 | N50 | Lead side panel, the Kit model | D0, F10 | PLANNED-LATER |  |
@@ -68,9 +68,9 @@ ORPHANS (notes with no stage in docs/ROADMAP_V2.md): none found.
 | N59 | Client requests (support tickets) | C1b (never tonight) | PLANNED-LATER |  |
 | N60 | Compare two is weak, and what is the QBR for? | C1 | PLANNED-LATER |  |
 | N61 | Team module: a real directory with activity | T1 (never tonight) | PLANNED-LATER |  |
-| N62 | More observations | F1, C1 (observations) | PLANNED-LATER | The N33 update DONE in S0.4 (it ran about hourly in the early period, then every 20 min; now fixed to 15). The Accounts health label and other observations stay F1 and C1 |
+| N62 | More observations | F1, C1 (observations) | PLANNED-LATER | F1 part DONE: the Accounts health label contradiction (same as N16) and the singular fix (1 contact asked, no page says 1 contacts: tests/e2e/f1.spec.ts); the N33 update was S0.4. The Ignored filter being easy to find stays C1 |
 | N63 | Setup is thin: it needs a real checklist system | C1, D0 | PLANNED-LATER |  |
-| N64 | "Why is an API marked unavailable when it is available?" and "turn on all scopes" | F1 (capability matrix), F8 (scope experience); release in Z2 (King) | PLANNED-LATER |  |
+| N64 | "Why is an API marked unavailable when it is available?" and "turn on all scopes" | F1 (capability matrix), F8 (scope experience); release in Z2 (King) | PLANNED-LATER | F1 part DONE: docs/CAPABILITIES.md (three causes, every data point, permissions asked and granted per install, stored evidence), classifyProbe, and /api/admin/capabilities for the live column (NOT VERIFIED LIVE until one call after the merge). The UI scope experience is F8, the release is Z2 |
 | N65 | Email sender health: vague, no data | E5 (never tonight) | PLANNED-LATER |  |
 | N66 | Reselling profit dashboard | R1 | PARKED | waits for evidence |
 | N67 | Duplicates: no filters, no cause, no source | C2 (never tonight) | PLANNED-LATER |  |
@@ -111,10 +111,10 @@ ORPHANS (notes with no stage in docs/ROADMAP_V2.md): none found.
 | N102 | Consent and sensitive content | E0, E2a, E2b, F8 | PLANNED-LATER |  |
 | N103 | Prove the code really reads and writes the live Supabase database | E0, E2a | PLANNED-LATER |  |
 | N104 | Fathom data into custom fields, and who configures what | E0, E2b | PLANNED-LATER |  |
-| UX-01 | [S1] Win rate and forecast built on 6 closed deals | F1 | PLANNED-LATER |  |
-| UX-02 | [S1] Two different open pipeline numbers | F1 | PLANNED-LATER |  |
+| UX-01 | [S1] Win rate and forecast built on 6 closed deals | F1 | DONE-TONIGHT | One 20-deal minimum on every screen; the forecast is a range from 20 closed deals or the owner's own probabilities (consistency.spec.ts, pipeline-intel.test.ts); real accounts say No forecast yet (6 closed deals) |
+| UX-02 | [S1] Two different open pipeline numbers | F1 | DONE-TONIGHT | One counted-deal definition on every screen (scripts/check-filter.ts); the Leads lifecycle says in one sentence how many contacts in an open deal have a counted deal (9,171 against 1 on the real agency); tests/e2e/f1.spec.ts |
 | UX-03 | [S1] Meeting notes page states something no longer true | F8 | PLANNED-LATER |  |
-| UX-04 | [S1] First screen headline is one test deal | F1, F5 | PLANNED-LATER |  |
+| UX-04 | [S1] First screen headline is one test deal | F1, F5 | DONE-TONIGHT | The audit's stale-deal headline says when one deal is most of the figure (audit-intel.test.ts) and the front door leads with leads waiting (tests/e2e/today.spec.ts) |
 | UX-05 | [S1] Agency user opened inside a client account lands on the agency view | F5 | PLANNED-LATER |  |
 | UX-06 | [S2] Sync-running banner on almost every load | S0.4 | DONE-TONIGHT | S0.4: the note shows only for a first sync or one queued or running 10 min or longer (freshness.test.ts, sync-reliability-db.test.ts, check-sync.ts, tests/e2e/freshness.spec.ts asserts none on any page) |
 | UX-07 | [S2] Clipping at narrow widths | D0, D1 | PLANNED-LATER |  |

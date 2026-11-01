@@ -5,19 +5,30 @@
 // quiet account is not flagged for being quiet and a busy account is flagged when it drops.
 
 import { inSendWindow } from "../sync/schedule.ts";
+import { MIN_BASE_FOR_PERCENT, MIN_MONEY_BASE_FOR_PERCENT, percentChange } from "./metrics.ts";
 
 export type SeriesPoint = {
   day: string; // YYYY-MM-DD, oldest first; the last point is today
   contacts: number; new30: number; openOpps: number; openValue: number; stale: number; unread: number; completeness: number; score: number;
+  /** False when this day's deal figures were counted under older rules (definitions.ts). Those days are not compared with today for deal figures. */
+  dealsOk?: boolean;
 };
+
+/** The figures that depend on how deals are counted. Only days counted the same way as today are compared for these. */
+const DEAL_KEYS = new Set<string>(["openOpps", "openValue", "stale", "score"]);
+const sameRules = (points: SeriesPoint[], key: string) => (DEAL_KEYS.has(key) ? points.filter((p) => p.dealsOk !== false) : points);
 
 export type Change = {
   today: number;
   yesterday: number | null;
   avg7: number | null;
-  /** Percent change against yesterday, or null when there is no yesterday or it was zero. */
+  /** Percent change against yesterday, or null when there is no yesterday or it was too small to measure a percentage against (N6). */
   vsYesterday: number | null;
   vsAvg: number | null;
+  /** Today minus yesterday: what to show when the percentage is withheld because the base is small. Null when there is no yesterday. */
+  diffYesterday: number | null;
+  /** True when yesterday's figure exists but was below the minimum for a percentage. */
+  smallBase: boolean;
   /** "up" or "down" only when today is outside this account's own normal range. */
   unusual: "up" | "down" | null;
   samples: number;
@@ -28,11 +39,12 @@ const sd = (xs: number[]) => {
   const m = mean(xs);
   return Math.sqrt(mean(xs.map((x) => (x - m) ** 2)));
 };
-const pct = (now: number, then: number | null) => (then === null || then === 0 ? null : Math.round(((now - then) / Math.abs(then)) * 100));
+const pct = (now: number, then: number | null, minBase: number) => percentChange(now, then, minBase);
 
 // `history` is the earlier days (oldest first, today excluded). `minAbs` stops tiny numbers from
 // looking dramatic (going from 1 to 2 contacts is not news).
-export function compare(history: number[], today: number, minAbs = 3): Change {
+// `minBase`: a percentage is shown only when the figure it is measured against was at least this big ("-100% vs yesterday" on 2 contacts says nothing).
+export function compare(history: number[], today: number, minAbs = 3, minBase = MIN_BASE_FOR_PERCENT): Change {
   const last7 = history.slice(-7);
   const yesterday = history.length ? history[history.length - 1] : null;
   const avg7 = last7.length ? mean(last7) : null;
@@ -42,12 +54,17 @@ export function compare(history: number[], today: number, minAbs = 3): Change {
     if (today - avg7 > band) unusual = "up";
     else if (avg7 - today > band) unusual = "down";
   }
-  return { today, yesterday, avg7: avg7 === null ? null : Math.round(avg7 * 10) / 10, vsYesterday: pct(today, yesterday), vsAvg: pct(today, avg7), unusual, samples: last7.length };
+  return {
+    today, yesterday, avg7: avg7 === null ? null : Math.round(avg7 * 10) / 10, vsYesterday: pct(today, yesterday, minBase), vsAvg: pct(today, avg7, minBase), unusual, samples: last7.length,
+    diffYesterday: yesterday === null ? null : Math.round((today - yesterday) * 10) / 10, smallBase: yesterday !== null && yesterday < minBase,
+  };
 }
 
-export const seriesOf = (points: SeriesPoint[], key: keyof Omit<SeriesPoint, "day">) => points.map((p) => p[key]);
-export const changeOf = (points: SeriesPoint[], key: keyof Omit<SeriesPoint, "day">, minAbs?: number): Change | null =>
-  points.length === 0 ? null : compare(seriesOf(points.slice(0, -1), key), points[points.length - 1][key], minAbs);
+export const seriesOf = (points: SeriesPoint[], key: keyof Omit<SeriesPoint, "day" | "dealsOk">) => points.map((p) => p[key]);
+export const changeOf = (all: SeriesPoint[], key: keyof Omit<SeriesPoint, "day" | "dealsOk">, minAbs?: number, minBase?: number): Change | null => {
+  const points = sameRules(all, key);
+  return points.length === 0 ? null : compare(seriesOf(points.slice(0, -1), key), points[points.length - 1][key], minAbs, minBase);
+};
 
 // ---------- attention items ----------
 
@@ -152,14 +169,14 @@ export function rank(accounts: AccountInput[], now = Date.now()): { attention: A
 export type Headline = { key: string; label: string; money: boolean; change: Change };
 
 export function portfolioHeadlines(perAccount: SeriesPoint[][]): Headline[] {
-  const days = [...new Set(perAccount.flatMap((s) => s.map((p) => p.day)))].sort();
-  const sum = (key: keyof Omit<SeriesPoint, "day">) =>
-    days.map((d) => perAccount.reduce((s, series) => s + (series.find((p) => p.day === d)?.[key] ?? 0), 0));
-  const make = (key: keyof Omit<SeriesPoint, "day">, label: string, isMoney: boolean, minAbs: number): Headline => {
-    const values = sum(key);
-    return { key, label, money: isMoney, change: compare(values.slice(0, -1), values[values.length - 1] ?? 0, minAbs) };
+  if (perAccount.every((s) => s.length === 0)) return [];
+  const make = (key: keyof Omit<SeriesPoint, "day" | "dealsOk">, label: string, isMoney: boolean, minAbs: number): Headline => {
+    // A deal figure is summed only over days counted under today's rules: a day counted the old way is not a day to compare with.
+    const lists = perAccount.map((s) => sameRules(s, key));
+    const days = [...new Set(lists.flatMap((s) => s.map((p) => p.day)))].sort();
+    const values = days.map((d) => lists.reduce((s, series) => s + ((series.find((p) => p.day === d)?.[key] as number | undefined) ?? 0), 0));
+    return { key, label, money: isMoney, change: compare(values.slice(0, -1), values[values.length - 1] ?? 0, minAbs, isMoney ? MIN_MONEY_BASE_FOR_PERCENT : MIN_BASE_FOR_PERCENT) };
   };
-  if (days.length === 0) return [];
   return [
     make("openValue", "Open pipeline", true, 5000),
     make("stale", "Stale deals", false, 3),

@@ -10,7 +10,7 @@ export type Account = {
   contacts: number; new30d: number; openOpps: number; openValue: number; staleOpps: number; revenueAtRisk: number;
   unread: number; unanswered: number; calendars: number | null; pipelines: number | null;
   emailPct: number; phonePct: number; tagPct: number; activePct: number; completenessPct: number;
-  daysInactive: number | null; lastActivityAt: string | null; dormant: boolean; score: number; band: Band; churn: Churn;
+  daysInactive: number | null; lastActivityAt: string | null; dormant: boolean; score: number; band: Band; bandNote?: string | null; churn: Churn;
   winRate: number | null; expectedRevenue: number | null; followUpRevenueAtRisk: number | null;
   leadFlowDropPct: number | null; syncError: string | null; contactsSyncedAt: string | null;
 };
@@ -27,9 +27,13 @@ export type Overview = {
     staleOpps: number; dormant: number; unread: number; unanswered: number; expectedRevenue: number | null;
     followUpRevenueAtRisk: number | null; avgScore: number; openAlerts: number; criticalAlerts: number;
     estimateAccounts: number; minClosedDeals: number; excludedDeals: number; outlier: { value: number; share: number; of: number } | null;
+    /** Of the left-out open deals, those in a closed-out stage or an unused pipeline. */
+    excludedByStage?: number;
+    /** A sentence when some account has more conversations than SubSync reads, else null. */
+    readLimit?: string | null;
   };
   bands: Record<Band, number>;
-  attention: Array<{ locationId: string; name: string | null; score: number; band: Band; churn: string; reasons: string[]; url: string }>;
+  attention: Array<{ locationId: string; name: string | null; score: number; band: Band; bandNote?: string | null; churn: string; reasons: string[]; url: string }>;
   freshness: Freshness;
 };
 
@@ -45,6 +49,8 @@ export type DomainCheck = {
 export type TrendPoint = {
   day: string; contacts: number; newContacts30d: number; openOpportunities: number; openValue: number;
   staleOpportunities: number; unreadConversations: number; completenessPct: number; engagementScore: number;
+  /** False when this day's deal figures were counted under older rules, so they are not drawn with today's. */
+  dealsOk?: boolean;
 };
 
 export type Deal = {

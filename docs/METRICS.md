@@ -8,14 +8,26 @@ says so and shows the formula.
 Defaults are per install and can be changed in Settings: stale after 30 days, dormant after 30 days,
 reply target (SLA) 4 hours.
 
+## Conventions that apply to every number
+
+- **Window.** Every "last N days" is rolling (N times 24 hours back from now), so a window has no midnight edge and no daylight-saving edge. A figure by calendar day or by hour of day (the best-times map, "booked twice the same day", after-hours leads) uses the client account's own time zone; an unknown time zone is read as UTC.
+- **Currency.** Amounts are shown as entered in each account. The database stores no currency, so nothing is converted or added across currencies, and each dollar card says so. (Open: store each account's currency at sync.)
+- **Exclusions.** Ignored accounts, and accounts hidden by the filter at the top of the app (a kind of business, an account manager, "hide test accounts"), are left out of every number on every page. One test (`scripts/check-filter.ts`) proves the same filter gives the same numbers on all pages.
+- **Minimum sample.** Each rate, claim or estimate names its minimum in its own definition (20 closed deals for a win rate and the forecast, 5 replies, 5 recorded outcomes, 10 for a "down X%" claim, 10 or 5,000 dollars for a percentage change) and the screen says "not enough data" with the number still needed.
+- **One place.** A definition lives in one function or one SQL fragment; screens call it and do not calculate (the sums on the Leads and Stages cards are done on the server).
+
 ## Deals
 
-**Counted deal.** An open deal with a value above zero and a person it belongs to (an owner). Only counted
-deals feed any dollar figure or open/stale count. Deals without a value or without an owner are not deleted
-or hidden from the Stale deals list; they are left out of the totals, and the Overview says how many
-(`excludedDeals`). Code: `queries.ts` (`counted`). Test: `scripts/check-metrics.ts` recomputes it from raw rows.
+**Counted deal.** An open deal with a value above zero, a person it belongs to (an owner), and a place **in play**: not in a closed-out
+or ignored stage and not in a pipeline marked not in use (see "Stage rules" below; stage F1, N38). Only counted deals feed any dollar figure or
+open/stale count. Deals that are not counted are not deleted; they are left out of the totals, and every screen that shows a total says how many were
+left out and why, in three reasons that never overlap: in a closed-out stage or an unused pipeline (counted first), no value, no owner
+(`excludedDeals`, `excluded.closedOut`, `excluded.noValue`, `excluded.noOwner`). One SQL fragment states the rule everywhere
+(`stage-rules-sql.ts`: `countedInScope`), and the Pipeline, Today, Overview, Accounts, Team, Leads lifecycle, Call lists, the stage cells, the
+quiet-deals list and the exports all use it. Code: `queries.ts` (`counted`), `metrics.ts`. Tests: `tests/unit/f1-deal-scope-db.test.ts` (golden
+deals in a real database), `scripts/check-filter.ts` (same figures on every page under every filter), `scripts/check-metrics.ts`.
 
-**Open pipeline** (FACT). Sum of value over counted open deals. Count of counted open deals. This is the only definition:
+**Open pipeline** (FACT). Sum of value over counted open deals (in play, with a value and an owner). Count of counted open deals. This is the only definition:
 Today, Overview, Accounts, Account audit, Pipeline, Clients and the exports all use it, and a browser test
 (`tests/e2e/consistency.spec.ts`) checks that they agree. Every screen that shows the total also says how many open
 deals were left out and why (no value, no owner). The rule lives in `metrics.ts` (`isCounted`, `openPipeline`) and
@@ -50,8 +62,8 @@ Code: `outlier` in `metrics.ts`. Test: `metrics.test.ts`.
 account's win rate; added across accounts. If no account has a win rate the Overview shows "Not enough data".
 It can never exceed Open pipeline.
 
-**Likely revenue, Pipeline screen** (ESTIMATE). Open pipeline times the win rate; "Not enough data" below 20 closed
-deals. Labelled "Estimate, not a fact" with the formula under the number (a tap on the label).
+**Likely revenue, Pipeline screen** (ESTIMATE). The most likely figure of the forecast below; "Not enough data" when the forecast has no basis.
+Labelled "Estimate, not a fact" with the method one tap away.
 
 **Cost of slow follow-up** (ESTIMATE). Conversations waiting past the reply target, times the account's
 average deal value, times its win rate. It is the rough size of the problem, not money lost. "Not enough
@@ -76,6 +88,20 @@ screen: Today, Overview, Inbox, Account audit and the exports all count the same
   setting to ignore automatic replies, because the conversation list does not say who or what sent the last message (Speed to lead reads
   messages and does; the Inbox does not).
 - **Pending** (inside the target) and **answered** are not waiting. **Missing data** is not guessed.
+- **Unread** (FACT, stage F1, N15) is a different thing from waiting. Unread is every conversation whose unread count is above zero, the same figure on
+  Today (the "Unread conversations" tile), Overview (`kpis.unread`) and the Inbox ("Unread (N)"). A conversation can be both unread and waiting; the
+  Inbox says how many of the unread ones are also waiting (`unread.unreadAndWaiting`) and lists those only once, under waiting. The old Inbox card showed
+  only the unread ones that were not waiting, which is why Today said 285 and the Inbox 259: on 1 Nov 2026 the real figures were 285 unread, of which
+  24 were also waiting, so 261 were shown below (a few hours earlier: 26 and 259). Nothing was added together; one list was subtracting the other. Code:
+  `unreadSummary` in `waiting.ts`. Test: `f1-rules.test.ts` and the "unread" checks in `scripts/check-filter.ts`.
+- **Critical** (stage F1, N15). A waiting customer is "critical" only when they have waited more than 24 hours and less than a week
+  (`CRITICAL_FROM_HOURS`, `CRITICAL_UNTIL_HOURS` in `comms-intel.ts`). Longer than a week is the "Older than a week" bucket and is never critical, so an
+  alarm is never raised on threads that are mostly dead. The wait chart counts exactly the waiting set the Inbox list shows (it used to count every
+  inbound thread, including ones 750 days old: 255 customers on the chart against 26 in the list).
+- **Read limit** (stage F1, N15). SubSync reads the newest 500 conversations of each account (`CONVERSATIONS_READ_PER_ACCOUNT`, five pages of 100 in
+  `engine.ts`). Where an account is at the limit, Today, Overview and the Inbox say "SubSync reads the newest 500 conversations of each account. N of M
+  accounts have more than that, so older conversations are not counted here" (`readLimitNote`). On 1 Nov 2026, 2 of the 3 real accounts were at 500.
+  The Inbox list itself is capped at 2,000 rows and says "Showing the first 2,000" if that ever happens.
 - **Channels** are named in words from the message type (Text message, Email, WhatsApp, Facebook, Instagram, Live chat, Call) and counted
   for the waiting conversations only.
 - **Deleted conversations:** the sync replaces an account's conversation list on every run, so a conversation the platform no longer
@@ -102,6 +128,11 @@ with at least one tag.
 - Replies kept up with, 10: 10 minus 2 for each conversation waiting past the reply target, never below 0.
 - Complete contact data, 10: the completeness percentage divided by 10.
 **Bands** (shown as Thriving, Healthy, Watch, At risk): 75 and above, 55 to 74, 35 to 54, under 35.
+**The label people read** (stage F1, N16 and N62) is the score's band held down by the reply delay (`healthBand` in `scoring.ts`): with 5 or more customers
+waiting for a reply past the target the label is at best Watch, with 15 or more it is At risk, whatever the score says. The score only takes up to 10
+points off for waiting replies, so an account with 23 customers waiting scored 57 and read "Healthy" inside a "Needs attention" list. The score itself is
+unchanged, so its history stays comparable; the screens say when the label was held down ("The score says healthy, but 21 customers are waiting for a
+reply, so it is shown as at risk"). In a "Needs attention" list nothing is labelled Healthy or Thriving: `attentionBand` makes it at best Watch.
 **Gone quiet** ("dormant" in the code): no contact, deal or message activity for the quiet setting (30 days by default), or no activity ever recorded.
 **Leave risk** (shown as Steady, Could leave, Likely to leave; "churn risk" in the code). A warning sign, not a prediction. It is "Could leave" when
 the account has been quiet for the quiet setting or more, or its health is under 40, or its health fell 12 points from its recent average; and
@@ -136,6 +167,104 @@ person on two different calendars within 30 minutes is a clash.
 **No-show recovery.** No-shows in the last N days where the contact has no later active appointment.
 Code: `appointment-intel.ts`, `appointment-deep.ts`. Tests: `appointment-intel.test.ts`, `appointment-deep.test.ts`, `appointment-f3.test.ts`
 (golden cases), `tests/e2e/appointments.spec.ts` (demo tenant, Insights tab).
+
+## Stage rules: which deals are in play (stage F1, N38)
+
+A deal in a stage named "Disqualified", "Wrong Phone Number", "Unreachable", "Not interested", "Lost" and the like is closed out by design, and a pipeline
+named "[Not IN USE]" is not one anyone works. Deals there are never open pipeline, never stale and never "dead pipeline to clean up", and they are not
+forecast. The owner can classify each stage (Active, Closed out, Ignore) and each pipeline (In use, Not in use) under "Stages and pipelines" on the
+Pipeline page. **With no rule from the owner, the suggestion made from the name applies, and the screen says so ("The stage's name says the deal is closed
+out. Change this if it is wrong").** The owner's rule always wins, in both directions (a stage named Disqualified can be marked Active). Rules are stored
+by pipeline and stage NAME (lower case, trimmed), so the same pipeline cloned into many client accounts is one rule (table `stage_rules`). Words that suggest
+closed out (whole words, case-insensitive): disqualified, bad fit, not a fit, not qualified, unqualified, wrong number, wrong phone, wrong contact,
+unreachable, do not contact, dnc, junk, spam, not interested, closed lost, lost, dead, archived, abandoned. Words that suggest a pipeline is not in use:
+not in use, unused, deprecated, do not use, inactive, archived, retired, obsolete. The same two patterns are used by the screen and by the database
+(`CLOSED_OUT_STAGE_PATTERN`, `NOT_IN_USE_PIPELINE_PATTERN` in `stage-rules.ts`, read by Postgres with `~*`), and a test checks they have no escapes.
+A rule can be taken off ("Use the name instead"). Changing a class is a **change of definition** (see "Definition versions"); a win probability is not.
+Real data on 1 Nov 2026: of 80 pipeline and stage pairs with open deals, 13 are closed out by name (for example School Outreach / Bad Fit, Wrong Phone
+Number, Not Interested, Unreachable; KDS LinkedIn Outreach Partner / Disqualified; two pipelines marked [Not IN USE]), holding 1,033 open deals, none of
+which has both a value and an owner, so today the rule changes no dollar figure on the real accounts; it changes the stage lists and the stale and dead
+counts. Code: `stage-rules.ts`, `stage-rules-sql.ts`. Tests: `f1-rules.test.ts`, `tests/unit/f1-deal-scope-db.test.ts`.
+
+## Forecast (stage F1, N37; rewritten)
+
+The forecast is shown only when there is a real basis, and always as a **range with its basis on show**:
+1. **From your closed deals.** A win rate needs at least 20 closed deals (one minimum for the whole product). The range is the open value times the low
+   and the high end of an 80% interval for that win rate (Wilson interval on won out of closed: 12 won of 20 is a rate of 60% that is really between about
+   46% and 73%, so 20,000 of open value converts to about 9,145 to 14,553, most likely 12,000). Fewer closed deals, a wider range. The screen states it:
+   "About 80% sure the open value converts to between $A and $B". Code: `rateRange`, `forecast` in `pipeline-intel.ts`.
+2. **Your own assumptions.** Until there is history, the owner sets a win probability per stage under "Stages and pipelines". The forecast is the sum of
+   value times the probability of its stage, with a band of 10 points either way, and is labelled "Your own assumptions", with no confidence figure because
+   there is no statistic behind it. A stage with no probability set is left out (and counted: "N deals are in a stage with no probability"), never given a
+   default. When both exist, history leads and the owner's figure is shown beside it.
+3. **Timing** comes from the real sales cycle of each pipeline: for a deal already d days old, the share of that pipeline's won deals that closed within
+   the next 30, 60 or 90 days given that they took longer than d (`closesWithin`). It needs at least 10 won deals with dates in the same pipeline; a deal
+   older than any won deal is not placed in time (and counted). The three horizons are therefore different numbers, never one repeated. Each horizon is
+   given as a range using the same low and high as the total.
+4. **What is in it:** counted open deals only (a value, an owner, in play). The "How this is calculated" drawer lists the formula, the inputs (open deals and
+   value, closed deals and the minimum, the win rate, the won deals used for timing), what was included, what was left out and why, and the caveats
+   (currency not converted; assumes open deals behave like closed ones; timing basis).
+5. Below the minimum and with no stage probabilities: "No forecast yet. It needs 20 closed deals (there are 5, so 15 more), or a win probability that you
+   set for each stage." *Not built:* forecast versus actual each month (N37 item 6) needs a monthly snapshot of the forecast and a forecast that has existed
+   for a month; no real account has 20 closed deals yet. It is part of stage P1 (Pipeline rebuild).
+Tests: `pipeline-intel.test.ts` (history range worked by hand, owner band, timing, no-basis text, too few won deals), `consistency.spec.ts`.
+
+## Definition versions (stage F1, N39)
+
+Every daily snapshot (`account_metrics_daily`) is written with the version of the counting rules it was counted under (`definition_version`: the code's
+`DEAL_RULES_VERSION` times 1000 plus the number of times the owner has changed a stage class). History is only ever compared inside one version:
+- the "Open pipeline over time" chart draws only the days of the newest version and says how many earlier days were not drawn and why;
+- "vs yesterday" and "vs the last 7 days" for open pipeline, stale deals and the health score use only days of the current version;
+- the churn baseline (score history), the executive summary's 30-days-ago figures and anomaly series, the account trend and the Today headlines follow
+  the same rule. Figures that do not depend on how deals are counted (new contacts, unread, contacts, completeness) keep their whole history.
+Rows written before the column existed (null) are read by date: every open deal counted up to 30 Oct 2026 (version 1), counted deals from 31 Oct 2026
+(version 2). This is the real case behind N39: on the real agency the series read 2,400,000 over 10,374 deals on 30 Oct and 1,000,000 over 1 deal from
+31 Oct, a change of rule drawn as a fall. Version 3 (this stage) starts with the stage rules; the earlier days are not drawn, which is why the chart
+needs two days before it appears again. Code: `definitions.ts`, `definitions-sql.ts`. Tests: `f1-rules.test.ts`, `tests/unit/f1-deal-scope-db.test.ts`.
+
+## Percent change (stage F1, N6)
+
+A percentage change is shown only when the figure it is measured against is at least 10 (a count) or 5,000 (dollars): `percentChange` in `metrics.ts`.
+Below that the screen shows the plain difference ("down 2 from yesterday") or states the earlier figure ("was 2 before (too small a base for a
+percentage)"), so two contacts never read as "-100% vs yesterday". Applies to the Today tiles, the executive summary, the Leads growth table and every
+"down X%" alert that has its own baseline rule.
+
+## Leads: cold lists and what a contact has done (stage F1, N45)
+
+The platform does not send a contact's last activity (none of the 103,404 synced contacts has one), so "quiet over 90 days" measured age. It is replaced by
+what SubSync can really see:
+- **Cold lists** are the tags that name a bought, scraped or cold-outreach list (words: cold, outreach, scrape, purchased, bought, list import, lead list,
+  prospecting list), unless the owner chose the list of tags himself (even an empty list: then nothing is cold). Contacts carrying a cold tag are counted
+  apart as "on cold lists" and are never counted as working leads or as going quiet. Each cold list is shown on its own with how many of its contacts
+  have a reply, booking or deal seen. Stored in `settings.cold_tags` (null means "use the tag names").
+- **Engaged** means a signal exists: the customer wrote last in a conversation (an inbound last message), an appointment (not invalid), or a deal in play.
+  For working leads: seen in the last 90 days, **engaged then quiet** (a signal, and nothing since for more than 90 days), or **nothing seen**.
+  Limit, stated on the screen: conversations are the newest 500 of each account (see "Read limit"), so "nothing seen" is not "never replied", and a
+  conversation where we wrote last says nothing about a reply.
+- Real data on 1 Nov 2026 (the agency install): 52,926 contacts, of which 50,958 carry a cold tag (`cold email outreach` alone 49,622, with 3 contacts
+  engaged), 1,968 are working leads: 152 seen in the last 90 days, 275 engaged then quiet, 1,541 nothing seen.
+Code: `suggestColdTag`, `effectiveColdTags`, `engagementOf` (`contact-intel.ts`), `contactOverview` (`contact-queries.ts`). Tests: `f1-rules.test.ts`,
+`tests/unit/f1-deal-scope-db.test.ts`.
+
+## Leads: data quality, and where leads come from (stage F1, N46 and N47)
+
+- **Invalid**, **disposable** and **missing** are three different counts. Invalid is judged on the values that exist (an email that cannot work, a phone
+  of fewer than 7 or more than 15 digits or one repeated digit); missing means nothing was typed. Every figure says "N of M checked". When the check
+  cannot run it says **"Not checked"** with the reason ("The contacts have not been read yet", "No contact has an email address to check") and never
+  shows a zero. The database check and the JavaScript check are the same rule, and a database test feeds both the same addresses and numbers (it found
+  that the database accepted ".dot@x.com" and "dou..ble@x.com" that the other rule refuses, and that was fixed). Real data on 1 Nov 2026: 0 invalid emails of
+  50,891 checked, 0 invalid phones of 36,746, 2,035 contacts with no email and 16,180 with no phone: the zero is a real zero, and the large number is
+  what is missing.
+- **Sources.** The text in a contact's source is grouped into kinds (Facebook or Instagram lead form, property site or call or walk-in, web form or ads or
+  website chat, a message, something else, none). When 50% or more of at least 20 contacts have no source, the card opens with the action ("99% of your
+  contacts have no source recorded, so you cannot tell which marketing brings customers") and three steps. The Speed to lead side of N47 is stage F2.
+Code: `qualityFigures`, `sourceSummary` (`contact-intel.ts`).
+
+## Leads lifecycle: two counts of "open deal" (stage F1, UX-02)
+
+"In an open deal (any value)" counts contacts with an open deal in play, whatever its value. The line under it says how many of those contacts have a deal with
+a value and an owner, the kind the dollar figures count (on the real agency: 9,171 contacts in an open deal, 1 with a counted deal). Both are shown, with
+the difference said in one sentence, so the Leads page no longer appears to disagree with Pipeline.
 
 ## Our own history (event store, recording now)
 

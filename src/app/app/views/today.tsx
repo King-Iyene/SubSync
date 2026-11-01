@@ -5,8 +5,9 @@ import { useState } from "react";
 import { useApiClient, useData } from "../session";
 import { Badge, Btn, Card, Empty, ErrorBox, ExtLink, fmtInt, fmtMoney, Loading, PageHeader, Stat, type Tone } from "../ui";
 
-type Change = { today: number; yesterday: number | null; avg7: number | null; vsYesterday: number | null; vsAvg: number | null; unusual: "up" | "down" | null; samples: number };
+type Change = { today: number; yesterday: number | null; avg7: number | null; vsYesterday: number | null; vsAvg: number | null; unusual: "up" | "down" | null; samples: number; diffYesterday?: number | null; smallBase?: boolean };
 type Data = {
+  readLimit?: string | null;
   connection: { ok: boolean; message: string | null };
   headlines: Array<{ key: string; label: string; money: boolean; change: Change }>;
   attention: Array<{ locationId: string; name: string; severity: "critical" | "warning" | "info"; url: string; items: Array<{ kind: string; title: string; detail: string }> }>;
@@ -69,7 +70,7 @@ function DoFirst({ go }: { go: GoFn }) {
       <p className="text-xs font-semibold uppercase tracking-wide text-primary">Do this first</p>
       <h2 className="mt-1 text-lg font-semibold">{f.title}</h2>
       <p className="mt-1 text-sm text-muted-foreground">{f.detail}</p>
-      {f.dollars !== null && <p className="mt-2 text-sm"><strong>{fmtMoney(f.dollars)}</strong> <span className="text-muted-foreground">{f.kind === "estimate" ? "estimated at risk" : "counted at risk"}</span></p>}
+      {f.dollars !== null && <p className="mt-2 text-sm"><strong>{fmtMoney(f.dollars)}</strong> <span className="text-muted-foreground">{f.kind === "estimate" ? "a rough estimate of what this may cost, not money you have lost" : "in deals that have not moved: the real deals in your CRM, added up, not an estimate"}</span></p>}
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <Btn onClick={() => go(f.view as never)}>{f.fix}</Btn>
         <Btn variant="ghost" onClick={() => go("audit" as never)}>See the full audit</Btn>
@@ -80,6 +81,15 @@ function DoFirst({ go }: { go: GoFn }) {
 
 const tone = (s: string): Tone => (s === "critical" ? "bad" : s === "warning" ? "warn" : "info");
 const signed = (n: number | null) => (n === null ? "no earlier day" : `${n > 0 ? "+" : ""}${n}%`);
+// "-100% vs yesterday" on two contacts says nothing (N6): below a base of 10 the plain difference is shown, not a percentage.
+const versus = (c: Change, money: boolean): string => {
+  if (c.vsYesterday !== null) return `${signed(c.vsYesterday)} vs yesterday`;
+  if (c.yesterday === null) return "no earlier day to compare with";
+  const d = c.diffYesterday ?? c.today - c.yesterday;
+  if (d === 0) return "same as yesterday";
+  const abs = money ? fmtMoney(Math.abs(d)) : fmtInt(Math.abs(d));
+  return `${d > 0 ? "up" : "down"} ${abs} from yesterday`;
+};
 // For these, up is bad (more stale deals, more unread); for the others, up is good.
 const UP_IS_BAD = new Set(["stale", "unread"]);
 
@@ -126,8 +136,8 @@ export function TodayView({ go }: { go: GoFn }) {
             <Stat key={h.key} label={h.label} value={h.money ? fmtMoney(c.today) : fmtInt(c.today)}
               tone={c.unusual ? (bad ? "bad" : "good") : undefined}
               sub={<>
-                {signed(c.vsYesterday)} vs yesterday
-                {c.avg7 !== null && <><br />{signed(c.vsAvg)} vs the last 7 days</>}
+                {versus(c, h.money)}
+                {c.avg7 !== null && c.vsAvg !== null && <><br />{signed(c.vsAvg)} vs the last 7 days</>}
                 {c.unusual && <><br /><strong>Unusual: {c.unusual === "up" ? "higher" : "lower"} than normal</strong></>}
               </>} />
           );
@@ -135,6 +145,7 @@ export function TodayView({ go }: { go: GoFn }) {
       </div>
 
       <OutlierNote />
+      {data.readLimit && <p className="mb-6 text-xs text-muted-foreground" data-testid="read-limit">{data.readLimit}</p>}
 
       <div id="needs-attention" />
       <Card title={data.attention.length ? `Needs attention today (${data.attention.length})` : "Needs attention today"} className="mb-6">

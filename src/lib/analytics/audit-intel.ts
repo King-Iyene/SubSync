@@ -7,6 +7,8 @@ export type AuditAccount = {
   locationId: string; name: string | null;
   staleValue: number; staleOpps: number; openValue: number; openOpps: number; excludedOpen: number;
   unanswered: number; winRate: number | null; avgDealValue: number | null; completenessPct: number; contacts: number;
+  /** The largest counted open deal that has not moved (outlier guard). */
+  topStaleDeal?: number;
 };
 
 export type AuditAppointments = {
@@ -65,10 +67,14 @@ export function buildAudit(accounts: AuditAccount[], appts: AuditAppointments): 
 
   if (staleDeals > 0) {
     const share = openValue > 0 ? staleDollars / openValue : 0;
+    // Outlier guard (UX-04): when one deal is most of the figure, the headline says so instead of reading as a pattern across the pipeline.
+    const topStale = live.reduce((m, a) => Math.max(m, a.topStaleDeal ?? 0), 0);
+    const oneDealShare = staleDollars > 0 ? topStale / staleDollars : 0;
+    const guard = staleDeals >= 1 && oneDealShare >= 0.5 ? ` One deal (${money(topStale)}) is ${Math.round(oneDealShare * 100)}% of this figure, so check that it is a real deal before relying on the number.` : "";
     findings.push({
       key: "stale", severity: share >= 0.5 ? "critical" : share >= 0.25 ? "warning" : "info",
       title: `${money(staleDollars)} is sitting in ${plural(staleDeals, "deal")} that ${staleDeals === 1 ? "has" : "have"} not moved`,
-      detail: `That is ${Math.round(share * 100)}% of the open pipeline across ${plural(live.length, "account")}. These are the likeliest lost revenue.`,
+      detail: `That is ${Math.round(share * 100)}% of the open pipeline across ${plural(live.length, "account")}. These are the likeliest lost revenue.${guard}`,
       count: staleDeals, dollars: staleDollars, kind: "fact", view: "deals", fix: "Open the stale deals, move each one forward or close it out.",
     });
   }

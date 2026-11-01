@@ -1,5 +1,6 @@
 import { sql } from "../db";
 import { callPriority, powerHourStats, type Filters, type Outcome } from "./call-intel";
+import { dealScopeJoins, outOfScope } from "./stage-rules-sql";
 
 const iso = (v: unknown) => (v instanceof Date ? v.toISOString() : null);
 const DAY = 86_400_000;
@@ -89,15 +90,17 @@ export async function callQueue(installationId: string, allowed: string[] | null
     with loc as (${visible(installationId, allowed)}),
     deals as (
       select o.location_id, o.contact_id,
-        count(*) filter (where o.status = 'open')::int open_count,
-        -- Dollar figures use counted deals only (docs/METRICS.md): a value above zero and an owner. The contact is still listed for any open deal.
-        coalesce(sum(o.monetary_value) filter (where o.status = 'open' and coalesce(o.monetary_value, 0) > 0 and o.assigned_to is not null), 0)::float8 open_value,
+        -- A deal in a closed-out stage or an unused pipeline does not make its contact a hot lead (stage-rules.ts).
+        count(*) filter (where o.status = 'open' and not ${outOfScope()})::int open_count,
+        -- Dollar figures use counted deals only (docs/METRICS.md): a value above zero, an owner and a place in play. The contact is still listed for any open deal in play.
+        coalesce(sum(o.monetary_value) filter (where o.status = 'open' and coalesce(o.monetary_value, 0) > 0 and o.assigned_to is not null and not ${outOfScope()}), 0)::float8 open_value,
         count(*) filter (where o.status = 'won')::int won_count,
         coalesce(sum(o.monetary_value) filter (where o.status = 'won'), 0)::float8 won_value,
         max(o.last_status_change_at) filter (where o.status = 'won') last_won_at,
-        coalesce(bool_or(o.status = 'open' and coalesce(st.nm, '') ~* '(proposal|quote|negotiat|contract)'
+        coalesce(bool_or(o.status = 'open' and not ${outOfScope()} and coalesce(st.nm, '') ~* '(proposal|quote|negotiat|contract)'
           and coalesce(greatest(o.last_action_at, o.updated_remote_at, o.last_stage_change_at), o.created_remote_at, o.synced_at) < now() - interval '7 days'), false) proposal_stale
       from cached_opportunities o
+      ${dealScopeJoins()}
       left join pipelines pl on pl.installation_id = o.installation_id and pl.location_id = o.location_id and pl.pipeline_id = o.pipeline_id
       left join lateral (select s->>'name' nm from jsonb_array_elements(coalesce(pl.stages, '[]'::jsonb)) s where s->>'id' = o.stage_id limit 1) st on true
       where o.installation_id = ${installationId} and o.contact_id is not null group by o.location_id, o.contact_id),

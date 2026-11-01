@@ -2,9 +2,10 @@
 
 import { useData } from "../session";
 import { Badge, Card, ExtLink, fmtInt, fmtMoney, Table, Td, Th } from "../ui";
+import { plural } from "@/lib/text";
 
 type Data = {
-  aging: { buckets: Array<{ label: string; count: number }>; critical: number; total: number };
+  aging: { buckets: Array<{ label: string; count: number }>; critical: number; older?: number; total: number };
   gaps: {
     days: number; total: number; value: number; stages: Array<{ stage: string; count: number; value: number }>;
     deals: Array<{ opportunityId: string; locationName: string | null; contactName: string | null; name: string | null; stageName: string; value: number; daysSinceContact: number | null; url: string }>;
@@ -21,6 +22,7 @@ export function CommsSections() {
   return (
     <div className="mt-6 space-y-4">
       <Card title="How long customers have been waiting">
+        <p className="mb-3 text-xs text-muted-foreground">The same customers as the lists above: the customer wrote last, the reply target has passed, and it was in the last 30 days.</p>
         {data.aging.total === 0 ? <p className="text-sm text-muted-foreground">No customer is waiting for a reply.</p> : (
           <>
             <ul className="space-y-2 text-sm">
@@ -31,12 +33,14 @@ export function CommsSections() {
                 </li>
               ))}
             </ul>
-            {data.aging.critical > 0 && <p className="mt-3 text-sm"><Badge tone="bad">Critical</Badge> {data.aging.critical} customer{data.aging.critical === 1 ? "" : "s"} have waited more than 24 hours.</p>}
+            {data.aging.critical > 0 && <p className="mt-3 text-sm"><Badge tone="bad">Critical</Badge> {plural(data.aging.critical, "customer has", "customers have")} waited more than 24 hours and up to a week, so {data.aging.critical === 1 ? "it is" : "they are"} still worth answering.</p>}
+            {(data.aging.older ?? 0) > 0 && <p className="mt-2 text-xs text-muted-foreground">{plural(data.aging.older ?? 0, "customer has", "customers have")} waited more than a week. They are not marked critical: after a week most are no longer waiting for you.</p>}
           </>
         )}
       </Card>
 
-      <Card title={`Active deals with no contact for ${data.gaps.days}+ days (${fmtInt(data.gaps.total)}, ${fmtMoney(data.gaps.value)})`}>
+      <Card title={`Open deals with no contact for ${data.gaps.days}+ days (${fmtInt(data.gaps.total)}, ${fmtMoney(data.gaps.value)})`}>
+        <p className="mb-2 text-xs text-muted-foreground">Only deals with a value and an owner that are in play, the same deals as the Pipeline. The total is counted over all of them; the list shows the biggest {data.gaps.deals.length}.</p>
         {data.gaps.total === 0 ? <p className="text-sm text-muted-foreground">Every open deal has been in touch recently.</p> : (
           <>
             <ul className="mb-3 space-y-1 text-sm">

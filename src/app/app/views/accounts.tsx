@@ -67,7 +67,7 @@ export function AccountsView({ go }: { go: GoFn }) {
         <summary className="cursor-pointer font-medium">What do these words mean?</summary>
         <dl className="mt-3 grid gap-3 sm:grid-cols-2">
           <div><dt className="font-medium">Health (0 to 100)</dt><dd className="text-muted-foreground">How alive the account is, from five parts: recent activity (up to 40), new contacts (20), deals that are moving (20), replies kept up with (10) and complete contact data (10). Open an account to see where every point came from.</dd></div>
-          <div><dt className="font-medium">Thriving, Healthy, Watch, At risk</dt><dd className="text-muted-foreground">75 and above is Thriving, 55 to 74 Healthy, 35 to 54 Watch, under 35 At risk.</dd></div>
+          <div><dt className="font-medium">Thriving, Healthy, Watch, At risk</dt><dd className="text-muted-foreground">75 and above is Thriving, 55 to 74 Healthy, 35 to 54 Watch, under 35 At risk. Waiting customers hold the label down: with 5 or more customers waiting for a reply an account is never better than Watch, and with 15 or more it is At risk, whatever the score says.</dd></div>
           <div><dt className="font-medium">Steady, Could leave, Likely to leave</dt><dd className="text-muted-foreground">Whether the client may stop using you, from how long the account has been quiet, how low its health is and how fast its health has dropped. It is a warning sign, not a prediction.</dd></div>
           <div><dt className="font-medium">Gone quiet</dt><dd className="text-muted-foreground">No contact, deal or message activity for {data.settings.dormantDays} days or more (you can change this in Settings).</dd></div>
         </dl>
@@ -96,7 +96,10 @@ export function AccountsView({ go }: { go: GoFn }) {
                   {a.syncError && <Badge tone="warn">Sync issue</Badge>}
                 </div>
               </Td>
-              <Td><div className="flex items-center gap-2"><ScoreBar score={a.score} /><BandBadge band={a.band} /></div></Td>
+              <Td>
+                <div className="flex items-center gap-2"><ScoreBar score={a.score} /><BandBadge band={a.band} /></div>
+                {a.bandNote && <p className="mt-1 max-w-56 text-xs text-muted-foreground">{a.bandNote}</p>}
+              </Td>
               <Td><ChurnBadge level={a.churn.level} /></Td>
               <Td>{daysLabel(a.daysInactive)}</Td>
               <Td className="whitespace-nowrap text-right tabular-nums">{fmtInt(a.contacts)}<div className="text-xs text-muted-foreground">+{a.new30d} in 30 days</div></Td>

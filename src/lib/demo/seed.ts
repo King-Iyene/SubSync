@@ -1,4 +1,5 @@
 import { refreshInsights } from "../analytics/service";
+import { currentVersion } from "../analytics/definitions";
 import { sql } from "../db";
 import { applyLeadRules } from "../sync/lead-rules-apply";
 import { checkDomain, type DnsResolver } from "../dns/email-auth";
@@ -324,6 +325,8 @@ export async function seedDemo(): Promise<{ installationId: string; accounts: nu
         open_value: Math.round(real.open_v * (valueStart + (1 - valueStart) * t) * (1 + (r() - 0.5) * 0.04)),
         stale_opportunities: Math.round(real.open_n * p.staleShare), unread_conversations: p.unread,
         completeness_pct: Math.round(realCompleteness * (0.93 + 0.07 * t)), engagement_score: score,
+        // The history is made up under today's counting rules, so it is comparable with today (definitions.ts).
+        definition_version: currentVersion(0),
       });
     }
     if (history.length) await db`insert into account_metrics_daily ${db(history as never)}`;
@@ -431,10 +434,58 @@ async function ensureInboxDemo(installationId: string): Promise<void> {
   })) as never)}`;
 }
 
+// Messy pipeline cases on purpose (stage 'F1', N38 and N45), added once and left alone after that: counted deals in a stage named "Disqualified"
+// and in a pipeline named "Legacy pipeline [Not IN USE]" (neither may count as open pipeline, stale or dead), and a cold list: about half of one
+// account's contacts carry the tag "cold email outreach" and never replied. Built from counters, so no other demo number moves except what these
+// deals take out of the totals. Skipped when it was already added.
+async function ensureStageDemo(installationId: string): Promise<void> {
+  const db = sql();
+  const [metro] = await db`select location_id from locations where installation_id = ${installationId} and name = 'Metro Auto Repair'`;
+  if (!metro) return;
+  const [has] = await db`select 1 from pipelines where installation_id = ${installationId} and location_id = ${metro.location_id} and stages @> '[{"id":"s6"}]'::jsonb`;
+  if (has) return;
+  await db`update pipelines set stages = stages || '[{"id":"s6","name":"Disqualified"}]'::jsonb where installation_id = ${installationId} and location_id = ${metro.location_id}`;
+  await db`update cached_opportunities set stage_id = 's6' where installation_id = ${installationId} and location_id = ${metro.location_id} and opportunity_id in (
+    select opportunity_id from cached_opportunities where installation_id = ${installationId} and location_id = ${metro.location_id} and status = 'open'
+      and monetary_value > 0 and assigned_to is not null order by opportunity_id limit 3)`;
+  const [peak] = await db`select location_id from locations where installation_id = ${installationId} and name = 'Peak Fitness Studio'`;
+  if (peak) {
+    await db`insert into pipelines (installation_id, location_id, pipeline_id, name, stages) values (${installationId}, ${peak.location_id}, ${"legacy-" + peak.location_id}, 'Legacy pipeline [Not IN USE]', ${db.json([{ id: "l1", name: "Old lead" }, { id: "l2", name: "Old proposal" }] as never)}) on conflict do nothing`;
+    const now = Date.now();
+    const rows = [1, 2, 3].map((k) => ({
+      installation_id: installationId, location_id: peak.location_id, opportunity_id: `${peak.location_id}-legacy${k}`, pipeline_id: `legacy-${peak.location_id}`, stage_id: k === 3 ? "l2" : "l1",
+      contact_id: `${peak.location_id}-c${k}`, contact_name: "Legacy Contact", name: `Legacy deal #${k}`, monetary_value: 1500 * k, status: "open", assigned_to: TEAM[k % TEAM.length],
+      last_stage_change_at: new Date(now - 200 * DAY), last_action_at: new Date(now - 200 * DAY), last_status_change_at: new Date(now - 200 * DAY), created_remote_at: new Date(now - 260 * DAY), updated_remote_at: new Date(now - 200 * DAY),
+    }));
+    await db`insert into cached_opportunities ${db(rows as never)} on conflict do nothing`;
+  }
+  await refreshInsights(installationId);
+}
+
+// The cold list part of the stage demo is its own idempotent step, so it is applied even to a demo whose pipelines were added earlier.
+async function ensureColdDemo(installationId: string): Promise<void> {
+  const db = sql();
+  const [green] = await db`select location_id from locations where installation_id = ${installationId} and name = 'Green Leaf Landscaping'`;
+  if (green) {
+    await db`update cached_contacts set tags = array['cold email outreach'] where installation_id = ${installationId} and location_id = ${green.location_id}
+      and contact_id ~ '-c[0-9]+$' and substring(contact_id from '[0-9]+$')::int >= 150 and tags is distinct from array['cold email outreach']`;
+  }
+}
+
+// The demo's made-up history was written before snapshots carried a definition version. It is generated under today's counting rules by
+// construction, so it is stamped with the current version (real accounts are never touched: their old rows stay "older rules" on purpose).
+async function stampDemoHistory(installationId: string): Promise<void> {
+  const [s] = await sql()`select deal_rules_revision from settings where installation_id = ${installationId}`;
+  await sql()`update account_metrics_daily set definition_version = ${currentVersion((s?.deal_rules_revision as number | undefined) ?? 0)} where installation_id = ${installationId} and definition_version is null`;
+}
+
 export async function ensureDemo(): Promise<string> {
   const [row] = await sql()`select id from installations where company_id = ${DEMO_COMPANY_ID} and is_demo`;
   const id = row ? (row.id as string) : (await seedDemo()).installationId;
+  await stampDemoHistory(id);
   await ensureSpeedDemo(id).catch(() => undefined);
   await ensureInboxDemo(id).catch(() => undefined);
+  await ensureStageDemo(id).catch(() => undefined);
+  await ensureColdDemo(id).catch(() => undefined);
   return id;
 }

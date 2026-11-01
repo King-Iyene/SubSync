@@ -63,9 +63,11 @@ export function OverviewView({ go }: { go: GoFn }) {
       </div>
       {k.excludedDeals > 0 && (
         <p className="mt-2 text-xs text-muted-foreground">
-          {fmtInt(k.excludedDeals)} open deal{k.excludedDeals === 1 ? " is" : "s are"} left out of every dollar figure because {k.excludedDeals === 1 ? "it has" : "they have"} no value or no owner.
+          {fmtInt(k.excludedDeals)} open deal{k.excludedDeals === 1 ? " is" : "s are"} left out of every dollar figure: {(k.excludedByStage ?? 0) > 0 ? `${fmtInt(k.excludedByStage ?? 0)} in a closed-out stage or a pipeline not in use, and ${fmtInt(k.excludedDeals - (k.excludedByStage ?? 0))} with` : "they have"} no value or no owner.
         </p>
       )}
+
+      {k.readLimit && <p className="mt-2 text-xs text-muted-foreground" data-testid="read-limit">{k.readLimit}</p>}
 
       {k.outlier && (
         <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">
@@ -110,6 +112,7 @@ export function OverviewView({ go }: { go: GoFn }) {
                   <div className="min-w-0">
                     <button type="button" onClick={() => go("account", a.locationId)} className="text-left text-sm font-medium hover:underline">{a.name ?? "Unnamed account"}</button>
                     <ul className="mt-1 space-y-0.5 text-xs text-muted-foreground">{a.reasons.slice(0, 3).map((r) => <li key={r}>{r}</li>)}</ul>
+                    {a.bandNote && <p className="mt-1 text-xs text-muted-foreground">{a.bandNote}</p>}
                   </div>
                   <div className="flex items-center gap-2">
                     <BandBadge band={a.band} />

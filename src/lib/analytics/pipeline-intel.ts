@@ -1,6 +1,7 @@
 // Pipeline and deal intelligence (spec section 2). Pure functions over cached deal rows, so every
 // number is explainable and unit tested. Nothing here talks to the database.
-import { MIN_CLOSED_DEALS, winRate } from "./metrics.ts";
+import { MIN_CLOSED_DEALS, winRate, winRateOf } from "./metrics.ts";
+import { stageProbability, type StoredRule } from "./stage-rules.ts";
 
 export type Deal = {
   opportunityId: string;
@@ -152,14 +153,17 @@ export function riskScore(d: Deal, now: number, ctx: { stageAvgDays: number | nu
     const ratio = days(now - inStage) / ctx.stageAvgDays;
     if (ratio > 1) {
       score += Math.min(25, Math.round((ratio - 1) * 25));
-      if (ratio >= 1.5) reasons.push(`In this stage ${round(ratio, 1)}x longer than usual`);
+      // A ratio of 749x says nothing a person can use, so past 10x the days are given instead (N38).
+      if (ratio > 10) reasons.push(`In this stage for ${days(now - inStage)} days; deals here usually stay about ${round(ctx.stageAvgDays, 0)}`);
+      else if (ratio >= 1.5) reasons.push(`In this stage ${round(ratio, 1)}x longer than usual`);
     }
   }
   if (d.createdAt !== null && ctx.avgWonCycle && ctx.avgWonCycle > 0) {
     const ratio = days(now - d.createdAt) / ctx.avgWonCycle;
     if (ratio > 1) {
       score += Math.min(15, Math.round((ratio - 1) * 15));
-      if (ratio >= 2) reasons.push(`Open ${round(ratio, 1)}x longer than deals that were won`);
+      if (ratio > 10) reasons.push(`Open for ${days(now - (d.createdAt as number))} days; deals that were won took about ${round(ctx.avgWonCycle, 0)}`);
+      else if (ratio >= 2) reasons.push(`Open ${round(ratio, 1)}x longer than deals that were won`);
     }
   }
   if (!d.value) {
@@ -218,36 +222,171 @@ export function valueDistribution(deals: Deal[]) {
   return { buckets, average: vals.length ? round(sum(vals) / vals.length) : null, median: vals.length ? round(median(vals) as number) : null, largest };
 }
 
-// ---------------- forecast (2.4) and coverage (2.20) ----------------
+// ---------------- forecast (2.4, N37) and coverage (2.20) ----------------
+
+/** The share of the range the forecast claims to cover: "about 80% sure". */
+export const FORECAST_CONFIDENCE = 0.8;
+const Z80 = 1.2816;
+/** A timing estimate needs this many won deals with dates in the pipeline it describes. */
+export const MIN_CYCLES_FOR_TIMING = 10;
+/** The owner's own stage probabilities are shown with a sensitivity band of this many points either way (they carry no statistical range). */
+export const OWNER_BAND_POINTS = 10;
+
+export type ForecastRange = { low: number; likely: number; high: number };
 
 export type Forecast = {
+  /** history = built from the closed deals (a win rate); owner = built from the stage probabilities the owner set; none = neither exists yet. */
+  method: "history" | "owner" | "none";
+  /** Counted open value the forecast is about (deals with a value and an owner, not in a closed-out stage or an unused pipeline). */
   openValue: number;
-  likely: number;
-  best: number;
-  worst: number;
+  openDeals: number;
   winRate: number | null;
+  /** The range of the win rate at FORECAST_CONFIDENCE, from how many deals it was measured on. */
+  winRateRange: { low: number; high: number } | null;
+  closedDeals: number;
+  closedNeeded: number;
+  /** The one forecast, as a range, or null when there is no basis for one. */
+  range: ForecastRange | null;
+  /** The same open value forecast from the owner's stage probabilities, when the owner set any (shown next to the history figure). */
+  ownerRange: ForecastRange | null;
+  /** Deals left out of the owner-assumption figure because their stage has no probability. */
+  ownerUnsetDeals: number;
+  /** How much of the range is expected to close within 30, 60 and 90 days, from the real sales cycle. Null when there are too few won deals. */
+  horizons: Array<{ days: 30 | 60 | 90; low: number; likely: number; high: number }> | null;
+  /** Open deals that could not be placed in time (older than any deal that was won, or in a pipeline with too few won deals). */
+  untimedDeals: number;
+  cycleSample: number;
   basis: string;
-  horizons: Array<{ days: 30 | 60 | 90; likely: number }> | null;
+  /** What to show under "How this is calculated". */
+  explain: { formula: string; inputs: Array<{ label: string; value: string }>; included: string; excluded: string[]; caveats: string[] };
+  stages: Array<{ pipeline: string; stage: string; deals: number; value: number; probability: number | null }>;
 };
 
-// Likely = open value times the win rate. Best and worst widen it. The 30/60/90 view counts a deal
-// as "due" once it is as old as the average won deal (overdue deals count in the first window).
-export function forecast(deals: Deal[], now: number, fallbackWinRate: number | null = null): Forecast {
+const money = (n: number) => "$" + Math.round(n).toLocaleString("en-US");
+
+/** The range a rate measured on n cases most likely lies in (Wilson score interval at about 80%). */
+export function rateRange(wins: number, n: number): { low: number; high: number } | null {
+  if (n <= 0) return null;
+  const p = wins / n;
+  const z2 = Z80 * Z80;
+  const denom = 1 + z2 / n;
+  const centre = (p + z2 / (2 * n)) / denom;
+  const half = (Z80 * Math.sqrt((p * (1 - p)) / n + z2 / (4 * n * n))) / denom;
+  return { low: Math.max(0, centre - half), high: Math.min(1, centre + half) };
+}
+
+/** Of the won deals in this pipeline, how often did a deal that is already `age` days old close within `h` more days? Null when no won deal was ever that old. */
+export function closesWithin(cycles: number[], age: number, h: number): number | null {
+  const older = cycles.filter((c) => c > age);
+  if (older.length === 0) return null;
+  return older.filter((c) => c <= age + h).length / older.length;
+}
+
+/**
+ * The forecast, with its method on show (N37). It is shown only when there is a real basis:
+ *  1. history: a win rate from at least 20 closed deals (one minimum for the whole product), as a range with its confidence;
+ *  2. the owner's own win probability per stage, labelled as an assumption, with a band either way and no confidence claimed.
+ * Timing comes from the real sales cycle of each pipeline (the won deals' created-to-won days), never a flat repeat. Deals with no value, no
+ * owner, or sitting in a closed-out stage or an unused pipeline are not in `deals` at all (loadDeals leaves them out), so they are never forecast.
+ */
+export function forecast(deals: Deal[], now: number, rules: StoredRule[] = []): Forecast {
   const opens = deals.filter(isOpen);
   const openValue = sum(opens.map((d) => d.value));
-  const rate = winRate(deals) ?? fallbackWinRate;
-  if (rate === null) {
-    return { openValue, likely: 0, best: 0, worst: 0, winRate: null, basis: `Not enough closed deals yet (needs at least ${MIN_CLOSED_DEALS}) to estimate a win rate.`, horizons: null };
+  const won = deals.filter((d) => d.status === "won").length;
+  const lost = deals.filter((d) => d.status === "lost").length;
+  const wr = winRateOf(won, lost);
+  const rate = wr.rate;
+  const rateCi = rate === null ? null : rateRange(won, won + lost);
+
+  // The stage table the forecast rests on, with the owner's probability beside each stage.
+  const byStage = new Map<string, { pipeline: string; stage: string; deals: number; value: number; probability: number | null }>();
+  for (const d of opens) {
+    const k = `${d.pipelineName}\u0000${d.stageName}`;
+    const row = byStage.get(k) ?? { pipeline: d.pipelineName, stage: d.stageName, deals: 0, value: 0, probability: stageProbability(d.pipelineName, d.stageName, rules) };
+    row.deals++;
+    row.value += d.value;
+    byStage.set(k, row);
   }
-  const cycle = avgCycleDays(deals);
-  const likely = openValue * rate;
-  const horizons = cycle === null ? null : ([30, 60, 90] as const).map((h) => ({
-    days: h,
-    likely: round(sum(opens.filter((d) => d.createdAt !== null && days(now - d.createdAt) + h >= cycle).map((d) => d.value)) * rate),
-  }));
+  const stages = [...byStage.values()].sort((a, b) => a.pipeline.localeCompare(b.pipeline) || b.value - a.value);
+
+  // The owner's assumptions.
+  const withP = opens.filter((d) => stageProbability(d.pipelineName, d.stageName, rules) !== null);
+  const ownerUnsetDeals = opens.length - withP.length;
+  const ownerAt = (shift: number) => sum(withP.map((d) => d.value * Math.min(1, Math.max(0, (stageProbability(d.pipelineName, d.stageName, rules) as number) + shift))));
+  const ownerRange: ForecastRange | null = withP.length > 0 ? { low: round(ownerAt(-OWNER_BAND_POINTS / 100)), likely: round(ownerAt(0)), high: round(ownerAt(OWNER_BAND_POINTS / 100)) } : null;
+
+  const method: Forecast["method"] = rate !== null ? "history" : ownerRange ? "owner" : "none";
+  const range: ForecastRange | null =
+    method === "history" && rateCi ? { low: round(openValue * rateCi.low), likely: round(openValue * (rate as number)), high: round(openValue * rateCi.high) }
+    : method === "owner" ? ownerRange
+    : null;
+
+  // Timing from each pipeline's own won deals.
+  const cyclesBy = new Map<string, number[]>();
+  for (const d of deals) {
+    const c = cycleDays(d);
+    if (c !== null) cyclesBy.set(d.pipelineName, [...(cyclesBy.get(d.pipelineName) ?? []), c]);
+  }
+  let horizons: Forecast["horizons"] = null;
+  let untimed = 0;
+  let cycleSample = 0;
+  if (range) {
+    const share = (d: Deal, h: number): number | null => {
+      const cycles = cyclesBy.get(d.pipelineName) ?? [];
+      if (cycles.length < MIN_CYCLES_FOR_TIMING || d.createdAt === null) return null;
+      return closesWithin(cycles, days(now - d.createdAt), h);
+    };
+    cycleSample = sum([...cyclesBy.values()].filter((c) => c.length >= MIN_CYCLES_FOR_TIMING).map((c) => c.length));
+    const eligible = opens.filter((d) => share(d, 90) !== null);
+    untimed = opens.length - eligible.length;
+    if (eligible.length > 0) {
+      // Each deal's chance of closing in the window, on top of the chance it is won at all (the forecast's own low, likely and high).
+      const scale = openValue > 0 ? { low: range.low / openValue, likely: range.likely / openValue, high: range.high / openValue } : { low: 0, likely: 0, high: 0 };
+      horizons = ([30, 60, 90] as const).map((h) => {
+        const timed = sum(eligible.map((d) => d.value * (share(d, h) as number)));
+        return { days: h, low: round(timed * scale.low), likely: round(timed * scale.likely), high: round(timed * scale.high) };
+      });
+    }
+  }
+
+  const rangeText = range ? `${money(range.low)} to ${money(range.high)} (most likely ${money(range.likely)})` : "";
+  const basis =
+    method === "history" && rateCi && range
+      ? `About ${Math.round(FORECAST_CONFIDENCE * 100)}% sure the open value converts to between ${money(range.low)} and ${money(range.high)}. That uses a ${Math.round((rate as number) * 100)}% win rate measured on ${won + lost} closed deals, which is really somewhere between ${Math.round(rateCi.low * 100)}% and ${Math.round(rateCi.high * 100)}%. An estimate, not a promise.`
+    : method === "owner"
+      ? `Your own assumptions: each stage's win probability as you set it, with a band of ${OWNER_BAND_POINTS} points either way. ${rangeText}. These are your assumptions, not measured results, so there is no confidence figure.`
+      : `No forecast yet. It needs ${MIN_CLOSED_DEALS} closed deals (there are ${won + lost}, so ${wr.needed} more), or a win probability that you set for each stage.`;
+
   return {
-    openValue, likely: round(likely), best: round(openValue * Math.min(1, rate * 1.5)), worst: round(openValue * rate * 0.5),
-    winRate: round(rate, 3), basis: `Open value times a ${Math.round(rate * 100)}% win rate. An estimate, not a promise.`, horizons,
+    method, openValue, openDeals: opens.length, winRate: rate === null ? null : round(rate, 3),
+    winRateRange: rateCi ? { low: round(rateCi.low, 3), high: round(rateCi.high, 3) } : null,
+    closedDeals: won + lost, closedNeeded: wr.needed, range, ownerRange, ownerUnsetDeals, horizons, untimedDeals: untimed, cycleSample, basis, stages,
+    explain: {
+      formula: method === "history"
+        ? "Open value x the share of closed deals that were won. The range comes from how many deals that share was measured on: fewer deals, wider range."
+        : method === "owner" ? "For each open deal: its value x the win probability you set for its stage. Added up."
+        : "A forecast needs either a win rate from closed deals or a win probability set for each stage.",
+      inputs: [
+        { label: "Open deals counted", value: String(opens.length) },
+        { label: "Open value counted", value: money(openValue) },
+        { label: "Closed deals (won plus lost)", value: `${won + lost} (minimum ${MIN_CLOSED_DEALS})` },
+        ...(rate !== null ? [{ label: "Win rate", value: `${Math.round(rate * 100)}%` }] : []),
+        ...(cycleSample > 0 ? [{ label: "Won deals used for timing", value: String(cycleSample) }] : []),
+      ],
+      included: "Open deals that have a value above zero and an owner, and that are not in a closed-out stage or in a pipeline marked not in use.",
+      excluded: [
+        "Open deals with no value or no owner (the screen says how many were left out).",
+        "Deals in a stage that is closed out or ignored, and in a pipeline that is not in use (you can change that under Stages and pipelines).",
+        "Open deals in a stage with no probability are left out of the figure built from your own assumptions.",
+      ],
+      caveats: [
+        "Amounts are as entered in each account; different currencies are not converted.",
+        "It assumes open deals behave like the deals that were closed before. A new offer or a new team can break that.",
+        horizons
+          ? `Timing: how often a won deal of the same age in the same pipeline closed within 30, 60 or 90 more days (${cycleSample} won deals). ${untimed} open ${untimed === 1 ? "deal is" : "deals are"} not placed in time, because ${untimed === 1 ? "it is" : "they are"} older than any won deal or in a pipeline with too few won deals.`
+          : `Timing needs at least ${MIN_CYCLES_FOR_TIMING} won deals with dates in the same pipeline, so none is shown.`,
+      ],
+    },
   };
 }
 

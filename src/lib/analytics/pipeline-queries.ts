@@ -1,5 +1,7 @@
 import { sql } from "../db";
 import type { Deal } from "./pipeline-intel";
+import { countedInScope, dealScopeJoins, outOfScope } from "./stage-rules-sql";
+import { currentSnapshotVersion, snapshotOk } from "./definitions-sql";
 
 const ms = (v: unknown) => (v instanceof Date ? v.getTime() : null);
 
@@ -12,19 +14,15 @@ export async function loadDeals(installationId: string, allowed: string[] | null
   const limited = allowed ? db`and o.location_id = any(${allowed}::text[])` : db``;
   const rows = await db`
     select o.opportunity_id, o.location_id, l.name location_name, coalesce(o.pipeline_id, '') pipeline_id,
-      coalesce(pl.name, 'Pipeline') pipeline_name, o.stage_id, coalesce(st.nm, 'Unknown stage') stage_name, coalesce(st.ord, 999)::int stage_order,
+      coalesce(sc_pl.name, 'Pipeline') pipeline_name, o.stage_id, coalesce(sc_st.nm, 'Unknown stage') stage_name, coalesce(sc_st.ord, 999)::int stage_order,
       o.name, o.contact_name, coalesce(o.monetary_value, 0)::float8 value, o.status, o.assigned_to,
       o.created_remote_at, o.last_stage_change_at, o.last_status_change_at,
       greatest(o.last_action_at, o.updated_remote_at) last_activity_at
     from cached_opportunities o
     join locations l on l.installation_id = o.installation_id and l.location_id = o.location_id and not l.ignored
-    left join pipelines pl on pl.installation_id = o.installation_id and pl.location_id = o.location_id and pl.pipeline_id = o.pipeline_id
-    left join lateral (
-      select s->>'name' nm, t.ord from jsonb_array_elements(coalesce(pl.stages, '[]'::jsonb)) with ordinality t(s, ord)
-      where s->>'id' = o.stage_id limit 1
-    ) st on true
+    ${dealScopeJoins()}
     where o.installation_id = ${installationId} ${only} ${limited}
-      and not (o.status = 'open' and not (coalesce(o.monetary_value, 0) > 0 and o.assigned_to is not null))
+      and (o.status <> 'open' or ${countedInScope()})
     order by coalesce(greatest(o.last_action_at, o.updated_remote_at, o.last_stage_change_at), o.created_remote_at, o.synced_at) desc nulls last
     limit 60000`;
   return rows.map((r) => ({
@@ -35,33 +33,48 @@ export async function loadDeals(installationId: string, allowed: string[] | null
   }));
 }
 
-// Open deals left out of every dollar figure and count (metrics.ts: a counted deal has a value above zero and an owner).
-// loadDeals above never returns them, so each screen that shows a total says how many were left out.
+// Open deals left out of every dollar figure and count (metrics.ts: a counted deal has a value above zero and an owner, and stage-rules.ts: it
+// is not in a closed-out or ignored stage or in a pipeline marked not in use). loadDeals above never returns them, so each screen that shows a
+// total says how many were left out and why. The three reasons never overlap: a deal in a closed-out stage is counted there only.
 export async function excludedOpenDeals(installationId: string, allowed: string[] | null, locationId?: string) {
   const db = sql();
   const only = locationId ? db`and o.location_id = ${locationId}` : db``;
   const limited = allowed ? db`and o.location_id = any(${allowed}::text[])` : db``;
   const [r] = await db`
     select count(*)::int total,
-      count(*) filter (where not (coalesce(o.monetary_value, 0) > 0))::int no_value,
-      count(*) filter (where coalesce(o.monetary_value, 0) > 0 and o.assigned_to is null)::int no_owner
+      count(*) filter (where ${outOfScope()})::int closed_out,
+      count(*) filter (where not ${outOfScope()} and not (coalesce(o.monetary_value, 0) > 0))::int no_value,
+      count(*) filter (where not ${outOfScope()} and coalesce(o.monetary_value, 0) > 0 and o.assigned_to is null)::int no_owner
     from cached_opportunities o
     join locations l on l.installation_id = o.installation_id and l.location_id = o.location_id and not l.ignored
+    ${dealScopeJoins()}
     where o.installation_id = ${installationId} ${only} ${limited}
-      and o.status = 'open' and not (coalesce(o.monetary_value, 0) > 0 and o.assigned_to is not null)`;
-  return { count: (r?.total as number) ?? 0, noValue: (r?.no_value as number) ?? 0, noOwner: (r?.no_owner as number) ?? 0 };
+      and o.status = 'open' and not ${countedInScope()}`;
+  return { count: (r?.total as number) ?? 0, closedOut: (r?.closed_out as number) ?? 0, noValue: (r?.no_value as number) ?? 0, noOwner: (r?.no_owner as number) ?? 0 };
 }
 
+// The open pipeline over time. Only days counted under today's rules are drawn (definitions.ts, N39): a line that mixed the old way of counting
+// with the new one would show a fall that never happened. `leftOut` is how many earlier days were not drawn, and `since` the first day that was.
 export async function pipelineTrend(installationId: string, allowed: string[] | null, days = 60) {
   const db = sql();
+  const version = await currentSnapshotVersion(installationId);
   const limited = allowed ? db`and m.location_id = any(${allowed}::text[])` : db``;
   const rows = await db`
-    select m.day, sum(m.open_value)::float8 open_value, sum(m.open_opportunities)::int open_opps
+    select m.day, bool_and(${snapshotOk("m", version)}) ok, sum(m.open_value)::float8 open_value, sum(m.open_opportunities)::int open_opps
     from account_metrics_daily m
     join locations l on l.installation_id = m.installation_id and l.location_id = m.location_id and not l.ignored
     where m.installation_id = ${installationId} and m.day > current_date - ${days}::int ${limited}
     group by m.day order by m.day`;
-  return rows.map((r) => ({ day: (r.day instanceof Date ? r.day.toISOString() : String(r.day)).slice(0, 10), openValue: r.open_value as number, openOpps: r.open_opps as number }));
+  const all = rows.map((r) => ({ day: (r.day instanceof Date ? r.day.toISOString() : String(r.day)).slice(0, 10), ok: r.ok === true, openValue: r.open_value as number, openOpps: r.open_opps as number }));
+  const kept = all.filter((p) => p.ok);
+  const leftOut = all.length - kept.length;
+  return {
+    points: kept.map(({ day, openValue, openOpps }) => ({ day, openValue, openOpps })),
+    leftOut, since: kept[0]?.day ?? null,
+    note: leftOut > 0
+      ? `The way deals are counted changed, so the ${leftOut} earlier ${leftOut === 1 ? "day is" : "days are"} not drawn${kept[0] ? `; this line starts on ${kept[0].day}` : ". The line is drawn once there are two days counted the new way"}. A line that mixed the two ways of counting would show a change that never happened.`
+      : null,
+  };
 }
 
 export const GOAL_METRICS = ["monthly_revenue", "monthly_leads", "monthly_deals_won"] as const;

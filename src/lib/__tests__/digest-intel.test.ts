@@ -77,12 +77,25 @@ test("no-shows and unconfirmed appointments become attention items only when the
 });
 
 test("portfolio headlines add the accounts together day by day", () => {
-  const a = week({ openValue: 100 }, { openValue: 200 });
-  const b = week({ openValue: 50 }, { openValue: 50 });
+  // Dollar figures are large enough here (15,000 to 25,000) to measure a percentage against. Stage F1 (N6): below a base of 5,000 dollars, or
+  // 10 for a count, no percentage is shown (the test further down).
+  const a = week({ openValue: 10_000 }, { openValue: 20_000 });
+  const b = week({ openValue: 5_000 }, { openValue: 5_000 });
   const h = portfolioHeadlines([a, b]).find((x) => x.key === "openValue")!;
-  assert.equal(h.change.today, 250);
-  assert.equal(h.change.yesterday, 150);
+  assert.equal(h.change.today, 25_000);
+  assert.equal(h.change.yesterday, 15_000);
   assert.equal(h.change.vsYesterday, 67);
+});
+
+test("a headline measured against a small base shows the plain difference, not a percentage (N6)", () => {
+  const small = portfolioHeadlines([week({ openValue: 100, stale: 2 }, { openValue: 250, stale: 0 })]);
+  const money = small.find((x) => x.key === "openValue")!.change;
+  assert.equal(money.vsYesterday, null);
+  assert.equal(money.diffYesterday, 150);
+  assert.equal(money.smallBase, true);
+  const stale = small.find((x) => x.key === "stale")!.change;
+  assert.equal(stale.vsYesterday, null, "two stale deals going to none is not minus 100 percent");
+  assert.equal(stale.diffYesterday, -2);
 });
 
 // The old vague "Data is under an hour old" helper was removed in stage S0.4: the one freshness rule is src/lib/sync/freshness.ts, tested in freshness.test.ts.

@@ -313,7 +313,7 @@ async function main() {
   // --- communication analysis, daily priorities, setup score, exports
   const ci2 = await call("/api/app/comms-intel", { token });
   assert.equal(ci2.status, 200);
-  assert.equal(ci2.body.aging.buckets.length, 6);
+  assert.equal(ci2.body.aging.buckets.length, 7, "six hourly buckets plus 'Older than a week' (stage F1, N15)");
   assert.equal(ci2.body.aging.buckets.reduce((s: number, b: { count: number }) => s + b.count, 0), ci2.body.aging.total);
   assert.ok(ci2.body.gaps.total > 0 && ci2.body.gaps.stages.length > 0, "quiet deals found");
   assert.ok(ci2.body.afterHours.leads > 100 && ci2.body.afterHours.afterHoursPct >= 0);

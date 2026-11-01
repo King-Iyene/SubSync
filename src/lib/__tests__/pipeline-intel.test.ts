@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   abandonedDeals, agingBuckets, avgCycleDays, coverage, deadPipeline, forecast, riskScore, riskyDeals, stageTable, valueDistribution,
-  winLossByMonth, winRate, type Deal,
+  winLossByMonth, winRate, rateRange, type Deal,
 } from "../analytics/pipeline-intel.ts";
 
 const NOW = Date.parse("2026-10-30T12:00:00Z");
@@ -93,22 +93,75 @@ test("risky deals are sorted most at risk first and only list open deals", () =>
   assert.equal(list[0].name, "Old");
 });
 
-test("forecast: likely, best and worst bands, with the not-enough-data case", () => {
+test("forecast with history: a range with a stated confidence, never a single number (N37)", () => {
   const f = forecast([...closed(12, 8), deal({ value: 10_000 }), deal({ value: 10_000 })], NOW);
+  assert.equal(f.method, "history");
   assert.equal(f.winRate, 0.6);
-  assert.equal(f.likely, 12_000);
-  assert.equal(f.best, 18_000);
-  assert.equal(f.worst, 6_000);
-  const none = forecast([deal()], NOW);
-  assert.equal(none.winRate, null);
-  assert.equal(none.likely, 0);
+  assert.ok(f.range);
+  assert.equal(f.range!.likely, 12_000, "open value x the win rate");
+  assert.ok(f.range!.low < f.range!.likely && f.range!.likely < f.range!.high, "a range around the likely figure");
+  // Worked by hand: 12 of 20 won, an 80% interval for the rate is about 45.7% to 72.8%, so 20,000 converts to about 9,145 to 14,553.
+  assert.ok(f.range!.low >= 9_140 && f.range!.low <= 9_150, "low " + f.range!.low);
+  assert.ok(f.range!.high >= 14_548 && f.range!.high <= 14_558, "high " + f.range!.high);
+  assert.ok(f.basis.includes("80%"), "the confidence is stated in words");
+  assert.ok(f.explain.inputs.some((i) => i.label.startsWith("Closed deals") && i.value.startsWith("20")), "the sample size is shown");
+  assert.ok(f.explain.excluded.length >= 2 && f.explain.included.length > 20, "what was included and excluded is written out");
 });
 
-test("forecast horizons count overdue deals in the first window", () => {
-  const f = forecast([...closed(12, 8, 60), deal({ value: 1000, createdAt: ago(50) }), deal({ value: 1000, createdAt: ago(1) })], NOW);
+test("a bigger sample gives a narrower range", () => {
+  const small = rateRange(12, 20)!;
+  const big = rateRange(120, 200)!;
+  assert.ok(big.high - big.low < small.high - small.low);
+  assert.equal(rateRange(0, 0), null);
+});
+
+test("forecast with no history and no stage probabilities says what unlocks it (N37)", () => {
+  const none = forecast([deal(), ...closed(3, 3)], NOW);
+  assert.equal(none.method, "none");
+  assert.equal(none.winRate, null);
+  assert.equal(none.range, null);
+  assert.equal(none.horizons, null);
+  assert.ok(none.basis.includes("20 closed deals") && none.basis.includes("14 more"), none.basis);
+});
+
+test("forecast from the owner's stage probabilities is labelled as an assumption, with a band and no confidence figure (N37)", () => {
+  const rules = [{ pipelineKey: "sales", stageKey: "new", cls: null, winProbability: 20 }];
+  const f = forecast([deal({ value: 1000 }), deal({ value: 3000 }), deal({ value: 5000, stageName: "Proposal" })], NOW, rules);
+  assert.equal(f.method, "owner");
+  assert.deepEqual(f.range, { low: 400, likely: 800, high: 1200 }, "4,000 at 20 percent, 10 points either way");
+  assert.equal(f.ownerUnsetDeals, 1, "the deal in a stage with no probability is left out, not guessed");
+  assert.ok(f.basis.startsWith("Your own assumptions"));
+  assert.ok(!/% sure/.test(f.basis), "no confidence is claimed for an assumption");
+});
+
+test("with history the owner's assumption is shown beside it, not instead of it", () => {
+  const rules = [{ pipelineKey: "sales", stageKey: "new", cls: null, winProbability: 50 }];
+  const f = forecast([...closed(12, 8), deal({ value: 10_000 })], NOW, rules);
+  assert.equal(f.method, "history");
+  assert.equal(f.ownerRange!.likely, 5000);
+});
+
+test("timing comes from the pipeline's own won deals, and a deal older than any won deal is not placed (N37)", () => {
+  const f = forecast([...closed(12, 8, 60), deal({ value: 1000, createdAt: ago(50) }), deal({ value: 1000, createdAt: ago(1) }), deal({ value: 1000, createdAt: ago(400) })], NOW);
   assert.ok(f.horizons);
-  assert.equal(f.horizons![0].likely, 600); // the 50 day old deal is due within 30 days; the new one is not
-  assert.equal(f.horizons![2].likely, 1200); // both are due within 90 days
+  // Won deals all took 60 days. The 50 day old deal is inside 30 more days; the 1 day old one is not until day 61; the 400 day old one is older than any won deal.
+  assert.equal(f.untimedDeals, 1);
+  const scale = f.range!.likely / f.openValue;
+  assert.equal(f.horizons![0].likely, Math.round(1000 * scale));
+  assert.equal(f.horizons![1].likely, Math.round(2000 * scale));
+  assert.equal(f.horizons![2].likely, Math.round(2000 * scale));
+  assert.ok(f.horizons![0].low <= f.horizons![0].likely && f.horizons![0].likely <= f.horizons![0].high);
+  assert.ok(f.horizons![2].likely > f.horizons![0].likely, "the three horizons are not the same number repeated");
+});
+
+test("too few won deals in a pipeline means no timing at all, and the screen says why", () => {
+  const f = forecast([...closed(9, 11, 60), ...Array.from({ length: 3 }, () => won(60)), deal({ value: 1000 })], NOW);
+  // 12 won in total in the one pipeline (>= 10), so timing exists; now break the pipeline name so each has fewer than 10.
+  assert.ok(f.horizons);
+  const split = forecast([...Array.from({ length: 6 }, () => won(60)), ...Array.from({ length: 6 }, () => ({ ...won(60), pipelineName: "Other" })), ...Array.from({ length: 8 }, () => lost()), deal({ value: 1000 })], NOW);
+  assert.equal(split.method, "history");
+  assert.equal(split.horizons, null);
+  assert.ok(split.explain.caveats.some((c) => c.includes("at least 10 won deals")));
 });
 
 test("coverage ratio needs three times the target", () => {

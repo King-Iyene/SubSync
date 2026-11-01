@@ -10,6 +10,7 @@ import {
   type ContactCursor, type ConversationRow, type OpportunityRow,
 } from "./ghl-data";
 import { leadFromMessages } from "../analytics/speed-intel";
+import { CONVERSATIONS_READ_PER_ACCOUNT, CONVERSATION_PAGE_SIZE } from "../analytics/waiting";
 import { diffAppointmentEvents } from "./appointment-events";
 import { applyLeadRules } from "./lead-rules-apply";
 import { diffDealEvents } from "./deal-events";
@@ -308,7 +309,8 @@ async function handleOpportunities(job: Job, deadline: number): Promise<Outcome>
   return { done: false, cursor: { page: pageNo } };
 }
 
-const CONVERSATION_PAGES = 5;
+// Up to 500 conversations per account (the newest first). The limit is stated on every screen that counts conversations (waiting.ts).
+const CONVERSATION_PAGES = CONVERSATIONS_READ_PER_ACCOUNT / CONVERSATION_PAGE_SIZE;
 
 async function handleConversations(job: Job): Promise<Outcome> {
   const db = sql();

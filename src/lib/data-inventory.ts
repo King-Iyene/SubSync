@@ -107,13 +107,14 @@ export const INVENTORY: Record<string, TableInfo> = {
   annotations: { noun: "chart notes", line: "yours", personal: { text: "notes you add to charts" } },
   usage_events: { noun: "page-view counts", line: "records" },
   team_names: { noun: "team member names", line: "yours", personal: { user_id: "a team member's sign-in id", name: "team member names you type" }, notPersonal: ["source"] },
+  stage_rules: { noun: "how you treat pipelines and stages", line: "yours", personal: { pipeline_key: "the names of your pipelines", stage_key: "the names of your pipeline stages", updated_by: "the name of the person who changed a rule" } },
   report_templates: { noun: "saved report layouts", line: "yours", personal: { name: "saved report names", spec: "the layout of a saved report" } },
   roadmap_votes: { noun: "roadmap votes", line: "yours", personal: { voter: "who voted on the roadmap (a sign-in id)" }, notPersonal: ["item_key"] },
   settings: {
     noun: "settings", line: "sign_in",
     personal: {
       slack_webhook_url: "the Slack channel address (kept as typed, so treat it like a password)", digest_email: "the email address that receives alerts",
-      brand_name: "the company name you show", custom_checklist: "your own checklist steps", ghl_app_domain: "the address you log in to", detected_app_domain: "the address you log in to", digest_timezone: "your time zone",
+      brand_name: "the company name you show", custom_checklist: "your own checklist steps", cold_tags: "the tags you marked as cold lists", ghl_app_domain: "the address you log in to", detected_app_domain: "the address you log in to", digest_timezone: "your time zone",
     },
     notPersonal: ["app_domain_source", "keep_transcripts", "push_notes_to_crm"],
   },

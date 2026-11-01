@@ -2,7 +2,7 @@ import { sql } from "../db";
 import { safeError } from "../safe-log";
 import { buildDigest, onboardingChecklist, toCsv, type DerivedAccount } from "../analytics/derive";
 import {
-  allManualTasks, dismissAlert, domainCandidates, duplicateGroups, inbox, listAlerts, listDomainChecks, manualTasks, metricsTrend,
+  allManualTasks, conversationCoverage, dismissAlert, domainCandidates, duplicateGroups, inbox, listAlerts, listDomainChecks, manualTasks, metricsTrend,
   dealHygiene, getSettings, pipelineCells, saveDomainCheck, searchContacts, setLocationFlags, setManualTask, staleDeals, updateSettings,
   visibleLocationIds, type Settings,
 } from "../analytics/queries";
@@ -27,11 +27,16 @@ import {
 import { OUTCOME_LABEL, PRESETS, parseFilters, parseOutcome } from "../analytics/call-intel";
 import { callQueue, createCallList, deleteCallList, listCallLists, logOutcome, MAX_LISTS, outcomeSummary, speedToLead } from "../analytics/call-queries";
 import {
-  activitySummary, anomalyIndices, compareAccounts, contactGap, goalProgress, periodChange, renewalStatus, roi, segmentStats, zAnomaly,
+  activitySummary, anomalyIndices, compareAccounts, contactGap, goalProgress, renewalStatus, roi, segmentStats, zAnomaly,
 } from "../analytics/client-intel";
 import { accountHistory, clientExtras, periodFigures, saveProfile, type ClientExtra, type ProfilePatch } from "../analytics/client-queries";
 import { dailyPriorities, replyAging, setupScore, worstDomainStatus, type SetupFacts } from "../analytics/comms-intel";
-import { channelCounts, channelLabel, WAITING_WINDOW_DAYS } from "../analytics/waiting";
+import { channelCounts, channelLabel, CONVERSATIONS_READ_PER_ACCOUNT, readLimitNote, unreadSummary, WAITING_WINDOW_DAYS } from "../analytics/waiting";
+import { attentionBand } from "../scoring";
+import { loadStageRules, saveStageRule, stageInventory } from "../analytics/stage-rules-sql";
+import { parseRulePatch, pipelineTreatment, ruleKey, stageProbability, treatmentOf } from "../analytics/stage-rules";
+import { sourceSummary } from "../analytics/contact-intel";
+import { MIN_MONEY_BASE_FOR_PERCENT, percentChange } from "../analytics/metrics";
 import { afterHours, communicationGaps } from "../analytics/comms-queries";
 import { badDataSamples, contactOverview, topLeads, vips } from "../analytics/contact-queries";
 import { appointmentInsights } from "../analytics/appointment-insight-queries";
@@ -127,7 +132,7 @@ function slim(a: DerivedAccount, links: ReturnType<typeof deepLinks>, forClient 
     contacts: a.contacts, new30d: a.new30d, openOpps: a.openOpps, openValue: a.openValue, staleOpps: a.staleOpps,
     revenueAtRisk: a.revenueAtRisk, unread: a.unread, unanswered: a.unanswered, calendars: a.calendars, pipelines: a.pipelines,
     emailPct: a.emailPct, phonePct: a.phonePct, tagPct: a.tagPct, activePct: a.activePct, completenessPct: a.completenessPct,
-    daysInactive: a.daysInactive, lastActivityAt: a.lastActivityAt, dormant: a.dormant, score: a.score, band: a.band,
+    daysInactive: a.daysInactive, lastActivityAt: a.lastActivityAt, dormant: a.dormant, score: a.score, band: a.band, bandNote: a.bandNote,
     churn: a.churn, winRate: a.winRate, expectedRevenue: a.expectedRevenue, followUpRevenueAtRisk: a.followUpRevenueAtRisk,
     leadFlowDropPct: a.leadFlowDropPct, syncError: a.syncError, contactsSyncedAt: a.contactsSyncedAt,
   };
@@ -137,9 +142,8 @@ function slim(a: DerivedAccount, links: ReturnType<typeof deepLinks>, forClient 
 
 async function overview(ctx: Ctx) {
   // Independent queries run together so the page does not wait on them one after another.
-  const [{ settings, accounts, hidden, links }, allAlerts, freshness] = await Promise.all([
-
-    accountsFor(ctx), listAlerts(ctx.installationId, false, 500, ctx.limitTo ?? undefined), freshnessFor(ctx.installationId, { limitTo: ctx.limitTo }),
+  const [{ settings, accounts, hidden, links }, allAlerts, freshness, coverage] = await Promise.all([
+    accountsFor(ctx), listAlerts(ctx.installationId, false, 500, ctx.limitTo ?? undefined), freshnessFor(ctx.installationId, { limitTo: ctx.limitTo }), conversationCoverage(ctx.installationId),
   ]);
   const overviewSeg = await segmentSet(ctx);
   const live = accounts.filter((a) => !a.ignored);
@@ -159,7 +163,10 @@ async function overview(ctx: Ctx) {
     .filter((x) => x.reasons.length > 0)
     .sort((x, y) => x.rank - y.rank)
     .slice(0, 8)
-    .map(({ a, reasons }) => ({ locationId: a.locationId, name: a.name, score: a.score, band: a.band, churn: a.churn.level, reasons, url: links.account(a.locationId) }));
+    // Inside a "Needs attention" list nothing is labelled Healthy or Thriving (N16): an account listed here is at best "Watch".
+    .map(({ a, reasons }) => ({ locationId: a.locationId, name: a.name, score: a.score, band: attentionBand(a.band), bandNote: a.bandNote, churn: a.churn.level, reasons, url: links.account(a.locationId) }));
+  const liveIds = new Set(live.map((a) => a.locationId));
+  const capped = coverage.filter((c) => liveIds.has(c.locationId) && c.stored >= CONVERSATIONS_READ_PER_ACCOUNT).length;
   return json({
     demo: ctx.demo,
     kind: ctx.kind,
@@ -175,6 +182,9 @@ async function overview(ctx: Ctx) {
       expectedRevenue: live.some((a) => a.winRate !== null) ? sum((a) => a.expectedRevenue ?? 0) : null,
       followUpRevenueAtRisk: live.some((a) => a.winRate !== null) ? sum((a) => a.followUpRevenueAtRisk ?? 0) : null,
       estimateAccounts: live.filter((a) => a.winRate !== null).length, minClosedDeals: MIN_CLOSED_DEALS, outlier: overviewOutlier(live), excludedDeals: sum((a) => a.excludedOpen ?? 0),
+      // Of the left-out deals, those in a closed-out stage or an unused pipeline (the rest have no value or no owner).
+      excludedByStage: sum((a) => a.outOfScopeOpen ?? 0),
+      readLimit: readLimitNote(capped, live.length),
       avgScore: live.length ? Math.round(sum((a) => a.score) / live.length) : 0,
       openAlerts: alerts.length, criticalAlerts: alerts.filter((x) => x.severity === "critical").length,
     },
@@ -203,7 +213,7 @@ async function computeAudit(ctx: Ctx) {
   };
   const audit = buildAudit(live.map((a) => ({
     locationId: a.locationId, name: a.name, staleValue: a.staleValue, staleOpps: a.staleOpps, openValue: a.openValue, openOpps: a.openOpps, excludedOpen: a.excludedOpen ?? 0,
-    unanswered: a.unanswered, winRate: a.winRate, avgDealValue: a.avgDealValue, completenessPct: a.completenessPct, contacts: a.contacts,
+    unanswered: a.unanswered, winRate: a.winRate, avgDealValue: a.avgDealValue, completenessPct: a.completenessPct, contacts: a.contacts, topStaleDeal: a.topStaleDeal ?? 0,
   })), appts);
   const who = settings.brandName ?? (ctx.limitTo ? "Your business" : "Your company");
   return { audit, who, names: live.map((a) => a.name ?? "").filter(Boolean) };
@@ -457,7 +467,9 @@ async function connectionRemove(ctx: Ctx, id: string) {
 async function dailyView(ctx: Ctx) {
   const sc = await scope(ctx);
   const d = await buildDailyDigest(ctx.installationId, { limitTo: ctx.limitTo, planLimit: accountLimit(ctx.plan, ctx.entitlements.enforced), onlyIds: await segmentSet(ctx) });
+  const seen = (await conversationCoverage(ctx.installationId)).filter((c) => sc.permits(c.locationId));
   return json({
+    readLimit: readLimitNote(seen.filter((c) => c.stored >= CONVERSATIONS_READ_PER_ACCOUNT).length, seen.length),
     generatedAt: d.generatedAt, freshness: d.freshness, connection: d.connection, headlines: d.headlines, accounts: d.accounts, limited: ctx.limitTo !== null,
     attention: d.attention.map((a) => ({ ...a, url: sc.links.account(a.locationId) })),
     fine: d.fine, notWatched: NOT_WATCHED,
@@ -540,12 +552,15 @@ async function segmentsView(ctx: Ctx) {
 
 // What each kind of client cares about, and which of your accounts fall under it.
 async function playbooksView(ctx: Ctx) {
-  const [rows, settings] = await Promise.all([
+  const [allRows, settings, seg] = await Promise.all([
     sql()`select l.location_id, l.name, p.industry from locations l
       left join account_profiles p on p.installation_id = l.installation_id and p.location_id = l.location_id
       where l.installation_id = ${ctx.installationId} and not l.ignored`,
     getSettings(ctx.installationId),
+    segmentSet(ctx),
   ]);
+  // The accounts listed under each industry follow the filter at the top of the app, like every other page (N8).
+  const rows = seg ? allRows.filter((r) => seg.has(r.location_id as string)) : allRows;
   const unset = rows.filter((r) => !((r.industry as string | null) ?? "").trim()).length;
   return json({
     industryTargets: settings.industryTargets, globalReplyHours: settings.slaHours, accountsWithoutIndustry: unset,
@@ -632,13 +647,19 @@ async function inboxView(ctx: Ctx) {
   // The same list and the same window as the Today and Overview counts: nothing is cut short at a few hundred, and if the list ever is
   // (more than the limit), the screen says so instead of showing a smaller number as if it were the total.
   const LIMIT = 2000;
-  const rows = (await inbox(ctx.installationId, settings.slaHours, LIMIT, ctx.limitTo ?? undefined)).filter((r) => permits(r.locationId));
+  const [fetched, coverage] = await Promise.all([inbox(ctx.installationId, settings.slaHours, LIMIT, ctx.limitTo ?? undefined), conversationCoverage(ctx.installationId)]);
+  const rows = fetched.filter((r) => permits(r.locationId));
   const late = rows.filter((r) => r.overSla);
+  const seen = coverage.filter((c) => permits(c.locationId));
   return json({
     slaHours: settings.slaHours,
     windowDays: WAITING_WINDOW_DAYS,
     overSla: late.length,
     waitingTotal: late.length,
+    // Unread is its own count (N15): every conversation with something nobody opened, the same figure Today shows. Some are also waiting; the
+    // sentence says how many, so nothing is added or taken away unseen.
+    unread: unreadSummary(rows),
+    readLimit: readLimitNote(seen.filter((c) => c.stored >= CONVERSATIONS_READ_PER_ACCOUNT).length, seen.length),
     channels: channelCounts(late.map((r) => r.lastMessageType)),
     truncated: rows.length >= LIMIT,
     items: rows.map((r) => ({ ...r, channel: channelLabel(r.lastMessageType), url: links.conversation(r.locationId, r.conversationId) })),
@@ -800,7 +821,7 @@ const settingsView = async (ctx: Ctx) => {
 
 function publicSettings(s: Settings) {
   // Never send the webhook URL back to the browser: it is a secret.
-  return { staleDays: s.staleDays, dormantDays: s.dormantDays, slaHours: s.slaHours, appDomain: s.appDomain, appDomainSource: s.appDomainSource, detectedDomain: s.detectedDomain, digestEnabled: s.digestEnabled, customChecklist: s.customChecklist, digestHour: s.digestHour, digestTimezone: s.digestTimezone, digestEmail: s.digestEmail, emailReady: emailConfigured(), brandName: s.brandName, brandColor: s.brandColor, industryTargets: s.industryTargets, keepTranscripts: s.keepTranscripts, pushNotesToCrm: s.pushNotesToCrm, speedTargetMinutes: s.speedTargetMinutes, countAutomatedTouches: s.countAutomatedTouches, speedBusinessHours: s.speedBusinessHours, speedOpenHour: s.speedOpenHour, speedCloseHour: s.speedCloseHour, alertQuietHours: s.alertQuietHours };
+  return { staleDays: s.staleDays, dormantDays: s.dormantDays, slaHours: s.slaHours, appDomain: s.appDomain, appDomainSource: s.appDomainSource, detectedDomain: s.detectedDomain, digestEnabled: s.digestEnabled, customChecklist: s.customChecklist, digestHour: s.digestHour, digestTimezone: s.digestTimezone, digestEmail: s.digestEmail, emailReady: emailConfigured(), brandName: s.brandName, brandColor: s.brandColor, industryTargets: s.industryTargets, keepTranscripts: s.keepTranscripts, pushNotesToCrm: s.pushNotesToCrm, speedTargetMinutes: s.speedTargetMinutes, countAutomatedTouches: s.countAutomatedTouches, speedBusinessHours: s.speedBusinessHours, speedOpenHour: s.speedOpenHour, speedCloseHour: s.speedCloseHour, alertQuietHours: s.alertQuietHours, coldTags: s.coldTags };
 }
 
 const INSIGHT_SETTINGS = new Set(["staleDays", "dormantDays", "slaHours", "speedTargetMinutes", "countAutomatedTouches", "speedBusinessHours", "speedOpenHour", "speedCloseHour", "industryTargets", "alertQuietHours"]);
@@ -855,6 +876,12 @@ async function settingsUpdate(ctx: Ctx) {
     if (body.digestTimezone === null || body.digestTimezone === "") patch.digestTimezone = null;
     else if (typeof body.digestTimezone === "string" && body.digestTimezone.length <= 64 && localParts(new Date(), body.digestTimezone) !== null) patch.digestTimezone = body.digestTimezone;
     else return json({ error: "That is not a time zone we recognise, for example Africa/Lagos or America/New_York" }, 400);
+  }
+  if ("coldTags" in body) {
+    // null puts it back to "decided from the tag names"; a list (even an empty one) is the owner's choice.
+    if (body.coldTags === null) patch.coldTags = null;
+    else if (Array.isArray(body.coldTags) && body.coldTags.length <= 50 && body.coldTags.every((t) => typeof t === "string" && t.trim().length > 0 && t.length <= 80)) patch.coldTags = [...new Set((body.coldTags as string[]).map((t) => t.trim()))];
+    else return json({ error: "Choose up to 50 tags" }, 400);
   }
   if ("clientViewAll" in body && ctx.kind === "agency") {
     await sql()`update locations set client_view = ${body.clientViewAll === true} where installation_id = ${ctx.installationId}`;
@@ -982,7 +1009,9 @@ async function exportCsv(ctx: Ctx, kind: string) {
       ]));
     }
     case "alerts": {
-      const rows = await listAlerts(ctx.installationId, false, 2000, ctx.limitTo ?? undefined);
+      // The same narrowing as the Alerts page: an alert about an account the filter hides is not exported either.
+      const alertSeg = await segmentSet(ctx);
+      const rows = (await listAlerts(ctx.installationId, false, 2000, ctx.limitTo ?? undefined)).filter((a) => !alertSeg || (a.locationId !== null && alertSeg.has(a.locationId)));
       return file("subsync-alerts", toCsv(rows, [
         { label: "Severity", value: (a) => a.severity }, { label: "Alert", value: (a) => a.title }, { label: "Type", value: (a) => a.kind }, { label: "Raised", value: (a) => a.createdAt },
       ]));
@@ -1066,7 +1095,9 @@ async function pipelineIntel(ctx: Ctx) {
   const location = ctx.url.searchParams.get("location") ?? undefined;
   if (location && !LOCATION_ID.test(location)) return json({ error: "Invalid account" }, 400);
   const [allowed, goals] = await Promise.all([allowedIds(ctx), ctx.kind === "client" ? Promise.resolve({} as Awaited<ReturnType<typeof getGoals>>) : getGoals(ctx.installationId)]);
-  const [deals, trend, sc, excluded] = await Promise.all([loadDeals(ctx.installationId, allowed, location), pipelineTrend(ctx.installationId, allowed), scope(ctx), excludedOpenDeals(ctx.installationId, allowed, location)]);
+  const [deals, trend, sc, excluded, rules] = await Promise.all([loadDeals(ctx.installationId, allowed, location), pipelineTrend(ctx.installationId, allowed), scope(ctx), excludedOpenDeals(ctx.installationId, allowed, location), loadStageRules(ctx.installationId)]);
+  // What the owner decided about stages and pipelines is the agency's own working note: a client's staff get the numbers built on it, never the controls.
+  const stageControls = ctx.kind === "client" ? null : await stageControlsFor(ctx, allowed, rules);
   const now = Date.now();
   const opens = deals.filter((d) => d.status === "open");
   const openValue = opens.reduce((s, d) => s + d.value, 0);
@@ -1076,7 +1107,8 @@ async function pipelineIntel(ctx: Ctx) {
   const dead = deadPipeline(deals, now);
   return json({
     totals: { open: opens.length, openValue, won: deals.filter((d) => d.status === "won").length, lost: deals.filter((d) => d.status === "lost").length, winRate: winRate(deals), avgCycleDays: avgCycleDays(deals) },
-    forecast: forecast(deals, now),
+    forecast: forecast(deals, now, ctx.kind === "client" ? [] : rules),
+    stageControls,
     excluded, outlier: dealOutlier(deals), minClosedDeals: MIN_CLOSED,
     coverage: coverage(openValue, goals.monthly_revenue ?? null),
     stages: stageTable(deals, now),
@@ -1088,15 +1120,50 @@ async function pipelineIntel(ctx: Ctx) {
     dead: { total: dead.total, rows: dead.rows.slice(0, 15).map((row) => ({ ...row.deal, reasons: row.reasons, url: link(row.deal) })) },
     accounts: location ? [] : accountSummaries(deals, now),
     pipelines: pipelineSummaries(deals).slice(0, 40),
-    trend,
+    trend: trend.points, trendNote: trend.note, trendSince: trend.since,
     goals,
   });
+}
+
+// The list the owner edits under "Stages and pipelines": every pipeline and stage with how many open deals sit in each, how it is treated now,
+// who decided, and the win probability the owner set (if any).
+async function stageControlsFor(ctx: Ctx, allowed: string[] | null, rules: Awaited<ReturnType<typeof loadStageRules>>) {
+  const inv = await stageInventory(ctx.installationId, allowed);
+  const pipelines = [...new Set(inv.map((r) => r.pipeline))].map((name) => ({ name, ...pipelineTreatment(name, rules) }));
+  const stages = inv.map((r) => {
+    const t = treatmentOf(r.pipeline, r.stage, rules);
+    const p = stageProbability(r.pipeline, r.stage, rules);
+    return { pipeline: r.pipeline, stage: r.stage, deals: r.deals, countedDeals: r.countedDeals, treatment: t.label, out: t.out, source: t.source, why: t.why, probability: p === null ? null : Math.round(p * 100) };
+  });
+  return {
+    canEdit: true,
+    // Added up here, not on the screen.
+    totals: { deals: inv.reduce((s, r) => s + r.deals, 0), countedDeals: inv.reduce((s, r) => s + r.countedDeals, 0), closedOutByName: stages.filter((s) => s.out && s.source === "name").length },
+    pipelines,
+    stages,
+  };
+}
+
+// One change to how a pipeline or stage is treated, or to a stage's win probability. Only the owner's side may change it (agency or business).
+async function stageRuleSave(ctx: Ctx) {
+  if (ctx.kind === "client") return json({ error: "Not available in this view" }, 403);
+  const parsed = parseRulePatch(await ctx.request.json().catch(() => null));
+  if (!parsed.ok) return json({ error: parsed.error }, 400);
+  const { pipeline, stage, cls, winProbability } = parsed.patch;
+  // The pipeline or stage named must exist in this installation, so the table cannot be filled with names nobody has.
+  const known = (await stageInventory(ctx.installationId, null)).some((r) => ruleKey(r.pipeline) === ruleKey(pipeline) && (stage === null || ruleKey(r.stage) === ruleKey(stage)));
+  if (!known) return json({ error: "That pipeline or stage was not found" }, 404);
+  await saveStageRule(ctx.installationId, actorOf(ctx), { pipelineKey: ruleKey(pipeline), stageKey: stage === null ? "" : ruleKey(stage), ...(cls !== undefined ? { cls } : {}), ...(winProbability !== undefined ? { winProbability } : {}) });
+  // The totals that every screen shows are counted again now, so they change at once, and the history is not mixed (definitions.ts).
+  if (cls !== undefined) await refreshInsights(ctx.installationId);
+  return json({ ok: true });
 }
 
 async function contactIntel(ctx: Ctx) {
   const allowed = await allowedIds(ctx);
   const [overview, leads, vipList, samples, sc, sources, dnd, birthdays] = await Promise.all([
-    contactOverview(ctx.installationId, allowed), topLeads(ctx.installationId, allowed), vips(ctx.installationId, allowed),
+    // The cold-list choice is the agency's own setting. A client's staff get the split it produces, built on the suggestion from the tag names.
+    contactOverview(ctx.installationId, allowed, ctx.kind === "client" ? null : (await getSettings(ctx.installationId)).coldTags), topLeads(ctx.installationId, allowed), vips(ctx.installationId, allowed),
     badDataSamples(ctx.installationId, allowed), scope(ctx),
     leadSources(ctx.installationId, allowed), dndSummary(ctx.installationId, allowed), upcomingBirthdays(ctx.installationId, allowed),
   ]);
@@ -1107,6 +1174,8 @@ async function contactIntel(ctx: Ctx) {
     vips: vipList.map((c) => ({ ...c, url: link(c) })),
     badData: samples.map((c) => ({ ...c, url: link(c) })),
     sources: sources.map((s) => ({ ...s, conversion: sourceConversion(s) })),
+    sourceSummary: sourceSummary(sources),
+    canEditCold: ctx.kind !== "client",
     dnd,
     birthdays: birthdays.map((b) => ({ ...b, url: link(b) })),
   });
@@ -1319,12 +1388,12 @@ async function execSummary(ctx: Ctx) {
   const now = Date.now();
   const allowed = await allowedIds(ctx);
   const [f, goals] = await Promise.all([periodFigures(ctx.installationId, allowed), getGoals(ctx.installationId)]);
-  const pct = (cur: number, prev: number | null) => (prev === null ? null : periodChange(cur, prev).pct);
+  const pct = (cur: number, prev: number | null, minBase = 10) => percentChange(cur, prev, minBase);
   const kpis = [
     { key: "contacts", label: "New contacts, 30 days", current: f.contacts.cur, previous: f.contacts.prev, pct: pct(f.contacts.cur, f.contacts.prev), money: false },
     { key: "won", label: "Deals won, 30 days", current: f.won.curCount, previous: f.won.prevCount, pct: pct(f.won.curCount, f.won.prevCount), money: false },
-    { key: "revenue", label: "Revenue won, 30 days", current: f.won.curValue, previous: f.won.prevValue, pct: pct(f.won.curValue, f.won.prevValue), money: true },
-    { key: "pipeline", label: "Open pipeline", current: f.pipeline.now, previous: f.pipeline.then, pct: pct(f.pipeline.now, f.pipeline.then), money: true },
+    { key: "revenue", label: "Revenue won, 30 days", current: f.won.curValue, previous: f.won.prevValue, pct: pct(f.won.curValue, f.won.prevValue, MIN_MONEY_BASE_FOR_PERCENT), money: true },
+    { key: "pipeline", label: "Open pipeline", current: f.pipeline.now, previous: f.pipeline.then, pct: pct(f.pipeline.now, f.pipeline.then, MIN_MONEY_BASE_FOR_PERCENT), money: true },
     { key: "score", label: "Average engagement score", current: f.score.now, previous: f.score.then, pct: pct(f.score.now, f.score.then), money: false },
   ];
   const actual = { monthly_revenue: f.month.revenue, monthly_leads: f.month.leads, monthly_deals_won: f.month.deals } as Record<string, number>;
@@ -1332,8 +1401,9 @@ async function execSummary(ctx: Ctx) {
   const money = (n: number) => "$" + Math.round(n).toLocaleString("en-US");
   const series = [
     { key: "newContacts", label: "New contacts (30 day total)", values: f.series.map((s) => s.newContacts), fmt: (n: number) => String(Math.round(n)) },
-    { key: "openValue", label: "Open pipeline", values: f.series.map((s) => s.openValue), fmt: money },
-    { key: "score", label: "Average engagement score", values: f.series.map((s) => s.score), fmt: (n: number) => String(Math.round(n)) },
+    // Deal figures are compared only across days counted the same way (definitions.ts, N39).
+    { key: "openValue", label: "Open pipeline", values: f.series.filter((s) => s.dealsOk).map((s) => s.openValue), fmt: money },
+    { key: "score", label: "Average engagement score", values: f.series.filter((s) => s.dealsOk).map((s) => s.score), fmt: (n: number) => String(Math.round(n)) },
   ];
   const anomalies = series.flatMap((s) => {
     const z = zAnomaly(s.values);
@@ -1341,7 +1411,7 @@ async function execSummary(ctx: Ctx) {
   });
   return json({
     kpis, goals: goalRows, anomalies, targets: goals,
-    trend: { days: f.series.map((s) => s.day), openValue: f.series.map((s) => s.openValue), openValueAnomalies: anomalyIndices(f.series.map((s) => s.openValue)) },
+    trend: { days: f.series.filter((s) => s.dealsOk).map((s) => s.day), openValue: f.series.filter((s) => s.dealsOk).map((s) => s.openValue), openValueAnomalies: anomalyIndices(f.series.filter((s) => s.dealsOk).map((s) => s.openValue)) },
   });
 }
 
@@ -1349,7 +1419,8 @@ async function commsIntel(ctx: Ctx) {
   const sc = await scope(ctx);
   const allowed = await allowedIds(ctx);
   const [rows, gaps, after] = await Promise.all([inbox(ctx.installationId, sc.settings.slaHours, 2000), communicationGaps(ctx.installationId, allowed), afterHours(ctx.installationId, allowed)]);
-  const waiting = rows.filter((x) => sc.permits(x.locationId) && x.lastMessageDirection === "inbound" && x.waitingHours !== null).map((x) => x.waitingHours as number);
+  // The same set as the Inbox list and the Today count (N15): the customer wrote last, past the reply target, inside the window. Never every inbound thread.
+  const waiting = rows.filter((x) => sc.permits(x.locationId) && x.overSla && x.waitingHours !== null).map((x) => x.waitingHours as number);
   return json({
     aging: replyAging(waiting),
     gaps: { ...gaps, deals: gaps.deals.map((d) => ({ ...d, url: sc.links.opportunities(d.locationId) })) },
@@ -1424,7 +1495,7 @@ async function testSlack(ctx: Ctx) {
 }
 
 async function digestPreview(ctx: Ctx) {
-  const d = await buildDailyDigest(ctx.installationId, { limitTo: ctx.limitTo, planLimit: accountLimit(ctx.plan, ctx.entitlements.enforced) });
+  const d = await buildDailyDigest(ctx.installationId, { limitTo: ctx.limitTo, planLimit: accountLimit(ctx.plan, ctx.entitlements.enforced), onlyIds: await segmentSet(ctx) });
   return json({ text: digestText(ctx.demo ? "Demo Company" : "your company", { attention: d.attention, fine: d.fine.length, headlines: d.headlines, freshnessLabel: d.freshness.text }, ctx.url.origin) });
 }
 
@@ -1531,6 +1602,7 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
     if (method === "PUT") {
       if (a === "settings") return await settingsUpdate(ctx);
       if (a === "goals") return await goalsUpdate(ctx);
+      if (a === "stage-rules") return await stageRuleSave(ctx);
       if (a === "meetings" && b) return await meetingUpdate(ctx, b);
       if (a === "team" && b && LOCATION_ID.test(b)) return await teamName(ctx, b);
       if (a === "clients" && b && LOCATION_ID.test(b)) return await clientUpdate(ctx, b);

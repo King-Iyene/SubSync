@@ -121,3 +121,100 @@ export function vipScore(f: VipFacts): number {
 export function daysIdle(lastActivityAt: number | null, now: number): number | null {
   return lastActivityAt === null ? null : days(now - lastActivityAt);
 }
+
+// ---------------- cold lists (N45) ----------------
+
+/** A tag that looks like a bought, scraped or cold-outreach list: its contacts never asked to hear from you, so they are not working leads. */
+const COLD_TAG_RE = /(^|[^a-z])(cold|outreach|scrap(e|ed|ing)|purchased|bought|list ?import|lead ?list|prospecting list)([^a-z]|$)/i;
+export const suggestColdTag = (tag: string): boolean => COLD_TAG_RE.test(tag);
+
+export type ColdTag = { tag: string; source: "owner" | "name" };
+
+/** The tags treated as cold lists: the owner's choice when one was made (even an empty one), else the suggestion made from the tag names. */
+export function effectiveColdTags(allTags: string[], chosen: string[] | null): ColdTag[] {
+  if (chosen !== null) {
+    const known = new Set(allTags.map((t) => t.toLowerCase()));
+    return chosen.filter((t) => known.has(t.toLowerCase())).map((tag) => ({ tag, source: "owner" as const }));
+  }
+  return allTags.filter(suggestColdTag).map((tag) => ({ tag, source: "name" as const }));
+}
+
+// ---------------- what a contact has done (N45) ----------------
+
+/**
+ * Where a contact stands, from signals SubSync can really see: the customer wrote last in a conversation, an appointment, a deal.
+ * "never" means none of those was seen, which is not the same as "never replied": only the newest conversations of each account are read.
+ */
+export type Engagement = "engaged_recently" | "engaged_then_quiet" | "none_seen";
+export const QUIET_AFTER_DAYS = 90;
+export function engagementOf(lastSignalMs: number | null, now: number): Engagement {
+  if (lastSignalMs === null) return "none_seen";
+  return now - lastSignalMs > QUIET_AFTER_DAYS * 86_400_000 ? "engaged_then_quiet" : "engaged_recently";
+}
+
+// ---------------- where leads come from (N47) ----------------
+
+export type SourceKind = "meta" | "portal" | "form" | "social" | "other" | "none";
+export const SOURCE_KIND_LABEL: Record<SourceKind, string> = {
+  meta: "Facebook or Instagram lead form", portal: "Property site, call or walk-in", form: "Web form, ads or website chat", social: "A message (DM, Messenger, WhatsApp)",
+  other: "Something else you typed", none: "No source recorded",
+};
+
+export type SourceInput = { source: string; contacts: number; new30: number; won: number; wonValue: number };
+
+const sourceKind = (source: string): SourceKind => {
+  const s = source.trim().toLowerCase();
+  if (s === "" || s === "unknown" || s === "none" || s === "n/a") return "none";
+  if (/zillow|realtor|trulia|redfin|homes\.com|rightmove|zoopla|portal|open house|call|phone|sign|walk/.test(s)) return "portal";
+  if (/\b(dm|dms|messenger|whatsapp|tiktok|linkedin|direct message|social)\b/.test(s)) return "social";
+  if (/facebook|instagram|\bfb\b|\big\b|\bmeta\b|lead ad/.test(s)) return "meta";
+  if (/form|website|web|landing|funnel|ppc|google|chat|widget|email/.test(s)) return "form";
+  return "other";
+};
+
+/** The share of contacts with no source, the contacts grouped by the kind of source, and, when most have none, what to do about it. */
+export function sourceSummary(rows: SourceInput[]) {
+  const total = rows.reduce((s, r) => s + r.contacts, 0);
+  const kinds = new Map<SourceKind, { contacts: number; won: number; wonValue: number; new30: number }>();
+  for (const r of rows) {
+    const k = sourceKind(r.source);
+    const cur = kinds.get(k) ?? { contacts: 0, won: 0, wonValue: 0, new30: 0 };
+    kinds.set(k, { contacts: cur.contacts + r.contacts, won: cur.won + r.won, wonValue: cur.wonValue + r.wonValue, new30: cur.new30 + r.new30 });
+  }
+  const none = kinds.get("none")?.contacts ?? 0;
+  const nonePct = total > 0 ? Math.round((none / total) * 100) : null;
+  const grouped = [...kinds.entries()].map(([kind, v]) => ({ kind, label: SOURCE_KIND_LABEL[kind], ...v })).sort((a, b) => b.contacts - a.contacts);
+  return {
+    total, noSource: none, noSourcePct: nonePct, kinds: grouped,
+    // Only an action when it is the majority and there are enough contacts for that to mean something.
+    action: total >= 20 && nonePct !== null && nonePct >= 50
+      ? { headline: `${nonePct}% of your contacts have no source recorded, so you cannot tell which marketing brings customers.`, steps: ["Open one recent lead in your CRM and check its Source field. If it is empty, the form, ad or funnel that created it is not setting one.", "Make every lead form, ad and funnel set a source, and give every imported list a Source column.", "Come back in a week: new contacts will be sorted by where they came from here."] }
+      : null,
+  };
+}
+
+// ---------------- data quality: checked, missing, invalid (N46) ----------------
+
+export type QualityFigure = { state: "checked"; value: number; of: number } | { state: "not_checked"; reason: string };
+
+/**
+ * A zero is only a zero when the check could run. "Invalid" is judged on the values that exist, so it needs some; "missing" is a different thing
+ * (a contact with no email is not a contact with a bad one). Before the contacts have been read, nothing is checked.
+ */
+export function qualityFigures(q: { total: number; withEmail: number; withPhone: number; badEmail: number; disposable: number; badPhone: number }, contactsRead: boolean) {
+  const none = (reason: string): QualityFigure => ({ state: "not_checked", reason });
+  const checked = (value: number, of: number): QualityFigure => ({ state: "checked", value, of });
+  const unread = !contactsRead || q.total === 0;
+  const noEmails = !unread && q.withEmail === 0;
+  const noPhones = !unread && q.withPhone === 0;
+  return {
+    total: q.total,
+    invalidEmails: unread ? none("The contacts have not been read yet") : noEmails ? none("No contact has an email address to check") : checked(q.badEmail, q.withEmail),
+    disposableEmails: unread ? none("The contacts have not been read yet") : noEmails ? none("No contact has an email address to check") : checked(q.disposable, q.withEmail),
+    invalidPhones: unread ? none("The contacts have not been read yet") : noPhones ? none("No contact has a phone number to check") : checked(q.badPhone, q.withPhone),
+    missingEmails: unread ? none("The contacts have not been read yet") : checked(q.total - q.withEmail, q.total),
+    missingPhones: unread ? none("The contacts have not been read yet") : checked(q.total - q.withPhone, q.total),
+    // kept for the older screens that add the three bad-value counts together
+    badEmail: q.badEmail, disposable: q.disposable, badPhone: q.badPhone,
+  };
+}

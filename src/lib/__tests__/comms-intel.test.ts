@@ -2,12 +2,14 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { afterHoursSummary, dailyPriorities, replyAging, setupScore, worstDomainStatus, type BriefInput } from "../analytics/comms-intel.ts";
 
-test("reply aging buckets messages by how long they have waited and counts the critical ones", () => {
-  const a = replyAging([0.5, 2, 3.9, 5, 13, 25, 30, 60, 100]);
-  assert.deepEqual(a.buckets.map((b) => b.count), [1, 2, 1, 1, 2, 2]);
-  assert.equal(a.critical, 4);
-  assert.equal(a.total, 9);
-  assert.deepEqual(replyAging([-1, NaN]).buckets.map((b) => b.count), [0, 0, 0, 0, 0, 0]);
+test("reply aging buckets messages by how long they have waited; critical is a day to a week, older is never critical (N15)", () => {
+  const a = replyAging([0.5, 2, 3.9, 5, 13, 25, 30, 60, 100, 167, 168, 700, 18000]);
+  assert.deepEqual(a.buckets.map((b) => b.count), [1, 2, 1, 1, 2, 3, 3]);
+  assert.equal(a.critical, 5, "25, 30, 60, 100 and 167 hours (a day to just under a week) are critical");
+  assert.equal(a.older, 3, "168 hours, 700 hours and 18,000 hours (750 days) are older than a week, not critical");
+  assert.equal(a.total, 13);
+  assert.deepEqual(replyAging([-1, NaN]).buckets.map((b) => b.count), [0, 0, 0, 0, 0, 0, 0]);
+  assert.equal(replyAging([18_000, 20_000]).critical, 0, "conversations that are years old never raise a Critical alarm");
 });
 
 test("after hours share and the suggestion only appear when there is enough data", () => {

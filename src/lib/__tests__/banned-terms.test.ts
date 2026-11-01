@@ -27,6 +27,8 @@ const MACHINE_TEXT = [
   /^x-ghl-signature$/i, /location[.]origin/,
   /^(https:\/\/)?(services[.]leadconnectorhq[.]com|marketplace[.]leadconnectorhq[.]com|marketplace[.]gohighlevel[.]com)$/,
   /^(Location|Company)$/, /^locations\/[A-Za-z]+[.](readonly|write)$/,
+  // The payments and invoices read addresses the capability check calls: the API names the kind of owner with this query value.
+  /&altType=location(&|$)/,
 ];
 
 export function violations(source: string, fileName: string): string[] {

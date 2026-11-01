@@ -21,6 +21,7 @@ export const ROUTE_GUARDS: RouteGuard[] = [
   { route: "api/cron/weekly", kind: "secret", guard: "Bearer CRON_SECRET. Does nothing while the kill switch is on." },
   { route: "api/cron/watchdog", kind: "secret", guard: "Bearer CRON_SECRET. The internal sync alarm: writes sync.alarm and sync.recovered lines (ids, times and counts only) to the audit log and sends nothing. Does nothing while the kill switch is on." },
   { route: "api/admin/diagnostics", kind: "secret", guard: "Bearer CRON_SECRET only; never opens for a browser session. Read only: sync health of every real install (short ids, times, counts), no customer data." },
+  { route: "api/admin/capabilities", kind: "secret", guard: "Bearer CRON_SECRET only; never opens for a browser session. Read only: at most 70 GET requests to the platform per call, and the answer holds field names, counts and statuses, never a value or a token." },
   { route: "/audit/[id]", kind: "public_by_design", guard: "A shared audit snapshot: a 192-bit random id, expires after 14 days, can be switched off by its owner, is rate limited, and shows totals, finding titles and a fix plan only, with account names removed." },
   { route: "/", kind: "public_static", guard: "Marketing page; no tenant data." },
   { route: "/app", kind: "public_static", guard: "The app shell; contains no data. All data comes from /api/app with a signed session." },

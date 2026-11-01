@@ -118,3 +118,43 @@ Status: S0.4 BUILT, awaiting King's checks. Tag for the lead: `stage-S0.4`.
 - I re-ran `npm run verify`: `verify exit: 0`; Node `ℹ tests 373 / ℹ pass 373 / ℹ fail 0`; Vitest `Test Files 23 passed (23) / Tests 168 passed (168)` (same numbers as the agent). The integration chain (`checks exit: 0`, including the new check-sync) and `npm run e2e` (`188 passed (53.5m)`, `166 skipped`, `e2e exit: 0`) are the agent's own runs against the same tree; I did not repeat them. The 18 screenshots the e2e run rewrote in `docs/review/` were reverted (not stage evidence).
 - DECIDED FOR KING, please review (customer data): real UNINSTALL notices now actually delete the company's copied data (before, the live type names INSTALL/UNINSTALL were silently ignored). That matches what the privacy page promises, takes effect only when this branch is merged, and reverts by removing `canonicalType` in `src/lib/ghl/webhook.ts`. UNSURE: a delayed UNINSTALL arriving after a reinstall would remove the fresh install (the notice carries no timestamp to compare); not guarded.
 - Status: S0.4 BUILT, awaiting King's checks. Tag `stage-S0.4`.
+
+
+### Stage F1: Numbers truth plus audits (1 Nov 2026): BUILT, awaiting King's checks
+
+Full evidence table (one row per instruction), real data, UNSURE items and King's 5 checks are in `docs/features/F1.md`. Notes handled: N6, N15, N16, N38, N45, N46, UX-01, UX-02, UX-04 (DONE-TONIGHT); N1, N8, N37, N39, N47, N62, N64 (their F1 parts); N44 (NEEDS-KING: approve the cut list); N17 (not a code item). Nothing was committed or pushed.
+
+**What was built (short).** One written definition of a counted deal everywhere (stage rules: a stage or pipeline can be Active, Closed out or Unset, by name or by the owner's choice, with a win chance per stage; `stage_rules`, `definition_version`), so Today, Overview, Pipeline, Team, Leads and exports stop disagreeing; the forecast is a range with its method and a drawer (no number without enough closed deals); history is only compared inside one definition version; the cold list is apart from working leads; "0 invalid" is told from "not checked"; no percentage on a small base; the unread card now says how many of the unread are also waiting (the 285 against 259 was the Inbox listing unread minus waiting); the wait chart equals its list and an ancient thread is never "Critical"; the read limit (500 conversations per account) is disclosed; KD Squares LTD with 21 customers waiting is now "At risk"; the same filter gives the same numbers on 37 pages (`scripts/check-filter.ts`, which found three pages that ignored it). Also `docs/DATA_POINTS.md` (116 rows, nothing cut), `docs/CAPABILITIES.md`, `docs/METRICS.md`, `docs/METRIC_AUDIT.md`.
+
+**Decisions made for King (also in `docs/DECISIONS.md`).**
+1. DECIDED FOR KING, please review: reply-delay labels use 5 customers waiting for "Watch" and 15 for "At risk" (my choice, not a measurement).
+2. DECIDED FOR KING: stage names like Disqualified, Wrong Phone Number, Unreachable and pipelines marked "Not in use" are closed out by name unless the owner marks them Active (13 of 80 real stage pairs; 1,033 real deals).
+3. Core change, performance only: the insight refresh writes accounts and alerts in one statement each (17 s down to about 6 s on the demo); same rows, same conflict rules.
+4. Nothing was cut from the data point list; King approves first (`docs/NEEDS_KING.md` section 16).
+
+**UNSURE.**
+- UNSURE: the business install did not grant `calendars/events.readonly` or `users.readonly`, yet appointments and team names read `ok` for it.
+- UNSURE: whether the platform sends a last-activity time on another address (the contact list sends none: 0 of 52,926).
+- UNSURE: the demo's lead rows age out of the 14 day speed window after about 16 hours, so `speed.spec.ts:17` needs a fresh seed (`npm run seed:demo`, then `scripts/make-sample-audit.ts`). Not a product bug; a test-data fragility that existed before this stage.
+- UNSURE: test deals by name ("test" in a deal name) were never defined; not built.
+- UNSURE: `check-flags` was running when the chain was stopped; its result line was not captured.
+
+**NOT VERIFIED LIVE.**
+- Every "Live" cell of `docs/CAPABILITIES.md`: the real tokens cannot be opened on this machine, so no call to the platform was made. After the merge, one secret-only call to `/api/admin/capabilities` (or `scripts/audit-capabilities.ts`) completes it (`docs/NEEDS_KING.md` section 16).
+- Every CRM count (contacts, open deals, unread, waiting): King's 5 checks.
+
+**Migrations.** `supabase/migrations/20261101030000_f1_numbers_truth.sql` (additive, idempotent), applied after backups: `backups/account_metrics_daily-2026-11-01T14-20-44-744Z.json` (459 rows) and `backups/settings-2026-11-01T14-20-44-744Z.json` (3 rows). After: 459 and 3 rows, new table `stage_rules` 0 rows. The demo tenant was re-seeded (demo rows only) and its sample audit link recreated.
+
+**Tests run, real result lines.** (Per the lead's change of plan the full suite was not run to the end; what ran on the final code is stated exactly.)
+- `npm run verify` (final code): `verify exit: 0`, Node `ℹ tests 402 / ℹ pass 402 / ℹ fail 0`, Vitest `Test Files  24 passed (24)`, `Tests  184 passed (184)`, lint `0 errors, 6 warnings`.
+- Integration chain (final code, stopped while `check-flags` ran): "All API checks passed.", connections ok, appointment insights ok, tenant isolation ok (384 cross-reads), sync ok. NOT RUN on the final code: check-flags, check-metrics, check-filter, check-stage-rules, check-audit, check-speed, check-roadmap (all passed one change earlier, `chain exit 0`).
+- `npm run e2e` (399 tests, code before the last fixes): `179 passed (1.2h)`, `186 skipped`, `24 did not run`, `10 failed` (4 tests at the widths; all diagnosed and fixed, see `docs/features/F1.md` section 5). Targeted rerun of `speed`, `f1`, `settings` specs: `69 passed (26.6m)`, `4 failed`; `settings` alone: `18 passed (14.0m)`, `1 failed`, `8 did not run` (before the last write speed-up). The settings spec was NOT rerun after the speed-up; the full browser run is for the end of M1.
+
+**Files changed (summary).** New: `src/lib/analytics/{stage-rules,stage-rules-sql,definitions,definitions-sql}.ts`, `src/lib/text.ts`, `src/lib/ghl/{capabilities,capabilities-run}.ts`, `src/app/api/admin/capabilities/route.ts`, `src/app/app/views/{forecast-card,stage-rules-card}.tsx`, the migration, `scripts/{check-filter,check-stage-rules,audit-capabilities}.ts`, tests `src/lib/__tests__/f1-rules.test.ts`, `tests/unit/f1-deal-scope-db.test.ts`, `tests/e2e/f1.spec.ts`, docs `DATA_POINTS.md`, `CAPABILITIES.md`. Changed: the analytics queries and intelligence modules, the router and access rules, the demo seed, the Overview, Today, Inbox, Pipeline, Leads, Accounts, Account detail and Executive summary screens, the check scripts, `docs/{METRICS,METRIC_AUDIT,NEEDS_KING,DECISIONS,PROGRESS,FEATURE_STATUS,NOTES_COVERAGE,TENANCY}.md`, `docs/features/F1.md`.
+
+Status: F1 BUILT, awaiting King's checks. Tag for the lead: `stage-F1`.
+
+#### F1: lead engineer's note
+- Speed mode (King's instruction): the lead did not re-run the suites after F1; the agent's results stand and the full M1 test run happens after D0, F2, F3 and F6 are built. Agent's final-code results: `npm run verify` exit 0 (Node 402/402, Vitest 184/184, lint 0 errors). Earlier full e2e had `10 failed` (4 distinct tests: settings stale threshold at three widths, speed.spec:59 phone), partly fixed (sample audit link recreated; alert/metric writes batched); to be rerun in the M1 full run. Not run on final code: check-flags, check-metrics, check-filter, check-stage-rules, check-audit, check-speed, check-roadmap.
+- DECIDED FOR KING (stable core touched): `snapshotMetrics` and `syncAlerts` now write in one statement each (alert step 18.2 s to 1.3 s). Please review in DECISIONS.md.
+- Status: F1 BUILT, awaiting King's checks. Tag `stage-F1`.

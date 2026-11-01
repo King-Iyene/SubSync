@@ -73,3 +73,18 @@ test("the pasteable summary labels the estimate and names where to start", () =>
   assert.match(text, /Big: \$90,000 stale across 9 deals, 12 waiting/);
   assert.match(text, /not money lost/);
 });
+
+test("when one deal is most of the stale figure the headline says so instead of reading as a pattern (UX-04)", () => {
+  // The real first screen: $1,000,000 in 1 deal that has not moved, 100% of the counted pipeline.
+  const one = buildAudit([acct({ staleValue: 1_000_000, staleOpps: 1, openValue: 1_000_000, openOpps: 1, topStaleDeal: 1_000_000 })], null);
+  const f = one.findings.find((x) => f_is(x, "stale"))!;
+  assert.match(f.detail, /One deal \(\$1,000,000\) is 100% of this figure, so check that it is a real deal/);
+  assert.equal(f.kind, "fact");
+  // Eight even deals: no guard, it is a pattern.
+  const even = buildAudit([acct({ staleValue: 40_000, staleOpps: 8, openValue: 60_000, openOpps: 12, topStaleDeal: 5_000 })], null);
+  assert.ok(!even.findings.find((x) => f_is(x, "stale"))!.detail.includes("One deal"));
+  // Two deals, one of them 60%: guard; at 49%: none.
+  assert.match(buildAudit([acct({ staleValue: 10_000, staleOpps: 2, openValue: 10_000, openOpps: 2, topStaleDeal: 6_000 })], null).findings[0].detail, /60% of this figure/);
+  assert.ok(!buildAudit([acct({ staleValue: 10_000, staleOpps: 2, openValue: 10_000, openOpps: 2, topStaleDeal: 4_900 })], null).findings[0].detail.includes("One deal"));
+});
+const f_is = (f: { key: string }, key: string) => f.key === key;

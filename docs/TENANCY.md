@@ -52,6 +52,7 @@ A person in one client account never sees another client account's data. An agen
 | `api/cron/weekly` | secret | Bearer CRON_SECRET; idle while the kill switch is on |
 | `api/cron/watchdog` | secret | Bearer CRON_SECRET; the internal sync alarm, writes audit lines (ids, times, counts) and sends nothing; idle while the kill switch is on |
 | `api/admin/diagnostics` | secret | Bearer CRON_SECRET only, read only; sync health of every real install (short ids, times, counts), no customer data |
+| `api/admin/capabilities` | secret | Bearer CRON_SECRET only, read only; which data the platform gives the app, install by install (field names, counts and statuses, never a value or a token); at most 70 GET requests per call |
 | `/audit/[id]` | public_by_design | Shared audit snapshot: 192-bit random id, 14-day expiry, switch-off by its owner, rate limited, totals, finding titles and a fix plan only, account names removed |
 | `/` | public_static | Marketing page |
 | `/app` | public_static | App shell with no data; data comes from `api/app` with a session |

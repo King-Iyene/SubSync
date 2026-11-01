@@ -4,6 +4,7 @@ import { emailConfigured, sendEmail, unsubscribeHeaders } from "../email";
 import { unsubscribeUrl } from "../unsubscribe";
 import { localParts } from "./digest-intel";
 import { alertEmail, alertsToSendNow } from "./weekly-email";
+import { currentVersion } from "./definitions";
 import { buildDigest, computeAlerts, deriveAccount, type DerivedAccount, type DomainStatus } from "./derive";
 import {
   accountRows, getSettings, listAlerts, listDomainChecks, markNotified, scoreHistory, syncAlerts, type Settings,
@@ -23,23 +24,30 @@ export async function loadAccounts(installationId: string): Promise<{ settings: 
 }
 
 // Write today's snapshot for every account (feeds trends and churn detection).
-export async function snapshotMetrics(installationId: string, accounts: DerivedAccount[]): Promise<void> {
+export async function snapshotMetrics(installationId: string, accounts: DerivedAccount[], rulesRevision = 0): Promise<void> {
   const db = sql();
-  for (const a of accounts) {
-    await db`
-      insert into account_metrics_daily
-        (installation_id, location_id, day, contacts, new_contacts_30d, open_opportunities, open_value,
-         stale_opportunities, unread_conversations, completeness_pct, engagement_score, days_inactive)
-      values
-        (${installationId}, ${a.locationId}, current_date, ${a.contacts}, ${a.new30d}, ${a.openOpps}, ${a.openValue},
-         ${a.staleOpps}, ${a.unread}, ${a.completenessPct}, ${a.score}, ${a.daysInactive})
-      on conflict (installation_id, location_id, day) do update set
-        contacts = excluded.contacts, new_contacts_30d = excluded.new_contacts_30d,
-        open_opportunities = excluded.open_opportunities, open_value = excluded.open_value,
-        stale_opportunities = excluded.stale_opportunities, unread_conversations = excluded.unread_conversations,
-        completeness_pct = excluded.completeness_pct, engagement_score = excluded.engagement_score,
-        days_inactive = excluded.days_inactive`;
-  }
+  // Written with the version of the counting rules, so history is only ever compared inside one version (definitions.ts, N39).
+  const version = currentVersion(rulesRevision);
+  if (accounts.length === 0) return;
+  // One statement for all accounts (a settings change refreshes insights, and one round trip per account made that take many seconds).
+  const rows = accounts.map((a) => ({
+    installation_id: installationId, location_id: a.locationId, contacts: a.contacts, new_contacts_30d: a.new30d,
+    open_opportunities: a.openOpps, open_value: a.openValue, stale_opportunities: a.staleOpps, unread_conversations: a.unread,
+    completeness_pct: a.completenessPct, engagement_score: a.score, days_inactive: a.daysInactive, definition_version: version,
+  }));
+  await db`
+    insert into account_metrics_daily (installation_id, location_id, day, contacts, new_contacts_30d, open_opportunities, open_value,
+      stale_opportunities, unread_conversations, completeness_pct, engagement_score, days_inactive, definition_version)
+    select r.installation_id::uuid, r.location_id, current_date, r.contacts, r.new_contacts_30d, r.open_opportunities, r.open_value,
+      r.stale_opportunities, r.unread_conversations, r.completeness_pct, r.engagement_score, r.days_inactive, r.definition_version
+    from jsonb_to_recordset(${db.json(rows as never)}::jsonb) as r(installation_id text, location_id text, contacts int, new_contacts_30d int, open_opportunities int,
+      open_value float8, stale_opportunities int, unread_conversations int, completeness_pct int, engagement_score int, days_inactive int, definition_version int)
+    on conflict (installation_id, location_id, day) do update set
+      contacts = excluded.contacts, new_contacts_30d = excluded.new_contacts_30d,
+      open_opportunities = excluded.open_opportunities, open_value = excluded.open_value,
+      stale_opportunities = excluded.stale_opportunities, unread_conversations = excluded.unread_conversations,
+      completeness_pct = excluded.completeness_pct, engagement_score = excluded.engagement_score,
+      days_inactive = excluded.days_inactive, definition_version = excluded.definition_version`;
 }
 
 export async function domainStatuses(installationId: string): Promise<DomainStatus[]> {
@@ -73,7 +81,7 @@ export async function emailPendingAlerts(installationId: string, settings: Setti
 // Slack if the agency configured a webhook. Returns a small summary.
 export async function refreshInsights(installationId: string): Promise<{ accounts: number; openAlerts: number; created: number }> {
   const { settings, accounts } = await loadAccounts(installationId);
-  await snapshotMetrics(installationId, accounts);
+  await snapshotMetrics(installationId, accounts, settings.dealRulesRevision);
   const drafts = computeAlerts(accounts, await domainStatuses(installationId), settings);
   const created = await syncAlerts(installationId, drafts);
 

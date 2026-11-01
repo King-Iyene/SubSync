@@ -6,6 +6,8 @@ import { anomalyIndices } from "../../../lib/analytics/client-intel";
 import {
   Badge, Btn, Card, Empty, ErrorBox, ExtLink, fmtInt, fmtMoney, inputClass, Loading, PageHeader, Sparkline, Stat, Table, Td, Th,
 } from "../ui";
+import { ForecastCard, type ForecastData } from "./forecast-card";
+import { StageRulesCard, type StageControls } from "./stage-rules-card";
 
 type DealRow = {
   opportunityId: string; locationId: string; locationName: string | null; pipelineName: string; stageName: string; name: string | null;
@@ -13,11 +15,13 @@ type DealRow = {
 };
 type Bucket = { label: string; count: number; value: number };
 type Data = {
-  excluded: { count: number; noValue: number; noOwner: number };
+  excluded: { count: number; closedOut?: number; noValue: number; noOwner: number };
+  stageControls?: StageControls | null;
+  trendNote?: string | null;
   outlier: { value: number; share: number; of: number } | null;
   minClosedDeals: number;
   totals: { open: number; openValue: number; won: number; lost: number; winRate: number | null; avgCycleDays: number | null };
-  forecast: { likely: number; best: number; worst: number; winRate: number | null; basis: string; horizons: Array<{ days: number; likely: number }> | null };
+  forecast: ForecastData;
   coverage: { target: number; needed: number; openValue: number; gap: number; ratio: number; healthy: boolean } | null;
   stages: Array<{ pipelineName: string; stageName: string; stageOrder: number; open: number; value: number; avgDwellDays: number | null; bottleneck: boolean; overdue: number; conversionToNext: number | null }>;
   aging: { buckets: Bucket[]; valueOlderThan60Pct: number | null };
@@ -90,6 +94,7 @@ export function PipelineView() {
   const chosen = pipe && names.includes(pipe) ? pipe : names[0] ?? "";
   const stages = data.stages.filter((s) => s.pipelineName === chosen).sort((a, b) => a.stageOrder - b.stageOrder);
   const f = data.forecast;
+  const range = f.range;
 
   const saveTarget = async () => {
     setNote(null);
@@ -111,32 +116,16 @@ export function PipelineView() {
         <Stat label="Open pipeline" value={fmtMoney(data.totals.openValue)} sub={<>{fmtInt(data.totals.open)} open deals{data.outlier && <span className="mt-1 block text-amber-700 dark:text-amber-400">One deal ({fmtMoney(data.outlier.value)}) is {Math.round(data.outlier.share * 100)}% of this.</span>}</>} />
         <Stat label="Win rate" value={pct(data.totals.winRate)} sub={data.totals.winRate === null ? `${data.totals.won + data.totals.lost} closed so far; a win rate needs ${data.minClosedDeals}` : `${data.totals.won} won, ${data.totals.lost} lost`} />
         <Stat label="Average time to win" value={data.totals.avgCycleDays === null ? "n/a" : `${data.totals.avgCycleDays} ${data.totals.avgCycleDays === 1 ? "day" : "days"}`} sub="created to won" />
-        <Stat label="Likely revenue (estimate)" value={f.winRate === null ? "Not enough data" : fmtMoney(f.likely)} sub={<details><summary className="cursor-pointer">Estimate, not a fact. How it is worked out</summary><span className="mt-1 block">Open pipeline x win rate. {f.winRate === null ? `Needs ${data.minClosedDeals} closed deals.` : `${Math.round(f.winRate * 100)}% win rate.`}</span></details>} />
+        <Stat label="Likely revenue (estimate)" value={range === null ? "Not enough data" : fmtMoney(range.likely)} sub={<>{range ? <span className="block">Range {fmtMoney(range.low)} to {fmtMoney(range.high)}</span> : <span className="block">{f.method === "none" ? `Needs ${data.minClosedDeals} closed deals or stage probabilities you set.` : ""}</span>}<span className="block">Estimate, not a fact. The method is under Revenue forecast.</span></>} />
       </div>
       {data.excluded.count > 0 && (
         <p className="text-xs text-muted-foreground">
-          {fmtInt(data.excluded.count)} open {data.excluded.count === 1 ? "deal is" : "deals are"} not counted in these figures ({fmtInt(data.excluded.noValue)} with no value, {fmtInt(data.excluded.noOwner)} with no owner). Amounts are as entered in each account; different currencies are not converted.
+          {fmtInt(data.excluded.count)} open {data.excluded.count === 1 ? "deal is" : "deals are"} not counted in these figures ({fmtInt(data.excluded.closedOut ?? 0)} in a closed-out stage or a pipeline not in use, {fmtInt(data.excluded.noValue)} with no value, {fmtInt(data.excluded.noOwner)} with no owner). Amounts are as entered in each account; different currencies are not converted.
         </p>
       )}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <Card title="Revenue forecast" className="lg:col-span-2">
-          {f.winRate === null ? <p className="text-sm text-muted-foreground">{f.basis}</p> : (
-            <>
-              <dl className="grid grid-cols-3 gap-3 text-sm">
-                <div><dt className="text-muted-foreground">Worst case</dt><dd className="text-lg font-semibold tabular-nums">{fmtMoney(f.worst)}</dd></div>
-                <div><dt className="text-muted-foreground">Likely</dt><dd className="text-lg font-semibold tabular-nums">{fmtMoney(f.likely)}</dd></div>
-                <div><dt className="text-muted-foreground">Best case</dt><dd className="text-lg font-semibold tabular-nums">{fmtMoney(f.best)}</dd></div>
-              </dl>
-              {f.horizons && (
-                <p className="mt-3 text-sm text-muted-foreground">
-                  Expected to close: {f.horizons.map((h) => `${fmtMoney(h.likely)} within ${h.days} days`).join(", ")}.
-                </p>
-              )}
-              <p className="mt-2 text-xs text-muted-foreground">{f.basis}</p>
-            </>
-          )}
-        </Card>
+        <ForecastCard f={f} />
         <Card title="Pipeline coverage">
           {data.coverage ? (
             <div className="space-y-1 text-sm">
@@ -160,7 +149,11 @@ export function PipelineView() {
             {fmtMoney(data.trend[0].openValue)} to {fmtMoney(data.trend[data.trend.length - 1].openValue)} over {data.trend.length} days. Red dots mark days that were unusual for this pipeline.
           </p>
         )}
+        {data.trend.length < 2 && !data.trendNote && <p className="mt-1 text-xs text-muted-foreground">Not enough history yet: the line is drawn once there are two days counted the same way.</p>}
+        {data.trendNote && <p className="mt-1 text-xs text-muted-foreground" data-testid="trend-note">{data.trendNote}</p>}
       </Card>
+
+      {data.stageControls?.canEdit && <StageRulesCard controls={data.stageControls} onChanged={reload} />}
 
       <Card title="Stages, bottlenecks and conversion" action={names.length > 1 ? (
         <select className="rounded-lg border bg-background px-2 py-1 text-sm" value={chosen} onChange={(e) => setPipe(e.target.value)} aria-label="Pipeline">

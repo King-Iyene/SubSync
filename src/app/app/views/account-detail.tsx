@@ -95,9 +95,12 @@ export function AccountDetailView({ locationId, go, agency, limited = false }: {
         </Card>
 
         <Card title="Trend (last 60 days)">
+          {trend.some((t) => t.dealsOk === false) && (
+            <p className="mb-3 text-xs text-muted-foreground" data-testid="trend-note">The way deals are counted changed, so the health score and open pipeline lines start on {trend.find((t) => t.dealsOk !== false)?.day ?? "today"}. Earlier days are not drawn: a line that mixed the two ways of counting would show a change that never happened.</p>
+          )}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div><p className="mb-1 text-xs text-muted-foreground">Health score</p><Sparkline label="Health score" values={trend.map((t) => t.engagementScore)} /></div>
-            <div><p className="mb-1 text-xs text-muted-foreground">Open pipeline value</p><Sparkline label="Open pipeline value" values={trend.map((t) => t.openValue)} /></div>
+            <div><p className="mb-1 text-xs text-muted-foreground">Health score</p><Sparkline label="Health score" values={trend.filter((t) => t.dealsOk !== false).map((t) => t.engagementScore)} /></div>
+            <div><p className="mb-1 text-xs text-muted-foreground">Open pipeline value</p><Sparkline label="Open pipeline value" values={trend.filter((t) => t.dealsOk !== false).map((t) => t.openValue)} /></div>
             <div><p className="mb-1 text-xs text-muted-foreground">Contacts</p><Sparkline label="Contacts" values={trend.map((t) => t.contacts)} /></div>
             <div><p className="mb-1 text-xs text-muted-foreground">Data completeness</p><Sparkline label="Data completeness" values={trend.map((t) => t.completenessPct)} /></div>
           </div>
