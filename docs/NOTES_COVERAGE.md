@@ -9,23 +9,23 @@ ORPHANS (notes with no stage in docs/ROADMAP_V2.md): none found.
 | --- | --- | --- | --- | --- |
 | N1 | Today: the filter bar is unclear | F5, F1, F8 | PLANNED-LATER | F1 part DONE: a hidden test account (or any filtered-out account) is excluded from every number on every page, proven by scripts/check-filter.ts (5 filters, 37 pages, three pages that ignored the filter fixed). Still F5 and F8: show what is hidden and why, plain filter help, the owner marking test accounts in Settings |
 | N2 | Today needs a client-account (sub-account) version | F5 | PLANNED-LATER |  |
-| N3 | UI/UX redesign: "it looks somehow not sweet" | D0, D1 | PLANNED-LATER |  |
+| N3 | UI/UX redesign: "it looks somehow not sweet" | D0, D1 | PLANNED-LATER | D0 part DONE: approved direction, light and dark tokens, plain status words and notices, quiet status line, one page template (docs/features/D0.md). D1 rolls the polish over every page and verifies both themes |
 | N4 | Today: the "When this is sent" card at the bottom | F9, F5, F8 | PLANNED-LATER |  |
 | N5 | Today: "Not watched yet" card, ship what is doable | F2, F4, F9, F8 | PLANNED-LATER |  |
 | N6 | Things I noticed in the same screenshots | F1, F5 | DONE-TONIGHT | F1: no percentage change below a base of 10 (5,000 dollars) on Today, the executive summary and Leads growth (f1-rules.test.ts, digest-intel.test.ts, tests/e2e/f1.spec.ts); the single-deal headline now says when one deal is most of the figure (audit-intel.test.ts, UX-04); 'counted at risk' is now plain words; the freshness part was S0.4 |
-| N7 | Dead ends: no way back | F5, F6, D1 | PLANNED-LATER |  |
-| N8 | A client-account filter wherever data is shown | F1, F5, D0 | PLANNED-LATER | F1 part DONE: every number, list and export respects the filter and one test proves the same filter gives the same numbers on every page (scripts/check-filter.ts, 5 filters x 37 pages; tests/e2e/f1.spec.ts for the demo). The persistent selector and its design are F5, D0 |
-| N9 | Status text and notifications should not sit in cards | D1, F5 | PLANNED-LATER |  |
-| N10 | Design quality: "not human built", "the gauge looks child built" | D0, D1 | PLANNED-LATER |  |
+| N7 | Dead ends: no way back | F5, F6, D1 | PLANNED-LATER | D0 part DONE: a Back to <page> link from every drill-in and a working browser Back button with the filter kept (dashboard.tsx, route.ts; tests/e2e/d0.spec.ts 'Back goes to where you came from'); labels on every Open button are F5, F6 and D1 |
+| N8 | A client-account filter wherever data is shown | F1, F5, D0 | PLANNED-LATER | F1 part DONE earlier. D0 part DONE: the one persistent selector (client accounts with search, multi-select, names and left-out reasons, in the address); absent on single-account pages. Wiring each page's own filters is each stage |
+| N9 | Status text and notifications should not sit in cards | D1, F5 | PLANNED-LATER | D0 part DONE: freshness is quiet text, notices are one plain row with a rule (InlineAlert), content stays in cards; the old tinted boxes on the M1 pages are replaced. Other pages adopt it in their stages and D1 |
+| N10 | Design quality: "not human built", "the gauge looks child built" | D0, D1 | PLANNED-LATER | D0 part DONE: design tokens with measured contrast, /design style guide, one HTML chart approach with labelled scales, tooltips, placeholders, sparkline, ranked rows (no gauge: documented why), fewer boxes. D1 rolls it over every page |
 | N11 | "SLA" is jargon | F4, F5 | PLANNED-LATER |  |
 | N12 | Filter by how long someone has waited, with a better view | F4 | PLANNED-LATER |  |
 | N13 | Why is "Older than a week (13)" hidden? | F4 | PLANNED-LATER |  |
-| N14 | Long lists make the page unusable | F4, D0 | PLANNED-LATER |  |
+| N14 | Long lists make the page unusable | F4, D0 | PLANNED-LATER | D0 part DONE: the shared DataList (10 rows, View all, sticky header and toolbar, pages of 25, copy, keyboard) used on the M1 pages; F4 applies it to Unanswered messages and the deals list |
 | N15 | The Inbox page contradicts itself on numbers | F1, F4 | DONE-TONIGHT | F1: one waiting definition and window; unread counted separately (the 285 vs 259 explained: the Inbox card subtracted the 24 to 26 that are also waiting, nothing was added); the wait chart counts the same set as the list (255 vs 26 fixed); Critical only for more than a day and under a week, older is its own bucket; the 500-conversation read limit is stated; the quiet-deals total is counted in the database, not over a capped 3,000 (docs/METRICS.md, f1-rules.test.ts, comms-intel.test.ts, f1.spec.ts, check-filter.ts) |
 | N16 | Health labels contradict "Needs attention" | F1 (item 3), F5 | DONE-TONIGHT | F1: the health label is held down by waiting customers (5 waiting: at best Watch, 15: At risk) and nothing in a Needs attention list is Healthy or Thriving; real: KD Squares LTD 21 waiting was Healthy, now At risk (f1-rules.test.ts, tests/e2e/f1.spec.ts) |
 | N17 | Progress seen | none (progress note) | NOT-A-CODE-ITEM | an observation that earlier fixes landed; the item it left open (the stale-deal tile driven by one deal) is now handled by the single-deal guard, see N6 and UX-04 |
 | N18 | Same conversation appears in three accounts | F2 | PLANNED-LATER |  |
-| N19 | Design still "not mature" on Speed to lead, Appointments and Insights | D0, D1 | PLANNED-LATER |  |
+| N19 | Design still "not mature" on Speed to lead, Appointments and Insights | D0, D1 | PLANNED-LATER | D0 part DONE for Speed to lead and Appointments: shared list and notices, trend chart with scale, tooltip and placeholder, plain badges; the Appointments Insights tab and the heatmap are F3 and D1 |
 | N20 | Smart Lists and dialing | F10 | PLANNED-LATER |  |
 | N21 | Show names and photos, not IDs | F2, F8 | PLANNED-LATER |  |
 | N22 | "Not enough data" without a reason | F2 | PLANNED-LATER |  |
@@ -34,15 +34,15 @@ ORPHANS (notes with no stage in docs/ROADMAP_V2.md): none found.
 | N25 | Appointment details and statuses | F3 | PLANNED-LATER |  |
 | N26 | Appointment Insights: unexplained graphs, no way to adjust | F3 | PLANNED-LATER |  |
 | N27 | Sales team accountability: setters and closers | T1 (never tonight) | NEEDS-KING | King must define setter and closer before T1 starts |
-| N28 | Structure first | D0 | PLANNED-LATER |  |
-| N29 | Easy for everyone | D0, D1, F5 | PLANNED-LATER |  |
+| N28 | Structure first | D0 | DONE-TONIGHT | D0: the structure exists and is tested: pilot menu in plain groups, one page template, module tabs, one filter bar, one list, one lead drawer, one alert style, one status line, one empty/error/skeleton set (src/app/app/ds, nav.ts; tests/unit/ds-components.test.ts, tests/e2e/d0.spec.ts, menu.spec.ts) |
+| N29 | Easy for everyone | D0, D1, F5 | PLANNED-LATER | D0 part DONE: My day (phone-first, 48 px tap targets, one column, plain words) for a client's staff, tested at 390, 768 and 1440 px (tests/e2e/d0.spec.ts). F5 and D1 continue |
 | N30 | More observations on Speed to lead | F2 | PLANNED-LATER |  |
 | N31 | Good things worth keeping | none (keep list) | NOT-A-CODE-ITEM | things to keep, no change |
 | N32 | Meeting notes: what is it, from what, and what do the switches do? | E2a (E1 later), D0 | PLANNED-LATER |  |
 | N33 | Auto-sync is not running: "Last synced" keeps growing | S0.4 | DONE-TONIGHT | S0.4: diagnosed from the live job table (bursts of 82 to 489 min before 06:25 UTC on 31 Oct: the 5 minute cron could not run on the Hobby plan; then a steady 20 min, not 15, from a finish-based due rule): due rule fixed, simulated-scheduler tests, one freshness line, internal alarm and diagnostics. The 15 minute cadence is NOT VERIFIED LIVE until the merge (docs/features/S0.4.md, docs/NEEDS_KING.md section 15) |
-| N34 | Filters must adapt to who is looking | D0 | PLANNED-LATER |  |
+| N34 | Filters must adapt to who is looking | D0 | DONE-TONIGHT | D0: one filter bar whose controls follow the person (agency: client accounts, kind of business, owner, test accounts; client staff: person, calendar, pipeline, source, time; none on a single-account page), remembered, carried in the address, said in words incl. which accounts are in and left out (src/lib/design/filters.ts, ScopeFilterBar; ui-logic.test.ts, ds-drill-range.test.ts, e2e d0 'WHICH client accounts'). The server applies industry, owner, test and the new accounts= picks (scripts/check-filter.ts extended, NOT RUN); wiring user, calendar, pipeline, source and range to numbers is each page stage |
 | N35 | Contact search is plain: merge it and build paying features around it | F10, D0 | PLANNED-LATER |  |
-| N36 | Pipeline is one endless page | P1 (never tonight), D0 pattern | PLANNED-LATER |  |
+| N36 | Pipeline is one endless page | P1 (never tonight), D0 pattern | PLANNED-LATER | D0 pattern DONE: ModuleTabs, one sub-navigation pattern (used for People, Pipeline, Setup, Appointments). The Pipeline rebuild is P1 |
 | N37 | Forecast trust: "why should they trust your forecast? how are you calculating?" | F1, P1 | PLANNED-LATER | F1 part DONE: minimum sample, a How this is calculated drawer, owner-set stage probabilities (labelled as assumptions), timing from each pipeline's real sales cycle, a range with a stated confidence, deals out of play excluded (pipeline-intel.test.ts, check-stage-rules.ts, tests/e2e/f1.spec.ts). NOT built: forecast versus actual each month (needs a month of recorded forecasts and 20 closed deals: P1) |
 | N38 | Stage awareness: closed-out stages and junk pipelines flagged as dead or risky | F1, P1 | DONE-TONIGHT | F1: the owner classifies stages (active, closed out, ignore) and pipelines (in use, not in use), starting from name suggestions the screen states; excluded stages never count as open pipeline, stale, dead or forecast; absurd ratio texts dropped. Real: 13 of 80 stage pairs closed out by name, 1,033 open deals (f1-rules.test.ts, tests/unit/f1-deal-scope-db.test.ts, scripts/check-stage-rules.ts) |
 | N39 | The pipeline-over-time chart shows a definition change as a trend | F1, P1 | PLANNED-LATER | F1 part DONE: snapshots carry a definition version and history is only compared inside one version; the chart says what it left out (tests/unit/f1-deal-scope-db.test.ts, f1-rules.test.ts). Axes, labels and a tooltip on the chart are P1 and D1 |
@@ -56,9 +56,9 @@ ORPHANS (notes with no stage in docs/ROADMAP_V2.md): none found.
 | N47 | Source data is 99% "Unknown" | F1, F2 | PLANNED-LATER | F1 part DONE: sources grouped by kind and 99% no source opens with an action and three steps (f1-rules.test.ts). The Speed to lead side and the Meta lead-form recognition on live data are F2 |
 | N48 | "Same person in several client accounts (23)" is a privacy problem | S0.2b, F1 | DONE-TONIGHT | S0.2b: card, query, tile and count removed, nothing compares people across clients; meeting matching never picks between clients (docs/features/S0.2b.md items 1, 19, 20) |
 | N49 | Tags: what do they mean, and can I see the leads that were tagged? | F10 | PLANNED-LATER |  |
-| N50 | Lead side panel, the Kit model | D0, F10 | PLANNED-LATER |  |
+| N50 | Lead side panel, the Kit model | D0, F10 | PLANNED-LATER | D0 part DONE: LeadDrawer (profile, tags, source, owner where known, deals, timeline, previous and next arrows through the list it was opened from, quiet Open in your CRM through the white-label link), used from Speed to lead, drilled chart lists and My day. Other lists, notes, tasks and calls slots: F10 and W1 |
 | N51 | Leads as a working surface | F10 (read-only part), W1 (never tonight) | PLANNED-LATER |  |
-| N52 | Light and dark mode, and following the agency's brand | D0, D1 | PLANNED-LATER |  |
+| N52 | Light and dark mode, and following the agency's brand | D0, D1 | PLANNED-LATER | D0 tokens part DONE: light and dark themes as tokens with a one-tap choice, the company's colour applied on top and made readable (accentTokens, tested). D1 verifies every page in both themes |
 | N53 | Call lists should actually support calling | F10 | PLANNED-LATER |  |
 | N54 | Call lists fail with a 504 | F10 | PLANNED-LATER |  |
 | N55 | Third-party dialers, for example Kixie | F10 | PLANNED-LATER |  |
@@ -69,7 +69,7 @@ ORPHANS (notes with no stage in docs/ROADMAP_V2.md): none found.
 | N60 | Compare two is weak, and what is the QBR for? | C1 | PLANNED-LATER |  |
 | N61 | Team module: a real directory with activity | T1 (never tonight) | PLANNED-LATER |  |
 | N62 | More observations | F1, C1 (observations) | PLANNED-LATER | F1 part DONE: the Accounts health label contradiction (same as N16) and the singular fix (1 contact asked, no page says 1 contacts: tests/e2e/f1.spec.ts); the N33 update was S0.4. The Ignored filter being easy to find stays C1 |
-| N63 | Setup is thin: it needs a real checklist system | C1, D0 | PLANNED-LATER |  |
+| N63 | Setup is thin: it needs a real checklist system | C1, D0 | PLANNED-LATER | D0 structure part DONE: the page template and tabs a checklist module needs; the checklist system is C1 |
 | N64 | "Why is an API marked unavailable when it is available?" and "turn on all scopes" | F1 (capability matrix), F8 (scope experience); release in Z2 (King) | PLANNED-LATER | F1 part DONE: docs/CAPABILITIES.md (three causes, every data point, permissions asked and granted per install, stored evidence), classifyProbe, and /api/admin/capabilities for the live column (NOT VERIFIED LIVE until one call after the merge). The UI scope experience is F8, the release is Z2 |
 | N65 | Email sender health: vague, no data | E5 (never tonight) | PLANNED-LATER |  |
 | N66 | Reselling profit dashboard | R1 | PARKED | waits for evidence |
@@ -80,9 +80,9 @@ ORPHANS (notes with no stage in docs/ROADMAP_V2.md): none found.
 | N71 | Data cleanup: what is it for? Merge Duplicates into it | C2 | PLANNED-LATER |  |
 | N72 | Compare setups and Industry playbooks (King did not comment) | C1, D1 | PLANNED-LATER |  |
 | N73 | Observations on these screens | S0.2b (N48), C1, C2 | PLANNED-LATER |  |
-| N74 | Freshness: two statements, and only one can be the truth | S0.4, D0 | DONE-TONIGHT | S0.4: one function (src/lib/sync/freshness.ts), one line above every page, exact wording and stale wording, vague badge and banner removed; tests/unit/freshness-one-source.test.ts, scripts/check-sync.ts, tests/e2e/freshness.spec.ts. D0 only restyles the status line |
+| N74 | Freshness: two statements, and only one can be the truth | S0.4, D0 | DONE-TONIGHT | S0.4 made the one freshness line; D0 restyled it as quiet text and exposes it as the shared StatusLine, drawn once by the shell (tests/unit/freshness-one-source.test.ts updated and passing, 7 tests) |
 | N75 | Trust for a Nigerian-built product selling abroad | F8 (Trust page); Z2, Z3 (King) | PLANNED-LATER |  |
-| N76 | Settings: one long page, and it needs advanced features | F8, D0, D1 | PLANNED-LATER |  |
+| N76 | Settings: one long page, and it needs advanced features | F8, D0, D1 | PLANNED-LATER | D0 part DONE: the sub-navigation pattern and plain groups exist; Settings itself is F8 and D1 |
 | N77 | Meeting notes privacy and how meetings work: what each setting does, and a contradiction | F8 (wording), E2a | PLANNED-LATER |  |
 | N78 | Speed to lead settings: who does the replying, and is it working? | F2 | PLANNED-LATER |  |
 | N79 | Slack: do we still need the pasted web address? Notification options and editable copy | F9 | PLANNED-LATER |  |
@@ -95,7 +95,7 @@ ORPHANS (notes with no stage in docs/ROADMAP_V2.md): none found.
 | N86 | Roadmap page: how does "Coming next" work, does it notify me? | F8 | PLANNED-LATER |  |
 | N87 | Getting started needs a real guide, and a feedback field | F8 | PLANNED-LATER |  |
 | N88 | Operating principles for Claude Code (applies to every stage) | CLAUDE.md principles | NOT-A-CODE-ITEM | operating principles, saved in CLAUDE.md |
-| N89 | UI/UX revamp needed on Settings and What's new too | F8, D1 | PLANNED-LATER |  |
+| N89 | UI/UX revamp needed on Settings and What's new too | F8, D1 | PLANNED-LATER | D0 part DONE: the shared page, tabs and notices are ready for Settings and What's new; the revamp is F8 and D1 |
 | N90 | Status of the old work | none (status note) | NOT-A-CODE-ITEM | a status note |
 | N91 | Zoom connect fails: "Zoom did not say who signed in" | E0 (copy), E1 later | PLANNED-LATER |  |
 | N92 | Slack connect fails again, and Connections is stuck on "Waiting for you..." | E0, F9 | PLANNED-LATER |  |
@@ -117,14 +117,21 @@ ORPHANS (notes with no stage in docs/ROADMAP_V2.md): none found.
 | UX-04 | [S1] First screen headline is one test deal | F1, F5 | DONE-TONIGHT | The audit's stale-deal headline says when one deal is most of the figure (audit-intel.test.ts) and the front door leads with leads waiting (tests/e2e/today.spec.ts) |
 | UX-05 | [S1] Agency user opened inside a client account lands on the agency view | F5 | PLANNED-LATER |  |
 | UX-06 | [S2] Sync-running banner on almost every load | S0.4 | DONE-TONIGHT | S0.4: the note shows only for a first sync or one queued or running 10 min or longer (freshness.test.ts, sync-reliability-db.test.ts, check-sync.ts, tests/e2e/freshness.spec.ts asserts none on any page) |
-| UX-07 | [S2] Clipping at narrow widths | D0, D1 | PLANNED-LATER |  |
+| UX-07 | [S2] Clipping at narrow widths | D0, D1 | PLANNED-LATER | D0 part DONE: no sideways scroll on Today, Speed to lead, Appointments, Account audit and Overview at 390, 768 and 1440 px (tests/e2e/d0.spec.ts; found and fixed a 1050 px page at 768); lists wrap on a phone with container queries. Other pages: D1 |
 | UX-08 | [S2] Clients page mostly n/a | C1 | PLANNED-LATER |  |
-| UX-09 | [S2] Visual sameness | D0, D1 | PLANNED-LATER |  |
-| UX-10 | [S2] Too much text before the content | D0, D1 | PLANNED-LATER |  |
-| UX-11 | [S2] Navigation has 20 items | D0 | PLANNED-LATER |  |
+| UX-09 | [S2] Visual sameness | D0, D1 | PLANNED-LATER | D0 part DONE: fewer boxes on the M1 pages (rules and spacing instead of nested cards), plain status words, varied blocks; D1 finishes every page |
+| UX-10 | [S2] Too much text before the content | D0, D1 | PLANNED-LATER | D0 part DONE: Page clamps the subtitle to two lines and a test keeps the M1 subtitles at 120 characters or fewer; other pages: D1 |
+| UX-11 | [S2] Navigation has 20 items | D0 | DONE-TONIGHT | D0: the menu is the pilot menu (Today, My day for clients, Speed to lead, Appointments, Unanswered messages, Account audit, Clients, People, Settings, Getting started, What's new) with Overview, Accounts, Team, Pipeline and deals, Setup, Duplicates, Data cleanup under More; nothing removed (tests/unit/ds-components.test.ts 'the menu structure', tests/e2e/menu.spec.ts) |
 | UX-12 | [S2] Call lists spins for more than 5 seconds | F10 | PLANNED-LATER |  |
-| UX-13 | [S2] Persistent filter bar pushes content down | F5, D0 | PLANNED-LATER |  |
+| UX-13 | [S2] Persistent filter bar pushes content down | F5, D0 | PLANNED-LATER | D0 part DONE: the filter drawer is drawn only when there is something to choose (and says what is hidden even when closed); F5 finishes Today |
 | S3-a | [S3] Team shows unresolved names (Team member ZWol) | F2 (N21) | PLANNED-LATER |  |
 | S3-b | [S3] Duplicates tile shows a scary exact-match number from test data | C2 (never tonight) | PLANNED-LATER |  |
 | S3-c | [S3] Meeting notes explainer uses numbered steps for tools most users lack | F8, E2a | PLANNED-LATER |  |
 | S0-none | [S0] No S0 blocker confirmed in the review (nothing to fix) | none | NOT-A-CODE-ITEM | the review found no S0 |
+| KF-4 | Per-card date range and comparison controls | D0, F2, F3, F6, F4, F5, F10, C1 | PLANNED-LATER | King's live feedback |
+| KF-1 | Pills and banners look AI (plain status text, plain banners) | D0, all stages | PLANNED-LATER | King's live feedback |
+| KF-2 | Filter must list which client accounts are included | D0, F5 | PLANNED-LATER | King's live feedback |
+| KF-3 | Dial through the CRM's own dialer, not the native phone app | F10, F2, F3 | PLANNED-LATER | King's live feedback |
+| KF-5 | Think like the customer and make things easier (guides, defaults, next steps) | every stage | PLANNED-LATER | King's live feedback |
+| KF-6 | Clickable charts: click a bar or slice to see the leads, click a lead for details | D0, all chart stages | PLANNED-LATER | King's live feedback |
+| KF-7 | Clients module: fees and renewals unexplained, demo shows none | C1 (demo seed too) | PLANNED-LATER | King's live feedback |

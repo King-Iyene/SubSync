@@ -8,6 +8,9 @@ You are building ONE stage of SubSync overnight. King is asleep and cannot answe
 3. The stage prompt and its addendum in `docs/ROADMAP_V2.md` (sections 6 and 7), every note it names in `docs/KING_REVIEW_NOTES.md` (read each named note start to finish), and any section of `docs/INTEGRATIONS_SPEC.md` it names.
 4. The previous feature file for the same area if it exists (`docs/features/<ID>.md`): the stage may already be partly built under the old runbook. Build the DELTA the new prompt requires, and verify the old parts still hold.
 
+## King's live feedback
+Read `docs/KING_FEEDBACK_LIVE.md` in full too (KF-1 to KF-4: badge and banner style, the filter must list account names, dialing uses the CRM's own dialer, per-card ranges and comparisons). Apply every item that touches your stage, including KF-5 (think like the customer and add small, safe improvements; log them in a "Customer-eyes improvements" table; bigger ideas go to docs/PROPOSALS.md).
+
 ## Before you build
 Write into `docs/features/<ID>.md` (create or extend): (a) the numbered list of EVERY instruction and acceptance clause in the stage prompt and its notes, in your own words (if it has fewer items than the prompt has sentences with must/do/add/test/acceptance, read again); (b) the five evaluation lines from principle 1 (decision and for whom; is the data truly available in the live API with our scopes, tested not assumed; does the CRM already do it; the simplest version that proves value; the risk).
 

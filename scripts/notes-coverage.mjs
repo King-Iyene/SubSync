@@ -77,7 +77,7 @@ function parse() {
   const rows = [];
   for (const l of readFileSync(OUT, "utf8").replace(/\r\n/g, "\n").split("\n")) {
     const c = l.split("|").map((x) => x.trim());
-    if (c.length >= 7 && /^(N\d+|UX-\d+|S3-[a-c]|S0-none)$/.test(c[1])) rows.push({ id: c[1], title: c[2], stage: c[3], status: c[4], note: c[5] });
+    if (c.length >= 7 && /^(N\d+|UX-\d+|S3-[a-c]|S0-none|KF-\d+)$/.test(c[1])) rows.push({ id: c[1], title: c[2], stage: c[3], status: c[4], note: c[5] });
   }
   return rows;
 }
@@ -104,6 +104,13 @@ else if (cmd === "set") {
   const r = rows.find((x) => x.id === a);
   if (!r) throw new Error(`no row ${a}`);
   r.status = b; r.note = (c ?? "").replace(/\|/g, "/");
+  write(rows);
+  counts();
+} else if (cmd === "add") {
+  const rows = parse();
+  if (rows.find((x) => x.id === a)) throw new Error(`${a} already exists`);
+  const [title, stage, status] = [b, c, process.argv[6]];
+  rows.push({ id: a, title, stage, status, note: process.argv[7] ?? "" });
   write(rows);
   counts();
 } else if (cmd === "counts") counts();
