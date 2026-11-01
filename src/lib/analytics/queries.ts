@@ -461,6 +461,7 @@ export type InboxRow = {
   conversationId: string;
   locationId: string;
   locationName: string | null;
+  contactId: string | null;
   contactName: string | null;
   lastMessageType: string | null;
   lastMessageDirection: string | null;
@@ -473,7 +474,7 @@ export type InboxRow = {
 export async function inbox(installationId: string, slaHours: number, limit = 200, locationId?: string): Promise<InboxRow[]> {
   const rows = await sql()`
     select * from (
-      select c.conversation_id, c.location_id, l.name location_name, c.contact_name, c.last_message_type,
+      select c.conversation_id, c.location_id, l.name location_name, c.contact_id, c.contact_name, c.last_message_type,
         c.last_message_direction, c.last_message_at, c.unread_count,
         (c.last_message_direction = 'inbound' and c.last_message_at < now() - make_interval(hours => ${slaHours}::int)
            and c.last_message_at > now() - interval '30 days') over_sla,
@@ -487,7 +488,7 @@ export async function inbox(installationId: string, slaHours: number, limit = 20
     order by over_sla desc, case when over_sla then last_message_at end asc, last_message_at desc nulls last
     limit ${limit}`;
   return rows.map((r) => ({
-    conversationId: r.conversation_id, locationId: r.location_id, locationName: r.location_name, contactName: r.contact_name,
+    conversationId: r.conversation_id, locationId: r.location_id, locationName: r.location_name, contactId: r.contact_id ?? null, contactName: r.contact_name,
     lastMessageType: r.last_message_type, lastMessageDirection: r.last_message_direction, lastMessageAt: toIso(r.last_message_at),
     unreadCount: r.unread_count, overSla: Boolean(r.over_sla), waitingHours: r.waiting_hours,
   }));

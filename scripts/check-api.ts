@@ -72,6 +72,7 @@ async function main() {
   assert.ok(st.body.deals.length > 0 && st.body.deals.every((d: { daysStale: number }) => d.daysStale >= 45) && st.body.totalValue > 0);
   const ib = await call("/api/app/inbox", { token });
   assert.ok(ib.body.items.length > 0 && ib.body.overSla >= 7 && ib.body.items[0].overSla);
+  assert.ok(ib.body.items.every((d: { assignee: string; channel: string; assignedTo: string | null }) => d.assignee.length > 0 && d.channel.length > 0 && d.assignee !== d.assignedTo), "every conversation names its channel and who it is assigned to (stage F4)");
   const pl = await call("/api/app/pipelines", { token });
   assert.ok(pl.body.stages.length >= 5 && pl.body.accounts.length >= 12 && pl.body.totals.open > 0);
   const du = await call("/api/app/duplicates", { token });
@@ -316,6 +317,10 @@ async function main() {
   assert.equal(ci2.body.aging.buckets.length, 7, "six hourly buckets plus 'Older than a week' (stage F1, N15)");
   assert.equal(ci2.body.aging.buckets.reduce((s: number, b: { count: number }) => s + b.count, 0), ci2.body.aging.total);
   assert.ok(ci2.body.gaps.total > 0 && ci2.body.gaps.stages.length > 0, "quiet deals found");
+  const quiet = await call("/api/app/deal-gaps", { token });
+  assert.equal(quiet.status, 200);
+  assert.equal(quiet.body.total, ci2.body.gaps.total, "the quiet deals moved to Pipeline are the same deals (stage F4)");
+  assert.equal((await call("/api/app/comms-intel?gaps=0", { token })).body.gaps, undefined, "the Unanswered messages page does not count them");
   assert.ok(ci2.body.afterHours.leads > 100 && ci2.body.afterHours.afterHoursPct >= 0);
   const db2 = await call("/api/app/daily-brief", { token });
   assert.equal(db2.status, 200);

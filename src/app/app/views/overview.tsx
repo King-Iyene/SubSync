@@ -58,7 +58,7 @@ export function OverviewView({ go }: { go: GoFn }) {
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <Stat label="Stale deal value" value={fmtMoney(k.staleValue)} tone={k.staleValue > 0 ? "warn" : undefined}
           sub={`${fmtInt(k.staleOpps)} of ${fmtInt(k.openOpps)} open deals have not moved`} />
-        <Stat label="Waiting past SLA" value={k.unanswered} tone={k.unanswered > 0 ? "warn" : undefined} sub="inbound, unanswered" />
+        <Stat label="Waiting past your reply target" value={k.unanswered} tone={k.unanswered > 0 ? "warn" : undefined} sub="customer wrote last, no reply" />
         <Stat label="Open alerts" value={k.openAlerts} tone={k.criticalAlerts > 0 ? "bad" : undefined} sub={`${k.criticalAlerts} critical`} />
       </div>
       {k.excludedDeals > 0 && (

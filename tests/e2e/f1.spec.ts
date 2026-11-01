@@ -170,10 +170,12 @@ test.describe("the screens", () => {
     await page.goto("/app#inbox");
     await page.reload();
     await expect(page.getByText("Demo mode", { exact: false }).first()).toBeVisible();
-    await expect(page.getByText(`Unread (${unread.unread})`)).toBeVisible();
-    await expect(page.getByTestId("unread-explainer")).toContainText("not the same as waiting for a reply");
-    await expect(page.getByTestId("unread-explainer")).toContainText(`${unread.unreadAndWaiting} of the ${unread.unread} are also waiting`);
-    await expect(page.getByText("How long customers have been waiting")).toBeVisible();
+    // Stage F4: the Unread tab counts every unread conversation (the figure Today shows); the ones that are also waiting are marked on their rows.
+    const tab = page.getByRole("tab", { name: `Unread (${unread.unread})` });
+    await expect(tab).toBeVisible();
+    await tab.click();
+    await expect(page.getByTestId("tab-body-unread")).toContainText("not the same as waiting for a reply");
+    await expect(page.getByText("How long customers have waited")).toBeVisible();
   });
 
   test("Leads: cold lists, who has engaged, data quality with its denominators, and the sources action", async ({ page }) => {

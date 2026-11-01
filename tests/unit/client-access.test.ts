@@ -11,7 +11,7 @@ import type { Identity, Role } from "@/lib/identity";
 const METHODS = ["GET", "POST", "PUT", "DELETE"] as const;
 
 // Everything a client's staff may call. Anything else is refused, whatever it is called.
-const CLIENT_GET = new Set(["overview", "accounts", "onboarding", "search", "stale", "hygiene", "inbox", "pipelines", "duplicates", "alerts", "pipeline-intel", "contact-intel", "comms-intel", "deal-events", "contact", "start", "appointments", "appointment-insights", "audit", "speed", "roadmap", "freshness"]);
+const CLIENT_GET = new Set(["overview", "accounts", "onboarding", "search", "stale", "hygiene", "inbox", "pipelines", "duplicates", "alerts", "pipeline-intel", "contact-intel", "comms-intel", "deal-gaps", "deal-events", "contact", "start", "appointments", "appointment-insights", "audit", "speed", "roadmap", "freshness"]);
 const CLIENT_POST = new Set(["usage", "roadmap"]);
 
 // Every first path segment the API handles, read from the router itself, plus names of things that must never reach a client even if they are built later.
@@ -35,6 +35,15 @@ describe("a client's staff can call only the read-only views of their own accoun
         }
       }
     }
+  });
+
+  it("a client may keep their own saved views of the Unanswered messages page, and nothing else under that name", () => {
+    expect(routeAllowed("client", "GET", ["inbox", "views"])).toBe(true);
+    expect(routeAllowed("client", "POST", ["inbox", "views"])).toBe(true);
+    expect(routeAllowed("client", "DELETE", ["inbox", "views", "6f9619ff-8b86-d011-b42d-00c04fc964ff"])).toBe(true);
+    for (const method of ["POST", "PUT", "DELETE"] as const) expect(routeAllowed("client", method, ["inbox"]), method + " /inbox").toBe(false);
+    expect(routeAllowed("client", "PUT", ["inbox", "views"])).toBe(false);
+    expect(routeAllowed("client", "POST", ["inbox", "other"])).toBe(false);
   });
 
   it("a client can never change anything about an account, switch client access, or read the agency controls on one", () => {

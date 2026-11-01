@@ -31,7 +31,7 @@ export function buildTools(installationId: string): ToolDef[] {
   return [
     {
       name: "portfolio_summary",
-      description: "Overall picture of every client account: counts, average engagement score, dormant accounts, money stuck in stale deals, and conversations waiting past the reply SLA.",
+      description: "Overall picture of every client account: counts, average engagement score, dormant accounts, money stuck in stale deals, and conversations waiting past the reply target.",
       inputSchema: { type: "object", properties: {} },
       run: async () => {
         const { accounts } = await live();

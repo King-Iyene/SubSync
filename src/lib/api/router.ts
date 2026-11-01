@@ -38,6 +38,8 @@ import { parseRulePatch, pipelineTreatment, ruleKey, stageProbability, treatment
 import { sourceSummary } from "../analytics/contact-intel";
 import { MIN_MONEY_BASE_FOR_PERCENT, percentChange } from "../analytics/metrics";
 import { afterHours, communicationGaps } from "../analytics/comms-queries";
+import { contactOwners, listViews, removeView, saveView, teamNames } from "../analytics/inbox-queries";
+import { assigneeLabel, MAX_SAVED_VIEWS, sanitizeQueue, viewName } from "../analytics/waiting-view";
 import { badDataSamples, contactOverview, topLeads, vips } from "../analytics/contact-queries";
 import { appointmentInsights } from "../analytics/appointment-insight-queries";
 import { auditSummary, buildAudit } from "../analytics/audit-intel";
@@ -658,11 +660,27 @@ async function inboxView(ctx: Ctx) {
   // The same list and the same window as the Today and Overview counts: nothing is cut short at a few hundred, and if the list ever is
   // (more than the limit), the screen says so instead of showing a smaller number as if it were the total.
   const LIMIT = 2000;
-  const [fetched, coverage] = await Promise.all([inbox(ctx.installationId, settings.slaHours, LIMIT, ctx.limitTo ?? undefined), conversationCoverage(ctx.installationId)]);
+  const [fetched, coverage, names] = await Promise.all([inbox(ctx.installationId, settings.slaHours, LIMIT, ctx.limitTo ?? undefined), conversationCoverage(ctx.installationId), teamNames(ctx.installationId)]);
   const rows = fetched.filter((r) => permits(r.locationId));
   const late = rows.filter((r) => r.overSla);
   const seen = coverage.filter((c) => permits(c.locationId));
+  // Who each conversation's contact is assigned to, as a name (N21). The conversation list does not say who a conversation is assigned to, so the
+  // contact's own team member is used; the page says so.
+  const owners = await contactOwners(ctx.installationId, rows);
+  const now = Date.now();
+  const items = rows.map((r) => {
+    const assignedTo = r.contactId ? owners.get(r.locationId + ":" + r.contactId) ?? null : null;
+    const at = r.lastMessageAt ? Date.parse(r.lastMessageAt) : NaN;
+    return {
+      ...r, assignedTo, assignee: assigneeLabel(assignedTo, names), ageHours: Number.isFinite(at) ? Math.max(0, Math.floor((now - at) / 3_600_000)) : null,
+      channel: channelLabel(r.lastMessageType), url: links.conversation(r.locationId, r.conversationId),
+    };
+  });
+  // "Assigned to me" is offered only to a person who really is assigned some of these contacts (their own sign-in id, never anyone else's).
+  const me = ctx.session.userId && items.some((i) => i.assignedTo === ctx.session.userId) ? ctx.session.userId : null;
   return json({
+    me,
+    namesMissing: items.some((i) => i.assignedTo !== null && !names.has(i.assignedTo)),
     slaHours: settings.slaHours,
     windowDays: WAITING_WINDOW_DAYS,
     overSla: late.length,
@@ -673,8 +691,28 @@ async function inboxView(ctx: Ctx) {
     readLimit: readLimitNote(seen.filter((c) => c.stored >= CONVERSATIONS_READ_PER_ACCOUNT).length, seen.length),
     channels: channelCounts(late.map((r) => r.lastMessageType)),
     truncated: rows.length >= LIMIT,
-    items: rows.map((r) => ({ ...r, channel: channelLabel(r.lastMessageType), url: links.conversation(r.locationId, r.conversationId) })),
+    items,
   });
+}
+
+// A person's saved views of the Unanswered messages page (per person, kept on the server so they follow the person to another device). The owner key is
+// derived here from the verified session, never from anything the browser sends.
+async function inboxViews(ctx: Ctx) {
+  return json({ views: await listViews(ctx.installationId, voterOf(ctx)), max: MAX_SAVED_VIEWS });
+}
+
+async function inboxViewSave(ctx: Ctx) {
+  const body = (await ctx.request.json().catch(() => null)) as { name?: unknown; filters?: unknown } | null;
+  const name = viewName(body?.name);
+  if (!name) return json({ error: "Give the view a name of up to 40 characters" }, 400);
+  const outcome = await saveView(ctx.installationId, voterOf(ctx), name, sanitizeQueue(body?.filters));
+  if (outcome === "full") return json({ error: "You can keep " + MAX_SAVED_VIEWS + " saved views. Remove one first." }, 409);
+  return json({ ok: true, views: await listViews(ctx.installationId, voterOf(ctx)), max: MAX_SAVED_VIEWS });
+}
+
+async function inboxViewRemove(ctx: Ctx, id: string) {
+  const gone = await removeView(ctx.installationId, voterOf(ctx), id);
+  return gone ? json({ ok: true, views: await listViews(ctx.installationId, voterOf(ctx)), max: MAX_SAVED_VIEWS }) : json({ error: "View not found" }, 404);
 }
 
 async function pipelines(ctx: Ctx) {
@@ -844,7 +882,7 @@ async function settingsUpdate(ctx: Ctx) {
   const int = (v: unknown, lo: number, hi: number) => (typeof v === "number" && Number.isInteger(v) && v >= lo && v <= hi ? v : null);
   if ("staleDays" in body) { const v = int(body.staleDays, 7, 365); if (v === null) return json({ error: "Stale days must be between 7 and 365" }, 400); patch.staleDays = v; }
   if ("dormantDays" in body) { const v = int(body.dormantDays, 7, 365); if (v === null) return json({ error: "Days before an account counts as gone quiet must be between 7 and 365" }, 400); patch.dormantDays = v; }
-  if ("slaHours" in body) { const v = int(body.slaHours, 1, 168); if (v === null) return json({ error: "SLA hours must be between 1 and 168" }, 400); patch.slaHours = v; }
+  if ("slaHours" in body) { const v = int(body.slaHours, 1, 168); if (v === null) return json({ error: "Reply target hours must be between 1 and 168" }, 400); patch.slaHours = v; }
   if ("digestEnabled" in body) patch.digestEnabled = body.digestEnabled === true;
   if ("industryTargets" in body) patch.industryTargets = body.industryTargets === true;
   if ("keepTranscripts" in body) patch.keepTranscripts = body.keepTranscripts === true;
@@ -990,10 +1028,12 @@ async function exportCsv(ctx: Ctx, kind: string) {
     }
     case "inbox": {
       const rows = (await inbox(ctx.installationId, settings.slaHours, 2000, ctx.limitTo ?? undefined)).filter((r) => permits(r.locationId));
+      const [owners, who] = await Promise.all([contactOwners(ctx.installationId, rows), teamNames(ctx.installationId)]);
       return file("subsync-inbox", toCsv(rows, [
         { label: "Account", value: (r) => r.locationName }, { label: "Contact", value: (r) => r.contactName }, { label: "Channel", value: (r) => r.lastMessageType },
         { label: "Last message", value: (r) => r.lastMessageAt }, { label: "Direction", value: (r) => r.lastMessageDirection },
-        { label: "Channel", value: (r) => channelLabel(r.lastMessageType) }, { label: "Unread", value: (r) => r.unreadCount }, { label: "Over SLA", value: (r) => (r.overSla ? "yes" : "no") }, { label: "Waiting hours", value: (r) => r.waitingHours },
+        { label: "Channel", value: (r) => channelLabel(r.lastMessageType) }, { label: "Unread", value: (r) => r.unreadCount }, { label: "Past reply target", value: (r) => (r.overSla ? "yes" : "no") }, { label: "Waiting hours", value: (r) => r.waitingHours },
+        { label: "Assigned to", value: (r) => assigneeLabel(r.contactId ? owners.get(r.locationId + ":" + r.contactId) ?? null : null, who) },
       ]));
     }
     case "deals": {
@@ -1429,14 +1469,27 @@ async function execSummary(ctx: Ctx) {
 async function commsIntel(ctx: Ctx) {
   const sc = await scope(ctx);
   const allowed = await allowedIds(ctx);
-  const [rows, gaps, after] = await Promise.all([inbox(ctx.installationId, sc.settings.slaHours, 2000), communicationGaps(ctx.installationId, allowed), afterHours(ctx.installationId, allowed)]);
+  // The deals with no contact moved to Pipeline (read by deal-gaps). The Unanswered messages page asks for gaps=0 so it does not pay for them.
+  const wantGaps = ctx.url.searchParams.get("gaps") !== "0";
+  const [rows, gaps, after] = await Promise.all([inbox(ctx.installationId, sc.settings.slaHours, 2000), wantGaps ? communicationGaps(ctx.installationId, allowed) : Promise.resolve(null), afterHours(ctx.installationId, allowed)]);
   // The same set as the Inbox list and the Today count (N15): the customer wrote last, past the reply target, inside the window. Never every inbound thread.
   const waiting = rows.filter((x) => sc.permits(x.locationId) && x.overSla && x.waitingHours !== null).map((x) => x.waitingHours as number);
   return json({
     aging: replyAging(waiting),
-    gaps: { ...gaps, deals: gaps.deals.map((d) => ({ ...d, url: sc.links.opportunities(d.locationId) })) },
+    ...(gaps ? { gaps: { ...gaps, deals: gaps.deals.map((d) => ({ ...d, url: sc.links.opportunities(d.locationId) })) } } : {}),
     afterHours: after,
   });
+}
+
+// Counted open deals whose contact has gone quiet (moved here from the Unanswered messages page). The same deals and the same rules as the Pipeline
+// (a value, an owner, in play); the total is counted over all of them and the rows are the first ones, the screen says how many there are in all.
+async function dealGaps(ctx: Ctx) {
+  const sc = await scope(ctx);
+  const allowed = await allowedIds(ctx);
+  const asked = Number(ctx.url.searchParams.get("days"));
+  const days = [7, 14, 30].includes(asked) ? asked : 7;
+  const gaps = await communicationGaps(ctx.installationId, allowed, days, 200);
+  return json({ ...gaps, deals: gaps.deals.map((d) => ({ ...d, url: sc.links.opportunities(d.locationId) })) });
 }
 
 async function dailyBrief(ctx: Ctx) {
@@ -1514,7 +1567,7 @@ async function digestPreview(ctx: Ctx) {
 
 const FEATURE_FOR: Record<string, Feature> = {
   search: "search", onboarding: "onboarding", stale: "stale", inbox: "inbox", pipelines: "pipelines", duplicates: "duplicates", email: "email",
-  alerts: "alerts", appointments: "appointments", audit: "audit", speed: "speed", "appointment-insights": "appointments", meetings: "meetings", connections: "connections", cleanup: "cleanup", "setup-compare": "setup_compare", playbooks: "playbooks", daily: "overview", team: "team", "deal-events": "pipelines", contact: "search", settings: "settings", export: "exports", digest: "overview", "api-keys": "ai", hygiene: "stale", "pipeline-intel": "pipelines", "contact-intel": "activity", clients: "clients", qbr: "reports", "comms-intel": "inbox", "call-queue": "calls", "call-lists": "calls", "call-outcomes": "calls",
+  alerts: "alerts", appointments: "appointments", audit: "audit", speed: "speed", "appointment-insights": "appointments", meetings: "meetings", connections: "connections", cleanup: "cleanup", "setup-compare": "setup_compare", playbooks: "playbooks", daily: "overview", team: "team", "deal-events": "pipelines", contact: "search", settings: "settings", export: "exports", digest: "overview", "api-keys": "ai", hygiene: "stale", "pipeline-intel": "pipelines", "contact-intel": "activity", clients: "clients", qbr: "reports", "comms-intel": "inbox", "deal-gaps": "pipelines", "call-queue": "calls", "call-lists": "calls", "call-outcomes": "calls",
 };
 
 export async function handle(request: Request, segments: string[]): Promise<Response> {
@@ -1552,6 +1605,7 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       if (a === "stale") return await stale(ctx);
       if (a === "hygiene") return await hygiene(ctx);
       if (a === "api-keys") return await keysList(ctx);
+      if (a === "inbox" && b === "views") return await inboxViews(ctx);
       if (a === "inbox") return await inboxView(ctx);
       if (a === "pipelines") return await pipelines(ctx);
       if (a === "duplicates") return await duplicates(ctx);
@@ -1573,6 +1627,7 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       if (a === "exec-summary") return await execSummary(ctx);
       if (a === "daily-brief") return await dailyBrief(ctx);
       if (a === "comms-intel") return await commsIntel(ctx);
+      if (a === "deal-gaps") return await dealGaps(ctx);
       if (a === "clients" && !b) return await clientsView(ctx);
       if (a === "clients" && b === "compare") return ctx.entitlements.features.reports === false ? json({ error: "This feature is switched off", feature: "reports", off: true }, 404) : await clientsCompare(ctx);
       if (a === "qbr" && b && LOCATION_ID.test(b)) return await qbrView(ctx, b);
@@ -1581,6 +1636,7 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
     if (method === "POST") {
       if (a === "email" && b === "check") return await emailCheck(ctx);
       if (a === "usage" && !b) return await usagePing(ctx);
+      if (a === "inbox" && b === "views") return await inboxViewSave(ctx);
       if (a === "audit" && b === "share") return await auditShare(ctx);
       if (a === "audit" && b === "revoke") return await auditRevoke(ctx);
       if (a === "roadmap" && !b) return await roadmapVote(ctx);
@@ -1607,6 +1663,7 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       if (a === "api-keys" && b && c === "revoke") return await keysRevoke(ctx, b);
     }
     if (method === "DELETE") {
+      if (a === "inbox" && b === "views" && c && /^[0-9a-fA-F-]{36}$/.test(c)) return await inboxViewRemove(ctx, c);
       if (a === "connections" && b && !c) return await connectionRemove(ctx, b);
       if (a === "call-lists" && b && /^[0-9a-fA-F-]{36}$/.test(b)) return await callListDelete(ctx, b);
     }

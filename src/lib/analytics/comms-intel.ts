@@ -11,13 +11,15 @@ export type AgingBucket = { label: string; min: number; max: number; count: numb
 export const CRITICAL_FROM_HOURS = 24;
 export const CRITICAL_UNTIL_HOURS = 7 * 24;
 
+// The wait buckets, one list for this function and for the chart on the Unanswered messages page, so the two cannot disagree.
+export const AGING_DEFS: ReadonlyArray<{ label: string; min: number; max: number }> = [
+  { label: "Under 1 hour", min: 0, max: 1 }, { label: "1 to 4 hours", min: 1, max: 4 }, { label: "4 to 12 hours", min: 4, max: 12 },
+  { label: "12 to 24 hours", min: 12, max: 24 }, { label: "24 to 48 hours", min: 24, max: 48 }, { label: "2 to 7 days", min: 48, max: CRITICAL_UNTIL_HOURS },
+  { label: "Older than a week", min: CRITICAL_UNTIL_HOURS, max: Infinity },
+];
+
 export function replyAging(waitingHours: number[]): { buckets: AgingBucket[]; critical: number; older: number; total: number } {
-  const defs = [
-    { label: "Under 1 hour", min: 0, max: 1 }, { label: "1 to 4 hours", min: 1, max: 4 }, { label: "4 to 12 hours", min: 4, max: 12 },
-    { label: "12 to 24 hours", min: 12, max: 24 }, { label: "24 to 48 hours", min: 24, max: 48 }, { label: "2 to 7 days", min: 48, max: CRITICAL_UNTIL_HOURS },
-    { label: "Older than a week", min: CRITICAL_UNTIL_HOURS, max: Infinity },
-  ];
-  const buckets: AgingBucket[] = defs.map((d) => ({ ...d, count: 0 }));
+  const buckets: AgingBucket[] = AGING_DEFS.map((d) => ({ ...d, count: 0 }));
   const valid = waitingHours.filter((h) => Number.isFinite(h) && h >= 0);
   for (const h of valid) {
     const bucket = buckets.find((x) => h >= x.min && h < x.max);

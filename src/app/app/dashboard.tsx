@@ -317,7 +317,7 @@ export function Dashboard() {
       case "accounts": return <AccountsView go={go} />;
       case "account": return view.locationId ? <AccountDetailView key={view.locationId} locationId={view.locationId} go={go} agency={agency} /> : <AccountsView go={go} />;
       case "deals": return <ModuleTabs key="pipe" start={1} tabs={pipeTabs} />;
-      case "inbox": return <InboxView />;
+      case "inbox": return <InboxView go={go} />;
       case "onboarding": return <ModuleTabs key="setup" start={0} tabs={setupTabs} />;
       case "email": return <ModuleTabs key="setup" start={1} tabs={setupTabs} />;
       case "duplicates": return <DuplicatesView />;

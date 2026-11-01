@@ -6,7 +6,7 @@ export type AccountMetrics = {
   newContacts30d: number;
   openOpportunities: number;
   staleOpportunities: number;
-  /** Inbound conversations nobody has answered within the SLA. */
+  /** Inbound conversations nobody has answered within the reply target. */
   unansweredOverSla: number;
   completenessPct: number;
   /** Days since the last sign of activity (contact, deal or message); null if never. */
@@ -56,8 +56,8 @@ export function engagementBreakdown(m: AccountMetrics): ScoreBreakdown {
     {
       key: "responsiveness", label: "Responsiveness", points: responsiveness, max: 10,
       why: m.unansweredOverSla === 0
-        ? "No inbound conversations waiting past the SLA"
-        : `${m.unansweredOverSla} inbound conversation${m.unansweredOverSla === 1 ? "" : "s"} waiting past the SLA`,
+        ? "No customer conversations waiting past your reply target"
+        : `${m.unansweredOverSla} inbound conversation${m.unansweredOverSla === 1 ? "" : "s"} waiting past your reply target`,
     },
     {
       key: "quality", label: "Data quality", points: quality, max: 10,
