@@ -6,6 +6,7 @@ import { Badge, Btn, Card, ErrorBox, inputClass, Loading, PageHeader, timeAgo } 
 import { storeLines, deleteMyDataText, uninstallText } from "@/lib/data-inventory";
 import { ConnectionsCard } from "./connections";
 import { SyncStatusPanel } from "./sync-status";
+import { WatchingPanel } from "./watching-panel";
 
 type S = { staleDays: number; dormantDays: number; slaHours: number; appDomain: string; appDomainSource: "manual" | "sso" | "install" | "default"; detectedDomain: string | null; digestEnabled: boolean; customChecklist: string[]; digestHour: number | null; digestTimezone: string | null; digestEmail: string | null; emailReady?: boolean; brandName: string | null; brandColor: string | null; industryTargets?: boolean; keepTranscripts: boolean; pushNotesToCrm: boolean; speedTargetMinutes: number; countAutomatedTouches: boolean; speedBusinessHours: boolean; speedOpenHour: number; speedCloseHour: number; alertQuietHours: boolean };
 
@@ -307,6 +308,7 @@ export function SettingsView() {
         )}
 
         <SyncStatusPanel />
+        <WatchingPanel />
 
         <Card title="What we store">
           <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground" data-testid="what-we-store">

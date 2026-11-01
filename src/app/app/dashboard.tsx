@@ -15,6 +15,7 @@ import { NAV, PARENT, type GoFn, type ViewId } from "./nav";
 import { useBrandedText } from "./brand-text";
 import { Btn } from "./ui";
 import { BackLink, BackProvider, ModuleTabs, type ModuleTab } from "./ds/template";
+import { InlineAlert } from "./ds/alert";
 import { FilterDrawer } from "./ds/filters";
 import { useTheme } from "./ds/theme";
 import { remember, remembered } from "./ds/remember";
@@ -195,10 +196,16 @@ export function Dashboard() {
   // the browser Back button return. A menu click starts a fresh trail.
   const move = useCallback((next: { id: ViewId; locationId?: string }, keepTrail: boolean) => {
     const here = viewRef.current;
-    if (here.id === next.id && (here.locationId ?? "") === (next.locationId ?? "")) { window.scrollTo({ top: 0 }); return; }
+    // Today for ONE client account (stage F5, N2): the same page with the filter narrowed to that account. The way back returns to the filter that was on.
+    const scoped = next.id === "today" && next.locationId ? { ...EMPTY_FILTER, accounts: [next.locationId] } : null;
+    const target: { id: ViewId; locationId?: string } = scoped ? { id: "today" } : next;
+    if (!scoped && here.id === next.id && (here.locationId ?? "") === (next.locationId ?? "")) { window.scrollTo({ top: 0 }); return; }
+    // The entry being left keeps its own filter in its address (a remembered filter is not in the address yet), so Back lands on the same numbers.
+    try { window.history.replaceState(null, "", buildHash(here, filterRef.current, rangesOf(window.location.hash))); } catch { /* see below */ }
     setTrail((t) => (keepTrail ? [...t, here].slice(-12) : []));
-    setViewState(next);
-    try { window.history.pushState(null, "", buildHash(next, filterRef.current)); } catch { /* a frame that forbids it: the screen still changes */ }
+    setViewState(target);
+    if (scoped) { setFilterState(scoped); filterRef.current = scoped; }
+    try { window.history.pushState(null, "", buildHash(target, scoped ?? filterRef.current)); } catch { /* a frame that forbids it: the screen still changes */ }
     window.scrollTo({ top: 0 });
   }, []);
   const go: GoFn = useCallback((id, locationId) => move({ id, locationId }, true), [move]);
@@ -233,10 +240,16 @@ export function Dashboard() {
   useEffect(() => {
     if (auth.status !== "ready" || launched.current) return;
     launched.current = true;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (auth.kind === "agency" && auth.locationId && !window.location.hash) setViewState({ id: "account", locationId: auth.locationId });
+    if (auth.kind === "agency" && auth.locationId && !window.location.hash) {
+      const only = { ...EMPTY_FILTER, accounts: [auth.locationId] };
+      // Not remembered: the next time SubSync is opened from the agency menu it must show every client account again.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setFilterState(only);
+      try { window.history.replaceState(null, "", buildHash({ id: "today" }, only)); } catch { /* the screen still narrows */ }
+    }
   }, [auth]);
-  const fromAccount = auth.status === "ready" && auth.kind === "agency" && Boolean(auth.locationId) && view.id === "account" && view.locationId === auth.locationId;
+  // True while the page shows only the account SubSync was opened from (the filter is that one account). Pages draw no account filter then.
+  const fromAccount = auth.status === "ready" && auth.kind === "agency" && Boolean(auth.locationId) && filter.accounts.length === 1 && filter.accounts[0] === auth.locationId;
   useBrandedText(auth.status === "ready" ? auth.brand.name : null);
   const api = useMemo(() => (baseApi ? (filterQuery ? baseApi.filtered(filterQuery) : baseApi) : null), [baseApi, filterQuery]);
 
@@ -384,10 +397,9 @@ export function Dashboard() {
           </nav>
           <main className="mx-auto w-full max-w-[1400px] flex-1 p-4 sm:px-10 sm:py-8">
             {fromAccount && (
-              <p className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-primary/30 bg-primary/5 px-3 py-2 text-sm print:hidden" role="note">
-                <span>You opened this from inside a client account, so it shows that account.</span>
-                <Btn variant="ghost" onClick={() => go("accounts")}>See all client accounts</Btn>
-              </p>
+              <InlineAlert className="mb-3" action={<Btn variant="ghost" onClick={() => setFilter(EMPTY_FILTER)}>See all client accounts</Btn>}>
+                You opened this from inside a client account, so every page shows only that account.
+              </InlineAlert>
             )}
             {auth.kind === "agency" && baseApi && !fromAccount && <ApiProvider value={baseApi}><FilterDrawer kind="agency" value={filter} onChange={setFilter} /></ApiProvider>}
             {back && <BackLink label={back.label} onClick={back.go} />}

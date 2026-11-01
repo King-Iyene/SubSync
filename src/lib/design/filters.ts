@@ -126,7 +126,11 @@ export function describeHidden(v: FilterValue, o: FilterOptions): HiddenNote[] {
     const names = scopeOf({ ...EMPTY_FILTER, accounts: s.accounts }, o).included.map((a) => a.name);
     out.push({ text: `Showing ${names.length} of ${live.length} client accounts: ${nameList(names)}.`, clear: { accounts: [] } });
   }
-  if (s.hideTest && (o.testAccounts ?? 0) > 0) out.push({ text: `${o.testAccounts} test ${o.testAccounts === 1 ? "account is" : "accounts are"} hidden because ${o.testAccounts === 1 ? "its" : "their"} name says test.`, clear: { hideTest: false } });
+  if (s.hideTest && (o.testAccounts ?? 0) > 0) {
+    // Say WHICH accounts (N1: "1 account hidden: KD Squares Test. Show it"), when the options carry their names.
+    const names = (o.accounts ?? []).filter((a) => a.test && !a.ignored).map((a) => a.name);
+    out.push({ text: `${o.testAccounts} test ${o.testAccounts === 1 ? "account is" : "accounts are"} hidden because ${o.testAccounts === 1 ? "its" : "their"} name says test${names.length > 0 ? `: ${nameList(names)}` : ""}.`, clear: { hideTest: false } });
+  }
   if (s.industry) out.push({ text: `Only ${o.industries?.find((i) => i.key === s.industry)?.label ?? s.industry} clients are shown.`, clear: { industry: "" } });
   if (s.owner) out.push({ text: `Only the clients of ${s.owner} are shown.`, clear: { owner: "" } });
   return out;
