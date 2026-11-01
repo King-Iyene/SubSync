@@ -201,6 +201,9 @@ export type AppointmentRow = {
   endAt: string | null;
   assignedTo: string | null;
   createdAt: string | null;
+  /** Who made the booking and how, when the platform says so (F3). Not verified against a live event: both stay null when the fields are absent. */
+  bookedByUser: string | null;
+  bookingChannel: string | null;
 };
 
 // The platform's statuses are new, confirmed, cancelled, showed, noshow and invalid. Spelling and spacing vary between its endpoints
@@ -226,6 +229,8 @@ export function mapAppointment(raw: unknown): AppointmentRow | null {
     endAt: toIso(r.endTime),
     assignedTo: str(r.assignedUserId),
     createdAt: toIso(r.dateAdded) ?? toIso(r.createdAt),
+    bookedByUser: str(rec(r.createdBy).userId),
+    bookingChannel: str(rec(r.createdBy).channel) ?? str(rec(r.createdBy).source) ?? str(r.source),
   };
 }
 

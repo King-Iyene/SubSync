@@ -386,7 +386,7 @@ async function handleAppointments(job: Job): Promise<Outcome> {
       for (const a of events) {
         rows.push({
           installation_id: job.installationId, location_id: loc, appointment_id: a.appointmentId, calendar_id: a.calendarId ?? cal.id, calendar_name: cal.name,
-          contact_id: a.contactId, title: a.title, status: a.status, start_at: a.startAt, end_at: a.endAt, assigned_to: a.assignedTo, created_remote_at: a.createdAt,
+          contact_id: a.contactId, title: a.title, status: a.status, start_at: a.startAt, end_at: a.endAt, assigned_to: a.assignedTo, created_remote_at: a.createdAt, booked_by_user: a.bookedByUser, booking_channel: a.bookingChannel,
           synced_at: new Date(),
         });
       }
@@ -417,7 +417,7 @@ async function handleAppointments(job: Job): Promise<Outcome> {
         on conflict (installation_id, location_id, appointment_id) do update set
           calendar_id = excluded.calendar_id, calendar_name = excluded.calendar_name, contact_id = excluded.contact_id, title = excluded.title,
           status = excluded.status, start_at = excluded.start_at, end_at = excluded.end_at, assigned_to = excluded.assigned_to,
-          created_remote_at = excluded.created_remote_at, synced_at = excluded.synced_at`;
+          created_remote_at = excluded.created_remote_at, booked_by_user = excluded.booked_by_user, booking_channel = excluded.booking_channel, synced_at = excluded.synced_at`;
     }
     // Anything in the window that we did not see this time was cancelled and removed, or moved out of it.
     await db`

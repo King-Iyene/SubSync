@@ -327,7 +327,7 @@ export function Dashboard() {
       case "roadmap": return <RoadmapView />;
       case "pipeline": return <ModuleTabs key="pipe" start={0} tabs={pipeTabs} />;
       case "team": return <TeamView />;
-      case "appointments": return <ModuleTabs key="appts" start={0} tabs={[{ label: "To do", node: <AppointmentsView go={go} /> }, { label: "Insights", node: <AppointmentInsights /> }]} />;
+      case "appointments": return <ModuleTabs key="appts" start={0} tabs={[{ label: "Appointments", node: <AppointmentsView go={go} /> }, { label: "Insights", node: <AppointmentInsights /> }]} />;
       case "meetings": return <MeetingsView />;
       case "cleanup": return <CleanupView />;
       case "clients": return <ClientsView reports={!off("reports")} />;

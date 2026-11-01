@@ -263,7 +263,7 @@ export async function seedDemo(): Promise<{ installationId: string; accounts: nu
         appts.push({
           installation_id: installationId, location_id: locationId, appointment_id: `${locationId}-ap${k}`, calendar_id: `${locationId}-cal${k % 3}`,
           calendar_name: ["Free consultation", "Estimate visit", "Follow-up call"][k % 3], contact_id: `${locationId}-c${1 + ((k * 11) % Math.max(1, p.contacts))}`,
-          title: "Appointment", status, start_at: new Date(startMs), end_at: new Date(startMs + 1_800_000), assigned_to: TEAM[k % 4], created_remote_at: new Date(startMs - 3 * 86_400_000),
+          title: "Appointment", status, start_at: new Date(startMs), end_at: new Date(startMs + 1_800_000), assigned_to: TEAM[k % 4], created_remote_at: new Date(startMs - 3 * 86_400_000), booked_by_user: k % 5 === 0 ? null : TEAM[(k + 1) % 3], booking_channel: k % 5 === 0 ? null : k % 2 ? "calendar page" : "team member",
         });
       }
       await db`insert into cached_appointments ${db(appts as never)}`;
