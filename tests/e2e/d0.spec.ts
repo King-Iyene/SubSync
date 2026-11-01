@@ -144,7 +144,7 @@ test("Back goes to where you came from, with the browser's Back button too", asy
   await page.goto("/app#audit");
   await page.reload();
   await expect(page.getByRole("heading", { level: 1, name: "Account audit" })).toBeVisible({ timeout: 60_000 });
-  const open = page.getByRole("button", { name: "Open", exact: true }).first();
+  const open = page.getByRole("button", { name: /^Open in / }).first();
   await open.waitFor({ timeout: 60_000 }).catch(() => undefined); // the title shows while the findings are still loading
   test.skip(!(await open.count()), "the audit has no finding to open on this data");
   await open.click();
@@ -153,7 +153,7 @@ test("Back goes to where you came from, with the browser's Back button too", asy
   await back.click();
   await expect(page.getByRole("heading", { level: 1, name: "Account audit" })).toBeVisible();
   await expect(page.getByTestId("back-link")).toHaveCount(0);
-  await page.getByRole("button", { name: "Open", exact: true }).first().click();
+  await page.getByRole("button", { name: /^Open in / }).first().click();
   await page.goBack();
   await expect(page.getByRole("heading", { level: 1, name: "Account audit" })).toBeVisible();
 });
