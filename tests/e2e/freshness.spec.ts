@@ -39,7 +39,9 @@ for (const [group, ids] of GROUPS) {
     await expect(page.getByTestId("freshness")).toBeVisible();
     for (const id of ids) {
       const nav = PAGES.find((n) => n.id === id)!;
-      if (id !== "today") await open(page, nav.label, nav.parent ? PAGES.find((n) => n.id === nav.parent)!.label : undefined);
+      // Since F10 the People module's tabs are Search and filters, Smart lists (the call lists) and Going cold (the old Leads page), not the three old page names.
+      const tabName = ({ search: "Search and filters", calls: "Smart lists", leads: "Going cold" } as Record<string, string>)[id] ?? nav.label;
+      if (id !== "today") await open(page, tabName, nav.parent ? PAGES.find((n) => n.id === nav.parent)!.label : undefined);
       await expect(page.getByTestId("freshness"), `${nav.label}: exactly one freshness line`).toHaveCount(1);
       await expect(page.getByTestId("freshness-text"), `${nav.label}: the same words as the server`).toHaveText(wanted);
       const body = (await page.locator("main").innerText()) + "\n" + (await page.locator("body").innerText());

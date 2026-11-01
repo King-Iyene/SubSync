@@ -46,6 +46,7 @@ export const INVENTORY: Record<string, TableInfo> = {
   },
   pipelines: { noun: "pipeline and stage names", line: "deals", notPersonal: ["name"] },
   deal_events: { noun: "deal history", line: "deals" },
+  contact_tag_events: { noun: "tag history (the day SubSync first saw a tag added or removed)", line: "contacts", personal: { tag: "tags" } },
   cached_conversations: {
     noun: "conversation details", line: "conversations",
     personal: { contact_name: "the contact's name" },

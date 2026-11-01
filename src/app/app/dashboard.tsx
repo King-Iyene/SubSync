@@ -31,7 +31,8 @@ import { AppointmentsView } from "./views/appointments";
 import { CleanupView } from "./views/cleanup";
 import { MeetingsView } from "./views/meetings";
 import { PlaybooksView } from "./views/playbooks";
-import { CallsView } from "./views/calls";
+import { GlobalSearch } from "./views/global-search";
+import { PeopleModule } from "./views/people-module";
 import { ClientsView } from "./views/clients";
 import { DealsView } from "./views/deals";
 import { DuplicatesView } from "./views/duplicates";
@@ -41,11 +42,9 @@ import { RoadmapView } from "./views/roadmap";
 import { FreshnessStrip as StatusLine } from "./views/sync-status";
 import { InboxView } from "./views/inbox";
 import { OnboardingView } from "./views/onboarding";
-import { LeadsView } from "./views/leads";
 import { OverviewView } from "./views/overview";
 import { PipelineView } from "./views/pipeline";
 import { DealMoves, TeamView } from "./views/people";
-import { SearchView } from "./views/search";
 import { SettingsView } from "./views/settings";
 import { ConnectionsPage } from "./views/connections";
 import { SetupCompareView } from "./views/setup-compare";
@@ -301,9 +300,10 @@ export function Dashboard() {
   const own = auth.locationId;
 
   // People: one module for finding contacts. Its tabs are the pages that used to be separate menu entries (nothing was removed); stage F10 grows it.
-  const peopleIds = (["search", "leads", "calls"] as const).filter((id) => NAV_FOR[auth.kind].has(id) && !off(NAV.find((n) => n.id === id)!.feature));
-  const peopleTabs: ModuleTab[] = peopleIds.map((id) => ({ id, label: NAV.find((n) => n.id === id)!.label, node: id === "search" ? <SearchView /> : id === "leads" ? <LeadsView /> : <CallsView /> }));
-  const peopleStart = Math.max(0, peopleIds.indexOf(view.id as "search" | "leads" | "calls"));
+  // F10: Search and filters, Smart lists (with the built-in call lists), Going cold, Imports and sources. The old Contact search, Leads and Call lists addresses open the matching tab.
+  const peopleOn = NAV_FOR[auth.kind].has("search") && !off("search");
+  const callsAllowed = NAV_FOR[auth.kind].has("calls") && !off("calls") && !locked("calls");
+  const peopleStart = view.id === "calls" ? 1 : view.id === "leads" ? 2 : 0;
   const pipeTabs = [{ label: "Forecast and stages", node: <><PipelineView /><DealMoves /></> }, { label: "Stale deals and hygiene", node: <DealsView /> }];
   const setupTabs = [{ label: "Setup checklists", node: <OnboardingView go={go} /> }, { label: "Email sender health", node: <EmailHealthView /> }, ...(limited ? [] : [...(off("setup_compare") ? [] : [{ label: "Compare setups", node: <SetupCompareView /> }]), ...(off("playbooks") ? [] : [{ label: "Industry playbooks", node: <PlaybooksView go={go} /> }])])];
 
@@ -324,7 +324,7 @@ export function Dashboard() {
     switch (view.id) {
       case "today": return <TodayView go={go} />;
       case "myday": return <MyDayView go={go} />;
-      case "people": case "search": case "leads": case "calls": return peopleTabs.length > 0 ? <ModuleTabs key="people" start={peopleStart} tabs={peopleTabs} label="People" /> : <Centered title="Not available" body="This page is switched off right now." />;
+      case "people": case "search": case "leads": case "calls": return peopleOn ? <PeopleModule key={"people" + peopleStart} start={peopleStart} callsAllowed={callsAllowed} /> : <Centered title="Not available" body="This page is switched off right now." />;
       case "audit": return <AuditView go={go} />;
       case "speed": return <SpeedView go={go} />;
       case "overview": return <OverviewView go={go} />;
@@ -405,6 +405,7 @@ export function Dashboard() {
             )}
             {auth.kind === "agency" && baseApi && !fromAccount && <ApiProvider value={baseApi}><FilterDrawer kind="agency" value={filter} onChange={setFilter} /></ApiProvider>}
             {back && <BackLink label={back.label} onClick={back.go} />}
+            {NAV_FOR[auth.kind].has("search") && !off("search") && <GlobalSearch go={go} />}
             <StatusLine /><BackProvider value={back}>{content}</BackProvider>
           </main>
         </div>

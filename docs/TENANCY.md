@@ -103,6 +103,10 @@ Where a meeting is saved is decided by an exact email match among the accounts t
 
 Outward actions (a CRM write, a meeting-tool subscription created or deleted) go through `src/lib/live-flags.ts`: with the switch off (the committed default) they are only recorded as "WOULD ..." lines (ids and field names only).
 
+`contact_tag_events` (stage F10) holds the day SubSync first saw a tag added to, or removed from, a contact ("since SubSync started watching"; the CRM does not say when a tag was added). It carries `installation_id`, `location_id`, `contact_id`, the tag name and the kind, and is classified with the synced customer data: removed by "Delete my data", by an uninstall and by removing one client account (`src/lib/tenant-tables.ts`). Every read goes through `people-list-queries.ts`, which limits it to the accounts the caller may see (`tests/unit/people-lists-db.test.ts`).
+
+Stage F10 also keeps three kinds of settings in `saved_views` (page `people`: a person's own smart lists; page `people-team`: lists shared with everyone who signs in to the same company or business, never created by or shown to a client's staff; page `people-prefs`: the person's dialer choice). The owner key is made on the server from the verified session; a client's staff are always held to their own account, whatever a saved list or an address says. Its routes are `people/...` under `api/app` (the one catch-all, already guarded), and a client's staff may use only `GET`, their own lists and the dialer setting (`src/lib/access.ts`). A read of the lead panel's custom fields and call history is made live for one lead at a time with that account's own token, stores nothing, and is refused unless the account is one the caller may see.
+
 ## Known gaps (not hidden)
 
 - Agency staff are refused rather than limited to their accounts, because the Users API check is not built. If an agency has staff who need SubSync today, the owner and admins can use it; staff cannot.
