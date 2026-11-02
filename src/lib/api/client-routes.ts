@@ -7,7 +7,7 @@ import {
 } from "../analytics/client-success";
 import { clientExtras } from "../analytics/client-queries";
 import {
-  accountFacts, addCustomStep, addNote, changeStep, deleteNote, deleteTemplate, historyStart, listHistory, listNotes, listTemplates, lastProgress, loadStates, locationVisible,
+  accountFacts, addCustomStep, listPeople, addNote, changeStep, deleteNote, deleteTemplate, historyStart, listHistory, listNotes, listTemplates, lastProgress, loadStates, locationVisible,
   newKey, removeCustomStep, saveTemplate, weeklyAppointments,
 } from "../analytics/client-success-queries";
 import { MAX_COMPARE } from "../analytics/client-success";
@@ -65,13 +65,13 @@ async function onboardingRows(ctx: Ctx, deps: Deps, only?: string) {
 
 export async function onboardingView(ctx: Ctx, deps: Deps) {
   const stuckDays = parseStuckDays(ctx.url.searchParams.get("stuck"));
-  const { rows, templates } = await onboardingRows(ctx, deps);
+  const [{ rows, templates }, people] = await Promise.all([onboardingRows(ctx, deps), listPeople(ctx.installationId)]);
   const clients = rows.map((r) => {
     const open = r.items.filter((i) => i.status === "todo");
     return { ...r, stuck: isStuck(r, stuckDays), openCount: open.length, overdueCount: open.filter((i) => i.due === "overdue").length };
   }).sort((a, b) => Number(b.stuck) - Number(a.stuck) || a.completionPct - b.completionPct);
   return json({
-    stuckDays, defaultStuckDays: DEFAULT_STUCK_DAYS, templates,
+    stuckDays, defaultStuckDays: DEFAULT_STUCK_DAYS, templates, people,
     stuck: clients.filter((c) => c.stuck).map((c) => ({ locationId: c.locationId, name: c.name, daysIn: c.daysIn, completionPct: c.completionPct, next: c.items.filter((i) => i.status === "todo").slice(0, 3).map((i) => i.label) })),
     clients,
   });

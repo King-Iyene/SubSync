@@ -148,6 +148,15 @@ export async function changeStep(installationId: string, allowed: string[] | nul
   return true;
 }
 
+/** Names to pick from when giving a step to someone: the team members SubSync knows by name, and anyone already given a step. */
+export async function listPeople(installationId: string): Promise<string[]> {
+  const rows = await sql()`
+    select name from team_names where installation_id = ${installationId} and nullif(trim(name), '') is not null
+    union select assignee from client_steps where installation_id = ${installationId} and nullif(trim(assignee), '') is not null
+    order by 1 limit 60`;
+  return rows.map((r) => r.name as string);
+}
+
 export const MAX_CUSTOM_STEPS = 25;
 export async function addCustomStep(installationId: string, allowed: string[] | null, locationId: string, label: string, actor: string | null): Promise<{ ok: true; key: string } | { ok: false; error: string; status: number }> {
   if (!(await locationVisible(installationId, allowed, locationId))) return { ok: false, error: "Client not found", status: 404 };

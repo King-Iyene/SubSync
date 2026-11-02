@@ -3,7 +3,7 @@ import { test } from "node:test";
 import {
   averageSeries, baselineShare, dealFigures, bandGroups, buildOnboardingItems, cleanSteps, COMPARE_METRICS, compareTable, crmAccountPage, daysBetween, DEFAULT_STUCK_DAYS, driftRows, dueState, endpoints, extraAutoItems, FIX,
   helpLines, HELP, historyLine, industryFromPicker, INDUSTRY_PICKER, isStuck, lastSpokenMs, needsAttention, NOTE_MAX, OTHER_INDUSTRY, parseCompareIds, parseQuarter, parseStuckDays,
-  pickerChoice, playbookLine, pointsIn, previousQuarter, proofSummary, qbrFindings, quarterOf, quarterProgress, recentQuarters, shiftDays, sharesBaseline, starterFromPlaybook, templateFor,
+  pickerChoice, playbookLine, pointsIn, previousQuarter, proofSummary, qbrFindings, quarterOf, quarterProgress, recentQuarters, reviewText, shiftDays, sharesBaseline, starterFromPlaybook, templateFor,
   USER_ENTERED, validateNote, validateStepPatch, valueCreatedWords, type AccountFacts, type BaseItem, type QuarterFacts,
 } from "../analytics/client-success.ts";
 import { industryKey } from "../analytics/playbooks.ts";
@@ -454,4 +454,17 @@ test("a review ends with next steps that follow from its issues, and always with
   assert.equal(t.length, 7);
   assert.match(t[0], /Reply to the 4 waiting customer messages first/);
   assert.match(t[t.length - 1], /next review/);
+});
+
+test("the review can be copied as plain text for an email, with the sender's own name instead of the product's", () => {
+  const t = reviewText({ client: "Alpha Dental", quarter: "Q4 2026 (Oct to Dec)", wins: [{ text: "4 deals won, worth $18,000." }], issues: [{ text: "2 customer messages are waiting past the reply target." }], steps: [{ text: "Agree one goal for next quarter and book the next review." }], proof: { total: 3, resolved: 2 }, brand: "Acme Marketing" });
+  assert.equal(t.split("\n")[0], "Quarterly review: Alpha Dental, Q4 2026 (Oct to Dec)");
+  assert.match(t, /What went well\n- 4 deals won, worth \$18,000\./);
+  assert.match(t, /What needs attention\n- 2 customer messages/);
+  assert.match(t, /What Acme Marketing caught: 3 problems flagged, 2 sorted out\./);
+  assert.match(t, /Next steps\n- Agree one goal/);
+  assert.doesNotMatch(t, /SubSync/);
+  assert.doesNotMatch(t, /\n{3,}/);
+  const bare = reviewText({ client: "A", quarter: "Q1", wins: [{ text: "w" }], issues: [], steps: [{ text: "s" }], proof: { total: 0, resolved: 0 } });
+  assert.doesNotMatch(bare, /What needs attention|What SubSync caught/);
 });

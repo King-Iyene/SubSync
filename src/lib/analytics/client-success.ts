@@ -331,7 +331,7 @@ export const FIX: Record<string, { crm?: string; view?: string; where: string; h
   email_auth: { view: "email", where: "SubSync, Email sender health", howto: "Check the client's sending domain here. If SPF, DKIM or DMARC fail, add the records at the domain's DNS host and check again." },
   workflows: { crm: "automation/workflows", where: "Automation, then Workflows", howto: "Open the automations to see what is built. SubSync cannot read this list for every account, so confirm it by eye." },
   "manual:kickoff": { where: "On a call", howto: "Hold the kickoff call, agree goals and who does what, then tick this off." },
-  "manual:domain": { crm: "settings/domain", where: "Settings, then Domains", howto: "Connect the client's own domain so pages and emails carry their name. Tick this off when it shows as connected." },
+  "manual:domain": { crm: "settings/domain", where: "Settings, then Domains", howto: "Connect the client's own domain so pages and emails carry their name. SubSync cannot see which domain is connected, so tick this off yourself when it is." },
   "manual:phone": { crm: "settings/phone-number", where: "Settings, then Phone Numbers", howto: "Buy or port a number and finish its registration. SubSync cannot see registration status, so tick this off yourself." },
   "manual:training": { where: "On a call", howto: "Walk the client's staff through the inbox, the calendar and the pipeline, then tick this off." },
 };
@@ -570,6 +570,19 @@ export function qbrFindings(cur: QuarterFacts, prev: QuarterFacts | null, now: N
   if (now.openAlerts > 0) steps.push({ text: `Work through the ${now.openAlerts} open alert${now.openAlerts === 1 ? "" : "s"} and clear each one.` });
   steps.push({ text: "Agree one goal for next quarter and book the next review." });
   return { wins, issues, steps };
+}
+
+/** The review as plain text a person can paste into an email or a message to the client: nothing to retype. Only what the review itself shows. */
+export function reviewText(r: { client: string; quarter: string; wins: ReadonlyArray<Finding>; issues: ReadonlyArray<Finding>; steps: ReadonlyArray<Finding>; proof: { total: number; resolved: number }; /** The sender's own name: a review sent to a client never carries the product's name. */ brand?: string | null }): string {
+  const list = (items: ReadonlyArray<Finding>) => items.map((i) => `- ${i.text}`).join("\n");
+  return [
+    `Quarterly review: ${r.client}, ${r.quarter}`, "",
+    "What went well", list(r.wins), "",
+    ...(r.issues.length ? ["What needs attention", list(r.issues), ""] : []),
+    r.proof.total > 0 ? `What SubSync caught: ${r.proof.total} problem${r.proof.total === 1 ? "" : "s"} flagged, ${r.proof.resolved} sorted out.` : "",
+    ...(r.proof.total > 0 ? [""] : []),
+    "Next steps", list(r.steps),
+  ].join("\n").replace(/\n{3,}/g, "\n\n").trim().split("SubSync").join(r.brand?.trim() || "SubSync");
 }
 
 export const ALERT_WORDS: Record<string, string> = {

@@ -1639,11 +1639,12 @@ async function digestPreview(ctx: Ctx) {
 // ---------------- routing ----------------
 
 // What the Clients module's own routes (client-routes.ts) need from this file.
-const clientDeps: clientRoutes.Deps = { allowedIds, accountsFor, actorOf, locationId: LOCATION_ID };
+// Who did it is the person's name from sign-in, never a raw id (N21): without a name the line says "Someone".
+const clientDeps: clientRoutes.Deps = { allowedIds, accountsFor, actorOf: (ctx) => ctx.session.userName ?? null, locationId: LOCATION_ID };
 
 const FEATURE_FOR: Record<string, Feature> = {
   search: "search", onboarding: "onboarding", stale: "stale", inbox: "inbox", pipelines: "pipelines", duplicates: "duplicates", email: "email",
-  alerts: "alerts", appointments: "appointments", audit: "audit", speed: "speed", "appointment-insights": "appointments", meetings: "meetings", connections: "connections", cleanup: "cleanup", "setup-compare": "setup_compare", playbooks: "playbooks", daily: "overview", team: "team", "deal-events": "pipelines", contact: "search", settings: "settings", export: "exports", digest: "overview", "api-keys": "ai", hygiene: "stale", "pipeline-intel": "pipelines", "contact-intel": "activity", clients: "clients", "client-onboarding": "onboarding", "client-trends": "clients", qbr: "reports", "comms-intel": "inbox", "deal-gaps": "pipelines", "call-queue": "calls", "call-lists": "calls", "call-outcomes": "calls",
+  alerts: "alerts", appointments: "appointments", audit: "audit", speed: "speed", "appointment-insights": "appointments", meetings: "meetings", connections: "connections", cleanup: "cleanup", "setup-compare": "setup_compare", playbooks: "playbooks", daily: "overview", team: "team", "deal-events": "pipelines", contact: "search", settings: "settings", export: "exports", digest: "overview", "api-keys": "ai", hygiene: "stale", "pipeline-intel": "pipelines", "contact-intel": "activity", clients: "clients", "client-onboarding": "onboarding", qbr: "reports", "comms-intel": "inbox", "deal-gaps": "pipelines", "call-queue": "calls", "call-lists": "calls", "call-outcomes": "calls",
 };
 
 export async function handle(request: Request, segments: string[]): Promise<Response> {

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { changeBetween, MIN_BASE as MIN_SHOW } from "@/lib/design/range";
 import { printAccent, printCss } from "@/lib/design/print";
-import { daysBetween, shiftDays } from "@/lib/analytics/client-success";
+import { daysBetween, reviewText, shiftDays } from "@/lib/analytics/client-success";
 import type { Finding, QuarterFacts } from "@/lib/analytics/client-success";
 import { useData } from "../../session";
 import { EmptyState, HowTo, LineChart, Section, SkeletonCards } from "../../ds";
@@ -30,6 +30,7 @@ const longDate = (iso: string) => new Date(`${iso}T00:00:00Z`).toLocaleDateStrin
 export function ReviewsTab({ accounts }: { accounts: Array<{ locationId: string; name: string }> }) {
   const [id, setId] = useState("");
   const [quarter, setQuarter] = useState("");
+  const [copied, setCopied] = useState<string | null>(null);
   const { data, error, loading, reload } = useData<Qbr>(id ? `qbr/${id}${quarter ? `?quarter=${quarter}` : ""}` : null);
   const c = data?.client;
   const accent = data ? printAccent(data.brand.color) : null;
@@ -64,6 +65,8 @@ export function ReviewsTab({ accounts }: { accounts: Array<{ locationId: string;
           </select>
         </div>
         <Btn variant="primary" disabled={!c} onClick={() => window.print()}>Print or save as PDF</Btn>
+        <Btn disabled={!data} onClick={() => { if (!data) return; navigator.clipboard.writeText(reviewText({ client: data.client.name ?? "Client", quarter: data.quarter.label, wins: data.findings.wins, issues: data.findings.issues, steps: data.findings.steps, proof: data.proof, brand: data.brand.name })).then(() => setCopied("Copied. Paste it into an email."), () => setCopied("Your browser did not allow copying. Use Print instead.")); }}>Copy as text</Btn>
+        {copied && <span className="text-sm text-muted-foreground" role="status">{copied}</span>}
       </div>
       {error && <ErrorBox error={error} onRetry={reload} />}
       {id && loading && !data && <SkeletonCards cards={4} label="Preparing the review..." />}

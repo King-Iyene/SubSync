@@ -18,7 +18,7 @@ type ClientOnb = {
   locationId: string; name: string | null; owner: string | null; url: string; industry: string | null; template: { id: string; name: string } | null; completionPct: number; daysIn: number | null;
   lastProgressAt: string | null; items: OnboardingItem[]; stuck: boolean; openCount: number; overdueCount: number;
 };
-type Data = { stuckDays: number; defaultStuckDays: number; templates: Tpl[]; stuck: Array<{ locationId: string; name: string | null; daysIn: number | null; completionPct: number; next: string[] }>; clients: ClientOnb[] };
+type Data = { stuckDays: number; defaultStuckDays: number; people?: string[]; templates: Tpl[]; stuck: Array<{ locationId: string; name: string | null; daysIn: number | null; completionPct: number; next: string[] }>; clients: ClientOnb[] };
 type Hist = { history: Array<{ text: string; at: string }> };
 
 const shortDate = (iso: string) => new Date(iso).toLocaleDateString("en-US", { day: "numeric", month: "short" });
@@ -26,6 +26,7 @@ const shortDate = (iso: string) => new Date(iso).toLocaleDateString("en-US", { d
 const dayOnly = (on: string) => new Date(`${on}T00:00:00Z`).toLocaleDateString("en-US", { day: "numeric", month: "short", timeZone: "UTC" });
 const dueWords = (d: OnboardingItem["due"], on: string | null) => (d === "overdue" ? `overdue, was due ${on ? dayOnly(on) : ""}` : d === "soon" ? `due ${on ? dayOnly(on) : "soon"}` : on ? `due ${dayOnly(on)}` : "");
 
+const PEOPLE_LIST = "onboarding-people";
 function StepRow({ it, loc, name, busy, run, go }: { it: OnboardingItem; loc: string; name: string; busy: boolean; run: (fn: () => Promise<unknown>) => void; go: GoFn }) {
   const api = useApiClient();
   const [how, setHow] = useState(false);
@@ -43,7 +44,7 @@ function StepRow({ it, loc, name, busy, run, go }: { it: OnboardingItem; loc: st
             {it.status === "unknown" && <span className="ml-2 text-xs font-normal text-muted-foreground no-underline">can&apos;t tell</span>}
             {it.due && <span className="ml-2"><Badge tone={it.due === "overdue" ? "bad" : it.due === "soon" ? "warn" : "neutral"}>{dueWords(it.due, it.dueOn)}</Badge></span>}
           </p>
-          {it.reason && <p className="text-xs text-muted-foreground">{REASON_WORDS[it.reason]}{it.detail && it.reason !== "permission" ? ` ${it.detail}.` : ""}</p>}
+          {it.reason && <p className="text-xs text-muted-foreground">{REASON_WORDS[it.reason]}{it.detail && it.reason === "not_checked" ? ` ${it.detail}.` : ""}</p>}
           {it.status === "done" && it.doneBy && <p className="text-xs text-muted-foreground">Finished by {it.doneBy}{it.doneAt ? `, ${shortDate(it.doneAt)}` : ""}</p>}
           {it.status === "todo" && it.detail && !it.reason && <p className="text-xs text-muted-foreground">{it.detail}</p>}
           {it.status !== "done" && (
@@ -52,7 +53,7 @@ function StepRow({ it, loc, name, busy, run, go }: { it: OnboardingItem; loc: st
               {it.fix?.view && <button type="button" onClick={() => go(it.fix!.view as "email")} className="min-h-8 text-sm font-medium text-primary underline-offset-4 hover:underline">{it.fix.label}</button>}
               {it.howto && <button type="button" aria-expanded={how} onClick={() => setHow(!how)} className="min-h-8 text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground">{how ? "Hide how to" : "How to"}</button>}
               <label className="flex items-center gap-1.5 text-xs text-muted-foreground">Given to
-                <input className={`${inputClass} h-8 w-32 px-2 py-1 text-xs`} value={who} maxLength={60} placeholder="Nobody yet" aria-label={`Who is on "${it.label}" for ${name}`} onChange={(e) => setWho(e.target.value)} onBlur={() => { if (who.trim() !== (it.assignee ?? "")) put({ assignee: who.trim() }); }} onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }} />
+                <input list={PEOPLE_LIST} className={`${inputClass} h-8 w-32 px-2 py-1 text-xs`} value={who} maxLength={60} placeholder="Nobody yet" aria-label={`Who is on "${it.label}" for ${name}`} onChange={(e) => setWho(e.target.value)} onBlur={() => { if (who.trim() !== (it.assignee ?? "")) put({ assignee: who.trim() }); }} onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }} />
               </label>
               <label className="flex items-center gap-1.5 text-xs text-muted-foreground">Due
                 <input type="date" className={`${inputClass} h-8 w-36 px-2 py-1 text-xs`} value={it.dueOn ?? ""} aria-label={`Due date of "${it.label}" for ${name}`} onChange={(e) => put({ dueOn: e.target.value })} />
@@ -80,7 +81,7 @@ function AddStep({ loc, name, run }: { loc: string; name: string; run: (fn: () =
   return (
     <form className="mt-3 flex flex-wrap items-end gap-2 border-t pt-3" onSubmit={(e: FormEvent) => { e.preventDefault(); if (!label.trim()) return; run(() => api.post(`client-onboarding/${loc}/steps`, { label, assignee: who, dueOn: due })); setLabel(""); setWho(""); setDue(""); }}>
       <div className="min-w-56 flex-1"><label className="mb-1 block text-xs text-muted-foreground" htmlFor={`add-${loc}`}>Add a step for {name}</label><input id={`add-${loc}`} className={inputClass} maxLength={STEP_LABEL_MAX} value={label} placeholder="e.g. Order the welcome gift" onChange={(e) => setLabel(e.target.value)} /></div>
-      <div><label className="mb-1 block text-xs text-muted-foreground" htmlFor={`addw-${loc}`}>Given to</label><input id={`addw-${loc}`} className={`${inputClass} w-36`} maxLength={60} value={who} onChange={(e) => setWho(e.target.value)} /></div>
+      <div><label className="mb-1 block text-xs text-muted-foreground" htmlFor={`addw-${loc}`}>Given to</label><input id={`addw-${loc}`} list={PEOPLE_LIST} className={`${inputClass} w-36`} maxLength={60} value={who} onChange={(e) => setWho(e.target.value)} /></div>
       <div><label className="mb-1 block text-xs text-muted-foreground" htmlFor={`addd-${loc}`}>Due</label><input id={`addd-${loc}`} type="date" className={`${inputClass} w-40`} value={due} onChange={(e) => setDue(e.target.value)} /></div>
       <Btn type="submit" disabled={!label.trim()}>Add step</Btn>
     </form>
@@ -226,6 +227,7 @@ export function OnboardingTab({ go }: { go: GoFn }) {
   const pick = (n: number) => { setDays(n); remember("stuck-days", String(n)); };
   return (
     <div>
+      <datalist id={PEOPLE_LIST}>{(data.people ?? []).map((p) => <option key={p} value={p} />)}</datalist>
       <HowTo id="clients-onboarding" title="How onboarding works" action={<button type="button" onClick={() => go("help")} className="text-xs font-medium text-primary underline">More in Getting started</button>}>
         Open a client&apos;s checklist. SubSync ticks what it can check itself (pipeline, contacts, calendar, profile, email sending). For anything unfinished, press <strong>Fix it</strong> to open the right page in your CRM, or <strong>How to</strong> for the steps. Give a step to someone and set a due date to keep it moving.
       </HowTo>

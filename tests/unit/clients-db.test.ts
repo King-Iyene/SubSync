@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { closeDb, sql } from "@/lib/db";
 import {
-  accountFacts, addCustomStep, addNote, changeStep, deleteNote, deleteTemplate, listHistory, listNotes, listTemplates, lastProgress, loadStates, noteSummaries, quarterFacts,
+  accountFacts, addCustomStep, addNote, listPeople, changeStep, deleteNote, deleteTemplate, listHistory, listNotes, listTemplates, lastProgress, loadStates, noteSummaries, quarterFacts,
   removeCustomStep, saveTemplate, weeklyAppointments, locationVisible, MAX_NOTES_PER_CLIENT,
 } from "@/lib/analytics/client-success-queries";
 import { dealFigures } from "@/lib/analytics/client-success";
@@ -91,6 +91,8 @@ describe.skipIf(!HAS_DB)("clients: notes, onboarding steps, templates, trends", 
     expect(history.map((h) => h.event).sort()).toEqual(["assigned", "done", "due"]);
     expect(history.find((h) => h.event === "assigned")).toMatchObject({ detail: "Dana", actor: "Sam", stepLabel: "Kickoff call completed" });
     expect((await lastProgress(a, null)).get(LA1)).toBeGreaterThan(0);
+    expect(await listPeople(a), "names to pick from include anyone already given a step").toContain("Dana");
+    expect(await listPeople(b), "and never another company's").not.toContain("Dana");
     // Reopening clears the flag everywhere and says so.
     await changeStep(a, null, LA1, "manual:kickoff", "Kickoff call completed", { done: false }, "Sam");
     const [again] = await sql()`select done from onboarding_tasks where installation_id = ${a} and location_id = ${LA1} and task = 'manual:kickoff'`;
