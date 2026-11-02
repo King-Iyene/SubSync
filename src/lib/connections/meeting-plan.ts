@@ -14,7 +14,7 @@ export const MAX_CONTACTS_PER_MEETING = 5;
 
 export type Candidate = { locationId: string; contactId: string; email: string };
 
-export type InboxReason = "no_external_attendee" | "no_match" | "duplicate_contact" | "cross_account" | "writes_off" | "provider_not_allowed" | "over_daily_cap";
+export type InboxReason = "no_external_attendee" | "no_match" | "duplicate_contact" | "cross_account" | "writes_off" | "provider_not_allowed" | "over_daily_cap" | "needs_permission" | "preview_needed";
 
 /** The plain sentence for each reason, as the Meeting inbox shows it. */
 export const INBOX_MESSAGE: Record<InboxReason, string> = {
@@ -25,6 +25,8 @@ export const INBOX_MESSAGE: Record<InboxReason, string> = {
   writes_off: "Saving to the CRM is switched off for you or for this account, so it waits here.",
   provider_not_allowed: "This account does not allow notes from this tool, so it waits here.",
   over_daily_cap: "The daily limit for notes was reached, so it waits here.",
+  needs_permission: "Needs permission: reconnect. SubSync cannot add notes to contacts yet, so this call waits here.",
+  preview_needed: "This call matched a contact. SubSync is waiting for your OK on how the first note looks, so nothing was added yet.",
 };
 
 export type PlanInput = {
@@ -71,6 +73,18 @@ export function retentionDays(policies: Record<string, PolicyFlags>, accessible:
   return days.length ? Math.min(...days) : DEFAULT_POLICY.inboxRetentionDays;
 }
 
+/** One contact and the rules of its account: what may be written there, and whether a limit stops it today. */
+export function targetFor(c: Candidate, i: Pick<PlanInput, "policies" | "settings" | "provider" | "writesToday">): PlanTarget {
+  const policy = i.policies[c.locationId] ?? DEFAULT_POLICY;
+  const { items, clips, writesAllowed } = clipChoices(i.settings.matrix, policy, i.settings.masterSwitch);
+  const wantsCrm = Object.values(items).some((d) => d === "note" || d === "comment" || d === "field");
+  let blocked: InboxReason | null = null;
+  if (!policy.providers.includes(i.provider)) blocked = "provider_not_allowed";
+  else if (!writesAllowed || !wantsCrm) blocked = "writes_off";
+  else if (i.writesToday.user >= policy.dailyCapPerUser || (i.writesToday.byAccount[c.locationId] ?? 0) >= policy.dailyCapPerAccount) blocked = "over_daily_cap";
+  return { locationId: c.locationId, contactId: c.contactId, email: c.email, allowed: blocked === null, blockedBecause: blocked, items, clips };
+}
+
 export function planMeeting(i: PlanInput): Plan {
   const accessible = accessibleAccounts(i.person, i.installed, i.provenAccess);
   const days = retentionDays(i.policies, accessible);
@@ -109,16 +123,7 @@ export function planMeeting(i: PlanInput): Plan {
   if (unique.length === 0) return unmatched("no_match");
   const chosen = unique.slice(0, MAX_CONTACTS_PER_MEETING);
 
-  const targets: PlanTarget[] = chosen.map((c) => {
-    const policy = i.policies[c.locationId] ?? DEFAULT_POLICY;
-    const { items, clips, writesAllowed } = clipChoices(i.settings.matrix, policy, i.settings.masterSwitch);
-    const wantsCrm = Object.values(items).some((d) => d === "note" || d === "comment" || d === "field");
-    let blocked: InboxReason | null = null;
-    if (!policy.providers.includes(i.provider)) blocked = "provider_not_allowed";
-    else if (!writesAllowed || !wantsCrm) blocked = "writes_off";
-    else if (i.writesToday.user >= policy.dailyCapPerUser || (i.writesToday.byAccount[c.locationId] ?? 0) >= policy.dailyCapPerAccount) blocked = "over_daily_cap";
-    return { locationId: c.locationId, contactId: c.contactId, email: c.email, allowed: blocked === null, blockedBecause: blocked, items, clips };
-  });
+  const targets: PlanTarget[] = chosen.map((c) => targetFor(c, i));
 
   if (targets.every((t) => !t.allowed)) {
     const reason = targets[0].blockedBecause as InboxReason;

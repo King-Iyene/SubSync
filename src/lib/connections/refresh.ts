@@ -23,15 +23,17 @@ export const FRESH_MS = 60_000;
 
 /**
  * A usable access token for the connection. Refreshes only when the stored one is about to expire, and only once however many callers ask at
- * the same moment. `refresh` calls the provider with the refresh token. A refusal marks the connection "needs reconnect" instead of retrying forever.
+ * the same moment. `refused` is an access token the provider just turned away although it looked fresh: it is refreshed anyway, but only if it is still the
+ * one stored, so when two callers are refused at once the second finds the first one's new token and uses it instead of spending another refresh token.
+ * `refresh` calls the provider with the refresh token. A refusal marks the connection "needs reconnect" instead of retrying forever.
  */
 export async function refreshLocked(
-  store: RefreshStore, id: string, refresh: (refreshToken: string) => Promise<{ ok: true; tokens: Tokens } | { ok: false }>, now: () => number = Date.now,
+  store: RefreshStore, id: string, refresh: (refreshToken: string) => Promise<{ ok: true; tokens: Tokens } | { ok: false }>, now: () => number = Date.now, refused: string | null = null,
 ): Promise<Refreshed> {
   return store.withLock(id, async (row) => {
     const current = await row.read();
     if (!current) return { ok: false, reason: "no_tokens" } as const;
-    if (current.expiresAt - now() > FRESH_MS) return { ok: true, accessToken: current.accessToken, refreshed: false } as const;
+    if (current.expiresAt - now() > FRESH_MS && (refused === null || current.accessToken !== refused)) return { ok: true, accessToken: current.accessToken, refreshed: false } as const;
     const result = await refresh(current.refreshToken);
     if (!result.ok) {
       await row.markNeedsReconnect("P-AUTH");

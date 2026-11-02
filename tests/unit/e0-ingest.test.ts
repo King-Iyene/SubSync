@@ -43,7 +43,7 @@ function memStore(over: { contacts?: Candidate[]; settings?: PersonSettings; acc
       meetings.set(id, { ...row, id });
       return id;
     },
-    updateMeeting: async (id, status, reason) => { log.updates.push([id, status, reason]); const m = meetings.get(id); if (m) { m.status = status; m.reason = reason; } },
+    updateMeeting: async (id, status, reason, expiresAt) => { log.updates.push([id, status, reason]); const m = meetings.get(id); if (m) { m.status = status; m.reason = reason; if (expiresAt !== undefined) m.expiresAt = expiresAt; } },
     recordWrite: async (r) => { log.writes.push(r); return true; },
     bump: async (_id, field) => { log.bumps.push(field); },
   };
@@ -125,7 +125,9 @@ describe("a meeting through one person's connection", () => {
     const result = await ingestPersonalMeeting(connOf(personOf("agency_admin")), meeting(), "rec-1", store, out.writer);
     expect(result).toMatchObject({ kind: "kept", reason: "preview_needed" });
     expect(out.fetched).toEqual([]);
-    expect([...meetings.values()][0]).toMatchObject({ status: "skipped", reason: "preview_needed" });
+    // Held in the person's private inbox (with a time limit), never in a state that keeps the call forever.
+    expect([...meetings.values()][0]).toMatchObject({ status: "needs_contact", reason: "preview_needed" });
+    expect([...meetings.values()][0].expiresAt).toBe(NOW + 14 * 86_400_000);
   });
 
   it("company staff whose access cannot be proven match nothing and never cause a lookup in any account", async () => {
@@ -203,6 +205,17 @@ describe("a meeting through one person's connection", () => {
     const refuse: Writer = async () => ({ outcome: "needs_permission" });
     const result = await ingestPersonalMeeting(connOf(personOf("agency_admin")), meeting(), "rec-1", store, refuse);
     expect(result).toMatchObject({ kind: "written", targets: [{ outcome: "needs_permission" }] });
+    // No permission is not a failure of the call: it waits in the person's inbox (with a time limit) and says "Needs permission: reconnect".
+    expect([...meetings.values()][0]).toMatchObject({ status: "needs_contact", reason: "needs_permission", expiresAt: NOW + 14 * 86_400_000 });
+    expect(log.writes).toEqual([]);
+  });
+
+  it("a write the CRM answers with an error is recorded as failed and not logged as a write", async () => {
+    vi.stubEnv("WRITE_GHL_LIVE", "true");
+    const { store, meetings, log } = memStore({ contacts: [CONTACT_B] });
+    const broken: Writer = async () => ({ outcome: "failed", status: 500 });
+    const result = await ingestPersonalMeeting(connOf(personOf("agency_admin")), meeting(), "rec-1", store, broken);
+    expect(result).toMatchObject({ kind: "written", targets: [{ outcome: "failed" }] });
     expect([...meetings.values()][0]).toMatchObject({ status: "failed", reason: "write_failed" });
     expect(log.writes).toEqual([]);
   });

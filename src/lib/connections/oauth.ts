@@ -1,6 +1,7 @@
 import { isSlackWebhook } from "../analytics/derive.ts";
 import type { Attendee } from "../analytics/meeting-intel.ts";
 import { connectError, providerCodeOf, SLACK_REDIRECT_ERRORS, type ConnectCode } from "./messages.ts";
+import { DEFAULT_WANTED, TRIGGERS_FIRST, TRIGGERS_SOLO, type WantedContent } from "./fathom.ts";
 import type { Provider } from "./state.ts";
 
 // Talking to Slack, Fathom and Zoom to sign a person in and keep the connection alive. The network call
@@ -15,7 +16,8 @@ export type Failed = { ok: false; error: string; code?: ConnectCode; providerCod
 
 const TIMEOUT_MS = 10_000;
 const FATHOM_AUTH = "https://fathom.video/external/v1/oauth2/authorize";
-const FATHOM_TOKEN = "https://fathom.video/external/v1/oauth2/token";
+// Fathom's developer docs (read 2 Nov 2026) put the token endpoint on api.fathom.ai; the sign-in page itself is on fathom.video (the app page shows that address).
+const FATHOM_TOKEN = "https://api.fathom.ai/external/v1/oauth2/token";
 const FATHOM_API = "https://api.fathom.ai/external/v1";
 
 // Which keys a provider needs. A provider with a missing key shows as "not switched on yet".
@@ -114,17 +116,28 @@ export const refreshTokens = (provider: "fathom" | "zoom", refreshToken: string,
   tokenCall(provider, { grant_type: "refresh_token", refresh_token: refreshToken }, keys, f, now);
 
 // ---- Fathom: SubSync registers its own webhook, so the person never pastes an address.
-export async function createFathomWebhook(accessToken: string, destinationUrl: string, f: Fetch = fetch): Promise<{ ok: true; id: string; secret: string } | Failed> {
+// Only what the person chose to save is requested (summary and action items by default; the transcript only when chosen, stage E2b). The secret is shown by
+// Fathom ONCE, in this answer, so it is returned here and stored by the caller before anything else happens.
+async function postWebhook(accessToken: string, destinationUrl: string, triggers: readonly string[], want: WantedContent, f: Fetch) {
+  return call(f, `${FATHOM_API}/webhooks`, {
+    method: "POST",
+    headers: { authorization: `Bearer ${accessToken}`, "content-type": "application/json" },
+    body: JSON.stringify({ destination_url: destinationUrl, triggered_for: triggers, include_summary: want.summary, include_action_items: want.actionItems, include_transcript: want.transcript, include_crm_matches: false }),
+  });
+}
+
+export async function createFathomWebhook(accessToken: string, destinationUrl: string, f: Fetch = fetch, want: WantedContent = DEFAULT_WANTED): Promise<{ ok: true; id: string; secret: string; triggers: string } | Failed> {
   try {
-    const { status, json } = await call(f, `${FATHOM_API}/webhooks`, {
-      method: "POST",
-      headers: { authorization: `Bearer ${accessToken}`, "content-type": "application/json" },
-      // Summary and action items only. The transcript is not requested.
-      body: JSON.stringify({ destination_url: destinationUrl, triggered_for: ["my_recordings", "my_shared_with_team_recordings"], include_summary: true, include_action_items: true, include_transcript: false }),
-    });
+    // First with the person's own recordings plus the ones they share with a team. A solo plan refuses the team type (it is Team-plan only): then the person's own recordings alone.
+    let triggers: readonly string[] = TRIGGERS_FIRST;
+    let { status, json } = await postWebhook(accessToken, destinationUrl, triggers, want, f);
+    if (status === 400) {
+      triggers = TRIGGERS_SOLO;
+      ({ status, json } = await postWebhook(accessToken, destinationUrl, triggers, want, f));
+    }
     const id = str(json.id, 200);
     const secret = str(json.secret, 500);
-    return status >= 200 && status < 300 && id && secret ? { ok: true, id, secret } : connectError("F-HOOK", "Fathom", providerCodeOf(status, json));
+    return status >= 200 && status < 300 && id && secret ? { ok: true, id, secret, triggers: triggers.join(",") } : connectError("F-HOOK", "Fathom", providerCodeOf(status, json));
   } catch {
     return connectError("P-NET", "Fathom");
   }

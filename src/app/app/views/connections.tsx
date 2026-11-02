@@ -19,7 +19,7 @@ type Mine = {
   id: string; provider: PersonalProvider; status: Shown; connectedAs: string | null; lastOkAt: string | null; lastEventAt: string | null;
   saved: number; skipped: number; lastErrorCode: string | null; delivery: boolean;
 };
-type MyData = { cards: Array<{ provider: PersonalProvider; name: string; available: boolean }>; connections: Mine[]; delivery: boolean; canAdmin: boolean; me: { name: string | null } };
+type MyData = { cards: Array<{ provider: PersonalProvider; name: string; available: boolean }>; connections: Mine[]; delivery: boolean; canAdmin: boolean; me: { name: string | null }; canWrite: boolean; inbox: { on: boolean; waiting: number } };
 
 type TeamRow = {
   id: string; person: string | null; provider: PersonalProvider; status: Shown; lastEventAt: string | null; saved: number; skipped: number; waiting: number;
@@ -37,7 +37,7 @@ type TeamData = {
 };
 
 const INFO: Record<PersonalProvider, { name: string; icon: LucideIcon; what: string }> = {
-  fathom: { name: "Fathom", icon: Mic, what: "After each recorded call, the summary and action items reach you, and SubSync adds them to the matching contact. A contact is only ever matched by exact email. If nobody matches, it waits in your own Meeting inbox." },
+  fathom: { name: "Fathom", icon: Mic, what: "After each recorded call, SubSync receives the summary and action items of YOUR calls, finds the contact by exact email, and adds a note to that contact, written as you. Nothing is ever saved to a guessed contact: if nobody matches, or two contacts share the email, the call waits in your own Meeting inbox for you to choose." },
   zoom: { name: "Zoom", icon: Video, what: "When Zoom writes a summary of a meeting you hosted, it reaches you. The host needs a paid Zoom plan with meeting summaries switched on." },
 };
 
@@ -147,6 +147,9 @@ function MySection({ data, reload }: { data: MyData; reload: () => Promise<void>
                   {working && <p className="mt-0.5 text-sm">Connected as <span className="font-medium">{mine?.connectedAs ?? data.me.name ?? "you"}</span>{mine?.lastEventAt ? `, last meeting ${timeAgo(mine.lastEventAt)}` : ", no meetings yet"}{mine ? ` · ${mine.saved} added to contacts, ${mine.skipped} waiting or not matched` : ""}</p>}
                   <p className="mt-0.5 text-sm text-muted-foreground">{nextStep(status, data.delivery)}</p>
                   {!working && <p className="mt-1 text-xs text-muted-foreground">{info.what}</p>}
+                  {card.provider === "fathom" && !working && <FathomNotice />}
+                  {working && !data.canWrite && <p className="mt-1 text-sm" data-testid="needs-permission"><span className="font-medium">Needs permission: reconnect.</span> <span className="text-muted-foreground">SubSync cannot add notes to contacts yet, because this install has not approved editing contacts. Your calls wait in your Meeting inbox and nothing is written to your CRM.</span></p>}
+                  {working && data.inbox.on && data.inbox.waiting > 0 && <p className="mt-1 text-sm" data-testid="inbox-waiting">{data.inbox.waiting} {data.inbox.waiting === 1 ? "call is" : "calls are"} waiting in your Meeting inbox. <a className="font-medium underline" href="#meetings">Open Meeting inbox</a></p>}
                   {!card.available && !mine && <p className="mt-1 text-xs text-muted-foreground">This needs the {info.name} app to be set up for SubSync first.</p>}
                   {mine?.lastErrorCode && status !== "connected" && <p className="mt-1 text-xs text-muted-foreground">If you contact us, send this code: {mine.lastErrorCode}</p>}
                 </div>
@@ -166,8 +169,21 @@ function MySection({ data, reload }: { data: MyData; reload: () => Promise<void>
       </ul>
       {msg && <div className="mt-3"><InlineAlert tone={msg.ok ? "success" : "danger"}>{msg.text}</InlineAlert></div>}
       <p className="mt-3 text-xs text-muted-foreground" data-testid="crm-note-rule">{CRM_NOTE_RULE}</p>
-      <p className="mt-3 text-xs text-muted-foreground">SubSync only receives the summary and action items you chose to save, never more. You are responsible for telling people on a call that it is recorded. Fathom has not yet been reviewed by Fathom for SubSync.</p>
+      <p className="mt-3 text-xs text-muted-foreground">SubSync only receives the summary and action items, never the transcript. You are responsible for telling people on a call that it is recorded.</p>
     </Section>
+  );
+}
+
+/** The plain explanation of the notice Fathom shows before it lets a person connect (INTEGRATIONS_SPEC section 9, roadmap section 9). */
+function FathomNotice() {
+  return (
+    <details className="mt-1 text-xs text-muted-foreground" data-testid="fathom-notice">
+      <summary className="cursor-pointer font-medium text-foreground">Fathom will say SubSync is &quot;not yet reviewed&quot;. What does that mean?</summary>
+      <div className="mt-1 space-y-1">
+        <p>When you press Connect, Fathom shows a page asking you to confirm that you trust SubSync. The notice appears because Fathom&apos;s review program for connected apps is new and SubSync has not been through it yet. SubSync will apply when the program opens. It does not mean anything is wrong.</p>
+        <p>What SubSync can read: only your own calls, and for each one its summary and action items. What SubSync keeps: the title, date, attendee emails, summary, action items and recording link, private to you, removed after 90 days (or 14 days if nobody matched). It does not keep the transcript. You can disconnect here at any time.</p>
+      </div>
+    </details>
   );
 }
 

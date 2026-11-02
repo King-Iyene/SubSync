@@ -20,7 +20,7 @@ import { join } from "node:path";
 import { closeDb, sql } from "../src/lib/db";
 import { schemaFromMigrations } from "../tests/fixtures/schema-from-migrations";
 
-const NEW_TABLES = ["user_connections", "meeting_note_settings", "meeting_policies", "meetings", "crm_writes"];
+const NEW_TABLES = ["user_connections", "meeting_note_settings", "meeting_policies", "meetings", "crm_writes", "meeting_deliveries", "meeting_ignored_emails"];
 const TOKEN_COLUMNS: Array<[string, string]> = [
   ["user_connections", "access_token_enc"], ["user_connections", "refresh_token_enc"], ["user_connections", "webhook_secret_enc"],
   ["connections", "access_token_enc"], ["connections", "refresh_token_enc"], ["connections", "webhook_secret_enc"],

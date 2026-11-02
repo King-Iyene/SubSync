@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { ModuleTabs, Page } from "../ds";
 import { crmNoteFootnote } from "@/lib/meeting-wording";
 import { useApiClient, useData } from "../session";
-import { Badge, Btn, Card, Empty, ErrorBox, ExtLink, inputClass, Loading, PageHeader, timeAgo } from "../ui";
+import { Badge, Btn, Card, Empty, ErrorBox, ExtLink, inputClass, Loading, timeAgo } from "../ui";
+import { MeetingInbox } from "./meeting-inbox";
 
 type Hook = { id: string; locationId: string; locationName: string | null; label: string | null; createdAt: string | null; lastUsedAt: string | null };
 type Meeting = {
@@ -16,7 +18,19 @@ type Data = { meetings: Meeting[]; hooks: Hook[]; accounts: Array<{ locationId: 
 
 const sourceName = (source: string, zoom: boolean) => (source === "fathom" ? "Fathom" : source === "zoom" && zoom ? "Zoom" : "Meeting tool");
 
+// Meeting notes (stage E2a): the person's own Meeting inbox first, then the older list of meetings that arrived through a private address.
 export function MeetingsView() {
+  return (
+    <Page title="Meeting notes" subtitle="After a recorded call, SubSync adds the summary and action items to the contact, written as you. A call it cannot place waits in your private inbox.">
+      <ModuleTabs label="Meeting notes sections" tabs={[
+        { label: "My Meeting inbox", node: <MeetingInbox /> },
+        { label: "Older meeting notes", node: <OlderMeetings /> },
+      ]} />
+    </Page>
+  );
+}
+
+function OlderMeetings() {
   const api = useApiClient();
   const { data, error, loading, reload } = useData<Data>("meetings");
   const [account, setAccount] = useState("");
@@ -50,11 +64,11 @@ export function MeetingsView() {
 
   return (
     <div>
-      <PageHeader title="Meeting notes" subtitle={`Recordings from ${data.moreTools ? "Fathom or Zoom" : "Fathom"}, turned into a summary and action items, matched to the right contact, ready to put in their record. Transcripts are not kept unless you switch that on.`} />
+      <p className="mb-4 text-sm text-muted-foreground">Meetings that arrived through a private address (before each person connected their own tool). {data.keepTranscripts ? "Transcripts are being kept." : "Transcripts are not kept."}</p>
       {msg && <p className="mb-4 rounded-lg border bg-muted/40 px-3 py-2 text-sm" role="status">{msg}</p>}
 
       {data.canManage && (
-        <Card title="Connect a meeting tool" className="mb-6">
+        <Card title="Advanced: a private address for a tool that cannot sign in" className="mb-6">
           <ol className="mb-4 list-decimal space-y-1 pl-5 text-sm text-muted-foreground">
             <li>Create a private address for a client account below.</li>
             <li><strong>Fathom:</strong> Settings, API Access, add a webhook, paste the address, and tick the new meeting content option.</li>
@@ -98,7 +112,7 @@ export function MeetingsView() {
       )}
 
       {data.meetings.length === 0 ? (
-        <Empty title="No meetings yet" body="Once a meeting tool sends its first recording, the summary, action items and the matched contact appear here." />
+        <Empty title="No older meeting notes" body="Meetings from people's own connected tools are in My Meeting inbox. This list is only for meetings that came through a private address." />
       ) : (
         <ul className="space-y-3">
           {data.meetings.map((m) => (

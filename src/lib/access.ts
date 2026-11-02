@@ -102,7 +102,7 @@ const GET_VIEWS = ["overview", "accounts", "onboarding", "search", "stale", "hyg
 // Connections (stage E0): EVERY role connects its own tools, so my-connections is open to all kinds; it only ever touches the signed-in person's own rows.
 // team-connections and meeting-policy are open to the kinds too, but the handler lets only administrators in (a client's account user gets 403) and limits an
 // account administrator to the people and the rule of their own account.
-const PERSONAL_RULES: Rule[] = [["GET", "my-connections"], ["POST", "my-connections"], ["DELETE", "my-connections"], ["GET", "team-connections"], ["POST", "team-connections"], ["PUT", "meeting-policy"]];
+const PERSONAL_RULES: Rule[] = [["GET", "my-connections"], ["POST", "my-connections"], ["DELETE", "my-connections"], ["GET", "team-connections"], ["POST", "team-connections"], ["PUT", "meeting-policy"], ["GET", "meeting-inbox"], ["POST", "meeting-inbox"], ["PUT", "meeting-inbox"]];
 
 const CLIENT_RULES: Rule[] = [...GET_VIEWS.map((a) => ["GET", a] as Rule), ["POST", "usage"], ["POST", "roadmap"], ["POST", "feedback"], ["POST", "problem"], ["POST", "inbox", "views"], ["DELETE", "inbox", "views"], ["POST", "people", "lists"], ["DELETE", "people", "lists"], ["PUT", "people", "dialer"], ...PERSONAL_RULES];
 
