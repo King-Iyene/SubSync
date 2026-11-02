@@ -258,3 +258,8 @@ Status: D0 BUILT, awaiting King's checks. Tag for the lead: `stage-D0`.
 - Agent ran: `npx tsc --noEmit` exit 0 (also after merging the overnight branch); eslint 0 errors, 6 warnings; `node --test` (10 files) tests 118 pass 118; vitest (6 files) 73 passed. Written, NOT run: `tests/e2e/c1.spec.ts`, `tests/unit/clients-db.test.ts`, new cross-tenant attacks in `scripts/check-tenancy.ts`. Reported failures not from C1: the note-permission test, "one wording for a missing permission" in `speed.tsx`, "the two slots other stages fill" (F5 watching panel).
 - My merge: three conflict files (router map, tenant tables, client-access test), kept both sides; `npx tsc --noEmit` clean.
 - Migration applied (additive, new empty tables): `20261102110000_c1_clients.sql`.
+
+#### F9 (resumed after the usage limit; merged cleanly, tag stage-F9)
+- Agent ran: `npx tsc --noEmit` exit 0 after each merge; `node --test src/lib/__tests__/notify-*.test.ts` tests 87 pass 87 (dedupe, retries, quiet hours, time zones, DST days, copy editor, allowlist guard, fake Slack); `node --test src/lib/__tests__/` tests 749 pass 746 fail 3 (meeting-wording, scope wording, settings-sections: not F9, same on a clean overnight checkout); vitest 33 files passed 1 failed (`f5-today.test.ts`). Written, NOT run: `tests/unit/f9-notifications-db.test.ts`, `tests/e2e/f9-notifications.spec.ts`. 0 of the 5 allowed emails used; no Slack message sent. DNS lookups (SPF, DKIM, DMARC) for kdsquares.com done, all present.
+- Migration applied (additive, new empty tables): `20261102120000_f9_notifications.sql`.
+- Merge: clean (the agent had merged twice itself); `npx tsc --noEmit` clean.
