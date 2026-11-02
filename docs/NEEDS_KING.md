@@ -144,3 +144,10 @@ S0.2b needs none (nothing new is read or written in the CRM). S0.4 needs none (i
 - (b) NOTHING is on `main`, and the merged branch has NOT been tested as a whole (only typechecked), so it must not go live yet. Your live app is unchanged except for the additive database migrations listed in this file (old code works with them).
 - (c) What you do: nothing now. When the limit resets, tell me "Continue the overnight run". I will run the full tests, fix failures, finish F9, E2a, C1, E2b and D1, test again, and then merge to main as you asked.
 - (d) Risk if you do nothing: none for the live app. The new work simply waits.
+
+## 25. From stage E2a (Fathom end to end): recommendation KEEP (based on fixtures only, nothing live)
+- **Nothing was run live.** The Fathom handler, the private Meeting inbox, the first-save preview and the expiry job are built and tested with signed fixtures and the dry-run CRM client (all four live switches off). The 9 live proofs and your exact morning test for each are in `docs/features/E2a.md` ("NOT VERIFIED LIVE"). Order: (1) turn the `meetings` feature flag on for your own account; (2) connect your own Fathom with `FATHOM_WEBHOOK_LIVE=true` (WRITE_GHL_LIVE still off): expect a stored meeting and a WOULD WRITE line; (3) then `WRITE_GHL_LIVE=true` for one real note authored as you.
+- **Open questions only a live run answers:** whether Fathom accepts the OAuth token when creating a webhook, and whether the 400 fallback is the right signal for a solo (non-team) Fathom plan.
+- Staff of the company (not account users) are not matched yet, so their calls wait in the inbox.
+- New cron `/api/cron/meeting-expiry` (daily 03:20, in `vercel.json`, takes effect on merge): clears expired inbox calls, handled calls after 90 days, delivery ids after 30 days.
+- Migration `20261102130000_e2a_fathom_inbox.sql` (two new empty tables, row level security on, no policy) is already APPLIED. `scripts/supabase-proof.ts` reports 29 passed, 1 failed (the failure is migration files vs live tables from other stages not yet merged in that worktree; re-run after all merges), 6 not verified live.
