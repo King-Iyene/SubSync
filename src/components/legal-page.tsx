@@ -12,6 +12,9 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
             <Link href="/support" className="hover:text-foreground">
               Support
             </Link>
+            <Link href="/trust" className="hover:text-foreground">
+              Trust
+            </Link>
             <Link href="/privacy" className="hover:text-foreground">
               Privacy
             </Link>

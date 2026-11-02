@@ -75,7 +75,7 @@ export class FakeTransports implements Transports {
 
 export const LEGACY: Legacy = { slackConfigured: false, digestEnabled: false, digestEmail: null, digestHour: null, digestTimezone: null, alertQuietHours: true };
 
-export type Overrides = Partial<Record<NotificationType, Partial<Pref> & { timing?: Partial<Pref["timing"]> }>>;
+export type Overrides = Partial<Record<NotificationType, Omit<Partial<Pref>, "timing"> & { timing?: Partial<Pref["timing"]> }>>;
 
 /** A context where every kind has its default preference, with some changed. `legacy` and `destinations` feed the defaults like the real loader does. */
 export function makeContext(o: { destinations?: Destination[]; legacy?: Partial<Legacy>; overrides?: Overrides; mode?: "agency" | "business"; zone?: string | null; onFail?: (id: string, code: string) => void } = {}): Context {

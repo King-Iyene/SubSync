@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { crmNoteFootnote } from "@/lib/meeting-wording";
 import { useApiClient, useData } from "../session";
 import { Badge, Btn, Card, Empty, ErrorBox, ExtLink, inputClass, Loading, PageHeader, timeAgo } from "../ui";
 
@@ -11,7 +12,7 @@ type Meeting = {
   contactId: string | null; contactName: string | null; status: string; note: string; contactUrl: string | null;
 };
 // `moreTools` is true only while Zoom and Google Meet are switched on; otherwise nothing on this page names them.
-type Data = { meetings: Meeting[]; hooks: Hook[]; accounts: Array<{ locationId: string; name: string }>; maxHooks: number; keepTranscripts: boolean; canManage: boolean; moreTools: boolean };
+type Data = { meetings: Meeting[]; hooks: Hook[]; accounts: Array<{ locationId: string; name: string }>; maxHooks: number; keepTranscripts: boolean; canManage: boolean; moreTools: boolean; noteWriteGranted?: boolean | null; pushNotesToCrm?: boolean };
 
 const sourceName = (source: string, zoom: boolean) => (source === "fathom" ? "Fathom" : source === "zoom" && zoom ? "Zoom" : "Meeting tool");
 
@@ -90,7 +91,7 @@ export function MeetingsView() {
             </ul>
           )}
           <p className="mt-3 text-xs text-muted-foreground">
-            SubSync does not write into your CRM. Putting a note straight into the contact&apos;s record needs a write permission this app does not ask for, so each meeting has a one-click &quot;Copy note&quot; instead.
+            {crmNoteFootnote(data.noteWriteGranted ?? null, data.pushNotesToCrm !== false)} A one-click &quot;Copy note&quot; is on every meeting for anything you want to paste by hand.
             {data.keepTranscripts ? " Transcripts are being kept." : " Transcripts are not kept (change this in Settings)."}
           </p>
         </Card>

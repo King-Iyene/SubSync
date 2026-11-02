@@ -8,7 +8,7 @@ export const SYNCED_DELETE = [
   "cleanup_changes", "cleanup_runs", "duplicate_reviews",
   "cached_contacts", "cached_opportunities", "cached_conversations", "cached_appointments", "pipelines",
   "account_metrics_daily", "alerts", "domain_checks", "onboarding_tasks",
-  "deal_events", "appointment_events", "lead_touches", "call_outcomes",
+  "deal_events", "appointment_events", "lead_touches", "call_outcomes", "contact_tag_events",
   "notification_states", "notifications", "notification_deliveries",
   "crm_writes", "meetings", "meeting_notes", "shared_audits", "sync_jobs", "locations",
 ] as const;
@@ -16,7 +16,7 @@ export const SYNCED_DELETE = [
 /** Settings, credentials and the agency's own notes. Kept by "delete my data" (the app keeps working), removed on uninstall. */
 export const CONFIG_DELETE_ON_UNINSTALL = [
   "call_lists", "account_profiles", "goals", "annotations", "usage_events", "team_names", "report_templates",
-  "api_keys", "connections", "user_connections", "notification_prefs", "notification_destinations", "meeting_note_settings", "meeting_policies", "meeting_hooks", "roadmap_votes", "saved_views", "stage_rules", "settings",
+  "api_keys", "connections", "user_connections", "notification_prefs", "notification_destinations", "meeting_note_settings", "meeting_policies", "meeting_hooks", "roadmap_votes", "saved_views", "feedback_items", "roadmap_suggestions", "stage_rules", "settings",
 ] as const;
 
 /** Everything an uninstall deletes. The installation row itself stays with its tokens emptied, so a reinstall starts clean. */
@@ -34,7 +34,7 @@ export const LOCATION_DELETE = [
   "cleanup_changes", "cleanup_runs", "duplicate_reviews",
   "cached_contacts", "cached_opportunities", "cached_conversations", "cached_appointments", "pipelines",
   "account_metrics_daily", "alerts", "domain_checks", "onboarding_tasks",
-  "deal_events", "appointment_events", "lead_touches", "call_outcomes",
+  "deal_events", "appointment_events", "lead_touches", "call_outcomes", "contact_tag_events",
   "notification_states", "notifications", "notification_deliveries", "notification_destinations",
   "crm_writes", "meeting_policies", "meeting_notes", "meeting_hooks", "account_profiles", "sync_jobs", "locations",
 ] as const;
