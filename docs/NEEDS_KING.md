@@ -138,3 +138,9 @@ S0.2b needs none (nothing new is read or written in the CRM). S0.4 needs none (i
 - **Feedback and roadmap suggestions are stored and never sent** (a "WOULD SEND" audit line is written for the alert to you). Your admin view is `GET /api/admin/feedback` (server secret) or `node --env-file=.env.local --import tsx scripts/feedback-report.ts`. Real sending needs F9's dispatcher and the live switches (NEEDS_KING section 20).
 - Release 2.2.0 scopes: `docs/SCOPES.md` (generated, tested) lists all 21 requested permissions grouped by feature with the reason for each.
 - Migration `20261102090000_f8_feedback.sql` (two new empty tables, row level security on) is already APPLIED.
+
+## 24. READ FIRST: the run stopped at the weekly usage limit
+- (a) The overnight run hit your weekly usage limit (resets Nov 3, 7pm New York). Done and merged on branch `overnight/2026-11-01`: S0.2b, S0.4, F1, D0, F2, F3, F4, F5, F6, F8, F10, E0. Unfinished with work saved on their own branches: F9, E2a, C1. Not started: E2b, D1.
+- (b) NOTHING is on `main`, and the merged branch has NOT been tested as a whole (only typechecked), so it must not go live yet. Your live app is unchanged except for the additive database migrations listed in this file (old code works with them).
+- (c) What you do: nothing now. When the limit resets, tell me "Continue the overnight run". I will run the full tests, fix failures, finish F9, E2a, C1, E2b and D1, test again, and then merge to main as you asked.
+- (d) Risk if you do nothing: none for the live app. The new work simply waits.
