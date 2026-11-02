@@ -1,6 +1,6 @@
 import { isSlackWebhook } from "../analytics/derive.ts";
 import type { Attendee } from "../analytics/meeting-intel.ts";
-import { connectError, providerCodeOf, SLACK_REDIRECT_ERRORS, type ConnectCode } from "./messages.ts";
+import { connectError, providerCodeOf, SLACK_REDIRECT_ERRORS, SLACK_SCOPE_ERRORS, type ConnectCode } from "./messages.ts";
 import type { Provider } from "./state.ts";
 
 // Talking to Slack, Fathom and Zoom to sign a person in and keep the connection alive. The network call
@@ -69,7 +69,7 @@ export async function exchangeSlack(code: string, keys: Keys, redirect: string, 
     });
     if (json.ok !== true) {
       const providerCode = providerCodeOf(status, json);
-      return SLACK_REDIRECT_ERRORS.has(providerCode) ? connectError("S-REDIRECT", "Slack", providerCode) : connectError("P-AUTH", "Slack", providerCode);
+      return SLACK_REDIRECT_ERRORS.has(providerCode) ? connectError("S-REDIRECT", "Slack", providerCode) : SLACK_SCOPE_ERRORS.has(providerCode) ? connectError("S-SCOPE", "Slack", providerCode) : connectError("P-AUTH", "Slack", providerCode);
     }
     const hook = (json.incoming_webhook ?? {}) as Record<string, unknown>;
     const url = str(hook.url, 500);

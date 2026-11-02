@@ -47,6 +47,8 @@ import { DealMoves, TeamView } from "./views/people";
 import { SearchView } from "./views/search";
 import { SettingsView } from "./views/settings";
 import { ConnectionsPage } from "./views/connections";
+import { NotificationsPage } from "./views/notifications";
+import { NotificationBell } from "./views/notification-bell";
 import { SetupCompareView } from "./views/setup-compare";
 import { TodayView } from "./views/today";
 
@@ -325,6 +327,7 @@ export function Dashboard() {
       case "alerts": return <AlertsView go={go} />;
       case "settings": return <SettingsView />;
       case "connections": return <ConnectionsPage />;
+      case "notifications": return <NotificationsPage />;
       case "help": return <HelpView go={go} />;
       case "roadmap": return <RoadmapView />;
       case "pipeline": return <ModuleTabs key="pipe" start={0} tabs={pipeTabs} />;
@@ -392,6 +395,7 @@ export function Dashboard() {
               </p>
             )}
             {auth.kind === "agency" && baseApi && !fromAccount && <ApiProvider value={baseApi}><FilterDrawer kind="agency" value={filter} onChange={setFilter} /></ApiProvider>}
+            <div className="mb-1 flex justify-end print:hidden"><NotificationBell go={go} /></div>
             {back && <BackLink label={back.label} onClick={back.go} />}
             <StatusLine /><BackProvider value={back}>{content}</BackProvider>
           </main>

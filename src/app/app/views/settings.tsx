@@ -5,6 +5,7 @@ import { useApiClient, useData } from "../session";
 import { Badge, Btn, Card, ErrorBox, inputClass, Loading, PageHeader, timeAgo } from "../ui";
 import { storeLines, deleteMyDataText, uninstallText } from "@/lib/data-inventory";
 import { SyncStatusPanel } from "./sync-status";
+import { DailyBriefLine } from "./notifications";
 
 type S = { staleDays: number; dormantDays: number; slaHours: number; appDomain: string; appDomainSource: "manual" | "sso" | "install" | "default"; detectedDomain: string | null; digestEnabled: boolean; customChecklist: string[]; digestHour: number | null; digestTimezone: string | null; digestEmail: string | null; emailReady?: boolean; brandName: string | null; brandColor: string | null; industryTargets?: boolean; keepTranscripts: boolean; pushNotesToCrm: boolean; speedTargetMinutes: number; countAutomatedTouches: boolean; speedBusinessHours: boolean; speedOpenHour: number; speedCloseHour: number; alertQuietHours: boolean };
 
@@ -204,6 +205,12 @@ export function SettingsView() {
         )}
 
         <h2 id="g-alerts" className="scroll-mt-4 pt-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Alerts and connections</h2>
+
+        <Card title="Notifications">
+          <DailyBriefLine />
+          <p className="mt-1 text-sm text-muted-foreground">Choose where each alert, the daily brief and the weekly summary go (the bell, email, one or more Slack channels), when, the quiet hours and the wording. It works without any setup.</p>
+          <p className="mt-2"><a className="text-sm font-medium underline underline-offset-2" href="#notifications" data-testid="open-notifications">Open Notifications</a></p>
+        </Card>
 
         <Card title="Slack alerts and daily brief">
           <label className="mb-3 flex items-start gap-2 text-sm"><input type="checkbox" className="mt-0.5 size-4" checked={form.alertQuietHours} onChange={(e) => setForm({ ...form, alertQuietHours: e.target.checked })} /> <span>Quiet hours: warnings are emailed between 07:00 and 21:00 in your time zone, and wait for the morning otherwise. Critical alerts are always sent at once. Every email has a link to stop it.</span></label>

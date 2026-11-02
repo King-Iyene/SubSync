@@ -103,6 +103,28 @@ Where a meeting is saved is decided by an exact email match among the accounts t
 
 Outward actions (a CRM write, a meeting-tool subscription created or deleted) go through `src/lib/live-flags.ts`: with the switch off (the committed default) they are only recorded as "WOULD ..." lines (ids and field names only).
 
+## Notifications (stage F9)
+
+Alerts, the daily brief and the weekly summary reach people through ONE dispatcher (`src/lib/notifications/dispatcher.ts`): the in-app bell, email and Slack. Every email and every Slack post goes through the live switches (`SEND_EMAIL_LIVE`, `SEND_SLACK_LIVE`, committed off): with a switch off the request is described in the log and the audit table (ids only, never the words) and nothing is sent.
+
+| New table | Holds | Who can read it | On uninstall | On "Delete my data" |
+| --- | --- | --- | --- | --- |
+| `notification_prefs` | one row per kind of message per installation: channels, email recipients, time, quiet hours, the company's own wording | administrators of that installation (checked in the handler; a client's staff get 403) | deleted | kept |
+| `notification_destinations` | one row per Slack channel an administrator authorised: label, status, the client account it is limited to (or the whole company), and the channel address, ENCRYPTED (`webhook_url_enc`) | administrators see label and status only; the address is decrypted on the server only at the moment of sending and is never returned by any endpoint | deleted | kept |
+| `notifications` | the bell: one row per item, the words a person reads, the page it links to | every person sees only their own scope: an agency all of its accounts, a business its own account and company-wide items, a client's staff ONLY items about their own account (`listBell`, `setBellState`) | deleted | deleted |
+| `notification_states` | one person's read, dismissed and snoozed marks on an item, keyed by the signed-in user id | only that person (the key is taken from the session, never from the request) | deleted | deleted |
+| `notification_deliveries` | the dispatcher's ledger: one row per message to one place (bell, email address, Slack channel), with status, attempts and the words | server code only | deleted | deleted |
+
+All five have row level security ON and no policy, and the public (anon) and signed-in database roles hold no privilege on them (applied to the live project and read back: `rls=true`, 0 policies, anon and authenticated cannot select). Every row carries the installation id.
+
+Rules that keep one client's data away from another:
+
+- A Slack channel made for ONE client account (`notification_destinations.location_id`) only ever receives that account's own messages. Another client's alert, or a message about all accounts (the daily brief), is never delivered to it (`eligibleDestinations`, checked when a message is planned AND again when it is sent). A channel with no account belongs to the company and receives everything the company's own owner sees.
+- The bell for a client's staff lists only items whose `location_id` is their own account; a read, dismiss or snooze of any other item answers 404, the same as an item that does not exist.
+- Routes: `notifications` (GET, POST read-all, read, dismiss, snooze) is open to every kind of person; `notification-prefs` (GET, PUT, POST preview and test, DELETE copy) and `notification-destinations` (GET, POST slack/start, advanced and test, DELETE) are for administrators only (a client's account user gets 403 from the route policy, and a business or company person who is not an administrator gets 403 from the handler). No route returns a channel address.
+- The Slack sign-in callback is the existing `api/integrations/[provider]/callback`; its signed state now also names the waiting destination row, which belongs to the installation that started it. A waiting row that never finishes shows "This did not finish. Try again." after two minutes.
+- The "stop these emails" link removes that one address from the settings AND from every kind of message in `notification_prefs` (matched by the signed address tag), and a message already waiting for it is skipped.
+
 ## Known gaps (not hidden)
 
 - Agency staff are refused rather than limited to their accounts, because the Users API check is not built. If an agency has staff who need SubSync today, the owner and admins can use it; staff cannot.

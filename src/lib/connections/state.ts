@@ -14,6 +14,8 @@ export type OAuthState = {
   /** Set for a single business: everything the connection does stays inside this account. */
   onlyLocationId: string | null;
   actor: string | null;
+  /** Set when the sign-in adds a Slack channel as a notification destination (F9): the waiting row that the result completes. */
+  destinationId?: string;
   /** Set when a person connects their OWN tool (Fathom, Zoom): who they are, taken from the signed session when the sign-in started. A workspace tool (Slack) has none. */
   person?: { userId: string; companyKey: string; name: string | null; home: string | null; role: string | null };
 };
@@ -50,7 +52,7 @@ export function verifyState(token: string | null | undefined, expected: Provider
     const person = p && typeof p.userId === "string" && p.userId && typeof p.companyKey === "string" && p.companyKey
       ? { userId: p.userId, companyKey: p.companyKey, name: typeof p.name === "string" ? p.name : null, home: typeof p.home === "string" ? p.home : null, role: typeof p.role === "string" ? p.role : null }
       : undefined;
-    return { provider: s.provider, installationId: s.installationId, onlyLocationId: typeof s.onlyLocationId === "string" ? s.onlyLocationId : null, actor: typeof s.actor === "string" ? s.actor : null, ...(person ? { person } : {}) };
+    return { provider: s.provider, installationId: s.installationId, onlyLocationId: typeof s.onlyLocationId === "string" ? s.onlyLocationId : null, actor: typeof s.actor === "string" ? s.actor : null, ...(typeof s.destinationId === "string" && /^[0-9a-f-]{36}$/i.test(s.destinationId) ? { destinationId: s.destinationId } : {}), ...(person ? { person } : {}) };
   } catch {
     return null;
   }

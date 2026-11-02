@@ -104,6 +104,17 @@ export const INVENTORY: Record<string, TableInfo> = {
     },
     notPersonal: ["provider_meeting_id"],
   },
+  notifications: {
+    noun: "your notification centre", line: "accounts",
+    personal: { title: "the words of each notification (they name client accounts and give numbers)", body: "the words of each notification (they name client accounts and give numbers)" },
+    notPersonal: ["dedupe_key", "link"],
+  },
+  notification_states: { noun: "which notifications each person has read, dismissed or snoozed", line: "accounts", personal: { user_key: "the sign-in id of the person who read or dismissed a notification" } },
+  notification_deliveries: {
+    noun: "a record of the messages SubSync sent, or is waiting to send", line: "accounts",
+    personal: { target: "the email address or Slack channel a message went to", payload: "the words of messages sent or waiting (they name client accounts and give numbers)" },
+    notPersonal: ["dedupe_key", "channel"],
+  },
   crm_writes: {
     noun: "a log of what SubSync wrote to your CRM", line: "meetings",
     personal: { authored_by: "which team member a note or comment was written as" },
@@ -153,6 +164,16 @@ export const INVENTORY: Record<string, TableInfo> = {
     secrets: { access_token_enc: "encrypted", refresh_token_enc: "encrypted", webhook_secret_enc: "encrypted" }, notPersonal: ["company_key", "public_key", "token_expires_at"],
   },
   meeting_policies: { noun: "the rules for meeting notes", line: "sign_in" },
+  notification_prefs: {
+    noun: "your notification choices", line: "sign_in",
+    personal: { recipients: "the email addresses that receive notifications", copy: "the wording you chose for messages", updated_by: "the name of the person who changed them" },
+    notPersonal: ["channels", "timing"],
+  },
+  notification_destinations: {
+    noun: "your Slack channels for notifications", line: "sign_in",
+    personal: { label: "the Slack workspace and channel a notification channel is connected as", connected_by: "the name of the person who connected it" },
+    secrets: { webhook_url_enc: "encrypted" },
+  },
   meeting_hooks: { noun: "private meeting addresses", line: "sign_in", personal: { label: "the label you gave an address" }, secrets: { token_hash: "hashed" } },
 
   // ---- kept after an uninstall on purpose (no contacts, messages or credentials)

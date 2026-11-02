@@ -1,5 +1,5 @@
 export type ViewId =
-  | "today" | "myday" | "audit" | "speed" | "overview" | "accounts" | "account" | "search" | "deals" | "inbox" | "onboarding" | "email" | "duplicates" | "alerts" | "settings" | "help" | "pipeline" | "leads" | "calls" | "clients" | "team" | "appointments" | "meetings" | "cleanup" | "roadmap" | "people" | "connections";
+  | "today" | "myday" | "audit" | "speed" | "overview" | "accounts" | "account" | "search" | "deals" | "inbox" | "onboarding" | "email" | "duplicates" | "alerts" | "settings" | "help" | "pipeline" | "leads" | "calls" | "clients" | "team" | "appointments" | "meetings" | "cleanup" | "roadmap" | "people" | "connections" | "notifications";
 
 export type GoFn = (view: ViewId, locationId?: string) => void;
 
@@ -35,9 +35,11 @@ export const NAV: NavItem[] = [
   { id: "meetings", label: "Meeting notes", feature: "meetings", group: "More" },
   { id: "settings", label: "Settings", feature: "settings", group: "Settings and help" },
   { id: "connections", label: "Connections", feature: "connections", group: "Settings and help" },
+  // Notifications (F9) lives under Settings (no menu entry of its own), reached from the bell and from Settings.
+  { id: "notifications", label: "Notifications", feature: "alerts", group: "Settings and help", parent: "settings" },
   { id: "help", label: "Getting started", feature: "overview", group: "Settings and help" },
   { id: "roadmap", label: "What's new", feature: "overview", group: "Settings and help" },
 ];
 
 // Where a page that lives inside another page highlights in the menu, and where "back" lands when there is no trail.
-export const PARENT: Partial<Record<ViewId, ViewId>> = { account: "accounts", deals: "pipeline", email: "onboarding", alerts: "today", search: "people", leads: "people", calls: "people" };
+export const PARENT: Partial<Record<ViewId, ViewId>> = { account: "accounts", deals: "pipeline", email: "onboarding", alerts: "today", search: "people", leads: "people", calls: "people", notifications: "settings" };
