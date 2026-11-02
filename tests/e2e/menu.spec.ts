@@ -23,5 +23,5 @@ test("the agency menu is the pilot menu with plain group names, keeps every othe
   await expect(side.getByText("Tidy up", { exact: true }), "no vague group name").toHaveCount(0);
   // The pages that became tabs are still one click away, inside People.
   await side.getByRole("button", { name: "People", exact: true }).click();
-  for (const tab of ["Contact search", "Leads", "Call lists"]) await expect(page.getByRole("tab", { name: tab, exact: true }), `People tab: ${tab}`).toBeVisible();
+  for (const tab of ["Search and filters", "Smart lists", "Going cold", "Imports and sources"]) await expect(page.getByRole("tab", { name: tab, exact: true }), `People tab: ${tab}`).toBeVisible();
 });

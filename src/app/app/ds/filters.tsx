@@ -106,6 +106,20 @@ export function AccountScope({ options, value, onChange }: { options: FilterOpti
   );
 }
 
+// N1: what each control means, where its choices come from and what the number in brackets counts, in plain words. Only the controls that are drawn are explained.
+export function FilterHelp({ controls }: { controls: ControlId[] }) {
+  const lines: string[] = [];
+  if (controls.includes("industry")) lines.push("Kind of business is the industry you typed for each client under Clients (Details). SubSync does not read it from your CRM, so a client with none typed is not counted. The number in brackets is how many client accounts have that kind.");
+  if (controls.includes("owner")) lines.push("Account owner is the person you set on the Accounts page as looking after each client. The number in brackets is how many client accounts they look after.");
+  if (controls.includes("test")) lines.push("A test account is one whose name contains test, demo, sample, sandbox or dummy. Hiding them leaves them out of every number on every page, not only here. Owners can change which accounts count as test accounts in Settings.");
+  if (lines.length === 0) return null;
+  return (
+    <ul className="mt-2 space-y-1 text-xs text-muted-foreground" data-testid="filter-help">
+      {lines.map((l) => <li key={l}>{l}</li>)}
+    </ul>
+  );
+}
+
 export function ScopeFilterBar({ kind, options, value, onChange, singleAccount = false, hideScope = false }: { kind: FilterKind; options: FilterOptions; value: FilterValue; onChange: (v: FilterValue) => void; singleAccount?: boolean; hideScope?: boolean }) {
   const controls = visibleControls(kind, options, singleAccount);
   if (controls.length === 0) return null;
@@ -138,6 +152,7 @@ export function ScopeFilterBar({ kind, options, value, onChange, singleAccount =
         )}
         {isFiltered(value) && <button type="button" className="text-xs underline" onClick={() => onChange(EMPTY_FILTER)}>Clear every filter</button>}
       </div>
+      <FilterHelp controls={controls} />
       {!hideScope && has("accounts") && <AccountScope options={options} value={value} onChange={onChange} />}
       {notes.length > 0 && (
         <ul className="mt-2 space-y-1 text-xs text-muted-foreground" data-testid="filter-hidden-notes">

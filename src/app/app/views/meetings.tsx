@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ModuleTabs, Page } from "../ds";
+import { crmNoteFootnote } from "@/lib/meeting-wording";
 import { useApiClient, useData } from "../session";
 import { Badge, Btn, Card, Empty, ErrorBox, ExtLink, inputClass, Loading, timeAgo } from "../ui";
 import { MeetingInbox } from "./meeting-inbox";
@@ -13,7 +14,7 @@ type Meeting = {
   contactId: string | null; contactName: string | null; status: string; note: string; contactUrl: string | null;
 };
 // `moreTools` is true only while Zoom and Google Meet are switched on; otherwise nothing on this page names them.
-type Data = { meetings: Meeting[]; hooks: Hook[]; accounts: Array<{ locationId: string; name: string }>; maxHooks: number; keepTranscripts: boolean; canManage: boolean; moreTools: boolean };
+type Data = { meetings: Meeting[]; hooks: Hook[]; accounts: Array<{ locationId: string; name: string }>; maxHooks: number; keepTranscripts: boolean; canManage: boolean; moreTools: boolean; noteWriteGranted?: boolean | null; pushNotesToCrm?: boolean };
 
 const sourceName = (source: string, zoom: boolean) => (source === "fathom" ? "Fathom" : source === "zoom" && zoom ? "Zoom" : "Meeting tool");
 
@@ -104,7 +105,7 @@ function OlderMeetings() {
             </ul>
           )}
           <p className="mt-3 text-xs text-muted-foreground">
-            SubSync adds a meeting to the matched contact&apos;s notes only for a contact it matched by exact email, and only when it has permission to edit contacts. If it cannot, use &quot;Copy note&quot;.
+            {crmNoteFootnote(data.noteWriteGranted ?? null, data.pushNotesToCrm !== false)} A one-click &quot;Copy note&quot; is on every meeting for anything you want to paste by hand.
             {data.keepTranscripts ? " Transcripts are being kept." : " Transcripts are not kept (change this in Settings)."}
           </p>
         </Card>

@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { DataList, ErrorState, HowTo, InlineAlert, Page, Section, SkeletonRows } from "../ds";
 import { PENDING_MS, STATUS_WORDS, type Shown } from "@/lib/connections/messages";
 import type { PolicyFlags } from "@/lib/connections/policy";
+import { CRM_NOTE_RULE } from "@/lib/meeting-wording";
 import { useApiClient, useData } from "../session";
 import { Badge, Btn, timeAgo, type Tone } from "../ui";
 
@@ -167,6 +168,7 @@ function MySection({ data, reload }: { data: MyData; reload: () => Promise<void>
         })}
       </ul>
       {msg && <div className="mt-3"><InlineAlert tone={msg.ok ? "success" : "danger"}>{msg.text}</InlineAlert></div>}
+      <p className="mt-3 text-xs text-muted-foreground" data-testid="crm-note-rule">{CRM_NOTE_RULE}</p>
       <p className="mt-3 text-xs text-muted-foreground">SubSync only receives the summary and action items, never the transcript. You are responsible for telling people on a call that it is recorded.</p>
     </Section>
   );

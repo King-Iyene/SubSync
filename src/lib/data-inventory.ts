@@ -46,6 +46,7 @@ export const INVENTORY: Record<string, TableInfo> = {
   },
   pipelines: { noun: "pipeline and stage names", line: "deals", notPersonal: ["name"] },
   deal_events: { noun: "deal history", line: "deals" },
+  contact_tag_events: { noun: "tag history (the day SubSync first saw a tag added or removed)", line: "contacts", personal: { tag: "tags" } },
   cached_conversations: {
     noun: "conversation details", line: "conversations",
     personal: { contact_name: "the contact's name" },
@@ -130,6 +131,8 @@ export const INVENTORY: Record<string, TableInfo> = {
   report_templates: { noun: "saved report layouts", line: "yours", personal: { name: "saved report names", spec: "the layout of a saved report" } },
   saved_views: { noun: "your saved views of a page", line: "yours", personal: { owner: "who saved the view (a sign-in id)", name: "the name you gave a saved view", filters: "the choices in a saved view (client account, channel, person)" }, notPersonal: ["page"] },
   roadmap_votes: { noun: "roadmap votes", line: "yours", personal: { voter: "who voted on the roadmap (a sign-in id)" }, notPersonal: ["item_key"] },
+  feedback_items: { noun: "feedback and problem reports you sent us", line: "yours", personal: { who: "who sent feedback or a problem report (a sign-in id)", message: "the feedback or problem report you typed" }, notPersonal: ["error_id"] },
+  roadmap_suggestions: { noun: "roadmap suggestions you made", line: "yours", personal: { who: "who made a roadmap suggestion (a sign-in id)", title: "the title of a suggestion you made", details: "the details of a suggestion you made" } },
   settings: {
     noun: "settings", line: "sign_in",
     personal: {

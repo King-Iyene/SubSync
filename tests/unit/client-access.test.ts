@@ -15,7 +15,7 @@ const CLIENT_GET = new Set(["my-connections", "team-connections", "meeting-inbox
 // Stage E0: every role connects its OWN tools, so these doors are open to a client's staff too. They only ever touch the signed-in person's own rows
 // (my-connections), or, for an account administrator only, the status of the people of their own account (team-connections) and that account's rule
 // (meeting-policy). meeting-inbox (stage E2a) is the signed-in person's OWN inbox: every query names their installation and user id. The handlers refuse an account user for the last two; tests/unit/e0-connections-db.test.ts asks them with real sessions.
-const CLIENT_POST = new Set(["usage", "roadmap", "my-connections", "team-connections", "meeting-inbox"]);
+const CLIENT_POST = new Set(["usage", "roadmap", "my-connections", "team-connections", "meeting-inbox", "feedback", "problem"]);
 const CLIENT_PUT = new Set(["meeting-policy", "meeting-inbox"]);
 const CLIENT_DELETE = new Set(["my-connections"]);
 

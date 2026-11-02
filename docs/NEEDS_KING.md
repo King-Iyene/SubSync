@@ -120,3 +120,27 @@ S0.2b needs none (nothing new is read or written in the CRM). S0.4 needs none (i
 - **Scopes for release 2.2.0:** optional `conversations/message.write` (internal comments). Already requested and enough: `contacts.write`, `users.readonly`, `locations/customFields.readonly`.
 - **Housekeeping:** remove the unused `SUPABASE_SERVICE_ROLE_KEY` and the unused `NEXT_PUBLIC_SUPABASE_*` pair from every Vercel environment and from your `.env.local` (no code uses them); decide whether to backfill the Supabase migration ledger (5 of 30 recorded).
 - Migration `20261102070000_user_connections.sql` is already APPLIED (5 new empty tables, row level security on, no policy, public roles refused, proved by `scripts/supabase-proof.ts`: 28 passed, 0 failed, 6 not verified live).
+
+## 21. From stage F5 (Today)
+- **Decision to approve:** an agency person who opens SubSync from inside a client account now sees EVERY page narrowed to that account until they press "See all client accounts" (before: they landed on the account page and other pages stayed unfiltered). Say "narrow only Today" if you prefer; it is a one-line change in `dashboard.tsx`.
+- **Load:** Today now makes six reads. If the 53,000-contact account feels slow, tell me and I will cache or trim them.
+- The Today filter help says "Owners can change which accounts count as test accounts in Settings": true only after F8's Settings control is merged (check in the morning).
+
+## 22. From stage F10 (People and call lists)
+- **The CRM dialer link (KF-3): none exists publicly.** The research found no public CRM link that opens a contact's dialer, so every Call button opens the contact in the CRM and says "Not available from your CRM yet". If you know a dialer link pattern for your CRM, send it and I will use it. Users can choose "My own phone app" in the Dialer setting. The CRM's own call history for one lead is read live in the panel and is NOT VERIFIED LIVE (the tokens cannot be opened on this machine).
+- **Speed on the hosted app is unmeasured.** From this machine (about 190 ms to the database) every call list loaded in 1.2 to 2.1 s on the 52,926-contact install, People first page 1.3 s; People options 2.9 s and tag detail 2.6 s load in parallel and are cached 60 s. The database itself answers in 13 to 94 ms. Morning check: open People and Call lists on the real account and tell me if any list takes over 2 seconds.
+- Migration `20261102100000_f10_people.sql` (new empty table `contact_tag_events`, index `cached_contacts_tags_gin`) is already APPLIED (backup `cached_contacts-2026-11-01T22-16-51-000Z.json`, 107,716 rows before and after).
+
+## 23. From stage F8 (Settings, Getting started, roadmap, trust)
+- **Approve the Trust page wording (`/trust`).** Every sentence is derived from tested code or labelled as a promise, but the incident and compliance promises are my wording: you approve them and a lawyer should review. It says honestly "no public status page yet" and shows no company registration number, address, phone or founders (nothing is invented): tell me the real company details to show.
+- **"Test account" means the existing "ignore this account" switch** (it also hides the account from lists and reports). Tell me if you want a separate flag.
+- **Check on the next real install:** that `contacts.write` is the permission the platform needs to add a note to a contact (the app says "Needs permission: reconnect" otherwise).
+- **Feedback and roadmap suggestions are stored and never sent** (a "WOULD SEND" audit line is written for the alert to you). Your admin view is `GET /api/admin/feedback` (server secret) or `node --env-file=.env.local --import tsx scripts/feedback-report.ts`. Real sending needs F9's dispatcher and the live switches (NEEDS_KING section 20).
+- Release 2.2.0 scopes: `docs/SCOPES.md` (generated, tested) lists all 21 requested permissions grouped by feature with the reason for each.
+- Migration `20261102090000_f8_feedback.sql` (two new empty tables, row level security on) is already APPLIED.
+
+## 24. READ FIRST: the run stopped at the weekly usage limit
+- (a) The overnight run hit your weekly usage limit (resets Nov 3, 7pm New York). Done and merged on branch `overnight/2026-11-01`: S0.2b, S0.4, F1, D0, F2, F3, F4, F5, F6, F8, F10, E0. Unfinished with work saved on their own branches: F9, E2a, C1. Not started: E2b, D1.
+- (b) NOTHING is on `main`, and the merged branch has NOT been tested as a whole (only typechecked), so it must not go live yet. Your live app is unchanged except for the additive database migrations listed in this file (old code works with them).
+- (c) What you do: nothing now. When the limit resets, tell me "Continue the overnight run". I will run the full tests, fix failures, finish F9, E2a, C1, E2b and D1, test again, and then merge to main as you asked.
+- (d) Risk if you do nothing: none for the live app. The new work simply waits.
