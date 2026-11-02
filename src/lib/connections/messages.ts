@@ -5,7 +5,7 @@
 /** A pending connection ("Waiting for you...") gives up after this long and offers Try again (N92). */
 export const PENDING_MS = 2 * 60_000;
 
-export type ConnectCode = "Z-IDENT" | "S-REDIRECT" | "P-AUTH" | "F-HOOK" | "P-NET" | "P-DENIED" | "P-STATE" | "P-OFF";
+export type ConnectCode = "Z-IDENT" | "S-REDIRECT" | "S-SCOPE" | "P-AUTH" | "F-HOOK" | "P-NET" | "P-DENIED" | "P-STATE" | "P-OFF";
 
 export type ConnectError = { ok: false; code: ConnectCode; error: string; /** The provider's own error code or HTTP status, for the log only. */ providerCode?: string };
 
@@ -26,6 +26,7 @@ export function connectError(code: ConnectCode, provider: string, providerCode?:
   switch (code) {
     case "Z-IDENT": return { ...base, error: withCode(`We could not confirm which ${provider} account you used. Try again.`, code) };
     case "S-REDIRECT": return { ...base, error: `${provider} refused the connection. This is a setup problem on our side, not yours. Contact us and we will fix it within 24 hours. Code: ${code}.` };
+    case "S-SCOPE": return { ...base, error: withCode(`${MESSAGE.needsPermission} ${provider} needs a permission SubSync did not ask for.`, code) };
     case "P-AUTH": return { ...base, error: withCode(`${provider} did not accept the sign-in. Try again.`, code) };
     case "F-HOOK": return { ...base, error: withCode(`${provider} signed you in, but we could not set up delivery of your meetings. Nothing was saved.`, code) };
     case "P-NET": return { ...base, error: withCode(`We could not reach ${provider}. Try again in a moment.`, code) };
@@ -37,6 +38,9 @@ export function connectError(code: ConnectCode, provider: string, providerCode?:
 
 /** Slack's own names for "the return address was not on the app". Any of these means the setup is wrong on our side. */
 export const SLACK_REDIRECT_ERRORS = new Set(["bad_redirect_uri", "redirect_uri_mismatch", "invalid_redirect_uri"]);
+
+/** Slack's own names for "the app asked for, or was given, less than it needs" (F9): the person is told to reconnect, with a code. */
+export const SLACK_SCOPE_ERRORS = new Set(["missing_scope", "invalid_scope", "not_allowed_token_type"]);
 
 /** The one thing worth logging about a provider's answer: a short machine code (Slack's `error`, Zoom's numeric `code`, or the HTTP status). */
 export function providerCodeOf(status: number, json: Record<string, unknown>): string {

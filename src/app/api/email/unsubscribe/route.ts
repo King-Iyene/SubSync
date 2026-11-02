@@ -1,5 +1,6 @@
 import { sql } from "@/lib/db";
 import { matchesEmail, readUnsubscribe } from "@/lib/unsubscribe";
+import { removeRecipientByMatch } from "@/lib/notifications/store";
 
 // The "stop these emails" link. A GET only shows a button (mail scanners open links without anyone asking them to, so a GET must never
 // change anything); the POST, from that button or from a mail app's one-click unsubscribe, removes the address from the installation's
@@ -23,9 +24,10 @@ export async function POST(request: Request) {
   const u = readUnsubscribe(tokenOf(request));
   if (!u) return page("This link does not work", "<p>It is damaged or it was not made for this address.</p>", 400);
   const [row] = await sql()`select digest_email from settings where installation_id = ${u.installationId}`;
-  if (row && matchesEmail(u, row.digest_email as string | null)) {
-    await sql()`update settings set digest_email = null where installation_id = ${u.installationId}`;
-    await sql()`insert into audit_log (installation_id, actor, action, detail) values (${u.installationId}, 'email-link', 'email.unsubscribed', ${sql().json({} as never)})`;
-  }
+  const wasSet = Boolean(row && matchesEmail(u, row.digest_email as string | null));
+  if (wasSet) await sql()`update settings set digest_email = null where installation_id = ${u.installationId}`;
+  // The address is also taken out of every kind of message in Notifications (F9), so one click stops all of them; a held or waiting message to it is skipped.
+  const removed = await removeRecipientByMatch(u.installationId, (e) => matchesEmail(u, e));
+  if (wasSet || removed > 0) await sql()`insert into audit_log (installation_id, actor, action, detail) values (${u.installationId}, 'email-link', 'email.unsubscribed', ${sql().json({} as never)})`;
   return page("Done", "<p>These emails have stopped. You can add an address again in Settings whenever you like.</p>");
 }

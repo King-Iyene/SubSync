@@ -85,10 +85,24 @@ export async function recordVerdicts(verdicts: Verdicts, now = Date.now()): Prom
     const action = alarmAction(v.verdict, prev, now);
     if (action === "none") continue;
     const name = action === "recover" ? "sync.recovered" : "sync.alarm";
-    // Telling a person is a dry run: the line says what would be sent and nothing leaves the server.
-    const outward = action === "recover" ? null : "WOULD NOTIFY the owner (dry run: no email or Slack is sent)";
+    // Telling a person goes through the notification dispatcher (stage F9, kind "Data refresh problem"): the owner's own choices decide the bell, email and Slack,
+    // and nothing real is sent while the live switches are off. The audit line keeps saying so.
+    const outward = action === "recover" ? null : "WOULD NOTIFY the owner (handed to the notification dispatcher: nothing real is sent while the live switches are off)";
     await db`insert into audit_log (installation_id, actor, action, detail, at) values (${v.id}, 'watchdog', ${name}, ${db.json({ ...v.detail, kind: action, ...(outward ? { outward } : {}) } as never)}, ${new Date(now)})`;
-    if (outward) console.warn("Sync alarm", { installation: v.id.slice(0, 8), ...v.detail, outward });
+    if (outward) {
+      console.warn("Sync alarm", { installation: v.id.slice(0, 8), ...v.detail, outward });
+      try {
+        // A new alarm is sent once; a reminder at most every 6 hours, so a long outage is not a message an hour.
+        const age = v.verdict.ageMinutes;
+        const { notifySyncProblem } = await import("../notifications/service");
+        await notifySyncProblem(v.id, {
+          dedupeKey: action === "raise" ? `sync_alarm:${v.id}:${Math.floor(now / 60_000)}` : `sync_alarm:${v.id}:remind:${Math.floor(now / (6 * 3_600_000))}`,
+          minutes: age, problem: age === null ? "has not finished its first refresh" : `data is ${age} minutes old and the refresh is delayed`, severity: "warning",
+        });
+      } catch (error) {
+        console.error("Could not hand the sync alarm to the dispatcher", error instanceof Error ? error.message : "unknown");
+      }
+    }
     if (action === "raise") tally.raised++; else if (action === "remind") tally.reminded++; else tally.recovered++;
   }
   return tally;

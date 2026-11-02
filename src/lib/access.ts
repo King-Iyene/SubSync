@@ -104,10 +104,18 @@ const GET_VIEWS = ["overview", "accounts", "onboarding", "search", "stale", "hyg
 // account administrator to the people and the rule of their own account.
 const PERSONAL_RULES: Rule[] = [["GET", "my-connections"], ["POST", "my-connections"], ["DELETE", "my-connections"], ["GET", "team-connections"], ["POST", "team-connections"], ["PUT", "meeting-policy"], ["GET", "meeting-inbox"], ["POST", "meeting-inbox"], ["PUT", "meeting-inbox"]];
 
-const CLIENT_RULES: Rule[] = [...GET_VIEWS.map((a) => ["GET", a] as Rule), ["POST", "usage"], ["POST", "roadmap"], ["POST", "feedback"], ["POST", "problem"], ["POST", "inbox", "views"], ["DELETE", "inbox", "views"], ["POST", "people", "lists"], ["DELETE", "people", "lists"], ["PUT", "people", "dialer"], ...PERSONAL_RULES];
+// Notifications (stage F9): the bell is for every kind of person (a client's staff see only their own account's items and only their own marks).
+// The preferences, Slack channels and tests are for a business (its administrator, checked inside the handler); a client's staff never reach them.
+const BELL_RULES: Rule[] = [["GET", "notifications"], ["POST", "notifications"]];
+const NOTIFY_ADMIN_RULES: Rule[] = [
+  ["GET", "notification-prefs"], ["PUT", "notification-prefs"], ["POST", "notification-prefs"], ["DELETE", "notification-prefs"],
+  ["GET", "notification-destinations"], ["POST", "notification-destinations"], ["DELETE", "notification-destinations"],
+];
+
+const CLIENT_RULES: Rule[] = [...BELL_RULES, ...GET_VIEWS.map((a) => ["GET", a] as Rule), ["POST", "usage"], ["POST", "roadmap"], ["POST", "feedback"], ["POST", "problem"], ["POST", "inbox", "views"], ["DELETE", "inbox", "views"], ["POST", "people", "lists"], ["DELETE", "people", "lists"], ["PUT", "people", "dialer"], ...PERSONAL_RULES];
 
 const BUSINESS_RULES: Rule[] = [
-  ...GET_VIEWS.map((a) => ["GET", a] as Rule), ...PERSONAL_RULES,
+  ...GET_VIEWS.map((a) => ["GET", a] as Rule), ...PERSONAL_RULES, ...BELL_RULES, ...NOTIFY_ADMIN_RULES, ...BELL_RULES, ...NOTIFY_ADMIN_RULES,
   ["GET", "email"], ["GET", "daily"], ["GET", "cleanup"], ["POST", "cleanup"], ["GET", "meetings"], ["POST", "meetings"], ["PUT", "meetings"], ["GET", "connections"], ["POST", "connections"], ["DELETE", "connections"], ["GET", "settings"], ["GET", "api-keys"], ["GET", "sync-status"], ["GET", "call-queue"],
   ["GET", "call-lists"], ["GET", "call-outcomes"], ["GET", "goals"], ["GET", "exec-summary"], ["GET", "daily-brief"], ["GET", "digest"],
   ["GET", "export", "stale"], ["GET", "export", "duplicates"], ["GET", "export", "inbox"], ["GET", "export", "deals"], ["GET", "export", "alerts"],
@@ -131,7 +139,7 @@ export function routeAllowed(kind: AccessKind, method: string, segments: string[
 
 // Pages (by nav id) each kind sees. The server enforces the same boundary; this only hides links.
 export const NAV_FOR: Record<AccessKind, ReadonlySet<string>> = {
-  agency: new Set(["today", "people", "audit", "speed", "overview", "accounts", "clients", "team", "appointments", "meetings", "cleanup", "search", "deals", "pipeline", "leads", "calls", "inbox", "onboarding", "email", "duplicates", "alerts", "settings", "connections", "help", "roadmap"]),
-  business: new Set(["today", "myday", "people", "audit", "speed", "overview", "team", "appointments", "meetings", "cleanup", "search", "deals", "pipeline", "leads", "calls", "inbox", "onboarding", "email", "duplicates", "alerts", "settings", "connections", "help", "roadmap"]),
+  agency: new Set(["today", "people", "audit", "speed", "overview", "accounts", "clients", "team", "appointments", "meetings", "cleanup", "search", "deals", "pipeline", "leads", "calls", "inbox", "onboarding", "email", "duplicates", "alerts", "settings", "notifications", "connections", "help", "roadmap"]),
+  business: new Set(["today", "myday", "people", "audit", "speed", "overview", "team", "appointments", "meetings", "cleanup", "search", "deals", "pipeline", "leads", "calls", "inbox", "onboarding", "email", "duplicates", "alerts", "settings", "notifications", "connections", "help", "roadmap"]),
   client: new Set(["myday", "people", "audit", "speed", "overview", "appointments", "search", "deals", "pipeline", "leads", "inbox", "duplicates", "onboarding", "alerts", "connections", "help", "roadmap"]),
 };

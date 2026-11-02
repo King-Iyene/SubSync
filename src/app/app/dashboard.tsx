@@ -46,6 +46,9 @@ import { PipelineView } from "./views/pipeline";
 import { DealMoves, TeamView } from "./views/people";
 import { SettingsView } from "./views/settings";
 import { ConnectionsPage } from "./views/connections";
+import { NotificationsPage } from "./views/notifications";
+import { NotificationBell } from "./views/notification-bell";
+
 import { TodayView } from "./views/today";
 
 type Auth =
@@ -341,6 +344,7 @@ export function Dashboard() {
       case "alerts": return <AlertsView go={go} />;
       case "settings": return <SettingsView />;
       case "connections": return <ConnectionsPage />;
+      case "notifications": return <NotificationsPage />;
       case "help": return <HelpView go={go} />;
       case "roadmap": return <RoadmapView />;
       case "pipeline": return <ModuleTabs key="pipe" start={0} tabs={pipeTabs} />;
@@ -407,6 +411,7 @@ export function Dashboard() {
               </InlineAlert>
             )}
             {auth.kind === "agency" && baseApi && !fromAccount && <ApiProvider value={baseApi}><FilterDrawer kind="agency" value={filter} onChange={setFilter} /></ApiProvider>}
+            <div className="mb-1 flex justify-end print:hidden"><NotificationBell go={go} /></div>
             {back && <BackLink label={back.label} onClick={back.go} />}
             {NAV_FOR[auth.kind].has("search") && !off("search") && <GlobalSearch go={go} />}
             <StatusLine /><BackProvider value={back}>{content}</BackProvider>

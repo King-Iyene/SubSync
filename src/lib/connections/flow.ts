@@ -1,6 +1,8 @@
 import { outward, type Deps } from "../live-flags";
 import { postToSlack } from "../notify";
-import { connectError } from "./messages";
+import { connectError, MESSAGE } from "./messages";
+import { completeDestination } from "../notifications/store";
+import { destinationLabel } from "../notifications/slack";
 import {
   authorizeUrl, deleteFathomWebhook, exchangeSlack, keysFor, redirectUri, revokeZoom,
 } from "./oauth";
@@ -35,9 +37,16 @@ export async function completeSignIn(provider: Provider, code: string, s: OAuthS
   if (!keys || !base) return connectError("P-OFF", NAMES[provider]);
   const got = await exchangeSlack(code, keys, redirectUri(base, provider), f);
   if (!got.ok) return got;
+  // A channel added from Notifications (F9): the waiting row made when the person pressed "Add to Slack" is completed. Several channels, one sign-in each.
+  if (s.destinationId) {
+    const saved = await completeDestination(s.installationId, s.destinationId, { webhookUrl: got.webhookUrl, label: destinationLabel(got.team, got.channel) }, s.actor);
+    if (!saved) return { ok: false, error: MESSAGE.pendingExpired, code: "P-STATE" };
+    await postToSlack(got.webhookUrl, ":white_check_mark: SubSync is connected to this channel. Choose what is sent here in Notifications.", { installationId: s.installationId, what: "slack.connect_message" });
+    return { ok: true, message: `Connected to ${got.channel ?? "your Slack channel"}.` };
+  }
   await saveSlack(s.installationId, got, s.onlyLocationId, s.actor);
   // A first message in the channel shows the connection works. It does not need to succeed.
-  await postToSlack(got.webhookUrl, ":white_check_mark: SubSync is connected to this channel. Alerts and the daily brief will be posted here once you switch them on.");
+  await postToSlack(got.webhookUrl, ":white_check_mark: SubSync is connected to this channel. Alerts and the daily brief will be posted here once you switch them on.", { installationId: s.installationId, what: "slack.connect_message" });
   return { ok: true, message: `Connected to ${got.channel ?? "your Slack channel"}.` };
 }
 

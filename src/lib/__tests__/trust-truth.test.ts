@@ -73,7 +73,7 @@ const PROOFS: Record<string, Proof[]> = {
   email_unsubscribe: [has("src/lib/email.ts", "List-Unsubscribe"), () => {
     // Every place the app sends a mail passes the stop-link headers on the same call.
     const calls: string[] = [];
-    for (const f of walk("src")) for (const line of read(f).split(/\r?\n/)) if (/\b(sendEmail|send)\(.*\.\.\.mail/.test(line)) calls.push(`${f}: ${line.trim()}`);
+    for (const f of walk("src")) for (const line of read(f).split(/\r?\n/)) if (/\b(sendEmail|sendEmailResult|send)\(.*\.\.\.mail/.test(line)) calls.push(`${f}: ${line.trim()}`);
     assert.ok(calls.length >= 2, "the mail calls are found (so this check is not looking at nothing)");
     assert.deepEqual(calls.filter((c) => !c.includes("unsubscribeHeaders")), [], "a mail sent without the stop link");
   }],

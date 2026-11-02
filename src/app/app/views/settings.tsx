@@ -10,6 +10,7 @@ import { Badge, Btn, Card, ErrorBox, inputClass, Loading, PageHeader, timeAgo } 
 import { SyncStatusPanel } from "./sync-status";
 import { ConnectionsSlot } from "./settings-slot-connections";
 import { WatchingSlot } from "./settings-slot-watching";
+import { DailyBriefLine } from "./notifications";
 import { BrandPreview, PermissionsPanel, SettingsHistoryCard, TestAccountsCard, WhoCanOpenCard, type PermissionGroup } from "./settings-parts";
 
 type S = { staleDays: number; dormantDays: number; slaHours: number; appDomain: string; appDomainSource: "manual" | "sso" | "install" | "default"; detectedDomain: string | null; digestEnabled: boolean; customChecklist: string[]; digestHour: number | null; digestTimezone: string | null; digestEmail: string | null; emailReady?: boolean; brandName: string | null; brandColor: string | null; industryTargets?: boolean; keepTranscripts: boolean; pushNotesToCrm: boolean; speedTargetMinutes: number; countAutomatedTouches: boolean; speedBusinessHours: boolean; speedOpenHour: number; speedCloseHour: number; alertQuietHours: boolean };
@@ -165,6 +166,14 @@ export function SettingsView() {
               )}
               <WhoCanOpenCard agency={kind === "agency"} />
             </>
+          )}
+
+          {section === "notifications" && (
+            <Card title="Notifications">
+              <DailyBriefLine />
+              <p className="mt-1 text-sm text-muted-foreground">Choose where each alert, the daily brief and the weekly summary go (the bell, email, one or more Slack channels), when, the quiet hours and the wording. It works without any setup.</p>
+              <p className="mt-2"><a className="text-sm font-medium underline underline-offset-2" href="#notifications" data-testid="open-notifications">Open Notifications</a></p>
+            </Card>
           )}
 
           {section === "notifications" && (

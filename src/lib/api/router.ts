@@ -81,6 +81,7 @@ import { excludedOpenDeals, getGoals, GOAL_METRICS, loadDeals, pipelineTrend, se
 import { MIN_CLOSED_DEALS as MIN_CLOSED, OUTLIER_MIN_DEALS, OUTLIER_SHARE, outlier as dealOutlier, winRateOf } from "../analytics/metrics";
 import { parsePickedAccounts } from "../design/filters";
 import { myConnectionRemove, myConnectionsView, myConnectionStart, myConnectionTest, policySave, teamConnectionRevoke, teamConnectionsView } from "./connections-api";
+import { bellAction, bellView, copyPreview, copyReset, copySave, destinationAdvanced, destinationRemove, destinationsView, destinationStart, destinationTest, prefSave, prefsView, prefTest } from "./notifications-api";
 import { meetingConfirm, meetingContactSearch, meetingDismiss, meetingIgnore, meetingInboxView, meetingLink, meetingSettingsSave } from "./meetings-api";
 import { can, personFromSession } from "../connections/person";
 import { handlePeople, timeoutResponse } from "./people-routes";
@@ -639,7 +640,7 @@ async function dailyChanges(ctx: Ctx) {
   return json({ from, to, accounts: ids.length, changes: portfolioRangeChanges([...series.values()], from, to) });
 }
 
-const USAGE_VIEWS = new Set(["today", "overview", "accounts", "clients", "team", "search", "deals", "pipeline", "leads", "calls", "inbox", "onboarding", "email", "duplicates", "alerts", "settings", "help", "account", "meetings", "audit", "speed", "appointments", "people", "myday", "roadmap"]);
+const USAGE_VIEWS = new Set(["today", "overview", "accounts", "clients", "team", "search", "deals", "pipeline", "leads", "calls", "inbox", "onboarding", "email", "duplicates", "alerts", "settings", "help", "account", "meetings", "audit", "speed", "appointments", "people", "myday", "roadmap", "notifications"]);
 
 // A counter of which pages get opened (no personal data), so the getting-started checklist can
 // tick itself off and so the agency can see what its team uses.
@@ -1768,7 +1769,7 @@ async function resyncOne(ctx: Ctx, locationId: string) {
 async function testSlack(ctx: Ctx) {
   const { settings } = await loadAccounts(ctx.installationId);
   if (!settings.slackWebhookUrl) return json({ error: "Add a Slack webhook URL first" }, 400);
-  const ok = await postToSlack(settings.slackWebhookUrl, ":white_check_mark: SubSync is connected to this channel.");
+  const ok = await postToSlack(settings.slackWebhookUrl, ":white_check_mark: SubSync is connected to this channel.", { installationId: ctx.installationId, what: "slack.test_message" });
   return ok ? json({ ok: true }) : json({ error: "Slack did not accept the message. Check the webhook URL." }, 502);
 }
 
@@ -1785,7 +1786,7 @@ const clientDeps: clientRoutes.Deps = { allowedIds, accountsFor, actorOf: (ctx) 
 
 const FEATURE_FOR: Record<string, Feature> = {
   search: "search", onboarding: "onboarding", stale: "stale", inbox: "inbox", pipelines: "pipelines", duplicates: "duplicates", email: "email",
-  "meeting-inbox": "meetings", "my-connections": "connections", "team-connections": "connections", "meeting-policy": "connections", alerts: "alerts", appointments: "appointments", audit: "audit", speed: "speed", "appointment-insights": "appointments", meetings: "meetings", connections: "connections", cleanup: "cleanup", "setup-compare": "setup_compare", playbooks: "playbooks", daily: "overview", team: "team", "deal-events": "pipelines", contact: "search", settings: "settings", export: "exports", digest: "overview", "api-keys": "ai", hygiene: "stale", "pipeline-intel": "pipelines", "contact-intel": "activity", clients: "clients", qbr: "reports", "comms-intel": "inbox", "deal-gaps": "pipelines", "call-queue": "calls", "call-lists": "calls", "call-outcomes": "calls", people: "search", "client-onboarding": "onboarding",
+  "meeting-inbox": "meetings", "my-connections": "connections", "team-connections": "connections", "meeting-policy": "connections", alerts: "alerts", notifications: "alerts", "notification-prefs": "alerts", "notification-destinations": "alerts", appointments: "appointments", audit: "audit", speed: "speed", "appointment-insights": "appointments", meetings: "meetings", connections: "connections", cleanup: "cleanup", "setup-compare": "setup_compare", playbooks: "playbooks", daily: "overview", team: "team", "deal-events": "pipelines", contact: "search", settings: "settings", export: "exports", digest: "overview", "api-keys": "ai", hygiene: "stale", "pipeline-intel": "pipelines", "contact-intel": "activity", clients: "clients", qbr: "reports", "comms-intel": "inbox", "deal-gaps": "pipelines", "call-queue": "calls", "call-lists": "calls", "call-outcomes": "calls", people: "search", "client-onboarding": "onboarding",
 };
 
 export async function handle(request: Request, segments: string[]): Promise<Response> {
@@ -1845,6 +1846,9 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       if (a === "duplicates") return await duplicates(ctx);
       if (a === "email" && !b) return await emailHealth(ctx);
       if (a === "alerts") return await alertsView(ctx);
+      if (a === "notifications" && !b) return await bellView(ctx);
+      if (a === "notification-prefs" && !b) return await prefsView(ctx);
+      if (a === "notification-destinations" && !b) return await destinationsView(ctx);
       if (a === "settings" && b === "history") return await settingsHistoryView(ctx);
       if (a === "settings") return await settingsView(ctx);
       if (a === "export" && b) return await exportCsv(ctx, b);
@@ -1901,6 +1905,13 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       if (a === "duplicates" && b === "review") return await duplicateReview(ctx);
       if (a === "duplicates" && b === "bulk") return await duplicateBulk(ctx);
       if (a === "duplicates" && b === "undo") return await duplicateUndo(ctx);
+      if (a === "notifications" && b === "read-all" && !c) return await bellAction(ctx, "read-all", "");
+      if (a === "notifications" && b && c) return await bellAction(ctx, b, c);
+      if (a === "notification-prefs" && b && c === "preview") return await copyPreview(ctx, b);
+      if (a === "notification-prefs" && b && c === "test") return await prefTest(ctx, b);
+      if (a === "notification-destinations" && b === "slack" && c === "start") return await destinationStart(ctx);
+      if (a === "notification-destinations" && b === "advanced" && !c) return await destinationAdvanced(ctx);
+      if (a === "notification-destinations" && b && c === "test") return await destinationTest(ctx, b);
       if (a === "alerts" && b && c === "dismiss") {
         await dismissAlert(ctx.installationId, b);
         return json({ ok: true });
@@ -1921,6 +1932,8 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       if (a === "client-onboarding" && b && LOCATION_ID.test(b) && c === "steps") return await clientRoutes.stepRemove(ctx, clientDeps, b);
       if (a === "connections" && b && !c) return await connectionRemove(ctx, b);
       if (a === "my-connections" && b && !c) return await myConnectionRemove(ctx, b);
+      if (a === "notification-prefs" && b && c === "copy") return await copyReset(ctx, b);
+      if (a === "notification-destinations" && b && !c) return await destinationRemove(ctx, b);
       if (a === "call-lists" && b && /^[0-9a-fA-F-]{36}$/.test(b)) return await callListDelete(ctx, b);
     }
     if (method === "PUT") {
@@ -1930,6 +1943,8 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       if (a === "stage-rules") return await stageRuleSave(ctx);
       if (a === "meeting-policy" && !b) return await policySave(ctx);
       if (a === "meeting-inbox" && b === "settings") return await meetingSettingsSave(ctx);
+      if (a === "notification-prefs" && b && !c) return await prefSave(ctx, b);
+      if (a === "notification-prefs" && b && c === "copy") return await copySave(ctx, b);
       if (a === "meetings" && b) return await meetingUpdate(ctx, b);
       if (a === "team" && b && LOCATION_ID.test(b)) return await teamName(ctx, b);
       if (a === "clients" && b && LOCATION_ID.test(b)) return await clientUpdate(ctx, b);
