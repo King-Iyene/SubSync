@@ -22,12 +22,12 @@ ORPHANS (notes with no stage in docs/ROADMAP_V2.md): none found.
 | N13 | Why is "Older than a week (13)" hidden? | F4 | DONE-TONIGHT | F4: tabs Last 7 days / Older / Unread with counts equal to their rows (tested for every combination of choices) and the first three rows of the other tabs always shown |
 | N14 | Long lists make the page unusable | F4, D0 | DONE-TONIGHT | F4: every list on Unanswered messages and the moved deals list is the shared DataList (10 rows, View all, pages of 25); summary charts above the lists; 'Open deals with no contact' now a Pipeline tab (No recent contact) with 7, 14 and 30 day choices |
 | N15 | The Inbox page contradicts itself on numbers | F1, F4 | DONE-TONIGHT | F1 rules kept; F4: Unread tab = every unread conversation (Today's number), wait chart built from the same rows as the list (waiting-view.test.ts), moved deals keep the F1 counted-deal query |
-| N16 | Health labels contradict "Needs attention" | F1 (item 3), F5 | DONE-TONIGHT | F1 labels, F5: Today's attention list uses Do first, Soon and When you can, never a health word |
+| N16 | Health labels contradict "Needs attention" | F1 (item 3), F5 | DONE-TONIGHT | F1 and C1: the Who to call first list on Health never says Healthy (needsAttention test) |
 | N17 | Progress seen | none (progress note) | NOT-A-CODE-ITEM | an observation that earlier fixes landed; the item it left open (the stale-deal tile driven by one deal) is now handled by the single-deal guard, see N6 and UX-04 |
 | N18 | Same conversation appears in three accounts | F2 | DONE-TONIGHT | F2: checked live (scripts/check-f2-live.ts): no email or phone shared across client accounts; one name in 3 accounts (the shared test contact); counting per client account is correct for real clients; documented in docs/features/F2.md section 6 |
 | N19 | Design still "not mature" on Speed to lead, Appointments and Insights | D0, D1 | PLANNED-LATER | F3 part DONE (Appointments, Insights). Speed to lead part belongs to F2; D1 polish |
 | N20 | Smart Lists and dialing | F10 | DONE-TONIGHT | F10: smart lists (filters, saved per person and team), Dial opens the CRM through the white-label link (no public dialer link exists), DND and quiet-hours warning. Push-to-CRM bridge not built (proposal) |
-| N21 | Show names and photos, not IDs | F2, F8 | PLANNED-LATER | F8 part DONE: one wording 'Needs permission: reconnect' (src/lib/meeting-wording.ts, scope-groups.ts permissionPrompt/FEATURE_NEEDS; Appointments and Speed to lead now use it; scope-experience.test.ts fails on 'Needs approval'). Names on lists and the Former team member state are the stages that draw them (F10, F4) |
+| N21 | Show names and photos, not IDs | F2, F8 | PLANNED-LATER | C1 part: Clients shows names typed or signed in, never an id; users API names are F2 and F8 |
 | N22 | "Not enough data" without a reason | F2 | DONE-TONIGHT | F2: 1 of 5 replies so far, raw counts first (1 of 11), n/a not none, one minimum per metric (speed-f2.test.ts, speed-intel.test.ts) |
 | N23 | Empty charts look broken | F2, D1 | PLANNED-LATER | F2 part DONE: one placeholder for the weekly chart and for Who replies fastest. D1 checks other pages |
 | N24 | Appointments "To do" tab is blank and vague | F3 | DONE-TONIGHT | F3 delta: status breakdown, dates, filters, upcoming list, empty states with a next step, every count opens its list; docs/features/F3.md; unit tests run, DB and browser tests written not run |
@@ -62,14 +62,14 @@ ORPHANS (notes with no stage in docs/ROADMAP_V2.md): none found.
 | N53 | Call lists should actually support calling | F10 | PLANNED-LATER | F10: last call, tries, result from calls logged in SubSync; the CRM's call records are read per lead (NOT VERIFIED LIVE) |
 | N54 | Call lists fail with a 504 | F10 | DONE-TONIGHT | F10: pages of 100, 45 second cache, 8 second database limit, friendly message with error ID; timings recorded |
 | N55 | Third-party dialers, for example Kixie | F10 | PLANNED-LATER | F10: Dialer setting (CRM or own phone). Kixie not built |
-| N56 | Accounts versus Clients: same rows, two pages | C1 | PLANNED-LATER |  |
+| N56 | Accounts versus Clients: same rows, two pages | C1 | DONE-TONIGHT | C1: Accounts, Clients and Setup are one Clients module with five tabs; old addresses open it (views/clients, tests/unit/c1-components.test.ts) |
 | N57 | Client billing health: who has paid, who is defaulting | R1 | PARKED | needs financial scopes and evidence first |
-| N58 | Clients > Details: what is it for? | C1, F5 | PLANNED-LATER | F5 part DONE: the filter help says industry is typed under Clients (Details) and not read from the CRM; C1 owns the Clients page |
+| N58 | Clients > Details: what is it for? | C1, F5 | DONE-TONIGHT | C1: fee, renewal and industry typed in the row, log of conversations with who and when, industry picker; auto-fill from billing SKIPPED (needs N57 scopes) |
 | N59 | Client requests (support tickets) | C1b (never tonight) | PLANNED-LATER |  |
-| N60 | Compare two is weak, and what is the QBR for? | C1 | PLANNED-LATER |  |
+| N60 | Compare two is weak, and what is the QBR for? | C1 | DONE-TONIGHT | C1: Compare of 2 to 6 clients against the average with a trend chart; review with quarter selector, trends, wins, issues, what SubSync caught, next steps, print; share link SKIPPED |
 | N61 | Team module: a real directory with activity | T1 (never tonight) | PLANNED-LATER |  |
-| N62 | More observations | F1, C1 (observations) | PLANNED-LATER | F1 part DONE: the Accounts health label contradiction (same as N16) and the singular fix (1 contact asked, no page says 1 contacts: tests/e2e/f1.spec.ts); the N33 update was S0.4. The Ignored filter being easy to find stays C1 |
-| N63 | Setup is thin: it needs a real checklist system | C1, D0 | PLANNED-LATER | D0 structure part DONE: the page template and tabs a checklist module needs; the checklist system is C1 |
+| N62 | More observations | F1, C1 (observations) | DONE-TONIGHT | C1: the Ignored filter stays on Health and the client page; health label fixes were F1 |
+| N63 | Setup is thin: it needs a real checklist system | C1, D0 | DONE-TONIGHT | C1: onboarding checklists with Fix it, how-to, templates by industry, custom steps, assignee, due date, history, stuck clients (client-success.ts, onboarding-tab.tsx); CRM page addresses UNSURE |
 | N64 | "Why is an API marked unavailable when it is available?" and "turn on all scopes" | F1 (capability matrix), F8 (scope experience); release in Z2 (King) | PLANNED-LATER | F1 and F8 parts DONE: docs/CAPABILITIES.md (F1); F8: scope groups with plain reasons (src/lib/scope-groups.ts), docs/SCOPES.md generated and tested not stale, What SubSync can read panel in Settings, Needs permission: reconnect prompts. Release 2.2.0 scope request is Z2 and King |
 | N65 | Email sender health: vague, no data | E5 (never tonight) | PLANNED-LATER |  |
 | N66 | Reselling profit dashboard | R1 | PARKED | waits for evidence |
@@ -78,11 +78,11 @@ ORPHANS (notes with no stage in docs/ROADMAP_V2.md): none found.
 | N69 | The duplicate score is wrong when names differ | C2 | PLANNED-LATER |  |
 | N70 | Merging from SubSync: possible, but only with a clear plan | C2 | PLANNED-LATER |  |
 | N71 | Data cleanup: what is it for? Merge Duplicates into it | C2 | PLANNED-LATER |  |
-| N72 | Compare setups and Industry playbooks (King did not comment) | C1, D1 | PLANNED-LATER |  |
-| N73 | Observations on these screens | S0.2b (N48), C1, C2 | PLANNED-LATER |  |
+| N72 | Compare setups and Industry playbooks (King did not comment) | C1, D1 | DONE-TONIGHT | C1: compare setups only for clients sharing a baseline, as a structured diff; industry picker and one reply-target switch inside Details |
+| N73 | Observations on these screens | S0.2b (N48), C1, C2 | DONE-TONIGHT | C1 part: Setup moved under Clients; Duplicates and Data cleanup stay for C2 |
 | N74 | Freshness: two statements, and only one can be the truth | S0.4, D0 | DONE-TONIGHT | S0.4, D0, F5: Today words the age of the data nowhere (freshness-one-source.test.ts passes) |
 | N75 | Trust for a Nigerian-built product selling abroad | F8 (Trust page); Z2, Z3 (King) | DONE-TONIGHT | F8: /trust (src/lib/trust.ts, src/lib/company.ts): what is read, stored, for how long, deletion, why each permission, outside services, security, incidents, status, Fathom notice, company; src/lib/__tests__/trust-truth.test.ts proves each claim (11 tests pass). Company registration, address and phone are not known and not shown (NEEDS_KING); legal review and the promises need King |
-| N76 | Settings: one long page, and it needs advanced features | F8, D0, D1 | DONE-TONIGHT | F8: Settings in eight sections with a left menu, one Save, unsaved line, remembered section, audit history under Advanced (settings.tsx; settings-sections.test.ts). Per-user roles, per-type notification preferences, per-industry thresholds and settings export are SKIPPED (F9, N72, proposals) |
+| N76 | Settings: one long page, and it needs advanced features | F8, D0, D1 | PLANNED-LATER | C1 part: reply targets by industry sit in Clients > Details; Settings itself is F8 and D1 |
 | N77 | Meeting notes privacy and how meetings work: what each setting does, and a contradiction | F8 (wording), E2a | DONE-TONIGHT | one true statement on every screen via meeting-wording.ts (F8) plus E2a's inbox, preview and Test mode lines; Needs permission: reconnect when contacts.write is missing; live proof NOT VERIFIED LIVE (docs/features/E2a.md) |
 | N78 | Speed to lead settings: who does the replying, and is it working? | F2 | DONE-TONIGHT | F2: SubSync measures and does not send, who replied, automatic first message shown apart from the person's reply with the counting option explained, target and option on the page with a Settings link (speed-f2.test.ts, speed-ui.test.ts) |
 | N79 | Slack: do we still need the pasted web address? Notification options and editable copy | F9 | PLANNED-LATER |  |

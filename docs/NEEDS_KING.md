@@ -151,3 +151,10 @@ S0.2b needs none (nothing new is read or written in the CRM). S0.4 needs none (i
 - Staff of the company (not account users) are not matched yet, so their calls wait in the inbox.
 - New cron `/api/cron/meeting-expiry` (daily 03:20, in `vercel.json`, takes effect on merge): clears expired inbox calls, handled calls after 90 days, delivery ids after 30 days.
 - Migration `20261102130000_e2a_fathom_inbox.sql` (two new empty tables, row level security on, no policy) is already APPLIED. `scripts/supabase-proof.ts` reports 29 passed, 1 failed (the failure is migration files vs live tables from other stages not yet merged in that worktree; re-run after all merges), 6 not verified live.
+
+## 26. From stage C1 (Clients)
+- **Check the Clients page in the demo:** fees, renewals, industries and logged conversations should now show (the demo fills itself on the first open after the merge and ignores errors, so if it still says "not set" tell me).
+- **The "Fix it" links in Onboarding use CRM settings addresses written from memory, not checked against a live account** (each step also says in words where to click). Please click each one once on a real account and tell me which are wrong; they are all in `FIX` in `src/lib/analytics/client-success.ts`.
+- "Value created" now counts only deals with a value and an owner, so it can read lower than before. "Stuck" counts days since SubSync first saw the client account, not since the agency signed the client.
+- The Review no longer prints the team's private notes about the client (the old one did): intentional.
+- Auto-fill of fee and renewal from billing needs the financial scopes (R1, parked). Migration `20261102110000_c1_clients.sql` (four new empty tables) is already APPLIED.
