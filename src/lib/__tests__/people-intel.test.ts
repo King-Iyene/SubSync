@@ -32,8 +32,11 @@ test("team win rate needs five closed deals", () => {
   assert.equal(teamWinRate({ wonCount: 12, lostCount: 8 }), 0.6);
 });
 
-test("people we only know by id still get a readable label", () => {
-  assert.equal(teamLabel("abcdef123456", null), "Team member 3456");
+test("people we only know by id get a plain label that says why, never the id (N21, S3-a)", () => {
+  assert.equal(teamLabel("abcdef123456", null, "ok"), "Former team member");
+  assert.equal(teamLabel("abcdef123456", null, "needs_permission"), "Needs permission: reconnect");
+  assert.equal(teamLabel("abcdef123456", null), "Name not loaded yet");
+  assert.ok(!/3456|abcdef/.test(teamLabel("abcdef123456", null, "ok") + teamLabel("abcdef123456", null)), "no part of the id is shown");
   assert.equal(teamLabel("abcdef123456", "Dana"), "Dana");
   assert.equal(teamLabel("unassigned", null), "Unassigned");
 });

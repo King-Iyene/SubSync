@@ -1,10 +1,9 @@
-import { randomBytes } from "node:crypto";
 import { updateSettings } from "../analytics/queries";
 import type { Meeting } from "../analytics/meeting-intel";
 import { MAX_PER_HOUR, recentCount, recordMeeting } from "../analytics/meeting-queries";
 import { decryptSecret, encryptSecret } from "../crypto";
 import { sql } from "../db";
-import { keysFor, refreshTokens, type SlackInstall, type Tokens } from "./oauth";
+import { keysFor, refreshTokens, type SlackInstall } from "./oauth";
 import { chooseAccount } from "./routing";
 import type { Provider } from "./state";
 
@@ -56,8 +55,6 @@ export const getConnection = async (installationId: string, id: string) => (awai
 export const findFathomByKey = async (key: string) => (await rowsWhere("key", key))[0] ?? null;
 export const findZoomByHost = (hostId: string) => rowsWhere("host", hostId);
 
-export const newPublicKey = () => randomBytes(24).toString("base64url");
-
 export async function saveSlack(installationId: string, s: SlackInstall, only: string | null, actor: string | null) {
   const db = sql();
   await updateSettings(installationId, { slackWebhookUrl: s.webhookUrl });
@@ -67,34 +64,6 @@ export async function saveSlack(installationId: string, s: SlackInstall, only: s
     await db`insert into connections (installation_id, provider, label, only_location_id, connected_by) values (${installationId}, 'slack', ${label}, ${only}, ${actor})`;
   }
   await db`insert into audit_log (installation_id, actor, action, detail) values (${installationId}, ${actor}, 'connections.slack_connected', ${db.json({ channel: s.channel } as never)})`;
-}
-
-// Returns the connection this one replaced, so the caller can remove its old webhook at Fathom.
-export async function saveFathom(installationId: string, t: Tokens, hook: { id: string; secret: string }, publicKey: string, only: string | null, actor: string | null): Promise<Row | null> {
-  const db = sql();
-  const [prev] = await db`select id from connections where installation_id = ${installationId} and provider = 'fathom'`;
-  const previous = prev ? await getConnection(installationId, prev.id as string) : null;
-  await db`delete from connections where installation_id = ${installationId} and provider = 'fathom'`;
-  await db`
-    insert into connections (installation_id, provider, label, external_id, access_token_enc, refresh_token_enc, token_expires_at, webhook_secret_enc, public_key, only_location_id, connected_by)
-    values (${installationId}, 'fathom', 'Fathom', ${hook.id}, ${encryptSecret(t.accessToken)}, ${encryptSecret(t.refreshToken)}, ${new Date(t.expiresAt)}, ${encryptSecret(hook.secret)}, ${publicKey}, ${only}, ${actor})`;
-  await db`insert into audit_log (installation_id, actor, action, detail) values (${installationId}, ${actor}, 'connections.fathom_connected', ${db.json({} as never)})`;
-  return previous ?? null;
-}
-
-export async function saveZoom(installationId: string, t: Tokens, user: { id: string; email: string | null }, only: string | null, actor: string | null) {
-  const db = sql();
-  const label = user.email ?? "Zoom";
-  const updated = await db`
-    update connections set label = ${label}, status = 'connected', access_token_enc = ${encryptSecret(t.accessToken)}, refresh_token_enc = ${encryptSecret(t.refreshToken)},
-      token_expires_at = ${new Date(t.expiresAt)}, only_location_id = ${only}, connected_by = ${actor}
-    where installation_id = ${installationId} and provider = 'zoom' and external_id = ${user.id} returning id`;
-  if (updated.length === 0) {
-    await db`
-      insert into connections (installation_id, provider, label, external_id, access_token_enc, refresh_token_enc, token_expires_at, only_location_id, connected_by)
-      values (${installationId}, 'zoom', ${label}, ${user.id}, ${encryptSecret(t.accessToken)}, ${encryptSecret(t.refreshToken)}, ${new Date(t.expiresAt)}, ${only}, ${actor})`;
-  }
-  await db`insert into audit_log (installation_id, actor, action, detail) values (${installationId}, ${actor}, 'connections.zoom_connected', ${db.json({} as never)})`;
 }
 
 // Removes the connection and everything stored for it. For Slack the saved channel address goes too.

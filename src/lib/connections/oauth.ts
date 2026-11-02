@@ -1,5 +1,6 @@
 import { isSlackWebhook } from "../analytics/derive.ts";
 import type { Attendee } from "../analytics/meeting-intel.ts";
+import { connectError, providerCodeOf, SLACK_REDIRECT_ERRORS, type ConnectCode } from "./messages.ts";
 import type { Provider } from "./state.ts";
 
 // Talking to Slack, Fathom and Zoom to sign a person in and keep the connection alive. The network call
@@ -9,7 +10,8 @@ import type { Provider } from "./state.ts";
 type Fetch = typeof fetch;
 export type Keys = { clientId: string; clientSecret: string };
 export type Tokens = { accessToken: string; refreshToken: string; expiresAt: number };
-export type Failed = { ok: false; error: string };
+/** A failed step: the plain words a person reads, a short code they can send us, and the provider's own code for the log (never shown, never a secret). */
+export type Failed = { ok: false; error: string; code?: ConnectCode; providerCode?: string };
 
 const TIMEOUT_MS = 10_000;
 const FATHOM_AUTH = "https://fathom.video/external/v1/oauth2/authorize";
@@ -62,17 +64,20 @@ const FORM = { "content-type": "application/x-www-form-urlencoded" };
 export type SlackInstall = { ok: true; webhookUrl: string; team: string | null; channel: string | null };
 export async function exchangeSlack(code: string, keys: Keys, redirect: string, f: Fetch = fetch): Promise<SlackInstall | Failed> {
   try {
-    const { json } = await call(f, "https://slack.com/api/oauth.v2.access", {
+    const { status, json } = await call(f, "https://slack.com/api/oauth.v2.access", {
       method: "POST", headers: FORM, body: form({ code, client_id: keys.clientId, client_secret: keys.clientSecret, redirect_uri: redirect }),
     });
-    if (json.ok !== true) return { ok: false, error: "Slack did not accept the sign-in" };
+    if (json.ok !== true) {
+      const providerCode = providerCodeOf(status, json);
+      return SLACK_REDIRECT_ERRORS.has(providerCode) ? connectError("S-REDIRECT", "Slack", providerCode) : connectError("P-AUTH", "Slack", providerCode);
+    }
     const hook = (json.incoming_webhook ?? {}) as Record<string, unknown>;
     const url = str(hook.url, 500);
     if (!url || !isSlackWebhook(url)) return { ok: false, error: "Slack did not give a channel to post to. Choose a channel and try again" };
     const team = (json.team ?? {}) as Record<string, unknown>;
     return { ok: true, webhookUrl: url, team: str(team.name, 100), channel: str(hook.channel, 100) };
   } catch {
-    return { ok: false, error: "Could not reach Slack" };
+    return connectError("P-NET", "Slack");
   }
 }
 
@@ -96,9 +101,9 @@ async function tokenCall(provider: "fathom" | "zoom", params: Record<string, str
       body: form(fathom ? { ...params, client_id: keys.clientId, client_secret: keys.clientSecret } : params),
     });
     const tokens = status >= 200 && status < 300 ? tokensFrom(json, now) : null;
-    return tokens ? { ok: true, tokens } : { ok: false, error: `${provider === "fathom" ? "Fathom" : "Zoom"} did not accept the sign-in` };
+    return tokens ? { ok: true, tokens } : connectError("P-AUTH", provider === "fathom" ? "Fathom" : "Zoom", providerCodeOf(status, json));
   } catch {
-    return { ok: false, error: `Could not reach ${provider === "fathom" ? "Fathom" : "Zoom"}` };
+    return connectError("P-NET", provider === "fathom" ? "Fathom" : "Zoom");
   }
 }
 
@@ -119,9 +124,19 @@ export async function createFathomWebhook(accessToken: string, destinationUrl: s
     });
     const id = str(json.id, 200);
     const secret = str(json.secret, 500);
-    return status >= 200 && status < 300 && id && secret ? { ok: true, id, secret } : { ok: false, error: "Fathom would not create the connection" };
+    return status >= 200 && status < 300 && id && secret ? { ok: true, id, secret } : connectError("F-HOOK", "Fathom", providerCodeOf(status, json));
   } catch {
-    return { ok: false, error: "Could not reach Fathom" };
+    return connectError("P-NET", "Fathom");
+  }
+}
+
+// A cheap read that proves the connection still works: the person's own meeting list, one item. NOT VERIFIED LIVE (see docs/features/E0.md).
+export async function testFathom(accessToken: string, f: Fetch = fetch): Promise<{ ok: true } | { ok: false; status: number }> {
+  try {
+    const { status } = await call(f, `${FATHOM_API}/meetings?limit=1`, { headers: { authorization: `Bearer ${accessToken}` } });
+    return status >= 200 && status < 300 ? { ok: true } : { ok: false, status };
+  } catch {
+    return { ok: false, status: 0 };
   }
 }
 
@@ -139,9 +154,10 @@ export async function fetchZoomUser(accessToken: string, f: Fetch = fetch): Prom
   try {
     const { status, json } = await call(f, "https://api.zoom.us/v2/users/me", { headers: { authorization: `Bearer ${accessToken}` } });
     const id = str(json.id, 100);
-    return status === 200 && id ? { ok: true, id, email: str(json.email, 200)?.toLowerCase() ?? null } : { ok: false, error: "Zoom did not say who signed in" };
+    // The usual cause of a refusal here is a missing scope (user:read:user); the provider's own code goes to the log, the person gets Z-IDENT.
+    return status === 200 && id ? { ok: true, id, email: str(json.email, 200)?.toLowerCase() ?? null } : connectError("Z-IDENT", "Zoom", providerCodeOf(status, json));
   } catch {
-    return { ok: false, error: "Could not reach Zoom" };
+    return connectError("P-NET", "Zoom");
   }
 }
 

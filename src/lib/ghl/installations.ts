@@ -1,6 +1,7 @@
 import { decryptSecret, encryptSecret } from "../crypto";
 import { LOCATION_DELETE, SYNCED_DELETE, UNINSTALL_DELETE } from "../tenant-tables";
 import { sql } from "../db";
+import { safeError } from "../safe-log";
 import { businessKey, isBusinessKey } from "../access";
 import { normalisePlan, planFromMarketplaceId, type Plan } from "../entitlements";
 import { refreshTokens, type TokenResponse } from "./client";
@@ -123,6 +124,17 @@ export async function purgeSyncedData(installationId: string): Promise<void> {
 // is written in src/lib/tenant-tables.ts.
 export async function purgeInstallation(companyId: string): Promise<void> {
   const db = sql();
+  // First tell the meeting tools to stop (their subscriptions are deleted, or only recorded as a dry run while the switch is off), then erase everything.
+  // Best effort: a provider that cannot be reached never stops the deletion below.
+  try {
+    const [pre] = await db`select id from installations where company_id = ${companyId}`;
+    if (pre) {
+      const { revokeInstallationSubscriptions } = await import("../connections/cleanup");
+      await revokeInstallationSubscriptions(pre.id as string);
+    }
+  } catch (error) {
+    console.error("Dropping meeting tool subscriptions failed", safeError(error));
+  }
   await db.begin(async (tx) => {
     const [row] = await tx`
       update installations

@@ -105,7 +105,8 @@ test("Getting started ticks honestly: a step is done only when it is", async ({ 
 test("the What's new page lists today's changes and the roadmap, and a vote can be given and taken back", async ({ request }) => {
   const c = await client(request);
   const first = await c.get("roadmap");
-  expect(first.changelog[0].title).toContain("Numbers you can trust");
+  expect(first.changelog[0].title).toContain("Settings in sections");
+  expect((first.changelog as Json[]).some((c) => String(c.title).includes("Numbers you can trust")), "the earlier entry is still there").toBe(true);
   expect(first.items.length).toBeGreaterThan(0);
   const key = first.items[0].key as string;
   await c.post("roadmap", { key });
@@ -114,11 +115,10 @@ test("the What's new page lists today's changes and the roadmap, and a vote can 
   expect(((await c.get("roadmap")).items as Json[]).find((i) => i.key === key)?.voted).toBe(false);
 });
 
-test("the Settings page is in five groups with a jump list", async ({ page }) => {
+test("the Settings page is in eight sections with a menu on the left (stage F8; the full checks are in f8.spec.ts)", async ({ page }) => {
   await page.goto("/app#settings");
   await page.reload();
-  const jump = page.getByTestId("settings-jump");
-  await expect(jump).toBeVisible();
-  for (const label of ["Rules and targets", "Your brand", "Your clients", "Alerts and connections", "Privacy and data"]) await expect(jump.getByText(label)).toBeVisible();
-  for (const id of ["g-rules", "g-brand", "g-alerts", "g-privacy"]) await expect(page.locator(`#${id}`)).toBeAttached();
+  const nav = page.getByTestId("settings-nav");
+  await expect(nav).toBeVisible();
+  for (const label of ["Team and access", "Notifications", "Integrations", "Reply targets and thresholds", "Brand", "Data and privacy", "Sync status", "Advanced"]) await expect(nav.getByRole("button", { name: label, exact: true })).toBeVisible();
 });

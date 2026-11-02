@@ -4,6 +4,7 @@ import { CircleHelp } from "lucide-react";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { errorId } from "@/lib/design/ui-logic";
 import type { ApiError } from "../session";
+import { openProblemReport, rememberErrorId } from "./error-memory";
 
 // The four "nothing to show yet" states every screen needs (loading, empty, error, and a definition one tap away). This file must not import
 // ../ui, which re-exports some of these under their older names.
@@ -58,12 +59,15 @@ export function ErrorState({ error, onRetry }: { error: ApiError | Error; onRetr
     setMade(errorId(status, message, Date.now()));
   }, [status, message]);
   const id = typeof sent === "string" && /^[A-Za-z0-9-]{4,24}$/.test(sent) ? sent : made;
+  // So "Report a problem" at the bottom of the page can carry this ID.
+  useEffect(() => { if (!upgrade) rememberErrorId(id); }, [id, upgrade]);
   return (
     <div className={`border-l-2 py-1 pl-3 text-sm ${upgrade ? "border-primary" : "border-destructive"}`} role="alert" data-testid="error-state">
       <p className="font-medium">{upgrade ? "This feature is part of the paid plan" : "Something went wrong"}</p>
       <p className="text-muted-foreground">{error.message}</p>
       {!upgrade && id && <p className="mt-1 text-xs text-muted-foreground">Error ID <strong className="font-mono text-foreground" data-testid="error-id">{id}</strong>. Quote it if you contact support.</p>}
       {onRetry && !upgrade && <button type="button" onClick={onRetry} className="mt-2 min-h-9 rounded-lg border bg-card px-3 py-1.5 text-sm hover:bg-muted">Try again</button>}
+      {!upgrade && <button type="button" onClick={() => openProblemReport(id)} className="ml-3 mt-2 min-h-9 text-sm underline underline-offset-4 hover:text-foreground">Report this problem</button>}
     </div>
   );
 }

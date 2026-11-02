@@ -77,13 +77,14 @@ test("people are ranked fastest first, and only with enough replies", () => {
 });
 
 test("durations read like a person would say them", () => {
-  assert.equal(fmtDuration(null), "none");
+  assert.equal(fmtDuration(null), "n/a", "nothing to show reads n/a, not none (N22)");
   assert.equal(fmtDuration(45), "45 sec");
   assert.equal(fmtDuration(300), "5 min");
   assert.equal(fmtDuration(3600), "1 h");
   assert.equal(fmtDuration(3600 + 600), "1 h 10 min");
-  assert.equal(fmtDuration(86_400), "1 d");
-  assert.equal(fmtDuration(86_400 + 3 * 3600), "1 d 3 h");
+  assert.equal(fmtDuration(86_400), "1 day");
+  assert.equal(fmtDuration(13 * 86_400), "13 days", "13 d 0 h reads 13 days (N30)");
+  assert.equal(fmtDuration(86_400 + 3 * 3600), "1 day 3 h");
 });
 
 test("lead sources are grouped into portal, meta, form, social and other, each with its own target", async () => {

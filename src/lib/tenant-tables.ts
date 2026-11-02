@@ -8,14 +8,14 @@ export const SYNCED_DELETE = [
   "cleanup_changes", "cleanup_runs", "duplicate_reviews",
   "cached_contacts", "cached_opportunities", "cached_conversations", "cached_appointments", "pipelines",
   "account_metrics_daily", "alerts", "domain_checks", "onboarding_tasks",
-  "deal_events", "appointment_events", "lead_touches", "call_outcomes",
-  "meeting_notes", "shared_audits", "sync_jobs", "locations",
+  "deal_events", "appointment_events", "lead_touches", "call_outcomes", "contact_tag_events",
+  "crm_writes", "meetings", "meeting_notes", "shared_audits", "sync_jobs", "locations",
 ] as const;
 
 /** Settings, credentials and the agency's own notes. Kept by "delete my data" (the app keeps working), removed on uninstall. */
 export const CONFIG_DELETE_ON_UNINSTALL = [
   "call_lists", "account_profiles", "goals", "annotations", "usage_events", "team_names", "report_templates",
-  "api_keys", "connections", "meeting_hooks", "roadmap_votes", "saved_views", "stage_rules", "client_notes", "onboarding_templates", "client_steps", "client_step_history", "settings",
+  "api_keys", "connections", "user_connections", "meeting_note_settings", "meeting_policies", "meeting_hooks", "roadmap_votes", "saved_views", "feedback_items", "roadmap_suggestions", "stage_rules", "client_notes", "onboarding_templates", "client_steps", "client_step_history", "settings",
 ] as const;
 
 /** Everything an uninstall deletes. The installation row itself stays with its tokens emptied, so a reinstall starts clean. */
@@ -33,8 +33,8 @@ export const LOCATION_DELETE = [
   "cleanup_changes", "cleanup_runs", "duplicate_reviews",
   "cached_contacts", "cached_opportunities", "cached_conversations", "cached_appointments", "pipelines",
   "account_metrics_daily", "alerts", "domain_checks", "onboarding_tasks",
-  "deal_events", "appointment_events", "lead_touches", "call_outcomes",
-  "meeting_notes", "meeting_hooks", "account_profiles", "client_notes", "client_steps", "client_step_history", "sync_jobs", "locations",
+  "deal_events", "appointment_events", "lead_touches", "call_outcomes", "contact_tag_events",
+  "crm_writes", "meeting_policies", "meeting_notes", "meeting_hooks", "account_profiles", "client_notes", "client_steps", "client_step_history", "sync_jobs", "locations",
 ] as const;
 
 /** Tables with a location column that the per-account purge leaves alone, with the reason. */

@@ -21,13 +21,34 @@ async function open(page: Page, hash: string, heading: string) {
 
 const bodyText = async (page: Page) => flat(await page.locator("body").innerText());
 
-test("Settings names neither Zoom nor Google Meet, and Slack and Fathom stay on Connections", async ({ page }) => {
+// Settings is in sections (stage F8): open the one a check reads.
+async function inSection(page: Page, title: string) {
+  await page.getByTestId("settings-nav").getByRole("button", { name: title, exact: true }).click();
+  await page.waitForLoadState("networkidle").catch(() => undefined);
+}
+
+test("Settings names neither Zoom nor Google Meet, and points to Connections", async ({ page }) => {
   await open(page, "settings", "Settings");
+  for (const title of ["Team and access", "Notifications", "Reply targets and thresholds", "Brand", "Sync status", "Advanced"]) {
+    await inSection(page, title);
+    expect(await bodyText(page), `Settings, ${title}, names Zoom or Google Meet`).not.toMatch(NAMED);
+  }
+  await inSection(page, "Data and privacy");
   await expect(page.getByText("Delete my data").first()).toBeVisible();
+  await inSection(page, "Integrations");
+  await expect(page.getByRole("link", { name: "Connections", exact: true })).toBeVisible();
+  expect(await bodyText(page), "Settings, Integrations, names Zoom or Google Meet").not.toMatch(NAMED);
+  await inSection(page, "Data and privacy");
+  expect(await bodyText(page), "Settings, Data and privacy, names Zoom or Google Meet").not.toMatch(NAMED);
+});
+
+// Stage E0 moved the connections out of Settings into their own page: Slack and Fathom stay visible, Zoom and Google Meet stay hidden.
+test("Connections names neither Zoom nor Google Meet, and Slack and Fathom stay on it", async ({ page }) => {
+  await open(page, "connections", "Connections");
   await expect(page.getByRole("heading", { name: "Fathom", exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Slack", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /^Slack/ })).toBeVisible();
   await expect(page.getByRole("heading", { name: /zoom/i })).toHaveCount(0);
-  expect(await bodyText(page), "Settings names Zoom or Google Meet").not.toMatch(NAMED);
+  expect(await bodyText(page), "Connections names Zoom or Google Meet").not.toMatch(NAMED);
 });
 
 for (const [hash, heading] of [["help", "Getting started"], ["roadmap", "What's new and next"], ["today", "Today"], ["accounts", "Accounts"], ["duplicates", "Duplicate contacts"]] as const) {
@@ -46,6 +67,7 @@ for (const [hash, heading] of [["help", "Getting started"], ["roadmap", "What's 
 
 test("the Meeting notes page is off: not in the menu, and an address typed by hand says it is switched off", async ({ page }) => {
   await open(page, "settings", "Settings");
+  await inSection(page, "Data and privacy");
   await expect(page.getByRole("complementary").getByRole("button", { name: "Meeting notes", exact: true })).toHaveCount(0);
   await expect(page.getByText("Meeting notes privacy")).toHaveCount(0); // nothing is connected, so its switches are not shown either
   await page.goto("/app#meetings");
@@ -71,6 +93,7 @@ test("the privacy page names Slack and Fathom but not Zoom or Google Meet, and i
 
 test("Settings shows what is stored and what each button removes, produced from the schema's list, and the demo cannot delete", async ({ page }) => {
   await open(page, "settings", "Settings");
+  await inSection(page, "Data and privacy");
   await expect(page.getByText("What we store").first()).toBeVisible();
   const text = await bodyText(page);
   for (const l of storeLines({ meetings: false })) expect(text, `What we store lists "${l.title}"`).toContain(flat(`${l.title}: ${l.text}`));
@@ -98,6 +121,7 @@ test("Links: the address is found by itself, saving other settings keeps it that
     // Typing an address is an override and wins.
     await put({ brandName: null, appDomainOverride: "crm.override.test" });
     await open(page, "settings", "Settings");
+    await inSection(page, "Advanced");
     await expect(page.getByText("You set this address yourself below.")).toBeVisible();
     expect(await bodyText(page)).toContain("crm.override.test");
     await expect(page.getByRole("button", { name: "Stop using my address" })).toBeVisible();
@@ -107,6 +131,7 @@ test("Links: the address is found by itself, saving other settings keeps it that
     const back = await put({ appDomainOverride: null });
     expect([back.appDomain, back.appDomainSource]).toEqual([start.appDomain, start.appDomainSource]);
     await open(page, "settings", "Settings");
+    await inSection(page, "Advanced");
     await expect(page.getByTestId("domain-source")).toContainText(/found this address by itself|has not seen your own login address yet/);
   } finally {
     await put({ appDomainOverride: null, brandName: null });

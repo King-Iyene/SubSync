@@ -25,7 +25,7 @@ import {
   valueDistribution, winLossByMonth, winRate,
 } from "../analytics/pipeline-intel";
 import { OUTCOME_LABEL, PRESETS, parseFilters, parseOutcome } from "../analytics/call-intel";
-import { callQueue, createCallList, deleteCallList, listCallLists, logOutcome, MAX_LISTS, outcomeSummary, speedToLead } from "../analytics/call-queries";
+import { callQueueAll, createCallList, deleteCallList, listCallLists, logOutcome, MAX_LISTS, outcomeSummary, speedToLead } from "../analytics/call-queries";
 import {
   activitySummary, anomalyIndices, contactGap, goalProgress, renewalStatus, roi, segmentStats, zAnomaly,
 } from "../analytics/client-intel";
@@ -45,13 +45,15 @@ import { appointmentInsights } from "../analytics/appointment-insight-queries";
 import { auditSummary, buildAudit } from "../analytics/audit-intel";
 import { appointmentList, staleDealList, waitingList, type AuditList } from "../analytics/audit-queries";
 import { DEAL_RULES_VERSION } from "../analytics/definitions";
-import { speedView } from "../analytics/speed-queries";
-import { CHANGELOG, ROADMAP } from "../roadmap";
+import { speedPart, speedView } from "../analytics/speed-queries";
+import { isPart, parseWindow } from "../analytics/speed-window";
+import { CHANGELOG, ROADMAP, STATUS_LABEL, STATUS_MEANING } from "../roadmap";
 import { buildSharePayload } from "../analytics/share-intel";
 import { randomBytes } from "node:crypto";
 import { emailConfigured } from "../email";
 import { validEmail } from "../analytics/weekly-email";
-import { appointmentView } from "../analytics/appointment-queries";
+import { appointmentBreakdown, appointmentDetail, appointmentView, setShowRateTarget } from "../analytics/appointment-queries";
+import { clampTarget, parseFilters as parseApptFilters, parseWindow as parseApptWindow } from "../analytics/appointment-f3";
 import { compareSetup, describe as describeDiff } from "../analytics/setup-intel";
 import {
   baselineShare, compareTable, dealFigures, driftRows, endpoints, INDUSTRY_PICKER, lastSpokenMs, parseCompareIds, parseQuarter, pointsIn, previousQuarter, proofSummary,
@@ -67,7 +69,8 @@ import { listConnections } from "../connections/queries";
 import { isProvider } from "../connections/state";
 import { locationAccessToken } from "../sync/engine";
 import { createHook, listHooks, listMeetings, MAX_HOOKS_PER_ACCOUNT, revokeHook, setMeetingStatus } from "../analytics/meeting-queries";
-import { buildDailyDigest, NOT_WATCHED } from "../analytics/digest-service";
+import { buildDailyDigest, NOT_WATCHED, seriesByLocation } from "../analytics/digest-service";
+import { portfolioRangeChanges, validFromDay, validToDay } from "../analytics/today-intel";
 import { digestText, localParts } from "../analytics/digest-intel";
 import { industryKey, industryOptions, matchesSegment, PLAYBOOKS } from "../analytics/playbooks";
 import { buildQueue, recordBulk, recordDecision, summarise, undoDecision } from "../analytics/dedupe-queries";
@@ -77,6 +80,14 @@ import { paceOf, sourceConversion, teamLabel, teamWinRate } from "../analytics/p
 import { excludedOpenDeals, getGoals, GOAL_METRICS, loadDeals, pipelineTrend, setGoal, type GoalMetric } from "../analytics/pipeline-queries";
 import { MIN_CLOSED_DEALS as MIN_CLOSED, OUTLIER_MIN_DEALS, OUTLIER_SHARE, outlier as dealOutlier, winRateOf } from "../analytics/metrics";
 import { parsePickedAccounts } from "../design/filters";
+import { myConnectionRemove, myConnectionsView, myConnectionStart, myConnectionTest, policySave, teamConnectionRevoke, teamConnectionsView } from "./connections-api";
+import { can, personFromSession } from "../connections/person";
+import { handlePeople, timeoutResponse } from "./people-routes";
+import { buildSteps, guideRoleOf } from "../getting-started";
+import { changedSettingKeys, feedbackGivenBy, logAccountFlags, logKeyChange, logSettingsChange, recordVote } from "../feedback-queries";
+import { groupStatus, parseGranted } from "../scope-groups";
+import { NOTE_SCOPE } from "../meeting-wording";
+import { giveFeedback, history as settingsHistoryView, ownSuggestions, reportProblem, suggest, whoOf } from "./f8-routes";
 import { authenticate, isResponse, json, type AuthContext } from "./auth";
 
 // All authenticated data endpoints live behind /api/app/<path>. Each one needs a valid signed
@@ -247,7 +258,8 @@ async function computeAudit(ctx: Ctx, withLists = false) {
 }
 
 async function auditViewData(ctx: Ctx) {
-  const { audit, who, settings, hidden, lists, readLimit } = await computeAudit(ctx, true);
+  // Today asks for the audit without the rows behind each number (lists=0): it needs only the first finding, and the lists are the slow part.
+  const { audit, who, settings, hidden, lists, readLimit } = await computeAudit(ctx, ctx.url.searchParams.get("lists") !== "0");
   return json({
     audit, summary: auditSummary(audit, who), lists, readLimit, hiddenAccounts: hidden,
     // The sender's own name and colour, for the printed page (N85). No logo: none is stored.
@@ -297,11 +309,41 @@ async function auditRevoke(ctx: Ctx) {
 }
 
 // How fast new leads get a first reply from a person.
+// Every lead row (anything with a client account and a contact) gets the white-label link that opens it in the CRM, wherever it sits in the answer.
+function withContactUrls<T>(value: T, link: (locationId: string, contactId: string) => string): T {
+  if (Array.isArray(value)) return value.map((v) => withContactUrls(v, link)) as T;
+  if (value && typeof value === "object") {
+    const o = value as Record<string, unknown>;
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(o)) out[k] = withContactUrls(v, link);
+    if (typeof o.locationId === "string" && typeof o.contactId === "string") out.url = link(o.locationId, o.contactId);
+    return out as T;
+  }
+  return value;
+}
+
 async function speedViewData(ctx: Ctx) {
   const sc = await scope(ctx);
-  const v = await speedView(ctx.installationId, await allowedIds(ctx), sc.settings.speedTargetMinutes);
+  const allowed = await allowedIds(ctx);
+  const part = ctx.url.searchParams.get("part");
+  // One card of the screen over the range that card chose (KF-4). Same accounts, same rows, same judging as the main answer; the dates are checked here, never trusted.
+  if (part !== null) {
+    if (!isPart(part)) return json({ error: "Unknown part of this screen" }, 400);
+    const now = Date.now();
+    const win = parseWindow(ctx.url.searchParams.get("from"), ctx.url.searchParams.get("to"), now);
+    if (!win.ok) return json({ error: win.error }, 400);
+    const cmpFrom = ctx.url.searchParams.get("cmpFrom"), cmpTo = ctx.url.searchParams.get("cmpTo");
+    const cmp = cmpFrom || cmpTo ? parseWindow(cmpFrom, cmpTo, now) : null;
+    if (cmp && !cmp.ok) return json({ error: "The comparison range is not valid: " + cmp.error }, 400);
+    const out = await speedPart(ctx.installationId, allowed, sc.settings.speedTargetMinutes, part, win.win, cmp && cmp.ok ? cmp.win : null, now);
+    return json(withContactUrls(out, sc.links.contact));
+  }
+  const v = await speedView(ctx.installationId, allowed, sc.settings.speedTargetMinutes);
   return json({
-    ...v, waiting: v.waiting.map((w) => ({ ...w, url: sc.links.contact(w.locationId, w.contactId) })),
+    ...v,
+    // How the numbers are measured, shown on the page itself (N78): the reply target and whether automatic messages count. A client's staff can read it, not change it.
+    measuring: { targetMinutes: sc.settings.speedTargetMinutes, countAutomated: sc.settings.countAutomatedTouches, businessHours: sc.settings.speedBusinessHours, canChange: ctx.kind !== "client" },
+    waiting: v.waiting.map((w) => ({ ...w, url: sc.links.contact(w.locationId, w.contactId) })),
     // The leads behind each week of the trend, with the same white-label link as every other list (KF-6).
     trend: v.trend.map((w) => ({ ...w, members: w.members.map((m) => ({ ...m, url: sc.links.contact(m.locationId, m.contactId) })) })),
   });
@@ -313,36 +355,92 @@ const voterOf = (ctx: Ctx) => `${ctx.kind}:${ctx.limitTo ?? "agency"}:${ctx.sess
 async function roadmapView(ctx: Ctx) {
   const rows = await sql()`select item_key, count(*)::int n, bool_or(voter = ${voterOf(ctx)}) mine from roadmap_votes where installation_id = ${ctx.installationId} group by item_key`;
   const by = new Map(rows.map((r) => [r.item_key as string, { n: r.n as number, mine: Boolean(r.mine) }]));
-  return json({ items: ROADMAP.map((i) => ({ ...i, votes: by.get(i.key)?.n ?? 0, voted: by.get(i.key)?.mine ?? false })), changelog: CHANGELOG });
+  // Statuses are words, with what each means; a shipped item has nothing left to vote for. Your own suggestions come with it (never anyone else's).
+  return json({
+    items: ROADMAP.map((i) => ({ ...i, label: STATUS_LABEL[i.status], votes: by.get(i.key)?.n ?? 0, voted: by.get(i.key)?.mine ?? false })),
+    statusMeaning: STATUS_MEANING, changelog: CHANGELOG, mine: await ownSuggestions(ctx),
+  });
 }
 
 async function roadmapVote(ctx: Ctx) {
   const body = (await ctx.request.json().catch(() => null)) as { key?: unknown } | null;
-  if (typeof body?.key !== "string" || !ROADMAP.some((i) => i.key === body.key)) return json({ error: "Unknown item" }, 400);
+  const item = typeof body?.key === "string" ? ROADMAP.find((i) => i.key === body.key) : undefined;
+  if (!item) return json({ error: "Unknown item" }, 400);
+  if (item.status === "shipped") return json({ error: "That one is already live, so there is nothing left to vote for." }, 400);
   const voter = voterOf(ctx);
-  const gone = await sql()`delete from roadmap_votes where installation_id = ${ctx.installationId} and item_key = ${body.key} and voter = ${voter} returning 1`;
-  if (gone.length === 0) await sql()`insert into roadmap_votes (installation_id, item_key, voter) values (${ctx.installationId}, ${body.key}, ${voter})`;
+  const gone = await sql()`delete from roadmap_votes where installation_id = ${ctx.installationId} and item_key = ${item.key} and voter = ${voter} returning 1`;
+  if (gone.length === 0) {
+    await sql()`insert into roadmap_votes (installation_id, item_key, voter) values (${ctx.installationId}, ${item.key}, ${voter}) on conflict do nothing`;
+    await recordVote(ctx.installationId, actorOf(ctx), item.key); // a dry-run line for King's daily digest: ids only
+  }
   return json({ ok: true, voted: gone.length === 0 });
+}
+
+// The date window and the three filters come from the address (from, to, cmpFrom, cmpTo, calendar, user, source). They only narrow what the caller is
+// already allowed to see: the accounts are fixed by allowedIds, never by anything sent here.
+function apptParams(ctx: Ctx) {
+  const q = ctx.url.searchParams;
+  return {
+    window: parseApptWindow({ from: q.get("from"), to: q.get("to"), cmpFrom: q.get("cmpFrom"), cmpTo: q.get("cmpTo") }, Date.now()),
+    filters: parseApptFilters({ calendar: q.get("calendar"), user: q.get("user"), source: q.get("source") }),
+  };
+}
+
+// A list row with its white-label link to the contact. A booking with no contact has no link.
+function withLink<T extends { locationId: string; contactId: string | null }>(sc: Awaited<ReturnType<typeof scope>>) {
+  return (p: T) => ({ ...p, url: p.contactId ? sc.links.contact(p.locationId, p.contactId) : null });
 }
 
 async function appointmentsView(ctx: Ctx) {
   const sc = await scope(ctx);
-  const v = await appointmentView(ctx.installationId, await allowedIds(ctx));
-  const link = (p: { locationId: string; contactId: string }) => sc.links.contact(p.locationId, p.contactId);
+  const v = await appointmentView(ctx.installationId, await allowedIds(ctx), Date.now(), apptParams(ctx));
+  const link = withLink(sc);
   return json({
-    ...v, canSeeAccounts: ctx.limitTo === null,
-    unconfirmed: v.unconfirmed.map((p) => ({ ...p, url: link(p) })), recover: v.recover.map((p) => ({ ...p, url: link(p) })), unmarked: v.unmarked.map((p) => ({ ...p, url: link(p) })),
+    ...v, canSeeAccounts: ctx.limitTo === null, canEditTargets: ctx.kind !== "client",
+    items: v.items.map(link), upcoming: v.upcoming.map(link), unmarked: v.unmarked.map(link), recover: v.recover.map(link),
+    // The "My day" page and the audit read this older shape: the people to remind (booked, not confirmed, within two days).
+    unconfirmed: v.upcoming.filter((r) => r.unconfirmed).slice(0, 15).map(link),
   });
+}
+
+// The calendar, person and client-account breakdowns: their own window, the same three filters.
+async function appointmentsBreakdownView(ctx: Ctx) {
+  const sc = await scope(ctx);
+  const v = await appointmentBreakdown(ctx.installationId, await allowedIds(ctx), Date.now(), apptParams(ctx));
+  return json({ ...v, canSeeAccounts: ctx.limitTo === null, items: v.items.map(withLink(sc)) });
+}
+
+// One appointment. The account it belongs to must be one the caller may see; anything else is "not found", the same answer as an id that does not exist.
+async function appointmentDetailView(ctx: Ctx, locationId: string, appointmentId: string) {
+  const sc = await scope(ctx);
+  const found = await appointmentDetail(ctx.installationId, await allowedIds(ctx), locationId, appointmentId);
+  if (!found || !sc.permits(locationId)) return json({ error: "Appointment not found" }, 404);
+  return json({ ...found, url: found.contact ? sc.links.contact(locationId, found.contact.contactId) : null });
+}
+
+// The show-rate target is the account's own setting. A client's staff cannot change it (the route policy refuses them too); the change is written to the audit log.
+async function appointmentTargetUpdate(ctx: Ctx) {
+  if (ctx.kind === "client") return json({ error: "Not available in this view" }, 403);
+  const body = (await ctx.request.json().catch(() => null)) as { showRate?: unknown } | null;
+  const value = body?.showRate === null ? null : clampTarget(body?.showRate);
+  if (body === null || (body.showRate !== null && value === null)) return json({ error: "Choose a show-rate target between 30% and 100%" }, 400);
+  if (ctx.demo) return json({ error: "Targets cannot be changed in the demo" }, 400);
+  await setShowRateTarget(ctx.installationId, value);
+  await sql()`insert into audit_log (installation_id, actor, action, detail) values (${ctx.installationId}, ${ctx.session.userId ?? ctx.kind}, 'appointments.target_changed', ${sql().json({ showRate: value } as never)})`;
+  return json({ ok: true, showRate: value });
 }
 
 // The deeper read of the same calendars: show rate by time and source, recovery, fairness, follow-up gaps and
 // a short brief before each upcoming appointment. Limited to the accounts the caller may see.
 async function appointmentInsightsView(ctx: Ctx) {
   const sc = await scope(ctx);
-  const v = await appointmentInsights(ctx.installationId, await allowedIds(ctx));
+  const v = await appointmentInsights(ctx.installationId, await allowedIds(ctx), Date.now(), apptParams(ctx));
   const link = (p: { locationId: string; contactId: string }) => sc.links.contact(p.locationId, p.contactId);
+  const itemLink = withLink(sc);
   return json({
-    ...v,
+    ...v, canEditTargets: ctx.kind !== "client",
+    items: v.items.map(itemLink),
+    funnel: { ...v.funnel, steps: v.funnel.steps.map((s) => ({ ...s, members: s.members.map((m) => ({ ...m, url: link(m) })) })) },
     repeatNoShows: v.repeatNoShows.map((p) => ({ ...p, url: link(p) })),
     followUp: { ...v.followUp, contacts: v.followUp.contacts.map((p) => ({ ...p, url: link(p) })) },
     briefs: v.briefs.map((p) => ({ ...p, url: link(p) })),
@@ -386,6 +484,7 @@ async function meetingsView(ctx: Ctx) {
     meetings: meetings.map((m) => ({ ...m, contactUrl: m.contactId ? sc.links.contact(m.locationId, m.contactId) : null })),
     hooks, accounts: locs.map((l) => ({ locationId: l.location_id as string, name: (l.name as string | null) ?? "Unnamed account" })),
     maxHooks: MAX_HOOKS_PER_ACCOUNT, keepTranscripts: sc.settings.keepTranscripts, canManage: ctx.kind !== "client", moreTools: zoomOn(ctx),
+    pushNotesToCrm: sc.settings.pushNotesToCrm, noteWriteGranted: ctx.demo ? null : await installationHasScope(ctx.installationId, NOTE_SCOPE),
   });
 }
 
@@ -496,7 +595,11 @@ async function connectionsView(ctx: Ctx) {
 }
 
 async function connectionStart(ctx: Ctx, provider: string) {
-  if (!isProvider(provider) || (provider === "zoom" && !zoomOn(ctx))) return json({ error: "Not found" }, 404);
+  // Only a workspace tool (Slack) is connected here, and only by an administrator. Personal tools are connected by each person under my-connections.
+  if (provider !== "slack") return json({ error: "Connect your own tools from My connections" }, 404);
+  const person = personFromSession(ctx.session, ctx.kind, ctx.limitTo);
+  if (!person || !can(person.role, "connect_workspace")) return json({ error: "Only an administrator can connect Slack", forbidden: true }, 403);
+  if (!isProvider(provider)) return json({ error: "Not found" }, 404);
   if (ctx.demo) return json({ error: "Connecting is not available in the demo. It needs a real install." }, 400);
   const link = startLink(provider, { provider, installationId: ctx.installationId, onlyLocationId: ctx.limitTo, actor: actorOf(ctx) });
   return link.ok ? json({ url: link.url }) : json({ error: link.error }, 503);
@@ -520,7 +623,22 @@ async function dailyView(ctx: Ctx) {
   });
 }
 
-const USAGE_VIEWS = new Set(["today", "overview", "accounts", "clients", "team", "search", "deals", "pipeline", "leads", "calls", "inbox", "onboarding", "email", "duplicates", "alerts", "settings", "help", "account", "meetings", "audit", "speed", "appointments"]);
+// How the four headline figures on Today changed since the start of the window a card asked for (stage F5, KF-4). Same accounts as every other read
+// (plan limit, the page filter, one account for a business); the only thing taken from the request is a start date, checked before it is used.
+async function dailyChanges(ctx: Ctx) {
+  const [{ today }] = await sql()`select current_date::text as today`;
+  const from = validFromDay(ctx.url.searchParams.get("from"), today as string);
+  if (!from) return json({ error: "Pick a start date within the last year and before today" }, 400);
+  const to = validToDay(ctx.url.searchParams.get("to"), from, today as string);
+  if (!to) return json({ error: "Pick an end date that is not before the start and not in the future" }, 400);
+  const { accounts } = await accountsFor(ctx);
+  const ids = accounts.filter((a) => !a.ignored).map((a) => a.locationId);
+  const span = Math.round((Date.parse(`${today}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000) + 2;
+  const series = await seriesByLocation(ctx.installationId, ids, span);
+  return json({ from, to, accounts: ids.length, changes: portfolioRangeChanges([...series.values()], from, to) });
+}
+
+const USAGE_VIEWS = new Set(["today", "overview", "accounts", "clients", "team", "search", "deals", "pipeline", "leads", "calls", "inbox", "onboarding", "email", "duplicates", "alerts", "settings", "help", "account", "meetings", "audit", "speed", "appointments", "people", "myday", "roadmap"]);
 
 // A counter of which pages get opened (no personal data), so the getting-started checklist can
 // tick itself off and so the agency can see what its team uses.
@@ -533,51 +651,40 @@ async function usagePing(ctx: Ctx) {
   return json({ ok: true });
 }
 
-// The getting-started checklist, with each step's real state.
+// The Getting started guide for this person's role, with each step's real state. The steps and when they tick are in src/lib/getting-started.ts (unit tested);
+// this only gathers the facts, all from the signed session's own installation. A client's staff get steps ticked from their own browser, not the company counter.
 async function startView(ctx: Ctx) {
   const db = sql();
-  const [views, [locs], status, settings, [clientOn], [feeOn]] = await Promise.all([
+  const agency = ctx.kind === "agency";
+  const [views, [locs], status, settings, [clientOn], accountRows, [shares], changed, given, [feeOn]] = await Promise.all([
     db`select distinct view from usage_events where installation_id = ${ctx.installationId}`,
     db`select count(*)::int total, count(*) filter (where contacts_synced_at is not null)::int synced from locations
         where installation_id = ${ctx.installationId} ${ctx.limitTo ? db`and location_id = ${ctx.limitTo}` : db``}`,
     syncStatus(ctx.installationId, ctx.limitTo),
     getSettings(ctx.installationId),
-    ctx.kind === "agency" ? db`select count(*)::int n from locations where installation_id = ${ctx.installationId} and client_view` : Promise.resolve([{ n: 0 }]),
-    ctx.kind === "agency" ? db`select count(*)::int n from account_profiles where installation_id = ${ctx.installationId} and monthly_fee is not null` : Promise.resolve([{ n: 0 }]),
+    agency ? db`select count(*)::int n from locations where installation_id = ${ctx.installationId} and client_view` : Promise.resolve([{ n: 0 }]),
+    agency ? db`select name, ignored from locations where installation_id = ${ctx.installationId}` : Promise.resolve([]),
+    agency ? db`select count(*)::int n from shared_audits where installation_id = ${ctx.installationId}` : Promise.resolve([{ n: 0 }]),
+    ctx.kind === "client" ? Promise.resolve(new Set<string>()) : changedSettingKeys(ctx.installationId),
+    feedbackGivenBy(ctx.installationId, whoOf(ctx).who),
+    agency ? db`select count(*)::int n from account_profiles where installation_id = ${ctx.installationId} and monthly_fee is not null` : Promise.resolve([{ n: 0 }]),
   ]);
-  const seen = new Set(views.map((v) => v.view as string));
-  const agency = ctx.kind === "agency";
   const synced = locs.total > 0 && locs.synced === locs.total && status.pending === 0;
   const syncDetail = locs.total === 0
     ? (status.pending > 0 ? "Looking for your accounts..." : "No accounts found yet. The platform can take a minute after an install: press Sync now on the home page.")
     : synced ? `${locs.total} account${locs.total === 1 ? "" : "s"} read. ${(await freshnessFor(ctx.installationId, { limitTo: ctx.limitTo })).text}.`
     : `${locs.synced} of ${locs.total} account${locs.total === 1 ? "" : "s"} read, ${status.pending} job${status.pending === 1 ? "" : "s"} left.`;
-  const steps = [
-    { id: "connected", title: "Connect SubSync", done: true, detail: agency ? "Connected to all your client accounts." : "Connected to your account.",
-      body: "You are signed in through the platform, so there is nothing to type. SubSync only reads your data.", view: null, cta: null },
-    { id: "synced", title: "Let the first sync finish", done: synced, detail: syncDetail,
-      body: "SubSync reads your " + (agency ? "client accounts" : "account") + " in the background. The first sync takes a few minutes, longer with many contacts. Numbers fill in as it goes.", view: "overview", cta: "See how fresh your data is" },
-    { id: "today", title: "See what needs you today", done: seen.has("today"),
-      detail: null, body: "Today ranks what to do first, with the reason and a link, and compares each account with its own normal.", view: "today", cta: "Open Today" },
-    { id: "search", title: "Find any contact", done: seen.has("search"),
-      detail: null, body: "Search by name, email or phone" + (agency ? " across every client account at once" : "") + ", and open a contact's timeline.", view: "search", cta: "Open contact search" },
-    { id: "duplicates", title: "Review likely duplicates", done: seen.has("duplicates"),
-      detail: null, body: "See likely duplicate contacts with a confidence score, decide which record to keep, then merge them in the platform.", view: "duplicates", cta: "Open Duplicates" },
-    { id: "brief", title: "Get the daily brief in Slack", done: Boolean(settings.slackWebhookUrl) && settings.digestEnabled,
-      detail: null, body: "Paste a Slack incoming webhook in Settings and choose the hour. It arrives once a day in your time zone.", view: "settings", cta: "Open Settings" },
-    { id: "email", title: "Get alerts and the Monday email", done: Boolean(settings.digestEmail),
-      detail: null, body: "Type one email address in Settings. New critical and warning alerts are emailed to it straight away, and a short summary arrives every Monday. Nothing is sent until you add an address.", view: "settings", cta: "Open Settings" },
-    ...(ctx.entitlements.features.meetings !== false ? [{ id: "meetings", title: "Connect a meeting tool (optional)", done: seen.has("meetings"), optional: true,
-      detail: null, body: `Connect ${zoomOn(ctx) ? "Zoom or Fathom" : "Fathom"} in Settings and each meeting summary is saved in SubSync and added to the matching contact's notes in your CRM.`, view: "meetings", cta: "Open Meeting notes" }] : []),
-    ...(agency && ctx.entitlements.features.clients !== false ? [{ id: "client_fees", title: "Add what each client pays you (optional)", done: (feeOn?.n ?? 0) > 0, optional: true,
-      detail: null, body: "Type each client's monthly fee and renewal date on the Clients page, in the row itself. SubSync cannot read them from your CRM, so you enter them once and the revenue, renewal and value-created figures fill in.", view: "clients", cta: "Open Clients" }] : []),
-    ...(agency ? [{ id: "clients", title: "Let a client see their own account", done: (clientOn?.n ?? 0) > 0, optional: true,
-      detail: null, body: "Switch on a read-only view for a client's own staff. They see only their own account: never other clients, fees or notes.", view: "settings", cta: "Open Settings" }] : []),
-  ];
-  // A client's own staff get the steps about using SubSync. The steps about alerts, email, meeting tools and client access report what the company
-  // set up in Settings (whether a Slack channel or an email address is saved), which a client never receives (N84).
-  const shown = ctx.kind === "client" ? steps.filter((s) => !["brief", "email", "meetings", "clients"].includes(s.id)) : steps;
-  return json({ kind: ctx.kind, steps: shown, doneCount: shown.filter((s) => s.done).length, total: shown.length });
+  const role = guideRoleOf(ctx.kind, ctx.session.role);
+  const steps = buildSteps(role, {
+    synced, syncDetail, seen: new Set(views.map((v) => v.view as string)), companyUsage: ctx.kind !== "client",
+    slackBrief: Boolean(settings.slackWebhookUrl) && settings.digestEnabled, emailSet: Boolean(settings.digestEmail), clientViewOn: clientOn?.n ?? 0,
+    ignoredCount: accountRows.filter((r) => r.ignored === true).length, testLookingCount: accountRows.filter((r) => r.ignored !== true && isTestName(r.name as string | null)).length,
+    changedKeys: changed, sharedAudits: shares?.n ?? 0, feedbackGiven: given,
+    meetingsPage: ctx.entitlements.features.meetings !== false, zoomOn: zoomOn(ctx),
+    clientFees: feeOn?.n ?? 0, clientsPage: ctx.entitlements.features.clients !== false,
+  });
+  // A client's staff never receive what the company set up in Settings (N84): their guide has no such step, and the facts above for it are empty.
+  return json({ kind: ctx.kind, role, steps, doneCount: steps.filter((s) => s.done).length, total: steps.length });
 }
 
 // Options for the filter bar. Not narrowed by the filter itself, so you can always change it.
@@ -902,7 +1009,17 @@ const settingsView = async (ctx: Ctx) => {
   const accts = ctx.kind === "agency" ? await sql()`select location_id, name, client_view from locations where installation_id = ${ctx.installationId} and not ignored order by lower(coalesce(name, ''))` : [];
   // Is a meeting tool connected? Its privacy switches stay visible even while the Meeting notes page is off.
   const [meetingTool] = await sql()`select 1 from connections where installation_id = ${ctx.installationId} and provider in ('fathom', 'zoom') ${zoomOn(ctx) ? sql()`` : sql()`and provider <> 'zoom'`} limit 1`;
-  return json({ features: ctx.entitlements.features, settings: publicSettings(settings), slackConfigured: Boolean(settings.slackWebhookUrl), kind: ctx.kind, canDeleteData: ctx.session.dataOwner === true, meetingTool: Boolean(meetingTool), clientView: counts ? { on: counts.on_ as number, total: counts.total as number } : null, clientAccounts: accts.map((r) => ({ locationId: r.location_id as string, name: (r.name as string | null) ?? "Unnamed account", on: r.client_view === true })) });
+  // Which permissions this install granted (names only), grouped by what they are for (N64). Not known for the demo, so nothing is marked missing there.
+  const [inst] = await sql()`select scope from installations where id = ${ctx.installationId}`;
+  const granted = ctx.demo || typeof inst?.scope !== "string" || inst.scope.trim() === "" ? null : parseGranted(inst.scope as string);
+  // Every client account, ignored ones too, so the owner can leave a test account out of every number or put it back (N1). Agency sessions only.
+  const everyAccount = ctx.kind === "agency" ? await sql()`select location_id, name, ignored from locations where installation_id = ${ctx.installationId} order by lower(coalesce(name, ''))` : [];
+  return json({
+    features: ctx.entitlements.features, settings: publicSettings(settings), slackConfigured: Boolean(settings.slackWebhookUrl), kind: ctx.kind, canDeleteData: ctx.session.dataOwner === true, meetingTool: Boolean(meetingTool),
+    clientView: counts ? { on: counts.on_ as number, total: counts.total as number } : null, clientAccounts: accts.map((r) => ({ locationId: r.location_id as string, name: (r.name as string | null) ?? "Unnamed account", on: r.client_view === true })),
+    permissions: groupStatus(granted), noteWriteGranted: granted === null ? null : granted.includes(NOTE_SCOPE),
+    testAccounts: everyAccount.map((r) => ({ locationId: r.location_id as string, name: (r.name as string | null) ?? "Unnamed account", ignored: r.ignored === true, looksTest: isTestName(r.name as string | null) })),
+  });
 };
 
 function publicSettings(s: Settings) {
@@ -999,6 +1116,8 @@ async function settingsUpdate(ctx: Ctx) {
     patch.customChecklist = [...new Set(list.map((x: string) => x.trim()))];
   }
   await updateSettings(ctx.installationId, patch);
+  // Every change to a setting is written to the audit log: the names of the settings, never their values (a Slack address is a secret).
+  await logSettingsChange(ctx.installationId, actorOf(ctx), ctx.kind, [...Object.keys(patch), ...("clientViewAll" in body && ctx.kind === "agency" ? ["clientViewAll"] : [])]);
   // Recomputing every account takes many seconds. Only settings that feed a number or an alert need it; a brand name, an email address or a
   // Slack address changes no figure, so saving those returns at once.
   if (Object.keys(patch).some((k) => INSIGHT_SETTINGS.has(k))) await refreshInsights(ctx.installationId);
@@ -1017,6 +1136,7 @@ async function flags(ctx: Ctx, locationId: string) {
     else return json({ error: "Owner must be up to 60 characters" }, 400);
   }
   if (!(await setLocationFlags(ctx.installationId, locationId, patch))) return json({ error: "Account not found" }, 404);
+  await logAccountFlags(ctx.installationId, actorOf(ctx), ctx.kind, locationId, Object.keys(patch));
   await refreshInsights(ctx.installationId);
   return json({ ok: true });
 }
@@ -1134,12 +1254,15 @@ async function keysCreate(ctx: Ctx) {
   const created = await createKey(ctx.installationId, name);
   if (created === "limit") return json({ error: `You can have up to ${MAX_KEYS} active keys. Revoke one first.` }, 400);
   // The key is returned this one time only; we keep just a hash.
+  await logKeyChange(ctx.installationId, actorOf(ctx), ctx.kind, true);
   return json({ key: created.key, row: created.row });
 }
 
 async function keysRevoke(ctx: Ctx, id: string) {
   if (!UUID.test(id)) return json({ error: "Key not found" }, 404);
-  return (await revokeKey(ctx.installationId, id)) ? json({ ok: true }) : json({ error: "Key not found" }, 404);
+  if (!(await revokeKey(ctx.installationId, id))) return json({ error: "Key not found" }, 404);
+  await logKeyChange(ctx.installationId, actorOf(ctx), ctx.kind, false);
+  return json({ ok: true });
 }
 
 // "Delete my data": only the owner (see mayDeleteData), only with the typed word, and always written to the audit log, refused or done.
@@ -1272,10 +1395,16 @@ async function contactIntel(ctx: Ctx) {
 async function teamView(ctx: Ctx) {
   const sc = await scope(ctx);
   const allowed = await allowedIds(ctx);
-  const [rows, pace] = await Promise.all([teamStats(ctx.installationId, allowed, sc.settings.staleDays), teamPace(ctx.installationId, allowed)]);
+  const [rows, pace, [acc]] = await Promise.all([
+    teamStats(ctx.installationId, allowed, sc.settings.staleDays), teamPace(ctx.installationId, allowed),
+    // How the last read of the team list went for the accounts in view, so a person who has no name can be explained instead of shown as an id.
+    sql()`select count(*) filter (where users_access = 'ok')::int ok, count(*) filter (where users_access = 'needs_permission')::int blocked from locations
+      where installation_id = ${ctx.installationId} and not ignored ${allowed ? sql()`and location_id = any(${allowed}::text[])` : sql()``}`,
+  ]);
+  const usersState = Number(acc?.ok) > 0 ? "ok" : Number(acc?.blocked) > 0 ? "needs_permission" : null;
   return json({
     staleDays: sc.settings.staleDays,
-    members: rows.map((r) => ({ ...r, label: teamLabel(r.userId, r.name), winRate: teamWinRate(r), pace: paceOf(pace.get(r.userId) ?? { replies: 0, medianSeconds: null, held: 0, noShow: 0 }) })),
+    members: rows.map((r) => ({ ...r, label: teamLabel(r.userId, r.name, usersState), winRate: teamWinRate(r), pace: paceOf(pace.get(r.userId) ?? { replies: 0, medianSeconds: null, held: 0, noShow: 0 }) })),
   });
 }
 
@@ -1309,14 +1438,25 @@ async function callQueueView(ctx: Ctx) {
   const parsed = parseFilters(params);
   if (!parsed.ok) return json({ error: parsed.error }, 400);
   const allowed = await allowedIds(ctx);
-  const [queue, speed, summary, sc] = await Promise.all([
-    callQueue(ctx.installationId, allowed, parsed.filters), speedToLead(ctx.installationId, allowed), outcomeSummary(ctx.installationId), scope(ctx),
-  ]);
-  return json({
-    presets: PRESETS, filters: parsed.filters, outcomes: OUTCOME_LABEL, total: queue.total, speedToLead: speed, summary,
-    rows: queue.rows.map((row) => ({ ...row, url: sc.links.contact(row.locationId, row.contactId) })),
-  });
+  // One page of up to CALL_PAGE rows (the list holds at most 400 candidates); the whole list is read once and kept for a short time, so turning the page is instant.
+  const page = Math.min(4, Math.max(1, Math.floor(Number(params.page)) || 1));
+  const started = Date.now();
+  try {
+    const [queue, speed, summary, sc] = await Promise.all([
+      callQueueAll(ctx.installationId, allowed, parsed.filters), speedToLead(ctx.installationId, allowed), outcomeSummary(ctx.installationId), scope(ctx),
+    ]);
+    return json({
+      presets: PRESETS, filters: parsed.filters, outcomes: OUTCOME_LABEL, total: queue.total, capped: queue.total >= 400, page, pages: Math.max(1, Math.ceil(queue.total / CALL_PAGE)), pageSize: CALL_PAGE,
+      speedToLead: speed, summary, tookMs: Date.now() - started, cached: queue.cached === true,
+      rows: queue.rows.slice((page - 1) * CALL_PAGE, page * CALL_PAGE).map((row) => ({ ...row, url: sc.links.contact(row.locationId, row.contactId) })),
+    });
+  } catch (error) {
+    const t = timeoutResponse(error, "call-queue");
+    if (t) return t;
+    throw error;
+  }
 }
+const CALL_PAGE = 100;
 
 async function callListsView(ctx: Ctx) {
   return json({ lists: await listCallLists(ctx.installationId), max: MAX_LISTS });
@@ -1644,7 +1784,7 @@ const clientDeps: clientRoutes.Deps = { allowedIds, accountsFor, actorOf: (ctx) 
 
 const FEATURE_FOR: Record<string, Feature> = {
   search: "search", onboarding: "onboarding", stale: "stale", inbox: "inbox", pipelines: "pipelines", duplicates: "duplicates", email: "email",
-  alerts: "alerts", appointments: "appointments", audit: "audit", speed: "speed", "appointment-insights": "appointments", meetings: "meetings", connections: "connections", cleanup: "cleanup", "setup-compare": "setup_compare", playbooks: "playbooks", daily: "overview", team: "team", "deal-events": "pipelines", contact: "search", settings: "settings", export: "exports", digest: "overview", "api-keys": "ai", hygiene: "stale", "pipeline-intel": "pipelines", "contact-intel": "activity", clients: "clients", "client-onboarding": "onboarding", qbr: "reports", "comms-intel": "inbox", "deal-gaps": "pipelines", "call-queue": "calls", "call-lists": "calls", "call-outcomes": "calls",
+  "my-connections": "connections", "team-connections": "connections", "meeting-policy": "connections", alerts: "alerts", appointments: "appointments", audit: "audit", speed: "speed", "appointment-insights": "appointments", meetings: "meetings", connections: "connections", cleanup: "cleanup", "setup-compare": "setup_compare", playbooks: "playbooks", daily: "overview", team: "team", "deal-events": "pipelines", contact: "search", settings: "settings", export: "exports", digest: "overview", "api-keys": "ai", hygiene: "stale", "pipeline-intel": "pipelines", "contact-intel": "activity", clients: "clients", "client-onboarding": "onboarding", qbr: "reports", "comms-intel": "inbox", "deal-gaps": "pipelines", "call-queue": "calls", "call-lists": "calls", "call-outcomes": "calls", people: "search",
 };
 
 export async function handle(request: Request, segments: string[]): Promise<Response> {
@@ -1658,10 +1798,22 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
   if (blocked) return blocked;
 
   try {
+    if (a === "people") {
+      return await handlePeople(ctx, {
+        allowed: () => allowedIds(ctx),
+        links: async () => (await scope(ctx)).links,
+        coldChoice: async () => (ctx.kind === "client" ? null : (await getSettings(ctx.installationId)).coldTags),
+        voter: voterOf(ctx),
+        locationToken: (locationId) => locationAccessToken(ctx.session.companyId, locationId),
+      });
+    }
     if (method === "GET") {
       if (a === "overview") return await overview(ctx);
+      if (a === "daily" && b === "changes") return await dailyChanges(ctx);
       if (a === "daily") return await dailyView(ctx);
       if (a === "roadmap") return await roadmapView(ctx);
+      if (a === "appointments" && b === "breakdown") return await appointmentsBreakdownView(ctx);
+      if (a === "appointments" && b && c && LOCATION_ID.test(b) && LOCATION_ID.test(c)) return await appointmentDetailView(ctx, b, c);
       if (a === "appointments") return await appointmentsView(ctx);
       if (a === "audit" && b === "shares") return await auditShares(ctx);
       if (a === "audit") return await auditViewData(ctx);
@@ -1671,6 +1823,8 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       if (a === "segments") return await segmentsView(ctx);
       if (a === "meetings") return await meetingsView(ctx);
       if (a === "connections" && !b) return await connectionsView(ctx);
+      if (a === "my-connections" && !b) return await myConnectionsView(ctx);
+      if (a === "team-connections" && !b) return await teamConnectionsView(ctx);
       if (a === "cleanup" && !b) return await cleanupView(ctx);
       if (a === "cleanup" && b) return await cleanupRunView(ctx, b);
       if (a === "playbooks") return await playbooksView(ctx);
@@ -1688,6 +1842,7 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       if (a === "duplicates") return await duplicates(ctx);
       if (a === "email" && !b) return await emailHealth(ctx);
       if (a === "alerts") return await alertsView(ctx);
+      if (a === "settings" && b === "history") return await settingsHistoryView(ctx);
       if (a === "settings") return await settingsView(ctx);
       if (a === "export" && b) return await exportCsv(ctx, b);
       if (a === "sync-status") return await syncStatusView(ctx);
@@ -1724,10 +1879,16 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       if (a === "audit" && b === "share") return await auditShare(ctx);
       if (a === "audit" && b === "revoke") return await auditRevoke(ctx);
       if (a === "roadmap" && !b) return await roadmapVote(ctx);
+      if (a === "roadmap" && b === "suggest" && !c) return await suggest(ctx, request);
+      if (a === "feedback" && !b) return await giveFeedback(ctx, request);
+      if (a === "problem" && !b) return await reportProblem(ctx, request);
       if (a === "cleanup" && b === "preview") return await cleanupPreview(ctx);
       if (a === "cleanup" && b && c === "apply") return await cleanupWork(ctx, b, "apply");
       if (a === "cleanup" && b && c === "undo") return await cleanupWork(ctx, b, "undo");
       if (a === "connections" && b && c === "start") return await connectionStart(ctx, b);
+      if (a === "my-connections" && b && c === "start") return await myConnectionStart(ctx, b);
+      if (a === "my-connections" && b && c === "test") return await myConnectionTest(ctx, b);
+      if (a === "team-connections" && b && c === "revoke") return await teamConnectionRevoke(ctx, b);
       if (a === "meetings" && b === "hooks" && !c) return await meetingHookCreate(ctx);
       if (a === "meetings" && b === "hooks" && c && segments[3] === "revoke") return await meetingHookRevoke(ctx, c);
       if (a === "duplicates" && b === "review") return await duplicateReview(ctx);
@@ -1752,12 +1913,15 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       if (a === "client-onboarding" && b === "templates") return await clientRoutes.templateRemove(ctx);
       if (a === "client-onboarding" && b && LOCATION_ID.test(b) && c === "steps") return await clientRoutes.stepRemove(ctx, clientDeps, b);
       if (a === "connections" && b && !c) return await connectionRemove(ctx, b);
+      if (a === "my-connections" && b && !c) return await myConnectionRemove(ctx, b);
       if (a === "call-lists" && b && /^[0-9a-fA-F-]{36}$/.test(b)) return await callListDelete(ctx, b);
     }
     if (method === "PUT") {
       if (a === "settings") return await settingsUpdate(ctx);
+      if (a === "appointments" && b === "targets") return await appointmentTargetUpdate(ctx);
       if (a === "goals") return await goalsUpdate(ctx);
       if (a === "stage-rules") return await stageRuleSave(ctx);
+      if (a === "meeting-policy" && !b) return await policySave(ctx);
       if (a === "meetings" && b) return await meetingUpdate(ctx, b);
       if (a === "team" && b && LOCATION_ID.test(b)) return await teamName(ctx, b);
       if (a === "clients" && b && LOCATION_ID.test(b)) return await clientUpdate(ctx, b);

@@ -11,8 +11,13 @@ import type { Identity, Role } from "@/lib/identity";
 const METHODS = ["GET", "POST", "PUT", "DELETE"] as const;
 
 // Everything a client's staff may call. Anything else is refused, whatever it is called.
-const CLIENT_GET = new Set(["overview", "accounts", "onboarding", "search", "stale", "hygiene", "inbox", "pipelines", "duplicates", "alerts", "pipeline-intel", "contact-intel", "comms-intel", "deal-gaps", "deal-events", "contact", "start", "appointments", "appointment-insights", "audit", "speed", "roadmap", "freshness", "client-trends"]);
-const CLIENT_POST = new Set(["usage", "roadmap"]);
+const CLIENT_GET = new Set(["my-connections", "team-connections", "overview", "accounts", "onboarding", "search", "stale", "hygiene", "inbox", "pipelines", "duplicates", "alerts", "pipeline-intel", "contact-intel", "comms-intel", "deal-gaps", "deal-events", "contact", "people", "start", "appointments", "appointment-insights", "audit", "speed", "roadmap", "freshness", "client-trends"]);
+// Stage E0: every role connects its OWN tools, so these doors are open to a client's staff too. They only ever touch the signed-in person's own rows
+// (my-connections), or, for an account administrator only, the status of the people of their own account (team-connections) and that account's rule
+// (meeting-policy). The handlers refuse an account user for the last two; tests/unit/e0-connections-db.test.ts asks them with real sessions.
+const CLIENT_POST = new Set(["usage", "roadmap", "my-connections", "team-connections", "feedback", "problem"]);
+const CLIENT_PUT = new Set(["meeting-policy"]);
+const CLIENT_DELETE = new Set(["my-connections"]);
 
 // Every first path segment the API handles, read from the router itself, plus names of things that must never reach a client even if they are built later.
 const router = readFileSync(join(process.cwd(), "src/lib/api/router.ts"), "utf8");
@@ -22,7 +27,7 @@ const never = ["sync-status", "tickets", "ticket", "fees", "fee", "notes", "bill
 describe("a client's staff can call only the read-only views of their own account", () => {
   it("the router handles a meaningful set of routes (so the loops below are not looping over nothing)", () => {
     expect(handled.length).toBeGreaterThan(35);
-    for (const s of ["settings", "clients", "connections", "meetings", "api-keys", "qbr", "cleanup"]) expect(handled).toContain(s);
+    for (const s of ["settings", "clients", "connections", "meetings", "api-keys", "qbr", "cleanup", "my-connections", "team-connections", "meeting-policy"]) expect(handled).toContain(s);
   });
 
   it("every route the router handles, and every name that must never reach a client, is refused for a client except the listed read-only views", () => {
@@ -30,7 +35,7 @@ describe("a client's staff can call only the read-only views of their own accoun
       for (const method of METHODS) {
         for (const path of [[segment], [segment, "x"], [segment, "x", "y"]]) {
           // A listed view may take an id after its name (accounts/<id>, contact/<id>/<id>); the handler checks that id against the caller's account.
-          const expected = (method === "GET" && CLIENT_GET.has(segment)) || (method === "POST" && CLIENT_POST.has(segment));
+          const expected = (method === "GET" && CLIENT_GET.has(segment)) || (method === "POST" && CLIENT_POST.has(segment)) || (method === "PUT" && CLIENT_PUT.has(segment)) || (method === "DELETE" && CLIENT_DELETE.has(segment));
           expect(routeAllowed("client", method, path), `${method} /${path.join("/")} for a client`).toBe(expected);
         }
       }
@@ -44,6 +49,13 @@ describe("a client's staff can call only the read-only views of their own accoun
     for (const method of ["POST", "PUT", "DELETE"] as const) expect(routeAllowed("client", method, ["inbox"]), method + " /inbox").toBe(false);
     expect(routeAllowed("client", "PUT", ["inbox", "views"])).toBe(false);
     expect(routeAllowed("client", "POST", ["inbox", "other"])).toBe(false);
+  });
+
+  it("the older shared connections page and its writes stay closed to a client (only the personal and team-status doors above are open)", () => {
+    for (const method of METHODS) expect(routeAllowed("client", method, ["connections", "x"]), `${method} connections/x`).toBe(false);
+    expect(routeAllowed("client", "POST", ["connections", "slack", "start"])).toBe(false);
+    expect(routeAllowed("client", "GET", ["meeting-policy"]), "a client cannot read the rules, only an administrator saves their account's").toBe(false);
+    expect(routeAllowed("client", "PUT", ["team-connections", "x", "revoke"]), "revoking is a POST").toBe(false);
   });
 
   it("a client can never change anything about an account, switch client access, or read the agency controls on one", () => {

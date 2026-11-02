@@ -70,7 +70,7 @@ export function overview(appts: Appt[], now: number) {
 }
 
 // No-shows in the last `days` days whose contact has not been booked again since.
-export function noShowRecovery(appts: Appt[], now: number, days = 14): Appt[] {
+export function noShowRecovery<T extends Appt>(appts: T[], now: number, days = 14): T[] {
   const latestBooked = new Map<string, number>();
   for (const a of appts) {
     if (!a.contactId || !isActive(a) || a.status === "noshow") continue;
@@ -100,7 +100,7 @@ export function breakdown(appts: Appt[], now: number, by: "calendar" | "person")
 }
 
 // What changed, in words, so the page can lead with it.
-export function headline(last: Rates, prior: Rates): string[] {
+export function headline(last: Rates, prior: Rates, against = "the 30 days before"): string[] {
   const out: string[] = [];
   // A claim about change needs a real baseline in both periods: "down 100%" from three appointments is noise, not news.
   if (last.showRate !== null && prior.showRate !== null && last.outcomes >= MIN_BASELINE_FOR_CLAIM && prior.outcomes >= MIN_BASELINE_FOR_CLAIM) {
@@ -109,7 +109,7 @@ export function headline(last: Rates, prior: Rates): string[] {
   }
   if (prior.booked >= MIN_BASELINE_FOR_CLAIM) {
     const d = Math.round(((last.booked - prior.booked) / prior.booked) * 100);
-    if (Math.abs(d) >= 15) out.push(`Bookings are ${d > 0 ? "up" : "down"} ${Math.abs(d)}% on the 30 days before.`);
+    if (Math.abs(d) >= 15) out.push(`Bookings are ${d > 0 ? "up" : "down"} ${Math.abs(d)}% on ${against}.`);
   }
   if (last.unmarked > 0) out.push(`${last.unmarked} past appointment${last.unmarked === 1 ? " has" : "s have"} no outcome recorded, so the real show rate is hidden.`);
   return out;

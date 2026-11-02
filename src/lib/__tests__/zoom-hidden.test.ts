@@ -27,14 +27,15 @@ function files(dir: string, out: string[] = []): string[] {
 //   notes    our own documentation of a route, never shown on a screen
 // A new mention anywhere else fails this test, and so does a changed count in a gated file, so each one is looked at on purpose.
 const ALLOWED: Record<string, { count: number; why: string }> = {
-  "src/app/app/views/connections.tsx": { count: 2, why: "gated: the Zoom card is drawn only when the API lists Zoom, and the API leaves it out while the switch is off" },
+  "src/app/app/views/connections.tsx": { count: 3, why: "gated: the Zoom card (its name and its sentence) is drawn only when the API lists Zoom, and an older shared Zoom connection is listed only when the API sends it; the API leaves both out while the switch is off" },
   "src/app/app/views/meetings.tsx": { count: 3, why: "gated: each mention is behind moreTools, which is the switch" },
   "src/app/privacy/page.tsx": { count: 1, why: "gated: the sentence about connected services picks its words from the switch" },
-  "src/lib/api/router.ts": { count: 1, why: "gated: the Getting started step picks its words from the switch" },
+  "src/lib/getting-started.ts": { count: 1, why: "gated: the meeting step picks its words from the switch (the facts say whether Zoom is on)" },
   "src/app/api/hooks/zoom/route.ts": { count: 1, why: "plumbing: a log line when a Zoom notification fails" },
+  "src/lib/api/connections-api.ts": { count: 1, why: "gated: the card list adds Zoom only when zoomOn(ctx), the switch" },
+  "src/lib/connections/personal-flow.ts": { count: 3, why: "plumbing: the provider's name in messages that follow a personal Zoom sign-in, which cannot start while the switch is off (the start route answers 404)" },
   "src/lib/connections/flow.ts": { count: 1, why: "plumbing: the provider's name for messages that follow a Zoom sign-in" },
   "src/lib/connections/oauth.ts": { count: 4, why: "plumbing: errors from Zoom's own sign-in and API calls" },
-  "src/lib/connections/queries.ts": { count: 1, why: "plumbing: the default label of a new Zoom connection" },
   "src/lib/route-guards.ts": { count: 2, why: "notes: the guard table (the Zoom notification route, and the privacy page that reads the switch)" },
 };
 

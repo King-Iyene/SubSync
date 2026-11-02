@@ -7,15 +7,17 @@ import { getInstalledLocations, getLocationToken } from "../ghl/client";
 import { getCompanyAccessToken, purgeLocationData } from "../ghl/installations";
 import {
   fetchAppointments, fetchCalendars, fetchConversationMessages, fetchUsers, isPermissionError, fetchCalendarCount, fetchContactsPage, fetchConversationsPage, fetchLocationDetails, fetchOpportunitiesPage, fetchPipelines,
-  type ContactCursor, type ConversationRow, type OpportunityRow,
+  type ContactCursor, type ContactRow, type ConversationRow, type OpportunityRow,
 } from "./ghl-data";
-import { leadFromMessages } from "../analytics/speed-intel";
+import { firstTouches, leadFromMessages } from "../analytics/speed-intel";
 import { CONVERSATIONS_READ_PER_ACCOUNT, CONVERSATION_PAGE_SIZE } from "../analytics/waiting";
 import { diffAppointmentEvents } from "./appointment-events";
 import { applyLeadRules } from "./lead-rules-apply";
 import { diffDealEvents } from "./deal-events";
+import { diffTagEvents } from "./tag-events";
 import { listAllInstalledLocations } from "./installed-locations";
 import { REFRESH_DUE_AFTER_MINUTES, REFRESH_EVERY_MINUTES } from "./schedule";
+import { OUR_WRITE_LEAD_MS, OUR_WRITE_WINDOW_MS } from "../connections/echo";
 
 // Resumable sync. Work is a queue of jobs in `sync_jobs`; a cron route calls runSlice() which
 // claims jobs one at a time (FOR UPDATE SKIP LOCKED, so parallel invocations never collide),
@@ -224,6 +226,7 @@ async function handleContacts(job: Job, deadline: number): Promise<Outcome> {
     const { contacts, next } = await fetchContactsPage(token, loc, cursor);
     const unique = [...new Map(contacts.map((c) => [c.contactId, c])).values()];
     if (unique.length > 0) {
+      await recordTagEvents(job.installationId, loc, unique);
       const rows = unique.map((c) => ({
         installation_id: job.installationId, location_id: loc, contact_id: c.contactId, first_name: c.firstName, last_name: c.lastName,
         email: c.email, phone: c.phone, tags: c.tags, date_added: c.dateAdded, last_activity_at: c.lastActivityAt,
@@ -234,7 +237,12 @@ async function handleContacts(job: Job, deadline: number): Promise<Outcome> {
         insert into cached_contacts ${db(rows as never)}
         on conflict (installation_id, location_id, contact_id) do update set
           first_name = excluded.first_name, last_name = excluded.last_name, email = excluded.email, phone = excluded.phone,
-          tags = excluded.tags, date_added = excluded.date_added, last_activity_at = excluded.last_activity_at,
+          tags = excluded.tags, date_added = excluded.date_added,
+          -- A note or field SubSync wrote can move the contact activity date. Within the window after one of our writes the older date is kept (spec 10).
+          last_activity_at = case when exists (
+            select 1 from crm_writes w where w.installation_id = excluded.installation_id and w.location_id = excluded.location_id and w.contact_id = excluded.contact_id
+              and w.undone_at is null and excluded.last_activity_at >= w.created_at - make_interval(secs => ${OUR_WRITE_LEAD_MS / 1000}) and excluded.last_activity_at <= w.created_at + make_interval(secs => ${OUR_WRITE_WINDOW_MS / 1000}))
+            then cached_contacts.last_activity_at else excluded.last_activity_at end,
           updated_remote_at = excluded.updated_remote_at, synced_at = excluded.synced_at,
           source = excluded.source, dnd = excluded.dnd, birth_date = excluded.birth_date, assigned_to = excluded.assigned_to`;
     }
@@ -248,6 +256,29 @@ async function handleContacts(job: Job, deadline: number): Promise<Outcome> {
     if (Date.now() > deadline) break;
   }
   return { done: false, cursor: (cursor ?? {}) as Record<string, unknown> };
+}
+
+// Compare this page of contacts' tags with what we hold and keep a log of every tag seen added or removed (stage F10). The platform does not say when a tag was
+// added, so the day is the day SubSync noticed. The first read of an account records nothing (every tag would look new). A failure here never stops the sync.
+async function recordTagEvents(installationId: string, loc: string, incoming: ContactRow[]): Promise<void> {
+  try {
+    const db = sql();
+    const ids = incoming.map((c) => c.contactId);
+    const [before, [prior]] = await Promise.all([
+      db`select contact_id, tags from cached_contacts where installation_id = ${installationId} and location_id = ${loc} and contact_id = any(${ids})`,
+      db`select contacts_synced_at from locations where installation_id = ${installationId} and location_id = ${loc}`,
+    ]);
+    const events = diffTagEvents(
+      incoming.map((c) => ({ contactId: c.contactId, tags: c.tags })),
+      new Map(before.map((r) => [r.contact_id as string, r.tags as string[] | null])),
+      prior?.contacts_synced_at != null,
+    );
+    if (events.length === 0) return;
+    const rows = events.map((e) => ({ installation_id: installationId, location_id: loc, contact_id: e.contactId, tag: e.tag, kind: e.kind }));
+    await db`insert into contact_tag_events ${db(rows as never)}`;
+  } catch (error) {
+    console.error("tag history not recorded", { message: safeError(error) });
+  }
 }
 
 // Compare this page of deals with what we hold and keep a log of what changed (a stage move, a
@@ -365,9 +396,12 @@ async function handleAppointments(job: Job): Promise<Outcome> {
     for (const u of users) {
       if (!u.name) continue;
       // A name someone typed is never overwritten by the platform's.
+      // The picture comes with the name from the same read (no extra permission). It is refreshed every time; the name only when it was not typed.
       await db`
-        insert into team_names (installation_id, user_id, name, source) values (${job.installationId}, ${u.id}, ${u.name}, 'platform')
-        on conflict (installation_id, user_id) do update set name = excluded.name where team_names.source = 'platform'`;
+        insert into team_names (installation_id, user_id, name, source, photo_url, seen_at) values (${job.installationId}, ${u.id}, ${u.name}, 'platform', ${u.photoUrl}, now())
+        on conflict (installation_id, user_id) do update set
+          name = case when team_names.source = 'platform' then excluded.name else team_names.name end,
+          photo_url = excluded.photo_url, seen_at = now()`;
     }
   } catch (error) {
     usersAccess = isPermissionError(error) ? "needs_permission" : "error";
@@ -386,7 +420,7 @@ async function handleAppointments(job: Job): Promise<Outcome> {
       for (const a of events) {
         rows.push({
           installation_id: job.installationId, location_id: loc, appointment_id: a.appointmentId, calendar_id: a.calendarId ?? cal.id, calendar_name: cal.name,
-          contact_id: a.contactId, title: a.title, status: a.status, start_at: a.startAt, end_at: a.endAt, assigned_to: a.assignedTo, created_remote_at: a.createdAt,
+          contact_id: a.contactId, title: a.title, status: a.status, start_at: a.startAt, end_at: a.endAt, assigned_to: a.assignedTo, created_remote_at: a.createdAt, booked_by_user: a.bookedByUser, booking_channel: a.bookingChannel,
           synced_at: new Date(),
         });
       }
@@ -417,7 +451,7 @@ async function handleAppointments(job: Job): Promise<Outcome> {
         on conflict (installation_id, location_id, appointment_id) do update set
           calendar_id = excluded.calendar_id, calendar_name = excluded.calendar_name, contact_id = excluded.contact_id, title = excluded.title,
           status = excluded.status, start_at = excluded.start_at, end_at = excluded.end_at, assigned_to = excluded.assigned_to,
-          created_remote_at = excluded.created_remote_at, synced_at = excluded.synced_at`;
+          created_remote_at = excluded.created_remote_at, booked_by_user = excluded.booked_by_user, booking_channel = excluded.booking_channel, synced_at = excluded.synced_at`;
     }
     // Anything in the window that we did not see this time was cancelled and removed, or moved out of it.
     await db`
@@ -448,7 +482,7 @@ async function handleSpeed(job: Job): Promise<Outcome> {
     join cached_conversations v on v.installation_id = c.installation_id and v.location_id = c.location_id and v.contact_id = c.contact_id
     left join lead_touches t on t.installation_id = c.installation_id and t.location_id = c.location_id and t.conversation_id = v.conversation_id
     where c.installation_id = ${job.installationId} and c.location_id = ${loc} and c.date_added >= ${new Date(Date.now() - SPEED_WINDOW_DAYS * 86_400_000)}
-      and (t.id is null or t.touch_at is null)
+      and (t.id is null or t.touch_at is null or t.read_version < 1)
     order by (t.id is null) desc, c.date_added desc limit ${SPEED_PER_RUN}`;
   const rules = () => applyLeadRules(job.installationId, loc).catch((e) => console.error("Applying the lead rules failed", safeError(e)));
   if (candidates.length === 0) { await rules(); return DONE; }
@@ -460,10 +494,20 @@ async function handleSpeed(job: Job): Promise<Outcome> {
       const msgs = await fetchConversationMessages(token, loc, c.conversation_id as string);
       const lead = leadFromMessages(msgs, c.date_added instanceof Date ? c.date_added.getTime() : null, countAutomated);
       if (!lead) continue;
+      // The automatic first message and the person's first reply, kept apart whatever the setting counts (N78).
+      const ft = firstTouches(msgs, lead.leadAt);
+      const at = (ms: number | null) => (ms === null ? null : new Date(ms));
+      // A conversation longer than one page (100 messages) was read from its newest end only, so its first messages were not seen: 2 means "read, not complete",
+      // and the screen does not use those leads for the automatic-versus-person view. 1 means read in full.
+      const version = msgs.length >= 100 ? 2 : 1;
+      // A reply already recorded is never taken back by a later read that saw fewer messages (touch_at and its user are kept once set).
       await db`
-        insert into lead_touches (installation_id, location_id, contact_id, conversation_id, lead_at, touch_at, touch_user_id)
-        values (${job.installationId}, ${loc}, ${c.contact_id}, ${c.conversation_id}, ${new Date(lead.leadAt)}, ${lead.touchAt === null ? null : new Date(lead.touchAt)}, ${lead.touchUserId})
-        on conflict (installation_id, location_id, conversation_id) do update set lead_at = excluded.lead_at, touch_at = excluded.touch_at, touch_user_id = excluded.touch_user_id, checked_at = now()`;
+        insert into lead_touches (installation_id, location_id, contact_id, conversation_id, lead_at, touch_at, touch_user_id, auto_touch_at, human_touch_at, read_version)
+        values (${job.installationId}, ${loc}, ${c.contact_id}, ${c.conversation_id}, ${new Date(lead.leadAt)}, ${at(lead.touchAt)}, ${lead.touchUserId}, ${at(ft.autoAt)}, ${at(ft.humanAt)}, ${version})
+        on conflict (installation_id, location_id, conversation_id) do update set lead_at = excluded.lead_at,
+          touch_at = coalesce(lead_touches.touch_at, excluded.touch_at),
+          touch_user_id = case when lead_touches.touch_at is not null then lead_touches.touch_user_id else excluded.touch_user_id end,
+          auto_touch_at = excluded.auto_touch_at, human_touch_at = excluded.human_touch_at, read_version = excluded.read_version, checked_at = now()`;
     } catch (error) {
       if (isPermissionError(error)) { access = "needs_permission"; break; }
       console.error("Reading a conversation failed", safeError(error));

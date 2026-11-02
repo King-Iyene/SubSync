@@ -131,16 +131,16 @@ export function bookingVelocity(leads: Lead[], appts: Appt[]) {
 
 // ---------- show rate by lead source (1.4) ----------
 
-export function showRateBySource(appts: Appt[], sourceOf: (locationId: string, contactId: string) => string | null, now: number) {
+export function showRateBySource(appts: Appt[], sourceOf: (locationId: string, contactId: string) => string | null, now: number, days = 90) {
   const groups = new Map<string, Appt[]>();
   for (const a of appts) {
-    if (!a.contactId || a.startAt > now || a.startAt < now - 90 * DAY) continue;
+    if (!a.contactId || a.status === "invalid" || a.startAt > now || a.startAt < now - days * DAY) continue;
     const s = sourceOf(a.locationId, a.contactId) ?? "Unknown";
     (groups.get(s) ?? groups.set(s, []).get(s)!).push(a);
   }
   return [...groups.entries()].map(([source, list]) => {
     const r = rates(list, 0, Number.MAX_SAFE_INTEGER, now);
-    return { source, booked: list.length, held: r.held, noShow: r.noShow, showRate: r.showRate };
+    return { source, booked: list.length, held: r.held, noShow: r.noShow, showRate: r.showRate, ids: list.map((x) => x.id) };
   }).filter((x) => x.booked >= 3).sort((a, b) => b.booked - a.booked);
 }
 
@@ -171,11 +171,12 @@ export function fairness(appts: Appt[], now: number, days = 30) {
   }
   const people = [...counts.entries()].filter(([k]) => k !== "unassigned");
   const total = people.reduce((s, [, n]) => s + n, 0);
-  if (people.length < 2 || total < 10) return { rows: people.map(([key, count]) => ({ key, count, share: total ? count / total : 0, skew: 0 })), skewed: false, note: null as string | null };
+  // `judged` is false when there is too little to say whether the split is even (fewer than two people or ten appointments): the health score then leaves it out.
+  if (people.length < 2 || total < 10) return { rows: people.map(([key, count]) => ({ key, count, share: total ? count / total : 0, skew: 0 })), skewed: false, judged: false, note: null as string | null };
   const expected = total / people.length;
   const rows = people.map(([key, count]) => ({ key, count, share: count / total, skew: count / expected })).sort((a, b) => b.count - a.count);
   const skewed = rows[0].skew >= 1.4 || rows[rows.length - 1].skew <= 0.6;
-  return { rows, skewed, note: skewed ? `${rows[0].count} appointments went to one person and ${rows[rows.length - 1].count} to another, against an even share of about ${Math.round(expected)}.` : null };
+  return { rows, skewed, judged: true, note: skewed ? `${rows[0].count} appointments went to one person and ${rows[rows.length - 1].count} to another, against an even share of about ${Math.round(expected)}.` : null };
 }
 
 // People or contacts booked twice at nearly the same time (1.14).
@@ -209,26 +210,35 @@ export function funnel(leads: Lead[], appts: Appt[], wonContacts: Set<string>, n
   const key = (loc: string, id: string) => `${loc}:${id}`;
   const per = new Map<string, Appt[]>();
   for (const a of appts) if (a.contactId) (per.get(key(a.locationId, a.contactId)) ?? per.set(key(a.locationId, a.contactId), []).get(key(a.locationId, a.contactId))!).push(a);
-  let booked = 0, confirmed = 0, showed = 0, won = 0;
+  const keys: Record<"leads" | "booked" | "confirmed" | "showed" | "won", string[]> = { leads: [], booked: [], confirmed: [], showed: [], won: [] };
   for (const l of inPeriod) {
-    const list = (per.get(key(l.locationId, l.id)) ?? []).filter(isActive);
+    const k = key(l.locationId, l.id);
+    keys.leads.push(k);
+    const list = (per.get(k) ?? []).filter(isActive);
     if (list.length === 0) continue;
-    booked++;
-    if (list.some((a) => a.status === "confirmed" || a.status === "showed")) confirmed++;
-    if (list.some((a) => a.status === "showed")) showed++;
-    if (wonContacts.has(key(l.locationId, l.id))) won++;
+    keys.booked.push(k);
+    if (list.some((a) => a.status === "confirmed" || a.status === "showed")) keys.confirmed.push(k);
+    if (list.some((a) => a.status === "showed")) keys.showed.push(k);
+    if (wonContacts.has(k)) keys.won.push(k);
   }
+  // "Customer" means a lead with at least one WON deal. It is the last step, so it only says something once outcomes are recorded.
   const steps = [
-    { step: "Leads", count: inPeriod.length },
-    { step: "Booked", count: booked },
-    { step: "Confirmed or showed", count: confirmed },
-    { step: "Showed", count: showed },
-    { step: "Became customers", count: won },
+    { step: "Leads", count: keys.leads.length, members: keys.leads },
+    { step: "Booked", count: keys.booked.length, members: keys.booked },
+    { step: "Confirmed or showed", count: keys.confirmed.length, members: keys.confirmed },
+    { step: "Showed", count: keys.showed.length, members: keys.showed },
+    { step: "Became customers (won a deal)", count: keys.won.length, members: keys.won },
   ];
-  const withDrop = steps.map((s, i) => ({ ...s, kept: i === 0 ? null : steps[i - 1].count ? s.count / steps[i - 1].count : null }));
-  const worst = withDrop.slice(1).filter((s) => s.kept !== null).sort((a, b) => (a.kept as number) - (b.kept as number))[0] ?? null;
-  return { steps: withDrop, biggestLeak: worst ? `${Math.round((1 - (worst.kept as number)) * 100)}% are lost before "${worst.step}".` : null };
+  const withDrop = steps.map((s, i) => ({ ...s, members: s.members.slice(0, FUNNEL_MEMBER_CAP), kept: i === 0 ? null : steps[i - 1].count ? s.count / steps[i - 1].count : null, before: i === 0 ? null : steps[i - 1].count }));
+  // A "biggest leak" is only named when the step before it had at least FUNNEL_MIN_BASE leads: "100% lost" from 3 leads is noise, not news.
+  const worst = withDrop.slice(1).filter((s) => s.kept !== null && (s.before as number) >= FUNNEL_MIN_BASE).sort((a, b) => (a.kept as number) - (b.kept as number))[0] ?? null;
+  const lost = worst ? (worst.before as number) - worst.count : 0;
+  return { steps: withDrop, biggestLeak: worst && lost > 0 ? (worst.count === 0 ? `None of the ${worst.before} leads before it reached "${worst.step}".` : `${Math.round((1 - (worst.kept as number)) * 100)}% (${lost} of ${worst.before}) are lost before "${worst.step}".`) : null };
 }
+
+/** A leak is named only when the step before it had at least this many leads. */
+export const FUNNEL_MIN_BASE = 10;
+const FUNNEL_MEMBER_CAP = 60;
 
 // What a held appointment is worth: revenue won from contacts who showed, divided by showed appointments (1.20).
 export function appointmentValue(appts: Appt[], wonValueByContact: Map<string, number>, now: number) {
@@ -257,15 +267,68 @@ export function volumeForecast(appts: Appt[], now: number) {
 
 // ---------- the calendar health score (1.24) ----------
 
-export function calendarHealth(input: { showRate: number | null; confirmedShare: number | null; unmarkedShare: number; fairnessSkewed: boolean }) {
-  const parts = [
-    { label: "Show rate", points: input.showRate === null ? 15 : Math.round(input.showRate * 40), max: 40, note: input.showRate === null ? "not enough outcomes yet" : `${Math.round(input.showRate * 100)}% show` },
-    { label: "Confirmations", points: input.confirmedShare === null ? 10 : Math.round(input.confirmedShare * 25), max: 25, note: input.confirmedShare === null ? "nothing upcoming" : `${Math.round(input.confirmedShare * 100)}% confirmed` },
-    { label: "Outcomes recorded", points: Math.round((1 - Math.min(1, input.unmarkedShare)) * 20), max: 20, note: `${Math.round(input.unmarkedShare * 100)}% of past appointments have none` },
-    { label: "Fair distribution", points: input.fairnessSkewed ? 5 : 15, max: 15, note: input.fairnessSkewed ? "uneven across people" : "even" },
+/** The score needs at least this many of its four checks to have something to judge; otherwise it is n/a. */
+export const HEALTH_MIN_CHECKS = 3;
+
+// A check whose input is missing (null) earns no points and is left out of the score: it says "n/a" and why, so missing data never helps or hurts.
+// The score is the points earned out of the points the available checks could have given, as a number out of 100.
+export function calendarHealth(input: { showRate: number | null; confirmedShare: number | null; unmarkedShare: number | null; fairnessSkewed: boolean | null; unmarked?: number; past?: number }) {
+  const parts: Array<{ label: string; points: number | null; max: number; note: string }> = [
+    { label: "Show rate", points: input.showRate === null ? null : Math.round(input.showRate * 40), max: 40, note: input.showRate === null ? "n/a: needs 5 recorded outcomes" : `${Math.round(input.showRate * 100)}% show` },
+    { label: "Confirmations", points: input.confirmedShare === null ? null : Math.round(input.confirmedShare * 25), max: 25, note: input.confirmedShare === null ? "n/a: needs 3 appointments in the next 2 days" : `${Math.round(input.confirmedShare * 100)}% of the next 2 days confirmed` },
+    {
+      label: "Outcomes recorded", points: input.unmarkedShare === null ? null : Math.round((1 - Math.min(1, input.unmarkedShare)) * 20), max: 20,
+      note: input.unmarkedShare === null ? "n/a: no past appointments in the last 30 days" : input.unmarkedShare === 0 ? "every past appointment has an outcome" : input.unmarked !== undefined && input.past !== undefined ? `${input.unmarked} of ${input.past} past appointments have no outcome recorded` : `${Math.round(input.unmarkedShare * 100)}% of past appointments have no outcome recorded`,
+    },
+    { label: "Fair distribution", points: input.fairnessSkewed === null ? null : input.fairnessSkewed ? 5 : 15, max: 15, note: input.fairnessSkewed === null ? "n/a: needs 2 people and 10 appointments" : input.fairnessSkewed ? "uneven across people" : "even" },
   ];
-  const score = parts.reduce((s, p) => s + p.points, 0);
-  return { score, parts, band: score >= 75 ? "healthy" : score >= 50 ? "watch" : "needs work" };
+  const used = parts.filter((p) => p.points !== null);
+  const earned = used.reduce((s, p) => s + (p.points as number), 0);
+  const possible = used.reduce((s, p) => s + p.max, 0);
+  const score = used.length >= HEALTH_MIN_CHECKS && possible > 0 ? Math.round((earned / possible) * 100) : null;
+  return { score, parts, used: used.length, of: parts.length, band: score === null ? null : score >= 75 ? "healthy" : score >= 50 ? "watch" : "needs work" };
+}
+
+// ---------- the best-times grid: only above its minimum ----------
+
+/** The grid needs this many recorded outcomes in all, and at least HEATMAP_MIN_CELLS cells that each have 5 outcomes, or it says nothing. */
+export const HEATMAP_MIN_OUTCOMES = 30;
+export const HEATMAP_MIN_CELLS = 3;
+export function heatmapReadiness(cells: Heat[]) {
+  const outcomes = cells.reduce((s, c) => s + c.held + c.noShow, 0);
+  const rated = cells.filter((c) => c.showRate !== null).length;
+  return { ready: outcomes >= HEATMAP_MIN_OUTCOMES && rated >= HEATMAP_MIN_CELLS, outcomes, ratedCells: rated, needOutcomes: HEATMAP_MIN_OUTCOMES };
+}
+
+// ---------- sources: a contact's source and the calendar it booked through are different things ----------
+
+/**
+ * Some platforms record the calendar page a person booked through as the contact's "source". That is a calendar, not a place the lead came from,
+ * so those rows are folded into one line instead of being listed next to real sources like "Facebook". `calendarNames` are the account's own
+ * calendar names; the match ignores capitals and spacing. This is an inference from names, so the line says what it is.
+ */
+export const CALENDAR_SOURCE_LABEL = "Booked through a calendar page";
+export function splitSources<T extends { source: string; booked: number; held: number; noShow: number; ids?: string[] }>(rows: T[], calendarNames: Set<string>): Array<T & { showRate: number | null; outcomes: number; isCalendar: boolean }> {
+  const norm = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
+  const names = new Set([...calendarNames].map(norm));
+  const out: Array<T & { showRate: number | null; outcomes: number; isCalendar: boolean }> = [];
+  const merged = { source: CALENDAR_SOURCE_LABEL, booked: 0, held: 0, noShow: 0, ids: [] as string[] } as unknown as T;
+  let hasCalendar = false;
+  for (const r of rows) {
+    if (names.has(norm(r.source))) {
+      hasCalendar = true;
+      merged.booked += r.booked; merged.held += r.held; merged.noShow += r.noShow;
+      (merged.ids as string[]).push(...(r.ids ?? []));
+      continue;
+    }
+    const outcomes = r.held + r.noShow;
+    out.push({ ...r, outcomes, showRate: outcomes >= 5 ? r.held / outcomes : null, isCalendar: false });
+  }
+  if (hasCalendar) {
+    const outcomes = merged.held + merged.noShow;
+    out.push({ ...merged, outcomes, showRate: outcomes >= 5 ? merged.held / outcomes : null, isCalendar: true });
+  }
+  return out.sort((a, b) => b.booked - a.booked);
 }
 
 // ---------- after the appointment: follow-up gaps (1.22) ----------

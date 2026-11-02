@@ -17,7 +17,7 @@ let required: Record<string, Col[]> = {};
 const ALLOWED: Record<string, string> = {
   "alerts.severity": "'info'", "appointment_events.kind": "'created'", "call_outcomes.outcome": "'answered'", "cleanup_changes.status": "'pending'",
   "cleanup_runs.status": "'previewed'", "connections.status": "'connected'", "connections.provider": "'slack'", "deal_events.kind": "'created'",
-  "domain_checks.status": "'ok'", "duplicate_reviews.decision": "'keep'", "meeting_notes.status": "'new'", "sync_jobs.type": "'locations'", "sync_jobs.status": "'pending'",
+  "domain_checks.status": "'ok'", "duplicate_reviews.decision": "'keep'", "feedback_items.kind": "'feedback'", "user_connections.provider": "'fathom'", "meetings.provider": "'fathom'", "meeting_policies.scope": "'account'", "crm_writes.kind": "'note'", "meeting_notes.status": "'new'", "sync_jobs.type": "'locations'", "sync_jobs.status": "'pending'",
 };
 
 const literal = (table: string, c: Col, inst: string, loc: string, runId: string | null): string => {

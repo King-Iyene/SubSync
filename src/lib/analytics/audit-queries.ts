@@ -89,7 +89,7 @@ export async function waitingList(installationId: string, locationIds: string[],
   };
 }
 
-type Person = { contactId: string; name: string; locationId: string; locationName: string | null; at: number; calendar: string | null };
+type Person = { contactId: string | null; name: string; locationId: string; locationName: string | null; at: number; calendar: string | null };
 const day = (ms: number) => new Date(ms).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
 
 /** Appointment rows (from appointmentView's own lists, newest first) in the same shape. `total` is the count the audit shows, so it can exceed the rows sent. */
@@ -97,7 +97,7 @@ export function appointmentList(people: Person[], total: number, what: string): 
   return {
     total, totalValue: null,
     rows: people.map((p, i) => ({
-      id: `${p.locationId}:${p.contactId}:${p.at}:${i}`, name: p.name, locationId: p.locationId, locationName: p.locationName, contactId: p.contactId,
+      id: `${p.locationId}:${p.contactId}:${p.at}:${i}`, name: p.name, locationId: p.locationId, locationName: p.locationName, contactId: p.contactId ?? "",
       detail: `${what} ${day(p.at)}${p.calendar ? `, ${p.calendar}` : ""}`, value: null, at: new Date(p.at).toISOString(),
     })),
   };

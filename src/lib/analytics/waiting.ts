@@ -2,6 +2,8 @@
 // The definition lives in docs/METRICS.md ("Waiting past the reply target"); the SQL in queries.ts says the same thing and a database
 // test checks the two agree. One window and one target are used on every screen.
 
+import { isInternalComment } from "./message-kinds.ts";
+
 /** A conversation whose last message from the customer is older than this is dead, not waiting: nobody is still expecting a reply. */
 export const WAITING_WINDOW_DAYS = 30;
 
@@ -12,12 +14,14 @@ export type ConvLike = { direction: string | null; at: number | null; type: stri
  * pending  the customer wrote last and the target has not passed yet
  * stale    the customer wrote last, longer ago than the window
  * answered the last message is ours or is not from the customer (a reply, an auto-reply, an internal note, a call we placed)
- * none     there is nothing to judge (no time)
+ * none     there is nothing to judge: no time, or the latest entry is an internal comment (a team note is not a reply and says nothing about whether the
+ *          customer was answered, so SubSync does not judge this conversation until the next customer message or reply)
  */
 export type WaitingState = "waiting" | "pending" | "stale" | "answered" | "none";
 
 export function waitingState(c: ConvLike, now: number, slaHours: number): WaitingState {
   if (c.at === null || !Number.isFinite(c.at)) return "none";
+  if (isInternalComment(c.type)) return "none";
   if (c.direction !== "inbound") return "answered";
   const age = now - c.at;
   if (age > WAITING_WINDOW_DAYS * 86_400_000) return "stale";
