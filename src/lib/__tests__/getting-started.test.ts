@@ -71,6 +71,10 @@ test("steps tick from facts: opened pages, saved settings, connected channels, a
   assert.equal(done("agency_owner", { slackBrief: true }, "brief"), true);
   assert.equal(done("agency_owner", { emailSet: true }, "email"), true);
   assert.equal(done("agency_owner", { clientViewOn: 1 }, "clients"), true);
+  assert.equal(done("agency_owner", {}, "client_fees"), false, "no fee typed yet");
+  assert.equal(done("agency_owner", { clientFees: 2 }, "client_fees"), true);
+  assert.equal(buildSteps("agency_owner", { ...none, clientsPage: false }).some((s) => s.id === "client_fees"), false, "no step for a page that is switched off");
+  assert.equal(buildSteps("account_admin", none).some((s) => s.id === "client_fees"), false, "a business has no clients to bill");
   assert.equal(done("agency_owner", {}, "share"), false);
   assert.equal(done("agency_owner", { sharedAudits: 1 }, "share"), true);
   assert.equal(done("agency_owner", { testLookingCount: 2 }, "tests"), false, "two accounts look like test accounts and nothing is left out yet");

@@ -5,7 +5,7 @@ import { accentTokens, contrast, parseColour } from "@/lib/design/color";
 import { EMPTY_FILTER, type FilterValue } from "@/lib/design/filters";
 import { THEME_PREFS } from "@/lib/design/ui-logic";
 import {
-  BarChart, CardRange, DataList, DefinitionTip, Distribution, DrillPanel, EmptyState, ErrorState, FilterDrawer, HowTo, InlineAlert, LeadDrawer, ModuleTabs, MyDayView, Page, ScopeFilterBar,
+  BarChart, CardRange, DataList, LineChart, DefinitionTip, Distribution, DrillPanel, EmptyState, ErrorState, FilterDrawer, HowTo, InlineAlert, LeadDrawer, ModuleTabs, MyDayView, Page, ScopeFilterBar,
   Section, Skeleton, SkeletonCards, SkeletonRows, Sparkline, StatusLine, ChartPlaceholder, useCardRange, useDrill, useTheme, type Column,
 } from "../app/ds";
 import { compareWeeks, totalsOf, weekBars, weeksIn, type TrendMember } from "@/lib/design/trend-bars";
@@ -187,6 +187,7 @@ export function DesignGuide() {
               <Card title="Bars with a scale"><BarChart title="Answered within target, by week" axisLabel="% of new leads" unit="%" sample={80} min={5} need="leads" bars={SAMPLE_WEEKS.map((w) => ({ ...w, tone: w.value === null ? "series" : w.value >= 80 ? "good" : w.value >= 60 ? "warn" : "bad" }))} /></Card>
               <Card title="Ranked rows"><Distribution title="How long customers have waited" unit="" rows={[{ label: "Under 4 hours", value: 14 }, { label: "4 to 24 hours", value: 9, tone: "warn" }, { label: "1 to 7 days", value: 6, tone: "bad" }, { label: "Older than a week", value: 13, tone: "bad" }]} /></Card>
               <Card title="Trend"><Sparkline label="Open pipeline" values={[12, 14, 13, 17, 19, 18, 24, 26, 25, 31]} /></Card>
+              <Card title="Trend on two axes (a line over days)"><LineChart title="Health score" ceiling={100} axisLabel="0 to 100" series={[{ label: "This quarter", tone: 1, points: [58, 60, 59, 63, 66, 70, 69, 74, 78, 81, 84].map((value, i) => ({ day: `2026-10-${String(i * 2 + 1).padStart(2, "0")}`, value })) }, { label: "Previous quarter, same dates", tone: "muted", dashed: true, points: [55, 54, 57, 56, 58, 60, 59, 61, 62, 63, 64].map((value, i) => ({ day: `2026-10-${String(i * 2 + 1).padStart(2, "0")}`, value })) }]} /></Card>
               <Card title="Under the minimum"><ChartPlaceholder title="Replies by week" need={5} have={2} unit="replies">{" "}Nothing is drawn from two points.</ChartPlaceholder></Card>
             </div>
           </Section>

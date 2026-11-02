@@ -6,8 +6,9 @@ import { useApiClient, useData } from "../session";
 import type { AccountDetail } from "../types";
 import {
   Badge, BandBadge, Btn, Card, ChurnBadge, daysLabel, ErrorBox, ExtLink, fmtInt, fmtMoney, fmtPct, inputClass, Loading, PageHeader,
-  severityTone, Sparkline, Stat, Table, Td, Th,
+  severityTone, Stat, Table, Td, Th,
 } from "../ui";
+import { ClientTrends } from "./clients/trends";
 
 // `limited` is the business and client view of their own account: no way back to an accounts list
 // and none of the agency's controls.
@@ -21,7 +22,7 @@ export function AccountDetailView({ locationId, go, agency, limited = false }: {
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox error={error} onRetry={reload} />;
   if (!data) return null;
-  const { account: a, breakdown, trend, staleDeals, checklist, domains, alerts } = data;
+  const { account: a, breakdown, staleDeals, checklist, domains, alerts } = data;
 
   const act = async (fn: () => Promise<unknown>, done?: string) => {
     setBusy(true);
@@ -43,7 +44,7 @@ export function AccountDetailView({ locationId, go, agency, limited = false }: {
     <div>
       {!limited && (
         <div className="mb-4 print:hidden">
-          <Btn variant="ghost" onClick={() => go("accounts")}>← All accounts</Btn>
+          <Btn variant="ghost" onClick={() => go("accounts")}>← All clients</Btn>
         </div>
       )}
 
@@ -93,19 +94,9 @@ export function AccountDetailView({ locationId, go, agency, limited = false }: {
           </ul>
           <p className="mt-3 text-xs text-muted-foreground">The total is simply the five rows added up. There are no hidden caps or adjustments.</p>
         </Card>
-
-        <Card title="Trend (last 60 days)">
-          {trend.some((t) => t.dealsOk === false) && (
-            <p className="mb-3 text-xs text-muted-foreground" data-testid="trend-note">The way deals are counted changed, so the health score and open pipeline lines start on {trend.find((t) => t.dealsOk !== false)?.day ?? "today"}. Earlier days are not drawn: a line that mixed the two ways of counting would show a change that never happened.</p>
-          )}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div><p className="mb-1 text-xs text-muted-foreground">Health score</p><Sparkline label="Health score" values={trend.filter((t) => t.dealsOk !== false).map((t) => t.engagementScore)} /></div>
-            <div><p className="mb-1 text-xs text-muted-foreground">Open pipeline value</p><Sparkline label="Open pipeline value" values={trend.filter((t) => t.dealsOk !== false).map((t) => t.openValue)} /></div>
-            <div><p className="mb-1 text-xs text-muted-foreground">Contacts</p><Sparkline label="Contacts" values={trend.map((t) => t.contacts)} /></div>
-            <div><p className="mb-1 text-xs text-muted-foreground">Data completeness</p><Sparkline label="Data completeness" values={trend.map((t) => t.completenessPct)} /></div>
-          </div>
-        </Card>
       </div>
+
+      <div className="mt-4"><ClientTrends locationId={locationId} name={a.name ?? "this client"} /></div>
 
       <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card title={`Onboarding checklist · ${checklist.completionPct}% done`}>
@@ -126,6 +117,7 @@ export function AccountDetailView({ locationId, go, agency, limited = false }: {
             ))}
           </ul>
           <p className="mt-3 text-xs text-muted-foreground">Items marked ? cannot be checked automatically. Tick the manual ones as you complete them.</p>
+          {!limited && <div className="mt-2 print:hidden"><button type="button" className="min-h-9 text-sm font-medium text-primary underline underline-offset-4" onClick={() => go("onboarding")}>Open the full checklist, with Fix it links, who is on each step and the history</button></div>}
         </Card>
 
         <div className="space-y-4">
