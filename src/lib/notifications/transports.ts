@@ -2,7 +2,7 @@
 // SEND_EMAIL_LIVE or SEND_SLACK_LIVE off, the request is built, a "WOULD SEND" line (ids only, never the words of the message) is written to the log and the
 // audit table, and nothing leaves the server. The bell is our own database, so it is not outward and is always live.
 
-import { emailConfigured, sendEmailResult, unsubscribeHeaders, type Mail as SendMail } from "../email";
+import { emailConfigured, sendEmailResult, unsubscribeHeaders } from "../email";
 import { outward } from "../live-flags";
 import { sql } from "../db";
 import type { Mail } from "./compose";
@@ -18,8 +18,7 @@ async function sendMail(installationId: string, to: string, mail: Mail, stopUrl:
   const stop = stopUrl(to);
   const out = await outward({ flag: "SEND_EMAIL_LIVE", verb: "SEND", what, installationId, ids }, async (): Promise<SendResult> => {
     if (!emailConfigured()) return { ok: false, permanent: false, code: "email_not_configured" };
-    const body: SendMail = { ...mail, ...(stop ? { headers: unsubscribeHeaders(stop) } : {}) };
-    const r = await sendEmailResult(to, body);
+    const r = await sendEmailResult(to, { ...mail, ...(stop ? { headers: unsubscribeHeaders(stop) } : {}) });
     return r.ok ? { ok: true } : { ok: false, permanent: r.permanent, code: `http_${r.status}` };
   });
   return out.live ? out.result : { ok: true, dryRun: true };

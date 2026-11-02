@@ -18,7 +18,7 @@ export type Checked = { ok: true } | { ok: false; error: string };
 
 const TOKEN = /\{([^{}]*)\}/g;
 // Anything outside printable text: control characters other than a line break (allowed in the body only).
-// eslint-disable-next-line no-control-regex
+
 const CONTROL = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/;
 // The same set for removing every one of them (a global pattern keeps a position, so it is never used with .test).
 const CONTROL_ALL = new RegExp(CONTROL.source, "g");

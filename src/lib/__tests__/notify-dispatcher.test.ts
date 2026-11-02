@@ -6,7 +6,7 @@ import { FakeLedger, FakeTransports, makeContext, slackDest, T } from "../../../
 
 // The dispatcher with a fake ledger and fake transports: dedupe, retries, quiet hours, time zones and daylight saving, routing, and who may receive what.
 
-const IN = "inst-1";
+
 const speed = (over: Partial<Intent> = {}): Intent => ({
   type: "speed_breach", locationId: "L1", severity: "warning", dedupeKey: "alert:a1", alertId: "a1",
   values: { account: "Sample Dental", count: 9, target: 15, longest: "40 min" }, ...over,

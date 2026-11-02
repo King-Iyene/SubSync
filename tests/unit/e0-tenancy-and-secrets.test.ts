@@ -106,8 +106,10 @@ describe("nothing that feeds a screen can read a token", () => {
     walk("src");
     // The first six are the connection code and its inventory; the last three are the older code that reads the INSTALL tokens (not a person's tool tokens).
     expect(readers.sort()).toEqual([
-      "src/lib/connections/cleanup.ts", "src/lib/connections/ingest-store.ts", "src/lib/connections/personal.ts", "src/lib/connections/queries.ts", "src/lib/data-inventory.ts", "src/lib/ghl/capabilities-run.ts", "src/lib/ghl/installations.ts", "src/lib/sync/engine.ts", "src/lib/sync/watchdog.ts",
+      "src/lib/connections/cleanup.ts", "src/lib/connections/ingest-store.ts", "src/lib/connections/personal.ts", "src/lib/connections/queries.ts", "src/lib/data-inventory.ts", "src/lib/ghl/capabilities-run.ts", "src/lib/ghl/installations.ts", "src/lib/notifications/service.ts", "src/lib/sync/engine.ts", "src/lib/sync/watchdog.ts",
     ]);
+    // notifications/service.ts (stage F9) only asks whether an install still has a refresh token (`is not null`, to skip fixture installs) like the watchdog; it never selects the value.
+    expect(read("src/lib/notifications/service.ts").match(/refresh_token_enc[^`\n]*/g)).toEqual(["refresh_token_enc is not null order by created_at"]);
   });
 });
 
