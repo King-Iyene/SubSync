@@ -108,7 +108,8 @@ test("Fathom and Zoom token exchange and refresh send the right things", async (
   const f1: Array<{ url: string; init: RequestInit }> = [];
   const fathom = await exchangeCode("fathom", "code9", keys, "https://x/cb", fake(200, reply, f1), NOW);
   assert.deepEqual(fathom, { ok: true, tokens: { accessToken: "AT", refreshToken: "RT", expiresAt: NOW + 3_600_000 } });
-  assert.equal(f1[0].url, "https://fathom.video/external/v1/oauth2/token");
+  // Fathom's developer docs (read 2 Nov 2026, stage E2a) give the token address on api.fathom.ai; the sign-in page itself stays on fathom.video.
+  assert.equal(f1[0].url, "https://api.fathom.ai/external/v1/oauth2/token");
   const fb = new URLSearchParams(String(f1[0].init.body));
   assert.equal(fb.get("grant_type"), "authorization_code");
   assert.equal(fb.get("client_secret"), "sec", "Fathom takes the keys in the form");
@@ -133,7 +134,7 @@ test("Fathom and Zoom token exchange and refresh send the right things", async (
 test("SubSync registers its own Fathom webhook, asking for the summary but not the transcript", async () => {
   const seen: Array<{ url: string; init: RequestInit }> = [];
   const made = await createFathomWebhook("AT", "https://subsync.example.com/api/hooks/fathom/key1", fake(201, { id: "wh_1", secret: "whsec_abc" }, seen));
-  assert.deepEqual(made, { ok: true, id: "wh_1", secret: "whsec_abc" });
+  assert.deepEqual(made, { ok: true, id: "wh_1", secret: "whsec_abc", triggers: "my_recordings,my_shared_with_team_recordings" });
   assert.equal(seen[0].url, "https://api.fathom.ai/external/v1/webhooks");
   assert.equal((seen[0].init.headers as Record<string, string>).authorization, "Bearer AT");
   const sent = JSON.parse(String(seen[0].init.body));

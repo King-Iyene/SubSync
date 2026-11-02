@@ -50,6 +50,7 @@ A person in one client account never sees another client account's data. An agen
 | `api/cron/daily` | secret | Bearer CRON_SECRET; idle while the kill switch is on |
 | `api/cron/digest` | secret | Bearer CRON_SECRET |
 | `api/cron/weekly` | secret | Bearer CRON_SECRET; idle while the kill switch is on |
+| `api/cron/meeting-expiry` | secret | Bearer CRON_SECRET; once a day removes inbox calls whose time is up, handled calls' text after 90 days, old delivery ids, and a person who left the CRM (only with the users permission and a complete list); counts only; idle while the kill switch is on |
 | `api/cron/watchdog` | secret | Bearer CRON_SECRET; the internal sync alarm, writes audit lines (ids, times, counts) and sends nothing; idle while the kill switch is on |
 | `api/admin/diagnostics` | secret | Bearer CRON_SECRET only, read only; sync health of every real install (short ids, times, counts), no customer data |
 | `api/admin/capabilities` | secret | Bearer CRON_SECRET only, read only; which data the platform gives the app, install by install (field names, counts and statuses, never a value or a token); at most 70 GET requests per call |
@@ -91,7 +92,10 @@ A personal tool (Fathom; Zoom and Google Meet later) belongs to the PERSON who c
 | `meetings` | meetings that arrived through ONE person's tool: title, attendee emails, summary, action items, recording link | only the person who recorded them. Nobody else, whatever their role, can read another person's meeting in SubSync | deleted | deleted |
 | `crm_writes` | every note, comment or field SubSync itself put in the CRM, with the id the CRM gave it (ids and times only) | server code only (it keeps our writes out of our numbers) | deleted | deleted |
 
-All five have row level security ON and no policy, and the public (anon) and signed-in database roles hold no privilege on them (`scripts/supabase-proof.ts` proves it against the live project with a real `set role` attempt). Only server code, which connects as the database owner, can use them. Every row carries the installation id; `user_connections` and `meeting_note_settings` are also unique per CRM user id, `meetings` per (person, tool, meeting id) and `crm_writes` per (meeting, contact, kind, part), in the database itself.
+| `meeting_deliveries` (stage E2a) | one row per Fathom delivery already handled (connection id and the delivery's own id, nothing of the call), so a retry is handled once | server code only | deleted | deleted |
+| `meeting_ignored_emails` (stage E2a) | the email addresses one person chose to "always ignore" in their Meeting inbox | the person only (through `personFromSession`) | deleted | kept |
+
+All seven have row level security ON and no policy, and the public (anon) and signed-in database roles hold no privilege on them (`scripts/supabase-proof.ts` proves it against the live project with a real `set role` attempt). Only server code, which connects as the database owner, can use them. Every row carries the installation id; `user_connections` and `meeting_note_settings` are also unique per CRM user id, `meetings` per (person, tool, meeting id) and `crm_writes` per (meeting, contact, kind, part), in the database itself.
 
 Who the person is comes only from the signed session (`personFromSession`: user id, role derived at sign-in and carried as `personRole`, kind, the one account a limited session is bound to). The routes `my-connections`, `team-connections` and `meeting-policy` live under `api/app` (no new route file):
 
@@ -107,3 +111,9 @@ Outward actions (a CRM write, a meeting-tool subscription created or deleted) go
 
 - Agency staff are refused rather than limited to their accounts, because the Users API check is not built. If an agency has staff who need SubSync today, the owner and admins can use it; staff cannot.
 - The Share link is public by design to anyone holding the link; it contains no names, expires in 30 days, and revocation is not built yet (planned in stage F6).
+
+## Meeting inbox and Fathom delivery (stage E2a)
+
+No new route file except the cron above. The Meeting inbox is the route `meeting-inbox` under `api/app` (the one catch-all, already guarded): GET (the person's own waiting and recent calls), GET `<id>/contacts` (search), POST `<id>/link`, `<id>/dismiss`, `<id>/ignore`, POST `confirm`, PUT `settings`. Open to every kind of session and every role, because it is the signed-in person's OWN inbox: every statement names the installation id AND the person's user id (`src/lib/connections/inbox-store.ts`), the person comes only from the signed session (`personFromSession`), and a call id from another person finds nothing (404). A contact search runs only inside the accounts the person can open (`accessibleAccounts`), and a "Link" is checked again on the server: the account must be one the person can open and the contact must be in it. The Meeting notes page itself stays behind the `meetings` switch (off by default); with it off the inbox routes answer 404.
+
+A delivery to `api/hooks/fathom/[key]` is verified (signature on the raw body, 5 minute window) before anything is read; the delivery's own id is claimed once in `meeting_deliveries` (unique per connection), so a retry or two simultaneous deliveries are handled once.

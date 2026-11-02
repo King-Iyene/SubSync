@@ -74,6 +74,7 @@ import { excludedOpenDeals, getGoals, GOAL_METRICS, loadDeals, pipelineTrend, se
 import { MIN_CLOSED_DEALS as MIN_CLOSED, OUTLIER_MIN_DEALS, OUTLIER_SHARE, outlier as dealOutlier, winRateOf } from "../analytics/metrics";
 import { parsePickedAccounts } from "../design/filters";
 import { myConnectionRemove, myConnectionsView, myConnectionStart, myConnectionTest, policySave, teamConnectionRevoke, teamConnectionsView } from "./connections-api";
+import { meetingConfirm, meetingContactSearch, meetingDismiss, meetingIgnore, meetingInboxView, meetingLink, meetingSettingsSave } from "./meetings-api";
 import { can, personFromSession } from "../connections/person";
 import { authenticate, isResponse, json, type AuthContext } from "./auth";
 
@@ -1684,7 +1685,7 @@ async function digestPreview(ctx: Ctx) {
 
 const FEATURE_FOR: Record<string, Feature> = {
   search: "search", onboarding: "onboarding", stale: "stale", inbox: "inbox", pipelines: "pipelines", duplicates: "duplicates", email: "email",
-  "my-connections": "connections", "team-connections": "connections", "meeting-policy": "connections", alerts: "alerts", appointments: "appointments", audit: "audit", speed: "speed", "appointment-insights": "appointments", meetings: "meetings", connections: "connections", cleanup: "cleanup", "setup-compare": "setup_compare", playbooks: "playbooks", daily: "overview", team: "team", "deal-events": "pipelines", contact: "search", settings: "settings", export: "exports", digest: "overview", "api-keys": "ai", hygiene: "stale", "pipeline-intel": "pipelines", "contact-intel": "activity", clients: "clients", qbr: "reports", "comms-intel": "inbox", "deal-gaps": "pipelines", "call-queue": "calls", "call-lists": "calls", "call-outcomes": "calls",
+  "meeting-inbox": "meetings", "my-connections": "connections", "team-connections": "connections", "meeting-policy": "connections", alerts: "alerts", appointments: "appointments", audit: "audit", speed: "speed", "appointment-insights": "appointments", meetings: "meetings", connections: "connections", cleanup: "cleanup", "setup-compare": "setup_compare", playbooks: "playbooks", daily: "overview", team: "team", "deal-events": "pipelines", contact: "search", settings: "settings", export: "exports", digest: "overview", "api-keys": "ai", hygiene: "stale", "pipeline-intel": "pipelines", "contact-intel": "activity", clients: "clients", qbr: "reports", "comms-intel": "inbox", "deal-gaps": "pipelines", "call-queue": "calls", "call-lists": "calls", "call-outcomes": "calls",
 };
 
 export async function handle(request: Request, segments: string[]): Promise<Response> {
@@ -1714,6 +1715,8 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       if (a === "meetings") return await meetingsView(ctx);
       if (a === "connections" && !b) return await connectionsView(ctx);
       if (a === "my-connections" && !b) return await myConnectionsView(ctx);
+      if (a === "meeting-inbox" && !b) return await meetingInboxView(ctx);
+      if (a === "meeting-inbox" && b && c === "contacts") return await meetingContactSearch(ctx, b);
       if (a === "team-connections" && !b) return await teamConnectionsView(ctx);
       if (a === "cleanup" && !b) return await cleanupView(ctx);
       if (a === "cleanup" && b) return await cleanupRunView(ctx, b);
@@ -1767,6 +1770,10 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       if (a === "connections" && b && c === "start") return await connectionStart(ctx, b);
       if (a === "my-connections" && b && c === "start") return await myConnectionStart(ctx, b);
       if (a === "my-connections" && b && c === "test") return await myConnectionTest(ctx, b);
+      if (a === "meeting-inbox" && b === "confirm") return await meetingConfirm(ctx);
+      if (a === "meeting-inbox" && b && c === "link") return await meetingLink(ctx, b);
+      if (a === "meeting-inbox" && b && c === "dismiss") return await meetingDismiss(ctx, b);
+      if (a === "meeting-inbox" && b && c === "ignore") return await meetingIgnore(ctx, b);
       if (a === "team-connections" && b && c === "revoke") return await teamConnectionRevoke(ctx, b);
       if (a === "meetings" && b === "hooks" && !c) return await meetingHookCreate(ctx);
       if (a === "meetings" && b === "hooks" && c && segments[3] === "revoke") return await meetingHookRevoke(ctx, c);
@@ -1798,6 +1805,7 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       if (a === "goals") return await goalsUpdate(ctx);
       if (a === "stage-rules") return await stageRuleSave(ctx);
       if (a === "meeting-policy" && !b) return await policySave(ctx);
+      if (a === "meeting-inbox" && b === "settings") return await meetingSettingsSave(ctx);
       if (a === "meetings" && b) return await meetingUpdate(ctx, b);
       if (a === "team" && b && LOCATION_ID.test(b)) return await teamName(ctx, b);
       if (a === "clients" && b && LOCATION_ID.test(b)) return await clientUpdate(ctx, b);

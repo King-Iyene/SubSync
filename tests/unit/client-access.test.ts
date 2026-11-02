@@ -11,12 +11,12 @@ import type { Identity, Role } from "@/lib/identity";
 const METHODS = ["GET", "POST", "PUT", "DELETE"] as const;
 
 // Everything a client's staff may call. Anything else is refused, whatever it is called.
-const CLIENT_GET = new Set(["my-connections", "team-connections", "overview", "accounts", "onboarding", "search", "stale", "hygiene", "inbox", "pipelines", "duplicates", "alerts", "pipeline-intel", "contact-intel", "comms-intel", "deal-gaps", "deal-events", "contact", "start", "appointments", "appointment-insights", "audit", "speed", "roadmap", "freshness"]);
+const CLIENT_GET = new Set(["my-connections", "team-connections", "meeting-inbox", "overview", "accounts", "onboarding", "search", "stale", "hygiene", "inbox", "pipelines", "duplicates", "alerts", "pipeline-intel", "contact-intel", "comms-intel", "deal-gaps", "deal-events", "contact", "start", "appointments", "appointment-insights", "audit", "speed", "roadmap", "freshness"]);
 // Stage E0: every role connects its OWN tools, so these doors are open to a client's staff too. They only ever touch the signed-in person's own rows
 // (my-connections), or, for an account administrator only, the status of the people of their own account (team-connections) and that account's rule
-// (meeting-policy). The handlers refuse an account user for the last two; tests/unit/e0-connections-db.test.ts asks them with real sessions.
-const CLIENT_POST = new Set(["usage", "roadmap", "my-connections", "team-connections"]);
-const CLIENT_PUT = new Set(["meeting-policy"]);
+// (meeting-policy). meeting-inbox (stage E2a) is the signed-in person's OWN inbox: every query names their installation and user id. The handlers refuse an account user for the last two; tests/unit/e0-connections-db.test.ts asks them with real sessions.
+const CLIENT_POST = new Set(["usage", "roadmap", "my-connections", "team-connections", "meeting-inbox"]);
+const CLIENT_PUT = new Set(["meeting-policy", "meeting-inbox"]);
 const CLIENT_DELETE = new Set(["my-connections"]);
 
 // Every first path segment the API handles, read from the router itself, plus names of things that must never reach a client even if they are built later.
