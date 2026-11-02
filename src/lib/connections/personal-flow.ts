@@ -1,7 +1,7 @@
 import { outward, type Deps } from "../live-flags";
 import { appUrl, startLink } from "./flow";
 import { connectError } from "./messages";
-import { createFathomWebhook, exchangeCode, fetchZoomUser, keysFor, redirectUri, testFathom, type Failed } from "./oauth";
+import { createFathomWebhook, deleteFathomWebhook, exchangeCode, fetchZoomUser, keysFor, redirectUri, testFathom, type Failed } from "./oauth";
 import { accessTokenFor, dropProviderSide, newPublicKey, saveConnection, startPending, type SecretRow } from "./personal";
 import { sql } from "../db";
 import type { Role } from "../identity";
@@ -70,7 +70,14 @@ export async function completePersonal(provider: PersonalProviderNow, code: stri
     }
   }
 
-  const saved = await saveConnection({ person, installationId: s.installationId, provider, tokens: got.tokens, accountEmail, hook, publicKey });
+  let saved: Awaited<ReturnType<typeof saveConnection>>;
+  try {
+    saved = await saveConnection({ person, installationId: s.installationId, provider, tokens: got.tokens, accountEmail, hook, publicKey });
+  } catch {
+    // The secret Fathom showed once could not be stored, so deliveries could never be checked: take the subscription back rather than leave one nobody can use.
+    if (hook) await deleteFathomWebhook(got.tokens.accessToken, hook.id, f).catch(() => false);
+    return connectError("F-HOOK", provider === "fathom" ? "Fathom" : "Zoom", "save_failed");
+  }
   // An older connection of the same person (for example from another install) loses its provider-side subscription.
   if (saved.previous?.webhookId) {
     await dropProviderSide({ id: saved.previous.id, installationId: saved.previous.installationId, provider, webhookId: saved.previous.webhookId, accessTokenEnc: null, refreshTokenEnc: null, tokenExpiresAt: null, ghlUserId: who.userId, homeLocationId: who.home, status: "connected" }, f, deps).catch(() => undefined);
@@ -89,7 +96,13 @@ export async function testPersonal(row: SecretRow, f: typeof fetch = fetch): Pro
   const name = row.provider === "fathom" ? "Fathom" : "Zoom";
   const token = await accessTokenFor(row, f);
   if (!token) return { ok: false, error: `${name} no longer accepts this connection. Connect again.`, code: "P-AUTH" };
-  const result = row.provider === "fathom" ? await testFathom(token, f) : await fetchZoomUser(token, f);
+  const ask = (t: string) => (row.provider === "fathom" ? testFathom(t, f) : fetchZoomUser(t, f));
+  let result = await ask(token);
+  // A token that looked fresh but was refused (401) is refreshed once and tried again, still under the one-at-a-time lock.
+  if (!result.ok && "status" in result && result.status === 401) {
+    const again = await accessTokenFor(row, f, token);
+    if (again) result = await ask(again);
+  }
   if (!result.ok) {
     const refused = "status" in result ? result.status === 401 || result.status === 403 : true;
     if (refused) await sql()`update user_connections set status = 'needs_reconnect', last_error_code = 'P-AUTH', updated_at = now() where id = ${row.id}`;

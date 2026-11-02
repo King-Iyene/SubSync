@@ -23,7 +23,6 @@ import { remember, remembered } from "./ds/remember";
 import { MyDayView } from "./ds/my-day";
 import { ApiProvider, makeApi, type Api } from "./session";
 import { AccountDetailView } from "./views/account-detail";
-import { AccountsView } from "./views/accounts";
 import { AlertsView } from "./views/alerts";
 import { AppointmentInsights } from "./views/appointment-insights";
 import { AuditView } from "./views/audit";
@@ -31,10 +30,9 @@ import { SpeedView } from "./views/speed";
 import { AppointmentsView } from "./views/appointments";
 import { CleanupView } from "./views/cleanup";
 import { MeetingsView } from "./views/meetings";
-import { PlaybooksView } from "./views/playbooks";
 import { GlobalSearch } from "./views/global-search";
 import { PeopleModule } from "./views/people-module";
-import { ClientsView } from "./views/clients";
+import { ClientsView, type ClientsFeatures } from "./views/clients";
 import { DealsView } from "./views/deals";
 import { DuplicatesView } from "./views/duplicates";
 import { EmailHealthView } from "./views/email-health";
@@ -50,7 +48,7 @@ import { SettingsView } from "./views/settings";
 import { ConnectionsPage } from "./views/connections";
 import { NotificationsPage } from "./views/notifications";
 import { NotificationBell } from "./views/notification-bell";
-import { SetupCompareView } from "./views/setup-compare";
+
 import { TodayView } from "./views/today";
 
 type Auth =
@@ -281,7 +279,8 @@ export function Dashboard() {
   const locked = (feature: string) => auth.locked.includes(feature);
   const off = (feature: string) => auth.features[feature] === false && !locked(feature);
   // A page that lives inside a module as a tab (People holds Contact search, Leads and Call lists) has no menu entry of its own.
-  const menu = NAV.filter((n) => NAV_FOR[auth.kind].has(n.id) && !off(n.feature) && !n.parent);
+  // (A page that lives inside the Clients module has no entry of its own for an agency; a business and a client's staff have no Clients module, so their Setup stays in their menu.)
+  const menu = NAV.filter((n) => NAV_FOR[auth.kind].has(n.id) && !off(n.feature) && (!n.parent || (limited && n.showWhenLimited)));
   // The sidebar: the pilot menu in plain groups that scroll, and Settings, Getting started and What's new pinned underneath so they are always visible.
   const mainMenu = menu.filter((n) => n.group !== "Settings and help");
   const footMenu = menu.filter((n) => n.group === "Settings and help");
@@ -300,7 +299,7 @@ export function Dashboard() {
   const labelFor = (n: (typeof NAV)[number]) => (limited && n.id === "overview" ? "My account" : n.label);
   // Pages that live inside another page highlight their parent in the menu.
   const shown: ViewId = auth.kind === "client" && view.id === "today" ? "myday" : view.id;
-  const active = PARENT[shown] ?? shown;
+  const active = limited && shown === "onboarding" ? shown : PARENT[shown] ?? shown;
   const agency = auth.demo ? "Demo Company" : limited ? "Your business" : "Your company";
   const own = auth.locationId;
 
@@ -310,7 +309,9 @@ export function Dashboard() {
   const callsAllowed = NAV_FOR[auth.kind].has("calls") && !off("calls") && !locked("calls");
   const peopleStart = view.id === "calls" ? 1 : view.id === "leads" ? 2 : 0;
   const pipeTabs = [{ label: "Forecast and stages", node: <><PipelineView /><DealMoves /></> }, { label: "Stale deals and hygiene", node: <DealsView /> }];
-  const setupTabs = [{ label: "Setup checklists", node: <OnboardingView go={go} /> }, { label: "Email sender health", node: <EmailHealthView /> }, ...(limited ? [] : [...(off("setup_compare") ? [] : [{ label: "Compare setups", node: <SetupCompareView /> }]), ...(off("playbooks") ? [] : [{ label: "Industry playbooks", node: <PlaybooksView go={go} /> }])])];
+  // A business or a client's staff keep the small Setup module (their own checklist and email sending). An agency has the Clients module instead.
+  const setupTabs = [{ label: "Setup checklists", node: <OnboardingView go={go} /> }, { label: "Email sender health", node: <EmailHealthView /> }];
+  const clientFeatures: ClientsFeatures = { health: !off("health"), onboarding: !off("onboarding"), clients: !off("clients"), reports: !off("reports"), setupCompare: !off("setup_compare"), playbooks: !off("playbooks") };
 
   const content = (() => {
     // A business or a client sees its own account as the home page, never an accounts list.
@@ -333,12 +334,12 @@ export function Dashboard() {
       case "audit": return <AuditView go={go} />;
       case "speed": return <SpeedView go={go} />;
       case "overview": return <OverviewView go={go} />;
-      case "accounts": return <AccountsView go={go} />;
-      case "account": return view.locationId ? <AccountDetailView key={view.locationId} locationId={view.locationId} go={go} agency={agency} /> : <AccountsView go={go} />;
+      case "accounts": return <ClientsView key="accounts" go={go} initialTab="health" features={clientFeatures} />;
+      case "account": return view.locationId ? <AccountDetailView key={view.locationId} locationId={view.locationId} go={go} agency={agency} /> : <ClientsView key="accounts" go={go} initialTab="health" features={clientFeatures} />;
       case "deals": return <ModuleTabs key="pipe" start={1} tabs={pipeTabs} />;
       case "inbox": return <InboxView go={go} />;
-      case "onboarding": return <ModuleTabs key="setup" start={0} tabs={setupTabs} />;
-      case "email": return <ModuleTabs key="setup" start={1} tabs={setupTabs} />;
+      case "onboarding": return limited ? <ModuleTabs key="setup" start={0} tabs={setupTabs} /> : <ClientsView key="onboarding" go={go} initialTab="onboarding" features={clientFeatures} />;
+      case "email": return limited ? <ModuleTabs key="setup" start={1} tabs={setupTabs} /> : <EmailHealthView />;
       case "duplicates": return <DuplicatesView />;
       case "alerts": return <AlertsView go={go} />;
       case "settings": return <SettingsView />;
@@ -351,7 +352,7 @@ export function Dashboard() {
       case "appointments": return <ModuleTabs key="appts" start={0} tabs={[{ label: "Appointments", node: <AppointmentsView go={go} /> }, { label: "Insights", node: <AppointmentInsights /> }]} />;
       case "meetings": return <MeetingsView />;
       case "cleanup": return <CleanupView />;
-      case "clients": return <ClientsView reports={!off("reports")} />;
+      case "clients": return <ClientsView key="clients" go={go} initialTab="health" features={clientFeatures} />;
     }
   })();
 

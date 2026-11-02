@@ -11,6 +11,8 @@ export type NavItem = {
   id: Exclude<ViewId, "account">; label: string; feature: string; group: NavGroup;
   /** A page that lives inside another module as a tab. It has no menu entry of its own; the parent's entry stays highlighted. */
   parent?: Exclude<ViewId, "account">;
+  /** A page with a parent that a business or a client's staff still see in their own menu (their parent is not in their menu). */
+  showWhenLimited?: boolean;
 };
 
 export const NAV: NavItem[] = [
@@ -26,10 +28,10 @@ export const NAV: NavItem[] = [
   { id: "leads", label: "Leads", feature: "activity", group: "Clients and people", parent: "people" },
   { id: "calls", label: "Call lists", feature: "calls", group: "Clients and people", parent: "people" },
   { id: "overview", label: "Overview", feature: "overview", group: "More" },
-  { id: "accounts", label: "Accounts", feature: "health", group: "More" },
+  { id: "accounts", label: "Accounts", feature: "health", group: "More", parent: "clients" },
   { id: "team", label: "Team", feature: "team", group: "More" },
   { id: "pipeline", label: "Pipeline and deals", feature: "pipelines", group: "More" },
-  { id: "onboarding", label: "Setup", feature: "onboarding", group: "More" },
+  { id: "onboarding", label: "Setup", feature: "onboarding", group: "More", parent: "clients", showWhenLimited: true },
   { id: "duplicates", label: "Duplicates", feature: "duplicates", group: "More" },
   { id: "cleanup", label: "Data cleanup", feature: "cleanup", group: "More" },
   { id: "meetings", label: "Meeting notes", feature: "meetings", group: "More" },
@@ -42,4 +44,4 @@ export const NAV: NavItem[] = [
 ];
 
 // Where a page that lives inside another page highlights in the menu, and where "back" lands when there is no trail.
-export const PARENT: Partial<Record<ViewId, ViewId>> = { account: "accounts", deals: "pipeline", email: "onboarding", alerts: "today", search: "people", leads: "people", calls: "people", notifications: "settings" };
+export const PARENT: Partial<Record<ViewId, ViewId>> = { account: "clients", accounts: "clients", onboarding: "clients", deals: "pipeline", email: "clients", alerts: "today", search: "people", leads: "people", calls: "people", notifications: "settings" };

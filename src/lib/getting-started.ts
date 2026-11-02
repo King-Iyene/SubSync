@@ -38,6 +38,8 @@ export type Facts = {
   changedKeys: ReadonlySet<string>;
   sharedAudits: number; feedbackGiven: number;
   meetingsPage: boolean; zoomOn: boolean;
+  /** Stage C1: how many clients have a monthly fee typed in, and whether the Clients page is switched on. Left out means none and on. */
+  clientFees?: number; clientsPage?: boolean;
 };
 
 const TARGET_KEYS = ["slaHours", "speedTargetMinutes", "staleDays", "dormantDays", "speedBusinessHours", "countAutomatedTouches"] as const;
@@ -83,13 +85,16 @@ export function buildSteps(role: GuideRole, f: Facts): Step[] {
     body: "The audit lists what is wrong and the money at risk. Press Share and send the link: it hides client names and stops working after 14 days." };
   const clients: Step = { id: "clients", title: "Let a client see their own account", done: f.clientViewOn > 0, optional: true, art: "clients", detail: null, view: "settings", section: "team", cta: "Open team and access",
     body: "Switch on a read-only view for a client's own staff. They see only their own account: never other clients, fees or notes." };
+  // Fees, renewal dates and industry are typed by the owner (SubSync cannot read them from the CRM), so this step says so and opens the row where they are typed.
+  const fees: Step[] = f.clientsPage === false ? [] : [{ id: "client_fees", title: "Add what each client pays you (optional)", done: (f.clientFees ?? 0) > 0, ticksOn: [], optional: true, art: "clients", detail: null, view: "clients", cta: "Open Clients",
+    body: "Type each client's monthly fee and renewal date on the Clients page, in the row itself. SubSync cannot read them from your CRM, so you enter them once and the revenue, renewal and value-created figures fill in." }];
   const meetings: Step[] = f.meetingsPage ? [{ id: "meetings", title: "Connect a meeting tool (optional)", done: seen("meetings"), ticksOn: ["meetings"], optional: true, art: "meeting", detail: null, view: "meetings", cta: "Open Meeting notes",
     body: `Connect ${f.zoomOn ? "Zoom or Fathom" : "Fathom"} and each meeting summary is saved in SubSync. When the guest matches one contact, it is also added to that contact's notes in your CRM, if you allow it.` }] : [];
   const feedback: Step = { id: "feedback", title: "Tell us what would help", done: f.feedbackGiven > 0 || seen("roadmap"), ticksOn: ["roadmap"], art: "feedback", optional: true, detail: null, view: "roadmap", cta: "Open What's new",
     body: "Use Give feedback at the bottom of any page, or suggest something on the What's new page. It goes to the people who build SubSync." };
 
   switch (role) {
-    case "agency_owner": return [connected, synced, today, speed, search, targets, brief, email, tests, share, clients, ...meetings, feedback];
+    case "agency_owner": return [connected, synced, today, speed, search, targets, brief, email, tests, share, ...fees, clients, ...meetings, feedback];
     case "agency_staff": return [connected, today, speed, calendar, search, feedback];
     case "account_admin": return [connected, synced, today, speed, calendar, search, targets, brief, email, ...meetings, feedback];
     case "account_user": return [connected, today, speed, calendar, feedback];

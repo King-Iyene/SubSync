@@ -152,7 +152,7 @@ export function pgRefreshStore(): RefreshStore {
 }
 
 /** An access token that works now, refreshed under the lock when needed. Null when the person must reconnect. */
-export async function accessTokenFor(row: SecretRow, f: typeof fetch = fetch): Promise<string | null> {
+export async function accessTokenFor(row: SecretRow, f: typeof fetch = fetch, refused: string | null = null): Promise<string | null> {
   if (row.provider === "google_meet") return null;
   const provider = row.provider;
   const keys = keysFor(provider);
@@ -160,7 +160,7 @@ export async function accessTokenFor(row: SecretRow, f: typeof fetch = fetch): P
   const result = await refreshLocked(pgRefreshStore(), row.id, async (refreshToken) => {
     const r = await refreshTokens(provider, refreshToken, keys, f);
     return r.ok ? { ok: true as const, tokens: r.tokens } : { ok: false as const };
-  });
+  }, Date.now, refused);
   return result.ok ? result.accessToken : null;
 }
 

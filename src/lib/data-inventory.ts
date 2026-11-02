@@ -120,6 +120,7 @@ export const INVENTORY: Record<string, TableInfo> = {
     noun: "a log of what SubSync wrote to your CRM", line: "meetings",
     personal: { authored_by: "which team member a note or comment was written as" },
   },
+  meeting_deliveries: { noun: "a list of meeting deliveries already handled (ids only)", line: "meetings" },
   shared_audits: { noun: "share links", line: "shares", personal: { payload: "a snapshot of totals, finding titles, fix steps and how each number is counted, with client names removed, plus your business name and colour" } },
 
   // ---- what you add, and your settings (kept by "Delete my data", removed by an uninstall)
@@ -127,6 +128,7 @@ export const INVENTORY: Record<string, TableInfo> = {
     noun: "each person's meeting-note choices", line: "yours",
     personal: { ghl_user_id: "which team member the choices belong to" }, notPersonal: ["content_matrix", "source_priority"],
   },
+  meeting_ignored_emails: { noun: "email addresses a person asked to always ignore in their Meeting inbox", line: "yours", personal: { ghl_user_id: "which team member the choice belongs to", email: "an email address you chose to always ignore" } },
   call_lists: { noun: "saved call lists", line: "yours", personal: { name: "saved call list names", filters: "the filters of a saved list" } },
   account_profiles: {
     noun: "your notes and fees for each client", line: "yours",
@@ -140,6 +142,11 @@ export const INVENTORY: Record<string, TableInfo> = {
   report_templates: { noun: "saved report layouts", line: "yours", personal: { name: "saved report names", spec: "the layout of a saved report" } },
   saved_views: { noun: "your saved views of a page", line: "yours", personal: { owner: "who saved the view (a sign-in id)", name: "the name you gave a saved view", filters: "the choices in a saved view (client account, channel, person)" }, notPersonal: ["page"] },
   roadmap_votes: { noun: "roadmap votes", line: "yours", personal: { voter: "who voted on the roadmap (a sign-in id)" }, notPersonal: ["item_key"] },
+  // Stage C1 (Clients): what you write about a client, and how far each client is through onboarding.
+  client_notes: { noun: "notes and conversations you log about a client", line: "yours", personal: { body: "the notes and conversations you log about a client", author: "who wrote a client note" }, notPersonal: ["kind"] },
+  onboarding_templates: { noun: "onboarding checklist templates", line: "yours", personal: { name: "the names of your onboarding templates", steps: "the steps of your onboarding templates" }, notPersonal: ["industry_key"] },
+  client_steps: { noun: "who is on each onboarding step and when it is due", line: "yours", personal: { label: "the steps you add to one client", assignee: "who an onboarding step is given to", done_by: "who finished an onboarding step" }, notPersonal: ["step_key"] },
+  client_step_history: { noun: "the history of onboarding steps", line: "yours", personal: { step_label: "the names of onboarding steps", detail: "what changed on an onboarding step", actor: "who changed an onboarding step" }, notPersonal: ["step_key"] },
   feedback_items: { noun: "feedback and problem reports you sent us", line: "yours", personal: { who: "who sent feedback or a problem report (a sign-in id)", message: "the feedback or problem report you typed" }, notPersonal: ["error_id"] },
   roadmap_suggestions: { noun: "roadmap suggestions you made", line: "yours", personal: { who: "who made a roadmap suggestion (a sign-in id)", title: "the title of a suggestion you made", details: "the details of a suggestion you made" } },
   settings: {
@@ -219,7 +226,7 @@ export const LINES: Record<LineId, Line> = {
   appointments: { title: "Appointments", lead: "The time, status and", tail: ", plus a history of status changes we record from the day you install" },
   accounts: { title: "Your client accounts", lead: "", tail: ", plus a daily set of counts for each account, the alerts we raise, and sync status" },
   actions: { title: "What you did with contacts", lead: "" },
-  meetings: { title: "Meeting notes (only if you connect a meeting tool)", lead: "", closing: "A meeting is private to the person who recorded it. Only a contact matched with certainty by exact email gets a note in your CRM, and only when SubSync has permission to add notes. A meeting nobody can be matched to is never saved to a guessed contact: it is only counted, or it waits in that person's private Meeting inbox for up to 14 days and is then removed. Everything SubSync writes to your CRM is logged, so it never counts as a reply or as activity in the numbers." },
+  meetings: { title: "Meeting notes (only if you connect a meeting tool)", lead: "", closing: "A meeting is private to the person who recorded it. Only a contact matched with certainty by exact email gets a note in your CRM, and only when SubSync has permission to add notes. A meeting nobody can be matched to is never saved to a guessed contact: it is only counted, or it waits in that person's private Meeting inbox for up to 14 days and is then removed. A call that was handled keeps its summary for 90 days, then only a log of ids and times remains. Everything SubSync writes to your CRM is logged, so it never counts as a reply or as activity in the numbers." },
   shares: { title: "Share links", lead: "", closing: `A link works for ${SHARE_LINK_DAYS} days and you can switch it off at any time.` },
   yours: { title: "Things you add", lead: "" },
   sign_in: { title: "Your company, settings and connections", lead: "", closing: "Access tokens are encrypted at rest. API keys are kept only as a one-way hash." },

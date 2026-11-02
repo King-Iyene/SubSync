@@ -1,7 +1,9 @@
 import { decryptSecret } from "../crypto";
 import { sql } from "../db";
 import { writeToCrm } from "../ghl/crm-writes";
+import { installationHasScope } from "../analytics/cleanup-queries";
 import { locationAccessToken } from "../sync/engine";
+import type { DeliveryStore, HookConnection } from "./fathom-hook";
 import type { IngestStore, MeetingRow, PersonalConnection, PersonSettings, Writer } from "./ingest";
 import type { Candidate } from "./meeting-plan";
 import type { Role } from "../identity";
@@ -67,10 +69,20 @@ export function pgIngestStore(): IngestStore {
         on conflict (owner_ghl_user_id, provider, provider_meeting_id) do nothing returning id`;
       return rows.length === 1 ? (rows[0].id as string) : null;
     },
-    async updateMeeting(id, status, reason) {
-      await sql()`update meetings set status = ${status}, reason = ${reason} where id = ${id}`;
+    async updateMeeting(id, status, reason, expiresAt) {
+      await sql()`update meetings set status = ${status}, reason = ${reason}, expires_at = ${expiresAt === undefined ? sql()`expires_at` : expiresAt === null ? null : new Date(expiresAt)} where id = ${id}`;
     },
-    recordWrite: (r) => recordCrmWrite({ ...r, partNo: 1 }),
+    async ignoredEmails(installationId, userId) {
+      const rows = await sql()`select email from meeting_ignored_emails where installation_id = ${installationId} and ghl_user_id = ${userId}`;
+      return rows.map((r) => r.email as string);
+    },
+    hasWriteScope: (installationId) => installationHasScope(installationId, "contacts.write"),
+    async recordWrite(r) {
+      const first = await recordCrmWrite({ ...r, partNo: 1 });
+      // The audit log says who wrote what where (ids only, never any text of the call).
+      if (first) await sql()`insert into audit_log (installation_id, actor, action, detail) values (${r.installationId}, ${r.authoredBy}, 'meeting_notes.note_written', ${sql().json({ meetingId: r.meetingId, locationId: r.locationId, contactId: r.contactId } as never)})`.catch(() => undefined);
+      return first;
+    },
     async bump(connectionId, field) {
       const db = sql();
       if (field === "saved") await db`update user_connections set saved_count = saved_count + 1, last_event_at = now(), last_ok_at = now() where id = ${connectionId}`;
@@ -84,10 +96,10 @@ export function crmWriter(companyKey: string): Writer {
   return (a) => writeToCrm({ installationId: a.installationId, locationId: a.locationId, contactId: a.contactId, meetingId: a.meetingId, request: a.request, token: () => locationAccessToken(companyKey, a.locationId) });
 }
 
-export type HookConnection = PersonalConnection & { webhookSecretEnc: string | null; status: string; companyKey: string };
+export type StoredHookConnection = PersonalConnection & { webhookSecretEnc: string | null; status: string; companyKey: string };
 
 /** The connection a Fathom delivery address belongs to. A revoked, disconnected or unknown key finds nothing (the route answers 404 for all of them). */
-export async function findPersonalByKey(key: string): Promise<HookConnection | null> {
+export async function findPersonalByKey(key: string): Promise<StoredHookConnection | null> {
   const [r] = await sql()`
     select u.id, u.installation_id, u.company_key, u.ghl_user_id, u.person_name, u.home_location_id, u.person_role, u.provider, u.provider_account_email, u.webhook_secret_enc, u.status
     from user_connections u join installations i on i.id = u.installation_id and i.uninstalled_at is null
@@ -101,4 +113,23 @@ export async function findPersonalByKey(key: string): Promise<HookConnection | n
   };
 }
 
-export const webhookSecretOf = (c: HookConnection): string | null => (c.webhookSecretEnc ? decryptSecret(c.webhookSecretEnc) : null);
+export const webhookSecretOf = (c: StoredHookConnection): string | null => (c.webhookSecretEnc ? decryptSecret(c.webhookSecretEnc) : null);
+
+/** The connection a delivery address belongs to, with its delivery secret decrypted for the signature check (server code only; never returned to a screen). */
+export async function findHookConnection(key: string): Promise<HookConnection | null> {
+  const c = await findPersonalByKey(key);
+  return c ? { ...c, webhookSecret: webhookSecretOf(c) } : null;
+}
+
+/** Claims a delivery id in the database: the unique index makes two simultaneous claims of one id give exactly one winner. */
+export function pgDeliveryStore(): DeliveryStore {
+  return {
+    async claim(installationId, connectionId, webhookId) {
+      const rows = await sql()`insert into meeting_deliveries (installation_id, connection_id, webhook_id) values (${installationId}, ${connectionId}, ${webhookId}) on conflict do nothing returning id`;
+      return rows.length === 1;
+    },
+    async release(connectionId, webhookId) {
+      await sql()`delete from meeting_deliveries where connection_id = ${connectionId} and webhook_id = ${webhookId}`;
+    },
+  };
+}

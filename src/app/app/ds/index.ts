@@ -14,3 +14,4 @@ export { EmptyState, Skeleton, SkeletonRows, SkeletonCards, ErrorState, Definiti
 export { BarChart, Distribution, Sparkline, ChartPlaceholder, type Bar, type ChartTone } from "./charts";
 export { MyDayView } from "./my-day";
 export { useTheme } from "./theme";
+export { LineChart } from "./line-chart";
