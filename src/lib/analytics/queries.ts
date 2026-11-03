@@ -402,6 +402,7 @@ export type DealRow = {
   locationId: string;
   locationName: string | null;
   name: string | null;
+  contactId?: string | null;
   contactName: string | null;
   value: number;
   pipelineName: string | null;
@@ -414,7 +415,7 @@ export async function staleDeals(installationId: string, days: number, limit = 2
   const db = sql();
   const scope = locationId ? db`and o.location_id = ${locationId}` : db``;
   const rows = await db`
-    select o.opportunity_id, o.location_id, l.name location_name, o.name, o.contact_name, o.monetary_value::float8 value,
+    select o.opportunity_id, o.location_id, l.name location_name, o.name, o.contact_id, o.contact_name, o.monetary_value::float8 value,
       pl.name pipeline_name, st.nm stage_name, o.act,
       floor(extract(epoch from (now() - o.act)) / 86400)::int days_stale
     from (
@@ -434,6 +435,7 @@ export async function staleDeals(installationId: string, days: number, limit = 2
     locationId: r.location_id,
     locationName: r.location_name,
     name: r.name,
+    contactId: (r.contact_id as string | null) || null,
     contactName: r.contact_name,
     value: r.value,
     pipelineName: r.pipeline_name,

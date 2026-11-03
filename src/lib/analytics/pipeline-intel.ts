@@ -13,6 +13,7 @@ export type Deal = {
   stageName: string;
   stageOrder: number; // 1-based position in its pipeline, 999 when unknown
   name: string | null;
+  contactId?: string | null;
   contactName: string | null;
   value: number;
   status: "open" | "won" | "lost" | string;

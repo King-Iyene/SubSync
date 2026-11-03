@@ -1,17 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useApiClient, useData } from "../session";
-import { anomalyIndices } from "../../../lib/analytics/client-intel";
+import { DataList, LeadDrawer, LineChart, ModuleTabs, type Column, type LeadSeed } from "../ds";
 import {
-  Badge, Btn, Card, Empty, ErrorBox, ExtLink, fmtInt, fmtMoney, inputClass, Loading, PageHeader, Sparkline, Stat, Table, Td, Th,
+  Badge, Btn, Card, Empty, ErrorBox, ExtLink, fmtInt, fmtMoney, inputClass, Loading, PageHeader, Stat, Table, Td, Th,
 } from "../ui";
+import { DealHygiene, PipelineRollup, StaleDeals } from "./deals";
 import { ForecastCard, type ForecastData } from "./forecast-card";
+import { QuietDeals } from "./quiet-deals";
 import { StageRulesCard, type StageControls } from "./stage-rules-card";
+
+// The Pipeline module (stage P1, N36): five tabs, at most four blocks on each, one line under each block title. Every number is the one the page always
+// showed (counted deals, stage rules, forecast method); only where it sits has changed.
 
 type DealRow = {
   opportunityId: string; locationId: string; locationName: string | null; pipelineName: string; stageName: string; name: string | null;
-  contactName: string | null; value: number; url: string;
+  contactId?: string | null; contactName: string | null; value: number; url: string;
 };
 type Bucket = { label: string; count: number; value: number };
 type Data = {
@@ -38,6 +43,17 @@ type Data = {
 
 const pct = (n: number | null) => (n === null ? "n/a" : `${Math.round(n * 100)}%`);
 const riskTone = (s: number) => (s >= 70 ? "bad" : s >= 40 ? "warn" : "neutral");
+const moneyShort = (n: number) => (n >= 1_000_000 ? `$${Math.round(n / 100_000) / 10}m` : n >= 1000 ? `$${Math.round(n / 100) / 10}k` : `$${Math.round(n)}`);
+
+/** A block: a title, one line under it, then the content. */
+function Block({ title, line, action, className, children }: { title: string; line: string; action?: ReactNode; className?: string; children: ReactNode }) {
+  return (
+    <Card title={title} action={action} className={className}>
+      <p className="-mt-3 mb-3 text-sm text-muted-foreground">{line}</p>
+      {children}
+    </Card>
+  );
+}
 
 function Bars({ items, money = true }: { items: Bucket[]; money?: boolean }) {
   const max = Math.max(1, ...items.map((b) => (money ? b.value : b.count)));
@@ -53,30 +69,34 @@ function Bars({ items, money = true }: { items: Bucket[]; money?: boolean }) {
   );
 }
 
-function DealTable({ rows, extra }: { rows: Array<DealRow & { reasons?: string[]; score?: number }>; extra?: "risk" | "reasons" }) {
+type ListRow = DealRow & { reasons?: string[]; score?: number };
+
+/** Deals as one list. A row opens the lead panel when the deal has a contact, otherwise the deal in your CRM. */
+function DealList({ rows, extra, caption }: { rows: ListRow[]; extra?: "risk" | "reasons"; caption: string }) {
+  const [open, setOpen] = useState<number | null>(null);
+  const withContact = rows.filter((d) => d.contactId);
+  const seeds: LeadSeed[] = withContact.map((d) => ({ contactId: d.contactId as string, locationId: d.locationId, name: d.contactName ?? d.name ?? "Contact", locationName: d.locationName, url: d.url, note: `${d.name ?? "Untitled deal"}, ${fmtMoney(d.value)}, ${d.pipelineName}: ${d.stageName}.` }));
+  const columns: Array<Column<ListRow>> = [
+    { key: "deal", header: "Deal", primary: true, width: "minmax(0,1.8fr)", cell: (d) => d.name ?? d.contactName ?? "Untitled deal" },
+    { key: "acct", header: "Client account", width: "minmax(0,1.3fr)", cell: (d) => <span className="text-muted-foreground">{d.locationName ?? "Unnamed account"}</span> },
+    { key: "stage", header: "Stage", width: "minmax(0,1.4fr)", cell: (d) => <span className="text-muted-foreground">{d.pipelineName}: {d.stageName}</span> },
+    { key: "value", header: "Value", width: "7rem", align: "right", cell: (d) => <span className="tabular-nums">{fmtMoney(d.value)}</span> },
+    ...(extra === "risk" ? [{ key: "risk", header: "Risk", width: "minmax(0,1.8fr)", cell: (d: ListRow) => (
+      <span><Badge tone={riskTone(d.score ?? 0)}>{d.score}</Badge><span className="mt-1 block text-xs text-muted-foreground">{(d.reasons ?? []).slice(0, 3).join(", ")}</span></span>
+    ) }] : []),
+    ...(extra === "reasons" ? [{ key: "why", header: "Why", width: "minmax(0,1.6fr)", cell: (d: ListRow) => <span className="text-xs text-muted-foreground">{(d.reasons ?? []).join(", ")}</span> }] : []),
+    { key: "open", header: "", width: "5rem", align: "right" as const, cell: (d: ListRow) => <ExtLink href={d.url}>Open</ExtLink> },
+  ];
   return (
-    <Table head={<tr><Th>Deal</Th><Th>Account</Th><Th>Stage</Th><Th className="text-right">Value</Th>{extra && <Th>{extra === "risk" ? "Risk" : "Why"}</Th>}<Th>{""}</Th></tr>}>
-      {rows.map((d) => (
-        <tr key={d.opportunityId} className="hover:bg-muted/40">
-          <Td className="font-medium">{d.name ?? d.contactName ?? "Untitled deal"}</Td>
-          <Td>{d.locationName ?? "Unnamed account"}</Td>
-          <Td className="text-muted-foreground">{d.pipelineName}: {d.stageName}</Td>
-          <Td className="text-right tabular-nums">{fmtMoney(d.value)}</Td>
-          {extra === "risk" && (
-            <Td>
-              <Badge tone={riskTone(d.score ?? 0)}>{d.score}</Badge>
-              <ul className="mt-1 space-y-0.5 text-xs text-muted-foreground">{(d.reasons ?? []).slice(0, 3).map((r) => <li key={r}>{r}</li>)}</ul>
-            </Td>
-          )}
-          {extra === "reasons" && <Td className="text-xs text-muted-foreground">{(d.reasons ?? []).join(", ")}</Td>}
-          <Td><ExtLink href={d.url}>Open</ExtLink></Td>
-        </tr>
-      ))}
-    </Table>
+    <>
+      <DataList rows={rows} columns={columns} rowKey={(d) => d.opportunityId} caption={caption}
+        onOpen={(d) => { const at = withContact.findIndex((x) => x.opportunityId === d.opportunityId); if (at >= 0) setOpen(at); else window.open(d.url, "_blank", "noopener,noreferrer"); }} />
+      <LeadDrawer leads={seeds} index={open} onIndex={setOpen} onClose={() => setOpen(null)} />
+    </>
   );
 }
 
-export function PipelineView() {
+export function PipelineView({ initialTab = 0 }: { initialTab?: number }) {
   const api = useApiClient();
   const { data, error, loading, reload } = useData<Data>("pipeline-intel");
   const [target, setTarget] = useState("");
@@ -87,7 +107,7 @@ export function PipelineView() {
   if (error) return <ErrorBox error={error} onRetry={reload} />;
   if (!data) return null;
   if (data.totals.open + data.totals.won + data.totals.lost === 0) {
-    return <div><PageHeader title="Pipeline" subtitle="Forecast, bottlenecks and deal risk across every client account." /><Empty title="No deals yet" body="Deals appear here once the first sync finishes." /></div>;
+    return <div><PageHeader title="Pipeline" subtitle="Deals appear here after the first sync." /><Empty title="No deals yet" body="Deals appear here once the first sync finishes." /></div>;
   }
 
   const names = [...new Set(data.stages.map((s) => s.pipelineName))];
@@ -108,59 +128,46 @@ export function PipelineView() {
     }
   };
 
-  return (
+  const overview = (
     <div className="space-y-6">
-      <PageHeader title="Pipeline" subtitle="Forecast, bottlenecks and deal risk across every client account. Everything here is calculated from deals we have synced." actions={<Btn onClick={() => api.download("export/deals", "subsync-open-deals.csv")}>Export open deals</Btn>} />
-
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Stat label="Open pipeline" value={fmtMoney(data.totals.openValue)} sub={<>{fmtInt(data.totals.open)} open deals{data.outlier && <span className="mt-1 block text-warning">One deal ({fmtMoney(data.outlier.value)}) is {Math.round(data.outlier.share * 100)}% of this.</span>}</>} />
-        <Stat label="Win rate" value={pct(data.totals.winRate)} sub={data.totals.winRate === null ? `${data.totals.won + data.totals.lost} closed so far; a win rate needs ${data.minClosedDeals}` : `${data.totals.won} won, ${data.totals.lost} lost`} />
-        <Stat label="Average time to win" value={data.totals.avgCycleDays === null ? "n/a" : `${data.totals.avgCycleDays} ${data.totals.avgCycleDays === 1 ? "day" : "days"}`} sub="created to won" />
-        <Stat label="Likely revenue (estimate)" value={range === null ? "Not enough data" : fmtMoney(range.likely)} sub={<>{range ? <span className="block">Range {fmtMoney(range.low)} to {fmtMoney(range.high)}</span> : <span className="block">{f.method === "none" ? `Needs ${data.minClosedDeals} closed deals or stage probabilities you set.` : ""}</span>}<span className="block">Estimate, not a fact. The method is under Revenue forecast.</span></>} />
-      </div>
-      {data.excluded.count > 0 && (
-        <p className="text-xs text-muted-foreground">
-          {fmtInt(data.excluded.count)} open {data.excluded.count === 1 ? "deal is" : "deals are"} not counted in these figures ({fmtInt(data.excluded.closedOut ?? 0)} in a closed-out stage or a pipeline not in use, {fmtInt(data.excluded.noValue)} with no value, {fmtInt(data.excluded.noOwner)} with no owner). Amounts are as entered in each account; different currencies are not converted.
-        </p>
-      )}
-
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <ForecastCard f={f} />
-        <Card title="Pipeline coverage">
-          {data.coverage ? (
-            <div className="space-y-1 text-sm">
-              <p className="text-lg font-semibold">{data.coverage.ratio}x of your monthly target</p>
-              <p className="text-muted-foreground">Target {fmtMoney(data.coverage.target)} a month. A healthy pipeline is 3x ({fmtMoney(data.coverage.needed)}).</p>
-              {data.coverage.healthy ? <Badge tone="good">Healthy</Badge> : <p>Gap: <strong>{fmtMoney(data.coverage.gap)}</strong></p>}
-            </div>
-          ) : <p className="text-sm text-muted-foreground">Set a monthly revenue target to see whether you have enough pipeline.</p>}
-          <div className="mt-3 flex gap-2">
-            <input className={inputClass} inputMode="numeric" placeholder="Monthly revenue target, e.g. 50000" value={target} onChange={(e) => setTarget(e.target.value.replace(/[^0-9.]/g, ""))} aria-label="Monthly revenue target" />
-            <Btn onClick={saveTarget} disabled={!target}>Save</Btn>
-          </div>
-          {note && <p className="mt-2 text-xs text-muted-foreground" role="status">{note}</p>}
-        </Card>
-      </div>
-
-      <Card title="Open pipeline over time">
-        <Sparkline values={data.trend.map((t) => t.openValue)} label="Open pipeline value" marks={anomalyIndices(data.trend.map((t) => t.openValue))} />
-        {data.trend.length >= 2 && (
-          <p className="mt-1 text-xs text-muted-foreground">
-            {fmtMoney(data.trend[0].openValue)} to {fmtMoney(data.trend[data.trend.length - 1].openValue)} over {data.trend.length} days. Red dots mark days that were unusual for this pipeline.
+      <Block title="Numbers" line="Counted deals across your client accounts.">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <Stat label="Open pipeline" value={fmtMoney(data.totals.openValue)} sub={<>{fmtInt(data.totals.open)} open deals{data.outlier && <span className="mt-1 block text-warning">One deal ({fmtMoney(data.outlier.value)}) is {Math.round(data.outlier.share * 100)}% of this.</span>}</>} />
+          <Stat label="Win rate" value={pct(data.totals.winRate)} sub={data.totals.winRate === null ? `${data.totals.won + data.totals.lost} closed so far. A win rate needs ${data.minClosedDeals}.` : `${data.totals.won} won, ${data.totals.lost} lost`} />
+          <Stat label="Time to win" value={data.totals.avgCycleDays === null ? "n/a" : `${data.totals.avgCycleDays} ${data.totals.avgCycleDays === 1 ? "day" : "days"}`} sub="created to won" />
+          <Stat label="Likely revenue (estimate)" value={range === null ? "Not enough data" : fmtMoney(range.likely)} sub={<>{range ? <span className="block">Range {fmtMoney(range.low)} to {fmtMoney(range.high)}</span> : <span className="block">{f.method === "none" ? `Needs ${data.minClosedDeals} closed deals or stage chances you set.` : ""}</span>}<span className="block">An estimate. The method is on the Forecast tab.</span></>} />
+        </div>
+        {data.excluded.count > 0 && (
+          <p className="mt-3 text-xs text-muted-foreground">
+            {fmtInt(data.excluded.count)} open {data.excluded.count === 1 ? "deal is" : "deals are"} left out: {fmtInt(data.excluded.closedOut ?? 0)} in a closed out stage or an unused pipeline, {fmtInt(data.excluded.noValue)} with no value, {fmtInt(data.excluded.noOwner)} with no owner. Amounts are as entered in each account. Currencies are not converted.
           </p>
         )}
-        {data.trend.length < 2 && !data.trendNote && <p className="mt-1 text-xs text-muted-foreground">Not enough history yet: the line is drawn once there are two days counted the same way.</p>}
-        {data.trendNote && <p className="mt-1 text-xs text-muted-foreground" data-testid="trend-note">{data.trendNote}</p>}
-      </Card>
+      </Block>
 
-      {data.stageControls?.canEdit && <StageRulesCard controls={data.stageControls} onChanged={reload} />}
+      <Block title="Pipeline over time" line="Open pipeline value, one point a day.">
+        <LineChart title="Open pipeline" series={[{ label: "Open pipeline", tone: 1, points: data.trend.map((t) => ({ day: t.day, value: t.openValue })) }]} format={moneyShort} axisLabel="deals with a value and an owner" />
+        {data.trendNote && <p className="mt-2 text-xs text-muted-foreground" data-testid="trend-note">{data.trendNote}</p>}
+      </Block>
 
-      <Card title="Stages, bottlenecks and conversion" action={names.length > 1 ? (
+      <Block title="Deals at risk" line="Score 0 to 100 from quiet days, time in stage, deal age and missing value.">
+        {data.risky.length === 0 ? <Empty title="No open deals" /> : <DealList rows={data.risky} extra="risk" caption="Deals most at risk" />}
+      </Block>
+
+      <Block title="Pipeline age" line="How long open deals have been open.">
+        <Bars items={data.aging.buckets} />
+        {data.aging.valueOlderThan60Pct !== null && <p className="mt-3 text-sm">{data.aging.valueOlderThan60Pct}% of open value is in deals older than 60 days.</p>}
+      </Block>
+    </div>
+  );
+
+  const stagesTab = (
+    <div className="space-y-6">
+      <Block title="Stages" line="Where deals wait and how many move on." action={names.length > 1 ? (
         <select className="rounded-lg border bg-background px-2 py-1 text-sm" value={chosen} onChange={(e) => setPipe(e.target.value)} aria-label="Pipeline">
           {names.map((n) => <option key={n}>{n}</option>)}
         </select>
       ) : undefined}>
-        <Table head={<tr><Th>Stage</Th><Th className="text-right">Open</Th><Th className="text-right">Value</Th><Th className="text-right">Avg days here</Th><Th className="text-right">Over 2x average</Th><Th className="text-right">To next stage</Th></tr>}>
+        <Table head={<tr><Th>Stage</Th><Th className="text-right">Open</Th><Th className="text-right">Value</Th><Th className="text-right">Days here</Th><Th className="text-right">Over 2x average</Th><Th className="text-right">To next stage</Th></tr>}>
           {stages.map((s) => (
             <tr key={s.stageName} className="hover:bg-muted/40">
               <Td className="font-medium">{s.stageName} {s.bottleneck && <Badge tone="warn">Bottleneck</Badge>}</Td>
@@ -172,22 +179,12 @@ export function PipelineView() {
             </tr>
           ))}
         </Table>
-        <p className="mt-2 text-xs text-muted-foreground">Conversion is estimated from where deals are now, because stage history is not kept. A bottleneck is a stage where deals wait much longer than in the others.</p>
-      </Card>
+        <p className="mt-2 text-xs text-muted-foreground">Moving on is estimated from where deals sit now, because stage history is not kept. A bottleneck is a stage where deals wait much longer than in the others.</p>
+      </Block>
 
-      <Card title="Deals most at risk">
-        {data.risky.length === 0 ? <Empty title="No open deals" /> : <DealTable rows={data.risky} extra="risk" />}
-        <p className="mt-2 text-xs text-muted-foreground">Risk (0 to 100) adds up four things: days without activity, time stuck in the current stage, how old the deal is compared with deals that were won, and a missing value.</p>
-      </Card>
+      {data.stageControls?.canEdit && <StageRulesCard controls={data.stageControls} onChanged={reload} />}
 
-      <div className="grid grid-cols-1 gap-4">
-        <Card title="How old is the pipeline">
-          <Bars items={data.aging.buckets} />
-          {data.aging.valueOlderThan60Pct !== null && <p className="mt-3 text-sm">{data.aging.valueOlderThan60Pct}% of open value is in deals older than 60 days.</p>}
-        </Card>
-      </div>
-
-      <Card title="Wins and losses by month">
+      <Block title="Wins and losses" line="Closed deals by month.">
         <Table head={<tr><Th>Month</Th><Th className="text-right">Won</Th><Th className="text-right">Lost</Th><Th className="text-right">Win rate</Th><Th className="text-right">Won value</Th><Th className="text-right">Lost value</Th></tr>}>
           {data.winLoss.map((m) => (
             <tr key={m.month}>
@@ -196,19 +193,54 @@ export function PipelineView() {
             </tr>
           ))}
         </Table>
-      </Card>
+      </Block>
+    </div>
+  );
 
-      <Card title={`Abandoned deals worth reopening (${fmtMoney(data.abandoned.value)})`}>
-        {data.abandoned.deals.length === 0 ? <p className="text-sm text-muted-foreground">No valuable deals were lost in the last 90 days.</p> : <DealTable rows={data.abandoned.deals} />}
-      </Card>
+  const staleTab = (
+    <div className="space-y-6">
+      <Block title="Stale deals" line="Open deals with no movement. Pick a row to see the contact.">
+        <StaleDeals />
+      </Block>
+      <Block title="Quiet contacts" line="Open deals where nobody has been in touch lately.">
+        <QuietDeals />
+      </Block>
+      <Block title={`Worth reopening (${fmtMoney(data.abandoned.value)})`} line="Valuable deals lost in the last 90 days.">
+        {data.abandoned.deals.length === 0 ? <p className="text-sm text-muted-foreground">No valuable deals were lost in the last 90 days.</p> : <DealList rows={data.abandoned.deals} caption="Abandoned deals worth reopening" />}
+      </Block>
+      <Block title={`Dead deals (${fmtInt(data.dead.total)})`} line="Deals that look finished and can be cleaned up.">
+        {data.dead.rows.length === 0 ? <p className="text-sm text-muted-foreground">Nothing looks dead.</p> : <DealList rows={data.dead.rows} extra="reasons" caption="Dead pipeline to clean up" />}
+      </Block>
+    </div>
+  );
 
-      <Card title={`Dead pipeline to clean up (${fmtInt(data.dead.total)})`}>
-        {data.dead.rows.length === 0 ? <p className="text-sm text-muted-foreground">Nothing looks dead.</p> : <DealTable rows={data.dead.rows} extra="reasons" />}
-      </Card>
+  const forecastTab = (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <ForecastCard f={f} />
+        <Block title="Coverage" line="Open pipeline against your monthly target.">
+          {data.coverage ? (
+            <div className="space-y-1 text-sm">
+              <p className="text-lg font-semibold">{data.coverage.ratio}x of your monthly target</p>
+              <p className="text-muted-foreground">Target {fmtMoney(data.coverage.target)} a month. A healthy pipeline is 3x ({fmtMoney(data.coverage.needed)}).</p>
+              {data.coverage.healthy ? <Badge tone="good">Healthy</Badge> : <p>Gap: <strong>{fmtMoney(data.coverage.gap)}</strong></p>}
+            </div>
+          ) : <p className="text-sm text-muted-foreground">Set a monthly revenue target to see if you have enough pipeline.</p>}
+          <div className="mt-3 flex gap-2">
+            <input className={inputClass} inputMode="numeric" placeholder="Monthly target, for example 50000" value={target} onChange={(e) => setTarget(e.target.value.replace(/[^0-9.]/g, ""))} aria-label="Monthly revenue target" />
+            <Btn onClick={saveTarget} disabled={!target}>Save</Btn>
+          </div>
+          {note && <p className="mt-2 text-xs text-muted-foreground" role="status">{note}</p>}
+        </Block>
+      </div>
+    </div>
+  );
 
+  const compareTab = (
+    <div className="space-y-6">
       {data.accounts.length > 1 && (
-        <Card title="Compare client accounts">
-          <Table head={<tr><Th>Account</Th><Th className="text-right">Open deals</Th><Th className="text-right">Open value</Th><Th className="text-right">Win rate</Th><Th className="text-right">Days to win</Th><Th className="text-right">Stale share</Th><Th className="text-right">Avg risk</Th></tr>}>
+        <Block title="Client accounts" line="Each account side by side.">
+          <Table head={<tr><Th>Account</Th><Th className="text-right">Open deals</Th><Th className="text-right">Open value</Th><Th className="text-right">Win rate</Th><Th className="text-right">Days to win</Th><Th className="text-right">Stale share</Th><Th className="text-right">Average risk</Th></tr>}>
             {data.accounts.map((a) => (
               <tr key={a.locationId} className="hover:bg-muted/40">
                 <Td className="font-medium">{a.locationName ?? "Unnamed account"}</Td>
@@ -221,11 +253,10 @@ export function PipelineView() {
               </tr>
             ))}
           </Table>
-        </Card>
+        </Block>
       )}
-
       {data.pipelines.length > 0 && (
-        <Card title="Every pipeline">
+        <Block title="Every pipeline" line="One row for each pipeline in each account.">
           <Table head={<tr><Th>Account</Th><Th>Pipeline</Th><Th className="text-right">Open</Th><Th className="text-right">Value</Th><Th className="text-right">Win rate</Th><Th className="text-right">Days to win</Th></tr>}>
             {data.pipelines.map((p) => (
               <tr key={`${p.locationId}-${p.pipelineName}`} className="hover:bg-muted/40">
@@ -235,8 +266,27 @@ export function PipelineView() {
               </tr>
             ))}
           </Table>
-        </Card>
+        </Block>
       )}
+      <Block title="Roll up" line="Open deals by stage, and each account's wins.">
+        <PipelineRollup />
+      </Block>
+      <Block title="Deal hygiene" line="Deals with no value, no contact, or a long wait.">
+        <DealHygiene />
+      </Block>
+    </div>
+  );
+
+  return (
+    <div>
+      <PageHeader title="Pipeline" subtitle="Deals across your client accounts, counted the same way everywhere." actions={<Btn onClick={() => api.download("export/deals", "subsync-open-deals.csv")}>Export open deals</Btn>} />
+      <ModuleTabs label="Pipeline sections" start={initialTab} tabs={[
+        { label: "Overview", node: overview },
+        { label: "Stages and bottlenecks", node: stagesTab },
+        { label: "Stale deals", node: staleTab },
+        { label: "Forecast", node: forecastTab },
+        { label: "Compare", node: compareTab },
+      ]} />
     </div>
   );
 }

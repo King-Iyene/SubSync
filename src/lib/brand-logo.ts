@@ -21,7 +21,13 @@ export function effectiveLogo(brandLogoUrl: string | null | undefined, detectedL
 const escAttr = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 /** The email header: the logo with a fixed height, or an empty string when there is none. The picture loads from the owner's own address. */
-export function emailLogoHtml(logoUrl: string | null | undefined, name: string): string {
-  const url = validLogoUrl(logoUrl);
+export const PRODUCT_MARK = "/brand/subsync-logo.png";
+export const PRODUCT_MARK_FALLBACK = "/brand/subsync-logo-512.png";
+
+/** With no agency logo, the product mark is shown when the address of this app is known (an email needs a full address). */
+export function emailLogoHtml(logoUrl: string | null | undefined, name: string, appUrl?: string | null): string {
+  const own = validLogoUrl(logoUrl);
+  const base = (appUrl ?? "").replace(/\/+$/, "");
+  const url = own ?? (/^https:\/\//.test(base) ? `${base}${PRODUCT_MARK}` : null);
   return url ? `<p style="margin:0 0 16px"><img src="${escAttr(url)}" alt="${escAttr(name)}" height="40" style="max-height:40px;width:auto;border:0"></p>` : "";
 }
