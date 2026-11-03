@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useId, useState, useSyncExternalStore } from "react";
 import { dialPlan, dialWarnings, mustStop, type DialerProvider } from "@/lib/people/dial";
 import { useApiClient } from "../session";
 
@@ -63,11 +63,12 @@ export function DialButton({ phone, contactUrl, dnd, timeZone, compact }: { phon
 /** The Dialer setting: the CRM's own dialer (the default) or the person's own phone app. */
 export function DialerSetting() {
   const { provider, set } = useDialer();
+  const selectId = useId(); // unique: the setting can be on the page and in the lead panel at once
   const [msg, setMsg] = useState<string | null>(null);
   return (
     <div className="text-sm">
-      <label htmlFor="dialer-setting" className="mr-2 font-medium">Dialer</label>
-      <select id="dialer-setting" value={provider} onChange={(e) => { setMsg(null); set(e.target.value === "phone" ? "phone" : "crm").catch((err: Error) => setMsg(err.message)); }}
+      <label htmlFor={selectId} className="mr-2 font-medium">Dialer</label>
+      <select id={selectId} value={provider} onChange={(e) => { setMsg(null); set(e.target.value === "phone" ? "phone" : "crm").catch((err: Error) => setMsg(err.message)); }}
         className="rounded-lg border bg-background px-2 py-1.5 text-sm">
         <option value="crm">My CRM&apos;s dialer</option>
         <option value="phone">My own phone app</option>
