@@ -65,7 +65,10 @@ async function main() {
   assert.equal(teamView.status, 200, "an administrator sees the team page");
   assert.deepEqual(teamView.body.team, []);
   assert.equal(JSON.stringify(teamView.body).match(/_enc|webhook_secret|public_key/), null, "no secret column name in the answer");
-  assert.equal((await call("/api/app/meeting-policy", { token, method: "PUT", body: JSON.stringify({ scope: "agency", flags: {} }) })).status, 403, "only the company owner saves the company rule (the demo person is an administrator)");
+  // The demo agency person is the company owner (so the owner-only screens can be shown), so the refusal is proven with the sessions that are not the owner:
+  // a business administrator and a client's staff may not save the company rule.
+  assert.equal((await call("/api/app/meeting-policy", { token: bt, method: "PUT", body: JSON.stringify({ scope: "agency", flags: {} }) })).status, 403, "only the company owner saves the company rule (a business administrator may not)");
+  assert.equal((await call("/api/app/meeting-policy", { token: ct, method: "PUT", body: JSON.stringify({ scope: "agency", flags: {} }) })).status, 403, "and a client's staff may not");
   assert.equal((await call("/api/app/meeting-policy", { token, method: "PUT", body: "not json" })).status, 400);
   assert.equal((await call("/api/app/team-connections/not-an-id/revoke", { token, method: "POST", body: "{}" })).status, 404);
   assert.equal((await call("/api/app/my-connections")).status, 401, "no session, no answer");
