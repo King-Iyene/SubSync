@@ -180,14 +180,10 @@ export function PipelineView() {
         <p className="mt-2 text-xs text-muted-foreground">Risk (0 to 100) adds up four things: days without activity, time stuck in the current stage, how old the deal is compared with deals that were won, and a missing value.</p>
       </Card>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4">
         <Card title="How old is the pipeline">
           <Bars items={data.aging.buckets} />
           {data.aging.valueOlderThan60Pct !== null && <p className="mt-3 text-sm">{data.aging.valueOlderThan60Pct}% of open value is in deals older than 60 days.</p>}
-        </Card>
-        <Card title="Deal sizes">
-          <Bars items={data.distribution.buckets} money={false} />
-          <p className="mt-3 text-sm text-muted-foreground">Average {data.distribution.average === null ? "n/a" : fmtMoney(data.distribution.average)}, median {data.distribution.median === null ? "n/a" : fmtMoney(data.distribution.median)}.</p>
         </Card>
       </div>
 

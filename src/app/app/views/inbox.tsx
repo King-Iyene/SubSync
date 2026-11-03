@@ -10,7 +10,6 @@ import { useApiClient, useData } from "../session";
 import type { GoFn } from "../nav";
 import { DataList, DefinitionTip, Distribution, DrillPanel, EmptyState, HowTo, InlineAlert, LeadDrawer, ModuleTabs, Page, remember, remembered, Section, useDrill, type Column, type LeadSeed } from "../ds";
 import { Badge, Btn, ErrorBox, ExtLink, fmtInt, Loading, timeAgo } from "../ui";
-import { AfterHoursCard } from "./comms-sections";
 import { QueueChoices, SavedViews, WaitChips, type ViewLite } from "./inbox-controls";
 
 type Data = {
@@ -230,8 +229,6 @@ export function InboxView({ go }: { go: GoFn }) {
         </>
       )}
 
-      <AfterHoursCard />
-      <p className="mt-6 text-xs text-muted-foreground" data-testid="deals-moved">Open deals whose contact has gone quiet are now in Pipeline. <button type="button" onClick={() => go("deals")} className="font-medium text-primary underline">Open them in Pipeline</button></p>
       <p className="mt-2 text-xs text-muted-foreground">We store only who wrote, when and through which channel. Message text is never copied.</p>
       <LeadDrawer leads={seeds} index={open} onIndex={setOpen} onClose={() => setOpen(null)} />
     </Page>

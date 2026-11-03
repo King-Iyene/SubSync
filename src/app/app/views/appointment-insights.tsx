@@ -41,6 +41,7 @@ const WIDGETS: Array<{ id: WidgetId; label: string }> = [
   { id: "repeat", label: "Repeat no-shows" }, { id: "source", label: "Show rate by lead source" }, { id: "velocity", label: "How fast leads get booked" }, { id: "confirm", label: "Reminders and confirmations" },
   { id: "fair", label: "Who gets the appointments" }, { id: "value", label: "What an appointment is worth" }, { id: "followup", label: "No follow-up after the appointment" }, { id: "double", label: "Double bookings" }, { id: "briefs", label: "Before your next appointments" },
 ];
+const DEFAULT_HIDDEN: WidgetId[] = ["funnel", "velocity", "fair", "value", "followup"];
 const INITIAL = { preset: "90d", compare: "none" } as const;
 const GRACE = 3 * 3_600_000;
 
@@ -69,7 +70,7 @@ export function AppointmentInsights() {
   useEffect(() => {
     // The browser's own memory is read after the page is up; the same pattern as the card range (stage D0).
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    try { const v = JSON.parse(remembered("appt-widgets-hidden") ?? "[]"); if (Array.isArray(v)) setHidden(v.filter((x): x is WidgetId => WIDGETS.some((w) => w.id === x))); } catch { /* nothing remembered */ }
+    try { const raw = remembered("appt-widgets-hidden"); const v = raw === null ? DEFAULT_HIDDEN : JSON.parse(raw); if (Array.isArray(v)) setHidden(v.filter((x): x is WidgetId => WIDGETS.some((w) => w.id === x))); } catch { /* nothing remembered */ }
   }, []);
   useEffect(() => { if (apptList || leadList) panel.current?.scrollIntoView({ block: "nearest", behavior: "smooth" }); }, [apptList, leadList]);
 
@@ -80,7 +81,7 @@ export function AppointmentInsights() {
     return <EmptyState title="No appointment history yet" body="Once calendars have bookings, show rates by time and source, recovery, fairness and the rest appear here. SubSync reads the last 90 days and the next 60." />;
   }
   const show = (id: WidgetId) => !hidden.includes(id);
-  const toggle = (id: WidgetId) => { const next = hidden.includes(id) ? hidden.filter((x) => x !== id) : [...hidden, id]; setHidden(next); remember("appt-widgets-hidden", next.length ? JSON.stringify(next) : null); };
+  const toggle = (id: WidgetId) => { const next = hidden.includes(id) ? hidden.filter((x) => x !== id) : [...hidden, id]; setHidden(next); remember("appt-widgets-hidden", JSON.stringify(next)); };
 
   // Rows for the lists behind the grid and the source table. The same rows the count was made from; the page opens them, never re-counts them.
   const asRows = (xs: Item[]): ApptRow[] => { const now = Date.now(); return xs.map((i) => ({ ...i, noOutcome: !["showed", "noshow", "cancelled", "invalid"].includes(i.status) && i.at < now - GRACE })); };

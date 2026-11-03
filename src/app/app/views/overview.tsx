@@ -5,7 +5,7 @@ import { useApiClient, useData } from "../session";
 import type { Overview } from "../types";
 import { DataList, InlineAlert, Page, SkeletonCards } from "../ds";
 import {
-  Badge, BandBadge, Btn, Card, ChurnBadge, Empty, ErrorBox, ExtLink, fmtInt, fmtMoney, Stat, StackedBar,
+  BandBadge, Btn, Card, ChurnBadge, Empty, ErrorBox, ExtLink, fmtInt, fmtMoney, Stat, StackedBar,
 } from "../ui";
 import type { GoFn } from "../nav";
 import { ExecSummary } from "./exec-summary";
@@ -55,11 +55,10 @@ export function OverviewView({ go }: { go: GoFn }) {
 
       <ExecSummary />
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Stat label="Stale deal value" value={fmtMoney(k.staleValue)} tone={k.staleValue > 0 ? "warn" : undefined}
           sub={`${fmtInt(k.staleOpps)} of ${fmtInt(k.openOpps)} open deals have not moved`} />
         <Stat label="Waiting past your reply target" value={k.unanswered} tone={k.unanswered > 0 ? "warn" : undefined} sub="customer wrote last, no reply" />
-        <Stat label="Open alerts" value={k.openAlerts} tone={k.criticalAlerts > 0 ? "bad" : undefined} sub={`${k.criticalAlerts} critical`} />
       </div>
       {k.excludedDeals > 0 && (
         <p className="mt-2 text-xs text-muted-foreground">
@@ -74,32 +73,6 @@ export function OverviewView({ go }: { go: GoFn }) {
           One deal ({fmtMoney(k.outlier.value)}) is {Math.round(k.outlier.share * 100)}% of the open pipeline of {fmtInt(k.outlier.of)} deals, so the dollar figures above move with it. Amounts are as entered in each account; different currencies are not converted.
         </InlineAlert>
       )}
-
-      <Card title="Estimates" className="mt-4" action={<Badge tone="info">Estimate, not a fact</Badge>}>
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-          <div>
-            <p className="text-xs text-muted-foreground">Expected revenue from open deals</p>
-            <p className="text-2xl font-semibold tabular-nums">{k.expectedRevenue === null ? <span className="text-base font-normal text-muted-foreground">Not enough data</span> : fmtMoney(k.expectedRevenue)}</p>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground">Cost of slow follow-up</p>
-            <p className="text-2xl font-semibold tabular-nums">{k.followUpRevenueAtRisk === null ? <span className="text-base font-normal text-muted-foreground">Not enough data</span> : fmtMoney(k.followUpRevenueAtRisk)}</p>
-          </div>
-        </div>
-        <p className="mt-3 text-xs text-muted-foreground">
-          {k.estimateAccounts === 0
-            ? `No account has ${k.minClosedDeals} closed deals yet, so there is no win rate to base an estimate on.`
-            : `Based on ${k.estimateAccounts} of ${k.accounts} accounts that have at least ${k.minClosedDeals} closed deals.`}
-        </p>
-        <details className="mt-2 text-xs text-muted-foreground">
-          <summary className="cursor-pointer select-none underline">How these are worked out</summary>
-          <ul className="mt-2 list-disc space-y-1 pl-5">
-            <li>Expected revenue: for each account with enough closed deals, its open deal value (deals with a value and an owner) times that account&apos;s own win rate, added up.</li>
-            <li>Cost of slow follow-up: conversations waiting past the reply target, times the account&apos;s average deal value, times its win rate. It is a rough size of the problem, not money lost.</li>
-            <li>Accounts with fewer than {k.minClosedDeals} closed deals are left out rather than guessed.</li>
-          </ul>
-        </details>
-      </Card>
 
       <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card title="Needs attention" className="lg:col-span-2" action={<Btn variant="ghost" onClick={() => go("accounts")}>All accounts</Btn>}>
@@ -127,11 +100,6 @@ export function OverviewView({ go }: { go: GoFn }) {
               { label: "Watch", value: data.bands.watch, className: "bg-amber-500" },
               { label: "At risk", value: data.bands.at_risk, className: "bg-red-500" },
             ]} />
-            <dl className="mt-3 space-y-1.5 text-sm">
-              <div className="flex justify-between"><dt className="text-muted-foreground">Client accounts</dt><dd>{fmtInt(k.accounts)}{k.ignored ? ` (${k.ignored} ignored)` : ""}</dd></div>
-              <div className="flex justify-between"><dt className="text-muted-foreground">Average health score</dt><dd>{k.avgScore} / 100</dd></div>
-              <div className="flex justify-between"><dt className="text-muted-foreground">Accounts gone quiet</dt><dd>{k.dormant}</dd></div>
-            </dl>
           </Card>
         </div>
       </div>

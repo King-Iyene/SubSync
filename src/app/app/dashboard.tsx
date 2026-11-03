@@ -43,7 +43,7 @@ import { InboxView } from "./views/inbox";
 import { OnboardingView } from "./views/onboarding";
 import { OverviewView } from "./views/overview";
 import { PipelineView } from "./views/pipeline";
-import { DealMoves, TeamView } from "./views/people";
+import { TeamView } from "./views/people";
 import { SettingsView } from "./views/settings";
 import { ConnectionsPage } from "./views/connections";
 import { NotificationsPage } from "./views/notifications";
@@ -308,7 +308,7 @@ export function Dashboard() {
   const peopleOn = NAV_FOR[auth.kind].has("search") && !off("search");
   const callsAllowed = NAV_FOR[auth.kind].has("calls") && !off("calls") && !locked("calls");
   const peopleStart = view.id === "calls" ? 1 : view.id === "leads" ? 2 : 0;
-  const pipeTabs = [{ label: "Forecast and stages", node: <><PipelineView /><DealMoves /></> }, { label: "Stale deals and hygiene", node: <DealsView /> }];
+  const pipeTabs = [{ label: "Forecast and stages", node: <PipelineView /> }, { label: "Stale deals and hygiene", node: <DealsView /> }];
   // A business or a client's staff keep the small Setup module (their own checklist and email sending). An agency has the Clients module instead.
   const setupTabs = [{ label: "Setup checklists", node: <OnboardingView go={go} /> }, { label: "Email sender health", node: <EmailHealthView /> }];
   const clientFeatures: ClientsFeatures = { health: !off("health"), onboarding: !off("onboarding"), clients: !off("clients"), reports: !off("reports"), setupCompare: !off("setup_compare"), playbooks: !off("playbooks") };

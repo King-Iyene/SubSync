@@ -3,7 +3,7 @@
 import type { GoFn } from "../nav";
 import { useState } from "react";
 import { useApiClient, useData } from "../session";
-import { CardRange, DataList, DefinitionTip, EmptyState, HowTo, InlineAlert, Page, Section, SkeletonCards, SkeletonRows, Sparkline, useCardRange } from "../ds";
+import { CardRange, DefinitionTip, EmptyState, HowTo, InlineAlert, Page, Section, SkeletonCards, SkeletonRows, Sparkline, useCardRange } from "../ds";
 import { Badge, Btn, ErrorBox, ExtLink, fmtInt, fmtMoney, Stat, type Tone } from "../ui";
 import {
   appointmentsLine, attentionLine, auditPick, chooseFirst, describeRangeChange, leadsLine, summaryText, todaySubtitle, UP_IS_BAD, type First, type RangeChange, type Scope,
@@ -264,15 +264,6 @@ export function TodayView({ go }: { go: GoFn }) {
 
       <Changes go={go} unusual={unusual} />
 
-      {d.fine.length > 0 && (
-        <Section title={`Fine today (${d.fine.length})`} hint={`Checked for each: ${d.fine[0].checked.join(", ")}.`}>
-          <DataList rows={d.fine} rowKey={(f) => f.locationId} caption="Client accounts that are fine today" onOpen={single ? undefined : (f) => go("today", f.locationId)}
-            columns={[
-              { key: "name", header: "Client account", primary: true, width: "minmax(0,1fr)", cell: (f) => f.name },
-              { key: "why", header: "Status", width: "minmax(0,2fr)", cell: (f) => <span className="text-muted-foreground">{f.learning ? "Nothing wrong, but still learning what is normal here (less than a week of history)" : "Nothing unusual compared with its last week"}</span> },
-            ]} />
-        </Section>
-      )}
     </Page>
   );
 }

@@ -312,25 +312,22 @@ function GoingColdTab({ showAccount }: { showAccount: boolean }) {
       <Section title="Cold lists and lifecycle" hint="Mark a tag as a cold list so it never hides the people you are really working.">
         <LeadsView part="cold" />
       </Section>
-      <details className="border-t pt-3">
-        <summary className="cursor-pointer text-sm font-medium">More about your contacts: cohorts, best leads, valuable contacts, growth, do not disturb, birthdays</summary>
-        <div className="mt-4"><LeadsView part="more" /></div>
-      </details>
     </div>
   );
 }
 
 // ---------------- Imports and sources ----------------
 
-function ImportsTab({ showAccount }: { showAccount: boolean }) {
+function ImportsTab() {
   return (
     <div className="space-y-6">
-      <SourceChart showAccount={showAccount} />
       <LeadsView part="sources" />
     </div>
   );
 }
 
+// Kept for later; hidden from view (simplify cut 3, docs/SIMPLIFY_M1_M2.md).
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function SourceChart({ showAccount }: { showAccount: boolean }) {
   const { data, error, loading, reload } = useData<{ sources: Array<{ source: string; contacts: number }> }>("contact-intel");
   const drill = useDrill();
@@ -380,7 +377,7 @@ export function PeopleModule({ start = 0, callsAllowed }: { start?: number; call
       { label: TABS[0], node: <SearchTab filter={filter} setFilter={setFilter} replaceFilter={replaceFilter} version={version} /> },
       { label: TABS[1], node: <SmartListsTab callsAllowed={callsAllowed} onOpen={(f) => { replaceFilter(f); setTab(0); }} /> },
       { label: TABS[2], node: <GoingColdTab showAccount={showAccount} /> },
-      { label: TABS[3], node: <ImportsTab showAccount={showAccount} /> },
+      { label: TABS[3], node: <ImportsTab /> },
     ]} />
     </PageShell>
   );
