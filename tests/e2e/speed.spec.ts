@@ -76,7 +76,8 @@ const part = async (request: APIRequestContext, p: string, days = 30, as?: "busi
 test("the main answer says how it is measured and never shows a raw id or a placeholder name", async ({ request }) => {
   const d = await speed(request);
   expect(d.measuring).toMatchObject({ targetMinutes: expect.any(Number), countAutomated: expect.any(Boolean), canChange: true });
-  const text = JSON.stringify(d.people) + JSON.stringify(d.waiting);
+  // What a person can read: the names and labels. (Each person's row also carries a machine key, userId, so that a click can open the leads behind it.)
+  const text = [...d.people.map((p: Json) => p.label), ...d.waiting.flatMap((w: Json) => [w.name, w.owner?.label, w.locationName])].join(" | ");
   expect(text, "no placeholder name such as Team member ZWol").not.toMatch(/Team member [A-Za-z0-9]{4}\b/);
   expect(text, "no raw demo user id").not.toMatch(/user-[0-9a-f]{4}/);
   expect(d.people.some((p: Json) => p.label === "Former team member"), "the demo's unnamed person is explained").toBeTruthy();

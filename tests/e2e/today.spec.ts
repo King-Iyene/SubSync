@@ -14,6 +14,7 @@ async function api(request: APIRequestContext, as?: "business" | "client") {
       return (await res.json()) as Json;
     },
     status: async (path: string): Promise<number> => (await request.get(`/api/app/${path}`, { headers })).status(),
+    put: async (path: string, data: unknown): Promise<number> => (await request.put(`/api/app/${path}`, { headers, data })).status(),
   };
 }
 
@@ -63,7 +64,13 @@ test("the lines are the same numbers their own pages show", async ({ page, reque
   if (attention > 0) await expect(page.getByTestId("attention-list").locator(":scope > li")).toHaveCount(attention);
 });
 
-test("the sync banner is only for a first sync, and the filter sits in a drawer that explains itself", async ({ page }) => {
+test("the sync banner is only for a first sync, and the filter sits in a drawer that explains itself", async ({ page, request }) => {
+  // The "Hide test accounts" help only exists while a test-named account is counted. The demo leaves its test account out on purpose, so bring it back
+  // for this test and put it back afterwards.
+  const c = await api(request);
+  const test_ = ((await c.get("settings")).testAccounts as Array<{ locationId: string; ignored: boolean }>).find((a) => a.ignored);
+  if (test_) expect(await c.put(`accounts/${test_.locationId}/flags`, { ignored: false })).toBe(200);
+  try {
   await page.goto("/app");
   await expect(page.getByTestId("front-door")).toBeVisible();
   await expect(page.getByText("First sync in progress")).toHaveCount(0);
@@ -77,6 +84,9 @@ test("the sync banner is only for a first sync, and the filter sits in a drawer 
   await expect(help).toContainText("the industry you typed for each client");
   await expect(help).toContainText("The number in brackets is how many client accounts have that kind");
   await expect(help).toContainText("contains test, demo, sample, sandbox or dummy");
+  } finally {
+    if (test_) await c.put(`accounts/${test_.locationId}/flags`, { ignored: true });
+  }
 });
 
 test("what a filter hides is named, with the way to bring it back", async ({ page, request }) => {
@@ -175,7 +185,10 @@ test("what SubSync watches is in Settings, with two columns, and not on Today", 
   await expect(page.getByText("When this is sent")).toHaveCount(0);
   await expect(page.getByText("Not watched yet")).toHaveCount(0);
   await expect(page.getByTestId("watching-panel")).toHaveCount(0);
+  // Since F8 Settings has eight sections; this panel is the top of "Sync status". The chosen section is remembered in the browser.
+  await page.evaluate(() => localStorage.setItem("subsync-settings-section", "sync"));
   await page.goto("/app#settings");
+  await page.reload();
   const panel = page.getByTestId("watching-panel");
   await expect(panel).toBeVisible();
   await expect(panel.getByTestId("watching-column")).toContainText("Watching (");
