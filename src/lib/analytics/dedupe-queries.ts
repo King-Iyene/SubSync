@@ -1,5 +1,6 @@
 import { sql } from "../db";
 import { classify, groupDuplicates, planFields, type FieldChoice, type Group, type Person } from "./dedupe";
+import { needsRecheck } from "./dedupe-guide";
 
 const iso = (v: unknown) => (v instanceof Date ? v.toISOString() : null);
 
@@ -17,7 +18,7 @@ async function loadCandidates(installationId: string, allowed: string[] | null):
       select location_id, name from locations where installation_id = ${installationId} and not ignored
         ${allowed ? db`and location_id = any(${allowed}::text[])` : db``}),
     c as (
-      select c.location_id, c.contact_id, c.full_name, c.email, c.phone, c.tags, c.date_added, c.last_activity_at, c.source,
+      select c.location_id, c.contact_id, c.full_name, c.email, c.phone, c.tags, c.date_added, c.last_activity_at, c.source, c.dnd,
         nullif(lower(btrim(coalesce(c.email, ''))), '') em,
         case when length(c.phone_digits) >= 7 then right(c.phone_digits, 10) end ph
       from cached_contacts c join loc on loc.location_id = c.location_id where c.installation_id = ${installationId}),
@@ -28,6 +29,7 @@ async function loadCandidates(installationId: string, allowed: string[] | null):
       from c)
     select cand.*, loc.name location_name,
       coalesce(d.open_deals, 0) open_deals, coalesce(d.won_deals, 0) won_deals,
+      (select count(*)::int from cached_appointments a where a.installation_id = ${installationId} and a.location_id = cand.location_id and a.contact_id = cand.contact_id and a.start_at > now() and coalesce(a.status, '') not in ('cancelled', 'canceled')) upcoming,
       exists (select 1 from cached_conversations v where v.installation_id = ${installationId} and v.location_id = cand.location_id and v.contact_id = cand.contact_id) has_conv
     from cand join loc on loc.location_id = cand.location_id
     left join (
@@ -40,7 +42,7 @@ async function loadCandidates(installationId: string, allowed: string[] | null):
     contactId: r.contact_id, locationId: r.location_id, locationName: r.location_name,
     name: (r.full_name as string | null)?.trim() || "Unnamed contact", email: r.email, phone: r.phone, tags: r.tags ?? [],
     createdAt: iso(r.date_added), lastActivityAt: iso(r.last_activity_at), source: r.source,
-    openDeals: r.open_deals, wonDeals: r.won_deals, hasConversation: r.has_conv === true,
+    openDeals: r.open_deals, wonDeals: r.won_deals, hasConversation: r.has_conv === true, dnd: r.dnd === true, upcomingAppointments: r.upcoming ?? 0,
   }));
 }
 
@@ -60,7 +62,12 @@ export async function buildQueue(installationId: string, allowed: string[] | nul
     }
   }
   all.sort((a, b) => b.confidence - a.confidence || b.people.length - a.people.length);
-  const open = all.filter((g) => !reviews.has(`${g.locationId}:${g.key}`));
+  // A group someone said they merged in the CRM comes back if it is still here a day later (the merge did not happen, or did not sync).
+  const now = Date.now();
+  const open = all.filter((g) => {
+    const r = reviews.get(`${g.locationId}:${g.key}`);
+    return !r || needsRecheck(r, now);
+  });
   return { all, open, reviews, truncated: people.length >= CANDIDATE_LIMIT };
 }
 
@@ -81,15 +88,17 @@ export async function summarise(installationId: string, allowed: string[] | null
 export async function recordDecision(
   installationId: string, allowed: string[] | null, actor: string | null,
   input: { locationId: string; key: string; decision: "keep" | "not_duplicate" | "merged_in_platform"; keepContactId: string | null; contactIds: string[] },
-): Promise<"ok" | "not_found"> {
+): Promise<"ok" | "not_found" | "blocked"> {
   if (allowed && !allowed.includes(input.locationId)) return "not_found";
   const db = sql();
   const rows = await db`
-    select contact_id, full_name, email, phone, tags, date_added, last_activity_at, source from cached_contacts
+    select contact_id, full_name, email, phone, tags, date_added, last_activity_at, source, dnd from cached_contacts
     where installation_id = ${installationId} and location_id = ${input.locationId} and contact_id = any(${input.contactIds}::text[])`;
   if (rows.length !== input.contactIds.length || rows.length < 2) return "not_found";
   if (input.keepContactId && !input.contactIds.includes(input.keepContactId)) return "not_found";
-  const snapshot = { takenAt: new Date().toISOString(), contacts: rows };
+  // A group with a do-not-disturb contact only ever records "different people". Nothing else is offered for it.
+  if (input.decision !== "not_duplicate" && rows.some((r) => r.dnd === true)) return "blocked";
+  const snapshot = { takenAt: new Date().toISOString(), contacts: rows.map((r) => ({ contact_id: r.contact_id, full_name: r.full_name, email: r.email, phone: r.phone, tags: r.tags, date_added: r.date_added, last_activity_at: r.last_activity_at, source: r.source })) };
   await db.begin(async (tx) => {
     await tx`
       insert into duplicate_reviews (installation_id, location_id, group_key, decision, keep_contact_id, snapshot, decided_by)
