@@ -183,7 +183,7 @@ test("Compare: several clients against their average, the differences named, one
   await tab(page, "Compare").click();
   await page.getByRole("button", { name: "Compare the 3 lowest health scores" }).click();
   await expect(page.getByTestId("compare-notes")).toBeVisible();
-  await expect(page.getByRole("columnheader", { name: "Average" })).toBeVisible();
+  await expect(page.getByRole("columnheader", { name: "Average", exact: true })).toBeVisible();
   await expect(page.getByTestId("line-chart").first()).toContainText("Average of these clients");
   expect(await page.locator("main").innerText()).toMatch(/against the average/);
   await expect(page.getByTestId("setup-compare")).toBeVisible();
