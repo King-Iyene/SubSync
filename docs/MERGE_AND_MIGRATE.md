@@ -45,3 +45,19 @@ Merge, wait for the Vercel build to go green, open the app, run the checks in do
 - Fixed in this release: webhook for another app, constant-time secret checks, `nosniff` and `Referrer-Policy`, typed searches kept out of browser storage.
 - Open, low risk, for a later release: the old `settings.slack_webhook_url` is stored in plain text (the trust page discloses it); no `script-src` content policy; weak rate limits on the shared audit and email-check addresses; no `state` value on the install callback (GHL's flow). The app can be framed by any HTTPS site on purpose, because agencies use their own white-label domains; every data call needs a signed session.
 - Not code, still yours before the GHL review: 24-hour support channel, HTTPS redirect URLs (remove any localhost one), the Loom demo (install, setup, main flows, errors, uninstall), a sandbox test install, privacy and terms reviewed by a human.
+
+## 7. Automatic migrations (GitHub workflow `.github/workflows/migrations.yml`)
+
+What it does, so you stop pasting SQL by hand:
+- **Check** (every push and pull request): spins up a brand-new Postgres, applies ALL migrations from scratch, applies them again (must change nothing), then typechecks and runs the unit tests. VERIFIED in my sandbox with the same runner (`scripts/migrate.ts`): 39 files apply cleanly from scratch and a second run applies 0.
+- **Apply to Supabase** (only when a push to `main` changes `supabase/migrations/**`, or by hand): waits for YOUR click, then applies only the migrations not yet recorded, once each, in order, each inside one transaction. It records them in a table `subsync_migrations`. It refuses any file that drops, truncates or deletes (those you run by hand).
+- NOT VERIFIED: the workflow has never run on GitHub (I cannot run Actions from my sandbox) and the runner has never touched your Supabase. The first run is yours to watch.
+
+One-time setup, in this order:
+1. GitHub, repo `King-Iyene/SubSync`, **Settings, Environments, New environment**, name it exactly `production`. Tick **Required reviewers** and add yourself. Save.
+2. In that same environment, **Add environment secret**: name `SUPABASE_DB_URL`. Value: Supabase, **Project Settings, Database, Connection string, Session pooler** (port 5432, URI). Replace `[YOUR-PASSWORD]` with the database password. Use the SESSION pooler, not "Transaction pooler" (the runner needs a session for its lock) and not the "Direct connection" (it is IPv6-only and GitHub's machines are IPv4). Never paste this value in chat.
+3. **Baseline once** (Supabase already has the older 26 migrations, and the runner must not re-run them): GitHub, **Actions, migrations, Run workflow**, set `baseline_through` to `20261031190000_call_list_indexes.sql`, leave the rest, **Run workflow**, then press **Review deployments, Approve** on the `production` job. It records 26 migrations as applied and runs nothing. (Check first that those 26 really are in Supabase; if some are missing, tell me and use an earlier file name.)
+4. **Apply the 13 new ones**: Actions, migrations, Run workflow, set `dry_run` to **false**, leave `baseline_through` empty, Run workflow, Approve. This replaces step 2 of the manual list above. Or, with `dry_run` true, it only prints what it would apply.
+5. From now on: a migration file merged to `main` shows a pending approval on the Actions page. Approve it and it is applied.
+
+Limits to know: it migrates the database only; the Vercel deploy still happens on its own at the same moment, so a migration should be merged in a change that works with or without the new tables for a few minutes (ours are additive). Turn on Supabase backups first. If a migration fails it stops and nothing after it runs; fix forward with a new file.

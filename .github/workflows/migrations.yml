@@ -1,0 +1,108 @@
+# Database migrations.
+#
+# 1. "Check" runs on every push and pull request: it applies ALL migrations to a brand-new throwaway Postgres, then typechecks and runs the unit tests.
+#    A migration that does not apply cleanly from scratch, or that drops/truncates/deletes, fails here before it can reach production.
+# 2. "Apply to Supabase" runs only on a push to main that changes supabase/migrations (or by hand), after "Check" passes AND a person approves it
+#    (GitHub Environment "production" with required reviewers). It applies only the migrations not yet recorded, once each, in order.
+#
+# One-time setup (King): see docs/MERGE_AND_MIGRATE.md, section "Automatic migrations".
+name: migrations
+
+on:
+  push:
+    branches: [main, "claude/**"]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Only list what would be applied (nothing changes)"
+        type: boolean
+        default: true
+      baseline_through:
+        description: "ONE TIME ONLY: mark every migration up to this file name as already applied, without running it (for a database that already has them)"
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: migrations-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: Check (fresh database)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: ci
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      PGPASSWORD: ci
+      MIGRATE_DATABASE_URL: postgresql://postgres:ci@localhost:5432/postgres
+      MIGRATE_SSL: "off"
+      PGOPTIONS: "-c search_path=public,extensions"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Make the database look like Supabase (roles and extensions the migrations expect)
+        run: |
+          psql -h localhost -U postgres -v ON_ERROR_STOP=1 -c "create schema if not exists extensions; create extension if not exists pgcrypto schema extensions; create extension if not exists pg_trgm schema extensions; create role anon nologin; create role authenticated nologin; create role service_role nologin bypassrls;"
+      - name: Apply every migration from scratch
+        run: node --import tsx scripts/migrate.ts
+      - name: Applying again must change nothing
+        run: node --import tsx scripts/migrate.ts | tee /tmp/second.txt && grep -q " 0 to apply" /tmp/second.txt
+      - run: npx tsc --noEmit
+      - run: node --test "src/lib/__tests__/*.test.ts"
+
+  changes:
+    name: Did the migrations change?
+    runs-on: ubuntu-latest
+    outputs:
+      migrations: ${{ steps.diff.outputs.migrations }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: diff
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then echo "migrations=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          before="${{ github.event.before }}"
+          if [ -z "$before" ] || [ "$before" = "0000000000000000000000000000000000000000" ]; then range="HEAD~1"; else range="$before"; fi
+          if git diff --name-only "$range" "${{ github.sha }}" -- supabase/migrations scripts/migrate.ts | grep -q .; then echo "migrations=true" >> "$GITHUB_OUTPUT"; else echo "migrations=false" >> "$GITHUB_OUTPUT"; fi
+
+  apply:
+    name: Apply to Supabase (needs approval)
+    needs: [check, changes]
+    if: >-
+      ((github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.changes.outputs.migrations == 'true') || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    # Required reviewers on this environment make the job wait for a click from King. Its secret, SUPABASE_DB_URL, lives here too.
+    environment: production
+    env:
+      MIGRATE_DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: One-time baseline (only when a file name was given)
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.baseline_through != '' }}
+        run: node --import tsx scripts/migrate.ts --baseline "${{ inputs.baseline_through }}"
+      - name: What would be applied
+        if: ${{ inputs.baseline_through == '' }}
+        run: node --import tsx scripts/migrate.ts --dry-run
+      - name: Apply
+        if: ${{ inputs.baseline_through == '' && (github.event_name == 'push' || inputs.dry_run == false) }}
+        run: node --import tsx scripts/migrate.ts
