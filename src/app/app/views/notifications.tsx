@@ -48,6 +48,8 @@ export function NotificationsPage() {
 
 function Body({ data, reload }: { data: Data; reload: () => Promise<void> }) {
   const [openId, setOpenId] = useState<string | null>(null);
+  // The result line of each row lives here, not in the row: saving the wording changes the row's key, which rebuilds the row, and its message would vanish.
+  const [notes, setNotes] = useState<Record<string, Note | null>>({});
   const test = !data.flags.emailLive || !data.flags.slackLive;
   return (
     <>
@@ -62,7 +64,7 @@ function Body({ data, reload }: { data: Data; reload: () => Promise<void> }) {
       <Section title="What you get" hint="One row for each kind of message. Press Change to set where it goes, when, and the words." id="what-you-get">
         <ul className="divide-y border-y" data-testid="notification-matrix">
           {data.types.map((t) => (
-            <TypeRow key={t.id + JSON.stringify(t.pref) + String(t.customCopy)} t={t} data={data} reload={reload} open={openId === t.id} onToggle={() => setOpenId(openId === t.id ? null : t.id)} />
+            <TypeRow key={t.id + JSON.stringify(t.pref) + String(t.customCopy)} t={t} note={notes[t.id] ?? null} setNote={(n) => setNotes((x) => ({ ...x, [t.id]: n }))} data={data} reload={reload} open={openId === t.id} onToggle={() => setOpenId(openId === t.id ? null : t.id)} />
           ))}
         </ul>
         <p className="mt-2 text-xs text-muted-foreground">{data.catchup}</p>
@@ -220,10 +222,9 @@ function summary(t: TypeData, data: Data): string {
   return `${bits.length ? bits.join(", ") : "nowhere yet"} · ${t.pref.whenText}`;
 }
 
-function TypeRow({ t, data, reload, open, onToggle }: { t: TypeData; data: Data; reload: () => Promise<void>; open: boolean; onToggle: () => void }) {
+function TypeRow({ t, data, reload, open, onToggle, note, setNote }: { note: Note | null; setNote: (n: Note | null) => void; t: TypeData; data: Data; reload: () => Promise<void>; open: boolean; onToggle: () => void }) {
   const api = useApiClient();
   const [d, setD] = useState<Draft>(() => toDraft(t));
-  const [note, setNote] = useState<Note | null>(null);
   const [busy, setBusy] = useState(false);
   const [testTo, setTestTo] = useState(t.pref.recipients[0] ?? "");
   const [testDest, setTestDest] = useState(t.pref.slackDestinations[0] ?? "");

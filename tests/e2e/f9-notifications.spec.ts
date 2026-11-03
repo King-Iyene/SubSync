@@ -17,7 +17,8 @@ test("the bell opens, lists what needs me, and a test item added from Notificati
   await expect(page.getByText("A test item was added to your bell.")).toBeVisible();
   await page.getByTestId("bell").getByRole("button").click();
   await expect(page.getByTestId("bell-panel")).toBeVisible();
-  await expect(page.getByTestId("bell-item").first()).toContainText("Test:");
+  // The bell lists the most urgent first, so the info-level test item is not necessarily the first row: look for it among the rows.
+  await expect(page.getByTestId("bell-item").filter({ hasText: "Test:" }).first()).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("bell-panel")).toHaveCount(0);
 });
@@ -55,7 +56,8 @@ test("the wording editor: a live preview with sample details, an unknown variabl
   await panel.getByLabel("Title").fill("{account}: {count} waiting");
   await panel.getByRole("button", { name: "Save wording" }).click();
   await expect(page.getByText("Wording saved.")).toBeVisible();
-  await page.getByTestId("type-speed_breach").getByRole("button", { name: "Change" }).click();
+  // The row stays open after saving (its button now says Close), so the wording panel is still there.
+  await expect(page.getByTestId("wording-speed_breach")).toBeVisible();
   await page.getByTestId("wording-speed_breach").getByRole("button", { name: "Reset to default" }).click();
   await expect(page.getByText("Back to the default wording.")).toBeVisible();
 });
@@ -79,7 +81,7 @@ test("Slack: with no channel connected the page says what to do; the pasted addr
 
 test("Settings shows the daily brief line and a way into Notifications; the page works at every width without scrolling sideways", async ({ page }) => {
   await open(page, "settings");
-  await page.getByRole("tab", { name: /Notifications/ }).click().catch(() => undefined);
+  await page.getByTestId("settings-nav").getByRole("button", { name: "Notifications", exact: true }).click();
   await expect(page.getByTestId("open-notifications")).toBeVisible();
   await expect(page.getByTestId("daily-brief-line")).toContainText("Daily brief:");
   await page.getByTestId("open-notifications").click();

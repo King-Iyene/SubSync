@@ -169,7 +169,7 @@ export function SettingsView() {
           )}
 
           {section === "notifications" && (
-            <Card title="Notifications">
+            <Card title="Daily brief and alerts">
               <DailyBriefLine />
               <p className="mt-1 text-sm text-muted-foreground">Choose where each alert, the daily brief and the weekly summary go (the bell, email, one or more Slack channels), when, the quiet hours and the wording. It works without any setup.</p>
               <p className="mt-2"><a className="text-sm font-medium underline underline-offset-2" href="#notifications" data-testid="open-notifications">Open Notifications</a></p>

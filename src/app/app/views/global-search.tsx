@@ -33,6 +33,7 @@ export function GlobalSearch({ go }: { go: GoFn }) {
 
   const { data, loading, error } = useData<{ rows: PersonUi[]; total: number }>(open && debounced.length >= 2 ? `people/search?q=${encodeURIComponent(debounced)}&page=1` : null);
   const rows = (data?.rows ?? []).slice(0, 8);
+  // Enter below calls preventDefault: the panel moves focus to its Close button, which would otherwise take this same Enter as a click.
   const close = () => { setOpen(false); setQ(""); setDebounced(""); setLead(null); };
 
   return (
@@ -47,7 +48,7 @@ export function GlobalSearch({ go }: { go: GoFn }) {
           <div className="absolute inset-0 bg-black/45" onClick={close} aria-hidden />
           <div role="dialog" aria-modal="true" aria-label="Search people" className="absolute left-1/2 top-[12vh] w-[min(40rem,94vw)] -translate-x-1/2 border bg-popover text-popover-foreground shadow-[var(--shadow-lift)]">
             <input ref={input} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Name, email or phone, across every client account..." maxLength={100} aria-label="Search people"
-              onKeyDown={(e) => { if (e.key === "Enter" && rows.length > 0) setLead(0); if (e.key === "Escape") close(); }}
+              onKeyDown={(e) => { if (e.key === "Enter" && rows.length > 0) { e.preventDefault(); setLead(0); } if (e.key === "Escape") close(); }}
               className="w-full border-b bg-transparent px-4 py-3 text-base outline-none" data-testid="global-search-input" />
             <div className="max-h-[50vh] overflow-y-auto" aria-live="polite">
               {debounced.length < 2 ? <p className="px-4 py-3 text-sm text-muted-foreground">Type at least two letters. Partial names, emails and the last digits of a phone number all work.</p>
