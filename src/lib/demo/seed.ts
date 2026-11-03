@@ -194,6 +194,11 @@ export async function seedDemo(): Promise<{ installationId: string; accounts: nu
       }
     }
     for (const part of chunk(contacts, 500)) await db`insert into cached_contacts ${db(part as never)}`;
+    // Tag history for about half the tagged contacts, so the lead panel shows both a dated tag and "before SubSync started watching". Days spread over the last 20.
+    await db`insert into contact_tag_events (installation_id, location_id, contact_id, tag, kind, at)
+      select c.installation_id, c.location_id, c.contact_id, t.tag, 'added', now() - make_interval(days => (abs(hashtext(c.contact_id || t.tag)) % 20))
+      from cached_contacts c cross join lateral unnest(c.tags) as t(tag)
+      where c.installation_id = ${installationId} and c.location_id = ${locationId} and abs(hashtext(c.contact_id)) % 2 = 0`;
     totalContacts += contacts.length;
 
     // opportunities

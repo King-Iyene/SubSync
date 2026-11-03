@@ -195,7 +195,12 @@ function SearchTab({ filter, setFilter, replaceFilter, version }: { filter: Smar
   const [pg, setPg] = useState({ fk, n: 1 });
   const pageNo = pg.fk === fk ? pg.n : 1;
   const setPageNo = (n: number) => setPg({ fk, n });
-  const [tag, setTag] = useState<string | null>(null);
+  const [tag, setTag] = useState<string | null>(() => takeHandOff("people-tag"));
+  useEffect(() => {
+    const take = () => { const t = takeHandOff("people-tag"); if (t) setTag(t); };
+    window.addEventListener("subsync:tag-handoff", take);
+    return () => window.removeEventListener("subsync:tag-handoff", take);
+  }, []);
   const params = useMemo(() => { const p = filterToParams(filter); p.set("page", String(pageNo)); return p.toString(); }, [filter, pageNo]);
   const list = useData<Page>(`people/search?${params}`);
   const lists = useData<{ lists: Saved[]; canShare: boolean }>("people/lists");
@@ -367,6 +372,12 @@ export function PeopleModule({ start = 0, callsAllowed }: { start?: number; call
     return {};
   });
   const [version, setVersion] = useState(0);
+  // A tag pressed in the lead panel: show the Search tab, where the tag's days are.
+  useEffect(() => {
+    const show = () => setTab(0);
+    window.addEventListener("subsync:tag-handoff", show);
+    return () => window.removeEventListener("subsync:tag-handoff", show);
+  }, []);
   const setFilter = (f: SmartFilter) => { setFilterState(f); const { q: _q, ...keep } = f; remember("people-filter", isEmptyFilter(keep) ? null : JSON.stringify(keep)); };
   // A change that does not come from the boxes themselves (a saved list, a tag day, clearing) also restarts the boxes.
   const replaceFilter = (f: SmartFilter) => { setFilter(f); setVersion((v) => v + 1); };
