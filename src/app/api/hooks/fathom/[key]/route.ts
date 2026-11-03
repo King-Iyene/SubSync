@@ -7,6 +7,7 @@ import { verifyFathom } from "@/lib/connections/signatures";
 import { decryptSecret } from "@/lib/crypto";
 import { handleFathomDelivery, KEY, MAX_BYTES } from "@/lib/connections/fathom-hook";
 import { crmWriter, findHookConnection, pgDeliveryStore, pgIngestStore } from "@/lib/connections/ingest-store";
+import { wantedForPerson } from "@/lib/connections/wanted";
 
 // Fathom posts here when a recording's summary is ready. The address is the one SubSync registered with
 // Fathom itself when the person signed in, and it belongs to ONE person. Every request must carry a valid
@@ -27,6 +28,7 @@ export async function POST(request: Request, ctx: { params: Promise<{ key: strin
       {
         enabled: () => featureOn("connections"), find: (k) => findHookConnection(k), store: pgIngestStore(), deliveries: pgDeliveryStore(),
         write: (c) => crmWriter(c.person.companyKey),
+        wantTranscript: async (c) => (await wantedForPerson(c.installationId, c.person)).transcript,
         logError: (code, error) => console.error("Saving a Fathom meeting failed", code, safeError(error)),
       },
     );

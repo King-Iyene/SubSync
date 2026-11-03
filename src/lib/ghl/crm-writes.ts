@@ -12,8 +12,9 @@ export type WriteKind = "note" | "comment" | "field";
 /**
  * Conservative size limits, ASSUMED until the morning test (scripts/ghl-write-limits.ts) has measured the real ones. The documentation does not state a
  * limit. Content longer than this is split by the caller; guessing too low only costs an extra part, guessing too high loses a note. NOT VERIFIED LIVE.
+ * `largeTextFieldChars` (a multi-line text field) was added in stage E2b on the same footing: assumed, not measured, and cut with a visible reason.
  */
-export const ASSUMED_LIMITS = { noteChars: 3_000, commentChars: 2_000, textFieldChars: 500 } as const;
+export const ASSUMED_LIMITS = { noteChars: 3_000, commentChars: 2_000, textFieldChars: 500, largeTextFieldChars: 2_000 } as const;
 export const LIMITS_VERIFIED = false;
 
 const NOTE_VERSION = "2021-07-28";

@@ -17,7 +17,7 @@ type Waiting = {
 type Recent = { id: string; title: string | null; startedAt: string | null; receivedAt: string; status: string; outcome: string };
 type Data = {
   demo: boolean; connected: boolean; canWrite: boolean; writeLive: boolean;
-  settings: { masterSwitch: boolean; unmatchedMode: "inbox" | "discard"; previewConfirmed: boolean };
+  settings: { masterSwitch: boolean; unmatchedMode: "inbox" | "discard"; unmatchedLocked?: boolean; previewConfirmed: boolean };
   preview: { sample: boolean; text: string; shortened: boolean; held: number } | null;
   waiting: Waiting[]; recent: Recent[]; accounts: Array<{ locationId: string; name: string }>;
 };
@@ -117,10 +117,11 @@ function Inbox({ data, reload }: { data: Data; reload: () => Promise<void> }) {
           </label>
           <label className="block">
             <span className="mb-1 block text-muted-foreground">If nobody on a call is one of your contacts</span>
-            <select className={inputClass + " max-w-md"} value={data.settings.unmatchedMode} disabled={busy} onChange={(e) => void act(async () => { await api.put("meeting-inbox/settings", { unmatchedMode: e.target.value }); return "Saved."; })}>
+            <select className={inputClass + " max-w-md"} value={data.settings.unmatchedMode} disabled={busy || data.settings.unmatchedLocked} onChange={(e) => void act(async () => { await api.put("meeting-inbox/settings", { unmatchedMode: e.target.value }); return "Saved."; })}>
               <option value="inbox">Keep it in my Meeting inbox so I can link it (recommended)</option>
               <option value="discard">Do not keep it (it is only counted)</option>
             </select>
+            {data.settings.unmatchedLocked && <span className="mt-1 block text-xs text-muted-foreground">Set by your admin.</span>}
           </label>
         </div>
       </Section>

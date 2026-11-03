@@ -101,7 +101,7 @@ export const INVENTORY: Record<string, TableInfo> = {
     noun: "meetings from connected tools", line: "meetings",
     personal: {
       owner_ghl_user_id: "which team member recorded it", title: "the meeting title", attendee_emails: "who attended (email addresses)", summary: "the summary", action_items: "action items",
-      recording_url: "a link to the recording", transcript_ref: "a reference to the full transcript at the tool that made it (the text itself is not kept unless you switch that on)",
+      recording_url: "a link to the recording", transcript_ref: "a reference to the full transcript at the tool that made it (SubSync does not keep the transcript text)",
     },
     notPersonal: ["provider_meeting_id"],
   },
@@ -121,13 +121,15 @@ export const INVENTORY: Record<string, TableInfo> = {
     personal: { authored_by: "which team member a note or comment was written as" },
   },
   meeting_deliveries: { noun: "a list of meeting deliveries already handled (ids only)", line: "meetings" },
+  field_write_state: { noun: "which meeting last filled each contact field SubSync updates (ids and times only, never the value)", line: "meetings" },
   shared_audits: { noun: "share links", line: "shares", personal: { payload: "a snapshot of totals, finding titles, fix steps and how each number is counted, with client names removed, plus your business name and colour" } },
 
   // ---- what you add, and your settings (kept by "Delete my data", removed by an uninstall)
   meeting_note_settings: {
     noun: "each person's meeting-note choices", line: "yours",
-    personal: { ghl_user_id: "which team member the choices belong to" }, notPersonal: ["content_matrix", "source_priority"],
+    personal: { ghl_user_id: "which team member the choices belong to", custom_template: "the note layout a person wrote for themselves" }, notPersonal: ["content_matrix", "source_priority", "preset_chosen"],
   },
+  field_mappings: { noun: "which contact fields an admin chose for meeting notes", line: "yours", notPersonal: ["ghl_custom_field_id", "field_name", "field_type"] },
   meeting_ignored_emails: { noun: "email addresses a person asked to always ignore in their Meeting inbox", line: "yours", personal: { ghl_user_id: "which team member the choice belongs to", email: "an email address you chose to always ignore" } },
   call_lists: { noun: "saved call lists", line: "yours", personal: { name: "saved call list names", filters: "the filters of a saved list" } },
   account_profiles: {
@@ -213,6 +215,8 @@ export const looksPersonal = (column: string) => !/(_at|_on)$/.test(column) && P
 
 /** Promises that the page makes in words: a column like this must not exist. A test checks every one against the schema. */
 export const NEVER_STORED: Array<{ table: string; columns: RegExp; claim: string }> = [
+  // Stage E2b: a transcript is held in memory for one delivery and written to the CRM only where the person and the account allow it. SubSync never keeps its text.
+  { table: "meetings", columns: /^(transcript|transcript_text|transcript_body|transcript_content)$/i, claim: "SubSync never keeps the text of a transcript." },
   { table: "cached_contacts", columns: /(note|custom|file|attachment)/i, claim: "No notes, files or custom fields." },
   { table: "cached_conversations", columns: /(^|_)(body|text|content|html|snippet)(_|$)/i, claim: "The text of a message is never copied." },
   { table: "lead_touches", columns: /(^|_)(body|text|content|html|snippet)(_|$)/i, claim: "The text of a message is never copied." },

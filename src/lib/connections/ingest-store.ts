@@ -8,6 +8,8 @@ import type { IngestStore, MeetingRow, PersonalConnection, PersonSettings, Write
 import type { Candidate } from "./meeting-plan";
 import type { Role } from "../identity";
 import { recordCrmWrite } from "./write-log";
+import { setupStore } from "./setup-store";
+import { cleanPriority } from "./source-priority";
 
 // The database side of ingest.ts: every statement is scoped by the installation id and, for a person, by their own user id. Webhook handlers have no
 // signed-in user, so they use this server-side layer after the provider's signature has been checked.
@@ -44,19 +46,21 @@ export function pgIngestStore(): IngestStore {
       return { agency, accounts };
     },
     async settings(installationId, userId): Promise<PersonSettings> {
-      const [r] = await sql()`select master_switch, unmatched_mode, preset, content_matrix, preview_confirmed_at from meeting_note_settings where installation_id = ${installationId} and ghl_user_id = ${userId}`;
+      const [r] = await sql()`select master_switch, unmatched_mode, preset, content_matrix, preview_confirmed_at, custom_template, preset_chosen, source_priority from meeting_note_settings where installation_id = ${installationId} and ghl_user_id = ${userId}`;
       if (!r) return DEFAULT_SETTINGS;
       return {
         masterSwitch: r.master_switch !== false, unmatchedMode: r.unmatched_mode === "discard" ? "discard" : "inbox",
         preset: r.preset === "full_record" || r.preset === "summary_only" || r.preset === "custom" ? r.preset : "recommended", custom: r.content_matrix,
         previewConfirmedAt: r.preview_confirmed_at instanceof Date ? r.preview_confirmed_at.getTime() : null,
+        template: (r.custom_template as string | null) ?? null, presetChosen: r.preset_chosen === true, sourcePriority: cleanPriority(r.source_priority),
       };
     },
     async writesToday(installationId, userId, locationIds) {
       const db = sql();
       const [u] = await db`select count(*)::int n from meetings where installation_id = ${installationId} and owner_ghl_user_id = ${userId} and status in ('saved', 'dry_run') and created_at >= date_trunc('day', now())`;
       const per = locationIds.length
-        ? await db`select location_id, count(*)::int n from crm_writes where installation_id = ${installationId} and location_id = any(${locationIds}::text[]) and created_at >= date_trunc('day', now()) group by location_id`
+        // One count per meeting and contact (a long note in three parts, or a note plus a field update, is still one delivery), not one per row.
+        ? await db`select location_id, count(distinct (meeting_id, contact_id))::int n from crm_writes where installation_id = ${installationId} and location_id = any(${locationIds}::text[]) and created_at >= date_trunc('day', now()) group by location_id`
         : [];
       return { user: (u?.n as number) ?? 0, byAccount: Object.fromEntries(per.map((r) => [r.location_id as string, r.n as number])) };
     },
@@ -77,10 +81,11 @@ export function pgIngestStore(): IngestStore {
       return rows.map((r) => r.email as string);
     },
     hasWriteScope: (installationId) => installationHasScope(installationId, "contacts.write"),
+    ...setupStore,
     async recordWrite(r) {
-      const first = await recordCrmWrite({ ...r, partNo: 1 });
+      const first = await recordCrmWrite({ ...r, partNo: r.partNo ?? 1 });
       // The audit log says who wrote what where (ids only, never any text of the call).
-      if (first) await sql()`insert into audit_log (installation_id, actor, action, detail) values (${r.installationId}, ${r.authoredBy}, 'meeting_notes.note_written', ${sql().json({ meetingId: r.meetingId, locationId: r.locationId, contactId: r.contactId } as never)})`.catch(() => undefined);
+      if (first) await sql()`insert into audit_log (installation_id, actor, action, detail) values (${r.installationId}, ${r.authoredBy}, ${`meeting_notes.${r.kind}_written`}, ${sql().json({ meetingId: r.meetingId, locationId: r.locationId, contactId: r.contactId } as never)})`.catch(() => undefined);
       return first;
     },
     async bump(connectionId, field) {

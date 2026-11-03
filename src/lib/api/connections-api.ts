@@ -7,6 +7,7 @@ import { disconnectOwn, isPersonalProvider, listMine, listTeam, revokeByAdmin, s
 import { START_PROVIDERS, startPersonal, testPersonal } from "../connections/personal-flow";
 import { can, covers, personFromSession, statusScope, type Person } from "../connections/person";
 import { effectivePolicy, readFlags } from "../connections/policy";
+import { hasEnabledMapping } from "../connections/setup-store";
 import { json, type AuthContext } from "./auth";
 
 // The screens' endpoints for connections (INTEGRATIONS_SPEC sections 3, 5.1, 6 and 12). Who the caller is comes ONLY from the signed session
@@ -145,6 +146,7 @@ export async function policySave(ctx: Ctx): Promise<Response> {
   const body = (await ctx.request.json().catch(() => null)) as PolicyBody | null;
   if (!body || (body.scope !== "agency" && body.scope !== "account")) return json({ error: "Say which rule you are changing" }, 400);
   const flags = readFlags(body.flags);
+  const notes: string[] = [];
   const db = sql();
   if (body.scope === "agency") {
     if (!can(person.role, "set_agency_policy") || ctx.kind !== "agency") return json({ error: "Only the company owner can change the company rule", forbidden: true }, 403);
@@ -161,10 +163,15 @@ export async function policySave(ctx: Ctx): Promise<Response> {
     if (!covers(scope, loc)) return json({ error: "Not found" }, 404);
     const [known] = await db`select 1 from locations where installation_id = ${ctx.installationId} and location_id = ${loc}`;
     if (!known) return json({ error: "Not found" }, 404);
+    // Contact fields (stage E2b) may be allowed for an account only once its admin has mapped at least one field.
+    if (flags.destinations.includes("field") && !(await hasEnabledMapping(ctx.installationId, loc))) {
+      flags.destinations = flags.destinations.filter((d) => d !== "field");
+      notes.push("Contact fields stay off until a field is mapped in Meeting notes settings.");
+    }
     await db`
       insert into meeting_policies (installation_id, scope, location_id, flags, set_by) values (${ctx.installationId}, 'account', ${loc}, ${db.json(flags as never)}, ${person.userId})
       on conflict (installation_id, scope, coalesce(location_id, '')) do update set flags = excluded.flags, set_by = excluded.set_by, set_at = now()`;
   }
   await db`insert into audit_log (installation_id, actor, action, detail) values (${ctx.installationId}, ${person.userId}, 'meeting_policy.saved', ${db.json({ scope: body.scope } as never)})`;
-  return json({ ok: true, policy: await policyView(ctx, person) });
+  return json({ ok: true, notes, policy: await policyView(ctx, person) });
 }

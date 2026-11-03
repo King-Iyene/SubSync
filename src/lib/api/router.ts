@@ -83,6 +83,7 @@ import { parsePickedAccounts } from "../design/filters";
 import { myConnectionRemove, myConnectionsView, myConnectionStart, myConnectionTest, policySave, teamConnectionRevoke, teamConnectionsView } from "./connections-api";
 import { bellAction, bellView, copyPreview, copyReset, copySave, destinationAdvanced, destinationRemove, destinationsView, destinationStart, destinationTest, prefSave, prefsView, prefTest } from "./notifications-api";
 import { meetingConfirm, meetingContactSearch, meetingDismiss, meetingIgnore, meetingInboxView, meetingLink, meetingSettingsSave } from "./meetings-api";
+import { meetingSetupAccountView, meetingSetupFieldsSave, meetingSetupFieldsView, meetingSetupPreview, meetingSetupSaveMine, meetingSetupView } from "./meeting-setup-api";
 import { can, personFromSession } from "../connections/person";
 import { handlePeople, timeoutResponse } from "./people-routes";
 import { buildSteps, guideRoleOf } from "../getting-started";
@@ -1786,7 +1787,7 @@ const clientDeps: clientRoutes.Deps = { allowedIds, accountsFor, actorOf: (ctx) 
 
 const FEATURE_FOR: Record<string, Feature> = {
   search: "search", onboarding: "onboarding", stale: "stale", inbox: "inbox", pipelines: "pipelines", duplicates: "duplicates", email: "email",
-  "meeting-inbox": "meetings", "my-connections": "connections", "team-connections": "connections", "meeting-policy": "connections", alerts: "alerts", notifications: "alerts", "notification-prefs": "alerts", "notification-destinations": "alerts", appointments: "appointments", audit: "audit", speed: "speed", "appointment-insights": "appointments", meetings: "meetings", connections: "connections", cleanup: "cleanup", "setup-compare": "setup_compare", playbooks: "playbooks", daily: "overview", team: "team", "deal-events": "pipelines", contact: "search", settings: "settings", export: "exports", digest: "overview", "api-keys": "ai", hygiene: "stale", "pipeline-intel": "pipelines", "contact-intel": "activity", clients: "clients", qbr: "reports", "comms-intel": "inbox", "deal-gaps": "pipelines", "call-queue": "calls", "call-lists": "calls", "call-outcomes": "calls", people: "search", "client-onboarding": "onboarding",
+  "meeting-inbox": "meetings", "meeting-setup": "meetings", "my-connections": "connections", "team-connections": "connections", "meeting-policy": "connections", alerts: "alerts", notifications: "alerts", "notification-prefs": "alerts", "notification-destinations": "alerts", appointments: "appointments", audit: "audit", speed: "speed", "appointment-insights": "appointments", meetings: "meetings", connections: "connections", cleanup: "cleanup", "setup-compare": "setup_compare", playbooks: "playbooks", daily: "overview", team: "team", "deal-events": "pipelines", contact: "search", settings: "settings", export: "exports", digest: "overview", "api-keys": "ai", hygiene: "stale", "pipeline-intel": "pipelines", "contact-intel": "activity", clients: "clients", qbr: "reports", "comms-intel": "inbox", "deal-gaps": "pipelines", "call-queue": "calls", "call-lists": "calls", "call-outcomes": "calls", people: "search", "client-onboarding": "onboarding",
 };
 
 export async function handle(request: Request, segments: string[]): Promise<Response> {
@@ -1827,6 +1828,9 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       if (a === "connections" && !b) return await connectionsView(ctx);
       if (a === "my-connections" && !b) return await myConnectionsView(ctx);
       if (a === "meeting-inbox" && !b) return await meetingInboxView(ctx);
+      if (a === "meeting-setup" && !b) return await meetingSetupView(ctx);
+      if (a === "meeting-setup" && b === "fields" && !c) return await meetingSetupFieldsView(ctx);
+      if (a === "meeting-setup" && b === "account" && !c) return await meetingSetupAccountView(ctx);
       if (a === "meeting-inbox" && b && c === "contacts") return await meetingContactSearch(ctx, b);
       if (a === "team-connections" && !b) return await teamConnectionsView(ctx);
       if (a === "cleanup" && !b) return await cleanupView(ctx);
@@ -1896,6 +1900,7 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       if (a === "my-connections" && b && c === "start") return await myConnectionStart(ctx, b);
       if (a === "my-connections" && b && c === "test") return await myConnectionTest(ctx, b);
       if (a === "meeting-inbox" && b === "confirm") return await meetingConfirm(ctx);
+      if (a === "meeting-setup" && b === "preview" && !c) return await meetingSetupPreview(ctx);
       if (a === "meeting-inbox" && b && c === "link") return await meetingLink(ctx, b);
       if (a === "meeting-inbox" && b && c === "dismiss") return await meetingDismiss(ctx, b);
       if (a === "meeting-inbox" && b && c === "ignore") return await meetingIgnore(ctx, b);
@@ -1943,6 +1948,8 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       if (a === "stage-rules") return await stageRuleSave(ctx);
       if (a === "meeting-policy" && !b) return await policySave(ctx);
       if (a === "meeting-inbox" && b === "settings") return await meetingSettingsSave(ctx);
+      if (a === "meeting-setup" && b === "mine" && !c) return await meetingSetupSaveMine(ctx);
+      if (a === "meeting-setup" && b === "fields" && !c) return await meetingSetupFieldsSave(ctx);
       if (a === "notification-prefs" && b && !c) return await prefSave(ctx, b);
       if (a === "notification-prefs" && b && c === "copy") return await copySave(ctx, b);
       if (a === "meetings" && b) return await meetingUpdate(ctx, b);

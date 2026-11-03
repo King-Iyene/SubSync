@@ -1,5 +1,6 @@
+import { FIELD_FOR_ITEM, type FieldMapping } from "./contact-fields.ts";
 import { accessibleAccounts, type InstalledAccount, type Person } from "./person.ts";
-import { clipChoices, DEFAULT_POLICY, type Clip, type Matrix, type PolicyFlags } from "./policy.ts";
+import { clipChoices, DEFAULT_POLICY, effectiveChoices, ITEMS, matrixFor, type Clip, type Matrix, type PersonChoices, type PolicyFlags } from "./policy.ts";
 
 // Where a meeting goes (INTEGRATIONS_SPEC sections 3.2 and 7, CLAUDE.md principle 13). Pure and deterministic: given who the person is, the contacts
 // that match the attendees, and the rules of each account, it says either "write to these contacts, under these accounts' rules" or "put it in the
@@ -43,8 +44,13 @@ export type PlanInput = {
   candidates: Candidate[];
   /** The effective policy (company default and account rule, most restrictive) of each client account. */
   policies: Record<string, PolicyFlags>;
-  settings: { masterSwitch: boolean; unmatchedMode: "inbox" | "discard"; matrix: Matrix };
+  /** `choices` (stage E2b) is the person's own choices; with it, each account's setup (default layout, locks) is applied per account and `matrix` is only the fallback. */
+  settings: { masterSwitch: boolean; unmatchedMode: "inbox" | "discard"; matrix: Matrix; choices?: PersonChoices };
   writesToday: { user: number; byAccount: Record<string, number> };
+  /** The contact fields each account's admin mapped (stage E2b). Left out: no field is available anywhere. */
+  mappings?: Record<string, FieldMapping[]>;
+  /** Does the install hold the permission to add conversation comments? Left out: not checked. */
+  canComment?: boolean;
 };
 
 export type PlanTarget = {
@@ -57,6 +63,10 @@ export type PlanTarget = {
   /** Each item's real destination after the account's rules clipped the person's choice. */
   items: Matrix;
   clips: Clip[];
+  /** The person's own text layout under this account's rules (null: the default layout). */
+  template: string | null;
+  /** The contact fields this account's admin mapped, on or off (the preview and the log say why one was left out). */
+  mappings: FieldMapping[];
 };
 
 export type Plan =
@@ -74,15 +84,21 @@ export function retentionDays(policies: Record<string, PolicyFlags>, accessible:
 }
 
 /** One contact and the rules of its account: what may be written there, and whether a limit stops it today. */
-export function targetFor(c: Candidate, i: Pick<PlanInput, "policies" | "settings" | "provider" | "writesToday">): PlanTarget {
+export function targetFor(c: Candidate, i: Pick<PlanInput, "policies" | "settings" | "provider" | "writesToday" | "mappings" | "canComment">): PlanTarget {
   const policy = i.policies[c.locationId] ?? DEFAULT_POLICY;
-  const { items, clips, writesAllowed } = clipChoices(i.settings.matrix, policy, i.settings.masterSwitch);
+  // The account's setup sits over the person's choices: its default layout for someone who never chose, and its locks.
+  const eff = i.settings.choices ? effectiveChoices(i.settings.choices, policy) : null;
+  const matrix = eff ? matrixFor(eff.choices.preset, eff.choices.custom) : i.settings.matrix;
+  const mappings = i.mappings?.[c.locationId] ?? [];
+  const mapped = new Set(mappings.filter((m) => m.enabled).map((m) => m.item));
+  const fieldItems = i.mappings ? ITEMS.filter((item) => FIELD_FOR_ITEM[item].some((f) => mapped.has(f))) : undefined;
+  const { items, clips, writesAllowed } = clipChoices(matrix, policy, i.settings.masterSwitch, fieldItems !== undefined || i.canComment !== undefined ? { fieldItems, canComment: i.canComment } : undefined);
   const wantsCrm = Object.values(items).some((d) => d === "note" || d === "comment" || d === "field");
   let blocked: InboxReason | null = null;
   if (!policy.providers.includes(i.provider)) blocked = "provider_not_allowed";
   else if (!writesAllowed || !wantsCrm) blocked = "writes_off";
   else if (i.writesToday.user >= policy.dailyCapPerUser || (i.writesToday.byAccount[c.locationId] ?? 0) >= policy.dailyCapPerAccount) blocked = "over_daily_cap";
-  return { locationId: c.locationId, contactId: c.contactId, email: c.email, allowed: blocked === null, blockedBecause: blocked, items, clips };
+  return { locationId: c.locationId, contactId: c.contactId, email: c.email, allowed: blocked === null, blockedBecause: blocked, items, clips, template: eff?.choices.template ?? null, mappings };
 }
 
 export function planMeeting(i: PlanInput): Plan {

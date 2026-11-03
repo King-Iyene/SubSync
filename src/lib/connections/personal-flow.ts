@@ -6,6 +6,7 @@ import { accessTokenFor, dropProviderSide, newPublicKey, saveConnection, startPe
 import { sql } from "../db";
 import type { Role } from "../identity";
 import type { Person } from "./person";
+import { wantedForPerson } from "./wanted";
 import type { OAuthState } from "./state";
 
 // Connecting your OWN tool (INTEGRATIONS_SPEC section 2). The person is named by the signed session when the sign-in starts, carried through the
@@ -58,9 +59,11 @@ export async function completePersonal(provider: PersonalProviderNow, code: stri
   let deliveryOn = false;
   if (provider === "fathom") {
     const key = newPublicKey();
+    // Ask Fathom for only what this person chose to save (the transcript only when some account would take it into the CRM).
+    const want = await wantedForPerson(s.installationId, person).catch(() => undefined);
     const made = await outward(
       { flag: "FATHOM_WEBHOOK_LIVE", verb: "CREATE", what: "fathom.webhook.create", installationId: s.installationId, ids: { userId: who.userId } },
-      () => createFathomWebhook(got.tokens.accessToken, `${base}/api/hooks/fathom/${key}`, f), deps,
+      () => createFathomWebhook(got.tokens.accessToken, `${base}/api/hooks/fathom/${key}`, f, want), deps,
     );
     if (made.live) {
       if (!made.result.ok) return made.result;

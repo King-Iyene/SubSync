@@ -34,6 +34,8 @@ export type HookDeps = {
   now?: () => number;
   /** Logs a code and an id only, never any content. */
   logError?: (code: string, error: unknown) => void;
+  /** Could this person's choices put a transcript in the CRM? Only then is the transcript read from the delivery. Left out: never read. */
+  wantTranscript?: (conn: HookConnection) => Promise<boolean>;
 };
 
 export type HookInput = { key: string; headers: { id: string | null; timestamp: string | null; signature: string | null }; body: string };
@@ -57,7 +59,8 @@ export async function handleFathomDelivery(input: HookInput, deps: HookDeps): Pr
     return { status: 400, body: { error: "Send JSON" } };
   }
   // Anything that is not a usable meeting is acknowledged, so Fathom does not keep retrying it.
-  const parsed = parseFathomDelivery(json);
+  const wantTranscript = deps.wantTranscript ? await deps.wantTranscript(conn).catch(() => false) : false;
+  const parsed = parseFathomDelivery(json, { transcript: wantTranscript });
   if (!parsed) return { status: 200, body: { ok: true, ignored: true } };
 
   const webhookId = (input.headers.id ?? "").slice(0, 100);
@@ -67,6 +70,7 @@ export async function handleFathomDelivery(input: HookInput, deps: HookDeps): Pr
   try {
     const done: IngestResult = await ingestPersonalMeeting(conn, parsed.meeting, parsed.recordingId, deps.store, deps.write(conn), {
       internalEmails: parsed.internalEmails, rep: parsed.recordedByName ?? conn.person.name, withNames: parsed.withNames, durationMinutes: parsed.durationMinutes,
+      transcript: parsed.transcriptText, callUrl: parsed.callUrl,
     });
     return { status: 200, body: { ok: true, result: done.kind } };
   } catch (error) {

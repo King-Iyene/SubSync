@@ -24,10 +24,33 @@ export type TemplateVariable = (typeof TEMPLATE_VARIABLES)[number];
 export type Vars = Partial<Record<TemplateVariable, string | null | undefined>>;
 
 const VARIABLE = /\{([a-z_]+)\}/g;
+/** Anything in curly brackets, so a wrong capital letter, a space or a typo is caught too and never printed as it stands. */
+const ANY_BRACKETS = /\{([^{}\n]{1,40})\}/g;
 
 /** The unknown variables a template uses (empty when it is fine). Used to refuse a template and to say which word is wrong. */
 export function unknownVariables(template: string): string[] {
-  return [...new Set([...template.matchAll(VARIABLE)].map((m) => m[1]).filter((v) => !(TEMPLATE_VARIABLES as readonly string[]).includes(v)))];
+  return [...new Set([...template.matchAll(ANY_BRACKETS)].map((m) => m[1]).filter((v) => !(TEMPLATE_VARIABLES as readonly string[]).includes(v)))];
+}
+
+export const MAX_TEMPLATE_CHARS = 2_000;
+/** The most transcript text read from a call (the same cap the meeting parser uses). A longer transcript becomes a link, never a cut-off text. */
+export const MAX_TRANSCRIPT_CHARS = 200_000;
+
+export type TemplateCheck = { ok: true } | { ok: false; problems: string[] };
+
+/**
+ * Is this layout acceptable? Plain sentences for each problem, so the screen can show them next to the live preview. An unknown word in curly
+ * brackets is refused (never printed as it stands), a bracket that is not closed is refused, and a layout with no variable at all is refused.
+ */
+export function checkTemplate(template: string): TemplateCheck {
+  const problems: string[] = [];
+  const text = template.trim();
+  if (!text) return { ok: false, problems: ["The layout is empty. Add at least {summary}."] };
+  if (template.length > MAX_TEMPLATE_CHARS) problems.push(`The layout is too long (${template.length} of ${MAX_TEMPLATE_CHARS} characters).`);
+  for (const v of unknownVariables(template)) problems.push(`{${v}} is not something SubSync can fill in. You can use: ${TEMPLATE_VARIABLES.map((n) => `{${n}}`).join(", ")}.`);
+  if (/[{}]/.test(template.replace(ANY_BRACKETS, ""))) problems.push("A curly bracket is not closed. Each { needs a } after the word.");
+  if (![...template.matchAll(ANY_BRACKETS)].some((m) => (TEMPLATE_VARIABLES as readonly string[]).includes(m[1]))) problems.push("The layout needs at least one word in curly brackets, for example {summary}.");
+  return problems.length ? { ok: false, problems } : { ok: true };
 }
 
 /** Plain text only: tags are removed, control characters dropped, the result trimmed and capped. A value is never inserted as HTML. */
@@ -44,7 +67,7 @@ export function plain(v: string | null | undefined, max: number): string {
 export function fillTemplate(template: string, vars: Vars): string {
   const unknown = unknownVariables(template);
   if (unknown.length) throw new Error(`Unknown variable: ${unknown.join(", ")}`);
-  const value = (name: string) => plain(vars[name as TemplateVariable], name === "summary" || name === "transcript" ? 6_000 : 600);
+  const value = (name: string) => plain(vars[name as TemplateVariable], name === "transcript" ? MAX_TRANSCRIPT_CHARS : name === "summary" ? 6_000 : 600);
   const paragraphs = template.split(/\n{2,}/).map((p) => p.split("\n"));
   const out: string[] = [];
   for (const lines of paragraphs) {
@@ -87,18 +110,40 @@ const when = (iso: string | null) =>
 
 export const SHORTENED = "[Shortened here. The full summary is in SubSync.]";
 
+/** What a transcript is written as when it is saved on its own (it never shares an item with the summary). */
+export const TRANSCRIPT_TEMPLATE = `Transcript: {title}
+Date: {date}
+
+{transcript}
+
+Added by SubSync from {tool}.`;
+
+/** What is written instead when the transcript is too long to save in a few parts. */
+export const TRANSCRIPT_LINK_TEMPLATE = `Transcript: {title}
+Date: {date}
+
+The full transcript is too long to save here. Open it in {tool}: {transcript_url}
+
+Added by SubSync from {tool}.`;
+
+/** The variables of one call for one destination: only the parts the person's choices (after the account's rules) put there are filled in. */
+export function buildVars(i: NoteInput, includes: Includes, extra: { transcript?: string | null; transcriptUrl?: string | null } = {}): Vars {
+  return {
+    title: i.title ?? "Untitled", rep: i.rep ?? "a team member", tool: i.tool,
+    date: includes.attendeesAndDate ? when(i.startedAt) : "", duration: includes.attendeesAndDate && i.durationMinutes ? `${i.durationMinutes} min` : "",
+    attendees: includes.attendeesAndDate ? i.attendeeNames.join(", ") : "",
+    summary: includes.summary ? i.summary : "", action_items: includes.actionItems ? i.actionItems.map((a) => `- ${plain(a, 300)}`).join("\n") : "",
+    recording_url: includes.recordingLink ? i.recordingUrl : "",
+    transcript: extra.transcript ?? "", transcript_url: extra.transcriptUrl ?? "",
+  };
+}
+
 /**
  * The note for one meeting with the default template. Longer than `limit` characters: the summary is cut at a paragraph boundary and says so. The
  * recording link and the footer are never the part that is cut. (Splitting into "Part 1 of N" is stage E2b.)
  */
 export function renderNote(i: NoteInput, includes: Includes = ALL_PARTS, limit: number = ASSUMED_LIMITS.noteChars): { text: string; shortened: boolean } {
-  const vars = (summary: string | null): Vars => ({
-    title: i.title ?? "Untitled", rep: i.rep ?? "a team member", tool: i.tool,
-    date: includes.attendeesAndDate ? when(i.startedAt) : "", duration: includes.attendeesAndDate && i.durationMinutes ? `${i.durationMinutes} min` : "",
-    attendees: includes.attendeesAndDate ? i.attendeeNames.join(", ") : "",
-    summary: includes.summary ? summary : "", action_items: includes.actionItems ? i.actionItems.map((a) => `- ${plain(a, 300)}`).join("\n") : "",
-    recording_url: includes.recordingLink ? i.recordingUrl : "",
-  });
+  const vars = (summary: string | null): Vars => ({ ...buildVars(i, includes), summary: includes.summary ? summary : "" });
   const full = fillTemplate(DEFAULT_TEMPLATE, vars(i.summary));
   if (full.length <= limit || !includes.summary || !i.summary) return { text: full.length <= limit ? full : full.slice(0, limit - 1) + "…", shortened: full.length > limit };
   // Everything except the summary, then as much of the summary as fits, cut between paragraphs.

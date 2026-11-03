@@ -1,9 +1,11 @@
 import { isLive } from "../live-flags.ts";
-import { deliverNotes, includesOf, planFor, settle, toolName, type IngestStore, type PersonalConnection, type Writer } from "./ingest.ts";
+import { composeDelivery, previewSections, previewText, type PreviewSection } from "./delivery.ts";
+import { choicesOf, deliverNotes, planFor, settle, toolName, type IngestStore, type PersonalConnection, type Writer } from "./ingest.ts";
 import { INBOX_MESSAGE, targetFor, type InboxReason } from "./meeting-plan.ts";
-import { renderNote, SAMPLE_NOTE_INPUT, type NoteInput } from "./note-template.ts";
+import { SAMPLE_NOTE_INPUT, type NoteInput } from "./note-template.ts";
 import { accessibleAccounts, type Person } from "./person.ts";
 import { matrixFor } from "./policy.ts";
+import { DUPLICATE_WORDS } from "./source-priority.ts";
 
 // The Meeting inbox (INTEGRATIONS_SPEC sections 5.2 and 12, notes N93 and roadmap E2a item 5): every call that nobody could be matched to with certainty,
 // and the first calls that wait for the person's OK. PRIVATE to the person who recorded it: every function takes the signed-in person and finds only that
@@ -65,10 +67,12 @@ export function outcomeWords(status: string, reason: string | null, notes: numbe
   if (status === "saved") return notes > 1 ? `Added to ${notes} contacts in your CRM.` : notes === 1 ? "Added to the contact in your CRM." : "Added to your CRM.";
   if (status === "dry_run") return "Test mode: SubSync worked out where this note goes and wrote nothing to your CRM yet.";
   if (status === "failed") return "Nothing was saved: your CRM did not accept the note. It will not be tried again by itself.";
+  if (status === "duplicate") return reason === "already_in_crm" || reason === "preferred_tool_has_it" ? DUPLICATE_WORDS[reason] : "This call was recorded twice, so this copy was not used.";
   if (status === "skipped") {
     if (reason === "dismissed") return "You dismissed this call. Nothing was saved.";
     if (reason === "ignored") return "Nothing was saved: you asked SubSync to always ignore this person.";
     if (reason === "no_match" || reason === "no_external_attendee") return "Nothing was saved: nobody on this call matched a contact, and you chose not to keep such calls.";
+    if (reason === "nothing_to_write") return "Nothing needed to be written: the contact fields already held newer information, or this call had nothing for them.";
     return "Nothing was saved.";
   }
   return "Waiting for you.";
@@ -76,11 +80,14 @@ export function outcomeWords(status: string, reason: string | null, notes: numbe
 
 // ---------------- the first-save preview ----------------
 
-/** What the preview shows: the note as it will really look. A real waiting call when there is one, otherwise a clearly marked sample. */
-export function previewFor(held: StoredMeeting | null, person: Person, matrixItems: ReturnType<typeof matrixFor>): { sample: boolean; text: string; shortened: boolean } {
+/**
+ * What the preview shows: what the call will really become. A real waiting call when there is one, otherwise a clearly marked sample. `text` is one box
+ * (a lone contact note is shown as it is); `sections` has one entry per destination. Long content shows its "Part 1 of N" items as they will be written.
+ */
+export function previewFor(held: StoredMeeting | null, person: Person, matrixItems: ReturnType<typeof matrixFor>, options: { template?: string | null } = {}): { sample: boolean; text: string; shortened: boolean; sections: PreviewSection[] } {
   const input = held ? noteInputOf(held, person.name) : SAMPLE_NOTE_INPUT;
-  const made = renderNote(input, includesOf(matrixItems));
-  return { sample: held === null, text: made.text, shortened: made.shortened };
+  const composed = composeDelivery({ input, items: matrixItems, template: options.template ?? null });
+  return { sample: held === null, text: previewText(composed), shortened: false, sections: previewSections(composed) };
 }
 
 // ---------------- actions ----------------
@@ -113,7 +120,8 @@ export async function linkMeeting(store: InboxStore, person: Person, installatio
   const ctx = await planFor(connection, [], {}, store);
   const target = targetFor({ locationId: hit.locationId, contactId: hit.contactId, email: hit.email ?? "" }, {
     policies: ctx.policies, provider: row.provider, writesToday: ctx.today,
-    settings: { masterSwitch: ctx.settings.masterSwitch, unmatchedMode: ctx.settings.unmatchedMode, matrix: matrixFor(ctx.settings.preset, ctx.settings.custom) },
+    settings: { masterSwitch: ctx.settings.masterSwitch, unmatchedMode: ctx.settings.unmatchedMode, matrix: matrixFor(ctx.settings.preset, ctx.settings.custom), choices: choicesOf(ctx.settings) },
+    ...(ctx.mappings ? { mappings: ctx.mappings } : {}), ...(ctx.canComment === undefined ? {} : { canComment: ctx.canComment }),
   });
   if (!target.allowed) return { ok: false, code: "not_allowed", message: INBOX_MESSAGE[(target.blockedBecause ?? "writes_off") as InboxReason] };
 

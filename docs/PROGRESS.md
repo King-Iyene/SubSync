@@ -27,6 +27,7 @@ Evidence: `docs/features/F4.md` (F6: `docs/features/F6.md`). From S0.3 on King d
 | F8 | Settings, Getting started, What's new | Built (tests run at the end) |
 | F9 | Alerts and emails | Built (tests and real sends at the end) |
 | F10 | Call lists | Built (tests at the end) |
+| E2b | Save destinations and content options (3 Nov) | BUILT, awaiting King's checks: comment and contact-field destinations, table, presets, layouts with live preview, parts, transcript rules, source priority, account setup and locks. Fixtures only, nothing sent. docs/features/E2b.md |
 | E1 to E4 | Zoom, Fathom, Slack, the pages that were hidden | Reviewed and documented; real meeting, Slack and write tests need King |
 | E1 to E4 | Zoom, Fathom, Slack, hidden pages | Not started |
 | Z1 to Z3 | Re-review, release 1.1.0, first pilot | Not started |

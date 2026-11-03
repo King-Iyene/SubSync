@@ -31,6 +31,13 @@ export type FathomDelivery = {
   /** Attendees for the note's "With:" line: everybody invited except the recorder. */
   withNames: string[];
   durationMinutes: number | null;
+  /**
+   * The call's full text, one line per turn ("Name: words"), only when Fathom sent it. It is held in memory for the one delivery and written to the CRM only
+   * where the person's table, the account's rules and the person's switch all allow it. It is never stored by SubSync (stage E2b).
+   */
+  transcriptText: string | null;
+  /** The call's own page in Fathom (where the full transcript lives), used when a transcript is too long to save. */
+  callUrl: string | null;
 };
 
 const rec = (v: unknown): Record<string, unknown> => (v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
@@ -62,12 +69,32 @@ const httpsUrl = (v: unknown): string | null => {
 
 const MAX_SUMMARY = 6_000;
 const MAX_ITEMS = 20;
+const MAX_TRANSCRIPT = 200_000;
+
+/** Fathom's transcript is a list of turns, each with a speaker and words. One line per turn. */
+function transcriptOf(v: unknown): string | null {
+  if (!Array.isArray(v)) return null;
+  const lines: string[] = [];
+  let size = 0;
+  for (const raw of v) {
+    const o = rec(raw);
+    const words = text(o.text, 4_000);
+    if (!words) continue;
+    const who = text(rec(o.speaker).display_name, 80);
+    const line = who ? `${who}: ${words}` : words;
+    size += line.length + 1;
+    if (size > MAX_TRANSCRIPT) break;
+    lines.push(line);
+  }
+  return lines.length ? lines.join("\n") : null;
+}
 
 /**
- * Reads one Fathom delivery. Returns null for anything that is not a usable meeting (so the route can acknowledge it and Fathom stops retrying).
+ * Reads one Fathom delivery. The transcript is read ONLY when `options.transcript` says this person's choices could put it in the CRM (data minimisation:
+ * otherwise it is never even looked at). Returns null for anything that is not a usable meeting (so the route can acknowledge it and Fathom stops retrying).
  * A delivery needs a recording id: without one there is nothing to dedupe on, and an unidentifiable meeting is never saved.
  */
-export function parseFathomDelivery(input: unknown): FathomDelivery | null {
+export function parseFathomDelivery(input: unknown, options: { transcript?: boolean } = {}): FathomDelivery | null {
   const b = rec(input);
   const idRaw = b.recording_id;
   const recordingId = typeof idRaw === "number" && Number.isFinite(idRaw) ? String(Math.trunc(idRaw)) : typeof idRaw === "string" && /^[A-Za-z0-9_-]{1,100}$/.test(idRaw) ? idRaw : null;
@@ -121,5 +148,6 @@ export function parseFathomDelivery(input: unknown): FathomDelivery | null {
   return {
     recordingId, meeting, recordedByEmail, recordedByName, internalEmails: [...internal], withNames: withNames.filter(Boolean).slice(0, 12),
     durationMinutes: minutes !== null && minutes > 0 && minutes < 24 * 60 ? minutes : null,
+    transcriptText: options.transcript === true ? transcriptOf(b.transcript) : null, callUrl: httpsUrl(b.url),
   };
 }

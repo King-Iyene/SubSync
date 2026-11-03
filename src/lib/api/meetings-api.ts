@@ -1,15 +1,18 @@
 import { installationHasScope } from "../analytics/cleanup-queries";
 import { getSettings } from "../analytics/queries";
 import { sql } from "../db";
-import { alwaysIgnore, confirmAndRelease, daysLeft, dismissMeeting, findContacts, kindOf, linkMeeting, messageFor, noteInputOf, outcomeWords, previewFor } from "../connections/inbox";
+import { alwaysIgnore, confirmAndRelease, daysLeft, type StoredMeeting, dismissMeeting, findContacts, kindOf, linkMeeting, messageFor, noteInputOf, outcomeWords, previewFor } from "../connections/inbox";
 import { pgInboxStore, listRecent, saveMySettings } from "../connections/inbox-store";
-import { includesOf } from "../connections/ingest";
+import { choicesOf, COMMENT_SCOPE } from "../connections/ingest";
+import { composeDelivery, previewText } from "../connections/delivery";
+import { loadFieldMappings } from "../connections/setup-store";
+import { itemsWithField } from "../connections/setup-view";
 import { crmWriter } from "../connections/ingest-store";
 import { accessibleAccounts, personFromSession, type Person } from "../connections/person";
-import { matrixFor } from "../connections/policy";
-import { renderNote } from "../connections/note-template";
+import { clipChoices, effectiveChoices, effectivePolicy, matrixFor } from "../connections/policy";
 import { isLive } from "../live-flags";
 import { deepLinks } from "../links";
+import { myEffectiveChoices } from "./meeting-setup-api";
 import { json, type AuthContext } from "./auth";
 
 // The person's own Meeting inbox (stage E2a). Who the caller is comes ONLY from the signed session (`personFromSession`); no user id, role, company or
@@ -44,17 +47,26 @@ export async function meetingInboxView(ctx: Ctx): Promise<Response> {
     store.settings(ctx.installationId, person.userId), store.listWaiting(ctx.installationId, person.userId), listRecent(ctx.installationId, person.userId),
     store.getConnection(ctx.installationId, person.userId), installationHasScope(ctx.installationId, "contacts.write"), store.installed(ctx.installationId),
   ]);
-  const matrix = matrixFor(settings.preset, settings.custom);
-  const includes = includesOf(matrix);
+  // What a note really becomes for this person: their choices under the rules of their own account (the company's rules for company staff), clipped like a real write (the preview ignores the master switch, so it always shows what notes would look like).
+  const home = person.homeLocationId;
+  const [rules, mappings, canComment] = await Promise.all([
+    store.policies(ctx.installationId, home ? [home] : []),
+    home ? loadFieldMappings(ctx.installationId, [home]).then((m) => m[home] ?? []) : Promise.resolve([]),
+    installationHasScope(ctx.installationId, COMMENT_SCOPE),
+  ]);
+  const policy = effectivePolicy(rules.agency, home ? rules.accounts[home] : null);
+  const choice = effectiveChoices(choicesOf(settings), policy).choices;
+  const matrix = clipChoices(matrixFor(choice.preset, choice.custom), policy, true, { fieldItems: itemsWithField(mappings), canComment }).items;
+  const noteFor = (m: StoredMeeting) => previewText(composeDelivery({ input: noteInputOf(m, person.name), items: matrix, template: choice.template }));
   const heldFirst = waiting.find((m) => kindOf(m.reason) === "held") ?? null;
   const accounts = await accountNames(ctx.installationId, accessibleAccounts(person, installed, await store.provenAccess(ctx.installationId, person.userId)));
   return json({
     demo: false, connected: connection !== null, canWrite, writeLive: isLive("WRITE_GHL_LIVE"),
-    settings: { masterSwitch: settings.masterSwitch, unmatchedMode: settings.unmatchedMode, previewConfirmed: settings.previewConfirmedAt !== null },
-    preview: settings.previewConfirmedAt === null ? { ...previewFor(heldFirst, person, matrix), held: waiting.filter((m) => kindOf(m.reason) === "held").length } : null,
+    settings: { masterSwitch: settings.masterSwitch, unmatchedMode: effectiveChoices(choicesOf(settings), policy).choices.unmatchedMode, unmatchedLocked: effectiveChoices(choicesOf(settings), policy).locked.unmatchedMode, previewConfirmed: settings.previewConfirmedAt !== null },
+    preview: settings.previewConfirmedAt === null ? { ...previewFor(heldFirst, person, matrix, { template: choice.template }), held: waiting.filter((m) => kindOf(m.reason) === "held").length } : null,
     waiting: waiting.map((m) => ({
       id: m.id, title: m.title, startedAt: m.startedAt, attendees: m.attendeeEmails, reason: m.reason, kind: kindOf(m.reason), message: messageFor(m.reason), daysLeft: daysLeft(m.expiresAt, now),
-      summary: m.summary, actionItems: m.actionItems, recordingUrl: m.recordingUrl, noteText: kindOf(m.reason) === "unmatched" ? renderNote(noteInputOf(m, person.name), includes).text : null,
+      summary: m.summary, actionItems: m.actionItems, recordingUrl: m.recordingUrl, noteText: kindOf(m.reason) === "unmatched" ? noteFor(m) : null,
     })),
     recent: recent.map((r) => ({ id: r.id, title: r.title, startedAt: r.startedAt, receivedAt: new Date(r.createdAt).toISOString(), status: r.status, outcome: outcomeWords(r.status, r.reason, r.notes) })),
     accounts,
@@ -119,7 +131,12 @@ export async function meetingSettingsSave(ctx: Ctx): Promise<Response> {
   if (!body) return json({ error: "Nothing to save" }, 400);
   const patch: { masterSwitch?: boolean; unmatchedMode?: "inbox" | "discard" } = {};
   if (typeof body.masterSwitch === "boolean") patch.masterSwitch = body.masterSwitch;
-  if (body.unmatchedMode === "inbox" || body.unmatchedMode === "discard") patch.unmatchedMode = body.unmatchedMode;
+  if (body.unmatchedMode === "inbox" || body.unmatchedMode === "discard") {
+    // A locked rule is the admin's (stage E2b): asking for what it already is changes nothing, anything else is refused.
+    const mine = await myEffectiveChoices(ctx, person);
+    if (mine.locked.unmatchedMode && body.unmatchedMode !== mine.choices.unmatchedMode) return json({ error: "Set by your admin.", locked: "unmatchedMode" }, 409);
+    patch.unmatchedMode = body.unmatchedMode;
+  }
   if (Object.keys(patch).length === 0) return json({ error: "Nothing to save" }, 400);
   await saveMySettings(ctx.installationId, person, patch);
   return json({ ok: true });

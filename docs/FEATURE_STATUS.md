@@ -202,3 +202,4 @@ connections, appointment insights, two-agency tenant isolation, feature switches
 | Filter bar with account names and left-out reasons | built | segments (agency) | demo company; it has no test or ignored account |
 | List, lead panel, notices, states, charts | built | existing endpoints | demo company only |
 | Clickable charts, card ranges | built, on the Speed to lead trend | speed trend with the leads behind each week | count equals rows by unit test; demo company in the browser |
+| E2b Meeting notes destinations (note, comment, contact field, parts, layouts, locks) | Wave 2 (meeting notes), behind the Meeting notes switch | no (switch off by default) | Fathom delivery (E2a), the account's own field list (needs the optional read permission) | **No.** Fixtures and a local database only; real CRM limits, comment permission and field writes are INFERENCE/CHECK (docs/features/E2b.md) |
