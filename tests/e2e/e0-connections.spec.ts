@@ -61,6 +61,8 @@ test("Settings points to Connections", async ({ page }) => {
   await page.goto("/app#settings");
   await page.reload();
   await expect(page.getByRole("heading", { name: "Settings", exact: true })).toBeVisible();
+  // Settings is in sections now; the pointer lives under Integrations.
+  await page.getByTestId("settings-nav").getByRole("button", { name: "Integrations", exact: true }).click();
   await page.getByRole("link", { name: "Connections", exact: true }).click();
   await expect(page.getByRole("heading", { name: "My connections", exact: true })).toBeVisible();
 });

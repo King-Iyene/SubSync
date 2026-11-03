@@ -117,7 +117,7 @@ test("Insights: every card has its three explanation lines, the grid of 1s is go
   await page.goto("/app#appointments");
   await page.reload();
   await page.getByRole("tab", { name: "Insights" }).first().click();
-  await expect(page.getByText("Calendar health").first()).toBeVisible({ timeout: 90_000 });
+  await expect(page.getByRole("heading", { name: "Calendar health" })).toBeVisible({ timeout: 90_000 });
   const explains = page.locator('[data-testid^="explain-"]');
   expect(await explains.count()).toBeGreaterThan(5);
   const heat = page.getByTestId("heat-grid");
@@ -137,13 +137,13 @@ test("Insights: widgets can be switched off and the choice is remembered", async
   await page.goto("/app#appointments");
   await page.reload();
   await page.getByRole("tab", { name: "Insights" }).first().click();
-  await expect(page.getByText("Calendar health").first()).toBeVisible({ timeout: 90_000 });
+  await expect(page.getByRole("heading", { name: "Calendar health" })).toBeVisible({ timeout: 90_000 });
   await page.getByText(/Choose what to show/).click();
   await page.getByRole("checkbox", { name: "Double bookings" }).uncheck();
   await expect(page.getByRole("heading", { name: /Double bookings/ })).toHaveCount(0);
   await page.reload();
   await page.getByRole("tab", { name: "Insights" }).first().click();
-  await expect(page.getByText("Calendar health").first()).toBeVisible({ timeout: 90_000 });
+  await expect(page.getByRole("heading", { name: "Calendar health" })).toBeVisible({ timeout: 90_000 });
   await expect(page.getByRole("heading", { name: /Double bookings/ })).toHaveCount(0);
   await page.getByText(/Choose what to show/).click();
   await page.getByRole("checkbox", { name: "Double bookings" }).check(); // leave it as it was
@@ -171,9 +171,9 @@ test("the Insights tab opens, shows its cards without errors, and carries no ala
   await page.reload();
   await expect(page.getByText("Demo mode", { exact: false }).first()).toBeVisible();
   await page.getByRole("tab", { name: "Insights" }).first().click();
-  await expect(page.getByText("Calendar health").first()).toBeVisible();
-  await expect(page.getByText("Best times to book", { exact: false }).first()).toBeVisible();
-  await expect(page.getByText("No-show recovery", { exact: false }).first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Calendar health" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Best times to book/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /No-show recovery/ })).toBeVisible();
   await page.waitForLoadState("networkidle").catch(() => undefined);
   const text = await page.locator("body").innerText();
   expect(text).not.toMatch(/down 100%|NaN|undefined|Infinity/);
