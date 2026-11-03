@@ -19,10 +19,13 @@ function walk(dir: string, out: string[] = []): string[] {
 
 test("the permission the note needs is one the app asks for, and the code really writes a note with it", () => {
   assert.ok((GHL_SCOPES as readonly string[]).includes(NOTE_SCOPE));
+  // Since E0 every CRM write goes through one client (src/lib/ghl/crm-writes.ts); meeting-crm.ts decides whether to write and stores the outcome.
   const crm = read("src/lib/analytics/meeting-crm.ts");
-  assert.match(crm, /\/contacts\/\$\{encodeURIComponent\(m\.contact_id as string\)\}\/notes/, "it adds a note on the matched contact");
+  const writes = read("src/lib/ghl/crm-writes.ts");
+  assert.match(writes, /path: `\/contacts\/\$\{seg\(a\.contactId\)\}\/notes`/, "it adds a note on the matched contact");
   assert.match(crm, /m\.push_notes_to_crm === false\) return "skipped"/, "and only when the setting is on");
-  assert.match(crm, /res\.status === 401 \|\| res\.status === 403/, "a refusal is stored as needs permission");
+  assert.match(writes, /res\.status === 401 \|\| res\.status === 403\) return \{ outcome: "needs_permission" \}/, "a refusal comes back as needs permission");
+  assert.match(crm, /done\.outcome === "needs_permission"[\s\S]*crm_note_status = 'needs_permission'/, "and is stored as needs permission");
 });
 
 test("no screen says SubSync does not write into the CRM, or that it never changes anything", () => {

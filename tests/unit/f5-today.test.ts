@@ -43,7 +43,9 @@ describe("What SubSync watches", () => {
     expect(html(el(WatchingPanel))).not.toMatch(/rounded-lg border bg-card/);
   });
   it("is mounted in Settings, and no longer on Today", () => {
-    expect(read("src/app/app/views/settings.tsx")).toMatch(/<WatchingPanel \/>/);
+    // Settings mounts it through the F8 slot, and the slot draws the panel.
+    expect(read("src/app/app/views/settings.tsx")).toMatch(/<WatchingSlot \/>/);
+    expect(read("src/app/app/views/settings-slot-watching.tsx")).toMatch(/<WatchingPanel \/>/);
     const today = read("src/app/app/views/today.tsx");
     for (const gone of ["When this is sent", "Not watched yet", "notWatched", "We list these so you never assume", "Daily brief: on", "Slack webhook", "Email delivery needs an email service"]) expect(today, gone).not.toContain(gone);
   });

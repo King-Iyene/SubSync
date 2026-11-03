@@ -34,18 +34,21 @@ test("every control lives in a real section, and the screen draws each section",
   for (const id of ["stale", "dormant", "sla", "speed-target", "speed-open", "speed-close", "brand-name", "brand-color", "domain", "custom", "slack", "digest-email", "digest-hour", "digest-zone"]) assert.match(screen, new RegExp(`id="${id}"`), `field ${id}`);
 });
 
-test("the two slots other stages fill exist, are in the right sections, and draw nothing yet", () => {
+test("the two slots other stages fill exist and are in the right sections: Watching is filled (F5), Connections draws nothing because its screens live on the Connections page (E0)", () => {
   const watching = read("src/app/app/views/settings-slot-watching.tsx");
   const connections = read("src/app/app/views/settings-slot-connections.tsx");
-  assert.match(watching, /return null;/);
+  assert.match(watching, /return <WatchingPanel \/>;/);
   assert.match(connections, /return null;/);
   assert.match(watching, /watching-panel/);
+  const page = read("src/app/app/views/connections.tsx");
+  assert.match(page, /id="my-connections"/, "My connections is drawn on the Connections page");
+  assert.match(page, /id="team-connections"/, "Team connections is drawn on the Connections page");
   assert.equal(CONTROL_HOME["watching"], "sync");
   assert.equal(CONTROL_HOME["team-connections"], "integrations");
   assert.equal(CONTROL_HOME["my-connections"], "integrations");
   const screen = read("src/app/app/views/settings.tsx");
   assert.ok(screen.indexOf("<WatchingSlot />") < screen.indexOf("<SyncStatusPanel />"), "the watching panel sits above the sync panel");
-  assert.ok(screen.indexOf("<ConnectionsSlot />") < screen.indexOf("<ConnectionsCard"), "the connections screens sit above the connection cards");
+  assert.ok(screen.indexOf("<ConnectionsSlot />") < screen.indexOf('<Card title="Connections">'), "the connections slot sits above the Connections card");
 });
 
 test("the settings that recalculate numbers are the ones the server recalculates for", () => {

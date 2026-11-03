@@ -413,3 +413,13 @@ OPERATING PRINCIPLES (apply to every stage)
 13. Never place data by guessing. A meeting, note, or message goes to a contact only when it is matched with certainty; otherwise it waits in the person's private inbox. No setting may route one client's data into another client's account.
 14. Our own writes must never change our own numbers. Anything SubSync creates (notes, internal comments) is logged and excluded from reply, activity, and engagement metrics, and from webhook echoes.
 <!-- SUBSYNC OPERATING PRINCIPLES END -->
+
+## Working principles (King, 3 Nov 2026; apply to the whole build)
+
+1. **Customer view first.** Before building anything, write two lines in `docs/DECISIONS.md`: who uses it (agency owner, setter, client admin), what they do next because of it, and what they would say if it were missing. If there is no answer, do not build it.
+2. **Do more than the minimum, within scope.** When an item is finished, look for the one extra thing that makes it clearly better (a better empty state, a one-tap fix, a clearer number) and tell King what it was in one line. Do not add features outside the roadmap without asking.
+3. **Keep it simple.** Fewer tiles, fewer screens, one main action per screen. If something needs a paragraph to explain, simplify it.
+4. **Be strategic.** Prefer what feeds the data moat (the event store), the alert-first wedge, and speed to value. Say so when a choice trades against these.
+5. **Be proactive.** If you spot a bug, a risk or a better approach, tell King, and fix it if it is small. If it is large, log it and propose a plan.
+6. **Move fast, worry less.** Do not stall on small decisions: pick a sensible default, log it, keep going. Stop only for irreversible, security or money items.
+7. **Be honest.** Mark everything VERIFIED, INFERENCE or CHECK, and report failures plainly.
