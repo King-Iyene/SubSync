@@ -326,3 +326,7 @@ Format: date, decision, reason.
 - **Server, small and read-only (stable core touched lightly):** `segmentSet` accepts `accounts=id,id` (intersected with the company's own accounts); `segments` lists accounts with test, ignored, industry, owner (agency only); the speed answer sends the leads behind each trend week (one selection function feeds the bar and the list). No migration. To revert: remove those fields; the screens fall back.
 - **Calls:** nothing D0 adds uses a tel: link (KF-3); the lead panel and My day open the contact in the CRM. The remaining tel: links (Appointments Insights tab, Call lists) belong to F3 and F10.
 - **Test changes, not loosening:** menu.spec and freshness.spec were updated for the new labels, groups and the People tabs; freshness-one-source was updated because the strip is now called StatusLine (still drawn once, above the page); route-registry lists the new public /design page.
+
+## Stage D1 (3 Nov 2026)
+- **Decision:** D1 is a polish pass on the approved D0 system, not a new direction: no new colours, no chart library, no new components unless a page needs one that D0 lacks. The work is subtraction (cards inside cards, repeated tile rows, long sentences) plus small, restrained motion that switches off under `prefers-reduced-motion`.
+- **Reason:** King approved "calm and exact" with KF-1 (plain badges, no pills, no tinted boxes). Changing the direction now would waste that approval and every page built on it.
