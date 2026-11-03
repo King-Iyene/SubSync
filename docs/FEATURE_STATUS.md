@@ -213,3 +213,48 @@ connections, appointment insights, two-agency tenant isolation, feature switches
 | Mode A buyer and UX review, S0 and S1 fixed | built | screenshots | demo company; no real person (Mode C) |
 | `scripts/ui-check.cjs` (repeatable UI check) | built | demo app | demo company |
 
+
+## Final test run before the merge to main (3 Nov 2026) — run in a sandbox with a throwaway local Postgres, NOT against Supabase
+
+Everything below is VERIFIED only for what it says. Nothing was run against the live Supabase project, the real CRM, a real mailbox, Slack or Fathom (no credentials in the sandbox). Those stay **NOT VERIFIED LIVE**.
+
+| Check | Result |
+| --- | --- |
+| Typecheck, lint, production build, bundle secret scan | Pass (lint: 0 errors, 9 warnings about unused variables) |
+| Node unit tests (`src/lib/__tests__`) | 751 of 751 |
+| Vitest, incl. real-database tests on a local Postgres built from the 39 migrations | 714 of 714 (57 files) |
+| Tenant isolation, two agencies, 448 cross-tenant reads as agency, business, client and forged sessions | All refused (`scripts/check-tenancy.ts`) |
+| Share link: revoke, 14-day expiry, view count, rate limit (30 a minute), generic preview | Pass (inside the tenancy script) |
+| Entitlements in `enforced` mode (free list, 402 for paid, plan swap is a row, unknown plan fails closed) | Pass (`check-entitlements.ts`); `open` mode runs with every other check |
+| White-label scan (no platform name in screens, emails, errors; default-domain links allowed only as the non-white-label fallback) | Pass (Node banned-terms tests and `check-audit.ts`) |
+| HTTP integration checks: api, connections, insights, sync, flags, metrics, filter (37 pages x 7 filters), stage rules, speed, roadmap, F8, audit | All pass |
+| Browser suite, desktop 1440 px (the real target: a desktop web app inside a CRM) | 226 passed, 20 skipped by design, 1 intermittent failure (`f4.spec.ts:34`, an API shape test that passes on its own and failed only in the full run; order-dependent, INFERENCE) |
+| Browser suite at phone 390 and tablet 768 px | Not a gate. Two real sideways-scroll bugs found and fixed; the full phone and tablet runs were not repeated on the final code |
+| Security review against GHL's review standard | `docs/SECURITY_REVIEW.md`: 0 critical, 0 high, 2 medium (1 fixed, 1 low-risk left, see below), 8 low |
+| Real data against manual CRM counts (F1, F2, F3, F6) | **NOT VERIFIED LIVE** (needs the live database and King's CRM counts) |
+| `scripts/supabase-proof.ts` (live schema equals the repo) | **NOT RUN** (needs King's credentials) |
+
+### Real bugs the full run found and fixed (not test changes)
+1. Removing one client account left its feedback rows behind (`feedback_items` was missing from the per-account purge). Privacy gap.
+2. The Appointments page scrolled sideways on a phone (shared filter dropdown) and `/design` did too (screen-reader chart tables). Both fixed.
+3. The quarterly review claimed problems were "sorted out" when SubSync only knows they stopped showing. Now says "cleared (fixed, dismissed or no longer showing)". A proof feature is proposed in `docs/INNOVATION_M1_M2.md`.
+4. Dial setting label bound to the wrong element (duplicate id), Ctrl+K then Enter closed the panel it opened, a duplicate Settings heading, and a reset message lost on save.
+5. The Connect button was disabled in the demo, and the demo agency session could not show the owner-only screens (demo only; unreachable in production).
+6. Security: a signed webhook meant for another app could purge one of our installs; cron and admin secrets are now compared in constant time; `nosniff` and `Referrer-Policy` added; typed People searches (a name, email or phone) no longer go into browser storage.
+
+### Customer walkthrough (Prompt B), M1 and M2. INFERENCE: from the demo company, the screens and the tests, not from real users.
+
+| Module | Agency owner: sees first, does, gets confused by | Setter (client's staff): same | Client admin: same |
+| --- | --- | --- | --- |
+| Today | Leads waiting in one sentence, then accounts needing attention. Does: open the worst account. Confusion: "Filter accounts" is collapsed, so people do not know why a number is smaller (it now says what is left out). | Opens on My day, not Today. Sees their own leads to call. Confusion: none found; no settings or plan. | Same as the owner but one account. |
+| Speed to lead | Median and share answered inside the target, accounts ranked. Does: open the accounts that fail. Confusion: "not enough data" until 5 replies; the screen now says "1 of 5 replies so far". | Own leads waiting. | Own account, ranked people. |
+| Appointments + Insights | Unmarked appointments and no-shows to recover; true show rate. Confusion: a health score of 73 on a rich demo vs "n/a" on a thin account; the rule (needs 3 of 4 checks) is explained on the card. | Own appointments to mark and remind. | Own account. |
+| Unanswered messages | Counts by age, saved views. Confusion: unread vs waiting (told apart). | Own queue. | Own account. |
+| Account audit + share link | The sellable asset. Does: share a link with a prospect. Confusion: none after the white-label fix; link expires in 14 days and can be switched off. | Not shown. | Own account's audit. |
+| Clients | Health, onboarding, fees, compare, quarterly review. Confusion: five tabs; QBR wording fixed. | Not shown (no fees, notes or other clients; tested). | Not shown. |
+| People and Call lists | Search, smart lists, going cold. Confusion: four tabs; the header search now hands off in memory. | Own contacts and call lists. | Own account. |
+| Settings, Getting started, What's new | Eight sections. Confusion: finding where Slack, Fathom and alerts live (Integrations, Connections). | Short guide only. | Guide for business admins. |
+| Connections and meeting notes (E0, E2a, E2b) | Own Fathom connection plus a team status table (names and status, never content). Behind a flag and dry-run switches. Confusion: "Needs permission: reconnect" for comments until a write permission is approved. | Own connection only. | Own connection only. |
+
+Top three problems fixed from the walkthrough: (1) sideways scrolling on phones, (2) the review overclaiming fixes, (3) a Ctrl+K search that closed the panel it opened.
+Open, for King: the simplify cuts 7 to 14 in `docs/SIMPLIFY_M1_M2.md` (hiding Duplicates and Cleanup, merging Team into Settings, Compare and Reviews), and the three proposals in `docs/INNOVATION_M1_M2.md` (recommended: Alert outcomes). Nothing there was built without your yes.
