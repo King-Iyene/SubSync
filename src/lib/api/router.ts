@@ -1,3 +1,4 @@
+import { validLogoUrl } from "@/lib/brand-logo";
 import { sql } from "../db";
 import { safeError } from "../safe-log";
 import { buildDigest, onboardingChecklist, toCsv, type DerivedAccount } from "../analytics/derive";
@@ -266,8 +267,8 @@ async function auditViewData(ctx: Ctx) {
   const { audit, who, settings, hidden, lists, readLimit } = await computeAudit(ctx, ctx.url.searchParams.get("lists") !== "0");
   return json({
     audit, summary: auditSummary(audit, who), lists, readLimit, hiddenAccounts: hidden,
-    // The sender's own name and colour, for the printed page (N85). No logo: none is stored.
-    brand: { name: settings.brandName, color: settings.brandColor },
+    // The sender's own name, colour and logo, for the printed page (N85).
+    brand: { name: settings.brandName, color: settings.brandColor, logoUrl: settings.brandLogoUrl },
     // Sharing is for an agency or a business, never a client's own staff; the demo holds only the public sample.
     canShare: ctx.kind !== "client" && !ctx.demo, demo: ctx.demo, shareDays: SHARE_LINK_DAYS,
     generatedAt: new Date().toISOString(),
@@ -281,7 +282,7 @@ async function auditShare(ctx: Ctx) {
   if (ctx.demo) return json({ error: "Sharing is not available in the demo" }, 400);
   const { audit, who, names, settings } = await computeAudit(ctx);
   const id = randomBytes(24).toString("base64url");
-  const payload = buildSharePayload(audit, who, names, new Date(), { branded: settings.brandName !== null, brandColor: settings.brandColor, rulesVersion: DEAL_RULES_VERSION });
+  const payload = buildSharePayload(audit, who, names, new Date(), { branded: settings.brandName !== null, brandColor: settings.brandColor, logoUrl: settings.brandLogoUrl, rulesVersion: DEAL_RULES_VERSION });
   await sql()`insert into shared_audits (installation_id, id, payload, expires_at) values (${ctx.installationId}, ${id}, ${sql().json(payload as never)}, now() + make_interval(days => ${SHARE_LINK_DAYS}))`;
   const origin = (process.env.NEXT_PUBLIC_APP_URL ?? ctx.url.origin).replace(/\/+$/, "");
   return json({ url: `${origin}/audit/${id}`, expiresInDays: SHARE_LINK_DAYS });
@@ -771,7 +772,7 @@ async function accountDetail(ctx: Ctx, locationId: string) {
   const [flagRow] = ctx.kind === "agency" ? await sql()`select client_view from locations where installation_id = ${ctx.installationId} and location_id = ${locationId}` : [];
   return json({
     clientView: flagRow?.client_view === true,
-    brand: { name: settings.brandName, color: settings.brandColor },
+    brand: { name: settings.brandName, color: settings.brandColor, logoUrl: settings.brandLogoUrl },
     account: slim(a, links, ctx.kind === "client"),
     breakdown: a.breakdown,
     trend,
@@ -1112,7 +1113,7 @@ const settingsView = async (ctx: Ctx) => {
 
 function publicSettings(s: Settings) {
   // Never send the webhook URL back to the browser: it is a secret.
-  return { staleDays: s.staleDays, dormantDays: s.dormantDays, slaHours: s.slaHours, appDomain: s.appDomain, appDomainSource: s.appDomainSource, detectedDomain: s.detectedDomain, digestEnabled: s.digestEnabled, customChecklist: s.customChecklist, digestHour: s.digestHour, digestTimezone: s.digestTimezone, digestEmail: s.digestEmail, emailReady: emailConfigured(), brandName: s.brandName, brandColor: s.brandColor, industryTargets: s.industryTargets, keepTranscripts: s.keepTranscripts, pushNotesToCrm: s.pushNotesToCrm, speedTargetMinutes: s.speedTargetMinutes, countAutomatedTouches: s.countAutomatedTouches, speedBusinessHours: s.speedBusinessHours, speedOpenHour: s.speedOpenHour, speedCloseHour: s.speedCloseHour, alertQuietHours: s.alertQuietHours, coldTags: s.coldTags };
+  return { staleDays: s.staleDays, dormantDays: s.dormantDays, slaHours: s.slaHours, appDomain: s.appDomain, appDomainSource: s.appDomainSource, detectedDomain: s.detectedDomain, digestEnabled: s.digestEnabled, customChecklist: s.customChecklist, digestHour: s.digestHour, digestTimezone: s.digestTimezone, digestEmail: s.digestEmail, emailReady: emailConfigured(), brandName: s.brandName, brandColor: s.brandColor, brandLogoUrl: s.brandLogoOverride, detectedLogoUrl: s.brandLogoUrl && !s.brandLogoOverride ? s.brandLogoUrl : null, industryTargets: s.industryTargets, keepTranscripts: s.keepTranscripts, pushNotesToCrm: s.pushNotesToCrm, speedTargetMinutes: s.speedTargetMinutes, countAutomatedTouches: s.countAutomatedTouches, speedBusinessHours: s.speedBusinessHours, speedOpenHour: s.speedOpenHour, speedCloseHour: s.speedCloseHour, alertQuietHours: s.alertQuietHours, coldTags: s.coldTags };
 }
 
 const INSIGHT_SETTINGS = new Set(["staleDays", "dormantDays", "slaHours", "speedTargetMinutes", "countAutomatedTouches", "speedBusinessHours", "speedOpenHour", "speedCloseHour", "industryTargets", "alertQuietHours"]);
@@ -1153,6 +1154,11 @@ async function settingsUpdate(ctx: Ctx) {
     if (body.brandColor === null || body.brandColor === "") patch.brandColor = null;
     else if (typeof body.brandColor === "string" && /^#[0-9a-fA-F]{6}$/.test(body.brandColor)) patch.brandColor = body.brandColor.toLowerCase();
     else return json({ error: "Choose a colour like #1d4ed8" }, 400);
+  }
+  if ("brandLogoUrl" in body) {
+    if (body.brandLogoUrl === null || body.brandLogoUrl === "") patch.brandLogoOverride = null;
+    else if (validLogoUrl(body.brandLogoUrl)) patch.brandLogoOverride = validLogoUrl(body.brandLogoUrl);
+    else return json({ error: "Use a web address that starts with https:// and has no ? or #" }, 400);
   }
   if ("digestHour" in body) {
     if (body.digestHour === null) patch.digestHour = null;
@@ -1726,7 +1732,7 @@ async function qbrView(ctx: Ctx, locationId: string) {
   const progress = quarterProgress(quarter, now);
   const current = pointsIn(days, quarter.from, quarter.to);
   return json({
-    brand: { name: settings.brandName, color: settings.brandColor }, client, openAlerts, generatedAt: new Date(now).toISOString(),
+    brand: { name: settings.brandName, color: settings.brandColor, logoUrl: settings.brandLogoUrl }, client, openAlerts, generatedAt: new Date(now).toISOString(),
     quarter: { ...quarter, ...progress }, previous, quarters: recentQuarters(now, 6).map((q) => ({ key: q.key, label: q.label })),
     facts: cur, previousFacts: prev, findings, proof: proofSummary(alerts, quarter), historyStartsOn: start,
     series: { current, previous: pointsIn(days, previous.from, previous.to) },

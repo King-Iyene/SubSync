@@ -76,7 +76,7 @@ export async function emailPendingAlerts(installationId: string, settings: Setti
   if (due.length === 0) return 0;
   const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/+$/, "");
   const stop = unsubscribeUrl(appUrl, installationId, settings.digestEmail);
-  const mail = alertEmail(settings.brandName ?? "Your company", due.map((a) => ({ severity: a.severity, title: a.title })), appUrl, stop);
+  const mail = alertEmail(settings.brandName ?? "Your company", due.map((a) => ({ severity: a.severity, title: a.title })), appUrl, stop, settings.brandLogoUrl);
   if (!(await send(settings.digestEmail, { ...mail, headers: unsubscribeHeaders(stop) }))) return 0;
   await sql()`update alerts set email_notified_at = now() where id = any(${due.map((a) => a.id)}::uuid[])`;
   return due.length;

@@ -27,6 +27,7 @@ test("parseSsoUser keeps only the fields we use", () => {
   const user = parseSsoUser(decryptSsoPayload(PAYLOAD, SECRET));
   assert.deepEqual(user, {
     whitelabelDomain: null,
+    whitelabelLogoUrl: null,
     userId: "u1",
     companyId: "c1",
     role: "admin",

@@ -145,7 +145,7 @@ test("an email for one alert uses its words as the subject; several are one emai
 test("markup in a message is escaped in the email and Slack mentions cannot be made", () => {
   const nasty: Item = { title: 'Evil "Clinic" & <b>Co</b>', body: "<script>x</script>", details: ["<!channel> look"], severity: "critical", link: { view: "account", locationId: 'L1"><img src=x>' } };
   const mail = composeEmail([nasty], { company: "A", appUrl: "https://app.test", stopUrl: 'https://s.test/?a="b"' });
-  assert.doesNotMatch(mail.html, /<script>|<b>Co|<img|<!channel>/);
+  assert.doesNotMatch(mail.html, /<script>|<b>Co|<img(?! src="https:\/\/app\.test\/brand\/)|<!channel>/);
   assert.match(mail.html, /&lt;script&gt;/);
   const slack = composeSlack([nasty], { company: "A", appUrl: "https://app.test" });
   assert.doesNotMatch(slack, /<!channel>|<script>|<b>/);

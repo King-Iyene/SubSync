@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { NAV, PARENT, type GoFn, type ViewId } from "./nav";
 import { useBrandedText } from "./brand-text";
+import { BrandLogo, ProductMark } from "./brand-logo";
 import { Btn } from "./ui";
 import { FeedbackBox } from "./feedback-box";
 import { BackLink, BackProvider, ModuleTabs, type ModuleTab } from "./ds/template";
@@ -33,7 +34,6 @@ import { MeetingsView } from "./views/meetings";
 import { GlobalSearch } from "./views/global-search";
 import { PeopleModule } from "./views/people-module";
 import { ClientsView, type ClientsFeatures } from "./views/clients";
-import { DealsView } from "./views/deals";
 import { EmailHealthView } from "./views/email-health";
 import { HelpView } from "./views/help";
 import { RoadmapView } from "./views/roadmap";
@@ -56,7 +56,7 @@ type Auth =
   | { status: "error"; message: string }
   | { status: "not_installed" }
   | { status: "maintenance"; message: string }
-  | { status: "ready"; api: Api; demo: boolean; userName: string | null; features: Record<string, boolean>; locked: string[]; kind: AccessKind; locationId: string | null; brand: { name: string | null; color: string | null } };
+  | { status: "ready"; api: Api; demo: boolean; userName: string | null; features: Record<string, boolean>; locked: string[]; kind: AccessKind; locationId: string | null; brand: { name: string | null; color: string | null; logoUrl?: string | null } };
 
 type SsoResponse = {
   error?: string;
@@ -67,7 +67,7 @@ type SsoResponse = {
   kind?: AccessKind;
   user?: { userName?: string | null; activeLocation?: string | null };
   entitlements?: { features: Record<string, boolean>; locked?: string[] };
-  brand?: { name: string | null; color: string | null };
+  brand?: { name: string | null; color: string | null; logoUrl?: string | null };
 };
 
 async function exchange(body: unknown): Promise<{ ok: boolean; status: number; data: SsoResponse }> {
@@ -80,7 +80,8 @@ async function exchange(body: unknown): Promise<{ ok: boolean; status: number; d
 const VIEW_IDS = NAV.map((n) => n.id as string);
 function stateFromHash(): { view: ViewState; filter: FilterValue } {
   if (typeof window === "undefined") return { view: { id: "today" }, filter: EMPTY_FILTER };
-  return parseHash(window.location.hash, VIEW_IDS);
+  // The old address #pipelines still opens Pipeline.
+  return parseHash(window.location.hash.replace(/^#pipelines(?=$|\?)/, "#pipeline"), VIEW_IDS);
 }
 
 // `?as=business` or `?as=client` opens the demo as a single business or as a client's staff.
@@ -322,7 +323,6 @@ export function Dashboard() {
   const peopleOn = NAV_FOR[auth.kind].has("search") && !off("search");
   const callsAllowed = NAV_FOR[auth.kind].has("calls") && !off("calls") && !locked("calls");
   const peopleStart = view.id === "calls" ? 1 : view.id === "leads" ? 2 : 0;
-  const pipeTabs = [{ label: "Forecast and stages", node: <PipelineView /> }, { label: "Stale deals and hygiene", node: <DealsView /> }];
   // A business or a client's staff keep the small Setup module (their own checklist and email sending). An agency has the Clients module instead.
   const setupTabs = [{ label: "Setup checklists", node: <OnboardingView go={go} /> }, { label: "Email sender health", node: <EmailHealthView /> }];
   const clientFeatures: ClientsFeatures = { health: !off("health"), onboarding: !off("onboarding"), clients: !off("clients"), reports: !off("reports"), setupCompare: !off("setup_compare"), playbooks: !off("playbooks") };
@@ -350,7 +350,7 @@ export function Dashboard() {
       case "overview": return <OverviewView go={go} />;
       case "accounts": return <ClientsView key="accounts" go={go} initialTab="health" features={clientFeatures} />;
       case "account": return view.locationId ? <AccountDetailView key={view.locationId} locationId={view.locationId} go={go} agency={agency} /> : <ClientsView key="accounts" go={go} initialTab="health" features={clientFeatures} />;
-      case "deals": return <ModuleTabs key="pipe" start={1} tabs={pipeTabs} />;
+      case "deals": return <PipelineView key="pipe" initialTab={2} />;
       case "inbox": return <InboxView go={go} />;
       case "onboarding": return limited ? <ModuleTabs key="setup" start={0} tabs={setupTabs} /> : <ClientsView key="onboarding" go={go} initialTab="onboarding" features={clientFeatures} />;
       case "email": return limited ? <ModuleTabs key="setup" start={1} tabs={setupTabs} /> : <EmailHealthView />;
@@ -361,7 +361,7 @@ export function Dashboard() {
       case "notifications": return <NotificationsPage />;
       case "help": return <HelpView go={go} />;
       case "roadmap": return <RoadmapView />;
-      case "pipeline": return <ModuleTabs key="pipe" start={0} tabs={pipeTabs} />;
+      case "pipeline": return <PipelineView key="pipe" initialTab={0} />;
       case "team": return <TeamView />;
       case "appointments": return <ModuleTabs key="appts" start={0} tabs={[{ label: "Appointments", node: <AppointmentsView go={go} /> }, { label: "Insights", node: <AppointmentInsights /> }]} />;
       case "meetings": return <MeetingsView />;
@@ -386,8 +386,13 @@ export function Dashboard() {
       <div className={`${theme === "dark" ? "dark " : ""}flex min-h-screen bg-background text-foreground`} data-theme={theme} style={accentStyle}>
         <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col self-start border-r border-sidebar-border bg-sidebar p-4 text-sidebar-foreground md:flex print:hidden">
           <div className="flex items-center gap-2.5 px-2 pt-1">
-            <span aria-hidden className="flex size-8 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground"><svg viewBox="0 0 24 24" className="size-[18px]" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M4 8h10a4 4 0 0 1 0 8H8" /><path d="M20 16H10a4 4 0 0 1 0-8h6" opacity="0.55" /></svg></span>
-            <span className="text-[1.05rem] font-semibold tracking-tight text-sidebar-accent-foreground">{auth.brand.name ?? "SubSync"}</span>
+            <BrandLogo
+              url={auth.brand.logoUrl} name={auth.brand.name ?? "SubSync"} height={36} className="max-w-full"
+              fallback={<>
+                <ProductMark height={32} />
+                <span className="text-[1.05rem] font-semibold tracking-tight text-sidebar-accent-foreground">{auth.brand.name ?? "SubSync"}</span>
+              </>}
+            />
           </div>
           <nav className="sidebar-scroll mt-3 flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto pr-1" aria-label="Sections">
             {renderNav(mainMenu)}

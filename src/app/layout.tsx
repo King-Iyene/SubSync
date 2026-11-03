@@ -14,6 +14,8 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "SubSync",
+  // The mark: King's file first, the 512 picture until it exists.
+  icons: { icon: [{ url: "/brand/subsync-logo.png", type: "image/png" }, { url: "/brand/subsync-logo-512.png", type: "image/png" }] },
   description:
     "One dashboard for all your client accounts. Search contacts, spot stale deals, check data quality and track onboarding across every account.",
 };

@@ -54,7 +54,7 @@ export type TrendPoint = {
 };
 
 export type Deal = {
-  opportunityId: string; locationId: string; locationName: string | null; name: string | null; contactName: string | null;
+  opportunityId: string; locationId: string; locationName: string | null; name: string | null; contactId?: string | null; contactName: string | null;
   value: number; pipelineName: string | null; stageName: string | null; lastActivityAt: string | null; daysStale: number; url: string;
 };
 
@@ -73,5 +73,5 @@ export type AccountDetail = {
   alerts: AlertItem[];
   settings: { staleDays: number; dormantDays: number; slaHours: number };
   clientView?: boolean;
-  brand?: { name: string | null; color: string | null };
+  brand?: { name: string | null; color: string | null; logoUrl?: string | null };
 };

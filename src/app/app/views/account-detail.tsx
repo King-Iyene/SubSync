@@ -9,6 +9,7 @@ import {
   severityTone, Stat, Table, Td, Th,
 } from "../ui";
 import { ClientTrends } from "./clients/trends";
+import { BrandLogo } from "../brand-logo";
 
 // `limited` is the business and client view of their own account: no way back to an accounts list
 // and none of the agency's controls.
@@ -50,6 +51,7 @@ export function AccountDetailView({ locationId, go, agency, limited = false }: {
 
       {/* Printed reports start with a clear header. */}
       <div className="mb-6 hidden border-b-4 pb-3 print:block" style={{ borderColor: data.brand?.color ?? "#111827" }}>
+        {data.brand?.logoUrl && <BrandLogo url={data.brand.logoUrl} name={data.brand.name ?? null} height={40} className="mb-1" fallback={null} />}
         <p className="text-lg font-semibold" style={{ color: data.brand?.color ?? undefined }}>{data.brand?.name ?? agency}</p>
         <p className="text-sm text-muted-foreground">Client performance report · {today}</p>
       </div>

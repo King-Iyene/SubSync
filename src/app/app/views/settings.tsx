@@ -13,7 +13,7 @@ import { WatchingSlot } from "./settings-slot-watching";
 import { DailyBriefLine } from "./notifications";
 import { BrandPreview, PermissionsPanel, SettingsHistoryCard, TestAccountsCard, WhoCanOpenCard, type PermissionGroup } from "./settings-parts";
 
-type S = { staleDays: number; dormantDays: number; slaHours: number; appDomain: string; appDomainSource: "manual" | "sso" | "install" | "default"; detectedDomain: string | null; digestEnabled: boolean; customChecklist: string[]; digestHour: number | null; digestTimezone: string | null; digestEmail: string | null; emailReady?: boolean; brandName: string | null; brandColor: string | null; industryTargets?: boolean; keepTranscripts: boolean; pushNotesToCrm: boolean; speedTargetMinutes: number; countAutomatedTouches: boolean; speedBusinessHours: boolean; speedOpenHour: number; speedCloseHour: number; alertQuietHours: boolean };
+type S = { staleDays: number; dormantDays: number; slaHours: number; appDomain: string; appDomainSource: "manual" | "sso" | "install" | "default"; detectedDomain: string | null; digestEnabled: boolean; customChecklist: string[]; digestHour: number | null; digestTimezone: string | null; digestEmail: string | null; emailReady?: boolean; brandName: string | null; brandColor: string | null; brandLogoUrl?: string | null; detectedLogoUrl?: string | null; industryTargets?: boolean; keepTranscripts: boolean; pushNotesToCrm: boolean; speedTargetMinutes: number; countAutomatedTouches: boolean; speedBusinessHours: boolean; speedOpenHour: number; speedCloseHour: number; alertQuietHours: boolean };
 
 type Data = {
   features?: Record<string, boolean>; settings: S; slackConfigured: boolean; canDeleteData?: boolean; meetingTool?: boolean; kind?: string;
@@ -71,7 +71,7 @@ export function SettingsView() {
     try {
       const body: Record<string, unknown> = {
         staleDays: form.staleDays, dormantDays: form.dormantDays, slaHours: form.slaHours,
-        digestEnabled: form.digestEnabled, digestHour: form.digestHour, digestTimezone: form.digestTimezone, digestEmail: form.digestEmail, brandName: form.brandName, brandColor: form.brandColor, keepTranscripts: form.keepTranscripts, pushNotesToCrm: form.pushNotesToCrm, speedTargetMinutes: form.speedTargetMinutes, countAutomatedTouches: form.countAutomatedTouches,
+        digestEnabled: form.digestEnabled, digestHour: form.digestHour, digestTimezone: form.digestTimezone, digestEmail: form.digestEmail, brandName: form.brandName, brandColor: form.brandColor, brandLogoUrl: form.brandLogoUrl ?? null, keepTranscripts: form.keepTranscripts, pushNotesToCrm: form.pushNotesToCrm, speedTargetMinutes: form.speedTargetMinutes, countAutomatedTouches: form.countAutomatedTouches,
         alertQuietHours: form.alertQuietHours, speedBusinessHours: form.speedBusinessHours, speedOpenHour: form.speedOpenHour, speedCloseHour: form.speedCloseHour,
         customChecklist: checklist.split("\n").map((l) => l.trim()).filter(Boolean),
       };
@@ -289,8 +289,13 @@ export function SettingsView() {
                     {form.brandColor && <Btn variant="ghost" onClick={() => setForm({ ...form, brandColor: null })}>Clear</Btn>}
                   </div>
                 </div>
+                <div className="sm:col-span-2">
+                  <label htmlFor="brand-logo" className="mb-1 block text-sm font-medium">Logo web address</label>
+                  <input id="brand-logo" type="url" inputMode="url" className={inputClass} maxLength={500} placeholder="https://example.com/logo.png" value={form.brandLogoUrl ?? ""} onChange={(e) => setForm({ ...form, brandLogoUrl: e.target.value.trim() || null })} data-testid="brand-logo" />
+                  <p className="mt-1 text-xs text-muted-foreground">{form.brandLogoUrl ? "Starts with https://. Leave it empty to use the logo your platform sent." : form.detectedLogoUrl ? "Using the logo your platform sent. Type an address to use another." : "Starts with https://. We never download it. Your browser loads it."}</p>
+                </div>
               </div>
-              <BrandPreview name={form.brandName} color={form.brandColor} />
+              <BrandPreview name={form.brandName} color={form.brandColor} logoUrl={form.brandLogoUrl ?? form.detectedLogoUrl ?? null} />
             </Card>
           )}
 

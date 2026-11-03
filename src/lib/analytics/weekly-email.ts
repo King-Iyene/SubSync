@@ -1,8 +1,11 @@
 // The weekly email: pure composition, no database or network, so it is unit tested.
 import { inSendWindow } from "../sync/schedule.ts";
+import { emailLogoHtml } from "../brand-logo.ts";
 
 export type WeeklyInput = {
   who: string;
+  /** The sender's logo web address, shown at the top of the email. */
+  logoUrl?: string | null;
   headlines: Array<{ label: string; money: boolean; today: number; vsAvg: number | null }>;
   attention: Array<{ name: string; title: string }>;
   fine: number;
@@ -49,7 +52,7 @@ export function weeklyEmail(i: WeeklyInput): { subject: string; text: string; ht
     ...(i.stopUrl ? ["", `Stop these emails: ${i.stopUrl}`] : []),
   ].join("\n");
   const html = `<div style="font-family:system-ui,sans-serif;max-width:560px;margin:0 auto;color:#111">
-<h2 style="margin:0 0 12px">${esc(subject)}</h2>
+${emailLogoHtml(i.logoUrl, i.who, i.appUrl)}<h2 style="margin:0 0 12px">${esc(subject)}</h2>
 <ul style="padding-left:18px;color:#444">${bits.map((b) => `<li>${esc(b)}</li>`).join("")}</ul>
 ${facts.length ? `<h3 style="margin:20px 0 6px">The last 14 days</h3><ul style="padding-left:18px">${facts.map((f) => `<li>${esc(f)}</li>`).join("")}</ul>` : ""}
 <h3 style="margin:20px 0 6px">${count === 0 ? "Nothing needs you" : "Needs attention"}</h3>
@@ -62,13 +65,13 @@ ${i.stopUrl ? `<p style="font-size:12px;color:#666"><a href="${esc(i.stopUrl)}" 
 }
 
 // An email for newly raised alerts, so the problem reaches the agency without opening the app.
-export function alertEmail(who: string, alerts: Array<{ severity: string; title: string }>, appUrl: string, stopUrl?: string): { subject: string; text: string; html: string } {
+export function alertEmail(who: string, alerts: Array<{ severity: string; title: string }>, appUrl: string, stopUrl?: string, logoUrl?: string | null): { subject: string; text: string; html: string } {
   const n = alerts.length;
   const subject = `${who}: ${n} new alert${n === 1 ? "" : "s"}${alerts.some((a) => a.severity === "critical") ? " (one is critical)" : ""}`;
   const top = alerts.slice(0, 10);
   const link = `${appUrl}/app#alerts`;
   const text = [subject, "", ...top.map((a) => `- ${a.title}`), ...(n > top.length ? [`...and ${n - top.length} more`] : []), "", `Open it: ${link}`, ...(stopUrl ? ["", `Stop these emails: ${stopUrl}`] : [])].join("\n");
-  const html = `<div style="font-family:system-ui,sans-serif;max-width:560px;margin:0 auto;color:#111"><h2>${esc(subject)}</h2><ul style="padding-left:18px">${top.map((a) => `<li>${esc(a.title)}</li>`).join("")}</ul>${n > top.length ? `<p>...and ${n - top.length} more.</p>` : ""}<p><a href="${esc(link)}">Open it</a></p>${stopUrl ? `<p style="font-size:12px;color:#666"><a href="${esc(stopUrl)}" style="color:#666">Stop these emails</a></p>` : ""}</div>`;
+  const html = `<div style="font-family:system-ui,sans-serif;max-width:560px;margin:0 auto;color:#111">${emailLogoHtml(logoUrl, who, appUrl)}<h2>${esc(subject)}</h2><ul style="padding-left:18px">${top.map((a) => `<li>${esc(a.title)}</li>`).join("")}</ul>${n > top.length ? `<p>...and ${n - top.length} more.</p>` : ""}<p><a href="${esc(link)}">Open it</a></p>${stopUrl ? `<p style="font-size:12px;color:#666"><a href="${esc(stopUrl)}" style="color:#666">Stop these emails</a></p>` : ""}</div>`;
   return { subject, text, html };
 }
 
