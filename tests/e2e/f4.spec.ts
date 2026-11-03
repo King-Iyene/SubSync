@@ -225,7 +225,9 @@ test("the wait chart: pressing a row opens the conversations behind it, the same
 test("open deals with no contact are under Pipeline, with the same total as the server counts, and not on this page", async ({ page, request }) => {
   await open(page);
   await expect(page.getByText("Open deals with no contact", { exact: false })).toHaveCount(0);
-  await page.getByRole("button", { name: "Open them in Pipeline" }).click();
+  await expect(page.getByTestId("deals-moved")).toHaveCount(0); // the signpost was removed (simplify cut 4); Pipeline is reached from the menu
+  await page.getByRole("button", { name: "Pipeline and deals" }).first().click();
+  await page.getByRole("tab", { name: "Stale deals and hygiene" }).click();
   await page.getByRole("tab", { name: "No recent contact" }).click();
   const panel = page.getByTestId("quiet-deals");
   await expect(panel).toBeVisible();
@@ -234,7 +236,6 @@ test("open deals with no contact are under Pipeline, with the same total as the 
   else await expect(page.getByTestId("quiet-total")).toContainText(String(gaps.total).replace(/\B(?=(\d{3})+(?!\d))/g, ","));
   await page.getByTestId("quiet-14").click();
   await expect(page.getByTestId("quiet-14")).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByTestId("back-link")).toBeVisible();
 });
 
 test("no word SLA on the page, in Overview or in Settings; the reply target is named", async ({ page }) => {
