@@ -191,7 +191,8 @@ test("a client's staff land on My day: one column, large tap targets, no sideway
 test("a chart is clickable: the bar opens the leads behind it, the count is the same everywhere, Back keeps the bar marked, Enter works", async ({ page }) => {
   await page.goto("/design");
   const card = page.getByRole("region", { name: /^List behind/ });
-  const bar = page.getByRole("button", { name: /open the list/ }).first();
+  // The trend chart only: the key-figure strip above it also has buttons that open a list, but those are not bars.
+  const bar = page.getByRole("figure").getByRole("button", { name: /open the list/ }).first();
   await bar.scrollIntoViewIfNeeded();
   const label = (await bar.getAttribute("aria-label")) ?? "";
   const count = Number(/(\d+) leads, open the list/.exec(label)?.[1]);
@@ -271,7 +272,8 @@ test("Speed to lead: the bars of the trend are clickable and the list behind a b
   for (const w of speed.trend) expect(w.members.length, "the server sends the rows behind each bar").toBe(Math.min(w.leads, 60));
   await page.goto("/app#speed");
   await page.reload();
-  const bar = page.getByRole("button", { name: /open the list/ }).first();
+  // The trend chart only: the key-figure strip above it also has buttons that open a list, but those are not bars.
+  const bar = page.getByRole("figure").getByRole("button", { name: /open the list/ }).first();
   await bar.waitFor({ timeout: 90_000 });
   const label = (await bar.getAttribute("aria-label")) ?? "";
   const count = Number(/(\d+) leads, open the list/.exec(label)?.[1]);

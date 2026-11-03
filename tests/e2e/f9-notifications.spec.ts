@@ -29,8 +29,12 @@ test("a bell item can be snoozed and dismissed, and leaves the list", async ({ p
   await page.getByRole("button", { name: "Add a test to the bell" }).first().click();
   await expect(page.getByText("A test item was added to your bell.")).toBeVisible();
   await page.getByTestId("bell").getByRole("button").click();
-  const before = await page.getByTestId("bell-item").count();
-  await page.getByTestId("bell-item").first().getByRole("button", { name: "Dismiss" }).click();
+  // Opening the bell re-reads the list, so the count changes once after the panel shows: take it when it has stopped moving.
+  const items = page.getByTestId("bell-item");
+  await expect(items.first()).toBeVisible();
+  let before = -1;
+  await expect.poll(async () => { const n = await items.count(); const same = n === before; before = n; await page.waitForTimeout(1000); return same; }, { timeout: 30_000 }).toBe(true);
+  await items.first().getByRole("button", { name: "Dismiss" }).click();
   await expect(page.getByTestId("bell-item")).toHaveCount(before - 1);
 });
 

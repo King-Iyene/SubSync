@@ -60,12 +60,15 @@ test("Data and privacy shows what is stored and what each button removes, and th
   await expect(page.getByRole("button", { name: "Delete all synced data" })).toBeDisabled();
   await expect(page.getByRole("link", { name: "the Trust page" })).toHaveAttribute("href", "/trust");
   await openSettings(page, "integrations");
-  await expect(page.getByRole("heading", { name: "Fathom", exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Slack", exact: true })).toBeVisible();
+  // Stage E0 moved the Slack and Fathom cards to their own Connections page; Integrations keeps the pointer to it and the permissions.
+  await expect(page.getByTestId("section-integrations").getByRole("link", { name: "Connections", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "What SubSync can read" })).toBeVisible();
   const first = page.getByTestId("section-integrations").locator("details").first();
   await first.locator("summary").click();
   await expect(first.getByText(/required|optional/).first()).toBeVisible();
+  await page.getByTestId("section-integrations").getByRole("link", { name: "Connections", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Fathom", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /^Slack/ })).toBeVisible();
 });
 
 test("a change in one section is kept while another is open, the page says it is not saved, and a brand change saves and is recorded in the history", async ({ page }) => {
