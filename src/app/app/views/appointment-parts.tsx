@@ -1,5 +1,6 @@
 "use client";
 
+import { CountUp } from "../ds/count-up";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { bucketOf, statusWord, type Bucket } from "@/lib/analytics/appointment-f3";
@@ -99,19 +100,19 @@ export function Explainer({ id, className = "" }: { id: keyof typeof EXPLAIN; cl
 
 // A number that opens the list behind it. Same look as a tile; a button because pressing it does something.
 export function CountTile({ label, value, sub, tone, onOpen, open, hint }: { label: ReactNode; value: ReactNode; sub?: ReactNode; tone?: Tone; onOpen?: () => void; open?: boolean; hint: string }) {
-  const rule = tone === "bad" ? "bg-destructive" : tone === "warn" ? "bg-warning" : tone === "good" ? "bg-success" : "bg-border";
+  const rule = tone === "bad" ? "border-destructive" : tone === "warn" ? "border-warning" : tone === "good" ? "border-success" : "border-border";
   const text = tone === "bad" ? "text-destructive" : tone === "warn" ? "text-warning" : tone === "good" ? "text-success" : "";
   const body = (
     <>
-      <span aria-hidden className={`absolute inset-y-0 left-0 w-0.5 ${rule}`} />
       <span className="block text-xs font-medium text-muted-foreground">{label}</span>
-      <span className={`tnum mt-1.5 block text-[1.7rem] font-semibold leading-none tracking-tight ${text}`}>{value}</span>
+      <span className={`tnum mt-1.5 block text-[1.7rem] font-semibold leading-none tracking-tight ${text}`}><CountUp value={value} /></span>
       {sub && <span className="mt-2 block text-xs leading-5 text-muted-foreground">{sub}</span>}
     </>
   );
-  const base = "relative block w-full overflow-hidden rounded-lg border bg-card p-4 pl-5 text-left";
+  // No box: a figure with a colour rule on its left, like every other key figure (D1). A pressable one gains an underline-free hover wash and a clear open state.
+  const base = `ds-press block w-full min-w-0 border-l-2 py-1 pl-4 pr-2 text-left ${rule}`;
   if (!onOpen) return <div className={base}>{body}</div>;
-  return <button type="button" onClick={onOpen} aria-pressed={open} aria-label={hint} title={hint} className={`${base} hover:border-primary/40 focus-visible:ring-2 focus-visible:ring-ring/30 ${open ? "border-primary/60" : ""}`}>{body}</button>;
+  return <button type="button" onClick={onOpen} aria-pressed={open} aria-label={hint} title={hint} className={`${base} -ml-px rounded-r-lg hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring/30 ${open ? "bg-accent/60" : ""}`}>{body}</button>;
 }
 
 // ---------- one appointment ----------

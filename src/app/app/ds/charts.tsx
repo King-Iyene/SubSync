@@ -53,7 +53,7 @@ export function BarChart({
   return (
     <figure className="min-w-0" data-testid="bar-chart">
       <figcaption className="mb-2 flex flex-wrap items-baseline justify-between gap-x-3 text-xs text-muted-foreground"><span className="font-medium text-foreground">{title}</span>{axisLabel && <span>{axisLabel}</span>}</figcaption>
-      <div className="flex gap-2">
+      <div className="mt-4 flex gap-2">
         <div className="relative w-10 shrink-0 text-right text-[11px] text-muted-foreground" style={{ height }} aria-hidden>
           {scale.ticks.map((t) => <span key={t} className="absolute right-0 -translate-y-1/2 tabular-nums" style={{ bottom: `${(t / scale.top) * 100}%` }}>{format(t)}</span>)}
         </div>
@@ -80,7 +80,7 @@ export function BarChart({
                     {direct && b.value !== null && <span className="mb-0.5 text-center text-[11px] font-medium tabular-nums">{format(b.value)}</span>}
                     {b.value === null
                       ? <span aria-hidden className="h-6 w-full rounded-t-[4px] border border-dashed" />
-                      : <span aria-hidden className={`w-full rounded-t-[4px] ${FILL[b.tone ?? "series"]} ${active === i ? "opacity-100" : "opacity-90"}`} style={{ height: `${h}%`, minHeight: b.value > 0 ? 2 : 0 }} />}
+                      : <span aria-hidden className={`ds-grow w-full rounded-t-[4px] ${FILL[b.tone ?? "series"]} ${active === i ? "opacity-100" : "opacity-90"}`} style={{ height: `${h}%`, minHeight: b.value > 0 ? 2 : 0 }} />}
                   </button>
                 </div>
               );
@@ -111,7 +111,7 @@ export function Distribution({ title, rows, unit = "", sample, min = 0, need, fo
             {clickable(onSelect, { value: r.value, count: r.count }) ? (
               <button type="button" onClick={() => onSelect?.(i)} aria-pressed={selected === i} aria-label={`${r.label}: ${format(r.value)}${unit ? ` ${unit}` : ""}${opens(noun, r)}`} className={`min-h-9 truncate text-left text-muted-foreground underline-offset-4 hover:text-foreground hover:underline ${selected === i ? "font-medium text-foreground underline" : ""}`}>{r.label}</button>
             ) : <span className="truncate text-muted-foreground">{r.label}</span>}
-            <span className="h-3 overflow-hidden rounded-full bg-muted" aria-hidden><span className={`block h-full rounded-full ${FILL[r.tone ?? "series"]}`} style={{ width: `${(r.value / scale.top) * 100}%` }} /></span>
+            <span className="h-3 overflow-hidden rounded-full bg-muted" aria-hidden><span className={`ds-grow-x block h-full rounded-full ${FILL[r.tone ?? "series"]}`} style={{ width: `${(r.value / scale.top) * 100}%` }} /></span>
             <span className="min-w-8 text-right tabular-nums">{format(r.value)}{unit ? ` ${unit}` : ""}</span>
           </li>
         ))}
@@ -128,11 +128,12 @@ export function Distribution({ title, rows, unit = "", sample, min = 0, need, fo
 export function Sparkline({ values, label, min = 3, format = (n: number) => String(Math.round(n)), unit = "" }: { values: number[]; label: string; min?: number; format?: (n: number) => string; unit?: string }) {
   if (belowMinimum(values.length, min)) return <p className="text-xs text-muted-foreground" data-testid="sparkline-empty">Needs at least {min} days of history ({values.length} so far).</p>;
   const lo = Math.min(...values), hi = Math.max(...values), span = hi - lo || 1;
-  const pts = values.map((v, i) => `${(i / (values.length - 1)) * 100},${100 - ((v - lo) / span) * 100}`).join(" ");
+  const y = (v: number) => 6 + (1 - (v - lo) / span) * 88;
+  const pts = values.map((v, i) => `${(i / (values.length - 1)) * 100},${y(v)}`).join(" ");
   const first = values[0], last = values[values.length - 1];
   return (
     <figure className="min-w-0" data-testid="sparkline">
-      <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="h-12 w-full overflow-visible" role="img" aria-label={`${label}: from ${format(first)} to ${format(last)}${unit ? ` ${unit}` : ""}, lowest ${format(lo)}, highest ${format(hi)}`}>
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="h-12 w-full overflow-hidden border-b border-border" role="img" aria-label={`${label}: from ${format(first)} to ${format(last)}${unit ? ` ${unit}` : ""}, lowest ${format(lo)}, highest ${format(hi)}`}>
         <polyline points={pts} fill="none" stroke="var(--chart-1)" strokeWidth="2" vectorEffect="non-scaling-stroke" strokeLinejoin="round" strokeLinecap="round" />
       </svg>
       <figcaption className="mt-1 flex flex-wrap gap-x-3 text-[11px] text-muted-foreground tabular-nums"><span>Start {format(first)}</span><span>Now <strong className="text-foreground">{format(last)}</strong></span><span>Range {format(lo)} to {format(hi)}</span></figcaption>

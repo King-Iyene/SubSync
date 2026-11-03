@@ -95,10 +95,7 @@ export function AppointmentsView({ go }: { go: GoFn }) {
     <Page title="Appointments" subtitle="Who is booked, who showed up, and who to chase today. A past appointment with no outcome is flagged, not guessed." actions={<Btn onClick={() => go("calls")}>Open call lists</Btn>}>
       {waiting > 0 && (
         <InlineAlert tone="warning" className="mb-6" title={waiting === d.access.total ? "SubSync needs your approval to read appointments." : `${waiting} account${waiting === 1 ? " still needs" : "s still need"} approval to show appointments.`}>
-          <p>
-            SubSync now asks for permission to read calendar events and your team&apos;s names (read only). Accounts that installed before this was added keep their old permissions until the app is approved again:
-            open the app in the marketplace and choose Reinstall (or ask the account owner to), then approve. Nothing else changes.
-          </p>
+          <p>To show appointments, the app needs one more read-only permission. Open the app in the marketplace and choose Reinstall (or ask the account owner), then approve. Nothing else changes.</p>
           {d.canSeeAccounts && <p className="mt-1 text-xs">Waiting: {d.access.needsPermission.slice(0, 6).map((a) => a.name ?? "Unnamed").join(", ")}{waiting > 6 ? ` and ${waiting - 6} more` : ""}.</p>}
         </InlineAlert>
       )}
@@ -123,7 +120,7 @@ export function AppointmentsView({ go }: { go: GoFn }) {
           <Card title="The numbers" className="mb-6">
               <CardRange state={range} label="Appointment numbers" />
               <p className="mt-2 text-xs text-muted-foreground" data-testid="appointments-window">
-                Appointments that start {d.window.from === d.window.to ? `on ${d.window.from}` : `from ${d.window.from} to ${d.window.to}`}{d.compareWindow ? `, compared with ${d.compareWindow.from} to ${d.compareWindow.to}` : ""} (UTC days). Show rate needs at least 5 recorded outcomes.
+                Appointments that start {d.window.from === d.window.to ? `on ${d.window.from}` : `from ${d.window.from} to ${d.window.to}`}{d.compareWindow ? `, compared with ${d.compareWindow.from} to ${d.compareWindow.to}` : ""} (UTC days).
                 {d.historyFrom ? ` Your history goes back to ${d.historyFrom}.` : ""}
               </p>
               {d.window.problem && <p className="mt-1 border-l-2 border-warning pl-2 text-xs" role="status">{d.window.problem}</p>}
@@ -132,7 +129,7 @@ export function AppointmentsView({ go }: { go: GoFn }) {
                   Pick a longer range, or clear the filters. <button type="button" className="font-medium text-primary underline" onClick={() => range.setSpec({ preset: "90d", compare: range.spec.compare })}>Show the last 90 days</button>
                 </InlineAlert>
               )}
-              <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+              <div className="mt-5 grid grid-cols-2 gap-x-6 gap-y-5 lg:grid-cols-4">
                 <CountTile label="Booked" value={fmtInt(sc.scheduled)} hint={`Booked in these dates: ${sc.scheduled}. Press to see the list`} onOpen={() => choose("booked")} open={sel?.key === "booked"}
                   sub={bookedChange ? bookedChange.text : "No comparison chosen"} />
                 <CountTile label="Show rate" value={pct(d.current.showRate)} tone={d.current.showRate !== null && target.state === "below" ? "warn" : undefined} hint={`Recorded outcomes: ${d.current.outcomes}. Press to see the list`} onOpen={() => choose("outcomes")} open={sel?.key === "outcomes"}
@@ -146,8 +143,8 @@ export function AppointmentsView({ go }: { go: GoFn }) {
               <Explainer id="numbers" />
           </Card>
 
-          <h2 className="mb-2 text-base font-semibold">Do these first</h2>
-          <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <h2 className="mb-3 border-t pt-5 text-base font-semibold">Do these first</h2>
+          <div className="mb-6 grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-3">
             <CountTile label="Record the outcome" value={fmtInt(d.unmarkedTotal)} tone={d.unmarkedTotal > 0 ? "warn" : undefined} hint={`Record the outcome: ${d.unmarkedTotal}. Press to see the list`} onOpen={() => choose("record")} open={sel?.key === "record"}
               sub="Past appointments still marked booked or confirmed. Mark them showed or no-show in your CRM." />
             <CountTile label="No-shows to rebook" value={fmtInt(d.recoverTotal)} tone={d.recoverTotal > 0 ? "warn" : undefined} hint={`No-shows to rebook: ${d.recoverTotal}. Press to see the list`} onOpen={() => choose("rebook")} open={sel?.key === "rebook"}
