@@ -117,7 +117,7 @@ export function SettingsView() {
 
   return (
     <div className="max-w-5xl">
-      <PageHeader title="Settings" subtitle="What counts as late, where alerts go, who can see what, and your data. Pick a section on the left." />
+      <PageHeader title="Settings" subtitle="Targets, alerts, access and data." />
       {msg && <p className={`mb-4 border-l-2 py-1 pl-3 text-sm ${msg.ok ? "border-success" : "border-destructive"}`} role={msg.ok ? "status" : "alert"} data-testid="settings-message">{msg.text}</p>}
 
       <div className="grid gap-6 md:grid-cols-[13.5rem_minmax(0,1fr)]">

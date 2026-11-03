@@ -75,6 +75,8 @@ test("the style guide's list, lead panel and charts work", async ({ page }) => {
 
 test("a company's own colour sits on top and stays readable", async ({ page }) => {
   await page.goto("/design");
+  await page.getByRole("group", { name: "Theme" }).getByRole("button", { name: "Dark", exact: true }).click(); // light is the default now; the nudge below is for the dark theme
+  await expect(page.locator("[data-theme]").first()).toHaveAttribute("data-theme", "dark");
   const before = await page.locator("[data-theme]").first().evaluate((el) => getComputedStyle(el).getPropertyValue("--primary").trim());
   await page.getByRole("button", { name: "Use #02244f" }).click();
   const after = await page.locator("[data-theme]").first().evaluate((el) => getComputedStyle(el).getPropertyValue("--primary").trim());
@@ -166,14 +168,14 @@ test("the light and dark choice changes the page and is remembered", async ({ pa
   await page.goto("/app");
   const shell = page.locator("[data-theme]").first();
   await expect(shell).toBeVisible({ timeout: 60_000 });
-  await expect(shell).toHaveAttribute("data-theme", "dark"); // the look people had before themes
-  const dark = await shell.evaluate((el) => getComputedStyle(el).backgroundColor);
-  await page.getByRole("group", { name: "Appearance" }).getByRole("button", { name: "Light appearance" }).click();
-  await expect(shell).toHaveAttribute("data-theme", "light");
-  expect(await shell.evaluate((el) => getComputedStyle(el).backgroundColor)).not.toBe(dark);
+  await expect(shell).toHaveAttribute("data-theme", "light"); // bright and crisp by default
+  const light = await shell.evaluate((el) => getComputedStyle(el).backgroundColor);
+  await page.getByRole("group", { name: "Appearance" }).getByRole("button", { name: "Dark appearance" }).click();
+  await expect(shell).toHaveAttribute("data-theme", "dark");
+  expect(await shell.evaluate((el) => getComputedStyle(el).backgroundColor)).not.toBe(light);
   await page.reload();
-  await expect(page.locator("[data-theme]").first()).toHaveAttribute("data-theme", "light", { timeout: 60_000 });
-  await page.getByRole("group", { name: "Appearance" }).getByRole("button", { name: "Dark appearance" }).click(); // leave it as it was
+  await expect(page.locator("[data-theme]").first()).toHaveAttribute("data-theme", "dark", { timeout: 60_000 });
+  await page.getByRole("group", { name: "Appearance" }).getByRole("button", { name: "Light appearance" }).click(); // leave it as it was
 });
 
 test("a client's staff land on My day: one column, large tap targets, no sideways scroll", async ({ page }) => {

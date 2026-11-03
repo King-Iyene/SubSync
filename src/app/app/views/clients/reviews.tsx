@@ -72,7 +72,7 @@ export function ReviewsTab({ accounts }: { accounts: Array<{ locationId: string;
       {error && <ErrorBox error={error} onRetry={reload} />}
       {id && loading && !data && <SkeletonCards cards={4} label="Preparing the review..." />}
       {!id && <>
-        <HowTo id="clients-reviews" title="What a review is for">A quarterly review is the one-page report you show a client at renewal to prove what you delivered. Choose a client and a quarter: you get the numbers against the quarter before, what went well, what did not, what SubSync caught for them, and what to do next. Press Print to save it as a PDF with your name and colour on it.</HowTo>
+        <HowTo id="clients-reviews" title="What a review is for">Pick a client and a quarter. Press Print to save a PDF.</HowTo>
         <EmptyState title="Choose a client" body="The review is built from what SubSync has recorded about that client. A quarter that began before SubSync started watching will be partly empty, and says so." />
       </>}
       {c && data && f && p && (

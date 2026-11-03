@@ -109,7 +109,7 @@ export function AuditView({ go }: { go: GoFn }) {
         </div>
 
         <HowTo id="audit-how" title="How to use the audit">
-          Start with the line that says what to fix first. Press any number to see the exact deals, conversations or appointments behind it, and the small question mark to see how it is counted. When it is ready for a client, press Share link: it has no client names and works for {data.shareDays} days.
+          Press a number to see what is behind it. Share link has no client names and lasts {data.shareDays} days.
         </HowTo>
 
         {data.demo && (

@@ -3,7 +3,7 @@
 export type ThemePref = "dark" | "light" | "system";
 export const THEME_PREFS: ThemePref[] = ["dark", "light", "system"];
 // The look people got before themes existed was dark, so that stays the default; "system" follows the device (N52).
-export const DEFAULT_THEME: ThemePref = "dark";
+export const DEFAULT_THEME: ThemePref = "light";
 export const isThemePref = (v: unknown): v is ThemePref => v === "dark" || v === "light" || v === "system";
 export const resolveTheme = (pref: ThemePref, systemDark: boolean): "dark" | "light" => (pref === "system" ? (systemDark ? "dark" : "light") : pref);
 
