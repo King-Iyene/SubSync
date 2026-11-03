@@ -308,17 +308,3 @@ export async function removeList(installationId: string, owner: string, teamOwne
     and ((page = ${PAGE_OWN} and owner = ${owner}) ${teamOwner ? sql()`or (page = ${PAGE_TEAM} and owner = ${teamOwner})` : sql()``}) returning 1`;
   return gone.length > 0;
 }
-
-// ---------------- the dialer setting (kept in saved_views, page 'people-prefs') ----------------
-
-export async function getDialer(installationId: string, owner: string): Promise<string | null> {
-  const [r] = await sql()`select filters from saved_views where installation_id = ${installationId} and owner = ${owner} and page = 'people-prefs' and name = 'dialer'`;
-  const v = (r?.filters as { provider?: unknown } | undefined)?.provider;
-  return typeof v === "string" ? v : null;
-}
-
-export async function setDialer(installationId: string, owner: string, provider: "crm" | "phone"): Promise<void> {
-  const db = sql();
-  await db`insert into saved_views (installation_id, owner, page, name, filters) values (${installationId}, ${owner}, 'people-prefs', 'dialer', ${db.json({ provider } as never)})
-    on conflict (installation_id, owner, page, name) do update set filters = excluded.filters`;
-}

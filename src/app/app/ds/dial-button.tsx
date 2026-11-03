@@ -1,44 +1,19 @@
 "use client";
 
-import { useEffect, useId, useState, useSyncExternalStore } from "react";
-import { dialPlan, dialWarnings, mustStop, type DialerProvider } from "@/lib/people/dial";
-import { useApiClient } from "../session";
+import { useState } from "react";
+import { dialPlan, dialWarnings, mustStop } from "@/lib/people/dial";
 
 // The Dial button (stage F10, KF-3). By default it opens the CRM's own dialer for the contact through the white-label link; the CRM publishes no link that opens
-// its dialer directly, so today it opens the contact in the CRM and says so. A person can choose their own phone app instead (the Dialer setting). SubSync
+// its dialer directly, so today it opens the contact in the CRM and says so. SubSync
 // builds no telephony. Before any dial the person is told if the contact asked not to be contacted, or if it is outside calling hours where the account is.
 
-let current: DialerProvider | null = null;
-let asked = false;
-const listeners = new Set<() => void>();
-const emit = () => listeners.forEach((l) => l());
-const subscribe = (l: () => void) => { listeners.add(l); return () => { listeners.delete(l); }; };
-
-/** The person's dialer choice, loaded once and shared by every button on the screen. */
-export function useDialer() {
-  const api = useApiClient();
-  const provider = useSyncExternalStore(subscribe, () => current, () => null);
-  useEffect(() => {
-    if (current !== null || asked) return;
-    asked = true;
-    api.get<{ provider: DialerProvider }>("people/dialer").then((r) => { current = r.provider; emit(); }).catch(() => { current = "crm"; emit(); });
-  }, [api]);
-  const set = async (next: DialerProvider) => {
-    const before = current;
-    current = next; emit();
-    try { await api.put("people/dialer", { provider: next }); } catch { current = before; emit(); throw new Error("Could not save the dialer choice. Try again."); }
-  };
-  return { provider: provider ?? "crm", set };
-}
-
 export function DialButton({ phone, contactUrl, dnd, timeZone, compact }: { phone: string | null | undefined; contactUrl: string | null | undefined; dnd?: boolean; timeZone?: string | null; compact?: boolean }) {
-  const { provider } = useDialer();
   const [open, setOpen] = useState(false);
-  const plan = dialPlan(provider, { phone, contactUrl });
+  const plan = dialPlan({ phone, contactUrl });
   if (!plan.href) return <span className="text-xs text-muted-foreground">{plan.note}</span>;
   const href = plan.href;
   const warnings = open ? dialWarnings({ dnd: dnd === true, phone, timeZone: timeZone ?? null, now: new Date() }) : [];
-  const go = () => { window.open(href, plan.provider === "phone" ? "_self" : "_blank", "noopener,noreferrer"); setOpen(false); };
+  const go = () => { window.open(href, "_blank", "noopener,noreferrer"); setOpen(false); };
   const press = () => {
     const w = dialWarnings({ dnd: dnd === true, phone, timeZone: timeZone ?? null, now: new Date() });
     if (w.length === 0) go(); else setOpen(true);
@@ -57,23 +32,5 @@ export function DialButton({ phone, contactUrl, dnd, timeZone, compact }: { phon
         </span>
       )}
     </span>
-  );
-}
-
-/** The Dialer setting: the CRM's own dialer (the default) or the person's own phone app. */
-export function DialerSetting() {
-  const { provider, set } = useDialer();
-  const selectId = useId(); // unique: the setting can be on the page and in the lead panel at once
-  const [msg, setMsg] = useState<string | null>(null);
-  return (
-    <div className="text-sm">
-      <label htmlFor={selectId} className="mr-2 font-medium">Dialer</label>
-      <select id={selectId} value={provider} onChange={(e) => { setMsg(null); set(e.target.value === "phone" ? "phone" : "crm").catch((err: Error) => setMsg(err.message)); }}
-        className="rounded-lg border bg-background px-2 py-1.5 text-sm">
-        <option value="crm">My CRM&apos;s dialer</option>
-        <option value="phone">My own phone app</option>
-      </select>
-      {msg && <span className="ml-2 text-xs text-destructive" role="alert">{msg}</span>}
-    </div>
   );
 }

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { changeBetween } from "@/lib/design/range";
 import { describeFilter, filterToParams, isEmptyFilter, parseSmartFilter, type SmartFilter } from "@/lib/people/filters";
 import { QUIET_AFTER_DAYS } from "@/lib/analytics/contact-intel";
-import { BarChart, CardRange, DataList, DialButton, DialerSetting, DrillPanel, EmptyState, ErrorState, HowTo, InlineAlert, LeadDrawer, ModuleTabs, Page as PageShell, Section, SkeletonRows, useCardRange, useDrill, type Column, type LeadSeed } from "../ds";
+import { BarChart, CardRange, DataList, DialButton, DrillPanel, EmptyState, ErrorState, HowTo, InlineAlert, LeadDrawer, ModuleTabs, Page as PageShell, Section, SkeletonRows, useCardRange, useDrill, type Column, type LeadSeed } from "../ds";
 import { remember, remembered, takeHandOff } from "../ds/remember";
 import { useApiClient, useData } from "../session";
 import { Btn, fmtInt, inputClass, timeAgo } from "../ui";
@@ -205,7 +205,7 @@ function SearchTab({ filter, setFilter, replaceFilter, version }: { filter: Smar
       <HowTo id="people-search" title="How to use this page">Search by name, email or phone, or narrow the list with the choices. Press a name to see the person, then use the arrows to move to the next. Press Dial to call. Save a list you use often and it is kept under Smart lists.</HowTo>
       <FilterBuilder key={version} opts={opts.data} value={filter} onChange={setFilter} onClear={() => replaceFilter({})} />
       <SaveList filter={filter} canShare={opts.data?.canShareLists ?? false} onSaved={() => void lists.reload()} />
-      <Section title={list.data ? `${fmtInt(list.data.total)} ${list.data.total === 1 ? "person" : "people"}` : "People"} hint={list.data?.description} action={<DialerSetting />}>
+      <Section title={list.data ? `${fmtInt(list.data.total)} ${list.data.total === 1 ? "person" : "people"}` : "People"} hint={list.data?.description}>
         {list.loading && !list.data ? <SkeletonRows rows={6} label="Finding people..." /> : list.error ? <ErrorState error={list.error} onRetry={list.reload} /> : list.data ? (
           <PeopleList page={list.data} onPage={setPageNo} showAccount={showAccount} caption="People" empty={isEmptyFilter(filter) ? "No contacts yet. Contacts appear once the first sync finishes." : "Nobody matches these choices. Clear one of them to widen the list."} />
         ) : null}

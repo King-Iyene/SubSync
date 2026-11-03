@@ -46,17 +46,14 @@ test("a tag filter narrows the list and says so in words; clearing restores it",
   await expect(heading).toHaveText(before);
 });
 
-test("Dial opens the CRM's own dialer by default and says plainly it cannot go straight to it; the phone app is only used when chosen", async ({ page }) => {
+test("Dial opens the CRM's own dialer by default and says plainly it cannot go straight to it", async ({ page }) => {
   await page.goto("/app#people");
   await page.getByTestId("people-list").locator("button[data-row-primary]").first().click();
   const drawer = page.getByTestId("lead-drawer");
   await expect(drawer.getByTestId("dial-button")).toHaveText("Call in your CRM");
   await expect(drawer.getByTestId("dial-note")).toContainText("Not available from your CRM yet");
   await expect(page.locator('a[href^="tel:"]')).toHaveCount(0);
-  await drawer.getByLabel("Dialer").selectOption("phone");
-  await expect(drawer.getByTestId("dial-button")).toHaveText("Call with my phone");
-  await drawer.getByLabel("Dialer").selectOption("crm"); // put the setting back
-  await expect(drawer.getByTestId("dial-button")).toHaveText("Call in your CRM");
+  await expect(drawer.getByLabel("Dialer")).toHaveCount(0);
 });
 
 test("Ctrl K opens the header search; two letters find people across the accounts; Enter opens the first person", async ({ page }) => {

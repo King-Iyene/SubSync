@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useApiClient, useData } from "../session";
-import { DataList, DialButton, DialerSetting, EmptyState, ErrorState, InlineAlert, LeadDrawer, SkeletonRows, type Column, type LeadSeed } from "../ds";
+import { DataList, DialButton, EmptyState, ErrorState, InlineAlert, LeadDrawer, SkeletonRows, type Column, type LeadSeed } from "../ds";
 import { Badge, Btn, Card, fmtMoney, inputClass, PageHeader, Stat, timeAgo } from "../ui";
 
 type Preset = { id: string; label: string; help: string };
@@ -132,7 +132,6 @@ export function CallsView({ embedded = false }: { embedded?: boolean } = {}) {
     <div className="space-y-6">
       {head}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <DialerSetting />
         {powerStart ? <Btn onClick={() => setPowerStart(null)}>End power hour</Btn> : <Btn variant="primary" onClick={() => { setNow(Date.now()); setPowerStart(Date.now()); }}>Start power hour</Btn>}
       </div>
 
