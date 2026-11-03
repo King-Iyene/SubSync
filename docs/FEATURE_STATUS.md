@@ -202,3 +202,13 @@ connections, appointment insights, two-agency tenant isolation, feature switches
 | Filter bar with account names and left-out reasons | built | segments (agency) | demo company; it has no test or ignored account |
 | List, lead panel, notices, states, charts | built | existing endpoints | demo company only |
 | Clickable charts, card ranges | built, on the Speed to lead trend | speed trend with the leads behind each week | count equals rows by unit test; demo company in the browser |
+
+## Stage D1: design polish, light and dark, Mode A review (3 Nov 2026)
+| Feature | Status | Data source | Tested against live data |
+| --- | --- | --- | --- |
+| Flat blocks (no card inside a card), key-figure strips, one slim toolbar row | built (BUILT, awaiting King's sign-off) | shared pieces in `ui.tsx`, `dashboard.tsx` | demo company only, 3 widths, light and dark (60 captures): 0 nested boxes |
+| Restrained motion: page fade, bars grow, figures count up once, grey loading placeholders; all off under reduced motion | built | none | browser: with reduced motion the figure is final at first read; without it `$0` then `$1,397,934`; unit tests for the rules |
+| Contrast fixes (status colours, ticks) | built | theme tokens | browser contrast check: 0 failures in 92 captures (demo company) |
+| Mode A buyer and UX review, S0 and S1 fixed | built | screenshots | demo company; no real person (Mode C) |
+| `scripts/ui-check.cjs` (repeatable UI check) | built | demo app | demo company |
+

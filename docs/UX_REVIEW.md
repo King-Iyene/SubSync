@@ -52,3 +52,33 @@ None confirmed. No tenant leak was seen, and no forbidden branding. The automate
 - Inbox & SLA gives each waiting conversation a Reply link and the channel it came from.
 - Counts match the CRM where I checked (332 contacts for KD Squares Test).
 - Phone width: the menu becomes a top tab bar and content reflows to one column.
+
+---
+
+# D1 re-run, Mode A (3 Nov 2026, demo company, Playwright Chromium)
+
+Method: `scripts/ui-check.cjs` opened Today, Speed to lead, Appointments, Unanswered messages, Account audit, Clients, People, Settings, Getting started and What's new at 390, 768 and 1440 px in light and dark (60 captures before the pass, 60 after), then My day and the business view at 390 and 1440 px. It records sideways scroll, console errors, failed requests, text below WCAG contrast (4.5:1, 3:1 large; disabled controls exempt), boxes inside boxes, internal words and the number of main headings. I then read the screenshots as P1 (skeptical owner), P3 (setter on a phone), P4 (business owner) and P6 (hostile reviewer). Not done: Safari and Firefox, a real iframe, a screen reader, real people (Mode C).
+
+**S0:** none. No tenant data crossed in the client and business captures, and no forbidden word appeared in any capture.
+
+| ID | Sev | Persona | Where | Finding | Status |
+| --- | --- | --- | --- | --- | --- |
+| D1-01 | S1 | P2, P3 | People | The page had no title at all (no main heading), only tabs and a 13-control form. A person arriving from the menu could not tell where they were. | Fixed: "People" title and one sentence |
+| D1-02 | S1 | P4, P6 | Getting started, answer "How do I remove SubSync and my data?" | About 1,900 characters in one paragraph, the same list of data repeated twice. Nobody reads it, and a reviewer reads it as hiding something. | Fixed: three plain sentences that point to Settings, Data and privacy (full text unchanged there and tested) |
+| D1-03 | S1 | P4 | Clients (light), Getting started (dark), My account | Status numbers at 3.2:1 and ticks at 1.9:1 to 2.5:1 on their green circle. Below the 4.5:1 rule. | Fixed: status colours use the theme tokens; the tick uses the page colour on the green |
+| D1-04 | S1 | P3 | Appointments at 390 px | The page was 24 px wider than the phone (the "Where the lead came from" label and select). Sideways scroll breaks the embedded-app rule. | Fixed: filter labels wrap, selects shrink |
+| D1-05 | S1 | P3, P4 | Audit and Appointments on a phone | Page sentence cut off with "..." in the middle of the point ("2 appointments with no..."). | Fixed: three lines on a phone, two on a wide screen |
+| D1-06 | S2 | P1 | Every page | About 270 px (1440) and 230 px (390) of filter, search, bell and status text before the title. | Fixed: one slim row |
+| D1-07 | S2 | P1 | Appointments, Speed, Audit, Clients | Boxes inside boxes (a card holding four tiles holding a list). 3 pages with nested boxes before, none after (counted in the browser). | Fixed in the shared Card, Stat and the two page tiles |
+| D1-08 | S2 | P1, P2 | Today | Ten rows each with two bordered buttons: nine copies of the same heavy button. | Fixed: one quiet button and one link per row, three columns on a wide screen (page 3,247 px to 2,521 px) |
+| D1-09 | S2 | P1 | Account audit | Seven identical boxed findings. | Fixed: a ruled list with the actions on the right (3,320 px to 2,756 px) |
+| D1-10 | S2 | P2 | Clients | Chart caption collided with the top axis label. | Fixed: space above the plot |
+| D1-11 | S2 | P3 | Clients on a phone | Table scrolls inside its frame and the account name scrolled away. | Partly fixed: the name column stays; stacked rows are in the plan (DECISIONS) |
+| D1-12 | S2 | P4 | People | "Team member (name not available)" ran over the next column. | Fixed: truncates with the full name on hover |
+| D1-13 | S2 | P4 | What's new | "Vote · 0" broke onto two lines. | Fixed |
+| D1-14 | S2 | P1 | Speed to lead | One 4,200 px column of seven sections. | Planned (DECISIONS): tabs |
+| D1-15 | S2 | P1 | Account audit | The same dollar figure four times. | Planned (DECISIONS) |
+| D1-16 | S3 | P4 | Settings | Two 13-row lists of the same accounts. | Planned |
+| D1-17 | S3 | P3 | Phone, first visit | Three "How to use this page" boxes stack above the content. | Planned |
+
+Per-persona one-liners (1 to 5): P1 clarity 4, trust 4 (the outlier warning on the audit is what earns it), design 4 (calmer, still a long column on Speed); P3 effort to get value 5 on My day, 3 on the other pages at 390 px; P4 clarity 3 (Speed and Audit still use words like "target" and "counted"); P6 no scope, branding or data problem found in the screens. Would pay at $9: P1 maybe, P4 maybe (AI personas cannot prove demand; see section 0 of BUYER_AND_UX_REVIEW).
