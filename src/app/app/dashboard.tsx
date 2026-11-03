@@ -19,7 +19,7 @@ import { BackLink, BackProvider, ModuleTabs, type ModuleTab } from "./ds/templat
 import { InlineAlert } from "./ds/alert";
 import { FilterDrawer } from "./ds/filters";
 import { useTheme } from "./ds/theme";
-import { remember, remembered } from "./ds/remember";
+import { handOff, remember, remembered } from "./ds/remember";
 import { MyDayView } from "./ds/my-day";
 import { ApiProvider, makeApi, type Api } from "./session";
 import { AccountDetailView } from "./views/account-detail";
@@ -211,6 +211,18 @@ export function Dashboard() {
   }, []);
   const go: GoFn = useCallback((id, locationId) => move({ id, locationId }, true), [move]);
   const goTop: GoFn = useCallback((id, locationId) => move({ id, locationId }, false), [move]);
+  // A tag pressed in the lead panel opens that tag's list in People (the panel cannot navigate by itself).
+  useEffect(() => {
+    const open = (e: Event) => {
+      const tag = (e as CustomEvent<string>).detail;
+      if (typeof tag !== "string" || !tag) return;
+      handOff("people-tag", tag);
+      go("search");
+      window.dispatchEvent(new Event("subsync:tag-handoff"));
+    };
+    window.addEventListener("subsync:open-tag", open);
+    return () => window.removeEventListener("subsync:open-tag", open);
+  }, [go]);
   const setFilter = useCallback((f: FilterValue) => {
     setFilterState(f);
     remember("filter", isFiltered(f) ? filterToLink(f) : null);
