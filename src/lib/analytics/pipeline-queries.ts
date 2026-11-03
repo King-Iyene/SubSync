@@ -15,7 +15,7 @@ export async function loadDeals(installationId: string, allowed: string[] | null
   const rows = await db`
     select o.opportunity_id, o.location_id, l.name location_name, coalesce(o.pipeline_id, '') pipeline_id,
       coalesce(sc_pl.name, 'Pipeline') pipeline_name, o.stage_id, coalesce(sc_st.nm, 'Unknown stage') stage_name, coalesce(sc_st.ord, 999)::int stage_order,
-      o.name, o.contact_name, coalesce(o.monetary_value, 0)::float8 value, o.status, o.assigned_to,
+      o.name, o.contact_id, o.contact_name, coalesce(o.monetary_value, 0)::float8 value, o.status, o.assigned_to,
       o.created_remote_at, o.last_stage_change_at, o.last_status_change_at,
       greatest(o.last_action_at, o.updated_remote_at) last_activity_at
     from cached_opportunities o
@@ -28,7 +28,7 @@ export async function loadDeals(installationId: string, allowed: string[] | null
   return rows.map((r) => ({
     opportunityId: r.opportunity_id, locationId: r.location_id, locationName: r.location_name, pipelineId: r.pipeline_id,
     pipelineName: r.pipeline_name, stageId: r.stage_id, stageName: r.stage_name, stageOrder: r.stage_order, name: r.name,
-    contactName: r.contact_name, value: r.value, status: r.status, assignedTo: r.assigned_to ?? null, createdAt: ms(r.created_remote_at),
+    contactId: (r.contact_id as string | null) || null, contactName: r.contact_name, value: r.value, status: r.status, assignedTo: r.assigned_to ?? null, createdAt: ms(r.created_remote_at),
     stageChangedAt: ms(r.last_stage_change_at), statusChangedAt: ms(r.last_status_change_at), lastActivityAt: ms(r.last_activity_at),
   }));
 }

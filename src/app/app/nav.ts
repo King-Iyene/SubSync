@@ -32,8 +32,9 @@ export const NAV: NavItem[] = [
   { id: "team", label: "Team", feature: "team", group: "More" },
   { id: "pipeline", label: "Pipeline and deals", feature: "pipelines", group: "More" },
   { id: "onboarding", label: "Setup", feature: "onboarding", group: "More", parent: "clients", showWhenLimited: true },
-  { id: "duplicates", label: "Duplicates", feature: "duplicates", group: "More" },
-  { id: "cleanup", label: "Data cleanup", feature: "cleanup", group: "More" },
+  { id: "cleanup", label: "Clean-up", feature: "cleanup", group: "More" },
+  // Stage C2: Duplicates is a tab of Clean-up. The old address still opens it.
+  { id: "duplicates", label: "Duplicates", feature: "duplicates", group: "More", parent: "cleanup", showWhenLimited: true },
   { id: "meetings", label: "Meeting notes", feature: "meetings", group: "More" },
   { id: "settings", label: "Settings", feature: "settings", group: "Settings and help" },
   { id: "connections", label: "Connections", feature: "connections", group: "Settings and help" },
@@ -44,4 +45,4 @@ export const NAV: NavItem[] = [
 ];
 
 // Where a page that lives inside another page highlights in the menu, and where "back" lands when there is no trail.
-export const PARENT: Partial<Record<ViewId, ViewId>> = { account: "clients", accounts: "clients", onboarding: "clients", deals: "pipeline", email: "clients", alerts: "today", search: "people", leads: "people", calls: "people", notifications: "settings" };
+export const PARENT: Partial<Record<ViewId, ViewId>> = { account: "clients", accounts: "clients", onboarding: "clients", deals: "pipeline", email: "clients", alerts: "today", search: "people", leads: "people", calls: "people", duplicates: "cleanup", notifications: "settings" };

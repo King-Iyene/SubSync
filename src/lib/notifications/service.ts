@@ -62,7 +62,7 @@ export async function loadContext(installationId: string): Promise<Loaded> {
   const company = settings.brandName ?? (inst?.name as string | undefined) ?? "Your company";
   const fallbackZone = (zone[0]?.timezone as string | undefined) ?? null;
   const ctx: Context = {
-    installationId, mode, company, appUrl: appUrl(), fallbackZone, pref: (t) => prefs[t], destinations: asDispatchDestinations(destinations), stopUrl: stopUrlFor(installationId),
+    installationId, mode, company, logoUrl: settings.brandLogoUrl, appUrl: appUrl(), fallbackZone, pref: (t) => prefs[t], destinations: asDispatchDestinations(destinations), stopUrl: stopUrlFor(installationId),
   };
   return { ctx, prefs, destinations, mode, company, fallbackZone, legacy, lastDailyOn: (last[0]?.d as string | null) ?? null, lastWeeklyOn: (last[0]?.w as string | null) ?? null };
 }
@@ -203,7 +203,7 @@ export function sampleItem(type: NotificationType, pref: Pref): Item {
 
 export async function sendEmailTest(installationId: string, l: Loaded, type: NotificationType, to: string): Promise<TestOutcome> {
   const pref = l.prefs[type];
-  const mail = composeEmail([sampleItem(type, pref)], { company: l.company, appUrl: appUrl(), stopUrl: l.ctx.stopUrl(to), test: true });
+  const mail = composeEmail([sampleItem(type, pref)], { company: l.company, logoUrl: l.ctx.logoUrl, appUrl: appUrl(), stopUrl: l.ctx.stopUrl(to), test: true });
   return sendTestMail(to, pref.recipients, mail, testSendDeps(installationId, l.ctx.stopUrl, () => isLive("SEND_EMAIL_LIVE")));
 }
 

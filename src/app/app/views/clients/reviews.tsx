@@ -8,13 +8,14 @@ import type { Finding, QuarterFacts } from "@/lib/analytics/client-success";
 import { useData } from "../../session";
 import { EmptyState, HowTo, LineChart, Section, SkeletonCards } from "../../ds";
 import { Btn, ErrorBox, inputClass, Stat, Table, Td, Th } from "../../ui";
+import { BrandLogo, ProductMark } from "../../brand-logo";
 import type { ClientRow, DayPoint } from "./types";
 
 // A quarterly business review (N60): what a client sees at renewal. Pick a client and a quarter; the review sets it against the quarter before, shows the
 // trends on labelled axes, says what went well and what did not, lists what SubSync caught, ends with next steps, and prints or saves as a PDF with the
 // agency's own name and colour. Built only from numbers SubSync holds. Where its record does not reach back it says so instead of drawing an empty chart.
 type Qbr = {
-  brand: { name: string | null; color: string | null }; client: ClientRow; openAlerts: number; generatedAt: string;
+  brand: { name: string | null; color: string | null; logoUrl?: string | null }; client: ClientRow; openAlerts: number; generatedAt: string;
   quarter: { key: string; label: string; from: string; to: string; complete: boolean; days: number; total: number }; previous: { key: string; label: string; from: string; to: string };
   quarters: Array<{ key: string; label: string }>;
   facts: QuarterFacts; previousFacts: QuarterFacts; findings: { wins: Finding[]; issues: Finding[]; steps: Finding[] };
@@ -71,13 +72,14 @@ export function ReviewsTab({ accounts }: { accounts: Array<{ locationId: string;
       {error && <ErrorBox error={error} onRetry={reload} />}
       {id && loading && !data && <SkeletonCards cards={4} label="Preparing the review..." />}
       {!id && <>
-        <HowTo id="clients-reviews" title="What a review is for">A quarterly review is the one-page report you show a client at renewal to prove what you delivered. Choose a client and a quarter: you get the numbers against the quarter before, what went well, what did not, what SubSync caught for them, and what to do next. Press Print to save it as a PDF with your name and colour on it.</HowTo>
+        <HowTo id="clients-reviews" title="What a review is for">Pick a client and a quarter. Press Print to save a PDF.</HowTo>
         <EmptyState title="Choose a client" body="The review is built from what SubSync has recorded about that client. A quarter that began before SubSync started watching will be partly empty, and says so." />
       </>}
       {c && data && f && p && (
         <article className="qbr-print space-y-6 border-t pt-5 print:border-0 print:pt-0" data-testid="qbr">
           <style dangerouslySetInnerHTML={{ __html: printCss(data.brand.color, ".qbr-print") }} />
           <header className="border-b-4 pb-3" style={{ borderColor: accent ?? "var(--primary)" }} data-testid="qbr-header">
+            <BrandLogo url={data.brand.logoUrl} name={data.brand.name} height={40} className="mb-2" fallback={<ProductMark height={40} className="mb-2" />} />
             {data.brand.name && <p className="mb-2 text-lg font-semibold" style={{ color: accent ?? undefined }}>{data.brand.name}</p>}
             <p className="text-xs uppercase tracking-wide text-muted-foreground">Quarterly business review</p>
             <h2 className="text-2xl font-semibold tracking-tight">{c.name ?? "Client"}</h2>

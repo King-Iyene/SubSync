@@ -35,9 +35,9 @@ const TONE: Record<Shown, Tone> = { not_connected: "neutral", waiting: "info", e
 export function NotificationsPage() {
   const { data, error, loading, reload } = useData<Data>("notification-prefs");
   return (
-    <Page title="Notifications" subtitle="Choose what SubSync tells you, where it goes, and when.">
+    <Page title="Notifications" subtitle="Choose what you hear about, and where.">
       <HowTo id="notifications-f9" title="This works without any setup">
-        New alerts appear in the bell at the top of every page. If you already set an email address or a Slack channel, they go there too. Change anything below: each kind of message has its own channels, time, quiet hours and wording.
+        Alerts show in the bell. Email and Slack work once you set them.
       </HowTo>
       {loading && !data ? <SkeletonRows rows={5} label="Loading notification choices" />
         : error ? (error.status === 403 ? <InlineAlert tone="info">Notification choices are for administrators. The bell at the top of the page shows what needs you.</InlineAlert> : <ErrorState error={error} onRetry={reload} />)

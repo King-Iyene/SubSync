@@ -35,11 +35,11 @@ export const HELP: Record<string, Help> = {
   renewal: { what: "The day this client's contract renews.", where: USER_ENTERED, todo: "Press Add date on the row. You get a list of renewals in the next 90 days.", entered: true },
   industry: { what: "The kind of business this client runs.", where: USER_ENTERED, todo: "Pick it from the list. It decides the reply target, call lists and onboarding steps that fit the client.", entered: true },
   valueCreated: { what: "How many times the client's monthly fee the new deals of the last 30 days are worth.", where: "The new deals come from the CRM; the monthly fee is what you type.", todo: "Add the fee to see it. Example: $18,000 of new deals for $2,500 a month is 7.2x.", entered: true },
-  lastSpoken: { what: "When someone on your team last talked to this client.", where: USER_ENTERED, todo: "Press I spoke to them today after a call, or add a note to the log.", entered: true },
+  lastSpoken: { what: "When someone on your team last talked to this client.", where: USER_ENTERED, todo: "Press Spoke to them today after a call, or add a note to the log.", entered: true },
   setup: { what: "How much of the client's account is set up, out of 100.", where: "Worked out by SubSync from pipelines, calendars, contacts and email sending.", todo: "Open Onboarding to see what is missing and fix it.", entered: false },
   monthlyRevenue: { what: "What your clients pay you each month, added up.", where: USER_ENTERED, todo: "Add the fee to each client. Clients with no fee are left out and counted.", entered: true },
   revenueAtRisk: { what: "The monthly fees of clients who look at risk or have gone quiet.", where: "The fees are what you typed; who is at risk is worked out by SubSync.", todo: "Call these clients first.", entered: true },
-  notSpoken: { what: "Clients nobody on your team has spoken to in 14 days or more.", where: USER_ENTERED, todo: "Press I spoke to them today after each call so this stays true.", entered: true },
+  notSpoken: { what: "Clients nobody on your team has spoken to in 14 days or more.", where: USER_ENTERED, todo: "Press Spoke to them today after each call so this stays true.", entered: true },
   renewals: { what: "Contracts renewing in the next 90 days.", where: USER_ENTERED, todo: "Add each client's renewal date.", entered: true },
 };
 
@@ -100,7 +100,7 @@ export function validateNote(raw: unknown, today: string): { ok: true; note: Not
   return { ok: true, note: { kind, body, occurredOn } };
 }
 
-/** "Last spoken" now comes from the log too: the newest logged conversation or the "I spoke to them today" press, whichever is later. */
+/** "Last spoken" now comes from the log too: the newest logged conversation or the "Spoke to them today" press, whichever is later. */
 export function lastSpokenMs(profileLastContactedMs: number | null, conversationDates: ReadonlyArray<string>): number | null {
   const logged = conversationDates.filter((d) => ISO.test(d)).map((d) => toMs(d) + 12 * 3_600_000);
   const all = [...(profileLastContactedMs === null ? [] : [profileLastContactedMs]), ...logged];

@@ -2,12 +2,11 @@ import { assigneeLabel } from "../analytics/waiting-view";
 import { teamNames } from "../analytics/inbox-queries";
 import { leadExtras } from "../analytics/people-detail";
 import {
-  coldTagsFor, getDialer, goingCold, listSavedLists, peopleOptions, removeList, saveList, searchPeople, setDialer, tagDetail, watchingSince, type ColdBucket,
+  coldTagsFor, goingCold, listSavedLists, peopleOptions, removeList, saveList, searchPeople, tagDetail, watchingSince, type ColdBucket,
 } from "../analytics/people-list-queries";
 import { fetchConversationCalls, fetchContactCustomFields, fetchCustomFieldNames, isPermissionError } from "../sync/ghl-data";
 import { callResultLabel, errorRef, isoDay, isQueryTimeout, TIMEOUT_MESSAGE } from "../people/helpers";
 import { describeFilter, listName, parseSmartFilter, scopeFilterTo } from "../people/filters";
-import { parseDialer } from "../people/dial";
 import type { deepLinks } from "../links";
 import { json, type AuthContext } from "./auth";
 
@@ -58,10 +57,10 @@ async function route(ctx: Ctx, h: PeopleHelpers): Promise<Response> {
 
   if (m === "GET" && b === "options") {
     const allowed = await h.allowed();
-    const [opts, names, dialer] = await Promise.all([peopleOptions(ctx.installationId, allowed), teamNames(ctx.installationId), getDialer(ctx.installationId, h.voter)]);
+    const [opts, names] = await Promise.all([peopleOptions(ctx.installationId, allowed), teamNames(ctx.installationId)]);
     return json({
       ...opts, owners: opts.owners.map((o) => ({ ...o, name: assigneeLabel(o.id, names) })),
-      canShareLists: ctx.kind !== "client", singleAccount: ctx.limitTo !== null, dialer: parseDialer(dialer),
+      canShareLists: ctx.kind !== "client", singleAccount: ctx.limitTo !== null,
     });
   }
 
@@ -129,16 +128,6 @@ async function route(ctx: Ctx, h: PeopleHelpers): Promise<Response> {
     }
     if (m === "DELETE" && c && /^[0-9a-fA-F-]{36}$/.test(c)) {
       return (await removeList(ctx.installationId, h.voter, team, c)) ? json({ ok: true }) : json({ error: "List not found" }, 404);
-    }
-  }
-
-  if (b === "dialer") {
-    if (m === "GET") return json({ provider: parseDialer(await getDialer(ctx.installationId, h.voter)) });
-    if (m === "PUT") {
-      const body = (await ctx.request.json().catch(() => null)) as { provider?: unknown } | null;
-      if (body?.provider !== "crm" && body?.provider !== "phone") return json({ error: "Choose the CRM's dialer or your own phone app" }, 400);
-      await setDialer(ctx.installationId, h.voter, body.provider);
-      return json({ ok: true, provider: body.provider });
     }
   }
 

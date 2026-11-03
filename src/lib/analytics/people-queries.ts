@@ -164,9 +164,9 @@ export type TimelineItem = { at: string; kind: string; title: string; detail?: s
 export async function contactTimeline(installationId: string, allowed: string[] | null, locationId: string, contactId: string) {
   if (allowed && !allowed.includes(locationId)) return null;
   const db = sql();
-  const [[c], deals, [convo], moves, names] = await Promise.all([
+  const [[c], deals, [convo], moves, names, appts, calls, tagMoves] = await Promise.all([
     db`select c.contact_id, c.location_id, l.name location_name, coalesce(nullif(c.full_name, ''), 'Unnamed contact') name, c.email, c.phone, c.tags,
-        c.source, c.dnd, c.date_added, c.last_activity_at
+        c.source, c.dnd, c.date_added, c.last_activity_at, c.first_seen_at, nullif(c.assigned_to, '') owner
        from cached_contacts c join locations l on l.installation_id = c.installation_id and l.location_id = c.location_id
        where c.installation_id = ${installationId} and c.location_id = ${locationId} and c.contact_id = ${contactId}`,
     db`select opportunity_id, name, status, monetary_value::float8 value, stage_id, created_remote_at, last_stage_change_at, last_status_change_at
@@ -180,6 +180,9 @@ export async function contactTimeline(installationId: string, allowed: string[] 
          and e.opportunity_id in (select opportunity_id from cached_opportunities where installation_id = ${installationId} and location_id = ${locationId} and contact_id = ${contactId})
        order by e.at desc limit 30`,
     stageNames(installationId),
+    db`select start_at, status, title from cached_appointments where installation_id = ${installationId} and location_id = ${locationId} and contact_id = ${contactId} and start_at is not null order by start_at desc limit 20`,
+    db`select created_at, outcome from call_outcomes where installation_id = ${installationId} and location_id = ${locationId} and contact_id = ${contactId} order by created_at desc limit 20`,
+    db`select tag, kind, at from contact_tag_events where installation_id = ${installationId} and location_id = ${locationId} and contact_id = ${contactId} order by at desc limit 20`,
   ]);
   if (!c) return null;
   const items: TimelineItem[] = [];
@@ -195,15 +198,18 @@ export async function contactTimeline(installationId: string, allowed: string[] 
   if (convo?.last_message_at) {
     items.push({ at: iso(convo.last_message_at) as string, kind: "message", title: `Last message was ${convo.last_message_direction === "inbound" ? "from them" : "from your team"}`, detail: convo.last_message_type ?? undefined });
   }
+  for (const a of appts) items.push({ at: iso(a.start_at) as string, kind: "appointment", title: `Appointment${a.title ? `: ${a.title}` : ""}`, detail: a.status ? `Status: ${a.status}` : "No outcome recorded" });
+  for (const x of calls) items.push({ at: iso(x.created_at) as string, kind: "call", title: `Call logged in SubSync: ${String(x.outcome).replace(/_/g, " ")}` });
+  for (const t of tagMoves) items.push({ at: iso(t.at) as string, kind: "tag", title: `Tag ${t.kind === "added" ? "added" : "removed"}: ${t.tag}` });
   items.sort((a, b) => b.at.localeCompare(a.at));
   return {
     contact: {
       contactId: c.contact_id as string, locationId: c.location_id as string, locationName: c.location_name as string | null, name: c.name as string,
       email: c.email as string | null, phone: c.phone as string | null, tags: (c.tags as string[]) ?? [], source: c.source as string | null, dnd: c.dnd === true,
-      lastActivityAt: iso(c.last_activity_at),
+      lastActivityAt: iso(c.last_activity_at), dateAdded: iso(c.date_added), firstSeenAt: iso(c.first_seen_at), owner: (c.owner as string | null) ?? null,
     },
     deals: deals.map((d) => ({ id: d.opportunity_id as string, name: d.name as string | null, status: d.status as string, value: d.value as number, stage: d.stage_id ? names.get(d.stage_id as string) ?? null : null })),
     unread: convo?.unread_count ?? 0,
-    timeline: items.slice(0, 40),
+    timeline: items.slice(0, 60),
   };
 }

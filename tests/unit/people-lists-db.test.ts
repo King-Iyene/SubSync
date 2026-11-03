@@ -3,6 +3,8 @@ import { encryptSecret } from "@/lib/crypto";
 import { forgetQueues, callQueueAll } from "@/lib/analytics/call-queries";
 import { goingCold, listSavedLists, removeList, saveList, searchPeople, tagDetail, timed } from "@/lib/analytics/people-list-queries";
 import { leadExtras } from "@/lib/analytics/people-detail";
+import { contactTimeline } from "@/lib/analytics/people-queries";
+import { tagDateLabel } from "@/lib/people/lead-panel";
 import { diffTagEvents } from "@/lib/sync/tag-events";
 import { isQueryTimeout } from "@/lib/people/helpers";
 import { closeDb, sql } from "@/lib/db";
@@ -137,6 +139,32 @@ describe.skipIf(!HAS_DB)("People: filters, scoping, tags, going cold, saved list
     const vip1 = first.rows.find((r) => r.contactId === "vip1");
     expect(vip1?.calls).toBe(2);
     expect(vip1?.timeZone).toBe("America/New_York");
+  });
+
+  it("the lead panel: a dated tag, an undated tag with the day SubSync first saw the lead, a timeline with calls and tag moves", async () => {
+    await sql()`insert into cached_appointments (installation_id, location_id, appointment_id, contact_id, title, status, start_at, end_at) values (${inst}, ${A}, 'apx1', 'vip1', 'Call', null, ${ago(2)}, ${ago(2)})`;
+    const t = await contactTimeline(inst, [A], A, "vip1");
+    expect(t?.contact.firstSeenAt).toBeTruthy();
+    expect(t?.timeline.map((x) => x.kind)).toEqual(expect.arrayContaining(["appointment", "call", "tag"]));
+    expect(t?.timeline.find((x) => x.kind === "appointment")?.detail).toBe("No outcome recorded");
+    const ex = await leadExtras(inst, [A], A, "vip1");
+    expect(ex?.tagDates.vip).toBeTruthy();
+    expect(ex?.tagDates.web).toBeUndefined(); // vip1 carries "web" but SubSync never saw it added
+    const known = tagDateLabel({ addedAt: ex?.tagDates.vip ?? null, firstSeenAt: t?.contact.firstSeenAt ?? null });
+    const unknown = tagDateLabel({ addedAt: ex?.tagDates.web ?? null, firstSeenAt: t?.contact.firstSeenAt ?? null });
+    expect(known.known).toBe(true);
+    expect(unknown.text).toMatch(/^Before SubSync started watching \(first seen \d{1,2} \w{3} \d{4}\)$/);
+  });
+
+  it("tenancy: a lead from another account or another company never opens", async () => {
+    expect(await contactTimeline(inst, [A], B, "other1")).toBeNull(); // account B is not in the caller's list
+    expect(await contactTimeline(inst, [B], B, "other1")).not.toBeNull();
+    expect(await contactTimeline(inst, [A], A, "other1")).toBeNull(); // B's contact id under A's account id
+    const [o] = await sql()`insert into installations (company_id, company_name, plan, access_token_enc, refresh_token_enc, token_expires_at) values (${CO + "-2"}, 'zzPeople2', 'pro', 'x', 'x', now()) returning id`;
+    try {
+      expect(await contactTimeline(o.id as string, null, A, "vip1")).toBeNull(); // another company asking for company 1's lead, even unrestricted
+      expect(await leadExtras(o.id as string, null, A, "vip1")).toBeNull();
+    } finally { await sql()`delete from installations where id = ${o.id}`; }
   });
 
   it("the tag diff the sync uses records what the database will hold", () => {

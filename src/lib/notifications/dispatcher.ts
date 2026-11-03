@@ -86,6 +86,8 @@ export type Context = {
   installationId: string;
   mode: "agency" | "business";
   company: string;
+  /** The company's logo web address for the email header. */
+  logoUrl?: string | null;
   appUrl: string;
   /** The zone of the first client account, for a preference with no zone of its own. */
   fallbackZone: string | null;
@@ -190,7 +192,7 @@ export async function drain(ctx: Context, ledger: Ledger, transports: Transports
       let result: SendResult;
       try {
         if (first.channel === "in_app") result = await transports.inApp(first);
-        else if (first.channel === "email") result = await transports.email(first.target, composeEmail(batch.map((b) => b.payload), { company: ctx.company, appUrl: ctx.appUrl, stopUrl: ctx.stopUrl(first.target) }), batch);
+        else if (first.channel === "email") result = await transports.email(first.target, composeEmail(batch.map((b) => b.payload), { company: ctx.company, logoUrl: ctx.logoUrl, appUrl: ctx.appUrl, stopUrl: ctx.stopUrl(first.target) }), batch);
         else {
           const dest = ctx.destinations.find((d) => d.id === first.target);
           result = dest ? await transports.slack(dest, composeSlack(batch.map((b) => b.payload), { company: ctx.company, appUrl: ctx.appUrl }), batch) : { ok: false, permanent: true, code: "channel_not_available" };

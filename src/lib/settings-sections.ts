@@ -50,7 +50,7 @@ export const NUMBER_SETTINGS = ["staleDays", "dormantDays", "slaHours", "speedTa
 export const SETTING_LABEL: Readonly<Record<string, string>> = {
   staleDays: "Stale deal days", dormantDays: "Gone quiet days", slaHours: "Reply target (hours)", speedTargetMinutes: "Speed to lead target", countAutomatedTouches: "Count automatic messages",
   speedBusinessHours: "Business hours", speedOpenHour: "Opening hour", speedCloseHour: "Closing hour", alertQuietHours: "Quiet hours", digestEnabled: "Daily brief",
-  digestHour: "Send hour", digestTimezone: "Time zone", digestEmail: "Alert email address", slackWebhookUrl: "Slack channel", brandName: "Brand name", brandColor: "Brand colour",
+  digestHour: "Send hour", digestTimezone: "Time zone", digestEmail: "Alert email address", slackWebhookUrl: "Slack channel", brandName: "Brand name", brandColor: "Brand colour", brandLogoUrl: "Logo address",
   keepTranscripts: "Keep transcripts", pushNotesToCrm: "Add meeting notes to contacts", customChecklist: "Your checklist steps", appDomainOverride: "Login address", coldTags: "Cold-list tags",
   industryTargets: "Targets by industry", clientViewAll: "Client access for every account",
 };

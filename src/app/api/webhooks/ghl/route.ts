@@ -5,8 +5,8 @@ import { sql } from "@/lib/db";
 import { getInstallation, purgeInstallation, purgeLocationData } from "@/lib/ghl/installations";
 import { actionFor, canonicalType, isForeignApp, parseWebhook, verifyWebhook } from "@/lib/ghl/webhook";
 import { recordPlanEvent } from "@/lib/entitlements-queries";
-import { captureWhitelabelDomain } from "@/lib/analytics/queries";
-import { enqueueAreaSync, enqueueFullSync } from "@/lib/sync/engine";
+import { captureWhitelabelDomain, captureWhitelabelLogo } from "@/lib/analytics/queries";
+import { enqueueAreaSync, enqueueFullSync, enqueueSyncForUnresolvedInstall } from "@/lib/sync/engine";
 import { isEchoOfOurWrite } from "@/lib/connections/write-log";
 
 // Receives platform webhooks. Verify the Ed25519 signature on the body, drop duplicates (failed
@@ -51,7 +51,18 @@ export async function POST(request: Request) {
       if (event.type === "AppInstall" && event.whitelabelDomain && target) {
         await captureWhitelabelDomain(target.id, event.whitelabelDomain, "install").catch((e) => console.error("Keeping the login domain failed", safeError(e)));
       }
+      if (event.type === "AppInstall" && event.whitelabelLogoUrl && target) {
+        await captureWhitelabelLogo(target.id, event.whitelabelLogoUrl).catch((e) => console.error("Keeping the logo failed", safeError(e)));
+      }
       if (event.type === "PlanChange") return NextResponse.json({ ok: true });
+    }
+    // A bulk-install event can arrive without a company id. We cannot tell whose it is from the event alone, so we ask the installed-locations list of each
+    // company to be read again (a read nobody else sees: it only finds accounts that are really installed for that company).
+    if (action.kind === "install" && !event.companyId && event.locationId) {
+      const own = await getInstallation(businessKey(event.locationId));
+      if (own) await enqueueFullSync(own.id);
+      else await enqueueSyncForUnresolvedInstall();
+      return NextResponse.json({ ok: true });
     }
     if (action.kind === "ignore" || !event.companyId) return NextResponse.json({ ok: true });
 

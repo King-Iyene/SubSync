@@ -37,7 +37,7 @@ export function TeamView() {
 
   return (
     <div>
-      <PageHeader title="Team" subtitle="Who owns the pipeline: open and won value, deals going stale, and how fast each person closes. Deals with nobody assigned are shown as Unassigned." />
+      <PageHeader title="Team" subtitle="Open and won value, stale deals and close speed per person." />
       {msg && <p className="mb-3 text-sm text-destructive" role="alert">{msg}</p>}
       {data.members.length === 0 ? (
         <Empty title="No assigned deals yet" body="Once deals or contacts have an owner in your CRM, each person appears here." />

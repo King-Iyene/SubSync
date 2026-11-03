@@ -10,11 +10,14 @@ export const PREVIEW_VALID_HOURS = 24;
 
 async function loadContacts(installationId: string, locationId: string): Promise<ContactLite[]> {
   const rows = await sql()`
-    select contact_id, first_name, last_name, phone, email, tags, last_activity_at, date_added, source
-    from cached_contacts where installation_id = ${installationId} and location_id = ${locationId} limit 40000`;
+    select c.contact_id, c.first_name, c.last_name, c.phone, c.email, c.tags, c.last_activity_at, c.date_added, c.source,
+      (c.dnd
+        or exists (select 1 from cached_opportunities o where o.installation_id = c.installation_id and o.location_id = c.location_id and o.contact_id = c.contact_id and o.status = 'open')
+        or exists (select 1 from cached_appointments a where a.installation_id = c.installation_id and a.location_id = c.location_id and a.contact_id = c.contact_id and a.start_at > now() and coalesce(a.status, '') not in ('cancelled', 'canceled'))) protected
+    from cached_contacts c where c.installation_id = ${installationId} and c.location_id = ${locationId} limit 40000`;
   return rows.map((r) => ({
     id: r.contact_id as string, firstName: r.first_name as string | null, lastName: r.last_name as string | null, phone: r.phone as string | null,
-    email: r.email as string | null, tags: (r.tags as string[]) ?? [], lastActivityAt: ms(r.last_activity_at), dateAdded: ms(r.date_added), source: r.source as string | null,
+    email: r.email as string | null, tags: (r.tags as string[]) ?? [], lastActivityAt: ms(r.last_activity_at), dateAdded: ms(r.date_added), source: r.source as string | null, protected: r.protected === true,
   }));
 }
 

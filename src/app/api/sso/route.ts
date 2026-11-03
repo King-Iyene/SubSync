@@ -3,7 +3,7 @@ import { decideForIdentity, mayDeleteData, type AccessKind } from "@/lib/access"
 import { deriveIdentity } from "@/lib/identity";
 import { logIdentity } from "@/lib/identity-log";
 import { demoEnabled } from "@/lib/api/auth";
-import { captureWhitelabelDomain, getSettings } from "@/lib/analytics/queries";
+import { captureWhitelabelDomain, captureWhitelabelLogo, getSettings } from "@/lib/analytics/queries";
 import { resolveEntitlements } from "@/lib/flags";
 import { businessInstalled, clientViewOn, getInstallation } from "@/lib/ghl/installations";
 import { decryptSsoPayload, parseSsoUser } from "@/lib/ghl/sso";
@@ -14,9 +14,9 @@ import { MAINTENANCE_MESSAGE, maintenanceOn } from "@/lib/runtime-guards";
 async function brandOf(installationId: string) {
   try {
     const s = await getSettings(installationId);
-    return { name: s.brandName, color: s.brandColor && /^#[0-9a-f]{6}$/i.test(s.brandColor) ? s.brandColor : null };
+    return { name: s.brandName, color: s.brandColor && /^#[0-9a-f]{6}$/i.test(s.brandColor) ? s.brandColor : null, logoUrl: s.brandLogoUrl };
   } catch {
-    return { name: null, color: null };
+    return { name: null, color: null, logoUrl: null };
   }
 }
 
@@ -45,7 +45,7 @@ export async function POST(request: Request) {
     };
     const session = signSession({ companyId: DEMO_COMPANY_ID, userId: user.userId, role: user.role, userName: user.userName, demo: true, kind, locationId, ...(kind === "agency" ? { personRole: "agency_owner" as const } : {}) });
     const demoInstall = await getInstallation(DEMO_COMPANY_ID).catch(() => null);
-    const brand = demoInstall ? await brandOf(demoInstall.id) : { name: null, color: null };
+    const brand = demoInstall ? await brandOf(demoInstall.id) : { name: null, color: null, logoUrl: null };
     return NextResponse.json({ user, installed: true, demo: true, kind, session, entitlements: await resolveEntitlements("pro", undefined, true), brand });
   }
 
@@ -100,6 +100,7 @@ export async function POST(request: Request) {
   await logIdentity(installation.id, identity, "ok");
   // An agency that resells the platform under its own domain gets links on that domain.
   if (user.whitelabelDomain) await captureWhitelabelDomain(installation.id, user.whitelabelDomain, "sso").catch(() => undefined);
+  if (user.whitelabelLogoUrl) await captureWhitelabelLogo(installation.id, user.whitelabelLogoUrl).catch(() => undefined);
 
   const session = signSession({
     companyId: decision.companyKey, userId: user.userId, role: user.role, userName: user.userName, demo: false,

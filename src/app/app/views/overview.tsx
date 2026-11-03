@@ -38,7 +38,7 @@ export function OverviewView({ go }: { go: GoFn }) {
   return (
     <Page
         title="Overview"
-        subtitle="Every client account at a glance: who needs attention, where money is stuck, and what changed."
+        subtitle="Who needs attention, where money is stuck, what changed."
         actions={
           <>
             <Btn onClick={() => window.print()}>Print summary</Btn>

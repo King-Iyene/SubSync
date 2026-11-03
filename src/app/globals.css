@@ -64,27 +64,27 @@
   Values are written as plain hex so the test and the style guide read exactly what the browser reads.
 */
 :root {
-  --background: #f4f6fa;
-  --foreground: #000c25;
+  --background: #ffffff;
+  --foreground: #00081a;
   --card: #ffffff;
-  --card-foreground: #000c25;
+  --card-foreground: #00081a;
   --popover: #ffffff;
   --popover-foreground: #000c25;
   --primary: #0a658b;
   --primary-foreground: #ffffff;
-  --secondary: #e6eef5;
+  --secondary: #e1ebf6;
   --secondary-foreground: #02244f;
-  --muted: #edf1f6;
-  --muted-foreground: #44546f;
-  --accent: #dcebf3;
+  --muted: #eaf0f8;
+  --muted-foreground: #2b3c58;
+  --accent: #d3e7f3;
   --accent-foreground: #02244f;
-  --destructive: #b3261e;
-  --success: #0e7a53;
-  --warning: #8a5a00;
+  --destructive: #a8170f;
+  --success: #0a6b47;
+  --warning: #7a4d00;
   --gold: #d4ad58;
   --gold-foreground: #000c25;
-  --border: #d5dce6;
-  --input: #c4cdda;
+  --border: #aebbd0;
+  --input: #8fa0ba;
   --ring: #0a658b;
   /* Categorical chart colours, always used in this order, validated for colour-blind separation (docs/features/D0.md). */
   --chart-1: #0878a6;
@@ -102,7 +102,7 @@
   --sidebar-accent-foreground: #ffffff;
   --sidebar-border: #ffffff1a;
   --sidebar-ring: #5cbce3;
-  --shadow-card: 0 1px 2px #000c2510, 0 6px 20px -10px #000c2524;
+  --shadow-card: 0 1px 2px #000c2518, 0 4px 14px -6px #000c2530;
   --shadow-lift: 0 2px 4px #000c2512, 0 12px 28px -12px #000c2538;
   /* Motion: short, calm. Reduced-motion users get none (below). */
   --motion-fast: 120ms;
@@ -112,27 +112,27 @@
 
 .dark {
   --background: #000c25;
-  --foreground: #f1f5fb;
-  --card: #031636;
-  --card-foreground: #f1f5fb;
-  --popover: #05214a;
+  --foreground: #ffffff;
+  --card: #0a2352;
+  --card-foreground: #ffffff;
+  --popover: #10306a;
   --popover-foreground: #f1f5fb;
-  --primary: #4db3dc;
+  --primary: #6cc8ef;
   --primary-foreground: #000c25;
   --secondary: #0b2147;
-  --secondary-foreground: #f1f5fb;
-  --muted: #0b2147;
-  --muted-foreground: #9fb0cb;
-  --accent: #02244f;
+  --secondary-foreground: #ffffff;
+  --muted: #12295a;
+  --muted-foreground: #cddaee;
+  --accent: #16407f;
   --accent-foreground: #ffffff;
   --destructive: #ff7a85;
   --success: #3dd598;
   --warning: #f59e3f;
   --gold: #d4ad58;
   --gold-foreground: #000c25;
-  --border: #ffffff1f;
-  --input: #ffffff29;
-  --ring: #4db3dc;
+  --border: #46629a;
+  --input: #5575b0;
+  --ring: #6cc8ef;
   --chart-1: #2f98c4;
   --chart-2: #b2893a;
   --chart-3: #8678e8;

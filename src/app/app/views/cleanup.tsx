@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useApiClient, useData } from "../session";
-import { Badge, Btn, Card, Empty, ErrorBox, fmtInt, inputClass, Loading, PageHeader, Table, Td, Th, timeAgo } from "../ui";
+import { Badge, Btn, Card, Empty, ErrorBox, fmtInt, inputClass, Loading, Table, Td, Th, timeAgo } from "../ui";
 
 type Run = {
   id: string; locationId: string; locationName: string | null; status: string; total: number; applied: number; skipped: number; failed: number; undone: number;
@@ -17,13 +17,15 @@ const STATUS: Record<string, { label: string; tone: "good" | "warn" | "bad" | "i
   undoing: { label: "Undoing", tone: "info" }, undone: { label: "Undone", tone: "neutral" }, needs_permission: { label: "Needs permission", tone: "warn" }, failed: { label: "Failed", tone: "bad" },
 };
 
-export function CleanupView() {
+// The Formatting tab (phones and names) and the Tags tab of Clean-up. Both plan first, show the exact changes, need the number typed back, and can be undone.
+export function CleanupView({ mode = "formatting" }: { mode?: "formatting" | "tags" }) {
   const api = useApiClient();
   const { data, error, loading, reload } = useData<Data>("cleanup");
   const [account, setAccount] = useState("");
-  const [phone, setPhone] = useState(true);
-  const [name, setName] = useState(true);
-  const [tag, setTag] = useState(false);
+  const formatting = mode === "formatting";
+  const [phone, setPhone] = useState(formatting);
+  const [name, setName] = useState(formatting);
+  const tag = !formatting;
   const [cc, setCc] = useState("");
   const [tagAction, setTagAction] = useState<"add" | "remove">("add");
   const [tagName, setTagName] = useState("");
@@ -87,11 +89,11 @@ export function CleanupView() {
 
   return (
     <div>
-      <PageHeader title="Data cleanup" subtitle="Tidy phone numbers and names, or add and remove a tag in bulk. You always see the exact changes first, confirm the number, and can undo the whole run afterwards." />
+      <p className="mb-4 max-w-2xl text-sm text-muted-foreground">{formatting ? "Write phone numbers in one standard form and fix names typed in capitals." : "Add or remove a tag for the contacts that match a filter. Contacts with an open deal, an appointment or do not disturb never get a tag added."} You see every change first and can undo the run.</p>
       {data.writeNote && <p className="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900" role="note">{data.writeNote}</p>}
       {msg && <p className={`mb-4 rounded-lg border px-3 py-2 text-sm ${msg.ok ? "bg-muted/40" : "border-red-300 bg-red-50 text-red-800"}`} role={msg.ok ? "status" : "alert"}>{msg.text}</p>}
 
-      <Card title="1. Choose what to tidy" className="mb-6">
+      <Card title="1. Choose what to change" className="mb-6">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {data.accounts.length > 1 && (
             <div>
@@ -101,17 +103,16 @@ export function CleanupView() {
             </div>
           )}
           <div className="space-y-3 text-sm md:col-span-2">
-            <label className="flex items-start gap-2"><input type="checkbox" className="mt-0.5 size-4" checked={phone} onChange={(e) => setPhone(e.target.checked)} /><span><strong>Standard phone numbers</strong>: write every number as +digits.</span></label>
-            {phone && (
+            {formatting && <label className="flex items-start gap-2"><input type="checkbox" className="mt-0.5 size-4" checked={phone} onChange={(e) => setPhone(e.target.checked)} /><span><strong>Phone numbers</strong>: write every number as +digits.</span></label>}
+            {formatting && phone && (
               <div className="ml-6 max-w-xs">
                 <label htmlFor="cl-cc" className="mb-1 block text-xs text-muted-foreground">Country code for numbers without one (optional)</label>
                 <input id="cl-cc" className={inputClass} placeholder="+1 or +234" value={cc} onChange={(e) => setCc(e.target.value)} />
                 <p className="mt-1 text-xs text-muted-foreground">Left blank, a number with no country code is left alone rather than guessed.</p>
               </div>
             )}
-            <label className="flex items-start gap-2"><input type="checkbox" className="mt-0.5 size-4" checked={name} onChange={(e) => setName(e.target.checked)} /><span><strong>Fix names</strong>: only those typed entirely in CAPITALS or lower case. Names like McDonald are left alone.</span></label>
-            <label className="flex items-start gap-2"><input type="checkbox" className="mt-0.5 size-4" checked={tag} onChange={(e) => setTag(e.target.checked)} /><span><strong>Add or remove a tag</strong> for the contacts that match a filter.</span></label>
-            {tag && (
+            {formatting && <label className="flex items-start gap-2"><input type="checkbox" className="mt-0.5 size-4" checked={name} onChange={(e) => setName(e.target.checked)} /><span><strong>Names</strong>: only those typed in CAPITALS or lower case. Names like McDonald are left alone.</span></label>}
+            {!formatting && (
               <div className="ml-6 grid grid-cols-1 gap-3 sm:grid-cols-4">
                 <div><label className="mb-1 block text-xs text-muted-foreground">Action</label><select className={inputClass} value={tagAction} onChange={(e) => setTagAction(e.target.value as "add" | "remove")}><option value="add">Add</option><option value="remove">Remove</option></select></div>
                 <div><label className="mb-1 block text-xs text-muted-foreground">Tag</label><input className={inputClass} maxLength={60} value={tagName} onChange={(e) => setTagName(e.target.value)} placeholder="No email" /></div>

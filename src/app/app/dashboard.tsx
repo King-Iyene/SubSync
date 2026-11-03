@@ -13,13 +13,14 @@ import {
 } from "lucide-react";
 import { NAV, PARENT, type GoFn, type ViewId } from "./nav";
 import { useBrandedText } from "./brand-text";
+import { BrandLogo, ProductMark } from "./brand-logo";
 import { Btn } from "./ui";
 import { FeedbackBox } from "./feedback-box";
 import { BackLink, BackProvider, ModuleTabs, type ModuleTab } from "./ds/template";
 import { InlineAlert } from "./ds/alert";
 import { FilterDrawer } from "./ds/filters";
 import { useTheme } from "./ds/theme";
-import { remember, remembered } from "./ds/remember";
+import { handOff, remember, remembered } from "./ds/remember";
 import { MyDayView } from "./ds/my-day";
 import { ApiProvider, makeApi, type Api } from "./session";
 import { AccountDetailView } from "./views/account-detail";
@@ -28,13 +29,11 @@ import { AppointmentInsights } from "./views/appointment-insights";
 import { AuditView } from "./views/audit";
 import { SpeedView } from "./views/speed";
 import { AppointmentsView } from "./views/appointments";
-import { CleanupView } from "./views/cleanup";
+import { CleanupModule } from "./views/cleanup-module";
 import { MeetingsView } from "./views/meetings";
 import { GlobalSearch } from "./views/global-search";
 import { PeopleModule } from "./views/people-module";
 import { ClientsView, type ClientsFeatures } from "./views/clients";
-import { DealsView } from "./views/deals";
-import { DuplicatesView } from "./views/duplicates";
 import { EmailHealthView } from "./views/email-health";
 import { HelpView } from "./views/help";
 import { RoadmapView } from "./views/roadmap";
@@ -57,7 +56,7 @@ type Auth =
   | { status: "error"; message: string }
   | { status: "not_installed" }
   | { status: "maintenance"; message: string }
-  | { status: "ready"; api: Api; demo: boolean; userName: string | null; features: Record<string, boolean>; locked: string[]; kind: AccessKind; locationId: string | null; brand: { name: string | null; color: string | null } };
+  | { status: "ready"; api: Api; demo: boolean; userName: string | null; features: Record<string, boolean>; locked: string[]; kind: AccessKind; locationId: string | null; brand: { name: string | null; color: string | null; logoUrl?: string | null } };
 
 type SsoResponse = {
   error?: string;
@@ -68,7 +67,7 @@ type SsoResponse = {
   kind?: AccessKind;
   user?: { userName?: string | null; activeLocation?: string | null };
   entitlements?: { features: Record<string, boolean>; locked?: string[] };
-  brand?: { name: string | null; color: string | null };
+  brand?: { name: string | null; color: string | null; logoUrl?: string | null };
 };
 
 async function exchange(body: unknown): Promise<{ ok: boolean; status: number; data: SsoResponse }> {
@@ -81,7 +80,8 @@ async function exchange(body: unknown): Promise<{ ok: boolean; status: number; d
 const VIEW_IDS = NAV.map((n) => n.id as string);
 function stateFromHash(): { view: ViewState; filter: FilterValue } {
   if (typeof window === "undefined") return { view: { id: "today" }, filter: EMPTY_FILTER };
-  return parseHash(window.location.hash, VIEW_IDS);
+  // The old address #pipelines still opens Pipeline.
+  return parseHash(window.location.hash.replace(/^#pipelines(?=$|\?)/, "#pipeline"), VIEW_IDS);
 }
 
 // `?as=business` or `?as=client` opens the demo as a single business or as a client's staff.
@@ -211,6 +211,18 @@ export function Dashboard() {
   }, []);
   const go: GoFn = useCallback((id, locationId) => move({ id, locationId }, true), [move]);
   const goTop: GoFn = useCallback((id, locationId) => move({ id, locationId }, false), [move]);
+  // A tag pressed in the lead panel opens that tag's list in People (the panel cannot navigate by itself).
+  useEffect(() => {
+    const open = (e: Event) => {
+      const tag = (e as CustomEvent<string>).detail;
+      if (typeof tag !== "string" || !tag) return;
+      handOff("people-tag", tag);
+      go("search");
+      window.dispatchEvent(new Event("subsync:tag-handoff"));
+    };
+    window.addEventListener("subsync:open-tag", open);
+    return () => window.removeEventListener("subsync:open-tag", open);
+  }, [go]);
   const setFilter = useCallback((f: FilterValue) => {
     setFilterState(f);
     remember("filter", isFiltered(f) ? filterToLink(f) : null);
@@ -252,7 +264,9 @@ export function Dashboard() {
   // True while the page shows only the account SubSync was opened from (the filter is that one account). Pages draw no account filter then.
   const fromAccount = auth.status === "ready" && auth.kind === "agency" && Boolean(auth.locationId) && filter.accounts.length === 1 && filter.accounts[0] === auth.locationId;
   useBrandedText(auth.status === "ready" ? auth.brand.name : null);
-  const api = useMemo(() => (baseApi ? (filterQuery ? baseApi.filtered(filterQuery) : baseApi) : null), [baseApi, filterQuery]);
+  // Clean-up picks its own client account, so the "show only" filter does not narrow it (and its bar is not drawn there).
+  const ownScope = view.id === "cleanup" || view.id === "duplicates";
+  const api = useMemo(() => (baseApi ? (filterQuery && !ownScope ? baseApi.filtered(filterQuery) : baseApi) : null), [baseApi, filterQuery, ownScope]);
 
   // Count which pages get opened, so the getting-started checklist can tick itself off.
   useEffect(() => {
@@ -280,7 +294,7 @@ export function Dashboard() {
   const off = (feature: string) => auth.features[feature] === false && !locked(feature);
   // A page that lives inside a module as a tab (People holds Contact search, Leads and Call lists) has no menu entry of its own.
   // (A page that lives inside the Clients module has no entry of its own for an agency; a business and a client's staff have no Clients module, so their Setup stays in their menu.)
-  const menu = NAV.filter((n) => NAV_FOR[auth.kind].has(n.id) && !off(n.feature) && (!n.parent || (limited && n.showWhenLimited)));
+  const menu = NAV.filter((n) => NAV_FOR[auth.kind].has(n.id) && !off(n.feature) && (!n.parent || (limited && n.showWhenLimited && !NAV_FOR[auth.kind].has(n.parent))));
   // The sidebar: the pilot menu in plain groups that scroll, and Settings, Getting started and What's new pinned underneath so they are always visible.
   const mainMenu = menu.filter((n) => n.group !== "Settings and help");
   const footMenu = menu.filter((n) => n.group === "Settings and help");
@@ -299,7 +313,8 @@ export function Dashboard() {
   const labelFor = (n: (typeof NAV)[number]) => (limited && n.id === "overview" ? "My account" : n.label);
   // Pages that live inside another page highlight their parent in the menu.
   const shown: ViewId = auth.kind === "client" && view.id === "today" ? "myday" : view.id;
-  const active = limited && shown === "onboarding" ? shown : PARENT[shown] ?? shown;
+  const parentOf = PARENT[shown];
+  const active = limited && (shown === "onboarding" || (shown === "duplicates" && !NAV_FOR[auth.kind].has("cleanup"))) ? shown : parentOf ?? shown;
   const agency = auth.demo ? "Demo Company" : limited ? "Your business" : "Your company";
   const own = auth.locationId;
 
@@ -308,7 +323,6 @@ export function Dashboard() {
   const peopleOn = NAV_FOR[auth.kind].has("search") && !off("search");
   const callsAllowed = NAV_FOR[auth.kind].has("calls") && !off("calls") && !locked("calls");
   const peopleStart = view.id === "calls" ? 1 : view.id === "leads" ? 2 : 0;
-  const pipeTabs = [{ label: "Forecast and stages", node: <PipelineView /> }, { label: "Stale deals and hygiene", node: <DealsView /> }];
   // A business or a client's staff keep the small Setup module (their own checklist and email sending). An agency has the Clients module instead.
   const setupTabs = [{ label: "Setup checklists", node: <OnboardingView go={go} /> }, { label: "Email sender health", node: <EmailHealthView /> }];
   const clientFeatures: ClientsFeatures = { health: !off("health"), onboarding: !off("onboarding"), clients: !off("clients"), reports: !off("reports"), setupCompare: !off("setup_compare"), playbooks: !off("playbooks") };
@@ -336,22 +350,21 @@ export function Dashboard() {
       case "overview": return <OverviewView go={go} />;
       case "accounts": return <ClientsView key="accounts" go={go} initialTab="health" features={clientFeatures} />;
       case "account": return view.locationId ? <AccountDetailView key={view.locationId} locationId={view.locationId} go={go} agency={agency} /> : <ClientsView key="accounts" go={go} initialTab="health" features={clientFeatures} />;
-      case "deals": return <ModuleTabs key="pipe" start={1} tabs={pipeTabs} />;
+      case "deals": return <PipelineView key="pipe" initialTab={2} />;
       case "inbox": return <InboxView go={go} />;
       case "onboarding": return limited ? <ModuleTabs key="setup" start={0} tabs={setupTabs} /> : <ClientsView key="onboarding" go={go} initialTab="onboarding" features={clientFeatures} />;
       case "email": return limited ? <ModuleTabs key="setup" start={1} tabs={setupTabs} /> : <EmailHealthView />;
-      case "duplicates": return <DuplicatesView />;
+      case "duplicates": case "cleanup": return <CleanupModule key="cleanup" canClean={auth.kind !== "client"} />;
       case "alerts": return <AlertsView go={go} />;
       case "settings": return <SettingsView />;
       case "connections": return <ConnectionsPage />;
       case "notifications": return <NotificationsPage />;
       case "help": return <HelpView go={go} />;
       case "roadmap": return <RoadmapView />;
-      case "pipeline": return <ModuleTabs key="pipe" start={0} tabs={pipeTabs} />;
+      case "pipeline": return <PipelineView key="pipe" initialTab={0} />;
       case "team": return <TeamView />;
       case "appointments": return <ModuleTabs key="appts" start={0} tabs={[{ label: "Appointments", node: <AppointmentsView go={go} /> }, { label: "Insights", node: <AppointmentInsights /> }]} />;
       case "meetings": return <MeetingsView />;
-      case "cleanup": return <CleanupView />;
       case "clients": return <ClientsView key="clients" go={go} initialTab="health" features={clientFeatures} />;
     }
   })();
@@ -373,8 +386,13 @@ export function Dashboard() {
       <div className={`${theme === "dark" ? "dark " : ""}flex min-h-screen bg-background text-foreground`} data-theme={theme} style={accentStyle}>
         <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col self-start border-r border-sidebar-border bg-sidebar p-4 text-sidebar-foreground md:flex print:hidden">
           <div className="flex items-center gap-2.5 px-2 pt-1">
-            <span aria-hidden className="flex size-8 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground"><svg viewBox="0 0 24 24" className="size-[18px]" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M4 8h10a4 4 0 0 1 0 8H8" /><path d="M20 16H10a4 4 0 0 1 0-8h6" opacity="0.55" /></svg></span>
-            <span className="text-[1.05rem] font-semibold tracking-tight text-sidebar-accent-foreground">{auth.brand.name ?? "SubSync"}</span>
+            <BrandLogo
+              url={auth.brand.logoUrl} name={auth.brand.name ?? "SubSync"} height={36} className="max-w-full"
+              fallback={<>
+                <ProductMark height={32} />
+                <span className="text-[1.05rem] font-semibold tracking-tight text-sidebar-accent-foreground">{auth.brand.name ?? "SubSync"}</span>
+              </>}
+            />
           </div>
           <nav className="sidebar-scroll mt-3 flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto pr-1" aria-label="Sections">
             {renderNav(mainMenu)}
@@ -414,7 +432,7 @@ export function Dashboard() {
             {/* One slim row above every page: which client accounts are counted on the left, search and notifications on the right (D1; was four stacked blocks). */}
             <div className="mb-3 flex flex-wrap items-start gap-x-4 gap-y-1 print:hidden" data-testid="toolbar">
               <div className="min-w-0 flex-1">
-                {auth.kind === "agency" && baseApi && !fromAccount && <ApiProvider value={baseApi}><FilterDrawer kind="agency" value={filter} onChange={setFilter} /></ApiProvider>}
+                {auth.kind === "agency" && baseApi && !fromAccount && !ownScope && <ApiProvider value={baseApi}><FilterDrawer kind="agency" value={filter} onChange={setFilter} /></ApiProvider>}
               </div>
               <div className="ml-auto flex shrink-0 items-center">
                 {NAV_FOR[auth.kind].has("search") && !off("search") && <GlobalSearch go={go} />}

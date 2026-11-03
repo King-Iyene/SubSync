@@ -76,3 +76,18 @@ UNSURE: the business install did not grant `calendars/events.readonly` or `users
 - The "Not watched yet" reasons (`NOT_WATCHED`) no longer say "the platform does not give this app call logs yet" (calls are in the data) or use one sentence for different causes: each now names its cause. The card itself moves to Settings in F5.
 - `/api/admin/capabilities` and `scripts/audit-capabilities.ts` exist so the matrix can be completed in one call.
 - No permission was added, removed or changed, and the marketplace app was not touched. Permissions the roadmap may want for later stages, from this matrix: `workflows.readonly` (failing workflows, only if the platform allows it), `payments/transactions.readonly` and `invoices.readonly` (stage R1, parked), `forms.readonly` (source detail, optional), `marketplace-installer-details.readonly` (stage Z2). F1 itself needs none (`docs/NEEDS_KING.md` section 12).
+
+## Stage C2: merge, merge link and restore (3 Nov 2026)
+
+Written from the code and the docs we hold. **No live call was made** (this machine cannot read the real install's tokens, and C2 changes nothing in a CRM). Every row is CHECK until the morning test below settles it. The product is built for the worst case: no merge from SubSync, no delete from SubSync.
+
+| Question | What we know | Status | What the screen does |
+| --- | --- | --- | --- |
+| Does the CRM API have a merge that keeps history of both contacts? | The public contacts API we use lists, reads, creates, updates and deletes a contact. We found no merge call in our docs or code. The CRM's own Merge button (Contacts list, select two) does keep both histories. | CHECK (read the contacts API reference and try it in a test account) | Guided merge only. We never merge. |
+| Can a link open the CRM merge screen with the contacts preselected? | We know the contact page link (`/v2/location/{id}/contacts/detail/{contactId}`, `deepLinks().contact`). We know of no link that opens Merge with contacts ticked. | CHECK (try it in a test account) | Button "Open both in your CRM" opens the two contact pages, built by the white-label `crmUrl` helper. The steps for the CRM's Merge button are printed beside it. |
+| Can a deleted contact be restored? | A deleted contact is gone with its conversations, appointments and payment links. We know of no restore call. A SubSync copy could only create a new contact with a new id. | CHECK (delete a test contact, look for it in the CRM and API) | SubSync has no delete button. The page says nothing is deleted from here. |
+| Is a contact's payment or subscription in our data? | No. Payments need `payments/transactions.readonly`, which the app does not ask for (matrix above). | Needs permission (never asked) | The keep suggestion says "payments not checked". The merge warning says to check payments in the CRM. |
+| Are active workflows in our data? | No (`workflows.readonly` not asked, platform limits it). | Not verified | Same: never claimed. |
+| Open deals, upcoming appointments, do-not-disturb, tags, source, dates | In our copy of contacts, deals and appointments (synced). | Verified in the stored data | Used for the keep suggestion and the safeguards. |
+
+**Morning test (King or the next stage, in a test account):** (1) merge two test contacts with the CRM button and note whether both histories remain; (2) try `POST /contacts/merge` style calls only in a sandbox and record the answer; (3) check whether the Merge screen accepts a link with contact ids; (4) delete a test contact and look for a restore. Record each answer here and change the status from CHECK.
