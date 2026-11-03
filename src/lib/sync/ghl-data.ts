@@ -4,7 +4,10 @@
 
 import { GHL_API, GhlError } from "../ghl/client.ts";
 import { ghlFetch } from "../ghl/http.ts";
+import { isInternalComment } from "../analytics/message-kinds.ts";
 import { mapMessage, type Msg } from "../analytics/speed-intel.ts";
+import { safePhotoUrl } from "../analytics/people-labels.ts";
+import { mapCallMessage, type CrmCall } from "../people/helpers.ts";
 
 export function toIso(value: unknown): string | null {
   if (value === null || value === undefined || value === "") return null;
@@ -144,7 +147,8 @@ export function mapConversation(raw: unknown): ConversationRow | null {
     contactId: str(r.contactId),
     contactName: str(r.fullName) ?? str(r.contactName),
     lastMessageType: str(r.lastMessageType),
-    lastMessageDirection: dir === "inbound" || dir === "outbound" ? dir : null,
+    // An internal comment is stored as an outbound message but is not a reply to the customer (spec section 10), so it never becomes "outbound" here.
+    lastMessageDirection: isInternalComment(str(r.lastMessageType)) ? null : dir === "inbound" || dir === "outbound" ? dir : null,
     lastMessageAt: toIso(r.lastMessageDate) ?? toIso(r.lastMessageAt),
     unreadCount: Number.isFinite(unread) && unread > 0 ? Math.floor(unread) : 0,
   };
@@ -201,6 +205,9 @@ export type AppointmentRow = {
   endAt: string | null;
   assignedTo: string | null;
   createdAt: string | null;
+  /** Who made the booking and how, when the platform says so (F3). Not verified against a live event: both stay null when the fields are absent. */
+  bookedByUser: string | null;
+  bookingChannel: string | null;
 };
 
 // The platform's statuses are new, confirmed, cancelled, showed, noshow and invalid. Spelling and spacing vary between its endpoints
@@ -226,6 +233,8 @@ export function mapAppointment(raw: unknown): AppointmentRow | null {
     endAt: toIso(r.endTime),
     assignedTo: str(r.assignedUserId),
     createdAt: toIso(r.dateAdded) ?? toIso(r.createdAt),
+    bookedByUser: str(rec(r.createdBy).userId),
+    bookingChannel: str(rec(r.createdBy).channel) ?? str(rec(r.createdBy).source) ?? str(r.source),
   };
 }
 
@@ -237,14 +246,14 @@ export function mapCalendar(raw: unknown): CalendarRow | null {
   return id ? { id, name: str(r.name) } : null;
 }
 
-export type UserRow = { id: string; name: string | null };
+export type UserRow = { id: string; name: string | null; photoUrl: string | null };
 
 export function mapUser(raw: unknown): UserRow | null {
   const r = rec(raw);
   const id = str(r.id) ?? str(r._id);
   if (!id) return null;
   const name = str(r.name) ?? [str(r.firstName), str(r.lastName)].filter(Boolean).join(" ");
-  return { id, name: name || null };
+  return { id, name: name || null, photoUrl: safePhotoUrl(r.profilePhoto) };
 }
 
 // ---- fetchers (location-scoped token required) ----
@@ -293,6 +302,40 @@ export async function fetchConversationMessages(token: string, locationId: strin
   return list.map(mapMessage).filter((m): m is Msg => m !== null);
 }
 let callShapeLogged = false;
+
+// ---- One lead, read live for the lead panel (stage F10). Read only, one contact at a time, nothing stored. NOT VERIFIED LIVE: written from the documented
+// shapes and read defensively (every field optional); the machine that built it could not open the real install's tokens.
+export type CustomFieldValue = { name: string; value: string };
+
+// The account's custom field names (id to name). Needs locations/customFields.readonly.
+export async function fetchCustomFieldNames(token: string, locationId: string): Promise<Map<string, string>> {
+  const body = rec(await getJson(`/locations/${encodeURIComponent(locationId)}/customFields`, {}, token, "2021-07-28"));
+  const list = Array.isArray(body.customFields) ? body.customFields : [];
+  return new Map(list.flatMap((f) => { const o = rec(f); const id = str(o.id); const name = str(o.name); return id && name ? [[id, name.slice(0, 80)] as [string, string]] : []; }));
+}
+
+// The values on one contact, with names when the account's field names are known. Empty values are left out.
+export async function fetchContactCustomFields(token: string, contactId: string, names: Map<string, string>): Promise<CustomFieldValue[]> {
+  const body = rec(await getJson(`/contacts/${encodeURIComponent(contactId)}`, {}, token, "2021-07-28"));
+  const list = Array.isArray(rec(body.contact).customFields) ? (rec(body.contact).customFields as unknown[]) : [];
+  const out: CustomFieldValue[] = [];
+  for (const f of list) {
+    const o = rec(f);
+    const id = str(o.id);
+    const raw = o.value;
+    const value = Array.isArray(raw) ? raw.filter((x) => typeof x === "string" || typeof x === "number").join(", ") : typeof raw === "string" || typeof raw === "number" || typeof raw === "boolean" ? String(raw) : "";
+    if (id && value.trim()) out.push({ name: names.get(id) ?? "Custom field", value: value.trim().slice(0, 200) });
+  }
+  return out.slice(0, 40);
+}
+
+// The calls in one conversation (newest page). Needs conversations/message.readonly.
+export async function fetchConversationCalls(token: string, locationId: string, conversationId: string): Promise<CrmCall[]> {
+  const body = rec(await getJson(`/conversations/${encodeURIComponent(conversationId)}/messages`, { limit: "100", locationId }, token, "2021-04-15"));
+  const inner = rec(body.messages);
+  const list = Array.isArray(inner.messages) ? inner.messages : Array.isArray(body.messages) ? body.messages : [];
+  return list.map(mapCallMessage).filter((c): c is CrmCall => c !== null).slice(0, 30);
+}
 
 // The people on the account (names only). Needs users.readonly.
 export async function fetchUsers(token: string, locationId: string): Promise<UserRow[]> {

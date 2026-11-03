@@ -1,4 +1,5 @@
 import { refreshInsights } from "../analytics/service";
+import { currentVersion } from "../analytics/definitions";
 import { sql } from "../db";
 import { applyLeadRules } from "../sync/lead-rules-apply";
 import { checkDomain, type DnsResolver } from "../dns/email-auth";
@@ -122,7 +123,7 @@ export async function seedDemo(): Promise<{ installationId: string; accounts: nu
   await db`delete from installations where company_id = ${DEMO_COMPANY_ID}`;
   const [inst] = await db`
     insert into installations (company_id, company_name, plan, is_demo, installed_at)
-    values (${DEMO_COMPANY_ID}, 'Demo Agency', 'paid', true, ${ago(90)}) returning id`;
+    values (${DEMO_COMPANY_ID}, 'Demo Company', 'paid', true, ${ago(90)}) returning id`;
   const installationId = inst.id as string;
   await db`insert into settings (installation_id) values (${installationId})`;
   // So the "Data sync" card shows a recent completed sync instead of "never".
@@ -262,7 +263,7 @@ export async function seedDemo(): Promise<{ installationId: string; accounts: nu
         appts.push({
           installation_id: installationId, location_id: locationId, appointment_id: `${locationId}-ap${k}`, calendar_id: `${locationId}-cal${k % 3}`,
           calendar_name: ["Free consultation", "Estimate visit", "Follow-up call"][k % 3], contact_id: `${locationId}-c${1 + ((k * 11) % Math.max(1, p.contacts))}`,
-          title: "Appointment", status, start_at: new Date(startMs), end_at: new Date(startMs + 1_800_000), assigned_to: TEAM[k % 4], created_remote_at: new Date(startMs - 3 * 86_400_000),
+          title: "Appointment", status, start_at: new Date(startMs), end_at: new Date(startMs + 1_800_000), assigned_to: TEAM[k % 4], created_remote_at: new Date(startMs - 3 * 86_400_000), booked_by_user: k % 5 === 0 ? null : TEAM[(k + 1) % 3], booking_channel: k % 5 === 0 ? null : k % 2 ? "calendar page" : "team member",
         });
       }
       await db`insert into cached_appointments ${db(appts as never)}`;
@@ -324,6 +325,8 @@ export async function seedDemo(): Promise<{ installationId: string; accounts: nu
         open_value: Math.round(real.open_v * (valueStart + (1 - valueStart) * t) * (1 + (r() - 0.5) * 0.04)),
         stale_opportunities: Math.round(real.open_n * p.staleShare), unread_conversations: p.unread,
         completeness_pct: Math.round(realCompleteness * (0.93 + 0.07 * t)), engagement_score: score,
+        // The history is made up under today's counting rules, so it is comparable with today (definitions.ts).
+        definition_version: currentVersion(0),
       });
     }
     if (history.length) await db`insert into account_metrics_daily ${db(history as never)}`;
@@ -404,13 +407,24 @@ async function ensureSpeedDemo(installationId: string): Promise<void> {
   for (const loc of live2) await applyLeadRules(installationId, loc).catch(() => undefined);
 }
 
+// F2: the automatic first message and the person's reply, recorded apart (N78). Two in three demo leads got an automatic text a few seconds after
+// they arrived, the person's reply is the existing first touch. Built from the contact number only (no random numbers), and only for rows that have not
+// been given this yet, so nothing else in the demo moves. User "user-e5f0" has no name in the team list on purpose: the screen shows "Former team member".
+async function ensureSpeedDemoF2(installationId: string): Promise<void> {
+  const db = sql();
+  await db`
+    update lead_touches set read_version = 1, human_touch_at = touch_at,
+      auto_touch_at = case when (substring(contact_id from '[0-9]+$')::int % 3) <> 0 then lead_at + ((5 + (substring(contact_id from '[0-9]+$')::int % 40)) * interval '1 second') end
+    where installation_id = ${installationId} and read_version < 1 and conversation_id like '%-sp%' and contact_id ~ '[0-9]+$'`;
+}
+
 // Messy inbox cases on purpose (runbook test data kit), added once to the first live account: the customer wrote last on five channels
 // (four are past the 4 hour target, one is still inside it), a thread nobody answered for 40 days (dead, not waiting), an automatic
 // reply after the customer, and an internal note. Only the four past the target are waiting.
 async function ensureInboxDemo(installationId: string): Promise<void> {
   const db = sql();
-  const [have] = await db`select count(*)::int n from cached_conversations where installation_id = ${installationId} and conversation_id like 'inbox-sample-%'`;
-  if (have.n > 0) return;
+  // The sample threads are re-made on every demo load so their ages stay what their names say (2 hours stays 2 hours, not 10 hours a day later).
+  await db`delete from cached_conversations where installation_id = ${installationId} and conversation_id like 'inbox-sample-%'`;
   const [loc] = await db`select location_id from locations where installation_id = ${installationId} and not ignored order by location_id limit 1`;
   if (!loc) return;
   const now = Date.now();
@@ -431,10 +445,144 @@ async function ensureInboxDemo(installationId: string): Promise<void> {
   })) as never)}`;
 }
 
+// Messy pipeline cases on purpose (stage 'F1', N38 and N45), added once and left alone after that: counted deals in a stage named "Disqualified"
+// and in a pipeline named "Legacy pipeline [Not IN USE]" (neither may count as open pipeline, stale or dead), and a cold list: about half of one
+// account's contacts carry the tag "cold email outreach" and never replied. Built from counters, so no other demo number moves except what these
+// deals take out of the totals. Skipped when it was already added.
+async function ensureStageDemo(installationId: string): Promise<void> {
+  const db = sql();
+  const [metro] = await db`select location_id from locations where installation_id = ${installationId} and name = 'Metro Auto Repair'`;
+  if (!metro) return;
+  const [has] = await db`select 1 from pipelines where installation_id = ${installationId} and location_id = ${metro.location_id} and stages @> '[{"id":"s6"}]'::jsonb`;
+  if (has) return;
+  await db`update pipelines set stages = stages || '[{"id":"s6","name":"Disqualified"}]'::jsonb where installation_id = ${installationId} and location_id = ${metro.location_id}`;
+  await db`update cached_opportunities set stage_id = 's6' where installation_id = ${installationId} and location_id = ${metro.location_id} and opportunity_id in (
+    select opportunity_id from cached_opportunities where installation_id = ${installationId} and location_id = ${metro.location_id} and status = 'open'
+      and monetary_value > 0 and assigned_to is not null order by opportunity_id limit 3)`;
+  const [peak] = await db`select location_id from locations where installation_id = ${installationId} and name = 'Peak Fitness Studio'`;
+  if (peak) {
+    await db`insert into pipelines (installation_id, location_id, pipeline_id, name, stages) values (${installationId}, ${peak.location_id}, ${"legacy-" + peak.location_id}, 'Legacy pipeline [Not IN USE]', ${db.json([{ id: "l1", name: "Old lead" }, { id: "l2", name: "Old proposal" }] as never)}) on conflict do nothing`;
+    const now = Date.now();
+    const rows = [1, 2, 3].map((k) => ({
+      installation_id: installationId, location_id: peak.location_id, opportunity_id: `${peak.location_id}-legacy${k}`, pipeline_id: `legacy-${peak.location_id}`, stage_id: k === 3 ? "l2" : "l1",
+      contact_id: `${peak.location_id}-c${k}`, contact_name: "Legacy Contact", name: `Legacy deal #${k}`, monetary_value: 1500 * k, status: "open", assigned_to: TEAM[k % TEAM.length],
+      last_stage_change_at: new Date(now - 200 * DAY), last_action_at: new Date(now - 200 * DAY), last_status_change_at: new Date(now - 200 * DAY), created_remote_at: new Date(now - 260 * DAY), updated_remote_at: new Date(now - 200 * DAY),
+    }));
+    await db`insert into cached_opportunities ${db(rows as never)} on conflict do nothing`;
+  }
+  await refreshInsights(installationId);
+}
+
+// The cold list part of the stage demo is its own idempotent step, so it is applied even to a demo whose pipelines were added earlier.
+async function ensureColdDemo(installationId: string): Promise<void> {
+  const db = sql();
+  const [green] = await db`select location_id from locations where installation_id = ${installationId} and name = 'Green Leaf Landscaping'`;
+  if (green) {
+    await db`update cached_contacts set tags = array['cold email outreach'] where installation_id = ${installationId} and location_id = ${green.location_id}
+      and contact_id ~ '-c[0-9]+$' and substring(contact_id from '[0-9]+$')::int >= 150 and tags is distinct from array['cold email outreach']`;
+  }
+}
+
+// The demo's made-up history was written before snapshots carried a definition version. It is generated under today's counting rules by
+// construction, so it is stamped with the current version (real accounts are never touched: their old rows stay "older rules" on purpose).
+async function stampDemoHistory(installationId: string): Promise<void> {
+  const [s] = await sql()`select deal_rules_revision from settings where installation_id = ${installationId}`;
+  await sql()`update account_metrics_daily set definition_version = ${currentVersion((s?.deal_rules_revision as number | undefined) ?? 0)} where installation_id = ${installationId} and definition_version is null`;
+}
+
+// The Clients page of the demo (stage C1, KF-7): realistic fees, renewal dates, industries, a few logged conversations and an onboarding setup, so the
+// screen looks like an agency that has been using it for a while instead of a page of "not set". Added once (the marker is the template named below),
+// built from the account names and fixed offsets only (no random numbers), so nothing else in the demo moves, and written with plain inserts that cannot
+// fail on a second run. Only the demo installation ever reaches this function. It writes only what a person types on the Clients page; no CRM data.
+const DEMO_FEES: Record<string, { fee: number; renewIn: number; spoke: number | null; industry?: string; notes?: string }> = {
+  "Bright Smile Dental": { fee: 2500, renewIn: 140, spoke: 3, industry: "Medical and dental", notes: "Wants a monthly recall report. Owner prefers email over calls." },
+  "Peak Fitness Studio": { fee: 1800, renewIn: 75, spoke: 8, industry: "Fitness and beauty" },
+  "Harbor Law Group": { fee: 3500, renewIn: 200, spoke: 5, industry: "Legal and finance", notes: "Intake form changes need sign-off from the managing partner." },
+  "Sunrise Roofing Co": { fee: 2200, renewIn: 24, spoke: 21, industry: "Home services (roofing, HVAC, cleaning)", notes: "Unhappy about slow follow-up on storm leads. Renewal at risk." },
+  "Green Leaf Landscaping": { fee: 1500, renewIn: 52, spoke: 17, industry: "Home services (roofing, HVAC, cleaning)" },
+  "Metro Auto Repair": { fee: 1900, renewIn: 310, spoke: 6, industry: "Auto repair" },
+  "Blue Door Realty": { fee: 4000, renewIn: 88, spoke: 2, industry: "Real estate", notes: "Three agents share the inbox. Wants speed-to-lead numbers per agent." },
+  "Oak & Ember Bistro": { fee: 900, renewIn: -6, spoke: 40, industry: "Restaurant", notes: "Contract lapsed last week; verbal yes to renew, paperwork pending." },
+  "Pure Glow Med Spa": { fee: 2800, renewIn: 165, spoke: 4, industry: "Fitness and beauty" },
+  "Summit HVAC Services": { fee: 2000, renewIn: 33, spoke: null, industry: "Home services (roofing, HVAC, cleaning)", notes: "Nothing has happened in their account for two months." },
+  "Paws & Claws Vet": { fee: 1600, renewIn: 120, spoke: 11, industry: "Medical and dental" },
+  "Northside Chiropractic": { fee: 1200, renewIn: 340, spoke: 1, industry: "Medical and dental" },
+  "Starlight Cleaning": { fee: 1100, renewIn: 61, spoke: 29, industry: "Home services (roofing, HVAC, cleaning)" },
+};
+// How long ago each client was added, so onboarding shows a mix: some new, one stuck, most finished long ago.
+const DEMO_ADDED: Record<string, number> = { "Northside Chiropractic": 9, "Starlight Cleaning": 20, "Oak & Ember Bistro": 35, "Green Leaf Landscaping": 41, "Paws & Claws Vet": 12 };
+const DEMO_LOG: Array<{ client: string; kind: "conversation" | "note" | "decision"; ago: number; by: string; body: string }> = [
+  { client: "Sunrise Roofing Co", kind: "conversation", ago: 21, by: "Priya Shah", body: "Call with the owner. He is frustrated that storm leads sit for hours. Promised a reply-time report by the end of the month." },
+  { client: "Sunrise Roofing Co", kind: "decision", ago: 20, by: "Priya Shah", body: "Move first reply to a text-back workflow, review again after two weeks." },
+  { client: "Bright Smile Dental", kind: "conversation", ago: 3, by: "Dana Brooks", body: "Monthly check-in. Happy with bookings; asked for a recall campaign for patients not seen in six months." },
+  { client: "Blue Door Realty", kind: "conversation", ago: 2, by: "Dana Brooks", body: "Walked the team through the speed-to-lead page. They want it split by agent." },
+  { client: "Blue Door Realty", kind: "note", ago: 14, by: "Marcus Lee", body: "Zillow leads arrive in bursts on Mondays. Staff the inbox before 9am." },
+  { client: "Harbor Law Group", kind: "conversation", ago: 5, by: "Marcus Lee", body: "Quarterly review booked for next month. Send the review pack a week before." },
+  { client: "Oak & Ember Bistro", kind: "note", ago: 40, by: "Priya Shah", body: "Last real conversation was about the holiday menu campaign." },
+  { client: "Peak Fitness Studio", kind: "conversation", ago: 8, by: "Dana Brooks", body: "Trial-class follow-up is working. Asked about a referral offer for members." },
+];
+
+async function ensureClientsDemo(installationId: string): Promise<void> {
+  const db = sql();
+  const marker = "Everyone: first 30 days";
+  const [done] = await db`select 1 from onboarding_templates where installation_id = ${installationId} and name = ${marker}`;
+  if (done) return;
+  // Two templates: one for everyone, one for home services (the steps of that industry's playbook).
+  const everyone = [{ key: "dm0brand1", label: "Collect logo, colours and photos", howto: "Ask the client for their logo files, brand colours and five good photos. You need them for every page and email." }, { key: "dm0camp02", label: "Client approves the first campaign" }, { key: "dm0check3", label: "Book the 30-day check-in call" }];
+  const home = [{ key: "dm0miss04", label: "Missed-call text back is on" }, { key: "dm0estim5", label: "Estimate follow-up at 2, 5 and 10 days" }, { key: "dm0revie6", label: "Review request after every job" }];
+  await db`insert into onboarding_templates (installation_id, name, industry_key, steps) values (${installationId}, ${marker}, null, ${db.json(everyone as never)}), (${installationId}, 'Home services onboarding', 'home_services', ${db.json(home as never)})`;
+  const locs = await db`select location_id, name from locations where installation_id = ${installationId} and not ignored`;
+  const idOf = new Map(locs.map((l) => [l.name as string, l.location_id as string]));
+  const now = Date.now();
+  const day = (offset: number) => new Date(now + offset * DAY).toISOString().slice(0, 10);
+  for (const [name, d] of Object.entries(DEMO_FEES)) {
+    const loc = idOf.get(name);
+    if (!loc) continue;
+    await db`
+      insert into account_profiles (installation_id, location_id, monthly_fee, renewal_date, industry, notes, last_contacted_at)
+      values (${installationId}, ${loc}, ${d.fee}, ${day(d.renewIn)}::date, ${d.industry ?? null}, ${d.notes ?? null}, ${d.spoke === null ? null : new Date(now - d.spoke * DAY)})
+      on conflict (installation_id, location_id) do update set monthly_fee = coalesce(account_profiles.monthly_fee, excluded.monthly_fee),
+        renewal_date = coalesce(account_profiles.renewal_date, excluded.renewal_date), industry = coalesce(account_profiles.industry, excluded.industry),
+        notes = coalesce(account_profiles.notes, excluded.notes), last_contacted_at = coalesce(account_profiles.last_contacted_at, excluded.last_contacted_at), updated_at = now()`;
+  }
+  for (const [name, daysAgo] of Object.entries(DEMO_ADDED)) {
+    const loc = idOf.get(name);
+    if (loc) await db`update locations set installed_at = ${new Date(now - daysAgo * DAY)} where installation_id = ${installationId} and location_id = ${loc}`;
+  }
+  for (const n of DEMO_LOG) {
+    const loc = idOf.get(n.client);
+    if (loc) await db`insert into client_notes (installation_id, location_id, kind, body, author, occurred_on) values (${installationId}, ${loc}, ${n.kind}, ${n.body}, ${n.by}, ${day(-n.ago)}::date)`;
+  }
+  // Some steps are already given to someone, due or finished, with their history.
+  const step = async (name: string, key: string, label: string, o: { assignee?: string; dueIn?: number; doneAgo?: number; by?: string }) => {
+    const loc = idOf.get(name);
+    if (!loc) return;
+    const doneAt = o.doneAgo === undefined ? null : new Date(now - o.doneAgo * DAY);
+    await db`insert into client_steps (installation_id, location_id, step_key, assignee, due_on, done_at, done_by) values (${installationId}, ${loc}, ${key}, ${o.assignee ?? null}, ${o.dueIn === undefined ? null : day(o.dueIn)}::date, ${doneAt}, ${doneAt ? o.by ?? o.assignee ?? null : null})
+      on conflict (installation_id, location_id, step_key) do nothing`;
+    if (doneAt) await db`insert into client_step_history (installation_id, location_id, step_key, step_label, event, actor, at) values (${installationId}, ${loc}, ${key}, ${label}, 'done', ${o.by ?? o.assignee ?? null}, ${doneAt})`;
+    if (o.assignee) await db`insert into client_step_history (installation_id, location_id, step_key, step_label, event, detail, actor, at) values (${installationId}, ${loc}, ${key}, ${label}, 'assigned', ${o.assignee}, 'Priya Shah', ${new Date(now - (o.doneAgo ?? 3) * DAY - 3_600_000)})`;
+  };
+  await step("Northside Chiropractic", "tpl:dm0brand1", "Collect logo, colours and photos", { assignee: "Dana Brooks", dueIn: 3 });
+  await step("Northside Chiropractic", "manual:kickoff", "Kickoff call completed", { assignee: "Marcus Lee", dueIn: -2 });
+  await step("Starlight Cleaning", "tpl:dm0miss04", "Missed-call text back is on", { assignee: "Marcus Lee", dueIn: 1 });
+  await step("Starlight Cleaning", "tpl:dm0estim5", "Estimate follow-up at 2, 5 and 10 days", { assignee: "Marcus Lee", doneAgo: 4 });
+  await step("Oak & Ember Bistro", "tpl:dm0camp02", "Client approves the first campaign", { assignee: "Priya Shah", dueIn: -9 });
+  await step("Paws & Claws Vet", "tpl:dm0check3", "Book the 30-day check-in call", { assignee: "Dana Brooks", dueIn: 14 });
+  await step("Paws & Claws Vet", "tpl:dm0brand1", "Collect logo, colours and photos", { assignee: "Dana Brooks", doneAgo: 6 });
+  const starlight = idOf.get("Starlight Cleaning");
+  if (starlight) await db`insert into onboarding_tasks (installation_id, location_id, task, done, done_at) values (${installationId}, ${starlight}, 'manual:kickoff', true, now()) on conflict do nothing`;
+}
+
 export async function ensureDemo(): Promise<string> {
   const [row] = await sql()`select id from installations where company_id = ${DEMO_COMPANY_ID} and is_demo`;
   const id = row ? (row.id as string) : (await seedDemo()).installationId;
+  await stampDemoHistory(id);
   await ensureSpeedDemo(id).catch(() => undefined);
+  await ensureSpeedDemoF2(id).catch(() => undefined);
   await ensureInboxDemo(id).catch(() => undefined);
+  await ensureStageDemo(id).catch(() => undefined);
+  await ensureColdDemo(id).catch(() => undefined);
+  await ensureClientsDemo(id).catch(() => undefined);
   return id;
 }

@@ -12,6 +12,8 @@ import { signSession } from "../src/lib/session";
 const BASE = process.env.BASE_URL ?? "http://localhost:3100";
 
 type Side = { company: string; marker: string; inst: string; locs: string[]; contacts: string[]; opps: string[] };
+// A fee no other number in the app can look like. Company A charges 4321.77 and 4322.77 for its two accounts, company B 8765.43 and 8766.43.
+const FEE = { a: [4321.77, 4322.77], b: [8765.43, 8766.43] } as const;
 
 async function main() {
   const call = async (path: string, token: string, init: RequestInit = {}) => {
@@ -25,8 +27,10 @@ async function main() {
     const company = `xtest-agency-${key}`;
     const marker = `zzTenant${K}`;
     await sql()`delete from installations where company_id = ${company}`;
-    const [inst] = await sql()`insert into installations (company_id, company_name, plan, access_token_enc, refresh_token_enc, token_expires_at)
-      values (${company}, ${marker + " Agency"}, 'pro', ${encryptSecret("not-a-real-token")}, ${encryptSecret("not-a-real-token")}, now() + interval '1 hour') returning id`;
+    // No refresh token on purpose: the production scheduler (every 5 minutes, same database) only queues sync jobs for installations that
+    // have one, so a fixture with one would get jobs from the cron in the middle of the "nothing changed" comparison below.
+    const [inst] = await sql()`insert into installations (company_id, company_name, plan, access_token_enc, token_expires_at)
+      values (${company}, ${marker + " Agency"}, 'pro', ${encryptSecret("not-a-real-token")}, now() + interval '1 hour') returning id`;
     const locs = [`xtestLoc${K}0001`, `xtestLoc${K}0002`];
     const contacts: string[] = [];
     const opps: string[] = [];
@@ -42,14 +46,19 @@ async function main() {
       await sql()`insert into cached_opportunities (installation_id, location_id, opportunity_id, pipeline_id, pipeline_name, stage_id, stage_name, contact_id, contact_name, name, monetary_value, status, last_stage_change_at, last_status_change_at)
         values (${inst.id}, ${loc}, ${o}, ${"p" + K}, ${marker + " Pipeline"}, 's1', 'New', ${c}, ${marker + " Person"}, ${marker + " Deal"}, 7777, 'open', now() - interval '120 days', now() - interval '120 days')`;
       await sql()`insert into meeting_notes (installation_id, location_id, source, title, summary) values (${inst.id}, ${loc}, 'other', ${marker + " Meeting"}, ${marker + " summary"})`;
+      // What an agency keeps about each client and must never show that client (N84): what it charges, its own notes, an owner label.
+      await sql()`insert into account_profiles (installation_id, location_id, monthly_fee, renewal_date, industry, notes) values (${inst.id}, ${loc}, ${FEE[key][i]}, '2027-03-01', ${marker + "Industry"}, ${marker + "FeeNote"})`;
+      await sql()`update locations set owner = ${marker + "OwnerLabel"} where installation_id = ${inst.id} and location_id = ${loc}`;
     }
+    await sql()`insert into api_keys (installation_id, name, key_prefix, key_hash) values (${inst.id}, ${marker + "KeyName"}, 'ss_zz', ${"zzhash" + key + Math.random().toString(36).slice(2)})`;
+    await sql()`insert into call_lists (installation_id, name, filters) values (${inst.id}, ${marker + "ListName"}, '{}')`;
     await sql()`insert into connections (installation_id, provider, label, external_id, access_token_enc, refresh_token_enc, token_expires_at, webhook_secret_enc, public_key)
       values (${inst.id}, 'fathom', ${marker + " Fathom"}, 'wh', ${encryptSecret("x")}, ${encryptSecret("y")}, now() + interval '1 hour', ${encryptSecret("whsec_AAAA")}, ${`xtestkey${K}`.padEnd(24, K)})`;
     return { company, marker, inst: inst.id as string, locs, contacts, opps };
   };
 
-  const session = (side: Side, kind: "agency" | "business" | "client", loc?: string) =>
-    signSession({ companyId: side.company, userId: "u-" + kind, role: "admin", userName: "Tester", demo: false, kind, locationId: loc ?? null });
+  const session = (side: Side, kind: "agency" | "business" | "client", loc?: string, dataOwner = false) =>
+    signSession({ companyId: side.company, userId: "u-" + kind, role: "admin", userName: "Tester", demo: false, kind, locationId: loc ?? null, dataOwner });
 
   const A = await make("a");
   const B = await make("b");
@@ -61,11 +70,14 @@ async function main() {
       "/api/app/overview", "/api/app/accounts", `/api/app/accounts/${other.locs[0]}`, `/api/app/accounts/${other.locs[0]}?locationId=${other.locs[0]}`,
       `/api/app/search?q=${other.marker}`, `/api/app/search?q=${other.marker.toLowerCase()}.test`, `/api/app/search?q=${encodeURIComponent("5550102")}`,
       "/api/app/stale", "/api/app/hygiene", "/api/app/inbox", "/api/app/pipelines", "/api/app/duplicates", "/api/app/alerts", "/api/app/pipeline-intel", "/api/app/contact-intel",
-      "/api/app/comms-intel", "/api/app/deal-events", `/api/app/contact/${other.contacts[0]}?locationId=${other.locs[0]}`, `/api/app/contact/${other.contacts[0]}`,
+      "/api/app/comms-intel", "/api/app/deal-gaps", "/api/app/deal-events", `/api/app/contact/${other.contacts[0]}?locationId=${other.locs[0]}`, `/api/app/contact/${other.contacts[0]}`,
       "/api/app/appointments", "/api/app/appointment-insights", "/api/app/meetings", "/api/app/cleanup", "/api/app/connections", "/api/app/team", "/api/app/clients",
-      "/api/app/daily", "/api/app/email", "/api/app/sync", "/api/app/health", "/api/app/call-queue", "/api/app/call-lists", "/api/app/call-outcomes", "/api/app/goals",
+      "/api/app/daily", "/api/app/email", "/api/app/sync-status", "/api/app/freshness", "/api/app/call-queue", "/api/app/call-lists", "/api/app/call-outcomes", "/api/app/goals",
       "/api/app/exec-summary", "/api/app/digest", "/api/app/settings", "/api/app/api-keys", `/api/app/setup-compare?baseline=${other.locs[0]}`, "/api/app/playbooks", "/api/app/start",
       "/api/app/export/stale", "/api/app/export/duplicates", "/api/app/export/inbox", "/api/app/export/deals", "/api/app/export/alerts",
+      // Stage C1 (Clients): onboarding, the log of conversations, trends, compare and the review, each aimed at the other side.
+      "/api/app/client-onboarding", `/api/app/client-onboarding/${other.locs[0]}/history`, `/api/app/clients/${other.locs[0]}/notes`, `/api/app/client-trends/${other.locs[0]}`,
+      `/api/app/client-trends?ids=${other.locs[0]},${other.locs[1]}`, `/api/app/clients/compare?ids=${other.locs[0]},${other.locs[1]}`, `/api/app/qbr/${other.locs[0]}?quarter=2026-Q4`,
       `/api/app/overview?industry=medical&owner=${other.marker}`, `/api/app/search?q=${me.marker}`,
     ];
 
@@ -124,6 +136,9 @@ async function main() {
       (select count(*)::int from sync_jobs where installation_id = ${s.inst}) jobs,
       (select count(*)::int from audit_log where installation_id = ${s.inst}) audits,
       (select count(*)::int from team_names where installation_id = ${s.inst}) names,
+      (select count(*)::int from client_notes where installation_id = ${s.inst}) client_notes,
+      (select count(*)::int from client_steps where installation_id = ${s.inst}) client_steps,
+      (select count(*)::int from client_step_history where installation_id = ${s.inst}) client_step_history,
       (select coalesce(sum(case when ignored then 1 else 0 end), 0)::int from locations where installation_id = ${s.inst}) ignored,
       (select count(*)::int from cached_contacts where installation_id = ${s.inst}) contacts`)[0];
     const snap = await before(B);
@@ -135,6 +150,10 @@ async function main() {
       ["PUT", `/api/app/accounts/${B.locs[0]}/flags`, { ignored: true }],
       ["PUT", `/api/app/clients/${B.locs[0]}`, { industry: "medical" }],
       ["POST", `/api/app/accounts/${B.locs[0]}/tasks`, {}],
+      ["PUT", `/api/app/client-onboarding/${B.locs[0]}/steps`, { key: "manual:kickoff", done: true }],
+      ["POST", `/api/app/client-onboarding/${B.locs[0]}/steps`, { label: "hacked" }],
+      ["POST", `/api/app/clients/${B.locs[0]}/notes`, { body: "hacked" }],
+      ["DELETE", `/api/app/clients/${B.locs[0]}/notes?id=00000000-0000-0000-0000-000000000000`, {}],
     ];
     for (const [method, path, body] of attacks) {
       const r = await call(path, tokenA, { method, body: JSON.stringify(body) });
@@ -144,7 +163,7 @@ async function main() {
     await call(`/api/app/team/${B.locs[0]}`, tokenA, { method: "PUT", body: JSON.stringify({ name: "hacked" }) });
     const connB = (await sql()`select id from connections where installation_id = ${B.inst}`)[0].id as string;
     assert.equal((await call(`/api/app/connections/${connB}`, tokenA, { method: "DELETE" })).status, 404, "another agency's connection cannot be removed");
-    assert.equal((await call(`/api/app/connections/${connB}`, tokenA, { method: "PUT", body: JSON.stringify({ defaultLocationId: A.locs[0] }) })).status, 404);
+    assert.equal((await call(`/api/app/connections/${connB}`, tokenA, { method: "PUT", body: JSON.stringify({ defaultLocationId: A.locs[0] }) })).status, 404, "the old default-account route is gone, and another agency's connection is out of reach in any case");
     const hit = await call("/api/app/cleanup/preview", tokenA, { method: "POST", body: JSON.stringify({ locationId: A.locs[0], rules: ["name"] }) });
     assert.equal(hit.status, 200, "its own account is fine");
     const runA = JSON.parse(hit.text).runId as string;
@@ -235,6 +254,8 @@ async function main() {
       let refusedAt = 0;
       for (let i = 1; i <= 45 && !refusedAt; i++) if (!(await (await fetch(`${BASE}/audit/${idC}`)).text()).includes("Snapshot taken")) refusedAt = i;
       assert.ok(refusedAt > 0 && refusedAt <= 45, "a burst of lookups is eventually refused");
+      // The refusal lasts for the rest of the minute, for every later lookup from this address. Wait it out so the checks after this one see real pages.
+      await new Promise((r) => setTimeout(r, 61_000));
       await call("/api/app/audit/revoke", tokenA, { method: "POST", body: JSON.stringify({ id: idC }) });
     }
 
@@ -255,6 +276,84 @@ async function main() {
       } finally { await setView(was); }
     }
 
+    // N84: a client's own staff never receive what the agency keeps about them. Fees, the agency's notes, the owner label, the industry, saved call
+    // lists, API keys, the agency's settings, tickets, or any other client's data. Every read a client session may make is asked, plus every read
+    // it may not, and the answers are searched for the secrets. A positive control proves the secrets are really in the data and that an agency
+    // session does see them. (There is no tickets feature yet: the address is asked anyway, so the day one is added it must be refused too.)
+    {
+      const keyOf = (s: Side) => (s === A ? "a" : "b");
+      const secretsOf = (s: Side) => [...FEE[keyOf(s)].map(String), s.marker + "FeeNote", s.marker + "OwnerLabel", s.marker + "Industry", s.marker + "KeyName", s.marker + "ListName"];
+      // Names of settings and agency-only fields that must not appear in any client answer.
+      const settingKeys = ["digestEmail", "slackConfigured", "slackWebhookUrl", "keepTranscripts", "pushNotesToCrm", "customChecklist", "digestHour", "monthlyFee", "renewalDate", "keyPrefix", "clientAccounts", "canDeleteData", "meetingTool"];
+      const clientPathsFor = (me: Side) => [
+        "/api/app/overview", "/api/app/accounts", `/api/app/accounts/${me.locs[1]}`, "/api/app/onboarding", `/api/app/search?q=${me.marker}`, "/api/app/stale", "/api/app/hygiene", "/api/app/inbox", "/api/app/pipelines", "/api/app/duplicates", "/api/app/alerts",
+        "/api/app/pipeline-intel", "/api/app/contact-intel", "/api/app/comms-intel", "/api/app/deal-gaps", "/api/app/deal-events", "/api/app/start", "/api/app/appointments", "/api/app/appointment-insights", "/api/app/audit", "/api/app/speed", "/api/app/roadmap",
+        // not allowed for a client at all: each must be refused
+        "/api/app/settings", "/api/app/clients", "/api/app/clients/compare", `/api/app/qbr/${me.locs[1]}`, "/api/app/api-keys", "/api/app/connections", "/api/app/meetings", "/api/app/cleanup", "/api/app/team", "/api/app/goals", "/api/app/call-lists",
+        "/api/app/call-queue", "/api/app/call-outcomes", "/api/app/exec-summary", "/api/app/daily", "/api/app/daily-brief", "/api/app/digest", "/api/app/export/stale", "/api/app/sync-status", "/api/app/freshness", "/api/app/segments", "/api/app/playbooks",
+        "/api/app/setup-compare", "/api/app/email", "/api/app/audit/shares", "/api/app/tickets", "/api/app/tickets/1", "/api/app/fees", "/api/app/notes",
+      ];
+      const allowedForClient = new Set(["overview", "accounts", "onboarding", "search", "stale", "hygiene", "inbox", "pipelines", "duplicates", "alerts", "pipeline-intel", "contact-intel", "comms-intel", "deal-gaps", "deal-events", "start", "appointments", "appointment-insights", "audit", "speed", "roadmap", "freshness", "client-trends"]);
+      let answered = 0;
+      let refusedCount = 0;
+      for (const [me, other] of sides) {
+        const client = session(me, "client", me.locs[1]);
+        for (const path of clientPathsFor(me)) {
+          const r = await call(path, client);
+          const seg = path.split("/")[3].split("?")[0];
+          const mayRead = allowedForClient.has(seg) && !path.includes("/audit/shares");
+          if (mayRead) { assert.ok(r.status < 400, `a client should read ${path}, got ${r.status}`); answered += 1; } else { assert.ok(r.status === 403 || r.status === 404, `a client must be refused ${path}, got ${r.status} ${r.text.slice(0, 80)}`); refusedCount += 1; }
+          for (const secret of [...secretsOf(me), ...secretsOf(other)]) assert.equal(r.text.includes(secret), false, `a client of ${me.company} saw "${secret}" through ${path}`);
+          if (mayRead) for (const key of settingKeys) assert.equal(r.text.includes(`"${key}"`), false, `a client answer carries the setting "${key}" through ${path}`);
+        }
+        // A client is only ever told about its own account, the one named in its session. Another account of the same company is not found.
+        assert.equal((await call(`/api/app/accounts/${me.locs[0]}`, client)).status, 404, "a sibling account is not found");
+        for (const method of ["POST", "PUT", "DELETE"]) {
+          for (const path of [`/api/app/accounts/${me.locs[1]}/flags`, "/api/app/settings", "/api/app/api-keys", "/api/app/tickets", `/api/app/clients/${me.locs[1]}`]) {
+            const r = await call(path, client, { method, body: "{}" });
+            assert.equal(r.status, 403, `a client must be refused ${method} ${path}, got ${r.status}`);
+          }
+        }
+        // The Getting started steps of a client do not report what the company set up in Settings.
+        const steps = (JSON.parse((await call("/api/app/start", client)).text).steps as Array<{ id: string }>).map((s) => s.id);
+        for (const hidden of ["brief", "email", "meetings", "clients"]) assert.equal(steps.includes(hidden), false, `a client's Getting started has no "${hidden}" step`);
+      }
+      assert.ok(answered >= 30 && refusedCount >= 50, `the sweep covered ${answered} reads and ${refusedCount} refusals`);
+      // Positive control: the secrets are really in the data, and the agency itself does see them.
+      const agencyClients = (await call("/api/app/clients", session(A, "agency"))).text;
+      for (const secret of ["4321.77", A.marker + "FeeNote"]) assert.ok(agencyClients.includes(secret), `the agency sees "${secret}" (so the checks above are not passing on empty data)`);
+      assert.ok((await call("/api/app/api-keys", session(A, "agency"))).text.includes(A.marker + "KeyName"), "and its key list");
+      assert.ok((await call("/api/app/settings", session(A, "agency"))).text.includes("digestEmail"), "and its settings");
+
+      // Switching client access off removes access on the very next request, on every page a client may read; switching it on restores it.
+      const clientTok = session(A, "client", A.locs[1]);
+      const was = (await sql()`select client_view from locations where installation_id = ${A.inst} and location_id = ${A.locs[1]}`)[0].client_view as boolean;
+      const setOne = async (on: boolean) => assert.equal((await call(`/api/app/accounts/${A.locs[1]}/flags`, session(A, "agency"), { method: "PUT", body: JSON.stringify({ clientView: on }) })).status, 200);
+      const sweepClient = async () => { const out: number[] = []; for (const seg of allowedForClient) out.push((await call(`/api/app/${seg}`, clientTok)).status); return out; };
+      try {
+        await setOne(true);
+        assert.ok((await sweepClient()).every((s) => s < 400), "on: a client reads every page it may read");
+        await setOne(false);
+        assert.deepEqual([...new Set(await sweepClient())], [403], "off for one account: every page is refused on the next request, with the same session");
+        assert.equal((await call("/api/app/usage", clientTok, { method: "POST", body: JSON.stringify({ view: "today" }) })).status, 403, "even the harmless writes");
+        assert.equal((await call("/api/app/roadmap", clientTok, { method: "POST", body: JSON.stringify({ item: "x" }) })).status, 403);
+        await setOne(true);
+        assert.ok((await sweepClient()).every((s) => s < 400), "on again: it works again");
+        // switched off for every account at once, through Settings
+        assert.equal((await call("/api/app/settings", session(A, "agency"), { method: "PUT", body: JSON.stringify({ clientViewAll: false }) })).status, 200);
+        assert.deepEqual([...new Set(await sweepClient())], [403], "off for all accounts through Settings: refused on the next request");
+        assert.deepEqual([...new Set(await Promise.all(A.locs.map(async (loc) => (await call("/api/app/overview", session(A, "client", loc))).status)))], [403], "for every account of the company");
+        // another company's switch changes nothing here
+        assert.equal((await call("/api/app/settings", session(B, "agency"), { method: "PUT", body: JSON.stringify({ clientViewAll: true }) })).status, 200);
+        assert.deepEqual([...new Set(await sweepClient())], [403], "company B switching its clients on does not open company A's");
+        assert.equal((await call("/api/app/overview", session(A, "client", B.locs[1]))).status, 403, "a session naming another company's account, under company A, is refused");
+      } finally {
+        await setOne(was);
+        await sql()`update locations set client_view = (location_id = ${A.locs[1]}) where installation_id = ${A.inst}`;
+        await sql()`update locations set client_view = (location_id = ${B.locs[1]}) where installation_id = ${B.inst}`;
+      }
+    }
+
     // The company name set in Settings is the name on the shared page.
     {
       await call("/api/app/settings", tokenA, { method: "PUT", body: JSON.stringify({ brandName: "ZZ Brand Alpha" }) });
@@ -268,17 +367,67 @@ async function main() {
     }
 
     // The webhook: unsigned or wrongly signed deliveries change nothing.
+    // (Company B made its own share link earlier in this run, so compare with a snapshot taken now, not the one from the start.)
+    const snapBeforeWebhook = await before(B);
     const body = JSON.stringify({ type: "UNINSTALL", companyId: B.company, webhookId: "xtest-wh-1" });
     assert.equal((await fetch(`${BASE}/api/webhooks/ghl`, { method: "POST", body })).status, 401, "unsigned");
     assert.equal((await fetch(`${BASE}/api/webhooks/ghl`, { method: "POST", body, headers: { "x-ghl-signature": "AAAA" } })).status, 401, "wrong signature");
-    assert.deepEqual(await before(B), snap, "a refused webhook changed nothing");
+    assert.deepEqual(await before(B), snapBeforeWebhook, "a refused webhook changed nothing");
 
     // Public addresses: a delivery for one agency's connection cannot reach the other's data, and a guess finds nothing.
     const guess = await fetch(`${BASE}/api/hooks/fathom/${"Z".repeat(24)}`, { method: "POST", body: "{}" });
     assert.equal(guess.status, 404);
     assert.equal((await fetch(`${BASE}/api/hooks/meeting/mh_${"Z".repeat(43)}`, { method: "POST", body: "{}" })).status, 404);
 
-    console.log(`tenant isolation: two agencies, ${sweeps} cross-reads as agency, business, client and forged sessions, attacks refused, account user read-only, share link and webhook safe, nothing changed: ok`);
+    // N83: "Delete my data" belongs to the owner. Anyone else is refused and the refusal is written down. The owner needs the typed word. The copied
+    // data goes, the settings, keys and the agency's own notes stay, the other company is untouched, and the audit entries outlive the data.
+    // This runs last: it empties company A (and then B).
+    {
+      const countsOf = async (s: Side) => (await sql()`select
+        (select count(*)::int from cached_contacts where installation_id = ${s.inst}) contacts, (select count(*)::int from locations where installation_id = ${s.inst}) locs,
+        (select count(*)::int from meeting_notes where installation_id = ${s.inst}) meetings, (select count(*)::int from api_keys where installation_id = ${s.inst}) keys,
+        (select count(*)::int from account_profiles where installation_id = ${s.inst}) profiles`)[0];
+      const audits = async (s: Side, action: string) => (await sql()`select count(*)::int n from audit_log where installation_id = ${s.inst} and action = ${action}`)[0].n as number;
+      const purge = (tok: string, body: unknown = { confirm: "DELETE" }) => call("/api/app/settings/purge", tok, { method: "POST", body: JSON.stringify(body) });
+      const A0 = await countsOf(A);
+      const B0 = await countsOf(B);
+      assert.ok(A0.contacts > 0 && A0.locs > 0 && A0.meetings > 0 && A0.keys > 0 && A0.profiles > 0, "company A has data to lose");
+
+      // Not the owner: an agency session without the owner flag (an administrator or staff), and a client. Refused, and nothing is deleted.
+      const refusedBefore = await audits(A, "data.purge_refused");
+      const notOwner = await purge(session(A, "agency"));
+      assert.equal(notOwner.status, 403, "an agency session that is not the owner is refused");
+      assert.equal(JSON.parse(notOwner.text).forbidden, true);
+      assert.equal(await audits(A, "data.purge_refused"), refusedBefore + 1, "and the refusal is written to the audit log");
+      assert.equal((await purge(session(A, "client", A.locs[1]))).status, 403, "a client session is refused");
+      assert.equal((await purge(session(A, "business", A.locs[0]))).status, 403, "a business session that is not its administrator is refused");
+      assert.deepEqual(await countsOf(A), A0, "none of those deleted anything");
+      // Settings tells the screen who may press the button.
+      assert.equal(JSON.parse((await call("/api/app/settings", session(A, "agency"))).text).canDeleteData, false, "the screen is told this person may not");
+      assert.equal(JSON.parse((await call("/api/app/settings", session(A, "agency", undefined, true))).text).canDeleteData, true, "and that the owner may");
+
+      // The owner: the typed word is required, then the data goes and the audit entry is written.
+      const ownerA = session(A, "agency", undefined, true);
+      assert.equal((await purge(ownerA, {})).status, 400, "no typed word, no deletion");
+      assert.equal((await purge(ownerA, { confirm: "delete" })).status, 400, "the word must be exactly DELETE");
+      assert.deepEqual(await countsOf(A), A0, "still nothing deleted");
+      const done = await purge(ownerA);
+      assert.equal(done.status, 200, done.text);
+      const A1 = await countsOf(A);
+      assert.deepEqual([A1.contacts, A1.locs, A1.meetings], [0, 0, 0], "the copied data is gone");
+      assert.deepEqual([A1.keys, A1.profiles], [A0.keys, A0.profiles], "settings, keys and the agency's own notes stay");
+      assert.deepEqual(await countsOf(B), B0, "the other company is untouched");
+      assert.equal(await audits(A, "data.purged"), 1, "the deletion is in the audit log");
+      const [entry] = await sql()`select actor, detail from audit_log where installation_id = ${A.inst} and action = 'data.purged'`;
+      assert.equal(entry.actor, "Tester");
+      assert.equal(JSON.stringify(entry.detail).includes(A.marker), false, "and the entry holds no customer data");
+      // Another company's owner can only ever delete that company's own data.
+      assert.equal((await purge(session(B, "agency", undefined, true))).status, 200);
+      assert.deepEqual(await countsOf(A), A1, "company B's owner changed nothing in company A");
+      assert.equal((await countsOf(B)).contacts, 0);
+    }
+
+    console.log(`tenant isolation: two agencies, ${sweeps} cross-reads as agency, business, client and forged sessions, attacks refused, account user read-only, client secrets never sent, client access off at once, Delete my data owner-only and audited, share link and webhook safe, nothing changed: ok`);
   } finally {
     await sql()`delete from installations where company_id in ('xtest-agency-a', 'xtest-agency-b')`;
     await closeDb();

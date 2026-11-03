@@ -50,3 +50,23 @@ export function outlier(deals: DealLike[]): { value: number; share: number; of: 
   const share = total > 0 ? top / total : 0;
   return share >= OUTLIER_SHARE ? { value: top, share: Math.round(share * 100) / 100, of: counted.length } : null;
 }
+
+/** A percentage change is shown only when the earlier figure was at least this big. Below it ("-100% vs yesterday" on 2 contacts) the plain difference is shown. */
+export const MIN_BASE_FOR_PERCENT = 10;
+/** The same rule for a dollar figure: a change measured against less than this is not worth a percentage. */
+export const MIN_MONEY_BASE_FOR_PERCENT = 5000;
+
+/** Percent change from `previous` to `current`, or null when the earlier figure is too small to measure a percentage against (N6). */
+export function percentChange(current: number, previous: number | null | undefined, minBase = MIN_BASE_FOR_PERCENT): number | null {
+  if (previous === null || previous === undefined || !Number.isFinite(previous) || previous < minBase) return null;
+  return Math.round(((current - previous) / previous) * 100);
+}
+
+/**
+ * Cost of slow follow-up (ESTIMATE): conversations waiting past the reply target x the account's average deal x its win rate. Null when nothing
+ * is waiting or the account has no win rate (fewer than MIN_CLOSED_DEALS closed deals) or no average deal. The one formula: the account tiles
+ * (`followUpRevenueAtRisk`) and the Account audit both call this and nothing else.
+ */
+export function followUpEstimate(a: { unanswered: number; winRate: number | null; avgDealValue: number | null }): number | null {
+  return a.unanswered > 0 && a.winRate !== null && a.avgDealValue !== null ? Math.round(a.unanswered * a.avgDealValue * a.winRate) : null;
+}

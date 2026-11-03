@@ -56,3 +56,50 @@ test("the in-app audit prints without the menu and without sideways overflow on 
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(795);
   await expect(page.getByRole("complementary")).toBeHidden();
 });
+
+// ---------------- stage F6 (written in the parallel run, not run there: the lead runs them after the merge) ----------------
+
+test("every number on the audit opens the list it was counted from, with the same count, and the way back is named", async ({ page }) => {
+  await page.goto("/app#audit");
+  await page.reload();
+  await expect(page.getByText("What needs fixing")).toBeVisible({ timeout: 60_000 });
+  const show = page.getByRole("button", { name: /^Show the [\d,]+ / }).first();
+  test.skip(!(await show.count()), "the demo has nothing to list on this data");
+  const n = Number(((await show.textContent()) ?? "").match(/Show the ([\d,]+)/)![1].replace(/,/g, ""));
+  await show.click();
+  await expect(page.getByTestId("drill-count")).toHaveText(String(n));
+  await expect(page.getByTestId("drill-back")).toHaveText("Back to the audit");
+  await page.getByTestId("drill-back").click();
+  await expect(page.getByTestId("drill-panel")).toHaveCount(0);
+});
+
+test("every button that leaves the audit says where it goes", async ({ page }) => {
+  await page.goto("/app#audit");
+  await page.reload();
+  await expect(page.getByText("What needs fixing")).toBeVisible({ timeout: 60_000 });
+  const names = await page.getByRole("button", { name: /^Open/ }).and(page.locator(":not([data-nextjs-dev-tools-button])")).allTextContents();
+  // The development server adds its own "Open Next.js Dev Tools" button to every page; it is not part of the app and does not exist in production.
+  for (const name of names) expect(name, "an Open button with no destination").toMatch(/^Open in .{3,}/);
+});
+
+test("the printed audit opens with the sender's own name and colour, on light paper", async ({ page }) => {
+  const res = await page.request.post("/api/sso", { data: { demo: true } });
+  const token = ((await res.json()) as { session: string }).session;
+  const headers = { Authorization: `Bearer ${token}` };
+  expect((await page.request.put("/api/app/settings", { headers, data: { brandName: "Acme Marketing", brandColor: "#aa3366" } })).ok()).toBeTruthy();
+  try {
+    await page.setViewportSize({ width: 794, height: 1100 });
+    await page.goto("/app#audit");
+    await page.reload();
+    await expect(page.getByText("What needs fixing")).toBeVisible({ timeout: 60_000 });
+    await page.emulateMedia({ media: "print" });
+    const header = page.getByTestId("audit-print-header");
+    await expect(header).toBeVisible();
+    await expect(header).toContainText("Acme Marketing");
+    expect(await header.evaluate((e) => getComputedStyle(e).borderBottomColor)).not.toBe("rgb(0, 0, 0)");
+    // On paper the text is dark: the dark shell's pale text would be unreadable on white.
+    expect(await page.locator("h1").first().evaluate((e) => getComputedStyle(e).color)).toBe("rgb(0, 12, 37)");
+  } finally {
+    await page.request.put("/api/app/settings", { headers, data: { brandName: null, brandColor: null } });
+  }
+});

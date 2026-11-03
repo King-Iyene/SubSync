@@ -1,8 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import { ModuleTabs, Page } from "../ds";
+import { crmNoteFootnote } from "@/lib/meeting-wording";
 import { useApiClient, useData } from "../session";
-import { Badge, Btn, Card, Empty, ErrorBox, ExtLink, inputClass, Loading, PageHeader, timeAgo } from "../ui";
+import { Badge, Btn, Card, Empty, ErrorBox, ExtLink, inputClass, Loading, timeAgo } from "../ui";
+import { MeetingInbox } from "./meeting-inbox";
+import { AccountSetup, MyMeetingSetup, type SetupData } from "./meeting-setup";
 
 type Hook = { id: string; locationId: string; locationName: string | null; label: string | null; createdAt: string | null; lastUsedAt: string | null };
 type Meeting = {
@@ -10,11 +14,28 @@ type Meeting = {
   attendees: Array<{ name: string | null; email: string | null }>; summary: string | null; actionItems: string[]; hasTranscript: boolean; recordingUrl: string | null;
   contactId: string | null; contactName: string | null; status: string; note: string; contactUrl: string | null;
 };
-type Data = { meetings: Meeting[]; hooks: Hook[]; accounts: Array<{ locationId: string; name: string }>; maxHooks: number; keepTranscripts: boolean; canManage: boolean };
+// `moreTools` is true only while Zoom and Google Meet are switched on; otherwise nothing on this page names them.
+type Data = { meetings: Meeting[]; hooks: Hook[]; accounts: Array<{ locationId: string; name: string }>; maxHooks: number; keepTranscripts: boolean; canManage: boolean; moreTools: boolean; noteWriteGranted?: boolean | null; pushNotesToCrm?: boolean };
 
-const SOURCE = { fathom: "Fathom", zoom: "Zoom", other: "Meeting tool" } as Record<string, string>;
+const sourceName = (source: string, zoom: boolean) => (source === "fathom" ? "Fathom" : source === "zoom" && zoom ? "Zoom" : "Meeting tool");
 
+// Meeting notes (stage E2a): the person's own Meeting inbox first, then the older list of meetings that arrived through a private address.
 export function MeetingsView() {
+  // Stage E2b: what a person saves and where, and (for admins) the account's rules and contact fields. Read once, shared by both tabs.
+  const setup = useData<SetupData>("meeting-setup");
+  return (
+    <Page title="Meeting notes" subtitle="After a recorded call, SubSync adds the summary and action items to the contact, written as you. A call it cannot place waits in your private inbox.">
+      <ModuleTabs label="Meeting notes sections" tabs={[
+        { label: "My Meeting inbox", node: <MeetingInbox /> },
+        { label: "What to save and where", node: <MyMeetingSetup data={setup.data} loading={setup.loading} error={setup.error} reload={setup.reload} /> },
+        ...(setup.data?.admin.can ? [{ label: "Account setup", node: <AccountSetup setup={setup.data} /> }] : []),
+        { label: "Older meeting notes", node: <OlderMeetings /> },
+      ]} />
+    </Page>
+  );
+}
+
+function OlderMeetings() {
   const api = useApiClient();
   const { data, error, loading, reload } = useData<Data>("meetings");
   const [account, setAccount] = useState("");
@@ -48,15 +69,15 @@ export function MeetingsView() {
 
   return (
     <div>
-      <PageHeader title="Meeting notes" subtitle="Recordings from Fathom or Zoom, turned into a summary and action items, matched to the right contact, ready to put in their record. Transcripts are not kept unless you switch that on." />
+      <p className="mb-4 text-sm text-muted-foreground">Meetings that arrived through a private address (before each person connected their own tool). {data.keepTranscripts ? "Transcripts are being kept." : "Transcripts are not kept."}</p>
       {msg && <p className="mb-4 rounded-lg border bg-muted/40 px-3 py-2 text-sm" role="status">{msg}</p>}
 
       {data.canManage && (
-        <Card title="Connect a meeting tool" className="mb-6">
+        <Card title="Advanced: a private address for a tool that cannot sign in" className="mb-6">
           <ol className="mb-4 list-decimal space-y-1 pl-5 text-sm text-muted-foreground">
             <li>Create a private address for a client account below.</li>
             <li><strong>Fathom:</strong> Settings, API Access, add a webhook, paste the address, and tick the new meeting content option.</li>
-            <li><strong>Zoom:</strong> in Zapier or Make, use the trigger for a new cloud recording with transcript, then a step that sends the data to a webhook with that address.</li>
+            {data.moreTools && <li><strong>Zoom:</strong> in Zapier or Make, use the trigger for a new cloud recording with transcript, then a step that sends the data to a webhook with that address.</li>}
             <li>Each finished meeting appears here within seconds, matched to the contact by the attendee&apos;s email.</li>
           </ol>
           <div className="flex flex-wrap items-end gap-3">
@@ -89,14 +110,14 @@ export function MeetingsView() {
             </ul>
           )}
           <p className="mt-3 text-xs text-muted-foreground">
-            SubSync does not write into your CRM. Putting a note straight into the contact&apos;s record needs a write permission this app does not ask for, so each meeting has a one-click &quot;Copy note&quot; instead.
+            {crmNoteFootnote(data.noteWriteGranted ?? null, data.pushNotesToCrm !== false)} A one-click &quot;Copy note&quot; is on every meeting for anything you want to paste by hand.
             {data.keepTranscripts ? " Transcripts are being kept." : " Transcripts are not kept (change this in Settings)."}
           </p>
         </Card>
       )}
 
       {data.meetings.length === 0 ? (
-        <Empty title="No meetings yet" body="Once a meeting tool sends its first recording, the summary, action items and the matched contact appear here." />
+        <Empty title="No older meeting notes" body="Meetings from people's own connected tools are in My Meeting inbox. This list is only for meetings that came through a private address." />
       ) : (
         <ul className="space-y-3">
           {data.meetings.map((m) => (
@@ -104,7 +125,7 @@ export function MeetingsView() {
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
                   <p className="font-medium">{m.title ?? "Untitled meeting"}</p>
-                  <p className="text-xs text-muted-foreground">{SOURCE[m.source] ?? "Meeting tool"} · {m.startedAt ? new Date(m.startedAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "date unknown"}{m.locationName ? ` · ${m.locationName}` : ""}</p>
+                  <p className="text-xs text-muted-foreground">{sourceName(m.source, data.moreTools)} · {m.startedAt ? new Date(m.startedAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "date unknown"}{m.locationName ? ` · ${m.locationName}` : ""}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   {m.contactName ? <Badge tone="good">With {m.contactName}</Badge> : <Badge tone="warn">No matching contact</Badge>}

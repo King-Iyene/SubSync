@@ -35,13 +35,13 @@ test("the Accounts page has no clipped text and no jargon, and says what its wor
   expect(await clipped(page)).toEqual([]);
   const text = await page.locator("main").innerText();
   expect(text).not.toMatch(/churn|engagement score|dormant/i);
-  expect(text).toContain("Leave risk");
+  expect(text).toMatch(/leave risk/i); // the column heading is shown in capitals
   await page.getByText("What do these words mean?").click();
   await expect(page.getByTestId("what-this-means")).toContainText("Likely to leave");
   const { scrollWidth, innerWidth } = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth }));
   expect(scrollWidth).toBeLessThanOrEqual(innerWidth + 1);
   if (testInfo.project.name === "desktop-1440") {
-    const needsScroll = await page.evaluate(() => { const w = document.querySelector("main table")?.parentElement as HTMLElement; return w.scrollWidth > w.clientWidth + 1; });
+    const needsScroll = await page.evaluate(() => { const w = Array.from(document.querySelectorAll("main table")).find((t) => /Leave risk/i.test(t.textContent ?? ""))?.parentElement as HTMLElement; return w.scrollWidth > w.clientWidth + 1; });
     expect(needsScroll, "on a desktop window the table fits without sideways scrolling").toBe(false);
   }
   await page.screenshot({ path: `docs/review/f7-accounts-${testInfo.project.name}.png`, fullPage: true });
@@ -58,7 +58,7 @@ test("the filters narrow the list and each chip's count equals the rows it shows
     const chip = page.getByRole("button", { name: new RegExp(`^${label} \\d+`) });
     const n = Number((await chip.innerText()).match(/(\d+)\s*$/)?.[1]);
     await chip.click();
-    await expect(page.locator("main tbody tr")).toHaveCount(n);
+    await expect(page.locator("main table").filter({ hasText: "Leave risk" }).locator("tbody tr")).toHaveCount(n);
   }
   await page.getByRole("button", { name: /^All \d+/ }).click();
   await page.getByLabel("Filter accounts by name").fill("zzzz-nothing");

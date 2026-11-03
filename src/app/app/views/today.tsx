@@ -3,51 +3,102 @@
 import type { GoFn } from "../nav";
 import { useState } from "react";
 import { useApiClient, useData } from "../session";
-import { Badge, Btn, Card, Empty, ErrorBox, ExtLink, fmtInt, fmtMoney, Loading, PageHeader, Stat, type Tone } from "../ui";
+import { CardRange, DefinitionTip, EmptyState, HowTo, InlineAlert, Page, Section, SkeletonCards, SkeletonRows, Sparkline, useCardRange } from "../ds";
+import { Badge, Btn, ErrorBox, ExtLink, fmtInt, fmtMoney, Stat, type Tone } from "../ui";
+import {
+  appointmentsLine, attentionLine, auditPick, chooseFirst, describeRangeChange, leadsLine, summaryText, todaySubtitle, UP_IS_BAD, type First, type RangeChange, type Scope,
+} from "@/lib/analytics/today-intel";
+import type { Audit } from "@/lib/analytics/audit-intel";
 
-type Change = { today: number; yesterday: number | null; avg7: number | null; vsYesterday: number | null; vsAvg: number | null; unusual: "up" | "down" | null; samples: number };
-type Data = {
+// Today, the front door (stage F5). The first screen answers "what needs me right now" in plain words, in the order a lead goes cold: leads waiting for a
+// reply, appointments to fix, then what else needs a person. Every figure is the number its own page shows (Speed to lead, Appointments, the Account audit);
+// the sentences come from src/lib/analytics/today-intel.ts, which is unit tested. One status line (the shell's) says how fresh the data is: Today says nothing
+// about how old the data is. What SubSync watches, and what it does not yet, lives in Settings.
+
+type Daily = {
+  readLimit?: string | null;
   connection: { ok: boolean; message: string | null };
-  freshness: { hours: number | null; ok: boolean; label: string; pending: number };
-  headlines: Array<{ key: string; label: string; money: boolean; change: Change }>;
+  headlines: Array<{ key: string; change: { unusual: "up" | "down" | null } }>;
   attention: Array<{ locationId: string; name: string; severity: "critical" | "warning" | "info"; url: string; items: Array<{ kind: string; title: string; detail: string }> }>;
   fine: Array<{ locationId: string; name: string; checked: string[]; learning: boolean }>;
   accounts: number;
-  notWatched: Array<{ what: string; why: string }>;
-  schedule: { hour: number; timezone: string | null; slack: boolean };
   limited: boolean;
 };
+type Access = { ok: number; total: number; needsPermission?: unknown[] };
+type Speed = { overall: { stillWaiting: number }; neverAnswered?: number; access: Access };
+type Appts = { unmarkedTotal?: number; access?: Access };
+// Every account is waiting on a permission (not "not read yet"): only then is a zero not a real zero.
+const needsPermission = (a: Access | undefined) => Boolean(a && a.total > 0 && a.ok === 0 && (a.needsPermission?.length ?? 0) === a.total);
+type AuditData = { audit: Pick<Audit, "findings" | "outlier" | "notes"> };
+type Changes = { from: string; to: string; accounts: number; changes: RangeChange[] };
 
-type AuditData = { audit: { headline: string; estimatedDollars: number | null; staleDollars: number; findings: Array<{ key: string; severity: string; title: string; detail: string; dollars: number | null; kind: string; view: string; fix: string }> } };
+// The card for "what changed" opens on the last 7 days; the person can widen it, and the choice is kept in the address and in this browser (KF-4).
+const CHANGES_RANGE = { preset: "7d", compare: "none" } as const;
 
-// The front door: three plain sentences that answer "what needs me right now", leads first because a lead goes cold in minutes.
-// Each number is the same one its own page shows (Speed to lead, Appointments, and the attention list below).
-function FrontDoor({ go, attention, limited }: { go: GoFn; attention: number | null; limited: boolean }) {
-  const speed = useData<{ overall: { stillWaiting: number }; neverAnswered?: number; access: { ok: number; total: number } }>("speed");
-  const appts = useData<{ unmarkedTotal?: number }>("appointments");
-  const waiting = speed.data ? Math.max(0, speed.data.overall.stillWaiting - (speed.data.neverAnswered ?? 0)) : null;
-  const never = speed.data?.neverAnswered ?? 0;
-  const unmarked = appts.data?.unmarkedTotal ?? null;
-  const leadLine = speed.loading && !speed.data ? "Checking for leads waiting for a reply..."
-    : waiting === null ? "Leads waiting for a reply could not be loaded."
-    : waiting === 0 && never === 0 ? "No leads are waiting for a reply right now."
-    : `${waiting} ${waiting === 1 ? "lead is" : "leads are"} waiting for a reply${never > 0 ? `, and ${never} ${never === 1 ? "was" : "were"} never answered` : ""}.`;
-  const urgent = (waiting ?? 0) > 0;
+const tone = (s: string): Tone => (s === "critical" ? "bad" : s === "warning" ? "warn" : "info");
+const shortDay = (d: string) => new Date(`${d}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
+const toAttention = () => document.getElementById("needs-attention")?.scrollIntoView({ behavior: "smooth", block: "start" });
+
+// The tile's way into the page that holds the same figure; each button says where it goes (N7).
+const TILE_LINK: Record<string, { label: string; view: Parameters<GoFn>[0] }> = {
+  openValue: { label: "Open Pipeline and deals", view: "pipeline" },
+  stale: { label: "Open stale deals", view: "deals" },
+  new30: { label: "Open People", view: "people" },
+  unread: { label: "Open Unanswered messages", view: "inbox" },
+};
+
+function FrontDoor({ go, scope, leads, lines, first, next, blocked, allClear, permission, myDay = false }: {
+  go: GoFn; scope: Scope; leads: string; lines: { appointments: string; attention: string; unmarked: number; attentionCount: number };
+  first: First | null; next: First | null; blocked: boolean; allClear: boolean; permission: React.ReactNode; myDay?: boolean;
+}) {
+  const urgent = first?.key === "leads";
+  const press = (f: First) => (f.view === "today" ? toAttention() : go(f.view as Parameters<GoFn>[0]));
   return (
-    <section className="mb-6 rounded-2xl border bg-card p-5 shadow-[var(--shadow-card)]" aria-label="What needs you right now" data-testid="front-door">
+    <section className="mb-8 border-y py-5" aria-label="What needs you right now" data-testid="front-door">
       <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">What needs you right now</p>
-      <h2 className={`mt-1 text-xl font-semibold ${urgent ? "text-red-700 dark:text-red-400" : ""}`} data-testid="leads-headline">{leadLine}</h2>
-      <ul className="mt-3 space-y-2 text-sm">
+      <h2 className={`mt-1 text-xl font-semibold ${urgent ? "text-destructive" : ""}`} data-testid="leads-headline">{leads}</h2>
+      {blocked && permission}
+
+      {first && (
+        urgent ? (
+          <div className="mt-4 flex flex-wrap items-center gap-3" data-testid="do-first">
+            <Btn variant="primary" onClick={() => press(first)}>{first.button}</Btn>
+            <span className="text-sm text-muted-foreground">The longest wait is first.</span>
+          </div>
+        ) : (
+          <div className="mt-4 border-l-2 border-primary pl-4" data-testid="do-first">
+            <p className="text-xs font-semibold uppercase tracking-wide text-primary">Do this first</p>
+            <p className="mt-1 text-base font-medium">{first.text}</p>
+            {first.detail && <p className="mt-1 text-sm text-muted-foreground">{first.detail}</p>}
+            {first.note && <p className="mt-1 text-xs"><DefinitionTip term="How this is counted">{first.note}</DefinitionTip></p>}
+            <div className="mt-3"><Btn variant="primary" onClick={() => press(first)}>{first.button}</Btn></div>
+          </div>
+        )
+      )}
+      {allClear && <p className="mt-3 text-sm text-muted-foreground" data-testid="all-clear">You are all caught up. If something needs you, it shows up here first.</p>}
+
+      <ul className="mt-5 space-y-2 border-t pt-4 text-sm">
         <li className="flex flex-wrap items-center justify-between gap-2">
-          <span>{unmarked === null ? "Checking appointments..." : unmarked === 0 ? "Every past appointment has an outcome recorded." : `${unmarked} past ${unmarked === 1 ? "appointment has" : "appointments have"} no outcome recorded, so the show rate is a guess.`}</span>
-          <Btn variant="ghost" onClick={() => go("appointments")}>Fix appointments</Btn>
+          <span>{lines.appointments}</span>
+          {lines.unmarked > 0 && <Btn variant="ghost" onClick={() => go("appointments")}>Fix appointments</Btn>}
         </li>
         <li className="flex flex-wrap items-center justify-between gap-2">
-          <span>{attention === null ? "Checking your accounts..." : attention === 0 ? (limited ? "Your account is within its normal range." : "No client account needs you today.") : `${attention} ${limited ? (attention === 1 ? "thing needs" : "things need") : attention === 1 ? "client account needs" : "client accounts need"} attention today.`}</span>
-          {(attention ?? 0) > 0 && <a href="#needs-attention" className="text-sm font-medium text-primary underline-offset-2 hover:underline">See which</a>}
+          <span>{lines.attention}</span>
+          {lines.attentionCount > 0 && <Btn variant="ghost" onClick={toAttention}>{scope === "account" ? "See what" : "See which"}</Btn>}
         </li>
+        {myDay && (
+          <li className="flex flex-wrap items-center justify-between gap-2" data-testid="front-door-myday">
+            <span className="text-muted-foreground">On a phone, or working your own list? My day shows the same leads and appointments as one short list.</span>
+            <Btn variant="ghost" onClick={() => go("myday")}>Open My day</Btn>
+          </li>
+        )}
+        {next && (
+          <li className="flex flex-wrap items-center justify-between gap-2" data-testid="front-door-next">
+            <span>{next.text}{next.note && <> <DefinitionTip term="How this is counted">{next.note}</DefinitionTip></>}</span>
+            <Btn variant="ghost" onClick={() => press(next)}>{next.button}</Btn>
+          </li>
+        )}
       </ul>
-      {urgent && <div className="mt-3"><Btn variant="primary" onClick={() => go("speed")}>Open Speed to lead</Btn></div>}
     </section>
   );
 }
@@ -57,154 +108,162 @@ function OutlierNote() {
   const { data } = useData<{ kpis: { outlier: { value: number; share: number; of: number } | null } }>("overview");
   const o = data?.kpis.outlier;
   if (!o) return null;
-  return <p className="mb-6 text-xs text-amber-700 dark:text-amber-400">One deal ({fmtMoney(o.value)}) is {Math.round(o.share * 100)}% of the open pipeline of {fmtInt(o.of)} deals, so the dollar figures move with it. Amounts are as entered in each account.</p>;
+  return <InlineAlert tone="warning" className="mb-4">One deal ({fmtMoney(o.value)}) is {Math.round(o.share * 100)}% of the open pipeline of {fmtInt(o.of)} deals, so the dollar figures move with it. Amounts are as entered in each account.</InlineAlert>;
 }
 
-// The one thing to do first, taken from the account audit, with the money it is costing when that can be stated honestly.
-function DoFirst({ go }: { go: GoFn }) {
-  const { data } = useData<AuditData>("audit");
-  const f = data?.audit.findings.find((x) => x.severity !== "info" && x.key !== "permission") ?? null;
-  if (!f) return null;
+// "What changed": the four headline figures, compared with the day before the window the card names (KF-4). A percentage appears only when the earlier
+// figure is large enough to measure against (N6); below that the plain difference is shown and says why.
+function Changes({ go, unusual }: { go: GoFn; unusual: Map<string, "up" | "down" | null> }) {
+  const range = useCardRange("today-changes", CHANGES_RANGE);
+  const r = range.resolved;
+  const changes = useData<Changes>(r ? `daily/changes?from=${r.current.from}&to=${r.current.to}` : null);
   return (
-    <section className="mb-6 rounded-2xl border border-primary/40 bg-primary/5 p-5" aria-label="Do this first">
-      <p className="text-xs font-semibold uppercase tracking-wide text-primary">Do this first</p>
-      <h2 className="mt-1 text-lg font-semibold">{f.title}</h2>
-      <p className="mt-1 text-sm text-muted-foreground">{f.detail}</p>
-      {f.dollars !== null && <p className="mt-2 text-sm"><strong>{fmtMoney(f.dollars)}</strong> <span className="text-muted-foreground">{f.kind === "estimate" ? "estimated at risk" : "counted at risk"}</span></p>}
-      <div className="mt-3 flex flex-wrap items-center gap-3">
-        <Btn onClick={() => go(f.view as never)}>{f.fix}</Btn>
-        <Btn variant="ghost" onClick={() => go("audit" as never)}>See the full audit</Btn>
-      </div>
-    </section>
+    <Section title="What changed" hint="Each figure is compared with its value on the day before the window starts. Press a figure's link to see what is behind it."
+      action={<CardRange state={range} label="What changed" compares={["none"]} maxDays={366} />}>
+      <OutlierNote />
+      {(!r || (changes.loading && !changes.data)) && <SkeletonCards cards={4} label="Working out what changed..." />}
+      {changes.error && <InlineAlert tone="danger" className="mb-3" action={<Btn onClick={() => void changes.reload()}>Try again</Btn>}>{changes.error.message}</InlineAlert>}
+      {changes.data && changes.data.changes.length === 0 && (
+        <EmptyState compact title="No history to compare yet" body="SubSync records these figures once a day, so a comparison appears from the second day." />
+      )}
+      {changes.data && changes.data.changes.length > 0 && (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4" data-testid="change-tiles">
+          {changes.data.changes.map((c) => {
+            const fmt = c.money ? fmtMoney : fmtInt;
+            const flag = unusual.get(c.key) ?? null;
+            const bad = flag !== null && (flag === "up") === UP_IS_BAD.has(c.key);
+            const link = TILE_LINK[c.key];
+            return (
+              <div key={c.key} data-testid={`tile-${c.key}`}>
+                <Stat label={c.label} value={fmt(c.now)} tone={flag ? (bad ? "bad" : "good") : undefined}
+                  sub={<>
+                    {describeRangeChange(c, fmt)}
+                    {!c.coversWindow && c.thenDay && <><br />SubSync has watched only since {shortDay(c.thenDay)}.</>}
+                    {flag && <><br /><strong>Unusual: {flag === "up" ? "higher" : "lower"} than normal</strong></>}
+                  </>} />
+                {c.points.length >= 4 && r && <div className="mt-1 px-1"><Sparkline values={c.points} label={`${c.label}, ${r.current.label}`} min={4} format={fmt} /></div>}
+                {link && <button type="button" onClick={() => go(link.view)} className="mt-1 min-h-9 px-1 text-xs font-medium text-primary underline-offset-2 hover:underline">{link.label}</button>}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </Section>
   );
 }
-
-const tone = (s: string): Tone => (s === "critical" ? "bad" : s === "warning" ? "warn" : "info");
-const signed = (n: number | null) => (n === null ? "no earlier day" : `${n > 0 ? "+" : ""}${n}%`);
-// For these, up is bad (more stale deals, more unread); for the others, up is good.
-const UP_IS_BAD = new Set(["stale", "unread"]);
 
 export function TodayView({ go }: { go: GoFn }) {
   const api = useApiClient();
-  const { data, error, loading, reload } = useData<Data>("daily");
+  const daily = useData<Daily>("daily");
+  const speed = useData<Speed>("speed");
+  const appts = useData<Appts>("appointments");
+  // The audit is read without the rows behind each number (lists=0): Today needs only its first finding.
+  const audit = useData<AuditData>("audit?lists=0");
   const [syncing, setSyncing] = useState(false);
+  const [copied, setCopied] = useState(false);
   const sync = async () => {
     setSyncing(true);
-    try { await api.post("sync"); await reload(); } finally { setSyncing(false); }
+    try { await api.post("sync"); await Promise.all([daily.reload(), speed.reload(), appts.reload(), audit.reload()]); } finally { setSyncing(false); }
   };
-  // The leads line does not wait for the slower daily read: it appears as soon as its own number arrives.
-  if (loading && !data) return (
-    <div>
-      <PageHeader title="Today" subtitle="What needs you right now, then what changed." />
-      <FrontDoor go={go} attention={null} limited={false} />
-      <Loading label="Working out what needs you today..." />
-    </div>
+
+  const d = daily.data;
+  const single = d ? d.limited || d.accounts === 1 : false;
+  const scope: Scope = single ? "account" : "all";
+  const name = d ? d.attention[0]?.name ?? d.fine[0]?.name ?? null : null;
+  const waiting = speed.data ? Math.max(0, speed.data.overall.stillWaiting - (speed.data.neverAnswered ?? 0)) : null;
+  const never = speed.data?.neverAnswered ?? 0;
+  // Replies cannot be timed until the conversations permission is approved: "no leads waiting" would be a false all-clear.
+  const blocked = needsPermission(speed.data?.access);
+  // Calendars that cannot be read are not "no problems": the line says so instead of claiming every appointment is fine.
+  const apptBlocked = needsPermission(appts.data?.access);
+  const unmarked = apptBlocked ? null : appts.data?.unmarkedTotal ?? null;
+  const attentionCount = d ? d.attention.length : null;
+  const leads = leadsLine({ waiting, never, loading: speed.loading, blocked });
+  const auditData = audit.data?.audit ?? null;
+  const ready = Boolean(d) && !speed.loading && !appts.loading && !audit.loading;
+  const first = blocked ? null : chooseFirst({ waiting, never, unmarked, attention: attentionCount, scope, audit: auditData });
+  const shownFirst = first && (first.key === "leads" || !audit.loading) ? first : null;
+  const nextPick = shownFirst?.key === "leads" ? auditPick(auditData) : null;
+  const next = nextPick && nextPick.key !== "unmarked" && nextPick.key !== "permission" ? nextPick : null;
+  const lines = { appointments: appointmentsLine(unmarked, apptBlocked), attention: attentionLine(attentionCount, scope), unmarked: unmarked ?? 0, attentionCount: attentionCount ?? 0 };
+  const allClear = ready && !blocked && shownFirst === null && (d?.accounts ?? 0) > 0 && waiting === 0 && never === 0 && unmarked === 0 && attentionCount === 0;
+
+  const copy = async () => {
+    const text = summaryText({ who: single ? name ?? "Your account" : "Your client accounts", leads, appointments: lines.appointments, attention: lines.attention, first: shownFirst });
+    try { await navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2500); } catch { window.prompt("Copy this summary", text); }
+  };
+  const permission = (
+    <InlineAlert tone="warning" className="mt-3" action={<Btn onClick={() => go("settings")}>Open Settings</Btn>}>
+      Replies cannot be timed yet because a permission has not been approved, so SubSync does not say that nothing is waiting. Ask the person who manages SubSync to approve it.
+    </InlineAlert>
   );
-  if (error) return <ErrorBox error={error} onRetry={reload} />;
-  if (!data) return null;
-  const s = data.schedule;
-  const when = `${String(s.hour).padStart(2, "0")}:00${s.timezone ? ` (${s.timezone})` : " in your first client's time zone"}`;
-  const noun = data.limited ? "your account" : "your client accounts";
+
+  // The leads line does not wait for the slower daily read: it appears as soon as its own number arrives.
+  if (daily.loading && !d) return (
+    <Page title="Today" subtitle={todaySubtitle("all", null)}>
+      <FrontDoor go={go} scope="all" leads={leads} lines={lines} first={shownFirst} next={null} blocked={blocked} allClear={false} permission={permission} />
+      <SkeletonRows rows={4} label="Working out what needs you today..." />
+    </Page>
+  );
+  if (daily.error) return <ErrorBox error={daily.error} onRetry={daily.reload} />;
+  if (!d) return null;
+
+  if (d.accounts === 0) {
+    return (
+      <Page title="Today" subtitle={todaySubtitle("all", null)} actions={<Btn variant="primary" onClick={sync} disabled={syncing}>{syncing ? "Syncing..." : "Sync now"}</Btn>}>
+        <EmptyState title="SubSync has not found any client accounts yet" body="The first read takes a few minutes after SubSync is installed. Press Sync now, or follow the steps in Getting started." action={<Btn variant="primary" onClick={() => go("help")}>Open Getting started</Btn>} />
+      </Page>
+    );
+  }
+
+  const unusual = new Map(d.headlines.map((h) => [h.key, h.change.unusual] as [string, "up" | "down" | null]));
+  const noun = single ? "this account" : "your client accounts";
+  const accountPage = d.limited ? "overview" : "account";
 
   return (
-    <div>
-      <PageHeader
-        title="Today"
-        subtitle="What needs you right now, then what changed."
-        actions={<><Badge tone={data.freshness.ok ? "good" : "warn"}>{data.freshness.label}</Badge><Btn variant="primary" onClick={sync} disabled={syncing}>{syncing ? "Syncing..." : "Sync now"}</Btn></>}
-      />
+    <Page title="Today" subtitle={todaySubtitle(scope, name)}
+      actions={<><Btn variant="ghost" onClick={copy}>{copied ? "Copied" : "Copy summary"}</Btn><Btn variant="primary" onClick={sync} disabled={syncing}>{syncing ? "Syncing..." : "Sync now"}</Btn></>}>
+      <HowTo id="today-how" title="How to use Today" action={<Btn variant="ghost" onClick={() => go("help")}>Open Getting started</Btn>}>
+        Read the large sentence first and press the button under it. Below are the other things that need a person, then what changed. What SubSync watches, and what it does not yet, is listed in Settings.
+      </HowTo>
 
-      {!data.connection.ok && <p className="mb-4 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">{data.connection.message}</p>}
-      {data.freshness.hours === null && data.freshness.pending > 0 && <p className="mb-4 rounded-lg border bg-muted/40 px-3 py-2 text-sm" role="status">First sync in progress: the numbers fill in over the next few minutes.</p>}
+      {!d.connection.ok && <InlineAlert tone="danger" className="mb-4">{d.connection.message}</InlineAlert>}
+      {d.readLimit && <div className="mb-4" data-testid="read-limit"><InlineAlert tone="info">{d.readLimit}</InlineAlert></div>}
 
-      <FrontDoor go={go} attention={data.attention.length} limited={data.limited} />
-      <DoFirst go={go} />
+      <FrontDoor go={go} scope={scope} leads={leads} lines={lines} first={shownFirst} next={next} blocked={blocked} allClear={allClear} permission={permission} myDay={d.limited} />
 
-      <div className="mb-2 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {data.headlines.map((h) => {
-          const c = h.change;
-          const bad = c.unusual !== null && (c.unusual === "up") === UP_IS_BAD.has(h.key);
-          return (
-            <Stat key={h.key} label={h.label} value={h.money ? fmtMoney(c.today) : fmtInt(c.today)}
-              tone={c.unusual ? (bad ? "bad" : "good") : undefined}
-              sub={<>
-                {signed(c.vsYesterday)} vs yesterday
-                {c.avg7 !== null && <><br />{signed(c.vsAvg)} vs the last 7 days</>}
-                {c.unusual && <><br /><strong>Unusual: {c.unusual === "up" ? "higher" : "lower"} than normal</strong></>}
-              </>} />
-          );
-        })}
-      </div>
-
-      <OutlierNote />
-
-      <div id="needs-attention" />
-      <Card title={data.attention.length ? `Needs attention today (${data.attention.length})` : "Needs attention today"} className="mb-6">
-        {data.attention.length === 0 ? (
-          <Empty title="Nothing needs you today" body={`${noun[0].toUpperCase() + noun.slice(1)} ${data.limited ? "is" : "are"} all within ${data.limited ? "its" : "their"} own normal range. Replies, deals, new leads and setup were all checked.`} />
+      <Section id="needs-attention" title={d.attention.length ? `Needs attention today (${d.attention.length})` : "Needs attention today"}
+        hint={single ? "What to look at in this account, most important first." : "The client accounts that need a person, most important first."}>
+        {d.attention.length === 0 ? (
+          <EmptyState compact title="Nothing needs you today" body={`${noun[0].toUpperCase() + noun.slice(1)} ${single ? "is" : "are"} all within ${single ? "its" : "their"} own normal range. Replies, deals, new leads and setup were all checked.`} />
         ) : (
-          <ul className="divide-y">
-            {data.attention.map((a, i) => (
-              <li key={a.locationId} className="py-4 first:pt-0 last:pb-0">
-                <div className="mb-2 flex flex-wrap items-center gap-2">
-                  <span className="text-sm text-muted-foreground tabular-nums">{i + 1}.</span>
-                  <span className="font-medium">{a.name}</span>
-                  <Badge tone={tone(a.severity)}>{a.severity === "critical" ? "Do first" : a.severity === "warning" ? "Soon" : "When you can"}</Badge>
-                </div>
-                <ul className="space-y-2 pl-6">
-                  {a.items.map((it) => (
-                    <li key={it.kind} className="text-sm"><span className="font-medium">{it.title}.</span> <span className="text-muted-foreground">{it.detail}</span></li>
-                  ))}
-                </ul>
-                <div className="mt-3 flex gap-3 pl-6">
-                  <Btn onClick={() => go(data.limited ? "overview" : "account", a.locationId)}>Open the account in SubSync</Btn>
-                  <ExtLink href={a.url}>Open in the platform</ExtLink>
-                </div>
-              </li>
-            ))}
+          <ul className="divide-y border-y" data-testid="attention-list">
+              {d.attention.map((a, i) => (
+                <li key={a.locationId} className="ds-row grid gap-x-6 gap-y-2 px-1 py-4 md:grid-cols-[13rem_minmax(0,1fr)_auto]">
+                  <div className="flex flex-wrap items-start gap-x-2 gap-y-1 md:block">
+                    {!single && <p className="font-medium"><span className="tnum mr-1.5 text-muted-foreground">{i + 1}.</span>{a.name}</p>}
+                    <div className="md:mt-1"><Badge tone={tone(a.severity)}>{a.severity === "critical" ? "Do first" : a.severity === "warning" ? "Soon" : "When you can"}</Badge></div>
+                  </div>
+                  <ul className="space-y-1.5">
+                    {a.items.map((it) => (
+                      <li key={it.kind} className="text-sm"><span className="font-medium">{it.title}.</span> <span className="text-muted-foreground">{it.detail}</span></li>
+                    ))}
+                  </ul>
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 md:w-48 md:flex-col md:items-end md:gap-y-0.5 [&>button]:-mr-3.5">
+                    {single
+                      ? <Btn variant="ghost" onClick={() => go(accountPage, a.locationId)}>Open the full account page</Btn>
+                      : <Btn variant="ghost" onClick={() => go("today", a.locationId)}>Open this account&apos;s Today</Btn>}
+                    <span className="text-sm"><ExtLink href={a.url}>Open in your CRM</ExtLink></span>
+                  </div>
+                </li>
+              ))}
           </ul>
         )}
-      </Card>
+        <div className="mt-3"><Btn variant="ghost" onClick={() => go("alerts")}>See every open alert and dismiss resolved ones</Btn></div>
+      </Section>
 
-      <div className="mb-6"><Btn variant="ghost" onClick={() => go("alerts")}>See every open alert and dismiss resolved ones</Btn></div>
+      <Changes go={go} unusual={unusual} />
 
-      {data.fine.length > 0 && (
-        <Card title={`Fine today (${data.fine.length})`} className="mb-6">
-          <ul className="divide-y text-sm">
-            {data.fine.map((f) => (
-              <li key={f.locationId} className="flex flex-wrap items-center justify-between gap-2 py-2">
-                <span className="font-medium">{f.name}</span>
-                <span className="text-muted-foreground">
-                  {f.learning ? "Nothing wrong, but still learning what is normal here (less than a week of history)" : "Nothing unusual compared with its last week"}
-                </span>
-              </li>
-            ))}
-          </ul>
-          <p className="mt-3 text-xs text-muted-foreground">Checked for each: {data.fine[0].checked.join(", ")}.</p>
-        </Card>
-      )}
-
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Card title="When this is sent">
-          {data.limited ? (
-            <p className="text-sm text-muted-foreground">Your daily brief is shown here each time you open SubSync.</p>
-          ) : s.slack ? (
-            <p className="text-sm">Sent to Slack every day at <strong>{when}</strong>. Change the time in Settings.</p>
-          ) : (
-            <div className="space-y-2 text-sm text-muted-foreground">
-              <p>Not scheduled yet. Add a Slack webhook in Settings and switch on the daily brief, and this arrives every morning at the time you choose, in your time zone.</p>
-              <Btn onClick={() => go("settings")}>Set it up</Btn>
-            </div>
-          )}
-          <p className="mt-3 text-xs text-muted-foreground">Email delivery needs an email service connected to the app. It is not switched on yet.</p>
-        </Card>
-        <Card title="Not watched yet">
-          <ul className="space-y-1 text-sm">
-            {data.notWatched.map((n) => <li key={n.what}><span className="font-medium">{n.what}</span> <span className="text-muted-foreground">: {n.why}</span></li>)}
-          </ul>
-          <p className="mt-3 text-xs text-muted-foreground">We list these so you never assume something is being watched when it is not.</p>
-        </Card>
-      </div>
-    </div>
+    </Page>
   );
 }

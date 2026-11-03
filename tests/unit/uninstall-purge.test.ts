@@ -2,6 +2,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { encryptSecret } from "@/lib/crypto";
 import { closeDb, sql } from "@/lib/db";
 import { purgeInstallation, purgeLocationData, purgeSyncedData } from "@/lib/ghl/installations";
+import { deletion, INVENTORY } from "@/lib/data-inventory";
 import { CONFIG_DELETE_ON_UNINSTALL, KEEP_ON_UNINSTALL, LOCATION_DELETE, SYNCED_DELETE, UNINSTALL_DELETE } from "@/lib/tenant-tables";
 
 // The real purge functions against the real database, with a fixture company that has one row in every tenant table.
@@ -15,15 +16,16 @@ let required: Record<string, Col[]> = {};
 // Values that satisfy the database's allowed-value rules (read from pg_constraint).
 const ALLOWED: Record<string, string> = {
   "alerts.severity": "'info'", "appointment_events.kind": "'created'", "call_outcomes.outcome": "'answered'", "cleanup_changes.status": "'pending'",
-  "cleanup_runs.status": "'previewed'", "connections.status": "'connected'", "connections.provider": "'slack'", "deal_events.kind": "'created'",
-  "domain_checks.status": "'ok'", "duplicate_reviews.decision": "'keep'", "meeting_notes.status": "'new'", "sync_jobs.type": "'locations'", "sync_jobs.status": "'pending'",
+  "cleanup_runs.status": "'previewed'", "connections.status": "'connected'", "connections.provider": "'slack'", "deal_events.kind": "'created'", "contact_tag_events.kind": "'added'", "client_step_history.event": "'done'",
+  "domain_checks.status": "'ok'", "duplicate_reviews.decision": "'keep'", "feedback_items.kind": "'feedback'", "user_connections.provider": "'fathom'", "meetings.provider": "'fathom'", "meeting_policies.scope": "'account'", "crm_writes.kind": "'note'", "meeting_notes.status": "'new'", "sync_jobs.type": "'locations'", "sync_jobs.status": "'pending'",
 };
 
-const literal = (table: string, c: Col, inst: string, loc: string, runId: string | null): string => {
+const literal = (table: string, c: Col, inst: string, loc: string, runId: string | null, connectionId: string | null): string => {
   if (ALLOWED[table + "." + c.column_name]) return ALLOWED[table + "." + c.column_name];
   if (c.column_name === "installation_id") return `'${inst}'::uuid`;
   if (c.column_name === "location_id") return `'${loc}'`;
   if (c.column_name === "run_id") return `'${runId}'::uuid`;
+  if (c.column_name === "connection_id") return `'${connectionId}'::uuid`; // a person's connection, created first (meeting_deliveries points at it)
   switch (c.data_type) {
     case "uuid": return "gen_random_uuid()";
     case "text": case "character varying": return `'x-${loc}'`; // unique per account, so two accounts can both be filled
@@ -45,14 +47,18 @@ async function fixture(): Promise<string> {
 
 async function fill(inst: string, loc: string, tables: readonly string[]) {
   let runId: string | null = null;
-  const order = [...tables].sort((a, b) => (a === "cleanup_runs" ? -1 : b === "cleanup_runs" ? 1 : 0)); // parent first
+  let connectionId: string | null = null;
+  const PARENTS = ["cleanup_runs", "user_connections"];
+  const rank = (t: string) => (PARENTS.includes(t) ? 0 : 1);
+  const order = [...tables].sort((a, b) => rank(a) - rank(b)); // parents first
   for (const t of order) {
     const cols = required[t] ?? [];
     if (!cols.some((c) => c.column_name === "installation_id")) continue;
     const names = cols.map((c) => `"${c.column_name}"`).join(", ");
-    const vals = cols.map((c) => literal(t, c, inst, loc, runId)).join(", ");
+    const vals = cols.map((c) => literal(t, c, inst, loc, runId, connectionId)).join(", ");
     const rows = await sql().unsafe(`insert into "${t}" (${names}) values (${vals}) returning *`);
     if (t === "cleanup_runs") runId = (rows[0] as unknown as { id: string }).id;
+    if (t === "user_connections") connectionId = (rows[0] as unknown as { id: string }).id;
   }
 }
 // One round trip for all tables: this link to the database is slow, and ~35 separate queries would not fit the time limit.
@@ -123,6 +129,34 @@ describe.skipIf(!HAS_DB)("uninstall and deletion against the real database", () 
       expect(one[t], `${t}: removed account must be gone`).toBe(0);
       expect(two[t], `${t}: the other account must remain`).toBeGreaterThan(0);
     }
+  });
+
+  // N83: the words on the Settings card, the privacy page and the help text come from data-inventory.ts. This proves each claim in them against
+  // real rows: what the text says Delete my data removes is gone afterwards, what it says is kept is still there, and an uninstall then removes
+  // that too and keeps only what the text says it keeps.
+  it("what the Delete my data and uninstall texts promise is what really happens to real rows", async () => {
+    const d = deletion();
+    const tablesFor = (nouns: string[]) => Object.entries(INVENTORY).filter(([, i]) => nouns.includes(i.noun)).map(([t]) => t).filter((t) => t !== "installations");
+    const inst = await fixture();
+    await fill(inst, "xtestPurgeLoc1", [...UNINSTALL_DELETE, ...KEEP_ON_UNINSTALL]);
+    const claimedGone = tablesFor(d.synced);
+    const claimedKept = tablesFor(d.kept);
+    const claimedRemains = tablesFor(d.remains);
+    expect(claimedGone.length, "the text names tables").toBeGreaterThan(10);
+    expect(new Set(claimedGone.concat(claimedKept)).size, "no table is both deleted and kept by Delete my data").toBe(claimedGone.length + claimedKept.length);
+
+    await purgeSyncedData(inst);
+    const afterPurge = await countAll([...claimedGone, ...claimedKept], inst);
+    for (const t of claimedGone) expect(afterPurge[t], `Delete my data says it removes ${INVENTORY[t].noun} (${t})`).toBe(0);
+    for (const t of claimedKept) expect(afterPurge[t], `Delete my data says it keeps ${INVENTORY[t].noun} (${t})`).toBeGreaterThan(0);
+
+    await purgeInstallation(CO);
+    const afterUninstall = await countAll([...claimedGone, ...claimedKept, ...claimedRemains], inst);
+    for (const t of [...claimedGone, ...claimedKept]) expect(afterUninstall[t], `an uninstall removes ${INVENTORY[t].noun} (${t})`).toBe(0);
+    for (const t of claimedRemains) expect(afterUninstall[t], `an uninstall keeps ${INVENTORY[t].noun} (${t}), as the text says`).toBeGreaterThan(0);
+    const [row] = await sql()`select access_token_enc, refresh_token_enc from installations where id = ${inst}`;
+    expect(row.access_token_enc, "tokens are emptied at once").toBeNull();
+    expect(row.refresh_token_enc).toBeNull();
   });
 
   it("closes the connection", async () => { await closeDb(); });

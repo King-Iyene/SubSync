@@ -1,4 +1,5 @@
 import { sql } from "../db";
+import { currentSnapshotVersion, snapshotOk } from "./definitions-sql";
 
 const iso = (v: unknown) => (v instanceof Date ? v.toISOString() : null);
 const ms = (v: unknown) => (v instanceof Date ? v.getTime() : null);
@@ -71,6 +72,7 @@ export async function saveProfile(installationId: string, allowed: string[] | nu
 
 export async function periodFigures(installationId: string, allowed: string[] | null) {
   const db = sql();
+  const version = await currentSnapshotVersion(installationId);
   const [[contacts], [won], [pipeNow], [pipeThen], [monthly], series] = await Promise.all([
     db`with loc as (${visible(installationId, allowed)})
        select count(*) filter (where c.date_added > now() - interval '30 days')::int cur,
@@ -88,7 +90,7 @@ export async function periodFigures(installationId: string, allowed: string[] | 
        select coalesce(sum(open_value), 0)::float8 value, coalesce(avg(engagement_score), 0)::float8 score from latest`,
     db`with loc as (${visible(installationId, allowed)}),
        then_ as (select distinct on (m.location_id) m.location_id, m.open_value, m.engagement_score from account_metrics_daily m join loc on loc.location_id = m.location_id
-         where m.installation_id = ${installationId} and m.day <= current_date - 30 order by m.location_id, m.day desc)
+         where m.installation_id = ${installationId} and m.day <= current_date - 30 and ${snapshotOk("m", version)} order by m.location_id, m.day desc)
        select coalesce(sum(open_value), 0)::float8 value, coalesce(avg(engagement_score), 0)::float8 score, count(*)::int n from then_`,
     db`with loc as (${visible(installationId, allowed)}),
        month as (select date_trunc('month', now()) start)
@@ -97,7 +99,8 @@ export async function periodFigures(installationId: string, allowed: string[] | 
          (select count(*)::int from cached_opportunities o join loc on loc.location_id = o.location_id, month where o.installation_id = ${installationId} and o.status = 'won' and o.last_status_change_at >= month.start) deals,
          (select coalesce(sum(o.monetary_value), 0)::float8 from cached_opportunities o join loc on loc.location_id = o.location_id, month where o.installation_id = ${installationId} and o.status = 'won' and o.last_status_change_at >= month.start) revenue`,
     db`with loc as (${visible(installationId, allowed)})
-       select m.day, sum(m.new_contacts_30d)::float8 new_contacts, sum(m.open_value)::float8 open_value, avg(m.engagement_score)::float8 score
+       select m.day, sum(m.new_contacts_30d)::float8 new_contacts, sum(m.open_value)::float8 open_value, avg(m.engagement_score)::float8 score,
+         bool_and(${snapshotOk("m", version)}) deals_ok
        from account_metrics_daily m join loc on loc.location_id = m.location_id
        where m.installation_id = ${installationId} and m.day > current_date - 90 group by m.day order by m.day`,
   ]);
@@ -107,17 +110,18 @@ export async function periodFigures(installationId: string, allowed: string[] | 
     pipeline: { now: pipeNow.value as number, then: pipeThen.n > 0 ? (pipeThen.value as number) : null },
     score: { now: Math.round(pipeNow.score as number), then: pipeThen.n > 0 ? Math.round(pipeThen.score as number) : null },
     month: { leads: monthly.leads as number, deals: monthly.deals as number, revenue: monthly.revenue as number },
-    series: series.map((s) => ({ day: (iso(s.day) ?? String(s.day)).slice(0, 10), newContacts: s.new_contacts as number, openValue: s.open_value as number, score: s.score as number })),
+    series: series.map((s) => ({ day: (iso(s.day) ?? String(s.day)).slice(0, 10), newContacts: s.new_contacts as number, openValue: s.open_value as number, score: s.score as number, dealsOk: s.deals_ok === true })),
   };
 }
 
 // 90 days of one account's numbers, for the QBR and the health timeline (6.6).
 export async function accountHistory(installationId: string, locationId: string) {
+  const version = await currentSnapshotVersion(installationId);
   const rows = await sql()`
-    select m.day, m.contacts, m.new_contacts_30d, m.open_value::float8 open_value, m.open_opportunities, m.engagement_score
+    select m.day, m.contacts, m.new_contacts_30d, m.open_value::float8 open_value, m.open_opportunities, m.engagement_score, ${snapshotOk("m", version)} deals_ok
     from account_metrics_daily m where m.installation_id = ${installationId} and m.location_id = ${locationId} and m.day > current_date - 90 order by m.day`;
   return rows.map((r) => ({
     day: (iso(r.day) ?? String(r.day)).slice(0, 10), contacts: r.contacts as number, newContacts30d: r.new_contacts_30d as number,
-    openValue: r.open_value as number, openOpportunities: r.open_opportunities as number, score: r.engagement_score as number,
+    openValue: r.open_value as number, openOpportunities: r.open_opportunities as number, score: r.engagement_score as number, dealsOk: r.deals_ok === true,
   }));
 }

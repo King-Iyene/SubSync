@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
-import ts from "typescript";
+import { CODE_LIKE, visibleText } from "../../../tests/fixtures/visible-text.ts";
 
 // Nothing a person can read may name the platform or use our internal words (brief 13A, runbook S0.3).
 // The scanner reads the code's syntax tree, so only text a person can see is checked: string literals, template text,
@@ -16,46 +16,20 @@ const PLATFORM = /gohighlevel|highlevel|leadconnector|\bghl\b/i;
 const INTERNAL = /\b(agenc(y|ies)|sub-?accounts?|locations?)\b/i;
 const AUDIENCE_PAGES = /\/src\/app\/(page|privacy\/page|terms\/page|support\/page)\.tsx$/;
 
-// Code that talks to the platform may name it. These files and folders never reach a screen as text.
-const NOT_SCANNED = [/\/src\/lib\/ghl\//, /\/src\/lib\/sync\//, /\/src\/lib\/crypto\.ts$/, /\/src\/lib\/links\.ts$/, /\/src\/lib\/db\.ts$/, /\/src\/lib\/tenant-tables\.ts$/, /\/src\/lib\/route-guards\.ts$/, /\/src\/lib\/safe-log\.ts$/, /\/src\/lib\/analytics\/cleanup-platform\.ts$/];
+// Only these never reach a screen as text: the default address constant, the guard table (our own documentation of each route), and files of
+// pure constants. The code that talks to the platform (src/lib/ghl, src/lib/sync) IS scanned: an error message or status text written there
+// is stored (for example as a sync error) and shown on a screen, so it must not name the platform either. Its machine strings are listed below.
+const NOT_SCANNED = [/\/src\/lib\/crypto\.ts$/, /\/src\/lib\/links\.ts$/, /\/src\/lib\/db\.ts$/, /\/src\/lib\/tenant-tables\.ts$/, /\/src\/lib\/route-guards\.ts$/];
 
-// Text a machine reads and a person never sees: the webhook's signature header name, and the browser's own `location` object
-// in the one-line script that closes the connect popup.
-const MACHINE_TEXT = [/^x-ghl-signature$/i, /location[.]origin/];
-
-type Found = { text: string; line: number };
-const SQL_TAG = /^(sql(\(\))?|db|tx|[a-z]+\.sql)$/;
-const IGNORED_ATTRS = new Set(["className", "key", "htmlFor", "id", "type", "role", "name", "d", "viewBox", "fill", "stroke", "width", "height", "style"]);
-// A lowercase word or key such as "agency", "client_view" or "a:b" is an internal code, not a sentence.
-const CODE_LIKE = /^[a-z0-9_.:\-/]+$/;
-
-export function visibleText(source: string, fileName = "x.tsx"): Found[] {
-  const sf = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true, fileName.endsWith("x") ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
-  const out: Found[] = [];
-  const lineOf = (n: ts.Node) => sf.getLineAndCharacterOfPosition(n.getStart(sf)).line + 1;
-  const add = (text: string, node: ts.Node) => { if (text.trim()) out.push({ text, line: lineOf(node) }); };
-  const visit = (node: ts.Node): void => {
-    if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node) || ts.isImportTypeNode(node)) return;
-    if (ts.isTypeNode(node) || ts.isInterfaceDeclaration(node) || ts.isTypeAliasDeclaration(node)) return;
-    if (ts.isTaggedTemplateExpression(node) && SQL_TAG.test(node.tag.getText(sf))) { node.template.forEachChild(visitInsideSql); return; }
-    if (ts.isCallExpression(node) && /\.unsafe$/.test(node.expression.getText(sf))) return;
-    if (ts.isJsxAttribute(node) && IGNORED_ATTRS.has(node.name.getText(sf))) return;
-    if (ts.isJsxText(node)) add(node.getText(sf), node);
-    else if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
-      const p = node.parent;
-      const comparing = (ts.isBinaryExpression(p) && /^[!=]==?$/.test(p.operatorToken.getText(sf))) || ts.isCaseClause(p) || ts.isElementAccessExpression(p);
-      if (!comparing) add(node.text, node);
-    } else if (ts.isTemplateExpression(node)) {
-      add(node.head.text, node.head);
-      node.templateSpans.forEach((s) => add(s.literal.text, s.literal));
-    }
-    ts.forEachChild(node, visit);
-  };
-  // Expressions inside a query (${...}) can still hold text, but the query words themselves are not text.
-  const visitInsideSql = (node: ts.Node) => { if (ts.isTemplateSpan(node)) visit(node.expression); else ts.forEachChild(node, visitInsideSql); };
-  visit(sf);
-  return out;
-}
+// Text a machine reads and a person never sees: the webhook's signature header name, the browser's own `location` object in the one-line
+// script that closes the connect popup, the platform's API and install host names, the two token kinds the API names, and the API's own scope names.
+const MACHINE_TEXT = [
+  /^x-ghl-signature$/i, /location[.]origin/,
+  /^(https:\/\/)?(services[.]leadconnectorhq[.]com|marketplace[.]leadconnectorhq[.]com|marketplace[.]gohighlevel[.]com)$/,
+  /^(Location|Company)$/, /^locations\/[A-Za-z]+[.](readonly|write)$/,
+  // The payments and invoices read addresses the capability check calls: the API names the kind of owner with this query value.
+  /&altType=location(&|$)/,
+];
 
 export function violations(source: string, fileName: string): string[] {
   const n = "/" + fileName.replace(/\\/g, "/").replace(/^\/+/, "");
@@ -94,6 +68,10 @@ test("the scanner catches the platform's name and our internal words in text, an
   assert.equal(violations('const r = await sql()`select location_id from locations where installation_id = ${id}`;', "a.ts").length, 0, "database queries are not text");
   assert.equal(violations('if (ctx.kind === "agency") go("agency");', "a.ts").length, 0, "internal codes are not text");
   assert.equal(violations('const [a] = await sql()`select 1 where x = ${"Your agency"}`;', "a.ts").length, 1, "text inside a query expression still counts");
+  assert.equal(violations("const r = await sql()`select coalesce(name, 'your agency') label from t`;", "a.ts").length, 1, "a quoted value inside a query can reach a screen");
+  assert.equal(violations("const r = await sql()`select 1 from t where mode = 'agency' and provider = 'zoom'`;", "a.ts").length, 0, "internal codes inside a query are not text");
+  assert.equal(violations('throw new Error("GHL request failed with status 500");', "src/lib/sync/engine.ts").length, 1, "error text written in the platform and sync code is scanned too");
+  assert.equal(violations('const host = "https://services.leadconnectorhq.com";', "src/lib/ghl/client.ts").length, 0, "its host name is a machine string");
   assert.equal(violations('const m = "Open it in your CRM";', "a.ts").length, 0);
 });
 

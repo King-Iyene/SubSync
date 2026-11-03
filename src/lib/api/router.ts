@@ -2,7 +2,7 @@ import { sql } from "../db";
 import { safeError } from "../safe-log";
 import { buildDigest, onboardingChecklist, toCsv, type DerivedAccount } from "../analytics/derive";
 import {
-  allManualTasks, dismissAlert, domainCandidates, duplicateGroups, inbox, listAlerts, listDomainChecks, manualTasks, metricsTrend,
+  allManualTasks, conversationCoverage, dismissAlert, domainCandidates, duplicateGroups, inbox, listAlerts, listDomainChecks, manualTasks, metricsTrend,
   dealHygiene, getSettings, pipelineCells, saveDomainCheck, searchContacts, setLocationFlags, setManualTask, staleDeals, updateSettings,
   visibleLocationIds, type Settings,
 } from "../analytics/queries";
@@ -14,51 +14,83 @@ import { deepLinks } from "../links";
 import { isTestName } from "../analytics/test-data";
 import { accountLimit, type Feature } from "../entitlements";
 import { purgeSyncedData } from "../ghl/installations";
+import { SYNCED_DELETE } from "../tenant-tables";
+import { SHARE_LINK_DAYS } from "../data-inventory";
 import { createKey, listKeys, MAX_KEYS, revokeKey } from "../mcp/store";
 import { postToSlack } from "../notify";
 import { enqueueFullSync, enqueueLocationSync, runSlice, syncStatus } from "../sync/engine";
-import { integrationHealth } from "../analytics/health";
+import { freshnessFor, syncPanel } from "../sync/freshness-queries";
 import {
   abandonedDeals, accountSummaries, agingBuckets, avgCycleDays, coverage, deadPipeline, forecast, pipelineSummaries, riskyDeals, stageTable,
   valueDistribution, winLossByMonth, winRate,
 } from "../analytics/pipeline-intel";
 import { OUTCOME_LABEL, PRESETS, parseFilters, parseOutcome } from "../analytics/call-intel";
-import { callQueue, createCallList, deleteCallList, listCallLists, logOutcome, MAX_LISTS, outcomeSummary, speedToLead } from "../analytics/call-queries";
+import { callQueueAll, createCallList, deleteCallList, listCallLists, logOutcome, MAX_LISTS, outcomeSummary, speedToLead } from "../analytics/call-queries";
 import {
-  activitySummary, anomalyIndices, compareAccounts, contactGap, goalProgress, periodChange, renewalStatus, roi, segmentStats, zAnomaly,
+  activitySummary, anomalyIndices, contactGap, goalProgress, renewalStatus, roi, segmentStats, zAnomaly,
 } from "../analytics/client-intel";
-import { accountHistory, clientExtras, periodFigures, saveProfile, type ClientExtra, type ProfilePatch } from "../analytics/client-queries";
+import { clientExtras, periodFigures, saveProfile, type ClientExtra, type ProfilePatch } from "../analytics/client-queries";
 import { dailyPriorities, replyAging, setupScore, worstDomainStatus, type SetupFacts } from "../analytics/comms-intel";
-import { channelCounts, channelLabel, WAITING_WINDOW_DAYS } from "../analytics/waiting";
+import { channelCounts, channelLabel, CONVERSATIONS_READ_PER_ACCOUNT, readLimitNote, unreadSummary, WAITING_WINDOW_DAYS } from "../analytics/waiting";
+import { attentionBand } from "../scoring";
+import { loadStageRules, saveStageRule, stageInventory } from "../analytics/stage-rules-sql";
+import { parseRulePatch, pipelineTreatment, ruleKey, stageProbability, treatmentOf } from "../analytics/stage-rules";
+import { sourceSummary } from "../analytics/contact-intel";
+import { MIN_MONEY_BASE_FOR_PERCENT, percentChange } from "../analytics/metrics";
 import { afterHours, communicationGaps } from "../analytics/comms-queries";
+import { contactOwners, listViews, removeView, saveView, teamNames } from "../analytics/inbox-queries";
+import { assigneeLabel, MAX_SAVED_VIEWS, sanitizeQueue, viewName } from "../analytics/waiting-view";
 import { badDataSamples, contactOverview, topLeads, vips } from "../analytics/contact-queries";
 import { appointmentInsights } from "../analytics/appointment-insight-queries";
 import { auditSummary, buildAudit } from "../analytics/audit-intel";
-import { speedView } from "../analytics/speed-queries";
-import { CHANGELOG, ROADMAP } from "../roadmap";
+import { appointmentList, staleDealList, waitingList, type AuditList } from "../analytics/audit-queries";
+import { DEAL_RULES_VERSION } from "../analytics/definitions";
+import { speedPart, speedView } from "../analytics/speed-queries";
+import { isPart, parseWindow } from "../analytics/speed-window";
+import { CHANGELOG, ROADMAP, STATUS_LABEL, STATUS_MEANING } from "../roadmap";
 import { buildSharePayload } from "../analytics/share-intel";
 import { randomBytes } from "node:crypto";
 import { emailConfigured } from "../email";
 import { validEmail } from "../analytics/weekly-email";
-import { appointmentView } from "../analytics/appointment-queries";
+import { appointmentBreakdown, appointmentDetail, appointmentView, setShowRateTarget } from "../analytics/appointment-queries";
+import { clampTarget, parseFilters as parseApptFilters, parseWindow as parseApptWindow } from "../analytics/appointment-f3";
 import { compareSetup, describe as describeDiff } from "../analytics/setup-intel";
+import {
+  baselineShare, compareTable, dealFigures, driftRows, endpoints, INDUSTRY_PICKER, lastSpokenMs, parseCompareIds, parseQuarter, pointsIn, previousQuarter, proofSummary,
+  qbrFindings, quarterOf, quarterProgress, recentQuarters, SHARED_BASELINE, type Quarter,
+} from "../analytics/client-success";
+import { alertsOf, historyStart, noteSummaries, quarterFacts } from "../analytics/client-success-queries";
+import * as clientRoutes from "./client-routes";
 import { applyRun, createPreview, getRun, installationHasScope, listRuns, PREVIEW_VALID_HOURS, sampleChanges, undoRun } from "../analytics/cleanup-queries";
 import { parseParams } from "../analytics/cleanup-intel";
 import { demoWriter, platformWriter } from "../analytics/cleanup-writer";
 import { availability, disconnect, startLink } from "../connections/flow";
-import { getConnection, listConnections, setDefaultAccount } from "../connections/queries";
+import { listConnections } from "../connections/queries";
 import { isProvider } from "../connections/state";
 import { locationAccessToken } from "../sync/engine";
 import { createHook, listHooks, listMeetings, MAX_HOOKS_PER_ACCOUNT, revokeHook, setMeetingStatus } from "../analytics/meeting-queries";
-import { buildDailyDigest, NOT_WATCHED } from "../analytics/digest-service";
+import { buildDailyDigest, NOT_WATCHED, seriesByLocation } from "../analytics/digest-service";
+import { portfolioRangeChanges, validFromDay, validToDay } from "../analytics/today-intel";
 import { digestText, localParts } from "../analytics/digest-intel";
-import { industryOptions, matchesSegment, PLAYBOOKS } from "../analytics/playbooks";
+import { industryKey, industryOptions, matchesSegment, PLAYBOOKS } from "../analytics/playbooks";
 import { buildQueue, recordBulk, recordDecision, summarise, undoDecision } from "../analytics/dedupe-queries";
 import { bulkSelect, groupKey } from "../analytics/dedupe";
 import { contactTimeline, dndSummary, leadSources, recentDealMoves, setTeamName, teamPace, teamStats, upcomingBirthdays } from "../analytics/people-queries";
 import { paceOf, sourceConversion, teamLabel, teamWinRate } from "../analytics/people-intel";
 import { excludedOpenDeals, getGoals, GOAL_METRICS, loadDeals, pipelineTrend, setGoal, type GoalMetric } from "../analytics/pipeline-queries";
 import { MIN_CLOSED_DEALS as MIN_CLOSED, OUTLIER_MIN_DEALS, OUTLIER_SHARE, outlier as dealOutlier, winRateOf } from "../analytics/metrics";
+import { parsePickedAccounts } from "../design/filters";
+import { myConnectionRemove, myConnectionsView, myConnectionStart, myConnectionTest, policySave, teamConnectionRevoke, teamConnectionsView } from "./connections-api";
+import { bellAction, bellView, copyPreview, copyReset, copySave, destinationAdvanced, destinationRemove, destinationsView, destinationStart, destinationTest, prefSave, prefsView, prefTest } from "./notifications-api";
+import { meetingConfirm, meetingContactSearch, meetingDismiss, meetingIgnore, meetingInboxView, meetingLink, meetingSettingsSave } from "./meetings-api";
+import { meetingSetupAccountView, meetingSetupFieldsSave, meetingSetupFieldsView, meetingSetupPreview, meetingSetupSaveMine, meetingSetupView } from "./meeting-setup-api";
+import { can, personFromSession } from "../connections/person";
+import { handlePeople, timeoutResponse } from "./people-routes";
+import { buildSteps, guideRoleOf } from "../getting-started";
+import { changedSettingKeys, feedbackGivenBy, logAccountFlags, logKeyChange, logSettingsChange, recordVote } from "../feedback-queries";
+import { groupStatus, parseGranted } from "../scope-groups";
+import { NOTE_SCOPE } from "../meeting-wording";
+import { giveFeedback, history as settingsHistoryView, ownSuggestions, reportProblem, suggest, whoOf } from "./f8-routes";
 import { authenticate, isResponse, json, type AuthContext } from "./auth";
 
 // All authenticated data endpoints live behind /api/app/<path>. Each one needs a valid signed
@@ -76,13 +108,15 @@ async function segmentSet(ctx: Ctx): Promise<Set<string> | null> {
   const industry = ctx.url.searchParams.get("industry");
   const owner = ctx.url.searchParams.get("owner");
   const hideTest = ctx.url.searchParams.get("hideTest") === "1";
-  if ((!industry || !/^[a-z_]{2,30}$/.test(industry)) && (!owner || owner.length > 60) && !hideTest) return ctx.seg;
+  // Client accounts picked in the filter bar (D0). Only ids that are well formed are kept, and they are matched against this company's own accounts below, so an id from anywhere else changes nothing.
+  const picked = parsePickedAccounts(ctx.url.searchParams.get("accounts"));
+  if ((!industry || !/^[a-z_]{2,30}$/.test(industry)) && (!owner || owner.length > 60) && !hideTest && picked.length === 0) return ctx.seg;
   const rows = await sql()`
     select l.location_id, l.name, l.owner, p.industry from locations l
     left join account_profiles p on p.installation_id = l.installation_id and p.location_id = l.location_id
     where l.installation_id = ${ctx.installationId}`;
   const filter = { industry: industry && /^[a-z_]{2,30}$/.test(industry) ? industry : null, owner: owner && owner.length <= 60 ? owner : null };
-  ctx.seg = new Set(rows.filter((r) => matchesSegment({ industry: r.industry as string | null, owner: r.owner as string | null }, filter) && !(hideTest && isTestName(r.name as string | null))).map((r) => r.location_id as string));
+  ctx.seg = new Set(rows.filter((r) => matchesSegment({ industry: r.industry as string | null, owner: r.owner as string | null }, filter) && !(hideTest && isTestName(r.name as string | null)) && (picked.length === 0 || picked.includes(r.location_id as string))).map((r) => r.location_id as string));
   return ctx.seg;
 }
 
@@ -118,13 +152,14 @@ const gate = (ctx: Ctx, feature: Feature) =>
   ctx.entitlements.locked.includes(feature) ? json({ error: "This feature is part of the paid plan", feature, upgrade: true }, 402)
   : ctx.entitlements.features[feature] === false ? json({ error: "This feature is switched off", feature, off: true }, 404) : null;
 
-function slim(a: DerivedAccount, links: ReturnType<typeof deepLinks>) {
+// The owner label is who at the company looks after the client: the company's own internal note, never sent to the client's staff (N84).
+function slim(a: DerivedAccount, links: ReturnType<typeof deepLinks>, forClient = false) {
   return {
-    locationId: a.locationId, name: a.name, ignored: a.ignored, owner: a.owner, url: links.account(a.locationId),
+    locationId: a.locationId, name: a.name, ignored: a.ignored, owner: forClient ? null : a.owner, url: links.account(a.locationId),
     contacts: a.contacts, new30d: a.new30d, openOpps: a.openOpps, openValue: a.openValue, staleOpps: a.staleOpps,
     revenueAtRisk: a.revenueAtRisk, unread: a.unread, unanswered: a.unanswered, calendars: a.calendars, pipelines: a.pipelines,
     emailPct: a.emailPct, phonePct: a.phonePct, tagPct: a.tagPct, activePct: a.activePct, completenessPct: a.completenessPct,
-    daysInactive: a.daysInactive, lastActivityAt: a.lastActivityAt, dormant: a.dormant, score: a.score, band: a.band,
+    daysInactive: a.daysInactive, lastActivityAt: a.lastActivityAt, dormant: a.dormant, score: a.score, band: a.band, bandNote: a.bandNote,
     churn: a.churn, winRate: a.winRate, expectedRevenue: a.expectedRevenue, followUpRevenueAtRisk: a.followUpRevenueAtRisk,
     leadFlowDropPct: a.leadFlowDropPct, syncError: a.syncError, contactsSyncedAt: a.contactsSyncedAt,
   };
@@ -134,9 +169,8 @@ function slim(a: DerivedAccount, links: ReturnType<typeof deepLinks>) {
 
 async function overview(ctx: Ctx) {
   // Independent queries run together so the page does not wait on them one after another.
-  const [{ settings, accounts, hidden, links }, allAlerts, sync] = await Promise.all([
-
-    accountsFor(ctx), listAlerts(ctx.installationId, false, 500, ctx.limitTo ?? undefined), syncStatus(ctx.installationId, ctx.limitTo),
+  const [{ settings, accounts, hidden, links }, allAlerts, freshness, coverage] = await Promise.all([
+    accountsFor(ctx), listAlerts(ctx.installationId, false, 500, ctx.limitTo ?? undefined), freshnessFor(ctx.installationId, { limitTo: ctx.limitTo }), conversationCoverage(ctx.installationId),
   ]);
   const overviewSeg = await segmentSet(ctx);
   const live = accounts.filter((a) => !a.ignored);
@@ -156,7 +190,10 @@ async function overview(ctx: Ctx) {
     .filter((x) => x.reasons.length > 0)
     .sort((x, y) => x.rank - y.rank)
     .slice(0, 8)
-    .map(({ a, reasons }) => ({ locationId: a.locationId, name: a.name, score: a.score, band: a.band, churn: a.churn.level, reasons, url: links.account(a.locationId) }));
+    // Inside a "Needs attention" list nothing is labelled Healthy or Thriving (N16): an account listed here is at best "Watch".
+    .map(({ a, reasons }) => ({ locationId: a.locationId, name: a.name, score: a.score, band: attentionBand(a.band), bandNote: a.bandNote, churn: a.churn.level, reasons, url: links.account(a.locationId) }));
+  const liveIds = new Set(live.map((a) => a.locationId));
+  const capped = coverage.filter((c) => liveIds.has(c.locationId) && c.stored >= CONVERSATIONS_READ_PER_ACCOUNT).length;
   return json({
     demo: ctx.demo,
     kind: ctx.kind,
@@ -172,12 +209,15 @@ async function overview(ctx: Ctx) {
       expectedRevenue: live.some((a) => a.winRate !== null) ? sum((a) => a.expectedRevenue ?? 0) : null,
       followUpRevenueAtRisk: live.some((a) => a.winRate !== null) ? sum((a) => a.followUpRevenueAtRisk ?? 0) : null,
       estimateAccounts: live.filter((a) => a.winRate !== null).length, minClosedDeals: MIN_CLOSED_DEALS, outlier: overviewOutlier(live), excludedDeals: sum((a) => a.excludedOpen ?? 0),
+      // Of the left-out deals, those in a closed-out stage or an unused pipeline (the rest have no value or no owner).
+      excludedByStage: sum((a) => a.outOfScopeOpen ?? 0),
+      readLimit: readLimitNote(capped, live.length),
       avgScore: live.length ? Math.round(sum((a) => a.score) / live.length) : 0,
       openAlerts: alerts.length, criticalAlerts: alerts.filter((x) => x.severity === "critical").length,
     },
     bands,
     attention,
-    sync,
+    freshness,
   });
 }
 
@@ -189,36 +229,61 @@ function overviewOutlier(live: DerivedAccount[]) {
   return count >= OUTLIER_MIN_DEALS && value > 0 && top / value >= OUTLIER_SHARE ? { value: top, share: Math.round((top / value) * 100) / 100, of: count } : null;
 }
 
-// The instant audit: what is wrong right now, what it costs, and where to start.
-async function computeAudit(ctx: Ctx) {
-  const { settings, accounts } = await accountsFor(ctx);
+// The instant audit: what is wrong right now, what it costs, and where to start. It covers exactly the accounts every other page covers under the same
+// filter (the page filter is carried on the request, N8); the lists behind its numbers (KF-6) and the snapshot a share link keeps are both built from
+// that same set of accounts, never from anything the browser names.
+async function computeAudit(ctx: Ctx, withLists = false) {
+  const { settings, accounts, hidden, links } = await accountsFor(ctx);
   const live = accounts.filter((a) => !a.ignored);
-  const v = await appointmentView(ctx.installationId, await allowedIds(ctx));
+  const liveIds = live.map((a) => a.locationId);
+  const liveSet = new Set(liveIds);
+  const [v, coverageRows] = await Promise.all([appointmentView(ctx.installationId, liveIds), conversationCoverage(ctx.installationId)]);
   const appts = v.access.total === 0 ? null : {
     readable: v.access.ok, total: v.access.total, needPermission: v.access.needsPermission.length,
     unmarked: v.unmarkedTotal, noShowsToRecover: v.recoverTotal, unconfirmed48: v.unconfirmedTotal,
   };
+  // SubSync reads the newest conversations of an account up to a limit; the waiting count says so when any account is at it (N15).
+  const readLimit = readLimitNote(coverageRows.filter((c) => liveSet.has(c.locationId) && c.stored >= CONVERSATIONS_READ_PER_ACCOUNT).length, live.length);
   const audit = buildAudit(live.map((a) => ({
     locationId: a.locationId, name: a.name, staleValue: a.staleValue, staleOpps: a.staleOpps, openValue: a.openValue, openOpps: a.openOpps, excludedOpen: a.excludedOpen ?? 0,
-    unanswered: a.unanswered, winRate: a.winRate, avgDealValue: a.avgDealValue, completenessPct: a.completenessPct, contacts: a.contacts,
-  })), appts);
+    unanswered: a.unanswered, winRate: a.winRate, avgDealValue: a.avgDealValue, completenessPct: a.completenessPct, contacts: a.contacts, topStaleDeal: a.topStaleDeal ?? 0,
+    wonCount: a.wonCount, lostCount: a.lostCount,
+  })), appts, { staleDays: settings.staleDays, slaHours: settings.slaHours, readLimit });
   const who = settings.brandName ?? (ctx.limitTo ? "Your business" : "Your company");
-  return { audit, who, names: live.map((a) => a.name ?? "").filter(Boolean) };
+  let lists: Record<string, AuditList> | null = null;
+  if (withLists) {
+    const [stale, waiting] = await Promise.all([staleDealList(ctx.installationId, liveIds, settings.staleDays), waitingList(ctx.installationId, liveIds, settings.slaHours)]);
+    const withUrl = (l: AuditList) => ({ ...l, rows: l.rows.map((r) => ({ ...r, url: r.contactId ? links.contact(r.locationId, r.contactId) : links.opportunities(r.locationId) })) });
+    lists = { stale: withUrl(stale), slow: withUrl(waiting) };
+    if (appts) { lists.unmarked = withUrl(appointmentList(v.unmarked, v.unmarkedTotal, "Started")); lists.noshows = withUrl(appointmentList(v.recover, v.recoverTotal, "No-show on")); }
+  }
+  return { audit, who, names: live.map((a) => a.name ?? "").filter(Boolean), settings, hidden, lists, readLimit };
 }
 
 async function auditViewData(ctx: Ctx) {
-  const { audit, who } = await computeAudit(ctx);
-  return json({ audit, summary: auditSummary(audit, who) });
+  // Today asks for the audit without the rows behind each number (lists=0): it needs only the first finding, and the lists are the slow part.
+  const { audit, who, settings, hidden, lists, readLimit } = await computeAudit(ctx, ctx.url.searchParams.get("lists") !== "0");
+  return json({
+    audit, summary: auditSummary(audit, who), lists, readLimit, hiddenAccounts: hidden,
+    // The sender's own name and colour, for the printed page (N85). No logo: none is stored.
+    brand: { name: settings.brandName, color: settings.brandColor },
+    // Sharing is for an agency or a business, never a client's own staff; the demo holds only the public sample.
+    canShare: ctx.kind !== "client" && !ctx.demo, demo: ctx.demo, shareDays: SHARE_LINK_DAYS,
+    generatedAt: new Date().toISOString(),
+  });
 }
 
-// A snapshot of the audit someone can send on: totals and finding titles only, account names scrubbed, expires in 30 days.
+// A snapshot of the audit someone can send on: totals, finding titles, fix steps and definitions only, account names scrubbed, expires in SHARE_LINK_DAYS.
+// It covers the accounts of the page filter that was on when it was made, and never holds a contact, a deal or a conversation.
 async function auditShare(ctx: Ctx) {
+  if (ctx.kind === "client") return json({ error: "Not available in this view" }, 403);
   if (ctx.demo) return json({ error: "Sharing is not available in the demo" }, 400);
-  const { audit, who, names } = await computeAudit(ctx);
+  const { audit, who, names, settings } = await computeAudit(ctx);
   const id = randomBytes(24).toString("base64url");
-  await sql()`insert into shared_audits (installation_id, id, payload, expires_at) values (${ctx.installationId}, ${id}, ${sql().json(buildSharePayload(audit, who, names) as never)}, now() + interval '14 days')`;
+  const payload = buildSharePayload(audit, who, names, new Date(), { branded: settings.brandName !== null, brandColor: settings.brandColor, rulesVersion: DEAL_RULES_VERSION });
+  await sql()`insert into shared_audits (installation_id, id, payload, expires_at) values (${ctx.installationId}, ${id}, ${sql().json(payload as never)}, now() + make_interval(days => ${SHARE_LINK_DAYS}))`;
   const origin = (process.env.NEXT_PUBLIC_APP_URL ?? ctx.url.origin).replace(/\/+$/, "");
-  return json({ url: `${origin}/audit/${id}`, expiresInDays: 14 });
+  return json({ url: `${origin}/audit/${id}`, expiresInDays: SHARE_LINK_DAYS });
 }
 
 // The links this installation has made, newest first, with how often each was opened. Never available to a client's own staff.
@@ -247,10 +312,44 @@ async function auditRevoke(ctx: Ctx) {
 }
 
 // How fast new leads get a first reply from a person.
+// Every lead row (anything with a client account and a contact) gets the white-label link that opens it in the CRM, wherever it sits in the answer.
+function withContactUrls<T>(value: T, link: (locationId: string, contactId: string) => string): T {
+  if (Array.isArray(value)) return value.map((v) => withContactUrls(v, link)) as T;
+  if (value && typeof value === "object") {
+    const o = value as Record<string, unknown>;
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(o)) out[k] = withContactUrls(v, link);
+    if (typeof o.locationId === "string" && typeof o.contactId === "string") out.url = link(o.locationId, o.contactId);
+    return out as T;
+  }
+  return value;
+}
+
 async function speedViewData(ctx: Ctx) {
   const sc = await scope(ctx);
-  const v = await speedView(ctx.installationId, await allowedIds(ctx), sc.settings.speedTargetMinutes);
-  return json({ ...v, waiting: v.waiting.map((w) => ({ ...w, url: sc.links.contact(w.locationId, w.contactId) })) });
+  const allowed = await allowedIds(ctx);
+  const part = ctx.url.searchParams.get("part");
+  // One card of the screen over the range that card chose (KF-4). Same accounts, same rows, same judging as the main answer; the dates are checked here, never trusted.
+  if (part !== null) {
+    if (!isPart(part)) return json({ error: "Unknown part of this screen" }, 400);
+    const now = Date.now();
+    const win = parseWindow(ctx.url.searchParams.get("from"), ctx.url.searchParams.get("to"), now);
+    if (!win.ok) return json({ error: win.error }, 400);
+    const cmpFrom = ctx.url.searchParams.get("cmpFrom"), cmpTo = ctx.url.searchParams.get("cmpTo");
+    const cmp = cmpFrom || cmpTo ? parseWindow(cmpFrom, cmpTo, now) : null;
+    if (cmp && !cmp.ok) return json({ error: "The comparison range is not valid: " + cmp.error }, 400);
+    const out = await speedPart(ctx.installationId, allowed, sc.settings.speedTargetMinutes, part, win.win, cmp && cmp.ok ? cmp.win : null, now);
+    return json(withContactUrls(out, sc.links.contact));
+  }
+  const v = await speedView(ctx.installationId, allowed, sc.settings.speedTargetMinutes);
+  return json({
+    ...v,
+    // How the numbers are measured, shown on the page itself (N78): the reply target and whether automatic messages count. A client's staff can read it, not change it.
+    measuring: { targetMinutes: sc.settings.speedTargetMinutes, countAutomated: sc.settings.countAutomatedTouches, businessHours: sc.settings.speedBusinessHours, canChange: ctx.kind !== "client" },
+    waiting: v.waiting.map((w) => ({ ...w, url: sc.links.contact(w.locationId, w.contactId) })),
+    // The leads behind each week of the trend, with the same white-label link as every other list (KF-6).
+    trend: v.trend.map((w) => ({ ...w, members: w.members.map((m) => ({ ...m, url: sc.links.contact(m.locationId, m.contactId) })) })),
+  });
 }
 
 // Voting is per person and counted inside the one installation, so one agency never sees another's votes.
@@ -259,36 +358,92 @@ const voterOf = (ctx: Ctx) => `${ctx.kind}:${ctx.limitTo ?? "agency"}:${ctx.sess
 async function roadmapView(ctx: Ctx) {
   const rows = await sql()`select item_key, count(*)::int n, bool_or(voter = ${voterOf(ctx)}) mine from roadmap_votes where installation_id = ${ctx.installationId} group by item_key`;
   const by = new Map(rows.map((r) => [r.item_key as string, { n: r.n as number, mine: Boolean(r.mine) }]));
-  return json({ items: ROADMAP.map((i) => ({ ...i, votes: by.get(i.key)?.n ?? 0, voted: by.get(i.key)?.mine ?? false })), changelog: CHANGELOG });
+  // Statuses are words, with what each means; a shipped item has nothing left to vote for. Your own suggestions come with it (never anyone else's).
+  return json({
+    items: ROADMAP.map((i) => ({ ...i, label: STATUS_LABEL[i.status], votes: by.get(i.key)?.n ?? 0, voted: by.get(i.key)?.mine ?? false })),
+    statusMeaning: STATUS_MEANING, changelog: CHANGELOG, mine: await ownSuggestions(ctx),
+  });
 }
 
 async function roadmapVote(ctx: Ctx) {
   const body = (await ctx.request.json().catch(() => null)) as { key?: unknown } | null;
-  if (typeof body?.key !== "string" || !ROADMAP.some((i) => i.key === body.key)) return json({ error: "Unknown item" }, 400);
+  const item = typeof body?.key === "string" ? ROADMAP.find((i) => i.key === body.key) : undefined;
+  if (!item) return json({ error: "Unknown item" }, 400);
+  if (item.status === "shipped") return json({ error: "That one is already live, so there is nothing left to vote for." }, 400);
   const voter = voterOf(ctx);
-  const gone = await sql()`delete from roadmap_votes where installation_id = ${ctx.installationId} and item_key = ${body.key} and voter = ${voter} returning 1`;
-  if (gone.length === 0) await sql()`insert into roadmap_votes (installation_id, item_key, voter) values (${ctx.installationId}, ${body.key}, ${voter})`;
+  const gone = await sql()`delete from roadmap_votes where installation_id = ${ctx.installationId} and item_key = ${item.key} and voter = ${voter} returning 1`;
+  if (gone.length === 0) {
+    await sql()`insert into roadmap_votes (installation_id, item_key, voter) values (${ctx.installationId}, ${item.key}, ${voter}) on conflict do nothing`;
+    await recordVote(ctx.installationId, actorOf(ctx), item.key); // a dry-run line for King's daily digest: ids only
+  }
   return json({ ok: true, voted: gone.length === 0 });
+}
+
+// The date window and the three filters come from the address (from, to, cmpFrom, cmpTo, calendar, user, source). They only narrow what the caller is
+// already allowed to see: the accounts are fixed by allowedIds, never by anything sent here.
+function apptParams(ctx: Ctx) {
+  const q = ctx.url.searchParams;
+  return {
+    window: parseApptWindow({ from: q.get("from"), to: q.get("to"), cmpFrom: q.get("cmpFrom"), cmpTo: q.get("cmpTo") }, Date.now()),
+    filters: parseApptFilters({ calendar: q.get("calendar"), user: q.get("user"), source: q.get("source") }),
+  };
+}
+
+// A list row with its white-label link to the contact. A booking with no contact has no link.
+function withLink<T extends { locationId: string; contactId: string | null }>(sc: Awaited<ReturnType<typeof scope>>) {
+  return (p: T) => ({ ...p, url: p.contactId ? sc.links.contact(p.locationId, p.contactId) : null });
 }
 
 async function appointmentsView(ctx: Ctx) {
   const sc = await scope(ctx);
-  const v = await appointmentView(ctx.installationId, await allowedIds(ctx));
-  const link = (p: { locationId: string; contactId: string }) => sc.links.contact(p.locationId, p.contactId);
+  const v = await appointmentView(ctx.installationId, await allowedIds(ctx), Date.now(), apptParams(ctx));
+  const link = withLink(sc);
   return json({
-    ...v, canSeeAccounts: ctx.limitTo === null,
-    unconfirmed: v.unconfirmed.map((p) => ({ ...p, url: link(p) })), recover: v.recover.map((p) => ({ ...p, url: link(p) })), unmarked: v.unmarked.map((p) => ({ ...p, url: link(p) })),
+    ...v, canSeeAccounts: ctx.limitTo === null, canEditTargets: ctx.kind !== "client",
+    items: v.items.map(link), upcoming: v.upcoming.map(link), unmarked: v.unmarked.map(link), recover: v.recover.map(link),
+    // The "My day" page and the audit read this older shape: the people to remind (booked, not confirmed, within two days).
+    unconfirmed: v.upcoming.filter((r) => r.unconfirmed).slice(0, 15).map(link),
   });
+}
+
+// The calendar, person and client-account breakdowns: their own window, the same three filters.
+async function appointmentsBreakdownView(ctx: Ctx) {
+  const sc = await scope(ctx);
+  const v = await appointmentBreakdown(ctx.installationId, await allowedIds(ctx), Date.now(), apptParams(ctx));
+  return json({ ...v, canSeeAccounts: ctx.limitTo === null, items: v.items.map(withLink(sc)) });
+}
+
+// One appointment. The account it belongs to must be one the caller may see; anything else is "not found", the same answer as an id that does not exist.
+async function appointmentDetailView(ctx: Ctx, locationId: string, appointmentId: string) {
+  const sc = await scope(ctx);
+  const found = await appointmentDetail(ctx.installationId, await allowedIds(ctx), locationId, appointmentId);
+  if (!found || !sc.permits(locationId)) return json({ error: "Appointment not found" }, 404);
+  return json({ ...found, url: found.contact ? sc.links.contact(locationId, found.contact.contactId) : null });
+}
+
+// The show-rate target is the account's own setting. A client's staff cannot change it (the route policy refuses them too); the change is written to the audit log.
+async function appointmentTargetUpdate(ctx: Ctx) {
+  if (ctx.kind === "client") return json({ error: "Not available in this view" }, 403);
+  const body = (await ctx.request.json().catch(() => null)) as { showRate?: unknown } | null;
+  const value = body?.showRate === null ? null : clampTarget(body?.showRate);
+  if (body === null || (body.showRate !== null && value === null)) return json({ error: "Choose a show-rate target between 30% and 100%" }, 400);
+  if (ctx.demo) return json({ error: "Targets cannot be changed in the demo" }, 400);
+  await setShowRateTarget(ctx.installationId, value);
+  await sql()`insert into audit_log (installation_id, actor, action, detail) values (${ctx.installationId}, ${ctx.session.userId ?? ctx.kind}, 'appointments.target_changed', ${sql().json({ showRate: value } as never)})`;
+  return json({ ok: true, showRate: value });
 }
 
 // The deeper read of the same calendars: show rate by time and source, recovery, fairness, follow-up gaps and
 // a short brief before each upcoming appointment. Limited to the accounts the caller may see.
 async function appointmentInsightsView(ctx: Ctx) {
   const sc = await scope(ctx);
-  const v = await appointmentInsights(ctx.installationId, await allowedIds(ctx));
+  const v = await appointmentInsights(ctx.installationId, await allowedIds(ctx), Date.now(), apptParams(ctx));
   const link = (p: { locationId: string; contactId: string }) => sc.links.contact(p.locationId, p.contactId);
+  const itemLink = withLink(sc);
   return json({
-    ...v,
+    ...v, canEditTargets: ctx.kind !== "client",
+    items: v.items.map(itemLink),
+    funnel: { ...v.funnel, steps: v.funnel.steps.map((s) => ({ ...s, members: s.members.map((m) => ({ ...m, url: link(m) })) })) },
     repeatNoShows: v.repeatNoShows.map((p) => ({ ...p, url: link(p) })),
     followUp: { ...v.followUp, contacts: v.followUp.contacts.map((p) => ({ ...p, url: link(p) })) },
     briefs: v.briefs.map((p) => ({ ...p, url: link(p) })),
@@ -314,7 +469,9 @@ async function setupCompare(ctx: Ctx) {
   return json({
     accounts: setups.map((s) => ({ locationId: s.locationId, name: s.name })),
     baseline: base ? { locationId: base.locationId, name: base.name, pipelines: base.pipelines.length, calendars: base.calendars } : null,
-    rows: base ? setups.filter((s) => s.locationId !== base.locationId).map((s) => { const d = compareSetup(base, s); return { locationId: s.locationId, name: s.name, matches: d.matches, notes: describeDiff(d) }; }) : [],
+    rows: base ? setups.filter((s) => s.locationId !== base.locationId && baselineShare(base, s) >= SHARED_BASELINE).map((s) => { const d = compareSetup(base, s); return { locationId: s.locationId, name: s.name, matches: d.matches, notes: describeDiff(d), share: baselineShare(base, s), drift: driftRows(base, s) }; }) : [],
+    // Accounts that did not start from the baseline's template are not compared with it: a list of differences between two unrelated clients says nothing.
+    unrelated: base ? setups.filter((s) => s.locationId !== base.locationId && baselineShare(base, s) < SHARED_BASELINE).map((s) => ({ locationId: s.locationId, name: s.name, pipelines: s.pipelines.length })) : [],
   });
 }
 
@@ -329,7 +486,8 @@ async function meetingsView(ctx: Ctx) {
   return json({
     meetings: meetings.map((m) => ({ ...m, contactUrl: m.contactId ? sc.links.contact(m.locationId, m.contactId) : null })),
     hooks, accounts: locs.map((l) => ({ locationId: l.location_id as string, name: (l.name as string | null) ?? "Unnamed account" })),
-    maxHooks: MAX_HOOKS_PER_ACCOUNT, keepTranscripts: sc.settings.keepTranscripts, canManage: ctx.kind !== "client",
+    maxHooks: MAX_HOOKS_PER_ACCOUNT, keepTranscripts: sc.settings.keepTranscripts, canManage: ctx.kind !== "client", moreTools: zoomOn(ctx),
+    pushNotesToCrm: sc.settings.pushNotesToCrm, noteWriteGranted: ctx.demo ? null : await installationHasScope(ctx.installationId, NOTE_SCOPE),
   });
 }
 
@@ -426,19 +584,24 @@ async function cleanupWork(ctx: Ctx, id: string, mode: "apply" | "undo") {
 }
 
 // ---------------- connections: sign in to Slack, Fathom and Zoom ----------------
+// Zoom and Google Meet are hidden behind the zoom_meet switch (off by default): the card, the stored connections and the sign-in start all vanish.
+const zoomOn = (ctx: Ctx) => ctx.entitlements.features.zoom_meet !== false;
+
 async function connectionsView(ctx: Ctx) {
-  const allowed = await allowedIds(ctx);
-  const [connections, locs] = await Promise.all([
-    listConnections(ctx.installationId),
-    sql()`select location_id, name from locations where installation_id = ${ctx.installationId} and not ignored ${allowed ? sql()`and location_id = any(${allowed}::text[])` : sql()``} order by name`,
-  ]);
+  const connections = await listConnections(ctx.installationId);
+  const available = availability();
+  const showZoom = zoomOn(ctx);
   return json({
-    connections, available: availability(), single: ctx.limitTo !== null,
-    accounts: locs.map((l) => ({ locationId: l.location_id as string, name: (l.name as string | null) ?? "Unnamed account" })),
+    connections: showZoom ? connections : connections.filter((c) => c.provider !== "zoom"),
+    available: showZoom ? available : { slack: available.slack, fathom: available.fathom },
   });
 }
 
 async function connectionStart(ctx: Ctx, provider: string) {
+  // Only a workspace tool (Slack) is connected here, and only by an administrator. Personal tools are connected by each person under my-connections.
+  if (provider !== "slack") return json({ error: "Connect your own tools from My connections" }, 404);
+  const person = personFromSession(ctx.session, ctx.kind, ctx.limitTo);
+  if (!person || !can(person.role, "connect_workspace")) return json({ error: "Only an administrator can connect Slack", forbidden: true }, 403);
   if (!isProvider(provider)) return json({ error: "Not found" }, 404);
   if (ctx.demo) return json({ error: "Connecting is not available in the demo. It needs a real install." }, 400);
   const link = startLink(provider, { provider, installationId: ctx.installationId, onlyLocationId: ctx.limitTo, actor: actorOf(ctx) });
@@ -450,20 +613,12 @@ async function connectionRemove(ctx: Ctx, id: string) {
   return (await disconnect(ctx.installationId, id, actorOf(ctx))) ? json({ ok: true }) : json({ error: "Not found" }, 404);
 }
 
-async function connectionUpdate(ctx: Ctx, id: string) {
-  if (!UUID.test(id)) return json({ error: "Not found" }, 404);
-  const body = (await ctx.request.json().catch(() => null)) as { defaultLocationId?: unknown } | null;
-  const loc = body?.defaultLocationId;
-  if (loc !== null && !(typeof loc === "string" && LOCATION_ID.test(loc))) return json({ error: "Choose an account, or none" }, 400);
-  const row = await getConnection(ctx.installationId, id);
-  if (!row) return json({ error: "Not found" }, 404);
-  return (await setDefaultAccount(ctx.installationId, row, loc as string | null)) ? json({ ok: true }) : json({ error: "That account cannot be used" }, 400);
-}
-
 async function dailyView(ctx: Ctx) {
   const sc = await scope(ctx);
   const d = await buildDailyDigest(ctx.installationId, { limitTo: ctx.limitTo, planLimit: accountLimit(ctx.plan, ctx.entitlements.enforced), onlyIds: await segmentSet(ctx) });
+  const seen = (await conversationCoverage(ctx.installationId)).filter((c) => sc.permits(c.locationId));
   return json({
+    readLimit: readLimitNote(seen.filter((c) => c.stored >= CONVERSATIONS_READ_PER_ACCOUNT).length, seen.length),
     generatedAt: d.generatedAt, freshness: d.freshness, connection: d.connection, headlines: d.headlines, accounts: d.accounts, limited: ctx.limitTo !== null,
     attention: d.attention.map((a) => ({ ...a, url: sc.links.account(a.locationId) })),
     fine: d.fine, notWatched: NOT_WATCHED,
@@ -471,12 +626,22 @@ async function dailyView(ctx: Ctx) {
   });
 }
 
-function agoText(iso: string): string {
-  const mins = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60_000));
-  return mins < 2 ? "just now" : mins < 120 ? mins + " minutes ago" : Math.round(mins / 60) + " hours ago";
+// How the four headline figures on Today changed since the start of the window a card asked for (stage F5, KF-4). Same accounts as every other read
+// (plan limit, the page filter, one account for a business); the only thing taken from the request is a start date, checked before it is used.
+async function dailyChanges(ctx: Ctx) {
+  const [{ today }] = await sql()`select current_date::text as today`;
+  const from = validFromDay(ctx.url.searchParams.get("from"), today as string);
+  if (!from) return json({ error: "Pick a start date within the last year and before today" }, 400);
+  const to = validToDay(ctx.url.searchParams.get("to"), from, today as string);
+  if (!to) return json({ error: "Pick an end date that is not before the start and not in the future" }, 400);
+  const { accounts } = await accountsFor(ctx);
+  const ids = accounts.filter((a) => !a.ignored).map((a) => a.locationId);
+  const span = Math.round((Date.parse(`${today}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000) + 2;
+  const series = await seriesByLocation(ctx.installationId, ids, span);
+  return json({ from, to, accounts: ids.length, changes: portfolioRangeChanges([...series.values()], from, to) });
 }
 
-const USAGE_VIEWS = new Set(["today", "overview", "accounts", "clients", "team", "search", "deals", "pipeline", "leads", "calls", "inbox", "onboarding", "email", "duplicates", "alerts", "settings", "help", "account", "meetings", "audit", "speed", "appointments"]);
+const USAGE_VIEWS = new Set(["today", "overview", "accounts", "clients", "team", "search", "deals", "pipeline", "leads", "calls", "inbox", "onboarding", "email", "duplicates", "alerts", "settings", "help", "account", "meetings", "audit", "speed", "appointments", "people", "myday", "roadmap", "notifications"]);
 
 // A counter of which pages get opened (no personal data), so the getting-started checklist can
 // tick itself off and so the agency can see what its team uses.
@@ -489,57 +654,56 @@ async function usagePing(ctx: Ctx) {
   return json({ ok: true });
 }
 
-// The getting-started checklist, with each step's real state.
+// The Getting started guide for this person's role, with each step's real state. The steps and when they tick are in src/lib/getting-started.ts (unit tested);
+// this only gathers the facts, all from the signed session's own installation. A client's staff get steps ticked from their own browser, not the company counter.
 async function startView(ctx: Ctx) {
   const db = sql();
-  const [views, [locs], status, settings, [clientOn]] = await Promise.all([
+  const agency = ctx.kind === "agency";
+  const [views, [locs], status, settings, [clientOn], accountRows, [shares], changed, given, [feeOn]] = await Promise.all([
     db`select distinct view from usage_events where installation_id = ${ctx.installationId}`,
     db`select count(*)::int total, count(*) filter (where contacts_synced_at is not null)::int synced from locations
         where installation_id = ${ctx.installationId} ${ctx.limitTo ? db`and location_id = ${ctx.limitTo}` : db``}`,
     syncStatus(ctx.installationId, ctx.limitTo),
     getSettings(ctx.installationId),
-    ctx.kind === "agency" ? db`select count(*)::int n from locations where installation_id = ${ctx.installationId} and client_view` : Promise.resolve([{ n: 0 }]),
+    agency ? db`select count(*)::int n from locations where installation_id = ${ctx.installationId} and client_view` : Promise.resolve([{ n: 0 }]),
+    agency ? db`select name, ignored from locations where installation_id = ${ctx.installationId}` : Promise.resolve([]),
+    agency ? db`select count(*)::int n from shared_audits where installation_id = ${ctx.installationId}` : Promise.resolve([{ n: 0 }]),
+    ctx.kind === "client" ? Promise.resolve(new Set<string>()) : changedSettingKeys(ctx.installationId),
+    feedbackGivenBy(ctx.installationId, whoOf(ctx).who),
+    agency ? db`select count(*)::int n from account_profiles where installation_id = ${ctx.installationId} and monthly_fee is not null` : Promise.resolve([{ n: 0 }]),
   ]);
-  const seen = new Set(views.map((v) => v.view as string));
-  const agency = ctx.kind === "agency";
   const synced = locs.total > 0 && locs.synced === locs.total && status.pending === 0;
   const syncDetail = locs.total === 0
     ? (status.pending > 0 ? "Looking for your accounts..." : "No accounts found yet. The platform can take a minute after an install: press Sync now on the home page.")
-    : synced ? `${locs.total} account${locs.total === 1 ? "" : "s"} read. Last sync finished ${status.lastFinishedAt ? agoText(status.lastFinishedAt) : "recently"}.`
+    : synced ? `${locs.total} account${locs.total === 1 ? "" : "s"} read. ${(await freshnessFor(ctx.installationId, { limitTo: ctx.limitTo })).text}.`
     : `${locs.synced} of ${locs.total} account${locs.total === 1 ? "" : "s"} read, ${status.pending} job${status.pending === 1 ? "" : "s"} left.`;
-  const steps = [
-    { id: "connected", title: "Connect SubSync", done: true, detail: agency ? "Connected to all your client accounts." : "Connected to your account.",
-      body: "You are signed in through the platform, so there is nothing to type. SubSync only reads your data.", view: null, cta: null },
-    { id: "synced", title: "Let the first sync finish", done: synced, detail: syncDetail,
-      body: "SubSync reads your " + (agency ? "client accounts" : "account") + " in the background. The first sync takes a few minutes, longer with many contacts. Numbers fill in as it goes.", view: "overview", cta: "See sync progress" },
-    { id: "today", title: "See what needs you today", done: seen.has("today"),
-      detail: null, body: "Today ranks what to do first, with the reason and a link, and compares each account with its own normal.", view: "today", cta: "Open Today" },
-    { id: "search", title: "Find any contact", done: seen.has("search"),
-      detail: null, body: "Search by name, email or phone" + (agency ? " across every client account at once" : "") + ", and open a contact's timeline.", view: "search", cta: "Open contact search" },
-    { id: "duplicates", title: "Review likely duplicates", done: seen.has("duplicates"),
-      detail: null, body: "See likely duplicate contacts with a confidence score, decide which record to keep, then merge them in the platform.", view: "duplicates", cta: "Open Duplicates" },
-    { id: "brief", title: "Get the daily brief in Slack", done: Boolean(settings.slackWebhookUrl) && settings.digestEnabled,
-      detail: null, body: "Paste a Slack incoming webhook in Settings and choose the hour. It arrives once a day in your time zone.", view: "settings", cta: "Open Settings" },
-    { id: "email", title: "Get alerts and the Monday email", done: Boolean(settings.digestEmail),
-      detail: null, body: "Type one email address in Settings. New critical and warning alerts are emailed to it straight away, and a short summary arrives every Monday. Nothing is sent until you add an address.", view: "settings", cta: "Open Settings" },
-    { id: "meetings", title: "Connect a meeting tool (optional)", done: seen.has("meetings"), optional: true,
-      detail: null, body: "Connect Zoom or Fathom in Settings and each meeting summary is saved in SubSync and added to the matching contact's notes in your CRM.", view: "meetings", cta: "Open Meeting notes" },
-    ...(agency ? [{ id: "clients", title: "Let a client see their own account", done: (clientOn?.n ?? 0) > 0, optional: true,
-      detail: null, body: "Switch on a read-only view for a client's own staff. They see only their own account: never other clients, fees or notes.", view: "settings", cta: "Open Settings" }] : []),
-  ];
-  return json({ kind: ctx.kind, steps, doneCount: steps.filter((s) => s.done).length, total: steps.length });
+  const role = guideRoleOf(ctx.kind, ctx.session.role);
+  const steps = buildSteps(role, {
+    synced, syncDetail, seen: new Set(views.map((v) => v.view as string)), companyUsage: ctx.kind !== "client",
+    slackBrief: Boolean(settings.slackWebhookUrl) && settings.digestEnabled, emailSet: Boolean(settings.digestEmail), clientViewOn: clientOn?.n ?? 0,
+    ignoredCount: accountRows.filter((r) => r.ignored === true).length, testLookingCount: accountRows.filter((r) => r.ignored !== true && isTestName(r.name as string | null)).length,
+    changedKeys: changed, sharedAudits: shares?.n ?? 0, feedbackGiven: given,
+    meetingsPage: ctx.entitlements.features.meetings !== false, zoomOn: zoomOn(ctx),
+    clientFees: feeOn?.n ?? 0, clientsPage: ctx.entitlements.features.clients !== false,
+  });
+  // A client's staff never receive what the company set up in Settings (N84): their guide has no such step, and the facts above for it are empty.
+  return json({ kind: ctx.kind, role, steps, doneCount: steps.filter((s) => s.done).length, total: steps.length });
 }
 
 // Options for the filter bar. Not narrowed by the filter itself, so you can always change it.
 async function segmentsView(ctx: Ctx) {
-  const rows = await sql()`
-    select l.location_id, l.name, l.owner, p.industry from locations l
+  const all = await sql()`
+    select l.location_id, l.name, l.owner, l.ignored, p.industry from locations l
     left join account_profiles p on p.installation_id = l.installation_id and p.location_id = l.location_id
-    where l.installation_id = ${ctx.installationId} and not l.ignored`;
+    where l.installation_id = ${ctx.installationId}`;
+  // Ignored accounts are listed (so the filter bar can say they are left out and why) but never counted in the totals, industries or owners.
+  const rows = all.filter((r) => !r.ignored);
   const owners = new Map<string, number>();
   for (const r of rows) if (r.owner) owners.set(r.owner as string, (owners.get(r.owner as string) ?? 0) + 1);
   return json({
     total: rows.length,
+    // The client accounts an agency can pick between in the filter bar (this endpoint is agency only; a business or client session is refused by the route policy).
+    accounts: all.map((r) => ({ id: r.location_id as string, name: (r.name as string | null) ?? "Unnamed account", test: isTestName(r.name as string | null), ignored: r.ignored === true, industry: industryKey(r.industry as string | null), owner: (r.owner as string | null) ?? null })).sort((a, b) => a.name.localeCompare(b.name)),
     testAccounts: rows.filter((r) => isTestName(r.name as string | null)).length,
     industries: industryOptions(rows.map((r) => r.industry as string | null)),
     owners: [...owners.entries()].map(([name, accounts]) => ({ name, accounts })).sort((a, b) => b.accounts - a.accounts || a.name.localeCompare(b.name)),
@@ -548,12 +712,15 @@ async function segmentsView(ctx: Ctx) {
 
 // What each kind of client cares about, and which of your accounts fall under it.
 async function playbooksView(ctx: Ctx) {
-  const [rows, settings] = await Promise.all([
+  const [allRows, settings, seg] = await Promise.all([
     sql()`select l.location_id, l.name, p.industry from locations l
       left join account_profiles p on p.installation_id = l.installation_id and p.location_id = l.location_id
       where l.installation_id = ${ctx.installationId} and not l.ignored`,
     getSettings(ctx.installationId),
+    segmentSet(ctx),
   ]);
+  // The accounts listed under each industry follow the filter at the top of the app, like every other page (N8).
+  const rows = seg ? allRows.filter((r) => seg.has(r.location_id as string)) : allRows;
   const unset = rows.filter((r) => !((r.industry as string | null) ?? "").trim()).length;
   return json({
     industryTargets: settings.industryTargets, globalReplyHours: settings.slaHours, accountsWithoutIndustry: unset,
@@ -566,7 +733,7 @@ async function playbooksView(ctx: Ctx) {
 
 async function accounts(ctx: Ctx) {
   const { settings, accounts: list, links } = await accountsFor(ctx);
-  return json({ accounts: list.map((a) => slim(a, links)), settings: { staleDays: settings.staleDays, dormantDays: settings.dormantDays, slaHours: settings.slaHours } });
+  return json({ accounts: list.map((a) => slim(a, links, ctx.kind === "client")), settings: { staleDays: settings.staleDays, dormantDays: settings.dormantDays, slaHours: settings.slaHours } });
 }
 
 async function onboardingOverview(ctx: Ctx) {
@@ -580,7 +747,7 @@ async function onboardingOverview(ctx: Ctx) {
       const { items, completionPct } = onboardingChecklist(a, {
         domainStatus: worst?.status ?? null, manual: manual.get(a.locationId) ?? {}, custom: settings.customChecklist,
       });
-      return { locationId: a.locationId, name: a.name, owner: a.owner, url: links.account(a.locationId), completionPct, items };
+      return { locationId: a.locationId, name: a.name, owner: ctx.kind === "client" ? null : a.owner, url: links.account(a.locationId), completionPct, items };
     })
     .sort((x, y) => x.completionPct - y.completionPct);
   return json({ accounts: rows });
@@ -604,7 +771,7 @@ async function accountDetail(ctx: Ctx, locationId: string) {
   return json({
     clientView: flagRow?.client_view === true,
     brand: { name: settings.brandName, color: settings.brandColor },
-    account: slim(a, links),
+    account: slim(a, links, ctx.kind === "client"),
     breakdown: a.breakdown,
     trend,
     staleDeals: deals.map((d) => ({ ...d, url: links.opportunities(d.locationId) })),
@@ -640,17 +807,59 @@ async function inboxView(ctx: Ctx) {
   // The same list and the same window as the Today and Overview counts: nothing is cut short at a few hundred, and if the list ever is
   // (more than the limit), the screen says so instead of showing a smaller number as if it were the total.
   const LIMIT = 2000;
-  const rows = (await inbox(ctx.installationId, settings.slaHours, LIMIT, ctx.limitTo ?? undefined)).filter((r) => permits(r.locationId));
+  const [fetched, coverage, names] = await Promise.all([inbox(ctx.installationId, settings.slaHours, LIMIT, ctx.limitTo ?? undefined), conversationCoverage(ctx.installationId), teamNames(ctx.installationId)]);
+  const rows = fetched.filter((r) => permits(r.locationId));
   const late = rows.filter((r) => r.overSla);
+  const seen = coverage.filter((c) => permits(c.locationId));
+  // Who each conversation's contact is assigned to, as a name (N21). The conversation list does not say who a conversation is assigned to, so the
+  // contact's own team member is used; the page says so.
+  const owners = await contactOwners(ctx.installationId, rows);
+  const now = Date.now();
+  const items = rows.map((r) => {
+    const assignedTo = r.contactId ? owners.get(r.locationId + ":" + r.contactId) ?? null : null;
+    const at = r.lastMessageAt ? Date.parse(r.lastMessageAt) : NaN;
+    return {
+      ...r, assignedTo, assignee: assigneeLabel(assignedTo, names), ageHours: Number.isFinite(at) ? Math.max(0, Math.floor((now - at) / 3_600_000)) : null,
+      channel: channelLabel(r.lastMessageType), url: links.conversation(r.locationId, r.conversationId),
+    };
+  });
+  // "Assigned to me" is offered only to a person who really is assigned some of these contacts (their own sign-in id, never anyone else's).
+  const me = ctx.session.userId && items.some((i) => i.assignedTo === ctx.session.userId) ? ctx.session.userId : null;
   return json({
+    me,
+    namesMissing: items.some((i) => i.assignedTo !== null && !names.has(i.assignedTo)),
     slaHours: settings.slaHours,
     windowDays: WAITING_WINDOW_DAYS,
     overSla: late.length,
     waitingTotal: late.length,
+    // Unread is its own count (N15): every conversation with something nobody opened, the same figure Today shows. Some are also waiting; the
+    // sentence says how many, so nothing is added or taken away unseen.
+    unread: unreadSummary(rows),
+    readLimit: readLimitNote(seen.filter((c) => c.stored >= CONVERSATIONS_READ_PER_ACCOUNT).length, seen.length),
     channels: channelCounts(late.map((r) => r.lastMessageType)),
     truncated: rows.length >= LIMIT,
-    items: rows.map((r) => ({ ...r, channel: channelLabel(r.lastMessageType), url: links.conversation(r.locationId, r.conversationId) })),
+    items,
   });
+}
+
+// A person's saved views of the Unanswered messages page (per person, kept on the server so they follow the person to another device). The owner key is
+// derived here from the verified session, never from anything the browser sends.
+async function inboxViews(ctx: Ctx) {
+  return json({ views: await listViews(ctx.installationId, voterOf(ctx)), max: MAX_SAVED_VIEWS });
+}
+
+async function inboxViewSave(ctx: Ctx) {
+  const body = (await ctx.request.json().catch(() => null)) as { name?: unknown; filters?: unknown } | null;
+  const name = viewName(body?.name);
+  if (!name) return json({ error: "Give the view a name of up to 40 characters" }, 400);
+  const outcome = await saveView(ctx.installationId, voterOf(ctx), name, sanitizeQueue(body?.filters));
+  if (outcome === "full") return json({ error: "You can keep " + MAX_SAVED_VIEWS + " saved views. Remove one first." }, 409);
+  return json({ ok: true, views: await listViews(ctx.installationId, voterOf(ctx)), max: MAX_SAVED_VIEWS });
+}
+
+async function inboxViewRemove(ctx: Ctx, id: string) {
+  const gone = await removeView(ctx.installationId, voterOf(ctx), id);
+  return gone ? json({ ok: true, views: await listViews(ctx.installationId, voterOf(ctx)), max: MAX_SAVED_VIEWS }) : json({ error: "View not found" }, 404);
 }
 
 async function pipelines(ctx: Ctx) {
@@ -801,22 +1010,36 @@ const settingsView = async (ctx: Ctx) => {
   const { settings } = await loadAccounts(ctx.installationId);
   const [counts] = ctx.kind === "agency" ? await sql()`select count(*)::int total, count(*) filter (where client_view)::int on_ from locations where installation_id = ${ctx.installationId}` : [null];
   const accts = ctx.kind === "agency" ? await sql()`select location_id, name, client_view from locations where installation_id = ${ctx.installationId} and not ignored order by lower(coalesce(name, ''))` : [];
-  return json({ features: ctx.entitlements.features, settings: publicSettings(settings), slackConfigured: Boolean(settings.slackWebhookUrl), kind: ctx.kind, clientView: counts ? { on: counts.on_ as number, total: counts.total as number } : null, clientAccounts: accts.map((r) => ({ locationId: r.location_id as string, name: (r.name as string | null) ?? "Unnamed account", on: r.client_view === true })) });
+  // Is a meeting tool connected? Its privacy switches stay visible even while the Meeting notes page is off.
+  const [meetingTool] = await sql()`select 1 from connections where installation_id = ${ctx.installationId} and provider in ('fathom', 'zoom') ${zoomOn(ctx) ? sql()`` : sql()`and provider <> 'zoom'`} limit 1`;
+  // Which permissions this install granted (names only), grouped by what they are for (N64). Not known for the demo, so nothing is marked missing there.
+  const [inst] = await sql()`select scope from installations where id = ${ctx.installationId}`;
+  const granted = ctx.demo || typeof inst?.scope !== "string" || inst.scope.trim() === "" ? null : parseGranted(inst.scope as string);
+  // Every client account, ignored ones too, so the owner can leave a test account out of every number or put it back (N1). Agency sessions only.
+  const everyAccount = ctx.kind === "agency" ? await sql()`select location_id, name, ignored from locations where installation_id = ${ctx.installationId} order by lower(coalesce(name, ''))` : [];
+  return json({
+    features: ctx.entitlements.features, settings: publicSettings(settings), slackConfigured: Boolean(settings.slackWebhookUrl), kind: ctx.kind, canDeleteData: ctx.session.dataOwner === true, meetingTool: Boolean(meetingTool),
+    clientView: counts ? { on: counts.on_ as number, total: counts.total as number } : null, clientAccounts: accts.map((r) => ({ locationId: r.location_id as string, name: (r.name as string | null) ?? "Unnamed account", on: r.client_view === true })),
+    permissions: groupStatus(granted), noteWriteGranted: granted === null ? null : granted.includes(NOTE_SCOPE),
+    testAccounts: everyAccount.map((r) => ({ locationId: r.location_id as string, name: (r.name as string | null) ?? "Unnamed account", ignored: r.ignored === true, looksTest: isTestName(r.name as string | null) })),
+  });
 };
 
 function publicSettings(s: Settings) {
   // Never send the webhook URL back to the browser: it is a secret.
-  return { staleDays: s.staleDays, dormantDays: s.dormantDays, slaHours: s.slaHours, appDomain: s.appDomain, digestEnabled: s.digestEnabled, customChecklist: s.customChecklist, digestHour: s.digestHour, digestTimezone: s.digestTimezone, digestEmail: s.digestEmail, emailReady: emailConfigured(), brandName: s.brandName, brandColor: s.brandColor, industryTargets: s.industryTargets, keepTranscripts: s.keepTranscripts, pushNotesToCrm: s.pushNotesToCrm, speedTargetMinutes: s.speedTargetMinutes, countAutomatedTouches: s.countAutomatedTouches, speedBusinessHours: s.speedBusinessHours, speedOpenHour: s.speedOpenHour, speedCloseHour: s.speedCloseHour, alertQuietHours: s.alertQuietHours };
+  return { staleDays: s.staleDays, dormantDays: s.dormantDays, slaHours: s.slaHours, appDomain: s.appDomain, appDomainSource: s.appDomainSource, detectedDomain: s.detectedDomain, digestEnabled: s.digestEnabled, customChecklist: s.customChecklist, digestHour: s.digestHour, digestTimezone: s.digestTimezone, digestEmail: s.digestEmail, emailReady: emailConfigured(), brandName: s.brandName, brandColor: s.brandColor, industryTargets: s.industryTargets, keepTranscripts: s.keepTranscripts, pushNotesToCrm: s.pushNotesToCrm, speedTargetMinutes: s.speedTargetMinutes, countAutomatedTouches: s.countAutomatedTouches, speedBusinessHours: s.speedBusinessHours, speedOpenHour: s.speedOpenHour, speedCloseHour: s.speedCloseHour, alertQuietHours: s.alertQuietHours, coldTags: s.coldTags };
 }
+
+const INSIGHT_SETTINGS = new Set(["staleDays", "dormantDays", "slaHours", "speedTargetMinutes", "countAutomatedTouches", "speedBusinessHours", "speedOpenHour", "speedCloseHour", "industryTargets", "alertQuietHours"]);
 
 async function settingsUpdate(ctx: Ctx) {
   const body = (await ctx.request.json().catch(() => null)) as Record<string, unknown> | null;
   if (!body) return json({ error: "Invalid request" }, 400);
-  const patch: Partial<Settings> = {};
+  const patch: Partial<Settings> & { appDomainOverride?: string | null } = {};
   const int = (v: unknown, lo: number, hi: number) => (typeof v === "number" && Number.isInteger(v) && v >= lo && v <= hi ? v : null);
   if ("staleDays" in body) { const v = int(body.staleDays, 7, 365); if (v === null) return json({ error: "Stale days must be between 7 and 365" }, 400); patch.staleDays = v; }
-  if ("dormantDays" in body) { const v = int(body.dormantDays, 7, 365); if (v === null) return json({ error: "Dormant days must be between 7 and 365" }, 400); patch.dormantDays = v; }
-  if ("slaHours" in body) { const v = int(body.slaHours, 1, 168); if (v === null) return json({ error: "SLA hours must be between 1 and 168" }, 400); patch.slaHours = v; }
+  if ("dormantDays" in body) { const v = int(body.dormantDays, 7, 365); if (v === null) return json({ error: "Days before an account counts as gone quiet must be between 7 and 365" }, 400); patch.dormantDays = v; }
+  if ("slaHours" in body) { const v = int(body.slaHours, 1, 168); if (v === null) return json({ error: "Reply target hours must be between 1 and 168" }, 400); patch.slaHours = v; }
   if ("digestEnabled" in body) patch.digestEnabled = body.digestEnabled === true;
   if ("industryTargets" in body) patch.industryTargets = body.industryTargets === true;
   if ("keepTranscripts" in body) patch.keepTranscripts = body.keepTranscripts === true;
@@ -860,13 +1083,28 @@ async function settingsUpdate(ctx: Ctx) {
     else if (typeof body.digestTimezone === "string" && body.digestTimezone.length <= 64 && localParts(new Date(), body.digestTimezone) !== null) patch.digestTimezone = body.digestTimezone;
     else return json({ error: "That is not a time zone we recognise, for example Africa/Lagos or America/New_York" }, 400);
   }
+  if ("coldTags" in body) {
+    // null puts it back to "decided from the tag names"; a list (even an empty one) is the owner's choice.
+    if (body.coldTags === null) patch.coldTags = null;
+    else if (Array.isArray(body.coldTags) && body.coldTags.length <= 50 && body.coldTags.every((t) => typeof t === "string" && t.trim().length > 0 && t.length <= 80)) patch.coldTags = [...new Set((body.coldTags as string[]).map((t) => t.trim()))];
+    else return json({ error: "Choose up to 50 tags" }, 400);
+  }
   if ("clientViewAll" in body && ctx.kind === "agency") {
     await sql()`update locations set client_view = ${body.clientViewAll === true} where installation_id = ${ctx.installationId}`;
   }
-  if ("appDomain" in body) {
+  // The login domain is found automatically (sign-in and install event). What is typed here is only an override: an empty value takes it off.
+  if ("appDomainOverride" in body) {
+    if (body.appDomainOverride === null || body.appDomainOverride === "") patch.appDomainOverride = null;
+    else {
+      const d = typeof body.appDomainOverride === "string" ? extractDomain(body.appDomainOverride) : null;
+      if (!d) return json({ error: "Enter the domain you log in to, for example app.youragency.com" }, 400);
+      patch.appDomainOverride = d;
+    }
+  } else if ("appDomain" in body) {
+    // Older screens send the domain on every save. It only counts as an override when it is not what the links already use.
     const d = typeof body.appDomain === "string" ? extractDomain(body.appDomain) : null;
     if (!d) return json({ error: "Enter the domain you log in to, for example app.youragency.com" }, 400);
-    patch.appDomain = d;
+    if (d !== (await getSettings(ctx.installationId)).appDomain) patch.appDomainOverride = d;
   }
   if ("slackWebhookUrl" in body) {
     if (body.slackWebhookUrl === null || body.slackWebhookUrl === "") patch.slackWebhookUrl = null;
@@ -881,7 +1119,11 @@ async function settingsUpdate(ctx: Ctx) {
     patch.customChecklist = [...new Set(list.map((x: string) => x.trim()))];
   }
   await updateSettings(ctx.installationId, patch);
-  await refreshInsights(ctx.installationId);
+  // Every change to a setting is written to the audit log: the names of the settings, never their values (a Slack address is a secret).
+  await logSettingsChange(ctx.installationId, actorOf(ctx), ctx.kind, [...Object.keys(patch), ...("clientViewAll" in body && ctx.kind === "agency" ? ["clientViewAll"] : [])]);
+  // Recomputing every account takes many seconds. Only settings that feed a number or an alert need it; a brand name, an email address or a
+  // Slack address changes no figure, so saving those returns at once.
+  if (Object.keys(patch).some((k) => INSIGHT_SETTINGS.has(k))) await refreshInsights(ctx.installationId);
   return settingsView(ctx);
 }
 
@@ -897,6 +1139,7 @@ async function flags(ctx: Ctx, locationId: string) {
     else return json({ error: "Owner must be up to 60 characters" }, 400);
   }
   if (!(await setLocationFlags(ctx.installationId, locationId, patch))) return json({ error: "Account not found" }, 404);
+  await logAccountFlags(ctx.installationId, actorOf(ctx), ctx.kind, locationId, Object.keys(patch));
   await refreshInsights(ctx.installationId);
   return json({ ok: true });
 }
@@ -945,10 +1188,12 @@ async function exportCsv(ctx: Ctx, kind: string) {
     }
     case "inbox": {
       const rows = (await inbox(ctx.installationId, settings.slaHours, 2000, ctx.limitTo ?? undefined)).filter((r) => permits(r.locationId));
+      const [owners, who] = await Promise.all([contactOwners(ctx.installationId, rows), teamNames(ctx.installationId)]);
       return file("subsync-inbox", toCsv(rows, [
         { label: "Account", value: (r) => r.locationName }, { label: "Contact", value: (r) => r.contactName }, { label: "Channel", value: (r) => r.lastMessageType },
         { label: "Last message", value: (r) => r.lastMessageAt }, { label: "Direction", value: (r) => r.lastMessageDirection },
-        { label: "Channel", value: (r) => channelLabel(r.lastMessageType) }, { label: "Unread", value: (r) => r.unreadCount }, { label: "Over SLA", value: (r) => (r.overSla ? "yes" : "no") }, { label: "Waiting hours", value: (r) => r.waitingHours },
+        { label: "Channel", value: (r) => channelLabel(r.lastMessageType) }, { label: "Unread", value: (r) => r.unreadCount }, { label: "Past reply target", value: (r) => (r.overSla ? "yes" : "no") }, { label: "Waiting hours", value: (r) => r.waitingHours },
+        { label: "Assigned to", value: (r) => assigneeLabel(r.contactId ? owners.get(r.locationId + ":" + r.contactId) ?? null : null, who) },
       ]));
     }
     case "deals": {
@@ -975,7 +1220,9 @@ async function exportCsv(ctx: Ctx, kind: string) {
       ]));
     }
     case "alerts": {
-      const rows = await listAlerts(ctx.installationId, false, 2000, ctx.limitTo ?? undefined);
+      // The same narrowing as the Alerts page: an alert about an account the filter hides is not exported either.
+      const alertSeg = await segmentSet(ctx);
+      const rows = (await listAlerts(ctx.installationId, false, 2000, ctx.limitTo ?? undefined)).filter((a) => !alertSeg || (a.locationId !== null && alertSeg.has(a.locationId)));
       return file("subsync-alerts", toCsv(rows, [
         { label: "Severity", value: (a) => a.severity }, { label: "Alert", value: (a) => a.title }, { label: "Type", value: (a) => a.kind }, { label: "Raised", value: (a) => a.createdAt },
       ]));
@@ -1010,19 +1257,31 @@ async function keysCreate(ctx: Ctx) {
   const created = await createKey(ctx.installationId, name);
   if (created === "limit") return json({ error: `You can have up to ${MAX_KEYS} active keys. Revoke one first.` }, 400);
   // The key is returned this one time only; we keep just a hash.
+  await logKeyChange(ctx.installationId, actorOf(ctx), ctx.kind, true);
   return json({ key: created.key, row: created.row });
 }
 
 async function keysRevoke(ctx: Ctx, id: string) {
   if (!UUID.test(id)) return json({ error: "Key not found" }, 404);
-  return (await revokeKey(ctx.installationId, id)) ? json({ ok: true }) : json({ error: "Key not found" }, 404);
+  if (!(await revokeKey(ctx.installationId, id))) return json({ error: "Key not found" }, 404);
+  await logKeyChange(ctx.installationId, actorOf(ctx), ctx.kind, false);
+  return json({ ok: true });
 }
 
+// "Delete my data": only the owner (see mayDeleteData), only with the typed word, and always written to the audit log, refused or done.
+// The audit log is not part of what is deleted, so the record outlives the data.
 async function purgeData(ctx: Ctx) {
   if (ctx.demo) return json({ error: "Demo data cannot be deleted" }, 403);
+  const audit = (action: string, detail: Record<string, unknown>) =>
+    sql()`insert into audit_log (installation_id, actor, action, detail) values (${ctx.installationId}, ${actorOf(ctx)}, ${action}, ${sql().json(detail as never)})`;
+  if (ctx.session.dataOwner !== true) {
+    await audit("data.purge_refused", { kind: ctx.kind });
+    return json({ error: "Only the owner of your company account can delete all the data. Ask them to do it.", forbidden: true }, 403);
+  }
   const body = (await ctx.request.json().catch(() => null)) as { confirm?: unknown } | null;
   if (body?.confirm !== "DELETE") return json({ error: 'Type DELETE to confirm' }, 400);
   await purgeSyncedData(ctx.installationId);
+  await audit("data.purged", { tables: SYNCED_DELETE.length, kind: ctx.kind });
   return json({ ok: true });
 }
 
@@ -1050,7 +1309,9 @@ async function pipelineIntel(ctx: Ctx) {
   const location = ctx.url.searchParams.get("location") ?? undefined;
   if (location && !LOCATION_ID.test(location)) return json({ error: "Invalid account" }, 400);
   const [allowed, goals] = await Promise.all([allowedIds(ctx), ctx.kind === "client" ? Promise.resolve({} as Awaited<ReturnType<typeof getGoals>>) : getGoals(ctx.installationId)]);
-  const [deals, trend, sc, excluded] = await Promise.all([loadDeals(ctx.installationId, allowed, location), pipelineTrend(ctx.installationId, allowed), scope(ctx), excludedOpenDeals(ctx.installationId, allowed, location)]);
+  const [deals, trend, sc, excluded, rules] = await Promise.all([loadDeals(ctx.installationId, allowed, location), pipelineTrend(ctx.installationId, allowed), scope(ctx), excludedOpenDeals(ctx.installationId, allowed, location), loadStageRules(ctx.installationId)]);
+  // What the owner decided about stages and pipelines is the agency's own working note: a client's staff get the numbers built on it, never the controls.
+  const stageControls = ctx.kind === "client" ? null : await stageControlsFor(ctx, allowed, rules);
   const now = Date.now();
   const opens = deals.filter((d) => d.status === "open");
   const openValue = opens.reduce((s, d) => s + d.value, 0);
@@ -1060,7 +1321,8 @@ async function pipelineIntel(ctx: Ctx) {
   const dead = deadPipeline(deals, now);
   return json({
     totals: { open: opens.length, openValue, won: deals.filter((d) => d.status === "won").length, lost: deals.filter((d) => d.status === "lost").length, winRate: winRate(deals), avgCycleDays: avgCycleDays(deals) },
-    forecast: forecast(deals, now),
+    forecast: forecast(deals, now, ctx.kind === "client" ? [] : rules),
+    stageControls,
     excluded, outlier: dealOutlier(deals), minClosedDeals: MIN_CLOSED,
     coverage: coverage(openValue, goals.monthly_revenue ?? null),
     stages: stageTable(deals, now),
@@ -1072,15 +1334,50 @@ async function pipelineIntel(ctx: Ctx) {
     dead: { total: dead.total, rows: dead.rows.slice(0, 15).map((row) => ({ ...row.deal, reasons: row.reasons, url: link(row.deal) })) },
     accounts: location ? [] : accountSummaries(deals, now),
     pipelines: pipelineSummaries(deals).slice(0, 40),
-    trend,
+    trend: trend.points, trendNote: trend.note, trendSince: trend.since,
     goals,
   });
+}
+
+// The list the owner edits under "Stages and pipelines": every pipeline and stage with how many open deals sit in each, how it is treated now,
+// who decided, and the win probability the owner set (if any).
+async function stageControlsFor(ctx: Ctx, allowed: string[] | null, rules: Awaited<ReturnType<typeof loadStageRules>>) {
+  const inv = await stageInventory(ctx.installationId, allowed);
+  const pipelines = [...new Set(inv.map((r) => r.pipeline))].map((name) => ({ name, ...pipelineTreatment(name, rules) }));
+  const stages = inv.map((r) => {
+    const t = treatmentOf(r.pipeline, r.stage, rules);
+    const p = stageProbability(r.pipeline, r.stage, rules);
+    return { pipeline: r.pipeline, stage: r.stage, deals: r.deals, countedDeals: r.countedDeals, treatment: t.label, out: t.out, source: t.source, why: t.why, probability: p === null ? null : Math.round(p * 100) };
+  });
+  return {
+    canEdit: true,
+    // Added up here, not on the screen.
+    totals: { deals: inv.reduce((s, r) => s + r.deals, 0), countedDeals: inv.reduce((s, r) => s + r.countedDeals, 0), closedOutByName: stages.filter((s) => s.out && s.source === "name").length },
+    pipelines,
+    stages,
+  };
+}
+
+// One change to how a pipeline or stage is treated, or to a stage's win probability. Only the owner's side may change it (agency or business).
+async function stageRuleSave(ctx: Ctx) {
+  if (ctx.kind === "client") return json({ error: "Not available in this view" }, 403);
+  const parsed = parseRulePatch(await ctx.request.json().catch(() => null));
+  if (!parsed.ok) return json({ error: parsed.error }, 400);
+  const { pipeline, stage, cls, winProbability } = parsed.patch;
+  // The pipeline or stage named must exist in this installation, so the table cannot be filled with names nobody has.
+  const known = (await stageInventory(ctx.installationId, null)).some((r) => ruleKey(r.pipeline) === ruleKey(pipeline) && (stage === null || ruleKey(r.stage) === ruleKey(stage)));
+  if (!known) return json({ error: "That pipeline or stage was not found" }, 404);
+  await saveStageRule(ctx.installationId, actorOf(ctx), { pipelineKey: ruleKey(pipeline), stageKey: stage === null ? "" : ruleKey(stage), ...(cls !== undefined ? { cls } : {}), ...(winProbability !== undefined ? { winProbability } : {}) });
+  // The totals that every screen shows are counted again now, so they change at once, and the history is not mixed (definitions.ts).
+  if (cls !== undefined) await refreshInsights(ctx.installationId);
+  return json({ ok: true });
 }
 
 async function contactIntel(ctx: Ctx) {
   const allowed = await allowedIds(ctx);
   const [overview, leads, vipList, samples, sc, sources, dnd, birthdays] = await Promise.all([
-    contactOverview(ctx.installationId, allowed), topLeads(ctx.installationId, allowed), vips(ctx.installationId, allowed),
+    // The cold-list choice is the agency's own setting. A client's staff get the split it produces, built on the suggestion from the tag names.
+    contactOverview(ctx.installationId, allowed, ctx.kind === "client" ? null : (await getSettings(ctx.installationId)).coldTags), topLeads(ctx.installationId, allowed), vips(ctx.installationId, allowed),
     badDataSamples(ctx.installationId, allowed), scope(ctx),
     leadSources(ctx.installationId, allowed), dndSummary(ctx.installationId, allowed), upcomingBirthdays(ctx.installationId, allowed),
   ]);
@@ -1091,6 +1388,8 @@ async function contactIntel(ctx: Ctx) {
     vips: vipList.map((c) => ({ ...c, url: link(c) })),
     badData: samples.map((c) => ({ ...c, url: link(c) })),
     sources: sources.map((s) => ({ ...s, conversion: sourceConversion(s) })),
+    sourceSummary: sourceSummary(sources),
+    canEditCold: ctx.kind !== "client",
     dnd,
     birthdays: birthdays.map((b) => ({ ...b, url: link(b) })),
   });
@@ -1099,10 +1398,16 @@ async function contactIntel(ctx: Ctx) {
 async function teamView(ctx: Ctx) {
   const sc = await scope(ctx);
   const allowed = await allowedIds(ctx);
-  const [rows, pace] = await Promise.all([teamStats(ctx.installationId, allowed, sc.settings.staleDays), teamPace(ctx.installationId, allowed)]);
+  const [rows, pace, [acc]] = await Promise.all([
+    teamStats(ctx.installationId, allowed, sc.settings.staleDays), teamPace(ctx.installationId, allowed),
+    // How the last read of the team list went for the accounts in view, so a person who has no name can be explained instead of shown as an id.
+    sql()`select count(*) filter (where users_access = 'ok')::int ok, count(*) filter (where users_access = 'needs_permission')::int blocked from locations
+      where installation_id = ${ctx.installationId} and not ignored ${allowed ? sql()`and location_id = any(${allowed}::text[])` : sql()``}`,
+  ]);
+  const usersState = Number(acc?.ok) > 0 ? "ok" : Number(acc?.blocked) > 0 ? "needs_permission" : null;
   return json({
     staleDays: sc.settings.staleDays,
-    members: rows.map((r) => ({ ...r, label: teamLabel(r.userId, r.name), winRate: teamWinRate(r), pace: paceOf(pace.get(r.userId) ?? { replies: 0, medianSeconds: null, held: 0, noShow: 0 }) })),
+    members: rows.map((r) => ({ ...r, label: teamLabel(r.userId, r.name, usersState), winRate: teamWinRate(r), pace: paceOf(pace.get(r.userId) ?? { replies: 0, medianSeconds: null, held: 0, noShow: 0 }) })),
   });
 }
 
@@ -1136,14 +1441,25 @@ async function callQueueView(ctx: Ctx) {
   const parsed = parseFilters(params);
   if (!parsed.ok) return json({ error: parsed.error }, 400);
   const allowed = await allowedIds(ctx);
-  const [queue, speed, summary, sc] = await Promise.all([
-    callQueue(ctx.installationId, allowed, parsed.filters), speedToLead(ctx.installationId, allowed), outcomeSummary(ctx.installationId), scope(ctx),
-  ]);
-  return json({
-    presets: PRESETS, filters: parsed.filters, outcomes: OUTCOME_LABEL, total: queue.total, speedToLead: speed, summary,
-    rows: queue.rows.map((row) => ({ ...row, url: sc.links.contact(row.locationId, row.contactId) })),
-  });
+  // One page of up to CALL_PAGE rows (the list holds at most 400 candidates); the whole list is read once and kept for a short time, so turning the page is instant.
+  const page = Math.min(4, Math.max(1, Math.floor(Number(params.page)) || 1));
+  const started = Date.now();
+  try {
+    const [queue, speed, summary, sc] = await Promise.all([
+      callQueueAll(ctx.installationId, allowed, parsed.filters), speedToLead(ctx.installationId, allowed), outcomeSummary(ctx.installationId), scope(ctx),
+    ]);
+    return json({
+      presets: PRESETS, filters: parsed.filters, outcomes: OUTCOME_LABEL, total: queue.total, capped: queue.total >= 400, page, pages: Math.max(1, Math.ceil(queue.total / CALL_PAGE)), pageSize: CALL_PAGE,
+      speedToLead: speed, summary, tookMs: Date.now() - started, cached: queue.cached === true,
+      rows: queue.rows.slice((page - 1) * CALL_PAGE, page * CALL_PAGE).map((row) => ({ ...row, url: sc.links.contact(row.locationId, row.contactId) })),
+    });
+  } catch (error) {
+    const t = timeoutResponse(error, "call-queue");
+    if (t) return t;
+    throw error;
+  }
 }
+const CALL_PAGE = 100;
 
 async function callListsView(ctx: Ctx) {
   return json({ lists: await listCallLists(ctx.installationId), max: MAX_LISTS });
@@ -1189,18 +1505,23 @@ async function domainStatusByAccount(installationId: string) {
   return (id: string) => worstDomainStatus(by.get(id) ?? []);
 }
 
-function clientRow(a: DerivedAccount, e: ClientExtra | undefined, avgCycle: number | null, links: ReturnType<typeof deepLinks>, now: number, emailAuth: SetupFacts["emailAuth"] = "unchecked") {
+type ClientNotes = { count: number; lastConversationOn: string | null; lastNote: { body: string; author: string | null; on: string } | null };
+// money and notes are the counted-deal figures and the log of conversations (stage C1): Value created uses the same counted deals as every other screen, and
+// "last spoken" is the later of the "I spoke to them today" press and the newest logged conversation.
+function clientRow(a: DerivedAccount, e: ClientExtra | undefined, avgCycle: number | null, links: ReturnType<typeof deepLinks>, now: number, emailAuth: SetupFacts["emailAuth"] = "unchecked", money?: { pipelineCreated: number; wonValue: number; wonCount: number }, notes?: ClientNotes) {
   const fee = e?.monthlyFee ?? null;
+  const spoken = lastSpokenMs(e?.lastContactedAt ?? null, notes?.lastConversationOn ? [notes.lastConversationOn] : []);
   const installed = e?.installedAt ?? null;
   const daysIn = installed === null ? null : Math.floor((now - installed) / 86_400_000);
   const hasWon = (e?.firstWonAt ?? null) !== null;
   return {
     locationId: a.locationId, name: a.name, url: links.account(a.locationId), score: a.score, band: a.band, churn: a.churn.level, dormant: a.dormant,
     new30d: a.new30d, openValue: a.openValue, unanswered: a.unanswered, completenessPct: a.completenessPct, winRate: a.winRate, avgCycleDays: avgCycle,
-    profile: { monthlyFee: fee, renewalDate: e?.renewalDate ?? null, industry: e?.industry ?? null, notes: e?.notes ?? null, lastContactedAt: e?.lastContactedAt ? new Date(e.lastContactedAt).toISOString() : null },
-    roi: roi({ monthlyFee: fee, pipelineCreated30d: e?.pipelineCreated30d ?? 0, wonValue30d: e?.wonValue30d ?? 0 }),
+    profile: { monthlyFee: fee, renewalDate: e?.renewalDate ?? null, industry: e?.industry ?? null, notes: e?.notes ?? null, lastContactedAt: spoken === null ? null : new Date(spoken).toISOString() },
+    log: { count: notes?.count ?? 0, lastNote: notes?.lastNote ?? null },
+    roi: roi({ monthlyFee: fee, pipelineCreated30d: money?.pipelineCreated ?? e?.pipelineCreated30d ?? 0, wonValue30d: money?.wonValue ?? e?.wonValue30d ?? 0 }),
     renewal: renewalStatus(e?.renewalDate ?? null, now),
-    contactGap: contactGap(e?.lastContactedAt ?? null, now),
+    contactGap: contactGap(spoken, now),
     progress: {
       daysSinceInstall: daysIn, firstLeadAt: e?.firstLeadAt ? new Date(e.firstLeadAt).toISOString() : null, firstWonAt: e?.firstWonAt ? new Date(e.firstWonAt).toISOString() : null,
       // 6.7: a client well past setup with no won deal needs a conversation.
@@ -1214,9 +1535,10 @@ function clientRow(a: DerivedAccount, e: ClientExtra | undefined, avgCycle: numb
 async function clientsView(ctx: Ctx) {
   const now = Date.now();
   const allowed = await allowedIds(ctx);
-  const [{ accounts, links }, extras, deals, domainOf] = await Promise.all([accountsFor(ctx), clientExtras(ctx.installationId, allowed), loadDeals(ctx.installationId, allowed), domainStatusByAccount(ctx.installationId)]);
+  const [{ accounts, links }, extras, deals, domainOf, notes] = await Promise.all([accountsFor(ctx), clientExtras(ctx.installationId, allowed), loadDeals(ctx.installationId, allowed), domainStatusByAccount(ctx.installationId), noteSummaries(ctx.installationId, allowed)]);
   const cycles = new Map(accountSummaries(deals, now).map((s) => [s.locationId, s.avgCycleDays]));
-  const rows = accounts.filter((a) => !a.ignored).map((a) => clientRow(a, extras.get(a.locationId), cycles.get(a.locationId) ?? null, links, now, domainOf(a.locationId)));
+  const money = dealFigures(deals, now - 30 * 86_400_000, now);
+  const rows = accounts.filter((a) => !a.ignored).map((a) => clientRow(a, extras.get(a.locationId), cycles.get(a.locationId) ?? null, links, now, domainOf(a.locationId), money.get(a.locationId) ?? { pipelineCreated: 0, wonValue: 0, wonCount: 0 }, notes.get(a.locationId)));
   const withFee = rows.filter((x) => x.profile.monthlyFee !== null);
   const atRisk = (x: (typeof rows)[number]) => x.band === "at_risk" || x.churn === "high" || x.dormant;
   return json({
@@ -1226,6 +1548,9 @@ async function clientsView(ctx: Ctx) {
       atRisk: withFee.filter(atRisk).reduce((s, x) => s + (x.profile.monthlyFee ?? 0), 0),
       clientsWithFee: withFee.length,
     },
+    // First-use guidance (KF-7): nobody has typed a fee, a renewal date or an industry yet, so the screen explains what to do instead of showing bare "n/a".
+    firstUse: { noFees: withFee.length === 0, noRenewals: rows.every((x) => !x.profile.renewalDate), noIndustry: rows.every((x) => !x.profile.industry), noLog: rows.every((x) => x.log.count === 0) },
+    industryChoices: INDUSTRY_PICKER.map((p) => p.value),
     renewals: rows.filter((x) => x.renewal && x.renewal.bucket !== "later").sort((a, b) => (a.renewal?.daysLeft ?? 0) - (b.renewal?.daysLeft ?? 0))
       .map((x) => ({ locationId: x.locationId, name: x.name, daysLeft: x.renewal?.daysLeft ?? 0, bucket: x.renewal?.bucket ?? "later", fee: x.profile.monthlyFee })),
     segments: segmentStats(rows.map((x) => ({ industry: x.profile.industry, score: x.score, winRate: x.winRate, openValue: x.openValue }))),
@@ -1233,22 +1558,22 @@ async function clientsView(ctx: Ctx) {
   });
 }
 
+// Two or more clients side by side (ids=a,b,c; the older a and b still work), each figure against the average of the clients picked, with the
+// clients that are far apart highlighted (client-success.ts). Missing figures stay missing: no guessing.
 async function clientsCompare(ctx: Ctx) {
-  const a = ctx.url.searchParams.get("a") ?? "";
-  const b = ctx.url.searchParams.get("b") ?? "";
-  if (!LOCATION_ID.test(a) || !LOCATION_ID.test(b) || a === b) return json({ error: "Pick two different accounts" }, 400);
+  const ids = parseCompareIds(ctx.url.searchParams.get("ids"), ctx.url.searchParams.get("a"), ctx.url.searchParams.get("b"), (x) => LOCATION_ID.test(x));
+  if (ids.length < 2) return json({ error: "Pick at least two different clients" }, 400);
   const now = Date.now();
   const allowed = await allowedIds(ctx);
   const [{ accounts }, deals] = await Promise.all([accountsFor(ctx), loadDeals(ctx.installationId, allowed)]);
   const cycles = new Map(accountSummaries(deals, now).map((s) => [s.locationId, s.avgCycleDays]));
-  const facts = (id: string) => {
-    const x = accounts.find((acc) => acc.locationId === id && !acc.ignored);
-    return x ? { name: x.name ?? "Unnamed account", new30d: x.new30d, winRate: x.winRate, avgCycleDays: cycles.get(id) ?? null, unanswered: x.unanswered, completenessPct: x.completenessPct, score: x.score, openValue: x.openValue } : null;
-  };
-  const fa = facts(a);
-  const fb = facts(b);
-  if (!fa || !fb) return json({ error: "Account not found" }, 404);
-  return json({ a: fa, b: fb, notes: compareAccounts(fa, fb) });
+  const picked = ids.map((id) => accounts.find((acc) => acc.locationId === id && !acc.ignored)).filter((x): x is DerivedAccount => Boolean(x));
+  if (picked.length !== ids.length) return json({ error: "Account not found" }, 404);
+  const clients = picked.map((x) => ({
+    locationId: x.locationId, name: x.name ?? "Unnamed account",
+    values: { score: x.score, new30d: x.new30d, openValue: x.openValue, winRate: x.winRate, avgCycleDays: cycles.get(x.locationId) ?? null, unanswered: x.unanswered, completenessPct: x.completenessPct },
+  }));
+  return json({ clients, ...compareTable(clients) });
 }
 
 async function clientUpdate(ctx: Ctx, locationId: string) {
@@ -1285,30 +1610,57 @@ async function clientUpdate(ctx: Ctx, locationId: string) {
   return ok ? json({ ok: true }) : json({ error: "Account not found" }, 404);
 }
 
+// A quarterly review of one client (stage C1): the quarter asked for (default: the current one, which is said to be still running), the quarter before it,
+// their numbers, wins and issues, the daily series behind the charts, and "what SubSync caught". Everything is read from what SubSync holds; where its record
+// does not reach back (it only knows what it saw since it started watching), the review says so instead of drawing an empty chart.
 async function qbrView(ctx: Ctx, locationId: string) {
   const now = Date.now();
   const allowed = await allowedIds(ctx);
-  const [{ accounts, links }, extras, deals, history, domainOf] = await Promise.all([
-    accountsFor(ctx), clientExtras(ctx.installationId, allowed), loadDeals(ctx.installationId, allowed, locationId), accountHistory(ctx.installationId, locationId), domainStatusByAccount(ctx.installationId),
+  const asked = ctx.url.searchParams.get("quarter");
+  const quarter: Quarter | null = asked ? parseQuarter(asked) : quarterOf(now);
+  if (!quarter) return json({ error: "Pick a quarter like 2026-Q4" }, 400);
+  const previous = previousQuarter(quarter);
+  const [{ accounts, links, settings }, extras, deals, domainOf, notes, alerts, start, days] = await Promise.all([
+    accountsFor(ctx), clientExtras(ctx.installationId, allowed), loadDeals(ctx.installationId, allowed, locationId), domainStatusByAccount(ctx.installationId),
+    noteSummaries(ctx.installationId, allowed), alertsOf(ctx.installationId, locationId), historyStart(ctx.installationId, locationId), clientRoutes.trendDays(ctx.installationId, locationId, 400),
   ]);
   const a = accounts.find((x) => x.locationId === locationId && !x.ignored);
   if (!a) return json({ error: "Account not found" }, 404);
   const avgCycle = accountSummaries(deals, now)[0]?.avgCycleDays ?? null;
-  const open = (await listAlerts(ctx.installationId, false, 500)).filter((al) => al.locationId === locationId);
-  const { settings: brandSettings } = await accountsFor(ctx);
-  return json({ brand: { name: brandSettings.brandName, color: brandSettings.brandColor }, client: clientRow(a, extras.get(locationId), avgCycle, links, now, domainOf(locationId)), history, openAlerts: open.length, generatedAt: new Date(now).toISOString() });
+  const money = dealFigures(deals, now - 30 * 86_400_000, now);
+  const client = clientRow(a, extras.get(locationId), avgCycle, links, now, domainOf(locationId), money.get(locationId), notes.get(locationId));
+  const [cur, prev, speed] = await Promise.all([
+    quarterFacts(ctx.installationId, locationId, quarter, deals), quarterFacts(ctx.installationId, locationId, previous, deals),
+    speedView(ctx.installationId, [locationId], settings.speedTargetMinutes).catch(() => null),
+  ]);
+  const openAlerts = alerts.filter((x) => !x.resolvedAt).length;
+  const findings = qbrFindings(cur, prev.healthDays > 0 || prev.contactsAdded > 0 ? prev : null, {
+    dormant: a.dormant, unanswered: a.unanswered, staleOpps: a.staleOpps, completenessPct: a.completenessPct, openAlerts, monthlyFee: client.profile.monthlyFee,
+    replyHitRate: speed?.overall.hitRate ?? null, replyLeads: speed?.overall.leads ?? 0,
+  });
+  const progress = quarterProgress(quarter, now);
+  const current = pointsIn(days, quarter.from, quarter.to);
+  return json({
+    brand: { name: settings.brandName, color: settings.brandColor }, client, openAlerts, generatedAt: new Date(now).toISOString(),
+    quarter: { ...quarter, ...progress }, previous, quarters: recentQuarters(now, 6).map((q) => ({ key: q.key, label: q.label })),
+    facts: cur, previousFacts: prev, findings, proof: proofSummary(alerts, quarter), historyStartsOn: start,
+    series: { current, previous: pointsIn(days, previous.from, previous.to) },
+    health: endpoints(current.map((p) => p.healthScore)),
+    // How fast new leads got a first reply lately (the Speed to lead page's own figure, last two weeks); its history is shorter than a quarter, so it is said as such.
+    reply: speed ? { hitRate: speed.overall.hitRate, leads: speed.overall.leads, targetMinutes: speed.targetMinutes, windowDays: speed.windowDays } : null,
+  });
 }
 
 async function execSummary(ctx: Ctx) {
   const now = Date.now();
   const allowed = await allowedIds(ctx);
   const [f, goals] = await Promise.all([periodFigures(ctx.installationId, allowed), getGoals(ctx.installationId)]);
-  const pct = (cur: number, prev: number | null) => (prev === null ? null : periodChange(cur, prev).pct);
+  const pct = (cur: number, prev: number | null, minBase = 10) => percentChange(cur, prev, minBase);
   const kpis = [
     { key: "contacts", label: "New contacts, 30 days", current: f.contacts.cur, previous: f.contacts.prev, pct: pct(f.contacts.cur, f.contacts.prev), money: false },
     { key: "won", label: "Deals won, 30 days", current: f.won.curCount, previous: f.won.prevCount, pct: pct(f.won.curCount, f.won.prevCount), money: false },
-    { key: "revenue", label: "Revenue won, 30 days", current: f.won.curValue, previous: f.won.prevValue, pct: pct(f.won.curValue, f.won.prevValue), money: true },
-    { key: "pipeline", label: "Open pipeline", current: f.pipeline.now, previous: f.pipeline.then, pct: pct(f.pipeline.now, f.pipeline.then), money: true },
+    { key: "revenue", label: "Revenue won, 30 days", current: f.won.curValue, previous: f.won.prevValue, pct: pct(f.won.curValue, f.won.prevValue, MIN_MONEY_BASE_FOR_PERCENT), money: true },
+    { key: "pipeline", label: "Open pipeline", current: f.pipeline.now, previous: f.pipeline.then, pct: pct(f.pipeline.now, f.pipeline.then, MIN_MONEY_BASE_FOR_PERCENT), money: true },
     { key: "score", label: "Average engagement score", current: f.score.now, previous: f.score.then, pct: pct(f.score.now, f.score.then), money: false },
   ];
   const actual = { monthly_revenue: f.month.revenue, monthly_leads: f.month.leads, monthly_deals_won: f.month.deals } as Record<string, number>;
@@ -1316,8 +1668,9 @@ async function execSummary(ctx: Ctx) {
   const money = (n: number) => "$" + Math.round(n).toLocaleString("en-US");
   const series = [
     { key: "newContacts", label: "New contacts (30 day total)", values: f.series.map((s) => s.newContacts), fmt: (n: number) => String(Math.round(n)) },
-    { key: "openValue", label: "Open pipeline", values: f.series.map((s) => s.openValue), fmt: money },
-    { key: "score", label: "Average engagement score", values: f.series.map((s) => s.score), fmt: (n: number) => String(Math.round(n)) },
+    // Deal figures are compared only across days counted the same way (definitions.ts, N39).
+    { key: "openValue", label: "Open pipeline", values: f.series.filter((s) => s.dealsOk).map((s) => s.openValue), fmt: money },
+    { key: "score", label: "Average engagement score", values: f.series.filter((s) => s.dealsOk).map((s) => s.score), fmt: (n: number) => String(Math.round(n)) },
   ];
   const anomalies = series.flatMap((s) => {
     const z = zAnomaly(s.values);
@@ -1325,20 +1678,34 @@ async function execSummary(ctx: Ctx) {
   });
   return json({
     kpis, goals: goalRows, anomalies, targets: goals,
-    trend: { days: f.series.map((s) => s.day), openValue: f.series.map((s) => s.openValue), openValueAnomalies: anomalyIndices(f.series.map((s) => s.openValue)) },
+    trend: { days: f.series.filter((s) => s.dealsOk).map((s) => s.day), openValue: f.series.filter((s) => s.dealsOk).map((s) => s.openValue), openValueAnomalies: anomalyIndices(f.series.filter((s) => s.dealsOk).map((s) => s.openValue)) },
   });
 }
 
 async function commsIntel(ctx: Ctx) {
   const sc = await scope(ctx);
   const allowed = await allowedIds(ctx);
-  const [rows, gaps, after] = await Promise.all([inbox(ctx.installationId, sc.settings.slaHours, 2000), communicationGaps(ctx.installationId, allowed), afterHours(ctx.installationId, allowed)]);
-  const waiting = rows.filter((x) => sc.permits(x.locationId) && x.lastMessageDirection === "inbound" && x.waitingHours !== null).map((x) => x.waitingHours as number);
+  // The deals with no contact moved to Pipeline (read by deal-gaps). The Unanswered messages page asks for gaps=0 so it does not pay for them.
+  const wantGaps = ctx.url.searchParams.get("gaps") !== "0";
+  const [rows, gaps, after] = await Promise.all([inbox(ctx.installationId, sc.settings.slaHours, 2000), wantGaps ? communicationGaps(ctx.installationId, allowed) : Promise.resolve(null), afterHours(ctx.installationId, allowed)]);
+  // The same set as the Inbox list and the Today count (N15): the customer wrote last, past the reply target, inside the window. Never every inbound thread.
+  const waiting = rows.filter((x) => sc.permits(x.locationId) && x.overSla && x.waitingHours !== null).map((x) => x.waitingHours as number);
   return json({
     aging: replyAging(waiting),
-    gaps: { ...gaps, deals: gaps.deals.map((d) => ({ ...d, url: sc.links.opportunities(d.locationId) })) },
+    ...(gaps ? { gaps: { ...gaps, deals: gaps.deals.map((d) => ({ ...d, url: sc.links.opportunities(d.locationId) })) } } : {}),
     afterHours: after,
   });
+}
+
+// Counted open deals whose contact has gone quiet (moved here from the Unanswered messages page). The same deals and the same rules as the Pipeline
+// (a value, an owner, in play); the total is counted over all of them and the rows are the first ones, the screen says how many there are in all.
+async function dealGaps(ctx: Ctx) {
+  const sc = await scope(ctx);
+  const allowed = await allowedIds(ctx);
+  const asked = Number(ctx.url.searchParams.get("days"));
+  const days = [7, 14, 30].includes(asked) ? asked : 7;
+  const gaps = await communicationGaps(ctx.installationId, allowed, days, 200);
+  return json({ ...gaps, deals: gaps.deals.map((d) => ({ ...d, url: sc.links.opportunities(d.locationId) })) });
 }
 
 async function dailyBrief(ctx: Ctx) {
@@ -1380,8 +1747,14 @@ async function goalsUpdate(ctx: Ctx) {
   return json({ ok: true });
 }
 
-async function healthView(ctx: Ctx) {
-  return json(await integrationHealth(ctx.installationId, ctx.demo));
+// The one freshness sentence, for every kind of person (a client sees its own account's only). A filter on screen never changes it.
+async function freshnessView(ctx: Ctx) {
+  return json({ freshness: await freshnessFor(ctx.installationId, { limitTo: ctx.limitTo }) });
+}
+
+// The Sync status panel: freshness, next run, failures with reasons, what runs when. Agency and business only.
+async function syncStatusView(ctx: Ctx) {
+  return json(await syncPanel(ctx.installationId, { limitTo: ctx.limitTo }));
 }
 
 async function resyncOne(ctx: Ctx, locationId: string) {
@@ -1397,20 +1770,24 @@ async function resyncOne(ctx: Ctx, locationId: string) {
 async function testSlack(ctx: Ctx) {
   const { settings } = await loadAccounts(ctx.installationId);
   if (!settings.slackWebhookUrl) return json({ error: "Add a Slack webhook URL first" }, 400);
-  const ok = await postToSlack(settings.slackWebhookUrl, ":white_check_mark: SubSync is connected to this channel.");
+  const ok = await postToSlack(settings.slackWebhookUrl, ":white_check_mark: SubSync is connected to this channel.", { installationId: ctx.installationId, what: "slack.test_message" });
   return ok ? json({ ok: true }) : json({ error: "Slack did not accept the message. Check the webhook URL." }, 502);
 }
 
 async function digestPreview(ctx: Ctx) {
-  const d = await buildDailyDigest(ctx.installationId, { limitTo: ctx.limitTo, planLimit: accountLimit(ctx.plan, ctx.entitlements.enforced) });
-  return json({ text: digestText(ctx.demo ? "Demo Company" : "your company", { attention: d.attention, fine: d.fine.length, headlines: d.headlines, freshnessLabel: d.freshness.label }, ctx.url.origin) });
+  const d = await buildDailyDigest(ctx.installationId, { limitTo: ctx.limitTo, planLimit: accountLimit(ctx.plan, ctx.entitlements.enforced), onlyIds: await segmentSet(ctx) });
+  return json({ text: digestText(ctx.demo ? "Demo Company" : "your company", { attention: d.attention, fine: d.fine.length, headlines: d.headlines, freshnessLabel: d.freshness.text }, ctx.url.origin) });
 }
 
 // ---------------- routing ----------------
 
+// What the Clients module's own routes (client-routes.ts) need from this file.
+// Who did it is the person's name from sign-in, never a raw id (N21): without a name the line says "Someone".
+const clientDeps: clientRoutes.Deps = { allowedIds, accountsFor, actorOf: (ctx) => ctx.session.userName ?? null, locationId: LOCATION_ID };
+
 const FEATURE_FOR: Record<string, Feature> = {
   search: "search", onboarding: "onboarding", stale: "stale", inbox: "inbox", pipelines: "pipelines", duplicates: "duplicates", email: "email",
-  alerts: "alerts", appointments: "appointments", audit: "audit", speed: "speed", "appointment-insights": "appointments", meetings: "meetings", connections: "connections", cleanup: "cleanup", "setup-compare": "setup_compare", playbooks: "playbooks", daily: "overview", team: "team", "deal-events": "pipelines", contact: "search", settings: "settings", export: "exports", digest: "overview", "api-keys": "ai", hygiene: "stale", "pipeline-intel": "pipelines", "contact-intel": "activity", clients: "clients", qbr: "reports", "comms-intel": "inbox", "call-queue": "calls", "call-lists": "calls", "call-outcomes": "calls",
+  "meeting-inbox": "meetings", "meeting-setup": "meetings", "my-connections": "connections", "team-connections": "connections", "meeting-policy": "connections", alerts: "alerts", notifications: "alerts", "notification-prefs": "alerts", "notification-destinations": "alerts", appointments: "appointments", audit: "audit", speed: "speed", "appointment-insights": "appointments", meetings: "meetings", connections: "connections", cleanup: "cleanup", "setup-compare": "setup_compare", playbooks: "playbooks", daily: "overview", team: "team", "deal-events": "pipelines", contact: "search", settings: "settings", export: "exports", digest: "overview", "api-keys": "ai", hygiene: "stale", "pipeline-intel": "pipelines", "contact-intel": "activity", clients: "clients", qbr: "reports", "comms-intel": "inbox", "deal-gaps": "pipelines", "call-queue": "calls", "call-lists": "calls", "call-outcomes": "calls", people: "search", "client-onboarding": "onboarding",
 };
 
 export async function handle(request: Request, segments: string[]): Promise<Response> {
@@ -1424,10 +1801,22 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
   if (blocked) return blocked;
 
   try {
+    if (a === "people") {
+      return await handlePeople(ctx, {
+        allowed: () => allowedIds(ctx),
+        links: async () => (await scope(ctx)).links,
+        coldChoice: async () => (ctx.kind === "client" ? null : (await getSettings(ctx.installationId)).coldTags),
+        voter: voterOf(ctx),
+        locationToken: (locationId) => locationAccessToken(ctx.session.companyId, locationId),
+      });
+    }
     if (method === "GET") {
       if (a === "overview") return await overview(ctx);
+      if (a === "daily" && b === "changes") return await dailyChanges(ctx);
       if (a === "daily") return await dailyView(ctx);
       if (a === "roadmap") return await roadmapView(ctx);
+      if (a === "appointments" && b === "breakdown") return await appointmentsBreakdownView(ctx);
+      if (a === "appointments" && b && c && LOCATION_ID.test(b) && LOCATION_ID.test(c)) return await appointmentDetailView(ctx, b, c);
       if (a === "appointments") return await appointmentsView(ctx);
       if (a === "audit" && b === "shares") return await auditShares(ctx);
       if (a === "audit") return await auditViewData(ctx);
@@ -1437,6 +1826,13 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       if (a === "segments") return await segmentsView(ctx);
       if (a === "meetings") return await meetingsView(ctx);
       if (a === "connections" && !b) return await connectionsView(ctx);
+      if (a === "my-connections" && !b) return await myConnectionsView(ctx);
+      if (a === "meeting-inbox" && !b) return await meetingInboxView(ctx);
+      if (a === "meeting-setup" && !b) return await meetingSetupView(ctx);
+      if (a === "meeting-setup" && b === "fields" && !c) return await meetingSetupFieldsView(ctx);
+      if (a === "meeting-setup" && b === "account" && !c) return await meetingSetupAccountView(ctx);
+      if (a === "meeting-inbox" && b && c === "contacts") return await meetingContactSearch(ctx, b);
+      if (a === "team-connections" && !b) return await teamConnectionsView(ctx);
       if (a === "cleanup" && !b) return await cleanupView(ctx);
       if (a === "cleanup" && b) return await cleanupRunView(ctx, b);
       if (a === "playbooks") return await playbooksView(ctx);
@@ -1448,15 +1844,20 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       if (a === "stale") return await stale(ctx);
       if (a === "hygiene") return await hygiene(ctx);
       if (a === "api-keys") return await keysList(ctx);
+      if (a === "inbox" && b === "views") return await inboxViews(ctx);
       if (a === "inbox") return await inboxView(ctx);
       if (a === "pipelines") return await pipelines(ctx);
       if (a === "duplicates") return await duplicates(ctx);
       if (a === "email" && !b) return await emailHealth(ctx);
       if (a === "alerts") return await alertsView(ctx);
+      if (a === "notifications" && !b) return await bellView(ctx);
+      if (a === "notification-prefs" && !b) return await prefsView(ctx);
+      if (a === "notification-destinations" && !b) return await destinationsView(ctx);
+      if (a === "settings" && b === "history") return await settingsHistoryView(ctx);
       if (a === "settings") return await settingsView(ctx);
       if (a === "export" && b) return await exportCsv(ctx, b);
-      if (a === "sync") return json(await syncStatus(ctx.installationId));
-      if (a === "health") return await healthView(ctx);
+      if (a === "sync-status") return await syncStatusView(ctx);
+      if (a === "freshness") return await freshnessView(ctx);
       if (a === "pipeline-intel") return await pipelineIntel(ctx);
       if (a === "contact-intel") return await contactIntel(ctx);
       if (a === "team") return await teamView(ctx);
@@ -1469,26 +1870,53 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       if (a === "exec-summary") return await execSummary(ctx);
       if (a === "daily-brief") return await dailyBrief(ctx);
       if (a === "comms-intel") return await commsIntel(ctx);
+      if (a === "deal-gaps") return await dealGaps(ctx);
       if (a === "clients" && !b) return await clientsView(ctx);
+      if (a === "clients" && b && LOCATION_ID.test(b) && c === "notes") return await clientRoutes.notesView(ctx, clientDeps, b);
+      if (a === "client-onboarding" && !b) return await clientRoutes.onboardingView(ctx, clientDeps);
+      if (a === "client-onboarding" && b && LOCATION_ID.test(b) && c === "history") return await clientRoutes.historyView(ctx, clientDeps, b);
+      if (a === "client-trends") return await clientRoutes.trendsView(ctx, clientDeps, b && LOCATION_ID.test(b) ? b : undefined);
       if (a === "clients" && b === "compare") return ctx.entitlements.features.reports === false ? json({ error: "This feature is switched off", feature: "reports", off: true }, 404) : await clientsCompare(ctx);
       if (a === "qbr" && b && LOCATION_ID.test(b)) return await qbrView(ctx, b);
       if (a === "digest") return await digestPreview(ctx);
     }
     if (method === "POST") {
       if (a === "email" && b === "check") return await emailCheck(ctx);
+      if (a === "clients" && b && LOCATION_ID.test(b) && c === "notes") return await clientRoutes.noteAdd(ctx, clientDeps, b);
+      if (a === "client-onboarding" && b === "templates" && c === "starter") return await clientRoutes.templateStarter(ctx);
+      if (a === "client-onboarding" && b && b !== "templates" && LOCATION_ID.test(b) && c === "steps") return await clientRoutes.stepAdd(ctx, clientDeps, b);
       if (a === "usage" && !b) return await usagePing(ctx);
+      if (a === "inbox" && b === "views") return await inboxViewSave(ctx);
       if (a === "audit" && b === "share") return await auditShare(ctx);
       if (a === "audit" && b === "revoke") return await auditRevoke(ctx);
       if (a === "roadmap" && !b) return await roadmapVote(ctx);
+      if (a === "roadmap" && b === "suggest" && !c) return await suggest(ctx, request);
+      if (a === "feedback" && !b) return await giveFeedback(ctx, request);
+      if (a === "problem" && !b) return await reportProblem(ctx, request);
       if (a === "cleanup" && b === "preview") return await cleanupPreview(ctx);
       if (a === "cleanup" && b && c === "apply") return await cleanupWork(ctx, b, "apply");
       if (a === "cleanup" && b && c === "undo") return await cleanupWork(ctx, b, "undo");
       if (a === "connections" && b && c === "start") return await connectionStart(ctx, b);
+      if (a === "my-connections" && b && c === "start") return await myConnectionStart(ctx, b);
+      if (a === "my-connections" && b && c === "test") return await myConnectionTest(ctx, b);
+      if (a === "meeting-inbox" && b === "confirm") return await meetingConfirm(ctx);
+      if (a === "meeting-setup" && b === "preview" && !c) return await meetingSetupPreview(ctx);
+      if (a === "meeting-inbox" && b && c === "link") return await meetingLink(ctx, b);
+      if (a === "meeting-inbox" && b && c === "dismiss") return await meetingDismiss(ctx, b);
+      if (a === "meeting-inbox" && b && c === "ignore") return await meetingIgnore(ctx, b);
+      if (a === "team-connections" && b && c === "revoke") return await teamConnectionRevoke(ctx, b);
       if (a === "meetings" && b === "hooks" && !c) return await meetingHookCreate(ctx);
       if (a === "meetings" && b === "hooks" && c && segments[3] === "revoke") return await meetingHookRevoke(ctx, c);
       if (a === "duplicates" && b === "review") return await duplicateReview(ctx);
       if (a === "duplicates" && b === "bulk") return await duplicateBulk(ctx);
       if (a === "duplicates" && b === "undo") return await duplicateUndo(ctx);
+      if (a === "notifications" && b === "read-all" && !c) return await bellAction(ctx, "read-all", "");
+      if (a === "notifications" && b && c) return await bellAction(ctx, b, c);
+      if (a === "notification-prefs" && b && c === "preview") return await copyPreview(ctx, b);
+      if (a === "notification-prefs" && b && c === "test") return await prefTest(ctx, b);
+      if (a === "notification-destinations" && b === "slack" && c === "start") return await destinationStart(ctx);
+      if (a === "notification-destinations" && b === "advanced" && !c) return await destinationAdvanced(ctx);
+      if (a === "notification-destinations" && b && c === "test") return await destinationTest(ctx, b);
       if (a === "alerts" && b && c === "dismiss") {
         await dismissAlert(ctx.installationId, b);
         return json({ ok: true });
@@ -1503,16 +1931,32 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       if (a === "api-keys" && b && c === "revoke") return await keysRevoke(ctx, b);
     }
     if (method === "DELETE") {
+      if (a === "inbox" && b === "views" && c && /^[0-9a-fA-F-]{36}$/.test(c)) return await inboxViewRemove(ctx, c);
+      if (a === "clients" && b && LOCATION_ID.test(b) && c === "notes") return await clientRoutes.noteRemove(ctx, clientDeps, b);
+      if (a === "client-onboarding" && b === "templates") return await clientRoutes.templateRemove(ctx);
+      if (a === "client-onboarding" && b && LOCATION_ID.test(b) && c === "steps") return await clientRoutes.stepRemove(ctx, clientDeps, b);
       if (a === "connections" && b && !c) return await connectionRemove(ctx, b);
+      if (a === "my-connections" && b && !c) return await myConnectionRemove(ctx, b);
+      if (a === "notification-prefs" && b && c === "copy") return await copyReset(ctx, b);
+      if (a === "notification-destinations" && b && !c) return await destinationRemove(ctx, b);
       if (a === "call-lists" && b && /^[0-9a-fA-F-]{36}$/.test(b)) return await callListDelete(ctx, b);
     }
     if (method === "PUT") {
       if (a === "settings") return await settingsUpdate(ctx);
+      if (a === "appointments" && b === "targets") return await appointmentTargetUpdate(ctx);
       if (a === "goals") return await goalsUpdate(ctx);
+      if (a === "stage-rules") return await stageRuleSave(ctx);
+      if (a === "meeting-policy" && !b) return await policySave(ctx);
+      if (a === "meeting-inbox" && b === "settings") return await meetingSettingsSave(ctx);
+      if (a === "meeting-setup" && b === "mine" && !c) return await meetingSetupSaveMine(ctx);
+      if (a === "meeting-setup" && b === "fields" && !c) return await meetingSetupFieldsSave(ctx);
+      if (a === "notification-prefs" && b && !c) return await prefSave(ctx, b);
+      if (a === "notification-prefs" && b && c === "copy") return await copySave(ctx, b);
       if (a === "meetings" && b) return await meetingUpdate(ctx, b);
-      if (a === "connections" && b && !c) return await connectionUpdate(ctx, b);
       if (a === "team" && b && LOCATION_ID.test(b)) return await teamName(ctx, b);
       if (a === "clients" && b && LOCATION_ID.test(b)) return await clientUpdate(ctx, b);
+      if (a === "client-onboarding" && b === "templates") return await clientRoutes.templateSave(ctx);
+      if (a === "client-onboarding" && b && LOCATION_ID.test(b) && c === "steps") return await clientRoutes.stepUpdate(ctx, clientDeps, b);
       if (a === "accounts" && b && LOCATION_ID.test(b) && c === "flags") return await flags(ctx, b);
       if (a === "accounts" && b && LOCATION_ID.test(b) && c === "tasks") return await taskUpdate(ctx, b);
     }

@@ -1,6 +1,7 @@
 // Pure helpers for lead sources, birthdays and team figures. No database imports, so they can be
 // unit tested.
 import { winRateOf } from "./metrics.ts";
+import { resolveUser, type UsersState } from "./people-labels.ts";
 
 // Days from `today` until the next birthday (0 = today). A 29 February birthday is celebrated on
 // 28 February in years without one. Returns null for a value that is not a real date.
@@ -62,8 +63,10 @@ export const paceOf = (r: PaceRow, now = Date.now()) => ({
   showRate: r.held + r.noShow >= MIN_OUTCOMES_FOR_SHOW_RATE ? r.held / (r.held + r.noShow) : null,
 });
 
-// What to call someone we only know by id.
-export function teamLabel(userId: string, name: string | null): string {
+// What to call someone we only know by id (N21, S3-a): never the id and never a placeholder made from it. A name the app has is used as it is;
+// without one the screen says why: the team list was read and the person is not in it ("Former team member"), or it could not be read
+// ("Needs permission: reconnect").
+export function teamLabel(userId: string, name: string | null, usersAccess?: UsersState): string {
   if (name) return name;
-  return userId === "unassigned" ? "Unassigned" : `Team member ${userId.slice(-4)}`;
+  return userId === "unassigned" ? "Unassigned" : resolveUser(userId, new Map(), usersAccess).label;
 }

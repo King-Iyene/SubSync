@@ -72,6 +72,7 @@ async function main() {
   assert.ok(st.body.deals.length > 0 && st.body.deals.every((d: { daysStale: number }) => d.daysStale >= 45) && st.body.totalValue > 0);
   const ib = await call("/api/app/inbox", { token });
   assert.ok(ib.body.items.length > 0 && ib.body.overSla >= 7 && ib.body.items[0].overSla);
+  assert.ok(ib.body.items.every((d: { assignee: string; channel: string; assignedTo: string | null }) => d.assignee.length > 0 && d.channel.length > 0 && d.assignee !== d.assignedTo), "every conversation names its channel and who it is assigned to (stage F4)");
   const pl = await call("/api/app/pipelines", { token });
   assert.ok(pl.body.stages.length >= 5 && pl.body.accounts.length >= 12 && pl.body.totals.open > 0);
   const du = await call("/api/app/duplicates", { token });
@@ -137,7 +138,7 @@ async function main() {
   assert.equal((await call("/api/app/export/secrets", { token })).status, 404);
   assert.equal((await call("/api/app/settings/test-slack", { method: "POST", token })).status, 400, "no webhook configured");
   const dg = await call("/api/app/digest", { token });
-  assert.match(dg.body.text, /Demo Agency/);
+  assert.match(dg.body.text, /Demo Company/);
   console.log("exports + digest: ok");
 
   // --- hygiene + keys + AI connector
@@ -192,13 +193,14 @@ async function main() {
   console.log("hygiene + api keys + AI connector: ok");
 
   // --- health + per-account resync
-  const hl = await call("/api/app/health", { token });
+  const hl = await call("/api/app/sync-status", { token });
   assert.equal(hl.status, 200);
-  assert.equal(hl.body.level, "healthy");
-  assert.ok(hl.body.accounts.length >= 13);
-  assert.equal((await call(`/api/app/sync/${hl.body.accounts[0].locationId}`, { method: "POST", token })).status, 200);
+  assert.equal(hl.body.freshness.state, "demo", "the demo company says its data is sample data, with no made-up time");
+  assert.ok(hl.body.freshness.accounts.length >= 13);
+  assert.equal(hl.body.problems.length, 0);
+  assert.equal((await call(`/api/app/sync/${hl.body.freshness.accounts[0].locationId}`, { method: "POST", token })).status, 200);
   assert.equal((await call("/api/app/sync/not valid!", { method: "POST", token })).status, 404);
-  console.log("health + resync: ok");
+  console.log("sync status + resync: ok");
 
   // --- pipeline intelligence + goals
   const pi = await call("/api/app/pipeline-intel", { token });
@@ -303,7 +305,13 @@ async function main() {
   assert.equal((await call(`/api/app/clients/compare?a=${target.locationId}&b=${target.locationId}`, { token })).status, 400);
   const qbr = await call(`/api/app/qbr/${target.locationId}`, { token });
   assert.equal(qbr.status, 200);
-  assert.ok(qbr.body.history.length > 10 && qbr.body.client.activity.startsWith("In the last 30 days"));
+  // The review (C1) is per quarter: a quarter with its own figures, last quarter's for comparison, findings, a daily series and a quarter picker.
+  assert.match(qbr.body.quarter.key, /^\d{4}-Q[1-4]$/);
+  assert.ok(Array.isArray(qbr.body.quarters) && qbr.body.quarters.length >= 2);
+  assert.ok(qbr.body.facts && qbr.body.previousFacts && ["wins", "issues", "steps"].every((k) => Array.isArray(qbr.body.findings[k])));
+  assert.ok(Array.isArray(qbr.body.series.current) && Array.isArray(qbr.body.series.previous));
+  assert.ok(typeof qbr.body.client.activity === "string" && qbr.body.client.activity.length > 0);
+  assert.equal((await call(`/api/app/qbr/${target.locationId}?quarter=nope`, { token })).status, 400, "a bad quarter is refused");
   assert.equal((await call("/api/app/qbr/nope-not-here", { token })).status, 404);
   // put the demo account back the way it was
   assert.equal((await upd({ monthlyFee: null, renewalDate: null, industry: "Roofing", notes: null })).status, 200);
@@ -312,9 +320,13 @@ async function main() {
   // --- communication analysis, daily priorities, setup score, exports
   const ci2 = await call("/api/app/comms-intel", { token });
   assert.equal(ci2.status, 200);
-  assert.equal(ci2.body.aging.buckets.length, 6);
+  assert.equal(ci2.body.aging.buckets.length, 7, "six hourly buckets plus 'Older than a week' (stage F1, N15)");
   assert.equal(ci2.body.aging.buckets.reduce((s: number, b: { count: number }) => s + b.count, 0), ci2.body.aging.total);
   assert.ok(ci2.body.gaps.total > 0 && ci2.body.gaps.stages.length > 0, "quiet deals found");
+  const quiet = await call("/api/app/deal-gaps", { token });
+  assert.equal(quiet.status, 200);
+  assert.equal(quiet.body.total, ci2.body.gaps.total, "the quiet deals moved to Pipeline are the same deals (stage F4)");
+  assert.equal((await call("/api/app/comms-intel?gaps=0", { token })).body.gaps, undefined, "the Unanswered messages page does not count them");
   assert.ok(ci2.body.afterHours.leads > 100 && ci2.body.afterHours.afterHoursPct >= 0);
   const db2 = await call("/api/app/daily-brief", { token });
   assert.equal(db2.status, 200);
@@ -382,7 +394,7 @@ async function main() {
   assert.equal(cov.body.kpis.accounts, 1);
   for (const [m, p] of [
     ["GET", "settings"], ["GET", "export/stale"], ["GET", "call-queue"], ["GET", "goals"], ["GET", "api-keys"], ["GET", "exec-summary"],
-    ["GET", "daily-brief"], ["GET", "clients"], ["GET", "health"], ["POST", "sync"], ["PUT", "settings"], ["POST", "call-outcomes"],
+    ["GET", "daily-brief"], ["GET", "clients"], ["GET", "sync-status"], ["POST", "sync"], ["PUT", "settings"], ["POST", "call-outcomes"],
   ] as const) {
     assert.equal((await call(`/api/app/${p}`, { token: ct, method: m, ...(m === "GET" ? {} : { body: "{}" }) })).status, 403, `${m} ${p} refused for a client`);
   }
@@ -503,7 +515,7 @@ async function main() {
   assert.ok(daily.body.fine.every((f: { checked: string[] }) => f.checked.length >= 5), "fine accounts say what was checked");
   assert.equal(daily.body.notWatched.length, 4);
   assert.equal(daily.body.limited, false);
-  assert.ok(typeof daily.body.freshness.label === "string" && daily.body.freshness.label.length > 5);
+  assert.ok(typeof daily.body.freshness.text === "string" && daily.body.freshness.text.length > 5);
   const bd = await call("/api/app/daily", { token: bt });
   assert.equal(bd.status, 200);
   assert.equal(bd.body.limited, true);
@@ -518,7 +530,7 @@ async function main() {
   assert.equal(okSet.body.settings.digestTimezone, "Africa/Lagos");
   assert.equal((await call("/api/app/daily", { token })).body.schedule.timezone, "Africa/Lagos");
   assert.equal((await putS({ digestHour: null, digestTimezone: null })).body.settings.digestHour, null);
-  assert.match((await call("/api/app/digest", { token })).body.text, /daily brief/);
+  assert.match((await call("/api/app/digest", { token })).body.text, /daily brief/i);
   assert.equal((await call("/api/cron/daily")).status, 401, "the hourly job needs its secret");
   console.log("daily brief: own-history comparison, ranking, scoping, schedule: ok");
 
@@ -526,21 +538,28 @@ async function main() {
   await sql()`delete from usage_events where installation_id = (select id from installations where is_demo)`;
   const st1 = await call("/api/app/start", { token });
   assert.equal(st1.status, 200);
-  assert.equal(st1.body.steps.length, 9, "agency sees nine steps including client view, email and meetings");
+  assert.equal(st1.body.steps.length, 14, "an agency owner sees fourteen steps: the guide for the owner, with the meeting step while that page is on (stage F8) and the client fees step (stage C1)");
+  assert.equal(st1.body.role, "agency_owner");
   assert.ok(st1.body.steps.every((s: { title: string; body: string }) => s.title && s.body));
   assert.equal(st1.body.steps.find((s: { id: string }) => s.id === "connected").done, true);
-  assert.equal(st1.body.steps.find((s: { id: string }) => s.id === "duplicates").done, false, "not done until the page has been opened");
+  assert.equal(st1.body.steps.find((s: { id: string }) => s.id === "speed").done, false, "not done until the page has been opened");
   assert.equal(st1.body.steps.find((s: { id: string }) => s.id === "synced").detail.includes("account"), true);
   const views = st1.body.steps.map((s: { view: string | null }) => s.view).filter(Boolean);
   assert.equal(new Set(views.filter((v: string) => v === "overview")).size <= 1 && views.filter((v: string) => v === "overview").length <= 1, true, "no two steps open the same page twice");
   const ping = (view: string, tok = token) => call("/api/app/usage", { token: tok, method: "POST", body: JSON.stringify({ view }) });
-  assert.equal((await ping("duplicates")).status, 200);
+  assert.equal((await ping("speed")).status, 200);
   assert.equal((await ping("not-a-page")).status, 400);
   assert.equal((await ping("today", ct)).status, 200, "a client view can be counted too");
   const st2 = await call("/api/app/start", { token });
-  assert.equal(st2.body.steps.find((s: { id: string }) => s.id === "duplicates").done, true);
-  assert.equal(st2.body.doneCount, st1.body.doneCount + 2, "the duplicates and today steps tick themselves off");
-  assert.equal((await call("/api/app/start", { token: bt })).body.steps.length, 8, "a business has no client-view step (eight: the six plus email and meetings)");
+  assert.equal(st2.body.steps.find((s: { id: string }) => s.id === "speed").done, true);
+  assert.equal(st2.body.doneCount, st1.body.doneCount + 2, "the speed and today steps tick themselves off");
+  const bizStart = (await call("/api/app/start", { token: bt })).body;
+  assert.equal(bizStart.role, "account_admin");
+  assert.equal(bizStart.steps.length, 11, "a business has its own guide: no client-view, test-account or share step (eleven, with the meeting step while that page is on)");
+  assert.equal(bizStart.steps.some((s: { id: string }) => ["clients", "tests", "share"].includes(s.id)), false);
+  const staffStart = (await call("/api/app/start", { token: ct })).body;
+  assert.equal(staffStart.role, "account_user");
+  assert.deepEqual(staffStart.steps.map((s: { id: string }) => s.id), ["connected", "today", "speed", "appointments", "feedback"], "a client's staff have the short guide");
   assert.equal((await call("/api/app/daily", { token })).body.connection.ok, true);
   await sql()`delete from usage_events where installation_id = (select id from installations where is_demo)`;
   console.log("getting started + usage + connection: ok");
@@ -554,14 +573,17 @@ async function main() {
   assert.ok(ap.body.upcoming7 > 0 && ap.body.unmarkedTotal > 0 && ap.body.recoverTotal > 0 && ap.body.unconfirmedTotal > 0, "every to-do list has something");
   assert.ok(ap.body.recover.every((p: { url: string; name: string }) => p.name && p.url.includes("/contacts/detail/")));
   assert.equal(ap.body.access.needsPermission.length, 1, "the account that predates the permission is called out");
-  assert.ok(ap.body.byCalendar.length >= 3 && ap.body.byPerson.some((p: { label: string }) => p.label === "Dana Brooks"), "people use their names");
+  // Since F3 the per-calendar and per-person breakdowns are the filter choices (with counts), and the account state is in "access".
+  assert.ok(ap.body.options.calendars.length >= 3 && ap.body.options.users.some((p: { label: string }) => p.label === "Dana Brooks"), "people use their names");
   assert.equal(ap.body.canSeeAccounts, true);
-  assert.ok(ap.body.perAccount.some((a: { access: string }) => a.access === "needs_permission"));
+  assert.ok(ap.body.access.total > 1 && ap.body.access.needsPermission.length >= 1, "an agency sees every account, and which ones need the permission");
   const bap = await call("/api/app/appointments", { token: bt });
   assert.equal(bap.status, 200);
   assert.equal(bap.body.canSeeAccounts, false);
-  assert.ok(bap.body.perAccount.length === 1 && bap.body.perAccount[0].locationId === own, "a business sees only its own appointments");
-  assert.ok([...bap.body.recover, ...bap.body.unmarked, ...bap.body.unconfirmed].every((p: { locationName: string | null }) => p.locationName === bap.body.perAccount[0].name));
+  assert.equal(bap.body.access.total, 1, "a business sees only its own account");
+  assert.ok(bap.body.items.length > 0 && bap.body.items.every((p: { locationId: string }) => p.locationId === own), "a business sees only its own appointments");
+  const ownName = bap.body.items[0].locationName;
+  assert.ok([...bap.body.recover, ...bap.body.unmarked, ...bap.body.unconfirmed].every((p: { locationName: string | null }) => p.locationName === ownName));
   assert.equal((await call("/api/app/appointments", { token: ct })).status, 200, "a client view can see its own appointments");
   const nsq = await call("/api/app/call-queue?preset=noshow_recovery", { token });
   assert.equal(nsq.status, 200);
@@ -587,7 +609,7 @@ async function main() {
 
   const sc2 = await call("/api/app/setup-compare", { token });
   assert.equal(sc2.status, 200);
-  assert.ok(sc2.body.baseline && sc2.body.accounts.length >= 13 && sc2.body.rows.length === sc2.body.accounts.length - 1);
+  assert.ok(sc2.body.baseline && sc2.body.accounts.length >= 13 && Array.isArray(sc2.body.unrelated) && sc2.body.rows.length + sc2.body.unrelated.length === sc2.body.accounts.length - 1, "every other account is compared, or listed as unrelated when it shares no baseline (stage C1)");
   assert.ok(sc2.body.rows.every((r: { matches: boolean; notes: string[] }) => r.matches || r.notes.length > 0), "a differing account always says what differs");
   assert.equal((await call("/api/app/setup-compare?baseline=bad%20id!", { token })).status, 400);
   assert.equal((await call("/api/app/setup-compare", { token: bt })).status, 403, "agency only");
@@ -620,7 +642,8 @@ async function main() {
   assert.ok(onlyMedical((await call(`/api/app/call-queue${q}`, { token })).body.rows), "call queue");
   assert.ok(onlyMedical((await call(`/api/app/contact-intel${q}`, { token })).body.topLeads), "leads");
   assert.ok(onlyMedical((await call(`/api/app/pipeline-intel${q}`, { token })).body.accounts), "pipeline accounts");
-  assert.ok(onlyMedical((await call(`/api/app/appointments${q}`, { token })).body.perAccount), "appointments");
+  const medAppts = (await call(`/api/app/appointments${q}`, { token })).body;
+  assert.ok(medAppts.items.length > 0 && onlyMedical(medAppts.items) && medAppts.access.total === 3, "appointments");
   assert.ok(onlyMedical((await call(`/api/app/duplicates${q}`, { token })).body.groups), "duplicates");
   const fdaily = await call(`/api/app/daily${q}`, { token });
   assert.equal(fdaily.body.accounts, 3);

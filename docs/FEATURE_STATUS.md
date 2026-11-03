@@ -160,3 +160,101 @@ connections, appointment insights, two-agency tenant isolation, feature switches
 | Accounts and account detail in plain words, defined health rules, what-this-means panel | Built | Tests written, not yet run |
 | Settings in five groups, change log updated, behavior tests for every setting, client access enforced and brand name on the shared page (tenancy script) | Built | Tests written, not yet run |
 | Alert emails sent once, retried, quiet hours, stop link and one-click header, unmarked appointments alert | Built | Tests written, not yet run; real send and sending-domain check pending |
+
+
+## Stage S0.2b: Tenancy follow-ups (1 Nov 2026, built; awaiting King's checks)
+
+| Item | Status | Data source | Tested against live data |
+| --- | --- | --- | --- |
+| Cross-client "same person" card and count removed (N48) | Built | none (removed) | Unit and integration tests; no query compares people across accounts |
+| "What we store" generated from the schema; privacy page and help text produced from it (N83) | Built | database schema (migration files and live database) | Yes: compared with the live schema, 39 tables |
+| "Delete my data": owner only, typed word, audit entry (N83) | Built | session identity | Yes: two real fixture companies over HTTP |
+| Uninstall and "Delete my data" delete what the text says (N83) | Built | real rows | Yes: fixture company with a row in every table |
+| Client accounts' staff never receive fees, notes, settings, tickets or other clients' data; access off is immediate (N84) | Built | two real fixture companies | Yes (HTTP, every route a client may and may not call) |
+| Login domain found at sign-in and install event; Settings field is an override (N82) | Built | sign-in and install event | Database tests yes; a real signed install event NOT VERIFIED LIVE |
+| Setting "save unmatched meetings in an account" removed; stored values migrated (N93) | Built | none (removed) | Yes: live table backed up, counts before and after; matching tests on real rows |
+| Zoom and Google Meet hidden behind a switch, off by default | Built | feature switches | Yes: API check with the switch off, browser run at the default state |
+| Meeting notes page behind its own switch, off until E2a | Built | feature switches | Yes (menu test updated to the new rule) |
+| Refresh every 15 minutes (the due rule measured from the start of the last cycle) (N33) | Built | sync job table, cron every 5 minutes | Yes: live history shows what it was (20 min); the new rule is proven by a fake-clock scheduler test and database tests; the 15 minute cadence itself NOT VERIFIED LIVE until merge (`scripts/sync-timeline.ts`) |
+| One freshness line above every page; same sentence in Today, Overview, Sync status and the Slack brief (N74, N6) | Built | last successful refresh per account | Yes: real rows over HTTP (`scripts/check-sync.ts`) and every page in a browser (`tests/e2e/freshness.spec.ts`) |
+| Sync status panel: next refresh, per-account refresh, failures with plain reasons, what runs when (N81) | Built | sync job table, accounts | Yes: fixture company with a failed read, stale account, long-running job |
+| "Sync is running" note only for a first sync or one running 10 minutes or more (UX-06) | Built | sync job table | Yes |
+| Internal sync alarm (older than 30 minutes) to the audit log, and a secret-only diagnostics address (N33) | Built, notification is a dry run | sync job table | Yes on real installs (0 alarms now); outward notification not built |
+| "Send at" honoured per time zone, once a day, 3 hour catch-up (N80) | Built | settings, clock | Yes with fake clocks across 7 time zones and both 2026 New York clock changes; a real send NOT VERIFIED LIVE |
+| Install and uninstall webhooks accepted under the names the platform really sends (INSTALL, UNINSTALL) | Built | live webhook log | Names verified from the live log; a real uninstall event NOT VERIFIED LIVE (`docs/NEEDS_KING.md` section 15) |
+| One counted-deal rule everywhere: value, owner and in play (N38, UX-02) | Built | synced deals, owner's stage rules | Yes: golden deals in a real database (`tests/unit/f1-deal-scope-db.test.ts`), 37 pages under 5 filters (`scripts/check-filter.ts`); real agency: 1 counted deal of 10,374 open (1,033 closed out by name, 9,189 no value, 151 no owner); the CRM comparison is King's check |
+| Stages and pipelines: the owner classifies, with name suggestions; win probability per stage (N37, N38) | Built | `stage_rules` table | Yes over HTTP with two agencies, a business and a client (`scripts/check-stage-rules.ts`); real: 13 of 80 stage pairs closed out by name |
+| Forecast as a range with a method drawer, owner assumptions, timing from the real sales cycle (N37) | Built, no real account has enough closed deals to show one | synced deals | Hand-worked unit tests; real accounts correctly say "No forecast yet" (6 closed deals); forecast versus actual each month NOT built (P1) |
+| Definition versions: history never drawn across a change of rule (N39) | Built | `account_metrics_daily.definition_version` | Yes: golden history in a real database; the real series (2,400,000 then 1,000,000) is the case it fixes |
+| Unread and waiting told apart; the wait chart over the same set; Critical only a day to a week; the 500-conversation limit stated (N15) | Built | synced conversations | Yes: real figures 285 unread, 24 also waiting; the chart equals the list under every filter |
+| Health label held down by waiting customers; never Healthy in Needs attention (N16, N62) | Built | derived | Yes: unit tests and demo browser test; real: KD Squares LTD 21 waiting, was Healthy, now At risk |
+| Leads: cold lists, engaged then quiet, "not checked", missing apart from invalid, sources action (N45, N46, N47) | Built | synced contacts, conversations, appointments, deals | Yes: golden leads in a real database; the SQL and JavaScript validity rules proven identical; real: 50,958 of 52,926 contacts on cold lists, 0 invalid emails of 50,891 checked |
+| Percentage change only on a base of 10 (5,000 dollars) (N6) | Built | daily numbers | Yes: unit tests, demo API test |
+| The same filter gives the same numbers on every page (N1, N8) | Built | all pages | Yes: 5 filters, 37 pages, 3 pages that ignored the filter fixed |
+| Data point audit (N44) and capability matrix (N64) | Written; the cut list awaits King | docs | Capability live column NOT VERIFIED LIVE (one call after the merge: `/api/admin/capabilities`) |
+
+## Stage D0: structure, design tokens, shared components (1 Nov 2026)
+| Feature | Status | Data source | Tested against live data |
+| --- | --- | --- | --- |
+| Design tokens, light and dark, company colour on top | built (BUILT, awaiting King's checks) | src/app/globals.css | contrast unit test reads the real CSS; browser checked at 3 widths on the demo company |
+| /design style guide | built | made-up sample data in the page | no (no real data involved) |
+| Pilot menu, People tabs, My day | built | existing endpoints | demo company only |
+| Filter bar with account names and left-out reasons | built | segments (agency) | demo company; it has no test or ignored account |
+| List, lead panel, notices, states, charts | built | existing endpoints | demo company only |
+| Clickable charts, card ranges | built, on the Speed to lead trend | speed trend with the leads behind each week | count equals rows by unit test; demo company in the browser |
+| E2b Meeting notes destinations (note, comment, contact field, parts, layouts, locks) | Wave 2 (meeting notes), behind the Meeting notes switch | no (switch off by default) | Fathom delivery (E2a), the account's own field list (needs the optional read permission) | **No.** Fixtures and a local database only; real CRM limits, comment permission and field writes are INFERENCE/CHECK (docs/features/E2b.md) |
+
+## Stage D1: design polish, light and dark, Mode A review (3 Nov 2026)
+| Feature | Status | Data source | Tested against live data |
+| --- | --- | --- | --- |
+| Flat blocks (no card inside a card), key-figure strips, one slim toolbar row | built (BUILT, awaiting King's sign-off) | shared pieces in `ui.tsx`, `dashboard.tsx` | demo company only, 3 widths, light and dark (60 captures): 0 nested boxes |
+| Restrained motion: page fade, bars grow, figures count up once, grey loading placeholders; all off under reduced motion | built | none | browser: with reduced motion the figure is final at first read; without it `$0` then `$1,397,934`; unit tests for the rules |
+| Contrast fixes (status colours, ticks) | built | theme tokens | browser contrast check: 0 failures in 92 captures (demo company) |
+| Mode A buyer and UX review, S0 and S1 fixed | built | screenshots | demo company; no real person (Mode C) |
+| `scripts/ui-check.cjs` (repeatable UI check) | built | demo app | demo company |
+
+
+## Final test run before the merge to main (3 Nov 2026) — run in a sandbox with a throwaway local Postgres, NOT against Supabase
+
+Everything below is VERIFIED only for what it says. Nothing was run against the live Supabase project, the real CRM, a real mailbox, Slack or Fathom (no credentials in the sandbox). Those stay **NOT VERIFIED LIVE**.
+
+| Check | Result |
+| --- | --- |
+| Typecheck, lint, production build, bundle secret scan | Pass (lint: 0 errors, 9 warnings about unused variables) |
+| Node unit tests (`src/lib/__tests__`) | 751 of 751 |
+| Vitest, incl. real-database tests on a local Postgres built from the 39 migrations | 714 of 714 (57 files) |
+| Tenant isolation, two agencies, 448 cross-tenant reads as agency, business, client and forged sessions | All refused (`scripts/check-tenancy.ts`) |
+| Share link: revoke, 14-day expiry, view count, rate limit (30 a minute), generic preview | Pass (inside the tenancy script) |
+| Entitlements in `enforced` mode (free list, 402 for paid, plan swap is a row, unknown plan fails closed) | Pass (`check-entitlements.ts`); `open` mode runs with every other check |
+| White-label scan (no platform name in screens, emails, errors; default-domain links allowed only as the non-white-label fallback) | Pass (Node banned-terms tests and `check-audit.ts`) |
+| HTTP integration checks: api, connections, insights, sync, flags, metrics, filter (37 pages x 7 filters), stage rules, speed, roadmap, F8, audit | All pass |
+| Browser suite, desktop 1440 px (the real target: a desktop web app inside a CRM) | 226 passed, 20 skipped by design, 1 intermittent failure (`f4.spec.ts:34`, an API shape test that passes on its own and failed only in the full run; order-dependent, INFERENCE) |
+| Browser suite at phone 390 and tablet 768 px | Not a gate. Two real sideways-scroll bugs found and fixed; the full phone and tablet runs were not repeated on the final code |
+| Security review against GHL's review standard | `docs/SECURITY_REVIEW.md`: 0 critical, 0 high, 2 medium (1 fixed, 1 low-risk left, see below), 8 low |
+| Real data against manual CRM counts (F1, F2, F3, F6) | **NOT VERIFIED LIVE** (needs the live database and King's CRM counts) |
+| `scripts/supabase-proof.ts` (live schema equals the repo) | **NOT RUN** (needs King's credentials) |
+
+### Real bugs the full run found and fixed (not test changes)
+1. Removing one client account left its feedback rows behind (`feedback_items` was missing from the per-account purge). Privacy gap.
+2. The Appointments page scrolled sideways on a phone (shared filter dropdown) and `/design` did too (screen-reader chart tables). Both fixed.
+3. The quarterly review claimed problems were "sorted out" when SubSync only knows they stopped showing. Now says "cleared (fixed, dismissed or no longer showing)". A proof feature is proposed in `docs/INNOVATION_M1_M2.md`.
+4. Dial setting label bound to the wrong element (duplicate id), Ctrl+K then Enter closed the panel it opened, a duplicate Settings heading, and a reset message lost on save.
+5. The Connect button was disabled in the demo, and the demo agency session could not show the owner-only screens (demo only; unreachable in production).
+6. Security: a signed webhook meant for another app could purge one of our installs; cron and admin secrets are now compared in constant time; `nosniff` and `Referrer-Policy` added; typed People searches (a name, email or phone) no longer go into browser storage.
+
+### Customer walkthrough (Prompt B), M1 and M2. INFERENCE: from the demo company, the screens and the tests, not from real users.
+
+| Module | Agency owner: sees first, does, gets confused by | Setter (client's staff): same | Client admin: same |
+| --- | --- | --- | --- |
+| Today | Leads waiting in one sentence, then accounts needing attention. Does: open the worst account. Confusion: "Filter accounts" is collapsed, so people do not know why a number is smaller (it now says what is left out). | Opens on My day, not Today. Sees their own leads to call. Confusion: none found; no settings or plan. | Same as the owner but one account. |
+| Speed to lead | Median and share answered inside the target, accounts ranked. Does: open the accounts that fail. Confusion: "not enough data" until 5 replies; the screen now says "1 of 5 replies so far". | Own leads waiting. | Own account, ranked people. |
+| Appointments + Insights | Unmarked appointments and no-shows to recover; true show rate. Confusion: a health score of 73 on a rich demo vs "n/a" on a thin account; the rule (needs 3 of 4 checks) is explained on the card. | Own appointments to mark and remind. | Own account. |
+| Unanswered messages | Counts by age, saved views. Confusion: unread vs waiting (told apart). | Own queue. | Own account. |
+| Account audit + share link | The sellable asset. Does: share a link with a prospect. Confusion: none after the white-label fix; link expires in 14 days and can be switched off. | Not shown. | Own account's audit. |
+| Clients | Health, onboarding, fees, compare, quarterly review. Confusion: five tabs; QBR wording fixed. | Not shown (no fees, notes or other clients; tested). | Not shown. |
+| People and Call lists | Search, smart lists, going cold. Confusion: four tabs; the header search now hands off in memory. | Own contacts and call lists. | Own account. |
+| Settings, Getting started, What's new | Eight sections. Confusion: finding where Slack, Fathom and alerts live (Integrations, Connections). | Short guide only. | Guide for business admins. |
+| Connections and meeting notes (E0, E2a, E2b) | Own Fathom connection plus a team status table (names and status, never content). Behind a flag and dry-run switches. Confusion: "Needs permission: reconnect" for comments until a write permission is approved. | Own connection only. | Own connection only. |
+
+Top three problems fixed from the walkthrough: (1) sideways scrolling on phones, (2) the review overclaiming fixes, (3) a Ctrl+K search that closed the panel it opened.
+Open, for King: the simplify cuts 7 to 14 in `docs/SIMPLIFY_M1_M2.md` (hiding Duplicates and Cleanup, merging Team into Settings, Compare and Reviews), and the three proposals in `docs/INNOVATION_M1_M2.md` (recommended: Alert outcomes). Nothing there was built without your yes.

@@ -18,7 +18,7 @@ test.describe.configure({ mode: "serial" });
 
 test("stale threshold: a shorter limit marks at least as many deals stale, a longer one at most as many", async ({ request }) => {
   const c = await client(request);
-  const original = (await c.get("settings")).staleDays as number;
+  const original = (await c.get("settings")).settings.staleDays as number;
   try {
     await c.put("settings", { staleDays: 7 });
     const short = (await c.get("overview")).kpis.staleOpps as number;
@@ -30,7 +30,7 @@ test("stale threshold: a shorter limit marks at least as many deals stale, a lon
 
 test("reply target: a tighter target counts at least as many conversations as waiting, a looser one at most as many", async ({ request }) => {
   const c = await client(request);
-  const original = (await c.get("settings")).slaHours as number;
+  const original = (await c.get("settings")).settings.slaHours as number;
   try {
     await c.put("settings", { slaHours: 1 });
     const tight = (await c.get("overview")).kpis.unanswered as number;
@@ -44,7 +44,7 @@ test("reply target: a tighter target counts at least as many conversations as wa
 
 test("speed target: the screen is judged against the target you set", async ({ request }) => {
   const c = await client(request);
-  const original = (await c.get("settings")).speedTargetMinutes as number;
+  const original = (await c.get("settings")).settings.speedTargetMinutes as number;
   try {
     await c.put("settings", { speedTargetMinutes: 5 });
     const tight = await c.get("speed");
@@ -68,10 +68,10 @@ test("bad values are refused with a plain message and change nothing", async ({ 
 
 test("business hours and the automatic-message option are saved and read back", async ({ request }) => {
   const c = await client(request);
-  const before = await c.get("settings");
+  const before = (await c.get("settings")).settings as Json;
   try {
     await c.put("settings", { speedBusinessHours: true, speedOpenHour: 8, speedCloseHour: 18, countAutomatedTouches: true });
-    const s = await c.get("settings");
+    const s = (await c.get("settings")).settings as Json;
     expect([s.speedBusinessHours, s.speedOpenHour, s.speedCloseHour, s.countAutomatedTouches]).toEqual([true, 8, 18, true]);
   } finally { await c.put("settings", { speedBusinessHours: before.speedBusinessHours, speedOpenHour: before.speedOpenHour, speedCloseHour: before.speedCloseHour, countAutomatedTouches: before.countAutomatedTouches }); }
 });
@@ -84,7 +84,8 @@ test("brand name: sign-in carries it and the screens show it instead of ours", a
     expect(((await sso.json()) as Json).brand.name).toBe("Acme Marketing");
     await page.goto("/app#help");
     await page.reload();
-    await expect(page.getByText("Acme Marketing").first()).toBeVisible();
+    // On a phone the sidebar that also carries the name is hidden, so look for a match a person can see, not just the first one in the page.
+    await expect(page.getByText("Acme Marketing").filter({ visible: true }).first()).toBeVisible();
     expect(await page.locator("body").innerText()).not.toMatch(/subsync/i);
   } finally { await c.put("settings", { brandName: null }); }
 });
@@ -104,7 +105,8 @@ test("Getting started ticks honestly: a step is done only when it is", async ({ 
 test("the What's new page lists today's changes and the roadmap, and a vote can be given and taken back", async ({ request }) => {
   const c = await client(request);
   const first = await c.get("roadmap");
-  expect(first.changelog[0].title).toContain("Numbers you can trust");
+  expect(first.changelog[0].title).toContain("Settings in sections");
+  expect((first.changelog as Json[]).some((c) => String(c.title).includes("Numbers you can trust")), "the earlier entry is still there").toBe(true);
   expect(first.items.length).toBeGreaterThan(0);
   const key = first.items[0].key as string;
   await c.post("roadmap", { key });
@@ -113,11 +115,10 @@ test("the What's new page lists today's changes and the roadmap, and a vote can 
   expect(((await c.get("roadmap")).items as Json[]).find((i) => i.key === key)?.voted).toBe(false);
 });
 
-test("the Settings page is in five groups with a jump list", async ({ page }) => {
+test("the Settings page is in eight sections with a menu on the left (stage F8; the full checks are in f8.spec.ts)", async ({ page }) => {
   await page.goto("/app#settings");
   await page.reload();
-  const jump = page.getByTestId("settings-jump");
-  await expect(jump).toBeVisible();
-  for (const label of ["Rules and targets", "Your brand", "Your clients", "Alerts and connections", "Privacy and data"]) await expect(jump.getByText(label)).toBeVisible();
-  for (const id of ["g-rules", "g-brand", "g-alerts", "g-privacy"]) await expect(page.locator(`#${id}`)).toBeAttached();
+  const nav = page.getByTestId("settings-nav");
+  await expect(nav).toBeVisible();
+  for (const label of ["Team and access", "Notifications", "Integrations", "Reply targets and thresholds", "Brand", "Data and privacy", "Sync status", "Advanced"]) await expect(nav.getByRole("button", { name: label, exact: true })).toBeVisible();
 });

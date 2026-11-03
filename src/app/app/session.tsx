@@ -38,8 +38,9 @@ export function useApiClient(): Api {
 
 export function makeApi(initialToken: string, refresh: () => Promise<string | null>, demo: boolean, filterQuery = "", shared: { token: string } = { token: initialToken }): Api {
   const request = async (method: string, path: string, body?: unknown, retried = false): Promise<Response> => {
-    // A filter only narrows what is read; it is added to every GET.
-    const url = method === "GET" && filterQuery && !path.startsWith("segments") ? `${path}${path.includes("?") ? "&" : "?"}${filterQuery}` : path;
+    // A filter only narrows what is read; it is added to every GET. A share link of the audit is made from a read, so it carries the filter too:
+    // the link covers the client accounts the person was looking at (N8), and the server decides which accounts those are.
+    const url = (method === "GET" || path === "audit/share") && filterQuery && !path.startsWith("segments") ? `${path}${path.includes("?") ? "&" : "?"}${filterQuery}` : path;
     const res = await fetch(`/api/app/${url}`, {
       method,
       headers: { Authorization: `Bearer ${shared.token}`, ...(body !== undefined ? { "Content-Type": "application/json" } : {}) },

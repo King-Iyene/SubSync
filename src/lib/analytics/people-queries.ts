@@ -1,5 +1,6 @@
 import { sql } from "../db";
 import { daysUntilBirthday, type PaceRow, type SourceRow, type TeamRow } from "./people-intel";
+import { countedInScope, dealScopeJoins } from "./stage-rules-sql";
 
 const iso = (v: unknown) => (v instanceof Date ? v.toISOString() : null);
 
@@ -67,14 +68,15 @@ export async function teamStats(installationId: string, allowed: string[] | null
     with loc as (${visible(installationId, allowed)}),
     opp as (
       select coalesce(nullif(o.assigned_to, ''), 'unassigned') user_id,
-        count(*) filter (where o.status = 'open')::int open_count,
-        coalesce(sum(o.monetary_value) filter (where o.status = 'open'), 0)::float8 open_value,
-        count(*) filter (where o.status = 'open' and coalesce(o.last_stage_change_at, o.created_remote_at) < now() - make_interval(days => ${staleDays}::int))::int stale_count,
+        -- Open deals are the counted deals in play, the same as the Pipeline and Today (docs/METRICS.md): a person's open value never differs from the total it belongs to.
+        count(*) filter (where o.status = 'open' and ${countedInScope()})::int open_count,
+        coalesce(sum(o.monetary_value) filter (where o.status = 'open' and ${countedInScope()}), 0)::float8 open_value,
+        count(*) filter (where o.status = 'open' and ${countedInScope()} and coalesce(o.last_stage_change_at, o.created_remote_at) < now() - make_interval(days => ${staleDays}::int))::int stale_count,
         count(*) filter (where o.status = 'won')::int won_count,
         coalesce(sum(o.monetary_value) filter (where o.status = 'won'), 0)::float8 won_value,
         count(*) filter (where o.status = 'lost')::int lost_count,
         avg(extract(epoch from (o.last_status_change_at - o.created_remote_at)) / 86400) filter (where o.status = 'won' and o.last_status_change_at > o.created_remote_at)::float8 avg_cycle
-      from cached_opportunities o join loc on loc.location_id = o.location_id
+      from cached_opportunities o join loc on loc.location_id = o.location_id ${dealScopeJoins()}
       where o.installation_id = ${installationId} group by 1),
     con as (
       select coalesce(nullif(c.assigned_to, ''), 'unassigned') user_id, count(*)::int contacts

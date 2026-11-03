@@ -38,7 +38,10 @@ test("deals with no value or no owner are left out everywhere, and every screen 
   const [overview, pipeline] = await Promise.all([get(request, h, "overview"), get(request, h, "pipeline-intel")]);
   expect(overview.kpis.excludedDeals, "the demo tenant has junk deals on purpose").toBeGreaterThan(0);
   expect(pipeline.excluded.count, "Pipeline reports the same left-out deals as Overview").toBe(overview.kpis.excludedDeals);
-  expect(pipeline.excluded.noValue + pipeline.excluded.noOwner).toBe(pipeline.excluded.count);
+  // Three reasons that never overlap (stage F1): in a closed-out stage or an unused pipeline, no value, no owner.
+  expect(pipeline.excluded.closedOut + pipeline.excluded.noValue + pipeline.excluded.noOwner).toBe(pipeline.excluded.count);
+  expect(pipeline.excluded.closedOut, "the demo has deals in a Disqualified stage and in a pipeline marked not in use").toBeGreaterThan(0);
+  expect(overview.kpis.excludedByStage).toBe(pipeline.excluded.closedOut);
 });
 
 test("the $1,000,000 outlier is called out on both screens and is not the same as a normal deal", async ({ request }) => {
@@ -64,9 +67,15 @@ test("no win rate or forecast is shown under the minimum number of closed deals"
   if (closed < 20) {
     expect(pipeline.totals.winRate, `${closed} closed deals is not enough for a win rate`).toBeNull();
     expect(pipeline.forecast.winRate).toBeNull();
-    expect(pipeline.forecast.likely).toBe(0);
+    expect(pipeline.forecast.range, "no forecast without history or the owner's own stage probabilities").toBeNull();
+    expect(pipeline.forecast.method).toBe("none");
   } else {
     expect(pipeline.totals.winRate).not.toBeNull();
+    expect(pipeline.forecast.method).toBe("history");
+    const r = pipeline.forecast.range;
+    expect(r.low, "a range, not a single number").toBeLessThan(r.likely);
+    expect(r.likely).toBeLessThan(r.high);
+    expect(pipeline.forecast.basis).toContain("80% sure");
   }
   // An estimate on Overview needs at least one account with enough closed deals.
   if (overview.kpis.estimateAccounts === 0) expect(overview.kpis.expectedRevenue).toBeNull();

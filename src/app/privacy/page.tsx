@@ -1,13 +1,29 @@
 import type { Metadata } from "next";
+import { connection } from "next/server";
+import { Suspense } from "react";
 import { LegalPage } from "@/components/legal-page";
+import { deleteMyDataText, storeLines, uninstallText } from "@/lib/data-inventory";
+import { featureOn } from "@/lib/flags";
 
 export const metadata: Metadata = { title: "Privacy Policy | SubSync" };
 
 // A plain-words draft of what SubSync reads and stores. It must be reviewed by a person before the app goes public (it handles other
 // businesses' customer data); docs/features/Z3.md lists this as an open item.
+// The lists of what is stored and what is deleted are produced from src/lib/data-inventory.ts, which a test checks against the real database
+// schema, so this page cannot name less than the database holds. The only thing read per request is the global switch for Zoom and Google Meet.
 export default function Privacy() {
   return (
-    <LegalPage title="Privacy Policy" updated="31 October 2026">
+    <Suspense fallback={<LegalPage title="Privacy Policy" updated="1 November 2026"><p>Loading.</p></LegalPage>}>
+      <PrivacyBody />
+    </Suspense>
+  );
+}
+
+async function PrivacyBody() {
+  await connection();
+  const zoomMeet = await featureOn("zoom_meet");
+  return (
+    <LegalPage title="Privacy Policy" updated="1 November 2026">
       <p>
         SubSync is operated by KD Squares Ltd (&quot;we&quot;, &quot;us&quot;).
         This policy explains what information SubSync handles when a company
@@ -16,56 +32,16 @@ export default function Privacy() {
       </p>
 
       <h2>What we read and store</h2>
+      <p>
+        This list is produced from the database itself, table by table, and checked by an automatic test that fails when the database holds
+        something that is not on it.
+      </p>
       <ul>
-        <li>
-          <strong>Installation data:</strong> the company identifier, the
-          sign-in role of each person who opens SubSync (owner, admin, staff or
-          client user, with no names or emails), and the access tokens needed to
-          read data from the connected client accounts. Tokens are encrypted at
-          rest.
-        </li>
-        <li>
-          <strong>Contacts:</strong> name, email, phone, tags, source, whether
-          they asked not to be contacted, and dates. No notes, files or custom
-          fields.
-        </li>
-        <li>
-          <strong>Deals:</strong> pipeline, stage, value, status, owner and dates.
-        </li>
-        <li>
-          <strong>Conversations:</strong> only who wrote last, when, and through
-          which channel. The text of messages is never copied. For new leads we
-          also record when the lead arrived and when a person first replied, so
-          reply speed can be measured.
-        </li>
-        <li>
-          <strong>Appointments:</strong> time, status, calendar and the person it
-          is assigned to.
-        </li>
-        <li>
-          <strong>Things you add:</strong> team member names you type, call
-          outcomes you log, a Slack address and an email address for alerts, your
-          company name and colour, and settings.
-        </li>
-        <li>
-          <strong>Meeting notes (optional, only if you connect a meeting tool):</strong>{" "}
-          the meeting title, attendees, the summary and action items the tool
-          sends. A full transcript is kept only if you switch that on in Settings.
-          If you switch it on, a short note can also be added to the matched
-          contact in your CRM.
-        </li>
-        <li>
-          <strong>Share links:</strong> if you make an audit link, a snapshot of
-          totals and finding titles with client names removed. It works for 14
-          days and you can switch it off at any time.
-        </li>
-        <li>
-          <strong>Records of what happened:</strong> a log of changes to deals and
-          appointments that we start keeping once you install, an audit log of
-          actions taken in the app (for example switching a link off), and basic
-          technical logs such as errors and sync status. Logs never contain access
-          tokens or message text.
-        </li>
+        {storeLines({ meetings: true }).map((l) => (
+          <li key={l.id}>
+            <strong>{l.title}:</strong> {l.text}
+          </li>
+        ))}
       </ul>
 
       <h2>How we use it</h2>
@@ -79,20 +55,17 @@ export default function Privacy() {
       <h2>Who else handles it</h2>
       <p>
         Our hosting and database providers and our email provider act as
-        processors on our behalf. If you connect Slack, Zoom or Fathom, the
+        processors on our behalf. If you connect {zoomMeet ? "Slack, Zoom or Fathom" : "Slack or Fathom"}, the
         information you choose to send goes to or comes from that service under its
         own terms. Emails carry a link to stop them.
       </p>
 
       <h2>Retention and deletion</h2>
       <p>
-        Settings has a &quot;Delete my data&quot; button that removes everything we
-        copied from your accounts and keeps your settings. When a company uninstalls
-        SubSync we stop syncing and delete its copied data, settings, connections and
-        tokens. We keep a short audit record of actions, the record of plan and
-        billing events, and the sign-in role log, none of which holds customer
-        contacts, messages or credentials. You can also ask us to delete your data
-        at any time by emailing code@kdsquares.com.
+        Settings has a &quot;Delete my data&quot; button, which only the owner of the company account can press. {deleteMyDataText()}
+      </p>
+      <p>
+        {uninstallText()} You can also ask us to delete your data at any time by emailing code@kdsquares.com.
       </p>
 
       <h2>Your responsibilities</h2>

@@ -16,7 +16,7 @@ const LIST_NAME: Record<string, string> = {
   hot_uncontacted: "Hot leads not contacted", win_back: "Win-back", recent_customers: "Recent customers", proposal_stale: "Proposal stage, quiet",
 };
 
-export function PlaybooksView({ go }: { go: GoFn }) {
+export function PlaybooksView({ go, embedded = false }: { go: GoFn; embedded?: boolean }) {
   const api = useApiClient();
   const { data, error, loading, reload } = useData<Data>("playbooks");
   const [msg, setMsg] = useState<string | null>(null);
@@ -74,7 +74,14 @@ export function PlaybooksView({ go }: { go: GoFn }) {
 
   return (
     <div>
-      <PageHeader title="Industry playbooks" subtitle="A clinic, an estate agent and a boutique need different things from the same app. Set each client's industry on the Clients page and SubSync groups them here, with the numbers and lists that matter for that kind of business." />
+      {embedded ? (
+        <div className="mb-4 border-t pt-6" data-testid="playbooks-heading">
+          <h2 className="text-base font-semibold">Industry playbooks and reply targets</h2>
+          <p className="mt-0.5 max-w-2xl text-xs text-muted-foreground">A clinic, an estate agent and a boutique need different things. Choose each client&apos;s industry in the table above and SubSync groups them here, with the reply target, call lists and checklist that fit.</p>
+        </div>
+      ) : (
+        <PageHeader title="Industry playbooks" subtitle="A clinic, an estate agent and a boutique need different things from the same app. Choose each client's industry on the Clients page and SubSync groups them here, with the numbers and lists that matter for that kind of business." />
+      )}
       {msg && <p className="mb-4 rounded-lg border bg-muted/40 px-3 py-2 text-sm" role="status">{msg}</p>}
 
       <Card title="Reply targets by industry" className="mb-6">
@@ -90,7 +97,7 @@ export function PlaybooksView({ go }: { go: GoFn }) {
       </Card>
 
       {present.length === 0 ? (
-        <Empty title="No industries recognised yet" body="Type an industry for each client on the Clients page (for example Dental, Real estate, Boutique, Roofing) and the matching playbook appears here." />
+        <Empty title="No industries recognised yet" body="Choose an industry for each client in the table above (for example Medical and dental, Real estate, Home services) and the matching playbook appears here." />
       ) : (
         <div className="space-y-4">{present.map(card)}</div>
       )}

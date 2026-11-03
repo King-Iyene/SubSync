@@ -35,6 +35,7 @@ export const FEATURES = [
   "clients",
   "audit",
   "speed",
+  "zoom_meet",
 ] as const;
 export type Feature = (typeof FEATURES)[number];
 

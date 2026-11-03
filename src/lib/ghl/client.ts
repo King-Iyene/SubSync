@@ -40,7 +40,7 @@ export class GhlError extends Error {
   readonly status: number;
   readonly detail: string;
   constructor(status: number, detail: string) {
-    super(`GHL request failed with status ${status}`);
+    super(`The CRM request failed with status ${status}`);
     this.status = status;
     this.detail = detail;
   }

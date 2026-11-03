@@ -52,10 +52,16 @@ function check(where: string, s: { text: string; links: string[] }, agencyAllowe
   for (const l of s.links) expect(l, `${where} has a link to the platform: ${l}`).not.toMatch(PLATFORM);
 }
 
+let originalDomain = "app.gohighlevel.com"; // the demo tenant's own address, put back at the end so other checks see it as it was
+
 test("the demo tenant carries a white-label domain, and every Open link uses it", async ({ page }) => {
   const token = await demoSession(page);
-  const put = await page.request.put("/api/app/settings", { headers: { Authorization: `Bearer ${token}` }, data: { appDomain: DOMAIN } });
+  originalDomain = (((await (await page.request.get("/api/app/settings", { headers: { Authorization: `Bearer ${token}` } })).json()) as { settings: { appDomain: string } }).settings.appDomain);
+  // Typing an address in Settings is an override (N82): it wins over the one found at sign-in.
+  const put = await page.request.put("/api/app/settings", { headers: { Authorization: `Bearer ${token}` }, data: { appDomainOverride: DOMAIN } });
   expect(put.ok(), await put.text()).toBeTruthy();
+  const after = ((await put.json()) as { settings: { appDomain: string; appDomainSource: string } }).settings;
+  expect([after.appDomain, after.appDomainSource]).toEqual([DOMAIN, "manual"]);
   const accounts = await page.request.get("/api/app/accounts", { headers: { Authorization: `Bearer ${token}` } });
   const body = await accounts.text();
   expect(body).toContain(`https://${DOMAIN}/v2/location/`);
@@ -122,4 +128,17 @@ test("white-label check: the product name is replaced by the company's own name"
   } finally {
     await page.request.put("/api/app/settings", { headers, data: { brandName: null } });
   }
+});
+
+// The demo tenant is shared with every other check: its own login address is put back, so nothing else sees the fake white-label domain.
+test("the demo tenant's own login address is put back", async ({ page }) => {
+  const token = await demoSession(page);
+  // Taking the override off goes back to what was found (nothing, for the demo): the address is the one it had before this file ran.
+  const put = await page.request.put("/api/app/settings", { headers: { Authorization: `Bearer ${token}` }, data: { appDomainOverride: null } });
+  expect(put.ok(), await put.text()).toBeTruthy();
+  const back = ((await put.json()) as { settings: { appDomain: string; appDomainSource: string } }).settings;
+  expect(back.appDomain).toBe(originalDomain);
+  expect(back.appDomainSource).not.toBe("manual");
+  const links = await (await page.request.get("/api/app/accounts", { headers: { Authorization: `Bearer ${token}` } })).text();
+  expect(links).toContain(`https://${originalDomain}/v2/location/`);
 });

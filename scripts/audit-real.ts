@@ -32,11 +32,9 @@ async function main() {
     const exactEmail = await db`select location_id, count(*)::int groups, sum(n)::int contacts from (select location_id, lower(email) k, count(*) n from cached_contacts where installation_id = ${id} and email is not null and email <> '' group by 1, 2 having count(*) > 1) x group by 1`;
     const exactPhone = await db`select location_id, count(*)::int groups, sum(n)::int contacts from (select location_id, phone_digits k, count(*) n from cached_contacts where installation_id = ${id} and length(phone_digits) >= 7 group by 1, 2 having count(*) > 1) x group by 1`;
     const nearPhone = await db`select location_id, count(*)::int groups from (select location_id, right(phone_digits, 10) k, count(distinct phone_digits) variants, count(*) n from cached_contacts where installation_id = ${id} and length(phone_digits) >= 10 group by 1, 2 having count(*) > 1 and count(distinct phone_digits) > 1) x group by 1`;
-    const crossAccount = await db`select count(*)::int n from (select lower(email) k from cached_contacts where installation_id = ${id} and email is not null and email <> '' group by 1 having count(distinct location_id) > 1) x`;
     console.log("exact same email in one account:", exactEmail.map((r) => ({ account: locs.find((l) => l.location_id === r.location_id)?.name, groups: r.groups, contacts: r.contacts })));
     console.log("exact same phone in one account:", exactPhone.map((r) => ({ account: locs.find((l) => l.location_id === r.location_id)?.name, groups: r.groups, contacts: r.contacts })));
     console.log("near phone matches (different format, same last 10 digits):", nearPhone.map((r) => ({ account: locs.find((l) => l.location_id === r.location_id)?.name, groups: r.groups })));
-    console.log("same email across different accounts:", crossAccount[0].n);
   }
   await closeDb();
 }

@@ -40,7 +40,8 @@ async function main() {
   assert.equal(list0.status, 200);
   assert.deepEqual(list0.body.connections, []);
   assert.equal(typeof list0.body.available.slack, "boolean");
-  assert.ok(list0.body.accounts.length >= 13);
+  assert.equal(typeof list0.body.available.zoom, "boolean", "this server has every switch on, so Zoom is listed (the switch-off case is in check-flags)");
+  assert.equal("accounts" in list0.body, false, "no list of accounts to save meetings in: that choice is gone (N93)");
   assert.equal((await call("/api/app/connections", { token: ct })).status, 403, "a client view has no connections");
   assert.equal((await call("/api/app/connections/slack/start", { token: ct, method: "POST", body: "{}" })).status, 403);
   assert.equal((await call("/api/app/connections", { token: bt })).status, 200, "a business can connect its own tools");
@@ -49,6 +50,29 @@ async function main() {
   assert.equal((await call("/api/integrations/slack/callback?code=x&state=forged")).status, 400, "a forged return is refused");
   assert.equal((await call("/api/integrations/nope/callback")).status, 404);
 
+  // --- stage E0: personal connections. Every kind of session may list and start ITS OWN connections; the status table and the rules are for administrators.
+  for (const [name, tk] of [["agency", token], ["business", bt], ["client", ct]] as const) {
+    const mine = await call("/api/app/my-connections", { token: tk });
+    assert.equal(mine.status, 200, `${name}: my connections`);
+    assert.deepEqual(mine.body.connections, [], `${name}: nothing connected yet`);
+    assert.ok(mine.body.cards.some((c: { provider: string }) => c.provider === "fathom"), `${name}: Fathom is offered`);
+    assert.equal(JSON.stringify(mine.body).includes("zoom"), mine.body.cards.some((c: { provider: string }) => c.provider === "zoom"), `${name}: this server has every switch on`);
+    assert.equal((await call("/api/app/my-connections/fathom/start", { token: tk, method: "POST", body: "{}" })).status, 400, `${name}: the demo cannot start a real sign-in`);
+    assert.equal((await call("/api/app/my-connections/nope/start", { token: tk, method: "POST", body: "{}" })).status, 404, `${name}: unknown tool`);
+    assert.equal((await call("/api/app/my-connections/not-an-id", { token: tk, method: "DELETE" })).status, 404, `${name}: a made-up id`);
+  }
+  const teamView = await call("/api/app/team-connections", { token });
+  assert.equal(teamView.status, 200, "an administrator sees the team page");
+  assert.deepEqual(teamView.body.team, []);
+  assert.equal(JSON.stringify(teamView.body).match(/_enc|webhook_secret|public_key/), null, "no secret column name in the answer");
+  // The demo agency person is the company owner (so the owner-only screens can be shown), so the refusal is proven with the sessions that are not the owner:
+  // a business administrator and a client's staff may not save the company rule.
+  assert.equal((await call("/api/app/meeting-policy", { token: bt, method: "PUT", body: JSON.stringify({ scope: "agency", flags: {} }) })).status, 403, "only the company owner saves the company rule (a business administrator may not)");
+  assert.equal((await call("/api/app/meeting-policy", { token: ct, method: "PUT", body: JSON.stringify({ scope: "agency", flags: {} }) })).status, 403, "and a client's staff may not");
+  assert.equal((await call("/api/app/meeting-policy", { token, method: "PUT", body: "not json" })).status, 400);
+  assert.equal((await call("/api/app/team-connections/not-an-id/revoke", { token, method: "POST", body: "{}" })).status, 404);
+  assert.equal((await call("/api/app/my-connections")).status, 401, "no session, no answer");
+
   // --- a person who knows a contact in account A
   await sql()`insert into cached_contacts (installation_id, location_id, contact_id, first_name, last_name, email, tags, date_added)
     values (${inst.id}, ${A}, 'conn-t1', 'Dana', 'Lee', 'dana.conn@x.test', '{}', now())`;
@@ -56,8 +80,8 @@ async function main() {
   // --- Fathom: a connection with a known secret, and signed deliveries
   const secretRaw = Buffer.from("fathom-test-signing-secret-0123456789").toString("base64");
   const key = "fathomkey" + "A".repeat(20);
-  await sql()`insert into connections (installation_id, provider, label, external_id, access_token_enc, refresh_token_enc, token_expires_at, webhook_secret_enc, public_key, default_location_id, connected_by)
-    values (${inst.id}, 'fathom', 'Fathom', 'wh_test', ${encryptSecret("at")}, ${encryptSecret("rt")}, now() + interval '1 hour', ${encryptSecret("whsec_" + secretRaw)}, ${key}, null, 'check')`;
+  await sql()`insert into connections (installation_id, provider, label, external_id, access_token_enc, refresh_token_enc, token_expires_at, webhook_secret_enc, public_key, connected_by)
+    values (${inst.id}, 'fathom', 'Fathom', 'wh_test', ${encryptSecret("at")}, ${encryptSecret("rt")}, now() + interval '1 hour', ${encryptSecret("whsec_" + secretRaw)}, ${key}, 'check')`;
   const deliver = (payload: unknown, o: { id?: string; ts?: number; sign?: boolean; path?: string } = {}) => {
     const body = JSON.stringify(payload);
     const id = o.id ?? "msg_" + Math.random().toString(36).slice(2);
@@ -96,7 +120,7 @@ async function main() {
   assert.equal((await call("/api/hooks/fathom/short", { method: "POST", body: "{}" })).status, 404);
   assert.equal((await deliver({ nothing: "useful" })).body.ignored, true, "something that is not a meeting is acknowledged and dropped");
 
-  // nobody known in the meeting: counted, not saved, unless an account was chosen
+  // nobody known in the meeting: counted, never saved. There is no setting that could change that (N93).
   const stranger = meeting({ recording_id: "rec-5", title: "CONN-STRANGER", calendar_invitees: [{ name: "Nobody", email: "nobody@nowhere.test" }] });
   const skipped = await deliver(stranger);
   assert.equal(skipped.body.saved, false);
@@ -109,19 +133,39 @@ async function main() {
   assert.equal(JSON.stringify(conn).includes("whsec"), false, "no secret ever reaches the browser");
   assert.equal(Object.keys(conn).some((k) => /token|secret|enc/i.test(k)), false);
 
-  assert.equal((await call(`/api/app/connections/${conn.id}`, { token, method: "PUT", body: JSON.stringify({ defaultLocationId: B }) })).status, 200);
-  assert.equal((await call(`/api/app/connections/${conn.id}`, { token, method: "PUT", body: JSON.stringify({ defaultLocationId: "no-such-account-x" }) })).status, 400, "only an account of this install");
-  assert.equal((await call(`/api/app/connections/${conn.id}`, { token, method: "PUT", body: JSON.stringify({}) })).status, 400);
-  const chosen = await deliver({ ...stranger, recording_id: "rec-6" });
-  assert.equal(chosen.body.saved, true);
-  assert.equal((await sql()`select location_id from meeting_notes where installation_id = ${inst.id} and title = 'CONN-STRANGER'`)[0].location_id, B, "falls back to the account the person chose");
+  // The old "save it in this account" setting is gone from the API, from the list the screen gets, and from the database column's use.
+  for (const body of [{ defaultLocationId: B }, { defaultLocationId: null }, {}]) {
+    const r = await call(`/api/app/connections/${conn.id}`, { token, method: "PUT", body: JSON.stringify(body) });
+    assert.ok(r.status === 404 || r.status === 405, `no route can set a default account, got ${r.status}`);
+  }
+  assert.equal("defaultLocationId" in conn, false, "and the connection list has no such field");
+  const again2 = await deliver({ ...stranger, recording_id: "rec-6" });
+  assert.equal(again2.body.saved, false);
+  assert.equal(again2.body.reason, "no_account", "a stranger is still not saved, however often it arrives");
+  assert.equal((await sql()`select count(*)::int n from meeting_notes where installation_id = ${inst.id} and title = 'CONN-STRANGER'`)[0].n, 0);
+  // Even a leftover value in the column (an old row, or someone writing it by hand) changes nothing: the code does not read it.
+  await sql()`update connections set default_location_id = ${B} where installation_id = ${inst.id} and provider = 'fathom'`;
+  assert.equal((await deliver({ ...stranger, recording_id: "rec-6b" })).body.saved, false, "a stored default account is never read");
+  await sql()`update connections set default_location_id = null where installation_id = ${inst.id} and provider = 'fathom'`;
 
-  // a single business never leaves its own account, even when the attendee is known elsewhere
+  // A single business never leaves its own account, and never guesses: Dana is known in A only, so a connection limited to B finds nobody.
   await sql()`update connections set only_location_id = ${B} where installation_id = ${inst.id} and provider = 'fathom'`;
-  await deliver(meeting({ recording_id: "rec-7", title: "CONN-ONLY-B" }));
-  assert.equal((await sql()`select location_id from meeting_notes where installation_id = ${inst.id} and title = 'CONN-ONLY-B'`)[0].location_id, B);
-  assert.equal((await call(`/api/app/connections/${conn.id}`, { token, method: "PUT", body: JSON.stringify({ defaultLocationId: A }) })).status, 400, "and cannot choose another account");
+  const onlyB = await deliver(meeting({ recording_id: "rec-7", title: "CONN-ONLY-B" }));
+  assert.equal(onlyB.body.saved, false);
+  assert.equal((await sql()`select count(*)::int n from meeting_notes where installation_id = ${inst.id} and title = 'CONN-ONLY-B'`)[0].n, 0, "not saved in B (nobody there is known) and not in A (it is not this business's account)");
+  // The same email in both accounts: inside B alone it is one record, so it matches B. For a connection that sees both it is not certain, so nothing is saved.
+  await sql()`insert into cached_contacts (installation_id, location_id, contact_id, first_name, last_name, email, tags, date_added)
+    values (${inst.id}, ${B}, 'conn-t2', 'Dana', 'Lee', 'dana.conn@x.test', '{}', now())`;
+  const bothB = await deliver(meeting({ recording_id: "rec-8", title: "CONN-SHARED-B" }));
+  assert.equal(bothB.body.saved, true, "a connection limited to B matches the one record in B");
+  const [sharedB] = await sql()`select location_id, contact_id from meeting_notes where installation_id = ${inst.id} and title = 'CONN-SHARED-B'`;
+  assert.deepEqual([sharedB.location_id, sharedB.contact_id], [B, "conn-t2"]);
   await sql()`update connections set only_location_id = null where installation_id = ${inst.id} and provider = 'fathom'`;
+  const shared = await deliver(meeting({ recording_id: "rec-9", title: "CONN-SHARED-BOTH" }));
+  assert.equal(shared.body.saved, false);
+  assert.equal(shared.body.reason, "no_account", "the same email in two clients is never auto-picked (N48, N93)");
+  assert.equal((await sql()`select count(*)::int n from meeting_notes where installation_id = ${inst.id} and title = 'CONN-SHARED-BOTH'`)[0].n, 0);
+  await sql()`delete from cached_contacts where installation_id = ${inst.id} and contact_id = 'conn-t2'`;
 
   const mv = await call("/api/app/meetings", { token });
   assert.ok(mv.body.meetings.some((m: { title: string; source: string }) => m.title === "CONN-QBR" && m.source === "fathom"), "it shows in Meeting notes");
@@ -140,8 +184,8 @@ async function main() {
   assert.equal(challenge.body.plainToken, "abc123");
   assert.equal(challenge.body.encryptedToken, createHmac("sha256", ZOOM_SECRET).update("abc123").digest("hex"), "answers Zoom's address check");
 
-  await sql()`insert into connections (installation_id, provider, label, external_id, access_token_enc, refresh_token_enc, token_expires_at, default_location_id, connected_by)
-    values (${inst.id}, 'zoom', 'host@agency.test', 'zoomhost-1', ${encryptSecret("at")}, ${encryptSecret("rt")}, now() + interval '1 hour', ${A}, 'check')`;
+  await sql()`insert into connections (installation_id, provider, label, external_id, access_token_enc, refresh_token_enc, token_expires_at, connected_by)
+    values (${inst.id}, 'zoom', 'host@agency.test', 'zoomhost-1', ${encryptSecret("at")}, ${encryptSecret("rt")}, now() + interval '1 hour', 'check')`;
   const summary = (uuid: string, host = "zoomhost-1") => ({
     event: "meeting.summary_completed", event_ts: Date.now(),
     payload: { account_id: "acct", object: { meeting_host_id: host, meeting_host_email: "host@agency.test", meeting_uuid: uuid, meeting_id: 1, meeting_topic: "CONN-ZOOM-CALL", meeting_start_time: "2026-10-30T09:00:00Z",
@@ -151,19 +195,13 @@ async function main() {
   assert.equal((await zoomPost(summary("u-1"), { ts: Math.floor(Date.now() / 1000) - 3600 })).status, 401, "an old one too");
   const z1 = await zoomPost(summary("u-1"));
   assert.equal(z1.status, 200, JSON.stringify(z1.body));
-  assert.equal(z1.body.saved, 1);
-  const [zn] = await sql()`select location_id, source, summary, action_items, transcript, recording_url from meeting_notes where installation_id = ${inst.id} and title = 'CONN-ZOOM-CALL'`;
-  assert.equal(zn.location_id, A, "no attendee list from Zoom: it goes to the chosen account");
-  assert.equal(zn.source, "zoom");
-  assert.match(zn.summary, /\$500 plan/);
-  assert.deepEqual(zn.action_items, ["Send the contract"]);
-  assert.equal(zn.transcript, null);
-  assert.equal((await zoomPost(summary("u-1"))).body.saved, 0, "the same meeting twice is kept once");
+  assert.equal(z1.body.saved, 0, "Zoom's summary names nobody who is a contact, so there is no account to put it in: it is counted, not saved (N93)");
+  assert.equal((await sql()`select count(*)::int n from meeting_notes where installation_id = ${inst.id} and title = 'CONN-ZOOM-CALL'`)[0].n, 0);
   assert.equal((await zoomPost(summary("u-9", "someone-else"))).body.saved, 0, "a host nobody connected is ignored");
   assert.equal((await zoomPost({ event: "meeting.started", payload: {} })).body.ignored, true);
-  assert.equal((await sql()`select count(*)::int n from meeting_notes where installation_id = ${inst.id} and title = 'CONN-ZOOM-CALL'`)[0].n, 1);
   const zc = (await call("/api/app/connections", { token })).body.connections.find((c: { provider: string }) => c.provider === "zoom");
-  assert.equal(zc.saved, 1);
+  assert.equal(zc.saved, 0);
+  assert.equal(zc.skipped, 1, "and it is counted");
   assert.equal((await zoomPost({ event: "app_deauthorized", payload: { user_id: "zoomhost-1", account_id: "acct" } })).status, 200);
   assert.equal((await sql()`select count(*)::int n from connections where installation_id = ${inst.id} and provider = 'zoom'`)[0].n, 0, "removing the app in Zoom removes the connection here");
 

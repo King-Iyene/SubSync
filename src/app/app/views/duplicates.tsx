@@ -14,7 +14,7 @@ type Group = {
   survivorId: string; plan: Choice[]; people: Person[]; review: { decision: string; keepContactId: string | null; decidedAt: string | null } | null;
 };
 type Data = {
-  summary: { exact: number; format: number; name: number; contacts: number; reviewed: number; crossAccount: number; accounts: Array<{ locationId: string; name: string | null; groups: number; contacts: number; allowDuplicates: boolean | null }> };
+  summary: { exact: number; format: number; name: number; contacts: number; reviewed: number; accounts: Array<{ locationId: string; name: string | null; groups: number; contacts: number; allowDuplicates: boolean | null }> };
   truncated: boolean; canReview: boolean; groups: Group[];
 };
 type Preview = { dryRun: true; count: number; contacts: number; sample: Array<{ locationName: string | null; confidence: number; reasons: string[]; names: string[] }> };
@@ -94,11 +94,10 @@ export function DuplicatesView() {
       />
       {msg && <p className={`mb-4 rounded-lg border px-3 py-2 text-sm ${msg.ok ? "bg-muted/40" : "border-red-300 bg-red-50 text-red-800"}`} role={msg.ok ? "status" : "alert"}>{msg.text}</p>}
 
-      <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-3">
         <Stat label="Exact matches" value={fmtInt(s.exact)} sub="same email or phone" tone={s.exact > 0 ? "bad" : undefined} />
         <Stat label="Written differently" value={fmtInt(s.format)} sub="phone format, email case" tone={s.format > 0 ? "warn" : undefined} />
         <Stat label="Contacts involved" value={fmtInt(s.contacts)} sub={`${s.reviewed} groups already reviewed`} />
-        <Stat label="Same person, other clients" value={fmtInt(s.crossAccount)} sub="normal when one person buys from several clients" />
       </div>
 
       <Card title="Is duplicate protection on?" className="mb-6">
@@ -118,7 +117,6 @@ export function DuplicatesView() {
         </ul>
         <p className="mt-3 text-xs text-muted-foreground">
           To block new duplicates in a client account: open it, go to Settings, then Business Profile (General), and switch off &quot;Allow Duplicate Contact&quot;. Do this for every account that shows exact matches above.
-          {s.crossAccount > 0 && ` The ${fmtInt(s.crossAccount)} people who appear in more than one client account are not duplicates: each client owns its own customers. See Leads for that list.`}
         </p>
       </Card>
 

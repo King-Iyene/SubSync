@@ -66,20 +66,14 @@ export async function buildQueue(installationId: string, allowed: string[] | nul
 
 export type QueueSummary = ReturnType<typeof classify> & { reviewed: number; accounts: Array<{ locationId: string; name: string | null; groups: number; contacts: number; allowDuplicates: boolean | null }> };
 
-export async function summarise(installationId: string, allowed: string[] | null, open: QueueGroup[], reviewedCount: number): Promise<QueueSummary & { crossAccount: number }> {
+export async function summarise(installationId: string, allowed: string[] | null, open: QueueGroup[], reviewedCount: number): Promise<QueueSummary> {
   const db = sql();
-  const [locs, [cross]] = await Promise.all([
-    db`select location_id, name, allow_duplicate_contact from locations where installation_id = ${installationId} and not ignored ${allowed ? db`and location_id = any(${allowed}::text[])` : db``} order by name`,
-    allowed && allowed.length === 1
-      ? Promise.resolve([{ n: 0 }])
-      : db`select count(*)::int n from (select lower(btrim(email)) k from cached_contacts where installation_id = ${installationId} and email is not null and email <> ''
-            ${allowed ? db`and location_id = any(${allowed}::text[])` : db``} group by 1 having count(distinct location_id) > 1) x`,
-  ]);
+  const locs = await db`select location_id, name, allow_duplicate_contact from locations where installation_id = ${installationId} and not ignored ${allowed ? db`and location_id = any(${allowed}::text[])` : db``} order by name`;
   const accounts = locs.map((l) => {
     const mine = open.filter((g) => g.locationId === l.location_id);
     return { locationId: l.location_id as string, name: l.name as string | null, groups: mine.length, contacts: mine.reduce((s, g) => s + g.people.length, 0), allowDuplicates: (l.allow_duplicate_contact as boolean | null) ?? null };
   });
-  return { ...classify(open), reviewed: reviewedCount, accounts, crossAccount: cross?.n ?? 0 };
+  return { ...classify(open), reviewed: reviewedCount, accounts };
 }
 
 // Record a decision about one group. The records are re-read from our copy and checked against

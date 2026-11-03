@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { decideForIdentity, type AccessKind } from "@/lib/access";
+import { decideForIdentity, mayDeleteData, type AccessKind } from "@/lib/access";
 import { deriveIdentity } from "@/lib/identity";
 import { logIdentity } from "@/lib/identity-log";
 import { demoEnabled } from "@/lib/api/auth";
@@ -43,7 +43,7 @@ export async function POST(request: Request) {
       userId: "demo-user", companyId: DEMO_COMPANY_ID, role: "admin", type: kind === "agency" ? "agency" : "account",
       userName: kind === "agency" ? "Demo Admin" : "Demo Owner", activeLocation: locationId,
     };
-    const session = signSession({ companyId: DEMO_COMPANY_ID, userId: user.userId, role: user.role, userName: user.userName, demo: true, kind, locationId });
+    const session = signSession({ companyId: DEMO_COMPANY_ID, userId: user.userId, role: user.role, userName: user.userName, demo: true, kind, locationId, ...(kind === "agency" ? { personRole: "agency_owner" as const } : {}) });
     const demoInstall = await getInstallation(DEMO_COMPANY_ID).catch(() => null);
     const brand = demoInstall ? await brandOf(demoInstall.id) : { name: null, color: null };
     return NextResponse.json({ user, installed: true, demo: true, kind, session, entitlements: await resolveEntitlements("pro", undefined, true), brand });
@@ -99,11 +99,11 @@ export async function POST(request: Request) {
   }
   await logIdentity(installation.id, identity, "ok");
   // An agency that resells the platform under its own domain gets links on that domain.
-  if (user.whitelabelDomain) await captureWhitelabelDomain(installation.id, user.whitelabelDomain).catch(() => undefined);
+  if (user.whitelabelDomain) await captureWhitelabelDomain(installation.id, user.whitelabelDomain, "sso").catch(() => undefined);
 
   const session = signSession({
     companyId: decision.companyKey, userId: user.userId, role: user.role, userName: user.userName, demo: false,
-    kind: decision.kind, locationId: decision.locationId,
+    kind: decision.kind, locationId: decision.locationId, dataOwner: mayDeleteData(identity, decision.kind), personRole: identity.role,
   });
   return NextResponse.json({ user, installed: true, kind: decision.kind, session, entitlements: await resolveEntitlements(installation.plan, installation.id), brand: await brandOf(installation.id) });
 }

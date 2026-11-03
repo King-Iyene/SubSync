@@ -7,8 +7,11 @@ import type { Feature } from "./entitlements.ts";
 
 // Brief v3, sections 7 and 8: these are deferred or avoided for now. See docs/FEATURE_STATUS.md for why.
 export const DEFAULT_OFF: ReadonlySet<Feature> = new Set<Feature>([
-  // Nothing is off. King switched everything built on (31 Oct), the AI assistant connector last. Connections is on; a provider shows as
-  // not available until its keys are set. A new feature goes in this list until it is verified.
+  // King's decision of 1 Nov 2026 (docs/ROADMAP_V2.md, stage S0.2b): the Meeting notes page stays off until stage E2a has passed, and
+  // Zoom and Google Meet stay hidden everywhere (card, text, emails, privacy page) until a pilot user asks for them. Slack and Fathom stay visible.
+  // A new feature goes in this list until it is verified.
+  "meetings",
+  "zoom_meet",
 ]);
 
 export function resolveFeatures(all: readonly Feature[], overrides: Record<string, boolean>, allOn = false): Record<Feature, boolean> {

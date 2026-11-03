@@ -1,4 +1,5 @@
 import { createHmac, hkdfSync, timingSafeEqual } from "node:crypto";
+import type { Role } from "./identity.ts";
 
 // Short-lived signed session issued after the host page proves who the user is (SSO).
 // The embedded page keeps it in memory and sends it as a Bearer token, because third-party
@@ -13,6 +14,10 @@ export type Session = {
   /** "agency" when absent (older sessions). A business or client session is limited to one account. */
   kind?: "agency" | "business" | "client";
   locationId?: string | null;
+  /** True only for the person who may delete all the data (see mayDeleteData in access.ts). Missing means no. */
+  dataOwner?: boolean;
+  /** The role sign-in worked out from the verified payload (agency owner, administrator, staff, account administrator or user). Connections decide who may see and revoke from it. Missing on older sessions, which then get the least privileged reading of the raw role. */
+  personRole?: Role;
   exp: number;
 };
 

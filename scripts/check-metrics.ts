@@ -26,12 +26,21 @@ async function main() {
   const k = ov.body.kpis;
 
   // 1. open pipeline and the deals left out, from the raw rows
+  // Written out by hand and not with the app's own patterns (stage F1): the demo's deals in play are the ones with a value and an owner that are
+  // not in a stage named exactly "Disqualified" and not in a pipeline whose name says "Not IN USE".
   const [raw] = await sql()`
+    with d as (
+      select o.status, o.monetary_value, o.assigned_to,
+        (coalesce(pl.name, '') like '%Not IN USE%' or coalesce(st.nm, '') = 'Disqualified') closed_out
+      from cached_opportunities o
+      left join pipelines pl on pl.installation_id = o.installation_id and pl.location_id = o.location_id and pl.pipeline_id = o.pipeline_id
+      left join lateral (select s->>'name' nm from jsonb_array_elements(coalesce(pl.stages, '[]'::jsonb)) s where s->>'id' = o.stage_id limit 1) st on true
+      where o.installation_id = ${inst.id} and o.location_id = any(${liveIds}::text[]))
     select
-      coalesce(sum(monetary_value) filter (where status = 'open' and coalesce(monetary_value, 0) > 0 and assigned_to is not null), 0)::float8 counted_value,
-      count(*) filter (where status = 'open' and coalesce(monetary_value, 0) > 0 and assigned_to is not null)::int counted,
-      count(*) filter (where status = 'open' and not (coalesce(monetary_value, 0) > 0 and assigned_to is not null))::int excluded
-    from cached_opportunities where installation_id = ${inst.id} and location_id = any(${liveIds}::text[])`;
+      coalesce(sum(monetary_value) filter (where status = 'open' and coalesce(monetary_value, 0) > 0 and assigned_to is not null and not closed_out), 0)::float8 counted_value,
+      count(*) filter (where status = 'open' and coalesce(monetary_value, 0) > 0 and assigned_to is not null and not closed_out)::int counted,
+      count(*) filter (where status = 'open' and not (coalesce(monetary_value, 0) > 0 and assigned_to is not null and not closed_out))::int excluded
+    from d`;
   assert.equal(Math.round(k.openValue), Math.round(raw.counted_value), "open pipeline counts only deals with a value and an owner");
   assert.equal(k.openOpps, raw.counted);
   assert.equal(k.excludedDeals, raw.excluded, "and says how many it left out");

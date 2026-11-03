@@ -1,21 +1,48 @@
 import { sql } from "../db";
+import { ttlCache } from "../ttl-cache";
+import { timed } from "./people-list-queries";
 import { callPriority, powerHourStats, type Filters, type Outcome } from "./call-intel";
+import { dealScopeJoins, outOfScope } from "./stage-rules-sql";
 
 const iso = (v: unknown) => (v instanceof Date ? v.toISOString() : null);
 const DAY = 86_400_000;
 
 function visible(installationId: string, allowed: string[] | null) {
   const db = sql();
-  return db`select location_id, name from locations where installation_id = ${installationId} and not ignored
+  return db`select location_id, name, timezone from locations where installation_id = ${installationId} and not ignored
     ${allowed ? db`and location_id = any(${allowed}::text[])` : db``}`;
 }
 
 export type QueueRow = {
   contactId: string; locationId: string; locationName: string | null; name: string; phone: string | null; email: string | null;
   priority: number; reasons: string[]; idleDays: number | null; openValue: number; lastOutcome: string | null; followUpAt: string | null;
+  /** Calls logged from the call lists in SubSync: the last one and how many. The CRM's own call history is read one lead at a time in the lead panel. */
+  lastCallAt: string | null; calls: number;
+  /** The account's time zone, for the calling-hours warning. */
+  timeZone: string | null;
 };
 
+// A list is read from the database at most once every 45 seconds per account and choice (the answer is kept in memory), and logging a call clears it.
+// The read runs under a hard time limit (people-list-queries.ts, timed): the database stops it and the caller shows a friendly message.
+const queueCache = ttlCache<{ total: number; rows: QueueRow[] }>(45_000, 120);
+export const forgetQueues = (installationId: string) => queueCache.clear(installationId + "|");
+
 export async function callQueue(installationId: string, allowed: string[] | null, f: Filters, limit = 100) {
+  const all = await callQueueAll(installationId, allowed, f);
+  return { total: all.total, rows: all.rows.slice(0, limit) };
+}
+
+/** Every row of the list (up to 400 candidates), scored and ordered. The page slices it. */
+export async function callQueueAll(installationId: string, allowed: string[] | null, f: Filters): Promise<{ total: number; rows: QueueRow[]; cached?: boolean }> {
+  const key = `${installationId}|${allowed ? [...allowed].sort().join(",") : "*"}|${JSON.stringify(f)}`;
+  const hit = queueCache.get(key);
+  if (hit) return { ...hit, cached: true };
+  const out = await callQueueRead(installationId, allowed, f);
+  queueCache.set(key, out);
+  return out;
+}
+
+async function callQueueRead(installationId: string, allowed: string[] | null, f: Filters): Promise<{ total: number; rows: QueueRow[] }> {
   const db = sql();
 
   // The preset decides who is in the list and how the database orders it before we score them.
@@ -85,27 +112,30 @@ export async function callQueue(installationId: string, allowed: string[] | null
   if (f.location) and(db`c.location_id = ${f.location}`);
   const followUps = f.preset === "follow_ups_due";
 
-  const rows = await db`
+  const rows = await timed((tx) => tx`
     with loc as (${visible(installationId, allowed)}),
     deals as (
       select o.location_id, o.contact_id,
-        count(*) filter (where o.status = 'open')::int open_count,
-        -- Dollar figures use counted deals only (docs/METRICS.md): a value above zero and an owner. The contact is still listed for any open deal.
-        coalesce(sum(o.monetary_value) filter (where o.status = 'open' and coalesce(o.monetary_value, 0) > 0 and o.assigned_to is not null), 0)::float8 open_value,
+        -- A deal in a closed-out stage or an unused pipeline does not make its contact a hot lead (stage-rules.ts).
+        count(*) filter (where o.status = 'open' and not ${outOfScope()})::int open_count,
+        -- Dollar figures use counted deals only (docs/METRICS.md): a value above zero, an owner and a place in play. The contact is still listed for any open deal in play.
+        coalesce(sum(o.monetary_value) filter (where o.status = 'open' and coalesce(o.monetary_value, 0) > 0 and o.assigned_to is not null and not ${outOfScope()}), 0)::float8 open_value,
         count(*) filter (where o.status = 'won')::int won_count,
         coalesce(sum(o.monetary_value) filter (where o.status = 'won'), 0)::float8 won_value,
         max(o.last_status_change_at) filter (where o.status = 'won') last_won_at,
-        coalesce(bool_or(o.status = 'open' and coalesce(st.nm, '') ~* '(proposal|quote|negotiat|contract)'
+        coalesce(bool_or(o.status = 'open' and not ${outOfScope()} and coalesce(st.nm, '') ~* '(proposal|quote|negotiat|contract)'
           and coalesce(greatest(o.last_action_at, o.updated_remote_at, o.last_stage_change_at), o.created_remote_at, o.synced_at) < now() - interval '7 days'), false) proposal_stale
       from cached_opportunities o
+      ${dealScopeJoins()}
       left join pipelines pl on pl.installation_id = o.installation_id and pl.location_id = o.location_id and pl.pipeline_id = o.pipeline_id
       left join lateral (select s->>'name' nm from jsonb_array_elements(coalesce(pl.stages, '[]'::jsonb)) s where s->>'id' = o.stage_id limit 1) st on true
       where o.installation_id = ${installationId} and o.contact_id is not null group by o.location_id, o.contact_id),
     cand as (${drive ?? db`select c0.location_id, c0.contact_id from cached_contacts c0 where c0.installation_id = ${installationId}`})
-    select c.contact_id, c.location_id, loc.name location_name, coalesce(nullif(c.full_name, ''), nullif(c.email, ''), 'Unnamed contact') name,
+    select c.contact_id, c.location_id, loc.name location_name, loc.timezone location_tz, coalesce(nullif(c.full_name, ''), nullif(c.email, ''), 'Unnamed contact') name,
       c.phone, c.email, c.date_added, c.last_activity_at,
       coalesce(d.open_count, 0) open_count, coalesce(d.open_value, 0) open_value, coalesce(d.won_value, 0) won_value,
-      lo.outcome last_outcome, lo.follow_up_at
+      lo.outcome last_outcome, lo.follow_up_at, lo.created_at last_call_at,
+      (select count(*)::int from call_outcomes o3 where o3.installation_id = ${installationId} and o3.location_id = c.location_id and o3.contact_id = c.contact_id) calls
     from cand
     join cached_contacts c on c.installation_id = ${installationId} and c.location_id = cand.location_id and c.contact_id = cand.contact_id
     join loc on loc.location_id = c.location_id
@@ -118,7 +148,7 @@ export async function callQueue(installationId: string, allowed: string[] | null
       and coalesce(lo.outcome, '') not in ('wrong_number', 'not_interested')
       and (lo.created_at is null or lo.created_at < now() - interval '12 hours' or ${followUps}::boolean)
     order by ${order}
-    limit 400`;
+    limit 400`);
 
   const now = Date.now();
   const scored: QueueRow[] = rows.map((r) => {
@@ -131,11 +161,11 @@ export async function callQueue(installationId: string, allowed: string[] | null
     });
     return {
       contactId: r.contact_id, locationId: r.location_id, locationName: r.location_name, name: r.name, phone: r.phone, email: r.email,
-      priority: p.score, reasons: p.reasons, idleDays: idle, openValue: r.open_value, lastOutcome: r.last_outcome, followUpAt: iso(r.follow_up_at),
+      priority: p.score, reasons: p.reasons, idleDays: idle, openValue: r.open_value, lastOutcome: r.last_outcome, followUpAt: iso(r.follow_up_at), lastCallAt: iso(r.last_call_at), calls: r.calls ?? 0, timeZone: r.location_tz ?? null,
     };
   });
   scored.sort((a, b) => (followUps ? 0 : b.priority - a.priority));
-  return { total: rows.length, rows: scored.slice(0, limit) };
+  return { total: rows.length, rows: scored };
 }
 
 // Speed to lead (8.8): how many fresh leads are waiting right now.
@@ -189,6 +219,7 @@ export async function logOutcome(
   await db`
     insert into call_outcomes (installation_id, location_id, contact_id, outcome, note, follow_up_at)
     values (${installationId}, ${v.locationId}, ${v.contactId}, ${v.outcome}, ${v.note}, ${followUp})`;
+  forgetQueues(installationId);
   return true;
 }
 

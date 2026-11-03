@@ -20,11 +20,13 @@ const GOALS = [
   { metric: "monthly_deals_won", label: "Deals won per month", money: false },
 ] as const;
 
-function Arrow({ pct }: { pct: number | null }) {
-  if (pct === null) return <span className="text-xs text-muted-foreground">no earlier data</span>;
+// A percentage only when the earlier figure was big enough to measure one against (metrics.ts, N6). Otherwise the earlier figure is just stated.
+function Arrow({ pct, previous, money }: { pct: number | null; previous: number | null; money: boolean }) {
+  if (previous === null) return <span className="text-xs text-muted-foreground">no earlier data</span>;
+  if (pct === null) return <span className="text-xs text-muted-foreground">was {money ? fmtMoney(previous) : fmtInt(previous)} before (too small a base for a percentage)</span>;
   if (pct === 0) return <span className="text-xs text-muted-foreground">no change</span>;
   const up = pct > 0;
-  return <span className={`text-xs font-medium ${up ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>{up ? "▲" : "▼"} {Math.abs(pct)}% vs before</span>;
+  return <span className={`text-xs font-medium ${up ? "text-success" : "text-destructive"}`}>{up ? "▲" : "▼"} {Math.abs(pct)}% vs before</span>;
 }
 
 // The one card to glance at: three numbers with their direction, goal progress, and anything unusual.
@@ -59,7 +61,7 @@ export function ExecSummary() {
           <div key={k.key}>
             <dt className="text-xs text-muted-foreground">{k.label}</dt>
             <dd className="text-xl font-semibold tabular-nums">{k.money ? fmtMoney(k.current) : fmtInt(k.current)}</dd>
-            <Arrow pct={k.pct} />
+            <Arrow pct={k.pct} previous={k.previous} money={k.money} />
           </div>
         ))}
       </dl>
@@ -100,7 +102,7 @@ export function ExecSummary() {
               </div>
             ))}
           </div>
-          <div className="mt-3 flex items-center gap-3"><Btn variant="primary" onClick={save}>Save goals</Btn>{msg && <span className="text-sm text-red-600" role="alert">{msg}</span>}</div>
+          <div className="mt-3 flex items-center gap-3"><Btn variant="primary" onClick={save}>Save goals</Btn>{msg && <span className="text-sm text-destructive" role="alert">{msg}</span>}</div>
         </div>
       )}
     </Card>

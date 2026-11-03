@@ -6,7 +6,7 @@ export type AccountMetrics = {
   newContacts30d: number;
   openOpportunities: number;
   staleOpportunities: number;
-  /** Inbound conversations nobody has answered within the SLA. */
+  /** Inbound conversations nobody has answered within the reply target. */
   unansweredOverSla: number;
   completenessPct: number;
   /** Days since the last sign of activity (contact, deal or message); null if never. */
@@ -56,8 +56,8 @@ export function engagementBreakdown(m: AccountMetrics): ScoreBreakdown {
     {
       key: "responsiveness", label: "Responsiveness", points: responsiveness, max: 10,
       why: m.unansweredOverSla === 0
-        ? "No inbound conversations waiting past the SLA"
-        : `${m.unansweredOverSla} inbound conversation${m.unansweredOverSla === 1 ? "" : "s"} waiting past the SLA`,
+        ? "No customer conversations waiting past your reply target"
+        : `${m.unansweredOverSla} inbound conversation${m.unansweredOverSla === 1 ? "" : "s"} waiting past your reply target`,
     },
     {
       key: "quality", label: "Data quality", points: quality, max: 10,
@@ -133,3 +133,32 @@ export function churnRisk(input: {
   }
   return { level, reasons };
 }
+
+// ---------------- the label people read (N16, N62) ----------------
+
+/** Conversations waiting past the reply target at which an account can no longer be called "Healthy" or better. */
+export const REPLY_DELAY_WATCH = 5;
+/** ...and at which it is "At risk" whatever the rest of the score says. */
+export const REPLY_DELAY_AT_RISK = 15;
+
+const ORDER: ScoreBand[] = ["thriving", "healthy", "watch", "at_risk"];
+const worse = (a: ScoreBand, b: ScoreBand): ScoreBand => (ORDER.indexOf(a) >= ORDER.indexOf(b) ? a : b);
+
+/**
+ * The health label: the band the score gives, held down by the reply delay. The score only takes 10 points off for waiting replies, so an
+ * account with 23 customers waiting could still score 57 and read "Healthy" next to a list saying it needs attention. The label can never be
+ * better than what the waiting customers say. The score itself is not changed, so its history stays comparable.
+ */
+export function healthBand(score: number, waiting: number): { band: ScoreBand; scoreBand: ScoreBand; heldDown: boolean; why: string | null } {
+  const fromScore = scoreBand(score);
+  const cap: ScoreBand = waiting >= REPLY_DELAY_AT_RISK ? "at_risk" : waiting >= REPLY_DELAY_WATCH ? "watch" : "thriving";
+  const band = worse(fromScore, cap);
+  const heldDown = band !== fromScore;
+  return {
+    band, scoreBand: fromScore, heldDown,
+    why: heldDown ? `The score says ${scoreBand(score).replace("_", " ")}, but ${waiting} ${waiting === 1 ? "customer is" : "customers are"} waiting for a reply, so it is shown as ${band.replace("_", " ")}.` : null,
+  };
+}
+
+/** Inside a "Needs attention" list nothing is labelled Healthy or Thriving: an account listed there is at best "Watch". */
+export const attentionBand = (band: ScoreBand): ScoreBand => worse(band, "watch");

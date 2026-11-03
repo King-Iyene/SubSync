@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { bearerMatches } from "@/lib/secret-compare";
 import { safeError } from "@/lib/safe-log";
 import { sql } from "@/lib/db";
 import { sendDigest } from "@/lib/analytics/service";
@@ -8,12 +9,12 @@ export const maxDuration = 60;
 
 export async function GET(request: Request) {
   const secret = process.env.CRON_SECRET;
-  if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) {
+  if (!secret || !bearerMatches(request.headers.get("authorization"), secret)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {
     const rows = await sql()`
-      select i.id, coalesce(i.company_name, 'your agency') label
+      select i.id, coalesce(i.company_name, 'your company') label
       from installations i join settings s on s.installation_id = i.id
       where i.uninstalled_at is null and not i.is_demo and s.digest_enabled and s.slack_webhook_url is not null`;
     let sent = 0;

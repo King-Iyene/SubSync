@@ -2,13 +2,13 @@
 // revenue figures, onboarding checklist, alert rules, the Slack digest and CSV export.
 
 import {
-  churnRisk, engagementBreakdown, isDormant, scoreBand,
+  churnRisk, engagementBreakdown, healthBand, isDormant,
   type ChurnRisk, type ScoreBand, type ScoreBreakdown,
 } from "../scoring.ts";
 import { fmtDuration } from "./speed-intel.ts";
 
 // A win rate built on a handful of deals is noise, so none is shown (or used in an estimate) below this.
-import { MIN_CLOSED_DEALS } from "./metrics.ts";
+import { followUpEstimate, MIN_CLOSED_DEALS } from "./metrics.ts";
 export { MIN_CLOSED_DEALS };
 
 export type AccountRow = {
@@ -19,8 +19,12 @@ export type AccountRow = {
   oldestWaitMinutes?: number | null;
   /** Open deals left out of every dollar figure because they have no value or no owner. */
   excludedOpen?: number;
+  /** Of those, the open deals that sit in a closed-out or ignored stage or in a pipeline marked not in use. */
+  outOfScopeOpen?: number;
   /** The largest counted open deal in the account, for the outlier note on dollar cards. */
   topDeal?: number;
+  /** The largest counted open deal that has not moved for the stale threshold (for the outlier guard on the stale-deal finding). */
+  topStaleDeal?: number;
   locationId: string;
   name: string | null;
   email: string | null;
@@ -61,7 +65,12 @@ export type DerivedAccount = AccountRow & {
   daysInactive: number | null;
   dormant: boolean;
   score: number;
+  /** The label people read: the score's band, held down by the reply delay (healthBand in scoring.ts). */
   band: ScoreBand;
+  /** The band the score alone gives. */
+  scoreBand: ScoreBand;
+  /** One sentence when the reply delay held the label down, else null. */
+  bandNote: string | null;
   breakdown: ScoreBreakdown;
   churn: ChurnRisk;
   winRate: number | null;
@@ -112,6 +121,7 @@ export function deriveAccount(
     daysInactive,
   });
   const score = breakdown.total;
+  const health = healthBand(score, row.unanswered);
 
   const closed = row.wonCount + row.lostCount;
   const winRate = closed >= MIN_CLOSED_DEALS ? row.wonCount / closed : null;
@@ -123,17 +133,16 @@ export function deriveAccount(
     emailPct, phonePct, tagPct, activePct, completenessPct, daysInactive,
     dormant: isDormant(daysInactive, settings.dormantDays),
     score,
-    band: scoreBand(score),
+    band: health.band,
+    scoreBand: health.scoreBand,
+    bandNote: health.why,
     breakdown,
     churn: churnRisk({ score, daysInactive, dormantDays: settings.dormantDays, history }),
     winRate,
     avgDealValue,
     expectedRevenue: winRate !== null ? Math.round(row.openValue * winRate) : null,
     revenueAtRisk: Math.round(row.staleValue),
-    followUpRevenueAtRisk:
-      row.unanswered > 0 && winRate !== null && avgDealValue !== null
-        ? Math.round(row.unanswered * avgDealValue * winRate)
-        : null,
+    followUpRevenueAtRisk: followUpEstimate({ unanswered: row.unanswered, winRate, avgDealValue }),
     leadFlowDropPct: leadFlowDrop(row.new30d, newContactsHistory),
   };
 }
@@ -305,7 +314,7 @@ export function buildDigest(agency: string, accounts: DerivedAccount[], openAler
   const lines = [
     `*Weekly summary for ${agency}*`,
     `${live.length} client accounts, ${live.filter((a) => a.dormant).length} dormant, ${openAlerts} open alerts`,
-    `${money(stale)} sitting in stale deals, ${waiting} conversations waiting past the SLA`,
+    `${money(stale)} sitting in stale deals, ${waiting} conversations waiting past your reply target`,
   ];
   if (atRisk.length) {
     lines.push("", "*Needs attention*");

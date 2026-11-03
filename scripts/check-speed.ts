@@ -50,7 +50,9 @@ async function main() {
   assert.ok(w.length > 0 && w.every((x) => x.waitingMinutes > 15 && x.url.startsWith("https://")));
   assert.deepEqual([...w.map((x) => x.waitingMinutes)].sort((a, b) => b - a), w.map((x) => x.waitingMinutes));
   assert.ok(!/gohighlevel|highlevel|\bghl\b/i.test(JSON.stringify(v.body.perAccount) + JSON.stringify(v.body.people)));
-  assert.ok(v.body.people.every((p: { replies: number }) => p.replies >= 3), "nobody is ranked on a couple of replies");
+  assert.ok(v.body.people.filter((p: { ranked: boolean }) => p.ranked).every((p: { replies: number }) => p.replies >= 3), "nobody is ranked on a couple of replies");
+  assert.ok(v.body.people.filter((p: { ranked: boolean }) => !p.ranked).every((p: { medianSeconds: number | null }) => p.medianSeconds === null), "an unranked person has no typical time");
+  assert.ok(!/Team member [A-Za-z0-9]{4}\b/.test(JSON.stringify(v.body.people) + JSON.stringify(v.body.waiting)), "no placeholder name made from an id");
 
   // The target is a real setting: a longer target can only make more leads count as on time.
   assert.equal((await call("/api/app/settings", agency, { method: "PUT", body: JSON.stringify({ speedTargetMinutes: 0 }) })).status, 400);
@@ -63,6 +65,34 @@ async function main() {
   assert.ok(longer.body.waiting.length <= v.body.waiting.length);
   await call("/api/app/settings", agency, { method: "PUT", body: JSON.stringify({ speedTargetMinutes: 15, countAutomatedTouches: false }) });
   assert.equal(((await call("/api/app/settings", agency)).body.settings).speedTargetMinutes, 15, "restored");
+
+  // A card over its own window (F2): the figures agree with the raw rows of exactly those days, and every list has as many leads as its figure.
+  const day = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString().slice(0, 10);
+  const win = { from: day(29), to: day(0) };
+  const card = await call(`/api/app/speed?part=summary&from=${win.from}&to=${win.to}`, agency);
+  assert.equal(card.status, 200, JSON.stringify(card.body).slice(0, 200));
+  const rawWin = (await sql()`
+    select
+      count(*) filter (where touch_at is not null and greatest(0, extract(epoch from touch_at - coalesce(clock_start, lead_at))) <= 900)::int as on_time,
+      count(*) filter (where touch_at is not null and greatest(0, extract(epoch from touch_at - coalesce(clock_start, lead_at))) > 900)::int as late_n,
+      count(*) filter (where touch_at is null and coalesce(clock_start, lead_at) < now() - interval '15 minutes')::int as waiting_n
+    from lead_touches t join locations l on l.installation_id = t.installation_id and l.location_id = t.location_id and not l.ignored
+    where t.installation_id = ${inst.id} and t.excluded is null and t.lead_at >= ${win.from + "T00:00:00Z"}::timestamptz and t.lead_at < ${day(-1) + "T00:00:00Z"}::timestamptz`)[0];
+  assert.deepEqual([card.body.summary.withinTarget, card.body.summary.answeredLate, card.body.summary.stillWaiting], [rawWin.on_time, rawWin.late_n, rawWin.waiting_n], "the card agrees with the raw rows of its window");
+  assert.equal(card.body.lists.within.count, card.body.summary.withinTarget);
+  assert.equal(card.body.lists.late.count, card.body.summary.answeredLate);
+  assert.equal(card.body.lists.waiting.count, card.body.summary.stillWaiting);
+  assert.equal((await call(`/api/app/speed?part=summary&from=${win.to}&to=${win.from}`, agency)).status, 400, "a backwards window is refused");
+  assert.equal((await call("/api/app/speed?part=nope&from=2026-10-01&to=2026-10-02", agency)).status, 400, "an unknown part is refused");
+  for (const p of ["source", "accounts", "people"]) {
+    const r = await call(`/api/app/speed?part=${p}&from=${win.from}&to=${win.to}`, agency);
+    assert.equal(r.status, 200, p);
+    for (const row of r.body.rows as Array<{ members: { count: number }; leads?: number; replies?: number }>) assert.equal(row.members.count, row.leads ?? row.replies, `${p}: a row's list equals its figure`);
+  }
+  for (const [label, tk] of [["business", biz.session], ["client", cli]] as const) {
+    const r = await call(`/api/app/speed?part=accounts&from=${win.from}&to=${win.to}`, tk);
+    assert.ok(r.status === 200 && r.body.rows.length <= 1, `${label}: one account at most on a card`);
+  }
 
   // A business or client only sees its own account.
   for (const [label, t] of [["business", biz.session], ["client", cli]] as const) {

@@ -1,6 +1,9 @@
 import { sql } from "../db";
 import type { AccountRow, AccountSettings, AlertDraft } from "./derive";
 import type { DomainReport } from "../dns/email-auth";
+import { DEFAULT_APP_DOMAIN } from "../links";
+import { countedInScope, dealScopeJoins, outOfScope } from "./stage-rules-sql";
+import { currentSnapshotVersion, snapshotOk } from "./definitions-sql";
 
 // Every query is scoped by installation_id. Counts are cast to int/float8 so the driver does
 // not hand back strings.
@@ -15,7 +18,12 @@ export const pgTextArray = (items: string[]): string =>
 
 export type Settings = AccountSettings & {
   slackWebhookUrl: string | null;
+  /** The domain every "Open in your CRM" link uses: the one typed in Settings if any, else the one seen at sign-in or install, else the standard one. */
   appDomain: string;
+  /** Where appDomain came from: "manual" (typed in Settings), "sso" or "install" (detected), "default" (nothing seen yet). */
+  appDomainSource: "manual" | "sso" | "install" | "default";
+  /** The login domain last seen at sign-in or install, kept even while an override is set so the override can be taken off. */
+  detectedDomain: string | null;
   digestEnabled: boolean;
   customChecklist: string[];
   /** Local hour (0 to 23) the daily brief is sent, and the time zone it is judged in. Null means the defaults. */
@@ -40,12 +48,16 @@ export type Settings = AccountSettings & {
   alertQuietHours: boolean;
   speedOpenHour: number;
   speedCloseHour: number;
+  /** Tags the owner marked as cold lists, or null when none were chosen yet (the suggestion from the tag names applies). */
+  coldTags: string[] | null;
+  /** Counts every change the owner makes to stage rules; part of the definition version of the daily snapshots (N39). */
+  dealRulesRevision: number;
 };
 
 export async function getSettings(installationId: string): Promise<Settings> {
   const db = sql();
   const read = () => db`
-    select stale_deal_days, dormant_days, sla_hours, slack_webhook_url, ghl_app_domain, digest_enabled, custom_checklist, digest_hour, digest_timezone, digest_email, brand_name, brand_color, industry_targets, push_notes_to_crm, keep_transcripts, speed_target_minutes, count_automated_touches, speed_business_hours, speed_open_hour, speed_close_hour, alert_quiet_hours
+    select stale_deal_days, dormant_days, sla_hours, slack_webhook_url, ghl_app_domain, app_domain_source, detected_app_domain, digest_enabled, custom_checklist, digest_hour, digest_timezone, digest_email, brand_name, brand_color, industry_targets, push_notes_to_crm, keep_transcripts, speed_target_minutes, count_automated_touches, speed_business_hours, speed_open_hour, speed_close_hour, alert_quiet_hours, cold_tags, deal_rules_revision
     from settings where installation_id = ${installationId}`;
   let [r] = await read();
   if (!r) {
@@ -60,6 +72,8 @@ export async function getSettings(installationId: string): Promise<Settings> {
     slaHours: r.sla_hours,
     slackWebhookUrl: r.slack_webhook_url,
     appDomain: r.ghl_app_domain,
+    appDomainSource: r.app_domain_source === "manual" || r.app_domain_source === "sso" || r.app_domain_source === "install" ? r.app_domain_source : "default",
+    detectedDomain: (r.detected_app_domain as string | null) ?? null,
     digestEnabled: r.digest_enabled,
     customChecklist: Array.isArray(r.custom_checklist) ? r.custom_checklist.filter((x: unknown): x is string => typeof x === "string") : [],
     digestHour: (r.digest_hour as number | null) ?? null,
@@ -76,17 +90,27 @@ export async function getSettings(installationId: string): Promise<Settings> {
     alertQuietHours: r.alert_quiet_hours !== false,
     speedOpenHour: typeof r.speed_open_hour === "number" ? r.speed_open_hour : 9,
     speedCloseHour: typeof r.speed_close_hour === "number" ? r.speed_close_hour : 17,
+    coldTags: Array.isArray(r.cold_tags) ? r.cold_tags.filter((x: unknown): x is string => typeof x === "string") : null,
+    dealRulesRevision: typeof r.deal_rules_revision === "number" ? r.deal_rules_revision : 0,
   };
 }
 
-// Take the agency's own domain from sign-in, unless it typed one in Settings (which always wins).
-export async function captureWhitelabelDomain(installationId: string, domain: string): Promise<void> {
+// Keep the company's own login domain, seen at sign-in or in the install event (stored per install, so per company). It is always remembered as
+// "detected"; it becomes the domain links use unless the company typed one in Settings, which always wins.
+export async function captureWhitelabelDomain(installationId: string, domain: string, from: "sso" | "install" = "sso"): Promise<void> {
   const db = sql();
   await db`insert into settings (installation_id) values (${installationId}) on conflict do nothing`;
-  await db`update settings set ghl_app_domain = ${domain}, app_domain_source = 'sso' where installation_id = ${installationId} and app_domain_source <> 'manual' and ghl_app_domain is distinct from ${domain}`;
+  await db`
+    update settings set
+      detected_app_domain = ${domain},
+      ghl_app_domain = case when app_domain_source = 'manual' then ghl_app_domain else ${domain} end,
+      app_domain_source = case when app_domain_source = 'manual' then 'manual' else ${from} end
+    where installation_id = ${installationId}
+      and (detected_app_domain is distinct from ${domain} or (app_domain_source <> 'manual' and ghl_app_domain is distinct from ${domain}))`;
 }
 
-export async function updateSettings(installationId: string, p: Partial<Settings>): Promise<void> {
+// `appDomainOverride`: a domain typed in Settings (wins over a detected one), or null to take the override off and go back to the detected one.
+export async function updateSettings(installationId: string, p: Partial<Settings> & { appDomainOverride?: string | null }): Promise<void> {
   const db = sql();
   await db`insert into settings (installation_id) values (${installationId}) on conflict do nothing`;
   await db`
@@ -95,8 +119,8 @@ export async function updateSettings(installationId: string, p: Partial<Settings
       dormant_days = coalesce(${p.dormantDays ?? null}::int, dormant_days),
       sla_hours = coalesce(${p.slaHours ?? null}::int, sla_hours),
       slack_webhook_url = case when ${p.slackWebhookUrl !== undefined} then ${p.slackWebhookUrl ?? null} else slack_webhook_url end,
-      ghl_app_domain = coalesce(${p.appDomain ?? null}, ghl_app_domain),
-      app_domain_source = case when ${p.appDomain !== undefined} then 'manual' else app_domain_source end,
+      ghl_app_domain = case when ${p.appDomainOverride === null} then coalesce(detected_app_domain, ${DEFAULT_APP_DOMAIN}) when ${typeof p.appDomainOverride === "string"} then ${p.appDomainOverride ?? null} else ghl_app_domain end,
+      app_domain_source = case when ${p.appDomainOverride === null} then (case when detected_app_domain is not null then 'sso' else 'default' end) when ${typeof p.appDomainOverride === "string"} then 'manual' else app_domain_source end,
       digest_enabled = coalesce(${p.digestEnabled ?? null}::boolean, digest_enabled),
       digest_hour = case when ${p.digestHour !== undefined} then ${p.digestHour ?? null}::int else digest_hour end,
       digest_timezone = case when ${p.digestTimezone !== undefined} then ${p.digestTimezone ?? null} else digest_timezone end,
@@ -112,6 +136,7 @@ export async function updateSettings(installationId: string, p: Partial<Settings
       speed_close_hour = coalesce(${p.speedCloseHour ?? null}::int, speed_close_hour),
       brand_name = case when ${p.brandName !== undefined} then ${p.brandName ?? null} else brand_name end,
       brand_color = case when ${p.brandColor !== undefined} then ${p.brandColor ?? null} else brand_color end,
+      cold_tags = case when ${p.coldTags !== undefined} then ${p.coldTags === undefined ? null : p.coldTags === null ? null : pgTextArray(p.coldTags)}::text[] else cold_tags end,
       custom_checklist = coalesce(${p.customChecklist !== undefined ? db.json(p.customChecklist) : null}::jsonb, custom_checklist)
     where installation_id = ${installationId}`;
 }
@@ -147,17 +172,22 @@ export async function accountRows(installationId: string, s: AccountSettings): P
         count(*) filter (where status = 'open' and counted and act < now() - make_interval(days => ${s.staleDays}::int))::int stale_opps,
         coalesce(sum(monetary_value) filter (where status = 'open' and counted and act < now() - make_interval(days => ${s.staleDays}::int)), 0)::float8 stale_value,
         count(*) filter (where status = 'open' and not counted)::int excluded_open,
+        count(*) filter (where status = 'open' and out_scope)::int out_scope_open,
         coalesce(max(monetary_value) filter (where status = 'open' and counted), 0)::float8 top_deal,
+        coalesce(max(monetary_value) filter (where status = 'open' and counted and act < now() - make_interval(days => ${s.staleDays}::int)), 0)::float8 top_stale_deal,
         count(*) filter (where status = 'won')::int won_count,
         count(*) filter (where status = 'lost')::int lost_count,
         coalesce(sum(monetary_value) filter (where status = 'won'), 0)::float8 won_value,
         max(act) last_opp_at
       from (
-        select location_id, status, monetary_value,
-          -- A deal counts toward dollar figures only with a value above zero and a person it belongs to.
-          (coalesce(monetary_value, 0) > 0 and assigned_to is not null) counted,
-          coalesce(greatest(last_stage_change_at, last_action_at, updated_remote_at, last_status_change_at), created_remote_at, synced_at) act
-        from cached_opportunities where installation_id = ${installationId}
+        select o.location_id, o.status, o.monetary_value,
+          -- A deal counts toward dollar figures only with a value above zero, a person it belongs to, and a place in play: not in a closed-out or
+          -- ignored stage and not in a pipeline marked not in use (stage-rules.ts). One rule, applied everywhere.
+          (coalesce(o.monetary_value, 0) > 0 and o.assigned_to is not null and not ${outOfScope()}) counted,
+          ${outOfScope()} out_scope,
+          coalesce(greatest(o.last_stage_change_at, o.last_action_at, o.updated_remote_at, o.last_status_change_at), o.created_remote_at, o.synced_at) act
+        from cached_opportunities o ${dealScopeJoins()}
+        where o.installation_id = ${installationId}
       ) x group by location_id
     ), v as (
       select location_id,
@@ -186,7 +216,7 @@ export async function accountRows(installationId: string, s: AccountSettings): P
       coalesce(o.open_opps, 0)::int open_opps, coalesce(o.open_value, 0)::float8 open_value,
       coalesce(o.stale_opps, 0)::int stale_opps, coalesce(o.stale_value, 0)::float8 stale_value,
       coalesce(o.won_count, 0)::int won_count, coalesce(o.lost_count, 0)::int lost_count,
-      coalesce(o.won_value, 0)::float8 won_value, coalesce(o.excluded_open, 0)::int excluded_open, coalesce(o.top_deal, 0)::float8 top_deal,
+      coalesce(o.won_value, 0)::float8 won_value, coalesce(o.excluded_open, 0)::int excluded_open, coalesce(o.out_scope_open, 0)::int out_scope_open, coalesce(o.top_deal, 0)::float8 top_deal, coalesce(o.top_stale_deal, 0)::float8 top_stale_deal,
       coalesce(sp.speed_waiting, 0)::int speed_waiting, coalesce(ap.unmarked, 0)::int unmarked_appts, sp.oldest_wait_min,
       coalesce(v.unread, 0)::int unread, coalesce(v.unanswered, 0)::int unanswered,
       greatest(c.last_contact_at, o.last_opp_at, v.last_msg_at) last_activity_at
@@ -221,7 +251,9 @@ export async function accountRows(installationId: string, s: AccountSettings): P
     lostCount: r.lost_count,
     wonValue: r.won_value,
     excludedOpen: r.excluded_open,
+    outOfScopeOpen: r.out_scope_open,
     topDeal: r.top_deal,
+    topStaleDeal: r.top_stale_deal,
     unmarkedAppointments: r.unmarked_appts,
     speedWaiting: r.speed_waiting,
     oldestWaitMinutes: r.oldest_wait_min === null || r.oldest_wait_min === undefined ? null : Math.round(Number(r.oldest_wait_min)),
@@ -238,9 +270,13 @@ export async function accountRows(installationId: string, s: AccountSettings): P
 // Score history per account, oldest first, excluding today (used as the churn baseline).
 export type AccountHistory = { scores: number[]; newContacts: number[] };
 
+// The score is built partly from deals, so only days counted under today's rules are used as its baseline (a rule change is not a drop in health).
+// New contacts do not depend on how deals are counted, so that history is kept whole.
 export async function scoreHistory(installationId: string, days = 30): Promise<Map<string, AccountHistory>> {
+  const version = await currentSnapshotVersion(installationId);
   const rows = await sql()`
-    select location_id, array_agg(engagement_score order by day) scores, array_agg(new_contacts_30d order by day) new_contacts
+    select location_id, coalesce(array_agg(engagement_score order by day) filter (where ${snapshotOk("account_metrics_daily", version)}), '{}') scores,
+      array_agg(new_contacts_30d order by day) new_contacts
     from account_metrics_daily
     where installation_id = ${installationId} and day >= current_date - ${days}::int and day < current_date
     group by location_id`;
@@ -259,8 +295,8 @@ export async function dealHygiene(installationId: string): Promise<HygieneRow[]>
       count(*) filter (where o.status = 'open' and o.act < now() - interval '90 days')::int ancient
     from locations l
     join (
-      select *, coalesce(greatest(last_stage_change_at, last_action_at, updated_remote_at, last_status_change_at), created_remote_at, synced_at) act
-      from cached_opportunities where installation_id = ${installationId}
+      select o.*, coalesce(greatest(o.last_stage_change_at, o.last_action_at, o.updated_remote_at, o.last_status_change_at), o.created_remote_at, o.synced_at) act
+      from cached_opportunities o ${dealScopeJoins()} where o.installation_id = ${installationId} and not (o.status = 'open' and ${outOfScope()})
     ) o on o.installation_id = l.installation_id and o.location_id = l.location_id
     where l.installation_id = ${installationId} and not l.ignored
     group by l.location_id, l.name
@@ -272,12 +308,13 @@ export async function dealHygiene(installationId: string): Promise<HygieneRow[]>
 }
 
 export async function metricsTrend(installationId: string, locationId: string, days = 60) {
+  const version = await currentSnapshotVersion(installationId);
   const rows = await sql()`
-    select day, contacts, new_contacts_30d, open_opportunities, open_value::float8 open_value,
-      stale_opportunities, unread_conversations, completeness_pct, engagement_score
-    from account_metrics_daily
-    where installation_id = ${installationId} and location_id = ${locationId} and day >= current_date - ${days}::int
-    order by day`;
+    select m.day, m.contacts, m.new_contacts_30d, m.open_opportunities, m.open_value::float8 open_value,
+      m.stale_opportunities, m.unread_conversations, m.completeness_pct, m.engagement_score, ${snapshotOk("m", version)} deals_ok
+    from account_metrics_daily m
+    where m.installation_id = ${installationId} and m.location_id = ${locationId} and m.day >= current_date - ${days}::int
+    order by m.day`;
   return rows.map((r) => ({
     day: r.day instanceof Date ? r.day.toISOString().slice(0, 10) : String(r.day),
     contacts: r.contacts,
@@ -288,6 +325,8 @@ export async function metricsTrend(installationId: string, locationId: string, d
     unreadConversations: r.unread_conversations,
     completenessPct: r.completeness_pct,
     engagementScore: r.engagement_score,
+    /** True when this day was counted under today's rules for deals (so its open value, stale deals and score can be compared with today's). */
+    dealsOk: r.deals_ok === true,
   }));
 }
 
@@ -362,8 +401,8 @@ export async function staleDeals(installationId: string, days: number, limit = 2
       pl.name pipeline_name, st.nm stage_name, o.act,
       floor(extract(epoch from (now() - o.act)) / 86400)::int days_stale
     from (
-      select *, coalesce(greatest(last_stage_change_at, last_action_at, updated_remote_at, last_status_change_at), created_remote_at, synced_at) act
-      from cached_opportunities where installation_id = ${installationId} and status = 'open'
+      select o.*, coalesce(greatest(o.last_stage_change_at, o.last_action_at, o.updated_remote_at, o.last_status_change_at), o.created_remote_at, o.synced_at) act
+      from cached_opportunities o ${dealScopeJoins()} where o.installation_id = ${installationId} and o.status = 'open' and not ${outOfScope()}
     ) o
     join locations l on l.installation_id = o.installation_id and l.location_id = o.location_id and not l.ignored
     left join pipelines pl on pl.installation_id = o.installation_id and pl.location_id = o.location_id and pl.pipeline_id = o.pipeline_id
@@ -402,17 +441,14 @@ export type PipelineCell = {
 export async function pipelineCells(installationId: string): Promise<PipelineCell[]> {
   const rows = await sql()`
     select o.location_id, l.name location_name, coalesce(o.pipeline_id, '') pipeline_id,
-      coalesce(pl.name, 'Pipeline') pipeline_name, coalesce(st.nm, 'Unknown stage') stage_name, coalesce(st.ord, 999)::int stage_order,
+      coalesce(sc_pl.name, 'Pipeline') pipeline_name, coalesce(sc_st.nm, 'Unknown stage') stage_name, coalesce(sc_st.ord, 999)::int stage_order,
       o.status, count(*)::int n, coalesce(sum(o.monetary_value), 0)::float8 value
     from cached_opportunities o
     join locations l on l.installation_id = o.installation_id and l.location_id = o.location_id and not l.ignored
-    left join pipelines pl on pl.installation_id = o.installation_id and pl.location_id = o.location_id and pl.pipeline_id = o.pipeline_id
-    left join lateral (
-      select s->>'name' nm, t.ord from jsonb_array_elements(coalesce(pl.stages, '[]'::jsonb)) with ordinality t(s, ord)
-      where s->>'id' = o.stage_id limit 1
-    ) st on true
-    where o.installation_id = ${installationId}
-    group by o.location_id, l.name, o.pipeline_id, pl.name, st.nm, st.ord, o.status`;
+    ${dealScopeJoins()}
+    -- Open deals count only when they are counted deals in play (a value, an owner, not closed out): the same rule as every other screen.
+    where o.installation_id = ${installationId} and (o.status <> 'open' or ${countedInScope()})
+    group by o.location_id, l.name, o.pipeline_id, sc_pl.name, sc_st.nm, sc_st.ord, o.status`;
   return rows.map((r) => ({
     locationId: r.location_id, locationName: r.location_name, pipelineId: r.pipeline_id, pipelineName: r.pipeline_name,
     stageName: r.stage_name, stageOrder: r.stage_order, status: r.status, count: r.n, value: r.value,
@@ -425,6 +461,7 @@ export type InboxRow = {
   conversationId: string;
   locationId: string;
   locationName: string | null;
+  contactId: string | null;
   contactName: string | null;
   lastMessageType: string | null;
   lastMessageDirection: string | null;
@@ -437,7 +474,7 @@ export type InboxRow = {
 export async function inbox(installationId: string, slaHours: number, limit = 200, locationId?: string): Promise<InboxRow[]> {
   const rows = await sql()`
     select * from (
-      select c.conversation_id, c.location_id, l.name location_name, c.contact_name, c.last_message_type,
+      select c.conversation_id, c.location_id, l.name location_name, c.contact_id, c.contact_name, c.last_message_type,
         c.last_message_direction, c.last_message_at, c.unread_count,
         (c.last_message_direction = 'inbound' and c.last_message_at < now() - make_interval(hours => ${slaHours}::int)
            and c.last_message_at > now() - interval '30 days') over_sla,
@@ -451,7 +488,7 @@ export async function inbox(installationId: string, slaHours: number, limit = 20
     order by over_sla desc, case when over_sla then last_message_at end asc, last_message_at desc nulls last
     limit ${limit}`;
   return rows.map((r) => ({
-    conversationId: r.conversation_id, locationId: r.location_id, locationName: r.location_name, contactName: r.contact_name,
+    conversationId: r.conversation_id, locationId: r.location_id, locationName: r.location_name, contactId: r.contact_id ?? null, contactName: r.contact_name,
     lastMessageType: r.last_message_type, lastMessageDirection: r.last_message_direction, lastMessageAt: toIso(r.last_message_at),
     unreadCount: r.unread_count, overSla: Boolean(r.over_sla), waitingHours: r.waiting_hours,
   }));
@@ -508,15 +545,17 @@ export async function syncAlerts(installationId: string, drafts: AlertDraft[]): 
   const db = sql();
   return db.begin(async (tx) => {
     const created: AlertRow[] = [];
-    for (const d of drafts) {
-      const rows = await tx`
+    // One statement for every alert (one round trip each took many seconds for an account list the size of the demo). A repeated key keeps the
+    // last draft, which is what inserting them one after another did.
+    const byKey = new Map(drafts.map((d) => [d.dedupeKey, d]));
+    const rows = [...byKey.values()].map((d) => ({ location_id: d.locationId, kind: d.kind, severity: d.severity, title: d.title, detail: d.detail, dedupe_key: d.dedupeKey }));
+    const all = rows.length === 0 ? [] : await tx`
         insert into alerts (installation_id, location_id, kind, severity, title, detail, dedupe_key)
-        values (${installationId}, ${d.locationId}, ${d.kind}, ${d.severity}, ${d.title}, ${tx.json(d.detail as never)}, ${d.dedupeKey})
+        select ${installationId}::uuid, r.location_id, r.kind, r.severity, r.title, r.detail, r.dedupe_key
+        from jsonb_to_recordset(${tx.json(rows as never)}::jsonb) as r(location_id text, kind text, severity text, title text, detail jsonb, dedupe_key text)
         on conflict (installation_id, dedupe_key) where resolved_at is null do update set severity = excluded.severity, title = excluded.title, detail = excluded.detail
         returning id, location_id, kind, severity, title, detail, created_at, resolved_at, (xmax = 0) as inserted`;
-      const r = rows[0];
-      if (r.inserted) created.push(mapAlert(r as unknown as AlertDbRow));
-    }
+    for (const r of all) if (r.inserted) created.push(mapAlert(r as unknown as AlertDbRow));
     const keys = drafts.map((d) => d.dedupeKey);
     await tx`
       update alerts set resolved_at = now()
@@ -636,4 +675,16 @@ export async function allManualTasks(installationId: string): Promise<Map<string
     out.set(r.location_id, m);
   }
   return out;
+}
+
+// ---------------- how much of each inbox is read (N15) ----------------
+
+// How many conversations are stored per account. An account at the read limit has older conversations SubSync never saw, and every screen that
+// counts conversations says so (waiting.ts, readLimitNote).
+export async function conversationCoverage(installationId: string): Promise<Array<{ locationId: string; stored: number }>> {
+  const rows = await sql()`
+    select c.location_id, count(*)::int n from cached_conversations c
+    join locations l on l.installation_id = c.installation_id and l.location_id = c.location_id and not l.ignored
+    where c.installation_id = ${installationId} group by c.location_id`;
+  return rows.map((r) => ({ locationId: r.location_id as string, stored: r.n as number }));
 }

@@ -1,5 +1,6 @@
 import { sql } from "../db";
 import { afterHoursSummary } from "./comms-intel";
+import { countedInScope, dealScopeJoins } from "./stage-rules-sql";
 
 function visible(installationId: string, allowed: string[] | null) {
   const db = sql();
@@ -12,39 +13,37 @@ export type GapDeal = {
   contactId: string | null; stageName: string; pipelineName: string; value: number; daysSinceContact: number | null;
 };
 
-// 4.9: open deals whose contact has not been touched (activity or a message) for `days` days or more.
-export async function communicationGaps(installationId: string, allowed: string[] | null, days = 7) {
-  const rows = await sql()`
-    with loc as (${visible(installationId, allowed)})
-    select o.opportunity_id, o.location_id, loc.name location_name, o.contact_id, o.contact_name, o.name,
-      coalesce(pl.name, 'Pipeline') pipeline_name, coalesce(st.nm, 'Unknown stage') stage_name, coalesce(o.monetary_value, 0)::float8 value,
-      floor(extract(epoch from (now() - touch.t)) / 86400)::int days_since
-    from cached_opportunities o join loc on loc.location_id = o.location_id
+// 4.9: counted open deals (a value, an owner, in play: docs/METRICS.md) whose contact has not been touched (activity or a message) for `days` days
+// or more. The total, the dollars and the stage breakdown are counted in the database over every such deal, never over a capped list, so the
+// numbers are the real ones; only the rows shown are limited, and the screen says how many there are in all.
+export async function communicationGaps(installationId: string, allowed: string[] | null, days = 7, rowLimit = 15) {
+  const db = sql();
+  const from = db`
+    from cached_opportunities o join (${visible(installationId, allowed)}) loc on loc.location_id = o.location_id
+    ${dealScopeJoins()}
     left join cached_contacts c on c.installation_id = o.installation_id and c.location_id = o.location_id and c.contact_id = o.contact_id
-    left join pipelines pl on pl.installation_id = o.installation_id and pl.location_id = o.location_id and pl.pipeline_id = o.pipeline_id
-    left join lateral (select s->>'name' nm from jsonb_array_elements(coalesce(pl.stages, '[]'::jsonb)) s where s->>'id' = o.stage_id limit 1) st on true
     left join lateral (
       select greatest(c.last_activity_at, (select max(v.last_message_at) from cached_conversations v
         where v.installation_id = o.installation_id and v.location_id = o.location_id and v.contact_id = o.contact_id)) t) touch on true
-    where o.installation_id = ${installationId} and o.status = 'open' and o.contact_id is not null
-      and (touch.t is null or touch.t < now() - make_interval(days => ${days}::int))
-    order by o.monetary_value desc nulls last limit 3000`;
+    where o.installation_id = ${installationId} and o.status = 'open' and ${countedInScope()} and o.contact_id is not null
+      and (touch.t is null or touch.t < now() - make_interval(days => ${days}::int))`;
+  const [totals, stageRows, rows] = await Promise.all([
+    db`select count(*)::int n, coalesce(sum(o.monetary_value), 0)::float8 value ${from}`,
+    db`select coalesce(sc_pl.name, 'Pipeline') pipeline_name, coalesce(sc_st.nm, 'Unknown stage') stage_name, count(*)::int n, coalesce(sum(o.monetary_value), 0)::float8 value ${from}
+       group by 1, 2 order by value desc limit 10`,
+    db`select o.opportunity_id, o.location_id, loc.name location_name, o.contact_id, o.contact_name, o.name,
+         coalesce(sc_pl.name, 'Pipeline') pipeline_name, coalesce(sc_st.nm, 'Unknown stage') stage_name, coalesce(o.monetary_value, 0)::float8 value,
+         floor(extract(epoch from (now() - touch.t)) / 86400)::int days_since ${from}
+       order by o.monetary_value desc nulls last limit ${rowLimit}`,
+  ]);
   const deals: GapDeal[] = rows.map((r) => ({
     opportunityId: r.opportunity_id, locationId: r.location_id, locationName: r.location_name, contactId: r.contact_id, contactName: r.contact_name,
     name: r.name, stageName: r.stage_name, pipelineName: r.pipeline_name, value: r.value, daysSinceContact: r.days_since,
   }));
-  const byStage = new Map<string, { stage: string; count: number; value: number }>();
-  for (const d of deals) {
-    const k = `${d.pipelineName}: ${d.stageName}`;
-    const s = byStage.get(k) ?? { stage: k, count: 0, value: 0 };
-    s.count++;
-    s.value += d.value;
-    byStage.set(k, s);
-  }
   return {
-    days, total: deals.length, value: deals.reduce((s, d) => s + d.value, 0),
-    stages: [...byStage.values()].sort((a, b) => b.value - a.value).slice(0, 10),
-    deals: deals.slice(0, 15),
+    days, total: totals[0].n as number, value: totals[0].value as number,
+    stages: stageRows.map((r) => ({ stage: `${r.pipeline_name}: ${r.stage_name}`, count: r.n as number, value: r.value as number })),
+    deals,
   };
 }
 
