@@ -30,7 +30,8 @@ describe("the Clients module's routes", () => {
     }
     expect(NAV_FOR.agency.has("clients") && NAV_FOR.agency.has("accounts") && NAV_FOR.agency.has("onboarding")).toBe(true);
     const own = NAV.filter((n) => n.parent && n.showWhenLimited).map((n) => n.id);
-    expect(own).toEqual(["onboarding"]);
+    // Duplicates became a tab of Clean-up (C2), and a client's staff already had it before; the Clean-up writes stay closed to them (see access.ts).
+    expect(own).toEqual(["onboarding", "duplicates"]);
     for (const id of own) expect(NAV_FOR.business.has(id) && NAV_FOR.client.has(id)).toBe(true);
   });
 });
