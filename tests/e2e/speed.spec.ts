@@ -129,6 +129,7 @@ test("in the browser: the first lead to chase is at the top, the page says it do
   await page.reload();
   await expect(page.getByTestId("speed-headline")).toBeVisible();
   const measuring = page.getByTestId("measuring");
+  await measuring.getByRole("button", { name: "What this means" }).click(); // the long sentence sits behind the small ? (text diet)
   await expect(measuring).toContainText("does not send any replies itself");
   await expect(measuring).toContainText("Automatic messages");
   await expect(page.getByTestId("speed-settings-link")).toBeVisible();
