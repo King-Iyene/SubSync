@@ -30,6 +30,7 @@ Then run `node --env-file=.env.local --import tsx scripts/supabase-proof.ts` (ne
 - Keep these OFF (unset) until the morning tests in docs/features/E0.md pass: `SEND_EMAIL_LIVE`, `SEND_SLACK_LIVE`, `WRITE_GHL_LIVE`, `FATHOM_WEBHOOK_LIVE`. With them off, nothing is sent or written to a customer's CRM.
 - Crons: `vercel.json` runs a job every 5 minutes. That needs Vercel Pro (Hobby allows daily only). Check the plan.
 - Do NOT set `DEMO_MODE` in production.
+- **`GHL_APP_ID` must be the SubSync app's id (`6ae2a79309eaa881c1eb419e`), not the old KD Squares app.** Since this release the webhook handler ignores signed events carrying a different app id (a security fix), so a wrong id would make real install and uninstall events be ignored. Client ID and Secret must also come from the SubSync app.
 
 ## 4. Merge, then watch
 Merge, wait for the Vercel build to go green, open the app, run the checks in docs/RUNBOOK.md. If something breaks: Vercel, Deployments, previous deploy, "Promote to Production" (the migrations stay; they are additive).
@@ -39,3 +40,8 @@ Merge, wait for the Vercel build to go green, open the app, run the checks in do
 - Pricing gate before any outside install: add Pro $9, delete the $5 plan, tell me the new plan id, then set `ENTITLEMENTS_MODE=enforced`.
 - GHL portal: version 2.2.0 with the new optional scopes (docs/features/Z2.md).
 - Not tested live (no credentials in my sandbox): real sync counts against your CRM, real emails, Slack and Fathom, the real install and uninstall.
+
+## 6. Security review (docs/SECURITY_REVIEW.md): what is left open
+- Fixed in this release: webhook for another app, constant-time secret checks, `nosniff` and `Referrer-Policy`, typed searches kept out of browser storage.
+- Open, low risk, for a later release: the old `settings.slack_webhook_url` is stored in plain text (the trust page discloses it); no `script-src` content policy; weak rate limits on the shared audit and email-check addresses; no `state` value on the install callback (GHL's flow). The app can be framed by any HTTPS site on purpose, because agencies use their own white-label domains; every data call needs a signed session.
+- Not code, still yours before the GHL review: 24-hour support channel, HTTPS redirect URLs (remove any localhost one), the Loom demo (install, setup, main flows, errors, uninstall), a sandbox test install, privacy and terms reviewed by a human.

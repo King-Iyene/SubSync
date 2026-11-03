@@ -1,37 +1,19 @@
-# Handoff (2026-11-03)
+# Handoff (3 Nov 2026, end of the M1 and M2 build)
 
-Source of truth: CLAUDE.md. Roadmap files ROADMAP_V2.md, INTEGRATIONS_SPEC.md and
-KING_REVIEW_NOTES.md were on King's desktop and are NOT in this repo checkout.
-The overnight branch `overnight/2026-11-01` was also not on the remote when this was written.
-First step for the next session: confirm that branch is pushed, check it out, and read those three docs.
+Source of truth: CLAUDE.md (read "Working principles" and the operating principles). Standing routines: docs/PROMPTS.md.
 
-## Reported done on the overnight branch (not verifiable from main-s6rbxo)
-S0.2 identity/roles/tenancy (f5d7576), S0.3 white-label hygiene (bedc59e), F1 pipeline metrics (20480e0),
-F2 speed to lead (fbabd35), F3 appointments (3b36eeb), F6 share-link hardening, F4/F5 Inbox + Today,
-F7-F10 Search/Sentiment/Replay/Audit, E1-E4 integrations, Z1-Z3 capture fields/audit export/share audit page.
+## State
+- Branch `claude/ecstatic-dijkstra-os2oco` holds the whole build: overnight branch + main-s6rbxo (merged, histories were unrelated) + E2b + D1 + simplify cuts 1 to 6 + test and security fixes. It was merged to `main` once all tests were green (see docs/FEATURE_STATUS.md, "Final test run").
+- M1 (S0.2b, S0.4, F1, D0, F2, F3, F6) and M2 (F4, F5, F8, F9, F10, C1, E0, E2a, E2b, D1) are built and pass the tests listed there.
+- Nothing was run against Supabase, the real CRM, real email, Slack or Fathom. Live switches (`SEND_EMAIL_LIVE`, `SEND_SLACK_LIVE`, `WRITE_GHL_LIVE`, `FATHOM_WEBHOOK_LIVE`) must stay off until docs/features/E0.md's morning tests pass.
 
-## Left for M1 (S0.2b, S0.4, F1, D0, F2, F3, F6)
-- S0.2b and S0.4: not reported as done. Read their definitions in ROADMAP_V2.md. D0: same.
-- Real sign-in as each role (owner, admin, staff, client admin, client user): pending. King's own role is unconfirmed.
-- Real-data verification for F1/F2/F3/F6 against a manual count in the CRM, recorded in docs/FEATURE_STATUS.md.
-- White-label install screen URL: verified in docs only, not clicked through.
-## Left for M2
-- Not defined in the context I had. Take it from ROADMAP_V2.md; do not guess.
+## King must do (steps in docs/MERGE_AND_MIGRATE.md)
+Apply the 13 new migrations to Supabase in order, check `GHL_APP_ID`, keep live switches off, then the pre-pilot pricing gate ($9 Pro, delete $5, tell Claude the plan id, enforced mode).
 
-## Tests still to run (deferred to the end of the overnight run)
-1. npm run lint, npx tsc --noEmit, npm run build
-2. npm test, then the full Vitest suite if present on the overnight branch
-3. Tenant isolation tests: two fake agencies, several locations, cross-tenant ID tampering must fail. Last run timed out; rerun.
-4. Entitlement tests in both ENTITLEMENTS_MODE=open and enforced
-5. White-label string scan: no "GoHighLevel", "HighLevel" or "GHL" in UI, emails or errors
-6. Integration checks: tenancy, flags, metrics, audit, speed, roadmap (API, connections, appointment-insights passed earlier;
-   one 503 on connections came from a stale dev server)
-7. Browser suite (Playwright) on key screens
-8. Real data: Z1 capture-field counts, audit export, share page, business hours, outbound calls (only unit-tested)
-9. Share links: revoke, expiry, rate limit
+## Waiting for King's yes (not built)
+- docs/INNOVATION_M1_M2.md: Alert outcomes (recommended), Coverage gaps, Likely no-show ranking.
+- docs/SIMPLIFY_M1_M2.md cuts 7 to 14 (hide Duplicates/Cleanup, merge Team, Compare and Reviews, merge Slack card, Getting started trim).
+- E2a: KEEP or CUT after real Fathom meetings. E2b needs a decision on the `conversations/message.write` scope (comments stay "SubSync only" until then). Zoom scope (E1), F9 product-name hiding.
 
-## Blockers for King
-- Retry/backoff tuning for midnight API calls needs approval (N98)
-- E2a Zoom scope expansion
-- F9 product-name hiding, and the other "never start" items
-- Pre-pilot gate (CLAUDE.md section 6): Pro at $9, delete the $5 plan, map the new planId, switch to enforced
+## How to run the tests (sandbox or laptop)
+Typecheck `npx tsc --noEmit`, lint `npx eslint`, build `npx next build`, Node `node --test "src/lib/__tests__/*.test.ts"`, Vitest `npx vitest run --no-file-parallelism` (needs DATABASE_URL to a THROWAWAY Postgres with the migrations applied; never production), HTTP checks `scripts/check-*.ts` against a dev server, browser `npx playwright test --project=desktop-1440`. Reseed the demo (`scripts/seed-demo.ts`, `scripts/make-sample-audit.ts`) before a browser run; some tests change the demo's state.
