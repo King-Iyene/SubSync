@@ -104,3 +104,9 @@ export function sourceOfDuplicates(people: Person[]): SourceSummary {
   return { total: people.length, days, sources, line };
 }
 
+
+// "I merged these in my CRM" is a claim we can check later. If the same records are still listed a day after, the group comes back.
+export const RECHECK_AFTER_MS = 24 * 3_600_000;
+export function needsRecheck(review: { decision: string; decidedAt: string | null }, now: number): boolean {
+  return review.decision === "merged_in_platform" && !!review.decidedAt && now - Date.parse(review.decidedAt) > RECHECK_AFTER_MS;
+}

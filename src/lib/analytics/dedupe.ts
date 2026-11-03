@@ -224,6 +224,9 @@ export function distinctNames(people: Person[]): number {
 }
 
 // Group contacts that are linked by a confident match (union-find). Pairs below `minScore` do not link.
+// A shared phone can sit on thousands of records. The group lists at most this many (the screen shows the best three pairs anyway).
+const MAX_SHARED = 300;
+
 export function groupDuplicates(people: Person[], minScore = 50, maxGroup = 40): Group[] {
   const parent = new Map(people.map((p) => [p.contactId, p.contactId]));
   const find = (x: string): string => {
@@ -298,7 +301,7 @@ export function groupDuplicates(people: Person[], minScore = 50, maxGroup = 40):
       if (!g) rep.set(m.contactId, m);
       else rep.set("c:" + g.key, g.people.find((x) => x.contactId === g.survivorId) ?? m);
     }
-    const reps = [...rep.values()];
+    const reps = [...rep.values()].slice(0, MAX_SHARED);
     if (reps.length < 2 || distinctNames(reps) < 2) continue;
     const key = groupKey(reps.map((m) => m.contactId));
     if (seenShared.has(key)) continue;
@@ -343,7 +346,9 @@ export function classify(groups: Group[]): { exact: number; format: number; name
 }
 
 // A safe default for a bulk action: groups at or above a confidence level that have not been reviewed.
-export function bulkSelect<G extends Group>(groups: G[], reviewed: Set<string>, minConfidence: number, maxConfidence = 100): G[] {
-  // Never a group of probably different people, and never one with a do-not-disturb contact.
-  return groups.filter((g) => !reviewed.has(g.key) && g.kind !== "shared" && !g.people.some((p) => p.dnd) && g.confidence >= minConfidence && g.confidence <= maxConfidence);
+export function bulkSelect<G extends Group>(groups: G[], reviewed: Set<string>, minConfidence: number, maxConfidence = 100, decision: "keep" | "not_duplicate" = "keep"): G[] {
+  // Choosing a record to keep is never bulk for a group of probably different people or one with a do-not-disturb contact.
+  // Saying "these are different people" is always allowed: it changes only our own note.
+  const keep = decision === "keep";
+  return groups.filter((g) => !reviewed.has(g.key) && !(keep && (g.kind === "shared" || g.people.some((p) => p.dnd))) && g.confidence >= minConfidence && g.confidence <= maxConfidence);
 }

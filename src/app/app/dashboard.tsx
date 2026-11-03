@@ -28,13 +28,12 @@ import { AppointmentInsights } from "./views/appointment-insights";
 import { AuditView } from "./views/audit";
 import { SpeedView } from "./views/speed";
 import { AppointmentsView } from "./views/appointments";
-import { CleanupView } from "./views/cleanup";
+import { CleanupModule } from "./views/cleanup-module";
 import { MeetingsView } from "./views/meetings";
 import { GlobalSearch } from "./views/global-search";
 import { PeopleModule } from "./views/people-module";
 import { ClientsView, type ClientsFeatures } from "./views/clients";
 import { DealsView } from "./views/deals";
-import { DuplicatesView } from "./views/duplicates";
 import { EmailHealthView } from "./views/email-health";
 import { HelpView } from "./views/help";
 import { RoadmapView } from "./views/roadmap";
@@ -252,7 +251,9 @@ export function Dashboard() {
   // True while the page shows only the account SubSync was opened from (the filter is that one account). Pages draw no account filter then.
   const fromAccount = auth.status === "ready" && auth.kind === "agency" && Boolean(auth.locationId) && filter.accounts.length === 1 && filter.accounts[0] === auth.locationId;
   useBrandedText(auth.status === "ready" ? auth.brand.name : null);
-  const api = useMemo(() => (baseApi ? (filterQuery ? baseApi.filtered(filterQuery) : baseApi) : null), [baseApi, filterQuery]);
+  // Clean-up picks its own client account, so the "show only" filter does not narrow it (and its bar is not drawn there).
+  const ownScope = view.id === "cleanup" || view.id === "duplicates";
+  const api = useMemo(() => (baseApi ? (filterQuery && !ownScope ? baseApi.filtered(filterQuery) : baseApi) : null), [baseApi, filterQuery, ownScope]);
 
   // Count which pages get opened, so the getting-started checklist can tick itself off.
   useEffect(() => {
@@ -280,7 +281,7 @@ export function Dashboard() {
   const off = (feature: string) => auth.features[feature] === false && !locked(feature);
   // A page that lives inside a module as a tab (People holds Contact search, Leads and Call lists) has no menu entry of its own.
   // (A page that lives inside the Clients module has no entry of its own for an agency; a business and a client's staff have no Clients module, so their Setup stays in their menu.)
-  const menu = NAV.filter((n) => NAV_FOR[auth.kind].has(n.id) && !off(n.feature) && (!n.parent || (limited && n.showWhenLimited)));
+  const menu = NAV.filter((n) => NAV_FOR[auth.kind].has(n.id) && !off(n.feature) && (!n.parent || (limited && n.showWhenLimited && !NAV_FOR[auth.kind].has(n.parent))));
   // The sidebar: the pilot menu in plain groups that scroll, and Settings, Getting started and What's new pinned underneath so they are always visible.
   const mainMenu = menu.filter((n) => n.group !== "Settings and help");
   const footMenu = menu.filter((n) => n.group === "Settings and help");
@@ -299,7 +300,8 @@ export function Dashboard() {
   const labelFor = (n: (typeof NAV)[number]) => (limited && n.id === "overview" ? "My account" : n.label);
   // Pages that live inside another page highlight their parent in the menu.
   const shown: ViewId = auth.kind === "client" && view.id === "today" ? "myday" : view.id;
-  const active = limited && shown === "onboarding" ? shown : PARENT[shown] ?? shown;
+  const parentOf = PARENT[shown];
+  const active = limited && (shown === "onboarding" || (shown === "duplicates" && !NAV_FOR[auth.kind].has("cleanup"))) ? shown : parentOf ?? shown;
   const agency = auth.demo ? "Demo Company" : limited ? "Your business" : "Your company";
   const own = auth.locationId;
 
@@ -340,7 +342,7 @@ export function Dashboard() {
       case "inbox": return <InboxView go={go} />;
       case "onboarding": return limited ? <ModuleTabs key="setup" start={0} tabs={setupTabs} /> : <ClientsView key="onboarding" go={go} initialTab="onboarding" features={clientFeatures} />;
       case "email": return limited ? <ModuleTabs key="setup" start={1} tabs={setupTabs} /> : <EmailHealthView />;
-      case "duplicates": return <DuplicatesView />;
+      case "duplicates": case "cleanup": return <CleanupModule key="cleanup" canClean={auth.kind !== "client"} />;
       case "alerts": return <AlertsView go={go} />;
       case "settings": return <SettingsView />;
       case "connections": return <ConnectionsPage />;
@@ -351,7 +353,6 @@ export function Dashboard() {
       case "team": return <TeamView />;
       case "appointments": return <ModuleTabs key="appts" start={0} tabs={[{ label: "Appointments", node: <AppointmentsView go={go} /> }, { label: "Insights", node: <AppointmentInsights /> }]} />;
       case "meetings": return <MeetingsView />;
-      case "cleanup": return <CleanupView />;
       case "clients": return <ClientsView key="clients" go={go} initialTab="health" features={clientFeatures} />;
     }
   })();
@@ -414,7 +415,7 @@ export function Dashboard() {
             {/* One slim row above every page: which client accounts are counted on the left, search and notifications on the right (D1; was four stacked blocks). */}
             <div className="mb-3 flex flex-wrap items-start gap-x-4 gap-y-1 print:hidden" data-testid="toolbar">
               <div className="min-w-0 flex-1">
-                {auth.kind === "agency" && baseApi && !fromAccount && <ApiProvider value={baseApi}><FilterDrawer kind="agency" value={filter} onChange={setFilter} /></ApiProvider>}
+                {auth.kind === "agency" && baseApi && !fromAccount && !ownScope && <ApiProvider value={baseApi}><FilterDrawer kind="agency" value={filter} onChange={setFilter} /></ApiProvider>}
               </div>
               <div className="ml-auto flex shrink-0 items-center">
                 {NAV_FOR[auth.kind].has("search") && !off("search") && <GlobalSearch go={go} />}
