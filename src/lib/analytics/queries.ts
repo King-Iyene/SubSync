@@ -61,9 +61,16 @@ export type Settings = AccountSettings & {
 
 export async function getSettings(installationId: string): Promise<Settings> {
   const db = sql();
-  const read = () => db`
+  const readFull = () => db`
     select stale_deal_days, dormant_days, sla_hours, slack_webhook_url, ghl_app_domain, app_domain_source, detected_app_domain, digest_enabled, custom_checklist, digest_hour, digest_timezone, digest_email, brand_name, brand_color, brand_logo_url, detected_logo_url, industry_targets, push_notes_to_crm, keep_transcripts, speed_target_minutes, count_automated_touches, speed_business_hours, speed_open_hour, speed_close_hour, alert_quiet_hours, cold_tags, deal_rules_revision
     from settings where installation_id = ${installationId}`;
+  // Until the logo migration is applied the two logo columns do not exist. Read without them then, so no page breaks (the logo simply stays empty).
+  const read = async () => {
+    try { return await readFull(); } catch (error) {
+      if ((error as { code?: string }).code !== "42703") throw error;
+      return db`select * from settings where installation_id = ${installationId}`;
+    }
+  };
   let [r] = await read();
   if (!r) {
     // First read for this agency: create the default row (rare), then read it back.
@@ -122,7 +129,11 @@ export async function captureWhitelabelLogo(installationId: string, logoUrl: str
   if (!url) return;
   const db = sql();
   await db`insert into settings (installation_id) values (${installationId}) on conflict do nothing`;
-  await db`update settings set detected_logo_url = ${url} where installation_id = ${installationId} and detected_logo_url is distinct from ${url}`;
+  try {
+    await db`update settings set detected_logo_url = ${url} where installation_id = ${installationId} and detected_logo_url is distinct from ${url}`;
+  } catch (error) {
+    if ((error as { code?: string }).code !== "42703") throw error; // the logo migration is not applied yet
+  }
 }
 
 // `appDomainOverride`: a domain typed in Settings (wins over a detected one), or null to take the override off and go back to the detected one.
@@ -152,7 +163,7 @@ export async function updateSettings(installationId: string, p: Partial<Settings
       speed_close_hour = coalesce(${p.speedCloseHour ?? null}::int, speed_close_hour),
       brand_name = case when ${p.brandName !== undefined} then ${p.brandName ?? null} else brand_name end,
       brand_color = case when ${p.brandColor !== undefined} then ${p.brandColor ?? null} else brand_color end,
-      brand_logo_url = case when ${p.brandLogoOverride !== undefined} then ${p.brandLogoOverride ?? null} else brand_logo_url end,
+      ${p.brandLogoOverride !== undefined ? db`brand_logo_url = ${p.brandLogoOverride ?? null},` : db``}
       cold_tags = case when ${p.coldTags !== undefined} then ${p.coldTags === undefined ? null : p.coldTags === null ? null : pgTextArray(p.coldTags)}::text[] else cold_tags end,
       custom_checklist = coalesce(${p.customChecklist !== undefined ? db.json(p.customChecklist) : null}::jsonb, custom_checklist)
     where installation_id = ${installationId}`;
