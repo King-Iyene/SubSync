@@ -119,3 +119,15 @@ export function actionFor(type: string | null): WebhookAction {
       return { kind: "ignore" };
   }
 }
+
+// The signing key is the platform's own, shared by every app, so a valid signature proves the platform sent the event, not that it was
+// meant for this app. A developer of another app can receive a signed event for a company that also uses it and replay it here. When the
+// event names an app (install, uninstall and plan events do) and it is not ours, it must be ignored. Events that carry no app id are
+// accepted as before. `ownAppId` is GHL_APP_ID; when it is not set the check is skipped.
+export function isForeignApp(body: unknown, ownAppId: string | undefined | null): boolean {
+  if (!ownAppId || !body || typeof body !== "object") return false;
+  const root = body as Record<string, unknown>;
+  const data = (root.data && typeof root.data === "object" ? root.data : {}) as Record<string, unknown>;
+  const given = typeof root.appId === "string" && root.appId ? root.appId : typeof data.appId === "string" && data.appId ? data.appId : null;
+  return given !== null && given !== ownAppId;
+}

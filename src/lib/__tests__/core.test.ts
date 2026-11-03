@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { generateKeyPairSync, sign } from "node:crypto";
 import { test } from "node:test";
 import { accountLimit, canUse, entitlements, FEATURES, normalisePlan, planFromMarketplaceId } from "../entitlements.ts";
-import { actionFor, parseWebhook, verifyWebhook } from "../ghl/webhook.ts";
+import { actionFor, isForeignApp, parseWebhook, verifyWebhook } from "../ghl/webhook.ts";
 import { churnRisk, engagementScore, isDormant, scoreBand, type AccountMetrics } from "../scoring.ts";
 import { bearerToken, signSession, verifySession } from "../session.ts";
 
@@ -132,4 +132,12 @@ test("webhook parsing and actions", () => {
   assert.deepEqual(actionFor("OpportunityStageUpdate"), { kind: "resync", scope: "opportunities" });
   assert.deepEqual(actionFor("InboundMessage"), { kind: "resync", scope: "conversations" });
   assert.deepEqual(actionFor("SomethingNew"), { kind: "ignore" });
+});
+
+test("a signed event for another app is recognised", () => {
+  assert.equal(isForeignApp({ type: "UNINSTALL", appId: "other", companyId: "c" }, "ours"), true);
+  assert.equal(isForeignApp({ type: "UNINSTALL", data: { appId: "other" } }, "ours"), true);
+  assert.equal(isForeignApp({ type: "UNINSTALL", appId: "ours" }, "ours"), false);
+  assert.equal(isForeignApp({ type: "ContactCreate", companyId: "c" }, "ours"), false, "no app id: accepted as before");
+  assert.equal(isForeignApp({ appId: "other" }, undefined), false, "check skipped when the app id is not configured");
 });

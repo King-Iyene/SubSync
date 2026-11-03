@@ -3,7 +3,7 @@ import { safeError } from "@/lib/safe-log";
 import { businessKey } from "@/lib/access";
 import { sql } from "@/lib/db";
 import { getInstallation, purgeInstallation, purgeLocationData } from "@/lib/ghl/installations";
-import { actionFor, canonicalType, parseWebhook, verifyWebhook } from "@/lib/ghl/webhook";
+import { actionFor, canonicalType, isForeignApp, parseWebhook, verifyWebhook } from "@/lib/ghl/webhook";
 import { recordPlanEvent } from "@/lib/entitlements-queries";
 import { captureWhitelabelDomain } from "@/lib/analytics/queries";
 import { enqueueAreaSync, enqueueFullSync } from "@/lib/sync/engine";
@@ -26,6 +26,9 @@ export async function POST(request: Request) {
   } catch {
     return NextResponse.json({ error: "Invalid body" }, { status: 400 });
   }
+
+  // A signed event meant for a different app must not purge or resync one of our installs.
+  if (isForeignApp(parsed, process.env.GHL_APP_ID)) return NextResponse.json({ ok: true, ignored: true });
 
   try {
     if (event.webhookId) {

@@ -5,7 +5,7 @@ import { changeBetween } from "@/lib/design/range";
 import { describeFilter, filterToParams, isEmptyFilter, parseSmartFilter, type SmartFilter } from "@/lib/people/filters";
 import { QUIET_AFTER_DAYS } from "@/lib/analytics/contact-intel";
 import { BarChart, CardRange, DataList, DialButton, DialerSetting, DrillPanel, EmptyState, ErrorState, HowTo, InlineAlert, LeadDrawer, ModuleTabs, Page as PageShell, Section, SkeletonRows, useCardRange, useDrill, type Column, type LeadSeed } from "../ds";
-import { remember, remembered } from "../ds/remember";
+import { remember, remembered, takeHandOff } from "../ds/remember";
 import { useApiClient, useData } from "../session";
 import { Btn, fmtInt, inputClass, timeAgo } from "../ui";
 import { CallsView } from "./calls";
@@ -359,14 +359,15 @@ const TABS = ["Search and filters", "Smart lists", "Going cold", "Imports and so
 export function PeopleModule({ start = 0, callsAllowed }: { start?: number; callsAllowed: boolean }) {
   const [tab, setTab] = useState(start);
   const [filter, setFilterState] = useState<SmartFilter>(() => {
-    const first = remembered("people-q");
-    if (first) { remember("people-q", null); return { q: first.slice(0, 100) }; }
+    const first = takeHandOff("people-q");
+    if (first) return { q: first.slice(0, 100) };
     const saved = remembered("people-filter");
-    if (saved) { try { const p = parseSmartFilter(JSON.parse(saved)); if (p.ok) return p.filter; } catch { /* a damaged value is ignored */ } }
+    // The remembered filter never holds the typed search (a name, email or phone is customer data and stays out of browser storage); an older saved value is read without it.
+    if (saved) { try { const p = parseSmartFilter(JSON.parse(saved)); if (p.ok) { const { q: _q, ...rest } = p.filter; return rest; } } catch { /* a damaged value is ignored */ } }
     return {};
   });
   const [version, setVersion] = useState(0);
-  const setFilter = (f: SmartFilter) => { setFilterState(f); remember("people-filter", isEmptyFilter(f) ? null : JSON.stringify(f)); };
+  const setFilter = (f: SmartFilter) => { setFilterState(f); const { q: _q, ...keep } = f; remember("people-filter", isEmptyFilter(keep) ? null : JSON.stringify(keep)); };
   // A change that does not come from the boxes themselves (a saved list, a tag day, clearing) also restarts the boxes.
   const replaceFilter = (f: SmartFilter) => { setFilter(f); setVersion((v) => v + 1); };
   const opts = useData<Options>("people/options");

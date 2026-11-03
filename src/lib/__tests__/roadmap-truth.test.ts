@@ -70,6 +70,6 @@ test("one vote per person per item is the database's own rule, a shipped item ca
 test("suggestions: stored per company, only the person's own are read back in the app, and King reads them through the secret-only admin address", () => {
   const q = read("src/lib/feedback-queries.ts");
   assert.match(q, /from roadmap_suggestions where installation_id = \$\{installationId\} and who = \$\{who\}/);
-  assert.match(read("src/app/api/admin/feedback/route.ts"), /Bearer \$\{secret\}/);
+  assert.match(read("src/app/api/admin/feedback/route.ts"), /!secret \|\| !bearerMatches\(request\.headers\.get\("authorization"\), secret\)/);
   assert.match(read("supabase/migrations/20261102090000_f8_feedback.sql"), /enable row level security/);
 });

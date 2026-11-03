@@ -26,6 +26,14 @@ const nextConfig: NextConfig = {
         ],
       },
       {
+        // Every page and route: no content sniffing, and no full address in the Referer of a link that leaves the app.
+        source: "/:path*",
+        headers: [
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+        ],
+      },
+      {
         source: "/((?!app).*)",
         headers: [
           { key: "Content-Security-Policy", value: "frame-ancestors 'self'" },

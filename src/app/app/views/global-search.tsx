@@ -3,7 +3,7 @@
 import { Search } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { LeadDrawer } from "../ds";
-import { remember } from "../ds/remember";
+import { handOff } from "../ds/remember";
 import { useData } from "../session";
 import type { GoFn } from "../nav";
 import { toSeed, type PersonUi } from "./people-module";
@@ -66,7 +66,7 @@ export function GlobalSearch({ go }: { go: GoFn }) {
                   </ul>
                 )}
             </div>
-            {data && data.total > 0 && <div className="flex items-center justify-between border-t px-4 py-2 text-xs text-muted-foreground"><span>{data.total} {data.total === 1 ? "match" : "matches"}</span><button type="button" className="min-h-8 font-medium text-primary underline" onClick={() => { remember("people-q", debounced); close(); go("search"); }}>See all results</button></div>}
+            {data && data.total > 0 && <div className="flex items-center justify-between border-t px-4 py-2 text-xs text-muted-foreground"><span>{data.total} {data.total === 1 ? "match" : "matches"}</span><button type="button" className="min-h-8 font-medium text-primary underline" onClick={() => { handOff("people-q", debounced); close(); go("search"); }}>See all results</button></div>}
           </div>
           <LeadDrawer leads={rows.map(toSeed)} index={lead} onIndex={setLead} onClose={() => setLead(null)} />
         </div>

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { bearerMatches } from "@/lib/secret-compare";
 import { safeError } from "@/lib/safe-log";
 import { maintenanceOn } from "@/lib/runtime-guards";
 import { runScheduled } from "@/lib/notifications/service";
@@ -10,7 +11,7 @@ export const maxDuration = 60;
 
 export async function GET(request: Request) {
   const secret = process.env.CRON_SECRET;
-  if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!secret || !bearerMatches(request.headers.get("authorization"), secret)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (maintenanceOn(process.env)) return NextResponse.json({ skipped: "maintenance" });
   try {
     const r = await runScheduled("weekly_summary");
