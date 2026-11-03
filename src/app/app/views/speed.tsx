@@ -84,7 +84,7 @@ export function SpeedView({ go }: { go: GoFn }) {
             Longest wait is first. Press a name or a number for the leads. SubSync measures replies and never sends them.
           </HowTo>
           <p className="mb-1 text-sm font-medium" data-testid="speed-headline">{headline}</p>
-          {waitingNow > 0 && <p className="mb-1 text-xs text-muted-foreground" data-testid="what-to-do">Reply to the oldest first. Then assign owners.</p>}
+          {waitingNow > 0 && <p className="mb-1 text-sm font-semibold" data-testid="what-to-do">Reply to the oldest first. Then assign owners.</p>}
           {m && (
             <p className="mb-3 text-xs text-muted-foreground" data-testid="measuring">
               <More label="How this is counted">{measuringSentence(m)}</More>{" "}
