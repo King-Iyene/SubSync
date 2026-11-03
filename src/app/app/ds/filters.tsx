@@ -120,8 +120,8 @@ export function FilterHelp({ controls }: { controls: ControlId[] }) {
   );
 }
 
-export function ScopeFilterBar({ kind, options, value, onChange, singleAccount = false, hideScope = false }: { kind: FilterKind; options: FilterOptions; value: FilterValue; onChange: (v: FilterValue) => void; singleAccount?: boolean; hideScope?: boolean }) {
-  const controls = visibleControls(kind, options, singleAccount);
+export function ScopeFilterBar({ kind, options, value, onChange, singleAccount = false, hideScope = false, skipAccounts = false }: { kind: FilterKind; options: FilterOptions; value: FilterValue; onChange: (v: FilterValue) => void; singleAccount?: boolean; hideScope?: boolean; skipAccounts?: boolean }) {
+  const controls = visibleControls(kind, options, singleAccount).filter((c) => !(skipAccounts && c === "accounts"));
   if (controls.length === 0) return null;
   const has = (c: ControlId) => controls.includes(c);
   const set = (patch: Partial<FilterValue>) => onChange({ ...value, ...patch });
@@ -180,21 +180,57 @@ export function FilterDrawer({ kind, value, onChange }: { kind: FilterKind; valu
   }, [data]);
   if (!options || data!.total < 2 || visibleControls(kind, options).length === 0) return null;
   const notes = describeHidden(value, options);
-  // One quiet row: "Filter accounts", which client accounts are counted, and which are left out. Opening one of them gives it the full width underneath (D1).
+  const live = options.accounts?.filter((a) => !a.ignored) ?? [];
+  const scope = scopeOf(value, options);
+  const label = scope.included.length === live.length ? "All client accounts" : scope.included.length === 1 ? scope.included[0].name : `${scope.included.length} of ${live.length} client accounts`;
+  const otherOn = isFiltered({ ...value, accounts: [] });
+  // ONE control: a single account picker (closed by default). The industry, owner and test-account filters sit inside it under "More filters", also closed.
   return (
     <div className="print:hidden" data-testid="filter-row">
-      <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1 text-xs">
-        <details className="open:order-last open:basis-full" data-testid="filter-drawer">
-          <summary className="ds-press -ml-2 inline-flex min-h-8 cursor-pointer select-none items-center rounded-lg px-2 text-sm font-medium hover:bg-muted">Filter accounts{isFiltered(value) ? " (on)" : ""}</summary>
-          <div className="mt-2 text-sm"><ScopeFilterBar kind={kind} options={options} value={value} onChange={onChange} hideScope /></div>
-        </details>
-        <AccountScope options={options} value={value} onChange={onChange} className="contents" />
-      </div>
+      <details className="relative" data-testid="filter-drawer">
+        <summary className="ds-press -ml-2 inline-flex min-h-8 cursor-pointer select-none items-center gap-1.5 rounded-lg px-2 text-sm font-medium hover:bg-muted" data-testid="account-picker-summary">
+          {label}{otherOn ? " (filters on)" : ""}<ChevronDown aria-hidden className="size-4 text-muted-foreground" />
+        </summary>
+        <div className="absolute left-0 top-full z-30 mt-1 w-80 max-w-[85vw] rounded-xl border bg-popover p-3 text-sm shadow-[var(--shadow-lift)]">
+          {live.length >= 2 && <AccountList accounts={options.accounts ?? []} picked={value.accounts} onChange={(accounts) => onChange({ ...value, accounts })} />}
+          <details className="mt-2 border-t pt-2" data-testid="more-filters">
+            <summary className="cursor-pointer select-none text-xs font-medium text-muted-foreground">More filters</summary>
+            <div className="mt-2"><ScopeFilterBar kind={kind} options={options} value={value} onChange={onChange} hideScope skipAccounts /></div>
+          </details>
+        </div>
+      </details>
       {notes.length > 0 && (
         <ul className="mt-1 space-y-0.5 text-xs text-muted-foreground" data-testid="filter-hidden-summary">
           {notes.map((n) => <li key={n.text}>{n.text} <button type="button" className="font-medium text-primary underline" onClick={() => onChange({ ...value, ...n.clear })}>{n.clear.hideTest === false ? "Show them" : "Show all"}</button></li>)}
         </ul>
       )}
+    </div>
+  );
+}
+
+function AccountList({ accounts, picked, onChange }: { accounts: Array<{ id: string; name: string }>; picked: string[]; onChange: (ids: string[]) => void }) {
+  const [q, setQ] = useState("");
+  const shown = useMemo(() => accounts.filter((a) => a.name.toLowerCase().includes(q.trim().toLowerCase())), [accounts, q]);
+  const set = new Set(picked);
+  const toggle = (id: string) => onChange(set.has(id) ? picked.filter((x) => x !== id) : [...picked, id]);
+  return (
+    <div>
+      <label className="relative block">
+        <Search aria-hidden className="pointer-events-none absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
+        <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Find a client account" aria-label="Find a client account" className="min-h-9 w-full rounded-lg border bg-card py-1.5 pl-8 pr-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/30" />
+      </label>
+      <ul className="mt-2 max-h-60 overflow-y-auto">
+        {shown.length === 0 && <li className="px-2 py-2 text-sm text-muted-foreground">No client account matches.</li>}
+        {shown.map((a) => (
+          <li key={a.id}>
+            <label className="flex min-h-9 cursor-pointer items-center gap-2 rounded-lg px-2 text-sm hover:bg-accent">
+              <input type="checkbox" className="size-4" checked={set.has(a.id)} onChange={() => toggle(a.id)} />
+              <span className="truncate">{a.name}</span>
+            </label>
+          </li>
+        ))}
+      </ul>
+      <button type="button" className="mt-1 text-xs underline" onClick={() => onChange([])}>Show all</button>
     </div>
   );
 }

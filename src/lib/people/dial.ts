@@ -1,17 +1,9 @@
 // The Dial button (stage F10, N20, N53, N55, KF-3). Pure, so the rules are unit tested. SubSync builds no telephony.
 //
-// Where a call is placed:
-//   "crm"   (the default) the CRM's own dialer. RESEARCH (1 Nov 2026, public documentation and help pages): the CRM publishes no web address that opens its
-//           dialer, or a phone view, for a given contact. So the button opens the contact in the CRM (through the white-label link helper) and the screen
-//           says so plainly ("Not available from your CRM yet"). If the CRM ever documents such a link, set DIALER_LINK_KNOWN and build it in dialPlan.
-//   "phone" the person's own phone app (a tel: link). Only used when the person chose it in their setting, never by default (KF-3).
-// A third-party dialer (for example Kixie) is a later provider, added only after its API is read; it is not built.
+// Every call opens the contact in the CRM (through the white-label link helper), where its own dialer places the call. RESEARCH (1 Nov 2026): the CRM
+// publishes no web address that opens its dialer for a contact. If it ever does, set DIALER_LINK_KNOWN and build it in dialPlan.
 
-export type DialerProvider = "crm" | "phone";
 export const DIALER_LINK_KNOWN = false;
-export const DEFAULT_DIALER: DialerProvider = "crm";
-
-export const parseDialer = (v: unknown): DialerProvider => (v === "phone" ? "phone" : "crm");
 
 /** A phone number reduced to what a tel: link needs (digits and a leading plus), or null when nothing usable is left. */
 export function telNumber(phone: string | null | undefined): string | null {
@@ -22,27 +14,17 @@ export function telNumber(phone: string | null | undefined): string | null {
 }
 
 export type DialPlan = {
-  provider: DialerProvider;
-  /** Where the button goes. Null when there is nothing to dial (no number, for the phone choice). */
+  /** Where the button goes. Null when the contact has no CRM link. */
   href: string | null;
-  /** The button's words. */
   label: string;
   /** One plain line under the button that says what will happen. */
   note: string;
-  /** True when the CRM has no link that opens its dialer, so the button opens the contact instead (always true today for the CRM choice). */
   fallsBackToContact: boolean;
 };
 
-export function dialPlan(provider: DialerProvider, v: { phone: string | null | undefined; contactUrl: string | null | undefined }): DialPlan {
-  if (provider === "phone") {
-    const n = telNumber(v.phone);
-    return {
-      provider, href: n ? `tel:${n}` : null, label: "Call with my phone", fallsBackToContact: false,
-      note: n ? "Opens your own phone app (your choice in the Dialer setting)." : "There is no phone number to call.",
-    };
-  }
+export function dialPlan(v: { phone: string | null | undefined; contactUrl: string | null | undefined }): DialPlan {
   return {
-    provider, href: v.contactUrl ?? null, label: "Call in your CRM", fallsBackToContact: !DIALER_LINK_KNOWN,
+    href: v.contactUrl ?? null, label: "Call", fallsBackToContact: !DIALER_LINK_KNOWN,
     note: DIALER_LINK_KNOWN ? "Opens your CRM's dialer." : "Not available from your CRM yet: this opens the contact in your CRM, where its own dialer places the call.",
   };
 }

@@ -68,7 +68,7 @@ test("a note needs words, a known kind and a real past date, and is capped", () 
   assert.ok(!validateNote({ body: "x", occurredOn: "yesterday" }, "2026-11-01").ok);
 });
 
-test("last spoken is the later of the 'I spoke to them today' press and the newest logged conversation", () => {
+test("last spoken is the later of the 'Spoke to them today' press and the newest logged conversation", () => {
   const press = Date.UTC(2026, 9, 20, 9);
   assert.equal(lastSpokenMs(null, []), null);
   assert.equal(lastSpokenMs(press, []), press);

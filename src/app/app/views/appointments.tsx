@@ -100,7 +100,7 @@ export function AppointmentsView({ go }: { go: GoFn }) {
         </InlineAlert>
       )}
       {d.access.namesNeedPermission > 0 && waiting === 0 && (
-        <InlineAlert tone="info" className="mb-4">Team member names need a permission: reconnect to show who each appointment is assigned to. Until then a person without a name is shown as &quot;Team member (name not available)&quot;.</InlineAlert>
+        <InlineAlert tone="info" className="mb-4">Staff names need a permission: reconnect to show who each appointment is assigned to. Until then a person without a name is shown as &quot;Team member (name not available)&quot;.</InlineAlert>
       )}
 
       {!hasAny && !filtered ? (

@@ -5,7 +5,7 @@ import { useEffect, useRef } from "react";
 import { neighbours } from "@/lib/design/ui-logic";
 import { useData } from "../session";
 import { Badge, fmtMoney, timeAgo } from "../ui";
-import { DialButton, DialerSetting } from "./dial-button";
+import { DialButton } from "./dial-button";
 import { ErrorState, SkeletonRows } from "./states";
 
 // One panel for any lead, opened from any list (N50): profile, tags, source, owner, deals and a timeline, with arrows to step to the previous and next
@@ -70,7 +70,7 @@ function Body({ seed }: { seed: LeadSeed }) {
 
       <dl className="mt-4 divide-y border-y">
         {c?.email && <Row label="Email"><a className="text-primary underline-offset-2 hover:underline" href={`mailto:${c.email}`}>{c.email}</a></Row>}
-        {phone && <Row label="Phone"><span className="tabular-nums">{phone}</span><span className="mt-1 block"><DialButton phone={phone} contactUrl={url} dnd={dnd} timeZone={extra?.timeZone ?? seed.timeZone} /></span><span className="mt-1 block"><DialerSetting /></span></Row>}
+        {phone && <Row label="Phone"><span className="flex items-center justify-between gap-3"><span className="tabular-nums">{phone}</span><DialButton phone={phone} contactUrl={url} dnd={dnd} timeZone={extra?.timeZone ?? seed.timeZone} /></span></Row>}
         {owner && <Row label="Owner">{owner}</Row>}
         {c && <Row label="Source">{c.source ?? "Not recorded"}</Row>}
         {c && <Row label="Last activity">{c.lastActivityAt ? timeAgo(c.lastActivityAt) : "None recorded"}</Row>}

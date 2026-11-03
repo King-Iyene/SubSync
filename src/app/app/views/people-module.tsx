@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { changeBetween } from "@/lib/design/range";
 import { describeFilter, filterToParams, isEmptyFilter, parseSmartFilter, type SmartFilter } from "@/lib/people/filters";
 import { QUIET_AFTER_DAYS } from "@/lib/analytics/contact-intel";
-import { BarChart, CardRange, DataList, DialButton, DialerSetting, DrillPanel, EmptyState, ErrorState, HowTo, InlineAlert, LeadDrawer, ModuleTabs, Page as PageShell, Section, SkeletonRows, useCardRange, useDrill, type Column, type LeadSeed } from "../ds";
+import { BarChart, CardRange, DataList, DialButton, DrillPanel, EmptyState, ErrorState, HowTo, InlineAlert, LeadDrawer, ModuleTabs, Page as PageShell, Section, SkeletonRows, useCardRange, useDrill, type Column, type LeadSeed } from "../ds";
 import { remember, remembered, takeHandOff } from "../ds/remember";
 import { useApiClient, useData } from "../session";
 import { Btn, fmtInt, inputClass, timeAgo } from "../ui";
@@ -39,7 +39,7 @@ export function PeopleList({ page, onPage, showAccount, caption, empty, drawerOn
   const columns: Array<Column<PersonUi>> = useMemo(() => [
     { key: "name", header: "Name", primary: true, width: "minmax(0,1.6fr)", cell: (r) => <span>{r.name}{r.email ? <span className="block truncate text-xs font-normal text-muted-foreground">{r.email}</span> : null}</span> },
     ...(showAccount ? [{ key: "acct", header: "Account", width: "minmax(0,1.1fr)", cell: (r: PersonUi) => <span className="block truncate">{r.locationName ?? "Unnamed account"}</span> }] : []),
-    { key: "phone", header: "Phone", width: "minmax(0,1.4fr)", cell: (r) => r.phone ? <span className="flex flex-col"><span className="tabular-nums">{r.phone}</span>{r.dnd ? <span className="text-xs font-semibold text-warning">Do not disturb</span> : null}<DialButton compact phone={r.phone} contactUrl={r.url} dnd={r.dnd} timeZone={r.timeZone} /></span> : <span className="text-muted-foreground">No phone</span> },
+    { key: "phone", header: "Phone", width: "minmax(0,1.4fr)", cell: (r) => r.phone ? <span className="flex items-center justify-between gap-2"><span className="tabular-nums">{r.phone}</span><DialButton phone={r.phone} contactUrl={r.url} dnd={r.dnd} timeZone={r.timeZone} /></span> : <span className="text-muted-foreground">No phone</span> },
     { key: "owner", header: "Owner", width: "minmax(0,1fr)", cell: (r) => <span className="block truncate" title={r.owner ? r.ownerName : undefined}>{r.owner ? r.ownerName : "No owner"}</span> },
     { key: "tags", header: "Tags", width: "minmax(0,1.2fr)", cell: (r) => r.tags.length ? <span className="block truncate text-xs text-muted-foreground">{r.tags.slice(0, 3).join(", ")}{r.tags.length > 3 ? ` +${r.tags.length - 3}` : ""}</span> : <span className="text-xs text-muted-foreground">No tags</span> },
     { key: "act", header: "Last activity", width: "minmax(0,0.9fr)", cell: (r) => <span>{r.lastActivityAt ? timeAgo(r.lastActivityAt) : r.dateAdded ? `Added ${timeAgo(r.dateAdded)}` : "None recorded"}</span> },
@@ -205,7 +205,7 @@ function SearchTab({ filter, setFilter, replaceFilter, version }: { filter: Smar
       <HowTo id="people-search" title="How to use this page">Search by name, email or phone, or narrow the list with the choices. Press a name to see the person, then use the arrows to move to the next. Press Dial to call. Save a list you use often and it is kept under Smart lists.</HowTo>
       <FilterBuilder key={version} opts={opts.data} value={filter} onChange={setFilter} onClear={() => replaceFilter({})} />
       <SaveList filter={filter} canShare={opts.data?.canShareLists ?? false} onSaved={() => void lists.reload()} />
-      <Section title={list.data ? `${fmtInt(list.data.total)} ${list.data.total === 1 ? "person" : "people"}` : "People"} hint={list.data?.description} action={<DialerSetting />}>
+      <Section title={list.data ? `${fmtInt(list.data.total)} ${list.data.total === 1 ? "person" : "people"}` : "People"} hint={list.data?.description}>
         {list.loading && !list.data ? <SkeletonRows rows={6} label="Finding people..." /> : list.error ? <ErrorState error={list.error} onRetry={list.reload} /> : list.data ? (
           <PeopleList page={list.data} onPage={setPageNo} showAccount={showAccount} caption="People" empty={isEmptyFilter(filter) ? "No contacts yet. Contacts appear once the first sync finishes." : "Nobody matches these choices. Clear one of them to widen the list."} />
         ) : null}
@@ -231,7 +231,7 @@ function SavedLists({ onOpen }: { onOpen: (f: SmartFilter) => void }) {
   const lists = useData<{ lists: Saved[]; canShare: boolean }>("people/lists");
   const opts = useData<Options>("people/options");
   const [msg, setMsg] = useState<string | null>(null);
-  const names = { owner: (id: string) => opts.data?.owners.find((o) => o.id === id)?.name ?? "a team member", account: (id: string) => opts.data?.accounts.find((a) => a.id === id)?.name ?? "one client account" };
+  const names = { owner: (id: string) => opts.data?.owners.find((o) => o.id === id)?.name ?? "a person on your team", account: (id: string) => opts.data?.accounts.find((a) => a.id === id)?.name ?? "one client account" };
   const del = async (id: string) => { setMsg(null); try { await api.del(`people/lists/${id}`); await lists.reload(); } catch (e) { setMsg((e as Error).message); } };
   if (lists.loading && !lists.data) return <SkeletonRows rows={2} label="Loading your lists..." />;
   if (lists.error) return <ErrorState error={lists.error} onRetry={lists.reload} />;

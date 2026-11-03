@@ -23,19 +23,10 @@ export function FreshnessStrip() {
       {f.detail && <span> · {f.detail}</span>}
     </>
   );
-  const accounts = f.accounts.length > 1 && (
-    <details className="mt-1 text-xs text-muted-foreground">
-      <summary className="cursor-pointer select-none">Each account</summary>
-      <ul className="mt-1 space-y-0.5">
-        {f.accounts.map((a) => <li key={a.locationId}>{a.name ?? "Unnamed account"}: {a.text}{a.problem ? ` (${a.problem})` : ""}</li>)}
-      </ul>
-    </details>
-  );
   return (
     <div className="mb-4 print:hidden" data-testid="freshness" data-state={f.state}>
       {warn ? <InlineAlert tone={f.state === "failing" ? "danger" : "warning"}>{words}</InlineAlert> : <p role="status" className="text-xs text-muted-foreground">{words}</p>}
       {f.syncingNote && <p className="mt-1 text-xs text-muted-foreground" data-testid="syncing-note">{f.syncingNote}</p>}
-      {accounts}
     </div>
   );
 }

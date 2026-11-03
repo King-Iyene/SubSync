@@ -224,8 +224,8 @@ export function InboxView({ go }: { go: GoFn }) {
           )}
           <ModuleTabs label="Unanswered messages" value={tabIndex} onChange={(i) => setFilter({ ...eff, tab: TABS[i].id })}
             tabs={TABS.map((t) => ({ id: t.id, label: `${TAB_LABEL[t.id]} (${counts[t.id]})`, node: body }))} />
-          {data.namesMissing && <p className="mb-4 text-xs text-muted-foreground" data-testid="names-missing">Some team member names are not available yet, so they show as &ldquo;Team member (name not available)&rdquo;. Whoever manages SubSync can add the names on the Team page.</p>}
-          <p className="mb-6 text-xs text-muted-foreground">&ldquo;Assigned to&rdquo; is the team member the customer&apos;s contact is assigned to. A call is the customer&apos;s last action, but SubSync cannot tell whether it was answered.</p>
+          {data.namesMissing && <p className="mb-4 text-xs text-muted-foreground" data-testid="names-missing">Some staff names are not available yet, so they show as &ldquo;Team member (name not available)&rdquo;. Whoever manages SubSync can add the names on the Team page.</p>}
+          <p className="mb-6 text-xs text-muted-foreground">&ldquo;Assigned to&rdquo; is the person the customer&apos;s contact is assigned to. A call is the customer&apos;s last action, but SubSync cannot tell whether it was answered.</p>
         </>
       )}
 

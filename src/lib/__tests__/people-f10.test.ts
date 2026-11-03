@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { describeFilter, filterToParams, isEmptyFilter, listName, parseSmartFilter, scopeFilterTo } from "../people/filters.ts";
-import { dialPlan, dialWarnings, localHour, mustStop, parseDialer, telNumber, DIALER_LINK_KNOWN } from "../people/dial.ts";
+import { dialPlan, dialWarnings, localHour, mustStop, telNumber, DIALER_LINK_KNOWN } from "../people/dial.ts";
 import { callResultLabel, errorRef, fillDays, isQueryTimeout, mapCallMessage } from "../people/helpers.ts";
 import { diffTagEvents } from "../sync/tag-events.ts";
 import { ttlCache } from "../ttl-cache.ts";
@@ -68,27 +68,21 @@ test("a list name is trimmed and capped", () => {
 
 // ---------------- dialing (KF-3) ----------------
 
-test("the default dialer is the CRM's, never a phone link", () => {
-  assert.equal(parseDialer(undefined), "crm");
-  assert.equal(parseDialer("anything"), "crm");
-  assert.equal(parseDialer("phone"), "phone");
-  const p = dialPlan("crm", { phone: "+1 555 010 1234", contactUrl: "https://crm.example.com/v2/location/loc1/contacts/detail/c1" });
+test("the call link is always the CRM's, never a phone link", () => {
+  const p = dialPlan({ phone: "+1 555 010 1234", contactUrl: "https://crm.example.com/v2/location/loc1/contacts/detail/c1" });
   assert.equal(p.href, "https://crm.example.com/v2/location/loc1/contacts/detail/c1");
   assert.ok(!p.href?.startsWith("tel:"));
-  assert.equal(p.label, "Call in your CRM");
+  assert.equal(p.label, "Call");
 });
 
 test("with no CRM link that opens the dialer, the plan says so plainly and opens the contact", () => {
   assert.equal(DIALER_LINK_KNOWN, false);
-  const p = dialPlan("crm", { phone: "5550101234", contactUrl: "https://x.example.com/c" });
+  const p = dialPlan({ phone: "5550101234", contactUrl: "https://x.example.com/c" });
   assert.equal(p.fallsBackToContact, true);
   assert.match(p.note, /Not available from your CRM yet/);
 });
 
-test("a tel: link exists only when the person chose their own phone app", () => {
-  const p = dialPlan("phone", { phone: "+1 (555) 010-1234", contactUrl: "https://x.example.com/c" });
-  assert.equal(p.href, "tel:+15550101234");
-  assert.equal(dialPlan("phone", { phone: null, contactUrl: "https://x.example.com/c" }).href, null);
+test("telNumber keeps only what a usable number needs", () => {
   assert.equal(telNumber("12"), null);
   assert.equal(telNumber("555 0101234"), "5550101234");
 });
@@ -189,14 +183,12 @@ test("call results are said in plain words", () => {
 import { readFileSync } from "node:fs";
 import { routeAllowed } from "../access.ts";
 
-test("a client's staff may read People and keep their own lists and dialer choice, and nothing else on it", () => {
+test("a client's staff may read People and keep their own lists, and nothing else on it", () => {
   for (const kind of ["client", "business"] as const) {
     assert.equal(routeAllowed(kind, "GET", ["people", "search"]), true, `${kind} reads`);
     assert.equal(routeAllowed(kind, "POST", ["people", "lists"]), true, `${kind} saves a list`);
     assert.equal(routeAllowed(kind, "DELETE", ["people", "lists", "x"]), true, `${kind} removes a list`);
-    assert.equal(routeAllowed(kind, "PUT", ["people", "dialer"]), true, `${kind} sets the dialer`);
     assert.equal(routeAllowed(kind, "PUT", ["people", "lists"]), false, `${kind} cannot replace a list`);
-    assert.equal(routeAllowed(kind, "POST", ["people", "dialer"]), false);
   }
   assert.equal(routeAllowed("client", "GET", ["call-queue"]), false, "a client's staff have no call lists");
   assert.equal(routeAllowed("business", "GET", ["call-queue"]), true);

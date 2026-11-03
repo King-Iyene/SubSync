@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useApiClient, useData } from "../session";
-import { DataList, DialButton, DialerSetting, EmptyState, ErrorState, InlineAlert, LeadDrawer, SkeletonRows, type Column, type LeadSeed } from "../ds";
+import { DataList, DialButton, EmptyState, ErrorState, InlineAlert, LeadDrawer, SkeletonRows, type Column, type LeadSeed } from "../ds";
 import { Badge, Btn, Card, fmtMoney, inputClass, PageHeader, Stat, timeAgo } from "../ui";
 
 type Preset = { id: string; label: string; help: string };
@@ -122,7 +122,7 @@ export function CallsView({ embedded = false }: { embedded?: boolean } = {}) {
   const columns: Array<Column<Row>> = [
     { key: "name", header: "Name", primary: true, width: "minmax(0,1.6fr)", cell: (r) => <span>{r.name} <Badge tone={tone(r.priority)}>{r.priority}</Badge><span className="block text-xs font-normal text-muted-foreground">{r.reasons.slice(0, 2).join(", ")}</span></span> },
     { key: "acct", header: "Account", width: "minmax(0,1fr)", cell: (r) => <span className="truncate">{r.locationName ?? "Unnamed account"}</span> },
-    { key: "phone", header: "Phone", width: "minmax(0,1.4fr)", cell: (r) => r.phone ? <span className="flex flex-col"><span className="tabular-nums">{r.phone}</span><DialButton compact phone={r.phone} contactUrl={r.url} dnd={false} timeZone={r.timeZone} /></span> : <span className="text-muted-foreground">No phone</span> },
+    { key: "phone", header: "Phone", width: "minmax(0,1.4fr)", cell: (r) => r.phone ? <span className="flex items-center justify-between gap-2"><span className="tabular-nums">{r.phone}</span><DialButton phone={r.phone} contactUrl={r.url} dnd={false} timeZone={r.timeZone} /></span> : <span className="text-muted-foreground">No phone</span> },
     { key: "quiet", header: "Quiet for", width: "minmax(0,0.7fr)", cell: (r) => <span>{r.idleDays !== null ? `${r.idleDays}d` : "n/a"}</span> },
     { key: "deal", header: "Deal", width: "minmax(0,0.7fr)", cell: (r) => <span className="tabular-nums">{r.openValue > 0 ? fmtMoney(r.openValue) : "None"}</span> },
     { key: "call", header: "Last call, tries, result", width: "minmax(0,1.3fr)", cell: (r) => r.lastCallAt ? <span className="text-xs">{timeAgo(r.lastCallAt)}, {r.calls} {r.calls === 1 ? "try" : "tries"}{r.lastOutcome ? `, ${data.outcomes[r.lastOutcome] ?? r.lastOutcome}` : ""}</span> : <span className="text-xs text-muted-foreground">Not called from SubSync</span> },
@@ -132,7 +132,6 @@ export function CallsView({ embedded = false }: { embedded?: boolean } = {}) {
     <div className="space-y-6">
       {head}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <DialerSetting />
         {powerStart ? <Btn onClick={() => setPowerStart(null)}>End power hour</Btn> : <Btn variant="primary" onClick={() => { setNow(Date.now()); setPowerStart(Date.now()); }}>Start power hour</Btn>}
       </div>
 
