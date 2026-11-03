@@ -72,7 +72,7 @@ test("the call link is always the CRM's, never a phone link", () => {
   const p = dialPlan({ phone: "+1 555 010 1234", contactUrl: "https://crm.example.com/v2/location/loc1/contacts/detail/c1" });
   assert.equal(p.href, "https://crm.example.com/v2/location/loc1/contacts/detail/c1");
   assert.ok(!p.href?.startsWith("tel:"));
-  assert.equal(p.label, "Call in your CRM");
+  assert.equal(p.label, "Call");
 });
 
 test("with no CRM link that opens the dialer, the plan says so plainly and opens the contact", () => {

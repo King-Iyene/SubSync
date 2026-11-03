@@ -70,7 +70,7 @@ function Body({ seed }: { seed: LeadSeed }) {
 
       <dl className="mt-4 divide-y border-y">
         {c?.email && <Row label="Email"><a className="text-primary underline-offset-2 hover:underline" href={`mailto:${c.email}`}>{c.email}</a></Row>}
-        {phone && <Row label="Phone"><span className="tabular-nums">{phone}</span><span className="mt-1 block"><DialButton phone={phone} contactUrl={url} dnd={dnd} timeZone={extra?.timeZone ?? seed.timeZone} /></span></Row>}
+        {phone && <Row label="Phone"><span className="flex items-center justify-between gap-3"><span className="tabular-nums">{phone}</span><DialButton phone={phone} contactUrl={url} dnd={dnd} timeZone={extra?.timeZone ?? seed.timeZone} /></span></Row>}
         {owner && <Row label="Owner">{owner}</Row>}
         {c && <Row label="Source">{c.source ?? "Not recorded"}</Row>}
         {c && <Row label="Last activity">{c.lastActivityAt ? timeAgo(c.lastActivityAt) : "None recorded"}</Row>}

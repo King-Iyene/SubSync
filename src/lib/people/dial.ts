@@ -24,7 +24,7 @@ export type DialPlan = {
 
 export function dialPlan(v: { phone: string | null | undefined; contactUrl: string | null | undefined }): DialPlan {
   return {
-    href: v.contactUrl ?? null, label: "Call in your CRM", fallsBackToContact: !DIALER_LINK_KNOWN,
+    href: v.contactUrl ?? null, label: "Call", fallsBackToContact: !DIALER_LINK_KNOWN,
     note: DIALER_LINK_KNOWN ? "Opens your CRM's dialer." : "Not available from your CRM yet: this opens the contact in your CRM, where its own dialer places the call.",
   };
 }
