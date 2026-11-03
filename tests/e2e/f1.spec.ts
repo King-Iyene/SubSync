@@ -156,17 +156,13 @@ test.describe("the screens", () => {
     await page.goto("/app#pipeline");
     await page.reload();
     await expect(page.getByText("Demo mode", { exact: false }).first()).toBeVisible();
-    await page.getByRole("tab", { name: "Forecast", exact: true }).click();
     await expect(page.getByText("Revenue forecast").first()).toBeVisible();
     await expect(page.getByTestId("forecast-how")).toBeVisible();
     await page.getByTestId("forecast-how").locator("summary").click();
     await expect(page.getByText("Left out", { exact: true }).first()).toBeVisible();
-    // The owner's stage controls live on the Stages tab; the left-out sentence on the Overview tab.
-    await page.getByRole("tab", { name: "Stages and bottlenecks", exact: true }).click();
     await expect(page.getByText("Stages and pipelines", { exact: true }).first()).toBeVisible();
-    await expect(page.getByText("Disqualified", { exact: false }).first()).toBeVisible();
-    await page.getByRole("tab", { name: "Overview", exact: true }).click();
     await expect(page.getByText("in a closed-out stage or a pipeline not in use", { exact: false }).first()).toBeVisible();
+    await expect(page.getByText("Disqualified", { exact: false }).first()).toBeVisible();
   });
 
   test("Inbox: unread is told apart from waiting, in words", async ({ page, request }) => {

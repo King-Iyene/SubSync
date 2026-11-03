@@ -9,7 +9,7 @@ export { InlineAlert, type AlertTone } from "./alert";
 export { FreshnessStrip as StatusLine } from "../views/sync-status";
 export { DataList, type Column } from "./data-list";
 export { LeadDrawer, type LeadSeed } from "./lead-drawer";
-export { DialButton } from "./dial-button";
+export { DialButton, DialerSetting, useDialer } from "./dial-button";
 export { EmptyState, Skeleton, SkeletonRows, SkeletonCards, ErrorState, DefinitionTip } from "./states";
 export { BarChart, Distribution, Sparkline, ChartPlaceholder, type Bar, type ChartTone } from "./charts";
 export { MyDayView } from "./my-day";

@@ -99,14 +99,14 @@ describe("a range on one card, the account list, how-to notes, copy (KF-4, KF-2,
 });
 
 describe("calls go through the CRM, never the phone's own dialer (KF-3)", () => {
-  it("the lead panel shows the number as text and offers a Call button, with no tel: link", () => {
+  it("the lead panel shows the number as text and offers Call in your CRM, with no tel: link", () => {
     const seed = { contactId: "c1", locationId: "loc1", name: "Ada", phone: "+15550100", url: "https://crm.example.com/contact/c1" };
     const m = html(el(ApiProvider, { value: sampleApi() }, el(LeadDrawer, { leads: [seed], index: 0, onIndex: () => undefined, onClose: () => undefined })));
     expect(m).not.toContain("tel:");
     // The phone row appears once the contact has loaded in the browser; the seed's own number is the same text, so check the component source too.
     // Since F10 the button is the shared DialButton; its words and the no-tel: default live in src/lib/people/dial.ts (tests/unit/people-f10 and src/lib/__tests__/people-f10.test.ts).
     expect(readFileSync("src/app/app/ds/lead-drawer.tsx", "utf8")).toContain("DialButton");
-    expect(readFileSync("src/lib/people/dial.ts", "utf8")).toContain('label: "Call"');
+    expect(readFileSync("src/lib/people/dial.ts", "utf8")).toContain("Call in your CRM");
   });
 
   it("no shared component or M1 page writes a tel: link", () => {

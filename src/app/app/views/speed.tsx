@@ -7,7 +7,7 @@ import { useData } from "../session";
 import type { GoFn } from "../nav";
 import { BarChart, CardRange, ChartPlaceholder, DataList, DrillPanel, EmptyState, HowTo, InlineAlert, LeadDrawer, Page, useCardRange, useDrill, type Column, type LeadSeed } from "../ds";
 import { compareWeeks, totalsOf, weekBars, weeksIn, type TrendMember, type TrendWeekData } from "@/lib/design/trend-bars";
-import { Badge, Btn, Card, ErrorBox, ExtLink, fmtInt, Loading, More, type Tone } from "../ui";
+import { Badge, Btn, Card, ErrorBox, ExtLink, fmtInt, Loading, type Tone } from "../ui";
 import { AccountsCard, leadColumns, leadCopy, leadKey, leadSeed, PeopleCard, SourceCard, SummaryCard, type LeadView, type PersonView } from "./speed-cards";
 
 // The wire shape of the main answer. The cards below the list ask for their own windows (speed-cards.tsx).
@@ -69,10 +69,11 @@ export function SpeedView({ go }: { go: GoFn }) {
   const m = data.measuring;
 
   return (
-    <Page title="Speed to lead" subtitle={`Wait for a first reply from a person. Target ${data.targetMinutes} min, last ${data.windowDays} days.`}>
+    <Page title="Speed to lead" subtitle={`How long new leads wait for a first reply from a person. Target ${data.targetMinutes} minutes, last ${data.windowDays} days.`}>
       {data.access.needsPermission.length > 0 && (
         <InlineAlert tone="warning" className="mb-4">
-          Needs permission: reconnect. {data.access.needsPermission.length === data.access.total ? "No account has" : `${data.access.needsPermission.length} of ${data.access.total} accounts have not`} approved message reading ({data.access.needsPermission.slice(0, 3).map((a) => a.name).join(", ")}{data.access.needsPermission.length > 3 ? " and more" : ""}). They are left out.
+          Needs permission: reconnect. Reading the messages inside conversations needs a permission that {data.access.needsPermission.length === data.access.total ? "none of your accounts has" : `${data.access.needsPermission.length} of ${data.access.total} accounts have not`} approved yet
+          ({data.access.needsPermission.slice(0, 3).map((a) => a.name).join(", ")}{data.access.needsPermission.length > 3 ? " and more" : ""}). Until then those accounts are left out, and nothing is guessed.
         </InlineAlert>
       )}
 
@@ -81,21 +82,22 @@ export function SpeedView({ go }: { go: GoFn }) {
       ) : (
         <>
           <HowTo id="speed" title="How to use this page" action={<button type="button" onClick={() => go("help")} className="text-xs font-medium text-primary underline">More in Getting started</button>}>
-            Longest wait is first. Press a name or a number for the leads. SubSync measures replies and never sends them.
+            Start at the top of the list: the longest wait is first. Tap a name to see the lead and step to the next one. Every number below opens the leads behind it. SubSync measures replies; it does not send them.
           </HowTo>
           <p className="mb-1 text-sm font-medium" data-testid="speed-headline">{headline}</p>
-          {waitingNow > 0 && <p className="mb-1 text-sm font-semibold" data-testid="what-to-do">Reply to the oldest first. Then assign owners.</p>}
+          {waitingNow > 0 && <p className="mb-1 text-xs text-muted-foreground" data-testid="what-to-do">What to do: reply to the first leads in the list, then assign the ones with no owner.</p>}
           {m && (
             <p className="mb-3 text-xs text-muted-foreground" data-testid="measuring">
-              <More>{measuringSentence(m)}</More>{" "}
-              {m.canChange ? <button type="button" onClick={() => go("settings")} className="font-medium text-primary underline" data-testid="speed-settings-link">Change target in Settings</button> : "Ask your account manager to change this."}
+              {measuringSentence(m)}{" "}
+              {m.canChange ? <button type="button" onClick={() => go("settings")} className="font-medium text-primary underline" data-testid="speed-settings-link">Change the target or this option in Settings</button> : "Ask the person who manages your account to change this."}
             </p>
           )}
 
           {leads.length > 0 && (
             <div className="mt-4">
               <h2 className="mb-2 text-base font-semibold">Leads waiting or missed ({data.waitingTotal ?? o.stillWaiting})</h2>
-                            <DataList rows={leads} columns={leadColumns(showAccount)} rowKey={leadKey} total={data.waitingTotal} onOpen={(_, i) => setOpen(i)} caption="Leads waiting or missed" copyText={leadCopy(showAccount)} />
+              <p className="mb-2 text-xs text-muted-foreground">Longest waiting first. Tap a name to see the lead.</p>
+              <DataList rows={leads} columns={leadColumns(showAccount)} rowKey={leadKey} total={data.waitingTotal} onOpen={(_, i) => setOpen(i)} caption="Leads waiting or missed" copyText={leadCopy(showAccount)} />
             </div>
           )}
 
@@ -107,7 +109,7 @@ export function SpeedView({ go }: { go: GoFn }) {
 
           {(data.unassignedWaiting ?? 0) > 0 && (
             <InlineAlert tone="warning" className="mt-4" title={`${data.unassignedWaiting} waiting lead${data.unassignedWaiting === 1 ? " has" : "s have"} no owner.`}>
-              Assign an owner, or fix routing.
+              Nobody is responsible for answering {data.unassignedWaiting === 1 ? "it" : "them"}. Assign them, or fix the routing so new leads always reach a person.
             </InlineAlert>
           )}
 
@@ -123,7 +125,7 @@ export function SpeedView({ go }: { go: GoFn }) {
             return (
               <Card title="Are replies getting faster?" className="mt-6">
                 <CardRange state={range} label="Replies by week" compares={["none", "previous"]} maxDays={56} />
-                <p className="mb-3 mt-3 text-xs text-muted-foreground">Leads answered inside {data.targetMinutes} min, by week. Under 5 leads, no bar.</p>
+                <p className="mb-3 mt-3 text-xs text-muted-foreground">New leads answered by a person inside your {data.targetMinutes}-minute target, by week. A week with fewer than 5 leads has no bar. Click a bar to see its leads.</p>
                 {cmp?.change && <p className="mb-3 text-sm" data-testid="trend-compare">{cmp.change.text}.</p>}
                 {win?.compare && cmp && !cmp.covered && <p className="mb-3 text-xs text-muted-foreground" data-testid="trend-compare-missing">There is not enough history to compare with {win.compare.label}: only 8 weeks are kept so far.</p>}
                 {noBars ? (

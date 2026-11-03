@@ -92,7 +92,7 @@ export function AppointmentsView({ go }: { go: GoFn }) {
     : d.unconfirmedTotal > 0 ? { text: `Remind ${d.unconfirmedTotal} person${d.unconfirmedTotal === 1 ? "" : "s"} booked in the next two days who has not confirmed.`, key: "remind" } : null;
 
   return (
-    <Page title="Appointments" subtitle="Who is booked, who showed, who to chase. A past appointment with no outcome is flagged. We never guess it." actions={<Btn onClick={() => go("calls")}>Open call lists</Btn>}>
+    <Page title="Appointments" subtitle="Who is booked, who showed up, and who to chase today. A past appointment with no outcome is flagged, not guessed." actions={<Btn onClick={() => go("calls")}>Open call lists</Btn>}>
       {waiting > 0 && (
         <InlineAlert tone="warning" className="mb-6" title={waiting === d.access.total ? "SubSync needs your approval to read appointments." : `${waiting} account${waiting === 1 ? " still needs" : "s still need"} approval to show appointments.`}>
           <p>To show appointments, the app needs one more read-only permission. Open the app in the marketplace and choose Reinstall (or ask the account owner), then approve. Nothing else changes.</p>
@@ -100,7 +100,7 @@ export function AppointmentsView({ go }: { go: GoFn }) {
         </InlineAlert>
       )}
       {d.access.namesNeedPermission > 0 && waiting === 0 && (
-        <InlineAlert tone="info" className="mb-4">Staff names need a permission: reconnect to show who each appointment is assigned to. Until then a person without a name is shown as &quot;Team member (name not available)&quot;.</InlineAlert>
+        <InlineAlert tone="info" className="mb-4">Team member names need a permission: reconnect to show who each appointment is assigned to. Until then a person without a name is shown as &quot;Team member (name not available)&quot;.</InlineAlert>
       )}
 
       {!hasAny && !filtered ? (
@@ -108,14 +108,14 @@ export function AppointmentsView({ go }: { go: GoFn }) {
       ) : (
         <div className={loading ? "opacity-60 transition-opacity" : ""} aria-busy={loading}>
           <HowTo id="appointments" title="How to use this page" action={<button type="button" onClick={() => go("help")} className="text-xs font-medium text-primary underline">More in Getting started</button>}>
-            Press a number or a row for details. Start with Do these first.
+            Press any number to see the appointments behind it, and any row to see its details. Work the three lists under Do these first: record outcomes, rebook no-shows, remind people booked soon.
           </HowTo>
           <ApptFilterBar options={d.options} value={filter} onChange={(f) => { setSel(null); setFilter(f); }} />
 
           {d.headline.length > 0 && (
             <ul className="mb-3 space-y-1 text-sm" data-testid="appointments-headline">{d.headline.map((h) => <li key={h} className="font-medium">{h}</li>)}</ul>
           )}
-          {next && <p className="mb-4 text-sm font-semibold" data-testid="what-to-do">What to do: {next.text} <button type="button" className="font-medium text-primary underline" onClick={() => choose(next.key)}>Show the list</button></p>}
+          {next && <p className="mb-4 text-xs text-muted-foreground" data-testid="what-to-do">What to do: {next.text} <button type="button" className="font-medium text-primary underline" onClick={() => choose(next.key)}>Show the list</button></p>}
 
           <Card title="The numbers" className="mb-6">
               <CardRange state={range} label="Appointment numbers" />
@@ -130,13 +130,13 @@ export function AppointmentsView({ go }: { go: GoFn }) {
                 </InlineAlert>
               )}
               <div className="mt-5 grid grid-cols-2 gap-x-6 gap-y-5 lg:grid-cols-4">
-                <CountTile label="Booked" value={fmtInt(sc.scheduled)} hint={`Booked in these dates: ${sc.scheduled}`} onOpen={() => choose("booked")} open={sel?.key === "booked"}
+                <CountTile label="Booked" value={fmtInt(sc.scheduled)} hint={`Booked in these dates: ${sc.scheduled}. Press to see the list`} onOpen={() => choose("booked")} open={sel?.key === "booked"}
                   sub={bookedChange ? bookedChange.text : "No comparison chosen"} />
-                <CountTile label="Show rate" value={pct(d.current.showRate)} tone={d.current.showRate !== null && target.state === "below" ? "warn" : undefined} hint={`Recorded outcomes: ${d.current.outcomes}`} onOpen={() => choose("outcomes")} open={sel?.key === "outcomes"}
+                <CountTile label="Show rate" value={pct(d.current.showRate)} tone={d.current.showRate !== null && target.state === "below" ? "warn" : undefined} hint={`Recorded outcomes: ${d.current.outcomes}. Press to see the list`} onOpen={() => choose("outcomes")} open={sel?.key === "outcomes"}
                   sub={<>{d.current.showRate === null ? `Needs 5 recorded outcomes, ${d.current.outcomes} so far.` : `${d.current.held} showed, ${d.current.noShow} no-show. ${target.text}`}{rateChange && d.current.showRate !== null ? <><br />{rateChange.text}</> : null}</>} />
-                <CountTile label="No-shows" value={fmtInt(sc.byBucket.noshow)} tone={sc.byBucket.noshow > 0 ? "warn" : undefined} hint={`No-shows in these dates: ${sc.byBucket.noshow}`} onOpen={() => choose("noshows")} open={sel?.key === "noshows"}
+                <CountTile label="No-shows" value={fmtInt(sc.byBucket.noshow)} tone={sc.byBucket.noshow > 0 ? "warn" : undefined} hint={`No-shows in these dates: ${sc.byBucket.noshow}. Press to see the list`} onOpen={() => choose("noshows")} open={sel?.key === "noshows"}
                   sub={d.current.noShowRate !== null ? `${pct(d.current.noShowRate)} of recorded outcomes` : "Rate shown once 5 outcomes are recorded"} />
-                <CountTile label="Coming up, next 7 days" value={fmtInt(d.upcomingTotal)} hint={`Coming up: ${d.upcomingTotal}`} onOpen={() => choose("upcoming")} open={sel?.key === "upcoming"}
+                <CountTile label="Coming up, next 7 days" value={fmtInt(d.upcomingTotal)} hint={`Coming up: ${d.upcomingTotal}. Press to see the list`} onOpen={() => choose("upcoming")} open={sel?.key === "upcoming"}
                   sub="Always the next 7 days, whatever dates are chosen" />
               </div>
               <div className="mt-4"><TargetEditor key={d.target.showRate} value={d.target.showRate} isDefault={d.target.isDefault} canEdit={d.canEditTargets} onSaved={reload} /></div>
@@ -145,11 +145,11 @@ export function AppointmentsView({ go }: { go: GoFn }) {
 
           <h2 className="mb-3 border-t pt-5 text-base font-semibold">Do these first</h2>
           <div className="mb-6 grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-3">
-            <CountTile label="Record the outcome" value={fmtInt(d.unmarkedTotal)} tone={d.unmarkedTotal > 0 ? "warn" : undefined} hint={`Record the outcome: ${d.unmarkedTotal}`} onOpen={() => choose("record")} open={sel?.key === "record"}
+            <CountTile label="Record the outcome" value={fmtInt(d.unmarkedTotal)} tone={d.unmarkedTotal > 0 ? "warn" : undefined} hint={`Record the outcome: ${d.unmarkedTotal}. Press to see the list`} onOpen={() => choose("record")} open={sel?.key === "record"}
               sub="Past appointments still marked booked or confirmed. Mark them showed or no-show in your CRM." />
-            <CountTile label="No-shows to rebook" value={fmtInt(d.recoverTotal)} tone={d.recoverTotal > 0 ? "warn" : undefined} hint={`No-shows to rebook: ${d.recoverTotal}`} onOpen={() => choose("rebook")} open={sel?.key === "rebook"}
+            <CountTile label="No-shows to rebook" value={fmtInt(d.recoverTotal)} tone={d.recoverTotal > 0 ? "warn" : undefined} hint={`No-shows to rebook: ${d.recoverTotal}. Press to see the list`} onOpen={() => choose("rebook")} open={sel?.key === "rebook"}
               sub="Missed in the last 14 days and not booked again." />
-            <CountTile label="Remind today" value={fmtInt(d.unconfirmedTotal)} hint={`Remind today: ${d.unconfirmedTotal}`} onOpen={() => choose("remind")} open={sel?.key === "remind"}
+            <CountTile label="Remind today" value={fmtInt(d.unconfirmedTotal)} hint={`Remind today: ${d.unconfirmedTotal}. Press to see the list`} onOpen={() => choose("remind")} open={sel?.key === "remind"}
               sub="Booked, not confirmed, starting within two days. A reminder cuts no-shows." />
           </div>
 
@@ -159,9 +159,9 @@ export function AppointmentsView({ go }: { go: GoFn }) {
           </div>
 
           <Card title="Appointments by status" className="mt-6">
-              <p className="mb-3 text-xs text-muted-foreground">Press a bar to see its appointments.</p>
+              <p className="mb-3 text-xs text-muted-foreground">Appointments that start in the dates chosen above. Press a bar to see them.</p>
               <Distribution title="Appointments by status" rows={rows} noun="appointments" sample={Math.max(1, sc.total)} min={0} need="appointments" onSelect={(i) => choose(`bar:${d.statusOrder.filter((s) => s.key !== "other" || sc.byBucket.other > 0)[i].key}`)} selected={selectedBar >= 0 ? selectedBar : null} />
-              {sc.byBucket.invalid > 0 && <p className="mt-2 text-xs text-muted-foreground">{sc.byBucket.invalid} invalid (spam, test or mistaken), counted here only.</p>}
+              {sc.byBucket.invalid > 0 && <p className="mt-2 text-xs text-muted-foreground">{sc.byBucket.invalid} invalid (spam, test or mistaken) are shown here and counted nowhere else.</p>}
               <Explainer id="status" />
           </Card>
 
@@ -204,7 +204,7 @@ function BreakdownSection({ go, filterQuery }: { go: GoFn; filterQuery: string }
   return (
     <Card title="By calendar, person and client account" className="mt-6">
         <CardRange state={range} label="Calendars, people and accounts" compares={["none"]} maxDays={90} />
-        {range.resolved && <p className="mt-2 text-xs text-muted-foreground" data-testid="breakdown-window">Starting {range.resolved.current.label}.</p>}
+        {range.resolved && <p className="mt-2 text-xs text-muted-foreground" data-testid="breakdown-window">Appointments that start {range.resolved.current.label}. Press a line to see its appointments.</p>}
         {error && <div className="mt-3"><ErrorBox error={error} onRetry={reload} /></div>}
         {!data && !error && <p className="mt-3 text-sm text-muted-foreground">Loading...</p>}
         {data && (

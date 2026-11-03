@@ -92,7 +92,7 @@ describe("the page and its cards say the same plain things everywhere", () => {
     const page = readFileSync("src/app/app/views/speed.tsx", "utf8");
     expect(page).toContain("measuringSentence");
     expect(page).toContain('go("settings")');
-    expect(page).toContain("SubSync measures replies and never sends them");
+    expect(page).toContain("SubSync measures replies; it does not send them");
   });
   it("every card has its own range (KF-4) and a list behind its figures (KF-6)", () => {
     const cards = readFileSync("src/app/app/views/speed-cards.tsx", "utf8");

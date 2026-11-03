@@ -154,13 +154,13 @@ function DetailBody({ row, onLead }: { row: ApptRow; onLead: () => void }) {
             {data.history.map((h, i) => <li key={h.at + "-" + i} className="text-sm"><p>{h.text}</p><p className="text-xs text-muted-foreground">{when(h.at)}</p></li>)}
           </ol>
         )}
-        <p className="mt-2 text-xs text-muted-foreground">History starts when SubSync first saw it.</p>
+        <p className="mt-2 text-xs text-muted-foreground">Your CRM keeps no history, so this only goes back to when SubSync first saw the appointment.</p>
       </section>
       <div className="mt-5 flex flex-wrap gap-2">
         {row.contactId && <Btn variant="primary" onClick={onLead}>See the lead</Btn>}
         {url && data?.contact?.phone && <a href={url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-9 items-center rounded-lg border bg-card px-3 text-sm font-medium hover:border-primary/40">Call in your CRM</a>}
       </div>
-      {url && data?.contact?.phone && <p className="mt-1 text-xs text-muted-foreground">Opens in your CRM to call.</p>}
+      {url && data?.contact?.phone && <p className="mt-1 text-xs text-muted-foreground">Opens this contact in your CRM, where its own dialer places the call.</p>}
       {url && <p className="mt-5 text-xs"><a href={url} target="_blank" rel="noopener noreferrer" className="text-muted-foreground underline underline-offset-4 hover:text-foreground">Open in your CRM</a></p>}
     </>
   );
@@ -219,7 +219,7 @@ export function ApptListPanel({ title, count, rows, showAccount, onBack, empty =
       </div>
       <DataList rows={rows} columns={apptColumns(showAccount)} rowKey={(r) => r.locationId + r.id} total={count} empty={empty} onOpen={(_, i) => setIndex(i)} caption={title}
         copyText={(r) => `${r.name}, ${r.calendar ?? "appointment"}, ${when(r.at)}, ${statusWord(r.status)}${r.noOutcome ? " (no outcome recorded)" : ""}, ${r.assigned}`} />
-      {left > 0 && <p className="mt-1 text-xs text-muted-foreground">Showing the first {rows.length} of {count}.</p>}
+      {left > 0 && <p className="mt-1 text-xs text-muted-foreground">Showing the first {rows.length} of {count}. The number above is the full count.</p>}
       <ApptDrawer rows={rows} index={index} onIndex={setIndex} onClose={() => setIndex(null)} />
     </section>
   );

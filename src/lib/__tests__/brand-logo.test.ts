@@ -37,9 +37,8 @@ test("the shared audit and the emails carry the logo only when it is valid", () 
   assert.match(html, /<img src="https:\/\/cdn\.brand\.io\/l\.png" alt="Ac&quot;me" height="40"/);
   assert.equal(emailLogoHtml("javascript:x", "A"), "");
   assert.match(alertEmail("Acme", [{ severity: "warning", title: "t" }], "https://x.io", undefined, "https://cdn.brand.io/l.png").html, /<img src="https:\/\/cdn\.brand\.io/);
-  assert.match(alertEmail("Acme", [{ severity: "warning", title: "t" }], "https://x.io").html, /<img src="https:\/\/x\.io\/brand\/subsync-logo\.png"/);
-  assert.equal(emailLogoHtml(null, "A"), "");
+  assert.doesNotMatch(alertEmail("Acme", [{ severity: "warning", title: "t" }], "https://x.io").html, /<img/);
   const item = { severity: "warning", title: "t", body: "", details: [], link: { view: null, locationId: null } } as never;
   assert.match(composeEmail([item], { company: "Acme", appUrl: "https://x.io", stopUrl: null, logoUrl: "https://cdn.brand.io/l.png" }).html, /<img/);
-  assert.match(composeEmail([item], { company: "Acme", appUrl: "https://x.io", stopUrl: null }).html, /brand\/subsync-logo\.png/);
+  assert.doesNotMatch(composeEmail([item], { company: "Acme", appUrl: "https://x.io", stopUrl: null }).html, /<img/);
 });

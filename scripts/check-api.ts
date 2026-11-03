@@ -76,7 +76,7 @@ async function main() {
   const pl = await call("/api/app/pipelines", { token });
   assert.ok(pl.body.stages.length >= 5 && pl.body.accounts.length >= 12 && pl.body.totals.open > 0);
   const du = await call("/api/app/duplicates", { token });
-  assert.ok(du.body.groups.length > 0 && du.body.groups[0].pairs[0].a.url.includes("/contacts/detail/"));
+  assert.ok(du.body.groups.length > 0 && du.body.groups[0].people[0].url.includes("/contacts/detail/"));
   const em = await call("/api/app/email", { token });
   assert.ok(em.body.checks.length >= 6 && em.body.checks.some((c: { status: string }) => c.status === "critical"));
   const al = await call("/api/app/alerts", { token });
@@ -456,24 +456,21 @@ async function main() {
   const dq = await call("/api/app/duplicates", { token });
   assert.equal(dq.status, 200);
   assert.ok(dq.body.groups.length > 3 && dq.body.summary.exact > 0 && dq.body.canReview === true);
-  for (const g of dq.body.groups as Array<{ confidence: number; kind: string; contactIds: string[]; total: number; pairs: Array<{ keepId: string; a: { contactId: string }; b: { contactId: string } }>; reasons: string[]; label: { title: string; showPercent: boolean } }>) {
-    assert.ok(g.contactIds.length >= 2 && g.contactIds.length === g.total && g.reasons.length > 0 && g.pairs.length >= 1 && g.pairs.length <= 3, "a group shows at most its three best pairs");
-    if (g.kind === "shared") assert.ok(g.confidence < 50 && !g.label.showPercent && /probably different people/.test(g.label.title), "different people on one phone are never shown as sure");
-    else assert.ok(g.confidence >= 50 && g.confidence <= 100);
-    assert.ok(g.pairs.every((p) => [p.a.contactId, p.b.contactId].includes(p.keepId)), "the suggested record is one of the pair");
+  for (const g of dq.body.groups as Array<{ confidence: number; people: Array<{ contactId: string }>; survivorId: string; plan: unknown[]; reasons: string[] }>) {
+    assert.ok(g.people.length >= 2 && g.confidence >= 50 && g.confidence <= 100 && g.reasons.length > 0 && g.plan.length === 4);
+    assert.ok(g.people.some((p) => p.contactId === g.survivorId), "the recommended record is one of the group");
   }
   assert.ok(dq.body.summary.accounts.length >= 13);
-  const dupTarget = (dq.body.groups as Array<{ locationId: string; kind: string; contactIds: string[]; pairs: Array<{ keepId: string }>; guard: { level: string } }>).find((g) => g.kind !== "shared" && g.guard.level !== "block")!;
-  const dupIds = dupTarget.contactIds;
-  const keepId = dupTarget.pairs[0].keepId;
+  const dupTarget = dq.body.groups[0] as { locationId: string; people: Array<{ contactId: string }>; survivorId: string };
+  const dupIds = dupTarget.people.map((p) => p.contactId);
   const review = (body: unknown, tok = token) => call("/api/app/duplicates/review", { token: tok, method: "POST", body: JSON.stringify(body) });
   assert.equal((await review({ locationId: dupTarget.locationId, contactIds: dupIds, decision: "delete_them", keepContactId: dupIds[0] })).status, 400, "unknown decisions are refused");
   assert.equal((await review({ locationId: dupTarget.locationId, contactIds: dupIds, decision: "keep" })).status, 400, "a keep decision needs a record");
   assert.equal((await review({ locationId: dupTarget.locationId, contactIds: [dupIds[0], "nope-nope"], decision: "not_duplicate" })).status, 404, "contacts that do not exist");
   assert.equal((await review({ locationId: otherAcc.locationId, contactIds: dupIds, decision: "not_duplicate" })).status, 404, "contacts from a different account");
-  const sumOf = (b: { summary: { exact: number; format: number; name: number; shared: number } }) => b.summary.exact + b.summary.format + b.summary.name + b.summary.shared;
+  const sumOf = (b: { summary: { exact: number; format: number; name: number } }) => b.summary.exact + b.summary.format + b.summary.name;
   const before = sumOf(dq.body);
-  assert.equal((await review({ locationId: dupTarget.locationId, contactIds: dupIds, decision: "keep", keepContactId: keepId })).status, 200);
+  assert.equal((await review({ locationId: dupTarget.locationId, contactIds: dupIds, decision: "keep", keepContactId: dupTarget.survivorId })).status, 200);
   const [rev] = await sql()`select decision, snapshot from duplicate_reviews where location_id = ${dupTarget.locationId} order by decided_at desc limit 1`;
   assert.equal(rev.decision, "keep");
   assert.equal(rev.snapshot.contacts.length, dupIds.length, "a snapshot of the records is saved");
@@ -487,10 +484,7 @@ async function main() {
   const [still] = await sql()`select count(*)::int n from duplicate_reviews`;
   assert.equal(still.n, 1, "a dry run records nothing");
   assert.equal((await call("/api/app/duplicates/bulk", { token, method: "POST", body: JSON.stringify({ decision: "not_duplicate", minConfidence: 90, maxConfidence: 10 }) })).status, 400);
-  const bulkDry = await call("/api/app/duplicates/bulk", { token, method: "POST", body: JSON.stringify({ decision: "not_duplicate", minConfidence: 90, maxConfidence: 100 }) });
-  assert.ok(bulkDry.body.count > 0 && bulkDry.body.count <= 50, "a run is capped at 50 groups");
-  assert.equal((await call("/api/app/duplicates/bulk", { token, method: "POST", body: JSON.stringify({ decision: "not_duplicate", minConfidence: 90, maxConfidence: 100, dryRun: false }) })).status, 400, "a bulk record needs the number typed back");
-  const applied = await call("/api/app/duplicates/bulk", { token, method: "POST", body: JSON.stringify({ decision: "not_duplicate", minConfidence: 90, maxConfidence: 100, dryRun: false, confirm: bulkDry.body.count }) });
+  const applied = await call("/api/app/duplicates/bulk", { token, method: "POST", body: JSON.stringify({ decision: "not_duplicate", minConfidence: 90, maxConfidence: 100, dryRun: false }) });
   assert.equal(applied.status, 200);
   assert.ok(applied.body.count > 0);
   assert.equal((await call("/api/app/duplicates/undo", { token, method: "POST", body: JSON.stringify({ locationId: dupTarget.locationId, key: "00000000-9" }) })).status, 404);

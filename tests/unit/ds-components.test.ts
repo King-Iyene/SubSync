@@ -89,10 +89,10 @@ describe("empty, loading and tips", () => {
 });
 
 describe("page template and tabs", () => {
-  it("the page has one h1, a one-sentence subtitle and its actions", () => {
+  it("the page has one h1, a clamped subtitle and its actions", () => {
     const m = html(el(Page, { title: "Speed to lead", subtitle: "How fast.", actions: el("button", null, "Go") }, el("p", null, "body")));
     expect(m.match(/<h1/g)).toHaveLength(1);
-    expect(m).toContain("page-subtitle");
+    expect(m).toContain("line-clamp-2");
     expect(m).toContain("<button>Go</button>");
     expect(m).toContain("body");
   });

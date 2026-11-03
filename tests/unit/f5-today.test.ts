@@ -81,7 +81,7 @@ describe("Today", () => {
     const m = html(el(ApiProvider, { value: fake() }, el(TodayView, { go })));
     expect(m).toContain("<h1");
     expect(m).toContain("Today");
-    expect(m).toContain("Every client account, checked for leads waiting, missed appointments and stalled deals.");
+    expect(m).toContain("Every client account, checked for leads waiting, missed appointments and stalled deals. Start at the top.");
     expect(m).toContain('data-testid="front-door"');
     expect(m).toContain('data-testid="leads-headline"');
     expect(m).toContain("Checking for leads waiting for a reply...");

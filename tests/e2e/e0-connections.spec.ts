@@ -17,7 +17,7 @@ async function openConnections(page: Page) {
 test("the page has a section for me and a section for admins, and a plain how-to that can be dismissed", async ({ page }) => {
   await openConnections(page);
   await expect(page.getByRole("heading", { name: "Team connections (admins)", exact: true })).toBeVisible();
-  await expect(page.getByTestId("how-to")).toContainText("A connection is yours alone");
+  await expect(page.getByTestId("how-to")).toContainText("a connection is yours");
   await page.getByRole("button", { name: "Hide this tip" }).click();
   await expect(page.getByTestId("how-to")).toHaveCount(0);
 });

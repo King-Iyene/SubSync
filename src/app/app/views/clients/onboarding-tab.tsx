@@ -229,7 +229,7 @@ export function OnboardingTab({ go }: { go: GoFn }) {
     <div>
       <datalist id={PEOPLE_LIST}>{(data.people ?? []).map((p) => <option key={p} value={p} />)}</datalist>
       <HowTo id="clients-onboarding" title="How onboarding works" action={<button type="button" onClick={() => go("help")} className="text-xs font-medium text-primary underline">More in Getting started</button>}>
-        Open a checklist. SubSync ticks what it can. Press <strong>Fix it</strong> for anything unfinished.
+        Open a client&apos;s checklist. SubSync ticks what it can check itself (pipeline, contacts, calendar, profile, email sending). For anything unfinished, press <strong>Fix it</strong> to open the right page in your CRM, or <strong>How to</strong> for the steps. Give a step to someone and set a due date to keep it moving.
       </HowTo>
 
       <Section title="Clients stuck in onboarding" hint="Not fully set up long after they were added."

@@ -1,55 +1,46 @@
 "use client";
 
 import { useState } from "react";
-import { HowTo, InlineAlert, Section } from "../ds";
 import { useApiClient, useData } from "../session";
-import { Badge, Btn, Empty, ErrorBox, ExtLink, fmtInt, inputClass, Loading, timeAgo } from "../ui";
+import { Badge, Btn, Card, Empty, ErrorBox, ExtLink, fmtInt, Loading, PageHeader, Stat, timeAgo } from "../ui";
 
-// Clean-up, Duplicates tab (stage C2). Three steps per pair: pick the contact to keep, check the differences, merge in your CRM.
-// SubSync never merges or deletes. It records what you decided and checks again later.
-
-type PersonUi = {
-  contactId: string; name: string; email: string | null; phone: string | null; tags: string[]; createdAt: string | null; lastActivityAt: string | null; source: string | null;
-  openDeals: number; wonDeals: number; upcomingAppointments: number; hasConversation: boolean; dnd: boolean; url: string;
+type Person = {
+  contactId: string; name: string; email: string | null; phone: string | null; tags: string[]; createdAt: string | null;
+  lastActivityAt: string | null; source: string | null; openDeals: number; wonDeals: number; hasConversation: boolean; url: string;
 };
-type Guard = { level: "ok" | "warn" | "block"; blocks: string[]; warnings: string[] };
-type Pair = {
-  score: number; reasons: string[]; keepId: string; keepReason: string; a: PersonUi; b: PersonUi; guards: Record<string, Guard>;
-  differences: Array<{ field: string; values: [string | null, string | null]; differs: boolean }>;
-};
+type Choice = { field: string; keep: string; from: string; others: string[] };
 type Group = {
-  key: string; locationId: string; locationName: string | null; confidence: number; kind: "exact" | "format" | "name" | "shared";
-  label: { title: string; line: string; tone: "good" | "warn" | "neutral"; showPercent: boolean }; reasons: string[]; total: number; contactIds: string[];
-  guard: Guard; pairs: Pair[]; review: { decision: string; keepContactId: string | null; decidedAt: string | null } | null; recheck: boolean;
+  key: string; locationId: string; locationName: string | null; confidence: number; reasons: string[]; kind: "exact" | "format" | "name";
+  survivorId: string; plan: Choice[]; people: Person[]; review: { decision: string; keepContactId: string | null; decidedAt: string | null } | null;
 };
 type Data = {
-  summary: { exact: number; format: number; name: number; shared: number; contacts: number; reviewed: number; accounts: Array<{ locationId: string; name: string | null; groups: number; contacts: number; allowDuplicates: boolean | null }> };
-  truncated: boolean; canReview: boolean; total: number; groups: Group[];
-  source: { total: number; line: string; days: Array<{ day: string; count: number; share: number; looksLikeImport: boolean }>; sources: Array<{ source: string; count: number }> };
+  summary: { exact: number; format: number; name: number; contacts: number; reviewed: number; accounts: Array<{ locationId: string; name: string | null; groups: number; contacts: number; allowDuplicates: boolean | null }> };
+  truncated: boolean; canReview: boolean; groups: Group[];
 };
-type Preview = { dryRun: true; count: number; contacts: number };
+type Preview = { dryRun: true; count: number; contacts: number; sample: Array<{ locationName: string | null; confidence: number; reasons: string[]; names: string[] }> };
 
-const PAGE = 10;
+const tone = (c: number) => (c >= 90 ? "bad" : c >= 75 ? "warn" : "neutral") as "bad" | "warn" | "neutral";
+const KIND_LABEL = { exact: "Exact match", format: "Same, written differently", name: "Name only" } as const;
 
 export function DuplicatesView() {
   const api = useApiClient();
-  const [kind, setKind] = useState<"" | "likely" | "shared">("");
-  const [account, setAccount] = useState("");
   const [showReviewed, setShowReviewed] = useState(false);
-  const qs = [kind && `kind=${kind}`, account && `account=${encodeURIComponent(account)}`, showReviewed && "reviewed=1"].filter(Boolean).join("&");
-  const { data, error, loading, reload } = useData<Data>(`duplicates${qs ? `?${qs}` : ""}`);
-  const [open, setOpen] = useState<string | null>(null);
-  const [shown, setShown] = useState(PAGE);
+  const { data, error, loading, reload } = useData<Data>(`duplicates${showReviewed ? "?reviewed=1" : ""}`);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [keep, setKeep] = useState<Record<string, string>>({});
+  const [range, setRange] = useState<"high" | "mid" | "low">("high");
+  const [bulkAction, setBulkAction] = useState<"keep" | "not_duplicate">("keep");
   const [preview, setPreview] = useState<Preview | null>(null);
-  const [confirm, setConfirm] = useState("");
+  const [page, setPage] = useState(0);
+  const [open, setOpen] = useState<Record<string, boolean>>({});
+  const [q, setQ] = useState("");
 
   if (loading && !data) return <Loading label="Checking contacts for duplicates..." />;
   if (error) return <ErrorBox error={error} onRetry={reload} />;
   if (!data) return null;
   const s = data.summary;
-  const likely = s.exact + s.format + s.name;
+  const bounds = { high: [90, 100], mid: [75, 89], low: [0, 74] }[range];
 
   const run = async (fn: () => Promise<unknown>, done: string) => {
     setBusy(true);
@@ -58,7 +49,6 @@ export function DuplicatesView() {
       await fn();
       setMsg({ ok: true, text: done });
       setPreview(null);
-      setConfirm("");
       await reload();
     } catch (e) {
       setMsg({ ok: false, text: (e as Error).message });
@@ -66,225 +56,231 @@ export function DuplicatesView() {
       setBusy(false);
     }
   };
-  const decide = (g: Group, decision: "not_duplicate" | "merged_in_platform", keepId: string | null, text: string) =>
-    run(() => api.post("duplicates/review", { locationId: g.locationId, contactIds: g.contactIds, decision, keepContactId: keepId }), text);
-  const bulkBody = (dryRun: boolean) => ({ decision: "not_duplicate", kind: "shared", minConfidence: 0, maxConfidence: 100, dryRun, ...(dryRun ? {} : { confirm: Number(confirm) }) });
-  const visible = data.groups.slice(0, shown);
+
+  const decide = (g: Group, decision: "keep" | "not_duplicate" | "merged_in_platform", text: string) =>
+    run(() => api.post("duplicates/review", { locationId: g.locationId, contactIds: g.people.map((p) => p.contactId), decision, keepContactId: decision === "not_duplicate" ? null : keep[g.key] ?? g.survivorId }), text);
+
+  // One row per name in each account, with how many groups and records sit behind it. The detail only
+  // appears when a row is opened, so a big account no longer prints thousands of cards.
+  const nameOf = (g: Group) => (g.people.find((p) => p.contactId === g.survivorId) ?? g.people[0])?.name?.trim() || "No name";
+  const byName = new Map<string, { key: string; name: string; locationName: string | null; groups: Group[]; records: number; top: number; reviewed: number }>();
+  for (const g of data.groups) {
+    const norm = nameOf(g).toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    const key = g.locationId + "|" + norm;
+    const row = byName.get(key) ?? { key, name: nameOf(g), locationName: g.locationName, groups: [], records: 0, top: 0, reviewed: 0 };
+    row.groups.push(g);
+    row.records += g.people.length;
+    row.top = Math.max(row.top, g.confidence);
+    if (g.review) row.reviewed += 1;
+    byName.set(key, row);
+  }
+  const needle = q.trim().toLowerCase();
+  const rows = [...byName.values()]
+    .filter((r) => !needle || r.name.toLowerCase().includes(needle) || (r.locationName ?? "").toLowerCase().includes(needle))
+    .sort((a, b) => b.top - a.top || b.records - a.records || a.name.localeCompare(b.name));
+  const PAGE = 20;
+  const pages = Math.max(1, Math.ceil(rows.length / PAGE));
+  const at = Math.min(page, pages - 1);
+  const pageRows = rows.slice(at * PAGE, at * PAGE + PAGE);
+
+  const bulkBody = (dryRun: boolean) => ({ decision: bulkAction, minConfidence: bounds[0], maxConfidence: bounds[1], dryRun });
 
   return (
     <div>
+      <PageHeader
+        title="Duplicate contacts"
+        subtitle="Likely duplicates inside each client account, scored by how sure we are, with a recommended record to keep. SubSync never changes your contacts: you merge in the platform, and we record what you decided."
+        actions={<Btn onClick={() => api.download("export/duplicates", "subsync-duplicates.csv")}>Export CSV</Btn>}
+      />
       {msg && <p className={`mb-4 rounded-lg border px-3 py-2 text-sm ${msg.ok ? "bg-muted/40" : "border-red-300 bg-red-50 text-red-800"}`} role={msg.ok ? "status" : "alert"}>{msg.text}</p>}
 
-      <Section title={`${fmtInt(likely)} group${likely === 1 ? "" : "s"} that may be the same person`} hint={s.shared > 0 ? `${fmtInt(s.shared)} more share a phone or email but look like different people.` : undefined}
-        action={<Btn onClick={() => api.download("export/duplicates", "subsync-duplicates.csv")}>Export list</Btn>}>
-        <div className="flex flex-wrap items-end gap-3 text-sm">
-          <label className="block">
-            <span className="mb-1 block text-xs text-muted-foreground">Show</span>
-            <select className={inputClass} value={kind} onChange={(e) => { setKind(e.target.value as typeof kind); setShown(PAGE); setOpen(null); }}>
-              <option value="">Everything</option>
-              <option value="likely">Likely the same person</option>
-              <option value="shared">Probably different people</option>
-            </select>
-          </label>
-          {s.accounts.length > 1 && (
+      <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-3">
+        <Stat label="Exact matches" value={fmtInt(s.exact)} sub="same email or phone" tone={s.exact > 0 ? "bad" : undefined} />
+        <Stat label="Written differently" value={fmtInt(s.format)} sub="phone format, email case" tone={s.format > 0 ? "warn" : undefined} />
+        <Stat label="Contacts involved" value={fmtInt(s.contacts)} sub={`${s.reviewed} groups already reviewed`} />
+      </div>
+
+      <Card title="Is duplicate protection on?" className="mb-6">
+        <p className="mb-3 text-sm text-muted-foreground">
+          When a client account blocks duplicates, a new contact with an existing email or phone is merged into the old one instead of creating a second record. Old duplicates from before it was switched on, or from imports, stay until merged.
+        </p>
+        <ul className="divide-y text-sm">
+          {s.accounts.map((a) => (
+            <li key={a.locationId} className="flex flex-wrap items-center justify-between gap-2 py-2">
+              <span className="font-medium">{a.name ?? "Unnamed account"}</span>
+              <span className="flex items-center gap-3">
+                <span className="text-muted-foreground">{a.groups} group{a.groups === 1 ? "" : "s"} · {fmtInt(a.contacts)} contacts</span>
+                {a.allowDuplicates === null ? <Badge>Setting not shown by the platform</Badge> : a.allowDuplicates ? <Badge tone="bad">Duplicates allowed</Badge> : <Badge tone="good">Blocking duplicates</Badge>}
+              </span>
+            </li>
+          ))}
+        </ul>
+        <p className="mt-3 text-xs text-muted-foreground">
+          To block new duplicates in a client account: open it, go to Settings, then Business Profile (General), and switch off &quot;Allow Duplicate Contact&quot;. Do this for every account that shows exact matches above.
+        </p>
+      </Card>
+
+      {data.canReview && data.groups.some((g) => !g.review) && (
+        <Card title="Bulk actions (preview first)" className="mb-6">
+          <div className="flex flex-wrap items-end gap-3 text-sm">
             <label className="block">
-              <span className="mb-1 block text-xs text-muted-foreground">Client account</span>
-              <select className={inputClass} value={account} onChange={(e) => { setAccount(e.target.value); setShown(PAGE); setOpen(null); }}>
-                <option value="">All accounts</option>
-                {s.accounts.filter((a) => a.groups > 0).map((a) => <option key={a.locationId} value={a.locationId}>{a.name ?? "Unnamed account"}</option>)}
+              <span className="mb-1 block text-xs text-muted-foreground">Groups with confidence</span>
+              <select className="rounded-lg border bg-background px-3 py-2" value={range} onChange={(e) => { setRange(e.target.value as typeof range); setPreview(null); }}>
+                <option value="high">90 to 100 (exact)</option>
+                <option value="mid">75 to 89 (written differently)</option>
+                <option value="low">Below 75 (weak hints)</option>
               </select>
             </label>
-          )}
-          <label className="flex items-center gap-2 pb-2 text-xs text-muted-foreground">
-            <input type="checkbox" className="size-4" checked={showReviewed} onChange={(e) => setShowReviewed(e.target.checked)} /> Show groups I already checked
-          </label>
-        </div>
-        <HowTo id="c2-dupes" title="How merging works">
-          <p>1. Pick the contact to keep. 2. Check what is different. 3. Merge in your CRM.</p>
-          <p>SubSync does not change your contacts. It tells you what it found and remembers what you decided.</p>
-        </HowTo>
-      </Section>
-
-      <Section title="Groups to check" hint={data.truncated ? "This account is large. The biggest groups come first." : undefined}>
-        {visible.length === 0 ? (
-          <Empty title="Nothing to check" body="No two contacts look like the same person, or you have checked them all." />
-        ) : (
-          <ul className="divide-y rounded-xl border bg-card" data-testid="dupe-groups">
-            {visible.map((g) => (
-              <GroupRow key={g.locationId + g.key} g={g} isOpen={open === g.locationId + g.key} onToggle={() => setOpen(open === g.locationId + g.key ? null : g.locationId + g.key)}
-                canReview={data.canReview} busy={busy} onDecide={decide}
-                onUndo={() => run(() => api.post("duplicates/undo", { locationId: g.locationId, key: g.key }), "Done. The group is back in the list.")} />
-            ))}
-          </ul>
-        )}
-        {data.groups.length > shown && (
-          <div className="mt-3 flex items-center justify-between text-sm">
-            <span className="text-xs text-muted-foreground">Showing {shown} of {fmtInt(data.total)}</span>
-            <Btn variant="secondary" onClick={() => setShown(shown + PAGE)}>Show more</Btn>
+            <label className="block">
+              <span className="mb-1 block text-xs text-muted-foreground">Record this decision</span>
+              <select className="rounded-lg border bg-background px-3 py-2" value={bulkAction} onChange={(e) => { setBulkAction(e.target.value as typeof bulkAction); setPreview(null); }}>
+                <option value="keep">Accept the recommended record to keep</option>
+                <option value="not_duplicate">These are not duplicates</option>
+              </select>
+            </label>
+            <Btn disabled={busy} onClick={async () => { setBusy(true); try { setPreview(await api.post<Preview>("duplicates/bulk", bulkBody(true))); setMsg(null); } catch (e) { setMsg({ ok: false, text: (e as Error).message }); } finally { setBusy(false); } }}>Preview</Btn>
           </div>
-        )}
-      </Section>
-
-      {data.source.total > 0 && (
-        <Section title="Where they came from" hint={data.source.line}>
-          <ul className="space-y-1 text-sm">
-            {data.source.days.slice(0, 3).map((d) => <li key={d.day}>{d.day}: {fmtInt(d.count)} record{d.count === 1 ? "" : "s"}{d.looksLikeImport ? " (looks like an import)" : ""}</li>)}
-            {data.source.sources.slice(0, 2).map((x) => <li key={x.source} className="text-muted-foreground">Source &quot;{x.source}&quot;: {fmtInt(x.count)} records</li>)}
-          </ul>
-        </Section>
-      )}
-
-      {data.canReview && s.shared > 0 && (
-        <Section title="Clear the lists of different people" hint="This only changes SubSync's own notes. Your contacts stay as they are. At most 50 groups at a time.">
-          <div className="flex flex-wrap items-center gap-3 text-sm">
-            <Btn disabled={busy} onClick={async () => { setBusy(true); try { setPreview(await api.post<Preview>("duplicates/bulk", bulkBody(true))); setMsg(null); } catch (e) { setMsg({ ok: false, text: (e as Error).message }); } finally { setBusy(false); } }}>Count them</Btn>
-            {preview && (preview.count === 0 ? <span>Nothing to clear.</span> : (
-              <>
-                <span>{fmtInt(preview.count)} group{preview.count === 1 ? "" : "s"} ({fmtInt(preview.contacts)} contacts).</span>
-                <label className="flex items-center gap-2"><span className="text-xs text-muted-foreground">Type {preview.count} to confirm</span><input className={`${inputClass} w-24`} inputMode="numeric" value={confirm} onChange={(e) => setConfirm(e.target.value)} /></label>
-                <Btn variant="primary" disabled={busy || Number(confirm) !== preview.count} onClick={() => run(() => api.post("duplicates/bulk", bulkBody(false)), `Done. ${preview.count} group${preview.count === 1 ? "" : "s"} marked as different people.`)}>Mark as different people</Btn>
-              </>
-            ))}
-          </div>
-        </Section>
-      )}
-    </div>
-  );
-}
-
-function GroupRow({ g, isOpen, onToggle, canReview, busy, onDecide, onUndo }: {
-  g: Group; isOpen: boolean; onToggle: () => void; canReview: boolean; busy: boolean;
-  onDecide: (g: Group, d: "not_duplicate" | "merged_in_platform", keep: string | null, text: string) => void; onUndo: () => void;
-}) {
-  const done = g.review && !g.recheck;
-  return (
-    <li>
-      <button type="button" aria-expanded={isOpen} onClick={onToggle} className="flex w-full flex-wrap items-center justify-between gap-2 px-4 py-3 text-left text-sm transition-colors hover:bg-muted/40">
-        <span className="min-w-0">
-          <span className="font-medium">{g.label.title}</span>
-          <span className="block text-xs text-muted-foreground">{g.locationName ?? "Unnamed account"} · {fmtInt(g.total)} records{g.label.showPercent ? ` · ${g.confidence}% sure` : ""}</span>
-        </span>
-        <span className="flex items-center gap-2">
-          {g.guard.level === "block" && g.kind !== "shared" && <Badge tone="warn">Leave for now</Badge>}
-          {g.recheck && <Badge tone="warn">Still here</Badge>}
-          {done && <Badge tone="good">{g.review!.decision === "not_duplicate" ? "Different people" : "Merged in your CRM"}{g.review!.decidedAt ? ` ${timeAgo(g.review!.decidedAt)}` : ""}</Badge>}
-          <span aria-hidden className="text-muted-foreground">{isOpen ? "Hide" : "Open"}</span>
-        </span>
-      </button>
-      {isOpen && <GroupDetail g={g} done={!!done} canReview={canReview} busy={busy} onDecide={onDecide} onUndo={onUndo} />}
-    </li>
-  );
-}
-
-function GroupDetail({ g, done, canReview, busy, onDecide, onUndo }: {
-  g: Group; done: boolean; canReview: boolean; busy: boolean;
-  onDecide: (g: Group, d: "not_duplicate" | "merged_in_platform", keep: string | null, text: string) => void; onUndo: () => void;
-}) {
-  const api = useApiClient();
-  const [all, setAll] = useState<PersonUi[] | null>(null);
-  const [allErr, setAllErr] = useState<string | null>(null);
-  const [keepBy, setKeepBy] = useState<Record<number, string>>({});
-  const shared = g.kind === "shared";
-  const seeAll = async () => {
-    try {
-      setAll((await api.get<{ people: PersonUi[] }>(`duplicates/group?locationId=${encodeURIComponent(g.locationId)}&key=${encodeURIComponent(g.key)}`)).people);
-    } catch (e) {
-      setAllErr((e as Error).message);
-    }
-  };
-  return (
-    <div className="space-y-4 border-t bg-muted/20 p-4">
-      <p className="text-sm">{g.label.line}</p>
-      {g.recheck && <InlineAlert tone="warning" title="You said you merged these">They are still listed. Check your CRM, or tell us they are different people.</InlineAlert>}
-      {g.guard.level === "block" && g.guard.blocks.map((b) => <InlineAlert key={b} tone="warning">{b}</InlineAlert>)}
-      {g.pairs.map((p, i) => {
-        const keepId = keepBy[i] ?? p.keepId;
-        const guard = p.guards[keepId] ?? { level: "ok", blocks: [], warnings: [] };
-        const other = keepId === p.a.contactId ? p.b : p.a;
-        const kept = keepId === p.a.contactId ? p.a : p.b;
-        return (
-          <div key={p.a.contactId + p.b.contactId} className="rounded-xl border bg-card p-4" data-testid="dupe-pair">
-            <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">Pair {i + 1} of {g.pairs.length}{!shared ? ` · ${p.score}% sure` : ""}</p>
-            {!shared && (
-              <>
-                <h3 className="mb-2 text-sm font-semibold">1. Pick the contact to keep</h3>
-                <div className="mb-4 grid gap-2 md:grid-cols-2">
-                  {[p.a, p.b].map((x) => (
-                    <label key={x.contactId} className={`flex cursor-pointer items-start gap-2 rounded-lg border p-3 text-sm ${keepId === x.contactId ? "border-primary bg-primary/5" : ""}`}>
-                      <input type="radio" className="mt-0.5 size-4" name={`keep-${g.key}-${i}`} checked={keepId === x.contactId} disabled={!canReview || done} onChange={() => setKeepBy({ ...keepBy, [i]: x.contactId })} />
-                      <span className="min-w-0">
-                        <span className="block font-medium">Keep {x.name}</span>
-                        <span className="block truncate text-xs text-muted-foreground">{x.email ?? x.phone ?? "No email or phone"}{x.createdAt ? `, added ${timeAgo(x.createdAt)}` : ""}</span>
-                        {x.contactId === p.keepId && <span className="block text-xs text-muted-foreground">Suggested. {p.keepReason}.</span>}
-                      </span>
-                    </label>
-                  ))}
-                </div>
-                <h3 className="mb-2 text-sm font-semibold">2. Check the differences</h3>
-              </>
-            )}
-            <div className="grid gap-3 md:grid-cols-2">
-              {[p.a, p.b].map((x) => <RecordCard key={x.contactId} x={x} />)}
+          {preview && (
+            <div className="mt-4 rounded-lg border bg-muted/30 p-3 text-sm">
+              <p className="font-medium">{preview.count === 0 ? "Nothing matches this range." : `${preview.count} group${preview.count === 1 ? "" : "s"} (${fmtInt(preview.contacts)} contacts) would be recorded. Nothing in your contacts changes.`}</p>
+              <ul className="mt-2 space-y-1 text-muted-foreground">
+                {preview.sample.map((x, i) => <li key={i}>{x.locationName}: {x.names.join(" / ")} <span className="text-xs">({x.confidence}% · {x.reasons.join(", ")})</span></li>)}
+              </ul>
+              {preview.count > 0 && (
+                <div className="mt-3"><Btn variant="primary" disabled={busy} onClick={() => run(() => api.post("duplicates/bulk", bulkBody(false)), `Recorded ${preview.count} decision${preview.count === 1 ? "" : "s"}. You can undo any of them below.`)}>
+                  Confirm and record {preview.count}
+                </Btn></div>
+              )}
             </div>
-            {!shared && (
-              <p className="mt-2 text-xs text-muted-foreground">
-                {p.differences.filter((d) => d.differs).length === 0 ? "Name, email and phone match." : `Different: ${p.differences.filter((d) => d.differs).map((d) => d.field.toLowerCase()).join(", ")}.`}
-              </p>
-            )}
-            {!shared && guard.blocks.map((b) => <p key={b} className="mt-2 text-sm font-medium text-red-700" role="alert">{b}</p>)}
-            {!shared && guard.warnings.length > 0 && guard.level === "warn" && <p className="mt-2 text-sm text-amber-800">{guard.warnings.join(" ")} Check before you merge.</p>}
-            {!shared && guard.level !== "block" && (
-              <>
-                <h3 className="mb-2 mt-4 text-sm font-semibold">3. Merge in your CRM</h3>
-                <p className="mb-2 text-xs text-muted-foreground">Open both. In your CRM, tick both people in Contacts and choose Merge. Keep {kept.name}. Check payments there first, SubSync cannot see them.</p>
-                <div className="flex flex-wrap items-center gap-3">
-                  <Btn variant="primary" onClick={() => { window.open(kept.url, "_blank", "noopener,noreferrer"); window.open(other.url, "_blank", "noopener,noreferrer"); }}>Open both in your CRM</Btn>
-                  <ExtLink href={kept.url}>{kept.name}</ExtLink>
-                  <ExtLink href={other.url}>{other.name}</ExtLink>
-                </div>
-              </>
-            )}
-          </div>
-        );
-      })}
-      {g.total > 3 ? (
-        <div>
-          {all === null ? <Btn variant="secondary" onClick={seeAll}>See all {fmtInt(g.total)}</Btn> : (
-            <ul className="max-h-72 divide-y overflow-y-auto rounded-lg border bg-card text-sm">
-              {all.map((x) => <li key={x.contactId} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2"><span className="min-w-0 truncate">{x.name}<span className="text-xs text-muted-foreground"> {x.email ?? ""} {x.phone ?? ""}</span></span><ExtLink href={x.url}>Open</ExtLink></li>)}
-            </ul>
           )}
-          {allErr && <p className="mt-1 text-xs text-red-700">{allErr}</p>}
-        </div>
-      ) : null}
-      {canReview && (
-        <div className="flex flex-wrap gap-2 border-t pt-3">
-          {!done ? (
-            <>
-              {!shared && g.guard.level !== "block" && <Btn disabled={busy} onClick={() => onDecide(g, "merged_in_platform", keepBy[0] ?? g.pairs[0]?.keepId ?? null, "Saved. We will check again tomorrow that it went through.")}>I merged them in my CRM</Btn>}
-              <Btn variant={shared ? "primary" : "ghost"} disabled={busy} onClick={() => onDecide(g, "not_duplicate", null, "Saved. These will not be flagged again.")}>These are different people</Btn>
-            </>
-          ) : <Btn variant="ghost" disabled={busy} onClick={onUndo}>Undo my answer</Btn>}
+        </Card>
+      )}
+
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="text-base font-semibold">Review queue</h2>
+        <label className="flex items-center gap-2 text-sm text-muted-foreground">
+          <input type="checkbox" className="size-4" checked={showReviewed} onChange={(e) => setShowReviewed(e.target.checked)} /> Show reviewed groups
+        </label>
+      </div>
+      {data.truncated && <p className="mb-3 text-xs text-muted-foreground">This account is very large, so we are showing the biggest groups first.</p>}
+
+      {data.groups.length === 0 ? (
+        <Empty title="Nothing to review" body="No two contacts in the same account look like the same person, or you have reviewed them all." />
+      ) : (
+        <div>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <input className="w-full max-w-xs rounded-lg border bg-card px-3 py-2 text-sm shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/30" placeholder="Find a name or account" aria-label="Find a name or account" value={q} onChange={(e) => { setQ(e.target.value); setPage(0); }} />
+            <span className="text-xs text-muted-foreground">{fmtInt(rows.length)} name{rows.length === 1 ? "" : "s"} · {fmtInt(data.groups.length)} group{data.groups.length === 1 ? "" : "s"}</span>
+          </div>
+          {rows.length === 0 ? <Empty title="No match" body="Nothing in the queue matches that search." /> : (
+          <ul className="divide-y rounded-xl border bg-card">
+            {pageRows.map((row) => (
+              <li key={row.key}>
+                <button type="button" aria-expanded={!!open[row.key]} onClick={() => setOpen({ ...open, [row.key]: !open[row.key] })}
+                  className="flex w-full flex-wrap items-center justify-between gap-2 px-4 py-3 text-left text-sm transition-colors hover:bg-muted/40">
+                  <span className="min-w-0">
+                    <span className="font-medium">{row.name}</span>
+                    <span className="text-muted-foreground"> · {row.locationName ?? "Unnamed account"}</span>
+                  </span>
+                  <span className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs text-muted-foreground">{row.groups.length > 1 ? `${row.groups.length} groups, ` : ""}{row.records} records</span>
+                    <Badge tone={tone(row.top)}>{row.top}% sure</Badge>
+                    {row.reviewed > 0 && <Badge tone="good">{row.reviewed === row.groups.length ? "Reviewed" : `${row.reviewed} reviewed`}</Badge>}
+                    <span aria-hidden className="text-muted-foreground">{open[row.key] ? "Hide" : "Review"}</span>
+                  </span>
+                </button>
+                {open[row.key] && (
+          <ul className="space-y-4 border-t bg-muted/20 p-3">
+          {row.groups.map((g) => {
+            const chosen = keep[g.key] ?? g.review?.keepContactId ?? g.survivorId;
+            return (
+              <li key={g.locationId + g.key} className="rounded-xl border bg-card p-4">
+                <div className="mb-3 flex flex-wrap items-center gap-2">
+                  <span className="font-medium">{g.locationName ?? "Unnamed account"}</span>
+                  <Badge tone={tone(g.confidence)}>{g.confidence}% sure</Badge>
+                  <Badge>{KIND_LABEL[g.kind]}</Badge>
+                  <span className="text-xs text-muted-foreground">{g.reasons.join(" · ")}</span>
+                  {g.review && <Badge tone="good">{g.review.decision === "not_duplicate" ? "Marked not duplicates" : g.review.decision === "merged_in_platform" ? "Merged in the platform" : "Record to keep chosen"} {g.review.decidedAt ? timeAgo(g.review.decidedAt) : ""}</Badge>}
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[520px] text-sm">
+                    <thead>
+                      <tr className="text-left text-xs text-muted-foreground">
+                        <th className="w-28 py-1 pr-2 font-normal">{""}</th>
+                        {g.people.map((p) => (
+                          <th key={p.contactId} className="py-1 pr-3 font-normal">
+                            <label className="flex items-center gap-2">
+                              <input type="radio" name={g.locationId + g.key} className="size-4" checked={chosen === p.contactId} disabled={!data.canReview} onChange={() => setKeep({ ...keep, [g.key]: p.contactId })} />
+                              <span className="font-medium text-foreground">{chosen === p.contactId ? "Keep this one" : "Merge into kept"}</span>
+                              {p.contactId === g.survivorId && <Badge tone="info">Recommended</Badge>}
+                            </label>
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {([
+                        ["Name", (p: Person) => p.name],
+                        ["Email", (p: Person) => p.email ?? "none"],
+                        ["Phone", (p: Person) => p.phone ?? "none"],
+                        ["Tags", (p: Person) => (p.tags.length ? p.tags.join(", ") : "none")],
+                        ["Added", (p: Person) => (p.createdAt ? timeAgo(p.createdAt) : "unknown")],
+                        ["Last activity", (p: Person) => (p.lastActivityAt ? timeAgo(p.lastActivityAt) : "none")],
+                        ["Deals", (p: Person) => `${p.openDeals} open · ${p.wonDeals} won`],
+                        ["Conversation", (p: Person) => (p.hasConversation ? "yes" : "no")],
+                      ] as Array<[string, (p: Person) => string]>).map(([label, get]) => (
+                        <tr key={label}>
+                          <td className="py-1.5 pr-2 text-xs text-muted-foreground">{label}</td>
+                          {g.people.map((p) => <td key={p.contactId} className="py-1.5 pr-3">{get(p)}</td>)}
+                        </tr>
+                      ))}
+                      <tr>
+                        <td className="py-1.5 pr-2 text-xs text-muted-foreground">Open</td>
+                        {g.people.map((p) => <td key={p.contactId} className="py-1.5 pr-3"><ExtLink href={p.url}>In the platform</ExtLink></td>)}
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div className="mt-3 rounded-lg bg-muted/40 p-3 text-xs text-muted-foreground">
+                  <p className="mb-1 font-medium text-foreground">After merging, the kept record should have:</p>
+                  <ul className="grid gap-x-6 sm:grid-cols-2">
+                    {g.plan.map((f) => <li key={f.field}><span className="capitalize">{f.field}</span>: {f.keep || "empty"}{f.others.length ? ` (also seen: ${f.others.join(", ")})` : ""}</li>)}
+                  </ul>
+                  <p className="mt-2">To merge: open the contact to keep, or select the contacts in the platform&apos;s Contacts list, and use its own Merge option. It keeps the history of both. SubSync cannot merge for you, because the platform offers no safe way to do it from outside.</p>
+                </div>
+                {data.canReview && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {!g.review ? (
+                      <>
+                        <Btn disabled={busy} onClick={() => decide(g, "merged_in_platform", "Recorded as merged. Refresh after the next sync and it will drop off the list.")}>I merged these in the platform</Btn>
+                        <Btn disabled={busy} onClick={() => decide(g, "keep", "Recorded your choice of record to keep.")}>Save this record to keep</Btn>
+                        <Btn variant="ghost" disabled={busy} onClick={() => decide(g, "not_duplicate", "Marked as not duplicates. They will not be flagged again.")}>Not duplicates</Btn>
+                      </>
+                    ) : (
+                      <Btn variant="ghost" disabled={busy} onClick={() => run(() => api.post("duplicates/undo", { locationId: g.locationId, key: g.key }), "Decision removed. The group is back in the queue.")}>Undo this decision</Btn>
+                    )}
+                  </div>
+                )}
+              </li>
+            );
+          })}
+          </ul>
+                )}
+              </li>
+            ))}
+          </ul>
+          )}
+          {pages > 1 && (
+            <div className="mt-3 flex items-center justify-between text-sm">
+              <span className="text-xs text-muted-foreground">Showing {at * PAGE + 1} to {Math.min(rows.length, at * PAGE + PAGE)} of {fmtInt(rows.length)}</span>
+              <span className="flex gap-2">
+                <Btn variant="secondary" disabled={at === 0} onClick={() => setPage(at - 1)}>Previous</Btn>
+                <Btn variant="secondary" disabled={at >= pages - 1} onClick={() => setPage(at + 1)}>Next</Btn>
+              </span>
+            </div>
+          )}
         </div>
       )}
-    </div>
-  );
-}
-
-function RecordCard({ x }: { x: PersonUi }) {
-  return (
-    <div className="min-w-0 rounded-lg border p-3 text-sm">
-      <p className="truncate font-medium">{x.name}</p>
-      {x.dnd && <p className="text-xs font-semibold text-amber-800">Do not disturb</p>}
-      <dl className="mt-1 grid grid-cols-[5.5rem_minmax(0,1fr)] gap-x-2 gap-y-0.5 text-xs">
-        <dt className="text-muted-foreground">Email</dt><dd className="truncate">{x.email ?? "none"}</dd>
-        <dt className="text-muted-foreground">Phone</dt><dd className="truncate">{x.phone ?? "none"}</dd>
-        <dt className="text-muted-foreground">Added</dt><dd>{x.createdAt ? timeAgo(x.createdAt) : "unknown"}{x.source ? `, ${x.source}` : ""}</dd>
-        <dt className="text-muted-foreground">Last activity</dt><dd>{x.lastActivityAt ? timeAgo(x.lastActivityAt) : "none"}</dd>
-        <dt className="text-muted-foreground">Deals</dt><dd>{x.openDeals} open, {x.wonDeals} won</dd>
-        {x.upcomingAppointments > 0 && <><dt className="text-muted-foreground">Appointments</dt><dd>{x.upcomingAppointments} coming up</dd></>}
-        {x.tags.length > 0 && <><dt className="text-muted-foreground">Tags</dt><dd className="truncate">{x.tags.join(", ")}</dd></>}
-      </dl>
     </div>
   );
 }

@@ -129,7 +129,7 @@ export function AppointmentInsights() {
               <button type="button" onClick={() => setLeadList(null)} className="min-h-9 text-xs font-medium text-primary underline">Close the list</button>
             </div>
             <DataList rows={leadList.rows} columns={leadColumns} rowKey={(m) => m.locationId + m.contactId} total={leadList.count} onOpen={(_, i) => setLeadIndex(i)} caption={leadList.title} empty="Nothing behind this one." />
-            {leadList.count > leadList.rows.length && <p className="mt-1 text-xs text-muted-foreground">Showing the first {leadList.rows.length} of {leadList.count}.</p>}
+            {leadList.count > leadList.rows.length && <p className="mt-1 text-xs text-muted-foreground">Showing the first {leadList.rows.length} of {leadList.count}. The number above is the full count.</p>}
             <LeadDrawer leads={leadList.rows.map<LeadSeed>((m) => ({ contactId: m.contactId, locationId: m.locationId, name: m.name, locationName: m.locationName, url: m.url }))} index={leadIndex} onIndex={setLeadIndex} onClose={() => setLeadIndex(null)} />
           </section>
         )}
@@ -141,7 +141,7 @@ export function AppointmentInsights() {
             <Card title="Calendar health" className="lg:col-span-1">
               <p className="text-4xl font-semibold tabular-nums" data-testid="health-score">{d.health.score === null ? "n/a" : d.health.score}{d.health.score !== null && <span className="text-base font-normal text-muted-foreground"> / 100</span>}</p>
               <p className="mb-3 mt-1">
-                {d.health.band ? <Badge tone={d.health.band === "healthy" ? "good" : d.health.band === "watch" ? "warn" : "bad"}>{d.health.band}</Badge> : <span className="text-xs text-muted-foreground">Needs 3 of 4 checks. {d.health.used} have data.</span>}
+                {d.health.band ? <Badge tone={d.health.band === "healthy" ? "good" : d.health.band === "watch" ? "warn" : "bad"}>{d.health.band}</Badge> : <span className="text-xs text-muted-foreground">Needs at least 3 of the 4 checks. {d.health.used} of {d.health.of} have data.</span>}
               </p>
               <ul className="space-y-1.5 text-sm">{d.health.parts.map((p) => <li key={p.label} className="flex justify-between gap-2"><span>{p.label} <span className="block text-xs text-muted-foreground">{p.note}</span></span><span className="tabular-nums">{p.points === null ? "n/a" : `${p.points}/${p.max}`}</span></li>)}</ul>
               <Explainer id="health" />
@@ -168,8 +168,8 @@ export function AppointmentInsights() {
                 })}
               </ul>
               {d.funnel.biggestLeak && <p className="mt-3 text-sm font-medium">Biggest drop: {d.funnel.biggestLeak}</p>}
-              {!d.funnel.biggestLeak && <p className="mt-3 text-xs text-muted-foreground">No biggest drop until a step has 10+ leads.</p>}
-              {d.funnel.unmarked > 0 && <p className="mt-2 text-xs text-muted-foreground">{d.funnel.unmarked} past appointment{d.funnel.unmarked === 1 ? " has" : "s have"} no outcome, so later steps may read low.</p>}
+              {!d.funnel.biggestLeak && <p className="mt-3 text-xs text-muted-foreground">No biggest drop is named until a step has at least 10 leads before it.</p>}
+              {d.funnel.unmarked > 0 && <p className="mt-2 text-xs text-muted-foreground">{d.funnel.unmarked} past appointment{d.funnel.unmarked === 1 ? " has" : "s have"} no outcome recorded, so Showed and Became customers may be lower than the truth.</p>}
               <p className="mt-2 text-xs text-muted-foreground">A customer is a lead with at least one won deal.</p>
               <Explainer id="funnel" />
             </Card>
@@ -185,7 +185,7 @@ export function AppointmentInsights() {
             </p>
           )}
           <HeatGrid cells={f.cells} onOpen={(c) => openAppts(`${DAYS[c.weekday]} at ${hourLabel(c.hour)}`, c.booked, d.items.filter((i) => i.weekday === c.weekday && i.hour === c.hour && i.status !== "cancelled"))} />
-          <p className="mt-2 text-xs text-muted-foreground">Each square is a day and hour with 5+ outcomes. The number is its show rate. Account time zones.</p>
+          <p className="mt-2 text-xs text-muted-foreground">Each coloured square is a day and hour with at least 5 recorded outcomes; the number is its show rate. Press one to see its appointments. Times are in each account&apos;s own time zone.</p>
           <Explainer id="heat" />
         </Card>
       )}
@@ -259,7 +259,7 @@ export function AppointmentInsights() {
               {d.fairness.rows.length === 0 ? <p className="text-sm text-muted-foreground">No assigned appointments yet.</p> : (
                 <ul className="space-y-1 text-sm">{d.fairness.rows.map((r) => <li key={r.key} className="flex justify-between"><span>{r.label}</span><span className="tabular-nums text-muted-foreground">{r.count} · {Math.round(r.share * 100)}%</span></li>)}</ul>
               )}
-              {!d.fairness.judged && d.fairness.rows.length > 0 && <p className="mt-2 text-xs text-muted-foreground">Needs 2 people and 10 appointments.</p>}
+              {!d.fairness.judged && d.fairness.rows.length > 0 && <p className="mt-2 text-xs text-muted-foreground">Needs 2 people and 10 appointments before it says whether the split is even.</p>}
               {d.fairness.note && <p className="mt-2 text-sm font-medium text-warning">Uneven: {d.fairness.note}</p>}
               <Explainer id="fair" />
             </Card>

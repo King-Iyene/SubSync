@@ -16,7 +16,6 @@ import { applyLeadRules } from "./lead-rules-apply";
 import { diffDealEvents } from "./deal-events";
 import { diffTagEvents } from "./tag-events";
 import { listAllInstalledLocations } from "./installed-locations";
-import { announceNewClients, finishFirstSyncNotices, newAccountIds } from "./new-client";
 import { REFRESH_DUE_AFTER_MINUTES, REFRESH_EVERY_MINUTES } from "./schedule";
 import { OUR_WRITE_LEAD_MS, OUR_WRITE_WINDOW_MS } from "../connections/echo";
 
@@ -63,15 +62,6 @@ export async function enqueueJobs(installationId: string, locationIds: Array<str
 
 export async function enqueueFullSync(installationId: string): Promise<number> {
   return enqueueJobs(installationId, [null], ["locations"]);
-}
-
-// An install event that names no company: read the installed-locations list of every live company install, so the new account is found by the sync
-// (which also announces it). Jobs already queued are not doubled.
-export async function enqueueSyncForUnresolvedInstall(): Promise<number> {
-  const rows = await sql()`select id from installations where uninstalled_at is null and not is_demo and refresh_token_enc is not null and mode <> 'business'`;
-  let n = 0;
-  for (const r of rows) n += await enqueueFullSync(r.id as string);
-  return n;
 }
 
 // Re-sync everything for one account (the "Resync" button). No-op while jobs are already queued.
@@ -178,11 +168,6 @@ async function handleLocations(job: Job): Promise<Outcome> {
   const installed = await listAllInstalledLocations((page) => getInstalledLocations(agencyToken, job.companyId, appId, page));
   const ids = installed.map((l) => l._id);
 
-  // Which accounts are new to this company (not the first read, when every account would look new).
-  const knownBefore = (await db`select location_id from locations where installation_id = ${job.installationId}`).map((r) => r.location_id as string);
-  const [earlier] = await db`select 1 x from sync_jobs where installation_id = ${job.installationId} and type = 'locations' and status = 'done' limit 1`;
-  const fresh = newAccountIds(ids, knownBefore, Boolean(earlier));
-
   for (const l of installed) {
     await db`
       insert into locations (installation_id, location_id, name, address, installed_at)
@@ -199,11 +184,6 @@ async function handleLocations(job: Job): Promise<Outcome> {
     for (const id of gone) await purgeLocationData(job.installationId, id);
   }
 
-  // A new account: tell the owner and seed its onboarding steps. A failure here never stops the sync.
-  if (fresh.length > 0) {
-    const names = new Map(installed.map((l) => [l._id, l.name ?? null]));
-    await announceNewClients(job.installationId, fresh.map((id) => ({ locationId: id, name: names.get(id) ?? null }))).catch((e) => console.error("Announcing a new client account failed", safeError(e)));
-  }
   await enqueueJobs(job.installationId, ids, PER_LOCATION);
   await enqueueJobs(job.installationId, [null], ["metrics"]);
   return DONE;
@@ -620,7 +600,6 @@ export async function runSlice(budgetMs = 45_000): Promise<SliceResult> {
       const outcome = await runJob(job, deadline);
       if (outcome.done) {
         await db`update sync_jobs set status = 'done', cursor = null, error = null, finished_at = now(), updated_at = now() where id = ${job.id}`;
-        if (job.locationId && (job.type === "contacts" || job.type === "opportunities")) await finishFirstSyncNotices(job.installationId).catch((e) => console.error("First sync notice failed", safeError(e)));
         if (job.locationId) await clearResolvedError(job.installationId, job.locationId).catch((e) => console.error("Clearing a resolved sync error failed", safeError(e)));
       } else {
         await db`update sync_jobs set status = 'pending', cursor = ${db.json(outcome.cursor as never)}, updated_at = now() where id = ${job.id}`;

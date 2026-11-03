@@ -9,7 +9,7 @@ import { fixFirstFinding, openLabel, type Audit, type AuditNote, type Finding, t
 import type { AuditList, AuditListRow } from "@/lib/analytics/audit-queries";
 import { SAMPLE_AUDIT_ID } from "@/lib/analytics/share-intel";
 import { printAccent, printCss } from "@/lib/design/print";
-import { BrandLogo, ProductMark } from "../brand-logo";
+import { BrandLogo } from "../brand-logo";
 
 type Row = AuditListRow & { url: string };
 type ListData = Omit<AuditList, "rows"> & { rows: Row[] };
@@ -103,13 +103,13 @@ export function AuditView({ go }: { go: GoFn }) {
         <style dangerouslySetInnerHTML={{ __html: printCss(data.brand.color) }} />
         {/* The printed page opens with the sender's own name and colour. Nothing else carries a product name. */}
         <div className="mb-4 hidden border-b-2 pb-3 print:block" data-testid="audit-print-header" style={{ borderColor: accent ?? "var(--primary)" }}>
-          <BrandLogo url={data.brand.logoUrl} name={data.brand.name} height={40} className="mb-2" fallback={data.brand.name ? undefined : <ProductMark height={40} className="mb-2" />} />
+          {data.brand.logoUrl && <BrandLogo url={data.brand.logoUrl} name={data.brand.name} height={40} className="mb-2" fallback={null} />}
           <p className="text-xl font-semibold" style={{ color: accent ?? "var(--primary)" }}>{data.brand.name ?? "Account audit"}</p>
           <p className="text-sm text-muted-foreground">{data.brand.name ? "Account audit" : "Prepared"} for {a.accountsScanned} client {a.accountsScanned === 1 ? "account" : "accounts"}, {longDate(data.generatedAt)}</p>
         </div>
 
         <HowTo id="audit-how" title="How to use the audit">
-          Press a number to see what is behind it. Share link has no client names and lasts {data.shareDays} days.
+          Start with the line that says what to fix first. Press any number to see the exact deals, conversations or appointments behind it, and the small question mark to see how it is counted. When it is ready for a client, press Share link: it has no client names and works for {data.shareDays} days.
         </HowTo>
 
         {data.demo && (

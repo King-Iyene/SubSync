@@ -59,9 +59,9 @@ function nextStep(s: Shown, delivery: boolean): string {
 export function ConnectionsPage() {
   const my = useData<MyData>("my-connections");
   return (
-    <Page title="Connections" subtitle="Connect your own tools once.">
+    <Page title="Connections" subtitle="Connect your own tools once. Admins can see who is connected, never what was said.">
       <HowTo id="connections-e0" title="How connections work">
-        A connection is yours alone. Admins see who is connected, never the content.
+        You sign in with your own account, so a connection is yours: nobody can connect for you or read your calls. Your admin sees who has connected and can switch a connection off, but never sees the content.
       </HowTo>
       {my.loading && !my.data ? <SkeletonRows rows={3} label="Loading your connections" />
         : my.error ? <ErrorState error={my.error} onRetry={my.reload} />

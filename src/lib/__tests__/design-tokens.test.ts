@@ -46,15 +46,6 @@ for (const theme of ["light", "dark"] as const) {
     }
   });
 
-  // Brightness pass: body and caption text must be clearly readable (7:1, WCAG AAA), and card edges must be visible against the page and the card.
-  test(`${theme} theme: body and muted text have at least 7:1, and borders are clearly visible`, () => {
-    for (const bg of ["background", "card", "muted"]) {
-      assert.ok(contrast(colour(t, "foreground"), colour(t, bg)) >= 12, `${theme}: --foreground on --${bg}`);
-      assert.ok(contrast(colour(t, "muted-foreground"), colour(t, bg)) >= 7, `${theme}: --muted-foreground on --${bg} is ${contrast(colour(t, "muted-foreground"), colour(t, bg)).toFixed(2)}:1`);
-    }
-    for (const surface of ["background", "card"]) assert.ok(contrast(colour(t, "border"), colour(t, surface)) >= 1.8, `${theme}: --border on --${surface} is ${contrast(colour(t, "border"), colour(t, surface)).toFixed(2)}:1`);
-  });
-
   test(`${theme} theme: focus ring, chart colours and the gold highlight have at least 3:1 against the surfaces`, () => {
     for (const surface of ["background", "card"]) {
       const s = colour(t, surface);

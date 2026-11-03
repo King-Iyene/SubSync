@@ -227,7 +227,8 @@ test("open deals with no contact are under Pipeline, with the same total as the 
   await expect(page.getByText("Open deals with no contact", { exact: false })).toHaveCount(0);
   await expect(page.getByTestId("deals-moved")).toHaveCount(0); // the signpost was removed (simplify cut 4); Pipeline is reached from the menu
   await page.getByRole("button", { name: "Pipeline and deals" }).first().click();
-  await page.getByRole("tab", { name: "Stale deals" }).click();
+  await page.getByRole("tab", { name: "Stale deals and hygiene" }).click();
+  await page.getByRole("tab", { name: "No recent contact" }).click();
   const panel = page.getByTestId("quiet-deals");
   await expect(panel).toBeVisible();
   const gaps = await get(request, "deal-gaps?days=7");

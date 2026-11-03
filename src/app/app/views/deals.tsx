@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useApiClient, useData } from "../session";
 import type { Deal } from "../types";
-import { DataList, LeadDrawer, type Column, type LeadSeed } from "../ds";
 import { Btn, Card, Empty, ErrorBox, ExtLink, fmtInt, fmtMoney, fmtPct, Loading, PageHeader, Stat, Table, Td, Th } from "../ui";
 import { QuietDeals } from "./quiet-deals";
 
@@ -24,7 +23,7 @@ export function DealsView() {
             className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium ${tab === id ? "border-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>{label}</button>
         ))}
       </div>
-      {tab === "stale" ? <StaleDeals /> : tab === "quiet" ? <QuietDeals /> : tab === "pipeline" ? <PipelineRollup /> : <DealHygiene />}
+      {tab === "stale" ? <Stale /> : tab === "quiet" ? <QuietDeals /> : tab === "pipeline" ? <Pipeline /> : <Hygiene />}
     </div>
   );
 }
@@ -34,7 +33,7 @@ type HygieneData = {
   totals: { open: number; noValue: number; noContact: number; ancient: number };
 };
 
-export function DealHygiene() {
+function Hygiene() {
   const { data, error, loading, reload } = useData<HygieneData>("hygiene");
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox error={error} onRetry={reload} />;
@@ -66,29 +65,16 @@ export function DealHygiene() {
   );
 }
 
-const staleColumns: Array<Column<Deal>> = [
-  { key: "deal", header: "Deal", primary: true, width: "minmax(0,2fr)", cell: (d) => <span>{d.name ?? "Untitled deal"}{d.contactName ? <span className="block truncate text-xs font-normal text-muted-foreground">{d.contactName}</span> : null}</span> },
-  { key: "account", header: "Client account", width: "minmax(0,1.4fr)", cell: (d) => <span className="text-muted-foreground">{d.locationName ?? "Unnamed account"}</span> },
-  { key: "stage", header: "Stage", width: "minmax(0,1.5fr)", cell: (d) => <span className="text-muted-foreground">{d.pipelineName ? `${d.pipelineName}: ` : ""}{d.stageName ?? "No stage"}</span> },
-  { key: "value", header: "Value", width: "7rem", align: "right", cell: (d) => <span className="tabular-nums">{fmtMoney(d.value)}</span> },
-  { key: "stale", header: "Days stale", width: "6rem", align: "right", cell: (d) => <span className="tabular-nums">{d.daysStale}</span> },
-  { key: "open", header: "", width: "7rem", align: "right", cell: (d) => <ExtLink href={d.url}>Open</ExtLink> },
-];
-
-/** Deals with no movement for a number of days. A row opens the lead panel when the deal has a contact, otherwise the deal in your CRM. */
-export function StaleDeals() {
+function Stale() {
   const api = useApiClient();
   const [days, setDays] = useState(30);
-  const [open, setOpen] = useState<number | null>(null);
   const { data, error, loading, reload } = useData<{ days: number; totalValue: number; deals: Deal[] }>(`stale?days=${days}`);
-  const withContact = (data?.deals ?? []).filter((d) => d.contactId);
-  const seeds: LeadSeed[] = withContact.map((d) => ({ contactId: d.contactId as string, locationId: d.locationId, name: d.contactName ?? d.name ?? "Contact", locationName: d.locationName, url: d.url, note: `${d.name ?? "Untitled deal"}, ${fmtMoney(d.value)}. No movement for ${d.daysStale} days.` }));
   return (
-    <div data-testid="stale-deals">
+    <div>
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <span className="text-sm text-muted-foreground">No movement in at least</span>
         {[14, 30, 45, 60, 90].map((d) => (
-          <button key={d} type="button" onClick={() => { setDays(d); setOpen(null); }} aria-pressed={days === d} className={`rounded-full border px-3 py-1 text-sm ${days === d ? "bg-foreground text-background" : "hover:bg-muted"}`}>{d} days</button>
+          <button key={d} type="button" onClick={() => setDays(d)} aria-pressed={days === d} className={`rounded-full border px-3 py-1 text-sm ${days === d ? "bg-foreground text-background" : "hover:bg-muted"}`}>{d} days</button>
         ))}
         <span className="ml-auto"><Btn onClick={() => api.download("export/stale", "subsync-stale-deals.csv")}>Export CSV</Btn></span>
       </div>
@@ -97,17 +83,26 @@ export function StaleDeals() {
       ) : (
         <>
           <div className="mb-4 grid grid-cols-2 gap-3 sm:max-w-md"><Stat label="Deals" value={fmtInt(data.deals.length)} /><Stat label="Total value" value={fmtMoney(data.totalValue)} tone="warn" /></div>
-          <DataList rows={data.deals.slice(0, 200)} columns={staleColumns} rowKey={(d) => d.opportunityId} caption="Stale deals" total={data.deals.length}
-            onOpen={(d) => { const at = withContact.findIndex((x) => x.opportunityId === d.opportunityId); if (at >= 0) setOpen(at); else window.open(d.url, "_blank", "noopener,noreferrer"); }} />
+          <Table head={<tr><Th>Deal</Th><Th>Account</Th><Th>Stage</Th><Th className="text-right">Value</Th><Th className="text-right">Days stale</Th><Th>{" "}</Th></tr>}>
+            {data.deals.slice(0, 200).map((d) => (
+              <tr key={d.opportunityId} className="hover:bg-muted/40">
+                <Td>{d.name ?? "Untitled deal"}<div className="text-xs text-muted-foreground">{d.contactName}</div></Td>
+                <Td>{d.locationName ?? "Unnamed account"}</Td>
+                <Td>{d.pipelineName ? `${d.pipelineName} · ` : ""}{d.stageName ?? "n/a"}</Td>
+                <Td className="text-right tabular-nums">{fmtMoney(d.value)}</Td>
+                <Td className="text-right tabular-nums">{d.daysStale}</Td>
+                <Td><ExtLink href={d.url}>Open</ExtLink></Td>
+              </tr>
+            ))}
+          </Table>
           {data.deals.length > 200 && <p className="mt-2 text-xs text-muted-foreground">Showing the 200 largest. Export the CSV for the full list.</p>}
-          <LeadDrawer leads={seeds} index={open} onIndex={setOpen} onClose={() => setOpen(null)} />
         </>
       )}
     </div>
   );
 }
 
-export function PipelineRollup() {
+function Pipeline() {
   const { data, error, loading, reload } = useData<Pipelines>("pipelines");
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox error={error} onRetry={reload} />;

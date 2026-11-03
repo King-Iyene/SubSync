@@ -7,8 +7,8 @@
 import { accentTokens, parseHex } from "./color";
 
 export const PRINT_LIGHT_TOKENS = {
-  "--background": "#ffffff", "--foreground": "#00081a", "--card": "#ffffff", "--card-foreground": "#00081a", "--muted": "#eaf0f8", "--muted-foreground": "#2b3c58",
-  "--border": "#aebbd0", "--primary": "#0a658b", "--destructive": "#a8170f", "--success": "#0a6b47", "--warning": "#7a4d00", "--accent": "#d3e7f3",
+  "--background": "#f4f6fa", "--foreground": "#000c25", "--card": "#ffffff", "--card-foreground": "#000c25", "--muted": "#edf1f6", "--muted-foreground": "#44546f",
+  "--border": "#d5dce6", "--primary": "#0a658b", "--destructive": "#b3261e", "--success": "#0e7a53", "--warning": "#8a5a00", "--accent": "#dcebf3",
 } as const;
 
 /** The sender's colour as it prints on white (readable text, 4.5 to 1), or null when they have not set a valid one. */

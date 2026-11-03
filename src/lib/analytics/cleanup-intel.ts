@@ -18,8 +18,6 @@ export type ContactLite = {
   lastActivityAt: number | null;
   dateAdded: number | null;
   source: string | null;
-  /** Do not disturb, an open deal or an upcoming appointment. Such a contact is never picked to receive a tag in bulk. */
-  protected?: boolean;
 };
 
 export type TagParams = {
@@ -115,7 +113,7 @@ export function planChanges(contacts: ContactLite[], params: Params, now = Date.
     }
     if (params.rules.includes("tag") && params.tag) {
       const has = c.tags.some((t) => t.toLowerCase() === params.tag!.name.toLowerCase());
-      const wanted = (params.tag.action === "add" ? !has : has) && !(params.tag.action === "add" && c.protected);
+      const wanted = params.tag.action === "add" ? !has : has;
       if (wanted && matchesTagFilter(c, params.tag.where, now)) {
         push({ contactId: c.id, rule: "tag", field: "tags", before: params.tag.action === "add" ? "without" : "with", after: params.tag.action === "add" ? "with" : "without", tag: params.tag.name });
       }

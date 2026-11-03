@@ -106,7 +106,7 @@ test("Details: fee, renewal and industry are typed in the row, with honest label
     const after = await api(request, "get", "clients");
     expect((after.clients as Json[]).find((x) => x.locationId === c.locationId)!.profile.monthlyFee).toBe(3210);
     // The log: add a conversation, see it with who and when, remove it.
-    await row.getByRole("button", { name: /Log|Add a note/ }).click();
+    await row.getByRole("button", { name: /Log/ }).click();
     const log = page.getByTestId("client-log");
     await log.getByLabel("What was said or decided").fill("Playwright check: agreed a call on Friday");
     await log.getByRole("button", { name: "Add to the log" }).click();

@@ -42,7 +42,7 @@ test("the first thing on Today is the leads-waiting sentence, in the first scree
 test("the five-second test: the page says what it is for, and what to do next, before anything is pressed", async ({ page }) => {
   await page.goto("/app");
   await expect(page.getByRole("heading", { level: 1, name: "Today" })).toBeVisible();
-  await expect(page.getByTestId("page-subtitle")).toContainText("checked for leads waiting, missed appointments and stalled deals.");
+  await expect(page.getByTestId("page-subtitle")).toContainText("checked for leads waiting, missed appointments and stalled deals. Start at the top.");
   await expect(page.getByTestId("front-door")).toContainText("What needs you right now");
   // One status line, drawn by the shell, and nothing on Today words the age of the data a second time.
   await expect(page.getByTestId("front-door")).not.toContainText(/updated|synced|last read/i);
@@ -77,8 +77,7 @@ test("the sync banner is only for a first sync, and the filter sits in a drawer 
   const drawer = page.getByTestId("filter-drawer");
   await expect(drawer).toBeVisible();
   await expect(drawer.getByText("Show only")).toBeHidden(); // closed until it is opened
-  await drawer.getByTestId("account-picker-summary").click();
-  await drawer.getByText("More filters").click();
+  await drawer.getByText("Filter accounts").click();
   await expect(drawer.getByText("Show only")).toBeVisible();
   // N1: where the kind of business comes from, what the number in brackets counts, what a test account is.
   const help = drawer.getByTestId("filter-help");
@@ -119,8 +118,7 @@ test("Today for one client account: opened from the all-accounts list, it narrow
   if (inAttention) await page.getByTestId("attention-list").getByRole("button", { name: /Open this account.s Today/ }).first().click();
   else await page.getByTestId("data-list").getByRole("button", { name: first.name as string }).first().click();
   await expect(page.getByTestId("page-subtitle")).toContainText("leads waiting, appointments to fix and deals that stopped moving");
-  // One account is chosen, so the picker shows that account's name (it used to say "1 of N").
-  await expect(page.getByTestId("account-picker-summary")).toContainText(first.name as string);
+  await expect(page.getByTestId("account-scope-summary")).toContainText("1 of");
   const back = page.getByTestId("back-link");
   await expect(back).toContainText("Back to Today");
   await back.click();

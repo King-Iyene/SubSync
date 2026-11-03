@@ -4,7 +4,7 @@ import { useState, type FormEvent, type KeyboardEvent, type ReactNode } from "re
 import { HELP, helpLines, industryFromPicker, INDUSTRY_MAX, NOTE_KIND_LABEL, NOTE_KINDS, NOTE_MAX, OTHER_INDUSTRY, pickerChoice, playbookLine, USER_ENTERED, valueCreatedWords, type NoteKind } from "@/lib/analytics/client-success";
 import { useApiClient, useData } from "../../session";
 import { DefinitionTip, EmptyState, HowTo, Section } from "../../ds";
-import { Badge, Btn, ErrorBox, ExtLink, fmtMoney, inputClass, Loading, More, Stat, Table, Td, Th } from "../../ui";
+import { Badge, Btn, ErrorBox, ExtLink, fmtMoney, inputClass, Loading, Stat, Table, Td, Th } from "../../ui";
 import { PlaybooksView } from "../playbooks";
 import type { GoFn } from "../../nav";
 import type { ClientRow, ClientsData } from "./types";
@@ -125,7 +125,7 @@ function ClientLog({ c, reload }: { c: ClientRow; reload: () => void }) {
         <div><label className="mb-1 block text-xs text-muted-foreground" htmlFor={`b-${c.locationId}`}>What was said or decided</label><textarea id={`b-${c.locationId}`} className={`${inputClass} min-h-16`} maxLength={NOTE_MAX} value={body} onChange={(e) => setBody(e.target.value)} placeholder="e.g. Agreed to move the review to Friday" /></div>
         <div className="flex flex-wrap items-center gap-2 sm:col-span-3">
           <Btn type="submit" variant="primary" disabled={busy || !body.trim()}>Add to the log</Btn>
-          <Btn disabled={busy} onClick={() => run(() => api.put(`clients/${c.locationId}`, { markContacted: true }), "Logged: spoken to them today.")}>Spoke to them today</Btn>
+          <Btn disabled={busy} onClick={() => run(() => api.put(`clients/${c.locationId}`, { markContacted: true }), "Logged: you spoke to them today.")}>I spoke to them today</Btn>
           {msg && <span className="text-sm text-muted-foreground" role="status">{msg}</span>}
         </div>
       </form>
@@ -167,7 +167,7 @@ export function DetailsTab({ data, reload, go, showPlaybooks = true }: { data: C
   return (
     <div className="space-y-6">
       <HowTo id="clients-details" title="How this page works" action={<button type="button" onClick={() => go("help")} className="text-xs font-medium text-primary underline">More in Getting started</button>}>
-        You type fee, renewal date and industry in the row. {USER_ENTERED}<More>{valueCreatedWords()}</More>
+        Fee, renewal date and industry are typed by you, right in the row: press <strong>Add fee</strong>, <strong>Add date</strong> or <strong>Choose industry</strong>. {USER_ENTERED} {valueCreatedWords()}
       </HowTo>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -215,7 +215,7 @@ export function DetailsTab({ data, reload, go, showPlaybooks = true }: { data: C
                 <Td className="tabular-nums">{c.roi ? <span>{c.roi.pipelineMultiple}x<span className="block text-xs text-muted-foreground">new deals against the fee</span></span> : <span className="text-muted-foreground">Add the fee to see this</span>}</Td>
                 <Td>
                   {c.contactGap.days === null ? <Badge tone="warn">Never logged</Badge> : c.contactGap.flagged ? <Badge tone="warn">{c.contactGap.days} days ago</Badge> : <span>{c.contactGap.days === 0 ? "today" : `${c.contactGap.days} days ago`}</span>}
-                  <span className="block"><button type="button" onClick={() => setLog(log === c.locationId ? null : c.locationId)} aria-expanded={log === c.locationId} className={addLink}>{log === c.locationId ? "Close log" : c.log.count > 0 ? `Log (${c.log.count})` : "Add a note"}</button></span>
+                  <span className="block"><button type="button" onClick={() => setLog(log === c.locationId ? null : c.locationId)} aria-expanded={log === c.locationId} className={addLink}>{log === c.locationId ? "Close log" : c.log.count > 0 ? `Log (${c.log.count})` : "Log a conversation"}</button></span>
                   {c.log.lastNote && log !== c.locationId && <span className="mt-0.5 block max-w-56 truncate text-xs text-muted-foreground" title={c.log.lastNote.body}>{c.log.lastNote.body}</span>}
                 </Td>
               </tr>,

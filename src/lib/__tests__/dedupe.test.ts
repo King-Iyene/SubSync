@@ -20,10 +20,10 @@ test("phones match across formats and emails across case and gmail tricks", () =
 test("identical email or phone is a confident match, format differences a little less", () => {
   assert.ok(scorePair(p("a", { email: "x@y.com" }), p("b", { email: "x@y.com" })).score >= 90);
   assert.ok(scorePair(p("a", { phone: "+15550102030" }), p("b", { phone: "+15550102030" })).score >= 90);
-  const fmt = scorePair(p("a", { phone: "+15550102030" }), p("b", { phone: "(555) 010-2030" }));
-  assert.ok(fmt.score >= 75 && fmt.score < 90 || fmt.score === 85);
-  assert.deepEqual(fmt.reasons, ["phone in a different format", "same name"]);
-  const mail = scorePair(p("a", { email: "ADA@y.com" }), p("b", { email: "ada@y.com" }));
+  const fmt = scorePair(p("a", { name: "Ann A", phone: "+15550102030" }), p("b", { name: "Bob B", phone: "(555) 010-2030" }));
+  assert.ok(fmt.score >= 75 && fmt.score < 90);
+  assert.deepEqual(fmt.reasons, ["phone in a different format"]);
+  const mail = scorePair(p("a", { name: "Ann A", email: "ADA@y.com" }), p("b", { name: "Bob B", email: "ada@y.com" }));
   assert.ok(mail.score >= 80 && mail.score < 90);
 });
 
@@ -51,9 +51,9 @@ test("groups link records through shared keys and ignore unrelated ones", () => 
 test("a shared placeholder phone number does not glue strangers together by name alone", () => {
   const people = [p("1", { name: "Ann One", phone: "5550000000" }), p("2", { name: "Bob Two", phone: "5550000000" })];
   const g = groupDuplicates(people);
-  // Same phone with different names is listed, but only as "probably different people" (C2).
+  // Same phone is still a real match signal (the review screen lets the user dismiss it) ...
   assert.equal(g.length, 1);
-  assert.equal(g[0].kind, "shared");
+  assert.equal(g[0].kind, "exact");
   // ... but a name-only link stays below the grouping threshold.
   assert.equal(groupDuplicates([p("1"), p("2")]).length, 0);
 });
@@ -83,10 +83,10 @@ test("summary and bulk selection respect confidence and what was already reviewe
     p("1", { email: "a@y.com" }), p("2", { email: "a@y.com" }),
     p("3", { phone: "+15550102030", name: "C C" }), p("4", { phone: "(555) 010-2030", name: "D D" }),
   ]);
-  assert.deepEqual(classify(groups), { exact: 1, format: 0, name: 0, shared: 1, contacts: 4 });
+  assert.deepEqual(classify(groups), { exact: 1, format: 1, name: 0, contacts: 4 });
   assert.equal(bulkSelect(groups, new Set(), 90).length, 1);
   assert.equal(bulkSelect(groups, new Set(groups.map((g) => g.key)), 0).length, 0);
-  assert.equal(bulkSelect(groups, new Set(), 0).length, 1, "a group of probably different people is never bulk selected");
+  assert.equal(bulkSelect(groups, new Set(), 0).length, 2);
 });
 
 test("group keys are stable for the same set of contacts", () => {

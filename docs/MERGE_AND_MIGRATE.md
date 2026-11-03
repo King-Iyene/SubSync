@@ -5,7 +5,7 @@ A push to `main` deploys the code to production at once. Migrations are NOT appl
 ## 1. Back up (2 minutes)
 Supabase dashboard, Database, Backups: confirm a recent backup exists (or press "Create backup" on a paid plan). All 13 migrations are additive and re-runnable, but a backup is the undo.
 
-## 2. Apply the 15 new migrations to the live Supabase project, in this order
+## 2. Apply the 14 new migrations to the live Supabase project, in this order
 Open Supabase, SQL Editor, New query. For each file below, paste the whole file and press Run. Wait for "Success" before the next one. (Or from your computer: `node --env-file=.env.local --import tsx scripts/apply-migration.ts supabase/migrations/<file>.sql`; it refuses anything that drops or deletes.)
 
 1. 20261101010000_detected_app_domain.sql
@@ -21,8 +21,7 @@ Open Supabase, SQL Editor, New query. For each file below, paste the whole file 
 11. 20261102120000_f9_notifications.sql
 12. 20261102130000_e2a_fathom_inbox.sql
 13. 20261103090000_e2b_setup.sql
-14. 20261103100000_lead_panel.sql
-15. 20261103110000_nc_brand_logo.sql
+14. 20261103100000_nc_brand_logo.sql
 
 Check first that the 26 older migrations (up to 20261031190000) are already applied: Table Editor should list `speed_*`, `lead_touches`, `shared_audits`, `email`/alert tables. If any are missing, apply those first, oldest first.
 Then run `node --env-file=.env.local --import tsx scripts/supabase-proof.ts` (needs your `.env.local`); it compares the live schema with the repo. Send me the output.
@@ -64,6 +63,5 @@ One-time setup, in this order:
 
 Limits to know: it migrates the database only; the Vercel deploy still happens on its own at the same moment, so a migration should be merged in a change that works with or without the new tables for a few minutes (ours are additive). Turn on Supabase backups first. If a migration fails it stops and nothing after it runs; fix forward with a new file.
 
-## 8. Update, round 2 (merged without a final full browser run; see below)
-This merge adds: the Clean-up module (Duplicates rebuilt), the lead panel (tags with dates), agency logo, a new-client notice, Pipeline tabs, the brighter light theme (now the default), one-line header filter, and the Call button (the dialer choice is gone). 2 more migrations: 14 and 15 in the list above. With the GitHub workflow set up (section 7) these two are the ones it applies.
-NOT DONE before this merge: one final full browser run and the HTTP checks on this exact combination (the unit suites, typecheck, lint, production build and bundle scan all pass). The aggressive text cut (hard word limits per screen) is still in progress on its own branch and is NOT in this merge.
+## 8. Version note (restore, 3 Nov 2026)
+The app is the version where M1 and M2 were complete, plus the agency logo (the company's own logo in the menu, reports, shared audit and emails; the SubSync mark only when the company has no name or logo of its own). The round-2 changes (text cuts, brighter theme, Clean-up, lead panel, one-line filter, Call button, Pipeline tabs, new-client notice) are NOT in this version. They are saved under the git tag `round2-before-revert` and can be brought back one at a time.

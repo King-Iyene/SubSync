@@ -75,8 +75,7 @@ import { portfolioRangeChanges, validFromDay, validToDay } from "../analytics/to
 import { digestText, localParts } from "../analytics/digest-intel";
 import { industryKey, industryOptions, matchesSegment, PLAYBOOKS } from "../analytics/playbooks";
 import { buildQueue, recordBulk, recordDecision, summarise, undoDecision } from "../analytics/dedupe-queries";
-import { bulkSelect, groupKey, suggestKeep, type Person } from "../analytics/dedupe";
-import { bestPairs, differences, groupGuard, groupLabel, needsRecheck, pairGuard, sourceOfDuplicates } from "../analytics/dedupe-guide";
+import { bulkSelect, groupKey } from "../analytics/dedupe";
 import { contactTimeline, dndSummary, leadSources, recentDealMoves, setTeamName, teamPace, teamStats, upcomingBirthdays } from "../analytics/people-queries";
 import { paceOf, sourceConversion, teamLabel, teamWinRate } from "../analytics/people-intel";
 import { excludedOpenDeals, getGoals, GOAL_METRICS, loadDeals, pipelineTrend, setGoal, type GoalMetric } from "../analytics/pipeline-queries";
@@ -899,99 +898,21 @@ async function pipelines(ctx: Ctx) {
   });
 }
 
-// Clean-up, Duplicates tab (stage C2). A group is shown as its best three pairs, never as one giant table, and a group of different
-// people who share a phone or an inbox is labelled that way and gets no percentage. Nothing here changes a contact.
-const LIST_CAP = 40;
-
-function personView(p: Person, url: string) {
-  return {
-    contactId: p.contactId, name: p.name, email: p.email, phone: p.phone, tags: p.tags, createdAt: p.createdAt, lastActivityAt: p.lastActivityAt, source: p.source,
-    openDeals: p.openDeals, wonDeals: p.wonDeals, upcomingAppointments: p.upcomingAppointments ?? 0, hasConversation: p.hasConversation, dnd: p.dnd === true, url,
-  };
-}
-
 async function duplicates(ctx: Ctx) {
   const sc = await scope(ctx);
   const allowed = await allowedIds(ctx);
   const showReviewed = ctx.url.searchParams.get("reviewed") === "1";
-  const kindParam = ctx.url.searchParams.get("kind");
-  const accountParam = ctx.url.searchParams.get("account");
   const q = await buildQueue(ctx.installationId, allowed);
   const summary = await summarise(ctx.installationId, allowed, q.open, q.reviews.size);
-  // The filters only narrow what the caller may already see (the queue was built from their allowed accounts).
-  const base = (showReviewed ? q.all : q.open)
-    .filter((g) => !accountParam || g.locationId === accountParam)
-    .filter((g) => (kindParam === "likely" ? g.kind !== "shared" : kindParam === "shared" ? g.kind === "shared" : true));
-  const list = base.slice(0, LIST_CAP);
-  const source = sourceOfDuplicates(q.open.filter((g) => g.kind !== "shared" && (!accountParam || g.locationId === accountParam)).flatMap((g) => g.people));
+  const list = (showReviewed ? q.all : q.open).slice(0, 60);
   return json({
-    summary, truncated: q.truncated, canReview: ctx.kind !== "client", total: base.length, source,
-    groups: list.map((g) => {
-      const review = q.reviews.get(g.locationId + ":" + g.key) ?? null;
-      const pairs = bestPairs(g.people, 3).map((pr) => {
-        const keep = suggestKeep([pr.a, pr.b]);
-        return {
-          score: pr.score, reasons: pr.reasons, keepId: keep.person.contactId, keepReason: keep.reason, differences: differences(pr.a, pr.b),
-          a: personView(pr.a, sc.links.contact(g.locationId, pr.a.contactId)), b: personView(pr.b, sc.links.contact(g.locationId, pr.b.contactId)),
-          guards: { [pr.a.contactId]: pairGuard(pr.a, pr.b), [pr.b.contactId]: pairGuard(pr.b, pr.a) },
-        };
-      });
-      return {
-        key: g.key, locationId: g.locationId, locationName: g.locationName, confidence: g.confidence, kind: g.kind, label: groupLabel(g), reasons: g.reasons,
-        total: g.people.length, contactIds: g.people.map((p) => p.contactId), guard: groupGuard(g), pairs,
-        review, recheck: review ? needsRecheck(review, Date.now()) : false,
-      };
-    }),
+    summary, truncated: q.truncated, canReview: ctx.kind !== "client",
+    groups: list.map((g) => ({
+      key: g.key, locationId: g.locationId, locationName: g.locationName, confidence: g.confidence, reasons: g.reasons, kind: g.kind,
+      survivorId: g.survivorId, plan: g.plan, review: q.reviews.get(g.locationId + ":" + g.key) ?? null,
+      people: g.people.map((p) => ({ ...p, url: sc.links.contact(g.locationId, p.contactId) })),
+    })),
   });
-}
-
-// Every record in one group, for "See all N". Compact rows only, capped.
-async function duplicateGroup(ctx: Ctx) {
-  const key = ctx.url.searchParams.get("key") ?? "";
-  const loc = ctx.url.searchParams.get("locationId") ?? "";
-  if (!/^[0-9a-f]{8}-\d{1,4}$/.test(key) || !LOCATION_ID.test(loc)) return json({ error: "Invalid request" }, 400);
-  const sc = await scope(ctx);
-  const q = await buildQueue(ctx.installationId, await allowedIds(ctx));
-  const g = q.all.find((x) => x.locationId === loc && x.key === key);
-  if (!g) return json({ error: "Group not found" }, 404);
-  return json({ total: g.people.length, people: g.people.slice(0, 200).map((p) => personView(p, sc.links.contact(loc, p.contactId))) });
-}
-
-// Contacts that are probably not worth keeping or cannot be reached. Read only: SubSync does not delete contacts. Contacts that are
-// do not disturb, or have an open deal or an upcoming appointment, are never listed.
-async function cleanupLeads(ctx: Ctx) {
-  const sc = await scope(ctx);
-  const allowed = await allowedIds(ctx);
-  const db = sql();
-  const rows = await db`
-    with loc as (select location_id, name from locations where installation_id = ${ctx.installationId} and not ignored ${allowed ? db`and location_id = any(${allowed}::text[])` : db``}),
-    c as (
-      select c.location_id, c.contact_id, c.full_name, c.email, c.phone, c.last_activity_at, c.date_added,
-        case
-          when coalesce(btrim(c.email), '') = '' and length(c.phone_digits) < 7 then 'nothing'
-          when coalesce(btrim(c.email), '') <> '' and c.email !~ '^[^@[:space:]]+@[^@[:space:]]+[.][^@[:space:]]+$' then 'bad_email'
-          when coalesce(c.last_activity_at, c.date_added) < now() - interval '365 days' then 'old'
-        end reason
-      from cached_contacts c join loc on loc.location_id = c.location_id
-      where c.installation_id = ${ctx.installationId} and not c.dnd
-        and not exists (select 1 from cached_opportunities o where o.installation_id = c.installation_id and o.location_id = c.location_id and o.contact_id = c.contact_id and o.status = 'open')
-        and not exists (select 1 from cached_appointments a where a.installation_id = c.installation_id and a.location_id = c.location_id and a.contact_id = c.contact_id and a.start_at > now() and coalesce(a.status, '') not in ('cancelled', 'canceled')))
-    select c.*, loc.name location_name, count(*) over (partition by c.reason)::int n
-    from c join loc on loc.location_id = c.location_id where c.reason is not null
-    order by c.reason, c.last_activity_at nulls first, c.contact_id limit 90`;
-  const counts: Record<string, number> = { nothing: 0, bad_email: 0, old: 0 };
-  const per: Record<string, number> = { nothing: 0, bad_email: 0, old: 0 };
-  const sample: Array<Record<string, unknown>> = [];
-  for (const r of rows) {
-    counts[r.reason as string] = r.n as number;
-    if (per[r.reason as string]++ < 10) {
-      sample.push({
-        contactId: r.contact_id, locationId: r.location_id, locationName: r.location_name, name: (r.full_name as string)?.trim() || "No name", email: r.email, phone: r.phone,
-        reason: r.reason, lastActivityAt: r.last_activity_at instanceof Date ? r.last_activity_at.toISOString() : null, url: sc.links.contact(r.location_id as string, r.contact_id as string),
-      });
-    }
-  }
-  return json({ counts, sample });
 }
 
 const actorOf = (ctx: Ctx) => ctx.session.userName ?? ctx.session.userId ?? null;
@@ -999,7 +920,7 @@ const actorOf = (ctx: Ctx) => ctx.session.userName ?? ctx.session.userId ?? null
 async function duplicateReview(ctx: Ctx) {
   const body = (await ctx.request.json().catch(() => null)) as { locationId?: unknown; contactIds?: unknown; decision?: unknown; keepContactId?: unknown } | null;
   const ids = Array.isArray(body?.contactIds) ? body.contactIds : [];
-  if (typeof body?.locationId !== "string" || !LOCATION_ID.test(body.locationId) || ids.length < 2 || ids.length > 300 || ids.some((i) => typeof i !== "string" || !LOCATION_ID.test(i))) {
+  if (typeof body?.locationId !== "string" || !LOCATION_ID.test(body.locationId) || ids.length < 2 || ids.length > 40 || ids.some((i) => typeof i !== "string" || !LOCATION_ID.test(i))) {
     return json({ error: "Send the account and the contacts in the group" }, 400);
   }
   const decision = body.decision;
@@ -1010,22 +931,18 @@ async function duplicateReview(ctx: Ctx) {
   const result = await recordDecision(ctx.installationId, await allowedIds(ctx), actorOf(ctx), {
     locationId: body.locationId, key: groupKey(contactIds), decision, keepContactId: decision === "not_duplicate" ? null : keep, contactIds,
   });
-  if (result === "blocked") return json({ error: "This group has a contact marked do not disturb. SubSync leaves it alone." }, 409);
   return result === "ok" ? json({ ok: true }) : json({ error: "Those contacts were not found" }, 404);
 }
 
-// At most this many groups are recorded in one run.
-const BULK_CAP = 50;
-
 async function duplicateBulk(ctx: Ctx) {
-  const body = (await ctx.request.json().catch(() => null)) as { confirm?: unknown; decision?: unknown; minConfidence?: unknown; maxConfidence?: unknown; dryRun?: unknown } | null;
+  const body = (await ctx.request.json().catch(() => null)) as { decision?: unknown; minConfidence?: unknown; maxConfidence?: unknown; dryRun?: unknown } | null;
   const decision = body?.decision;
   if (decision !== "not_duplicate" && decision !== "keep") return json({ error: "Unknown action" }, 400);
   const min = Number(body?.minConfidence);
   const max = body?.maxConfidence === undefined ? 100 : Number(body.maxConfidence);
   if (!Number.isFinite(min) || !Number.isFinite(max) || min < 0 || max > 100 || min > max) return json({ error: "Choose a confidence range between 0 and 100" }, 400);
   const q = await buildQueue(ctx.installationId, await allowedIds(ctx));
-  const chosen = bulkSelect(q.open, new Set(), min, max, decision).filter((g) => (body as { kind?: unknown }).kind !== "shared" || g.kind === "shared").slice(0, BULK_CAP);
+  const chosen = bulkSelect(q.open, new Set(), min, max).slice(0, 500);
   // A dry run (the default) changes nothing: it only says what would be recorded.
   if (body?.dryRun !== false) {
     return json({
@@ -1033,8 +950,6 @@ async function duplicateBulk(ctx: Ctx) {
       sample: chosen.slice(0, 8).map((g) => ({ locationName: g.locationName, confidence: g.confidence, reasons: g.reasons, names: g.people.map((p) => p.name) })),
     });
   }
-  // A second confirm: the caller must send back the number of groups the dry run showed.
-  if (Number((body as { confirm?: unknown }).confirm) !== chosen.length) return json({ error: `Type ${chosen.length} to confirm` }, 400);
   return json({ ok: true, count: await recordBulk(ctx.installationId, actorOf(ctx), decision, chosen) });
 }
 
@@ -1924,7 +1839,6 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       if (a === "meeting-setup" && b === "account" && !c) return await meetingSetupAccountView(ctx);
       if (a === "meeting-inbox" && b && c === "contacts") return await meetingContactSearch(ctx, b);
       if (a === "team-connections" && !b) return await teamConnectionsView(ctx);
-      if (a === "cleanup" && b === "leads") return await cleanupLeads(ctx);
       if (a === "cleanup" && !b) return await cleanupView(ctx);
       if (a === "cleanup" && b) return await cleanupRunView(ctx, b);
       if (a === "playbooks") return await playbooksView(ctx);
@@ -1939,7 +1853,6 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       if (a === "inbox" && b === "views") return await inboxViews(ctx);
       if (a === "inbox") return await inboxView(ctx);
       if (a === "pipelines") return await pipelines(ctx);
-      if (a === "duplicates" && b === "group") return await duplicateGroup(ctx);
       if (a === "duplicates") return await duplicates(ctx);
       if (a === "email" && !b) return await emailHealth(ctx);
       if (a === "alerts") return await alertsView(ctx);

@@ -51,7 +51,7 @@ test("Connections names neither Zoom nor Google Meet, and Slack and Fathom stay 
   expect(await bodyText(page), "Connections names Zoom or Google Meet").not.toMatch(NAMED);
 });
 
-for (const [hash, heading] of [["help", "Getting started"], ["roadmap", "What's new and next"], ["today", "Today"], ["accounts", "Clients"], ["duplicates", "Clean-up"]] as const) {
+for (const [hash, heading] of [["help", "Getting started"], ["roadmap", "What's new and next"], ["today", "Today"], ["accounts", "Clients"], ["duplicates", "Duplicate contacts"]] as const) {
   test(`the ${hash} page names neither Zoom nor Google Meet`, async ({ page }) => {
     await open(page, hash, heading);
     expect(await bodyText(page), `the ${hash} page names Zoom or Google Meet`).not.toMatch(NAMED);

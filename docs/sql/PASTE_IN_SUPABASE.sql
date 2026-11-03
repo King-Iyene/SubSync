@@ -1,5 +1,5 @@
 -- SubSync: paste this WHOLE file into the Supabase SQL Editor and press Run, once.
--- It adds the 15 new migrations. Every statement is safe to run twice.
+-- It adds the 14 new migrations. Every statement is safe to run twice.
 -- It runs as ONE transaction: if anything fails, nothing changes.
 begin;
 
@@ -575,13 +575,7 @@ begin
   end if;
 end $$;
 
--- ===== 20261103100000_lead_panel.sql =====
--- Lead panel: the day SubSync first stored a contact. The CRM does not say when a tag was added, so a tag with no recorded "added" event is shown as
--- "before SubSync started watching (first seen on this day)". Additive: one column with a default; the sync upsert never touches it.
--- Existing rows get the migration time, the latest day SubSync could have first seen them.
-alter table public.cached_contacts add column if not exists first_seen_at timestamptz not null default now();
-
--- ===== 20261103110000_nc_brand_logo.sql =====
+-- ===== 20261103100000_nc_brand_logo.sql =====
 -- Additive: the agency logo web address. `detected_logo_url` comes from the install event and sign-in (white-label details);
 -- `brand_logo_url` is the owner's own address from Settings and wins. Both are https only (checked in code); the server never fetches them.
 alter table public.settings add column if not exists detected_logo_url text;
