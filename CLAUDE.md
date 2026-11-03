@@ -423,3 +423,5 @@ OPERATING PRINCIPLES (apply to every stage)
 5. **Be proactive.** If you spot a bug, a risk or a better approach, tell King, and fix it if it is small. If it is large, log it and propose a plan.
 6. **Move fast, worry less.** Do not stall on small decisions: pick a sensible default, log it, keep going. Stop only for irreversible, security or money items.
 7. **Be honest.** Mark everything VERIFIED, INFERENCE or CHECK, and report failures plainly.
+
+Standing routines (customer walkthrough, simplify pass, innovation pass, daily status): `docs/PROMPTS.md`. Run them at the moments named there.
