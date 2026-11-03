@@ -231,7 +231,7 @@ function SavedLists({ onOpen }: { onOpen: (f: SmartFilter) => void }) {
   const lists = useData<{ lists: Saved[]; canShare: boolean }>("people/lists");
   const opts = useData<Options>("people/options");
   const [msg, setMsg] = useState<string | null>(null);
-  const names = { owner: (id: string) => opts.data?.owners.find((o) => o.id === id)?.name ?? "a team member", account: (id: string) => opts.data?.accounts.find((a) => a.id === id)?.name ?? "one client account" };
+  const names = { owner: (id: string) => opts.data?.owners.find((o) => o.id === id)?.name ?? "a person on your team", account: (id: string) => opts.data?.accounts.find((a) => a.id === id)?.name ?? "one client account" };
   const del = async (id: string) => { setMsg(null); try { await api.del(`people/lists/${id}`); await lists.reload(); } catch (e) { setMsg((e as Error).message); } };
   if (lists.loading && !lists.data) return <SkeletonRows rows={2} label="Loading your lists..." />;
   if (lists.error) return <ErrorState error={lists.error} onRetry={lists.reload} />;

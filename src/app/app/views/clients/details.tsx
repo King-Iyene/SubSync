@@ -125,7 +125,7 @@ function ClientLog({ c, reload }: { c: ClientRow; reload: () => void }) {
         <div><label className="mb-1 block text-xs text-muted-foreground" htmlFor={`b-${c.locationId}`}>What was said or decided</label><textarea id={`b-${c.locationId}`} className={`${inputClass} min-h-16`} maxLength={NOTE_MAX} value={body} onChange={(e) => setBody(e.target.value)} placeholder="e.g. Agreed to move the review to Friday" /></div>
         <div className="flex flex-wrap items-center gap-2 sm:col-span-3">
           <Btn type="submit" variant="primary" disabled={busy || !body.trim()}>Add to the log</Btn>
-          <Btn disabled={busy} onClick={() => run(() => api.put(`clients/${c.locationId}`, { markContacted: true }), "Logged: you spoke to them today.")}>I spoke to them today</Btn>
+          <Btn disabled={busy} onClick={() => run(() => api.put(`clients/${c.locationId}`, { markContacted: true }), "Logged: spoken to them today.")}>Spoke to them today</Btn>
           {msg && <span className="text-sm text-muted-foreground" role="status">{msg}</span>}
         </div>
       </form>
@@ -215,7 +215,7 @@ export function DetailsTab({ data, reload, go, showPlaybooks = true }: { data: C
                 <Td className="tabular-nums">{c.roi ? <span>{c.roi.pipelineMultiple}x<span className="block text-xs text-muted-foreground">new deals against the fee</span></span> : <span className="text-muted-foreground">Add the fee to see this</span>}</Td>
                 <Td>
                   {c.contactGap.days === null ? <Badge tone="warn">Never logged</Badge> : c.contactGap.flagged ? <Badge tone="warn">{c.contactGap.days} days ago</Badge> : <span>{c.contactGap.days === 0 ? "today" : `${c.contactGap.days} days ago`}</span>}
-                  <span className="block"><button type="button" onClick={() => setLog(log === c.locationId ? null : c.locationId)} aria-expanded={log === c.locationId} className={addLink}>{log === c.locationId ? "Close log" : c.log.count > 0 ? `Log (${c.log.count})` : "Log a conversation"}</button></span>
+                  <span className="block"><button type="button" onClick={() => setLog(log === c.locationId ? null : c.locationId)} aria-expanded={log === c.locationId} className={addLink}>{log === c.locationId ? "Close log" : c.log.count > 0 ? `Log (${c.log.count})` : "Add a note"}</button></span>
                   {c.log.lastNote && log !== c.locationId && <span className="mt-0.5 block max-w-56 truncate text-xs text-muted-foreground" title={c.log.lastNote.body}>{c.log.lastNote.body}</span>}
                 </Td>
               </tr>,
