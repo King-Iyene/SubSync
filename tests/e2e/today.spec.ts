@@ -119,7 +119,8 @@ test("Today for one client account: opened from the all-accounts list, it narrow
   if (inAttention) await page.getByTestId("attention-list").getByRole("button", { name: /Open this account.s Today/ }).first().click();
   else await page.getByTestId("data-list").getByRole("button", { name: first.name as string }).first().click();
   await expect(page.getByTestId("page-subtitle")).toContainText("leads waiting, appointments to fix and deals that stopped moving");
-  await expect(page.getByTestId("account-picker-summary")).not.toContainText("All client accounts");
+  // One account is chosen, so the picker shows that account's name (it used to say "1 of N").
+  await expect(page.getByTestId("account-picker-summary")).toContainText(first.name as string);
   const back = page.getByTestId("back-link");
   await expect(back).toContainText("Back to Today");
   await back.click();

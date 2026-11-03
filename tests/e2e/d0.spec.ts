@@ -133,9 +133,11 @@ test("a filter is carried in the address and survives a reload", async ({ page }
   // The demo company has no test account, so the owner choice stands in for any filter: it goes into the address and the page says what is hidden.
   await drawer.getByLabel("Account owner").selectOption({ index: 1 });
   await expect.poll(() => page.evaluate(() => window.location.hash)).toMatch(/^#speed\?.*owner=/);
+  await drawer.getByTestId("account-picker-summary").click(); // close the picker
   await expect(page.getByTestId("filter-hidden-summary")).toContainText("are shown");
   await page.getByTestId("filter-hidden-summary").getByRole("button", { name: "Show all" }).click();
   await expect.poll(() => page.evaluate(() => window.location.hash)).toBe("#speed");
+  await drawer.getByTestId("account-picker-summary").click(); // More filters stays open from before
   await drawer.getByLabel("Account owner").selectOption({ index: 1 });
   await page.reload();
   await expect(page.getByTestId("account-picker-summary")).toContainText("filters on", { timeout: 60_000 });
