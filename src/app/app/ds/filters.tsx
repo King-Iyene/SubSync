@@ -12,10 +12,10 @@ import { useData } from "../session";
 // nothing to choose between is not drawn, and the bar is absent on a page that is about one account. Whatever is hidden is said in words, with the way
 // to bring it back. The value lives in the page address (src/lib/design/route.ts), so it is carried in a link and survives a reload.
 
-const select = "min-h-9 rounded-lg border bg-card px-2.5 py-1.5 text-sm outline-none hover:border-primary/30 focus-visible:ring-2 focus-visible:ring-ring/30";
+const select = "min-h-9 min-w-0 max-w-full rounded-lg border bg-card px-2.5 py-1.5 text-sm outline-none hover:border-primary/30 focus-visible:ring-2 focus-visible:ring-ring/30";
 
 function Labelled({ label, children }: { label: string; children: React.ReactNode }) {
-  return <label className="flex items-center gap-1.5 text-xs text-muted-foreground"><span className="font-medium">{label}</span>{children}</label>;
+  return <label className="flex min-w-0 max-w-full items-center gap-1.5 text-xs text-muted-foreground"><span className="shrink-0 font-medium">{label}</span>{children}</label>; // min-w-0 and max-w-full: a long choice must shrink on a phone, never push the page sideways
 }
 
 function AccountPicker({ accounts, picked, onChange }: { accounts: Array<{ id: string; name: string }>; picked: string[]; onChange: (ids: string[]) => void }) {

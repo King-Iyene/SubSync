@@ -91,7 +91,7 @@ export function BarChart({
       <div className="ml-12 mt-1 flex gap-1.5 sm:gap-2" aria-hidden>
         {bars.map((b, i) => <span key={b.label + i} className="min-w-0 flex-1 truncate text-center text-[11px] text-muted-foreground">{b.label}</span>)}
       </div>
-      <table className="sr-only"><caption>{title}</caption><thead><tr><th>Group</th><th>Value</th></tr></thead><tbody>{bars.map((b, i) => <tr key={b.label + i}><td>{b.label}</td><td>{b.value === null ? "too few to show" : format(b.value)}</td></tr>)}</tbody></table>
+      <div className="sr-only"><table><caption>{title}</caption><thead><tr><th>Group</th><th>Value</th></tr></thead><tbody>{bars.map((b, i) => <tr key={b.label + i}><td>{b.label}</td><td>{b.value === null ? "too few to show" : format(b.value)}</td></tr>)}</tbody></table></div>
     </figure>
   );
 }

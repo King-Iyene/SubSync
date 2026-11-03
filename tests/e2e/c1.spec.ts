@@ -90,6 +90,8 @@ test("Details: fee, renewal and industry are typed in the row, with honest label
   const c = (before.clients as Json[])[0];
   await open(page, "clients");
   await tab(page, "Details and billing").click();
+  // Wait for the tab's own content (it loads after the tab opens) before reading the whole page.
+  await expect(page.locator("main")).toContainText("You enter this; SubSync does not read it from your CRM.", { timeout: 30_000 });
   const text = await page.locator("main").innerText();
   expect(text).not.toMatch(/\bn\/a\b/);
   expect(text).toContain("You enter this; SubSync does not read it from your CRM.");
@@ -194,7 +196,7 @@ test("Reviews: a quarter's review with the quarter before it, wins, issues, what
   const c = (clients.clients as Json[])[0];
   await open(page, "clients");
   await tab(page, "Reviews (QBR)").click();
-  await page.getByLabel("Client").selectOption(c.locationId);
+  await page.getByLabel("Client", { exact: true }).selectOption(c.locationId);
   await expect(page.getByTestId("qbr")).toBeVisible();
   await expect(page.getByTestId("qbr-header")).toContainText(c.name);
   await expect(page.getByTestId("qbr-running")).toBeVisible(); // the current quarter is said to be still running

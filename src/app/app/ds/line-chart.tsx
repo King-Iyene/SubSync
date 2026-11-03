@@ -74,8 +74,8 @@ export function LineChart({ title, series, format = (n: number) => String(Math.r
         ))}
       </ul>
       {note && <p className="mt-1 text-xs text-muted-foreground">{note}</p>}
-      <table className="sr-only"><caption>{title}</caption><thead><tr><th>Day</th>{series.map((s) => <th key={s.label}>{s.label}</th>)}</tr></thead>
-        <tbody>{l.days.slice(-120).map((d) => <tr key={d}><td>{dayLabel(d, true)}</td>{valuesOn(series, d).map((v, i) => <td key={i}>{v === null ? "none" : format(v)}</td>)}</tr>)}</tbody></table>
+      <div className="sr-only"><table><caption>{title}</caption><thead><tr><th>Day</th>{series.map((s) => <th key={s.label}>{s.label}</th>)}</tr></thead>
+        <tbody>{l.days.slice(-120).map((d) => <tr key={d}><td>{dayLabel(d, true)}</td>{valuesOn(series, d).map((v, i) => <td key={i}>{v === null ? "none" : format(v)}</td>)}</tr>)}</tbody></table></div>
     </figure>
   );
 }
