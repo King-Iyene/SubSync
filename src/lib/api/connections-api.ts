@@ -26,8 +26,8 @@ const zoomOn = (ctx: Ctx) => ctx.entitlements.features.zoom_meet !== false;
 /** The tools a person can connect. Zoom and Google Meet are not listed while their switch is off. */
 function cards(ctx: Ctx) {
   const on = availability();
-  const list: Array<{ provider: PersonalProvider; name: string; available: boolean }> = [{ provider: "fathom", name: "Fathom", available: on.fathom }];
-  if (zoomOn(ctx)) list.push({ provider: "zoom", name: "Zoom", available: on.zoom });
+  const list: Array<{ provider: PersonalProvider; name: string; available: boolean }> = [{ provider: "fathom", name: "Fathom", available: ctx.demo || on.fathom }];
+  if (zoomOn(ctx)) list.push({ provider: "zoom", name: "Zoom", available: ctx.demo || on.zoom });
   return list;
 }
 

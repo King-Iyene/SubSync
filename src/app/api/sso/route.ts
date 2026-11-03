@@ -43,7 +43,7 @@ export async function POST(request: Request) {
       userId: "demo-user", companyId: DEMO_COMPANY_ID, role: "admin", type: kind === "agency" ? "agency" : "account",
       userName: kind === "agency" ? "Demo Admin" : "Demo Owner", activeLocation: locationId,
     };
-    const session = signSession({ companyId: DEMO_COMPANY_ID, userId: user.userId, role: user.role, userName: user.userName, demo: true, kind, locationId });
+    const session = signSession({ companyId: DEMO_COMPANY_ID, userId: user.userId, role: user.role, userName: user.userName, demo: true, kind, locationId, ...(kind === "agency" ? { personRole: "agency_owner" as const } : {}) });
     const demoInstall = await getInstallation(DEMO_COMPANY_ID).catch(() => null);
     const brand = demoInstall ? await brandOf(demoInstall.id) : { name: null, color: null };
     return NextResponse.json({ user, installed: true, demo: true, kind, session, entitlements: await resolveEntitlements("pro", undefined, true), brand });
