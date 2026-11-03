@@ -61,6 +61,8 @@ jobs:
         run: node --import tsx scripts/migrate.ts
       - name: Applying again must change nothing
         run: node --import tsx scripts/migrate.ts | tee /tmp/second.txt && grep -q " 0 to apply" /tmp/second.txt
+      - name: Generate the framework types (a clean checkout does not have them)
+        run: npx next typegen
       - run: npx tsc --noEmit
       - run: node --test "src/lib/__tests__/*.test.ts"
 
