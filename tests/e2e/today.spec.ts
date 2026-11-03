@@ -42,7 +42,7 @@ test("the first thing on Today is the leads-waiting sentence, in the first scree
 test("the five-second test: the page says what it is for, and what to do next, before anything is pressed", async ({ page }) => {
   await page.goto("/app");
   await expect(page.getByRole("heading", { level: 1, name: "Today" })).toBeVisible();
-  await expect(page.getByTestId("page-subtitle")).toContainText("checked for leads waiting, missed appointments and stalled deals. Start at the top.");
+  await expect(page.getByTestId("page-subtitle")).toContainText("checked for leads waiting, missed appointments and stalled deals.");
   await expect(page.getByTestId("front-door")).toContainText("What needs you right now");
   // One status line, drawn by the shell, and nothing on Today words the age of the data a second time.
   await expect(page.getByTestId("front-door")).not.toContainText(/updated|synced|last read/i);

@@ -167,7 +167,7 @@ export function DetailsTab({ data, reload, go, showPlaybooks = true }: { data: C
   return (
     <div className="space-y-6">
       <HowTo id="clients-details" title="How this page works" action={<button type="button" onClick={() => go("help")} className="text-xs font-medium text-primary underline">More in Getting started</button>}>
-        You type fee, renewal date and industry in the row. {USER_ENTERED}<More label="How value is counted">{valueCreatedWords()}</More>
+        You type fee, renewal date and industry in the row. {USER_ENTERED}<More>{valueCreatedWords()}</More>
       </HowTo>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">

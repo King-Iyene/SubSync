@@ -87,7 +87,7 @@ export function SpeedView({ go }: { go: GoFn }) {
           {waitingNow > 0 && <p className="mb-1 text-sm font-semibold" data-testid="what-to-do">Reply to the oldest first. Then assign owners.</p>}
           {m && (
             <p className="mb-3 text-xs text-muted-foreground" data-testid="measuring">
-              <More label="How this is counted">{measuringSentence(m)}</More>{" "}
+              <More>{measuringSentence(m)}</More>{" "}
               {m.canChange ? <button type="button" onClick={() => go("settings")} className="font-medium text-primary underline" data-testid="speed-settings-link">Change target in Settings</button> : "Ask your account manager to change this."}
             </p>
           )}
