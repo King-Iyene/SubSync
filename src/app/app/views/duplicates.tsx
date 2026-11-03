@@ -105,15 +105,6 @@ export function DuplicatesView() {
         </HowTo>
       </Section>
 
-      {data.source.total > 0 && (
-        <Section title="Where they came from" hint={data.source.line}>
-          <ul className="space-y-1 text-sm">
-            {data.source.days.slice(0, 3).map((d) => <li key={d.day}>{d.day}: {fmtInt(d.count)} records{d.looksLikeImport ? " (looks like an import)" : ""}</li>)}
-            {data.source.sources.slice(0, 2).map((x) => <li key={x.source} className="text-muted-foreground">Source &quot;{x.source}&quot;: {fmtInt(x.count)} records</li>)}
-          </ul>
-        </Section>
-      )}
-
       <Section title="Groups to check" hint={data.truncated ? "This account is large. The biggest groups come first." : undefined}>
         {visible.length === 0 ? (
           <Empty title="Nothing to check" body="No two contacts look like the same person, or you have checked them all." />
@@ -133,6 +124,15 @@ export function DuplicatesView() {
           </div>
         )}
       </Section>
+
+      {data.source.total > 0 && (
+        <Section title="Where they came from" hint={data.source.line}>
+          <ul className="space-y-1 text-sm">
+            {data.source.days.slice(0, 3).map((d) => <li key={d.day}>{d.day}: {fmtInt(d.count)} record{d.count === 1 ? "" : "s"}{d.looksLikeImport ? " (looks like an import)" : ""}</li>)}
+            {data.source.sources.slice(0, 2).map((x) => <li key={x.source} className="text-muted-foreground">Source &quot;{x.source}&quot;: {fmtInt(x.count)} records</li>)}
+          </ul>
+        </Section>
+      )}
 
       {data.canReview && s.shared > 0 && (
         <Section title="Clear the lists of different people" hint="This only changes SubSync's own notes. Your contacts stay as they are. At most 50 groups at a time.">
@@ -214,6 +214,7 @@ function GroupDetail({ g, done, canReview, busy, onDecide, onUndo }: {
                       <input type="radio" className="mt-0.5 size-4" name={`keep-${g.key}-${i}`} checked={keepId === x.contactId} disabled={!canReview || done} onChange={() => setKeepBy({ ...keepBy, [i]: x.contactId })} />
                       <span className="min-w-0">
                         <span className="block font-medium">Keep {x.name}</span>
+                        <span className="block truncate text-xs text-muted-foreground">{x.email ?? x.phone ?? "No email or phone"}{x.createdAt ? `, added ${timeAgo(x.createdAt)}` : ""}</span>
                         {x.contactId === p.keepId && <span className="block text-xs text-muted-foreground">Suggested. {p.keepReason}.</span>}
                       </span>
                     </label>
