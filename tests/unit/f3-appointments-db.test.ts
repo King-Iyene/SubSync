@@ -161,9 +161,18 @@ describe.skipIf(!HAS_DB)("appointments: counts equal lists, windows and filters 
     expect((await appointmentView(instA, null, NOW)).target.isDefault).toBe(true);
   });
 
-  it("the Insights tab: a small account has an n/a health score, no heat grid and no 100% claim, and its lists match its numbers", async () => {
+  it("the Insights tab: a small sample has an n/a health score, no heat grid and no 100% claim, and its lists match its numbers", async () => {
     const ins = await appointmentInsights(instA, null, NOW);
-    expect(ins.health.score).toBeNull();
+    // This account has data for 3 of the 4 checks (show rate, outcomes recorded, spread across people; nothing is due in the next 2 days), which is what the
+    // rule asks for, so it IS scored: points earned over the points the checks with data could give, and the check without data earns nothing.
+    const used = ins.health.parts.filter((p) => p.points !== null);
+    expect(ins.health.used).toBe(3);
+    expect(ins.health.parts.find((p) => p.label === "Confirmations")?.points).toBeNull();
+    expect(ins.health.score).toBe(Math.round((used.reduce((s, p) => s + (p.points as number), 0) / used.reduce((s, p) => s + p.max, 0)) * 100));
+    // One calendar's single appointment is a genuinely small sample: only 1 check has data, so the score is n/a.
+    const small = await appointmentInsights(instA, null, NOW, { filters: { calendar: "cal2" } });
+    expect(small.health.score).toBeNull();
+    expect(small.health.used).toBeLessThan(3);
     expect(ins.heat.ready).toBe(false);
     expect(ins.funnel.biggestLeak ?? "").not.toMatch(/100%/);
     expect(ins.funnel.steps.every((s) => s.members.length === Math.min(60, s.count))).toBe(true);

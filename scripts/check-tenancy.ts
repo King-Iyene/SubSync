@@ -254,6 +254,8 @@ async function main() {
       let refusedAt = 0;
       for (let i = 1; i <= 45 && !refusedAt; i++) if (!(await (await fetch(`${BASE}/audit/${idC}`)).text()).includes("Snapshot taken")) refusedAt = i;
       assert.ok(refusedAt > 0 && refusedAt <= 45, "a burst of lookups is eventually refused");
+      // The refusal lasts for the rest of the minute, for every later lookup from this address. Wait it out so the checks after this one see real pages.
+      await new Promise((r) => setTimeout(r, 61_000));
       await call("/api/app/audit/revoke", tokenA, { method: "POST", body: JSON.stringify({ id: idC }) });
     }
 
@@ -365,10 +367,12 @@ async function main() {
     }
 
     // The webhook: unsigned or wrongly signed deliveries change nothing.
+    // (Company B made its own share link earlier in this run, so compare with a snapshot taken now, not the one from the start.)
+    const snapBeforeWebhook = await before(B);
     const body = JSON.stringify({ type: "UNINSTALL", companyId: B.company, webhookId: "xtest-wh-1" });
     assert.equal((await fetch(`${BASE}/api/webhooks/ghl`, { method: "POST", body })).status, 401, "unsigned");
     assert.equal((await fetch(`${BASE}/api/webhooks/ghl`, { method: "POST", body, headers: { "x-ghl-signature": "AAAA" } })).status, 401, "wrong signature");
-    assert.deepEqual(await before(B), snap, "a refused webhook changed nothing");
+    assert.deepEqual(await before(B), snapBeforeWebhook, "a refused webhook changed nothing");
 
     // Public addresses: a delivery for one agency's connection cannot reach the other's data, and a guess finds nothing.
     const guess = await fetch(`${BASE}/api/hooks/fathom/${"Z".repeat(24)}`, { method: "POST", body: "{}" });

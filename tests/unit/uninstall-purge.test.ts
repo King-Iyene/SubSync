@@ -16,15 +16,16 @@ let required: Record<string, Col[]> = {};
 // Values that satisfy the database's allowed-value rules (read from pg_constraint).
 const ALLOWED: Record<string, string> = {
   "alerts.severity": "'info'", "appointment_events.kind": "'created'", "call_outcomes.outcome": "'answered'", "cleanup_changes.status": "'pending'",
-  "cleanup_runs.status": "'previewed'", "connections.status": "'connected'", "connections.provider": "'slack'", "deal_events.kind": "'created'",
+  "cleanup_runs.status": "'previewed'", "connections.status": "'connected'", "connections.provider": "'slack'", "deal_events.kind": "'created'", "contact_tag_events.kind": "'added'", "client_step_history.event": "'done'",
   "domain_checks.status": "'ok'", "duplicate_reviews.decision": "'keep'", "feedback_items.kind": "'feedback'", "user_connections.provider": "'fathom'", "meetings.provider": "'fathom'", "meeting_policies.scope": "'account'", "crm_writes.kind": "'note'", "meeting_notes.status": "'new'", "sync_jobs.type": "'locations'", "sync_jobs.status": "'pending'",
 };
 
-const literal = (table: string, c: Col, inst: string, loc: string, runId: string | null): string => {
+const literal = (table: string, c: Col, inst: string, loc: string, runId: string | null, connectionId: string | null): string => {
   if (ALLOWED[table + "." + c.column_name]) return ALLOWED[table + "." + c.column_name];
   if (c.column_name === "installation_id") return `'${inst}'::uuid`;
   if (c.column_name === "location_id") return `'${loc}'`;
   if (c.column_name === "run_id") return `'${runId}'::uuid`;
+  if (c.column_name === "connection_id") return `'${connectionId}'::uuid`; // a person's connection, created first (meeting_deliveries points at it)
   switch (c.data_type) {
     case "uuid": return "gen_random_uuid()";
     case "text": case "character varying": return `'x-${loc}'`; // unique per account, so two accounts can both be filled
@@ -46,14 +47,18 @@ async function fixture(): Promise<string> {
 
 async function fill(inst: string, loc: string, tables: readonly string[]) {
   let runId: string | null = null;
-  const order = [...tables].sort((a, b) => (a === "cleanup_runs" ? -1 : b === "cleanup_runs" ? 1 : 0)); // parent first
+  let connectionId: string | null = null;
+  const PARENTS = ["cleanup_runs", "user_connections"];
+  const rank = (t: string) => (PARENTS.includes(t) ? 0 : 1);
+  const order = [...tables].sort((a, b) => rank(a) - rank(b)); // parents first
   for (const t of order) {
     const cols = required[t] ?? [];
     if (!cols.some((c) => c.column_name === "installation_id")) continue;
     const names = cols.map((c) => `"${c.column_name}"`).join(", ");
-    const vals = cols.map((c) => literal(t, c, inst, loc, runId)).join(", ");
+    const vals = cols.map((c) => literal(t, c, inst, loc, runId, connectionId)).join(", ");
     const rows = await sql().unsafe(`insert into "${t}" (${names}) values (${vals}) returning *`);
     if (t === "cleanup_runs") runId = (rows[0] as unknown as { id: string }).id;
+    if (t === "user_connections") connectionId = (rows[0] as unknown as { id: string }).id;
   }
 }
 // One round trip for all tables: this link to the database is slow, and ~35 separate queries would not fit the time limit.

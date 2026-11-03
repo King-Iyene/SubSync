@@ -36,7 +36,7 @@ export const LOCATION_DELETE = [
   "account_metrics_daily", "alerts", "domain_checks", "onboarding_tasks",
   "deal_events", "appointment_events", "lead_touches", "call_outcomes", "contact_tag_events",
   "notification_states", "notifications", "notification_deliveries", "notification_destinations",
-  "crm_writes", "meeting_policies", "meeting_notes", "meeting_hooks", "account_profiles", "client_notes", "client_steps", "client_step_history", "sync_jobs", "locations",
+  "crm_writes", "meeting_policies", "meeting_notes", "meeting_hooks", "account_profiles", "client_notes", "feedback_items", "client_steps", "client_step_history", "sync_jobs", "locations",
 ] as const;
 
 /** Tables with a location column that the per-account purge leaves alone, with the reason. */

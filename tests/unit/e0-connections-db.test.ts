@@ -63,7 +63,8 @@ describe.skipIf(!HAS_DB)("connections against the real database (stage E0)", () 
     vi.stubEnv("FATHOM_CLIENT_ID", "fixture-id");
     vi.stubEnv("FATHOM_CLIENT_SECRET", "fixture-secret");
     for (const co of [CO_A, CO_B]) await sql()`delete from installations where company_id = ${co}`;
-    [{ id: instA }] = await sql()`insert into installations (company_id, company_name, plan) values (${CO_A}, 'zzE0 A', 'pro') returning id` as unknown as Array<{ id: string }>;
+    // Company A holds the permission to add notes to contacts (without it a matched meeting correctly waits as "needs_permission").
+    [{ id: instA }] = await sql()`insert into installations (company_id, company_name, plan, scope) values (${CO_A}, 'zzE0 A', 'pro', 'contacts.write users.readonly') returning id` as unknown as Array<{ id: string }>;
     [{ id: instB }] = await sql()`insert into installations (company_id, company_name, plan) values (${CO_B}, 'zzE0 B', 'pro') returning id` as unknown as Array<{ id: string }>;
     for (const [inst, loc, name] of [[instA, LA1, "zzE0 Client A1"], [instA, LA2, "zzE0 Client A2"], [instB, LB1, "zzE0 Client B1"]]) await sql()`insert into locations (installation_id, location_id, name) values (${inst}, ${loc}, ${name})`;
   });

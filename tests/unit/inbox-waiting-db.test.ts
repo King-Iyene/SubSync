@@ -40,7 +40,9 @@ describe.skipIf(!HAS_DB)("waiting conversations: the database and the rule agree
     const state = Object.fromEntries(rows.map((r) => [r.id as string, waitingState({ direction: r.d as string | null, at: r.at instanceof Date ? r.at.getTime() : null, type: r.t as string | null }, now, SLA)]));
     expect(state).toEqual({
       "inbox-sample-1": "waiting", "inbox-sample-2": "waiting", "inbox-sample-3": "pending", "inbox-sample-4": "waiting",
-      "inbox-sample-5": "waiting", "inbox-sample-6": "stale", "inbox-sample-7": "answered", "inbox-sample-8": "answered",
+      "inbox-sample-5": "waiting", "inbox-sample-6": "stale", "inbox-sample-7": "answered",
+      // An internal note is not a reply and says nothing about whether the customer was answered, so the rule does not judge it (stage E0, principle 14).
+      "inbox-sample-8": "none",
     });
     const list = await inbox(inst, SLA, 100_000);
     const flagged = new Set(list.filter((r) => r.overSla).map((r) => r.conversationId));

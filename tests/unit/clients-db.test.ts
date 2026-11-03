@@ -152,7 +152,7 @@ describe.skipIf(!HAS_DB)("clients: notes, onboarding steps, templates, trends", 
     for (const w of weeks) expect(w.members.length, "under the cap, the list is the count").toBe(w.count);
     expect(weeks.reduce((s, w) => s + w.showed, 0)).toBe(2);
     expect(weeks.reduce((s, w) => s + w.noShow, 0)).toBe(1);
-    expect(weeks.flatMap((w) => w.members).map((m) => m.name).sort()).toEqual(["Ada One", "Ada One", "Bo Two"].sort());
+    expect(weeks.flatMap((w) => w.members).map((m) => m.name).sort()).toEqual(["Ada One", "Bo Two", "Bo Two"]); // ap1 Ada (showed), ap2 Bo (no-show), ap4 Bo (showed); ap3 is Ada's and cancelled, so it is left out
   });
 
   it("a quarter's figures count only what happened inside it, from the same counted deals as every other screen", async () => {

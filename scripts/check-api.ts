@@ -305,7 +305,13 @@ async function main() {
   assert.equal((await call(`/api/app/clients/compare?a=${target.locationId}&b=${target.locationId}`, { token })).status, 400);
   const qbr = await call(`/api/app/qbr/${target.locationId}`, { token });
   assert.equal(qbr.status, 200);
-  assert.ok(qbr.body.history.length > 10 && qbr.body.client.activity.startsWith("In the last 30 days"));
+  // The review (C1) is per quarter: a quarter with its own figures, last quarter's for comparison, findings, a daily series and a quarter picker.
+  assert.match(qbr.body.quarter.key, /^\d{4}-Q[1-4]$/);
+  assert.ok(Array.isArray(qbr.body.quarters) && qbr.body.quarters.length >= 2);
+  assert.ok(qbr.body.facts && qbr.body.previousFacts && ["wins", "issues", "steps"].every((k) => Array.isArray(qbr.body.findings[k])));
+  assert.ok(Array.isArray(qbr.body.series.current) && Array.isArray(qbr.body.series.previous));
+  assert.ok(typeof qbr.body.client.activity === "string" && qbr.body.client.activity.length > 0);
+  assert.equal((await call(`/api/app/qbr/${target.locationId}?quarter=nope`, { token })).status, 400, "a bad quarter is refused");
   assert.equal((await call("/api/app/qbr/nope-not-here", { token })).status, 404);
   // put the demo account back the way it was
   assert.equal((await upd({ monthlyFee: null, renewalDate: null, industry: "Roofing", notes: null })).status, 200);
@@ -532,7 +538,7 @@ async function main() {
   await sql()`delete from usage_events where installation_id = (select id from installations where is_demo)`;
   const st1 = await call("/api/app/start", { token });
   assert.equal(st1.status, 200);
-  assert.equal(st1.body.steps.length, 13, "an agency owner sees thirteen steps: the guide for the owner, with the meeting step while that page is on (stage F8)");
+  assert.equal(st1.body.steps.length, 14, "an agency owner sees fourteen steps: the guide for the owner, with the meeting step while that page is on (stage F8) and the client fees step (stage C1)");
   assert.equal(st1.body.role, "agency_owner");
   assert.ok(st1.body.steps.every((s: { title: string; body: string }) => s.title && s.body));
   assert.equal(st1.body.steps.find((s: { id: string }) => s.id === "connected").done, true);
@@ -567,14 +573,17 @@ async function main() {
   assert.ok(ap.body.upcoming7 > 0 && ap.body.unmarkedTotal > 0 && ap.body.recoverTotal > 0 && ap.body.unconfirmedTotal > 0, "every to-do list has something");
   assert.ok(ap.body.recover.every((p: { url: string; name: string }) => p.name && p.url.includes("/contacts/detail/")));
   assert.equal(ap.body.access.needsPermission.length, 1, "the account that predates the permission is called out");
-  assert.ok(ap.body.byCalendar.length >= 3 && ap.body.byPerson.some((p: { label: string }) => p.label === "Dana Brooks"), "people use their names");
+  // Since F3 the per-calendar and per-person breakdowns are the filter choices (with counts), and the account state is in "access".
+  assert.ok(ap.body.options.calendars.length >= 3 && ap.body.options.users.some((p: { label: string }) => p.label === "Dana Brooks"), "people use their names");
   assert.equal(ap.body.canSeeAccounts, true);
-  assert.ok(ap.body.perAccount.some((a: { access: string }) => a.access === "needs_permission"));
+  assert.ok(ap.body.access.total > 1 && ap.body.access.needsPermission.length >= 1, "an agency sees every account, and which ones need the permission");
   const bap = await call("/api/app/appointments", { token: bt });
   assert.equal(bap.status, 200);
   assert.equal(bap.body.canSeeAccounts, false);
-  assert.ok(bap.body.perAccount.length === 1 && bap.body.perAccount[0].locationId === own, "a business sees only its own appointments");
-  assert.ok([...bap.body.recover, ...bap.body.unmarked, ...bap.body.unconfirmed].every((p: { locationName: string | null }) => p.locationName === bap.body.perAccount[0].name));
+  assert.equal(bap.body.access.total, 1, "a business sees only its own account");
+  assert.ok(bap.body.items.length > 0 && bap.body.items.every((p: { locationId: string }) => p.locationId === own), "a business sees only its own appointments");
+  const ownName = bap.body.items[0].locationName;
+  assert.ok([...bap.body.recover, ...bap.body.unmarked, ...bap.body.unconfirmed].every((p: { locationName: string | null }) => p.locationName === ownName));
   assert.equal((await call("/api/app/appointments", { token: ct })).status, 200, "a client view can see its own appointments");
   const nsq = await call("/api/app/call-queue?preset=noshow_recovery", { token });
   assert.equal(nsq.status, 200);
@@ -600,7 +609,7 @@ async function main() {
 
   const sc2 = await call("/api/app/setup-compare", { token });
   assert.equal(sc2.status, 200);
-  assert.ok(sc2.body.baseline && sc2.body.accounts.length >= 13 && sc2.body.rows.length === sc2.body.accounts.length - 1);
+  assert.ok(sc2.body.baseline && sc2.body.accounts.length >= 13 && Array.isArray(sc2.body.unrelated) && sc2.body.rows.length + sc2.body.unrelated.length === sc2.body.accounts.length - 1, "every other account is compared, or listed as unrelated when it shares no baseline (stage C1)");
   assert.ok(sc2.body.rows.every((r: { matches: boolean; notes: string[] }) => r.matches || r.notes.length > 0), "a differing account always says what differs");
   assert.equal((await call("/api/app/setup-compare?baseline=bad%20id!", { token })).status, 400);
   assert.equal((await call("/api/app/setup-compare", { token: bt })).status, 403, "agency only");
@@ -633,7 +642,8 @@ async function main() {
   assert.ok(onlyMedical((await call(`/api/app/call-queue${q}`, { token })).body.rows), "call queue");
   assert.ok(onlyMedical((await call(`/api/app/contact-intel${q}`, { token })).body.topLeads), "leads");
   assert.ok(onlyMedical((await call(`/api/app/pipeline-intel${q}`, { token })).body.accounts), "pipeline accounts");
-  assert.ok(onlyMedical((await call(`/api/app/appointments${q}`, { token })).body.perAccount), "appointments");
+  const medAppts = (await call(`/api/app/appointments${q}`, { token })).body;
+  assert.ok(medAppts.items.length > 0 && onlyMedical(medAppts.items) && medAppts.access.total === 3, "appointments");
   assert.ok(onlyMedical((await call(`/api/app/duplicates${q}`, { token })).body.groups), "duplicates");
   const fdaily = await call(`/api/app/daily${q}`, { token });
   assert.equal(fdaily.body.accounts, 3);

@@ -206,7 +206,7 @@ describe.skipIf(!HAS_DB)("Fathom per user against the real database (stage E2a)"
     await connect(admin, inst, KEY);
     await deliver(fathomPayload(), "msg_1");
     await sql()`insert into meeting_ignored_emails (installation_id, ghl_user_id, email) values (${inst}, ${admin.userId}, 'x@y.test')`;
-    await purgeInstallation(inst);
+    await purgeInstallation(CO); // takes the company id (as the uninstall webhook passes it), not the installation row id
     for (const t of ["user_connections", "meetings", "meeting_deliveries", "meeting_ignored_emails", "meeting_note_settings", "crm_writes"]) {
       expect((await sql().unsafe(`select count(*)::int n from ${t} where installation_id = '${inst}'`))[0].n, t).toBe(0);
     }

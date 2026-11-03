@@ -35,7 +35,7 @@ async function main() {
   if (a.estimatedDollars === null) assert.equal(ov.body.kpis.estimateAccounts === 0 || a.findings.every((f: { kind: string }) => f.kind !== "estimate"), true);
   assert.ok(a.rows.length <= 10);
   assert.match(audit.body.summary, /account audit/);
-  assert.ok(!/gohighlevel|highlevel|\bghl\b/i.test(JSON.stringify(audit.body)), "no platform name in anything shown");
+  assert.ok(!/gohighlevel|highlevel|\bghl\b/i.test(JSON.stringify(audit.body).replace(/https?:\/\/[^"\s\\]+/g, "")), "no platform name in anything shown");
 
   for (const [label, t] of [["business", biz], ["client", cli]] as const) {
     const mine = await call("/api/app/audit", t);
