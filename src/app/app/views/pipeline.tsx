@@ -135,11 +135,11 @@ export function PipelineView({ initialTab = 0 }: { initialTab?: number }) {
           <Stat label="Open pipeline" value={fmtMoney(data.totals.openValue)} sub={<>{fmtInt(data.totals.open)} open deals{data.outlier && <span className="mt-1 block text-warning">One deal ({fmtMoney(data.outlier.value)}) is {Math.round(data.outlier.share * 100)}% of this.</span>}</>} />
           <Stat label="Win rate" value={pct(data.totals.winRate)} sub={data.totals.winRate === null ? `${data.totals.won + data.totals.lost} closed so far. A win rate needs ${data.minClosedDeals}.` : `${data.totals.won} won, ${data.totals.lost} lost`} />
           <Stat label="Time to win" value={data.totals.avgCycleDays === null ? "n/a" : `${data.totals.avgCycleDays} ${data.totals.avgCycleDays === 1 ? "day" : "days"}`} sub="created to won" />
-          <Stat label="Likely revenue (estimate)" value={range === null ? "Not enough data" : fmtMoney(range.likely)} sub={<>{range ? <span className="block">Range {fmtMoney(range.low)} to {fmtMoney(range.high)}</span> : <span className="block">{f.method === "none" ? `Needs ${data.minClosedDeals} closed deals or stage chances you set.` : ""}</span>}<span className="block">An estimate. The method is on the Forecast tab.</span></>} />
+          <Stat label="Likely revenue (estimate)" value={range === null ? "Not enough data" : fmtMoney(range.likely)} sub={<>{range ? <span className="block">Range {fmtMoney(range.low)} to {fmtMoney(range.high)}</span> : <span className="block">{f.method === "none" ? `Needs ${data.minClosedDeals} closed deals or stage chances you set.` : ""}</span>}<span className="block">Estimate, not a fact. The method is on the Forecast tab.</span></>} />
         </div>
         {data.excluded.count > 0 && (
           <p className="mt-3 text-xs text-muted-foreground">
-            {fmtInt(data.excluded.count)} open {data.excluded.count === 1 ? "deal is" : "deals are"} left out: {fmtInt(data.excluded.closedOut ?? 0)} in a closed out stage or an unused pipeline, {fmtInt(data.excluded.noValue)} with no value, {fmtInt(data.excluded.noOwner)} with no owner. Amounts are as entered in each account. Currencies are not converted.
+            {fmtInt(data.excluded.count)} open {data.excluded.count === 1 ? "deal is" : "deals are"} not counted in these figures: {fmtInt(data.excluded.closedOut ?? 0)} in a closed-out stage or a pipeline not in use, {fmtInt(data.excluded.noValue)} with no value, {fmtInt(data.excluded.noOwner)} with no owner. Amounts are as entered in each account. Currencies are not converted.
           </p>
         )}
       </Block>

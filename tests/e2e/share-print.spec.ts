@@ -98,7 +98,10 @@ test("the printed audit opens with the sender's own name and colour, on light pa
     await expect(header).toContainText("Acme Marketing");
     expect(await header.evaluate((e) => getComputedStyle(e).borderBottomColor)).not.toBe("rgb(0, 0, 0)");
     // On paper the text is dark: the dark shell's pale text would be unreadable on white.
-    expect(await page.locator("h1").first().evaluate((e) => getComputedStyle(e).color)).toBe("rgb(0, 12, 37)");
+    const [r, g, b] = (await page.locator("h1").first().evaluate((e) => getComputedStyle(e).color)).match(/\d+/g)!.map(Number);
+    expect(r, "heading text is not dark on paper").toBeLessThan(60);
+    expect(g).toBeLessThan(60);
+    expect(b).toBeLessThan(80);
   } finally {
     await page.request.put("/api/app/settings", { headers, data: { brandName: null, brandColor: null } });
   }

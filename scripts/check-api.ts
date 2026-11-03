@@ -609,8 +609,8 @@ async function main() {
   assert.equal(brandOk.body.settings.brandName, "Acme Marketing");
   assert.equal(brandOk.body.settings.brandColor, "#1d4ed8", "colours are stored in lower case");
   const qb = await call(`/api/app/qbr/${roofing.locationId}`, { token });
-  assert.deepEqual(qb.body.brand, { name: "Acme Marketing", color: "#1d4ed8" });
-  assert.deepEqual((await call(`/api/app/accounts/${roofing.locationId}`, { token })).body.brand, { name: "Acme Marketing", color: "#1d4ed8" });
+  assert.deepEqual(qb.body.brand, { name: "Acme Marketing", color: "#1d4ed8", logoUrl: null });
+  assert.deepEqual((await call(`/api/app/accounts/${roofing.locationId}`, { token })).body.brand, { name: "Acme Marketing", color: "#1d4ed8", logoUrl: null });
   assert.equal((await putBrand({ brandName: null, brandColor: null })).body.settings.brandName, null);
 
   const sc2 = await call("/api/app/setup-compare", { token });

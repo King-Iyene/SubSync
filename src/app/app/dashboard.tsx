@@ -389,7 +389,7 @@ export function Dashboard() {
             <BrandLogo
               url={auth.brand.logoUrl} name={auth.brand.name ?? "SubSync"} height={36} className="max-w-full"
               fallback={<>
-                <ProductMark height={32} />
+                {!auth.brand.name && <ProductMark height={32} />}
                 <span className="text-[1.05rem] font-semibold tracking-tight text-sidebar-accent-foreground">{auth.brand.name ?? "SubSync"}</span>
               </>}
             />

@@ -103,7 +103,7 @@ export function AuditView({ go }: { go: GoFn }) {
         <style dangerouslySetInnerHTML={{ __html: printCss(data.brand.color) }} />
         {/* The printed page opens with the sender's own name and colour. Nothing else carries a product name. */}
         <div className="mb-4 hidden border-b-2 pb-3 print:block" data-testid="audit-print-header" style={{ borderColor: accent ?? "var(--primary)" }}>
-          <BrandLogo url={data.brand.logoUrl} name={data.brand.name} height={40} className="mb-2" fallback={<ProductMark height={40} className="mb-2" />} />
+          <BrandLogo url={data.brand.logoUrl} name={data.brand.name} height={40} className="mb-2" fallback={data.brand.name ? undefined : <ProductMark height={40} className="mb-2" />} />
           <p className="text-xl font-semibold" style={{ color: accent ?? "var(--primary)" }}>{data.brand.name ?? "Account audit"}</p>
           <p className="text-sm text-muted-foreground">{data.brand.name ? "Account audit" : "Prepared"} for {a.accountsScanned} client {a.accountsScanned === 1 ? "account" : "accounts"}, {longDate(data.generatedAt)}</p>
         </div>

@@ -79,7 +79,7 @@ export function ReviewsTab({ accounts }: { accounts: Array<{ locationId: string;
         <article className="qbr-print space-y-6 border-t pt-5 print:border-0 print:pt-0" data-testid="qbr">
           <style dangerouslySetInnerHTML={{ __html: printCss(data.brand.color, ".qbr-print") }} />
           <header className="border-b-4 pb-3" style={{ borderColor: accent ?? "var(--primary)" }} data-testid="qbr-header">
-            <BrandLogo url={data.brand.logoUrl} name={data.brand.name} height={40} className="mb-2" fallback={<ProductMark height={40} className="mb-2" />} />
+            <BrandLogo url={data.brand.logoUrl} name={data.brand.name} height={40} className="mb-2" fallback={data.brand.name ? undefined : <ProductMark height={40} className="mb-2" />} />
             {data.brand.name && <p className="mb-2 text-lg font-semibold" style={{ color: accent ?? undefined }}>{data.brand.name}</p>}
             <p className="text-xs uppercase tracking-wide text-muted-foreground">Quarterly business review</p>
             <h2 className="text-2xl font-semibold tracking-tight">{c.name ?? "Client"}</h2>
