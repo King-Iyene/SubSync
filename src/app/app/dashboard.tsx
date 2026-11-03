@@ -410,10 +410,17 @@ export function Dashboard() {
                 You opened this from inside a client account, so every page shows only that account.
               </InlineAlert>
             )}
-            {auth.kind === "agency" && baseApi && !fromAccount && <ApiProvider value={baseApi}><FilterDrawer kind="agency" value={filter} onChange={setFilter} /></ApiProvider>}
-            <div className="mb-1 flex justify-end print:hidden"><NotificationBell go={go} /></div>
             {back && <BackLink label={back.label} onClick={back.go} />}
-            {NAV_FOR[auth.kind].has("search") && !off("search") && <GlobalSearch go={go} />}
+            {/* One slim row above every page: which client accounts are counted on the left, search and notifications on the right (D1; was four stacked blocks). */}
+            <div className="mb-3 flex flex-wrap items-start gap-x-4 gap-y-1 print:hidden" data-testid="toolbar">
+              <div className="min-w-0 flex-1">
+                {auth.kind === "agency" && baseApi && !fromAccount && <ApiProvider value={baseApi}><FilterDrawer kind="agency" value={filter} onChange={setFilter} /></ApiProvider>}
+              </div>
+              <div className="ml-auto flex shrink-0 items-center">
+                {NAV_FOR[auth.kind].has("search") && !off("search") && <GlobalSearch go={go} />}
+                <NotificationBell go={go} />
+              </div>
+            </div>
             <StatusLine /><BackProvider value={back}>{content}</BackProvider>
             <FeedbackBox page={view.id} />
           </main>

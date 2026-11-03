@@ -65,7 +65,7 @@ export function RoadmapView() {
                     <p className="flex flex-wrap items-center gap-2 font-medium">{i.title} <Badge tone={tone}>{i.label}</Badge></p>
                     <p className="text-sm text-muted-foreground">{i.body}</p>
                   </div>
-                  {status !== "shipped" && <Btn variant={i.voted ? "ghost" : undefined} disabled={busy === i.key} onClick={() => vote(i.key)}>{i.voted ? "Voted" : "Vote"} · {i.votes}</Btn>}
+                  {status !== "shipped" && <span className="shrink-0 whitespace-nowrap"><Btn variant={i.voted ? "ghost" : undefined} disabled={busy === i.key} onClick={() => vote(i.key)}>{i.voted ? "Voted" : "Vote"} · {i.votes}</Btn></span>}
                 </li>
               ))}
             </ul>

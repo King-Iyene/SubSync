@@ -1,7 +1,8 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { EmptyState, ErrorState } from "./ds/states";
+import { CountUp } from "./ds/count-up";
+import { EmptyState, ErrorState, Skeleton } from "./ds/states";
 import type { ApiError } from "./session";
 import type { Band } from "./types";
 
@@ -57,26 +58,29 @@ export const severityTone = (s: string): Tone => (s === "critical" ? "bad" : s =
 
 // ---------- layout ----------
 
+// A block of the page: a heading over a thin rule, no box (D1: no card inside a card). Lists, charts and the key-figure strip draw their own edges.
 export function Card({ title, action, children, className = "" }: { title?: string; action?: ReactNode; children: ReactNode; className?: string }) {
   return (
-    <section className={`min-w-0 rounded-lg border bg-card text-card-foreground print:break-inside-avoid ${className}`}>
+    <section className={`min-w-0 border-t pt-5 print:break-inside-avoid ${className}`}>
       {(title || action) && (
-        <header className="flex items-center justify-between gap-3 border-b px-4 py-3">
-          {title && <h2 className="text-[0.9rem] font-semibold">{title}</h2>}
+        <header className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+          {title && <h2 className="text-base font-semibold">{title}</h2>}
           {action}
         </header>
       )}
-      <div className="p-4">{children}</div>
+      <div>{children}</div>
     </section>
   );
 }
 
+// One key figure: a small label, a large number that counts up once, and a line under it. No box: a row of these reads as a strip of figures with a
+// thin colour rule on the left, which is what separates it from the boxed lists and charts around it.
 export function Stat({ label, value, sub, tone }: { label: ReactNode; value: ReactNode; sub?: ReactNode; tone?: Tone }) {
+  const rule = tone === "bad" ? "border-destructive" : tone === "warn" ? "border-warning" : tone === "good" ? "border-success" : "border-border";
   return (
-    <div className="relative overflow-hidden rounded-lg border bg-card p-4 pl-5">
-      <span aria-hidden className={`absolute inset-y-0 left-0 w-0.5 ${tone === "bad" ? "bg-destructive" : tone === "warn" ? "bg-warning" : tone === "good" ? "bg-success" : "bg-border"}`} />
+    <div className={`min-w-0 border-l-2 py-0.5 pl-4 ${rule}`}>
       <p className="text-xs font-medium text-muted-foreground">{label}</p>
-      <p className={`tnum mt-1.5 text-[1.7rem] font-semibold leading-none tracking-tight ${tone === "bad" ? "text-destructive" : tone === "warn" ? "text-warning" : tone === "good" ? "text-success" : ""}`}>{value}</p>
+      <p className={`tnum mt-1.5 break-words text-[1.7rem] font-semibold leading-none tracking-tight ${tone === "bad" ? "text-destructive" : tone === "warn" ? "text-warning" : tone === "good" ? "text-success" : ""}`}><CountUp value={value} /></p>
       {sub && <div className="mt-2 text-xs leading-5 text-muted-foreground">{sub}</div>}
     </div>
   );
@@ -98,11 +102,15 @@ export function Empty({ title, body }: { title: string; body?: string }) {
   return <EmptyState title={title} body={body} />;
 }
 
+// While a page loads: grey blocks the shape of what is coming (a title, a strip of figures, a few rows), so the page does not jump. The words stay
+// for a screen reader. (Was a spinner before D1.)
 export function Loading({ label = "Loading..." }: { label?: string }) {
   return (
-    <p className="flex items-center justify-center gap-2 py-10 text-center text-sm text-muted-foreground" role="status">
-      <span aria-hidden className="size-4 animate-spin rounded-full border-2 border-primary/25 border-t-primary" />{label}
-    </p>
+    <div role="status" aria-busy="true" aria-label={label} data-testid="loading" className="space-y-6 py-2">
+      <div className="flex gap-8">{[0, 1, 2].map((i) => <div key={i} className="w-28 space-y-2"><Skeleton className="h-3 w-16" /><Skeleton className="h-8 w-24" /></div>)}</div>
+      <div className="space-y-3">{[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
+      <span className="sr-only">{label}</span>
+    </div>
   );
 }
 
@@ -187,8 +195,9 @@ export function StackedBar({ parts }: { parts: Array<{ label: string; value: num
 export function Table({ head, children }: { head: ReactNode; children: ReactNode }) {
   return (
     <div className="overflow-x-auto rounded-xl border bg-card print:overflow-visible">
-      <table className="w-full min-w-[640px] text-sm">
-        <thead className="border-b bg-muted/60 text-left text-[0.7rem] uppercase tracking-wide text-muted-foreground">{head}</thead>
+      {/* On a phone the table scrolls sideways inside its own frame and the first column (the name) stays put, so a row is never nameless. */}
+      <table className="w-full min-w-[640px] text-sm [&_tbody_td:first-child]:sticky [&_tbody_td:first-child]:left-0 [&_tbody_td:first-child]:z-[1] [&_tbody_td:first-child]:bg-card [&_thead_th:first-child]:sticky [&_thead_th:first-child]:left-0 [&_thead_th:first-child]:z-[1] [&_thead_th:first-child]:bg-muted">
+        <thead className="border-b bg-muted text-left text-[0.7rem] uppercase tracking-wide text-muted-foreground">{head}</thead>
         <tbody className="divide-y [&>tr]:transition-colors [&>tr:hover]:bg-accent/40">{children}</tbody>
       </table>
     </div>

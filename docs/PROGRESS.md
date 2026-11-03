@@ -22,6 +22,7 @@ Evidence: `docs/features/F4.md` (F6: `docs/features/F6.md`). From S0.3 on King d
 | F3 | Appointments | Built, verified (King's CRM checks pending, no wait) |
 | F6 | Account audit and Share link | Built, verified (M1 complete) |
 | F4 | Inbox and SLA | Built, verified |
+| D1 | Design polish, light and dark, Mode A review | BUILT, awaiting King's sign-off (3 Nov): flat blocks, one toolbar row, count-up and skeleton motion (off under reduced motion), contrast fixed, 5 S1 fixed, plan for the rest in DECISIONS. `docs/features/D1.md` |
 | F5 | Today | Built, verified |
 | F7 | Accounts | Built (tests run at the end) |
 | F8 | Settings, Getting started, What's new | Built (tests run at the end) |

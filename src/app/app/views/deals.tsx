@@ -38,7 +38,7 @@ function Hygiene() {
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox error={error} onRetry={reload} />;
   if (!data) return null;
-  const cell = (n: number) => (n > 0 ? <span className="text-amber-600 dark:text-amber-400">{fmtInt(n)}</span> : "0");
+  const cell = (n: number) => (n > 0 ? <span className="text-warning">{fmtInt(n)}</span> : "0");
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

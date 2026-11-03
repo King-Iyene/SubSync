@@ -12,10 +12,10 @@ import { useData } from "../session";
 // nothing to choose between is not drawn, and the bar is absent on a page that is about one account. Whatever is hidden is said in words, with the way
 // to bring it back. The value lives in the page address (src/lib/design/route.ts), so it is carried in a link and survives a reload.
 
-const select = "min-h-9 min-w-0 max-w-full rounded-lg border bg-card px-2.5 py-1.5 text-sm outline-none hover:border-primary/30 focus-visible:ring-2 focus-visible:ring-ring/30";
+const select = "ds-press min-h-9 min-w-0 max-w-full rounded-lg border bg-card px-2.5 py-1.5 text-sm outline-none hover:border-primary/30 focus-visible:ring-2 focus-visible:ring-ring/30";
 
 function Labelled({ label, children }: { label: string; children: React.ReactNode }) {
-  return <label className="flex min-w-0 max-w-full items-center gap-1.5 text-xs text-muted-foreground"><span className="shrink-0 font-medium">{label}</span>{children}</label>; // min-w-0 and max-w-full: a long choice must shrink on a phone, never push the page sideways
+  return <label className="flex min-w-0 max-w-full flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-muted-foreground"><span className="font-medium">{label}</span>{children}</label>;
 }
 
 function AccountPicker({ accounts, picked, onChange }: { accounts: Array<{ id: string; name: string }>; picked: string[]; onChange: (ids: string[]) => void }) {
@@ -72,16 +72,16 @@ function Pick({ label, choices, value, onChange, any }: { label: string; choices
 }
 
 // KF-2: which client accounts are in, by name (removable), and which are left out and why. The numbers use the same rules (segmentSet on the server).
-export function AccountScope({ options, value, onChange }: { options: FilterOptions; value: FilterValue; onChange: (v: FilterValue) => void }) {
+export function AccountScope({ options, value, onChange, className = "mt-2 space-y-1 text-xs" }: { options: FilterOptions; value: FilterValue; onChange: (v: FilterValue) => void; className?: string }) {
   const live = (options.accounts ?? []).filter((a) => !a.ignored);
   if (live.length < 2) return null;
   const scope = scopeOf(value, options);
   const remove = (id: string) => onChange({ ...value, accounts: value.accounts.length > 0 ? value.accounts.filter((x) => x !== id) : scope.included.filter((a) => a.id !== id).map((a) => a.id) });
   const names = scope.included.map((a) => a.name);
   return (
-    <div className="mt-2 space-y-1 text-xs" data-testid="account-scope">
-      <details>
-        <summary className="cursor-pointer select-none text-muted-foreground" data-testid="account-scope-summary">
+    <div className={className} data-testid="account-scope">
+      <details className="open:basis-full">
+        <summary className="cursor-pointer select-none rounded text-muted-foreground hover:text-foreground" data-testid="account-scope-summary">
           <span className="font-medium text-foreground">{scope.included.length === live.length ? `All ${live.length} client accounts` : `${scope.included.length} of ${live.length} client accounts`}</span>
           {names.length > 0 && scope.included.length !== live.length ? `: ${nameList(names)}` : ""}
         </summary>
@@ -95,8 +95,8 @@ export function AccountScope({ options, value, onChange }: { options: FilterOpti
         </ul>
       </details>
       {scope.left.length > 0 && (
-        <details data-testid="account-left-out">
-          <summary className="cursor-pointer select-none text-muted-foreground">Left out ({scope.left.length})</summary>
+        <details data-testid="account-left-out" className="open:basis-full">
+          <summary className="cursor-pointer select-none rounded text-muted-foreground hover:text-foreground">Left out ({scope.left.length})</summary>
           <ul className="mt-1.5 space-y-0.5">
             {scope.left.map((a) => <li key={a.id}><span className="font-medium">{a.name}</span> <span className="text-muted-foreground">: {a.reason}</span></li>)}
           </ul>
@@ -180,15 +180,18 @@ export function FilterDrawer({ kind, value, onChange }: { kind: FilterKind; valu
   }, [data]);
   if (!options || data!.total < 2 || visibleControls(kind, options).length === 0) return null;
   const notes = describeHidden(value, options);
+  // One quiet row: "Filter accounts", which client accounts are counted, and which are left out. Opening one of them gives it the full width underneath (D1).
   return (
-    <div className="mb-3 print:hidden">
-      <details className="rounded-lg border bg-card px-3 py-2" data-testid="filter-drawer">
-        <summary className="cursor-pointer text-sm font-medium">Filter accounts{isFiltered(value) ? " (on)" : ""}</summary>
-        <div className="mt-2"><ScopeFilterBar kind={kind} options={options} value={value} onChange={onChange} hideScope /></div>
-      </details>
-      <AccountScope options={options} value={value} onChange={onChange} />
+    <div className="print:hidden" data-testid="filter-row">
+      <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1 text-xs">
+        <details className="open:order-last open:basis-full" data-testid="filter-drawer">
+          <summary className="ds-press -ml-2 inline-flex min-h-8 cursor-pointer select-none items-center rounded-lg px-2 text-sm font-medium hover:bg-muted">Filter accounts{isFiltered(value) ? " (on)" : ""}</summary>
+          <div className="mt-2 text-sm"><ScopeFilterBar kind={kind} options={options} value={value} onChange={onChange} hideScope /></div>
+        </details>
+        <AccountScope options={options} value={value} onChange={onChange} className="contents" />
+      </div>
       {notes.length > 0 && (
-        <ul className="mt-1.5 space-y-0.5 px-1 text-xs text-muted-foreground" data-testid="filter-hidden-summary">
+        <ul className="mt-1 space-y-0.5 text-xs text-muted-foreground" data-testid="filter-hidden-summary">
           {notes.map((n) => <li key={n.text}>{n.text} <button type="button" className="font-medium text-primary underline" onClick={() => onChange({ ...value, ...n.clear })}>{n.clear.hideTest === false ? "Show them" : "Show all"}</button></li>)}
         </ul>
       )}

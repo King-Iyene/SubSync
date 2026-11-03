@@ -125,7 +125,7 @@ export function SpeedView({ go }: { go: GoFn }) {
             return (
               <Card title="Are replies getting faster?" className="mt-6">
                 <CardRange state={range} label="Replies by week" compares={["none", "previous"]} maxDays={56} />
-                <p className="mb-3 mt-3 text-xs text-muted-foreground">The share of new leads answered by a person inside your {data.targetMinutes}-minute target, by the week the lead came in. A week with fewer than 5 leads shows no bar. Click a bar to see its leads.</p>
+                <p className="mb-3 mt-3 text-xs text-muted-foreground">New leads answered by a person inside your {data.targetMinutes}-minute target, by week. A week with fewer than 5 leads has no bar. Click a bar to see its leads.</p>
                 {cmp?.change && <p className="mb-3 text-sm" data-testid="trend-compare">{cmp.change.text}.</p>}
                 {win?.compare && cmp && !cmp.covered && <p className="mb-3 text-xs text-muted-foreground" data-testid="trend-compare-missing">There is not enough history to compare with {win.compare.label}: only 8 weeks are kept so far.</p>}
                 {noBars ? (

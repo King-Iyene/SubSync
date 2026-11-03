@@ -132,7 +132,7 @@ export function AuditView({ go }: { go: GoFn }) {
           </div>
         )}
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-x-10 gap-y-6 sm:grid-cols-2">
           <div>
             <Stat
               label={tip("stale", "Deals that stopped moving")} value={fmtMoney(a.staleDollars)} tone={a.staleDollars > 0 ? "warn" : undefined}
@@ -166,24 +166,24 @@ export function AuditView({ go }: { go: GoFn }) {
         {a.findings.length === 0 ? (
           <EmptyState title="Nothing urgent" body="No stale deals, waiting conversations or unmarked appointments across the accounts you can see. Run it again after your next sync." />
         ) : (
-          <ul className="space-y-3">
+          <ul className="divide-y border-y">
             {a.findings.map((f, i) => (
-              <li key={f.key + i} className="rounded-lg border bg-card p-4" data-testid="audit-finding">
+              <li key={f.key + i} className="ds-row grid gap-x-8 gap-y-3 px-1 py-4 md:grid-cols-[minmax(0,1fr)_auto]" data-testid="audit-finding">
                 <div className="min-w-0">
-                  <div className="mb-1 flex flex-wrap items-center gap-2">
+                  <div className="mb-1 flex flex-wrap items-center gap-x-3 gap-y-1">
                     <Badge tone={tone[f.severity]}>{label[f.severity]}</Badge>
                     {f.kind === "estimate" && <Badge tone="info">Estimate</Badge>}
                     {f.kind === "fact" && tip(f.note, <Badge tone="neutral">Counted</Badge>)}
                     {f.kind !== "fact" && f.note && f.note !== "estimate" && tip(f.note, <span className="text-xs text-muted-foreground">How this is counted</span>)}
                   </div>
                   <p className="font-medium">{f.title}</p>
-                  <p className="mt-1 text-sm text-muted-foreground">{f.detail}</p>
+                  <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{f.detail}</p>
                   {f.window && <p className="mt-1 text-xs text-muted-foreground">Counted over: {f.window}.</p>}
                   <p className="mt-2 text-sm"><span className="font-medium">What to do:</span> {f.fix}</p>
-                  <div className="mt-3 flex flex-wrap gap-2 print:hidden">
-                    {listButton(f, i)}
-                    <Btn variant={canOpenList(f) ? "ghost" : "secondary"} onClick={() => go(f.view)}>{openLabel(f.view)}</Btn>
-                  </div>
+                </div>
+                <div className="flex flex-wrap content-start gap-2 md:w-56 md:flex-col md:items-stretch print:hidden [&>button]:justify-center">
+                  {listButton(f, i)}
+                  <Btn variant={canOpenList(f) ? "ghost" : "secondary"} onClick={() => go(f.view)}>{openLabel(f.view)}</Btn>
                 </div>
               </li>
             ))}

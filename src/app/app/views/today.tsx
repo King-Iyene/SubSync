@@ -238,26 +238,25 @@ export function TodayView({ go }: { go: GoFn }) {
           <EmptyState compact title="Nothing needs you today" body={`${noun[0].toUpperCase() + noun.slice(1)} ${single ? "is" : "are"} all within ${single ? "its" : "their"} own normal range. Replies, deals, new leads and setup were all checked.`} />
         ) : (
           <ul className="divide-y border-y" data-testid="attention-list">
-            {d.attention.map((a, i) => (
-              <li key={a.locationId} className="py-4">
-                <div className="mb-2 flex flex-wrap items-center gap-2">
-                  {!single && <span className="tnum text-sm text-muted-foreground">{i + 1}.</span>}
-                  {!single && <span className="font-medium">{a.name}</span>}
-                  <Badge tone={tone(a.severity)}>{a.severity === "critical" ? "Do first" : a.severity === "warning" ? "Soon" : "When you can"}</Badge>
-                </div>
-                <ul className={`space-y-2 ${single ? "" : "pl-6"}`}>
-                  {a.items.map((it) => (
-                    <li key={it.kind} className="text-sm"><span className="font-medium">{it.title}.</span> <span className="text-muted-foreground">{it.detail}</span></li>
-                  ))}
-                </ul>
-                <div className={`mt-3 flex flex-wrap items-center gap-3 ${single ? "" : "pl-6"}`}>
-                  {single
-                    ? <Btn onClick={() => go(accountPage, a.locationId)}>Open the full account page</Btn>
-                    : <Btn onClick={() => go("today", a.locationId)}>Open this account&apos;s Today</Btn>}
-                  <ExtLink href={a.url}>Open in your CRM</ExtLink>
-                </div>
-              </li>
-            ))}
+              {d.attention.map((a, i) => (
+                <li key={a.locationId} className="ds-row grid gap-x-6 gap-y-2 px-1 py-4 md:grid-cols-[13rem_minmax(0,1fr)_auto]">
+                  <div className="flex flex-wrap items-start gap-x-2 gap-y-1 md:block">
+                    {!single && <p className="font-medium"><span className="tnum mr-1.5 text-muted-foreground">{i + 1}.</span>{a.name}</p>}
+                    <div className="md:mt-1"><Badge tone={tone(a.severity)}>{a.severity === "critical" ? "Do first" : a.severity === "warning" ? "Soon" : "When you can"}</Badge></div>
+                  </div>
+                  <ul className="space-y-1.5">
+                    {a.items.map((it) => (
+                      <li key={it.kind} className="text-sm"><span className="font-medium">{it.title}.</span> <span className="text-muted-foreground">{it.detail}</span></li>
+                    ))}
+                  </ul>
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 md:w-48 md:flex-col md:items-end md:gap-y-0.5 [&>button]:-mr-3.5">
+                    {single
+                      ? <Btn variant="ghost" onClick={() => go(accountPage, a.locationId)}>Open the full account page</Btn>
+                      : <Btn variant="ghost" onClick={() => go("today", a.locationId)}>Open this account&apos;s Today</Btn>}
+                    <span className="text-sm"><ExtLink href={a.url}>Open in your CRM</ExtLink></span>
+                  </div>
+                </li>
+              ))}
           </ul>
         )}
         <div className="mt-3"><Btn variant="ghost" onClick={() => go("alerts")}>See every open alert and dismiss resolved ones</Btn></div>

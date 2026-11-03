@@ -134,13 +134,13 @@ describe("the Details and billing tab (KF-7)", () => {
 
   it("is plain (no pill, dot or glow) and the playbooks section can be left out when its switch is off", () => {
     expect(m).not.toMatch(/bg-gradient|blur|ring-1/);
-    // The only round things are the shared help button and the loading spinner; this tab adds none.
-    expect((m.match(/rounded-full/g) ?? []).length).toBe((m.match(/aria-label="What /g) ?? []).length + (m.match(/animate-spin/g) ?? []).length);
+    // The only round things are the shared help button; this tab adds none, and the loading placeholder (grey blocks since D1) has none either.
+    expect((m.match(/rounded-full/g) ?? []).length).toBe((m.match(/aria-label="What /g) ?? []).length);
     expect(m).not.toContain("tel:");
-    // The playbooks section loads its own data (a spinner in this static render); with its switch off it is not drawn at all.
+    // The playbooks section loads its own data (a loading placeholder in this static render); with its switch off it is not drawn at all.
     const off = html(withApi(el(DetailsTab, { data: empty, reload: noop, go: noop, showPlaybooks: false })));
-    expect((m.match(/animate-spin/g) ?? []).length).toBe(1);
-    expect((off.match(/animate-spin/g) ?? []).length).toBe(0);
+    expect((m.match(/data-testid="loading"/g) ?? []).length).toBe(1);
+    expect((off.match(/data-testid="loading"/g) ?? []).length).toBe(0);
   });
 });
 

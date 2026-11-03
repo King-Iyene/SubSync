@@ -11,11 +11,11 @@ export const SUBTITLE_MAX = 120;
 
 export function Page({ title, subtitle, actions, children }: { title: string; subtitle?: string; actions?: ReactNode; children: ReactNode }) {
   return (
-    <div data-testid="page">
+    <div data-testid="page" className="ds-enter">
       <header className="mb-6 flex flex-wrap items-start justify-between gap-x-4 gap-y-3 border-b pb-5">
         <div className="min-w-0">
           <h1 className="text-[1.65rem] font-semibold leading-tight tracking-tight">{title}</h1>
-          {subtitle && <p className="mt-1.5 line-clamp-2 max-w-2xl text-sm leading-6 text-muted-foreground" data-testid="page-subtitle">{subtitle}</p>}
+          {subtitle && <p className="mt-1.5 line-clamp-3 max-w-2xl sm:line-clamp-2 text-sm leading-6 text-muted-foreground" data-testid="page-subtitle">{subtitle}</p>}
         </div>
         {actions && <div className="flex flex-wrap gap-2 print:hidden">{actions}</div>}
       </header>
@@ -79,7 +79,7 @@ export function ModuleTabs({ tabs, start = 0, value, onChange, label = "Sections
             className={`-mb-px inline-flex min-h-10 shrink-0 items-center gap-1.5 border-b-2 py-2 text-sm transition-colors ${n === i ? "border-primary font-medium text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}>{t.label}{t.badge}</button>
         ))}
       </div></div>
-      <div role="tabpanel" id={`${base}-p${i}`} aria-labelledby={`${base}-t${i}`}>{tabs[i].node}</div>
+      <div key={i} role="tabpanel" id={`${base}-p${i}`} aria-labelledby={`${base}-t${i}`} className="ds-enter">{tabs[i].node}</div>
     </div>
   );
 }

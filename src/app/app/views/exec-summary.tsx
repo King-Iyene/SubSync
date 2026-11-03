@@ -26,7 +26,7 @@ function Arrow({ pct, previous, money }: { pct: number | null; previous: number 
   if (pct === null) return <span className="text-xs text-muted-foreground">was {money ? fmtMoney(previous) : fmtInt(previous)} before (too small a base for a percentage)</span>;
   if (pct === 0) return <span className="text-xs text-muted-foreground">no change</span>;
   const up = pct > 0;
-  return <span className={`text-xs font-medium ${up ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>{up ? "▲" : "▼"} {Math.abs(pct)}% vs before</span>;
+  return <span className={`text-xs font-medium ${up ? "text-success" : "text-destructive"}`}>{up ? "▲" : "▼"} {Math.abs(pct)}% vs before</span>;
 }
 
 // The one card to glance at: three numbers with their direction, goal progress, and anything unusual.
@@ -102,7 +102,7 @@ export function ExecSummary() {
               </div>
             ))}
           </div>
-          <div className="mt-3 flex items-center gap-3"><Btn variant="primary" onClick={save}>Save goals</Btn>{msg && <span className="text-sm text-red-600" role="alert">{msg}</span>}</div>
+          <div className="mt-3 flex items-center gap-3"><Btn variant="primary" onClick={save}>Save goals</Btn>{msg && <span className="text-sm text-destructive" role="alert">{msg}</span>}</div>
         </div>
       )}
     </Card>

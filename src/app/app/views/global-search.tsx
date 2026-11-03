@@ -38,11 +38,9 @@ export function GlobalSearch({ go }: { go: GoFn }) {
 
   return (
     <>
-      <div className="mb-3 flex justify-end print:hidden">
-        <button type="button" onClick={() => setOpen(true)} className="inline-flex min-h-9 items-center gap-2 border-b border-transparent px-2 text-sm text-muted-foreground hover:border-border hover:text-foreground" data-testid="global-search-open" aria-label="Search people, Control K">
-          <Search aria-hidden className="size-4" />Search people <kbd className="text-xs text-muted-foreground/80">Ctrl K</kbd>
-        </button>
-      </div>
+      <button type="button" onClick={() => setOpen(true)} className="ds-press inline-flex min-h-9 items-center gap-2 rounded-lg px-2.5 text-sm text-muted-foreground hover:bg-muted hover:text-foreground print:hidden" data-testid="global-search-open" aria-label="Search people, Control K">
+        <Search aria-hidden className="size-4" /><span className="hidden sm:inline">Search people</span> <kbd className="hidden font-sans text-xs text-muted-foreground sm:inline">Ctrl K</kbd>
+      </button>
       {open && (
         <div className="fixed inset-0 z-40 print:hidden" data-testid="global-search">
           <div className="absolute inset-0 bg-black/45" onClick={close} aria-hidden />
