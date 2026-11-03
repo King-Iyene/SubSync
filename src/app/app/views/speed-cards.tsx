@@ -1,5 +1,6 @@
 "use client";
 
+import { CountUp } from "../ds/count-up";
 import { useState, type ReactNode } from "react";
 import { shareChange } from "@/lib/design/range";
 import { autoLine, autoVsHumanLines, copyLine, leadStatus, personProgressText, unknownSourceAction } from "@/lib/design/speed-text";
@@ -74,12 +75,12 @@ export const leadCopy = (showAccount: boolean) => (l: LeadView) => copyLine({ ..
 
 // A figure that opens its list. A real button (not a card with a click handler), so the keyboard and screen readers get it.
 function ClickStat({ label, value, sub, tone, active, onClick, openLabel }: { label: string; value: ReactNode; sub?: ReactNode; tone?: "bad" | "warn" | "good"; active: boolean; onClick: () => void; openLabel: string }) {
+  const rule = tone === "bad" ? "border-destructive" : tone === "warn" ? "border-warning" : tone === "good" ? "border-success" : "border-border";
   return (
     <button type="button" onClick={onClick} aria-pressed={active} aria-label={openLabel} data-testid="click-stat"
-      className="relative block w-full overflow-hidden rounded-lg border bg-card p-4 pl-5 text-left hover:border-primary/40 focus-visible:ring-2 focus-visible:ring-ring/40">
-      <span aria-hidden className={`absolute inset-y-0 left-0 w-0.5 ${tone === "bad" ? "bg-destructive" : tone === "warn" ? "bg-warning" : tone === "good" ? "bg-success" : "bg-border"}`} />
+      className={`ds-press block w-full min-w-0 rounded-r-lg border-l-2 py-1 pl-4 pr-2 text-left hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring/40 ${active ? "bg-accent/60" : ""} ${rule}`}>
       <span className="block text-xs font-medium text-muted-foreground">{label}</span>
-      <span className={`tnum mt-1.5 block text-[1.7rem] font-semibold leading-none tracking-tight ${tone === "bad" ? "text-destructive" : tone === "warn" ? "text-warning" : tone === "good" ? "text-success" : ""}`}>{value}</span>
+      <span className={`tnum mt-1.5 block text-[1.7rem] font-semibold leading-none tracking-tight ${tone === "bad" ? "text-destructive" : tone === "warn" ? "text-warning" : tone === "good" ? "text-success" : ""}`}><CountUp value={value} /></span>
       {sub && <span className="mt-2 block text-xs leading-5 text-muted-foreground">{sub}</span>}
     </button>
   );
@@ -139,7 +140,7 @@ export function SummaryCard({ showAccount }: { showAccount: boolean }) {
                 <p className="text-sm text-muted-foreground" data-testid="summary-empty">No new leads were judged in this window. A lead is counted once its reply target has passed or a person has replied. Try a longer range.</p>
               ) : (
                 <>
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  <div className="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2 lg:grid-cols-4">
                     <Stat
                       label={<DefinitionTip term="Typical first reply" label="How the typical reply is worked out">The middle of all first reply times: half of the leads were answered faster, half slower. It needs at least {MIN_FOR_MEDIAN} replies.</DefinitionTip>}
                       value={s.medianSeconds === null ? "n/a" : fmtDuration(s.medianSeconds)}

@@ -159,8 +159,8 @@ export function AccountsView({ go, embedded = false }: { go: GoFn; embedded?: bo
               <Td className="whitespace-nowrap text-right tabular-nums">{fmtInt(a.contacts)}<div className="text-xs text-muted-foreground">+{a.new30d} in 30 days</div></Td>
               <Td className="text-right tabular-nums">{a.completenessPct}%</Td>
               <Td className="text-right tabular-nums">{fmtMoney(a.openValue)}</Td>
-              <Td className="text-right tabular-nums">{a.staleOpps > 0 ? <span className="text-amber-600 dark:text-amber-400">{a.staleOpps}</span> : "0"}</Td>
-              <Td className="text-right tabular-nums">{a.unanswered > 0 ? <span className="text-amber-600 dark:text-amber-400">{a.unanswered}</span> : "0"}</Td>
+              <Td className="text-right tabular-nums">{a.staleOpps > 0 ? <span className="text-warning">{a.staleOpps}</span> : "0"}</Td>
+              <Td className="text-right tabular-nums">{a.unanswered > 0 ? <span className="text-warning">{a.unanswered}</span> : "0"}</Td>
             </tr>,
             ...(embedded && trends === a.locationId ? [<tr key={`${a.locationId}-trends`}><td colSpan={9} className="bg-muted/20 px-3 py-4"><ClientTrends locationId={a.locationId} name={a.name ?? "this client"} /></td></tr>] : []),
           ])}

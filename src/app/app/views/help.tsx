@@ -2,7 +2,6 @@
 
 import { COMPANY } from "@/lib/company";
 import { GUIDE_TITLES, type GuideRole, type Step } from "@/lib/getting-started";
-import { removalAnswer } from "@/lib/data-inventory";
 import { SETTINGS_SECTION_KEY } from "@/lib/settings-sections";
 import { CRM_WRITE_SUMMARY } from "@/lib/meeting-wording";
 import type { GoFn, ViewId } from "../nav";
@@ -29,7 +28,7 @@ const FAQ: Array<[string, string]> = [
   ["Why is a number empty or zero?", "That account has not finished syncing yet, or it genuinely has no data. The sync step above shows progress."],
   ["Why does Today say \"still learning\"?", "Changes are judged against an account's own last week, so a new account needs a few days of history first."],
   ["How do I hide a test account?", "Open Settings, Team and access, and switch on Test and practice accounts for it. It stops counting in totals, alerts and lists, and you can switch it back."],
-  ["How do I remove SubSync and my data?", removalAnswer()],
+  ["How do I remove SubSync and my data?", "Settings, Data and privacy, has a Delete my data button (only the owner can press it). It removes everything SubSync copied from your CRM. Uninstalling cuts the connection at once and deletes it all. That page lists exactly what is removed and the little we keep."],
   ["Who do I contact?", `${COMPANY.supportEmail}. We reply within ${COMPANY.supportReply}. You can also use Give feedback or Report a problem at the bottom of any page.`],
 ];
 
@@ -63,7 +62,7 @@ export function HelpView({ go }: { go: GoFn }) {
       <ol className="divide-y border-y" data-testid="guide-steps">
         {data.steps.map((s, i) => (
           <li key={s.id} className="flex gap-4 py-4" data-step={s.id} data-done={ticked[i] ? "true" : "false"}>
-            <span className={`mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full text-sm font-medium ${ticked[i] ? "bg-success text-white" : "border"}`} aria-label={ticked[i] ? "Done" : `Step ${i + 1}`}>{ticked[i] ? "✓" : i + 1}</span>
+            <span className={`mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full text-sm font-medium ${ticked[i] ? "bg-success text-background" : "border"}`} aria-label={ticked[i] ? "Done" : `Step ${i + 1}`}>{ticked[i] ? "✓" : i + 1}</span>
             <div className="min-w-0 flex-1">
               <p className="text-sm font-medium">{s.title}{s.optional && <span className="ml-2 text-xs font-normal text-muted-foreground">optional</span>}</p>
               <p className="mt-1 text-sm leading-6 text-muted-foreground">{s.body}</p>

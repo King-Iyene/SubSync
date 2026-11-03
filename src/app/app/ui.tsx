@@ -195,8 +195,9 @@ export function StackedBar({ parts }: { parts: Array<{ label: string; value: num
 export function Table({ head, children }: { head: ReactNode; children: ReactNode }) {
   return (
     <div className="overflow-x-auto rounded-xl border bg-card print:overflow-visible">
-      <table className="w-full min-w-[640px] text-sm">
-        <thead className="border-b bg-muted/60 text-left text-[0.7rem] uppercase tracking-wide text-muted-foreground">{head}</thead>
+      {/* On a phone the table scrolls sideways inside its own frame and the first column (the name) stays put, so a row is never nameless. */}
+      <table className="w-full min-w-[640px] text-sm [&_tbody_td:first-child]:sticky [&_tbody_td:first-child]:left-0 [&_tbody_td:first-child]:z-[1] [&_tbody_td:first-child]:bg-card [&_thead_th:first-child]:sticky [&_thead_th:first-child]:left-0 [&_thead_th:first-child]:z-[1] [&_thead_th:first-child]:bg-muted">
+        <thead className="border-b bg-muted text-left text-[0.7rem] uppercase tracking-wide text-muted-foreground">{head}</thead>
         <tbody className="divide-y [&>tr]:transition-colors [&>tr:hover]:bg-accent/40">{children}</tbody>
       </table>
     </div>

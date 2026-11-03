@@ -98,7 +98,7 @@ function ColdLists({ e, tags, canEdit, onChanged }: { e: Engagement; tags: strin
           </div>
         </fieldset>
       )}
-      {msg && <p className="mt-2 text-sm text-red-600" role="alert">{msg}</p>}
+      {msg && <p className="mt-2 text-sm text-destructive" role="alert">{msg}</p>}
     </Card>
   );
 }

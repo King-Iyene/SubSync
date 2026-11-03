@@ -249,11 +249,11 @@ export function TodayView({ go }: { go: GoFn }) {
                       <li key={it.kind} className="text-sm"><span className="font-medium">{it.title}.</span> <span className="text-muted-foreground">{it.detail}</span></li>
                     ))}
                   </ul>
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 md:w-48 md:flex-col md:items-stretch md:gap-y-2">
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 md:w-48 md:flex-col md:items-end md:gap-y-0.5 [&>button]:-mr-3.5">
                     {single
-                      ? <Btn onClick={() => go(accountPage, a.locationId)}>Open the full account page</Btn>
-                      : <Btn onClick={() => go("today", a.locationId)}>Open this account&apos;s Today</Btn>}
-                    <span className="md:text-center"><ExtLink href={a.url}>Open in your CRM</ExtLink></span>
+                      ? <Btn variant="ghost" onClick={() => go(accountPage, a.locationId)}>Open the full account page</Btn>
+                      : <Btn variant="ghost" onClick={() => go("today", a.locationId)}>Open this account&apos;s Today</Btn>}
+                    <span className="text-sm"><ExtLink href={a.url}>Open in your CRM</ExtLink></span>
                   </div>
                 </li>
               ))}
