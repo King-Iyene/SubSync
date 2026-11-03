@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { BrandLogo } from "../brand-logo";
 import { describeChange } from "@/lib/settings-sections";
 import { NEEDS_PERMISSION } from "@/lib/meeting-wording";
 import { useData } from "../session";
@@ -132,14 +133,16 @@ export function SettingsHistoryCard() {
   );
 }
 
-export function BrandPreview({ name, color }: { name: string | null; color: string | null }) {
+export function BrandPreview({ name, color, logoUrl }: { name: string | null; color: string | null; logoUrl?: string | null }) {
   const accent = color ?? "#1d4ed8";
   return (
     <div className="mt-4 rounded-lg border p-3" aria-label="Preview" data-testid="brand-preview">
       <p className="mb-2 text-xs text-muted-foreground">Preview: your name and colour, as they appear on printed reports and share links.</p>
       <div className="flex items-center gap-3">
-        <span aria-hidden className="size-8 shrink-0 rounded-md" style={{ background: accent }} />
-        <span className="text-base font-semibold">{name?.trim() || "Your company name"}</span>
+        <BrandLogo url={logoUrl} name={name?.trim() || null} height={40} fallback={<>
+          <span aria-hidden className="size-8 shrink-0 rounded-md" style={{ background: accent }} />
+          <span className="text-base font-semibold">{name?.trim() || "Your company name"}</span>
+        </>} />
       </div>
     </div>
   );

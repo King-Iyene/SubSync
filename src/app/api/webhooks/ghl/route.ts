@@ -5,7 +5,7 @@ import { sql } from "@/lib/db";
 import { getInstallation, purgeInstallation, purgeLocationData } from "@/lib/ghl/installations";
 import { actionFor, canonicalType, isForeignApp, parseWebhook, verifyWebhook } from "@/lib/ghl/webhook";
 import { recordPlanEvent } from "@/lib/entitlements-queries";
-import { captureWhitelabelDomain } from "@/lib/analytics/queries";
+import { captureWhitelabelDomain, captureWhitelabelLogo } from "@/lib/analytics/queries";
 import { enqueueAreaSync, enqueueFullSync } from "@/lib/sync/engine";
 import { isEchoOfOurWrite } from "@/lib/connections/write-log";
 
@@ -50,6 +50,9 @@ export async function POST(request: Request) {
       // from the first screen (a domain typed in Settings still wins). Sign-in captures it too, so a missed event is made up at the first open.
       if (event.type === "AppInstall" && event.whitelabelDomain && target) {
         await captureWhitelabelDomain(target.id, event.whitelabelDomain, "install").catch((e) => console.error("Keeping the login domain failed", safeError(e)));
+      }
+      if (event.type === "AppInstall" && event.whitelabelLogoUrl && target) {
+        await captureWhitelabelLogo(target.id, event.whitelabelLogoUrl).catch((e) => console.error("Keeping the logo failed", safeError(e)));
       }
       if (event.type === "PlanChange") return NextResponse.json({ ok: true });
     }

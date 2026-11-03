@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { NAV, PARENT, type GoFn, type ViewId } from "./nav";
 import { useBrandedText } from "./brand-text";
+import { BrandLogo } from "./brand-logo";
 import { Btn } from "./ui";
 import { FeedbackBox } from "./feedback-box";
 import { BackLink, BackProvider, ModuleTabs, type ModuleTab } from "./ds/template";
@@ -57,7 +58,7 @@ type Auth =
   | { status: "error"; message: string }
   | { status: "not_installed" }
   | { status: "maintenance"; message: string }
-  | { status: "ready"; api: Api; demo: boolean; userName: string | null; features: Record<string, boolean>; locked: string[]; kind: AccessKind; locationId: string | null; brand: { name: string | null; color: string | null } };
+  | { status: "ready"; api: Api; demo: boolean; userName: string | null; features: Record<string, boolean>; locked: string[]; kind: AccessKind; locationId: string | null; brand: { name: string | null; color: string | null; logoUrl?: string | null } };
 
 type SsoResponse = {
   error?: string;
@@ -68,7 +69,7 @@ type SsoResponse = {
   kind?: AccessKind;
   user?: { userName?: string | null; activeLocation?: string | null };
   entitlements?: { features: Record<string, boolean>; locked?: string[] };
-  brand?: { name: string | null; color: string | null };
+  brand?: { name: string | null; color: string | null; logoUrl?: string | null };
 };
 
 async function exchange(body: unknown): Promise<{ ok: boolean; status: number; data: SsoResponse }> {
@@ -373,8 +374,13 @@ export function Dashboard() {
       <div className={`${theme === "dark" ? "dark " : ""}flex min-h-screen bg-background text-foreground`} data-theme={theme} style={accentStyle}>
         <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col self-start border-r border-sidebar-border bg-sidebar p-4 text-sidebar-foreground md:flex print:hidden">
           <div className="flex items-center gap-2.5 px-2 pt-1">
-            <span aria-hidden className="flex size-8 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground"><svg viewBox="0 0 24 24" className="size-[18px]" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M4 8h10a4 4 0 0 1 0 8H8" /><path d="M20 16H10a4 4 0 0 1 0-8h6" opacity="0.55" /></svg></span>
-            <span className="text-[1.05rem] font-semibold tracking-tight text-sidebar-accent-foreground">{auth.brand.name ?? "SubSync"}</span>
+            <BrandLogo
+              url={auth.brand.logoUrl} name={auth.brand.name ?? "SubSync"} height={36} className="max-w-full"
+              fallback={<>
+                <span aria-hidden className="flex size-8 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground"><svg viewBox="0 0 24 24" className="size-[18px]" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M4 8h10a4 4 0 0 1 0 8H8" /><path d="M20 16H10a4 4 0 0 1 0-8h6" opacity="0.55" /></svg></span>
+                <span className="text-[1.05rem] font-semibold tracking-tight text-sidebar-accent-foreground">{auth.brand.name ?? "SubSync"}</span>
+              </>}
+            />
           </div>
           <nav className="sidebar-scroll mt-3 flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto pr-1" aria-label="Sections">
             {renderNav(mainMenu)}

@@ -2,6 +2,7 @@
 // `copy.ts` (no angle brackets, one line), and is escaped again here for the place it lands, so nothing a customer typed can become markup or a mention.
 
 import type { Severity } from "./catalog.ts";
+import { emailLogoHtml } from "../brand-logo.ts";
 
 export type Link = { view: string | null; locationId: string | null };
 
@@ -25,7 +26,7 @@ export const worst = (items: Pick<Item, "severity">[]): Severity => items.reduce
 const sorted = (items: Item[]) => [...items].sort((a, b) => severityRank[a.severity] - severityRank[b.severity]);
 
 export type Mail = { subject: string; text: string; html: string };
-export type MailOptions = { company: string; appUrl: string; stopUrl: string | null; test?: boolean };
+export type MailOptions = { company: string; logoUrl?: string | null; appUrl: string; stopUrl: string | null; test?: boolean };
 
 export function composeEmail(input: Item[], o: MailOptions): Mail {
   const items = sorted(input);
@@ -51,7 +52,7 @@ export function composeEmail(input: Item[], o: MailOptions): Mail {
   const body = n === 1
     ? `<h2 style="margin:0 0 12px">${esc(items[0].title)}</h2>${items[0].body ? `<p>${esc(items[0].body)}</p>` : ""}${items[0].details.length ? `<ul style="padding-left:18px">${items[0].details.map((d) => `<li>${esc(d)}</li>`).join("")}</ul>` : ""}`
     : `<h2 style="margin:0 0 12px">${esc(base)}</h2><ul style="padding-left:18px">${shown.map((i) => `<li>${esc(i.title)}</li>`).join("")}</ul>${more > 0 ? `<p>...and ${more} more in the app.</p>` : ""}`;
-  const html = `<div style="font-family:system-ui,sans-serif;max-width:560px;margin:0 auto;color:#111">${o.test ? '<p style="color:#666;font-size:13px">This is a test. Nothing is wrong.</p>' : ""}${body}<p><a href="${esc(openUrl)}" style="display:inline-block;background:#0f766e;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none">Open it</a></p>${o.stopUrl ? `<p style="font-size:12px;color:#666"><a href="${esc(o.stopUrl)}" style="color:#666">Stop these emails</a></p>` : ""}</div>`;
+  const html = `<div style="font-family:system-ui,sans-serif;max-width:560px;margin:0 auto;color:#111">${emailLogoHtml(o.logoUrl, o.company)}${o.test ? '<p style="color:#666;font-size:13px">This is a test. Nothing is wrong.</p>' : ""}${body}<p><a href="${esc(openUrl)}" style="display:inline-block;background:#0f766e;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none">Open it</a></p>${o.stopUrl ? `<p style="font-size:12px;color:#666"><a href="${esc(o.stopUrl)}" style="color:#666">Stop these emails</a></p>` : ""}</div>`;
   return { subject, text: lines.join("\n"), html };
 }
 

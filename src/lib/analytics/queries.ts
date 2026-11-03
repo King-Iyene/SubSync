@@ -2,6 +2,7 @@ import { sql } from "../db";
 import type { AccountRow, AccountSettings, AlertDraft } from "./derive";
 import type { DomainReport } from "../dns/email-auth";
 import { DEFAULT_APP_DOMAIN } from "../links";
+import { effectiveLogo, validLogoUrl } from "../brand-logo";
 import { countedInScope, dealScopeJoins, outOfScope } from "./stage-rules-sql";
 import { currentSnapshotVersion, snapshotOk } from "./definitions-sql";
 
@@ -34,6 +35,10 @@ export type Settings = AccountSettings & {
   /** Name and colour shown at the top of printed client reports. */
   brandName: string | null;
   brandColor: string | null;
+  /** The logo to show: the owner's address, else the one the install or sign-in carried. */
+  brandLogoUrl: string | null;
+  /** Only the owner's typed address (for the Settings field). */
+  brandLogoOverride: string | null;
   /** Use each industry's own reply target in the daily brief instead of one number for everyone. */
   industryTargets: boolean;
   keepTranscripts: boolean;
@@ -57,7 +62,7 @@ export type Settings = AccountSettings & {
 export async function getSettings(installationId: string): Promise<Settings> {
   const db = sql();
   const read = () => db`
-    select stale_deal_days, dormant_days, sla_hours, slack_webhook_url, ghl_app_domain, app_domain_source, detected_app_domain, digest_enabled, custom_checklist, digest_hour, digest_timezone, digest_email, brand_name, brand_color, industry_targets, push_notes_to_crm, keep_transcripts, speed_target_minutes, count_automated_touches, speed_business_hours, speed_open_hour, speed_close_hour, alert_quiet_hours, cold_tags, deal_rules_revision
+    select stale_deal_days, dormant_days, sla_hours, slack_webhook_url, ghl_app_domain, app_domain_source, detected_app_domain, digest_enabled, custom_checklist, digest_hour, digest_timezone, digest_email, brand_name, brand_color, brand_logo_url, detected_logo_url, industry_targets, push_notes_to_crm, keep_transcripts, speed_target_minutes, count_automated_touches, speed_business_hours, speed_open_hour, speed_close_hour, alert_quiet_hours, cold_tags, deal_rules_revision
     from settings where installation_id = ${installationId}`;
   let [r] = await read();
   if (!r) {
@@ -81,6 +86,8 @@ export async function getSettings(installationId: string): Promise<Settings> {
     digestEmail: (r.digest_email as string | null) ?? null,
     brandName: (r.brand_name as string | null) ?? null,
     brandColor: (r.brand_color as string | null) ?? null,
+    brandLogoUrl: effectiveLogo(r.brand_logo_url as string | null, r.detected_logo_url as string | null),
+    brandLogoOverride: validLogoUrl(r.brand_logo_url),
     industryTargets: r.industry_targets === true,
     keepTranscripts: r.keep_transcripts === true,
     pushNotesToCrm: r.push_notes_to_crm !== false,
@@ -107,6 +114,15 @@ export async function captureWhitelabelDomain(installationId: string, domain: st
       app_domain_source = case when app_domain_source = 'manual' then 'manual' else ${from} end
     where installation_id = ${installationId}
       and (detected_app_domain is distinct from ${domain} or (app_domain_source <> 'manual' and ghl_app_domain is distinct from ${domain}))`;
+}
+
+// Keep the logo address the install event or sign-in carried (already checked to be https). The owner's own address in Settings wins at read time.
+export async function captureWhitelabelLogo(installationId: string, logoUrl: string): Promise<void> {
+  const url = validLogoUrl(logoUrl);
+  if (!url) return;
+  const db = sql();
+  await db`insert into settings (installation_id) values (${installationId}) on conflict do nothing`;
+  await db`update settings set detected_logo_url = ${url} where installation_id = ${installationId} and detected_logo_url is distinct from ${url}`;
 }
 
 // `appDomainOverride`: a domain typed in Settings (wins over a detected one), or null to take the override off and go back to the detected one.
@@ -136,6 +152,7 @@ export async function updateSettings(installationId: string, p: Partial<Settings
       speed_close_hour = coalesce(${p.speedCloseHour ?? null}::int, speed_close_hour),
       brand_name = case when ${p.brandName !== undefined} then ${p.brandName ?? null} else brand_name end,
       brand_color = case when ${p.brandColor !== undefined} then ${p.brandColor ?? null} else brand_color end,
+      brand_logo_url = case when ${p.brandLogoOverride !== undefined} then ${p.brandLogoOverride ?? null} else brand_logo_url end,
       cold_tags = case when ${p.coldTags !== undefined} then ${p.coldTags === undefined ? null : p.coldTags === null ? null : pgTextArray(p.coldTags)}::text[] else cold_tags end,
       custom_checklist = coalesce(${p.customChecklist !== undefined ? db.json(p.customChecklist) : null}::jsonb, custom_checklist)
     where installation_id = ${installationId}`;

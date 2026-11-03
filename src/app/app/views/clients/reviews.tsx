@@ -8,13 +8,14 @@ import type { Finding, QuarterFacts } from "@/lib/analytics/client-success";
 import { useData } from "../../session";
 import { EmptyState, HowTo, LineChart, Section, SkeletonCards } from "../../ds";
 import { Btn, ErrorBox, inputClass, Stat, Table, Td, Th } from "../../ui";
+import { BrandLogo } from "../../brand-logo";
 import type { ClientRow, DayPoint } from "./types";
 
 // A quarterly business review (N60): what a client sees at renewal. Pick a client and a quarter; the review sets it against the quarter before, shows the
 // trends on labelled axes, says what went well and what did not, lists what SubSync caught, ends with next steps, and prints or saves as a PDF with the
 // agency's own name and colour. Built only from numbers SubSync holds. Where its record does not reach back it says so instead of drawing an empty chart.
 type Qbr = {
-  brand: { name: string | null; color: string | null }; client: ClientRow; openAlerts: number; generatedAt: string;
+  brand: { name: string | null; color: string | null; logoUrl?: string | null }; client: ClientRow; openAlerts: number; generatedAt: string;
   quarter: { key: string; label: string; from: string; to: string; complete: boolean; days: number; total: number }; previous: { key: string; label: string; from: string; to: string };
   quarters: Array<{ key: string; label: string }>;
   facts: QuarterFacts; previousFacts: QuarterFacts; findings: { wins: Finding[]; issues: Finding[]; steps: Finding[] };
@@ -78,6 +79,7 @@ export function ReviewsTab({ accounts }: { accounts: Array<{ locationId: string;
         <article className="qbr-print space-y-6 border-t pt-5 print:border-0 print:pt-0" data-testid="qbr">
           <style dangerouslySetInnerHTML={{ __html: printCss(data.brand.color, ".qbr-print") }} />
           <header className="border-b-4 pb-3" style={{ borderColor: accent ?? "var(--primary)" }} data-testid="qbr-header">
+            {data.brand.logoUrl && <BrandLogo url={data.brand.logoUrl} name={data.brand.name} height={40} className="mb-2" fallback={null} />}
             {data.brand.name && <p className="mb-2 text-lg font-semibold" style={{ color: accent ?? undefined }}>{data.brand.name}</p>}
             <p className="text-xs uppercase tracking-wide text-muted-foreground">Quarterly business review</p>
             <h2 className="text-2xl font-semibold tracking-tight">{c.name ?? "Client"}</h2>

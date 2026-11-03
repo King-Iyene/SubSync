@@ -5,6 +5,7 @@ import type { SharePayload } from "@/lib/analytics/share-intel";
 import { accentTokens, parseHex } from "@/lib/design/color";
 import { printAccent } from "@/lib/design/print";
 import { PrintButton } from "./print-button";
+import { BrandLogo } from "@/app/app/brand-logo";
 
 // The page a client or prospect receives (stage F6): one honest, client-ready report. Counted facts and estimates are kept apart and labelled; every number
 // has its definition on the page; there is a fix plan and a next step; the sender's own name and colour are on it (N85); nothing names a client account.
@@ -103,6 +104,7 @@ export function AuditReport({ payload: p, expiresAt }: { payload: SharePayload; 
       <style dangerouslySetInnerHTML={{ __html: REPORT_CSS }} />
       <main>
         <header className="rp-bar">
+          {sender && p.brandLogoUrl && <BrandLogo url={p.brandLogoUrl} name={sender} height={40} className="rp-logo" fallback={null} />}
           <p className="rp-eyebrow rp-accent">Account audit{sender ? ` · ${sender}` : ""}</p>
           <h1>{p.headline}</h1>
           <p className="rp-meta">

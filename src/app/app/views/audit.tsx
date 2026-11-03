@@ -9,6 +9,7 @@ import { fixFirstFinding, openLabel, type Audit, type AuditNote, type Finding, t
 import type { AuditList, AuditListRow } from "@/lib/analytics/audit-queries";
 import { SAMPLE_AUDIT_ID } from "@/lib/analytics/share-intel";
 import { printAccent, printCss } from "@/lib/design/print";
+import { BrandLogo } from "../brand-logo";
 
 type Row = AuditListRow & { url: string };
 type ListData = Omit<AuditList, "rows"> & { rows: Row[] };
@@ -21,7 +22,7 @@ type Data = {
   /** The rows behind each finding that has a list (KF-6), from the same accounts and the same rules as the numbers. */
   lists: Partial<Record<FindingKey, ListData>> | null;
   readLimit: string | null; hiddenAccounts: number;
-  brand: { name: string | null; color: string | null };
+  brand: { name: string | null; color: string | null; logoUrl?: string | null };
   canShare: boolean; demo: boolean; shareDays: number; generatedAt: string;
 };
 
@@ -102,6 +103,7 @@ export function AuditView({ go }: { go: GoFn }) {
         <style dangerouslySetInnerHTML={{ __html: printCss(data.brand.color) }} />
         {/* The printed page opens with the sender's own name and colour. Nothing else carries a product name. */}
         <div className="mb-4 hidden border-b-2 pb-3 print:block" data-testid="audit-print-header" style={{ borderColor: accent ?? "var(--primary)" }}>
+          {data.brand.logoUrl && <BrandLogo url={data.brand.logoUrl} name={data.brand.name} height={40} className="mb-2" fallback={null} />}
           <p className="text-xl font-semibold" style={{ color: accent ?? "var(--primary)" }}>{data.brand.name ?? "Account audit"}</p>
           <p className="text-sm text-muted-foreground">{data.brand.name ? "Account audit" : "Prepared"} for {a.accountsScanned} client {a.accountsScanned === 1 ? "account" : "accounts"}, {longDate(data.generatedAt)}</p>
         </div>

@@ -1,3 +1,4 @@
+import { validLogoUrl } from "../brand-logo.ts";
 // What goes into a shared audit link. Pure, so it is unit tested: the point is that nothing identifying leaves.
 //
 // The snapshot holds totals, finding titles, fix steps, the definition of each number, and the sender's own business name and colour. It never holds
@@ -12,6 +13,8 @@ export type SharePayload = {
   branded?: boolean;
   /** The sender's colour (#rrggbb), checked before it was stored. */
   brandColor?: string | null;
+  /** The sender's logo web address (https, checked). The browser loads it; the page falls back to the name. */
+  brandLogoUrl?: string | null;
   /** What to do first, in one sentence. */
   fixFirst?: string | null;
   estimateRange?: { low: number; high: number } | null;
@@ -45,7 +48,7 @@ export type ShareSource = {
   fixFirst?: string | null; estimateRange?: { low: number; high: number } | null; outlier?: { value: number; share: number } | null; leftOut?: number;
   notes?: ShareNote[];
 };
-export type ShareExtra = { branded?: boolean; brandColor?: string | null; rulesVersion?: number };
+export type ShareExtra = { branded?: boolean; brandColor?: string | null; logoUrl?: string | null; rulesVersion?: number };
 
 const HEX = /^#[0-9a-f]{6}$/i;
 
@@ -69,6 +72,7 @@ export function buildSharePayload(audit: ShareSource, who: string, accountNames:
     createdAt: now.toISOString(),
     ...(extra.branded !== undefined ? { branded: extra.branded } : {}),
     ...(extra.brandColor && HEX.test(extra.brandColor) ? { brandColor: extra.brandColor.toLowerCase() } : {}),
+    ...(validLogoUrl(extra.logoUrl) ? { brandLogoUrl: validLogoUrl(extra.logoUrl) } : {}),
     ...(audit.fixFirst ? { fixFirst: scrub(audit.fixFirst, accountNames).slice(0, 400) } : {}),
     ...(audit.estimateRange ? { estimateRange: { low: Math.round(audit.estimateRange.low), high: Math.round(audit.estimateRange.high) } } : {}),
     ...(audit.outlier ? { outlier: { value: Math.round(audit.outlier.value), share: audit.outlier.share } } : {}),
