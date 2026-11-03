@@ -77,7 +77,8 @@ test("every button that leaves the audit says where it goes", async ({ page }) =
   await page.goto("/app#audit");
   await page.reload();
   await expect(page.getByText("What needs fixing")).toBeVisible({ timeout: 60_000 });
-  const names = await page.getByRole("button", { name: /^Open/ }).allTextContents();
+  const names = await page.getByRole("button", { name: /^Open/ }).and(page.locator(":not([data-nextjs-dev-tools-button])")).allTextContents();
+  // The development server adds its own "Open Next.js Dev Tools" button to every page; it is not part of the app and does not exist in production.
   for (const name of names) expect(name, "an Open button with no destination").toMatch(/^Open in .{3,}/);
 });
 
