@@ -104,7 +104,7 @@ export function AuditReport({ payload: p, expiresAt }: { payload: SharePayload; 
       <style dangerouslySetInnerHTML={{ __html: REPORT_CSS }} />
       <main>
         <header className="rp-bar">
-          <BrandLogo url={p.brandLogoUrl} name={sender} height={40} className="rp-logo" fallback={<ProductMark height={40} className="rp-logo" />} />
+          <BrandLogo url={p.brandLogoUrl} name={sender} height={40} className="rp-logo" fallback={sender ? undefined : <ProductMark height={40} className="rp-logo" />} />
           <p className="rp-eyebrow rp-accent">Account audit{sender ? ` · ${sender}` : ""}</p>
           <h1>{p.headline}</h1>
           <p className="rp-meta">
