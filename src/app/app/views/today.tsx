@@ -118,7 +118,7 @@ function Changes({ go, unusual }: { go: GoFn; unusual: Map<string, "up" | "down"
   const r = range.resolved;
   const changes = useData<Changes>(r ? `daily/changes?from=${r.current.from}&to=${r.current.to}` : null);
   return (
-    <Section title="What changed" hint="Each figure is compared with its value on the day before the window starts. Press a figure's link to see what is behind it."
+    <Section title="What changed" hint="Change since the day before the window."
       action={<CardRange state={range} label="What changed" compares={["none"]} maxDays={366} />}>
       <OutlierNote />
       {(!r || (changes.loading && !changes.data)) && <SkeletonCards cards={4} label="Working out what changed..." />}
@@ -233,7 +233,7 @@ export function TodayView({ go }: { go: GoFn }) {
       <FrontDoor go={go} scope={scope} leads={leads} lines={lines} first={shownFirst} next={next} blocked={blocked} allClear={allClear} permission={permission} myDay={d.limited} />
 
       <Section id="needs-attention" title={d.attention.length ? `Needs attention today (${d.attention.length})` : "Needs attention today"}
-        hint={single ? "What to look at in this account, most important first." : "The client accounts that need a person, most important first."}>
+        hint="Most important first.">
         {d.attention.length === 0 ? (
           <EmptyState compact title="Nothing needs you today" body={`${noun[0].toUpperCase() + noun.slice(1)} ${single ? "is" : "are"} all within ${single ? "its" : "their"} own normal range. Replies, deals, new leads and setup were all checked.`} />
         ) : (

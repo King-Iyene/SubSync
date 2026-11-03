@@ -1,6 +1,7 @@
 "use client";
 
 import { ArrowLeft } from "lucide-react";
+import { Short } from "./more";
 import { createContext, useContext, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 
 // ---- the page template ----
@@ -12,10 +13,10 @@ export const SUBTITLE_MAX = 120;
 export function Page({ title, subtitle, actions, children }: { title: string; subtitle?: string; actions?: ReactNode; children: ReactNode }) {
   return (
     <div data-testid="page" className="ds-enter">
-      <header className="mb-6 flex flex-wrap items-start justify-between gap-x-4 gap-y-3 border-b pb-5">
+      <header className="mb-6 flex flex-wrap items-start justify-between gap-x-4 gap-y-3 border-b-2 pb-5">
         <div className="min-w-0">
-          <h1 className="text-[1.65rem] font-semibold leading-tight tracking-tight">{title}</h1>
-          {subtitle && <p className="mt-1.5 line-clamp-3 max-w-2xl sm:line-clamp-2 text-sm leading-6 text-muted-foreground" data-testid="page-subtitle">{subtitle}</p>}
+          <h1 className="text-[1.9rem] font-bold leading-tight tracking-tight">{title}</h1>
+          {subtitle && <p className="mt-1.5 max-w-2xl text-base leading-6 text-muted-foreground" data-testid="page-subtitle"><Short text={subtitle} /></p>}
         </div>
         {actions && <div className="flex flex-wrap gap-2 print:hidden">{actions}</div>}
       </header>
@@ -31,8 +32,8 @@ export function Section({ title, hint, action, children, id, className = "" }: {
     <section id={id} className={`mb-8 ${className}`} aria-labelledby={id ? `${id}-h` : undefined}>
       <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
         <div className="min-w-0">
-          <h2 id={id ? `${id}-h` : undefined} className="text-base font-semibold">{title}</h2>
-          {hint && <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>}
+          <h2 id={id ? `${id}-h` : undefined} className="text-lg font-bold">{title}</h2>
+          {hint && <p className="mt-0.5 text-sm text-muted-foreground">{typeof hint === "string" ? <Short text={hint} /> : hint}</p>}
         </div>
         {action && <div className="print:hidden">{action}</div>}
       </div>
