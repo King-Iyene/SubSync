@@ -224,7 +224,7 @@ export function TodayView({ go }: { go: GoFn }) {
     <Page title="Today" subtitle={todaySubtitle(scope, name)}
       actions={<><Btn variant="ghost" onClick={copy}>{copied ? "Copied" : "Copy summary"}</Btn><Btn variant="primary" onClick={sync} disabled={syncing}>{syncing ? "Syncing..." : "Sync now"}</Btn></>}>
       <HowTo id="today-how" title="How to use Today" action={<Btn variant="ghost" onClick={() => go("help")}>Open Getting started</Btn>}>
-        Read the large sentence first and press the button under it. Below are the other things that need a person, then what changed. What SubSync watches, and what it does not yet, is listed in Settings.
+        Do the big sentence first. Other items and changes are below.
       </HowTo>
 
       {!d.connection.ok && <InlineAlert tone="danger" className="mb-4">{d.connection.message}</InlineAlert>}

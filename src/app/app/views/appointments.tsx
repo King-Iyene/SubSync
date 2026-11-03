@@ -92,7 +92,7 @@ export function AppointmentsView({ go }: { go: GoFn }) {
     : d.unconfirmedTotal > 0 ? { text: `Remind ${d.unconfirmedTotal} person${d.unconfirmedTotal === 1 ? "" : "s"} booked in the next two days who has not confirmed.`, key: "remind" } : null;
 
   return (
-    <Page title="Appointments" subtitle="Who is booked, who showed up, and who to chase today. A past appointment with no outcome is flagged, not guessed." actions={<Btn onClick={() => go("calls")}>Open call lists</Btn>}>
+    <Page title="Appointments" subtitle="Who is booked, who showed, who to chase. A past appointment with no outcome is flagged. We never guess it." actions={<Btn onClick={() => go("calls")}>Open call lists</Btn>}>
       {waiting > 0 && (
         <InlineAlert tone="warning" className="mb-6" title={waiting === d.access.total ? "SubSync needs your approval to read appointments." : `${waiting} account${waiting === 1 ? " still needs" : "s still need"} approval to show appointments.`}>
           <p>To show appointments, the app needs one more read-only permission. Open the app in the marketplace and choose Reinstall (or ask the account owner), then approve. Nothing else changes.</p>
@@ -108,7 +108,7 @@ export function AppointmentsView({ go }: { go: GoFn }) {
       ) : (
         <div className={loading ? "opacity-60 transition-opacity" : ""} aria-busy={loading}>
           <HowTo id="appointments" title="How to use this page" action={<button type="button" onClick={() => go("help")} className="text-xs font-medium text-primary underline">More in Getting started</button>}>
-            Press any number to see the appointments behind it, and any row to see its details. Work the three lists under Do these first: record outcomes, rebook no-shows, remind people booked soon.
+            Press a number or a row for details. Start with Do these first.
           </HowTo>
           <ApptFilterBar options={d.options} value={filter} onChange={(f) => { setSel(null); setFilter(f); }} />
 

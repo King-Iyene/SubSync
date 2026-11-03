@@ -40,6 +40,24 @@ const toneClass: Record<Tone, string> = {
   neutral: "border-border text-muted-foreground",
 };
 
+// Text diet: only the first sentence of a plain-text note is shown. The rest sits behind a small "?" that is closed until opened, so nothing is lost.
+export function splitFirst(text: string): { head: string; rest: string } {
+  const m = text.match(/^(.+?[.!?])\s+(\S[\s\S]*)$/);
+  return m ? { head: m[1], rest: m[2] } : { head: text, rest: "" };
+}
+export function More({ children, label = "More" }: { children: ReactNode; label?: string }) {
+  return (
+    <details className="group relative ml-1.5 inline-block align-middle">
+      <summary aria-label={label} title={label} className="inline-flex size-5 cursor-pointer list-none items-center justify-center rounded-full border border-foreground/40 text-[11px] font-semibold leading-none text-foreground hover:bg-accent [&::-webkit-details-marker]:hidden">?</summary>
+      <div className="absolute left-0 top-7 z-20 w-72 max-w-[80vw] rounded-lg border-2 bg-popover p-3 text-sm font-normal leading-5 text-popover-foreground shadow-lg">{children}</div>
+    </details>
+  );
+}
+function Short({ text }: { text: string }) {
+  const { head, rest } = splitFirst(text);
+  return <>{head}{rest && <More label="How this is counted">{rest}</More>}</>;
+}
+
 export function Badge({ tone = "neutral", children }: { tone?: Tone; children: ReactNode }) {
   return <span data-tone={tone} className={`inline-block border-l-2 pl-2 text-xs font-medium leading-4 whitespace-nowrap ${toneClass[tone]}`}>{children}</span>;
 }
@@ -61,10 +79,10 @@ export const severityTone = (s: string): Tone => (s === "critical" ? "bad" : s =
 // A block of the page: a heading over a thin rule, no box (D1: no card inside a card). Lists, charts and the key-figure strip draw their own edges.
 export function Card({ title, action, children, className = "" }: { title?: string; action?: ReactNode; children: ReactNode; className?: string }) {
   return (
-    <section className={`min-w-0 border-t pt-5 print:break-inside-avoid ${className}`}>
+    <section className={`min-w-0 border-t-2 pt-5 print:break-inside-avoid ${className}`}>
       {(title || action) && (
         <header className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-          {title && <h2 className="text-base font-semibold">{title}</h2>}
+          {title && <h2 className="text-lg font-bold">{title}</h2>}
           {action}
         </header>
       )}
@@ -79,9 +97,9 @@ export function Stat({ label, value, sub, tone }: { label: ReactNode; value: Rea
   const rule = tone === "bad" ? "border-destructive" : tone === "warn" ? "border-warning" : tone === "good" ? "border-success" : "border-border";
   return (
     <div className={`min-w-0 border-l-2 py-0.5 pl-4 ${rule}`}>
-      <p className="text-xs font-medium text-muted-foreground">{label}</p>
-      <p className={`tnum mt-1.5 break-words text-[1.7rem] font-semibold leading-none tracking-tight ${tone === "bad" ? "text-destructive" : tone === "warn" ? "text-warning" : tone === "good" ? "text-success" : ""}`}><CountUp value={value} /></p>
-      {sub && <div className="mt-2 text-xs leading-5 text-muted-foreground">{sub}</div>}
+      <p className="text-sm font-semibold text-muted-foreground">{label}</p>
+      <p className={`tnum mt-1.5 break-words text-[2.1rem] font-bold leading-none tracking-tight ${tone === "bad" ? "text-destructive" : tone === "warn" ? "text-warning" : tone === "good" ? "text-success" : ""}`}><CountUp value={value} /></p>
+      {sub && <div className="mt-2 text-sm leading-5 text-muted-foreground">{typeof sub === "string" ? <Short text={sub} /> : sub}</div>}
     </div>
   );
 }
@@ -90,8 +108,8 @@ export function PageHeader({ title, subtitle, actions }: { title: string; subtit
   return (
     <div className="mb-7 flex flex-wrap items-start justify-between gap-3 border-b pb-5">
       <div>
-        <h1 className="text-[1.65rem] font-semibold leading-tight tracking-tight">{title}</h1>
-        {subtitle && <p className="mt-1.5 max-w-2xl text-sm leading-6 text-muted-foreground">{subtitle}</p>}
+        <h1 className="text-[1.9rem] font-bold leading-tight tracking-tight">{title}</h1>
+        {subtitle && <p className="mt-1.5 max-w-2xl text-base leading-6 text-muted-foreground"><Short text={subtitle} /></p>}
       </div>
       {actions && <div className="flex flex-wrap gap-2 print:hidden">{actions}</div>}
     </div>

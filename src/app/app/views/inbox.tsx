@@ -172,7 +172,7 @@ export function InboxView({ go }: { go: GoFn }) {
   return (
     <Page
       title="Unanswered messages"
-      subtitle="Customer messages that are still waiting for a reply. Late means past your reply target; change it in Settings."
+      subtitle="Messages still waiting for a reply. Late means past your reply target (set in Settings)."
       actions={<Btn onClick={() => api.download("export/inbox", "subsync-unanswered-messages.csv")}>Export CSV</Btn>}
     >
       <p className="mb-1 text-sm font-medium" data-testid="waiting-headline">
@@ -190,7 +190,7 @@ export function InboxView({ go }: { go: GoFn }) {
       ) : (
         <>
           <HowTo id="unanswered" title="How to use this page" action={<button type="button" onClick={() => go("help")} className="text-xs font-medium text-primary underline">More in Getting started</button>}>
-            Pick a tab, narrow it by how long they waited, the channel, the client account or who it is assigned to, and save the view you use every day. Press a name to see the customer, and use the arrows to step to the next one.
+            Pick a tab, narrow the list, press a name. Save the view you use daily.
           </HowTo>
           <div className="mb-4 space-y-3">
             <QueueChoices rows={rows} filter={eff} me={me} onChange={setFilter} />

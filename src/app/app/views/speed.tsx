@@ -69,7 +69,7 @@ export function SpeedView({ go }: { go: GoFn }) {
   const m = data.measuring;
 
   return (
-    <Page title="Speed to lead" subtitle={`How long new leads wait for a first reply from a person. Target ${data.targetMinutes} minutes, last ${data.windowDays} days.`}>
+    <Page title="Speed to lead" subtitle={`Wait for a first reply from a person. Target ${data.targetMinutes} min, last ${data.windowDays} days.`}>
       {data.access.needsPermission.length > 0 && (
         <InlineAlert tone="warning" className="mb-4">
           Needs permission: reconnect. Reading the messages inside conversations needs a permission that {data.access.needsPermission.length === data.access.total ? "none of your accounts has" : `${data.access.needsPermission.length} of ${data.access.total} accounts have not`} approved yet
@@ -82,7 +82,7 @@ export function SpeedView({ go }: { go: GoFn }) {
       ) : (
         <>
           <HowTo id="speed" title="How to use this page" action={<button type="button" onClick={() => go("help")} className="text-xs font-medium text-primary underline">More in Getting started</button>}>
-            Start at the top of the list: the longest wait is first. Tap a name to see the lead and step to the next one. Every number below opens the leads behind it. SubSync measures replies; it does not send them.
+            Longest wait is first. Press a name or a number for the leads. SubSync measures replies and never sends them.
           </HowTo>
           <p className="mb-1 text-sm font-medium" data-testid="speed-headline">{headline}</p>
           {waitingNow > 0 && <p className="mb-1 text-xs text-muted-foreground" data-testid="what-to-do">What to do: reply to the first leads in the list, then assign the ones with no owner.</p>}

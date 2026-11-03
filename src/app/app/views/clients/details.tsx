@@ -4,7 +4,7 @@ import { useState, type FormEvent, type KeyboardEvent, type ReactNode } from "re
 import { HELP, helpLines, industryFromPicker, INDUSTRY_MAX, NOTE_KIND_LABEL, NOTE_KINDS, NOTE_MAX, OTHER_INDUSTRY, pickerChoice, playbookLine, USER_ENTERED, valueCreatedWords, type NoteKind } from "@/lib/analytics/client-success";
 import { useApiClient, useData } from "../../session";
 import { DefinitionTip, EmptyState, HowTo, Section } from "../../ds";
-import { Badge, Btn, ErrorBox, ExtLink, fmtMoney, inputClass, Loading, Stat, Table, Td, Th } from "../../ui";
+import { Badge, Btn, ErrorBox, ExtLink, fmtMoney, inputClass, Loading, More, Stat, Table, Td, Th } from "../../ui";
 import { PlaybooksView } from "../playbooks";
 import type { GoFn } from "../../nav";
 import type { ClientRow, ClientsData } from "./types";
@@ -167,7 +167,7 @@ export function DetailsTab({ data, reload, go, showPlaybooks = true }: { data: C
   return (
     <div className="space-y-6">
       <HowTo id="clients-details" title="How this page works" action={<button type="button" onClick={() => go("help")} className="text-xs font-medium text-primary underline">More in Getting started</button>}>
-        Fee, renewal date and industry are typed by you, right in the row: press <strong>Add fee</strong>, <strong>Add date</strong> or <strong>Choose industry</strong>. {USER_ENTERED} {valueCreatedWords()}
+        You type fee, renewal date and industry in the row. {USER_ENTERED}<More label="How value is counted">{valueCreatedWords()}</More>
       </HowTo>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
