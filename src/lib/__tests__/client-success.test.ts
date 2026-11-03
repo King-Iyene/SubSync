@@ -400,7 +400,7 @@ test("wins and issues each rest on a real count; small samples are not turned in
   assert.match(wins, /4 deals won, worth \$18,000/);
   assert.match(wins, /health score rose from 58 to 84/);
   assert.match(wins, /80% of 30 appointments/);
-  assert.match(wins, /3 problems SubSync flagged were sorted out/);
+  assert.match(wins, /3 problems SubSync flagged have cleared \(fixed, dismissed or no longer showing\)/);
   assert.match(wins, /\$45,000 of new deals started, 6x what the client paid for the quarter/);
   assert.equal(r.issues.length, 0);
   const small = qbrFindings(qf({ apptWithOutcome: 6, apptShowed: 1, healthStart: 50, healthEnd: 20, healthDays: 5 }), null, nowFacts);
@@ -415,7 +415,7 @@ test("issues name what is wrong right now and what fell", () => {
   for (const re of [/health score fell from 80 to 60/, /gone quiet/, /1 customer message is waiting/, /3 open deals have not moved/, /only 40% complete/, /2 alerts are still open/, /30% of the last 20 new leads/]) assert.match(t, re);
 });
 
-test("what SubSync caught: alerts in the quarter grouped in plain words, with how many were sorted out; sync problems are not a result for the client", () => {
+test("what SubSync caught: alerts in the quarter grouped in plain words, with how many have cleared; sync problems are not a result for the client", () => {
   const q = { from: "2026-10-01", to: "2026-12-31" };
   const p = proofSummary([
     { kind: "sla", title: "Alpha has 12 messages waiting", createdAt: "2026-10-05T10:00:00Z", resolvedAt: "2026-10-06T10:00:00Z" },
@@ -461,7 +461,7 @@ test("the review can be copied as plain text for an email, with the sender's own
   assert.equal(t.split("\n")[0], "Quarterly review: Alpha Dental, Q4 2026 (Oct to Dec)");
   assert.match(t, /What went well\n- 4 deals won, worth \$18,000\./);
   assert.match(t, /What needs attention\n- 2 customer messages/);
-  assert.match(t, /What Acme Marketing caught: 3 problems flagged, 2 sorted out\./);
+  assert.match(t, /What Acme Marketing caught: 3 problems flagged, 2 cleared \(fixed, dismissed or no longer showing\)\./);
   assert.match(t, /Next steps\n- Agree one goal/);
   assert.doesNotMatch(t, /SubSync/);
   assert.doesNotMatch(t, /\n{3,}/);

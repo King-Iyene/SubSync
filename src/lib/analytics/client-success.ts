@@ -553,7 +553,7 @@ export function qbrFindings(cur: QuarterFacts, prev: QuarterFacts | null, now: N
     const r = Math.round(now.replyHitRate * 100);
     (r >= 80 ? wins : r < 50 ? issues : []).push({ text: `${r}% of the last ${now.replyLeads} new leads got a first reply inside the target.` });
   }
-  if (cur.alertsResolved > 0) wins.push({ text: `${cur.alertsResolved} problem${cur.alertsResolved === 1 ? "" : "s"} SubSync flagged ${cur.alertsResolved === 1 ? "was" : "were"} sorted out.` });
+  if (cur.alertsResolved > 0) wins.push({ text: `${cur.alertsResolved} problem${cur.alertsResolved === 1 ? "" : "s"} SubSync flagged ${cur.alertsResolved === 1 ? "has" : "have"} cleared (fixed, dismissed or no longer showing).` });
   if (now.dormant) issues.push({ text: "The account has gone quiet: nothing has happened in it for a long time." });
   if (now.unanswered > 0) issues.push({ text: `${now.unanswered} customer message${now.unanswered === 1 ? " is" : "s are"} waiting past the reply target.` });
   if (now.staleOpps > 0) issues.push({ text: `${now.staleOpps} open deal${now.staleOpps === 1 ? " has" : "s have"} not moved for a long time.` });
@@ -579,7 +579,7 @@ export function reviewText(r: { client: string; quarter: string; wins: ReadonlyA
     `Quarterly review: ${r.client}, ${r.quarter}`, "",
     "What went well", list(r.wins), "",
     ...(r.issues.length ? ["What needs attention", list(r.issues), ""] : []),
-    r.proof.total > 0 ? `What SubSync caught: ${r.proof.total} problem${r.proof.total === 1 ? "" : "s"} flagged, ${r.proof.resolved} sorted out.` : "",
+    r.proof.total > 0 ? `What SubSync caught: ${r.proof.total} problem${r.proof.total === 1 ? "" : "s"} flagged, ${r.proof.resolved} cleared (fixed, dismissed or no longer showing).` : "",
     ...(r.proof.total > 0 ? [""] : []),
     "Next steps", list(r.steps),
   ].join("\n").replace(/\n{3,}/g, "\n\n").trim().split("SubSync").join(r.brand?.trim() || "SubSync");
@@ -590,7 +590,7 @@ export const ALERT_WORDS: Record<string, string> = {
   speed: "New leads were left unanswered", stale: "Deals stopped moving", email: "An email sender problem", appointments: "Appointments were left without an outcome",
 };
 export type ProofAlert = { kind: string; title: string; createdAt: string; resolvedAt: string | null };
-/** "What SubSync caught": the alerts raised in the quarter, grouped by what they were about, with how many are sorted out. Sync problems are not a result for the client and are left out. */
+/** "What SubSync caught": the alerts raised in the quarter, grouped by what they were about, with how many have cleared. Sync problems are not a result for the client and are left out. */
 export function proofSummary(alerts: ReadonlyArray<ProofAlert>, q: Pick<Quarter, "from" | "to">): { total: number; resolved: number; groups: Array<{ kind: string; label: string; raised: number; resolved: number; example: string }> } {
   const inQ = alerts.filter((a) => a.kind !== "sync" && a.createdAt.slice(0, 10) >= q.from && a.createdAt.slice(0, 10) <= q.to);
   const by = new Map<string, ProofAlert[]>();

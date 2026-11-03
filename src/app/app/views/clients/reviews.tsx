@@ -96,7 +96,7 @@ export function ReviewsTab({ accounts }: { accounts: Array<{ locationId: string;
               <Stat label="New deals started" value={money(f.pipelineCreated)} sub={c.profile.monthlyFee ? `${Math.round((f.pipelineCreated / (c.profile.monthlyFee * 3)) * 10) / 10}x what the client paid for the quarter` : "Add the monthly fee on the Details tab to see this against what they pay"} />
               <Stat label="Appointments attended" value={rate === null ? <span className="text-base font-semibold">Too few to rate</span> : `${rate}%`} sub={rate === null ? `${f.apptWithOutcome} with a recorded outcome; a rate needs ${MIN_SHOW}` : `${f.apptShowed} of ${f.apptWithOutcome} with a recorded outcome`} />
               <Stat label="First replies in time" value={data.reply && data.reply.hitRate !== null && data.reply.leads >= MIN_SHOW ? `${Math.round(data.reply.hitRate * 100)}%` : <span className="text-base font-semibold">Too few to rate</span>} sub={data.reply ? `New leads, last ${data.reply.windowDays} days, target ${data.reply.targetMinutes} minutes. SubSync keeps 8 weeks of this, so it covers the end of the quarter only.` : "Not available"} />
-              <Stat label="Problems SubSync flagged" value={data.proof.total} sub={`${data.proof.resolved} sorted out`} />
+              <Stat label="Problems SubSync flagged" value={data.proof.total} sub={`${data.proof.resolved} cleared`} />
               <Stat label="Waiting past the reply target" value={c.unanswered} tone={c.unanswered > 0 ? "warn" : undefined} sub="customer messages, right now" />
             </div>
           </Section>
@@ -115,10 +115,10 @@ export function ReviewsTab({ accounts }: { accounts: Array<{ locationId: string;
             <Section title="What needs attention" className="mb-0">{data.findings.issues.length === 0 ? <p className="text-sm text-muted-foreground">Nothing stands out as a problem right now.</p> : <ul className="list-disc space-y-1.5 pl-5 text-sm" data-testid="qbr-issues">{data.findings.issues.map((w) => <li key={w.text}>{w.text}</li>)}</ul>}</Section>
           </div>
 
-          <Section title="What SubSync caught" hint="Problems SubSync noticed in this client's account during the quarter, and how many have been sorted out since.">
+          <Section title="What SubSync caught" hint="Problems SubSync noticed in this client's account during the quarter, and how many have cleared since (fixed, dismissed or no longer showing; SubSync does not yet record which).">
             {data.proof.total === 0 ? <p className="text-sm text-muted-foreground" data-testid="qbr-proof-empty">SubSync did not flag any problem in this quarter. {data.historyStartsOn && data.historyStartsOn > data.quarter.from ? `It only started watching on ${longDate(data.historyStartsOn)}.` : ""}</p> : (
               <>
-                <p className="mb-3 text-sm" data-testid="qbr-proof">{data.proof.total} problem{data.proof.total === 1 ? "" : "s"} flagged, {data.proof.resolved} sorted out{data.proof.total - data.proof.resolved > 0 ? `, ${data.proof.total - data.proof.resolved} still open` : ""}.</p>
+                <p className="mb-3 text-sm" data-testid="qbr-proof">{data.proof.total} problem{data.proof.total === 1 ? "" : "s"} flagged, {data.proof.resolved} cleared{data.proof.total - data.proof.resolved > 0 ? `, ${data.proof.total - data.proof.resolved} still open` : ""}.</p>
                 <Table head={<tr><Th>What it was about</Th><Th className="text-right">Flagged</Th><Th className="text-right">Sorted out</Th><Th>Example</Th></tr>}>
                   {data.proof.groups.map((g) => <tr key={g.kind}><Td className="font-medium">{g.label}</Td><Td className="text-right tabular-nums">{g.raised}</Td><Td className="text-right tabular-nums">{g.resolved}</Td><Td className="text-muted-foreground">{g.example}</Td></tr>)}
                 </Table>
