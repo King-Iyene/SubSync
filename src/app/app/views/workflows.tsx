@@ -13,6 +13,7 @@ import { EmptyState, InlineAlert, LocalAccountPicker, Page, RecordsPanel, Sectio
 import { WfBars, WfDonut, WfNumber, WfTrend, type Mark } from "../ds/workflow-charts";
 import { useApiClient, useData } from "../session";
 import { Btn, ErrorBox } from "../ui";
+import { DeliveryTab, ProofTab } from "./workflows-extra";
 import { ChangeDialog, ItemPanel, keyOf, StateBadge, Tabs, WfTable, when, type Acc, type ChangeKind } from "./workflows-parts";
 import type { GoFn } from "../nav";
 import type { AccessKind } from "@/lib/access";
@@ -30,11 +31,12 @@ type Data = {
   slices: Slice[]; bars: Array<{ locationId: string; name: string; total: number; attention: number }>; top: Array<{ workflowId: string; locationId: string; name: string; failed: number | null; runs: number | null; share: number }>;
   decisions: Array<{ decision: Decision; count: number }>; ratings: Array<{ rating: number; label: string; count: number }>;
   daily: { failing: Array<{ day: string; value: number | null }>; total: Array<{ day: string; value: number | null }>; runs: Array<{ day: string; value: number | null }>; errors: Array<{ day: string; value: number | null }> };
+  muted: Array<Finding & { why: "fixed" | "snoozed"; until: number; key: string }>; since: { at: number; changes: number } | null;
   coverage: Array<{ locationId: string; have: string[]; missing: string[]; none: boolean }>; standard: string[]; syncedAt: number | null; caps: { deletesToday: number; writesToday: number };
 };
 type History = { rows: Array<{ id: number; at: number; account: string; name: string; type: string; what: string; source: string; who: string; outcome: string; undone: boolean; undoable: boolean }> };
 type Show = "workflow" | "campaign" | "both";
-type TabId = "overview" | "list" | "health" | "history";
+type TabId = "overview" | "list" | "health" | "delivery" | "proof" | "history";
 
 const COLOUR: Record<Bucket, string> = { failing: "var(--destructive)", never_run: "var(--warning)", running: "var(--success)", draft: "var(--chart-1)", stopped: "var(--muted-foreground)" };
 const DEC_COLOUR: Record<Decision, string> = { keep: "var(--success)", review: "var(--warning)", retire: "var(--destructive)", unsorted: "var(--muted-foreground)" };
@@ -73,6 +75,9 @@ export function WorkflowsView({ go, kind }: { go: GoFn; kind: AccessKind }) {
     setPanel(itemsSpec({ key, title, subtitle, items: list, accounts, failing, labels, exportName: `workflows-${key}` }));
   }, [data, accounts, failing, labels]);
   const close = () => { setPanel(null); setMark(null); };
+  const markIt = async (locationId: string, workflowId: string, b: Record<string, unknown>) => {
+    try { await api.post("workflows/mark", { locationId, workflowId, ...b }); await reload(); } catch (e) { setNote({ ok: false, text: (e as Error).message }); }
+  };
 
   const syncNow = async () => {
     setSyncing(true); setNote(null);
@@ -112,11 +117,12 @@ export function WorkflowsView({ go, kind }: { go: GoFn; kind: AccessKind }) {
         {kind === "agency" && accounts.length >= 2 ? <LocalAccountPicker accounts={accounts.map((a) => ({ id: a.locationId, name: a.name }))} picked={picked} onChange={(ids) => { setPicked(ids); setSel(new Set()); }} /> : null}
         <span className="text-sm text-muted-foreground" data-testid="wf-updated">{data.syncedAt ? `Updated ${when(data.syncedAt, data.now).toLowerCase()}` : "Not updated yet"}</span>
       </div>
+      {data.since && data.since.changes > 0 ? <InlineAlert tone="info" className="mb-4"><span data-testid="wf-since">Since your last visit ({when(data.since.at, data.now).toLowerCase()}): {data.since.changes} change{data.since.changes === 1 ? "" : "s"} to your workflows and campaigns.</span> <button type="button" className="font-medium text-primary hover:underline" onClick={() => setTab("history")}>See them</button></InlineAlert> : null}
       {note ? <InlineAlert tone={note.ok ? "success" : "warning"} onDismiss={() => setNote(null)} className="mb-4">{note.text}</InlineAlert> : null}
       {noList ? <InlineAlert tone="warning" title="Needs permission: reconnect" className="mb-4">SubSync needs <code>workflows.readonly</code> to list workflows, and <code>workflows.logs</code> to see which ones fail or never run. Open SubSync again from your CRM&apos;s app list and accept it. Campaigns need <code>campaigns.readonly</code>.</InlineAlert> : null}
       {!data.available ? <InlineAlert tone="info" title="Needs the latest database update" className="mb-4">Ask the person who manages SubSync to apply the newest update. Until then this page stays empty.</InlineAlert> : null}
       {!data.permissions.history && !noList ? <InlineAlert tone="info" title="Needs permission: reconnect" className="mb-4">Allow <code>workflows.logs</code> to see failing and idle workflows. Until then those checks are not shown, and nothing is guessed.</InlineAlert> : null}
-      <Tabs tabs={[{ id: "overview", label: "Overview" }, { id: "list", label: `List (${total})` }, { id: "health", label: `Health${data.findings.length ? ` (${data.findings.length})` : ""}` }, { id: "history", label: "History" }]} value={tab} onChange={(t) => { setTab(t); setSel(new Set()); }} />
+      <Tabs tabs={[{ id: "overview", label: "Overview" }, { id: "list", label: `List (${total})` }, { id: "health", label: `Health${data.findings.length ? ` (${data.findings.length})` : ""}` }, { id: "delivery", label: "Campaign delivery" }, { id: "proof", label: "Proof" }, { id: "history", label: "History" }]} value={tab} onChange={(t) => { setTab(t); setSel(new Set()); }} />
 
       {tab === "overview" ? (
         total === 0 ? (
@@ -187,12 +193,22 @@ export function WorkflowsView({ go, kind }: { go: GoFn; kind: AccessKind }) {
                       <li key={f.key} className="grid gap-x-4 gap-y-1 px-4 py-3 text-sm sm:grid-cols-[6rem_1fr_auto]" data-testid="wf-finding">
                         <span><span className={`inline-block border-l-2 pl-2 text-xs font-semibold uppercase ${f.severity === "critical" ? "border-destructive text-destructive" : f.severity === "warning" ? "border-warning text-warning" : "border-muted-foreground text-muted-foreground"}`}>{f.severity === "critical" ? "Fix now" : f.severity === "warning" ? "Check" : "Tidy"}</span></span>
                         <span className="min-w-0"><span className="block font-medium">{f.title}{f.estimate ? " (estimate)" : ""}</span><span className="block text-muted-foreground">{f.why}</span><span className="block">{f.next}</span><span className="block text-xs text-muted-foreground">{accounts.find((a) => a.locationId === f.locationId)?.name}</span></span>
-                        {f.workflowId ? <button type="button" className="min-h-9 self-start text-sm font-medium text-primary hover:underline" data-testid="wf-finding-open" onClick={() => { const w = items.find((x) => x.workflowId === f.workflowId && x.locationId === f.locationId); if (w) setOpen(w); }}>Open</button> : <span />}
+                        <span className="flex flex-wrap items-start gap-x-3 self-start">
+                          {f.workflowId ? <button type="button" className="min-h-9 text-sm font-medium text-primary hover:underline" data-testid="wf-finding-open" onClick={() => { const w = items.find((x) => x.workflowId === f.workflowId && x.locationId === f.locationId); if (w) setOpen(w); }}>Details</button> : null}
+                          {data.can.organise ? <><button type="button" className="min-h-9 text-sm hover:underline" data-testid="wf-fixed" onClick={() => markIt(f.locationId, f.workflowId ?? "coverage", { action: "fixed" })}>Mark fixed</button>
+                            <button type="button" className="min-h-9 text-sm hover:underline" data-testid="wf-snooze" onClick={() => markIt(f.locationId, f.workflowId ?? "coverage", { action: "snooze", choice: "week" })}>Snooze a week</button></> : null}
+                        </span>
                       </li>
                     ))}
                   </ul>
                 )}
               </Section>
+              {data.muted.length ? (
+                <Section title="Set aside" hint="Marked fixed or snoozed. They come back by themselves if the problem is still there.">
+                  <ul className="divide-y rounded-xl border text-sm" data-testid="wf-muted">{data.muted.map((m) => <li key={m.key} className="grid grid-cols-[1fr_auto] gap-3 px-4 py-2"><span className="min-w-0 truncate">{m.title} <span className="text-muted-foreground">({m.why === "fixed" ? "marked fixed" : "snoozed"}, until {new Date(m.until).toLocaleDateString("en-GB", { day: "numeric", month: "short" })})</span></span>
+                    {data.can.organise ? <button type="button" className="min-h-8 text-sm font-medium text-primary hover:underline" data-testid="wf-reopen" onClick={() => markIt(m.locationId, m.workflowId ?? "coverage", { action: "reopen" })}>Bring back</button> : null}</li>)}</ul>
+                </Section>
+              ) : null}
               {show !== "campaign" ? (
                 <Section title="Do the basics exist?" hint="Found by workflow names only, so this is an estimate. A workflow with an unusual name is not recognised.">
                   {data.coverage.length === 0 ? <p className="text-sm text-muted-foreground">Update the list first.</p> : (
@@ -205,6 +221,9 @@ export function WorkflowsView({ go, kind }: { go: GoFn; kind: AccessKind }) {
           )}
         </div>
       ) : null}
+
+      {tab === "delivery" ? <DeliveryTab q={q} now={data.now} /> : null}
+      {tab === "proof" ? <ProofTab q={q} /> : null}
 
       {tab === "history" ? (
         <Section title="What changed" hint="What SubSync did, and what it noticed changed in your CRM between two updates.">

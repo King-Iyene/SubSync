@@ -1,4 +1,4 @@
-import type { Deps } from "../live-flags.ts";
+import { isLive, type Deps } from "../live-flags.ts";
 import { createWorkflow, deleteWorkflow, putDefinition, renamedDefinition, setStatus, validateDefinition, workflowDefinition, type WriteOutcome } from "./ghl.ts";
 import { missingScopes, type WriteKind } from "./guards.ts";
 import type { WfItem } from "./model.ts";
@@ -39,7 +39,11 @@ export async function runOne(kind: WriteKind, w: Pick<WfItem, "workflowId" | "lo
   if (miss) return { ...base, outcome: "needs_permission", message: NEEDS(miss) };
   if (d.demo) return { ...base, outcome: "done", message: "Done (demo: only SubSync's copy changed).", newName: arg.newName, newWorkflowId: kind === "clone" ? `demo-${Date.now().toString(36)}` : undefined };
   let token: string;
-  try { token = await d.token(w.locationId); } catch { return { ...base, outcome: "failed", message: "SubSync could not open this client account. Reconnect it and try again." }; }
+  try { token = await d.token(w.locationId); } catch {
+    // A rehearsal of publish or pause sends nothing, so it needs no key. Everything else reads the workflow first and does need one.
+    if ((kind === "publish" || kind === "unpublish") && !isLive("WORKFLOWS_WRITE_LIVE", d.outward?.env ?? process.env)) token = "";
+    else return { ...base, outcome: "failed", message: "SubSync could not open this client account. Reconnect it and try again." };
+  }
   const c = { token, fetchImpl: d.fetchImpl, installationId: d.installationId, locationId: w.locationId, workflowId: w.workflowId, idem: d.idem };
   const o = d.outward ?? {};
 

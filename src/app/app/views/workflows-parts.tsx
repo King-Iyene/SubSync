@@ -6,7 +6,7 @@ import type { LabelRow } from "@/lib/workflows/store-types";
 import { BUCKET_LABEL, bucketOf, type Bucket } from "@/lib/workflows/reports";
 import { entityOf, type WfItem } from "@/lib/workflows/model";
 import { InlineAlert } from "../ds";
-import { useApiClient } from "../session";
+import { useApiClient, useData } from "../session";
 import { Badge, Btn } from "../ui";
 
 // The pieces of the Workflows page that are not charts: the table, the one-item panel, and the change dialog (pick, preview, confirm).
@@ -112,6 +112,8 @@ export function ItemPanel({ item, account, label, bucket, now, canOrganise, onCl
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => { ref.current?.focus(); const k = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); }; window.addEventListener("keydown", k); return () => window.removeEventListener("keydown", k); }, [onClose]);
+  const det = useData<Detail>(`workflows/detail?locationId=${encodeURIComponent(item.locationId)}&workflowId=${encodeURIComponent(item.workflowId)}`);
+  const watch = async () => { try { await api.post("workflows/mark", { locationId: item.locationId, workflowId: item.workflowId, action: label?.watch ? "unwatch" : "watch" }); onSaved(); } catch (e) { setMsg({ ok: false, text: (e as Error).message }); } };
   const save = async () => {
     setBusy(true); setMsg(null);
     try {
@@ -133,7 +135,29 @@ export function ItemPanel({ item, account, label, bucket, now, canOrganise, onCl
           <dt className="text-muted-foreground">Runs in 30 days</dt><dd>{item.runs30d ?? "Not known"}</dd>
           <dt className="text-muted-foreground">Errors in 30 days</dt><dd>{item.failed30d ?? "Not known"}</dd>
         </dl>
-        {item.uiUrl ? <a href={item.uiUrl} target="_blank" rel="noopener noreferrer" className="mb-5 inline-flex min-h-9 items-center gap-1.5 rounded-lg border px-3 text-sm font-medium hover:bg-accent" data-testid="wf-panel-crm">Open in your CRM<ExternalLink aria-hidden className="size-3.5" /></a> : null}
+        <section className="mb-5" aria-label="What it does" data-testid="wf-detail">
+          <h3 className="mb-2 text-sm font-semibold">What it does</h3>
+          {det.loading && !det.data ? <p className="text-sm text-muted-foreground">Reading it...</p> : det.error ? <p className="text-sm text-muted-foreground">Could not read it right now.</p> : det.data?.kind === "campaign" ? <p className="text-sm text-muted-foreground">{det.data.note}</p> : (
+            <>
+              {det.data?.needs?.length ? <p className="text-sm text-warning">Needs permission: reconnect ({det.data.needs.join(", ")}).</p> : null}
+              {det.data?.summary ? (
+                <div className="text-sm">
+                  <p><span className="text-muted-foreground">Starts when: </span>{det.data.summary.triggers.length ? det.data.summary.triggers.join(", ") : "Nothing starts it by itself"}</p>
+                  <ol className="mt-2 list-decimal space-y-0.5 pl-5">{det.data.summary.steps.map((s) => <li key={s.n}>{s.name}</li>)}</ol>
+                  {det.data.summary.stepCount > det.data.summary.steps.length ? <p className="mt-1 text-xs text-muted-foreground">And {det.data.summary.stepCount - det.data.summary.steps.length} more steps.</p> : null}
+                  {det.data.summary.settings.length ? <p className="mt-2 text-xs text-muted-foreground">{det.data.summary.settings.join(". ")}.</p> : null}
+                </div>
+              ) : det.data && !det.data.needs?.includes("workflows.readonly") ? <p className="text-sm text-muted-foreground">Not available from the platform yet.</p> : null}
+              {det.data?.errors?.length ? (
+                <div className="mt-3"><h4 className="text-xs font-semibold text-destructive">Recent problems</h4><ul className="mt-1 space-y-1 text-sm" data-testid="wf-errors">{det.data.errors.map((e, i) => <li key={i}><span className="font-medium">{e.step}</span>: {e.words}{e.at ? <span className="text-muted-foreground"> ({when(e.at, now).toLowerCase()})</span> : null}</li>)}</ul></div>
+              ) : null}
+            </>
+          )}
+        </section>
+        <div className="mb-5 flex flex-wrap gap-2">
+          {canOrganise ? <button type="button" onClick={watch} aria-pressed={label?.watch === true} data-testid="wf-watch" className="min-h-9 rounded-lg border px-3 text-sm font-medium hover:bg-accent">{label?.watch ? "Stop watching" : "Watch it"}</button> : null}
+          {item.uiUrl ? <a href={item.uiUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border px-3 text-sm text-muted-foreground hover:bg-accent" data-testid="wf-panel-crm">Also open in your CRM<ExternalLink aria-hidden className="size-3.5" /></a> : null}
+        </div>
         <h3 className="mb-2 text-sm font-semibold">Your notes (kept in SubSync only)</h3>
         {!canOrganise ? <p className="text-sm text-muted-foreground">Labels, ratings and notes are for administrators on the paid plan.{label ? ` Decision: ${label.decision ? DEC[label.decision] : "not set"}.` : ""}</p> : (
           <div className="space-y-3">
@@ -157,6 +181,7 @@ export function ItemPanel({ item, account, label, bucket, now, canOrganise, onCl
 
 // ---------------------------------------------------------------- change dialog
 
+type Detail = { kind: "workflow" | "campaign"; note?: string; needs?: string[]; summary: { triggers: string[]; steps: Array<{ n: number; name: string }>; stepCount: number; settings: string[] } | null; errors: Array<{ at: number | null; step: string; words: string }> };
 export type ChangeKind = "rename" | "publish" | "unpublish" | "delete" | "clone";
 type PRow = { workflowId: string; locationId: string; name: string; to: string | null; status: "change" | "unchanged" | "blocked"; problem: string | null; needsPause: boolean; maybeActive: boolean };
 type Preview = { kind: ChangeKind; rows: PRow[]; count: number; problem: string | null; dryRun: boolean; token: string | null; phrase: string | null; pauses: number; active: number };

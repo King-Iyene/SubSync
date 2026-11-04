@@ -36,6 +36,13 @@ export async function ensureWorkflowsDemo(installationId: string): Promise<void>
       await db`insert into workflow_items (installation_id, location_id, workflow_id, name, status, kind, ui_url, remote_created_at, remote_updated_at, runs_30d, enrolled_30d, failed_30d, last_run_at)
         values (${installationId}, ${l.location_id as string}, ${id}, ${name}, ${st}, ${o.kind ?? null}, ${"#crm-demo"}, ${new Date(now - 120 * DAY)}, ${new Date(now - o.edited * DAY)}, ${o.runs}, ${o.runs === null ? null : Math.round(o.runs / 2)}, ${o.failed},
           ${o.runs ? new Date(now - DAY) : null}) on conflict do nothing`;
+      if (campaign && status !== "draft") {
+        // Made-up delivery totals: one account is healthy, one bounces a lot, one has messages stuck waiting.
+        const sent = 400 + n * 37, bad = i % 3 === 1 ? 0.28 : 0.02, delivered = Math.round(sent * (1 - bad - 0.01)), queued = i % 3 === 2 ? 60 : 0;
+        const day = new Date(now).toISOString().slice(0, 10);
+        await db`insert into campaign_stats (installation_id, location_id, campaign_id, day, sent, delivered, opened, clicked, bounced, failed, unsubscribed, queued)
+          values (${installationId}, ${l.location_id as string}, ${id}, ${day}, ${sent}, ${delivered}, ${Math.round(delivered * 0.38)}, ${Math.round(delivered * 0.06)}, ${Math.round(sent * bad)}, ${Math.round(sent * 0.01)}, ${Math.round(delivered * 0.004)}, ${queued}) on conflict do nothing`;
+      }
       if (n % 4 === 0) await db`insert into workflow_labels (installation_id, location_id, workflow_id, labels, decision, rating, owner, updated_by) values (${installationId}, ${l.location_id as string}, ${id}, ${["lead handling"]}::text[], ${n % 8 === 0 ? "review" : "keep"}, ${(n % 5) + 1}, 'Dana Brooks', 'Dana Brooks') on conflict do nothing`;
     }
     for (let d = 14; d >= 0; d--) {
