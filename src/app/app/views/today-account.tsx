@@ -162,7 +162,7 @@ export function TodayAccount({ go, data: t, kind, reload, sync, syncing, now }: 
       )}
 
       {alsoRows.length > 0 && (
-        <FixFirstQueue rows={alsoRows} max={5} title="Also needs you" hint="Other things in this account, ranked by money at stake, then by how long they have been wrong."
+        <FixFirstQueue single rows={alsoRows} max={5} title="Also needs you" hint="Other things in this account, ranked by money at stake, then by how long they have been wrong."
           onShow={(r: QueueRow) => setFocus(r.key)} empty="Nothing else needs you." />
       )}
       {row && <div className="mb-8"><RowsPanel title={`${KIND_LABEL[row.kind]}`} count={row.count} noun={NOUN[row.kind]} items={t.items.filter((i) => row.itemIds.includes(i.id))} onClose={() => setFocus(null)} /></div>}

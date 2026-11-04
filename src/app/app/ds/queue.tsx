@@ -28,7 +28,7 @@ export function stakeOf(r: Pick<QueueRow, "dollars" | "estimate" | "count" | "ki
 const primary = "ds-press inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-primary px-3.5 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)] active:translate-y-px";
 const quiet = "ds-press min-h-9 rounded-lg px-2.5 text-sm text-muted-foreground underline-offset-4 hover:bg-muted hover:text-foreground hover:underline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--ring)]";
 
-export function QueueRowView({ row, now, active, onShow }: { row: QueueRow; now: number; active: boolean; onShow: (r: QueueRow) => void }) {
+export function QueueRowView({ row, now, active, onShow, single = false }: { row: QueueRow; now: number; active: boolean; onShow: (r: QueueRow) => void; single?: boolean }) {
   const s = SEVERITY[row.severity];
   const stake = stakeOf(row);
   const age = row.since === null ? null : ageWords(Math.max(0, (now - row.since) / 60_000));
@@ -36,8 +36,8 @@ export function QueueRowView({ row, now, active, onShow }: { row: QueueRow; now:
     <li id={`queue-${row.key}`} data-testid="queue-row" data-kind={row.kind} data-severity={row.severity} aria-current={active ? "true" : undefined}
       className={`ds-row grid items-center gap-x-5 gap-y-2 border-l-[3px] py-3 pl-4 pr-2 md:grid-cols-[minmax(0,1fr)_8.5rem_9rem_auto] ${s.stripe} ${active ? "bg-accent/50 outline outline-2 -outline-offset-2 outline-[var(--ring)]" : ""}`}>
       <div className="min-w-0">
-        <p className="break-words font-semibold">{row.accountName}</p>
-        <p className="mt-0.5 break-words text-sm text-muted-foreground">{row.text}</p>
+        {single ? <p className="break-words font-semibold">{row.text}</p> : <><p className="break-words font-semibold">{row.accountName}</p>
+        <p className="mt-0.5 break-words text-sm text-muted-foreground">{row.text}</p></>}
       </div>
       <div className="tnum md:text-right">
         <p className="text-lg font-semibold leading-6">{stake.main}</p>
@@ -55,8 +55,8 @@ export function QueueRowView({ row, now, active, onShow }: { row: QueueRow; now:
   );
 }
 
-export function FixFirstQueue({ rows, max = 7, onShow, empty, title = "Fix first", hint }: {
-  rows: QueueRow[]; max?: number; onShow: (r: QueueRow) => void; empty: string; title?: string; hint?: string;
+export function FixFirstQueue({ rows, max = 7, onShow, empty, title = "Fix first", hint, single = false }: {
+  rows: QueueRow[]; max?: number; onShow: (r: QueueRow) => void; empty: string; title?: string; hint?: string; /** One account only: the row leads with what is wrong, not the account name. */ single?: boolean;
 }) {
   const [all, setAll] = useState(false);
   const [at, setAt] = useState(0);
@@ -91,7 +91,7 @@ export function FixFirstQueue({ rows, max = 7, onShow, empty, title = "Fix first
         <p className="border-y py-6 text-center text-sm text-muted-foreground" data-testid="queue-empty">{empty}</p>
       ) : (
         <ul className="divide-y border-y" data-testid="queue-list">
-          {shown.map((r, n) => <QueueRowView key={r.key} row={r} now={now} active={n === active} onShow={onShow} />)}
+          {shown.map((r, n) => <QueueRowView key={r.key} row={r} now={now} active={n === active} onShow={onShow} single={single} />)}
         </ul>
       )}
       {rows.length > shown.length && <p className="mt-2 text-xs text-muted-foreground">Showing {shown.length} of {rows.length}.{!all && " The rest follow in the same order."}</p>}
