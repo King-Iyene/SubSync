@@ -59,7 +59,11 @@ Proposals (not built, for `docs/PROPOSALS.md`): see FOR THE LEAD.
 | `npx eslint` on every file added or changed | 0 errors, 0 warnings |
 | `node --test src/lib/__tests__/appointment-work.test.ts` | 14 tests, 14 pass |
 | `npx vitest run tests/unit/appointment-work-db.test.ts --no-file-parallelism` (real database, fixture companies removed afterwards) | 5 passed: counts equal `appointmentView` (Today's source), a person's deals once and a no-owner deal not counted, tenancy for agency and client with forged account and company ids, every chart bar's count equals its list, 150 accounts (five rows per list, one page of 25, short tables, search, sort) |
-| `PW_BASE_URL=http://localhost:3141 npx playwright test tests/e2e/appointments-v2.spec.ts` | see section 6 |
+| `node --test src/lib/__tests__/` (the whole pure suite, includes the banned-words scan and the "one wording for a missing permission" test, which caught that the page had lost the words "Needs permission: reconnect": restored) | 875 tests, 875 pass, 0 fail |
+| `npx vitest run` on `f3-appointments-ui`, `ds-components`, `ds-drill-range`, `route-registry`, `client-access`, `tenant-tables`, `access-roles`, `f3-appointments-db` (`--no-file-parallelism`) | 8 files, 85 tests, all passed |
+| `PW_BASE_URL=http://localhost:3141 npx playwright test tests/e2e/appointments-v2.spec.ts -g "a headline, one button"` at phone-390, tablet-768 and desktop-1440 (the four roles; run again after the last edit) | 12 passed (7.5 min) |
+| the same file, the six interaction tests at desktop-1440 (Today agreement, chart mark to list, See all with search, the person panel, the do-not-disturb warning, client tenancy) | 6 passed (5.4 min) |
+| `npx playwright test tests/e2e/appointments.spec.ts --project=desktop-1440` (the older API and Insights tests, one UI test replaced) | 9 passed |
 
 Written: unit tests for every number (unmarked, cancelled, rebooked, tiny samples, one person with two appointments, 150 accounts), a database test for the queries and the scale, `tests/e2e/appointments-v2.spec.ts` (four roles at the three widths, Today agreement, chart mark to list, See all, the person panel, the do-not-disturb warning, client tenancy, no sideways scroll, 44 px targets at 390), and the old `tests/e2e/appointments.spec.ts` updated (its two tests of the removed tab replaced by one for the card range).
 
