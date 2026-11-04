@@ -5,6 +5,7 @@
     { "path": "/api/cron/daily", "schedule": "0 * * * *" },
     { "path": "/api/cron/weekly", "schedule": "5 * * * *" },
     { "path": "/api/cron/workflows", "schedule": "35 * * * *" },
+    { "path": "/api/cron/data-health", "schedule": "50 * * * *" },
     { "path": "/api/cron/watchdog", "schedule": "*/10 * * * *" },
     { "path": "/api/cron/meeting-expiry", "schedule": "20 3 * * *" }
   ]

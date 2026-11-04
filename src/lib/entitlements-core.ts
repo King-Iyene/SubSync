@@ -13,7 +13,7 @@ export type Tier = "free" | "pro";
 export type Mode = "open" | "enforced";
 
 // Brief section 6: Free is Instant Audit, overview, contact search and data health.
-export const FREE_FEATURES: ReadonlySet<Feature> = new Set<Feature>(["overview", "audit", "search", "health", "settings", "workflows"]);
+export const FREE_FEATURES: ReadonlySet<Feature> = new Set<Feature>(["overview", "audit", "search", "health", "settings", "workflows", "data_health"]);
 
 export const modeFrom = (value: string | undefined): Mode => (value === "enforced" ? "enforced" : "open");
 
