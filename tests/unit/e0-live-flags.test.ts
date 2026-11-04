@@ -9,9 +9,9 @@ type Row = { installationId: string; action: string; detail: Record<string, unkn
 const recorder = () => { const rows: Row[] = []; const logs: unknown[][] = []; return { rows, logs, deps: { env: {} as Record<string, string>, audit: async (r: Row) => { rows.push(r); }, log: (...a: unknown[]) => { logs.push(a); } } }; };
 
 describe("the four live switches", () => {
-  it("are exactly the four named in the rules, and all off with no environment", () => {
-    expect([...LIVE_FLAGS]).toEqual(["SEND_EMAIL_LIVE", "SEND_SLACK_LIVE", "WRITE_GHL_LIVE", "FATHOM_WEBHOOK_LIVE"]);
-    expect(liveFlags({})).toEqual({ SEND_EMAIL_LIVE: false, SEND_SLACK_LIVE: false, WRITE_GHL_LIVE: false, FATHOM_WEBHOOK_LIVE: false });
+  it("are exactly the five named in the rules (the fifth is the Workflows module), and all off with no environment", () => {
+    expect([...LIVE_FLAGS]).toEqual(["SEND_EMAIL_LIVE", "SEND_SLACK_LIVE", "WRITE_GHL_LIVE", "FATHOM_WEBHOOK_LIVE", "WORKFLOWS_WRITE_LIVE", "DATA_HEALTH_WRITE_LIVE"]);
+    expect(liveFlags({})).toEqual({ SEND_EMAIL_LIVE: false, SEND_SLACK_LIVE: false, WRITE_GHL_LIVE: false, FATHOM_WEBHOOK_LIVE: false, WORKFLOWS_WRITE_LIVE: false, DATA_HEALTH_WRITE_LIVE: false });
   });
   it("only the exact word true switches one on (a typo can never switch anything on)", () => {
     for (const v of ["", "1", "yes", "TRUE", "True", " true", "true ", "on", "false", "0"]) expect(isLive("WRITE_GHL_LIVE", { WRITE_GHL_LIVE: v }), JSON.stringify(v)).toBe(false);

@@ -14,6 +14,7 @@ import { NAV } from "../app/nav";
 import { Badge, Btn, Card, Stat } from "../app/ui";
 import { SAMPLE_LEADS, SAMPLE_OPTIONS, SAMPLE_TREND, SAMPLE_WEEKS, sampleApi } from "./sample";
 import { TodayBlocks } from "./today-blocks";
+import { WorkflowsBlocks } from "./workflows-blocks";
 
 const MEMBER_COLUMNS: Array<Column<TrendMember>> = [
   { key: "name", header: "Lead", primary: true, width: "minmax(0,2fr)", cell: (m) => m.name },
@@ -246,6 +247,7 @@ export function DesignGuide() {
           </Section>
 
           <TodayBlocks />
+          <WorkflowsBlocks />
 
           <Section title="Page template" hint="Title, one short sentence, actions, tabs, then the blocks.">
             <div className="rounded-2xl border p-4"><Page title="Page title" subtitle="One short sentence that says what the page is for." actions={<Btn variant="primary">Do the main thing</Btn>}><p className="text-sm text-muted-foreground">Blocks go here.</p></Page></div>

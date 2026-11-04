@@ -76,3 +76,11 @@ require a typed confirmation, snapshot the old values, allow undo, and refuse wh
 Nothing uses the change scopes yet except Data cleanup (switched off).
 
 The earlier list above that says `marketplace-installer-details.readonly` was not found is unchanged.
+
+## Planned for version 2.1.0: the Workflows module (8 new optional scopes, 29 scopes in total)
+
+All optional, so an install that declines them keeps working and the Workflows page says "Needs permission: reconnect" with the exact names:
+`workflows.readonly` and `workflows.logs` (read the list and the run history), `campaigns.readonly`, `emails/campaigns.readonly` and `emails/stats.readonly`
+(read campaigns and their delivery totals), and the change scopes `workflows.write` (rename, copy), `workflows.publish` and `workflows.delete`, each used only after
+a preview and a confirm and only with `WORKFLOWS_WRITE_LIVE` switched on. SubSync still asks for 29 scopes in total (7 required and 22 optional). Nothing here can send a message or start a campaign.
+Batch it into the 1.1.0 release with the other scope and pricing changes (docs/DECISIONS.md).

@@ -587,7 +587,7 @@ export async function syncAlerts(installationId: string, drafts: AlertDraft[]): 
     const keys = drafts.map((d) => d.dedupeKey);
     await tx`
       update alerts set resolved_at = now()
-      where installation_id = ${installationId} and resolved_at is null and not (dedupe_key = any(${pgTextArray(keys)}::text[]))`;
+      where installation_id = ${installationId} and resolved_at is null and dedupe_key not like 'wf:%' and not (dedupe_key = any(${pgTextArray(keys)}::text[]))`;
     return created;
   });
 }

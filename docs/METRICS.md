@@ -443,6 +443,17 @@ Still no new measurement of the CRM. Everything below is worked out from rows Su
 
 **Saved views, command palette, printable report.** A view stores which client accounts and the junk switch, nothing else, and is the person's own (at most 10). The palette lists jumps, lists, accounts, views and actions; Ctrl or Cmd + K opens it on Today. The report prints the headline, the top 12 Fix first rows, the insights, the forecast line and what SubSync caught, with the sender's own brand name when one is set.
 
+## Workflows and campaigns (module W1)
+
+- **Failing** workflow: published, with logs known, at least 3 failed steps and at least 20% of the steps of the last 30 days failed (critical from 50%). Counted from the log totals; never from a guess.
+- **Never ran (30 days)**: published and the log total of the last 30 days is exactly 0. An estimate (a rare trigger can be quiet on purpose). Unknown logs are "not known", never 0.
+- **Old draft**: draft and not edited for 30 days. Estimate.
+- **Campaign looks stuck**: shown as running or scheduled and not changed for 14 days. Estimate. **Campaign failed**: the platform says failed.
+- **Missing basics**: an account has no published workflow whose name looks like missed call text back, new lead follow up, appointment reminders or no show follow up. By name only, so an estimate.
+- **Delivered share** = delivered / sent, only when both are reported and sent is above 0. **Delivery health (0 to 100)** = 100 x delivered share, minus 50 x (bounced + failed) / sent, minus 200 x unsubscribed share (capped at 10%), only from 50 sent. Below that: "Not enough data".
+- **Looks sent but did not arrive**: from 50 sent, shown as sent or done, and delivered share below 80%. Bounces above 5%, unsubscribes above 2% and messages waiting for more than 2 days are separate prompts.
+- **Against its own usual**: the campaign's delivered share against the median of the same account's earlier campaigns, needs 3 earlier ones of 50 sent or more.
+- **Marked fixed / snoozed** hides a finding for 7 days / until the date; it returns by itself if the problem is still there. **Cleared** (Proof) = the alert's condition went away; SubSync cannot tell who fixed it.
 ## Today, third pass (4 Nov 2026): the counting rule
 
 Still no new measurement. This pass fixes how the same figures are COUNTED and worded. Code: `src/lib/analytics/today-queue.ts` (`mergeReplies`, `countsOf`), tests `src/lib/__tests__/today-count.test.ts`, `tests/unit/today-lists.test.ts`, `tests/e2e/today3.spec.ts`.
@@ -608,3 +619,21 @@ Code: `src/lib/analytics/unanswered-v2.ts` (everything pure: the person, the buc
 
 **Not measured:** message text (never stored); whether a call was answered ("Call, result not known"); unread (a different question: the Unread tile on Today).
 
+
+- **Turned off** (Workflows): a workflow that was published at the earlier update and is now a draft or paused, noticed in the last 7 days, not changed by SubSync, and still not published. Campaigns count as info only.
+- **Same workflow across accounts**: names are matched after lower case, punctuation and "copy" are removed; drift = states differ, version numbers differ (a platform edit counter, so an inference that the contents differ), or it is missing from some client accounts. Needs 2 accounts.
+- **Near duplicate**: inside one client account, same normalised name or at least 80% shared words (words of 2 letters or more).
+- **Review due**: decision Review and no change to the note for 14 days.
+
+## Data health (module DATA_HEALTH)
+
+- **Contacts counted:** every synced contact of the client account, minus ones marked Ignore in SubSync. Fewer than 50: no score ("not enough data").
+- **Score:** 100 minus, for each problem, its weight times min(1, share of contacts with it / its cap). Weights: duplicates 20 (cap 15%), junk 15 (5%), invalid phone 10 (20%), invalid email 10 (10%), no phone 10 (50%), no email 10 (50%), no activity 10 (60%), no owner 5 (60%), no source 5 (50%), no deal and no conversation 5 (60%). Rounded. 85 and up good, 65 and up fair, under 65 poor. Estimate; the formula is in `src/lib/data-health/score.ts`.
+- **Duplicate:** an extra copy: every contact in a same-email or same-phone group except the oldest (the existing duplicate finder).
+- **Invalid phone:** under 7 or over 15 digits, letters, or one repeated digit or 1234567. **Invalid email:** not name@domain.tld, double dots, or a common typo domain (gmial.com). **No phone / no email:** empty. These never overlap with invalid.
+- **Junk:** a first, last or full name like test, asdf, xxx, fake, demo, none, n/a, only digits; email at example.com or a test domain or starting test@; a phone of repeated digits; plus the account's own junk words.
+- **No activity:** last activity (or date added) older than the account's days setting (default 180). Skipped for contacts SubSync changed in the last 7 days.
+- **No deal and no conversation:** no row in synced deals and none in synced conversations. **No source / no owner:** empty.
+- **Quality firewall spike:** per source, bad records (duplicate, junk, invalid phone or email) created in the last 24 hours, at least the account's minimum (default 10), at least 3 times the same source's daily average over the 14 days before (counted as 1 if lower), and at least a third of what that source created.
+- **Since you installed:** first stored score, latest score, flags ever raised, flags that stopped being flagged. **Average time to fix:** mean hours between an alert raised and resolved.
+- **Benchmark:** median and quartiles of the latest score (last 14 days) of accounts in the same size and industry group, only with at least 10 accounts from at least 3 companies and never from opted out companies.

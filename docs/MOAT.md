@@ -53,3 +53,11 @@ to fake, and it matters to the agencies that resell this under their own name.
 3. Setter and closer leaderboard across accounts (replies, first-reply time, appointments held, deals won), from the history above.
 4. Benchmarks (section 3), after a first handful of agencies.
 5. Email delivery of the weekly digest, so the product reaches people who do not open the app.
+
+## Data health moat (module DATA_HEALTH)
+
+1. **What is accumulated:** a daily score per client account with every component, every flagged contact id with first-seen and fixed-at dates, each quality alert with who or what closed it and how fast, and each account's saved rules, owners and decisions.
+2. **Why it cannot be copied:** the CRM keeps none of this history. A competitor can show today's duplicates, never "score 54 to 88 since you installed, 312 problems found, 290 fixed, 4.2 hours on average to fix". The record starts on install day and grows every day.
+3. **Network effect:** "your score against accounts like yours" uses only anonymous aggregates (median and quartiles) per coarse size and industry group, shown only when a group has at least 10 accounts from at least 3 companies. The more installs, the better it gets.
+4. **Switching cost, kept honest:** rules, owners, marks and history live in SubSync and can be downloaded at any time (Rules tab, "Download my record"). Export is a trust feature, so it stays.
+5. **What we never do with it:** no record, name, email, phone or id leaves its own account, no per-company number is ever shown to another company, an opt-out (Rules tab) removes an account's company from the pool, and nothing here is sold or used to message anyone.

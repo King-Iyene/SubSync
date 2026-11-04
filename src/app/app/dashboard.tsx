@@ -12,6 +12,7 @@ import { movedSettingsSection } from "@/lib/settings-sections";
 import {
   Briefcase, CalendarCheck, ClipboardCheck, Zap, CircleHelp, Copy, Eraser, Inbox, Kanban, LayoutDashboard, Mic, Monitor, Moon, PhoneCall, Plug, Search, Settings, Sun, Target, UserRound, Users, Wrench, type LucideIcon,
   Sparkles, UsersRound,
+  Workflow,
 } from "lucide-react";
 import { NAV, PARENT, visibleNav, type GoFn, type ViewId } from "./nav";
 import { useBrandedText } from "./brand-text";
@@ -32,6 +33,8 @@ import { SpeedView } from "./views/speed";
 import { AppointmentsView } from "./views/appointments";
 import { CleanupView } from "./views/cleanup";
 import { MeetingsView } from "./views/meetings";
+import { WorkflowsView } from "./views/workflows";
+import { DataHealthView } from "./views/data-health";
 import { GlobalSearch } from "./views/global-search";
 import { PeopleModule } from "./views/people-module";
 import { ClientsView, type ClientsFeatures } from "./views/clients";
@@ -373,6 +376,9 @@ export function Dashboard() {
       case "team": return <TeamView />;
       case "appointments": return <ModuleTabs key="appts" start={0} tabs={[{ label: "Appointments", node: <AppointmentsView go={go} /> }, { label: "Insights", node: <AppointmentInsights /> }]} />;
       case "meetings": return <MeetingsView />;
+      // Workflows reads with the unfiltered client and keeps its own account choice (like Today), so the shared filter never changes what it counts.
+      case "data-health": return <ApiProvider value={baseApi}><DataHealthView go={go} kind={auth.kind} /></ApiProvider>;
+      case "workflows": return <ApiProvider value={baseApi}><WorkflowsView go={go} kind={auth.kind} /></ApiProvider>;
       case "cleanup": return <CleanupView />;
       case "clients": return <ClientsView key="clients" go={go} initialTab="health" features={clientFeatures} />;
     }
@@ -446,7 +452,7 @@ export function Dashboard() {
                 {/* On Today the quiet freshness line sits here, in the one row with search and the bell (the page below draws its own account filter and "Showing" chip). */}
                 {view.id === "today" && strip}
                 {/* Today draws its own account selector inside the page; the shared one is for every other page. */}
-                {auth.kind === "agency" && baseApi && !fromAccount && view.id !== "today" && <ApiProvider value={baseApi}><FilterDrawer kind="agency" value={filter} onChange={setFilter} /></ApiProvider>}
+                {auth.kind === "agency" && baseApi && !fromAccount && view.id !== "today" && view.id !== "workflows" && view.id !== "data-health" && <ApiProvider value={baseApi}><FilterDrawer kind="agency" value={filter} onChange={setFilter} /></ApiProvider>}
               </div>
               <div className="ml-auto flex shrink-0 items-center">
                 {NAV_FOR[auth.kind].has("search") && !off("search") && <GlobalSearch go={go} />}
@@ -467,7 +473,7 @@ const THEME_LABEL: Record<ThemePref, string> = { dark: "Dark appearance", light:
 
 const ICONS: Record<string, LucideIcon> = {
   today: Sun, myday: Sun, people: UsersRound, audit: ClipboardCheck, speed: Zap, overview: LayoutDashboard, inbox: Inbox, appointments: CalendarCheck, meetings: Mic, search: Search, pipeline: Kanban, leads: Target, calls: PhoneCall,
-  accounts: Briefcase, clients: UserRound, team: Users, onboarding: Wrench, duplicates: Copy, cleanup: Eraser, settings: Settings, connections: Plug, help: CircleHelp, roadmap: Sparkles,
+  accounts: Briefcase, clients: UserRound, team: Users, onboarding: Wrench, duplicates: Copy, cleanup: Eraser, settings: Settings, connections: Plug, help: CircleHelp, roadmap: Sparkles, workflows: Workflow, "data-health": ClipboardCheck,
 };
 
 function Centered({ title, body }: { title: string; body: string }) {
