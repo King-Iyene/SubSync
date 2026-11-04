@@ -50,6 +50,16 @@ export const SCOPE_GROUPS: readonly ScopeGroup[] = [
     { scope: "locations/tags.write", kind: "change", required: false, why: "Reserved for tagging after a preview. Nothing in SubSync uses it today." },
     { scope: "locations/tasks.write", kind: "change", required: false, why: "Reserved for creating follow-up tasks after a preview. Nothing in SubSync uses it today." },
   ] },
+  { id: "workflows", title: "Workflows and campaigns", summary: "The automations and campaigns in your client accounts, and how they are doing.", scopes: [
+    { scope: "workflows.readonly", kind: "read", required: false, why: "The list of workflows in each client account (name, state, last edited), for the Workflows page. Without it the page says: Needs permission, reconnect." },
+    { scope: "workflows.logs", kind: "read", required: false, why: "How many times each workflow ran and how many steps failed in the last 30 days, to find broken or idle ones. Who went through a workflow is never stored." },
+    { scope: "workflows.write", kind: "change", required: false, why: "Only to rename a workflow or copy one into another client account, after a preview and a confirm. Optional." },
+    { scope: "workflows.publish", kind: "change", required: false, why: "Only to publish or pause a workflow, after a preview and a confirm. Optional." },
+    { scope: "workflows.delete", kind: "change", required: false, why: "Only to delete a workflow, after a preview, a typed confirmation and a saved copy. Optional." },
+    { scope: "campaigns.readonly", kind: "read", required: false, why: "The list of campaigns in each client account (name, state, last change), to find stuck or failed ones. Read only: SubSync never starts or sends a campaign." },
+    { scope: "emails/campaigns.readonly", kind: "read", required: false, why: "The email, bulk and workflow campaigns of each client account, read only, for the same list." },
+    { scope: "emails/stats.readonly", kind: "read", required: false, why: "How many messages of each campaign were sent, delivered, opened, clicked, bounced or are still waiting, to find campaigns that looked sent but did not arrive. Totals only: SubSync never sees who received what." },
+  ] },
 ];
 
 /** Groups with no CRM permission at all, said on purpose so nobody goes looking for a switch that does not exist. */
@@ -61,7 +71,6 @@ export const NO_PERMISSION_GROUPS = [
 export const NOT_REQUESTED: ReadonlyArray<{ id: string; scope: string; why: string }> = [
   { id: "payments", scope: "payments/transactions.readonly", why: "Failed payments and wallet balance. Not asked for: financial permissions cost trust and no feature needs them yet." },
   { id: "invoices", scope: "invoices.readonly", why: "Invoices. Not asked for, for the same reason." },
-  { id: "workflows", scope: "workflows.readonly", why: "Whether automations are running. Not asked for: the platform limits this to some accounts, so SubSync watches the results (leads left unanswered) instead." },
   { id: "forms", scope: "forms.readonly", why: "Form-by-form lead source. Not asked for yet." },
   { id: "installer", scope: "marketplace-installer-details.readonly", why: "Reading each install's plan, to double-check billing. Planned for a later release." },
   { id: "send", scope: "conversations/message.write", why: "Sending messages. Never asked for: SubSync does not reply to anyone, it measures how fast your team does." },
@@ -93,6 +102,10 @@ export const FEATURE_NEEDS: readonly FeatureNeed[] = [
   { id: "appointments", feature: "Appointment checks and the no-show list", scope: "calendars/events.readonly" },
   { id: "team_names", feature: "Team member names", scope: "users.readonly" },
   { id: "tags", feature: "Hot-lead and cold-list rules that use tags", scope: "locations/tags.readonly" },
+  { id: "workflow_history", feature: "Failing and idle workflow checks", scope: "workflows.logs" },
+  { id: "campaign_stats", feature: "Campaign delivery figures", scope: "emails/stats.readonly" },
+  { id: "campaigns", feature: "The campaign list and its health", scope: "campaigns.readonly" },
+  { id: "data_health_fix", feature: "Fixing phone formats and name capitals in Data health", scope: "contacts.write" },
   { id: "meeting_notes", feature: "Adding a meeting summary to a contact's notes", scope: "contacts.write" },
 ];
 

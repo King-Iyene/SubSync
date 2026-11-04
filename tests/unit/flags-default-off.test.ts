@@ -7,6 +7,10 @@ import { DEFAULT_OFF } from "@/lib/flags-core";
 const REVIEWED_ALWAYS_ON_BASELINE = new Set([
   "overview", "search", "onboarding", "health", "stale", "activity", "inbox", "pipelines", "duplicates", "email", "alerts", "reports", "builder",
   "exports", "ai", "connections", "cleanup", "setup_compare", "playbooks", "clients", "team", "calls", "appointments", "audit", "speed", "settings",
+  // reachable only through the default-off "workflows" gate; they exist so the free plan can be told apart from the paid one
+  "workflows_pro", "workflows_write",
+  // reachable only through the default-off "data_health" gate
+  "data_health_pro", "data_health_fix",
 ]);
 
 describe("new features default off", () => {

@@ -1,0 +1,2 @@
+// The shape of one workflow's SubSync-side notes. Kept apart from store.ts so pure code (and node --test) can import it without a database.
+export type LabelRow = { labels: string[]; group: string | null; rating: number | null; decision: "keep" | "review" | "retire" | null; note: string | null; owner: string | null; updatedBy: string | null; updatedAt: number | null; fixedAt: number | null; snoozedUntil: number | null; watch: boolean };

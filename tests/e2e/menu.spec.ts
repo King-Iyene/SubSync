@@ -26,8 +26,8 @@ test("the agency menu is the pilot menu with plain group names, keeps every othe
   // Stage C1: Accounts and Setup are tabs of Clients now, not menu entries; their old addresses still open the module.
   for (const label of ["Accounts", "Setup"]) await expect(side.getByRole("button", { name: label, exact: true }), `${label} is a tab of Clients`).toHaveCount(0);
   await side.getByRole("button", { name: "Clients", exact: true }).click();
-  for (const tab of ["Health", "Onboarding", "Details and billing", "Compare", "Reviews (QBR)"]) await expect(page.getByRole("tab", { name: tab, exact: true }), `Clients tab: ${tab}`).toBeVisible();
+  for (const tab of ["Clients", "Onboarding", "Compare", "Reviews (QBR)", "Industries"]) await expect(page.getByRole("tab", { name: tab, exact: true }), `Clients tab: ${tab}`).toBeVisible();
   // The pages that became tabs are still one click away, inside People.
   await side.getByRole("button", { name: "People", exact: true }).click();
-  for (const tab of ["Search and filters", "Smart lists", "Going cold", "Imports and sources"]) await expect(page.getByRole("tab", { name: tab, exact: true }), `People tab: ${tab}`).toBeVisible();
+  for (const tab of ["Find and call", "Tags", "Going cold", "Sources"]) await expect(page.getByRole("tab", { name: tab, exact: true }), `People tab: ${tab}`).toBeVisible();
 });

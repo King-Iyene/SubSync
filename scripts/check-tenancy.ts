@@ -83,6 +83,7 @@ async function main() {
       "/api/app/today", `/api/app/today?accounts=${other.locs[0]}`, `/api/app/today?accounts=${other.locs.join(",")}&ta=${other.locs[0]}`, `/api/app/today?accounts=%2e%2e%2f${other.locs[0]}`,
       "/api/app/today/brief", `/api/app/today/brief?accounts=${other.locs[0]}`, "/api/app/today/views",
       // The duplicate review (stage DUP): the list, the obvious ones, one group, and the other side's account asked for by every parameter the screen takes.
+      "/api/app/data-health", `/api/app/data-health?wa=${other.locs[0]}`, `/api/app/data-health/records?loc=${other.locs[0]}`, `/api/app/data-health/sources?loc=${other.locs[0]}`, `/api/app/data-health/proof?loc=${other.locs[0]}`, `/api/app/data-health/export?loc=${other.locs[0]}`, `/api/app/data-health/fixes?loc=${other.locs[0]}`,
       "/api/app/duplicates?size=50", "/api/app/duplicates/obvious", `/api/app/duplicates?location=${other.locs[0]}&size=50`, `/api/app/duplicates?accounts=${other.locs[0]}&status=decided`, `/api/app/duplicates?focus=${other.locs[0]}:00000000-2`,
       // Clean-up (stage CLEANUP): the quality overview and one account, the list and CSV behind a finding, the rules, what-would-this-setting-find, the history, asked for the other side's account by every parameter.
       "/api/app/cleanup/quality", `/api/app/cleanup/quality?account=${other.locs[0]}`, `/api/app/cleanup/quality/list?account=${other.locs[0]}&finding=bad_email`, `/api/app/cleanup/quality/csv?account=${other.locs[0]}&finding=bad_email`,
@@ -92,7 +93,13 @@ async function main() {
       // The Appointments work lists (stage APPT): the lists, the full list and the comparison, asked for the other side's account and person by every parameter the page takes.
       "/api/app/appointments/work", "/api/app/appointments/list?kind=all&size=50", `/api/app/appointments/list?kind=all&location=${other.locs[0]}&size=50`, `/api/app/appointments/list?kind=record&location=${other.locs[0]}`,
       `/api/app/appointments/list?kind=window&bucket=noshow&location=${other.locs[0]}`, "/api/app/appointments/compare?by=account", "/api/app/appointments/compare?by=person", `/api/app/appointments/${other.locs[0]}/anything`,
+      // People (stage PEOPLE): the call lists, the lead panel, the search and the recent list, asked for the other side's accounts, people and words by every parameter they take.
+      "/api/app/people/home", "/api/app/people/recent", `/api/app/people/queue?list=waiting&location=${other.locs[0]}`, `/api/app/people/queue?list=hot&accounts=${other.locs.join(",")}`,
+      `/api/app/people/queue?list=stale&account=${other.locs[0]}&q=${other.marker}`, `/api/app/people/queue?list=noshows&mine=1&location=${other.locs[0]}`, `/api/app/people/queue?list=followups&q=${other.marker}`,
+      `/api/app/people/person/${other.locs[0]}/${other.contacts[0]}`, `/api/app/people/person/${other.locs[0]}/%2e%2e%2f${other.contacts[0]}`, `/api/app/people/search?q=${other.marker}&location=${other.locs[0]}`,
+      `/api/app/people/contact/${other.locs[0]}/${other.contacts[0]}`,
       // The rebuilt Account audit (stage AUDIT): the read, the client list and a single client, asked for the other side's account by every parameter it takes.
+      "/api/app/clients?part=home", "/api/app/clients?part=list&size=50", `/api/app/clients?part=list&q=${other.marker}`, `/api/app/clients?part=one&id=${other.locs[0]}`, "/api/app/clients?part=names",
       "/api/app/audit", "/api/app/audit/clients?size=50", `/api/app/audit?location=${other.locs[0]}`, `/api/app/audit/clients?location=${other.locs[0]}&q=${other.marker}`, `/api/app/audit?accounts=${other.locs[0]}&fresh=1`,
     ];
 
@@ -112,7 +119,7 @@ async function main() {
           sweeps += 1;
           assert.ok(r.status < 500, `${label} ${path} -> ${r.status} ${r.text.slice(0, 120)}`);
           // A search echoes what was typed. Only its results count as data.
-          const body = path.startsWith("/api/app/search") ? JSON.stringify((JSON.parse(r.text) as { hits?: unknown }).hits ?? []) : r.text;
+          const body = path.startsWith("/api/app/search") ? JSON.stringify((JSON.parse(r.text) as { hits?: unknown }).hits ?? []) : path.startsWith("/api/app/people/search") ? JSON.stringify((JSON.parse(r.text) as { rows?: unknown }).rows ?? []) : r.text;
           for (const needle of [other.marker, other.marker.toLowerCase(), other.company, ...other.locs, ...other.contacts, ...other.opps]) {
             assert.equal(body.includes(needle), false, `${me.company} (${label}) saw "${needle}" of ${other.company} through ${path}`);
           }
@@ -182,6 +189,17 @@ async function main() {
       ["POST", "/api/app/today/action", { action: "done", rowKey: `${B.locs[0]}|replies` }],
       ["POST", "/api/app/today/action", { action: "snooze", rowKey: `${B.locs[0]}|stale`, choice: "day" }],
       ["POST", "/api/app/today/action", { action: "undo", eventId: 1 }],
+      // Workflows: a change, a label, a mark and a read of the other agency's workflow in its client account.
+      ["POST", "/api/app/workflows/preview", { kind: "delete", items: [{ locationId: B.locs[0], workflowId: "w-1" }] }],
+      ["PUT", "/api/app/workflows/labels", { items: [{ locationId: B.locs[0], workflowId: "w-1" }], patch: { decision: "retire" } }],
+      ["POST", "/api/app/workflows/mark", { locationId: B.locs[0], workflowId: "w-1", action: "fixed" }],
+      // Data health: a mark, a rule, a refresh, a fix preview, a confirm and an undo on the other agency's client account (all must be refused).
+      ["POST", "/api/app/data-health/mark", { locationId: B.locs[0], contactIds: [B.contacts[0]], state: "ignored" }],
+      ["PUT", "/api/app/data-health/rules", { locationId: B.locs[0], junkWords: ["hacked"] }],
+      ["POST", "/api/app/data-health/refresh", { locationId: B.locs[0] }],
+      ["POST", "/api/app/data-health/preview", { locationId: B.locs[0], kinds: ["phone"] }],
+      ["POST", "/api/app/data-health/confirm", { locationId: B.locs[0], kinds: ["phone"], token: "1.x" }],
+      ["POST", "/api/app/data-health/undo", { locationId: B.locs[0] }],
       // The duplicate review: a decision, a set-aside and a merge on the other agency's contacts (the merge never writes: it is switched off).
       ["POST", "/api/app/duplicates/review", { locationId: B.locs[0], contactIds: [B.contacts[0], B.contacts[0] + "dup"], decision: "not_duplicate" }],
       ["POST", "/api/app/duplicates/snooze", { locationId: B.locs[0], contactIds: [B.contacts[0], B.contacts[0] + "dup"] }],
@@ -194,6 +212,9 @@ async function main() {
       ["POST", "/api/app/cleanup/quality/scan", { locationId: B.locs[0] }],
       ["POST", "/api/app/duplicates/merge-workflow", { locationId: B.locs[0], contactIds: [B.contacts[0], B.contacts[0] + "dup"], keepContactId: B.contacts[0], confirm: true }],
       ["POST", "/api/app/duplicates/undo-snooze", { locationId: B.locs[0], key: "00000000-2" }],
+      // People: marking the other agency's person as opened, and logging a call on the other agency's person.
+      ["PUT", "/api/app/people/seen", { locationId: B.locs[0], contactId: B.contacts[0] }],
+      ["POST", "/api/app/people/outcome", { locationId: B.locs[0], contactId: B.contacts[0], outcome: "answered" }],
       // A reply target on the other agency's client account.
       ["PUT", "/api/app/speed/target", { locationId: B.locs[0], minutes: 5 }],
     ];
@@ -331,7 +352,7 @@ async function main() {
         "/api/app/overview", "/api/app/accounts", `/api/app/accounts/${me.locs[1]}`, "/api/app/onboarding", `/api/app/search?q=${me.marker}`, "/api/app/stale", "/api/app/hygiene", "/api/app/inbox", "/api/app/pipelines", "/api/app/duplicates", "/api/app/alerts",
         "/api/app/pipeline-intel", "/api/app/contact-intel", "/api/app/comms-intel", "/api/app/deal-gaps", "/api/app/deal-events", "/api/app/start", "/api/app/appointments", "/api/app/appointment-insights", "/api/app/audit", "/api/app/speed", "/api/app/roadmap",
         // not allowed for a client at all: each must be refused
-        "/api/app/settings", "/api/app/clients", "/api/app/clients/compare", `/api/app/qbr/${me.locs[1]}`, "/api/app/api-keys", "/api/app/connections", "/api/app/meetings", "/api/app/cleanup", "/api/app/team", "/api/app/goals", "/api/app/call-lists",
+        "/api/app/settings", "/api/app/clients", "/api/app/clients?part=home", "/api/app/clients?part=list", "/api/app/clients?part=names", `/api/app/clients?part=one&id=${me.locs[1]}`, "/api/app/clients/compare", `/api/app/qbr/${me.locs[1]}`, "/api/app/api-keys", "/api/app/connections", "/api/app/meetings", "/api/app/cleanup", "/api/app/team", "/api/app/goals", "/api/app/call-lists",
         "/api/app/call-queue", "/api/app/call-outcomes", "/api/app/exec-summary", "/api/app/daily", "/api/app/daily-brief", "/api/app/digest", "/api/app/export/stale", "/api/app/sync-status", "/api/app/freshness", "/api/app/segments", "/api/app/playbooks",
         "/api/app/setup-compare", "/api/app/email", "/api/app/audit/shares", "/api/app/tickets", "/api/app/tickets/1", "/api/app/fees", "/api/app/notes",
       ];

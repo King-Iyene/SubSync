@@ -443,6 +443,17 @@ Still no new measurement of the CRM. Everything below is worked out from rows Su
 
 **Saved views, command palette, printable report.** A view stores which client accounts and the junk switch, nothing else, and is the person's own (at most 10). The palette lists jumps, lists, accounts, views and actions; Ctrl or Cmd + K opens it on Today. The report prints the headline, the top 12 Fix first rows, the insights, the forecast line and what SubSync caught, with the sender's own brand name when one is set.
 
+## Workflows and campaigns (module W1)
+
+- **Failing** workflow: published, with logs known, at least 3 failed steps and at least 20% of the steps of the last 30 days failed (critical from 50%). Counted from the log totals; never from a guess.
+- **Never ran (30 days)**: published and the log total of the last 30 days is exactly 0. An estimate (a rare trigger can be quiet on purpose). Unknown logs are "not known", never 0.
+- **Old draft**: draft and not edited for 30 days. Estimate.
+- **Campaign looks stuck**: shown as running or scheduled and not changed for 14 days. Estimate. **Campaign failed**: the platform says failed.
+- **Missing basics**: an account has no published workflow whose name looks like missed call text back, new lead follow up, appointment reminders or no show follow up. By name only, so an estimate.
+- **Delivered share** = delivered / sent, only when both are reported and sent is above 0. **Delivery health (0 to 100)** = 100 x delivered share, minus 50 x (bounced + failed) / sent, minus 200 x unsubscribed share (capped at 10%), only from 50 sent. Below that: "Not enough data".
+- **Looks sent but did not arrive**: from 50 sent, shown as sent or done, and delivered share below 80%. Bounces above 5%, unsubscribes above 2% and messages waiting for more than 2 days are separate prompts.
+- **Against its own usual**: the campaign's delivered share against the median of the same account's earlier campaigns, needs 3 earlier ones of 50 sent or more.
+- **Marked fixed / snoozed** hides a finding for 7 days / until the date; it returns by itself if the problem is still there. **Cleared** (Proof) = the alert's condition went away; SubSync cannot tell who fixed it.
 ## Today, third pass (4 Nov 2026): the counting rule
 
 Still no new measurement. This pass fixes how the same figures are COUNTED and worded. Code: `src/lib/analytics/today-queue.ts` (`mergeReplies`, `countsOf`), tests `src/lib/__tests__/today-count.test.ts`, `tests/unit/today-lists.test.ts`, `tests/e2e/today3.spec.ts`.
@@ -546,3 +557,72 @@ No new measurement of the CRM. The audit reads the same four lists as Today and 
 - **Match score of a pair (0 to 100).** Same email as typed 94; same address written differently (capitals, dots, +tag) 82; same phone as typed 90; same last 10 digits 80; two digits swapped 60; same name adds 5 to another signal, alone 35; a similar name (nickname, initial, small typo) adds 3, alone 32. Guards: a phone shared by different first names, or a shared company mailbox with different names, is capped at 55 and says why. A group's score is its best pair. Only pairs at or above the client's threshold (Strict 85, Balanced 50, Loose 30, custom 25 to 90) link. Words: 90 and over almost certainly the same person, 75 very likely, below could be.
 - **Matching rules.** Strict: email and phone as typed, threshold 85. Balanced: email and phone in any format, the same name as extra proof, threshold 50 (the behaviour before this stage). Loose: also similar names, swapped digits and a name on its own (never for a name shared by more than 8 contacts), threshold 30.
 - **Which value wins.** Per field (name, email, phone, owner, source): the record kept, the most recently used, the fullest, or the oldest. Defaults: name fullest, email and phone the record kept, owner the record kept, source the oldest.
+## People, call lists and the lead panel (stage PEOPLE, 5 Nov 2026)
+
+Nothing here is a new definition of a metric. The five lists are the lists other pages already use, read through the same function, so a number on a chip and the number on the page it comes from are one thing (tests: `tests/unit/people-v2-db.test.ts`, `tests/e2e/people-v2.spec.ts` "every chip's number is the number of people in its list").
+
+| List | Who is on it | Read through | Count on its chip |
+| --- | --- | --- | --- |
+| Waiting for a reply | New leads nobody has replied to (Speed to lead's "waiting", the last 14 days; Today's "new leads"), the longest wait first | `speedList` status waiting | Speed's own total. A lead whose contact is not in SubSync's copy yet is kept, from what Speed knew (it shows as "Unnamed contact", as it does on Speed to lead). |
+| No-shows to rebook | Missed an appointment in the last 14 days and no later booking that is not cancelled or itself missed (Appointments' "recover") | `workBase` items of kind recover, one row per person | The people with a contact. Bookings with no contact attached are not people: they are counted in "N bookings have no contact attached" under the list, so chip plus that note equals Appointments' number. |
+| Follow-ups due | People whose last logged call was "follow up" and whose day has come | the call list `follow_ups_due` | rows (the call list holds at most 400; a full one says so) |
+| Hot leads gone quiet | An open deal in play and nothing for 3 days or more, biggest deals first (the call list "hot leads not contacted in 3+ days") | the call list `hot_uncontacted` | rows (same cap of 400) |
+| Stale deals | Counted open deals (a value, an owner, in play) with no movement for the account's stale days, biggest first (Today's stale deals) | `staleDealList` | Today's count of DEALS, not people: a person with two stale deals has two rows. The list shows the first 100 deals and says so. Deals with no contact are not rows (nobody to call) and are said in a note. |
+
+The call-list reads keep their existing rules: a contact who asked not to be contacted, one called in the last 12 hours, and one marked wrong number or not interested are not on Hot leads or Follow-ups. Waiting, No-shows and Stale deals do show a do-not-disturb person, marked on the row, with a stop before any call or email.
+
+**Mine.** A person is "mine" when the contact's owner is the person asking, or (for a no-show) the booking is assigned to them. A client's staff start on Mine only when at least one person on the list is assigned to them; otherwise they see everyone and the screen says "Nobody is assigned to you in this list, so it shows everyone" (a queue of zero would look broken). An agency or business owner starts on everyone.
+
+**The sentence at the top.** The most urgent list that has anybody on it, in the order waiting, no-shows, follow-ups, hot, stale, then "Also:" the others in short. When every list is empty: "Nobody needs a call right now."
+
+**Search.** A name or email needs 2 characters; a phone number 3 digits (so "55" does not match every number). It matches part of the name, the email, or the last digits of the phone, inside the caller's accounts, 50 a page, ordered by exact email, then name starts with the words, then most recent activity. The count is exact up to 10,000 and then stops ("10,000+"): a count of two letters in a very large agency would cost more than the page.
+
+**The headline of a person** (first rule that fits): asked not to be contacted (a stop); the customer wrote last and nobody has answered ("Never answered" only when a lead has waited more than 3 days, Speed's rule); a no-show to rebook; a follow-up due; a counted deal with no movement for the stale days; a booking coming up; an open deal; a customer; quiet for 90 days or more; a new contact; otherwise the last activity. It names only what a fact says.
+
+**Tag dates.** The day SubSync first SAW a tag added (`contact_tag_events`, filled since SubSync started watching), never the day it was added in the CRM, which the CRM does not say. The panel says so beside the tags.
+
+**The timeline** merges what SubSync holds: contact added, first reply (the lead ledger), the last message, calls logged in SubSync, appointments and their status changes (`appointment_events`), deal created, moved and won or lost (`deal_events`), tags added and removed; and, read live for one person when the CRM answers, its messages (when, which way, which channel, who sent it; NEVER the words) and calls. NOT VERIFIED LIVE: the shape of the CRM's messages (read defensively, every field optional).
+
+**Since you last looked.** The time the signed-in person last had this person open (kept for them alone), compared with the timeline: the things newer than that, never the "added" row; nothing the first time.
+## Clients, rebuilt (stage CLIENTS, 5 Nov 2026)
+
+No new measurement of the CRM. The book reads the same rows as Today, the Account audit and Speed to lead and applies one set of rules. Code: `src/lib/analytics/clients-v2.ts` (every rule), `clients-v2-book.ts` (builds the book from the facts), `clients-v2-queries.ts` (counted deal money, the typed profile), `src/lib/api/clients-book-routes.ts`; tests `src/lib/__tests__/clients-v2.test.ts`, `clients-v2-book.test.ts`, `tests/unit/clients-v2-db.test.ts`, `tests/unit/clients-book-components.test.ts`, `tests/e2e/clients-v2.spec.ts`.
+
+**What is typed and what is read.** Fee, renewal date, industry and the log are typed by the agency; SubSync does not read them from the CRM and says so on screen. Everything else is worked out.
+
+**People waiting, no-shows, quiet deals** = the Account audit's per-client rows (Today's rules; `core.clients`). Never the account's own `unanswered` count, which counts conversations past the reply hours and disagrees with Today (the old Health tab said 17 for a client Today counts as 21).
+**Replies in time** = Today's own `withinTargetShare` over the last 14 days of the lead ledger, against the default reply target, claimed only from 5 judged leads (`MIN_REPLY_LEADS`); under 5 there is no claim.
+
+**Health label** (one word per client, with the reason):
+- **Not read yet**: SubSync has not finished reading the account. Never judged.
+- **New**: added fewer than 14 days ago (`NEW_CLIENT_DAYS`). Not judged on score, activity or a drop; people waiting still count.
+- **At risk**: gone quiet, or a health score under 35, or the churn warning is high, or 15 or more people are waiting (`REPLY_DELAY_AT_RISK`).
+- **Watch**: health score 35 to 54, or the churn warning is medium, or 5 or more people waiting (`REPLY_DELAY_WATCH`), or fewer than half of the last 14 days' new leads (from 5 judged) got a reply in time, or new contacts are down at least 50% against the client's own normal (`leadFlowDrop`: needs 7 history points and a baseline of 10), or 3 or more no-shows are still waiting.
+- **Healthy**: none of the above. 1 to 4 people waiting, 1 or 2 no-shows and 3 or more quiet deals are shown as a line and never change the label.
+The row's reason is the most serious reason with its number, "and N more things". A client labelled At risk or Watch always has at least one reason that is not a small note.
+
+**Who needs you** = At risk, Watch, and any client whose renewal is overdue or due within 14 days (shown as "Renewal due" or "Renewal overdue", never "Healthy"). Order: At risk, Watch, renewal due, then the rest; inside a group the renewal that is soonest within 30 days, then the bigger fee (money first), then the lower score, then the name. The headline numbers, the chips and the list are all `selectClients`, so a count equals the clients it opens (tested on 150 clients, every page of every filter).
+**Renewals in the next 60 days** = clients with a typed renewal date that is overdue or within 60 days, soonest first; "due within 30 days" in the sentence counts overdue ones too. The countdown is `renewalStatus` (client-intel).
+**Money at stake** = the monthly fees the agency typed for the clients labelled At risk. The page says when only some of them have a fee. **Monthly fees** = the sum of typed fees, with how many clients have one.
+**Value created** (client page) = the value of deals that started in the last 30 days (counted deals: a value above zero and an owner, and an open deal also in play) divided by the typed monthly fee. A multiple is said only from 3 new deals; under that the dollars are shown and the sentence says there are too few. Labelled an estimate; the formula is one tap away. Counted by one SQL statement (`countedDealMoney`) that a database test holds equal to `dealFigures` over `loadDeals`.
+**What changed** = the client's daily record now against the day about 30 days earlier (within a week of that day): health score when it moved 5 points or more; new contacts with `changeBetween` (a percentage only from a base of 10, else the plain difference); open pipeline when it moved 20% or more. Under 28 days of record it says so and claims nothing.
+**What to say** = text per reason, to read out or copy. **Reminder days** = 60, 30 and 14 days before the renewal that are still ahead. Both are displays; nothing is sent. The **client summary** (copy or print) leaves out the fee and the team's private notes and names no product.
+**Server and scale.** The first answer holds five rows of each list and counts (a few kB at 150 clients); a full list is asked 25 at a time (at most 50) with search, filter and order on the server; the heavy read is the Account audit's own 45-second kept read, shared by account set. Agency only: a business owner and a client's staff get 403 on every Clients address.
+
+- **Turned off** (Workflows): a workflow that was published at the earlier update and is now a draft or paused, noticed in the last 7 days, not changed by SubSync, and still not published. Campaigns count as info only.
+- **Same workflow across accounts**: names are matched after lower case, punctuation and "copy" are removed; drift = states differ, version numbers differ (a platform edit counter, so an inference that the contents differ), or it is missing from some client accounts. Needs 2 accounts.
+- **Near duplicate**: inside one client account, same normalised name or at least 80% shared words (words of 2 letters or more).
+- **Review due**: decision Review and no change to the note for 14 days.
+
+## Data health (module DATA_HEALTH)
+
+- **Contacts counted:** every synced contact of the client account, minus ones marked Ignore in SubSync. Fewer than 50: no score ("not enough data").
+- **Score:** 100 minus, for each problem, its weight times min(1, share of contacts with it / its cap). Weights: duplicates 20 (cap 15%), junk 15 (5%), invalid phone 10 (20%), invalid email 10 (10%), no phone 10 (50%), no email 10 (50%), no activity 10 (60%), no owner 5 (60%), no source 5 (50%), no deal and no conversation 5 (60%). Rounded. 85 and up good, 65 and up fair, under 65 poor. Estimate; the formula is in `src/lib/data-health/score.ts`.
+- **Duplicate:** an extra copy: every contact in a same-email or same-phone group except the oldest (the existing duplicate finder).
+- **Invalid phone:** under 7 or over 15 digits, letters, or one repeated digit or 1234567. **Invalid email:** not name@domain.tld, double dots, or a common typo domain (gmial.com). **No phone / no email:** empty. These never overlap with invalid.
+- **Junk:** a first, last or full name like test, asdf, xxx, fake, demo, none, n/a, only digits; email at example.com or a test domain or starting test@; a phone of repeated digits; plus the account's own junk words.
+- **No activity:** last activity (or date added) older than the account's days setting (default 180). Skipped for contacts SubSync changed in the last 7 days.
+- **No deal and no conversation:** no row in synced deals and none in synced conversations. **No source / no owner:** empty.
+- **Quality firewall spike:** per source, bad records (duplicate, junk, invalid phone or email) created in the last 24 hours, at least the account's minimum (default 10), at least 3 times the same source's daily average over the 14 days before (counted as 1 if lower), and at least a third of what that source created.
+- **Since you installed:** first stored score, latest score, flags ever raised, flags that stopped being flagged. **Average time to fix:** mean hours between an alert raised and resolved.
+- **Benchmark:** median and quartiles of the latest score (last 14 days) of accounts in the same size and industry group, only with at least 10 accounts from at least 3 companies and never from opted out companies.
