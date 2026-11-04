@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { neighbours } from "@/lib/design/ui-logic";
 import { useData } from "../session";
 import { Badge, fmtMoney, timeAgo } from "../ui";
@@ -42,7 +42,7 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   return <div className="flex gap-3 py-1.5 text-sm"><dt className="w-24 shrink-0 text-muted-foreground">{label}</dt><dd className="min-w-0 break-words">{children}</dd></div>;
 }
 
-function Body({ seed }: { seed: LeadSeed }) {
+function Body({ seed, top }: { seed: LeadSeed; top?: ReactNode }) {
   const { data, error, loading, reload } = useData<Detail>(`contact/${encodeURIComponent(seed.locationId)}/${encodeURIComponent(seed.contactId)}`);
   const extra = useData<Extras>(`people/contact/${encodeURIComponent(seed.locationId)}/${encodeURIComponent(seed.contactId)}`).data;
   const c = data?.contact;
@@ -64,12 +64,13 @@ function Body({ seed }: { seed: LeadSeed }) {
         </div>
       )}
       {seed.note && <p className="mt-3 text-sm text-muted-foreground">{seed.note}</p>}
+      {top}
 
       {loading && !data && <div className="mt-5"><SkeletonRows rows={4} label="Loading this lead..." /></div>}
       {error && <div className="mt-5"><ErrorState error={error} onRetry={reload} /></div>}
 
       <dl className="mt-4 divide-y border-y">
-        {c?.email && <Row label="Email"><a className="text-primary underline-offset-2 hover:underline" href={`mailto:${c.email}`}>{c.email}</a></Row>}
+        {c?.email && <Row label="Email"><span className="break-all">{c.email}</span>{url && <span className="mt-1 block"><a className="font-medium text-primary underline underline-offset-2" href={url} target="_blank" rel="noopener noreferrer" data-testid="drawer-email">Email in your CRM</a><span className="block text-xs text-muted-foreground">Opens the contact in your CRM, where its own email box sends the message.</span></span>}</Row>}
         {phone && <Row label="Phone"><span className="tabular-nums">{phone}</span><span className="mt-1 block"><DialButton phone={phone} contactUrl={url} dnd={dnd} timeZone={extra?.timeZone ?? seed.timeZone} /></span><span className="mt-1 block"><DialerSetting /></span></Row>}
         {owner && <Row label="Owner">{owner}</Row>}
         {c && <Row label="Source">{c.source ?? "Not recorded"}</Row>}
@@ -142,7 +143,7 @@ function Body({ seed }: { seed: LeadSeed }) {
   );
 }
 
-export function LeadDrawer({ leads, index, onIndex, onClose }: { leads: readonly LeadSeed[]; index: number | null; onIndex: (i: number) => void; onClose: () => void }) {
+export function LeadDrawer({ leads, index, onIndex, onClose, top }: { leads: readonly LeadSeed[]; index: number | null; onIndex: (i: number) => void; onClose: () => void; /** Extra block shown right under the name (for example the appointment a lead was opened from). */ top?: (seed: LeadSeed, index: number) => ReactNode }) {
   const close = useRef<HTMLButtonElement>(null);
   const open = index !== null && index >= 0 && index < leads.length;
   useEffect(() => {
@@ -167,7 +168,7 @@ export function LeadDrawer({ leads, index, onIndex, onClose }: { leads: readonly
           </div>
           <button ref={close} type="button" aria-label="Close" onClick={onClose} className="inline-flex size-10 items-center justify-center rounded-lg hover:bg-muted"><X aria-hidden className="size-5" /></button>
         </header>
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5"><Body key={seed.locationId + seed.contactId} seed={seed} /></div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5"><Body key={seed.locationId + seed.contactId + (seed.note ?? "")} seed={seed} top={top?.(seed, index)} /></div>
       </aside>
     </div>
   );

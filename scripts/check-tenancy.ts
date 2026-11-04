@@ -86,6 +86,9 @@ async function main() {
       "/api/app/duplicates?size=50", "/api/app/duplicates/obvious", `/api/app/duplicates?location=${other.locs[0]}&size=50`, `/api/app/duplicates?accounts=${other.locs[0]}&status=decided`, `/api/app/duplicates?focus=${other.locs[0]}:00000000-2`,
       // Speed to lead (stage SPEED): the first screen, the list behind a number and the comparisons, the other side's account asked for by every parameter they take.
       "/api/app/speed?part=home", `/api/app/speed?part=list&status=all&account=${other.locs[0]}`, `/api/app/speed?part=list&status=waiting&account=${other.locs.join(",")}`, `/api/app/speed?part=list&status=all&person=${other.marker}`, "/api/app/speed?part=compare&by=account", "/api/app/speed?part=compare&by=person",
+      // The Appointments work lists (stage APPT): the lists, the full list and the comparison, asked for the other side's account and person by every parameter the page takes.
+      "/api/app/appointments/work", "/api/app/appointments/list?kind=all&size=50", `/api/app/appointments/list?kind=all&location=${other.locs[0]}&size=50`, `/api/app/appointments/list?kind=record&location=${other.locs[0]}`,
+      `/api/app/appointments/list?kind=window&bucket=noshow&location=${other.locs[0]}`, "/api/app/appointments/compare?by=account", "/api/app/appointments/compare?by=person", `/api/app/appointments/${other.locs[0]}/anything`,
     ];
 
     // TENANCY_FAST=1 skips the long cross-read sweep (while iterating on the share link and write attacks); the full run does not.

@@ -10,16 +10,16 @@ const DAY = 86_400_000;
 const LOAD_CAP = 60_000;
 const isoDay = (t: number) => new Date(t).toISOString().slice(0, 10);
 
-function visible(installationId: string, allowed: string[] | null) {
+export function visible(installationId: string, allowed: string[] | null) {
   const db = sql();
   return db`select location_id, name, appointments_access, users_access, appointments_synced_at from locations
     where installation_id = ${installationId} and not ignored ${allowed ? db`and location_id = any(${allowed}::text[])` : db``}`;
 }
 
-type Loaded = Appt & { bookedBy: string | null; channel: string | null };
+export type Loaded = Appt & { bookedBy: string | null; channel: string | null };
 
 // Everything between `from` and `to`, with the platform's own fields. `booked_by_user` and `booking_channel` exist after the F3 migration.
-async function loadAppts(installationId: string, allowed: string[] | null, from: number, to: number): Promise<Loaded[]> {
+export async function loadAppts(installationId: string, allowed: string[] | null, from: number, to: number): Promise<Loaded[]> {
   const db = sql();
   const rows = await db`
     with loc as (${visible(installationId, allowed)})
