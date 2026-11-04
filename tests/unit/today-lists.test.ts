@@ -37,7 +37,8 @@ describe("the work list for an agency", () => {
     expect(m).toContain("See all 150 clients");
     // one small action button per row, in its own column, with the external-link icon because it leaves the app
     expect(count(m, 'data-testid="queue-open"')).toBe(5);
-    expect(m).toMatch(/h-10[^"]*@3xl:h-8/);
+    // 44 px for a thumb on a phone, 32 px on a laptop
+    expect(m).toMatch(/h-11[^"]*@3xl:h-8/);
     expect(m).not.toMatch(/min-h-12|px-5 py-3/);
   });
   it("six accounts or fewer: every row shown, no 'See all'", () => {
@@ -52,7 +53,7 @@ describe("the work list for an agency", () => {
     const tracks = m.match(/@3xl:grid-cols-\[[^\]]+\]/g) ?? [];
     expect(new Set(tracks).size, "one track definition for the heading and every row").toBe(1);
     expect(m).toContain("At stake");
-    expect(m).toContain("How urgent");
+    expect(m).toContain("Urgency");
   });
 });
 

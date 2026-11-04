@@ -52,7 +52,7 @@ export function TodayBlocks() {
           <LocalAccountPicker accounts={SAMPLE_PICKER_ACCOUNTS} picked={picked} onChange={setPicked} />
           {picked.length > 0 && <ShowingChip label={picked.length === 1 ? SAMPLE_PICKER_ACCOUNTS.find((a) => a.id === picked[0])?.name ?? "1 account" : `${picked.length} client accounts`} onClear={() => setPicked([])} />}
         </div>
-        <AccountList rows={needing.rows} total={needing.total} urgent={needing.rows.filter((a) => a.urgent).length} max={4} onShow={(a) => setKind(a.top.kind)} onOnly={(a) => setPicked([a.locationId])} onSeeAll={() => setKind(null)} empty="Nothing needs fixing right now." />
+        <AccountList rows={needing.rows} total={needing.total} urgent={needing.rows.filter((a) => a.urgent).length} max={4} onShow={(a) => setKind(a.top.kind)} onOnly={(a) => setPicked([a.locationId])} onSeeAll={() => setKind(null)} empty="Nothing needs you right now." />
       </Section>
 
       <Section title="Today: clickable charts" hint="A slice, a legend row or a bar is a button. After a click a chip says what is shown, with the way back; the count on a slice is the number of rows in its list.">

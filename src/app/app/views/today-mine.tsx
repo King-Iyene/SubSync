@@ -19,7 +19,7 @@ function CallRow({ name, sub, url, dnd, phone }: { name: string; sub?: string; u
     <li className={GRID} data-testid="call-row" data-dnd={dnd ? "true" : "false"}>
       <div className="min-w-0"><p className="truncate font-semibold">{name}</p>{sub && <p className="truncate text-sm text-muted-foreground">{sub}</p>}</div>
       {dnd
-        ? <button type="button" disabled title="This person asked not to be contacted." className="inline-flex h-10 w-full cursor-not-allowed items-center justify-center gap-1.5 rounded-md border px-2 text-sm font-medium text-muted-foreground opacity-70 sm:h-8"><Phone aria-hidden className="size-3.5" />No calls</button>
+        ? <button type="button" disabled title="This person asked not to be contacted." className="inline-flex h-11 w-full cursor-not-allowed items-center justify-center gap-1.5 rounded-md border px-2 text-sm font-medium text-muted-foreground opacity-70 sm:h-8"><Phone aria-hidden className="size-3.5" />No calls</button>
         : <RowButton href={url} label={phone ? "Call" : "Open"} sr={`${name}, ${phone ? "call in your CRM" : "no phone number"}`} />}
     </li>
   );

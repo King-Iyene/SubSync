@@ -262,12 +262,12 @@ const COUNT_WORDS: Record<Kind, [string, string]> = {
   stale: ["deal gone quiet", "deals gone quiet"],
 };
 
-export function breakdownOf(t: Totals): string | null {
+export function breakdownOf(t: Totals, o: { dollars?: boolean } = {}): string | null {
   const c = countsOf(t, []);
   const bits = KINDS.filter((k) => t[k].count > 0).map((k) => {
     const w = COUNT_WORDS[k];
     const sub = k === "replies" && c.newLeads > 0 ? ` (${c.newLeads} new ${c.newLeads === 1 ? "lead" : "leads"})` : "";
-    return `${t[k].count.toLocaleString("en-US")} ${t[k].count === 1 ? w[0] : w[1]}${sub}${k === "stale" && t.stale.dollars ? ` (${money(t.stale.dollars)})` : ""}`;
+    return `${t[k].count.toLocaleString("en-US")} ${t[k].count === 1 ? w[0] : w[1]}${sub}${k === "stale" && t.stale.dollars && o.dollars ? ` (${money(t.stale.dollars)})` : ""}`;
   });
   if (bits.length === 0) return null;
   return bits.length === 1 ? `${bits[0]}.` : `${bits.slice(0, -1).join(", ")} and ${bits[bits.length - 1]}.`;
@@ -281,7 +281,9 @@ export function headlineOf(i: { scope: "all" | "account"; rows: QueueRow[]; tota
   const c = countsOf(i.totals, i.rows);
   const accounts = c.accounts;
   const dollars = c.staleDollars;
-  const breakdown = breakdownOf(i.totals);
+  // The dollars are in the sentence above the line when it says them; otherwise the line carries them.
+  const sayDollars = dollars > 0 && (i.scope === "all" || c.replies === 0);
+  const breakdown = breakdownOf(i.totals, { dollars: !sayDollars });
   if (c.things === 0) {
     const text = i.scope === "all" ? "Every client account is on track today." : "You are all caught up today.";
     return { parts: [{ t: text }], text, allClear: true, breakdown: null, accounts: 0, dollars: 0 };
@@ -292,7 +294,6 @@ export function headlineOf(i: { scope: "all" | "account"; rows: QueueRow[]; tota
       ? [{ t: c.replies.toLocaleString("en-US"), strong: true, action: "replies" }, { t: ` ${c.replies === 1 ? "person is" : "people are"} waiting for a reply.` }]
       : [{ t: c.things.toLocaleString("en-US"), strong: true, action: "things" }, { t: ` ${c.things === 1 ? "thing needs" : "things need"} you today.` }];
   // On one account with people waiting, the sentence is only that (the thing to do first); the dollars are in the line under it.
-  const sayDollars = dollars > 0 && (i.scope === "all" || c.replies === 0);
   if (sayDollars) parts.push({ t: " " }, { t: money(dollars), strong: true, action: "dollars" }, { t: " is at risk." });
   // One deal worth at least half of it is said out loud, so the dollar figure is not read as a pattern (the audit's outlier guard).
   if (sayDollars && i.outlier) parts.push({ t: ` One deal is ${money(i.outlier.value)} of that.` });

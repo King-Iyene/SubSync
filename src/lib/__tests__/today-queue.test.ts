@@ -105,7 +105,7 @@ test("the headline: clients and counted dollars, built from existing figures", (
   const items = [item("replies", "aaa"), item("replies", "bbb"), item("stale", "ccc", { value: 48_200 })];
   const h = headlineOf({ scope: "all", rows: queueOf(items), totals: totalsFrom(items) });
   assert.equal(h.text, "3 clients need you today. $48,200 is at risk.");
-  assert.equal(h.breakdown, "2 people waiting for a reply and 1 deal gone quiet ($48,200).");
+  assert.equal(h.breakdown, "2 people waiting for a reply and 1 deal gone quiet.");
   assert.equal(h.allClear, false);
   const one = headlineOf({ scope: "all", rows: queueOf([item("replies", "aaa")]), totals: totalsFrom([item("replies", "aaa")]) });
   assert.equal(one.text, "1 client needs you today.", "no dollars, no dollar sentence");

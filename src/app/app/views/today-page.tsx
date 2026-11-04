@@ -242,7 +242,7 @@ export function TodayPage({ go, t, kind, reload, sync, syncing, options, picked,
           <>
             <AccountList rows={needing.rows} total={needing.total} urgent={urgent} onShow={(a) => m.open(specAccount(a.locationId, env))} onOnly={(a) => changeAccounts([a.locationId])} onSeeAll={() => m.open(specClients(env))}
               onAct={m.act} canAssign={m.canAssign} assigned={m.assigned} whyOf={m.rowWhy} nextOf={(a) => nextAction(rows, view.items, a.locationId)} onNext={(a, na) => m.open(specNext(na.itemIds, na.text, env))}
-              empty={rows.length === 0 ? (view.held.length > 0 ? "Everything left is set aside. It comes back by itself." : "Nothing needs fixing right now.") : "Nothing of this kind needs fixing right now."} />
+              empty={rows.length === 0 ? (view.held.length > 0 ? "Everything left is set aside. It comes back by itself." : "Nothing needs you right now.") : "Nothing here needs you right now."} />
             <HeldLink m={m} />
             {bars.bars.length > 1 && (
               <section className="mb-8" aria-labelledby="where-h" data-testid="today-charts">

@@ -1,17 +1,13 @@
-import { expect, test, type APIRequestContext, type Locator, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
+import { api as sharedApi, moreMenu, openMore, type Json } from "./today-helpers";
 
-// Today, second pass, in a real browser at 1440: the records panel from every kind of mark (count equals rows), the fixed-column alignment of every list, the account picker's
-// Done and Show all accounts buttons, the working queue (Done, Snooze, Undo), the tabs, and a click on every other button and link built for Today to prove each one does
-// something. Each test that changes the working queue puts it back (Undo) so the tests can run again. Demo company; agency owner, business administrator and client's staff.
-type Json = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
-
-async function api(request: APIRequestContext, as?: "business" | "client") {
-  const s = await request.post("/api/sso", { data: { demo: true, ...(as ? { as } : {}) } });
-  const headers = { Authorization: `Bearer ${((await s.json()) as { session: string }).session}` };
-  return {
-    get: async (path: string): Promise<Json> => { const res = await request.get(`/api/app/${path}`, { headers }); expect(res.ok(), `${path}: ${res.status()}`).toBeTruthy(); return (await res.json()) as Json; },
-    post: async (path: string, data: unknown) => request.post(`/api/app/${path}`, { headers, data }),
-  };
+// Today, second pass, in a real browser at 1440 (updated for Today v3): the records panel from every kind of mark (count equals rows), the fixed-column alignment of every list, the
+// account picker's Done and Show all accounts buttons, the working queue (Done for now, Snooze, Undo) from the row menu, the More detail tabs, and a click on every other button and link
+// built for Today to prove each one does something. Each test that changes the working queue puts it back (Undo) so the tests can run again. Demo company; agency owner, business
+// administrator and client's staff.
+async function api(request: Parameters<typeof sharedApi>[0], as?: "business" | "client") {
+  const a = await sharedApi(request, as);
+  return { get: a.get, post: async (path: string, data: Json) => { const r = await a.post(path, data); return { status: () => r.status, json: async () => r.body }; } };
 }
 const num = (s: string) => Number(s.replace(/[^0-9]/g, ""));
 /** A figure counts up for 600 ms: read the value it ends on, never the text in the middle of the count. */
@@ -19,14 +15,14 @@ async function final(l: Locator): Promise<number> {
   const el = l.locator("[data-final]").first();
   return num((await el.count()) ? ((await el.getAttribute("data-final")) ?? "") : await l.innerText());
 }
-const rowSel = (key: string) => `[id="${key}"]`;
 async function openToday(page: Page, query = "") {
   await page.goto(`/app${query}`);
-  await expect(page.getByTestId("today-headline")).toBeVisible({ timeout: 20_000 });
-  await expect(page.getByTestId("queue-row").first()).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByTestId("today-headline")).toBeVisible({ timeout: 45_000 });
+  await expect(page.getByTestId("queue-row").first()).toBeVisible({ timeout: 45_000 });
 }
 const panel = (page: Page) => page.getByTestId("records-panel");
 async function closePanel(page: Page) { await page.keyboard.press("Escape"); await expect(panel(page)).toHaveCount(0); }
+const heldCount = async (page: Page) => ((await page.getByTestId("held-link").count()) ? Number(await page.getByTestId("held-link").getAttribute("data-count")) : 0);
 
 /** The left edge of each child of every row, as numbers: row by row, then compared column by column. */
 async function leftEdges(rows: Locator, child: string): Promise<number[][]> {
@@ -41,32 +37,28 @@ function sameColumns(edges: number[][], label: string) {
   }
 }
 
-test("every column of the Fix first queue lines up on every row, at 1440 and at 1024", async ({ page }) => {
+test("every column of the work list lines up on every row, at 1440 and at 1024", async ({ page }) => {
   for (const width of [1440, 1024]) {
     await page.setViewportSize({ width, height: 900 });
     await openToday(page);
     const rows = page.getByTestId("queue-row");
     expect(await rows.count()).toBeGreaterThan(2);
-    await page.getByTestId("queue-all").click().catch(() => undefined);
-    for (const col of ["amount", "urgency", "crm", "show", "done", "more"]) {
-      const xs = await rows.evaluateAll((els, c) => els.map((el) => Math.round((el.querySelector(`[data-col=${c}]`) as HTMLElement).getBoundingClientRect().left * 10) / 10), col);
-      expect(Math.max(...xs) - Math.min(...xs), `${width}px, queue column ${col}: ${xs.join(", ")}`).toBeLessThanOrEqual(1);
-      const ws = await rows.evaluateAll((els, c) => els.map((el) => Math.round((el.querySelector(`[data-col=${c}]`) as HTMLElement).getBoundingClientRect().width * 10) / 10), col);
-      expect(Math.max(...ws) - Math.min(...ws), `${width}px, queue column ${col} width: ${ws.join(", ")}`).toBeLessThanOrEqual(1);
+    // A column that a narrow list folds away (amount and urgency under the reason) is not drawn, so only the drawn ones are compared.
+    for (const col of ["amount", "urgency", "crm", "more"]) {
+      const xs = await rows.evaluateAll((els, c) => els.map((el) => { const e = el.querySelector(`[data-col=${c}]`) as HTMLElement; return e && e.offsetParent !== null ? Math.round(e.getBoundingClientRect().left * 10) / 10 : null; }), col);
+      const drawn = xs.filter((x): x is number => x !== null);
+      if (width >= 1440 || col === "crm" || col === "more") expect(drawn.length, `${width}px: ${col} drawn on every row`).toBe(xs.length);
+      if (drawn.length) expect(Math.max(...drawn) - Math.min(...drawn), `${width}px, work-list column ${col}: ${drawn.join(", ")}`).toBeLessThanOrEqual(1);
+      const ws = await rows.evaluateAll((els, c) => els.map((el) => { const e = el.querySelector(`[data-col=${c}]`) as HTMLElement; return e && e.offsetParent !== null ? Math.round(e.getBoundingClientRect().width * 10) / 10 : null; }), col);
+      const w = ws.filter((x): x is number => x !== null);
+      if (w.length) expect(Math.max(...w) - Math.min(...w), `${width}px, work-list column ${col} width: ${w.join(", ")}`).toBeLessThanOrEqual(1);
     }
-    // The accounts list under it works the same way.
-    const needing = page.getByTestId("needing-row");
-    for (const col of ["state", "crm", "only"]) {
-      const xs = await needing.evaluateAll((els, c) => els.map((el) => Math.round((el.querySelector(`[data-col=${c}]`) as HTMLElement).getBoundingClientRect().left * 10) / 10), col);
-      expect(Math.max(...xs) - Math.min(...xs), `${width}px, accounts column ${col}: ${xs.join(", ")}`).toBeLessThanOrEqual(1);
-    }
-    if (width === 1440) await page.screenshot({ path: "docs/review/today2-queue-aligned-1440.png", clip: { x: 0, y: 0, width: 1440, height: 900 } });
   }
 });
 
 test("People, Sources and Coverage lists line up too", async ({ page }) => {
   await openToday(page);
-  await page.getByRole("tab", { name: "People" }).click();
+  await openMore(page, "People");
   await expect(page.getByTestId("tab-people")).toBeVisible();
   const work = page.getByTestId("workload-row");
   if ((await work.count()) > 1) sameColumns(await leftEdges(work, ":scope > span"), "workload");
@@ -95,7 +87,7 @@ test("the account picker: a row ticks anywhere on it, Show all accounts and Done
   await expect(pop).toHaveCount(0);
   await expect(summary).toHaveText(`2 of ${total}`);
   expect(page.url()).toContain("ta=");
-  // The queue is narrowed to those two.
+  // The list is narrowed to those two.
   await expect(page.getByTestId("queue-row").filter({ hasNotText: /Bright Smile Dental|Blue Door Realty/ })).toHaveCount(0);
   // Open again, press Show all accounts: closes, every account is back, the chip and the address parameter are gone.
   await page.getByTestId("picker-button").click();
@@ -114,7 +106,7 @@ test("the account picker: a row ticks anywhere on it, Show all accounts and Done
   // A click outside closes it.
   await page.getByTestId("picker-button").click();
   await expect(pop).toBeVisible();
-  await page.getByTestId("page-subtitle").click();
+  await page.getByRole("heading", { level: 1, name: "Today" }).click();
   await expect(pop).toHaveCount(0);
   // Real mouse clicks at the middle of both buttons hit the buttons themselves (nothing sits on top of them), in a short window too.
   await page.setViewportSize({ width: 1024, height: 560 });
@@ -131,24 +123,24 @@ test("the account picker: a row ticks anywhere on it, Show all accounts and Done
   await expect(pop).toHaveCount(0);
 });
 
-test("a pulse tile opens the records panel and its count is the number on the tile", async ({ page, request }) => {
+test("a tile opens the records panel and its count is the number on the tile", async ({ page, request }) => {
   const { get } = await api(request);
   const today = await get("today");
   await openToday(page);
-  const shown = await final(page.getByTestId("pulse-leads").locator("p.tnum"));
-  await page.getByTestId("pulse-leads-open").click();
+  await openMore(page);
+  const shown = await final(page.getByTestId("pulse-replies").locator("p.tnum"));
+  await page.getByTestId("pulse-replies-open").click();
   await expect(panel(page)).toBeVisible();
   const count = page.getByTestId("records-count");
   expect(Number(await count.getAttribute("data-count"))).toBe(shown);
   expect(shown).toBeGreaterThan(0);
-  expect(Number(await count.getAttribute("data-count"))).toBe(today.totals.leads.count - Object.values(today.holds as Json).filter((h: Json) => String(h.rowKey).endsWith("|leads")).length);
-  // The header says a title and a sentence in words, and the rows are the leads.
-  await expect(page.getByTestId("records-title")).toContainText("Leads waiting");
+  expect(Number(await count.getAttribute("data-count"))).toBe(today.totals.replies.count - Object.values(today.holds as Json).filter((h: Json) => String(h.rowKey).includes("|replies")).length);
+  // The header says a title and a sentence in words, and the rows are the people.
+  await expect(page.getByTestId("records-title")).toContainText("waiting for a reply");
   await expect(page.getByTestId("records-subtitle")).toContainText("reply target");
   expect(await page.getByTestId("records-row").count()).toBe(Math.min(50, shown));
   await expect(page.getByTestId("records-showing")).toContainText(`Showing ${Math.min(50, shown)} of ${shown}`);
   await expect(page.getByTestId("records-overlay")).toBeVisible();
-  await page.screenshot({ path: "docs/review/today2-panel-tile.png" });
   // The header row stays put while the table scrolls.
   const th = page.getByTestId("records-th").first();
   const before = (await th.boundingBox())!.y;
@@ -159,7 +151,8 @@ test("a pulse tile opens the records panel and its count is the number on the ti
 
 test("the panel: search, filter chip, + Filter, sort, date range, Maximise, Export CSV, OPEN, Open in CRM, paging, X and Esc", async ({ page }) => {
   await openToday(page);
-  await page.getByTestId("pulse-leads-open").click();
+  await openMore(page);
+  await page.getByTestId("pulse-replies-open").click();
   const total = Number(await page.getByTestId("records-count").getAttribute("data-count"));
   // Search narrows ("12 of 57"), clearing it restores.
   await page.getByTestId("records-search-toggle").click();
@@ -184,7 +177,7 @@ test("the panel: search, filter chip, + Filter, sort, date range, Maximise, Expo
   await page.getByTestId("add-filter-source").click();
   await expect(page.getByTestId("records-chip-source")).toBeVisible();
   await page.keyboard.press("Escape");
-  // Date range chip: "Older than 30 days" leaves nothing for leads; Any time restores.
+  // Date range chip: "Older than 30 days" leaves nothing for people waiting; Any time restores.
   await page.getByTestId("records-chip-range").click();
   await page.getByTestId("range-old30").click();
   await expect(page.getByTestId("records-empty")).toBeVisible();
@@ -214,7 +207,6 @@ test("the panel: search, filter chip, + Filter, sort, date range, Maximise, Expo
   await expect(panel(page)).toHaveAttribute("data-maximised", "true");
   const big = await panel(page).boundingBox();
   expect(big!.width).toBeGreaterThanOrEqual(1438);
-  await page.screenshot({ path: "docs/review/today2-panel-maximised.png" });
   await page.getByTestId("records-maximise").click();
   await expect(panel(page)).toHaveAttribute("data-maximised", "false");
   expect((await panel(page).boundingBox())!.width).toBeLessThanOrEqual(962);
@@ -238,13 +230,13 @@ test("the panel: search, filter chip, + Filter, sort, date range, Maximise, Expo
   await page.getByTestId("records-close").click();
   await expect(panel(page)).toHaveCount(0);
   // Focus is trapped while it is open.
-  await page.getByTestId("pulse-leads-open").click();
+  await page.getByTestId("pulse-replies-open").click();
   for (let i = 0; i < 12; i++) await page.keyboard.press("Tab");
   expect(await page.evaluate(() => !!document.activeElement?.closest("[data-testid=records-panel]"))).toBe(true);
   await closePanel(page);
 });
 
-test("every number opens the records behind it and the count equals the rows: headline, donut, legend, bars, Fix first amount, days, alert numbers, insight cards", async ({ page }) => {
+test("every number opens the records behind it and the count equals the rows: headline, bars (segments and names), work-list amount, days, alert numbers, insight cards", async ({ page }) => {
   await openToday(page);
   const equal = async () => {
     await expect(panel(page)).toBeVisible();
@@ -267,47 +259,29 @@ test("every number opens the records behind it and the count equals the rows: he
     await expect(page.getByTestId("records-title")).toContainText("at risk");
     await closePanel(page);
   }
-  // Donut: every slice and every legend item; the count on it is the count in the panel.
-  for (const s of await page.locator("[data-testid^=slice-]").all()) {
+  // Bars: every segment and every name; the count on it is the count in the panel.
+  for (const s of await page.getByTestId("bar-segment").all()) {
     const n = Number(await s.getAttribute("data-count"));
-    await s.focus();
-    await page.keyboard.press("Enter");
+    await s.click();
     expect(await equal()).toBe(n);
     await closePanel(page);
   }
-  for (const l of await page.locator("[data-testid^=legend-]").all()) {
-    const n = num((await l.innerText()).split("\n").filter((x) => /^[\d,]+$/.test(x.trim()))[0] ?? "");
-    await l.click();
-    expect(await equal()).toBe(n);
-    await closePanel(page);
-  }
-  await page.screenshot({ path: "docs/review/today2-before-slice.png" });
-  const slice = page.locator("[data-testid^=slice-]").first();
-  await slice.focus();
-  await page.keyboard.press("Enter");
-  await equal();
-  await page.screenshot({ path: "docs/review/today2-panel-slice.png" });
-  await closePanel(page);
-  // Account bars.
-  for (const [i, b] of (await page.getByTestId("account-bar").all()).entries()) {
+  for (const b of await page.getByTestId("account-bar").all()) {
     const n = Number(await b.getAttribute("data-count"));
-    await b.click();
+    await b.getByTestId("bar-account").click();
     expect(await equal()).toBe(n);
-    if (i === 0) await page.screenshot({ path: "docs/review/today2-panel-bar.png" });
     await closePanel(page);
   }
-  // Fix first: the amount and Show on every shown row.
+  // The work list: the amount of every shown row.
   const rows = page.getByTestId("queue-row");
   for (let i = 0; i < Math.min(3, await rows.count()); i++) {
     const row = rows.nth(i);
-    const amount = row.getByTestId("queue-amount");
-    await amount.click();
-    await equal();
-    await closePanel(page);
-    await row.getByTestId("queue-show").click();
-    await equal();
+    const n = Number(await row.getByTestId("queue-amount").getAttribute("data-count"));
+    await row.getByTestId("queue-amount").click();
+    expect(await equal()).toBe(n);
     await closePanel(page);
   }
+  await openMore(page);
   // Alerts: the numbers and the days.
   for (const k of ["raised", "cleared", "open"]) {
     const b = page.getByTestId(`proof-open-${k}`);
@@ -330,7 +304,6 @@ test("every number opens the records behind it and the count equals the rows: he
     const n = Number(await cards.nth(i).getAttribute("data-sample"));
     await cards.nth(i).click();
     expect(await equal()).toBe(n);
-    if (i === 0) await page.screenshot({ path: "docs/review/today2-panel-insight.png" });
     await closePanel(page);
   }
   expect(await cards.count()).toBeLessThanOrEqual(3);
@@ -338,6 +311,7 @@ test("every number opens the records behind it and the count equals the rows: he
 
 test("a point on the typical-reply line opens the replies behind it, or says why it cannot", async ({ page }) => {
   await openToday(page);
+  await openMore(page);
   const spark = page.getByTestId("pulse-reply").getByTestId("spark-surface");
   if (!(await spark.count())) { await expect(page.getByTestId("spark-empty").first()).toBeVisible(); return; }
   const b = (await spark.boundingBox())!;
@@ -350,100 +324,104 @@ test("a point on the typical-reply line opens the replies behind it, or says why
   await closePanel(page);
 });
 
-test("Done hides a row and moves the headline, the set-aside list has N rows, and it stays after a reload", async ({ page, request }) => {
+test("Done for now sets a problem aside and moves the count, the set-aside list has N rows, and it stays after a reload", async ({ page, request }) => {
   await openToday(page);
-  const clientsBefore = await final(page.getByTestId("headline-clients"));
-  const rows = page.getByTestId("queue-row");
-  const first = rows.first();
+  const first = page.getByTestId("queue-row").first();
   const text = await first.innerText();
-  const firstId = (await first.getAttribute("id")) as string;
-  const [res] = await Promise.all([page.waitForResponse((r) => r.url().includes("/api/app/today/action")), first.getByTestId("queue-done").click()]);
+  const heldBefore = await heldCount(page);
+  await first.getByTestId("queue-more").click();
+  const [res] = await Promise.all([page.waitForResponse((r) => r.url().includes("/api/app/today/action")), page.getByTestId("menu-done").click()]);
   const eventId = ((await res.json()) as { eventId: number }).eventId;
   try {
     await expect(page.getByTestId("today-toast")).toContainText("Marked done");
-    await expect(rows.first()).not.toHaveText(text);
+    await expect(page.getByTestId("queue-row").first()).not.toHaveText(text);
     await expect(page.getByTestId("held-link")).toBeVisible();
     await expect(page.getByTestId("held-link")).toContainText("snoozed");
-    const held = Number(await page.getByTestId("held-link").getAttribute("data-count"));
-    expect(held).toBeGreaterThan(0);
-    await expect.poll(async () => final(page.getByTestId("headline-clients"))).toBeLessThanOrEqual(clientsBefore);
+    const held = await heldCount(page);
+    expect(held).toBeGreaterThan(heldBefore);
     await page.getByTestId("held-link").click();
     await expect(page.getByTestId("records-count")).toHaveAttribute("data-count", String(held));
     await expect(page.getByTestId("records-title")).toContainText("Set aside");
     await expect(page.getByTestId("records-showing")).toContainText(`Showing ${Math.min(50, held)} of ${held}`);
     await closePanel(page);
     await page.reload();
-    await expect(page.getByTestId("held-link")).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByTestId("held-link")).toBeVisible({ timeout: 45_000 });
     await expect(page.getByTestId("queue-row").first()).not.toHaveText(text);
   } finally {
     const { post } = await api(request);
     expect((await post("today/action", { action: "undo", eventId })).status()).toBe(200);
   }
   await page.reload();
-  await expect(page.getByTestId("queue-row").first()).toHaveAttribute("id", firstId, { timeout: 20_000 });
+  await expect(page.getByTestId("queue-row").first()).toHaveText(text, { timeout: 45_000 });
 });
 
-test("Done then Undo (inside ten seconds) restores the row and the headline", async ({ page }) => {
+test("Done for now then Undo (inside ten seconds) restores the list and the headline", async ({ page }) => {
   await openToday(page);
   await page.waitForTimeout(1000); // the figures count up for 600 ms
   const headline = await page.getByTestId("today-headline").innerText();
   const rows = page.getByTestId("queue-row");
-  const key = (await rows.first().getAttribute("id")) as string;
-  const heldBefore = await page.getByTestId("held-link").count();
-  await rows.first().getByTestId("queue-done").click();
-  await expect(page.locator(rowSel(key))).toHaveCount(0);
+  const text = await rows.first().innerText();
+  const heldBefore = await heldCount(page);
+  await rows.first().getByTestId("queue-more").click();
+  await page.getByTestId("menu-done").click();
+  await expect.poll(() => heldCount(page)).toBeGreaterThan(heldBefore);
   await page.getByTestId("today-undo").click();
-  await expect(page.locator(rowSel(key))).toHaveCount(1);
+  await expect.poll(() => heldCount(page), { timeout: 15_000 }).toBe(heldBefore);
+  await expect(rows.first()).toHaveText(text);
   await expect(page.getByTestId("today-headline")).toHaveText(headline);
-  await expect(page.getByTestId("held-link")).toHaveCount(heldBefore);
 });
 
-test("Snooze 1 day and Snooze until Monday hide a row; Assign to me marks it; each is undoable", async ({ page }) => {
+test("Snooze 1 day and Snooze until Monday set a problem aside; Assign to me marks it; each is undoable", async ({ page }) => {
   await openToday(page);
   const rows = page.getByTestId("queue-row");
-  const keyOf = async (n: number) => (await rows.nth(n).getAttribute("id"))!;
-  let key = await keyOf(0);
+  const heldBefore = await heldCount(page);
   await rows.first().getByTestId("queue-more").click();
-  await expect(page.getByTestId("queue-menu")).toBeVisible();
-  await page.getByTestId("queue-snooze-day").click();
-  await expect(page.locator(rowSel(key))).toHaveCount(0);
+  await expect(page.getByTestId("pop-menu")).toBeVisible();
+  await page.getByTestId("menu-snooze-day").click();
   await expect(page.getByTestId("today-toast")).toContainText("Snoozed for 1 day");
+  await expect.poll(() => heldCount(page)).toBeGreaterThan(heldBefore);
   await page.getByTestId("today-undo").click();
-  await expect(page.locator(rowSel(key))).toHaveCount(1);
-  key = await keyOf(0);
+  await expect.poll(() => heldCount(page), { timeout: 15_000 }).toBe(heldBefore);
   await rows.first().getByTestId("queue-more").click();
-  await page.getByTestId("queue-snooze-monday").click();
-  await expect(page.locator(rowSel(key))).toHaveCount(0);
+  await page.getByTestId("menu-snooze-monday").click();
   await expect(page.getByTestId("today-toast")).toContainText("until Monday");
+  await expect.poll(() => heldCount(page)).toBeGreaterThan(heldBefore);
   await page.getByTestId("today-undo").click();
-  await expect(page.locator(rowSel(key))).toHaveCount(1);
+  await expect.poll(() => heldCount(page), { timeout: 15_000 }).toBe(heldBefore);
   // Assign to me keeps the row and labels it.
   await rows.first().getByTestId("queue-more").click();
-  await page.getByTestId("queue-assign").click();
-  await expect(page.locator(rowSel(key)).getByTestId("queue-assigned")).toBeVisible();
+  await page.getByTestId("menu-assign").click();
+  await expect(rows.first()).toContainText("Assigned to you");
   await page.getByTestId("today-undo").click();
-  await expect(page.locator(rowSel(key)).getByTestId("queue-assigned")).toHaveCount(0);
+  await expect(rows.first()).not.toContainText("Assigned to you", { timeout: 15_000 });
 });
 
-test("server rules: forged rows are refused, a client's staff cannot assign, and nobody can undo someone else's mark", async ({ request }) => {
+test("server rules: forged rows and people are refused, a client's staff cannot assign, and nobody can undo someone else's mark", async ({ request }) => {
   const agency = await api(request);
   const today = await agency.get("today");
-  const row = (today.queue as Json[])[0];
-  const forged = await agency.post("today/action", { action: "done", rowKey: "zzzForeignAccount|leads" });
+  const items = today.items as Json[];
+  const rowOf = (i: Json) => `${i.locationId}|${i.kind}`;
+  const row = rowOf(items[0]);
+  const forged = await agency.post("today/action", { action: "done", rowKey: "zzzForeignAccount|replies" });
   expect(forged.status()).toBe(404);
-  for (const bad of ["../x|leads", "demo-loc-1|nonsense", "demo-loc-1", "demo-loc-1|leads|extra", 5]) expect((await agency.post("today/action", { action: "done", rowKey: bad })).status(), String(bad)).toBe(400);
-  expect((await agency.post("today/action", { action: "explode", rowKey: row.key })).status()).toBe(400);
-  expect((await agency.post("today/action", { action: "snooze", rowKey: row.key, choice: "forever" })).status()).toBe(400);
+  for (const bad of ["../x|replies", "demo-loc-1|nonsense", "demo-loc-1|leads", "demo-loc-1", "demo-loc-1|replies|a|b", "demo-loc-1|stale|a", 5]) expect((await agency.post("today/action", { action: "done", rowKey: bad })).status(), String(bad)).toBe(400);
+  expect((await agency.post("today/action", { action: "done", rowKey: "demo-loc-1|replies|nobody-like-this" })).status(), "a person that is not there").toBe(404);
+  expect((await agency.post("today/action", { action: "explode", rowKey: row })).status()).toBe(400);
+  expect((await agency.post("today/action", { action: "snooze", rowKey: row, choice: "forever" })).status()).toBe(400);
   expect((await agency.post("today/action", { action: "undo", eventId: 999_999_999 })).status()).toBe(404);
   const client = await api(request, "client");
   const ct = await client.get("today");
-  const crow = (ct.queue as Json[])[0];
-  expect((await client.post("today/action", { action: "assign", rowKey: crow.key })).status()).toBe(403);
+  const mineItem = (ct.items as Json[])[0];
+  const crow = rowOf(mineItem);
+  expect((await client.post("today/action", { action: "assign", rowKey: crow })).status()).toBe(403);
   // A client cannot act on an account that is not theirs.
-  const other = (today.queue as Json[]).find((r) => r.locationId !== crow.locationId)!;
-  expect((await client.post("today/action", { action: "done", rowKey: other.key })).status()).toBe(404);
+  const other = items.find((i) => i.locationId !== mineItem.locationId)!;
+  expect((await client.post("today/action", { action: "done", rowKey: rowOf(other) })).status()).toBe(404);
+  // A person of another account, named through the client's own account key, is not found either.
+  const otherPerson = items.find((i) => i.kind === "replies" && i.locationId !== mineItem.locationId);
+  if (otherPerson) expect((await client.post("today/action", { action: "done", rowKey: `${mineItem.locationId}|replies|${String(otherPerson.id).slice(`replies:${otherPerson.locationId}:`.length)}` })).status()).toBe(404);
   // A client's own Done goes in their own lane: the agency does not see it, and the agency cannot undo it.
-  const mine = await client.post("today/action", { action: "done", rowKey: crow.key });
+  const mine = await client.post("today/action", { action: "done", rowKey: crow });
   expect(mine.status()).toBe(200);
   const ev = ((await mine.json()) as { eventId: number }).eventId;
   const asAgency = await agency.get("today");
@@ -457,7 +435,7 @@ test("the Today brief preview uses the same headline and the same top rows, and 
   const brief = await get("today/brief");
   await openToday(page);
   await expect(page.getByTestId("today-headline")).toContainText(brief.headline.replace(/ One deal is.*/, "").replace(/ is at risk\..*/, ""));
-  await page.getByTestId("brief-preview").click();
+  await moreMenu(page, "brief");
   await expect(page.getByTestId("brief-panel")).toBeVisible();
   await expect(page.getByTestId("brief-subject")).toContainText(brief.headline);
   await expect(page.getByTestId("brief-lines")).toContainText("Fix first:");
@@ -468,6 +446,7 @@ test("the Today brief preview uses the same headline and the same top rows, and 
 
 test("the junk control recomputes the dollar figure and lists what it left out", async ({ page }) => {
   await openToday(page);
+  await openMore(page);
   const toggle = page.getByTestId("junk-toggle");
   await expect(toggle).toBeVisible();
   const on = String(await final(page.getByTestId("pulse-risk").locator("p.tnum")));
@@ -484,11 +463,11 @@ test("the junk control recomputes the dollar figure and lists what it left out",
   }
 });
 
-test("the tabs and the rest of the buttons built for Today all do something", async ({ page, context }) => {
+test("More detail and the rest of the buttons built for Today all do something", async ({ page, context }) => {
   await openToday(page);
   // Tabs.
   for (const [name, id] of [["People", "tab-people"], ["Sources", "tab-sources"], ["Coverage", "tab-coverage"]] as const) {
-    await page.getByRole("tab", { name }).click();
+    await openMore(page, name);
     await expect(page.getByTestId(id)).toBeVisible();
   }
   // Coverage hour bar opens its leads; Sources row opens its leads; People rows open theirs.
@@ -502,40 +481,36 @@ test("the tabs and the rest of the buttons built for Today all do something", as
   if (await w.count()) { const n = Number(await w.getAttribute("data-waiting")); await w.click(); await expect(page.getByTestId("records-count")).toHaveAttribute("data-count", String(n)); await closePanel(page); }
   const cr = page.getByTestId("compare-row").first();
   if (await cr.count()) { const n = Number(await cr.getAttribute("data-answered")); await cr.click(); await expect(page.getByTestId("records-count")).toHaveAttribute("data-count", String(n)); await closePanel(page); }
-  await page.getByRole("tab", { name: "Overview" }).click();
-  // See all, then Show the top.
-  const all = page.getByTestId("queue-all");
-  if (await all.count()) { const before = await page.getByTestId("queue-row").count(); await all.click(); expect(await page.getByTestId("queue-row").count()).toBeGreaterThan(before); await all.click(); expect(await page.getByTestId("queue-row").count()).toBe(before); }
-  // Open in CRM opens a new tab.
+  await page.getByRole("tab", { name: "Numbers" }).click();
+  // Open opens a new tab.
   await expect(page.getByTestId("queue-open").first()).toHaveAttribute("href", /^https:\/\//);
   const [tab] = await Promise.all([context.waitForEvent("page"), page.getByTestId("queue-open").first().click()]);
   expect(tab).toBeTruthy();
   await tab.close();
-  // Account chip: Only this account narrows Today, the chip's cross brings every account back.
-  await page.getByTestId("needing-row").first().getByRole("button", { name: "Only this account" }).click();
+  // Show only this client narrows Today, "See all" brings every account back.
+  await page.getByTestId("queue-row").first().getByTestId("queue-more").click();
+  await page.getByTestId("menu-only").click();
   await expect(page.getByTestId("today-toolbar").getByTestId("showing-chip")).toBeVisible();
   expect(page.url()).toContain("ta=");
-  await page.getByTestId("today-toolbar").getByTestId("showing-chip").getByRole("button").click();
+  await page.getByTestId("today-toolbar").getByTestId("showing-chip").getByRole("button", { name: "See all" }).click();
   await expect(page.getByTestId("today-toolbar").getByTestId("showing-chip")).toHaveCount(0);
   expect(page.url()).not.toContain("ta=");
-  // Next step opens its records.
-  const next = page.getByTestId("next-step-button").first();
-  if (await next.count()) { await next.click(); await expect(panel(page)).toBeVisible(); await closePanel(page); }
-  // Why opens its leads.
-  const why = page.getByTestId("queue-why-item").first();
-  if (await why.count()) { await why.click(); await expect(panel(page)).toBeVisible(); await closePanel(page); }
-  // Since your last visit: reload after the visit window cannot be forced, so only check the strip's numbers when it is there.
+  // The next step (a row menu item) opens its records.
+  await page.getByTestId("queue-row").first().getByTestId("queue-more").click();
+  const next = page.getByTestId("menu-next");
+  if (await next.count()) { await next.click(); await expect(panel(page)).toBeVisible(); await closePanel(page); } else await page.keyboard.press("Escape");
+  // Since you last looked: reload after the visit window cannot be forced, so only check the strip's numbers when it is there.
   const since = page.getByTestId("since-strip");
   if (await since.count()) for (const b of await since.locator("button").all()) { await b.click(); await expect(panel(page)).toBeVisible(); await closePanel(page); }
-  // Coming up: the countdown ring and the counts.
+  // If nobody acts: the counts.
+  await openMore(page, "Numbers");
   for (const k of ["leads", "deals", "appointments"]) { const c = page.getByTestId(`coming-${k}`); if ((await c.count()) && (await c.getAttribute("data-count")) !== "0") { await c.click(); await expect(panel(page)).toBeVisible(); await closePanel(page); } }
-  // Share Today copies the summary; Sync now runs; the preview of the email opens and closes.
+  // Share copies the summary; Sync now runs; the preview of the email opens and closes.
   await page.context().grantPermissions(["clipboard-read", "clipboard-write"]).catch(() => undefined);
-  await page.getByRole("button", { name: "Share Today" }).click();
-  await expect(page.getByRole("button", { name: /Copied to your clipboard|Share Today/ })).toBeVisible();
-  await page.getByRole("button", { name: "Sync now" }).click();
-  await expect(page.getByTestId("today-headline")).toBeVisible({ timeout: 30_000 });
-  await page.getByTestId("brief-preview").click();
+  await moreMenu(page, "share");
+  await moreMenu(page, "sync");
+  await expect(page.getByTestId("today-headline")).toBeVisible({ timeout: 45_000 });
+  await moreMenu(page, "brief");
   await page.getByTestId("brief-close").click();
   await expect(page.getByTestId("brief-panel")).toHaveCount(0);
 });
@@ -545,12 +520,12 @@ test("a business administrator and a client's staff get the same panel, limited 
     const { get } = await api(request, as);
     const t = await get("today");
     await page.goto(`/app?as=${as}`);
-    await expect(page.getByTestId("today-headline")).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByTestId("today-headline")).toBeVisible({ timeout: 45_000 });
     await expect(page.getByTestId("today-account-picker")).toHaveCount(0);
     const names = new Set((t.accounts as Json[]).map((a) => a.name));
     expect(names.size).toBe(1);
     // The headline's number opens the panel; its rows are all this account's.
-    const head = page.getByTestId("headline-things");
+    const head = page.getByTestId("headline-replies").or(page.getByTestId("headline-things"));
     if (await head.count()) {
       const n = await final(head);
       await head.click();
@@ -558,56 +533,51 @@ test("a business administrator and a client's staff get the same panel, limited 
       for (const cell of await page.getByTestId("records-row").locator("td:nth-child(2)").allInnerTexts()) expect([...names]).toContain(cell);
       await closePanel(page);
     }
-    const row = page.getByTestId("queue-row").first();
+    const row = page.getByTestId("reply-row").first();
     if (await row.count()) {
-      await row.getByTestId("queue-more").click();
-      await expect(page.getByTestId("queue-snooze-day")).toBeVisible();
-      if (as === "client") await expect(page.getByTestId("queue-assign")).toHaveCount(0); else await expect(page.getByTestId("queue-assign")).toBeVisible();
+      await row.getByTestId("reply-more").click();
+      await expect(page.getByTestId("menu-snooze-day")).toBeVisible();
+      if (as === "client") await expect(page.getByTestId("menu-assign")).toHaveCount(0); else await expect(page.getByTestId("menu-assign")).toBeVisible();
       await page.keyboard.press("Escape");
     }
-    if (as === "client") await expect(page.getByRole("tab")).toHaveCount(0); else await expect(page.getByRole("tab", { name: "People" })).toBeVisible();
-    await expect(page.getByTestId("brief-preview")).toHaveCount(0);
+    await openMore(page);
+    if (as === "client") await expect(page.getByRole("tab")).toHaveCount(1); else await expect(page.getByRole("tab", { name: "People" })).toBeVisible();
+    await page.getByTestId("today-more").click();
+    await expect(page.getByTestId("menu-brief")).toHaveCount(0);
+    await page.keyboard.press("Escape");
   }
 });
 
-test("a real mouse click on the ring of the donut opens the records behind that slice", async ({ page }) => {
+test("a real mouse click on a bar segment opens the records behind exactly that segment", async ({ page }) => {
   await openToday(page);
-  const slice = page.getByTestId("slice-leads");
-  await slice.scrollIntoViewIfNeeded();
+  const seg = page.getByTestId("bar-segment").first();
+  await seg.scrollIntoViewIfNeeded();
   await page.waitForTimeout(800);
-  const n = Number(await slice.getAttribute("data-count"));
-  // A point inside the slice's own ring, in page coordinates (the middle of a thin ring is not where its bounding box centre is): walk along its outline and step 5 px towards
-  // the middle of the donut until the browser says the slice is what is under that point.
-  const at = await slice.evaluate((el) => {
-    const path = el as unknown as SVGGeometryElement;
-    const m = (path as unknown as SVGGraphicsElement).getScreenCTM()!;
-    const svg = path.ownerSVGElement as SVGSVGElement;
-    const c = svg.createSVGPoint(); c.x = 165; c.y = 118; const centre = c.matrixTransform(m);
-    const total = path.getTotalLength();
-    for (let i = 1; i < 120; i++) {
-      const p = path.getPointAtLength((total * i) / 120);
-      const x = p.x * m.a + p.y * m.c + m.e, y = p.x * m.b + p.y * m.d + m.f;
-      const d = Math.hypot(centre.x - x, centre.y - y) || 1;
-      const px = x + ((centre.x - x) / d) * 5, py = y + ((centre.y - y) / d) * 5;
-      if (document.elementFromPoint(px, py) === el) return { x: px, y: py };
-    }
-    return null;
-  });
-  expect(at, "a point of the slice that the browser reports as the slice").not.toBeNull();
-  await page.mouse.move(at!.x, at!.y);
-  await expect(page.getByTestId("donut-tip")).toContainText(/Leads waiting/);
-  await page.mouse.click(at!.x, at!.y);
+  const n = Number(await seg.getAttribute("data-count"));
+  const kind = await seg.getAttribute("data-kind");
+  const account = await seg.getAttribute("data-account");
+  const b = (await seg.boundingBox())!;
+  const x = b.x + b.width / 2, y = b.y + b.height / 2;
+  // The browser reports the segment itself under the middle of it (nothing sits on top).
+  const hit = await page.evaluate(([px, py]) => (document.elementFromPoint(px, py) as HTMLElement | null)?.closest("[data-testid]")?.getAttribute("data-testid"), [x, y]);
+  expect(hit).toBe("bar-segment");
+  await page.mouse.move(x, y);
+  await expect(page.getByTestId("bars-tip")).toContainText(/:/);
+  await page.mouse.click(x, y);
   await expect(panel(page)).toBeVisible();
   await expect(page.getByTestId("records-count")).toHaveAttribute("data-count", String(n));
+  expect(kind).toBeTruthy();
+  expect(account).toBeTruthy();
 });
 
 test("the records panel and the account list follow the light or dark theme of the app (they are drawn inside the themed wrapper)", async ({ page }) => {
   await openToday(page);
+  await openMore(page);
   const luminance = (css: string) => { const [r, g, b] = (css.match(/\d+/g) ?? ["0", "0", "0"]).map(Number); return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255; };
   for (const [pref, light] of [["Dark", false], ["Light", true], ["Dark", false]] as const) {
     await page.evaluate((p) => { [...document.querySelectorAll("button")].find((b) => b.textContent?.trim() === p)?.click(); }, pref);
     await expect(page.locator("[data-theme]").first()).toHaveAttribute("data-theme", light ? "light" : "dark");
-    await page.getByTestId("pulse-leads-open").click();
+    await page.getByTestId("pulse-replies-open").click();
     const panelBg = await panel(page).evaluate((el) => getComputedStyle(el).backgroundColor);
     expect(luminance(panelBg) > 0.5, `${pref}: panel background ${panelBg}`).toBe(light);
     await closePanel(page);

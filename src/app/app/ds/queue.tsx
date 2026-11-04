@@ -34,8 +34,8 @@ export type RowAction = "done" | "snooze_day" | "snooze_monday" | "assign";
 export type RowWhy = { key: string; text: string; onOpen: () => void };
 
 // ONE button height across the page (h-8), one icon size (size-3.5), one menu trigger (size-8).
-export const ACTION_BUTTON = "ds-press inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-md border bg-card px-2.5 text-sm font-medium hover:border-primary/40 hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--ring)] @3xl:h-8";
-const MENU_TRIGGER = "ds-press inline-flex size-10 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-[var(--ring)] @3xl:size-8";
+export const ACTION_BUTTON = "ds-press inline-flex h-11 w-full items-center justify-center gap-1.5 rounded-md border bg-card px-2.5 text-sm font-medium hover:border-primary/40 hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--ring)] @3xl:h-8";
+const MENU_TRIGGER = "ds-press inline-flex size-11 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-[var(--ring)] @3xl:size-8";
 
 /** The one small action button of a row: an outlined link that leaves the app (with the external-link icon), or a button that stays inside it. */
 export function RowButton({ href, onClick, label, sr, testId }: { href?: string; onClick?: () => void; label: string; sr: string; testId?: string }) {
@@ -96,7 +96,7 @@ function ListHead({ title, hint, right, id }: { title: string; hint?: ReactNode;
     </div>
   );
 }
-const SEE_ALL = "ds-press min-h-9 rounded-md px-2.5 text-sm font-medium text-primary underline-offset-4 hover:bg-muted hover:underline focus-visible:outline-2 focus-visible:outline-[var(--ring)]";
+const SEE_ALL = "ds-press min-h-11 rounded-md sm:min-h-9 px-2.5 text-sm font-medium text-primary underline-offset-4 hover:bg-muted hover:underline focus-visible:outline-2 focus-visible:outline-[var(--ring)]";
 
 // ---------- agency, all accounts: one row per client account, its biggest problem ----------
 
@@ -116,14 +116,14 @@ export function AccountList({
   useEffect(() => { if (moved.current) document.getElementById(`account-row-${shown[active]?.locationId}`)?.scrollIntoView({ block: "nearest" }); }, [active, shown, moved]);
   return (
     <section className="mb-8" aria-labelledby="work-h" data-testid="fix-first">
-      <ListHead id="work-h" title={title} hint={total === 0 ? undefined : <span data-testid="work-summary">{total.toLocaleString("en-US")} {total === 1 ? "client needs" : "clients need"} you{urgent > 0 ? `, ${urgent.toLocaleString("en-US")} of them urgent` : ""}. Most valuable first.</span>}
+      <ListHead id="work-h" title={title} hint={total === 0 ? undefined : <span data-testid="work-summary">{total.toLocaleString("en-US")} {total === 1 ? "client needs" : "clients need"} you{urgent > 0 ? (urgent === total && total > 1 ? ", all of them urgent" : `, ${urgent.toLocaleString("en-US")} of them urgent`) : ""}. Most valuable first.</span>}
         right={total > shown.length ? <button type="button" onClick={onSeeAll} className={SEE_ALL} data-testid="queue-all">See all {total.toLocaleString("en-US")} clients</button> : undefined} />
       {rows.length === 0 ? (
         <p className="border-y py-6 text-center text-sm text-muted-foreground" data-testid="queue-empty">{empty}</p>
       ) : (
         <ul className="@container divide-y border-y" data-testid="queue-list">
           <li aria-hidden className={`hidden gap-x-3 border-l-[3px] border-transparent py-1.5 pl-4 pr-1 text-[0.7rem] font-semibold uppercase tracking-wide text-muted-foreground @3xl:grid ${ACCOUNT_TRACKS}`} data-testid="queue-header">
-            <span>Client</span><span className="text-right">At stake</span><span>How urgent</span><span /><span />
+            <span>Client</span><span className="text-right">At stake</span><span>Urgency</span><span /><span />
           </li>
           {shown.map((a, n) => {
             const s = SEVERITY[a.severity];
@@ -143,7 +143,7 @@ export function AccountList({
                 className={`ds-row grid grid-cols-[minmax(0,1fr)_6rem_2.5rem] items-center gap-x-3 gap-y-0.5 border-l-[3px] py-2 pl-4 pr-1 ${ACCOUNT_TRACKS} ${s.stripe} ${n === active ? "bg-accent/50 outline outline-2 -outline-offset-2 outline-[var(--ring)]" : ""}`}>
                 <div className="min-w-0" data-col="title">
                   <p className="truncate font-semibold" title={a.name}>{a.name}</p>
-                  <p className="truncate text-sm text-muted-foreground" title={a.reason}>{a.reason}{a.count > a.top.count && <span> and {a.count - a.top.count} more {a.count - a.top.count === 1 ? "thing" : "things"}</span>}{mine ? <span> · Assigned to {mine}</span> : null}</p>
+                  <p className="line-clamp-2 text-sm text-muted-foreground @3xl:truncate" title={a.reason}>{a.reason}{a.count > a.top.count && <span> and {a.count - a.top.count} more {a.count - a.top.count === 1 ? "thing" : "things"}</span>}{mine ? <span> · Assigned to {mine}</span> : null}</p>
                   <p className={`flex items-center gap-1 text-xs @3xl:hidden ${s.text}`}><s.Icon aria-hidden className="size-3.5 shrink-0" />{s.word}{age ? <span className="text-muted-foreground"> · {ageLabel(a.top.kind, age)}</span> : null}</p>
                 </div>
                 <div className="tnum hidden text-right @3xl:block" data-col="amount">
@@ -201,7 +201,7 @@ export function ReplyNowList({ items, total, newLeads, max = INLINE_ROWS, onSeeA
               <div className="min-w-0">
                 <p className="truncate font-semibold" title={p.name}>{p.name}</p>
                 <p className="truncate text-sm text-muted-foreground">{!single && <span>{p.accountName} · </span>}{replyContext(p)}{mine ? <span> · Assigned to {mine}</span> : null}</p>
-                <p className={`text-xs @3xl:hidden ${p.never ? "text-destructive" : "text-muted-foreground"}`} data-testid="lead-wait-narrow">Waiting {wait}</p>
+                <p className={`text-xs @3xl:hidden ${p.never ? "text-destructive" : "text-muted-foreground"}`} data-testid="lead-wait-narrow">{p.never ? wait : `Waiting ${wait}`}</p>
               </div>
               <p className={`tnum hidden items-center gap-1.5 text-sm @3xl:flex ${p.never ? "font-medium text-destructive" : ""}`} data-testid="lead-wait">{p.never && <TriangleAlert aria-hidden className="size-3.5 shrink-0" />}{p.never ? wait : `Waiting ${wait}`}</p>
               <div><RowButton href={p.url} label="Reply" sr={`${p.name}, in your CRM`} testId="lead-open" /></div>

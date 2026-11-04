@@ -442,3 +442,25 @@ Still no new measurement of the CRM. Everything below is worked out from rows Su
 **Accounts compared.** Typical first reply per client account over the last 14 days, ranked only with at least 5 answered leads; the 3 fastest and the 3 slowest (fewer when fewer than 6 are ranked, so the lists never overlap).
 
 **Saved views, command palette, printable report.** A view stores which client accounts and the junk switch, nothing else, and is the person's own (at most 10). The palette lists jumps, lists, accounts, views and actions; Ctrl or Cmd + K opens it on Today. The report prints the headline, the top 12 Fix first rows, the insights, the forecast line and what SubSync caught, with the sender's own brand name when one is set.
+
+## Today, third pass (4 Nov 2026): the counting rule
+
+Still no new measurement. This pass fixes how the same figures are COUNTED and worded. Code: `src/lib/analytics/today-queue.ts` (`mergeReplies`, `countsOf`), tests `src/lib/__tests__/today-count.test.ts`, `tests/unit/today-lists.test.ts`, `tests/e2e/today3.spec.ts`.
+
+**The bug.** Today counted "leads waiting" (Speed to lead) and "unanswered messages" (the audit's waiting conversations) as two kinds and added them. A new lead that nobody answered is usually also a conversation nobody answered, so one person was counted twice (live: "8 leads waiting and 24 unanswered messages" were shown as 32 things, and the 8 were among the 24).
+
+**Waiting for a reply** = distinct contacts (people) who are waiting for a reply: either a new lead past the reply target (`speed_target_minutes`) with no person's reply, or a conversation whose last message is the customer's and which is older than the reply window (`sla_hours`). A person who is both is ONE person. A person with several waiting conversations is one person (the longest wait). A conversation with no contact id is counted once per conversation. Each person is one row (kind `replies`). **New leads among them** is a SUBSET, said as "of which N are new leads" or "(N new leads)", never added to the people count.
+
+**Capped lists.** The two source lists are capped (200 waiting leads, 100 waiting conversations). When a list was cut, the part that was not loaded cannot be matched with the other list, so the count adds what is missing from each list (an upper bound) and the list says it was cut ("first ones only"). With neither list cut the count is exact.
+
+**One function.** `countsOf(totals, rows)` returns `replies`, `newLeads`, `appointments`, `noshows`, `stale`, `staleDollars`, `things` (the kinds added up; no person is in it twice) and `accounts` (client accounts with at least one row). The headline, the breakdown line, the tiles, the work list, the bars, the lists behind every number, the share text and the daily brief read these. Unit test: one fixture (8 leads inside 24 conversations, plus a second account) is built once, and the headline sentence, the breakdown, the tile, the work-list rows, the bar totals, every bar segment and every list's count and rows are compared; the old double count (32) must not appear anywhere.
+
+**The other three kinds** are separate problems and are never merged with people waiting: appointments to mark, no-shows to win back, deals gone quiet (the old "stale deals"). Dollars are only ever the counted value of deals gone quiet.
+
+**Headline.** All client accounts: "N clients need you today." (N = accounts with a row), then "$X is at risk." and, if one deal is at least half, "One deal is $Y of that." One account: "N people are waiting for a reply." when anyone is waiting (the thing to do first; the dollars go in the line under it), else "N things need you today.", else "You are all caught up today."
+
+**Charts.** No donut. A client account chart exists only when more than one client account is on screen: one stacked bar per account, the top 8 by things to do, a "+N more" link to the full list. A segment opens that account's records of that kind (count on the mark = rows opened, title "Account, kind"); the name opens that account's records of every kind. With one account there is no chart: a list grouped by kind with counts that open that kind.
+
+**History footnote.** "Comparisons with your usual start after 7 days of history." appears once under the tiles when any comparison lacks history (and a tile with no comparison says nothing).
+
+**Marks on one person.** Done for now, Snooze and Assign on the Reply now list act on one person (row key `<account>|replies|<person>`); the server looks the person up in the same read and refuses a person that is not in the caller's accounts.

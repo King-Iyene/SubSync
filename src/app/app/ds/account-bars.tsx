@@ -26,7 +26,7 @@ export function AccountBars({ title, bars, rows, more, onSegment, onAccount, onM
             onMouseEnter={() => setHot(b.locationId)} onMouseLeave={() => setHot(null)}>
             <button type="button" onClick={() => onAccount(b.locationId)} onFocus={() => setHot(b.locationId)} data-testid="bar-account" aria-label={`${b.name}, ${b.count.toLocaleString("en-US")} ${b.count === 1 ? "thing" : "things"}. Show everything for this client.`}
               className="ds-press min-h-8 truncate rounded-md px-1.5 text-left hover:bg-muted focus-visible:outline-2 focus-visible:outline-[var(--ring)]" title={b.name}>{b.name}</button>
-            <span className="relative block h-5 border-l border-foreground/30">
+            <span className="relative block h-6 border-l border-foreground/30">
               <span className="flex h-full gap-[2px]" style={{ width: `${(b.count / max) * 100}%` }}>
                 {KINDS.filter((k) => (b.byKind[k] ?? 0) > 0).map((k, i, all) => (
                   <button key={k} type="button" onClick={() => onSegment(b.locationId, k)} onFocus={() => setHot(b.locationId)} data-testid="bar-segment" data-kind={k} data-count={b.byKind[k]} data-account={b.locationId}

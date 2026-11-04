@@ -12,7 +12,8 @@ export function TodayHeader({ filter, more }: { filter?: ReactNode; more: MenuIt
   return (
     <header className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 print:hidden" data-testid="today-header">
       <h1 className="mr-auto text-[1.65rem] font-semibold leading-tight tracking-tight">Today</h1>
-      {filter}
+      {/* On a phone the title and More are one row, and the client-account filter is the row under it. */}
+      {filter && <div className="order-3 w-full sm:order-none sm:w-auto">{filter}</div>}
       <PopMenu label="More" items={more} testId="today-more"
         triggerClassName="ds-press inline-flex h-8 items-center gap-1 rounded-md border bg-card px-2.5 text-sm font-medium hover:border-primary/40 hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--ring)]">
         More<ChevronDown aria-hidden className="size-3.5" />

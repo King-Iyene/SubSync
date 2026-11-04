@@ -69,7 +69,7 @@ export function LocalAccountPicker({ accounts, picked, onChange, label = "Client
   return (
     <div className="relative" data-testid="today-account-picker">
       <button ref={button} type="button" aria-expanded={open} aria-controls={open ? id : undefined} aria-haspopup="dialog" onClick={() => (open ? close() : setOpen(true))} data-testid="picker-button"
-        className="ds-press inline-flex min-h-10 max-w-full items-center gap-2 rounded-lg border bg-card px-3 text-sm hover:border-primary/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)]">
+        className="ds-press inline-flex h-8 max-w-full items-center gap-2 rounded-md border bg-card px-2.5 text-sm hover:border-primary/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)]">
         <span className="text-muted-foreground">{label}</span>
         <span className="min-w-0 truncate font-medium" data-testid="picker-summary">{summary}</span>
         <ChevronDown aria-hidden className="size-4 shrink-0 text-muted-foreground" />
