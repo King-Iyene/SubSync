@@ -604,3 +604,16 @@ The row's reason is the most serious reason with its number, "and N more things"
 - **Same workflow across accounts**: names are matched after lower case, punctuation and "copy" are removed; drift = states differ, version numbers differ (a platform edit counter, so an inference that the contents differ), or it is missing from some client accounts. Needs 2 accounts.
 - **Near duplicate**: inside one client account, same normalised name or at least 80% shared words (words of 2 letters or more).
 - **Review due**: decision Review and no change to the note for 14 days.
+
+## Data health (module DATA_HEALTH)
+
+- **Contacts counted:** every synced contact of the client account, minus ones marked Ignore in SubSync. Fewer than 50: no score ("not enough data").
+- **Score:** 100 minus, for each problem, its weight times min(1, share of contacts with it / its cap). Weights: duplicates 20 (cap 15%), junk 15 (5%), invalid phone 10 (20%), invalid email 10 (10%), no phone 10 (50%), no email 10 (50%), no activity 10 (60%), no owner 5 (60%), no source 5 (50%), no deal and no conversation 5 (60%). Rounded. 85 and up good, 65 and up fair, under 65 poor. Estimate; the formula is in `src/lib/data-health/score.ts`.
+- **Duplicate:** an extra copy: every contact in a same-email or same-phone group except the oldest (the existing duplicate finder).
+- **Invalid phone:** under 7 or over 15 digits, letters, or one repeated digit or 1234567. **Invalid email:** not name@domain.tld, double dots, or a common typo domain (gmial.com). **No phone / no email:** empty. These never overlap with invalid.
+- **Junk:** a first, last or full name like test, asdf, xxx, fake, demo, none, n/a, only digits; email at example.com or a test domain or starting test@; a phone of repeated digits; plus the account's own junk words.
+- **No activity:** last activity (or date added) older than the account's days setting (default 180). Skipped for contacts SubSync changed in the last 7 days.
+- **No deal and no conversation:** no row in synced deals and none in synced conversations. **No source / no owner:** empty.
+- **Quality firewall spike:** per source, bad records (duplicate, junk, invalid phone or email) created in the last 24 hours, at least the account's minimum (default 10), at least 3 times the same source's daily average over the 14 days before (counted as 1 if lower), and at least a third of what that source created.
+- **Since you installed:** first stored score, latest score, flags ever raised, flags that stopped being flagged. **Average time to fix:** mean hours between an alert raised and resolved.
+- **Benchmark:** median and quartiles of the latest score (last 14 days) of accounts in the same size and industry group, only with at least 10 accounts from at least 3 companies and never from opted out companies.
