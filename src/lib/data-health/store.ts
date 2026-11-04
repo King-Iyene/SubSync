@@ -95,11 +95,11 @@ export async function snapshotAccount(installationId: string, locationId: string
   const bucket = bucketOf(res.total, (prof?.industry as string | null) ?? null);
   const day = dayOf(now);
   const spikes = findSpikes(contacts.filter((c) => !ignored.has(c.contactId)), extras, settings, now);
-  await persist(installationId, locationId, day, res, bucket);
+  await persist(installationId, locationId, day, res, bucket, now);
   return { ...res, locationId, bucket, spikes, day };
 }
 
-async function persist(installationId: string, locationId: string, day: string, r: ScoreResult, bucket: string) {
+async function persist(installationId: string, locationId: string, day: string, r: ScoreResult, bucket: string, now: number) {
   const db = sql();
   await safe(async () => {
     await db.begin(async (tx) => {
@@ -113,7 +113,7 @@ async function persist(installationId: string, locationId: string, day: string, 
       }
       // Flags that were open and are no longer flagged today were fixed (or the record is gone). Recorded once, with the time we noticed.
       const keys = r.flags.map((f) => `${f.contactId}|${f.rule}`);
-      await tx`update dh_flags set fixed_at = now() where installation_id = ${installationId} and location_id = ${locationId} and fixed_at is null and last_seen_day < ${day}::date and not ((contact_id || '|' || rule) = any(${keys}::text[]))`;
+      await tx`update dh_flags set fixed_at = ${new Date(now)} where installation_id = ${installationId} and location_id = ${locationId} and fixed_at is null and last_seen_day < ${day}::date and not ((contact_id || '|' || rule) = any(${keys}::text[]))`;
     });
   }, undefined);
 }

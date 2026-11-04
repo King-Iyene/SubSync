@@ -31,7 +31,10 @@ export const MAX_ROWS = 500;
 async function oneAccount(ctx: Ctx, deps: Deps, loc: unknown): Promise<string | null> {
   if (typeof loc !== "string" || !LOC.test(loc)) return null;
   const base = ctx.limitTo ? [ctx.limitTo] : await deps.allowed(ctx);
-  return base === null || base.includes(loc) ? loc : null;
+  if (base !== null) return base.includes(loc) ? loc : null;
+  // "Every account of this company": the account must still belong to this company, so another company's id answers like one that does not exist.
+  const [own] = await sql()`select 1 as x from locations where installation_id = ${ctx.installationId} and location_id = ${loc}`;
+  return own ? loc : null;
 }
 
 async function accountsInView(ctx: Ctx, deps: Deps) {
