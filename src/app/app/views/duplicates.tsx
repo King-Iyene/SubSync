@@ -217,7 +217,7 @@ export function DuplicatesView({ embedded = false }: { embedded?: boolean } = {}
           )}
           {h.groups > 0 && <button type="button" className={BTN} aria-pressed={fast} onClick={() => setFast(!fast)} data-testid="dup-fast">{fast ? "Fast review is on" : "Fast review"}</button>}
         </div>
-        {fast && <p className="mt-2 text-xs text-muted-foreground" data-testid="dup-fast-hint">Press Y for yes, N for no, L for later. On a phone, swipe right for yes, left for no, up for later.</p>}
+        {fast && <p className="mt-2 text-sm text-muted-foreground" data-testid="dup-fast-hint">Press Y for yes, N for no, L for later. On a phone, swipe right for yes, left for no, up for later.</p>}
         {(doneNow > 0 || fast) && h.groups + doneNow > 0 && <div className="mt-3 max-w-md"><ProgressBar done={doneNow} total={doneNow + h.groups} label={`${fmtInt(doneNow)} done, ${fmtInt(h.groups)} to go`} /></div>}
       </section>
 
@@ -232,7 +232,7 @@ export function DuplicatesView({ embedded = false }: { embedded?: boolean } = {}
                   <li key={r.locationId + r.key} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-t py-2.5" data-testid="dup-obvious-row">
                     <div className="min-w-0 text-sm">
                       <p className="truncate font-medium">Keep {r.keep.name}{r.keep.email ? `, ${r.keep.email}` : ""}</p>
-                      <p className="truncate text-xs text-muted-foreground">Remove {r.remove.map((x) => x.name).join(", ")}{r.tagsAdded.length ? ` · adds tags ${r.tagsAdded.join(", ")}` : ""}{data.multi && r.locationName ? ` · ${r.locationName}` : ""}</p>
+                      <p className="truncate text-sm text-muted-foreground">Remove {r.remove.map((x) => x.name).join(", ")}{r.tagsAdded.length ? ` · adds tags ${r.tagsAdded.join(", ")}` : ""}{data.multi && r.locationName ? ` · ${r.locationName}` : ""}</p>
                     </div>
                     <RowButton onClick={() => { setObvious(false); focusGroup(r); }} label="Review" sr={`${r.keep.name}`} />
                   </li>
@@ -240,7 +240,7 @@ export function DuplicatesView({ embedded = false }: { embedded?: boolean } = {}
               </ul>
               {(obv.data?.pages ?? 1) > 1 && (
                 <div className="mt-2 flex items-center justify-between text-sm">
-                  <span className="text-xs text-muted-foreground">Showing {obv.data?.from} to {obv.data?.to} of {fmtInt(obv.data?.total ?? 0)}</span>
+                  <span className="text-sm text-muted-foreground">Showing {obv.data?.from} to {obv.data?.to} of {fmtInt(obv.data?.total ?? 0)}</span>
                   <span className="flex gap-2"><button type="button" className={BTN} disabled={oPage === 0} onClick={() => setOPage(oPage - 1)}>Previous</button><button type="button" className={BTN} disabled={oPage >= (obv.data?.pages ?? 1) - 1} onClick={() => setOPage(oPage + 1)}>Next</button></span>
                 </div>
               )}
@@ -338,14 +338,15 @@ export function DuplicatesView({ embedded = false }: { embedded?: boolean } = {}
             <MatchWhy confidence={step.confidence} likelihood={step.likelihood.label} reasons={step.reasons} pairs={step.pairs} people={step.people} rules={step.rules} />
             <Compare people={step.people} watchingSince={step.watchingSince} />
           </details>
-          {copied && <textarea readOnly className="mt-3 h-40 w-full rounded-lg border bg-card p-2 font-mono text-xs" value={copied} aria-label="Summary to copy" onFocus={(e) => e.currentTarget.select()} />}
+          {copied && <textarea readOnly className="mt-3 h-40 w-full rounded-lg border bg-card p-2 font-mono text-sm" value={copied} aria-label="Summary to copy" onFocus={(e) => e.currentTarget.select()} />}
         </section>
       ) : (
+        <div className="text-center" data-testid="dup-celebrate">{!filtered && data.counts.later === 0 && <p aria-hidden="true" className="ds-pop mx-auto mb-1 text-5xl text-success">&#10003;</p>}
         <EmptyState
           title={filtered ? "Nothing matches" : data.counts.later > 0 ? "Nothing left to decide right now" : "All clean. Nice work."}
           body={filtered ? "No match fits what you picked." : data.counts.later > 0 ? "The ones you set aside come back in 7 days." : doneNow > 0 ? `You sorted out ${fmtInt(doneNow)} just now. Nobody in your contacts appears twice.` : "Nobody in your contacts appears twice."}
           action={filtered ? <button type="button" className={BTN} onClick={clearFilters}>Show everything</button> : undefined}
-        />
+        /></div>
       )}
 
       {data.upNext.length > 0 && !f.all && (
@@ -362,18 +363,18 @@ export function DuplicatesView({ embedded = false }: { embedded?: boolean } = {}
             <div data-testid="dup-all-panel">
               <div className="mb-3 flex flex-wrap items-center gap-2">
                 <input type="search" className={searchClass} placeholder="Search a name, email or phone" aria-label="Search groups" value={qInput} onChange={(e) => setQInput(e.target.value)} data-testid="dup-search" />
-                <label className="flex items-center gap-1.5 text-xs text-muted-foreground">Sort
+                <label className="flex items-center gap-1.5 text-sm text-muted-foreground">Sort
                   <select className={selectClass} value={f.sort} onChange={(e) => patch({ sort: e.target.value, page: 0, i: 0, focus: null })} aria-label="Sort groups">
                     {Object.entries(SORT_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                   </select>
                 </label>
-                <label className="flex items-center gap-1.5 text-xs text-muted-foreground">Kind
+                <label className="flex items-center gap-1.5 text-sm text-muted-foreground">Kind
                   <select className={selectClass} value={f.reason} onChange={(e) => patch({ reason: e.target.value, page: 0, i: 0, focus: null })} aria-label="Kind of match">
                     <option value="">All ({fmtInt(data.counts.open)})</option>
                     {Object.entries(REASON_LABELS).map(([k, v]) => <option key={k} value={k}>{v} ({fmtInt(data.byReason[k] ?? 0)})</option>)}
                   </select>
                 </label>
-                <label className="flex items-center gap-1.5 text-xs text-muted-foreground">Show
+                <label className="flex items-center gap-1.5 text-sm text-muted-foreground">Show
                   <select className={selectClass} value={f.status} onChange={(e) => patch({ status: e.target.value as F["status"], page: 0, i: 0, focus: null })} aria-label="Which groups">
                     <option value="open">To do ({fmtInt(data.counts.open)})</option>
                     <option value="maybe">Maybe the same person ({fmtInt(data.counts.maybe)})</option>
@@ -386,7 +387,7 @@ export function DuplicatesView({ embedded = false }: { embedded?: boolean } = {}
                 <ul data-testid="dup-list">{data.list.rows.map((r) => <GroupRow key={r.locationId + r.key} row={r} multi={data.multi} onOpen={() => focusGroup(r)} />)}</ul>
               )}
               <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-sm">
-                <span className="text-xs text-muted-foreground" data-testid="dup-list-range">{data.list.total === 0 ? "" : `Showing ${fmtInt(data.list.from)} to ${fmtInt(data.list.to)} of ${fmtInt(data.list.total)}`}</span>
+                <span className="text-sm text-muted-foreground" data-testid="dup-list-range">{data.list.total === 0 ? "" : `Showing ${fmtInt(data.list.from)} to ${fmtInt(data.list.to)} of ${fmtInt(data.list.total)}`}</span>
                 <span className="flex gap-2">
                   <button type="button" className={BTN} disabled={data.list.page === 0} onClick={() => patch({ page: data.list.page - 1 })}>Previous</button>
                   <button type="button" className={BTN} disabled={data.list.page >= data.list.pages - 1} onClick={() => patch({ page: data.list.page + 1 })}>Next</button>
@@ -406,7 +407,7 @@ export function DuplicatesView({ embedded = false }: { embedded?: boolean } = {}
           <ul data-testid="dup-clients">
             {data.accounts.rows.map((a) => (
               <li key={a.locationId} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-t py-2.5">
-                <div className="min-w-0"><p className="truncate text-sm font-medium">{a.name ?? "Unnamed account"}</p><p className="truncate text-xs text-muted-foreground">{plural(a.groups, "group", "groups")} · {plural(a.extra, "extra contact", "extra contacts")}{a.openDeals > 0 ? ` · ${plural(a.openDeals, "open deal", "open deals")}` : ""}</p></div>
+                <div className="min-w-0"><p className="truncate text-sm font-medium">{a.name ?? "Unnamed account"}</p><p className="truncate text-sm text-muted-foreground">{plural(a.groups, "group", "groups")} · {plural(a.extra, "extra contact", "extra contacts")}{a.openDeals > 0 ? ` · ${plural(a.openDeals, "open deal", "open deals")}` : ""}</p></div>
                 <RowButton onClick={() => { setSheetKey(null); setQInput(""); setF({ ...START, location: a.locationId, all: f.all }); window.scrollTo?.({ top: 0, behavior: "smooth" }); }} label="Review" sr={`${a.name ?? "this client"}'s duplicates`} />
               </li>
             ))}
@@ -414,7 +415,7 @@ export function DuplicatesView({ embedded = false }: { embedded?: boolean } = {}
           <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-sm">
             {!f.accAll
               ? <button type="button" className={BTN} onClick={() => patch({ accAll: true, ap: 0 })} data-testid="dup-clients-all">See all {fmtInt(data.accounts.total)} clients</button>
-              : <><span className="text-xs text-muted-foreground">Showing {fmtInt(data.accounts.from)} to {fmtInt(data.accounts.to)} of {fmtInt(data.accounts.total)}</span>
+              : <><span className="text-sm text-muted-foreground">Showing {fmtInt(data.accounts.from)} to {fmtInt(data.accounts.to)} of {fmtInt(data.accounts.total)}</span>
                 <span className="flex gap-2"><button type="button" className={BTN} disabled={data.accounts.page === 0} onClick={() => patch({ ap: data.accounts.page - 1 })}>Previous</button><button type="button" className={BTN} disabled={data.accounts.page >= data.accounts.pages - 1} onClick={() => patch({ ap: data.accounts.page + 1 })}>Next</button><button type="button" className={QUIET} onClick={() => patch({ accAll: false, ap: 0, aq: "" })}>Show fewer</button></span></>}
           </div>
         </Section>

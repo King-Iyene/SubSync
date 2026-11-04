@@ -94,7 +94,7 @@ export function QualityTab({ canFix }: { canFix: boolean }) {
               {` · ${fmtInt(p.totals.contacts)} contacts · ${plural(p.totals.problems, "problem", "problems")} to fix · ${plural(p.totals.duplicateGroups, "duplicate group", "duplicate groups")}`}
             </p>
             <div className="mt-2 max-w-md"><TrendLine trend={p.trend} label="Portfolio data quality" /></div>
-            {p.pending > 0 && <p className="mt-2 text-xs text-muted-foreground" data-testid="quality-pending">{plural(p.pending, "client account is", "client accounts are")} scored overnight. They appear here tomorrow.</p>}
+            {p.pending > 0 && <p className="mt-2 text-sm text-muted-foreground" data-testid="quality-pending">{plural(p.pending, "client account is", "client accounts are")} scored overnight. They appear here tomorrow.</p>}
           </section>
 
           <Section title="Clients to fix first" hint="Lowest score first." id="quality-clients">
@@ -104,7 +104,7 @@ export function QualityTab({ canFix }: { canFix: boolean }) {
                   <li key={r.locationId} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-t py-3" data-testid="quality-client">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium">{r.name ?? "Unnamed account"}</p>
-                      <p className="text-xs text-muted-foreground">{r.score === null ? (r.day ? "Not enough contacts to score" : "Not scored yet") : `${r.score} out of 100 · ${r.word}`} · {fmtInt(r.contacts)} contacts · {plural(r.problems, "problem", "problems")} · {plural(r.duplicateGroups, "duplicate group", "duplicate groups")}</p>
+                      <p className="text-sm text-muted-foreground">{r.score === null ? (r.day ? "Not enough contacts to score" : "Not scored yet") : `${r.score} out of 100 · ${r.word}`} · {fmtInt(r.contacts)} contacts · {plural(r.problems, "problem", "problems")} · {plural(r.duplicateGroups, "duplicate group", "duplicate groups")}</p>
                     </div>
                     <RowButton onClick={() => setPicked(r.locationId)} label="Open" sr={`${r.name ?? "this client"}'s data quality`} testId="quality-open" />
                   </li>
@@ -114,7 +114,7 @@ export function QualityTab({ canFix }: { canFix: boolean }) {
             {p.accounts.total > 5 && (
               <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-sm">
                 {!all ? <button type="button" className={BTN} onClick={() => { setAll(true); setPage(0); }} data-testid="quality-see-all">See all {fmtInt(p.accounts.total)} clients</button>
-                  : <><span className="text-xs text-muted-foreground">Showing {fmtInt(p.accounts.from)} to {fmtInt(p.accounts.to)} of {fmtInt(p.accounts.total)}</span>
+                  : <><span className="text-sm text-muted-foreground">Showing {fmtInt(p.accounts.from)} to {fmtInt(p.accounts.to)} of {fmtInt(p.accounts.total)}</span>
                     <span className="flex gap-2"><button type="button" className={BTN} disabled={p.accounts.page === 0} onClick={() => setPage(p.accounts.page - 1)}>Previous</button><button type="button" className={BTN} disabled={p.accounts.page >= p.accounts.pages - 1} onClick={() => setPage(p.accounts.page + 1)}>Next</button><button type="button" className={QUIET} onClick={() => { setAll(false); setPage(0); }}>Show fewer</button></span></>}
               </div>
             )}
@@ -133,30 +133,30 @@ export function QualityTab({ canFix }: { canFix: boolean }) {
                 {acct.data.score === null && <p className="mt-1 text-sm text-muted-foreground">A score needs at least {acct.data.minContacts} contacts; this client has {fmtInt(acct.data.contacts)}. The problems are still listed below.</p>}
                 {acct.data.score && (
                   <ul className="mt-4 grid max-w-xl gap-x-6 gap-y-3 sm:grid-cols-2" data-testid="quality-parts">
-                    {Object.entries(acct.data.partLabels).map(([k, label]) => <li key={k}><ScoreMeter score={acct.data!.score!.parts[k] ?? 0} label={label} testId={`quality-part-${k}`} /><p className="text-xs text-muted-foreground">{label}</p></li>)}
+                    {Object.entries(acct.data.partLabels).map(([k, label]) => <li key={k}><ScoreMeter score={acct.data!.score!.parts[k] ?? 0} label={label} testId={`quality-part-${k}`} /><p className="text-sm text-muted-foreground">{label}</p></li>)}
                   </ul>
                 )}
                 <div className="mt-3 max-w-md"><TrendLine trend={acct.data.trend} label={`${acct.data.name ?? "Client"} data quality`} /></div>
-                <p className="mt-2 text-xs text-muted-foreground">{fmtInt(acct.data.contacts)} contacts read from SubSync&apos;s copy; {plural(acct.data.duplicates.groups, "duplicate group", "duplicate groups")} in the Duplicates tab.</p>
+                <p className="mt-2 text-sm text-muted-foreground">{fmtInt(acct.data.contacts)} contacts read from SubSync&apos;s copy; {plural(acct.data.duplicates.groups, "duplicate group", "duplicate groups")} in the Duplicates tab.</p>
               </section>
 
               <FixCards findings={acct.data.findings} examples={acct.data.examples} onShow={(f) => void open(f)} />
 
               <Section title="Every kind of problem" hint="Each row opens the exact contacts. Counts equal the rows." id="quality-findings">
                 <div className="mb-3 flex flex-wrap items-center gap-2 text-sm">
-                  <label htmlFor="q-cc" className="text-xs text-muted-foreground">Country code for local phone numbers</label>
+                  <label htmlFor="q-cc" className="text-sm text-muted-foreground">Country code for local phone numbers</label>
                   <input id="q-cc" className={`${FIELD} w-24`} placeholder="+1" inputMode="tel" value={cc} onChange={(e) => setCc(e.target.value)} data-testid="quality-cc" />
-                  <span className="text-xs text-muted-foreground">Left blank, a number without one is never guessed.</span>
+                  <span className="text-sm text-muted-foreground">Left blank, a number without one is never guessed.</span>
                 </div>
                 {acct.data.findings.length === 0 ? <EmptyState title="Nothing to fix" body="No missing, broken or junk details were found in this client's contacts." /> : (
                   <ul data-testid="quality-findings-list">
                     {acct.data.findings.map((f, i) => (
                       <li key={f.id} className="border-t py-3" data-testid="quality-finding" data-finding={f.id}>
-                        {(i === 0 || acct.data!.findings[i - 1].groupLabel !== f.groupLabel) && <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">{f.groupLabel}</p>}
+                        {(i === 0 || acct.data!.findings[i - 1].groupLabel !== f.groupLabel) && <p className="mb-1 text-sm font-medium uppercase tracking-wide text-muted-foreground">{f.groupLabel}</p>}
                         <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
                           <div className="min-w-0">
                             <p className="text-sm font-medium"><span className="tabular-nums" data-testid="finding-count">{fmtInt(f.count)}</span> {f.label.toLowerCase()}</p>
-                            <p className="line-clamp-2 text-xs text-muted-foreground">{f.todo}</p>
+                            <p className="line-clamp-2 text-sm text-muted-foreground">{f.todo}</p>
                           </div>
                           <div className="flex items-center gap-1">
                             <button type="button" className={QUIET} onClick={() => void csv(f)} data-testid="finding-csv">{f.fixable ? "Copy the fixes as a CSV" : "Download as CSV"}<span className="sr-only"> for {f.label.toLowerCase()}</span></button>
@@ -206,7 +206,7 @@ function FixCards({ findings, examples, onShow }: { findings: Finding[]; example
         const n = fs.reduce((s, f) => s + f.count, 0);
         const main = fs.slice().sort((a, b) => b.count - a.count)[0];
         return (
-          <section key={c.id} className="flex flex-col rounded-xl border bg-card p-4" data-testid="fix-card" data-card={c.id} aria-label={c.title}>
+          <section key={c.id} className="flex flex-col rounded-xl border bg-card p-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md motion-reduce:transform-none motion-reduce:transition-none" data-testid="fix-card" data-card={c.id} aria-label={c.title}>
             <h3 className="text-base font-semibold">{c.title}</h3>
             <p className="mt-2 text-4xl font-semibold tabular-nums" data-testid="fix-card-count">{fmtInt(n)}</p>
             <p className="text-sm text-muted-foreground">{n === 0 ? c.empty : c.id === "junk" ? "test or empty contacts" : c.id === "phones" ? "phone numbers need fixing" : "emails need fixing"}</p>
@@ -243,11 +243,11 @@ function ImportCheck({ locationId, name }: { locationId: string; name: string | 
   return (
     <Section title="Check a file before you import it" hint={`Paste a list of people (Name, Email, Phone) and see who is already in ${name ?? "this client"}. The file is read here and never stored.`} id="quality-import" className="mt-8">
       <div className="grid gap-2">
-        <textarea className="min-h-28 w-full rounded-lg border bg-card p-3 font-mono text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring/30" placeholder={"Name,Email,Phone\nAda Lovelace,ada@example.co,+15550102030"} aria-label="The list to check, as CSV" value={text} onChange={(e) => { setText(e.target.value); setRes(null); }} data-testid="import-text" />
+        <textarea className="min-h-28 w-full rounded-lg border bg-card p-3 font-mono text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/30" placeholder={"Name,Email,Phone\nAda Lovelace,ada@example.co,+15550102030"} aria-label="The list to check, as CSV" value={text} onChange={(e) => { setText(e.target.value); setRes(null); }} data-testid="import-text" />
         <div className="flex flex-wrap items-center gap-2">
           <label className={`${BTN} cursor-pointer`}>Choose a CSV file<input type="file" accept=".csv,text/csv,text/plain" className="sr-only" onChange={(e) => void readFile(e.target.files?.[0])} data-testid="import-file" /></label>
           <button type="button" className={PRIMARY} disabled={busy || text.trim().length === 0} onClick={() => void run()} data-testid="import-run">{busy ? "Checking..." : "Check this list"}</button>
-          <span className="text-xs text-muted-foreground">Up to 5,000 people at a time.</span>
+          <span className="text-sm text-muted-foreground">Up to 5,000 people at a time.</span>
         </div>
       </div>
       {err && <div className="mt-3"><InlineAlert tone="danger" onDismiss={() => setErr(null)}>{err}</InlineAlert></div>}
@@ -260,12 +260,12 @@ function ImportCheck({ locationId, name }: { locationId: string; name: string | 
               <ul className="mt-2" data-testid="import-rows">
                 {res.rows.filter((r) => r.verdict !== "new").slice(0, 100).map((r) => (
                   <li key={r.row} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-t py-2.5 text-sm" data-verdict={r.verdict}>
-                    <div className="min-w-0"><p className="truncate font-medium">Row {r.row}: {r.name || r.email || r.phone || "no details"}</p><p className="line-clamp-2 text-xs text-muted-foreground">{VERDICT[r.verdict]} · {r.why}{r.match ? ` (${r.match.name || "unnamed"})` : ""}</p></div>
+                    <div className="min-w-0"><p className="truncate font-medium">Row {r.row}: {r.name || r.email || r.phone || "no details"}</p><p className="line-clamp-2 text-sm text-muted-foreground">{VERDICT[r.verdict]} · {r.why}{r.match ? ` (${r.match.name || "unnamed"})` : ""}</p></div>
                     {r.url ? <RowButton href={r.url} label="Open" sr={r.match?.name ?? "the contact"} /> : null}
                   </li>
                 ))}
               </ul>
-              {res.shown < res.total && <p className="mt-1 text-xs text-muted-foreground">The first {fmtInt(res.shown)} rows are listed; the numbers above cover the whole file.</p>}
+              {res.shown < res.total && <p className="mt-1 text-sm text-muted-foreground">The first {fmtInt(res.shown)} rows are listed; the numbers above cover the whole file.</p>}
               {(counts.new ?? 0) > 0 && <div className="mt-3"><button type="button" className={BTN} onClick={() => void copy()} data-testid="import-copy">{copied ? "Copied" : `Copy only the ${fmtInt(counts.new ?? 0)} new people (CSV)`}</button></div>}
             </>
           )}

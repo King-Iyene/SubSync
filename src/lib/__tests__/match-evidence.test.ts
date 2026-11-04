@@ -101,7 +101,7 @@ test("learning: signals that mislead in this account lose weight, and nothing mo
   assert.ok(learned < base, `the shared-phone pair scores lower once learned (${base} to ${learned})`);
 });
 
-import { incomingFrom } from "../analytics/prevention.ts";
+import { incomingFrom } from "../analytics/arrival-parse.ts";
 import { tagPossibleDuplicate } from "../ghl/crm-gateway.ts";
 
 test("a contact-created webhook body is read, whatever the nesting", () => {

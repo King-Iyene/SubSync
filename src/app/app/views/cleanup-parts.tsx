@@ -1,6 +1,7 @@
 "use client";
 
 import { Sparkline } from "../ds";
+import { CountUp } from "../ds/count-up";
 import type { Trend } from "@/lib/analytics/quality";
 
 // The pieces shared by every tab of the Clean-up module (stage CLEANUP): one score meter, used for a match score on a duplicate group AND for the data-quality score of a
@@ -38,7 +39,7 @@ export function ScoreMeter({ score, word, label, big = false, testId }: { score:
 
 /** A score trend from stored snapshots, or the plain reason there is none yet. */
 export function TrendLine({ trend, label }: { trend: Trend; label: string }) {
-  if (trend.state === "not_enough") return <p className="text-xs text-muted-foreground" data-testid="trend-empty">{trend.reason}</p>;
+  if (trend.state === "not_enough") return <p className="text-sm text-muted-foreground" data-testid="trend-empty">{trend.reason}</p>;
   const sign = trend.change > 0 ? "up" : trend.change < 0 ? "down" : "the same";
   return (
     <div data-testid="trend">
@@ -67,12 +68,12 @@ export function ScoreRing({ score, word, label, size = 150, testId }: { score: n
       <div className="relative" style={{ width: size, height: size }}>
         <svg viewBox="0 0 120 120" width={size} height={size} aria-hidden="true">
           <circle cx="60" cy="60" r={r} fill="none" stroke="currentColor" strokeWidth="10" className="text-muted" />
-          {score !== null && <circle cx="60" cy="60" r={r} fill="none" stroke="currentColor" strokeWidth="10" strokeLinecap="round" strokeDasharray={`${(pct / 100) * c} ${c}`} transform="rotate(-90 60 60)" className={toneText(pct)} />}
+          {score !== null && <circle cx="60" cy="60" r={r} fill="none" stroke="currentColor" strokeWidth="10" strokeLinecap="round" strokeDasharray={`${(pct / 100) * c} ${c}`} transform="rotate(-90 60 60)" className={`${toneText(pct)} transition-[stroke-dasharray] duration-700 ease-out motion-reduce:transition-none`} />}
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
           <span className="sr-only">{label}: </span>
-          <span className="text-4xl font-semibold tabular-nums leading-none" data-testid={testId ? `${testId}-n` : undefined}>{score === null ? "-" : score}</span>
-          <span className="mt-1 text-xs text-muted-foreground">{score === null ? "not enough contacts" : word}</span>
+          <span className="text-4xl font-semibold tabular-nums leading-none" data-testid={testId ? `${testId}-n` : undefined}>{score === null ? "-" : <CountUp value={score} />}</span>
+          <span className="mt-1 text-sm text-muted-foreground">{score === null ? "not enough contacts" : word}</span>
         </div>
       </div>
     </div>
@@ -101,7 +102,7 @@ export function ProgressBar({ done, total, label }: { done: number; total: numbe
   return (
     <div data-testid="dup-progress">
       <div className="h-1.5 overflow-hidden rounded-full bg-muted" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} aria-label={label}><div className="h-full bg-primary transition-all" style={{ width: `${pct}%` }} /></div>
-      <p className="mt-1 text-xs text-muted-foreground">{label}</p>
+      <p className="mt-1 text-sm text-muted-foreground">{label}</p>
     </div>
   );
 }

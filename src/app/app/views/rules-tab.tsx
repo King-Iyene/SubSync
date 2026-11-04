@@ -68,20 +68,20 @@ export function RulesTab({ canEdit }: { canEdit: boolean }) {
             {data.canCompany && (
               <li className="border-t py-1">
                 <button type="button" className={`flex min-h-11 w-full items-center justify-between gap-3 rounded px-2 text-left text-sm hover:bg-accent/50 ${scope === "company" ? "font-semibold" : ""}`} aria-pressed={scope === "company"} onClick={() => setScope("company")} data-testid="rules-company">
-                  <span>All clients (the company default)</span><span className="text-xs text-muted-foreground">{data.company?.saved ? data.company.preset : "not set"}</span>
+                  <span>All clients (the company default)</span><span className="text-sm text-muted-foreground">{data.company?.saved ? data.company.preset : "not set"}</span>
                 </button>
               </li>
             )}
             {data.accounts.rows.map((a) => (
               <li key={a.locationId} className="border-t py-1">
                 <button type="button" className={`flex min-h-11 w-full items-center justify-between gap-3 rounded px-2 text-left text-sm hover:bg-accent/50 ${(scope || data.selected?.locationId) === a.locationId ? "font-semibold" : ""}`} aria-pressed={(scope || data.selected?.locationId) === a.locationId} onClick={() => setScope(a.locationId)} data-testid="rules-account">
-                  <span className="truncate">{a.name}</span><span className="shrink-0 text-xs text-muted-foreground">{a.preset}{a.source === "company" ? " (company)" : ""}</span>
+                  <span className="truncate">{a.name}</span><span className="shrink-0 text-sm text-muted-foreground">{a.preset}{a.source === "company" ? " (company)" : ""}</span>
                 </button>
               </li>
             ))}
           </ul>
           {data.accounts.pages > 1 && (
-            <div className="mt-2 flex items-center justify-between text-sm"><span className="text-xs text-muted-foreground">Showing {data.accounts.from} to {data.accounts.to} of {data.accounts.total}</span>
+            <div className="mt-2 flex items-center justify-between text-sm"><span className="text-sm text-muted-foreground">Showing {data.accounts.from} to {data.accounts.to} of {data.accounts.total}</span>
               <span className="flex gap-2"><button type="button" className={BTN} disabled={data.accounts.page === 0} onClick={() => setAp(ap - 1)}>Previous</button><button type="button" className={BTN} disabled={data.accounts.page >= data.accounts.pages - 1} onClick={() => setAp(ap + 1)}>Next</button></span></div>
           )}
         </Section>
@@ -95,7 +95,7 @@ export function RulesTab({ canEdit }: { canEdit: boolean }) {
       <Section title="Stop new duplicates" hint="Five steps in your CRM, so the list stops growing." id="rules-prevent" className="mt-8">
         <ol className="list-decimal space-y-1.5 pl-5 text-sm" data-testid="prevent-recipe">{PREVENT_RECIPE.map((s) => <li key={s}>{s}</li>)}</ol>
         <button type="button" className={`${BTN} mt-3`} onClick={() => void copy(PREVENT_RECIPE.map((s, i) => `${i + 1}. ${s}`).join("\n"))} data-testid="prevent-copy">{copied?.startsWith("1. Switch off") ? "Copied" : "Copy these steps"}</button>
-        <p className="mt-2 text-xs text-muted-foreground">SubSync cannot change these settings for you: it only reads. Old duplicates stay until they are merged.</p>
+        <p className="mt-2 text-sm text-muted-foreground">SubSync cannot change these settings for you: it only reads. Old duplicates stay until they are merged.</p>
       </Section>
 
       {canEdit && <Section title="Changing contacts" hint="Off for every client until you allow it." id="rules-write" className="mt-8"><WriteAccessCard embedded /></Section>}
@@ -147,7 +147,7 @@ function Editor({ data, cfg, scope, name, own, canEdit, canSave, onSaved }: { da
           {data.presets.map((p) => (
             <label key={p.id} className={`flex min-h-11 cursor-pointer items-start gap-3 border-l-2 py-1.5 pl-3 ${preset === p.id ? "border-primary" : "border-transparent"}`}>
               <input type="radio" name="preset" className="mt-1 size-5 shrink-0" checked={preset === p.id} onChange={() => pick(p.id)} data-testid={`preset-${p.id}`} />
-              <span className="min-w-0"><span className="block text-sm font-semibold">{p.label}{p.id === "balanced" ? " (the usual choice)" : ""}</span><span className="block text-xs text-muted-foreground">{p.line}</span></span>
+              <span className="min-w-0"><span className="block text-sm font-semibold">{p.label}{p.id === "balanced" ? " (the usual choice)" : ""}</span><span className="block text-sm text-muted-foreground">{p.line}</span></span>
             </label>
           ))}
         </fieldset>
@@ -167,14 +167,14 @@ function Editor({ data, cfg, scope, name, own, canEdit, canSave, onSaved }: { da
           <label className="flex min-h-11 items-start gap-2 text-sm"><input type="checkbox" className="mt-1 size-4" disabled={!canEdit} checked={rules.guards} onChange={(e) => set("guards", e.target.checked)} /><span>Be careful with a shared phone or a shared company mailbox (info@, sales@): they may be different people</span></label>
           <div className="mt-2 max-w-sm"><label htmlFor="thr" className="block text-sm">How sure SubSync must be before it shows a match</label>
             <input id="thr" type="range" min={25} max={90} step={5} className="mt-1 w-full" disabled={!canEdit} value={rules.threshold} onChange={(e) => set("threshold", Number(e.target.value))} data-testid="rules-threshold" aria-describedby="thr-h" />
-            <p id="thr-h" className="text-xs text-muted-foreground">Lower finds more groups and more false alarms. Higher finds fewer.</p></div>
+            <p id="thr-h" className="text-sm text-muted-foreground">Lower finds more groups and more false alarms. Higher finds fewer.</p></div>
         </details>
       </Section>
 
       <Section title="Which value wins" hint="When two records disagree, this is the value SubSync suggests you keep. You can always pick differently in the merge screen." id="rules-wins">
         <div className="grid gap-3 sm:grid-cols-2" data-testid="rules-survive">
           {FIELDS.map((f) => (
-            <label key={f.key} className="block text-sm"><span className="mb-1 block text-xs text-muted-foreground">{f.label}</span>
+            <label key={f.key} className="block text-sm"><span className="mb-1 block text-sm text-muted-foreground">{f.label}</span>
               <select className={`${FIELD} w-full`} disabled={!canEdit} value={survive[f.key]} onChange={(e) => setSurvive({ ...survive, [f.key]: e.target.value as Winner })} data-testid={`survive-${f.key}`}>
                 {(Object.keys(data.winnerWords) as Winner[]).map((w) => <option key={w} value={w}>{data.winnerWords[w]}</option>)}
               </select></label>
@@ -208,7 +208,7 @@ function Editor({ data, cfg, scope, name, own, canEdit, canSave, onSaved }: { da
 
 function SelectField({ label, value, words, disabled, onChange }: { label: string; value: string; words: Record<string, string>; disabled: boolean; onChange: (v: string) => void }) {
   return (
-    <label className="block text-sm"><span className="mb-1 block text-xs text-muted-foreground">{label}</span>
+    <label className="block text-sm"><span className="mb-1 block text-sm text-muted-foreground">{label}</span>
       <select className={`${FIELD} w-full`} disabled={disabled} value={value} onChange={(e) => onChange(e.target.value)} data-testid={`field-${label.toLowerCase()}`}>
         {Object.entries(words).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
       </select></label>

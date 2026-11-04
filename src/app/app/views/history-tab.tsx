@@ -45,7 +45,7 @@ export function HistoryTab() {
       {problem && <div className="mb-3"><InlineAlert tone="danger" onDismiss={() => setProblem(null)}>{problem}</InlineAlert></div>}
       {done && <div className="mb-3" role="status"><InlineAlert tone="info" onDismiss={() => setDone(null)}>{done}</InlineAlert></div>}
       <div className="mb-3 flex flex-wrap items-center gap-3">
-        <label className="flex items-center gap-1.5 text-xs text-muted-foreground">Show
+        <label className="flex items-center gap-1.5 text-sm text-muted-foreground">Show
           <select className={FIELD} value={kind} onChange={(e) => { setKind(e.target.value as Kind | ""); setPage(0); }} aria-label="Kind of event" data-testid="history-kind">
             <option value="">Everything ({fmtInt(total)})</option>
             {(Object.keys(KIND_LABEL) as Kind[]).filter((k) => data.counts[k] > 0).map((k) => <option key={k} value={k}>{KIND_LABEL[k]} ({fmtInt(data.counts[k])})</option>)}
@@ -60,7 +60,7 @@ export function HistoryTab() {
             <li key={r.id} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-t py-2.5" data-testid="history-row" data-kind={r.kind}>
               <div className="min-w-0">
                 <p className="line-clamp-2 break-words text-sm">{r.text}</p>
-                <p className="truncate text-xs text-muted-foreground">{r.who} · {when(r.at)} ({timeAgo(r.at)}){r.dryRun ? " · nothing was sent" : ""}</p>
+                <p className="truncate text-sm text-muted-foreground">{r.who} · {when(r.at)} ({timeAgo(r.at)}){r.dryRun ? " · nothing was sent" : ""}</p>
               </div>
               {r.undo ? <button type="button" className={`${BTN} min-h-11 px-3 sm:min-h-8`} disabled={busy === r.id} onClick={() => void undo(r)} data-testid="history-undo">Undo<span className="sr-only"> this decision</span></button> : <span />}
             </li>
@@ -68,7 +68,7 @@ export function HistoryTab() {
         </ul>
       )}
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-sm">
-        <span className="text-xs text-muted-foreground" data-testid="history-range">{data.total === 0 ? "" : `Page ${data.page + 1} of ${data.pages} · ${fmtInt(data.total)} lines`}</span>
+        <span className="text-sm text-muted-foreground" data-testid="history-range">{data.total === 0 ? "" : `Page ${data.page + 1} of ${data.pages} · ${fmtInt(data.total)} lines`}</span>
         <span className="flex gap-2"><button type="button" className={BTN} disabled={data.page === 0} onClick={() => setPage(data.page - 1)}>Previous</button><button type="button" className={BTN} disabled={data.page >= data.pages - 1} onClick={() => setPage(data.page + 1)}>Next</button></span>
       </div>
     </div>

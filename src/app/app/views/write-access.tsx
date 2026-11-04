@@ -42,7 +42,7 @@ export function WriteAccessCard({ embedded = false }: { embedded?: boolean }) {
               <li key={a.locationId} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-t py-2.5" data-testid="write-row">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium">{a.name}</p>
-                  <p className="text-xs text-muted-foreground" data-testid="write-state">{a.writeEnabled ? "SubSync may change this client's contacts, after you confirm each change." : "Off. SubSync only reads this client's contacts."}</p>
+                  <p className="text-sm text-muted-foreground" data-testid="write-state">{a.writeEnabled ? "SubSync may change this client's contacts, after you confirm each change." : "Off. SubSync only reads this client's contacts."}</p>
                   {asking === a.locationId && !a.writeEnabled && (
                     <div className="mt-2 border-l-2 border-warning py-1 pl-3 text-sm" role="group" aria-label={`Allow changes for ${a.name}`}>
                       <p>Allow SubSync to change {a.name}&apos;s contacts? It will ask you to preview and confirm every change.</p>
@@ -57,7 +57,7 @@ export function WriteAccessCard({ embedded = false }: { embedded?: boolean }) {
             ))}
           </ul>
           {data.accounts.pages > 1 && (
-            <div className="mt-2 flex items-center justify-between text-sm"><span className="text-xs text-muted-foreground">Showing {data.accounts.from} to {data.accounts.to} of {data.accounts.total}</span>
+            <div className="mt-2 flex items-center justify-between text-sm"><span className="text-sm text-muted-foreground">Showing {data.accounts.from} to {data.accounts.to} of {data.accounts.total}</span>
               <span className="flex gap-2"><button type="button" className={BTN} disabled={data.accounts.page === 0} onClick={() => setPage(page - 1)}>Previous</button><button type="button" className={BTN} disabled={data.accounts.page >= data.accounts.pages - 1} onClick={() => setPage(page + 1)}>Next</button></span></div>
           )}
         </>

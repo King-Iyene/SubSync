@@ -1,6 +1,7 @@
 import { sql } from "../db";
 import { schemaReady } from "./cleanup-config";
 import type { Person } from "./dedupe";
+import { asPerson, incomingFrom, type Incoming } from "./arrival-parse";
 import { scoreEvidence, TIER_AT, type Evidence } from "./match-evidence";
 
 // Real-time prevention, the honest version (stage CLEANUP, round 2). The platform tells SubSync about a new contact with its contact-created webhook, within seconds, and the event
@@ -8,23 +9,7 @@ import { scoreEvidence, TIER_AT, type Evidence } from "./match-evidence";
 // account's existing contacts while the webhook is being answered and say "possible duplicate of X" at once: an alert, a card in the Duplicates tab and, only if the account
 // allowed it, a tag in the CRM through the write gateway. Nothing here writes to the CRM.
 
-export type Incoming = { contactId: string; name: string; email: string | null; phone: string | null; tags: string[]; source: string | null; createdAt: string | null };
-
-const text = (v: unknown): string | null => (typeof v === "string" && v.trim() ? v.trim() : null);
-
-/** Reads the contact out of a contact-created webhook body, defensively (the platform nests it differently across event versions). Null when there is no usable contact. */
-export function incomingFrom(body: unknown): Incoming | null {
-  const o = (body && typeof body === "object" ? body : {}) as Record<string, unknown>;
-  const c = (o.contact && typeof o.contact === "object" ? o.contact : o) as Record<string, unknown>;
-  const id = text(c.id) ?? text(c.contactId);
-  if (!id) return null;
-  const name = text(c.name) ?? text(c.fullName) ?? [text(c.firstName), text(c.lastName)].filter(Boolean).join(" ");
-  const tags = Array.isArray(c.tags) ? c.tags.filter((t): t is string => typeof t === "string") : [];
-  const when = text(c.dateAdded) ?? text(c.createdAt);
-  return { contactId: id, name: name || "Unnamed contact", email: text(c.email), phone: text(c.phone), tags, source: text(c.source), createdAt: when && Number.isFinite(Date.parse(when)) ? new Date(when).toISOString() : new Date().toISOString() };
-}
-
-const asPerson = (i: Incoming): Person => ({ contactId: i.contactId, name: i.name, email: i.email, phone: i.phone, tags: i.tags, createdAt: i.createdAt, lastActivityAt: null, source: i.source, openDeals: 0, wonDeals: 0, hasConversation: false });
+export { incomingFrom, type Incoming } from "./arrival-parse";
 
 export type Found = { otherId: string; otherName: string; score: number; tier: Evidence["tier"]; reasons: string[] };
 

@@ -29,11 +29,11 @@ export function MatchWhy({ confidence, likelihood, reasons, pairs, people, rules
       <div className="min-w-0 text-sm">
         <p className="font-medium">Why these match</p>
         <ul className="mt-0.5 list-disc space-y-0.5 pl-5 text-muted-foreground" data-testid="dup-reasons">{reasons.map((r) => <li key={r}>{r}</li>)}</ul>
-        <p className="mt-1 text-xs text-muted-foreground" data-testid="dup-rules-note">How careful we are: {STRICTNESS[rules.preset] ?? "Normal"}. {rules.sentence}</p>
+        <p className="mt-1 text-sm text-muted-foreground" data-testid="dup-rules-note">How careful we are: {STRICTNESS[rules.preset] ?? "Normal"}. {rules.sentence}</p>
         {pairs.length > 1 && (
           <details className="mt-1" data-testid="dup-pairs">
-            <summary className="min-h-9 cursor-pointer text-xs text-muted-foreground">How sure for each pair</summary>
-            <ul className="mt-1 space-y-1 text-xs">{pairs.map((x) => <li key={x.a + x.b}><span className="font-medium tabular-nums">{x.score}</span> · {nameOf(x.a)} and {nameOf(x.b)}{x.reasons.length ? <span className="text-muted-foreground">: {x.reasons.join("; ").toLowerCase()}</span> : null}</li>)}</ul>
+            <summary className="min-h-9 cursor-pointer text-sm text-muted-foreground">How sure for each pair</summary>
+            <ul className="mt-1 space-y-1 text-sm">{pairs.map((x) => <li key={x.a + x.b}><span className="font-medium tabular-nums">{x.score}</span> · {nameOf(x.a)} and {nameOf(x.b)}{x.reasons.length ? <span className="text-muted-foreground">: {x.reasons.join("; ").toLowerCase()}</span> : null}</li>)}</ul>
           </details>
         )}
       </div>
@@ -90,7 +90,7 @@ export function WorkflowMerge({ workflow, people, switchedOff, onRun }: { workfl
                 <>
                   <label className="mt-3 flex min-h-11 items-start gap-2"><input type="checkbox" className="mt-1 size-5" checked={sure} onChange={(e) => setSure(e.target.checked)} data-testid="dup-workflow-sure" /><span>I have looked at both records and want them merged. I understand it cannot be undone.</span></label>
                   <button type="button" className={`${PRIMARY} mt-2`} disabled={!sure || busy} onClick={async () => { setBusy(true); try { setMsg(await onRun()); } finally { setBusy(false); } }} data-testid="dup-workflow-run">{busy ? "Sending..." : "Start the merge"}</button>
-                  {switchedOff && !msg && <p className="mt-2 text-xs text-muted-foreground">Sending is switched off on the server for now: confirming records a dry run and nothing reaches your CRM.</p>}
+                  {switchedOff && !msg && <p className="mt-2 text-sm text-muted-foreground">Sending is switched off on the server for now: confirming records a dry run and nothing reaches your CRM.</p>}
                 </>
               )}
             </>
@@ -119,12 +119,12 @@ export function PersonCard({ p, i, keep, best, locked, differ, onKeep }: { p: Pe
   if (differ.has("conversation")) rows.push(["Conversation", p.hasConversation ? "Yes" : null]);
   if (p.dnd) rows.push(["Do Not Disturb", "Yes"]);
   return (
-    <li className={`min-w-0 rounded-xl border bg-card p-4 ${keep ? "border-primary ring-1 ring-primary/40" : ""}`} data-testid="dup-record" data-keep={keep ? "true" : "false"}>
+    <li className={`min-w-0 rounded-xl border bg-card p-4 transition-all duration-200 hover:shadow-md focus-within:ring-2 focus-within:ring-ring/50 motion-reduce:transition-none ${keep ? "border-primary ring-1 ring-primary/40" : ""}`} data-testid="dup-record" data-keep={keep ? "true" : "false"}>
       <div className="flex items-center gap-3">
         <Avatar name={p.name} tone={i} />
         <div className="min-w-0">
           <p className="break-words text-lg font-semibold leading-tight">{p.name}</p>
-          <p className="text-xs text-muted-foreground">Added {when(p.createdAt) ?? "a while ago"}{best ? " · the best one to keep" : ""}</p>
+          <p className="text-sm text-muted-foreground">Added {when(p.createdAt) ?? "a while ago"}{best ? " · the best one to keep" : ""}</p>
         </div>
       </div>
       <dl className="mt-3 space-y-1.5 text-sm">
