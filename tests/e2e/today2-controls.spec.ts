@@ -53,7 +53,8 @@ test("every number opens its records, and the panel closes with the cross, Esc a
 test("the records panel: count matches the row total, search, sort, filters, maximise, export and the open buttons", async ({ page }) => {
   await openToday(page);
   const leadsTile = page.getByTestId("pulse-leads").getByRole("button").first();
-  const readTile = async () => Number((await page.getByTestId("pulse-leads").innerText()).match(/\d[\d,]*/g)?.[0].replace(/,/g, ""));
+  // The value the figure ends on (data-final), never the text in the middle of its count-up.
+  const readTile = async () => Number(((await page.getByTestId("pulse-leads").locator("[data-final]").first().getAttribute("data-final")) ?? "").replace(/[^0-9]/g, ""));
   // The figure counts up when the page opens: wait until it stops moving.
   let pressed = await readTile();
   await expect.poll(async () => { const now = await readTile(); const same = now === pressed; pressed = now; return same; }, { intervals: [600, 600, 600], timeout: 10_000 }).toBe(true);
