@@ -59,6 +59,15 @@ Proposals (not built): a "Connect Fathom" and "Connect Slack" step in Getting st
 4. Open the demo as a client's staff user (add `?as=client`). The menu has no Settings but one entry, Integrations. It shows "My connections" (the demo user is the account's administrator, so the team part for their own account also shows; an account user would not get it) and no permissions list.
 5. Make the window a phone width (390 px). Settings, Integrations has no sideways scroll, the Connect button is easy to press with a thumb, and the section list scrolls inside its own strip.
 
+## Tests and results (4 Nov 2026, demo company, one slow machine, own server on port 3111)
+
+- `npx next typegen && npx tsc --noEmit`: 0 errors. `npx eslint src tests`: 0 errors, 11 warnings (older).
+- `node --test src/lib/__tests__/`: tests 839, pass 839, fail 0.
+- `npx vitest run --no-file-parallelism` on the files this stage touches or that read the menu and access rules (`connections-in-settings`, `ds-components`, `client-access`, `c1-access`, `e0-tenancy-and-secrets`, `flags-default-off`): 6 files, 73 tests, all pass. The full vitest suite and the database-backed tests were NOT run.
+- Browser: `connections-in-settings.spec.ts` at 1440, 768 and 390: 26 passed (4 roles; menu, old address, one click from the menu, phone thumb targets, typing the old address into an open page). Desktop 1440: `menu` 1, `e0-connections` 6, `e2a-fathom` 4, `s02b` 11, `f8` (the Data and privacy and Integrations test, after fixing its selector: the first details element is now the Fathom notice) 1, `settings` (the eight sections test) 1. Not passed: `settings.spec.ts` "stale threshold" timed out in an API recalculation on this machine (API only, no screen, the demo setting was checked afterwards and is back at 30/30/4/15); the other settings API tests of that file did not run (serial mode) and were not retried.
+- A first-run failure of the old-address test happened twice before the helper loaded the address fresh instead of goto, goto-with-hash, reload (a slow-machine race in the helper, not in the app; the app path was reproduced by hand three times).
+- Screenshots: `docs/review/connections-<role>-<width>.png` for agency, agency-account, business and client at 1440, 768 and 390. The 768 shots show the old squeezed layout fixed (taken before the 1024 px change for business; the new layout was verified by the 768 browser run, not re-photographed).
+
 ## NOT verified
 
 Everything ran on the demo company. Not verified: a real sign-in from inside a white-label CRM menu (the address rewrite and the Settings highlight use the same code as every other page, but only the demo was driven); a real Fathom or Slack sign-in (the demo cannot start one, unchanged by this stage); how Integrations looks on King's own screen.
