@@ -67,6 +67,7 @@ import {
 import { alertsOf, historyStart, noteSummaries, quarterFacts } from "../analytics/client-success-queries";
 import * as clientRoutes from "./client-routes";
 import { handleWorkflows } from "./workflows-api";
+import { handleDataHealth } from "./data-health-api";
 import { applyRun, createPreview, getRun, installationHasScope, listRuns, PREVIEW_VALID_HOURS, sampleChanges, undoRun } from "../analytics/cleanup-queries";
 import { parseParams } from "../analytics/cleanup-intel";
 import { demoWriter, platformWriter } from "../analytics/cleanup-writer";
@@ -1857,7 +1858,7 @@ async function digestPreview(ctx: Ctx) {
 const clientDeps: clientRoutes.Deps = { allowedIds, accountsFor, actorOf: (ctx) => ctx.session.userName ?? null, locationId: LOCATION_ID };
 
 const FEATURE_FOR: Record<string, Feature> = {
-  search: "search", onboarding: "onboarding", stale: "stale", inbox: "inbox", pipelines: "pipelines", duplicates: "duplicates", email: "email",
+  "data-health": "data_health", search: "search", onboarding: "onboarding", stale: "stale", inbox: "inbox", pipelines: "pipelines", duplicates: "duplicates", email: "email",
   "meeting-inbox": "meetings", "meeting-setup": "meetings", "my-connections": "connections", "team-connections": "connections", "meeting-policy": "connections", alerts: "alerts", notifications: "alerts", "notification-prefs": "alerts", "notification-destinations": "alerts", appointments: "appointments", audit: "audit", speed: "speed", "appointment-insights": "appointments", meetings: "meetings", connections: "connections", cleanup: "cleanup", "setup-compare": "setup_compare", playbooks: "playbooks", daily: "overview", today: "overview", team: "team", "deal-events": "pipelines", contact: "search", settings: "settings", export: "exports", digest: "overview", "api-keys": "ai", hygiene: "stale", "pipeline-intel": "pipelines", "contact-intel": "activity", clients: "clients", qbr: "reports", "comms-intel": "inbox", "deal-gaps": "pipelines", "call-queue": "calls", "call-lists": "calls", "call-outcomes": "calls", people: "search", workflows: "workflows", "client-onboarding": "onboarding",
 };
 
@@ -1872,6 +1873,7 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
   if (blocked) return blocked;
 
   try {
+    if (a === "data-health") return await handleDataHealth(ctx, { allowed: allowedIds, token: (c, loc) => locationAccessToken(c.session.companyId, loc), links: async () => (await scope(ctx)).links });
     if (a === "workflows") return await handleWorkflows(ctx, { allowed: allowedIds, token: (c, loc) => locationAccessToken(c.session.companyId, loc) });
     if (a === "people") {
       return await handlePeople(ctx, {

@@ -105,6 +105,7 @@ export const FEATURE_NEEDS: readonly FeatureNeed[] = [
   { id: "workflow_history", feature: "Failing and idle workflow checks", scope: "workflows.logs" },
   { id: "campaign_stats", feature: "Campaign delivery figures", scope: "emails/stats.readonly" },
   { id: "campaigns", feature: "The campaign list and its health", scope: "campaigns.readonly" },
+  { id: "data_health_fix", feature: "Fixing phone formats and name capitals in Data health", scope: "contacts.write" },
   { id: "meeting_notes", feature: "Adding a meeting summary to a contact's notes", scope: "contacts.write" },
 ];
 

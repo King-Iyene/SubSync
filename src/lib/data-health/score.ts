@@ -45,6 +45,13 @@ export function benchmarkLine(mine: number | null, b: { n: number; companies: nu
   return `Your score is ${pos} of ${b.n} accounts like yours (${bucket}). The middle score there is ${Math.round(b.median)}.`;
 }
 
+/** One line per day: the average score of the accounts that had a score that day. */
+export function averageSeries(snaps: Array<{ day: string; score: number | null }>): Array<{ day: string; score: number | null }> {
+  const by = new Map<string, { sum: number; n: number }>();
+  for (const s of snaps) if (s.score !== null) { const e = by.get(s.day) ?? { sum: 0, n: 0 }; e.sum += s.score; e.n++; by.set(s.day, e); }
+  return [...by].sort((a, b) => a[0].localeCompare(b[0])).map(([day, e]) => ({ day, score: Math.round(e.sum / e.n) }));
+}
+
 /** "Since you installed": first stored score, latest, problems found and fixed. Pure over the stored rows. */
 export function sinceInstall(snaps: Array<{ day: string; score: number | null }>, found: number, fixed: number) {
   const scored = snaps.filter((s) => s.score !== null).sort((a, b) => a.day.localeCompare(b.day));
