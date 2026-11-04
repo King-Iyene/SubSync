@@ -4,9 +4,9 @@ import { CornerDownLeft, Search } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { filterCommands, type PaletteCommand } from "@/lib/analytics/today-palette";
 
-// Today's command palette: Ctrl or Cmd + K opens a small search over what a person can do on this page (jump to a part of the page, open the list behind a number, narrow to
-// a client account, switch the junk-deal control, share, print, run a saved view). Arrow keys move, Enter runs, Esc closes. While Today is open this takes Ctrl K from the
-// shared people search; the first line of the list is "Search people" so that is one key press away, not lost. Every command is also a button on the page: the palette
+// Today's command palette: Ctrl or Cmd + Shift + K opens a small search over what a person can do on this page (jump to a part of the page, open the list behind a number, narrow to
+// a client account, switch the junk-deal control, share, print, run a saved view). Arrow keys move, Enter runs, Esc closes. Ctrl or Cmd + K stays the shared people search
+// (its own shortcut, tested in f10); the first line of the list is also "Search people". Every command is also a button on the page: the palette
 // is a shortcut, never the only way in.
 export function CommandPalette({ commands, label = "Commands" }: { commands: PaletteCommand[]; label?: string }) {
   const [open, setOpen] = useState(false);
@@ -20,7 +20,7 @@ export function CommandPalette({ commands, label = "Commands" }: { commands: Pal
 
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "k") {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && !e.altKey && e.key.toLowerCase() === "k") {
         e.preventDefault(); e.stopPropagation();
         opener.current = document.activeElement as HTMLElement | null;
         setOpen((o) => !o); setQ(""); setAt(0);
@@ -38,7 +38,7 @@ export function CommandPalette({ commands, label = "Commands" }: { commands: Pal
     <>
       <button type="button" onClick={() => { opener.current = document.activeElement as HTMLElement | null; setOpen(true); setQ(""); setAt(0); }} data-testid="palette-open" aria-haspopup="dialog"
         className="ds-press inline-flex min-h-10 items-center gap-2 rounded-lg border bg-card px-3 text-sm text-muted-foreground hover:border-primary/40 hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)] print:hidden">
-        <Search aria-hidden className="size-4" /><span>{label}</span><kbd className="font-sans text-xs">Ctrl K</kbd>
+        <Search aria-hidden className="size-4" /><span>{label}</span><kbd className="font-sans text-xs">Ctrl Shift K</kbd>
       </button>
       {open && (
         <div className="fixed inset-0 z-50 print:hidden" data-testid="palette">

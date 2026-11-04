@@ -203,11 +203,11 @@ test("tabs, the junk switch, set aside, Share, Preview, Print and Sync now all r
   await expect(page.getByRole("button", { name: "Sync now" })).toBeEnabled({ timeout: 60_000 });
 });
 
-test("the command palette opens with Ctrl K, filters, runs a command with Enter, and Esc closes it", async ({ page }) => {
+test("the command palette opens with Ctrl Shift K, filters, runs a command with Enter, and Esc closes it", async ({ page }) => {
   await openToday(page);
   await expect(page.getByTestId("palette-open")).toBeVisible();
   await page.waitForTimeout(500);
-  await page.keyboard.press("Control+k");
+  await page.keyboard.press("Control+Shift+K");
   await expect(page.getByTestId("palette")).toBeVisible();
   await expect(page.getByTestId("global-search")).toHaveCount(0);
   await page.getByTestId("palette-input").fill("leads waiting");
@@ -226,7 +226,7 @@ test("the command palette opens with Ctrl K, filters, runs a command with Enter,
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("palette")).toHaveCount(0);
   // Search people is one line away and opens the shared search.
-  await page.keyboard.press("Control+k");
+  await page.keyboard.press("Control+Shift+K");
   await page.getByTestId("palette-input").fill("search people");
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("global-search")).toBeVisible();

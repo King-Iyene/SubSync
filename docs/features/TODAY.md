@@ -14,7 +14,7 @@ Status: **BUILT, awaiting King's checks.** Branch `worktree-agent-ac68081ba5286a
 
 **Junk control** "Exclude test and very old deals" by the dollar headline (on by default, remembered): leaves stale deals with a test name or no movement for more than 3 times the stale days out of the dollar figure and counts, and lists every one left out with its dollars.
 
-**Extras for Today (read only, existing data):** why behind a leads row ("what they share": no owner, outside 8 am to 6 pm, one source), "if nobody acts today" with a live ring counting down to the next lead that passes its reply target, best next step per client account (fixed rules, effect stated as a count), People tab (workload by owner, accounts compared: fastest and slowest), Sources tab (typical reply by source), Coverage tab (24 hours, gap hours marked), Preview the daily email, a command palette (Ctrl or Cmd K), saved views and a printable report.
+**Extras for Today (read only, existing data):** why behind a leads row ("what they share": no owner, outside 8 am to 6 pm, one source), "if nobody acts today" with a live ring counting down to the next lead that passes its reply target, best next step per client account (fixed rules, effect stated as a count), People tab (workload by owner, accounts compared: fastest and slowest), Sources tab (typical reply by source), Coverage tab (24 hours, gap hours marked), Preview the daily email, a command palette (Ctrl or Cmd Shift K; Ctrl K stays the people search), saved views and a printable report.
 
 **Daily brief** (Slack and email, dry-run switches untouched, nothing sent): the scheduled brief and the preview in Today are written from the same Today ranking and headline (`briefLines` in `today-queue.ts`).
 

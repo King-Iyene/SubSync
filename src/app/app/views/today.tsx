@@ -158,7 +158,7 @@ function TodayAgency({ go, t, reload, sync, syncing, options, picked, setPicked,
   const windowReplies = (i: number) => env.ledger.filter((l) => l.touchAt !== null && l.leadAt > pointEnd(reply.points[i].day, m.now) - 7 * 86_400_000 && l.leadAt <= pointEnd(reply.points[i].day, m.now)).length;
   const since = t.sinceVisit && (t.sinceVisit.newLeads.length + t.sinceVisit.breached.length + t.sinceVisit.answered.length + t.sinceVisit.clearedAlerts.length > 0) ? t.sinceVisit : null;
 
-  // ---- command palette (Ctrl K), saved views and the printable report ----
+  // ---- command palette (Ctrl Shift K), saved views and the printable report ----
   const nameOf = useMemo(() => new Map(options.map((o) => [o.id, o.name])), [options]);
   const scrollTo = (id: string, tabIndex = 0) => { setTab(tabIndex); setTimeout(() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" }), 80); };
   const applyView = (v: TodayView) => { changeAccounts(v.accounts); m.setExcludeJunk(v.excludeJunk); };
