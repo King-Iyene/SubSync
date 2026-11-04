@@ -86,33 +86,31 @@ jobs:
     name: Apply to Supabase (needs approval)
     needs: [check, changes]
     if: >-
-      github.event_name == 'workflow_dispatch'
+      ((github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.changes.outputs.migrations == 'true') || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     # Required reviewers on this environment make the job wait for a click from King.
     environment: production
     env:
-      # Same three secrets the other projects use. Only the access token is needed: the Supabase tool signs in to the project with it.
-      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-      PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF || 'ugfvzcbkqnhtejgcqhsb' }}
+      # The database connection address (Supabase, Connect, Session pooler, with the database password filled in). The workflow talks to the
+      # database directly, so it does not need the Supabase access token or a project link.
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
     steps:
       - uses: actions/checkout@v4
       - uses: supabase/setup-cli@v1
         with:
           version: latest
-      - name: Link to the Supabase project
+      - name: Check the connection address is set
         run: |
-          test -n "$SUPABASE_ACCESS_TOKEN" || { echo "The secret SUPABASE_ACCESS_TOKEN is not set (Settings, Secrets and variables, Actions)."; exit 2; }
-          supabase link --project-ref "$PROJECT_REF"
+          test -n "$SUPABASE_DB_URL" || { echo "The secret SUPABASE_DB_URL is not set (Settings, Secrets and variables, Actions). Use Supabase, Connect, Session pooler, and put the database password in place of [YOUR-PASSWORD]."; exit 2; }
       - name: One-time baseline (only when a file name was given)
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.baseline_through != '' }}
         run: |
           versions=$(ls supabase/migrations/*.sql | xargs -n1 basename | sort | awk -v stop="${{ inputs.baseline_through }}" '{print substr($0,1,14)} $0==stop{exit}')
           echo "Marking as already applied: $versions"
-          supabase migration repair --status applied $versions
+          supabase migration repair --status applied $versions --db-url "$SUPABASE_DB_URL" --yes
       - name: What would be applied
         if: ${{ inputs.baseline_through == '' }}
-        run: supabase db push --dry-run
+        run: supabase db push --dry-run --db-url "$SUPABASE_DB_URL" --yes
       - name: Apply
         if: ${{ inputs.baseline_through == '' && (github.event_name == 'push' || inputs.dry_run == false) }}
-        run: supabase db push
+        run: supabase db push --db-url "$SUPABASE_DB_URL" --yes
