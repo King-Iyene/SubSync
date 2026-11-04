@@ -12,9 +12,15 @@ import { useApiClient, useData } from "../session";
 type Saved = { id: string; name: string; view: TodayView };
 type Listing = { views: Saved[]; max: number };
 
-export function ViewsMenu({ current, names, onApply }: { current: TodayView; names: ReadonlyMap<string, string>; onApply: (v: TodayView) => void }) {
+export function ViewsMenu({ current, names, onApply, open: controlled, onOpenChange, hideTrigger = false }: {
+  current: TodayView; names: ReadonlyMap<string, string>; onApply: (v: TodayView) => void;
+  /** Controlled use: the page's "More" menu opens it, so it draws no button of its own and places itself at the top right. */
+  open?: boolean; onOpenChange?: (open: boolean) => void; hideTrigger?: boolean;
+}) {
   const api = useApiClient();
-  const [open, setOpen] = useState(false);
+  const [own, setOwn] = useState(false);
+  const open = controlled ?? own;
+  const setOpen = useCallback((v: boolean | ((o: boolean) => boolean)) => { const next = typeof v === "function" ? v(open) : v; if (onOpenChange) onOpenChange(next); else setOwn(next); }, [open, onOpenChange]);
   const [name, setName] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
@@ -29,6 +35,7 @@ export function ViewsMenu({ current, names, onApply }: { current: TodayView; nam
   const measure = useCallback(() => {
     const r = button.current?.getBoundingClientRect();
     if (r) setPos({ left: Math.max(8, Math.min(r.left, window.innerWidth - 328)), top: r.bottom + 4 });
+    else setPos({ left: Math.max(8, window.innerWidth - 336), top: 120 });
   }, []);
   useLayoutEffect(() => { if (open) measure(); }, [open, measure]);
   useEffect(() => {
@@ -38,7 +45,7 @@ export function ViewsMenu({ current, names, onApply }: { current: TodayView; nam
     document.addEventListener("pointerdown", away); document.addEventListener("keydown", esc, true);
     window.addEventListener("resize", measure); window.addEventListener("scroll", measure, true);
     return () => { document.removeEventListener("pointerdown", away); document.removeEventListener("keydown", esc, true); window.removeEventListener("resize", measure); window.removeEventListener("scroll", measure, true); };
-  }, [open, measure]);
+  }, [open, measure, setOpen]);
 
   const save = async () => {
     setMsg(null);
@@ -52,10 +59,10 @@ export function ViewsMenu({ current, names, onApply }: { current: TodayView; nam
 
   return (
     <>
-      <button ref={button} type="button" aria-haspopup="dialog" aria-expanded={open} aria-controls={open ? id : undefined} onClick={() => setOpen((o) => !o)} data-testid="views-button"
+      {!hideTrigger && <button ref={button} type="button" aria-haspopup="dialog" aria-expanded={open} aria-controls={open ? id : undefined} onClick={() => setOpen((o) => !o)} data-testid="views-button"
         className="ds-press inline-flex min-h-10 items-center gap-2 rounded-lg border bg-card px-3 text-sm hover:border-primary/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)] print:hidden">
         <Bookmark aria-hidden className="size-4 text-muted-foreground" />Views
-      </button>
+      </button>}
       {open && pos && createPortal(
         <div ref={panel} id={id} role="dialog" aria-label="Saved views of Today" data-testid="views-popover" style={{ position: "fixed", left: pos.left, top: pos.top, width: "min(320px, calc(100vw - 16px))", zIndex: 60 }}
           className="rounded-xl border bg-popover p-2 text-sm text-popover-foreground shadow-[var(--shadow-lift)] print:hidden">

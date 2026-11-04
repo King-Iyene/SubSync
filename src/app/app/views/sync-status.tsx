@@ -11,7 +11,7 @@ import { Badge, Btn, Card, type Tone } from "../ui";
 // daily brief, Today, the Overview and the Sync status panel use (src/lib/sync/freshness.ts). Nothing else on a page may word it.
 const stateTone: Record<FreshnessState, Tone> = { demo: "neutral", first_sync: "info", never: "warn", fresh: "good", delayed: "warn", failing: "bad" };
 
-export function FreshnessStrip() {
+export function FreshnessStrip({ inline = false }: { inline?: boolean }) {
   const { data } = useData<{ freshness: Freshness }>("freshness");
   const f = data?.freshness;
   if (!f) return null;
@@ -23,7 +23,7 @@ export function FreshnessStrip() {
       {f.detail && <span> · {f.detail}</span>}
     </>
   );
-  const accounts = f.accounts.length > 1 && (
+  const accounts = !inline && f.accounts.length > 1 && (
     <details className="mt-1 text-xs text-muted-foreground">
       <summary className="cursor-pointer select-none">Each account</summary>
       <ul className="mt-1 space-y-0.5">
@@ -32,7 +32,7 @@ export function FreshnessStrip() {
     </details>
   );
   return (
-    <div className="mb-4 print:hidden" data-testid="freshness" data-state={f.state}>
+    <div className={`${inline ? "" : "mb-4 "}print:hidden`} data-testid="freshness" data-state={f.state}>
       {warn ? <InlineAlert tone={f.state === "failing" ? "danger" : "warning"}>{words}</InlineAlert> : <p role="status" className="text-xs text-muted-foreground">{words}</p>}
       {f.syncingNote && <p className="mt-1 text-xs text-muted-foreground" data-testid="syncing-note">{f.syncingNote}</p>}
       {accounts}

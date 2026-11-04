@@ -62,7 +62,7 @@ export function buildSteps(role: GuideRole, f: Facts): Step[] {
     body: "You are signed in through your CRM, so there is nothing to type. SubSync mostly reads your data." };
   const synced: Step = { id: "synced", title: "Let the first sync finish", done: f.synced, art: "sync", detail: f.syncDetail, view: "overview", cta: "See how fresh your data is",
     body: `SubSync reads your ${what} in the background. The first sync takes a few minutes, longer with many contacts. Numbers fill in as it goes.` };
-  const today: Step = { id: "today", title: "See what needs you today", done: seen("today") || seen("myday"), ticksOn: ["today", "myday"], art: "today", detail: null, view: role === "account_user" ? "myday" : "today", cta: role === "account_user" ? "Open My day" : "Open Today",
+  const today: Step = { id: "today", title: "See what needs you today", done: seen("today") || seen("myday"), ticksOn: ["today", "myday"], art: "today", detail: null, view: "today", cta: "Open Today",
     body: "The first screen ranks what to do first, with the reason and a link. Start at the top." };
   const speed: Step = { id: "speed", title: "Find the leads still waiting", done: seen("speed"), ticksOn: ["speed"], art: "speed", detail: null, view: "speed", cta: "Open Speed to lead",
     body: "Every new lead is timed from the moment it arrives to the first reply from a person. Open the waiting list, call the oldest first, and open the lead in your CRM from there." };

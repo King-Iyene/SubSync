@@ -11,22 +11,22 @@ const ACCOUNTS: AccountFacts[] = ["demoMapleDental", "demoHarborRealty", "demoNo
 }));
 // kind, account index, how many, value of each (deals only)
 const PLAN: Array<[Kind, number, number, number | null]> = [
-  ["leads", 0, 5, null], ["leads", 1, 3, null], ["leads", 3, 2, null], ["appointments", 2, 4, null], ["noshows", 3, 3, null],
-  ["stale", 1, 4, 2400], ["stale", 4, 2, 6300], ["unanswered", 1, 3, null], ["unanswered", 2, 2, null],
+  ["replies", 0, 5, null], ["replies", 1, 3, null], ["replies", 3, 2, null], ["appointments", 2, 4, null], ["noshows", 3, 3, null],
+  ["stale", 1, 4, 2400], ["stale", 4, 2, 6300], ["replies", 2, 2, null],
 ];
 let n = 0;
 export const SAMPLE_TODAY_ITEMS: TodayItem[] = PLAN.flatMap(([kind, a, count, value]) => Array.from({ length: count }, (_, j) => {
   n += 1;
   return {
     id: `s${n}`, kind, locationId: ACCOUNTS[a].id, accountName: ACCOUNTS[a].name, name: `${FIRST[n % FIRST.length]} ${LAST[(n * 3) % LAST.length]}`,
-    detail: kind === "stale" ? `$${value} in Proposal, no change for ${34 + j * 7} days` : kind === "leads" ? `Waiting ${1 + j} h` : "Waiting for a reply",
+    detail: kind === "stale" ? `$${value} in Proposal, no change for ${34 + j * 7} days` : kind === "replies" ? `Waiting ${1 + j} h` : "Waiting for a reply",
     at: NOW - (kind === "stale" ? (34 + j * 7) * DAY : kind === "appointments" ? (2 + j) * DAY : (1 + j) * 3_600_000),
-    value, contactId: `demoContact${n}`, url: "https://example.com/open", never: kind === "leads" && j === 0 && a === 0,
+    value, contactId: `demoContact${n}`, url: "https://example.com/open", never: kind === "replies" && j === 0 && a === 0, newLead: kind === "replies" && j < 2,
   };
 }));
 export const SAMPLE_TODAY_TOTALS: Totals = (() => {
   const t = emptyTotals();
-  for (const k of KINDS) { const m = SAMPLE_TODAY_ITEMS.filter((x) => x.kind === k); t[k] = { count: m.length, dollars: k === "stale" ? m.reduce((s, x) => s + (x.value ?? 0), 0) : null, shown: m.length }; }
+  for (const k of KINDS) { const m = SAMPLE_TODAY_ITEMS.filter((x) => x.kind === k); t[k] = { count: m.length, dollars: k === "stale" ? m.reduce((s, x) => s + (x.value ?? 0), 0) : null, shown: m.length, ...(k === "replies" ? { newLeads: m.filter((x) => x.newLead).length } : {}) }; }
   return t;
 })();
 export const SAMPLE_TODAY_QUEUE = buildQueue({ items: SAMPLE_TODAY_ITEMS, totals: SAMPLE_TODAY_TOTALS, accounts: new Map(ACCOUNTS.map((a) => [a.id, a])), staleDays: 30, now: NOW });

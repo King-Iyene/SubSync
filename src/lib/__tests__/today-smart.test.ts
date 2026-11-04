@@ -105,7 +105,7 @@ test("sources: per source typical reply from 5 answered; the list equals the cou
 });
 
 test("workload: waiting by owner, overloaded needs 3 people and twice the middle, quiet needs real data elsewhere", () => {
-  const w = (owner: string | null, k: number): TodayItem[] => Array.from({ length: k }, () => ({ id: `leads:${n++}`, kind: "leads" as const, locationId: "aaa", accountName: "A", name: "x", detail: "", at: NOW - 2 * H, value: null, contactId: "c", url: "u", owner }));
+  const w = (owner: string | null, k: number): TodayItem[] => Array.from({ length: k }, () => ({ id: `leads:${n++}`, kind: "replies" as const, locationId: "aaa", accountName: "A", name: "x", detail: "", at: NOW - 2 * H, value: null, contactId: "c", url: "u", owner, newLead: true }));
   const waiting = [...w("Marcus", 9), ...w("Dana", 2), ...w("Priya", 3), ...w(null, 4)];
   const ledger = [...many(6, { touchBy: "Dana", replyMin: 5 }), ...many(3, { touchBy: "Priya", replyMin: 9 })];
   const p = workload(waiting, ledger, NOW);
@@ -135,35 +135,35 @@ test("accounts compared: needs 5 answered, fastest and slowest are the two ends,
 });
 
 const ACCOUNTS: AccountFacts[] = [{ id: "aaa", name: "Maple Dental", followUpEstimate: null, url: "https://crm.example.com/a" }, { id: "bbb", name: "Harbor Realty", followUpEstimate: null, url: "https://crm.example.com/b" }];
-const item = (kind: Kind, loc: string, over: Partial<TodayItem> = {}): TodayItem => ({ id: `${kind}:${n++}`, kind, locationId: loc, accountName: loc === "aaa" ? "Maple Dental" : "Harbor Realty", name: `P${n}`, detail: "", at: NOW - 2 * H, value: null, contactId: `c${n}`, url: "u", ...over });
+const item = (kind: Kind, loc: string, over: Partial<TodayItem> = {}): TodayItem => ({ id: `${kind}:${n++}`, kind, locationId: loc, accountName: loc === "aaa" ? "Maple Dental" : "Harbor Realty", name: `P${n}`, detail: "", at: NOW - 2 * H, value: null, contactId: `c${n}`, url: "u", ...(kind === "replies" ? { newLead: true } : {}), ...over });
 const totalsOf = (items: TodayItem[]): Totals => { const t = emptyTotals(); for (const k of KINDS) { const m = items.filter((x) => x.kind === k); t[k] = { count: m.length, dollars: k === "stale" && m.length ? m.reduce((s, x) => s + (x.value ?? 0), 0) : null, shown: m.length }; } return t; };
 
 test("best next action: fixed rules per kind, the effect is arithmetic on the count", () => {
-  const items = [...Array.from({ length: 8 }, (_, k) => item("leads", "aaa", { at: NOW - (k + 1) * H })), ...Array.from({ length: 4 }, () => item("stale", "bbb", { value: 1000, at: NOW - 40 * D }))];
+  const items = [...Array.from({ length: 8 }, (_, k) => item("replies", "aaa", { at: NOW - (k + 1) * H })), ...Array.from({ length: 4 }, () => item("stale", "bbb", { value: 1000, at: NOW - 40 * D }))];
   const q = buildQueue({ items, totals: totalsOf(items), accounts: new Map(ACCOUNTS.map((a) => [a.id, a])), staleDays: 30, now: NOW });
   const a = nextAction(q, items, "aaa")!;
-  assert.equal(a.kind, "leads"); assert.equal(a.n, 5); assert.equal(a.of, 8);
-  assert.equal(a.text, "Answer the 5 longest-waiting leads first");
-  assert.match(a.effect, /3 leads would still be waiting after that/);
+  assert.equal(a.kind, "replies"); assert.equal(a.n, 5); assert.equal(a.of, 8);
+  assert.equal(a.text, "Reply to the 5 people who have waited longest");
+  assert.match(a.effect, /3 people would still be waiting after that/);
   assert.equal(a.itemIds.length, 5);
   assert.equal(items.find((i) => i.id === a.itemIds[0])!.at, NOW - 8 * H, "the longest wait comes first");
   const b = nextAction(q, items, "bbb")!;
-  assert.equal(b.text, "Review the 3 biggest stale deals");
+  assert.equal(b.text, "Review the 3 biggest quiet deals");
   assert.equal(nextAction(q, items, "zzz"), null);
   const one = nextAction(buildQueue({ items: [items[0]], totals: totalsOf([items[0]]), accounts: new Map(ACCOUNTS.map((x) => [x.id, x])), staleDays: 30, now: NOW }), [items[0]], "aaa")!;
-  assert.equal(one.text, "Answer the longest-waiting lead first");
+  assert.equal(one.text, "Reply to the person who has waited longest");
   assert.match(one.effect, /clear/);
 });
 
 test("why: only measurable shared facts that cover at least half of a leads row, never a cause", () => {
-  const l = (o: Partial<TodayItem>) => item("leads", "aaa", { at: NOW - 3 * H, ...o });
+  const l = (o: Partial<TodayItem>) => item("replies", "aaa", { at: NOW - 3 * H, ...o });
   const items = [l({ owner: null, source: "Facebook" }), l({ owner: null, source: "Facebook" }), l({ owner: null, source: "Facebook" }), l({ owner: "Priya", source: "Google" })];
   const row = buildQueue({ items, totals: totalsOf(items), accounts: new Map(ACCOUNTS.map((a) => [a.id, a])), staleDays: 30, now: NOW })[0];
   const w = whyOf(row, items, "UTC");
   assert.deepEqual(w.map((x) => x.key), ["no_owner", "source"]);
   assert.equal(w[0].n, 3); assert.equal(w[0].itemIds.length, 3);
-  assert.match(w[0].text, /3 of 4 have no owner in the CRM/);
-  assert.match(w[1].text, /3 of 4 came from Facebook/);
+  assert.match(w[0].text, /3 of 4 new leads have no owner in the CRM/);
+  assert.match(w[1].text, /3 of 4 new leads came from Facebook/);
   const late = [l({ at: new Date("2026-11-04T01:00:00Z").getTime() }), l({ at: new Date("2026-11-04T02:00:00Z").getTime() }), l({ at: new Date("2026-11-04T11:00:00Z").getTime(), owner: "x", source: "a" })];
   const r2 = buildQueue({ items: late, totals: totalsOf(late), accounts: new Map(ACCOUNTS.map((a) => [a.id, a])), staleDays: 30, now: NOW })[0];
   assert.ok(whyOf(r2, late, "UTC").some((x) => x.key === "after_hours" && x.n === 2));
@@ -179,7 +179,7 @@ test("forecast: leads inside their reply window pass the target at arrival plus 
   const f = forecastOf(c, [{ id: "d", kind: "stale", locationId: "aaa", accountName: "A", name: "D", at: NOW + H, value: 2500, contactId: null, url: "u" }], []);
   assert.equal(f.next!.name, "Soonest");
   assert.equal(f.dealDollars, 2500);
-  assert.equal(forecastLine(f, 15), "If nobody acts today: 2 leads will pass the 15-minute reply target, 1 deal ($2,500) will turn stale.");
+  assert.equal(forecastLine(f, 15), "If nobody acts today: 2 leads will pass the 15-minute reply target, 1 deal ($2,500) will go quiet.");
   assert.equal(forecastLine(forecastOf([], [], []), 15), "Nothing is about to go wrong today.");
 });
 
@@ -208,9 +208,9 @@ function env(items: TodayItem[], ledger: LeadRow[] = [], excludeJunk = false, ho
 
 test("every mark opens exactly the rows it counts", () => {
   const items = [
-    ...Array.from({ length: 7 }, () => item("leads", "aaa", { owner: "Marcus", source: "Facebook" })), ...Array.from({ length: 3 }, () => item("leads", "bbb")),
+    ...Array.from({ length: 7 }, () => item("replies", "aaa", { owner: "Marcus", source: "Facebook" })), ...Array.from({ length: 3 }, () => item("replies", "bbb")),
     ...Array.from({ length: 2 }, () => item("appointments", "aaa")), ...Array.from({ length: 4 }, (_, k) => item("stale", "bbb", { value: 1000 + k, at: NOW - 40 * D })),
-    ...Array.from({ length: 3 }, () => item("noshows", "aaa")), item("unanswered", "bbb"),
+    ...Array.from({ length: 3 }, () => item("noshows", "aaa")), item("replies", "bbb"),
   ];
   const e = env(items);
   for (const k of KINDS) { const s = specKind(k, e); assert.equal(s.rows.length, e.view.totals[k].count, k); assert.equal(s.count, e.view.totals[k].count, k); }
@@ -223,21 +223,21 @@ test("every mark opens exactly the rows it counts", () => {
   assert.equal(specThings(e).rows.length, items.length);
   assert.equal(specThings(e).count, items.length);
   // A kind of which the server sent only some rows: the count stays the true number, and the list says it was cut.
-  const cut = env(items, [], false, {}, { leads: { count: 50, dollars: null, shown: 10 } });
-  assert.equal(specKind("leads", cut).count, 50);
-  assert.equal(specKind("leads", cut).rows.length, 10);
-  assert.ok(specKind("leads", cut).note);
+  const cut = env(items, [], false, {}, { replies: { count: 50, dollars: null, shown: 11 } });
+  assert.equal(specKind("replies", cut).count, 50);
+  assert.equal(specKind("replies", cut).rows.length, 11);
+  assert.ok(specKind("replies", cut).note);
 });
 
 test("holds and the junk control change the number and the list together", () => {
-  const items = [item("stale", "aaa", { value: 5000, at: NOW - 40 * D }), item("stale", "aaa", { value: 7000, at: NOW - 120 * D }), item("leads", "aaa"), item("leads", "aaa")];
-  const hold = { eventId: 1, action: "snooze" as const, until: NOW + D, by: "Dana", at: NOW, rowKey: "aaa|leads" } as never;
+  const items = [item("stale", "aaa", { value: 5000, at: NOW - 40 * D }), item("stale", "aaa", { value: 7000, at: NOW - 120 * D }), item("replies", "aaa"), item("replies", "aaa")];
+  const hold = { eventId: 1, action: "snooze" as const, until: NOW + D, by: "Dana", at: NOW, rowKey: "aaa|replies" } as never;
   const e = env(items, [], true, { [items[2].id]: hold });
   assert.equal(specKind("stale", e).count, 1);
   assert.equal(specKind("stale", e).rows.length, 1);
   assert.match(specKind("stale", e).note ?? "", /Left out: 1 test or very old deal worth \$7,000/);
-  assert.equal(specKind("leads", e).count, 1);
-  assert.equal(specKind("leads", e).rows.length, 1);
+  assert.equal(specKind("replies", e).count, 1);
+  assert.equal(specKind("replies", e).rows.length, 1);
 });
 
 test("leads, alerts, days, hours, sources and insights lists equal their counts", () => {

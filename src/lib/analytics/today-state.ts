@@ -63,14 +63,21 @@ export function snoozeUntil(choice: SnoozeChoice, now: number, zone: string): nu
   return now + 7 * DAY;
 }
 
-/** The row key is the client account and the kind: "<locationId>|<kind>". Anything else is refused. */
+/**
+ * The row key is the client account and the kind: "<locationId>|<kind>". A person on the Reply now list is a row of one: "<locationId>|replies|<person>", where the person is
+ * the part of the item id after the account ("replies:<locationId>:<person>"). Anything else is refused; the server looks the items up itself, so a forged person finds nothing.
+ */
 const LOCATION = /^[A-Za-z0-9_-]{3,64}$/;
-export function parseRowKey(key: unknown): { locationId: string; kind: Kind } | null {
+const PERSON = /^[^|]{1,200}$/;
+export function parseRowKey(key: unknown): { locationId: string; kind: Kind; person: string | null } | null {
   if (typeof key !== "string") return null;
-  const [loc, kind, extra] = key.split("|");
+  const [loc, kind, person, extra] = key.split("|");
   if (extra !== undefined || !loc || !LOCATION.test(loc) || !(KINDS as readonly string[]).includes(kind)) return null;
-  return { locationId: loc, kind: kind as Kind };
+  if (person !== undefined && (kind !== "replies" || !PERSON.test(person))) return null;
+  return { locationId: loc, kind: kind as Kind, person: person ?? null };
 }
+/** The item id a one-person row stands for. */
+export const personItemId = (locationId: string, person: string) => `replies:${locationId}:${person}`;
 
 // ---------- junk control ----------
 
@@ -123,6 +130,8 @@ export function applyView(i: ViewInput, o: ViewOpts): View {
     const full = i.totals[k];
     const dollars = full.dollars === null ? null : Math.max(0, full.dollars - removedDollars);
     totals[k] = { count: Math.max(0, full.count - removedN), dollars: dollars && dollars > 0 ? dollars : null, shown: keep.filter((x) => x.kind === k).length };
+    // Of the people waiting for a reply, the new leads: the true total less the new leads taken out (a subset, so it can never exceed the people shown).
+    if (k === "replies") totals[k].newLeads = Math.min(totals[k].count, Math.max(0, (full.newLeads ?? 0) - removedHeld.filter((x) => x.item.newLead).length - removedJunk.filter((x) => x.newLead).length));
   }
   const queue = buildQueue({ items: keep, totals, accounts: new Map(i.accounts.map((a) => [a.id, a])), staleDays: i.staleDays, now: i.now });
   // The audit's outlier guard, on what is still counted: a deal left out as junk or set aside must not be named as "most of that".

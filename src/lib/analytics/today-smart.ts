@@ -204,7 +204,7 @@ export const QUIET_MIN_WAITING = 3;
  * sent no first reply in 14 days, but only when the ledger holds at least MIN_FOR_MEDIAN replies in all (otherwise silence means nothing). A median reply needs MIN_PER_PERSON.
  */
 export function workload(waiting: TodayItem[], ledger: LeadRow[], now: number): PersonLoad[] {
-  const lead = waiting.filter((i) => i.kind === "leads");
+  const lead = waiting.filter((i) => i.kind === "replies" && i.newLead === true);
   const by = new Map<string, TodayItem[]>();
   for (const i of lead) by.set(i.owner ?? NOBODY, [...(by.get(i.owner ?? NOBODY) ?? []), i]);
   const replies = new Map<string, number[]>();
@@ -226,7 +226,7 @@ export function workload(waiting: TodayItem[], ledger: LeadRow[], now: number): 
   }
   return rows.filter((r) => r.waiting > 0 || r.replies > 0).sort((a, b) => b.waiting - a.waiting || b.replies - a.replies || a.name.localeCompare(b.name));
 }
-export const waitingOf = (waiting: TodayItem[], name: string): TodayItem[] => waiting.filter((i) => i.kind === "leads" && (i.owner ?? NOBODY) === name);
+export const waitingOf = (waiting: TodayItem[], name: string): TodayItem[] => waiting.filter((i) => i.kind === "replies" && i.newLead === true && (i.owner ?? NOBODY) === name);
 
 // ---------- accounts compared ----------
 
@@ -256,13 +256,12 @@ export const answeredLeadsOf = (rows: LeadRow[], locationId: string): LeadRow[] 
 
 export type NextAction = { locationId: string; kind: Kind; n: number; of: number; text: string; effect: string; itemIds: string[] };
 const STEP: Record<Kind, { n: number; text: (n: number) => string; sort: (a: TodayItem, b: TodayItem) => number; left: (rest: number) => string }> = {
-  leads: { n: 5, text: (n) => `Answer the ${n === 1 ? "longest-waiting lead" : `${n} longest-waiting leads`} first`, sort: (a, b) => (a.at ?? Infinity) - (b.at ?? Infinity), left: (r) => `${plural(r, "lead")} would still be waiting` },
+  replies: { n: 5, text: (n) => `Reply to the ${n === 1 ? "person who has waited longest" : `${n} people who have waited longest`}`, sort: (a, b) => (a.at ?? Infinity) - (b.at ?? Infinity), left: (r) => `${plural(r, "person", "people")} would still be waiting` },
   noshows: { n: 3, text: (n) => `Rebook ${plural(n, "no-show")}`, sort: (a, b) => (a.at ?? Infinity) - (b.at ?? Infinity), left: (r) => `${plural(r, "no-show")} would still need recovering` },
   appointments: { n: 5, text: (n) => `Mark the outcome of ${plural(n, "appointment")}`, sort: (a, b) => (a.at ?? Infinity) - (b.at ?? Infinity), left: (r) => `${plural(r, "appointment")} would still have no outcome` },
-  stale: { n: 3, text: (n) => `Review the ${n === 1 ? "biggest stale deal" : `${n} biggest stale deals`}`, sort: (a, b) => (b.value ?? 0) - (a.value ?? 0), left: (r) => `${plural(r, "stale deal")} would still be open` },
-  unanswered: { n: 5, text: (n) => `Reply to the ${n === 1 ? "oldest conversation" : `${n} oldest conversations`}`, sort: (a, b) => (a.at ?? Infinity) - (b.at ?? Infinity), left: (r) => `${plural(r, "conversation")} would still be waiting` },
+  stale: { n: 3, text: (n) => `Review the ${n === 1 ? "biggest quiet deal" : `${n} biggest quiet deals`}`, sort: (a, b) => (b.value ?? 0) - (a.value ?? 0), left: (r) => `${plural(r, "quiet deal")} would still be open` },
 };
-/** One suggested step for a client account, from fixed rules: the account's top row in the queue decides the kind (leads: the 5 longest-waiting, no-shows: 3, appointments: 5, stale deals: the 3 biggest, conversations: the 5 oldest). The effect is arithmetic on the count, never a promise. */
+/** One suggested step for a client account, from fixed rules: the account's top row in the queue decides the kind (people waiting: the 5 longest, no-shows: 3, appointments: 5, quiet deals: the 3 biggest). The effect is arithmetic on the count, never a promise. */
 export function nextAction(rows: QueueRow[], items: TodayItem[], locationId: string): NextAction | null {
   const top = rows.find((r) => r.locationId === locationId);
   if (!top) return null;
@@ -284,20 +283,20 @@ export const MIN_WHY = 2;
  * what caused it; it says what the leads have in common. Other kinds of row have no "why" yet.
  */
 export function whyOf(row: QueueRow, items: TodayItem[], zone: string): Why[] {
-  if (row.kind !== "leads") return [];
-  const mine = items.filter((i) => row.itemIds.includes(i.id));
+  if (row.kind !== "replies") return [];
+  const mine = items.filter((i) => row.itemIds.includes(i.id) && i.newLead === true);
   if (mine.length < MIN_WHY) return [];
   const out: Why[] = [];
   const add = (key: string, text: (n: number) => string, pick: (i: TodayItem) => boolean) => {
     const hit = mine.filter(pick);
     if (hit.length >= MIN_WHY && hit.length * 2 >= mine.length) out.push({ key, text: text(hit.length), n: hit.length, of: mine.length, itemIds: hit.map((i) => i.id) });
   };
-  add("no_owner", (n) => `${n} of ${mine.length} have no owner in the CRM`, (i) => !i.owner);
-  add("after_hours", (n) => `${n} of ${mine.length} arrived outside ${hourWords(DAY_FROM)} to ${hourWords(AFTER_HOURS_FROM)}`, (i) => i.at !== null && (hourOf(i.at, zone) >= AFTER_HOURS_FROM || hourOf(i.at, zone) < DAY_FROM));
+  add("no_owner", (n) => `${n} of ${mine.length} new leads have no owner in the CRM`, (i) => !i.owner);
+  add("after_hours", (n) => `${n} of ${mine.length} new leads arrived outside ${hourWords(DAY_FROM)} to ${hourWords(AFTER_HOURS_FROM)}`, (i) => i.at !== null && (hourOf(i.at, zone) >= AFTER_HOURS_FROM || hourOf(i.at, zone) < DAY_FROM));
   const sources = new Map<string, TodayItem[]>();
   for (const i of mine) { const k = sourceLabel(i.source ?? null); if (k !== NO_SOURCE) sources.set(k, [...(sources.get(k) ?? []), i]); }
   const top = [...sources.entries()].sort((a, b) => b[1].length - a[1].length)[0];
-  if (top) add("source", (n) => `${n} of ${mine.length} came from ${top[0]}`, (i) => sourceLabel(i.source ?? null) === top[0]);
+  if (top) add("source", (n) => `${n} of ${mine.length} new leads came from ${top[0]}`, (i) => sourceLabel(i.source ?? null) === top[0]);
   return out.slice(0, 3);
 }
 
@@ -315,7 +314,7 @@ export const emptyForecast = (): Forecast => ({ leads: [], deals: [], appointmen
 /** Leads still inside their reply window (nobody has replied, the target has not passed): each passes the target at arrival + target. */
 export function comingLeads(rows: LeadRow[], targetMinutes: number, now: number): Array<Coming & { startedAt: number }> {
   return rows.filter((r) => r.touchAt === null && judge(r, targetMinutes, now) === null && r.leadAt <= now)
-    .map((r) => ({ id: `coming:lead:${r.id}`, kind: "leads" as const, locationId: r.locationId, accountName: r.accountName, name: r.name, at: r.leadAt + targetMinutes * 60_000, startedAt: r.leadAt, value: null, contactId: r.contactId, url: r.url }))
+    .map((r) => ({ id: `coming:lead:${r.id}`, kind: "replies" as const, locationId: r.locationId, accountName: r.accountName, name: r.name, at: r.leadAt + targetMinutes * 60_000, startedAt: r.leadAt, value: null, contactId: r.contactId, url: r.url }))
     .sort((a, b) => a.at - b.at || a.name.localeCompare(b.name));
 }
 export const forecastOf = (leads: Array<Coming & { startedAt: number }>, deals: Coming[], appointments: Coming[]): Forecast => ({
@@ -324,7 +323,7 @@ export const forecastOf = (leads: Array<Coming & { startedAt: number }>, deals: 
 export function forecastLine(f: Forecast, targetMinutes: number): string {
   const bits: string[] = [];
   if (f.leads.length > 0) bits.push(`${plural(f.leads.length, "lead")} will pass the ${targetMinutes}-minute reply target`);
-  if (f.deals.length > 0) bits.push(`${plural(f.deals.length, "deal")}${f.dealDollars > 0 ? ` (${money(f.dealDollars)})` : ""} will turn stale`);
+  if (f.deals.length > 0) bits.push(`${plural(f.deals.length, "deal")}${f.dealDollars > 0 ? ` (${money(f.dealDollars)})` : ""} will go quiet`);
   if (f.appointments.length > 0) bits.push(`${plural(f.appointments.length, "appointment")} will need an outcome marked`);
   return bits.length === 0 ? "Nothing is about to go wrong today." : `If nobody acts today: ${bits.join(", ")}.`;
 }

@@ -49,12 +49,27 @@ describe.skipIf(!HAS_DB)("Today's working queue", () => {
   });
   afterAll(async () => { for (const co of [CO_A, CO_B]) await sql()`delete from installations where company_id = ${co}`; await closeDb(); });
 
+  it("Done for now on ONE waiting person holds that person only, and a forged person finds nothing", async () => {
+    const agency = session(CO_A, "agency", null);
+    const before = await today(agency);
+    const mine = idsOf(before, A1, "replies");
+    const one = mine[0].slice(`replies:${A1}:`.length);
+    const r = await act(agency, { action: "done", rowKey: `${A1}|replies|${one}` });
+    expect(r.status, JSON.stringify(r.body)).toBe(200);
+    expect(r.body.count, "one person, not the whole row").toBe(1);
+    const after = await today(agency);
+    expect(Object.keys(after.holds)).toEqual([mine[0]]);
+    expect((await act(agency, { action: "done", rowKey: `${A1}|replies|nobody-like-this` })).status).toBe(404);
+    expect((await act(agency, { action: "done", rowKey: `${A2}|replies|${one}` })).status, "a person of another account").toBe(404);
+    await sql()`delete from today_actions where installation_id = ${instA}`;
+  });
+
   it("Done on a row is one appended event that holds exactly that row's items, and nothing else", async () => {
     const agency = session(CO_A, "agency", null);
     const before = await today(agency);
-    const mine = idsOf(before, A1, "unanswered");
+    const mine = idsOf(before, A1, "replies");
     expect(mine.length).toBe(3);
-    const r = await act(agency, { action: "done", rowKey: `${A1}|unanswered` });
+    const r = await act(agency, { action: "done", rowKey: `${A1}|replies` });
     expect(r.status, JSON.stringify(r.body)).toBe(200);
     expect(r.body.count).toBe(3);
     const rows = await sql()`select action, lane, location_id, item_ids from today_actions where installation_id = ${instA}`;
@@ -81,28 +96,28 @@ describe.skipIf(!HAS_DB)("Today's working queue", () => {
 
   it("Snooze needs a choice and sets a return time; Assign to me shows the person's name", async () => {
     const agency = session(CO_A, "agency", null);
-    expect((await act(agency, { action: "snooze", rowKey: `${A1}|unanswered` })).status).toBe(400);
-    const s = await act(agency, { action: "snooze", rowKey: `${A1}|unanswered`, choice: "day" });
+    expect((await act(agency, { action: "snooze", rowKey: `${A1}|replies` })).status).toBe(400);
+    const s = await act(agency, { action: "snooze", rowKey: `${A1}|replies`, choice: "day" });
     expect(s.status).toBe(200);
     expect(s.body.until).toBeGreaterThan(Date.now() + 23 * 3_600_000);
-    const a = await act(agency, { action: "assign", rowKey: `${A2}|unanswered` });
+    const a = await act(agency, { action: "assign", rowKey: `${A2}|replies` });
     expect(a.status).toBe(200);
     const d = await today(agency);
-    expect(d.holds[`unanswered:${A1}:${A1}-p0`] ?? Object.values(d.holds)[0]).toBeTruthy();
+    expect(d.holds[`replies:${A1}:${A1}-p0`] ?? Object.values(d.holds)[0]).toBeTruthy();
     expect(Object.values(d.assigned as Record<string, { by: string | null }>).some((x) => x.by === "Test agency")).toBe(true);
   });
 
   it("a row of another company's account, or of an account that does not exist, is refused with the same answer", async () => {
     const agency = session(CO_A, "agency", null);
-    const foreign = await act(agency, { action: "done", rowKey: `${B1}|unanswered` });
-    const missing = await act(agency, { action: "done", rowKey: `xtestNoSuchAccount|unanswered` });
+    const foreign = await act(agency, { action: "done", rowKey: `${B1}|replies` });
+    const missing = await act(agency, { action: "done", rowKey: `xtestNoSuchAccount|replies` });
     expect(foreign.status).toBe(404);
     expect(missing.status).toBe(404);
     expect(foreign.body).toEqual(missing.body);
     expect((await sql()`select count(*)::int n from today_actions where installation_id = ${instB}`)[0].n).toBe(0);
     // Malformed rows never reach the database.
-    for (const rowKey of ["", `${A1}`, `${A1}|nothing`, `${A1}|unanswered|x`, "../../x|unanswered", 42, null]) expect((await act(agency, { action: "done", rowKey })).status, String(rowKey)).toBe(400);
-    expect((await act(agency, { action: "delete", rowKey: `${A1}|unanswered` })).status).toBe(400);
+    for (const rowKey of ["", `${A1}`, `${A1}|nothing`, `${A1}|replies|x|y`, `${A1}|stale|x`, "../../x|replies", 42, null]) expect((await act(agency, { action: "done", rowKey })).status, String(rowKey)).toBe(400);
+    expect((await act(agency, { action: "delete", rowKey: `${A1}|replies` })).status).toBe(400);
   });
 
   it("a client's staff mark in their own lane, cannot assign, cannot reach a sibling account, and cannot undo someone else's mark", async () => {
@@ -110,7 +125,7 @@ describe.skipIf(!HAS_DB)("Today's working queue", () => {
     const client = session(CO_A, "client", A1, "u-setter");
     const before = await today(agency);
     const held = Object.keys(before.holds).length;
-    const own = await act(client, { action: "done", rowKey: `${A1}|unanswered` });
+    const own = await act(client, { action: "done", rowKey: `${A1}|replies` });
     expect(own.status, JSON.stringify(own.body)).toBe(200);
     const lane = await sql()`select lane from today_actions where id = ${own.body.eventId}`;
     expect(lane[0].lane).toBe("user:u-setter");
@@ -118,9 +133,9 @@ describe.skipIf(!HAS_DB)("Today's working queue", () => {
     expect(Object.keys((await today(agency)).holds).length).toBe(held);
     // The setter's own read holds the row back.
     expect(Object.keys((await today(client)).holds).length).toBeGreaterThan(0);
-    expect((await act(client, { action: "assign", rowKey: `${A1}|unanswered` })).status).toBe(403);
-    expect((await act(client, { action: "done", rowKey: `${A2}|unanswered` })).status).toBe(404);
-    expect((await act(client, { action: "done", rowKey: `${B1}|unanswered` })).status).toBe(404);
+    expect((await act(client, { action: "assign", rowKey: `${A1}|replies` })).status).toBe(403);
+    expect((await act(client, { action: "done", rowKey: `${A2}|replies` })).status).toBe(404);
+    expect((await act(client, { action: "done", rowKey: `${B1}|replies` })).status).toBe(404);
     // An event id from the team lane finds nothing for the setter.
     const [team] = await sql()`select id::int from today_actions where installation_id = ${instA} and lane = 'team' order by id limit 1`;
     expect((await act(client, { action: "undo", eventId: team.id })).status).toBe(404);
@@ -131,9 +146,9 @@ describe.skipIf(!HAS_DB)("Today's working queue", () => {
 
   it("with no session, or a session of another company, nothing is written", async () => {
     const before = (await sql()`select count(*)::int n from today_actions`)[0].n;
-    const res = await handle(new Request("http://localhost/api/app/today/action", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "done", rowKey: `${A1}|unanswered` }) }), ["today", "action"]);
+    const res = await handle(new Request("http://localhost/api/app/today/action", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "done", rowKey: `${A1}|replies` }) }), ["today", "action"]);
     expect(res.status).toBe(401);
-    const b = await act(session(CO_B, "agency", null), { action: "done", rowKey: `${A1}|unanswered` });
+    const b = await act(session(CO_B, "agency", null), { action: "done", rowKey: `${A1}|replies` });
     expect(b.status).toBe(404);
     expect((await sql()`select count(*)::int n from today_actions`)[0].n).toBe(before);
   });
@@ -146,7 +161,7 @@ describe.skipIf(!HAS_DB)("Today's working queue", () => {
       expect(d.items.length).toBeGreaterThan(0);
       expect(d.holds).toEqual({});
       expect(d.actionsReady).toBe(false);
-      const r = await act(agency, { action: "done", rowKey: `${A1}|unanswered` });
+      const r = await act(agency, { action: "done", rowKey: `${A1}|replies` });
       expect(r.status).toBe(503);
       expect(r.body.needsUpdate).toBe(true);
       expect(String(r.body.error)).toMatch(/latest database update/i);

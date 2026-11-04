@@ -36,9 +36,10 @@ export async function POST(request: Request) {
   if (body?.demo === true) {
     if (!demoEnabled()) return NextResponse.json({ error: "Demo mode is off" }, { status: 403 });
     const { DEMO_COMPANY_ID, demoFirstLocation } = await import("@/lib/demo/seed");
-    // `as` lets demos and screenshots open the limited views: "business" or "client".
+    // `as` lets demos and screenshots open the limited views: "business", "client", or "location" (an agency person inside one client account).
     const kind: AccessKind = body.as === "business" || body.as === "client" ? body.as : "agency";
-    const locationId = kind === "agency" ? null : await demoFirstLocation();
+    // `as=location`: an agency user who opened SubSync from inside one client account (the platform sends that account with the sign-in).
+    const locationId = kind === "agency" ? (body.as === "location" ? await demoFirstLocation() : null) : await demoFirstLocation();
     const user = {
       userId: "demo-user", companyId: DEMO_COMPANY_ID, role: "admin", type: kind === "agency" ? "agency" : "account",
       userName: kind === "agency" ? "Demo Admin" : "Demo Owner", activeLocation: locationId,

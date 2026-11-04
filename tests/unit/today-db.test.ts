@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { closeDb, sql } from "@/lib/db";
 import { handle } from "@/lib/api/router";
 import { signSession } from "@/lib/session";
-import { slicesOf, type Totals } from "@/lib/analytics/today-queue";
+import { buildQueue, slicesOf, type Totals } from "@/lib/analytics/today-queue";
 import type { TodayData } from "@/lib/analytics/today-types";
 
 // The rebuilt Today against the real database: two companies, each with client accounts that have conversations waiting for a reply. It proves three things.
@@ -100,20 +100,23 @@ describe.skipIf(!HAS_DB)("Today reads only the accounts the signed session may r
   it("the count on each slice is the number of rows in the list behind it, and the queue adds up to the same totals", async () => {
     const r = await call(session(CO_A, "agency", null));
     const totals: Totals = r.body.totals;
+    const queueOf = (b: TodayData) => buildQueue({ items: b.items, totals: b.totals, accounts: new Map(b.accounts.map((a) => [a.id, a])), staleDays: b.staleDays, now: b.now });
     for (const s of slicesOf(totals)) {
       const rows = r.body.items.filter((i) => i.kind === s.kind);
       expect(s.count, `${s.kind}: slice count vs rows in its list`).toBe(rows.length);
-      expect(r.body.queue.filter((q) => q.kind === s.kind).reduce((n, q) => n + q.count, 0), `${s.kind}: queue rows add up`).toBe(s.count);
+      expect(queueOf(r.body).filter((q) => q.kind === s.kind).reduce((n, q) => n + q.count, 0), `${s.kind}: queue rows add up`).toBe(s.count);
     }
-    expect(totals.unanswered.count).toBe(6);
+    expect(totals.replies.count).toBe(6);
     // Narrowing to one account narrows every number with it.
     const one = await call(session(CO_A, "agency", null), `?accounts=${A1}`);
-    expect(one.body.totals.unanswered.count).toBe(3);
-    expect(one.body.queue.every((q) => q.locationId === A1)).toBe(true);
+    expect(one.body.totals.replies.count).toBe(3);
+    expect(queueOf(one.body).every((q) => q.locationId === A1)).toBe(true);
+    // The payload carries the rows and the counts, not a second copy of the queue they make.
+    expect((r.body as unknown as Record<string, unknown>).queue).toBeUndefined();
   });
   it("marks set aside on one account never reach a business or client view of another account of the same installation", async () => {
     // A team-lane mark on A2 (an agency pressed Done there). A business or a client's staff reading A1 must not learn the account, the row or the item ids from it.
-    const [ev] = await sql()`insert into today_actions (installation_id, location_id, row_key, kind, action, lane, actor_key, item_ids) values (${instA}, ${A2}, ${`${A2}|unanswered`}, 'unanswered', 'done', 'team', 'u-agency', ${["unanswered:secret-item-id"]}::text[]) returning id`;
+    const [ev] = await sql()`insert into today_actions (installation_id, location_id, row_key, kind, action, lane, actor_key, item_ids) values (${instA}, ${A2}, ${`${A2}|replies`}, 'replies', 'done', 'team', 'u-agency', ${["replies:secret-item-id"]}::text[]) returning id`;
     try {
       for (const kind of ["business", "client"] as const) {
         const r = await call(session(CO_A, kind, A1));

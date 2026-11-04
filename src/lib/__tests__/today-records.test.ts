@@ -15,11 +15,11 @@ const ACCOUNTS: AccountFacts[] = [
 ];
 let n = 0;
 const item = (kind: Kind, loc: string, over: Partial<TodayItem> = {}): TodayItem => ({
-  id: `i${n++}`, kind, locationId: loc, accountName: loc === "aaa" ? "Maple Dental" : "Harbor Realty", name: `Person ${n}`, detail: "detail", at: NOW - 2 * H, value: null, contactId: `c${n}`, url: `https://crm.example.com/c${n}`, ...over,
+  id: `i${n++}`, kind, locationId: loc, accountName: loc === "aaa" ? "Maple Dental" : "Harbor Realty", name: `Person ${n}`, detail: "detail", at: NOW - 2 * H, value: null, contactId: `c${n}`, url: `https://crm.example.com/c${n}`, ...(kind === "replies" ? { newLead: true } : {}), ...over,
 });
 const ITEMS: TodayItem[] = [
-  ...Array.from({ length: 7 }, () => item("leads", "aaa", { owner: "Marcus", source: "Facebook" })),
-  ...Array.from({ length: 3 }, () => item("leads", "bbb")),
+  ...Array.from({ length: 7 }, () => item("replies", "aaa", { owner: "Marcus", source: "Facebook" })),
+  ...Array.from({ length: 3 }, () => item("replies", "bbb")),
   ...Array.from({ length: 2 }, () => item("appointments", "aaa")),
   ...Array.from({ length: 4 }, () => item("stale", "bbb", { value: 1000, at: NOW - 40 * D })),
   item("noshows", "aaa"),
@@ -51,7 +51,7 @@ test("a queue row's count equals the rows behind it, and a bar's count equals it
 });
 
 test("a list that was cut says how many were loaded and keeps the number that was pressed", () => {
-  const spec = itemsSpec(ITEMS.slice(0, 5), NOW, { key: "k", title: "t", subtitle: "", noun: "leads", count: 183 });
+  const spec = itemsSpec(ITEMS.slice(0, 5), NOW, { key: "k", title: "t", subtitle: "", noun: "replies", count: 183 });
   assert.equal(spec.count, 183);
   assert.equal(spec.rows.length, 5);
   assert.match(spec.note ?? "", /first 5 of 183/);
@@ -74,7 +74,7 @@ test("the dollar headline equals the counted stale deals in its list", () => {
 });
 
 test("columns that hold nothing are left out, so a lead list has no deal value and a one-account list no account", () => {
-  const leads = itemsSpec(ITEMS.filter((i) => i.kind === "leads"), NOW, { key: "l", title: "", subtitle: "", noun: "", count: 10 });
+  const leads = itemsSpec(ITEMS.filter((i) => i.kind === "replies"), NOW, { key: "l", title: "", subtitle: "", noun: "", count: 10 });
   assert.ok(!leads.cols.some((c) => c.key === "value"));
   assert.ok(leads.cols.some((c) => c.key === "owner"));
   assert.ok(leads.cols.some((c) => c.primary));
@@ -87,7 +87,7 @@ test("filters: a facet chip, the date range, and search narrow the rows and neve
   const s = spec();
   assert.equal(filterRecs(s, emptyFilter()).length, ITEMS.length);
   assert.equal(filterRecs(s, { ...emptyFilter(), facets: { account: ["Maple Dental"] } }).length, 10);
-  assert.equal(filterRecs(s, { ...emptyFilter(), facets: { account: ["Maple Dental"], kind: ["Leads waiting"] } }).length, 7);
+  assert.equal(filterRecs(s, { ...emptyFilter(), facets: { account: ["Maple Dental"], kind: ["Waiting for a reply"] } }).length, 7);
   assert.equal(filterRecs(s, { ...emptyFilter(), facets: { owner: ["Marcus"] } }).length, 7);
   assert.equal(filterRecs(s, { ...emptyFilter(), facets: { owner: ["(none)"] } }).length, ITEMS.length - 7);
   assert.equal(filterRecs(s, { ...emptyFilter(), q: "facebook" }).length, 7);
@@ -130,7 +130,7 @@ test("leads and alerts lists build a row per lead or alert, with the reply time 
     { id: "1", locationId: "aaa", accountName: "Maple Dental", contactId: "c1", name: "Ann", source: "Google", ownerName: "Marcus", touchBy: "Priya", leadAt: NOW - H, touchAt: NOW - H + 5 * 60_000, url: "u" },
     { id: "2", locationId: "aaa", accountName: "Maple Dental", contactId: "c2", name: "Bo", source: null, ownerName: null, touchBy: null, leadAt: NOW - H, touchAt: null, url: "u" },
   ];
-  const s = leadsSpec(l, NOW, { key: "x", title: "t", subtitle: "", noun: "leads", count: 2 });
+  const s = leadsSpec(l, NOW, { key: "x", title: "t", subtitle: "", noun: "replies", count: 2 });
   assert.equal(s.rows.length, 2);
   assert.equal(s.rows[0].cells.reply, 5);
   assert.equal(s.rows[1].cells.reply, null);

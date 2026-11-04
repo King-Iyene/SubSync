@@ -17,7 +17,6 @@ export type NavItem = {
 
 export const NAV: NavItem[] = [
   { id: "today", label: "Today", feature: "overview", group: "" },
-  { id: "myday", label: "My day", feature: "overview", group: "" },
   { id: "speed", label: "Speed to lead", feature: "speed", group: "Daily work" },
   { id: "appointments", label: "Appointments", feature: "appointments", group: "Daily work" },
   { id: "inbox", label: "Unanswered messages", feature: "inbox", group: "Daily work" },

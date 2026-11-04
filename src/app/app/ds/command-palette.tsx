@@ -8,8 +8,17 @@ import { filterCommands, type PaletteCommand } from "@/lib/analytics/today-palet
 // a client account, switch the junk-deal control, share, print, run a saved view). Arrow keys move, Enter runs, Esc closes. Ctrl or Cmd + K stays the shared people search
 // (its own shortcut, tested in f10); the first line of the list is also "Search people". Every command is also a button on the page: the palette
 // is a shortcut, never the only way in.
-export function CommandPalette({ commands, label = "Commands" }: { commands: PaletteCommand[]; label?: string }) {
-  const [open, setOpen] = useState(false);
+export function CommandPalette({ commands, label = "Commands", open: controlled, onOpenChange, hideTrigger = false }: {
+  commands: PaletteCommand[]; label?: string;
+  /** Controlled use: the page's "More" menu opens the palette, so the palette draws no button of its own (Ctrl Shift K still works). */
+  open?: boolean; onOpenChange?: (open: boolean) => void; hideTrigger?: boolean;
+}) {
+  const [own, setOwn] = useState(false);
+  const open = controlled ?? own;
+  // The shortcut's listener is made once, so it reads the current state through a ref.
+  const openRef = useRef(open);
+  useEffect(() => { openRef.current = open; });
+  const setOpen = (v: boolean | ((o: boolean) => boolean)) => { const next = typeof v === "function" ? v(openRef.current) : v; if (onOpenChange) onOpenChange(next); else setOwn(next); };
   const [q, setQ] = useState("");
   const [at, setAt] = useState(0);
   const input = useRef<HTMLInputElement>(null);
@@ -29,6 +38,7 @@ export function CommandPalette({ commands, label = "Commands" }: { commands: Pal
     // Capture phase on the window: this runs before the shared people search listens, and only while this page is on screen.
     window.addEventListener("keydown", key, true);
     return () => window.removeEventListener("keydown", key, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => { if (open) setTimeout(() => input.current?.focus(), 0); }, [open]);
   const close = () => { setOpen(false); setQ(""); const back = opener.current; opener.current = null; if (back && document.contains(back)) setTimeout(() => back.focus(), 0); };
@@ -36,10 +46,10 @@ export function CommandPalette({ commands, label = "Commands" }: { commands: Pal
 
   return (
     <>
-      <button type="button" onClick={() => { opener.current = document.activeElement as HTMLElement | null; setOpen(true); setQ(""); setAt(0); }} data-testid="palette-open" aria-haspopup="dialog"
+      {!hideTrigger && <button type="button" onClick={() => { opener.current = document.activeElement as HTMLElement | null; setOpen(true); setQ(""); setAt(0); }} data-testid="palette-open" aria-haspopup="dialog"
         className="ds-press inline-flex min-h-10 items-center gap-2 rounded-lg border bg-card px-3 text-sm text-muted-foreground hover:border-primary/40 hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)] print:hidden">
         <Search aria-hidden className="size-4" /><span>{label}</span><kbd className="font-sans text-xs">Ctrl Shift K</kbd>
-      </button>
+      </button>}
       {open && (
         <div className="fixed inset-0 z-50 print:hidden" data-testid="palette">
           <div className="absolute inset-0 bg-black/50" onMouseDown={close} aria-hidden />

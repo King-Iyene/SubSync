@@ -56,7 +56,7 @@ for (const theme of ["light", "dark"] as const) {
     if (theme === "dark") assert.ok(contrast(colour(t, "gold"), colour(t, "background")) >= 3, "dark: gold on the page");
   });
 
-  // Today's charts: the five kinds of thing keep one chart colour each (chart-1 to chart-5, see KIND_CHART) and are drawn on the page surface with a ring in the page colour
+  // Today's charts: the four kinds of thing keep one chart colour each (chart-1 to chart-4, see KIND_CHART) and are drawn on the page surface with a ring in the page colour
   // between slices; the "raised" bars are the foreground at 70% and the "cleared" bars and the reply-speed line are the accent. Every mark needs 3:1 on the page and card.
   test(`${theme} theme: Today's marks (one colour per kind, raised bars, cleared bars, the sparkline) have at least 3:1 on the page and the card`, () => {
     for (const surface of ["background", "card"]) {
@@ -68,7 +68,7 @@ for (const theme of ["light", "dark"] as const) {
       assert.ok(contrast(mix(s, colour(t, "foreground"), 0.7), s) >= 3, `${theme}: raised bars on --${surface}`);
       assert.ok(contrast(colour(t, "primary"), s) >= 3, `${theme}: cleared bars and the sparkline on --${surface}`);
     }
-    assert.equal(new Set(Object.values(KIND_CHART)).size, 5, "five kinds, five different colours");
+    assert.equal(new Set(Object.values(KIND_CHART)).size, 4, "four kinds, four different colours");
   });
 
   // The menu writes its text at reduced strength (text-sidebar-foreground/75 for items, /70 for group labels). Blend and check the real result.

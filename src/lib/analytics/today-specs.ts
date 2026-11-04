@@ -15,14 +15,17 @@ const strip = (l: LeadRow) => { const { zone: _z, ...rest } = l; void _z; return
 export type SpecEnv = { now: number; view: View; accounts: AccountFacts[]; staleDays: number; targetMinutes: number; ledger: LeadRow[]; scope: "all" | "account"; excluded: boolean };
 
 const SUBTITLE: Record<Kind, (e: SpecEnv) => string> = {
-  leads: (e) => `New leads that nobody on your team has replied to, past the ${e.targetMinutes}-minute reply target. Oldest first.`,
+  replies: (e) => `People whose message nobody has answered: new leads past the ${e.targetMinutes}-minute reply target, and customers who wrote last. Each person once, longest wait first.`,
   appointments: () => "Past appointments with no outcome marked, so they count as neither a show nor a no-show.",
   noshows: () => "People who missed an appointment in the last 14 days and have not booked another.",
   stale: (e) => `Open deals with a value and an owner that have not moved in ${e.staleDays} days or more. Biggest first.`,
-  unanswered: (e) => `Conversations where the customer wrote last and nobody has answered, past the ${e.targetMinutes}-minute reply target.`,
 };
-const where = (e: SpecEnv, accountName?: string) => (accountName ? `, ${accountName}` : e.scope === "account" ? "" : ", all client accounts");
-const NOUN: Record<Kind, [string, string]> = { leads: ["lead", "leads"], appointments: ["appointment", "appointments"], noshows: ["no-show", "no-shows"], stale: ["deal", "deals"], unanswered: ["conversation", "conversations"] };
+/** Where a list comes from, in words: the account that was clicked, the one account the page is showing, or every client account. A list never says "all client accounts" when the page shows one. */
+const only = (e: SpecEnv) => (e.accounts.length === 1 ? e.accounts[0].name : null);
+const where = (e: SpecEnv, accountName?: string) => { const n = accountName ?? only(e); return n ? `${n}` : e.scope === "account" ? "" : "All client accounts"; };
+/** "KD Squares LTD, waiting for a reply": the account first, then exactly what was clicked. */
+const titled = (e: SpecEnv, what: string, accountName?: string) => { const w = where(e, accountName); return w ? `${w}, ${what}` : what[0].toUpperCase() + what.slice(1); };
+const NOUN: Record<Kind, [string, string]> = { replies: ["person waiting", "people waiting"], appointments: ["appointment", "appointments"], noshows: ["no-show", "no-shows"], stale: ["deal", "deals"] };
 const nounOf = (k: Kind, n: number) => NOUN[k][n === 1 ? 0 : 1];
 
 /** A slice of the donut, a legend row, or a figure tile of that kind. Count: the total for the kind. */
@@ -31,7 +34,7 @@ export function specKind(kind: Kind, e: SpecEnv, accountId?: string): RecordsSpe
   const name = accountId ? e.accounts.find((a) => a.id === accountId)?.name : undefined;
   const count = accountId ? items.length : e.view.totals[kind].count;
   const note = kind === "stale" && e.excluded && e.view.junk.items.length > 0 ? `Left out: ${e.view.junk.items.length} test or very old ${plural(e.view.junk.items.length, "deal")} worth ${money(e.view.junk.dollars)}. Switch off "Exclude test and very old deals" to include them.` : undefined;
-  return itemsSpec(items, e.now, { key: `kind:${kind}${accountId ? `:${accountId}` : ""}`, title: `${KIND_LABEL[kind]}${where(e, name)}`, subtitle: SUBTITLE[kind](e), noun: nounOf(kind, count), count, note, exportName: `${kind}${name ? `-${name}` : ""}` });
+  return itemsSpec(items, e.now, { key: `kind:${kind}${accountId ? `:${accountId}` : ""}`, title: titled(e, KIND_LABEL[kind].toLowerCase(), name), subtitle: SUBTITLE[kind](e), noun: nounOf(kind, count), count, note, exportName: `${kind}${name ? `-${name}` : ""}` });
 }
 
 /** A Fix first row (its amount or its Show button). Count: the row's count. */
@@ -59,14 +62,14 @@ export function specClients(e: SpecEnv): RecordsSpec {
 /** "$1,397,934 is at risk": the counted stale deals the figure adds up. Count: the number of those deals. */
 export function specDollars(e: SpecEnv): RecordsSpec {
   const s = specKind("stale", e);
-  return { ...s, key: "dollars", title: `${money(e.view.totals.stale.dollars ?? 0)} at risk`, subtitle: `The open deals behind the dollar figure: each has a value and an owner and has not moved in ${e.staleDays} days or more. The figure is their values added up.` };
+  return { ...s, key: "dollars", title: `${money(e.view.totals.stale.dollars ?? 0)} at risk, deals gone quiet`, subtitle: `The open deals behind the dollar figure: each has a value and an owner and has not moved in ${e.staleDays} days or more. The figure is their values added up.` };
 }
 
 /** On one account the headline says "N things need you". Count: all of them. */
 export function specThings(e: SpecEnv): RecordsSpec {
   const items = e.view.items;
   const count = Object.values(e.view.totals).reduce((s, t) => s + t.count, 0);
-  return itemsSpec(items, e.now, { key: "things", title: "Everything that needs you today", subtitle: "Leads to answer, appointments to mark, no-shows to recover, stale deals and unanswered conversations.", noun: count === 1 ? "thing" : "things", count, exportName: "needs-you-today" });
+  return itemsSpec(items, e.now, { key: "things", title: "Everything that needs you today", subtitle: "People waiting for a reply, appointments to mark, no-shows to win back and deals gone quiet.", noun: count === 1 ? "thing" : "things", count, exportName: "needs-you-today" });
 }
 
 /** Alerts: raised, cleared or still open in the last 7 days, or one day of them. */
@@ -121,7 +124,7 @@ export function specSince(k: "new" | "breached" | "answered" | "alerts", s: Sinc
 }
 
 export function specComing(kind: "leads" | "deals" | "appointments", list: Coming[], targetMinutes: number): RecordsSpec {
-  const t = { leads: ["Leads about to pass the reply target", `Leads inside their ${targetMinutes}-minute reply window that nobody has answered. Each one passes the target at the time shown if nobody replies.`, "lead"], deals: ["Deals about to turn stale", "Counted open deals that will have had no movement for the stale days by the time shown, if nobody touches them.", "deal"], appointments: ["Appointments still to happen today", "Appointments that start later today. Each will need an outcome marked afterwards.", "appointment"] }[kind];
+  const t = { leads: ["Leads about to pass the reply target", `Leads inside their ${targetMinutes}-minute reply window that nobody has answered. Each one passes the target at the time shown if nobody replies.`, "lead"], deals: ["Deals about to go quiet", "Counted open deals that will have had no movement for the stale days by the time shown, if nobody touches them.", "deal"], appointments: ["Appointments still to happen today", "Appointments that start later today. Each will need an outcome marked afterwards.", "appointment"] }[kind];
   return comingSpec(list, { key: `coming:${kind}`, title: t[0], subtitle: t[1], noun: plural(list.length, t[2]) });
 }
 

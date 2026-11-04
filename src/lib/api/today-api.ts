@@ -11,8 +11,8 @@ import { comingLeads, forecastOf, leadInsights, sinceVisitOf, type Coming, type 
 import { resolveEvents } from "../analytics/today-state";
 import { loadActions, touchVisit } from "../analytics/today-store";
 import {
-  ageWords, answeredStreak, buildQueue, emptyTotals, proofOf, replyPulse, withinTargetShare,
-  type AccountFacts, type AlertFact, type Kind, type Proof, type QueueRow, type Totals, type TodayItem,
+  ageWords, answeredStreak, emptyTotals, mergeReplies, proofOf, replyPulse, withinTargetShare,
+  type AccountFacts, type AlertFact, type Kind, type Proof, type Totals, type TodayItem,
 } from "../analytics/today-queue";
 import { MIN_OUTCOMES_FOR_RATE } from "../analytics/appointment-intel";
 import type { AccessKind } from "../access";
@@ -73,25 +73,29 @@ export async function buildToday(i: {
   const replies = ledgerAll.map((r) => ({ locationId: r.locationId, leadAt: r.leadAt, touchAt: r.touchAt }));
   const zones: Record<string, string> = Object.fromEntries(zoneRows.filter((z) => i.permits(z.location_id as string)).map((z) => [z.location_id as string, (z.timezone as string | null) || "UTC"]));
 
-  // ---- the five kinds of thing, each from the function its own page uses ----
-  const leadItems: TodayItem[] = speed.waiting.map((w) => ({
-    id: `leads:${w.locationId}:${w.contactId}`, kind: "leads", locationId: w.locationId, accountName: w.locationName, name: w.name,
-    detail: w.neverAnswered ? "Never answered" : `Waiting ${ageWords(w.waitingMinutes)}`, at: now - w.waitingMinutes * 60_000, value: null,
-    contactId: w.contactId, url: links.contact(w.locationId, w.contactId), never: w.neverAnswered,
-    owner: w.unassigned ? null : w.owner?.label ?? null, source: w.source === "No source recorded" ? null : w.source,
-  }));
+  // ---- the four kinds of thing, each from the function its own page uses. Waiting people come from TWO lists (new leads past their reply target, and conversations the
+  // customer wrote last) and are merged so that each person is counted once (mergeReplies, docs/METRICS.md "Today, third pass"). ----
   const lists = i.audit.lists ?? {};
-  const items: TodayItem[] = [...leadItems, ...itemsOf("appointments", lists.unmarked), ...itemsOf("noshows", lists.noshows), ...itemsOf("stale", lists.stale), ...itemsOf("unanswered", lists.slow)];
+  const waiters = mergeReplies({
+    leads: speed.waiting.map((w) => ({
+      locationId: w.locationId, accountName: w.locationName, contactId: w.contactId, name: w.name, at: now - w.waitingMinutes * 60_000, never: w.neverAnswered,
+      url: links.contact(w.locationId, w.contactId), owner: w.unassigned ? null : w.owner?.label ?? null, source: w.source === "No source recorded" ? null : w.source,
+      detail: w.neverAnswered ? "Never answered" : `Waiting ${ageWords(w.waitingMinutes)}`,
+    })),
+    leadsTotal: speed.waitingTotal,
+    conversations: (lists.slow?.rows ?? []).map((r) => ({ id: r.id, locationId: r.locationId, accountName: r.locationName ?? "Client account", contactId: r.contactId, name: r.name, at: toMs(r.at), url: (r as unknown as { url: string }).url, detail: r.detail })),
+    conversationsTotal: lists.slow?.total ?? 0,
+  });
+  const items: TodayItem[] = [...waiters.items, ...itemsOf("appointments", lists.unmarked), ...itemsOf("noshows", lists.noshows), ...itemsOf("stale", lists.stale)];
   const totals: Totals = emptyTotals();
   const set = (k: Kind, count: number, dollars: number | null) => { totals[k] = { count, dollars: dollars && dollars > 0 ? dollars : null, shown: items.filter((x) => x.kind === k).length }; };
-  set("leads", speed.waitingTotal, null);
+  set("replies", waiters.count, null);
+  totals.replies.newLeads = waiters.newLeads;
   set("appointments", lists.unmarked?.total ?? 0, null);
   set("noshows", lists.noshows?.total ?? 0, null);
   set("stale", lists.stale?.total ?? 0, lists.stale?.totalValue ?? null);
-  set("unanswered", lists.slow?.total ?? 0, null);
 
   const accounts: AccountFacts[] = i.audit.live.map((a) => ({ id: a.locationId, name: a.name ?? "Unnamed account", followUpEstimate: a.followUpRevenueAtRisk, url: links.opportunities(a.locationId) }));
-  const queue: QueueRow[] = buildQueue({ items, totals, accounts: new Map(accounts.map((a) => [a.id, a])), staleDays: settings.staleDays, now });
 
   // ---- access, said plainly (a missing permission is never a false all-clear) ----
   const sp = speed.access;
@@ -134,7 +138,7 @@ export async function buildToday(i: {
   const base = {
     ledger, ledgerTotal: ledgerRows.length, insights, sinceVisit, forecast, zones,
     holds: resolved.holds, assigned: resolved.assigned, actionsReady: actionLog.available,
-    now, scope: i.limitTo ? ("account" as const) : ("all" as const), kind: i.kind, accounts, items, totals, queue, staleDays: settings.staleDays, targetMinutes: target,
+    now, scope: i.limitTo ? ("account" as const) : ("all" as const), kind: i.kind, accounts, items, totals, staleDays: settings.staleDays, targetMinutes: target,
     access: { leadsBlocked, apptsBlocked }, readLimit: null as string | null,
     outlier: (i.audit.audit as { outlier: { value: number; share: number } | null }).outlier ?? null,
     pulse: { reply: { current: pulse.current, usual: pulse.usual, points: pulse.points, verdict: pulse.verdict }, stale: staleHead ? { today: staleHead.today, usual: staleHead.avg7, samples: staleHead.samples, unusual: staleHead.unusual } : null },

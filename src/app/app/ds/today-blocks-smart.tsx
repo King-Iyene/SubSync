@@ -47,7 +47,7 @@ export function SinceStrip({ since, showAlerts, onOpen }: { since: SinceVisit; s
     ...(showAlerts ? [{ k: "alerts" as const, n: since.clearedAlerts.length, one: "alert cleared", many: "alerts cleared" }] : []),
   ];
   return (
-    <section className="mb-7 rounded-xl border bg-muted/40 px-4 py-3" aria-label="Since your last visit" data-testid="since-strip">
+    <section className="mb-7 rounded-xl border bg-muted/40 px-4 py-3" aria-label="Since you last looked" data-testid="since-strip">
       <p className="mb-1.5 text-xs font-medium text-muted-foreground">Since your last visit ({day})</p>
       <ul className="flex flex-wrap gap-x-7 gap-y-1.5 text-sm">
         {cells.map((c) => (
@@ -98,6 +98,8 @@ export function ComingBlock({ forecast, targetMinutes, onOpen }: { forecast: For
       )}
     </li>
   );
+  // Nothing is about to go wrong: no empty section (the calm all-clear is the headline's job).
+  if (nothing) return null;
   return (
     <section className="mb-9 border-t pt-6" aria-labelledby="coming-h" data-testid="coming-block">
       <h2 id="coming-h" className="text-base font-semibold">If nobody acts today</h2>
@@ -116,7 +118,7 @@ export function ComingBlock({ forecast, targetMinutes, onOpen }: { forecast: For
           ) : <p className="flex items-center gap-2 text-sm text-muted-foreground"><Clock aria-hidden className="size-4" />No lead is inside its reply window right now.</p>}
           <ul className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             {stat("leads", forecast.leads.length, "lead will pass the reply target", "leads will pass the reply target")}
-            {stat("deals", forecast.deals.length, "deal will turn stale", "deals will turn stale", forecast.dealDollars > 0 ? money(forecast.dealDollars) : undefined)}
+            {stat("deals", forecast.deals.length, "deal will go quiet", "deals will go quiet", forecast.dealDollars > 0 ? money(forecast.dealDollars) : undefined)}
             {stat("appointments", forecast.appointments.length, "appointment will need an outcome", "appointments will need an outcome")}
           </ul>
         </div>
