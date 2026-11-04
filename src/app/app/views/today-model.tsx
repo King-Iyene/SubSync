@@ -23,7 +23,7 @@ export function useTodayModel({ t, kind, reload }: { t: TodayData; kind: AccessK
   const now = useNow();
   const [excludeJunk, setJunk] = useState<boolean>(() => remembered(JUNK_KEY) !== "off");
   const [localHolds, setLocalHolds] = useState<Record<string, Hold>>({});
-  const [localAssigned, setLocalAssigned] = useState<Record<string, string>>({});
+  const [localAssigned, setLocalAssigned] = useState<Record<string, { name: string; eventId: number }>>({});
   const [undone, setUndone] = useState<number[]>([]);
   const [panel, setPanel] = useState<RecordsSpec | null>(null);
   const [toast, setToast] = useState<Toast | null>(null);
@@ -45,9 +45,11 @@ export function useTodayModel({ t, kind, reload }: { t: TodayData; kind: AccessK
   const assigned = useMemo(() => {
     const out: Record<string, string | null> = {};
     for (const [k, a] of Object.entries(t.assigned)) out[k] = a.by ?? "a team member";
-    for (const [k, name] of Object.entries(localAssigned)) out[k] = name;
+    // A mark that was undone is gone, whether the server's answer has caught up yet or not.
+    for (const [k, a] of Object.entries(t.assigned)) if (undone.includes(a.eventId)) delete out[k];
+    for (const [k, a] of Object.entries(localAssigned)) if (!undone.includes(a.eventId)) out[k] = a.name;
     return out;
-  }, [t.assigned, localAssigned]);
+  }, [t.assigned, localAssigned, undone]);
 
   const open = useCallback((spec: RecordsSpec) => setPanel(spec), []);
   const close = useCallback(() => setPanel(null), []);
@@ -66,7 +68,7 @@ export function useTodayModel({ t, kind, reload }: { t: TodayData; kind: AccessK
       const r = await api.post<{ eventId: number; at: number; until: number | null }>("today/action", body);
       const label = `${row.accountName}, ${KIND_LABEL[row.kind].toLowerCase()}`;
       if (a === "assign") {
-        setLocalAssigned((m) => ({ ...m, [row.key]: "you" }));
+        setLocalAssigned((m) => ({ ...m, [row.key]: { name: "you", eventId: r.eventId } }));
         say({ text: `Assigned to you: ${label}.`, eventId: r.eventId });
       } else {
         const until = a === "done" ? r.at + DONE_HOLD_DAYS * DAY : (r.until as number);

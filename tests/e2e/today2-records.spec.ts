@@ -356,6 +356,7 @@ test("Done hides a row and moves the headline, the set-aside list has N rows, an
   const rows = page.getByTestId("queue-row");
   const first = rows.first();
   const text = await first.innerText();
+  const firstId = (await first.getAttribute("id")) as string;
   const [res] = await Promise.all([page.waitForResponse((r) => r.url().includes("/api/app/today/action")), first.getByTestId("queue-done").click()]);
   const eventId = ((await res.json()) as { eventId: number }).eventId;
   try {
@@ -379,20 +380,22 @@ test("Done hides a row and moves the headline, the set-aside list has N rows, an
     expect((await post("today/action", { action: "undo", eventId })).status()).toBe(200);
   }
   await page.reload();
-  await expect(page.getByTestId("queue-row").first()).toHaveText(text, { timeout: 20_000 });
+  await expect(page.getByTestId("queue-row").first()).toHaveAttribute("id", firstId, { timeout: 20_000 });
 });
 
 test("Done then Undo (inside ten seconds) restores the row and the headline", async ({ page }) => {
   await openToday(page);
+  await page.waitForTimeout(1000); // the figures count up for 600 ms
   const headline = await page.getByTestId("today-headline").innerText();
   const rows = page.getByTestId("queue-row");
   const key = (await rows.first().getAttribute("id")) as string;
+  const heldBefore = await page.getByTestId("held-link").count();
   await rows.first().getByTestId("queue-done").click();
   await expect(page.locator(rowSel(key))).toHaveCount(0);
   await page.getByTestId("today-undo").click();
   await expect(page.locator(rowSel(key))).toHaveCount(1);
   await expect(page.getByTestId("today-headline")).toHaveText(headline);
-  await expect(page.getByTestId("held-link")).toHaveCount(0);
+  await expect(page.getByTestId("held-link")).toHaveCount(heldBefore);
 });
 
 test("Snooze 1 day and Snooze until Monday hide a row; Assign to me marks it; each is undoable", async ({ page }) => {
@@ -570,17 +573,30 @@ test("a business administrator and a client's staff get the same panel, limited 
 test("a real mouse click on the ring of the donut opens the records behind that slice", async ({ page }) => {
   await openToday(page);
   const slice = page.getByTestId("slice-leads");
+  await slice.scrollIntoViewIfNeeded();
+  await page.waitForTimeout(800);
   const n = Number(await slice.getAttribute("data-count"));
-  // A point on the slice's own outline, in page coordinates: the middle of a thin ring is not where its bounding box centre is.
+  // A point inside the slice's own ring, in page coordinates (the middle of a thin ring is not where its bounding box centre is): walk along its outline and step 5 px towards
+  // the middle of the donut until the browser says the slice is what is under that point.
   const at = await slice.evaluate((el) => {
     const path = el as unknown as SVGGeometryElement;
-    const p = path.getPointAtLength(path.getTotalLength() * 0.12);
     const m = (path as unknown as SVGGraphicsElement).getScreenCTM()!;
-    return { x: p.x * m.a + p.y * m.c + m.e, y: p.x * m.b + p.y * m.d + m.f };
+    const svg = path.ownerSVGElement as SVGSVGElement;
+    const c = svg.createSVGPoint(); c.x = 165; c.y = 118; const centre = c.matrixTransform(m);
+    const total = path.getTotalLength();
+    for (let i = 1; i < 120; i++) {
+      const p = path.getPointAtLength((total * i) / 120);
+      const x = p.x * m.a + p.y * m.c + m.e, y = p.x * m.b + p.y * m.d + m.f;
+      const d = Math.hypot(centre.x - x, centre.y - y) || 1;
+      const px = x + ((centre.x - x) / d) * 5, py = y + ((centre.y - y) / d) * 5;
+      if (document.elementFromPoint(px, py) === el) return { x: px, y: py };
+    }
+    return null;
   });
-  await page.mouse.move(at.x, at.y);
+  expect(at, "a point of the slice that the browser reports as the slice").not.toBeNull();
+  await page.mouse.move(at!.x, at!.y);
   await expect(page.getByTestId("donut-tip")).toContainText(/Leads waiting/);
-  await page.mouse.click(at.x, at.y);
+  await page.mouse.click(at!.x, at!.y);
   await expect(panel(page)).toBeVisible();
   await expect(page.getByTestId("records-count")).toHaveAttribute("data-count", String(n));
 });
