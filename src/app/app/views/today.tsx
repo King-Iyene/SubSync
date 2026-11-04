@@ -7,7 +7,9 @@ import {
   accountBars, accountsNeedingYou, accountsQuery, ageWords, barsTitle, donutTitle, headlineOf, money, parseTodayAccounts, proofLine, replyWords, shareText, slicesOf,
   staleUsual, withTodayAccounts, type HeadlineAction, type Kind, type QueueRow, type Usual,
 } from "@/lib/analytics/today-queue";
-import { nextAction } from "@/lib/analytics/today-smart";
+import { forecastLine, nextAction } from "@/lib/analytics/today-smart";
+import { type PaletteCommand, type TodayView } from "@/lib/analytics/today-palette";
+import { KIND_LABEL } from "@/lib/analytics/today-queue";
 import {
   pointEnd, specAccount, specAlerts, specClients, specComing, specDollars, specInsight, specKind, specNext, specReplies, specRow, specSince, specThings,
 } from "@/lib/analytics/today-specs";
@@ -15,8 +17,8 @@ import type { TodayData } from "@/lib/analytics/today-types";
 import type { GoFn } from "../nav";
 import { ApiProvider, useApiClient, useData } from "../session";
 import {
-  AccountBars, ComingBlock, DonutChart, EmptyState, FixFirstQueue, HeadlineBlock, InlineAlert, InsightStrip, LocalAccountPicker, ModuleTabs, Page, ProofStrip, PulseSpark, PulseTile,
-  RaisedClearedStrip, remember, remembered, Section, ShowingChip, SinceStrip, Skeleton, SkeletonCards, SkeletonRows,
+  AccountBars, CommandPalette, ComingBlock, DonutChart, EmptyState, FixFirstQueue, HeadlineBlock, InlineAlert, InsightStrip, LocalAccountPicker, ModuleTabs, Page, PrintReport, ProofStrip, PulseSpark, PulseTile,
+  RaisedClearedStrip, remember, remembered, Section, ShowingChip, SinceStrip, Skeleton, SkeletonCards, SkeletonRows, ViewsMenu,
 } from "../ds";
 import { Badge, Btn, ErrorBox, fmtInt, fmtMoney } from "../ui";
 import { TodayAccount } from "./today-account";
@@ -156,6 +158,36 @@ function TodayAgency({ go, t, reload, sync, syncing, options, picked, setPicked,
   const windowReplies = (i: number) => env.ledger.filter((l) => l.touchAt !== null && l.leadAt > pointEnd(reply.points[i].day, m.now) - 7 * 86_400_000 && l.leadAt <= pointEnd(reply.points[i].day, m.now)).length;
   const since = t.sinceVisit && (t.sinceVisit.newLeads.length + t.sinceVisit.breached.length + t.sinceVisit.answered.length + t.sinceVisit.clearedAlerts.length > 0) ? t.sinceVisit : null;
 
+  // ---- command palette (Ctrl K), saved views and the printable report ----
+  const nameOf = useMemo(() => new Map(options.map((o) => [o.id, o.name])), [options]);
+  const scrollTo = (id: string, tabIndex = 0) => { setTab(tabIndex); setTimeout(() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" }), 80); };
+  const applyView = (v: TodayView) => { changeAccounts(v.accounts); m.setExcludeJunk(v.excludeJunk); };
+  const commands: PaletteCommand[] = [
+    { id: "search-people", group: "Find", title: "Search people", hint: "Names, emails and phone numbers in every client account", keywords: "contact lead", run: () => document.querySelector<HTMLElement>('[data-testid="global-search-open"]')?.click() },
+    { id: "go-fix", group: "Go to", title: "Fix first", hint: "The ranked queue", keywords: "queue top", run: () => scrollTo("fix-first-h") },
+    { id: "go-charts", group: "Go to", title: "Where the work is", hint: "The two charts", keywords: "donut bars", run: () => scrollTo("where-h") },
+    { id: "go-accounts", group: "Go to", title: "Accounts needing you", run: () => scrollTo("needs-you") },
+    { id: "go-caught", group: "Go to", title: "What SubSync caught", hint: "For your next client review", keywords: "alerts proof", run: () => scrollTo("caught-h") },
+    { id: "tab-people", group: "Go to", title: "People tab", hint: "Workload by person", keywords: "owner workload", run: () => setTab(1) },
+    { id: "tab-sources", group: "Go to", title: "Sources tab", hint: "Speed by source", run: () => setTab(2) },
+    { id: "tab-coverage", group: "Go to", title: "Coverage tab", hint: "Which hours of the day miss leads", keywords: "hours", run: () => setTab(3) },
+    ...(["leads", "appointments", "noshows", "stale", "unanswered"] as const).map((k): PaletteCommand => ({ id: `list-${k}`, group: "Open list", title: KIND_LABEL[k], hint: `${fmtInt(view.totals[k].count)} behind this number`, run: () => m.open(specKind(k, env)) })),
+    { id: "list-clients", group: "Open list", title: "Clients that need you", run: () => m.open(specClients(env)) },
+    { id: "list-dollars", group: "Open list", title: "Deals behind the dollars at risk", keywords: "money stale", run: () => m.open(specDollars(env)) },
+    ...options.map((o): PaletteCommand => ({ id: `account-${o.id}`, group: "Client account", title: o.name, hint: "Show only this client account", keywords: "account only narrow", run: () => changeAccounts([o.id]) })),
+    { id: "all-accounts", group: "Client account", title: "Show all client accounts", disabled: picked.length === 0, run: () => changeAccounts([]) },
+    { id: "junk", group: "Do", title: m.excludeJunk ? "Count test and very old deals again" : "Leave out test and very old deals", keywords: "junk exclude", run: () => m.setExcludeJunk(!m.excludeJunk) },
+    { id: "share", group: "Do", title: "Share Today", hint: "Copies the headline and the top 3", keywords: "copy", run: () => void copy() },
+    { id: "brief", group: "Do", title: "Preview the daily email", run: () => setBrief(true) },
+    { id: "sync", group: "Do", title: "Sync now", hint: "Read every client account again", run: () => void sync() },
+    { id: "print", group: "Do", title: "Print the report", hint: "Or save it as a PDF", keywords: "pdf paper", run: () => window.print() },
+  ];
+  const report = {
+    brandName: null, who: picked.length > 0 ? pickedNames.join(", ") : "All client accounts", generatedAt: new Date(m.now).toLocaleString("en-GB", { dateStyle: "full", timeStyle: "short" }),
+    headline: headline.text, breakdown: headline.breakdown, rows, insights: m.insights.map((i) => i.text), forecast: forecastLine(t.forecast, t.targetMinutes),
+    proof: t.proof ? proofLine(t.proof) : null, setAside: view.held.length,
+  };
+
   const overview = (
     <>
       {since && <SinceStrip since={since} showAlerts onOpen={(k) => m.open(specSince(k, since, env))} />}
@@ -239,15 +271,19 @@ function TodayAgency({ go, t, reload, sync, syncing, options, picked, setPicked,
 
   return (
     <Page title="Today" subtitle="What needs a person across your client accounts, most valuable first."
-      actions={<><Btn variant="ghost" onClick={() => setBrief(true)} testId="brief-preview">Preview the daily email</Btn><Btn variant="ghost" onClick={copy}>{copied ? "Copied to your clipboard" : "Share Today"}</Btn><Btn onClick={sync} disabled={syncing}>{syncing ? "Syncing..." : "Sync now"}</Btn></>}>
-      {(options.length >= 2 || picked.length > 0) && (
-        <div className="mb-5 flex flex-wrap items-center gap-x-3 gap-y-2" data-testid="today-toolbar">
-          <LocalAccountPicker accounts={options} picked={picked} onChange={changeAccounts} />
-          {picked.length > 0 && <ShowingChip label={pickedNames.length === 1 ? pickedNames[0] : `${pickedNames.length} client accounts`} onClear={() => changeAccounts([])} />}
-        </div>
-      )}
+      actions={<><Btn variant="ghost" onClick={() => setBrief(true)} testId="brief-preview">Preview the daily email</Btn><Btn variant="ghost" onClick={() => window.print()} testId="print-report">Print report</Btn><Btn variant="ghost" onClick={copy}>{copied ? "Copied to your clipboard" : "Share Today"}</Btn><Btn onClick={sync} disabled={syncing}>{syncing ? "Syncing..." : "Sync now"}</Btn></>}>
+      <PrintReport r={report} now={m.now} />
+      <div className="mb-5 flex flex-wrap items-center gap-x-3 gap-y-2 print:hidden" data-testid="today-toolbar">
+        <LocalAccountPicker accounts={options} picked={picked} onChange={changeAccounts} />
+        {picked.length > 0 && <ShowingChip label={pickedNames.length === 1 ? pickedNames[0] : `${pickedNames.length} client accounts`} onClear={() => changeAccounts([])} />}
+        <span className="ml-auto flex flex-wrap items-center gap-2">
+          <ViewsMenu current={{ accounts: picked, excludeJunk: m.excludeJunk }} names={nameOf} onApply={applyView} />
+          <CommandPalette commands={commands} />
+        </span>
+      </div>
       {error && <InlineAlert tone="danger" className="mb-4" action={<Btn onClick={() => void reload()}>Try again</Btn>}>{error}</InlineAlert>}
 
+      <div className="print:hidden">
       <HeadlineBlock headline={headline} onPart={onPart}>
         {blockedLeads && <InlineAlert tone="warning" className="mt-3" action={<Btn onClick={() => go("settings")}>Open Settings</Btn>}>{blockedLeads}</InlineAlert>}
         {blockedAppts && <InlineAlert tone="warning" className="mt-3" action={<Btn onClick={() => go("settings")}>Open Settings</Btn>}>{blockedAppts}</InlineAlert>}
@@ -262,6 +298,7 @@ function TodayAgency({ go, t, reload, sync, syncing, options, picked, setPicked,
         { label: "Sources", node: <SourcesTab m={m} t={t} /> },
         { label: "Coverage", node: <CoverageTab m={m} t={t} /> },
       ]} />
+      </div>
       <TodayLayers m={m} />
       {brief && <BriefPreview onClose={() => setBrief(false)} />}
     </Page>

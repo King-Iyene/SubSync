@@ -28,3 +28,7 @@ export { useNow } from "./live";
 export { RowsPanel } from "./rows-panel";
 export { RecordsPanel } from "./records-panel";
 export { InsightStrip, SinceStrip, ComingBlock, HourStrip, SourceBars, WorkloadList, CompareList } from "./today-blocks-smart";
+export { CommandPalette } from "./command-palette";
+export { ViewsMenu } from "./views-menu";
+export { PrintReport, type ReportInput } from "./print-report";
+export { PopMenu, type MenuItem } from "./pop-menu";
