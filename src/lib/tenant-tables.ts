@@ -5,7 +5,7 @@
 
 /** Copied customer data. "Delete my data" removes exactly this, and so does an uninstall. */
 export const SYNCED_DELETE = [
-  "cleanup_changes", "cleanup_runs", "duplicate_reviews",
+  "cleanup_changes", "cleanup_runs", "duplicate_reviews", "duplicate_snoozes",
   "cached_contacts", "cached_opportunities", "cached_conversations", "cached_appointments", "pipelines",
   "account_metrics_daily", "alerts", "domain_checks", "onboarding_tasks",
   "deal_events", "appointment_events", "lead_touches", "call_outcomes", "contact_tag_events",
@@ -31,7 +31,7 @@ export const KEEP_ON_UNINSTALL: readonly string[] = [
 
 /** Removing one client account deletes its rows from these, children first, the account row last. */
 export const LOCATION_DELETE = [
-  "cleanup_changes", "cleanup_runs", "duplicate_reviews",
+  "cleanup_changes", "cleanup_runs", "duplicate_reviews", "duplicate_snoozes",
   "cached_contacts", "cached_opportunities", "cached_conversations", "cached_appointments", "pipelines",
   "account_metrics_daily", "alerts", "domain_checks", "onboarding_tasks",
   "deal_events", "appointment_events", "lead_touches", "call_outcomes", "contact_tag_events",

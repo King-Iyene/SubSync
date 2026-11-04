@@ -18,7 +18,7 @@ const CLIENT_GET = new Set(["today", "people", "notifications", "my-connections"
 // (meeting-policy). meeting-inbox (stage E2a) is the signed-in person's OWN inbox: every query names their installation and user id. The handlers refuse an account user for the last two; tests/unit/e0-connections-db.test.ts asks them with real sessions.
 // Stage F9: the bell (notifications) is open to a client's staff; the handler limits it to their own account's items and their own marks. The preferences and
 // Slack channels (notification-prefs, notification-destinations) are NOT in these lists, so they stay refused.
-const CLIENT_POST = new Set(["usage", "roadmap", "notifications", "my-connections", "team-connections", "meeting-inbox", "meeting-setup", "feedback", "problem"]);
+const CLIENT_POST = new Set(["duplicates", "usage", "roadmap", "notifications", "my-connections", "team-connections", "meeting-inbox", "meeting-setup", "feedback", "problem"]);
 const CLIENT_PUT = new Set(["meeting-policy", "meeting-inbox", "meeting-setup"]);
 const CLIENT_DELETE = new Set(["my-connections"]);
 

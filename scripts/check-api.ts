@@ -452,51 +452,57 @@ async function main() {
   assert.equal((await call(`/api/app/contact/${otherAcc.locationId}/${foreign[0].contact_id}`, { token: ct })).status, 404, "nor can a client");
   console.log("sources + DND + birthdays + teamRes + movement + timeline: ok");
 
-  // --- duplicates: scored review queue, decisions with snapshots, dry-run bulk, undo
-  const dq = await call("/api/app/duplicates", { token });
+  // --- duplicates (stage DUP): one page and one group, decisions with snapshots, set aside, undo, isolation, the one-click merge switched off
+  const dq = await call("/api/app/duplicates?size=25", { token });
   assert.equal(dq.status, 200);
-  assert.ok(dq.body.groups.length > 3 && dq.body.summary.exact > 0 && dq.body.canReview === true);
-  for (const g of dq.body.groups as Array<{ confidence: number; people: Array<{ contactId: string }>; survivorId: string; plan: unknown[]; reasons: string[] }>) {
-    assert.ok(g.people.length >= 2 && g.confidence >= 50 && g.confidence <= 100 && g.reasons.length > 0 && g.plan.length === 4);
-    assert.ok(g.people.some((p) => p.contactId === g.survivorId), "the recommended record is one of the group");
-  }
-  assert.ok(dq.body.summary.accounts.length >= 13);
-  const dupTarget = dq.body.groups[0] as { locationId: string; people: Array<{ contactId: string }>; survivorId: string };
+  assert.ok(dq.body.health.groups > 3 && dq.body.health.extra >= dq.body.health.groups && dq.body.step, "the demo has duplicates to review");
+  assert.ok(dq.body.list.rows.length <= 25 && dq.body.upNext.length <= 5, "one page, not the whole list");
+  assert.equal(dq.body.selection.total, dq.body.health.groups, "the stepper and the headline count the same groups");
+  for (const g of dq.body.list.rows as Array<{ size: number; reason: { label: string }; likelihood: { key: string } }>) assert.ok(g.size >= 2 && g.reason.label.length > 0 && g.likelihood.key.length > 0);
+  const dupTarget = dq.body.step as { locationId: string; key: string; survivorId: string; why: string; people: Array<{ contactId: string }> };
+  assert.ok(dupTarget.people.some((p) => p.contactId === dupTarget.survivorId), "the recommended record is one of the group");
+  assert.ok(dupTarget.why.length > 0, "the pick comes with its reason");
   const dupIds = dupTarget.people.map((p) => p.contactId);
   const review = (body: unknown, tok = token) => call("/api/app/duplicates/review", { token: tok, method: "POST", body: JSON.stringify(body) });
   assert.equal((await review({ locationId: dupTarget.locationId, contactIds: dupIds, decision: "delete_them", keepContactId: dupIds[0] })).status, 400, "unknown decisions are refused");
   assert.equal((await review({ locationId: dupTarget.locationId, contactIds: dupIds, decision: "keep" })).status, 400, "a keep decision needs a record");
   assert.equal((await review({ locationId: dupTarget.locationId, contactIds: [dupIds[0], "nope-nope"], decision: "not_duplicate" })).status, 404, "contacts that do not exist");
   assert.equal((await review({ locationId: otherAcc.locationId, contactIds: dupIds, decision: "not_duplicate" })).status, 404, "contacts from a different account");
-  const sumOf = (b: { summary: { exact: number; format: number; name: number } }) => b.summary.exact + b.summary.format + b.summary.name;
-  const before = sumOf(dq.body);
-  assert.equal((await review({ locationId: dupTarget.locationId, contactIds: dupIds, decision: "keep", keepContactId: dupTarget.survivorId })).status, 200);
+  const before = dq.body.health.groups as number;
+  assert.equal((await review({ locationId: dupTarget.locationId, contactIds: dupIds, decision: "not_duplicate" })).status, 200);
   const [rev] = await sql()`select decision, snapshot from duplicate_reviews where location_id = ${dupTarget.locationId} order by decided_at desc limit 1`;
-  assert.equal(rev.decision, "keep");
+  assert.equal(rev.decision, "not_duplicate");
   assert.equal(rev.snapshot.contacts.length, dupIds.length, "a snapshot of the records is saved");
-  const [audit] = await sql()`select count(*)::int n from audit_log where action = 'duplicates.keep'`;
+  const [audit] = await sql()`select count(*)::int n from audit_log where action = 'duplicates.not_duplicate'`;
   assert.ok(audit.n >= 1, "the action is logged");
-  assert.equal(sumOf((await call("/api/app/duplicates", { token })).body), before - 1, "a reviewed group leaves the queue");
-  assert.equal((await call("/api/app/duplicates?reviewed=1", { token })).body.groups.filter((g: { review: unknown }) => g.review).length, 1);
+  assert.equal((await call("/api/app/duplicates?size=25", { token })).body.health.groups, before - 1, "a decided group leaves the queue");
+  assert.equal((await call("/api/app/duplicates/undo", { token, method: "POST", body: JSON.stringify({ locationId: dupTarget.locationId, key: dupTarget.key }) })).status, 200);
+  assert.equal((await call("/api/app/duplicates?size=25", { token })).body.health.groups, before, "undo brings it back");
+  // Not now, and back
+  assert.equal((await call("/api/app/duplicates/snooze", { token, method: "POST", body: JSON.stringify({ locationId: dupTarget.locationId, contactIds: dupIds }) })).status, 200);
+  assert.equal((await call("/api/app/duplicates?size=25", { token })).body.counts.later, 1);
+  assert.equal((await call("/api/app/duplicates/unsnooze", { token, method: "POST", body: JSON.stringify({ locationId: dupTarget.locationId, contactIds: dupIds }) })).status, 200);
+  // The one-click merge is switched off: it answers in words, changes nothing, and never reaches a client of another account
+  const mergeTry = await call("/api/app/duplicates/merge", { token, method: "POST", body: JSON.stringify({ locationId: dupTarget.locationId, contactIds: dupIds, keepContactId: dupTarget.survivorId }) });
+  assert.equal(mergeTry.status, 200);
+  assert.ok(mergeTry.body.switchedOff === true || mergeTry.body.blocked === true, "never merged from here");
+  assert.equal((await call("/api/app/duplicates?size=25", { token })).body.health.groups, before, "nothing changed");
+  // bulk (the older preview tool): a dry run records nothing; a client's staff may not use it
   const dry = await call("/api/app/duplicates/bulk", { token, method: "POST", body: JSON.stringify({ decision: "not_duplicate", minConfidence: 0, maxConfidence: 100 }) });
   assert.equal(dry.body.dryRun, true, "bulk defaults to a dry run");
   assert.ok(dry.body.count > 0 && dry.body.sample.length > 0);
   const [still] = await sql()`select count(*)::int n from duplicate_reviews`;
-  assert.equal(still.n, 1, "a dry run records nothing");
-  assert.equal((await call("/api/app/duplicates/bulk", { token, method: "POST", body: JSON.stringify({ decision: "not_duplicate", minConfidence: 90, maxConfidence: 10 }) })).status, 400);
-  const applied = await call("/api/app/duplicates/bulk", { token, method: "POST", body: JSON.stringify({ decision: "not_duplicate", minConfidence: 90, maxConfidence: 100, dryRun: false }) });
-  assert.equal(applied.status, 200);
-  assert.ok(applied.body.count > 0);
-  assert.equal((await call("/api/app/duplicates/undo", { token, method: "POST", body: JSON.stringify({ locationId: dupTarget.locationId, key: "00000000-9" }) })).status, 404);
-  const [firstReview] = await sql()`select group_key from duplicate_reviews where location_id = ${dupTarget.locationId} limit 1`;
-  assert.equal((await call("/api/app/duplicates/undo", { token, method: "POST", body: JSON.stringify({ locationId: dupTarget.locationId, key: firstReview.group_key }) })).status, 200);
-  // a client view can look but not decide; a business decides only about its own account
-  assert.equal((await review({ locationId: dupTarget.locationId, contactIds: dupIds, decision: "not_duplicate" }, ct)).status, 403);
-  assert.equal((await call("/api/app/duplicates", { token: ct })).body.canReview, false);
-  assert.equal((await review({ locationId: dupTarget.locationId, contactIds: dupIds, decision: "not_duplicate" }, bt)).status, dupTarget.locationId === own ? 200 : 404);
+  assert.equal(still.n, 0, "a dry run records nothing");
+  assert.equal((await call("/api/app/duplicates/bulk", { token: ct, method: "POST", body: JSON.stringify({ decision: "not_duplicate", minConfidence: 0 }) })).status, 403);
+  // a client's staff and a business reach only their own account: another account's contacts are "not found", their own list is only their account
+  assert.equal((await review({ locationId: otherAcc.locationId, contactIds: dupIds, decision: "not_duplicate" }, ct)).status, 404);
+  const cdq = await call("/api/app/duplicates?size=50", { token: ct });
+  assert.equal(cdq.body.canExport, false);
+  assert.ok((cdq.body.list.rows as Array<{ locationId: string }>).every((r) => r.locationId === own), "a client sees only their own account's groups");
   await sql()`delete from duplicate_reviews where installation_id = (select id from installations where is_demo)`;
+  await sql()`delete from duplicate_snoozes where installation_id = (select id from installations where is_demo)`;
   await sql()`delete from audit_log where installation_id = (select id from installations where is_demo)`;
-  console.log("duplicates: scored queue, snapshots, audit log, dry run, undo, isolation: ok");
+  console.log("duplicates: one page and one group, snapshots, audit log, set aside, undo, merge switched off, isolation: ok");
 
   // --- the daily brief: changes against each account's own history, ranked attention, schedule
   const daily = await call("/api/app/daily", { token });
