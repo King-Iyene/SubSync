@@ -114,7 +114,7 @@ test("the account picker: a row ticks anywhere on it, Show all accounts and Done
   // A click outside closes it.
   await page.getByTestId("picker-button").click();
   await expect(pop).toBeVisible();
-  await page.getByTestId("today-headline").click({ position: { x: 4, y: 4 } });
+  await page.getByTestId("page-subtitle").click();
   await expect(pop).toHaveCount(0);
   // Real mouse clicks at the middle of both buttons hit the buttons themselves (nothing sits on top of them), in a short window too.
   await page.setViewportSize({ width: 1024, height: 560 });
