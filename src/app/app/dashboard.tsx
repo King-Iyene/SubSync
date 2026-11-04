@@ -249,7 +249,7 @@ export function Dashboard() {
       // Not remembered: the next time SubSync is opened from the agency menu it must show every client account again.
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setFilterState(only);
-      try { window.history.replaceState(null, "", withTodayAccounts(buildHash({ id: "today" }, only), [auth.locationId])); } catch { /* the screen still narrows */ }
+      try { window.history.replaceState(null, "", withTodayAccounts(buildHash({ id: "today" }, only), [auth.locationId])); window.dispatchEvent(new Event("subsync-today-accounts")); } catch { /* the screen still narrows */ }
     }
   }, [auth]);
   // True while the page shows only the account SubSync was opened from (the filter is that one account). Pages draw no account filter then.
