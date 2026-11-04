@@ -94,6 +94,7 @@ import { meetingSetupAccountView, meetingSetupFieldsSave, meetingSetupFieldsView
 import { can, personFromSession } from "../connections/person";
 import { handlePeople, timeoutResponse } from "./people-routes";
 import { handleDuplicates } from "./duplicates-routes";
+import { handleApptWork } from "./appointment-work-routes";
 import { buildSteps, guideRoleOf } from "../getting-started";
 import { changedSettingKeys, feedbackGivenBy, logAccountFlags, logKeyChange, logSettingsChange, recordVote } from "../feedback-queries";
 import { groupStatus, parseGranted } from "../scope-groups";
@@ -1827,6 +1828,10 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
         voter: voterOf(ctx),
         locationToken: (locationId) => locationAccessToken(ctx.session.companyId, locationId),
       });
+    }
+    // The rebuilt Appointments page: the work lists, "See all" and the comparison (read only).
+    if (a === "appointments" && method === "GET" && (b === "work" || b === "list" || b === "compare") && !c) {
+      return await handleApptWork(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links });
     }
     // The guided duplicate review (reading, setting a group aside, the one-click merge, which is switched off). Deciding and undoing stay below.
     if (a === "duplicates" && (method === "GET" || ["snooze", "unsnooze", "merge"].includes(b ?? ""))) {
