@@ -38,7 +38,7 @@ async function oneAccount(ctx: Ctx, deps: Deps, loc: unknown): Promise<string | 
   if (base !== null) {
     if (!base.includes(loc)) return null;
     // A single account named by the session must still belong to this company (a session can never widen itself to another company).
-    if (ctx.limitTo) { const [mine] = await sql`select 1 as x from locations where installation_id = ${ctx.installationId} and location_id = ${loc}`; if (!mine) return null; }
+    if (ctx.limitTo) { const [mine] = await sql()`select 1 as x from locations where installation_id = ${ctx.installationId} and location_id = ${loc}`; if (!mine) return null; }
     return loc;
   }
   // "Every account of this company": the account must still belong to this company, so another company's id answers like one that does not exist.
