@@ -210,7 +210,7 @@ export function breakdownOf(t: Totals): string | null {
  * The one big sentence. "4 clients need you today. $48,200 is at risk." The count of clients is the number of client accounts with at least one row in the queue,
  * the dollars are the counted value of stale deals (a fact, never an estimate). With nothing to do it says so plainly.
  */
-export function headlineOf(i: { scope: "all" | "account"; rows: QueueRow[]; totals: Totals }): Headline {
+export function headlineOf(i: { scope: "all" | "account"; rows: QueueRow[]; totals: Totals; /** One deal that is most of the stalled money (the audit's outlier guard). */ outlier?: { value: number; share: number } | null }): Headline {
   const accounts = new Set(i.rows.map((r) => r.locationId)).size;
   const things = KINDS.reduce((s, k) => s + i.totals[k].count, 0);
   const dollars = i.totals.stale.dollars ?? 0;
@@ -223,6 +223,8 @@ export function headlineOf(i: { scope: "all" | "account"; rows: QueueRow[]; tota
     ? [{ t: String(accounts), strong: true }, { t: ` ${accounts === 1 ? "client needs" : "clients need"} you today.` }]
     : [{ t: things.toLocaleString("en-US"), strong: true }, { t: ` ${things === 1 ? "thing needs" : "things need"} you today.` }];
   if (dollars > 0) parts.push({ t: " " }, { t: money(dollars), strong: true }, { t: " is at risk." });
+  // One deal worth at least half of it is said out loud, so the dollar figure is not read as a pattern (the audit's outlier guard).
+  if (dollars > 0 && i.outlier) parts.push({ t: ` One deal is ${money(i.outlier.value)} of that.` });
   return { parts, text: parts.map((p) => p.t).join(""), allClear: false, breakdown, accounts, dollars };
 }
 

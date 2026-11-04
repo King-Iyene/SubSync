@@ -43,7 +43,7 @@ test("the ranking rule: value at risk first, then how long it has been wrong, th
 });
 
 test("equal value and age fall back to severity, then to the name, so the order never flickers", () => {
-  const base = { dollars: null, estimate: null, ageMinutes: 120, since: NOW, url: "u", itemIds: [], partial: false, count: 1, text: "t" } as const;
+  const base = { dollars: null, estimate: null, ageMinutes: 120, since: NOW, url: "u", itemIds: [], partial: false, count: 1, text: "t" } as unknown as Omit<QueueRow, "key" | "kind" | "locationId" | "accountName" | "severity">;
   const rows: QueueRow[] = [
     { ...base, key: "1", kind: "appointments", locationId: "a", accountName: "Zed", severity: "info" },
     { ...base, key: "2", kind: "leads", locationId: "b", accountName: "Bee", severity: "critical" },
@@ -109,6 +109,12 @@ test("the headline: clients and counted dollars, built from existing figures", (
   assert.equal(h.allClear, false);
   const one = headlineOf({ scope: "all", rows: queueOf([item("leads", "aaa")]), totals: totalsFrom([item("leads", "aaa")]) });
   assert.equal(one.text, "1 client needs you today.", "no dollars, no dollar sentence");
+});
+
+test("one deal that is most of the stalled money is said out loud, never hidden in the total", () => {
+  const items = [item("stale", "aaa", { value: 900_000 }), item("stale", "bbb", { value: 100_000 })];
+  const h = headlineOf({ scope: "all", rows: queueOf(items), totals: totalsFrom(items), outlier: { value: 900_000, share: 0.9 } });
+  assert.equal(h.text, "2 clients need you today. $1,000,000 is at risk. One deal is $900,000 of that.");
 });
 
 test("the headline never counts an estimate as money at risk", () => {
