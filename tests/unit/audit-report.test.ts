@@ -158,13 +158,14 @@ describe("the in-app audit screen", () => {
     expect(src).not.toMatch(/tel:/);
   });
 
-  it("labels every button that leaves the page with where it goes, and offers the list behind each number", () => {
-    expect(src).toContain("openLabel(first.view)");
-    expect(src).toContain("openLabel(f.view)");
-    expect(src).not.toMatch(/>\s*Open\s*<\/Btn>/);
-    expect(src).toContain('backLabel="Back to the audit"');
-    expect(src).toMatch(/drill\.select\(staleIdx\)/);
-    expect(src).toMatch(/drill\.select\(slowIdx\)/);
+  it("offers the shared list behind every finding, with one button each, and says where a link leaves the app", () => {
+    const parts = readFileSync("src/app/app/views/audit-parts.tsx", "utf8");
+    expect(src).toContain("RecordsPanel");
+    expect(src).toContain("specOf(f, data)");
+    expect(parts).toContain('data-testid="audit-show"');
+    expect(parts).toContain("Show ${num(f.count)}");
+    expect(src + parts).not.toMatch(/>\s*Open\s*<\/(Btn|button)>/);
+    expect(src + parts).not.toMatch(/gohighlevel|highlevel|leadconnector|\bGHL\b/i);
   });
 
   it("the list's way back is named by the page, and the chart pages keep their own wording", () => {

@@ -107,6 +107,8 @@ export function AuditReport({ payload: p, expiresAt }: { payload: SharePayload; 
           {sender && p.brandLogoUrl && <BrandLogo url={p.brandLogoUrl} name={sender} height={40} className="rp-logo" fallback={null} />}
           <p className="rp-eyebrow rp-accent">Account audit{sender ? ` · ${sender}` : ""}</p>
           <h1>{p.headline}</h1>
+          {p.verdictSub && <p className="rp-sub" style={{ fontSize: "0.95rem", marginTop: 0 }} data-testid="report-sub">{p.verdictSub}</p>}
+          {p.grade && <p className="rp-sub" data-testid="report-grade">{p.grade}</p>}
           <p className="rp-meta">
             Snapshot taken {day(p.createdAt)}. This link works until {day(expiresAt.toISOString())}. It covers {p.accountsScanned} client {p.accountsScanned === 1 ? "account" : "accounts"}.
           </p>
@@ -131,7 +133,7 @@ export function AuditReport({ payload: p, expiresAt }: { payload: SharePayload; 
             <p className="rp-kicker">Estimate, not a fact{refFor(notes, "estimate")}</p>
             <p className="rp-value">{p.estimatedDollars === null ? <small>Not enough data</small> : usd(p.estimatedDollars)}</p>
             {p.estimateRange && p.estimatedDollars !== null && <p className="rp-sub">Most likely between {usd(p.estimateRange.low)} and {usd(p.estimateRange.high)}.</p>}
-            <p className="rp-sub">Cost of slow follow-up: waiting conversations x average deal x win rate. A rough size of the problem, not money lost. It is never added to the counted figure.</p>
+            <p className="rp-sub">What leaks each month: people waiting for a reply and no-shows not rebooked, each counted once, x average deal x win rate. A rough size of the problem, not money lost. It is never added to the counted figure.</p>
           </div>
         </section>
         {(p.leftOut ?? 0) > 0 && <p className="rp-sub" style={{ marginTop: "0.75rem" }}>{(p.leftOut as number).toLocaleString("en-US")} open {p.leftOut === 1 ? "deal is" : "deals are"} left out of every dollar figure (no value, no owner, or in a closed-out stage).{refFor(notes, "left_out")}</p>}
@@ -145,9 +147,19 @@ export function AuditReport({ payload: p, expiresAt }: { payload: SharePayload; 
                   <span className={`rp-tag ${f.severity === "critical" ? "rp-crit" : "rp-warn"}`}>{f.severity === "critical" ? "Urgent · " : "Soon · "}</span>{f.title}
                   {f.dollars !== null && <span className="rp-sub"> · {usd(f.dollars)} {f.kind === "estimate" ? "(estimate)" : "(counted)"}</span>}
                   {refFor(notes, f.note)}
+                  {f.what && <span className="rp-win">{f.what}</span>}
                   {f.window && <span className="rp-win">Counted over: {f.window}.</span>}
                 </li>
               ))}
+            </ul>
+          </section>
+        )}
+
+        {(p.healthy?.length ?? 0) > 0 && (
+          <section aria-label="What is healthy">
+            <h2>What is healthy</h2>
+            <ul className="rp-list">
+              {p.healthy!.map((h) => <li key={h}>{h}</li>)}
             </ul>
           </section>
         )}

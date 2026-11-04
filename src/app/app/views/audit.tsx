@@ -1,103 +1,117 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { MoreHorizontal } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useApiClient, useData } from "../session";
-import type { GoFn } from "../nav";
-import { DataList, DefinitionTip, DrillPanel, EmptyState, HowTo, InlineAlert, Page, SkeletonRows, useDrill, type Column } from "../ds";
-import { Badge, Btn, Card, ErrorBox, ExtLink, fmtMoney, Stat, type Tone } from "../ui";
-import { fixFirstFinding, openLabel, type Audit, type AuditNote, type Finding, type FindingKey, type NoteKey } from "@/lib/analytics/audit-intel";
-import type { AuditList, AuditListRow } from "@/lib/analytics/audit-queries";
+import { EmptyState, ErrorState, InlineAlert, Page, PopMenu, RecordsPanel, Section, SkeletonCards, type MenuItem } from "../ds";
+import { Btn, Card } from "../ui";
+import type { Finding, FindingKey, Grade, Verdict } from "@/lib/analytics/audit-v2";
+import type { ClientPage, ProgressLine, Reading } from "@/lib/analytics/audit-clients";
+import { itemsSpec, type RecordsSpec } from "@/lib/analytics/today-records";
 import { SAMPLE_AUDIT_ID } from "@/lib/analytics/share-intel";
 import { printAccent, printCss } from "@/lib/design/print";
 import { BrandLogo } from "../brand-logo";
+import { ClientRowView, FindingRow, GoodNews, LIST_TITLE, Pager, ProgressBlock, ReadingStrip, VerdictBlock, clientControls, num} from "./audit-parts";
 
-type Row = AuditListRow & { url: string };
-type ListData = Omit<AuditList, "rows"> & { rows: Row[] };
+// The Account audit, rebuilt (docs/AUDIT_REVIEW.md, docs/features/AUDIT.md). The first thing on the page is one sentence about the money, with the word "estimate"
+// on it and its formula one tap away; then the one thing to do first; then the findings as short rows (ranked by money, then by how easy they are to fix), each with
+// ONE button that opens exactly the people or deals it counted in the shared list; then what is healthy and what has improved. An agency also sees the clients that need
+// it most (five, then all of them, searched and paged on the server). Nothing here changes anything in the CRM.
+
 type ShareLink = { id: string; url: string; createdAt: string; expiresAt: string; revoked: boolean; expired: boolean; views: number; lastViewedAt: string | null };
+type Data = {
+  verdict: Verdict; grade: Grade | null; startHere: FindingKey | null; totals: { things: number; accounts: number; accountsWithProblems: number; people: number; deals: number };
+  notes: string[]; healthy: string[]; progress: ProgressLine[]; reading: Reading; findings: Finding[]; clients: (ClientPage & { sort: string; withProblems: number; clean: number; accounts: number }) | null;
+  summary: string; scope: "all" | "account"; staleDays: number; slaHours: number; targetMinutes: number; readLimit: string | null; now: number;
+  brand: { name: string | null; color: string | null; logoUrl?: string | null }; generatedAt: string; hiddenAccounts: number; focus: { id: string; name: string } | null;
+  canShare: boolean; demo: boolean; shareDays: number;
+};
+
 const shortDate = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
 const longDate = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 
-type Data = {
-  audit: Audit; summary: string;
-  /** The rows behind each finding that has a list (KF-6), from the same accounts and the same rules as the numbers. */
-  lists: Partial<Record<FindingKey, ListData>> | null;
-  readLimit: string | null; hiddenAccounts: number;
-  brand: { name: string | null; color: string | null; logoUrl?: string | null };
-  canShare: boolean; demo: boolean; shareDays: number; generatedAt: string;
-};
+function specOf(f: Finding, d: Data): RecordsSpec {
+  return itemsSpec(f.items, d.now, {
+    key: `audit-${f.key}`, title: LIST_TITLE[f.key], noun: f.count === 1 ? f.noun.one : f.noun.many, count: f.count, exportName: `audit-${f.key}`,
+    subtitle: f.what,
+    note: f.partial || f.items.length < f.count ? `SubSync loaded the first ${num(f.items.length)} of ${num(f.count)}. The number in the title is the true count.` : null,
+  });
+}
 
-const tone: Record<Finding["severity"], Tone> = { critical: "bad", warning: "warn", info: "info" };
-const label: Record<Finding["severity"], string> = { critical: "Urgent", warning: "Soon", info: "Good to know" };
-
-// What each list is called, and what its rows are.
-const LIST_TITLE: Partial<Record<FindingKey, { title: string; noun: string; one: string }>> = {
-  stale: { title: "Deals that stopped moving", noun: "deals", one: "deal" },
-  slow: { title: "Conversations waiting for a reply", noun: "conversations", one: "conversation" },
-  unmarked: { title: "Appointments with no outcome", noun: "appointments", one: "appointment" },
-  noshows: { title: "No-shows not rebooked", noun: "no-shows", one: "no-show" },
-};
-
-const rowColumns: Array<Column<Row>> = [
-  { key: "name", header: "Contact", primary: true, width: "minmax(0,1.5fr)", cell: (r) => r.name },
-  { key: "account", header: "Client account", width: "minmax(0,1.2fr)", cell: (r) => <span className="text-muted-foreground">{r.locationName ?? ""}</span> },
-  { key: "what", header: "What", width: "minmax(0,2.2fr)", cell: (r) => <span className="text-muted-foreground">{r.detail}</span> },
-  { key: "open", header: "", width: "8.5rem", align: "right", cell: (r) => <ExtLink href={r.url}>Open in your CRM</ExtLink> },
-];
-
-// Instant audit: what is wrong across the accounts right now and what it is costing. Money that is counted from deals is labelled a fact; money inferred
-// from a win rate is labelled an estimate and kept apart. Every number has its definition one tap away and opens the list it was counted from.
-export function AuditView({ go }: { go: GoFn }) {
-  const { data, error, loading, reload } = useData<Data>("audit");
+export function AuditView() {
   const api = useApiClient();
-  const drill = useDrill();
+  const [focus, setFocus] = useState<string | null>(null);
+  const [runs, setRuns] = useState(0);
+  const path = useMemo(() => {
+    const sp = new URLSearchParams();
+    if (focus) sp.set("location", focus);
+    if (runs > 0) { sp.set("fresh", "1"); sp.set("r", String(runs)); }
+    const q = sp.toString();
+    return q ? `audit?${q}` : "audit";
+  }, [focus, runs]);
+  const { data, error, loading, reload } = useData<Data>(path);
+  const [spec, setSpec] = useState<RecordsSpec | null>(null);
   const [copied, setCopied] = useState<"summary" | "link" | null>(null);
   const [link, setLink] = useState<string | null>(null);
   const [linkError, setLinkError] = useState<string | null>(null);
   const [sharing, setSharing] = useState(false);
   const [links, setLinks] = useState<ShareLink[]>([]);
+  const [all, setAll] = useState(false);
+  const [cq, setCq] = useState("");
+  const [csort, setCsort] = useState("money");
+  const [cpage, setCpage] = useState(0);
+  const [debounced, setDebounced] = useState("");
   const loadLinks = useCallback(() => { api.get<{ links: ShareLink[] }>("audit/shares").then((r) => setLinks(r.links)).catch(() => setLinks([])); }, [api]);
   useEffect(() => { loadLinks(); }, [loadLinks]);
-  // A list that has just been opened is brought into view, so pressing a number at the top of the page does not look like nothing happened.
-  useEffect(() => { if (drill.open) document.getElementById("audit-drill")?.scrollIntoView({ block: "nearest" }); }, [drill.open, drill.selected]);
+  useEffect(() => { const t = setTimeout(() => { setDebounced(cq); setCpage(0); }, 300); return () => clearTimeout(t); }, [cq]);
+  // While the first read of the accounts runs, the page looks again on its own, so the numbers fill in without a reload.
+  const reading = data?.reading.reading === true;
+  useEffect(() => {
+    if (!reading) return;
+    const t = setInterval(() => { void reload(); }, 20_000);
+    return () => clearInterval(t);
+  }, [reading, reload]);
+
+  const clientsPath = all && data?.clients
+    ? `audit/clients?${new URLSearchParams({ q: debounced, sort: csort, page: String(cpage), size: "10", ...(focus ? { location: focus } : {}), ...(runs ? { r: String(runs) } : {}) }).toString()}`
+    : null;
+  const list = useData<ClientPage & { sort: string; withProblems: number; clean: number; accounts: number }>(clientsPath);
+
   const revoke = async (id: string) => { try { await api.post("audit/revoke", { id }); } finally { loadLinks(); } };
-  if (loading && !data) return <Page title="Account audit" subtitle="Checking every account you can see."><SkeletonRows rows={4} label="Auditing your accounts..." /></Page>;
-  if (error) return <ErrorBox error={error} onRetry={reload} />;
-  if (!data) return null;
-  const a = data.audit;
-  const notes = new Map<NoteKey, AuditNote>(a.notes.map((n) => [n.key, n]));
-  const tip = (key: NoteKey | undefined, term: React.ReactNode) => (key && notes.get(key) ? <DefinitionTip term={term} label="How this is counted">{notes.get(key)!.text}</DefinitionTip> : term);
-
-  const indexOf = (key: FindingKey) => a.findings.findIndex((f) => f.key === key);
-  const listFor = (f: Finding) => data.lists?.[f.key] ?? null;
-  const canOpenList = (f: Finding) => Boolean(LIST_TITLE[f.key]) && (f.count ?? 0) > 0 && listFor(f) !== null;
-  const picked = drill.selected !== null ? a.findings[drill.selected] : undefined;
-  const pickedList = picked ? listFor(picked) : null;
-  const staleIdx = indexOf("stale");
-  const slowIdx = indexOf("slow");
-  const stale = staleIdx >= 0 ? a.findings[staleIdx] : null;
-  const first = fixFirstFinding(a);
-  const accent = printAccent(data.brand.color);
-
   const share = async () => {
     setSharing(true); setLinkError(null);
-    try { setLink((await api.post<{ url: string }>("audit/share")).url); loadLinks(); } catch { setLink(null); setLinkError("Could not create a link. Try again."); } finally { setSharing(false); }
+    try { setLink((await api.post<{ url: string }>("audit/share", focus ? { location: focus } : {})).url); loadLinks(); } catch { setLink(null); setLinkError("Could not create a link. Try again."); } finally { setSharing(false); }
   };
   const copy = async (text: string, what: "summary" | "link") => {
     try { await navigator.clipboard.writeText(text); setCopied(what); setTimeout(() => setCopied(null), 2500); } catch { window.prompt(what === "link" ? "Copy this link" : "Copy this summary", text); }
   };
-  const listButton = (f: Finding, i: number) => canOpenList(f) ? (
-    <Btn onClick={() => drill.select(i)}>Show the {(f.count ?? 0).toLocaleString("en-US")} {f.count === 1 ? LIST_TITLE[f.key]!.one : LIST_TITLE[f.key]!.noun}</Btn>
-  ) : null;
+
+  if (loading && !data) return <Page title="Account audit" subtitle="Checking what is wrong and what it costs."><SkeletonCards cards={3} label="Auditing your accounts..." /></Page>;
+  if (error) return <ErrorState error={error} onRetry={reload} />;
+  if (!data) return null;
+
+  const first = data.findings.find((f) => f.key === data.startHere) ?? null;
+  const open = (f: Finding) => setSpec(specOf(f, data));
+  const accent = printAccent(data.brand.color);
+  const accountWord = data.totals.accounts === 1 ? "account" : "client accounts";
+  const accountsLine = data.scope === "all" && data.totals.accounts > 0
+    ? (data.totals.accounts > data.totals.accountsWithProblems ? `${num(data.totals.accounts - data.totals.accountsWithProblems)} of ${num(data.totals.accounts)} client accounts have nothing to fix.` : data.totals.accountsWithProblems > 0 ? `All ${num(data.totals.accounts)} client accounts have something to fix.` : null) : null;
+
+  const menu: MenuItem[] = [
+    { key: "again", label: "Run the audit again", onSelect: () => setRuns((n) => n + 1) },
+    ...(data.canShare ? [{ key: "share", label: sharing ? "Creating link..." : "Share a link with a client", onSelect: () => { void share(); }, disabled: sharing }] : []),
+    { key: "copy", label: copied === "summary" ? "Copied" : "Copy a summary", onSelect: () => { void copy(data.summary, "summary"); } },
+    { key: "print", label: "Print", onSelect: () => window.print() },
+    ...(data.demo ? [{ key: "sample", label: "See a sample to send a client", onSelect: () => { window.open(`/audit/${SAMPLE_AUDIT_ID}`, "_blank", "noopener"); } }] : []),
+  ];
+
+  const empty = data.totals.accounts === 0;
 
   return (
     <Page
       title="Account audit"
-      subtitle={a.headline}
-      actions={<>
-        {data.canShare && <Btn onClick={share} disabled={sharing}>{sharing ? "Creating link..." : "Share link"}</Btn>}
-        <Btn onClick={() => window.print()}>Print</Btn>
-        <Btn variant="primary" onClick={() => copy(data.summary, "summary")}>{copied === "summary" ? "Copied" : "Copy summary"}</Btn>
-      </>}
+      subtitle={data.focus ? `Only ${data.focus.name}.` : data.scope === "all" ? "What is leaking across your client accounts, and what to fix first." : "What is leaking in your account, and what to fix first."}
+      actions={<PopMenu label="More: share, print or run again" items={menu} testId="audit-more" triggerClassName="ds-press inline-flex h-11 items-center gap-1.5 rounded-lg border bg-card px-3 text-sm font-medium hover:border-primary/40 sm:h-9"><MoreHorizontal aria-hidden className="size-4" /><span>More</span></PopMenu>}
     >
       <div className="audit-print">
         <style dangerouslySetInnerHTML={{ __html: printCss(data.brand.color) }} />
@@ -105,116 +119,79 @@ export function AuditView({ go }: { go: GoFn }) {
         <div className="mb-4 hidden border-b-2 pb-3 print:block" data-testid="audit-print-header" style={{ borderColor: accent ?? "var(--primary)" }}>
           {data.brand.logoUrl && <BrandLogo url={data.brand.logoUrl} name={data.brand.name} height={40} className="mb-2" fallback={null} />}
           <p className="text-xl font-semibold" style={{ color: accent ?? "var(--primary)" }}>{data.brand.name ?? "Account audit"}</p>
-          <p className="text-sm text-muted-foreground">{data.brand.name ? "Account audit" : "Prepared"} for {a.accountsScanned} client {a.accountsScanned === 1 ? "account" : "accounts"}, {longDate(data.generatedAt)}</p>
+          <p className="text-sm text-muted-foreground">{data.brand.name ? "Account audit" : "Prepared"} for {data.totals.accounts} {accountWord}, {longDate(data.generatedAt)}</p>
         </div>
 
-        <HowTo id="audit-how" title="How to use the audit">
-          Start with the line that says what to fix first. Press any number to see the exact deals, conversations or appointments behind it, and the small question mark to see how it is counted. When it is ready for a client, press Share link: it has no client names and works for {data.shareDays} days.
-        </HowTo>
-
-        {data.demo && (
-          <InlineAlert tone="info" className="mb-4">Sharing is switched off in the demo. <a className="font-medium underline" href={`/audit/${SAMPLE_AUDIT_ID}`} target="_blank" rel="noreferrer">Open the sample audit</a> to see what a client would receive.</InlineAlert>
+        {data.focus && (
+          <p className="mb-4 text-sm text-muted-foreground print:hidden" data-testid="audit-focus">
+            Showing only <span className="font-medium text-foreground">{data.focus.name}</span>. <button type="button" className="min-h-8 text-primary underline underline-offset-4 max-sm:min-h-11" onClick={() => { setFocus(null); setAll(false); setCpage(0); }}>Show all clients</button>
+          </p>
         )}
+        <ReadingStrip r={data.reading} />
         {linkError && <InlineAlert tone="danger" className="mb-4">{linkError}</InlineAlert>}
         {link && (
           <InlineAlert tone="success" className="mb-4 break-all" action={<Btn onClick={() => copy(link, "link")}>{copied === "link" ? "Copied" : "Copy link"}</Btn>}>
-            Share this link. It covers the {a.accountsScanned} client {a.accountsScanned === 1 ? "account" : "accounts"} in this audit and shows totals, finding titles, the fix plan and how each number is counted. It has no client names and works for {data.shareDays} days. You can switch it off at any time below: <a className="font-medium underline" href={link} target="_blank" rel="noreferrer">{link}</a>
+            Send this link. It shows the sentence, the figures, what to fix and how each number is counted. It has no client names and works for {data.shareDays} days. You can switch it off below: <a className="font-medium underline" href={link} target="_blank" rel="noreferrer">{link}</a>
           </InlineAlert>
         )}
-        {data.canShare && <p className="mb-4 text-xs text-muted-foreground print:hidden">Printing from this page includes your client account names. For a copy without names to send to a client, press Share link and print that page.</p>}
 
-        {first && (
-          <div className="mb-5 border-l-2 border-primary pl-4" data-testid="audit-fix-first">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">What to fix first</p>
-            <p className="mt-1 text-base font-medium">{data.audit.fixFirst}</p>
-            <div className="mt-2 flex flex-wrap gap-2 print:hidden">
-              {listButton(first, a.findings.indexOf(first))}
-              <Btn onClick={() => go(first.view)}>{openLabel(first.view)}</Btn>
-            </div>
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 gap-x-10 gap-y-6 sm:grid-cols-2">
-          <div>
-            <Stat
-              label={tip("stale", "Deals that stopped moving")} value={fmtMoney(a.staleDollars)} tone={a.staleDollars > 0 ? "warn" : undefined}
-              sub={<>
-                <Badge tone="neutral">Counted</Badge> {stale ? stale.window : "No deal has stopped moving"}.
-                {a.outlier && <span className="mt-1 block">One deal ({fmtMoney(a.outlier.value)}) is {Math.round(a.outlier.share * 100)}% of this figure, so check that it is a real deal before relying on it.</span>}
-              </>}
-            />
-            {stale && canOpenList(stale) && <div className="mt-2 print:hidden"><button type="button" className="min-h-9 text-xs font-medium text-primary underline" onClick={() => drill.select(staleIdx)}>Show the {stale.count?.toLocaleString("en-US")} {stale.count === 1 ? "deal" : "deals"} behind this</button></div>}
-          </div>
-          <div>
-            <Stat
-              label={<>{tip("estimate", "Cost of slow follow-up")} <Badge tone="info">Estimate</Badge></>}
-              value={a.estimatedDollars === null ? <span className="text-base font-normal text-muted-foreground">Not enough data</span> : fmtMoney(a.estimatedDollars)}
-              sub={a.estimatedDollars === null
-                ? "Needs at least 20 won or lost deals in an account. Until then no dollar figure is shown."
-                : <>{a.estimateRange && <span className="mb-1 block">Most likely between {fmtMoney(a.estimateRange.low)} and {fmtMoney(a.estimateRange.high)}.</span>}Waiting conversations x average deal x each account&apos;s win rate. A rough size of the problem, not money lost. Never added to the figure beside it.</>}
-            />
-            {slowIdx >= 0 && canOpenList(a.findings[slowIdx]) && <div className="mt-2 print:hidden"><button type="button" className="min-h-9 text-xs font-medium text-primary underline" onClick={() => drill.select(slowIdx)}>Show the {a.findings[slowIdx].count?.toLocaleString("en-US")} waiting {a.findings[slowIdx].count === 1 ? "conversation" : "conversations"}</button></div>}
-          </div>
-        </div>
-        {(a.leftOut > 0 || data.hiddenAccounts > 0 || data.readLimit) && (
-          <div className="mt-3 space-y-1 text-xs text-muted-foreground">
-            {a.leftOut > 0 && <p>{tip("left_out", `${a.leftOut.toLocaleString("en-US")} open ${a.leftOut === 1 ? "deal is" : "deals are"} left out of every dollar figure`)} (no value, no owner, or in a closed-out stage).</p>}
-            {data.hiddenAccounts > 0 && <p className="print:hidden">{data.hiddenAccounts} client {data.hiddenAccounts === 1 ? "account is" : "accounts are"} left out by the filter at the top of the app. A share link made now covers only the accounts shown here.</p>}
-            {data.readLimit && <p>{data.readLimit}</p>}
-          </div>
-        )}
-
-        <h2 className="mb-3 mt-6 text-base font-semibold">What needs fixing</h2>
-        {a.findings.length === 0 ? (
-          <EmptyState title="Nothing urgent" body="No stale deals, waiting conversations or unmarked appointments across the accounts you can see. Run it again after your next sync." />
+        {empty ? (
+          <EmptyState title="No client accounts to audit yet" body="Client accounts appear here as SubSync reads them for the first time. It usually takes a few minutes." />
         ) : (
-          <ul className="divide-y border-y">
-            {a.findings.map((f, i) => (
-              <li key={f.key + i} className="ds-row grid gap-x-8 gap-y-3 px-1 py-4 md:grid-cols-[minmax(0,1fr)_auto]" data-testid="audit-finding">
-                <div className="min-w-0">
-                  <div className="mb-1 flex flex-wrap items-center gap-x-3 gap-y-1">
-                    <Badge tone={tone[f.severity]}>{label[f.severity]}</Badge>
-                    {f.kind === "estimate" && <Badge tone="info">Estimate</Badge>}
-                    {f.kind === "fact" && tip(f.note, <Badge tone="neutral">Counted</Badge>)}
-                    {f.kind !== "fact" && f.note && f.note !== "estimate" && tip(f.note, <span className="text-xs text-muted-foreground">How this is counted</span>)}
+          <>
+            <VerdictBlock staleDays={data.staleDays} v={data.verdict} grade={data.grade?.line ?? null} accountsLine={accountsLine} start={first} onStart={() => first && open(first)} />
+
+            <Section title={data.findings.length === 0 ? "What needs fixing" : `What needs fixing (${data.findings.length})`} hint="Biggest money first. Among equals, the quick fixes come first.">
+              {data.findings.length === 0 ? (
+                <EmptyState compact title="Nothing to fix" body="Nobody is waiting, no deal has gone quiet and every appointment has an outcome. Run the audit again after your next refresh." />
+              ) : (
+                <ol className="divide-y border-y" data-testid="audit-findings">
+                  {data.findings.map((f, i) => <FindingRow key={f.key} f={f} n={i + 1} onShow={() => open(f)} />)}
+                </ol>
+              )}
+              {data.notes.length > 0 && <ul className="mt-2 space-y-1 text-xs text-muted-foreground" data-testid="audit-notes">{data.notes.map((n) => <li key={n}>{n}</li>)}</ul>}
+              {data.readLimit && <p className="mt-2 text-xs text-muted-foreground">{data.readLimit}</p>}
+            </Section>
+
+            {data.clients && data.clients.withProblems > 0 && (
+              <Section title="Clients to look at first" hint="Ranked by counted deal money plus the estimate. The two are shown separately, never added on screen." id="audit-clients">
+                <ul className="divide-y border-y" data-testid="audit-clients">
+                  {data.clients.rows.map((r) => <ClientRowView key={r.id} r={r} onOpen={() => { setFocus(r.id); setAll(false); window.scrollTo?.({ top: 0, behavior: "smooth" }); }} />)}
+                </ul>
+                {data.clients.withProblems > data.clients.rows.length && !all && (
+                  <div className="mt-3 print:hidden"><Btn onClick={() => setAll(true)} testId="audit-see-all">{`See all ${num(data.clients.withProblems)} clients`}</Btn></div>
+                )}
+                {all && (
+                  <div className="mt-4" data-testid="audit-all-clients">
+                    <div className="mb-3 flex flex-wrap items-center gap-2 print:hidden">
+                      <input type="search" aria-label="Search client accounts" placeholder="Search by name" value={cq} onChange={(e) => setCq(e.target.value)} className={`${clientControls.field} w-full sm:w-64`} data-testid="audit-search" />
+                      <select aria-label="Order" value={csort} onChange={(e) => { setCsort(e.target.value); setCpage(0); }} className={clientControls.field} data-testid="audit-sort">
+                        {clientControls.SORTS.map((s) => <option key={s.v} value={s.v}>{s.l}</option>)}
+                      </select>
+                      <button type="button" className="min-h-11 px-2 text-sm text-muted-foreground underline underline-offset-4 sm:min-h-9" onClick={() => setAll(false)}>Show fewer</button>
+                    </div>
+                    {list.error ? <ErrorState error={list.error} onRetry={list.reload} /> : !list.data ? <p className="text-sm text-muted-foreground" role="status">Loading the clients...</p> : list.data.rows.length === 0 ? (
+                      <EmptyState compact title="No client matches" body="Try a shorter name." />
+                    ) : (
+                      <>
+                        <ul className="divide-y border-y">{list.data.rows.map((r) => <ClientRowView key={r.id} r={r} onOpen={() => { setFocus(r.id); setAll(false); window.scrollTo?.({ top: 0, behavior: "smooth" }); }} />)}</ul>
+                        <Pager page={list.data} onPage={setCpage} label="Client pages" />
+                      </>
+                    )}
                   </div>
-                  <p className="font-medium">{f.title}</p>
-                  <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{f.detail}</p>
-                  {f.window && <p className="mt-1 text-xs text-muted-foreground">Counted over: {f.window}.</p>}
-                  <p className="mt-2 text-sm"><span className="font-medium">What to do:</span> {f.fix}</p>
-                </div>
-                <div className="flex flex-wrap content-start gap-2 md:w-56 md:flex-col md:items-stretch print:hidden [&>button]:justify-center">
-                  {listButton(f, i)}
-                  <Btn variant={canOpenList(f) ? "ghost" : "secondary"} onClick={() => go(f.view)}>{openLabel(f.view)}</Btn>
-                </div>
-              </li>
-            ))}
-          </ul>
+                )}
+              </Section>
+            )}
+
+            <GoodNews lines={data.healthy} />
+            <ProgressBlock lines={data.progress} />
+          </>
         )}
 
-        {picked && pickedList && LIST_TITLE[picked.key] && (
-          <div id="audit-drill" className="print:hidden">
-            <DrillPanel
-              drill={drill} title={LIST_TITLE[picked.key]!.title} count={picked.count ?? pickedList.total} noun={picked.count === 1 ? LIST_TITLE[picked.key]!.one : LIST_TITLE[picked.key]!.noun}
-              rows={pickedList.rows} columns={rowColumns} rowKey={(r) => r.id} backLabel="Back to the audit" empty="Nothing behind this one right now."
-              toLead={(r) => ({ contactId: r.contactId, locationId: r.locationId, name: r.name, locationName: r.locationName, url: r.url, note: r.detail })}
-            />
-          </div>
-        )}
-
-        {a.rows.length > 0 && (
-          <Card title="Where to start" className="mt-6">
-            <DataList rows={a.rows} rowKey={(r) => r.locationId} onOpen={(r) => go("account", r.locationId)} caption="Where to start"
-              columns={[
-                { key: "name", header: "Client account", primary: true, width: "minmax(0,1.5fr)", cell: (r) => r.name },
-                { key: "stale", header: "Stale deals", width: "minmax(0,1.5fr)", cell: (r) => <span className="text-muted-foreground">{fmtMoney(r.staleValue)} stale in {r.staleOpps} {r.staleOpps === 1 ? "deal" : "deals"}</span> },
-                { key: "waiting", header: "Waiting", width: "6rem", cell: (r) => <span className="text-muted-foreground">{r.waiting} waiting</span> },
-                { key: "est", header: "Estimate", width: "minmax(0,1.2fr)", cell: (r) => <span className="text-muted-foreground">{r.estimated !== null ? `about ${fmtMoney(r.estimated)} (estimate)` : "no estimate"}</span> },
-              ]} />
-            <p className="mt-2 text-xs text-muted-foreground print:hidden">Press a client account to open its own page; the way back is at the top.</p>
-          </Card>
-        )}
-        <p className="mt-4 text-xs text-muted-foreground">{a.accountsScanned} client {a.accountsScanned === 1 ? "account" : "accounts"} checked just now from the latest sync. Nothing here changes anything in your accounts.</p>
+        <p role="status" className="mt-6 text-xs text-muted-foreground" data-testid="audit-foot">
+          Checked {new Date(data.generatedAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "UTC" })} UTC from the latest refresh of {num(data.totals.accounts)} {accountWord}. Nothing here changes anything in your accounts.{" "}
+          <button type="button" className="min-h-8 text-primary underline underline-offset-4 max-sm:min-h-11 print:hidden" onClick={() => setRuns((n) => n + 1)} data-testid="audit-rerun">Run again</button>
+        </p>
       </div>
 
       {data.canShare && links.length > 0 && (
@@ -232,6 +209,7 @@ export function AuditView({ go }: { go: GoFn }) {
           </ul>
         </Card>
       )}
+      {spec && <RecordsPanel key={spec.key} spec={spec} onClose={() => setSpec(null)} now={data.now} canExport={data.canShare || data.demo} />}
     </Page>
   );
 }
