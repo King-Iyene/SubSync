@@ -90,7 +90,9 @@ test("the account selector narrows every number, is kept in the address as ta=, 
   await expect(page.getByTestId("queue-row").first()).toContainText(target.accountName);
   const rows = page.getByTestId("queue-row");
   for (const r of await rows.all()) await expect(r).toContainText(target.accountName);
-  const total = (mine.items as Json[]).length;
+  // The page leaves test-named and very old (3x the stale days) stale deals out of the counts by default (the "Exclude test and very old deals" control).
+  const junk = (i: Json) => i.kind === "stale" && ((i.at !== null && mine.now - i.at > mine.staleDays * 3 * 86_400_000) || /(^|[^a-z0-9])(test|testing|demo|sample|sandbox|dummy)([^a-z0-9]|$)/i.test(i.name));
+  const total = (mine.items as Json[]).filter((i) => !junk(i)).length;
   await expect(page.getByTestId("donut-total")).toContainText(String(total).replace(/\B(?=(\d{3})+(?!\d))/g, ","));
   // Remembered: a fresh visit to Today restores it; the Speed to lead page is not narrowed by it.
   await page.goto("/app");

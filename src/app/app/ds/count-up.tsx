@@ -23,7 +23,9 @@ export function CountUp({ value }: { value: ReactNode }) {
     };
     node.nodeValue = parts.at(0);
     frame = requestAnimationFrame(tick);
-    return () => { cancelAnimationFrame(frame); node.nodeValue = final; };
+    // When the value changes, React has already written the NEW text by the time this cleanup runs, so restore from the span's own data-final (the value now on screen),
+    // never from the old closure: that would put the previous number back on screen and leave it there.
+    return () => { cancelAnimationFrame(frame); node.nodeValue = (ref.current?.dataset.final ?? final); };
   }, [value]);
-  return <span ref={ref}>{typeof value === "number" ? String(value) : value}</span>;
+  return <span ref={ref} data-final={typeof value === "string" || typeof value === "number" ? String(value) : undefined}>{typeof value === "number" ? String(value) : value}</span>;
 }
