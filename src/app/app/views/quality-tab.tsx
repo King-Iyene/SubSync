@@ -7,7 +7,7 @@ import { EmptyState, ErrorState, HowTo, InlineAlert, RecordsPanel, RowButton, Se
 import { useApiClient, useData } from "../session";
 import { fmtInt } from "../ui";
 import { CleanupView } from "./cleanup";
-import { BTN, FIELD, PRIMARY, QUIET, ScoreMeter, TrendLine, plural } from "./cleanup-parts";
+import { BTN, FIELD, PRIMARY, QUIET, ScoreMeter, ScoreRing, TrendLine, plural } from "./cleanup-parts";
 
 // Data quality (stage CLEANUP): one score per client account and for the whole portfolio, the clients to fix first, and for one client the exact problems with the exact
 // contacts behind every number. SubSync only reads: it shows the fix, copies it as a CSV and opens each contact in your CRM. The same scan makes the number and the list,
@@ -20,7 +20,7 @@ type Portfolio = {
 };
 type Finding = { id: string; label: string; todo: string; group: string; groupLabel: string; fixable: boolean; count: number };
 type AccountQ = {
-  kind: "account"; locationId: string; name: string | null; contacts: number; score: { score: number; word: string; parts: Record<string, number> } | null; partLabels: Record<string, string>; trend: Trend;
+  kind: "account"; examples: Record<string, { before: string; after: string } | null>; locationId: string; name: string | null; contacts: number; score: { score: number; word: string; parts: Record<string, number> } | null; partLabels: Record<string, string>; trend: Trend;
   minContacts: number; duplicates: { groups: number; extra: number; newGroups: number }; scannedAt: string; findings: Finding[];
 };
 type ListQ = { finding: string; label: string; todo: string; account: string | null; locationId: string; count: number; cut: boolean; rows: Array<{ id: string; name: string; email: string | null; phone: string | null; fix: Array<{ field: string; before: string; after: string }> | null; url: string }> };
@@ -88,7 +88,7 @@ export function QualityTab({ canFix }: { canFix: boolean }) {
       {!loc && p && (
         <>
           <section className="mb-6" aria-label="Data quality at a glance" data-testid="quality-head">
-            <ScoreMeter big score={p.portfolio.score} word={p.portfolio.word} label="Data quality" testId="quality-score" />
+            <ScoreRing score={p.portfolio.score} word={p.portfolio.word} label="Data quality" testId="quality-score" />
             <p className="mt-2 text-sm text-muted-foreground">
               {p.portfolio.scored === 0 ? "No client has enough contacts to score yet." : `Across ${plural(p.portfolio.scored, "client account", "client accounts")}`}
               {` · ${fmtInt(p.totals.contacts)} contacts · ${plural(p.totals.problems, "problem", "problems")} to fix · ${plural(p.totals.duplicateGroups, "duplicate group", "duplicate groups")}`}
@@ -129,7 +129,7 @@ export function QualityTab({ canFix }: { canFix: boolean }) {
             <>
               <section className="mb-6" aria-label="This client's data quality">
                 <h2 className="mb-2 text-lg font-semibold">{acct.data.name ?? "This client"}</h2>
-                <ScoreMeter big score={acct.data.score?.score ?? null} word={acct.data.score?.word} label="Data quality" testId="quality-account-score" />
+                <ScoreRing score={acct.data.score?.score ?? null} word={acct.data.score?.word} label="Data quality" testId="quality-account-score" />
                 {acct.data.score === null && <p className="mt-1 text-sm text-muted-foreground">A score needs at least {acct.data.minContacts} contacts; this client has {fmtInt(acct.data.contacts)}. The problems are still listed below.</p>}
                 {acct.data.score && (
                   <ul className="mt-4 grid max-w-xl gap-x-6 gap-y-3 sm:grid-cols-2" data-testid="quality-parts">
@@ -140,7 +140,9 @@ export function QualityTab({ canFix }: { canFix: boolean }) {
                 <p className="mt-2 text-xs text-muted-foreground">{fmtInt(acct.data.contacts)} contacts read from SubSync&apos;s copy; {plural(acct.data.duplicates.groups, "duplicate group", "duplicate groups")} in the Duplicates tab.</p>
               </section>
 
-              <Section title="What to fix" hint="Each row opens the exact contacts. Counts equal the rows." id="quality-findings">
+              <FixCards findings={acct.data.findings} examples={acct.data.examples} onShow={(f) => void open(f)} />
+
+              <Section title="Every kind of problem" hint="Each row opens the exact contacts. Counts equal the rows." id="quality-findings">
                 <div className="mb-3 flex flex-wrap items-center gap-2 text-sm">
                   <label htmlFor="q-cc" className="text-xs text-muted-foreground">Country code for local phone numbers</label>
                   <input id="q-cc" className={`${FIELD} w-24`} placeholder="+1" inputMode="tel" value={cc} onChange={(e) => setCc(e.target.value)} data-testid="quality-cc" />
@@ -188,6 +190,34 @@ export function QualityTab({ canFix }: { canFix: boolean }) {
 }
 
 // ---------------- check before you import ----------------
+
+// Three big cards for the three things most people want to do: fix phone numbers, fix emails, remove junk. Each says how many, shows one real before and after, and has one button.
+function FixCards({ findings, examples, onShow }: { findings: Finding[]; examples: Record<string, { before: string; after: string } | null>; onShow: (f: Finding) => void }) {
+  const by = (ids: string[]) => findings.filter((f) => ids.includes(f.id));
+  const cards = [
+    { id: "phones", title: "Fix phone numbers", ids: ["phone_format", "bad_phone", "placeholder_phone"], ex: examples.phone_format, empty: "Every phone number looks right." },
+    { id: "emails", title: "Fix emails", ids: ["email_typo", "bad_email", "disposable_email"], ex: examples.email_typo, empty: "Every email looks right." },
+    { id: "junk", title: "Remove junk", ids: ["test_record", "empty_record"], ex: null, empty: "No test or empty contacts." },
+  ];
+  return (
+    <div className="mb-8 grid gap-4 md:grid-cols-3" data-testid="fix-cards">
+      {cards.map((c) => {
+        const fs = by(c.ids);
+        const n = fs.reduce((s, f) => s + f.count, 0);
+        const main = fs.slice().sort((a, b) => b.count - a.count)[0];
+        return (
+          <section key={c.id} className="flex flex-col rounded-xl border bg-card p-4" data-testid="fix-card" data-card={c.id} aria-label={c.title}>
+            <h3 className="text-base font-semibold">{c.title}</h3>
+            <p className="mt-2 text-4xl font-semibold tabular-nums" data-testid="fix-card-count">{fmtInt(n)}</p>
+            <p className="text-sm text-muted-foreground">{n === 0 ? c.empty : c.id === "junk" ? "test or empty contacts" : c.id === "phones" ? "phone numbers need fixing" : "emails need fixing"}</p>
+            {c.ex && n > 0 && <p className="mt-3 break-words text-sm" data-testid="fix-card-example"><span className="text-muted-foreground line-through">{c.ex.before}</span> <span aria-hidden="true">to</span><span className="sr-only">becomes</span> <span className="font-medium">{c.ex.after}</span></p>}
+            <div className="mt-auto pt-4">{main && n > 0 ? <button type="button" className={PRIMARY} onClick={() => onShow(main)} data-testid="fix-card-show">Show them<span className="sr-only"> ({c.title.toLowerCase()})</span></button> : null}</div>
+          </section>
+        );
+      })}
+    </div>
+  );
+}
 
 function ImportCheck({ locationId, name }: { locationId: string; name: string | null }) {
   const api = useApiClient();

@@ -117,7 +117,15 @@ async function qualityView(ctx: Ctx, h: CleanupHelpers): Promise<Response> {
     if (!acct) return json({ error: "Account not found" }, 404);
     const s = await scanAccount(ctx.installationId, acct.id, country);
     const trend = await trendFor(ctx.installationId, allowed, acct.id);
+    // One real before and after for each kind of fix, so the big cards can show what the fix looks like.
+    const examples: Record<string, { before: string; after: string } | null> = {};
+    for (const id of ["phone_format", "email_typo", "name_case"] as const) {
+      const r = s.scan.counts[id] > 0 ? await findingRows(ctx.installationId, acct.id, id, country, 1) : null;
+      const f = r?.rows[0]?.fix?.[0];
+      examples[id] = f ? { before: f.before, after: f.after } : null;
+    }
     return json({
+      examples,
       kind: "account", locationId: acct.id, name: acct.name, contacts: s.scan.total, score: s.score ? { ...s.score, word: scoreWord(s.score.score) } : null, partLabels: PART_LABEL, trend,
       minContacts: 50, duplicates: s.dup, scannedAt: new Date(s.at).toISOString(),
       findings: FINDING_ORDER.map((id) => ({ id, label: FINDINGS[id].label, todo: FINDINGS[id].todo, group: FINDINGS[id].group, groupLabel: GROUP_LABEL[FINDINGS[id].group], fixable: FINDINGS[id].fixable, count: s.scan.counts[id] })).filter((f) => f.count > 0),

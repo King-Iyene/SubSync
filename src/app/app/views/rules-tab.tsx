@@ -56,8 +56,8 @@ export function RulesTab({ canEdit }: { canEdit: boolean }) {
 
   return (
     <div data-testid="rules-tab">
-      <HowTo id="rules" title="You choose how strict SubSync is">
-        These choices only change which contacts SubSync suggests are duplicates and which value it suggests keeping. They never change a contact. Balanced is how SubSync has always matched.
+      <HowTo id="rules" title="You choose how careful SubSync is">
+        These choices only change which contacts SubSync suggests are duplicates and which value it suggests keeping. They never change a contact. Normal is how SubSync has always matched.
       </HowTo>
       {!data.ready.rules && <div className="mb-4"><InlineAlert tone="warning">Saving rules is not available yet: SubSync is finishing an update. You can look, but not save.</InlineAlert></div>}
 
@@ -140,7 +140,7 @@ function Editor({ data, cfg, scope, name, own, canEdit, onSaved }: { data: Data;
 
   return (
     <div data-testid="rules-editor">
-      <Section title={`How strict, for ${name}`} hint={scope === "company" ? "Used for every client that has no choice of its own." : `Now using ${SOURCE_WORD[own] ?? "the built-in rules"}.`} id="rules-strict">
+      <Section title={`How careful, for ${name}`} hint={scope === "company" ? "Used for every client that has no choice of its own." : `Now using ${SOURCE_WORD[own] ?? "the built-in rules"}.`} id="rules-strict">
         <fieldset disabled={!canEdit} className="grid gap-2" data-testid="rules-presets">
           <legend className="sr-only">Matching strictness</legend>
           {data.presets.map((p) => (
@@ -151,7 +151,7 @@ function Editor({ data, cfg, scope, name, own, canEdit, onSaved }: { data: Data;
           ))}
         </fieldset>
         {effect && scope !== "company" && (
-          <p className="mt-3 text-sm" data-testid="rules-effect">With this setting SubSync finds <strong className="tabular-nums" data-testid="rules-effect-groups">{fmtInt(effect.with.groups)}</strong> duplicate group{effect.with.groups === 1 ? "" : "s"} ({fmtInt(effect.with.extra)} extra contact{effect.with.extra === 1 ? "" : "s"})
+          <p className="mt-3 text-sm" data-testid="rules-effect">With this setting SubSync shows <strong className="tabular-nums" data-testid="rules-effect-groups">{fmtInt(effect.with.groups)}</strong> match{effect.with.groups === 1 ? "" : "es"} (people who appear more than once)
             <span className="text-muted-foreground"> {effect.with.groups === effect.now.groups ? "the same as now" : `instead of ${fmtInt(effect.now.groups)} now`}.</span></p>
         )}
         {preset === "custom" && <p className="mt-2 text-sm text-muted-foreground" data-testid="rules-custom">Your own mix: {describeRules(rules)}</p>}
@@ -164,7 +164,7 @@ function Editor({ data, cfg, scope, name, own, canEdit, onSaved }: { data: Data;
           </div>
           <label className="mt-3 flex min-h-11 items-start gap-2 text-sm"><input type="checkbox" className="mt-1 size-4" disabled={!canEdit} checked={rules.nameAlone} onChange={(e) => set("nameAlone", e.target.checked)} /><span>A name on its own can start a group (common names are never grouped)</span></label>
           <label className="flex min-h-11 items-start gap-2 text-sm"><input type="checkbox" className="mt-1 size-4" disabled={!canEdit} checked={rules.guards} onChange={(e) => set("guards", e.target.checked)} /><span>Be careful with a shared phone or a shared company mailbox (info@, sales@): they may be different people</span></label>
-          <div className="mt-2 max-w-sm"><label htmlFor="thr" className="block text-sm">How sure to be: {rules.threshold} out of 100</label>
+          <div className="mt-2 max-w-sm"><label htmlFor="thr" className="block text-sm">How sure SubSync must be before it shows a match</label>
             <input id="thr" type="range" min={25} max={90} step={5} className="mt-1 w-full" disabled={!canEdit} value={rules.threshold} onChange={(e) => set("threshold", Number(e.target.value))} data-testid="rules-threshold" aria-describedby="thr-h" />
             <p id="thr-h" className="text-xs text-muted-foreground">Lower finds more groups and more false alarms. Higher finds fewer.</p></div>
         </details>

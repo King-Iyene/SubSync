@@ -52,3 +52,56 @@ export function TrendLine({ trend, label }: { trend: Trend; label: string }) {
 }
 
 export const plural = (n: number, one: string, many: string) => `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
+
+// ---------- the friendly pieces (the redesign: one plain question per screen) ----------
+
+const toneText = (score: number) => (score >= 75 ? "text-success" : score >= 55 ? "text-warning" : "text-destructive");
+
+/** A round score: the number in the middle, one word under it. Read by a screen reader as one sentence. */
+export function ScoreRing({ score, word, label, size = 150, testId }: { score: number | null; word?: string | null; label: string; size?: number; testId?: string }) {
+  const r = 52;
+  const c = 2 * Math.PI * r;
+  const pct = score === null ? 0 : Math.max(0, Math.min(100, score));
+  return (
+    <div className="inline-flex flex-col items-center" data-testid={testId}>
+      <div className="relative" style={{ width: size, height: size }}>
+        <svg viewBox="0 0 120 120" width={size} height={size} aria-hidden="true">
+          <circle cx="60" cy="60" r={r} fill="none" stroke="currentColor" strokeWidth="10" className="text-muted" />
+          {score !== null && <circle cx="60" cy="60" r={r} fill="none" stroke="currentColor" strokeWidth="10" strokeLinecap="round" strokeDasharray={`${(pct / 100) * c} ${c}`} transform="rotate(-90 60 60)" className={toneText(pct)} />}
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <span className="sr-only">{label}: </span>
+          <span className="text-4xl font-semibold tabular-nums leading-none" data-testid={testId ? `${testId}-n` : undefined}>{score === null ? "-" : score}</span>
+          <span className="mt-1 text-xs text-muted-foreground">{score === null ? "not enough contacts" : word}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** How sure SubSync is, as a bar and one plain sentence. The number lives behind "How we decided". */
+export function MatchMeter({ confidence, word, reason }: { confidence: number; word: string; reason: string }) {
+  return (
+    <div className="max-w-md" data-testid="dup-meter">
+      <p className="text-base font-semibold">{word}</p>
+      <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-muted" aria-hidden="true"><div className={`h-full ${confidence >= 90 ? "bg-success" : confidence >= 75 ? "bg-primary" : "bg-warning"}`} style={{ width: `${Math.max(8, Math.min(100, confidence))}%` }} /></div>
+      <p className="mt-1.5 text-sm text-muted-foreground" data-testid="dup-reason-line">{reason}</p>
+    </div>
+  );
+}
+
+export function Avatar({ name, tone = 0 }: { name: string; tone?: number }) {
+  const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase()).join("") || "?";
+  const hues = ["bg-primary/15 text-primary", "bg-success/15 text-success", "bg-warning/15 text-warning"];
+  return <span aria-hidden="true" className={`inline-flex size-11 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${hues[tone % hues.length]}`}>{initials}</span>;
+}
+
+export function ProgressBar({ done, total, label }: { done: number; total: number; label: string }) {
+  const pct = total <= 0 ? 0 : Math.round((done / total) * 100);
+  return (
+    <div data-testid="dup-progress">
+      <div className="h-1.5 overflow-hidden rounded-full bg-muted" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} aria-label={label}><div className="h-full bg-primary transition-all" style={{ width: `${pct}%` }} /></div>
+      <p className="mt-1 text-xs text-muted-foreground">{label}</p>
+    </div>
+  );
+}

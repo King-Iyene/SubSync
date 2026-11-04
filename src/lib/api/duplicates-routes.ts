@@ -116,7 +116,7 @@ async function overviewRoute(ctx: Ctx, h: DuplicatesHelpers): Promise<Response> 
   }
 
   return json({
-    health: ov.health, byReason: ov.byReason, obvious: ov.obvious, truncated: built.truncated,
+    health: ov.health, sure: open.filter((g) => g.confidence >= 90).length, byReason: ov.byReason, obvious: ov.obvious, truncated: built.truncated,
     multi: ov.accounts.length > 1 || (ctx.kind === "agency" && !ctx.limitTo),
     counts: { open: open.length, later: selectGroups(built.all, { ...base, status: "later" }).length, decided: selectGroups(built.all, { ...base, status: "decided" }).length },
     protection: await protectionFor(ctx.installationId, allowed), canExport: ctx.kind !== "client",

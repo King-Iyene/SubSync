@@ -2,10 +2,11 @@
 
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { guardrails, REASON_LABELS, SORT_LABELS } from "@/lib/analytics/dedupe-review";
+import { diffFields, guardrails, REASON_LABELS, SORT_LABELS } from "@/lib/analytics/dedupe-review";
 import type { FieldPick } from "@/lib/analytics/cleanup-rules";
 import { EmptyState, ErrorState, HowTo, InlineAlert, Page, PopMenu, RowButton, Section, SkeletonCards } from "../ds";
-import { MatchWhy, type Pair, type Workflow } from "./duplicates-extra";
+import { MatchWhy, PersonCard, type Pair, type Workflow } from "./duplicates-extra";
+import { MatchMeter, ProgressBar } from "./cleanup-parts";
 import { useApiClient, useData } from "../session";
 import { fmtInt } from "../ui";
 import { buttons, Compare, GroupRow, MergeSheet, RecordCard, type Row, type WithUrl } from "./duplicates-parts";
@@ -26,6 +27,7 @@ type Step = {
 type Paged<T> = { rows: T[]; page: number; pages: number; total: number; from: number; to: number };
 type Account = { locationId: string; name: string | null; groups: number; contacts: number; extra: number; openDeals: number };
 type Data = {
+  sure: number;
   health: { groups: number; contacts: number; extra: number; listSize: number; shareLabel: string };
   byReason: Record<string, number>; obvious: number; truncated: boolean; multi: boolean; status: "open" | "decided" | "later";
   counts: { open: number; later: number; decided: number }; protection: { allowing: number; names: string[] }; canExport: boolean; mergeSwitchedOff: boolean;
@@ -65,6 +67,10 @@ export function DuplicatesView({ embedded = false }: { embedded?: boolean } = {}
   const [oPage, setOPage] = useState(0);
   const [copied, setCopied] = useState<string | null>(null);
   const [qInput, setQInput] = useState("");
+  // Fast review: yes, no or later with one key (Y, N, L) or one swipe. The count is only for the progress bar of this visit.
+  const [fast, setFast] = useState(false);
+  const [doneNow, setDoneNow] = useState(0);
+  const touch = useRef<{ x: number; y: number } | null>(null);
   const obv = useData<ObviousData>(obvious ? `duplicates/obvious?page=${oPage}` : null);
 
   const patch = useCallback((p: Partial<F>) => setF((x) => ({ ...x, ...p })), []);
@@ -96,6 +102,7 @@ export function DuplicatesView({ embedded = false }: { embedded?: boolean } = {}
     setProblem(null);
     try {
       await api.post(path, body);
+      if (!path.includes("undo") && !path.includes("unsnooze")) setDoneNow((n) => n + 1);
       setSheetKey(null);
       setToast({
         text: done,
@@ -130,9 +137,9 @@ export function DuplicatesView({ embedded = false }: { embedded?: boolean } = {}
   };
 
   // Keyboard: arrows move between groups; M starts the merge, N says not a duplicate, S skips. Not while typing in a box.
-  const keys = useRef({ prev, next, merge: () => {}, not: () => {}, skip: next });
+  const keys = useRef({ prev, next, merge: () => {}, not: () => {}, skip: next, later: () => {}, fast: false });
   useEffect(() => {
-    keys.current = { prev, next, merge: () => { if (step && !decided) setSheetKey(step.key); }, not: () => { if (step && !decided && !busy) void notDuplicate(step); }, skip: next };
+    keys.current = { prev, next, merge: () => { if (step && !decided) setSheetKey(step.key); }, not: () => { if (step && !decided && !busy) void notDuplicate(step); }, skip: next, later: () => { if (step && !decided && !busy) void notNow(step); }, fast };
   });
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
@@ -142,7 +149,10 @@ export function DuplicatesView({ embedded = false }: { embedded?: boolean } = {}
       if (e.key === "ArrowLeft") { e.preventDefault(); k.prev(); }
       else if (e.key === "ArrowRight") { e.preventDefault(); k.next(); }
       // Single-letter keys only act while focus is inside the group on screen (WCAG 2.1.4), so they can never fire by accident elsewhere on the page.
-      else if (!t?.closest("[data-testid='dup-step']")) return;
+      // Fast review is the person's own choice to use them anywhere (it is a switch they turned on, and it can be turned off).
+      else if (!k.fast && !t?.closest("[data-testid='dup-step']")) return;
+      else if (k.fast && (e.key === "y" || e.key === "Y")) k.merge();
+      else if (k.fast && (e.key === "l" || e.key === "L")) k.later();
       else if (e.key === "m" || e.key === "M") k.merge();
       else if (e.key === "n" || e.key === "N") k.not();
       else if (e.key === "s" || e.key === "S") k.skip();
@@ -189,25 +199,30 @@ export function DuplicatesView({ embedded = false }: { embedded?: boolean } = {}
 
       <section className="mb-6" data-testid="dup-health" aria-label="Duplicates at a glance">
         <p className="text-3xl font-semibold tracking-tight" data-testid="dup-headline">
-          {h.groups === 0 ? "No duplicates to merge" : `${plural(h.groups, "duplicate group", "duplicate groups")} to fix`}
+          {h.groups === 0 ? "All clean. Nobody appears twice." : `${fmtInt(h.groups)} ${h.groups === 1 ? "person appears" : "people appear"} more than once`}
         </p>
-        <p className="mt-1 text-sm text-muted-foreground" data-testid="dup-health-line">
+        <p className="mt-1 text-base text-muted-foreground" data-testid="dup-health-line">
           {h.groups === 0
-            ? `We compared ${fmtInt(h.listSize)} contacts and none look like the same person.`
-            : <>{plural(h.extra, "extra contact", "extra contacts")} to remove{h.shareLabel ? `, ${h.shareLabel}` : ""}. About 3 clicks each.</>}
-          {data.counts.later > 0 && <> {plural(data.counts.later, "group", "groups")} set aside.</>}
+            ? `We compared ${fmtInt(h.listSize)} contacts and no one is there twice.`
+            : <>{fmtInt(data.sure)} {data.sure === 1 ? "is a sure match" : "are sure matches"}. Clean them all in about {Math.max(1, Math.ceil(h.groups / 3))} {Math.ceil(h.groups / 3) <= 1 ? "minute" : "minutes"}.</>}
+          {data.counts.later > 0 && <> {plural(data.counts.later, "match", "matches")} set aside for later.</>}
         </p>
-        {data.obvious > 0 && (
-          <button type="button" className={`${BTN} mt-3`} aria-expanded={obvious} onClick={() => { setObvious(!obvious); setOPage(0); }} data-testid="dup-obvious-btn">
-            Merge all the obvious ones ({fmtInt(data.obvious)})
-          </button>
-        )}
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          {data.obvious > 0 && (
+            <button type="button" className={BTN} aria-expanded={obvious} onClick={() => { setObvious(!obvious); setOPage(0); }} data-testid="dup-obvious-btn">
+              Combine all the sure ones ({fmtInt(data.obvious)})
+            </button>
+          )}
+          {h.groups > 0 && <button type="button" className={BTN} aria-pressed={fast} onClick={() => setFast(!fast)} data-testid="dup-fast">{fast ? "Fast review is on" : "Fast review"}</button>}
+        </div>
+        {fast && <p className="mt-2 text-xs text-muted-foreground" data-testid="dup-fast-hint">Press Y for yes, N for no, L for later. On a phone, swipe right for yes, left for no, up for later.</p>}
+        {(doneNow > 0 || fast) && h.groups + doneNow > 0 && <div className="mt-3 max-w-md"><ProgressBar done={doneNow} total={doneNow + h.groups} label={`${fmtInt(doneNow)} done, ${fmtInt(h.groups)} to go`} /></div>}
       </section>
 
       {obvious && (
         <section className="mb-8 border-y py-4" data-testid="dup-obvious-panel" aria-label="The obvious duplicates">
           <h2 className="text-base font-semibold">{plural(data.obvious, "obvious group", "obvious groups")}</h2>
-          <p className="mt-0.5 text-sm text-muted-foreground">Same email and same phone number, nothing to warn about. This is a preview: merging many at once from here is switched off, so nothing is changed.</p>
+          <p className="mt-0.5 text-sm text-muted-foreground">Same email and same phone number, nothing to warn about. This is a preview: nothing is combined until you say so, one at a time.</p>
           {obv.loading && !obv.data ? <p className="mt-3 text-sm text-muted-foreground">Loading...</p> : obv.error ? <div className="mt-3"><ErrorState error={obv.error} onRetry={obv.reload} /></div> : (
             <>
               <ul className="mt-2">
@@ -240,52 +255,65 @@ export function DuplicatesView({ embedded = false }: { embedded?: boolean } = {}
       )}
 
       {step && keepId ? (
-        <section aria-label="The group to review" data-testid="dup-step" tabIndex={-1} className={`outline-none ${loading ? "opacity-70 transition-opacity" : "transition-opacity"}`}>
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b pb-3">
+        <section aria-label="The group to review" data-testid="dup-step" tabIndex={-1} className={`outline-none ${loading ? "opacity-70 transition-opacity" : "transition-opacity"}`}
+          onTouchStart={(e) => { if (fast) touch.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }; }}
+          onTouchEnd={(e) => {
+            const t0 = touch.current; touch.current = null;
+            if (!fast || !t0 || decided || busy) return;
+            const dx = e.changedTouches[0].clientX - t0.x; const dy = e.changedTouches[0].clientY - t0.y;
+            if (Math.abs(dx) > Math.abs(dy) && dx > 90) setSheetKey(step.key);
+            else if (Math.abs(dx) > Math.abs(dy) && dx < -90) void notDuplicate(step);
+            else if (dy < -90) void notNow(step);
+          }}>
+          <div className="mb-4 flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
             <div className="min-w-0">
-              <p className="text-lg font-semibold outline-none" tabIndex={-1} data-testid="dup-step-count" aria-live="polite">Group {fmtInt(at + 1)} of {fmtInt(total)}</p>
-              <p className="text-sm text-muted-foreground" data-testid="dup-reason">{step.reason.label}{data.multi && step.locationName ? ` · ${step.locationName}` : ""} · {step.likelihood.label}</p>
+              <h2 className="text-2xl font-semibold tracking-tight" data-testid="dup-question">Are these the same person?</h2>
+              <p className="mt-0.5 text-sm text-muted-foreground outline-none" tabIndex={-1} data-testid="dup-step-count" aria-live="polite">Match {fmtInt(at + 1)} of {fmtInt(total)}{data.multi && step.locationName ? ` · ${step.locationName}` : ""}</p>
             </div>
             <div className="flex gap-2">
-              <button type="button" className={`${BTN} px-3`} onClick={prev} disabled={total < 2} aria-label="Previous group" aria-keyshortcuts="ArrowLeft" data-testid="dup-prev"><ChevronLeft aria-hidden className="size-5" /></button>
-              <button type="button" className={`${BTN} px-3`} onClick={next} disabled={total < 2} aria-label="Next group" aria-keyshortcuts="ArrowRight" data-testid="dup-next"><ChevronRight aria-hidden className="size-5" /></button>
+              <button type="button" className={`${BTN} px-3`} onClick={prev} disabled={total < 2} aria-label="Previous match" aria-keyshortcuts="ArrowLeft" data-testid="dup-prev"><ChevronLeft aria-hidden className="size-5" /></button>
+              <button type="button" className={`${BTN} px-3`} onClick={next} disabled={total < 2} aria-label="Next match" aria-keyshortcuts="ArrowRight" data-testid="dup-next"><ChevronRight aria-hidden className="size-5" /></button>
             </div>
           </div>
 
+          <MatchMeter confidence={step.confidence} word={step.likelihood.label} reason={step.reason.label} />
+
           {step.review && (
-            <div className="mb-4"><InlineAlert tone="info" action={<button type="button" className={QUIET} disabled={busy} onClick={() => void putBack(step)} data-testid="dup-undo-decision">Undo</button>}>
-              {step.review.kind === "not_duplicate" ? "You marked this as not a duplicate." : step.review.kind === "merged_in_platform" ? "You said this was merged in your CRM." : "You decided about this group."}
+            <div className="mt-4"><InlineAlert tone="info" action={<button type="button" className={QUIET} disabled={busy} onClick={() => void putBack(step)} data-testid="dup-undo-decision">Undo</button>}>
+              {step.review.kind === "not_duplicate" ? "You said these are different people." : step.review.kind === "merged_in_platform" ? "You said these were combined in your CRM." : "You decided about this match."}
             </InlineAlert></div>
           )}
           {step.until && !step.review && (
-            <div className="mb-4"><InlineAlert tone="info" action={<button type="button" className={QUIET} disabled={busy} onClick={() => void putBack(step)} data-testid="dup-unsnooze">Put back</button>}>
+            <div className="mt-4"><InlineAlert tone="info" action={<button type="button" className={QUIET} disabled={busy} onClick={() => void putBack(step)} data-testid="dup-unsnooze">Put back</button>}>
               Set aside until {new Date(step.until).toLocaleDateString("en-US", { day: "numeric", month: "short" })}.
             </InlineAlert></div>
           )}
 
-          <ul className={`grid gap-x-6 gap-y-4 ${step.people.length >= 3 ? "md:grid-cols-3" : step.people.length === 2 ? "md:grid-cols-2" : ""}`} data-testid="dup-records">
-            {step.people.map((p, i) => (
-              <RecordCard key={p.contactId} p={p} i={i} keep={p.contactId === keepId} best={p.contactId === step.survivorId} locked={decided} onKeep={() => setChosen({ key: step.key, id: p.contactId })} />
-            ))}
-          </ul>
+          {(() => {
+            const d = diffFields(step.people);
+            const differ = new Set(d.differ.map((r) => r.id));
+            return (
+              <>
+                <ul className={`mt-4 grid gap-4 ${step.people.length >= 3 ? "md:grid-cols-3" : step.people.length === 2 ? "md:grid-cols-2" : ""}`} data-testid="dup-records">
+                  {step.people.map((p, i) => <PersonCard key={p.contactId} p={p} i={i} keep={p.contactId === keepId} best={p.contactId === step.survivorId} locked={decided} differ={differ} onKeep={() => setChosen({ key: step.key, id: p.contactId })} />)}
+                </ul>
+                {d.same.length > 0 && <p className="mt-2 text-sm text-muted-foreground" data-testid="dup-same-line">The same on both: {d.same.map((r) => r.label.toLowerCase()).join(", ")}.</p>}
+              </>
+            );
+          })()}
 
-          <p className="mt-3 text-sm" data-testid="dup-why">
-            {keepId === step.survivorId
-              ? <><span className="font-medium">Best match picked: {step.people.find((p) => p.contactId === step.survivorId)?.name}.</span> <span className="text-muted-foreground">{step.why}.</span></>
-              : <span className="text-muted-foreground">You chose {step.people.find((p) => p.contactId === keepId)?.name} instead of our pick ({step.people.find((p) => p.contactId === step.survivorId)?.name}).</span>}
-          </p>
-          <MatchWhy confidence={step.confidence} likelihood={step.likelihood.label} reasons={step.reasons} pairs={step.pairs} people={step.people} rules={step.rules} />
-          {guardrails(step.people, keepId).length > 0 && !sheetOpen && !decided && <p className="mt-1 text-sm text-warning" data-testid="dup-careful">There is something to check before merging this one. You will see it next.</p>}
+          {guardrails(step.people, keepId).length > 0 && !sheetOpen && !decided && <p className="mt-3 text-sm text-warning" data-testid="dup-careful">One thing to check first: {guardrails(step.people, keepId)[0].text}</p>}
 
           {!decided && !sheetOpen && (
-            <div className="mt-6" data-testid="dup-actions">
-              <button type="button" className={PRIMARY} onClick={() => setSheetKey(step.key)} aria-keyshortcuts="m" data-testid="dup-merge">Merge these {step.people.length} contacts</button>
+            <div className="mt-5" data-testid="dup-actions">
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <button type="button" className={`${PRIMARY} sm:min-w-56`} onClick={() => setSheetKey(step.key)} aria-keyshortcuts="m y" data-testid="dup-merge">Yes, combine them</button>
+                <button type="button" className={`${BTN} min-h-12 sm:min-w-48`} disabled={busy} onClick={() => void notDuplicate(step)} aria-keyshortcuts="n" data-testid="dup-not-dup">No, different people</button>
+              </div>
               <div className="mt-2 flex flex-wrap gap-x-2 gap-y-1">
-                <button type="button" className={QUIET} disabled={busy} onClick={() => void notDuplicate(step)} aria-keyshortcuts="n" data-testid="dup-not-dup">Not a duplicate</button>
-                <button type="button" className={QUIET} disabled={busy} onClick={() => void notNow(step)} data-testid="dup-not-now">Not now</button>
+                <button type="button" className={QUIET} disabled={busy} onClick={() => void notNow(step)} aria-keyshortcuts="l" data-testid="dup-not-now">Decide later</button>
                 <button type="button" className={QUIET} disabled={total < 2} onClick={next} aria-keyshortcuts="s" data-testid="dup-skip">Skip</button>
               </div>
-              <p className="mt-2 hidden text-xs text-muted-foreground md:block">Keys: the left and right arrows move between groups. With the group selected, M merges, N says not a duplicate and S skips.</p>
             </div>
           )}
 
@@ -297,14 +325,24 @@ export function DuplicatesView({ embedded = false }: { embedded?: boolean } = {}
               picks={step.picks} workflow={step.workflow} onWorkflowMerge={() => mergeInCrm(step)}
             />
           )}
-          <Compare people={step.people} watchingSince={step.watchingSince} />
+
+          <details className="mt-6 border-t pt-3" data-testid="dup-how">
+            <summary className="min-h-11 cursor-pointer text-sm font-medium">How we decided</summary>
+            <p className="mt-1 text-sm" data-testid="dup-why">
+              {keepId === step.survivorId
+                ? <><span className="font-medium">Best one to keep: {step.people.find((p) => p.contactId === step.survivorId)?.name}.</span> <span className="text-muted-foreground">{step.why}.</span></>
+                : <span className="text-muted-foreground">You chose {step.people.find((p) => p.contactId === keepId)?.name} instead of our pick ({step.people.find((p) => p.contactId === step.survivorId)?.name}).</span>}
+            </p>
+            <MatchWhy confidence={step.confidence} likelihood={step.likelihood.label} reasons={step.reasons} pairs={step.pairs} people={step.people} rules={step.rules} />
+            <Compare people={step.people} watchingSince={step.watchingSince} />
+          </details>
           {copied && <textarea readOnly className="mt-3 h-40 w-full rounded-lg border bg-card p-2 font-mono text-xs" value={copied} aria-label="Summary to copy" onFocus={(e) => e.currentTarget.select()} />}
         </section>
       ) : (
         <EmptyState
-          title={filtered ? "Nothing matches" : data.counts.later > 0 ? "Nothing left to review right now" : "No duplicates to merge"}
-          body={filtered ? "No group fits what you picked." : data.counts.later > 0 ? "The groups you set aside come back after 7 days." : "No two contacts in your accounts look like the same person."}
-          action={filtered ? <button type="button" className={BTN} onClick={clearFilters}>Show all groups</button> : undefined}
+          title={filtered ? "Nothing matches" : data.counts.later > 0 ? "Nothing left to decide right now" : "All clean. Nice work."}
+          body={filtered ? "No match fits what you picked." : data.counts.later > 0 ? "The ones you set aside come back in 7 days." : doneNow > 0 ? `You sorted out ${fmtInt(doneNow)} just now. Nobody in your contacts appears twice.` : "Nobody in your contacts appears twice."}
+          action={filtered ? <button type="button" className={BTN} onClick={clearFilters}>Show everything</button> : undefined}
         />
       )}
 

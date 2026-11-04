@@ -124,7 +124,7 @@ export function MergeSheet({ accountName, people, keepId, why, switchedOff, onCl
   };
   return (
     <section aria-labelledby="dup-sheet-h" className="mt-5 border-t-2 border-primary pt-4" data-testid="dup-sheet">
-      <h3 id="dup-sheet-h" ref={head} tabIndex={-1} className="text-lg font-semibold outline-none">Merge {people.length} contacts into {keep.name}</h3>
+      <h3 id="dup-sheet-h" ref={head} tabIndex={-1} className="text-lg font-semibold outline-none">Combine these {people.length} people into {keep.name}</h3>
       <p className="mt-1 text-sm text-muted-foreground">Nothing changes until you finish in your CRM. Here is exactly what the merge does.</p>
 
       {warnings.length > 0 && (

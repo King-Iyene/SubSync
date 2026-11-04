@@ -4,8 +4,11 @@ import { useState } from "react";
 import type { Guardrail } from "@/lib/analytics/dedupe-review";
 import type { Person } from "@/lib/analytics/dedupe";
 import type { FieldPick } from "@/lib/analytics/cleanup-rules";
-import { InlineAlert } from "../ds";
-import { BTN, PRIMARY, ScoreMeter } from "./cleanup-parts";
+import { DialButton, InlineAlert } from "../ds";
+import { ExtLink, timeAgo } from "../ui";
+import { Avatar, BTN, PRIMARY, ScoreMeter } from "./cleanup-parts";
+
+const STRICTNESS: Record<string, string> = { strict: "Careful", balanced: "Normal", loose: "Thorough", custom: "Your own mix" };
 
 // The Clean-up additions to the duplicate review (stage CLEANUP): the match score with its reasons, what each field becomes under the account's "which value wins" rules, and
 // starting a merge from SubSync through the customer's own merge workflow. Plain words, no pills, no tinted boxes (KF-1).
@@ -21,14 +24,14 @@ export function MatchWhy({ confidence, likelihood, reasons, pairs, people, rules
   const nameOf = (id: string) => people.find((p) => p.contactId === id)?.name ?? "a contact";
   return (
     <div className="mt-4 grid gap-x-8 gap-y-3 sm:grid-cols-[auto_minmax(0,1fr)]" data-testid="dup-match">
-      <ScoreMeter score={confidence} word={likelihood} label="Match score" testId="dup-score" />
+      <ScoreMeter score={confidence} word={likelihood} label="How sure we are" testId="dup-score" />
       <div className="min-w-0 text-sm">
         <p className="font-medium">Why these match</p>
         <ul className="mt-0.5 list-disc space-y-0.5 pl-5 text-muted-foreground" data-testid="dup-reasons">{reasons.map((r) => <li key={r}>{r}</li>)}</ul>
-        <p className="mt-1 text-xs text-muted-foreground" data-testid="dup-rules-note">Matching rules: {rules.preset === "custom" ? "your own mix" : rules.preset}. {rules.sentence}</p>
+        <p className="mt-1 text-xs text-muted-foreground" data-testid="dup-rules-note">How careful we are: {STRICTNESS[rules.preset] ?? "Normal"}. {rules.sentence}</p>
         {pairs.length > 1 && (
           <details className="mt-1" data-testid="dup-pairs">
-            <summary className="min-h-9 cursor-pointer text-xs text-muted-foreground">Score for each pair</summary>
+            <summary className="min-h-9 cursor-pointer text-xs text-muted-foreground">How sure for each pair</summary>
             <ul className="mt-1 space-y-1 text-xs">{pairs.map((x) => <li key={x.a + x.b}><span className="font-medium tabular-nums">{x.score}</span> · {nameOf(x.a)} and {nameOf(x.b)}{x.reasons.length ? <span className="text-muted-foreground">: {x.reasons.join("; ").toLowerCase()}</span> : null}</li>)}</ul>
           </details>
         )}
@@ -95,5 +98,49 @@ export function WorkflowMerge({ workflow, people, switchedOff, onRun }: { workfl
         </div>
       )}
     </div>
+  );
+}
+
+// ---------- one person, as a card ----------
+
+const when = (iso: string | null) => (iso ? timeAgo(iso) : null);
+
+/** One of the two records as a card: initials, name, and only what differs from the other record (what is identical is said once, under the cards). */
+export function PersonCard({ p, i, keep, best, locked, differ, onKeep }: { p: Person & { url: string }; i: number; keep: boolean; best: boolean; locked: boolean; differ: ReadonlySet<string>; onKeep: () => void }) {
+  const rows: Array<[string, string | null]> = [];
+  if (differ.has("phone")) rows.push(["Phone", p.phone?.trim() || null]);
+  if (differ.has("email")) rows.push(["Email", p.email?.trim() || null]);
+  if (differ.has("owner")) rows.push(["Belongs to", p.ownerName ?? (p.ownerId ? `Team member ${p.ownerId.slice(-4)}` : null)]);
+  if (differ.has("source")) rows.push(["Came from", p.source?.trim() || null]);
+  if (differ.has("tags")) rows.push(["Tags", p.tags.length ? p.tags.join(", ") : null]);
+  rows.push(["Last activity", when(p.lastActivityAt) ?? "none seen"]);
+  if (differ.has("deals") || p.openDeals > 0 || p.wonDeals > 0) rows.push(["Deals", p.openDeals || p.wonDeals ? `${p.openDeals} open, ${p.wonDeals} won` : null]);
+  if (differ.has("conversation")) rows.push(["Conversation", p.hasConversation ? "Yes" : null]);
+  if (p.dnd) rows.push(["Do Not Disturb", "Yes"]);
+  return (
+    <li className={`min-w-0 rounded-xl border bg-card p-4 ${keep ? "border-primary ring-1 ring-primary/40" : ""}`} data-testid="dup-record" data-keep={keep ? "true" : "false"}>
+      <div className="flex items-center gap-3">
+        <Avatar name={p.name} tone={i} />
+        <div className="min-w-0">
+          <p className="break-words text-lg font-semibold leading-tight">{p.name}</p>
+          <p className="text-xs text-muted-foreground">Added {when(p.createdAt) ?? "a while ago"}{best ? " · the best one to keep" : ""}</p>
+        </div>
+      </div>
+      <dl className="mt-3 space-y-1.5 text-sm">
+        {rows.map(([k, v]) => (
+          <div key={k} className="grid grid-cols-[6.5rem_minmax(0,1fr)] gap-2 border-l-2 border-primary/60 pl-2">
+            <dt className="text-muted-foreground">{k}</dt><dd className="min-w-0 break-words">{v ?? <span className="text-muted-foreground">none</span>}</dd>
+          </div>
+        ))}
+      </dl>
+      <label className={`mt-3 flex min-h-11 items-center gap-2 text-sm ${locked ? "" : "cursor-pointer"}`}>
+        <input type="radio" name="dup-keep" className="size-5 shrink-0" checked={keep} disabled={locked} onChange={onKeep} aria-label={`Keep ${p.name} (record ${String.fromCharCode(65 + i)})`} data-testid="dup-keep-radio" />
+        <span>{keep ? "Keep this one" : "Keep this one instead"}</span>
+      </label>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-0.5 text-sm">
+        <DialButton compact phone={p.phone} contactUrl={p.url} dnd={p.dnd === true} />
+        <ExtLink href={p.url}>Open contact</ExtLink>
+      </div>
+    </li>
   );
 }

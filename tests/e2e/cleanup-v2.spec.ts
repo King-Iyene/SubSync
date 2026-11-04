@@ -41,10 +41,14 @@ for (const role of ROLES) {
     // The Duplicates tab: the match score and why, in words.
     await tab(page, "Duplicates").click();
     await expect(page.getByTestId("dup-headline")).toBeVisible({ timeout: 180_000 });
+    await expect(page.getByTestId("dup-question")).toHaveText("Are these the same person?");
+    await expect(page.getByTestId("dup-meter")).toBeVisible();
+    await expect(page.getByTestId("dup-reason-line")).toBeVisible();
+    await page.getByTestId("dup-how").locator("summary").click();
     await expect(page.getByTestId("dup-score")).toBeVisible();
     await expect(page.getByTestId("dup-score-n")).toHaveText(/^\d{1,3}$/);
     await expect(page.getByTestId("dup-reasons").locator("li").first()).toBeVisible();
-    await expect(page.getByTestId("dup-rules-note")).toContainText(/Matching rules: (balanced|strict|loose|your own mix)/);
+    await expect(page.getByTestId("dup-rules-note")).toContainText(/How careful we are: (Careful|Normal|Thorough|Your own mix)/);
     if (role.multi) await expect(page.getByTestId("dup-clients")).toBeVisible();
     expect(await page.locator("main").innerText()).not.toMatch(BANNED);
     await noSideways(page);
@@ -112,6 +116,8 @@ test("data quality: the count on a row equals the rows behind it, and a pasted f
   await expect(page.getByTestId("quality-account")).toBeVisible({ timeout: 180_000 });
   await expect(page.getByTestId("quality-account-score-n")).toBeVisible({ timeout: 180_000 });
   await expect(page.getByTestId("quality-parts").locator("li")).toHaveCount(5);
+  await expect(page.getByTestId("fix-card")).toHaveCount(3);
+  await expect(page.getByTestId("fix-card").first().getByTestId("fix-card-count")).toHaveText(/^[d,]+$/);
   // The same number through the page and through the API: the row says N and the list behind it holds N.
   const finding = page.locator('[data-testid="quality-finding"][data-finding="bad_email"]');
   await expect(finding).toBeVisible();

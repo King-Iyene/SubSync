@@ -34,9 +34,9 @@ export const PRESETS: Record<Exclude<PresetId, "custom">, MatchRules> = {
 export const DEFAULT_RULES: MatchRules = PRESETS.balanced;
 
 export const PRESET_WORDS: Record<Exclude<PresetId, "custom">, { label: string; line: string }> = {
-  strict: { label: "Strict", line: "Only the same email or the same phone number, written exactly alike. Fewest groups, almost no false alarms." },
-  balanced: { label: "Balanced", line: "The same email or phone number even when written differently (capitals, spaces, brackets). The usual choice." },
-  loose: { label: "Loose", line: "Also similar names (Bob and Robert), numbers with two digits swapped, and names on their own. Most groups, some will be wrong." },
+  strict: { label: "Careful", line: "Only the same email or phone number, written exactly alike. Fewest matches, almost no wrong guesses." },
+  balanced: { label: "Normal", line: "The same email or phone number even when written differently (capitals, spaces, brackets). The usual choice." },
+  loose: { label: "Thorough", line: "Also similar names (Bob and Robert), numbers with two digits swapped, and names on their own. Finds the most, some will be wrong." },
 };
 
 export const FIELD_WORDS = {
@@ -81,7 +81,7 @@ export function describeRules(rules: MatchRules): string {
   if (rules.phone !== "off") bits.push(rules.phone === "exact" ? "the same phone number, as typed" : rules.phone === "similar" ? "the same phone number in any format" : "the same phone number, even with two digits swapped");
   if (rules.name !== "off") bits.push(rules.name === "exact" ? "the same name (as extra proof)" : "a similar name");
   if (rules.nameAlone && rules.name !== "off") bits.push("a name on its own");
-  return `Matches on ${bits.length ? bits.join(", ") : "nothing"}. A pair needs a score of ${rules.threshold} or more.`;
+  return `Looks for ${bits.length ? bits.join(", ") : "nothing"}. ${rules.threshold >= 80 ? "Only very sure matches are shown." : rules.threshold <= 35 ? "Even weak matches are shown." : "Likely matches are shown."}`;
 }
 
 /** What each choice does to the number of groups, in words: used under the controls. */
