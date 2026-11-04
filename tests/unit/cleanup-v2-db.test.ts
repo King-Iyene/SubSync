@@ -48,7 +48,7 @@ describe.skipIf(!HAS_DB)("the Clean-up module", () => {
     const rows = [
       // A1: an exact pair, a nickname pair (only Loose), a bad email, a typo domain, a phone not in international format, an empty contact.
       contact(instA, A1, "a1-1", "Ann", "Ames", "ann@x.test", "+15550101111"), contact(instA, A1, "a1-2", "Ann", "Ames", "ann@x.test", "+15550101111"),
-      contact(instA, A1, "a1-3", "Bob", "Hart", "bob@hart.test", null), contact(instA, A1, "a1-4", "Robert", "Hart", "rob@hart2.test", null),
+      contact(instA, A1, "a1-3", "Bob", "Hart", "bob@hart.test", null), contact(instA, A1, "a1-4", "Robert", "Hart", "robert@hart.test", null),
       contact(instA, A1, "a1-5", "Eve", "Stone", "not-an-email", "+15550105555"), contact(instA, A1, "a1-6", "Frank", "Diaz", "frank@gmial.com", "(555) 010-6666"),
       contact(instA, A1, "a1-7", null, null, null, null),
       contact(instA, A2, "a2-1", "Cy", "Cole", "cy@x.test", null),
