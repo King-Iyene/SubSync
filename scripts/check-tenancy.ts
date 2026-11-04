@@ -115,7 +115,7 @@ async function main() {
           sweeps += 1;
           assert.ok(r.status < 500, `${label} ${path} -> ${r.status} ${r.text.slice(0, 120)}`);
           // A search echoes what was typed. Only its results count as data.
-          const body = path.startsWith("/api/app/search") ? JSON.stringify((JSON.parse(r.text) as { hits?: unknown }).hits ?? []) : r.text;
+          const body = path.startsWith("/api/app/search") ? JSON.stringify((JSON.parse(r.text) as { hits?: unknown }).hits ?? []) : path.startsWith("/api/app/people/search") ? JSON.stringify((JSON.parse(r.text) as { rows?: unknown }).rows ?? []) : r.text;
           for (const needle of [other.marker, other.marker.toLowerCase(), other.company, ...other.locs, ...other.contacts, ...other.opps]) {
             assert.equal(body.includes(needle), false, `${me.company} (${label}) saw "${needle}" of ${other.company} through ${path}`);
           }
