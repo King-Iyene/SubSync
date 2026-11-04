@@ -74,7 +74,19 @@ Proposals (not built; for `docs/PROPOSALS.md`): see FOR THE LEAD.
 
 ## Verification
 
-VERIFICATION_PLACEHOLDER
+Commands run in `C:\Users\KING\wt\AUDIT` (4 to 5 Nov 2026). The full suite, the full integration chain and the full e2e were NOT run (parallel mode).
+
+| Command | Result |
+|---|---|
+| `npx next typegen && npx tsc --noEmit` | clean (no output) |
+| `npx eslint` on every file this stage touched (src, tests, scripts) | 0 errors; 3 warnings, all older unused imports in `router.ts` and none in a file of this stage. A full `npx eslint src tests` was NOT run after the lead asked me to wrap up. |
+| `node --test src/lib/__tests__/` | 882 tests, 882 pass, 0 fail (includes the 21 in `audit-v2.test.ts`) |
+| `npx vitest run tests/unit/audit-v2-db.test.ts --no-file-parallelism` | 5 passed (real database: the share link live, expired, switched off, wrong token, other company, view count; the lists at 150 client accounts). Fixture companies removed afterwards. |
+| `npx vitest run tests/unit/audit-report.test.ts --no-file-parallelism` | 14 passed |
+| `BASE_URL=http://localhost:3151 node --env-file=.env.local --import tsx scripts/check-audit.ts` | "account audit: Your client accounts are leaking about $294,275 a month. Counted $1397934 matches the Overview, estimate kept apart, one finding per person, scoped to one account for business and client: ok" |
+| `PW_BASE_URL=http://localhost:3151 npx playwright test tests/e2e/audit-v2.spec.ts` at desktop-1440, tablet-768, phone-390 (in pieces; every demo call takes 10 to 40 seconds) | tablet-768: 10 of 10 passed. desktop-1440: the four role tests, the Run again and See all test, the client list, one client and the demo-share tests passed; "the same numbers" and "a client's staff and a business owner" failed once on my own test mistakes (the CRM address in the JSON matched the banned-word check; a business owner in the demo gets 400, not 403 when it tries to share), were fixed in the spec and passed afterwards. phone-390: the four role tests, "same numbers", the demo-share and Run again tests passed; the three API tests failed once because the demo's numbers move with the clock between two reads more than 45 seconds apart, so the spec now reads what must agree back to back, and they passed (3 of 3). At the end the four role tests were run again at all three widths to take the final screenshots: 4 of 4 at each width. |
+| `PW_BASE_URL=... tests/e2e/share-print.spec.ts` (edited) | NOT run. Edited to the new screen; type-checks and lints. |
+| `scripts/check-tenancy.ts` (with five new audit read addresses) | NOT PASSED, NOT COMPLETED. Run three times: (1) failed at a positive control (`/api/app/accounts` as an agency answered 403), (2) failed at `GET /api/app/export/stale` answering 500, a route this stage does not touch, (3) stopped on the lead's request because the fixture companies `xtest-agency-a` and `xtest-agency-b` are shared by every agent and runs delete each other's rows. The first two failures were most likely other agents' runs or load on the shared database; I could not tell. The lead should run it alone. If a fixture is left behind by my stopped run, `make()` deletes it at the start of the next run. |
 
 ## NOT verified
 
