@@ -93,6 +93,7 @@ import { meetingConfirm, meetingContactSearch, meetingDismiss, meetingIgnore, me
 import { meetingSetupAccountView, meetingSetupFieldsSave, meetingSetupFieldsView, meetingSetupPreview, meetingSetupSaveMine, meetingSetupView } from "./meeting-setup-api";
 import { can, personFromSession } from "../connections/person";
 import { handlePeople, timeoutResponse } from "./people-routes";
+import { handleDuplicates } from "./duplicates-routes";
 import { buildSteps, guideRoleOf } from "../getting-started";
 import { changedSettingKeys, feedbackGivenBy, logAccountFlags, logKeyChange, logSettingsChange, recordVote } from "../feedback-queries";
 import { groupStatus, parseGranted } from "../scope-groups";
@@ -924,23 +925,6 @@ async function pipelines(ctx: Ctx) {
   });
 }
 
-async function duplicates(ctx: Ctx) {
-  const sc = await scope(ctx);
-  const allowed = await allowedIds(ctx);
-  const showReviewed = ctx.url.searchParams.get("reviewed") === "1";
-  const q = await buildQueue(ctx.installationId, allowed);
-  const summary = await summarise(ctx.installationId, allowed, q.open, q.reviews.size);
-  const list = (showReviewed ? q.all : q.open).slice(0, 60);
-  return json({
-    summary, truncated: q.truncated, canReview: ctx.kind !== "client",
-    groups: list.map((g) => ({
-      key: g.key, locationId: g.locationId, locationName: g.locationName, confidence: g.confidence, reasons: g.reasons, kind: g.kind,
-      survivorId: g.survivorId, plan: g.plan, review: q.reviews.get(g.locationId + ":" + g.key) ?? null,
-      people: g.people.map((p) => ({ ...p, url: sc.links.contact(g.locationId, p.contactId) })),
-    })),
-  });
-}
-
 const actorOf = (ctx: Ctx) => ctx.session.userName ?? ctx.session.userId ?? null;
 
 async function duplicateReview(ctx: Ctx) {
@@ -961,6 +945,8 @@ async function duplicateReview(ctx: Ctx) {
 }
 
 async function duplicateBulk(ctx: Ctx) {
+  // Recording many decisions at once is for whoever runs the company or the business; a client's staff decide one group at a time.
+  if (ctx.kind === "client") return json({ error: "Not available in this view" }, 403);
   const body = (await ctx.request.json().catch(() => null)) as { decision?: unknown; minConfidence?: unknown; maxConfidence?: unknown; dryRun?: unknown } | null;
   const decision = body?.decision;
   if (decision !== "not_duplicate" && decision !== "keep") return json({ error: "Unknown action" }, 400);
@@ -1842,6 +1828,10 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
         locationToken: (locationId) => locationAccessToken(ctx.session.companyId, locationId),
       });
     }
+    // The guided duplicate review (reading, setting a group aside, the one-click merge, which is switched off). Deciding and undoing stay below.
+    if (a === "duplicates" && (method === "GET" || ["snooze", "unsnooze", "merge"].includes(b ?? ""))) {
+      return await handleDuplicates(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links, locationToken: (locationId) => locationAccessToken(ctx.session.companyId, locationId) });
+    }
     if (method === "GET") {
       if (a === "overview") return await overview(ctx);
       if (a === "today" && !b) return await todayView(ctx);
@@ -1882,7 +1872,6 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       if (a === "inbox" && b === "views") return await inboxViews(ctx);
       if (a === "inbox") return await inboxView(ctx);
       if (a === "pipelines") return await pipelines(ctx);
-      if (a === "duplicates") return await duplicates(ctx);
       if (a === "email" && !b) return await emailHealth(ctx);
       if (a === "alerts") return await alertsView(ctx);
       if (a === "notifications" && !b) return await bellView(ctx);

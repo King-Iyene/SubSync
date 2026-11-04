@@ -82,6 +82,8 @@ async function main() {
       // Today (second pass): the read, the brief preview and the saved views, asked for the other side's accounts by every parameter Today takes.
       "/api/app/today", `/api/app/today?accounts=${other.locs[0]}`, `/api/app/today?accounts=${other.locs.join(",")}&ta=${other.locs[0]}`, `/api/app/today?accounts=%2e%2e%2f${other.locs[0]}`,
       "/api/app/today/brief", `/api/app/today/brief?accounts=${other.locs[0]}`, "/api/app/today/views",
+      // The duplicate review (stage DUP): the list, the obvious ones, one group, and the other side's account asked for by every parameter the screen takes.
+      "/api/app/duplicates?size=50", "/api/app/duplicates/obvious", `/api/app/duplicates?location=${other.locs[0]}&size=50`, `/api/app/duplicates?accounts=${other.locs[0]}&status=decided`, `/api/app/duplicates?focus=${other.locs[0]}:00000000-2`,
     ];
 
     // TENANCY_FAST=1 skips the long cross-read sweep (while iterating on the share link and write attacks); the full run does not.
@@ -148,6 +150,8 @@ async function main() {
       (select count(*)::int from client_steps where installation_id = ${s.inst}) client_steps,
       (select count(*)::int from client_step_history where installation_id = ${s.inst}) client_step_history,
       (select count(*)::int from today_actions where installation_id = ${s.inst}) today_actions,
+      (select count(*)::int from duplicate_reviews where installation_id = ${s.inst}) duplicate_reviews,
+      (select count(*)::int from duplicate_snoozes where installation_id = ${s.inst}) duplicate_snoozes,
       (select count(*)::int from saved_views where installation_id = ${s.inst}) saved_views,
       (select coalesce(sum(case when ignored then 1 else 0 end), 0)::int from locations where installation_id = ${s.inst}) ignored,
       (select count(*)::int from cached_contacts where installation_id = ${s.inst}) contacts`)[0];
@@ -168,6 +172,10 @@ async function main() {
       ["POST", "/api/app/today/action", { action: "done", rowKey: `${B.locs[0]}|replies` }],
       ["POST", "/api/app/today/action", { action: "snooze", rowKey: `${B.locs[0]}|stale`, choice: "day" }],
       ["POST", "/api/app/today/action", { action: "undo", eventId: 1 }],
+      // The duplicate review: a decision, a set-aside and a merge on the other agency's contacts (the merge never writes: it is switched off).
+      ["POST", "/api/app/duplicates/review", { locationId: B.locs[0], contactIds: [B.contacts[0], B.contacts[0] + "dup"], decision: "not_duplicate" }],
+      ["POST", "/api/app/duplicates/snooze", { locationId: B.locs[0], contactIds: [B.contacts[0], B.contacts[0] + "dup"] }],
+      ["POST", "/api/app/duplicates/merge", { locationId: B.locs[0], contactIds: [B.contacts[0], B.contacts[0] + "dup"], keepContactId: B.contacts[0] }],
     ];
     for (const [method, path, body] of attacks) {
       const r = await call(path, tokenA, { method, body: JSON.stringify(body) });

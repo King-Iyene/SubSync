@@ -17,6 +17,18 @@ export type Person = {
   openDeals: number;
   wonDeals: number;
   hasConversation: boolean;
+  // Added for the guided review. All optional so the older callers and fixtures keep working.
+  /** Do Not Disturb: the person asked not to be contacted. */
+  dnd?: boolean;
+  /** The user id of the team member who owns the contact, and their name where SubSync knows it. */
+  ownerId?: string | null;
+  ownerName?: string | null;
+  /** Total value of the open deals (only filled in for the group on screen). */
+  openValue?: number;
+  /** Appointments linked to the contact (only filled in for the group on screen). */
+  appointments?: number;
+  /** The day SubSync first saw each tag on this contact ("since SubSync started watching"). Only filled in for the group on screen. */
+  tagDates?: Record<string, string>;
 };
 
 // ---------- normalising ----------
@@ -112,11 +124,45 @@ export function groupKey(ids: string[]): string {
 
 // Which record to keep: the one with the most to lose. Deals matter most, then conversations,
 // then how complete and how recently used it is, and finally the oldest as the tiebreak.
-export function chooseSurvivor(people: Person[]): Person {
-  const value = (p: Person) =>
-    p.wonDeals * 1000 + p.openDeals * 400 + (p.hasConversation ? 150 : 0) + (p.email ? 40 : 0) + (p.phone ? 40 : 0) + p.tags.length * 5 +
-    (p.lastActivityAt ? Math.max(0, 60 - (Date.now() - Date.parse(p.lastActivityAt)) / 86_400_000) : 0);
-  return [...people].sort((x, y) => value(y) - value(x) || (x.createdAt ?? "9").localeCompare(y.createdAt ?? "9") || x.contactId.localeCompare(y.contactId))[0];
+export function keepValue(p: Person, now: number = Date.now()): number {
+  return p.wonDeals * 1000 + p.openDeals * 400 + (p.hasConversation ? 150 : 0) + (p.email ? 40 : 0) + (p.phone ? 40 : 0) + p.tags.length * 5 +
+    (p.lastActivityAt ? Math.max(0, 60 - (now - Date.parse(p.lastActivityAt)) / 86_400_000) : 0);
+}
+
+export function chooseSurvivor(people: Person[], now: number = Date.now()): Person {
+  return [...people].sort((x, y) => keepValue(y, now) - keepValue(x, now) || (x.createdAt ?? "9").localeCompare(y.createdAt ?? "9") || x.contactId.localeCompare(y.contactId))[0];
+}
+
+// Two records that clearly belong to different people: both have an email and they differ, AND both have a phone and they differ. Missing
+// values never count (a record with no phone cannot "differ" on phone). Merging such a pair is never offered.
+export function clearlyDiffer(a: Person, b: Person): boolean {
+  const ea = foldEmail(a.email);
+  const eb = foldEmail(b.email);
+  const pa = normPhone(a.phone);
+  const pb = normPhone(b.phone);
+  return !!ea && !!eb && ea !== eb && !!pa && !!pb && pa !== pb;
+}
+
+// A chain of matches can tie together records that are not all the same person (A and B share an email, B and C share a phone, but A and C
+// share nothing and differ on both). Split such a cluster into groups in which nobody clearly differs from anybody else. The record that
+// would be kept seeds each group; others join only when they share an email or phone with the seed and do not clearly differ from anyone
+// already in. Leftovers are tried again as a group of their own.
+export function splitCompatible(people: Person[], now: number = Date.now()): Person[][] {
+  const out: Person[][] = [];
+  let rest = [...people];
+  while (rest.length >= 2) {
+    const seed = chooseSurvivor(rest, now);
+    const group = [seed];
+    for (const o of rest) {
+      if (o === seed) continue;
+      const linked = (foldEmail(o.email) && foldEmail(o.email) === foldEmail(seed.email)) || (normPhone(o.phone) && normPhone(o.phone) === normPhone(seed.phone));
+      if (linked && group.every((g) => !clearlyDiffer(g, o))) group.push(o);
+    }
+    if (group.length >= 2) out.push(group);
+    const used = new Set(group);
+    rest = rest.filter((p) => !used.has(p)); // a seed that matched nobody is dropped; the others are tried again
+  }
+  return out;
 }
 
 // Group contacts that are linked by a confident match (union-find). Pairs below `minScore` do not link.
@@ -161,20 +207,38 @@ export function groupDuplicates(people: Person[], minScore = 50, maxGroup = 40):
     (clusters.get(r) ?? clusters.set(r, []).get(r)!).push(p);
   }
   const groups: Group[] = [];
-  for (const members of clusters.values()) {
-    if (members.length < 2) continue;
-    const reasons = [...new Set(members.flatMap((m) => best.get(m.contactId)!.reasons))];
-    const confidence = Math.max(...members.map((m) => best.get(m.contactId)!.score));
-    const exact = reasons.includes("same email") || reasons.includes("same phone");
-    const format = reasons.some((r) => r.startsWith("phone in") || r.startsWith("email differs"));
-    groups.push({
-      key: groupKey(members.map((m) => m.contactId)),
-      people: members,
-      confidence,
-      reasons,
-      kind: exact && !format ? "exact" : format ? "format" : "name",
-      survivorId: chooseSurvivor(members).contactId,
-    });
+  for (const cluster of clusters.values()) {
+    if (cluster.length < 2) continue;
+    // A cluster in which two records clearly differ (different email AND different phone) is split, so we never offer to merge two people.
+    const parts = cluster.some((a, i) => cluster.slice(i + 1).some((b) => clearlyDiffer(a, b))) ? splitCompatible(cluster) : [cluster];
+    for (const members of parts) {
+      // Reasons and confidence come from the pairs inside this group only.
+      const own = new Map<string, Pair>();
+      for (let i = 0; i < members.length; i++) {
+        for (let j = i + 1; j < members.length; j++) {
+          const pair = scorePair(members[i], members[j]);
+          if (pair.score < minScore) continue;
+          for (const id of [members[i].contactId, members[j].contactId]) {
+            const prev = own.get(id);
+            if (!prev || pair.score > prev.score) own.set(id, pair);
+          }
+        }
+      }
+      const linked = members.filter((m) => own.has(m.contactId));
+      if (linked.length < 2) continue;
+      const reasons = [...new Set(linked.flatMap((m) => own.get(m.contactId)!.reasons))];
+      const confidence = Math.max(...linked.map((m) => own.get(m.contactId)!.score));
+      const exact = reasons.includes("same email") || reasons.includes("same phone");
+      const format = reasons.some((r) => r.startsWith("phone in") || r.startsWith("email differs"));
+      groups.push({
+        key: groupKey(linked.map((m) => m.contactId)),
+        people: linked,
+        confidence,
+        reasons,
+        kind: exact && !format ? "exact" : format ? "format" : "name",
+        survivorId: chooseSurvivor(linked).contactId,
+      });
+    }
   }
   return groups.sort((a, b) => b.confidence - a.confidence || b.people.length - a.people.length);
 }

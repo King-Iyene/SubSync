@@ -464,3 +464,13 @@ Still no new measurement. This pass fixes how the same figures are COUNTED and w
 **History footnote.** "Comparisons with your usual start after 7 days of history." appears once under the tiles when any comparison lacks history (and a tile with no comparison says nothing).
 
 **Marks on one person.** Done for now, Snooze and Assign on the Reply now list act on one person (row key `<account>|replies|<person>`); the server looks the person up in the same read and refuses a person that is not in the caller's accounts.
+
+## Duplicate contacts (stage DUP, 5 Nov 2026)
+
+Code: `src/lib/analytics/dedupe.ts` (grouping), `src/lib/analytics/dedupe-review.ts` (everything shown), tests `src/lib/__tests__/dedupe-review.test.ts` and `dedupe.test.ts`. No new measurement of the CRM: these numbers are counted from SubSync's own copy of the contacts.
+
+**Duplicate group.** Two or more contacts of ONE client account that share an email (case, spaces, gmail dots and "+tags" ignored) or a phone number (last 10 digits). A group never spans two client accounts and never holds two records that clearly differ (a different email AND a different phone). A chain that ties two different people together is split.
+
+**Groups to fix** (the headline, "Group 3 of 41", the list, the client list, the client count) = groups not decided and not set aside, all counted from the same open list. **Extra contacts to remove** = records in open groups minus one kept record per group. **Share of your list** = extra contacts over all contacts of the accounts in scope ("under 1%" below 1%; nothing shown when there are no extra contacts). Verified against the 5,000-group fixture (`dedupe-review.test.ts`): per-account counts add up to the headline.
+
+**Best record to keep.** Most to lose first: won deals, open deals, a conversation, a phone and an email, tags, recent activity, then the oldest. The reason lists up to three things the pick has that the others lack. **Importance** (order of groups): open deals, paying customers (won deals; payments are not read), Do Not Disturb, recent activity, how sure. **How sure** is three words, not a percentage. **Obvious group**: two or three records with the same email AND phone and no warning. **Tag date**: the day SubSync first saw the tag (since it started watching), never the day it was added.

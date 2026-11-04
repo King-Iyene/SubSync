@@ -112,7 +112,7 @@ const NOTIFY_ADMIN_RULES: Rule[] = [
   ["GET", "notification-destinations"], ["POST", "notification-destinations"], ["DELETE", "notification-destinations"],
 ];
 
-const CLIENT_RULES: Rule[] = [...BELL_RULES, ...GET_VIEWS.map((a) => ["GET", a] as Rule), ["POST", "usage"], ["POST", "today", "action"], ["POST", "roadmap"], ["POST", "feedback"], ["POST", "problem"], ["POST", "inbox", "views"], ["DELETE", "inbox", "views"], ["POST", "people", "lists"], ["DELETE", "people", "lists"], ["PUT", "people", "dialer"], ...PERSONAL_RULES];
+const CLIENT_RULES: Rule[] = [...BELL_RULES, ...GET_VIEWS.map((a) => ["GET", a] as Rule), ["POST", "usage"], ["POST", "today", "action"], ["POST", "roadmap"], ["POST", "feedback"], ["POST", "problem"], ["POST", "inbox", "views"], ["DELETE", "inbox", "views"], ["POST", "people", "lists"], ["DELETE", "people", "lists"], ["PUT", "people", "dialer"], ["POST", "duplicates"], ...PERSONAL_RULES];
 
 const BUSINESS_RULES: Rule[] = [
   ...GET_VIEWS.map((a) => ["GET", a] as Rule), ...PERSONAL_RULES, ...BELL_RULES, ...NOTIFY_ADMIN_RULES, ...BELL_RULES, ...NOTIFY_ADMIN_RULES,
