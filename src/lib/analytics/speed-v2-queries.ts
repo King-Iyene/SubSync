@@ -206,6 +206,9 @@ export async function setAccountTarget(installationId: string, allowed: string[]
   if (!parsed.ok) return { ok: false, status: 400, error: parsed.error };
   if (allowed && !allowed.includes(locationId)) return { ok: false, status: 404, error: "Client account not found." };
   const db = sql();
+  // The account must be one of THIS company's before anything is written (another company's account is simply "not found", with or without the database update).
+  const mine = await db`select 1 from locations where installation_id = ${installationId} and location_id = ${locationId}`;
+  if (mine.length === 0) return { ok: false, status: 404, error: "Client account not found." };
   try {
     const r = await db`update locations set speed_target_minutes = ${parsed.minutes} where installation_id = ${installationId} and location_id = ${locationId} returning location_id`;
     if (r.length === 0) return { ok: false, status: 404, error: "Client account not found." };
