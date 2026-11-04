@@ -135,7 +135,9 @@ export function FastSection({ d, range, open, showAccount, reload }: { d: Pictur
       )}
       {weeks.length >= 2 && (
         <div className="mt-6" data-testid="speed-weeks">
-          {weeks.every((w) => w.hitRate === null)
+          {weeks.some((w) => w.hitRate !== null) && weeks.every((w) => w.hitRate === null || w.hitRate === 0)
+            ? <p className="text-sm text-muted-foreground" data-testid="speed-weeks-zero">No week in this range had a lead answered in time, so there is nothing to chart. The numbers above show every lead.</p>
+            : weeks.every((w) => w.hitRate === null)
             ? <ChartPlaceholder title="Answered in time, by week" need={5} have={weeks.reduce((m, w) => Math.max(m, w.leads), 0)} unit="leads in one week">{" "}A week needs 5 judged leads before it shows a bar.</ChartPlaceholder>
             : <BarChart title="Answered in time, by week" axisLabel="% of leads" unit="%" format={(n) => `${Math.round(n)}`} sample={weeks.reduce((x, w) => x + w.leads, 0)} min={5} need="leads" noun="leads" bars={weekBars(weeks)}
                 onSelect={(i) => open({ title: `Week of ${weekBars([weeks[i]])[0].label}`, params: { status: "all", week: String(weeks[i].index) } })} />}

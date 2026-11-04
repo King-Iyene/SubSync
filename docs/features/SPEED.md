@@ -93,3 +93,20 @@ Written and run, with the commands and results in "Verification". `src/lib/__tes
 5. *A real business-hours clock* (F2 proposal 3): the same function, a metric version.
 
 **Local-only changes not committed:** `next.config.ts` has a `turbopack.root` line and `tsconfig.json` was edited by `next typegen` (both marked skip-worktree).
+
+## Verification (commands run in `C:\Users\KING\wt\SPEED`, 5 Nov 2026; the dev server on port 3131 reads the real database through the demo company)
+
+| Command | Result |
+|---|---|
+| `npx next typegen && npx tsc --noEmit` | clean |
+| `npx eslint src tests scripts/check-tenancy.ts` | 0 errors, 12 warnings, none in a file of this stage |
+| `node --test src/lib/__tests__/` | 879 tests, 879 pass, 0 fail (18 are the new `speed-v2.test.ts`, including the 150-account scale test and the Today-agreement test) |
+| `npx vitest run tests/unit/speed-v2-db.test.ts --no-file-parallelism` | 5 passed, 1 skipped (the saved-target test skips itself until the column exists); fixture companies removed afterwards |
+| `npx vitest run tests/unit/speed-ui.test.ts access-roles route-registry client-access speed-f2 golden-speed today-lists` | all pass |
+| `npx vitest run tests/unit/data-inventory.test.ts` | 1 FAILED, expected: "locations columns: migration files against the live database". The migration file adds `speed_target_minutes`; the live database does not have it until the merge applies the migration. It passes once the migration has run. |
+| `PW_BASE_URL=http://localhost:3131 npx playwright test tests/e2e/speed-v2.spec.ts` (one group at a time) | desktop-1440: all 12 pass (four roles; See all; figure to list counts; Today agreement for agency, business and client; every figure's count equals its list for months, weeks, clients and people; tenancy; the target without the column; call and email menu and lead panel; range in the address). tablet-768 and phone-390: the four role tests pass (no sideways scroll, thumb-sized buttons at 390). |
+| `npx playwright test tests/e2e/speed.spec.ts --project=desktop-1440` (the older API tests of the answers Today and the alerts still read) | 7 of 8 pass (the one timing out at the default 90 s passes with `--timeout=500000`). **1 FAILS and is not from this stage:** "contacts that are not leads are left out" expects the demo to hold left-out contacts of the reasons import, spam, test and duplicate; the demo today has only "do not contact" and "test" (the old screenshot, taken before any change, shows 12 and 9). The left-out query is untouched. |
+| `TURBOPACK_ROOT=C:/Users/KING TEST_PORT=3133 TEST_DIST_DIR=.next-speed-t CHECKS=check-tenancy node scripts/with-dev-server.mjs` | **NOT a clean pass.** Two runs got through all the cross-read sweeps (which include the six new Speed addresses with the other agency's accounts and a person id) and all forged writes (which include the new `PUT speed/target` on the other agency's account, refused with a 4xx) and then both stopped at `scripts/check-tenancy.ts:190`: `select id from connections where installation_id = <agency B>` returned no row, i.e. the fixture connection of the other agency was already gone. That line and the connection fixture are not part of this stage; the same fixture worked on the Duplicates branch before the Connections changes were merged, so the lead should run the check on main to see whether it is the Connections stage. Fixtures were removed (checked: no `xtest-` installations left). |
+| Screenshots | `docs/review/speed-<role>-<390|768|1440>.png` and `-full.png` (new), `docs/review/speed-old-<role>-<width>.png` (before; the client's staff at 1440 was not captured) |
+
+One fix found by the tests: the first role test failed because the headline number counts up when the page opens (the test read it mid-animation); the test now waits for it. The target test failed because the write answered 503 before it checked the account existed; `setAccountTarget` now checks the account belongs to the caller's company first, so another company's account is always "not found" with or without the database update.
