@@ -84,10 +84,11 @@ export async function saveSync(installationId: string, locationId: string, fresh
 }
 
 export async function loadLabels(installationId: string, allowed: string[] | null): Promise<Map<string, LabelRow>> {
-  const rows = await safe(() => sql()`select location_id, workflow_id, labels, group_name, rating, decision, note, owner, updated_by, updated_at from workflow_labels where installation_id = ${installationId} ${allowed === null ? sql()`` : sql()`and location_id = any(${idList(allowed)}::text[])`}`, []);
+  const rows = await safe(() => sql()`select location_id, workflow_id, labels, group_name, rating, decision, note, owner, updated_by, updated_at, fixed_at, snoozed_until, watch from workflow_labels where installation_id = ${installationId} ${allowed === null ? sql()`` : sql()`and location_id = any(${idList(allowed)}::text[])`}`, []);
   return new Map(rows.map((r) => [keyOf(r.location_id as string, r.workflow_id as string), {
     labels: (r.labels as string[]) ?? [], group: (r.group_name as string | null) ?? null, rating: num(r.rating), decision: (r.decision as LabelRow["decision"]) ?? null,
     note: (r.note as string | null) ?? null, owner: (r.owner as string | null) ?? null, updatedBy: (r.updated_by as string | null) ?? null, updatedAt: ms(r.updated_at),
+    fixedAt: ms(r.fixed_at), snoozedUntil: ms(r.snoozed_until), watch: Boolean(r.watch),
   }]));
 }
 
@@ -219,4 +220,46 @@ export async function loadCampaigns(installationId: string, allowed: string[] | 
     if (isMissing(e)) return { camps: [], available: false };
     throw e;
   }
+}
+
+/** Done, Snooze and Watch on one row (SubSync only, never the CRM). `workflowId` may be "coverage" for the missing-basics check of an account. */
+export async function saveMark(installationId: string, locationId: string, workflowId: string, patch: { fixed?: boolean; snoozedUntil?: number | null; watch?: boolean }, by: string | null): Promise<void> {
+  try {
+    await sql()`insert into workflow_labels (installation_id, location_id, workflow_id, updated_by, fixed_at, snoozed_until, watch)
+      values (${installationId}, ${locationId}, ${workflowId}, ${by}, ${patch.fixed ? new Date() : null}, ${patch.snoozedUntil ? new Date(patch.snoozedUntil) : null}, ${patch.watch ?? false})
+      on conflict (installation_id, location_id, workflow_id) do update set
+        fixed_at = ${patch.fixed === undefined ? sql()`workflow_labels.fixed_at` : patch.fixed ? sql()`now()` : sql()`null`},
+        snoozed_until = ${patch.snoozedUntil === undefined ? sql()`workflow_labels.snoozed_until` : patch.snoozedUntil ? sql()`${new Date(patch.snoozedUntil)}::timestamptz` : sql()`null`},
+        watch = ${patch.watch === undefined ? sql()`workflow_labels.watch` : sql()`${patch.watch}::boolean`}, updated_by = ${by}, updated_at = now()`;
+    await sql()`insert into workflow_changes (installation_id, location_id, workflow_id, kind, source, actor_name, after) values (${installationId}, ${locationId}, ${workflowId}, 'label', 'subsync', ${by}, ${sql().json({ mark: Object.keys(patch) } as never)})`;
+  } catch (e) {
+    if (isMissing(e)) throw new NeedsUpdate();
+    throw e;
+  }
+}
+
+/** This module's alerts, for the weekly Proof. */
+export async function loadWorkflowAlerts(installationId: string, allowed: string[] | null, since: number): Promise<Array<{ kind: string; title: string; createdAt: number; resolvedAt: number | null; locationId: string | null }>> {
+  const rows = await safe(() => sql()`select kind, title, created_at, resolved_at, location_id from alerts where installation_id = ${installationId} and dedupe_key like 'wf:%' and (created_at > ${new Date(since)} or resolved_at is null or resolved_at > ${new Date(since)}) ${allowed === null ? sql()`` : sql()`and location_id = any(${idList(allowed)}::text[])`} order by created_at desc limit 1000`, []);
+  return rows.map((r) => ({ kind: r.kind as string, title: r.title as string, createdAt: ms(r.created_at) ?? 0, resolvedAt: ms(r.resolved_at), locationId: (r.location_id as string | null) ?? null }));
+}
+
+/** "Since your last visit": reads the person's last visit (saved_views, page workflows_visit) and moves it forward. A new visit starts after 30 minutes. */
+export async function touchVisit(installationId: string, owner: string, now: number): Promise<number | null> {
+  try {
+    const [row] = await sql()`select filters from saved_views where installation_id = ${installationId} and owner = ${owner} and page = 'workflows_visit' and name = 'last'`;
+    const f = (row?.filters ?? null) as { seen?: number; since?: number | null } | null;
+    const seen = typeof f?.seen === "number" ? f.seen : null;
+    const since = seen !== null && now - seen > 30 * 60_000 ? seen : typeof f?.since === "number" ? f.since : null;
+    await sql()`insert into saved_views (installation_id, owner, page, name, filters) values (${installationId}, ${owner}, 'workflows_visit', 'last', ${sql().json({ seen: now, since } as never)})
+      on conflict (installation_id, owner, page, name) do update set filters = excluded.filters`;
+    return since;
+  } catch (e) {
+    console.error("Workflows visit memory failed", e instanceof Error ? e.message : "unknown");
+    return null;
+  }
+}
+export async function changesSince(installationId: string, allowed: string[] | null, since: number): Promise<number> {
+  const [r] = await safe(() => sql()`select count(*)::int n from workflow_changes where installation_id = ${installationId} and created_at > ${new Date(since)} and kind <> 'label' ${allowed === null ? sql()`` : sql()`and location_id = any(${idList(allowed)}::text[])`}`, [{ n: 0 }]);
+  return (r?.n as number) ?? 0;
 }

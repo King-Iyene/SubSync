@@ -64,6 +64,11 @@ create table if not exists public.workflow_labels (
   primary key (installation_id, location_id, workflow_id)
 );
 
+-- The working queue (Done, Snooze, watch) lives on the same row, SubSync only.
+alter table public.workflow_labels add column if not exists fixed_at timestamptz;
+alter table public.workflow_labels add column if not exists snoozed_until timestamptz;
+alter table public.workflow_labels add column if not exists watch boolean not null default false;
+
 -- A copy of a workflow's definition taken just before SubSync changes or deletes it, so it can be put back or recreated.
 create table if not exists public.workflow_snapshots (
   id bigint generated always as identity primary key,

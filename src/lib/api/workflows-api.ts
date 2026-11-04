@@ -2,6 +2,7 @@ import { sql } from "../db";
 import { dispatchAlerts } from "../notifications/service";
 import { parseGranted } from "../scope-groups";
 import { capProblem, checkToken, makeToken, mayHaveActive, mayWrite, opKey, phraseMatches, deletePhrase, type WriteKind } from "../workflows/guards";
+import { applyMarks, markKey } from "../workflows/detail";
 import { alertDrafts, coverageFor, nextSteps, rankFindings, standardLabel, STANDARD } from "../workflows/health";
 import { changeWords, entityOf, type WfItem } from "../workflows/model";
 import { planRename, ruleIsEmpty, type RenameRule } from "../workflows/rename";
@@ -9,16 +10,17 @@ import { accountBars, dailySeries, decisionSlices, failingIds, ratingBars, statu
 import { recreate, runOne, type Result, type RunDeps } from "../workflows/run";
 import { currentFindings, raiseAlerts, syncAccount, type AccountSync } from "../workflows/sync";
 import {
-  accountNames, appendChange, applyLocal, finishChange, findChange, latestSnapshot, loadChanges, loadDaily, loadItems, loadLabels, recordDaily, saveLabel, saveSnapshot, todayCounts, NEEDS_UPDATE, NeedsUpdate,
+  accountNames, appendChange, applyLocal, finishChange, findChange, latestSnapshot, loadChanges, loadDaily, loadItems, loadLabels, recordDaily, saveLabel, saveSnapshot, todayCounts, touchVisit, changesSince, NEEDS_UPDATE, NeedsUpdate,
   type LabelPatch,
 } from "../workflows/store";
 import { json, type AuthContext } from "./auth";
+import { delivery, detail, mark, proof } from "./workflows-more";
 
 // The Workflows module's routes (docs/features/WORKFLOWS.md). Same rule as every route: the company, the person and the client accounts come from the signed
 // session, never from the request. A client's staff may read their own account's list and health; only an agency owner or administrator, or a business
 // administrator, may organise or change anything; nothing is ever sent to the CRM unless WORKFLOWS_WRITE_LIVE is on.
 
-type Ctx = AuthContext & { request: Request; url: URL; segments: string[] };
+export type Ctx = AuthContext & { request: Request; url: URL; segments: string[] };
 export type Deps = {
   allowed: (ctx: Ctx) => Promise<string[] | null>;
   token: (ctx: Ctx, locationId: string) => Promise<string>;
@@ -29,24 +31,24 @@ const ID = /^[A-Za-z0-9_:.-]{1,120}$/;
 const LOC = /^[A-Za-z0-9_-]{3,64}$/;
 const DAY = 86_400_000;
 
-function actor(ctx: Ctx) {
+export function actor(ctx: Ctx) {
   const pr = ctx.session.personRole as string | undefined;
   return {
     key: ctx.session.userId ?? ctx.kind, name: ctx.session.userName ?? null,
     may: mayWrite({ kind: ctx.kind, role: ctx.session.role ?? null, isOwnerOrAdmin: pr === "agency_owner" || pr === "agency_admin" || pr === "account_admin" || (ctx.demo && ctx.kind !== "client") }),
   };
 }
-const isOn = (ctx: Ctx, f: "workflows_pro" | "workflows_write") => ctx.entitlements.features[f] !== false && !ctx.entitlements.locked.includes(f);
+export const isOn = (ctx: Ctx, f: "workflows_pro" | "workflows_write") => ctx.entitlements.features[f] !== false && !ctx.entitlements.locked.includes(f);
 
-async function grantedOf(ctx: Ctx): Promise<string[] | null> {
+export async function grantedOf(ctx: Ctx): Promise<string[] | null> {
   if (ctx.demo) return null;
   const [inst] = await sql()`select scope from installations where id = ${ctx.installationId}`;
   return typeof inst?.scope !== "string" || inst.scope.trim() === "" ? null : parseGranted(inst.scope as string);
 }
-const has = (g: string[] | null, ...s: string[]) => g === null || s.every((x) => g.includes(x));
+export const has = (g: string[] | null, ...s: string[]) => g === null || s.every((x) => g.includes(x));
 
 /** The client accounts a request may touch: the signed session's own list, narrowed (never widened) by the page's own `wa` choice. */
-async function accountsOf(ctx: Ctx, deps: Deps): Promise<string[] | null> {
+export async function accountsOf(ctx: Ctx, deps: Deps): Promise<string[] | null> {
   const base = ctx.limitTo ? [ctx.limitTo] : await deps.allowed(ctx);
   const pick = (ctx.url.searchParams.get("wa") ?? "").split(",").filter((x) => LOC.test(x));
   if (ctx.limitTo || pick.length === 0) return base;
@@ -59,12 +61,17 @@ const toWords = (e: unknown) => (e instanceof NeedsUpdate ? e.message : null);
 async function view(ctx: Ctx, deps: Deps) {
   const allowed = await accountsOf(ctx, deps);
   const now = Date.now();
-  const [{ items, available }, accounts, labels, daily, granted, { findings, logsKnown }] = await Promise.all([
+  const [{ items, available }, accounts, labels, daily, granted, { findings: allFindings, logsKnown }] = await Promise.all([
     loadItems(ctx.installationId, allowed), accountNames(ctx.installationId, allowed), loadLabels(ctx.installationId, allowed), loadDaily(ctx.installationId, allowed),
     grantedOf(ctx), currentFindings(ctx.installationId, allowed, now),
   ]);
+  const marks = new Map([...labels].map(([k, v]) => [k, { fixedAt: v.fixedAt, snoozedUntil: v.snoozedUntil }]));
+  const { open: findings, muted } = applyMarks(allFindings, marks, now);
   const live = items.filter((w) => !w.removedSeenAt);
   const failing = failingIds(findings);
+  const visitOwner = ctx.session.userId ?? null;
+  const sinceAt = !ctx.demo && visitOwner ? await touchVisit(ctx.installationId, visitOwner, now) : null;
+  const sinceChanges = sinceAt ? await changesSince(ctx.installationId, allowed, sinceAt) : 0;
   const me = actor(ctx);
   const staff = ctx.kind !== "client";
   const ranked = rankFindings(findings);
@@ -84,7 +91,7 @@ async function view(ctx: Ctx, deps: Deps) {
     accounts: accounts.filter((a) => !a.ignored).map((a) => ({ locationId: a.locationId, name: a.name })),
     items: live.map((w) => ({ ...w, kind: w.kind })),
     labels: staff ? Object.fromEntries([...labels].map(([k, v]) => [k, v])) : {},
-    findings: ranked, logsKnown, nextSteps: nextSteps(ranked, logsKnown),
+    findings: ranked, muted: muted.map((m) => ({ ...m, key: markKey(m) })), since: sinceAt ? { at: sinceAt, changes: sinceChanges } : null, logsKnown, nextSteps: nextSteps(ranked, logsKnown),
     slices: statusSlices(live, failing), bars: accountBars(live, accounts.filter((a) => !a.ignored), failing),
     top: topFailing(live).map((t) => ({ workflowId: t.w.workflowId, locationId: t.w.locationId, name: t.w.name, failed: t.w.failed30d, runs: t.w.runs30d, share: t.share })),
     decisions: decisionSlices(live, labels), ratings: ratingBars(live, labels),
@@ -128,7 +135,9 @@ async function sync(ctx: Ctx, deps: Deps) {
       results.push(await syncAccount({ installationId: ctx.installationId, locationId: a.locationId, granted, now, token: () => deps.token(ctx, a.locationId) }));
     }
   }
-  const { findings } = await currentFindings(ctx.installationId, allowed, now);
+  const { findings: everyFinding } = await currentFindings(ctx.installationId, allowed, now);
+  const marked = await loadLabels(ctx.installationId, allowed);
+  const { open: findings } = applyMarks(everyFinding, new Map([...marked].map(([k, v]) => [k, { fixedAt: v.fixedAt, snoozedUntil: v.snoozedUntil }])), now);
   const { items } = await loadItems(ctx.installationId, allowed);
   if (!ctx.demo && allowed === null) {
     // New alerts go through the same dispatcher as every other alert (in-app inbox, email, Slack when set up, quiet hours, one message per alert).
@@ -168,7 +177,7 @@ const picks = (v: unknown): Pick[] | null => {
   return out;
 };
 /** The picked items as SubSync holds them, only inside the accounts this session may read. A pick outside them is dropped, and if anything is dropped the request is refused. */
-async function resolve(ctx: Ctx, deps: Deps, raw: unknown): Promise<{ items: WfItem[] } | { error: string; status: number }> {
+export async function resolve(ctx: Ctx, deps: Deps, raw: unknown): Promise<{ items: WfItem[] } | { error: string; status: number }> {
   const p = picks(raw);
   if (!p || p.length === 0) return { error: "Nothing was picked.", status: 400 };
   const allowed = ctx.limitTo ? [ctx.limitTo] : await deps.allowed(ctx);
@@ -368,6 +377,10 @@ export async function handleWorkflows(ctx: Ctx, deps: Deps): Promise<Response> {
     if (m === "POST" && a === "preview") return await preview(ctx, deps);
     if (m === "POST" && a === "confirm") return await confirm(ctx, deps);
     if (m === "POST" && a === "undo") return await undo(ctx, deps);
+    if (m === "GET" && a === "detail") return await detail(ctx, deps);
+    if (m === "POST" && a === "mark") return await mark(ctx, deps);
+    if (m === "GET" && a === "delivery") return await delivery(ctx, deps);
+    if (m === "GET" && a === "proof") return await proof(ctx, deps);
     return json({ error: "Not found" }, 404);
   } catch (e) {
     if (e instanceof NeedsUpdate) return json({ error: e.message }, 503);

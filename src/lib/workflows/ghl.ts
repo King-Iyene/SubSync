@@ -50,6 +50,11 @@ export async function workflowLastRun(c: Call, workflowId: string): Promise<numb
   const r = await read(c, `/workflows/${seg(workflowId)}/logs?limit=1`);
   return r.ok ? parseLastRun(r.value) : null;
 }
+/** The newest failing step records of one workflow (workflows.logs), for the plain-words list in the detail panel. */
+export async function workflowErrors(c: Call, workflowId: string, now: number) {
+  const q = new URLSearchParams({ statuses: "error,failed,failed_retry_limit_reached", limit: "10", startDate: iso(now - 29.5 * 86_400_000), endDate: iso(now) });
+  return read(c, `/workflows/${seg(workflowId)}/logs?${q}`);
+}
 export async function workflowDefinition(c: Call, workflowId: string) {
   return read(c, `/workflows/${seg(workflowId)}/definition`);
 }
