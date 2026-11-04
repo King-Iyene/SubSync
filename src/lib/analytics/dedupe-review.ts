@@ -362,3 +362,28 @@ export function emailPlan(v: { email: string | null | undefined; contactUrl: str
   if (!v.email) return { href: null, label: "Email", note: "There is no email address." };
   return { href: v.contactUrl ?? null, label: "Email in your CRM", note: EMAIL_LINK_KNOWN ? "Opens your CRM email box." : "Not available from your CRM yet: this opens the contact in your CRM, where its own email box sends the message." };
 }
+
+// ---------- why two records match, in words ----------
+
+export const REASON_WORDS: Record<string, string> = {
+  "same email": "Same email address",
+  "same phone": "Same phone number",
+  "email differs only in case, spaces or gmail dots": "Same email address, written differently",
+  "phone in a different format": "Same phone number, written differently",
+  "same name": "Same name",
+  "similar name": "A similar name (a nickname, an initial or a small spelling difference)",
+  "phone with two digits swapped": "Phone numbers that differ by two swapped digits",
+  "different first names": "Different first names, so this may be a shared household or office phone",
+  "shared company mailbox": "A shared company mailbox such as info@, so this may be different people",
+};
+
+/** Every pair inside a small group, with its score and the reasons in words. Groups of more than six records are summarised by the group's own score instead. */
+export function pairScores(people: readonly Person[], score: (a: Person, b: Person) => { score: number; reasons: string[] }): Array<{ a: string; b: string; score: number; reasons: string[] }> {
+  if (people.length > 6) return [];
+  const out: Array<{ a: string; b: string; score: number; reasons: string[] }> = [];
+  for (let i = 0; i < people.length; i++) for (let j = i + 1; j < people.length; j++) {
+    const s = score(people[i], people[j]);
+    out.push({ a: people[i].contactId, b: people[j].contactId, score: s.score, reasons: s.reasons.map((r) => REASON_WORDS[r] ?? r) });
+  }
+  return out;
+}

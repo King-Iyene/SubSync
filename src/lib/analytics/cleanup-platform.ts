@@ -5,7 +5,8 @@ import { ghlFetch } from "../ghl/http.ts";
 // first and only changes it if it still looks the way it did at preview time, so a change a person
 // made in the meantime is never overwritten. Kept free of database imports so it can be unit tested.
 
-export type Outcome = { result: "applied" | "skipped" | "permission" | "failed"; detail?: string };
+// "dry_run": the gateway did not send it (the server's switch is off, or this account has not allowed changes). The change stays pending.
+export type Outcome = { result: "applied" | "skipped" | "permission" | "failed" | "dry_run"; detail?: string };
 
 export type ChangeRow = {
   id: number; contactId: string; rule: string; field: string; before: string | null; after: string | null; tag: string | null;

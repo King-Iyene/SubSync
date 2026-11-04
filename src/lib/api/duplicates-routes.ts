@@ -1,8 +1,13 @@
-import { chooseSurvivor, groupKey, type Person } from "../analytics/dedupe";
-import { builtQueue, decisionSets, forgetQueue, loadPeople, overview, recordDecision, snoozeGroup, unsnoozeGroup, type Built } from "../analytics/dedupe-queries";
+import { chooseSurvivor, groupKey, scorePair, type Person } from "../analytics/dedupe";
+import { BUILTIN, loadConfigs, writeEnabledFor } from "../analytics/cleanup-config";
+import { describeRules, pickFields, presetOf } from "../analytics/cleanup-rules";
+import { builtQueue, decisionSets, forgetQueue, loadPeople, othersSharing, overview, recordDecision, snoozeGroup, unsnoozeGroup, type Built } from "../analytics/dedupe-queries";
 import {
-  anyClearlyDiffer, explainSurvivor, guardrails, likelihood, pageOf, parseSort, parseStatus, reasonOf, selectGroups, type ReasonKey,
+  anyClearlyDiffer, explainSurvivor, guardrails, likelihood, pageOf, pairScores, parseSort, parseStatus, reasonOf, REASON_WORDS, selectGroups, type ReasonKey,
 } from "../analytics/dedupe-review";
+import { HISTORY_ACTIONS, parseKind } from "../analytics/history-intel";
+import { historyPage } from "../analytics/history-queries";
+import { mergeViaWorkflow, planWorkflowMerge } from "../ghl/crm-gateway";
 import { mergeContacts } from "../ghl/crm-merge";
 import { isLive } from "../live-flags";
 import type { deepLinks } from "../links";
@@ -21,6 +26,7 @@ export type DuplicatesHelpers = {
   links: () => Promise<ReturnType<typeof deepLinks>>;
   /** The token for one account. Only called when the merge switch is on. */
   locationToken: (locationId: string) => Promise<string>;
+  actor?: (ctx: Ctx) => string | null;
 };
 
 const ID = /^[A-Za-z0-9_-]{3,64}$/;
@@ -73,7 +79,7 @@ async function overviewRoute(ctx: Ctx, h: DuplicatesHelpers): Promise<Response> 
   const list = pageOf(selection, int(sp.get("page"), 0), int(sp.get("size"), 25));
   // `focus` is a group the person picked from a list (`account:key`): the stepper opens on it, wherever it sits in the selection.
   const focus = sp.get("focus");
-  const focusAt = focus && /^[A-Za-z0-9_-]{3,64}:[0-9a-f]{8}-d{1,3}$/.test(focus) ? selection.findIndex((g) => `${g.locationId}:${g.key}` === focus) : -1;
+  const focusAt = focus && /^[A-Za-z0-9_-]{3,64}:[0-9a-f]{8}-\d{1,3}$/.test(focus) ? selection.findIndex((g) => `${g.locationId}:${g.key}` === focus) : -1;
 
   // The clients with groups: a short list, searchable and paged for an agency with many accounts. A single-account caller never gets it.
   const an = ov.accounts.length > 1 ? ov.accounts : [];
@@ -89,7 +95,15 @@ async function overviewRoute(ctx: Ctx, h: DuplicatesHelpers): Promise<Response> 
     const people: Person[] = detail?.people ?? g.people;
     const keepId = chooseSurvivor(people).contactId;
     const review = sets.reviews.get(`${g.locationId}:${g.key}`) ?? null;
+    const cfg = built.configs.get(g.locationId) ?? BUILTIN;
+    const optedIn = ctx.demo || (await writeEnabledFor(ctx.installationId, g.locationId));
+    const wf = planWorkflowMerge(people, keepId, { workflowId: cfg.mergeWorkflowId, others: g.people.length === 2 ? await othersSharing(ctx.installationId, g.locationId, g.people.map((p) => p.contactId)) : 0 });
     step = {
+      rules: { preset: presetOf(cfg.match), sentence: describeRules(cfg.match), source: cfg.source },
+      reasons: g.reasons.map((r) => REASON_WORDS[r] ?? r),
+      pairs: pairScores(people, (x, y) => scorePair(x, y, cfg.match)),
+      picks: pickFields(people, keepId, cfg.survive),
+      workflow: { set: !!cfg.mergeWorkflowId, optedIn, canAsk: ctx.kind !== "client", survivorId: wf.survivorId, survivorDiffers: wf.survivorDiffers, blockers: wf.blockers, warnings: wf.warnings, matchBy: wf.matchBy },
       key: g.key, locationId: g.locationId, locationName: detail?.locationName ?? g.locationName, reason: reasonOf(g), likelihood: likelihood(g.confidence), confidence: g.confidence,
       survivorId: keepId, why: explainSurvivor(people, keepId), obvious: g.obvious, review: review ? { kind: review.decision, at: review.decidedAt, keepContactId: review.keepContactId } : null,
       until: sets.later.get(`${g.locationId}:${g.key}`) ?? null, watchingSince: detail?.watchingSince ?? null, enriched: !!detail,
@@ -102,7 +116,7 @@ async function overviewRoute(ctx: Ctx, h: DuplicatesHelpers): Promise<Response> 
     multi: ov.accounts.length > 1 || (ctx.kind === "agency" && !ctx.limitTo),
     counts: { open: open.length, later: selectGroups(built.all, { ...base, status: "later" }).length, decided: selectGroups(built.all, { ...base, status: "decided" }).length },
     protection: await protectionFor(ctx.installationId, allowed), canExport: ctx.kind !== "client",
-    accounts, status, mergeSwitchedOff: ctx.demo || !isLive("WRITE_GHL_LIVE"),
+    accounts, status, mergeSwitchedOff: ctx.demo || !isLive("WRITE_GHL_LIVE"), masterSwitchOn: !ctx.demo && isLive("WRITE_GHL_LIVE"),
     // An account id is echoed only when it is one of the caller's own accounts, so a request can never make the answer name another company's account.
     selection: { total: selection.length, i, status, q, reason, location: location && built.listSizes.has(location) ? location : null, sort },
     list: { ...list, rows: list.rows.map((r) => rowOf(r as Item, sets)) },
@@ -189,9 +203,65 @@ async function mergeRoute(ctx: Ctx, h: DuplicatesHelpers): Promise<Response> {
   return json({ ok: true, merged: true });
 }
 
+/** The merge through the customer's own merge workflow. With preview:true it only says what would happen. Never for a client's staff, never without the account's opt-in. */
+async function mergeWorkflowRoute(ctx: Ctx, h: DuplicatesHelpers): Promise<Response> {
+  if (ctx.kind === "client") return json({ error: "Ask your administrator to start a merge from SubSync, or merge in your CRM." }, 403);
+  const body0 = (await ctx.request.clone().json().catch(() => null)) as { confirm?: unknown; preview?: unknown } | null;
+  const g = await readGroup(ctx);
+  if (g instanceof Response) return g;
+  if (!g.keepContactId) return json({ error: "Choose the record to keep" }, 400);
+  const allowed = await h.allowed();
+  const loaded = await loadPeople(ctx.installationId, allowed, g.locationId, g.contactIds);
+  if (!loaded) return json({ error: "Those contacts were not found" }, 404);
+  const cfg = (await loadConfigs(ctx.installationId, allowed)).get(g.locationId) ?? BUILTIN;
+  const optedIn = ctx.demo || (await writeEnabledFor(ctx.installationId, g.locationId));
+  const others = await othersSharing(ctx.installationId, g.locationId, g.contactIds);
+  if (body0?.preview === true) {
+    const plan = planWorkflowMerge(loaded.people, g.keepContactId, { workflowId: cfg.mergeWorkflowId, others });
+    return json({ ok: true, preview: true, plan, optedIn, masterSwitchOn: !ctx.demo && isLive("WRITE_GHL_LIVE") });
+  }
+  const result = await mergeViaWorkflow(
+    {
+      installationId: ctx.installationId, locationId: g.locationId, actor: h.actor?.(ctx) ?? actorOf(ctx), optedIn, workflowId: cfg.mergeWorkflowId, people: loaded.people, pickedKeepId: g.keepContactId, others,
+      confirmed: body0?.confirm === true, token: () => h.locationToken(g.locationId), workflowPublished: null,
+    },
+    // The demo company is made up: it can never write, whatever the switch says.
+    ctx.demo ? { env: {} } : {},
+  );
+  if (result.outcome === "blocked") return json({ ok: false, blocked: true, blockers: result.blockers, message: result.blockers[0]?.text ?? "This one cannot be merged from here." }, 200);
+  if (result.outcome === "opted_out") return json({ ok: false, optIn: true, message: "Changing contacts is not switched on for this client account. Switch it on in Settings first. Nothing was changed." }, 403);
+  if (result.outcome === "switched_off") {
+    return json({ ok: true, switchedOff: true, message: "Merging from SubSync is switched off on the server for now, so nothing was sent. The merge you confirmed is recorded in the history as a dry run." });
+  }
+  if (result.outcome === "needs_permission") return json({ ok: false, needsPermission: true, message: "SubSync needs permission to change contacts. Finish it in your CRM instead." }, 403);
+  if (result.outcome === "failed") return json({ ok: false, message: "Your CRM refused the request, and nothing was merged. You can try again, or finish it in your CRM.", status: result.status, retry: true }, 502);
+  const db = sql();
+  await db`insert into audit_log (installation_id, actor, action, detail) values (${ctx.installationId}, ${actorOf(ctx)}, 'duplicates.merge_requested', ${db.json({ locationId: g.locationId, key: groupKey(g.contactIds), keep: result.survivorId, contacts: g.contactIds.length } as never)})`;
+  forgetQueue(ctx.installationId);
+  return json({ ok: true, requested: true, survivorId: result.survivorId, message: "Sent to your merge workflow. Your CRM does the merge; the group leaves this list after SubSync next refreshes from it." });
+}
+
+async function historyRoute(ctx: Ctx, h: DuplicatesHelpers): Promise<Response> {
+  const sp = ctx.url.searchParams;
+  const locP = sp.get("location");
+  const r = await historyPage(ctx.installationId, await h.allowed(), { kind: parseKind(sp.get("kind")), location: locP && ID.test(locP) ? locP : null, page: int(sp.get("page"), 0), q: (sp.get("q") ?? "").slice(0, 60) });
+  return json({ ...r, actions: HISTORY_ACTIONS.length, canUndo: true });
+}
+
+/** The matching choices that apply to the caller's accounts, read only (a client's staff can see how matching is set; only an administrator changes it). */
+async function rulesReadRoute(ctx: Ctx, h: DuplicatesHelpers): Promise<Response> {
+  const configs = await loadConfigs(ctx.installationId, await h.allowed());
+  const rows = [...configs].slice(0, 200).map(([id, c]) => ({ locationId: id, preset: presetOf(c.match), sentence: describeRules(c.match), source: c.source }));
+  const presets = [...new Set(rows.map((r) => r.preset))];
+  return json({ presets, sentence: rows[0]?.sentence ?? describeRules(BUILTIN.match), mixed: presets.length > 1, accounts: rows.length });
+}
+
 export async function handleDuplicates(ctx: Ctx, h: DuplicatesHelpers): Promise<Response> {
   const [, b] = ctx.segments;
   const m = ctx.request.method;
+  if (m === "GET" && b === "history") return historyRoute(ctx, h);
+  if (m === "GET" && b === "rules") return rulesReadRoute(ctx, h);
+  if (m === "POST" && b === "merge-workflow") return mergeWorkflowRoute(ctx, h);
   if (m === "GET" && !b) return overviewRoute(ctx, h);
   if (m === "GET" && b === "obvious") return obviousRoute(ctx, h);
   if (m === "POST" && b === "snooze") return snoozeRoute(ctx, h, false);
