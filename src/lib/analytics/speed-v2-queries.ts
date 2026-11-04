@@ -46,7 +46,7 @@ const personOut = (userId: string, rows: readonly LoadedRow[], lk: Lookups): Per
 };
 
 /** What the won and lost deals of each account say about its average deal and win rate (the same rule as the Account audit: a win rate needs 20 closed deals). */
-async function accountFacts(installationId: string, allowed: string[] | null): Promise<AccountFacts[] | null> {
+export async function accountFacts(installationId: string, allowed: string[] | null): Promise<AccountFacts[] | null> {
   try {
     const db = sql();
     const rows = await db`

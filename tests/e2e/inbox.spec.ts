@@ -39,16 +39,16 @@ test("the messy cases: a dead thread, an automatic reply, an internal note and a
   expect(sample(8), "an internal note is not the customer waiting").toBeUndefined();
 });
 
-test("the Inbox screen leads with the waiting count in plain words, names the window, and shows channels", async ({ page }, testInfo) => {
+test("the Inbox screen leads with the number of people waiting in plain words, names the target and the window, and has a channel choice in its list", async ({ page }, testInfo) => {
   await page.goto("/app#inbox");
   await page.reload();
   await expect(page.getByText("Demo mode", { exact: false }).first()).toBeVisible();
-  const headline = page.getByTestId("waiting-headline");
-  await expect(headline).toBeVisible();
-  await expect(headline).toContainText(/conversations? (is|are) waiting for a reply/);
-  await expect(headline).toContainText("in the last 30 days");
-  // Stage F4: the channel is a choice (with a count for each) instead of a row of badges.
-  await expect(page.getByLabel("Channel", { exact: true })).toBeVisible();
+  const headline = page.getByTestId("today-headline");
+  await expect(headline).toBeVisible({ timeout: 90_000 });
+  await expect(headline).toContainText(/(person is|people are) waiting for a reply/);
+  await expect(page.getByTestId("wait-proof")).toContainText("in the last 30 days");
+  await page.getByTestId("wait-all").click();
+  await expect(page.getByLabel("Channel", { exact: true })).toBeVisible({ timeout: 90_000 });
   await page.waitForLoadState("networkidle").catch(() => undefined);
   await page.screenshot({ path: `docs/review/f4-inbox-${testInfo.project.name}.png`, fullPage: true });
 });

@@ -98,6 +98,7 @@ import { can, personFromSession } from "../connections/person";
 import { handlePeople, timeoutResponse } from "./people-routes";
 import { handleDuplicates } from "./duplicates-routes";
 import { handleSpeedPart, handleSpeedTarget } from "./speed-routes";
+import { handleUnansweredPart } from "./unanswered-routes";
 import { handleApptWork } from "./appointment-work-routes";
 import { buildSteps, guideRoleOf } from "../getting-started";
 import { changedSettingKeys, feedbackGivenBy, logAccountFlags, logKeyChange, logSettingsChange, recordVote } from "../feedback-queries";
@@ -1876,6 +1877,8 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
     const speedHelpers = { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links, targetMinutes: async () => (await scope(ctx)).settings.speedTargetMinutes, measuring: async () => { const st = (await scope(ctx)).settings; return { countAutomated: st.countAutomatedTouches, businessHours: st.speedBusinessHours }; } };
     if (a === "speed" && method === "GET" && ["home", "list", "compare"].includes(ctx.url.searchParams.get("part") ?? "")) return await handleSpeedPart(ctx, speedHelpers);
     if (a === "speed" && b === "target" && method === "PUT") return await handleSpeedTarget(ctx, speedHelpers);
+    // The rebuilt Unanswered messages screen: its first screen, the list behind a number and the rankings (GET ?part=home|list|ranks, read only; an unknown part is refused with 400). Without a part the older answer below still serves the exports and the older tests.
+    if (a === "inbox" && method === "GET" && !b && ctx.url.searchParams.has("part")) return await handleUnansweredPart(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links, targets: async () => { const st = (await scope(ctx)).settings; return { slaHours: st.slaHours, targetMinutes: st.speedTargetMinutes }; } });
     if (method === "GET") {
       if (a === "overview") return await overview(ctx);
       if (a === "today" && !b) return await todayView(ctx);
