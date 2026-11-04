@@ -50,6 +50,7 @@ A person in one client account never sees another client account's data. An agen
 | `api/cron/daily` | secret | Bearer CRON_SECRET; idle while the kill switch is on |
 | `api/cron/digest` | secret | Bearer CRON_SECRET |
 | `api/cron/weekly` | secret | Bearer CRON_SECRET; idle while the kill switch is on |
+| `api/cron/data-health` | secret | Bearer CRON_SECRET; idle while the kill switch is on; read only toward the CRM: daily scores, quality alerts through the shared dispatcher, weekly digest rehearsal |
 | `api/cron/workflows` | secret | Bearer CRON_SECRET; idle while the kill switch is on; read only, Workflows alerts and the weekly Proof email (dry run unless SEND_EMAIL_LIVE) |
 | `api/cron/meeting-expiry` | secret | Bearer CRON_SECRET; once a day removes inbox calls whose time is up, handled calls' text after 90 days, old delivery ids, and a person who left the CRM (only with the users permission and a complete list); counts only; idle while the kill switch is on |
 | `api/cron/watchdog` | secret | Bearer CRON_SECRET; the internal sync alarm, writes audit lines (ids, times, counts) and sends nothing; idle while the kill switch is on |

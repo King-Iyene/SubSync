@@ -6,7 +6,7 @@
 2. **Data.** TESTED against the tables we already sync: `cached_contacts` (name, email, phone, source, do not disturb, owner, dates), `cached_opportunities`, `cached_conversations`, `cached_appointments`. Duplicates come from the existing finder (`duplicateGroups`), not a second copy. Not available from the platform yet: unsubscribed state, active payments, active workflows per contact. Those are never guessed; the fix path is conservative because of it.
 3. **Native or competitor overlap.** The CRM has a duplicate list and bulk tools per account. Competitors in `docs/research/DATA_QUALITY_COMPETITORS.md` clean data but do not keep a history, rank accounts, alert on a bad import by source or prove the result to a client. Our edge is the history, the cross-account league and the same-day alert.
 4. **Simplest version that proves value.** A score with a one line reason, every number opening its records, a daily record, a league table. Then alerts, digest, finders, safe fixes.
-5. **Risk.** Writes (optional `contacts.write`, rehearsal unless `DATA_HEALTH_WRITE_LIVE=true`, preview, signed token, daily cap, protected contacts, 24 hour undo), privacy (history holds ids and counts only, never names), benchmark re-identification (k of 10 accounts and 3 companies, coarse groups, opt out), cost (a few accounts per hourly run).
+5. **Risk.** Writes (optional `contacts.write`, rehearsal unless its live switch is on, preview, signed token, daily cap, protected contacts, 24 hour undo), privacy (history holds ids and counts only, never names), benchmark re-identification (k of 10 accounts and 3 companies, coarse groups, opt out), cost (a few accounts per hourly run).
 
 ## What shipped
 

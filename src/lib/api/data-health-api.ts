@@ -27,6 +27,9 @@ const DAY = 86_400_000;
 const body = async (ctx: Ctx) => (await ctx.request.json().catch(() => null)) as Record<string, unknown> | null;
 const feature = (ctx: Ctx, f: "data_health_pro" | "data_health_fix") => ctx.entitlements.features[f] !== false && !ctx.entitlements.locked.includes(f);
 export const MAX_ROWS = 500;
+// The import guard counts each contact once, for the four kinds of bad record (the same count as the Imports table).
+const BAD_RULES = new Set(["duplicate", "junk", "bad_phone", "bad_email"]);
+const uniqueContacts = <T extends { contactId: string }>(rows: T[]) => { const seen = new Set<string>(); return rows.filter((r) => (seen.has(r.contactId) ? false : (seen.add(r.contactId), true))); };
 
 /** One account the signed session may read, or null. Never the request's word alone. */
 async function oneAccount(ctx: Ctx, deps: Deps, loc: unknown): Promise<string | null> {
@@ -109,7 +112,7 @@ async function records(ctx: Ctx, deps: Deps) {
   const mark = new Map(marks.map((m) => [m.contactId, m]));
   const account = names[0]?.name ?? "Client account";
   const seen = new Set<string>();
-  const wanted = mode === "queue" ? rows.filter((r) => mark.get(r.contactId)?.state === "todo") : mode === "fixed" ? rows.filter((r) => mark.get(r.contactId)?.state === "fixed") : mode === "source" ? rows.filter((r) => ((r.source ?? "").trim() || "Unknown source") === src) : rows;
+  const wanted = mode === "queue" ? rows.filter((r) => mark.get(r.contactId)?.state === "todo") : mode === "fixed" ? rows.filter((r) => mark.get(r.contactId)?.state === "fixed") : mode === "source" ? uniqueContacts(rows.filter((r) => BAD_RULES.has(r.rule) && ((r.source ?? "").trim() || "Unknown source") === src)) : rows;
   const recs: Rec[] = [];
   for (const r of wanted) {
     const m = mark.get(r.contactId), id = `${r.contactId}|${r.rule}`;
