@@ -33,6 +33,8 @@ export type TodayItem = {
   never?: boolean;
   /** The contact asked not to be contacted: never offered as a call. */
   dnd?: boolean; hasPhone?: boolean;
+  /** Who owns the lead in the CRM (a name), and where it came from. Only leads carry them today; both stay null when the CRM does not say. */
+  owner?: string | null; source?: string | null;
 };
 
 export type KindTotal = { count: number; dollars: number | null; /** Rows actually sent (a cap); count is the true number. */ shown: number };
@@ -436,6 +438,23 @@ export function staleUsual(s: { today: number; usual: number | null; samples: nu
 }
 
 // ---------- share ----------
+
+/**
+ * The daily brief (Slack and email) says what Today says, in the same order: the same headline, the same breakdown, then the top rows of the Fix first queue, then
+ * how many things are set aside. It is built from the same queue, so the brief and the screen cannot disagree. Returns plain lines; the sender decides the format.
+ */
+export function briefLines(i: { headline: Headline; rows: QueueRow[]; setAside: number; limit?: number }): string[] {
+  const lines = [i.headline.text];
+  if (i.headline.breakdown) lines.push(i.headline.breakdown);
+  const top = i.rows.slice(0, i.limit ?? 5);
+  if (top.length > 0) {
+    lines.push("Fix first:");
+    top.forEach((r, n) => lines.push(`${n + 1}. ${r.accountName}: ${r.text}${r.dollars ? `, ${money(r.dollars)} at stake` : r.estimate ? `, about ${money(r.estimate)} (estimate)` : ""}${r.since !== null ? `, wrong for ${ageWords(r.ageMinutes)}` : ""}`));
+    if (i.rows.length > top.length) lines.push(`${i.rows.length - top.length} more are in SubSync.`);
+  }
+  if (i.setAside > 0) lines.push(`${i.setAside} ${i.setAside === 1 ? "item is" : "items are"} set aside (snoozed or marked Done) and not counted above.`);
+  return lines;
+}
 
 /** Plain text for Slack or email: the headline and the top three things. SubSync sends nothing; the person pastes it. */
 export function shareText(i: { who: string; headline: Headline; rows: QueueRow[] }): string {
