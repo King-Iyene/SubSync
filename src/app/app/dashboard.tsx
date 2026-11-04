@@ -450,7 +450,7 @@ export function Dashboard() {
                 {/* On Today the quiet freshness line sits here, in the one row with search and the bell (the page below draws its own account filter and "Showing" chip). */}
                 {view.id === "today" && strip}
                 {/* Today draws its own account selector inside the page; the shared one is for every other page. */}
-                {auth.kind === "agency" && baseApi && !fromAccount && view.id !== "today" && <ApiProvider value={baseApi}><FilterDrawer kind="agency" value={filter} onChange={setFilter} /></ApiProvider>}
+                {auth.kind === "agency" && baseApi && !fromAccount && view.id !== "today" && view.id !== "workflows" && <ApiProvider value={baseApi}><FilterDrawer kind="agency" value={filter} onChange={setFilter} /></ApiProvider>}
               </div>
               <div className="ml-auto flex shrink-0 items-center">
                 {NAV_FOR[auth.kind].has("search") && !off("search") && <GlobalSearch go={go} />}

@@ -16,7 +16,7 @@ export const HEALTH = {
 } as const;
 
 export type Severity = "critical" | "warning" | "info";
-export type FindingKind = "failing" | "idle" | "draft_stale" | "removed" | "coverage" | "stuck" | "campaign_failed";
+export type FindingKind = "failing" | "idle" | "draft_stale" | "removed" | "coverage" | "stuck" | "campaign_failed" | "turned_off" | "review_due";
 export type Finding = {
   key: string; kind: FindingKind; severity: Severity;
   workflowId: string | null; locationId: string; title: string; why: string; next: string; estimate: boolean;
@@ -112,6 +112,7 @@ export function nextSteps(findings: Finding[], logsKnown: boolean): string[] {
   const out: string[] = [];
   const n = (k: FindingKind) => findings.filter((f) => f.kind === k).length;
   if (n("campaign_failed")) out.push(`${n("campaign_failed")} campaign${n("campaign_failed") === 1 ? "" : "s"} reported an error.`);
+  if (n("turned_off")) out.push(`${n("turned_off")} workflow${n("turned_off") === 1 ? " was" : "s were"} turned off since the last look.`);
   if (n("failing")) out.push(`Fix ${n("failing")} failing workflow${n("failing") === 1 ? "" : "s"} first. Contacts are hitting an error step.`);
   if (n("coverage")) out.push(`${n("coverage")} client account${n("coverage") === 1 ? " is" : "s are"} missing a standard lead-handling workflow (estimate, by name).`);
   if (n("idle")) out.push(`Check ${n("idle")} published workflow${n("idle") === 1 ? "" : "s"} that did not run in 30 days.`);
@@ -122,8 +123,8 @@ export function nextSteps(findings: Finding[], logsKnown: boolean): string[] {
 
 /** What alert drafts to raise for the alert engine. Only failing and coverage gaps page people; the rest stay on the page. */
 export function alertDrafts(findings: Finding[]): Array<{ locationId: string; kind: string; severity: "info" | "warning" | "critical"; title: string; detail: Record<string, unknown>; dedupeKey: string }> {
-  return findings.filter((f) => f.kind === "failing" || f.kind === "campaign_failed" || (f.kind === "coverage" && f.severity === "warning")).map((f) => ({
-    locationId: f.locationId, kind: f.kind === "failing" ? "workflow_failing" : f.kind === "campaign_failed" ? "campaign_failed" : "workflow_coverage", severity: f.severity, title: f.title,
+  return findings.filter((f) => f.kind === "failing" || f.kind === "campaign_failed" || f.kind === "turned_off" || (f.kind === "coverage" && f.severity === "warning")).map((f) => ({
+    locationId: f.locationId, kind: f.kind === "failing" ? "workflow_failing" : f.kind === "campaign_failed" ? "campaign_failed" : f.kind === "turned_off" ? "workflow_turned_off" : "workflow_coverage", severity: f.severity, title: f.title,
     detail: { why: f.why, next: f.next, workflowId: f.workflowId, estimate: f.estimate }, dedupeKey: `wf:${f.key}`,
   }));
 }

@@ -6,6 +6,7 @@ import { applyMarks, markKey } from "../workflows/detail";
 import { alertDrafts, coverageFor, nextSteps, rankFindings, standardLabel, STANDARD } from "../workflows/health";
 import { changeWords, entityOf, type WfItem } from "../workflows/model";
 import { planRename, ruleIsEmpty, type RenameRule } from "../workflows/rename";
+import { compareAcross, findDuplicates, lintNames, FIX } from "../workflows/tidy";
 import { accountBars, dailySeries, decisionSlices, failingIds, ratingBars, statusSlices, topFailing } from "../workflows/reports";
 import { recreate, runOne, type Result, type RunDeps } from "../workflows/run";
 import { currentFindings, raiseAlerts, syncAccount, type AccountSync } from "../workflows/sync";
@@ -98,6 +99,11 @@ async function view(ctx: Ctx, deps: Deps) {
     daily: { failing: dailySeries(daily, (d) => d.failing), total: dailySeries(daily, (d) => d.total), runs: dailySeries(daily, (d) => d.runs), errors: dailySeries(daily, (d) => d.errors) },
     coverage: coverage.map((c) => ({ ...c, missing: c.missing.map(standardLabel), have: c.have.map(standardLabel) })), standard: STANDARD.map((s) => s.label),
     syncedAt: seen?.at instanceof Date ? seen.at.getTime() : syncedAt,
+    tidy: staff ? {
+      names: lintNames(live), fixes: FIX,
+      dupes: findDuplicates(live).map((d) => ({ locationId: d.locationId, exact: d.exact, ids: d.items.map((w) => w.workflowId) })),
+      compare: compareAcross(live, accounts.filter((a) => !a.ignored).map((a) => a.locationId)).map((g) => ({ name: g.name, accounts: g.accounts, states: g.states, drift: g.drift, items: g.items.map((w) => ({ workflowId: w.workflowId, locationId: w.locationId })) })),
+    } : null,
     caps: await todayCounts(ctx.installationId, now),
   });
 }
@@ -222,7 +228,7 @@ type Row = { workflowId: string; locationId: string; name: string; to: string | 
 function ruleOf(raw: unknown): RenameRule {
   const o = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
   const s = (v: unknown, n: number) => (typeof v === "string" ? v.slice(0, n) : undefined);
-  return { find: s(o.find, 200) || undefined, replace: s(o.replace, 200), prefix: s(o.prefix, 100) || undefined, suffix: s(o.suffix, 100) || undefined, tidy: o.tidy !== false, casing: o.casing === "title" ? "title" : "none" };
+  return { find: s(o.find, 200) || undefined, replace: s(o.replace, 200), prefix: s(o.prefix, 100) || undefined, suffix: s(o.suffix, 100) || undefined, tidy: o.tidy !== false, tidyOnly: o.tidyOnly === true, casing: o.casing === "title" ? "title" : "none" };
 }
 
 function plan(kind: WriteKind, items: WfItem[], b: Record<string, unknown>, now: number, allowedTargets: Set<string>): { rows: Row[]; error?: string } {

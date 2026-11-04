@@ -12,6 +12,8 @@ export type RenameRule = {
   tidy?: boolean;
   /** "title" capitalises each word. */
   casing?: "none" | "title";
+  /** A rule that only tidies spaces (the one-tap fix for names with extra spaces). */
+  tidyOnly?: boolean;
 };
 
 export type RenameRow = {
@@ -36,7 +38,7 @@ export function applyRule(name: string, r: RenameRule): string {
   return out;
 }
 
-export const ruleIsEmpty = (r: RenameRule) => !r.find && !r.prefix && !r.suffix && r.casing !== "title";
+export const ruleIsEmpty = (r: RenameRule) => !r.tidyOnly && !r.find && !r.prefix && !r.suffix && r.casing !== "title";
 
 /** The preview. Two workflows in one client account may not end up with the same name, and a name may not be empty or longer than the platform allows. */
 export function planRename(items: WfItem[], rule: RenameRule, allowPaused: boolean): RenameRow[] {

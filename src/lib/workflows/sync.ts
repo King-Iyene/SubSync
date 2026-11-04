@@ -3,7 +3,8 @@ import type { AlertRow } from "../analytics/queries";
 import { alertDrafts, coverageFindings, findingsFor, type Finding } from "./health";
 import { campaignStats, listCampaigns, listWorkflows, workflowLastRun, workflowStats, type Call } from "./ghl";
 import { mergeStats, type WfItem } from "./model";
-import { accountNames, isMissing, loadItems, saveCampaignStats, saveSync } from "./store";
+import { turnedOff, reviewDue } from "./tidy";
+import { accountNames, isMissing, loadChanges, loadItems, loadLabels, saveCampaignStats, saveSync } from "./store";
 
 // Reads each client account's workflows and campaigns, keeps SubSync's copy up to date, notices changes made in the CRM, and keeps the alerts for this
 // module in step. Read only. A permission that was not granted is reported per account, never guessed around.
@@ -62,11 +63,11 @@ export async function syncAccount(a: { installationId: string; locationId: strin
 
 /** Findings for a set of accounts from SubSync's saved copy (the same function the screen uses, so an alert and the page can never disagree). */
 export async function currentFindings(installationId: string, allowed: string[] | null, now: number): Promise<{ findings: Finding[]; logsKnown: boolean; known: Set<string> }> {
-  const [{ items }, accounts] = await Promise.all([loadItems(installationId, allowed), accountNames(installationId, allowed)]);
+  const [{ items }, accounts, changes, labels] = await Promise.all([loadItems(installationId, allowed), accountNames(installationId, allowed), loadChanges(installationId, allowed, 400), loadLabels(installationId, allowed)]);
   const logsKnown = items.some((w) => w.runs30d !== null);
   const known = new Set(items.map((w) => w.locationId));
   const live = accounts.filter((x) => !x.ignored);
-  return { findings: [...findingsFor(items, { now, logsKnown }), ...coverageFindings(live, items, known)], logsKnown, known };
+  return { findings: [...findingsFor(items, { now, logsKnown }), ...turnedOff(changes, items, now), ...reviewDue(items, labels, now), ...coverageFindings(live, items, known)], logsKnown, known };
 }
 
 /** Raises this module's alerts and clears the ones whose condition went away. Only keys that start with wf: are touched, so no other alert is ever resolved. */
