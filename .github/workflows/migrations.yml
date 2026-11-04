@@ -86,7 +86,7 @@ jobs:
     name: Apply to Supabase (needs approval)
     needs: [check, changes]
     if: >-
-      github.event_name == 'workflow_dispatch'
+      ((github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.changes.outputs.migrations == 'true') || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     # Required reviewers on this environment make the job wait for a click from King.
     environment: production
