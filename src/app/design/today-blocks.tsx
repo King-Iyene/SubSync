@@ -23,6 +23,7 @@ const SAMPLE_FORECAST = forecastOf(
 
 export function TodayBlocks() {
   const [panelOpen, setPanelOpen] = useState(false);
+  const [stamp] = useState(() => Date.now());
   const [kind, setKind] = useState<Kind | null>(null);
   const [picked, setPicked] = useState<string[]>([]);
   const [day, setDay] = useState<number | null>(null);
@@ -77,7 +78,7 @@ export function TodayBlocks() {
 
       <Section title="Today: records panel" hint="Every number on Today opens this: a large panel over a dimmed page with the actual records. Title and a sentence, editable filter chips, + Filter, search, typed columns, a header that stays put, 50 rows a page, OPEN on a row, Open in the CRM, Maximise, Export CSV and the footer. Esc or the cross closes it.">
         <button type="button" onClick={() => setPanelOpen(true)} className="inline-flex min-h-10 items-center rounded-lg border bg-card px-4 text-sm font-medium hover:border-primary/40" data-testid="design-open-panel">Open the records panel</button>
-        {panelOpen && <RecordsPanel spec={itemsSpec(SAMPLE_TODAY_ITEMS, Date.now(), { key: "design", title: "Leads and deals, all client accounts", subtitle: "Made-up records for the style guide.", noun: "things", count: SAMPLE_TODAY_ITEMS.length })} now={Date.now()} onClose={() => setPanelOpen(false)} />}
+        {panelOpen && <RecordsPanel spec={itemsSpec(SAMPLE_TODAY_ITEMS, stamp, { key: "design", title: "Leads and deals, all client accounts", subtitle: "Made-up records for the style guide.", noun: "things", count: SAMPLE_TODAY_ITEMS.length })} now={stamp} onClose={() => setPanelOpen(false)} />}
       </Section>
 
       <Section title="Today: smart blocks" hint="Spotted today (at most three cards, each with the sample size and the word estimate when it is one), since your last visit, and what happens if nobody acts, with a ring that counts down to the next lead passing its reply target.">
