@@ -147,7 +147,7 @@ export function SpeedView({ go }: { go: GoFn }) {
 
           <p className="mb-2 text-xs text-muted-foreground" data-testid="measuring">
             {measuringSentence(d.measuring)} A lead is a new contact with a conversation. The clock starts when the contact is created or the first message arrives, and stops at the first message or call a person placed from your CRM.{" "}
-            {d.measuring.canChange ? <button type="button" onClick={() => go("settings")} className="font-medium text-primary underline" data-testid="speed-settings-link">Change the default target or this option in Settings</button> : "Ask the person who manages your account to change these."}
+            {d.measuring.canChange ? <button type="button" onClick={() => go("settings")} className="font-medium text-primary underline" data-testid="speed-settings-link">Change the reply target, or switch on &quot;Count automatic messages as a reply&quot;, in Settings</button> : "Ask the person who manages your account to change these."}
             {d.truncated ? " This range holds more leads than SubSync reads at once; the newest 20,000 are used." : ""}
           </p>
         </>

@@ -265,8 +265,8 @@ describe("the sentence about how this is measured (N78)", () => {
     const s = measuringSentence({ targetMinutes: 15, countAutomated: false, businessHours: false });
     expect(s).toContain("does not send any replies itself");
     expect(s).toContain("15 minutes");
-    expect(s).toContain("Automatic messages do not count as a reply");
-    expect(measuringSentence({ targetMinutes: 1, countAutomated: true, businessHours: true })).toMatch(/1 minute\. Automatic messages count as a reply, and leads that arrive out of hours/);
+    expect(s).toContain("do not stop the clock. Only a reply from a person does.");
+    expect(measuringSentence({ targetMinutes: 1, countAutomated: true, businessHours: true })).toMatch(/1 minute\. Automatic messages count as a reply\. Leads that arrive out of hours/);
   });
   it("uses plain words only", () => {
     const all = [measuringSentence({ targetMinutes: 15, countAutomated: false, businessHours: true }), unknownSourceAction({ n: 3, total: 4, share: 0.75 }).body, ...autoVsHumanLines({ read: 9, notRead: 1, autoSent: 5, alsoPerson: 2, onlyAutoPastTarget: 3, personOnly: 1, autoMedianSeconds: 9, personMedianSeconds: 200 })].join(" ");
