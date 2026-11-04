@@ -17,13 +17,14 @@ const SAMPLE_INSIGHTS: Insight[] = [
   { key: "slow_source", text: "Facebook leads wait 3x longer than Google leads for a first reply (24 min against 8 min).", sample: 24, sampleLabel: "24 leads", estimate: true, title: "Facebook", subtitle: "Sample.", itemIds: [] },
 ];
 const SAMPLE_SINCE: SinceVisit = { since: Date.parse("2026-11-03T09:30:00Z"), newLeads: Array.from({ length: 6 }, () => null as never), breached: Array.from({ length: 2 }, () => null as never), answered: Array.from({ length: 4 }, () => null as never), clearedAlerts: [] };
+// One reading of the clock for the whole sample (module level, so nothing reads the time while a component renders).
+const SAMPLE_NOW = Date.now();
 const SAMPLE_FORECAST = forecastOf(
-  [{ id: "c1", kind: "leads", locationId: "x", accountName: "Maple Dental", name: "Ada Okafor", at: Date.now() + 7 * 60_000 + 42_000, startedAt: Date.now() - 7 * 60_000, value: null, contactId: "c", url: "#" }],
-  [{ id: "d1", kind: "stale", locationId: "x", accountName: "Harbor Realty", name: "Kitchen remodel", at: Date.now() + 3_600_000, value: 2400, contactId: null, url: "#" }], []);
+  [{ id: "c1", kind: "leads", locationId: "x", accountName: "Maple Dental", name: "Ada Okafor", at: SAMPLE_NOW + 7 * 60_000 + 42_000, startedAt: SAMPLE_NOW - 7 * 60_000, value: null, contactId: "c", url: "#" }],
+  [{ id: "d1", kind: "stale", locationId: "x", accountName: "Harbor Realty", name: "Kitchen remodel", at: SAMPLE_NOW + 3_600_000, value: 2400, contactId: null, url: "#" }], []);
 
 export function TodayBlocks() {
   const [panelOpen, setPanelOpen] = useState(false);
-  const [stamp] = useState(() => Date.now());
   const [kind, setKind] = useState<Kind | null>(null);
   const [picked, setPicked] = useState<string[]>([]);
   const [day, setDay] = useState<number | null>(null);
@@ -78,7 +79,7 @@ export function TodayBlocks() {
 
       <Section title="Today: records panel" hint="Every number on Today opens this: a large panel over a dimmed page with the actual records. Title and a sentence, editable filter chips, + Filter, search, typed columns, a header that stays put, 50 rows a page, OPEN on a row, Open in the CRM, Maximise, Export CSV and the footer. Esc or the cross closes it.">
         <button type="button" onClick={() => setPanelOpen(true)} className="inline-flex min-h-10 items-center rounded-lg border bg-card px-4 text-sm font-medium hover:border-primary/40" data-testid="design-open-panel">Open the records panel</button>
-        {panelOpen && <RecordsPanel spec={itemsSpec(SAMPLE_TODAY_ITEMS, stamp, { key: "design", title: "Leads and deals, all client accounts", subtitle: "Made-up records for the style guide.", noun: "things", count: SAMPLE_TODAY_ITEMS.length })} now={stamp} onClose={() => setPanelOpen(false)} />}
+        {panelOpen && <RecordsPanel spec={itemsSpec(SAMPLE_TODAY_ITEMS, SAMPLE_NOW, { key: "design", title: "Leads and deals, all client accounts", subtitle: "Made-up records for the style guide.", noun: "things", count: SAMPLE_TODAY_ITEMS.length })} now={SAMPLE_NOW} onClose={() => setPanelOpen(false)} />}
       </Section>
 
       <Section title="Today: smart blocks" hint="Spotted today (at most three cards, each with the sample size and the word estimate when it is one), since your last visit, and what happens if nobody acts, with a ring that counts down to the next lead passing its reply target.">
