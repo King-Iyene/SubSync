@@ -9,7 +9,7 @@ import { CRM_NOTE_RULE } from "@/lib/meeting-wording";
 import { useApiClient, useData } from "../session";
 import { Badge, Btn, timeAgo, type Tone } from "../ui";
 
-// Connections (stage E0, INTEGRATIONS_SPEC sections 2, 3, 5.1 and 12). Two sections:
+// Connections (stage E0, INTEGRATIONS_SPEC sections 2, 3, 5.1 and 12), now Settings, Integrations (4 Nov 2026). Two sections:
 //   My connections          every person: the tools THEY connect. Nobody else can connect them, see their tokens, or read their meetings.
 //   Team connections        administrators: who has connected (names, status, counts, never what was said), Slack, the rules, and a way to revoke.
 // A connection that is waiting for the provider gives up after 2 minutes and offers Try again.
@@ -36,6 +36,9 @@ type TeamData = {
   delivery: boolean;
 };
 
+/** Every button in these two sections is a thumb target on a phone (44 px), as in the Today lists; on a laptop they keep the shared 32 px height. */
+const PHONE_TARGETS = "max-sm:[&_button]:min-h-11";
+
 const INFO: Record<PersonalProvider, { name: string; icon: LucideIcon; what: string }> = {
   fathom: { name: "Fathom", icon: Mic, what: "After each recorded call, SubSync receives the summary and action items of YOUR calls, finds the contact by exact email, and adds a note to that contact, written as you. Nothing is ever saved to a guessed contact: if nobody matches, or two contacts share the email, the call waits in your own Meeting inbox for you to choose." },
   zoom: { name: "Zoom", icon: Video, what: "When Zoom writes a summary of a meeting you hosted, it reaches you. The host needs a paid Zoom plan with meeting summaries switched on." },
@@ -56,10 +59,15 @@ function nextStep(s: Shown, delivery: boolean): string {
   }
 }
 
-export function ConnectionsPage() {
+/**
+ * The connections themselves: My connections for everyone, Team connections for admins. It is the body of Settings, Integrations (and, for a client's staff, who have
+ * no Settings, of the Integrations page). Nested inside a Settings section its headings are one level lower.
+ */
+export function IntegrationsContent({ nested = false }: { nested?: boolean }) {
   const my = useData<MyData>("my-connections");
+  const level = nested ? 3 : 2;
   return (
-    <Page title="Connections" subtitle="Connect your own tools once. Admins can see who is connected, never what was said.">
+    <>
       <HowTo id="connections-e0" title="How connections work">
         You sign in with your own account, so a connection is yours: nobody can connect for you or read your calls. Your admin sees who has connected and can switch a connection off, but never sees the content.
       </HowTo>
@@ -67,17 +75,26 @@ export function ConnectionsPage() {
         : my.error ? <ErrorState error={my.error} onRetry={my.reload} />
         : my.data ? (
           <>
-            <MySection data={my.data} reload={my.reload} />
-            {my.data.canAdmin && <TeamSection />}
+            <MySection data={my.data} reload={my.reload} level={level} />
+            {my.data.canAdmin && <TeamSection level={level} />}
           </>
         ) : null}
+    </>
+  );
+}
+
+/** The page a client's staff open (they have no Settings): the same connections, with their own title. */
+export function IntegrationsPage() {
+  return (
+    <Page title="Integrations" subtitle="Connect your own tools once. Admins can see who is connected, never what was said.">
+      <IntegrationsContent />
     </Page>
   );
 }
 
 // ---------------- My connections ----------------
 
-function MySection({ data, reload }: { data: MyData; reload: () => Promise<void> }) {
+function MySection({ data, reload, level }: { data: MyData; reload: () => Promise<void>; level: 2 | 3 }) {
   const api = useApiClient();
   const [waiting, setWaiting] = useState<{ provider: PersonalProvider; at: number } | null>(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -125,7 +142,7 @@ function MySection({ data, reload }: { data: MyData; reload: () => Promise<void>
   };
 
   return (
-    <Section title="My connections" hint={data.me.name ? `For ${data.me.name}. These belong to you and nobody else.` : "These belong to you and nobody else."} id="my-connections">
+    <Section title="My connections" hint={data.me.name ? `For ${data.me.name}. These belong to you and nobody else.` : "These belong to you and nobody else."} id="my-connections" level={level} className={PHONE_TARGETS}>
       <ul className="divide-y border-y" data-testid="my-connections">
         {data.cards.map((card) => {
           const info = INFO[card.provider];
@@ -189,7 +206,7 @@ function FathomNotice() {
 
 // ---------------- Team connections (administrators) ----------------
 
-function TeamSection() {
+function TeamSection({ level }: { level: 2 | 3 }) {
   const api = useApiClient();
   const { data, error, loading, reload } = useData<TeamData>("team-connections");
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -248,14 +265,14 @@ function TeamSection() {
 
   const { summary } = data;
   return (
-    <Section title="Team connections (admins)" hint="Who has connected, and the rules. You see names and status, never what was said." id="team-connections">
+    <Section title="Team connections (admins)" hint="Who has connected, and the rules. You see names and status, never what was said." id="team-connections" level={level} className={PHONE_TARGETS}>
       <p className="mb-3 text-sm" data-testid="team-summary">
         {summary.people === 0 ? "Nobody has connected a tool yet." : `${summary.people} ${summary.people === 1 ? "person has" : "people have"} connected a tool: ${summary.connected} working${summary.needAttention ? `, ${summary.needAttention} need${summary.needAttention === 1 ? "s" : ""} attention` : ""}${summary.waiting ? `, ${summary.waiting} ${summary.waiting === 1 ? "call is" : "calls are"} waiting for someone to pick a contact` : ""}.`}
       </p>
 
       <DataList<TeamRow>
         rows={data.team} rowKey={(r) => r.id} caption="Who has connected"
-        empty="Nobody has connected yet. Ask each person to open Connections and press Connect: a connection is personal, so you cannot do it for them."
+        empty="Ask each person to open Integrations and press Connect: a connection is personal, so you cannot do it for them."
         columns={[
           { key: "who", header: "Person", primary: true, width: "minmax(0,1.4fr)", cell: (r) => <span><span className="font-medium">{r.person ?? "Unnamed"}</span>{r.accountName ? <span className="text-muted-foreground"> · {r.accountName}</span> : <span className="text-muted-foreground"> · company team</span>}</span> },
           { key: "tool", header: "Tool", width: "6rem", cell: (r) => INFO[r.provider]?.name ?? r.provider },

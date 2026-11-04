@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
-import { CONTROL_HOME, describeChange, HISTORY_ACTION, isSectionId, NUMBER_SETTINGS, SECTION_IDS, SECTIONS, sectionsFor, SETTING_LABEL, SETTINGS_SECTION_KEY } from "../settings-sections.ts";
+import { CONTROL_HOME, describeChange, HISTORY_ACTION, isSectionId, MOVED_INTO_SETTINGS, movedSettingsSection, NUMBER_SETTINGS, SECTION_IDS, SECTIONS, sectionsFor, SETTING_LABEL, SETTINGS_SECTION_KEY } from "../settings-sections.ts";
 
 // N76 and N89: Settings in the eight sections the note names, nothing lost in the move, settings changes audited, numbers recalculated only when they should be.
 const read = (f: string) => readFileSync(join(process.cwd(), f), "utf8");
@@ -34,21 +34,23 @@ test("every control lives in a real section, and the screen draws each section",
   for (const id of ["stale", "dormant", "sla", "speed-target", "speed-open", "speed-close", "brand-name", "brand-color", "domain", "custom", "slack", "digest-email", "digest-hour", "digest-zone"]) assert.match(screen, new RegExp(`id="${id}"`), `field ${id}`);
 });
 
-test("the two slots other stages fill exist and are in the right sections: Watching is filled (F5), Connections draws nothing because its screens live on the Connections page (E0)", () => {
+test("the two slots other stages fill exist and are in the right sections: Watching is filled (F5), Connections is filled with the connection screens (they moved into Settings, Integrations on 4 Nov 2026)", () => {
   const watching = read("src/app/app/views/settings-slot-watching.tsx");
   const connections = read("src/app/app/views/settings-slot-connections.tsx");
   assert.match(watching, /return <WatchingPanel \/>;/);
-  assert.match(connections, /return null;/);
+  assert.match(connections, /return <IntegrationsContent nested \/>;/);
   assert.match(watching, /watching-panel/);
   const page = read("src/app/app/views/connections.tsx");
-  assert.match(page, /id="my-connections"/, "My connections is drawn on the Connections page");
-  assert.match(page, /id="team-connections"/, "Team connections is drawn on the Connections page");
+  assert.match(page, /id="my-connections"/, "My connections is drawn by the connection screens");
+  assert.match(page, /id="team-connections"/, "Team connections is drawn by the connection screens");
   assert.equal(CONTROL_HOME["watching"], "sync");
   assert.equal(CONTROL_HOME["team-connections"], "integrations");
   assert.equal(CONTROL_HOME["my-connections"], "integrations");
   const screen = read("src/app/app/views/settings.tsx");
   assert.ok(screen.indexOf("<WatchingSlot />") < screen.indexOf("<SyncStatusPanel />"), "the watching panel sits above the sync panel");
-  assert.ok(screen.indexOf("<ConnectionsSlot />") < screen.indexOf('<Card title="Connections">'), "the connections slot sits above the Connections card");
+  assert.ok(screen.indexOf("<ConnectionsSlot />") < screen.indexOf("<PermissionsPanel"), "the connections sit above the permissions list, inside Integrations");
+  assert.doesNotMatch(screen, /<Card title="Connections">/, "no pointer card to a separate Connections page is left");
+  assert.doesNotMatch(screen, /href="#connections"/, "Settings no longer sends anyone to a Connections menu entry");
 });
 
 test("the settings that recalculate numbers are the ones the server recalculates for", () => {
@@ -87,4 +89,13 @@ test("the test-account switch uses the account switch that already leaves an acc
   assert.match(parts, /You decide/);
   // The server turns the account flag into exclusion everywhere (the queries filter on it), and it is for agency sessions only.
   assert.match(read("src/lib/access.ts"), /if \(a === "accounts" && c === "flags"\) return false;/);
+});
+
+test("Connections moved into Settings, Integrations: the old address maps to that section and nothing else moved", () => {
+  assert.deepEqual({ ...MOVED_INTO_SETTINGS }, { connections: "integrations" });
+  assert.equal(movedSettingsSection("connections"), "integrations");
+  assert.equal(movedSettingsSection("settings"), null);
+  assert.equal(movedSettingsSection("constructor"), null, "a name from the object prototype is not a moved page");
+  assert.equal(movedSettingsSection("toString"), null);
+  for (const section of Object.values(MOVED_INTO_SETTINGS)) assert.ok(SECTION_IDS.includes(section), "the target section exists");
 });

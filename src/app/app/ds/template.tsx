@@ -26,12 +26,13 @@ export function Page({ title, subtitle, actions, children }: { title: string; su
 
 // A group of content under one heading, separated by space and a thin rule instead of a box (fewer cards, N10). `hint` is the one line that says what
 // the block is for.
-export function Section({ title, hint, action, children, id, className = "" }: { title: string; hint?: ReactNode; action?: ReactNode; children: ReactNode; id?: string; className?: string }) {
+export function Section({ title, hint, action, children, id, className = "", level = 2 }: { title: string; hint?: ReactNode; action?: ReactNode; children: ReactNode; id?: string; className?: string; /** Heading level: 3 when the block sits inside another section (for example inside a Settings section). */ level?: 2 | 3 }) {
+  const Heading = level === 3 ? "h3" : "h2";
   return (
     <section id={id} className={`mb-8 ${className}`} aria-labelledby={id ? `${id}-h` : undefined}>
       <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
         <div className="min-w-0">
-          <h2 id={id ? `${id}-h` : undefined} className="text-base font-semibold">{title}</h2>
+          <Heading id={id ? `${id}-h` : undefined} className="text-base font-semibold">{title}</Heading>
           {hint && <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>}
         </div>
         {action && <div className="print:hidden">{action}</div>}

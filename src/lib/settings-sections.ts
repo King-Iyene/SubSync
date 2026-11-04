@@ -16,7 +16,7 @@ export type Section = {
 export const SECTIONS: readonly Section[] = [
   { id: "team", title: "Team and access", hint: "Who can open SubSync, and which client accounts are left out of every number.", kinds: ["agency", "business"] },
   { id: "notifications", title: "Notifications", hint: "Where alerts and the daily and weekly summaries go, and when.", kinds: ["agency", "business"] },
-  { id: "integrations", title: "Integrations", hint: "Connections to other tools, and the permissions SubSync has.", kinds: ["agency", "business"] },
+  { id: "integrations", title: "Integrations", hint: "Connect your own tools once, see who on your team has connected, and what SubSync may read.", kinds: ["agency", "business"] },
   { id: "targets", title: "Reply targets and thresholds", hint: "What counts as late, stale or gone quiet.", kinds: ["agency", "business"] },
   { id: "brand", title: "Brand", hint: "Your name and colour on screens, reports and share links.", kinds: ["agency", "business"] },
   { id: "privacy", title: "Data and privacy", hint: "What SubSync stores, meeting notes, and deleting everything.", kinds: ["agency", "business"] },
@@ -67,6 +67,15 @@ export function describeChange(action: string, keys: readonly string[]): string 
   const names = keys.map((k) => SETTING_LABEL[k] ?? (k === "ignored" ? "Leave out of every number" : k === "clientView" ? "Client access" : k === "owner" ? "Account owner label" : "a setting"));
   return `${head}: ${[...new Set(names)].join(", ")}`;
 }
+
+/**
+ * Pages that used to be a menu entry of their own and now live inside a Settings section (4 Nov 2026: Connections became Settings, Integrations). The old address
+ * (#connections) and every link to it still work: the shell opens Settings on that section. Pure, so a test can prove none is lost.
+ */
+export const MOVED_INTO_SETTINGS: Readonly<Record<string, SectionId>> = { connections: "integrations" };
+
+/** The Settings section an old page address now lives in, or null when the page did not move. */
+export const movedSettingsSection = (viewId: string): SectionId | null => (Object.hasOwn(MOVED_INTO_SETTINGS, viewId) ? MOVED_INTO_SETTINGS[viewId] : null);
 
 /** The browser memory key that holds the section Settings opens on. Getting started sets it before it opens Settings. */
 export const SETTINGS_SECTION_KEY = "settings-section";

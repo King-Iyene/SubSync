@@ -24,7 +24,8 @@ type Data = {
 // Settings in sections with a menu on the left (N76, N89). One form, one Save button: a change made in one section is kept while you look at another, and the
 // page says so when something is not saved yet. Which section opens is remembered in this browser; Getting started opens the right one with "Do it now".
 
-export function SettingsView() {
+/** `openSection` is set when an old address (#connections) asks for one section; the person can still pick another afterwards. */
+export function SettingsView({ openSection }: { openSection?: SectionId } = {}) {
   const api = useApiClient();
   const { data, error, loading, reload } = useData<Data>("settings");
   const keys = useData<{ keys: Array<{ id: string; name: string; prefix: string; createdAt: string; lastUsedAt: string | null }>; max: number; endpoint: string }>("api-keys");
@@ -38,7 +39,14 @@ export function SettingsView() {
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [digest, setDigest] = useState<string | null>(null);
-  const [picked, setPicked] = useState<string | null>(() => remembered(SETTINGS_SECTION_KEY));
+  const [picked, setPicked] = useState<string | null>(() => openSection ?? remembered(SETTINGS_SECTION_KEY));
+  // An old link to a page that moved into Settings asks for its section, also when Settings is already open.
+  useEffect(() => {
+    if (!openSection) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setPicked(openSection);
+    remember(SETTINGS_SECTION_KEY, openSection);
+  }, [openSection]);
   // The answer the page held when Save was pressed: the form is filled again from the NEXT answer (the saved values as the server holds them), never from this one.
   const before = useRef<Data | null>(null);
 
@@ -117,14 +125,14 @@ export function SettingsView() {
 
   return (
     <div className="max-w-5xl">
-      <PageHeader title="Settings" subtitle="What counts as late, where alerts go, who can see what, and your data. Pick a section on the left." />
+      <PageHeader title="Settings" subtitle="What counts as late, where alerts go, who can see what, and your data. Pick a section." />
       {msg && <p className={`mb-4 border-l-2 py-1 pl-3 text-sm ${msg.ok ? "border-success" : "border-destructive"}`} role={msg.ok ? "status" : "alert"} data-testid="settings-message">{msg.text}</p>}
 
-      <div className="grid gap-6 md:grid-cols-[13.5rem_minmax(0,1fr)]">
-        <nav aria-label="Settings sections" data-testid="settings-nav" className="flex gap-1 overflow-x-auto md:sticky md:top-4 md:flex-col md:self-start md:overflow-visible">
+      <div className="grid gap-6 lg:grid-cols-[13.5rem_minmax(0,1fr)]">
+        <nav aria-label="Settings sections" data-testid="settings-nav" className="flex gap-1 overflow-x-auto lg:sticky lg:top-4 lg:flex-col lg:self-start lg:overflow-visible">
           {sections.map((s) => (
             <button key={s.id} type="button" onClick={() => choose(s.id)} aria-current={s.id === section ? "page" : undefined}
-              className={`shrink-0 rounded-lg px-3 py-2 text-left text-sm transition-colors ${s.id === section ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"}`}>{s.title}</button>
+              className={`shrink-0 rounded-lg px-3 py-2 text-left text-sm transition-colors max-sm:min-h-11 ${s.id === section ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"}`}>{s.title}</button>
           ))}
         </nav>
 
@@ -217,12 +225,7 @@ export function SettingsView() {
 
           {section === "integrations" && (
             <>
-              <ConnectionsSlot />
-              {data.features?.connections !== false && (
-                <Card title="Connections">
-                  <p className="text-sm text-muted-foreground">Each person connects their own tools, and admins see who has connected. Open <a className="font-medium text-foreground underline underline-offset-2" href="#connections">Connections</a> in the menu (Settings and help).</p>
-                </Card>
-              )}
+              {data.features?.connections !== false && <ConnectionsSlot />}
               <PermissionsPanel groups={data.permissions} />
             </>
           )}

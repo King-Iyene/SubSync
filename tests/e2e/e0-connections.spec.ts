@@ -10,7 +10,9 @@ async function openConnections(page: Page) {
   await expect(page.getByText("Demo mode", { exact: false }).first()).toBeVisible();
   await page.goto("/app#connections");
   await page.reload();
-  await expect(page.getByRole("heading", { name: "Connections", exact: true })).toBeVisible();
+  // Connections moved into Settings, Integrations (4 Nov 2026): the old address opens Settings on that section.
+  await expect(page.getByRole("heading", { name: "Settings", exact: true })).toBeVisible();
+  await expect(page.getByTestId("section-integrations")).toBeVisible();
   await expect(page.getByRole("heading", { name: "My connections", exact: true })).toBeVisible();
 }
 
@@ -55,14 +57,13 @@ test("nothing scrolls sideways at this width", async ({ page }) => {
   expect(overflow, "the page is wider than the screen").toBeLessThanOrEqual(1);
 });
 
-test("Settings points to Connections", async ({ page }) => {
+test("Settings, Integrations holds the connections one click from Settings", async ({ page }) => {
   await page.goto("/app");
   await expect(page.getByText("Demo mode", { exact: false }).first()).toBeVisible();
   await page.goto("/app#settings");
   await page.reload();
   await expect(page.getByRole("heading", { name: "Settings", exact: true })).toBeVisible();
-  // Settings is in sections now; the pointer lives under Integrations.
+  // Settings is in sections; the connections are the Integrations section, no second page and no pointer to click.
   await page.getByTestId("settings-nav").getByRole("button", { name: "Integrations", exact: true }).click();
-  await page.getByRole("link", { name: "Connections", exact: true }).click();
   await expect(page.getByRole("heading", { name: "My connections", exact: true })).toBeVisible();
 });
