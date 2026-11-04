@@ -19,12 +19,12 @@ export type ReasonKey = "both" | "email" | "phone" | "name";
 
 export function reasonOf(g: { reasons: readonly string[] }): { key: ReasonKey; label: string } {
   const email = g.reasons.some((r) => r === "same email" || r.startsWith("email differs"));
-  const phone = g.reasons.some((r) => r === "same phone" || r.startsWith("phone in"));
-  const loose = g.reasons.some((r) => r.startsWith("email differs") || r.startsWith("phone in"));
+  const phone = g.reasons.some((r) => r === "same phone" || r.startsWith("phone in") || r.startsWith("phone with"));
+  const loose = g.reasons.some((r) => r.startsWith("email differs") || r.startsWith("phone in") || r.startsWith("phone with"));
   if (email && phone) return { key: "both", label: loose ? "Same email and phone number, written differently" : "Same email and phone number" };
   if (email) return { key: "email", label: g.reasons.includes("same email") ? "Same email" : "Same email, written differently" };
-  if (phone) return { key: "phone", label: g.reasons.includes("same phone") ? "Same phone number" : "Same phone number, written differently" };
-  return { key: "name", label: "Same name" };
+  if (phone) return { key: "phone", label: g.reasons.includes("same phone") ? "Same phone number" : g.reasons.includes("phone with two digits swapped") ? "Phone numbers that differ by two swapped digits" : "Same phone number, written differently" };
+  return { key: "name", label: g.reasons.includes("similar name") && !g.reasons.includes("same name") ? "Similar name" : "Same name" };
 }
 
 export const REASON_LABELS: Record<ReasonKey, string> = { both: "Same email and phone", email: "Same email", phone: "Same phone number", name: "Same name" };

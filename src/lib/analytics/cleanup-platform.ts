@@ -16,7 +16,7 @@ export interface Writer {
   revert(change: ChangeRow): Promise<Outcome>;
 }
 
-type Current = { firstName: string | null; lastName: string | null; phone: string | null; tags: string[] };
+type Current = { firstName: string | null; lastName: string | null; phone: string | null; email: string | null; tags: string[] };
 
 const asString = (v: unknown) => (typeof v === "string" && v.length > 0 ? v : null);
 
@@ -31,7 +31,7 @@ export function platformWriter(token: string, fetchImpl: typeof fetch = fetch): 
     if (!res.ok) return { result: "failed", detail: `The platform answered ${res.status}` };
     const body = (await res.json().catch(() => ({}))) as { contact?: Record<string, unknown> };
     const c = body.contact ?? {};
-    return { current: { firstName: asString(c.firstName), lastName: asString(c.lastName), phone: asString(c.phone), tags: Array.isArray(c.tags) ? c.tags.filter((t): t is string => typeof t === "string") : [] } };
+    return { current: { firstName: asString(c.firstName), lastName: asString(c.lastName), phone: asString(c.phone), email: asString(c.email), tags: Array.isArray(c.tags) ? c.tags.filter((t): t is string => typeof t === "string") : [] } };
   }
 
   const status = (res: Response): Outcome => {
@@ -43,7 +43,7 @@ export function platformWriter(token: string, fetchImpl: typeof fetch = fetch): 
   async function setField(change: ChangeRow, expect: string | null, value: string | null, verb: string): Promise<Outcome> {
     const got = await read(change.contactId);
     if ("result" in got) return got;
-    const now = got.current[change.field as "phone" | "firstName" | "lastName"] ?? null;
+    const now = got.current[change.field as "phone" | "firstName" | "lastName" | "email"] ?? null;
     if (now !== expect) return { result: "skipped", detail: `Changed since the preview, so it was left alone (${verb})` };
     return status(await call(`/contacts/${encodeURIComponent(change.contactId)}`, { method: "PUT", body: JSON.stringify({ [change.field]: value ?? "" }) }));
   }

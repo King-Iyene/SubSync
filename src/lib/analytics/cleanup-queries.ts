@@ -134,7 +134,7 @@ async function mirrorLocal(installationId: string, locationId: string, c: Change
     return;
   }
   const value = mode === "apply" ? c.after : c.before;
-  const col = c.field === "firstName" ? "first_name" : c.field === "lastName" ? "last_name" : "phone";
+  const col = c.field === "firstName" ? "first_name" : c.field === "lastName" ? "last_name" : c.field === "email" ? "email" : "phone";
   await db`update cached_contacts set ${db(col)} = ${value} where installation_id = ${installationId} and location_id = ${locationId} and contact_id = ${c.contactId}`;
 }
 

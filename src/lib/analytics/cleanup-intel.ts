@@ -6,7 +6,7 @@
 //   name   - fix first and last names typed in ALL CAPS or all lower case
 //   tag    - add or remove one tag on the contacts that match a filter
 
-export type RuleId = "phone" | "name" | "tag";
+export type RuleId = "phone" | "name" | "tag" | "email";
 
 export type ContactLite = {
   id: string;
@@ -26,12 +26,14 @@ export type TagParams = {
   where: { missing?: "email" | "phone" | "either"; idleDays?: number; hasTag?: string; source?: string };
 };
 
+import { emailFix } from "./email-fix.ts";
+
 export type Params = { rules: RuleId[]; defaultCountryCode: string | null; tag: TagParams | null };
 
 export type Change = {
   contactId: string;
   rule: RuleId;
-  field: "phone" | "firstName" | "lastName" | "tags";
+  field: "phone" | "firstName" | "lastName" | "tags" | "email";
   before: string | null;
   after: string | null;
   /** For tag changes, the tag being added or removed. */
@@ -105,6 +107,10 @@ export function planChanges(contacts: ContactLite[], params: Params, now = Date.
       const after = formatPhone(c.phone, params.defaultCountryCode);
       if (after) push({ contactId: c.id, rule: "phone", field: "phone", before: c.phone, after });
     }
+    if (params.rules.includes("email")) {
+      const after = emailFix(c.email);
+      if (after && after !== c.email) push({ contactId: c.id, rule: "email", field: "email", before: c.email, after });
+    }
     if (params.rules.includes("name")) {
       const first = formatName(c.firstName);
       if (first && first !== c.firstName) push({ contactId: c.id, rule: "name", field: "firstName", before: c.firstName, after: first });
@@ -122,8 +128,9 @@ export function planChanges(contacts: ContactLite[], params: Params, now = Date.
   return { changes, truncated: changes.length >= MAX_CHANGES };
 }
 
-export function summarise(changes: Change[]): { phone: number; name: number; tagAdd: number; tagRemove: number; contacts: number } {
+export function summarise(changes: Change[]): { phone: number; email: number; name: number; tagAdd: number; tagRemove: number; contacts: number } {
   return {
+    email: changes.filter((c) => c.rule === "email").length,
     phone: changes.filter((c) => c.rule === "phone").length,
     name: changes.filter((c) => c.rule === "name").length,
     tagAdd: changes.filter((c) => c.rule === "tag" && c.after === "with").length,
@@ -138,7 +145,7 @@ const TAG_NAME = /^[^\n\r,;<>]{1,60}$/;
 
 export function parseParams(input: unknown): { ok: true; params: Params } | { ok: false; error: string } {
   const o = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
-  const rules = Array.isArray(o.rules) ? [...new Set(o.rules.filter((r): r is RuleId => r === "phone" || r === "name" || r === "tag"))] : [];
+  const rules = Array.isArray(o.rules) ? [...new Set(o.rules.filter((r): r is RuleId => r === "phone" || r === "name" || r === "tag" || r === "email"))] : [];
   if (rules.length === 0) return { ok: false, error: "Choose at least one clean-up" };
   let cc: string | null = null;
   if (o.defaultCountryCode !== undefined && o.defaultCountryCode !== null && o.defaultCountryCode !== "") {

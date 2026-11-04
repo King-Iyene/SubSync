@@ -5,6 +5,9 @@
 // which record to keep; it never changes anything. The merge itself is done in the platform's
 // own merge screen, which keeps the history of both records.
 
+import { DEFAULT_RULES, type MatchRules } from "./cleanup-rules.ts";
+import { digitBag, digitsSwapped, firstNamesDiffer, isRoleEmail, nameSimilarity, soundex, splitName, canonicalFirst } from "./name-match.ts";
+
 export type Person = {
   contactId: string;
   name: string;
@@ -71,32 +74,50 @@ export function normName(name: string): string {
 
 // ---------- scoring ----------
 
-export type MatchReason = "same email" | "same phone" | "email differs only in case, spaces or gmail dots" | "phone in a different format" | "same name";
+export type MatchReason =
+  | "same email" | "same phone" | "email differs only in case, spaces or gmail dots" | "phone in a different format" | "same name"
+  | "similar name" | "phone with two digits swapped" | "different first names" | "shared company mailbox";
 
 export type Pair = { score: number; reasons: MatchReason[] };
 
-// How sure we are that two records are the same person (0 to 100) and why.
-export function scorePair(a: Person, b: Person): Pair {
+// How sure we are that two records are the same person (0 to 100) and why. `rules` says which fields count and how strictly (Balanced is the original behaviour).
+export function scorePair(a: Person, b: Person, rules: MatchRules = DEFAULT_RULES): Pair {
   const reasons: MatchReason[] = [];
   let score = 0;
   const ea = normEmail(a.email);
   const eb = normEmail(b.email);
-  if (ea && eb) {
-    if (a.email!.trim() === b.email!.trim()) { reasons.push("same email"); score = Math.max(score, 94); }
-    else if (ea === eb || foldEmail(a.email) === foldEmail(b.email)) { reasons.push("email differs only in case, spaces or gmail dots"); score = Math.max(score, 82); }
+  let emailLink = false;
+  if (rules.email !== "off" && ea && eb) {
+    if (a.email!.trim() === b.email!.trim()) { reasons.push("same email"); score = Math.max(score, 94); emailLink = true; }
+    else if (rules.email === "similar" && (ea === eb || foldEmail(a.email) === foldEmail(b.email))) { reasons.push("email differs only in case, spaces or gmail dots"); score = Math.max(score, 82); emailLink = true; }
   }
   const pa = normPhone(a.phone);
   const pb = normPhone(b.phone);
-  if (pa && pb && pa === pb) {
-    if ((a.phone ?? "").trim() === (b.phone ?? "").trim()) { reasons.push("same phone"); score = Math.max(score, 90); }
-    else { reasons.push("phone in a different format"); score = Math.max(score, 80); }
+  let phoneLink = false;
+  if (rules.phone !== "off" && pa && pb) {
+    if (pa === pb) {
+      if ((a.phone ?? "").trim() === (b.phone ?? "").trim()) { reasons.push("same phone"); score = Math.max(score, 90); phoneLink = true; }
+      else if (rules.phone !== "exact") { reasons.push("phone in a different format"); score = Math.max(score, 80); phoneLink = true; }
+    } else if (rules.phone === "typo" && digitsSwapped(pa, pb)) { reasons.push("phone with two digits swapped"); score = Math.max(score, 60); phoneLink = true; }
   }
   const na = normName(a.name);
   const nb = normName(b.name);
-  if (na && na === nb && na !== "unnamed contact" && na.includes(" ")) {
-    reasons.push("same name");
-    // The same name alone is weak; with another signal it confirms the match.
-    score = score > 0 ? Math.min(99, score + 5) : 35;
+  if (rules.name !== "off") {
+    if (na && na === nb && na !== "unnamed contact" && na.includes(" ")) {
+      reasons.push("same name");
+      // The same name alone is weak; with another signal it confirms the match.
+      score = score > 0 ? Math.min(99, score + 5) : 35;
+    } else if (rules.name === "similar" && na !== "unnamed contact" && nb !== "unnamed contact") {
+      const m = nameSimilarity(a.name, b.name);
+      if (m.kind !== "none" && m.kind !== "exact") { reasons.push("similar name"); score = score > 0 ? Math.min(99, score + 3) : 32; }
+    }
+  }
+  if (rules.guards && score > 0) {
+    const named = na && nb && na !== "unnamed contact" && nb !== "unnamed contact";
+    // One phone number for two people with different first names is usually a household or an office line, not one person.
+    if (phoneLink && !emailLink && named && firstNamesDiffer(a.name, b.name)) { reasons.push("different first names"); score = Math.min(score, 55); }
+    // info@ or sales@ belongs to a business: two different people can share it.
+    if (emailLink && !phoneLink && named && isRoleEmail(a.email) && nameSimilarity(a.name, b.name).kind === "none" && na !== nb) { reasons.push("shared company mailbox"); score = Math.min(score, 55); }
   }
   return { score, reasons };
 }
@@ -166,7 +187,8 @@ export function splitCompatible(people: Person[], now: number = Date.now()): Per
 }
 
 // Group contacts that are linked by a confident match (union-find). Pairs below `minScore` do not link.
-export function groupDuplicates(people: Person[], minScore = 50, maxGroup = 40): Group[] {
+const NAME_BUCKET_MAX = 8;
+export function groupDuplicates(people: Person[], minScore = 50, maxGroup = 40, rules: MatchRules = DEFAULT_RULES): Group[] {
   const parent = new Map(people.map((p) => [p.contactId, p.contactId]));
   const find = (x: string): string => {
     let r = x;
@@ -179,16 +201,24 @@ export function groupDuplicates(people: Person[], minScore = 50, maxGroup = 40):
   const buckets = new Map<string, Person[]>();
   const add = (k: string | null, p: Person) => { if (k) (buckets.get(k) ?? buckets.set(k, []).get(k)!).push(p); };
   for (const p of people) {
-    add(foldEmail(p.email) && "e:" + foldEmail(p.email), p);
-    add(normPhone(p.phone) && "p:" + normPhone(p.phone), p);
+    if (rules.email !== "off") add(foldEmail(p.email) && "e:" + foldEmail(p.email), p);
+    const ph = normPhone(p.phone);
+    if (rules.phone !== "off") add(ph && "p:" + ph, p);
+    if (rules.phone === "typo" && ph) add("t:" + digitBag(ph), p);
+    if (rules.name !== "off" && rules.nameAlone && p.name !== "Unnamed contact") {
+      const { first, last } = splitName(p.name);
+      if (first && last) add("n:" + soundex(last) + canonicalFirst(first).charAt(0), p);
+    }
   }
   const best = new Map<string, Pair>();
-  for (const members of buckets.values()) {
+  for (const [bucketKey, members] of buckets) {
     if (members.length < 2) continue;
+    // A name shared by many records is a common name, not a duplicate: it is never grouped on the name alone.
+    if (bucketKey.startsWith("n:") && members.length > NAME_BUCKET_MAX) continue;
     const limited = members.slice(0, maxGroup);
     for (let i = 0; i < limited.length; i++) {
       for (let j = i + 1; j < limited.length; j++) {
-        const pair = scorePair(limited[i], limited[j]);
+        const pair = scorePair(limited[i], limited[j], rules);
         if (pair.score < minScore) continue;
         const ra = find(limited[i].contactId);
         const rb = find(limited[j].contactId);
@@ -216,7 +246,7 @@ export function groupDuplicates(people: Person[], minScore = 50, maxGroup = 40):
       const own = new Map<string, Pair>();
       for (let i = 0; i < members.length; i++) {
         for (let j = i + 1; j < members.length; j++) {
-          const pair = scorePair(members[i], members[j]);
+          const pair = scorePair(members[i], members[j], rules);
           if (pair.score < minScore) continue;
           for (const id of [members[i].contactId, members[j].contactId]) {
             const prev = own.get(id);
@@ -229,7 +259,7 @@ export function groupDuplicates(people: Person[], minScore = 50, maxGroup = 40):
       const reasons = [...new Set(linked.flatMap((m) => own.get(m.contactId)!.reasons))];
       const confidence = Math.max(...linked.map((m) => own.get(m.contactId)!.score));
       const exact = reasons.includes("same email") || reasons.includes("same phone");
-      const format = reasons.some((r) => r.startsWith("phone in") || r.startsWith("email differs"));
+      const format = reasons.some((r) => r.startsWith("phone in") || r.startsWith("phone with") || r.startsWith("email differs"));
       groups.push({
         key: groupKey(linked.map((m) => m.contactId)),
         people: linked,

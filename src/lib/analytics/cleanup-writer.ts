@@ -11,14 +11,14 @@ const asString = (v: unknown) => (typeof v === "string" && v.length > 0 ? v : nu
 export function demoWriter(installationId: string, locationId: string): Writer {
   const db = sql();
   async function current(contactId: string) {
-    const [r] = await db`select first_name, last_name, phone, tags from cached_contacts where installation_id = ${installationId} and location_id = ${locationId} and contact_id = ${contactId}`;
-    return r ? { firstName: asString(r.first_name), lastName: asString(r.last_name), phone: asString(r.phone), tags: (r.tags as string[]) ?? [] } : null;
+    const [r] = await db`select first_name, last_name, phone, email, tags from cached_contacts where installation_id = ${installationId} and location_id = ${locationId} and contact_id = ${contactId}`;
+    return r ? { firstName: asString(r.first_name), lastName: asString(r.last_name), phone: asString(r.phone), email: asString(r.email), tags: (r.tags as string[]) ?? [] } : null;
   }
   async function field(change: ChangeRow, expect: string | null, value: string | null): Promise<Outcome> {
     const cur = await current(change.contactId);
     if (!cur) return { result: "skipped", detail: "The contact no longer exists" };
-    if ((cur[change.field as "phone" | "firstName" | "lastName"] ?? null) !== expect) return { result: "skipped", detail: "Changed since the preview, so it was left alone" };
-    const col = change.field === "firstName" ? "first_name" : change.field === "lastName" ? "last_name" : "phone";
+    if ((cur[change.field as "phone" | "firstName" | "lastName" | "email"] ?? null) !== expect) return { result: "skipped", detail: "Changed since the preview, so it was left alone" };
+    const col = change.field === "firstName" ? "first_name" : change.field === "lastName" ? "last_name" : change.field === "email" ? "email" : "phone";
     await db`update cached_contacts set ${db(col)} = ${value} where installation_id = ${installationId} and location_id = ${locationId} and contact_id = ${change.contactId}`;
     return { result: "applied" };
   }
