@@ -211,13 +211,13 @@ function TodayBody({ go, kind, picked, setPicked }: { go: GoFn; kind: AccessKind
         {needing.rows.length === 0 ? (
           <EmptyState compact title="No client account needs you" body="Every account is on track against its own usual." />
         ) : (
-          <ul className="divide-y border-y" data-testid="needing-you">
+          <ul className="@container divide-y border-y" data-testid="needing-you">
             {needing.rows.map((a) => (
-              <li key={a.locationId} className="ds-row grid items-center gap-x-5 gap-y-1.5 py-3 md:grid-cols-[minmax(0,1.1fr)_9rem_minmax(0,2fr)_auto]" data-testid="needing-row">
+              <li key={a.locationId} className="ds-row grid items-center gap-x-5 gap-y-1.5 py-3 @4xl:grid-cols-[minmax(0,1.1fr)_9rem_minmax(0,2fr)_auto]" data-testid="needing-row">
                 <p className="break-words font-semibold">{a.name}</p>
                 <p className="text-sm"><Badge tone={a.state === "Needs you now" ? "bad" : a.state === "Needs a look" ? "warn" : "neutral"}>{a.state}</Badge></p>
                 <p className="min-w-0 break-words text-sm text-muted-foreground">{a.reason}{a.count > 1 && <span> and {a.count - 1} more things</span>}{a.dollars ? <span>. {money(a.dollars)} at stake.</span> : null}</p>
-                <div className="flex flex-wrap items-center gap-x-1 md:justify-end">
+                <div className="flex flex-wrap items-center gap-x-1 @4xl:justify-end">
                   <a href={a.url} target="_blank" rel="noopener noreferrer" className="ds-press inline-flex min-h-9 items-center gap-1.5 rounded-lg border bg-card px-3 text-sm font-medium hover:border-primary/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)]">Open in CRM<ExternalLink aria-hidden className="size-3.5" /><span className="sr-only"> ({a.name}, opens in a new tab)</span></a>
                   <button type="button" onClick={() => changeAccounts([a.locationId])} className="ds-press min-h-9 rounded-lg px-2.5 text-sm text-muted-foreground underline-offset-4 hover:bg-muted hover:text-foreground hover:underline focus-visible:outline-2 focus-visible:outline-[var(--ring)]">Only this account</button>
                 </div>

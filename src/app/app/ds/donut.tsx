@@ -67,7 +67,7 @@ export function DonutChart({ title, slices, selected, onSelect, hint = "Click a 
               <button type="button" aria-pressed={on} onClick={() => press(s.kind)} onMouseEnter={() => setHot(s.kind)} onMouseLeave={() => setHot(null)} onFocus={() => setHot(s.kind)} onBlur={() => setHot(null)} data-testid={`legend-${s.kind}`}
                 className={`ds-press group flex min-h-10 w-full items-center gap-3 px-1 py-1.5 text-left text-sm hover:bg-muted focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--ring)] ${on ? "font-semibold" : ""}`}>
                 <span aria-hidden className="size-3 shrink-0 rounded-[3px]" style={{ background: kindColour(s.kind) }} />
-                <span className="min-w-0 flex-1 truncate">{s.label}</span>
+                <span className="min-w-0 flex-1 break-words">{s.label}</span>
                 <span className="tnum shrink-0">{s.count.toLocaleString("en-US")}</span>
                 <span className="tnum w-10 shrink-0 text-right text-muted-foreground">{s.share}%</span>
                 <span className="inline-flex w-4 shrink-0 justify-end">{on ? <Check aria-hidden className="size-4" /> : <ChevronRight aria-hidden className="size-4 text-muted-foreground opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100" />}</span>

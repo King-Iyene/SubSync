@@ -34,12 +34,12 @@ export function QueueRowView({ row, now, active, onShow, single = false }: { row
   const age = row.since === null ? null : ageWords(Math.max(0, (now - row.since) / 60_000));
   return (
     <li id={`queue-${row.key}`} data-testid="queue-row" data-kind={row.kind} data-severity={row.severity} aria-current={active ? "true" : undefined}
-      className={`ds-row grid items-center gap-x-5 gap-y-2 border-l-[3px] py-3 pl-4 pr-2 md:grid-cols-[minmax(0,1fr)_8.5rem_9rem_auto] ${s.stripe} ${active ? "bg-accent/50 outline outline-2 -outline-offset-2 outline-[var(--ring)]" : ""}`}>
+      className={`ds-row grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-5 gap-y-2 border-l-[3px] py-3 pl-4 pr-2 @4xl:grid-cols-[minmax(0,1fr)_8.5rem_9rem_auto] ${s.stripe} ${active ? "bg-accent/50 outline outline-2 -outline-offset-2 outline-[var(--ring)]" : ""}`}>
       <div className="min-w-0">
         {single ? <p className="break-words font-semibold">{row.text}</p> : <><p className="break-words font-semibold">{row.accountName}</p>
         <p className="mt-0.5 break-words text-sm text-muted-foreground">{row.text}</p></>}
       </div>
-      <div className="tnum md:text-right">
+      <div className="tnum text-right">
         <p className="text-lg font-semibold leading-6">{stake.main}</p>
         {stake.sub && <p className="text-xs text-muted-foreground">{stake.sub}</p>}
       </div>
@@ -47,7 +47,7 @@ export function QueueRowView({ row, now, active, onShow, single = false }: { row
         <p className={`flex items-center gap-1.5 font-medium ${s.text}`}><s.Icon aria-hidden className="size-4 shrink-0" />{s.word}</p>
         {age && <p className="text-xs text-muted-foreground">Wrong for {age}</p>}
       </div>
-      <div className="flex flex-wrap items-center gap-x-1 gap-y-1 md:justify-end">
+      <div className="flex flex-wrap items-center justify-end gap-x-1 gap-y-1">
         <a href={row.url} target="_blank" rel="noopener noreferrer" className={primary} data-testid="queue-open">Open in CRM<ExternalLink aria-hidden className="size-3.5" /><span className="sr-only"> ({row.accountName}, opens in a new tab)</span></a>
         <button type="button" onClick={() => onShow(row)} className={quiet} data-testid="queue-show">{SHOW[row.kind]}</button>
       </div>
@@ -90,7 +90,7 @@ export function FixFirstQueue({ rows, max = 7, onShow, empty, title = "Fix first
       {rows.length === 0 ? (
         <p className="border-y py-6 text-center text-sm text-muted-foreground" data-testid="queue-empty">{empty}</p>
       ) : (
-        <ul className="divide-y border-y" data-testid="queue-list">
+        <ul className="@container divide-y border-y" data-testid="queue-list">
           {shown.map((r, n) => <QueueRowView key={r.key} row={r} now={now} active={n === active} onShow={onShow} single={single} />)}
         </ul>
       )}

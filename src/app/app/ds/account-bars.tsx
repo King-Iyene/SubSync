@@ -29,7 +29,7 @@ export function AccountBars({ title, bars, rows, selected, onSelect, used = fals
               <button type="button" aria-pressed={on} onClick={() => onSelect(b.locationId)} onMouseEnter={() => setHot(b.locationId)} onMouseLeave={() => setHot(null)} onFocus={() => setHot(b.locationId)} onBlur={() => setHot(null)}
                 data-testid="account-bar" data-count={b.count} aria-label={`${barTooltip(b, rows)}. Show only this account.`}
                 className={`ds-press group grid min-h-10 w-full grid-cols-[minmax(6rem,10rem)_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-1.5 py-1 text-left text-sm hover:bg-muted focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--ring)] ${on ? "bg-muted font-semibold" : ""}`}>
-                <span className="truncate">{b.name}</span>
+                <span className="break-words">{b.name}</span>
                 <span className="relative block h-2.5 border-l border-foreground/30" aria-hidden>
                   <span className="ds-grow-x flex h-full gap-[2px]" style={{ width: `${(b.count / max) * 100}%`, opacity: dim ? 0.4 : 1 }}>
                     {KINDS.filter((k) => (b.byKind[k] ?? 0) > 0).map((k, i, all) => (
