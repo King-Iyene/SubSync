@@ -83,3 +83,15 @@ export function dialWarnings(v: { dnd: boolean; phone: string | null | undefined
 }
 
 export const mustStop = (w: DialWarning[]) => w.some((x) => x.level === "stop");
+
+// ---------------- warnings before any email (stage PEOPLE) ----------------
+
+export type EmailWarning = { id: "dnd" | "no_email"; level: "stop" | "caution"; text: string };
+
+/** What to tell a person BEFORE they email: somebody who asked not to be contacted is a stop; no address is a caution. SubSync never sends the message, the CRM's own mail box does. */
+export function emailWarnings(v: { dnd: boolean; email: string | null | undefined }): EmailWarning[] {
+  const out: EmailWarning[] = [];
+  if (v.dnd) out.push({ id: "dnd", level: "stop", text: "This person asked not to be contacted. Do not email them." });
+  if (!v.email || !v.email.includes("@")) out.push({ id: "no_email", level: "caution", text: "There is no email address on this contact." });
+  return out;
+}

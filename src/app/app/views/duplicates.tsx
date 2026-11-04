@@ -259,7 +259,7 @@ export function DuplicatesView() {
 
           <ul className={`grid gap-x-6 gap-y-4 ${step.people.length >= 3 ? "md:grid-cols-3" : step.people.length === 2 ? "md:grid-cols-2" : ""}`} data-testid="dup-records">
             {step.people.map((p, i) => (
-              <RecordCard key={p.contactId} p={p} i={i} keep={p.contactId === keepId} best={p.contactId === step.survivorId} locked={decided} onKeep={() => setChosen({ key: step.key, id: p.contactId })} />
+              <RecordCard key={p.contactId} p={p} i={i} keep={p.contactId === keepId} best={p.contactId === step.survivorId} locked={decided} locationId={step.locationId} onKeep={() => setChosen({ key: step.key, id: p.contactId })} />
             ))}
           </ul>
 

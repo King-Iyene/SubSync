@@ -89,6 +89,11 @@ async function main() {
       // The Appointments work lists (stage APPT): the lists, the full list and the comparison, asked for the other side's account and person by every parameter the page takes.
       "/api/app/appointments/work", "/api/app/appointments/list?kind=all&size=50", `/api/app/appointments/list?kind=all&location=${other.locs[0]}&size=50`, `/api/app/appointments/list?kind=record&location=${other.locs[0]}`,
       `/api/app/appointments/list?kind=window&bucket=noshow&location=${other.locs[0]}`, "/api/app/appointments/compare?by=account", "/api/app/appointments/compare?by=person", `/api/app/appointments/${other.locs[0]}/anything`,
+      // People (stage PEOPLE): the call lists, the lead panel, the search and the recent list, asked for the other side's accounts, people and words by every parameter they take.
+      "/api/app/people/home", "/api/app/people/recent", `/api/app/people/queue?list=waiting&location=${other.locs[0]}`, `/api/app/people/queue?list=hot&accounts=${other.locs.join(",")}`,
+      `/api/app/people/queue?list=stale&account=${other.locs[0]}&q=${other.marker}`, `/api/app/people/queue?list=noshows&mine=1&location=${other.locs[0]}`, `/api/app/people/queue?list=followups&q=${other.marker}`,
+      `/api/app/people/person/${other.locs[0]}/${other.contacts[0]}`, `/api/app/people/person/${other.locs[0]}/%2e%2e%2f${other.contacts[0]}`, `/api/app/people/search?q=${other.marker}&location=${other.locs[0]}`,
+      `/api/app/people/contact/${other.locs[0]}/${other.contacts[0]}`,
       // The rebuilt Account audit (stage AUDIT): the read, the client list and a single client, asked for the other side's account by every parameter it takes.
       "/api/app/audit", "/api/app/audit/clients?size=50", `/api/app/audit?location=${other.locs[0]}`, `/api/app/audit/clients?location=${other.locs[0]}&q=${other.marker}`, `/api/app/audit?accounts=${other.locs[0]}&fresh=1`,
     ];
@@ -183,6 +188,9 @@ async function main() {
       ["POST", "/api/app/duplicates/review", { locationId: B.locs[0], contactIds: [B.contacts[0], B.contacts[0] + "dup"], decision: "not_duplicate" }],
       ["POST", "/api/app/duplicates/snooze", { locationId: B.locs[0], contactIds: [B.contacts[0], B.contacts[0] + "dup"] }],
       ["POST", "/api/app/duplicates/merge", { locationId: B.locs[0], contactIds: [B.contacts[0], B.contacts[0] + "dup"], keepContactId: B.contacts[0] }],
+      // People: marking the other agency's person as opened, and logging a call on the other agency's person.
+      ["PUT", "/api/app/people/seen", { locationId: B.locs[0], contactId: B.contacts[0] }],
+      ["POST", "/api/app/people/outcome", { locationId: B.locs[0], contactId: B.contacts[0], outcome: "answered" }],
       // A reply target on the other agency's client account.
       ["PUT", "/api/app/speed/target", { locationId: B.locs[0], minutes: 5 }],
     ];

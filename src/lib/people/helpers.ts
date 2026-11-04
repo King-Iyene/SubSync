@@ -1,3 +1,6 @@
+import { isInternalComment } from "../analytics/message-kinds.ts";
+import { channelLabel } from "../analytics/waiting.ts";
+
 // Small pure helpers for the People module (stage F10): days for a tag's per-day counts, the hard-timeout error, call messages from the CRM and the
 // words for a call result. Pure, so they are unit tested.
 
@@ -75,4 +78,23 @@ export function callResultLabel(status: string | null, durationSeconds: number |
   if (s === "failed") return "Did not connect";
   if (s === "canceled" || s === "cancelled") return "Cancelled";
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : "Result not recorded";
+}
+
+// ---------------- messages from the CRM (the lead panel's timeline) ----------------
+
+export type CrmMessage = { at: number; direction: "inbound" | "outbound" | null; channel: string; userId: string | null };
+
+/**
+ * One text, email or chat message of a conversation, as a timeline entry: when, which way, on which channel, and who sent it. NEVER the words of the message (SubSync does not
+ * keep or show what people wrote). A call, an internal comment or an entry with no readable time gives null. NOT VERIFIED LIVE (same shape caveat as mapCallMessage).
+ */
+export function mapMessageEvent(raw: unknown): CrmMessage | null {
+  const o = rec(raw);
+  const type = String(o.messageType ?? o.type ?? "");
+  if (!type || /call/i.test(type) || isInternalComment(type) || /activity/i.test(type)) return null;
+  const t = o.dateAdded ?? o.createdAt ?? o.date;
+  const at = typeof t === "number" ? (t < 1e11 ? t * 1000 : t) : typeof t === "string" ? Date.parse(t) : NaN;
+  if (!Number.isFinite(at)) return null;
+  const d = typeof o.direction === "string" ? o.direction.toLowerCase() : "";
+  return { at, direction: d === "inbound" || d === "outbound" ? d : null, channel: channelLabel(type), userId: typeof o.userId === "string" && o.userId ? o.userId.slice(0, 64) : null };
 }

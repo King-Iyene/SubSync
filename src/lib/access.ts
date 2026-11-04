@@ -112,7 +112,11 @@ const NOTIFY_ADMIN_RULES: Rule[] = [
   ["GET", "notification-destinations"], ["POST", "notification-destinations"], ["DELETE", "notification-destinations"],
 ];
 
-const CLIENT_RULES: Rule[] = [...BELL_RULES, ...GET_VIEWS.map((a) => ["GET", a] as Rule), ["POST", "usage"], ["POST", "today", "action"], ["POST", "roadmap"], ["POST", "feedback"], ["POST", "problem"], ["POST", "inbox", "views"], ["DELETE", "inbox", "views"], ["POST", "people", "lists"], ["DELETE", "people", "lists"], ["PUT", "people", "dialer"], ["POST", "duplicates"], ...PERSONAL_RULES];
+// People (stage PEOPLE): what a person does while working a list. Each only ever touches the person's own marks (the people they opened, their recent searches) or logs a call on a
+// contact inside the accounts they may read (the handler checks the account again); none of them writes to the CRM.
+const PEOPLE_DAILY_RULES: Rule[] = [["PUT", "people", "seen"], ["POST", "people", "recent"], ["DELETE", "people", "recent"], ["POST", "people", "outcome"]];
+
+const CLIENT_RULES: Rule[] = [...BELL_RULES, ...GET_VIEWS.map((a) => ["GET", a] as Rule), ["POST", "usage"], ["POST", "today", "action"], ["POST", "roadmap"], ["POST", "feedback"], ["POST", "problem"], ["POST", "inbox", "views"], ["DELETE", "inbox", "views"], ["POST", "people", "lists"], ["DELETE", "people", "lists"], ["PUT", "people", "dialer"], ...PEOPLE_DAILY_RULES, ["POST", "duplicates"], ...PERSONAL_RULES];
 
 const BUSINESS_RULES: Rule[] = [
   ...GET_VIEWS.map((a) => ["GET", a] as Rule), ...PERSONAL_RULES, ...BELL_RULES, ...NOTIFY_ADMIN_RULES, ...BELL_RULES, ...NOTIFY_ADMIN_RULES,
@@ -121,7 +125,7 @@ const BUSINESS_RULES: Rule[] = [
   ["GET", "export", "stale"], ["GET", "export", "duplicates"], ["GET", "export", "inbox"], ["GET", "export", "deals"], ["GET", "export", "alerts"],
   ["POST", "email", "check"], ["POST", "alerts"], ["POST", "duplicates"], ["POST", "usage"], ["POST", "today", "action"], ["POST", "today", "views"], ["POST", "roadmap"], ["POST", "feedback"], ["POST", "problem"], ["POST", "audit", "share"], ["POST", "audit", "revoke"], ["POST", "sync"], ["POST", "call-lists"], ["POST", "call-outcomes"],
   ["POST", "settings", "test-slack"], ["POST", "settings", "purge"], ["POST", "api-keys"],
-  ["DELETE", "call-lists"], ["DELETE", "today", "views"], ["POST", "inbox", "views"], ["DELETE", "inbox", "views"], ["POST", "people", "lists"], ["DELETE", "people", "lists"], ["PUT", "people", "dialer"],
+  ["DELETE", "call-lists"], ["DELETE", "today", "views"], ["POST", "inbox", "views"], ["DELETE", "inbox", "views"], ["POST", "people", "lists"], ["DELETE", "people", "lists"], ["PUT", "people", "dialer"], ...PEOPLE_DAILY_RULES,
   ["GET", "team"], ["PUT", "team"], ["PUT", "settings"], ["PUT", "goals"], ["PUT", "appointments", "targets"], ["PUT", "speed", "target"], ["PUT", "accounts"], ["PUT", "stage-rules"],
 ];
 
