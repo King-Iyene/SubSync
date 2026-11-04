@@ -9,7 +9,7 @@ import { ChartHint } from "./showing";
 // colours as the donut, so a colour means the same kind everywhere on the page. Bars start at the same baseline, have a 4 px rounded end and 2 px between their
 // parts. The number sits at the end of the bar. Each bar is a button: it narrows Today to that account (the page shows a chip with the way back). The details
 // are written out in words in a line under the chart when a bar is hovered or focused.
-export function AccountBars({ title, bars, rows, selected, onSelect, used = false, hint = "Click a bar to show only that client account." }: {
+export function AccountBars({ title, bars, rows, selected, onSelect, used = false, hint = "Click a bar to see the things to fix in that client account." }: {
   title: string; bars: AccountBar[]; rows: QueueRow[]; selected: string | null; onSelect: (locationId: string) => void; used?: boolean; hint?: string;
 }) {
   const [hot, setHot] = useState<string | null>(null);
@@ -27,7 +27,7 @@ export function AccountBars({ title, bars, rows, selected, onSelect, used = fals
           return (
             <li key={b.locationId}>
               <button type="button" aria-pressed={on} onClick={() => onSelect(b.locationId)} onMouseEnter={() => setHot(b.locationId)} onMouseLeave={() => setHot(null)} onFocus={() => setHot(b.locationId)} onBlur={() => setHot(null)}
-                data-testid="account-bar" data-count={b.count} aria-label={`${barTooltip(b, rows)}. Show only this account.`}
+                data-testid="account-bar" data-count={b.count} aria-label={`${barTooltip(b, rows)}. Show the things to fix.`}
                 className={`ds-press group grid min-h-10 w-full grid-cols-[minmax(6rem,10rem)_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-1.5 py-1 text-left text-sm hover:bg-muted focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--ring)] ${on ? "bg-muted font-semibold" : ""}`}>
                 <span className="break-words">{b.name}</span>
                 <span className="relative block h-2.5 border-l border-foreground/30" aria-hidden>

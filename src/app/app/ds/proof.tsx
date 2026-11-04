@@ -7,15 +7,17 @@ import { ChartHint, ShowingChip } from "./showing";
 
 // What SubSync caught, for the review with a client: how many alerts it raised in the last 7 days, how many are cleared and how many are still open. The word is
 // "cleared" because SubSync can see that a problem went away from the CRM data but not whether a person fixed it, and the line under the numbers says so.
-export function ProofStrip({ proof, title = "What SubSync caught" }: { proof: Proof; title?: string }) {
+export function ProofStrip({ proof, title = "What SubSync caught", onOpen }: { proof: Proof; title?: string; /** Press a number to open the alerts it counts. */ onOpen?: (k: "raised" | "cleared" | "open") => void }) {
   return (
     <div data-testid="proof-strip">
       <h3 className="text-base font-semibold">{title}</h3>
       <dl className="mt-3 grid grid-cols-3 gap-4">
-        {([["Raised", proof.raised, "alerts in 7 days"], ["Cleared", proof.cleared, "went away"], ["Still open", proof.open, "right now"]] as const).map(([k, n, sub]) => (
+        {([["Raised", proof.raised, "alerts in 7 days", "raised"], ["Cleared", proof.cleared, "went away", "cleared"], ["Still open", proof.open, "right now", "open"]] as const).map(([k, n, sub, key]) => (
           <div key={k} className="min-w-0 border-l-2 border-border pl-3">
             <dt className="text-xs font-medium text-muted-foreground">{k}</dt>
-            <dd className="tnum mt-1 text-[1.7rem] font-semibold leading-none" data-testid={`proof-${k.toLowerCase().replace(" ", "-")}`}>{n}</dd>
+            <dd className="tnum mt-1 text-[1.7rem] font-semibold leading-none" data-testid={`proof-${k.toLowerCase().replace(" ", "-")}`}>
+              {onOpen && n > 0 ? <button type="button" onClick={() => onOpen(key)} aria-label={`${k}: ${n}. Show the alerts.`} data-testid={`proof-open-${key}`} className="ds-press -mx-1 cursor-pointer rounded-md px-1 underline decoration-primary/30 decoration-2 underline-offset-[0.18em] hover:decoration-primary focus-visible:outline-2 focus-visible:outline-[var(--ring)]">{n}</button> : n}
+            </dd>
             <dd className="mt-1 text-xs text-muted-foreground">{sub}</dd>
           </div>
         ))}
@@ -29,7 +31,7 @@ export function ProofStrip({ proof, title = "What SubSync caught" }: { proof: Pr
  * The same seven days as small bars: alerts raised go up from the line, alerts cleared go down, so a good week has a bar under the line for each bar above it.
  * Each day is a button that lists that day's alerts; the number on the day is the number of rows in its list.
  */
-export function RaisedClearedStrip({ proof, selected, onSelect }: { proof: Proof; selected: number | null; onSelect: (i: number | null) => void }) {
+export function RaisedClearedStrip({ proof, selected, onSelect, onOpenDay }: { proof: Proof; selected: number | null; onSelect: (i: number | null) => void; /** When given, a day opens the records panel instead of a list under the strip. */ onOpenDay?: (i: number) => void }) {
   const [used, setUsed] = useState(false);
   const max = Math.max(1, ...proof.days.map((d) => Math.max(d.raised.length, d.cleared.length)));
   const day = selected === null ? null : proof.days[selected];
@@ -44,7 +46,7 @@ export function RaisedClearedStrip({ proof, selected, onSelect }: { proof: Proof
           return (
             <button key={d.day} type="button" disabled={empty} aria-pressed={on} data-testid="raised-day" data-raised={r} data-cleared={c}
               aria-label={`${d.label}: ${r} raised, ${c} cleared.${empty ? "" : " Show the alerts."}`}
-              onClick={() => { setUsed(true); onSelect(on ? null : i); }}
+              onClick={() => { setUsed(true); if (onOpenDay) onOpenDay(i); else onSelect(on ? null : i); }} title={empty ? "Nothing was raised or cleared on this day." : `Show the ${r + c} alerts of ${d.label}`}
               className={`ds-press group flex min-w-0 flex-col items-stretch rounded-lg px-1 pb-1 pt-1.5 text-center hover:bg-muted focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--ring)] disabled:cursor-default disabled:hover:bg-transparent ${on ? "bg-muted outline outline-2 -outline-offset-2 outline-foreground" : ""}`}>
               <span className="tnum min-h-4 text-[11px] font-medium leading-4">{r > 0 ? r : ""}</span>
               <span className="relative mx-auto block w-4/5 max-w-7" style={{ height: H * 2 + 2 }} aria-hidden>
@@ -63,7 +65,7 @@ export function RaisedClearedStrip({ proof, selected, onSelect }: { proof: Proof
         <li className="flex items-center gap-1.5"><span aria-hidden className="h-2.5 w-3 rounded-t-[3px] bg-foreground/70" />Raised, above the line</li>
         <li className="flex items-center gap-1.5"><span aria-hidden className="h-2.5 w-3 rounded-b-[3px] bg-primary" />Cleared, below the line</li>
       </ul>
-      {day && (
+      {day && !onOpenDay && (
         <section className="mt-4" aria-label={`Alerts on ${day.label}`} data-testid="raised-list">
           <div className="mb-2 flex flex-wrap items-center gap-2"><ShowingChip label={`${day.label}, ${day.day}`} onClear={() => onSelect(null)} /></div>
           {([["Raised", day.raised], ["Cleared", day.cleared]] as const).map(([k, list]) => list.length > 0 && (
