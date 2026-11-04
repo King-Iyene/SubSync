@@ -9,6 +9,8 @@ async function noSideScroll(page: Page, where: string) {
 }
 const tab = (page: Page, name: string) => page.getByRole("tab", { name, exact: true });
 const firstName = (page: Page) => page.getByTestId("person-name").first();
+// Every call of the demo signs it in again, so a step can take many seconds on a slow machine.
+test.beforeEach(() => { test.setTimeout(240_000); });
 
 test("People has four tabs and no tab opens with a phone link on the page", async ({ page }) => {
   await page.goto("/app#people");
@@ -100,7 +102,7 @@ test("Going cold: pressing a bar shows the people behind it, and the list's own 
   await page.goto("/app#leads");
   await expect(tab(page, "Going cold")).toHaveAttribute("aria-selected", "true");
   const chart = page.getByRole("button", { name: /Nothing seen yet.*open the list/i }).first();
-  await expect(chart).toBeVisible();
+  await expect(chart).toBeVisible({ timeout: 150_000 });
   await chart.click();
   await expect(page.getByRole("heading", { level: 2 }).filter({ hasText: /^Nothing seen yet/ })).toBeVisible();
 });

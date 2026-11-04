@@ -26,7 +26,7 @@ type Cut = { rows: ListRow[]; total: number; capped: boolean; withoutContact: nu
 const CACHE_MS = 45_000;
 const cache = ttlCache<Cut>(CACHE_MS, 200);
 /** Forget an installation's lists (a call was logged, so the list that hides people called in the last hours must move at once). */
-export const forgetPeopleLists = (installationId: string) => cache.clear(installationId + "|");
+export const forgetPeopleLists = (installationId: string) => { cache.clear(installationId + "|"); waitingCache.clear(installationId + "|"); };
 
 const hash = (s: string) => { let h = 0x811c9dc5; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; } return h.toString(16); };
 const allowedKey = (allowed: string[] | null) => (allowed ? hash([...allowed].sort().join(",")) : "all");
@@ -157,11 +157,25 @@ async function cutOf(list: Exclude<ListId, "waiting">, a: Args): Promise<Cut> {
 
 // ---------------- waiting: Speed to lead's own list, paged on the server ----------------
 
+// Speed to lead's list is the heaviest read (it loads the lead ledger of every account in view), so its answer is kept for the same 45 seconds as the other lists.
+const waitingCache = ttlCache<Awaited<ReturnType<typeof speedList>>>(CACHE_MS, 200);
+
 async function waiting(a: Args, o: { mine: boolean; q: string; page: number; size: number }) {
-  const r = await speedList({
+  const key = `${a.installationId}|${allowedKey(a.allowed)}|${a.meId ?? ""}|${o.mine ? 1 : 0}|${o.q}|${o.page}|${o.size}`;
+  let r = waitingCache.get(key);
+  if (!r) { r = await waitingRead(a, o); waitingCache.set(key, r); }
+  return await shape(a, r, o);
+}
+
+async function waitingRead(a: Args, o: { mine: boolean; q: string; page: number; size: number }) {
+  return speedList({
     installationId: a.installationId, allowed: a.allowed, targetMinutes: a.targetMinutes, now: a.now, meId: a.meId, status: "waiting", win: null, person: null, account: null,
     owner: o.mine ? "me" : null, noSource: false, week: null, q: o.q, sort: "wait", page: Math.max(0, o.page - 1), size: o.size,
   });
+}
+
+async function shape(a: Args, r: Awaited<ReturnType<typeof speedList>>, o: { size: number }) {
+  void o;
   const cands: Cand[] = r.rows.map((x) => ({
     locationId: x.locationId, contactId: x.contactId, at: new Date(a.now - x.minutes * 60_000).toISOString(), value: null,
     why: `${x.neverAnswered ? "Never answered, waiting" : "Waiting"} ${ageWords(x.minutes)}${x.source && x.source !== "No source recorded" ? ` · ${x.source}` : ""}`,
@@ -195,7 +209,9 @@ export async function peopleCounts(a: Args): Promise<{ counts: ListCount[]; capp
   const caps: Partial<Record<ListId, boolean>> = {};
   const counts = await Promise.all(LIST_IDS.map(async (id): Promise<ListCount> => {
     if (id === "waiting") {
-      const all = await speedList({ installationId: a.installationId, allowed: a.allowed, targetMinutes: a.targetMinutes, now: a.now, meId: a.meId, status: "waiting", win: null, person: null, account: null, owner: null, noSource: false, week: null, q: "", sort: "wait", page: 0, size: 1 });
+      const key = `${a.installationId}|${allowedKey(a.allowed)}|${a.meId ?? ""}|count`;
+      let all = waitingCache.get(key);
+      if (!all) { all = await speedList({ installationId: a.installationId, allowed: a.allowed, targetMinutes: a.targetMinutes, now: a.now, meId: a.meId, status: "waiting", win: null, person: null, account: null, owner: null, noSource: false, week: null, q: "", sort: "wait", page: 0, size: 1 }); waitingCache.set(key, all); }
       return { id, total: all.total, mine: a.meId ? all.facets.mine : null };
     }
     const cut = await cutOf(id, a);

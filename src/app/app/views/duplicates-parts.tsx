@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { crmSteps, diffFields, emailPlan, mergePlan, summaryText, type DiffRow, type Guardrail } from "@/lib/analytics/dedupe-review";
 import type { Person } from "@/lib/analytics/dedupe";
-import { DialButton, InlineAlert, RowButton } from "../ds";
+import { DialButton, InlineAlert, LeadDrawer, RowButton } from "../ds";
 import { ExtLink, timeAgo } from "../ui";
 
 // The parts of the duplicate review (stage DUP). One group at a time: the records side by side, only what differs, a pre-picked record to keep with the
@@ -23,8 +23,9 @@ const shortDay = (iso: string) => new Date(iso).toLocaleDateString("en-US", { da
 
 // ---------- the records ----------
 
-export function RecordCard({ p, i, keep, best, onKeep, locked }: { p: WithUrl; i: number; keep: boolean; best: boolean; onKeep: () => void; locked: boolean }) {
+export function RecordCard({ p, i, keep, best, onKeep, locked, locationId }: { p: WithUrl; i: number; keep: boolean; best: boolean; onKeep: () => void; locked: boolean; /** The client account of the group: lets the record open in the shared lead panel. */ locationId?: string }) {
   const email = emailPlan({ email: p.email, contactUrl: p.url });
+  const [panel, setPanel] = useState(false);
   return (
     <li className={`min-w-0 border-t-2 pt-3 ${keep ? "border-primary" : "border-border"}`} data-testid="dup-record" data-keep={keep ? "true" : "false"}>
       <label className={`flex min-h-11 items-start gap-3 ${locked ? "" : "cursor-pointer"}`}>
@@ -42,8 +43,10 @@ export function RecordCard({ p, i, keep, best, onKeep, locked }: { p: WithUrl; i
       <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-0.5 text-sm">
         <DialButton compact phone={p.phone} contactUrl={p.url} dnd={p.dnd === true} />
         {email.href ? <a href={email.href} target="_blank" rel="noopener noreferrer" title={email.note} className="inline-flex min-h-9 items-center font-medium text-primary underline underline-offset-2" data-testid="dup-email">{email.label}</a> : <span className="text-xs text-muted-foreground">{email.note}</span>}
+        {locationId && <button type="button" onClick={() => setPanel(true)} className="inline-flex min-h-9 items-center font-medium text-primary underline underline-offset-2" data-testid="dup-show">Show</button>}
         <ExtLink href={p.url}>Open contact</ExtLink>
       </div>
+      {locationId && panel && <LeadDrawer leads={[{ contactId: p.contactId, locationId, name: p.name, phone: p.phone, email: p.email, url: p.url, dnd: p.dnd === true }]} index={0} onIndex={() => undefined} onClose={() => setPanel(false)} showAccount={false} />}
     </li>
   );
 }

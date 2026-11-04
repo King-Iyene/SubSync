@@ -71,6 +71,10 @@ for (const role of ROLES) {
     if (process.env.SHOTS) {
       mkdirSync("docs/review", { recursive: true });
       await page.screenshot({ path: `docs/review/people-${role.slug}-${testInfo.project.name.replace(/\D+/g, "")}.png` });
+      await page.getByTestId("person-name").first().click();
+      await expect(page.getByTestId("drawer-timeline")).toBeVisible({ timeout: 90_000 });
+      await page.waitForTimeout(1500);
+      await page.screenshot({ path: `docs/review/people-panel-${role.slug}-${testInfo.project.name.replace(/\D+/g, "")}.png` });
     }
   });
 }
@@ -239,8 +243,10 @@ test("recent searches and recently opened people are remembered for the person, 
     await page.getByTestId("people-search-input").fill(word);
     await expect(page.getByTestId("people-results")).toBeVisible({ timeout: 90_000 });
     await page.getByTestId("people-search-input").press("Enter");
+    const marked = page.waitForResponse((r) => r.url().includes("people/seen") && r.request().method() === "PUT", { timeout: 120_000 });
     await page.getByTestId("people-list").getByTestId("person-name").first().click();
     await expect(page.getByTestId("drawer-headline")).toBeVisible({ timeout: 90_000 });
+    expect((await marked).status()).toBe(200);
     await page.keyboard.press("Escape");
     // A fresh visit: the search words and the person are offered again.
     await page.reload();
@@ -287,11 +293,11 @@ test("a note to self is only copied: nothing is saved, nothing is sent", async (
 test("a client's staff only ever read their own account, whatever the address says", async ({ request }) => {
   test.setTimeout(300_000);
   const agency = await api(request);
-  const other = ((await agency.get("health")).accounts as Json[]).map((x) => x.locationId as string);
+  const other = ((await agency.get("people/options")).accounts as Json[]).map((x) => x.id as string);
   const a = await api(request, "client");
   const mine = await a.get("people/home");
   expect(mine.multi).toBe(false);
-  const own = ((await a.get("health")).accounts as Json[])[0].locationId as string;
+  const own = ((await a.get("people/options")).accounts as Json[])[0].id as string;
   expect(((mine.page?.rows ?? []) as Json[]).every((r) => r.locationId === own)).toBe(true);
   const foreign = other.find((x) => x !== own) ?? "someOtherAccount1";
   for (const forged of [`location=${foreign}`, `account=${foreign}`, `accounts=${foreign}`]) {
@@ -330,6 +336,7 @@ test("the phone: nothing scrolls sideways on any tab or in the panel, and every 
 test("the header search: arrows move down the results, Enter opens one, each result has a Call button, and an empty box offers what was opened lately", async ({ page }) => {
   test.setTimeout(300_000);
   await page.goto("/app#today");
+  await expect(page.getByTestId("global-search-open")).toBeVisible({ timeout: 90_000 });
   await page.keyboard.press("Control+k");
   const input = page.getByTestId("global-search-input");
   await expect(input).toBeFocused();
@@ -344,4 +351,17 @@ test("the header search: arrows move down the results, Enter opens one, each res
   await input.press("Enter");
   await expect(page.getByTestId("lead-drawer")).toBeVisible();
   await expect(page.getByTestId("drawer-name")).toHaveText(second.split("\n")[0].replace(/Do not disturb$/, "").trim());
+});
+
+test("the duplicate review opens the same lead panel from each record (Today, Speed, Appointments and the audit already do, see their own specs)", async ({ page }) => {
+  test.setTimeout(300_000);
+  await page.goto("/app#duplicates");
+  await page.reload();
+  await expect(page.getByTestId("dup-step")).toBeVisible({ timeout: 120_000 });
+  await page.getByTestId("dup-show").first().click();
+  const drawer = page.getByTestId("lead-drawer");
+  await expect(drawer).toBeVisible();
+  await expect(drawer.getByTestId("drawer-call")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(drawer).toHaveCount(0);
 });

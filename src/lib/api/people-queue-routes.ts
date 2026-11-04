@@ -49,11 +49,12 @@ export async function handlePeopleQueue(ctx: Ctx, h: QueueHelpers): Promise<Resp
     const now = Date.now();
     const [allowed, st, names, links] = await Promise.all([h.allowed(), h.settings(), teamNames(ctx.installationId), h.links()]);
     const args = { installationId: ctx.installationId, allowed, meId: me, staleDays: st.staleDays, targetMinutes: st.speedTargetMinutes, now };
-    const { counts, capped } = await peopleCounts(args);
-    const start = startHere(counts);
     const staff = ctx.kind === "client";
+    // The first page of the most common starting list is read at the same time as the counts (it is the heaviest read), unless the person may start on "Mine", which the counts decide.
+    const [{ counts, capped }, guess] = await Promise.all([peopleCounts(args), staff ? Promise.resolve(null) : peopleQueue(args, { list: "waiting", mine: false, q: "", page: 1 })]);
+    const start = startHere(counts);
     const mine = start ? startOnMine({ staff, mine: counts.find((x) => x.id === start)?.mine ?? null }) : false;
-    const first = start ? await peopleQueue(args, { list: start, mine, q: "", page: 1 }) : null;
+    const first = start ? (start === "waiting" && guess && !mine ? guess : await peopleQueue(args, { list: start, mine, q: "", page: 1 })) : null;
     return json({
       counts, capped, start, mine, staff, canMine: me !== null, staleDays: st.staleDays, say: queueSay(counts, st.staleDays), multi: allowed === null || allowed.length > 1,
       lists: LIST_IDS.map((id) => listInfo(id, st.staleDays)),
