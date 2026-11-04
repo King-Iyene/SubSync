@@ -58,6 +58,7 @@ export const SCOPE_GROUPS: readonly ScopeGroup[] = [
     { scope: "workflows.delete", kind: "change", required: false, why: "Only to delete a workflow, after a preview, a typed confirmation and a saved copy. Optional." },
     { scope: "campaigns.readonly", kind: "read", required: false, why: "The list of campaigns in each client account (name, state, last change), to find stuck or failed ones. Read only: SubSync never starts or sends a campaign." },
     { scope: "emails/campaigns.readonly", kind: "read", required: false, why: "The email, bulk and workflow campaigns of each client account, read only, for the same list." },
+    { scope: "emails/stats.readonly", kind: "read", required: false, why: "How many messages of each campaign were sent, delivered, opened, clicked, bounced or are still waiting, to find campaigns that looked sent but did not arrive. Totals only: SubSync never sees who received what." },
   ] },
 ];
 
@@ -102,6 +103,7 @@ export const FEATURE_NEEDS: readonly FeatureNeed[] = [
   { id: "team_names", feature: "Team member names", scope: "users.readonly" },
   { id: "tags", feature: "Hot-lead and cold-list rules that use tags", scope: "locations/tags.readonly" },
   { id: "workflow_history", feature: "Failing and idle workflow checks", scope: "workflows.logs" },
+  { id: "campaign_stats", feature: "Campaign delivery figures", scope: "emails/stats.readonly" },
   { id: "campaigns", feature: "The campaign list and its health", scope: "campaigns.readonly" },
   { id: "meeting_notes", feature: "Adding a meeting summary to a contact's notes", scope: "contacts.write" },
 ];

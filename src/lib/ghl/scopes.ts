@@ -32,6 +32,7 @@ export const GHL_SCOPES = [
   "workflows.delete",
   "campaigns.readonly",
   "emails/campaigns.readonly",
+  "emails/stats.readonly",
 ] as const;
 
 // The platform's own help article (OAuth consent for marketplace apps) says branded installs use the leadconnectorhq host, which

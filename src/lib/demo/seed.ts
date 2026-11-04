@@ -1,4 +1,5 @@
 import { refreshInsights } from "../analytics/service";
+import { ensureWorkflowsDemo } from "../workflows/demo";
 import { currentVersion } from "../analytics/definitions";
 import { sql } from "../db";
 import { applyLeadRules } from "../sync/lead-rules-apply";
@@ -584,5 +585,6 @@ export async function ensureDemo(): Promise<string> {
   await ensureStageDemo(id).catch(() => undefined);
   await ensureColdDemo(id).catch(() => undefined);
   await ensureClientsDemo(id).catch(() => undefined);
+  await ensureWorkflowsDemo(id).catch(() => undefined);
   return id;
 }

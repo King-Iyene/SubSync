@@ -87,7 +87,7 @@ export async function runOne(kind: WriteKind, w: Pick<WfItem, "workflowId" | "lo
   if (!def.ok) return { ...base, outcome: "failed", message: "SubSync could not read the workflow, so nothing was copied." };
   const src = (def.value && typeof def.value === "object" ? (def.value as Record<string, unknown>) : {}) as Record<string, unknown>;
   const inner = (typeof src.definition === "object" && src.definition ? src.definition : src) as Record<string, unknown>;
-  const { version: _v, ...rest } = inner;
+  const rest = Object.fromEntries(Object.entries(inner).filter(([k]) => k !== "version"));
   const copy = { ...rest, name: arg.newName ?? `${w.name} (copy)`, source: { system: "api" } };
   let tt: string;
   try { tt = await d.token(arg.targetLocationId); } catch { return { ...base, outcome: "failed", message: "SubSync could not open the other client account." }; }
@@ -112,7 +112,7 @@ export async function recreate(w: { workflowId: string; locationId: string; name
   let token: string;
   try { token = await d.token(w.locationId); } catch { return { ...base, outcome: "failed", message: "SubSync could not open this client account." }; }
   const inner = (typeof snapshot.definition === "object" && snapshot.definition ? snapshot.definition : snapshot) as Record<string, unknown>;
-  const { version: _v, ...rest } = inner;
+  const rest = Object.fromEntries(Object.entries(inner).filter(([k]) => k !== "version"));
   const made = await createWorkflow({ token, fetchImpl: d.fetchImpl, installationId: d.installationId, locationId: w.locationId, workflowId: w.workflowId, idem: d.idem }, { ...rest, name: w.name, source: { system: "api" } }, d.outward ?? {});
   const r = fromWrite(made);
   const id = made.outcome === "done" && made.body && typeof made.body === "object" ? String((made.body as Record<string, unknown>).workflowId ?? (made.body as Record<string, unknown>).id ?? "") : "";

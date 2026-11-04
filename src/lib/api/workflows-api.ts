@@ -1,4 +1,5 @@
 import { sql } from "../db";
+import { dispatchAlerts } from "../notifications/service";
 import { parseGranted } from "../scope-groups";
 import { capProblem, checkToken, makeToken, mayHaveActive, mayWrite, opKey, phraseMatches, deletePhrase, type WriteKind } from "../workflows/guards";
 import { alertDrafts, coverageFor, nextSteps, rankFindings, standardLabel, STANDARD } from "../workflows/health";
@@ -129,7 +130,11 @@ async function sync(ctx: Ctx, deps: Deps) {
   }
   const { findings } = await currentFindings(ctx.installationId, allowed, now);
   const { items } = await loadItems(ctx.installationId, allowed);
-  if (!ctx.demo && allowed === null) await raiseAlerts(ctx.installationId, findings);
+  if (!ctx.demo && allowed === null) {
+    // New alerts go through the same dispatcher as every other alert (in-app inbox, email, Slack when set up, quiet hours, one message per alert).
+    const created = await raiseAlerts(ctx.installationId, findings);
+    if (created.length) await dispatchAlerts(ctx.installationId, created).catch(() => null);
+  }
   await recordDaily(ctx.installationId, items, failingIds(findings), new Date(now).toISOString().slice(0, 10));
   return json({ ok: true, accounts: results.map((r) => ({ ...r, name: list.find((a) => a.locationId === r.locationId)?.name ?? "Client account" })), alerts: alertDrafts(findings).length });
 }
@@ -298,7 +303,7 @@ async function confirm(ctx: Ctx, deps: Deps) {
     if (claim === null) { results.push({ workflowId: w.workflowId, locationId: w.locationId, name: w.name, outcome: "skipped", message: "Already done by this confirmation.", already: true }); continue; }
     const rd: RunDeps = { installationId: ctx.installationId, granted, token: (loc) => deps.token(ctx, loc), demo: ctx.demo, idem: key, saveCopy: (def) => saveSnapshot(ctx.installationId, w.locationId, w.workflowId, w.name, kind, def) };
     const res = await runOne(kind, w, { newName: row.to ?? undefined, targetLocationId: typeof b.targetLocationId === "string" ? b.targetLocationId : undefined }, rd);
-    const applied = res.outcome === "done" || (ctx.demo && res.outcome === "done");
+    const applied = res.outcome === "done";
     await finishChange(claim, res.outcome, { name: res.newName ?? w.name, status: kind === "publish" ? "published" : kind === "unpublish" ? "draft" : w.status, newWorkflowId: res.newWorkflowId ?? null });
     if (applied) {
       if (kind === "rename") await applyLocal(ctx.installationId, w.locationId, w.workflowId, { name: row.to ?? w.name });

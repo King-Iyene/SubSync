@@ -1,8 +1,9 @@
 import { sql } from "../db";
+import type { AlertRow } from "../analytics/queries";
 import { alertDrafts, coverageFindings, findingsFor, type Finding } from "./health";
-import { listCampaigns, listWorkflows, workflowLastRun, workflowStats, type Call } from "./ghl";
+import { campaignStats, listCampaigns, listWorkflows, workflowLastRun, workflowStats, type Call } from "./ghl";
 import { mergeStats, type WfItem } from "./model";
-import { accountNames, isMissing, loadItems, saveSync } from "./store";
+import { accountNames, isMissing, loadItems, saveCampaignStats, saveSync } from "./store";
 
 // Reads each client account's workflows and campaigns, keeps SubSync's copy up to date, notices changes made in the CRM, and keeps the alerts for this
 // module in step. Read only. A permission that was not granted is reported per account, never guessed around.
@@ -45,6 +46,13 @@ export async function syncAccount(a: { installationId: string; locationId: strin
     if (c.items.length === 0 && (c.refused || c.failed)) out.campaigns = c.refused ? "needs_permission" : "failed";
     else {
       out.changes += await saveSync(a.installationId, a.locationId, c.items.map((w) => mergeStats(w, null, null)), { complete: !c.failed && !c.refused, prefix: "campaign" });
+      if (has(a.granted, "emails/stats.readonly")) {
+        const day = new Date(a.now).toISOString().slice(0, 10);
+        for (const w of c.items.filter((x) => x.status !== "draft").slice(0, STATS_CAP)) {
+          const r = await campaignStats({ ...call, locationId: a.locationId }, w.kind, w.workflowId.replace(/^campaign:/, ""));
+          if (r && r.ok && r.value) await saveCampaignStats(a.installationId, a.locationId, w.workflowId, r.value, day);
+        }
+      }
       out.campaigns = "ok";
       out.count += c.items.length;
     }
@@ -62,24 +70,24 @@ export async function currentFindings(installationId: string, allowed: string[] 
 }
 
 /** Raises this module's alerts and clears the ones whose condition went away. Only keys that start with wf: are touched, so no other alert is ever resolved. */
-export async function raiseAlerts(installationId: string, findings: Finding[]): Promise<number> {
+export async function raiseAlerts(installationId: string, findings: Finding[]): Promise<AlertRow[]> {
   const drafts = alertDrafts(findings);
   try {
     return await sql().begin(async (tx) => {
-      let created = 0;
+      const created: AlertRow[] = [];
       for (const d of drafts) {
         const [r] = await tx`
           insert into alerts (installation_id, location_id, kind, severity, title, detail, dedupe_key) values (${installationId}, ${d.locationId}, ${d.kind}, ${d.severity}, ${d.title}, ${tx.json(d.detail as never)}, ${d.dedupeKey})
           on conflict (installation_id, dedupe_key) where resolved_at is null do update set severity = excluded.severity, title = excluded.title, detail = excluded.detail
-          returning (xmax = 0) as inserted`;
-        if (r?.inserted) created++;
+          returning id, (xmax = 0) as inserted`;
+        if (r?.inserted) created.push({ id: r.id as string, locationId: d.locationId, kind: d.kind, severity: d.severity, title: d.title, detail: d.detail, createdAt: new Date().toISOString(), resolvedAt: null });
       }
       const keys = drafts.map((d) => d.dedupeKey);
       await tx`update alerts set resolved_at = now() where installation_id = ${installationId} and resolved_at is null and dedupe_key like 'wf:%' and not (dedupe_key = any(${keys}::text[]))`;
       return created;
     });
   } catch (e) {
-    if (isMissing(e)) return 0;
+    if (isMissing(e)) return [];
     throw e;
   }
 }

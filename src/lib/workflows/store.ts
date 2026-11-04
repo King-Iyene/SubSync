@@ -1,4 +1,5 @@
 import { sql } from "../db";
+import { statsFromRow, type Camp, type Stats } from "./delivery";
 import { diffObserved, type WfItem, type WfStatus } from "./model";
 
 // The only place the Workflows module touches its tables (migration 20261104120000_workflows.sql). If the migration has not been applied (Postgres 42P01, a
@@ -10,8 +11,8 @@ export function isMissing(error: unknown): boolean {
   const c = e?.code ?? e?.cause?.code;
   return c === "42P01" || c === "42703";
 }
-async function safe<T>(run: () => Promise<T>, fallback: T): Promise<T> {
-  try { return await run(); } catch (e) { if (isMissing(e)) return fallback; throw e; }
+async function safe<T>(run: () => PromiseLike<T>, fallback: unknown): Promise<T> {
+  try { return await run(); } catch (e) { if (isMissing(e)) return fallback as T; throw e; }
 }
 
 const ms = (v: unknown) => (v instanceof Date ? v.getTime() : null);
@@ -26,7 +27,7 @@ export async function loadItems(installationId: string, allowed: string[] | null
   try {
     const rows = await sql()`
       select location_id, workflow_id, name, status, kind, folder_id, version, ui_url, remote_created_at, remote_updated_at, updated_by, runs_30d, enrolled_30d, failed_30d, last_run_at, removed_seen_at
-      from workflow_items where installation_id = ${installationId} ${allowed === null ? sql`` : sql`and location_id = any(${idList(allowed)}::text[])`}
+      from workflow_items where installation_id = ${installationId} ${allowed === null ? sql()`` : sql()`and location_id = any(${idList(allowed)}::text[])`}
       order by remote_updated_at desc nulls last limit 5000`;
     return {
       available: true,
@@ -83,7 +84,7 @@ export async function saveSync(installationId: string, locationId: string, fresh
 }
 
 export async function loadLabels(installationId: string, allowed: string[] | null): Promise<Map<string, LabelRow>> {
-  const rows = await safe(() => sql()`select location_id, workflow_id, labels, group_name, rating, decision, note, owner, updated_by, updated_at from workflow_labels where installation_id = ${installationId} ${allowed === null ? sql`` : sql`and location_id = any(${idList(allowed)}::text[])`}`, []);
+  const rows = await safe(() => sql()`select location_id, workflow_id, labels, group_name, rating, decision, note, owner, updated_by, updated_at from workflow_labels where installation_id = ${installationId} ${allowed === null ? sql()`` : sql()`and location_id = any(${idList(allowed)}::text[])`}`, []);
   return new Map(rows.map((r) => [keyOf(r.location_id as string, r.workflow_id as string), {
     labels: (r.labels as string[]) ?? [], group: (r.group_name as string | null) ?? null, rating: num(r.rating), decision: (r.decision as LabelRow["decision"]) ?? null,
     note: (r.note as string | null) ?? null, owner: (r.owner as string | null) ?? null, updatedBy: (r.updated_by as string | null) ?? null, updatedAt: ms(r.updated_at),
@@ -112,7 +113,7 @@ export async function saveLabel(installationId: string, locationId: string, work
 
 export type ChangeRow = { id: number; locationId: string; workflowId: string; kind: string; source: string; actorName: string | null; before: Record<string, unknown> | null; after: Record<string, unknown> | null; outcome: string; undoes: number | null; at: number };
 export async function loadChanges(installationId: string, allowed: string[] | null, limit = 300): Promise<ChangeRow[]> {
-  const rows = await safe(() => sql()`select id::int, location_id, workflow_id, kind, source, actor_name, before, after, outcome, undoes::int, created_at from workflow_changes where installation_id = ${installationId} ${allowed === null ? sql`` : sql`and location_id = any(${idList(allowed)}::text[])`} order by created_at desc, id desc limit ${limit}`, []);
+  const rows = await safe(() => sql()`select id::int, location_id, workflow_id, kind, source, actor_name, before, after, outcome, undoes::int, created_at from workflow_changes where installation_id = ${installationId} ${allowed === null ? sql()`` : sql()`and location_id = any(${idList(allowed)}::text[])`} order by created_at desc, id desc limit ${limit}`, []);
   return rows.map((r) => ({ id: r.id as number, locationId: r.location_id as string, workflowId: r.workflow_id as string, kind: r.kind as string, source: r.source as string, actorName: (r.actor_name as string | null) ?? null, before: (r.before as Record<string, unknown> | null) ?? null, after: (r.after as Record<string, unknown> | null) ?? null, outcome: r.outcome as string, undoes: (r.undoes as number | null) ?? null, at: ms(r.created_at) ?? 0 }));
 }
 
@@ -158,7 +159,7 @@ export async function applyLocal(installationId: string, locationId: string, wor
 }
 
 export async function accountNames(installationId: string, allowed: string[] | null): Promise<Array<{ locationId: string; name: string; ignored: boolean }>> {
-  const rows = await sql()`select location_id, coalesce(name, location_id) as name, ignored from locations where installation_id = ${installationId} ${allowed === null ? sql`` : sql`and location_id = any(${idList(allowed)}::text[])`} order by lower(coalesce(name, ''))`;
+  const rows = await sql()`select location_id, coalesce(name, location_id) as name, ignored from locations where installation_id = ${installationId} ${allowed === null ? sql()`` : sql()`and location_id = any(${idList(allowed)}::text[])`} order by lower(coalesce(name, ''))`;
   return rows.map((r) => ({ locationId: r.location_id as string, name: r.name as string, ignored: Boolean(r.ignored) }));
 }
 
@@ -181,7 +182,7 @@ export async function recordDaily(installationId: string, items: WfItem[], faili
   }, undefined);
 }
 export async function loadDaily(installationId: string, allowed: string[] | null, days = 90): Promise<Array<{ day: string; total: number; failing: number; runs: number | null; errors: number | null }>> {
-  const rows = await safe(() => sql()`select day::text as day, sum(total)::int total, sum(failing)::int failing, sum(runs_30d)::int runs, sum(errors_30d)::int errors from workflow_daily where installation_id = ${installationId} ${allowed === null ? sql`` : sql`and location_id = any(${idList(allowed)}::text[])`} and day > current_date - ${days}::int group by day order by day`, []);
+  const rows = await safe(() => sql()`select day::text as day, sum(total)::int total, sum(failing)::int failing, sum(runs_30d)::int runs, sum(errors_30d)::int errors from workflow_daily where installation_id = ${installationId} ${allowed === null ? sql()`` : sql()`and location_id = any(${idList(allowed)}::text[])`} and day > current_date - ${days}::int group by day order by day`, []);
   return rows.map((r) => ({ day: r.day as string, total: r.total as number, failing: r.failing as number, runs: num(r.runs), errors: num(r.errors) }));
 }
 
@@ -192,4 +193,30 @@ export async function findChange(installationId: string, allowed: string[] | nul
   const rows = await loadChanges(installationId, allowed, 1000);
   const c = rows.find((r) => r.id === id);
   return c ? { change: c, undone: rows.some((r) => r.undoes === id && r.outcome !== "failed") } : null;
+}
+
+// ---------------------------------------------------------------- campaign delivery
+export async function saveCampaignStats(installationId: string, locationId: string, campaignId: string, s: Stats, day: string): Promise<void> {
+  await safe(() => sql()`insert into campaign_stats (installation_id, location_id, campaign_id, day, sent, delivered, opened, clicked, bounced, failed, unsubscribed, queued)
+    values (${installationId}, ${locationId}, ${campaignId}, ${day}, ${s.sent}, ${s.delivered}, ${s.opened}, ${s.clicked}, ${s.bounced}, ${s.failed}, ${s.unsubscribed}, ${s.queued})
+    on conflict (installation_id, location_id, campaign_id, day) do update set sent = excluded.sent, delivered = excluded.delivered, opened = excluded.opened, clicked = excluded.clicked, bounced = excluded.bounced, failed = excluded.failed, unsubscribed = excluded.unsubscribed, queued = excluded.queued`, undefined);
+}
+/** Every campaign SubSync knows, with its newest delivery totals (null when none were read). */
+export async function loadCampaigns(installationId: string, allowed: string[] | null): Promise<{ camps: Camp[]; available: boolean }> {
+  try {
+    const rows = await sql()`
+      select i.location_id, i.workflow_id, i.name, i.status, i.kind, i.remote_updated_at, i.remote_created_at, s.sent, s.delivered, s.opened, s.clicked, s.bounced, s.failed, s.unsubscribed, s.queued, s.day
+      from workflow_items i
+      left join lateral (select * from campaign_stats c where c.installation_id = i.installation_id and c.location_id = i.location_id and c.campaign_id = i.workflow_id order by day desc limit 1) s on true
+      where i.installation_id = ${installationId} and i.workflow_id like 'campaign:%' and i.removed_seen_at is null ${allowed === null ? sql()`` : sql()`and i.location_id = any(${idList(allowed)}::text[])`}
+      order by i.remote_created_at desc nulls last limit 2000`;
+    return { available: true, camps: rows.map((r) => ({
+      campaignId: r.workflow_id as string, locationId: r.location_id as string, name: r.name as string, status: r.status as string, kind: (r.kind as string | null) ?? null,
+      updatedAt: ms(r.remote_updated_at), createdAt: ms(r.remote_created_at), takenAt: r.day ? Date.parse(String(r.day)) : null,
+      stats: r.day ? statsFromRow(r) : null,
+    })) };
+  } catch (e) {
+    if (isMissing(e)) return { camps: [], available: false };
+    throw e;
+  }
 }

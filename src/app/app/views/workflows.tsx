@@ -9,10 +9,10 @@ import {
   BUCKET_LABEL, bucketOf, decisionOf, failingIds, inAccount, inBucket, inDecision, inRating, itemsSpec, reportLines, type Bucket, type Decision, type Slice,
 } from "@/lib/workflows/reports";
 import type { RecordsSpec } from "@/lib/analytics/today-records";
-import { EmptyState, ErrorBox, InlineAlert, LocalAccountPicker, Page, RecordsPanel, Section, SkeletonCards } from "../ds";
+import { EmptyState, InlineAlert, LocalAccountPicker, Page, RecordsPanel, Section, SkeletonCards } from "../ds";
 import { WfBars, WfDonut, WfNumber, WfTrend, type Mark } from "../ds/workflow-charts";
 import { useApiClient, useData } from "../session";
-import { Btn } from "../ui";
+import { Btn, ErrorBox } from "../ui";
 import { ChangeDialog, ItemPanel, keyOf, StateBadge, Tabs, WfTable, when, type Acc, type ChangeKind } from "./workflows-parts";
 import type { GoFn } from "../nav";
 import type { AccessKind } from "@/lib/access";
@@ -60,7 +60,7 @@ export function WorkflowsView({ go, kind }: { go: GoFn; kind: AccessKind }) {
   const items = useMemo(() => (data?.items ?? []).filter((w) => show === "both" || entityOf(w.workflowId) === show), [data, show]);
   const failing = useMemo(() => failingIds(data?.findings ?? []), [data]);
   const labels = useMemo(() => new Map(Object.entries(data?.labels ?? {})), [data]);
-  const accounts = data?.accounts ?? [];
+  const accounts = useMemo(() => data?.accounts ?? [], [data]);
   const slices: Slice[] = useMemo(() => {
     const n = new Map<Bucket, number>();
     for (const w of items) n.set(bucketOf(w, failing), (n.get(bucketOf(w, failing)) ?? 0) + 1);
@@ -113,7 +113,7 @@ export function WorkflowsView({ go, kind }: { go: GoFn; kind: AccessKind }) {
         <span className="text-sm text-muted-foreground" data-testid="wf-updated">{data.syncedAt ? `Updated ${when(data.syncedAt, data.now).toLowerCase()}` : "Not updated yet"}</span>
       </div>
       {note ? <InlineAlert tone={note.ok ? "success" : "warning"} onDismiss={() => setNote(null)} className="mb-4">{note.text}</InlineAlert> : null}
-      {noList ? <InlineAlert tone="warning" title="Needs permission: reconnect" className="mb-4">SubSync needs <code>workflows.readonly</code> to list workflows, and <code>workflows.logs</code> to see which ones fail or never run. Open SubSync again from your CRM's app list and accept it. Campaigns need <code>campaigns.readonly</code>.</InlineAlert> : null}
+      {noList ? <InlineAlert tone="warning" title="Needs permission: reconnect" className="mb-4">SubSync needs <code>workflows.readonly</code> to list workflows, and <code>workflows.logs</code> to see which ones fail or never run. Open SubSync again from your CRM&apos;s app list and accept it. Campaigns need <code>campaigns.readonly</code>.</InlineAlert> : null}
       {!data.available ? <InlineAlert tone="info" title="Needs the latest database update" className="mb-4">Ask the person who manages SubSync to apply the newest update. Until then this page stays empty.</InlineAlert> : null}
       {!data.permissions.history && !noList ? <InlineAlert tone="info" title="Needs permission: reconnect" className="mb-4">Allow <code>workflows.logs</code> to see failing and idle workflows. Until then those checks are not shown, and nothing is guessed.</InlineAlert> : null}
       <Tabs tabs={[{ id: "overview", label: "Overview" }, { id: "list", label: `List (${total})` }, { id: "health", label: `Health${data.findings.length ? ` (${data.findings.length})` : ""}` }, { id: "history", label: "History" }]} value={tab} onChange={(t) => { setTab(t); setSel(new Set()); }} />

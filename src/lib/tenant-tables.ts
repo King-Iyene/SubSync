@@ -10,7 +10,7 @@ export const SYNCED_DELETE = [
   "account_metrics_daily", "alerts", "domain_checks", "onboarding_tasks",
   "deal_events", "appointment_events", "lead_touches", "call_outcomes", "contact_tag_events",
   "notification_states", "notifications", "notification_deliveries",
-  "workflow_snapshots", "workflow_changes", "workflow_daily", "workflow_items",
+  "campaign_stats", "workflow_snapshots", "workflow_changes", "workflow_daily", "workflow_items",
   "meeting_deliveries", "crm_writes", "field_write_state", "meetings", "meeting_notes", "shared_audits", "sync_jobs", "locations",
 ] as const;
 
@@ -37,7 +37,7 @@ export const LOCATION_DELETE = [
   "account_metrics_daily", "alerts", "domain_checks", "onboarding_tasks",
   "deal_events", "appointment_events", "lead_touches", "call_outcomes", "contact_tag_events",
   "notification_states", "notifications", "notification_deliveries", "notification_destinations",
-  "crm_writes", "field_write_state", "field_mappings", "meeting_policies", "meeting_notes", "meeting_hooks", "account_profiles", "client_notes", "today_actions", "workflow_labels", "workflow_snapshots", "workflow_changes", "workflow_daily", "workflow_items", "feedback_items", "client_steps", "client_step_history", "sync_jobs", "locations",
+  "crm_writes", "field_write_state", "field_mappings", "meeting_policies", "meeting_notes", "meeting_hooks", "account_profiles", "client_notes", "today_actions", "workflow_labels", "campaign_stats", "workflow_snapshots", "workflow_changes", "workflow_daily", "workflow_items", "feedback_items", "client_steps", "client_step_history", "sync_jobs", "locations",
 ] as const;
 
 /** Tables with a location column that the per-account purge leaves alone, with the reason. */

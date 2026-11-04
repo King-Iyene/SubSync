@@ -89,6 +89,17 @@ create table if not exists public.workflow_daily (
   primary key (installation_id, location_id, day)
 );
 
+-- Delivery totals of each campaign, one row per day it was read, so a campaign can be compared with the same account's own earlier ones. Totals only: the platform
+-- gives no list of the people behind each number, so none is stored. A figure the platform did not send stays null.
+create table if not exists public.campaign_stats (
+  installation_id uuid not null references public.installations (id) on delete cascade,
+  location_id text not null,
+  campaign_id text not null,
+  day date not null,
+  sent integer, delivered integer, opened integer, clicked integer, bounced integer, failed integer, unsubscribed integer, queued integer,
+  primary key (installation_id, location_id, campaign_id, day)
+);
+alter table public.campaign_stats enable row level security;
 alter table public.workflow_daily enable row level security;
 alter table public.workflow_items enable row level security;
 alter table public.workflow_changes enable row level security;

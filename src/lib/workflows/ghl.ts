@@ -1,6 +1,7 @@
 import { outward, type Deps } from "../live-flags.ts";
 import { GHL_API } from "../ghl/client.ts";
 import { ghlFetch } from "../ghl/http.ts";
+import { parseStats as parseDeliveryStats } from "./delivery.ts";
 import { parseCampaignList, parseLastRun, parseSearch, parseStats, type SearchPage } from "./model.ts";
 
 // The ONE place that talks to the CRM's workflow and campaign endpoints (docs/features/WORKFLOWS.md). Reads are always live. Every change goes through
@@ -69,6 +70,16 @@ export async function listCampaigns(c: Call & { locationId: string }): Promise<{
     items.push(...parseCampaignList(r.value, c.locationId, source));
   }
   return { items, refused, failed };
+}
+
+const STATS_SOURCE: Record<string, string> = { "campaign:email": "email-campaigns", "campaign:workflow": "workflow-campaigns", "campaign:bulk": "bulk-actions" };
+export const statsSourceOf = (kind: string | null): string | null => (kind ? STATS_SOURCE[kind] ?? null : null);
+/** Delivery totals of one campaign (emails/stats.readonly). The classic campaign list has no statistics endpoint, so it returns null. */
+export async function campaignStats(c: Call & { locationId: string }, kind: string | null, campaignId: string) {
+  const src = statsSourceOf(kind);
+  if (!src) return null;
+  const r = await read(c, `/emails/locations/${seg(c.locationId)}/campaigns/stats/${src}/${seg(campaignId)}`);
+  return r.ok ? { ok: true as const, value: parseDeliveryStats(r.value) } : r;
 }
 
 // ---------------------------------------------------------------- changes

@@ -197,7 +197,7 @@ export function ChangeDialog({ kind, items, accounts, permitted, onClose, onChan
           <div><h2 className="text-lg font-semibold">{TITLE[kind]} {items.length} item{items.length === 1 ? "" : "s"}</h2><p className="text-sm text-muted-foreground">You see exactly what will change before anything is sent.</p></div>
           <button type="button" onClick={onClose} aria-label="Close" data-testid="wf-dialog-close" className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg border"><X aria-hidden className="size-4" /></button>
         </div>
-        {!permitted ? <InlineAlert tone="warning" title="Needs permission: reconnect">SubSync needs {NEEDS[kind].join(" and ")}. Open SubSync again from your CRM's app list and accept it. Nothing else changes.</InlineAlert> : null}
+        {!permitted ? <InlineAlert tone="warning" title="Needs permission: reconnect">SubSync needs {NEEDS[kind].join(" and ")}. Open SubSync again from your CRM&apos;s app list and accept it. Nothing else changes.</InlineAlert> : null}
         {done ? (
           <div data-testid="wf-result">
             {done.dryRun ? <InlineAlert tone="info" title="Nothing was sent">Live changes are switched off for this install, so this was a rehearsal. It is recorded in History.</InlineAlert> : null}

@@ -12,7 +12,7 @@ const R = 52, C = 2 * Math.PI * R;
 
 export function WfDonut({ title, marks, selected, onSelect, centre = "in total", empty = "Nothing to show yet." }: { title: string; marks: Mark[]; selected: string | null; onSelect: (key: string) => void; centre?: string; empty?: string }) {
   const total = marks.reduce((s, m) => s + m.count, 0);
-  let offset = 0;
+  const starts = marks.reduce<number[]>((a, m, i) => [...a, i === 0 ? 0 : a[i - 1] + (marks[i - 1].count / (total || 1)) * C], []);
   return (
     <figure className="min-w-0" data-testid="wf-donut">
       <figcaption className="mb-2 text-sm font-semibold">{title}</figcaption>
@@ -20,15 +20,14 @@ export function WfDonut({ title, marks, selected, onSelect, centre = "in total",
         <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
           <svg viewBox="0 0 140 140" className="size-36 shrink-0" role="group" aria-label={`${title}: ${marks.map((m) => `${m.label} ${m.count}`).join(", ")}`}>
             <g transform="rotate(-90 70 70)">
-              {marks.filter((m) => m.count > 0).map((m) => {
-                const len = (m.count / total) * C;
-                const el = (
+              {marks.map((m, i) => {
+                if (m.count <= 0) return null;
+                const len = (m.count / total) * C, offset = starts[i];
+                return (
                   <circle key={m.key} cx="70" cy="70" r={R} fill="none" stroke={m.colour} strokeWidth={selected === m.key ? 24 : 18} strokeDasharray={`${Math.max(len - 1.5, 0.5)} ${C}`} strokeDashoffset={-offset}
                     opacity={selected && selected !== m.key ? 0.4 : 1} className="cursor-pointer" role="button" tabIndex={0} aria-label={`${m.label}: ${m.count}. Show the list.`}
                     onClick={() => onSelect(m.key)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect(m.key); } }} data-testid={`wf-slice-${m.key}`} />
                 );
-                offset += len;
-                return el;
               })}
             </g>
             <text x="70" y="68" textAnchor="middle" className="fill-foreground text-[22px] font-semibold" style={{ fontVariantNumeric: "tabular-nums" }}>{total}</text>
