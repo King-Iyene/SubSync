@@ -107,10 +107,10 @@ jobs:
         run: |
           versions=$(ls supabase/migrations/*.sql | xargs -n1 basename | sort | awk -v stop="${{ inputs.baseline_through }}" '{print substr($0,1,14)} $0==stop{exit}')
           echo "Marking as already applied: $versions"
-          supabase migration repair --status applied $versions --db-url "$SUPABASE_DB_URL"
+          supabase migration repair --status applied $versions --db-url "$SUPABASE_DB_URL" --yes
       - name: What would be applied
         if: ${{ inputs.baseline_through == '' }}
-        run: supabase db push --dry-run --db-url "$SUPABASE_DB_URL"
+        run: supabase db push --dry-run --db-url "$SUPABASE_DB_URL" --yes
       - name: Apply
         if: ${{ inputs.baseline_through == '' && (github.event_name == 'push' || inputs.dry_run == false) }}
-        run: supabase db push --db-url "$SUPABASE_DB_URL"
+        run: supabase db push --db-url "$SUPABASE_DB_URL" --yes
