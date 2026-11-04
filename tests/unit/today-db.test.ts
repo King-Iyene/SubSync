@@ -111,4 +111,19 @@ describe.skipIf(!HAS_DB)("Today reads only the accounts the signed session may r
     expect(one.body.totals.unanswered.count).toBe(3);
     expect(one.body.queue.every((q) => q.locationId === A1)).toBe(true);
   });
+  it("marks set aside on one account never reach a business or client view of another account of the same installation", async () => {
+    // A team-lane mark on A2 (an agency pressed Done there). A business or a client's staff reading A1 must not learn the account, the row or the item ids from it.
+    const [ev] = await sql()`insert into today_actions (installation_id, location_id, row_key, kind, action, lane, actor_key, item_ids) values (${instA}, ${A2}, ${`${A2}|unanswered`}, 'unanswered', 'done', 'team', 'u-agency', ${["unanswered:secret-item-id"]}::text[]) returning id`;
+    try {
+      for (const kind of ["business", "client"] as const) {
+        const r = await call(session(CO_A, kind, A1));
+        expect(JSON.stringify(r.body), kind).not.toContain("secret-item-id");
+        expect(JSON.stringify(r.body.holds), kind).not.toContain(A2);
+        expect(r.body.assigned, kind).toEqual({});
+      }
+      expect((await call(session(CO_A, "agency", null))).status).toBe(200);
+    } finally {
+      await sql()`delete from today_actions where id = ${ev.id as number}`;
+    }
+  });
 });

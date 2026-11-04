@@ -128,7 +128,8 @@ export async function buildToday(i: {
     url: p.contactId ? links.contact(p.locationId, p.contactId) : links.opportunities(p.locationId),
   }));
   const forecast = forecastOf(comingLeads(ledgerRows, target, now).slice(0, 200), comingDeals, comingAppts);
-  const resolved = resolveEvents(actionLog.events, now, i.lanes);
+  // Only marks on accounts this person may read: the team lane of an installation can hold marks on accounts a business or a client view must never learn about.
+  const resolved = resolveEvents(actionLog.events.filter((e) => i.permits(e.locationId)), now, i.lanes);
 
   const base = {
     ledger, ledgerTotal: ledgerRows.length, insights, sinceVisit, forecast, zones,
