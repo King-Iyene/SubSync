@@ -74,6 +74,7 @@ import { buildDailyDigest, NOT_WATCHED, seriesByLocation } from "../analytics/di
 import { portfolioRangeChanges, validFromDay, validToDay } from "../analytics/today-intel";
 import { buildToday } from "./today-api";
 import { briefFromToday, todayAction, todayBrief, userKeyOf as todayUserKey, type TodayDeps } from "./today-actions";
+import { todayViewRemove, todayViewSave, todayViewsList } from "./today-views";
 import { lanesFor } from "../analytics/today-state";
 import { resolveEntitlements } from "../flags";
 import type { Plan } from "../entitlements";
@@ -1845,6 +1846,7 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       if (a === "overview") return await overview(ctx);
       if (a === "today" && !b) return await todayView(ctx);
       if (a === "today" && b === "brief" && !c) return await todayBrief(ctx, todayDeps);
+      if (a === "today" && b === "views" && !c) return await todayViewsList(ctx);
       if (a === "daily" && b === "changes") return await dailyChanges(ctx);
       if (a === "daily") return await dailyView(ctx);
       if (a === "roadmap") return await roadmapView(ctx);
@@ -1920,6 +1922,7 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       if (a === "client-onboarding" && b && b !== "templates" && LOCATION_ID.test(b) && c === "steps") return await clientRoutes.stepAdd(ctx, clientDeps, b);
       if (a === "usage" && !b) return await usagePing(ctx);
       if (a === "today" && b === "action" && !c) return await todayAction(ctx, todayDeps);
+      if (a === "today" && b === "views" && !c) return await todayViewSave(ctx);
       if (a === "inbox" && b === "views") return await inboxViewSave(ctx);
       if (a === "audit" && b === "share") return await auditShare(ctx);
       if (a === "audit" && b === "revoke") return await auditRevoke(ctx);
@@ -1966,6 +1969,7 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
     }
     if (method === "DELETE") {
       if (a === "inbox" && b === "views" && c && /^[0-9a-fA-F-]{36}$/.test(c)) return await inboxViewRemove(ctx, c);
+      if (a === "today" && b === "views" && c) return await todayViewRemove(ctx, c);
       if (a === "clients" && b && LOCATION_ID.test(b) && c === "notes") return await clientRoutes.noteRemove(ctx, clientDeps, b);
       if (a === "client-onboarding" && b === "templates") return await clientRoutes.templateRemove(ctx);
       if (a === "client-onboarding" && b && LOCATION_ID.test(b) && c === "steps") return await clientRoutes.stepRemove(ctx, clientDeps, b);
