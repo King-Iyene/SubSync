@@ -27,7 +27,7 @@ export type Penalty = { id: "household" | "mailbox" | "conflict" | "first_names"
 /** The starting weights, out of 100: how sure this signal alone would make a careful person. */
 export const BASE_WEIGHT: Record<SignalId, number> = {
   email_exact: 88, email_fold: 78, email_local: 38, domain_business: 8,
-  phone_exact: 80, phone_format: 70, phone_last7: 50, phone_swap: 32,
+  phone_exact: 80, phone_format: 70, phone_last7: 50, phone_swap: 38,
   name_exact: 32, name_order: 30, name_nickname: 27, name_spelling: 22, name_initial: 14,
   time_close: 12, time_day: 4, source_same: 4, tags_one: 4, tags_many: 7,
 };
@@ -46,6 +46,8 @@ const GENERIC = new Set(["gmail.com", "googlemail.com", "yahoo.com", "hotmail.co
 const localOf = (e: string) => e.slice(0, e.lastIndexOf("@")).toLowerCase().split("+")[0];
 const domainOf = (e: string) => e.slice(e.lastIndexOf("@") + 1).toLowerCase();
 const letters = (s: string) => s.replace(/[^a-z]/g, "");
+/** The name before the @ is the first initial plus the last name (treed for Tom Reed), a very common business address. */
+function initialLast(name: string, local: string): boolean { const n = splitName(name); return !!n.first && !!n.last && local === n.first[0] + n.last; }
 const last = (p: string, n: number) => p.slice(-n);
 
 export type Evidence = { signals: Signal[]; penalties: Penalty[]; score: number; tier: Tier; reasons: string[] };
@@ -75,7 +77,7 @@ export function gather(a: Person, b: Person, w: Weights = {}): { signals: Signal
       // The same person with a business address and a personal one: the name before the @ is alike (ann.lee and ann_lee, alee and a.lee), the domains differ.
       const sa = letters(la);
       const sb = letters(lb);
-      if (sa.length >= 4 && sb.length >= 4 && !isRoleEmail(ea) && !isRoleEmail(eb) && (sa === sb || jaroWinkler(sa, sb) >= 0.93)) add("email_local");
+      if (sa.length >= 4 && sb.length >= 4 && !isRoleEmail(ea) && !isRoleEmail(eb) && (sa === sb || jaroWinkler(sa, sb) >= 0.93 || initialLast(a.name, sa) || initialLast(b.name, sb) || initialLast(a.name, sb) || initialLast(b.name, sa))) add("email_local");
       if (da === db && !GENERIC.has(da)) add("domain_business");
     }
   }
@@ -119,15 +121,18 @@ export function gather(a: Person, b: Person, w: Weights = {}): { signals: Signal
   const shared = b.tags.map((t) => t.trim().toLowerCase()).filter((t) => ta2.has(t)).length;
   if (shared >= 2) add("tags_many"); else if (shared === 1) add("tags_one");
 
+  // The same company domain means more once the names are alike too (two people at one firm are rarely both called Bob Smith).
+  if (nameLink && signals.some((s) => s.id === "domain_business")) { const d = signals.find((s) => s.id === "domain_business")!; d.weight = Math.max(d.weight, 28); }
+
   // ----- penalties: strong signals that point the other way -----
   const namesKnown = real && na.includes(" ") && nb.includes(" ");
-  if (phoneLink && !emailLink && namesKnown && firstNamesDiffer(a.name, b.name)) penalties.push({ id: "household", weight: 32, label: "different first names, so this may be a shared household or office phone" });
+  if (phoneLink && !emailLink && !nameLink && namesKnown && firstNamesDiffer(a.name, b.name)) penalties.push({ id: "household", weight: 32, label: "different first names, so this may be a shared household or office phone" });
   if (emailLink && !phoneLink && namesKnown && isRoleEmail(a.email) && !nameLink) penalties.push({ id: "mailbox", weight: 32, label: "a shared company mailbox such as info@, so this may be different people" });
   // Every contact detail both have disagrees (email, phone, and the name is not alike): two people.
   const bothMail = !!ea && !!eb;
   const bothPhone = !!pa && !!pb;
   if (bothMail && bothPhone && !emailLink && !phoneLink && !nameLink && !signals.some((s) => s.id === "email_local")) penalties.push({ id: "conflict", weight: 38, label: "the email and the phone number are both different" });
-  if (!emailLink && !phoneLink && namesKnown && splitName(a.name).last === splitName(b.name).last && firstNamesDiffer(a.name, b.name)) penalties.push({ id: "first_names", weight: 18, label: "the first names are different" });
+  if (!emailLink && !phoneLink && !nameLink && namesKnown && splitName(a.name).last === splitName(b.name).last && firstNamesDiffer(a.name, b.name)) penalties.push({ id: "first_names", weight: 18, label: "the first names are different" });
   return { signals, penalties };
 }
 

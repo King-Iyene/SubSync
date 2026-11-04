@@ -2,6 +2,7 @@ import { sql } from "../db";
 import { ttlCache } from "../ttl-cache";
 import { classify, groupDuplicates, planFields, type FieldChoice, type Group, type Person } from "./dedupe";
 import { loadConfigs, type AccountConfig } from "./cleanup-config";
+import { learnWeights, pairKey, type Learned } from "./match-evidence";
 import { byAccount, health, isObvious, rankValue, reasonCounts, type QueueItem } from "./dedupe-review";
 
 const iso = (v: unknown) => (v instanceof Date ? v.toISOString() : null);
@@ -81,9 +82,28 @@ const building = new Map<string, Promise<Built>>();
 
 const hash = (s: string) => { let h = 0x811c9dc5; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; } return h.toString(16); };
 
+/** What the person decided before, as pairs: the pairs they said are NOT the same person (never asked again) and, per account, the weights learned from their yes and no answers. */
+async function learnFrom(installationId: string, allowed: string[] | null): Promise<{ rejected: Set<string>; learned: Map<string, Learned> }> {
+  const rows = await sql()`select location_id, decision, snapshot from duplicate_reviews where installation_id = ${installationId} ${allowed ? sql()`and location_id = any(${allowed}::text[])` : sql()``} order by decided_at desc limit 1500`;
+  const rejected = new Set<string>();
+  const acc = new Map<string, { accepted: Array<[Person, Person]>; rejected: Array<[Person, Person]> }>();
+  for (const r of rows) {
+    const list = ((r.snapshot as { contacts?: Array<Record<string, unknown>> } | null)?.contacts ?? []).slice(0, 6).map((c): Person => ({
+      contactId: String(c.contact_id), name: String(c.full_name ?? "").trim() || "Unnamed contact", email: (c.email as string | null) ?? null, phone: (c.phone as string | null) ?? null,
+      tags: (c.tags as string[] | null) ?? [], createdAt: c.date_added ? new Date(c.date_added as string).toISOString() : null, lastActivityAt: null, source: (c.source as string | null) ?? null, openDeals: 0, wonDeals: 0, hasConversation: false,
+    }));
+    const no = r.decision === "not_duplicate";
+    const slot = acc.get(r.location_id as string) ?? acc.set(r.location_id as string, { accepted: [], rejected: [] }).get(r.location_id as string)!;
+    for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) {
+      if (no) { rejected.add(pairKey(list[i].contactId, list[j].contactId)); slot.rejected.push([list[i], list[j]]); } else slot.accepted.push([list[i], list[j]]);
+    }
+  }
+  return { rejected, learned: new Map([...acc].map(([loc, d]) => [loc, learnWeights(d)])) };
+}
+
 async function build(installationId: string, allowed: string[] | null): Promise<Built> {
   const now = Date.now();
-  const configs = await loadConfigs(installationId, allowed);
+  const [configs, learn] = await Promise.all([loadConfigs(installationId, allowed), learnFrom(installationId, allowed).catch(() => ({ rejected: new Set<string>(), learned: new Map<string, Learned>() }))]);
   const nameLocs = [...configs].filter(([, c]) => c.match.nameAlone && c.match.name !== "off").map(([id]) => id);
   const typoLocs = [...configs].filter(([, c]) => c.match.phone === "typo").map(([id]) => id);
   const [people, sizes] = await Promise.all([
@@ -95,7 +115,7 @@ async function build(installationId: string, allowed: string[] | null): Promise<
   const all: Built["all"] = [];
   for (const [locationId, list] of byLocation) {
     const rules = (configs.get(locationId) ?? { match: undefined }).match;
-    for (const g of groupDuplicates(list, rules?.threshold ?? 50, 40, rules)) {
+    for (const g of groupDuplicates(list, rules?.threshold ?? 50, 40, rules, { rejected: learn.rejected, weights: learn.learned.get(locationId)?.weights })) {
       const item: QueueItem = { ...g, locationId, locationName: list[0].locationName };
       all.push({ ...item, rank: rankValue(item, now), obvious: isObvious(item) });
     }
