@@ -38,7 +38,7 @@ for (const width of [1440, 1024]) {
       expect(Math.max(...xs) - Math.min(...xs), `${col} left or right edge differs between rows at ${width}: ${JSON.stringify([...new Set(xs)])}`).toBeLessThanOrEqual(1);
     }
     // KF-8: one small button of one constant word, and a short row (about 56 to 72 px; a reason that wraps on a narrow list may add a line).
-    const labels = (await page.getByTestId("queue-open").allInnerTexts()).map((l) => l.trim());
+    const labels = (await page.getByTestId("queue-open").allInnerTexts()).map((l) => l.trim().split(/\s/)[0]); // the first word (the rest is for a screen reader)
     expect(new Set(labels)).toEqual(new Set(["Open"]));
     const btn = await page.getByTestId("queue-open").first().boundingBox();
     expect(btn!.height, "the button is small").toBeLessThanOrEqual(width >= 1440 ? 34 : 46);

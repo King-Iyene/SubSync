@@ -200,7 +200,7 @@ export function ReplyNowList({ items, total, newLeads, max = INLINE_ROWS, onSeeA
               className={`ds-row grid grid-cols-[minmax(0,1fr)_6rem_2.5rem] items-center gap-x-3 gap-y-0.5 py-2 pl-1 pr-1 ${REPLY_TRACKS} ${n === active ? "bg-accent/50 outline outline-2 -outline-offset-2 outline-[var(--ring)]" : ""}`}>
               <div className="min-w-0">
                 <p className="truncate font-semibold" title={p.name}>{p.name}</p>
-                <p className="truncate text-sm text-muted-foreground">{!single && <span>{p.accountName} · </span>}{replyContext(p)}{mine ? <span> · Assigned to {mine}</span> : null}</p>
+                <p className="line-clamp-2 text-sm text-muted-foreground @3xl:truncate">{!single && <span>{p.accountName} · </span>}{replyContext(p)}{mine ? <span> · Assigned to {mine}</span> : null}</p>
                 <p className={`text-xs @3xl:hidden ${p.never ? "text-destructive" : "text-muted-foreground"}`} data-testid="lead-wait-narrow">{p.never ? wait : `Waiting ${wait}`}</p>
               </div>
               <p className={`tnum hidden items-center gap-1.5 text-sm @3xl:flex ${p.never ? "font-medium text-destructive" : ""}`} data-testid="lead-wait">{p.never && <TriangleAlert aria-hidden className="size-3.5 shrink-0" />}{p.never ? wait : `Waiting ${wait}`}</p>
@@ -229,7 +229,7 @@ export function KindList({ rows, title = "Also needs you", hint }: { rows: KindR
           <li key={r.kind} data-testid="kind-row" data-kind={r.kind} className={`ds-row grid grid-cols-[minmax(0,1fr)_6rem] items-center gap-x-3 gap-y-0.5 py-2 pl-1 pr-1 ${KIND_TRACKS}`}>
             <div className="min-w-0">
               <p className="truncate font-semibold">{KIND_LABEL[r.kind]}</p>
-              <p className="truncate text-sm text-muted-foreground" title={r.text}>{r.text}</p>
+              <p className="line-clamp-2 text-sm text-muted-foreground @3xl:truncate" title={r.text}>{r.text}</p>
             </div>
             <button type="button" onClick={r.onOpen} data-testid="kind-count" data-count={r.count} aria-label={`${r.count.toLocaleString("en-US")} ${KIND_LABEL[r.kind].toLowerCase()}. Show them.`}
               className="tnum ds-press order-3 col-span-2 w-fit rounded-md px-1 text-left text-sm text-muted-foreground underline underline-offset-4 hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-[var(--ring)] @3xl:order-none @3xl:col-span-1 @3xl:w-full @3xl:text-right @3xl:text-base @3xl:font-semibold @3xl:text-foreground @3xl:no-underline">{r.count.toLocaleString("en-US")}<span className="@3xl:hidden"> to look at</span></button>

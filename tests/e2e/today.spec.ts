@@ -6,7 +6,7 @@ import { api, counted, moreMenu, openMore, type Json } from "./today-helpers";
 // of the projects. The v3 rules (counting, above the fold, roles, phone) are in today3.spec.ts.
 const thousands = (n: number) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 
-test("the first thing on Today is the one sentence, big, on the first screen, with the work list under it and the numbers behind More detail", async ({ page, request }, testInfo) => {
+test("the first thing on Today is the one sentence, big, on the first screen, with the work list under it and the numbers behind More detail", async ({ page, request }) => {
   const { get } = await api(request);
   const today = await get("today");
   await page.goto("/app");

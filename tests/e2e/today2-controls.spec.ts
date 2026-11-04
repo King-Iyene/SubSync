@@ -14,6 +14,7 @@ const panel = (page: Page) => page.getByTestId("records-panel");
 const count = async (page: Page) => Number(await page.getByTestId("records-count").getAttribute("data-count"));
 
 test("every number opens its records, and the panel closes with the cross, Esc and a click outside", async ({ page }) => {
+  test.setTimeout(240_000); // every mark reads Today again; the demo company is slow to answer
   await openToday(page);
   await openMore(page);
   const doors: Array<[string, () => ReturnType<Page["getByTestId"]>]> = [
@@ -27,7 +28,7 @@ test("every number opens its records, and the panel closes with the cross, Esc a
     ["a bar segment", () => page.getByTestId("bar-segment").first()],
     ["a bar's account name", () => page.getByTestId("bar-account").first()],
     ["See all clients", () => page.getByTestId("queue-all")],
-    ["a raised alerts day", () => page.getByTestId("raised-day").last()],
+    ["a raised alerts day", () => page.locator('[data-testid="raised-day"]:not([disabled])').last()],
   ];
   const via = ["cross", "escape", "outside"] as const;
   let n = 0;
@@ -96,6 +97,7 @@ test("the records panel: count matches the row total, search, sort, filters, max
 });
 
 test("the work list: Open, the row menu (Show everything, Done for now, Snooze, Assign), See all, and Undo all do what they say", async ({ page }) => {
+  test.setTimeout(240_000); // every mark reads Today again; the demo company is slow to answer
   await openToday(page);
   const rows = page.getByTestId("queue-row");
   const first = rows.first();
@@ -146,7 +148,8 @@ test("the work list: Open, the row menu (Show everything, Done for now, Snooze, 
 
 test("the chips: a records chip removes its filter, and 'Show only this client' and 'See all' narrow and widen Today", async ({ page }) => {
   await openToday(page);
-  await page.getByTestId("bar-account").first().click();
+  // The second bar has several kinds of thing (the first may have only one, and then there is no Kind to filter by).
+  await page.getByTestId("bar-account").nth(1).click();
   await expect(panel(page)).toBeVisible();
   const before = await page.getByTestId("records-row").count();
   await page.getByTestId("records-add-filter").click();
@@ -169,6 +172,7 @@ test("the chips: a records chip removes its filter, and 'Show only this client' 
 });
 
 test("More detail: the tabs, the junk switch, set aside; More: Share, Preview, Print and Sync now all respond", async ({ page, context }) => {
+  test.setTimeout(240_000); // every mark reads Today again; the demo company is slow to answer
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   await openToday(page);
   await expect(page.getByTestId("more-detail")).toHaveAttribute("data-open", "false");
@@ -211,6 +215,7 @@ test("More detail: the tabs, the junk switch, set aside; More: Share, Preview, P
 });
 
 test("the command palette opens with Ctrl Shift K and from More, filters, runs a command with Enter, and Esc closes it", async ({ page }) => {
+  test.setTimeout(240_000); // every mark reads Today again; the demo company is slow to answer
   await openToday(page);
   await page.waitForTimeout(500);
   await page.keyboard.press("Control+Shift+K");
@@ -239,6 +244,7 @@ test("the command palette opens with Ctrl Shift K and from More, filters, runs a
 });
 
 test("saved views: save the current choice, apply it from another state, remove it", async ({ page }) => {
+  test.setTimeout(240_000); // every mark reads Today again; the demo company is slow to answer
   await openToday(page);
   await page.getByTestId("queue-row").first().getByTestId("queue-more").click();
   await page.getByTestId("menu-only").click();

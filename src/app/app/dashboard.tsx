@@ -374,6 +374,8 @@ export function Dashboard() {
     "--primary": accent.text, "--primary-foreground": accentTokens(accent.text, theme)!.onFill, "--ring": accent.text,
     "--sidebar-primary": menuAccent.text, "--sidebar-primary-foreground": accentTokens(menuAccent.text, "dark")!.onFill, "--sidebar-ring": menuAccent.text,
   } as React.CSSProperties) : undefined;
+  // The freshness line is built once: on Today it sits in the top row with search and the bell, on every other page above the page.
+  const strip = <StatusLine inline={view.id === "today"} />;
   const previous = trail.length > 0 ? trail[trail.length - 1] : null;
   const backLabel = previous ? (previous.id === "account" ? "the client account" : NAV.find((n) => n.id === previous.id)?.label ?? "the last page") : null;
   const back = previous && backLabel ? { label: backLabel, go: () => window.history.back() } : null;
@@ -429,8 +431,8 @@ export function Dashboard() {
             {/* One slim row above every page: which client accounts are counted on the left, search and notifications on the right (D1; was four stacked blocks). */}
             <div className="mb-3 flex flex-wrap items-start gap-x-4 gap-y-1 print:hidden" data-testid="toolbar">
               <div className="min-w-0 flex-1">
-                {/* On Today the quiet "Updated 2 min ago" line sits here, in the one row with search and the bell (the page below draws its own account filter and "Showing" chip). */}
-                {view.id === "today" && <StatusLine inline />}
+                {/* On Today the quiet freshness line sits here, in the one row with search and the bell (the page below draws its own account filter and "Showing" chip). */}
+                {view.id === "today" && strip}
                 {/* Today draws its own account selector inside the page; the shared one is for every other page. */}
                 {auth.kind === "agency" && baseApi && !fromAccount && view.id !== "today" && <ApiProvider value={baseApi}><FilterDrawer kind="agency" value={filter} onChange={setFilter} /></ApiProvider>}
               </div>
@@ -439,7 +441,7 @@ export function Dashboard() {
                 <NotificationBell go={go} />
               </div>
             </div>
-            {view.id !== "today" && <StatusLine />}<BackProvider value={back}>{content}</BackProvider>
+            {view.id !== "today" && strip}<BackProvider value={back}>{content}</BackProvider>
             <FeedbackBox page={view.id} />
           </main>
         </div>

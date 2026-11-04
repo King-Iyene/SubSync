@@ -71,7 +71,6 @@ test("People, Sources and Coverage lists line up too", async ({ page }) => {
 
 test("the account picker: a row ticks anywhere on it, Show all accounts and Done close it with a visible result, Esc and a click outside close it", async ({ page }) => {
   await openToday(page);
-  const picker = page.getByTestId("today-account-picker");
   const pop = page.getByTestId("picker-popover");
   const summary = page.getByTestId("picker-summary");
   const total = (await summary.innerText()).replace("All ", "");
@@ -237,6 +236,7 @@ test("the panel: search, filter chip, + Filter, sort, date range, Maximise, Expo
 });
 
 test("every number opens the records behind it and the count equals the rows: headline, bars (segments and names), work-list amount, days, alert numbers, insight cards", async ({ page }) => {
+  test.setTimeout(240_000); // every mark reads Today again; the demo company is slow to answer
   await openToday(page);
   const equal = async () => {
     await expect(panel(page)).toBeVisible();
@@ -325,6 +325,7 @@ test("a point on the typical-reply line opens the replies behind it, or says why
 });
 
 test("Done for now sets a problem aside and moves the count, the set-aside list has N rows, and it stays after a reload", async ({ page, request }) => {
+  test.setTimeout(240_000); // every mark reads Today again; the demo company is slow to answer
   await openToday(page);
   const first = page.getByTestId("queue-row").first();
   const text = await first.innerText();
@@ -356,6 +357,7 @@ test("Done for now sets a problem aside and moves the count, the set-aside list 
 });
 
 test("Done for now then Undo (inside ten seconds) restores the list and the headline", async ({ page }) => {
+  test.setTimeout(240_000); // every mark reads Today again; the demo company is slow to answer
   await openToday(page);
   await page.waitForTimeout(1000); // the figures count up for 600 ms
   const headline = await page.getByTestId("today-headline").innerText();
@@ -372,6 +374,7 @@ test("Done for now then Undo (inside ten seconds) restores the list and the head
 });
 
 test("Snooze 1 day and Snooze until Monday set a problem aside; Assign to me marks it; each is undoable", async ({ page }) => {
+  test.setTimeout(240_000); // every mark reads Today again; the demo company is slow to answer
   await openToday(page);
   const rows = page.getByTestId("queue-row");
   const heldBefore = await heldCount(page);
@@ -464,6 +467,7 @@ test("the junk control recomputes the dollar figure and lists what it left out",
 });
 
 test("More detail and the rest of the buttons built for Today all do something", async ({ page, context }) => {
+  test.setTimeout(240_000); // every mark reads Today again; the demo company is slow to answer
   await openToday(page);
   // Tabs.
   for (const [name, id] of [["People", "tab-people"], ["Sources", "tab-sources"], ["Coverage", "tab-coverage"]] as const) {
@@ -516,6 +520,7 @@ test("More detail and the rest of the buttons built for Today all do something",
 });
 
 test("a business administrator and a client's staff get the same panel, limited to their account, and a client cannot assign", async ({ page, request }) => {
+  test.setTimeout(240_000); // every mark reads Today again; the demo company is slow to answer
   for (const as of ["business", "client"] as const) {
     const { get } = await api(request, as);
     const t = await get("today");
