@@ -33,7 +33,11 @@ test("every number opens its records, and the panel closes with the cross, Esc a
     const el = door();
     if ((await el.count()) === 0) continue;
     await el.scrollIntoViewIfNeeded();
-    await el.click();
+    // A ring's bounding box centre is its hole, so a slice is pressed where it is drawn: a point on its own outline.
+    const press = label === "a donut slice"
+      ? async () => { const pt = await el.evaluate((p: SVGGeometryElement) => { const m = p.getPointAtLength(p.getTotalLength() * 0.12); const c = p.getScreenCTM()!; return { x: m.x * c.a + c.e, y: m.y * c.d + c.f }; }); await page.mouse.click(pt.x, pt.y); }
+      : () => el.click({ timeout: 8_000 });
+    await press().catch((e: Error) => { throw new Error(`${label} could not be pressed: ${e.message.split("\n").slice(0, 16).join(" | ")}`); });
     await expect(panel(page), `${label} opens the records`).toBeVisible();
     await expect(page.getByTestId("records-title")).not.toBeEmpty();
     expect(await count(page), `${label}: heading count`).toBeGreaterThanOrEqual(0);
