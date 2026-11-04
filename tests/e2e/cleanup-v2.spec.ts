@@ -44,7 +44,7 @@ for (const role of ROLES) {
     await expect(page.getByTestId("dup-question")).toHaveText("Are these the same person?");
     await expect(page.getByTestId("dup-meter")).toBeVisible();
     await expect(page.getByTestId("dup-reason-line")).toBeVisible();
-    await page.getByTestId("dup-how").locator("summary").click();
+    await page.getByTestId("dup-how").locator("summary").first().click();
     await expect(page.getByTestId("dup-score")).toBeVisible();
     await expect(page.getByTestId("dup-score-n")).toHaveText(/^\d{1,3}$/);
     await expect(page.getByTestId("dup-reasons").locator("li").first()).toBeVisible();

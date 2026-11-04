@@ -40,7 +40,7 @@ for (const role of ROLES) {
     expect(await radios.count()).toBeGreaterThanOrEqual(2);
     await expect(page.locator('[data-testid="dup-keep-radio"]:checked')).toHaveCount(1);
     await expect(page.locator('[data-testid="dup-record"][data-keep="true"]')).toContainText("the best one to keep");
-    await page.getByTestId("dup-how").locator("summary").click();
+    await page.getByTestId("dup-how").locator("summary").first().click();
     const why = (await page.getByTestId("dup-why").innerText()).trim();
     expect(why).toMatch(/^Best one to keep: .+\./);
     expect(why.length, "a sentence, not a paragraph").toBeLessThan(200);
