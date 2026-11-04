@@ -14,6 +14,12 @@ async function api(request: APIRequestContext, as?: "business" | "client") {
   };
 }
 const num = (s: string) => Number(s.replace(/[^0-9]/g, ""));
+/** A figure counts up for 600 ms: read the value it ends on, never the text in the middle of the count. */
+async function final(l: Locator): Promise<number> {
+  const el = l.locator("[data-final]").first();
+  return num((await el.count()) ? ((await el.getAttribute("data-final")) ?? "") : await l.innerText());
+}
+const rowSel = (key: string) => `[id="${key}"]`;
 async function openToday(page: Page, query = "") {
   await page.goto(`/app${query}`);
   await expect(page.getByTestId("today-headline")).toBeVisible({ timeout: 20_000 });
@@ -90,7 +96,7 @@ test("the account picker: a row ticks anywhere on it, Show all accounts and Done
   await expect(summary).toHaveText(`2 of ${total}`);
   expect(page.url()).toContain("ta=");
   // The queue is narrowed to those two.
-  for (const r of await page.getByTestId("queue-row").all()) await expect(r).toContainText(/Bright Smile Dental|Blue Door Realty/);
+  await expect(page.getByTestId("queue-row").filter({ hasNotText: /Bright Smile Dental|Blue Door Realty/ })).toHaveCount(0);
   // Open again, press Show all accounts: closes, every account is back, the chip and the address parameter are gone.
   await page.getByTestId("picker-button").click();
   await expect(pop).toBeVisible();
@@ -112,6 +118,7 @@ test("the account picker: a row ticks anywhere on it, Show all accounts and Done
   await expect(pop).toHaveCount(0);
   // Real mouse clicks at the middle of both buttons hit the buttons themselves (nothing sits on top of them), in a short window too.
   await page.setViewportSize({ width: 1024, height: 560 });
+  await page.evaluate(() => window.scrollTo(0, 0));
   await page.getByTestId("picker-button").click();
   for (const id of ["picker-done", "picker-all"]) {
     const b = await page.getByTestId(id).boundingBox();
@@ -128,7 +135,7 @@ test("a pulse tile opens the records panel and its count is the number on the ti
   const { get } = await api(request);
   const today = await get("today");
   await openToday(page);
-  const shown = num(await page.getByTestId("pulse-leads").locator("p.tnum").innerText());
+  const shown = await final(page.getByTestId("pulse-leads").locator("p.tnum"));
   await page.getByTestId("pulse-leads-open").click();
   await expect(panel(page)).toBeVisible();
   const count = page.getByTestId("records-count");
@@ -250,7 +257,7 @@ test("every number opens the records behind it and the count equals the rows: he
     return count;
   };
   // Headline: clients, dollars.
-  const clients = num(await page.getByTestId("headline-clients").innerText());
+  const clients = await final(page.getByTestId("headline-clients"));
   await page.getByTestId("headline-clients").click();
   expect(await equal()).toBe(clients);
   await closePanel(page);
@@ -343,7 +350,7 @@ test("a point on the typical-reply line opens the replies behind it, or says why
 
 test("Done hides a row and moves the headline, the set-aside list has N rows, and it stays after a reload", async ({ page, request }) => {
   await openToday(page);
-  const clientsBefore = num(await page.getByTestId("headline-clients").innerText());
+  const clientsBefore = await final(page.getByTestId("headline-clients"));
   const rows = page.getByTestId("queue-row");
   const first = rows.first();
   const text = await first.innerText();
@@ -356,7 +363,7 @@ test("Done hides a row and moves the headline, the set-aside list has N rows, an
     await expect(page.getByTestId("held-link")).toContainText("snoozed");
     const held = Number(await page.getByTestId("held-link").getAttribute("data-count"));
     expect(held).toBeGreaterThan(0);
-    expect(num(await page.getByTestId("headline-clients").innerText())).toBeLessThanOrEqual(clientsBefore);
+    await expect.poll(async () => final(page.getByTestId("headline-clients"))).toBeLessThanOrEqual(clientsBefore);
     await page.getByTestId("held-link").click();
     await expect(page.getByTestId("records-count")).toHaveAttribute("data-count", String(held));
     await expect(page.getByTestId("records-title")).toContainText("Set aside");
@@ -377,11 +384,11 @@ test("Done then Undo (inside ten seconds) restores the row and the headline", as
   await openToday(page);
   const headline = await page.getByTestId("today-headline").innerText();
   const rows = page.getByTestId("queue-row");
-  const key = await rows.first().getAttribute("id");
+  const key = (await rows.first().getAttribute("id")) as string;
   await rows.first().getByTestId("queue-done").click();
-  await expect(page.locator(`#${key}`)).toHaveCount(0);
+  await expect(page.locator(rowSel(key))).toHaveCount(0);
   await page.getByTestId("today-undo").click();
-  await expect(page.locator(`#${key}`)).toHaveCount(1);
+  await expect(page.locator(rowSel(key))).toHaveCount(1);
   await expect(page.getByTestId("today-headline")).toHaveText(headline);
   await expect(page.getByTestId("held-link")).toHaveCount(0);
 });
@@ -394,23 +401,23 @@ test("Snooze 1 day and Snooze until Monday hide a row; Assign to me marks it; ea
   await rows.first().getByTestId("queue-more").click();
   await expect(page.getByTestId("queue-menu")).toBeVisible();
   await page.getByTestId("queue-snooze-day").click();
-  await expect(page.locator(`#${key}`)).toHaveCount(0);
+  await expect(page.locator(rowSel(key))).toHaveCount(0);
   await expect(page.getByTestId("today-toast")).toContainText("Snoozed for 1 day");
   await page.getByTestId("today-undo").click();
-  await expect(page.locator(`#${key}`)).toHaveCount(1);
+  await expect(page.locator(rowSel(key))).toHaveCount(1);
   key = await keyOf(0);
   await rows.first().getByTestId("queue-more").click();
   await page.getByTestId("queue-snooze-monday").click();
-  await expect(page.locator(`#${key}`)).toHaveCount(0);
+  await expect(page.locator(rowSel(key))).toHaveCount(0);
   await expect(page.getByTestId("today-toast")).toContainText("until Monday");
   await page.getByTestId("today-undo").click();
-  await expect(page.locator(`#${key}`)).toHaveCount(1);
+  await expect(page.locator(rowSel(key))).toHaveCount(1);
   // Assign to me keeps the row and labels it.
   await rows.first().getByTestId("queue-more").click();
   await page.getByTestId("queue-assign").click();
-  await expect(page.locator(`#${key}`).getByTestId("queue-assigned")).toBeVisible();
+  await expect(page.locator(rowSel(key)).getByTestId("queue-assigned")).toBeVisible();
   await page.getByTestId("today-undo").click();
-  await expect(page.locator(`#${key}`).getByTestId("queue-assigned")).toHaveCount(0);
+  await expect(page.locator(rowSel(key)).getByTestId("queue-assigned")).toHaveCount(0);
 });
 
 test("server rules: forged rows are refused, a client's staff cannot assign, and nobody can undo someone else's mark", async ({ request }) => {
@@ -458,9 +465,10 @@ test("the junk control recomputes the dollar figure and lists what it left out",
   await openToday(page);
   const toggle = page.getByTestId("junk-toggle");
   await expect(toggle).toBeVisible();
-  const on = await page.getByTestId("pulse-risk").locator("p.tnum").innerText();
+  const on = String(await final(page.getByTestId("pulse-risk").locator("p.tnum")));
   await toggle.uncheck();
-  const off = await page.getByTestId("pulse-risk").locator("p.tnum").innerText();
+  await page.waitForTimeout(800);
+  const off = String(await final(page.getByTestId("pulse-risk").locator("p.tnum")));
   await toggle.check();
   expect(num(off)).toBeGreaterThanOrEqual(num(on));
   if (num(off) > num(on)) {
@@ -494,8 +502,9 @@ test("the tabs and the rest of the buttons built for Today all do something", as
   const all = page.getByTestId("queue-all");
   if (await all.count()) { const before = await page.getByTestId("queue-row").count(); await all.click(); expect(await page.getByTestId("queue-row").count()).toBeGreaterThan(before); await all.click(); expect(await page.getByTestId("queue-row").count()).toBe(before); }
   // Open in CRM opens a new tab.
+  await expect(page.getByTestId("queue-open").first()).toHaveAttribute("href", /^https:\/\//);
   const [tab] = await Promise.all([context.waitForEvent("page"), page.getByTestId("queue-open").first().click()]);
-  expect(tab.url()).toMatch(/^https?:/);
+  expect(tab).toBeTruthy();
   await tab.close();
   // Account chip: Only this account narrows Today, the chip's cross brings every account back.
   await page.getByTestId("needing-row").first().getByRole("button", { name: "Only this account" }).click();
@@ -538,7 +547,7 @@ test("a business administrator and a client's staff get the same panel, limited 
     // The headline's number opens the panel; its rows are all this account's.
     const head = page.getByTestId("headline-things");
     if (await head.count()) {
-      const n = num(await head.innerText());
+      const n = await final(head);
       await head.click();
       await expect(page.getByTestId("records-count")).toHaveAttribute("data-count", String(n));
       for (const cell of await page.getByTestId("records-row").locator("td:nth-child(2)").allInnerTexts()) expect([...names]).toContain(cell);
