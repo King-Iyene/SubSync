@@ -18,9 +18,9 @@ import { clearlyDiffer, foldEmail, normName, normPhone, type Group, type Person 
 export type ReasonKey = "both" | "email" | "phone" | "name";
 
 export function reasonOf(g: { reasons: readonly string[] }): { key: ReasonKey; label: string } {
-  const email = g.reasons.some((r) => r === "same email" || r.startsWith("email differs"));
-  const phone = g.reasons.some((r) => r === "same phone" || r.startsWith("phone in") || r.startsWith("phone with"));
-  const loose = g.reasons.some((r) => r.startsWith("email differs") || r.startsWith("phone in") || r.startsWith("phone with"));
+  const email = g.reasons.some((r) => r === "same email" || r.startsWith("email differs") || r === "similar email name");
+  const phone = g.reasons.some((r) => r === "same phone" || r.startsWith("phone in") || r.startsWith("phone with") || r === "same last seven digits");
+  const loose = g.reasons.some((r) => r.startsWith("email differs") || r.startsWith("phone in") || r.startsWith("phone with") || r === "similar email name" || r === "same last seven digits");
   if (email && phone) return { key: "both", label: loose ? "Same email and phone number, written differently" : "Same email and phone number" };
   if (email) return { key: "email", label: g.reasons.includes("same email") ? "Same email" : "Same email, written differently" };
   if (phone) return { key: "phone", label: g.reasons.includes("same phone") ? "Same phone number" : g.reasons.includes("phone with two digits swapped") ? "Phone numbers that differ by two swapped digits" : "Same phone number, written differently" };
@@ -375,6 +375,16 @@ export const REASON_WORDS: Record<string, string> = {
   "phone with two digits swapped": "Phone numbers that differ by two swapped digits",
   "different first names": "Different first names, so this may be a shared household or office phone",
   "shared company mailbox": "A shared company mailbox such as info@, so this may be different people",
+  "same name, first and last swapped": "The same name with first and last swapped",
+  "similar email name": "The name before the @ is alike (a business and a personal address)",
+  "same company email domain": "The same company email domain",
+  "same last seven digits": "The same last seven digits of the phone number",
+  "added at about the same time": "Added within minutes of each other",
+  "added within a day of each other": "Added within a day of each other",
+  "came from the same place": "Came from the same source",
+  "shared tag": "A shared tag",
+  "shared tags": "Shared tags",
+  "contact details conflict": "The email and the phone number are both different",
 };
 
 /** Every pair inside a small group, with its score and the reasons in words. Groups of more than six records are summarised by the group's own score instead. */

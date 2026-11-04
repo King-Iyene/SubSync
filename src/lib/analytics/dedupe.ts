@@ -6,6 +6,7 @@
 // own merge screen, which keeps the history of both records.
 
 import { DEFAULT_RULES, type MatchRules } from "./cleanup-rules.ts";
+import { pairKey, scoreEvidence, TIER_AT, type Weights } from "./match-evidence.ts";
 import { digitBag, digitsSwapped, firstNamesDiffer, isRoleEmail, nameSimilarity, soundex, splitName, canonicalFirst } from "./name-match.ts";
 
 export type Person = {
@@ -76,6 +77,7 @@ export function normName(name: string): string {
 
 export type MatchReason =
   | "same email" | "same phone" | "email differs only in case, spaces or gmail dots" | "phone in a different format" | "same name"
+  | "same name, first and last swapped" | "similar email name" | "same company email domain" | "same last seven digits" | "added at about the same time" | "added within a day of each other" | "came from the same place" | "shared tag" | "shared tags" | "contact details conflict"
   | "similar name" | "phone with two digits swapped" | "different first names" | "shared company mailbox";
 
 export type Pair = { score: number; reasons: MatchReason[] };
@@ -188,7 +190,16 @@ export function splitCompatible(people: Person[], now: number = Date.now()): Per
 
 // Group contacts that are linked by a confident match (union-find). Pairs below `minScore` do not link.
 const NAME_BUCKET_MAX = 8;
-export function groupDuplicates(people: Person[], minScore = 50, maxGroup = 40, rules: MatchRules = DEFAULT_RULES): Group[] {
+export type MatchContext = { weights?: Weights; rejected?: ReadonlySet<string> };
+
+export function groupDuplicates(people: Person[], minScore = 50, maxGroup = 40, rules: MatchRules = DEFAULT_RULES, ctx: MatchContext = {}): Group[] {
+  // A pair the person rejected is never linked again. With "look deeper" on, the evidence engine scores every pair (with the weights learned for this account).
+  const pairOf = (x: Person, y: Person): Pair => {
+    if (ctx.rejected?.has(pairKey(x.contactId, y.contactId))) return { score: 0, reasons: [] };
+    if (rules.deep) { const e = scoreEvidence(x, y, ctx.weights); return { score: e.score, reasons: e.reasons as MatchReason[] }; }
+    return scorePair(x, y, rules);
+  };
+  if (rules.deep) minScore = Math.max(minScore, TIER_AT.maybe);
   const parent = new Map(people.map((p) => [p.contactId, p.contactId]));
   const find = (x: string): string => {
     let r = x;
@@ -205,6 +216,14 @@ export function groupDuplicates(people: Person[], minScore = 50, maxGroup = 40, 
     const ph = normPhone(p.phone);
     if (rules.phone !== "off") add(ph && "p:" + ph, p);
     if (rules.phone === "typo" && ph) add("t:" + digitBag(ph), p);
+    if (rules.deep) {
+      if (ph) add("l:" + ph.slice(-7), p);
+      const em = normEmail(p.email);
+      const lp = em ? em.slice(0, em.lastIndexOf("@")).split("+")[0].replace(/[^a-z]/g, "") : "";
+      if (lp.length >= 4) add("m:" + lp, p);
+      const tk = normName(p.name).split(" ").filter(Boolean);
+      if (tk.length >= 2 && p.name !== "Unnamed contact") add("o:" + [soundex(tk[0]), soundex(tk[tk.length - 1])].sort().join("-"), p);
+    }
     if (rules.name !== "off" && rules.nameAlone && p.name !== "Unnamed contact") {
       const { first, last } = splitName(p.name);
       if (first && last) add("n:" + soundex(last) + canonicalFirst(first).charAt(0), p);
@@ -214,11 +233,11 @@ export function groupDuplicates(people: Person[], minScore = 50, maxGroup = 40, 
   for (const [bucketKey, members] of buckets) {
     if (members.length < 2) continue;
     // A name shared by many records is a common name, not a duplicate: it is never grouped on the name alone.
-    if (bucketKey.startsWith("n:") && members.length > NAME_BUCKET_MAX) continue;
+    if ((bucketKey.startsWith("n:") || bucketKey.startsWith("o:")) && members.length > NAME_BUCKET_MAX) continue;
     const limited = members.slice(0, maxGroup);
     for (let i = 0; i < limited.length; i++) {
       for (let j = i + 1; j < limited.length; j++) {
-        const pair = scorePair(limited[i], limited[j], rules);
+        const pair = pairOf(limited[i], limited[j]);
         if (pair.score < minScore) continue;
         const ra = find(limited[i].contactId);
         const rb = find(limited[j].contactId);
@@ -246,7 +265,7 @@ export function groupDuplicates(people: Person[], minScore = 50, maxGroup = 40, 
       const own = new Map<string, Pair>();
       for (let i = 0; i < members.length; i++) {
         for (let j = i + 1; j < members.length; j++) {
-          const pair = scorePair(members[i], members[j], rules);
+          const pair = pairOf(members[i], members[j]);
           if (pair.score < minScore) continue;
           for (const id of [members[i].contactId, members[j].contactId]) {
             const prev = own.get(id);

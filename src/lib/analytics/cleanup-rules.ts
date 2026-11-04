@@ -21,14 +21,16 @@ export type MatchRules = {
   nameAlone: boolean;
   /** Do not call a shared household phone or a shared company mailbox "almost certainly the same person". */
   guards: boolean;
+  /** Look deeper: weigh all the evidence (name, email name, phone in three strengths, when and where added, shared tags) so the same person with DIFFERENT details is found. */
+  deep: boolean;
   /** A pair must score at least this (0 to 100) to be linked. */
   threshold: number;
 };
 
 export const PRESETS: Record<Exclude<PresetId, "custom">, MatchRules> = {
-  strict: { preset: "strict", email: "exact", phone: "exact", name: "exact", nameAlone: false, guards: true, threshold: 85 },
-  balanced: { preset: "balanced", email: "similar", phone: "similar", name: "exact", nameAlone: false, guards: true, threshold: 50 },
-  loose: { preset: "loose", email: "similar", phone: "typo", name: "similar", nameAlone: true, guards: true, threshold: 30 },
+  strict: { preset: "strict", email: "exact", phone: "exact", name: "exact", nameAlone: false, guards: true, deep: false, threshold: 85 },
+  balanced: { preset: "balanced", email: "similar", phone: "similar", name: "exact", nameAlone: false, guards: true, deep: false, threshold: 50 },
+  loose: { preset: "loose", email: "similar", phone: "typo", name: "similar", nameAlone: true, guards: true, deep: true, threshold: 30 },
 };
 
 export const DEFAULT_RULES: MatchRules = PRESETS.balanced;
@@ -61,6 +63,7 @@ export function parseRules(raw: unknown): MatchRules {
     name: oneOf(r.name, ["off", "exact", "similar"] as const, "exact"),
     nameAlone: r.nameAlone === true,
     guards: r.guards !== false,
+    deep: r.deep === true,
     threshold: Number.isFinite(t) ? Math.min(90, Math.max(25, Math.round(t))) : 50,
   };
 }
@@ -69,7 +72,7 @@ export function parseRules(raw: unknown): MatchRules {
 export function presetOf(rules: MatchRules): PresetId {
   for (const id of ["strict", "balanced", "loose"] as const) {
     const p = PRESETS[id];
-    if (p.email === rules.email && p.phone === rules.phone && p.name === rules.name && p.nameAlone === rules.nameAlone && p.guards === rules.guards && p.threshold === rules.threshold) return id;
+    if (p.email === rules.email && p.phone === rules.phone && p.name === rules.name && p.nameAlone === rules.nameAlone && p.guards === rules.guards && p.deep === rules.deep && p.threshold === rules.threshold) return id;
   }
   return "custom";
 }
@@ -81,6 +84,7 @@ export function describeRules(rules: MatchRules): string {
   if (rules.phone !== "off") bits.push(rules.phone === "exact" ? "the same phone number, as typed" : rules.phone === "similar" ? "the same phone number in any format" : "the same phone number, even with two digits swapped");
   if (rules.name !== "off") bits.push(rules.name === "exact" ? "the same name (as extra proof)" : "a similar name");
   if (rules.nameAlone && rules.name !== "off") bits.push("a name on its own");
+  if (rules.deep) bits.push("the same person with different details (a new phone, a second email, a nickname)");
   return `Looks for ${bits.length ? bits.join(", ") : "nothing"}. ${rules.threshold >= 80 ? "Only very sure matches are shown." : rules.threshold <= 35 ? "Even weak matches are shown." : "Likely matches are shown."}`;
 }
 
