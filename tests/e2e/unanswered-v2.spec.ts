@@ -59,12 +59,12 @@ for (const role of ROLES) {
 /**
  * Presses a number and checks that the list it opens holds exactly that many people. The number was read when the page loaded and the list is read when it is pressed; on the
  * slow demo that is minutes apart, and a person can cross the reply target in between (the clock moves, each number is right at its moment). So when the two differ the page is
- * loaded again and the pair is retaken, up to 4 times; a list that is always different still fails.
+ * loaded again and the pair is retaken, up to 6 times (a demo sign-in made by another test run elsewhere deletes and re-makes the four sample conversations, for about ten seconds each time on this machine, so a read can land in that gap; the transaction added to the demo seed in this stage closes the gap once every server runs it); a list that is always different still fails.
  */
 async function opensItsPeople(page: Page, press: () => Promise<number>, back = true) {
   let lastShown = -1, lastCount = -2;
-  for (let attempt = 0; attempt < 4; attempt++) {
-    if (attempt > 0) { await page.reload(); await expect(page.getByTestId("today-headline")).toBeVisible({ timeout: 90_000 }); }
+  for (let attempt = 0; attempt < 6; attempt++) {
+    if (attempt > 0) { await page.waitForTimeout(3000 * attempt); await page.reload(); await expect(page.getByTestId("today-headline")).toBeVisible({ timeout: 90_000 }); }
     lastShown = await press();
     try { await expect(page.getByTestId("wait-list-count")).toHaveText(String(lastShown), { timeout: 45_000 }); lastCount = lastShown; break; }
     catch { lastCount = n(await page.getByTestId("wait-list-count").innerText().catch(() => "-1")); }
