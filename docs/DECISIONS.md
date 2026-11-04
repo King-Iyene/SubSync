@@ -452,3 +452,11 @@ Decision: the screen is one sentence, one primary button ("Reply to the oldest w
 - **"What to say" is text only, reminders are dates to put in a calendar.** Nothing is sent and nothing is written to the CRM. The summary to copy or print leaves out the fee and private notes.
 - **No migration.** Everything reads tables that already exist.
 - **Not built on purpose:** sending reminders, importing fees from a pasted list (proposal), a client-facing share link, billing-based fees (needs financial scopes).
+
+## 4 Nov 2026: Workflows round 2 (pain points)
+
+- **Evidence is thin and said so.** `docs/research/WORKFLOWS_PAIN_POINTS.md`: 20 pain points from agency blogs and help pages (Reddit, the forum, G2 and YouTube were not readable). Verdicts: BUILD what is read only or SubSync side and has an endpoint; PROPOSAL for stuck in a wait step and which workflows touched a contact; SKIP for A2P status, usage cost (no endpoint found).
+- **Built:** "turned off" alert (published to draft or paused, seen between two updates, not by SubSync; also pushed through the shared dispatcher), compare the same workflow across client accounts with drift flags (states, versions, missing from some), name linter with a one-tap fix that opens the rename preview, near duplicate finder (same account, 80% shared words), review due (Review for 14 days), saved views (the person's own, in `saved_views`), command palette (Ctrl Shift K, this page only), hourly scheduled refresh route and a rehearsed weekly Proof email.
+- **The Proof email is a rehearsal.** The repo allows only the notification dispatcher to send email (a test enforces it), and the dispatcher has a fixed list of message types. Sending needs one new type there; until King approves that, the cron composes the mail and logs "WOULD SEND" even with `SEND_EMAIL_LIVE` on.
+- **One account picker.** The shell's account bar is not drawn on Workflows (same rule as Today); the page keeps its own picker. The page ignores the shared filter.
+- **Cron.** `api/cron/workflows` (hourly at :35, Bearer `CRON_SECRET`, read only, up to 8 client accounts per company per run, least recently read first, only companies with the module on and the paid plan). Registered in `vercel.json`, `route-guards.ts` and `docs/TENANCY.md`.

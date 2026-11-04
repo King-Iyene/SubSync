@@ -23,7 +23,7 @@ export async function ensureWorkflowsDemo(installationId: string): Promise<void>
   const db = sql();
   const [have] = await db`select 1 as x from workflow_items where installation_id = ${installationId} limit 1`;
   if (have) return;
-  const locs = await db`select location_id, name from locations where installation_id = ${installationId} and not ignored order by name limit 6`;
+  const locs = await db`select location_id, name from locations where installation_id = ${installationId} and not ignored order by name limit 20`;
   if (locs.length === 0) return;
   const now = Date.now();
   let n = 0;

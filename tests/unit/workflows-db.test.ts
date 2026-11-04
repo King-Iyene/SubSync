@@ -173,6 +173,45 @@ describe.skipIf(!HAS_DB)("Workflows module", () => {
     expect(p.status).toBe(200);
   });
 
+  it("round 2: tidy, turned off and saved views stay inside the session", async () => {
+    await sql()`insert into workflow_items (installation_id, location_id, workflow_id, name, status, remote_updated_at) values
+      (${instA}, ${A1}, 'a1-w3', 'Missed Call Text Back (copy)', 'draft', now()), (${instA}, ${A2}, 'a2-w2', 'Missed Call Text Back', 'published', now()),
+      (${instA}, ${A2}, 'a2-w3', 'Welcome  Message ', 'draft', now()), (${instB}, ${B1}, 'b1-w2', 'Missed Call Text Back', 'published', now())`;
+    await sql()`insert into workflow_changes (installation_id, location_id, workflow_id, kind, source, before, after, created_at) values (${instA}, ${A1}, 'a1-w3', 'status', 'observed', ${sql().json({ status: "published" } as never)}, ${sql().json({ status: "draft" } as never)}, now() - interval '1 day')`;
+    const t = session(CO_A, "agency", null);
+    const v = await call(t, "GET", "workflows");
+    expect(v.body.findings.some((f: Json) => f.kind === "turned_off" && f.workflowId === "a1-w3")).toBe(true);
+    const cmp = v.body.tidy.compare.find((g: Json) => g.name.startsWith("Missed Call Text Back"));
+    expect(cmp.items.map((i: Json) => i.locationId).sort()).toEqual([A1, A1, A2].sort());
+    expect(cmp.items.some((i: Json) => i.locationId === B1)).toBe(false);
+    expect(v.body.tidy.names.map((n: Json) => n.issue).sort()).toEqual(expect.arrayContaining(["copy", "spaces"]));
+    expect(v.body.tidy.dupes.length).toBeGreaterThan(0);
+    expect((await call(session(CO_A, "client", A2), "GET", "workflows")).body.tidy).toBeNull();
+    // saved views: only the person's own choices, another company's account id is dropped, a client may not save, and a view is private to its owner
+    const save = await call(t, "POST", "workflows/views", { name: "Mine", filters: { show: "both", tab: "tidy", picked: [A1, B1, "nonsense"] } });
+    expect(save.status).toBe(200);
+    const list = await call(t, "GET", "workflows/views");
+    expect(list.body.views).toHaveLength(1);
+    expect(list.body.views[0].filters.picked).toEqual([A1]);
+    expect((await call(session(CO_A, "client", A1), "POST", "workflows/views", { name: "x", filters: {} })).status).toBeGreaterThanOrEqual(403);
+    expect((await call(session(CO_A, "client", A1), "GET", "workflows/views")).body.views).toEqual([]);
+    expect((await call(session(CO_B, "agency", null), "GET", "workflows/views")).body.views).toEqual([]);
+    expect((await call(t, "POST", "workflows/views", { name: " ", filters: {} })).status).toBe(400);
+    expect((await call(t, "DELETE", "workflows/views?name=Mine")).status).toBe(200);
+    expect((await call(t, "GET", "workflows/views")).body.views).toEqual([]);
+  });
+
+  it("the scheduled refresh answers only to the secret, and only touches companies that have the module on", async () => {
+    const { GET } = await import("@/app/api/cron/workflows/route");
+    process.env.CRON_SECRET = "test-secret-for-workflows";
+    expect((await GET(new Request("http://localhost/api/cron/workflows"))).status).toBe(401);
+    expect((await GET(new Request("http://localhost/api/cron/workflows", { headers: { Authorization: "Bearer wrong" } }))).status).toBe(401);
+    const ok = await GET(new Request("http://localhost/api/cron/workflows", { headers: { Authorization: "Bearer test-secret-for-workflows" } }));
+    expect(ok.status).toBe(200);
+    const b = (await ok.json()) as Json;
+    expect(typeof b.companies).toBe("number");
+  });
+
   it("with the tables missing the page still opens, empty", async () => {
     await sql()`alter table workflow_items rename to workflow_items_hidden`;
     try {

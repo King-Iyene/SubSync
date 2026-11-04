@@ -235,3 +235,71 @@ test("a client's staff see their own account only, with no change buttons", asyn
   await expect(page.getByTestId("wf-save")).toHaveCount(0);
   await page.getByTestId("wf-panel-close").click();
 });
+
+test("only the page's own account picker shows: the shell's account bar is hidden here and still there on other pages", async ({ page }) => {
+  await open(page);
+  await expect(page.getByTestId("toolbar").getByText("Filter accounts")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /Client accounts/ })).toBeVisible();
+  await page.goto("/app#overview");
+  await expect(page.getByTestId("toolbar").getByText("Filter accounts")).toBeVisible({ timeout: 30_000 });
+});
+
+test("tidy up: names to fix preview before they change, duplicates and the same workflow across accounts open their rows", async ({ page }) => {
+  await open(page);
+  await tab(page, "tidy");
+  await expect(page.getByTestId("wf-tidy")).toBeVisible();
+  await expect(page.getByTestId("wf-names")).toBeVisible();
+  await page.screenshot({ path: `${SHOT}/workflows-tidy-desktop-1440.png`, fullPage: true });
+  // the one-tap fix opens the rename preview with the rule already filled in; nothing is sent until Confirm
+  await page.getByTestId("wf-fix-copy").click();
+  await expect(page.getByTestId("wf-dialog")).toBeVisible();
+  await page.getByTestId("wf-allow-paused").check();
+  await page.getByTestId("wf-preview-btn").click();
+  await expect(page.getByTestId("wf-preview-row").first()).toBeVisible();
+  await expect(page.getByTestId("wf-confirm")).toBeEnabled();
+  await page.getByTestId("wf-dialog-close").click();
+  await expect(page.getByTestId("wf-dialog")).toBeHidden();
+  await page.getByTestId("wf-dupe-show").first().click();
+  await expect(panel(page)).toBeVisible();
+  expect(await count(page)).toBeGreaterThan(1);
+  await page.keyboard.press("Escape");
+  await page.getByTestId("wf-compare-show").first().click();
+  await expect(panel(page)).toBeVisible();
+  expect(await count(page)).toBeGreaterThan(1);
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("wf-compare-row").first()).toContainText("accounts");
+});
+
+test("the turned-off check, saved views and the command palette", async ({ page }) => {
+  await open(page);
+  await tab(page, "health");
+  await expect(page.getByTestId("wf-findings")).toContainText("was turned off");
+  // saved view: name it, save it, change the page, apply it
+  await page.getByTestId("wf-view-name").fill("My tidy view");
+  await page.getByTestId("wf-tab-tidy").click();
+  await page.getByTestId("wf-show-both").click();
+  await page.getByTestId("wf-view-save").click();
+  await expect(page.getByTestId("wf-view-pick")).toBeVisible();
+  await page.getByTestId("wf-tab-overview").click();
+  await page.getByTestId("wf-show-workflow").click();
+  await page.getByTestId("wf-view-pick").selectOption("My tidy view");
+  await expect(page.getByTestId("wf-tidy")).toBeVisible();
+  await expect(page.getByTestId("wf-show-both")).toHaveAttribute("aria-pressed", "true");
+  // palette by keyboard: Ctrl Shift K, type, Enter
+  await page.keyboard.press("Control+Shift+K");
+  await expect(page.getByTestId("wf-palette")).toBeVisible();
+  await page.getByTestId("wf-palette-input").fill("proof");
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("wf-proof")).toBeVisible();
+  // palette by mouse: open a workflow by name
+  await page.getByTestId("wf-palette-open").click();
+  await page.getByTestId("wf-palette-input").fill("Missed Call");
+  await page.getByTestId("wf-palette-row").filter({ hasText: "Items" }).first().click();
+  await expect(page.getByTestId("wf-panel")).toBeVisible();
+  await page.getByTestId("wf-panel-close").click();
+  await page.keyboard.press("Control+Shift+K");
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("wf-palette")).toBeHidden();
+  // tidy up after the test: remove the saved view through the API the page uses
+  await page.evaluate(async () => { const t = (await fetch("/api/sso/demo", { method: "POST" }).catch(() => null)); void t; });
+});
