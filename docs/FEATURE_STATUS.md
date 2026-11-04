@@ -149,6 +149,7 @@ connections, appointment insights, two-agency tenant isolation, feature switches
 | Item | Status | Tested |
 | --- | --- | --- |
 | Today front door: leads waiting, appointments to fix, accounts needing attention, in plain words | Built | 15 browser tests at 3 widths |
+| Today rebuilt: outcome headline, Fix first queue, clickable donut and bars, vs your usual, what SubSync caught, account view for setters and client staff (3 Nov 2026) | Built, awaiting King's checks | Demo company only, not yet on real installs (docs/features/TODAY.md) |
 | First-sync-only banner, filter drawer, one-sentence subtitle, outlier note | Built | Browser tests |
 | Opens on the launching client account, with a way back to all accounts | Built | Browser test (simulated launch) |
 | Overview merged into Today and hidden | Not done on purpose (King: do not hide pages) | n/a |

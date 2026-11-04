@@ -141,3 +141,10 @@ export async function speedPart(installationId: string, allowed: string[] | null
   }
   return { ...base, rows: peoplePart(rows, lk) };
 }
+
+// The lead arrivals and first replies of the last 14 days for the accounts the caller may see, nothing else: what Today's "reply speed against your usual" and the
+// answered-in-time streak are worked out from (src/lib/analytics/today-queue.ts). The same rows, the same exclusions, the same window as the Speed to lead screen.
+export async function replyRows(installationId: string, allowed: string[] | null, now = Date.now()): Promise<Array<{ locationId: string; leadAt: number; touchAt: number | null }>> {
+  const rows = await loadRows(sql(), installationId, allowed, now - SPEED_WINDOW_DAYS * DAY, now + DAY);
+  return rows.map((r) => ({ locationId: r.locationId, leadAt: r.leadAt, touchAt: r.touchAt }));
+}

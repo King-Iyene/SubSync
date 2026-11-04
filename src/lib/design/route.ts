@@ -1,4 +1,5 @@
 import { EMPTY_FILTER, filterFromLink, filterToLink, type FilterValue } from "./filters.ts";
+import { rangesOf } from "./range.ts";
 
 // The address of a page inside the app, kept in the part after the # so the browser's Back button, a reload and a pasted link all land where
 // the person was, with the same filter (N7, N8). Pure; the shell reads and writes it.
@@ -26,6 +27,17 @@ export function buildHash(view: ViewState, filter: FilterValue, ranges = ""): st
   const head = view.id === "account" && view.locationId ? `account=${encodeURIComponent(view.locationId)}` : view.id;
   const q = [filterToLink(filter), ranges].filter(Boolean).join("&");
   return `#${head}${q ? `?${q}` : ""}`;
+}
+
+/**
+ * The parts of an address that a page keeps when the shell rewrites it: the card ranges (`r.*`) and Today's own account choice (`ta=`). The shell passes this
+ * where it used to pass the ranges alone, so leaving Today and coming Back lands on the same accounts.
+ */
+export function keptParams(hash: string): string {
+  const q = hash.indexOf("?");
+  const ta = q === -1 ? null : new URLSearchParams(hash.slice(q + 1)).get("ta");
+  const ids = ta ? ta.split(",").filter((x) => /^[A-Za-z0-9_-]{3,64}$/.test(x)).slice(0, 50) : [];
+  return [rangesOf(hash), ids.length ? `ta=${ids.join(",")}` : ""].filter(Boolean).join("&");
 }
 
 export const sameView = (a: ViewState, b: ViewState) => a.id === b.id && (a.locationId ?? "") === (b.locationId ?? "");

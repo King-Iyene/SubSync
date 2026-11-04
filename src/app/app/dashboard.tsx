@@ -4,7 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import { accentTokens } from "@/lib/design/color";
 import { EMPTY_FILTER, filterFromLink, filterToLink, filterToQuery, isFiltered, type FilterValue } from "@/lib/design/filters";
 import { buildHash, parseHash, type ViewState } from "@/lib/design/route";
-import { rangesOf } from "@/lib/design/range";
+import { keptParams } from "@/lib/design/route";
+import { withTodayAccounts } from "@/lib/analytics/today-queue";
 import { THEME_PREFS, type ThemePref } from "@/lib/design/ui-logic";
 import { NAV_FOR, type AccessKind } from "@/lib/access";
 import {
@@ -199,15 +200,16 @@ export function Dashboard() {
   const move = useCallback((next: { id: ViewId; locationId?: string }, keepTrail: boolean) => {
     const here = viewRef.current;
     // Today for ONE client account (stage F5, N2): the same page with the filter narrowed to that account. The way back returns to the filter that was on.
-    const scoped = next.id === "today" && next.locationId ? { ...EMPTY_FILTER, accounts: [next.locationId] } : null;
-    const target: { id: ViewId; locationId?: string } = scoped ? { id: "today" } : next;
-    if (!scoped && here.id === next.id && (here.locationId ?? "") === (next.locationId ?? "")) { window.scrollTo({ top: 0 }); return; }
+    // Today's own account choice (`ta=`) belongs to Today alone: it does not touch the shared filter that every other page uses.
+    const only = next.id === "today" && next.locationId ? next.locationId : null;
+    const target: { id: ViewId; locationId?: string } = only ? { id: "today" } : next;
+    if (!only && here.id === next.id && (here.locationId ?? "") === (next.locationId ?? "")) { window.scrollTo({ top: 0 }); return; }
     // The entry being left keeps its own filter in its address (a remembered filter is not in the address yet), so Back lands on the same numbers.
-    try { window.history.replaceState(null, "", buildHash(here, filterRef.current, rangesOf(window.location.hash))); } catch { /* see below */ }
+    try { window.history.replaceState(null, "", buildHash(here, filterRef.current, keptParams(window.location.hash))); } catch { /* see below */ }
     setTrail((t) => (keepTrail ? [...t, here].slice(-12) : []));
     setViewState(target);
-    if (scoped) { setFilterState(scoped); filterRef.current = scoped; }
-    try { window.history.pushState(null, "", buildHash(target, scoped ?? filterRef.current)); } catch { /* a frame that forbids it: the screen still changes */ }
+    try { window.history.pushState(null, "", only ? withTodayAccounts(buildHash(target, filterRef.current), [only]) : buildHash(target, filterRef.current)); } catch { /* a frame that forbids it: the screen still changes */ }
+    if (only) window.dispatchEvent(new Event("subsync-today-accounts"));
     window.scrollTo({ top: 0 });
   }, []);
   const go: GoFn = useCallback((id, locationId) => move({ id, locationId }, true), [move]);
@@ -215,7 +217,7 @@ export function Dashboard() {
   const setFilter = useCallback((f: FilterValue) => {
     setFilterState(f);
     remember("filter", isFiltered(f) ? filterToLink(f) : null);
-    try { window.history.replaceState(null, "", buildHash(viewRef.current, f, rangesOf(window.location.hash))); } catch { /* see above */ }
+    try { window.history.replaceState(null, "", buildHash(viewRef.current, f, keptParams(window.location.hash))); } catch { /* see above */ }
   }, []);
   // The browser Back and Forward buttons: read the page and filter from the address.
   useEffect(() => {
@@ -247,7 +249,7 @@ export function Dashboard() {
       // Not remembered: the next time SubSync is opened from the agency menu it must show every client account again.
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setFilterState(only);
-      try { window.history.replaceState(null, "", buildHash({ id: "today" }, only)); } catch { /* the screen still narrows */ }
+      try { window.history.replaceState(null, "", withTodayAccounts(buildHash({ id: "today" }, only), [auth.locationId])); window.dispatchEvent(new Event("subsync-today-accounts")); } catch { /* the screen still narrows */ }
     }
   }, [auth]);
   // True while the page shows only the account SubSync was opened from (the filter is that one account). Pages draw no account filter then.
@@ -299,7 +301,7 @@ export function Dashboard() {
   ));
   const labelFor = (n: (typeof NAV)[number]) => (limited && n.id === "overview" ? "My account" : n.label);
   // Pages that live inside another page highlight their parent in the menu.
-  const shown: ViewId = auth.kind === "client" && view.id === "today" ? "myday" : view.id;
+  const shown: ViewId = view.id;
   const active = limited && shown === "onboarding" ? shown : PARENT[shown] ?? shown;
   const agency = auth.demo ? "Demo Company" : limited ? "Your business" : "Your company";
   const own = auth.locationId;
@@ -317,7 +319,7 @@ export function Dashboard() {
   const content = (() => {
     // A business or a client sees its own account as the home page, never an accounts list.
     if (limited) {
-      const id = view.id === "account" ? "overview" : view.id === "today" && auth.kind === "client" ? "myday" : view.id;
+      const id = view.id === "account" ? "overview" : view.id;
       if (!NAV_FOR[auth.kind].has(id)) return <Centered title="Not available" body="This page is not part of your view of SubSync." />;
       // A page that is switched off is switched off for a business too (the menu already leaves it out; this covers a typed address).
       const pageFeature = NAV.find((n) => n.id === id)?.feature;
@@ -329,7 +331,8 @@ export function Dashboard() {
     if (feature && off(feature)) return <Centered title="Not available" body="This page is switched off right now." />;
     if (feature && locked(feature)) return <Centered title="Part of the paid plan" body="This page is included in the Pro plan. Ask whoever manages your SubSync plan to upgrade, and it appears here straight away." />;
     switch (view.id) {
-      case "today": return <TodayView go={go} />;
+      // Today reads with the unfiltered client and applies its own account choice, so the shared filter never changes what Today counts.
+      case "today": return <ApiProvider value={baseApi}><TodayView go={go} kind={auth.kind} /></ApiProvider>;
       case "myday": return <MyDayView go={go} />;
       case "people": case "search": case "leads": case "calls": return peopleOn ? <PeopleModule key={"people" + peopleStart} start={peopleStart} callsAllowed={callsAllowed} /> : <Centered title="Not available" body="This page is switched off right now." />;
       case "audit": return <AuditView go={go} />;
@@ -412,7 +415,7 @@ export function Dashboard() {
           </nav>
           <main className="mx-auto w-full max-w-[1400px] flex-1 p-4 sm:px-10 sm:py-8">
             {fromAccount && (
-              <InlineAlert className="mb-3" action={<Btn variant="ghost" onClick={() => setFilter(EMPTY_FILTER)}>See all client accounts</Btn>}>
+              <InlineAlert className="mb-3" action={<Btn variant="ghost" onClick={() => { setFilter(EMPTY_FILTER); try { window.history.replaceState(null, "", withTodayAccounts(window.location.hash, [])); window.dispatchEvent(new Event("subsync-today-accounts")); } catch { /* see above */ } }}>See all client accounts</Btn>}>
                 You opened this from inside a client account, so every page shows only that account.
               </InlineAlert>
             )}
@@ -420,7 +423,8 @@ export function Dashboard() {
             {/* One slim row above every page: which client accounts are counted on the left, search and notifications on the right (D1; was four stacked blocks). */}
             <div className="mb-3 flex flex-wrap items-start gap-x-4 gap-y-1 print:hidden" data-testid="toolbar">
               <div className="min-w-0 flex-1">
-                {auth.kind === "agency" && baseApi && !fromAccount && <ApiProvider value={baseApi}><FilterDrawer kind="agency" value={filter} onChange={setFilter} /></ApiProvider>}
+                {/* Today draws its own account selector inside the page; the shared one is for every other page. */}
+                {auth.kind === "agency" && baseApi && !fromAccount && view.id !== "today" && <ApiProvider value={baseApi}><FilterDrawer kind="agency" value={filter} onChange={setFilter} /></ApiProvider>}
               </div>
               <div className="ml-auto flex shrink-0 items-center">
                 {NAV_FOR[auth.kind].has("search") && !off("search") && <GlobalSearch go={go} />}

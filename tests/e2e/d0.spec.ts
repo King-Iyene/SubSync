@@ -47,6 +47,7 @@ test("the style guide shows the plain status words and notices: no pill, dot, ti
 
 test("the style guide's list, lead panel and charts work", async ({ page }) => {
   await page.goto("/design");
+  await page.waitForLoadState("networkidle").catch(() => undefined); // the page is a long one: let it hydrate before the first click
   const list = page.getByTestId("data-list").first();
   await expect(list).toHaveAttribute("data-mode", "preview");
   await expect(list.getByTestId("list-range")).toHaveText("Showing 10 of 37");
@@ -75,6 +76,7 @@ test("the style guide's list, lead panel and charts work", async ({ page }) => {
 
 test("a company's own colour sits on top and stays readable", async ({ page }) => {
   await page.goto("/design");
+  await page.waitForLoadState("networkidle").catch(() => undefined);
   const before = await page.locator("[data-theme]").first().evaluate((el) => getComputedStyle(el).getPropertyValue("--primary").trim());
   await page.getByRole("button", { name: "Use #02244f" }).click();
   const after = await page.locator("[data-theme]").first().evaluate((el) => getComputedStyle(el).getPropertyValue("--primary").trim());
@@ -173,8 +175,8 @@ test("the light and dark choice changes the page and is remembered", async ({ pa
   await page.getByRole("group", { name: "Appearance" }).getByRole("button", { name: "Dark appearance" }).click(); // leave it as it was
 });
 
-test("a client's staff land on My day: one column, large tap targets, no sideways scroll", async ({ page }) => {
-  await page.goto("/app?as=client");
+test("a client's staff open My day from the menu: one column, large tap targets, no sideways scroll (they land on Today, their own account, first)", async ({ page }) => {
+  await page.goto("/app?as=client#myday");
   await page.reload();
   await expect(page.getByRole("heading", { level: 1, name: "My day", exact: true })).toBeVisible({ timeout: 60_000 });
   await page.waitForLoadState("networkidle").catch(() => undefined);

@@ -72,6 +72,7 @@ import { locationAccessToken } from "../sync/engine";
 import { createHook, listHooks, listMeetings, MAX_HOOKS_PER_ACCOUNT, revokeHook, setMeetingStatus } from "../analytics/meeting-queries";
 import { buildDailyDigest, NOT_WATCHED, seriesByLocation } from "../analytics/digest-service";
 import { portfolioRangeChanges, validFromDay, validToDay } from "../analytics/today-intel";
+import { buildToday } from "./today-api";
 import { digestText, localParts } from "../analytics/digest-intel";
 import { industryKey, industryOptions, matchesSegment, PLAYBOOKS } from "../analytics/playbooks";
 import { buildQueue, recordBulk, recordDecision, summarise, undoDecision } from "../analytics/dedupe-queries";
@@ -258,7 +259,7 @@ async function computeAudit(ctx: Ctx, withLists = false) {
     lists = { stale: withUrl(stale), slow: withUrl(waiting) };
     if (appts) { lists.unmarked = withUrl(appointmentList(v.unmarked, v.unmarkedTotal, "Started")); lists.noshows = withUrl(appointmentList(v.recover, v.recoverTotal, "No-show on")); }
   }
-  return { audit, who, names: live.map((a) => a.name ?? "").filter(Boolean), settings, hidden, lists, readLimit };
+  return { audit, who, names: live.map((a) => a.name ?? "").filter(Boolean), settings, hidden, lists, readLimit, live, links, apptView: v };
 }
 
 async function auditViewData(ctx: Ctx) {
@@ -640,6 +641,14 @@ async function dailyChanges(ctx: Ctx) {
   const span = Math.round((Date.parse(`${today}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000) + 2;
   const series = await seriesByLocation(ctx.installationId, ids, span);
   return json({ from, to, accounts: ids.length, changes: portfolioRangeChanges([...series.values()], from, to) });
+}
+
+// The rebuilt Today: the ranked things to fix, the five kinds behind them, reply speed against the account's own usual and what SubSync caught (src/lib/api/today-api.ts).
+// The accounts come from the signed session (a business or a client's staff see only their own, whatever `accounts=` says) and the page filter, never from a parameter alone.
+async function todayView(ctx: Ctx) {
+  const sc = await scope(ctx);
+  const [allowed, audit] = await Promise.all([allowedIds(ctx), computeAudit(ctx, true)]);
+  return json(await buildToday({ installationId: ctx.installationId, kind: ctx.kind, limitTo: ctx.limitTo, now: Date.now(), allowed, settings: sc.settings, audit, links: sc.links, permits: sc.permits }));
 }
 
 const USAGE_VIEWS = new Set(["today", "overview", "accounts", "clients", "team", "search", "deals", "pipeline", "leads", "calls", "inbox", "onboarding", "email", "duplicates", "alerts", "settings", "help", "account", "meetings", "audit", "speed", "appointments", "people", "myday", "roadmap", "notifications"]);
@@ -1793,7 +1802,7 @@ const clientDeps: clientRoutes.Deps = { allowedIds, accountsFor, actorOf: (ctx) 
 
 const FEATURE_FOR: Record<string, Feature> = {
   search: "search", onboarding: "onboarding", stale: "stale", inbox: "inbox", pipelines: "pipelines", duplicates: "duplicates", email: "email",
-  "meeting-inbox": "meetings", "meeting-setup": "meetings", "my-connections": "connections", "team-connections": "connections", "meeting-policy": "connections", alerts: "alerts", notifications: "alerts", "notification-prefs": "alerts", "notification-destinations": "alerts", appointments: "appointments", audit: "audit", speed: "speed", "appointment-insights": "appointments", meetings: "meetings", connections: "connections", cleanup: "cleanup", "setup-compare": "setup_compare", playbooks: "playbooks", daily: "overview", team: "team", "deal-events": "pipelines", contact: "search", settings: "settings", export: "exports", digest: "overview", "api-keys": "ai", hygiene: "stale", "pipeline-intel": "pipelines", "contact-intel": "activity", clients: "clients", qbr: "reports", "comms-intel": "inbox", "deal-gaps": "pipelines", "call-queue": "calls", "call-lists": "calls", "call-outcomes": "calls", people: "search", "client-onboarding": "onboarding",
+  "meeting-inbox": "meetings", "meeting-setup": "meetings", "my-connections": "connections", "team-connections": "connections", "meeting-policy": "connections", alerts: "alerts", notifications: "alerts", "notification-prefs": "alerts", "notification-destinations": "alerts", appointments: "appointments", audit: "audit", speed: "speed", "appointment-insights": "appointments", meetings: "meetings", connections: "connections", cleanup: "cleanup", "setup-compare": "setup_compare", playbooks: "playbooks", daily: "overview", today: "overview", team: "team", "deal-events": "pipelines", contact: "search", settings: "settings", export: "exports", digest: "overview", "api-keys": "ai", hygiene: "stale", "pipeline-intel": "pipelines", "contact-intel": "activity", clients: "clients", qbr: "reports", "comms-intel": "inbox", "deal-gaps": "pipelines", "call-queue": "calls", "call-lists": "calls", "call-outcomes": "calls", people: "search", "client-onboarding": "onboarding",
 };
 
 export async function handle(request: Request, segments: string[]): Promise<Response> {
@@ -1818,6 +1827,7 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
     }
     if (method === "GET") {
       if (a === "overview") return await overview(ctx);
+      if (a === "today" && !b) return await todayView(ctx);
       if (a === "daily" && b === "changes") return await dailyChanges(ctx);
       if (a === "daily") return await dailyView(ctx);
       if (a === "roadmap") return await roadmapView(ctx);

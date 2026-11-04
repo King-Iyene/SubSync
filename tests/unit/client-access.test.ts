@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { mayDeleteData, NAV_FOR, routeAllowed } from "@/lib/access";
 import type { Identity, Role } from "@/lib/identity";
 
+// (Today, rebuilt: a client's staff may read `today`; it holds only their own account whatever the address says, see tests/unit/today-db.test.ts.)
 // N84: "They see a read-only view of that one account only: never other clients, your fees, notes or settings" is a security claim, so it is
 // tested. This file covers the rule itself (what a client's staff may call at all); scripts/check-tenancy.ts proves the answers over real HTTP
 // against two real fixture companies with fees, notes, settings, keys and a second client, and that switching client access off removes access
@@ -11,7 +12,7 @@ import type { Identity, Role } from "@/lib/identity";
 const METHODS = ["GET", "POST", "PUT", "DELETE"] as const;
 
 // Everything a client's staff may call. Anything else is refused, whatever it is called.
-const CLIENT_GET = new Set(["people", "notifications", "my-connections", "team-connections", "meeting-inbox", "meeting-setup", "overview", "accounts", "onboarding", "search", "stale", "hygiene", "inbox", "pipelines", "duplicates", "alerts", "pipeline-intel", "contact-intel", "comms-intel", "deal-gaps", "deal-events", "contact", "start", "appointments", "appointment-insights", "audit", "speed", "roadmap", "freshness", "people", "client-trends"]);
+const CLIENT_GET = new Set(["today", "people", "notifications", "my-connections", "team-connections", "meeting-inbox", "meeting-setup", "overview", "accounts", "onboarding", "search", "stale", "hygiene", "inbox", "pipelines", "duplicates", "alerts", "pipeline-intel", "contact-intel", "comms-intel", "deal-gaps", "deal-events", "contact", "start", "appointments", "appointment-insights", "audit", "speed", "roadmap", "freshness", "people", "client-trends"]);
 // Stage E0: every role connects its OWN tools, so these doors are open to a client's staff too. They only ever touch the signed-in person's own rows
 // (my-connections), or, for an account administrator only, the status of the people of their own account (team-connections) and that account's rule
 // (meeting-policy). meeting-inbox (stage E2a) is the signed-in person's OWN inbox: every query names their installation and user id. The handlers refuse an account user for the last two; tests/unit/e0-connections-db.test.ts asks them with real sessions.
@@ -72,7 +73,7 @@ describe("a client's staff can call only the read-only views of their own accoun
   });
 
   it("the client menu has no page that shows fees, notes, settings, other clients or the company's controls", () => {
-    for (const page of ["settings", "clients", "accounts", "team", "meetings", "cleanup", "calls", "email", "today", "roadmap-admin"]) expect(NAV_FOR.client.has(page), `client menu: ${page}`).toBe(false);
+    for (const page of ["settings", "clients", "accounts", "team", "meetings", "cleanup", "calls", "email", "roadmap-admin"]) expect(NAV_FOR.client.has(page), `client menu: ${page}`).toBe(false);
     expect(NAV_FOR.business.has("clients")).toBe(false);
   });
 });

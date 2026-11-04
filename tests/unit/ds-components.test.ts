@@ -246,11 +246,13 @@ describe("the menu structure", () => {
     for (const n of NAV) if (n.parent) expect(NAV.some((p) => p.id === n.parent), n.id).toBe(true);
     for (const id of NAV.map((n) => n.id)) if (id !== "myday") expect(NAV_FOR.agency.has(id), `agency sees ${id}`).toBe(true);
   });
-  it("My day is for a client's staff and a business, not for an agency; a client does not get Today", () => {
+  it("My day is for a client's staff and a business, not for an agency; Today is for everyone, and a client's Today is their own account only (the server enforces it)", () => {
     expect(NAV_FOR.client.has("myday")).toBe(true);
     expect(NAV_FOR.business.has("myday")).toBe(true);
     expect(NAV_FOR.agency.has("myday")).toBe(false);
-    expect(NAV_FOR.client.has("today")).toBe(false);
+    expect(NAV_FOR.client.has("today")).toBe(true);
+    expect(NAV_FOR.business.has("today")).toBe(true);
+    expect(NAV_FOR.agency.has("today")).toBe(true);
   });
 });
 

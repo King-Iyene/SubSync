@@ -1,7 +1,7 @@
 import { expect, test, type APIRequestContext } from "@playwright/test";
 
-// F5: Today is the front door. In five seconds, in plain words: leads waiting, appointments to fix, accounts needing attention. WRITTEN in the parallel
-// stage (branch stage/F5) and NOT RUN there: the lead runs it after the merge, on the demo company, at the three widths (390, 768, 1440).
+// Today, rebuilt: one sentence, four figures against the account's own usual, the Fix first queue, clickable charts, accounts needing you, what SubSync caught.
+// Run on the demo company as an agency owner, a business administrator and a client's staff user, at 1440 (and the other widths of the projects).
 type Json = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 
 async function api(request: APIRequestContext, as?: "business" | "client") {
@@ -14,121 +14,247 @@ async function api(request: APIRequestContext, as?: "business" | "client") {
       return (await res.json()) as Json;
     },
     status: async (path: string): Promise<number> => (await request.get(`/api/app/${path}`, { headers })).status(),
-    put: async (path: string, data: unknown): Promise<number> => (await request.put(`/api/app/${path}`, { headers, data })).status(),
   };
 }
 
-test("the first thing on Today is the leads-waiting sentence, in the first screen, within five seconds, with the button under it", async ({ page, request }, testInfo) => {
+test("the first thing on Today is the one sentence, big, on the first screen, with the queue starting under the figures", async ({ page, request }, testInfo) => {
   const { get } = await api(request);
-  const speed = await get("speed");
-  const waiting = Math.max(0, speed.overall.stillWaiting - (speed.neverAnswered ?? 0));
-  const never = speed.neverAnswered ?? 0;
+  const today = await get("today");
   await page.goto("/app");
-  const headline = page.getByTestId("leads-headline");
-  await expect(headline).toBeVisible({ timeout: 5000 });
-  await expect(headline, "the headline is on the first screen, not below the fold").toBeInViewport();
-  if (waiting > 0) await expect(headline).toHaveText(new RegExp(`^${waiting} leads? (is|are) waiting for a reply`));
-  else await expect(headline).toContainText(never > 0 ? "never answered" : "No leads are waiting");
-  if (never > 0) await expect(headline).toContainText(`${never} ${never === 1 ? "was" : "were"} never answered`);
-  // The one thing to do first is a button, on the first screen too, when there is something to do.
-  if (waiting + never > 0) {
-    const first = page.getByTestId("do-first");
-    await expect(first.getByRole("button", { name: "Open Speed to lead" })).toBeInViewport();
+  const headline = page.getByTestId("today-headline");
+  await expect(headline).toBeVisible({ timeout: 15_000 });
+  await expect(headline).toBeInViewport();
+  const rows = today.queue as Json[];
+  if (rows.length > 0) {
+    const clients = new Set(rows.map((r) => r.locationId)).size;
+    await expect(headline).toContainText(new RegExp(`${clients} clients? needs? you today\\.`), { timeout: 10_000 });
+  } else {
+    await expect(headline).toContainText("Every client account is on track today.");
   }
+  await expect(page.getByTestId("today-pulse").locator("[data-verdict]")).toHaveCount(4);
+  await expect(page.getByTestId("fix-first")).toBeVisible();
   await page.waitForLoadState("networkidle").catch(() => undefined);
-  await page.screenshot({ path: `docs/review/f5-today-${testInfo.project.name}.png`, fullPage: true });
+  await page.screenshot({ path: `docs/review/today-after-${testInfo.project.name}.png`, fullPage: true });
 });
 
-test("the five-second test: the page says what it is for, and what to do next, before anything is pressed", async ({ page }) => {
+test("the five-second test: what the page is for is in the subtitle, and nothing on the headline words the age of the data", async ({ page }) => {
   await page.goto("/app");
   await expect(page.getByRole("heading", { level: 1, name: "Today" })).toBeVisible();
-  await expect(page.getByTestId("page-subtitle")).toContainText("checked for leads waiting, missed appointments and stalled deals. Start at the top.");
-  await expect(page.getByTestId("front-door")).toContainText("What needs you right now");
-  // One status line, drawn by the shell, and nothing on Today words the age of the data a second time.
-  await expect(page.getByTestId("front-door")).not.toContainText(/updated|synced|last read/i);
+  await expect(page.getByTestId("page-subtitle")).toContainText("What needs a person across your client accounts, most valuable first.");
+  await expect(page.getByTestId("today-headline-block")).not.toContainText(/updated|synced|last read/i);
 });
 
-test("the lines are the same numbers their own pages show", async ({ page, request }) => {
+test("the figures are the numbers their own pages show", async ({ page, request }) => {
   const { get } = await api(request);
-  const [daily, appts] = await Promise.all([get("daily"), get("appointments")]);
+  const [speed, appts] = await Promise.all([get("speed"), get("appointments")]);
   await page.goto("/app");
-  const door = page.getByTestId("front-door");
-  await expect(door).toBeVisible();
-  const unmarked = appts.unmarkedTotal as number;
-  if (unmarked > 0) await expect(door).toContainText(new RegExp(`${unmarked} past appointments? (has|have) no outcome recorded`));
-  else await expect(door).toContainText("Every past appointment has an outcome recorded");
-  const attention = daily.attention.length as number;
-  if (attention > 0) await expect(door).toContainText(new RegExp(`${attention} client accounts? needs? attention today`));
-  else await expect(door).toContainText("No client account needs you today");
-  // The count on the list below is the count in the sentence.
-  if (attention > 0) await expect(page.getByTestId("attention-list").locator(":scope > li")).toHaveCount(attention);
+  await expect(page.getByTestId("pulse-leads")).toContainText(String(speed.waitingTotal).replace(/\B(?=(\d{3})+(?!\d))/g, ","), { timeout: 15_000 });
+  await expect(page.getByTestId("pulse-appointments")).toContainText(String(appts.unmarkedTotal));
 });
 
-test("the sync banner is only for a first sync, and the filter sits in a drawer that explains itself", async ({ page, request }) => {
-  // The "Hide test accounts" help only exists while a test-named account is counted. The demo leaves its test account out on purpose, so bring it back
-  // for this test and put it back afterwards.
-  const c = await api(request);
-  const test_ = ((await c.get("settings")).testAccounts as Array<{ locationId: string; ignored: boolean }>).find((a) => a.ignored);
-  if (test_) expect(await c.put(`accounts/${test_.locationId}/flags`, { ignored: false })).toBe(200);
-  try {
+test("Today draws its own account selector and not the shared filter; the shared filter does not change Today and still works on other pages", async ({ page, request }) => {
+  const { get } = await api(request);
+  const baseline = await get("today");
+  await page.goto("/app#today?hideTest=1&industry=medical");
+  await expect(page.getByTestId("today-headline")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId("filter-drawer")).toHaveCount(0);
+  await expect(page.getByTestId("filter-row")).toHaveCount(0);
+  await expect(page.getByTestId("today-account-picker")).toBeVisible();
+  // The shared filter (industry, test accounts) names nothing Today counts: the same total as with no filter at all.
+  await expect(page.getByTestId("donut-total")).toContainText(String(baseline.items.length).replace(/\B(?=(\d{3})+(?!\d))/g, ","));
+  // Another page keeps the shared filter.
+  await page.goto("/app#speed");
+  await page.reload();
+  await expect(page.getByTestId("filter-drawer")).toBeVisible({ timeout: 30_000 });
+});
+
+test("the account selector narrows every number, is kept in the address as ta=, is remembered for Today only, and its chip clears it", async ({ page, request }) => {
+  const { get } = await api(request);
+  const base = await get("today");
+  const target = (base.queue as Json[])[0];
+  const mine = await get(`today?accounts=${target.locationId}`);
   await page.goto("/app");
-  await expect(page.getByTestId("front-door")).toBeVisible();
-  await expect(page.getByText("First sync in progress")).toHaveCount(0);
-  const drawer = page.getByTestId("filter-drawer");
-  await expect(drawer).toBeVisible();
-  await expect(drawer.getByText("Show only")).toBeHidden(); // closed until it is opened
-  await drawer.getByText("Filter accounts").click();
-  await expect(drawer.getByText("Show only")).toBeVisible();
-  // N1: where the kind of business comes from, what the number in brackets counts, what a test account is.
-  const help = drawer.getByTestId("filter-help");
-  await expect(help).toContainText("the industry you typed for each client");
-  await expect(help).toContainText("The number in brackets is how many client accounts have that kind");
-  await expect(help).toContainText("contains test, demo, sample, sandbox or dummy");
-  } finally {
-    if (test_) await c.put(`accounts/${test_.locationId}/flags`, { ignored: true });
+  await expect(page.getByTestId("today-headline")).toBeVisible({ timeout: 15_000 });
+  const picker = page.getByTestId("today-account-picker");
+  await picker.getByRole("button", { name: /Client accounts/ }).click();
+  await picker.getByLabel("Find a client account").fill(target.accountName);
+  await picker.getByRole("checkbox").first().check();
+  await picker.getByRole("button", { name: "Done" }).click();
+  expect(page.url()).toContain(`ta=${target.locationId}`);
+  const chip = page.getByTestId("today-toolbar").getByTestId("showing-chip");
+  await expect(chip).toContainText(target.accountName);
+  await expect(page.getByTestId("queue-row").first()).toContainText(target.accountName);
+  const rows = page.getByTestId("queue-row");
+  for (const r of await rows.all()) await expect(r).toContainText(target.accountName);
+  const total = (mine.items as Json[]).length;
+  await expect(page.getByTestId("donut-total")).toContainText(String(total).replace(/\B(?=(\d{3})+(?!\d))/g, ","));
+  // Remembered: a fresh visit to Today restores it; the Speed to lead page is not narrowed by it.
+  await page.goto("/app");
+  await expect(page.getByTestId("today-toolbar").getByTestId("showing-chip")).toContainText(target.accountName, { timeout: 15_000 });
+  await page.goto("/app#speed");
+  await page.reload();
+  await expect(page.getByTestId("filter-drawer")).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId("account-scope-summary").first()).toContainText(/All \d+ client accounts/);
+  // The chip's cross puts it back.
+  await page.goto("/app");
+  const again = page.getByTestId("today-toolbar").getByTestId("showing-chip");
+  await again.getByRole("button", { name: /Stop showing/ }).click();
+  await expect(again).toHaveCount(0);
+  expect(page.url()).not.toContain("ta=");
+});
+
+test("Fix first: seven rows, same four parts each, one main button, a quiet Show, and j k Enter", async ({ page }) => {
+  await page.goto("/app");
+  const rows = page.getByTestId("queue-row");
+  await expect(rows.first()).toBeVisible({ timeout: 15_000 });
+  expect(await rows.count()).toBeLessThanOrEqual(7);
+  for (const r of await rows.all()) {
+    await expect(r.getByTestId("queue-open")).toHaveText(/Open in CRM/);
+    await expect(r.getByTestId("queue-show")).toBeVisible();
+    await expect(r).toContainText(/Urgent|Soon|When you can/);
+    await expect(r).toContainText(/Wrong for/);
+  }
+  // Keyboard: j moves the highlight, k moves it back.
+  await expect(rows.nth(0)).toHaveAttribute("aria-current", "true");
+  await page.keyboard.press("j");
+  await expect(rows.nth(1)).toHaveAttribute("aria-current", "true");
+  await page.keyboard.press("k");
+  await expect(rows.nth(0)).toHaveAttribute("aria-current", "true");
+  // Enter opens the highlighted row in the CRM, in a new tab, with a link built from the account's own CRM address.
+  await page.evaluate(() => { (window as unknown as { __opened: string[] }).__opened = []; window.open = ((u: string) => { (window as unknown as { __opened: string[] }).__opened.push(u); return null; }) as typeof window.open; });
+  const first = await rows.nth(0).getByTestId("queue-open").getAttribute("href");
+  await page.keyboard.press("Enter");
+  const opened = await page.evaluate(() => (window as unknown as { __opened: string[] }).__opened);
+  expect(opened).toEqual([first]);
+  expect(first).toMatch(/^https:\/\//);
+});
+
+test("every Open in CRM link is a real https address in a new tab, and none is a phone link", async ({ page }) => {
+  await page.goto("/app");
+  await expect(page.getByTestId("queue-row").first()).toBeVisible({ timeout: 15_000 });
+  for (const a of await page.getByTestId("fix-first").locator("a").all()) {
+    expect(await a.getAttribute("href")).toMatch(/^https:\/\//);
+    expect(await a.getAttribute("target")).toBe("_blank");
+    expect(await a.getAttribute("rel")).toContain("noopener");
+  }
+  expect(await page.locator('a[href^="tel:"]').count()).toBe(0);
+});
+
+test("the donut: each slice is a button; clicking it filters the queue to that kind, opens its list, and the count equals the rows; the chip and the legend undo it", async ({ page, request }) => {
+  const { get } = await api(request);
+  const t = await get("today");
+  await page.goto("/app");
+  await expect(page.getByTestId("donut-chart")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId("chart-hint").first()).toBeVisible();
+  const kinds = (["leads", "appointments", "noshows", "stale", "unanswered"] as const).filter((k) => t.totals[k].count > 0);
+  expect(kinds.length).toBeGreaterThan(1);
+  for (const kind of kinds) {
+    const slice = page.getByTestId(`slice-${kind}`);
+    await expect(slice).toHaveAttribute("data-count", String(t.totals[kind].count));
+    await slice.focus();
+    await expect(page.getByTestId("donut-tip")).toContainText(String(t.totals[kind].count));
+    await page.keyboard.press("Enter");
+    const panel = page.getByTestId("today-list");
+    await expect(panel).toBeVisible();
+    // The count on the slice is the number in the list's heading, and the rows are the rows (the list may be capped, and then says so).
+    await expect(panel.getByTestId("drill-count")).toHaveText(String(t.totals[kind].count));
+    const loaded = (t.items as Json[]).filter((i) => i.kind === kind).length;
+    await expect(panel.getByTestId("list-range")).toContainText(`of ${Math.max(loaded, t.totals[kind].count)}`);
+    await expect(page.getByTestId("today-toolbar").getByTestId("showing-chip")).toContainText(/.+/);
+    // The queue shows only that kind.
+    for (const r of await page.getByTestId("queue-row").all()) expect(await r.getAttribute("data-kind")).toBe(kind);
+    // The selected slice is marked with more than colour.
+    await expect(slice).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByTestId(`legend-${kind}`)).toHaveAttribute("aria-pressed", "true");
+  }
+  await expect(page.getByTestId("donut-chart").getByTestId("chart-hint")).toHaveCount(0); // gone after the first click
+  // The legend row does the same as the slice, and pressing the chosen one again closes it; the chip's cross also closes it.
+  await page.getByTestId(`legend-${kinds[0]}`).click();
+  await expect(page.getByTestId("today-list")).toBeVisible();
+  await page.getByTestId("today-toolbar").getByRole("button", { name: /Stop showing/ }).click();
+  await expect(page.getByTestId("today-list")).toHaveCount(0);
+  await page.screenshot({ path: "docs/review/today-charts-donut.png", fullPage: false, clip: { x: 0, y: 0, width: 1440, height: 900 } }).catch(() => undefined);
+});
+
+test("Show the leads on a queue row opens exactly that row's items", async ({ page }) => {
+  await page.goto("/app");
+  const row = page.getByTestId("queue-row").first();
+  await expect(row).toBeVisible({ timeout: 15_000 });
+  const count = Number((await row.getByTestId("queue-show").evaluate((el) => el.closest("li")?.querySelector(".tnum p")?.textContent ?? "")).replace(/[^\d]/g, ""));
+  await row.getByTestId("queue-show").click();
+  const panel = page.getByTestId("today-list");
+  await expect(panel).toBeVisible();
+  const heading = Number(await panel.getByTestId("drill-count").innerText());
+  expect(heading).toBeGreaterThan(0);
+  if (count > 0 && !(await row.innerText()).includes("$")) expect(heading).toBe(count);
+  await expect(page.getByTestId("showing-chip").first()).toBeVisible();
+});
+
+test("the bars: where it is happening; clicking a bar narrows Today to that account, with a chip to go back", async ({ page }) => {
+  await page.goto("/app");
+  const bars = page.getByTestId("account-bar");
+  await expect(bars.first()).toBeVisible({ timeout: 15_000 });
+  expect(await bars.count()).toBeLessThanOrEqual(8);
+  const counts = (await bars.evaluateAll((els) => els.map((e) => Number(e.getAttribute("data-count"))))) as number[];
+  expect([...counts].sort((a, b) => b - a)).toEqual(counts); // longest first
+  await bars.first().focus();
+  await expect(page.getByTestId("bars-tip")).toContainText(/:/);
+  const name = (await bars.first().getAttribute("aria-label"))!.split(":")[0];
+  await bars.first().click();
+  expect(page.url()).toContain("ta=");
+  await expect(page.getByTestId("today-toolbar").getByTestId("showing-chip").first()).toContainText(name);
+  await expect(page.getByTestId("account-bar")).toHaveCount(1);
+  await page.getByTestId("today-toolbar").getByRole("button", { name: /Stop showing/ }).first().click();
+  await expect(page.getByTestId("account-bar").first()).toBeVisible();
+  await expect(page.getByTestId("account-bar")).not.toHaveCount(1);
+});
+
+test("raised and cleared: each day with alerts opens its list; the number on the day is the rows; the word is cleared", async ({ page }) => {
+  await page.goto("/app");
+  const strip = page.getByTestId("raised-cleared");
+  await expect(strip).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId("raised-title")).toContainText(/Last 7 days: \d+ alerts? raised, \d+ cleared, \d+ still open\./);
+  await expect(page.getByTestId("proof-note")).toContainText("Cleared means the problem is gone from your CRM data");
+  const days = strip.getByTestId("raised-day");
+  expect(await days.count()).toBe(7);
+  for (const d of await days.all()) {
+    if (await d.isDisabled()) continue;
+    const raised = Number(await d.getAttribute("data-raised")), cleared = Number(await d.getAttribute("data-cleared"));
+    await d.click();
+    if (raised > 0) await expect(strip.getByTestId("raised-list-raised-count")).toHaveText(String(raised));
+    if (cleared > 0) await expect(strip.getByTestId("raised-list-cleared-count")).toHaveText(String(cleared));
+    await strip.getByTestId("raised-list").getByRole("button", { name: /Stop showing/ }).click();
+    await expect(strip.getByTestId("raised-list")).toHaveCount(0);
   }
 });
 
-test("what a filter hides is named, with the way to bring it back", async ({ page, request }) => {
-  const { get } = await api(request);
-  const seg = await get("segments");
-  const test_ = (seg.accounts as Json[]).filter((a) => a.test && !a.ignored);
-  await page.goto("/app#today?hideTest=1");
-  await expect(page.getByTestId("front-door")).toBeVisible();
-  const summary = page.getByTestId("filter-hidden-summary");
-  if (test_.length > 0) {
-    await expect(summary).toContainText(`${test_.length} test ${test_.length === 1 ? "account is" : "accounts are"} hidden because ${test_.length === 1 ? "its" : "their"} name says test: `);
-    await expect(summary).toContainText(test_[0].name as string);
-    await summary.getByRole("button", { name: "Show them" }).click();
-    await expect(summary).toHaveCount(0);
-  } else {
-    await expect(summary).toHaveCount(0);
-  }
-});
-
-test("Today for one client account: opened from the all-accounts list, it narrows to that account and the way back returns", async ({ page, request }) => {
-  const { get } = await api(request);
-  const daily = await get("daily");
-  const first = (daily.attention as Json[])[0] ?? (daily.fine as Json[])[0];
-  expect(first, "the demo company has at least one client account").toBeTruthy();
+test("Share Today copies the headline and the top three, and sends nothing", async ({ page, context }) => {
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  let posts = 0;
+  page.on("request", (r) => { if (r.method() === "POST" && new URL(r.url()).pathname.startsWith("/api/app/") && !/\/(usage|sync)$/.test(new URL(r.url()).pathname)) posts += 1; });
   await page.goto("/app");
-  await expect(page.getByTestId("front-door")).toBeVisible();
-  // From the attention list when it has the account, else from the "Fine today" list: either opens that one account's Today.
-  const inAttention = (daily.attention as Json[]).length > 0;
-  if (inAttention) await page.getByTestId("attention-list").getByRole("button", { name: /Open this account.s Today/ }).first().click();
-  else await page.getByTestId("data-list").getByRole("button", { name: first.name as string }).first().click();
-  await expect(page.getByTestId("page-subtitle")).toContainText("leads waiting, appointments to fix and deals that stopped moving");
-  await expect(page.getByTestId("account-scope-summary")).toContainText("1 of");
-  const back = page.getByTestId("back-link");
-  await expect(back).toContainText("Back to Today");
-  await back.click();
-  await expect(page.getByTestId("page-subtitle")).toContainText("Every client account");
+  await expect(page.getByTestId("today-headline")).toBeVisible({ timeout: 15_000 });
+  await page.getByRole("button", { name: "Share Today" }).click();
+  await expect(page.getByRole("button", { name: "Copied to your clipboard" })).toBeVisible();
+  const text = await page.evaluate(() => navigator.clipboard.readText());
+  expect(text).toMatch(/^Your client accounts: Today\n/);
+  expect(text).toContain("Fix first:");
+  expect(text.split("\n").filter((l) => /^\d\. /.test(l)).length).toBeLessThanOrEqual(3);
+  expect(posts).toBe(0);
 });
 
-test("opened from inside a client account, SubSync starts on Today for that account with a plain notice and a way to all of them", async ({ page, request }) => {
+test("the loading state is a skeleton and a failed read says what went wrong with an error ID and a retry", async ({ page }) => {
+  await page.route("**/api/app/today*", (route) => route.fulfill({ status: 500, json: { error: "Something went wrong. Please try again." } }));
+  await page.goto("/app");
+  await expect(page.getByTestId("error-state")).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByTestId("error-id")).toHaveText(/^E-/);
+  await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
+});
+
+test("an agency person opened from inside a client account starts on Today for that account with a plain notice and a way to all of them", async ({ page, request }) => {
   const { get } = await api(request);
-  const accounts = await get("accounts");
-  const loc = (accounts.accounts as Json[]).find((a) => !a.ignored)?.locationId as string;
+  const t = await get("today");
+  const loc = (t.accounts as Json[])[0].id as string;
   await page.route("**/api/sso", async (route) => {
     const res = await route.fetch();
     const body = await res.json();
@@ -137,55 +263,50 @@ test("opened from inside a client account, SubSync starts on Today for that acco
   });
   await page.goto("/app");
   const note = page.getByTestId("inline-alert").filter({ hasText: "opened this from inside a client account" });
-  await expect(note).toBeVisible();
-  await expect(page.getByRole("heading", { level: 1, name: "Today" })).toBeVisible();
-  await expect(page.getByTestId("page-subtitle")).toContainText("leads waiting, appointments to fix and deals that stopped moving");
-  // The notice is a plain row: no tinted box (KF-1).
+  await expect(note).toBeVisible({ timeout: 15_000 });
+  expect(page.url()).toContain(`ta=${loc}`);
   expect(await note.evaluate((el) => getComputedStyle(el).backgroundColor)).toMatch(/rgba\(0, 0, 0, 0\)|transparent/);
-  // It is not remembered: showing every account again is one press, and the account filter drawer comes back.
+  await expect(page.getByTestId("today-toolbar").getByTestId("showing-chip").first()).toBeVisible();
   await note.getByRole("button", { name: "See all client accounts" }).click();
   await expect(note).toBeHidden();
-  await expect(page.getByTestId("page-subtitle")).toContainText("Every client account");
-});
-
-test("what changed has its own range, states the window in words, and keeps it in the address", async ({ page }) => {
-  await page.goto("/app");
-  const card = page.getByTestId("card-range").first();
-  await expect(card).toBeVisible();
-  await expect(card.getByTestId("card-range-window")).toContainText("Last 7 days");
-  await card.getByLabel("What changed: range").selectOption("30d");
-  await expect(card.getByTestId("card-range-window")).toContainText("Last 30 days");
-  expect(page.url()).toContain("r.today-changes=30d");
-  const tiles = page.getByTestId("change-tiles");
-  await expect(tiles).toBeVisible();
-  await expect(tiles.locator("[data-testid^=tile-]")).toHaveCount(4);
-  // A percentage appears only beside a base big enough for it; otherwise the page says the base is too small.
-  for (const t of await tiles.locator("[data-testid^=tile-]").all()) {
-    const text = await t.innerText();
-    if (/\d+%/.test(text)) expect(text).not.toContain("too small a base");
-    expect(text).toMatch(/Up |Down |No change|No earlier day/);
-  }
+  await expect(page.getByTestId("today-toolbar").getByTestId("showing-chip")).toHaveCount(0);
 });
 
 test("the change figures read only what the person may see: a client's staff are refused, a bad date is refused", async ({ request }) => {
   const agency = await api(request);
   const ok = await agency.get("daily/changes?from=" + new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10));
   expect(ok.changes.map((c: Json) => c.key)).toEqual(["openValue", "stale", "new30", "unread"]);
-  for (const bad of ["", "?from=nope", "?from=2099-01-01", "?from=2020-01-01", "?from=2026-02-30"]) {
-    expect(await agency.status(`daily/changes${bad}`), bad).toBe(400);
-  }
+  for (const bad of ["", "?from=nope", "?from=2099-01-01", "?from=2020-01-01", "?from=2026-02-30"]) expect(await agency.status(`daily/changes${bad}`), bad).toBe(400);
   const client = await api(request, "client");
   expect(await client.status("daily/changes?from=2026-10-01")).toBe(403);
   expect(await client.status("daily")).toBe(403);
 });
 
+test("a business and a client's staff get one account from the server, even when the address names another", async ({ request }) => {
+  const agency = await api(request);
+  const all = await agency.get("today");
+  const ids = (all.accounts as Json[]).map((a) => a.id as string);
+  for (const as of ["business", "client"] as const) {
+    const who = await api(request, as);
+    const mine = await who.get("today");
+    expect(mine.accounts).toHaveLength(1);
+    const own = mine.accounts[0].id as string;
+    const other = ids.find((i) => i !== own)!;
+    const tampered = await who.get(`today?accounts=${other}`);
+    expect(tampered.accounts.map((a: Json) => a.id)).toEqual([own]);
+    expect(JSON.stringify(tampered)).not.toContain(other);
+    expect(new Set((tampered.items as Json[]).map((i) => i.locationId))).toEqual(new Set((tampered.items as Json[]).length ? [own] : []));
+    expect(await who.status("segments")).toBe(403);
+    expect(await who.status("settings")).toBe(as === "business" ? 200 : 403);
+  }
+});
+
 test("what SubSync watches is in Settings, with two columns, and not on Today", async ({ page }) => {
   await page.goto("/app");
-  await expect(page.getByTestId("front-door")).toBeVisible();
+  await expect(page.getByTestId("today-headline")).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText("When this is sent")).toHaveCount(0);
   await expect(page.getByText("Not watched yet")).toHaveCount(0);
   await expect(page.getByTestId("watching-panel")).toHaveCount(0);
-  // Since F8 Settings has eight sections; this panel is the top of "Sync status". The chosen section is remembered in the browser.
   await page.evaluate(() => localStorage.setItem("subsync-settings-section", "sync"));
   await page.goto("/app#settings");
   await page.reload();
@@ -193,20 +314,64 @@ test("what SubSync watches is in Settings, with two columns, and not on Today", 
   await expect(panel).toBeVisible();
   await expect(panel.getByTestId("watching-column")).toContainText("Watching (");
   await expect(panel.getByTestId("not-yet-column")).toContainText("Not yet (");
-  await expect(panel.getByTestId("not-yet-column")).toContainText("Missed calls");
-  await expect(panel.getByTestId("not-yet-column")).toContainText("Not built yet");
 });
 
 test("the Today screen has no sideways scroll and keeps its short subtitle", async ({ page }) => {
   await page.goto("/app");
-  await expect(page.getByTestId("page-subtitle")).toBeVisible();
+  await expect(page.getByTestId("fix-first")).toBeVisible({ timeout: 15_000 });
+  await page.waitForLoadState("networkidle").catch(() => undefined);
   const { scrollWidth, innerWidth } = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth }));
   expect(scrollWidth).toBeLessThanOrEqual(innerWidth + 1);
   expect((await page.getByTestId("page-subtitle").innerText()).length).toBeLessThanOrEqual(120);
 });
 
-test("a client's staff open on My day, never on Today", async ({ page }) => {
+test("a client's staff open on Today for their own account: their leads, calls, appointments and numbers, and nothing of the company", async ({ page }) => {
   await page.goto("/app?as=client");
-  await expect(page.getByRole("heading", { level: 1, name: "My day" })).toBeVisible();
-  await expect(page.getByTestId("front-door")).toHaveCount(0);
+  await expect(page.getByRole("heading", { level: 1, name: "Today" })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId("today-headline")).toBeVisible();
+  await expect(page.getByTestId("today-account-picker")).toHaveCount(0);
+  await expect(page.getByTestId("filter-drawer")).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Fix first" })).toHaveCount(0); // the company-wide queue is not theirs; "Also needs you" is their own account
+  await expect(page.getByTestId("today-proof")).toHaveCount(0); // alerts are for the business administrator
+  await expect(page.getByTestId("my-numbers")).toBeVisible();
+  const text = await page.locator("main").innerText();
+  expect(text).not.toMatch(/\bfee\b|monthly|subscription|plan\b|client accounts need|Settings/i);
+  // Leads: oldest first, each with one big Open in CRM; a live wait.
+  const leads = page.getByTestId("my-leads").locator("li");
+  if (await leads.count()) {
+    await expect(leads.first().getByTestId("lead-open")).toHaveText(/Open in CRM/);
+    await expect(leads.first().getByTestId("lead-wait")).toContainText(/Waiting|Never answered/);
+  }
+  // Calls: a person who asked not to be contacted is a disabled button that says so; every other call opens the CRM (never a phone link).
+  for (const r of await page.getByTestId("call-row").all()) {
+    if ((await r.getAttribute("data-dnd")) === "true") await expect(r.getByRole("button", { name: "Do not call" })).toBeDisabled();
+  }
+  expect(await page.locator('a[href^="tel:"]').count()).toBe(0);
+  await page.screenshot({ path: "docs/review/today-account-client.png", fullPage: true });
+});
+
+test("a business administrator also sees what SubSync caught in their account, and Done for today or the queue, never other accounts", async ({ page }) => {
+  await page.goto("/app?as=business");
+  await expect(page.getByTestId("today-headline")).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId("today-proof")).toBeVisible();
+  await expect(page.getByTestId("today-account-picker")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Share my day" })).toBeVisible();
+  await page.screenshot({ path: "docs/review/today-account-business.png", fullPage: true });
+});
+
+test("the style guide shows Today's building blocks, still opens without signing in and has no sideways scroll", async ({ page }) => {
+  await page.goto("/design");
+  await expect(page.getByTestId("today-headline")).toBeVisible();
+  await expect(page.getByTestId("donut-chart")).toBeVisible();
+  await expect(page.getByTestId("account-bars")).toBeVisible();
+  await expect(page.getByTestId("raised-cleared")).toBeVisible();
+  await expect(page.getByTestId("fix-first")).toBeVisible();
+  await expect(page.getByTestId("design-pulse")).toBeVisible();
+  const { scrollWidth, innerWidth } = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth }));
+  expect(scrollWidth).toBeLessThanOrEqual(innerWidth + 1);
+  // A slice works on the style guide too.
+  await page.waitForLoadState("networkidle").catch(() => undefined);
+  await page.waitForTimeout(1000); // hydrated
+  await page.getByTestId("legend-leads").click();
+  await expect(page.getByTestId("today-list")).toBeVisible();
 });

@@ -77,48 +77,60 @@ describe("Today", () => {
     return api;
   };
   const go = () => undefined;
-  it("the first screen, before any data arrives, already says what the screen is for and that it is checking for leads", () => {
-    const m = html(el(ApiProvider, { value: fake() }, el(TodayView, { go })));
+  it("the first screen, before any data arrives, already says what the screen is for and that it is checking (a skeleton the shape of the page)", () => {
+    const m = html(el(ApiProvider, { value: fake() }, el(TodayView, { go, kind: "agency" })));
     expect(m).toContain("<h1");
     expect(m).toContain("Today");
-    expect(m).toContain("Every client account, checked for leads waiting, missed appointments and stalled deals. Start at the top.");
-    expect(m).toContain('data-testid="front-door"');
-    expect(m).toContain('data-testid="leads-headline"');
-    expect(m).toContain("Checking for leads waiting for a reply...");
-    expect(m).toContain("What needs you right now");
+    expect(m).toContain("Checking every client account for what needs a person.");
+    expect(m).toContain('aria-busy="true"');
+    expect(m).toContain("Working out what needs you today");
+    expect(m).toContain("Working out what to fix first...");
   });
-  it("reads only data the signed-in person may see: the same reads as the pages whose numbers it repeats, never an id of its own", () => {
+  it("reads only data the signed-in person may see: one Today read and, for an agency only, the list of its own accounts for the selector; never an id of its own", () => {
     const src = read("src/app/app/views/today.tsx");
     const paths = [...src.matchAll(/useData<[^>]*>\(([^)]*)\)/g)].map((m) => m[1].replace(/\s+/g, " "));
-    expect([...paths].sort()).toEqual(['"appointments"', '"audit?lists=0"', '"daily"', '"overview"', '"speed"', "r ? `daily/changes?from=${r.current.from}&to=${r.current.to}` : null"].sort());
+    expect([...paths].sort()).toEqual(['"today"', 'kind === "agency" ? "segments" : null'].sort());
   });
   it("notices use the plain notice, not cards; nothing on the page is a content card", () => {
-    const src = read("src/app/app/views/today.tsx");
-    expect(src).not.toMatch(/<Card[ >]|import \{[^}]*\bCard\b/);
-    expect(src).toContain("InlineAlert");
+    for (const f of ["today.tsx", "today-account.tsx"]) {
+      const src = read(`src/app/app/views/${f}`);
+      expect(src, f).not.toMatch(/<Card[ >]|import \{[^}]*\bCard\b/);
+    }
+    expect(read("src/app/app/views/today.tsx")).toContain("InlineAlert");
   });
   it("no phone link, no platform name, no jargon on the page", () => {
-    const src = read("src/app/app/views/today.tsx");
-    expect(src).not.toMatch(/tel:/);
-    expect(src).not.toMatch(/\bSLA\b|GoHighLevel|HighLevel|\bGHL\b|sub-?account/i);
+    for (const f of ["today.tsx", "today-account.tsx"]) {
+      const src = read(`src/app/app/views/${f}`);
+      expect(src, f).not.toMatch(/tel:/);
+      expect(src, f).not.toMatch(/\bSLA\b|GoHighLevel|HighLevel|\bGHL\b|sub-?account/i);
+    }
   });
-  it("every drill-in goes through the shell's go(), which keeps the way back (N7); no raw hash links", () => {
+  it("every drill-in goes through the shell's go(), which keeps the way back (N7); no raw hash links; the only address Today touches is its own account choice", () => {
     const src = read("src/app/app/views/today.tsx");
     expect(src).not.toMatch(/href="#/);
-    expect(src).not.toMatch(/window\.location/);
+    for (const use of src.match(/window\.location\.\w+/g) ?? []) expect(use).toBe("window.location.hash");
+    expect(src).toContain("withTodayAccounts");
   });
-  it("the page never works a percentage out for itself: it uses describeRangeChange", () => {
-    const src = read("src/app/app/views/today.tsx");
+  it("the page never works a percentage out for itself: comparisons come from vsUsual and staleUsual, which hold the minimum-sample rule", () => {
+    const src = read("src/app/app/views/today.tsx") + read("src/app/app/views/today-account.tsx");
     expect(src).not.toMatch(/vsYesterday|vsAvg|signed\(|percentChange|\.percent\b/);
-    expect(src).toContain("describeRangeChange");
+    expect(src).toContain("staleUsual");
+    expect(src).toContain("vsUsual");
   });
-  it("the shell opens on the launching account as Today with the filter narrowed to it, and says so with a plain notice (N2)", () => {
+  it("Today draws its own account selector and not the shared header filter, and a launch from inside a client account narrows Today and says so with a plain notice (N2)", () => {
     const dash = read("src/app/app/dashboard.tsx");
     expect(dash).toMatch(/accounts: \[auth\.locationId\]/);
-    expect(dash).toMatch(/<InlineAlert className="mb-3" action=\{<Btn variant="ghost" onClick=\{\(\) => setFilter\(EMPTY_FILTER\)\}>See all client accounts<\/Btn>\}>/);
+    expect(dash).toMatch(/withTodayAccounts\(buildHash\(\{ id: "today" \}, only\), \[auth\.locationId\]\)/);
+    expect(dash).toMatch(/<InlineAlert className="mb-3" action=\{<Btn variant="ghost" onClick=\{\(\) => \{ setFilter\(EMPTY_FILTER\);/);
     expect(dash).not.toMatch(/rounded-xl border border-primary\/30 bg-primary\/5/);
-    // Today for one account from the all-accounts list: go("today", id) narrows the filter and keeps the way back.
+    // The shared filter is not drawn on Today, and Today reads with the unfiltered client.
+    expect(dash).toMatch(/view\.id !== "today" && <ApiProvider/);
+    expect(dash).toMatch(/case "today": return <ApiProvider value=\{baseApi\}><TodayView/);
+    // Today for one account from the all-accounts list: go("today", id) sets Today's own choice, never the shared filter, and keeps the way back.
     expect(dash).toMatch(/next\.id === "today" && next\.locationId/);
+    expect(dash).not.toMatch(/scoped/);
+    const today = read("src/app/app/views/today.tsx");
+    expect(today).not.toMatch(/ScopeFilterBar|FilterDrawer|AccountScope/);
   });
 });
 
@@ -128,6 +140,9 @@ describe("who may read the change figures (the route policy)", () => {
     expect(routeAllowed("business", "GET", ["daily", "changes"])).toBe(true);
     expect(routeAllowed("client", "GET", ["daily", "changes"])).toBe(false);
     expect(routeAllowed("client", "GET", ["daily"])).toBe(false);
+    // The rebuilt Today read is open to a client's staff for their own account (the handler limits it to that account, see tests/unit/today-db.test.ts).
+    for (const kind of ["agency", "business", "client"] as const) expect(routeAllowed(kind, "GET", ["today"]), kind).toBe(true);
+    for (const kind of ["business", "client"] as const) expect(routeAllowed(kind, "POST", ["today"]), kind).toBe(false);
   });
   it("it is read only: nothing can write through it", () => {
     for (const kind of ["business", "client"] as const) expect(routeAllowed(kind, "POST", ["daily", "changes"]), kind).toBe(false);
