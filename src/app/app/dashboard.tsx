@@ -353,7 +353,7 @@ export function Dashboard() {
       // "My day" is Today now (one page, one menu item). The old address still opens it.
       case "myday": return <ApiProvider value={baseApi}><TodayView go={go} kind={auth.kind} /></ApiProvider>;
       case "people": case "search": case "leads": case "calls": return peopleOn ? <PeopleModule key={"people" + peopleStart} start={peopleStart} callsAllowed={callsAllowed} /> : <Centered title="Not available" body="This page is switched off right now." />;
-      case "audit": return <AuditView go={go} />;
+      case "audit": return <AuditView />;
       case "speed": return <SpeedView go={go} />;
       case "overview": return <OverviewView go={go} />;
       case "accounts": return <ClientsView key="accounts" go={go} initialTab="health" features={clientFeatures} />;

@@ -4,7 +4,7 @@ import { validLogoUrl } from "../brand-logo.ts";
 // The snapshot holds totals, finding titles, fix steps, the definition of each number, and the sender's own business name and colour. It never holds
 // a client account name, a contact, a deal or a conversation: the lists behind the numbers stay in the app. Every field added in stage F6 is optional,
 // so a link made before it (and the sample audit) still opens and reads correctly.
-export type ShareFinding = { severity: string; title: string; count: number | null; dollars: number | null; kind: string; fix?: string; note?: string; window?: string };
+export type ShareFinding = { severity: string; title: string; count: number | null; dollars: number | null; kind: string; fix?: string; note?: string; window?: string; /** What is wrong, in a sentence (the rebuilt audit). */ what?: string };
 export type ShareNote = { key: string; title: string; text: string };
 export type SharePayload = {
   who: string; headline: string; accountsScanned: number; staleDollars: number; estimatedDollars: number | null;
@@ -26,6 +26,10 @@ export type SharePayload = {
   notes?: ShareNote[];
   /** The counting rules this snapshot was made under (DEAL_RULES_VERSION), so an old link can be read against the rules of its day. */
   rulesVersion?: number;
+  /** The rebuilt audit: why the headline says what it says, the good news, and the one-line grade. All optional, so an older link still opens. */
+  verdictSub?: string;
+  healthy?: string[];
+  grade?: string | null;
 };
 
 /** The id of the public sample audit (fictional data, made by scripts/make-sample-audit.ts) that the demo points to. */
@@ -44,9 +48,10 @@ export function scrub(text: string, names: string[]): string {
 
 export type ShareSource = {
   headline: string; accountsScanned: number; staleDollars: number; estimatedDollars: number | null;
-  findings: Array<{ severity: string; title: string; count: number | null; dollars: number | null; kind: string; fix?: string; note?: string; window?: string }>;
+  findings: Array<{ severity: string; title: string; count: number | null; dollars: number | null; kind: string; fix?: string; note?: string; window?: string; what?: string }>;
   fixFirst?: string | null; estimateRange?: { low: number; high: number } | null; outlier?: { value: number; share: number } | null; leftOut?: number;
   notes?: ShareNote[];
+  verdictSub?: string; healthy?: string[]; grade?: string | null;
 };
 export type ShareExtra = { branded?: boolean; brandColor?: string | null; logoUrl?: string | null; rulesVersion?: number };
 
@@ -68,6 +73,7 @@ export function buildSharePayload(audit: ShareSource, who: string, accountNames:
       ...(f.fix ? { fix: scrub(f.fix, accountNames).slice(0, 300) } : {}),
       ...(f.note ? { note: f.note } : {}),
       ...(f.window ? { window: scrub(f.window, accountNames).slice(0, 160) } : {}),
+      ...(f.what ? { what: scrub(f.what, accountNames).slice(0, 300) } : {}),
     })),
     createdAt: now.toISOString(),
     ...(extra.branded !== undefined ? { branded: extra.branded } : {}),
@@ -78,6 +84,9 @@ export function buildSharePayload(audit: ShareSource, who: string, accountNames:
     ...(audit.outlier ? { outlier: { value: Math.round(audit.outlier.value), share: audit.outlier.share } } : {}),
     ...(audit.leftOut ? { leftOut: audit.leftOut } : {}),
     ...(notes.length ? { notes: notes.map((n) => ({ key: n.key, title: n.title, text: scrub(n.text, accountNames).slice(0, 700) })) } : {}),
+    ...(audit.verdictSub ? { verdictSub: scrub(audit.verdictSub, accountNames).slice(0, 500) } : {}),
+    ...(audit.healthy?.length ? { healthy: audit.healthy.slice(0, 4).map((h) => scrub(h, accountNames).slice(0, 200)) } : {}),
+    ...(audit.grade ? { grade: scrub(audit.grade, accountNames).slice(0, 200) } : {}),
     ...(extra.rulesVersion !== undefined ? { rulesVersion: extra.rulesVersion } : {}),
   };
 }
