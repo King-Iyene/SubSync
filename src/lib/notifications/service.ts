@@ -167,7 +167,19 @@ async function buildScheduled(installationId: string, type: "daily_brief" | "wee
   const d = await buildDailyDigest(installationId);
   const values = { company: l.company, attention_count: d.attention.length, fine_count: d.fine.length, date: shortDate(now, zone) };
   const base = { attention: d.attention, fine: d.fine.length, headlines: d.headlines, freshnessLabel: d.freshness.text };
-  if (type === "daily_brief") return { type, locationId: null, severity: "info", dedupeKey: `daily_brief:${date}`, values, details: dailyLines(base) };
+  if (type === "daily_brief") {
+    // The brief says what Today says: the same headline, the same ranking of what to fix first, and how many items are set aside. If the Today read fails the brief
+    // still goes out with the older lines. Real sending stays behind the existing dry-run switches; nothing here changes them.
+    try {
+      const [inst] = await sql()`select plan, company_id from installations where id = ${installationId}`;
+      const { todayBriefForInstallation } = await import("../api/router");
+      const t = await todayBriefForInstallation(installationId, inst.plan as never, inst.company_id as string);
+      return { type, locationId: null, severity: "info", dedupeKey: `daily_brief:${date}`, values, details: [...t.lines, `${d.freshness.text}.`] };
+    } catch (error) {
+      console.error("The daily brief could not use Today's ranking; using the older lines", safeError(error));
+      return { type, locationId: null, severity: "info", dedupeKey: `daily_brief:${date}`, values, details: dailyLines(base) };
+    }
+  }
   // The weekly summary adds the week's plain facts. If any read fails the summary still goes out without that part.
   const target = (await getSettings(installationId).catch(() => null))?.speedTargetMinutes ?? 15;
   const [sp, ap] = await Promise.all([speedView(installationId, null, target).catch(() => null), appointmentView(installationId, null).catch(() => null)]);
