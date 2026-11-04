@@ -23,24 +23,37 @@ const leadName = (full: unknown, email: unknown, phone: unknown): string => {
 };
 
 // Lead records for the accounts the caller may see, in a window of arrival times. This is the ONE query behind every figure and every list.
-async function loadRows(db: Db, installationId: string, allowed: string[] | null, fromMs: number, toMs: number): Promise<LoadedRow[]> {
+/** Each client account's own reply target, when it set one. A database without the column yet (the update that adds it has not run) answers an empty map, and the default target applies everywhere. */
+export async function loadTargets(db: Db, installationId: string): Promise<{ ready: boolean; map: Map<string, number> }> {
+  try {
+    const r = await db`select location_id, speed_target_minutes from locations where installation_id = ${installationId} and speed_target_minutes is not null`;
+    return { ready: true, map: new Map(r.map((x) => [x.location_id as string, Number(x.speed_target_minutes)])) };
+  } catch {
+    return { ready: false, map: new Map() };
+  }
+}
+
+export async function loadRows(db: Db, installationId: string, allowed: string[] | null, fromMs: number, toMs: number): Promise<LoadedRow[]> {
+  const targets = await loadTargets(db, installationId);
   const rows = await db`
     select t.location_id, t.contact_id, coalesce(t.clock_start, t.lead_at) lead_at, t.touch_at, t.touch_user_id, t.auto_touch_at, t.human_touch_at, t.read_version,
-      c.source, c.tags, c.full_name, c.email, c.phone, nullif(c.assigned_to, '') assigned_to
+      c.source, c.tags, c.full_name, c.email, c.phone, c.dnd, l.timezone, nullif(c.assigned_to, '') assigned_to
     from lead_touches t
     left join cached_contacts c on c.installation_id = t.installation_id and c.location_id = t.location_id and c.contact_id = t.contact_id
     join locations l on l.installation_id = t.installation_id and l.location_id = t.location_id and not l.ignored
     where t.installation_id = ${installationId} and t.excluded is null and t.lead_at > ${new Date(fromMs)} and t.lead_at < ${new Date(toMs)}
-      ${allowed ? db`and t.location_id = any(${allowed}::text[])` : db``} limit 20000`;
+      ${allowed ? db`and t.location_id = any(${allowed}::text[])` : db``} order by t.lead_at desc limit 20000`;
   return rows.map((r) => ({
     locationId: r.location_id as string, contactId: r.contact_id as string, leadAt: ms(r.lead_at) ?? 0, touchAt: ms(r.touch_at), userId: r.touch_user_id as string | null,
     source: (r.source as string | null) ?? null, tags: (r.tags as string[] | null) ?? [], assigned: r.assigned_to !== null,
     autoAt: ms(r.auto_touch_at), humanAt: ms(r.human_touch_at), detailed: Number(r.read_version ?? 0) === 1,
     name: leadName(r.full_name, r.email, r.phone), assignedTo: (r.assigned_to as string | null) ?? null,
+    phone: (r.phone as string | null) || null, email: (r.email as string | null) || null, dnd: r.dnd === true, timeZone: (r.timezone as string | null) || null,
+    targetMinutes: targets.map.get(r.location_id as string) ?? null,
   }));
 }
 
-async function loadLookups(db: Db, installationId: string, allowed: string[] | null, targetMinutes: number, now: number) {
+export async function loadLookups(db: Db, installationId: string, allowed: string[] | null, targetMinutes: number, now: number) {
   const [locs, people] = await Promise.all([
     db`select location_id, name, speed_access, users_access from locations where installation_id = ${installationId} and not ignored ${allowed ? db`and location_id = any(${allowed}::text[])` : db``} order by lower(coalesce(name, ''))`,
     db`select user_id, name, photo_url from team_names where installation_id = ${installationId}`,
@@ -167,10 +180,12 @@ export async function leadLedger(installationId: string, allowed: string[] | nul
   return rows.map((r) => ({
     id: `lead:${r.locationId}:${r.contactId}:${r.leadAt}`, locationId: r.locationId, accountName: lk.locationNames.get(r.locationId) ?? "Client account", contactId: r.contactId, name: r.name,
     source: r.source && r.source.trim() !== "" ? r.source.trim() : null, ownerName: who(r.assignedTo, r.locationId), touchBy: r.touchAt !== null ? who(r.userId, r.locationId) : null,
-    leadAt: r.leadAt, touchAt: r.touchAt, url: "", zone: zone.get(r.locationId) ?? "UTC",
+    leadAt: r.leadAt, touchAt: r.touchAt, url: "", zone: zone.get(r.locationId) ?? "UTC", targetMinutes: r.targetMinutes ?? null,
   }));
 }
 export type LeadLedgerRow = {
   id: string; locationId: string; accountName: string; contactId: string; name: string; source: string | null; ownerName: string | null; touchBy: string | null;
   leadAt: number; touchAt: number | null; url: string; zone: string;
+  /** The account's own reply target, when it set one. */
+  targetMinutes?: number | null;
 };

@@ -3,7 +3,11 @@
 import { classifySource, autoVsHuman, bySource, hasNoSource, isNeverAnswered, judge, membersOf, NO_SOURCE, peopleProgress, progressToward, responseSeconds, SOURCE_CLASS_LABEL, sourceLabel, summarise, unknownSource, MIN_FOR_MEDIAN, MIN_PER_PERSON, type AutoVsHuman, type Judged, type Progress, type Summary, type TouchRow } from "./speed-intel";
 import { resolveUser, type KnownUser, type PersonLabel, type UsersState } from "./people-labels";
 
-export type LoadedRow = TouchRow & { name: string; assignedTo: string | null };
+export type LoadedRow = TouchRow & {
+  name: string; assignedTo: string | null;
+  /** For the one-click call and email buttons and the warning before a call. Only the new Speed to lead screen reads them. */
+  phone?: string | null; email?: string | null; dnd?: boolean; timeZone?: string | null;
+};
 
 export type Lookups = {
   now: number; targetMinutes: number;
@@ -76,7 +80,7 @@ export function summaryPart(rows: LoadedRow[], lk: Lookups): SummaryPart {
       late: membersPart(rows, lk, (_r, s) => s === "late"),
       waiting: membersPart(rows, lk, (_r, s) => s === "waiting"),
       // Only an automatic message went out and nobody has replied, past the target: the same leads autoVsHuman counts as onlyAutoPastTarget.
-      onlyAuto: membersPart(rows, lk, (r) => r.detailed === true && r.autoAt != null && r.humanAt == null && (lk.now - r.leadAt) / 60_000 > lk.targetMinutes),
+      onlyAuto: membersPart(rows, lk, (r) => r.detailed === true && r.autoAt != null && r.humanAt == null && (lk.now - r.leadAt) / 60_000 > (r.targetMinutes ?? lk.targetMinutes)),
     },
     autoVsHuman: autoVsHuman(rows, lk.targetMinutes, lk.now),
     unknownSource: unknownSource(judgedOnly(rows, lk)),
@@ -91,7 +95,7 @@ export function sourcePart(rows: LoadedRow[], lk: Lookups): SourcePart {
     rows: bySource(rows, lk.targetMinutes, lk.now).map((s) => ({
       ...s, label: SOURCE_CLASS_LABEL[s.cls],
       // The class's own target decides who is late, so its list is judged against that target, the same one its figures use.
-      members: (() => { const m = membersOf(rows.filter((r) => classifySource(r.source, r.tags) === s.cls), s.targetMinutes, lk.now, () => true, 100); return { count: m.count, shown: m.rows.length, rows: m.rows.map((x) => leadOut(x.row as LoadedRow, x.status, { ...lk, targetMinutes: s.targetMinutes })) }; })(),
+      members: (() => { const m = membersOf(rows.filter((r) => classifySource(r.source, r.tags) === s.cls).map((r) => (s.cls === "other" ? r : { ...r, targetMinutes: null })), s.targetMinutes, lk.now, () => true, 100); return { count: m.count, shown: m.rows.length, rows: m.rows.map((x) => leadOut(x.row as LoadedRow, x.status, { ...lk, targetMinutes: s.targetMinutes })) }; })(),
     })),
     unknown: { ...unknownSource(judgedRows), members: membersPart(rows, lk, (r) => hasNoSource(r), 100) },
     total: judgedRows.length,
