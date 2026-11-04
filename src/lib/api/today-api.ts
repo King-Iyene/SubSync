@@ -126,6 +126,7 @@ export async function buildToday(i: {
   return {
     ...base,
     mine: {
+      timeZone: zone,
       calls: {
         newLeads: { total: newLeads.total, rows: newLeads.rows.slice(0, 5).map((r) => ({ contactId: r.contactId, name: r.name, hasPhone: !!r.phone, url: links.contact(r.locationId, r.contactId) })) },
         noshows: { total: v.recoverTotal, rows: v.recover.slice(0, 5).map(person) },

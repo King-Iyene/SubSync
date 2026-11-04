@@ -192,6 +192,8 @@ export const accountsQuery = (ids: string[]) => (ids.length ? `accounts=${ids.fi
 export type HeadlinePart = { t: string; strong?: boolean };
 export type Headline = { parts: HeadlinePart[]; text: string; allClear: boolean; /** "14 leads waiting, 6 appointments to mark and 9 stale deals worth $48,200." */ breakdown: string | null; accounts: number; dollars: number };
 
+/** "1 lead waiting", "14 leads waiting": a count with the right singular or plural, as a person would say it. */
+export const countWords = (k: Kind, n: number) => `${n.toLocaleString("en-US")} ${COUNT_WORDS[k][n === 1 ? 0 : 1]}`;
 const COUNT_WORDS: Record<Kind, [string, string]> = {
   leads: ["lead waiting", "leads waiting"], appointments: ["appointment to mark", "appointments to mark"], noshows: ["no-show to recover", "no-shows to recover"],
   stale: ["stale deal", "stale deals"], unanswered: ["unanswered message", "unanswered messages"],
@@ -257,16 +259,17 @@ export function donutTitle(t: Totals): string {
 
 // ---------- the per-account bars ----------
 
-export type AccountBar = { locationId: string; name: string; count: number; dollars: number | null; kinds: Kind[] };
+export type AccountBar = { locationId: string; name: string; count: number; dollars: number | null; kinds: Kind[]; /** How many of each kind, for the coloured segments of the bar. */ byKind: Partial<Record<Kind, number>> };
 
 /** "Where it is happening": the accounts with the most things to fix, top `max`. The bar is the number of things; the dollars are in the tooltip. */
 export function accountBars(rows: QueueRow[], max = 8): { bars: AccountBar[]; accounts: number } {
   const by = new Map<string, AccountBar>();
   for (const r of rows) {
-    const cur = by.get(r.locationId) ?? { locationId: r.locationId, name: r.accountName, count: 0, dollars: null, kinds: [] };
+    const cur = by.get(r.locationId) ?? { locationId: r.locationId, name: r.accountName, count: 0, dollars: null, kinds: [], byKind: {} };
     cur.count += r.count;
     if (r.dollars) cur.dollars = (cur.dollars ?? 0) + r.dollars;
     if (!cur.kinds.includes(r.kind)) cur.kinds.push(r.kind);
+    cur.byKind[r.kind] = (cur.byKind[r.kind] ?? 0) + r.count;
     by.set(r.locationId, cur);
   }
   const all = [...by.values()].sort((a, b) => b.count - a.count || (b.dollars ?? 0) - (a.dollars ?? 0) || a.name.localeCompare(b.name));
@@ -420,6 +423,17 @@ export function proofLine(p: Proof): string {
   return `Last 7 days: ${plural(p.raised, "alert")} raised, ${p.cleared} cleared, ${p.open} still open.`;
 }
 export const PROOF_NOTE = "Cleared means the problem is gone from your CRM data. SubSync cannot tell whether a person fixed it or it went away on its own.";
+
+// ---------- stale deals against the account's own normal ----------
+
+/** The stale-deal count against its own recent normal, using the daily check's own rule (`compare` in digest-intel.ts: at least 4 earlier days, outside the usual band). */
+export function staleUsual(s: { today: number; usual: number | null; samples: number; unusual: "up" | "down" | null } | null): Usual {
+  if (!s || s.usual === null || s.samples < 4) return { verdict: "not_enough", text: "Not enough history yet to compare with your usual." };
+  const usual = Math.round(s.usual);
+  if (s.unusual === "up") return { verdict: "worse", text: `More stale deals than your usual (about ${usual}).` };
+  if (s.unusual === "down") return { verdict: "better", text: `Fewer stale deals than your usual (about ${usual}).` };
+  return { verdict: "same", text: `About the same as your usual (about ${usual}).` };
+}
 
 // ---------- share ----------
 
