@@ -134,7 +134,7 @@ export function HourStrip({ stats, title, targetMinutes, onOpen }: { stats: Hour
   return (
     <figure className="min-w-0" data-testid="hour-strip">
       <figcaption className="mb-1 text-sm font-semibold leading-5" data-testid="hour-title">{title}</figcaption>
-      <p className="mb-2 text-xs text-muted-foreground">Click an hour to see its leads. Hours are in each client account's own time.</p>
+      <p className="mb-2 text-xs text-muted-foreground">Click an hour to see its leads. Hours are in each client account&apos;s own time.</p>
       <div className="grid grid-cols-[repeat(24,minmax(0,1fr))] gap-[3px]">
         {stats.map((s) => (
           <button key={s.hour} type="button" disabled={s.leads === 0} onClick={() => onOpen(s.hour)} onMouseEnter={() => setHot(s.hour)} onMouseLeave={() => setHot(null)} onFocus={() => setHot(s.hour)} onBlur={() => setHot(null)}

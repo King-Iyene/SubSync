@@ -17,7 +17,7 @@ export { useTheme } from "./theme";
 export { LineChart } from "./line-chart";
 // Today's building blocks (the Today rebuild). Each one has an example with sample data on /design.
 export { HeadlineBlock } from "./headline";
-export { FixFirstQueue, QueueRowView, stakeOf } from "./queue";
+export { FixFirstQueue, QueueRowView, stakeOf, type RowAction, type RowWhy } from "./queue";
 export { LocalAccountPicker, type PickerAccount } from "./account-picker";
 export { PulseTile, PulseSpark, type SparkPoint } from "./pulse";
 export { ProofStrip, RaisedClearedStrip } from "./proof";
@@ -26,3 +26,5 @@ export { AccountBars } from "./account-bars";
 export { ChartHint, ShowingChip, useUsed } from "./showing";
 export { useNow } from "./live";
 export { RowsPanel } from "./rows-panel";
+export { RecordsPanel } from "./records-panel";
+export { InsightStrip, SinceStrip, ComingBlock, HourStrip, SourceBars, WorkloadList, CompareList } from "./today-blocks-smart";

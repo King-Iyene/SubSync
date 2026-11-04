@@ -3,11 +3,16 @@
 import { CalendarCheck, CircleCheck, ExternalLink, Phone, TriangleAlert } from "lucide-react";
 import { useState } from "react";
 import type { AccessKind } from "@/lib/access";
-import { ageWords, headlineOf, KIND_LABEL, replyWords, shareText, vsUsual, type Kind, type QueueRow, type TodayItem } from "@/lib/analytics/today-queue";
+import { ageWords, headlineOf, replyWords, shareText, vsUsual, type HeadlineAction, type QueueRow, type TodayItem } from "@/lib/analytics/today-queue";
+import { judge } from "@/lib/analytics/speed-intel";
+import { leadsSpec } from "@/lib/analytics/today-records";
+import { pointEnd, specAlerts, specComing, specInsight, specKind, specReplies, specRow, specSince, specThings } from "@/lib/analytics/today-specs";
 import type { TodayData, TodayPerson } from "@/lib/analytics/today-types";
 import type { GoFn } from "../nav";
-import { EmptyState, FixFirstQueue, HeadlineBlock, InlineAlert, Page, ProofStrip, PulseSpark, PulseTile, RaisedClearedStrip, RowsPanel, Section } from "../ds";
+import { ComingBlock, EmptyState, FixFirstQueue, HeadlineBlock, InlineAlert, InsightStrip, ModuleTabs, Page, ProofStrip, PulseSpark, PulseTile, RaisedClearedStrip, Section, SinceStrip } from "../ds";
 import { Btn, fmtInt } from "../ui";
+import { TodayLayers, useTodayModel } from "./today-model";
+import { CoverageTab, HeadlineControls, PeopleTab, SourcesTab } from "./today-parts";
 
 
 // Today for ONE account: a business, a setter, a client's staff. They never see other accounts, fees, settings or plan information (the server sends none of it, and
@@ -15,7 +20,6 @@ import { Btn, fmtInt } from "../ui";
 // tomorrow's appointments, this week's numbers against their own usual, and a plain "done for today" when there is nothing left.
 
 const big = "ds-press inline-flex min-h-12 items-center justify-center gap-2 rounded-lg bg-primary px-5 text-base font-medium text-primary-foreground hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)] active:translate-y-px";
-const NOUN: Record<Kind, string> = { leads: "leads", appointments: "appointments", noshows: "no-shows", stale: "deals", unanswered: "conversations" };
 
 function Waiting({ items, now }: { items: TodayItem[]; now: number }) {
   const [all, setAll] = useState(false);
@@ -69,16 +73,17 @@ const stamp = (p: TodayPerson, zone: string) => {
   try { return new Date(p.at).toLocaleString("en-US", { weekday: "short", hour: "numeric", minute: "2-digit", timeZone: zone }); } catch { return new Date(p.at).toLocaleString("en-US", { weekday: "short", hour: "numeric", minute: "2-digit" }); }
 };
 
-export function TodayAccount({ go, data: t, kind, reload, sync, syncing, now }: { go: GoFn; data: TodayData; kind: AccessKind; reload: () => Promise<void>; sync: () => Promise<void>; syncing: boolean; now: number }) {
+export function TodayAccount({ go, data: t, kind, reload, sync, syncing }: { go: GoFn; data: TodayData; kind: AccessKind; reload: () => Promise<void>; sync: () => Promise<void>; syncing: boolean }) {
+  const m = useTodayModel({ t, kind, reload });
+  const { view, env, now } = m;
   const mine = t.mine;
-  const [focus, setFocus] = useState<string | null>(null);
   const [onlyUnmarked, setOnlyUnmarked] = useState(false);
   const [copied, setCopied] = useState(false);
   const [day, setDay] = useState<number | null>(null);
-  const headline = headlineOf({ scope: "account", rows: t.queue, totals: t.totals, outlier: t.outlier });
-  const leads = t.items.filter((i) => i.kind === "leads");
-  const alsoRows = t.queue.filter((r) => r.kind !== "leads");
-  const row = focus ? t.queue.find((r) => r.key === focus) ?? null : null;
+  const headline = headlineOf({ scope: "account", rows: view.queue, totals: view.totals, outlier: t.outlier });
+  const leads = view.items.filter((i) => i.kind === "leads");
+  const alsoRows = view.queue.filter((r) => r.kind !== "leads");
+  const onPart = (a: HeadlineAction) => m.open(a === "dollars" ? specKind("stale", env) : specThings(env));
   const name = t.accounts[0]?.name ?? "My day";
   const calls = mine?.calls;
   const callTotal = (calls?.newLeads.total ?? 0) + (calls?.noshows.total ?? 0) + (calls?.confirm.total ?? 0);
@@ -89,7 +94,7 @@ export function TodayAccount({ go, data: t, kind, reload, sync, syncing, now }: 
 
   const copy = async () => {
     const extra = [calls ? `${callTotal} ${callTotal === 1 ? "call" : "calls"} to make` : null, appts.length ? `${appts.length} ${appts.length === 1 ? "appointment" : "appointments"} today and tomorrow` : null].filter(Boolean).join(", ");
-    const text = shareText({ who: name, headline, rows: t.queue }) + (extra ? `\n${extra}.` : "");
+    const text = shareText({ who: name, headline, rows: view.queue }) + (extra ? `\n${extra}.` : "");
     try { await navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2500); } catch { window.prompt("Copy this summary", text); }
   };
 
@@ -97,14 +102,14 @@ export function TodayAccount({ go, data: t, kind, reload, sync, syncing, now }: 
   const show = n ? vsUsual({ now: n.showRate.now, usual: n.showRate.usual, nNow: n.showRate.nNow, nUsual: n.showRate.nUsual, minN: n.showRate.minN, lowerIsBetter: false, fmt: (x) => `${Math.round(x * 100)}%`, tolerance: 0.05 }) : null;
   const target = n ? vsUsual({ now: n.inTarget.now, usual: n.inTarget.usual, nNow: n.inTarget.nNow, nUsual: n.inTarget.nUsual, minN: 5, lowerIsBetter: false, fmt: (x) => `${Math.round(x * 100)}%`, tolerance: 0.05 }) : null;
 
-  return (
-    <Page title="Today" subtitle="Leads to answer, calls to make and appointments to mark, most urgent first."
-      actions={<><Btn variant="ghost" onClick={copy}>{copied ? "Copied to your clipboard" : "Share my day"}</Btn><Btn onClick={sync} disabled={syncing}>{syncing ? "Syncing..." : "Sync now"}</Btn></>}>
-      <HeadlineBlock headline={headline}>
-        {t.access.leadsBlocked && <InlineAlert tone="warning" className="mt-3">Needs permission: replies cannot be timed until the conversations permission is approved. Ask the person who manages SubSync.</InlineAlert>}
-        {t.access.apptsBlocked && <InlineAlert tone="warning" className="mt-3">Needs permission: appointments cannot be checked until the calendar permission is approved.</InlineAlert>}
-      </HeadlineBlock>
+  const insights = kind === "client" ? m.insights.filter((i) => i.key !== "idle_owner") : m.insights;
+  const since = t.sinceVisit && (t.sinceVisit.newLeads.length + t.sinceVisit.breached.length + t.sinceVisit.answered.length + t.sinceVisit.clearedAlerts.length > 0) ? t.sinceVisit : null;
+  const judgedIn = (days: number) => env.ledger.filter((l) => l.leadAt > now - days * 86_400_000 && l.leadAt <= now && judge(l, t.targetMinutes, now) !== null);
+  const specTarget = () => { const rows = judgedIn(7).map(({ zone: _z, ...r }) => { void _z; return r; }); return leadsSpec(rows, now, { key: "in-target", title: "Leads this week, judged against the reply target", subtitle: `Leads of the last 7 days that were answered, or are past the ${t.targetMinutes}-minute target without an answer. The share is the ones answered inside the target.`, noun: rows.length === 1 ? "lead" : "leads", count: rows.length, exportName: "leads-this-week" }); };
 
+  const overview = (
+    <>
+      {since && <SinceStrip since={since} showAlerts={kind === "business"} onOpen={(k) => m.open(specSince(k, since, env))} />}
       {done && (
         <section className="mb-9 flex flex-wrap items-center gap-x-6 gap-y-3 border-b pb-8" aria-label="Done for today" data-testid="done-for-today">
           <CircleCheck aria-hidden className="size-14 shrink-0 text-success" />
@@ -120,7 +125,8 @@ export function TodayAccount({ go, data: t, kind, reload, sync, syncing, now }: 
       )}
 
       {leads.length > 0 && (
-        <Section id="my-leads" title={`My leads waiting (${fmtInt(t.totals.leads.count)})`} hint="The longest wait is first. The clock keeps counting while this page is open.">
+        <Section id="my-leads" title={`My leads waiting (${fmtInt(view.totals.leads.count)})`} hint="The longest wait is first. The clock keeps counting while this page is open."
+          action={<Btn variant="ghost" onClick={() => m.open(specKind("leads", env))} testId="leads-show-all">Show all {fmtInt(view.totals.leads.count)}</Btn>}>
           <Waiting items={leads} now={now} />
         </Section>
       )}
@@ -161,25 +167,30 @@ export function TodayAccount({ go, data: t, kind, reload, sync, syncing, now }: 
         </Section>
       )}
 
+      <InsightStrip insights={insights} onOpen={(i) => m.open(specInsight(i, env))} />
+
       {alsoRows.length > 0 && (
         <FixFirstQueue single rows={alsoRows} max={5} title="Also needs you" hint="Other things in this account, ranked by money at stake, then by how long they have been wrong."
-          onShow={(r: QueueRow) => setFocus(r.key)} empty="Nothing else needs you." />
+          onShow={(r: QueueRow) => m.open(specRow(r, env))} empty="Nothing else needs you." assigned={m.assigned} whyOf={m.rowWhy} onAct={m.act} canAssign={m.canAssign} busyKey={m.busy} />
       )}
-      {row && <div className="mb-8"><RowsPanel title={`${KIND_LABEL[row.kind]}`} count={row.count} noun={NOUN[row.kind]} items={t.items.filter((i) => row.itemIds.includes(i.id))} onClose={() => setFocus(null)} /></div>}
+
+      <ComingBlock forecast={t.forecast} targetMinutes={t.targetMinutes} onOpen={(k) => m.open(specComing(k, t.forecast[k], t.targetMinutes))} />
 
       {n && (
         <section className="mb-9 border-t pt-6" aria-labelledby="my-numbers-h" data-testid="my-numbers">
           <h2 id="my-numbers-h" className="mb-1 text-base font-semibold">My numbers this week</h2>
           <p className="mb-5 text-xs text-muted-foreground">Each one is compared with the week before. A comparison shows only when there are enough leads or appointments behind it.</p>
           <div className="grid grid-cols-1 gap-x-8 gap-y-6 sm:grid-cols-3">
-            <PulseTile testId="my-reply" label="Typical first reply" usual={n.reply.verdict}
+            <PulseTile testId="my-reply" label="Typical first reply" usual={n.reply.verdict} onOpen={n.reply.current.answered > 0 ? () => m.open(specReplies(env, now, 7, "Typical first reply, last 7 days")) : undefined} openLabel="Show the replies this is worked out from"
               value={n.reply.current.seconds === null ? `${fmtInt(n.reply.current.answered)} ${n.reply.current.answered === 1 ? "reply" : "replies"}` : replyWords(n.reply.current.seconds)}
               sub={n.reply.current.seconds === null ? "A typical time needs at least 5 replies." : `From ${fmtInt(n.reply.current.answered)} replies in 7 days.`}
-              spark={<PulseSpark points={t.pulse.reply.points.map((p) => ({ label: p.day, value: p.value, note: p.window }))} label="Typical first reply, last 7 days" format={replyWords} />} />
-            <PulseTile testId="my-showrate" label="Show rate" usual={show}
+              spark={<PulseSpark points={t.pulse.reply.points.map((p) => ({ label: p.day, value: p.value, note: p.window }))} label="Typical first reply, last 7 days" format={replyWords}
+                onPoint={(i) => m.open(specReplies(env, pointEnd(t.pulse.reply.points[i].day, now), 7, `Typical first reply, 7 days to ${t.pulse.reply.points[i].day}`))}
+                pointInfo={(i) => { const end = pointEnd(t.pulse.reply.points[i].day, now); const c = env.ledger.filter((l) => l.touchAt !== null && l.leadAt > end - 7 * 86_400_000 && l.leadAt <= end).length; return c > 0 ? { open: true, text: `Click to see the ${c} replies behind it.` } : { open: false, text: "SubSync no longer holds the leads behind this point." }; }} />} />
+            <PulseTile testId="my-showrate" label="Show rate" usual={show} onOpen={() => go("appointments")} openLabel="Open Appointments to see the appointments behind this"
               value={n.showRate.now === null ? "Not enough yet" : `${Math.round(n.showRate.now * 100)}%`}
               sub={n.showRate.now === null ? `Needs ${n.showRate.minN} appointments with an outcome marked. ${n.showRate.nNow} so far.` : `Of ${n.showRate.nNow} appointments with an outcome, last 30 days.`} />
-            <PulseTile testId="my-intarget" label="Leads answered inside the target" usual={target}
+            <PulseTile testId="my-intarget" label="Leads answered inside the target" usual={target} onOpen={judgedIn(7).length > 0 ? () => m.open(specTarget()) : undefined} openLabel="Show the leads this share is worked out from"
               value={n.inTarget.now === null ? "Not enough yet" : `${Math.round(n.inTarget.now * 100)}%`}
               sub={n.inTarget.now === null ? `Needs 5 leads past their target. ${n.inTarget.nNow} so far.` : `Of ${n.inTarget.nNow} leads this week. The target is ${t.targetMinutes} minutes.`} />
           </div>
@@ -190,11 +201,32 @@ export function TodayAccount({ go, data: t, kind, reload, sync, syncing, now }: 
         <section className="mb-4 border-t pt-6" aria-labelledby="caught-h" data-testid="today-proof">
           <h2 id="caught-h" className="mb-4 text-base font-semibold">What SubSync caught in your account</h2>
           <div className="grid grid-cols-1 gap-x-14 gap-y-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
-            <ProofStrip proof={t.proof} title="The last 7 days" />
-            <RaisedClearedStrip proof={t.proof} selected={day} onSelect={setDay} />
+            <ProofStrip proof={t.proof} title="The last 7 days" onOpen={(k) => m.open(specAlerts(t.proof!, k))} />
+            <RaisedClearedStrip proof={t.proof} selected={day} onSelect={setDay} onOpenDay={(i) => m.open(specAlerts(t.proof!, { day: i }))} />
           </div>
         </section>
       )}
+    </>
+  );
+
+  return (
+    <Page title="Today" subtitle="Leads to answer, calls to make and appointments to mark, most urgent first."
+      actions={<><Btn variant="ghost" onClick={copy}>{copied ? "Copied to your clipboard" : "Share my day"}</Btn><Btn onClick={sync} disabled={syncing}>{syncing ? "Syncing..." : "Sync now"}</Btn></>}>
+      <HeadlineBlock headline={headline} onPart={onPart}>
+        {t.access.leadsBlocked && <InlineAlert tone="warning" className="mt-3">Needs permission: replies cannot be timed until the conversations permission is approved. Ask the person who manages SubSync.</InlineAlert>}
+        {t.access.apptsBlocked && <InlineAlert tone="warning" className="mt-3">Needs permission: appointments cannot be checked until the calendar permission is approved.</InlineAlert>}
+        <HeadlineControls m={m} staleCount={t.totals.stale.count} />
+        {!t.actionsReady && <p className="mt-2 text-xs text-muted-foreground" data-testid="needs-update">Done and Snooze need the latest database update. Everything else works.</p>}
+      </HeadlineBlock>
+      {kind === "business" ? (
+        <ModuleTabs label="Today views" tabs={[
+          { label: "Overview", node: overview },
+          { label: "People", node: <PeopleTab m={m} t={t} agency={false} /> },
+          { label: "Sources", node: <SourcesTab m={m} t={t} /> },
+          { label: "Coverage", node: <CoverageTab m={m} t={t} /> },
+        ]} />
+      ) : overview}
+      <TodayLayers m={m} />
       <button type="button" onClick={() => void reload()} className="sr-only">Refresh Today</button>
     </Page>
   );

@@ -77,9 +77,11 @@ test("the account selector narrows every number, is kept in the address as ta=, 
   await expect(page.getByTestId("today-headline")).toBeVisible({ timeout: 15_000 });
   const picker = page.getByTestId("today-account-picker");
   await picker.getByRole("button", { name: /Client accounts/ }).click();
-  await picker.getByLabel("Find a client account").fill(target.accountName);
-  await picker.getByRole("checkbox").first().check();
-  await picker.getByRole("button", { name: "Done" }).click();
+  const pop = page.getByTestId("picker-popover");
+  await pop.getByLabel("Find a client account").fill(target.accountName);
+  await pop.getByRole("checkbox").first().check();
+  await pop.getByRole("button", { name: "Done" }).click();
+  await expect(pop).toHaveCount(0);
   expect(page.url()).toContain(`ta=${target.locationId}`);
   const chip = page.getByTestId("today-toolbar").getByTestId("showing-chip");
   await expect(chip).toContainText(target.accountName);

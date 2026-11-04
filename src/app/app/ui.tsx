@@ -122,8 +122,8 @@ export function ErrorBox({ error, onRetry }: { error: ApiError | Error; onRetry?
 // ---------- controls ----------
 
 export function Btn({
-  children, onClick, variant = "secondary", disabled, type = "button", title,
-}: { children: ReactNode; onClick?: () => void; variant?: "primary" | "secondary" | "ghost"; disabled?: boolean; type?: "button" | "submit"; title?: string }) {
+  children, onClick, variant = "secondary", disabled, type = "button", title, testId,
+}: { children: ReactNode; onClick?: () => void; variant?: "primary" | "secondary" | "ghost"; disabled?: boolean; type?: "button" | "submit"; title?: string; testId?: string }) {
   const style =
     variant === "primary"
       ? "bg-primary text-primary-foreground hover:bg-primary/90 active:translate-y-px"
@@ -131,7 +131,7 @@ export function Btn({
         ? "text-muted-foreground hover:bg-muted hover:text-foreground"
         : "border bg-card hover:border-primary/40 hover:bg-accent/50 active:translate-y-px";
   return (
-    <button type={type} title={title} disabled={disabled} onClick={onClick}
+    <button type={type} title={title} disabled={disabled} onClick={onClick} data-testid={testId}
       className={`inline-flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 ${style}`}>
       {children}
     </button>
