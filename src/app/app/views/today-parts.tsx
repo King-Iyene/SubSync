@@ -79,7 +79,7 @@ export function BriefPreview({ onClose }: { onClose: () => void }) {
   }, [onClose]);
   return createPortal(
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/55 p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }} data-testid="brief-overlay">
-      <div role="dialog" aria-modal="true" aria-label="Preview of the daily email" className="flex max-h-[80vh] w-[min(40rem,100%)] flex-col overflow-hidden rounded-2xl border bg-card shadow-2xl" data-testid="brief-panel">
+      <div role="dialog" aria-modal="true" aria-label="Preview of the daily email" className="flex max-h-[80vh] w-[min(40rem,100%)] flex-col overflow-hidden rounded-xl border bg-card shadow-2xl" data-testid="brief-panel">
         <header className="flex items-start justify-between gap-3 border-b px-5 py-4">
           <div><h2 className="text-lg font-semibold">Preview of the daily email</h2><p className="mt-0.5 text-sm text-muted-foreground">Written from the same list as Today. SubSync has sent nothing.</p></div>
           <button type="button" onClick={onClose} aria-label="Close" data-testid="brief-close" className="inline-flex size-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"><X aria-hidden className="size-5" /></button>

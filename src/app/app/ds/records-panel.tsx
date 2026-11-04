@@ -122,7 +122,7 @@ export function RecordsPanel({ spec, onClose, now, zone = "UTC", canExport = tru
   const node = (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/55 p-3 sm:p-6 print:hidden" data-testid="records-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div ref={root} role="dialog" aria-modal="true" aria-labelledby={titleId} onKeyDown={onKey} data-testid="records-panel" data-maximised={max} data-key={spec.key}
-        className={`relative flex flex-col overflow-hidden border bg-card text-card-foreground shadow-2xl ${max ? "h-full w-full rounded-none" : "h-[80vh] w-[min(960px,100%)] rounded-2xl"}`}>
+        className={`relative flex flex-col overflow-hidden border bg-card text-card-foreground shadow-2xl ${max ? "h-full w-full rounded-none" : "h-[80vh] w-[min(960px,100%)] rounded-xl"}`}>
         <header className="flex items-start gap-3 border-b px-5 pb-3 pt-4">
           <div className="min-w-0 flex-1">
             <h2 id={titleId} className="flex flex-wrap items-baseline gap-x-2 text-xl font-semibold tracking-tight" data-testid="records-title">

@@ -592,7 +592,8 @@ create table if not exists public.today_actions (
   location_id text not null,
   row_key text not null,
   kind text not null,
-  action text not null check (action in ('done', 'snooze', 'assign', 'undo')),
+  -- action is done, snooze, assign or undo; the server is the only writer and checks it
+  action text not null,
   -- 'team' for an agency or a business administrator (the team shares one queue), 'user:<id>' for a client's staff (their own queue only).
   lane text not null,
   actor_key text not null,

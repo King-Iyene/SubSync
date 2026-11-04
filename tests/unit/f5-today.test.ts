@@ -143,6 +143,9 @@ describe("who may read the change figures (the route policy)", () => {
     // The rebuilt Today read is open to a client's staff for their own account (the handler limits it to that account, see tests/unit/today-db.test.ts).
     for (const kind of ["agency", "business", "client"] as const) expect(routeAllowed(kind, "GET", ["today"]), kind).toBe(true);
     for (const kind of ["business", "client"] as const) expect(routeAllowed(kind, "POST", ["today"]), kind).toBe(false);
+    // The one write Today has is a mark inside SubSync (Done, Snooze, Assign, Undo on a row): open to the three kinds, nothing else under today is.
+    for (const kind of ["agency", "business", "client"] as const) expect(routeAllowed(kind, "POST", ["today", "action"]), kind).toBe(true);
+    for (const kind of ["business", "client"] as const) { expect(routeAllowed(kind, "POST", ["today", "other"]), kind).toBe(false); expect(routeAllowed(kind, "PUT", ["today", "action"]), kind).toBe(false); expect(routeAllowed(kind, "DELETE", ["today", "action"]), kind).toBe(false); }
   });
   it("it is read only: nothing can write through it", () => {
     for (const kind of ["business", "client"] as const) expect(routeAllowed(kind, "POST", ["daily", "changes"]), kind).toBe(false);
