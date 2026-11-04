@@ -47,6 +47,7 @@ import { buildAudit } from "../analytics/audit-intel";
 import { shareSourceOf } from "../analytics/audit-v2";
 import { revokeShared } from "../analytics/share-queries";
 import { clientPage, coreFor, pagePayload, type AuditBase } from "./audit-api";
+import { handleClientsPart } from "./clients-book-routes";
 import { appointmentList, staleDealList, waitingList, type AuditList } from "../analytics/audit-queries";
 import { DEAL_RULES_VERSION } from "../analytics/definitions";
 import { speedPart, speedView } from "../analytics/speed-queries";
@@ -288,6 +289,21 @@ async function auditScope(ctx: Ctx, wanted: string | null) {
     return { settings, live, apptView, links, readLimit: readLimitNote(coverage.filter((c) => idSet.has(c.locationId) && c.stored >= CONVERSATIONS_READ_PER_ACCOUNT).length, live.length) };
   };
   return { settings, hidden, ids, base, focus: focus ? { id: focus.locationId, name: focus.name ?? "Unnamed account" } : null };
+}
+
+// The rebuilt Clients screen (docs/CLIENTS_REVIEW.md): the client accounts come from the signed session and the page filter, the heavy read is the Account audit's own kept read
+// (same accounts, same 45 seconds), and the route is agency only (the route policy refuses a business owner and a client's staff before this runs).
+async function clientsBookPart(ctx: Ctx) {
+  const { settings, accounts, links } = await accountsFor(ctx);
+  const live = accounts.filter((a) => !a.ignored);
+  const ids = live.map((a) => a.locationId);
+  const idSet = new Set(ids);
+  const base = async (): Promise<AuditBase> => {
+    const [apptView, coverage] = await Promise.all([appointmentView(ctx.installationId, ids), conversationCoverage(ctx.installationId)]);
+    return { settings, live, apptView, links, readLimit: readLimitNote(coverage.filter((c) => idSet.has(c.locationId) && c.stored >= CONVERSATIONS_READ_PER_ACCOUNT).length, live.length) };
+  };
+  const now = Date.now();
+  return handleClientsPart({ ctx, settings, live, links, now, core: () => coreFor({ installationId: ctx.installationId, ids, limitTo: ctx.limitTo, now, base }) });
 }
 
 async function auditCore(ctx: Ctx, wanted: string | null, fresh = false) {
@@ -1940,6 +1956,7 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       if (a === "daily-brief") return await dailyBrief(ctx);
       if (a === "comms-intel") return await commsIntel(ctx);
       if (a === "deal-gaps") return await dealGaps(ctx);
+      if (a === "clients" && !b && ctx.url.searchParams.get("part")) return await clientsBookPart(ctx);
       if (a === "clients" && !b) return await clientsView(ctx);
       if (a === "clients" && b && LOCATION_ID.test(b) && c === "notes") return await clientRoutes.notesView(ctx, clientDeps, b);
       if (a === "client-onboarding" && !b) return await clientRoutes.onboardingView(ctx, clientDeps);
