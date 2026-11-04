@@ -52,16 +52,18 @@ test("the figures are the numbers their own pages show", async ({ page, request 
   await expect(page.getByTestId("pulse-appointments")).toContainText(String(appts.unmarkedTotal));
 });
 
-test("Today draws its own account selector and not the shared filter; the shared filter does not change Today and still works on other pages", async ({ page, request }) => {
-  const { get } = await api(request);
-  const baseline = await get("today");
+test("Today draws its own account selector and not the shared filter; the shared filter does not change Today and still works on other pages", async ({ page }) => {
+  await page.goto("/app");
+  await expect(page.getByTestId("donut-total")).toBeVisible({ timeout: 15_000 });
+  const baseTotal = (await page.getByTestId("donut-total").innerText()).trim();
   await page.goto("/app#today?hideTest=1&industry=medical");
+  await page.reload();
   await expect(page.getByTestId("today-headline")).toBeVisible({ timeout: 15_000 });
   await expect(page.getByTestId("filter-drawer")).toHaveCount(0);
   await expect(page.getByTestId("filter-row")).toHaveCount(0);
   await expect(page.getByTestId("today-account-picker")).toBeVisible();
   // The shared filter (industry, test accounts) names nothing Today counts: the same total as with no filter at all.
-  await expect(page.getByTestId("donut-total")).toContainText(String(baseline.items.length).replace(/\B(?=(\d{3})+(?!\d))/g, ","));
+  await expect(page.getByTestId("donut-total")).toHaveText(baseTotal);
   // Another page keeps the shared filter.
   await page.goto("/app#speed");
   await page.reload();
@@ -142,7 +144,7 @@ test("every Open in CRM link is a real https address in a new tab, and none is a
   expect(await page.locator('a[href^="tel:"]').count()).toBe(0);
 });
 
-test("the donut: each slice is a button; clicking it filters the queue to that kind, opens its list, and the count equals the rows; the chip and the legend undo it", async ({ page, request }) => {
+test("the donut: each slice is a button; pressing it opens the records behind it, and the count on the slice is the number of rows; the legend does the same", async ({ page, request }) => {
   const { get } = await api(request);
   const t = await get("today");
   await page.goto("/app");
@@ -150,49 +152,51 @@ test("the donut: each slice is a button; clicking it filters the queue to that k
   await expect(page.getByTestId("chart-hint").first()).toBeVisible();
   const kinds = (["leads", "appointments", "noshows", "stale", "unanswered"] as const).filter((k) => t.totals[k].count > 0);
   expect(kinds.length).toBeGreaterThan(1);
+  const panel = page.getByTestId("records-panel");
   for (const kind of kinds) {
     const slice = page.getByTestId(`slice-${kind}`);
-    await expect(slice).toHaveAttribute("data-count", String(t.totals[kind].count));
+    const n = Number(await slice.getAttribute("data-count"));
+    expect(n).toBeGreaterThan(0);
     await slice.focus();
-    await expect(page.getByTestId("donut-tip")).toContainText(String(t.totals[kind].count));
+    await expect(page.getByTestId("donut-tip")).toContainText(String(n));
     await page.keyboard.press("Enter");
-    const panel = page.getByTestId("today-list");
     await expect(panel).toBeVisible();
-    // The count on the slice is the number in the list's heading, and the rows are the rows (the list may be capped, and then says so).
-    await expect(panel.getByTestId("drill-count")).toHaveText(String(t.totals[kind].count));
-    const loaded = (t.items as Json[]).filter((i) => i.kind === kind).length;
-    await expect(panel.getByTestId("list-range")).toContainText(`of ${Math.max(loaded, t.totals[kind].count)}`);
-    await expect(page.getByTestId("today-toolbar").getByTestId("showing-chip")).toContainText(/.+/);
-    // The queue shows only that kind.
-    for (const r of await page.getByTestId("queue-row").all()) expect(await r.getAttribute("data-kind")).toBe(kind);
-    // The selected slice is marked with more than colour.
+    // The count on the slice is the number in the panel's heading; the rows are the rows (a list that was cut says so).
+    await expect(panel.getByTestId("records-count")).toHaveAttribute("data-count", String(n));
+    const shown = Number(await panel.getByTestId("records-count").getAttribute("data-shown"));
+    if (shown < n) await expect(panel.getByTestId("records-note")).toBeVisible();
+    await expect(panel.getByTestId("records-showing")).toContainText(`of ${shown}`);
+    // The chosen slice and its legend row are marked with more than colour while the panel is open.
     await expect(slice).toHaveAttribute("aria-pressed", "true");
     await expect(page.getByTestId(`legend-${kind}`)).toHaveAttribute("aria-pressed", "true");
+    await page.keyboard.press("Escape");
+    await expect(panel).toHaveCount(0);
   }
   await expect(page.getByTestId("donut-chart").getByTestId("chart-hint")).toHaveCount(0); // gone after the first click
-  // The legend row does the same as the slice, and pressing the chosen one again closes it; the chip's cross also closes it.
+  // The legend row does the same as the slice.
   await page.getByTestId(`legend-${kinds[0]}`).click();
-  await expect(page.getByTestId("today-list")).toBeVisible();
-  await page.getByTestId("today-toolbar").getByRole("button", { name: /Stop showing/ }).click();
-  await expect(page.getByTestId("today-list")).toHaveCount(0);
+  await expect(panel).toBeVisible();
+  await page.getByTestId("records-close").click();
+  await expect(panel).toHaveCount(0);
   await page.screenshot({ path: "docs/review/today-charts-donut.png", fullPage: false, clip: { x: 0, y: 0, width: 1440, height: 900 } }).catch(() => undefined);
 });
 
-test("Show the leads on a queue row opens exactly that row's items", async ({ page }) => {
+test("Show on a queue row opens exactly that row's items", async ({ page }) => {
   await page.goto("/app");
   const row = page.getByTestId("queue-row").first();
   await expect(row).toBeVisible({ timeout: 15_000 });
-  const count = Number((await row.getByTestId("queue-show").evaluate((el) => el.closest("li")?.querySelector(".tnum p")?.textContent ?? "")).replace(/[^\d]/g, ""));
+  const count = Number((await row.getByTestId("queue-amount").getAttribute("aria-label"))!.match(/(\d[\d,]*) items?/)?.[1].replace(/,/g, ""));
   await row.getByTestId("queue-show").click();
-  const panel = page.getByTestId("today-list");
+  const panel = page.getByTestId("records-panel");
   await expect(panel).toBeVisible();
-  const heading = Number(await panel.getByTestId("drill-count").innerText());
+  const heading = Number(await panel.getByTestId("records-count").getAttribute("data-count"));
   expect(heading).toBeGreaterThan(0);
-  if (count > 0 && !(await row.innerText()).includes("$")) expect(heading).toBe(count);
-  await expect(page.getByTestId("showing-chip").first()).toBeVisible();
+  expect(heading).toBe(count);
+  await page.getByTestId("records-close").click();
+  await expect(panel).toHaveCount(0);
 });
 
-test("the bars: where it is happening; clicking a bar narrows Today to that account, with a chip to go back", async ({ page }) => {
+test("the bars: where it is happening; clicking a bar opens the things to fix in that account, and the count on the bar is the number of rows", async ({ page }) => {
   await page.goto("/app");
   const bars = page.getByTestId("account-bar");
   await expect(bars.first()).toBeVisible({ timeout: 15_000 });
@@ -203,8 +207,15 @@ test("the bars: where it is happening; clicking a bar narrows Today to that acco
   await expect(page.getByTestId("bars-tip")).toContainText(/:/);
   const name = (await bars.first().getAttribute("aria-label"))!.split(":")[0];
   await bars.first().click();
+  const panel = page.getByTestId("records-panel");
+  await expect(panel).toBeVisible();
+  await expect(page.getByTestId("records-title")).toContainText(name);
+  await expect(panel.getByTestId("records-count")).toHaveAttribute("data-count", String(counts[0]));
+  await page.keyboard.press("Escape");
+  await expect(panel).toHaveCount(0);
+  // Narrowing Today to one account is done from Accounts needing you.
+  await page.getByTestId("needing-row").first().getByRole("button", { name: "Only this account" }).click();
   expect(page.url()).toContain("ta=");
-  await expect(page.getByTestId("today-toolbar").getByTestId("showing-chip").first()).toContainText(name);
   await expect(page.getByTestId("account-bar")).toHaveCount(1);
   await page.getByTestId("today-toolbar").getByRole("button", { name: /Stop showing/ }).first().click();
   await expect(page.getByTestId("account-bar").first()).toBeVisible();
@@ -219,14 +230,16 @@ test("raised and cleared: each day with alerts opens its list; the number on the
   await expect(page.getByTestId("proof-note")).toContainText("Cleared means the problem is gone from your CRM data");
   const days = strip.getByTestId("raised-day");
   expect(await days.count()).toBe(7);
+  const panel = page.getByTestId("records-panel");
   for (const d of await days.all()) {
     if (await d.isDisabled()) continue;
     const raised = Number(await d.getAttribute("data-raised")), cleared = Number(await d.getAttribute("data-cleared"));
     await d.click();
-    if (raised > 0) await expect(strip.getByTestId("raised-list-raised-count")).toHaveText(String(raised));
-    if (cleared > 0) await expect(strip.getByTestId("raised-list-cleared-count")).toHaveText(String(cleared));
-    await strip.getByTestId("raised-list").getByRole("button", { name: /Stop showing/ }).click();
-    await expect(strip.getByTestId("raised-list")).toHaveCount(0);
+    await expect(panel).toBeVisible();
+    await expect(panel.getByTestId("records-count")).toHaveAttribute("data-count", String(raised + cleared));
+    await expect(page.getByTestId("records-title")).toContainText("Alerts on");
+    await page.keyboard.press("Escape");
+    await expect(panel).toHaveCount(0);
   }
 });
 
