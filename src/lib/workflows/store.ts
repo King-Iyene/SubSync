@@ -184,3 +184,12 @@ export async function loadDaily(installationId: string, allowed: string[] | null
   const rows = await safe(() => sql()`select day::text as day, sum(total)::int total, sum(failing)::int failing, sum(runs_30d)::int runs, sum(errors_30d)::int errors from workflow_daily where installation_id = ${installationId} ${allowed === null ? sql`` : sql`and location_id = any(${idList(allowed)}::text[])`} and day > current_date - ${days}::int group by day order by day`, []);
   return rows.map((r) => ({ day: r.day as string, total: r.total as number, failing: r.failing as number, runs: num(r.runs), errors: num(r.errors) }));
 }
+
+export async function finishChange(id: number, outcome: string, after: Record<string, unknown> | null): Promise<void> {
+  await safe(() => sql()`update workflow_changes set outcome = ${outcome}, after = coalesce(${after ? sql().json(after as never) : null}, after) where id = ${id}`, undefined);
+}
+export async function findChange(installationId: string, allowed: string[] | null, id: number): Promise<{ change: ChangeRow; undone: boolean } | null> {
+  const rows = await loadChanges(installationId, allowed, 1000);
+  const c = rows.find((r) => r.id === id);
+  return c ? { change: c, undone: rows.some((r) => r.undoes === id && r.outcome !== "failed") } : null;
+}

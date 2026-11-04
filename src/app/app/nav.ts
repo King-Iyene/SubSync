@@ -1,5 +1,5 @@
 export type ViewId =
-  | "today" | "myday" | "audit" | "speed" | "overview" | "accounts" | "account" | "search" | "deals" | "inbox" | "onboarding" | "email" | "duplicates" | "alerts" | "settings" | "help" | "pipeline" | "leads" | "calls" | "clients" | "team" | "appointments" | "meetings" | "cleanup" | "roadmap" | "people" | "connections" | "notifications";
+  | "today" | "myday" | "audit" | "speed" | "overview" | "accounts" | "account" | "search" | "deals" | "inbox" | "onboarding" | "email" | "duplicates" | "alerts" | "settings" | "help" | "pipeline" | "leads" | "calls" | "clients" | "team" | "appointments" | "meetings" | "cleanup" | "roadmap" | "people" | "connections" | "notifications" | "workflows";
 
 export type GoFn = (view: ViewId, locationId?: string) => void;
 
@@ -21,6 +21,7 @@ export const NAV: NavItem[] = [
   { id: "speed", label: "Speed to lead", feature: "speed", group: "Daily work" },
   { id: "appointments", label: "Appointments", feature: "appointments", group: "Daily work" },
   { id: "inbox", label: "Unanswered messages", feature: "inbox", group: "Daily work" },
+  { id: "workflows", label: "Workflows", feature: "workflows", group: "Daily work" },
   { id: "audit", label: "Account audit", feature: "audit", group: "Daily work" },
   { id: "clients", label: "Clients", feature: "clients", group: "Clients and people" },
   { id: "people", label: "People", feature: "search", group: "Clients and people" },

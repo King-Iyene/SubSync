@@ -18,6 +18,8 @@ export type RunDeps = {
   /** The demo has no CRM: a change is applied to SubSync's own copy only. */
   demo: boolean;
   idem: string;
+  /** Saves the copy of the definition before anything is changed or deleted. If it throws, the change does not happen. */
+  saveCopy?: (definition: unknown) => Promise<void>;
 };
 
 const NEEDS = (miss: string[]) => `Needs permission: reconnect. Missing: ${miss.join(", ")}.`;
@@ -50,6 +52,7 @@ export async function runOne(kind: WriteKind, w: Pick<WfItem, "workflowId" | "lo
     const def = await workflowDefinition({ token, fetchImpl: d.fetchImpl }, w.workflowId);
     // A copy first. If it cannot be read, the delete does not happen: a delete that cannot be undone is not worth the risk.
     if (!def.ok) return { ...base, outcome: def.reason === "needs_permission" ? "needs_permission" : "skipped", message: def.reason === "needs_permission" ? NEEDS(["workflows.readonly"]) : "SubSync could not save a copy first, so nothing was deleted." };
+    try { await d.saveCopy?.(def.value); } catch { return { ...base, outcome: "skipped", message: "SubSync could not save a copy first, so nothing was deleted." }; }
     const r = fromWrite(await deleteWorkflow(c, o));
     return { ...base, ...r, snapshot: def.value, message: r.outcome === "done" ? "Deleted. A copy is saved so it can be recreated as a draft." : r.message };
   }
@@ -60,6 +63,7 @@ export async function runOne(kind: WriteKind, w: Pick<WfItem, "workflowId" | "lo
     if (!def.ok) return { ...base, outcome: def.reason === "needs_permission" ? "needs_permission" : "failed", message: def.reason === "needs_permission" ? NEEDS(["workflows.readonly"]) : "SubSync could not read the workflow, so nothing was changed." };
     const next = renamedDefinition(def.value, arg.newName);
     if (!next) return { ...base, outcome: "skipped", message: "The workflow came back in a shape SubSync does not recognise, so it was left alone.", snapshot: def.value };
+    try { await d.saveCopy?.(def.value); } catch { return { ...base, outcome: "skipped", message: "SubSync could not save a copy first, so nothing was changed.", snapshot: def.value }; }
     const published = w.status === "published";
     if (published) {
       const down = fromWrite(await setStatus(c, "draft", o));

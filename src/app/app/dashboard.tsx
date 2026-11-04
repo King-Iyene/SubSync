@@ -11,6 +11,7 @@ import { NAV_FOR, type AccessKind } from "@/lib/access";
 import {
   Briefcase, CalendarCheck, ClipboardCheck, Zap, CircleHelp, Copy, Eraser, Inbox, Kanban, LayoutDashboard, Mic, Monitor, Moon, PhoneCall, Plug, Search, Settings, Sun, Target, UserRound, Users, Wrench, type LucideIcon,
   Sparkles, UsersRound,
+  Workflow,
 } from "lucide-react";
 import { NAV, PARENT, type GoFn, type ViewId } from "./nav";
 import { useBrandedText } from "./brand-text";
@@ -32,6 +33,7 @@ import { SpeedView } from "./views/speed";
 import { AppointmentsView } from "./views/appointments";
 import { CleanupView } from "./views/cleanup";
 import { MeetingsView } from "./views/meetings";
+import { WorkflowsView } from "./views/workflows";
 import { GlobalSearch } from "./views/global-search";
 import { PeopleModule } from "./views/people-module";
 import { ClientsView, type ClientsFeatures } from "./views/clients";
@@ -355,6 +357,8 @@ export function Dashboard() {
       case "team": return <TeamView />;
       case "appointments": return <ModuleTabs key="appts" start={0} tabs={[{ label: "Appointments", node: <AppointmentsView go={go} /> }, { label: "Insights", node: <AppointmentInsights /> }]} />;
       case "meetings": return <MeetingsView />;
+      // Workflows reads with the unfiltered client and keeps its own account choice (like Today), so the shared filter never changes what it counts.
+      case "workflows": return <ApiProvider value={baseApi}><WorkflowsView go={go} kind={auth.kind} /></ApiProvider>;
       case "cleanup": return <CleanupView />;
       case "clients": return <ClientsView key="clients" go={go} initialTab="health" features={clientFeatures} />;
     }
@@ -445,7 +449,7 @@ const THEME_LABEL: Record<ThemePref, string> = { dark: "Dark appearance", light:
 
 const ICONS: Record<string, LucideIcon> = {
   today: Sun, myday: Sun, people: UsersRound, audit: ClipboardCheck, speed: Zap, overview: LayoutDashboard, inbox: Inbox, appointments: CalendarCheck, meetings: Mic, search: Search, pipeline: Kanban, leads: Target, calls: PhoneCall,
-  accounts: Briefcase, clients: UserRound, team: Users, onboarding: Wrench, duplicates: Copy, cleanup: Eraser, settings: Settings, connections: Plug, help: CircleHelp, roadmap: Sparkles,
+  accounts: Briefcase, clients: UserRound, team: Users, onboarding: Wrench, duplicates: Copy, cleanup: Eraser, settings: Settings, connections: Plug, help: CircleHelp, roadmap: Sparkles, workflows: Workflow,
 };
 
 function Centered({ title, body }: { title: string; body: string }) {
