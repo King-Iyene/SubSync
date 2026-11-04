@@ -125,7 +125,7 @@ test("there is one menu item for the day: no 'My day', the old address opens Tod
   await page.goto("/app?as=client#myday");
   await expect(page.getByRole("heading", { level: 1, name: "Today" })).toBeVisible({ timeout: 60_000 });
   await expect(page.getByTestId("today-headline")).toBeVisible();
-  const nav = page.locator('nav[aria-label="Sections"]').first();
+  const nav = page.locator('nav[aria-label="Sections"]:visible').first(); // the side menu, or the row of pages on a phone
   await expect(nav.getByRole("button", { name: "Today" })).toHaveCount(1);
   await expect(nav.getByRole("button", { name: "My day" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "My day" })).toHaveCount(0);
@@ -173,11 +173,21 @@ test("a person on Reply now: Done for now on one person holds that person only, 
   await page.goto("/app?as=client");
   const rows = page.getByTestId("reply-row");
   await expect(rows.first()).toBeVisible({ timeout: 60_000 });
-  const before = Number((await page.getByTestId("today-headline").innerText()).match(/\d[\d,]*/)![0].replace(/,/g, ""));
+  // The figure counts up for 600 ms: read the number it ends on.
+  const final = async () => Number(((await page.getByTestId("headline-replies").locator("[data-final]").first().getAttribute("data-final")) ?? "").replace(/[^0-9]/g, ""));
+  await expect.poll(final).toBe(counted(t).filter((i) => i.kind === "replies").length);
+  const before = await final();
+  const heldBefore = Object.values(t.holds as Json).map((h: Json) => h.eventId);
   await rows.first().getByTestId("reply-more").click();
-  await page.getByTestId("menu-done").click();
-  await expect(page.getByTestId("today-toast")).toContainText(/Marked done/);
-  await expect(page.getByTestId("today-headline")).toContainText(new RegExp(`^\\s*${before - 1}\\b`), { timeout: 15_000 });
-  await page.getByTestId("today-undo").click();
-  await expect(page.getByTestId("today-headline")).toContainText(new RegExp(`^\\s*${before}\\b`), { timeout: 15_000 });
+  try {
+    await page.getByTestId("menu-done").click();
+    await expect(page.getByTestId("today-toast")).toContainText(/Marked done/);
+    await expect.poll(final, { timeout: 30_000 }).toBe(before - 1);
+    await page.getByTestId("today-undo").click();
+    await expect.poll(final, { timeout: 30_000 }).toBe(before);
+  } finally {
+    // Whatever happened, the demo company is put back: any mark this test made is undone.
+    const now = await who.get("today");
+    for (const h of Object.values(now.holds as Json) as Json[]) if (!heldBefore.includes(h.eventId)) await who.post("today/action", { action: "undo", eventId: h.eventId });
+  }
 });

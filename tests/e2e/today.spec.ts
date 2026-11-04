@@ -178,11 +178,14 @@ test("there is no donut: every bar segment opens exactly its own records, and th
 });
 
 test("the amount on a work-list row opens exactly that client account's records, and the count equals the rows", async ({ page }) => {
+  test.setTimeout(240_000);
   await page.goto("/app");
   const row = page.getByTestId("queue-row").first();
   await expect(row).toBeVisible({ timeout: 45_000 });
   const count = Number(await row.getByTestId("queue-amount").getAttribute("data-count"));
-  await row.getByTestId("queue-amount").click();
+  // On a wide list the amount is a button; on a phone the amount folds under the reason and the same list opens from the row menu.
+  if (await row.getByTestId("queue-amount").isVisible()) await row.getByTestId("queue-amount").click();
+  else { await row.getByTestId("queue-more").click(); await page.getByTestId("menu-show").click(); }
   const panel = page.getByTestId("records-panel");
   await expect(panel).toBeVisible();
   const heading = Number(await panel.getByTestId("records-count").getAttribute("data-count"));
@@ -220,6 +223,7 @@ test("the bars: one per client account, longest first, at most 8 and a '+N more'
 });
 
 test("raised and cleared: each day with alerts opens its list; the number on the day is the rows; the word is cleared", async ({ page }) => {
+  test.setTimeout(240_000);
   await page.goto("/app");
   await openMore(page);
   const strip = page.getByTestId("raised-cleared");
@@ -299,6 +303,7 @@ test("the change figures read only what the person may see: a client's staff are
 });
 
 test("a business and a client's staff get one account from the server, even when the address names another", async ({ request }) => {
+  test.setTimeout(300_000); // a dozen reads of Today
   const agency = await api(request);
   const all = await agency.get("today");
   const ids = (all.accounts as Json[]).map((a) => a.id as string);

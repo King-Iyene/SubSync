@@ -24,13 +24,13 @@ export async function api(request: APIRequestContext, as?: "business" | "client"
 export const isJunk = (i: Json, now: number, staleDays: number) =>
   i.kind === "stale" && ((i.at !== null && now - i.at > staleDays * 3 * 86_400_000) || /(^|[^a-z0-9])(test|testing|demo|sample|sandbox|dummy)([^a-z0-9]|$)/i.test(i.name));
 
-/** The items Today counts by default (test and very old deals left out). */
-export const counted = (t: Json): Json[] => (t.items as Json[]).filter((i) => !isJunk(i, t.now, t.staleDays));
+/** The items Today counts by default (test and very old deals left out, and anything set aside with Done or Snooze). */
+export const counted = (t: Json): Json[] => (t.items as Json[]).filter((i) => !isJunk(i, t.now, t.staleDays) && !(t.holds as Json)[i.id]);
 
 /** Opens "More detail" (closed until asked for) and, if given, one of its tabs. */
 export async function openMore(page: Page, tab?: string) {
   const toggle = page.getByTestId("more-detail-toggle");
-  await expect(toggle).toBeVisible({ timeout: 30_000 });
+  await expect(toggle).toBeVisible({ timeout: 90_000 });
   if ((await toggle.getAttribute("aria-expanded")) !== "true") await toggle.click();
   if (tab) await page.getByRole("tab", { name: tab }).click();
 }

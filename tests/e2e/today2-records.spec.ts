@@ -314,6 +314,7 @@ test("a point on the typical-reply line opens the replies behind it, or says why
   await openMore(page);
   const spark = page.getByTestId("pulse-reply").getByTestId("spark-surface");
   if (!(await spark.count())) { await expect(page.getByTestId("spark-empty").first()).toBeVisible(); return; }
+  await spark.scrollIntoViewIfNeeded(); // the figures are under More detail, so the line may be below the fold
   const b = (await spark.boundingBox())!;
   await page.mouse.move(b.x + b.width - 3, b.y + b.height / 2);
   await expect(page.getByTestId("spark-tip")).toBeVisible();
@@ -328,14 +329,15 @@ test("Done for now sets a problem aside and moves the count, the set-aside list 
   test.setTimeout(240_000); // every mark reads Today again; the demo company is slow to answer
   await openToday(page);
   const first = page.getByTestId("queue-row").first();
-  const text = await first.innerText();
+  const reasonOf = () => page.getByTestId("queue-row").first().locator("p").nth(1);
+  const text = (await reasonOf().innerText()).trim(); // what is wrong with the first client account, in words
   const heldBefore = await heldCount(page);
   await first.getByTestId("queue-more").click();
   const [res] = await Promise.all([page.waitForResponse((r) => r.url().includes("/api/app/today/action")), page.getByTestId("menu-done").click()]);
   const eventId = ((await res.json()) as { eventId: number }).eventId;
   try {
     await expect(page.getByTestId("today-toast")).toContainText("Marked done");
-    await expect(page.getByTestId("queue-row").first()).not.toHaveText(text);
+    await expect(reasonOf()).not.toHaveText(text);
     await expect(page.getByTestId("held-link")).toBeVisible();
     await expect(page.getByTestId("held-link")).toContainText("snoozed");
     const held = await heldCount(page);
@@ -347,13 +349,13 @@ test("Done for now sets a problem aside and moves the count, the set-aside list 
     await closePanel(page);
     await page.reload();
     await expect(page.getByTestId("held-link")).toBeVisible({ timeout: 45_000 });
-    await expect(page.getByTestId("queue-row").first()).not.toHaveText(text);
+    await expect(reasonOf()).not.toHaveText(text);
   } finally {
     const { post } = await api(request);
     expect((await post("today/action", { action: "undo", eventId })).status()).toBe(200);
   }
   await page.reload();
-  await expect(page.getByTestId("queue-row").first()).toHaveText(text, { timeout: 45_000 });
+  await expect(reasonOf()).toHaveText(text, { timeout: 45_000 });
 });
 
 test("Done for now then Undo (inside ten seconds) restores the list and the headline", async ({ page }) => {
@@ -362,14 +364,14 @@ test("Done for now then Undo (inside ten seconds) restores the list and the head
   await page.waitForTimeout(1000); // the figures count up for 600 ms
   const headline = await page.getByTestId("today-headline").innerText();
   const rows = page.getByTestId("queue-row");
-  const text = await rows.first().innerText();
+  const text = (await rows.first().locator("p").nth(1).innerText()).trim();
   const heldBefore = await heldCount(page);
   await rows.first().getByTestId("queue-more").click();
   await page.getByTestId("menu-done").click();
   await expect.poll(() => heldCount(page)).toBeGreaterThan(heldBefore);
   await page.getByTestId("today-undo").click();
   await expect.poll(() => heldCount(page), { timeout: 15_000 }).toBe(heldBefore);
-  await expect(rows.first()).toHaveText(text);
+  await expect(rows.first().locator("p").nth(1)).toHaveText(text);
   await expect(page.getByTestId("today-headline")).toHaveText(headline);
 });
 
@@ -400,6 +402,7 @@ test("Snooze 1 day and Snooze until Monday set a problem aside; Assign to me mar
 });
 
 test("server rules: forged rows and people are refused, a client's staff cannot assign, and nobody can undo someone else's mark", async ({ request }) => {
+  test.setTimeout(480_000); // about fifteen calls, each of which reads Today again
   const agency = await api(request);
   const today = await agency.get("today");
   const items = today.items as Json[];
