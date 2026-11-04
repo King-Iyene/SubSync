@@ -12,7 +12,7 @@ import type { Identity, Role } from "@/lib/identity";
 const METHODS = ["GET", "POST", "PUT", "DELETE"] as const;
 
 // Everything a client's staff may call. Anything else is refused, whatever it is called.
-const CLIENT_GET = new Set(["today", "people", "notifications", "my-connections", "team-connections", "meeting-inbox", "meeting-setup", "overview", "accounts", "onboarding", "search", "stale", "hygiene", "inbox", "pipelines", "duplicates", "alerts", "pipeline-intel", "contact-intel", "comms-intel", "deal-gaps", "deal-events", "contact", "start", "appointments", "appointment-insights", "audit", "speed", "roadmap", "freshness", "people", "client-trends"]);
+const CLIENT_GET = new Set(["today", "workflows", "people", "notifications", "my-connections", "team-connections", "meeting-inbox", "meeting-setup", "overview", "accounts", "onboarding", "search", "stale", "hygiene", "inbox", "pipelines", "duplicates", "alerts", "pipeline-intel", "contact-intel", "comms-intel", "deal-gaps", "deal-events", "contact", "start", "appointments", "appointment-insights", "audit", "speed", "roadmap", "freshness", "people", "client-trends"]);
 // Stage E0: every role connects its OWN tools, so these doors are open to a client's staff too. They only ever touch the signed-in person's own rows
 // (my-connections), or, for an account administrator only, the status of the people of their own account (team-connections) and that account's rule
 // (meeting-policy). meeting-inbox (stage E2a) is the signed-in person's OWN inbox: every query names their installation and user id. The handlers refuse an account user for the last two; tests/unit/e0-connections-db.test.ts asks them with real sessions.

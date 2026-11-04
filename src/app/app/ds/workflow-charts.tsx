@@ -30,8 +30,8 @@ export function WfDonut({ title, marks, selected, onSelect, centre = "in total",
                 );
               })}
             </g>
-            <text x="70" y="68" textAnchor="middle" className="fill-foreground text-[22px] font-semibold" style={{ fontVariantNumeric: "tabular-nums" }}>{total}</text>
-            <text x="70" y="85" textAnchor="middle" className="fill-muted-foreground text-[9px]">{centre}</text>
+            <text x="70" y="68" textAnchor="middle" pointerEvents="none" className="fill-foreground text-[22px] font-semibold" style={{ fontVariantNumeric: "tabular-nums" }}>{total}</text>
+            <text x="70" y="85" textAnchor="middle" pointerEvents="none" className="fill-muted-foreground text-[9px]">{centre}</text>
           </svg>
           <ul className="min-w-[10rem] flex-1 space-y-1">
             {marks.map((m) => (

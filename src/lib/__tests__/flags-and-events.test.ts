@@ -10,7 +10,7 @@ test("every built feature is on by default except the two King switched off on 1
   assert.equal(resolveFeatures(FEATURES, { ai: false }).ai, false, "a database row still switches it off without a deploy");
   for (const on of ["overview", "search", "inbox", "appointments", "calls", "alerts", "pipelines", "stale", "onboarding", "settings", "health", "connections", "reports", "cleanup", "setup_compare", "playbooks", "builder", "duplicates", "clients", "team", "activity"] as const) assert.equal(f[on], true, on);
   // Stage S0.2b (King, 1 Nov 2026): the Meeting notes page waits for stage E2a, and Zoom and Google Meet are hidden everywhere.
-  assert.deepEqual([...DEFAULT_OFF].sort(), ["meetings", "zoom_meet"]);
+  assert.deepEqual([...DEFAULT_OFF].sort(), ["meetings", "workflows", "zoom_meet"]);
   assert.equal(f.meetings, false);
   assert.equal(f.zoom_meet, false);
   assert.ok([...DEFAULT_OFF].every((x) => (FEATURES as readonly string[]).includes(x)), "every switched-off name is a real feature");

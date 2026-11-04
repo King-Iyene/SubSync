@@ -115,7 +115,7 @@ export function WorkflowsView({ go, kind }: { go: GoFn; kind: AccessKind }) {
           ))}
         </div>
         {kind === "agency" && accounts.length >= 2 ? <LocalAccountPicker accounts={accounts.map((a) => ({ id: a.locationId, name: a.name }))} picked={picked} onChange={(ids) => { setPicked(ids); setSel(new Set()); }} /> : null}
-        <span className="text-sm text-muted-foreground" data-testid="wf-updated">{data.syncedAt ? `Updated ${when(data.syncedAt, data.now).toLowerCase()}` : "Not updated yet"}</span>
+        <span className="text-sm text-muted-foreground" data-testid="wf-updated">{data.syncedAt ? `Last read ${when(data.syncedAt, data.now).toLowerCase()}` : "Not read yet"}</span>
       </div>
       {data.since && data.since.changes > 0 ? <InlineAlert tone="info" className="mb-4"><span data-testid="wf-since">Since your last visit ({when(data.since.at, data.now).toLowerCase()}): {data.since.changes} change{data.since.changes === 1 ? "" : "s"} to your workflows and campaigns.</span> <button type="button" className="font-medium text-primary hover:underline" onClick={() => setTab("history")}>See them</button></InlineAlert> : null}
       {note ? <InlineAlert tone={note.ok ? "success" : "warning"} onDismiss={() => setNote(null)} className="mb-4">{note.text}</InlineAlert> : null}
@@ -147,7 +147,7 @@ export function WorkflowsView({ go, kind }: { go: GoFn; kind: AccessKind }) {
                 onSelect={(k) => open_(k, accounts.find((a) => a.locationId === k)?.name ?? "Client account", "Everything in this client account. The red part is failing or never ran.", inAccount(items, k))} />
               <WfTrend title="How many were failing, day by day" points={data.daily.failing} unit=" failing" colour="var(--destructive)" onPoint={(day) => open_(`day-${day}`, `Failing today`, `SubSync's own record shows ${data.daily.failing.find((p) => p.day === day)?.value ?? 0} failing on ${day}. The list below is the failing ones now.`, inBucket(items, failing, "failing"))} />
               <WfTrend title="Steps run in the last 30 days, as counted each day" points={data.daily.runs} colour="var(--chart-1)" onPoint={(day) => open_(`runs-${day}`, "Items that ran", `Counted on ${day}. Showing items with runs now.`, items.filter((w) => (w.runs30d ?? 0) > 0))} />
-              <WfBars title="Which fail most?" colour="var(--destructive)" rows={data.top.filter((t) => items.some((w) => w.workflowId === t.workflowId && w.locationId === t.locationId)).map((t) => ({ key: `${t.locationId}|${t.workflowId}`, label: t.name, value: t.failed ?? 0 }))} selected={mark}
+              <WfBars title="Which fail most?" colour="var(--destructive)" rows={data.top.filter((t) => items.some((w) => w.workflowId === t.workflowId && w.locationId === t.locationId)).map((t) => ({ key: `${t.locationId}|${t.workflowId}`, label: `${t.name} (${accounts.find((a) => a.locationId === t.locationId)?.name ?? ""})`, value: t.failed ?? 0 }))} selected={mark}
                 onSelect={(k) => open_(`top-${k}`, "Failing steps", "The one you pressed.", items.filter((w) => keyOf(w) === k))} empty="Nothing is failing." />
               {staff && data.can.health ? (
                 <WfDonut title="Your decisions" marks={data.decisions.map((d): Mark => ({ key: d.decision, label: DEC_LABEL[d.decision], count: d.count, colour: DEC_COLOUR[d.decision] }))} selected={mark} centre="sorted by you"

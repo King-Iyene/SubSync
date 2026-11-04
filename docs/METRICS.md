@@ -442,3 +442,15 @@ Still no new measurement of the CRM. Everything below is worked out from rows Su
 **Accounts compared.** Typical first reply per client account over the last 14 days, ranked only with at least 5 answered leads; the 3 fastest and the 3 slowest (fewer when fewer than 6 are ranked, so the lists never overlap).
 
 **Saved views, command palette, printable report.** A view stores which client accounts and the junk switch, nothing else, and is the person's own (at most 10). The palette lists jumps, lists, accounts, views and actions; Ctrl or Cmd + K opens it on Today. The report prints the headline, the top 12 Fix first rows, the insights, the forecast line and what SubSync caught, with the sender's own brand name when one is set.
+
+## Workflows and campaigns (module W1)
+
+- **Failing** workflow: published, with logs known, at least 3 failed steps and at least 20% of the steps of the last 30 days failed (critical from 50%). Counted from the log totals; never from a guess.
+- **Never ran (30 days)**: published and the log total of the last 30 days is exactly 0. An estimate (a rare trigger can be quiet on purpose). Unknown logs are "not known", never 0.
+- **Old draft**: draft and not edited for 30 days. Estimate.
+- **Campaign looks stuck**: shown as running or scheduled and not changed for 14 days. Estimate. **Campaign failed**: the platform says failed.
+- **Missing basics**: an account has no published workflow whose name looks like missed call text back, new lead follow up, appointment reminders or no show follow up. By name only, so an estimate.
+- **Delivered share** = delivered / sent, only when both are reported and sent is above 0. **Delivery health (0 to 100)** = 100 x delivered share, minus 50 x (bounced + failed) / sent, minus 200 x unsubscribed share (capped at 10%), only from 50 sent. Below that: "Not enough data".
+- **Looks sent but did not arrive**: from 50 sent, shown as sent or done, and delivered share below 80%. Bounces above 5%, unsubscribes above 2% and messages waiting for more than 2 days are separate prompts.
+- **Against its own usual**: the campaign's delivered share against the median of the same account's earlier campaigns, needs 3 earlier ones of 50 sent or more.
+- **Marked fixed / snoozed** hides a finding for 7 days / until the date; it returns by itself if the problem is still there. **Cleared** (Proof) = the alert's condition went away; SubSync cannot tell who fixed it.

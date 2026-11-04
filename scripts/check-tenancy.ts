@@ -168,6 +168,10 @@ async function main() {
       ["POST", "/api/app/today/action", { action: "done", rowKey: `${B.locs[0]}|leads` }],
       ["POST", "/api/app/today/action", { action: "snooze", rowKey: `${B.locs[0]}|stale`, choice: "day" }],
       ["POST", "/api/app/today/action", { action: "undo", eventId: 1 }],
+      // Workflows: a change, a label, a mark and a read of the other agency's workflow in its client account.
+      ["POST", "/api/app/workflows/preview", { kind: "delete", items: [{ locationId: B.locs[0], workflowId: "w-1" }] }],
+      ["PUT", "/api/app/workflows/labels", { items: [{ locationId: B.locs[0], workflowId: "w-1" }], patch: { decision: "retire" } }],
+      ["POST", "/api/app/workflows/mark", { locationId: B.locs[0], workflowId: "w-1", action: "fixed" }],
     ];
     for (const [method, path, body] of attacks) {
       const r = await call(path, tokenA, { method, body: JSON.stringify(body) });
