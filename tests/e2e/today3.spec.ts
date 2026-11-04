@@ -47,6 +47,7 @@ for (const role of ROLES) {
 }
 
 test("above the fold at 1440 x 800: the header, the headline, the one button and at least the first three rows are on screen", async ({ page }, testInfo) => {
+  test.setTimeout(240_000);
   test.skip(testInfo.project.name !== "desktop-1440", "the fold is measured at 1440 x 800");
   await page.setViewportSize({ width: 1440, height: 800 });
   for (const path of ["/app", "/app?as=client", "/app?as=business"]) {

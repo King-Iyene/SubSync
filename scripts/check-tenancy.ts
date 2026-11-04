@@ -132,7 +132,7 @@ async function main() {
     await sibling(cli, A.locs[1], A.locs[0], "a client view");
     // Marking a Today row of the sibling account is refused for a client's staff and a business, exactly like a row that does not exist.
     for (const [label, token, otherLoc] of [["a business view", biz, A.locs[1]], ["a client view", cli, A.locs[0]]] as const) {
-      const r = await call("/api/app/today/action", token, { method: "POST", body: JSON.stringify({ action: "done", rowKey: `${otherLoc}|leads` }) });
+      const r = await call("/api/app/today/action", token, { method: "POST", body: JSON.stringify({ action: "done", rowKey: `${otherLoc}|replies` }) });
       assert.equal(r.status, 404, `${label} marked a row of the sibling account (${r.status})`);
     }
 
@@ -165,7 +165,7 @@ async function main() {
       ["POST", `/api/app/clients/${B.locs[0]}/notes`, { body: "hacked" }],
       ["DELETE", `/api/app/clients/${B.locs[0]}/notes?id=00000000-0000-0000-0000-000000000000`, {}],
       // Today's working queue: a mark on the other agency's row, and a saved view that names the other agency's account.
-      ["POST", "/api/app/today/action", { action: "done", rowKey: `${B.locs[0]}|leads` }],
+      ["POST", "/api/app/today/action", { action: "done", rowKey: `${B.locs[0]}|replies` }],
       ["POST", "/api/app/today/action", { action: "snooze", rowKey: `${B.locs[0]}|stale`, choice: "day" }],
       ["POST", "/api/app/today/action", { action: "undo", eventId: 1 }],
     ];
