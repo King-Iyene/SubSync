@@ -3,7 +3,9 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { guardrails, REASON_LABELS, SORT_LABELS } from "@/lib/analytics/dedupe-review";
+import type { FieldPick } from "@/lib/analytics/cleanup-rules";
 import { EmptyState, ErrorState, HowTo, InlineAlert, Page, PopMenu, RowButton, Section, SkeletonCards } from "../ds";
+import { MatchWhy, type Pair, type Workflow } from "./duplicates-extra";
 import { useApiClient, useData } from "../session";
 import { fmtInt } from "../ui";
 import { buttons, Compare, GroupRow, MergeSheet, RecordCard, type Row, type WithUrl } from "./duplicates-parts";
@@ -19,6 +21,7 @@ type Step = {
   key: string; locationId: string; locationName: string | null; reason: { key: string; label: string }; likelihood: { key: string; label: string }; confidence: number;
   survivorId: string; why: string; obvious: boolean; review: { kind: string; at: string | null; keepContactId: string | null } | null; until: string | null;
   watchingSince: string | null; enriched: boolean; people: WithUrl[];
+  rules: { preset: string; sentence: string; source: string }; reasons: string[]; pairs: Pair[]; picks: FieldPick[]; workflow: Workflow;
 };
 type Paged<T> = { rows: T[]; page: number; pages: number; total: number; from: number; to: number };
 type Account = { locationId: string; name: string | null; groups: number; contacts: number; extra: number; openDeals: number };
@@ -49,7 +52,7 @@ const plural = (n: number, one: string, many: string) => `${fmtInt(n)} ${n === 1
 const selectClass = "min-h-11 rounded-lg border bg-card px-2.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/30 sm:min-h-10";
 const searchClass = "min-h-11 w-full rounded-lg border bg-card px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/30 sm:min-h-10 sm:w-64";
 
-export function DuplicatesView() {
+export function DuplicatesView({ embedded = false }: { embedded?: boolean } = {}) {
   const api = useApiClient();
   const [f, setF] = useState<F>(START);
   const { data, error, loading, reload } = useData<Data>(pathOf(f));
@@ -112,9 +115,11 @@ export function DuplicatesView() {
   const notNow = (s: Step) => send("duplicates/snooze", bodyOf(s), "Set aside for 7 days. It comes back after that.", { path: "duplicates/unsnooze", body: bodyOf(s), focus: `${s.locationId}:${s.key}` });
   const merged = (s: Step) => send("duplicates/review", { ...bodyOf(s), decision: "merged_in_platform", keepContactId: keepId }, "Marked as merged. It leaves the list after SubSync next refreshes from your CRM.", { path: "duplicates/undo", body: { locationId: s.locationId, key: s.key }, focus: `${s.locationId}:${s.key}` });
   const putBack = (s: Step) => (s.review ? send("duplicates/undo", { locationId: s.locationId, key: s.key }, "Put back in the list.") : send("duplicates/unsnooze", bodyOf(s), "Put back in the list."));
-  const mergeHere = async (s: Step): Promise<string> => {
+  // Start the merge through the customer's own merge workflow (the gateway checks the opt-in, the confirm, the guardrails and the master switch).
+  const mergeInCrm = async (s: Step): Promise<string> => {
     try {
-      const r = await api.post<{ message?: string }>("duplicates/merge", { ...bodyOf(s), keepContactId: keepId });
+      const r = await api.post<{ message?: string; requested?: boolean }>("duplicates/merge-workflow", { ...bodyOf(s), keepContactId: keepId, confirm: true });
+      if (r.requested) void reload();
       return r.message ?? "Done.";
     } catch (e) {
       return (e as Error).message;
@@ -146,8 +151,12 @@ export function DuplicatesView() {
     return () => window.removeEventListener("keydown", h);
   }, []);
 
-  if (!data && loading) return <Page title="Duplicate contacts"><SkeletonCards cards={3} label="Looking for duplicate contacts..." /></Page>;
-  if (!data) return <Page title="Duplicate contacts">{error ? <ErrorState error={error} onRetry={reload} /> : null}</Page>;
+  // A function, not a component: a component defined here would be a new type on every render and would reset everything inside it.
+  const shell = (actions: React.ReactNode, children: React.ReactNode) => (embedded
+    ? <div data-testid="dup-embedded">{actions && <div className="mb-4 flex justify-end">{actions}</div>}{children}</div>
+    : <Page title="Duplicate contacts" subtitle="Contacts that look like the same person, one group at a time." actions={actions}>{children}</Page>);
+  if (!data && loading) return shell(null, <SkeletonCards cards={3} label="Looking for duplicate contacts..." />);
+  if (!data) return shell(null, error ? <ErrorState error={error} onRetry={reload} /> : null);
   const h = data.health;
   const clearFilters = () => { setQInput(""); setF({ ...START, all: f.all }); };
 
@@ -167,12 +176,9 @@ export function DuplicatesView() {
     f.q ? `"${f.q}"` : null,
   ].filter(Boolean).join(" · ");
 
-  return (
-    <Page
-      title="Duplicate contacts"
-      subtitle="Contacts that look like the same person, one group at a time."
-      actions={<PopMenu label="More" items={menu} testId="dup-more" triggerClassName={`${BTN} px-3`}><span>More</span></PopMenu>}
-    >
+  return shell(
+    <PopMenu label="More" items={menu} testId="dup-more" triggerClassName={`${BTN} px-3`}><span>More</span></PopMenu>,
+    <>
       <HowTo id="duplicates-review" title="How this works">
         Each screen is one group of contacts that look like the same person. The best record to keep is already picked. Press Merge, finish in your CRM with one click, then say you did. Arrow keys move between groups.
       </HowTo>
@@ -268,6 +274,7 @@ export function DuplicatesView() {
               ? <><span className="font-medium">Best match picked: {step.people.find((p) => p.contactId === step.survivorId)?.name}.</span> <span className="text-muted-foreground">{step.why}.</span></>
               : <span className="text-muted-foreground">You chose {step.people.find((p) => p.contactId === keepId)?.name} instead of our pick ({step.people.find((p) => p.contactId === step.survivorId)?.name}).</span>}
           </p>
+          <MatchWhy confidence={step.confidence} likelihood={step.likelihood.label} reasons={step.reasons} pairs={step.pairs} people={step.people} rules={step.rules} />
           {guardrails(step.people, keepId).length > 0 && !sheetOpen && !decided && <p className="mt-1 text-sm text-warning" data-testid="dup-careful">There is something to check before merging this one. You will see it next.</p>}
 
           {!decided && !sheetOpen && (
@@ -286,7 +293,8 @@ export function DuplicatesView() {
             <MergeSheet
               key={step.key + keepId}
               accountName={step.locationName} people={step.people} keepId={keepId} why={step.why} switchedOff={data.mergeSwitchedOff}
-              onClose={() => setSheetKey(null)} onMerged={() => merged(step)} onMergeHere={() => mergeHere(step)} copy={copy}
+              onClose={() => setSheetKey(null)} onMerged={() => merged(step)} copy={copy}
+              picks={step.picks} workflow={step.workflow} onWorkflowMerge={() => mergeInCrm(step)}
             />
           )}
           <Compare people={step.people} watchingSince={step.watchingSince} />
@@ -386,6 +394,6 @@ export function DuplicatesView() {
           </span>
         </div>
       )}
-    </Page>
+    </>,
   );
 }

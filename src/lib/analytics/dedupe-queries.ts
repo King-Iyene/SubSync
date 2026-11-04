@@ -300,3 +300,13 @@ export async function othersSharing(installationId: string, locationId: string, 
         or (length(c.phone_digits) >= 7 and right(c.phone_digits, 10) = any(select ph from mine where ph is not null)))`;
   return (r?.n as number) ?? 0;
 }
+
+// ---------------- "what would this setting find?" ----------------
+
+/** The open groups one client account would have under the given rules, without saving anything. Not cached: it is only asked for while a person is choosing. */
+export async function previewCounts(installationId: string, locationId: string, rules: import("./cleanup-rules").MatchRules): Promise<{ groups: number; extra: number }> {
+  const people = await loadCandidates(installationId, [locationId], rules.nameAlone && rules.name !== "off" ? [locationId] : [], rules.phone === "typo" ? [locationId] : []);
+  const sets = await decisionSets(installationId);
+  const open = groupDuplicates(people, rules.threshold, 40, rules).filter((g) => !sets.decided.has(`${locationId}:${g.key}`) && !sets.later.has(`${locationId}:${g.key}`));
+  return { groups: open.length, extra: open.reduce((s, g) => s + g.people.length - 1, 0) };
+}

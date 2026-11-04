@@ -18,7 +18,7 @@ const BANNED = /gohighlevel|highlevel|leadconnector|\bghl\b|sub-?accounts?|\bSLA
 
 async function open(page: Page, path: string, menu = false) {
   await page.goto(path);
-  if (menu) await page.getByRole("button", { name: "Duplicates", exact: true }).first().click({ timeout: 90_000 });
+  if (menu) await page.getByRole("button", { name: "Clean-up", exact: true }).first().click({ timeout: 90_000 });
   else await page.reload();
   await expect(page.getByTestId("dup-headline")).toBeVisible({ timeout: 90_000 });
   await expect(page.getByTestId("dup-step")).toBeVisible({ timeout: 90_000 });
@@ -112,9 +112,10 @@ test("Merge opens a sheet that says what is kept, moved and removed; the one-cli
   page.context().on("page", (p) => popups.push(p.url()));
   await page.getByTestId("dup-open-both").click();
   await expect.poll(() => popups.length, { timeout: 20_000 }).toBeGreaterThanOrEqual(1);
-  // The one-click merge: switched off (the demo never writes), says so, and changes nothing.
-  await page.getByTestId("dup-merge-here").click();
-  await expect(page.getByTestId("dup-sheet").getByTestId("inline-alert")).toContainText(/switched off|cannot carry everything/i, { timeout: 60_000 });
+  // Merging from SubSync: the demo has no merge workflow set up and never writes, so the page says what to do and offers nothing that could send. It changes nothing.
+  await page.getByTestId("dup-workflow-open").click();
+  await expect(page.getByTestId("dup-workflow")).toContainText(/no merge workflow|cannot|Do Not Disturb|share the same/i, { timeout: 60_000 });
+  await expect(page.getByTestId("dup-workflow-run")).toHaveCount(0);
   const after = await get("duplicates?size=5");
   expect(after.health.groups, "nothing was decided or removed").toBe(before.health.groups);
   expect(after.counts).toEqual(before.counts);

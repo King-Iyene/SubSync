@@ -9,20 +9,21 @@ type Run = {
   truncated: boolean; note: string | null; createdAt: string | null; params: { rules: string[] };
 };
 type Change = { contactId: string; name: string; rule: string; field: string; before: string | null; after: string | null; tag: string | null; status: string; error: string | null };
-type Data = { runs: Run[]; canWrite: boolean; accounts: Array<{ locationId: string; name: string }>; writeNote: string | null; previewValidHours: number };
-type Preview = { runId: string; total: number; truncated: boolean; scanned: number; summary: { phone: number; name: number; tagAdd: number; tagRemove: number; contacts: number } };
+type Data = { runs: Run[]; canWrite: boolean; masterSwitchOn?: boolean; accounts: Array<{ locationId: string; name: string }>; writeNote: string | null; previewValidHours: number };
+type Preview = { runId: string; total: number; truncated: boolean; scanned: number; summary: { phone: number; email?: number; name: number; tagAdd: number; tagRemove: number; contacts: number } };
 
 const STATUS: Record<string, { label: string; tone: "good" | "warn" | "bad" | "info" | "neutral" }> = {
   previewed: { label: "Preview only", tone: "neutral" }, applying: { label: "Applying", tone: "info" }, applied: { label: "Applied", tone: "good" }, partial: { label: "Applied, some skipped", tone: "warn" },
   undoing: { label: "Undoing", tone: "info" }, undone: { label: "Undone", tone: "neutral" }, needs_permission: { label: "Needs permission", tone: "warn" }, failed: { label: "Failed", tone: "bad" },
 };
 
-export function CleanupView() {
+export function CleanupView({ embedded = false }: { embedded?: boolean } = {}) {
   const api = useApiClient();
   const { data, error, loading, reload } = useData<Data>("cleanup");
   const [account, setAccount] = useState("");
   const [phone, setPhone] = useState(true);
   const [name, setName] = useState(true);
+  const [email, setEmail] = useState(true);
   const [tag, setTag] = useState(false);
   const [cc, setCc] = useState("");
   const [tagAction, setTagAction] = useState<"add" | "remove">("add");
@@ -54,7 +55,7 @@ export function CleanupView() {
   };
 
   const makePreview = () => guard(async () => {
-    const rules = [phone && "phone", name && "name", tag && "tag"].filter(Boolean);
+    const rules = [phone && "phone", email && "email", name && "name", tag && "tag"].filter(Boolean);
     const body = {
       locationId: chosen, rules, defaultCountryCode: cc || null,
       tag: tag ? { action: tagAction, name: tagName, where: { ...(missing ? { missing } : {}), ...(idle ? { idleDays: Number(idle) } : {}) } } : undefined,
@@ -87,7 +88,10 @@ export function CleanupView() {
 
   return (
     <div>
-      <PageHeader title="Data cleanup" subtitle="Tidy phone numbers and names, or add and remove a tag in bulk. You always see the exact changes first, confirm the number, and can undo the whole run afterwards." />
+      {!embedded && <PageHeader title="Data cleanup" subtitle="Tidy phone numbers and names, or add and remove a tag in bulk. You always see the exact changes first, confirm the number, and can undo the whole run afterwards." />}
+      <p className="mb-4 text-sm text-muted-foreground" data-testid="bulk-state">
+        Changes are sent only for a client you have allowed in Settings, Clean-up. {data.masterSwitchOn ? "Sending is on." : "Sending is switched off on the server right now, so applying only records what would change and your CRM is not touched."}
+      </p>
       {data.writeNote && <p className="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900" role="note">{data.writeNote}</p>}
       {msg && <p className={`mb-4 rounded-lg border px-3 py-2 text-sm ${msg.ok ? "bg-muted/40" : "border-red-300 bg-red-50 text-red-800"}`} role={msg.ok ? "status" : "alert"}>{msg.text}</p>}
 
@@ -109,6 +113,7 @@ export function CleanupView() {
                 <p className="mt-1 text-xs text-muted-foreground">Left blank, a number with no country code is left alone rather than guessed.</p>
               </div>
             )}
+            <label className="flex items-start gap-2"><input type="checkbox" className="mt-0.5 size-4" checked={email} onChange={(e) => setEmail(e.target.checked)} /><span><strong>Fix email typos</strong>: only well-known mistakes such as gmial.com or name@gmail.con.</span></label>
             <label className="flex items-start gap-2"><input type="checkbox" className="mt-0.5 size-4" checked={name} onChange={(e) => setName(e.target.checked)} /><span><strong>Fix names</strong>: only those typed entirely in CAPITALS or lower case. Names like McDonald are left alone.</span></label>
             <label className="flex items-start gap-2"><input type="checkbox" className="mt-0.5 size-4" checked={tag} onChange={(e) => setTag(e.target.checked)} /><span><strong>Add or remove a tag</strong> for the contacts that match a filter.</span></label>
             {tag && (
@@ -122,7 +127,7 @@ export function CleanupView() {
             )}
           </div>
         </div>
-        <div className="mt-4"><Btn variant="primary" disabled={busy || !chosen || (!phone && !name && !tag)} onClick={makePreview}>{busy ? "Working..." : "Preview the changes"}</Btn></div>
+        <div className="mt-4"><Btn variant="primary" disabled={busy || !chosen || (!phone && !email && !name && !tag)} onClick={makePreview}>{busy ? "Working..." : "Preview the changes"}</Btn></div>
       </Card>
 
       {d && (
@@ -132,13 +137,13 @@ export function CleanupView() {
             {preview ? `, from ${fmtInt(preview.scanned)} contacts (${preview.summary.contacts} would be touched)` : ""}.
             {d.run.truncated && " The plan was capped at 5,000 changes: run it again afterwards for the rest."}
           </p>
-          {preview && <p className="mb-3 text-xs text-muted-foreground">{preview.summary.phone} phone numbers · {preview.summary.name} name fixes · {preview.summary.tagAdd} tags to add · {preview.summary.tagRemove} tags to remove.</p>}
+          {preview && <p className="mb-3 text-xs text-muted-foreground">{preview.summary.phone} phone numbers · {preview.summary.email ?? 0} email fixes · {preview.summary.name} name fixes · {preview.summary.tagAdd} tags to add · {preview.summary.tagRemove} tags to remove.</p>}
           {d.changes.length === 0 ? <Empty title="Nothing to change" body="Everything in this account already looks the way these rules would leave it." /> : (
             <Table head={<tr><Th>Contact</Th><Th>Change</Th><Th>Before</Th><Th>After</Th><Th>Result</Th></tr>}>
               {d.changes.map((c) => (
                 <tr key={c.contactId + c.field + (c.tag ?? "")}>
                   <Td className="font-medium">{c.name}</Td>
-                  <Td>{c.rule === "tag" ? `${c.after === "with" ? "Add" : "Remove"} tag "${c.tag}"` : c.field === "phone" ? "Phone" : c.field === "firstName" ? "First name" : "Last name"}</Td>
+                  <Td>{c.rule === "tag" ? `${c.after === "with" ? "Add" : "Remove"} tag "${c.tag}"` : c.field === "phone" ? "Phone" : c.field === "email" ? "Email" : c.field === "firstName" ? "First name" : "Last name"}</Td>
                   <Td className="text-muted-foreground">{c.rule === "tag" ? (c.before === "with" ? "has the tag" : "no tag") : c.before ?? "empty"}</Td>
                   <Td>{c.rule === "tag" ? (c.after === "with" ? "has the tag" : "no tag") : c.after ?? "empty"}</Td>
                   <Td>{c.status === "pending" ? "" : <Badge tone={c.status === "applied" ? "good" : c.status === "failed" ? "bad" : "neutral"}>{c.status}</Badge>}{c.error ? <span className="ml-1 text-xs text-muted-foreground">{c.error}</span> : null}</Td>

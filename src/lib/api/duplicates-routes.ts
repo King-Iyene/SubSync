@@ -262,6 +262,12 @@ export async function handleDuplicates(ctx: Ctx, h: DuplicatesHelpers): Promise<
   if (m === "GET" && b === "history") return historyRoute(ctx, h);
   if (m === "GET" && b === "rules") return rulesReadRoute(ctx, h);
   if (m === "POST" && b === "merge-workflow") return mergeWorkflowRoute(ctx, h);
+  if (m === "POST" && b === "undo-snooze") {
+    // From the history: take back a "Not now" by its group key (the history knows the key, not the contacts).
+    const body = (await ctx.request.json().catch(() => null)) as { locationId?: unknown; key?: unknown } | null;
+    if (typeof body?.locationId !== "string" || !ID.test(body.locationId) || typeof body.key !== "string" || !/^[0-9a-f]{8}-d{1,3}$/.test(body.key)) return json({ error: "Send the account and the group" }, 400);
+    return (await unsnoozeGroup(ctx.installationId, await h.allowed(), actorOf(ctx), body.locationId, body.key)) ? json({ ok: true }) : json({ error: "Nothing was set aside" }, 404);
+  }
   if (m === "GET" && !b) return overviewRoute(ctx, h);
   if (m === "GET" && b === "obvious") return obviousRoute(ctx, h);
   if (m === "POST" && b === "snooze") return snoozeRoute(ctx, h, false);

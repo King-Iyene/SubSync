@@ -29,8 +29,9 @@ async function loadRows(installationId: string, locationId: string): Promise<Row
 }
 
 /** The open duplicate groups of ONE account, counted exactly as the Duplicates tab counts them (one list, one rule). */
-export async function dupeNumbers(installationId: string, locationId: string, sinceMs: number | null): Promise<{ groups: number; extra: number; newGroups: number }> {
-  const [b, sets] = await Promise.all([builtQueue(installationId, [locationId]), decisionSets(installationId)]);
+export async function dupeNumbers(installationId: string, locationId: string, sinceMs: number | null, scope?: string[] | null): Promise<{ groups: number; extra: number; newGroups: number }> {
+  // `scope` is the caller's whole set of accounts, so a portfolio read builds the queue once (it is cached) instead of once per account.
+  const [b, sets] = await Promise.all([builtQueue(installationId, scope === undefined ? [locationId] : scope), decisionSets(installationId)]);
   const open = b.all.filter((g) => g.locationId === locationId && !sets.decided.has(`${g.locationId}:${g.key}`) && !sets.later.has(`${g.locationId}:${g.key}`));
   const newest = (g: (typeof open)[number]) => Math.max(0, ...g.people.map((p) => (p.createdAt ? Date.parse(p.createdAt) : 0)));
   return {
@@ -57,7 +58,7 @@ async function saveSnapshot(installationId: string, locationId: string, s: Scann
 }
 
 /** Scans one account (cached a minute; two people opening it share one read) and stores today's snapshot. The caller has already checked the account is theirs. */
-export async function scanAccount(installationId: string, locationId: string, countryCode: string | null = null): Promise<Scanned> {
+export async function scanAccount(installationId: string, locationId: string, countryCode: string | null = null, queueScope?: string[] | null): Promise<Scanned> {
   const key = `${installationId}|${locationId}|${countryCode ?? ""}`;
   const hit = scans.get(key);
   if (hit) return hit;
@@ -67,7 +68,7 @@ export async function scanAccount(installationId: string, locationId: string, co
     const rows = await loadRows(installationId, locationId);
     const scan = scanContacts(rows, { countryCode });
     const prev = await previousSnapshot(installationId, locationId);
-    const dup = await dupeNumbers(installationId, locationId, prev?.at ?? null);
+    const dup = await dupeNumbers(installationId, locationId, prev?.at ?? null, queueScope);
     const score = scoreOf(scan, dup.extra);
     const out: Scanned = { scan, rows: new Map(rows.map((r) => [r.id, r])), score, dup, at: Date.now() };
     scans.set(key, out);
@@ -105,25 +106,24 @@ export async function portfolio(installationId: string, allowed: string[] | null
   const stored = await latestSnapshots(installationId, ids);
   const today = dayOf(new Date());
   const deadline = Date.now() + budgetMs;
-  const rows: AccountScore[] = [];
-  let scannedNow = 0;
-  for (const l of locs) {
+  // Accounts without a snapshot from today are scanned four at a time until the budget is spent.
+  const fresh = new Map<string, AccountScore>();
+  const need = locs.filter((l) => stored.get(l.location_id as string)?.day !== today).map((l) => l.location_id as string);
+  for (let i = 0; i < need.length && Date.now() < deadline && fresh.size < 40; i += 4) {
+    await Promise.all(need.slice(i, i + 4).map(async (id) => {
+      try {
+        const s = await scanAccount(installationId, id, null, allowed);
+        fresh.set(id, { locationId: id, name: null, score: s.score?.score ?? null, contacts: s.scan.total, day: today, duplicateGroups: s.dup.groups, counts: s.scan.counts, parts: s.score?.parts ?? null });
+      } catch { /* keep the stored one */ }
+    }));
+  }
+  const rows: AccountScore[] = locs.map((l) => {
     const id = l.location_id as string;
     const name = (l.name as string | null) ?? null;
-    const snap = stored.get(id);
-    if (!snap || snap.day !== today) {
-      if (Date.now() < deadline && scannedNow < 40) {
-        try {
-          const s = await scanAccount(installationId, id);
-          scannedNow++;
-          rows.push({ locationId: id, name, score: s.score?.score ?? null, contacts: s.scan.total, day: today, duplicateGroups: s.dup.groups, counts: s.scan.counts, parts: s.score?.parts ?? null });
-          continue;
-        } catch { /* fall back to the stored one */ }
-      }
-    }
-    rows.push(snap ? { ...snap, name } : { locationId: id, name, score: null, contacts: 0, day: null, duplicateGroups: 0, counts: {}, parts: null });
-  }
-  return { rows, scannedNow, pending: rows.filter((r) => r.day === null).length };
+    const got = fresh.get(id) ?? stored.get(id);
+    return got ? { ...got, name } : { locationId: id, name, score: null, contacts: 0, day: null, duplicateGroups: 0, counts: {}, parts: null };
+  });
+  return { rows, scannedNow: fresh.size, pending: rows.filter((r) => r.day === null).length };
 }
 
 /** The whole portfolio in one number: the average score weighted by contacts, over the accounts that have one. */

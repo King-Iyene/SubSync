@@ -24,7 +24,7 @@ export async function dailyQualityScan(installationId: string, budgetMs = BUDGET
   let scanned = 0;
   for (const r of rows) {
     if (Date.now() >= deadline) break;
-    try { await scanAccount(installationId, r.location_id as string); scanned++; } catch { /* the next run tries again */ }
+    try { await scanAccount(installationId, r.location_id as string, null, null); scanned++; } catch { /* the next run tries again */ }
   }
   return { scanned, pending: rows.length - scanned };
 }

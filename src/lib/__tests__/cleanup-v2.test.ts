@@ -135,7 +135,9 @@ test("every finding is found on its own fixture, and only there", () => {
   assert.deepEqual(ids(q("12", { firstName: "ADA", lastName: "LOVELACE" })), ["name_case"]);
   assert.deepEqual(ids(q("13", { firstName: "McDonald", lastName: "O'Neil" })), [], "mixed case was typed on purpose");
   assert.ok(ids(q("14", { firstName: "test", lastName: "user" })).includes("test_record"));
-  assert.ok(ids(q("15", { email: "x@example.com" })).includes("test_record"));
+  assert.ok(ids(q("15", { email: "test@example.com" })).includes("test_record"));
+  assert.ok(!ids(q("16", { email: "ada@example.com" })).includes("test_record"), "a real-looking name at a reserved domain is not called junk");
+  assert.ok(ids(q("17", { email: "x@nowhere.invalid" })).includes("test_record"));
 });
 
 test("exact suggested fixes", () => {

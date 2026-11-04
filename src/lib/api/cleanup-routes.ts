@@ -1,6 +1,6 @@
-import { clearAccountConfig, loadConfigs, saveConfig, schemaReady, setWriteEnabled, BUILTIN } from "../analytics/cleanup-config";
-import { describeRules, FIELD_WORDS, PRESET_WORDS, presetOf, PRESETS, WINNER_WORDS } from "../analytics/cleanup-rules";
-import { forgetQueue } from "../analytics/dedupe-queries";
+import { clearAccountConfig, loadCompany, loadConfigs, saveConfig, schemaReady, setWriteEnabled, BUILTIN } from "../analytics/cleanup-config";
+import { describeRules, FIELD_WORDS, parseRules, PRESET_WORDS, presetOf, PRESETS, WINNER_WORDS } from "../analytics/cleanup-rules";
+import { forgetQueue, previewCounts } from "../analytics/dedupe-queries";
 import { pageOf } from "../analytics/dedupe-review";
 import { checkImport, cleanCsv, MAX_BYTES, type Existing } from "../analytics/import-check";
 import { findingCsv, findingRows, forgetScans, portfolio, portfolioScore, ranked, scanAccount, trendFor } from "../analytics/quality-queries";
@@ -44,14 +44,29 @@ async function rulesView(ctx: Ctx, h: CleanupHelpers): Promise<Response> {
     return { locationId: l.location_id as string, name: (l.name as string | null) ?? "Unnamed account", preset: presetOf(c.match), source: c.source, writeEnabled: c.writeEnabled };
   }), int(sp.get("ap"), 0), 8);
   const wanted = sp.get("location");
+  const company = !allowed && locs.length > 1 ? await loadCompany(ctx.installationId) : null;
   const pick = (wanted && ID.test(wanted) && locs.find((l) => l.location_id === wanted)) || locs[0] || null;
   const c = pick ? configs.get(pick.location_id as string) ?? BUILTIN : BUILTIN;
   return json({
     ready, demo: ctx.demo, multi: locs.length > 1, canCompany: !allowed && locs.length > 1, masterSwitchOn: !ctx.demo && isLive("WRITE_GHL_LIVE"),
     presets: (["strict", "balanced", "loose"] as const).map((id) => ({ id, ...PRESET_WORDS[id], rules: PRESETS[id] })), fieldWords: FIELD_WORDS, winnerWords: WINNER_WORDS,
     accounts, total: locs.length,
+    company: !allowed && locs.length > 1 ? (() => { const m = company?.match ?? BUILTIN.match; return { match: m, survive: company?.survive ?? BUILTIN.survive, mergeWorkflowId: company?.mergeWorkflowId ?? null, preset: presetOf(m), saved: !!company, sentence: describeRules(m) }; })() : null,
     selected: pick ? { locationId: pick.location_id as string, name: (pick.name as string | null) ?? "Unnamed account", match: c.match, survive: c.survive, preset: presetOf(c.match), source: c.source, mergeWorkflowId: c.mergeWorkflowId, writeEnabled: c.writeEnabled, sentence: describeRules(c.match) } : null,
   });
+}
+
+/** How many groups one client would have under a setting, without saving it. Used while a person is choosing. */
+async function previewRules(ctx: Ctx, h: CleanupHelpers): Promise<Response> {
+  const sp = ctx.url.searchParams;
+  const acct = await ownAccount(ctx, h, sp.get("location"));
+  if (!acct) return json({ error: "Account not found" }, 404);
+  const preset = sp.get("preset");
+  const rules = preset === "custom"
+    ? parseRules({ preset: "custom", email: sp.get("email"), phone: sp.get("phone"), name: sp.get("name"), nameAlone: sp.get("nameAlone") === "1", guards: sp.get("guards") !== "0", threshold: Number(sp.get("threshold")) })
+    : parseRules({ preset });
+  const [now, then] = await Promise.all([previewCounts(ctx.installationId, acct.id, (await loadConfigs(ctx.installationId, [acct.id])).get(acct.id)?.match ?? BUILTIN.match), previewCounts(ctx.installationId, acct.id, rules)]);
+  return json({ locationId: acct.id, now, with: then, sentence: describeRules(rules) });
 }
 
 async function saveRules(ctx: Ctx, h: CleanupHelpers): Promise<Response> {
@@ -60,6 +75,8 @@ async function saveRules(ctx: Ctx, h: CleanupHelpers): Promise<Response> {
   if (scope !== "company" && !ID.test(scope)) return json({ error: "Choose a client account" }, 400);
   const wf = body?.mergeWorkflowId === undefined ? undefined : typeof body.mergeWorkflowId === "string" && body.mergeWorkflowId.trim() ? body.mergeWorkflowId.trim() : null;
   if (typeof wf === "string" && !/^[A-Za-z0-9_-]{6,64}$/.test(wf)) return json({ error: "A workflow id is letters, numbers and dashes (6 to 64 characters). Copy it from your CRM." }, 400);
+  // The account is checked first, so a forged id answers "not found" whether or not the database update has been applied.
+  if (scope !== "company" && !(await ownAccount(ctx, h, scope))) return json({ error: "Account not found" }, 404);
   const r = await saveConfig(ctx.installationId, await h.allowed(), h.actor(ctx), scope, { match: body?.match, survive: body?.survive, ...(wf !== undefined ? { mergeWorkflowId: wf } : {}) });
   if (r === "unavailable") return json({ error: "Saving rules needs a one-time update to SubSync's database that has not been applied yet.", unavailable: true }, 503);
   if (r === "not_found") return json({ error: "Account not found" }, 404);
@@ -70,6 +87,7 @@ async function saveRules(ctx: Ctx, h: CleanupHelpers): Promise<Response> {
 async function clearRules(ctx: Ctx, h: CleanupHelpers): Promise<Response> {
   const body = (await ctx.request.json().catch(() => null)) as { locationId?: unknown } | null;
   if (typeof body?.locationId !== "string" || !ID.test(body.locationId)) return json({ error: "Choose a client account" }, 400);
+  if (!(await ownAccount(ctx, h, body.locationId))) return json({ error: "Account not found" }, 404);
   const r = await clearAccountConfig(ctx.installationId, await h.allowed(), h.actor(ctx), body.locationId);
   if (r === "unavailable") return json({ error: "Saving rules needs a one-time update to SubSync's database that has not been applied yet.", unavailable: true }, 503);
   if (r === "not_found") return json({ error: "Account not found" }, 404);
@@ -80,6 +98,7 @@ async function clearRules(ctx: Ctx, h: CleanupHelpers): Promise<Response> {
 async function writeSwitch(ctx: Ctx, h: CleanupHelpers): Promise<Response> {
   const body = (await ctx.request.json().catch(() => null)) as { locationId?: unknown; enabled?: unknown } | null;
   if (typeof body?.locationId !== "string" || !ID.test(body.locationId) || typeof body.enabled !== "boolean") return json({ error: "Choose a client account and on or off" }, 400);
+  if (!(await ownAccount(ctx, h, body.locationId))) return json({ error: "Account not found" }, 404);
   const r = await setWriteEnabled(ctx.installationId, await h.allowed(), h.actor(ctx), body.locationId, body.enabled);
   if (r === "unavailable") return json({ error: "This switch needs a one-time update to SubSync's database that has not been applied yet.", unavailable: true }, 503);
   if (r === "not_found") return json({ error: "Account not found" }, 404);
@@ -174,6 +193,7 @@ export async function handleCleanupV2(ctx: Ctx, h: CleanupHelpers): Promise<Resp
   const [, b, c] = ctx.segments;
   const m = ctx.request.method;
   if (m === "GET" && b === "rules" && !c) return rulesView(ctx, h);
+  if (m === "GET" && b === "rules" && c === "preview") return previewRules(ctx, h);
   if (m === "GET" && b === "quality" && !c) return qualityView(ctx, h);
   if (m === "GET" && b === "quality" && c === "list") return qualityList(ctx, h);
   if (m === "GET" && b === "quality" && c === "csv") return qualityCsv(ctx, h);

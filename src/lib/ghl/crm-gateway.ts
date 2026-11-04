@@ -160,7 +160,7 @@ export async function mergeViaWorkflow(a: WorkflowArgs, deps: GatewayDeps = {}):
       const res = await ghlFetch(
         `${GHL_API}/contacts/${encodeURIComponent(plan.enrolId)}/workflow/${encodeURIComponent(a.workflowId!)}`,
         { method: "POST", headers: { Authorization: `Bearer ${await a.token()}`, Version: VERSION, Accept: "application/json", "Content-Type": "application/json" }, body: JSON.stringify({ eventStartTime: new Date().toISOString() }), cache: "no-store" },
-        deps.fetchImpl ? { fetchImpl: deps.fetchImpl } : {},
+        { ...(deps.fetchImpl ? { fetchImpl: deps.fetchImpl } : {}), ...(deps.sleep ? { sleep: deps.sleep } : {}) },
       );
       const result: WorkflowResult = res.status === 401 || res.status === 403 ? { outcome: "needs_permission" } : res.ok ? { outcome: "requested", survivorId: plan.survivorId } : { outcome: "failed", status: res.status };
       await recordWrite({ installationId: a.installationId, actor: a.actor, locationId: a.locationId, contactId: plan.enrolId, op: "merge_workflow", fields: ["workflow"], result: result.outcome }, deps);

@@ -1882,7 +1882,7 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       return await handleApptWork(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links });
     }
     // The guided duplicate review (reading, setting a group aside, the one-click merge, which is switched off). Deciding and undoing stay below.
-    if (a === "duplicates" && (method === "GET" || ["snooze", "unsnooze", "merge", "merge-workflow"].includes(b ?? ""))) {
+    if (a === "duplicates" && (method === "GET" || ["snooze", "unsnooze", "merge", "merge-workflow", "undo-snooze"].includes(b ?? ""))) {
       return await handleDuplicates(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links, locationToken: (locationId) => locationAccessToken(ctx.session.companyId, locationId) });
     }
     // Clean-up v2: rules, data quality, import check, the per-account switch for changing contacts. Anything else under cleanup falls through to the run endpoints below.

@@ -45,7 +45,10 @@ const DISPOSABLE = new Set([
 ]);
 
 const TEST_NAME = /^(test|testing|tester|asdf|asdfgh|qwerty|xxx+|aaa+|zzz+|sample|demo|dummy|fake|n\/a|na|none|null|unknown|no name|noname|delete me|do not use|john doe|jane doe|lorem)(\s|$)/i;
-const TEST_DOMAIN = new Set(["example.com", "example.org", "example.net", "test.com", "test.test", "invalid", "localhost", "email.com.test"]);
+// A made-up address: a reserved test domain together with a test-looking name before the @ (test@example.com), or a domain that can never exist (.invalid, .test, .localhost).
+const TEST_DOMAIN = new Set(["example.com", "example.org", "example.net", "test.com"]);
+const TEST_LOCAL = /^(test|testing|tester|asdf|asdfgh|demo|sample|fake|dummy|abc|xxx+|noemail|none)d*$/i;
+const isTestEmail = (email: string): boolean => { const d = domainOf(email); return /.(invalid|test|localhost)$/.test(d) || (TEST_DOMAIN.has(d) && TEST_LOCAL.test(email.slice(0, email.lastIndexOf("@")))); };
 
 // ---------- one contact ----------
 
@@ -92,8 +95,7 @@ export function findingsOf(r: QRow, o: Options = {}): FindingId[] {
     }
   }
   if ((first && formatName(first)) || (last && formatName(last))) out.push("name_case");
-  const emailDomain = email && EMAIL_SHAPE.test(email) ? domainOf(email) : "";
-  if (hasName && (TEST_NAME.test(fullName) || (emailDomain && TEST_DOMAIN.has(emailDomain)))) out.push("test_record");
+  if ((hasName && TEST_NAME.test(fullName)) || (email && EMAIL_SHAPE.test(email) && isTestEmail(email))) out.push("test_record");
   return out;
 }
 

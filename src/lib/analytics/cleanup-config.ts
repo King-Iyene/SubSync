@@ -68,6 +68,13 @@ export async function loadConfigs(installationId: string, allowed: string[] | nu
   return out;
 }
 
+/** The company-wide default choices (an agency only; null before anyone saved one). */
+export async function loadCompany(installationId: string): Promise<{ match: MatchRules; survive: Survivorship; mergeWorkflowId: string | null } | null> {
+  if (!(await schemaReady()).defaults) return null;
+  const [r] = await sql()`select cleanup_defaults from settings where installation_id = ${installationId}`;
+  return r?.cleanup_defaults ? parseBlob(r.cleanup_defaults) : null;
+}
+
 export type ConfigInput = { match?: unknown; survive?: unknown; mergeWorkflowId?: string | null };
 
 /**

@@ -3,8 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import { crmSteps, diffFields, emailPlan, mergePlan, summaryText, type DiffRow, type Guardrail } from "@/lib/analytics/dedupe-review";
 import type { Person } from "@/lib/analytics/dedupe";
-import { DialButton, InlineAlert, RowButton } from "../ds";
+import { DialButton, RowButton } from "../ds";
 import { ExtLink, timeAgo } from "../ui";
+import type { FieldPick } from "@/lib/analytics/cleanup-rules";
+import { Picks, WorkflowMerge, type Workflow } from "./duplicates-extra";
 
 // The parts of the duplicate review (stage DUP). One group at a time: the records side by side, only what differs, a pre-picked record to keep with the
 // reason in words, and a merge sheet that says what will be kept, moved and removed and finishes the job in the CRM's own merge screen. Plain words, no
@@ -100,9 +102,10 @@ export function Compare({ people, watchingSince }: { people: Person[]; watchingS
 
 // ---------- the merge sheet ----------
 
-export function MergeSheet({ accountName, people, keepId, why, switchedOff, onClose, onMerged, onMergeHere, copy }: {
+export function MergeSheet({ accountName, people, keepId, why, switchedOff, onClose, onMerged, copy, picks, workflow, onWorkflowMerge }: {
   accountName: string | null; people: WithUrl[]; keepId: string; why: string; switchedOff: boolean;
-  onClose: () => void; onMerged: () => Promise<void>; onMergeHere: () => Promise<string>; copy: (text: string) => Promise<void>;
+  onClose: () => void; onMerged: () => Promise<void>; copy: (text: string) => Promise<void>;
+  picks?: FieldPick[]; workflow?: Workflow; onWorkflowMerge?: () => Promise<string>;
 }) {
   const plan = mergePlan(people, keepId);
   const keep = people.find((p) => p.contactId === keepId)!;
@@ -110,7 +113,6 @@ export function MergeSheet({ accountName, people, keepId, why, switchedOff, onCl
   const warnings: Guardrail[] = plan.warnings;
   const [ack, setAck] = useState(warnings.length === 0);
   const [opened, setOpened] = useState(false);
-  const [here, setHere] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const head = useRef<HTMLHeadingElement>(null);
   useEffect(() => { head.current?.focus(); }, []);
@@ -139,6 +141,7 @@ export function MergeSheet({ accountName, people, keepId, why, switchedOff, onCl
           {plan.picks.length > 0 && (
             <div className="mt-3 text-sm"><p className="font-medium">In the merge screen, choose</p><ul className="mt-1 list-disc space-y-1 pl-5 text-muted-foreground">{plan.picks.map((l) => <li key={l}>{l}</li>)}</ul></div>
           )}
+          {picks && <Picks picks={picks} people={people} />}
           {people.length > 10 && <p className="mt-3 text-sm text-muted-foreground">Your CRM merges up to 10 contacts at a time, so do the first 10, then come back for the rest.</p>}
 
           <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
@@ -147,15 +150,14 @@ export function MergeSheet({ accountName, people, keepId, why, switchedOff, onCl
           </div>
           <p className="mt-2 text-xs text-muted-foreground">The first tab is the one to keep. If only one tab opened, use these links: {[keep, ...others].map((p, i) => <span key={p.contactId}>{i > 0 ? " · " : ""}<ExtLink href={p.url}>{p.name}{p.contactId === keepId ? " (keep)" : ""}</ExtLink></span>)}</p>
 
+          {workflow && onWorkflowMerge && <WorkflowMerge workflow={workflow} people={people} switchedOff={switchedOff} onRun={onWorkflowMerge} />}
+
           <ol className="mt-4 list-decimal space-y-1 pl-5 text-sm text-muted-foreground" data-testid="dup-steps">{steps.map((s) => <li key={s}>{s}</li>)}</ol>
 
           <div className="mt-5 flex flex-col gap-2 border-t pt-4 sm:flex-row sm:flex-wrap sm:items-center">
             <button type="button" className={opened ? PRIMARY : BTN} disabled={busy} onClick={async () => { setBusy(true); try { await onMerged(); } finally { setBusy(false); } }} data-testid="dup-done-in-crm">I merged them in my CRM</button>
             <button type="button" className={QUIET} onClick={onClose} data-testid="dup-sheet-back">Not yet, go back</button>
-            <button type="button" className={QUIET} disabled={busy} onClick={async () => { setBusy(true); try { setHere(await onMergeHere()); } finally { setBusy(false); } }} data-testid="dup-merge-here">Merge from here{switchedOff ? " (not on yet)" : ""}</button>
           </div>
-          {here && <div className="mt-3"><InlineAlert tone="info">{here}</InlineAlert></div>}
-          {switchedOff && !here && <p className="mt-2 text-xs text-muted-foreground">Merging from here is switched off for now: your CRM&apos;s own merge keeps conversations, deals and notes, and this does not.</p>}
         </>
       )}
     </section>
