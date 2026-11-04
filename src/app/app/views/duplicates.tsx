@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { diffFields, guardrails, REASON_LABELS, SORT_LABELS } from "@/lib/analytics/dedupe-review";
 import type { FieldPick } from "@/lib/analytics/cleanup-rules";
 import { EmptyState, ErrorState, HowTo, InlineAlert, Page, PopMenu, RowButton, Section, SkeletonCards } from "../ds";
-import { MatchWhy, PersonCard, type Pair, type Workflow } from "./duplicates-extra";
+import { ArrivalsCard, MatchWhy, PersonCard, type Pair, type Workflow } from "./duplicates-extra";
 import { MatchMeter, ProgressBar } from "./cleanup-parts";
 import { useApiClient, useData } from "../session";
 import { fmtInt } from "../ui";
@@ -30,14 +30,14 @@ type Data = {
   sure: number;
   health: { groups: number; contacts: number; extra: number; listSize: number; shareLabel: string };
   byReason: Record<string, number>; obvious: number; truncated: boolean; multi: boolean; status: "open" | "decided" | "later";
-  counts: { open: number; later: number; decided: number }; protection: { allowing: number; names: string[] }; canExport: boolean; mergeSwitchedOff: boolean;
+  counts: { open: number; maybe: number; later: number; decided: number }; protection: { allowing: number; names: string[] }; canExport: boolean; mergeSwitchedOff: boolean;
   accounts: Paged<Account>; selection: { total: number; i: number; status: string; q: string; reason: string | null; location: string | null; sort: string };
   list: Paged<Row>; upNext: Row[]; step: Step | null;
 };
 type ObviousRow = { key: string; locationId: string; locationName: string | null; keep: { name: string; email: string | null; phone: string | null }; remove: Array<{ name: string; email: string | null; phone: string | null }>; tagsAdded: string[] };
 type ObviousData = Paged<ObviousRow> & { switchedOff: boolean };
 
-type F = { status: "open" | "decided" | "later"; q: string; reason: string; location: string; sort: string; page: number; i: number; focus: string | null; all: boolean; ap: number; aq: string; accAll: boolean };
+type F = { status: "open" | "decided" | "later" | "maybe"; q: string; reason: string; location: string; sort: string; page: number; i: number; focus: string | null; all: boolean; ap: number; aq: string; accAll: boolean };
 const START: F = { status: "open", q: "", reason: "", location: "", sort: "important", page: 0, i: 0, focus: null, all: false, ap: 0, aq: "", accAll: false };
 
 function pathOf(f: F): string {
@@ -180,7 +180,7 @@ export function DuplicatesView({ embedded = false }: { embedded?: boolean } = {}
     ...(data.canExport ? [{ key: "csv", label: "Download the list (CSV)", onSelect: () => void api.download("export/duplicates", "subsync-duplicates.csv") }] : []),
   ];
   const filterWords = [
-    f.status === "later" ? "groups set aside" : f.status === "decided" ? "groups already decided" : null,
+    f.status === "maybe" ? "maybe the same person" : f.status === "later" ? "groups set aside" : f.status === "decided" ? "groups already decided" : null,
     f.location ? (data.accounts.rows.find((a) => a.locationId === f.location)?.name ?? step?.locationName ?? "one client account") : null,
     f.reason ? REASON_LABELS[f.reason as keyof typeof REASON_LABELS] : null,
     f.q ? `"${f.q}"` : null,
@@ -196,6 +196,8 @@ export function DuplicatesView({ embedded = false }: { embedded?: boolean } = {}
       {error && <div className="mb-4"><ErrorState error={error} onRetry={reload} /></div>}
       {problem && <div className="mb-4"><InlineAlert tone="danger" onDismiss={() => setProblem(null)}>{problem}</InlineAlert></div>}
       {data.truncated && <div className="mb-4"><InlineAlert tone="warning">This list is capped for speed, so the biggest groups are shown first. Merge some and the rest appear.</InlineAlert></div>}
+
+      <ArrivalsCard multi={data.multi} />
 
       <section className="mb-6" data-testid="dup-health" aria-label="Duplicates at a glance">
         <p className="text-3xl font-semibold tracking-tight" data-testid="dup-headline">
@@ -374,6 +376,7 @@ export function DuplicatesView({ embedded = false }: { embedded?: boolean } = {}
                 <label className="flex items-center gap-1.5 text-xs text-muted-foreground">Show
                   <select className={selectClass} value={f.status} onChange={(e) => patch({ status: e.target.value as F["status"], page: 0, i: 0, focus: null })} aria-label="Which groups">
                     <option value="open">To do ({fmtInt(data.counts.open)})</option>
+                    <option value="maybe">Maybe the same person ({fmtInt(data.counts.maybe)})</option>
                     <option value="later">Set aside ({fmtInt(data.counts.later)})</option>
                     <option value="decided">Done ({fmtInt(data.counts.decided)})</option>
                   </select>

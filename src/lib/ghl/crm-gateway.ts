@@ -170,3 +170,34 @@ export async function mergeViaWorkflow(a: WorkflowArgs, deps: GatewayDeps = {}):
   );
   return done.live ? done.result : { outcome: "switched_off", line: done.line, survivorId: plan.survivorId };
 }
+
+// ---------------- prevention: tag a new contact that looks like an existing one ----------------
+
+export const POSSIBLE_DUPLICATE_TAG = "possible-duplicate";
+
+export type TagArgs = { installationId: string; locationId: string; contactId: string; actor: string | null; optedIn: boolean; preventTag: boolean; token: () => Promise<string> };
+
+/**
+ * The optional prevention action: add one tag to a contact that just arrived and looks like an existing one, so the customer's own workflows and lists can act on it. Needs the
+ * account's opt-in AND its prevention choice AND the master switch; otherwise nothing is sent (a dry run line is recorded when only the switch is off). Adds a tag, removes nothing,
+ * changes no other field.
+ */
+export async function tagPossibleDuplicate(a: TagArgs, deps: GatewayDeps = {}): Promise<"skipped" | "switched_off" | "tagged" | "needs_permission" | "failed"> {
+  if (!a.optedIn || !a.preventTag) return "skipped";
+  const done = await outward(
+    { flag: "WRITE_GHL_LIVE", verb: "WRITE", what: "crm.contact.tag", installationId: a.installationId, ids: { locationId: a.locationId, contactId: a.contactId }, fields: ["tags"] },
+    async () => {
+      await (deps.sleep ?? wait)(SPACING_MS);
+      const res = await ghlFetch(
+        `${GHL_API}/contacts/${encodeURIComponent(a.contactId)}/tags`,
+        { method: "POST", headers: { Authorization: `Bearer ${await a.token()}`, Version: VERSION, Accept: "application/json", "Content-Type": "application/json" }, body: JSON.stringify({ tags: [POSSIBLE_DUPLICATE_TAG] }), cache: "no-store" },
+        { ...(deps.fetchImpl ? { fetchImpl: deps.fetchImpl } : {}), ...(deps.sleep ? { sleep: deps.sleep } : {}) },
+      );
+      const r = res.status === 401 || res.status === 403 ? "needs_permission" : res.ok ? "tagged" : "failed";
+      await recordWrite({ installationId: a.installationId, actor: a.actor, locationId: a.locationId, contactId: a.contactId, op: "tag.possible_duplicate", fields: ["tags"], result: r }, deps);
+      return r as "tagged" | "needs_permission" | "failed";
+    },
+    deps,
+  );
+  return done.live ? done.result : "switched_off";
+}

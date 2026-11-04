@@ -100,3 +100,28 @@ test("learning: signals that mislead in this account lose weight, and nothing mo
   const learned = scoreEvidence(...fam(9), l.weights).score;
   assert.ok(learned < base, `the shared-phone pair scores lower once learned (${base} to ${learned})`);
 });
+
+import { incomingFrom } from "../analytics/prevention.ts";
+import { tagPossibleDuplicate } from "../ghl/crm-gateway.ts";
+
+test("a contact-created webhook body is read, whatever the nesting", () => {
+  assert.equal(incomingFrom({}), null);
+  const a = incomingFrom({ type: "ContactCreate", locationId: "L", id: "c1", firstName: "Ann", lastName: "Lee", email: "a@x.com", phone: "+1555", tags: ["t", 3] });
+  assert.deepEqual([a?.contactId, a?.name, a?.email, a?.tags], ["c1", "Ann Lee", "a@x.com", ["t"]]);
+  assert.equal(incomingFrom({ contact: { id: "c2", name: "Bo Ray" } })?.name, "Bo Ray");
+});
+
+test("prevention tag: only with the account's opt-in and choice, a dry run while the master switch is off, one tag and one audit line when on", async () => {
+  const calls: Array<{ path: string; body: unknown }> = [];
+  const fetchImpl = (async (url: string, init: RequestInit) => { calls.push({ path: new URL(url).pathname, body: JSON.parse(init.body as string) }); return Response.json({ ok: true }); }) as unknown as typeof fetch;
+  const lines: string[] = [];
+  const deps = (live: boolean) => ({ env: live ? { WRITE_GHL_LIVE: "true" } : {}, fetchImpl, sleep: async () => undefined, log: () => undefined, audit: async (r: { action: string }) => { lines.push(r.action); } });
+  const a = { installationId: "i", locationId: "L", contactId: "c1", actor: null, token: async () => "tok" };
+  assert.equal(await tagPossibleDuplicate({ ...a, optedIn: false, preventTag: true }, deps(true)), "skipped");
+  assert.equal(await tagPossibleDuplicate({ ...a, optedIn: true, preventTag: false }, deps(true)), "skipped");
+  assert.equal(await tagPossibleDuplicate({ ...a, optedIn: true, preventTag: true }, deps(false)), "switched_off");
+  assert.equal(calls.length, 0);
+  assert.equal(await tagPossibleDuplicate({ ...a, optedIn: true, preventTag: true }, deps(true)), "tagged");
+  assert.deepEqual(calls, [{ path: "/contacts/c1/tags", body: { tags: ["possible-duplicate"] } }]);
+  assert.deepEqual(lines, ["dry_run.would_write", "crm.write"]);
+});

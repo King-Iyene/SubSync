@@ -5,6 +5,7 @@ import type { Guardrail } from "@/lib/analytics/dedupe-review";
 import type { Person } from "@/lib/analytics/dedupe";
 import type { FieldPick } from "@/lib/analytics/cleanup-rules";
 import { DialButton, InlineAlert } from "../ds";
+import { useApiClient, useData } from "../session";
 import { ExtLink, timeAgo } from "../ui";
 import { Avatar, BTN, PRIMARY, ScoreMeter } from "./cleanup-parts";
 
@@ -142,5 +143,38 @@ export function PersonCard({ p, i, keep, best, locked, differ, onKeep }: { p: Pe
         <ExtLink href={p.url}>Open contact</ExtLink>
       </div>
     </li>
+  );
+}
+
+// ---------- new arrivals that may already exist (real-time prevention) ----------
+
+type Arrival = { id: string; locationName: string | null; newName: string | null; otherName: string | null; score: number; tier: string; reasons: string[]; newUrl: string; otherUrl: string };
+
+/** "Possible duplicate of X": contacts that arrived in the last two weeks and look like one the client already has. Each can be opened or dismissed with one click. */
+export function ArrivalsCard({ multi }: { multi: boolean }) {
+  const api = useApiClient();
+  const { data, reload } = useData<{ rows: Arrival[] }>("duplicates/arrivals");
+  const [busy, setBusy] = useState<string | null>(null);
+  if (!data || data.rows.length === 0) return null;
+  const dismiss = async (id: string) => { setBusy(id); try { await api.post("duplicates/arrivals-dismiss", { id }); await reload(); } finally { setBusy(null); } };
+  return (
+    <section className="mb-6 rounded-xl border bg-card p-4" data-testid="arrivals" aria-label="New contacts that may already exist">
+      <h2 className="text-lg font-semibold">New contacts that may already exist</h2>
+      <p className="text-sm text-muted-foreground">Spotted within seconds of arriving. Nothing was changed.</p>
+      <ul className="mt-2">
+        {data.rows.map((r) => (
+          <li key={r.id} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-t py-3" data-testid="arrival">
+            <div className="min-w-0">
+              <p className="break-words text-base font-medium">{r.newName ?? "A new contact"} <span className="font-normal text-muted-foreground">may be</span> {r.otherName ?? "an existing contact"}</p>
+              <p className="text-sm text-muted-foreground">{r.tier === "sure" ? "Almost certainly the same person" : "Very likely the same person"}{multi && r.locationName ? ` · ${r.locationName}` : ""} · {r.reasons.slice(0, 2).join(", ").toLowerCase()}</p>
+            </div>
+            <div className="flex items-center gap-1">
+              <ExtLink href={r.otherUrl}>Open the first</ExtLink>
+              <button type="button" className={BTN} disabled={busy === r.id} onClick={() => void dismiss(r.id)} data-testid="arrival-dismiss">Not the same<span className="sr-only"> ({r.newName ?? "new contact"})</span></button>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }

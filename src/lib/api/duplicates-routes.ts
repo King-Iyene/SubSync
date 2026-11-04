@@ -8,6 +8,7 @@ import {
 import { HISTORY_ACTIONS, parseKind } from "../analytics/history-intel";
 import { historyPage } from "../analytics/history-queries";
 import { mergeViaWorkflow, planWorkflowMerge } from "../ghl/crm-gateway";
+import { dismissArrival, listArrivals } from "../analytics/prevention";
 import { mergeContacts } from "../ghl/crm-merge";
 import { isLive } from "../live-flags";
 import type { deepLinks } from "../links";
@@ -118,7 +119,7 @@ async function overviewRoute(ctx: Ctx, h: DuplicatesHelpers): Promise<Response> 
   return json({
     health: ov.health, sure: open.filter((g) => g.confidence >= 90).length, byReason: ov.byReason, obvious: ov.obvious, truncated: built.truncated,
     multi: ov.accounts.length > 1 || (ctx.kind === "agency" && !ctx.limitTo),
-    counts: { open: open.length, later: selectGroups(built.all, { ...base, status: "later" }).length, decided: selectGroups(built.all, { ...base, status: "decided" }).length },
+    counts: { open: open.length, maybe: selectGroups(built.all, { ...base, status: "maybe" }).length, later: selectGroups(built.all, { ...base, status: "later" }).length, decided: selectGroups(built.all, { ...base, status: "decided" }).length },
     protection: await protectionFor(ctx.installationId, allowed), canExport: ctx.kind !== "client",
     accounts, status, mergeSwitchedOff: ctx.demo || !isLive("WRITE_GHL_LIVE"), masterSwitchOn: !ctx.demo && isLive("WRITE_GHL_LIVE"),
     // An account id is echoed only when it is one of the caller's own accounts, so a request can never make the answer name another company's account.
@@ -263,6 +264,15 @@ async function rulesReadRoute(ctx: Ctx, h: DuplicatesHelpers): Promise<Response>
 export async function handleDuplicates(ctx: Ctx, h: DuplicatesHelpers): Promise<Response> {
   const [, b] = ctx.segments;
   const m = ctx.request.method;
+  if (m === "GET" && b === "arrivals") {
+    const links = await h.links();
+    const rows = await listArrivals(ctx.installationId, await h.allowed());
+    return json({ rows: rows.map((r) => ({ ...r, newUrl: links.contact(r.locationId, r.contactId), otherUrl: links.contact(r.locationId, r.otherId) })) });
+  }
+  if (m === "POST" && b === "arrivals-dismiss") {
+    const body = (await ctx.request.json().catch(() => null)) as { id?: unknown } | null;
+    return typeof body?.id === "string" && /^[0-9a-f-]{36}$/.test(body.id) && (await dismissArrival(ctx.installationId, await h.allowed(), body.id)) ? json({ ok: true }) : json({ error: "Not found" }, 404);
+  }
   if (m === "GET" && b === "history") return historyRoute(ctx, h);
   if (m === "GET" && b === "rules") return rulesReadRoute(ctx, h);
   if (m === "POST" && b === "merge-workflow") return mergeWorkflowRoute(ctx, h);

@@ -127,8 +127,10 @@ export function sortGroups<T extends QueueItem>(list: readonly T[], sort: SortKe
 
 // ---------- the queue: filter, sort, page ----------
 
-export type Status = "open" | "decided" | "later";
-export const parseStatus = (v: unknown): Status => (v === "decided" || v === "later" ? v : "open");
+export type Status = "open" | "decided" | "later" | "maybe";
+export const parseStatus = (v: unknown): Status => (v === "decided" || v === "later" || v === "maybe" ? v : "open");
+/** Below this a group is a "maybe": shown on its own so a weak guess never floods the review. */
+export const MAYBE_BELOW = 60;
 
 export type Select = {
   status: Status;
@@ -158,7 +160,7 @@ export function selectGroups<T extends QueueItem>(all: readonly T[], o: Select):
     const id = idOf(g);
     const done = o.decided.has(id);
     const later = !done && o.later.has(id);
-    if (o.status === "open" ? done || later : o.status === "decided" ? !done : !later) return false;
+    if (o.status === "open" ? done || later || g.confidence < MAYBE_BELOW : o.status === "maybe" ? done || later || g.confidence >= MAYBE_BELOW : o.status === "decided" ? !done : !later) return false;
     if (o.location && g.locationId !== o.location) return false;
     if (o.reason && reasonOf(g).key !== o.reason) return false;
     return matches(g);

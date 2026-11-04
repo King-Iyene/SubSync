@@ -13,26 +13,27 @@ export type AccountConfig = {
   mergeWorkflowId: string | null;
   /** The per-account opt-in for changing contacts from SubSync. Off until a person switches it on. */
   writeEnabled: boolean;
+  preventTag: boolean;
   /** Where the matching choice comes from. */
   source: "account" | "company" | "builtin";
 };
 
-export const BUILTIN: AccountConfig = { match: DEFAULT_RULES, survive: DEFAULT_SURVIVORSHIP, mergeWorkflowId: null, writeEnabled: false, source: "builtin" };
+export const BUILTIN: AccountConfig = { match: DEFAULT_RULES, survive: DEFAULT_SURVIVORSHIP, mergeWorkflowId: null, writeEnabled: false, preventTag: false, source: "builtin" };
 
-export type Ready = { rules: boolean; defaults: boolean; snapshots: boolean };
+export type Ready = { rules: boolean; defaults: boolean; snapshots: boolean; possible: boolean };
 const ready = ttlCache<Ready>(60_000, 2);
 
 /** Which of this stage's database pieces exist (the migration may not have been applied yet). Cached a minute. */
 export async function schemaReady(): Promise<Ready> {
   const hit = ready.get("x");
   if (hit) return hit;
-  let r: Ready = { rules: false, defaults: false, snapshots: false };
+  let r: Ready = { rules: false, defaults: false, snapshots: false, possible: false };
   try {
     const rows = await sql()`
       select table_name, column_name from information_schema.columns
-      where table_schema = 'public' and ((table_name = 'locations' and column_name in ('cleanup_rules', 'cleanup_write_enabled')) or (table_name = 'settings' and column_name = 'cleanup_defaults') or table_name = 'cleanup_quality_snapshots')`;
+      where table_schema = 'public' and ((table_name = 'locations' and column_name in ('cleanup_rules', 'cleanup_write_enabled')) or (table_name = 'settings' and column_name = 'cleanup_defaults') or table_name in ('cleanup_quality_snapshots', 'possible_duplicates'))`;
     const has = (t: string, c?: string) => rows.some((x) => x.table_name === t && (!c || x.column_name === c));
-    r = { rules: has("locations", "cleanup_rules") && has("locations", "cleanup_write_enabled"), defaults: has("settings", "cleanup_defaults"), snapshots: has("cleanup_quality_snapshots") };
+    r = { rules: has("locations", "cleanup_rules") && has("locations", "cleanup_write_enabled"), defaults: has("settings", "cleanup_defaults"), snapshots: has("cleanup_quality_snapshots"), possible: has("possible_duplicates") };
   } catch {
     // an unreadable catalogue means "not ready": the screens say so in words
   }
@@ -41,10 +42,10 @@ export async function schemaReady(): Promise<Ready> {
 }
 export const forgetSchema = () => ready.clear("x");
 
-const parseBlob = (raw: unknown): { match: MatchRules; survive: Survivorship; mergeWorkflowId: string | null } => {
+const parseBlob = (raw: unknown): { match: MatchRules; survive: Survivorship; mergeWorkflowId: string | null; preventTag: boolean } => {
   const o = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
   const wf = typeof o.mergeWorkflowId === "string" && /^[A-Za-z0-9_-]{6,64}$/.test(o.mergeWorkflowId) ? o.mergeWorkflowId : null;
-  return { match: parseRules(o.match), survive: parseSurvivorship(o.survive), mergeWorkflowId: wf };
+  return { match: parseRules(o.match), survive: parseSurvivorship(o.survive), mergeWorkflowId: wf, preventTag: o.preventTag === true };
 };
 
 /** The effective choices for each client account the caller may see: the account's own, else the company default, else Balanced. */
@@ -62,20 +63,20 @@ export async function loadConfigs(installationId: string, allowed: string[] | nu
     const base = own ?? company;
     out.set(l.location_id as string, {
       match: base?.match ?? DEFAULT_RULES, survive: base?.survive ?? DEFAULT_SURVIVORSHIP, mergeWorkflowId: own?.mergeWorkflowId ?? company?.mergeWorkflowId ?? null,
-      writeEnabled: l.cleanup_write_enabled === true, source: own ? "account" : company ? "company" : "builtin",
+      writeEnabled: l.cleanup_write_enabled === true, preventTag: own?.preventTag ?? company?.preventTag ?? false, source: own ? "account" : company ? "company" : "builtin",
     });
   }
   return out;
 }
 
 /** The company-wide default choices (an agency only; null before anyone saved one). */
-export async function loadCompany(installationId: string): Promise<{ match: MatchRules; survive: Survivorship; mergeWorkflowId: string | null } | null> {
+export async function loadCompany(installationId: string): Promise<{ match: MatchRules; survive: Survivorship; mergeWorkflowId: string | null; preventTag: boolean } | null> {
   if (!(await schemaReady()).defaults) return null;
   const [r] = await sql()`select cleanup_defaults from settings where installation_id = ${installationId}`;
   return r?.cleanup_defaults ? parseBlob(r.cleanup_defaults) : null;
 }
 
-export type ConfigInput = { match?: unknown; survive?: unknown; mergeWorkflowId?: string | null };
+export type ConfigInput = { match?: unknown; survive?: unknown; mergeWorkflowId?: string | null; preventTag?: boolean };
 
 /**
  * Saves the choices for one account (`scope` an account id) or for the whole company (`scope` "company", an agency only: the caller checks). Only the parts sent change.
@@ -90,6 +91,7 @@ export async function saveConfig(installationId: string, allowed: string[] | nul
     return {
       match: input.match !== undefined ? parseRules(input.match) : old.match, survive: input.survive !== undefined ? parseSurvivorship(input.survive) : old.survive,
       mergeWorkflowId: input.mergeWorkflowId !== undefined ? (input.mergeWorkflowId && /^[A-Za-z0-9_-]{6,64}$/.test(input.mergeWorkflowId) ? input.mergeWorkflowId : null) : old.mergeWorkflowId,
+      preventTag: input.preventTag !== undefined ? input.preventTag === true : old.preventTag,
     };
   };
   if (scope === "company") {

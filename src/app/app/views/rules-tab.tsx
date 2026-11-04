@@ -12,7 +12,7 @@ import { WriteAccessCard } from "./write-access";
 // workflow of each client, and a copyable recipe that stops new duplicates at the source. Saved per client account with a company default underneath. The choices only change
 // what SubSync SHOWS; they never change a contact. A client's staff cannot change them (the route refuses it), they only see which rules apply.
 
-type Cfg = { match: MatchRules; survive: Survivorship; mergeWorkflowId: string | null };
+type Cfg = { match: MatchRules; survive: Survivorship; mergeWorkflowId: string | null; preventTag?: boolean };
 type Data = {
   total: number;
   ready: { rules: boolean; defaults: boolean }; demo: boolean; multi: boolean; canCompany: boolean; masterSwitchOn: boolean;
@@ -108,6 +108,7 @@ function Editor({ data, cfg, scope, name, own, canEdit, canSave, onSaved }: { da
   const [rules, setRules] = useState<MatchRules>(cfg.match);
   const [survive, setSurvive] = useState<Survivorship>(cfg.survive ?? DEFAULT_SURVIVORSHIP);
   const [wf, setWf] = useState(cfg.mergeWorkflowId ?? "");
+  const [tagNew, setTagNew] = useState(cfg.preventTag === true);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [copied, setCopied] = useState(false);
@@ -121,12 +122,12 @@ function Editor({ data, cfg, scope, name, own, canEdit, canSave, onSaved }: { da
     const t = setTimeout(() => { api.get<{ now: { groups: number; extra: number }; with: { groups: number; extra: number } }>(`cleanup/rules/preview?${qs}`).then((r) => { if (live) setEffect(r); }).catch(() => { if (live) setEffect(null); }); }, 350);
     return () => { live = false; clearTimeout(t); };
   }, [qs, api]);
-  const dirty = JSON.stringify(rules) !== JSON.stringify(cfg.match) || JSON.stringify(survive) !== JSON.stringify(cfg.survive) || (wf.trim() || "") !== (cfg.mergeWorkflowId ?? "");
+  const dirty = JSON.stringify(rules) !== JSON.stringify(cfg.match) || JSON.stringify(survive) !== JSON.stringify(cfg.survive) || (wf.trim() || "") !== (cfg.mergeWorkflowId ?? "") || tagNew !== (cfg.preventTag === true);
 
   const save = async () => {
     setBusy(true); setMsg(null);
     try {
-      await api.post("cleanup/rules", { scope, match: rules, survive, mergeWorkflowId: wf.trim() || null });
+      await api.post("cleanup/rules", { scope, match: rules, survive, mergeWorkflowId: wf.trim() || null, preventTag: tagNew });
       setMsg({ ok: true, text: "Saved. Open Duplicates to see the groups with these rules." });
       onSaved();
     } catch (e) { setMsg({ ok: false, text: (e as Error).message }); } finally { setBusy(false); }
@@ -179,6 +180,11 @@ function Editor({ data, cfg, scope, name, own, canEdit, canSave, onSaved }: { da
               </select></label>
           ))}
         </div>
+      </Section>
+
+      <Section title="New contacts" hint="SubSync checks every new contact within seconds of it arriving." id="rules-arrivals">
+        <p className="text-base text-muted-foreground">A new contact that looks like one you already have shows up as a card on the Duplicates tab and in your alerts. Nothing is changed in your CRM.</p>
+        <label className="mt-2 flex min-h-11 items-start gap-2 text-base"><input type="checkbox" className="mt-1 size-5" disabled={!canEdit} checked={tagNew} onChange={(e) => setTagNew(e.target.checked)} data-testid="prevent-tag" /><span>Also add the tag <strong>possible-duplicate</strong> to it in my CRM (only if changing contacts is allowed for this client)</span></label>
       </Section>
 
       <Section title="Merge workflow" hint="Lets SubSync start a merge for you, through a workflow you own." id="rules-workflow">

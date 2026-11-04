@@ -28,3 +28,21 @@ create table if not exists public.cleanup_quality_snapshots (
 );
 create index if not exists cleanup_quality_snapshots_installation_idx on public.cleanup_quality_snapshots (installation_id, day desc);
 alter table public.cleanup_quality_snapshots enable row level security;
+
+-- possible_duplicates: a contact that arrived (contact-created webhook) and looks like one the account already has. Ids, a score, a tier and short reasons only (no contact detail).
+-- The Duplicates tab shows them as "Possible duplicate of X" cards and the daily alert counts them; a person dismisses one with a click.
+create table if not exists public.possible_duplicates (
+  id uuid primary key default gen_random_uuid(),
+  installation_id uuid not null references public.installations (id) on delete cascade,
+  location_id text not null,
+  contact_id text not null,
+  other_contact_id text not null,
+  score integer not null,
+  tier text not null,
+  reasons jsonb not null default '[]'::jsonb,
+  status text not null default 'new' check (status in ('new', 'dismissed')),
+  created_at timestamptz not null default now(),
+  unique (installation_id, location_id, contact_id, other_contact_id)
+);
+create index if not exists possible_duplicates_installation_idx on public.possible_duplicates (installation_id, status, created_at desc);
+alter table public.possible_duplicates enable row level security;

@@ -52,7 +52,7 @@ async function rulesView(ctx: Ctx, h: CleanupHelpers): Promise<Response> {
     presets: (["strict", "balanced", "loose"] as const).map((id) => ({ id, ...PRESET_WORDS[id], rules: PRESETS[id] })), fieldWords: FIELD_WORDS, winnerWords: WINNER_WORDS,
     accounts, total: locs.length,
     company: !allowed && locs.length > 1 ? (() => { const m = company?.match ?? BUILTIN.match; return { match: m, survive: company?.survive ?? BUILTIN.survive, mergeWorkflowId: company?.mergeWorkflowId ?? null, preset: presetOf(m), saved: !!company, sentence: describeRules(m) }; })() : null,
-    selected: pick ? { locationId: pick.location_id as string, name: (pick.name as string | null) ?? "Unnamed account", match: c.match, survive: c.survive, preset: presetOf(c.match), source: c.source, mergeWorkflowId: c.mergeWorkflowId, writeEnabled: c.writeEnabled, sentence: describeRules(c.match) } : null,
+    selected: pick ? { locationId: pick.location_id as string, name: (pick.name as string | null) ?? "Unnamed account", match: c.match, survive: c.survive, preset: presetOf(c.match), source: c.source, mergeWorkflowId: c.mergeWorkflowId, writeEnabled: c.writeEnabled, preventTag: c.preventTag, sentence: describeRules(c.match) } : null,
   });
 }
 
@@ -77,7 +77,7 @@ async function saveRules(ctx: Ctx, h: CleanupHelpers): Promise<Response> {
   if (typeof wf === "string" && !/^[A-Za-z0-9_-]{6,64}$/.test(wf)) return json({ error: "A workflow id is letters, numbers and dashes (6 to 64 characters). Copy it from your CRM." }, 400);
   // The account is checked first, so a forged id answers "not found" whether or not the database update has been applied.
   if (scope !== "company" && !(await ownAccount(ctx, h, scope))) return json({ error: "Account not found" }, 404);
-  const r = await saveConfig(ctx.installationId, await h.allowed(), h.actor(ctx), scope, { match: body?.match, survive: body?.survive, ...(wf !== undefined ? { mergeWorkflowId: wf } : {}) });
+  const r = await saveConfig(ctx.installationId, await h.allowed(), h.actor(ctx), scope, { match: body?.match, survive: body?.survive, ...(typeof (body as { preventTag?: unknown } | null)?.preventTag === "boolean" ? { preventTag: (body as { preventTag: boolean }).preventTag } : {}), ...(wf !== undefined ? { mergeWorkflowId: wf } : {}) });
   if (r === "unavailable") return json({ error: "Saving rules is not available yet. SubSync is finishing an update, so try again later.", unavailable: true }, 503);
   if (r === "not_found") return json({ error: "Account not found" }, 404);
   forgetQueue(ctx.installationId);

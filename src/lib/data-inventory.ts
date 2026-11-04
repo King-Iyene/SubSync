@@ -89,6 +89,7 @@ export const INVENTORY: Record<string, TableInfo> = {
     personal: { snapshot: "a copy of the duplicate records you reviewed", decided_by: "the name of the person who decided" },
     notPersonal: ["group_key"],
   },
+  possible_duplicates: { noun: "new contacts that may already exist", line: "accounts", notPersonal: ["contact_id", "other_contact_id", "score", "tier", "reasons", "status"] },
   cleanup_quality_snapshots: { noun: "daily data-quality scores", line: "accounts", notPersonal: ["day", "contacts", "score", "parts", "counts", "duplicate_groups", "duplicate_extra", "new_groups"] },
   duplicate_snoozes: { noun: "duplicate groups you set aside", line: "actions", personal: { decided_by: "the name of the person who set it aside" }, notPersonal: ["group_key", "until"] },
   meeting_notes: {
