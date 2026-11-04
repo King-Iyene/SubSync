@@ -94,6 +94,8 @@ export type View = {
   items: TodayItem[]; totals: Totals; queue: QueueRow[];
   held: Array<{ item: TodayItem; hold: Hold }>;
   junk: { items: TodayItem[]; dollars: number };
+  /** One deal that is at least half of the stalled dollars on screen (the audit's guard), worked out from the deals that are still counted. */
+  outlier: { value: number; share: number } | null;
 };
 
 /**
@@ -123,7 +125,11 @@ export function applyView(i: ViewInput, o: ViewOpts): View {
     totals[k] = { count: Math.max(0, full.count - removedN), dollars: dollars && dollars > 0 ? dollars : null, shown: keep.filter((x) => x.kind === k).length };
   }
   const queue = buildQueue({ items: keep, totals, accounts: new Map(i.accounts.map((a) => [a.id, a])), staleDays: i.staleDays, now: i.now });
-  return { items: keep, totals, queue, held, junk: { items: junkItems, dollars: junkItems.reduce((s, x) => s + (x.value ?? 0), 0) } };
+  // The audit's outlier guard, on what is still counted: a deal left out as junk or set aside must not be named as "most of that".
+  const top = keep.filter((x) => x.kind === "stale" && (x.value ?? 0) > 0).reduce((m, x) => Math.max(m, x.value as number), 0);
+  const dollars = totals.stale.dollars ?? 0;
+  const outlier = top > 0 && dollars > 0 && top / dollars >= 0.5 ? { value: Math.round(top), share: Math.round((top / dollars) * 100) / 100 } : null;
+  return { items: keep, totals, queue, held, junk: { items: junkItems, dollars: junkItems.reduce((s, x) => s + (x.value ?? 0), 0) }, outlier };
 }
 
 // ---------- the list behind "N snoozed" ----------

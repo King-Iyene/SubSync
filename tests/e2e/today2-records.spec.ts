@@ -270,7 +270,8 @@ test("every number opens the records behind it and the count equals the rows: he
   // Donut: every slice and every legend item; the count on it is the count in the panel.
   for (const s of await page.locator("[data-testid^=slice-]").all()) {
     const n = Number(await s.getAttribute("data-count"));
-    await s.click();
+    await s.focus();
+    await page.keyboard.press("Enter");
     expect(await equal()).toBe(n);
     await closePanel(page);
   }
@@ -282,7 +283,8 @@ test("every number opens the records behind it and the count equals the rows: he
   }
   await page.screenshot({ path: "docs/review/today2-before-slice.png" });
   const slice = page.locator("[data-testid^=slice-]").first();
-  await slice.click();
+  await slice.focus();
+  await page.keyboard.press("Enter");
   await equal();
   await page.screenshot({ path: "docs/review/today2-panel-slice.png" });
   await closePanel(page);
@@ -563,4 +565,22 @@ test("a business administrator and a client's staff get the same panel, limited 
     if (as === "client") await expect(page.getByRole("tab")).toHaveCount(0); else await expect(page.getByRole("tab", { name: "People" })).toBeVisible();
     await expect(page.getByTestId("brief-preview")).toHaveCount(0);
   }
+});
+
+test("a real mouse click on the ring of the donut opens the records behind that slice", async ({ page }) => {
+  await openToday(page);
+  const slice = page.getByTestId("slice-leads");
+  const n = Number(await slice.getAttribute("data-count"));
+  // A point on the slice's own outline, in page coordinates: the middle of a thin ring is not where its bounding box centre is.
+  const at = await slice.evaluate((el) => {
+    const path = el as unknown as SVGGeometryElement;
+    const p = path.getPointAtLength(path.getTotalLength() * 0.12);
+    const m = (path as unknown as SVGGraphicsElement).getScreenCTM()!;
+    return { x: p.x * m.a + p.y * m.c + m.e, y: p.x * m.b + p.y * m.d + m.f };
+  });
+  await page.mouse.move(at.x, at.y);
+  await expect(page.getByTestId("donut-tip")).toContainText(/Leads waiting/);
+  await page.mouse.click(at.x, at.y);
+  await expect(panel(page)).toBeVisible();
+  await expect(page.getByTestId("records-count")).toHaveAttribute("data-count", String(n));
 });

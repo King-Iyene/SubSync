@@ -132,7 +132,7 @@ function TodayAgency({ go, t, reload, sync, syncing, options, picked, setPicked,
   const changeAccounts = (ids: string[]) => { m.close(); setDay(null); setPicked(ids); };
 
   const rows = view.queue;
-  const headline = headlineOf({ scope: "all", rows, totals: view.totals, outlier: t.outlier });
+  const headline = headlineOf({ scope: "all", rows, totals: view.totals, outlier: view.outlier });
   const slices = slicesOf(view.totals);
   const bars = accountBars(rows);
   const accountMap = useMemo(() => new Map(t.accounts.map((a) => [a.id, a])), [t.accounts]);

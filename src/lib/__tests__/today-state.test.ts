@@ -131,3 +131,15 @@ test("the list behind 'N snoozed' has exactly N rows, and the brief says what th
   assert.ok(lines.some((l) => l.startsWith("1. Maple Dental")));
   assert.ok(lines.some((l) => /1 item is set aside/.test(l)));
 });
+
+test("the one-deal sentence is worked out from the deals still counted: a junk or set-aside deal is never named as most of the money", () => {
+  const items = [item("stale", "aaa", { value: 1_000_000, at: NOW - 200 * D }), item("stale", "aaa", { value: 8000, at: NOW - 40 * D }), item("stale", "aaa", { value: 6000, at: NOW - 35 * D })];
+  const t = totals(items);
+  const off = applyView({ items, totals: t, accounts: ACCOUNTS, staleDays: 30, now: NOW }, { holds: {}, excludeJunk: false });
+  assert.deepEqual(off.outlier, { value: 1_000_000, share: 0.99 });
+  const on = applyView({ items, totals: t, accounts: ACCOUNTS, staleDays: 30, now: NOW }, { holds: {}, excludeJunk: true });
+  assert.equal(on.totals.stale.dollars, 14000);
+  assert.deepEqual(on.outlier, { value: 8000, share: 0.57 }, "the $1,000,000 deal is left out, so it is never named; 8,000 of 14,000 is over half, so the guard names that one");
+  const even = [item("stale", "aaa", { value: 5000, at: NOW - 40 * D }), item("stale", "aaa", { value: 5000, at: NOW - 40 * D }), item("stale", "aaa", { value: 4000, at: NOW - 40 * D })];
+  assert.equal(applyView({ items: even, totals: totals(even), accounts: ACCOUNTS, staleDays: 30, now: NOW }, { holds: {}, excludeJunk: true }).outlier, null);
+});

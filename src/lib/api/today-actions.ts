@@ -66,7 +66,7 @@ export async function todayAction(ctx: Ctx, deps: TodayDeps): Promise<Response> 
 /** The text of the daily brief as it would go out: the same headline, breakdown and top rows as Today, from the same ranking. Nothing is sent. */
 export function briefFromToday(data: TodayPayload, opts: { excludeJunk?: boolean } = {}) {
   const view = applyView({ items: data.items, totals: data.totals, accounts: data.accounts, staleDays: data.staleDays, now: data.now }, { holds: data.holds, excludeJunk: opts.excludeJunk ?? true });
-  const headline = headlineOf({ scope: data.scope, rows: view.queue, totals: view.totals, outlier: data.outlier });
+  const headline = headlineOf({ scope: data.scope, rows: view.queue, totals: view.totals, outlier: view.outlier });
   return { headline: headline.text, lines: briefLines({ headline, rows: view.queue, setAside: view.held.length }), held: view.held.length };
 }
 

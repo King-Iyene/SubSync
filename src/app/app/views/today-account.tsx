@@ -80,7 +80,7 @@ export function TodayAccount({ go, data: t, kind, reload, sync, syncing }: { go:
   const [onlyUnmarked, setOnlyUnmarked] = useState(false);
   const [copied, setCopied] = useState(false);
   const [day, setDay] = useState<number | null>(null);
-  const headline = headlineOf({ scope: "account", rows: view.queue, totals: view.totals, outlier: t.outlier });
+  const headline = headlineOf({ scope: "account", rows: view.queue, totals: view.totals, outlier: view.outlier });
   const leads = view.items.filter((i) => i.kind === "leads");
   const alsoRows = view.queue.filter((r) => r.kind !== "leads");
   const onPart = (a: HeadlineAction) => m.open(a === "dollars" ? specKind("stale", env) : specThings(env));
