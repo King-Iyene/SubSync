@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 // Today, second pass: real-browser checks of the two live bugs King found (rows out of line in Fix first; "Done" and "Show all accounts" in the account picker doing
 // nothing) and a click on every control of the page. Desktop 1440 is the gate; the alignment test also resizes to 1024.
-test.skip(({}, info) => info.project.name !== "desktop-1440", "Desktop 1440 is the gate for Today's second pass");
+test.beforeEach(({}, info) => { test.skip(info.project.name !== "desktop-1440", "Desktop 1440 is the gate for Today's second pass"); }); // eslint-disable-line no-empty-pattern
 
 async function openToday(page: Page) {
   await page.goto("/app");
