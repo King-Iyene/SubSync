@@ -12,6 +12,8 @@ export const DEFAULT_OFF: ReadonlySet<Feature> = new Set<Feature>([
   // A new feature goes in this list until it is verified.
   "meetings",
   "zoom_meet",
+  // The Workflows module (docs/features/WORKFLOWS.md): off until King switches it on. Its paid parts (workflows_pro, workflows_write) sit behind it.
+  "workflows",
 ]);
 
 export function resolveFeatures(all: readonly Feature[], overrides: Record<string, boolean>, allOn = false): Record<Feature, boolean> {

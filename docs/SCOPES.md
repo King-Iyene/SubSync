@@ -2,7 +2,7 @@
 
 This file is generated from `src/lib/scope-groups.ts` (run `scripts/gen-scopes-doc.ts`). A test fails when it is stale, when a permission the app asks for is missing from it, or when it lists one the app does not ask for. Do not edit it by hand.
 
-SubSync asks for 21 permissions: 7 required and 14 optional. Fewer permissions is a trust advantage, and every permission added later makes every installed company approve again, so each one below has a reason. An optional permission can be declined: the feature that needs it then says "Needs permission: reconnect" and everything else keeps working.
+SubSync asks for 28 permissions: 7 required and 21 optional. Fewer permissions is a trust advantage, and every permission added later makes every installed company approve again, so each one below has a reason. An optional permission can be declined: the feature that needs it then says "Needs permission: reconnect" and everything else keeps working.
 
 Wording rule: the screen says one of three things. **Needs permission: reconnect** (the app asked and this install declined, or the app has not asked yet), **Not available from the platform yet** (the platform refuses even with the permission, or has no such data), or it simply shows the data. See `docs/CAPABILITIES.md` for which data point is which.
 
@@ -76,6 +76,20 @@ How your accounts label and follow up on contacts.
 | `locations/tags.write` | change | optional | Reserved for tagging after a preview. Nothing in SubSync uses it today. |
 | `locations/tasks.write` | change | optional | Reserved for creating follow-up tasks after a preview. Nothing in SubSync uses it today. |
 
+## Workflows and campaigns
+
+The automations and campaigns in your client accounts, and how they are doing.
+
+| Permission | Kind | Required | Why we ask |
+| --- | --- | --- | --- |
+| `workflows.readonly` | read | optional | The list of workflows in each client account (name, state, last edited), for the Workflows page. Without it the page says: Needs permission, reconnect. |
+| `workflows.logs` | read | optional | How many times each workflow ran and how many steps failed in the last 30 days, to find broken or idle ones. Who went through a workflow is never stored. |
+| `workflows.write` | change | optional | Only to rename a workflow or copy one into another client account, after a preview and a confirm. Optional. |
+| `workflows.publish` | change | optional | Only to publish or pause a workflow, after a preview and a confirm. Optional. |
+| `workflows.delete` | change | optional | Only to delete a workflow, after a preview, a typed confirmation and a saved copy. Optional. |
+| `campaigns.readonly` | read | optional | The list of campaigns in each client account (name, state, last change), to find stuck or failed ones. Read only: SubSync never starts or sends a campaign. |
+| `emails/campaigns.readonly` | read | optional | The email, bulk and workflow campaigns of each client account, read only, for the same list. |
+
 ## Email health
 
 No permission needed. SubSync checks the sending domain's public DNS records (SPF, DKIM, DMARC) from the domain it finds on the account's profile.
@@ -86,7 +100,6 @@ No permission needed. SubSync checks the sending domain's public DNS records (SP
 | --- | --- |
 | `payments/transactions.readonly` | Failed payments and wallet balance. Not asked for: financial permissions cost trust and no feature needs them yet. |
 | `invoices.readonly` | Invoices. Not asked for, for the same reason. |
-| `workflows.readonly` | Whether automations are running. Not asked for: the platform limits this to some accounts, so SubSync watches the results (leads left unanswered) instead. |
 | `forms.readonly` | Form-by-form lead source. Not asked for yet. |
 | `marketplace-installer-details.readonly` | Reading each install's plan, to double-check billing. Planned for a later release. |
 | `conversations/message.write` | Sending messages. Never asked for: SubSync does not reply to anyone, it measures how fast your team does. |

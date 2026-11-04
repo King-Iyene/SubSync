@@ -24,6 +24,14 @@ export const GHL_SCOPES = [
   "opportunities.write",
   "locations/tags.write",
   "locations/tasks.write",
+  // Workflows module (optional): read the list and history, then change after a preview. Campaigns are read only.
+  "workflows.readonly",
+  "workflows.logs",
+  "workflows.write",
+  "workflows.publish",
+  "workflows.delete",
+  "campaigns.readonly",
+  "emails/campaigns.readonly",
 ] as const;
 
 // The platform's own help article (OAuth consent for marketplace apps) says branded installs use the leadconnectorhq host, which

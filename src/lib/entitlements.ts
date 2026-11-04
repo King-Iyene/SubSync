@@ -36,6 +36,10 @@ export const FEATURES = [
   "audit",
   "speed",
   "zoom_meet",
+  // Workflows module: the page is the first (default off, free plan reads the list), health alerts and labels are the second, changes the third.
+  "workflows",
+  "workflows_pro",
+  "workflows_write",
 ] as const;
 export type Feature = (typeof FEATURES)[number];
 

@@ -6,7 +6,7 @@
 // it runs the real call. No other file may decide dry-run for itself: code that wants to send an email, post to Slack, write to the CRM or
 // create or delete a meeting-tool subscription goes through `outward`.
 
-export const LIVE_FLAGS = ["SEND_EMAIL_LIVE", "SEND_SLACK_LIVE", "WRITE_GHL_LIVE", "FATHOM_WEBHOOK_LIVE"] as const;
+export const LIVE_FLAGS = ["SEND_EMAIL_LIVE", "SEND_SLACK_LIVE", "WRITE_GHL_LIVE", "FATHOM_WEBHOOK_LIVE", "WORKFLOWS_WRITE_LIVE"] as const;
 export type LiveFlag = (typeof LIVE_FLAGS)[number];
 
 type Env = Record<string, string | undefined>;
