@@ -55,6 +55,7 @@ test("the figures are the numbers their own pages show", async ({ page, request 
 test("Today draws its own account selector and not the shared filter; the shared filter does not change Today and still works on other pages", async ({ page }) => {
   await page.goto("/app");
   await expect(page.getByTestId("donut-total")).toBeVisible({ timeout: 15_000 });
+  await page.waitForTimeout(1000); // the figure counts up for 600 ms
   const baseTotal = (await page.getByTestId("donut-total").innerText()).trim();
   await page.goto("/app#today?hideTest=1&industry=medical");
   await page.reload();
