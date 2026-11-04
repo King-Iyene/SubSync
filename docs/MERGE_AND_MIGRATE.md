@@ -3,9 +3,9 @@
 A push to `main` deploys the code to production at once. Migrations are NOT applied by a deploy (no CI, no Edge Functions). Do these steps in this order.
 
 ## 1. Back up (2 minutes)
-Supabase dashboard, Database, Backups: confirm a recent backup exists (or press "Create backup" on a paid plan). All 13 migrations are additive and re-runnable, but a backup is the undo.
+Supabase dashboard, Database, Backups: confirm a recent backup exists (or press "Create backup" on a paid plan). All 15 migrations are additive and re-runnable, but a backup is the undo.
 
-## 2. Apply the 14 new migrations to the live Supabase project, in this order
+## 2. Apply the 15 new migrations to the live Supabase project, in this order
 Open Supabase, SQL Editor, New query. For each file below, paste the whole file and press Run. Wait for "Success" before the next one. (Or from your computer: `node --env-file=.env.local --import tsx scripts/apply-migration.ts supabase/migrations/<file>.sql`; it refuses anything that drops or deletes.)
 
 1. 20261101010000_detected_app_domain.sql
@@ -22,6 +22,7 @@ Open Supabase, SQL Editor, New query. For each file below, paste the whole file 
 12. 20261102130000_e2a_fathom_inbox.sql
 13. 20261103090000_e2b_setup.sql
 14. 20261103100000_nc_brand_logo.sql
+15. 20261104090000_today_actions.sql (Today's working queue: Done, Snooze, Assign. Until it is applied Today still opens and shows every row; the buttons say "Needs the latest database update")
 
 Check first that the 26 older migrations (up to 20261031190000) are already applied: Table Editor should list `speed_*`, `lead_touches`, `shared_audits`, `email`/alert tables. If any are missing, apply those first, oldest first.
 Then run `node --env-file=.env.local --import tsx scripts/supabase-proof.ts` (needs your `.env.local`); it compares the live schema with the repo. Send me the output.
@@ -58,7 +59,7 @@ One-time setup, in this order:
 1. GitHub, repo `King-Iyene/SubSync`, **Settings, Environments, New environment**, name it exactly `production`. Tick **Required reviewers** and add yourself. Save.
 2. In that same environment, **Add environment secret**: name `SUPABASE_DB_URL`. Value: Supabase, **Project Settings, Database, Connection string, Session pooler** (port 5432, URI). Replace `[YOUR-PASSWORD]` with the database password. Use the SESSION pooler, not "Transaction pooler" (the runner needs a session for its lock) and not the "Direct connection" (it is IPv6-only and GitHub's machines are IPv4). Never paste this value in chat.
 3. **Baseline once** (Supabase already has the older 26 migrations, and the runner must not re-run them): GitHub, **Actions, migrations, Run workflow**, set `baseline_through` to `20261029030000_api_keys.sql`, leave the rest, **Run workflow**, then press **Review deployments, Approve** on the `production` job. It marks only the first 5 files as already applied and runs nothing. The first 5 cannot be run twice, but production certainly has them. Every later file is safe to run twice (tested), so the next step applies the rest and does nothing where a table already exists.
-4. **Apply the 13 new ones**: Actions, migrations, Run workflow, set `dry_run` to **false**, leave `baseline_through` empty, Run workflow, Approve. This replaces step 2 of the manual list above. Or, with `dry_run` true, it only prints what it would apply.
+4. **Apply the 15 new ones**: Actions, migrations, Run workflow, set `dry_run` to **false**, leave `baseline_through` empty, Run workflow, Approve. This replaces step 2 of the manual list above. Or, with `dry_run` true, it only prints what it would apply.
 5. From now on: a migration file merged to `main` shows a pending approval on the Actions page. Approve it and it is applied.
 
 Limits to know: it migrates the database only; the Vercel deploy still happens on its own at the same moment, so a migration should be merged in a change that works with or without the new tables for a few minutes (ours are additive). Turn on Supabase backups first. If a migration fails it stops and nothing after it runs; fix forward with a new file.
