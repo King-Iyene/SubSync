@@ -80,24 +80,29 @@ describe("the list of leads (N22, N30, N78, KF-6)", () => {
 
 describe("Speed to lead does not use the phone's own dialer (KF-3)", () => {
   it("writes no tel: link in the page or its cards, and nothing places a call itself", () => {
-    for (const file of ["src/app/app/views/speed.tsx", "src/app/app/views/speed-cards.tsx", "src/lib/design/speed-text.ts"]) {
+    for (const file of ["src/app/app/views/speed.tsx", "src/app/app/views/speed-cards.tsx", "src/lib/design/speed-text.ts", "src/app/app/views/speed-rows.tsx"]) {
       const text = readFileSync(file, "utf8");
       expect(text, file).not.toMatch(/tel:|sms:|href=\{`?tel/i);
     }
   });
 });
 
-describe("the page and its cards say the same plain things everywhere", () => {
-  it("the page names the measuring sentence and a link to Settings, and says SubSync does not send replies", () => {
+describe("the page says the same plain things everywhere", () => {
+  it("the page names the measuring sentence and a link to Settings, and says SubSync never sends a reply", () => {
     const page = readFileSync("src/app/app/views/speed.tsx", "utf8");
     expect(page).toContain("measuringSentence");
     expect(page).toContain('go("settings")');
-    expect(page).toContain("SubSync measures replies; it does not send them");
+    expect(page).toContain("it never sends a reply");
   });
-  it("every card has its own range (KF-4) and a list behind its figures (KF-6)", () => {
+  it("the source card under More detail has its own range (KF-4) and a list behind its figures (KF-6)", () => {
     const cards = readFileSync("src/app/app/views/speed-cards.tsx", "utf8");
-    for (const key of ["speed-summary", "speed-source", "speed-accounts", "speed-people"]) expect(cards).toContain(`useCardRange("${key}"`);
-    expect((cards.match(/<CardRange /g) ?? []).length).toBe(4);
-    expect((cards.match(/<LeadsPanel /g) ?? []).length).toBe(4);
+    expect(cards).toContain('useCardRange("speed-source"');
+    expect((cards.match(/<CardRange /g) ?? []).length).toBe(1);
+    expect((cards.match(/<LeadsPanel /g) ?? []).length).toBe(1);
+  });
+  it("the new screen's files write no tel: or sms: link either", () => {
+    for (const file of ["src/app/app/views/speed-rows.tsx", "src/app/app/views/speed-all.tsx", "src/app/app/views/speed-picture.tsx"]) {
+      expect(readFileSync(file, "utf8"), file).not.toMatch(/href={?[`"']?(tel|sms):/i);
+    }
   });
 });
