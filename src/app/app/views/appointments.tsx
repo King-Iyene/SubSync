@@ -66,8 +66,12 @@ export function AppointmentsView({ go }: { go: GoFn }) {
   const h = headlineOf(d.counts);
   const none = d.counts.record + d.counts.recover + d.counts.upcoming === 0 && d.rate.booked === 0 && !d.rateBefore?.booked;
   const r = d.rate;
-  const windowWords = range.resolved ? range.resolved.current.label : "the dates chosen";
-  const change = d.rateBefore && r.rate !== null && d.rateBefore.rate !== null ? shareChange({ n: r.held, total: r.outcomes }, { n: d.rateBefore.held, total: d.rateBefore.outcomes }) : null;
+  // "last 30 days" for a preset, "6 Oct to 4 Nov" for custom dates; the full dates are always under the control.
+  const windowWords = range.resolved ? (range.spec.preset === "custom" ? range.resolved.current.label : `the ${range.resolved.current.label.split(",")[0].toLowerCase()}`) : "the dates chosen";
+  const before = d.rateBefore;
+  const change = before && r.rate !== null && before.outcomes > 0
+    ? (before.outcomes >= 10 && r.outcomes >= 10 ? shareChange({ n: r.held, total: r.outcomes }, { n: before.held, total: before.outcomes }).text : `Before that it was ${Math.round((before.held / before.outcomes) * 100)}% of ${before.outcomes}, too few to call a change`)
+    : null;
   const target = targetState(r.rate, d.target.showRate);
   const accountsLine = d.accounts.rows.slice(0, 8).map((a) => ({ label: a.label, record: a.record, recover: a.recover }));
   const summary = summaryText({ counts: d.counts, rate: r, windowWords, accounts: d.several ? accountsLine : undefined });
@@ -91,7 +95,7 @@ export function AppointmentsView({ go }: { go: GoFn }) {
   return (
     <Page title="Appointments" subtitle="Who missed, who was never marked, and who may not show." actions={<PopMenu label="More" items={menu} testId="appt-more" triggerClassName={`${BTN} px-3`}><span>More</span></PopMenu>}>
       {waiting > 0 && (
-        <InlineAlert tone="warning" className="mb-5" title={waiting === d.access.total ? "SubSync needs your approval to read appointments." : `${plural(waiting, "account still needs", "accounts still need")} approval to show appointments.`}>
+        <InlineAlert tone="warning" className="mb-5" title={waiting === d.access.total ? "Needs permission: reconnect. SubSync cannot read appointments yet." : `Needs permission: reconnect. ${plural(waiting, "account", "accounts")} cannot show appointments yet.`}>
           <p>The app needs one more read-only permission. Open the app in the marketplace and choose Reinstall (or ask the account owner), then approve. Nothing else changes.{d.canSeeAccounts && waiting <= 6 ? ` Waiting: ${d.access.needsPermission.map((a) => a.name ?? "Unnamed").join(", ")}.` : ""}</p>
         </InlineAlert>
       )}
@@ -100,12 +104,12 @@ export function AppointmentsView({ go }: { go: GoFn }) {
         <EmptyState title="No appointments yet" body={waiting > 0 ? "They will appear after the app is approved again and the next sync finishes." : "Once calendars have bookings, the no-shows to call, the appointments nobody marked and the true show rate appear here. Appointments are read from the last 90 days and the next 60."} action={<button type="button" className={BTN} onClick={() => go("help")}>Open Getting started</button>} />
       ) : (
         <div className={loading ? "opacity-70 transition-opacity" : "transition-opacity"} aria-busy={loading}>
-          <HowTo id="appointments-v2" title="How this works">Start with the button. Each row has one button that opens the person in your CRM, and a menu for the rest. Mark outcomes in your CRM; SubSync never changes an appointment.</HowTo>
+          <HowTo id="appointments-v2" title="How this works">Start with the button. Each row has one button and a menu. SubSync only reads: mark outcomes in your CRM.</HowTo>
 
-          <section className="mb-7" aria-label="What needs a person" data-testid="appt-headline-block">
+          <section className="mb-7" aria-label="What needs you" data-testid="appt-headline-block">
             <h2 className="max-w-4xl text-[clamp(1.6rem,3.3vw,2.6rem)] font-semibold leading-[1.06] tracking-tight" data-testid="appt-headline" data-clear={h.total === 0}>
               {h.total === 0 && <CircleCheck aria-hidden className="mr-3 inline-block size-[0.8em] -translate-y-[0.05em] text-success" />}
-              {h.total === 0 ? h.title : <><span className="tnum text-primary"><CountUp value={h.total} /></span> {h.total === 1 ? "appointment needs" : "appointments need"} a person.</>}
+              {h.total === 0 ? h.title : <><span className="tnum text-primary"><CountUp value={h.total} /></span> {h.total === 1 ? "appointment needs" : "appointments need"} you.</>}
             </h2>
             {h.line && <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground" data-testid="appt-headline-line">{h.line}</p>}
             {h.action && (
@@ -128,7 +132,7 @@ export function AppointmentsView({ go }: { go: GoFn }) {
                 <p>
                   {r.rate === null
                     ? <>Not enough marked appointments yet: {r.outcomes} of 5 needed. {r.unmarked > 0 ? `Mark the ${plural(r.unmarked, "past appointment", "past appointments")} below to get a true rate.` : ""}</>
-                    : <>Of {plural(r.outcomes, "appointment", "appointments")} someone marked in {windowWords.charAt(0).toLowerCase()}{windowWords.slice(1)}, {r.held} showed and {r.noShow} did not.{change ? ` ${change.text}.` : ""}</>}
+                    : <>Of {plural(r.outcomes, "appointment", "appointments")} someone marked in {windowWords}, {r.held} showed and {r.noShow} did not.{change ? ` ${change}.` : ""}</>}
                 </p>
                 {r.rate !== null && r.range && <p className="text-muted-foreground" data-testid="appt-rate-range">{plural(r.unmarked, "appointment has", "appointments have")} no outcome yet. Once marked, the rate will land between {pct(r.range.low)} and {pct(r.range.high)}.</p>}
                 {r.rate !== null && !r.range && r.unmarked > 0 && <p className="text-muted-foreground">{plural(r.unmarked, "appointment has", "appointments have")} no outcome yet.</p>}
@@ -138,10 +142,10 @@ export function AppointmentsView({ go }: { go: GoFn }) {
               <div className="md:col-span-2 lg:col-span-1"><CardRange state={range} label="Show rate" /></div>
             </div>
             <details className="mt-3 text-sm" onToggle={(e) => setChart((e.currentTarget as HTMLDetailsElement).open)}>
-              <summary className="min-h-11 cursor-pointer select-none py-2 text-muted-foreground hover:text-foreground sm:min-h-9" data-testid="appt-chart-toggle">Where did they go, and your target</summary>
+              <summary className="min-h-11 cursor-pointer select-none py-2 text-muted-foreground hover:text-foreground sm:min-h-9" data-testid="appt-chart-toggle">What happened to them, and your target</summary>
               {chart && (
                 <div className="mt-2 max-w-2xl" data-testid="appt-outcome-chart">
-                  <Distribution title={`What happened to the appointments of ${windowWords.charAt(0).toLowerCase()}${windowWords.slice(1)}`} noun="appointments" sample={Math.max(1, OUTCOME_BUCKETS.reduce((s, b) => s + d.outcomes.counts[b.key], 0))} min={0} need="appointments"
+                  <Distribution title={`What happened to the appointments of ${windowWords}`} noun="appointments" sample={Math.max(1, OUTCOME_BUCKETS.reduce((s, b) => s + d.outcomes.counts[b.key], 0))} min={0} need="appointments"
                     rows={OUTCOME_BUCKETS.map((b) => ({ label: b.label, value: d.outcomes.counts[b.key], count: d.outcomes.counts[b.key], detail: b.hint, tone: TONE[b.key] }))}
                     onSelect={openBucket} selected={drill?.kind === "window" ? OUTCOME_BUCKETS.findIndex((b) => b.key === drill.id) : null} />
                   <Explainer id="status" />
@@ -149,14 +153,14 @@ export function AppointmentsView({ go }: { go: GoFn }) {
               )}
               <div className="mt-3"><TargetEditor key={d.target.showRate} value={d.target.showRate} isDefault={d.target.isDefault} canEdit={d.canEditTargets} onSaved={reload} /></div>
             </details>
-            {drill?.kind === "window" && <div id="appt-drill"><FullList key={drill.id + wq} kind="window" fixed={drill.fixed} title={drill.title} several={d.several} empty="Nothing behind this bar." onClose={() => setDrill(null)} testId="appt-drill-list" /></div>}
+            {drill?.kind === "window" && <div id="appt-drill"><FullList key={drill.id + wq} kind="window" fixed={drill.fixed} title={drill.title} empty="Nothing behind this bar." onClose={() => setDrill(null)} testId="appt-drill-list" /></div>}
           </section>
 
-          {SECTIONS.map((s) => <WorkSection key={s.kind} {...s} total={d.lists[s.kind].total} value={d.lists[s.kind].value} rows={d.lists[s.kind].rows} several={d.several} showAccount={d.several && d.canSeeAccounts} />)}
+          {SECTIONS.map((s) => <WorkSection key={s.kind} {...s} total={d.lists[s.kind].total} value={d.lists[s.kind].value} rows={d.lists[s.kind].rows} showAccount={d.several && d.canSeeAccounts} />)}
 
           <ComparePanel windowQuery={wq} canAccounts={d.canSeeAccounts} several={d.several} onOpen={openCompare}
             initial={{ person: d.people, calendar: d.calendars, account: d.accounts }} />
-          {drill?.kind === "all" && <div id="appt-drill" className="-mt-4 mb-8"><FullList key={drill.id} kind="all" fixed={drill.fixed} title={drill.title} several={d.several} empty="Nothing to do here." onClose={() => setDrill(null)} testId="appt-drill-list" /></div>}
+          {drill?.kind === "all" && <div id="appt-drill" className="-mt-4 mb-8"><FullList key={drill.id} kind="all" fixed={drill.fixed} title={drill.title} empty="Nothing to do here." onClose={() => setDrill(null)} testId="appt-drill-list" /></div>}
 
           <p className="mb-2 text-xs text-muted-foreground">Figures are counted from your CRM&apos;s appointments, last 90 days and next 60{d.historyFrom ? `, from ${d.historyFrom}` : ""}. The three lists use the same rows as Today. {fmtInt(d.counts.record + d.counts.recover + d.counts.upcoming)} in all.</p>
         </div>

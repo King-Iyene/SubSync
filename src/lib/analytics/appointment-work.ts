@@ -61,14 +61,14 @@ const ago = (days: number) => (days <= 0 ? "today" : days === 1 ? "yesterday" : 
 /** The one plain line under a person's name. Words only; no percentages, no jargon. */
 export function reasonFor(kind: WorkKind, v: { at: number; now: number; calendar: string | null; why?: UpcomingWhy[]; lastMissed?: number | null; timeZone?: string | null }): string {
   const days = Math.max(0, Math.floor((v.now - v.at) / DAY));
-  const cal = v.calendar ? ` (${v.calendar})` : "";
-  if (kind === "record") return `Was ${dayFmt(v.at, v.timeZone)}${cal}. Nobody marked it showed or no-show.`;
-  if (kind === "recover") return `Missed ${ago(days)}${cal}. Not booked again.`;
+  const cal = v.calendar ? ` · ${v.calendar}` : "";
+  if (kind === "record") return `Was ${dayFmt(v.at, v.timeZone)}${cal} · not marked`;
+  if (kind === "recover") return `Missed ${ago(days)}${cal}`;
   const bits: string[] = [];
   if (v.why?.includes("unconfirmed")) bits.push("not confirmed yet");
   if (v.why?.includes("missed_before")) bits.push(v.lastMissed ? `missed their last one on ${dayFmt(v.lastMissed, v.timeZone)}` : "missed an earlier one");
   const text = bits.join(", ");
-  return `${text.charAt(0).toUpperCase()}${text.slice(1)}${cal}.`;
+  return `${text.charAt(0).toUpperCase()}${text.slice(1)}${cal}`;
 }
 
 // ---------- filter, sort, page ----------
@@ -237,7 +237,7 @@ export function headlineOf(c: Counts): { title: string; line: string | null; act
   const action = c.recover > 0 ? { kind: "recover" as const, label: `Follow up the ${plural(c.recover, "no-show", "no-shows")}` }
     : c.record > 0 ? { kind: "record" as const, label: `Mark ${plural(c.record, "past appointment", "past appointments")}` }
     : { kind: "upcoming" as const, label: `Check ${plural(c.upcoming, "appointment", "appointments")} coming up` };
-  return { title: `${plural(total, "appointment needs", "appointments need")} a person.`, line: `${parts.join(", ").replace(/, ([^,]*)$/, " and $1")}.${money}`, action, total };
+  return { title: `${plural(total, "appointment needs", "appointments need")} you.`, line: `${parts.join(", ").replace(/, ([^,]*)$/, " and $1")}.${money}`, action, total };
 }
 export const money$ = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
 

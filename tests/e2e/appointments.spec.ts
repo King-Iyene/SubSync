@@ -74,43 +74,16 @@ test("the show-rate target is refused when it is not 30 to 100, and nothing is s
   expect([400, 403]).toContain(low.status());
 });
 
-test("the Appointments tab: numbers open their lists, a row opens the appointment, no tel: link anywhere", async ({ page }, testInfo) => {
-  const errors: string[] = [];
-  page.on("pageerror", (e) => errors.push(e.message));
+// The Appointments tab itself was rebuilt (stage APPT): its browser tests are in appointments-v2.spec.ts. This one keeps the card range honest on the new page.
+test("the card range on the true show rate changes the window sentence and is carried in the address", async ({ page }) => {
   await page.goto("/app#appointments");
   await page.reload();
-  await expect(page.getByTestId("appointments-window")).toBeVisible({ timeout: 90_000 });
-  await expect(page.getByTestId("card-range").first()).toBeVisible();
-  await expect(page.getByText("What this shows, how to read it, what to do").first()).toBeVisible();
-  // A bar of the status chart opens its list; the heading count is the bar's count.
-  const bar = page.getByRole("button", { name: /open the list/ }).first();
-  await bar.scrollIntoViewIfNeeded();
-  const count = Number(/(\d+) appointments, open the list/.exec((await bar.getAttribute("aria-label")) ?? "")?.[1]);
-  expect(count).toBeGreaterThan(0);
-  await bar.click();
-  await expect(page.getByTestId("appt-list-count")).toHaveText(String(count));
-  await page.getByTestId("appt-list-panel").locator("button[data-row-primary]").first().click();
-  await expect(page.getByTestId("appt-drawer")).toBeVisible();
-  await expect(page.getByText("Status history")).toBeVisible();
-  await expect(page.getByTestId("appt-drawer-position")).toContainText("1 of");
-  await page.keyboard.press("Escape");
-  await expect(page.getByTestId("appt-drawer")).toHaveCount(0);
+  const range = page.getByTestId("appt-rate-card").getByTestId("card-range");
+  await expect(range).toBeVisible({ timeout: 90_000 });
+  await range.getByLabel("Show rate: range").selectOption("7d");
+  await expect(page.getByTestId("appt-rate-card").getByTestId("card-range-window")).toContainText("Last 7 days", { timeout: 60_000 });
+  expect(page.url()).toMatch(/r.appointments=7d/);
   expect(await page.locator('a[href^="tel:"]').count(), "no phone link").toBe(0);
-  const text = await page.locator("body").innerText();
-  expect(text).not.toMatch(/down 100%|NaN|undefined|Infinity/);
-  const { sw, cw } = await page.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
-  expect(sw, "no sideways scroll").toBeLessThanOrEqual(cw);
-  expect(errors, errors.join("\n")).toEqual([]);
-  await page.screenshot({ path: `docs/review/f3-appointments-${testInfo.project.name}.png`, fullPage: true });
-});
-
-test("the card range on the numbers changes the window sentence and is carried in the address", async ({ page }) => {
-  await page.goto("/app#appointments");
-  await page.reload();
-  const range = page.getByTestId("card-range").first();
-  await range.getByLabel("Appointment numbers: range").selectOption("7d");
-  await expect(page.getByTestId("appointments-window")).toContainText("Appointments that start from", { timeout: 60_000 });
-  expect(page.url()).toMatch(/r\.appointments=7d/);
 });
 
 test("Insights: every card has its three explanation lines, the grid of 1s is gone, and a thin health score says n/a", async ({ page }) => {

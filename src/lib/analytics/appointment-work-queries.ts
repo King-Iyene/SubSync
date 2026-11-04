@@ -59,7 +59,7 @@ function toItem(a: Loaded, kind: WorkKind | "window", c: { info: Map<string, Con
   const k = a.contactId ? `${a.locationId}:${a.contactId}` : null;
   const info = k ? c.info.get(k) : undefined;
   const zone = c.zones.get(a.locationId) ?? null;
-  const reason = kind === "window" ? `${a.status === "noshow" ? "No-show" : a.status === "showed" ? "Showed" : a.status === "cancelled" ? "Cancelled" : "No outcome marked"} on ${new Date(a.startAt).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })}${a.calendarName ? ` (${a.calendarName})` : ""}.`
+  const reason = kind === "window" ? `${a.status === "noshow" ? "No-show" : a.status === "showed" ? "Showed" : a.status === "cancelled" ? "Cancelled" : "No outcome marked"} on ${new Date(a.startAt).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })}${a.calendarName ? ` · ${a.calendarName}` : ""}`
     : reasonFor(kind, { at: a.startAt, now, calendar: a.calendarName, why: extra.why, lastMissed: extra.lastMissed, timeZone: zone });
   return {
     key: `${a.locationId}:${a.id}`, kind, id: a.id, locationId: a.locationId, locationName: c.names.get(a.locationId) ?? null, contactId: a.contactId,

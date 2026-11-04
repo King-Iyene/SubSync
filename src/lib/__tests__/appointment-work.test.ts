@@ -54,7 +54,7 @@ test("Coming up that may not show: next 7 days, not confirmed or missed their la
   assert.equal(w.upcoming.length, 3);
   assert.deepEqual(w.upcoming.map((u) => u.why.slice().sort().join("+")).sort(), ["missed_before", "missed_before+unconfirmed", "unconfirmed"]);
   const both = w.upcoming.find((u) => u.why.length === 2)!;
-  assert.match(reasonFor("upcoming", { at: both.a.startAt, now: NOW, calendar: "Consult", why: both.why, lastMissed: both.lastMissed }), /^Not confirmed yet, missed their last one on \w+ \d+ \(Consult\)\.$/);
+  assert.match(reasonFor("upcoming", { at: both.a.startAt, now: NOW, calendar: "Consult", why: both.why, lastMissed: both.lastMissed }), /^Not confirmed yet, missed their last one on \w+ \d+ · Consult$/);
   assert.equal(w.upcoming.every((u) => u.a.startAt >= NOW), true);
 });
 
@@ -160,12 +160,12 @@ test("people: the same lists cut by who the appointment is assigned to, and one 
 test("the headline: one sentence, the most valuable job first, the three add up, a calm all-clear", () => {
   const h = headlineOf({ record: 12, recover: 9, upcoming: 6, recoverValue: 0, value: 48200 });
   assert.equal(h.total, 27);
-  assert.equal(h.title, "27 appointments need a person.");
+  assert.equal(h.title, "27 appointments need you.");
   assert.equal(h.action?.label, "Follow up the 9 no-shows");
   assert.match(h.line!, /9 no-shows nobody has followed up, 12 past appointments with no outcome marked and 6 appointments coming up that may not show\. The people behind them have \$48,200 of open deals\.$/);
   assert.equal(headlineOf({ record: 3, recover: 0, upcoming: 0, recoverValue: 0, value: 0 }).action?.label, "Mark 3 past appointments");
   assert.equal(headlineOf({ record: 0, recover: 0, upcoming: 1, recoverValue: 0, value: 0 }).action?.label, "Check 1 appointment coming up");
-  assert.equal(headlineOf({ record: 1, recover: 1, upcoming: 0, recoverValue: 0, value: 0 }).title, "2 appointments need a person.");
+  assert.equal(headlineOf({ record: 1, recover: 1, upcoming: 0, recoverValue: 0, value: 0 }).title, "2 appointments need you.");
   const clear = headlineOf({ record: 0, recover: 0, upcoming: 0, recoverValue: 0, value: 0 });
   assert.equal(clear.action, null);
   assert.match(clear.title, /accounted for/);

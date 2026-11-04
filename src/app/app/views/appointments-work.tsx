@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { statusWord } from "@/lib/analytics/appointment-f3";
 import { dialPlan, dialWarnings } from "@/lib/people/dial";
 import { money$, sortLabel, SORT_KEYS, type Compare, type SortKey, type WorkItem, type WorkKind } from "@/lib/analytics/appointment-work";
@@ -99,7 +99,7 @@ export function RowList({ rows, kind, showAccount, empty, testId = "appt-rows" }
                 <p className="text-xs text-muted-foreground @3xl:hidden">{when(r.at)}{r.value > 0 ? ` · ${money$(r.value)} in open deals` : ""}</p>
               </div>
               <p className="tnum hidden text-sm @3xl:block">{when(r.at)}</p>
-              <p className="tnum hidden text-right text-sm @3xl:block">{r.value > 0 ? money$(r.value) : <span className="text-muted-foreground">none</span>}</p>
+              <p className="tnum hidden text-right text-sm @3xl:block">{r.value > 0 ? money$(r.value) : null}</p>
               <div>{button}</div>
               <div><PopMenu label={`More for ${r.name}`} items={items} testId="appt-row-more" triggerClassName="ds-press inline-flex size-11 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-[var(--ring)] @3xl:size-8" /></div>
             </li>
@@ -116,13 +116,16 @@ export function RowList({ rows, kind, showAccount, empty, testId = "appt-rows" }
 export type Fixed = Record<string, string>;
 const query = (o: Record<string, string | number | null | undefined>) => new URLSearchParams(Object.entries(o).filter(([, v]) => v !== null && v !== undefined && v !== "").map(([k, v]) => [k, String(v)])).toString();
 
-export function FullList({ kind, fixed, title, onClose, several, empty, size = 25, testId = "appt-full" }: { kind: WorkKind | "all" | "window"; fixed?: Fixed; title?: ReactNode; onClose?: () => void; several: boolean; empty: ReactNode; size?: number; testId?: string }) {
+export function FullList({ kind, fixed, title, onClose, empty, size = 25, testId = "appt-full" }: { kind: WorkKind | "all" | "window"; fixed?: Fixed; title?: ReactNode; onClose?: () => void; empty: ReactNode; size?: number; testId?: string }) {
   const [q, setQ] = useState("");
   const [qNow, setQNow] = useState("");
   const [sort, setSort] = useState<SortKey>("important");
   const [location, setLocation] = useState("");
   const [user, setUser] = useState("");
   const [page, setPage] = useState(0);
+  const head = useRef<HTMLParagraphElement>(null);
+  // The button that opened this list is gone, so focus moves to its title (a person on a keyboard or a screen reader is not left behind).
+  useEffect(() => { head.current?.focus({ preventScroll: false }); }, []);
   useEffect(() => { const t = setTimeout(() => { setQNow(q); setPage(0); }, 300); return () => clearTimeout(t); }, [q]);
   const path = `appointments/list?${query({ kind, ...fixed, q: qNow, sort, location, user, page, size })}`;
   const { data, error, loading, reload } = useData<ListData>(path);
@@ -131,7 +134,7 @@ export function FullList({ kind, fixed, title, onClose, several, empty, size = 2
   return (
     <section aria-label={typeof title === "string" ? title : "The full list"} data-testid={testId} className="mt-3">
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm font-semibold" data-testid="appt-full-title">{title}{data ? <>: <span data-testid="appt-full-count">{data.total.toLocaleString("en-US")}</span></> : null}</p>
+        <p ref={head} tabIndex={-1} className="text-sm font-semibold outline-none" data-testid="appt-full-title">{title}{data ? <>: <span data-testid="appt-full-count">{data.total.toLocaleString("en-US")}</span></> : null}</p>
         {onClose && <button type="button" className={QUIET} onClick={onClose} data-testid="appt-full-close">Show fewer</button>}
       </div>
       <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -180,8 +183,8 @@ export function FullList({ kind, fixed, title, onClose, several, empty, size = 2
 
 // ---------- one of the three work lists ----------
 
-export function WorkSection({ kind, title, hint, empty, total, value, rows, several, showAccount }: {
-  kind: WorkKind; title: string; hint: string; empty: string; total: number; value: number; rows: WorkRowData[]; several: boolean; showAccount: boolean;
+export function WorkSection({ kind, title, hint, empty, total, value, rows, showAccount }: {
+  kind: WorkKind; title: string; hint: string; empty: string; total: number; value: number; rows: WorkRowData[]; showAccount: boolean;
 }) {
   const [all, setAll] = useState(false);
   return (
@@ -196,7 +199,7 @@ export function WorkSection({ kind, title, hint, empty, total, value, rows, seve
         {total > rows.length && !all && <button type="button" className="ds-press min-h-11 rounded-md px-2.5 text-sm font-medium text-primary underline-offset-4 hover:bg-muted hover:underline focus-visible:outline-2 focus-visible:outline-[var(--ring)] sm:min-h-9" onClick={() => setAll(true)} data-testid={`appt-${kind}-all`}>See all {total.toLocaleString("en-US")}</button>}
       </div>
       {all
-        ? <FullList kind={kind} several={several} empty={empty} onClose={() => setAll(false)} title={title} testId={`appt-${kind}-full`} />
+        ? <FullList kind={kind} empty={empty} onClose={() => { setAll(false); setTimeout(() => document.getElementById(`appt-${kind}-h`)?.focus(), 30); }} title={title} testId={`appt-${kind}-full`} />
         : <RowList rows={rows} kind={kind} showAccount={showAccount} empty={empty} testId={`appt-${kind}-rows`} />}
     </section>
   );
@@ -208,7 +211,7 @@ type By = "person" | "calendar" | "account";
 const BY_LABEL: Record<By, string> = { person: "People", calendar: "Calendars", account: "Client accounts" };
 
 export function CompareRows({ rows, by, onOpen }: { rows: Compare[]; by: By; onOpen: (r: Compare) => void }) {
-  if (rows.length === 0) return <p className="border-y py-6 text-center text-sm text-muted-foreground">Nothing to compare in these dates.</p>;
+  if (rows.length === 0) return <p className="border-y py-6 text-center text-sm text-muted-foreground" data-testid="appt-compare-empty">Nobody has anything to do. Nothing needs a nudge.</p>;
   return (
     <ul className="@container divide-y border-y" data-testid="appt-compare-rows">
       <li aria-hidden className="hidden grid-cols-[minmax(0,1fr)_6rem_8rem] gap-x-3 py-1.5 pl-1 pr-1 text-[0.7rem] font-semibold uppercase tracking-wide text-muted-foreground @3xl:grid"><span>{by === "person" ? "Person" : by === "calendar" ? "Calendar" : "Client account"}</span><span className="text-right">To do</span><span className="text-right">Show rate</span></li>
@@ -224,7 +227,7 @@ export function CompareRows({ rows, by, onOpen }: { rows: Compare[]; by: By; onO
               ? <button type="button" onClick={() => onOpen(r)} className="tnum ds-press min-h-11 min-w-11 rounded-md px-2 text-base font-semibold text-primary underline underline-offset-4 hover:bg-muted focus-visible:outline-2 focus-visible:outline-[var(--ring)] @3xl:min-h-8" data-testid="appt-compare-open" data-count={r.todo} aria-label={`${r.todo} to do for ${r.label}. Show them.`}>{r.todo}</button>
               : <span className="tnum text-base text-muted-foreground">0</span>}
           </div>
-          <p className="tnum hidden text-right text-sm @3xl:block">{r.rate === null ? <span className="text-muted-foreground">n/a ({r.outcomes} of 5 marked)</span> : `${Math.round(r.rate * 100)}% of ${r.outcomes}`}</p>
+          <p className="tnum hidden text-right text-sm @3xl:block">{r.rate === null ? <span className="text-muted-foreground" title={`${r.outcomes} of 5 marked so far`}>n/a</span> : `${Math.round(r.rate * 100)}% of ${r.outcomes}`}</p>
         </li>
       ))}
     </ul>
@@ -243,7 +246,9 @@ export function ComparePanel({ windowQuery, initial, canAccounts, several, onOpe
   useEffect(() => { const t = setTimeout(() => { setQNow(q); setPage(0); }, 300); return () => clearTimeout(t); }, [q]);
   const paged = useData<Paged<Compare> & { by: By }>(all ? `appointments/compare?${windowQuery}&${query({ by, q: qNow, page, size: 10 })}` : null);
   const first = initial[by];
-  const shownRows = all ? paged.data?.rows ?? [] : first.rows;
+  // Inline, only the lines with something to do (the rows are already sorted most-to-do first); the full list has everyone.
+  const busy = first.rows.filter((r) => r.todo > 0);
+  const shownRows = all ? paged.data?.rows ?? [] : busy;
   const total = all ? paged.data?.total ?? first.total : first.total;
   return (
     <section className="mb-8" aria-labelledby="appt-compare-h" data-testid="appt-compare">
@@ -252,15 +257,23 @@ export function ComparePanel({ windowQuery, initial, canAccounts, several, onOpe
           <h2 id="appt-compare-h" className="text-lg font-semibold tracking-tight">Who needs a nudge</h2>
           <p className="mt-0.5 text-sm text-muted-foreground">Most to do first. Press a number to see exactly those appointments.</p>
         </div>
-        <div role="tablist" aria-label="Compare by" className="flex gap-1">
-          {tabs.map((t) => <button key={t} type="button" role="tab" aria-selected={by === t} onClick={() => { setBy(t); setAll(false); setQ(""); setQNow(""); setPage(0); }} data-testid={`appt-by-${t}`} className={`ds-press min-h-11 rounded-md px-3 text-sm sm:min-h-9 ${by === t ? "bg-muted font-semibold" : "text-muted-foreground hover:bg-muted/60"}`}>{BY_LABEL[t]}</button>)}
+        <div role="tablist" aria-label="Compare by" className="flex gap-1" onKeyDown={(e: KeyboardEvent) => {
+          const i = tabs.indexOf(by);
+          const n = e.key === "ArrowRight" ? tabs[(i + 1) % tabs.length] : e.key === "ArrowLeft" ? tabs[(i - 1 + tabs.length) % tabs.length] : null;
+          if (!n) return;
+          e.preventDefault(); setBy(n); setAll(false); setQ(""); setQNow(""); setPage(0);
+          setTimeout(() => document.getElementById(`appt-tab-${n}`)?.focus(), 0);
+        }}>
+          {tabs.map((t) => <button key={t} id={`appt-tab-${t}`} type="button" role="tab" tabIndex={by === t ? 0 : -1} aria-controls="appt-compare-panel" aria-selected={by === t} onClick={() => { setBy(t); setAll(false); setQ(""); setQNow(""); setPage(0); }} data-testid={`appt-by-${t}`} className={`ds-press min-h-11 rounded-md px-3 text-sm sm:min-h-9 ${by === t ? "bg-muted font-semibold" : "text-muted-foreground hover:bg-muted/60"}`}>{BY_LABEL[t]}</button>)}
         </div>
       </div>
+      <div id="appt-compare-panel" role="tabpanel" aria-labelledby={`appt-tab-${by}`}>
       {all && <input type="search" className={`${FIELD} mb-2 w-full sm:w-64`} placeholder={`Find in ${BY_LABEL[by].toLowerCase()}`} aria-label="Find in this table" value={q} onChange={(e) => setQ(e.target.value)} data-testid="appt-compare-search" />}
       <CompareRows rows={shownRows} by={by} onOpen={(r) => onOpen(by, r)} />
+      </div>
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-sm">
         {!all
-          ? (total > first.rows.length ? <button type="button" className={BTN} onClick={() => setAll(true)} data-testid="appt-compare-all">See all {total.toLocaleString("en-US")}</button> : <span />)
+          ? (total > busy.length ? <button type="button" className={BTN} onClick={() => setAll(true)} data-testid="appt-compare-all">{busy.length === 0 ? "See everyone" : "See all"} {total.toLocaleString("en-US")}</button> : <span />)
           : <>
               <span className="text-xs text-muted-foreground">{paged.data ? `Showing ${paged.data.from} to ${paged.data.to} of ${paged.data.total.toLocaleString("en-US")}` : "Loading..."}</span>
               <span className="flex gap-2">
