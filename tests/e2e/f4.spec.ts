@@ -26,7 +26,6 @@ const open = async (page: Page, hash = "#inbox") => {
   await expect(page.getByText("Demo mode", { exact: false }).first()).toBeVisible();
   await expect(page.getByRole("heading", { level: 1, name: "Unanswered messages", exact: true })).toBeVisible({ timeout: 60_000 });
 };
-const tabCount = async (page: Page, label: string) => Number(((await page.getByRole("tab", { name: new RegExp(`^${label} \\(`) }).innerText()).match(/\((\d+)\)/) ?? [])[1]);
 
 test.describe("the numbers behind the page (API, desktop only)", () => {
   test.beforeEach(async ({}, testInfo) => { test.skip(apiOnly(testInfo), "the numbers do not change with the window width"); });
@@ -107,120 +106,7 @@ test.describe("the numbers behind the page (API, desktop only)", () => {
   });
 });
 
-test("the page names its tabs with counts, and the count on each tab is the number of rows under it", async ({ page }) => {
-  await open(page);
-  await expect(page.getByTestId("waiting-headline")).toContainText(/conversations? (is|are) waiting for a reply/);
-  for (const [label, key] of [["Last 7 days", "recent"], ["Older", "older"], ["Unread", "unread"]] as const) {
-    const count = await tabCount(page, label);
-    await page.getByRole("tab", { name: new RegExp(`^${label} \\(`) }).click();
-    const body = page.getByTestId(`tab-body-${key}`);
-    await expect(body).toBeVisible();
-    if (count === 0) { await expect(body.getByTestId("empty-state")).toBeVisible(); continue; }
-    await expect(body.getByTestId("list-range")).toContainText(new RegExp(`of ${count}$`));
-    // Nothing is hidden: the other two tabs show their first rows underneath.
-    for (const other of ["recent", "older", "unread"].filter((t) => t !== key)) await expect(page.getByTestId(`peek-${other}`)).toBeVisible();
-  }
-});
-
-test("a long list shows ten rows and View all opens a paginated table; a name opens the customer panel and the reply link says where it goes", async ({ page }) => {
-  await open(page);
-  const body = page.getByTestId("tab-body-recent");
-  const list = body.getByTestId("data-list");
-  await expect(list).toHaveAttribute("data-mode", "preview");
-  const rows = await list.locator("ul > li").count();
-  expect(rows).toBeLessThanOrEqual(10);
-  const link = list.getByRole("link", { name: "Reply in your CRM" }).first();
-  await expect(link).toHaveAttribute("target", "_blank");
-  expect(await link.getAttribute("href")).not.toMatch(/^tel:/);
-  const total = await tabCount(page, "Last 7 days");
-  if (total > 10) {
-    await list.getByRole("button", { name: new RegExp(`View all ${total}`) }).click();
-    await expect(list.getByTestId("list-range")).toContainText(`of ${total}`);
-  }
-  await list.locator("button[data-row-primary]").first().click();
-  await expect(page.getByTestId("lead-drawer")).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(page.getByTestId("lead-drawer")).toBeHidden();
-  await noSideScroll(page, "Unanswered messages");
-});
-
-test("the wait chips narrow the list and the counts follow; the choice is in the address and is remembered after a reload", async ({ page }) => {
-  await open(page);
-  const before = await tabCount(page, "Last 7 days");
-  await page.getByTestId("chip-24h").click();
-  await expect(page.getByTestId("chip-24h")).toHaveAttribute("aria-pressed", "true");
-  const after = await tabCount(page, "Last 7 days");
-  expect(after).toBeLessThanOrEqual(before);
-  await expect(page.getByTestId("queue-scope")).toContainText("Your choices leave");
-  await expect.poll(() => page.evaluate(() => window.location.hash)).toContain("q.wait=24h");
-  await page.reload();
-  await expect(page.getByTestId("chip-24h")).toHaveAttribute("aria-pressed", "true");
-  // Opening the page again from the menu (no choices in the address) brings back the remembered ones.
-  await page.goto("/app#inbox");
-  await page.reload();
-  await expect(page.getByTestId("chip-24h")).toHaveAttribute("aria-pressed", "true");
-  await page.getByTestId("clear-choices").click();
-  await expect(page.getByTestId("chip-any")).toHaveAttribute("aria-pressed", "true");
-  expect(await tabCount(page, "Last 7 days")).toBe(before);
-});
-
-test("channel, client account and person are choices with names and counts; the order can be flipped", async ({ page }) => {
-  await open(page);
-  const choices = page.getByTestId("queue-choices");
-  const channel = choices.getByLabel("Channel", { exact: true });
-  if (await channel.count()) {
-    const options = await channel.locator("option").allInnerTexts();
-    expect(options[0]).toBe("All channels");
-    expect(options.length).toBeGreaterThan(2);
-    const first = options[1];
-    await channel.selectOption({ index: 1 });
-    await expect(page.getByTestId("queue-scope")).toBeVisible();
-    // Every row left says that channel.
-    const label = first.replace(/ \(\d+\)$/, "");
-    const rows = page.getByTestId("tab-body-recent").getByTestId("data-list").locator("ul > li");
-    for (const text of await rows.allInnerTexts()) expect(text).toContain(label);
-    await page.getByTestId("clear-choices").click();
-  }
-  const people = choices.getByLabel("Assigned to", { exact: true });
-  if (await people.count()) for (const o of await people.locator("option").allInnerTexts()) expect(o, "a name, never an id").not.toMatch(/\b[A-Za-z0-9]{20,}\b/);
-  await choices.getByLabel("Order", { exact: true }).selectOption("newest");
-  await expect(page.getByTestId("tab-body-recent")).toContainText("Newest first");
-});
-
-test("saved views: save the current choices under a name, use them again, remove them", async ({ page }) => {
-  await open(page);
-  await page.getByTestId("chip-4h").click();
-  await page.getByTestId("saved-views").locator("summary").click();
-  const name = `e2e view ${Date.now() % 100000}`;
-  await page.getByLabel("Name for the saved view").fill(name);
-  await page.getByRole("button", { name: "Save this view" }).click();
-  await expect(page.getByTestId("saved-views")).toContainText(`Saved "${name}"`);
-  await page.getByTestId("chip-any").click();
-  await page.getByRole("button", { name: `Use the saved view ${name}` }).click();
-  await expect(page.getByTestId("chip-4h")).toHaveAttribute("aria-pressed", "true");
-  await page.getByRole("button", { name: `Remove the saved view ${name}` }).click();
-  await expect(page.getByRole("button", { name: `Use the saved view ${name}` })).toHaveCount(0);
-  await page.getByTestId("chip-any").click();
-});
-
-test("the wait chart: pressing a row opens the conversations behind it, the same number, and a name opens the customer panel", async ({ page }) => {
-  await open(page);
-  const chart = page.getByTestId("distribution").first();
-  await expect(chart).toBeVisible();
-  const buttons = chart.getByRole("button");
-  const n = await buttons.count();
-  test.skip(n === 0, "nothing is waiting in this demo, so no row has anything behind it");
-  const target = buttons.first();
-  const label = (await target.getAttribute("aria-label")) ?? "";
-  const count = Number((label.match(/: (\d+)/) ?? [])[1]);
-  await target.click();
-  const panel = page.getByTestId("drill-panel");
-  await expect(panel).toBeVisible();
-  await expect(panel.getByTestId("drill-count")).toHaveText(String(count));
-  await expect(panel.getByTestId("list-range")).toContainText(`of ${count}`);
-  await panel.getByRole("button", { name: "Back to the chart" }).click();
-  await expect(page.getByTestId("drill-closed")).toBeVisible();
-});
+// The tabs, wait chips, saved-view and drill-panel tests of the older screen were replaced by tests/e2e/unanswered-v2.spec.ts (the screen was rebuilt: docs/UNANSWERED_REVIEW.md).
 
 test("open deals with no contact are under Pipeline, with the same total as the server counts, and not on this page", async ({ page, request }) => {
   await open(page);

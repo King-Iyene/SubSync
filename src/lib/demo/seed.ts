@@ -425,25 +425,29 @@ async function ensureSpeedDemoF2(installationId: string): Promise<void> {
 async function ensureInboxDemo(installationId: string): Promise<void> {
   const db = sql();
   // The sample threads are re-made on every demo load so their ages stay what their names say (2 hours stays 2 hours, not 10 hours a day later).
-  await db`delete from cached_conversations where installation_id = ${installationId} and conversation_id like 'inbox-sample-%'`;
-  const [loc] = await db`select location_id from locations where installation_id = ${installationId} and not ignored order by location_id limit 1`;
-  if (!loc) return;
-  const now = Date.now();
-  const h = (hours: number) => new Date(now - hours * 3_600_000);
-  const rows: Array<[string, string, string | null, Date | null, number, string]> = [
-    ["inbox-sample-1", "TYPE_SMS", "inbound", h(30), 1, "Inbox sample: text, 30 hours"],
-    ["inbox-sample-2", "TYPE_EMAIL", "inbound", h(6), 1, "Inbox sample: email, 6 hours"],
-    ["inbox-sample-3", "TYPE_WHATSAPP", "inbound", h(2), 1, "Inbox sample: WhatsApp, 2 hours (inside the target)"],
-    ["inbox-sample-4", "TYPE_FB", "inbound", h(50), 2, "Inbox sample: Facebook, 50 hours"],
-    ["inbox-sample-5", "TYPE_IG", "inbound", h(5 * 24), 1, "Inbox sample: Instagram, 5 days"],
-    ["inbox-sample-6", "TYPE_SMS", "inbound", h(40 * 24), 0, "Inbox sample: text, 40 days (dead)"],
-    ["inbox-sample-7", "TYPE_SMS", "outbound", h(3), 0, "Inbox sample: automatic reply after the customer"],
-    ["inbox-sample-8", "TYPE_INTERNAL_COMMENT", null, h(5), 0, "Inbox sample: internal note"],
-  ];
-  await db`insert into cached_conversations ${db(rows.map(([id, type, dir, at, unread, name]) => ({
-    installation_id: installationId, location_id: loc.location_id, conversation_id: id, contact_id: `${loc.location_id}-c${rows.findIndex((r) => r[0] === id) + 1}`,
-    contact_name: name, last_message_type: type, last_message_direction: dir, last_message_at: at, unread_count: unread, synced_at: new Date(),
-  })) as never)}`;
+  // Delete and insert are ONE transaction: a screen that reads the conversations while another demo sign-in re-makes them never sees the threads missing (the counts on the
+  // Unanswered messages screen and in its tests used to dip by four for a moment).
+  await db.begin(async (tx) => {
+    await tx`delete from cached_conversations where installation_id = ${installationId} and conversation_id like 'inbox-sample-%'`;
+    const [loc] = await tx`select location_id from locations where installation_id = ${installationId} and not ignored order by location_id limit 1`;
+    if (!loc) return;
+    const now = Date.now();
+    const h = (hours: number) => new Date(now - hours * 3_600_000);
+    const rows: Array<[string, string, string | null, Date | null, number, string]> = [
+      ["inbox-sample-1", "TYPE_SMS", "inbound", h(30), 1, "Inbox sample: text, 30 hours"],
+      ["inbox-sample-2", "TYPE_EMAIL", "inbound", h(6), 1, "Inbox sample: email, 6 hours"],
+      ["inbox-sample-3", "TYPE_WHATSAPP", "inbound", h(2), 1, "Inbox sample: WhatsApp, 2 hours (inside the target)"],
+      ["inbox-sample-4", "TYPE_FB", "inbound", h(50), 2, "Inbox sample: Facebook, 50 hours"],
+      ["inbox-sample-5", "TYPE_IG", "inbound", h(5 * 24), 1, "Inbox sample: Instagram, 5 days"],
+      ["inbox-sample-6", "TYPE_SMS", "inbound", h(40 * 24), 0, "Inbox sample: text, 40 days (dead)"],
+      ["inbox-sample-7", "TYPE_SMS", "outbound", h(3), 0, "Inbox sample: automatic reply after the customer"],
+      ["inbox-sample-8", "TYPE_INTERNAL_COMMENT", null, h(5), 0, "Inbox sample: internal note"],
+    ];
+    await tx`insert into cached_conversations ${tx(rows.map(([id, type, dir, at, unread, name]) => ({
+      installation_id: installationId, location_id: loc.location_id, conversation_id: id, contact_id: `${loc.location_id}-c${rows.findIndex((r) => r[0] === id) + 1}`,
+      contact_name: name, last_message_type: type, last_message_direction: dir, last_message_at: at, unread_count: unread, synced_at: new Date(),
+    })) as never)}`;
+  });
 }
 
 // Messy pipeline cases on purpose (stage 'F1', N38 and N45), added once and left alone after that: counted deals in a stage named "Disqualified"

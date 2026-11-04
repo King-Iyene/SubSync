@@ -38,22 +38,23 @@ test("no screen, alert, email, export, error or help text says SLA", () => {
   assert.deepEqual(found, [], 'Say "your reply target" instead.');
 });
 
-test("the page is called Unanswered messages everywhere a person sees its name, and it carries the three tabs and the labelled CRM link", () => {
+test("the page is called Unanswered messages everywhere a person sees its name, and its reply button says where it goes (rebuilt in stage UNANS)", () => {
   const page = readFileSync(join(ROOT, "app/app/views/inbox.tsx"), "utf8");
+  const rows = readFileSync(join(ROOT, "app/app/views/unanswered-rows.tsx"), "utf8");
   const nav = readFileSync(join(ROOT, "app/app/nav.ts"), "utf8");
   assert.match(nav, /id: "inbox", label: "Unanswered messages"/);
-  assert.match(page, /title="Unanswered messages"/);
-  for (const tab of ["Last 7 days", "Older", "Unread"]) assert.ok(page.includes(`"${tab}"`), `tab ${tab}`);
-  assert.ok(page.includes("Reply in your CRM"), "the reply link says where it goes");
+  assert.match(page, /<h1[^>]*>Unanswered messages<\/h1>/);
+  assert.ok(/label="Reply"/.test(rows) && rows.includes("the conversation in your CRM"), "the reply button says where it goes");
   assert.ok(!/Inbox zero|Inbox & SLA/.test(page));
-  assert.ok(!/tel:/.test(page + readFileSync(join(ROOT, "app/app/views/inbox-controls.tsx"), "utf8") + readFileSync(join(ROOT, "app/app/views/quiet-deals.tsx"), "utf8")), "no call goes to the phone's own dialer (KF-3)");
+  assert.ok(!/tel:/.test(page + rows + readFileSync(join(ROOT, "app/app/views/unanswered-all.tsx"), "utf8") + readFileSync(join(ROOT, "app/app/views/quiet-deals.tsx"), "utf8")), "no call goes to the phone's own dialer (KF-3)");
 });
 
 test("the CRM links on the page come from the white-label helper, never a hard-coded host", () => {
   const router = readFileSync(join(ROOT, "lib/api/router.ts"), "utf8");
   const view = router.slice(router.indexOf("async function inboxView"), router.indexOf("async function inboxViews"));
   assert.match(view, /links\.conversation\(/);
-  for (const f of ["inbox.tsx", "inbox-controls.tsx", "quiet-deals.tsx", "comms-sections.tsx"]) assert.ok(!/gohighlevel|leadconnector/i.test(readFileSync(join(ROOT, "app/app/views", f), "utf8")), f);
+  assert.match(readFileSync(join(ROOT, "lib/api/unanswered-routes.ts"), "utf8"), /h\.conversation\(/, "the rebuilt screen builds its links with the same helper");
+  for (const f of ["inbox.tsx", "inbox-controls.tsx", "unanswered-rows.tsx", "unanswered-all.tsx", "unanswered-picture.tsx", "quiet-deals.tsx", "comms-sections.tsx"]) assert.ok(!/gohighlevel|leadconnector/i.test(readFileSync(join(ROOT, "app/app/views", f), "utf8")), f);
 });
 
 test("the open deals with no contact are on the Pipeline side now, and no longer on the Unanswered messages page", () => {
