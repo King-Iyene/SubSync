@@ -59,7 +59,7 @@ export function RulesTab({ canEdit }: { canEdit: boolean }) {
       <HowTo id="rules" title="You choose how careful SubSync is">
         These choices only change which contacts SubSync suggests are duplicates and which value it suggests keeping. They never change a contact. Normal is how SubSync has always matched.
       </HowTo>
-      {!data.ready.rules && <div className="mb-4"><InlineAlert tone="warning">Saving rules is not available yet: SubSync is finishing an update. You can look, but not save.</InlineAlert></div>}
+      {!data.ready.rules && <div className="mb-4"><InlineAlert tone="warning">Saving rules is not available yet: SubSync is finishing an update. You can try the settings and see what they would find, but not save them.</InlineAlert></div>}
 
       {data.multi && (
         <Section title="Which client" hint={`${fmtInt(data.total)} client accounts. A client without its own choice follows the company default.`} id="rules-scope">
@@ -89,7 +89,7 @@ export function RulesTab({ canEdit }: { canEdit: boolean }) {
 
       {target ? (
         <Editor key={(scope || data.selected?.locationId || "x") + JSON.stringify(target.match) + String(target.mergeWorkflowId)} data={data} cfg={target} scope={scope === "company" ? "company" : data.selected!.locationId} name={name}
-          own={scope === "company" ? "company" : data.selected!.source} canEdit={canEdit && data.ready.rules && (scope !== "company" || data.ready.defaults)} onSaved={reload} />
+          own={scope === "company" ? "company" : data.selected!.source} canEdit={canEdit} canSave={canEdit && data.ready.rules && (scope !== "company" || data.ready.defaults)} onSaved={reload} />
       ) : null}
 
       <Section title="Stop new duplicates" hint="Five steps in your CRM, so the list stops growing." id="rules-prevent" className="mt-8">
@@ -103,7 +103,7 @@ export function RulesTab({ canEdit }: { canEdit: boolean }) {
   );
 }
 
-function Editor({ data, cfg, scope, name, own, canEdit, onSaved }: { data: Data; cfg: Cfg; scope: string; name: string; own: string; canEdit: boolean; onSaved: () => void }) {
+function Editor({ data, cfg, scope, name, own, canEdit, canSave, onSaved }: { data: Data; cfg: Cfg; scope: string; name: string; own: string; canEdit: boolean; canSave: boolean; onSaved: () => void }) {
   const api = useApiClient();
   const [rules, setRules] = useState<MatchRules>(cfg.match);
   const [survive, setSurvive] = useState<Survivorship>(cfg.survive ?? DEFAULT_SURVIVORSHIP);
@@ -189,7 +189,7 @@ function Editor({ data, cfg, scope, name, own, canEdit, onSaved }: { data: Data;
           <input id="wf" className={`${FIELD} w-full`} disabled={!canEdit} placeholder="Paste the id from your CRM" value={wf} onChange={(e) => setWf(e.target.value)} data-testid="workflow-id" autoComplete="off" /></div>
       </Section>
 
-      {canEdit && (
+      {canSave && (
         <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
           <button type="button" className={PRIMARY} disabled={busy || !dirty} onClick={() => void save()} data-testid="rules-save">{busy ? "Saving..." : "Save these rules"}</button>
           {scope !== "company" && own === "account" && data.canCompany && <button type="button" className={QUIET} disabled={busy} onClick={() => void back()} data-testid="rules-clear">Go back to the company default</button>}

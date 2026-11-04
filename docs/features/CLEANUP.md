@@ -53,17 +53,64 @@ Everything that changes a client's contacts goes through `src/lib/ghl/crm-gatewa
 
 In `docs/METRICS.md`, section "Clean-up: data quality, match score and matching rules": the twelve findings, the score and its five parts, the trend rule, the new-duplicates alert, the pair score, the three presets, and which value wins.
 
-## 5. Tests and verification
+## 5. Tests written
 
-(see section 7 for the exact commands and their results)
+Node (`src/lib/__tests__`): `cleanup-v2.test.ts` (nicknames, initials, spelling, transposed digits, shared household phone, shared company mailbox, placeholder numbers, presets, common names, survivorship, every finding and its exact fix, the score and a tiny sample, the trend, worst-first, the import check), `cleanup-history.test.ts` (history sentences, undo rules, 150 accounts and 5,100 groups, a 20,000-contact scan), `crm-gateway.test.ts` (stubbed platform only: switched off, no opt-in, audited with ids only, the merge route's blockers and results). Database (`tests/unit/cleanup-v2-db.test.ts`, forged ids on every new route, a client's staff refused, what-would-this-setting-find, the import check stored nowhere, history and undo, apply never reaches the platform, 150 accounts) and `cleanup-nav.test.ts`. Browser: `tests/e2e/cleanup-v2.spec.ts` (four roles at three widths, menu and old addresses, a setting changes the groups, data quality count equals rows, a pasted file, history, merging explained). Updated: `dedupe.test.ts`, `cleanup-intel.test.ts`, `duplicates-merge.spec.ts`, `menu.spec.ts`, `s02b.spec.ts` (one word each).
 
-## 6. Design skills run
+## 6. Design skills run (what each changed)
 
-(see below, filled in after the screens were photographed)
+- **Design critique.** Found: the trend sentence wrapped in a narrow box; the page opened on a tip box before the number; the Duplicates screen was a stack of technical blocks (score, bullet list, rules note, table) around the merge button. Changed: trend boxes widened; and, with King's feedback of 5 Nov, the whole Duplicates screen was redesigned: one question ("Are these the same person?"), two cards showing only what differs, a match meter with one plain reason, "Yes, combine them" beside "No, different people", everything technical behind "How we decided"; Data quality opens with a score ring and three big cards. Kept (worked): the calm column, no pills, compact right-hand row buttons.
+- **Accessibility review.** Found: the score bar was announced twice (an image label and the number); the "Copy the fixes" and "Download" buttons repeated on every row with the same name; the import result was not announced. Changed: the bar is hidden from assistive technology and the number carries a spoken label; each row button names its problem; the import result is a status region. Checked: tabs are a real tab list with arrow keys; radios sit in a labelled group; the strictness slider has a label and a description; every phone button is 44 px; fast-review keys work only after the person turns the switch on (WCAG 2.1.4); the ring is hidden decoration with a spoken sentence.
+- **UX copy.** Changed: "Merge now" to "Start the merge"; "Strict, Balanced, Loose" to "Careful, Normal, Thorough"; "duplicate groups" to "people appear more than once"; "A pair needs a score of 50" to "Likely matches are shown"; the database-update messages to "not available yet, SubSync is finishing an update". Kept: "Decide later", "Skip", "Undo", the plain history sentences.
+- **Dataviz palette check.** The ring and the bars use the app's own status colours (success, warning, destructive) and always carry the number and a word (colour is never the only signal); the trend is the existing one-line sparkline in the single series colour. No new chart type, no categorical palette, so the validator was not needed.
 
-## 7. Verification record
+### Customer-eyes improvements (KF-5)
 
-(see below)
+| What | Persona | Where |
+|---|---|---|
+| A plain summary with an estimate of the time ("about 27 minutes") and a progress bar | P2 | Duplicates |
+| "Combine all the sure ones" previews the list first | P2 | Duplicates |
+| Fast review: Y, N, L or swipe | P3 setter, P2 | Duplicates |
+| What a setting would find, before saving it | P1, P2 | Rules |
+| Three big cards with a real before and after | P1, P4 | Data quality |
+| Check a file before importing, copy only the new people | P2 | Data quality |
+| Copy the fixes as CSV, open each contact in the CRM | P2 | Data quality |
+| Copyable five-step recipe to stop new duplicates; copyable merge-workflow steps | P2 | Rules |
+| History with Undo | P1, P4 | History |
+
+## 7. Verification record (commands run in `C:\Users\KING\wt\CLEANUP`, 4 to 5 Nov 2026)
+
+| Command | Result |
+|---|---|
+| `npx next typegen && npx tsc --noEmit` | clean |
+| `npx eslint src tests scripts/check-tenancy.ts` | 0 errors, 13 warnings |
+| `node --test src/lib/__tests__/` | 944 tests, 944 pass |
+| `npx vitest run tests/unit/cleanup-v2-db.test.ts tests/unit/cleanup-nav.test.ts tests/unit/client-access.test.ts tests/unit/ds-components.test.ts tests/unit/tenant-tables.test.ts tests/unit/data-inventory.test.ts --no-file-parallelism` | 65 pass, 1 fails: the live-database half of `data-inventory.test.ts`, because the migration `20261105120000_cleanup_v2.sql` is not applied to the live database (the inventory names its 3 columns and 1 table). It passes once the migration is applied. The migration-file half passes. |
+| `PW_BASE_URL=http://localhost:3191 npx playwright test tests/e2e/cleanup-v2.spec.ts --project=desktop-1440` | 9 of 9 pass (one test was re-run alone after a fix: the strictness choices were disabled while the database update was missing; now they can be tried without saving) |
+| the four role tests at `phone-390` and `tablet-768` (no sideways scroll, plain words, tabs per role, 44 px phone buttons) | 8 of 8 pass |
+| `scripts/check-tenancy.ts`, the integration chain, the full e2e suite | NOT run (the brief forbids it; the lead runs tenancy alone). New read addresses and 7 forged writes were appended to `scripts/check-tenancy.ts`. |
+
+Screenshots: `docs/review/cleanup-<role>-<390|768|1440>.png` for the four roles (agency all accounts, agency inside one account, a client's staff, a business owner), plus `cleanup-agency-all-rules-1440.png` and `cleanup-agency-all-history-1440.png`.
+
+## 8. NOT verified
+
+- **Every real CRM call.** Tests use a stubbed platform only. The merge-workflow route (is a published workflow required, the `Version` header, which record survives, Do Not Disturb, conversations and deals after a workflow merge) and the field updates through the new gateway were never run against the platform; the first live test plan is `docs/NEEDS_KING.md` 29 (e).
+- **Saving rules, the per-account switch and the score history** were exercised only through code paths that skip when the migration is missing (the database test marks them "needs the update"); they run once the migration is applied. The strictness preview ("what would this setting find") was verified live on the demo: Careful 5 groups, Normal 10, Thorough 55 for one client.
+- **The daily scan and the new-duplicates alert** need the snapshot table; their code ran only in the part that does not need it. UNSURE: how long the daily scan takes for an agency of 100 accounts with 50,000 contacts each (it is time-budgeted at 25 seconds per refresh and resumes).
+- **Fast review on a real phone** (swipe) was not tried on a device; keys Y, N and L and the buttons were exercised in code review only, not in a browser run.
+- **Real agency scale.** 150 accounts and 5,100 groups were tested in units; a 20,000-contact account was scanned in a unit test; no real agency with 100 accounts was used.
+- **The UI research** rests on two pages read in full (HubSpot, Insycle) and review summaries for the rest.
 
 ## FOR THE LEAD
-(see below)
+
+**Log entry.** Stage CLEANUP: Clean-up module (Duplicates, Data quality, History, Rules), one write gateway, the friendly redesign. BUILT, awaiting King's checks. Decisions for King: switching writing on (NEEDS_KING 29; recommend yes, one throwaway test account first); a client's staff keep Duplicates and gain History only (DECIDED FOR KING); the older Data cleanup apply is now behind the gateway (a behaviour change, no real use lost). UNSURE: see section 8. NOT VERIFIED LIVE: every CRM write.
+
+**Migration.** `supabase/migrations/20261105120000_cleanup_v2.sql`: `locations.cleanup_rules jsonb`, `locations.cleanup_write_enabled boolean not null default false`, `settings.cleanup_defaults jsonb`, new table `cleanup_quality_snapshots` (RLS on, no policy, like its siblings). **Additive: yes. Idempotent: yes. NOT applied by me** (the brief). The old code never reads any of it; the new code works without it (Normal matching, writing off, no history). Needs applying before the rules, the switch and the score trend work; `tests/unit/data-inventory.test.ts` (live half) fails until it is.
+
+**Shared logs.** The task asked for entries, so I appended (end of file only) to `docs/NEEDS_KING.md` (new section 29, renumber if another stage took it), `docs/DECISIONS.md`, `docs/METRICS.md`, `docs/TENANCY.md`, `docs/PROPOSALS.md`. Not touched: `PROGRESS.md`, `FEATURE_STATUS.md`, `NOTES_COVERAGE.md`, `OVERNIGHT_LOG.md`.
+
+**Coverage updates.** None (no note id is about this; it answers King's chat instruction).
+
+**Files likely to conflict at merge:** `src/app/app/nav.ts` (the Duplicates and Data cleanup lines became Clean-up and Duplicates-as-child, plus one PARENT entry); `src/app/app/dashboard.tsx` (the imports, the `menu` line, the two `case` lines); `src/lib/api/router.ts` (imports, one dispatch block before the speed block, the cleanup apply gate, `cleanupView`); `src/lib/api/duplicates-routes.ts` and `src/app/app/views/duplicates.tsx` and `duplicates-parts.tsx` (the Duplicates stage's files, heavily changed); `src/lib/analytics/dedupe.ts`, `dedupe-review.ts`, `dedupe-queries.ts`; `src/lib/analytics/service.ts` (3 lines in `refreshInsights`); `src/lib/notifications/catalog.ts` (one word); `src/app/app/views/settings.tsx` (one import, one line); `src/lib/demo/dupes-demo.ts`; `src/lib/data-inventory.ts`, `src/lib/tenant-tables.ts`; `scripts/check-tenancy.ts` (additions); `tests/e2e/duplicates-merge.spec.ts`, `menu.spec.ts`, `s02b.spec.ts` (one word each); the appended docs.
+
+**Local-only change not committed:** `next.config.ts` has a `turbopack.root` line (skip-worktree).
