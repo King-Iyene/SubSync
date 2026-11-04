@@ -64,7 +64,7 @@ export const INVENTORY: Record<string, TableInfo> = {
   locations: {
     noun: "the list of client accounts", line: "accounts",
     personal: { name: "client account name", email: "the client business's email", phone: "the client business's phone", website: "the client business's website", address: "the client business's address", owner: "the owner label you give an account" },
-    notPersonal: ["users_access"],
+    notPersonal: ["users_access", "cleanup_rules", "cleanup_write_enabled"],
   },
   account_metrics_daily: { noun: "daily account numbers", line: "accounts" },
   alerts: {
@@ -89,6 +89,8 @@ export const INVENTORY: Record<string, TableInfo> = {
     personal: { snapshot: "a copy of the duplicate records you reviewed", decided_by: "the name of the person who decided" },
     notPersonal: ["group_key"],
   },
+  possible_duplicates: { noun: "new contacts that may already exist", line: "accounts", notPersonal: ["contact_id", "other_contact_id", "score", "tier", "reasons", "status"] },
+  cleanup_quality_snapshots: { noun: "daily data-quality scores", line: "accounts", notPersonal: ["day", "contacts", "score", "parts", "counts", "duplicate_groups", "duplicate_extra", "new_groups"] },
   duplicate_snoozes: { noun: "duplicate groups you set aside", line: "actions", personal: { decided_by: "the name of the person who set it aside" }, notPersonal: ["group_key", "until"] },
   meeting_notes: {
     noun: "meeting notes", line: "meetings",
@@ -173,7 +175,7 @@ export const INVENTORY: Record<string, TableInfo> = {
       slack_webhook_url: "the Slack channel address (kept as typed, so treat it like a password)", digest_email: "the email address that receives alerts",
       brand_name: "the company name you show", brand_logo_url: "the logo address you show", detected_logo_url: "the logo address your platform sent", custom_checklist: "your own checklist steps", cold_tags: "the tags you marked as cold lists", ghl_app_domain: "the address you log in to", detected_app_domain: "the address you log in to", digest_timezone: "your time zone",
     },
-    notPersonal: ["app_domain_source", "keep_transcripts", "push_notes_to_crm"],
+    notPersonal: ["app_domain_source", "keep_transcripts", "push_notes_to_crm", "cleanup_defaults"],
   },
   api_keys: {
     noun: "API keys", line: "sign_in",

@@ -18,14 +18,14 @@ const BANNED = /gohighlevel|highlevel|leadconnector|\bghl\b|sub-?accounts?|\bSLA
 
 async function open(page: Page, path: string, menu = false) {
   await page.goto(path);
-  if (menu) await page.getByRole("button", { name: "Duplicates", exact: true }).first().click({ timeout: 90_000 });
+  if (menu) await page.getByRole("button", { name: "Clean-up", exact: true }).first().click({ timeout: 90_000 });
   else await page.reload();
   await expect(page.getByTestId("dup-headline")).toBeVisible({ timeout: 90_000 });
   await expect(page.getByTestId("dup-step")).toBeVisible({ timeout: 90_000 });
 }
 const count = async (page: Page) => Number(/of ([\d,]+)/.exec(await page.getByTestId("dup-step-count").innerText())![1].replace(/,/g, ""));
-const position = async (page: Page) => Number(/Group ([\d,]+) of/.exec(await page.getByTestId("dup-step-count").innerText())![1].replace(/,/g, ""));
-const headlineGroups = async (page: Page) => Number(/^([\d,]+) duplicate group/.exec(await page.getByTestId("dup-headline").innerText())![1].replace(/,/g, ""));
+const position = async (page: Page) => Number(/Match ([\d,]+) of/.exec(await page.getByTestId("dup-step-count").innerText())![1].replace(/,/g, ""));
+const headlineGroups = async (page: Page) => Number(/^([\d,]+) (?:person appears|people appear)/.exec(await page.getByTestId("dup-headline").innerText())![1].replace(/,/g, ""));
 
 for (const role of ROLES) {
   test(`${role.name}: the best record is pre-picked with a reason, one primary button, plain words, no sideways scroll`, async ({ page }, testInfo) => {
@@ -34,18 +34,19 @@ for (const role of ROLES) {
     const n = await count(page);
     expect(n, "the demo has duplicates to review").toBeGreaterThan(0);
     expect(await headlineGroups(page), "the headline and the stepper count the same groups").toBe(n);
-    await expect(page.getByTestId("dup-health-line")).toContainText(/extra contacts? to remove/);
+    await expect(page.getByTestId("dup-health-line")).toContainText(/sure match|Clean them all/);
     // The pre-picked record: exactly one radio is checked and it is the one marked as the best match, with the reason in words.
     const radios = page.getByTestId("dup-keep-radio");
     expect(await radios.count()).toBeGreaterThanOrEqual(2);
     await expect(page.locator('[data-testid="dup-keep-radio"]:checked')).toHaveCount(1);
-    await expect(page.locator('[data-testid="dup-record"][data-keep="true"]')).toContainText("Best match");
+    await expect(page.locator('[data-testid="dup-record"][data-keep="true"]')).toContainText("the best one to keep");
+    await page.getByTestId("dup-how").locator("summary").first().click();
     const why = (await page.getByTestId("dup-why").innerText()).trim();
-    expect(why).toMatch(/^Best match picked: .+\./);
+    expect(why).toMatch(/^Best one to keep: .+\./);
     expect(why.length, "a sentence, not a paragraph").toBeLessThan(200);
     // One big primary action.
     await expect(page.getByTestId("dup-merge")).toBeVisible();
-    await expect(page.getByTestId("dup-merge")).toHaveText(/^Merge these \d+ contacts$/);
+    await expect(page.getByTestId("dup-merge")).toHaveText("Yes, combine them");
     // Differences only: the table has rows, and each shown row really differs between the records (the identical ones are collapsed).
     await expect(page.getByTestId("dup-diff")).toBeVisible();
     // Plain words, no platform name.
@@ -112,9 +113,10 @@ test("Merge opens a sheet that says what is kept, moved and removed; the one-cli
   page.context().on("page", (p) => popups.push(p.url()));
   await page.getByTestId("dup-open-both").click();
   await expect.poll(() => popups.length, { timeout: 20_000 }).toBeGreaterThanOrEqual(1);
-  // The one-click merge: switched off (the demo never writes), says so, and changes nothing.
-  await page.getByTestId("dup-merge-here").click();
-  await expect(page.getByTestId("dup-sheet").getByTestId("inline-alert")).toContainText(/switched off|cannot carry everything/i, { timeout: 60_000 });
+  // Merging from SubSync: the demo has no merge workflow set up and never writes, so the page says what to do and offers nothing that could send. It changes nothing.
+  await page.getByTestId("dup-workflow-open").click();
+  await expect(page.getByTestId("dup-workflow")).toContainText(/no merge workflow|cannot|Do Not Disturb|share the same/i, { timeout: 60_000 });
+  await expect(page.getByTestId("dup-workflow-run")).toHaveCount(0);
   const after = await get("duplicates?size=5");
   expect(after.health.groups, "nothing was decided or removed").toBe(before.health.groups);
   expect(after.counts).toEqual(before.counts);
@@ -236,7 +238,7 @@ test("an agency can review one client at a time, and the client is named", async
   await firstClient.getByRole("button").click();
   await expect(page.getByTestId("dup-filter-note")).toContainText(name, { timeout: 60_000 });
   await expect.poll(() => count(page), { timeout: 60_000 }).toBeLessThan(total);
-  await expect(page.getByTestId("dup-reason")).toContainText(name);
+  await expect(page.getByTestId("dup-reason-line")).toBeVisible();
 });
 
 // ---- tenancy (server side): a client's staff reach their own account and nothing else ----

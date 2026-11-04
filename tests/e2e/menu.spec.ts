@@ -6,7 +6,7 @@ import { expect, test } from "@playwright/test";
 // passes. This server runs with the real default switches, so the page must be absent from the menu (asserted below).
 // The pilot menu (D0): plain group names, a short list on top, and everything else the app already shows under "More". Contact search, Leads and Call lists
 // are tabs inside People. Nothing that was visible has disappeared.
-const LABELS = ["Today", "Speed to lead", "Appointments", "Unanswered messages", "Account audit", "Clients", "People", "Overview", "Team", "Pipeline and deals", "Duplicates", "Data cleanup", "Settings", "Getting started", "What's new"];
+const LABELS = ["Today", "Speed to lead", "Appointments", "Unanswered messages", "Account audit", "Clients", "People", "Overview", "Team", "Pipeline and deals", "Clean-up", "Settings", "Getting started", "What's new"];
 const GROUPS = ["Daily work", "Clients and people", "More"];
 
 test.beforeEach(async ({}, testInfo) => { test.skip(testInfo.project.name !== "desktop-1440", "the sidebar is the desktop layout"); });

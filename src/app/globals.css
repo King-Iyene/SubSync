@@ -192,3 +192,7 @@
   .ds-skeleton { animation: none; }
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
 }
+
+/* Clean-up: a small pop for the "all clean" check mark. Only when the person has not asked for less motion. */
+@keyframes ds-pop { 0% { transform: scale(.6); opacity: 0; } 60% { transform: scale(1.12); opacity: 1; } 100% { transform: scale(1); } }
+@media (prefers-reduced-motion: no-preference) { .ds-pop { animation: ds-pop .6s ease-out both; } }

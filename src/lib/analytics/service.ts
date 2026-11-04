@@ -87,7 +87,10 @@ export async function emailPendingAlerts(installationId: string, settings: Setti
 export async function refreshInsights(installationId: string): Promise<{ accounts: number; openAlerts: number; created: number }> {
   const { settings, accounts } = await loadAccounts(installationId);
   await snapshotMetrics(installationId, accounts, settings.dealRulesRevision);
-  const drafts = computeAlerts(accounts, await domainStatuses(installationId), settings);
+  // Clean-up: today's data-quality snapshot per account, and an alert for accounts where new likely duplicates appeared. Never stops the refresh.
+  const { dailyQualityScan, duplicateAlertDrafts } = await import("./cleanup-scan");
+  await dailyQualityScan(installationId).catch(() => undefined);
+  const drafts = [...computeAlerts(accounts, await domainStatuses(installationId), settings), ...(await duplicateAlertDrafts(installationId).catch(() => []))];
   const created = await syncAlerts(installationId, drafts);
 
   // Telling people (the bell, email, Slack) is the dispatcher's job (stage F9): it reads each kind of message's preferences, quiet hours and routing, never

@@ -18,13 +18,13 @@ import { clearlyDiffer, foldEmail, normName, normPhone, type Group, type Person 
 export type ReasonKey = "both" | "email" | "phone" | "name";
 
 export function reasonOf(g: { reasons: readonly string[] }): { key: ReasonKey; label: string } {
-  const email = g.reasons.some((r) => r === "same email" || r.startsWith("email differs"));
-  const phone = g.reasons.some((r) => r === "same phone" || r.startsWith("phone in"));
-  const loose = g.reasons.some((r) => r.startsWith("email differs") || r.startsWith("phone in"));
+  const email = g.reasons.some((r) => r === "same email" || r.startsWith("email differs") || r === "similar email name");
+  const phone = g.reasons.some((r) => r === "same phone" || r.startsWith("phone in") || r.startsWith("phone with") || r === "same last seven digits");
+  const loose = g.reasons.some((r) => r.startsWith("email differs") || r.startsWith("phone in") || r.startsWith("phone with") || r === "similar email name" || r === "same last seven digits");
   if (email && phone) return { key: "both", label: loose ? "Same email and phone number, written differently" : "Same email and phone number" };
   if (email) return { key: "email", label: g.reasons.includes("same email") ? "Same email" : "Same email, written differently" };
-  if (phone) return { key: "phone", label: g.reasons.includes("same phone") ? "Same phone number" : "Same phone number, written differently" };
-  return { key: "name", label: "Same name" };
+  if (phone) return { key: "phone", label: g.reasons.includes("same phone") ? "Same phone number" : g.reasons.includes("phone with two digits swapped") ? "Phone numbers that differ by two swapped digits" : "Same phone number, written differently" };
+  return { key: "name", label: g.reasons.includes("similar name") && !g.reasons.includes("same name") ? "Similar name" : "Same name" };
 }
 
 export const REASON_LABELS: Record<ReasonKey, string> = { both: "Same email and phone", email: "Same email", phone: "Same phone number", name: "Same name" };
@@ -127,8 +127,10 @@ export function sortGroups<T extends QueueItem>(list: readonly T[], sort: SortKe
 
 // ---------- the queue: filter, sort, page ----------
 
-export type Status = "open" | "decided" | "later";
-export const parseStatus = (v: unknown): Status => (v === "decided" || v === "later" ? v : "open");
+export type Status = "open" | "decided" | "later" | "maybe";
+export const parseStatus = (v: unknown): Status => (v === "decided" || v === "later" || v === "maybe" ? v : "open");
+/** Below this a group is a "maybe": shown on its own so a weak guess never floods the review. */
+export const MAYBE_BELOW = 60;
 
 export type Select = {
   status: Status;
@@ -158,7 +160,7 @@ export function selectGroups<T extends QueueItem>(all: readonly T[], o: Select):
     const id = idOf(g);
     const done = o.decided.has(id);
     const later = !done && o.later.has(id);
-    if (o.status === "open" ? done || later : o.status === "decided" ? !done : !later) return false;
+    if (o.status === "open" ? done || later || g.confidence < MAYBE_BELOW : o.status === "maybe" ? done || later || g.confidence >= MAYBE_BELOW : o.status === "decided" ? !done : !later) return false;
     if (o.location && g.locationId !== o.location) return false;
     if (o.reason && reasonOf(g).key !== o.reason) return false;
     return matches(g);
@@ -361,4 +363,39 @@ export const EMAIL_LINK_KNOWN = false;
 export function emailPlan(v: { email: string | null | undefined; contactUrl: string | null | undefined }): { href: string | null; label: string; note: string } {
   if (!v.email) return { href: null, label: "Email", note: "There is no email address." };
   return { href: v.contactUrl ?? null, label: "Email in your CRM", note: EMAIL_LINK_KNOWN ? "Opens your CRM email box." : "Not available from your CRM yet: this opens the contact in your CRM, where its own email box sends the message." };
+}
+
+// ---------- why two records match, in words ----------
+
+export const REASON_WORDS: Record<string, string> = {
+  "same email": "Same email address",
+  "same phone": "Same phone number",
+  "email differs only in case, spaces or gmail dots": "Same email address, written differently",
+  "phone in a different format": "Same phone number, written differently",
+  "same name": "Same name",
+  "similar name": "A similar name (a nickname, an initial or a small spelling difference)",
+  "phone with two digits swapped": "Phone numbers that differ by two swapped digits",
+  "different first names": "Different first names, so this may be a shared household or office phone",
+  "shared company mailbox": "A shared company mailbox such as info@, so this may be different people",
+  "same name, first and last swapped": "The same name with first and last swapped",
+  "similar email name": "The name before the @ is alike (a business and a personal address)",
+  "same company email domain": "The same company email domain",
+  "same last seven digits": "The same last seven digits of the phone number",
+  "added at about the same time": "Added within minutes of each other",
+  "added within a day of each other": "Added within a day of each other",
+  "came from the same place": "Came from the same source",
+  "shared tag": "A shared tag",
+  "shared tags": "Shared tags",
+  "contact details conflict": "The email and the phone number are both different",
+};
+
+/** Every pair inside a small group, with its score and the reasons in words. Groups of more than six records are summarised by the group's own score instead. */
+export function pairScores(people: readonly Person[], score: (a: Person, b: Person) => { score: number; reasons: string[] }): Array<{ a: string; b: string; score: number; reasons: string[] }> {
+  if (people.length > 6) return [];
+  const out: Array<{ a: string; b: string; score: number; reasons: string[] }> = [];
+  for (let i = 0; i < people.length; i++) for (let j = i + 1; j < people.length; j++) {
+    const s = score(people[i], people[j]);
+    out.push({ a: people[i].contactId, b: people[j].contactId, score: s.score, reasons: s.reasons.map((r) => REASON_WORDS[r] ?? r) });
+  }
+  return out;
 }

@@ -22,3 +22,13 @@ Each: what, persona it helps, why it matters, effort, risk. All PROPOSALS; none 
 5. **"Waiting on the customer".** A person whose last message is OURS is not waiting for a reply, but a lead we answered who then went silent for 3 days is worth a second try. A fifth kind "Go back to" with its own count. Persona: P3, P4. Effort: medium. Risk: adds a kind; the counting rule says it must not add anyone twice.
 6. **Done for now that clears itself when the customer writes again.** Today a Done mark holds for 7 days. If the person writes again, the mark should lift at once. Persona: P3. Effort: small (compare the last inbound time with the mark). Risk: low.
 7. **Phone home-screen shortcut.** A one-tap link that opens Today for the signed-in person's account, for setters who live on their phone. Persona: P3. Effort: small. Risk: needs the CRM's app address (not verified).
+
+## From stage CLEANUP (5 Nov 2026)
+1. **Learn from rejections.** After "not a duplicate", lower the score of pairs that look alike (same name pattern, same domain) so they stop appearing. Persona P2 ops person. Effort medium. Risk: hides a real duplicate; keep it visible in History.
+2. **A client-facing before-and-after proof, white-label and printable.** "Your contact list: 54 out of 100 in October, 87 now. 312 duplicates merged, 1,204 numbers standardised." The stored daily snapshots are the data. Persona P1 agency owner, P5 white-label owner. Effort small to medium. Risk none (reads only).
+3. **Weekly digest of what was found and fixed** in the Monday email. Persona P1. Effort small. Risk none.
+4. **Safe auto-merge queue.** Exact email-and-phone matches queued with a review window (say 48 hours), then added to the customer's merge workflow in one batch. A merge cannot be undone on this platform, so the review window is the safety, not a rollback. Persona P2. Effort medium. Risk: irreversible; needs the first live test (NEEDS_KING 29) to pass first.
+5. **Company name matching and company duplicates.** Needs the company name copied into SubSync (a field, not a scope). Persona P2. Effort medium. Risk: noisy matches.
+6. **Prevention at the source.** Read the CRM's forms and surveys (scope `forms.readonly`, new, forces re-approval) and say which ones create duplicates. Persona P2. Effort medium. Risk: scope re-approval.
+7. **Two-person approval for a merge** (the person who asks and an administrator who approves), as Clientell offers. Persona P1. Effort medium. Risk low.
+8. **Phone region by account.** Use the account's own country (from its address) as the default for local numbers so "Fix phone formats" needs no country code typed. Persona P2. Effort small.

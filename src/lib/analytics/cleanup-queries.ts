@@ -85,7 +85,9 @@ async function work(installationId: string, run: RunRow, mode: "apply" | "undo",
   const deadline = Date.now() + budgetMs;
   await db`update cleanup_runs set status = ${mode === "apply" ? "applying" : "undoing"}, applied_at = case when ${mode === "apply"} and applied_at is null then now() else applied_at end where id = ${run.id}`;
   let permissionStop = false;
-  while (Date.now() < deadline && !permissionStop) {
+  let heldBack = false;
+  let heldNote: string | null = null;
+  while (Date.now() < deadline && !permissionStop && !heldBack) {
     const batch = await db`select id, contact_id, rule, field, before_value, after_value, tag from cleanup_changes where run_id = ${run.id} and status = ${from} order by id limit 20`;
     if (batch.length === 0) break;
     for (const r of batch) {
@@ -98,6 +100,8 @@ async function work(installationId: string, run: RunRow, mode: "apply" | "undo",
         outcome = { result: "failed", detail: safeError(error) };
       }
       if (outcome.result === "permission") { permissionStop = true; break; }
+      // Nothing was sent (the switch is off, or the account has not allowed changes): the change stays as it was and the run says so.
+      if (outcome.result === "dry_run") { heldBack = true; heldNote = outcome.detail ?? "Nothing was sent."; break; }
       const status = outcome.result === "applied" ? (mode === "apply" ? "applied" : "undone") : outcome.result === "skipped" ? "skipped" : "failed";
       await db`update cleanup_changes set status = ${status}, error = ${outcome.detail ?? null} where id = ${change.id}`;
       if (mirror && outcome.result === "applied") await mirrorLocal(installationId, run.locationId, change, mode);
@@ -106,11 +110,13 @@ async function work(installationId: string, run: RunRow, mode: "apply" | "undo",
   const [c] = await db`
     select count(*) filter (where status = 'pending')::int pending, count(*) filter (where status = 'applied')::int applied, count(*) filter (where status = 'skipped')::int skipped,
       count(*) filter (where status = 'failed')::int failed, count(*) filter (where status = 'undone')::int undone from cleanup_changes where run_id = ${run.id}`;
-  const finished = mode === "apply" ? c.pending === 0 : c.applied === 0;
-  const status = permissionStop ? "needs_permission"
+  const finished = !heldBack && (mode === "apply" ? c.pending === 0 : c.applied === 0);
+  const status = heldBack ? (mode === "apply" ? (c.applied > 0 ? "partial" : "previewed") : "applied")
+    : permissionStop ? "needs_permission"
     : mode === "apply" ? (finished ? (c.failed > 0 || c.skipped > 0 ? "partial" : "applied") : "applying")
     : finished ? "undone" : "undoing";
-  const note = permissionStop ? "SubSync does not have permission to change contacts in this account yet. Nothing was changed. Approve the write permission, then run this again." : null;
+  const note = heldBack ? `${heldNote ?? "Nothing was sent."} Your changes are saved and still waiting; nothing in your CRM was changed.`
+    : permissionStop ? "SubSync does not have permission to change contacts in this account yet. Nothing was changed. Approve the write permission, then run this again." : null;
   await db`update cleanup_runs set status = ${status}, applied = ${c.applied}, skipped = ${c.skipped}, failed = ${c.failed}, undone = ${c.undone}, note = ${note},
     undone_at = case when ${status === "undone"} then now() else undone_at end where id = ${run.id}`;
   if (finished || permissionStop) {
@@ -134,7 +140,7 @@ async function mirrorLocal(installationId: string, locationId: string, c: Change
     return;
   }
   const value = mode === "apply" ? c.after : c.before;
-  const col = c.field === "firstName" ? "first_name" : c.field === "lastName" ? "last_name" : "phone";
+  const col = c.field === "firstName" ? "first_name" : c.field === "lastName" ? "last_name" : c.field === "email" ? "email" : "phone";
   await db`update cached_contacts set ${db(col)} = ${value} where installation_id = ${installationId} and location_id = ${locationId} and contact_id = ${c.contactId}`;
 }
 

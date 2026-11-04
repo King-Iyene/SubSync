@@ -9,6 +9,7 @@ import { useApiClient, useData } from "../session";
 import { Badge, Btn, Card, ErrorBox, inputClass, Loading, PageHeader, timeAgo } from "../ui";
 import { SyncStatusPanel } from "./sync-status";
 import { ConnectionsSlot } from "./settings-slot-connections";
+import { WriteAccessCard } from "./write-access";
 import { WatchingSlot } from "./settings-slot-watching";
 import { DailyBriefLine } from "./notifications";
 import { BrandPreview, PermissionsPanel, SettingsHistoryCard, TestAccountsCard, WhoCanOpenCard, type PermissionGroup } from "./settings-parts";
@@ -227,6 +228,7 @@ export function SettingsView({ openSection }: { openSection?: SectionId } = {}) 
             <>
               {data.features?.connections !== false && <ConnectionsSlot />}
               <PermissionsPanel groups={data.permissions} />
+              <WriteAccessCard />
             </>
           )}
 

@@ -31,7 +31,7 @@ import { AppointmentInsights } from "./views/appointment-insights";
 import { AuditView } from "./views/audit";
 import { SpeedView } from "./views/speed";
 import { AppointmentsView } from "./views/appointments";
-import { CleanupView } from "./views/cleanup";
+import { CleanupModule } from "./views/cleanup-hub";
 import { MeetingsView } from "./views/meetings";
 import { WorkflowsView } from "./views/workflows";
 import { DataHealthView } from "./views/data-health";
@@ -39,7 +39,6 @@ import { GlobalSearch } from "./views/global-search";
 import { PeopleModule } from "./views/people-module";
 import { ClientsView, type ClientsFeatures } from "./views/clients";
 import { DealsView } from "./views/deals";
-import { DuplicatesView } from "./views/duplicates";
 import { EmailHealthView } from "./views/email-health";
 import { HelpView } from "./views/help";
 import { RoadmapView } from "./views/roadmap";
@@ -302,7 +301,8 @@ export function Dashboard() {
   const off = (feature: string) => auth.features[feature] === false && !locked(feature);
   // A page that lives inside a module as a tab (People holds Contact search, Leads and Call lists) has no menu entry of its own.
   // (A page that lives inside the Clients module has no entry of its own for an agency; a business and a client's staff have no Clients module, so their Setup stays in their menu.)
-  const menu = visibleNav(NAV_FOR[auth.kind], { limited, off });
+  // The Clean-up entry stays while either of its two features is on (a switched-off tab is left out inside it).
+  const menu = visibleNav(NAV_FOR[auth.kind], { limited, off: (f) => (f === "cleanup" ? off("cleanup") && off("duplicates") : off(f)) });
   // The sidebar: the pilot menu in plain groups that scroll, and Settings, Getting started and What's new pinned underneath so they are always visible.
   const mainMenu = menu.filter((n) => n.group !== "Settings and help");
   const footMenu = menu.filter((n) => n.group === "Settings and help");
@@ -365,7 +365,7 @@ export function Dashboard() {
       case "inbox": return <InboxView go={go} />;
       case "onboarding": return limited ? <ModuleTabs key="setup" start={0} tabs={setupTabs} /> : <ClientsView key="onboarding" go={go} initialTab="onboarding" features={clientFeatures} />;
       case "email": return limited ? <ModuleTabs key="setup" start={1} tabs={setupTabs} /> : <EmailHealthView />;
-      case "duplicates": return <DuplicatesView />;
+      case "duplicates": case "cleanup": return <CleanupModule key={viewId} kind={auth.kind} start={viewId === "cleanup" ? "quality" : "duplicates"} duplicatesOn={!off("duplicates") && NAV_FOR[auth.kind].has("duplicates")} cleanupOn={!off("cleanup") && NAV_FOR[auth.kind].has("cleanup")} />;
       case "alerts": return <AlertsView go={go} />;
       case "settings": return <SettingsView openSection={movedTo ?? undefined} />;
       case "connections": return <IntegrationsPage />;
@@ -379,7 +379,6 @@ export function Dashboard() {
       // Workflows reads with the unfiltered client and keeps its own account choice (like Today), so the shared filter never changes what it counts.
       case "data-health": return <ApiProvider value={baseApi}><DataHealthView go={go} kind={auth.kind} /></ApiProvider>;
       case "workflows": return <ApiProvider value={baseApi}><WorkflowsView go={go} kind={auth.kind} /></ApiProvider>;
-      case "cleanup": return <CleanupView />;
       case "clients": return <ClientsView key="clients" go={go} initialTab="health" features={clientFeatures} />;
     }
   })();

@@ -8,6 +8,7 @@ import { recordPlanEvent } from "@/lib/entitlements-queries";
 import { captureWhitelabelDomain, captureWhitelabelLogo } from "@/lib/analytics/queries";
 import { enqueueAreaSync, enqueueFullSync } from "@/lib/sync/engine";
 import { isEchoOfOurWrite } from "@/lib/connections/write-log";
+import { onContactCreated } from "@/lib/ghl/arrival";
 
 // Receives platform webhooks. Verify the Ed25519 signature on the body, drop duplicates (failed
 // deliveries are retried up to 12 times), then queue work and return fast: heavy lifting
@@ -80,6 +81,8 @@ export async function POST(request: Request) {
         if (!target) continue;
         if (action.kind === "install") await enqueueFullSync(target.id);
         else if (action.kind === "resync" && event.locationId) await enqueueAreaSync(target.id, event.locationId, action.scope);
+        // A new contact: compare it with the account's contacts right now (bounded to a couple of seconds, never throws).
+        if (event.type === "ContactCreate" && event.locationId) await onContactCreated(target.id, target.companyId, event.locationId, parsed);
       }
     }
     return NextResponse.json({ ok: true });

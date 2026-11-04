@@ -100,6 +100,10 @@ import { meetingSetupAccountView, meetingSetupFieldsSave, meetingSetupFieldsView
 import { can, personFromSession } from "../connections/person";
 import { handlePeople, timeoutResponse } from "./people-routes";
 import { handleDuplicates } from "./duplicates-routes";
+import { handleCleanupV2 } from "./cleanup-routes";
+import { gatedWriter } from "../ghl/crm-gateway";
+import { writeEnabledFor } from "../analytics/cleanup-config";
+import { isLive } from "../live-flags";
 import { handleSpeedPart, handleSpeedTarget } from "./speed-routes";
 import { handleUnansweredPart } from "./unanswered-routes";
 import { handleApptWork } from "./appointment-work-routes";
@@ -593,7 +597,7 @@ async function cleanupView(ctx: Ctx) {
     ctx.demo ? Promise.resolve(true) : installationHasScope(ctx.installationId, "contacts.write"),
   ]);
   return json({
-    runs, canWrite, accounts: locs.map((l) => ({ locationId: l.location_id as string, name: (l.name as string | null) ?? "Unnamed account" })),
+    runs, canWrite, masterSwitchOn: !ctx.demo && isLive("WRITE_GHL_LIVE"), accounts: locs.map((l) => ({ locationId: l.location_id as string, name: (l.name as string | null) ?? "Unnamed account" })),
     previewValidHours: PREVIEW_VALID_HOURS,
     writeNote: canWrite ? null : "Previewing is always safe. To apply changes, SubSync needs permission to edit contacts, which this install has not approved yet.",
   });
@@ -638,10 +642,19 @@ async function cleanupWork(ctx: Ctx, id: string, mode: "apply" | "undo") {
     return json({ error: "There is nothing to undo" }, 409);
   }
 
-  if (!ctx.demo && !(await installationHasScope(ctx.installationId, "contacts.write"))) {
+  // The gateway (src/lib/ghl/crm-gateway.ts): this account must have allowed changes (Settings), and the server's master switch must be on. Otherwise the run is a dry run:
+  // nothing is sent, one "WOULD WRITE" line is recorded and the changes stay waiting. The demo company is made up and always uses its own copy.
+  const optedIn = ctx.demo || (await writeEnabledFor(ctx.installationId, run.locationId));
+  if (!ctx.demo && !optedIn) {
+    return json({ error: "Changing contacts is not switched on for this client account. Switch it on in Settings first. Nothing was changed.", notAllowed: true }, 403);
+  }
+  const live = !ctx.demo && isLive("WRITE_GHL_LIVE");
+  if (live && !(await installationHasScope(ctx.installationId, "contacts.write"))) {
     return json({ error: "SubSync does not have permission to change contacts in this account yet. Nothing was changed.", needsPermission: true }, 403);
   }
-  const writer = ctx.demo ? demoWriter(ctx.installationId, run.locationId) : platformWriter(await locationAccessToken(ctx.session.companyId, run.locationId));
+  const writer = ctx.demo
+    ? demoWriter(ctx.installationId, run.locationId)
+    : gatedWriter(platformWriter(live ? await locationAccessToken(ctx.session.companyId, run.locationId) : ""), { installationId: ctx.installationId, locationId: run.locationId, actor: actorOf(ctx), runId: run.id, optedIn });
   const done = mode === "apply" ? await applyRun(ctx.installationId, run, writer, !ctx.demo, actorOf(ctx)) : await undoRun(ctx.installationId, run, writer, !ctx.demo, actorOf(ctx));
   return json({ run: done, finished: done.status !== "applying" && done.status !== "undoing" });
 }
@@ -1891,8 +1904,13 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       return await handleApptWork(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links });
     }
     // The guided duplicate review (reading, setting a group aside, the one-click merge, which is switched off). Deciding and undoing stay below.
-    if (a === "duplicates" && (method === "GET" || ["snooze", "unsnooze", "merge"].includes(b ?? ""))) {
+    if (a === "duplicates" && (method === "GET" || ["snooze", "unsnooze", "merge", "merge-workflow", "undo-snooze", "arrivals-dismiss"].includes(b ?? ""))) {
       return await handleDuplicates(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links, locationToken: (locationId) => locationAccessToken(ctx.session.companyId, locationId) });
+    }
+    // Clean-up v2: rules, data quality, import check, the per-account switch for changing contacts. Anything else under cleanup falls through to the run endpoints below.
+    if (a === "cleanup" && ["rules", "quality", "write", "import-check"].includes(b ?? "")) {
+      const r = await handleCleanupV2(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links, actor: actorOf });
+      if (r) return r;
     }
     // The rebuilt Speed to lead screen: its home, lists and comparisons (GET ?part=home|list|compare) and one account's reply target (PUT speed/target).
     const speedHelpers = { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links, targetMinutes: async () => (await scope(ctx)).settings.speedTargetMinutes, measuring: async () => { const st = (await scope(ctx)).settings; return { countAutomated: st.countAutomatedTouches, businessHours: st.speedBusinessHours }; } };

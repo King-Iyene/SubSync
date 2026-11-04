@@ -1,6 +1,8 @@
 import { sql } from "../db";
 import { ttlCache } from "../ttl-cache";
 import { classify, groupDuplicates, planFields, type FieldChoice, type Group, type Person } from "./dedupe";
+import { loadConfigs, type AccountConfig } from "./cleanup-config";
+import { learnWeights, pairKey, type Learned } from "./match-evidence";
 import { byAccount, health, isObvious, rankValue, reasonCounts, type QueueItem } from "./dedupe-review";
 
 const iso = (v: unknown) => (v instanceof Date ? v.toISOString() : null);
@@ -13,7 +15,7 @@ const CANDIDATE_LIMIT = 60_000;
 
 type Candidate = Person & { locationId: string; locationName: string | null };
 
-async function loadCandidates(installationId: string, allowed: string[] | null): Promise<Candidate[]> {
+async function loadCandidates(installationId: string, allowed: string[] | null, nameLocs: string[], typoLocs: string[]): Promise<Candidate[]> {
   const db = sql();
   const rows = await db`
     with loc as (
@@ -22,12 +24,22 @@ async function loadCandidates(installationId: string, allowed: string[] | null):
     c as (
       select c.location_id, c.contact_id, c.full_name, c.email, c.phone, c.tags, c.date_added, c.last_activity_at, c.source, c.dnd, nullif(c.assigned_to, '') owner_id,
         nullif(lower(btrim(coalesce(c.email, ''))), '') em,
-        case when length(c.phone_digits) >= 7 then right(c.phone_digits, 10) end ph
+        case when length(c.phone_digits) >= 7 then right(c.phone_digits, 10) end ph,
+        -- Only for accounts whose rules look at similar names or swapped digits: the first three letters of the last name, and the digits of the number in order.
+        case when c.location_id = any(${nameLocs}::text[]) and btrim(coalesce(c.full_name, '')) like '% %'
+          then nullif(left(lower(regexp_replace(regexp_replace(btrim(c.full_name), '^.* ', ''), '[^a-zA-Z]', '', 'g')), 3), '') end nk,
+        case when c.location_id = any(${typoLocs}::text[]) and length(c.phone_digits) >= 7
+          then (select string_agg(d, '' order by d) from regexp_split_to_table(right(c.phone_digits, 10), '') d) end pb
       from cached_contacts c join loc on loc.location_id = c.location_id where c.installation_id = ${installationId}),
     cand as (
       select c.*, greatest(
           case when em is not null then count(*) over (partition by location_id, em) else 0 end,
-          case when ph is not null then count(*) over (partition by location_id, ph) else 0 end) size
+          case when ph is not null then count(*) over (partition by location_id, ph) else 0 end,
+          case when nk is not null then count(*) over (partition by location_id, nk) else 0 end,
+          case when pb is not null then count(*) over (partition by location_id, pb) else 0 end) size,
+        greatest(
+          case when em is not null then count(*) over (partition by location_id, em) else 0 end,
+          case when ph is not null then count(*) over (partition by location_id, ph) else 0 end) exact_size
       from c)
     select cand.*, loc.name location_name,
       coalesce(d.open_deals, 0) open_deals, coalesce(d.won_deals, 0) won_deals,
@@ -38,7 +50,7 @@ async function loadCandidates(installationId: string, allowed: string[] | null):
       from cached_opportunities where installation_id = ${installationId} and contact_id is not null group by location_id, contact_id) d
       on d.location_id = cand.location_id and d.contact_id = cand.contact_id
     where cand.size > 1
-    order by cand.size desc, cand.location_id, cand.contact_id limit ${CANDIDATE_LIMIT}`;
+    order by (cand.exact_size > 1) desc, cand.size desc, cand.location_id, cand.contact_id limit ${CANDIDATE_LIMIT}`;
   return rows.map((r) => ({
     contactId: r.contact_id, locationId: r.location_id, locationName: r.location_name,
     name: (r.full_name as string | null)?.trim() || "Unnamed contact", email: r.email, phone: r.phone, tags: r.tags ?? [],
@@ -56,6 +68,8 @@ export async function reviewedKeys(installationId: string): Promise<Map<string, 
 // ---------------- the built queue (cached for a short time; one build serves every page of the review) ----------------
 
 export type Built = {
+  /** The effective choices per client account (matching strictness, which value wins, the merge workflow). */
+  configs: Map<string, AccountConfig>;
   /** Every group, with its rank. Never sent to the browser whole: the API sends one page and one group in detail. */
   all: Array<QueueItem & { obvious: boolean }>;
   /** Contacts per client account in scope (the list the share is measured against). */
@@ -68,22 +82,45 @@ const building = new Map<string, Promise<Built>>();
 
 const hash = (s: string) => { let h = 0x811c9dc5; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; } return h.toString(16); };
 
+/** What the person decided before, as pairs: the pairs they said are NOT the same person (never asked again) and, per account, the weights learned from their yes and no answers. */
+async function learnFrom(installationId: string, allowed: string[] | null): Promise<{ rejected: Set<string>; learned: Map<string, Learned> }> {
+  const rows = await sql()`select location_id, decision, snapshot from duplicate_reviews where installation_id = ${installationId} ${allowed ? sql()`and location_id = any(${allowed}::text[])` : sql()``} order by decided_at desc limit 1500`;
+  const rejected = new Set<string>();
+  const acc = new Map<string, { accepted: Array<[Person, Person]>; rejected: Array<[Person, Person]> }>();
+  for (const r of rows) {
+    const list = ((r.snapshot as { contacts?: Array<Record<string, unknown>> } | null)?.contacts ?? []).slice(0, 6).map((c): Person => ({
+      contactId: String(c.contact_id), name: String(c.full_name ?? "").trim() || "Unnamed contact", email: (c.email as string | null) ?? null, phone: (c.phone as string | null) ?? null,
+      tags: (c.tags as string[] | null) ?? [], createdAt: c.date_added ? new Date(c.date_added as string).toISOString() : null, lastActivityAt: null, source: (c.source as string | null) ?? null, openDeals: 0, wonDeals: 0, hasConversation: false,
+    }));
+    const no = r.decision === "not_duplicate";
+    const slot = acc.get(r.location_id as string) ?? acc.set(r.location_id as string, { accepted: [], rejected: [] }).get(r.location_id as string)!;
+    for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) {
+      if (no) { rejected.add(pairKey(list[i].contactId, list[j].contactId)); slot.rejected.push([list[i], list[j]]); } else slot.accepted.push([list[i], list[j]]);
+    }
+  }
+  return { rejected, learned: new Map([...acc].map(([loc, d]) => [loc, learnWeights(d)])) };
+}
+
 async function build(installationId: string, allowed: string[] | null): Promise<Built> {
   const now = Date.now();
+  const [configs, learn] = await Promise.all([loadConfigs(installationId, allowed), learnFrom(installationId, allowed).catch(() => ({ rejected: new Set<string>(), learned: new Map<string, Learned>() }))]);
+  const nameLocs = [...configs].filter(([, c]) => c.match.nameAlone && c.match.name !== "off").map(([id]) => id);
+  const typoLocs = [...configs].filter(([, c]) => c.match.phone === "typo").map(([id]) => id);
   const [people, sizes] = await Promise.all([
-    loadCandidates(installationId, allowed),
+    loadCandidates(installationId, allowed, nameLocs, typoLocs),
     sql()`select location_id, count(*)::int n from cached_contacts where installation_id = ${installationId} ${allowed ? sql()`and location_id = any(${allowed}::text[])` : sql()``} group by location_id`,
   ]);
   const byLocation = new Map<string, Candidate[]>();
   for (const p of people) (byLocation.get(p.locationId) ?? byLocation.set(p.locationId, []).get(p.locationId)!).push(p);
   const all: Built["all"] = [];
   for (const [locationId, list] of byLocation) {
-    for (const g of groupDuplicates(list)) {
+    const rules = (configs.get(locationId) ?? { match: undefined }).match;
+    for (const g of groupDuplicates(list, rules?.threshold ?? 50, 40, rules, { rejected: learn.rejected, weights: learn.learned.get(locationId)?.weights })) {
       const item: QueueItem = { ...g, locationId, locationName: list[0].locationName };
       all.push({ ...item, rank: rankValue(item, now), obvious: isObvious(item) });
     }
   }
-  return { all, listSizes: new Map(sizes.map((r) => [r.location_id as string, r.n as number])), truncated: people.length >= CANDIDATE_LIMIT };
+  return { configs, all, listSizes: new Map(sizes.map((r) => [r.location_id as string, r.n as number])), truncated: people.length >= CANDIDATE_LIMIT };
 }
 
 /** The groups for the caller's accounts. Cached 45 seconds per installation and account set; two people opening the page share one read. */
@@ -266,4 +303,30 @@ export async function recordBulk(installationId: string, actor: string | null, d
   });
   forgetQueue(installationId);
   return groups.length;
+}
+
+// ---------------- other contacts that share the pair's email or phone ----------------
+
+/** How many OTHER contacts of the account share an email or phone number with the given contacts. The merge workflow in the CRM would take those too. */
+export async function othersSharing(installationId: string, locationId: string, contactIds: string[]): Promise<number> {
+  const db = sql();
+  const [r] = await db`
+    with mine as (
+      select nullif(lower(btrim(coalesce(email, ''))), '') em, case when length(phone_digits) >= 7 then right(phone_digits, 10) end ph
+      from cached_contacts where installation_id = ${installationId} and location_id = ${locationId} and contact_id = any(${contactIds}::text[]))
+    select count(*)::int n from cached_contacts c
+    where c.installation_id = ${installationId} and c.location_id = ${locationId} and not (c.contact_id = any(${contactIds}::text[]))
+      and (lower(btrim(coalesce(c.email, ''))) = any(select em from mine where em is not null)
+        or (length(c.phone_digits) >= 7 and right(c.phone_digits, 10) = any(select ph from mine where ph is not null)))`;
+  return (r?.n as number) ?? 0;
+}
+
+// ---------------- "what would this setting find?" ----------------
+
+/** The open groups one client account would have under the given rules, without saving anything. Not cached: it is only asked for while a person is choosing. */
+export async function previewCounts(installationId: string, locationId: string, rules: import("./cleanup-rules").MatchRules): Promise<{ groups: number; extra: number }> {
+  const people = await loadCandidates(installationId, [locationId], rules.nameAlone && rules.name !== "off" ? [locationId] : [], rules.phone === "typo" ? [locationId] : []);
+  const sets = await decisionSets(installationId);
+  const open = groupDuplicates(people, rules.threshold, 40, rules).filter((g) => !sets.decided.has(`${locationId}:${g.key}`) && !sets.later.has(`${locationId}:${g.key}`));
+  return { groups: open.length, extra: open.reduce((s, g) => s + g.people.length - 1, 0) };
 }

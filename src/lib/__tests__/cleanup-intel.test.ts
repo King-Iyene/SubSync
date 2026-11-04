@@ -41,7 +41,7 @@ test("the plan lists each change with its before and after, and nothing else", (
   assert.deepEqual(changes.map((x) => [x.contactId, x.field, x.before, x.after]), [
     ["1", "phone", "(555) 010-2030", "+15550102030"], ["1", "firstName", "JOHN", "John"], ["1", "lastName", "smith", "Smith"],
   ]);
-  assert.deepEqual(summarise(changes), { phone: 1, name: 2, tagAdd: 0, tagRemove: 0, contacts: 1 });
+  assert.deepEqual(summarise(changes), { email: 0, phone: 1, name: 2, tagAdd: 0, tagRemove: 0, contacts: 1 });
 });
 
 test("tags apply only to who matches the filter, and not twice", () => {

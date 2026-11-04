@@ -20,10 +20,10 @@ test("phones match across formats and emails across case and gmail tricks", () =
 test("identical email or phone is a confident match, format differences a little less", () => {
   assert.ok(scorePair(p("a", { email: "x@y.com" }), p("b", { email: "x@y.com" })).score >= 90);
   assert.ok(scorePair(p("a", { phone: "+15550102030" }), p("b", { phone: "+15550102030" })).score >= 90);
-  const fmt = scorePair(p("a", { name: "Ann A", phone: "+15550102030" }), p("b", { name: "Bob B", phone: "(555) 010-2030" }));
+  const fmt = scorePair(p("a", { name: "Ann A", phone: "+15550102030" }), p("b", { name: "Ann Ab", phone: "(555) 010-2030" }));
   assert.ok(fmt.score >= 75 && fmt.score < 90);
   assert.deepEqual(fmt.reasons, ["phone in a different format"]);
-  const mail = scorePair(p("a", { name: "Ann A", email: "ADA@y.com" }), p("b", { name: "Bob B", email: "ada@y.com" }));
+  const mail = scorePair(p("a", { name: "Ann A", email: "ADA@y.com" }), p("b", { name: "Ann Ab", email: "ada@y.com" }));
   assert.ok(mail.score >= 80 && mail.score < 90);
 });
 

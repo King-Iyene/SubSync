@@ -60,4 +60,37 @@ export async function ensureDupesDemo(installationId: string): Promise<void> {
     }] as never)} on conflict do nothing`;
     await db`insert into contact_tag_events (installation_id, location_id, contact_id, tag, kind, at) values (${installationId}, ${locationId}, ${locationId + "-dm5"}, 'web lead', 'added', ${at(2)})`;
   }
+  await ensureQualityDemo(installationId, locs.map((l) => l.location_id as string));
+}
+
+// Clean-up demo data (stage CLEANUP): the kinds of mess the data-quality tab and the matching rules exist for, so the screens look like an agency with years of messy data. Added once per
+// client account (the marker is the contact id "<account>-dq1"), fixed values only, inserts that cannot fail on a second run. Demo installation only; made-up people, never a real CRM.
+async function ensureQualityDemo(installationId: string, locationIds: string[]): Promise<void> {
+  const db = sql();
+  const now = Date.now();
+  const at = (days: number) => new Date(now - days * DAY);
+  for (const locationId of locationIds) {
+    const [done] = await db`select 1 x from cached_contacts where installation_id = ${installationId} and location_id = ${locationId} and contact_id = ${locationId + "-dq1"}`;
+    if (done) continue;
+    const row = (id: string, first: string | null, last: string | null, email: string | null, phone: string | null, days: number) => ({
+      installation_id: installationId, location_id: locationId, contact_id: `${locationId}-${id}`, first_name: first, last_name: last, email, phone, tags: [] as string[],
+      date_added: at(days), last_activity_at: null, updated_remote_at: at(days), source: null, dnd: false, birth_date: null, assigned_to: null,
+    });
+    await db`insert into cached_contacts ${db([
+      row("dq1", "Bob", "Hartwell", "bob.hartwell@hartwell-co.example.net", null, 12),          // a nickname pair (Loose finds it)
+      row("dq2", "Robert", "Hartwell", "r.hartwell@hartwell-mail.example.net", null, 11),
+      row("dq3", "Maya", "Ortiz", "maya@ortiz-studio.example.net", "+15550142030", 20),         // two digits swapped (Loose finds it)
+      row("dq4", "Maya", "Ortiz", null, "+15550142003", 19),
+      row("dq5", "Ann", "Lee", "ann.lee@leefamily.example.net", "+15550177001", 30),            // a shared household phone: grouped, but "could be"
+      row("dq6", "Bob", "Lee", "bob.lee@leefamily.example.net", "+15550177001", 29),
+      row("dq7", "Carl", "Wu", "info@wu-supplies.example.net", null, 40),                       // a shared company mailbox
+      row("dq8", "Dana", "Fox", "info@wu-supplies.example.net", null, 39),
+      row("dq9", "test", "user", "test@example.com", "0000000000", 50),                         // junk
+      row("dq10", "Eve", "Stone", "not-an-email", "(555) 010-2030", 45),                        // an email that cannot work, a phone not in international format
+      row("dq11", "Frank", "Diaz", "frank.diaz@gmial.com", "+15550188010", 44),                 // a typo in the email domain
+      row("dq12", "GRACE", "HOPPER", "grace.h@hopper-labs.example.net", "+15550188011", 43),    // a name in capitals
+      row("dq13", "Ivy", "Chen", "ivy.chen@mailinator.com", "123", 42),                         // a throwaway address and a number that is too short
+      row("dq14", null, null, null, null, 41),                                                  // an empty contact
+    ] as never)} on conflict do nothing`;
+  }
 }
