@@ -79,6 +79,9 @@ async function main() {
       "/api/app/client-onboarding", `/api/app/client-onboarding/${other.locs[0]}/history`, `/api/app/clients/${other.locs[0]}/notes`, `/api/app/client-trends/${other.locs[0]}`,
       `/api/app/client-trends?ids=${other.locs[0]},${other.locs[1]}`, `/api/app/clients/compare?ids=${other.locs[0]},${other.locs[1]}`, `/api/app/qbr/${other.locs[0]}?quarter=2026-Q4`,
       `/api/app/overview?industry=medical&owner=${other.marker}`, `/api/app/search?q=${me.marker}`,
+      // Today (second pass): the read, the brief preview and the saved views, asked for the other side's accounts by every parameter Today takes.
+      "/api/app/today", `/api/app/today?accounts=${other.locs[0]}`, `/api/app/today?accounts=${other.locs.join(",")}&ta=${other.locs[0]}`, `/api/app/today?accounts=%2e%2e%2f${other.locs[0]}`,
+      "/api/app/today/brief", `/api/app/today/brief?accounts=${other.locs[0]}`, "/api/app/today/views",
     ];
 
     // TENANCY_FAST=1 skips the long cross-read sweep (while iterating on the share link and write attacks); the full run does not.
@@ -117,7 +120,7 @@ async function main() {
     const biz = session(A, "business", A.locs[0]);
     const cli = session(A, "client", A.locs[1]);
     const sibling = async (token: string, mineLoc: string, otherLoc: string, label: string) => {
-      for (const path of ["/api/app/overview", "/api/app/accounts", `/api/app/accounts/${otherLoc}`, "/api/app/search?q=zzTenantA", "/api/app/stale", "/api/app/inbox", "/api/app/appointments", "/api/app/pipelines", "/api/app/duplicates", "/api/app/contact-intel"]) {
+      for (const path of ["/api/app/overview", "/api/app/accounts", `/api/app/accounts/${otherLoc}`, "/api/app/search?q=zzTenantA", "/api/app/stale", "/api/app/inbox", "/api/app/appointments", "/api/app/pipelines", "/api/app/duplicates", "/api/app/contact-intel", "/api/app/today", `/api/app/today?accounts=${otherLoc}`, `/api/app/today?accounts=${mineLoc},${otherLoc}`, "/api/app/today/views"]) {
         const r = await call(path, token);
         assert.ok(r.status < 500);
         assert.equal(r.text.includes(otherLoc), false, `${label} saw the sibling account ${otherLoc} through ${path}`);
@@ -127,6 +130,11 @@ async function main() {
     };
     await sibling(biz, A.locs[0], A.locs[1], "a business view");
     await sibling(cli, A.locs[1], A.locs[0], "a client view");
+    // Marking a Today row of the sibling account is refused for a client's staff and a business, exactly like a row that does not exist.
+    for (const [label, token, otherLoc] of [["a business view", biz, A.locs[1]], ["a client view", cli, A.locs[0]]] as const) {
+      const r = await call("/api/app/today/action", token, { method: "POST", body: JSON.stringify({ action: "done", rowKey: `${otherLoc}|leads` }) });
+      assert.equal(r.status, 404, `${label} marked a row of the sibling account (${r.status})`);
+    }
 
     // Writes: every change aimed at the other agency's data is refused, and nothing changes there.
     const before = async (s: Side) => (await sql()`select
@@ -139,6 +147,8 @@ async function main() {
       (select count(*)::int from client_notes where installation_id = ${s.inst}) client_notes,
       (select count(*)::int from client_steps where installation_id = ${s.inst}) client_steps,
       (select count(*)::int from client_step_history where installation_id = ${s.inst}) client_step_history,
+      (select count(*)::int from today_actions where installation_id = ${s.inst}) today_actions,
+      (select count(*)::int from saved_views where installation_id = ${s.inst}) saved_views,
       (select coalesce(sum(case when ignored then 1 else 0 end), 0)::int from locations where installation_id = ${s.inst}) ignored,
       (select count(*)::int from cached_contacts where installation_id = ${s.inst}) contacts`)[0];
     const snap = await before(B);
@@ -154,6 +164,10 @@ async function main() {
       ["POST", `/api/app/client-onboarding/${B.locs[0]}/steps`, { label: "hacked" }],
       ["POST", `/api/app/clients/${B.locs[0]}/notes`, { body: "hacked" }],
       ["DELETE", `/api/app/clients/${B.locs[0]}/notes?id=00000000-0000-0000-0000-000000000000`, {}],
+      // Today's working queue: a mark on the other agency's row, and a saved view that names the other agency's account.
+      ["POST", "/api/app/today/action", { action: "done", rowKey: `${B.locs[0]}|leads` }],
+      ["POST", "/api/app/today/action", { action: "snooze", rowKey: `${B.locs[0]}|stale`, choice: "day" }],
+      ["POST", "/api/app/today/action", { action: "undo", eventId: 1 }],
     ];
     for (const [method, path, body] of attacks) {
       const r = await call(path, tokenA, { method, body: JSON.stringify(body) });
