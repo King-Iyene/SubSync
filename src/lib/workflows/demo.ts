@@ -11,6 +11,8 @@ const NAMES: Array<[string, "published" | "draft" | "paused" | "failed" | "done"
   ["Old Webinar Funnel", "draft", { runs: null, failed: null, edited: 75 }],
   ["Birthday Offer (copy)", "draft", { runs: null, failed: null, edited: 4 }],
   ["Cold Lead Reactivation", "published", { runs: 18, failed: 11, edited: 9 }],
+  ["New lead follow-up", "published", { runs: 12, failed: 0, edited: 15 }],
+  ["REVIEW REQUEST REMINDER", "published", { runs: 8, failed: 0, edited: 22 }],
   ["Black Friday Blast", "done", { runs: null, failed: null, edited: 30, kind: "campaign:email" }],
   ["Spring Promo", "published", { runs: null, failed: null, edited: 25, kind: "campaign:bulk" }],
   ["Welcome Sequence", "failed", { runs: null, failed: null, edited: 2, kind: "campaign:workflow" }],
@@ -51,6 +53,10 @@ export async function ensureWorkflowsDemo(installationId: string): Promise<void>
     }
   }
   const [first] = locs;
+  // One workflow somebody turned off in the CRM three days ago, so the "turned off" check has something to show.
+  await db`update workflow_items set status = 'draft' where installation_id = ${installationId} and location_id = ${first.location_id as string} and workflow_id = 'wf-demo0x4'`;
+  await db`insert into workflow_changes (installation_id, location_id, workflow_id, kind, source, before, after, created_at) values
+    (${installationId}, ${first.location_id as string}, 'wf-demo0x4', 'status', 'observed', ${db.json({ status: "published" } as never)}, ${db.json({ status: "draft" } as never)}, ${new Date(now - 3 * DAY)})`;
   await db`insert into workflow_changes (installation_id, location_id, workflow_id, kind, source, before, after, created_at) values
     (${installationId}, ${first.location_id as string}, ${"wf-demo0x2"}, 'renamed', 'observed', ${db.json({ name: "New lead follow-up" } as never)}, ${db.json({ name: "New Lead Follow Up" } as never)}, ${new Date(now - 2 * DAY)}),
     (${installationId}, ${first.location_id as string}, ${"wf-demo0x3"}, 'status', 'observed', ${db.json({ status: "published" } as never)}, ${db.json({ status: "draft" } as never)}, ${new Date(now - 5 * DAY)})`;

@@ -124,7 +124,7 @@ const BUSINESS_RULES: Rule[] = [
   ["GET", "call-lists"], ["GET", "call-outcomes"], ["GET", "goals"], ["GET", "exec-summary"], ["GET", "daily-brief"], ["GET", "digest"],
   ["GET", "export", "stale"], ["GET", "export", "duplicates"], ["GET", "export", "inbox"], ["GET", "export", "deals"], ["GET", "export", "alerts"],
   ["POST", "email", "check"], ["POST", "alerts"], ["POST", "duplicates"], ["POST", "usage"], ["POST", "today", "action"], ["POST", "today", "views"], ["POST", "roadmap"], ["POST", "feedback"], ["POST", "problem"], ["POST", "audit", "share"], ["POST", "audit", "revoke"], ["POST", "sync"], ["POST", "call-lists"], ["POST", "call-outcomes"],
-  ["POST", "workflows"], ["PUT", "workflows"], ["POST", "settings", "test-slack"], ["POST", "settings", "purge"], ["POST", "api-keys"],
+  ["POST", "workflows"], ["PUT", "workflows"], ["DELETE", "workflows"], ["POST", "settings", "test-slack"], ["POST", "settings", "purge"], ["POST", "api-keys"],
   ["DELETE", "call-lists"], ["DELETE", "today", "views"], ["POST", "inbox", "views"], ["DELETE", "inbox", "views"], ["POST", "people", "lists"], ["DELETE", "people", "lists"], ["PUT", "people", "dialer"], ...PEOPLE_DAILY_RULES,
   ["GET", "team"], ["PUT", "team"], ["PUT", "settings"], ["PUT", "goals"], ["PUT", "appointments", "targets"], ["PUT", "speed", "target"], ["PUT", "accounts"], ["PUT", "stage-rules"],
 ];

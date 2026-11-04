@@ -15,7 +15,7 @@ import {
   type LabelPatch,
 } from "../workflows/store";
 import { json, type AuthContext } from "./auth";
-import { delivery, detail, mark, proof } from "./workflows-more";
+import { delivery, detail, mark, proof, viewsList, viewsRemove, viewsSave } from "./workflows-more";
 
 // The Workflows module's routes (docs/features/WORKFLOWS.md). Same rule as every route: the company, the person and the client accounts come from the signed
 // session, never from the request. A client's staff may read their own account's list and health; only an agency owner or administrator, or a business
@@ -387,6 +387,9 @@ export async function handleWorkflows(ctx: Ctx, deps: Deps): Promise<Response> {
     if (m === "POST" && a === "mark") return await mark(ctx, deps);
     if (m === "GET" && a === "delivery") return await delivery(ctx, deps);
     if (m === "GET" && a === "proof") return await proof(ctx, deps);
+    if (m === "GET" && a === "views") return await viewsList(ctx);
+    if (m === "POST" && a === "views") return await viewsSave(ctx, deps);
+    if (m === "DELETE" && a === "views") return await viewsRemove(ctx);
     return json({ error: "Not found" }, 404);
   } catch (e) {
     if (e instanceof NeedsUpdate) return json({ error: e.message }, 503);

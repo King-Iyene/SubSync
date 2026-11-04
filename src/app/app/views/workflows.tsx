@@ -1,7 +1,7 @@
 "use client";
 
 import { Printer, RefreshCw } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Finding } from "@/lib/workflows/health";
 import type { LabelRow } from "@/lib/workflows/store-types";
 import { entityOf, type WfItem } from "@/lib/workflows/model";
@@ -14,6 +14,9 @@ import { WfBars, WfDonut, WfNumber, WfTrend, type Mark } from "../ds/workflow-ch
 import { useApiClient, useData } from "../session";
 import { Btn, ErrorBox } from "../ui";
 import { DeliveryTab, ProofTab } from "./workflows-extra";
+import { TidyTab, type TidyData } from "./workflows-tidy";
+import { WfPalette, type Command } from "./workflows-palette";
+import type { RenameRule } from "@/lib/workflows/rename";
 import { ChangeDialog, ItemPanel, keyOf, StateBadge, Tabs, WfTable, when, type Acc, type ChangeKind } from "./workflows-parts";
 import type { GoFn } from "../nav";
 import type { AccessKind } from "@/lib/access";
@@ -31,12 +34,13 @@ type Data = {
   slices: Slice[]; bars: Array<{ locationId: string; name: string; total: number; attention: number }>; top: Array<{ workflowId: string; locationId: string; name: string; failed: number | null; runs: number | null; share: number }>;
   decisions: Array<{ decision: Decision; count: number }>; ratings: Array<{ rating: number; label: string; count: number }>;
   daily: { failing: Array<{ day: string; value: number | null }>; total: Array<{ day: string; value: number | null }>; runs: Array<{ day: string; value: number | null }>; errors: Array<{ day: string; value: number | null }> };
+  tidy: TidyData | null;
   muted: Array<Finding & { why: "fixed" | "snoozed"; until: number; key: string }>; since: { at: number; changes: number } | null;
   coverage: Array<{ locationId: string; have: string[]; missing: string[]; none: boolean }>; standard: string[]; syncedAt: number | null; caps: { deletesToday: number; writesToday: number };
 };
 type History = { rows: Array<{ id: number; at: number; account: string; name: string; type: string; what: string; source: string; who: string; outcome: string; undone: boolean; undoable: boolean }> };
 type Show = "workflow" | "campaign" | "both";
-type TabId = "overview" | "list" | "health" | "delivery" | "proof" | "history";
+type TabId = "overview" | "list" | "health" | "tidy" | "delivery" | "proof" | "history";
 
 const COLOUR: Record<Bucket, string> = { failing: "var(--destructive)", never_run: "var(--warning)", running: "var(--success)", draft: "var(--chart-1)", stopped: "var(--muted-foreground)" };
 const DEC_COLOUR: Record<Decision, string> = { keep: "var(--success)", review: "var(--warning)", retire: "var(--destructive)", unsorted: "var(--muted-foreground)" };
@@ -58,6 +62,12 @@ export function WorkflowsView({ go, kind }: { go: GoFn; kind: AccessKind }) {
   const [syncing, setSyncing] = useState(false);
   const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null);
   const [mark, setMark] = useState<string | null>(null);
+  const [preset, setPreset] = useState<RenameRule | undefined>(undefined);
+  const [fixItems, setFixItems] = useState<WfItem[] | null>(null);
+  const [palette, setPalette] = useState(false);
+  const views = useData<{ views: Array<{ name: string; filters: { show: Show; tab: TabId; picked: string[] } }> }>(kind === "client" ? null : "workflows/views");
+  const [viewName, setViewName] = useState("");
+  const [saving, setSaving] = useState(false);
 
   const items = useMemo(() => (data?.items ?? []).filter((w) => show === "both" || entityOf(w.workflowId) === show), [data, show]);
   const failing = useMemo(() => failingIds(data?.findings ?? []), [data]);
@@ -75,6 +85,18 @@ export function WorkflowsView({ go, kind }: { go: GoFn; kind: AccessKind }) {
     setPanel(itemsSpec({ key, title, subtitle, items: list, accounts, failing, labels, exportName: `workflows-${key}` }));
   }, [data, accounts, failing, labels]);
   const close = () => { setPanel(null); setMark(null); };
+  useEffect(() => {
+    // Ctrl or Cmd + Shift + K opens the palette on this page only (Ctrl K stays the people search).
+    const k = (e: KeyboardEvent) => { if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "k") { e.preventDefault(); e.stopPropagation(); setPalette((p) => !p); } };
+    window.addEventListener("keydown", k, true);
+    return () => window.removeEventListener("keydown", k, true);
+  }, []);
+  const saveView = async () => {
+    if (!viewName.trim()) return;
+    setSaving(true);
+    try { await api.post("workflows/views", { name: viewName, filters: { show, tab, picked } }); setViewName(""); await views.reload(); setNote({ ok: true, text: "View saved." }); } catch (e) { setNote({ ok: false, text: (e as Error).message }); } finally { setSaving(false); }
+  };
+  const applyView = (v: { filters: { show: Show; tab: TabId; picked: string[] } }) => { setShow(v.filters.show ?? "workflow"); setTab(v.filters.tab ?? "overview"); setPicked(v.filters.picked ?? []); setSel(new Set()); };
   const markIt = async (locationId: string, workflowId: string, b: Record<string, unknown>) => {
     try { await api.post("workflows/mark", { locationId, workflowId, ...b }); await reload(); } catch (e) { setNote({ ok: false, text: (e as Error).message }); }
   };
@@ -115,6 +137,22 @@ export function WorkflowsView({ go, kind }: { go: GoFn; kind: AccessKind }) {
           ))}
         </div>
         {kind === "agency" && accounts.length >= 2 ? <LocalAccountPicker accounts={accounts.map((a) => ({ id: a.locationId, name: a.name }))} picked={picked} onChange={(ids) => { setPicked(ids); setSel(new Set()); }} /> : null}
+        {staff ? (
+          <span className="flex flex-wrap items-center gap-2" data-testid="wf-views">
+            {views.data?.views.length ? (
+              <label className="text-sm"><span className="sr-only">Saved views</span>
+                <select value="" onChange={(e) => { const v = views.data?.views.find((x) => x.name === e.target.value); if (v) applyView(v); }} data-testid="wf-view-pick" className="h-9 rounded-lg border bg-background px-2 text-sm"><option value="">Saved views</option>{views.data.views.map((v) => <option key={v.name} value={v.name}>{v.name}</option>)}</select>
+              </label>
+            ) : null}
+            {data.can.organise ? (
+              <>
+                <label className="text-sm"><span className="sr-only">Name this view</span><input value={viewName} onChange={(e) => setViewName(e.target.value)} maxLength={40} placeholder="Name this view" data-testid="wf-view-name" className="h-9 w-36 rounded-lg border bg-background px-2 text-sm" /></label>
+                <button type="button" onClick={saveView} disabled={saving || !viewName.trim()} data-testid="wf-view-save" className="min-h-9 rounded-lg border px-3 text-sm hover:bg-accent disabled:opacity-50">Save view</button>
+              </>
+            ) : null}
+            <button type="button" onClick={() => setPalette(true)} data-testid="wf-palette-open" className="min-h-9 rounded-lg border px-3 text-sm text-muted-foreground hover:bg-accent" title="Ctrl Shift K">Search and commands</button>
+          </span>
+        ) : null}
         <span className="text-sm text-muted-foreground" data-testid="wf-updated">{data.syncedAt ? `Last read ${when(data.syncedAt, data.now).toLowerCase()}` : "Not read yet"}</span>
       </div>
       {data.since && data.since.changes > 0 ? <InlineAlert tone="info" className="mb-4"><span data-testid="wf-since">Since your last visit ({when(data.since.at, data.now).toLowerCase()}): {data.since.changes} change{data.since.changes === 1 ? "" : "s"} to your workflows and campaigns.</span> <button type="button" className="font-medium text-primary hover:underline" onClick={() => setTab("history")}>See them</button></InlineAlert> : null}
@@ -122,7 +160,7 @@ export function WorkflowsView({ go, kind }: { go: GoFn; kind: AccessKind }) {
       {noList ? <InlineAlert tone="warning" title="Needs permission: reconnect" className="mb-4">SubSync needs <code>workflows.readonly</code> to list workflows, and <code>workflows.logs</code> to see which ones fail or never run. Open SubSync again from your CRM&apos;s app list and accept it. Campaigns need <code>campaigns.readonly</code>.</InlineAlert> : null}
       {!data.available ? <InlineAlert tone="info" title="Needs the latest database update" className="mb-4">Ask the person who manages SubSync to apply the newest update. Until then this page stays empty.</InlineAlert> : null}
       {!data.permissions.history && !noList ? <InlineAlert tone="info" title="Needs permission: reconnect" className="mb-4">Allow <code>workflows.logs</code> to see failing and idle workflows. Until then those checks are not shown, and nothing is guessed.</InlineAlert> : null}
-      <Tabs tabs={[{ id: "overview", label: "Overview" }, { id: "list", label: `List (${total})` }, { id: "health", label: `Health${data.findings.length ? ` (${data.findings.length})` : ""}` }, { id: "delivery", label: "Campaign delivery" }, { id: "proof", label: "Proof" }, { id: "history", label: "History" }]} value={tab} onChange={(t) => { setTab(t); setSel(new Set()); }} />
+      <Tabs tabs={[{ id: "overview", label: "Overview" }, { id: "list", label: `List (${total})` }, { id: "health", label: `Health${data.findings.length ? ` (${data.findings.length})` : ""}` }, { id: "tidy", label: "Tidy up" }, { id: "delivery", label: "Campaign delivery" }, { id: "proof", label: "Proof" }, { id: "history", label: "History" }]} value={tab} onChange={(t) => { setTab(t); setSel(new Set()); }} />
 
       {tab === "overview" ? (
         total === 0 ? (
@@ -222,6 +260,8 @@ export function WorkflowsView({ go, kind }: { go: GoFn; kind: AccessKind }) {
         </div>
       ) : null}
 
+      {tab === "tidy" ? (data.tidy ? <TidyTab tidy={data.tidy} items={items} accounts={accounts} canChange={data.can.change}
+        onFix={(rule, list) => { setPreset(rule); setFixItems(list); setDialog("rename"); }} onShow={(key, title, sub, list) => open_(key, title, sub, list)} /> : <EmptyState title="Not available in this view" body="Tidying is for administrators." />) : null}
       {tab === "delivery" ? <DeliveryTab q={q} now={data.now} /> : null}
       {tab === "proof" ? <ProofTab q={q} /> : null}
 
@@ -243,10 +283,19 @@ export function WorkflowsView({ go, kind }: { go: GoFn; kind: AccessKind }) {
         </Section>
       ) : null}
 
+      {palette ? <WfPalette onClose={() => setPalette(false)}
+        commands={[
+          ...([["overview", "Overview"], ["list", "List"], ["health", "Health"], ["tidy", "Tidy up"], ["delivery", "Campaign delivery"], ["proof", "Proof"], ["history", "History"]] as Array<[TabId, string]>).map(([id, label]): Command => ({ id: `go-${id}`, group: "Go to", label, run: () => setTab(id) })),
+          ...([["workflow", "Show workflows"], ["campaign", "Show campaigns"], ["both", "Show both"]] as Array<[Show, string]>).map(([id, label]): Command => ({ id: `show-${id}`, group: "Do", label, run: () => setShow(id) })),
+          ...(data.can.sync ? [{ id: "sync", group: "Do" as const, label: "Update now", run: () => { void syncNow(); } }] : []),
+          { id: "print", group: "Do", label: "Print report", run: () => window.print() },
+          ...(views.data?.views ?? []).map((v): Command => ({ id: `view-${v.name}`, group: "Saved views", label: v.name, run: () => applyView(v) })),
+        ]}
+        items={items.map((w): Command => ({ id: keyOf(w), group: "Items", label: w.name, hint: accounts.find((a) => a.locationId === w.locationId)?.name, run: () => setOpen(w) }))} /> : null}
       {panel ? <RecordsPanel spec={panel} onClose={close} now={data.now} canExport={staff} /> : null}
       {open ? <ItemPanel item={open} account={accounts.find((a) => a.locationId === open.locationId)?.name ?? "Client account"} label={data.labels[keyOf(open)]} bucket={bucketOf(open, failing)} now={data.now} canOrganise={data.can.organise} onClose={() => setOpen(null)} onSaved={reload} /> : null}
-      {dialog ? <ChangeDialog kind={dialog} items={picks} accounts={accounts} permitted={dialog === "rename" || dialog === "clone" ? data.permissions.rename : dialog === "delete" ? data.permissions.delete : data.permissions.publish}
-        onClose={() => setDialog(null)} onChanged={() => { setSel(new Set()); reload(); }} /> : null}
+      {dialog ? <ChangeDialog kind={dialog} items={dialog === "rename" && fixItems ? fixItems : picks} accounts={accounts} preset={dialog === "rename" ? preset : undefined} permitted={dialog === "rename" || dialog === "clone" ? data.permissions.rename : dialog === "delete" ? data.permissions.delete : data.permissions.publish}
+        onClose={() => { setDialog(null); setPreset(undefined); setFixItems(null); }} onChanged={() => { setSel(new Set()); reload(); }} /> : null}
 
       <article className="hidden print:block" data-testid="wf-print-area" aria-hidden>
         <h1 className="text-xl font-bold">Workflows report</h1>

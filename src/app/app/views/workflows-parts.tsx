@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { LabelRow } from "@/lib/workflows/store-types";
 import { BUCKET_LABEL, bucketOf, type Bucket } from "@/lib/workflows/reports";
 import { entityOf, type WfItem } from "@/lib/workflows/model";
+import type { RenameRule } from "@/lib/workflows/rename";
 import { InlineAlert } from "../ds";
 import { useApiClient, useData } from "../session";
 import { Badge, Btn } from "../ui";
@@ -190,9 +191,9 @@ const TITLE: Record<ChangeKind, string> = { rename: "Rename", publish: "Publish"
 const NEEDS: Record<ChangeKind, string[]> = { rename: ["workflows.readonly", "workflows.write"], publish: ["workflows.publish"], unpublish: ["workflows.publish"], delete: ["workflows.delete", "workflows.readonly"], clone: ["workflows.readonly", "workflows.write"] };
 const OUT: Record<string, string> = { done: "Done", dry_run: "Not sent (live changes are off)", skipped: "Left alone", needs_permission: "Needs permission", conflict: "Not accepted", failed: "Failed" };
 
-export function ChangeDialog({ kind, items, accounts, permitted, onClose, onChanged }: { kind: ChangeKind; items: WfItem[]; accounts: Acc[]; permitted: boolean; onClose: () => void; onChanged: () => void }) {
+export function ChangeDialog({ kind, items, accounts, permitted, preset, onClose, onChanged }: { kind: ChangeKind; items: WfItem[]; accounts: Acc[]; permitted: boolean; preset?: RenameRule; onClose: () => void; onChanged: () => void }) {
   const api = useApiClient();
-  const [rule, setRule] = useState({ find: "", replace: "", prefix: "", suffix: "", casing: "none" as "none" | "title" });
+  const [rule, setRule] = useState({ find: preset?.find ?? "", replace: preset?.replace ?? "", prefix: preset?.prefix ?? "", suffix: preset?.suffix ?? "", casing: (preset?.casing ?? "none") as "none" | "title", tidyOnly: preset?.tidyOnly === true });
   const [allowPaused, setAllowPaused] = useState(false);
   const [target, setTarget] = useState("");
   const [pv, setPv] = useState<Preview | null>(null);
@@ -214,7 +215,7 @@ export function ChangeDialog({ kind, items, accounts, permitted, onClose, onChan
   };
   const needsConfig = kind === "rename" || kind === "clone";
   const deleteReady = kind !== "delete" || (typed.trim() === pv?.phrase && (pv?.active === 0 || active));
-  const canPreview = kind === "rename" ? Boolean(rule.find || rule.prefix || rule.suffix || rule.casing === "title") : kind === "clone" ? Boolean(target) : true;
+  const canPreview = kind === "rename" ? Boolean(rule.tidyOnly || rule.find || rule.prefix || rule.suffix || rule.casing === "title") : kind === "clone" ? Boolean(target) : true;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" data-testid="wf-dialog" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div ref={ref} tabIndex={-1} role="dialog" aria-modal="true" aria-label={TITLE[kind]} className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border bg-background p-5 shadow-xl">

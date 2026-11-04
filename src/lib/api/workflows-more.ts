@@ -4,6 +4,7 @@ import {
 import { parseLogs, proofOf, snoozeUntil, summarise } from "../workflows/detail";
 import { workflowDefinition, workflowErrors } from "../workflows/ghl";
 import { accountNames, loadCampaigns, loadItems, loadWorkflowAlerts, saveMark, NeedsUpdate } from "../workflows/store";
+import { sql } from "../db";
 import { json } from "./auth";
 import { actor, grantedOf, has, isOn, resolve, accountsOf, type Ctx, type Deps } from "./workflows-api";
 
@@ -102,4 +103,39 @@ export async function proof(ctx: Ctx, deps: Deps) {
     // "Cleared" is the honest word: SubSync can tell the condition went away, not who fixed it.
     note: "Cleared means the problem is no longer there at the latest update. SubSync cannot tell who fixed it.",
   });
+}
+
+// ---------------------------------------------------------------- saved views (the person's own: which client accounts, which part, Workflows or Campaigns)
+const VIEW_MAX = 10;
+const ownerOf = (ctx: Ctx) => ctx.session.userId ?? null;
+export async function viewsList(ctx: Ctx) {
+  const owner = ownerOf(ctx);
+  if (!owner || ctx.kind === "client") return json({ views: [] });
+  const rows = await sql()`select name, filters from saved_views where installation_id = ${ctx.installationId} and owner = ${owner} and page = 'workflows' order by name`.catch(() => []);
+  return json({ views: rows.map((r) => ({ name: r.name as string, filters: r.filters })) });
+}
+export async function viewsSave(ctx: Ctx, deps: Deps) {
+  const owner = ownerOf(ctx);
+  if (!owner || ctx.kind === "client") return json({ error: "Saved views are for administrators." }, 403);
+  const b = await body(ctx);
+  const name = typeof b?.name === "string" ? b.name.trim().slice(0, 40) : "";
+  if (!name) return json({ error: "Give the view a name." }, 400);
+  const f = (b?.filters ?? {}) as Record<string, unknown>;
+  // Only choices are kept, never a row or a name of a workflow. The accounts are checked against the session, so another company's id is dropped.
+  const allowed = ctx.limitTo ? [ctx.limitTo] : await deps.allowed(ctx);
+  const known = new Set((await accountNames(ctx.installationId, allowed)).map((a) => a.locationId));
+  const picked = Array.isArray(f.picked) ? f.picked.filter((x): x is string => typeof x === "string" && known.has(x)).slice(0, 50) : [];
+  const clean = { show: ["workflow", "campaign", "both"].includes(String(f.show)) ? f.show : "workflow", tab: ["overview", "list", "health", "tidy", "delivery", "proof", "history"].includes(String(f.tab)) ? f.tab : "overview", picked };
+  const [{ n }] = await sql()`select count(*)::int n from saved_views where installation_id = ${ctx.installationId} and owner = ${owner} and page = 'workflows' and name <> ${name}`;
+  if ((n as number) >= VIEW_MAX) return json({ error: `At most ${VIEW_MAX} saved views.` }, 400);
+  await sql()`insert into saved_views (installation_id, owner, page, name, filters) values (${ctx.installationId}, ${owner}, 'workflows', ${name}, ${sql().json(clean as never)})
+    on conflict (installation_id, owner, page, name) do update set filters = excluded.filters`;
+  return json({ ok: true });
+}
+export async function viewsRemove(ctx: Ctx) {
+  const owner = ownerOf(ctx);
+  if (!owner || ctx.kind === "client") return json({ error: "Saved views are for administrators." }, 403);
+  const name = (ctx.url.searchParams.get("name") ?? "").slice(0, 40);
+  await sql()`delete from saved_views where installation_id = ${ctx.installationId} and owner = ${owner} and page = 'workflows' and name = ${name}`;
+  return json({ ok: true });
 }
