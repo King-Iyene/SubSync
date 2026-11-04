@@ -1862,6 +1862,7 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
         coldChoice: async () => (ctx.kind === "client" ? null : (await getSettings(ctx.installationId)).coldTags),
         voter: voterOf(ctx),
         locationToken: (locationId) => locationAccessToken(ctx.session.companyId, locationId),
+        settings: async () => { const st = (await scope(ctx)).settings; return { staleDays: st.staleDays, speedTargetMinutes: st.speedTargetMinutes }; },
       });
     }
     // The rebuilt Appointments page: the work lists, "See all" and the comparison (read only).

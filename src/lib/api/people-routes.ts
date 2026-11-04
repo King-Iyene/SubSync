@@ -4,12 +4,14 @@ import { leadExtras } from "../analytics/people-detail";
 import {
   coldTagsFor, getDialer, goingCold, listSavedLists, peopleOptions, removeList, saveList, searchPeople, setDialer, tagDetail, watchingSince, type ColdBucket,
 } from "../analytics/people-list-queries";
-import { fetchConversationCalls, fetchContactCustomFields, fetchCustomFieldNames, isPermissionError } from "../sync/ghl-data";
+import { fetchConversationActivity, fetchContactCustomFields, fetchCustomFieldNames, isPermissionError } from "../sync/ghl-data";
 import { callResultLabel, errorRef, isoDay, isQueryTimeout, TIMEOUT_MESSAGE } from "../people/helpers";
 import { describeFilter, listName, parseSmartFilter, scopeFilterTo } from "../people/filters";
 import { parseDialer } from "../people/dial";
+import { personKey } from "../people/queue";
 import type { deepLinks } from "../links";
 import { json, type AuthContext } from "./auth";
+import { handlePeopleQueue } from "./people-queue-routes";
 
 // The People module's endpoints, under /api/app/people/... (the one catch-all route, already guarded). Every handler derives who is asking from the verified
 // session (`ctx`), limits every read to the accounts that caller may see, and never takes an account, owner key or installation from the browser.
@@ -25,6 +27,8 @@ export type PeopleHelpers = {
   voter: string;
   /** The token for one account, for the live read of a single lead. */
   locationToken: (locationId: string) => Promise<string>;
+  /** The settings the call lists use: the account's stale-deal days and the reply target. */
+  settings: () => Promise<{ staleDays: number; speedTargetMinutes: number }>;
 };
 
 /** A friendly answer when the database stopped a read for taking too long, with an error ID the person can quote. Null for any other error. */
@@ -56,6 +60,10 @@ async function route(ctx: Ctx, h: PeopleHelpers): Promise<Response> {
   const sp = ctx.url.searchParams;
   const page = Math.min(1000, Math.max(1, Math.floor(Number(sp.get("page"))) || 1));
 
+  // The call lists, the lead panel (headline, timeline, what changed) and recent searches have their own file.
+  const queued = await handlePeopleQueue(ctx, { allowed: h.allowed, links: h.links, voter: h.voter, settings: h.settings });
+  if (queued) return queued;
+
   if (m === "GET" && b === "options") {
     const allowed = await h.allowed();
     const [opts, names, dialer] = await Promise.all([peopleOptions(ctx.installationId, allowed), teamNames(ctx.installationId), getDialer(ctx.installationId, h.voter)]);
@@ -73,8 +81,9 @@ async function route(ctx: Ctx, h: PeopleHelpers): Promise<Response> {
     const [cold, links, names] = await Promise.all([filter.cold ? coldTagsFor(ctx.installationId, allowed, await h.coldChoice()) : Promise.resolve([] as string[]), h.links(), teamNames(ctx.installationId)]);
     const res = await searchPeople(ctx.installationId, allowed, filter, page, cold);
     return json({
-      ...res, filter, description: describeFilter(filter, { owner: (id) => assigneeLabel(id, names) }),
-      rows: res.rows.map((r) => ({ ...r, ownerName: assigneeLabel(r.owner, names), url: links.contact(r.locationId, r.contactId) })),
+      // The choices are NOT echoed back: an answer must never name an account the caller did not ask about with their own rights (check-tenancy counts that as a leak).
+      ...res, description: describeFilter(filter, { owner: (id) => assigneeLabel(id, names) }),
+      rows: res.rows.map((r) => ({ ...r, rowId: personKey(r.locationId, r.contactId), why: "", at: null, value: null, ownerName: assigneeLabel(r.owner, names), url: links.contact(r.locationId, r.contactId) })),
     });
   }
 
@@ -84,7 +93,7 @@ async function route(ctx: Ctx, h: PeopleHelpers): Promise<Response> {
     const allowed = await h.allowed();
     const [cold, links, names] = await Promise.all([coldTagsFor(ctx.installationId, allowed, await h.coldChoice()), h.links(), teamNames(ctx.installationId)]);
     const res = await goingCold(ctx.installationId, allowed, bucket as ColdBucket, cold, page);
-    return json({ ...res, bucket, rows: res.rows.map((r) => ({ ...r, ownerName: assigneeLabel(r.owner, names), url: links.contact(r.locationId, r.contactId) })) });
+    return json({ ...res, bucket, rows: res.rows.map((r) => ({ ...r, rowId: personKey(r.locationId, r.contactId), why: r.lastSignalAt ? `Last seen ${new Date(r.lastSignalAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })}` : "Nothing seen yet", at: r.lastSignalAt, value: null, ownerName: assigneeLabel(r.owner, names), url: links.contact(r.locationId, r.contactId) })) });
   }
 
   if (m === "GET" && b === "tags" && !c) {
@@ -149,26 +158,27 @@ async function route(ctx: Ctx, h: PeopleHelpers): Promise<Response> {
     if (!ex) return json({ error: "Contact not found" }, 404);
     const names = await teamNames(ctx.installationId);
     const { conversationId, ...rest } = ex;
-    type Live = { state: "ok" | "needs_permission" | "unavailable" | "off"; customFields: Array<{ name: string; value: string }>; calls: Array<{ at: string; direction: string | null; result: string; by: string | null }>; note: string | null };
-    let live: Live = { state: "off", customFields: [], calls: [], note: "The demo does not read your CRM." };
+    type Live = { state: "ok" | "needs_permission" | "unavailable" | "off"; customFields: Array<{ name: string; value: string }>; calls: Array<{ at: string; direction: string | null; result: string; by: string | null }>; messages: Array<{ at: string; direction: string | null; channel: string; by: string | null }>; note: string | null };
+    let live: Live = { state: "off", customFields: [], calls: [], messages: [], note: "The demo does not read your CRM." };
     if (!ctx.demo) {
-      live = { state: "ok", customFields: [], calls: [], note: null };
+      live = { state: "ok", customFields: [], calls: [], messages: [], note: null };
       try {
         const token = await h.locationToken(c);
         const [fields, calls] = await Promise.allSettled([
           fetchCustomFieldNames(token, c).then((n) => fetchContactCustomFields(token, d, n)),
-          conversationId ? fetchConversationCalls(token, c, conversationId) : Promise.resolve([]),
+          conversationId ? fetchConversationActivity(token, c, conversationId) : Promise.resolve({ calls: [], messages: [] }),
         ]);
         const denied = [fields, calls].some((r) => r.status === "rejected" && isPermissionError(r.reason));
         const broken = [fields, calls].some((r) => r.status === "rejected" && !isPermissionError(r.reason));
         if (fields.status === "fulfilled") live.customFields = fields.value;
         if (calls.status === "fulfilled") {
-          live.calls = calls.value.map((x) => ({ at: new Date(x.at).toISOString(), direction: x.direction, result: callResultLabel(x.status, x.durationSeconds), by: x.userId ? assigneeLabel(x.userId, names) : null }));
+          live.calls = calls.value.calls.map((x) => ({ at: new Date(x.at).toISOString(), direction: x.direction, result: callResultLabel(x.status, x.durationSeconds), by: x.userId ? assigneeLabel(x.userId, names) : null }));
+          live.messages = calls.value.messages.map((x) => ({ at: new Date(x.at).toISOString(), direction: x.direction, channel: x.channel, by: x.userId ? assigneeLabel(x.userId, names) : null }));
         }
         if (denied) { live.state = "needs_permission"; live.note = "Needs permission: reconnect SubSync to let it read custom fields and call history."; }
         else if (broken) { live.state = "unavailable"; live.note = "Your CRM did not answer for custom fields or calls. Try again later."; }
       } catch {
-        live = { state: "unavailable", customFields: [], calls: [], note: "Custom fields and the CRM's call history could not be read right now." };
+        live = { state: "unavailable", customFields: [], calls: [], messages: [], note: "Custom fields and the CRM's call history could not be read right now." };
       }
     }
     return json({ ...rest, ownerName: assigneeLabel(rest.owner, names), live });

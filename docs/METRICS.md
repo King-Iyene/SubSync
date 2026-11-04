@@ -536,3 +536,31 @@ No new measurement of the CRM. The audit reads the same four lists as Today and 
 **First run.** While any account has not finished its first read, the page says "Reading your client accounts: N of M done" with a progress bar and looks again every 20 seconds; the numbers it shows meanwhile are what is read so far.
 
 **Share link.** Same table, token (192 random bits), 14-day expiry and switch-off as before; now carries the sentence, the figures, the finding titles with what is wrong and the fix, the good news and the grade line, and how each number is counted. Never an account name, a person or a deal. It covers the accounts of the page the person was looking at (the page filter, and the one client if they had opened one). An older link still opens (every new field is optional).
+
+## People, call lists and the lead panel (stage PEOPLE, 5 Nov 2026)
+
+Nothing here is a new definition of a metric. The five lists are the lists other pages already use, read through the same function, so a number on a chip and the number on the page it comes from are one thing (tests: `tests/unit/people-v2-db.test.ts`, `tests/e2e/people-v2.spec.ts` "every chip's number is the number of people in its list").
+
+| List | Who is on it | Read through | Count on its chip |
+| --- | --- | --- | --- |
+| Waiting for a reply | New leads nobody has replied to (Speed to lead's "waiting", the last 14 days; Today's "new leads"), the longest wait first | `speedList` status waiting | Speed's own total. A lead whose contact is not in SubSync's copy yet is kept, from what Speed knew (it shows as "Unnamed contact", as it does on Speed to lead). |
+| No-shows to rebook | Missed an appointment in the last 14 days and no later booking that is not cancelled or itself missed (Appointments' "recover") | `workBase` items of kind recover, one row per person | The people with a contact. Bookings with no contact attached are not people: they are counted in "N bookings have no contact attached" under the list, so chip plus that note equals Appointments' number. |
+| Follow-ups due | People whose last logged call was "follow up" and whose day has come | the call list `follow_ups_due` | rows (the call list holds at most 400; a full one says so) |
+| Hot leads gone quiet | An open deal in play and nothing for 3 days or more, biggest deals first (the call list "hot leads not contacted in 3+ days") | the call list `hot_uncontacted` | rows (same cap of 400) |
+| Stale deals | Counted open deals (a value, an owner, in play) with no movement for the account's stale days, biggest first (Today's stale deals) | `staleDealList` | Today's count of DEALS, not people: a person with two stale deals has two rows. The list shows the first 100 deals and says so. Deals with no contact are not rows (nobody to call) and are said in a note. |
+
+The call-list reads keep their existing rules: a contact who asked not to be contacted, one called in the last 12 hours, and one marked wrong number or not interested are not on Hot leads or Follow-ups. Waiting, No-shows and Stale deals do show a do-not-disturb person, marked on the row, with a stop before any call or email.
+
+**Mine.** A person is "mine" when the contact's owner is the person asking, or (for a no-show) the booking is assigned to them. A client's staff start on Mine only when at least one person on the list is assigned to them; otherwise they see everyone and the screen says "Nobody is assigned to you in this list, so it shows everyone" (a queue of zero would look broken). An agency or business owner starts on everyone.
+
+**The sentence at the top.** The most urgent list that has anybody on it, in the order waiting, no-shows, follow-ups, hot, stale, then "Also:" the others in short. When every list is empty: "Nobody needs a call right now."
+
+**Search.** A name or email needs 2 characters; a phone number 3 digits (so "55" does not match every number). It matches part of the name, the email, or the last digits of the phone, inside the caller's accounts, 50 a page, ordered by exact email, then name starts with the words, then most recent activity. The count is exact up to 10,000 and then stops ("10,000+"): a count of two letters in a very large agency would cost more than the page.
+
+**The headline of a person** (first rule that fits): asked not to be contacted (a stop); the customer wrote last and nobody has answered ("Never answered" only when a lead has waited more than 3 days, Speed's rule); a no-show to rebook; a follow-up due; a counted deal with no movement for the stale days; a booking coming up; an open deal; a customer; quiet for 90 days or more; a new contact; otherwise the last activity. It names only what a fact says.
+
+**Tag dates.** The day SubSync first SAW a tag added (`contact_tag_events`, filled since SubSync started watching), never the day it was added in the CRM, which the CRM does not say. The panel says so beside the tags.
+
+**The timeline** merges what SubSync holds: contact added, first reply (the lead ledger), the last message, calls logged in SubSync, appointments and their status changes (`appointment_events`), deal created, moved and won or lost (`deal_events`), tags added and removed; and, read live for one person when the CRM answers, its messages (when, which way, which channel, who sent it; NEVER the words) and calls. NOT VERIFIED LIVE: the shape of the CRM's messages (read defensively, every field optional).
+
+**Since you last looked.** The time the signed-in person last had this person open (kept for them alone), compared with the timeline: the things newer than that, never the "added" row; nothing the first time.

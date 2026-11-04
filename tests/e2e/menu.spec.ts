@@ -29,5 +29,5 @@ test("the agency menu is the pilot menu with plain group names, keeps every othe
   for (const tab of ["Health", "Onboarding", "Details and billing", "Compare", "Reviews (QBR)"]) await expect(page.getByRole("tab", { name: tab, exact: true }), `Clients tab: ${tab}`).toBeVisible();
   // The pages that became tabs are still one click away, inside People.
   await side.getByRole("button", { name: "People", exact: true }).click();
-  for (const tab of ["Search and filters", "Smart lists", "Going cold", "Imports and sources"]) await expect(page.getByRole("tab", { name: tab, exact: true }), `People tab: ${tab}`).toBeVisible();
+  for (const tab of ["Find and call", "Tags", "Going cold", "Sources"]) await expect(page.getByRole("tab", { name: tab, exact: true }), `People tab: ${tab}`).toBeVisible();
 });

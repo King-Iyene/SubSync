@@ -39,8 +39,8 @@ for (const [group, ids] of GROUPS) {
     await expect(page.getByTestId("freshness")).toBeVisible();
     for (const id of ids) {
       const nav = PAGES.find((n) => n.id === id)!;
-      // The Clients module's tabs are Health (the old Accounts page) and Onboarding (the old Setup page). Since F10 the People module's tabs are Search and filters, Smart lists (the call lists) and Going cold (the old Leads page), not the three old page names.
-      const tabName = ({ search: "Search and filters", calls: "Smart lists", leads: "Going cold", accounts: "Health", onboarding: "Onboarding" } as Record<string, string>)[id] ?? nav.label;
+      // The Clients module's tabs are Health (the old Accounts page) and Onboarding (the old Setup page). Since the People rebuild the People module's tabs are Find and call (search and the call lists), Tags, Going cold (the old Leads page) and Sources.
+      const tabName = ({ search: "Find and call", calls: "Find and call", leads: "Going cold", accounts: "Health", onboarding: "Onboarding" } as Record<string, string>)[id] ?? nav.label;
       if (id !== "today") await open(page, tabName, nav.parent ? PAGES.find((n) => n.id === nav.parent)!.label : undefined);
       await expect(page.getByTestId("freshness"), `${nav.label}: exactly one freshness line`).toHaveCount(1);
       await expect(page.getByTestId("freshness-text"), `${nav.label}: the same words as the server`).toHaveText(wanted);

@@ -1,6 +1,7 @@
 import { sql, type Sql } from "../db";
 import { fillDays, QUERY_TIMEOUT_MS } from "../people/helpers";
 import { MAX_LISTS_PER_PERSON, PAGE_SIZE, parseSmartFilter, type SmartFilter } from "../people/filters";
+import { COUNT_CAP, searchTerm } from "../people/queue";
 import { ttlCache } from "../ttl-cache";
 import { QUIET_AFTER_DAYS, effectiveColdTags } from "./contact-intel";
 import { dealScopeJoins, outOfScope } from "./stage-rules-sql";
@@ -96,8 +97,10 @@ function filterSql(db: Sql, installationId: string, f: SmartFilter, coldTags: st
   const add = (x: ReturnType<Sql>) => parts.push(x);
   if (f.q) {
     const like = `%${escapeLike(f.q)}%`;
+    // Only something that looks like a phone number (digits, spaces, brackets, dashes, a plus) is also looked for in the phone numbers: an email or a name that happens to hold digits is not.
+    const t = searchTerm(f.q);
     const digits = f.q.replace(/\D/g, "");
-    add(db`(c.full_name ilike ${like} or lower(c.email) like ${like.toLowerCase()} ${digits.length >= 3 ? db`or c.phone_digits like ${`%${digits}%`}` : db``})`);
+    add(db`(c.full_name ilike ${like} or lower(c.email) like ${like.toLowerCase()} ${t.ok && t.kind === "phone" && digits.length >= 3 ? db`or c.phone_digits like ${`%${digits}%`}` : db``})`);
   }
   if (f.tags?.length) add(f.tagMode === "all" ? db`c.tags @> ${f.tags}::text[]` : db`c.tags && ${f.tags}::text[]`);
   if (f.notTag) add(db`not (c.tags @> ${[f.notTag]}::text[])`);
@@ -127,15 +130,22 @@ function filterSql(db: Sql, installationId: string, f: SmartFilter, coldTags: st
   return parts.reduce((acc, p) => db`${acc} and ${p}`, db`true`);
 }
 
-export async function searchPeople(installationId: string, allowed: string[] | null, f: SmartFilter, page: number, coldTags: string[]): Promise<{ total: number; page: number; pageSize: number; rows: PersonRow[] }> {
+/**
+ * One page of people for the filter. The count is exact up to COUNT_CAP (10,000) and then stops ("capped"): counting two million matches of two letters would cost more than
+ * the page itself, and nobody reads past the first pages. The count is a second read of the same filter, run beside the page, so the number and the list agree.
+ */
+export async function searchPeople(installationId: string, allowed: string[] | null, f: SmartFilter, page: number, coldTags: string[]): Promise<{ total: number; capped: boolean; page: number; pageSize: number; rows: PersonRow[] }> {
   const size = PAGE_SIZE;
   const offset = (Math.max(1, Math.floor(page)) - 1) * size;
   return timed(async (db) => {
+    const counting = db`with loc as (${visible(db, installationId, allowed)})
+      select count(*)::int n from (select 1 from cached_contacts c join loc on loc.location_id = c.location_id
+        where c.installation_id = ${installationId} and ${filterSql(db, installationId, f, coldTags)} limit ${COUNT_CAP + 1}) x`;
     const rows = await db`
       with loc as (${visible(db, installationId, allowed)}),
       pg as (
         select c.contact_id, c.location_id, loc.name location_name, loc.timezone, coalesce(nullif(c.full_name, ''), nullif(c.email, ''), 'Unnamed contact') name, c.email, c.phone, c.tags,
-          c.source, nullif(c.assigned_to, '') owner, c.dnd, c.date_added, c.last_activity_at, count(*) over() total
+          c.source, nullif(c.assigned_to, '') owner, c.dnd, c.date_added, c.last_activity_at
         from cached_contacts c join loc on loc.location_id = c.location_id
         where c.installation_id = ${installationId} and ${filterSql(db, installationId, f, coldTags)}
         order by ${f.q ? db`(lower(c.email) = ${f.q.toLowerCase()}) desc, (c.full_name ilike ${escapeLike(f.q) + "%"}) desc,` : db``} c.last_activity_at desc nulls last, c.date_added desc nulls last, c.contact_id
@@ -145,14 +155,10 @@ export async function searchPeople(installationId: string, allowed: string[] | n
         select max(o.created_at) last_call_at, count(*)::int calls, (array_agg(o.outcome order by o.created_at desc))[1] last_result
         from call_outcomes o where o.installation_id = ${installationId} and o.location_id = pg.location_id and o.contact_id = pg.contact_id) lc on true
       order by pg.last_activity_at desc nulls last, pg.date_added desc nulls last, pg.contact_id`;
-    // The page can be past the end (the list shrank): the total is then unknown from the rows, so it is counted on its own.
-    let total = rows[0]?.total ?? 0;
-    if (rows.length === 0 && offset > 0) {
-      const [c] = await db`with loc as (${visible(db, installationId, allowed)}) select count(*)::int n from cached_contacts c join loc on loc.location_id = c.location_id where c.installation_id = ${installationId} and ${filterSql(db, installationId, f, coldTags)}`;
-      total = c?.n ?? 0;
-    }
+    const [counted] = await counting;
+    const n = Number(counted?.n ?? 0);
     return {
-      total: Number(total), page: Math.max(1, Math.floor(page)), pageSize: size,
+      total: Math.min(n, COUNT_CAP), capped: n > COUNT_CAP, page: Math.max(1, Math.floor(page)), pageSize: size,
       rows: rows.map((r) => ({
         contactId: r.contact_id, locationId: r.location_id, locationName: r.location_name, name: r.name, email: r.email, phone: r.phone, tags: r.tags ?? [], source: r.source,
         owner: r.owner, dnd: r.dnd === true, timeZone: r.timezone ?? null, dateAdded: iso(r.date_added), lastActivityAt: iso(r.last_activity_at),
