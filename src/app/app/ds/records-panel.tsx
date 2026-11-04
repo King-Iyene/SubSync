@@ -59,6 +59,7 @@ export function RecordsPanel({ spec, onClose, now, zone = "UTC", canExport = tru
   const [page, setPage] = useState(0);
   const [max, setMax] = useState(false);
   const [searching, setSearching] = useState(false);
+  const [menuLeft, setMenuLeft] = useState(false);
   const [menu, setMenu] = useState(false);
   const [open, setOpen] = useState<string | null>(null); // which chip's list is open
   const [chips, setChips] = useState<string[]>(() => {
@@ -211,9 +212,9 @@ export function RecordsPanel({ spec, onClose, now, zone = "UTC", canExport = tru
             <button type="button" className={iconBtn} aria-label="Search" onClick={() => setSearching(true)} data-testid="records-search-toggle"><Search aria-hidden className="size-4.5" /></button>
           )}
           <div className="relative" data-pop-anchor>
-            <button type="button" className={iconBtn} aria-label="More" aria-expanded={menu} aria-haspopup="menu" onClick={() => setMenu(!menu)} data-testid="records-menu"><MoreHorizontal aria-hidden className="size-5" /></button>
+            <button type="button" className={iconBtn} aria-label="More" aria-expanded={menu} aria-haspopup="menu" onClick={(e) => { const b = e.currentTarget.getBoundingClientRect(), r = root.current?.getBoundingClientRect(); setMenuLeft(!!r && b.right - r.left < 240); setMenu(!menu); }} data-testid="records-menu"><MoreHorizontal aria-hidden className="size-5" /></button>
             {menu && (
-              <div role="menu" className="absolute right-0 top-full z-30 mt-1 w-56 rounded-xl border bg-popover p-1.5 text-sm shadow-[var(--shadow-lift)]">
+              <div role="menu" className={`absolute ${menuLeft ? "left-0" : "right-0"} top-full z-30 mt-1 w-56 rounded-xl border bg-popover p-1.5 text-sm shadow-[var(--shadow-lift)]`}>
                 {canExport ? <button type="button" role="menuitem" onClick={download} data-testid="records-export" className="flex min-h-9 w-full items-center gap-2 rounded-lg px-2 text-left hover:bg-accent"><Download aria-hidden className="size-4" />Export CSV ({rows.length})</button> : null}
                 <button type="button" role="menuitem" onClick={() => { change(emptyFilter(spec.preset)); setSort(null); setSearching(false); setMenu(false); }} className="flex min-h-9 w-full items-center gap-2 rounded-lg px-2 text-left hover:bg-accent" data-testid="records-reset"><X aria-hidden className="size-4" />Clear filters and sorting</button>
               </div>
