@@ -1,3 +1,55 @@
+# Today (third pass, 4 Nov 2026): one question, one number per fact, one page for every role
+
+Status: **BUILT on branch `today-v3`, awaiting King's checks.** No migration. Spec: `docs/TODAY_REVIEW.md`. King's added rules: KF-8, KF-9, KF-10 in `docs/KING_FEEDBACK_LIVE.md`. Decisions: `docs/DECISIONS.md`, "Today v3". Counting rule: `docs/METRICS.md`, "Today, third pass".
+
+## What changed, in plain words
+
+- **Every number is counted once.** A person waiting for a reply is ONE person, whether they are a new lead, a customer message nobody answered, or both. "Leads waiting" and "unanswered messages" are now one thing, "Waiting for a reply", and "N new leads" is said as part of it ("93 people waiting for a reply (53 new leads)"), never added on. One function (`countsOf`) feeds the headline, the list, the bars, the tiles and every list behind a number.
+- **One slim top row.** The title, the client-account filter (it names the accounts) and ONE "More" menu. The "Updated 2 min ago" line sits in the row with search and the bell. The banner "You opened this from inside a client account" is one line in the filter row: "Showing KD Squares LTD. See all."
+- **One sentence and one button.** "13 clients need you today. $1,218,373 is at risk." and one filled button (for an agency "Open <the client that needs you most>"; for one account "Reply now"). Nothing else on the page is a filled button.
+- **The work list.** Agency: one row per client account (its biggest problem), five rows, then "See all 13 clients" (the full list opens in the records panel with search, sort, an urgency chip and 50 a page). One account: **Reply now**, the people who have waited longest first, five rows, "See all N". Each row is one line of who or what, one line of why, one small outlined button (Open or Reply) in a fixed column, and a quiet three-dot menu (Show everything, Show only this client, Done for now, Snooze 1 day, Snooze until Monday, Assign to me, the next step). Rows are about 60 px tall, so six fit at 1440 x 800.
+- **Charts only where they answer something.** No donut. More than one client account: one stacked bar per account (top 8 and "+N more clients, see all"). A segment opens that account's records of that kind; the name opens everything for that account; the count on a mark is the number of rows it opens, and the records panel says exactly what was clicked ("Blue Door Realty, waiting for a reply"). One account: no chart, a list grouped by kind with counts that open that kind.
+- **One page for every role.** Agency (all accounts), an agency person inside one account, a client's staff and a business owner see the same page built from the same parts. A client's staff see calls to make and today's and tomorrow's appointments on Today itself; the menu item "My day" is gone and the old address opens Today.
+- **More detail, closed until asked for:** the four numbers, spotted today, "if nobody acts today", alerts raised and cleared, People, Sources, Coverage. Behind "More" in the top row: preview the daily email, print, share, sync now, saved views, commands (Ctrl Shift K still works). "Since you last looked" stays in the page.
+- **Plain words.** "Waiting for a reply", "No-shows to win back", "Deals gone quiet", "Urgent / Soon / When you can"; no "SLA", "stale" or "past the target". The note "Comparisons with your usual start after 7 days of history." appears once, not four times. "0 replies" is "No replies yet". An empty section (nothing about to go wrong, no appointments) is not drawn.
+
+## Design skills run (KF-10) and what each changed
+
+- **Design critique** (hierarchy, five-second test, consistency): the first draft repeated the dollar figure three times (sentence, line under it, the row), so the line under the sentence no longer repeats it; the account filter was 40 px high beside 32 px buttons, so it is 32 px; "13 of them urgent" when all 13 are urgent now reads "all of them urgent"; on a phone the filter wrapped More onto its own row, so More now stays on the title's row and the filter is the row under it; the reason line may wrap to two lines on a phone instead of being cut.
+- **Accessibility review** (WCAG 2.1 AA): touch targets on a phone are 44 px (Open, Reply, the menu, See all) and 32 px on a laptop; the parts of a bar are 24 px tall; every button has a name that says who it is for and says when it opens a new tab; urgency is an icon and a word, never colour alone; the first row is only drawn as selected after the keyboard is used; the segments of a bar have labels, the colours have a legend and there is a hidden table. Reported and left: the narrow segments of a bar are narrower than 24 px (the same list is reachable from the account's name, one tab stop away).
+- **UX copy:** "Nothing needs fixing right now" became "Nothing needs you right now", "How urgent" became "Urgency", "Reply to the person who has waited longest" replaces "Answer the longest-waiting lead first".
+- **Dataviz palette check:** the four chart colours were validated with the skill's script in light and dark (lightness band, chroma, colour-blind separation, contrast): all pass (worst adjacent pair delta E 18.9 for colour-blind simulations). Marks keep 2 px gaps, a 4 px rounded end, a legend, a tooltip line and a hidden table.
+
+## The counting definition (short)
+
+Waiting for a reply = distinct people who are either a new lead past the reply target with no person's reply, or a customer whose message is the last one and is older than the reply window. Counted once. New leads among them are a subset. Appointments to mark, no-shows to win back and deals gone quiet are separate kinds. Full text and the capped-list rule: `docs/METRICS.md`.
+
+## King's 5 checks (plain words)
+
+1. Open Today as the agency owner. Read the first sentence, then the line under it. The number of people waiting in the line is the same number you get when you press "Waiting for a reply" under More detail, and it is the sum of the bars. Nothing is counted twice.
+2. Look at the list. Five rows, one small "Open" button on each, lined up in one column. Press the three dots on a row: Show everything, Show only this client, Done for now, Snooze. Press "See all 13 clients": you get the whole list with search.
+3. Press one coloured part of a bar. The list that opens is only that client's people of that kind, its title says so, and its number is the number on the bar part. Press "Show only this client": the bars disappear (one account has no chart) and "Reply now" appears.
+4. Open Today as a client's staff user (add ?as=client to the address) and as a business owner (?as=business). One menu item, "Today". The first thing is "N people are waiting for a reply" and "Reply now"; each row has one "Reply" button. Resize to a phone: nothing scrolls sideways, the buttons are thumb size.
+5. Press "More" in the top row: the daily email preview, print, share, sync, saved views and commands are all there. Press "More detail" at the bottom: the four numbers (with the "start after 7 days of history" note once), People, Sources and Coverage.
+
+## Tests
+
+Unit: `src/lib/__tests__/today-count.test.ts` (the counting rule, one number per fact, titles, 150 accounts), `today-queue.test.ts`, `today-smart.test.ts`, `today-state.test.ts`, `today-records.test.ts`; `tests/unit/today-lists.test.ts` (five rows inline at 150 accounts, the compact grid, the bars), `f5-today.test.ts`, `ds-components.test.ts`. Database (shared project, fixtures removed): `today-db`, `today-actions-db` (one-person marks, forged people refused). Browser: `tests/e2e/today.spec.ts`, `today3.spec.ts` (the acceptance list for four roles at three widths), and the second-pass specs updated to the new layout. Screenshots: `docs/review/today-v3-<role>-<width>.png` for agency, agency-account, client and business at 1440, 768 and 390 (a `-full` file beside each is the whole page).
+
+## Results (4 Nov 2026, demo company, one slow machine)
+
+- `npx next typegen && npx tsc --noEmit`: 0 errors. `npx eslint src tests`: 0 errors, 11 warnings (older ones plus unused test variables).
+- `node --test src/lib/__tests__/`: tests 838, pass 838, fail 0.
+- `npx vitest run --no-file-parallelism` (once, alone): Test Files 1 failed | 60 passed (61), Tests 1 failed | 741 passed (742). The one failure is `tests/unit/data-inventory.test.ts`, "the migration reader matches the live database": the live database has a `cached_contacts.first_seen_at` column that no migration file creates. It is not part of Today and this branch adds no migration.
+- Browser, desktop 1440: `today3.spec.ts` 14 of 14, `today2.spec.ts` 3 of 3, `today2-controls.spec.ts` 8 of 8, `today2-records.spec.ts` 17 of 17, `today.spec.ts` 21 of 21. Phone 390 and tablet 768: `today.spec.ts` and `today3.spec.ts` all pass (`today3` skips the "above the fold" test off desktop); `d0.spec.ts` "client's staff open Today" passes at all three widths. Some tests failed on a first run because of the test or the busy shared machine (a stale selector, a 90 second limit on tests that read Today a dozen times, a number read in the middle of its count-up), were fixed and re-run alone, and then passed.
+- Screenshots: `docs/review/today-v3-<role>-<width>.png` for agency, agency-account (an agency person inside one client account), client and business at 1440, 768 and 390; a `-full` file beside each shows the whole page. The "before" is the v2 screenshots (`docs/review/today2-*.png`, `today-after-desktop-1440.png`) and King's live screenshot described in `docs/TODAY_REVIEW.md`; the working tree was changed in place, so there is no new "before" capture.
+
+## NOT verified
+
+Everything ran on the demo company. Not run on real installs: the merge of new leads and conversations on real data (the demo has leads that are also conversations; the real mix may differ), a real agency with 100 accounts (150 accounts are tested as a fixture), the look on King's own screen and the white-label links of a real agency. A count of people waiting is an upper bound when either source list was cut at its cap (200 leads, 100 conversations); the list then says "first ones only".
+
+---
+
 # Today (rebuilt 3 Nov 2026, second pass 4 Nov 2026)
 
 ## Second pass (4 Nov 2026): records behind every number, spotted today, a working queue

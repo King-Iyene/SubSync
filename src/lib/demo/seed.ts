@@ -4,6 +4,7 @@ import { currentVersion } from "../analytics/definitions";
 import { sql } from "../db";
 import { applyLeadRules } from "../sync/lead-rules-apply";
 import { checkDomain, type DnsResolver } from "../dns/email-auth";
+import { ensureDupesDemo } from "./dupes-demo";
 
 // Demo data: a fictional agency with 14 client accounts of deliberately different health, so
 // every feature has something realistic to show. All names, emails and numbers are invented
@@ -586,5 +587,6 @@ export async function ensureDemo(): Promise<string> {
   await ensureColdDemo(id).catch(() => undefined);
   await ensureClientsDemo(id).catch(() => undefined);
   await ensureWorkflowsDemo(id).catch(() => undefined);
+  await ensureDupesDemo(id).catch(() => undefined);
   return id;
 }

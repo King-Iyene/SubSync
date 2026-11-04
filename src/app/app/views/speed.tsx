@@ -1,154 +1,157 @@
 "use client";
 
-import { useState } from "react";
-import { waitLabel } from "@/lib/design/ui-logic";
+import { ChevronDown } from "lucide-react";
+import { useRef, useState } from "react";
+import { summaryText } from "@/lib/analytics/speed-v2";
 import { measuringSentence } from "@/lib/design/speed-text";
 import { useData } from "../session";
 import type { GoFn } from "../nav";
-import { BarChart, CardRange, ChartPlaceholder, DataList, DrillPanel, EmptyState, HowTo, InlineAlert, LeadDrawer, Page, useCardRange, useDrill, type Column, type LeadSeed } from "../ds";
-import { compareWeeks, totalsOf, weekBars, weeksIn, type TrendMember, type TrendWeekData } from "@/lib/design/trend-bars";
-import { Badge, Btn, Card, ErrorBox, ExtLink, fmtInt, Loading, type Tone } from "../ui";
-import { AccountsCard, leadColumns, leadCopy, leadKey, leadSeed, PeopleCard, SourceCard, SummaryCard, type LeadView, type PersonView } from "./speed-cards";
+import { EmptyState, ErrorState, HeadlineBlock, HowTo, InlineAlert, PopMenu, SkeletonRows, useCardRange, type MenuItem } from "../ds";
+import { PrimaryButton } from "./today-chrome";
+import { SourceCard } from "./speed-cards";
+import { LeadList } from "./speed-all";
+import { FastSection, SlowSection, type CompareAccountRow, type ComparePersonRow, type OpenList, type PictureData } from "./speed-picture";
+import { LeadRows, useLeadActions, waitWords, type LeadRow } from "./speed-rows";
 
-// The wire shape of the main answer. The cards below the list ask for their own windows (speed-cards.tsx).
-type Summary = { leads: number; answered: number; withinTarget: number; answeredLate: number; stillWaiting: number; hitRate: number | null; medianSeconds: number | null; p90Seconds: number | null };
-type Waiting = {
-  locationId: string; locationName: string; contactId: string; name: string; waitingMinutes: number; url: string; unassigned?: boolean; neverAnswered?: boolean;
-  source?: string; owner?: PersonView | null; autoSeconds?: number | null; detailed?: boolean;
-};
-type Data = {
-  targetMinutes: number; windowDays: number;
+// Speed to lead, rebuilt (docs/SPEED_REVIEW.md). One question: "who is waiting for a first reply, and what do I do first?". Top to bottom: one sentence, one button
+// ("Reply to the oldest waiting lead"), a short list of the five leads to reply to now (See all opens the whole list, searched and paged on the server), how fast
+// replies come, who is slow, and the rest behind "More detail". The leads waiting are the same people Today counts as new leads; every number opens exactly the
+// leads it counts. SubSync measures replies and never sends one.
+
+type Home = PictureData & {
+  now: number; seePeople: boolean;
   access: { ok: number; needsPermission: Array<{ locationId: string; name: string }>; total: number };
-  overall: Summary;
-  unassignedWaiting?: number;
-  trend?: TrendWeekData[];
-  neverAnswered?: number;
-  leftOut?: Array<{ reason: string; label: string; n: number }>;
-  waitingTotal?: number;
-  waiting: Waiting[];
-  measuring?: { targetMinutes: number; countAutomated: boolean; businessHours: boolean; canChange: boolean };
+  waiting: {
+    waiting: number; never: number; noOwner: number; accountsWithWaiting: number; oldestMinutes: number | null;
+    headline: { parts: Array<{ t: string; strong?: boolean }>; text: string; allClear: boolean };
+    rows: LeadRow[]; cost: { line: string | null; formula: string; amount: number | null; leftOutAccounts: number };
+  };
+  compareAccounts: { total: number; rows: CompareAccountRow[] };
+  comparePeople: { total: number; rows: ComparePersonRow[] };
+  noSource: { n: number; total: number; share: number | null; actionable: boolean };
+  leftOut: Array<{ reason: string; label: string; n: number }>;
+  next: { key: string; text: string };
+  measuring: { targetMinutes: number; countAutomated: boolean; businessHours: boolean; canChange: boolean };
+  truncated: boolean;
 };
+type ListSpec = { title: string; params: Record<string, string>; noun?: string };
 
-// A waiting row in the shape the shared lead list takes (the same columns as every list behind a figure).
-const asLead = (w: Waiting): LeadView => ({
-  locationId: w.locationId, locationName: w.locationName, contactId: w.contactId, name: w.name, url: w.url, status: "waiting", neverAnswered: w.neverAnswered === true, minutes: w.waitingMinutes,
-  source: w.source ?? "No source recorded", repliedBy: null, owner: w.owner ?? null, unassigned: w.unassigned === true, autoSeconds: w.autoSeconds ?? null, personSeconds: null, detailed: w.detailed === true,
-});
+const MORE_TRIGGER = "ds-press inline-flex h-8 items-center gap-1 rounded-md border bg-card px-2.5 text-sm font-medium hover:border-primary/40 hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--ring)]";
 
-// The leads behind one week of the trend chart: the rows of the list are the leads the bar counts (KF-6).
-const statusTone: Record<TrendMember["status"], Tone> = { within: "good", late: "warn", waiting: "bad" };
-const statusText: Record<TrendMember["status"], string> = { within: "answered in time", late: "answered late", waiting: "still waiting" };
-const memberColumns: Array<Column<TrendMember>> = [
-  { key: "name", header: "Lead", primary: true, width: "minmax(0,2fr)", cell: (m) => m.name },
-  { key: "account", header: "Client account", width: "minmax(0,1.5fr)", cell: (m) => <span className="text-muted-foreground">{m.locationName}</span> },
-  { key: "status", header: "What happened", width: "11rem", cell: (m) => <Badge tone={statusTone[m.status]}>{statusText[m.status]}{m.status === "waiting" ? ` ${waitLabel(m.minutes)}` : m.status === "late" ? ` after ${waitLabel(m.minutes)}` : ""}</Badge> },
-  { key: "open", header: "", width: "7rem", align: "right", cell: (m) => <ExtLink href={m.url}>Open contact</ExtLink> },
-];
-const INITIAL_RANGE = { preset: "90d", compare: "none" } as const;
-
-// How fast new leads get a first reply from a person. Replies from workflows and campaigns do not count. SubSync measures replies; it never sends one.
 export function SpeedView({ go }: { go: GoFn }) {
-  const { data, error, loading, reload } = useData<Data>("speed");
-  const [open, setOpen] = useState<number | null>(null);
-  const drill = useDrill();
-  const range = useCardRange("speed-trend", INITIAL_RANGE);
-  if (loading && !data) return <Loading label="Timing first replies..." />;
-  if (error) return <ErrorBox error={error} onRetry={reload} />;
-  if (!data) return null;
-  const o = data.overall;
-  // One plain sentence first: how many leads are waiting for a reply right now, and how many were missed.
-  const never = data.neverAnswered ?? 0;
-  const waitingNow = Math.max(0, o.stillWaiting - never);
-  const headline = waitingNow === 0 && never === 0
-    ? "No leads are waiting for a reply right now."
-    : `${waitingNow} ${waitingNow === 1 ? "lead is" : "leads are"} waiting for a reply${never > 0 ? `, and ${never} ${never === 1 ? "was" : "were"} never answered` : ""}.`;
-  const none = data.access.total > 0 && data.access.ok === 0;
-  const showAccount = data.access.total > 1;
-  const leads = data.waiting.map(asLead);
-  const seeds: LeadSeed[] = leads.map(leadSeed);
-  const m = data.measuring;
+  const range = useCardRange("speed", { preset: "30d", compare: "none" });
+  const r = range.resolved;
+  const path = r ? `speed?${new URLSearchParams({ part: "home", from: r.current.from, to: r.current.to, ...(r.compare ? { cmpFrom: r.compare.from, cmpTo: r.compare.to } : {}) })}` : null;
+  const { data, error, loading, reload } = useData<Home>(path);
+  const [list, setList] = useState<ListSpec | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [more, setMore] = useState(false);
+  const top = useRef<HTMLDivElement>(null);
+  const rows = data?.waiting.rows ?? [];
+  const actions = useLeadActions(rows);
+
+  if (error) return <div data-testid="page"><ErrorState error={error} onRetry={reload} /></div>;
+  if (!data || !r) return <div data-testid="page"><SkeletonRows rows={6} label="Timing first replies..." /></div>;
+
+  const d = data;
+  const w = d.waiting;
+  const multi = d.access.total > 1;
+  const none = d.access.total > 0 && d.access.ok === 0;
+  const empty = d.summary.judged === 0 && w.waiting === 0;
+  const stale = loading && !(d.window.from === r.current.from && d.window.to === r.current.to);
+  const open: OpenList = (spec) => { setList(spec); setTimeout(() => top.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 60); };
+  const waitingList: ListSpec = { title: "Waiting for a reply", params: { status: "waiting" } };
+  const oldest = rows[0];
+
+  const copy = async () => {
+    const text = summaryText({
+      who: multi ? "All client accounts" : d.accounts[0]?.name ?? "Your account", headline: w.headline.text, typical: d.summary.typicalLine, cost: w.cost.line,
+      waiting: rows.map((x) => ({ name: x.name, account: multi ? x.locationName : null, waited: waitWords(x).replace(/^Waiting /, ""), owner: x.owner ? `owner ${x.owner.label}` : "no owner" })),
+      slow: d.compareAccounts.rows.filter((a) => a.ranked && a.hitRate !== null).slice(0, 3).map((a) => ({ name: a.name, line: `${Math.round((a.hitRate as number) * 100)}% answered in time, ${a.judged} leads` })),
+    });
+    try { await navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2500); } catch { window.prompt("Copy this summary", text); }
+  };
+  const menu: MenuItem[] = [
+    { key: "copy", label: copied ? "Copied to your clipboard" : "Copy a summary", onSelect: () => void copy() },
+    { key: "print", label: "Print", onSelect: () => window.print() },
+    ...(d.measuring.canChange ? [{ key: "settings", label: "Change the default reply target", onSelect: () => go("settings") }] : []),
+    { key: "help", label: "How to use this page", onSelect: () => go("help") },
+  ];
 
   return (
-    <Page title="Speed to lead" subtitle={`How long new leads wait for a first reply from a person. Target ${data.targetMinutes} minutes, last ${data.windowDays} days.`}>
-      {data.access.needsPermission.length > 0 && (
+    <div data-testid="page" className="ds-enter" ref={top}>
+      <header className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 print:hidden">
+        <div className="mr-auto min-w-0">
+          <h1 className="text-[1.65rem] font-semibold leading-tight tracking-tight">Speed to lead</h1>
+          <p className="mt-1 max-w-2xl text-sm text-muted-foreground" data-testid="page-subtitle">How long new leads wait for a first reply from a person. SubSync measures this; it never sends a reply.</p>
+        </div>
+        <PopMenu label="More" items={menu} testId="speed-more" triggerClassName={MORE_TRIGGER}>More<ChevronDown aria-hidden className="size-3.5" /></PopMenu>
+      </header>
+
+      {d.access.needsPermission.length > 0 && (
         <InlineAlert tone="warning" className="mb-4">
-          Needs permission: reconnect. Reading the messages inside conversations needs a permission that {data.access.needsPermission.length === data.access.total ? "none of your accounts has" : `${data.access.needsPermission.length} of ${data.access.total} accounts have not`} approved yet
-          ({data.access.needsPermission.slice(0, 3).map((a) => a.name).join(", ")}{data.access.needsPermission.length > 3 ? " and more" : ""}). Until then those accounts are left out, and nothing is guessed.
+          Needs permission: reconnect. {d.access.needsPermission.length === d.access.total ? "None of your accounts has" : `${d.access.needsPermission.length} of ${d.access.total} accounts ${d.access.needsPermission.length === 1 ? "has" : "have"} not`} approved reading conversations
+          ({d.access.needsPermission.slice(0, 3).map((a) => a.name).join(", ")}{d.access.needsPermission.length > 3 ? " and more" : ""}). Those accounts are left out; nothing is guessed.
         </InlineAlert>
       )}
 
-      {o.leads === 0 ? (
-        <EmptyState title={none ? "Waiting for permission" : "No new leads to time yet"} body={none ? "Approve the new permissions when SubSync asks, then run a sync. First replies appear here after that." : "A lead appears here once a new contact has a conversation. Check back after the next sync."} action={<Btn onClick={() => go("help")}>Open Getting started</Btn>} />
+      {none || empty ? (
+        <EmptyState title={none ? "Waiting for permission" : "No new leads yet"} body={none ? "Approve the new permission when SubSync asks, then run a sync. First replies appear here after that." : "A lead appears here once a new contact has a conversation. Check back after the next sync."}
+          action={<button type="button" onClick={() => go("help")} className="ds-press h-10 rounded-lg border bg-card px-4 text-sm font-medium hover:border-primary/40">Open Getting started</button>} />
       ) : (
         <>
-          <HowTo id="speed" title="How to use this page" action={<button type="button" onClick={() => go("help")} className="text-xs font-medium text-primary underline">More in Getting started</button>}>
-            Start at the top of the list: the longest wait is first. Tap a name to see the lead and step to the next one. Every number below opens the leads behind it. SubSync measures replies; it does not send them.
-          </HowTo>
-          <p className="mb-1 text-sm font-medium" data-testid="speed-headline">{headline}</p>
-          {waitingNow > 0 && <p className="mb-1 text-xs text-muted-foreground" data-testid="what-to-do">What to do: reply to the first leads in the list, then assign the ones with no owner.</p>}
-          {m && (
-            <p className="mb-3 text-xs text-muted-foreground" data-testid="measuring">
-              {measuringSentence(m)}{" "}
-              {m.canChange ? <button type="button" onClick={() => go("settings")} className="font-medium text-primary underline" data-testid="speed-settings-link">Change the target or this option in Settings</button> : "Ask the person who manages your account to change this."}
-            </p>
-          )}
+          <HowTo id="speed2" title="How to use this page">Reply to the lead at the top, then the next. Every number opens the leads behind it, and a lead&apos;s three dots call or email it through your CRM.</HowTo>
 
-          {leads.length > 0 && (
-            <div className="mt-4">
-              <h2 className="mb-2 text-base font-semibold">Leads waiting or missed ({data.waitingTotal ?? o.stillWaiting})</h2>
-              <p className="mb-2 text-xs text-muted-foreground">Longest waiting first. Tap a name to see the lead.</p>
-              <DataList rows={leads} columns={leadColumns(showAccount)} rowKey={leadKey} total={data.waitingTotal} onOpen={(_, i) => setOpen(i)} caption="Leads waiting or missed" copyText={leadCopy(showAccount)} />
+          <HeadlineBlock headline={{ ...w.headline, breakdown: null, accounts: w.accountsWithWaiting, dollars: w.cost.amount ?? 0 } as never}
+            action={oldest ? <PrimaryButton p={{ label: "Reply to the oldest waiting lead", sr: `${oldest.name}, the longest wait`, href: oldest.url }} /> : undefined}>
+            <div className="mt-3 max-w-3xl text-sm leading-6 text-muted-foreground" data-testid="speed-proof">
+              {d.summary.typicalLine}{w.cost.line ? <> <span className="font-medium text-foreground" data-testid="speed-cost">{w.cost.line}</span></> : null}
+              {w.cost.line && <details className="mt-1 inline-block align-top"><summary className="ds-press min-h-9 cursor-pointer list-none px-1 font-medium text-primary underline underline-offset-4" data-testid="cost-formula-toggle">How this is worked out</summary><span className="block max-w-xl pt-1" data-testid="cost-formula">{w.cost.formula}</span></details>}
             </div>
-          )}
+            {w.waiting === 0 && <p className="mt-2 text-sm" data-testid="speed-next"><span className="font-medium">Next best step.</span> {d.next.text}</p>}
+          </HeadlineBlock>
 
-          {(data.leftOut ?? []).length > 0 && (
-            <p className="mt-2 text-xs text-muted-foreground">
-              {fmtInt((data.leftOut ?? []).reduce((s, x) => s + x.n, 0))} new contacts were not counted as leads: {(data.leftOut ?? []).map((x) => `${fmtInt(x.n)} ${x.label}`).join(", ")}.
-            </p>
-          )}
+          <div className={stale ? "opacity-70" : ""} aria-busy={stale}>
+            {list ? (
+              <LeadList key={JSON.stringify(list.params)} title={list.title} params={list.params} showAccount={multi} canMine noun={list.noun} onBack={() => { setList(null); setTimeout(() => document.querySelector<HTMLElement>("[data-testid=reply-all], [data-testid=speed-fast] h2")?.focus(), 60); }} backLabel="Back to Reply now" />
+            ) : w.waiting > 0 && (
+              <section className="mb-10" aria-label="Reply now" data-testid="reply-now">
+                <div className="mb-2 flex flex-wrap items-end justify-between gap-x-4 gap-y-1">
+                  <div className="min-w-0">
+                    <h2 className="text-lg font-semibold tracking-tight">Reply now</h2>
+                    <p className="mt-0.5 text-sm text-muted-foreground" data-testid="reply-summary">Longest wait first.{w.noOwner > 0 ? ` ${w.noOwner.toLocaleString("en-US")} ${w.noOwner === 1 ? "has" : "have"} no owner.` : ""}</p>
+                  </div>
+                  {w.waiting > rows.length && <button type="button" onClick={() => open(waitingList)} className="ds-press min-h-11 rounded-md px-2.5 text-sm font-medium text-primary underline-offset-4 hover:bg-muted hover:underline sm:min-h-9" data-testid="reply-all">See all {w.waiting.toLocaleString("en-US")}</button>}
+                </div>
+                <LeadRows rows={rows} showAccount={multi} actions={actions} testId="reply-rows" />
+                {actions.drawer}
+              </section>
+            )}
 
-          {(data.unassignedWaiting ?? 0) > 0 && (
-            <InlineAlert tone="warning" className="mt-4" title={`${data.unassignedWaiting} waiting lead${data.unassignedWaiting === 1 ? " has" : "s have"} no owner.`}>
-              Nobody is responsible for answering {data.unassignedWaiting === 1 ? "it" : "them"}. Assign them, or fix the routing so new leads always reach a person.
-            </InlineAlert>
-          )}
+            <FastSection d={d} range={range} open={open} showAccount={multi} reload={reload} />
+            <SlowSection d={d} accounts={d.compareAccounts} people={d.comparePeople} seePeople={d.seePeople} multi={multi} open={open} reload={reload} />
+          </div>
 
-          <SummaryCard showAccount={showAccount} />
+          <section className="mb-4 border-t pt-4 print:hidden" aria-label="More detail" data-testid="speed-more-detail">
+            <button type="button" onClick={() => setMore(!more)} aria-expanded={more} data-testid="speed-more-toggle"
+              className="ds-press inline-flex h-9 items-center gap-1.5 rounded-md px-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-[var(--ring)]">
+              More detail<ChevronDown aria-hidden className={`size-4 transition-transform ${more ? "rotate-180" : ""}`} />
+            </button>
+            {more && (
+              <div className="mt-3">
+                <SourceCard showAccount={multi} />
+                {d.leftOut.length > 0 && <p className="mt-4 text-xs text-muted-foreground" data-testid="left-out">{d.leftOut.reduce((s, x) => s + x.n, 0).toLocaleString("en-US")} new contacts in this range were not counted as leads: {d.leftOut.map((x) => `${x.n.toLocaleString("en-US")} ${x.label}`).join(", ")}.</p>}
+              </div>
+            )}
+          </section>
 
-          {data.trend && data.trend.some((w) => w.leads > 0) && (() => {
-            const all = data.trend ?? [];
-            const win = range.resolved;
-            const weeks = win ? weeksIn(all, win.current) : all;
-            const cmp = win ? compareWeeks(all, win.current, win.compare) : null;
-            const picked = drill.selected !== null ? weeks[drill.selected] : undefined;
-            const noBars = weeks.every((w) => w.hitRate === null);
-            return (
-              <Card title="Are replies getting faster?" className="mt-6">
-                <CardRange state={range} label="Replies by week" compares={["none", "previous"]} maxDays={56} />
-                <p className="mb-3 mt-3 text-xs text-muted-foreground">New leads answered by a person inside your {data.targetMinutes}-minute target, by week. A week with fewer than 5 leads has no bar. Click a bar to see its leads.</p>
-                {cmp?.change && <p className="mb-3 text-sm" data-testid="trend-compare">{cmp.change.text}.</p>}
-                {win?.compare && cmp && !cmp.covered && <p className="mb-3 text-xs text-muted-foreground" data-testid="trend-compare-missing">There is not enough history to compare with {win.compare.label}: only 8 weeks are kept so far.</p>}
-                {noBars ? (
-                  <ChartPlaceholder title="This chart" need={5} have={weeks.reduce((best, w) => Math.max(best, w.leads), 0)} unit="leads in one week">{" "}It needs a week with 5 or more judged leads before it shows a bar.</ChartPlaceholder>
-                ) : (
-                  <BarChart title="Answered within target, by week" axisLabel="% of new leads" unit="%" format={(n) => `${Math.round(n)}`} sample={totalsOf(weeks).total} min={5} need="leads" noun="leads"
-                    bars={weekBars(weeks)} onSelect={(i) => drill.select(i)} selected={drill.selected} />
-                )}
-                {picked && (
-                  <DrillPanel drill={drill} title={`Week of ${weekBars([picked])[0].label}`} count={picked.leads} noun={picked.leads === 1 ? "lead" : "leads"} rows={picked.members} columns={memberColumns} rowKey={(x) => x.locationId + x.contactId}
-                    toLead={(x) => ({ contactId: x.contactId, locationId: x.locationId, name: x.name, locationName: x.locationName, url: x.url, note: `${statusText[x.status][0].toUpperCase()}${statusText[x.status].slice(1)}.` })} />
-                )}
-              </Card>
-            );
-          })()}
-
-          <SourceCard showAccount={showAccount} />
-          {showAccount && <AccountsCard go={go} />}
-          <PeopleCard showAccount={showAccount} />
+          <p className="mb-2 text-xs text-muted-foreground" data-testid="measuring">
+            {measuringSentence(d.measuring)} A lead is a new contact with a conversation. The clock starts when the contact is created or the first message arrives, and stops at the first message or call a person placed from your CRM.{" "}
+            {d.measuring.canChange ? <button type="button" onClick={() => go("settings")} className="font-medium text-primary underline" data-testid="speed-settings-link">Change the reply target, or switch on &quot;Count automatic messages as a reply&quot;, in Settings</button> : "Ask the person who manages your account to change these."}
+            {d.truncated ? " This range holds more leads than SubSync reads at once; the newest 20,000 are used." : ""}
+          </p>
         </>
       )}
-      <p className="mt-4 text-xs text-muted-foreground">A lead is a new contact with a conversation. The clock starts when the contact is created or the first message arrives, whichever is earlier, and stops at the first message a person sent from the app. Automatic texts do not stop it unless you change that in Settings.</p>
-      <LeadDrawer leads={seeds} index={open} onIndex={setOpen} onClose={() => setOpen(null)} />
-    </Page>
+    </div>
   );
 }

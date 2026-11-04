@@ -8,22 +8,22 @@ import { keptParams } from "@/lib/design/route";
 import { withTodayAccounts } from "@/lib/analytics/today-queue";
 import { THEME_PREFS, type ThemePref } from "@/lib/design/ui-logic";
 import { NAV_FOR, type AccessKind } from "@/lib/access";
+import { movedSettingsSection } from "@/lib/settings-sections";
 import {
   Briefcase, CalendarCheck, ClipboardCheck, Zap, CircleHelp, Copy, Eraser, Inbox, Kanban, LayoutDashboard, Mic, Monitor, Moon, PhoneCall, Plug, Search, Settings, Sun, Target, UserRound, Users, Wrench, type LucideIcon,
   Sparkles, UsersRound,
   Workflow,
 } from "lucide-react";
-import { NAV, PARENT, type GoFn, type ViewId } from "./nav";
+import { NAV, PARENT, visibleNav, type GoFn, type ViewId } from "./nav";
 import { useBrandedText } from "./brand-text";
 import { BrandLogo, ProductMark } from "./brand-logo";
 import { Btn } from "./ui";
 import { FeedbackBox } from "./feedback-box";
-import { BackLink, BackProvider, ModuleTabs, type ModuleTab } from "./ds/template";
+import { BackLink, BackProvider, ModuleTabs } from "./ds/template";
 import { InlineAlert } from "./ds/alert";
 import { FilterDrawer } from "./ds/filters";
 import { useTheme } from "./ds/theme";
 import { remember, remembered } from "./ds/remember";
-import { MyDayView } from "./ds/my-day";
 import { ApiProvider, makeApi, type Api } from "./session";
 import { AccountDetailView } from "./views/account-detail";
 import { AlertsView } from "./views/alerts";
@@ -49,7 +49,7 @@ import { OverviewView } from "./views/overview";
 import { PipelineView } from "./views/pipeline";
 import { TeamView } from "./views/people";
 import { SettingsView } from "./views/settings";
-import { ConnectionsPage } from "./views/connections";
+import { IntegrationsPage } from "./views/connections";
 import { NotificationsPage } from "./views/notifications";
 import { NotificationBell } from "./views/notification-bell";
 
@@ -88,12 +88,12 @@ function stateFromHash(): { view: ViewState; filter: FilterValue } {
   return parseHash(window.location.hash, VIEW_IDS);
 }
 
-// `?as=business` or `?as=client` opens the demo as a single business or as a client's staff.
+// `?as=business` or `?as=client` opens the demo as a single business or as a client's staff; `?as=location` as an agency person who opened SubSync from inside one client account.
 // Only demo mode honours it; real sign-in decides the view from the host's user context.
-function demoView(): "business" | "client" | undefined {
+function demoView(): "business" | "client" | "location" | undefined {
   if (typeof window === "undefined") return undefined;
   const as = new URLSearchParams(window.location.search).get("as");
-  return as === "business" || as === "client" ? as : undefined;
+  return as === "business" || as === "client" || as === "location" ? as : undefined;
 }
 
 export function Dashboard() {
@@ -221,6 +221,12 @@ export function Dashboard() {
     remember("filter", isFiltered(f) ? filterToLink(f) : null);
     try { window.history.replaceState(null, "", buildHash(viewRef.current, f, keptParams(window.location.hash))); } catch { /* see above */ }
   }, []);
+  // Today's "Showing KD Squares. See all" also ends the one-account narrowing the shell started with, so the other pages show every client account again.
+  useEffect(() => {
+    const clear = () => setFilter(EMPTY_FILTER);
+    window.addEventListener("subsync-clear-account-filter", clear);
+    return () => window.removeEventListener("subsync-clear-account-filter", clear);
+  }, [setFilter]);
   // The browser Back and Forward buttons: read the page and filter from the address.
   useEffect(() => {
     const onPop = () => {
@@ -254,6 +260,13 @@ export function Dashboard() {
       try { window.history.replaceState(null, "", withTodayAccounts(buildHash({ id: "today" }, only), [auth.locationId])); window.dispatchEvent(new Event("subsync-today-accounts")); } catch { /* the screen still narrows */ }
     }
   }, [auth]);
+  // An old address that moved into Settings (#connections) is rewritten to the page it lives in now, so the address, a reload and the Back button agree with the screen.
+  useEffect(() => {
+    if (auth.status !== "ready" || !movedSettingsSection(view.id) || !NAV_FOR[auth.kind].has("settings")) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setViewState({ id: "settings" });
+    try { window.history.replaceState(null, "", buildHash({ id: "settings" }, filterRef.current, keptParams(window.location.hash))); } catch { /* the screen is already right */ }
+  }, [auth, view.id]);
   // True while the page shows only the account SubSync was opened from (the filter is that one account). Pages draw no account filter then.
   const fromAccount = auth.status === "ready" && auth.kind === "agency" && Boolean(auth.locationId) && filter.accounts.length === 1 && filter.accounts[0] === auth.locationId;
   useBrandedText(auth.status === "ready" ? auth.brand.name : null);
@@ -279,13 +292,16 @@ export function Dashboard() {
   }
 
   const limited = auth.kind !== "agency";
+  // Connections is Settings, Integrations now: an old address opens Settings on that section (a client's staff have no Settings, so theirs stays the Integrations page).
+  const movedTo = movedSettingsSection(view.id);
+  const viewId: ViewId = movedTo && NAV_FOR[auth.kind].has("settings") ? "settings" : view.id;
   // Features that are switched off (flags) are not shown at all.
   // Switched off for everyone: not shown. Locked by plan: shown with a Pro note, and the page explains.
   const locked = (feature: string) => auth.locked.includes(feature);
   const off = (feature: string) => auth.features[feature] === false && !locked(feature);
   // A page that lives inside a module as a tab (People holds Contact search, Leads and Call lists) has no menu entry of its own.
   // (A page that lives inside the Clients module has no entry of its own for an agency; a business and a client's staff have no Clients module, so their Setup stays in their menu.)
-  const menu = NAV.filter((n) => NAV_FOR[auth.kind].has(n.id) && !off(n.feature) && (!n.parent || (limited && n.showWhenLimited)));
+  const menu = visibleNav(NAV_FOR[auth.kind], { limited, off });
   // The sidebar: the pilot menu in plain groups that scroll, and Settings, Getting started and What's new pinned underneath so they are always visible.
   const mainMenu = menu.filter((n) => n.group !== "Settings and help");
   const footMenu = menu.filter((n) => n.group === "Settings and help");
@@ -303,8 +319,9 @@ export function Dashboard() {
   ));
   const labelFor = (n: (typeof NAV)[number]) => (limited && n.id === "overview" ? "My account" : n.label);
   // Pages that live inside another page highlight their parent in the menu.
-  const shown: ViewId = view.id;
-  const active = limited && shown === "onboarding" ? shown : PARENT[shown] ?? shown;
+  const shown: ViewId = viewId;
+  const parentOfShown = PARENT[shown];
+  const active = limited && shown === "onboarding" ? shown : parentOfShown && menu.some((n) => n.id === parentOfShown) ? parentOfShown : shown;
   const agency = auth.demo ? "Demo Company" : limited ? "Your business" : "Your company";
   const own = auth.locationId;
 
@@ -321,23 +338,24 @@ export function Dashboard() {
   const content = (() => {
     // A business or a client sees its own account as the home page, never an accounts list.
     if (limited) {
-      const id = view.id === "account" ? "overview" : view.id;
+      const id = viewId === "account" ? "overview" : viewId;
       if (!NAV_FOR[auth.kind].has(id)) return <Centered title="Not available" body="This page is not part of your view of SubSync." />;
       // A page that is switched off is switched off for a business too (the menu already leaves it out; this covers a typed address).
       const pageFeature = NAV.find((n) => n.id === id)?.feature;
       if (pageFeature && off(pageFeature)) return <Centered title="Not available" body="This page is switched off right now." />;
-      if (id === "myday") return <MyDayView go={go} />;
+      if (id === "myday") return <ApiProvider value={baseApi}><TodayView go={go} kind={auth.kind} /></ApiProvider>;
       if (id === "overview") return own ? <AccountDetailView key={own} locationId={own} go={go} agency={agency} limited /> : <Centered title="Open SubSync from inside your account" body="We could not tell which account you are in." />;
     }
-    const feature = NAV.find((n) => n.id === view.id)?.feature;
+    const feature = NAV.find((n) => n.id === viewId)?.feature;
     if (feature && off(feature)) return <Centered title="Not available" body="This page is switched off right now." />;
     if (feature && locked(feature)) return <Centered title="Part of the paid plan" body="This page is included in the Pro plan. Ask whoever manages your SubSync plan to upgrade, and it appears here straight away." />;
-    switch (view.id) {
+    switch (viewId) {
       // Today reads with the unfiltered client and applies its own account choice, so the shared filter never changes what Today counts.
       case "today": return <ApiProvider value={baseApi}><TodayView go={go} kind={auth.kind} /></ApiProvider>;
-      case "myday": return <MyDayView go={go} />;
+      // "My day" is Today now (one page, one menu item). The old address still opens it.
+      case "myday": return <ApiProvider value={baseApi}><TodayView go={go} kind={auth.kind} /></ApiProvider>;
       case "people": case "search": case "leads": case "calls": return peopleOn ? <PeopleModule key={"people" + peopleStart} start={peopleStart} callsAllowed={callsAllowed} /> : <Centered title="Not available" body="This page is switched off right now." />;
-      case "audit": return <AuditView go={go} />;
+      case "audit": return <AuditView />;
       case "speed": return <SpeedView go={go} />;
       case "overview": return <OverviewView go={go} />;
       case "accounts": return <ClientsView key="accounts" go={go} initialTab="health" features={clientFeatures} />;
@@ -348,8 +366,8 @@ export function Dashboard() {
       case "email": return limited ? <ModuleTabs key="setup" start={1} tabs={setupTabs} /> : <EmailHealthView />;
       case "duplicates": return <DuplicatesView />;
       case "alerts": return <AlertsView go={go} />;
-      case "settings": return <SettingsView />;
-      case "connections": return <ConnectionsPage />;
+      case "settings": return <SettingsView openSection={movedTo ?? undefined} />;
+      case "connections": return <IntegrationsPage />;
       case "notifications": return <NotificationsPage />;
       case "help": return <HelpView go={go} />;
       case "roadmap": return <RoadmapView />;
@@ -372,6 +390,8 @@ export function Dashboard() {
     "--primary": accent.text, "--primary-foreground": accentTokens(accent.text, theme)!.onFill, "--ring": accent.text,
     "--sidebar-primary": menuAccent.text, "--sidebar-primary-foreground": accentTokens(menuAccent.text, "dark")!.onFill, "--sidebar-ring": menuAccent.text,
   } as React.CSSProperties) : undefined;
+  // The freshness line is built once: on Today it sits in the top row with search and the bell, on every other page above the page.
+  const strip = <StatusLine inline={view.id === "today"} />;
   const previous = trail.length > 0 ? trail[trail.length - 1] : null;
   const backLabel = previous ? (previous.id === "account" ? "the client account" : NAV.find((n) => n.id === previous.id)?.label ?? "the last page") : null;
   const back = previous && backLabel ? { label: backLabel, go: () => window.history.back() } : null;
@@ -418,7 +438,7 @@ export function Dashboard() {
             ))}
           </nav>
           <main className="mx-auto w-full max-w-[1400px] flex-1 p-4 sm:px-10 sm:py-8">
-            {fromAccount && (
+            {fromAccount && view.id !== "today" && (
               <InlineAlert className="mb-3" action={<Btn variant="ghost" onClick={() => { setFilter(EMPTY_FILTER); try { window.history.replaceState(null, "", withTodayAccounts(window.location.hash, [])); window.dispatchEvent(new Event("subsync-today-accounts")); } catch { /* see above */ } }}>See all client accounts</Btn>}>
                 You opened this from inside a client account, so every page shows only that account.
               </InlineAlert>
@@ -427,6 +447,8 @@ export function Dashboard() {
             {/* One slim row above every page: which client accounts are counted on the left, search and notifications on the right (D1; was four stacked blocks). */}
             <div className="mb-3 flex flex-wrap items-start gap-x-4 gap-y-1 print:hidden" data-testid="toolbar">
               <div className="min-w-0 flex-1">
+                {/* On Today the quiet freshness line sits here, in the one row with search and the bell (the page below draws its own account filter and "Showing" chip). */}
+                {view.id === "today" && strip}
                 {/* Today draws its own account selector inside the page; the shared one is for every other page. */}
                 {auth.kind === "agency" && baseApi && !fromAccount && view.id !== "today" && <ApiProvider value={baseApi}><FilterDrawer kind="agency" value={filter} onChange={setFilter} /></ApiProvider>}
               </div>
@@ -435,7 +457,7 @@ export function Dashboard() {
                 <NotificationBell go={go} />
               </div>
             </div>
-            <StatusLine /><BackProvider value={back}>{content}</BackProvider>
+            {view.id !== "today" && strip}<BackProvider value={back}>{content}</BackProvider>
             <FeedbackBox page={view.id} />
           </main>
         </div>

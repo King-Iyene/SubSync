@@ -1,0 +1,109 @@
+"use client";
+
+import { CalendarCheck, CircleCheck, Phone, TriangleAlert } from "lucide-react";
+import { useState } from "react";
+import type { TodayData, TodayMine, TodayPerson } from "@/lib/analytics/today-types";
+import { EmptyState, RowButton } from "../ds";
+import { Btn } from "../ui";
+
+// What a client's staff, a business owner or a setter also needs on Today (what "My day" used to be, now on Today itself): the calls to make and today's and tomorrow's
+// appointments. The people who are waiting for a reply are NOT repeated here: they are the Reply now list above. Same compact row grid as every Today list.
+
+const stamp = (p: TodayPerson, zone: string) => {
+  try { return new Date(p.at).toLocaleString("en-US", { weekday: "short", hour: "numeric", minute: "2-digit", timeZone: zone }); } catch { return new Date(p.at).toLocaleString("en-US", { weekday: "short", hour: "numeric", minute: "2-digit" }); }
+};
+const GRID = "@container ds-row grid grid-cols-[minmax(0,1fr)_6rem] items-center gap-x-3 py-2 pl-1 pr-1";
+
+function CallRow({ name, sub, url, dnd, phone }: { name: string; sub?: string; url: string; dnd?: boolean; phone: boolean }) {
+  return (
+    <li className={GRID} data-testid="call-row" data-dnd={dnd ? "true" : "false"}>
+      <div className="min-w-0"><p className="truncate font-semibold">{name}</p>{sub && <p className="truncate text-sm text-muted-foreground">{sub}</p>}</div>
+      {dnd
+        ? <button type="button" disabled title="This person asked not to be contacted." className="inline-flex h-11 w-full cursor-not-allowed items-center justify-center gap-1.5 rounded-md border px-2 text-sm font-medium text-muted-foreground opacity-70 sm:h-8"><Phone aria-hidden className="size-3.5" />No calls</button>
+        : <RowButton href={url} label={phone ? "Call" : "Open"} sr={`${name}, ${phone ? "call in your CRM" : "no phone number"}`} />}
+    </li>
+  );
+}
+
+function CallGroup({ title, total, shown, children, testId }: { title: string; total: number; shown: number; children: React.ReactNode; testId: string }) {
+  if (total === 0) return null;
+  return (
+    <div className="mb-4" data-testid={testId}>
+      <h3 className="text-sm font-semibold">{title} <span className="tnum font-normal text-muted-foreground">({total})</span></h3>
+      <ul className="mt-1 divide-y border-y">{children}</ul>
+      {total > shown && <p className="mt-1 text-xs text-muted-foreground">Showing {shown} of {total}. The rest are in Appointments.</p>}
+    </div>
+  );
+}
+
+export function CallsSection({ mine }: { mine: TodayMine }) {
+  const c = mine.calls;
+  const total = c.noshows.total + c.confirm.total;
+  if (total === 0) return null;
+  return (
+    <section className="mb-8" aria-labelledby="my-calls-h" data-testid="my-calls">
+      <h2 id="my-calls-h" className="text-lg font-semibold tracking-tight">Calls to make today</h2>
+      <p className="mb-3 mt-0.5 text-sm text-muted-foreground">A call opens the person in your CRM, where you dial.</p>
+      <CallGroup title="No-shows to win back" total={c.noshows.total} shown={c.noshows.rows.length} testId="calls-noshows">
+        {c.noshows.rows.map((p, i) => <CallRow key={`${p.contactId}-${i}`} name={p.name} sub={`Missed ${stamp(p, mine.timeZone)}${p.calendar ? `, ${p.calendar}` : ""}`} url={p.url} dnd={p.dnd} phone={!!p.phone} />)}
+      </CallGroup>
+      <CallGroup title="Appointments to confirm" total={c.confirm.total} shown={c.confirm.rows.length} testId="calls-confirm">
+        {c.confirm.rows.map((p, i) => <CallRow key={`${p.contactId}-${i}`} name={p.name} sub={`${stamp(p, mine.timeZone)}${p.calendar ? `, ${p.calendar}` : ""}`} url={p.url} dnd={p.dnd} phone={!!p.phone} />)}
+      </CallGroup>
+    </section>
+  );
+}
+
+export function AppointmentsSection({ mine, go }: { mine: TodayMine; go: () => void }) {
+  const [onlyUnmarked, setOnlyUnmarked] = useState(false);
+  const appts = [...mine.appointments.today.map((p) => ({ p, day: "Today" })), ...mine.appointments.tomorrow.map((p) => ({ p, day: "Tomorrow" }))];
+  const shown = onlyUnmarked ? appts.filter((a) => a.p.noOutcome) : appts;
+  const unmarked = appts.filter((a) => a.p.noOutcome).length;
+  // No appointments today or tomorrow: no empty section (new bookings show up here when they exist).
+  if (appts.length === 0) return null;
+  return (
+    <section className="mb-8" aria-labelledby="my-appts-h" data-testid="my-appts">
+      <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
+        <div className="min-w-0">
+          <h2 id="my-appts-h" className="text-lg font-semibold tracking-tight">Appointments today and tomorrow</h2>
+          {appts.length > 0 && <p className="mt-0.5 text-sm text-muted-foreground">{unmarked > 0 ? `${unmarked} of ${appts.length} have no outcome marked yet.` : "Every appointment that has passed has an outcome marked."}</p>}
+        </div>
+        {unmarked > 0 && <Btn variant="ghost" onClick={() => setOnlyUnmarked(!onlyUnmarked)}>{onlyUnmarked ? "Show all" : "Only those with no outcome"}</Btn>}
+      </div>
+      {shown.length === 0 ? (
+        <EmptyState compact title={appts.length === 0 ? "No appointments today or tomorrow" : "Nothing left with no outcome"} body={appts.length === 0 ? "New bookings appear here as they come in." : "Every appointment shown has an outcome marked."} />
+      ) : (
+        <ul className="divide-y border-y" data-testid="my-appts-list">
+          {shown.map(({ p, day: d }, i) => (
+            <li key={`${p.contactId}-${i}`} className={GRID} data-testid="my-appt" data-no-outcome={p.noOutcome ? "true" : "false"}>
+              <div className="flex min-w-0 items-center gap-2.5">
+                <CalendarCheck aria-hidden className="size-4 shrink-0 text-muted-foreground" />
+                <div className="min-w-0">
+                  <p className="truncate font-semibold">{p.name}</p>
+                  <p className="truncate text-sm text-muted-foreground">{d}, {stamp(p, mine.timeZone).replace(/^\w+, /, "")}{p.calendar ? `, ${p.calendar}` : ""}{p.noOutcome && <span className="inline-flex items-center gap-1 pl-2 font-medium text-warning"><TriangleAlert aria-hidden className="size-3.5" />No outcome marked</span>}</p>
+                </div>
+              </div>
+              <RowButton href={p.url} label="Open" sr={p.name} />
+            </li>
+          ))}
+        </ul>
+      )}
+      {unmarked > 0 && <div className="mt-1"><Btn variant="ghost" onClick={go}>Mark outcomes in Appointments</Btn></div>}
+    </section>
+  );
+}
+
+/** The calm all-clear: nothing waiting, nothing to call, nothing to mark. */
+export function DoneForToday({ data, streak }: { data: TodayData; streak: number }) {
+  return (
+    <section className="mb-8 flex items-center gap-4 border-b pb-6" aria-label="Done for today" data-testid="done-for-today">
+      <CircleCheck aria-hidden className="size-10 shrink-0 text-success" />
+      <div className="min-w-0">
+        <h2 className="text-xl font-semibold tracking-tight">Done for today</h2>
+        <p className="mt-0.5 text-sm text-muted-foreground" data-testid="streak">
+          {streak > 0 ? `${streak} ${streak === 1 ? "day" : "days"} in a row with every new lead answered inside ${data.targetMinutes} minutes.` : `Every person has an answer. Keep each new lead under ${data.targetMinutes} minutes.`}
+        </p>
+      </div>
+    </section>
+  );
+}

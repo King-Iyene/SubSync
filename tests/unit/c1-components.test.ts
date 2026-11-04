@@ -5,10 +5,8 @@ import { describe, expect, it } from "vitest";
 import { LineChart } from "@/app/app/ds";
 import { ApiProvider, type Api } from "@/app/app/session";
 import { ClientsView } from "@/app/app/views/clients";
-import { DetailsTab } from "@/app/app/views/clients/details";
 import { ClientCard } from "@/app/app/views/clients/onboarding-tab";
 import { ReviewsTab } from "@/app/app/views/clients/reviews";
-import type { ClientRow, ClientsData } from "@/app/app/views/clients/types";
 import { bandGroups, healthBars } from "@/lib/analytics/client-success";
 import { buildOnboardingItems } from "@/lib/analytics/client-success";
 
@@ -80,70 +78,6 @@ describe("the Clients by health chart", () => {
   });
 });
 
-const client = (o: Partial<ClientRow> & { locationId: string; name: string }): ClientRow => ({
-  url: "https://crm.example.com/x", score: 70, band: "healthy", churn: "low", dormant: false, new30d: 10, openValue: 1000, unanswered: 0, completenessPct: 80, winRate: null, avgCycleDays: null,
-  profile: { monthlyFee: null, renewalDate: null, industry: null, notes: null, lastContactedAt: null }, log: { count: 0, lastNote: null }, roi: null, renewal: null,
-  contactGap: { days: null, flagged: true }, progress: { daysSinceInstall: 60, firstLeadAt: null, firstWonAt: null, needsIntervention: false }, activity: "", setup: { score: 80, missing: [] }, ...o,
-});
-const data = (clients: ClientRow[], o: Partial<ClientsData> = {}): ClientsData => ({
-  clients, revenue: { monthly: 0, atRisk: 0, clientsWithFee: 0 }, firstUse: { noFees: true, noRenewals: true, noIndustry: true, noLog: true }, industryChoices: ["Medical and dental", "Real estate"], renewals: [], segments: [], compare: clients.map((c) => ({ locationId: c.locationId, name: c.name ?? "Unnamed account" })), ...o,
-});
-
-describe("the Details and billing tab (KF-7)", () => {
-  const empty = data([client({ locationId: "L1", name: "Alpha Dental" }), client({ locationId: "L2", name: "Beta Realty" })]);
-  const m = html(withApi(el(DetailsTab, { data: empty, reload: noop, go: noop })));
-  const t = text(m);
-
-  it("with nothing entered it guides instead of showing bare n/a: a first-use button, 'Add' on every row, and no n/a", () => {
-    expect(t).toContain("Add your first client fee");
-    expect(t).toContain("Not set up yet");
-    expect(t).toContain("Needs fees");
-    expect(t).toContain("No dates yet");
-    expect((m.match(/data-testid="add-fee"/g) ?? []).length).toBe(2);
-    expect((m.match(/data-testid="add-renewal"/g) ?? []).length).toBe(2);
-    expect((m.match(/data-testid="add-industry"/g) ?? []).length).toBe(2);
-    expect(t).toContain("Add the fee to see this");
-    expect(t).not.toMatch(/\bn\/a\b/);
-    expect(t).not.toMatch(/\bnot set\b(?! up)/i);
-    expect(t).toContain("Never logged");
-  });
-
-  it("every column and tile has a two-line explanation, and says that the user enters it", () => {
-    for (const phrase of ["What each column means", "What this client pays you each month", "The day this client's contract renews", "The kind of business this client runs", "When someone on your team last talked to this client", "What your clients pay you each month, added up", "Clients nobody on your team has spoken to in 14 days or more"]) expect(t, phrase).toContain(phrase);
-    expect(t).toContain("You enter this; SubSync does not read it from your CRM.");
-    expect((t.match(/you enter this/gi) ?? []).length).toBeGreaterThanOrEqual(5);
-  });
-
-  it("the details panel of the column help is open on first use", () => {
-    expect(m).toMatch(/<details[^>]*open=""[^>]*data-testid="column-help"|<details[^>]*data-testid="column-help"[^>]*open=""/);
-  });
-
-  it("with fees entered the tiles show the numbers and the row shows the fee and the value created", () => {
-    const filled = data([client({ locationId: "L1", name: "Alpha Dental", profile: { monthlyFee: 2500, renewalDate: "2026-12-15", industry: "Real estate", notes: null, lastContactedAt: "2026-10-30T10:00:00Z" }, roi: { pipelineMultiple: 7.2, wonMultiple: 1 }, renewal: { daysLeft: 14, bucket: "30" }, contactGap: { days: 2, flagged: false }, log: { count: 2, lastNote: { body: "Agreed to move the review to Friday", author: "Dana Brooks", on: "2026-10-30" } } })],
-      { revenue: { monthly: 2500, atRisk: 0, clientsWithFee: 1 }, firstUse: { noFees: false, noRenewals: false, noIndustry: false, noLog: false }, renewals: [{ locationId: "L1", name: "Alpha Dental", daysLeft: 14, bucket: "30", fee: 2500 }] });
-    const f = text(html(withApi(el(DetailsTab, { data: filled, reload: noop, go: noop }))));
-    expect(f).toContain("$2,500");
-    expect(f).toContain("7.2x");
-    expect(f).toContain("in 14 days");
-    expect(f).toContain("Playbook: Real estate and property.");
-    expect(f).toContain("Log (2)");
-    expect(f).toContain("Agreed to move the review to Friday");
-    expect(f).not.toContain("Add your first client fee");
-    expect(f).toContain("1 of 1 clients have a fee");
-  });
-
-  it("is plain (no pill, dot or glow) and the playbooks section can be left out when its switch is off", () => {
-    expect(m).not.toMatch(/bg-gradient|blur|ring-1/);
-    // The only round things are the shared help button; this tab adds none, and the loading placeholder (grey blocks since D1) has none either.
-    expect((m.match(/rounded-full/g) ?? []).length).toBe((m.match(/aria-label="What /g) ?? []).length);
-    expect(m).not.toContain("tel:");
-    // The playbooks section loads its own data (a loading placeholder in this static render); with its switch off it is not drawn at all.
-    const off = html(withApi(el(DetailsTab, { data: empty, reload: noop, go: noop, showPlaybooks: false })));
-    expect((m.match(/data-testid="loading"/g) ?? []).length).toBe(1);
-    expect((off.match(/data-testid="loading"/g) ?? []).length).toBe(0);
-  });
-});
-
 describe("the Onboarding checklist of one client", () => {
   const facts = { website: null, timezone: "Africa/Lagos", address: "1 Main St", appointments: 0, appointmentsAccess: "ok" };
   const built = buildOnboardingItems({
@@ -197,23 +131,26 @@ describe("the Onboarding checklist of one client", () => {
 
 describe("the module", () => {
   const mod = (props: Record<string, unknown>) => html(withApi(el(ClientsView, { go: noop, ...props })));
-  it("has five tabs and opens on the one asked for", () => {
+  it("has five tabs (Clients first) and opens on the one asked for", () => {
     const m = mod({ initialTab: "onboarding" });
     const t = text(m);
-    for (const tab of ["Health", "Onboarding", "Details and billing", "Compare", "Reviews (QBR)"]) expect(t, tab).toContain(tab);
+    for (const tab of ["Clients", "Onboarding", "Compare", "Reviews (QBR)", "Industries"]) expect(t, tab).toContain(tab);
     expect(m).toMatch(/aria-selected="true"[^>]*>Onboarding</);
     expect(t).toContain("Export CSV");
-    expect(t).toContain("Health, onboarding, fees and renewals, comparisons and quarterly reviews, for every client.");
+    expect(t).toContain("Which clients may leave, which renewals are coming, and what each client pays you.");
+    expect(t).toContain("fees, renewal dates and industries are typed by you");
   });
   it("leaves out the tabs whose switch is off, and a tab asked for that is off falls back to the first one", () => {
     const f = { health: true, onboarding: true, clients: true, reports: false, setupCompare: true, playbooks: true };
     const t = text(mod({ initialTab: "reviews", features: f }));
     expect(t).not.toContain("Compare");
     expect(t).not.toContain("Reviews (QBR)");
-    const noHealth = mod({ features: { ...f, health: false, reports: true } });
-    expect((noHealth.match(/role="tab"/g) ?? []).length).toBe(4);
-    expect(noHealth).not.toMatch(/role="tab"[^>]*>Health</);
-    expect(noHealth).toMatch(/aria-selected="true"[^>]*>Onboarding</);
+    expect(t).toContain("Industries");
+    const onlyOnboarding = mod({ features: { ...f, health: false, clients: false } });
+    expect((onlyOnboarding.match(/role="tab"/g) ?? []).length).toBe(1);
+    expect(onlyOnboarding).toMatch(/aria-selected="true"[^>]*>Onboarding</);
+    // The old address of the fee tab opens the Clients tab.
+    expect(mod({ initialTab: "details" })).toMatch(/aria-selected="true"[^>]*>Clients</);
   });
   it("the header is not printed (a review prints alone) and no page-wide print rules hide the review", () => {
     expect(mod({})).toContain("print:hidden");
@@ -230,7 +167,7 @@ describe("the Reviews tab before a client is chosen", () => {
 });
 
 describe("the new screens follow the rules of the app", () => {
-  const files = [...readdirSync("src/app/app/views/clients").filter((f) => /\.tsx?$/.test(f)).map((f) => `src/app/app/views/clients/${f}`), "src/app/app/ds/line-chart.tsx", "src/app/app/views/accounts.tsx", "src/app/app/views/setup-compare.tsx"];
+  const files = [...readdirSync("src/app/app/views/clients").filter((f) => /\.tsx?$/.test(f)).map((f) => `src/app/app/views/clients/${f}`), "src/app/app/ds/line-chart.tsx", "src/app/app/views/setup-compare.tsx"];
   it("no tel: link (calls go through the CRM's own dialer), no hard-coded CRM address, no pill, gradient or emoji", () => {
     for (const f of files) {
       const src = readFileSync(f, "utf8");

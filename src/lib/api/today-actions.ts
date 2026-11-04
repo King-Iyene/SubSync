@@ -1,5 +1,5 @@
 import { briefLines, headlineOf } from "../analytics/today-queue";
-import { applyView, canAssign, isSnoozeChoice, lanesFor, parseRowKey, resolveEvents, snoozeUntil, type SnoozeChoice } from "../analytics/today-state";
+import { applyView, canAssign, isSnoozeChoice, lanesFor, parseRowKey, personItemId, resolveEvents, snoozeUntil, type SnoozeChoice } from "../analytics/today-state";
 import { appendAction, findAction, NEEDS_UPDATE, NeedsUpdate } from "../analytics/today-store";
 import { json, type AuthContext } from "./auth";
 import type { buildToday } from "./today-api";
@@ -48,12 +48,12 @@ export async function todayAction(ctx: Ctx, deps: TodayDeps): Promise<Response> 
     }
     if (!(await deps.permits(ctx, row.locationId))) return NOT_FOUND();
     const data = await deps.load(ctx);
-    const items = data.items.filter((i) => i.locationId === row.locationId && i.kind === row.kind);
+    const items = data.items.filter((i) => i.locationId === row.locationId && i.kind === row.kind && (row.person === null || i.id === personItemId(row.locationId, row.person)));
     if (items.length === 0) return NOT_FOUND();
     const now = Date.now();
     const until = choice ? snoozeUntil(choice, now, data.zones[row.locationId] ?? "UTC") : null;
     const done = await appendAction({
-      installationId: ctx.installationId, locationId: row.locationId, rowKey: `${row.locationId}|${row.kind}`, kind: row.kind, action: body.action, lane,
+      installationId: ctx.installationId, locationId: row.locationId, rowKey: row.person === null ? `${row.locationId}|${row.kind}` : `${row.locationId}|${row.kind}|${row.person}`, kind: row.kind, action: body.action, lane,
       actorKey: userKey, actorName, actorRole, until, undoes: null, itemIds: items.map((i) => i.id).slice(0, 500),
     });
     return json({ ok: true, eventId: done.id, at: done.at, until, count: items.length });

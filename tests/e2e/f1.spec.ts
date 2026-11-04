@@ -187,7 +187,7 @@ test.describe("the screens", () => {
     await expect(page.getByTestId("counted-note")).toContainText("with a value and an owner");
     await expect(page.getByText("Engaged, then quiet", { exact: false }).first()).toBeVisible();
     // Data quality moved to the Imports and sources tab of People (F10).
-    await page.getByRole("tab", { name: "Imports and sources", exact: true }).click();
+    await page.getByRole("tab", { name: "Sources", exact: true }).click();
     await expect(page.getByTestId("quality")).toContainText("checked");
     await expect(page.getByText("Missing emails")).toBeVisible();
   });

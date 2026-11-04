@@ -43,7 +43,11 @@ import { contactOwners, listViews, removeView, saveView, teamNames } from "../an
 import { assigneeLabel, MAX_SAVED_VIEWS, sanitizeQueue, viewName } from "../analytics/waiting-view";
 import { badDataSamples, contactOverview, topLeads, vips } from "../analytics/contact-queries";
 import { appointmentInsights } from "../analytics/appointment-insight-queries";
-import { auditSummary, buildAudit } from "../analytics/audit-intel";
+import { buildAudit } from "../analytics/audit-intel";
+import { shareSourceOf } from "../analytics/audit-v2";
+import { revokeShared } from "../analytics/share-queries";
+import { clientPage, coreFor, pagePayload, type AuditBase } from "./audit-api";
+import { handleClientsPart } from "./clients-book-routes";
 import { appointmentList, staleDealList, waitingList, type AuditList } from "../analytics/audit-queries";
 import { DEAL_RULES_VERSION } from "../analytics/definitions";
 import { speedPart, speedView } from "../analytics/speed-queries";
@@ -94,6 +98,9 @@ import { meetingConfirm, meetingContactSearch, meetingDismiss, meetingIgnore, me
 import { meetingSetupAccountView, meetingSetupFieldsSave, meetingSetupFieldsView, meetingSetupPreview, meetingSetupSaveMine, meetingSetupView } from "./meeting-setup-api";
 import { can, personFromSession } from "../connections/person";
 import { handlePeople, timeoutResponse } from "./people-routes";
+import { handleDuplicates } from "./duplicates-routes";
+import { handleSpeedPart, handleSpeedTarget } from "./speed-routes";
+import { handleApptWork } from "./appointment-work-routes";
 import { buildSteps, guideRoleOf } from "../getting-started";
 import { changedSettingKeys, feedbackGivenBy, logAccountFlags, logKeyChange, logSettingsChange, recordVote } from "../feedback-queries";
 import { groupStatus, parseGranted } from "../scope-groups";
@@ -268,27 +275,74 @@ async function computeAudit(ctx: Ctx, withLists = false) {
   return { audit, who, names: live.map((a) => a.name ?? "").filter(Boolean), settings, hidden, lists, readLimit, live, links, apptView: v };
 }
 
-async function auditViewData(ctx: Ctx) {
-  // Today asks for the audit without the rows behind each number (lists=0): it needs only the first finding, and the lists are the slow part.
-  const { audit, who, settings, hidden, lists, readLimit } = await computeAudit(ctx, ctx.url.searchParams.get("lists") !== "0");
+// The rebuilt Account audit (docs/AUDIT_REVIEW.md). The accounts come from the signed session and the page filter, never from the request; the one thing the
+// request may add is `location`, which only NARROWS to one of those accounts (an id that is not one of them changes nothing). The heavy read is kept for 45 seconds per
+// caller scope, so paging the client list or opening the page twice does not read everything again; `fresh=1` (the Run again button) skips the kept copy.
+async function auditScope(ctx: Ctx, wanted: string | null) {
+  const { settings, accounts, hidden, links } = await accountsFor(ctx);
+  let live = accounts.filter((a) => !a.ignored);
+  const focus = wanted && LOCATION_ID.test(wanted) ? live.find((a) => a.locationId === wanted) ?? null : null;
+  if (focus) live = [focus];
+  const ids = live.map((a) => a.locationId);
+  const idSet = new Set(ids);
+  const base = async (): Promise<AuditBase> => {
+    const [apptView, coverage] = await Promise.all([appointmentView(ctx.installationId, ids), conversationCoverage(ctx.installationId)]);
+    return { settings, live, apptView, links, readLimit: readLimitNote(coverage.filter((c) => idSet.has(c.locationId) && c.stored >= CONVERSATIONS_READ_PER_ACCOUNT).length, live.length) };
+  };
+  return { settings, hidden, ids, base, focus: focus ? { id: focus.locationId, name: focus.name ?? "Unnamed account" } : null };
+}
+
+// The rebuilt Clients screen (docs/CLIENTS_REVIEW.md): the client accounts come from the signed session and the page filter, the heavy read is the Account audit's own kept read
+// (same accounts, same 45 seconds), and the route is agency only (the route policy refuses a business owner and a client's staff before this runs).
+async function clientsBookPart(ctx: Ctx) {
+  const { settings, accounts, links } = await accountsFor(ctx);
+  const live = accounts.filter((a) => !a.ignored);
+  const ids = live.map((a) => a.locationId);
+  const idSet = new Set(ids);
+  const base = async (): Promise<AuditBase> => {
+    const [apptView, coverage] = await Promise.all([appointmentView(ctx.installationId, ids), conversationCoverage(ctx.installationId)]);
+    return { settings, live, apptView, links, readLimit: readLimitNote(coverage.filter((c) => idSet.has(c.locationId) && c.stored >= CONVERSATIONS_READ_PER_ACCOUNT).length, live.length) };
+  };
+  const now = Date.now();
+  return handleClientsPart({ ctx, settings, live, links, now, core: () => coreFor({ installationId: ctx.installationId, ids, limitTo: ctx.limitTo, now, base }) });
+}
+
+async function auditCore(ctx: Ctx, wanted: string | null, fresh = false) {
+  const s = await auditScope(ctx, wanted);
+  const core = await coreFor({ installationId: ctx.installationId, ids: s.ids, limitTo: ctx.limitTo, now: Date.now(), base: s.base, fresh });
+  return { s, core };
+}
+
+async function auditV2View(ctx: Ctx) {
+  const sp = ctx.url.searchParams;
+  const { s, core } = await auditCore(ctx, sp.get("location"), sp.get("fresh") === "1");
+  const who = s.settings.brandName ?? (ctx.limitTo ? "Your business" : "Your company");
   return json({
-    audit, summary: auditSummary(audit, who), lists, readLimit, hiddenAccounts: hidden,
-    // The sender's own name, colour and logo, for the printed page (N85).
-    brand: { name: settings.brandName, color: settings.brandColor, logoUrl: settings.brandLogoUrl },
+    ...pagePayload(core, sp, { brand: { name: s.settings.brandName, color: s.settings.brandColor, logoUrl: s.settings.brandLogoUrl }, who }),
+    hiddenAccounts: ctx.limitTo ? 0 : s.hidden, focus: s.focus,
     // Sharing is for an agency or a business, never a client's own staff; the demo holds only the public sample.
     canShare: ctx.kind !== "client" && !ctx.demo, demo: ctx.demo, shareDays: SHARE_LINK_DAYS,
-    generatedAt: new Date().toISOString(),
   });
 }
 
-// A snapshot of the audit someone can send on: totals, finding titles, fix steps and definitions only, account names scrubbed, expires in SHARE_LINK_DAYS.
-// It covers the accounts of the page filter that was on when it was made, and never holds a contact, a deal or a conversation.
+/** One page of the client list (search, order, page), from the same kept read as the page. Only for an agency looking at more than one client account. */
+async function auditClientsView(ctx: Ctx) {
+  const sp = ctx.url.searchParams;
+  const { core } = await auditCore(ctx, sp.get("location"));
+  if (core.scope !== "all") return json({ error: "Not available in this view" }, 404);
+  return json(clientPage(core, sp));
+}
+
+// A snapshot of the audit someone can send on: the sentence, the figures, finding titles, fix steps and definitions only, account names scrubbed, expires in SHARE_LINK_DAYS.
+// It covers the same accounts as the page the person was looking at (the page filter, and the one client if they had opened one), and never holds a contact, a deal or a conversation.
 async function auditShare(ctx: Ctx) {
   if (ctx.kind === "client") return json({ error: "Not available in this view" }, 403);
   if (ctx.demo) return json({ error: "Sharing is not available in the demo" }, 400);
-  const { audit, who, names, settings } = await computeAudit(ctx);
+  const body = (await ctx.request.json().catch(() => null)) as { location?: unknown } | null;
+  const { s, core } = await auditCore(ctx, typeof body?.location === "string" ? body.location : null);
+  const who = s.settings.brandName ?? (ctx.limitTo ? "Your business" : "Your company");
   const id = randomBytes(24).toString("base64url");
-  const payload = buildSharePayload(audit, who, names, new Date(), { branded: settings.brandName !== null, brandColor: settings.brandColor, logoUrl: settings.brandLogoUrl, rulesVersion: DEAL_RULES_VERSION });
+  const payload = buildSharePayload(shareSourceOf(core.audit, core.healthy, core.accounts.length), who, core.accountNames, new Date(), { branded: s.settings.brandName !== null, brandColor: s.settings.brandColor, logoUrl: s.settings.brandLogoUrl, rulesVersion: DEAL_RULES_VERSION });
   await sql()`insert into shared_audits (installation_id, id, payload, expires_at) values (${ctx.installationId}, ${id}, ${sql().json(payload as never)}, now() + make_interval(days => ${SHARE_LINK_DAYS}))`;
   const origin = (process.env.NEXT_PUBLIC_APP_URL ?? ctx.url.origin).replace(/\/+$/, "");
   return json({ url: `${origin}/audit/${id}`, expiresInDays: SHARE_LINK_DAYS });
@@ -313,8 +367,7 @@ async function auditRevoke(ctx: Ctx) {
   if (ctx.demo) return json({ error: "Sharing is not available in the demo" }, 400);
   const body = (await ctx.request.json().catch(() => null)) as { id?: unknown } | null;
   if (typeof body?.id !== "string" || !/^[A-Za-z0-9_-]{20,64}$/.test(body.id)) return json({ error: "Unknown link" }, 400);
-  const done = await sql()`update shared_audits set revoked_at = now() where id = ${body.id} and installation_id = ${ctx.installationId} and revoked_at is null returning id`;
-  if (done.length === 0) return json({ error: "That link was not found or is already switched off" }, 404);
+  if (!(await revokeShared(ctx.installationId, body.id))) return json({ error: "That link was not found or is already switched off" }, 404);
   await sql()`insert into audit_log (installation_id, actor, action, detail) values (${ctx.installationId}, ${ctx.session.userId ?? ctx.kind}, 'audit.share_revoked', ${sql().json({ ref: body.id.slice(-6) } as never)})`;
   return json({ ok: true });
 }
@@ -925,23 +978,6 @@ async function pipelines(ctx: Ctx) {
   });
 }
 
-async function duplicates(ctx: Ctx) {
-  const sc = await scope(ctx);
-  const allowed = await allowedIds(ctx);
-  const showReviewed = ctx.url.searchParams.get("reviewed") === "1";
-  const q = await buildQueue(ctx.installationId, allowed);
-  const summary = await summarise(ctx.installationId, allowed, q.open, q.reviews.size);
-  const list = (showReviewed ? q.all : q.open).slice(0, 60);
-  return json({
-    summary, truncated: q.truncated, canReview: ctx.kind !== "client",
-    groups: list.map((g) => ({
-      key: g.key, locationId: g.locationId, locationName: g.locationName, confidence: g.confidence, reasons: g.reasons, kind: g.kind,
-      survivorId: g.survivorId, plan: g.plan, review: q.reviews.get(g.locationId + ":" + g.key) ?? null,
-      people: g.people.map((p) => ({ ...p, url: sc.links.contact(g.locationId, p.contactId) })),
-    })),
-  });
-}
-
 const actorOf = (ctx: Ctx) => ctx.session.userName ?? ctx.session.userId ?? null;
 
 async function duplicateReview(ctx: Ctx) {
@@ -962,6 +998,8 @@ async function duplicateReview(ctx: Ctx) {
 }
 
 async function duplicateBulk(ctx: Ctx) {
+  // Recording many decisions at once is for whoever runs the company or the business; a client's staff decide one group at a time.
+  if (ctx.kind === "client") return json({ error: "Not available in this view" }, 403);
   const body = (await ctx.request.json().catch(() => null)) as { decision?: unknown; minConfidence?: unknown; maxConfidence?: unknown; dryRun?: unknown } | null;
   const decision = body?.decision;
   if (decision !== "not_duplicate" && decision !== "keep") return json({ error: "Unknown action" }, 400);
@@ -1842,8 +1880,21 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
         coldChoice: async () => (ctx.kind === "client" ? null : (await getSettings(ctx.installationId)).coldTags),
         voter: voterOf(ctx),
         locationToken: (locationId) => locationAccessToken(ctx.session.companyId, locationId),
+        settings: async () => { const st = (await scope(ctx)).settings; return { staleDays: st.staleDays, speedTargetMinutes: st.speedTargetMinutes }; },
       });
     }
+    // The rebuilt Appointments page: the work lists, "See all" and the comparison (read only).
+    if (a === "appointments" && method === "GET" && (b === "work" || b === "list" || b === "compare") && !c) {
+      return await handleApptWork(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links });
+    }
+    // The guided duplicate review (reading, setting a group aside, the one-click merge, which is switched off). Deciding and undoing stay below.
+    if (a === "duplicates" && (method === "GET" || ["snooze", "unsnooze", "merge"].includes(b ?? ""))) {
+      return await handleDuplicates(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links, locationToken: (locationId) => locationAccessToken(ctx.session.companyId, locationId) });
+    }
+    // The rebuilt Speed to lead screen: its home, lists and comparisons (GET ?part=home|list|compare) and one account's reply target (PUT speed/target).
+    const speedHelpers = { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links, targetMinutes: async () => (await scope(ctx)).settings.speedTargetMinutes, measuring: async () => { const st = (await scope(ctx)).settings; return { countAutomated: st.countAutomatedTouches, businessHours: st.speedBusinessHours }; } };
+    if (a === "speed" && method === "GET" && ["home", "list", "compare"].includes(ctx.url.searchParams.get("part") ?? "")) return await handleSpeedPart(ctx, speedHelpers);
+    if (a === "speed" && b === "target" && method === "PUT") return await handleSpeedTarget(ctx, speedHelpers);
     if (method === "GET") {
       if (a === "overview") return await overview(ctx);
       if (a === "today" && !b) return await todayView(ctx);
@@ -1856,7 +1907,8 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       if (a === "appointments" && b && c && LOCATION_ID.test(b) && LOCATION_ID.test(c)) return await appointmentDetailView(ctx, b, c);
       if (a === "appointments") return await appointmentsView(ctx);
       if (a === "audit" && b === "shares") return await auditShares(ctx);
-      if (a === "audit") return await auditViewData(ctx);
+      if (a === "audit" && b === "clients") return await auditClientsView(ctx);
+      if (a === "audit") return await auditV2View(ctx);
       if (a === "speed") return await speedViewData(ctx);
       if (a === "appointment-insights") return await appointmentInsightsView(ctx);
       if (a === "setup-compare") return await setupCompare(ctx);
@@ -1884,7 +1936,6 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       if (a === "inbox" && b === "views") return await inboxViews(ctx);
       if (a === "inbox") return await inboxView(ctx);
       if (a === "pipelines") return await pipelines(ctx);
-      if (a === "duplicates") return await duplicates(ctx);
       if (a === "email" && !b) return await emailHealth(ctx);
       if (a === "alerts") return await alertsView(ctx);
       if (a === "notifications" && !b) return await bellView(ctx);
@@ -1908,6 +1959,7 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       if (a === "daily-brief") return await dailyBrief(ctx);
       if (a === "comms-intel") return await commsIntel(ctx);
       if (a === "deal-gaps") return await dealGaps(ctx);
+      if (a === "clients" && !b && ctx.url.searchParams.get("part")) return await clientsBookPart(ctx);
       if (a === "clients" && !b) return await clientsView(ctx);
       if (a === "clients" && b && LOCATION_ID.test(b) && c === "notes") return await clientRoutes.notesView(ctx, clientDeps, b);
       if (a === "client-onboarding" && !b) return await clientRoutes.onboardingView(ctx, clientDeps);

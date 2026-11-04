@@ -28,17 +28,17 @@ test("the ranking rule: value at risk first, then how long it has been wrong, th
   const items = [
     item("stale", "aaa", { value: 4000, at: NOW - 40 * D }), item("stale", "aaa", { value: 1000, at: NOW - 35 * D }),   // Maple: $5,000 counted
     item("stale", "ccc", { value: 12000, at: NOW - 31 * D }),                                                          // North: $12,000 counted
-    item("leads", "bbb", { at: NOW - 3 * H }),                                                                         // Harbor: leads, no dollars
-    item("unanswered", "bbb", { at: NOW - 30 * H }),                                                                   // Harbor: estimate $900
+    item("replies", "bbb", { at: NOW - 3 * H }),                                                                       // Harbor: people waiting, one row, estimate $900
+    item("appointments", "bbb", { at: NOW - 30 * H }),                                                                 // Harbor: no dollars
     item("appointments", "ccc", { at: NOW - 10 * D }),                                                                 // no dollars, older than the leads
   ];
   const q = queueOf(items);
   assert.deepEqual(q.map((r) => `${r.accountName}:${r.kind}`), [
     "North Roofing:stale",        // $12,000
     "Maple Dental:stale",         // $5,000
-    "Harbor Realty:unanswered",   // about $900 (the existing estimate)
+    "Harbor Realty:replies",      // about $900 (the existing estimate)
     "North Roofing:appointments", // no money: the one that has been wrong longest (10 days)
-    "Harbor Realty:leads",        // no money, 3 hours
+    "Harbor Realty:appointments", // no money, 30 hours
   ]);
 });
 
@@ -46,7 +46,7 @@ test("equal value and age fall back to severity, then to the name, so the order 
   const base = { dollars: null, estimate: null, ageMinutes: 120, since: NOW, url: "u", itemIds: [], partial: false, count: 1, text: "t" } as unknown as Omit<QueueRow, "key" | "kind" | "locationId" | "accountName" | "severity">;
   const rows: QueueRow[] = [
     { ...base, key: "1", kind: "appointments", locationId: "a", accountName: "Zed", severity: "info" },
-    { ...base, key: "2", kind: "leads", locationId: "b", accountName: "Bee", severity: "critical" },
+    { ...base, key: "2", kind: "replies", locationId: "b", accountName: "Bee", severity: "critical" },
     { ...base, key: "3", kind: "noshows", locationId: "c", accountName: "Ann", severity: "warning" },
     { ...base, key: "4", kind: "noshows", locationId: "d", accountName: "Abe", severity: "warning" },
   ];
@@ -55,7 +55,7 @@ test("equal value and age fall back to severity, then to the name, so the order 
 });
 
 test("the estimate counts as value at risk only where it exists, and never as counted dollars", () => {
-  const q = queueOf([item("unanswered", "bbb"), item("unanswered", "aaa")]);
+  const q = queueOf([item("replies", "bbb"), item("replies", "aaa")]);
   const bbb = q.find((r) => r.locationId === "bbb")!;
   assert.equal(bbb.estimate, 900);
   assert.equal(bbb.dollars, null);
@@ -64,50 +64,50 @@ test("the estimate counts as value at risk only where it exists, and never as co
 });
 
 test("one row per account and kind; the count is the rows behind it; the age is the oldest item", () => {
-  const q = queueOf([item("leads", "aaa", { at: NOW - 5 * H }), item("leads", "aaa", { at: NOW - 20 * 60_000 }), item("leads", "bbb")]);
+  const q = queueOf([item("replies", "aaa", { at: NOW - 5 * H }), item("replies", "aaa", { at: NOW - 20 * 60_000 }), item("replies", "bbb")]);
   assert.equal(q.length, 2);
   const maple = q.find((r) => r.locationId === "aaa")!;
   assert.equal(maple.count, 2);
   assert.equal(maple.itemIds.length, 2);
   assert.equal(maple.ageMinutes, 300);
-  assert.equal(maple.text, "2 leads waiting past the reply target");
-  assert.equal(maple.severity, "critical", "a lead waiting an hour or more is critical");
+  assert.equal(maple.text, "2 people waiting for a reply");
+  assert.equal(maple.severity, "critical", "a person waiting an hour or more is critical");
 });
 
-test("row wording is six to ten words and names the stale window", () => {
+test("row wording is short plain words and has no jargon", () => {
   for (const k of KINDS) {
     const r = queueOf([item(k, "aaa")])[0];
     const words = r.text.split(/\s+/).length;
-    assert.ok(words >= 5 && words <= 10, `${k}: "${r.text}" has ${words} words`);
-    assert.ok(!/—|–| - /.test(r.text), "no dashes in the wording");
+    assert.ok(words >= 4 && words <= 10, `${k}: "${r.text}" has ${words} words`);
+    assert.doesNotMatch(r.text, /\bSLA\b|\bstale\b|pipeline at risk|past the target/i, `${k}: no bare jargon`);
   }
-  assert.match(queueOf([item("stale", "aaa", { value: 10 })])[0].text, /no movement in 30\+ days/);
+  assert.equal(queueOf([item("stale", "aaa", { value: 10 })])[0].text, "1 open deal gone quiet");
 });
 
 test("severity thresholds", () => {
-  assert.equal(severityOf("leads", 1, 10, false), "warning");
-  assert.equal(severityOf("leads", 1, 10, true), "critical");
-  assert.equal(severityOf("unanswered", 5, 0, false), "critical");
+  assert.equal(severityOf("replies", 1, 10, false), "warning");
+  assert.equal(severityOf("replies", 1, 10, true), "critical");
+  assert.equal(severityOf("replies", 5, 0, false), "critical");
   assert.equal(severityOf("stale", 9, 0, false), "warning");
   assert.equal(severityOf("appointments", 2, 0, false), "info");
 });
 
 test("a capped list is marked partial so the screen says so", () => {
-  const items = [item("leads", "aaa")];
+  const items = [item("replies", "aaa")];
   const totals = totalsFrom(items);
-  totals.leads = { count: 250, dollars: null, shown: 1 };
+  totals.replies = { count: 250, dollars: null, shown: 1 };
   const q = buildQueue({ items, totals, accounts: ACCOUNTS, staleDays: 30, now: NOW });
   assert.equal(q[0].partial, true);
 });
 
 // ---------- headline ----------
 test("the headline: clients and counted dollars, built from existing figures", () => {
-  const items = [item("leads", "aaa"), item("leads", "bbb"), item("stale", "ccc", { value: 48_200 })];
+  const items = [item("replies", "aaa"), item("replies", "bbb"), item("stale", "ccc", { value: 48_200 })];
   const h = headlineOf({ scope: "all", rows: queueOf(items), totals: totalsFrom(items) });
   assert.equal(h.text, "3 clients need you today. $48,200 is at risk.");
-  assert.equal(h.breakdown, "2 leads waiting and 1 stale deal worth $48,200.");
+  assert.equal(h.breakdown, "2 people waiting for a reply and 1 deal gone quiet.");
   assert.equal(h.allClear, false);
-  const one = headlineOf({ scope: "all", rows: queueOf([item("leads", "aaa")]), totals: totalsFrom([item("leads", "aaa")]) });
+  const one = headlineOf({ scope: "all", rows: queueOf([item("replies", "aaa")]), totals: totalsFrom([item("replies", "aaa")]) });
   assert.equal(one.text, "1 client needs you today.", "no dollars, no dollar sentence");
 });
 
@@ -118,14 +118,16 @@ test("one deal that is most of the stalled money is said out loud, never hidden 
 });
 
 test("the headline never counts an estimate as money at risk", () => {
-  const items = [item("unanswered", "bbb")];
+  const items = [item("replies", "bbb")];
   const h = headlineOf({ scope: "all", rows: queueOf(items), totals: totalsFrom(items) });
   assert.doesNotMatch(h.text, /\$/);
 });
 
 test("an account's own headline counts things, and says all clear plainly", () => {
-  const items = [item("leads", "aaa"), item("appointments", "aaa"), item("appointments", "aaa")];
-  assert.equal(headlineOf({ scope: "account", rows: queueOf(items), totals: totalsFrom(items) }).text, "3 things need you today.");
+  const items = [item("replies", "aaa"), item("appointments", "aaa"), item("appointments", "aaa")];
+  assert.equal(headlineOf({ scope: "account", rows: queueOf(items), totals: totalsFrom(items) }).text, "1 person is waiting for a reply.", "one account leads with the thing to do first");
+  const noReplies = [item("appointments", "aaa"), item("appointments", "aaa"), item("noshows", "aaa")];
+  assert.equal(headlineOf({ scope: "account", rows: queueOf(noReplies), totals: totalsFrom(noReplies) }).text, "3 things need you today.");
   assert.equal(headlineOf({ scope: "account", rows: [], totals: emptyTotals() }).text, "You are all caught up today.");
   assert.equal(headlineOf({ scope: "all", rows: [], totals: emptyTotals() }).text, "Every client account is on track today.");
   assert.equal(headlineOf({ scope: "all", rows: [], totals: emptyTotals() }).allClear, true);
@@ -133,13 +135,13 @@ test("an account's own headline counts things, and says all clear plainly", () =
 
 // ---------- scoping ----------
 test("the account filter narrows rows and totals; no account picked means all", () => {
-  const items = [item("leads", "aaa"), item("leads", "bbb"), item("stale", "bbb", { value: 700 }), item("appointments", "ccc")];
+  const items = [item("replies", "aaa"), item("replies", "bbb"), item("stale", "bbb", { value: 700 }), item("appointments", "ccc")];
   const q = queueOf(items);
   assert.equal(scopeRows(q, { accounts: [], kind: null }).length, 4);
-  assert.deepEqual(scopeRows(q, { accounts: ["bbb"], kind: null }).map((r) => r.kind).sort(), ["leads", "stale"]);
-  assert.deepEqual(scopeRows(q, { accounts: ["bbb", "ccc"], kind: "leads" }).map((r) => r.locationId), ["bbb"]);
+  assert.deepEqual(scopeRows(q, { accounts: ["bbb"], kind: null }).map((r) => r.kind).sort(), ["replies", "stale"]);
+  assert.deepEqual(scopeRows(q, { accounts: ["bbb", "ccc"], kind: "replies" }).map((r) => r.locationId), ["bbb"]);
   const t = totalsOf(items, totalsFrom(items), ["bbb"]);
-  assert.equal(t.leads.count, 1);
+  assert.equal(t.replies.count, 1);
   assert.equal(t.stale.dollars, 700);
   assert.equal(t.appointments.count, 0);
 });
@@ -157,39 +159,39 @@ test("Today's own address parameter: parsed, cleaned, written back and sent as t
 
 // ---------- the donut ----------
 test("donut slices: one per kind with something in it, shares add up to 100, the count equals the rows behind it", () => {
-  const items = [...[0, 1, 2, 3, 4, 5, 6].map(() => item("leads", "aaa")), item("stale", "aaa", { value: 1 }), item("stale", "bbb", { value: 2 }), item("appointments", "ccc")];
+  const items = [...[0, 1, 2, 3, 4, 5, 6].map(() => item("replies", "aaa")), item("stale", "aaa", { value: 1 }), item("stale", "bbb", { value: 2 }), item("appointments", "ccc")];
   const t = totalsFrom(items);
   const s = slicesOf(t);
-  assert.deepEqual(s.map((x) => x.kind), ["leads", "appointments", "stale"]);
+  assert.deepEqual(s.map((x) => x.kind), ["replies", "appointments", "stale"]);
   assert.equal(s.reduce((a, x) => a + x.share, 0), 100);
   for (const slice of s) assert.equal(slice.count, scopeRows(queueOf(items), { accounts: [], kind: slice.kind }).reduce((a, r) => a + r.itemIds.length, 0), `${slice.kind}: the slice count is the number of rows in its list`);
   assert.equal(slicesOf(emptyTotals()).length, 0);
-  assert.match(donutTitle(t), /^10 things need attention, most of them leads waiting \(7\)$/);
+  assert.match(donutTitle(t), /^10 things need attention, most of them waiting for a reply \(7\)$/);
 });
 
 test("slice shares use largest remainder so thirds still add up", () => {
-  const items = [item("leads", "aaa"), item("appointments", "aaa"), item("noshows", "aaa")];
+  const items = [item("replies", "aaa"), item("appointments", "aaa"), item("noshows", "aaa")];
   const s = slicesOf(totalsFrom(items));
   assert.equal(s.reduce((a, x) => a + x.share, 0), 100);
 });
 
 // ---------- the per-account bars ----------
 test("bars: top accounts by things to fix, with the tooltip in words", () => {
-  const items = [...[1, 2, 3, 4].map(() => item("leads", "bbb")), item("stale", "bbb", { value: 6300 }), item("leads", "aaa"), item("appointments", "ccc"), item("appointments", "ccc")];
+  const items = [...[1, 2, 3, 4].map(() => item("replies", "bbb")), item("stale", "bbb", { value: 6300 }), item("replies", "aaa"), item("appointments", "ccc"), item("appointments", "ccc")];
   const q = queueOf(items);
   const b = accountBars(q, 2);
   assert.deepEqual(b.bars.map((x) => x.name), ["Harbor Realty", "North Roofing"]);
   assert.equal(b.accounts, 3);
-  assert.equal(barTooltip(b.bars[0], q), "Harbor Realty: 4 leads waiting, 1 stale deal, $6,300 at stake");
-  assert.equal(barsTitle(b), "Harbor Realty has the most to fix: 5 things, out of 3 accounts needing you");
+  assert.equal(barTooltip(b.bars[0], q), "Harbor Realty: 4 people waiting for a reply, 1 deal gone quiet, $6,300 at stake");
+  assert.equal(barsTitle(b), "Harbor Realty has the most to do: 5 things. Each bar is one client account.");
   assert.equal(accountBars([]).bars.length, 0);
 });
 
 test("accounts needing you: one row each, worst first, with the one reason and plain health words", () => {
-  const q = queueOf([item("leads", "aaa", { at: NOW - 3 * H }), item("appointments", "aaa"), item("stale", "ccc", { value: 9000 })]);
+  const q = queueOf([item("replies", "aaa", { at: NOW - 3 * H }), item("appointments", "aaa"), item("stale", "ccc", { value: 9000 })]);
   const r = accountsNeedingYou(q, ACCOUNTS, 5);
   assert.deepEqual(r.rows.map((x) => [x.name, x.state]), [["North Roofing", "Needs a look"], ["Maple Dental", "Needs you now"]]);
-  assert.equal(r.rows[1].reason, "1 lead waiting past the reply target");
+  assert.equal(r.rows[1].reason, "1 person waiting for a reply");
   assert.equal(r.total, 2);
 });
 
@@ -253,14 +255,14 @@ test("what SubSync caught: raised, cleared and still open over 7 days, said with
 
 // ---------- share ----------
 test("share text is the headline and the top three, in plain words", () => {
-  const items = [item("stale", "ccc", { value: 12000, at: NOW - 40 * D }), item("leads", "aaa"), item("appointments", "bbb"), item("noshows", "bbb"), item("unanswered", "aaa")];
+  const items = [item("stale", "ccc", { value: 12000, at: NOW - 40 * D }), item("replies", "aaa"), item("appointments", "bbb"), item("noshows", "bbb"), item("replies", "aaa")];
   const q = queueOf(items);
   const text = shareText({ who: "Your client accounts", headline: headlineOf({ scope: "all", rows: q, totals: totalsFrom(items) }), rows: q });
   const lines = text.split("\n");
   assert.equal(lines[0], "Your client accounts: Today");
   assert.match(lines[1], /^3 clients need you today\. \$12,000 is at risk\.$/);
   assert.equal(lines.filter((l) => /^\d\. /.test(l)).length, 3);
-  assert.match(text, /1\. North Roofing: 1 open deal with no movement in 30\+ days, \$12,000 at stake, wrong for 40 days/);
+  assert.match(text, /1\. North Roofing: 1 open deal gone quiet, \$12,000 at stake, wrong for 40 days/);
 });
 
 test("ages in words", () => {

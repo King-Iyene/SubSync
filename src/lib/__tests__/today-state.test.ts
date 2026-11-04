@@ -16,7 +16,7 @@ const totals = (items: TodayItem[], extra: Partial<Record<Kind, number>> = {}): 
   for (const k of KINDS) { const m = items.filter((x) => x.kind === k); t[k] = { count: m.length + (extra[k] ?? 0), dollars: k === "stale" && m.length ? m.reduce((s, x) => s + (x.value ?? 0), 0) : null, shown: m.length }; }
   return t;
 };
-const ev = (over: Partial<ActionEvent>): ActionEvent => ({ id: 1, rowKey: "aaa|leads", locationId: "aaa", kind: "leads", action: "snooze", lane: "team", actorKey: "u1", actorName: "Dana", until: NOW + D, undoes: null, itemIds: [], at: NOW - 60_000, ...over });
+const ev = (over: Partial<ActionEvent>): ActionEvent => ({ id: 1, rowKey: "aaa|replies", locationId: "aaa", kind: "replies", action: "snooze", lane: "team", actorKey: "u1", actorName: "Dana", until: NOW + D, undoes: null, itemIds: [], at: NOW - 60_000, ...over });
 
 test("snooze hides items until it ends, then they come back by themselves", () => {
   const e = ev({ itemIds: ["a", "b"], until: NOW + H });
@@ -40,7 +40,7 @@ test("the latest active event wins for an item, and an assignment never hides an
   const r = resolveEvents(events, NOW, ["team"]);
   assert.equal(r.holds.a.action, "done");
   assert.equal(r.holds.a.by, "Priya");
-  assert.equal(r.assigned["aaa|leads"].by, "Dana");
+  assert.equal(r.assigned["aaa|replies"].by, "Dana");
 });
 
 test("lanes: a client's staff read only their own events, and never the team's", () => {
@@ -68,23 +68,25 @@ test("snooze choices: one day is 24 hours, Monday is the next Monday 08:00 in th
 });
 
 test("a row key is a well-formed account id and one of the five kinds, nothing else", () => {
-  assert.deepEqual(parseRowKey("aaa|leads"), { locationId: "aaa", kind: "leads" });
-  for (const bad of ["aaa|other", "aaa", "../x|leads", "aaa|leads|x", "a|leads", "", 5, null, undefined, "aaa |leads"]) assert.equal(parseRowKey(bad), null, String(bad));
+  assert.deepEqual(parseRowKey("aaa|replies"), { locationId: "aaa", kind: "replies", person: null });
+  assert.deepEqual(parseRowKey("aaa|replies|c-1"), { locationId: "aaa", kind: "replies", person: "c-1" }, "one person of a replies row");
+  assert.equal(parseRowKey("aaa|stale|c-1"), null, "only a replies row can name one person");
+  for (const bad of ["aaa|other", "aaa", "../x|replies", "aaa|leads|x", "a|replies", "", 5, null, undefined, "aaa |replies"]) assert.equal(parseRowKey(bad), null, String(bad));
 });
 
 test("holds take items out of the totals, the queue and the headline, by exactly the rows removed (a cut list stays honest)", () => {
-  const items = [item("leads", "aaa"), item("leads", "aaa"), item("leads", "bbb"), item("stale", "bbb", { value: 1000, at: NOW - 40 * D }), item("stale", "bbb", { value: 2000, at: NOW - 35 * D })];
-  const t = totals(items, { leads: 10 }); // the server counted 13 leads but sent 3
+  const items = [item("replies", "aaa"), item("replies", "aaa"), item("replies", "bbb"), item("stale", "bbb", { value: 1000, at: NOW - 40 * D }), item("stale", "bbb", { value: 2000, at: NOW - 35 * D })];
+  const t = totals(items, { replies: 10 }); // the server counted 13 leads but sent 3
   const open = applyView({ items, totals: t, accounts: ACCOUNTS, staleDays: 30, now: NOW }, { holds: {}, excludeJunk: false });
-  assert.equal(open.totals.leads.count, 13);
+  assert.equal(open.totals.replies.count, 13);
   assert.equal(headlineOf({ scope: "all", rows: open.queue, totals: open.totals }).accounts, 2);
-  const hold = { eventId: 1, action: "snooze" as const, until: NOW + D, by: "Dana", at: NOW, rowKey: "aaa|leads" };
+  const hold = { eventId: 1, action: "snooze" as const, until: NOW + D, by: "Dana", at: NOW, rowKey: "aaa|replies" };
   const holds = { [items[0].id]: hold, [items[1].id]: hold };
   const v = applyView({ items, totals: t, accounts: ACCOUNTS, staleDays: 30, now: NOW }, { holds, excludeJunk: false });
-  assert.equal(v.totals.leads.count, 11);
+  assert.equal(v.totals.replies.count, 11);
   assert.equal(v.held.length, 2);
-  assert.ok(!v.queue.some((r) => r.key === "aaa|leads"));
-  assert.equal(v.queue.find((r) => r.key === "bbb|leads")?.count, 1);
+  assert.ok(!v.queue.some((r) => r.key === "aaa|replies"));
+  assert.equal(v.queue.find((r) => r.key === "bbb|replies")?.count, 1);
   // Every queue row's count is the number of items behind it.
   for (const r of v.queue) assert.equal(r.itemIds.length, r.count);
   assert.equal(v.totals.stale.dollars, 3000);
@@ -99,7 +101,7 @@ test("junk control: a test-named or very old stale deal leaves the dollar figure
     item("stale", "aaa", { value: 5000, at: NOW - 40 * D }),                               // real
     item("stale", "aaa", { value: 7000, at: NOW - 120 * D }),                              // very old
     item("stale", "aaa", { value: 900, at: NOW - 40 * D, name: "Test deal (ignore)" }),    // test name
-    item("leads", "aaa", { name: "Test Lead", at: NOW - 200 * D }),                        // never junk: only stale deals are
+    item("replies", "aaa", { name: "Test Lead", at: NOW - 200 * D }),                        // never junk: only stale deals are
   ];
   assert.equal(isJunk(items[1], 90, NOW), true);
   assert.equal(isJunk(items[2], 90, NOW), true);
@@ -111,15 +113,15 @@ test("junk control: a test-named or very old stale deal leaves the dollar figure
   assert.equal(on.totals.stale.count, 1);
   assert.equal(on.junk.items.length, 2);
   assert.equal(on.junk.dollars, 7900);
-  assert.equal(on.totals.leads.count, 1);
+  assert.equal(on.totals.replies.count, 1);
   const off = applyView({ items, totals: t, accounts: ACCOUNTS, staleDays: 30, now: NOW }, { holds: {}, excludeJunk: false });
   assert.equal(off.totals.stale.dollars, 12900);
   assert.equal(off.junk.items.length, 0);
 });
 
 test("the list behind 'N snoozed' has exactly N rows, and the brief says what the headline says", () => {
-  const items = [item("leads", "aaa"), item("leads", "aaa")];
-  const hold = { eventId: 1, action: "done" as const, until: NOW + D, by: "Dana", at: NOW, rowKey: "aaa|leads" };
+  const items = [item("replies", "aaa"), item("replies", "aaa")];
+  const hold = { eventId: 1, action: "done" as const, until: NOW + D, by: "Dana", at: NOW, rowKey: "aaa|replies" };
   const v = applyView({ items, totals: totals(items), accounts: ACCOUNTS, staleDays: 30, now: NOW }, { holds: { [items[0].id]: hold }, excludeJunk: false });
   const s = heldSpec(v.held);
   assert.equal(s.count, 1);

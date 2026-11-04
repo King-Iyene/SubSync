@@ -89,6 +89,7 @@ export const INVENTORY: Record<string, TableInfo> = {
     personal: { snapshot: "a copy of the duplicate records you reviewed", decided_by: "the name of the person who decided" },
     notPersonal: ["group_key"],
   },
+  duplicate_snoozes: { noun: "duplicate groups you set aside", line: "actions", personal: { decided_by: "the name of the person who set it aside" }, notPersonal: ["group_key", "until"] },
   meeting_notes: {
     noun: "meeting notes", line: "meetings",
     personal: {

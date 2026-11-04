@@ -71,6 +71,8 @@ describe("the filter explains itself (N1)", () => {
   });
 });
 
+// The files that draw Today: the container, the page, its frame and what a client's staff also see.
+const PAGE_FILES = ["today.tsx", "today-page.tsx", "today-chrome.tsx", "today-mine.tsx"];
 describe("Today", () => {
   const fake = (): Api => {
     const api: Api = { get: () => new Promise(() => undefined), post: () => new Promise(() => undefined), put: () => new Promise(() => undefined), del: () => new Promise(() => undefined), download: async () => undefined, demo: true, filtered: () => api };
@@ -81,10 +83,9 @@ describe("Today", () => {
     const m = html(el(ApiProvider, { value: fake() }, el(TodayView, { go, kind: "agency" })));
     expect(m).toContain("<h1");
     expect(m).toContain("Today");
-    expect(m).toContain("Checking every client account for what needs a person.");
     expect(m).toContain('aria-busy="true"');
     expect(m).toContain("Working out what needs you today");
-    expect(m).toContain("Working out what to fix first...");
+    expect(m).toContain("Working out what to do first...");
   });
   it("reads only data the signed-in person may see: one Today read and, for an agency only, the list of its own accounts for the selector; never an id of its own", () => {
     const src = read("src/app/app/views/today.tsx");
@@ -92,14 +93,14 @@ describe("Today", () => {
     expect([...paths].sort()).toEqual(['"today"', 'kind === "agency" ? "segments" : null'].sort());
   });
   it("notices use the plain notice, not cards; nothing on the page is a content card", () => {
-    for (const f of ["today.tsx", "today-account.tsx"]) {
+    for (const f of PAGE_FILES) {
       const src = read(`src/app/app/views/${f}`);
       expect(src, f).not.toMatch(/<Card[ >]|import \{[^}]*\bCard\b/);
     }
-    expect(read("src/app/app/views/today.tsx")).toContain("InlineAlert");
+    expect(read("src/app/app/views/today-page.tsx")).toContain("InlineAlert");
   });
   it("no phone link, no platform name, no jargon on the page", () => {
-    for (const f of ["today.tsx", "today-account.tsx"]) {
+    for (const f of PAGE_FILES) {
       const src = read(`src/app/app/views/${f}`);
       expect(src, f).not.toMatch(/tel:/);
       expect(src, f).not.toMatch(/\bSLA\b|GoHighLevel|HighLevel|\bGHL\b|sub-?account/i);
@@ -112,10 +113,9 @@ describe("Today", () => {
     expect(src).toContain("withTodayAccounts");
   });
   it("the page never works a percentage out for itself: comparisons come from vsUsual and staleUsual, which hold the minimum-sample rule", () => {
-    const src = read("src/app/app/views/today.tsx") + read("src/app/app/views/today-account.tsx");
+    const src = PAGE_FILES.map((f) => read(`src/app/app/views/${f}`)).join("\n");
     expect(src).not.toMatch(/vsYesterday|vsAvg|signed\(|percentChange|\.percent\b/);
     expect(src).toContain("staleUsual");
-    expect(src).toContain("vsUsual");
   });
   it("Today draws its own account selector and not the shared header filter, and a launch from inside a client account narrows Today and says so with a plain notice (N2)", () => {
     const dash = read("src/app/app/dashboard.tsx");

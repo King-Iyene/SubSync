@@ -175,18 +175,20 @@ test("the light and dark choice changes the page and is remembered", async ({ pa
   await page.getByRole("group", { name: "Appearance" }).getByRole("button", { name: "Dark appearance" }).click(); // leave it as it was
 });
 
-test("a client's staff open My day from the menu: one column, large tap targets, no sideways scroll (they land on Today, their own account, first)", async ({ page }) => {
+test("a client's staff open Today (the old My day address opens it): one column, thumb-size buttons on a phone, no sideways scroll, no settings", async ({ page }, testInfo) => {
   await page.goto("/app?as=client#myday");
   await page.reload();
-  await expect(page.getByRole("heading", { level: 1, name: "My day", exact: true })).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByRole("heading", { level: 1, name: "Today", exact: true })).toBeVisible({ timeout: 60_000 });
   await page.waitForLoadState("networkidle").catch(() => undefined);
-  await noSideScroll(page, "My day");
-  const leads = page.getByTestId("myday-leads").getByRole("button");
-  for (const b of (await leads.all()).slice(0, 5)) {
+  await noSideScroll(page, "Today");
+  const buttons = page.getByTestId("reply-row").getByTestId("lead-open");
+  const phone = testInfo.project.name.startsWith("phone");
+  for (const b of (await buttons.all()).slice(0, 5)) {
     const box = await b.boundingBox();
-    expect(box?.height ?? 0, "a lead is at least 44 px tall to tap").toBeGreaterThanOrEqual(44);
+    expect(box?.height ?? 0, phone ? "a Reply button is at least 44 px tall to tap on a phone" : "a Reply button is a small 32 px button on a laptop").toBeGreaterThanOrEqual(phone ? 44 : 30);
   }
   await expect(page.getByRole("button", { name: "Settings", exact: true })).toHaveCount(0); // no settings for a client's staff
+  await expect(page.getByRole("button", { name: "My day", exact: true })).toHaveCount(0); // one menu item for the day
 });
 
 // ---- KF-2, KF-4, KF-6 ----

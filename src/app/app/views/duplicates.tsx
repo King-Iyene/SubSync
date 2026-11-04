@@ -1,286 +1,391 @@
 "use client";
 
-import { useState } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { guardrails, REASON_LABELS, SORT_LABELS } from "@/lib/analytics/dedupe-review";
+import { EmptyState, ErrorState, HowTo, InlineAlert, Page, PopMenu, RowButton, Section, SkeletonCards } from "../ds";
 import { useApiClient, useData } from "../session";
-import { Badge, Btn, Card, Empty, ErrorBox, ExtLink, fmtInt, Loading, PageHeader, Stat, timeAgo } from "../ui";
+import { fmtInt } from "../ui";
+import { buttons, Compare, GroupRow, MergeSheet, RecordCard, type Row, type WithUrl } from "./duplicates-parts";
 
-type Person = {
-  contactId: string; name: string; email: string | null; phone: string | null; tags: string[]; createdAt: string | null;
-  lastActivityAt: string | null; source: string | null; openDeals: number; wonDeals: number; hasConversation: boolean; url: string;
+// Duplicate contacts, rebuilt (stage DUP; docs/DUPLICATES_REVIEW.md). One group at a time: the best record is already picked and the reason is in words,
+// only what differs is shown, and one big button starts the merge. SubSync only READS the CRM, so the merge is finished in the CRM's own screen with one
+// click ("Open both in your CRM"); the one-click merge from here is built and switched off (docs/features/DUPLICATES.md). Every number comes from the same
+// open list the stepper walks. The server sends one page and one group, never the whole list, so it stays quick at 100 accounts and thousands of groups.
+
+const { BTN, PRIMARY, QUIET } = buttons;
+
+type Step = {
+  key: string; locationId: string; locationName: string | null; reason: { key: string; label: string }; likelihood: { key: string; label: string }; confidence: number;
+  survivorId: string; why: string; obvious: boolean; review: { kind: string; at: string | null; keepContactId: string | null } | null; until: string | null;
+  watchingSince: string | null; enriched: boolean; people: WithUrl[];
 };
-type Choice = { field: string; keep: string; from: string; others: string[] };
-type Group = {
-  key: string; locationId: string; locationName: string | null; confidence: number; reasons: string[]; kind: "exact" | "format" | "name";
-  survivorId: string; plan: Choice[]; people: Person[]; review: { decision: string; keepContactId: string | null; decidedAt: string | null } | null;
-};
+type Paged<T> = { rows: T[]; page: number; pages: number; total: number; from: number; to: number };
+type Account = { locationId: string; name: string | null; groups: number; contacts: number; extra: number; openDeals: number };
 type Data = {
-  summary: { exact: number; format: number; name: number; contacts: number; reviewed: number; accounts: Array<{ locationId: string; name: string | null; groups: number; contacts: number; allowDuplicates: boolean | null }> };
-  truncated: boolean; canReview: boolean; groups: Group[];
+  health: { groups: number; contacts: number; extra: number; listSize: number; shareLabel: string };
+  byReason: Record<string, number>; obvious: number; truncated: boolean; multi: boolean; status: "open" | "decided" | "later";
+  counts: { open: number; later: number; decided: number }; protection: { allowing: number; names: string[] }; canExport: boolean; mergeSwitchedOff: boolean;
+  accounts: Paged<Account>; selection: { total: number; i: number; status: string; q: string; reason: string | null; location: string | null; sort: string };
+  list: Paged<Row>; upNext: Row[]; step: Step | null;
 };
-type Preview = { dryRun: true; count: number; contacts: number; sample: Array<{ locationName: string | null; confidence: number; reasons: string[]; names: string[] }> };
+type ObviousRow = { key: string; locationId: string; locationName: string | null; keep: { name: string; email: string | null; phone: string | null }; remove: Array<{ name: string; email: string | null; phone: string | null }>; tagsAdded: string[] };
+type ObviousData = Paged<ObviousRow> & { switchedOff: boolean };
 
-const tone = (c: number) => (c >= 90 ? "bad" : c >= 75 ? "warn" : "neutral") as "bad" | "warn" | "neutral";
-const KIND_LABEL = { exact: "Exact match", format: "Same, written differently", name: "Name only" } as const;
+type F = { status: "open" | "decided" | "later"; q: string; reason: string; location: string; sort: string; page: number; i: number; focus: string | null; all: boolean; ap: number; aq: string; accAll: boolean };
+const START: F = { status: "open", q: "", reason: "", location: "", sort: "important", page: 0, i: 0, focus: null, all: false, ap: 0, aq: "", accAll: false };
+
+function pathOf(f: F): string {
+  const sp = new URLSearchParams({ status: f.status, sort: f.sort, page: String(f.page), size: f.all ? "25" : "5", i: String(f.i), ap: String(f.ap), an: f.accAll ? "10" : "5" });
+  if (f.q) sp.set("q", f.q);
+  if (f.reason) sp.set("reason", f.reason);
+  if (f.location) sp.set("location", f.location);
+  if (f.focus) sp.set("focus", f.focus);
+  if (f.aq) sp.set("aq", f.aq);
+  return `duplicates?${sp.toString()}`;
+}
+
+const plural = (n: number, one: string, many: string) => `${fmtInt(n)} ${n === 1 ? one : many}`;
+const selectClass = "min-h-11 rounded-lg border bg-card px-2.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/30 sm:min-h-10";
+const searchClass = "min-h-11 w-full rounded-lg border bg-card px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/30 sm:min-h-10 sm:w-64";
 
 export function DuplicatesView() {
   const api = useApiClient();
-  const [showReviewed, setShowReviewed] = useState(false);
-  const { data, error, loading, reload } = useData<Data>(`duplicates${showReviewed ? "?reviewed=1" : ""}`);
+  const [f, setF] = useState<F>(START);
+  const { data, error, loading, reload } = useData<Data>(pathOf(f));
+  const [chosen, setChosen] = useState<{ key: string; id: string } | null>(null);
+  const [sheetKey, setSheetKey] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ text: string; undo?: () => Promise<void> } | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  const [keep, setKeep] = useState<Record<string, string>>({});
-  const [range, setRange] = useState<"high" | "mid" | "low">("high");
-  const [bulkAction, setBulkAction] = useState<"keep" | "not_duplicate">("keep");
-  const [preview, setPreview] = useState<Preview | null>(null);
-  const [page, setPage] = useState(0);
-  const [open, setOpen] = useState<Record<string, boolean>>({});
-  const [q, setQ] = useState("");
+  const [obvious, setObvious] = useState(false);
+  const [oPage, setOPage] = useState(0);
+  const [copied, setCopied] = useState<string | null>(null);
+  const [qInput, setQInput] = useState("");
+  const obv = useData<ObviousData>(obvious ? `duplicates/obvious?page=${oPage}` : null);
 
-  if (loading && !data) return <Loading label="Checking contacts for duplicates..." />;
-  if (error) return <ErrorBox error={error} onRetry={reload} />;
-  if (!data) return null;
-  const s = data.summary;
-  const bounds = { high: [90, 100], mid: [75, 89], low: [0, 74] }[range];
+  const patch = useCallback((p: Partial<F>) => setF((x) => ({ ...x, ...p })), []);
+  useEffect(() => {
+    const t = setTimeout(() => setF((x) => (x.q === qInput ? x : { ...x, q: qInput, page: 0, i: 0, focus: null })), 300);
+    return () => clearTimeout(t);
+  }, [qInput]);
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 20_000);
+    return () => clearTimeout(t);
+  }, [toast]);
 
-  const run = async (fn: () => Promise<unknown>, done: string) => {
+  const step = data?.step ?? null;
+  const total = data?.selection.total ?? 0;
+  const at = data?.selection.i ?? 0;
+  const keepId = step ? (chosen && chosen.key === step.key ? chosen.id : step.survivorId) : null;
+  const sheetOpen = !!step && sheetKey === step.key;
+  const decided = !!step?.review;
+  const filtered = !!(f.q || f.reason || f.location || f.status !== "open");
+
+  const go = useCallback((i: number) => { setSheetKey(null); setF((x) => ({ ...x, i, focus: null })); }, []);
+  const prev = () => go(at <= 0 ? total - 1 : at - 1);
+  const next = () => go(at + 1 >= total ? 0 : at + 1);
+  const focusGroup = (r: { locationId: string; key: string }) => { setSheetKey(null); setF((x) => ({ ...x, focus: `${r.locationId}:${r.key}`, i: 0 })); window.scrollTo?.({ top: 0, behavior: "smooth" }); };
+
+  const send = async (path: string, body: unknown, done: string, undo?: { path: string; body: unknown; focus: string }) => {
     setBusy(true);
-    setMsg(null);
+    setProblem(null);
     try {
-      await fn();
-      setMsg({ ok: true, text: done });
-      setPreview(null);
+      await api.post(path, body);
+      setSheetKey(null);
+      setToast({
+        text: done,
+        undo: undo ? async () => { await api.post(undo.path, undo.body); setToast(null); setF((x) => ({ ...x, focus: undo.focus })); } : undefined,
+      });
       await reload();
+      // The button that was pressed is gone: put focus on the next group so a keyboard or screen reader user is not left behind.
+      setTimeout(() => document.querySelector<HTMLElement>("[data-testid='dup-step-count']")?.focus(), 50);
     } catch (e) {
-      setMsg({ ok: false, text: (e as Error).message });
+      setProblem((e as Error).message);
     } finally {
       setBusy(false);
     }
   };
+  const bodyOf = (s: Step) => ({ locationId: s.locationId, contactIds: s.people.map((p) => p.contactId) });
+  const notDuplicate = (s: Step) => send("duplicates/review", { ...bodyOf(s), decision: "not_duplicate" }, "Marked as not a duplicate. It will not be suggested again.", { path: "duplicates/undo", body: { locationId: s.locationId, key: s.key }, focus: `${s.locationId}:${s.key}` });
+  const notNow = (s: Step) => send("duplicates/snooze", bodyOf(s), "Set aside for 7 days. It comes back after that.", { path: "duplicates/unsnooze", body: bodyOf(s), focus: `${s.locationId}:${s.key}` });
+  const merged = (s: Step) => send("duplicates/review", { ...bodyOf(s), decision: "merged_in_platform", keepContactId: keepId }, "Marked as merged. It leaves the list after SubSync next refreshes from your CRM.", { path: "duplicates/undo", body: { locationId: s.locationId, key: s.key }, focus: `${s.locationId}:${s.key}` });
+  const putBack = (s: Step) => (s.review ? send("duplicates/undo", { locationId: s.locationId, key: s.key }, "Put back in the list.") : send("duplicates/unsnooze", bodyOf(s), "Put back in the list."));
+  const mergeHere = async (s: Step): Promise<string> => {
+    try {
+      const r = await api.post<{ message?: string }>("duplicates/merge", { ...bodyOf(s), keepContactId: keepId });
+      return r.message ?? "Done.";
+    } catch (e) {
+      return (e as Error).message;
+    }
+  };
+  const copy = async (text: string) => {
+    try { await navigator.clipboard.writeText(text); setToast({ text: "Copied. Paste it wherever you need it." }); setCopied(null); } catch { setCopied(text); }
+  };
 
-  const decide = (g: Group, decision: "keep" | "not_duplicate" | "merged_in_platform", text: string) =>
-    run(() => api.post("duplicates/review", { locationId: g.locationId, contactIds: g.people.map((p) => p.contactId), decision, keepContactId: decision === "not_duplicate" ? null : keep[g.key] ?? g.survivorId }), text);
+  // Keyboard: arrows move between groups; M starts the merge, N says not a duplicate, S skips. Not while typing in a box.
+  const keys = useRef({ prev, next, merge: () => {}, not: () => {}, skip: next });
+  useEffect(() => {
+    keys.current = { prev, next, merge: () => { if (step && !decided) setSheetKey(step.key); }, not: () => { if (step && !decided && !busy) void notDuplicate(step); }, skip: next };
+  });
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (e.metaKey || e.ctrlKey || e.altKey || t?.closest("input, textarea, select, [contenteditable='true']")) return;
+      const k = keys.current;
+      if (e.key === "ArrowLeft") { e.preventDefault(); k.prev(); }
+      else if (e.key === "ArrowRight") { e.preventDefault(); k.next(); }
+      // Single-letter keys only act while focus is inside the group on screen (WCAG 2.1.4), so they can never fire by accident elsewhere on the page.
+      else if (!t?.closest("[data-testid='dup-step']")) return;
+      else if (e.key === "m" || e.key === "M") k.merge();
+      else if (e.key === "n" || e.key === "N") k.not();
+      else if (e.key === "s" || e.key === "S") k.skip();
+    };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, []);
 
-  // One row per name in each account, with how many groups and records sit behind it. The detail only
-  // appears when a row is opened, so a big account no longer prints thousands of cards.
-  const nameOf = (g: Group) => (g.people.find((p) => p.contactId === g.survivorId) ?? g.people[0])?.name?.trim() || "No name";
-  const byName = new Map<string, { key: string; name: string; locationName: string | null; groups: Group[]; records: number; top: number; reviewed: number }>();
-  for (const g of data.groups) {
-    const norm = nameOf(g).toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-    const key = g.locationId + "|" + norm;
-    const row = byName.get(key) ?? { key, name: nameOf(g), locationName: g.locationName, groups: [], records: 0, top: 0, reviewed: 0 };
-    row.groups.push(g);
-    row.records += g.people.length;
-    row.top = Math.max(row.top, g.confidence);
-    if (g.review) row.reviewed += 1;
-    byName.set(key, row);
-  }
-  const needle = q.trim().toLowerCase();
-  const rows = [...byName.values()]
-    .filter((r) => !needle || r.name.toLowerCase().includes(needle) || (r.locationName ?? "").toLowerCase().includes(needle))
-    .sort((a, b) => b.top - a.top || b.records - a.records || a.name.localeCompare(b.name));
-  const PAGE = 20;
-  const pages = Math.max(1, Math.ceil(rows.length / PAGE));
-  const at = Math.min(page, pages - 1);
-  const pageRows = rows.slice(at * PAGE, at * PAGE + PAGE);
+  if (!data && loading) return <Page title="Duplicate contacts"><SkeletonCards cards={3} label="Looking for duplicate contacts..." /></Page>;
+  if (!data) return <Page title="Duplicate contacts">{error ? <ErrorState error={error} onRetry={reload} /> : null}</Page>;
+  const h = data.health;
+  const clearFilters = () => { setQInput(""); setF({ ...START, all: f.all }); };
 
-  const bulkBody = (dryRun: boolean) => ({ decision: bulkAction, minConfidence: bounds[0], maxConfidence: bounds[1], dryRun });
+  const summary = [
+    `Duplicate contacts: ${plural(h.groups, "group", "groups")} to fix, ${plural(h.extra, "extra contact", "extra contacts")}${h.shareLabel ? ` (${h.shareLabel})` : ""}.`,
+    ...data.accounts.rows.map((a) => `- ${a.name ?? "Unnamed account"}: ${plural(a.groups, "group", "groups")}, ${plural(a.extra, "extra contact", "extra contacts")}`),
+  ].join("\n");
+
+  const menu = [
+    { key: "copy", label: "Copy a summary", onSelect: () => void copy(summary) },
+    ...(data.canExport ? [{ key: "csv", label: "Download the list (CSV)", onSelect: () => void api.download("export/duplicates", "subsync-duplicates.csv") }] : []),
+  ];
+  const filterWords = [
+    f.status === "later" ? "groups set aside" : f.status === "decided" ? "groups already decided" : null,
+    f.location ? (data.accounts.rows.find((a) => a.locationId === f.location)?.name ?? step?.locationName ?? "one client account") : null,
+    f.reason ? REASON_LABELS[f.reason as keyof typeof REASON_LABELS] : null,
+    f.q ? `"${f.q}"` : null,
+  ].filter(Boolean).join(" · ");
 
   return (
-    <div>
-      <PageHeader
-        title="Duplicate contacts"
-        subtitle="Likely duplicates inside each client account, scored by how sure we are, with a recommended record to keep. SubSync never changes your contacts: you merge in the platform, and we record what you decided."
-        actions={<Btn onClick={() => api.download("export/duplicates", "subsync-duplicates.csv")}>Export CSV</Btn>}
-      />
-      {msg && <p className={`mb-4 rounded-lg border px-3 py-2 text-sm ${msg.ok ? "bg-muted/40" : "border-red-300 bg-red-50 text-red-800"}`} role={msg.ok ? "status" : "alert"}>{msg.text}</p>}
+    <Page
+      title="Duplicate contacts"
+      subtitle="Contacts that look like the same person, one group at a time."
+      actions={<PopMenu label="More" items={menu} testId="dup-more" triggerClassName={`${BTN} px-3`}><span>More</span></PopMenu>}
+    >
+      <HowTo id="duplicates-review" title="How this works">
+        Each screen is one group of contacts that look like the same person. The best record to keep is already picked. Press Merge, finish in your CRM with one click, then say you did. Arrow keys move between groups.
+      </HowTo>
 
-      <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-3">
-        <Stat label="Exact matches" value={fmtInt(s.exact)} sub="same email or phone" tone={s.exact > 0 ? "bad" : undefined} />
-        <Stat label="Written differently" value={fmtInt(s.format)} sub="phone format, email case" tone={s.format > 0 ? "warn" : undefined} />
-        <Stat label="Contacts involved" value={fmtInt(s.contacts)} sub={`${s.reviewed} groups already reviewed`} />
-      </div>
+      {error && <div className="mb-4"><ErrorState error={error} onRetry={reload} /></div>}
+      {problem && <div className="mb-4"><InlineAlert tone="danger" onDismiss={() => setProblem(null)}>{problem}</InlineAlert></div>}
+      {data.truncated && <div className="mb-4"><InlineAlert tone="warning">This list is capped for speed, so the biggest groups are shown first. Merge some and the rest appear.</InlineAlert></div>}
 
-      <Card title="Is duplicate protection on?" className="mb-6">
-        <p className="mb-3 text-sm text-muted-foreground">
-          When a client account blocks duplicates, a new contact with an existing email or phone is merged into the old one instead of creating a second record. Old duplicates from before it was switched on, or from imports, stay until merged.
+      <section className="mb-6" data-testid="dup-health" aria-label="Duplicates at a glance">
+        <p className="text-3xl font-semibold tracking-tight" data-testid="dup-headline">
+          {h.groups === 0 ? "No duplicates to merge" : `${plural(h.groups, "duplicate group", "duplicate groups")} to fix`}
         </p>
-        <ul className="divide-y text-sm">
-          {s.accounts.map((a) => (
-            <li key={a.locationId} className="flex flex-wrap items-center justify-between gap-2 py-2">
-              <span className="font-medium">{a.name ?? "Unnamed account"}</span>
-              <span className="flex items-center gap-3">
-                <span className="text-muted-foreground">{a.groups} group{a.groups === 1 ? "" : "s"} · {fmtInt(a.contacts)} contacts</span>
-                {a.allowDuplicates === null ? <Badge>Setting not shown by the platform</Badge> : a.allowDuplicates ? <Badge tone="bad">Duplicates allowed</Badge> : <Badge tone="good">Blocking duplicates</Badge>}
-              </span>
-            </li>
-          ))}
-        </ul>
-        <p className="mt-3 text-xs text-muted-foreground">
-          To block new duplicates in a client account: open it, go to Settings, then Business Profile (General), and switch off &quot;Allow Duplicate Contact&quot;. Do this for every account that shows exact matches above.
+        <p className="mt-1 text-sm text-muted-foreground" data-testid="dup-health-line">
+          {h.groups === 0
+            ? `We compared ${fmtInt(h.listSize)} contacts and none look like the same person.`
+            : <>{plural(h.extra, "extra contact", "extra contacts")} to remove{h.shareLabel ? `, ${h.shareLabel}` : ""}. About 3 clicks each.</>}
+          {data.counts.later > 0 && <> {plural(data.counts.later, "group", "groups")} set aside.</>}
         </p>
-      </Card>
+        {data.obvious > 0 && (
+          <button type="button" className={`${BTN} mt-3`} aria-expanded={obvious} onClick={() => { setObvious(!obvious); setOPage(0); }} data-testid="dup-obvious-btn">
+            Merge all the obvious ones ({fmtInt(data.obvious)})
+          </button>
+        )}
+      </section>
 
-      {data.canReview && data.groups.some((g) => !g.review) && (
-        <Card title="Bulk actions (preview first)" className="mb-6">
-          <div className="flex flex-wrap items-end gap-3 text-sm">
-            <label className="block">
-              <span className="mb-1 block text-xs text-muted-foreground">Groups with confidence</span>
-              <select className="rounded-lg border bg-background px-3 py-2" value={range} onChange={(e) => { setRange(e.target.value as typeof range); setPreview(null); }}>
-                <option value="high">90 to 100 (exact)</option>
-                <option value="mid">75 to 89 (written differently)</option>
-                <option value="low">Below 75 (weak hints)</option>
-              </select>
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-xs text-muted-foreground">Record this decision</span>
-              <select className="rounded-lg border bg-background px-3 py-2" value={bulkAction} onChange={(e) => { setBulkAction(e.target.value as typeof bulkAction); setPreview(null); }}>
-                <option value="keep">Accept the recommended record to keep</option>
-                <option value="not_duplicate">These are not duplicates</option>
-              </select>
-            </label>
-            <Btn disabled={busy} onClick={async () => { setBusy(true); try { setPreview(await api.post<Preview>("duplicates/bulk", bulkBody(true))); setMsg(null); } catch (e) { setMsg({ ok: false, text: (e as Error).message }); } finally { setBusy(false); } }}>Preview</Btn>
-          </div>
-          {preview && (
-            <div className="mt-4 rounded-lg border bg-muted/30 p-3 text-sm">
-              <p className="font-medium">{preview.count === 0 ? "Nothing matches this range." : `${preview.count} group${preview.count === 1 ? "" : "s"} (${fmtInt(preview.contacts)} contacts) would be recorded. Nothing in your contacts changes.`}</p>
-              <ul className="mt-2 space-y-1 text-muted-foreground">
-                {preview.sample.map((x, i) => <li key={i}>{x.locationName}: {x.names.join(" / ")} <span className="text-xs">({x.confidence}% · {x.reasons.join(", ")})</span></li>)}
+      {obvious && (
+        <section className="mb-8 border-y py-4" data-testid="dup-obvious-panel" aria-label="The obvious duplicates">
+          <h2 className="text-base font-semibold">{plural(data.obvious, "obvious group", "obvious groups")}</h2>
+          <p className="mt-0.5 text-sm text-muted-foreground">Same email and same phone number, nothing to warn about. This is a preview: merging many at once from here is switched off, so nothing is changed.</p>
+          {obv.loading && !obv.data ? <p className="mt-3 text-sm text-muted-foreground">Loading...</p> : obv.error ? <div className="mt-3"><ErrorState error={obv.error} onRetry={obv.reload} /></div> : (
+            <>
+              <ul className="mt-2">
+                {(obv.data?.rows ?? []).map((r) => (
+                  <li key={r.locationId + r.key} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-t py-2.5" data-testid="dup-obvious-row">
+                    <div className="min-w-0 text-sm">
+                      <p className="truncate font-medium">Keep {r.keep.name}{r.keep.email ? `, ${r.keep.email}` : ""}</p>
+                      <p className="truncate text-xs text-muted-foreground">Remove {r.remove.map((x) => x.name).join(", ")}{r.tagsAdded.length ? ` · adds tags ${r.tagsAdded.join(", ")}` : ""}{data.multi && r.locationName ? ` · ${r.locationName}` : ""}</p>
+                    </div>
+                    <RowButton onClick={() => { setObvious(false); focusGroup(r); }} label="Review" sr={`${r.keep.name}`} />
+                  </li>
+                ))}
               </ul>
-              {preview.count > 0 && (
-                <div className="mt-3"><Btn variant="primary" disabled={busy} onClick={() => run(() => api.post("duplicates/bulk", bulkBody(false)), `Recorded ${preview.count} decision${preview.count === 1 ? "" : "s"}. You can undo any of them below.`)}>
-                  Confirm and record {preview.count}
-                </Btn></div>
+              {(obv.data?.pages ?? 1) > 1 && (
+                <div className="mt-2 flex items-center justify-between text-sm">
+                  <span className="text-xs text-muted-foreground">Showing {obv.data?.from} to {obv.data?.to} of {fmtInt(obv.data?.total ?? 0)}</span>
+                  <span className="flex gap-2"><button type="button" className={BTN} disabled={oPage === 0} onClick={() => setOPage(oPage - 1)}>Previous</button><button type="button" className={BTN} disabled={oPage >= (obv.data?.pages ?? 1) - 1} onClick={() => setOPage(oPage + 1)}>Next</button></span>
+                </div>
               )}
-            </div>
+            </>
           )}
-        </Card>
+        </section>
       )}
 
-      <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-base font-semibold">Review queue</h2>
-        <label className="flex items-center gap-2 text-sm text-muted-foreground">
-          <input type="checkbox" className="size-4" checked={showReviewed} onChange={(e) => setShowReviewed(e.target.checked)} /> Show reviewed groups
-        </label>
-      </div>
-      {data.truncated && <p className="mb-3 text-xs text-muted-foreground">This account is very large, so we are showing the biggest groups first.</p>}
+      {filtered && (
+        <p className="mb-3 text-sm" data-testid="dup-filter-note">
+          <span className="text-muted-foreground">Showing </span>{filterWords || "a filtered list"}
+          <button type="button" className={`${QUIET} ml-1`} onClick={clearFilters} data-testid="dup-clear-filters">Show all</button>
+        </p>
+      )}
 
-      {data.groups.length === 0 ? (
-        <Empty title="Nothing to review" body="No two contacts in the same account look like the same person, or you have reviewed them all." />
-      ) : (
-        <div>
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <input className="w-full max-w-xs rounded-lg border bg-card px-3 py-2 text-sm shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/30" placeholder="Find a name or account" aria-label="Find a name or account" value={q} onChange={(e) => { setQ(e.target.value); setPage(0); }} />
-            <span className="text-xs text-muted-foreground">{fmtInt(rows.length)} name{rows.length === 1 ? "" : "s"} · {fmtInt(data.groups.length)} group{data.groups.length === 1 ? "" : "s"}</span>
+      {step && keepId ? (
+        <section aria-label="The group to review" data-testid="dup-step" tabIndex={-1} className={`outline-none ${loading ? "opacity-70 transition-opacity" : "transition-opacity"}`}>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b pb-3">
+            <div className="min-w-0">
+              <p className="text-lg font-semibold outline-none" tabIndex={-1} data-testid="dup-step-count" aria-live="polite">Group {fmtInt(at + 1)} of {fmtInt(total)}</p>
+              <p className="text-sm text-muted-foreground" data-testid="dup-reason">{step.reason.label}{data.multi && step.locationName ? ` · ${step.locationName}` : ""} · {step.likelihood.label}</p>
+            </div>
+            <div className="flex gap-2">
+              <button type="button" className={`${BTN} px-3`} onClick={prev} disabled={total < 2} aria-label="Previous group" aria-keyshortcuts="ArrowLeft" data-testid="dup-prev"><ChevronLeft aria-hidden className="size-5" /></button>
+              <button type="button" className={`${BTN} px-3`} onClick={next} disabled={total < 2} aria-label="Next group" aria-keyshortcuts="ArrowRight" data-testid="dup-next"><ChevronRight aria-hidden className="size-5" /></button>
+            </div>
           </div>
-          {rows.length === 0 ? <Empty title="No match" body="Nothing in the queue matches that search." /> : (
-          <ul className="divide-y rounded-xl border bg-card">
-            {pageRows.map((row) => (
-              <li key={row.key}>
-                <button type="button" aria-expanded={!!open[row.key]} onClick={() => setOpen({ ...open, [row.key]: !open[row.key] })}
-                  className="flex w-full flex-wrap items-center justify-between gap-2 px-4 py-3 text-left text-sm transition-colors hover:bg-muted/40">
-                  <span className="min-w-0">
-                    <span className="font-medium">{row.name}</span>
-                    <span className="text-muted-foreground"> · {row.locationName ?? "Unnamed account"}</span>
-                  </span>
-                  <span className="flex flex-wrap items-center gap-2">
-                    <span className="text-xs text-muted-foreground">{row.groups.length > 1 ? `${row.groups.length} groups, ` : ""}{row.records} records</span>
-                    <Badge tone={tone(row.top)}>{row.top}% sure</Badge>
-                    {row.reviewed > 0 && <Badge tone="good">{row.reviewed === row.groups.length ? "Reviewed" : `${row.reviewed} reviewed`}</Badge>}
-                    <span aria-hidden className="text-muted-foreground">{open[row.key] ? "Hide" : "Review"}</span>
-                  </span>
-                </button>
-                {open[row.key] && (
-          <ul className="space-y-4 border-t bg-muted/20 p-3">
-          {row.groups.map((g) => {
-            const chosen = keep[g.key] ?? g.review?.keepContactId ?? g.survivorId;
-            return (
-              <li key={g.locationId + g.key} className="rounded-xl border bg-card p-4">
-                <div className="mb-3 flex flex-wrap items-center gap-2">
-                  <span className="font-medium">{g.locationName ?? "Unnamed account"}</span>
-                  <Badge tone={tone(g.confidence)}>{g.confidence}% sure</Badge>
-                  <Badge>{KIND_LABEL[g.kind]}</Badge>
-                  <span className="text-xs text-muted-foreground">{g.reasons.join(" · ")}</span>
-                  {g.review && <Badge tone="good">{g.review.decision === "not_duplicate" ? "Marked not duplicates" : g.review.decision === "merged_in_platform" ? "Merged in the platform" : "Record to keep chosen"} {g.review.decidedAt ? timeAgo(g.review.decidedAt) : ""}</Badge>}
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[520px] text-sm">
-                    <thead>
-                      <tr className="text-left text-xs text-muted-foreground">
-                        <th className="w-28 py-1 pr-2 font-normal">{""}</th>
-                        {g.people.map((p) => (
-                          <th key={p.contactId} className="py-1 pr-3 font-normal">
-                            <label className="flex items-center gap-2">
-                              <input type="radio" name={g.locationId + g.key} className="size-4" checked={chosen === p.contactId} disabled={!data.canReview} onChange={() => setKeep({ ...keep, [g.key]: p.contactId })} />
-                              <span className="font-medium text-foreground">{chosen === p.contactId ? "Keep this one" : "Merge into kept"}</span>
-                              {p.contactId === g.survivorId && <Badge tone="info">Recommended</Badge>}
-                            </label>
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y">
-                      {([
-                        ["Name", (p: Person) => p.name],
-                        ["Email", (p: Person) => p.email ?? "none"],
-                        ["Phone", (p: Person) => p.phone ?? "none"],
-                        ["Tags", (p: Person) => (p.tags.length ? p.tags.join(", ") : "none")],
-                        ["Added", (p: Person) => (p.createdAt ? timeAgo(p.createdAt) : "unknown")],
-                        ["Last activity", (p: Person) => (p.lastActivityAt ? timeAgo(p.lastActivityAt) : "none")],
-                        ["Deals", (p: Person) => `${p.openDeals} open · ${p.wonDeals} won`],
-                        ["Conversation", (p: Person) => (p.hasConversation ? "yes" : "no")],
-                      ] as Array<[string, (p: Person) => string]>).map(([label, get]) => (
-                        <tr key={label}>
-                          <td className="py-1.5 pr-2 text-xs text-muted-foreground">{label}</td>
-                          {g.people.map((p) => <td key={p.contactId} className="py-1.5 pr-3">{get(p)}</td>)}
-                        </tr>
-                      ))}
-                      <tr>
-                        <td className="py-1.5 pr-2 text-xs text-muted-foreground">Open</td>
-                        {g.people.map((p) => <td key={p.contactId} className="py-1.5 pr-3"><ExtLink href={p.url}>In the platform</ExtLink></td>)}
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-                <div className="mt-3 rounded-lg bg-muted/40 p-3 text-xs text-muted-foreground">
-                  <p className="mb-1 font-medium text-foreground">After merging, the kept record should have:</p>
-                  <ul className="grid gap-x-6 sm:grid-cols-2">
-                    {g.plan.map((f) => <li key={f.field}><span className="capitalize">{f.field}</span>: {f.keep || "empty"}{f.others.length ? ` (also seen: ${f.others.join(", ")})` : ""}</li>)}
-                  </ul>
-                  <p className="mt-2">To merge: open the contact to keep, or select the contacts in the platform&apos;s Contacts list, and use its own Merge option. It keeps the history of both. SubSync cannot merge for you, because the platform offers no safe way to do it from outside.</p>
-                </div>
-                {data.canReview && (
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {!g.review ? (
-                      <>
-                        <Btn disabled={busy} onClick={() => decide(g, "merged_in_platform", "Recorded as merged. Refresh after the next sync and it will drop off the list.")}>I merged these in the platform</Btn>
-                        <Btn disabled={busy} onClick={() => decide(g, "keep", "Recorded your choice of record to keep.")}>Save this record to keep</Btn>
-                        <Btn variant="ghost" disabled={busy} onClick={() => decide(g, "not_duplicate", "Marked as not duplicates. They will not be flagged again.")}>Not duplicates</Btn>
-                      </>
-                    ) : (
-                      <Btn variant="ghost" disabled={busy} onClick={() => run(() => api.post("duplicates/undo", { locationId: g.locationId, key: g.key }), "Decision removed. The group is back in the queue.")}>Undo this decision</Btn>
-                    )}
-                  </div>
-                )}
-              </li>
-            );
-          })}
+
+          {step.review && (
+            <div className="mb-4"><InlineAlert tone="info" action={<button type="button" className={QUIET} disabled={busy} onClick={() => void putBack(step)} data-testid="dup-undo-decision">Undo</button>}>
+              {step.review.kind === "not_duplicate" ? "You marked this as not a duplicate." : step.review.kind === "merged_in_platform" ? "You said this was merged in your CRM." : "You decided about this group."}
+            </InlineAlert></div>
+          )}
+          {step.until && !step.review && (
+            <div className="mb-4"><InlineAlert tone="info" action={<button type="button" className={QUIET} disabled={busy} onClick={() => void putBack(step)} data-testid="dup-unsnooze">Put back</button>}>
+              Set aside until {new Date(step.until).toLocaleDateString("en-US", { day: "numeric", month: "short" })}.
+            </InlineAlert></div>
+          )}
+
+          <ul className={`grid gap-x-6 gap-y-4 ${step.people.length >= 3 ? "md:grid-cols-3" : step.people.length === 2 ? "md:grid-cols-2" : ""}`} data-testid="dup-records">
+            {step.people.map((p, i) => (
+              <RecordCard key={p.contactId} p={p} i={i} keep={p.contactId === keepId} best={p.contactId === step.survivorId} locked={decided} locationId={step.locationId} onKeep={() => setChosen({ key: step.key, id: p.contactId })} />
+            ))}
           </ul>
-                )}
+
+          <p className="mt-3 text-sm" data-testid="dup-why">
+            {keepId === step.survivorId
+              ? <><span className="font-medium">Best match picked: {step.people.find((p) => p.contactId === step.survivorId)?.name}.</span> <span className="text-muted-foreground">{step.why}.</span></>
+              : <span className="text-muted-foreground">You chose {step.people.find((p) => p.contactId === keepId)?.name} instead of our pick ({step.people.find((p) => p.contactId === step.survivorId)?.name}).</span>}
+          </p>
+          {guardrails(step.people, keepId).length > 0 && !sheetOpen && !decided && <p className="mt-1 text-sm text-warning" data-testid="dup-careful">There is something to check before merging this one. You will see it next.</p>}
+
+          {!decided && !sheetOpen && (
+            <div className="mt-6" data-testid="dup-actions">
+              <button type="button" className={PRIMARY} onClick={() => setSheetKey(step.key)} aria-keyshortcuts="m" data-testid="dup-merge">Merge these {step.people.length} contacts</button>
+              <div className="mt-2 flex flex-wrap gap-x-2 gap-y-1">
+                <button type="button" className={QUIET} disabled={busy} onClick={() => void notDuplicate(step)} aria-keyshortcuts="n" data-testid="dup-not-dup">Not a duplicate</button>
+                <button type="button" className={QUIET} disabled={busy} onClick={() => void notNow(step)} data-testid="dup-not-now">Not now</button>
+                <button type="button" className={QUIET} disabled={total < 2} onClick={next} aria-keyshortcuts="s" data-testid="dup-skip">Skip</button>
+              </div>
+              <p className="mt-2 hidden text-xs text-muted-foreground md:block">Keys: the left and right arrows move between groups. With the group selected, M merges, N says not a duplicate and S skips.</p>
+            </div>
+          )}
+
+          {sheetOpen && (
+            <MergeSheet
+              key={step.key + keepId}
+              accountName={step.locationName} people={step.people} keepId={keepId} why={step.why} switchedOff={data.mergeSwitchedOff}
+              onClose={() => setSheetKey(null)} onMerged={() => merged(step)} onMergeHere={() => mergeHere(step)} copy={copy}
+            />
+          )}
+          <Compare people={step.people} watchingSince={step.watchingSince} />
+          {copied && <textarea readOnly className="mt-3 h-40 w-full rounded-lg border bg-card p-2 font-mono text-xs" value={copied} aria-label="Summary to copy" onFocus={(e) => e.currentTarget.select()} />}
+        </section>
+      ) : (
+        <EmptyState
+          title={filtered ? "Nothing matches" : data.counts.later > 0 ? "Nothing left to review right now" : "No duplicates to merge"}
+          body={filtered ? "No group fits what you picked." : data.counts.later > 0 ? "The groups you set aside come back after 7 days." : "No two contacts in your accounts look like the same person."}
+          action={filtered ? <button type="button" className={BTN} onClick={clearFilters}>Show all groups</button> : undefined}
+        />
+      )}
+
+      {data.upNext.length > 0 && !f.all && (
+        <Section title="Up next" hint="The next groups, most important first." id="dup-next" className="mt-10">
+          <ul data-testid="dup-up-next">{data.upNext.map((r) => <GroupRow key={r.locationId + r.key} row={r} multi={data.multi} onOpen={() => focusGroup(r)} />)}</ul>
+        </Section>
+      )}
+
+      {(data.counts.open > 0 || data.counts.later > 0 || data.counts.decided > 0) && (
+        <Section title="All groups" hint="Search, sort and open any group." id="dup-all" className={data.upNext.length > 0 && !f.all ? "mt-2" : "mt-10"}>
+          {!f.all ? (
+            <button type="button" className={BTN} onClick={() => patch({ all: true, page: 0 })} data-testid="dup-see-all">See all {fmtInt(data.selection.total)} {data.selection.total === 1 ? "group" : "groups"}</button>
+          ) : (
+            <div data-testid="dup-all-panel">
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                <input type="search" className={searchClass} placeholder="Search a name, email or phone" aria-label="Search groups" value={qInput} onChange={(e) => setQInput(e.target.value)} data-testid="dup-search" />
+                <label className="flex items-center gap-1.5 text-xs text-muted-foreground">Sort
+                  <select className={selectClass} value={f.sort} onChange={(e) => patch({ sort: e.target.value, page: 0, i: 0, focus: null })} aria-label="Sort groups">
+                    {Object.entries(SORT_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                  </select>
+                </label>
+                <label className="flex items-center gap-1.5 text-xs text-muted-foreground">Kind
+                  <select className={selectClass} value={f.reason} onChange={(e) => patch({ reason: e.target.value, page: 0, i: 0, focus: null })} aria-label="Kind of match">
+                    <option value="">All ({fmtInt(data.counts.open)})</option>
+                    {Object.entries(REASON_LABELS).map(([k, v]) => <option key={k} value={k}>{v} ({fmtInt(data.byReason[k] ?? 0)})</option>)}
+                  </select>
+                </label>
+                <label className="flex items-center gap-1.5 text-xs text-muted-foreground">Show
+                  <select className={selectClass} value={f.status} onChange={(e) => patch({ status: e.target.value as F["status"], page: 0, i: 0, focus: null })} aria-label="Which groups">
+                    <option value="open">To do ({fmtInt(data.counts.open)})</option>
+                    <option value="later">Set aside ({fmtInt(data.counts.later)})</option>
+                    <option value="decided">Done ({fmtInt(data.counts.decided)})</option>
+                  </select>
+                </label>
+              </div>
+              {data.list.rows.length === 0 ? <p className="border-y py-6 text-center text-sm text-muted-foreground">No group fits that.</p> : (
+                <ul data-testid="dup-list">{data.list.rows.map((r) => <GroupRow key={r.locationId + r.key} row={r} multi={data.multi} onOpen={() => focusGroup(r)} />)}</ul>
+              )}
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-sm">
+                <span className="text-xs text-muted-foreground" data-testid="dup-list-range">{data.list.total === 0 ? "" : `Showing ${fmtInt(data.list.from)} to ${fmtInt(data.list.to)} of ${fmtInt(data.list.total)}`}</span>
+                <span className="flex gap-2">
+                  <button type="button" className={BTN} disabled={data.list.page === 0} onClick={() => patch({ page: data.list.page - 1 })}>Previous</button>
+                  <button type="button" className={BTN} disabled={data.list.page >= data.list.pages - 1} onClick={() => patch({ page: data.list.page + 1 })}>Next</button>
+                  <button type="button" className={QUIET} onClick={() => patch({ all: false, page: 0 })}>Hide the list</button>
+                </span>
+              </div>
+            </div>
+          )}
+        </Section>
+      )}
+
+      {data.multi && data.accounts.total > 1 && (
+        <Section title="Clients with duplicates" hint="Pick one client to review only theirs." id="dup-clients" className="mt-8">
+          {f.accAll && (
+            <input type="search" className={`${searchClass} mb-2`} placeholder="Find a client" aria-label="Find a client" value={f.aq} onChange={(e) => patch({ aq: e.target.value, ap: 0 })} data-testid="dup-client-search" />
+          )}
+          <ul data-testid="dup-clients">
+            {data.accounts.rows.map((a) => (
+              <li key={a.locationId} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-t py-2.5">
+                <div className="min-w-0"><p className="truncate text-sm font-medium">{a.name ?? "Unnamed account"}</p><p className="truncate text-xs text-muted-foreground">{plural(a.groups, "group", "groups")} · {plural(a.extra, "extra contact", "extra contacts")}{a.openDeals > 0 ? ` · ${plural(a.openDeals, "open deal", "open deals")}` : ""}</p></div>
+                <RowButton onClick={() => { setSheetKey(null); setQInput(""); setF({ ...START, location: a.locationId, all: f.all }); window.scrollTo?.({ top: 0, behavior: "smooth" }); }} label="Review" sr={`${a.name ?? "this client"}'s duplicates`} />
               </li>
             ))}
           </ul>
-          )}
-          {pages > 1 && (
-            <div className="mt-3 flex items-center justify-between text-sm">
-              <span className="text-xs text-muted-foreground">Showing {at * PAGE + 1} to {Math.min(rows.length, at * PAGE + PAGE)} of {fmtInt(rows.length)}</span>
-              <span className="flex gap-2">
-                <Btn variant="secondary" disabled={at === 0} onClick={() => setPage(at - 1)}>Previous</Btn>
-                <Btn variant="secondary" disabled={at >= pages - 1} onClick={() => setPage(at + 1)}>Next</Btn>
-              </span>
-            </div>
-          )}
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-sm">
+            {!f.accAll
+              ? <button type="button" className={BTN} onClick={() => patch({ accAll: true, ap: 0 })} data-testid="dup-clients-all">See all {fmtInt(data.accounts.total)} clients</button>
+              : <><span className="text-xs text-muted-foreground">Showing {fmtInt(data.accounts.from)} to {fmtInt(data.accounts.to)} of {fmtInt(data.accounts.total)}</span>
+                <span className="flex gap-2"><button type="button" className={BTN} disabled={data.accounts.page === 0} onClick={() => patch({ ap: data.accounts.page - 1 })}>Previous</button><button type="button" className={BTN} disabled={data.accounts.page >= data.accounts.pages - 1} onClick={() => patch({ ap: data.accounts.page + 1 })}>Next</button><button type="button" className={QUIET} onClick={() => patch({ accAll: false, ap: 0, aq: "" })}>Show fewer</button></span></>}
+          </div>
+        </Section>
+      )}
+
+      {data.protection.allowing > 0 && (
+        <Section title="Stop new duplicates" id="dup-protect" className="mt-8" hint={`${plural(data.protection.allowing, "client account still lets", "client accounts still let")} duplicates be created.`}>
+          <p className="text-sm text-muted-foreground">{data.protection.names.join(", ")}{data.protection.allowing > data.protection.names.length ? ` and ${data.protection.allowing - data.protection.names.length} more` : ""}. In your CRM, open the client account, go to Settings, Business Profile, and switch off &quot;Allow Duplicate Contact&quot;. Old duplicates stay until merged.</p>
+        </Section>
+      )}
+
+      {toast && (
+        <div role="status" data-testid="dup-toast" className="fixed inset-x-4 bottom-4 z-40 flex items-center justify-between gap-3 rounded-lg border bg-card px-4 py-3 text-sm shadow-[var(--shadow-lift)] sm:left-auto sm:max-w-sm">
+          <span>{toast.text}</span>
+          <span className="flex shrink-0 gap-1">
+            {toast.undo && <button type="button" className={`${QUIET} font-medium text-foreground`} onClick={() => void toast.undo!().catch((e: Error) => setProblem(e.message))} data-testid="dup-undo">Undo</button>}
+            <button type="button" className={QUIET} onClick={() => setToast(null)} aria-label="Close this message">Close</button>
+          </span>
         </div>
       )}
-    </div>
+    </Page>
   );
 }

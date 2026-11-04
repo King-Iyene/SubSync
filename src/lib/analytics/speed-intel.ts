@@ -69,6 +69,8 @@ export type TouchRow = {
   tags?: string[];
   /** When the first automatic message went out, and when the first person replied, kept apart from touchAt. `detailed` is false for rows read before this was recorded. */
   autoAt?: number | null; humanAt?: number | null; detailed?: boolean;
+  /** This account's own reply target when it set one. Every figure and list judges the lead against it; without one the default target passed in is used. */
+  targetMinutes?: number | null;
 };
 
 // Where a lead came from decides how fast it must be answered. Portal and phone leads go cold in minutes, web forms a little
@@ -84,9 +86,9 @@ export type Judged = "within" | "late" | "waiting";
 
 // The one place a single lead is judged against a target: answered inside it, answered after it, still waiting past it, or not judged yet (still inside
 // its window, so it counts neither way). Every figure and every list behind a figure uses this.
-export function judge(r: Pick<TouchRow, "leadAt" | "touchAt">, targetMinutes: number, now: number): Judged | null {
+export function judge(r: Pick<TouchRow, "leadAt" | "touchAt" | "targetMinutes">, targetMinutes: number, now: number): Judged | null {
   const s = responseSeconds(r);
-  const target = targetMinutes * 60;
+  const target = (r.targetMinutes ?? targetMinutes) * 60;
   if (s !== null) return s <= target ? "within" : "late";
   return (now - r.leadAt) / 1000 > target ? "waiting" : null;
 }
@@ -189,7 +191,8 @@ export function topSourceNames(rows: TouchRow[], limit = 3): Array<{ label: stri
 export function bySource(rows: TouchRow[], accountTarget: number, now: number): Array<{ cls: SourceClass; targetMinutes: number; names: Array<{ label: string; n: number }> } & Summary> {
   const out: Array<{ cls: SourceClass; targetMinutes: number; names: Array<{ label: string; n: number }> } & Summary> = [];
   for (const cls of ["portal", "meta", "form", "social", "other"] as SourceClass[]) {
-    const mine = rows.filter((r) => classifySource(r.source, r.tags) === cls);
+    // A source is judged against its own target, so an account's own reply target must not override it here.
+    const mine = rows.filter((r) => classifySource(r.source, r.tags) === cls).map((r) => (cls === "other" ? r : { ...r, targetMinutes: null }));
     if (mine.length === 0) continue;
     const targetMinutes = cls === "other" ? accountTarget : SOURCE_TARGET_MINUTES[cls];
     out.push({ cls, targetMinutes, names: topSourceNames(mine), ...summarise(mine, targetMinutes, now) });
@@ -284,7 +287,7 @@ export function autoVsHuman(rows: TouchRow[], targetMinutes: number, now: number
     read: read.length, notRead: rows.length - read.length,
     autoSent: auto.length,
     alsoPerson: auto.filter((r) => r.humanAt != null).length,
-    onlyAutoPastTarget: auto.filter((r) => r.humanAt == null && (now - r.leadAt) / 60_000 > targetMinutes).length,
+    onlyAutoPastTarget: auto.filter((r) => r.humanAt == null && (now - r.leadAt) / 60_000 > (r.targetMinutes ?? targetMinutes)).length,
     personOnly: read.filter((r) => r.autoAt == null && r.humanAt != null).length,
     autoMedianSeconds: autoTimes.length >= MIN_FOR_MEDIAN ? percentile(autoTimes, 0.5) : null,
     personMedianSeconds: personTimes.length >= MIN_FOR_MEDIAN ? percentile(personTimes, 0.5) : null,

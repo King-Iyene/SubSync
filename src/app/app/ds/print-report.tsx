@@ -32,7 +32,7 @@ export function PrintReport({ r, now }: { r: ReportInput; now: number }) {
       {r.breakdown && <p className="mt-1 text-sm">{r.breakdown}</p>}
       {r.forecast && <p className="mt-2 text-sm">{r.forecast}</p>}
       <h3 className="mb-1 mt-6 text-base font-semibold">Fix first</h3>
-      {r.rows.length === 0 ? <p className="text-sm">Nothing needs fixing right now.</p> : (
+      {r.rows.length === 0 ? <p className="text-sm">Nothing needs you right now.</p> : (
         <table className="w-full border-collapse text-sm">
           <thead><tr className="border-b border-black text-left"><th className="py-1 pr-2">Client account</th><th className="py-1 pr-2">What is wrong</th><th className="py-1 pr-2 text-right">At stake</th><th className="py-1">Wrong for</th></tr></thead>
           <tbody>

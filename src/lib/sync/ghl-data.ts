@@ -7,7 +7,7 @@ import { ghlFetch } from "../ghl/http.ts";
 import { isInternalComment } from "../analytics/message-kinds.ts";
 import { mapMessage, type Msg } from "../analytics/speed-intel.ts";
 import { safePhotoUrl } from "../analytics/people-labels.ts";
-import { mapCallMessage, type CrmCall } from "../people/helpers.ts";
+import { mapCallMessage, mapMessageEvent, type CrmCall, type CrmMessage } from "../people/helpers.ts";
 
 export function toIso(value: unknown): string | null {
   if (value === null || value === undefined || value === "") return null;
@@ -335,6 +335,18 @@ export async function fetchConversationCalls(token: string, locationId: string, 
   const inner = rec(body.messages);
   const list = Array.isArray(inner.messages) ? inner.messages : Array.isArray(body.messages) ? body.messages : [];
   return list.map(mapCallMessage).filter((c): c is CrmCall => c !== null).slice(0, 30);
+}
+
+// The calls AND the messages of one conversation (newest page), from ONE request. Messages are kept as when, direction, channel and sender: never what was written.
+// Needs conversations/message.readonly.
+export async function fetchConversationActivity(token: string, locationId: string, conversationId: string): Promise<{ calls: CrmCall[]; messages: CrmMessage[] }> {
+  const body = rec(await getJson(`/conversations/${encodeURIComponent(conversationId)}/messages`, { limit: "100", locationId }, token, "2021-04-15"));
+  const inner = rec(body.messages);
+  const list = Array.isArray(inner.messages) ? inner.messages : Array.isArray(body.messages) ? body.messages : [];
+  return {
+    calls: list.map(mapCallMessage).filter((c): c is CrmCall => c !== null).slice(0, 30),
+    messages: list.map(mapMessageEvent).filter((m): m is CrmMessage => m !== null).slice(0, 40),
+  };
 }
 
 // The people on the account (names only). Needs users.readonly.

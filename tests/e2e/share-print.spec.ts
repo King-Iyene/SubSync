@@ -59,27 +59,29 @@ test("the in-app audit prints without the menu and without sideways overflow on 
 
 // ---------------- stage F6 (written in the parallel run, not run there: the lead runs them after the merge) ----------------
 
-test("every number on the audit opens the list it was counted from, with the same count, and the way back is named", async ({ page }) => {
+test("every finding on the audit opens the list it was counted from, with the same count, and Escape closes it", async ({ page }) => {
   await page.goto("/app#audit");
   await page.reload();
   await expect(page.getByText("What needs fixing")).toBeVisible({ timeout: 60_000 });
-  const show = page.getByRole("button", { name: /^Show the [\d,]+ / }).first();
-  test.skip(!(await show.count()), "the demo has nothing to list on this data");
-  const n = Number(((await show.textContent()) ?? "").match(/Show the ([\d,]+)/)![1].replace(/,/g, ""));
-  await show.click();
-  await expect(page.getByTestId("drill-count")).toHaveText(String(n));
-  await expect(page.getByTestId("drill-back")).toHaveText("Back to the audit");
-  await page.getByTestId("drill-back").click();
-  await expect(page.getByTestId("drill-panel")).toHaveCount(0);
+  const finding = page.getByTestId("audit-finding").first();
+  test.skip(!(await finding.count()), "the demo has nothing to list on this data");
+  const n = Number(await finding.getAttribute("data-count"));
+  await finding.getByTestId("audit-show").click();
+  await expect(page.getByTestId("records-count")).toHaveAttribute("data-count", String(n));
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("records-panel")).toHaveCount(0);
 });
 
-test("every button that leaves the audit says where it goes", async ({ page }) => {
+test("every link that leaves the audit says where it goes", async ({ page }) => {
   await page.goto("/app#audit");
   await page.reload();
   await expect(page.getByText("What needs fixing")).toBeVisible({ timeout: 60_000 });
-  const names = await page.getByRole("button", { name: /^Open/ }).and(page.locator(":not([data-nextjs-dev-tools-button])")).allTextContents();
-  // The development server adds its own "Open Next.js Dev Tools" button to every page; it is not part of the app and does not exist in production.
-  for (const name of names) expect(name, "an Open button with no destination").toMatch(/^Open in .{3,}/);
+  const finding = page.getByTestId("audit-finding").first();
+  test.skip(!(await finding.count()), "the demo has nothing to list on this data");
+  await finding.getByTestId("audit-show").click();
+  const links = page.getByTestId("records-crm");
+  await expect(links.first()).toBeVisible({ timeout: 30_000 });
+  for (const text of await links.allTextContents()) expect(text, "a link with no destination").toMatch(/^Open in CRM/);
 });
 
 test("the printed audit opens with the sender's own name and colour, on light paper", async ({ page }) => {

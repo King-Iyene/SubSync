@@ -60,13 +60,13 @@ test("Data and privacy shows what is stored and what each button removes, and th
   await expect(page.getByRole("button", { name: "Delete all synced data" })).toBeDisabled();
   await expect(page.getByRole("link", { name: "the Trust page" })).toHaveAttribute("href", "/trust");
   await openSettings(page, "integrations");
-  // Stage E0 moved the Slack and Fathom cards to their own Connections page; Integrations keeps the pointer to it and the permissions.
-  await expect(page.getByTestId("section-integrations").getByRole("link", { name: "Connections", exact: true })).toBeVisible();
+  // The Slack and Fathom cards (My connections, Team connections) are the top of Integrations, above the permissions.
+  await expect(page.getByTestId("section-integrations").getByRole("heading", { name: "My connections", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "What SubSync can read" })).toBeVisible();
-  const first = page.getByTestId("section-integrations").locator("details").first();
+  // The first details in Integrations is now the Fathom notice (My connections is above the permissions): take the first permission group.
+  const first = page.getByTestId("permissions-summary").locator("xpath=..").locator("details").first();
   await first.locator("summary").click();
   await expect(first.getByText(/required|optional/).first()).toBeVisible();
-  await page.getByTestId("section-integrations").getByRole("link", { name: "Connections", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Fathom", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: /^Slack/ })).toBeVisible();
 });

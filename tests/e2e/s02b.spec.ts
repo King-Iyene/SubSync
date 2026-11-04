@@ -27,7 +27,7 @@ async function inSection(page: Page, title: string) {
   await page.waitForLoadState("networkidle").catch(() => undefined);
 }
 
-test("Settings names neither Zoom nor Google Meet, and points to Connections", async ({ page }) => {
+test("Settings names neither Zoom nor Google Meet, and holds the connections in Integrations", async ({ page }) => {
   await open(page, "settings", "Settings");
   for (const title of ["Team and access", "Notifications", "Reply targets and thresholds", "Brand", "Sync status", "Advanced"]) {
     await inSection(page, title);
@@ -36,15 +36,15 @@ test("Settings names neither Zoom nor Google Meet, and points to Connections", a
   await inSection(page, "Data and privacy");
   await expect(page.getByText("Delete my data").first()).toBeVisible();
   await inSection(page, "Integrations");
-  await expect(page.getByRole("link", { name: "Connections", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "My connections", exact: true })).toBeVisible();
   expect(await bodyText(page), "Settings, Integrations, names Zoom or Google Meet").not.toMatch(NAMED);
   await inSection(page, "Data and privacy");
   expect(await bodyText(page), "Settings, Data and privacy, names Zoom or Google Meet").not.toMatch(NAMED);
 });
 
-// Stage E0 moved the connections out of Settings into their own page: Slack and Fathom stay visible, Zoom and Google Meet stay hidden.
-test("Connections names neither Zoom nor Google Meet, and Slack and Fathom stay on it", async ({ page }) => {
-  await open(page, "connections", "Connections");
+// The connections live in Settings, Integrations (an old #connections address opens it): Slack and Fathom stay visible, Zoom and Google Meet stay hidden.
+test("Integrations names neither Zoom nor Google Meet, and Slack and Fathom stay on it", async ({ page }) => {
+  await open(page, "connections", "Settings");
   await expect(page.getByRole("heading", { name: "Fathom", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: /^Slack/ })).toBeVisible();
   await expect(page.getByRole("heading", { name: /zoom/i })).toHaveCount(0);

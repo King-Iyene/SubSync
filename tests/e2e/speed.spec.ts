@@ -45,17 +45,6 @@ test("Facebook and Instagram lead forms are their own source with their own targ
   expect(classes).toContain("portal"); // Zillow, Realtor.com and open house sign-ins
 });
 
-test("the speed screen uses plain words and shows the left-out sentence", async ({ page }, testInfo) => {
-  await page.goto("/app#speed");
-  await page.reload();
-  await expect(page.getByText("Demo mode", { exact: false }).first()).toBeVisible();
-  await expect(page.getByText(/leads? (is|are) waiting for a reply|No leads are waiting for a reply/).first()).toBeVisible();
-  await expect(page.getByText("were not counted as leads", { exact: false })).toBeVisible();
-  await expect(page.getByText("Facebook and Instagram lead forms", { exact: false }).first()).toBeVisible();
-  await page.waitForLoadState("networkidle").catch(() => undefined);
-  await page.screenshot({ path: `docs/review/f2-speed-${testInfo.project.name}.png`, fullPage: true });
-});
-
 test("the real estate sample audit page opens and says it is fictional", async ({ page }, testInfo) => {
   await page.goto("/audit/sample-real-estate-team-audit");
   await expect(page.getByText("Sample real estate team (fictional data)").first()).toBeVisible();
@@ -124,44 +113,4 @@ test("a window is checked on the server, and a client only sees its own account"
   expect(own.size).toBeLessThanOrEqual(1);
 });
 
-test("in the browser: the first lead to chase is at the top, the page says it does not send replies, and a figure opens its list", async ({ page }) => {
-  await page.goto("/app#speed");
-  await page.reload();
-  await expect(page.getByTestId("speed-headline")).toBeVisible();
-  const measuring = page.getByTestId("measuring");
-  await expect(measuring).toContainText("does not send any replies itself");
-  await expect(measuring).toContainText("Automatic messages");
-  await expect(page.getByTestId("speed-settings-link")).toBeVisible();
-  // The list of leads comes before the cards: the first thing under the headline is a lead to chase.
-  const list = page.getByTestId("data-list").first();
-  const card = page.getByRole("heading", { name: "How fast replies come" });
-  await expect(card).toBeVisible();
-  const [a, b] = [await list.boundingBox(), await card.boundingBox()];
-  expect(a && b && a.y < b.y, "the list is above the first card").toBeTruthy();
-  // No raw id, no placeholder, no 13 d 0 h.
-  const body = await page.locator("body").innerText();
-  expect(body).not.toMatch(/Team member [A-Za-z0-9]{4}\b|user-[0-9a-f]{4}/);
-  expect(body).not.toMatch(/\b\d+ d \d+ h\b/);
-  // Every card has its own range.
-  for (const label of ["Reply speed", "Where leads come from", "By client account", "Who replies fastest"]) await expect(page.getByRole("group", { name: `Range for ${label}` })).toBeVisible();
-  // A figure opens the leads behind it, and the heading's count is the figure.
-  const late = page.getByRole("button", { name: /^Answered late: \d+ leads?, open the list$/ });
-  const n = Number(/(\d+) lead/.exec((await late.getAttribute("aria-label")) ?? "")?.[1]);
-  await late.click();
-  await expect(page.getByTestId("drill-count")).toHaveText(String(n));
-  await page.getByTestId("drill-back").click();
-  await expect(page.getByTestId("drill-panel")).toHaveCount(0);
-});
-
-test("in the browser: a card's range is its own and is carried in the address", async ({ page }) => {
-  await page.goto("/app#speed");
-  await page.reload();
-  const range = page.getByRole("group", { name: "Range for Reply speed" });
-  await range.getByRole("combobox", { name: "Reply speed: range" }).selectOption("7d");
-  await expect(page.getByTestId("card-range-window").first()).toContainText("Last 7 days");
-  expect(page.url()).toContain("r.speed-summary=7d");
-  // Another card kept its own range.
-  expect(page.url()).not.toContain("r.speed-source=7d");
-  await page.reload();
-  await expect(page.getByTestId("card-range-window").first()).toContainText("Last 7 days");
-});
+// The browser tests of the screen itself moved to tests/e2e/speed-v2.spec.ts (the screen was rebuilt); the tests above check the old answers, which Today and the alerts still read.

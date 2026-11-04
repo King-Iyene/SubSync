@@ -10,7 +10,8 @@ async function openConnections(page: Page) {
   await expect(page.getByText("Demo mode", { exact: false }).first()).toBeVisible();
   await page.goto("/app#connections");
   await page.reload();
-  await expect(page.getByRole("heading", { name: "Connections", exact: true })).toBeVisible();
+  // Connections is Settings, Integrations now: the old address opens that section.
+  await expect(page.getByTestId("section-integrations")).toBeVisible();
   await expect(page.getByTestId("my-fathom")).toBeVisible();
 }
 

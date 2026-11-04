@@ -30,3 +30,23 @@ export type TrendsData = { locationId: string; name: string; days: DayPoint[]; h
 
 export const TABS = ["health", "onboarding", "details", "compare", "reviews"] as const;
 export type TabId = (typeof TABS)[number];
+
+// The rebuilt screen's shapes (GET clients?part=home|list|one), the same as src/lib/analytics/clients-v2.ts builds on the server.
+import type { Assessment, Changed, Filter, Headline, Primary, Renewal, Summary, TalkingPoint, Value } from "@/lib/analytics/clients-v2";
+export type BookRowOut = {
+  id: string; name: string; level: Assessment["level"]; label: string; line: string; reasons: Assessment["reasons"]; needs: { kind: "risk" | "renewal"; label: string } | null; renewal: Renewal | null;
+  context: string[]; score: number; fee: number | null; industry: string | null; lastSpokenDays: number | null; daysSinceAdded: number | null; url: string;
+};
+export type BookHome = {
+  now: number; summary: Summary; headline: Headline; support: string; primary: Primary | null; next: string | null;
+  needs: { total: number; rows: BookRowOut[]; ids: string[] };
+  renewals: { total: number; fee: number; overdue: number; windowDays: number; rows: BookRowOut[] };
+  facets: Record<Filter, number>; reading: { reading: boolean; done: number; total: number; text: string }; readLimit: string | null; targetMinutes: number;
+  industryChoices: string[]; firstId: string | null;
+};
+export type BookList = { rows: BookRowOut[]; total: number; page: number; pages: number; from: number; to: number; filter: Filter; facets: Record<Filter, number>; industryChoices: string[] };
+export type BookOne = {
+  row: BookRowOut; value: Value; valueFormula: string; dealsLine: string | null; changed: Changed; historyStartsOn: string | null; talk: TalkingPoint[];
+  reminders: Array<{ before: number; date: string; words: string }>; summary: string; industryChoices: string[]; playbook: string;
+  queue: { position: number | null; total: number; previous: string | null; next: string | null };
+};

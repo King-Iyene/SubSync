@@ -16,34 +16,37 @@ import type { TodayModel } from "./today-model";
 // Pieces of Today shared by the agency page and the one-account page: the controls by the headline, and the People, Sources and Coverage tabs. Each tab is worked out
 // from the lead ledger (the last 14 days of leads, the same rows as Speed to lead) with the rules in docs/METRICS.md, and every number in it opens its records.
 
-/** The control by the dollar headline, and the link to what was set aside. */
-export function HeadlineControls({ m, staleCount }: { m: TodayModel; staleCount: number }) {
-  const held = m.view.held.length;
-  const onlySnoozed = m.view.held.every((h) => h.hold.action === "snooze");
+/** "Exclude test and very old deals" and the link to what it left out. It sits with the deal numbers under More detail, not by the headline. */
+export function JunkControl({ m, staleCount }: { m: TodayModel; staleCount: number }) {
   const left = m.view.junk.items.length;
-  if (held === 0 && staleCount === 0) return null;
+  if (staleCount === 0) return null;
   return (
-    <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm" data-testid="headline-controls">
-      {staleCount > 0 && (
-        <span className="inline-flex flex-wrap items-center gap-x-2">
-          <label className="inline-flex min-h-9 cursor-pointer items-center gap-2">
-            <input type="checkbox" className="size-4" checked={m.excludeJunk} onChange={(e) => m.setExcludeJunk(e.target.checked)} data-testid="junk-toggle" />
-            <span>Exclude test and very old deals</span>
-          </label>
-          {m.excludeJunk && left > 0 && (
-            <button type="button" onClick={() => m.open(specJunk(m.env))} className="min-h-9 rounded-lg px-1.5 text-muted-foreground underline underline-offset-4 hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-[var(--ring)]" data-testid="junk-left-out">
-              {left} left out, {money(m.view.junk.dollars)}
-            </button>
-          )}
-        </span>
-      )}
-      {held > 0 && (
-        <button type="button" onClick={() => m.open(heldSpec(m.view.held))} data-testid="held-link" data-count={held}
-          className="min-h-9 rounded-lg px-1.5 text-muted-foreground underline underline-offset-4 hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-[var(--ring)]">
-          {held} {onlySnoozed ? "snoozed" : "snoozed or done"}
+    <div className="mb-5 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm" data-testid="headline-controls">
+      <label className="inline-flex min-h-9 cursor-pointer items-center gap-2">
+        <input type="checkbox" className="size-4" checked={m.excludeJunk} onChange={(e) => m.setExcludeJunk(e.target.checked)} data-testid="junk-toggle" />
+        <span>Exclude test and very old deals</span>
+      </label>
+      {m.excludeJunk && left > 0 && (
+        <button type="button" onClick={() => m.open(specJunk(m.env))} className="min-h-9 rounded-lg px-1.5 text-muted-foreground underline underline-offset-4 hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-[var(--ring)]" data-testid="junk-left-out">
+          {left} left out, {money(m.view.junk.dollars)}
         </button>
       )}
     </div>
+  );
+}
+
+/** "N snoozed": the way back to what a person set aside. Quiet text under the list, only when something is set aside. */
+export function HeldLink({ m }: { m: TodayModel }) {
+  const held = m.view.held.length;
+  if (held === 0) return null;
+  const onlySnoozed = m.view.held.every((h) => h.hold.action === "snooze");
+  return (
+    <p className="mb-6 text-sm" data-testid="headline-controls-held">
+      <button type="button" onClick={() => m.open(heldSpec(m.view.held))} data-testid="held-link" data-count={held}
+        className="min-h-9 rounded-lg px-1.5 text-muted-foreground underline underline-offset-4 hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-[var(--ring)]">
+        {held} {onlySnoozed ? "snoozed" : "snoozed or done"}
+      </button>
+    </p>
   );
 }
 

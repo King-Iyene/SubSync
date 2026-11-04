@@ -1,23 +1,25 @@
 // Today, rebuilt (the outcome-first front door). Pure: no database, no React, so every sentence, every ranking and every chart number on Today can be unit tested.
 //
 // Nothing here measures anything new. Every figure is one SubSync already shows on its own page, under its existing definition (docs/METRICS.md):
-//   leads waiting      Speed to lead (a lead past its reply target with no person's reply)
-//   appointments       Appointments (past, no outcome marked) and no-shows not rebooked
-//   stale deals        the Account audit (counted open deals, no movement for the stale days, dollars from the deal values)
-//   unanswered         the Account audit's waiting conversations
+//   waiting for a reply  Speed to lead (a new lead past its reply target with no person's reply) and the Account audit's waiting conversations, counted ONCE per person
+//   appointments         Appointments (past, no outcome marked) and no-shows not rebooked
+//   deals gone quiet     the Account audit (counted open deals, no movement for the stale days, dollars from the deal values)
 // What this file adds is the order things are listed in, the sentences, the shares behind the charts and the "vs your usual" comparisons.
 
 import { MIN_FOR_MEDIAN } from "./speed-intel.ts";
 
-export const KINDS = ["leads", "appointments", "noshows", "stale", "unanswered"] as const;
+// The counting rule (docs/METRICS.md, "Today, third pass"): a person is counted ONCE for "waiting for a reply". A new lead nobody answered and a customer message nobody
+// answered are the same person waiting, so they are ONE kind ("replies"); "new leads among them" is a subset that is said, never added. Appointments to mark, no-shows to
+// win back and deals gone quiet are different problems and stay separate kinds.
+export const KINDS = ["replies", "appointments", "noshows", "stale"] as const;
 export type Kind = (typeof KINDS)[number];
 
-/** Plain names for each kind, as the donut and its legend say them. */
+/** Plain names for each kind, as the list, the bars and the records panel say them. */
 export const KIND_LABEL: Record<Kind, string> = {
-  leads: "Leads waiting", appointments: "Appointments to mark", noshows: "No-shows to recover", stale: "Stale deals", unanswered: "Unanswered messages",
+  replies: "Waiting for a reply", appointments: "Appointments to mark", noshows: "No-shows to win back", stale: "Deals gone quiet",
 };
 /** One colour per KIND, the same everywhere on the page (the validated categorical chart tokens, in order). Status colours are never used for a kind. */
-export const KIND_CHART: Record<Kind, 1 | 2 | 3 | 4 | 5> = { leads: 1, appointments: 2, noshows: 3, stale: 4, unanswered: 5 };
+export const KIND_CHART: Record<Kind, 1 | 2 | 3 | 4> = { replies: 1, appointments: 2, noshows: 3, stale: 4 };
 export const kindColour = (k: Kind) => `var(--chart-${KIND_CHART[k]})`;
 
 export type TodayItem = {
@@ -33,11 +35,13 @@ export type TodayItem = {
   never?: boolean;
   /** The contact asked not to be contacted: never offered as a call. */
   dnd?: boolean; hasPhone?: boolean;
+  /** A waiting person who is also a new lead (a SUBSET of the people waiting, never added to them). Only "replies" items carry it. */
+  newLead?: boolean;
   /** Who owns the lead in the CRM (a name), and where it came from. Only leads carry them today; both stay null when the CRM does not say. */
   owner?: string | null; source?: string | null;
 };
 
-export type KindTotal = { count: number; dollars: number | null; /** Rows actually sent (a cap); count is the true number. */ shown: number };
+export type KindTotal = { count: number; dollars: number | null; /** Rows actually sent (a cap); count is the true number. */ shown: number; /** Of the people waiting for a reply, how many are new leads. A subset of count. */ newLeads?: number };
 export type Totals = Record<Kind, KindTotal>;
 export const emptyTotals = (): Totals => Object.fromEntries(KINDS.map((k) => [k, { count: 0, dollars: null, shown: 0 }])) as Totals;
 
@@ -53,7 +57,7 @@ export type QueueRow = {
   count: number;
   /** Counted dollars at stake (stale deal values). Null when the row has none. */
   dollars: number | null;
-  /** The existing estimate, labelled as one wherever it is shown. Only the unanswered-messages row has one. */
+  /** The existing estimate, labelled as one wherever it is shown. Only the waiting-for-a-reply row has one. */
   estimate: number | null;
   /** Since when it has been wrong. */
   since: number | null; ageMinutes: number;
@@ -81,19 +85,17 @@ export function ageWords(minutes: number): string {
 /** Six to ten words about what is wrong with this group. */
 export function rowText(kind: Kind, count: number, staleDays: number): string {
   switch (kind) {
-    case "leads": return `${plural(count, "lead")} waiting past the reply target`;
+    case "replies": return `${plural(count, "person", "people")} waiting for a reply`;
     case "appointments": return `${plural(count, "past appointment")} with no outcome marked`;
     case "noshows": return `${plural(count, "no-show")} from the last 14 days not rebooked`;
-    case "stale": return `${plural(count, "open deal")} with no movement in ${staleDays}+ days`;
-    case "unanswered": return `${plural(count, "conversation")} waiting for your reply past the target`;
+    case "stale": void staleDays; return `${plural(count, "open deal")} gone quiet`;
   }
 }
 
-/** Severity of one group. Thresholds are written in docs/METRICS.md: a lead waiting an hour or never answered is critical; a pile of 5 or more waiting conversations or 10 or more stale deals is critical. */
+/** Severity of one group. Thresholds are written in docs/METRICS.md: a person waiting an hour or never answered is critical, and so is a pile of 5 or more; 10 or more deals gone quiet is critical. */
 export function severityOf(kind: Kind, count: number, ageMinutes: number, never: boolean): Severity {
   switch (kind) {
-    case "leads": return never || ageMinutes >= 60 ? "critical" : "warning";
-    case "unanswered": return count >= 5 ? "critical" : "warning";
+    case "replies": return never || ageMinutes >= 60 || count >= 5 ? "critical" : "warning";
     case "stale": return count >= 10 ? "critical" : "warning";
     case "noshows": return "warning";
     case "appointments": return count >= 5 ? "warning" : "info";
@@ -122,7 +124,7 @@ export function buildQueue(i: QueueInput): QueueRow[] {
     const acct = i.accounts.get(first.locationId);
     rows.push({
       key, kind, locationId: first.locationId, accountName: first.accountName, text: rowText(kind, items.length, i.staleDays), count: items.length,
-      dollars: dollars && dollars > 0 ? dollars : null, estimate: kind === "unanswered" ? acct?.followUpEstimate ?? null : null,
+      dollars: dollars && dollars > 0 ? dollars : null, estimate: kind === "replies" ? acct?.followUpEstimate ?? null : null,
       since, ageMinutes, severity: severityOf(kind, items.length, ageMinutes, items.some((x) => x.never === true)),
       url: kind === "stale" ? acct?.url ?? oldest.url : oldest.url, itemIds: items.map((x) => x.id),
       partial: i.totals[kind].count > i.totals[kind].shown,
@@ -144,6 +146,63 @@ export function rankQueue(rows: QueueRow[]): QueueRow[] {
     || a.accountName.localeCompare(b.accountName) || a.kind.localeCompare(b.kind));
 }
 
+// ---------- the counting rule: ONE function behind every number ----------
+
+/** No list on Today shows more than this many rows inline; the rest is behind one "See all N" that opens the full list in the records panel (50 a page). */
+export const INLINE_ROWS = 5;
+
+/** A new lead that nobody on the team has answered (Speed to lead's waiting list). */
+export type WaitingLead = { locationId: string; accountName: string; contactId: string; name: string; at: number; never: boolean; url: string; owner: string | null; source: string | null; detail: string };
+/** A conversation whose last message is the customer's and which nobody has answered (the Account audit's waiting list). The contact may be unknown (""). */
+export type WaitingConversation = { id: string; locationId: string; accountName: string; contactId: string; name: string; at: number | null; url: string; detail: string };
+
+/**
+ * People waiting for a reply, each counted ONCE. A new lead nobody answered is usually also a conversation nobody answered (two lists describing one person), so the two
+ * lists are merged by contact: a person in both is one row, marked as a new lead; a person in more than one conversation is one row (the oldest wait). The count is the number
+ * of distinct people. When a list was cut at its cap the part that was not loaded cannot be matched, so the count then adds what is missing from each list (an upper bound)
+ * and `partial` says so. Nothing else on Today counts these people: the headline, the tiles, the work list, the bars and every list behind a number read what this returns.
+ */
+export function mergeReplies(i: { leads: WaitingLead[]; leadsTotal: number; conversations: WaitingConversation[]; conversationsTotal: number }): { items: TodayItem[]; count: number; newLeads: number; partial: boolean } {
+  const byPerson = new Map<string, TodayItem>();
+  const key = (loc: string, contact: string, fallback: string) => `${loc}:${contact || fallback}`;
+  const earlier = (a: number | null, b: number | null) => (a === null ? b : b === null ? a : Math.min(a, b));
+  for (const l of i.leads) {
+    const k = key(l.locationId, l.contactId, l.name);
+    const had = byPerson.get(k);
+    byPerson.set(k, {
+      id: `replies:${k}`, kind: "replies", locationId: l.locationId, accountName: l.accountName, name: l.name, detail: l.detail, at: earlier(had?.at ?? null, l.at), value: null,
+      contactId: l.contactId || null, url: l.url, never: l.never || had?.never === true, owner: l.owner, source: l.source, newLead: true,
+    });
+  }
+  for (const c of i.conversations) {
+    const k = key(c.locationId, c.contactId, `conversation-${c.id}`);
+    const had = byPerson.get(k);
+    if (had) { had.at = earlier(had.at, c.at); continue; }
+    byPerson.set(k, { id: `replies:${k}`, kind: "replies", locationId: c.locationId, accountName: c.accountName, name: c.name, detail: c.detail, at: c.at, value: null, contactId: c.contactId || null, url: c.url, newLead: false });
+  }
+  const items = [...byPerson.values()];
+  const missingLeads = Math.max(0, i.leadsTotal - i.leads.length);
+  const missingConversations = Math.max(0, i.conversationsTotal - i.conversations.length);
+  const newLeads = items.filter((x) => x.newLead).length + missingLeads;
+  return { items, count: items.length + missingLeads + missingConversations, newLeads, partial: missingLeads + missingConversations > 0 };
+}
+
+export type Counts = {
+  /** People waiting for a reply, each once. */
+  replies: number; /** Of those, how many are new leads. Never added to replies. */ newLeads: number;
+  appointments: number; noshows: number; stale: number; staleDollars: number;
+  /** Every kind added up. Because a person waiting is one kind, no person is in it twice. */
+  things: number; /** Client accounts with at least one row on the list. */ accounts: number;
+};
+/** THE counting function. Every number on Today (headline, tiles, work list, bars, the lists behind them, the brief, the share text) is read from here. */
+export function countsOf(totals: Totals, rows: Pick<QueueRow, "locationId">[]): Counts {
+  const things = KINDS.reduce((s, k) => s + totals[k].count, 0);
+  return {
+    replies: totals.replies.count, newLeads: Math.min(totals.replies.count, totals.replies.newLeads ?? 0), appointments: totals.appointments.count, noshows: totals.noshows.count,
+    stale: totals.stale.count, staleDollars: totals.stale.dollars ?? 0, things, accounts: new Set(rows.map((r) => r.locationId)).size,
+  };
+}
+
 // ---------- scoping: the account selector and the clicked kind ----------
 
 export type TodayScope = { accounts: string[]; kind: Kind | null };
@@ -163,7 +222,7 @@ export function totalsOf(items: TodayItem[], full: Totals, accounts: string[]): 
     const mine = items.filter((x) => x.kind === k && (!narrowed || picked.has(x.locationId)));
     const dollars = k === "stale" ? mine.reduce((s, x) => s + (x.value ?? 0), 0) : 0;
     // With every account in, the true total (which may exceed the rows sent) is kept; once narrowed, the total is the rows of those accounts.
-    out[k] = narrowed ? { count: mine.length, dollars: dollars > 0 ? dollars : null, shown: mine.length } : { ...full[k], shown: mine.length };
+    out[k] = narrowed ? { count: mine.length, dollars: dollars > 0 ? dollars : null, shown: mine.length, ...(k === "replies" ? { newLeads: mine.filter((x) => x.newLead).length } : {}) } : { ...full[k], shown: mine.length };
   }
   return out;
 }
@@ -192,45 +251,52 @@ export const accountsQuery = (ids: string[]) => (ids.length ? `accounts=${ids.fi
 // ---------- the headline ----------
 
 /** A strong part of the headline is a button: it opens the records behind that number. */
-export type HeadlineAction = "clients" | "dollars" | "things";
+export type HeadlineAction = "clients" | "dollars" | "things" | "replies";
 export type HeadlinePart = { t: string; strong?: boolean; action?: HeadlineAction };
-export type Headline = { parts: HeadlinePart[]; text: string; allClear: boolean; /** "14 leads waiting, 6 appointments to mark and 9 stale deals worth $48,200." */ breakdown: string | null; accounts: number; dollars: number };
+export type Headline = { parts: HeadlinePart[]; text: string; allClear: boolean; /** "8 people waiting for a reply (3 new leads), 6 appointments to mark and 9 deals gone quiet worth $48,200." */ breakdown: string | null; accounts: number; dollars: number };
 
-/** "1 lead waiting", "14 leads waiting": a count with the right singular or plural, as a person would say it. */
+/** "1 person waiting for a reply", "14 people waiting for a reply": a count with the right singular or plural, as a person would say it. */
 export const countWords = (k: Kind, n: number) => `${n.toLocaleString("en-US")} ${COUNT_WORDS[k][n === 1 ? 0 : 1]}`;
 const COUNT_WORDS: Record<Kind, [string, string]> = {
-  leads: ["lead waiting", "leads waiting"], appointments: ["appointment to mark", "appointments to mark"], noshows: ["no-show to recover", "no-shows to recover"],
-  stale: ["stale deal", "stale deals"], unanswered: ["unanswered message", "unanswered messages"],
+  replies: ["person waiting for a reply", "people waiting for a reply"], appointments: ["appointment to mark", "appointments to mark"], noshows: ["no-show to win back", "no-shows to win back"],
+  stale: ["deal gone quiet", "deals gone quiet"],
 };
 
-export function breakdownOf(t: Totals): string | null {
+export function breakdownOf(t: Totals, o: { dollars?: boolean } = {}): string | null {
+  const c = countsOf(t, []);
   const bits = KINDS.filter((k) => t[k].count > 0).map((k) => {
     const w = COUNT_WORDS[k];
-    return `${t[k].count.toLocaleString("en-US")} ${t[k].count === 1 ? w[0] : w[1]}${k === "stale" && t.stale.dollars ? ` worth ${money(t.stale.dollars)}` : ""}`;
+    const sub = k === "replies" && c.newLeads > 0 ? ` (${c.newLeads} new ${c.newLeads === 1 ? "lead" : "leads"})` : "";
+    return `${t[k].count.toLocaleString("en-US")} ${t[k].count === 1 ? w[0] : w[1]}${sub}${k === "stale" && t.stale.dollars && o.dollars ? ` (${money(t.stale.dollars)})` : ""}`;
   });
   if (bits.length === 0) return null;
   return bits.length === 1 ? `${bits[0]}.` : `${bits.slice(0, -1).join(", ")} and ${bits[bits.length - 1]}.`;
 }
 
 /**
- * The one big sentence. "4 clients need you today. $48,200 is at risk." The count of clients is the number of client accounts with at least one row in the queue,
- * the dollars are the counted value of stale deals (a fact, never an estimate). With nothing to do it says so plainly.
+ * The one big sentence. All client accounts: "4 clients need you today. $48,200 is at risk." One account: "8 people are waiting for a reply." (the thing to do first), else
+ * "3 things need you today." The numbers come from countsOf, the one counting function. With nothing to do it says so plainly.
  */
 export function headlineOf(i: { scope: "all" | "account"; rows: QueueRow[]; totals: Totals; /** One deal that is most of the stalled money (the audit's outlier guard). */ outlier?: { value: number; share: number } | null }): Headline {
-  const accounts = new Set(i.rows.map((r) => r.locationId)).size;
-  const things = KINDS.reduce((s, k) => s + i.totals[k].count, 0);
-  const dollars = i.totals.stale.dollars ?? 0;
-  const breakdown = breakdownOf(i.totals);
-  if (things === 0) {
+  const c = countsOf(i.totals, i.rows);
+  const accounts = c.accounts;
+  const dollars = c.staleDollars;
+  // The dollars are in the sentence above the line when it says them; otherwise the line carries them.
+  const sayDollars = dollars > 0 && (i.scope === "all" || c.replies === 0);
+  const breakdown = breakdownOf(i.totals, { dollars: !sayDollars });
+  if (c.things === 0) {
     const text = i.scope === "all" ? "Every client account is on track today." : "You are all caught up today.";
     return { parts: [{ t: text }], text, allClear: true, breakdown: null, accounts: 0, dollars: 0 };
   }
   const parts: HeadlinePart[] = i.scope === "all"
     ? [{ t: String(accounts), strong: true, action: "clients" }, { t: ` ${accounts === 1 ? "client needs" : "clients need"} you today.` }]
-    : [{ t: things.toLocaleString("en-US"), strong: true, action: "things" }, { t: ` ${things === 1 ? "thing needs" : "things need"} you today.` }];
-  if (dollars > 0) parts.push({ t: " " }, { t: money(dollars), strong: true, action: "dollars" }, { t: " is at risk." });
+    : c.replies > 0
+      ? [{ t: c.replies.toLocaleString("en-US"), strong: true, action: "replies" }, { t: ` ${c.replies === 1 ? "person is" : "people are"} waiting for a reply.` }]
+      : [{ t: c.things.toLocaleString("en-US"), strong: true, action: "things" }, { t: ` ${c.things === 1 ? "thing needs" : "things need"} you today.` }];
+  // On one account with people waiting, the sentence is only that (the thing to do first); the dollars are in the line under it.
+  if (sayDollars) parts.push({ t: " " }, { t: money(dollars), strong: true, action: "dollars" }, { t: " is at risk." });
   // One deal worth at least half of it is said out loud, so the dollar figure is not read as a pattern (the audit's outlier guard).
-  if (dollars > 0 && i.outlier) parts.push({ t: ` One deal is ${money(i.outlier.value)} of that.` });
+  if (sayDollars && i.outlier) parts.push({ t: ` One deal is ${money(i.outlier.value)} of that.` });
   return { parts, text: parts.map((p) => p.t).join(""), allClear: false, breakdown, accounts, dollars };
 }
 
@@ -283,7 +349,7 @@ export function accountBars(rows: QueueRow[], max = 8): { bars: AccountBar[]; ac
 export function barsTitle(b: { bars: AccountBar[]; accounts: number }): string {
   if (b.bars.length === 0) return "No client account has anything to fix";
   const top = b.bars[0];
-  return b.accounts === 1 ? `${top.name} has ${plural(top.count, "thing")} to fix` : `${top.name} has the most to fix: ${plural(top.count, "thing")}, out of ${b.accounts} accounts needing you`;
+  return b.accounts === 1 ? `${top.name} has ${plural(top.count, "thing")} to fix` : `${top.name} has the most to do: ${plural(top.count, "thing")}. Each bar is one client account.`;
 }
 
 /** The tooltip, in words: "Bright Smile Dental: 14 leads waiting, $6,300 at stake". */
@@ -296,7 +362,11 @@ export function barTooltip(b: AccountBar, rows: QueueRow[]): string {
 
 // ---------- accounts needing you ----------
 
-export type NeedingYou = { locationId: string; name: string; state: "Needs you now" | "Needs a look" | "Slipping"; reason: string; count: number; dollars: number | null; url: string };
+export type NeedingYou = {
+  locationId: string; name: string; state: "Needs you now" | "Needs a look" | "Slipping"; reason: string; count: number; dollars: number | null; url: string;
+  /** The account's biggest problem (the row Done, Snooze and Assign act on), and how many kinds of problem the account has. */
+  top: QueueRow; kinds: number; oldestMinutes: number | null; urgent: boolean; /** The account's worst severity over all its rows (the row's stripe and word). */ severity: Severity;
+};
 
 /** One row per account, the worst reason first, ranked by the same rule as the queue. */
 export function accountsNeedingYou(rows: QueueRow[], accounts: Map<string, AccountFacts>, limit = 5): { rows: NeedingYou[]; total: number } {
@@ -311,10 +381,35 @@ export function accountsNeedingYou(rows: QueueRow[], accounts: Map<string, Accou
     out.push({
       locationId: r.locationId, name: r.accountName, state: worst === "critical" ? "Needs you now" : worst === "warning" ? "Needs a look" : "Slipping",
       reason: r.text, count: mine.reduce((s, x) => s + x.count, 0), dollars: dollars > 0 ? dollars : null, url: accounts.get(r.locationId)?.url ?? r.url,
+      top: r, kinds: mine.length, oldestMinutes: mine.reduce<number | null>((m, x) => (x.since === null ? m : Math.max(m ?? 0, x.ageMinutes)), null), urgent: worst === "critical", severity: worst,
     });
   }
   return { rows: out.slice(0, limit), total: out.length };
 }
+
+// ---------- one person on the Reply now list ----------
+
+/** How long it has been wrong, in the words of its kind: "Waiting 3 h", "Quiet for 65 days". */
+export const ageLabel = (kind: Kind, age: string) => (kind === "replies" ? `Waiting ${age}` : kind === "stale" ? `Quiet for ${age}` : `Open for ${age}`);
+
+/** The one line under a person's name: where they came from, or the channel of their last message. No wait time here (the wait has its own column). */
+export function replyContext(i: Pick<TodayItem, "newLead" | "source" | "detail">): string {
+  if (i.newLead) return i.source ? `New lead from ${i.source}` : "New lead";
+  const channel = i.detail.split(", waiting")[0]?.trim();
+  return channel ? `${channel}, customer wrote last` : "Customer wrote last";
+}
+/** The part of a waiting person's item id after the account: what a one-person row key carries. */
+export const personOf = (i: Pick<TodayItem, "id" | "locationId">) => i.id.slice(`replies:${i.locationId}:`.length);
+/** A waiting person as a one-row group, so Done, Snooze and Assign work on one person exactly as they do on a whole row. */
+export function personRow(i: TodayItem, now: number): QueueRow {
+  const ageMinutes = i.at === null ? 0 : Math.max(0, Math.round((now - i.at) / 60_000));
+  return {
+    key: `${i.locationId}|replies|${personOf(i)}`, kind: "replies", locationId: i.locationId, accountName: i.accountName, text: `${i.name} is waiting for a reply`, count: 1, dollars: null, estimate: null,
+    since: i.at, ageMinutes, severity: i.never === true || ageMinutes >= 60 ? "critical" : "warning", url: i.url, itemIds: [i.id], partial: false,
+  };
+}
+/** The people waiting, longest wait first (a person with no known start goes last). */
+export const waitingOldestFirst = (items: TodayItem[]): TodayItem[] => items.filter((i) => i.kind === "replies").sort((a, b) => (a.at ?? Infinity) - (b.at ?? Infinity) || a.name.localeCompare(b.name));
 
 // ---------- vs your usual ----------
 

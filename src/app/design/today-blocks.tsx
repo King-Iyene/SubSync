@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { accountBars, accountsNeedingYou, barsTitle, donutTitle, headlineOf, KIND_LABEL, replyWords, slicesOf, staleUsual, type Kind } from "@/lib/analytics/today-queue";
 import {
-  AccountBars, ComingBlock, DonutChart, FixFirstQueue, HeadlineBlock, InsightStrip, LocalAccountPicker, ProofStrip, PulseSpark, PulseTile, RaisedClearedStrip, RecordsPanel, RowsPanel, Section, ShowingChip, SinceStrip,
+  AccountBars, AccountList, ComingBlock, DonutChart, HeadlineBlock, InsightStrip, LocalAccountPicker, ProofStrip, PulseSpark, PulseTile, RaisedClearedStrip, RecordsPanel, RowsPanel, Section, ShowingChip, SinceStrip,
 } from "../app/ds";
 import { itemsSpec } from "@/lib/analytics/today-records";
 import { forecastOf, type Insight, type SinceVisit } from "@/lib/analytics/today-smart";
@@ -20,7 +20,7 @@ const SAMPLE_SINCE: SinceVisit = { since: Date.parse("2026-11-03T09:30:00Z"), ne
 // One reading of the clock for the whole sample (module level, so nothing reads the time while a component renders).
 const SAMPLE_NOW = Date.now();
 const SAMPLE_FORECAST = forecastOf(
-  [{ id: "c1", kind: "leads", locationId: "x", accountName: "Maple Dental", name: "Ada Okafor", at: SAMPLE_NOW + 7 * 60_000 + 42_000, startedAt: SAMPLE_NOW - 7 * 60_000, value: null, contactId: "c", url: "#" }],
+  [{ id: "c1", kind: "replies", locationId: "x", accountName: "Maple Dental", name: "Ada Okafor", at: SAMPLE_NOW + 7 * 60_000 + 42_000, startedAt: SAMPLE_NOW - 7 * 60_000, value: null, contactId: "c", url: "#" }],
   [{ id: "d1", kind: "stale", locationId: "x", accountName: "Harbor Realty", name: "Kitchen remodel", at: SAMPLE_NOW + 3_600_000, value: 2400, contactId: null, url: "#" }], []);
 
 export function TodayBlocks() {
@@ -28,14 +28,13 @@ export function TodayBlocks() {
   const [kind, setKind] = useState<Kind | null>(null);
   const [picked, setPicked] = useState<string[]>([]);
   const [day, setDay] = useState<number | null>(null);
-  const [usedBars, setUsedBars] = useState(false);
-  const scoped = picked.length ? SAMPLE_TODAY_QUEUE.filter((r) => picked.includes(r.locationId)) : SAMPLE_TODAY_QUEUE;
+    const scoped = picked.length ? SAMPLE_TODAY_QUEUE.filter((r) => picked.includes(r.locationId)) : SAMPLE_TODAY_QUEUE;
   const slices = slicesOf(SAMPLE_TODAY_TOTALS);
   const bars = accountBars(scoped);
   const headline = headlineOf({ scope: "all", rows: SAMPLE_TODAY_QUEUE, totals: SAMPLE_TODAY_TOTALS });
   const items = kind ? SAMPLE_TODAY_ITEMS.filter((i) => i.kind === kind) : [];
   const facts = new Map(SAMPLE_PICKER_ACCOUNTS.map((a) => [a.id, { id: a.id, name: a.name, followUpEstimate: null, url: "https://example.com/open" }]));
-  const needing = accountsNeedingYou(SAMPLE_TODAY_QUEUE, facts, 3);
+  const needing = accountsNeedingYou(scoped, facts, 100_000);
   return (
     <>
       <Section title="Today: headline and figures" hint="One big sentence made from the existing figures, then figures against the account's own usual. A comparison shows only above the minimum sample; below it the tile says so.">
@@ -53,14 +52,13 @@ export function TodayBlocks() {
           <LocalAccountPicker accounts={SAMPLE_PICKER_ACCOUNTS} picked={picked} onChange={setPicked} />
           {picked.length > 0 && <ShowingChip label={picked.length === 1 ? SAMPLE_PICKER_ACCOUNTS.find((a) => a.id === picked[0])?.name ?? "1 account" : `${picked.length} client accounts`} onClear={() => setPicked([])} />}
         </div>
-        <FixFirstQueue rows={kind ? scoped.filter((r) => r.kind === kind) : scoped} max={4} onShow={(r) => setKind(r.kind)} empty="Nothing needs fixing right now." />
-        <ul className="mt-2 divide-y border-y text-sm" data-testid="design-needing">{needing.rows.map((a) => <li key={a.locationId} className="flex flex-wrap gap-x-4 py-2"><span className="font-medium">{a.name}</span><span className="text-muted-foreground">{a.state}: {a.reason}</span></li>)}</ul>
+        <AccountList rows={needing.rows} total={needing.total} urgent={needing.rows.filter((a) => a.urgent).length} max={4} onShow={(a) => setKind(a.top.kind)} onOnly={(a) => setPicked([a.locationId])} onSeeAll={() => setKind(null)} empty="Nothing needs you right now." />
       </Section>
 
       <Section title="Today: clickable charts" hint="A slice, a legend row or a bar is a button. After a click a chip says what is shown, with the way back; the count on a slice is the number of rows in its list.">
         <div className="grid grid-cols-1 gap-x-14 gap-y-9 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
           <DonutChart title={donutTitle(SAMPLE_TODAY_TOTALS)} slices={slices} selected={kind} onSelect={(k) => setKind(kind === k ? null : k)} used={kind !== null} />
-          <AccountBars title={barsTitle(bars)} bars={bars.bars} rows={scoped} selected={picked.length === 1 ? picked[0] : null} onSelect={(id) => { setUsedBars(true); setPicked(picked.length === 1 && picked[0] === id ? [] : [id]); }} used={usedBars} />
+          <AccountBars title={barsTitle(bars)} bars={bars.bars} rows={scoped} more={Math.max(0, bars.accounts - bars.bars.length)} onSegment={(id, k) => { setPicked([id]); setKind(k); }} onAccount={(id) => { setPicked([id]); }} onMore={() => setPicked([])} />
         </div>
         {kind && (
           <div className="mt-5">

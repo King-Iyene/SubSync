@@ -1,4 +1,4 @@
-import type { AccountFacts, Proof, QueueRow, ReplyPoint, TodayItem, Totals, Usual } from "./today-queue.ts";
+import type { AccountFacts, Proof, ReplyPoint, TodayItem, Totals, Usual } from "./today-queue.ts";
 import type { Forecast, Insight, LeadRow, SinceVisit } from "./today-smart.ts";
 import type { Assignment, Hold } from "./today-state.ts";
 
@@ -22,7 +22,7 @@ export type TodayMine = {
 };
 export type TodayData = {
   now: number; scope: "all" | "account"; kind: "agency" | "business" | "client";
-  accounts: AccountFacts[]; items: TodayItem[]; totals: Totals; queue: QueueRow[]; staleDays: number; targetMinutes: number;
+  accounts: AccountFacts[]; items: TodayItem[]; totals: Totals; staleDays: number; targetMinutes: number;
   access: { leadsBlocked: boolean; apptsBlocked: boolean };
   outlier: { value: number; share: number } | null;
   pulse: { reply: { current: { seconds: number | null; answered: number }; usual: { seconds: number | null; answered: number }; points: ReplyPoint[]; verdict: Usual }; stale: { today: number; usual: number | null; samples: number; unusual: "up" | "down" | null } | null };

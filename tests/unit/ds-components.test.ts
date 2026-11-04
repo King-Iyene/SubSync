@@ -11,6 +11,7 @@ import { ApiError, ApiProvider } from "@/app/app/session";
 import { Badge, Stat } from "@/app/app/ui";
 import { NAV } from "@/app/app/nav";
 import { EMPTY_FILTER } from "@/lib/design/filters";
+import { parseHash } from "@/lib/design/route";
 import { sampleApi, SAMPLE_LEADS, SAMPLE_OPTIONS } from "@/app/design/sample";
 
 // Component tests (stage D0). Each shared component is rendered on the server to markup (no browser) and checked for what it must say, which roles it
@@ -234,8 +235,8 @@ describe("the menu structure", () => {
   });
   it("the pilot menu is on top, in order", () => {
     const top = NAV.filter((n) => !n.parent && n.group !== "More").map((n) => n.label);
-    expect(top).toEqual(["Today", "My day", "Speed to lead", "Appointments", "Unanswered messages", "Workflows", "Account audit", "Clients", "People", "Settings", "Connections", "Getting started", "What's new"]);
-    // Connections (stage E0) sits with Settings: every role connects its own tools, so it is in every kind's menu.
+    expect(top).toEqual(["Today", "Speed to lead", "Appointments", "Unanswered messages", "Workflows", "Account audit", "Clients", "People", "Settings", "Getting started", "What's new"]);
+    // Connections (stage E0) is Settings, Integrations now (4 Nov 2026): not a menu entry of its own. A client's staff, who have no Settings, get an Integrations entry (tests/unit/connections-in-settings.test.ts).
   });
   it("nothing that was visible has gone: every page is still in the menu, under More, or a tab of its parent", () => {
     for (const id of ["overview", "accounts", "team", "pipeline", "onboarding", "duplicates", "cleanup", "meetings"]) expect(NAV.find((n) => n.id === id)?.group, id).toBe("More");
@@ -246,10 +247,9 @@ describe("the menu structure", () => {
     for (const n of NAV) if (n.parent) expect(NAV.some((p) => p.id === n.parent), n.id).toBe(true);
     for (const id of NAV.map((n) => n.id)) if (id !== "myday") expect(NAV_FOR.agency.has(id), `agency sees ${id}`).toBe(true);
   });
-  it("My day is for a client's staff and a business, not for an agency; Today is for everyone, and a client's Today is their own account only (the server enforces it)", () => {
-    expect(NAV_FOR.client.has("myday")).toBe(true);
-    expect(NAV_FOR.business.has("myday")).toBe(true);
-    expect(NAV_FOR.agency.has("myday")).toBe(false);
+  it("there is ONE menu item for the day: Today is for everyone (a client's Today is their own account only, the server enforces it), and the old My day address still opens Today", () => {
+    expect(NAV.some((n) => n.id === "myday" || n.label === "My day"), "no second menu item called My day").toBe(false);
+    expect(parseHash("#myday", NAV.map((n) => n.id)).view.id).toBe("today");
     expect(NAV_FOR.client.has("today")).toBe(true);
     expect(NAV_FOR.business.has("today")).toBe(true);
     expect(NAV_FOR.agency.has("today")).toBe(true);

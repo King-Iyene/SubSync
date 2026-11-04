@@ -51,8 +51,8 @@ function Inbox({ data, reload }: { data: Data; reload: () => Promise<void> }) {
     <div data-testid="meeting-inbox">
       {data.demo && <InlineAlert tone="info">The demo has no connected meeting tool, so there is nothing here. Connecting needs a real install.</InlineAlert>}
       {!data.demo && !data.connected && (
-        <InlineAlert tone="info" title="Fathom is not connected" action={<a className="font-medium underline" href="#connections">Open Connections</a>}>
-          Connect your own Fathom under Connections. After each recorded call SubSync finds the contact by email and adds the summary and action items to it, written as you.
+        <InlineAlert tone="info" title="Fathom is not connected" action={<a className="font-medium underline" href="#connections">Open Integrations</a>}>
+          Connect your own Fathom under Integrations. After each recorded call SubSync finds the contact by email and adds the summary and action items to it, written as you.
         </InlineAlert>
       )}
       {!data.demo && !data.canWrite && (
@@ -88,7 +88,7 @@ function Inbox({ data, reload }: { data: Data; reload: () => Promise<void> }) {
 
       <Section title="Calls waiting for you" hint="Private to you. Nobody else can see these, not even your admin." id="waiting">
         {others.length === 0 ? (
-          <EmptyState title="Nothing is waiting" body={data.connected ? "When a call has no contact with a matching email, or two contacts share it, it appears here for 14 days. Pick the right contact and the note is added." : "Connect Fathom under Connections. Calls it cannot place come here."} action={!data.connected ? <a className="font-medium underline" href="#connections">Open Connections</a> : undefined} compact />
+          <EmptyState title="Nothing is waiting" body={data.connected ? "When a call has no contact with a matching email, or two contacts share it, it appears here for 14 days. Pick the right contact and the note is added." : "Connect Fathom under Integrations. Calls it cannot place come here."} action={!data.connected ? <a className="font-medium underline" href="#connections">Open Integrations</a> : undefined} compact />
         ) : (
           <ul className="divide-y border-y" data-testid="waiting-list">
             {others.map((w) => <WaitingRow key={w.id} w={w} data={data} act={act} busy={busy} />)}

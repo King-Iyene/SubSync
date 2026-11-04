@@ -3,9 +3,8 @@ import { headers } from "next/headers";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
-import { sql } from "@/lib/db";
+import { findShared } from "@/lib/analytics/share-queries";
 import { createLimiter } from "@/lib/rate-limit";
-import type { SharePayload } from "@/lib/analytics/share-intel";
 import { AuditReport } from "./report";
 
 // A shared account audit: totals, finding titles, a fix plan and how each number is counted. No account or client names, never indexed, no preview that
@@ -37,9 +36,7 @@ async function AuditBody({ params }: { params: Promise<{ id: string }> }) {
   const h = await headers();
   const ip = (h.get("x-forwarded-for") ?? "").split(",")[0].trim() || "unknown";
   if (!lookups.allow(ip)) notFound();
-  if (!/^[A-Za-z0-9_-]{20,64}$/.test(id)) notFound();
-  const [row] = await sql()`select payload, expires_at from shared_audits where id = ${id} and expires_at > now() and revoked_at is null`;
-  if (!row) notFound();
-  await sql()`update shared_audits set views = views + 1, last_viewed_at = now() where id = ${id}`.catch(() => undefined);
-  return <AuditReport payload={row.payload as SharePayload} expiresAt={row.expires_at as Date} />;
+  const found = await findShared(id);
+  if (!found) notFound();
+  return <AuditReport payload={found.payload} expiresAt={found.expiresAt} />;
 }
