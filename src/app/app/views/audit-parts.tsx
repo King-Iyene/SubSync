@@ -86,7 +86,7 @@ export function VerdictBlock({ v, grade, accountsLine, start, onStart, extra, st
 export function FindingRow({ f, n, onShow }: { f: Finding; n: number; onShow: () => void }) {
   const d = dollarsText(f);
   return (
-    <li className="ds-row grid gap-x-6 gap-y-2 py-4 md:grid-cols-[minmax(0,1fr)_12rem]" data-testid="audit-finding" data-key={f.key} data-count={f.count}>
+    <li className="ds-row grid gap-x-6 gap-y-2 py-4 @3xl:grid-cols-[minmax(0,1fr)_12rem]" data-testid="audit-finding" data-key={f.key} data-count={f.count}>
       <div className="min-w-0">
         <p className="font-medium leading-6"><span aria-hidden className="tnum mr-2 text-muted-foreground">{n}.</span><Dollars text={f.title} /></p>
         <p className="mt-0.5 max-w-3xl text-sm leading-5 text-muted-foreground">{f.what}</p>
@@ -98,7 +98,7 @@ export function FindingRow({ f, n, onShow }: { f: Finding; n: number; onShow: ()
         <p className="mt-1 text-sm"><span className="font-medium">How to fix it:</span> {f.fix}</p>
         <Formula label="How this is counted" sr={f.title}>{f.formula}</Formula>
       </div>
-      <div className="flex items-start md:justify-end print:hidden">
+      <div className="flex items-start @3xl:justify-end print:hidden">
         <button type="button" onClick={onShow} className={ACTION_BUTTON} data-testid="audit-show">{showLabel(f)}<span className="sr-only">, the list of {LIST_TITLE[f.key].toLowerCase()}</span></button>
       </div>
     </li>
@@ -154,7 +154,7 @@ export function ClientRowView({ r, onOpen }: { r: ClientPage["rows"][number]; on
     r.noshows > 0 ? `${num(r.noshows)} ${r.noshows === 1 ? "no-show" : "no-shows"}` : null, r.appointments > 0 ? `${num(r.appointments)} to mark` : null,
   ].filter(Boolean).join(", ");
   return (
-    <li className="ds-row grid items-center gap-x-6 gap-y-2 py-3 md:grid-cols-[minmax(0,1fr)_12rem]" data-testid="audit-client" data-id={r.id}>
+    <li className="ds-row grid items-center gap-x-6 gap-y-2 py-3 @3xl:grid-cols-[minmax(0,1fr)_12rem]" data-testid="audit-client" data-id={r.id}>
       <div className="min-w-0">
         <p className="truncate font-medium">{r.name}</p>
         <p className="text-sm text-muted-foreground">{bits}</p>
@@ -164,7 +164,7 @@ export function ClientRowView({ r, onOpen }: { r: ClientPage["rows"][number]; on
           {r.estimate !== null && <span>about {money(r.estimate)} a month (estimate)</span>}
         </p>
       </div>
-      <div className="flex md:justify-end print:hidden"><button type="button" onClick={onOpen} className={ACTION_BUTTON} data-testid="audit-client-open">Audit this client<span className="sr-only">: {r.name}</span></button></div>
+      <div className="flex @3xl:justify-end print:hidden"><button type="button" onClick={onOpen} className={ACTION_BUTTON} data-testid="audit-client-open">Audit this client<span className="sr-only">: {r.name}</span></button></div>
     </li>
   );
 }

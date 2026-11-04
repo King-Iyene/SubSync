@@ -108,6 +108,12 @@ test("the client list is paged on the server, ranked by money, searchable, and a
   test.setTimeout(240_000);
   const a = await api(request);
   const d = await a.get("audit");
+  // The demo's numbers move with the clock and the server keeps one read for 45 seconds, so what must agree is read straight after the audit.
+  const all = await a.get(`audit/clients?size=50&sort=name`);
+  const sum = (k: string) => (all.rows as Json[]).reduce((s, r) => s + r[k], 0);
+  if (all.pages === 1) {
+    for (const k of ["stale", "replies", "noshows", "appointments"]) expect(sum(k)).toBe((d.findings as Json[]).find((f) => f.key === k)?.count ?? 0);
+  }
   expect(d.clients.rows.length).toBeLessThanOrEqual(5);
   const p1 = await a.get("audit/clients?size=5&page=0");
   expect(p1.total).toBe(d.clients.total);
@@ -120,12 +126,6 @@ test("the client list is paged on the server, ranked by money, searchable, and a
   const name = p1.rows[0].name as string;
   const found = await a.get(`audit/clients?q=${encodeURIComponent(name.slice(0, 5))}`);
   expect(found.rows.some((r: Json) => r.name === name)).toBe(true);
-  // The numbers of the clients add up to the findings.
-  const all = await a.get(`audit/clients?size=50&sort=name`);
-  const sum = (k: string) => (all.rows as Json[]).reduce((s, r) => s + r[k], 0);
-  if (all.pages === 1) {
-    for (const k of ["stale", "replies", "noshows", "appointments"]) expect(sum(k)).toBe((d.findings as Json[]).find((f) => f.key === k)?.count ?? 0);
-  }
 });
 
 test("one client only: the audit narrows to that account, and an id that is not one of the caller's accounts changes nothing", async ({ request }) => {
@@ -133,15 +133,15 @@ test("one client only: the audit narrows to that account, and an id that is not 
   const a = await api(request);
   const d = await a.get("audit");
   const row = d.clients.rows[0] as Json;
+  const forged = await a.get("audit?location=not-my-account-0000");
+  expect(forged.focus).toBeNull();
+  expect(forged.scope).toBe(d.scope);
+  expect(forged.totals.things).toBe(d.totals.things);
   const one = await a.get(`audit?location=${row.id}`);
   expect(one.scope).toBe("account");
   expect(one.focus.id).toBe(row.id);
   expect(one.clients).toBeNull();
   for (const f of one.findings as Json[]) for (const it of f.items as Json[]) expect(it.locationId).toBe(row.id);
-  const forged = await a.get("audit?location=not-my-account-0000");
-  expect(forged.focus).toBeNull();
-  expect(forged.scope).toBe(d.scope);
-  expect(forged.totals.things).toBe(d.totals.things);
 });
 
 test("a client's staff and a business owner see only their own account, and no list of other clients", async ({ request }) => {

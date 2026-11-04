@@ -145,7 +145,7 @@ export function AuditView() {
               {data.findings.length === 0 ? (
                 <EmptyState compact title="Nothing to fix" body="Nobody is waiting, no deal has gone quiet and every appointment has an outcome. Run the audit again after your next refresh." />
               ) : (
-                <ol className="divide-y border-y" data-testid="audit-findings">
+                <ol className="@container divide-y border-y" data-testid="audit-findings">
                   {data.findings.map((f, i) => <FindingRow key={f.key} f={f} n={i + 1} onShow={() => open(f)} />)}
                 </ol>
               )}
@@ -155,7 +155,7 @@ export function AuditView() {
 
             {data.clients && data.clients.withProblems > 0 && (
               <Section title="Clients to look at first" hint="Ranked by counted deal money plus the estimate. The two are shown separately, never added on screen." id="audit-clients">
-                <ul className="divide-y border-y" data-testid="audit-clients">
+                <ul className="@container divide-y border-y" data-testid="audit-clients">
                   {data.clients.rows.map((r) => <ClientRowView key={r.id} r={r} onOpen={() => { setFocus(r.id); setAll(false); window.scrollTo?.({ top: 0, behavior: "smooth" }); }} />)}
                 </ul>
                 {data.clients.withProblems > data.clients.rows.length && !all && (
@@ -174,7 +174,7 @@ export function AuditView() {
                       <EmptyState compact title="No client matches" body="Try a shorter name." />
                     ) : (
                       <>
-                        <ul className="divide-y border-y">{list.data.rows.map((r) => <ClientRowView key={r.id} r={r} onOpen={() => { setFocus(r.id); setAll(false); window.scrollTo?.({ top: 0, behavior: "smooth" }); }} />)}</ul>
+                        <ul className="@container divide-y border-y">{list.data.rows.map((r) => <ClientRowView key={r.id} r={r} onOpen={() => { setFocus(r.id); setAll(false); window.scrollTo?.({ top: 0, behavior: "smooth" }); }} />)}</ul>
                         <Pager page={list.data} onPage={setCpage} label="Client pages" />
                       </>
                     )}
