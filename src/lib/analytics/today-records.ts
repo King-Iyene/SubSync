@@ -43,16 +43,16 @@ export const COL_ICON_NAME: Record<ColType, string> = { text: "Aa", date: "date"
 // ---------- builders ----------
 
 const ITEM_COLS: Col[] = [
-  { key: "what", header: "What", type: "text", primary: true, w: 15 },
-  { key: "account", header: "Client account", type: "text", facet: true, w: 13 },
-  { key: "kind", header: "Kind", type: "kind", facet: true, w: 12 },
-  { key: "since", header: "Wrong since", type: "date", w: 11 },
-  { key: "waiting", header: "For", type: "duration", w: 7 },
-  { key: "value", header: "Deal value", type: "money", w: 9 },
-  { key: "owner", header: "Owner", type: "text", facet: true, w: 10 },
-  { key: "source", header: "Source", type: "text", facet: true, w: 10 },
-  { key: "detail", header: "Detail", type: "text", w: 20 },
-  { key: "crm", header: "CRM", type: "link", w: 7 },
+  { key: "what", header: "What", type: "text", primary: true, w: 14 },
+  { key: "account", header: "Client account", type: "text", facet: true, w: 12 },
+  { key: "kind", header: "Kind", type: "kind", facet: true, w: 11 },
+  { key: "since", header: "Wrong since", type: "date", w: 10.5 },
+  { key: "waiting", header: "For", type: "duration", w: 6 },
+  { key: "value", header: "Deal value", type: "money", w: 8 },
+  { key: "owner", header: "Owner", type: "text", facet: true, w: 9 },
+  { key: "source", header: "Source", type: "text", facet: true, w: 9 },
+  { key: "detail", header: "Detail", type: "text", w: 14 },
+  { key: "crm", header: "CRM", type: "link", w: 8 },
 ];
 
 export function itemRec(i: TodayItem, now: number): Rec {
@@ -68,7 +68,13 @@ export function itemRec(i: TodayItem, now: number): Rec {
 
 /** Columns with no value in any row are left out, so a one-account list has no Client account column and a lead list has no Deal value. */
 export function trimColumns(cols: Col[], rows: Rec[]): Col[] {
-  return cols.filter((c) => c.primary || rows.some((r) => r.cells[c.key] !== null && r.cells[c.key] !== undefined && r.cells[c.key] !== ""));
+  return cols.filter((c) => {
+    if (c.primary) return true;
+    if (!rows.some((r) => r.cells[c.key] !== null && r.cells[c.key] !== undefined && r.cells[c.key] !== "")) return false;
+    // A kind column that says the same thing on every row (the list is already titled "Leads waiting") only costs width.
+    if (c.type === "kind" && c.key === "kind" && new Set(rows.map((r) => r.cells[c.key])).size <= 1) return false;
+    return true;
+  });
 }
 
 export type SpecInput = { key: string; title: string; subtitle: string; noun: string; count: number; note?: string | null; preset?: Record<string, string[]>; exportName?: string };

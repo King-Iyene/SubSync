@@ -122,6 +122,7 @@ export function FixFirstQueue({ rows, max = 7, onShow, empty, title = "Fix first
 }) {
   const [all, setAll] = useState(false);
   const [at, setAt] = useState(0);
+  const moved = useRef(false); // the page scrolls to the highlighted row only after j or k, never on its own when it opens
   const now = useNow();
   const shown = all ? rows.slice(0, 50) : rows.slice(0, max);
   const active = Math.min(at, Math.max(0, shown.length - 1));
@@ -131,8 +132,8 @@ export function FixFirstQueue({ rows, max = 7, onShow, empty, title = "Fix first
       if (el && (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || el.isContentEditable)) return;
       if (e.metaKey || e.ctrlKey || e.altKey || shown.length === 0) return;
       if (document.querySelector("[data-testid=records-panel]")) return;
-      if (e.key === "j") setAt((n) => Math.min(shown.length - 1, n + 1));
-      else if (e.key === "k") setAt((n) => Math.max(0, n - 1));
+      if (e.key === "j") { moved.current = true; setAt((n) => Math.min(shown.length - 1, n + 1)); }
+      else if (e.key === "k") { moved.current = true; setAt((n) => Math.max(0, n - 1)); }
       else if (e.key === "Enter" && !el?.closest("a,button,summary,[role=tab]")) { const r = shown[active]; if (r) window.open(r.url, "_blank", "noopener,noreferrer"); }
       else return;
       e.preventDefault();
@@ -140,7 +141,7 @@ export function FixFirstQueue({ rows, max = 7, onShow, empty, title = "Fix first
     window.addEventListener("keydown", on);
     return () => window.removeEventListener("keydown", on);
   }, [shown, active]);
-  useEffect(() => { document.getElementById(`queue-${shown[active]?.key}`)?.scrollIntoView({ block: "nearest" }); }, [active, shown]);
+  useEffect(() => { if (moved.current) document.getElementById(`queue-${shown[active]?.key}`)?.scrollIntoView({ block: "nearest" }); }, [active, shown]);
   return (
     <section className="mb-9" aria-labelledby="fix-first-h" data-testid="fix-first">
       <div className="mb-2 flex flex-wrap items-end justify-between gap-x-4 gap-y-1">
