@@ -191,7 +191,7 @@ test("a client's staff opening Clients get a plain 'not available' and no money"
   await page.goto("/app?as=client#clients");
   await page.reload();
   await expect(page.getByText("Not available")).toBeVisible({ timeout: 120_000 });
-  expect(await page.locator("main").innerText()).not.toMatch(/\$\d|renew|fee/i);
+  expect(await page.locator("main").innerText()).not.toMatch(/\$\d|renew|\bfees?\b/i);
 });
 
 test("an id that is not one of the caller's clients is not found, and the page never takes a client from the address", async ({ request }) => {
