@@ -22,7 +22,7 @@ export function ImportsTab({ data, target, openRecords }: Common & { openRecords
   if (!d) return null;
   return (
     <div data-testid="dh-imports">
-      <p className="mb-4 text-sm text-muted-foreground">SubSync cannot block a bad import, but it tells you the same day. An alert is raised when one source creates many bad records compared with this account's own normal (at least {data.settings.spikeMin}).</p>
+      <p className="mb-4 text-sm text-muted-foreground">SubSync cannot block a bad import, but it tells you the same day. An alert is raised when one source creates many bad records compared with this account&apos;s own normal (at least {data.settings.spikeMin}).</p>
       {d.spikes.length ? <div className="mb-6 space-y-2" data-testid="dh-spikes">{d.spikes.map((x) => <InlineAlert key={x.source} tone="warning" title={`${x.source}: ${x.recent} bad records in the last 24 hours`}>It created {x.created} records and its usual is {x.usual} bad ones a day.</InlineAlert>)}</div> : <p className="mb-6 text-sm" data-testid="dh-no-spikes">No source is sending an unusual number of bad records right now.</p>}
       <Section title="Bad records by where they came from" hint="Duplicates, junk, invalid phones and emails. Press a number to see them.">
         {d.sources.length === 0 ? <EmptyState compact title="Nothing to show" body="No open duplicate, junk or invalid records." /> : (

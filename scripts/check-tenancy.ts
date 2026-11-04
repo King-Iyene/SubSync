@@ -83,6 +83,7 @@ async function main() {
       "/api/app/today", `/api/app/today?accounts=${other.locs[0]}`, `/api/app/today?accounts=${other.locs.join(",")}&ta=${other.locs[0]}`, `/api/app/today?accounts=%2e%2e%2f${other.locs[0]}`,
       "/api/app/today/brief", `/api/app/today/brief?accounts=${other.locs[0]}`, "/api/app/today/views",
       // The duplicate review (stage DUP): the list, the obvious ones, one group, and the other side's account asked for by every parameter the screen takes.
+      "/api/app/data-health", `/api/app/data-health?wa=${other.locs[0]}`, `/api/app/data-health/records?loc=${other.locs[0]}`, `/api/app/data-health/sources?loc=${other.locs[0]}`, `/api/app/data-health/proof?loc=${other.locs[0]}`, `/api/app/data-health/export?loc=${other.locs[0]}`, `/api/app/data-health/fixes?loc=${other.locs[0]}`,
       "/api/app/duplicates?size=50", "/api/app/duplicates/obvious", `/api/app/duplicates?location=${other.locs[0]}&size=50`, `/api/app/duplicates?accounts=${other.locs[0]}&status=decided`, `/api/app/duplicates?focus=${other.locs[0]}:00000000-2`,
       // Speed to lead (stage SPEED): the first screen, the list behind a number and the comparisons, the other side's account asked for by every parameter they take.
       "/api/app/speed?part=home", `/api/app/speed?part=list&status=all&account=${other.locs[0]}`, `/api/app/speed?part=list&status=waiting&account=${other.locs.join(",")}`, `/api/app/speed?part=list&status=all&person=${other.marker}`, "/api/app/speed?part=compare&by=account", "/api/app/speed?part=compare&by=person",
@@ -189,6 +190,13 @@ async function main() {
       ["POST", "/api/app/workflows/preview", { kind: "delete", items: [{ locationId: B.locs[0], workflowId: "w-1" }] }],
       ["PUT", "/api/app/workflows/labels", { items: [{ locationId: B.locs[0], workflowId: "w-1" }], patch: { decision: "retire" } }],
       ["POST", "/api/app/workflows/mark", { locationId: B.locs[0], workflowId: "w-1", action: "fixed" }],
+      // Data health: a mark, a rule, a refresh, a fix preview, a confirm and an undo on the other agency's client account (all must be refused).
+      ["POST", "/api/app/data-health/mark", { locationId: B.locs[0], contactIds: [B.contacts[0]], state: "ignored" }],
+      ["PUT", "/api/app/data-health/rules", { locationId: B.locs[0], junkWords: ["hacked"] }],
+      ["POST", "/api/app/data-health/refresh", { locationId: B.locs[0] }],
+      ["POST", "/api/app/data-health/preview", { locationId: B.locs[0], kinds: ["phone"] }],
+      ["POST", "/api/app/data-health/confirm", { locationId: B.locs[0], kinds: ["phone"], token: "1.x" }],
+      ["POST", "/api/app/data-health/undo", { locationId: B.locs[0] }],
       // The duplicate review: a decision, a set-aside and a merge on the other agency's contacts (the merge never writes: it is switched off).
       ["POST", "/api/app/duplicates/review", { locationId: B.locs[0], contactIds: [B.contacts[0], B.contacts[0] + "dup"], decision: "not_duplicate" }],
       ["POST", "/api/app/duplicates/snooze", { locationId: B.locs[0], contactIds: [B.contacts[0], B.contacts[0] + "dup"] }],

@@ -19,6 +19,7 @@ import { proofLines } from "../data-health/digest";
 // Nothing is sent to the CRM unless the optional contacts.write permission is granted AND DATA_HEALTH_WRITE_LIVE is on.
 export type Deps = WfDeps & { links: (ctx: Ctx) => Promise<ReturnType<typeof deepLinks>> };
 
+const API_HOST = "https://services.leadconnectorhq.com";
 const LOC = /^[A-Za-z0-9_-]{3,64}$/;
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
 const CONTACT = /^[A-Za-z0-9_-]{1,64}$/;
@@ -209,7 +210,7 @@ async function fixPreview(ctx: Ctx, deps: Deps) {
 }
 
 async function put(token: string, locationId: string, contactId: string, fields: Record<string, string>): Promise<boolean> {
-  const res = await fetch(`https://services.leadconnectorhq.com/contacts/${encodeURIComponent(contactId)}`, { method: "PUT", headers: { Authorization: `Bearer ${token}`, Version: "2021-07-28", "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify(fields) }).catch(() => null);
+  const res = await fetch(`${API_HOST}/contacts/${encodeURIComponent(contactId)}`, { method: "PUT", headers: { Authorization: `Bearer ${token}`, Version: "2021-07-28", "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify(fields) }).catch(() => null);
   void locationId;
   return !!res && res.ok;
 }
