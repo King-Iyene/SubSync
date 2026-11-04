@@ -1,6 +1,6 @@
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 
-// Stage C1 (Clients): WRITTEN in the stage, NOT RUN (the lead runs it after the merge, on a clean server). It uses the demo company, which is shared, so every
+// Stage C1 (Clients). The Health and Details tabs became the Clients tab in stage CLIENTS: their tests moved to tests/e2e/clients-v2.spec.ts. WRITTEN in the stage, NOT RUN (the lead runs it after the merge, on a clean server). It uses the demo company, which is shared, so every
 // change a test makes is undone in the same test. Covers the five tabs, the old addresses, the inline edits and the log, onboarding (Fix it, who and when,
 // history, templates, stuck), Compare, the quarterly review, and that nothing scrolls sideways at the three widths.
 type Json = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -25,13 +25,13 @@ const open = async (page: Page, hash: string) => {
 };
 const tab = (page: Page, name: string) => page.getByRole("tab", { name, exact: true });
 
-test("Clients is one module with five tabs, and the old addresses open it on the right tab", async ({ page }, info) => {
+test("Clients is one module with five tabs (the Clients tab first), and the old addresses open it on the right tab", async ({ page }, info) => {
   await open(page, "clients");
-  for (const name of ["Health", "Onboarding", "Details and billing", "Compare", "Reviews (QBR)"]) await expect(tab(page, name)).toBeVisible();
-  await expect(tab(page, "Health")).toHaveAttribute("aria-selected", "true");
-  await noSideScroll(page, "Clients, Health");
+  for (const name of ["Clients", "Onboarding", "Compare", "Reviews (QBR)", "Industries"]) await expect(tab(page, name)).toBeVisible();
+  await expect(tab(page, "Clients")).toHaveAttribute("aria-selected", "true");
+  await noSideScroll(page, "Clients, first tab");
   await open(page, "accounts");
-  await expect(tab(page, "Health")).toHaveAttribute("aria-selected", "true");
+  await expect(tab(page, "Clients")).toHaveAttribute("aria-selected", "true");
   await expect(page.getByRole("heading", { name: "Clients", level: 1 })).toBeVisible();
   await open(page, "onboarding");
   await expect(tab(page, "Onboarding")).toHaveAttribute("aria-selected", "true");
@@ -40,100 +40,6 @@ test("Clients is one module with five tabs, and the old addresses open it on the
   await open(page, "email");
   await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
   await page.screenshot({ path: `docs/review/c1-email-${info.project.name}.png`, fullPage: true });
-});
-
-test("Health: the clients to call first never say Healthy, and a click on a bar lists exactly the clients it counts", async ({ page }, info) => {
-  await open(page, "clients");
-  const list = page.getByRole("list", { name: "Clients to call first" });
-  await expect(list).toBeVisible();
-  const text = await list.innerText();
-  expect(text).not.toMatch(/Healthy|Thriving/);
-  expect(text).toMatch(/At risk|Watch/);
-  const chart = page.getByTestId("bar-chart").filter({ hasText: "Clients by health" });
-  await expect(chart).toBeVisible();
-  const bars = chart.getByRole("button");
-  const n = await bars.count();
-  expect(n).toBe(4);
-  for (let i = 0; i < n; i++) {
-    const label = (await bars.nth(i).getAttribute("aria-label")) ?? "";
-    const m = /: (\d+)/.exec(label);
-    if (!m || Number(m[1]) === 0) continue;
-    await bars.nth(i).click();
-    await expect(page.getByTestId("drill-count")).toHaveText(m[1]);
-    await expect(page.getByTestId("drill-panel").getByRole("listitem")).toHaveCount(Number(m[1]));
-  }
-  await page.screenshot({ path: `docs/review/c1-health-${info.project.name}.png`, fullPage: true });
-});
-
-test("Health: a client's trends have axes, a range of their own, and the weekly bars open the people behind them", async ({ page }) => {
-  await open(page, "clients");
-  await page.getByRole("button", { name: "Show trends" }).first().click();
-  const trends = page.getByTestId("client-trends");
-  await expect(trends).toBeVisible();
-  await expect(trends.getByTestId("line-chart")).toHaveCount(3);
-  await expect(trends.getByTestId("card-range-window").first()).toContainText("Last 90 days");
-  await expect(trends.getByTestId("line-chart").first()).toContainText("0");
-  await expect(trends.getByTestId("line-chart").first()).toContainText("100");
-  const appts = trends.getByTestId("bar-chart").filter({ hasText: "Appointments by week" });
-  if (await appts.count()) {
-    const bar = appts.getByRole("button").filter({ hasText: /appointments?, open the list/ }).first();
-    if (await bar.count()) {
-      const count = Number(/(\d+) appointments?/.exec((await bar.getAttribute("aria-label")) ?? "")?.[1]);
-      await bar.click();
-      await expect(page.getByTestId("drill-count").last()).toHaveText(String(count));
-    }
-  }
-});
-
-test("Details: fee, renewal and industry are typed in the row, with honest labels, and a conversation can be logged", async ({ page, request }) => {
-  const before = await api(request, "get", "clients");
-  const c = (before.clients as Json[])[0];
-  await open(page, "clients");
-  await tab(page, "Details and billing").click();
-  // Wait for the tab's own content (it loads after the tab opens) before reading the whole page.
-  await expect(page.locator("main")).toContainText("You enter this; SubSync does not read it from your CRM.", { timeout: 30_000 });
-  const text = await page.locator("main").innerText();
-  expect(text).not.toMatch(/\bn\/a\b/);
-  expect(text).toContain("You enter this; SubSync does not read it from your CRM.");
-  expect(text).toContain("What each column means");
-  const row = page.getByTestId("client-row").filter({ hasText: c.name }).first();
-  const oldFee = c.profile.monthlyFee as number | null;
-  try {
-    await row.getByRole("button", { name: /change the fee|Add fee/ }).click();
-    await row.getByLabel(/pays you per month/).fill("3210");
-    await row.getByRole("button", { name: "Save" }).click();
-    await expect(row).toContainText("$3,210");
-    const after = await api(request, "get", "clients");
-    expect((after.clients as Json[]).find((x) => x.locationId === c.locationId)!.profile.monthlyFee).toBe(3210);
-    // The log: add a conversation, see it with who and when, remove it.
-    await row.getByRole("button", { name: /Log/ }).click();
-    const log = page.getByTestId("client-log");
-    await log.getByLabel("What was said or decided").fill("Playwright check: agreed a call on Friday");
-    await log.getByRole("button", { name: "Add to the log" }).click();
-    await expect(log).toContainText("Playwright check: agreed a call on Friday");
-    await log.getByRole("listitem").filter({ hasText: "Playwright check" }).getByRole("button", { name: "Remove" }).click();
-    await expect(log).not.toContainText("Playwright check");
-  } finally {
-    await api(request, "put", `clients/${c.locationId}`, { monthlyFee: oldFee === null ? "" : String(oldFee) });
-  }
-  await noSideScroll(page, "Clients, Details");
-});
-
-test("Details: the industry is a picker, and a picked industry lands in its playbook", async ({ page, request }) => {
-  const before = await api(request, "get", "clients");
-  const c = (before.clients as Json[]).find((x) => !x.profile.industry) ?? (before.clients as Json[])[0];
-  const old = c.profile.industry as string | null;
-  await open(page, "clients");
-  await tab(page, "Details and billing").click();
-  const row = page.getByTestId("client-row").filter({ hasText: c.name }).first();
-  try {
-    await row.getByRole("button", { name: /Choose industry|change the industry/ }).click();
-    await row.getByLabel(/kind of business/).selectOption("Real estate");
-    await row.getByRole("button", { name: "Save" }).click();
-    await expect(row).toContainText("Playbook: Real estate and property.");
-  } finally {
-    await api(request, "put", `clients/${c.locationId}`, { industry: old ?? "" });
-  }
 });
 
 test("Onboarding: Fix it goes through the white-label link, a step can be given to someone with a due date, and the history says so", async ({ page, request }) => {

@@ -27,6 +27,8 @@ export type Core = {
   audit: AuditV2; clients: ClientRow[]; accounts: AuditAccount[]; healthy: string[]; progress: ReturnType<typeof progressOf>;
   reading: ReturnType<typeof readingOf>; scope: "all" | "account"; targetMinutes: number; staleDays: number; slaHours: number; now: number;
   readLimit: string | null; accountNames: string[];
+  /** The lead ledger of the last 14 days (Speed to lead's rows), kept so the Clients book can judge replies per client without a second read. */
+  replies: Array<{ locationId: string; leadAt: number; touchAt: number | null }>;
 };
 
 type WithUrl = AuditList["rows"][number] & { url?: string };
@@ -87,7 +89,7 @@ export async function loadCore(i: { installationId: string; ids: string[]; limit
   return {
     audit, clients: clientRows(audit, accounts), accounts, healthy, progress: progressOf({ series: seriesIn, replies, targetMinutes: target, now }),
     reading: readingOf({ state: fresh.state, accounts: fresh.accounts }), scope: live.length === 1 || i.limitTo ? "account" : "all", targetMinutes: target,
-    staleDays: settings.staleDays, slaHours: settings.slaHours, now, readLimit: base.readLimit, accountNames: accounts.map((a) => a.name),
+    staleDays: settings.staleDays, slaHours: settings.slaHours, now, readLimit: base.readLimit, accountNames: accounts.map((a) => a.name), replies,
   };
 }
 
