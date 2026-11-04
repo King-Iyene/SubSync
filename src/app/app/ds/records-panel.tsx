@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { portalRoot } from "./portal-root";
 import {
   cellText, emptyFilter, facetValues, filterRecs, NO_VALUE, rangeChoices, sortRecs, toCsv,
   type Cell, type Col, type ColType, type Rec, type RecFilter, type RecordsSpec, type Sort,
@@ -277,7 +278,7 @@ export function RecordsPanel({ spec, onClose, now, zone = "UTC", canExport = tru
       </div>
     </div>
   );
-  return typeof document === "undefined" ? null : createPortal(node, document.body);
+  return typeof document === "undefined" ? null : createPortal(node, portalRoot());
 }
 
 /** The OPEN button on a row: shows the lead when the row is a lead, otherwise opens the record in the CRM. Always reachable by keyboard; drawn on hover or focus. */

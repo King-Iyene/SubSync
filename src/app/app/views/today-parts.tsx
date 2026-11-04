@@ -3,6 +3,7 @@
 import { X } from "lucide-react";
 import { useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
+import { portalRoot } from "../ds/portal-root";
 import { money } from "@/lib/analytics/today-queue";
 import { accountSpeeds, fastestSlowest, hourStats, hourTitle, sourceStats, sourceTitle, workload } from "@/lib/analytics/today-smart";
 import { specAccountReplies, specHour, specJunk, specPerson, specSource } from "@/lib/analytics/today-specs";
@@ -94,7 +95,7 @@ export function BriefPreview({ onClose }: { onClose: () => void }) {
         </div>
       </div>
     </div>,
-    document.body,
+    portalRoot(),
   );
 }
 

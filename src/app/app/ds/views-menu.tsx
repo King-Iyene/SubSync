@@ -3,6 +3,7 @@
 import { Bookmark, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { portalRoot } from "./portal-root";
 import { describeTodayView, type TodayView } from "@/lib/analytics/today-palette";
 import { useApiClient, useData } from "../session";
 
@@ -78,7 +79,7 @@ export function ViewsMenu({ current, names, onApply }: { current: TodayView; nam
             {views.length >= max && <p className="mt-1 px-1 text-xs text-muted-foreground">You can keep {max} views. Remove one first.</p>}
             {msg && <p className="mt-1 px-1 text-xs" role="status">{msg}</p>}
           </form>
-        </div>, document.body)}
+        </div>, portalRoot())}
     </>
   );
 }

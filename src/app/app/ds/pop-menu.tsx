@@ -3,6 +3,7 @@
 import { MoreHorizontal } from "lucide-react";
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { portalRoot } from "./portal-root";
 
 // A small menu opened by a button, drawn in a layer of its own on the page (a portal with fixed placement) so no card, scroll area or sticky bar around the button can clip
 // it or sit on top of it. Esc and a click outside close it, and focus goes back to the button. Used for the "more" actions of a Fix first row.
@@ -52,7 +53,7 @@ export function PopMenu({ label, items, testId, triggerClassName, children }: { 
               <span>{it.label}</span>{it.hint && <span className="text-xs text-muted-foreground">{it.hint}</span>}
             </button>
           ))}
-        </div>, document.body)}
+        </div>, portalRoot())}
     </>
   );
 }

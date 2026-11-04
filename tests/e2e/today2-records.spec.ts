@@ -289,11 +289,11 @@ test("every number opens the records behind it and the count equals the rows: he
   await page.screenshot({ path: "docs/review/today2-panel-slice.png" });
   await closePanel(page);
   // Account bars.
-  for (const b of await page.getByTestId("account-bar").all()) {
+  for (const [i, b] of (await page.getByTestId("account-bar").all()).entries()) {
     const n = Number(await b.getAttribute("data-count"));
     await b.click();
     expect(await equal()).toBe(n);
-    if (b === (await page.getByTestId("account-bar").all())[0]) await page.screenshot({ path: "docs/review/today2-panel-bar.png" });
+    if (i === 0) await page.screenshot({ path: "docs/review/today2-panel-bar.png" });
     await closePanel(page);
   }
   // Fix first: the amount and Show on every shown row.
@@ -599,4 +599,21 @@ test("a real mouse click on the ring of the donut opens the records behind that 
   await page.mouse.click(at!.x, at!.y);
   await expect(panel(page)).toBeVisible();
   await expect(page.getByTestId("records-count")).toHaveAttribute("data-count", String(n));
+});
+
+test("the records panel and the account list follow the light or dark theme of the app (they are drawn inside the themed wrapper)", async ({ page }) => {
+  await openToday(page);
+  const luminance = (css: string) => { const [r, g, b] = (css.match(/\d+/g) ?? ["0", "0", "0"]).map(Number); return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255; };
+  for (const [pref, light] of [["Dark", false], ["Light", true], ["Dark", false]] as const) {
+    await page.evaluate((p) => { [...document.querySelectorAll("button")].find((b) => b.textContent?.trim() === p)?.click(); }, pref);
+    await expect(page.locator("[data-theme]").first()).toHaveAttribute("data-theme", light ? "light" : "dark");
+    await page.getByTestId("pulse-leads-open").click();
+    const panelBg = await panel(page).evaluate((el) => getComputedStyle(el).backgroundColor);
+    expect(luminance(panelBg) > 0.5, `${pref}: panel background ${panelBg}`).toBe(light);
+    await closePanel(page);
+    await page.getByTestId("picker-button").click();
+    const pickBg = await page.getByTestId("picker-popover").evaluate((el) => getComputedStyle(el).backgroundColor);
+    expect(luminance(pickBg) > 0.5, `${pref}: account list background ${pickBg}`).toBe(light);
+    await page.keyboard.press("Escape");
+  }
 });

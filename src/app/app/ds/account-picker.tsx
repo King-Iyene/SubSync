@@ -3,6 +3,7 @@
 import { Check, ChevronDown, Search } from "lucide-react";
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { portalRoot } from "./portal-root";
 
 // The account selector that belongs to ONE page (Today), not to the whole app: a button that says what is counted ("All 13" or "3 of 13"), and a list with search and a
 // checkbox per account. Nothing ticked means every account. It draws only when there are at least two accounts to choose between, and the page never offers it to a
@@ -99,7 +100,7 @@ export function LocalAccountPicker({ accounts, picked, onChange, label = "Client
             <button type="button" className="min-h-10 rounded-lg bg-primary px-4 font-medium text-primary-foreground hover:bg-primary/90" data-testid="picker-done" onClick={() => close()}>Done</button>
           </div>
         </div>,
-        document.body,
+        portalRoot(),
       )}
     </div>
   );
