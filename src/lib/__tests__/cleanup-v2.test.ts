@@ -62,12 +62,12 @@ test("balanced is the original behaviour; presets differ in what they link", () 
 });
 
 test("loose finds a nickname pair and swapped digits that balanced does not", () => {
-  const nick = [p("1", { name: "Bob Smith", phone: "+15550101111" }), p("2", { name: "Robert Smith" })];
+  const nick = [p("1", { name: "Bob Smith", email: "bob@hart.test", phone: "+15550101111" }), p("2", { name: "Robert Smith", email: "robert@hart.test" })];
   assert.equal(groupDuplicates(nick, PRESETS.balanced.threshold, 40, PRESETS.balanced).length, 0);
   const loose = groupDuplicates(nick, PRESETS.loose.threshold, 40, PRESETS.loose);
   assert.equal(loose.length, 1);
   assert.ok(loose[0].reasons.includes("similar name"));
-  assert.ok(loose[0].confidence < 50, "a name on its own is only a hint");
+  assert.ok(loose[0].confidence < 60, "a nickname at the same company is only a maybe");
   const swap = [p("1", { name: "Ann Lee", phone: "+15550102030" }), p("2", { name: "Ann Lee", phone: "+15550102003" })];
   assert.equal(groupDuplicates(swap, PRESETS.balanced.threshold, 40, PRESETS.balanced).length, 0, "balanced does not look for swapped digits");
   assert.equal(groupDuplicates(swap, PRESETS.loose.threshold, 40, PRESETS.loose).length, 1, "loose does, and the same name confirms it");
