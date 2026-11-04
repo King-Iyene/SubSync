@@ -35,7 +35,7 @@ export function WriteAccessCard({ embedded = false }: { embedded?: boolean }) {
       {problem && <div className="mb-3"><InlineAlert tone="danger" onDismiss={() => setProblem(null)}>{problem}</InlineAlert></div>}
       {!data && loading ? <p className="text-sm text-muted-foreground">Loading...</p> : error ? <InlineAlert tone="danger">{error.message}</InlineAlert> : data && (
         <>
-          {!data.ready.rules && <div className="mb-3"><InlineAlert tone="warning">This switch needs a one-time update to SubSync&apos;s database that has not been applied yet, so every client stays off.</InlineAlert></div>}
+          {!data.ready.rules && <div className="mb-3"><InlineAlert tone="warning">This switch is not available yet: SubSync is finishing an update, so every client stays off.</InlineAlert></div>}
           {data.accounts.total > 8 && <input type="search" className={`${FIELD} mb-2 w-full sm:w-64`} placeholder="Find a client" aria-label="Find a client" value={q} onChange={(e) => { setQ(e.target.value); setPage(0); }} />}
           <ul data-testid="write-accounts">
             {data.accounts.rows.map((a) => (

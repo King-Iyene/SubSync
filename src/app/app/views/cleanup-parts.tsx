@@ -25,10 +25,11 @@ export function ScoreMeter({ score, word, label, big = false, testId }: { score:
   return (
     <div data-testid={testId} className="min-w-0">
       <p className="flex flex-wrap items-baseline gap-x-2">
+        <span className="sr-only">{label}: </span>
         <span className={`${big ? "text-5xl" : "text-2xl"} font-semibold tabular-nums tracking-tight`} data-testid={testId ? `${testId}-n` : undefined}>{score}</span>
         <span className="text-sm text-muted-foreground">out of 100{word ? ` · ${word}` : ""}</span>
       </p>
-      <div className={`mt-1.5 h-1 overflow-hidden rounded-full bg-muted ${big ? "max-w-xs" : "max-w-[10rem]"}`} role="img" aria-label={`${label}: ${score} out of 100${word ? `, ${word}` : ""}`}>
+      <div className={`mt-1.5 h-1 overflow-hidden rounded-full bg-muted ${big ? "max-w-xs" : "max-w-[10rem]"}`} aria-hidden="true">
         <div className={`h-full ${toneOf(score)}`} style={{ width: `${Math.max(2, Math.min(100, score))}%` }} />
       </div>
     </div>

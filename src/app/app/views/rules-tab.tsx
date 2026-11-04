@@ -45,7 +45,7 @@ export function RulesTab({ canEdit }: { canEdit: boolean }) {
   const [scope, setScope] = useState<string>("");
   const [ap, setAp] = useState(0);
   const [aq, setAq] = useState("");
-  const { data, error, loading, reload } = useData<Data>(`cleanup/rules?ap=${ap}&aq=${encodeURIComponent(aq)}${scope && scope !== "company" ? `&location=${encodeURIComponent(scope)}` : ""}`);
+  const { data, error, loading, reload } = useData<Data>(`cleanup/rules?ap=${ap}&aq=${encodeURIComponent(aq)}${scope && scope !== "company" ? `&account=${encodeURIComponent(scope)}` : ""}`);
   const [copied, setCopied] = useState<string | null>(null);
 
   if (!data && loading) return <SkeletonCards cards={2} label="Loading the rules..." />;
@@ -59,7 +59,7 @@ export function RulesTab({ canEdit }: { canEdit: boolean }) {
       <HowTo id="rules" title="You choose how strict SubSync is">
         These choices only change which contacts SubSync suggests are duplicates and which value it suggests keeping. They never change a contact. Balanced is how SubSync has always matched.
       </HowTo>
-      {!data.ready.rules && <div className="mb-4"><InlineAlert tone="warning">Saving rules needs a one-time update to SubSync&apos;s database that has not been applied yet. You can look, but not save.</InlineAlert></div>}
+      {!data.ready.rules && <div className="mb-4"><InlineAlert tone="warning">Saving rules is not available yet: SubSync is finishing an update. You can look, but not save.</InlineAlert></div>}
 
       {data.multi && (
         <Section title="Which client" hint={`${fmtInt(data.total)} client accounts. A client without its own choice follows the company default.`} id="rules-scope">
@@ -114,7 +114,7 @@ function Editor({ data, cfg, scope, name, own, canEdit, onSaved }: { data: Data;
   const preset = presetOf(rules);
   const [effect, setEffect] = useState<{ now: { groups: number; extra: number }; with: { groups: number; extra: number } } | null>(null);
   // What would this setting find? Asked while a person chooses (one client at a time), never saved. A short pause so dragging the slider is not a request per pixel.
-  const qs = scope === "company" ? "" : `location=${encodeURIComponent(scope)}&preset=${preset}${preset === "custom" ? `&email=${rules.email}&phone=${rules.phone}&name=${rules.name}&nameAlone=${rules.nameAlone ? 1 : 0}&guards=${rules.guards ? 1 : 0}&threshold=${rules.threshold}` : ""}`;
+  const qs = scope === "company" ? "" : `account=${encodeURIComponent(scope)}&preset=${preset}${preset === "custom" ? `&email=${rules.email}&phone=${rules.phone}&name=${rules.name}&nameAlone=${rules.nameAlone ? 1 : 0}&guards=${rules.guards ? 1 : 0}&threshold=${rules.threshold}` : ""}`;
   useEffect(() => {
     if (!qs) return;
     let live = true;

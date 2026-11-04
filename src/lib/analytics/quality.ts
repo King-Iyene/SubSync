@@ -61,7 +61,8 @@ export type Options = { countryCode?: string | null };
 
 export function phoneDigits(phone: string | null | undefined): number { return clean(phone).replace(/\D/g, "").length; }
 
-/** Which findings apply to one contact. Pure. */
+/** Which findings apply to one contact. Pure. The options are accepted so callers can pass one set to every function; no finding depends on them. */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function findingsOf(r: QRow, o: Options = {}): FindingId[] {
   const out: FindingId[] = [];
   const email = clean(r.email);

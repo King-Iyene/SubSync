@@ -85,7 +85,7 @@ export function WorkflowMerge({ workflow, people, switchedOff, onRun }: { workfl
               {checked && (
                 <>
                   <label className="mt-3 flex min-h-11 items-start gap-2"><input type="checkbox" className="mt-1 size-5" checked={sure} onChange={(e) => setSure(e.target.checked)} data-testid="dup-workflow-sure" /><span>I have looked at both records and want them merged. I understand it cannot be undone.</span></label>
-                  <button type="button" className={`${PRIMARY} mt-2`} disabled={!sure || busy} onClick={async () => { setBusy(true); try { setMsg(await onRun()); } finally { setBusy(false); } }} data-testid="dup-workflow-run">{busy ? "Sending..." : "Merge now"}</button>
+                  <button type="button" className={`${PRIMARY} mt-2`} disabled={!sure || busy} onClick={async () => { setBusy(true); try { setMsg(await onRun()); } finally { setBusy(false); } }} data-testid="dup-workflow-run">{busy ? "Sending..." : "Start the merge"}</button>
                   {switchedOff && !msg && <p className="mt-2 text-xs text-muted-foreground">Sending is switched off on the server for now: confirming records a dry run and nothing reaches your CRM.</p>}
                 </>
               )}

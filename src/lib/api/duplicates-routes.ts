@@ -91,13 +91,17 @@ async function overviewRoute(ctx: Ctx, h: DuplicatesHelpers): Promise<Response> 
   const g = selection[i] as Item | undefined;
   let step: unknown = null;
   if (g) {
-    const detail = await loadPeople(ctx.installationId, allowed, g.locationId, g.people.map((p) => p.contactId));
+    // One round trip: the records in detail, whether this account allowed changes, and how many other contacts share the pair's email or phone.
+    const [detail, optedIn, others] = await Promise.all([
+      loadPeople(ctx.installationId, allowed, g.locationId, g.people.map((p) => p.contactId)),
+      ctx.demo ? Promise.resolve(true) : writeEnabledFor(ctx.installationId, g.locationId),
+      g.people.length === 2 ? othersSharing(ctx.installationId, g.locationId, g.people.map((p) => p.contactId)) : Promise.resolve(0),
+    ]);
     const people: Person[] = detail?.people ?? g.people;
     const keepId = chooseSurvivor(people).contactId;
     const review = sets.reviews.get(`${g.locationId}:${g.key}`) ?? null;
     const cfg = built.configs.get(g.locationId) ?? BUILTIN;
-    const optedIn = ctx.demo || (await writeEnabledFor(ctx.installationId, g.locationId));
-    const wf = planWorkflowMerge(people, keepId, { workflowId: cfg.mergeWorkflowId, others: g.people.length === 2 ? await othersSharing(ctx.installationId, g.locationId, g.people.map((p) => p.contactId)) : 0 });
+    const wf = planWorkflowMerge(people, keepId, { workflowId: cfg.mergeWorkflowId, others });
     step = {
       rules: { preset: presetOf(cfg.match), sentence: describeRules(cfg.match), source: cfg.source },
       reasons: g.reasons.map((r) => REASON_WORDS[r] ?? r),

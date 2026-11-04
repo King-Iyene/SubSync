@@ -70,39 +70,39 @@ describe.skipIf(!HAS_DB)("the Clean-up module", () => {
     expect(all.body.accounts.total).toBe(2);
     expect(new Set((all.body.accounts.rows as Json[]).map((r) => r.locationId))).toEqual(new Set([A1, A2]));
     expect(JSON.stringify(all.body)).not.toContain(B1);
-    expect((await call(agency, "GET", `cleanup/quality?location=${B1}`)).status).toBe(404);
-    expect((await call(agency, "GET", `cleanup/quality/list?location=${B1}&finding=bad_email`)).status).toBe(404);
-    expect((await call(agency, "GET", `cleanup/quality/csv?location=${B1}&finding=bad_email`)).status).toBe(404);
+    expect((await call(agency, "GET", `cleanup/quality?account=${B1}`)).status).toBe(404);
+    expect((await call(agency, "GET", `cleanup/quality/list?account=${B1}&finding=bad_email`)).status).toBe(404);
+    expect((await call(agency, "GET", `cleanup/quality/csv?account=${B1}&finding=bad_email`)).status).toBe(404);
     expect((await call(agency, "POST", "cleanup/quality/scan", { locationId: B1 })).status).toBe(404);
-    expect((await call(agency, "GET", `cleanup/rules/preview?location=${B1}&preset=loose`)).status).toBe(404);
+    expect((await call(agency, "GET", `cleanup/rules/preview?account=${B1}&preset=loose`)).status).toBe(404);
     expect((await call(agency, "POST", "cleanup/write", { locationId: B1, enabled: true })).status).toBe(404);
     expect((await call(agency, "POST", "cleanup/rules", { scope: B1, match: { preset: "loose" } })).status).toBe(404);
   });
 
   it("the findings of one account list exactly the contacts they count", async () => {
     const agency = session(CO_A, "agency", null);
-    const q = await call(agency, "GET", `cleanup/quality?location=${A1}&cc=1`);
+    const q = await call(agency, "GET", `cleanup/quality?account=${A1}&cc=1`);
     expect(q.status).toBe(200);
     expect(q.body.contacts).toBe(7);
     expect(q.body.score, "seven contacts are too few to score").toBeNull();
     const counts = Object.fromEntries((q.body.findings as Json[]).map((f) => [f.id, f.count]));
     for (const id of ["bad_email", "email_typo", "phone_format", "empty_record"]) {
       expect(counts[id], id).toBeGreaterThan(0);
-      const l = await call(agency, "GET", `cleanup/quality/list?location=${A1}&finding=${id}&cc=1`);
+      const l = await call(agency, "GET", `cleanup/quality/list?account=${A1}&finding=${id}&cc=1`);
       expect(l.status).toBe(200);
       expect(l.body.rows.length, `rows behind ${id}`).toBe(counts[id]);
       expect(l.body.count).toBe(counts[id]);
     }
-    const fix = await call(agency, "GET", `cleanup/quality/list?location=${A1}&finding=phone_format&cc=1`);
+    const fix = await call(agency, "GET", `cleanup/quality/list?account=${A1}&finding=phone_format&cc=1`);
     expect(fix.body.rows[0].fix).toEqual([{ field: "phone", before: "(555) 010-6666", after: "+15550106666" }]);
-    const csv = await handle(new Request(`http://localhost/api/app/cleanup/quality/csv?location=${A1}&finding=email_typo`, { headers: { Authorization: `Bearer ${agency}` } }), ["cleanup", "quality", "csv"]);
+    const csv = await handle(new Request(`http://localhost/api/app/cleanup/quality/csv?account=${A1}&finding=email_typo`, { headers: { Authorization: `Bearer ${agency}` } }), ["cleanup", "quality", "csv"]);
     expect(csv.status).toBe(200);
     expect(await csv.text()).toContain("frank@gmial.com,frank@gmail.com");
   });
 
   it("a client's staff are refused the Clean-up routes they never had, and may still use Duplicates and its history", async () => {
     const client = session(CO_A, "client", A1);
-    for (const path of ["cleanup/quality", "cleanup/rules", `cleanup/quality/list?location=${A1}&finding=bad_email`, "cleanup/rules/preview?preset=loose"]) expect((await call(client, "GET", path)).status, path).toBe(403);
+    for (const path of ["cleanup/quality", "cleanup/rules", `cleanup/quality/list?account=${A1}&finding=bad_email`, "cleanup/rules/preview?preset=loose"]) expect((await call(client, "GET", path)).status, path).toBe(403);
     for (const [path, body] of [["cleanup/import-check", { locationId: A1, csv: "Email\na@b.co" }], ["cleanup/write", { locationId: A1, enabled: true }], ["cleanup/rules", { scope: A1 }], ["duplicates/merge-workflow", { locationId: A1, contactIds: ["a1-1", "a1-2"], keepContactId: "a1-1", confirm: true }]] as const) {
       expect((await call(client, "POST", path, body)).status, path).toBe(path === "duplicates/merge-workflow" ? 403 : 403);
     }
@@ -114,12 +114,12 @@ describe.skipIf(!HAS_DB)("the Clean-up module", () => {
 
   it("what would this setting find: strict, balanced and loose differ, and nothing is saved", async () => {
     const agency = session(CO_A, "agency", null);
-    const get = async (preset: string) => (await call(agency, "GET", `cleanup/rules/preview?location=${A1}&preset=${preset}`)).body.with.groups as number;
+    const get = async (preset: string) => (await call(agency, "GET", `cleanup/rules/preview?account=${A1}&preset=${preset}`)).body.with.groups as number;
     const [strict, balanced, loose] = [await get("strict"), await get("balanced"), await get("loose")];
     expect(strict).toBe(1);
     expect(balanced).toBe(1);
     expect(loose, "Loose also finds Bob and Robert Hart").toBe(2);
-    const view = await call(agency, "GET", `cleanup/rules?location=${A1}`);
+    const view = await call(agency, "GET", `cleanup/rules?account=${A1}`);
     expect(view.body.selected.preset, "looking changed nothing").toBe("balanced");
   });
 
@@ -184,8 +184,8 @@ describe.skipIf(!HAS_DB)("the Clean-up module", () => {
     expect((await call(agency, "POST", "cleanup/rules", { scope: A1, match: { preset: "loose" } })).status).toBe(200);
     const q = await call(agency, "GET", "duplicates?size=25");
     expect(q.body.counts.open, "Loose finds the nickname pair too").toBe(3);
-    expect((await call(agency, "GET", `cleanup/rules?location=${A1}`)).body.selected.preset).toBe("loose");
-    expect((await call(agency, "GET", `cleanup/rules?location=${A2}`)).body.selected.preset).toBe("balanced");
+    expect((await call(agency, "GET", `cleanup/rules?account=${A1}`)).body.selected.preset).toBe("loose");
+    expect((await call(agency, "GET", `cleanup/rules?account=${A2}`)).body.selected.preset).toBe("balanced");
     expect((await call(agency, "POST", "cleanup/rules/clear", { locationId: A1 })).status).toBe(200);
     expect((await call(agency, "GET", "duplicates?size=25")).body.counts.open).toBe(2);
     const biz = session(CO_A, "business", A1);
@@ -201,7 +201,7 @@ describe.skipIf(!HAS_DB)("the Clean-up module", () => {
     expect(n[0].c).toBe(1);
     await call(agency, "POST", "cleanup/quality/scan", { locationId: A2 });
     expect((await sql()`select count(*)::int c from cleanup_quality_snapshots where installation_id = ${instA} and location_id = ${A2}`)[0].c, "a second scan the same day replaces, never adds").toBe(1);
-    const q = await call(agency, "GET", `cleanup/quality?location=${A2}`);
+    const q = await call(agency, "GET", `cleanup/quality?account=${A2}`);
     expect(q.body.trend.state).toBe("not_enough");
     expect((await sql()`select count(*)::int c from cleanup_quality_snapshots where installation_id = ${instB}`)[0].c).toBe(0);
   });

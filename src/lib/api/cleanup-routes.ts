@@ -43,7 +43,7 @@ async function rulesView(ctx: Ctx, h: CleanupHelpers): Promise<Response> {
     const c = configs.get(l.location_id as string) ?? BUILTIN;
     return { locationId: l.location_id as string, name: (l.name as string | null) ?? "Unnamed account", preset: presetOf(c.match), source: c.source, writeEnabled: c.writeEnabled };
   }), int(sp.get("ap"), 0), 8);
-  const wanted = sp.get("location");
+  const wanted = sp.get("account");
   const company = !allowed && locs.length > 1 ? await loadCompany(ctx.installationId) : null;
   const pick = (wanted && ID.test(wanted) && locs.find((l) => l.location_id === wanted)) || locs[0] || null;
   const c = pick ? configs.get(pick.location_id as string) ?? BUILTIN : BUILTIN;
@@ -59,7 +59,7 @@ async function rulesView(ctx: Ctx, h: CleanupHelpers): Promise<Response> {
 /** How many groups one client would have under a setting, without saving it. Used while a person is choosing. */
 async function previewRules(ctx: Ctx, h: CleanupHelpers): Promise<Response> {
   const sp = ctx.url.searchParams;
-  const acct = await ownAccount(ctx, h, sp.get("location"));
+  const acct = await ownAccount(ctx, h, sp.get("account"));
   if (!acct) return json({ error: "Account not found" }, 404);
   const preset = sp.get("preset");
   const rules = preset === "custom"
@@ -78,7 +78,7 @@ async function saveRules(ctx: Ctx, h: CleanupHelpers): Promise<Response> {
   // The account is checked first, so a forged id answers "not found" whether or not the database update has been applied.
   if (scope !== "company" && !(await ownAccount(ctx, h, scope))) return json({ error: "Account not found" }, 404);
   const r = await saveConfig(ctx.installationId, await h.allowed(), h.actor(ctx), scope, { match: body?.match, survive: body?.survive, ...(wf !== undefined ? { mergeWorkflowId: wf } : {}) });
-  if (r === "unavailable") return json({ error: "Saving rules needs a one-time update to SubSync's database that has not been applied yet.", unavailable: true }, 503);
+  if (r === "unavailable") return json({ error: "Saving rules is not available yet. SubSync is finishing an update, so try again later.", unavailable: true }, 503);
   if (r === "not_found") return json({ error: "Account not found" }, 404);
   forgetQueue(ctx.installationId);
   return json({ ok: true });
@@ -89,7 +89,7 @@ async function clearRules(ctx: Ctx, h: CleanupHelpers): Promise<Response> {
   if (typeof body?.locationId !== "string" || !ID.test(body.locationId)) return json({ error: "Choose a client account" }, 400);
   if (!(await ownAccount(ctx, h, body.locationId))) return json({ error: "Account not found" }, 404);
   const r = await clearAccountConfig(ctx.installationId, await h.allowed(), h.actor(ctx), body.locationId);
-  if (r === "unavailable") return json({ error: "Saving rules needs a one-time update to SubSync's database that has not been applied yet.", unavailable: true }, 503);
+  if (r === "unavailable") return json({ error: "Saving rules is not available yet. SubSync is finishing an update, so try again later.", unavailable: true }, 503);
   if (r === "not_found") return json({ error: "Account not found" }, 404);
   forgetQueue(ctx.installationId);
   return json({ ok: true });
@@ -100,7 +100,7 @@ async function writeSwitch(ctx: Ctx, h: CleanupHelpers): Promise<Response> {
   if (typeof body?.locationId !== "string" || !ID.test(body.locationId) || typeof body.enabled !== "boolean") return json({ error: "Choose a client account and on or off" }, 400);
   if (!(await ownAccount(ctx, h, body.locationId))) return json({ error: "Account not found" }, 404);
   const r = await setWriteEnabled(ctx.installationId, await h.allowed(), h.actor(ctx), body.locationId, body.enabled);
-  if (r === "unavailable") return json({ error: "This switch needs a one-time update to SubSync's database that has not been applied yet.", unavailable: true }, 503);
+  if (r === "unavailable") return json({ error: "This switch is not available yet. SubSync is finishing an update, so try again later.", unavailable: true }, 503);
   if (r === "not_found") return json({ error: "Account not found" }, 404);
   return json({ ok: true, enabled: body.enabled, masterSwitchOn: !ctx.demo && isLive("WRITE_GHL_LIVE") });
 }
@@ -111,7 +111,7 @@ async function qualityView(ctx: Ctx, h: CleanupHelpers): Promise<Response> {
   const sp = ctx.url.searchParams;
   const allowed = await h.allowed();
   const country = cc(sp.get("cc"));
-  const loc = sp.get("location");
+  const loc = sp.get("account");
   if (loc) {
     const acct = await ownAccount(ctx, h, loc);
     if (!acct) return json({ error: "Account not found" }, 404);
@@ -139,7 +139,7 @@ async function qualityView(ctx: Ctx, h: CleanupHelpers): Promise<Response> {
 async function qualityList(ctx: Ctx, h: CleanupHelpers): Promise<Response> {
   const sp = ctx.url.searchParams;
   const finding = sp.get("finding");
-  const acct = await ownAccount(ctx, h, sp.get("location"));
+  const acct = await ownAccount(ctx, h, sp.get("account"));
   if (!acct || !isFinding(finding)) return json({ error: "Account not found" }, 404);
   const links = await h.links();
   const r = await findingRows(ctx.installationId, acct.id, finding, cc(sp.get("cc")));
@@ -152,7 +152,7 @@ async function qualityList(ctx: Ctx, h: CleanupHelpers): Promise<Response> {
 async function qualityCsv(ctx: Ctx, h: CleanupHelpers): Promise<Response> {
   const sp = ctx.url.searchParams;
   const finding = sp.get("finding");
-  const acct = await ownAccount(ctx, h, sp.get("location"));
+  const acct = await ownAccount(ctx, h, sp.get("account"));
   if (!acct || !isFinding(finding)) return json({ error: "Account not found" }, 404);
   const csv = await findingCsv(ctx.installationId, acct.id, finding, cc(sp.get("cc")), FINDINGS[finding].label);
   return new Response(csv, { headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": `attachment; filename="subsync-${finding}.csv"`, "Cache-Control": "no-store" } });

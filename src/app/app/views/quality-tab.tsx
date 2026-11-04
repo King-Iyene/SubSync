@@ -32,7 +32,7 @@ type ImportRes = {
 const FIELD_WORD: Record<string, string> = { email: "Email", phone: "Phone", firstName: "First name", lastName: "Last name" };
 const VERDICT: Record<string, string> = { exists: "Already in this account", maybe: "Could already be here", again: "Twice in the file", new: "New", invalid: "Cannot work" };
 
-function specOf(l: ListQ, now: number): RecordsSpec {
+function specOf(l: ListQ): RecordsSpec {
   const rows: Rec[] = l.rows.map((r) => ({
     id: r.id,
     cells: { name: r.name, email: r.email, phone: r.phone, fix: r.fix ? r.fix.map((f) => `${FIELD_WORD[f.field] ?? f.field}: ${f.before} to ${f.after}`).join("; ") : null, crm: r.url },
@@ -62,16 +62,16 @@ export function QualityTab({ canFix }: { canFix: boolean }) {
   const single = top.data && !top.data.multi && top.data.accounts.rows[0] ? top.data.accounts.rows[0].locationId : null;
   const loc = picked ?? single;
   const ccq = cc.replace(/\D/g, "").slice(0, 4);
-  const acct = useData<AccountQ>(loc ? `cleanup/quality?location=${encodeURIComponent(loc)}${ccq ? `&cc=${ccq}` : ""}` : null);
+  const acct = useData<AccountQ>(loc ? `cleanup/quality?account=${encodeURIComponent(loc)}${ccq ? `&cc=${ccq}` : ""}` : null);
 
   const open = async (f: Finding) => {
     setProblem(null);
     try {
-      const l = await api.get<ListQ>(`cleanup/quality/list?location=${encodeURIComponent(loc!)}&finding=${f.id}${ccq ? `&cc=${ccq}` : ""}`);
-      setList({ spec: specOf(l, now) });
+      const l = await api.get<ListQ>(`cleanup/quality/list?account=${encodeURIComponent(loc!)}&finding=${f.id}${ccq ? `&cc=${ccq}` : ""}`);
+      setList({ spec: specOf(l) });
     } catch (e) { setProblem((e as Error).message); }
   };
-  const csv = (f: Finding) => api.download(`cleanup/quality/csv?location=${encodeURIComponent(loc!)}&finding=${f.id}${ccq ? `&cc=${ccq}` : ""}`, `subsync-${f.id}.csv`).catch((e: Error) => setProblem(e.message));
+  const csv = (f: Finding) => api.download(`cleanup/quality/csv?account=${encodeURIComponent(loc!)}&finding=${f.id}${ccq ? `&cc=${ccq}` : ""}`, `subsync-${f.id}.csv`).catch((e: Error) => setProblem(e.message));
   useEffect(() => { remember("quality-cc", cc); }, [cc]);
 
   if (!picked && top.loading && !top.data) return <SkeletonCards cards={3} label="Scoring your contact lists..." />;
@@ -93,7 +93,7 @@ export function QualityTab({ canFix }: { canFix: boolean }) {
               {p.portfolio.scored === 0 ? "No client has enough contacts to score yet." : `Across ${plural(p.portfolio.scored, "client account", "client accounts")}`}
               {` · ${fmtInt(p.totals.contacts)} contacts · ${plural(p.totals.problems, "problem", "problems")} to fix · ${plural(p.totals.duplicateGroups, "duplicate group", "duplicate groups")}`}
             </p>
-            <div className="mt-2 max-w-sm"><TrendLine trend={p.trend} label="Portfolio data quality" /></div>
+            <div className="mt-2 max-w-md"><TrendLine trend={p.trend} label="Portfolio data quality" /></div>
             {p.pending > 0 && <p className="mt-2 text-xs text-muted-foreground" data-testid="quality-pending">{plural(p.pending, "client account is", "client accounts are")} scored overnight. They appear here tomorrow.</p>}
           </section>
 
@@ -136,7 +136,7 @@ export function QualityTab({ canFix }: { canFix: boolean }) {
                     {Object.entries(acct.data.partLabels).map(([k, label]) => <li key={k}><ScoreMeter score={acct.data!.score!.parts[k] ?? 0} label={label} testId={`quality-part-${k}`} /><p className="text-xs text-muted-foreground">{label}</p></li>)}
                   </ul>
                 )}
-                <div className="mt-3 max-w-sm"><TrendLine trend={acct.data.trend} label={`${acct.data.name ?? "Client"} data quality`} /></div>
+                <div className="mt-3 max-w-md"><TrendLine trend={acct.data.trend} label={`${acct.data.name ?? "Client"} data quality`} /></div>
                 <p className="mt-2 text-xs text-muted-foreground">{fmtInt(acct.data.contacts)} contacts read from SubSync&apos;s copy; {plural(acct.data.duplicates.groups, "duplicate group", "duplicate groups")} in the Duplicates tab.</p>
               </section>
 
@@ -157,7 +157,7 @@ export function QualityTab({ canFix }: { canFix: boolean }) {
                             <p className="line-clamp-2 text-xs text-muted-foreground">{f.todo}</p>
                           </div>
                           <div className="flex items-center gap-1">
-                            <button type="button" className={QUIET} onClick={() => void csv(f)} data-testid="finding-csv">{f.fixable ? "Copy the fixes as a CSV" : "Download as CSV"}</button>
+                            <button type="button" className={QUIET} onClick={() => void csv(f)} data-testid="finding-csv">{f.fixable ? "Copy the fixes as a CSV" : "Download as CSV"}<span className="sr-only"> for {f.label.toLowerCase()}</span></button>
                             <RowButton onClick={() => void open(f)} label="Show" sr={`${f.count} ${f.label}`} testId="finding-show" />
                           </div>
                         </div>
@@ -196,7 +196,7 @@ function ImportCheck({ locationId, name }: { locationId: string; name: string | 
   const [res, setRes] = useState<ImportRes | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const counts = res?.counts ?? {};
+  const counts = useMemo(() => res?.counts ?? {}, [res]);
 
   const run = async () => {
     setBusy(true); setErr(null); setRes(null);
@@ -222,7 +222,7 @@ function ImportCheck({ locationId, name }: { locationId: string; name: string | 
       </div>
       {err && <div className="mt-3"><InlineAlert tone="danger" onDismiss={() => setErr(null)}>{err}</InlineAlert></div>}
       {res && (
-        <div className="mt-4" data-testid="import-result">
+        <div className="mt-4" data-testid="import-result" role="status">
           {res.problem && <div className="mb-3"><InlineAlert tone="warning">{res.problem}</InlineAlert></div>}
           {res.total > 0 && (
             <>
