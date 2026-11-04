@@ -102,3 +102,29 @@ export function appointmentList(people: Person[], total: number, what: string): 
     })),
   };
 }
+
+/**
+ * The deals that will turn stale within the next 24 hours if nobody touches them: counted open deals whose last movement is between `staleDays` days and `staleDays`
+ * days plus one day ago. Largest first. Used only for Today's "if nobody acts today" countdown; it never changes the stale-deal figure, which counts deals already stale.
+ */
+export async function staleSoonList(installationId: string, locationIds: string[], staleDays: number, limit = AUDIT_LIST_ROWS) {
+  if (locationIds.length === 0) return [] as Array<{ id: string; name: string; locationId: string; contactId: string | null; value: number; at: number }>;
+  const rows = await sql()`
+    select x.opportunity_id, x.location_id, x.contact_id, x.contact_name, x.name, x.monetary_value, x.act
+    from (
+      select o.opportunity_id, o.location_id, o.contact_id, o.contact_name, o.name, o.monetary_value::float8 monetary_value,
+        coalesce(greatest(o.last_stage_change_at, o.last_action_at, o.updated_remote_at, o.last_status_change_at), o.created_remote_at, o.synced_at) act
+      from cached_opportunities o ${dealScopeJoins()}
+      where o.installation_id = ${installationId} and o.status = 'open' and o.location_id = any(${locationIds}::text[]) and ${countedInScope()}
+    ) x
+    join locations l on l.installation_id = ${installationId} and l.location_id = x.location_id and not l.ignored
+    where x.act < now() - make_interval(days => ${staleDays}::int) and x.act >= now() - make_interval(days => ${staleDays}::int) - interval '1 day'
+    order by x.monetary_value desc, x.act asc
+    limit ${limit}`;
+  return rows.map((r) => ({
+    id: r.opportunity_id as string, name: ((r.contact_name as string | null) || (r.name as string | null) || "Unnamed deal"), locationId: r.location_id as string,
+    contactId: (r.contact_id as string | null) ?? null, value: r.monetary_value as number,
+    // The moment it turns stale: staleDays after its last movement.
+    at: (r.act as Date).getTime() + staleDays * 86_400_000,
+  }));
+}

@@ -148,3 +148,29 @@ export async function replyRows(installationId: string, allowed: string[] | null
   const rows = await loadRows(sql(), installationId, allowed, now - SPEED_WINDOW_DAYS * DAY, now + DAY);
   return rows.map((r) => ({ locationId: r.locationId, leadAt: r.leadAt, touchAt: r.touchAt }));
 }
+
+/**
+ * The lead ledger Today reads: every lead of the last 14 days for the accounts the caller may see (the same rows, window and exclusions as Speed to lead), with the
+ * names a person reads (account, lead, owner, who replied, source) and the account's own time zone. Today's insights, coverage strip, speed by source, workload and
+ * "accounts compared" are all worked out from these rows, and the lists behind them list these rows, so a number and its list cannot disagree. Nothing is written.
+ * `url` is left empty: the router fills it with the white-label link.
+ */
+export async function leadLedger(installationId: string, allowed: string[] | null, now = Date.now()): Promise<Array<LeadLedgerRow>> {
+  const db = sql();
+  const [{ lk }, rows, zones] = await Promise.all([
+    loadLookups(db, installationId, allowed, 0, now),
+    loadRows(db, installationId, allowed, now - SPEED_WINDOW_DAYS * DAY, now + DAY),
+    db`select location_id, timezone from locations where installation_id = ${installationId} and not ignored ${allowed ? db`and location_id = any(${allowed}::text[])` : db``}`,
+  ]);
+  const zone = new Map(zones.map((z) => [z.location_id as string, (z.timezone as string | null) || "UTC"]));
+  const who = (id: string | null, locationId: string) => (id ? resolveUser(id, lk.team, lk.usersAccess.get(locationId)).label : null);
+  return rows.map((r) => ({
+    id: `lead:${r.locationId}:${r.contactId}:${r.leadAt}`, locationId: r.locationId, accountName: lk.locationNames.get(r.locationId) ?? "Client account", contactId: r.contactId, name: r.name,
+    source: r.source && r.source.trim() !== "" ? r.source.trim() : null, ownerName: who(r.assignedTo, r.locationId), touchBy: r.touchAt !== null ? who(r.userId, r.locationId) : null,
+    leadAt: r.leadAt, touchAt: r.touchAt, url: "", zone: zone.get(r.locationId) ?? "UTC",
+  }));
+}
+export type LeadLedgerRow = {
+  id: string; locationId: string; accountName: string; contactId: string; name: string; source: string | null; ownerName: string | null; touchBy: string | null;
+  leadAt: number; touchAt: number | null; url: string; zone: string;
+};

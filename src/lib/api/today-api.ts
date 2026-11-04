@@ -2,11 +2,14 @@ import { sql } from "../db";
 import type { DerivedAccount } from "../analytics/derive";
 import type { Settings } from "../analytics/queries";
 import { listAlerts } from "../analytics/queries";
-import { replyRows, speedView } from "../analytics/speed-queries";
+import { leadLedger, speedView } from "../analytics/speed-queries";
 import { portfolioHeadlines } from "../analytics/digest-intel";
 import { seriesByLocation } from "../analytics/digest-service";
 import { callQueueAll } from "../analytics/call-queries";
-import type { AuditList } from "../analytics/audit-queries";
+import { staleSoonList, type AuditList } from "../analytics/audit-queries";
+import { comingLeads, forecastOf, leadInsights, sinceVisitOf, type Coming, type LeadRow } from "../analytics/today-smart";
+import { resolveEvents } from "../analytics/today-state";
+import { loadActions, touchVisit } from "../analytics/today-store";
 import {
   ageWords, answeredStreak, buildQueue, emptyTotals, proofOf, replyPulse, withinTargetShare,
   type AccountFacts, type AlertFact, type Kind, type Proof, type QueueRow, type Totals, type TodayItem,
@@ -51,22 +54,31 @@ export async function buildToday(i: {
   allowed: string[] | null; settings: Settings; audit: Audit;
   links: { contact: (l: string, c: string) => string; opportunities: (l: string) => string; account: (l: string) => string };
   permits: (locationId: string) => boolean;
+  /** The lanes of Done and Snooze marks this person reads ("team", or their own for a client's staff), and the key their last-visit memory is kept under. */
+  lanes: string[]; userKey: string;
 }) {
   const { installationId, now, links, settings } = i;
   const target = settings.speedTargetMinutes;
   const liveIds = i.audit.live.map((a) => a.locationId);
-  const [speed, replies, alerts, series] = await Promise.all([
+  const [speed, ledgerAll, alerts, series, actionLog, soonDeals, zoneRows, sinceAt] = await Promise.all([
     speedView(installationId, i.allowed, target, now),
-    replyRows(installationId, i.allowed, now),
+    leadLedger(installationId, i.allowed, now),
     i.kind === "client" ? Promise.resolve([]) : listAlerts(installationId, true, 500, i.limitTo ?? undefined),
     seriesByLocation(installationId, liveIds, 10),
+    loadActions(installationId, i.lanes, now),
+    staleSoonList(installationId, liveIds, settings.staleDays).catch(() => []),
+    sql()`select location_id, timezone from locations where installation_id = ${installationId} and not ignored`,
+    touchVisit(installationId, i.userKey, now),
   ]);
+  const replies = ledgerAll.map((r) => ({ locationId: r.locationId, leadAt: r.leadAt, touchAt: r.touchAt }));
+  const zones: Record<string, string> = Object.fromEntries(zoneRows.filter((z) => i.permits(z.location_id as string)).map((z) => [z.location_id as string, (z.timezone as string | null) || "UTC"]));
 
   // ---- the five kinds of thing, each from the function its own page uses ----
   const leadItems: TodayItem[] = speed.waiting.map((w) => ({
     id: `leads:${w.locationId}:${w.contactId}`, kind: "leads", locationId: w.locationId, accountName: w.locationName, name: w.name,
     detail: w.neverAnswered ? "Never answered" : `Waiting ${ageWords(w.waitingMinutes)}`, at: now - w.waitingMinutes * 60_000, value: null,
     contactId: w.contactId, url: links.contact(w.locationId, w.contactId), never: w.neverAnswered,
+    owner: w.unassigned ? null : w.owner?.label ?? null, source: w.source === "No source recorded" ? null : w.source,
   }));
   const lists = i.audit.lists ?? {};
   const items: TodayItem[] = [...leadItems, ...itemsOf("appointments", lists.unmarked), ...itemsOf("noshows", lists.noshows), ...itemsOf("stale", lists.stale), ...itemsOf("unanswered", lists.slow)];
@@ -99,7 +111,28 @@ export async function buildToday(i: {
   }));
   const proof: Proof | null = i.kind === "client" ? null : proofOf(facts, now);
 
+  // ---- the lead ledger and what is worked out from it (docs/METRICS.md, "Today, second pass"). The rows are the Speed to lead rows; nothing is written. ----
+  const ledgerRows: LeadRow[] = ledgerAll.map((r) => ({ ...r, url: links.contact(r.locationId, r.contactId) }));
+  const LEDGER_CAP = 3000;
+  const ledger = [...ledgerRows].sort((a, b) => b.leadAt - a.leadAt).slice(0, LEDGER_CAP);
+  const insights = leadInsights(ledgerRows, now);
+  const sinceVisit = sinceVisitOf({ since: sinceAt, ledger: ledgerRows, alerts: facts, targetMinutes: target, now });
+
+  // ---- if nobody acts today: leads inside their reply window, deals about to turn stale, appointments still to happen today ----
+  const comingDeals: Coming[] = soonDeals.filter((d) => i.permits(d.locationId)).map((d) => ({
+    id: `coming:deal:${d.id}`, kind: "stale" as const, locationId: d.locationId, accountName: names.get(d.locationId) ?? "Client account", name: d.name, at: d.at, value: d.value, contactId: d.contactId,
+    url: d.contactId ? links.contact(d.locationId, d.contactId) : links.opportunities(d.locationId),
+  }));
+  const comingAppts: Coming[] = i.audit.apptView.upcoming.filter((p) => dayBucket(p.at, now, zones[p.locationId] ?? "UTC") === "today" && i.permits(p.locationId)).map((p) => ({
+    id: `coming:appt:${p.id}`, kind: "appointments" as const, locationId: p.locationId, accountName: names.get(p.locationId) ?? "Client account", name: p.name, at: p.at, value: null, contactId: p.contactId,
+    url: p.contactId ? links.contact(p.locationId, p.contactId) : links.opportunities(p.locationId),
+  }));
+  const forecast = forecastOf(comingLeads(ledgerRows, target, now).slice(0, 200), comingDeals, comingAppts);
+  const resolved = resolveEvents(actionLog.events, now, i.lanes);
+
   const base = {
+    ledger, ledgerTotal: ledgerRows.length, insights, sinceVisit, forecast, zones,
+    holds: resolved.holds, assigned: resolved.assigned, actionsReady: actionLog.available,
     now, scope: i.limitTo ? ("account" as const) : ("all" as const), kind: i.kind, accounts, items, totals, queue, staleDays: settings.staleDays, targetMinutes: target,
     access: { leadsBlocked, apptsBlocked }, readLimit: null as string | null,
     outlier: (i.audit.audit as { outlier: { value: number; share: number } | null }).outlier ?? null,

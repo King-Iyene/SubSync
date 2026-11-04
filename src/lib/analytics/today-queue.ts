@@ -191,7 +191,9 @@ export const accountsQuery = (ids: string[]) => (ids.length ? `accounts=${ids.fi
 
 // ---------- the headline ----------
 
-export type HeadlinePart = { t: string; strong?: boolean };
+/** A strong part of the headline is a button: it opens the records behind that number. */
+export type HeadlineAction = "clients" | "dollars" | "things";
+export type HeadlinePart = { t: string; strong?: boolean; action?: HeadlineAction };
 export type Headline = { parts: HeadlinePart[]; text: string; allClear: boolean; /** "14 leads waiting, 6 appointments to mark and 9 stale deals worth $48,200." */ breakdown: string | null; accounts: number; dollars: number };
 
 /** "1 lead waiting", "14 leads waiting": a count with the right singular or plural, as a person would say it. */
@@ -224,9 +226,9 @@ export function headlineOf(i: { scope: "all" | "account"; rows: QueueRow[]; tota
     return { parts: [{ t: text }], text, allClear: true, breakdown: null, accounts: 0, dollars: 0 };
   }
   const parts: HeadlinePart[] = i.scope === "all"
-    ? [{ t: String(accounts), strong: true }, { t: ` ${accounts === 1 ? "client needs" : "clients need"} you today.` }]
-    : [{ t: things.toLocaleString("en-US"), strong: true }, { t: ` ${things === 1 ? "thing needs" : "things need"} you today.` }];
-  if (dollars > 0) parts.push({ t: " " }, { t: money(dollars), strong: true }, { t: " is at risk." });
+    ? [{ t: String(accounts), strong: true, action: "clients" }, { t: ` ${accounts === 1 ? "client needs" : "clients need"} you today.` }]
+    : [{ t: things.toLocaleString("en-US"), strong: true, action: "things" }, { t: ` ${things === 1 ? "thing needs" : "things need"} you today.` }];
+  if (dollars > 0) parts.push({ t: " " }, { t: money(dollars), strong: true, action: "dollars" }, { t: " is at risk." });
   // One deal worth at least half of it is said out loud, so the dollar figure is not read as a pattern (the audit's outlier guard).
   if (dollars > 0 && i.outlier) parts.push({ t: ` One deal is ${money(i.outlier.value)} of that.` });
   return { parts, text: parts.map((p) => p.t).join(""), allClear: false, breakdown, accounts, dollars };
@@ -404,7 +406,7 @@ export function withinTargetShare(rows: WithinRow[], targetMinutes: number, to: 
 
 export type AlertFact = { id: string; locationId: string | null; accountName: string; title: string; severity: Severity; createdAt: number; resolvedAt: number | null };
 export type ProofDay = { day: string; label: string; raised: AlertFact[]; cleared: AlertFact[] };
-export type Proof = { raised: number; cleared: number; open: number; days: ProofDay[] };
+export type Proof = { raised: number; cleared: number; open: number; days: ProofDay[]; /** The alerts still open now (the list behind "Still open"). */ openAlerts: AlertFact[] };
 
 /** Alerts over the last 7 days: raised that day, cleared that day (we only know the condition went away, not whether a person fixed it), and how many are still open now. */
 export function proofOf(alerts: AlertFact[], now: number): Proof {
@@ -418,7 +420,7 @@ export function proofOf(alerts: AlertFact[], now: number): Proof {
     at.get(dayKey(a.createdAt))?.raised.push(a);
     if (a.resolvedAt !== null) at.get(dayKey(a.resolvedAt))?.cleared.push(a);
   }
-  return { raised: days.reduce((s, d) => s + d.raised.length, 0), cleared: days.reduce((s, d) => s + d.cleared.length, 0), open: alerts.filter((a) => a.resolvedAt === null).length, days };
+  return { raised: days.reduce((s, d) => s + d.raised.length, 0), cleared: days.reduce((s, d) => s + d.cleared.length, 0), open: alerts.filter((a) => a.resolvedAt === null).length, days, openAlerts: alerts.filter((a) => a.resolvedAt === null) };
 }
 
 export function proofLine(p: Proof): string {

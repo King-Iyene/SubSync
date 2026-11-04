@@ -73,6 +73,10 @@ import { createHook, listHooks, listMeetings, MAX_HOOKS_PER_ACCOUNT, revokeHook,
 import { buildDailyDigest, NOT_WATCHED, seriesByLocation } from "../analytics/digest-service";
 import { portfolioRangeChanges, validFromDay, validToDay } from "../analytics/today-intel";
 import { buildToday } from "./today-api";
+import { briefFromToday, todayAction, todayBrief, userKeyOf as todayUserKey, type TodayDeps } from "./today-actions";
+import { lanesFor } from "../analytics/today-state";
+import { resolveEntitlements } from "../flags";
+import type { Plan } from "../entitlements";
 import { digestText, localParts } from "../analytics/digest-intel";
 import { industryKey, industryOptions, matchesSegment, PLAYBOOKS } from "../analytics/playbooks";
 import { buildQueue, recordBulk, recordDecision, summarise, undoDecision } from "../analytics/dedupe-queries";
@@ -645,10 +649,22 @@ async function dailyChanges(ctx: Ctx) {
 
 // The rebuilt Today: the ranked things to fix, the five kinds behind them, reply speed against the account's own usual and what SubSync caught (src/lib/api/today-api.ts).
 // The accounts come from the signed session (a business or a client's staff see only their own, whatever `accounts=` says) and the page filter, never from a parameter alone.
-async function todayView(ctx: Ctx) {
+async function todayData(ctx: Ctx) {
   const sc = await scope(ctx);
   const [allowed, audit] = await Promise.all([allowedIds(ctx), computeAudit(ctx, true)]);
-  return json(await buildToday({ installationId: ctx.installationId, kind: ctx.kind, limitTo: ctx.limitTo, now: Date.now(), allowed, settings: sc.settings, audit, links: sc.links, permits: sc.permits }));
+  const userKey = todayUserKey(ctx);
+  return buildToday({ installationId: ctx.installationId, kind: ctx.kind, limitTo: ctx.limitTo, now: Date.now(), allowed, settings: sc.settings, audit, links: sc.links, permits: sc.permits, lanes: lanesFor(ctx.kind, userKey), userKey });
+}
+async function todayView(ctx: Ctx) {
+  return json(await todayData(ctx));
+}
+const todayDeps: TodayDeps = { load: (c) => todayData(c as Ctx), permits: async (c, locationId) => (await scope(c as Ctx)).permits(locationId) };
+
+/** The daily brief for one company, built from the same Today read the screen uses (the scheduled brief calls this; it sends nothing itself). */
+export async function todayBriefForInstallation(installationId: string, plan: Plan, companyId: string): Promise<{ headline: string; lines: string[] }> {
+  const session = { companyId, userId: null, role: null, userName: null, demo: false, kind: "agency" as const, locationId: null, exp: 0 };
+  const ctx: Ctx = { session, installationId, plan, demo: false, entitlements: await resolveEntitlements(plan, installationId), kind: "agency", limitTo: null, request: new Request("http://localhost/internal"), url: new URL("http://localhost/internal"), segments: ["today"] };
+  return briefFromToday(await todayData(ctx));
 }
 
 const USAGE_VIEWS = new Set(["today", "overview", "accounts", "clients", "team", "search", "deals", "pipeline", "leads", "calls", "inbox", "onboarding", "email", "duplicates", "alerts", "settings", "help", "account", "meetings", "audit", "speed", "appointments", "people", "myday", "roadmap", "notifications"]);
@@ -1828,6 +1844,7 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
     if (method === "GET") {
       if (a === "overview") return await overview(ctx);
       if (a === "today" && !b) return await todayView(ctx);
+      if (a === "today" && b === "brief" && !c) return await todayBrief(ctx, todayDeps);
       if (a === "daily" && b === "changes") return await dailyChanges(ctx);
       if (a === "daily") return await dailyView(ctx);
       if (a === "roadmap") return await roadmapView(ctx);
@@ -1902,6 +1919,7 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       if (a === "client-onboarding" && b === "templates" && c === "starter") return await clientRoutes.templateStarter(ctx);
       if (a === "client-onboarding" && b && b !== "templates" && LOCATION_ID.test(b) && c === "steps") return await clientRoutes.stepAdd(ctx, clientDeps, b);
       if (a === "usage" && !b) return await usagePing(ctx);
+      if (a === "today" && b === "action" && !c) return await todayAction(ctx, todayDeps);
       if (a === "inbox" && b === "views") return await inboxViewSave(ctx);
       if (a === "audit" && b === "share") return await auditShare(ctx);
       if (a === "audit" && b === "revoke") return await auditRevoke(ctx);

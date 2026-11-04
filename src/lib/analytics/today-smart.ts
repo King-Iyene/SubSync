@@ -8,11 +8,11 @@
 //   - Nothing here claims a cause. It says what is different and how many leads it is based on.
 //   - Nothing here writes anywhere or sends anything.
 
-import { judge, MIN_FOR_MEDIAN, MIN_PER_PERSON, NEVER_ANSWERED_MINUTES, NO_SOURCE, sourceLabel, type Judged } from "./speed-intel.ts";
+import { judge, MIN_FOR_MEDIAN, MIN_PER_PERSON, NO_SOURCE, sourceLabel, type Judged } from "./speed-intel.ts";
 import { localClock } from "./digest-intel.ts";
 import type { LedgerLead, Rec, RecordsSpec } from "./today-records.ts";
 import { leadsSpec, trimColumns } from "./today-records.ts";
-import { ageWords, KIND_LABEL, money, replyWords, type Kind, type QueueRow, type TodayItem } from "./today-queue.ts";
+import { KIND_LABEL, money, replyWords, type AlertFact, type Kind, type QueueRow, type TodayItem } from "./today-queue.ts";
 
 const DAY = 86_400_000;
 const median = (xs: number[]) => { const s = [...xs].sort((a, b) => a - b); return s[Math.min(s.length - 1, Math.max(0, Math.ceil(0.5 * s.length) - 1))]; };
@@ -345,4 +345,38 @@ export function comingSpec(list: Coming[], i: { key: string; title: string; subt
   return { key: i.key, title: i.title, subtitle: i.subtitle, noun: i.noun, count: list.length, cols: trimColumns([...COMING_COLS], rows), rows, note: null, dateKey: "at", preset: {}, exportName: i.key };
 }
 
-export const NEVER_WORD = ageWords(NEVER_ANSWERED_MINUTES);
+
+// ---------- since your last visit ----------
+
+/** A visit is a stretch of use with no gap longer than this. Reloading the page inside a visit does not start a new one. */
+export const VISIT_GAP_MS = 30 * 60_000;
+export type VisitRecord = { seen: number; since: number | null };
+/**
+ * What Today remembers about one person: when they last had the page open (`seen`) and when the visit before this one ended (`since`, what "since your last visit"
+ * counts from). A gap of more than VISIT_GAP_MS between two reads starts a new visit and moves `since` to the end of the previous one. The first ever read has no `since`.
+ */
+export function nextVisit(prev: VisitRecord | null, now: number): VisitRecord {
+  if (!prev) return { seen: now, since: null };
+  if (now - prev.seen > VISIT_GAP_MS) return { seen: now, since: prev.seen };
+  return { seen: now, since: prev.since };
+}
+
+export type SinceVisit = {
+  since: number;
+  newLeads: LedgerLead[]; breached: LedgerLead[]; answered: LedgerLead[]; clearedAlerts: AlertFact[];
+};
+/**
+ * What changed since the person last had Today open, from the lead ledger and the alerts: leads that arrived, leads that passed their reply target without an inside-target
+ * reply, leads that got a first reply, and alerts that cleared. Only the last 14 days exist in the ledger, so an older `since` is cut to that and the strip says so.
+ */
+export function sinceVisitOf(i: { since: number | null; ledger: LeadRow[]; alerts: AlertFact[]; targetMinutes: number; now: number }): SinceVisit | null {
+  if (i.since === null) return null;
+  const since = Math.max(i.since, i.now - 14 * DAY);
+  const strip = (l: LeadRow): LedgerLead => stripZone(l);
+  const target = i.targetMinutes * 60_000;
+  const newLeads = i.ledger.filter((l) => l.leadAt > since && l.leadAt <= i.now).map(strip);
+  const breached = i.ledger.filter((l) => l.leadAt + target > since && l.leadAt + target <= i.now && (l.touchAt === null || l.touchAt - l.leadAt > target)).map(strip);
+  const answered = i.ledger.filter((l) => l.touchAt !== null && l.touchAt > since && l.touchAt <= i.now).map(strip);
+  const clearedAlerts = i.alerts.filter((a) => a.resolvedAt !== null && a.resolvedAt > since);
+  return { since, newLeads, breached, answered, clearedAlerts };
+}
