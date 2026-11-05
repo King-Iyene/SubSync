@@ -4,13 +4,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MIN_LEADS, type Flow, type FlowLead } from "@/lib/analytics/lead-flow";
 import { ReportFilterBar, useReportApi, useReportFilter } from "./report-filter";
 import { specClientsAll, specClientsWeek, specFlowLink, specFlowNode } from "@/lib/analytics/flow-records";
-import { weeksOf, type ClientEvent, type WeekBar } from "@/lib/analytics/clients-flow";
+import { weeksOf, type ClientEvent } from "@/lib/analytics/clients-flow";
 import { tabMeta } from "@/lib/analytics/today-tabs";
 import { useApiClient, ApiError } from "../session";
 import { EmptyState, Skeleton } from "../ds";
 import { LeadFlowChart } from "../ds/lead-flow-chart";
 import { TagPill, WhatIs } from "../ds/what-is";
 import { fmtInt } from "../ui";
+import { fmtFull, fmtStat } from "@/lib/analytics/chart-format";
+import { ModeToggle, TimeChart, useChartMode } from "../ds/time-chart";
 import type { TodayModel } from "./today-model";
 
 // Two report tabs of Today. Lead flow: where the leads added in a chosen stretch of time went (every step and band opens its people). Clients coming and going: clients added and
@@ -89,44 +91,14 @@ export function LeadFlowTab({ m, clients, kind }: { m: TodayModel; clients?: Arr
 type ClientsResponse = { now: number; current: number; firstSeen: number | null; events: ClientEvent[]; departuresReady: boolean };
 const fmtDay = (ms: number) => new Date(ms).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 
-function WeekChart({ bars, onBar }: { bars: WeekBar[]; onBar: (b: WeekBar, kind: "added" | "removed") => void }) {
-  const [hot, setHot] = useState<string | null>(null);
-  const W = 640, H = 190, L = 28, B = 24, T = 12;
-  const max = Math.max(3, ...bars.map((b) => Math.max(b.added, b.removed)));
-  const step = (W - L) / bars.length, bw = Math.min(14, step * 0.32);
-  const y = (v: number) => T + (H - T - B) * (1 - v / max);
-  const label = (b: WeekBar) => `Week of ${b.label}: ${b.added} ${b.added === 1 ? "client" : "clients"} added, ${b.removed} removed`;
-  const tip = bars.find((b) => b.start === hot);
-  return (
-    <figure data-testid="clients-chart" className="min-w-0">
-      <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full overflow-visible" role="group" aria-label="Clients added and removed each week">
-        <line x1={L} x2={W} y1={y(0)} y2={y(0)} stroke="var(--t-rule)" />
-        <text x={L - 6} y={y(max)} textAnchor="end" dominantBaseline="middle" className="t-num" style={{ fontSize: 10.5, fill: "var(--t-ink3)" }}>{max}</text>
-        {bars.map((b, i) => {
-          const cx = L + step * i + step / 2;
-          return (
-            <g key={b.start}>
-              {([["added", cx - bw - 1, "var(--t-c1)", b.added], ["removed", cx + 1, "var(--t-ink3)", b.removed]] as const).map(([kind, x, fill, v]) => (
-                <rect key={kind} x={x} y={y(v) - (v === 0 ? 0 : 0)} width={bw} height={Math.max(v === 0 ? 0 : 2, y(0) - y(v))} rx={1.5} fill={fill} pointerEvents="none" fillOpacity={hot === b.start ? 1 : 0.8} />
-              ))}
-              {(["added", "removed"] as const).map((kind, k) => (
-                <rect key={`hit-${kind}`} x={cx - bw - 1 + k * (bw + 2)} y={T} width={bw} height={H - T - B} fill="transparent" role="button" tabIndex={0} aria-label={`${label(b)}. See the ${kind} clients.`} data-testid={`week-${kind}`} data-week={b.start} data-count={b[kind]}
-                  className="cursor-pointer outline-none focus-visible:stroke-[var(--t-ink)] focus-visible:stroke-2" onClick={() => onBar(b, kind)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onBar(b, kind); } }}
-                  onMouseEnter={() => setHot(b.start)} onMouseLeave={() => setHot(null)} onFocus={() => setHot(b.start)} onBlur={() => setHot(null)}><title>{label(b)}</title></rect>
-              ))}
-              {(i % 2 === 0 || i === bars.length - 1) && <text x={cx} y={H - 6} textAnchor="middle" style={{ fontSize: 10.5, fill: "var(--t-ink3)" }}>{b.label}</text>}
-            </g>
-          );
-        })}
-      </svg>
-      <p className="t-small t-quiet mt-1 min-h-5" role="status" aria-live="polite">{tip ? label(tip) : "Left bar: clients added that week. Right bar: clients removed. Select a bar to see which clients."}</p>
-      <div className="sr-only"><table><caption>Clients added and removed each week</caption><thead><tr><th>Week of</th><th>Added</th><th>Removed</th></tr></thead><tbody>{bars.map((b) => <tr key={b.start}><td>{b.label}</td><td>{b.added}</td><td>{b.removed}</td></tr>)}</tbody></table></div>
-    </figure>
-  );
-}
+const RECENT_SHOWN = 25;
 
 export function ClientsFlowTab({ m }: { m: TodayModel }) {
   const api = useApiClient();
+  const f = useReportFilter("c", "90d");
+  const [mode, setMode] = useChartMode("clients");
+  const [typed, setTyped] = useState("");
+  const [all, setAll] = useState(false);
   const [state, setState] = useState<{ data: ClientsResponse | null; error: string | null }>({ data: null, error: null });
   const load = useCallback(async () => {
     setState((s) => ({ ...s, error: null }));
@@ -136,31 +108,54 @@ export function ClientsFlowTab({ m }: { m: TodayModel }) {
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { void load(); }, [load]);
   const d = state.data;
-  const bars = useMemo(() => (d ? weeksOf(d.events, d.now, 12) : []), [d]);
-  if (state.error) return <div data-testid="clients-flow-tab"><TabIntro name="Clients coming and going" /><EmptyState title="Clients coming and going could not be read" body={state.error} action={<button type="button" onClick={() => void load()} className="ds-press h-9 cursor-pointer rounded-[4px] border border-[var(--t-rule2)] px-3 text-sm">Try again</button>} /></div>;
-  if (!d) return <div><TabIntro name="Clients coming and going" /><div className="space-y-4" role="status" aria-busy="true" aria-label="Counting clients"><Skeleton className="h-8 w-64" /><Skeleton className="h-48 w-full" /></div></div>;
-  const recent = d.events.slice(0, 12);
-  const added = d.events.filter((e) => e.kind === "added").length, removed = d.events.filter((e) => e.kind === "removed").length;
+  const range = f.range;
+  const bar = <ReportFilterBar f={f} label="Clients coming and going" datesNote="Dates choose which arrivals and departures are counted. There is no client filter here because this tab is about the clients themselves." />;
+  // Only what happened in the chosen dates: the chart, the two counts and the list all read the same events, so a mark and the list it opens agree.
+  const events = useMemo(() => {
+    if (!d || !range) return [] as ClientEvent[];
+    const from = Date.parse(`${range.from}T00:00:00Z`), to = Date.parse(`${range.to}T00:00:00Z`) + 86_400_000;
+    return d.events.filter((e) => e.at >= from && e.at < to);
+  }, [d, range]);
+  const bars = useMemo(() => {
+    if (!d || !range) return [];
+    const end = Math.min(d.now, Date.parse(`${range.to}T12:00:00Z`));
+    const weeks = Math.min(54, Math.max(2, Math.ceil(((Date.parse(`${range.to}T00:00:00Z`) - Date.parse(`${range.from}T00:00:00Z`)) / 86_400_000 + 1) / 7) + 1));
+    return weeksOf(events, end, weeks);
+  }, [d, range, events]);
+  if (state.error) return <div data-testid="clients-flow-tab"><TabIntro name="Clients coming and going" />{bar}<EmptyState title="Clients coming and going could not be read" body={state.error} action={<button type="button" onClick={() => void load()} className="ds-press h-9 cursor-pointer rounded-[4px] border border-[var(--t-rule2)] px-3 text-sm">Try again</button>} /></div>;
+  if (!d) return <div><TabIntro name="Clients coming and going" />{bar}<div className="space-y-4" role="status" aria-busy="true" aria-label="Counting clients"><Skeleton className="h-8 w-64" /><Skeleton className="h-48 w-full" /></div></div>;
+  const added = events.filter((e) => e.kind === "added").length, removed = events.filter((e) => e.kind === "removed").length;
+  const needle = typed.trim().toLowerCase();
+  const matching = events.filter((e) => !needle || e.name.toLowerCase().includes(needle));
+  const recent = all ? matching : matching.slice(0, RECENT_SHOWN);
   return (
     <div data-testid="clients-flow-tab" className="max-w-5xl">
       <TabIntro name="Clients coming and going" />
-      <p className="mb-1 text-[0.9375rem]" data-testid="clients-current"><span className="t-num font-medium">{fmtInt(d.current)}</span> {d.current === 1 ? "client" : "clients"} now.
-        {" "}<button type="button" className="ds-press cursor-pointer text-primary underline underline-offset-4" onClick={() => m.open(specClientsAll(d.events, "added"))} data-testid="clients-added-all">{fmtInt(added)} added</button>,
-        {" "}<button type="button" className="ds-press cursor-pointer text-primary underline underline-offset-4" onClick={() => m.open(specClientsAll(d.events, "removed"))} data-testid="clients-removed-all">{fmtInt(removed)} removed</button> so far.</p>
-      <p className="t-small t-quiet mb-5" data-testid="clients-since">{d.firstSeen ? `Counts from ${fmtDay(d.firstSeen)}, the first client SubSync saw.` : "Counts from the first client SubSync saw."}{d.departuresReady ? " Clients that left are recorded from the day this started, so earlier ones are not here." : " Needs the latest database update to record clients that leave. History starts the day it is applied."}</p>
-      <WeekChart bars={bars} onBar={(b, kind) => m.open(specClientsWeek(d.events, b, kind))} />
-      <h4 className="t-title mt-8 mb-2">Recent arrivals and departures</h4>
-      {recent.length === 0 ? <p className="t-small t-quiet" data-testid="clients-none">No clients yet.</p> : (
+      {bar}
+      <p className="mb-1 text-[0.9375rem]" data-testid="clients-current"><span className="t-num font-medium" title={fmtFull(d.current)}>{fmtStat(d.current)}</span> {d.current === 1 ? "client" : "clients"} now.
+        {" "}<button type="button" className="ds-press cursor-pointer text-primary underline underline-offset-4" onClick={() => m.open(specClientsAll(events, "added"))} data-testid="clients-added-all">{fmtStat(added)} added</button>,
+        {" "}<button type="button" className="ds-press cursor-pointer text-primary underline underline-offset-4" onClick={() => m.open(specClientsAll(events, "removed"))} data-testid="clients-removed-all">{fmtStat(removed)} removed</button> {range?.label.toLowerCase() ?? "in these dates"}.
+        {" "}<WhatIs text={`${d.firstSeen ? `Counts from ${fmtDay(d.firstSeen)}, the first client SubSync saw. ` : ""}${d.departuresReady ? "Clients that left are recorded from the day this started, so earlier ones are not here." : "Needs the latest database update to record clients that leave. History starts the day it is applied."}`} /></p>
+      <div className="mb-2 mt-4 flex items-center justify-between gap-3"><h4 className="t-title">Clients added and removed each week</h4><ModeToggle mode={mode} onChange={setMode} label="Clients added and removed" /></div>
+      <TimeChart testId="clients-chart" mode={mode} label="Clients added and removed each week" noun="Week of" hint="Select a week to see which clients."
+        points={bars.map((b) => ({ id: b.start, label: `Week of ${b.label}`, short: b.label }))} series={[{ key: "added", name: "Added", colour: "var(--t-c1)", values: bars.map((b) => b.added) }, { key: "removed", name: "Removed", colour: "var(--t-ink3)", values: bars.map((b) => b.removed) }]}
+        onPick={(i) => m.open(specClientsWeek(events, bars[i]))} />
+      <div className="mt-8 mb-2 flex flex-wrap items-center justify-between gap-2">
+        <h4 className="t-title">Recent arrivals and departures</h4>
+        <input type="search" value={typed} onChange={(e) => setTyped(e.target.value)} placeholder="Search by client name" aria-label="Search the recent list" data-testid="clients-search" className={`${field} w-56 max-w-full cursor-text`} />
+      </div>
+      {recent.length === 0 ? <p className="t-small t-quiet" data-testid="clients-none">{needle ? "No client matches that name." : "No clients added or removed in these dates."}</p> : (
         <ul className="max-w-xl" data-testid="clients-recent">
           {recent.map((e, n) => (
             <li key={`${e.locationId}-${e.kind}-${n}`} className="flex min-h-9 items-center gap-3 border-b border-[var(--t-rule)] text-sm last:border-0">
-              <span className="min-w-0 flex-1 truncate">{e.name}</span>
+              <span className="min-w-0 flex-1 truncate" title={e.name}>{e.name}</span>
               <span className={`w-16 shrink-0 text-xs ${e.kind === "added" ? "text-[var(--t-ok)]" : "text-[var(--t-ink2)]"}`}>{e.kind === "added" ? "Added" : "Removed"}</span>
               <span className="t-num t-quiet w-28 shrink-0 text-right">{fmtDay(e.at)}</span>
             </li>
           ))}
         </ul>
       )}
+      {!all && matching.length > RECENT_SHOWN && <button type="button" onClick={() => setAll(true)} className="ds-press mt-2 cursor-pointer text-sm text-primary underline underline-offset-4" data-testid="clients-more">Show all {fmtInt(matching.length)}</button>}
     </div>
   );
 }

@@ -112,7 +112,7 @@ test("Clients coming and going: current count, a clickable weekly chart, and one
   await openTab(page, "Clients coming and going");
   await expect(page.getByTestId("clients-current")).toContainText("clients now");
   await expect(page.getByTestId("clients-since")).toContainText("Counts from");
-  const bar = page.getByTestId("week-added").filter({ hasNot: page.locator("[data-count='0']") }).first();
+  const bar = page.getByTestId("clients-chart-mark").filter({ hasNot: page.locator("[data-count='0']") }).first();
   await expect(bar).toHaveCSS("cursor", "pointer");
   const n = await bar.getAttribute("data-count");
   await bar.click();
