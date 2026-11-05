@@ -197,8 +197,10 @@ test("every number opens the records behind it and the count equals the rows: he
     return count;
   };
   // Headline: clients, dollars.
-  const clients = await final(page.getByTestId("headline-clients"));
-  await page.getByTestId("headline-clients").click();
+  // The headline names clients when every client has replies waiting or nothing is waiting; otherwise its first number is the people waiting.
+  const lead = (await page.getByTestId("headline-clients").count()) ? page.getByTestId("headline-clients") : page.getByTestId("headline-replies");
+  const clients = await final(lead);
+  await lead.click();
   expect(await equal()).toBe(clients);
   await closePanel(page);
   if (await page.getByTestId("headline-dollars").count()) {
@@ -426,8 +428,8 @@ test("More detail and the rest of the buttons built for Today all do something",
     await expect(page.getByTestId(id)).toBeVisible();
   }
   // Coverage hour bar opens its leads; Sources row opens its leads; People rows open theirs.
-  const hour = page.getByTestId("hour-bar").and(page.locator("[data-leads]:not([disabled])")).first();
-  if (await hour.count()) { const n = Number(await hour.getAttribute("data-leads")); await hour.click(); await expect(page.getByTestId("records-count")).toHaveAttribute("data-count", String(n)); await closePanel(page); }
+  const hour = page.getByTestId("hour-mark").and(page.locator("[data-count]:not([data-count=\"0\"])")).first();
+  if (await hour.count()) { const n = Number(await hour.getAttribute("data-count")) + Number((await hour.getAttribute("data-count2")) || 0); await hour.click(); await expect(page.getByTestId("records-count")).toHaveAttribute("data-count", String(n)); await closePanel(page); }
   await page.getByRole("tab", { name: "Sources" }).click();
   const srcRow = page.getByTestId("source-row").first();
   if (await srcRow.count()) { const n = Number(await srcRow.getAttribute("data-leads")); await srcRow.click(); await expect(page.getByTestId("records-count")).toHaveAttribute("data-count", String(n)); await closePanel(page); }
@@ -459,7 +461,7 @@ test("More detail and the rest of the buttons built for Today all do something",
   if (await since.count()) for (const b of await since.locator("button").all()) { await b.click(); await expect(panel(page)).toBeVisible(); await closePanel(page); }
   // If nobody acts: the counts.
   await openMore(page, "Forecast");
-  for (const k of ["leads", "deals", "appointments"]) { const c = page.getByTestId(`coming-${k}`); if ((await c.count()) && (await c.getAttribute("data-count")) !== "0") { await c.click(); await expect(panel(page)).toBeVisible(); await closePanel(page); } }
+  for (const k of ["leads", "deals", "appointments"]) { const c = page.getByTestId(`coming-open-${k}`); if (await c.count()) { await c.click(); await expect(panel(page)).toBeVisible(); await closePanel(page); } }
   // Share copies the summary; Sync now runs; the preview of the email opens and closes.
   await page.context().grantPermissions(["clipboard-read", "clipboard-write"]).catch(() => undefined);
   await moreMenu(page, "share");
@@ -497,7 +499,7 @@ test("a business administrator and a client's staff get the same panel, limited 
       await page.keyboard.press("Escape");
     }
     await openMore(page);
-    if (as === "client") await expect(page.getByRole("tab")).toHaveCount(2); else await expect(page.getByRole("tab", { name: "People" })).toBeVisible();
+    if (as === "client") { await expect(page.getByRole("tab", { name: "People" })).toHaveCount(0); await expect(page.getByRole("tab", { name: "Clients coming and going" })).toHaveCount(0); expect(await page.getByRole("tab").count()).toBeGreaterThanOrEqual(2); } else await expect(page.getByRole("tab", { name: "People" })).toBeVisible();
     await page.getByTestId("today-more").click();
     await expect(page.getByTestId("menu-brief")).toHaveCount(0);
     await page.keyboard.press("Escape");

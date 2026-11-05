@@ -40,8 +40,10 @@ test("agency owner: each of the six tabs switches, shows its content, and its fi
     await expect(none).toContainText("reply window");
     await expect(none).toContainText(/Already late|Nothing is late either/);
   } else {
-    await expect(page.getByTestId("coming-block")).toBeVisible();
-    await drill(page, "coming-next");
+    await expect(page.getByTestId("coming-headline")).toBeVisible();
+    await panel(page).locator("[data-testid^=coming-open-]").first().click();
+    await expect(page.getByTestId("records-panel")).toBeVisible();
+    await page.keyboard.press("Escape");
   }
   await page.getByRole("tab", { name: "Proof" }).click();
   await expect(page.getByTestId("today-proof")).toBeVisible();
@@ -53,13 +55,22 @@ test("agency owner: each of the six tabs switches, shows its content, and its fi
   expect(await page.getByTestId("source-row").count(), "sources are listed").toBeGreaterThan(0);
   await drill(page, "source-row");
   await page.getByRole("tab", { name: "Coverage" }).click();
-  await expect(page.getByTestId("hour-bar")).toHaveCount(24);
-  await drill(page, "hour-bar");
+  await expect(page.getByTestId("hour-mark")).toHaveCount(24);
+  await page.getByTestId("hour-mark").and(page.locator("[data-count]:not([data-count=\"0\"])")).first().click(); // an hour with leads
+  await expect(page.getByTestId("records-panel")).toBeVisible();
+  await page.keyboard.press("Escape");
   await page.getByRole("tab", { name: "Growth" }).click();
-  await expect(page.getByTestId("growth-counters").locator("li")).toHaveCount(4);
+  await expect(page.getByTestId("growth-counters").locator("li")).toHaveCount(5);
   await drill(page, "growth-week");
-  await drill(page, "growth-day");
-  await drill(page, "source-slice");
+  await drill(page, "growth-chart-mark");
+  { // a whole ring has its hole in the middle of the slice's box, so press the ring itself
+    const sl = panel(page).getByTestId("source-slice").first();
+    await sl.scrollIntoViewIfNeeded();
+    const bb = (await sl.boundingBox())!;
+    await page.mouse.click(bb.x + bb.width / 2, bb.y + bb.height * 0.1);
+    await expect(page.getByTestId("records-panel")).toBeVisible();
+    await page.keyboard.press("Escape");
+  }
   // Keyboard: the arrow keys move between tabs.
   await page.getByRole("tab", { name: "Growth" }).focus();
   await page.keyboard.press("ArrowRight");

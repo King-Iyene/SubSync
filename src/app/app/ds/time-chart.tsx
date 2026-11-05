@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { fmtAxis, fmtFull, monotonePath, niceTicks, thinLabels } from "@/lib/analytics/chart-format";
 
 // ONE chart for everything over time on Today (Growth daily leads, Clients coming and going, What SubSync caught, Coverage by hour), drawn as bars or as a line and switched
@@ -31,7 +31,20 @@ export function ModeToggle({ mode, onChange, label }: { mode: ChartMode; onChang
   );
 }
 
-const W = 640, H = 200, T = 22, B = 26, R = 50;
+/** The floating card every Today chart shares: a bold title (the full date or the name), one line per figure, an optional comparison line. Sits inside a `relative` figure. */
+export function ChartCard({ title, lines, compare, hint, left, top = 4, testId }: { title: string; lines: ReactNode[]; compare?: ReactNode; hint?: ReactNode; /** Percent from the figure's left edge, 0 to 100. */ left: number; top?: number | string; testId?: string }) {
+  return (
+    <div className="pointer-events-none absolute z-20 w-max max-w-[15rem] rounded-xl border border-[var(--t-rule2)] bg-[var(--t-raise)]/90 px-3 py-2 text-xs shadow-lg backdrop-blur-md" data-testid={testId} role="tooltip"
+      style={{ left: `${Math.min(76, Math.max(2, left))}%`, top }}>
+      <p className="text-sm font-bold text-[var(--t-ink)]">{title}</p>
+      {lines.map((l, i) => <p key={i} className="mt-1 flex items-center gap-1.5 text-[var(--t-ink)]">{l}</p>)}
+      {compare && <p className="mt-1 text-[var(--t-ink2)]">{compare}</p>}
+      {hint && <p className="mt-1 text-[var(--t-ink2)]">{hint}</p>}
+    </div>
+  );
+}
+
+const W = 640, H = 200, T = 22, B = 30, R = 50;
 
 export function TimeChart({ points, series, avg, mode, onPick, selectedId, label, noun = "", testId = "time-chart", hint, labelEvery, flags, flagWord = "Needs a look" }: {
   points: ChartPoint[]; series: ChartSeries[]; /** A dashed average line, drawn on both modes. */ avg?: Array<number | null>; mode: ChartMode; onPick?: (i: number) => void; selectedId?: string | null; label: string; noun?: string; testId?: string; hint?: string; /** Draw a label every N points instead of fitting them (hours: every 3). */ labelEvery?: number; /** A warning mark above a point (a gap hour), with the word for the legend. */ flags?: boolean[]; flagWord?: string;
@@ -44,7 +57,7 @@ export function TimeChart({ points, series, avg, mode, onPick, selectedId, label
   const iw = W - L - R, ih = H - T - B;
   const step = iw / Math.max(1, n), x = (i: number) => L + step * i + step / 2, y = (v: number) => T + ih - (v / top) * ih;
   const k = series.length, bar = Math.max(1.5, Math.min(12, (step * 0.72) / k)), gap = k > 1 ? 1.5 : 0;
-  const labels = labelEvery ? points.map((_, i) => i).filter((i) => i % labelEvery === 0) : thinLabels(n, Math.max(2, Math.floor(iw / 58)));
+  const labels = labelEvery ? points.map((_, i) => i).filter((i) => i % labelEvery === 0) : thinLabels(n, Math.max(2, Math.floor(iw / 76)));
   const avgPts = (avg ?? []).map((v, i) => (v === null ? null : ([x(i), y(v)] as const))).filter((p): p is readonly [number, number] => p !== null);
   const lastAvg = [...(avg ?? [])].reverse().find((v) => v !== null && v !== undefined) ?? null;
   const tipP = hot === null ? null : points[hot];
@@ -73,7 +86,7 @@ export function TimeChart({ points, series, avg, mode, onPick, selectedId, label
             <g key={s.key} pointerEvents="none">
               {n > 1 && <><defs><linearGradient id={`${testId}-g-${s.key}`} x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor={s.colour} stopOpacity={j === 0 ? 0.32 : 0.14} /><stop offset="100%" stopColor={s.colour} stopOpacity={0} /></linearGradient></defs>
                 <path d={`${d}L${pts[n - 1][0]},${y(0)}L${pts[0][0]},${y(0)}Z`} fill={`url(#${testId}-g-${s.key})`} /></>}
-              <path d={d} pathLength={1} className="tc-draw" fill="none" stroke={s.colour} strokeWidth={2.25} strokeLinejoin="round" strokeLinecap="round" />
+              <path d={d} pathLength={1} className="tc-draw" fill="none" stroke={s.colour} strokeWidth={hot !== null ? 2.5 : 2.25} strokeOpacity={hot !== null ? 0.7 : 1} strokeLinejoin="round" strokeLinecap="round" />
               {n > 1 && <circle cx={pts[n - 1][0]} cy={pts[n - 1][1]} r={3.5} fill={s.colour} stroke="var(--t-raise)" strokeWidth={1.5} />}
               {n <= 45 && pts.map(([px, py], i) => (s.values[i] ?? 0) > 0 && hot !== i ? <circle key={i} cx={px} cy={py} r={1.8} fill={s.colour} /> : null)}
             </g>
@@ -81,7 +94,7 @@ export function TimeChart({ points, series, avg, mode, onPick, selectedId, label
         })}
         {flags?.map((on, i) => on ? <path key={`flag-${i}`} d={`M${x(i)},${T - 12} l5,9 h-10 z`} fill="var(--t-soon)" pointerEvents="none" data-testid={`${testId}-flag`}><title>{flagWord}</title></path> : null)}
         {hot !== null && <line x1={x(hot)} x2={x(hot)} y1={T} y2={y(0)} stroke="var(--t-ink3)" strokeWidth={1} strokeDasharray="3 3" pointerEvents="none" />}
-        {hot !== null && mode === "line" && series.map((s) => <circle key={s.key} cx={x(hot)} cy={y(s.values[hot] ?? 0)} r={4} fill={s.colour} stroke="var(--t-raise)" strokeWidth={1.5} pointerEvents="none" />)}
+        {hot !== null && mode === "line" && series.map((s) => <circle key={s.key} cx={x(hot)} cy={y(s.values[hot] ?? 0)} r={5} fill={s.colour} stroke="var(--t-raise)" strokeWidth={1.5} pointerEvents="none" style={{ filter: `drop-shadow(0 0 5px ${s.colour})` }} />)}
         {avgPts.length > 1 && <polyline points={avgPts.map((p) => p.join(",")).join(" ")} fill="none" stroke="var(--t-accent)" strokeWidth={2} strokeDasharray="5 4" strokeLinejoin="round" strokeLinecap="round" pointerEvents="none" data-testid="chart-avg" />}
         {avgPts.length > 1 && lastAvg !== null && <text x={W - R + 6} y={avgPts[avgPts.length - 1][1]} dominantBaseline="middle" className="t-num" style={{ fontSize: 11, fill: "var(--t-ink)" }} pointerEvents="none">avg {fmtAxis(Math.round(lastAvg * 10) / 10)}</text>}
         {points.map((p, i) => (
@@ -91,7 +104,7 @@ export function TimeChart({ points, series, avg, mode, onPick, selectedId, label
             onClick={() => open(i)} onKeyDown={(e) => { if (onPick && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); open(i); } else if (e.key === "ArrowRight" || e.key === "ArrowLeft") { e.preventDefault(); const nx = (e.key === "ArrowRight" ? e.currentTarget.nextElementSibling : e.currentTarget.previousElementSibling) as SVGElement | null; if (nx && nx.hasAttribute("data-id")) nx.focus(); } }}
             onMouseEnter={() => setHot(i)} onMouseLeave={() => setHot(null)} onFocus={() => setHot(i)} onBlur={() => setHot(null)} />
         ))}
-        {labels.map((i) => <text key={i} x={x(i)} y={H - 7} textAnchor={i === 0 ? "start" : i === n - 1 ? "end" : "middle"} style={{ fontSize: 11.5, fill: "var(--t-ink2)" }}>{points[i].short}</text>)}
+        {labels.map((i) => <text key={i} x={x(i)} y={H - 9} textAnchor={i === 0 ? "start" : i === n - 1 ? "end" : "middle"} style={{ fontSize: 12.5, fill: "var(--t-ink)", fillOpacity: 0.85 }}>{points[i].short}</text>)}
       </svg>
       {tipP && hot !== null && (
         <div className="pointer-events-none absolute top-1 z-20 w-max max-w-[15rem] rounded-xl border border-[var(--t-rule2)] bg-[var(--t-raise)]/85 px-3 py-2 text-xs shadow-lg backdrop-blur-md" data-testid={`${testId}-card`}

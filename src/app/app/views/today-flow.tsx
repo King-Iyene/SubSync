@@ -1,5 +1,6 @@
 "use client";
 
+import { fullDate } from "@/lib/analytics/chart-format";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MIN_LEADS, type Flow, type FlowLead } from "@/lib/analytics/lead-flow";
 import { ReportFilterBar, useReportApi, useReportFilter } from "./report-filter";
@@ -138,7 +139,7 @@ export function ClientsFlowTab({ m }: { m: TodayModel }) {
         {" "}<WhatIs text={`${d.firstSeen ? `Counts from ${fmtDay(d.firstSeen)}, the first client SubSync saw. ` : ""}${d.departuresReady ? "Clients that left are recorded from the day this started, so earlier ones are not here." : "Needs the latest database update to record clients that leave. History starts the day it is applied."}`} /></p>
       <div className="mb-2 mt-4 flex items-center justify-between gap-3"><h4 className="t-title">Clients added and removed each week</h4><ModeToggle mode={mode} onChange={setMode} label="Clients added and removed" /></div>
       <TimeChart testId="clients-chart" mode={mode} label="Clients added and removed each week" noun="Week of" hint="Select a week to see which clients."
-        points={bars.map((b) => ({ id: b.start, label: `Week of ${b.label}`, short: b.label }))} series={[{ key: "added", name: "Added", colour: "var(--t-c1)", values: bars.map((b) => b.added) }, { key: "removed", name: "Removed", colour: "var(--t-ink3)", values: bars.map((b) => b.removed) }]}
+        points={bars.map((b) => ({ id: b.start, label: `Week of ${fullDate(b.start)}`, short: b.label }))} series={[{ key: "added", name: "Added", colour: "var(--t-c1)", values: bars.map((b) => b.added) }, { key: "removed", name: "Removed", colour: "var(--t-ink3)", values: bars.map((b) => b.removed) }]}
         onPick={(i) => m.open(specClientsWeek(events, bars[i]))} />
       <div className="mt-8 mb-2 flex flex-wrap items-center justify-between gap-2">
         <h4 className="t-title">Recent arrivals and departures</h4>

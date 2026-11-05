@@ -46,7 +46,7 @@ test("every number opens its records, and the panel closes with the cross, Esc a
     else await page.getByTestId("records-overlay").click({ position: { x: 4, y: 4 } });
     await expect(panel(page), `${label}: closes with ${how}`).toHaveCount(0);
   }
-  expect(n).toBeGreaterThan(8);
+  expect(n).toBeGreaterThanOrEqual(8); // the raised-alerts day moved to the Proof chart (raised-cleared-mark), which today-tabs opens
 });
 
 test("the records panel: count matches the row total, search, sort, filters, maximise, export and the open buttons", async ({ page }) => {
@@ -110,7 +110,7 @@ test("the work list: Open, the row menu (Show everything, Done for now, Snooze, 
   await page.keyboard.press("Escape");
   // See all opens the full list of clients in the records panel; its count is the headline's.
   if (await page.getByTestId("queue-all").count()) {
-    const clients = Number((await page.getByTestId("today-headline").innerText()).match(/(\d[\d,]*) clients?/)![1].replace(/,/g, ""));
+    const clients = Number((await page.getByTestId("work-summary").innerText()).match(/(\d[\d,]*) clients?/)![1].replace(/,/g, ""));
     await page.getByTestId("queue-all").click();
     await expect(panel(page)).toBeVisible();
     expect(await count(page)).toBe(clients);
@@ -181,7 +181,7 @@ test("More detail: the tabs, the junk switch, set aside; More: Share, Preview, P
     await expect(page.getByTestId(id).first()).toBeVisible();
   }
   await page.getByRole("tab", { name: "Coverage" }).click();
-  const hour = page.getByTestId("hour-bar").first();
+  const hour = page.getByTestId("hour-mark").first();
   if (await hour.count()) { await hour.click(); await expect(panel(page)).toBeVisible(); await page.keyboard.press("Escape"); }
   await page.getByRole("tab", { name: "Forecast" }).click();
   // Junk switch changes the dollar figure or at least toggles.

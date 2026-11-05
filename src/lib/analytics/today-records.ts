@@ -110,11 +110,11 @@ export function accountsSpec(rows: AccountRow[], i: SpecInput): RecordsSpec {
 }
 
 const ALERT_COLS: Col[] = [
-  { key: "account", header: "Client", type: "text", primary: true, facet: true, w: 14 },
-  { key: "title", header: "Alert", type: "text", w: 26 },
-  { key: "what", header: "What happened", type: "kind", facet: true, w: 11 },
-  { key: "when", header: "When", type: "date", w: 11 },
-  { key: "severity", header: "How serious", type: "kind", facet: true, w: 10 },
+  { key: "account", header: "Client", type: "text", primary: true, facet: true, w: 12 },
+  { key: "title", header: "Alert", type: "text", w: 19 },
+  { key: "what", header: "What happened", type: "kind", facet: true, w: 8.5 },
+  { key: "when", header: "When", type: "date", w: 8.5 },
+  { key: "severity", header: "How serious", type: "kind", facet: true, w: 8 },
 ];
 export type AlertRow = { id: string; accountName: string; title: string; what: "Raised" | "Cleared"; at: number; severity: string };
 /** Alerts raised or cleared: the list behind a day of the raised and cleared strip, or behind "Raised 14". */

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { ChartCard } from "./time-chart";
 import { NODE_INFO, NODE_LABEL, type Flow, type NodeId } from "@/lib/analytics/lead-flow";
 
 // Lead flow, drawn as a flow chart (Sankey style) in SVG from Today's own tokens. Four columns: new leads, what happened to the first reply, whether an appointment was
@@ -44,17 +45,20 @@ const pct = (n: number | null) => (n === null ? "" : ` (${n}%)`);
 export function LeadFlowChart({ flow, onNode, onLink, label }: { flow: Flow; onNode: (id: NodeId) => void; onLink: (from: NodeId, to: NodeId) => void; label: string }) {
   const { boxes, ribbons } = useMemo(() => layout(flow), [flow]);
   const [tip, setTip] = useState<string | null>(null);
+  // What is under the pointer: a step ("n:id") or a band ("l:from>to"), for the floating card, the dimming and the glow.
+  const [hot, setHot] = useState<string | null>(null);
   const node = (id: NodeId) => flow.nodes.find((n) => n.id === id)!;
   const press = (fn: () => void) => (e: React.KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fn(); } };
   return (
-    <figure className="min-w-0" data-testid="lead-flow-chart">
+    <figure className="relative min-w-0" data-testid="lead-flow-chart">
+      <div className="relative">
       <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full overflow-visible" role="group" aria-label={label}>
         {ribbons.map((r) => {
           const text = `${NODE_LABEL[r.from]} then ${NODE_LABEL[r.to].toLowerCase()}: ${r.count} ${r.count === 1 ? "lead" : "leads"}. See them.`;
           return (
-            <path key={`${r.from}-${r.to}`} d={r.d} fill="none" stroke={COLOUR[r.to]} strokeOpacity={0.3} strokeWidth={r.h} role="button" tabIndex={0} aria-label={text}
+            <path key={`${r.from}-${r.to}`} d={r.d} fill="none" stroke={COLOUR[r.to]} strokeOpacity={hot === null ? 0.3 : hot === `l:${r.from}>${r.to}` ? 0.62 : hot === `n:${r.from}` || hot === `n:${r.to}` ? 0.42 : 0.12} strokeWidth={r.h} role="button" tabIndex={0} aria-label={text}
               data-testid="flow-link" data-from={r.from} data-to={r.to} data-count={r.count} className="cursor-pointer outline-none transition-[stroke-opacity] hover:[stroke-opacity:0.55] focus-visible:[stroke-opacity:0.6]"
-              onClick={() => onLink(r.from, r.to)} onKeyDown={press(() => onLink(r.from, r.to))} onMouseEnter={() => setTip(text.replace(" See them.", ""))} onMouseLeave={() => setTip(null)} onFocus={() => setTip(text.replace(" See them.", ""))} onBlur={() => setTip(null)}>
+              onClick={() => onLink(r.from, r.to)} onKeyDown={press(() => onLink(r.from, r.to))} onMouseEnter={() => { setHot(`l:${r.from}>${r.to}`); setTip(text.replace(" See them.", "")); }} onMouseLeave={() => { setHot(null); setTip(null); }} onFocus={() => { setHot(`l:${r.from}>${r.to}`); setTip(text.replace(" See them.", "")); }} onBlur={() => { setHot(null); setTip(null); }}>
               <title>{text}</title>
             </path>
           );
@@ -67,7 +71,8 @@ export function LeadFlowChart({ flow, onNode, onLink, label }: { flow: Flow; onN
             <g key={b.id}>
               <rect x={b.x} y={b.y} width={NW} height={b.h} rx={2} fill={COLOUR[b.id]} role="button" tabIndex={0} aria-label={text} data-testid="flow-node" data-node={b.id} data-count={n.count}
                 className="cursor-pointer outline-none hover:brightness-110 focus-visible:stroke-[var(--t-ink)] focus-visible:stroke-2" onClick={() => onNode(b.id)} onKeyDown={press(() => onNode(b.id))}
-                onMouseEnter={() => setTip(text.replace(" See them.", ""))} onMouseLeave={() => setTip(null)} onFocus={() => setTip(text.replace(" See them.", ""))} onBlur={() => setTip(null)}>
+                onMouseEnter={() => { setHot(`n:${b.id}`); setTip(text.replace(" See them.", "")); }} onMouseLeave={() => { setHot(null); setTip(null); }} onFocus={() => { setHot(`n:${b.id}`); setTip(text.replace(" See them.", "")); }} onBlur={() => { setHot(null); setTip(null); }}
+                style={{ filter: hot === `n:${b.id}` ? `drop-shadow(0 0 5px ${COLOUR[b.id]})` : undefined, opacity: hot !== null && hot !== `n:${b.id}` && !hot.includes(b.id) ? 0.55 : 1 }}>
                 <title>{text}</title>
               </rect>
               <text x={right ? b.x + NW + 8 : b.x + NW + 8} y={b.y + Math.min(b.h / 2, 14)} dominantBaseline="middle" pointerEvents="none"
@@ -78,6 +83,19 @@ export function LeadFlowChart({ flow, onNode, onLink, label }: { flow: Flow; onN
           );
         })}
       </svg>
+      {hot && (() => {
+        if (hot.startsWith("n:")) {
+          const id = hot.slice(2) as NodeId, n = node(id), b = boxes.find((x) => x.id === id);
+          return <ChartCard testId="flow-card" title={n.label} left={b ? ((b.x + NW + 14) / W) * 100 : 20} top={`${b ? Math.min(70, Math.max(0, ((b.y + Math.min(b.h, 40)) / H) * 100)) : 0}%`}
+            lines={[<><span className="t-num font-medium">{n.count.toLocaleString("en-US")}</span> {n.count === 1 ? "lead" : "leads"}{n.pct === null ? "" : `, ${n.pct}% ${n.of}`}</>]} compare={NODE_INFO[id]} hint="Click to see them" />;
+        }
+        const r = ribbons.find((x) => `l:${x.from}>${x.to}` === hot);
+        if (!r) return null;
+        const a = node(r.from), share = a.count ? Math.round((r.count / a.count) * 100) : 0;
+        return <ChartCard testId="flow-card" title={`${NODE_LABEL[r.from]} then ${NODE_LABEL[r.to].toLowerCase()}`} left={((boxes.find((x) => x.id === r.from)?.x ?? 0) + 120) / W * 100} top="20%"
+          lines={[<><span className="t-num font-medium">{r.count.toLocaleString("en-US")}</span> {r.count === 1 ? "lead" : "leads"}</>]} compare={`${share}% of the ${a.count.toLocaleString("en-US")} at "${NODE_LABEL[r.from]}"`} hint="Click to see them" />;
+      })()}
+      </div>
       <p className="t-small t-quiet mt-1 min-h-5" role="status" aria-live="polite" data-testid="flow-tip">{tip ?? "Select a step or a band to see the people. Each band is the leads that went from one step to the next."}</p>
       <div className="sr-only">
         <table><caption>{label}</caption><thead><tr><th>Step</th><th>Leads</th><th>Share</th></tr></thead>

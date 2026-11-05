@@ -2,7 +2,7 @@
 
 import { Check, Pencil, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { fmtStat, fmtFull, dayLabel } from "@/lib/analytics/chart-format";
+import { fmtStat, fmtFull, dayLabel, fullDate } from "@/lib/analytics/chart-format";
 import { filterQuery, ReportFilterBar, useReportApi, useReportFilter } from "./report-filter";
 import { ModeToggle, TimeChart, useChartMode } from "../ds/time-chart";
 import type { AccessKind } from "@/lib/access";
@@ -33,7 +33,7 @@ function ChangeLine({ c, against, compact = false, vs = false }: { c: Change; ag
     // A table row shows the plain difference instead of a percentage the earlier figure is too small to support.
     const diff = c.count - c.previous;
     if (compact) return <span className="t-small t-quiet" title={`${fmtInt(c.count)} now, ${fmtInt(c.previous)} ${against}. ${c.note ?? ""}`}>{diff === 0 ? "Same as last week" : diff > 0 ? `\u25B2 ${diff} more` : `\u25BC ${Math.abs(diff)} fewer`}</span>;
-    return <span className="t-small t-quiet" title={c.note ?? undefined}>Too few to compare</span>;
+    return <span className="t-small t-quiet" title={c.note ?? undefined}>Not enough leads to compare</span>;
   }
   const tone = c.direction === "up" ? "text-[var(--t-ok)]" : c.direction === "down" ? "text-[var(--t-bad)]" : "text-[var(--t-ink2)]";
   return <span className={`t-small ${tone}`} title={`${fmtInt(c.count)} now, ${fmtInt(c.previous)} ${against}`}>{c.direction === "up" ? "▲ Up" : c.direction === "down" ? "▼ Down" : "No change"}{c.direction === "same" ? "" : ` ${Math.abs(c.pct)}%`}<span className="t-quiet"> {vs ? "vs" : "on"} {against}</span></span>;
@@ -183,7 +183,7 @@ export function GrowthTab({ m, g: headerG, error: headerError, reload: headerRel
           </span>
         ) : <span className="t-small t-quiet" data-testid="growth-badge-none" title="A rate needs 14 complete days and at least 5 leads in the earlier week.">Rate: not enough data yet</span>}</span>}>
         <TimeChart testId="growth-chart" mode={mode} selectedId={day} label={`New email leads a day, ${rangeWord}, with the 7 day average`} noun="Day"
-          points={g.series.map((p) => ({ id: p.day, label: new Date(`${p.day}T12:00:00Z`).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }), short: dayLabel(p.day, g.range.days), partial: p.partial }))} series={[{ key: "leads", name: "New email leads", colour: "var(--t-c1)", values: g.series.map((p) => p.count) }]}
+          points={g.series.map((p) => ({ id: p.day, label: fullDate(p.day), short: dayLabel(p.day, g.range.days), partial: p.partial }))} series={[{ key: "leads", name: "New email leads", colour: "var(--t-c1)", values: g.series.map((p) => p.count) }]}
           avg={g.series.map((p) => p.avg7)} onPick={(i) => { const d = g.series[i].day; setDay(d); m.open(specDay(g, d)); }} />
       </Section>
 

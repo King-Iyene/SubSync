@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ChartCard } from "./time-chart";
 import { barTooltip, KIND_LABEL, KINDS, kindColour, type AccountBar, type Kind, type QueueRow } from "@/lib/analytics/today-queue";
 
 // "Where the work is": ONE stacked bar per client account (agency, all accounts). The bar is split by kind of thing in the chart colours (one colour per kind everywhere), sorted by
@@ -16,13 +17,15 @@ export function AccountBars({ title, bars, rows, more, onSegment, onAccount, onM
   const [hot, setHot] = useState<string | null>(null);
   const max = Math.max(1, ...bars.map((b) => b.count));
   const tip = bars.find((b) => b.locationId === hot) ?? null;
+  const avgCount = bars.length ? bars.reduce((t, b) => t + b.count, 0) / bars.length : 0;
+  const tipAt = tip ? bars.indexOf(tip) : -1;
   const present = KINDS.filter((k) => bars.some((b) => (b.byKind[k] ?? 0) > 0));
   return (
-    <figure className="min-w-0" data-testid="account-bars">
+    <figure className="relative min-w-0" data-testid="account-bars">
       <figcaption className="sr-only" data-testid="bars-title">{title}</figcaption>
       <ul className="space-y-0.5">
         {bars.map((b) => (
-          <li key={b.locationId} data-testid="account-bar" data-account={b.locationId} data-count={b.count} className="grid min-h-8 grid-cols-[minmax(5rem,9rem)_minmax(0,1fr)_2.5rem] items-center gap-3 text-sm"
+          <li key={b.locationId} data-testid="account-bar" data-account={b.locationId} data-count={b.count} style={{ opacity: hot && hot !== b.locationId ? 0.55 : 1, transition: "opacity .15s ease" }} className="grid min-h-8 grid-cols-[minmax(5rem,9rem)_minmax(0,1fr)_2.5rem] items-center gap-3 text-sm"
             onMouseEnter={() => setHot(b.locationId)} onMouseLeave={() => setHot(null)}>
             <button type="button" onClick={() => onAccount(b.locationId)} onFocus={() => setHot(b.locationId)} data-testid="bar-account" aria-label={`${b.name}, ${b.count.toLocaleString("en-US")} ${b.count === 1 ? "thing" : "things"}. See everything for this client.`}
               className="ds-press min-h-8 truncate rounded-[4px] px-1.5 text-left hover:bg-muted focus-visible:outline-2 focus-visible:outline-[var(--ring)]" title={b.name}>{b.name}</button>
@@ -44,6 +47,12 @@ export function AccountBars({ title, bars, rows, more, onSegment, onAccount, onM
           </li>
         )}
       </ul>
+      {tip && (() => {
+        const d = Math.round((tip.count - avgCount) * 10) / 10;
+        return <ChartCard testId="bars-card" title={tip.name} left={58} top={Math.min(tipAt * 32 + 30, 200)}
+          lines={[...KINDS.filter((k) => (tip.byKind[k] ?? 0) > 0).map((k) => <><span aria-hidden className="size-2 rounded-full" style={{ background: kindColour(k) }} /><span className="t-num font-medium">{tip.byKind[k]}</span> {KIND_LABEL[k].toLowerCase()}</>), <span className="t-num font-medium">{tip.count.toLocaleString("en-US")} in all</span>]}
+          compare={bars.length > 1 ? `${d === 0 ? "Same as" : `${d > 0 ? "+" : ""}${d} against`} the average client (${Math.round(avgCount * 10) / 10})` : undefined} hint="Click a colour to see its people" />;
+      })()}
       <ul className="t-small t-quiet mt-3 flex flex-wrap gap-x-5 gap-y-1" aria-label="What the colours mean">
         {present.map((k) => <li key={k} className="flex items-center gap-1.5"><span aria-hidden className="size-2.5 rounded-[3px]" style={{ background: kindColour(k) }} />{KIND_LABEL[k]}</li>)}
       </ul>

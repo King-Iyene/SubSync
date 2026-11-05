@@ -4,6 +4,7 @@ import { CircleCheck, Info, Minus, TriangleAlert } from "lucide-react";
 import { useRef, useState, type ReactNode } from "react";
 import type { Usual, Verdict } from "@/lib/analytics/today-queue";
 import { CountUp } from "./count-up";
+import { fullDate } from "@/lib/analytics/chart-format";
 
 // One figure compared with the account's own usual: the label, the big number, one line that says better, worse, about the same or "not enough history yet"
 // (only above the minimum sample, see vsUsual in today-queue.ts), and an optional small line of the last few days. The verdict is in the FORM too: an icon and a
@@ -43,6 +44,8 @@ export function PulseSpark({ points, label, format, height = 96, onPoint, pointI
     setAt(Math.round(Math.min(1, Math.max(0, (clientX - r.left) / r.width)) * last));
   };
   const p = at === null ? null : points[at];
+  const avg = points.reduce((t, q) => t + q.value, 0) / points.length;
+  const diff = p ? p.value - avg : 0;
   return (
     <figure className="mt-3" data-testid="pulse-spark">
       <div ref={box} className={`relative touch-pan-y px-1.5 outline-offset-4 ${onPoint ? "cursor-pointer" : ""}`} style={{ height }} tabIndex={0} role="group" aria-label={`${label}. Use the left and right arrow keys to read each day.`}
@@ -55,10 +58,13 @@ export function PulseSpark({ points, label, format, height = 96, onPoint, pointI
           <polyline fill="none" stroke="var(--primary)" strokeWidth="2" vectorEffect="non-scaling-stroke" strokeLinejoin="round" strokeLinecap="round" points={points.map((q, i) => `${x(i)},${y(q.value)}`).join(" ")} />
         </svg>
         <span aria-hidden className="pointer-events-none absolute size-[10px] -translate-x-1/2 translate-y-1/2 rounded-full bg-primary ring-2 ring-background" style={{ left: `calc(0.375rem + (100% - 0.75rem) * ${x(last) / 100})`, bottom: `${100 - y(points[last].value)}%` }} />
-        {at !== null && at !== last && <span aria-hidden className="pointer-events-none absolute size-2 -translate-x-1/2 translate-y-1/2 rounded-full bg-foreground ring-2 ring-background" style={{ left: `calc(0.375rem + (100% - 0.75rem) * ${x(at) / 100})`, bottom: `${100 - y(points[at].value)}%` }} />}
+        {at !== null && <span aria-hidden className="pointer-events-none absolute inset-y-0 border-l border-dashed border-[var(--t-ink3)]" style={{ left: `calc(0.375rem + (100% - 0.75rem) * ${x(at) / 100})` }} />}
+        {at !== null && at !== last && <span aria-hidden className="pointer-events-none absolute size-2 -translate-x-1/2 translate-y-1/2 rounded-full bg-foreground ring-2 ring-background shadow-[0_0_6px_var(--primary)]" style={{ left: `calc(0.375rem + (100% - 0.75rem) * ${x(at) / 100})`, bottom: `${100 - y(points[at].value)}%` }} />}
         {p && (
           <div role="tooltip" className="pointer-events-none absolute bottom-full z-20 mb-1 w-max max-w-[14rem] rounded-[4px] border border-[var(--t-rule2)] bg-popover px-2.5 py-1.5 text-xs text-popover-foreground shadow-[var(--shadow-lift)]" style={{ left: `${Math.min(Math.max(x(at as number), 18), 82)}%`, transform: "translateX(-50%)" }}>
-            <p className="font-medium">{p.label}: {format(p.value)}</p>
+            <p className="text-sm font-bold">{fullDate(p.label)}</p>
+            <p className="t-num mt-0.5 font-medium">{format(p.value)}</p>
+            <p className="text-muted-foreground">{Math.abs(diff) < 0.05 * Math.max(1, Math.abs(avg)) ? "About the average" : `${diff > 0 ? "Above" : "Below"} the average (${format(avg)})`}</p>
             {p.note && <p className="text-muted-foreground">{p.note}</p>}
             {onPoint && pointInfo && <p className="mt-0.5 text-muted-foreground" data-testid="spark-tip">{pointInfo(at as number).text}</p>}
           </div>
