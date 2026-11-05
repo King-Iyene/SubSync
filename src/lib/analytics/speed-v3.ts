@@ -41,7 +41,7 @@ export const isAfterHours = (ms: number, tz: string | null | undefined, hrs: { s
 
 export type Sel =
   | { kind: "all" } | { kind: "after" } | { kind: "open" } | { kind: "cell"; dow: number; hour: number } | { kind: "source"; source: string }
-  | { kind: "fast" } | { kind: "slow" } | { kind: "person"; userId: string } | { kind: "noOwner" } | { kind: "owner"; userId: string };
+  | { kind: "fast" } | { kind: "slow" } | { kind: "week"; index: number } | { kind: "person"; userId: string } | { kind: "noOwner" } | { kind: "owner"; userId: string };
 
 /** The judged leads (answered in time, late, or waiting past the target) that a mark stands for, longest wait first. */
 export function pick(rows: readonly LoadedRow[], sel: Sel, o: Opts): Array<{ row: LoadedRow; status: Judged }> {
@@ -54,6 +54,7 @@ export function pick(rows: readonly LoadedRow[], sel: Sel, o: Opts): Array<{ row
       case "source": return sourceLabel(r.source) === sel.source;
       case "fast": { const s = responseSeconds(r); return s !== null && s <= FAST_SECONDS; }
       case "slow": { const s = responseSeconds(r); return s !== null && s > FAST_SECONDS; }
+      case "week": return r.leadAt > o.now - (sel.index + 1) * WEEK && r.leadAt <= o.now - sel.index * WEEK;
       case "person": return r.userId === sel.userId && status !== "waiting";
       case "noOwner": return r.assignedTo === null;
       case "owner": return r.assignedTo === sel.userId;
@@ -143,7 +144,7 @@ export function trendVsNormal(rows: readonly LoadedRow[], o: Opts, weeks = 8): T
   const pts: WeekPoint[] = [];
   for (let i = weeks - 1; i >= 0; i--) {
     const end = o.now - i * WEEK, start = end - WEEK;
-    const w = rows.filter((r) => r.leadAt > start && r.leadAt <= end);
+    const w = rows.filter((r) => r.leadAt > start && r.leadAt <= end && judge(r, o.targetMinutes, o.now) !== null);
     const t = w.map(responseSeconds).filter((x): x is number => x !== null);
     pts.push({ index: i, start, leads: w.length, answered: t.length, medianSeconds: t.length >= MIN_FOR_MEDIAN ? median(t) : null });
   }
@@ -199,4 +200,16 @@ export function digestPreview(i: { who: string; waiting: number; dollars: number
   if (i.gap.line) lines.push(i.gap.line);
   lines.push("This is a preview. Nothing was sent.");
   return lines.join("\n");
+}
+
+// ---------- lead rescue: who to reply to first, by money and by how fast the lead is cooling ----------
+
+export type Rescue = { key: string; locationId: string; contactId: string; waitedMinutes: number; dollars: number; score: number };
+/** Waiting leads ranked by open-deal dollars weighted by freshness (a lead loses half its weight every 24 hours of waiting). No deal means zero dollars and the longest wait goes first. */
+export function rescueRank(rows: readonly LoadedRow[], dollarsByKey: ReadonlyMap<string, number>, o: Opts, limit = 10): Rescue[] {
+  return pick(rows, { kind: "all" }, o).filter((x) => x.status === "waiting").map(({ row }) => {
+    const waitedMinutes = Math.max(0, Math.round((o.now - row.leadAt) / 60_000));
+    const dollars = dollarsByKey.get(keyOf(row)) ?? 0;
+    return { key: keyOf(row), locationId: row.locationId, contactId: row.contactId, waitedMinutes, dollars, score: dollars * Math.pow(0.5, waitedMinutes / 1440) };
+  }).sort((a, b) => b.score - a.score || b.waitedMinutes - a.waitedMinutes || a.key.localeCompare(b.key)).slice(0, limit);
 }

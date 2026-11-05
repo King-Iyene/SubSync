@@ -98,3 +98,19 @@ test("digest preview says it sends nothing", () => {
   const t = digestPreview({ who: "Alpha", waiting: 2, dollars: 1200, typical: "Typical first reply: 4 min.", trend: trendVsNormal([], O), gap: gapMap([], O), word: "daily" });
   assert.match(t, /2 leads are waiting/); assert.match(t, /\$1,200/); assert.match(t, /Nothing was sent/);
 });
+
+test("a week mark opens exactly the leads it counted", () => {
+  const rows = [...Array.from({ length: 6 }, (_, i) => lead(60 + i, 5)), ...Array.from({ length: 6 }, (_, i) => lead(8 * 1440 + i, 5)), lead(120, 1)];
+  const t = trendVsNormal(rows, O);
+  for (const w of t.weeks) assert.equal(pick(rows, { kind: "week", index: w.index }, O).length, w.leads);
+});
+
+test("rescue: money first, cooling lowers it, no deal goes by wait, ties are stable", async () => {
+  const { rescueRank } = await import("../analytics/speed-v3.ts");
+  const a = lead(60 * 30, null), b = lead(60, null), c = lead(60 * 5, null), d = lead(60 * 5, null);
+  const $ = new Map([[keyOf(a), 1000], [keyOf(b), 900]]);
+  const r = rescueRank([a, b, c, d, lead(5, null)], $, O);
+  assert.equal(r.length, 4); // the 5 minute lead is still inside its target: not waiting
+  assert.equal(r[0].key, keyOf(b)); // 900 fresh beats 1000 cooled 30 hours
+  assert.equal(r[2].dollars, 0); assert.ok(r[2].waitedMinutes === r[3].waitedMinutes);
+});

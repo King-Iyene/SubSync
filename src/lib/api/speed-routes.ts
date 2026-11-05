@@ -41,6 +41,7 @@ function withUrls<T>(value: T, link: (locationId: string, contactId: string) => 
 export function parseSel(sp: URLSearchParams, seePeople: boolean): Sel | null {
   const k = sp.get("sel");
   if (k === "all" || k === "after" || k === "open" || k === "fast" || k === "slow" || k === "noOwner") return { kind: k };
+  if (k === "week") { const i = int(sp.get("index"), -1); return i >= 0 && i <= 7 ? { kind: "week", index: i } : null; }
   if (k === "cell") { const dow = int(sp.get("dow"), -1), hour = int(sp.get("hour"), -1); return dow >= 0 && dow < DAY_NAMES.length && hour >= 0 && hour < 24 ? { kind: "cell", dow, hour } : null; }
   if (k === "source") { const v = sp.get("source"); return v && v.length <= 120 ? { kind: "source", source: v } : null; }
   if ((k === "person" || k === "owner") && seePeople) { const v = sp.get("user"); return v && ID.test(v) ? { kind: k, userId: v } : null; }

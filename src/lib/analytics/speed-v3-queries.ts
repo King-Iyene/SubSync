@@ -1,8 +1,11 @@
 import { sql } from "../db";
 import { resolveUser } from "./people-labels";
+import { countedDealsOf } from "./waiting-money-queries";
+import { sourceLabel } from "./speed-intel";
+import { accountFacts, rowOut, suggestionsFor } from "./speed-v2-queries";
+import { costEstimate, money } from "./speed-v2";
 import { loadLookups, loadRows } from "./speed-queries";
-import { rowOut, suggestionsFor } from "./speed-v2-queries";
-import { bySourceFunnel, fastVsSlow, gapMap, ownerGaps, pick, setterScorecard, trendVsNormal, DAY, type Outcomes, type Sel } from "./speed-v3";
+import { bySourceFunnel, rescueRank, fastVsSlow, gapMap, ownerGaps, pick, setterScorecard, trendVsNormal, DAY, type Outcomes, type Sel } from "./speed-v3";
 
 // The reads behind the Speed to lead extras (stage SPEED3). Read only; every query is bound to the accounts the router allowed. What became of a lead is read from the
 // appointments and deals SubSync already holds: booked (an appointment that is not cancelled, starting after the lead arrived), showed (marked showed), won (a won deal).
@@ -40,11 +43,22 @@ export async function speedInsights(i: InsightInput) {
   const locOf = (u: string) => rows.find((r) => r.userId === u || r.assignedTo === u)?.locationId;
   const setters = i.seePeople ? setterScorecard(recent, oc, o) : { rows: [], teamMedianSeconds: null };
   const gaps = ownerGaps(recent, o);
+  // Lead rescue: the waiting leads (last 14 days) ranked by the open deals of those people and how long they have cooled.
+  const waiting = pick(rows.filter((r) => r.leadAt > i.now - 14 * DAY), { kind: "all" }, o).filter((x) => x.status === "waiting").map((x) => x.row);
+  const deals = await countedDealsOf(i.installationId, waiting.map((r) => `${r.locationId}:${r.contactId}`)).catch(() => []);
+  const dollars = new Map<string, number>();
+  for (const d of deals) dollars.set(`${d.locationId}:${d.contactId}`, (dollars.get(`${d.locationId}:${d.contactId}`) ?? 0) + d.value);
+  const rescue = rescueRank(waiting, dollars, o, 8).map((x) => { const r = waiting.find((w) => w.locationId === x.locationId && w.contactId === x.contactId) as typeof waiting[number]; return { ...rowOut(r, "waiting", lk, new Map()), dollars: x.dollars, waitedMinutes: x.waitedMinutes }; });
+  // Cost of slow, per source: the leads answered late or not at all, valued with each account's own average deal and win rate (only where it has enough closed deals).
+  const facts = await accountFacts(i.installationId, i.allowed);
+  const slow = new Map<string, Map<string, number>>();
+  for (const { row, status } of pick(recent, { kind: "all" }, o)) if (status !== "within") { const k = sourceLabel(row.source); const m = slow.get(k) ?? new Map<string, number>(); m.set(row.locationId, (m.get(row.locationId) ?? 0) + 1); slow.set(k, m); }
+  const costBySource = [...slow].map(([source, m]) => { const c = costEstimate(m, facts ?? []); return { source, missed: c.waiting, dollars: c.amount, line: c.amount === null ? null : money(c.amount) }; }).sort((a, b) => (b.dollars ?? -1) - (a.dollars ?? -1) || b.missed - a.missed).slice(0, 8);
   return {
     now: i.now, days: 28, gap: gapMap(recent, o), fastSlow: fastVsSlow(recent, oc, o), sources: bySourceFunnel(recent, oc, o).slice(0, 12), trend: trendVsNormal(rows, o),
     setters: { teamMedianSeconds: setters.teamMedianSeconds, rows: setters.rows.slice(0, 10).map((s) => ({ ...s, name: name(s.userId, locOf(s.userId)) })) },
     owners: i.seePeople ? { ...gaps, owners: gaps.owners.slice(0, 8).map((x) => ({ ...x, name: name(x.userId, locOf(x.userId)) })) } : { ...gaps, owners: [] },
-    seePeople: i.seePeople,
+    rescue, costBySource, seePeople: i.seePeople,
   };
 }
 

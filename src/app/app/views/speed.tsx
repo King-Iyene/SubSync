@@ -104,7 +104,7 @@ export function SpeedView({ go }: { go: GoFn }) {
           <HowTo id="speed2" title="How to use this page">Reply to the lead at the top, then the next. Every number opens the leads behind it, and a lead&apos;s three dots call or email it through your CRM.</HowTo>
 
           <HeadlineBlock headline={{ ...w.headline, breakdown: null, accounts: w.accountsWithWaiting, dollars: w.cost.amount ?? 0 } as never}
-            action={oldest ? <PrimaryButton p={{ label: "Reply to the oldest waiting lead", sr: `${oldest.name}, the longest wait`, href: oldest.url }} /> : undefined}>
+            action={oldest ? <PrimaryButton p={{ label: "Reply to the oldest waiting lead", sr: `${oldest.name}, the longest wait`, onClick: () => actions.reply(oldest) }} /> : undefined}>
             {w.waiting > 0 && (
               <div className="mt-3 max-w-3xl space-y-2" data-testid="speed-money-block">
                 <p className="text-[0.95rem] font-medium" data-testid="speed-money">{w.money.line}</p>
