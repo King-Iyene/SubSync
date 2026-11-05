@@ -19,7 +19,7 @@ import { useBrandedText } from "./brand-text";
 import { BrandLogo, ProductMark } from "./brand-logo";
 import { Btn } from "./ui";
 import { FeedbackBox } from "./feedback-box";
-import { BackLink, BackProvider, ModuleTabs } from "./ds/template";
+import { BackLink, BackProvider, ModuleTabs, TrailProvider } from "./ds/template";
 import { InlineAlert } from "./ds/alert";
 import { FilterDrawer } from "./ds/filters";
 import { useTheme } from "./ds/theme";
@@ -308,7 +308,7 @@ export function Dashboard() {
   const footMenu = menu.filter((n) => n.group === "Settings and help");
   const renderNav = (list: typeof menu) => list.map((n, i) => (
       <div key={n.id}>
-        {n.group !== (list[i - 1]?.group ?? null) && (n.group && n.group !== "Settings and help" ? <p className="px-3 pb-1 pt-3 text-[10.5px] font-semibold uppercase tracking-[0.14em] text-sidebar-foreground/70">{n.group}</p> : <div className="my-2 border-t border-sidebar-border" />)}
+        {n.group !== (list[i - 1]?.group ?? null) && (n.group && n.group !== "Settings and help" ? <p data-testid="nav-group" className="px-3 pb-1 pt-3 text-[10.5px] font-semibold uppercase tracking-[0.14em] text-sidebar-foreground/70">{n.group}</p> : i > 0 || n.group === "Settings and help" ? <div className="my-2 border-t border-sidebar-border" /> : null)}
         <button type="button" onClick={() => goTop(n.id)} aria-current={n.id === active ? "page" : undefined}
           className={`group relative flex w-full items-center gap-2.5 rounded-lg px-3 py-1.5 text-left text-[0.86rem] transition-colors ${n.id === active ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground" : "text-sidebar-foreground/75 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"}`}>
           {n.id === active && <span aria-hidden className="absolute inset-y-1.5 left-0 w-[3px] rounded-full bg-sidebar-primary" />}
@@ -323,6 +323,9 @@ export function Dashboard() {
   const shown: ViewId = viewId;
   const parentOfShown = PARENT[shown];
   const active = limited && shown === "onboarding" ? shown : parentOfShown && menu.some((n) => n.id === parentOfShown) ? parentOfShown : shown;
+  // The "Section" of the "Section > Page" trail above each title: the menu group, or the parent module for a page that lives inside one.
+  const activeItem = menu.find((n) => n.id === active);
+  const trailSection = activeItem ? (PARENT[shown] && activeItem.id !== shown ? activeItem.label : activeItem.group && activeItem.group !== "Settings and help" ? activeItem.group : null) : null;
   const agency = auth.demo ? "Demo Company" : limited ? "Your business" : "Your company";
   const own = auth.locationId;
 
@@ -458,7 +461,7 @@ export function Dashboard() {
                 <NotificationBell go={go} />
               </div>
             </div>
-            {view.id !== "today" && strip}<BackProvider value={back}>{content}</BackProvider>
+            {view.id !== "today" && strip}<BackProvider value={back}><TrailProvider value={trailSection}>{content}</TrailProvider></BackProvider>
             <FeedbackBox page={view.id} />
           </main>
         </div>

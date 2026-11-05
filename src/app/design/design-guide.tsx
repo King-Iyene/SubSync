@@ -137,7 +137,7 @@ export function DesignGuide() {
 
           <Section title="Menu" hint="The pilot menu. Everything else the app shows is under More or inside a module as a tab.">
             <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              {(["", "Daily work", "Clients and people", "More", "Settings and help"] as const).map((g) => (
+              {(["", "Reply", "Clients and people", "More", "Settings and help"] as const).map((g) => (
                 <li key={g || "top"} className="rounded-xl border p-3">
                   <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{g || "Home"}</p>
                   <ul className="space-y-0.5 text-sm">{NAV.filter((n) => n.group === g && !n.parent).map((n) => <li key={n.id}>{n.label}</li>)}</ul>

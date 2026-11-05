@@ -5,7 +5,7 @@ export type GoFn = (view: ViewId, locationId?: string) => void;
 
 // The pilot menu (stage D0, N43 and UX-11): a short list of plain groups. Everything else the app already shows stays reachable under "More"
 // (or inside a module as a tab); nothing that was visible has been removed, and a page behind a switch stays behind it (the `feature` below).
-export type NavGroup = "" | "Daily work" | "Clients and people" | "More" | "Settings and help";
+export type NavGroup = "" | "Reply" | "Clients and people" | "More" | "Settings and help";
 
 export type NavItem = {
   id: Exclude<ViewId, "account">; label: string; feature: string; group: NavGroup;
@@ -18,28 +18,29 @@ export type NavItem = {
 };
 
 export const NAV: NavItem[] = [
+  // Money-first order (stage SHELL): today's work, then replies, then appointments, then who the clients and people are, then the audit and clean-up, then everything else.
   { id: "today", label: "Today", feature: "overview", group: "" },
-  { id: "speed", label: "Speed to lead", feature: "speed", group: "Daily work" },
-  { id: "appointments", label: "Appointments", feature: "appointments", group: "Daily work" },
-  { id: "inbox", label: "Unanswered messages", feature: "inbox", group: "Daily work" },
-  { id: "workflows", label: "Workflows", feature: "workflows", group: "Daily work" },
-  { id: "data-health", label: "Data health", feature: "data_health", group: "Daily work" },
-  { id: "audit", label: "Account audit", feature: "audit", group: "Daily work" },
+  { id: "speed", label: "Speed to lead", feature: "speed", group: "Reply" },
+  { id: "inbox", label: "Unanswered messages", feature: "inbox", group: "Reply" },
+  { id: "appointments", label: "Appointments", feature: "appointments", group: "" },
   { id: "clients", label: "Clients", feature: "clients", group: "Clients and people" },
   { id: "people", label: "People", feature: "search", group: "Clients and people" },
   { id: "search", label: "Contact search", feature: "search", group: "Clients and people", parent: "people" },
   { id: "leads", label: "Leads", feature: "activity", group: "Clients and people", parent: "people" },
   { id: "calls", label: "Call lists", feature: "calls", group: "Clients and people", parent: "people" },
-  { id: "overview", label: "Overview", feature: "overview", group: "More" },
-  { id: "accounts", label: "Accounts", feature: "health", group: "More", parent: "clients" },
-  { id: "team", label: "Team", feature: "team", group: "More" },
-  { id: "pipeline", label: "Pipeline and deals", feature: "pipelines", group: "More" },
-  { id: "onboarding", label: "Setup", feature: "onboarding", group: "More", parent: "clients", showWhenLimited: true },
+  { id: "accounts", label: "Accounts", feature: "health", group: "Clients and people", parent: "clients" },
+  { id: "onboarding", label: "Setup", feature: "onboarding", group: "Clients and people", parent: "clients", showWhenLimited: true },
+  { id: "audit", label: "Account audit", feature: "audit", group: "" },
   // Clean-up is ONE entry (stage CLEANUP) holding Duplicates, Data quality, History and Rules. The old ids stay, so #duplicates and #cleanup still open the right tab. A client's staff have no
   // Clean-up of their own, so for them the Duplicates page is the Clean-up entry (showWhenParentHidden); their tabs are Duplicates and History.
-  { id: "cleanup", label: "Clean-up", feature: "cleanup", group: "More" },
-  { id: "duplicates", label: "Clean-up", feature: "duplicates", group: "More", parent: "cleanup", showWhenParentHidden: true },
+  { id: "cleanup", label: "Clean-up", feature: "cleanup", group: "" },
+  { id: "duplicates", label: "Clean-up", feature: "duplicates", group: "", parent: "cleanup", showWhenParentHidden: true },
+  { id: "overview", label: "Overview", feature: "overview", group: "More" },
+  { id: "team", label: "Team", feature: "team", group: "More" },
+  { id: "pipeline", label: "Pipeline and deals", feature: "pipelines", group: "More" },
   { id: "meetings", label: "Meeting notes", feature: "meetings", group: "More" },
+  { id: "workflows", label: "Workflows", feature: "workflows", group: "More" },
+  { id: "data-health", label: "Data health", feature: "data_health", group: "More" },
   { id: "settings", label: "Settings", feature: "settings", group: "Settings and help" },
   // Connections moved into Settings, Integrations (4 Nov 2026). The id stays so every old address (#connections) and link still works: it opens Settings on Integrations.
   // A client's staff have no Settings, so for them it stays one menu entry, called Integrations (showWhenParentHidden).

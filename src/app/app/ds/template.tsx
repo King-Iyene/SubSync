@@ -9,11 +9,17 @@ import { createContext, useContext, useId, useRef, useState, type KeyboardEvent,
 // A subtitle longer than this is a paragraph in disguise (UX-10): put the detail in a Section hint or a definition tip instead.
 export const SUBTITLE_MAX = 120;
 
+// "Section > Page": the shell says which section the open page belongs to (null on a top-level page), so a person always sees where they are.
+const TrailContext = createContext<string | null>(null);
+export const TrailProvider = TrailContext.Provider;
+
 export function Page({ title, subtitle, actions, children }: { title: string; subtitle?: string; actions?: ReactNode; children: ReactNode }) {
+  const section = useContext(TrailContext);
   return (
     <div data-testid="page" className="ds-enter">
       <header className="mb-6 flex flex-wrap items-start justify-between gap-x-4 gap-y-3 border-b pb-5">
         <div className="min-w-0">
+          {section && section !== title && <p data-testid="trail" className="mb-1 text-xs font-medium text-muted-foreground">{section} <span aria-hidden>&gt;</span><span className="sr-only">then</span> {title}</p>}
           <h1 className="text-[1.65rem] font-semibold leading-tight tracking-tight">{title}</h1>
           {subtitle && <p className="mt-1.5 line-clamp-3 max-w-2xl sm:line-clamp-2 text-sm leading-6 text-muted-foreground" data-testid="page-subtitle">{subtitle}</p>}
         </div>
