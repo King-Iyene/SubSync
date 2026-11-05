@@ -379,7 +379,7 @@ export function buildGrowth(i: GrowthInput): GrowthData {
     gross: { signUps, unique, removed, windowDays: WINDOW },
     range: { from: rf, to: rt, days: WINDOW, label: i.range?.label ?? `Last ${WINDOW} days`, count: rCount, previous: rPrev, change: changeOf(rCount, rPrev), start: rStart, end: rEnd }, series, badge: weekBadge(series),
     goal: { total: withGoal.length ? goalTotal : null, count: goalCount, status: withGoal.length ? goalStatus(goalTotal, goalCount, b0, i.now, b0.monthStart) : null, accountsWithGoal: withGoal.length },
-    mix: sourceMix(counted.map((c) => ({ at: c.at as number, source: c.source })), i.now), signals: signals.sort((a, b) => Math.abs(b.pct) - Math.abs(a.pct)), league,
+    mix: sourceMix(counted.map((c) => ({ at: c.at as number, source: c.source })), i.now, { start: rStart, end: rEnd }), signals: signals.sort((a, b) => Math.abs(b.pct) - Math.abs(a.pct)), league,
     records, recentAll, partial: !!i.partial, setup: i.setup ?? { goalsReady: true, settingsReady: true },
   };
 }

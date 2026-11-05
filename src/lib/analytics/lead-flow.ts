@@ -82,7 +82,7 @@ export const FLOW_PRESETS: Array<{ key: FlowPreset; label: string }> = [
 const DAY = 86_400_000;
 const toMs = (iso: string) => Date.parse(`${iso}T00:00:00Z`);
 const toIso = (ms: number) => new Date(ms).toISOString().slice(0, 10);
-export const isIsoDay = (s: unknown): s is string => typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s) && toIso(toMs(s)) === s;
+export const isIsoDay = (s: unknown): s is string => typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s) && Number.isFinite(toMs(s)) && toIso(toMs(s)) === s;
 export const MAX_FLOW_DAYS = 366;
 
 /** The first and last day (inclusive, "YYYY-MM-DD") of a choice, given today's date. A bad custom choice gives a plain problem and the last 7 days. */
