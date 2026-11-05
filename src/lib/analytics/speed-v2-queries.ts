@@ -27,7 +27,7 @@ export type LeadRowOut = LeadOut & {
   suggestion: { label: string; medianSeconds: number; replies: number } | null;
 };
 
-function rowOut(r: LoadedRow, status: Parameters<typeof leadOut>[1], lk: Lookups, suggestions: ReadonlyMap<string, Suggestion | null>): LeadRowOut {
+export function rowOut(r: LoadedRow, status: Parameters<typeof leadOut>[1], lk: Lookups, suggestions: ReadonlyMap<string, Suggestion | null>): LeadRowOut {
   const base = leadOut(r, status, lk);
   const sg = r.assignedTo === null ? suggestions.get(r.locationId) ?? null : null;
   return {
@@ -36,7 +36,7 @@ function rowOut(r: LoadedRow, status: Parameters<typeof leadOut>[1], lk: Lookups
   };
 }
 
-function suggestionsFor(rows: readonly LoadedRow[], accounts: Iterable<string>): Map<string, Suggestion | null> {
+export function suggestionsFor(rows: readonly LoadedRow[], accounts: Iterable<string>): Map<string, Suggestion | null> {
   const out = new Map<string, Suggestion | null>();
   for (const a of accounts) out.set(a, suggestReplier(rows, a));
   return out;

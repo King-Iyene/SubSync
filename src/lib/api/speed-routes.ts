@@ -1,5 +1,7 @@
 import { setAccountTarget, speedCompare, speedHome, speedList } from "../analytics/speed-v2-queries";
 import { SORTS, STATUS_FILTERS, type LeadSort, type LeadStatusFilter } from "../analytics/speed-v2";
+import { speedInsightList, speedInsights } from "../analytics/speed-v3-queries";
+import { DAY_NAMES, type Sel } from "../analytics/speed-v3";
 import { parseWindow, type Win } from "../analytics/speed-window";
 import type { deepLinks } from "../links";
 import { json, type AuthContext } from "./auth";
@@ -33,6 +35,16 @@ function withUrls<T>(value: T, link: (locationId: string, contactId: string) => 
     return out as T;
   }
   return value;
+}
+
+/** The mark a list was opened from. Only these shapes are accepted; a person or an owner list is for the people who may see people. */
+export function parseSel(sp: URLSearchParams, seePeople: boolean): Sel | null {
+  const k = sp.get("sel");
+  if (k === "all" || k === "after" || k === "open" || k === "fast" || k === "slow" || k === "noOwner") return { kind: k };
+  if (k === "cell") { const dow = int(sp.get("dow"), -1), hour = int(sp.get("hour"), -1); return dow >= 0 && dow < DAY_NAMES.length && hour >= 0 && hour < 24 ? { kind: "cell", dow, hour } : null; }
+  if (k === "source") { const v = sp.get("source"); return v && v.length <= 120 ? { kind: "source", source: v } : null; }
+  if ((k === "person" || k === "owner") && seePeople) { const v = sp.get("user"); return v && ID.test(v) ? { kind: k, userId: v } : null; }
+  return null;
 }
 
 /** The window of a request: dates are checked on the server. With none given, the last 30 days. */
@@ -102,6 +114,16 @@ export async function handleSpeedPart(ctx: Ctx, h: SpeedHelpers): Promise<Respon
       noSource: sp.get("source") === "none", week, q: (sp.get("q") ?? "").slice(0, 80), sort: sortP as LeadSort, page: int(sp.get("page"), 0), size: int(sp.get("size"), 25),
     });
     return json(withUrls(out, links.contact));
+  }
+
+  if (part === "insights" || part === "insight-list") {
+    const input = { installationId: ctx.installationId, allowed: narrowed(allowedAll, sp.get("account")), targetMinutes, now, seePeople };
+    if (input.allowed === "none") return json({ error: "Unknown account" }, 404);
+    const base = { ...input, allowed: input.allowed as string[] | null };
+    if (part === "insights") return json(await speedInsights(base));
+    const sel = parseSel(sp, seePeople);
+    if (!sel) return json({ error: "Unknown list" }, 400);
+    return json(withUrls(await speedInsightList({ ...base, sel }), links.contact));
   }
 
   if (part === "compare") {
