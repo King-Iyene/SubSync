@@ -15,7 +15,7 @@ for (const mode of ["light", "dark"] as const) {
     await todayReady(page);
     await theme(page, mode);
     await openMore(page, "Lead flow");
-    await page.getByTestId("flow-preset").selectOption("30d");
+    await page.getByTestId("filter-preset").selectOption("30d");
     await page.waitForTimeout(2500);
     await page.getByTestId("flow-tab").screenshot({ path: `${OUT}-leadflow-${mode}.png` });
     await openMore(page, "Clients coming and going");

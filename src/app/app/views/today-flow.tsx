@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FLOW_PRESETS, MIN_LEADS, resolveFlowRange, type Flow, type FlowLead, type FlowPreset } from "@/lib/analytics/lead-flow";
+import { MIN_LEADS, type Flow, type FlowLead } from "@/lib/analytics/lead-flow";
+import { ReportFilterBar, useReportApi, useReportFilter } from "./report-filter";
 import { specClientsAll, specClientsWeek, specFlowLink, specFlowNode } from "@/lib/analytics/flow-records";
 import { weeksOf, type ClientEvent, type WeekBar } from "@/lib/analytics/clients-flow";
 import { tabMeta } from "@/lib/analytics/today-tabs";
@@ -30,47 +31,32 @@ export function TabIntro({ name }: { name: string }) {
 type FlowResponse = { from: string; to: string; accounts: number; flow: Flow; leads: FlowLead[]; sent: number; partial: boolean; needsUpdate: boolean };
 const field = "min-h-9 rounded-[4px] border border-[var(--t-rule2)] bg-[var(--t-raise)] px-2 py-1 text-sm cursor-pointer outline-none hover:border-primary focus-visible:outline-2 focus-visible:outline-[var(--ring)]";
 
-export function LeadFlowTab({ m }: { m: TodayModel }) {
-  const api = useApiClient();
-  const [today, setToday] = useState<string | null>(null);
-  const [preset, setPreset] = useState<FlowPreset>("7d");
-  const [from, setFrom] = useState(""), [to, setTo] = useState("");
+export function LeadFlowTab({ m, clients, kind }: { m: TodayModel; clients?: Array<{ id: string; name: string }>; kind?: string }) {
+  const f = useReportFilter("l", "7d");
+  const api = useReportApi(f);
+  const range = f.range;
   const [state, setState] = useState<{ data: FlowResponse | null; error: string | null; loading: boolean }>({ data: null, error: null, loading: true });
   const latest = useRef(0);
-  useEffect(() => { setToday(new Date().toISOString().slice(0, 10)); }, []);
-  const range = useMemo(() => (today ? resolveFlowRange(preset, today, from, to) : null), [preset, today, from, to]);
+  const query = range && !range.problem ? `from=${range.from}&to=${range.to}` : range ? `from=${range.from}&to=${range.to}` : "";
+  const clientQuery = f.client && f.client !== "all" ? `&client=${encodeURIComponent(f.client)}` : "";
   const load = useCallback(async () => {
-    if (!range || range.problem) return;
+    if (!range) return;
     const mine = ++latest.current; // an answer for dates the person has already left must never overwrite the newer one
     setState((s) => ({ ...s, loading: true, error: null }));
-    try { const data = await api.get<FlowResponse>(`today/lead-flow?from=${range.from}&to=${range.to}`); if (mine === latest.current) setState({ data, error: null, loading: false }); }
+    try { const data = await api.get<FlowResponse>(`today/lead-flow?${query}${clientQuery}`); if (mine === latest.current) setState({ data, error: null, loading: false }); }
     catch (e) { if (mine === latest.current) setState((s) => ({ data: s.data, error: e instanceof ApiError && e.status !== 500 ? e.message : "Lead flow could not be read. Please try again.", loading: false })); }
-  }, [api, range]);
+  }, [api, range, query, clientQuery]);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { void load(); }, [load]);
 
   const d = state.data;
   const input = d && range ? { flow: d.flow, leads: d.leads, sent: d.sent, partial: d.partial, rangeLabel: range.label } : null;
   const won = d?.flow.won ?? 0;
-  const pickPreset = (p: FlowPreset) => { setPreset(p); if (p === "custom" && range && !from) { setFrom(range.from); setTo(range.to); } };
-
+  
   return (
     <div data-testid="flow-tab" className="max-w-5xl">
       <TabIntro name="Lead flow" />
-      <div className="mb-5 flex flex-wrap items-center gap-2" role="group" aria-label="Dates for lead flow" data-testid="flow-range">
-        <select className={field} aria-label="Lead flow: dates" value={preset} onChange={(e) => pickPreset(e.target.value as FlowPreset)} data-testid="flow-preset">
-          {FLOW_PRESETS.map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}
-        </select>
-        {preset === "custom" && (
-          <>
-            <input type="date" className={field} aria-label="Lead flow: from" value={from} max={today ?? undefined} onChange={(e) => setFrom(e.target.value)} data-testid="flow-from" />
-            <input type="date" className={field} aria-label="Lead flow: to" value={to} max={today ?? undefined} onChange={(e) => setTo(e.target.value)} data-testid="flow-to" />
-          </>
-        )}
-        <span className="t-small t-quiet" data-testid="flow-window">{range ? `Leads added ${range.problem ? "" : range.from === range.to ? `on ${range.from}` : `${range.from} to ${range.to}`}` : "Working out the dates"}</span>
-        <WhatIs text="Every person added as a contact in these dates, followed to where they are now: did a person reply, did they book, did they show up." />
-      </div>
-      {range?.problem && <p className="t-small mb-4 border-l-2 border-[var(--t-soon)] pl-2" role="status" data-testid="flow-problem">{range.problem} Showing the last 7 days instead.</p>}
-
+      <ReportFilterBar f={f} label="Lead flow" clients={kind === "agency" ? clients : undefined} datesNote="Every person added as a contact in these dates, followed to where they are now: did a person reply, did they book, did they show up." />
       {state.error && !d && <EmptyState title="Lead flow could not be read" body={state.error} action={<button type="button" onClick={() => void load()} className="ds-press h-9 cursor-pointer rounded-[4px] border border-[var(--t-rule2)] px-3 text-sm">Try again</button>} />}
       {!d && !state.error && <div className="space-y-4" role="status" aria-busy="true" aria-label="Following the leads"><Skeleton className="h-8 w-64" /><Skeleton className="h-64 w-full" /></div>}
       {d && input && (

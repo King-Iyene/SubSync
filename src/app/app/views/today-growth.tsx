@@ -1,12 +1,15 @@
 "use client";
 
 import { Check, Pencil, X } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { fmtStat, fmtFull, dayLabel } from "@/lib/analytics/chart-format";
+import { filterQuery, ReportFilterBar, useReportApi, useReportFilter } from "./report-filter";
+import { ModeToggle, TimeChart, useChartMode } from "../ds/time-chart";
 import type { AccessKind } from "@/lib/access";
-import { specDay, specPeriod, specRemoved, specSignUps, specSource } from "@/lib/analytics/growth-records";
+import { specDay, specPeriod, specRange, specRemoved, specSignUps, specSource } from "@/lib/analytics/growth-records";
 import type { Change, GoalStatus, GrowthData, LeagueRow, Period } from "@/lib/analytics/growth";
 import { ApiError, useApiClient } from "../session";
-import { GrowthChart, SourceDonut } from "../ds/growth-chart";
+import { SourceDonut } from "../ds/growth-chart";
 import { EmptyState, Skeleton } from "../ds";
 import { fmtInt } from "../ui";
 import { WhatIs } from "../ds/what-is";
@@ -24,7 +27,7 @@ const PERIODS: Array<{ p: Period; label: string; against: string; info: string }
   { p: "all", label: "All time", against: "", info: "Every person SubSync holds with a usable email, counted once." },
 ];
 
-function ChangeLine({ c, against, compact = false }: { c: Change; against: string; compact?: boolean }) {
+function ChangeLine({ c, against, compact = false, vs = false }: { c: Change; against: string; compact?: boolean; vs?: boolean }) {
   if (c.previous === null) return <span className="t-small t-quiet">Since the first contact</span>;
   if (c.pct === null) {
     // A table row shows the plain difference instead of a percentage the earlier figure is too small to support.
@@ -33,7 +36,7 @@ function ChangeLine({ c, against, compact = false }: { c: Change; against: strin
     return <span className="t-small t-quiet" title={c.note ?? undefined}>Too few to compare</span>;
   }
   const tone = c.direction === "up" ? "text-[var(--t-ok)]" : c.direction === "down" ? "text-[var(--t-bad)]" : "text-[var(--t-ink2)]";
-  return <span className={`t-small ${tone}`} title={`${fmtInt(c.count)} now, ${fmtInt(c.previous)} ${against}`}>{c.direction === "up" ? "▲ Up" : c.direction === "down" ? "▼ Down" : "No change"}{c.direction === "same" ? "" : ` ${Math.abs(c.pct)}%`}<span className="t-quiet"> on {against}</span></span>;
+  return <span className={`t-small ${tone}`} title={`${fmtInt(c.count)} now, ${fmtInt(c.previous)} ${against}`}>{c.direction === "up" ? "▲ Up" : c.direction === "down" ? "▼ Down" : "No change"}{c.direction === "same" ? "" : ` ${Math.abs(c.pct)}%`}<span className="t-quiet"> {vs ? "vs" : "on"} {against}</span></span>;
 }
 
 function Section({ id, title, hint, children, right }: { id: string; title: string; hint?: string; children: React.ReactNode; right?: React.ReactNode }) {
@@ -99,17 +102,36 @@ function GoalBar({ s }: { s: GoalStatus }) {
   );
 }
 
-export function GrowthTab({ m, g, error, reload, kind }: { m: TodayModel; g: GrowthData | null; loading: boolean; error: string | null; reload: () => void; kind: AccessKind }) {
-  const api = useApiClient();
+export function GrowthTab({ m, g: headerG, error: headerError, reload: headerReload, kind, clients }: { m: TodayModel; g: GrowthData | null; loading: boolean; error: string | null; reload: () => void; kind: AccessKind; clients?: Array<{ id: string; name: string }> }) {
+  const f = useReportFilter("g", "30d");
+  const api = useReportApi(f);
+  const [mode, setMode] = useChartMode("growth");
+  // Until the tab's own bar is changed it shows the read the page already made (the header's clients, the last 30 days). Changed, it reads its own.
+  const own = f.differs;
+  const query = filterQuery(f);
+  const [mine, setMine] = useState<{ g: GrowthData | null; error: string | null }>({ g: null, error: null });
+  const latest = useRef(0);
+  const loadOwn = useCallback(async () => {
+    if (!own || !f.range) return;
+    const n = ++latest.current;
+    try { const d = await api.get<GrowthData>(`today/growth${query ? `?${query}` : ""}`); if (n === latest.current) setMine({ g: d, error: null }); }
+    catch (e) { if (n === latest.current) setMine((s) => ({ g: s.g, error: e instanceof ApiError && e.status !== 500 ? e.message : "Growth could not be read. Please try again." })); }
+  }, [api, own, query, f.range]);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { void loadOwn(); }, [loadOwn]);
+  const g = own ? mine.g : headerG, error = own ? mine.error : headerError;
+  const reload = () => { headerReload(); void loadOwn(); };
   const [day, setDay] = useState<string | null>(null);
   const [source, setSource] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [rulesError, setRulesError] = useState<string | null>(null);
   const [domains, setDomains] = useState<string | null>(null);
   const canEdit = kind === "agency"; // a business owner and a client's staff read; the company that looks after the clients sets goals and rules
-  if (error && !g) return <EmptyState title="Growth could not be read" body={error} action={<button type="button" onClick={reload} className="ds-press h-9 rounded-[4px] border border-[var(--t-rule2)] px-3 text-sm">Try again</button>} />;
-  if (!g) return <div className="space-y-4" role="status" aria-busy="true" aria-label="Counting email leads"><Skeleton className="h-16 w-full" /><Skeleton className="h-40 w-full" /></div>;
-  if (g.accounts === 0) return <EmptyState title="No clients to count yet" body="Growth counts new email leads for each client. It appears once SubSync has read a client." />;
+  const bar = <ReportFilterBar f={f} label="Growth" clients={kind === "agency" ? clients : undefined} datesNote="Dates drive the counter, the chart, the sources and the sign ups. The goal is always for this month. Today, This week and This month always mean those calendar stretches." />;
+  if (error && !g) return <div data-testid="growth-tab" className="max-w-5xl"><TabIntro name="Growth" />{bar}<EmptyState title="Growth could not be read" body={error} action={<button type="button" onClick={reload} className="ds-press h-9 cursor-pointer rounded-[4px] border border-[var(--t-rule2)] px-3 text-sm">Try again</button>} /></div>;
+  if (!g) return <div data-testid="growth-tab" className="max-w-5xl"><TabIntro name="Growth" />{bar}<div className="space-y-4" role="status" aria-busy="true" aria-label="Counting email leads"><Skeleton className="h-16 w-full" /><Skeleton className="h-40 w-full" /></div></div>;
+  if (g.accounts === 0) return <div data-testid="growth-tab" className="max-w-5xl"><TabIntro name="Growth" />{bar}<EmptyState title="No clients to count yet" body="Growth counts new email leads for each client. It appears once SubSync has read a client." /></div>;
+  const rangeWord = g.range.label.toLowerCase(), against = `the ${g.range.days} ${g.range.days === 1 ? "day" : "days"} before`;
   const none = g.changes.all.count === 0 && g.gross.signUps === 0;
   const multi = g.scope === "agency";
   const open = (p: Period) => m.open(specPeriod(g, p));
@@ -126,18 +148,27 @@ export function GrowthTab({ m, g, error, reload, kind }: { m: TodayModel; g: Gro
   return (
     <div data-testid="growth-tab" className="max-w-5xl">
       <TabIntro name="Growth" />
+      {bar}
       {g.partial && <p className="t-small t-quiet mb-4" data-testid="growth-partial">SubSync counted the newest 150,000 contacts. Older ones are not in these numbers.</p>}
       {none && <p className="t-small t-quiet mb-6" data-testid="growth-none">No email leads yet. SubSync counts people who have a usable email on their contact. Contacts with no email are not counted.</p>}
 
-      <ul className="mb-10 grid grid-cols-2 gap-x-8 gap-y-6 lg:grid-cols-4" data-testid="growth-counters">
+      <ul className="mb-10 grid grid-cols-2 items-stretch gap-x-6 gap-y-6 md:grid-cols-3 xl:grid-cols-5" data-testid="growth-counters">
+        <li className="min-w-0 border-t border-[var(--t-rule)] pt-3">
+          <button type="button" onClick={() => m.open(specRange(g))} title={`${fmtFull(g.range.count)} new email leads, ${rangeWord}. See them.`} data-testid="growth-range" data-count={g.range.count} aria-label={`${g.range.label}: ${fmtFull(g.range.count)} new email leads. See them.`}
+            className="ds-press flex h-full w-full min-w-0 cursor-pointer flex-col rounded-[4px] text-left hover:bg-[var(--t-wash)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)]">
+            <span className="t-label block truncate">{g.range.label}</span>
+            <span className="t-figure t-num mt-2 block max-w-full truncate">{fmtStat(g.range.count)}</span>
+            <span className="mt-1.5 block"><ChangeLine c={g.range.change} against={against} vs /></span>
+          </button>
+        </li>
         {PERIODS.map((x) => {
           const c = g.changes[x.p];
           return (
-            <li key={x.p} className="border-t border-[var(--t-rule)] pt-3">
+            <li key={x.p} className="min-w-0 border-t border-[var(--t-rule)] pt-3">
               <button type="button" onClick={() => open(x.p)} title={x.info} data-testid={`growth-${x.p}`} data-count={c.count} aria-label={`${x.label}: ${fmtInt(c.count)} new email leads. ${x.info} See them.`}
-                className="ds-press block w-full rounded-[4px] text-left hover:bg-[var(--t-wash)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)]">
-                <span className="t-label block">{x.label}</span>
-                <span className="t-figure mt-2 block">{fmtInt(c.count)}</span>
+                className="ds-press flex h-full w-full min-w-0 cursor-pointer flex-col rounded-[4px] text-left hover:bg-[var(--t-wash)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)]">
+                <span className="t-label block truncate">{x.label}</span>
+                <span className="t-figure t-num mt-2 block max-w-full truncate" title={fmtFull(c.count)}>{fmtStat(c.count)}</span>
                 <span className="mt-1.5 block"><ChangeLine c={c} against={x.against} /></span>
               </button>
             </li>
@@ -145,19 +176,21 @@ export function GrowthTab({ m, g, error, reload, kind }: { m: TodayModel; g: Gro
         })}
       </ul>
 
-      <Section id="growth-chart-h" title="New email leads each day" hint="One bar a day, one person once. The line is the average of the 7 days before. Select a day to see its people."
-        right={g.badge ? (
+      <Section id="growth-chart-h" title={`New email leads each day, ${rangeWord}`} hint="One mark a day, one person once. The dashed line is the average of the 7 days before. Select a day to see its people."
+        right={<span className="flex flex-wrap items-center gap-3"><ModeToggle mode={mode} onChange={setMode} label="New email leads each day" />{g.badge ? (
           <span data-testid="growth-badge" title="The last 7 complete days against the 7 before them" className={`t-small inline-flex items-center rounded-[4px] border px-2 py-1 ${g.badge.direction === "up" ? "border-[var(--t-ok)] text-[var(--t-ok)]" : g.badge.direction === "down" ? "border-[var(--t-bad)] text-[var(--t-bad)]" : "border-[var(--t-rule2)] text-[var(--t-ink2)]"}`}>
             {g.badge.direction === "up" ? "▲ Rising" : g.badge.direction === "down" ? "▼ Falling" : "Steady"}{g.badge.direction === "same" ? "" : ` ${Math.abs(g.badge.pct)}%`}<span className="t-quiet ml-1">last 7 days</span>
           </span>
-        ) : <span className="t-small t-quiet" data-testid="growth-badge-none" title="A rate needs 14 complete days and at least 5 leads in the earlier week.">Rate: not enough data yet</span>}>
-        <GrowthChart series={g.series} selected={day} label="New email leads a day, last 30 days, with the 7 day average" onDay={(d) => { setDay(d); m.open(specDay(g, d)); }} />
+        ) : <span className="t-small t-quiet" data-testid="growth-badge-none" title="A rate needs 14 complete days and at least 5 leads in the earlier week.">Rate: not enough data yet</span>}</span>}>
+        <TimeChart testId="growth-chart" mode={mode} selectedId={day} label={`New email leads a day, ${rangeWord}, with the 7 day average`} noun="Day"
+          points={g.series.map((p) => ({ id: p.day, label: p.label, short: dayLabel(p.day, g.range.days), partial: p.partial }))} series={[{ key: "leads", name: "New email leads", colour: "var(--t-c1)", values: g.series.map((p) => p.count) }]}
+          avg={g.series.map((p) => p.avg7)} onPick={(i) => { const d = g.series[i].day; setDay(d); m.open(specDay(g, d)); }} />
       </Section>
 
       <div className="grid grid-cols-1 gap-x-14 lg:grid-cols-2">
-        <Section id="growth-gross-h" title="Sign ups, then people" hint={`Last ${g.gross.windowDays} days. Copies, test records and staff are taken out.`}>
+        <Section id="growth-gross-h" title="Sign ups, then people" hint={`${g.range.label}. Copies, test records and staff are taken out.`}>
           <ul className="divide-y divide-[var(--t-rule)] border-y border-[var(--t-rule)]" data-testid="growth-gross">
-            <GrossRow label="Sign ups with an email" n={g.gross.signUps} onOpen={() => m.open(specSignUps(g))} testId="gross-signups" info="Every contact added with an email in the last 30 days, before anything is taken out." />
+            <GrossRow label="Sign ups with an email" n={g.gross.signUps} onOpen={() => m.open(specSignUps(g))} testId="gross-signups" info="Every contact added with an email in these dates, before anything is taken out." />
             {([["duplicate", "Extra copies of a person", "The same person again: same email once case, dots and +tags are ignored."], ["junk", "Test or junk records", "Names or emails like test, asdf or example.com, and addresses that are not valid."], ["staff", "Your own staff", "Addresses at the domains you listed as your own."], ["role", "Shared mailboxes", "Addresses like info@ or sales@, which are a business, not a person."]] as const)
               .filter(([k]) => k !== "role" || g.rules.excludeRoleAddresses).map(([k, label, info]) => (
                 <GrossRow key={k} label={label} n={g.gross.removed[k]} minus onOpen={() => m.open(specRemoved(g, k))} testId={`gross-${k}`} info={info} />
@@ -167,7 +200,7 @@ export function GrowthTab({ m, g, error, reload, kind }: { m: TodayModel; g: Gro
           {removedTotal > 0 && <p className="t-small t-quiet mt-2">{fmtInt(removedTotal)} of {fmtInt(g.gross.signUps)} sign ups were taken out.</p>}
         </Section>
 
-        <Section id="growth-goal-h" title="This month's goal" hint={multi ? "Set one for each client in the table below." : "How many new email leads you want this month."}>
+        <Section id="growth-goal-h" title="This month's goal (always this month)" hint={multi ? "Set one for each client in the table below." : "How many new email leads you want this month."}>
           {multi ? (
             g.goal.accountsWithGoal === 0 ? <p className="t-small t-quiet" data-testid="goal-none">No client has a goal yet. Use the pencil in the table below to set one.</p>
               : <div data-testid="goal-card"><p className="t-small mb-2"><span className="t-num" data-testid="goal-sum">{fmtInt(g.goal.count)}</span> of <span className="t-num">{fmtInt(g.goal.total ?? 0)}</span> across {g.goal.accountsWithGoal} {g.goal.accountsWithGoal === 1 ? "client" : "clients"} with a goal</p>{gs && <GoalBar s={gs} />}</div>
@@ -184,10 +217,10 @@ export function GrowthTab({ m, g, error, reload, kind }: { m: TodayModel; g: Gro
         </Section>
       </div>
 
-      <Section id="growth-source-h" title="Where email leads come from" hint="Last 30 days against the 30 before. Select a source to see its people.">
-        {g.mix.total === 0 ? <p className="t-small t-quiet" data-testid="source-none">No email leads in the last 30 days.</p> : (
+      <Section id="growth-source-h" title="Where email leads come from" hint={`${g.range.label} against ${against}. Select a source to see its people.`}>
+        {g.mix.total === 0 ? <p className="t-small t-quiet" data-testid="source-none">No email leads in these dates.</p> : (
           <div className="grid grid-cols-1 gap-x-14 gap-y-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-            <SourceDonut rows={g.mix.rows} total={g.mix.total} selected={source} label="Where email leads came from in the last 30 days" onPick={(s) => { setSource(s); m.open(specSource(g, s)); }} />
+            <SourceDonut rows={g.mix.rows} total={g.mix.total} selected={source} label={`Where email leads came from, ${rangeWord}`} rangeWord={rangeWord} onPick={(s) => { setSource(s); m.open(specSource(g, s)); }} />
             <p className="t-small self-start border-t border-[var(--t-rule)] pt-3 lg:border-l lg:border-t-0 lg:pl-8 lg:pt-0" data-testid="source-line">{g.mix.line}</p>
           </div>
         )}
@@ -204,7 +237,7 @@ export function GrowthTab({ m, g, error, reload, kind }: { m: TodayModel; g: Gro
         </Section>
       )}
 
-      <EmailLeads />
+      <EmailLeads filterClient={f.client && f.client !== "all" ? f.client : null} from={own && f.range && !f.range.problem ? f.range.from : null} to={own && f.range && !f.range.problem ? f.range.to : null} />
 
       <Section id="growth-rules-h" title="How leads are counted">
         <p className="t-small t-quiet max-w-2xl">One person is one lead, found by their email (capital letters, spaces, a +tag and the dots in a Gmail name do not make a new person). A person counts once for each client. Contacts with no email, extra copies, test records, your own staff{g.rules.excludeRoleAddresses ? " and shared mailboxes such as info@" : ""} are left out.</p>

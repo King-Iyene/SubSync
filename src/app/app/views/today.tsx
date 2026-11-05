@@ -6,7 +6,7 @@ import { accountsQuery, parseTodayAccounts, withTodayAccounts } from "@/lib/anal
 import type { TodayData } from "@/lib/analytics/today-types";
 import type { GrowthData } from "@/lib/analytics/growth";
 import type { GoFn } from "../nav";
-import { ApiProvider, useApiClient, useData } from "../session";
+import { ApiProvider, RootApiProvider, useApiClient, useData } from "../session";
 import { EmptyState, Page, remember, remembered, Skeleton, SkeletonRows } from "../ds";
 import { Btn, ErrorBox } from "../ui";
 import { TodayPage } from "./today-page";
@@ -56,7 +56,7 @@ export function TodayView({ go, kind }: { go: GoFn; kind: AccessKind }) {
   const agency = kind === "agency";
   const [picked, setPicked] = useTodayAccounts(agency);
   const scoped = useMemo(() => (picked.length ? base.filtered(accountsQuery(picked)) : base), [base, picked]);
-  return <ApiProvider value={scoped}><TodayBody go={go} kind={kind} picked={picked} setPicked={setPicked} /></ApiProvider>;
+  return <RootApiProvider value={base}><ApiProvider value={scoped}><TodayBody go={go} kind={kind} picked={picked} setPicked={setPicked} /></ApiProvider></RootApiProvider>;
 }
 
 function TodayBody({ go, kind, picked, setPicked }: { go: GoFn; kind: AccessKind; picked: string[]; setPicked: (ids: string[]) => void }) {

@@ -3,6 +3,7 @@ import { buildGrowth, cleanDomain, signalsOf, classify, type GrowthAccount, type
 import { isMissingTable } from "../analytics/today-store";
 import type { AlertDraft } from "../analytics/derive";
 import { json, type AuthContext } from "./auth";
+import { parseReportParams } from "../analytics/report-filter";
 
 // The Growth tab of Today: new email leads, read from the contacts SubSync already holds (src/lib/analytics/growth.ts has every counting rule). Read only, plus two small
 // settings that live in SubSync's own tables (a monthly goal per client account, and which addresses are left out). Which accounts a person may read is decided by the
@@ -54,14 +55,27 @@ export async function accountsOf(installationId: string, permits: (l: string) =>
 
 export async function growthRead(ctx: Ctx, deps: GrowthDeps): Promise<Response> {
   const permits = await deps.permits(ctx);
-  const accounts = await accountsOf(ctx.installationId, permits, await deps.accountUrl(ctx));
+  // The tab's own dates and client. A client the caller may not read is refused here, from the signed session's list, never trusted from the address.
+  const asked = parseReportParams(new URL(ctx.request.url), permits);
+  if (!asked.ok) return json({ error: asked.error }, asked.status);
+  const everyone = await accountsOf(ctx.installationId, permits, await deps.accountUrl(ctx));
+  const accounts = asked.client ? everyone.filter((a) => a.id === asked.client) : everyone;
+  if (asked.client && accounts.length === 0) return json({ error: "That client is not in your list." }, 404);
   const [{ rules, ready: settingsReady }, { goals, ready: goalsReady }, { contacts, partial }] = await Promise.all([
     loadRules(ctx.installationId), loadGoals(ctx.installationId), deps.contactUrl(ctx).then((u) => loadContacts(ctx.installationId, accounts.map((a) => a.id), u)),
   ]);
   const mine = Object.fromEntries(Object.entries(goals).filter(([l]) => permits(l)));
-  const data = buildGrowth({ now: Date.now(), accounts, contacts, rules, goals: mine, scope: ctx.kind === "agency" && accounts.length > 1 ? "agency" : "account", partial, setup: { goalsReady, settingsReady } });
+  const data = buildGrowth({ now: Date.now(), accounts, contacts, rules, goals: mine, scope: ctx.kind === "agency" && accounts.length > 1 ? "agency" : "account", partial, range: asked.from && asked.to ? { from: asked.from, to: asked.to, label: rangeLabel(asked.from, asked.to) } : undefined, setup: { goalsReady, settingsReady } });
   // A client's staff never see which internal addresses the company leaves out.
   return json(ctx.kind === "client" ? { ...data, rules: { ...data.rules, internalDomains: [] } } : data);
+}
+
+/** "Last 7 days" when the dates are exactly that many days ending today, otherwise the two dates. */
+function rangeLabel(from: string, to: string): string {
+  const days = Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000) + 1;
+  const today = new Date().toISOString().slice(0, 10);
+  if (to >= today.slice(0, 10) && [7, 30, 90].includes(days)) return `Last ${days} days`;
+  return from === to ? from : `${from} to ${to}`;
 }
 
 const NEEDS_UPDATE = "Needs the latest database update. Ask the person who manages SubSync to apply it, then try again.";

@@ -52,6 +52,13 @@ export function specPeriod(d: GrowthData, p: Period, locationId?: string): Recor
   return specOf(list, { key: `growth-${p}${locationId ? `-${locationId}` : ""}`, title: `Email leads ${PERIOD_WORD[p]}${who}`, subtitle: PERIOD_SUB[p], count });
 }
 
+const inRange = (d: GrowthData, at: number) => at >= d.range.start && at < d.range.end;
+/** Everyone counted in the chosen dates (the big counter). */
+export function specRange(d: GrowthData): RecordsSpec {
+  const list = counted(d).filter((r) => inRange(d, r.at));
+  return specOf(list, { key: "growth-range", title: `Email leads, ${d.range.label.toLowerCase()}`, subtitle: `New email leads added ${d.range.from} to ${d.range.to}, one per person.`, count: d.range.count });
+}
+
 /** One day of the chart. */
 export function specDay(d: GrowthData, day: string): RecordsSpec {
   const list = counted(d).filter((r) => r.day === day);
@@ -63,17 +70,17 @@ export function specDay(d: GrowthData, day: string): RecordsSpec {
 export function specRemoved(d: GrowthData, why: "duplicate" | "junk" | "staff" | "role" | "all"): RecordsSpec {
   const list = d.records.filter((r) => r.verdict !== "counted" && (why === "all" || r.verdict === why));
   const word = why === "all" ? "left out of the count" : why === "duplicate" ? "that were extra copies of a person" : why === "junk" ? "that look like test or junk records" : why === "staff" ? "from your own staff addresses" : "from shared mailboxes such as info@";
-  return specOf(list, { key: `growth-removed-${why}`, title: `Sign ups ${word}`, subtitle: `Records with an email added in the last ${d.gross.windowDays} days, with the reason each was not counted.`, noun: list.length === 1 ? "sign up" : "sign ups", count: why === "all" ? Object.values(d.gross.removed).reduce((s, n) => s + n, 0) : d.gross.removed[why] });
+  return specOf(list, { key: `growth-removed-${why}`, title: `Sign ups ${word}`, subtitle: `Records with an email added ${d.range.from} to ${d.range.to}, with the reason each was not counted.`, noun: list.length === 1 ? "sign up" : "sign ups", count: why === "all" ? Object.values(d.gross.removed).reduce((s, n) => s + n, 0) : d.gross.removed[why] });
 }
 
 /** Everything with an email in the last 30 days, counted or not (the "sign ups" figure). */
 export function specSignUps(d: GrowthData): RecordsSpec {
-  return specOf(d.records, { key: "growth-signups", title: "Sign ups with an email, last 30 days", subtitle: "Every record with an email added in the last 30 days, with the reason for those that were not counted.", noun: "sign ups", count: d.gross.signUps });
+  return specOf(d.records, { key: "growth-signups", title: `Sign ups with an email, ${d.range.label.toLowerCase()}`, subtitle: `Every record with an email added ${d.range.from} to ${d.range.to}, with the reason for those that were not counted.`, noun: "sign ups", count: d.gross.signUps });
 }
 
 /** One source of the last 30 days. */
 export function specSource(d: GrowthData, source: string): RecordsSpec {
-  const list = counted(d).filter((r) => r.at > d.now - 30 * DAY && sourceLabel(r.source) === source);
+  const list = counted(d).filter((r) => inRange(d, r.at) && sourceLabel(r.source) === source);
   const row = d.mix.rows.find((r) => r.source === source);
-  return specOf(list, { key: `growth-source-${source.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`, title: `Email leads from ${source}, last 30 days`, subtitle: "One per person, newest first.", count: row?.count ?? list.length });
+  return specOf(list, { key: `growth-source-${source.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`, title: `Email leads from ${source}, ${d.range.label.toLowerCase()}`, subtitle: "One per person, newest first.", count: row?.count ?? list.length });
 }

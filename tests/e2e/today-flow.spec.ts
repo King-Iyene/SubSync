@@ -66,8 +66,8 @@ test("everything pressable on Today shows the pointer", async ({ page }) => {
 test("Lead flow: steps and bands open their people, the numbers add up, and the date choices change the leads", async ({ page }) => {
   test.setTimeout(180_000);
   await openTab(page, "Lead flow");
-  await page.getByTestId("flow-preset").selectOption("30d");
-  await expect(page.getByTestId("flow-window")).toContainText("Leads added");
+  await page.getByTestId("filter-preset").selectOption("30d");
+  await expect(page.getByTestId("filter-window")).toContainText(/\d{4}-\d{2}-\d{2}/);
   const chart = page.getByTestId("lead-flow-chart");
   await expect(chart.or(page.getByText("No new leads in these dates"))).toBeVisible({ timeout: 45_000 });
   if (await chart.count() === 0) test.skip(true, "the demo has no new leads in 30 days");
@@ -93,18 +93,18 @@ test("Lead flow: steps and bands open their people, the numbers add up, and the 
   await page.keyboard.press("Escape");
   // Dates: more days never means fewer leads; a custom range works and a wrong one is explained.
   const t30 = total;
-  await page.getByTestId("flow-preset").selectOption("7d");
-  await expect(page.getByTestId("flow-window")).toContainText("Leads added");
+  await page.getByTestId("filter-preset").selectOption("7d");
+  await expect(page.getByTestId("filter-window")).toContainText(/\d{4}-\d{2}-\d{2}/);
   await expect(async () => { const t7 = await page.getByTestId("flow-total").count() ? Number(((await page.getByTestId("flow-total").innerText()).match(/[\d,]+/) ?? ["0"])[0].replace(/,/g, "")) : 0; expect(t7).toBeLessThanOrEqual(t30); }).toPass();
-  await page.getByTestId("flow-preset").selectOption("custom");
-  await expect(page.getByTestId("flow-from")).toBeVisible();
+  await page.getByTestId("filter-preset").selectOption("custom");
+  await expect(page.getByTestId("filter-from")).toBeVisible();
   const today = new Date().toISOString().slice(0, 10);
-  await page.getByTestId("flow-from").fill(today); await page.getByTestId("flow-to").fill("2020-01-01");
-  await expect(page.getByTestId("flow-problem")).toContainText("before");
-  await page.getByTestId("flow-from").fill("2026-10-01"); await page.getByTestId("flow-to").fill(today);
-  await expect(page.getByTestId("flow-problem")).toHaveCount(0);
+  await page.getByTestId("filter-from").fill(today); await page.getByTestId("filter-to").fill("2020-01-01");
+  await expect(page.getByTestId("filter-problem")).toContainText("before");
+  await page.getByTestId("filter-from").fill("2026-10-01"); await page.getByTestId("filter-to").fill(today);
+  await expect(page.getByTestId("filter-problem")).toHaveCount(0);
   await expect(page.getByTestId("flow-window")).toContainText("2026-10-01");
-  for (const p of ["this-month", "last-month"]) { await page.getByTestId("flow-preset").selectOption(p); await expect(page.getByTestId("flow-window")).toContainText("Leads added"); }
+  for (const p of ["this-month", "last-month"]) { await page.getByTestId("filter-preset").selectOption(p); await expect(page.getByTestId("filter-window")).toContainText(/\d{4}-\d{2}-\d{2}/); }
 });
 
 test("Clients coming and going: current count, a clickable weekly chart, and one line saying when it counts from", async ({ page }) => {

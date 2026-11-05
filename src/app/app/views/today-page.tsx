@@ -236,7 +236,7 @@ export function TodayPage({ go, t, kind, reload, sync, syncing, options, picked,
     </section>
   ) : null;
 
-  const growthTab = <GrowthTab m={m} g={growth.data} loading={growth.loading} error={growth.error} reload={growth.reload} kind={kind} />;
+  const growthTab = <GrowthTab m={m} g={growth.data} loading={growth.loading} error={growth.error} reload={growth.reload} kind={kind} clients={options} />;
   const intro = (name: string, node: React.ReactNode) => <><TabIntro name={name} />{node}</>;
   const tabs = [
     { label: "Forecast", node: intro("Forecast", forecast) },
@@ -247,7 +247,7 @@ export function TodayPage({ go, t, kind, reload, sync, syncing, options, picked,
       { label: "Coverage", node: intro("Coverage", <CoverageTab m={m} t={t} />) },
     ] : []),
     { label: "Growth", node: growthTab },
-    { label: "Lead flow", node: <LeadFlowTab m={m} /> },
+    { label: "Lead flow", node: <LeadFlowTab m={m} clients={options} kind={kind} /> },
     ...(coming ? [{ label: "Clients coming and going", node: <ClientsFlowTab m={m} /> }] : []),
   ];
   const allDone = headline.allClear && !t.access.leadsBlocked && !t.access.apptsBlocked && (mine ? mine.calls.noshows.total + mine.calls.confirm.total === 0 : true);

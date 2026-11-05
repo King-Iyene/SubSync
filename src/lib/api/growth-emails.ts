@@ -19,13 +19,15 @@ export async function growthEmails(ctx: Ctx, deps: GrowthDeps): Promise<Response
   const client = url.searchParams.get("client") ?? "";
   const page = Math.max(1, Math.min(10_000, Number(url.searchParams.get("page")) || 1));
   const csv = url.searchParams.get("format") === "csv";
+  const from = url.searchParams.get("from"), to = url.searchParams.get("to");
+  const fromMs = from && /^\d{4}-\d{2}-\d{2}$/.test(from) ? Date.parse(`${from}T00:00:00Z`) : null, toMs = to && /^\d{4}-\d{2}-\d{2}$/.test(to) ? Date.parse(`${to}T00:00:00Z`) + 86_400_000 : null;
   const permits = await deps.permits(ctx);
   const accounts = await accountsOf(ctx.installationId, permits, await deps.accountUrl(ctx));
   const names = new Map(accounts.map((a) => [a.id, a.name]));
   const { rules } = await loadRules(ctx.installationId);
   const { contacts } = await loadContacts(ctx.installationId, accounts.map((a) => a.id), await deps.contactUrl(ctx));
   const verdicts = classify(contacts, rules);
-  const all = contacts.filter((c) => verdicts.get(c.id) === "counted" && (!client || c.locationId === client)
+  const all = contacts.filter((c) => verdicts.get(c.id) === "counted" && (!client || c.locationId === client) && (fromMs === null || (c.at as number) >= fromMs) && (toMs === null || (c.at as number) < toMs)
     && (!q || `${c.email ?? ""} ${c.name} ${names.get(c.locationId) ?? ""} ${c.source ?? ""}`.toLowerCase().includes(q)));
   all.sort((a, b) => (b.at as number) - (a.at as number));
   const toRow = (c: GrowthContact) => ({ id: c.id, locationId: c.locationId, client: names.get(c.locationId) ?? "Client", name: c.name, email: c.email ?? "", source: c.source, at: c.at as number, dnd: c.dnd === true, url: c.url ?? "" });
