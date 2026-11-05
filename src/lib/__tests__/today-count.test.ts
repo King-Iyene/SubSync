@@ -80,12 +80,12 @@ test("one number per fact: the headline, the tiles, the work list, the bars and 
   const oneKd = applyView({ items: view.items.filter((i) => i.locationId === "kd"), totals: { ...view.totals, replies: { ...view.totals.replies, count: 24, shown: 24 }, appointments: { ...view.totals.appointments }, stale: { count: 1, dollars: 5000, shown: 1 } }, accounts, staleDays: 30, now: NOW }, { holds: {}, excludeJunk: false });
   const h = headlineOf({ scope: "account", rows: oneKd.queue, totals: oneKd.totals });
   assert.match(h.text, /^24 people are waiting for a reply\.$/);
-  assert.match(h.breakdown ?? "", /^24 people waiting for a reply \(8 new leads\)/);
+  assert.match(h.breakdown ?? "", /^8 of them are new leads\./);
 
   // headline for every account says clients, and the account list has exactly that many
   const all = headlineOf({ scope: "all", rows: view.queue, totals: view.totals });
   const needing = accountsNeedingYou(view.queue, new Map(accounts.map((a) => [a.id, a])), 100_000);
-  assert.match(all.text, /^2 clients need you today\./);
+  assert.match(all.text, /across 2 clients\.$/);
   assert.equal(needing.total, 2);
   assert.equal(specClients(env).count, needing.total);
   assert.equal(specClients(env).rows.length, needing.total);
@@ -104,7 +104,7 @@ test("one number per fact: the headline, the tiles, the work list, the bars and 
       assert.equal(s.count, n, `${b.name} ${k}: the segment count`);
       assert.equal(s.rows.length, n, `${b.name} ${k}: only the rows of that account and kind`);
       assert.ok(s.rows.every((r) => r.lead?.locationId === b.locationId), `${b.name} ${k}: no row of another account`);
-      assert.ok(s.rows.every((r) => r.cells.kind === (k === "replies" ? "Waiting for a reply" : r.cells.kind)), "only rows of the clicked kind");
+      assert.ok(s.rows.every((r) => r.cells.kind === (k === "replies" ? "Needs a reply" : r.cells.kind)), "only rows of the clicked kind");
     }
   }
   for (const k of KINDS) { assert.equal(specKind(k, env).count, view.totals[k].count); assert.equal(specKind(k, env).rows.length, view.totals[k].count); }
@@ -114,18 +114,18 @@ test("one number per fact: the headline, the tiles, the work list, the bars and 
   assert.ok(!/32/.test(breakdownOf(view.totals) ?? "x"), "the old double count never appears");
 });
 
-test("a list never says 'all client accounts' when the page shows one account, and names exactly what was clicked", () => {
+test("a list never says 'all clients' when the page shows one account, and names exactly what was clicked", () => {
   const { accounts, view } = fixture();
   const one = applyView({ items: view.items.filter((i) => i.locationId === "kd"), totals: { ...view.totals, replies: { count: 24, dollars: null, shown: 24, newLeads: 8 } }, accounts: [accounts[0]], staleDays: 30, now: NOW }, { holds: {}, excludeJunk: false });
   const env: SpecEnv = { now: NOW, view: one, accounts: [accounts[0]], staleDays: 30, targetMinutes: 15, ledger: [], scope: "all", excluded: false };
   const s = specKind("replies", env);
-  assert.equal(s.title, "KD Squares LTD, waiting for a reply");
-  assert.doesNotMatch(s.title, /all client accounts/i);
+  assert.equal(s.title, "KD Squares LTD, needs a reply");
+  assert.doesNotMatch(s.title, /all clients/i);
   assert.equal(s.count, 24);
   assert.equal(s.rows.length, 24);
   const everyone = specKind("replies", fixture().env);
-  assert.match(everyone.title, /^All client accounts, waiting for a reply$/);
-  assert.equal(specKind("replies", fixture().env, "kd").title, "KD Squares LTD, waiting for a reply");
+  assert.match(everyone.title, /^All clients, needs a reply$/);
+  assert.equal(specKind("replies", fixture().env, "kd").title, "KD Squares LTD, needs a reply");
 });
 
 test("the Reply now list is the people, longest wait first, each with one row key that names them", () => {
@@ -155,7 +155,7 @@ test("100 or 1,000 accounts: the totals are right, the inline cut is 5 rows, and
   const headline = headlineOf({ scope: "all", rows: view.queue, totals: view.totals });
   assert.equal(INLINE_ROWS, 5, "no list shows more than five rows inline");
   assert.equal(needing.total, N);
-  assert.match(headline.text, new RegExp(`^${N} clients need you today`));
+  assert.match(headline.text, new RegExp(`across ${N} clients\\.$`));
   const full = specClients(env);
   assert.equal(full.count, N, "the full list opens with the headline's count");
   assert.equal(full.rows.length, N);
@@ -164,7 +164,7 @@ test("100 or 1,000 accounts: the totals are right, the inline cut is 5 rows, and
   const bars = accountBars(view.queue);
   assert.equal(bars.bars.length, 8);
   assert.equal(bars.accounts - bars.bars.length, N - 8);
-  assert.match(barsTitle(bars), /Each bar is one client account/);
+  assert.match(barsTitle(bars), /Each bar is one client\./);
   // the page itself is paged by the panel: 50 rows a page, so 150 accounts are three pages
   assert.equal(Math.ceil(full.rows.length / 50), 3);
 });

@@ -327,7 +327,7 @@ export function donutTitle(t: Totals): string {
   if (s.length === 0) return "Nothing needs attention right now";
   const top = [...s].sort((a, b) => b.count - a.count)[0];
   const total = s.reduce((x, y) => x + y.count, 0);
-  return `${total.toLocaleString("en-US")} things need attention, most of them ${top.label.toLowerCase()} (${top.count.toLocaleString("en-US")})`;
+  return `${total.toLocaleString("en-US")} things need attention, the biggest group is ${top.label.toLowerCase()} (${top.count.toLocaleString("en-US")})`;
 }
 
 // ---------- the per-account bars ----------

@@ -70,7 +70,7 @@ test("one row per account and kind; the count is the rows behind it; the age is 
   assert.equal(maple.count, 2);
   assert.equal(maple.itemIds.length, 2);
   assert.equal(maple.ageMinutes, 300);
-  assert.equal(maple.text, "2 people waiting for a reply");
+  assert.equal(maple.text, "2 people need a reply");
   assert.equal(maple.severity, "critical", "a person waiting an hour or more is critical");
 });
 
@@ -81,7 +81,7 @@ test("row wording is short plain words and has no jargon", () => {
     assert.ok(words >= 4 && words <= 10, `${k}: "${r.text}" has ${words} words`);
     assert.doesNotMatch(r.text, /\bSLA\b|\bstale\b|pipeline at risk|past the target/i, `${k}: no bare jargon`);
   }
-  assert.equal(queueOf([item("stale", "aaa", { value: 10 })])[0].text, "1 open deal gone quiet");
+  assert.equal(queueOf([item("stale", "aaa", { value: 10 })])[0].text, "1 open deal has gone quiet");
 });
 
 test("severity thresholds", () => {
@@ -104,17 +104,18 @@ test("a capped list is marked partial so the screen says so", () => {
 test("the headline: clients and counted dollars, built from existing figures", () => {
   const items = [item("replies", "aaa"), item("replies", "bbb"), item("stale", "ccc", { value: 48_200 })];
   const h = headlineOf({ scope: "all", rows: queueOf(items), totals: totalsFrom(items) });
-  assert.equal(h.text, "3 clients need you today. $48,200 is at risk.");
-  assert.equal(h.breakdown, "2 people waiting for a reply and 1 deal gone quiet.");
+  assert.equal(h.text, "2 people are waiting for a reply across 3 clients.");
+  assert.equal(h.breakdown, "Also 1 quiet deal, worth $48,200.");
   assert.equal(h.allClear, false);
   const one = headlineOf({ scope: "all", rows: queueOf([item("replies", "aaa")]), totals: totalsFrom([item("replies", "aaa")]) });
-  assert.equal(one.text, "1 client needs you today.", "no dollars, no dollar sentence");
+  assert.equal(one.text, "1 person is waiting for a reply across 1 client.");
 });
 
 test("one deal that is most of the stalled money is said out loud, never hidden in the total", () => {
   const items = [item("stale", "aaa", { value: 900_000 }), item("stale", "bbb", { value: 100_000 })];
   const h = headlineOf({ scope: "all", rows: queueOf(items), totals: totalsFrom(items), outlier: { value: 900_000, share: 0.9 } });
-  assert.equal(h.text, "2 clients need you today. $1,000,000 is at risk. One deal is $900,000 of that.");
+  assert.equal(h.text, "2 clients have something to do today.");
+  assert.match(h.breakdown ?? "", /\$1,000,000\. One deal is \$900,000 of the quiet-deal money\.$/);
 });
 
 test("the headline never counts an estimate as money at risk", () => {
@@ -127,9 +128,9 @@ test("an account's own headline counts things, and says all clear plainly", () =
   const items = [item("replies", "aaa"), item("appointments", "aaa"), item("appointments", "aaa")];
   assert.equal(headlineOf({ scope: "account", rows: queueOf(items), totals: totalsFrom(items) }).text, "1 person is waiting for a reply.", "one account leads with the thing to do first");
   const noReplies = [item("appointments", "aaa"), item("appointments", "aaa"), item("noshows", "aaa")];
-  assert.equal(headlineOf({ scope: "account", rows: queueOf(noReplies), totals: totalsFrom(noReplies) }).text, "3 things need you today.");
+  assert.equal(headlineOf({ scope: "account", rows: queueOf(noReplies), totals: totalsFrom(noReplies) }).text, "3 things need a look today.");
   assert.equal(headlineOf({ scope: "account", rows: [], totals: emptyTotals() }).text, "You are all caught up today.");
-  assert.equal(headlineOf({ scope: "all", rows: [], totals: emptyTotals() }).text, "Every client account is on track today.");
+  assert.equal(headlineOf({ scope: "all", rows: [], totals: emptyTotals() }).text, "Every client is on track today.");
   assert.equal(headlineOf({ scope: "all", rows: [], totals: emptyTotals() }).allClear, true);
 });
 
@@ -166,7 +167,7 @@ test("donut slices: one per kind with something in it, shares add up to 100, the
   assert.equal(s.reduce((a, x) => a + x.share, 0), 100);
   for (const slice of s) assert.equal(slice.count, scopeRows(queueOf(items), { accounts: [], kind: slice.kind }).reduce((a, r) => a + r.itemIds.length, 0), `${slice.kind}: the slice count is the number of rows in its list`);
   assert.equal(slicesOf(emptyTotals()).length, 0);
-  assert.match(donutTitle(t), /^10 things need attention, most of them waiting for a reply \(7\)$/);
+  assert.match(donutTitle(t), /^10 things need attention, the biggest group is needs a reply \(7\)$/);
 });
 
 test("slice shares use largest remainder so thirds still add up", () => {
@@ -182,8 +183,8 @@ test("bars: top accounts by things to fix, with the tooltip in words", () => {
   const b = accountBars(q, 2);
   assert.deepEqual(b.bars.map((x) => x.name), ["Harbor Realty", "North Roofing"]);
   assert.equal(b.accounts, 3);
-  assert.equal(barTooltip(b.bars[0], q), "Harbor Realty: 4 people waiting for a reply, 1 deal gone quiet, $6,300 at stake");
-  assert.equal(barsTitle(b), "Harbor Realty has the most to do: 5 things. Each bar is one client account.");
+  assert.equal(barTooltip(b.bars[0], q), "Harbor Realty: 4 people need a reply, 1 quiet deal, $6,300 in quiet deals");
+  assert.equal(barsTitle(b), "Harbor Realty has the most to do, with 5 things. Each bar is one client.");
   assert.equal(accountBars([]).bars.length, 0);
 });
 
@@ -191,7 +192,7 @@ test("accounts needing you: one row each, worst first, with the one reason and p
   const q = queueOf([item("replies", "aaa", { at: NOW - 3 * H }), item("appointments", "aaa"), item("stale", "ccc", { value: 9000 })]);
   const r = accountsNeedingYou(q, ACCOUNTS, 5);
   assert.deepEqual(r.rows.map((x) => [x.name, x.state]), [["North Roofing", "Needs a look"], ["Maple Dental", "Needs you now"]]);
-  assert.equal(r.rows[1].reason, "1 person waiting for a reply");
+  assert.equal(r.rows[1].reason, "1 person needs a reply");
   assert.equal(r.total, 2);
 });
 
@@ -257,12 +258,12 @@ test("what SubSync caught: raised, cleared and still open over 7 days, said with
 test("share text is the headline and the top three, in plain words", () => {
   const items = [item("stale", "ccc", { value: 12000, at: NOW - 40 * D }), item("replies", "aaa"), item("appointments", "bbb"), item("noshows", "bbb"), item("replies", "aaa")];
   const q = queueOf(items);
-  const text = shareText({ who: "Your client accounts", headline: headlineOf({ scope: "all", rows: q, totals: totalsFrom(items) }), rows: q });
+  const text = shareText({ who: "Your clients", headline: headlineOf({ scope: "all", rows: q, totals: totalsFrom(items) }), rows: q });
   const lines = text.split("\n");
-  assert.equal(lines[0], "Your client accounts: Today");
-  assert.match(lines[1], /^3 clients need you today\. \$12,000 is at risk\.$/);
+  assert.equal(lines[0], "Your clients: Today");
+  assert.match(lines[1], /across 3 clients\.$/);
   assert.equal(lines.filter((l) => /^\d\. /.test(l)).length, 3);
-  assert.match(text, /1\. North Roofing: 1 open deal gone quiet, \$12,000 at stake, wrong for 40 days/);
+  assert.match(text, /1\. North Roofing: 1 open deal has gone quiet, \$12,000 in deals, open for 40 days/);
 });
 
 test("ages in words", () => {

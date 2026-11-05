@@ -5,7 +5,7 @@ import { describeTodayView, filterCommands, sanitizeTodayView, todayViewName } f
 const cmds = [
   { group: "Go to", title: "Fix first", hint: "The queue", keywords: "queue" },
   { group: "Open list", title: "Leads waiting now", hint: "13 leads" },
-  { group: "Client account", title: "Bright Smile Dental", keywords: "account" },
+  { group: "Client", title: "Bright Smile Dental", keywords: "account" },
   { group: "Do", title: "Print the report", keywords: "pdf paper" },
 ];
 
@@ -42,8 +42,8 @@ describe("saved views of Today", () => {
   });
   it("describes a view in plain words", () => {
     const names = new Map([["abc123", "Bright Smile Dental"]]);
-    assert.equal(describeTodayView({ accounts: [], excludeJunk: false }, names), "All client accounts");
+    assert.equal(describeTodayView({ accounts: [], excludeJunk: false }, names), "All clients");
     assert.equal(describeTodayView({ accounts: ["abc123"], excludeJunk: true }, names), "Bright Smile Dental, leaving out test and very old deals");
-    assert.equal(describeTodayView({ accounts: ["a1b2c3", "d4e5f6"], excludeJunk: false }, names), "2 client accounts");
+    assert.equal(describeTodayView({ accounts: ["a1b2c3", "d4e5f6"], excludeJunk: false }, names), "2 clients");
   });
 });

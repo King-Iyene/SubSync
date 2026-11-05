@@ -87,7 +87,7 @@ test("filters: a facet chip, the date range, and search narrow the rows and neve
   const s = spec();
   assert.equal(filterRecs(s, emptyFilter()).length, ITEMS.length);
   assert.equal(filterRecs(s, { ...emptyFilter(), facets: { account: ["Maple Dental"] } }).length, 10);
-  assert.equal(filterRecs(s, { ...emptyFilter(), facets: { account: ["Maple Dental"], kind: ["Waiting for a reply"] } }).length, 7);
+  assert.equal(filterRecs(s, { ...emptyFilter(), facets: { account: ["Maple Dental"], kind: ["Needs a reply"] } }).length, 7);
   assert.equal(filterRecs(s, { ...emptyFilter(), facets: { owner: ["Marcus"] } }).length, 7);
   assert.equal(filterRecs(s, { ...emptyFilter(), facets: { owner: ["(none)"] } }).length, ITEMS.length - 7);
   assert.equal(filterRecs(s, { ...emptyFilter(), q: "facebook" }).length, 7);
@@ -121,7 +121,7 @@ test("CSV: only the columns shown, escaped, and a formula cell is neutralised", 
   const cols = s.cols.filter((c) => ["what", "account"].includes(c.key));
   const lines = toCsv(cols, s.rows.slice(0, 2)).trim().split("\r\n");
   assert.equal(lines.length, 3);
-  assert.equal(lines[0], "What,Client account");
+  assert.equal(lines[0], "What,Client");
   assert.ok(!lines.join("").includes("crm.example.com"));
 });
 

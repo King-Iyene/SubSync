@@ -131,7 +131,7 @@ test("the list behind 'N snoozed' has exactly N rows, and the brief says what th
   const lines = briefLines({ headline, rows: v.queue, setAside: v.held.length });
   assert.equal(lines[0], headline.text);
   assert.ok(lines.some((l) => l.startsWith("1. Maple Dental")));
-  assert.ok(lines.some((l) => /1 item is set aside/.test(l)));
+  assert.ok(lines.some((l) => /1 item is snoozed or marked done/.test(l)));
 });
 
 test("the one-deal sentence is worked out from the deals still counted: a junk or set-aside deal is never named as most of the money", () => {

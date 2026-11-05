@@ -179,7 +179,7 @@ test("forecast: leads inside their reply window pass the target at arrival plus 
   const f = forecastOf(c, [{ id: "d", kind: "stale", locationId: "aaa", accountName: "A", name: "D", at: NOW + H, value: 2500, contactId: null, url: "u" }], []);
   assert.equal(f.next!.name, "Soonest");
   assert.equal(f.dealDollars, 2500);
-  assert.equal(forecastLine(f, 15), "If nobody acts today: 2 leads will pass the 15-minute reply target, 1 deal ($2,500) will go quiet.");
+  assert.equal(forecastLine(f, 15), "If nothing changes today: 2 leads will pass the 15-minute reply target, 1 deal ($2,500) will go quiet.");
   assert.equal(forecastLine(forecastOf([], [], []), 15), "Nothing is about to go wrong today.");
 });
 
