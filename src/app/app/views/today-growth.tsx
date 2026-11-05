@@ -183,7 +183,7 @@ export function GrowthTab({ m, g: headerG, error: headerError, reload: headerRel
           </span>
         ) : <span className="t-small t-quiet" data-testid="growth-badge-none" title="A rate needs 14 complete days and at least 5 leads in the earlier week.">Rate: not enough data yet</span>}</span>}>
         <TimeChart testId="growth-chart" mode={mode} selectedId={day} label={`New email leads a day, ${rangeWord}, with the 7 day average`} noun="Day"
-          points={g.series.map((p) => ({ id: p.day, label: p.label, short: dayLabel(p.day, g.range.days), partial: p.partial }))} series={[{ key: "leads", name: "New email leads", colour: "var(--t-c1)", values: g.series.map((p) => p.count) }]}
+          points={g.series.map((p) => ({ id: p.day, label: new Date(`${p.day}T12:00:00Z`).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }), short: dayLabel(p.day, g.range.days), partial: p.partial }))} series={[{ key: "leads", name: "New email leads", colour: "var(--t-c1)", values: g.series.map((p) => p.count) }]}
           avg={g.series.map((p) => p.avg7)} onPick={(i) => { const d = g.series[i].day; setDay(d); m.open(specDay(g, d)); }} />
       </Section>
 

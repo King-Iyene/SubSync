@@ -3,8 +3,8 @@
 
 export type TabTag = "To do" | "Report";
 export const TAB_META = {
-  Forecast: { tag: "To do", subtitle: "What will slip later today if nobody acts: replies, deals and appointments about to be late." },
-  Proof: { tag: "Report", subtitle: "What SubSync caught and what was fixed, to show a client." },
+  Forecast: { tag: "To do", subtitle: "What is about to go wrong later today if nobody acts, in a sentence and a short list." },
+  Proof: { tag: "Report", subtitle: "How many problems SubSync found this week, how many are fixed and how many still need you." },
   People: { tag: "Report", subtitle: "How the people waiting for a reply are shared between your team." },
   Sources: { tag: "Report", subtitle: "How fast each source of leads gets a first reply." },
   Coverage: { tag: "Report", subtitle: "Which hours of the day leads wait the longest for a reply." },

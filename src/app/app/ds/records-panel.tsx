@@ -22,6 +22,7 @@ import { LeadDrawer, type LeadSeed } from "./lead-drawer";
 // pressed; when you narrow the list it says "12 of 183". Esc and the cross close it, focus stays inside it and goes back to where it was when it closes.
 // The rows are whatever the page already received for this person, so narrowing or exporting can never reach more than they were sent.
 
+import { StatusChip } from "./status-chip";
 const PAGE = 50;
 const ICON: Record<ColType, LucideIcon> = { text: Type, date: CalendarDays, number: Hash, money: DollarSign, duration: Clock, link: Link2, kind: Tag };
 const FIRST_CHIPS = ["account", "kind", "state", "what", "owner"];
@@ -34,7 +35,7 @@ function Cellv({ col, v, zone }: { col: Col; v: Cell; zone: string }) {
   if (col.type === "money") return <span className="tnum">{cellText(col, v)}</span>;
   if (col.type === "duration") return <span className="tnum">{typeof v === "number" ? ageWords(v) : String(v)}</span>;
   if (col.type === "date") return <span className="tnum whitespace-nowrap">{cellText(col, v, zone)}</span>;
-  if (col.type === "kind") return <span className="inline-block max-w-full truncate rounded-md border bg-muted/60 px-1.5 py-0.5 text-xs font-medium">{String(v)}</span>;
+  if (col.type === "kind") return <StatusChip word={String(v)} />;
   return <span className="break-words">{String(v)}</span>;
 }
 
@@ -129,7 +130,7 @@ export function RecordsPanel({ spec, onClose, now, zone = "UTC", canExport = tru
   const range = rangeChoices(now);
   const rangeLabel = filter.range ? (range.find((r) => r.from === filter.range!.from && r.to === filter.range!.to)?.label ?? "Custom") : "Any time";
   const sortBy = (k: string) => setSort((s) => (s?.key !== k ? { key: k, dir: "asc" } : s.dir === "asc" ? { key: k, dir: "desc" } : null));
-  const totalW = spec.cols.reduce((s, c) => s + (c.w ?? 10), 0);
+  const totalW = spec.cols.reduce((s, c) => s + (c.primary ? Math.max(c.w ?? 10, 12) : (c.w ?? 10)), 0) + (rowAction ? 11 : 0);
 
   const chip = "inline-flex min-h-8 items-center gap-1 rounded-lg border bg-card px-2.5 text-sm hover:border-primary/40 focus-visible:outline-2 focus-visible:outline-[var(--ring)]";
   const iconBtn = "inline-flex size-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-[var(--ring)]";
@@ -250,9 +251,10 @@ export function RecordsPanel({ spec, onClose, now, zone = "UTC", canExport = tru
           ) : (
             <table className="w-full table-fixed border-separate border-spacing-0 text-sm" style={{ minWidth: `${totalW}rem` }} data-testid="records-table">
               <caption className="sr-only">{spec.title}: {spec.subtitle}</caption>
-              <colgroup>{spec.cols.map((c) => <col key={c.key} style={{ width: `${c.w ?? 10}rem` }} />)}</colgroup>
+              <colgroup>{rowAction && <col style={{ width: "2.75rem" }} />}{spec.cols.map((c) => <col key={c.key} style={{ width: `${c.primary ? Math.max(c.w ?? 10, 12) : (c.w ?? 10)}rem` }} />)}{rowAction && <col style={{ width: "8rem" }} />}</colgroup>
               <thead>
                 <tr>
+                  {rowAction && <th scope="col" className="sticky top-0 z-10 border-b bg-muted p-0 pl-4"><span className="sr-only">Select</span></th>}
                   {spec.cols.map((c) => {
                     const I = ICON[c.type];
                     const s = sort?.key === c.key ? sort.dir : null;
@@ -265,23 +267,24 @@ export function RecordsPanel({ spec, onClose, now, zone = "UTC", canExport = tru
                       </th>
                     );
                   })}
+                  {rowAction && <th scope="col" className="sticky top-0 z-10 border-b bg-muted px-3 pr-5 text-right text-xs font-semibold text-muted-foreground"><span className="sr-only">Action</span></th>}
                 </tr>
               </thead>
               <tbody>
                 {shown.map((r) => (
                   <tr key={r.id} data-testid="records-row" className="group hover:bg-accent/40">
-                    {spec.cols.map((c) => (
-                      <td key={c.key} className="relative border-b px-3 py-2 align-middle first:pl-5">
+                    {rowAction && <td className="border-b py-2 pl-4 pr-0 align-middle"><input type="checkbox" className="size-4 shrink-0 cursor-pointer" aria-label={`Select ${String(r.cells[spec.cols.find((x) => x.primary)?.key ?? ""] ?? "this row")}`} checked={picked.has(r.id)} onChange={(e) => setPicked((p) => { const n = new Set(p); if (e.target.checked) n.add(r.id); else n.delete(r.id); return n; })} data-testid="records-pick" /></td>}
+                    {spec.cols.map((c, ci) => (
+                      <td key={c.key} className={`relative border-b px-3 py-2 align-middle ${ci === 0 && !rowAction ? "pl-5" : ""}`}>
                         {c.primary ? (
                           <div className="flex items-center gap-2 pr-1">
-                            {rowAction && <input type="checkbox" className="size-4 shrink-0 cursor-pointer" aria-label={`Select ${String(r.cells[c.key] ?? "this row")}`} checked={picked.has(r.id)} onChange={(e) => setPicked((p) => { const n = new Set(p); if (e.target.checked) n.add(r.id); else n.delete(r.id); return n; })} data-testid="records-pick" />}
-                            <span className="min-w-0 flex-1 break-words font-medium"><Cellv col={c} v={r.cells[c.key] ?? null} zone={zone} /></span>
-                            {rowAction && <button type="button" disabled={working} onClick={() => void runAction([r])} data-testid="records-row-action" aria-label={`${rowAction.label}: ${String(r.cells[c.key] ?? "this row")}`} className="ds-press inline-flex min-h-7 shrink-0 cursor-pointer items-center rounded-md border bg-card px-2 text-xs font-medium hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50">{rowAction.label}</button>}
+                            <span className="min-w-0 flex-1 truncate font-medium [&>span]:block [&>span]:truncate" title={String(r.cells[c.key] ?? "")}><Cellv col={c} v={r.cells[c.key] ?? null} zone={zone} /></span>
                             <RowOpen rec={r} onLead={() => { const i = leadRows.findIndex((x) => x.id === r.id); if (i >= 0) setLead(i); }} />
                           </div>
                         ) : <Cellv col={c} v={r.cells[c.key] ?? null} zone={zone} />}
                       </td>
                     ))}
+                    {rowAction && <td className="border-b py-2 pl-3 pr-5 text-right align-middle"><button type="button" disabled={working} onClick={() => void runAction([r])} data-testid="records-row-action" aria-label={`${rowAction.label}: ${String(r.cells[spec.cols.find((x) => x.primary)?.key ?? ""] ?? "this row")}`} className="ds-press inline-flex min-h-7 shrink-0 cursor-pointer items-center rounded-md border bg-card px-2 text-xs font-medium hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50">{rowAction.label}</button></td>}
                   </tr>
                 ))}
               </tbody>

@@ -676,3 +676,7 @@ Code: `src/lib/analytics/growth.ts` (rules), `growth-records.ts` (the people beh
 
 ## Today urgency words
 "Urgent" is rare on purpose. A reply row is Urgent only when its oldest wait is **4 hours or more**, or **10 or more** people wait; otherwise it is "Soon". Quiet deals are Urgent only at **25 or more**; no-shows are "Soon"; appointments with no outcome are "Soon" at 5 or more, else "Can wait". Never answered alone no longer makes a row urgent.
+
+
+## Range semantics of the report tabs (5 Nov 2026)
+Dates are whole local days, first and last included, in each client's own time zone for lead counts. The comparison is the same number of days directly before the chosen ones ("vs the 30 days before"); under 5 leads before, it says "Too few to compare". Today, This week, This month and All time are always calendar stretches, and the monthly goal is always this month. Sources compare the chosen dates against the days before them. Proof covers the last 7 days and Sources and Coverage the last 14 days of leads SubSync holds, so those tabs filter by client only.
