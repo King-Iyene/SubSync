@@ -1,6 +1,8 @@
 "use client";
 
-import { TagPill } from "./what-is";
+import { TagPill, WhatIs } from "./what-is";
+import { ModeToggle, TimeChart, useChartMode } from "./time-chart";
+import { fmtStat } from "@/lib/analytics/chart-format";
 import { ChevronRight, CircleAlert, Clock, TriangleAlert, UserRound } from "lucide-react";
 import { useState } from "react";
 import { ageWords, money, replyWords } from "@/lib/analytics/today-queue";
@@ -139,57 +141,46 @@ export function ComingBlock({ forecast, targetMinutes, onOpen }: { forecast: For
   );
 }
 
-/** Leads by the hour they arrived: how many were answered inside the target and how many were not. A gap hour is marked with an icon and a word. */
+/** Leads by the hour they arrived: how many were answered inside the target and how many were not (bars or a line). A gap hour carries a warning mark and a word. */
 export function HourStrip({ stats, title, targetMinutes, onOpen }: { stats: HourStat[]; title: string; targetMinutes: number; onOpen: (hour: number) => void }) {
-  const [hot, setHot] = useState<number | null>(null);
-  const max = Math.max(1, ...stats.map((s) => s.leads));
-  const H = 96;
-  const tip = hot === null ? null : stats[hot];
+  const [mode, setMode] = useChartMode("coverage");
   return (
-    <figure className="min-w-0" data-testid="hour-strip">
-      <figcaption className="t-title mb-1" data-testid="hour-title">{title}</figcaption>
-      <p className="mb-2 text-xs text-muted-foreground">Select an hour to see its leads. Hours use each client&apos;s own time zone.</p>
-      <div className="grid grid-cols-[repeat(24,minmax(0,1fr))] gap-[3px]">
-        {stats.map((s) => (
-          <button key={s.hour} type="button" disabled={s.leads === 0} onClick={() => onOpen(s.hour)} onMouseEnter={() => setHot(s.hour)} onMouseLeave={() => setHot(null)} onFocus={() => setHot(s.hour)} onBlur={() => setHot(null)}
-            data-testid="hour-bar" data-hour={s.hour} data-leads={s.leads} data-gap={s.gap} aria-label={`${hourWords(s.hour)}: ${s.leads} leads, ${s.within} answered within ${targetMinutes} minutes, ${s.missed} not.${s.gap ? " A gap hour." : ""}${s.leads ? " See the leads." : ""}`}
-            className="ds-press group flex min-w-0 flex-col items-stretch rounded-md pb-0.5 hover:bg-muted focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--ring)] disabled:cursor-default disabled:hover:bg-transparent">
-            <span className="flex flex-col justify-end" style={{ height: H }} aria-hidden>
-              <span className="block bg-primary" style={{ height: Math.max(s.missed > 0 ? 2 : 0, (s.missed / max) * H), borderRadius: "3px 3px 0 0" }} />
-              <span className="block bg-foreground/25" style={{ height: Math.max(s.within > 0 ? 2 : 0, (s.within / max) * H) }} />
-            </span>
-            <span className="mt-0.5 flex h-4 items-center justify-center text-[10px] text-muted-foreground">{s.gap ? <TriangleAlert aria-hidden className="size-3 text-warning" /> : s.hour % 6 === 0 ? hourWords(s.hour).replace(" ", "") : ""}</span>
-          </button>
-        ))}
+    <figure className="min-w-0 max-w-3xl" data-testid="hour-strip">
+      <div className="mb-2 flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+        <figcaption className="t-title min-w-0 flex-1" data-testid="hour-title">{title} <WhatIs text={`Select an hour to see its leads. Hours use each client's own time zone. A gap hour has at least 5 leads and fewer than half were answered within ${targetMinutes} minutes.`} /></figcaption>
+        <ModeToggle mode={mode} onChange={setMode} label="Coverage by hour" />
       </div>
-      <ul className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted-foreground" aria-label="What the bars mean">
-        <li className="flex items-center gap-1.5"><span aria-hidden className="h-2.5 w-3 bg-primary" />Not answered within {targetMinutes} minutes</li>
-        <li className="flex items-center gap-1.5"><span aria-hidden className="h-2.5 w-3 bg-foreground/25" />Answered within {targetMinutes} minutes</li>
-        <li className="flex items-center gap-1.5"><TriangleAlert aria-hidden className="size-3 text-warning" />Gap hour: fewer than half answered in time</li>
-      </ul>
-      <p className="mt-1 min-h-10 text-sm leading-5" role="status" aria-live="polite" data-testid="hour-tip">{tip ? (tip.leads === 0 ? `${hourWords(tip.hour)}: no leads in the last 14 days.` : `${hourWords(tip.hour)}: ${tip.leads} leads, ${tip.within} answered within ${targetMinutes} minutes, ${tip.missed} not.${tip.gap ? " This hour is a gap." : ""}`) : ""}</p>
+      <TimeChart testId="hour" mode={mode} labelEvery={3} noun="Hour" hint="Hover or focus an hour for its numbers. Select it to see its leads."
+        label={`Leads by the hour they arrived, last 14 days: answered within ${targetMinutes} minutes, and not`}
+        points={stats.map((s) => ({ id: String(s.hour), label: hourWords(s.hour), short: hourWords(s.hour).replace(" ", "") }))}
+        series={[{ key: "within", name: `Answered within ${targetMinutes} min`, colour: "var(--t-c1)", values: stats.map((s) => s.within) }, { key: "missed", name: "Not answered in time", colour: "var(--t-c3)", values: stats.map((s) => s.missed) }]}
+        flags={stats.map((s) => s.gap)} flagWord="Gap hour: fewer than half answered in time" onPick={(i) => { if (stats[i].leads > 0) onOpen(i); }} />
     </figure>
   );
 }
 
 const trackBtn = "ds-press grid w-full items-center gap-x-3 rounded-[4px] px-2 py-1.5 text-left hover:bg-muted focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--ring)]";
 
-/** Speed by source: a thin bar per source, longest wait longest. Fixed columns, so every row lines up. */
+/** Speed by source, compact: the source (cut short with the full name on hover), a small bar for its share of leads, the number of leads and the typical first reply. */
 export function SourceBars({ stats, title, onOpen }: { stats: SourceStat[]; title: string; onOpen: (name: string) => void }) {
-  const max = Math.max(1, ...stats.map((s) => s.medianSeconds ?? 0));
+  const max = Math.max(1, ...stats.map((s) => s.leads));
+  const grid = "grid-cols-[minmax(0,1.3fr)_minmax(4rem,1fr)_3.5rem_6.5rem]";
+  const none = stats.length === 1 && stats[0].name === "No source recorded";
   return (
-    <figure className="min-w-0" data-testid="source-bars">
-      <figcaption className="t-title mb-1" data-testid="source-title">{title}</figcaption>
-      <p className="mb-2 text-xs text-muted-foreground">How fast each source gets a first reply, last 14 days. A typical time needs 5 or more replies. Select a source to see its leads.</p>
-      <div className="grid grid-cols-[minmax(0,1.2fr)_minmax(0,2fr)_7rem_5.5rem] gap-x-3 px-2 pb-1 t-label" aria-hidden><span>Source</span><span>Typical first reply</span><span className="text-right">Time</span><span className="text-right">Leads</span></div>
+    <figure className="min-w-0 max-w-2xl" data-testid="source-bars">
+      <figcaption className="t-title mb-2" data-testid="source-title">{title} <WhatIs text="How fast each source gets a first reply, last 14 days. A typical time needs 5 or more replies. Select a source to see its leads." /></figcaption>
+      {none && (
+        <p className="t-small mb-2" data-testid="source-hint">None of these leads says where it came from. <WhatIs text="Sources are filled in when a lead arrives through a tracked form, a link with UTM tags (utm_source) or an ad. Turn those on and this table will show which sources get answered fastest." /></p>
+      )}
+      <div className={`grid ${grid} gap-x-3 px-2 pb-1 t-label`} aria-hidden><span>Source</span><span>Share of leads</span><span className="text-right">Leads</span><span className="text-right">Typical first reply</span></div>
       <ul className="divide-y border-y">
         {stats.map((s) => (
           <li key={s.name}>
-            <button type="button" onClick={() => onOpen(s.name)} data-testid="source-row" data-leads={s.leads} className={`${trackBtn} grid-cols-[minmax(0,1.2fr)_minmax(0,2fr)_7rem_5.5rem]`} aria-label={`${s.name}: ${s.leads} leads${s.medianSeconds === null ? ", not enough replies for a typical time" : `, typical first reply ${replyWords(s.medianSeconds)}`}. See the leads.`}>
-              <span className="break-words text-sm font-medium">{s.name}</span>
-              <span className="relative block h-2.5 border-l border-foreground/30" aria-hidden>{s.medianSeconds !== null && <span className="ds-grow-x block h-full rounded-r-[4px] bg-primary" style={{ width: `${Math.max(2, (s.medianSeconds / max) * 100)}%` }} />}</span>
-              <span className="tnum text-right text-sm">{s.medianSeconds === null ? <span className="text-xs text-muted-foreground">Not enough replies</span> : replyWords(s.medianSeconds)}</span>
-              <span className="tnum text-right text-sm text-muted-foreground">{s.leads.toLocaleString("en-US")}</span>
+            <button type="button" onClick={() => onOpen(s.name)} data-testid="source-row" data-leads={s.leads} className={`${trackBtn} ${grid} cursor-pointer`} aria-label={`${s.name}: ${s.leads} leads${s.medianSeconds === null ? ", not enough replies for a typical time" : `, typical first reply ${replyWords(s.medianSeconds)}`}. See the leads.`}>
+              <span className="truncate text-sm font-medium" title={s.name}>{s.name}</span>
+              <span className="relative block h-2 rounded-full bg-[var(--t-sunk)]" aria-hidden><span className="ds-grow-x block h-full rounded-full bg-[var(--t-c1)]" style={{ width: `${Math.max(3, (s.leads / max) * 100)}%` }} /></span>
+              <span className="tnum text-right text-sm" title={s.leads.toLocaleString("en-US")}>{fmtStat(s.leads)}</span>
+              <span className="tnum text-right text-sm">{s.medianSeconds === null ? <span className="text-xs text-muted-foreground" title="A typical time needs 5 or more replies">Too few replies</span> : replyWords(s.medianSeconds)}</span>
             </button>
           </li>
         ))}

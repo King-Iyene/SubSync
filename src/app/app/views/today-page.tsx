@@ -27,6 +27,8 @@ import { AppointmentsSection, CallsSection, DoneForToday } from "./today-mine";
 import { useTodayModel, TodayLayers } from "./today-model";
 import { BriefPreview, CoverageTab, HeldLink, JunkControl, PeopleTab, SourcesTab } from "./today-parts";
 import { GrowthTab } from "./today-growth";
+import { ForecastTab } from "./today-forecast";
+import { ProofTab } from "./today-proof";
 import { ClientsFlowTab, LeadFlowTab, TabIntro } from "./today-flow";
 import { SECTION_META } from "@/lib/analytics/today-tabs";
 
@@ -208,46 +210,22 @@ export function TodayPage({ go, t, kind, reload, sync, syncing, options, picked,
   );
 
   // ---- what sits under "Break it down" ----
-  const nothingComing = t.forecast.leads.length + t.forecast.deals.length + t.forecast.appointments.length === 0;
-  const forecast = (
-    <div data-testid="tab-numbers">
-      <ComingBlock forecast={t.forecast} targetMinutes={t.targetMinutes} onOpen={(k) => m.open(specComing(k, t.forecast[k], t.targetMinutes))} />
-      {nothingComing && (
-        <div data-testid="coming-none" className="max-w-xl">
-          <p className="t-title">Nothing new is about to slip today.</p>
-          <p className="t-small t-quiet mt-2">No lead is still inside its {t.targetMinutes}-minute reply window, no open deal is about to go quiet and no appointment is about to end without an outcome. This tab looks ahead only.</p>
-          {counts.replies + counts.stale + counts.appointments > 0 ? (
-            <p className="t-small mt-3">
-              Already late: {[counts.replies > 0 ? `${fmtInt(counts.replies)} ${counts.replies === 1 ? "person" : "people"} waiting for a reply` : null, counts.stale > 0 ? `${fmtInt(counts.stale)} quiet ${counts.stale === 1 ? "deal" : "deals"}` : null, counts.appointments > 0 ? `${fmtInt(counts.appointments)} ${counts.appointments === 1 ? "appointment" : "appointments"} with no outcome` : null].filter(Boolean).join(", ")}.
-              {counts.replies > 0 && <> <button type="button" className="ds-press text-primary underline underline-offset-4" onClick={() => m.open(specKind("replies", env))} data-testid="coming-late-open">See them</button></>}
-            </p>
-          ) : <p className="t-small t-quiet mt-3">Nothing is late either.</p>}
-        </div>
-      )}
-    </div>
-  );
-  const proof = t.proof && kind !== "client" ? (
-    <section aria-labelledby="caught-h" data-testid="today-proof">
-      <h2 id="caught-h" className="t-title mb-4">{agency ? "For your next client review" : "What SubSync caught in your account"}</h2>
-      <div className="grid grid-cols-1 gap-x-14 gap-y-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
-        <ProofStrip proof={t.proof} title={agency ? undefined : "The last 7 days"} onOpen={(k) => m.open(specAlerts(t.proof!, k))} />
-        <RaisedClearedStrip proof={t.proof} selected={day} onSelect={setDay} onOpenDay={(i) => m.open(specAlerts(t.proof!, { day: i }))} />
-      </div>
-    </section>
-  ) : null;
+  const clientList = agency ? options : undefined;
+  const proof = t.proof && kind !== "client" ? <ProofTab m={m} proof={t.proof} agency={agency} clients={clientList} who={picked.length > 0 ? pickedNames.join(", ") : multi ? "Your clients" : only ?? "Your account"} /> : null;
+  const forecast = <ForecastTab m={m} t={t} clients={clientList} agency={agency} />;
 
-  const growthTab = <GrowthTab m={m} g={growth.data} loading={growth.loading} error={growth.error} reload={growth.reload} kind={kind} />;
+  const growthTab = <GrowthTab m={m} g={growth.data} loading={growth.loading} error={growth.error} reload={growth.reload} kind={kind} clients={options} />;
   const intro = (name: string, node: React.ReactNode) => <><TabIntro name={name} />{node}</>;
   const tabs = [
-    { label: "Forecast", node: intro("Forecast", forecast) },
-    ...(proof ? [{ label: "Proof", node: intro("Proof", proof) }] : []),
+    { label: "Forecast", node: forecast },
+    ...(proof ? [{ label: "Proof", node: proof }] : []),
     ...(kind !== "client" ? [
       { label: "People", node: intro("People", <PeopleTab m={m} t={t} agency={multi} />) },
-      { label: "Sources", node: intro("Sources", <SourcesTab m={m} t={t} />) },
-      { label: "Coverage", node: intro("Coverage", <CoverageTab m={m} t={t} />) },
+      { label: "Sources", node: intro("Sources", <SourcesTab m={m} t={t} clients={clientList} agency={agency} />) },
+      { label: "Coverage", node: intro("Coverage", <CoverageTab m={m} t={t} clients={clientList} agency={agency} />) },
     ] : []),
     { label: "Growth", node: growthTab },
-    { label: "Lead flow", node: <LeadFlowTab m={m} /> },
+    { label: "Lead flow", node: <LeadFlowTab m={m} clients={options} kind={kind} /> },
     ...(coming ? [{ label: "Clients coming and going", node: <ClientsFlowTab m={m} /> }] : []),
   ];
   const allDone = headline.allClear && !t.access.leadsBlocked && !t.access.apptsBlocked && (mine ? mine.calls.noshows.total + mine.calls.confirm.total === 0 : true);

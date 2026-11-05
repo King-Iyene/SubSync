@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { DayPoint, SourceRow } from "@/lib/analytics/growth";
+import { fmtStat } from "@/lib/analytics/chart-format";
 
 // Growth's two charts, drawn from Today's own tokens (--t-c1 and friends, checked with the dataviz validator). One series each, thin marks, quiet gridlines, direct labels.
 // Every mark is a button: a day opens the leads of that day, a slice or a legend row opens the leads of that source. A hidden table carries every number.
@@ -60,7 +61,7 @@ const colourOf = (i: number) => CHART_VARS[Math.min(i, CHART_VARS.length - 1)];
 const polar = (cx: number, cy: number, r: number, a: number) => [cx + r * Math.cos(a), cy + r * Math.sin(a)] as const;
 
 /** Where the last 30 days of email leads came from. Four sources and "Other"; a slice or a legend row opens its people. */
-export function SourceDonut({ rows, total, selected, onPick, label }: { rows: SourceRow[]; total: number; selected: string | null; onPick: (source: string) => void; label: string }) {
+export function SourceDonut({ rows, total, selected, onPick, label, rangeWord = "last 30 days" }: { rows: SourceRow[]; total: number; selected: string | null; onPick: (source: string) => void; label: string; rangeWord?: string }) {
   const [hot, setHot] = useState<string | null>(null);
   const shown = rows.length <= 5 ? rows : rows.slice(0, 4);
   const rest = rows.length <= 5 ? [] : rows.slice(4);
@@ -87,13 +88,13 @@ export function SourceDonut({ rows, total, selected, onPick, label }: { rows: So
             <path key={it.source} d={arc(from, to)} fillRule="evenodd" fill={it.colour} fillOpacity={0.55} stroke="var(--t-raise)" strokeWidth={1.5} />
           ) : (
             <path key={it.source} d={arc(from, to)} fillRule="evenodd" fill={it.colour} fillOpacity={selected && !on ? 0.4 : hot && hot !== it.source ? 0.6 : 1} stroke={on ? "var(--t-ink)" : "var(--t-raise)"} strokeWidth={on ? 2 : 1.5} strokeLinejoin="round"
-              role="button" tabIndex={0} aria-pressed={on} aria-label={`${it.source}: ${it.count} email leads, ${Math.round(it.share * 100)}% of the last 30 days. See them.`} data-testid="source-slice" data-source={it.source} data-count={it.count}
+              role="button" tabIndex={0} aria-pressed={on} aria-label={`${it.source}: ${it.count} email leads, ${Math.round(it.share * 100)}% of the ${rangeWord}. See them.`} data-testid="source-slice" data-source={it.source} data-count={it.count}
               className="cursor-pointer outline-none [&:focus-visible]:stroke-[var(--ring)] [&:focus-visible]:stroke-[3px]" onClick={() => onPick(it.source)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onPick(it.source); } }}
               onMouseEnter={() => setHot(it.source)} onMouseLeave={() => setHot(null)} onFocus={() => setHot(it.source)} onBlur={() => setHot(null)} />
           );
         })}
-        <text x={cx} y={cy - 2} textAnchor="middle" className="t-num" style={{ fontSize: 20, fill: "var(--t-ink)", fontWeight: 500 }}>{total.toLocaleString("en-US")}</text>
-        <text x={cx} y={cy + 14} textAnchor="middle" style={{ fontSize: 9.5, fill: "var(--t-ink2)" }}>last 30 days</text>
+        <text x={cx} y={cy - 2} textAnchor="middle" className="t-num" style={{ fontSize: 20, fill: "var(--t-ink)", fontWeight: 500 }}>{fmtStat(total)}</text>
+        <text x={cx} y={cy + 14} textAnchor="middle" style={{ fontSize: 9.5, fill: "var(--t-ink2)" }}>{rangeWord.length > 16 ? "in these dates" : rangeWord}</text>
       </svg>
       <ul className="min-w-0" data-testid="source-legend">
         {items.map((it) => {
@@ -102,10 +103,10 @@ export function SourceDonut({ rows, total, selected, onPick, label }: { rows: So
           const row = (
             <>
               <span aria-hidden className="size-2.5 shrink-0 rounded-[2px]" style={{ background: it.colour }} />
-              <span className="min-w-0 flex-1 truncate">{it.source}</span>
-              <span className="t-num shrink-0">{it.count}</span>
+              <span className="min-w-0 flex-1 truncate" title={it.source}>{it.source}</span>
+              <span className="t-num shrink-0 text-right" title={it.count.toLocaleString("en-US")}>{fmtStat(it.count)}</span>
               <span className="t-num w-9 shrink-0 text-right text-[var(--t-ink2)]">{Math.round(it.share * 100)}%</span>
-              <span className={`w-16 shrink-0 text-right text-xs ${it.change > 0 ? "text-[var(--t-ok)]" : it.change < 0 ? "text-[var(--t-bad)]" : "text-[var(--t-ink3)]"}`} title="Against the 30 days before">{it.change > 0 ? "▲ " : it.change < 0 ? "▼ " : ""}{trend}</span>
+              <span className={`w-16 shrink-0 text-right text-xs ${it.change > 0 ? "text-[var(--t-ok)]" : it.change < 0 ? "text-[var(--t-bad)]" : "text-[var(--t-ink3)]"}`} title="Against the same number of days before">{it.change > 0 ? "▲ " : it.change < 0 ? "▼ " : ""}{trend}</span>
             </>
           );
           return (

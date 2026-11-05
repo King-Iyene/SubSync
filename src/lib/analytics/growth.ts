@@ -181,15 +181,17 @@ export function changesOf(leads: LeadAt[], now: number): Record<Period, Change> 
 
 export type DayPoint = { day: string; label: string; count: number; partial: boolean; avg7: number | null };
 /** New email leads per day for the last SERIES_DAYS days ending today (today is partial and drawn lighter), with the trailing 7 day average over complete days. */
-export function dailySeries(leads: LeadAt[], now: number, refZone: string): DayPoint[] {
+export function dailySeries(leads: LeadAt[], now: number, refZone: string, win?: { from: string; to: string }): DayPoint[] {
   const counts = new Map<string, number>();
   for (const l of leads) { const k = dayKey(l.at, l.zone); counts.set(k, (counts.get(k) ?? 0) + 1); }
   const b = boundsOf(now, refZone);
   const days: string[] = [];
-  for (let i = SERIES_DAYS - 1; i >= 0; i--) days.push(dayKey(b.todayStart - i * DAY + DAY / 2, refZone));
-  const out: DayPoint[] = days.map((day, i) => ({ day, label: new Date(`${day}T12:00:00Z`).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }), count: counts.get(day) ?? 0, partial: i === days.length - 1, avg7: null }));
-  for (let i = 0; i < out.length - 1; i++) {
-    if (i < 6) continue;
+  if (win) { for (let t = Date.parse(`${win.from}T12:00:00Z`); t <= Date.parse(`${win.to}T12:00:00Z`); t += DAY) days.push(new Date(t).toISOString().slice(0, 10)); }
+  else for (let i = SERIES_DAYS - 1; i >= 0; i--) days.push(dayKey(b.todayStart - i * DAY + DAY / 2, refZone));
+  const todayKey = dayKey(now, refZone);
+  const out: DayPoint[] = days.map((day) => ({ day, label: new Date(`${day}T12:00:00Z`).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }), count: counts.get(day) ?? 0, partial: day === todayKey, avg7: null }));
+  for (let i = 0; i < out.length; i++) {
+    if (i < 6 || out[i].partial) continue;
     const win = out.slice(i - 6, i + 1);
     out[i].avg7 = Math.round((win.reduce((s, p) => s + p.count, 0) / 7) * 10) / 10;
   }
@@ -222,12 +224,15 @@ export function goalStatus(goal: number, count: number, b: Pick<Bounds, "dayOfMo
 export type SourceRow = { source: string; count: number; previous: number; share: number; change: number };
 export type SourceMix = { rows: SourceRow[]; total: number; previousTotal: number; best: SourceRow | null; worst: SourceRow | null; line: string };
 /** Where the last 30 days of email leads came from, against the 30 days before. Best is the source that grew most, worst the one that fell most, both with at least 5 leads in one of the two periods. */
-export function sourceMix(leads: Array<{ at: number; source: string | null }>, now: number): SourceMix {
+export function sourceMix(leads: Array<{ at: number; source: string | null }>, now: number, win?: { start: number; end: number }): SourceMix {
   const cur = new Map<string, number>(), prev = new Map<string, number>();
+  // The chosen dates against the same number of days right before them (default: the last 30 days against the 30 before).
+  const end = Math.min(win?.end ?? now, now), start = win?.start ?? now - 30 * DAY, len = Math.max(DAY, end - start);
+  const days = Math.round(len / DAY);
   for (const l of leads) {
     const s = sourceLabel(l.source);
-    if (l.at > now - 30 * DAY && l.at <= now) cur.set(s, (cur.get(s) ?? 0) + 1);
-    else if (l.at > now - 60 * DAY && l.at <= now - 30 * DAY) prev.set(s, (prev.get(s) ?? 0) + 1);
+    if (l.at > start && l.at <= end) cur.set(s, (cur.get(s) ?? 0) + 1);
+    else if (l.at > start - len && l.at <= start) prev.set(s, (prev.get(s) ?? 0) + 1);
   }
   const total = [...cur.values()].reduce((s, n) => s + n, 0), previousTotal = [...prev.values()].reduce((s, n) => s + n, 0);
   const rows: SourceRow[] = [...new Set([...cur.keys(), ...prev.keys()])].map((source) => {
@@ -238,8 +243,8 @@ export function sourceMix(leads: Array<{ at: number; source: string | null }>, n
   const best = [...eligible].sort((a, b) => b.change - a.change)[0] ?? null;
   const worst = [...eligible].sort((a, b) => a.change - b.change)[0] ?? null;
   const b2 = best && best.change > 0 ? best : null, w2 = worst && worst.change < 0 && worst.source !== b2?.source ? worst : null;
-  const line = total < 10 ? "Not enough email leads in the last 30 days to compare sources."
-    : [b2 ? `${b2.source} grew most (+${b2.change})` : null, w2 ? `${w2.source} fell most (${w2.change})` : null].filter(Boolean).join(", ") || "No source moved much against the 30 days before.";
+  const line = total < 10 ? `Not enough email leads in these ${days} days to compare sources.`
+    : [b2 ? `${b2.source} grew most (+${b2.change})` : null, w2 ? `${w2.source} fell most (${w2.change})` : null].filter(Boolean).join(", ") || `No source moved much against the ${days} days before.`;
   return { rows, total, previousTotal, best: b2, worst: w2, line };
 }
 
@@ -288,6 +293,8 @@ export type GrowthData = {
   now: number; scope: "agency" | "account"; zone: string; rules: GrowthRules; accounts: number;
   changes: Record<Period, Change>;
   gross: { signUps: number; unique: number; removed: Record<"duplicate" | "junk" | "staff" | "role", number>; windowDays: number };
+  /** The dates the chart, the sources and the sign ups cover, the count in them and the count in the same number of days right before. */
+  range: { from: string; to: string; days: number; label: string; count: number; previous: number; change: Change; start: number; end: number };
   series: DayPoint[]; badge: ReturnType<typeof weekBadge>;
   goal: { total: number | null; count: number; status: GoalStatus | null; accountsWithGoal: number };
   mix: SourceMix; signals: GrowthSignal[]; league: LeagueRow[];
@@ -299,6 +306,8 @@ export type GrowthData = {
 export type GrowthInput = {
   now: number; accounts: GrowthAccount[]; contacts: GrowthContact[]; rules: GrowthRules; goals: Record<string, number>; scope: "agency" | "account"; partial?: boolean;
   setup?: { goalsReady: boolean; settingsReady: boolean };
+  /** Days (YYYY-MM-DD, inclusive) the tab asked for; default is the last 30 days ending today. */
+  range?: { from: string; to: string; label?: string };
 };
 export const RECORD_CAP = 4000;
 export const RECENT_ALL_CAP = 2000;
@@ -314,12 +323,19 @@ export function buildGrowth(i: GrowthInput): GrowthData {
   for (const a of i.accounts) zones.set(a.zone, (zones.get(a.zone) ?? 0) + 1);
   const refZone = [...zones.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "UTC";
 
-  const WINDOW = 30;
+  const b0 = boundsOf(i.now, refZone);
+  const todayIso = dayKey(i.now, refZone);
+  const rf = i.range?.from ?? dayKey(b0.todayStart - 29 * DAY + DAY / 2, refZone), rt = i.range?.to ?? todayIso;
+  const [fy, fm, fd] = rf.split("-").map(Number), [ty, tm, td] = rt.split("-").map(Number);
+  const rStart = localMidnight(fy, fm, fd, refZone);
+  const rEnd = Math.min(localMidnight(ty, tm, td + 1, refZone), i.now + 1);
+  const WINDOW = Math.max(1, Math.round((localMidnight(ty, tm, td + 1, refZone) - rStart) / DAY));
+  const inRange = (at: number) => at >= rStart && at < rEnd;
   const removed = { duplicate: 0, junk: 0, staff: 0, role: 0 };
   let signUps = 0, unique = 0;
   for (const c of dated) {
     const v = verdicts.get(c.id);
-    if (!v || v === "no_email" || (c.at as number) <= i.now - WINDOW * DAY) continue;
+    if (!v || v === "no_email" || !inRange(c.at as number)) continue;
     signUps++;
     if (v === "counted") unique++; else removed[v]++;
   }
@@ -332,12 +348,12 @@ export function buildGrowth(i: GrowthInput): GrowthData {
   };
   const byRecent = (a: GrowthContact, b: GrowthContact) => (b.at as number) - (a.at as number);
   const records = [
-    ...counted.filter((c) => (c.at as number) > i.now - 62 * DAY).sort(byRecent).slice(0, RECORD_CAP).map((c) => rec(c, "counted")),
-    ...dated.filter((c) => { const v = verdicts.get(c.id); return v && v !== "counted" && v !== "no_email" && (c.at as number) > i.now - WINDOW * DAY; }).sort(byRecent).slice(0, 1000).map((c) => rec(c, verdicts.get(c.id) as Verdict)),
+    ...counted.filter((c) => ((c.at as number) > i.now - 62 * DAY || inRange(c.at as number))).sort(byRecent).slice(0, RECORD_CAP).map((c) => rec(c, "counted")),
+    ...dated.filter((c) => { const v = verdicts.get(c.id); return v && v !== "counted" && v !== "no_email" && inRange(c.at as number); }).sort(byRecent).slice(0, 1000).map((c) => rec(c, verdicts.get(c.id) as Verdict)),
   ];
   const recentAll = counted.sort(byRecent).slice(0, RECENT_ALL_CAP).map((c) => rec(c, "counted"));
 
-  const series = dailySeries(leads, i.now, refZone);
+  const series = dailySeries(leads, i.now, refZone, { from: rf, to: rt });
   const perAccount = new Map<string, number[]>();
   for (const c of counted) { const l = perAccount.get(c.locationId); if (l) l.push(c.at as number); else perAccount.set(c.locationId, [c.at as number]); }
   const signals: GrowthSignal[] = [];
@@ -356,12 +372,14 @@ export function buildGrowth(i: GrowthInput): GrowthData {
   const withGoal = league.filter((r) => r.goal !== null);
   const goalTotal = withGoal.reduce((s, r) => s + (r.goal as number), 0);
   const goalCount = withGoal.reduce((s, r) => s + r.month, 0);
-  const b0 = boundsOf(i.now, refZone);
+  const rCount = leads.filter((l) => inRange(l.at)).length, rLen = rEnd - rStart;
+  const rPrev = leads.filter((l) => l.at >= rStart - rLen && l.at < rStart).length;
   return {
     now: i.now, scope: i.scope, zone: refZone, rules: i.rules, accounts: i.accounts.length, changes: changesOf(leads, i.now),
-    gross: { signUps, unique, removed, windowDays: WINDOW }, series, badge: weekBadge(series),
+    gross: { signUps, unique, removed, windowDays: WINDOW },
+    range: { from: rf, to: rt, days: WINDOW, label: i.range?.label ?? `Last ${WINDOW} days`, count: rCount, previous: rPrev, change: changeOf(rCount, rPrev), start: rStart, end: rEnd }, series, badge: weekBadge(series),
     goal: { total: withGoal.length ? goalTotal : null, count: goalCount, status: withGoal.length ? goalStatus(goalTotal, goalCount, b0, i.now, b0.monthStart) : null, accountsWithGoal: withGoal.length },
-    mix: sourceMix(counted.map((c) => ({ at: c.at as number, source: c.source })), i.now), signals: signals.sort((a, b) => Math.abs(b.pct) - Math.abs(a.pct)), league,
+    mix: sourceMix(counted.map((c) => ({ at: c.at as number, source: c.source })), i.now, { start: rStart, end: rEnd }), signals: signals.sort((a, b) => Math.abs(b.pct) - Math.abs(a.pct)), league,
     records, recentAll, partial: !!i.partial, setup: i.setup ?? { goalsReady: true, settingsReady: true },
   };
 }

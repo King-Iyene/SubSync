@@ -15,12 +15,13 @@ type Res = { total: number; doNotContact: number; page: number; pageSize: number
 const day = (ms: number) => new Date(ms).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 const field = "min-h-9 rounded-[4px] border border-[var(--t-rule2)] bg-[var(--t-raise)] px-2 py-1 text-sm outline-none hover:border-primary focus-visible:outline-2 focus-visible:outline-[var(--ring)]";
 
-export function EmailLeads() {
+export function EmailLeads({ filterClient = null, from = null, to = null }: { filterClient?: string | null; from?: string | null; to?: string | null } = {}) {
   const api = useApiClient();
   const [typed, setTyped] = useState(""), [q, setQ] = useState(""), [client, setClient] = useState(""), [page, setPage] = useState(1);
   const [res, setRes] = useState<Res | null>(null), [error, setError] = useState<string | null>(null), [busy, setBusy] = useState(false), [saveError, setSaveError] = useState<string | null>(null);
   useEffect(() => { const t = setTimeout(() => { setQ(typed.trim()); setPage(1); }, 300); return () => clearTimeout(t); }, [typed]);
-  const query = `q=${encodeURIComponent(q)}&client=${encodeURIComponent(client)}`;
+  const useClient = filterClient ?? client;
+  const query = `q=${encodeURIComponent(q)}&client=${encodeURIComponent(useClient)}${from && to ? `&from=${from}&to=${to}` : ""}`;
   const load = useCallback(async () => {
     setError(null);
     try { setRes(await api.get<Res>(`today/growth/emails?${query}&page=${page}`)); }

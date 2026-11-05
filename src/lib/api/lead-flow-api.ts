@@ -3,6 +3,7 @@ import { localMidnight } from "../analytics/growth";
 import { buildFlow, isIsoDay, MAX_FLOW_DAYS, type FlowLead, type Outcome, type Reply } from "../analytics/lead-flow";
 import { isMissingTable } from "../analytics/today-store";
 import { json, type AuthContext } from "./auth";
+import { parseReportParams } from "../analytics/report-filter";
 import type { GrowthDeps } from "./growth-api";
 
 // The Lead flow tab of Today. Read only, from data SubSync already holds: contacts (when each was added), the first-reply check (lead_touches), appointments and deals.
@@ -25,8 +26,11 @@ export async function leadFlowRead(ctx: Ctx, deps: GrowthDeps): Promise<Response
 
   const permits = await deps.permits(ctx);
   const [contactUrl, accountUrl] = await Promise.all([deps.contactUrl(ctx), deps.accountUrl(ctx)]);
+  const asked = parseReportParams(url, permits);
+  if (!asked.ok) return json({ error: asked.error }, asked.status);
   const accounts = (await sql()`select location_id, name, timezone, speed_access from locations where installation_id = ${ctx.installationId} and not ignored order by name`)
-    .filter((r) => permits(r.location_id as string));
+    .filter((r) => permits(r.location_id as string) && (!asked.client || r.location_id === asked.client));
+  if (asked.client && accounts.length === 0) return json({ error: "That client is not in your list." }, 404);
   if (accounts.length === 0) return json(empty(from, to, 0));
 
   // Each client's own midnight to midnight, so "last 7 days" means the same days the client sees.

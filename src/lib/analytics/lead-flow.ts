@@ -75,14 +75,14 @@ export function buildFlow(leads: FlowLead[], minLeads = MIN_LEADS): Flow {
 
 // ---------- the date choices ----------
 
-export type FlowPreset = "7d" | "30d" | "this-month" | "last-month" | "custom";
+export type FlowPreset = "7d" | "30d" | "this-month" | "last-month" | "90d" | "custom";
 export const FLOW_PRESETS: Array<{ key: FlowPreset; label: string }> = [
-  { key: "7d", label: "Last 7 days" }, { key: "30d", label: "Last 30 days" }, { key: "this-month", label: "This month" }, { key: "last-month", label: "Last month" }, { key: "custom", label: "Custom dates" },
+  { key: "7d", label: "Last 7 days" }, { key: "30d", label: "Last 30 days" }, { key: "this-month", label: "This month" }, { key: "last-month", label: "Last month" }, { key: "90d", label: "Last 90 days" }, { key: "custom", label: "Custom dates" },
 ];
 const DAY = 86_400_000;
 const toMs = (iso: string) => Date.parse(`${iso}T00:00:00Z`);
 const toIso = (ms: number) => new Date(ms).toISOString().slice(0, 10);
-export const isIsoDay = (s: unknown): s is string => typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s) && toIso(toMs(s)) === s;
+export const isIsoDay = (s: unknown): s is string => typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s) && Number.isFinite(toMs(s)) && toIso(toMs(s)) === s;
 export const MAX_FLOW_DAYS = 366;
 
 /** The first and last day (inclusive, "YYYY-MM-DD") of a choice, given today's date. A bad custom choice gives a plain problem and the last 7 days. */
@@ -90,6 +90,7 @@ export function resolveFlowRange(preset: FlowPreset, today: string, from?: strin
   const last7 = { from: toIso(toMs(today) - 6 * DAY), to: today };
   if (preset === "7d") return { ...last7, label: "Last 7 days", problem: null };
   if (preset === "30d") return { from: toIso(toMs(today) - 29 * DAY), to: today, label: "Last 30 days", problem: null };
+  if (preset === "90d") return { from: toIso(toMs(today) - 89 * DAY), to: today, label: "Last 90 days", problem: null };
   const y = Number(today.slice(0, 4)), m = Number(today.slice(5, 7));
   if (preset === "this-month") return { from: toIso(Date.UTC(y, m - 1, 1)), to: today, label: "This month", problem: null };
   if (preset === "last-month") return { from: toIso(Date.UTC(y, m - 2, 1)), to: toIso(Date.UTC(y, m - 1, 0)), label: "Last month", problem: null };

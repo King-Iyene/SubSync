@@ -29,6 +29,10 @@ export type Api = {
 
 const ApiContext = createContext<Api | null>(null);
 export const ApiProvider = ApiContext.Provider;
+/** The client with no filter added: Today's report tabs use it when a tab's own client choice replaces the header's. */
+export const RootApiContext = createContext<Api | null>(null);
+export const RootApiProvider = RootApiContext.Provider;
+export function useRootApi(): Api | null { return useContext(RootApiContext); }
 
 export function useApiClient(): Api {
   const api = useContext(ApiContext);

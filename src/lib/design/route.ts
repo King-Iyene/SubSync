@@ -37,7 +37,9 @@ export function keptParams(hash: string): string {
   const q = hash.indexOf("?");
   const ta = q === -1 ? null : new URLSearchParams(hash.slice(q + 1)).get("ta");
   const ids = ta ? ta.split(",").filter((x) => /^[A-Za-z0-9_-]{3,64}$/.test(x)).slice(0, 50) : [];
-  return [rangesOf(hash), ids.length ? `ta=${ids.join(",")}` : ""].filter(Boolean).join("&");
+  // The filter bar of each report tab of Today (gr gf gt gc, lr..., see report-filter.ts) stays too.
+  const bars = q === -1 ? [] : [...new URLSearchParams(hash.slice(q + 1)).entries()].filter(([k, v]) => /^[glcpsvw][rftc]$/.test(k) && /^[A-Za-z0-9_,-]{1,64}$/.test(v)).map(([k, v]) => `${k}=${v}`);
+  return [rangesOf(hash), ids.length ? `ta=${ids.join(",")}` : "", ...bars].filter(Boolean).join("&");
 }
 
 export const sameView = (a: ViewState, b: ViewState) => a.id === b.id && (a.locationId ?? "") === (b.locationId ?? "");
