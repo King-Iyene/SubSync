@@ -74,7 +74,8 @@ test("each call outcome button writes once, double clicks are one save, Undo wor
   const log = drawer.getByTestId("log-call");
   if (!(await log.count())) test.skip(true, "this contact has no phone number, so the call log is not offered");
   // The panel moves to the next person after each logged call, so what was written stays in the panel's footer (with Undo).
-  const open = async () => { const l = drawer.getByTestId("log-call"); await l.waitFor(); if (!(await l.evaluate((el) => (el as HTMLDetailsElement).open))) await l.getByText("Log how the call went").click(); return l; };
+  const open = async () => { for (let i = 0; i < 8 && !(await drawer.getByTestId("log-call").count()); i++) { await drawer.getByRole("button", { name: "Next lead" }).click(); await page.waitForTimeout(400); }
+    const l = drawer.getByTestId("log-call"); await l.waitFor({ timeout: 20_000 }); if (!(await l.evaluate((el) => (el as HTMLDetailsElement).open))) await l.getByText("Log how the call went").click(); return l; };
   for (const k of ["answered", "voicemail", "no_answer", "wrong_number", "booked", "not_interested", "follow_up"]) {
     const l = await open();
     await l.getByTestId(`log-${k}`).click();
