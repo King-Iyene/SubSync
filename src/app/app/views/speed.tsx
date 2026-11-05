@@ -6,8 +6,10 @@ import { summaryText } from "@/lib/analytics/speed-v2";
 import { measuringSentence } from "@/lib/design/speed-text";
 import { useData } from "../session";
 import type { GoFn } from "../nav";
-import { EmptyState, ErrorState, HeadlineBlock, HowTo, InlineAlert, PopMenu, SkeletonRows, useCardRange, type MenuItem } from "../ds";
+import { EmptyState, ErrorState, HeadlineBlock, HowTo, InlineAlert, ModuleTabs, PopMenu, SkeletonRows, useCardRange, type MenuItem } from "../ds";
 import { focusClient } from "../ds/global-filter";
+import "./today-theme.css";
+import { AlertsTab, CaptureTab, PaceTab, PeopleTab } from "./speed-insights";
 import { PrimaryButton } from "./today-chrome";
 import { SourceCard } from "./speed-cards";
 import { LeadList } from "./speed-all";
@@ -100,6 +102,8 @@ export function SpeedView({ go }: { go: GoFn }) {
         <EmptyState title={none ? "Waiting for permission" : "No new leads yet"} body={none ? "Approve the new permission when SubSync asks, then run a sync. First replies appear here after that." : "A lead appears here once a new contact has a conversation. Check back after the next sync."}
           action={<button type="button" onClick={() => go("help")} className="ds-press h-10 rounded-lg border bg-card px-4 text-sm font-medium hover:border-primary/40">Open Getting started</button>} />
       ) : (
+        <ModuleTabs label="Speed to lead sections" tabs={[
+          { label: "Replies", node: (
         <>
           <HowTo id="speed2" title="How to use this page">Reply to the lead at the top, then the next. Every number opens the leads behind it, and a lead&apos;s three dots call or email it through your CRM.</HowTo>
 
@@ -164,6 +168,12 @@ export function SpeedView({ go }: { go: GoFn }) {
             {d.truncated ? " This range holds more leads than SubSync reads at once; the newest 20,000 are used." : ""}
           </p>
         </>
+          ) },
+          { label: "Pace", node: <PaceTab multi={multi} /> },
+          ...(d.seePeople ? [{ label: "People", node: <PeopleTab multi={multi} /> }] : [{ label: "Owners", node: <PeopleTab multi={multi} /> }]),
+          { label: "Lead capture", node: <CaptureTab /> },
+          { label: "Alerts", node: <AlertsTab who={multi ? "All client accounts" : d.accounts[0]?.name ?? "Your account"} waiting={w.waiting} dollars={w.money.dollars || null} typical={d.summary.typicalLine} canChange={d.measuring.canChange} targetMinutes={d.measuring.targetMinutes} go={go} /> },
+        ]} />
       )}
     </div>
   );
