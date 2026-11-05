@@ -52,7 +52,7 @@ describe("freshness has one source and one place on screen", () => {
     expect(dash).not.toMatch(/<FreshnessStrip/);
     // Built once; on Today it sits in the top row next to search and the bell, on every other page it is drawn above the page.
     expect(dash).toMatch(/const strip = <StatusLine inline=\{view\.id === "today"\} \/>;/);
-    expect(dash).toMatch(/\{view\.id !== "today" && strip\}<BackProvider value=\{back\}>\{content\}<\/BackProvider>/);
+    expect(dash).toMatch(/\{view\.id !== "today" && strip\}<BackProvider value=\{back\}><TrailProvider value=\{trailSection\}>\{content\}<\/TrailProvider><\/BackProvider>/);
     expect(dash).toMatch(/\{view\.id === "today" && strip\}/);
     expect(read("src/app/app/ds/index.ts")).toMatch(/FreshnessStrip as StatusLine/);
     // No other view asks for the freshness data.

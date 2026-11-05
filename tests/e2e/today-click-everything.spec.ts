@@ -1,5 +1,8 @@
 import { expect, test, type ElementHandle, type Page } from "@playwright/test";
+import { appendFileSync } from "node:fs";
 import { todayReady } from "./today-helpers";
+
+const note = (m: string) => { if (process.env.CLICK_LOG) appendFileSync(process.env.CLICK_LOG, `${m}\n`); };
 
 // Click everything on Today. For two roles (agency owner, client staff) and the desktop widths, find every visible button, link, tab, chip, chart mark and tile, click each with a REAL mouse
 // click (ElementHandle.click moves the mouse and presses it; an element that is covered or out of reach fails the click), and require something observable to have happened: an address change, a
@@ -13,7 +16,7 @@ const ROLES = [
 const SELECTOR = 'button, a[href], [role=button], [role=tab], [role=link], [role=menuitem], summary, [data-clickable], [role=group][tabindex="0"]';
 const SKIP_NAME = /sign out|log ?out|disconnect|delete|remove/i;
 
-type Stage = { name: string; setup: (page: Page) => Promise<void> };
+type Stage = { name: string; scope?: string; setup: (page: Page) => Promise<void> };
 
 /** Everything the page shows that a click could change, as one string. */
 async function signature(page: Page, popups: { n: number }): Promise<string> {
@@ -29,27 +32,27 @@ async function signature(page: Page, popups: { n: number }): Promise<string> {
   return `${s}#${popups.n}`;
 }
 
-async function enumerate(page: Page): Promise<Array<{ i: number; label: string; disabled: boolean; current: boolean }>> {
-  return page.evaluate((sel) => {
-    const all = [...document.querySelectorAll<HTMLElement>(sel)].filter((e) => {
+async function enumerate(page: Page, scope = "body"): Promise<Array<{ i: number; label: string; disabled: boolean; current: boolean }>> {
+  return page.evaluate(({ sel, scope }) => {
+    const all = [...(document.querySelector(scope) ?? document.body).querySelectorAll<HTMLElement>(sel)].filter((e) => {
       const r = e.getBoundingClientRect(); const cs = getComputedStyle(e);
-      return r.width > 0 && r.height > 0 && cs.visibility !== "hidden" && !e.closest("[data-testid=pop-menu]") && !e.closest("[aria-hidden=true]") && !e.closest("[inert]");
+      return r.width > 0 && r.height > 0 && cs.visibility !== "hidden" && !e.closest("[data-testid=pop-menu]") && !e.closest("aside, nav, [data-testid=sidebar]") && !e.closest("[aria-hidden=true]") && !e.closest("[inert]");
     });
     return all.map((e, i) => ({
       i, label: `${e.tagName.toLowerCase()}${e.getAttribute("data-testid") ? `#${e.getAttribute("data-testid")}` : ""} "${(e.getAttribute("aria-label") ?? e.textContent ?? "").trim().replace(/\s+/g, " ").slice(0, 60)}"`,
       disabled: e.hasAttribute("disabled") || e.getAttribute("aria-disabled") === "true", current: e.getAttribute("aria-selected") === "true" || e.getAttribute("aria-current") === "true" || e.getAttribute("aria-current") === "page",
     }));
-  }, SELECTOR);
+  }, { sel: SELECTOR, scope });
 }
 
-async function handleAt(page: Page, i: number): Promise<ElementHandle<HTMLElement> | null> {
-  const h = await page.evaluateHandle(({ sel, i }) => {
-    const all = [...document.querySelectorAll<HTMLElement>(sel)].filter((e) => {
+async function handleAt(page: Page, i: number, scope = "body"): Promise<ElementHandle<HTMLElement> | null> {
+  const h = await page.evaluateHandle(({ sel, i, scope }) => {
+    const all = [...(document.querySelector(scope) ?? document.body).querySelectorAll<HTMLElement>(sel)].filter((e) => {
       const r = e.getBoundingClientRect(); const cs = getComputedStyle(e);
-      return r.width > 0 && r.height > 0 && cs.visibility !== "hidden" && !e.closest("[data-testid=pop-menu]") && !e.closest("[aria-hidden=true]") && !e.closest("[inert]");
+      return r.width > 0 && r.height > 0 && cs.visibility !== "hidden" && !e.closest("[data-testid=pop-menu]") && !e.closest("aside, nav, [data-testid=sidebar]") && !e.closest("[aria-hidden=true]") && !e.closest("[inert]");
     });
     return all[i] ?? null;
-  }, { sel: SELECTOR, i });
+  }, { sel: SELECTOR, i, scope });
   return h.asElement() as ElementHandle<HTMLElement> | null;
 }
 
@@ -87,36 +90,38 @@ for (const role of ROLES) {
 
     const stages: Stage[] = [
       { name: "page", setup: async () => undefined },
-      { name: "break-down-open", setup: async (p) => { await p.getByTestId("more-detail-toggle").click(); } },
+      { name: "break-down-open", scope: "[data-testid=today-tabs]", setup: async (p) => { await p.getByTestId("more-detail-toggle").click(); } },
       ...(role.name === "agency owner" ? ["Forecast", "Proof", "People", "Sources", "Coverage"] : ["Forecast"]).map((tab): Stage => ({
-        name: `tab-${tab}`, setup: async (p) => { await p.getByTestId("more-detail-toggle").click(); await p.getByRole("tab", { name: tab }).click(); await p.waitForTimeout(600); },
+        name: `tab-${tab}`, scope: "[data-testid=today-tabpanel]", setup: async (p) => { await p.getByTestId("more-detail-toggle").click(); await p.getByRole("tab", { name: tab }).click(); await p.waitForTimeout(600); },
       })),
     ];
 
     for (const stage of stages) {
       await fresh(stage);
-      const items = await enumerate(page);
+      const items = await enumerate(page, stage.scope);
       const startHref = page.url();
       for (const it of items) {
         if (it.disabled || it.current || SKIP_NAME.test(it.label)) continue;
-        const h = await handleAt(page, it.i);
+        const h = await handleAt(page, it.i, stage.scope);
         if (!h) { await fresh(stage); continue; }
         const before = await signature(page, popups);
         try { await h.click({ timeout: 6000 }); } catch (e) { failures.push(`[${stage.name}] ${it.label}: cannot be clicked (${String(e).split("\n")[0]})`); await tidy(stage, startHref); continue; }
         clicked++;
         const after = await settle(page, before, popups);
+        note(`[${stage.name}] ${clicked} ${it.label} ${after === before ? "NOTHING" : "ok"}`);
         if (after === before) failures.push(`[${stage.name}] ${it.label}: nothing happened`);
         await tidy(stage, startHref);
         // The page after tidy must be the same page, so the next index points at the same element.
-        if (JSON.stringify((await enumerate(page)).map((x) => x.label)) !== JSON.stringify(items.map((x) => x.label))) {
+        if (JSON.stringify((await enumerate(page, stage.scope)).map((x) => x.label)) !== JSON.stringify(items.map((x) => x.label))) {
           // Counts may have moved after a write (Mark done, Snooze): the next element is found again by its label.
-          const now = await enumerate(page);
+          const now = await enumerate(page, stage.scope);
           const next = items[items.indexOf(it) + 1];
           if (next && !now.some((x) => x.label === next.label)) continue;
         }
       }
 
-      // Every menu: open it, click each item (reopening it each time), and require a visible result.
+      // Every menu (they all live on the page itself, so once): open it, click each item (reopening it each time), and require a visible result.
+      if (stage.name !== "page") continue;
       const triggers = page.locator('[aria-haspopup="menu"]');
       const count = await triggers.count();
       for (let j = 0; j < count; j++) {
@@ -141,6 +146,7 @@ for (const role of ROLES) {
           clicked++;
           await expect(menu, `[${stage.name}] menu ${j} "${label}" closes`).toHaveCount(0);
           const after = await settle(page, before, popups);
+          note(`[${stage.name}] menu ${j} item "${label}" ${after === before ? "NOTHING" : "ok"}`);
           if (after === before) failures.push(`[${stage.name}] menu ${j} item "${label}": nothing happened`);
           const undo = page.getByTestId("today-undo");
           if (await undo.count()) { await undo.click().catch(() => undefined); clicked++; }

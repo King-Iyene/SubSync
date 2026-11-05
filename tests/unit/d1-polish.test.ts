@@ -104,7 +104,7 @@ describe("the toolbar", () => {
     const src = readFileSync("src/app/app/dashboard.tsx", "utf8");
     const i = src.indexOf('data-testid="toolbar"');
     expect(i).toBeGreaterThan(0);
-    const row = src.slice(i, src.indexOf("<StatusLine />", i));
-    for (const part of ["FilterDrawer", "GlobalSearch", "NotificationBell"]) expect(row, part).toContain(part);
+    const row = src.slice(i, src.indexOf("<GlobalFilterBar", i));
+    for (const part of ["GlobalSearch", "NotificationBell"]) expect(row, part).toContain(part);
   });
 });

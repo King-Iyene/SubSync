@@ -910,7 +910,7 @@ alter table public.possible_duplicates enable row level security;
 create table if not exists public.growth_goals (
   installation_id uuid not null references public.installations (id) on delete cascade,
   location_id text not null,
-  monthly_goal integer not null check (monthly_goal >= 1 and monthly_goal <= 1000000),
+  monthly_goal integer not null, -- 1 to 1,000,000, checked by the server
   set_by text,
   updated_at timestamptz not null default now(),
   primary key (installation_id, location_id)
