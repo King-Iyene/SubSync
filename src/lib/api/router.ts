@@ -105,6 +105,7 @@ import { can, personFromSession } from "../connections/person";
 import { handlePeople, timeoutResponse } from "./people-routes";
 import { handleDuplicates } from "./duplicates-routes";
 import { handleWorkbench } from "./workbench-routes";
+import { handleBoard } from "./pipeline-board-routes";
 import { handleCleanupV2 } from "./cleanup-routes";
 import { gatedWriter } from "../ghl/crm-gateway";
 import { writeEnabledFor } from "../analytics/cleanup-config";
@@ -1910,7 +1911,7 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       });
     }
     // The Lead workbench (stage MOAT): the live conversation, the preview and the one gateway every write goes through (switched off by default).
-    if (a === "workbench") return await handleWorkbench(ctx, { allowed: () => allowedIds(ctx), locationToken: (locationId) => locationAccessToken(ctx.session.companyId, locationId) });
+    if (a === "workbench") return await handleWorkbench(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links, locationToken: (locationId) => locationAccessToken(ctx.session.companyId, locationId) });
     // The rebuilt Appointments page: the work lists, "See all" and the comparison (read only).
     if (a === "appointments" && method === "GET" && (b === "work" || b === "list" || b === "compare") && !c) {
       return await handleApptWork(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links });
@@ -1985,6 +1986,9 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       if (a === "export" && b) return await exportCsv(ctx, b);
       if (a === "sync-status") return await syncStatusView(ctx);
       if (a === "freshness") return await freshnessView(ctx);
+      if (a === "pipeline-intel" && ctx.url.searchParams.get("view") === "board") {
+        return await handleBoard(ctx, { allowed: () => allowedIds(ctx), staleDays: async () => (await scope(ctx)).settings.staleDays, stageControls: (allowed, rules) => stageControlsFor(ctx, allowed, rules) });
+      }
       if (a === "pipeline-intel") return await pipelineIntel(ctx);
       if (a === "contact-intel") return await contactIntel(ctx);
       if (a === "team") return await teamView(ctx);

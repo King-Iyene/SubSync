@@ -7,7 +7,8 @@ import {
   Badge, Btn, Card, Empty, ErrorBox, ExtLink, fmtInt, fmtMoney, inputClass, Loading, PageHeader, Sparkline, Stat, Table, Td, Th,
 } from "../ui";
 import { ForecastCard, type ForecastData } from "./forecast-card";
-import { StageRulesCard, type StageControls } from "./stage-rules-card";
+import { type StageControls } from "./stage-rules-card";
+import { PipelineBoard } from "./pipeline-board";
 
 type DealRow = {
   opportunityId: string; locationId: string; locationName: string | null; pipelineName: string; stageName: string; name: string | null;
@@ -76,7 +77,8 @@ function DealTable({ rows, extra }: { rows: Array<DealRow & { reasons?: string[]
   );
 }
 
-export function PipelineView() {
+/** The older all-in-one screen, now the "More detail" part under the board. It only loads when someone opens it. */
+function PipelineDetails() {
   const api = useApiClient();
   const { data, error, loading, reload } = useData<Data>("pipeline-intel");
   const [target, setTarget] = useState("");
@@ -153,7 +155,6 @@ export function PipelineView() {
         {data.trendNote && <p className="mt-1 text-xs text-muted-foreground" data-testid="trend-note">{data.trendNote}</p>}
       </Card>
 
-      {data.stageControls?.canEdit && <StageRulesCard controls={data.stageControls} onChanged={reload} />}
 
       <Card title="Stages, bottlenecks and conversion" action={names.length > 1 ? (
         <select className="rounded-lg border bg-background px-2 py-1 text-sm" value={chosen} onChange={(e) => setPipe(e.target.value)} aria-label="Pipeline">
@@ -237,6 +238,19 @@ export function PipelineView() {
           </Table>
         </Card>
       )}
+    </div>
+  );
+}
+
+export function PipelineView() {
+  const [more, setMore] = useState(false);
+  return (
+    <div className="space-y-8">
+      <PipelineBoard />
+      <section aria-label="More detail" className="border-t pt-4">
+        <button type="button" onClick={() => setMore(!more)} aria-expanded={more} className="min-h-11 text-[15px] font-medium text-primary underline underline-offset-4" data-testid="pipeline-more">{more ? "Hide the detail" : "More detail: aging, wins and losses, deal risk"}</button>
+        {more && <div className="mt-4"><PipelineDetails /></div>}
+      </section>
     </div>
   );
 }

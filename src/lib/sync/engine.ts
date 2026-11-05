@@ -495,7 +495,10 @@ async function handleSpeed(job: Job): Promise<Outcome> {
   let access: "ok" | "needs_permission" = "ok";
   for (const c of candidates) {
     try {
-      const msgs = await fetchConversationMessages(token, loc, c.conversation_id as string);
+      const all = await fetchConversationMessages(token, loc, c.conversation_id as string);
+      // Principle 14: a message SubSync itself sent (the composer) is never a first reply, so it never changes the speed numbers.
+      const ours = new Set((await db`select ghl_id from crm_writes where installation_id = ${job.installationId} and contact_id = ${c.contact_id} and kind = 'message' and ghl_id is not null and undone_at is null`).map((r) => r.ghl_id as string));
+      const msgs = ours.size ? all.filter((m) => !(m.id && ours.has(m.id))) : all;
       const lead = leadFromMessages(msgs, c.date_added instanceof Date ? c.date_added.getTime() : null, countAutomated);
       if (!lead) continue;
       // The automatic first message and the person's first reply, kept apart whatever the setting counts (N78).

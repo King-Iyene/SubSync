@@ -112,4 +112,14 @@ describe.skipIf(!HAS_DB)("Lead workbench: routes, tenancy and dry runs", () => {
     expect((await sql()`select 1 from cached_contacts where installation_id = ${instA} and contact_id = 'a1-ada'`).length).toBe(1);
   });
 
+  it("the pipeline board is cut to the caller's accounts", async () => {
+    const a = await call(agency(), "GET", "pipeline-intel?view=board");
+    expect(a.status).toBe(200);
+    expect(a.body.headline.openCount).toBe(2);
+    const c = await call(client(), "GET", "pipeline-intel?view=board");
+    expect(c.status).toBe(200);
+    expect(c.body.headline.openCount).toBe(1);
+    expect(c.body.stageControls).toBeNull();
+    expect((await call(client(), "GET", `pipeline-intel?view=board&location=${A2}`)).status).toBe(404);
+  });
 });

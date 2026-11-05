@@ -43,8 +43,9 @@ test("a note is saved to the contact, shows each state, can be undone, and Copy 
   let mode: Mode = "saved";
   const posts = await fake(page, () => mode);
   const drawer = await openPanel(page);
+  await drawer.getByTestId("wb-tab-record").click();
   await drawer.getByText("Add a note to this contact").click();
-  await expect(drawer.getByTestId("note-to-self").getByRole("tooltip")).toContainText("marked as added in SubSync");
+  await expect(drawer.getByTestId("note-to-self").locator("[role=tooltip]")).toContainText("marked as added in SubSync");
   await expect(drawer.getByTestId("note-save")).toBeDisabled();
   await drawer.getByTestId("note-text").fill("Wants a quote by Friday");
   await drawer.getByTestId("note-save").click();
@@ -93,19 +94,17 @@ test("each call outcome button writes once, double clicks are one save, Undo wor
   await page.screenshot({ path: `${SHOTS}/contact-writeback-call-${info.project.name}.png` });
 });
 
-test("Email opens the contact in the CRM; a contact with no address has it disabled with the reason", async ({ page, context }) => {
+test("Email opens the composer on the Email channel; a contact with no address has it disabled with the reason", async ({ page }) => {
   test.setTimeout(300_000);
   const drawer = await openPanel(page);
   const email = drawer.getByTestId("drawer-email");
   if (await email.isDisabled()) {
-    await expect(drawer.getByTestId("drawer-no-contact-way")).toContainText(/no email address/i);
+    await expect(drawer.getByTestId("drawer-no-contact-way")).toContainText(/no email address|asked not to be contacted/i);
     return;
   }
-  const popup = context.waitForEvent("page", { timeout: 15_000 });
   await email.click();
-  const strip = page.getByTestId("dial-warning");
-  if (await strip.count()) await page.getByTestId("dial-anyway").click();
-  expect((await popup).url(), "a new tab opened").toBeTruthy();
+  await expect(drawer.getByTestId("wb-composer")).toBeVisible();
+  await expect(drawer.getByTestId("wb-subject"), "the Email channel has a subject").toBeVisible();
 });
 
 test("tags: a clear section under the actions, searchable picker with create, colour chips, date only, confirmed removal, undo, tooltips instead of sentences", async ({ page }, info) => {
@@ -133,7 +132,7 @@ test("tags: a clear section under the actions, searchable picker with create, co
   await expect(tags.getByTestId("tag-status")).toContainText(/Tag .brand new tag. added to .+ in your CRM/);
   expect(posts.at(-1)).toMatchObject({ path: "tag", body: { tag: "brand new tag", remove: false } });
   const chip = tags.getByTestId("drawer-tag").filter({ hasText: "brand new tag" });
-  await expect(chip.getByTestId("tag-date")).toHaveText(/^\d{1,2} [A-Z][a-z]{2}( \d{4})?$/);
+  await expect(chip.getByTestId("tag-date")).toHaveText(/^(\d{1,2} [A-Z][a-z]{2}|[A-Z][a-z]{2} \d{1,2})(,? \d{4})?$/);
   await expect(chip).not.toContainText(/added|first seen/i);
   const before = posts.length;
   await tags.getByRole("button", { name: "Remove the tag brand new tag" }).click();
@@ -169,8 +168,8 @@ test("Call with: a connected dialer needs a valid https link and saves only the 
     return r.fulfill({ json: { provider: "phone" } });
   });
   await fake(page, () => "saved");
-  await openPanel(page);
-  const setting = page.getByTestId("dialer-setting").first();
+  const drawer = await openPanel(page);
+  const setting = drawer.getByTestId("dialer-setting");
   if (await setting.count()) {
     await setting.getByTestId("dialer-select").selectOption("connected");
     await setting.getByTestId("dialer-template").fill("http://bad.example.com/{phone}");

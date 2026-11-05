@@ -4,7 +4,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { diffFields, guardrails, REASON_LABELS, SORT_LABELS } from "@/lib/analytics/dedupe-review";
 import type { FieldPick } from "@/lib/analytics/cleanup-rules";
-import { EmptyState, ErrorState, HowTo, InlineAlert, Page, PopMenu, RowButton, Section, SkeletonCards } from "../ds";
+import { EmptyState, ErrorState, HowTo, InlineAlert, LeadDrawer, Page, PopMenu, RowButton, Section, SkeletonCards } from "../ds";
 import { ArrivalsCard, MatchWhy, PersonCard, type Pair, type Workflow } from "./duplicates-extra";
 import { MatchMeter, ProgressBar } from "./cleanup-parts";
 import { useApiClient, useData } from "../session";
@@ -60,6 +60,7 @@ export function DuplicatesView({ embedded = false }: { embedded?: boolean } = {}
   const { data, error, loading, reload } = useData<Data>(pathOf(f));
   const [chosen, setChosen] = useState<{ key: string; id: string } | null>(null);
   const [sheetKey, setSheetKey] = useState<string | null>(null);
+  const [panel, setPanel] = useState<number | null>(null);
   const [toast, setToast] = useState<{ text: string; undo?: () => Promise<void> } | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -297,12 +298,19 @@ export function DuplicatesView({ embedded = false }: { embedded?: boolean } = {}
             return (
               <>
                 <ul className={`mt-4 grid gap-4 ${step.people.length >= 3 ? "md:grid-cols-3" : step.people.length === 2 ? "md:grid-cols-2" : ""}`} data-testid="dup-records">
-                  {step.people.map((p, i) => <PersonCard key={p.contactId} p={p} i={i} keep={p.contactId === keepId} best={p.contactId === step.survivorId} locked={decided} differ={differ} onKeep={() => setChosen({ key: step.key, id: p.contactId })} />)}
+                  {step.people.map((p, i) => <PersonCard key={p.contactId} p={p} i={i} keep={p.contactId === keepId} best={p.contactId === step.survivorId} locked={decided} differ={differ} onKeep={() => setChosen({ key: step.key, id: p.contactId })} onShow={() => setPanel(i)} />)}
                 </ul>
                 {d.same.length > 0 && <p className="mt-2 text-sm text-muted-foreground" data-testid="dup-same-line">The same on both: {d.same.map((r) => r.label.toLowerCase()).join(", ")}.</p>}
               </>
             );
           })()}
+
+          {panel !== null && (
+            <LeadDrawer
+              leads={step.people.map((p) => ({ contactId: p.contactId, locationId: step.locationId, name: p.name, phone: p.phone, email: p.email, url: p.url, dnd: p.dnd === true, locationName: step.locationName, note: "One of the records in this possible duplicate." }))}
+              index={panel} onIndex={setPanel} onClose={() => setPanel(null)} showAccount={false}
+            />
+          )}
 
           {guardrails(step.people, keepId).length > 0 && !sheetOpen && !decided && <p className="mt-3 text-sm text-warning" data-testid="dup-careful">One thing to check first: {guardrails(step.people, keepId)[0].text}</p>}
 

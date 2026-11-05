@@ -680,3 +680,9 @@ Code: `src/lib/analytics/growth.ts` (rules), `growth-records.ts` (the people beh
 
 ## Range semantics of the report tabs (5 Nov 2026)
 Dates are whole local days, first and last included, in each client's own time zone for lead counts. The comparison is the same number of days directly before the chosen ones ("vs the 30 days before"); under 5 leads before, it says "Too few to compare". Today, This week, This month and All time are always calendar stretches, and the monthly goal is always this month. Sources compare the chosen dates against the days before them. Proof covers the last 7 days and Sources and Coverage the last 14 days of leads SubSync holds, so those tabs filter by client only.
+
+## Pipeline board (stage MOAT)
+- **Counted once:** each open deal id appears in exactly one stage and is added to the headline once; only deals the existing rules count (value above zero, an owner, pipeline in use, not a closed-out stage).
+- **Stuck (per stage):** time in the CURRENT stage (stage change, else created) above that stage's limit AND no activity for 7 days (or unknown). Limit = 2 x the median days open deals have sat in that stage, clamped 5 to 30; stages with fewer than 5 deals use the account's stale-days setting.
+- **No next step:** no upcoming appointment for the deal's contact (not cancelled, no-show or invalid) AND no activity for 7 days.
+- **Forecast shown** only with 20 or more closed deals; **trend line** only with 14 or more days and a change of at least 10 percent of its high. Tests: src/lib/__tests__/pipeline-board.test.ts.
