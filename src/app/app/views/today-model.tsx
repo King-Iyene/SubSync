@@ -75,7 +75,7 @@ export function useTodayModel({ t, kind, reload }: { t: TodayData; kind: AccessK
         const mine: Record<string, Hold> = {};
         for (const id of row.itemIds) mine[id] = { eventId: r.eventId, action: a === "done" ? "done" : "snooze", until, by: "you", at: r.at, rowKey: row.key };
         setLocalHolds((m) => ({ ...m, ...mine }));
-        say({ text: a === "done" ? `Marked done: ${label}.` : `Snoozed ${a === "snooze_day" ? "for 1 day" : "until Monday"}: ${label}.`, eventId: r.eventId });
+        say({ text: a === "done" ? `Marked done: ${label}.` : `Snoozed ${a === "snooze_day" ? "until tomorrow" : "until Monday"}: ${label}.`, eventId: r.eventId });
       }
       void reload();
     } catch (error) {

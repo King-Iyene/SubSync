@@ -106,7 +106,7 @@ test("one number per fact (one account): the sentence, the Reply now list, its '
   test.skip(n === 0, "the demo client has nobody waiting");
   await page.goto("/app?as=client");
   await expect(page.getByTestId("today-headline")).toContainText(new RegExp(`${thousands(n)} (people are|person is) waiting for a reply`), { timeout: 60_000 });
-  await expect(page.getByTestId("reply-summary")).toContainText(/longest wait/);
+  await expect(page.getByTestId("reply-summary")).toContainText(/longest wait/i);
   const shown = await page.getByTestId("reply-row").count();
   expect(shown).toBeLessThanOrEqual(5);
   if (n > shown) {

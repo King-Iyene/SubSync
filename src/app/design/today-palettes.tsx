@@ -7,13 +7,13 @@ import "../app/views/today-theme.css";
 
 // Today's two palette options side by side, light and dark, each drawn by the real Today tokens (src/app/app/views/today-theme.css). A is the default. Nothing here is a screenshot:
 // every swatch reads the same CSS variables the page reads, so a change to the token block shows here at once. The contrast figures are computed from the swatch's own colours.
-const SWATCHES: Array<{ name: string; token: string; onToken?: string; note: string }> = [
+const SWATCHES: Array<{ name: string; token: string; onToken?: string; note: string; asText?: boolean }> = [
   { name: "Ground", token: "--t-ground", onToken: "--t-ink", note: "page" },
   { name: "Raised", token: "--t-raise", onToken: "--t-ink", note: "queue and panel" },
   { name: "Accent", token: "--t-accent", onToken: "--t-on-accent", note: "the one colour" },
-  { name: "Urgent", token: "--t-bad", onToken: "--t-ink", note: "status only" },
-  { name: "Soon", token: "--t-warn", onToken: "--t-ink", note: "status only" },
-  { name: "Fine", token: "--t-ok", onToken: "--t-ink", note: "status only" },
+  { name: "Urgent", token: "--t-bad", note: "status only", asText: true },
+  { name: "Soon", token: "--t-warn", note: "status only", asText: true },
+  { name: "Fine", token: "--t-ok", note: "status only", asText: true },
 ];
 const CHART = ["--t-c1", "--t-c2", "--t-c3", "--t-c4"];
 
@@ -50,7 +50,7 @@ function Panel({ palette, mode, title }: { palette: "a" | "b"; mode: "light" | "
             <li key={s.name} className="min-w-0">
               <span className="block h-10 rounded-[4px] border border-[var(--t-rule)]" style={{ background: `var(${s.token})` }} />
               <span className="t-small mt-1 block font-medium">{s.name}</span>
-              <span className="t-small t-quiet block">{s.onToken ? <Ratio fg={hex[s.onToken]} bg={hex[s.token]} /> : null}</span>
+              <span className="t-small t-quiet block">{s.asText ? <Ratio fg={hex[s.token]} bg={hex["--t-raise"]} /> : s.onToken ? <Ratio fg={hex[s.onToken]} bg={hex[s.token]} /> : null}</span>
             </li>
           ))}
         </ul>

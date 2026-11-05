@@ -40,7 +40,7 @@ const MENU_TRIGGER = "ds-press inline-flex size-11 items-center justify-center r
 /** The one small action button of a row: an outlined link that leaves the app (with the external-link icon), or a button that stays inside it. */
 export function RowButton({ href, onClick, label, sr, testId }: { href?: string; onClick?: () => void; label: string; sr: string; testId?: string }) {
   return href
-    ? <a href={href} target="_blank" rel="noopener noreferrer" className={ACTION_BUTTON} data-testid={testId}>{label}<ExternalLink aria-hidden className="size-3.5" /><span className="sr-only"> ({sr}, opens in a new tab)</span></a>
+    ? <a href={href} target="_blank" rel="noopener noreferrer" className={ACTION_BUTTON} data-testid={testId} title="Opens in your CRM">{label}<ExternalLink aria-hidden className="size-3.5" /><span className="sr-only"> ({sr}, opens in a new tab)</span></a>
     : <button type="button" onClick={onClick} className={ACTION_BUTTON} data-testid={testId}>{label}<span className="sr-only"> ({sr})</span></button>;
 }
 

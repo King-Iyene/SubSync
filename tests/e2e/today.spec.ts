@@ -350,7 +350,7 @@ test("a client's staff open on Today for their own account: Reply now, calls, ap
   await expect(page.getByTestId("today-headline")).toBeVisible();
   await expect(page.getByTestId("today-account-picker")).toHaveCount(0);
   await expect(page.getByTestId("filter-drawer")).toHaveCount(0);
-  await expect(page.getByRole("heading", { name: "Do this first" })).toHaveCount(0);
+  await expect(page.getByTestId("fix-first")).toHaveCount(0);
   await expect(page.getByTestId("account-bars")).toHaveCount(0);
   await expect(page.getByTestId("donut-chart")).toHaveCount(0);
   await expect(page.getByTestId("today-proof")).toHaveCount(0); // alerts are for the business administrator
@@ -375,7 +375,7 @@ test("a client's staff open on Today for their own account: Reply now, calls, ap
 test("a business administrator also sees what SubSync caught in their account, never other accounts", async ({ page }) => {
   await page.goto("/app?as=business");
   await expect(page.getByTestId("today-headline")).toBeVisible({ timeout: 45_000 });
-  await openMore(page);
+  await openMore(page, "Proof");
   await expect(page.getByTestId("today-proof")).toBeVisible();
   await expect(page.getByTestId("today-account-picker")).toHaveCount(0);
   await page.getByTestId("today-more").click();
@@ -388,7 +388,6 @@ test("the style guide shows Today's building blocks, still opens without signing
   await expect(page.getByTestId("today-headline")).toBeVisible();
   await expect(page.getByTestId("donut-chart")).toBeVisible();
   await expect(page.getByTestId("account-bars")).toBeVisible();
-  await openMore(page, "Proof");
   await expect(page.getByTestId("raised-cleared")).toBeVisible();
   await expect(page.getByTestId("fix-first")).toBeVisible();
   await expect(page.getByTestId("design-pulse")).toBeVisible();

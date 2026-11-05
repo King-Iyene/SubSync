@@ -110,7 +110,7 @@ test("the work list: Open, the row menu (Show everything, Done for now, Snooze, 
   await page.keyboard.press("Escape");
   // See all opens the full list of clients in the records panel; its count is the headline's.
   if (await page.getByTestId("queue-all").count()) {
-    const clients = Number((await page.getByTestId("today-headline").innerText()).match(/\d[\d,]*/)![0].replace(/,/g, ""));
+    const clients = Number((await page.getByTestId("today-headline").innerText()).match(/(\d[\d,]*) clients?/)![1].replace(/,/g, ""));
     await page.getByTestId("queue-all").click();
     await expect(panel(page)).toBeVisible();
     expect(await count(page)).toBe(clients);
@@ -129,7 +129,7 @@ test("the work list: Open, the row menu (Show everything, Done for now, Snooze, 
   // Snooze (menu) then Undo.
   await rows.first().getByTestId("queue-more").click();
   await page.getByTestId("menu-snooze-day").click();
-  await expect(page.getByTestId("today-toast")).toContainText(/Snoozed for 1 day/);
+  await expect(page.getByTestId("today-toast")).toContainText(/Snoozed until tomorrow/);
   await expect.poll(heldNow).toBeGreaterThan(heldBefore);
   await page.getByTestId("today-undo").click();
   await expect.poll(heldNow, { timeout: 15_000 }).toBe(heldBefore);
@@ -221,7 +221,7 @@ test("the command palette opens with Ctrl Shift K and from More, filters, runs a
   await page.keyboard.press("Control+Shift+K");
   await expect(page.getByTestId("palette")).toBeVisible();
   await expect(page.getByTestId("global-search")).toHaveCount(0);
-  await page.getByTestId("palette-input").fill("waiting for a reply");
+  await page.getByTestId("palette-input").fill("needs a reply");
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("palette")).toHaveCount(0);
   await expect(panel(page)).toBeVisible();

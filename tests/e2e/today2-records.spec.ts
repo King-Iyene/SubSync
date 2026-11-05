@@ -135,7 +135,7 @@ test("a tile opens the records panel and its count is the number on the tile", a
   expect(shown).toBeGreaterThan(0);
   expect(Number(await count.getAttribute("data-count"))).toBe(today.totals.replies.count - Object.values(today.holds as Json).filter((h: Json) => String(h.rowKey).includes("|replies")).length);
   // The header says a title and a sentence in words, and the rows are the people.
-  await expect(page.getByTestId("records-title")).toContainText("waiting for a reply");
+  await expect(page.getByTestId("records-title")).toContainText("needs a reply");
   await expect(page.getByTestId("records-subtitle")).toContainText("reply target");
   expect(await page.getByTestId("records-row").count()).toBe(Math.min(50, shown));
   await expect(page.getByTestId("records-showing")).toContainText(`Showing ${Math.min(50, shown)} of ${shown}`);
@@ -383,7 +383,7 @@ test("Snooze 1 day and Snooze until Monday set a problem aside; Assign to me mar
   await rows.first().getByTestId("queue-more").click();
   await expect(page.getByTestId("pop-menu")).toBeVisible();
   await page.getByTestId("menu-snooze-day").click();
-  await expect(page.getByTestId("today-toast")).toContainText("Snoozed for 1 day");
+  await expect(page.getByTestId("today-toast")).toContainText("Snoozed until tomorrow");
   await expect.poll(() => heldCount(page)).toBeGreaterThan(heldBefore);
   await page.getByTestId("today-undo").click();
   await expect.poll(() => heldCount(page), { timeout: 15_000 }).toBe(heldBefore);
@@ -445,7 +445,7 @@ test("the Today brief preview uses the same headline and the same top rows, and 
   await expect(page.getByTestId("brief-panel")).toBeVisible();
   await expect(page.getByTestId("brief-subject")).toContainText(brief.headline);
   await expect(page.getByTestId("brief-lines")).toContainText("Do this first:");
-  await expect(page.getByTestId("brief-panel")).toContainText("SubSync has sent nothing");
+  await expect(page.getByTestId("brief-panel")).toContainText("Nothing has been sent");
   await page.getByTestId("brief-close").click();
   await expect(page.getByTestId("brief-panel")).toHaveCount(0);
 });
