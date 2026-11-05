@@ -1,4 +1,5 @@
-import { waitingMoney, waitingMoneyLine } from "./waiting-money";
+import { waitingMoney } from "./waiting-money-queries";
+import { waitingMoneyLine } from "./waiting-money";
 import { sql } from "../db";
 import { MIN_CLOSED_DEALS } from "./metrics";
 import { EXCLUSION_LABEL, type Exclusion } from "./lead-rules";

@@ -65,7 +65,8 @@ test("a client's staff see the date range but no account picker", async ({ page 
   await expect(page.getByTestId("account-button")).toHaveCount(0);
 });
 
-test("the SubSync name and logo show unless the company has its own brand on", async ({ page }) => {
+test("the SubSync name and logo show unless the company has its own brand on", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop-1440", "the sidebar is the desktop layout");
   await open(page, "today");
   const side = page.getByRole("complementary");
   await expect(side.getByText("SubSync", { exact: false }).first()).toBeVisible();

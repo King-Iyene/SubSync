@@ -1,4 +1,5 @@
-import { waitingMoney, waitingMoneyLine } from "./waiting-money";
+import { waitingMoney } from "./waiting-money-queries";
+import { waitingMoneyLine } from "./waiting-money";
 import { sql } from "../db";
 import { conversationCoverage } from "./queries";
 import { properCase, resolveUser, type PersonLabel } from "./people-labels";
