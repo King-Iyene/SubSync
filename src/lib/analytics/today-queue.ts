@@ -392,7 +392,8 @@ export function accountsNeedingYou(rows: QueueRow[], accounts: Map<string, Accou
     if (seen.has(r.locationId)) continue;
     seen.add(r.locationId);
     const mine = rows.filter((x) => x.locationId === r.locationId);
-    const worst = mine.some((x) => x.severity === "critical") ? "critical" : mine.some((x) => x.severity === "warning") ? "warning" : "info";
+    // The stripe and the word describe the problem the row names (its biggest one), so a row about 2 quiet deals is not drawn red because another kind of problem is old.
+    const worst = r.severity;
     const dollars = mine.reduce((s, x) => s + (x.dollars ?? 0), 0);
     out.push({
       locationId: r.locationId, name: r.accountName, state: worst === "critical" ? "Needs you now" : worst === "warning" ? "Needs a look" : "Slipping",

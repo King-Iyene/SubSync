@@ -69,12 +69,14 @@ for (const role of ROLES) {
     const popups = { n: 0 };
     context.on("page", (p) => { popups.n++; void p.close().catch(() => undefined); });
     const failures: string[] = [];
+    // Each start is a clean start: the remembered client choice and the remembered theme from an earlier click must not carry over.
+    await page.addInitScript(() => { try { window.localStorage.removeItem("subsync-today-accounts"); } catch { /* no storage */ } });
     let clicked = 0;
 
     const fresh = async (stage: Stage) => {
       await page.goto(role.path);
       await todayReady(page);
-      await page.waitForTimeout(1200); // counts finish animating
+      await page.waitForTimeout(700); // counts finish animating
       await stage.setup(page);
       await page.waitForTimeout(500);
     };
@@ -131,8 +133,9 @@ for (const role of ROLES) {
         const n = await page.locator('[data-testid="pop-menu"] [role=menuitem]').count();
         expect(n, `[${stage.name}] menu ${j} has items`).toBeGreaterThan(0);
         await page.keyboard.press("Escape");
+        const menuUrl = page.url();
         for (let k = 0; k < n; k++) {
-          await fresh(stage);
+          if (k > 0) { await page.keyboard.press("Escape"); await page.waitForTimeout(150); if ((await page.locator("[data-testid=records-panel],[role=dialog],[data-testid=pop-menu]").count()) > 0 || page.url() !== menuUrl) await fresh(stage); }
           const t2 = page.locator('[aria-haspopup="menu"]').nth(j);
           await t2.scrollIntoViewIfNeeded();
           await t2.click();

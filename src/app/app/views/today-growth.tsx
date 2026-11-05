@@ -23,7 +23,12 @@ const PERIODS: Array<{ p: Period; label: string; against: string; info: string }
 
 function ChangeLine({ c, against, compact = false }: { c: Change; against: string; compact?: boolean }) {
   if (c.previous === null) return <span className="t-small t-quiet">Since the first contact</span>;
-  if (c.pct === null) return <span className="t-small t-quiet" title={c.note ?? undefined}>{compact ? "\u2013" : "Too few to compare"}</span>;
+  if (c.pct === null) {
+    // A table row shows the plain difference instead of a percentage the earlier figure is too small to support.
+    const diff = c.count - c.previous;
+    if (compact) return <span className="t-small t-quiet" title={`${fmtInt(c.count)} now, ${fmtInt(c.previous)} ${against}. ${c.note ?? ""}`}>{diff === 0 ? "Same as last week" : diff > 0 ? `\u25B2 ${diff} more` : `\u25BC ${Math.abs(diff)} fewer`}</span>;
+    return <span className="t-small t-quiet" title={c.note ?? undefined}>Too few to compare</span>;
+  }
   const tone = c.direction === "up" ? "text-[var(--t-ok)]" : c.direction === "down" ? "text-[var(--t-bad)]" : "text-[var(--t-ink2)]";
   return <span className={`t-small ${tone}`} title={`${fmtInt(c.count)} now, ${fmtInt(c.previous)} ${against}`}>{c.direction === "up" ? "▲ Up" : c.direction === "down" ? "▼ Down" : "No change"}{c.direction === "same" ? "" : ` ${Math.abs(c.pct)}%`}<span className="t-quiet"> on {against}</span></span>;
 }
@@ -59,9 +64,10 @@ function GoalInline({ locationId, goal, name, onSaved, disabled }: { locationId:
   if (!edit) {
     return (
       <span className="inline-flex items-center gap-1.5">
-        <span className="t-num" data-testid="goal-value">{goal === null ? "No goal" : fmtInt(goal)}</span>
+        {goal !== null && <span className="t-num" data-testid="goal-value">{fmtInt(goal)}</span>}
+        {goal === null && disabled && <span className="t-quiet" data-testid="goal-value">No goal</span>}
         {!disabled && <button type="button" onClick={() => { setText(goal === null ? "" : String(goal)); setErr(null); setEdit(true); }} aria-label={goal === null ? `Set a monthly goal for ${name}` : `Change the monthly goal for ${name}`} title="Set the number of new email leads you want this month" data-testid="goal-edit"
-          className="ds-press inline-flex size-7 items-center justify-center rounded-[4px] text-[var(--t-ink2)] hover:bg-[var(--t-wash)] hover:text-[var(--t-ink)] focus-visible:outline-2 focus-visible:outline-[var(--ring)]"><Pencil aria-hidden className="size-3.5" /></button>}
+          className={`ds-press inline-flex items-center justify-center rounded-[4px] text-[var(--t-ink2)] hover:bg-[var(--t-wash)] hover:text-[var(--t-ink)] focus-visible:outline-2 focus-visible:outline-[var(--ring)] ${goal === null ? "h-7 px-2 text-sm underline decoration-[var(--t-rule2)] underline-offset-4" : "size-7"}`}>{goal === null ? "Set goal" : <Pencil aria-hidden className="size-3.5" />}</button>}
       </span>
     );
   }
@@ -90,7 +96,7 @@ function GoalBar({ s }: { s: GoalStatus }) {
   );
 }
 
-export function GrowthTab({ m, g, loading, error, reload, kind }: { m: TodayModel; g: GrowthData | null; loading: boolean; error: string | null; reload: () => void; kind: AccessKind }) {
+export function GrowthTab({ m, g, error, reload, kind }: { m: TodayModel; g: GrowthData | null; loading: boolean; error: string | null; reload: () => void; kind: AccessKind }) {
   const api = useApiClient();
   const [day, setDay] = useState<string | null>(null);
   const [source, setSource] = useState<string | null>(null);

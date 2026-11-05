@@ -55,15 +55,15 @@ export function GrowthChart({ series, selected, onDay, label }: { series: DayPoi
   );
 }
 
-const CHART_VARS = ["var(--t-c1)", "var(--t-c2)", "var(--t-c3)", "var(--t-c4)"];
-const colourOf = (i: number) => (i < CHART_VARS.length ? CHART_VARS[i] : "var(--t-ink3)");
+const CHART_VARS = ["var(--t-c1)", "var(--t-c2)", "var(--t-c3)", "var(--t-c4)", "var(--t-ink3)"];
+const colourOf = (i: number) => CHART_VARS[Math.min(i, CHART_VARS.length - 1)];
 const polar = (cx: number, cy: number, r: number, a: number) => [cx + r * Math.cos(a), cy + r * Math.sin(a)] as const;
 
 /** Where the last 30 days of email leads came from. Four sources and "Other"; a slice or a legend row opens its people. */
 export function SourceDonut({ rows, total, selected, onPick, label }: { rows: SourceRow[]; total: number; selected: string | null; onPick: (source: string) => void; label: string }) {
   const [hot, setHot] = useState<string | null>(null);
-  const shown = rows.slice(0, 4);
-  const rest = rows.slice(4);
+  const shown = rows.length <= 5 ? rows : rows.slice(0, 4);
+  const rest = rows.length <= 5 ? [] : rows.slice(4);
   const items = [...shown.map((r, i) => ({ ...r, colour: colourOf(i) })), ...(rest.length ? [{ source: "Other", count: rest.reduce((s, r) => s + r.count, 0), previous: rest.reduce((s, r) => s + r.previous, 0), share: rest.reduce((s, r) => s + r.share, 0), change: rest.reduce((s, r) => s + r.change, 0), colour: "var(--t-ink3)" }] : [])];
   const cx = 70, cy = 70, R1 = 60, R0 = 42;
   let a = -Math.PI / 2;
