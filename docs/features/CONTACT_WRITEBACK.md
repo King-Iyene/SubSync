@@ -48,3 +48,6 @@ Only `contacts.write` (already listed as optional). Nothing else is needed. (`co
 
 ## Verified / not
 Unit tests (idempotency, cap, marker, request shapes, dry run, messages, tag names) pass. Database tests written (`tests/unit/contact-writeback-db.test.ts`) but need a database. Playwright spec `tests/e2e/contact-writeback.spec.ts` written; the app server could not start in this sandbox (no build/DB), so it and the screenshots are NOT run. Not tested against the live CRM.
+
+## Call with (dialer setting)
+Per user, stored in saved_views (page people-prefs, name dialer): provider crm (default, opens the contact in the CRM), phone (tel: link) or connected (vendor label + https template with {phone} / {email}; validated, never fetched). No vendor link pattern is built in: none of Kixie, Aloware, Wave, PhoneBurner or Dialpad could be confirmed from public docs (search 5 Nov 2026), so all use the user's own template and the screen says so. Any Call button that opens a link announces the call, which opens Log how the call went in the lead panel. No migration needed.

@@ -1,9 +1,10 @@
 "use client";
 
 import { CalendarClock, CircleDollarSign, MessageSquare, Phone, Tag, UserPlus, Zap } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { groupByDay, noteToSelf, type TimelineItem, type TimelineKind } from "@/lib/people/person";
 import { useApiClient } from "../session";
+import { CALL_STARTED } from "./dial-button";
 
 // The pieces of the lead panel that have a life of their own: the timeline, "log this call" and "a note for your CRM". The panel (lead-drawer.tsx) assembles them.
 
@@ -68,6 +69,9 @@ const BTN = "ds-press inline-flex min-h-11 cursor-pointer items-center rounded-m
 /** One tap to write down how a call went. It is saved on the contact in your CRM (a note, a tag, and for "follow up" a task) and on SubSync's own list, so the person leaves the call lists for 12 hours. */
 export function LogCall({ locationId, contactId, onLogged }: { locationId: string; contactId: string; onLogged: (label: string, message?: string, id?: string) => void }) {
   const api = useApiClient();
+  const [open, setOpen] = useState(false);
+  // Starting a call (any Call button) opens this, so the result is one tap away and goes to the CRM.
+  useEffect(() => { const on = () => setOpen(true); window.addEventListener(CALL_STARTED, on); return () => window.removeEventListener(CALL_STARTED, on); }, []);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const [last, setLast] = useState<{ id: string; label: string } | null>(null);
@@ -89,7 +93,7 @@ export function LogCall({ locationId, contactId, onLogged }: { locationId: strin
     finally { setBusy(false); }
   };
   return (
-    <details className="mt-4 border-t pt-3" data-testid="log-call">
+    <details className="mt-4 border-t pt-3" data-testid="log-call" open={open} onToggle={(e) => setOpen((e.target as HTMLDetailsElement).open)}>
       <summary className="min-h-9 cursor-pointer text-sm font-medium">Log how the call went</summary>
       <p className="mt-1 text-xs text-muted-foreground">Saved as a note on this contact in your CRM (and a tag; a task for "Follow up in 3 days"). The person also leaves the call lists for 12 hours. Nothing is ever sent to them.</p>
       <div className="mt-2 flex flex-wrap gap-2">

@@ -4,7 +4,7 @@ import { useState, type ReactNode } from "react";
 import { emailPlan } from "@/lib/analytics/dedupe-review";
 import { dialPlan, dialWarnings, emailWarnings, mustStop, type DialWarning, type EmailWarning } from "@/lib/people/dial";
 import { copyDetails } from "@/lib/people/person";
-import { useDialer } from "./dial-button";
+import { announceCall, useDialer } from "./dial-button";
 
 // Call and Email for ONE person, the same way everywhere People shows one (a list row, the lead panel, the header search). Both open the CRM through the white-label link:
 // the CRM's own dialer and mail box do the rest (it publishes no link straight to them yet, so today they open the person and the page says so once). SubSync never
@@ -22,17 +22,17 @@ export type Strip =
   | null;
 
 export function useContactActions() {
-  const { provider } = useDialer();
+  const { provider, choice } = useDialer();
   const [strip, setStrip] = useState<Strip>(null);
   const [copied, setCopied] = useState<string | null>(null);
 
   const open = (href: string, same: boolean) => window.open(href, same ? "_self" : "_blank", "noopener,noreferrer");
 
   const call = (p: ActionPerson) => {
-    const plan = dialPlan(provider, { phone: p.phone, contactUrl: p.url });
+    const plan = dialPlan(choice, { phone: p.phone, email: p.email, contactUrl: p.url });
     if (!plan.href) { setStrip({ key: p.key, note: plan.note }); return; }
     const w = dialWarnings({ dnd: p.dnd, phone: p.phone, timeZone: p.timeZone, now: new Date() });
-    if (w.length === 0) { open(plan.href, plan.provider === "phone"); setStrip(null); return; }
+    if (w.length === 0) { open(plan.href, plan.provider === "phone"); setStrip(null); announceCall(); return; }
     setStrip({ key: p.key, kind: "call", warnings: w, href: plan.href, same: plan.provider === "phone" });
   };
 
@@ -49,7 +49,7 @@ export function useContactActions() {
     try { await navigator.clipboard.writeText(text); setCopied(p.key); setTimeout(() => setCopied(null), 2000); } catch { window.prompt("Copy this person", text); }
   };
 
-  return { provider, call, email, copy, copied, strip, closeStrip: () => setStrip(null), openStrip: (s: Strip) => { if (s && "href" in s) { open(s.href, s.same); setStrip(null); } } };
+  return { provider, call, email, copy, copied, strip, closeStrip: () => setStrip(null), openStrip: (s: Strip) => { if (s && "href" in s) { open(s.href, s.same); setStrip(null); if (s.kind === "call") announceCall(); } } };
 }
 
 export type ContactActions = ReturnType<typeof useContactActions>;
@@ -79,8 +79,10 @@ export function DialNote({ className = "" }: { className?: string }) {
   return (
     <p className={`text-xs text-muted-foreground ${className}`} data-testid="dial-note">
       {provider === "phone"
-        ? "Call uses your own phone app, as you chose in the Dialer setting. Email opens the person in your CRM. SubSync never places a call or sends a message."
-        : "Not available from your CRM yet: Call and Email open the person in your CRM, where its own dialer and mail box do the rest. SubSync never places a call or sends a message."}
+        ? "Call opens the phone or softphone on this device, which places the call (your choice in the Call with setting). Email opens the person in your CRM. SubSync itself never places a call or sends a message."
+        : provider === "connected"
+          ? "Call opens your connected dialer in a new tab, which places the call (your choice in the Call with setting). Email opens the person in your CRM. SubSync itself never places a call or sends a message."
+          : "Call and Email open the person in your CRM, where its own dialer and mail box place the call or send the message. SubSync itself never places a call or sends a message."}
     </p>
   );
 }

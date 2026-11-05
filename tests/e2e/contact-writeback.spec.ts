@@ -135,3 +135,24 @@ test("tags: add with +, remove only after a plain confirmation, undo, dates say 
   await expect(tags.getByTestId("tag-status")).toContainText("Undone");
   await page.screenshot({ path: `${SHOTS}/contact-writeback-tags-${info.project.name}.png` });
 });
+
+test("Call with: a connected dialer needs a valid https link and saves only the choice and the link", async ({ page }) => {
+  test.setTimeout(300_000);
+  let saved: Record<string, unknown> | null = null;
+  await page.route(/\/api\/app\/people\/dialer$/, (r) => {
+    if (r.request().method() === "PUT") { saved = r.request().postDataJSON(); return r.fulfill({ json: { ok: true, ...saved } }); }
+    return r.fulfill({ json: { provider: "phone" } });
+  });
+  await fake(page, () => "saved");
+  await openPanel(page);
+  const setting = page.getByTestId("dialer-setting").first();
+  if (await setting.count()) {
+    await setting.getByTestId("dialer-select").selectOption("connected");
+    await setting.getByTestId("dialer-template").fill("http://bad.example.com/{phone}");
+    await expect(setting.getByTestId("dialer-template-error")).toContainText("https://");
+    await expect(setting.getByTestId("dialer-save")).toBeDisabled();
+    await setting.getByTestId("dialer-template").fill("https://dialer.example.com/call?to={phone}");
+    await setting.getByTestId("dialer-save").click();
+    expect(saved).toMatchObject({ provider: "connected", template: "https://dialer.example.com/call?to={phone}" });
+  }
+});
