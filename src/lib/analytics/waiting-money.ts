@@ -31,6 +31,6 @@ const money = (n: number) => "$" + Math.round(n).toLocaleString("en-US");
 export function waitingMoneyLine(m: WaitingMoney | null, noMoneyNext: string): string {
   if (m === null) return noMoneyNext;
   if (m.peopleWithDeals === 0) return noMoneyNext;
-  return `${m.peopleWithDeals.toLocaleString("en-US")} of these ${m.peopleWithDeals === 1 ? "person has" : "people have"} open ${m.deals === 1 ? "a deal" : "deals"} worth ${money(m.dollars)}.`;
+  return `${m.peopleWithDeals.toLocaleString("en-US")} of these people ${m.peopleWithDeals === 1 ? "has" : "have"} ${m.deals === 1 ? "an open deal" : "open deals"} worth ${money(m.dollars)}.`;
 }
 

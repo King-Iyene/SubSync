@@ -1,0 +1,10 @@
+# SHELL: menu, filter bar, logo rule, theme (stage/shell)
+
+- Menu, money first: Today; Reply (Speed to lead, Unanswered messages); Appointments; Clients and people (Clients, People); Account audit; Clean-up; More (Overview, Team, Pipeline and deals, Meeting notes, Workflows, Data health); footer (Settings, Getting started, What's new). Old addresses and every flag/access rule unchanged. The shell draws "Section > Page" above each page; the menu item is highlighted; sub-sections stay visible tabs.
+- ONE filter bar (`ds/global-filter.tsx`, pure parts in `src/lib/design/global-filter.ts`): accounts (agency only: button "All 13 client accounts", searchable checkbox list, "Only this client" per row, recent clients first, left-out accounts with reasons, chips for 1 to 3) and dates (Last 7/30/90 days, Custom with two dates, window written out; "Right now" on pages that show what is true now). Accounts in the address (`accounts=`, Today keeps `ta=`), dates in `r.page=`, remembered per person. Cards follow the page range unless the card has its own choice in the address (`useCardRange`). `focusClient(id)` narrows to one client from any row. Client staff and business owners see dates, no picker.
+- Logo rule: `src/lib/brand-resolve.ts` (`resolveBrand`): SubSync unless the company's own brand settings are on, then only its own.
+- Theme: dark lifted to a soft deep blue-grey, light theme with a light side menu, body text 15px+, phone menu at the bottom with 48px targets.
+- Settings: visible tabs Replies, Brand, Notifications, Integrations, Team, Data, Sync status, Advanced.
+- Counted money line on Speed to lead and Unanswered messages: `waiting-money.ts` (open deals of the waiting people, each deal and person once, the shared counted-deal SQL), clients with people waiting listed as "Only this client" buttons. The estimate keeps its 20-closed-deals rule.
+
+Not done: Workflows and Data health keep their own account pickers; card-level controls remain (KF-4); server-side numbers that do not use `useCardRange` ignore the page range.
