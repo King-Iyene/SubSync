@@ -53,10 +53,10 @@ export function CommandPalette({ commands, label = "Commands", open: controlled,
       {open && (
         <div className="fixed inset-0 z-50 print:hidden" data-testid="palette">
           <div className="absolute inset-0 bg-black/50" onMouseDown={close} aria-hidden />
-          <div role="dialog" aria-modal="true" aria-label="Commands for Today" className="absolute left-1/2 top-[12vh] w-[min(38rem,94vw)] -translate-x-1/2 overflow-hidden rounded-xl border bg-popover text-popover-foreground shadow-[var(--shadow-lift)]">
+          <div role="dialog" aria-modal="true" aria-label="Commands for Today" className="absolute left-1/2 top-[12vh] w-[min(38rem,94vw)] -translate-x-1/2 overflow-hidden rounded-[6px] border border-[var(--t-rule2)] bg-popover text-popover-foreground shadow-[var(--shadow-lift)]">
             <div className="flex items-center gap-2 border-b px-4">
               <Search aria-hidden className="size-4 shrink-0 text-muted-foreground" />
-              <input ref={input} value={q} onChange={(e) => { setQ(e.target.value); setAt(0); }} placeholder="Type what you want to do or find..." aria-label="Search commands" data-testid="palette-input"
+              <input ref={input} value={q} onChange={(e) => { setQ(e.target.value); setAt(0); }} placeholder="Search commands" aria-label="Search commands" data-testid="palette-input"
                 role="combobox" aria-expanded="true" aria-controls={listId} aria-activedescendant={shown[active] ? `${listId}-${shown[active].id}` : undefined}
                 onKeyDown={(e) => {
                   if (e.key === "ArrowDown") { e.preventDefault(); setAt(Math.min(shown.length - 1, active + 1)); }
@@ -78,7 +78,7 @@ export function CommandPalette({ commands, label = "Commands", open: controlled,
                 </li>
               ))}
             </ul>
-            <p className="border-t px-4 py-2 text-xs text-muted-foreground">Up and down to choose, Enter to run, Esc to close.</p>
+            <p className="border-t px-4 py-2 text-xs text-muted-foreground">Arrow keys to move, Enter to run, Esc to close.</p>
           </div>
         </div>
       )}

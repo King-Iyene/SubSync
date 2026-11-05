@@ -10,19 +10,19 @@ import { ChartHint, ShowingChip } from "./showing";
 export function ProofStrip({ proof, title = "What SubSync caught", onOpen }: { proof: Proof; title?: string; /** Press a number to open the alerts it counts. */ onOpen?: (k: "raised" | "cleared" | "open") => void }) {
   return (
     <div data-testid="proof-strip">
-      <h3 className="text-base font-semibold">{title}</h3>
+      <h3 className="t-title">{title}</h3>
       <dl className="mt-3 grid grid-cols-3 gap-4">
-        {([["Raised", proof.raised, "alerts in 7 days", "raised"], ["Cleared", proof.cleared, "went away", "cleared"], ["Still open", proof.open, "right now", "open"]] as const).map(([k, n, sub, key]) => (
-          <div key={k} className="min-w-0 border-l-2 border-border pl-3">
-            <dt className="text-xs font-medium text-muted-foreground">{k}</dt>
-            <dd className="tnum mt-1 text-[1.7rem] font-semibold leading-none" data-testid={`proof-${k.toLowerCase().replace(" ", "-")}`}>
-              {onOpen && n > 0 ? <button type="button" onClick={() => onOpen(key)} aria-label={`${k}: ${n}. Show the alerts.`} data-testid={`proof-open-${key}`} className="ds-press -mx-1 cursor-pointer rounded-md px-1 underline decoration-primary/30 decoration-2 underline-offset-[0.18em] hover:decoration-primary focus-visible:outline-2 focus-visible:outline-[var(--ring)]">{n}</button> : n}
+        {([["Raised", proof.raised, "in the last 7 days", "raised"], ["Cleared", proof.cleared, "went away", "cleared"], ["Still open", proof.open, "open now", "open"]] as const).map(([k, n, sub, key]) => (
+          <div key={k} className="min-w-0 border-l border-[var(--t-rule2)] pl-3">
+            <dt className="t-label">{k}</dt>
+            <dd className="t-figure mt-1.5" data-testid={`proof-${k.toLowerCase().replace(" ", "-")}`}>
+              {onOpen && n > 0 ? <button type="button" onClick={() => onOpen(key)} aria-label={`${k}: ${n}. See the alerts.`} data-testid={`proof-open-${key}`} className="ds-press -mx-1 cursor-pointer rounded-md px-1 underline decoration-primary/40 decoration-[0.07em] underline-offset-[0.18em] hover:decoration-primary focus-visible:outline-2 focus-visible:outline-[var(--ring)]">{n}</button> : n}
             </dd>
-            <dd className="mt-1 text-xs text-muted-foreground">{sub}</dd>
+            <dd className="t-small t-quiet mt-1">{sub}</dd>
           </div>
         ))}
       </dl>
-      <p className="mt-3 text-xs leading-5 text-muted-foreground" data-testid="proof-note">{PROOF_NOTE}</p>
+      <p className="t-small t-quiet mt-3" data-testid="proof-note">{PROOF_NOTE}</p>
     </div>
   );
 }
@@ -38,15 +38,15 @@ export function RaisedClearedStrip({ proof, selected, onSelect, onOpenDay }: { p
   const H = 44;
   return (
     <figure className="min-w-0" data-testid="raised-cleared">
-      <figcaption className="text-sm font-semibold leading-5" data-testid="raised-title">{proofLine(proof)}</figcaption>
-      <ChartHint used={used}>Click a day to see the alerts raised and cleared that day.</ChartHint>
+      <figcaption className="font-medium" data-testid="raised-title">{proofLine(proof)}</figcaption>
+      <ChartHint used={used}>Select a day to see the alerts raised and cleared that day.</ChartHint>
       <div className="mt-2 grid grid-cols-7 gap-1.5">
         {proof.days.map((d, i) => {
           const r = d.raised.length, c = d.cleared.length, on = selected === i, empty = r + c === 0;
           return (
             <button key={d.day} type="button" disabled={empty} aria-pressed={on} data-testid="raised-day" data-raised={r} data-cleared={c}
-              aria-label={`${d.label}: ${r} raised, ${c} cleared.${empty ? "" : " Show the alerts."}`}
-              onClick={() => { setUsed(true); if (onOpenDay) onOpenDay(i); else onSelect(on ? null : i); }} title={empty ? "Nothing was raised or cleared on this day." : `Show the ${r + c} alerts of ${d.label}`}
+              aria-label={`${d.label}: ${r} raised, ${c} cleared.${empty ? "" : " See the alerts."}`}
+              onClick={() => { setUsed(true); if (onOpenDay) onOpenDay(i); else onSelect(on ? null : i); }} title={empty ? "Nothing was raised or cleared on this day." : `See the ${r + c} alerts of ${d.label}`}
               className={`ds-press group flex min-w-0 flex-col items-stretch rounded-lg px-1 pb-1 pt-1.5 text-center hover:bg-muted focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--ring)] disabled:cursor-default disabled:hover:bg-transparent ${on ? "bg-muted outline outline-2 -outline-offset-2 outline-foreground" : ""}`}>
               <span className="tnum min-h-4 text-[11px] font-medium leading-4">{r > 0 ? r : ""}</span>
               <span className="relative mx-auto block w-4/5 max-w-7" style={{ height: H * 2 + 2 }} aria-hidden>

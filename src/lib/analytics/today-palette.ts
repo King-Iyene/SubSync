@@ -51,6 +51,6 @@ export function todayViewName(v: unknown): string | null {
 
 /** The sentence a view is listed with. */
 export function describeTodayView(v: TodayView, names: ReadonlyMap<string, string>): string {
-  const who = v.accounts.length === 0 ? "All client accounts" : v.accounts.length === 1 ? names.get(v.accounts[0]) ?? "1 client account" : `${v.accounts.length} client accounts`;
+  const who = v.accounts.length === 0 ? "All clients" : v.accounts.length === 1 ? names.get(v.accounts[0]) ?? "1 client" : `${v.accounts.length} clients`;
   return v.excludeJunk ? `${who}, leaving out test and very old deals` : who;
 }

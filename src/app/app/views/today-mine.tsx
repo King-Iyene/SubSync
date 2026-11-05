@@ -12,14 +12,14 @@ import { Btn } from "../ui";
 const stamp = (p: TodayPerson, zone: string) => {
   try { return new Date(p.at).toLocaleString("en-US", { weekday: "short", hour: "numeric", minute: "2-digit", timeZone: zone }); } catch { return new Date(p.at).toLocaleString("en-US", { weekday: "short", hour: "numeric", minute: "2-digit" }); }
 };
-const GRID = "@container ds-row grid grid-cols-[minmax(0,1fr)_6rem] items-center gap-x-3 py-2 pl-1 pr-1";
+const GRID = "@container ds-row grid grid-cols-[minmax(0,1fr)_6rem] items-center gap-x-3 py-2.5 pl-4 pr-2";
 
 function CallRow({ name, sub, url, dnd, phone }: { name: string; sub?: string; url: string; dnd?: boolean; phone: boolean }) {
   return (
     <li className={GRID} data-testid="call-row" data-dnd={dnd ? "true" : "false"}>
       <div className="min-w-0"><p className="truncate font-semibold">{name}</p>{sub && <p className="truncate text-sm text-muted-foreground">{sub}</p>}</div>
       {dnd
-        ? <button type="button" disabled title="This person asked not to be contacted." className="inline-flex h-11 w-full cursor-not-allowed items-center justify-center gap-1.5 rounded-md border px-2 text-sm font-medium text-muted-foreground opacity-70 sm:h-8"><Phone aria-hidden className="size-3.5" />No calls</button>
+        ? <button type="button" disabled title="This person asked not to be contacted." className="inline-flex h-11 w-full cursor-not-allowed items-center justify-center gap-1.5 rounded-[4px] border px-2 text-sm font-medium text-muted-foreground opacity-70 sm:h-8"><Phone aria-hidden className="size-3.5" />No calls</button>
         : <RowButton href={url} label={phone ? "Call" : "Open"} sr={`${name}, ${phone ? "call in your CRM" : "no phone number"}`} />}
     </li>
   );
@@ -29,9 +29,9 @@ function CallGroup({ title, total, shown, children, testId }: { title: string; t
   if (total === 0) return null;
   return (
     <div className="mb-4" data-testid={testId}>
-      <h3 className="text-sm font-semibold">{title} <span className="tnum font-normal text-muted-foreground">({total})</span></h3>
-      <ul className="mt-1 divide-y border-y">{children}</ul>
-      {total > shown && <p className="mt-1 text-xs text-muted-foreground">Showing {shown} of {total}. The rest are in Appointments.</p>}
+      <h3 className="mb-1.5 font-medium">{title} <span className="t-num t-quiet font-normal">({total})</span></h3>
+      <ul className="t-surface divide-y overflow-hidden">{children}</ul>
+      {total > shown && <p className="t-small t-quiet mt-1">Showing {shown} of {total}. The rest are in Appointments.</p>}
     </div>
   );
 }
@@ -41,10 +41,10 @@ export function CallsSection({ mine }: { mine: TodayMine }) {
   const total = c.noshows.total + c.confirm.total;
   if (total === 0) return null;
   return (
-    <section className="mb-8" aria-labelledby="my-calls-h" data-testid="my-calls">
-      <h2 id="my-calls-h" className="text-lg font-semibold tracking-tight">Calls to make today</h2>
-      <p className="mb-3 mt-0.5 text-sm text-muted-foreground">A call opens the person in your CRM, where you dial.</p>
-      <CallGroup title="No-shows to win back" total={c.noshows.total} shown={c.noshows.rows.length} testId="calls-noshows">
+    <section className="mb-10" aria-labelledby="my-calls-h" data-testid="my-calls">
+      <h2 id="my-calls-h" className="t-title">Calls for today</h2>
+      <p className="t-small t-quiet mb-3 mt-0.5">Each call opens the person in your CRM, where you dial.</p>
+      <CallGroup title="No-shows to rebook" total={c.noshows.total} shown={c.noshows.rows.length} testId="calls-noshows">
         {c.noshows.rows.map((p, i) => <CallRow key={`${p.contactId}-${i}`} name={p.name} sub={`Missed ${stamp(p, mine.timeZone)}${p.calendar ? `, ${p.calendar}` : ""}`} url={p.url} dnd={p.dnd} phone={!!p.phone} />)}
       </CallGroup>
       <CallGroup title="Appointments to confirm" total={c.confirm.total} shown={c.confirm.rows.length} testId="calls-confirm">
@@ -62,18 +62,18 @@ export function AppointmentsSection({ mine, go }: { mine: TodayMine; go: () => v
   // No appointments today or tomorrow: no empty section (new bookings show up here when they exist).
   if (appts.length === 0) return null;
   return (
-    <section className="mb-8" aria-labelledby="my-appts-h" data-testid="my-appts">
+    <section className="mb-10" aria-labelledby="my-appts-h" data-testid="my-appts">
       <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
         <div className="min-w-0">
-          <h2 id="my-appts-h" className="text-lg font-semibold tracking-tight">Appointments today and tomorrow</h2>
-          {appts.length > 0 && <p className="mt-0.5 text-sm text-muted-foreground">{unmarked > 0 ? `${unmarked} of ${appts.length} have no outcome marked yet.` : "Every appointment that has passed has an outcome marked."}</p>}
+          <h2 id="my-appts-h" className="t-title">Appointments today and tomorrow</h2>
+          {appts.length > 0 && <p className="t-small t-quiet mt-0.5">{unmarked > 0 ? `${unmarked} of ${appts.length} have no outcome marked yet.` : "Every appointment that has passed has an outcome marked."}</p>}
         </div>
-        {unmarked > 0 && <Btn variant="ghost" onClick={() => setOnlyUnmarked(!onlyUnmarked)}>{onlyUnmarked ? "Show all" : "Only those with no outcome"}</Btn>}
+        {unmarked > 0 && <Btn variant="ghost" onClick={() => setOnlyUnmarked(!onlyUnmarked)}>{onlyUnmarked ? "Show all" : "Only unmarked"}</Btn>}
       </div>
       {shown.length === 0 ? (
-        <EmptyState compact title={appts.length === 0 ? "No appointments today or tomorrow" : "Nothing left with no outcome"} body={appts.length === 0 ? "New bookings appear here as they come in." : "Every appointment shown has an outcome marked."} />
+        <EmptyState compact title={appts.length === 0 ? "No appointments today or tomorrow" : "Every appointment is marked"} body={appts.length === 0 ? "New bookings show up here as they come in." : "Every appointment shown has an outcome."} />
       ) : (
-        <ul className="divide-y border-y" data-testid="my-appts-list">
+        <ul className="t-surface divide-y overflow-hidden" data-testid="my-appts-list">
           {shown.map(({ p, day: d }, i) => (
             <li key={`${p.contactId}-${i}`} className={GRID} data-testid="my-appt" data-no-outcome={p.noOutcome ? "true" : "false"}>
               <div className="flex min-w-0 items-center gap-2.5">
@@ -96,12 +96,12 @@ export function AppointmentsSection({ mine, go }: { mine: TodayMine; go: () => v
 /** The calm all-clear: nothing waiting, nothing to call, nothing to mark. */
 export function DoneForToday({ data, streak }: { data: TodayData; streak: number }) {
   return (
-    <section className="mb-8 flex items-center gap-4 border-b pb-6" aria-label="Done for today" data-testid="done-for-today">
-      <CircleCheck aria-hidden className="size-10 shrink-0 text-success" />
+    <section className="mb-12 flex items-center gap-4" aria-label="Done for today" data-testid="done-for-today">
+      <CircleCheck aria-hidden className="size-8 shrink-0 text-success" />
       <div className="min-w-0">
-        <h2 className="text-xl font-semibold tracking-tight">Done for today</h2>
-        <p className="mt-0.5 text-sm text-muted-foreground" data-testid="streak">
-          {streak > 0 ? `${streak} ${streak === 1 ? "day" : "days"} in a row with every new lead answered inside ${data.targetMinutes} minutes.` : `Every person has an answer. Keep each new lead under ${data.targetMinutes} minutes.`}
+        <h2 className="t-title">Done for today</h2>
+        <p className="t-small t-quiet mt-0.5" data-testid="streak">
+          {streak > 0 ? `${streak} ${streak === 1 ? "day" : "days"} in a row with every new lead answered within ${data.targetMinutes} minutes.` : `Everyone has an answer. Aim to reply to each new lead within ${data.targetMinutes} minutes.`}
         </p>
       </div>
     </section>

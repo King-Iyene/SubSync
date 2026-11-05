@@ -18,24 +18,24 @@ export { INLINE_ROWS };
 
 const SEVERITY: Record<Severity, { word: string; stripe: string; text: string; Icon: typeof CircleAlert }> = {
   critical: { word: "Urgent", stripe: "border-destructive", text: "text-destructive", Icon: CircleAlert },
-  warning: { word: "Soon", stripe: "border-warning", text: "text-warning", Icon: TriangleAlert },
-  info: { word: "When you can", stripe: "border-border", text: "text-muted-foreground", Icon: Clock },
+  warning: { word: "Soon", stripe: "border-transparent", text: "text-warning", Icon: TriangleAlert },
+  info: { word: "Can wait", stripe: "border-transparent", text: "text-muted-foreground", Icon: Clock },
 };
 
 /** What is at stake, in words: counted dollars, the existing estimate (labelled), or the count. */
 export function stakeOf(r: Pick<QueueRow, "dollars" | "estimate" | "count" | "kind" | "partial">): { main: string; sub: string | null } {
   const n = r.count.toLocaleString("en-US");
   if (r.dollars) return { main: money(r.dollars), sub: `${n} ${r.count === 1 ? "deal" : "deals"}` };
-  if (r.estimate) return { main: n, sub: `about ${money(r.estimate)} (estimate)` };
-  return { main: n, sub: r.partial ? "first ones only" : r.kind === "replies" ? (r.count === 1 ? "person" : "people") : null };
+  if (r.estimate) return { main: n, sub: `about ${money(r.estimate)}, estimated` };
+  return { main: n, sub: r.partial ? "first few only" : r.kind === "replies" ? (r.count === 1 ? "person" : "people") : null };
 }
 
 export type RowAction = "done" | "snooze_day" | "snooze_monday" | "assign";
 export type RowWhy = { key: string; text: string; onOpen: () => void };
 
 // ONE button height across the page (h-8), one icon size (size-3.5), one menu trigger (size-8).
-export const ACTION_BUTTON = "ds-press inline-flex h-11 w-full items-center justify-center gap-1.5 rounded-md border bg-card px-2.5 text-sm font-medium hover:border-primary/40 hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--ring)] @3xl:h-8";
-const MENU_TRIGGER = "ds-press inline-flex size-11 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-[var(--ring)] @3xl:size-8";
+export const ACTION_BUTTON = "ds-press inline-flex h-11 w-full items-center justify-center gap-1.5 rounded-[4px] border border-[var(--t-rule2)] bg-transparent px-2.5 text-[0.8125rem] font-medium hover:border-primary hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--ring)] @3xl:h-8";
+const MENU_TRIGGER = "ds-press inline-flex size-11 items-center justify-center rounded-[4px] text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-[var(--ring)] @3xl:size-8";
 
 /** The one small action button of a row: an outlined link that leaves the app (with the external-link icon), or a button that stays inside it. */
 export function RowButton({ href, onClick, label, sr, testId }: { href?: string; onClick?: () => void; label: string; sr: string; testId?: string }) {
@@ -51,8 +51,8 @@ function Menu({ label, items, testId }: { label: string; items: MenuItem[]; test
 /** The set-aside actions as menu items: Done for now, Snooze 1 day, Snooze until Monday, Assign to me. */
 function actionItems(row: QueueRow, onAct: (r: QueueRow, a: RowAction) => void, canAssign: boolean, kindWord: string | null): MenuItem[] {
   return [
-    { key: "done", label: kindWord ? `Done for now: ${kindWord}` : "Done for now", onSelect: () => onAct(row, "done") },
-    { key: "snooze-day", label: "Snooze 1 day", onSelect: () => onAct(row, "snooze_day") },
+    { key: "done", label: kindWord ? `Mark done: ${kindWord}` : "Mark done", onSelect: () => onAct(row, "done") },
+    { key: "snooze-day", label: "Snooze until tomorrow", onSelect: () => onAct(row, "snooze_day") },
     { key: "snooze-monday", label: "Snooze until Monday", onSelect: () => onAct(row, "snooze_monday") },
     ...(canAssign ? [{ key: "assign", label: "Assign to me", onSelect: () => onAct(row, "assign") }] : []),
   ];
@@ -89,21 +89,21 @@ function ListHead({ title, hint, right, id }: { title: string; hint?: ReactNode;
   return (
     <div className="mb-2 flex flex-wrap items-end justify-between gap-x-4 gap-y-1">
       <div className="min-w-0">
-        <h2 id={id} className="text-lg font-semibold tracking-tight">{title}</h2>
-        {hint && <p className="mt-0.5 text-sm text-muted-foreground">{hint}</p>}
+        <h2 id={id} className="t-title">{title}</h2>
+        {hint && <p className="t-small t-quiet mt-0.5">{hint}</p>}
       </div>
       {right}
     </div>
   );
 }
-const SEE_ALL = "ds-press min-h-11 rounded-md sm:min-h-9 px-2.5 text-sm font-medium text-primary underline-offset-4 hover:bg-muted hover:underline focus-visible:outline-2 focus-visible:outline-[var(--ring)]";
+const SEE_ALL = "ds-press min-h-11 rounded-[4px] sm:min-h-9 px-2.5 text-sm font-medium text-primary underline-offset-4 hover:bg-muted hover:underline focus-visible:outline-2 focus-visible:outline-[var(--ring)]";
 
 // ---------- agency, all accounts: one row per client account, its biggest problem ----------
 
 const ACCOUNT_TRACKS = "@3xl:grid-cols-[minmax(0,1fr)_6.5rem_7rem_6rem_2rem]";
 
 export function AccountList({
-  rows, total, urgent, max = INLINE_ROWS, title = "Start here", onShow, onOnly, onSeeAll, onAct, canAssign = false, assigned = {}, whyOf, nextOf, onNext, empty, footer,
+  rows, total, urgent, max = INLINE_ROWS, title = "Do this first", onShow, onOnly, onSeeAll, onAct, canAssign = false, assigned = {}, whyOf, nextOf, onNext, empty, footer,
 }: {
   rows: NeedingYou[]; total: number; urgent: number; max?: number; title?: string;
   /** The amount was pressed or "Show everything": open every record of that client account. */
@@ -115,15 +115,15 @@ export function AccountList({
   const { active, moved } = useRowKeys(shown.length, (i) => { const r = shown[i]; if (r) window.open(r.url, "_blank", "noopener,noreferrer"); });
   useEffect(() => { if (moved.current) document.getElementById(`account-row-${shown[active]?.locationId}`)?.scrollIntoView({ block: "nearest" }); }, [active, shown, moved]);
   return (
-    <section className="mb-8" aria-labelledby="work-h" data-testid="fix-first">
-      <ListHead id="work-h" title={title} hint={total === 0 ? undefined : <span data-testid="work-summary">{total.toLocaleString("en-US")} {total === 1 ? "client needs" : "clients need"} you{urgent > 0 ? (urgent === total && total > 1 ? ", all of them urgent" : `, ${urgent.toLocaleString("en-US")} of them urgent`) : ""}. Most valuable first.</span>}
-        right={total > shown.length ? <button type="button" onClick={onSeeAll} className={SEE_ALL} data-testid="queue-all">See all {total.toLocaleString("en-US")} clients</button> : undefined} />
+    <section className="mb-10" aria-labelledby="work-h" data-testid="fix-first">
+      <ListHead id="work-h" title={title} hint={total === 0 ? undefined : <span data-testid="work-summary">{total.toLocaleString("en-US")} {total === 1 ? "client" : "clients"}, largest amount first{urgent > 0 ? (urgent === total && total > 1 ? ". All are urgent." : `. ${urgent.toLocaleString("en-US")} ${urgent === 1 ? "is" : "are"} urgent.`) : "."}</span>}
+        right={total > shown.length ? <button type="button" onClick={onSeeAll} className={SEE_ALL} data-testid="queue-all">Show all {total.toLocaleString("en-US")} clients</button> : undefined} />
       {rows.length === 0 ? (
-        <p className="border-y py-6 text-center text-sm text-muted-foreground" data-testid="queue-empty">{empty}</p>
+        <p className="t-surface t-small t-quiet px-4 py-6" data-testid="queue-empty">{empty}</p>
       ) : (
-        <ul className="@container divide-y border-y" data-testid="queue-list">
-          <li aria-hidden className={`hidden gap-x-3 border-l-[3px] border-transparent py-1.5 pl-4 pr-1 text-[0.7rem] font-semibold uppercase tracking-wide text-muted-foreground @3xl:grid ${ACCOUNT_TRACKS}`} data-testid="queue-header">
-            <span>Client</span><span className="text-right">At stake</span><span>Urgency</span><span /><span />
+        <ul className="@container t-surface divide-y overflow-hidden" data-testid="queue-list">
+          <li aria-hidden className={`hidden gap-x-3 border-l-2 border-transparent py-2 pl-4 pr-1 t-label @3xl:grid ${ACCOUNT_TRACKS}`} data-testid="queue-header">
+            <span>Client</span><span className="text-right">Amount</span><span>Status</span><span /><span />
           </li>
           {shown.map((a, n) => {
             const s = SEVERITY[a.severity];
@@ -131,25 +131,25 @@ export function AccountList({
             const age = a.top.since === null ? null : ageWords(a.top.ageMinutes);
             const na = nextOf?.(a) ?? null;
             const items: MenuItem[] = [
-              { key: "show", label: "Show everything for this client", onSelect: () => onShow(a) },
+              { key: "show", label: "See everything for this client", onSelect: () => onShow(a) },
               { key: "only", label: "Show only this client", onSelect: () => onOnly(a) },
-              ...(na && onNext ? [{ key: "next", label: `Next step: ${na.text}`, hint: na.effect, onSelect: () => onNext(a, na) }] : []),
-              ...((whyOf?.(a.top) ?? []).map((w) => ({ key: `why-${w.key}`, label: `What they share: ${w.text}`, onSelect: w.onOpen }))),
+              ...(na && onNext ? [{ key: "next", label: `Next: ${na.text}`, hint: na.effect, onSelect: () => onNext(a, na) }] : []),
+              ...((whyOf?.(a.top) ?? []).map((w) => ({ key: `why-${w.key}`, label: `Common thread: ${w.text}`, onSelect: w.onOpen }))),
               ...(onAct ? actionItems(a.top, onAct, canAssign, KIND_LABEL[a.top.kind].toLowerCase()) : []),
             ];
             const mine = assigned[a.top.key];
             return (
               <li key={a.locationId} id={`account-row-${a.locationId}`} data-testid="queue-row" data-kind={a.top.kind} data-severity={a.severity} aria-current={n === active ? "true" : undefined}
-                className={`ds-row grid grid-cols-[minmax(0,1fr)_6rem_2.5rem] items-center gap-x-3 gap-y-0.5 border-l-[3px] py-2 pl-4 pr-1 ${ACCOUNT_TRACKS} ${s.stripe} ${n === active ? "bg-accent/50 outline outline-2 -outline-offset-2 outline-[var(--ring)]" : ""}`}>
+                className={`ds-row grid grid-cols-[minmax(0,1fr)_6rem_2.5rem] items-center gap-x-3 gap-y-0.5 border-l-2 py-2.5 pl-4 pr-2 ${ACCOUNT_TRACKS} ${s.stripe} ${n === active ? "bg-accent/50 outline outline-2 -outline-offset-2 outline-[var(--ring)]" : ""}`}>
                 <div className="min-w-0" data-col="title">
                   <p className="truncate font-semibold" title={a.name}>{a.name}</p>
-                  <p className="line-clamp-2 text-sm text-muted-foreground @3xl:truncate" title={a.reason}>{a.reason}{a.count > a.top.count && <span> and {a.count - a.top.count} more {a.count - a.top.count === 1 ? "thing" : "things"}</span>}{mine ? <span> · Assigned to {mine}</span> : null}</p>
+                  <p className="t-small t-quiet line-clamp-2 @3xl:truncate" title={a.reason}>{a.reason}{a.count > a.top.count && <span>, plus {a.count - a.top.count} more</span>}{mine ? <span>. Assigned to {mine}</span> : null}</p>
                   <p className={`flex items-center gap-1 text-xs @3xl:hidden ${s.text}`}><s.Icon aria-hidden className="size-3.5 shrink-0" />{s.word}{age ? <span className="text-muted-foreground"> · {ageLabel(a.top.kind, age)}</span> : null}</p>
                 </div>
                 <div className="tnum hidden text-right @3xl:block" data-col="amount">
-                  <button type="button" onClick={() => onShow(a)} aria-label={`${stake.main}${stake.sub ? `, ${stake.sub}` : ""}. Show everything for ${a.name}.`} data-testid="queue-amount" data-count={a.count}
+                  <button type="button" onClick={() => onShow(a)} aria-label={`${stake.main}${stake.sub ? `, ${stake.sub}` : ""}. See everything for ${a.name}.`} data-testid="queue-amount" data-count={a.count}
                     className="ds-press w-full rounded-md px-1 text-right hover:bg-muted focus-visible:outline-2 focus-visible:outline-[var(--ring)]">
-                    <span className="block text-base font-semibold leading-5">{stake.main}</span>
+                    <span className="t-num block text-[0.9375rem] leading-5">{stake.main}</span>
                     {stake.sub && <span className="block truncate text-xs leading-4 text-muted-foreground">{stake.sub}</span>}
                   </button>
                 </div>
@@ -173,7 +173,7 @@ export function AccountList({
 
 const REPLY_TRACKS = "@3xl:grid-cols-[minmax(0,1fr)_9rem_6rem_2rem]";
 
-export function ReplyNowList({ items, total, newLeads, max = INLINE_ROWS, onSeeAll, onAct, canAssign = false, assigned = {}, title = "Reply now", single = true }: {
+export function ReplyNowList({ items, total, newLeads, max = INLINE_ROWS, onSeeAll, onAct, canAssign = false, assigned = {}, title = "Do this first", single = true }: {
   items: TodayItem[]; total: number; newLeads: number; max?: number; onSeeAll: () => void; onAct?: (r: QueueRow, a: RowAction) => void; canAssign?: boolean;
   assigned?: Record<string, string | null>; title?: string; single?: boolean;
 }) {
@@ -183,13 +183,13 @@ export function ReplyNowList({ items, total, newLeads, max = INLINE_ROWS, onSeeA
   useEffect(() => { if (moved.current) document.getElementById(`reply-${shown[active]?.id}`)?.scrollIntoView({ block: "nearest" }); }, [active, shown, moved]);
   if (total === 0) return null;
   const oldest = items[0]?.at ?? null;
-  const hint = [oldest !== null && now > 0 ? `The longest wait is ${ageWords(Math.max(0, (now - oldest) / 60_000))}.` : null, newLeads > 0 ? `${newLeads.toLocaleString("en-US")} of ${total.toLocaleString("en-US")} ${newLeads === 1 ? "is a new lead" : "are new leads"}.` : null].filter(Boolean).join(" ");
+  const hint = [oldest !== null && now > 0 ? `Longest wait: ${ageWords(Math.max(0, (now - oldest) / 60_000))}.` : null, newLeads > 0 ? `${newLeads.toLocaleString("en-US")} of the ${total.toLocaleString("en-US")} ${newLeads === 1 ? "is a new lead" : "are new leads"}.` : null].filter(Boolean).join(" ");
   return (
-    <section className="mb-8" aria-label={title} data-testid="reply-now">
+    <section className="mb-10" aria-label={title} data-testid="reply-now">
       <ListHead title={title} hint={hint ? <span data-testid="reply-summary">{hint}</span> : undefined}
-        right={total > shown.length ? <button type="button" onClick={onSeeAll} className={SEE_ALL} data-testid="reply-all">See all {total.toLocaleString("en-US")}</button> : undefined} />
-      <ul className="@container divide-y border-y" data-testid="my-leads">
-        <li aria-hidden className={`hidden gap-x-3 py-1.5 pl-1 pr-1 text-[0.7rem] font-semibold uppercase tracking-wide text-muted-foreground @3xl:grid ${REPLY_TRACKS}`}><span>Who</span><span>Waiting</span><span /><span /></li>
+        right={total > shown.length ? <button type="button" onClick={onSeeAll} className={SEE_ALL} data-testid="reply-all">Show all {total.toLocaleString("en-US")}</button> : undefined} />
+      <ul className="@container t-surface divide-y overflow-hidden" data-testid="my-leads">
+        <li aria-hidden className={`t-label hidden gap-x-3 py-2 pl-4 pr-2 @3xl:grid ${REPLY_TRACKS}`}><span>Person</span><span>Wait</span><span /><span /></li>
         {shown.map((p, n) => {
           const row = personRow(p, now || p.at || 0);
           const wait = p.never === true ? "Never answered" : p.at === null ? "Waiting" : `${ageWords(Math.max(0, ((now || p.at) - p.at) / 60_000))}`;
@@ -197,10 +197,10 @@ export function ReplyNowList({ items, total, newLeads, max = INLINE_ROWS, onSeeA
           const items: MenuItem[] = onAct ? actionItems(row, onAct, canAssign, null) : [];
           return (
             <li key={p.id} id={`reply-${p.id}`} data-testid="reply-row" aria-current={n === active ? "true" : undefined} data-new-lead={p.newLead ? "true" : "false"}
-              className={`ds-row grid grid-cols-[minmax(0,1fr)_6rem_2.5rem] items-center gap-x-3 gap-y-0.5 py-2 pl-1 pr-1 ${REPLY_TRACKS} ${n === active ? "bg-accent/50 outline outline-2 -outline-offset-2 outline-[var(--ring)]" : ""}`}>
+              className={`ds-row grid grid-cols-[minmax(0,1fr)_6rem_2.5rem] items-center gap-x-3 gap-y-0.5 py-2.5 pl-4 pr-2 ${REPLY_TRACKS} ${n === active ? "bg-accent/50 outline outline-2 -outline-offset-2 outline-[var(--ring)]" : ""}`}>
               <div className="min-w-0">
                 <p className="truncate font-semibold" title={p.name}>{p.name}</p>
-                <p className="line-clamp-2 text-sm text-muted-foreground @3xl:truncate">{!single && <span>{p.accountName} · </span>}{replyContext(p)}{mine ? <span> · Assigned to {mine}</span> : null}</p>
+                <p className="t-small t-quiet line-clamp-2 @3xl:truncate">{!single && <span>{p.accountName}. </span>}{replyContext(p)}{mine ? <span>. Assigned to {mine}</span> : null}</p>
                 <p className={`text-xs @3xl:hidden ${p.never ? "text-destructive" : "text-muted-foreground"}`} data-testid="lead-wait-narrow">{p.never ? wait : `Waiting ${wait}`}</p>
               </div>
               <p className={`tnum hidden items-center gap-1.5 text-sm @3xl:flex ${p.never ? "font-medium text-destructive" : ""}`} data-testid="lead-wait">{p.never && <TriangleAlert aria-hidden className="size-3.5 shrink-0" />}{p.never ? wait : `Waiting ${wait}`}</p>
@@ -219,20 +219,20 @@ export function ReplyNowList({ items, total, newLeads, max = INLINE_ROWS, onSeeA
 export type KindRow = { kind: "appointments" | "noshows" | "stale"; count: number; text: string; onOpen: () => void; action: { label: string; href?: string; onClick?: () => void; sr: string } };
 
 const KIND_TRACKS = "@3xl:grid-cols-[minmax(0,1fr)_5rem_6rem]";
-export function KindList({ rows, title = "Also needs you", hint }: { rows: KindRow[]; title?: string; hint?: string }) {
+export function KindList({ rows, title = "Also on your list", hint }: { rows: KindRow[]; title?: string; hint?: string }) {
   if (rows.length === 0) return null;
   return (
-    <section className="mb-8" aria-label={title} data-testid="also-needs">
+    <section className="mb-10" aria-label={title} data-testid="also-needs">
       <ListHead title={title} hint={hint} />
-      <ul className="@container divide-y border-y" data-testid="kind-list">
+      <ul className="@container t-surface divide-y overflow-hidden" data-testid="kind-list">
         {rows.map((r) => (
-          <li key={r.kind} data-testid="kind-row" data-kind={r.kind} className={`ds-row grid grid-cols-[minmax(0,1fr)_6rem] items-center gap-x-3 gap-y-0.5 py-2 pl-1 pr-1 ${KIND_TRACKS}`}>
+          <li key={r.kind} data-testid="kind-row" data-kind={r.kind} className={`ds-row grid grid-cols-[minmax(0,1fr)_6rem] items-center gap-x-3 gap-y-0.5 py-2.5 pl-4 pr-2 ${KIND_TRACKS}`}>
             <div className="min-w-0">
               <p className="truncate font-semibold">{KIND_LABEL[r.kind]}</p>
               <p className="line-clamp-2 text-sm text-muted-foreground @3xl:truncate" title={r.text}>{r.text}</p>
             </div>
             <button type="button" onClick={r.onOpen} data-testid="kind-count" data-count={r.count} aria-label={`${r.count.toLocaleString("en-US")} ${KIND_LABEL[r.kind].toLowerCase()}. Show them.`}
-              className="tnum ds-press order-3 col-span-2 w-fit rounded-md px-1 text-left text-sm text-muted-foreground underline underline-offset-4 hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-[var(--ring)] @3xl:order-none @3xl:col-span-1 @3xl:w-full @3xl:text-right @3xl:text-base @3xl:font-semibold @3xl:text-foreground @3xl:no-underline">{r.count.toLocaleString("en-US")}<span className="@3xl:hidden"> to look at</span></button>
+              className="tnum ds-press order-3 col-span-2 w-fit rounded-md px-1 text-left text-sm text-muted-foreground underline underline-offset-4 hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-[var(--ring)] @3xl:order-none @3xl:col-span-1 @3xl:w-full @3xl:text-right @3xl:text-base @3xl:font-semibold @3xl:text-foreground @3xl:no-underline">{r.count.toLocaleString("en-US")}<span className="@3xl:hidden"> to check</span></button>
             <div><RowButton href={r.action.href} onClick={r.action.onClick} label={r.action.label} sr={r.action.sr} testId="kind-open" /></div>
           </li>
         ))}

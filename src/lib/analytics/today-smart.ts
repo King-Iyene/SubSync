@@ -153,13 +153,13 @@ export function hourTitle(stats: HourStat[], targetMinutes: number): string {
   const total = stats.reduce((s, x) => s + x.leads, 0);
   if (total < MIN_FOR_MEDIAN) return "Not enough leads in the last 14 days to see which hours are missed.";
   const gaps = stats.filter((s) => s.gap).sort((a, b) => b.missed - a.missed || a.hour - b.hour);
-  if (gaps.length === 0) return `No hour of the day stands out: leads are answered inside ${targetMinutes} minutes about as often at every hour.`;
+  if (gaps.length === 0) return `No hour of the day stands out: leads are answered within ${targetMinutes} minutes about as often at every hour.`;
   const g = gaps[0];
-  return `${hourWords(g.hour)} is the hour that misses most: ${g.missed} of ${g.leads} leads that arrived then were not answered inside ${targetMinutes} minutes.`;
+  return `${hourWords(g.hour)} is the hour that misses most: ${g.missed} of ${g.leads} leads that arrived then were not answered within ${targetMinutes} minutes.`;
 }
 export const hourSpec = (rows: LeadRow[], h: number, targetMinutes: number, now: number): RecordsSpec => {
   const mine = leadsInHour(rows, h, targetMinutes, now);
-  return leadsSpec(mine.map(stripZone), now, { key: `hour:${h}`, title: `Leads that arrived at ${hourWords(h)}`, subtitle: `Last 14 days, in each client account's own time. Answered inside ${targetMinutes} minutes, answered later, or still waiting.`, noun: mine.length === 1 ? "lead" : "leads", count: mine.length });
+  return leadsSpec(mine.map(stripZone), now, { key: `hour:${h}`, title: `Leads that arrived at ${hourWords(h)}`, subtitle: `Last 14 days, in each client's own time zone. Answered within ${targetMinutes} minutes, answered later, or still waiting.`, noun: mine.length === 1 ? "lead" : "leads", count: mine.length });
 };
 
 // ---------- speed by source ----------
@@ -189,7 +189,7 @@ export function sourceTitle(stats: SourceStat[]): string {
 }
 export const sourceSpec = (rows: LeadRow[], name: string, targetMinutes: number, now: number): RecordsSpec => {
   const mine = leadsOfSource(rows, name, targetMinutes, now);
-  return leadsSpec(mine.map(stripZone), now, { key: `source:${name.toLowerCase()}`, title: `${name} leads`, subtitle: `Last 14 days. Answered inside ${targetMinutes} minutes, answered later, or still waiting.`, noun: mine.length === 1 ? "lead" : "leads", count: mine.length, preset: {} });
+  return leadsSpec(mine.map(stripZone), now, { key: `source:${name.toLowerCase()}`, title: `${name} leads`, subtitle: `Last 14 days. Answered within ${targetMinutes} minutes, answered later, or still waiting.`, noun: mine.length === 1 ? "lead" : "leads", count: mine.length, preset: {} });
 };
 
 // ---------- workload by person ----------
@@ -325,14 +325,14 @@ export function forecastLine(f: Forecast, targetMinutes: number): string {
   if (f.leads.length > 0) bits.push(`${plural(f.leads.length, "lead")} will pass the ${targetMinutes}-minute reply target`);
   if (f.deals.length > 0) bits.push(`${plural(f.deals.length, "deal")}${f.dealDollars > 0 ? ` (${money(f.dealDollars)})` : ""} will go quiet`);
   if (f.appointments.length > 0) bits.push(`${plural(f.appointments.length, "appointment")} will need an outcome marked`);
-  return bits.length === 0 ? "Nothing is about to go wrong today." : `If nobody acts today: ${bits.join(", ")}.`;
+  return bits.length === 0 ? "Nothing is about to go wrong today." : `If nothing changes today: ${bits.join(", ")}.`;
 }
 
 const COMING_COLS = [
   { key: "what", header: "What", type: "text", primary: true, w: 15 },
-  { key: "account", header: "Client account", type: "text", facet: true, w: 13 },
+  { key: "account", header: "Client", type: "text", facet: true, w: 13 },
   { key: "kind", header: "Kind", type: "kind", facet: true, w: 12 },
-  { key: "at", header: "Goes wrong at", type: "date", w: 12 },
+  { key: "at", header: "Due by", type: "date", w: 12 },
   { key: "value", header: "Deal value", type: "money", w: 9 },
   { key: "crm", header: "CRM", type: "link", w: 7 },
 ] as const;

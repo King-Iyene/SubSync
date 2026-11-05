@@ -16,7 +16,7 @@ export type Kind = (typeof KINDS)[number];
 
 /** Plain names for each kind, as the list, the bars and the records panel say them. */
 export const KIND_LABEL: Record<Kind, string> = {
-  replies: "Waiting for a reply", appointments: "Appointments to mark", noshows: "No-shows to win back", stale: "Deals gone quiet",
+  replies: "Needs a reply", appointments: "Needs an outcome", noshows: "No-shows to rebook", stale: "Quiet deals",
 };
 /** One colour per KIND, the same everywhere on the page (the validated categorical chart tokens, in order). Status colours are never used for a kind. */
 export const KIND_CHART: Record<Kind, 1 | 2 | 3 | 4> = { replies: 1, appointments: 2, noshows: 3, stale: 4 };
@@ -85,10 +85,10 @@ export function ageWords(minutes: number): string {
 /** Six to ten words about what is wrong with this group. */
 export function rowText(kind: Kind, count: number, staleDays: number): string {
   switch (kind) {
-    case "replies": return `${plural(count, "person", "people")} waiting for a reply`;
-    case "appointments": return `${plural(count, "past appointment")} with no outcome marked`;
+    case "replies": return count === 1 ? "1 person needs a reply" : `${plural(count, "person", "people")} need a reply`;
+    case "appointments": return count === 1 ? "1 appointment is over with no outcome" : `${plural(count, "appointment")} are over with no outcome`;
     case "noshows": return `${plural(count, "no-show")} from the last 14 days not rebooked`;
-    case "stale": void staleDays; return `${plural(count, "open deal")} gone quiet`;
+    case "stale": void staleDays; return count === 1 ? "1 open deal has gone quiet" : `${plural(count, "open deal")} have gone quiet`;
   }
 }
 
@@ -258,19 +258,22 @@ export type Headline = { parts: HeadlinePart[]; text: string; allClear: boolean;
 /** "1 person waiting for a reply", "14 people waiting for a reply": a count with the right singular or plural, as a person would say it. */
 export const countWords = (k: Kind, n: number) => `${n.toLocaleString("en-US")} ${COUNT_WORDS[k][n === 1 ? 0 : 1]}`;
 const COUNT_WORDS: Record<Kind, [string, string]> = {
-  replies: ["person waiting for a reply", "people waiting for a reply"], appointments: ["appointment to mark", "appointments to mark"], noshows: ["no-show to win back", "no-shows to win back"],
-  stale: ["deal gone quiet", "deals gone quiet"],
+  replies: ["person needs a reply", "people need a reply"], appointments: ["appointment with no outcome", "appointments with no outcome"], noshows: ["no-show not rebooked", "no-shows not rebooked"],
+  stale: ["quiet deal", "quiet deals"],
 };
 
 export function breakdownOf(t: Totals, o: { dollars?: boolean } = {}): string | null {
   const c = countsOf(t, []);
-  const bits = KINDS.filter((k) => t[k].count > 0).map((k) => {
+  // The headline already says how many people need a reply; this line adds how many are new leads, then the other kinds in plain words.
+  const lead = c.replies > 0 && c.newLeads > 0 ? `${c.newLeads.toLocaleString("en-US")} of them ${c.newLeads === 1 ? "is a new lead" : "are new leads"}.` : null;
+  const bits = KINDS.filter((k) => k !== "replies" && t[k].count > 0).map((k) => {
     const w = COUNT_WORDS[k];
-    const sub = k === "replies" && c.newLeads > 0 ? ` (${c.newLeads} new ${c.newLeads === 1 ? "lead" : "leads"})` : "";
-    return `${t[k].count.toLocaleString("en-US")} ${t[k].count === 1 ? w[0] : w[1]}${sub}${k === "stale" && t.stale.dollars && o.dollars ? ` (${money(t.stale.dollars)})` : ""}`;
+    return `${t[k].count.toLocaleString("en-US")} ${t[k].count === 1 ? w[0] : w[1]}${k === "stale" && t.stale.dollars && o.dollars ? `, worth ${money(t.stale.dollars)}` : ""}`;
   });
-  if (bits.length === 0) return null;
-  return bits.length === 1 ? `${bits[0]}.` : `${bits.slice(0, -1).join(", ")} and ${bits[bits.length - 1]}.`;
+  const list = bits.length === 0 ? null : (bits.length === 1 ? bits[0] : `${bits.slice(0, -1).join(", ")} and ${bits[bits.length - 1]}`);
+  const rest = list === null ? null : `${c.replies > 0 ? "Also " : ""}${c.replies > 0 ? list : list.charAt(0).toUpperCase() + list.slice(1)}.`;
+  const all = [lead, rest].filter(Boolean).join(" ");
+  return all === "" ? null : all;
 }
 
 /**
@@ -281,22 +284,22 @@ export function headlineOf(i: { scope: "all" | "account"; rows: QueueRow[]; tota
   const c = countsOf(i.totals, i.rows);
   const accounts = c.accounts;
   const dollars = c.staleDollars;
-  // The dollars are in the sentence above the line when it says them; otherwise the line carries them.
-  const sayDollars = dollars > 0 && (i.scope === "all" || c.replies === 0);
-  const breakdown = breakdownOf(i.totals, { dollars: !sayDollars });
+  // The sentence carries the one number that matters most (people waiting). The line under it carries the rest, the dollars included.
+  const breakdown0 = breakdownOf(i.totals, { dollars: true });
+  const outlierNote = i.outlier && dollars > 0 && breakdown0 ? ` One deal is ${money(i.outlier.value)} of the quiet-deal money.` : "";
+  const breakdown = breakdown0 ? breakdown0 + outlierNote : null;
   if (c.things === 0) {
-    const text = i.scope === "all" ? "Every client account is on track today." : "You are all caught up today.";
+    const text = i.scope === "all" ? "Every client is on track today." : "You are all caught up today.";
     return { parts: [{ t: text }], text, allClear: true, breakdown: null, accounts: 0, dollars: 0 };
   }
+  const replyWord = c.replies === 1 ? "person is" : "people are";
   const parts: HeadlinePart[] = i.scope === "all"
-    ? [{ t: String(accounts), strong: true, action: "clients" }, { t: ` ${accounts === 1 ? "client needs" : "clients need"} you today.` }]
+    ? (c.replies > 0
+      ? [{ t: c.replies.toLocaleString("en-US"), strong: true, action: "replies" }, { t: ` ${replyWord} waiting for a reply across ` }, { t: String(accounts), strong: true, action: "clients" }, { t: ` ${accounts === 1 ? "client" : "clients"}.` }]
+      : [{ t: String(accounts), strong: true, action: "clients" }, { t: ` ${accounts === 1 ? "client has" : "clients have"} something to do today.` }])
     : c.replies > 0
-      ? [{ t: c.replies.toLocaleString("en-US"), strong: true, action: "replies" }, { t: ` ${c.replies === 1 ? "person is" : "people are"} waiting for a reply.` }]
-      : [{ t: c.things.toLocaleString("en-US"), strong: true, action: "things" }, { t: ` ${c.things === 1 ? "thing needs" : "things need"} you today.` }];
-  // On one account with people waiting, the sentence is only that (the thing to do first); the dollars are in the line under it.
-  if (sayDollars) parts.push({ t: " " }, { t: money(dollars), strong: true, action: "dollars" }, { t: " is at risk." });
-  // One deal worth at least half of it is said out loud, so the dollar figure is not read as a pattern (the audit's outlier guard).
-  if (sayDollars && i.outlier) parts.push({ t: ` One deal is ${money(i.outlier.value)} of that.` });
+      ? [{ t: c.replies.toLocaleString("en-US"), strong: true, action: "replies" }, { t: ` ${replyWord} waiting for a reply.` }]
+      : [{ t: c.things.toLocaleString("en-US"), strong: true, action: "things" }, { t: ` ${c.things === 1 ? "thing needs" : "things need"} a look today.` }];
   return { parts, text: parts.map((p) => p.t).join(""), allClear: false, breakdown, accounts, dollars };
 }
 
@@ -347,9 +350,9 @@ export function accountBars(rows: QueueRow[], max = 8): { bars: AccountBar[]; ac
 }
 
 export function barsTitle(b: { bars: AccountBar[]; accounts: number }): string {
-  if (b.bars.length === 0) return "No client account has anything to fix";
+  if (b.bars.length === 0) return "No client has anything to do";
   const top = b.bars[0];
-  return b.accounts === 1 ? `${top.name} has ${plural(top.count, "thing")} to fix` : `${top.name} has the most to do: ${plural(top.count, "thing")}. Each bar is one client account.`;
+  return b.accounts === 1 ? `${top.name} has ${plural(top.count, "thing")} to do` : `${top.name} has the most to do, with ${plural(top.count, "thing")}. Each bar is one client.`;
 }
 
 /** The tooltip, in words: "Bright Smile Dental: 14 leads waiting, $6,300 at stake". */
@@ -357,7 +360,7 @@ export function barTooltip(b: AccountBar, rows: QueueRow[]): string {
   const mine = rows.filter((r) => r.locationId === b.locationId);
   const parts = KINDS.map((k) => mine.filter((r) => r.kind === k)).filter((x) => x.length > 0)
     .map((x) => { const w = COUNT_WORDS[x[0].kind]; const n = x.reduce((s, r) => s + r.count, 0); return `${n.toLocaleString("en-US")} ${n === 1 ? w[0] : w[1]}`; });
-  return `${b.name}: ${parts.join(", ")}${b.dollars ? `, ${money(b.dollars)} at stake` : ""}`;
+  return `${b.name}: ${parts.join(", ")}${b.dollars ? `, ${money(b.dollars)} in quiet deals` : ""}`;
 }
 
 // ---------- accounts needing you ----------
@@ -396,7 +399,7 @@ export const ageLabel = (kind: Kind, age: string) => (kind === "replies" ? `Wait
 export function replyContext(i: Pick<TodayItem, "newLead" | "source" | "detail">): string {
   if (i.newLead) return i.source ? `New lead from ${i.source}` : "New lead";
   const channel = i.detail.split(", waiting")[0]?.trim();
-  return channel ? `${channel}, customer wrote last` : "Customer wrote last";
+  return channel ? `${channel}. The customer wrote last.` : "The customer wrote last.";
 }
 /** The part of a waiting person's item id after the account: what a one-person row key carries. */
 export const personOf = (i: Pick<TodayItem, "id" | "locationId">) => i.id.slice(`replies:${i.locationId}:`.length);
@@ -421,9 +424,9 @@ export function vsUsual(i: { now: number | null; usual: number | null; nNow: num
   if (i.now === null || i.usual === null || i.nNow < i.minN || i.nUsual < i.minN) return { verdict: "not_enough", text: "Not enough history yet to compare with your usual." };
   const tol = i.tolerance ?? 0.15;
   const change = i.usual === 0 ? (i.now === 0 ? 0 : 1) : (i.now - i.usual) / i.usual;
-  if (Math.abs(change) < tol) return { verdict: "same", text: `About the same as your usual (${i.fmt(i.usual)}).` };
+  if (Math.abs(change) < tol) return { verdict: "same", text: `About the same as usual (${i.fmt(i.usual)}).` };
   const better = i.lowerIsBetter ? change < 0 : change > 0;
-  return { verdict: better ? "better" : "worse", text: `${better ? "Better" : "Worse"} than your usual (${i.fmt(i.usual)}).` };
+  return { verdict: better ? "better" : "worse", text: `${better ? "Better" : "Worse"} than usual (${i.fmt(i.usual)}).` };
 }
 
 export type ReplyRow = { leadAt: number; touchAt: number | null };
@@ -529,9 +532,9 @@ export const PROOF_NOTE = "Cleared means the problem is gone from your CRM data.
 export function staleUsual(s: { today: number; usual: number | null; samples: number; unusual: "up" | "down" | null } | null): Usual {
   if (!s || s.usual === null || s.samples < 4) return { verdict: "not_enough", text: "Not enough history yet to compare with your usual." };
   const usual = Math.round(s.usual);
-  if (s.unusual === "up") return { verdict: "worse", text: `More stale deals than your usual (about ${usual}).` };
-  if (s.unusual === "down") return { verdict: "better", text: `Fewer stale deals than your usual (about ${usual}).` };
-  return { verdict: "same", text: `About the same as your usual (about ${usual}).` };
+  if (s.unusual === "up") return { verdict: "worse", text: `More quiet deals than usual (about ${usual}).` };
+  if (s.unusual === "down") return { verdict: "better", text: `Fewer quiet deals than usual (about ${usual}).` };
+  return { verdict: "same", text: `About the same as usual (about ${usual}).` };
 }
 
 // ---------- share ----------
@@ -545,11 +548,11 @@ export function briefLines(i: { headline: Headline; rows: QueueRow[]; setAside: 
   if (i.headline.breakdown) lines.push(i.headline.breakdown);
   const top = i.rows.slice(0, i.limit ?? 5);
   if (top.length > 0) {
-    lines.push("Fix first:");
-    top.forEach((r, n) => lines.push(`${n + 1}. ${r.accountName}: ${r.text}${r.dollars ? `, ${money(r.dollars)} at stake` : r.estimate ? `, about ${money(r.estimate)} (estimate)` : ""}${r.since !== null ? `, wrong for ${ageWords(r.ageMinutes)}` : ""}`));
+    lines.push("Do this first:");
+    top.forEach((r, n) => lines.push(`${n + 1}. ${r.accountName}: ${r.text}${r.dollars ? `, ${money(r.dollars)} in deals` : r.estimate ? `, about ${money(r.estimate)}, estimated` : ""}${r.since !== null ? `, open for ${ageWords(r.ageMinutes)}` : ""}`));
     if (i.rows.length > top.length) lines.push(`${i.rows.length - top.length} more are in SubSync.`);
   }
-  if (i.setAside > 0) lines.push(`${i.setAside} ${i.setAside === 1 ? "item is" : "items are"} set aside (snoozed or marked Done) and not counted above.`);
+  if (i.setAside > 0) lines.push(`${i.setAside} ${i.setAside === 1 ? "item is" : "items are"} snoozed or marked done and not counted above.`);
   return lines;
 }
 
@@ -559,8 +562,8 @@ export function shareText(i: { who: string; headline: Headline; rows: QueueRow[]
   if (i.headline.breakdown) lines.push(i.headline.breakdown);
   const top = i.rows.slice(0, 3);
   if (top.length > 0) {
-    lines.push("", "Fix first:");
-    top.forEach((r, n) => lines.push(`${n + 1}. ${r.accountName}: ${r.text}${r.dollars ? `, ${money(r.dollars)} at stake` : ""}${r.since !== null ? `, wrong for ${ageWords(r.ageMinutes)}` : ""}`));
+    lines.push("", "Do this first:");
+    top.forEach((r, n) => lines.push(`${n + 1}. ${r.accountName}: ${r.text}${r.dollars ? `, ${money(r.dollars)} in deals` : ""}${r.since !== null ? `, open for ${ageWords(r.ageMinutes)}` : ""}`));
   }
   return lines.join("\n");
 }

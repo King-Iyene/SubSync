@@ -65,9 +65,9 @@ export function ViewsMenu({ current, names, onApply, open: controlled, onOpenCha
       </button>}
       {open && pos && createPortal(
         <div ref={panel} id={id} role="dialog" aria-label="Saved views of Today" data-testid="views-popover" style={{ position: "fixed", left: pos.left, top: pos.top, width: "min(320px, calc(100vw - 16px))", zIndex: 60 }}
-          className="rounded-xl border bg-popover p-2 text-sm text-popover-foreground shadow-[var(--shadow-lift)] print:hidden">
+          className="rounded-[6px] border border-[var(--t-rule2)] bg-popover p-2 text-sm text-popover-foreground shadow-[var(--shadow-lift)] print:hidden">
           <ul className="max-h-60 overflow-y-auto" data-testid="views-list">
-            {views.length === 0 && <li className="px-2 py-2 text-muted-foreground">{list.loading && !saved ? "Loading..." : "No saved views yet."}</li>}
+            {views.length === 0 && <li className="px-2 py-2 text-muted-foreground">{list.loading && !saved ? "Loading" : "No saved views yet."}</li>}
             {views.map((v) => (
               <li key={v.id} className="flex items-center gap-1">
                 <button type="button" onClick={() => { onApply(v.view); setOpen(false); }} data-testid="views-apply" className="min-h-10 min-w-0 flex-1 rounded-lg px-2 text-left hover:bg-accent">
@@ -78,12 +78,12 @@ export function ViewsMenu({ current, names, onApply, open: controlled, onOpenCha
             ))}
           </ul>
           <form className="mt-2 border-t pt-2" onSubmit={(e) => { e.preventDefault(); if (name.trim()) void save(); }}>
-            <p className="mb-1 px-1 text-xs text-muted-foreground">Save what you see now: {describeTodayView(current, names)}.</p>
+            <p className="mb-1 px-1 text-xs text-muted-foreground">Save this view: {describeTodayView(current, names)}.</p>
             <div className="flex gap-2">
               <input value={name} onChange={(e) => setName(e.target.value)} maxLength={40} placeholder="Name this view" aria-label="Name this view" data-testid="views-name" className="min-h-9 min-w-0 flex-1 rounded-lg border bg-card px-2 outline-none focus-visible:ring-2 focus-visible:ring-ring/40" />
               <button type="submit" disabled={!name.trim() || views.length >= max} data-testid="views-save" className="min-h-9 rounded-lg bg-primary px-3 font-medium text-primary-foreground disabled:opacity-50">Save</button>
             </div>
-            {views.length >= max && <p className="mt-1 px-1 text-xs text-muted-foreground">You can keep {max} views. Remove one first.</p>}
+            {views.length >= max && <p className="mt-1 px-1 text-xs text-muted-foreground">You can keep {max} views. Remove one to add another.</p>}
             {msg && <p className="mt-1 px-1 text-xs" role="status">{msg}</p>}
           </form>
         </div>, portalRoot())}

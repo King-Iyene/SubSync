@@ -44,7 +44,7 @@ export const COL_ICON_NAME: Record<ColType, string> = { text: "Aa", date: "date"
 
 const ITEM_COLS: Col[] = [
   { key: "what", header: "What", type: "text", primary: true, w: 14 },
-  { key: "account", header: "Client account", type: "text", facet: true, w: 12 },
+  { key: "account", header: "Client", type: "text", facet: true, w: 12 },
   { key: "kind", header: "Kind", type: "kind", facet: true, w: 11 },
   { key: "since", header: "Wrong since", type: "date", w: 10.5 },
   { key: "waiting", header: "For", type: "duration", w: 6 },
@@ -85,13 +85,13 @@ export function itemsSpec(items: TodayItem[], now: number, i: SpecInput): Record
   const cut = i.count > rows.length;
   return {
     key: i.key, title: i.title, subtitle: i.subtitle, noun: i.noun, count: i.count, cols: trimColumns(ITEM_COLS, rows), rows,
-    note: i.note ?? (cut ? `SubSync loaded the first ${rows.length.toLocaleString("en-US")} of ${i.count.toLocaleString("en-US")}. Open the client account to see the rest.` : null),
+    note: i.note ?? (cut ? `SubSync loaded the first ${rows.length.toLocaleString("en-US")} of ${i.count.toLocaleString("en-US")}. Open the client to see the rest.` : null),
     dateKey: "since", preset: i.preset ?? {}, exportName: i.exportName ?? i.key,
   };
 }
 
 const ACCOUNT_COLS: Col[] = [
-  { key: "account", header: "Client account", type: "text", primary: true, w: 16 },
+  { key: "account", header: "Client", type: "text", primary: true, w: 16 },
   { key: "state", header: "How urgent", type: "kind", facet: true, w: 12 },
   { key: "things", header: "Things to fix", type: "number", w: 9 },
   { key: "dollars", header: "Stale deal value", type: "money", w: 11 },
@@ -110,7 +110,7 @@ export function accountsSpec(rows: AccountRow[], i: SpecInput): RecordsSpec {
 }
 
 const ALERT_COLS: Col[] = [
-  { key: "account", header: "Client account", type: "text", primary: true, facet: true, w: 14 },
+  { key: "account", header: "Client", type: "text", primary: true, facet: true, w: 14 },
   { key: "title", header: "Alert", type: "text", w: 26 },
   { key: "what", header: "What happened", type: "kind", facet: true, w: 11 },
   { key: "when", header: "When", type: "date", w: 11 },
@@ -129,7 +129,7 @@ export type LedgerLead = {
 };
 const LEAD_COLS: Col[] = [
   { key: "what", header: "Lead", type: "text", primary: true, w: 15 },
-  { key: "account", header: "Client account", type: "text", facet: true, w: 13 },
+  { key: "account", header: "Client", type: "text", facet: true, w: 13 },
   { key: "source", header: "Source", type: "text", facet: true, w: 11 },
   { key: "since", header: "Arrived", type: "date", w: 11 },
   { key: "reply", header: "First reply after", type: "duration", w: 10 },

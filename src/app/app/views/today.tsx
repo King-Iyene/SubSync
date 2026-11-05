@@ -9,6 +9,7 @@ import { ApiProvider, useApiClient, useData } from "../session";
 import { EmptyState, Page, remember, remembered, Skeleton, SkeletonRows } from "../ds";
 import { Btn, ErrorBox } from "../ui";
 import { TodayPage } from "./today-page";
+import "./today-theme.css";
 
 // Today's container: it loads the read, keeps the client-account choice (in this page's address as `ta=`, and in this browser, for Today only), and hands everything to TodayPage
 // (src/app/app/views/today-page.tsx), which draws the page for every role. See docs/features/TODAY.md.

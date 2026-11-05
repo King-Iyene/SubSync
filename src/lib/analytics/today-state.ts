@@ -145,7 +145,7 @@ export function applyView(i: ViewInput, o: ViewOpts): View {
 
 const HELD_COLS: Col[] = [
   { key: "what", header: "What", type: "text", primary: true, w: 14 },
-  { key: "account", header: "Client account", type: "text", facet: true, w: 13 },
+  { key: "account", header: "Client", type: "text", facet: true, w: 13 },
   { key: "kind", header: "Kind", type: "kind", facet: true, w: 12 },
   { key: "hold", header: "State", type: "kind", facet: true, w: 10 },
   { key: "until", header: "Comes back", type: "date", w: 11 },

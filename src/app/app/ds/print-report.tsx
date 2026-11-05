@@ -31,15 +31,15 @@ export function PrintReport({ r, now }: { r: ReportInput; now: number }) {
       <h2 className="text-xl font-semibold">{r.headline}</h2>
       {r.breakdown && <p className="mt-1 text-sm">{r.breakdown}</p>}
       {r.forecast && <p className="mt-2 text-sm">{r.forecast}</p>}
-      <h3 className="mb-1 mt-6 text-base font-semibold">Fix first</h3>
+      <h3 className="mb-1 mt-6 text-base font-semibold">Do this first</h3>
       {r.rows.length === 0 ? <p className="text-sm">Nothing needs you right now.</p> : (
         <table className="w-full border-collapse text-sm">
-          <thead><tr className="border-b border-black text-left"><th className="py-1 pr-2">Client account</th><th className="py-1 pr-2">What is wrong</th><th className="py-1 pr-2 text-right">At stake</th><th className="py-1">Wrong for</th></tr></thead>
+          <thead><tr className="border-b border-black text-left"><th className="py-1 pr-2">Client</th><th className="py-1 pr-2">What is wrong</th><th className="py-1 pr-2 text-right">Amount</th><th className="py-1">Open for</th></tr></thead>
           <tbody>
             {r.rows.slice(0, 12).map((x) => (
               <tr key={x.key} className="border-b border-gray-400 align-top">
                 <td className="py-1 pr-2 font-medium">{x.accountName}</td><td className="py-1 pr-2">{x.text}</td>
-                <td className="py-1 pr-2 text-right">{x.dollars ? money(x.dollars) : x.estimate ? `about ${money(x.estimate)} (estimate)` : x.count.toLocaleString("en-US")}</td>
+                <td className="py-1 pr-2 text-right">{x.dollars ? money(x.dollars) : x.estimate ? `about ${money(x.estimate)}, estimated` : x.count.toLocaleString("en-US")}</td>
                 <td className="py-1">{x.since === null ? "" : ageWords(Math.max(0, (now - x.since) / 60_000))}</td>
               </tr>
             ))}
@@ -47,9 +47,9 @@ export function PrintReport({ r, now }: { r: ReportInput; now: number }) {
         </table>
       )}
       {r.rows.length > 12 && <p className="mt-1 text-xs">{r.rows.length - 12} more rows are in SubSync.</p>}
-      {r.insights.length > 0 && (<><h3 className="mb-1 mt-6 text-base font-semibold">Spotted today</h3><ul className="list-disc pl-5 text-sm">{r.insights.map((t) => <li key={t}>{t}</li>)}</ul></>)}
+      {r.insights.length > 0 && (<><h3 className="mb-1 mt-6 text-base font-semibold">Worth a look</h3><ul className="list-disc pl-5 text-sm">{r.insights.map((t) => <li key={t}>{t}</li>)}</ul></>)}
       {r.proof && (<><h3 className="mb-1 mt-6 text-base font-semibold">What SubSync caught</h3><p className="text-sm">{r.proof}</p></>)}
-      {r.setAside > 0 && <p className="mt-4 text-xs">{r.setAside} {r.setAside === 1 ? "item is" : "items are"} set aside (snoozed or marked Done) and not counted above.</p>}
+      {r.setAside > 0 && <p className="mt-4 text-xs">{r.setAside} {r.setAside === 1 ? "item is" : "items are"} snoozed or marked done and not counted above.</p>}
       {r.note && <p className="mt-2 text-xs">{r.note}</p>}
       <p className="mt-6 border-t border-gray-400 pt-2 text-xs">Counts come from your CRM data as last read. SubSync changed nothing in your CRM.</p>
     </article>

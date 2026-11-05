@@ -15,17 +15,17 @@ const strip = (l: LeadRow) => { const { zone: _z, ...rest } = l; void _z; return
 export type SpecEnv = { now: number; view: View; accounts: AccountFacts[]; staleDays: number; targetMinutes: number; ledger: LeadRow[]; scope: "all" | "account"; excluded: boolean };
 
 const SUBTITLE: Record<Kind, (e: SpecEnv) => string> = {
-  replies: (e) => `People whose message nobody has answered: new leads past the ${e.targetMinutes}-minute reply target, and customers who wrote last. Each person once, longest wait first.`,
-  appointments: () => "Past appointments with no outcome marked, so they count as neither a show nor a no-show.",
+  replies: (e) => `People who need a reply: new leads past the ${e.targetMinutes}-minute reply target, and customers who wrote last. Each person is listed once, longest wait first.`,
+  appointments: () => "Appointments that are over but have no outcome. They count as neither a show nor a no-show until someone marks them.",
   noshows: () => "People who missed an appointment in the last 14 days and have not booked another.",
   stale: (e) => `Open deals with a value and an owner that have not moved in ${e.staleDays} days or more. Biggest first.`,
 };
 /** Where a list comes from, in words: the account that was clicked, the one account the page is showing, or every client account. A list never says "all client accounts" when the page shows one. */
 const only = (e: SpecEnv) => (e.accounts.length === 1 ? e.accounts[0].name : null);
-const where = (e: SpecEnv, accountName?: string) => { const n = accountName ?? only(e); return n ? `${n}` : e.scope === "account" ? "" : "All client accounts"; };
+const where = (e: SpecEnv, accountName?: string) => { const n = accountName ?? only(e); return n ? `${n}` : e.scope === "account" ? "" : "All clients"; };
 /** "KD Squares LTD, waiting for a reply": the account first, then exactly what was clicked. */
 const titled = (e: SpecEnv, what: string, accountName?: string) => { const w = where(e, accountName); return w ? `${w}, ${what}` : what[0].toUpperCase() + what.slice(1); };
-const NOUN: Record<Kind, [string, string]> = { replies: ["person waiting", "people waiting"], appointments: ["appointment", "appointments"], noshows: ["no-show", "no-shows"], stale: ["deal", "deals"] };
+const NOUN: Record<Kind, [string, string]> = { replies: ["person to reply to", "people to reply to"], appointments: ["appointment", "appointments"], noshows: ["no-show", "no-shows"], stale: ["deal", "deals"] };
 const nounOf = (k: Kind, n: number) => NOUN[k][n === 1 ? 0 : 1];
 
 /** A slice of the donut, a legend row, or a figure tile of that kind. Count: the total for the kind. */
@@ -46,8 +46,8 @@ export function specRow(row: QueueRow, e: SpecEnv): RecordsSpec {
 /** An account bar. Count: the things to fix in that account. */
 export function specAccount(locationId: string, e: SpecEnv): RecordsSpec {
   const items = e.view.items.filter((i) => i.locationId === locationId);
-  const name = e.accounts.find((a) => a.id === locationId)?.name ?? "Client account";
-  return itemsSpec(items, e.now, { key: `account:${locationId}`, title: name, subtitle: "Everything in this client account that needs a person, most urgent kind first.", noun: items.length === 1 ? "thing to fix" : "things to fix", count: items.length, exportName: `fix-${name}` });
+  const name = e.accounts.find((a) => a.id === locationId)?.name ?? "Client";
+  return itemsSpec(items, e.now, { key: `account:${locationId}`, title: name, subtitle: "Everything at this client that needs a person, most urgent first.", noun: items.length === 1 ? "thing to do" : "things to do", count: items.length, exportName: `fix-${name}` });
 }
 
 /** "13 clients": one row per client account with something to fix. Count: the number of accounts. */
@@ -56,25 +56,25 @@ export function specClients(e: SpecEnv): RecordsSpec {
   const oldest = new Map<string, number>();
   for (const r of e.view.queue) oldest.set(r.locationId, Math.max(oldest.get(r.locationId) ?? 0, r.ageMinutes));
   return accountsSpec(need.rows.map((a) => ({ locationId: a.locationId, name: a.name, state: a.state, things: a.count, dollars: a.dollars, oldestMinutes: oldest.get(a.locationId) ?? null, reason: a.reason, url: a.url })),
-    { key: "clients", title: `${need.total} ${plural(need.total, "client")} need you today`, subtitle: "Every client account with at least one thing to fix, the most urgent first.", noun: plural(need.total, "client account"), count: need.total, exportName: "clients-needing-you" });
+    { key: "clients", title: `${need.total} ${plural(need.total, "client")} with something to do`, subtitle: "Every client with at least one thing to do, most urgent first.", noun: plural(need.total, "client"), count: need.total, exportName: "clients-needing-you" });
 }
 
 /** "$1,397,934 is at risk": the counted stale deals the figure adds up. Count: the number of those deals. */
 export function specDollars(e: SpecEnv): RecordsSpec {
   const s = specKind("stale", e);
-  return { ...s, key: "dollars", title: `${money(e.view.totals.stale.dollars ?? 0)} at risk, deals gone quiet`, subtitle: `The open deals behind the dollar figure: each has a value and an owner and has not moved in ${e.staleDays} days or more. The figure is their values added up.` };
+  return { ...s, key: "dollars", title: `${money(e.view.totals.stale.dollars ?? 0)} in quiet deals`, subtitle: `The open deals behind this amount. Each has a value and an owner and has not moved in ${e.staleDays} days or more. The amount is their values added up.` };
 }
 
 /** On one account the headline says "N things need you". Count: all of them. */
 export function specThings(e: SpecEnv): RecordsSpec {
   const items = e.view.items;
   const count = Object.values(e.view.totals).reduce((s, t) => s + t.count, 0);
-  return itemsSpec(items, e.now, { key: "things", title: "Everything that needs you today", subtitle: "People waiting for a reply, appointments to mark, no-shows to win back and deals gone quiet.", noun: count === 1 ? "thing" : "things", count, exportName: "needs-you-today" });
+  return itemsSpec(items, e.now, { key: "things", title: "Everything to do today", subtitle: "People who need a reply, appointments with no outcome, no-shows to rebook and quiet deals.", noun: count === 1 ? "thing" : "things", count, exportName: "needs-you-today" });
 }
 
 /** Alerts: raised, cleared or still open in the last 7 days, or one day of them. */
 export function specAlerts(proof: Proof, which: "raised" | "cleared" | "open" | { day: number }): RecordsSpec {
-  const sev = (s: string) => (s === "critical" ? "Urgent" : s === "warning" ? "Soon" : "When you can");
+  const sev = (s: string) => (s === "critical" ? "Urgent" : s === "warning" ? "Soon" : "Can wait");
   const row = (a: { id: string; accountName: string; title: string; severity: string }, what: "Raised" | "Cleared", at: number): AlertRow => ({ id: a.id, accountName: a.accountName, title: a.title, what, at, severity: sev(a.severity) });
   let rows: AlertRow[] = [];
   let title = "", subtitle = "";
@@ -114,17 +114,17 @@ export function specInsight(i: Insight, e: SpecEnv): RecordsSpec {
 export function specSince(k: "new" | "breached" | "answered" | "alerts", s: SinceVisit, e: SpecEnv): RecordsSpec {
   const when = new Date(s.since).toLocaleString("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "UTC" });
   if (k === "alerts") {
-    const rows: AlertRow[] = s.clearedAlerts.map((a) => ({ id: a.id, accountName: a.accountName, title: a.title, what: "Cleared", at: a.resolvedAt as number, severity: a.severity === "critical" ? "Urgent" : a.severity === "warning" ? "Soon" : "When you can" }));
-    return alertsSpec(rows, { key: "since:alerts", title: "Alerts cleared since your last visit", subtitle: `Alerts whose problem went away after ${when} UTC.`, noun: plural(rows.length, "alert"), count: rows.length, exportName: "alerts-cleared" });
+    const rows: AlertRow[] = s.clearedAlerts.map((a) => ({ id: a.id, accountName: a.accountName, title: a.title, what: "Cleared", at: a.resolvedAt as number, severity: a.severity === "critical" ? "Urgent" : a.severity === "warning" ? "Soon" : "Can wait" }));
+    return alertsSpec(rows, { key: "since:alerts", title: "Alerts cleared since you were last here", subtitle: `Alerts whose problem went away after ${when} UTC.`, noun: plural(rows.length, "alert"), count: rows.length, exportName: "alerts-cleared" });
   }
   const list = k === "new" ? s.newLeads : k === "breached" ? s.breached : s.answered;
-  const title = k === "new" ? "New leads since your last visit" : k === "breached" ? "Leads that passed their reply target since your last visit" : "Leads that got a first reply since your last visit";
-  const sub = k === "new" ? `Leads that arrived after ${when} UTC.` : k === "breached" ? `Leads whose ${e.targetMinutes}-minute reply target ran out after ${when} UTC without a reply inside it.` : `Leads whose first reply was sent after ${when} UTC.`;
+  const title = k === "new" ? "New leads since you were last here" : k === "breached" ? "Leads that went past the reply target since you were last here" : "Leads that got a first reply since you were last here";
+  const sub = k === "new" ? `Leads that arrived after ${when} UTC.` : k === "breached" ? `Leads that went past the ${e.targetMinutes}-minute reply target after ${when} UTC without a reply.` : `Leads whose first reply was sent after ${when} UTC.`;
   return leadsSpec(list, e.now, { key: `since:${k}`, title, subtitle: sub, noun: plural(list.length, "lead"), count: list.length, exportName: `since-${k}` });
 }
 
 export function specComing(kind: "leads" | "deals" | "appointments", list: Coming[], targetMinutes: number): RecordsSpec {
-  const t = { leads: ["Leads about to pass the reply target", `Leads inside their ${targetMinutes}-minute reply window that nobody has answered. Each one passes the target at the time shown if nobody replies.`, "lead"], deals: ["Deals about to go quiet", "Counted open deals that will have had no movement for the stale days by the time shown, if nobody touches them.", "deal"], appointments: ["Appointments still to happen today", "Appointments that start later today. Each will need an outcome marked afterwards.", "appointment"] }[kind];
+  const t = { leads: ["Leads about to pass the reply target", `Leads still inside their ${targetMinutes}-minute reply window that nobody has answered. Each one passes the target at the time shown if nobody replies.`, "lead"], deals: ["Deals about to go quiet", "Open deals that will pass the quiet-deal limit by the time shown, if nobody touches them.", "deal"], appointments: ["Appointments still to happen today", "Appointments that start later today. Each will need an outcome marked afterwards.", "appointment"] }[kind];
   return comingSpec(list, { key: `coming:${kind}`, title: t[0], subtitle: t[1], noun: plural(list.length, t[2]) });
 }
 
@@ -148,7 +148,7 @@ export function specWhy(text: string, ids: string[], accountName: string, e: Spe
 }
 export function specJunk(e: SpecEnv): RecordsSpec {
   const items = e.view.junk.items;
-  return itemsSpec(items, e.now, { key: "junk", title: "Left out of the dollar figure", subtitle: `Stale deals with a test name, or with no movement for more than ${junkDaysOf(e.staleDays)} days (3 times the stale days). ${money(e.view.junk.dollars)} in all. Switch the control off to count them again.`, noun: plural(items.length, "deal"), count: items.length, exportName: "left-out-deals" });
+  return itemsSpec(items, e.now, { key: "junk", title: "Left out of the quiet-deal amount", subtitle: `Deals with a test name, or with no movement for more than ${junkDaysOf(e.staleDays)} days (3 times the quiet-deal limit). ${money(e.view.junk.dollars)} in all. Turn the setting off to count them again.`, noun: plural(items.length, "deal"), count: items.length, exportName: "left-out-deals" });
 }
 
 export { leadsInHour, ageWords };

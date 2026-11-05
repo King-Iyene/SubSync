@@ -23,7 +23,7 @@ export type SparkPoint = { label: string; value: number; note?: string };
  * axis. Hover or focus shows the exact value and the date; a hidden table carries the same numbers for a screen reader. Points are drawn only where a figure
  * exists, so a missing day is a gap in the data, never a guess.
  */
-export function PulseSpark({ points, label, format, height = 44, onPoint, pointInfo }: {
+export function PulseSpark({ points, label, format, height = 72, onPoint, pointInfo }: {
   points: SparkPoint[]; label: string; format: (n: number) => string; height?: number;
   /** Press a point (click, or Enter on the focused point): open the records behind it. */
   onPoint?: (i: number) => void;
@@ -32,7 +32,7 @@ export function PulseSpark({ points, label, format, height = 44, onPoint, pointI
 }) {
   const [at, setAt] = useState<number | null>(null);
   const box = useRef<HTMLDivElement>(null);
-  if (points.length < 3) return <p className="mt-2 text-xs text-muted-foreground" data-testid="spark-empty">Not enough days to draw a line yet.</p>;
+  if (points.length < 3) return <p className="mt-2 text-xs text-muted-foreground" data-testid="spark-empty">Not enough days yet to draw a line.</p>;
   const lo = Math.min(...points.map((p) => p.value)), hi = Math.max(...points.map((p) => p.value)), span = hi - lo || 1;
   const x = (i: number) => (i / (points.length - 1)) * 100;
   const y = (v: number) => 8 + (1 - (v - lo) / span) * 84;
@@ -57,7 +57,7 @@ export function PulseSpark({ points, label, format, height = 44, onPoint, pointI
         <span aria-hidden className="pointer-events-none absolute size-[10px] -translate-x-1/2 translate-y-1/2 rounded-full bg-primary ring-2 ring-background" style={{ left: `calc(0.375rem + (100% - 0.75rem) * ${x(last) / 100})`, bottom: `${100 - y(points[last].value)}%` }} />
         {at !== null && at !== last && <span aria-hidden className="pointer-events-none absolute size-2 -translate-x-1/2 translate-y-1/2 rounded-full bg-foreground ring-2 ring-background" style={{ left: `calc(0.375rem + (100% - 0.75rem) * ${x(at) / 100})`, bottom: `${100 - y(points[at].value)}%` }} />}
         {p && (
-          <div role="tooltip" className="pointer-events-none absolute bottom-full z-20 mb-1 w-max max-w-[14rem] rounded-lg border bg-popover px-2.5 py-1.5 text-xs text-popover-foreground shadow-[var(--shadow-lift)]" style={{ left: `${Math.min(Math.max(x(at as number), 18), 82)}%`, transform: "translateX(-50%)" }}>
+          <div role="tooltip" className="pointer-events-none absolute bottom-full z-20 mb-1 w-max max-w-[14rem] rounded-[4px] border border-[var(--t-rule2)] bg-popover px-2.5 py-1.5 text-xs text-popover-foreground shadow-[var(--shadow-lift)]" style={{ left: `${Math.min(Math.max(x(at as number), 18), 82)}%`, transform: "translateX(-50%)" }}>
             <p className="font-medium">{p.label}: {format(p.value)}</p>
             {p.note && <p className="text-muted-foreground">{p.note}</p>}
             {onPoint && pointInfo && <p className="mt-0.5 text-muted-foreground" data-testid="spark-tip">{pointInfo(at as number).text}</p>}
@@ -72,11 +72,11 @@ export function PulseSpark({ points, label, format, height = 44, onPoint, pointI
 export function PulseTile({ label, value, usual, sub, spark, testId, onOpen, openLabel }: { label: ReactNode; value: ReactNode; usual: Usual | null; sub?: ReactNode; spark?: ReactNode; testId?: string; /** Press the number to open the records behind it. */ onOpen?: () => void; openLabel?: string }) {
   const v = usual ? VERDICT[usual.verdict] : null;
   return (
-    <div className={`min-w-0 border-l-2 py-0.5 pl-4 ${v?.rule ?? "border-border"}`} data-testid={testId} data-verdict={usual?.verdict ?? "none"}>
-      <p className="text-xs font-medium text-muted-foreground">{label}</p>
-      <p className="tnum mt-1.5 break-words text-[1.9rem] font-semibold leading-none tracking-tight">
+    <div className="min-w-0 py-0.5" data-testid={testId} data-verdict={usual?.verdict ?? "none"}>
+      <p className="t-label">{label}</p>
+      <p className="t-figure mt-2 break-words">
         {onOpen ? <button type="button" onClick={onOpen} data-testid={testId ? `${testId}-open` : undefined} aria-label={openLabel ?? "Show the records behind this number"} title={openLabel ?? "Show the records behind this number"}
-          className="ds-press -mx-1 cursor-pointer rounded-md px-1 text-left underline decoration-primary/30 decoration-2 underline-offset-[0.18em] hover:decoration-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)]"><CountUp value={value} /></button> : <CountUp value={value} />}
+          className="ds-press -mx-1 cursor-pointer rounded-md px-1 text-left underline decoration-primary/40 decoration-[0.07em] underline-offset-[0.18em] hover:decoration-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)]"><CountUp value={value} /></button> : <CountUp value={value} />}
       </p>
       {sub && <div className="mt-2 text-sm leading-5">{sub}</div>}
       {usual && v && <p className={`mt-1.5 flex items-start gap-1.5 text-xs leading-5 ${v.text}`} data-testid={testId ? `${testId}-usual` : undefined}><v.Icon aria-hidden className="mt-0.5 size-3.5 shrink-0" /><span>{usual.text}</span></p>}
