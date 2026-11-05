@@ -435,13 +435,16 @@ export function Dashboard() {
               Demo mode: this is sample data for a fictional company, not real clients.
             </div>
           )}
-          <nav className="flex gap-1 overflow-x-auto border-b p-2 md:hidden print:hidden" aria-label="Sections">
+          <nav className="fixed inset-x-0 bottom-0 z-30 flex gap-1 overflow-x-auto border-t bg-card p-1.5 shadow-[var(--shadow-lift)] md:hidden print:hidden" aria-label="Sections" data-testid="phone-menu">
             {menu.map((n) => (
               <button key={n.id} type="button" onClick={() => goTop(n.id)} aria-current={n.id === active ? "page" : undefined}
-                className={`shrink-0 border-b-2 px-3 py-2 text-sm transition-colors ${n.id === active ? "border-primary font-medium text-foreground" : "border-transparent text-muted-foreground"}`}>{labelFor(n)}</button>
+                className={`flex min-h-12 min-w-[4.5rem] shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg px-2.5 text-xs leading-tight transition-colors ${n.id === active ? "bg-accent font-semibold text-foreground" : "text-muted-foreground"}`}>
+                {(() => { const Icon = ICONS[n.id]; return Icon ? <Icon aria-hidden className="size-5" /> : null; })()}
+                <span className="max-w-[5.5rem] truncate">{labelFor(n)}</span>
+              </button>
             ))}
           </nav>
-          <main className="mx-auto w-full max-w-[1400px] flex-1 p-4 sm:px-10 sm:py-8">
+          <main className="mx-auto w-full max-w-[1400px] flex-1 p-4 pb-24 sm:px-10 sm:py-8 md:pb-8">
             {fromAccount && view.id !== "today" && (
               <InlineAlert className="mb-3" action={<Btn variant="ghost" onClick={() => { setFilter(EMPTY_FILTER); try { window.history.replaceState(null, "", withTodayAccounts(window.location.hash, [])); window.dispatchEvent(new Event("subsync-today-accounts")); } catch { /* see above */ } }}>See all client accounts</Btn>}>
                 You opened this from inside a client account, so every page shows only that account.

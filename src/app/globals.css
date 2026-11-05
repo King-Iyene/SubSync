@@ -93,15 +93,15 @@
   --chart-4: #1f8f5f;
   --chart-5: #c2410c;
   --radius: 0.75rem;
-  /* The side menu is navy in both themes. */
-  --sidebar: #000c25;
-  --sidebar-foreground: #dfe7f3;
-  --sidebar-primary: #5cbce3;
-  --sidebar-primary-foreground: #000c25;
-  --sidebar-accent: #02244f;
-  --sidebar-accent-foreground: #ffffff;
-  --sidebar-border: #ffffff1a;
-  --sidebar-ring: #5cbce3;
+  /* The side menu is light in the light theme and soft blue-grey in the dark one (stage SHELL). */
+  --sidebar: #ffffff;
+  --sidebar-foreground: #17243a;
+  --sidebar-primary: #0a658b;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #e6eff6;
+  --sidebar-accent-foreground: #02244f;
+  --sidebar-border: #d5dce6;
+  --sidebar-ring: #0a658b;
   --shadow-card: 0 1px 2px #000c2510, 0 6px 20px -10px #000c2524;
   --shadow-lift: 0 2px 4px #000c2512, 0 12px 28px -12px #000c2538;
   /* Motion: short, calm. Reduced-motion users get none (below). */
@@ -111,40 +111,47 @@
 }
 
 .dark {
-  --background: #000c25;
+  --background: #141d2f;
   --foreground: #f1f5fb;
-  --card: #031636;
+  --card: #1b263b;
   --card-foreground: #f1f5fb;
-  --popover: #05214a;
+  --popover: #233049;
   --popover-foreground: #f1f5fb;
-  --primary: #4db3dc;
-  --primary-foreground: #000c25;
-  --secondary: #0b2147;
+  --primary: #5bbce3;
+  --primary-foreground: #0a1424;
+  --secondary: #243149;
   --secondary-foreground: #f1f5fb;
-  --muted: #0b2147;
-  --muted-foreground: #9fb0cb;
-  --accent: #02244f;
+  --muted: #212d44;
+  --muted-foreground: #aebcd2;
+  --accent: #2a3a57;
   --accent-foreground: #ffffff;
   --destructive: #ff7a85;
   --success: #3dd598;
   --warning: #f59e3f;
   --gold: #d4ad58;
   --gold-foreground: #000c25;
-  --border: #ffffff1f;
-  --input: #ffffff29;
-  --ring: #4db3dc;
+  --border: #ffffff26;
+  --input: #ffffff33;
+  --ring: #5bbce3;
   --chart-1: #2f98c4;
   --chart-2: #b2893a;
   --chart-3: #8678e8;
   --chart-4: #2aa876;
   --chart-5: #e8662f;
-  --sidebar: #000a1e;
-  --sidebar-border: #ffffff17;
+  --sidebar: #101827;
+  --sidebar-accent: #223150;
+  --sidebar-primary: #5bbce3;
+  --sidebar-primary-foreground: #0a1424;
+  --sidebar-foreground: #dbe4f1;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: #ffffff1f;
   --shadow-card: 0 1px 2px #0000004d, 0 6px 20px -10px #00000080;
   --shadow-lift: 0 2px 4px #00000059, 0 12px 28px -12px #00000099;
 }
 
 @layer base {
+  /* Body text reads at 15px or more (stage SHELL): every rem size scales with this. */
+  html { font-size: 107%; }
   * {
     @apply border-border outline-ring/50;
   }
