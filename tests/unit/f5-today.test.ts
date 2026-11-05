@@ -87,10 +87,10 @@ describe("Today", () => {
     expect(m).toContain("Working out what needs you today");
     expect(m).toContain("Working out what to do first...");
   });
-  it("reads only data the signed-in person may see: one Today read and, for an agency only, the list of its own accounts for the selector; never an id of its own", () => {
+  it("reads only data the signed-in person may see: one Today read, the Growth read and, for an agency only, the list of its own accounts for the selector; never an id of its own", () => {
     const src = read("src/app/app/views/today.tsx");
     const paths = [...src.matchAll(/useData<[^>]*>\(([^)]*)\)/g)].map((m) => m[1].replace(/\s+/g, " "));
-    expect([...paths].sort()).toEqual(['"today"', 'kind === "agency" ? "segments" : null'].sort());
+    expect([...paths].sort()).toEqual(['"today"', '"today/growth"', 'kind === "agency" ? "segments" : null'].sort());
   });
   it("notices use the plain notice, not cards; nothing on the page is a content card", () => {
     for (const f of PAGE_FILES) {
@@ -117,14 +117,14 @@ describe("Today", () => {
     expect(src).not.toMatch(/vsYesterday|vsAvg|signed\(|percentChange|\.percent\b/);
     expect(src).toContain("staleUsual");
   });
-  it("Today draws its own account selector and not the shared header filter, and a launch from inside a client account narrows Today and says so with a plain notice (N2)", () => {
+  it("Today keeps its own account choice (ta=) which the one shared filter bar edits, and a launch from inside a client account narrows Today and says so with a plain notice (N2)", () => {
     const dash = read("src/app/app/dashboard.tsx");
     expect(dash).toMatch(/accounts: \[auth\.locationId\]/);
     expect(dash).toMatch(/withTodayAccounts\(buildHash\(\{ id: "today" \}, only\), \[auth\.locationId\]\)/);
     expect(dash).toMatch(/<InlineAlert className="mb-3" action=\{<Btn variant="ghost" onClick=\{\(\) => \{ setFilter\(EMPTY_FILTER\);/);
     expect(dash).not.toMatch(/rounded-xl border border-primary\/30 bg-primary\/5/);
-    // The shared filter is not drawn on Today, and Today reads with the unfiltered client.
-    expect(dash).toMatch(/view\.id !== "today" && <ApiProvider/);
+    // The shared filter bar edits Today's own choice (ta=); Today itself reads with the unfiltered client and filters through its own address.
+    expect(dash).toMatch(/<GlobalFilterBar view={view.id}/);
     expect(dash).toMatch(/case "today": return <ApiProvider value=\{baseApi\}><TodayView/);
     // Today for one account from the all-accounts list: go("today", id) sets Today's own choice, never the shared filter, and keeps the way back.
     expect(dash).toMatch(/next\.id === "today" && next\.locationId/);

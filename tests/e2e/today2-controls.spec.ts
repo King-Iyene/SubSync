@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { moreMenu, openMore } from "./today-helpers";
+import { moreMenu, openMore, clearAccounts } from "./today-helpers";
 
 // Click-test of every control on Today in a real browser (desktop 1440). Each test presses what a person presses and checks the visible result. Anything that marks a row
 // (Done for now, Snooze, Assign) is undone at once so the demo company stays as it was. Updated for Today v3: the numbers are under More detail, the row actions are in the row
@@ -163,10 +163,10 @@ test("the chips: a records chip removes its filter, and 'Show only this client' 
   // Show only this client narrows Today; "See all" widens it again.
   await page.getByTestId("queue-row").first().getByTestId("queue-more").click();
   await page.getByTestId("menu-only").click();
-  const chip = page.getByTestId("today-toolbar").getByTestId("showing-chip");
+  const chip = page.getByTestId("account-chip");
   await expect(chip).toBeVisible();
   expect(page.url()).toContain("ta=");
-  await chip.getByRole("button", { name: "See all" }).click();
+  await clearAccounts(page);
   await expect(chip).toHaveCount(0);
   expect(page.url()).not.toContain("ta=");
 });
@@ -256,7 +256,7 @@ test("saved views: save the current choice, apply it from another state, remove 
   await page.getByTestId("views-save").click();
   await expect(page.getByTestId("views-list")).toContainText(name);
   await page.keyboard.press("Escape");
-  await page.getByTestId("today-toolbar").getByTestId("showing-chip").getByRole("button", { name: "See all" }).click();
+  await clearAccounts(page);
   expect(page.url()).not.toContain("ta=");
   await moreMenu(page, "views");
   await page.getByTestId("views-list").getByText(name).click();
@@ -271,7 +271,7 @@ test("saved views: save the current choice, apply it from another state, remove 
 test("a client's staff: their own queue with Done for now and Snooze, no Assign, no account choice, their own records", async ({ page }) => {
   await page.goto("/app?as=client");
   await expect(page.getByTestId("today-headline")).toBeVisible({ timeout: 45_000 });
-  await expect(page.getByTestId("today-account-picker")).toHaveCount(0);
+  await expect(page.getByTestId("account-control")).toHaveCount(0);
   const rows = page.getByTestId("reply-row");
   if (await rows.count()) {
     await rows.first().getByTestId("reply-more").click();

@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { api as sharedApi, moreMenu, openMore, type Json } from "./today-helpers";
+import { api as sharedApi, moreMenu, openMore, type Json, clearAccounts } from "./today-helpers";
 
 // Today, second pass, in a real browser at 1440 (updated for Today v3): the records panel from every kind of mark (count equals rows), the fixed-column alignment of every list, the
 // account picker's Done and Show all accounts buttons, the working queue (Done for now, Snooze, Undo) from the row menu, the More detail tabs, and a click on every other button and link
@@ -69,58 +69,6 @@ test("People, Sources and Coverage lists line up too", async ({ page }) => {
   if ((await src.count()) > 1) sameColumns(await leftEdges(src, ":scope > span"), "sources");
 });
 
-test("the account picker: a row ticks anywhere on it, Show all accounts and Done close it with a visible result, Esc and a click outside close it", async ({ page }) => {
-  await openToday(page);
-  const pop = page.getByTestId("picker-popover");
-  const summary = page.getByTestId("picker-summary");
-  const total = (await summary.innerText()).replace("All ", "");
-  // Open, tick two rows by clicking the NAME (not the box), see the chip and the address, press Done.
-  await page.getByTestId("picker-button").click();
-  await expect(pop).toBeVisible();
-  await pop.getByText("Bright Smile Dental").click();
-  await pop.getByText("Blue Door Realty").click();
-  await expect(pop.getByRole("checkbox", { checked: true })).toHaveCount(2);
-  await expect(page.getByTestId("today-toolbar").getByTestId("showing-chip")).toContainText("2 client accounts");
-  expect(page.url()).toMatch(/ta=[^&]+,[^&]+/);
-  await pop.getByRole("button", { name: "Done" }).click();
-  await expect(pop).toHaveCount(0);
-  await expect(summary).toHaveText(`2 of ${total}`);
-  expect(page.url()).toContain("ta=");
-  // The list is narrowed to those two.
-  await expect(page.getByTestId("queue-row").filter({ hasNotText: /Bright Smile Dental|Blue Door Realty/ })).toHaveCount(0);
-  // Open again, press Show all accounts: closes, every account is back, the chip and the address parameter are gone.
-  await page.getByTestId("picker-button").click();
-  await expect(pop).toBeVisible();
-  await pop.getByRole("button", { name: "Show all accounts" }).click();
-  await expect(pop).toHaveCount(0);
-  await expect(summary).toHaveText(`All ${total}`);
-  await expect(page.getByTestId("today-toolbar").getByTestId("showing-chip")).toHaveCount(0);
-  expect(page.url()).not.toContain("ta=");
-  // Esc closes it, and gives the focus back to the button.
-  await page.getByTestId("picker-button").click();
-  await expect(pop).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(pop).toHaveCount(0);
-  await expect(page.getByTestId("picker-button")).toBeFocused();
-  // A click outside closes it.
-  await page.getByTestId("picker-button").click();
-  await expect(pop).toBeVisible();
-  await page.getByRole("heading", { level: 1, name: "Today" }).click();
-  await expect(pop).toHaveCount(0);
-  // Real mouse clicks at the middle of both buttons hit the buttons themselves (nothing sits on top of them), in a short window too.
-  await page.setViewportSize({ width: 1024, height: 560 });
-  await page.evaluate(() => window.scrollTo(0, 0));
-  await page.getByTestId("picker-button").click();
-  for (const id of ["picker-done", "picker-all"]) {
-    const b = await page.getByTestId(id).boundingBox();
-    expect(b, id).not.toBeNull();
-    const hit = await page.evaluate(([x, y]) => (document.elementFromPoint(x, y) as HTMLElement | null)?.closest("[data-testid]")?.getAttribute("data-testid"), [b!.x + b!.width / 2, b!.y + b!.height / 2]);
-    expect(hit, `what is under the middle of ${id}`).toBe(id);
-    expect(b!.y + b!.height, `${id} is inside the window`).toBeLessThanOrEqual(560);
-  }
-  await page.mouse.click(...(await (async () => { const b = (await page.getByTestId("picker-done").boundingBox())!; return [b.x + b.width / 2, b.y + b.height / 2] as [number, number]; })()));
-  await expect(pop).toHaveCount(0);
-});
 
 test("a tile opens the records panel and its count is the number on the tile", async ({ page, request }) => {
   const { get } = await api(request);
@@ -497,10 +445,10 @@ test("More detail and the rest of the buttons built for Today all do something",
   // Show only this client narrows Today, "See all" brings every account back.
   await page.getByTestId("queue-row").first().getByTestId("queue-more").click();
   await page.getByTestId("menu-only").click();
-  await expect(page.getByTestId("today-toolbar").getByTestId("showing-chip")).toBeVisible();
+  await expect(page.getByTestId("account-chip")).toBeVisible();
   expect(page.url()).toContain("ta=");
-  await page.getByTestId("today-toolbar").getByTestId("showing-chip").getByRole("button", { name: "See all" }).click();
-  await expect(page.getByTestId("today-toolbar").getByTestId("showing-chip")).toHaveCount(0);
+  await clearAccounts(page);
+  await expect(page.getByTestId("account-chip")).toHaveCount(0);
   expect(page.url()).not.toContain("ta=");
   // The next step (a row menu item) opens its records.
   await page.getByTestId("queue-row").first().getByTestId("queue-more").click();
@@ -529,7 +477,7 @@ test("a business administrator and a client's staff get the same panel, limited 
     const t = await get("today");
     await page.goto(`/app?as=${as}`);
     await expect(page.getByTestId("today-headline")).toBeVisible({ timeout: 45_000 });
-    await expect(page.getByTestId("today-account-picker")).toHaveCount(0);
+    await expect(page.getByTestId("account-control")).toHaveCount(0);
     const names = new Set((t.accounts as Json[]).map((a) => a.name));
     expect(names.size).toBe(1);
     // The headline's number opens the panel; its rows are all this account's.
@@ -589,8 +537,8 @@ test("the records panel and the account list follow the light or dark theme of t
     const panelBg = await panel(page).evaluate((el) => getComputedStyle(el).backgroundColor);
     expect(luminance(panelBg) > 0.5, `${pref}: panel background ${panelBg}`).toBe(light);
     await closePanel(page);
-    await page.getByTestId("picker-button").click();
-    const pickBg = await page.getByTestId("picker-popover").evaluate((el) => getComputedStyle(el).backgroundColor);
+    await page.getByTestId("account-button").click();
+    const pickBg = await page.getByTestId("account-list").evaluate((el) => getComputedStyle(el).backgroundColor);
     expect(luminance(pickBg) > 0.5, `${pref}: account list background ${pickBg}`).toBe(light);
     await page.keyboard.press("Escape");
   }

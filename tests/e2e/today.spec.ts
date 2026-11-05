@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { api, counted, moreMenu, openMore, type Json } from "./today-helpers";
+import { api, counted, moreMenu, openMore, type Json, clearAccounts } from "./today-helpers";
 
 // Today (third pass): one sentence and one button, then the work list; one row per client account for an agency, Reply now for one account; a stacked bar per account only when
 // there is more than one; every mark opens exactly its own records. Run on the demo company as an agency owner, a business administrator and a client's staff user, at the three widths
@@ -60,7 +60,7 @@ test("Today draws its own account selector and not the shared filter; the shared
   await expect(page.getByTestId("today-headline")).toBeVisible({ timeout: 45_000 });
   await expect(page.getByTestId("filter-drawer")).toHaveCount(0);
   await expect(page.getByTestId("filter-row")).toHaveCount(0);
-  await expect(page.getByTestId("today-account-picker")).toBeVisible();
+  await expect(page.getByTestId("account-control")).toBeVisible();
   // The shared filter (industry, test accounts) names nothing Today counts: the same sentence as with no filter at all.
   await page.waitForTimeout(1000);
   await expect(page.getByTestId("today-headline")).toHaveText(base);
@@ -79,14 +79,14 @@ test("the account selector narrows every number, is kept in the address as ta=, 
   const mine = await get(`today?accounts=${target.id}`);
   await page.goto("/app");
   await expect(page.getByTestId("today-headline")).toBeVisible({ timeout: 45_000 });
-  await page.getByTestId("today-account-picker").getByRole("button", { name: /Client accounts/ }).click();
-  const pop = page.getByTestId("picker-popover");
+  await page.getByTestId("account-button").click();
+  const pop = page.getByTestId("account-list");
   await pop.getByLabel("Find a client account").fill(target.name);
   await pop.getByRole("checkbox").first().check();
   await pop.getByRole("button", { name: "Done" }).click();
   await expect(pop).toHaveCount(0);
   expect(page.url()).toContain(`ta=${target.id}`);
-  const chip = page.getByTestId("today-toolbar").getByTestId("showing-chip");
+  const chip = page.getByTestId("account-chip");
   await expect(chip).toContainText(target.name);
   // One account: the one-account page (Reply now, no account chart), and its sentence is that account's count.
   await expect(page.getByTestId("account-bars")).toHaveCount(0);
@@ -95,15 +95,15 @@ test("the account selector narrows every number, is kept in the address as ta=, 
   for (const r of await page.getByTestId("reply-row").all()) await expect(r).toBeVisible();
   // Remembered: a fresh visit to Today restores it; the Speed to lead page is not narrowed by it.
   await page.goto("/app");
-  await expect(page.getByTestId("today-toolbar").getByTestId("showing-chip")).toContainText(target.name, { timeout: 45_000 });
+  await expect(page.getByTestId("account-chip")).toContainText(target.name, { timeout: 45_000 });
   await page.goto("/app#speed");
   await page.reload();
   await expect(page.getByTestId("filter-drawer")).toBeVisible({ timeout: 30_000 });
   await expect(page.getByTestId("account-scope-summary").first()).toContainText(/All \d+ client accounts/);
   // "See all" puts it back.
   await page.goto("/app");
-  const again = page.getByTestId("today-toolbar").getByTestId("showing-chip");
-  await again.getByRole("button", { name: "See all" }).click();
+  const again = page.getByTestId("account-chip");
+  await clearAccounts(page);
   await expect(again).toHaveCount(0);
   expect(page.url()).not.toContain("ta=");
 });
@@ -215,7 +215,7 @@ test("the bars: one per client account, longest first, at most 8 and a '+N more'
   await page.getByTestId("menu-only").click();
   expect(page.url()).toContain("ta=");
   await expect(page.getByTestId("account-bar")).toHaveCount(0);
-  await page.getByTestId("showing-clear").click();
+  await clearAccounts(page);
   await expect(page.getByTestId("account-bar").first()).toBeVisible();
   expect(await page.getByTestId("account-bar").count()).toBeGreaterThan(1);
 });
@@ -281,14 +281,14 @@ test("an agency person opened from inside a client account starts on Today for t
     await route.fulfill({ response: res, json: body });
   });
   await page.goto("/app");
-  const chip = page.getByTestId("today-toolbar").getByTestId("showing-chip");
+  const chip = page.getByTestId("account-chip");
   await expect(chip).toContainText(name, { timeout: 45_000 });
   expect(page.url()).toContain(`ta=${loc}`);
   // The old banner is gone from Today (it stays on the other pages): one line in the top row says it.
   await expect(page.getByTestId("inline-alert").filter({ hasText: "opened this from inside a client account" })).toHaveCount(0);
   await expect(page.getByTestId("account-bars")).toHaveCount(0);
-  await chip.getByRole("button", { name: "See all" }).click();
-  await expect(page.getByTestId("today-toolbar").getByTestId("showing-chip")).toHaveCount(0);
+  await clearAccounts(page);
+  await expect(page.getByTestId("account-chip")).toHaveCount(0);
 });
 
 test("the change figures read only what the person may see: a client's staff are refused, a bad date is refused", async ({ request }) => {
@@ -348,7 +348,7 @@ test("a client's staff open on Today for their own account: Reply now, calls, ap
   await page.goto("/app?as=client");
   await expect(page.getByRole("heading", { level: 1, name: "Today" })).toBeVisible({ timeout: 45_000 });
   await expect(page.getByTestId("today-headline")).toBeVisible();
-  await expect(page.getByTestId("today-account-picker")).toHaveCount(0);
+  await expect(page.getByTestId("account-control")).toHaveCount(0);
   await expect(page.getByTestId("filter-drawer")).toHaveCount(0);
   await expect(page.getByTestId("fix-first")).toHaveCount(0);
   await expect(page.getByTestId("account-bars")).toHaveCount(0);
@@ -377,7 +377,7 @@ test("a business administrator also sees what SubSync caught in their account, n
   await expect(page.getByTestId("today-headline")).toBeVisible({ timeout: 45_000 });
   await openMore(page, "Proof");
   await expect(page.getByTestId("today-proof")).toBeVisible();
-  await expect(page.getByTestId("today-account-picker")).toHaveCount(0);
+  await expect(page.getByTestId("account-control")).toHaveCount(0);
   await page.getByTestId("today-more").click();
   await expect(page.getByTestId("menu-share")).toContainText("Share my day");
   await page.keyboard.press("Escape");

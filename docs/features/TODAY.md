@@ -1,3 +1,28 @@
+# Today: blue palettes and the Growth tab (5 Nov 2026, branch `today-blue-growth`)
+
+## Colours
+King: the berry and brown look is not nice. Today and the shell are now ONE blue family, mature and quiet: a deep slate-navy ground, cool greys with a faint blue lean, one steel or ink-blue accent, hairline rules, no gradients, no glows, never sky blue, never bright royal blue, no purple.
+- **Palette A (default), slate and steel.** Light: ground #f1f3f6, raised #f8f9fb, ink #151c28, accent #1f4e8c. Dark: ground #0f1623, raised #151e2e, lifted #1c2740, ink #e3e8f0, accent #6f9ad8 (softened).
+- **Palette B, ink and teal-grey** (`data-palette="b"`). Light: ground #edf1f3, ink #0f1d2a, accent #1a416f. Dark: ground #0c161d, raised #13212b, accent #7aa7d0.
+- Status colours stay reserved and far from the accent: Urgent red, Soon amber, Fine green, always with a word or icon. Chart colours (--t-c1 to --t-c4) pass the dataviz validator in light and dark on their own surface. Contrast figures for every pair are on the /design page.
+- The sidebar tokens in `globals.css` use the same slate family on every page, so the menu does not change colour when you leave Today.
+- "Urgent" is rare: a reply row is Urgent at 4 hours of waiting or 10 people, quiet deals at 25. Everything else past its limit says "Soon".
+
+## Growth tab (Break it down, last tab; also in the command palette)
+Read only, from contacts SubSync already holds, no new permission. Definitions: `docs/METRICS.md`, "Email leads". Every number opens the people behind it in the records panel.
+1. **Counters:** today, this week, this month, all time, each with up or down percent against the same stretch of the period before. "Too few to compare" under 5 earlier.
+2. **Chart:** new email leads per day (30 days), 7 day average line, a Rising, Falling or Steady badge, click a day for its people.
+3. **Sign ups, then people:** sign ups with an email, minus copies, test or junk, staff, shared mailboxes, equals leads counted. Each line opens its records with the reason.
+4. **This month's goal:** typed inline (pencil), progress bar, On track, Behind or Reached, a month-end forecast, "Not enough data yet" in the first 7 days of the month. Table `growth_goals`.
+5. **Where leads come from:** donut and table, change against the 30 days before, one line naming the source that grew most and the one that fell most. A slice or a row opens its people.
+6. **Clients by growth** (agency, several clients): league table in fixed columns, fastest growing first, with the goal per client. A client's staff see their own client only.
+7. **How leads are counted:** the rules in words, with two settings for the company (shared mailboxes, own staff domains). Table `growth_settings`.
+8. **Sudden drop or spike:** appears in Worth a look (up to two lines, labelled estimate) and is raised as an alert of kind `growth` through the existing dispatcher (dedupe key, quiet hours and the email dry run unchanged).
+Both new tables are additive; if the migration is not applied, Growth still opens and says what needs the update. Migration `supabase/migrations/20261106110000_growth.sql`, also in `docs/sql/PASTE_IN_SUPABASE.sql` (one transaction), the uninstall and per-client purge lists and the data inventory.
+
+## Menus and tabs
+The shared menu (`PopMenu`) now measures itself: it opens below when it fits, above when it fits there, otherwise on the roomier side with its own scroll, sits above every layer, and a scroll inside it does not move it. Today's tab row is its own component (no scroll bar). `tests/e2e/today-click-everything.spec.ts` clicks every visible control with a real mouse at 1440 and 1024 for an agency owner and a client's staff, opens every menu and clicks every item, and fails if anything does nothing.
+
 # Today redesign (5 Nov 2026, branch `today-redesign`): new structure, type, colour and words
 
 King: "the designs are too AI based ... the font, the text, A to Z." Behaviour is unchanged (every number opens the records panel, the working queue, the client filter, saved views, Ctrl Shift K, print, tenancy and entitlements). Critique and before and after: `docs/review/TODAY_DESIGN_CRITIQUE.md`.
@@ -12,7 +37,7 @@ King: "the designs are too AI based ... the font, the text, A to Z." Behaviour i
 
 ## Type and colour
 - Newsreader (the sentence, section titles, big figures), Hanken Grotesk (everything read), IBM Plex Mono (labels and aligned figures, tabular). Loaded with next/font (self-hosted at build, no CSP change), real fallback stacks. One scale as tokens in `src/app/app/views/today-theme.css`: display, figure, title, body 15px, small, label.
-- Tokens are scoped to `.today` (the app wrapper carries it only while Today is open). Palette A (graphite and berry) is the default, palette B (pine and jade) is `data-palette="b"`. Both light and dark, side by side on /design. Neither is blue. Status colours (Urgent, Soon, Fine) are reserved and always have a word or icon.
+- Tokens are scoped to `.today` (the app wrapper carries it only while Today is open). Palette A (now slate and steel blue, see the top of this file) is the default, palette B (ink and teal-grey) is `data-palette="b"`. Both light and dark, side by side on /design. Status colours (Urgent, Soon, Fine) are reserved and always have a word or icon.
 
 ## Words (one word per idea, used everywhere on Today)
 | Idea | Word | Not |

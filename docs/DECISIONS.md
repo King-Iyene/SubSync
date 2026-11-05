@@ -483,3 +483,12 @@ Decision: the screen is one sentence, one primary button ("Reply to the oldest w
 ## 5 Nov 2026, Today redesign (branch today-redesign)
 - Who: agency owner, setter, business owner. They open Today, read one sentence, then act on a verb-first row (Reply to 13 people, Review 2 quiet deals). Without it they would go back to counting in the CRM.
 - Decision: tokens scoped to .today, fonts Newsreader, Hanken Grotesk, IBM Plex Mono (next/font), palette A default (graphite and berry), palette B (pine and jade) one attribute away. Words in docs/features/TODAY.md. Critique: docs/review/TODAY_DESIGN_CRITIQUE.md. Buyer test: docs/review/TODAY_BUYER_TEST.md.
+
+## 5 Nov 2026, Today: blue palettes, Growth tab (branch today-blue-growth)
+- Who and what: the agency owner sees whether each client's email lead flow is rising or falling and which client is behind its monthly goal; they message the client or fix the form before the client notices. A setter reads the same tab for their own client. Without it they count sign ups by hand and cannot tell people from copies.
+- Colours: King found the berry and brown look wrong. Palette A is slate-navy and steel blue (#1f4e8c light, #6f9ad8 dark), Palette B ink-blue and teal-grey (#1a416f, #7aa7d0). One accent, hairlines, no gradient or glow. The sidebar tokens in globals.css now use the same slate family on every page, so the shell and Today are one family. Chart colours pass the dataviz validator in light and dark.
+- Urgent is now a threshold (4 hours or 10 people) so the list is not a wall of red.
+- Growth reads contacts SubSync already syncs (no new scope). Two additive tables, `growth_goals` and `growth_settings`, degrade with a plain message if the migration is not applied. The Growth read is capped at the newest 150,000 contacts per read and says so.
+- Menu fix: the shared PopMenu now measures its own height, flips up or scrolls inside itself near the window edge, sits above every layer (z 80), and ignores scrolls inside itself. Today's tab row is its own component with no scroll bar.
+- Demo seed now uses gmail, outlook, yahoo and icloud addresses instead of example.com, because example.com is a junk domain and would make every demo lead "test data".
+- Not built: a lead-count tile on the main view (the headline already carries the number that matters; Worth a look carries a drop or spike), and "ball in whose court" (not synced).

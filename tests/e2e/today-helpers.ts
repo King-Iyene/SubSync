@@ -45,3 +45,11 @@ export async function moreMenu(page: Page, key: "brief" | "print" | "share" | "s
 export async function todayReady(page: Page) {
   await expect(page.getByTestId("today-headline")).toBeVisible({ timeout: 45_000 });
 }
+
+/** Puts Today back on every client: opens the shared filter's account list, presses "All client accounts" and closes it. */
+export async function clearAccounts(page: Page) {
+  await page.getByTestId("account-button").click();
+  await page.getByRole("button", { name: "All client accounts" }).click();
+  await page.getByTestId("account-list").getByRole("button", { name: "Done", exact: true }).click();
+  await expect(page.getByTestId("account-list")).toHaveCount(0);
+}

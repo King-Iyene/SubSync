@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { clearAccounts } from "./today-helpers";
 
 // Today, second pass: real-browser checks of the two live bugs King found (rows out of line in the work list; "Done" and "Show all accounts" in the account picker doing
 // nothing) and a click on every control of the page. Desktop 1440 is the gate; the alignment test also resizes to 1024.
@@ -62,57 +63,50 @@ for (const width of [1440, 1024]) {
   });
 }
 
-test("the account picker: rows toggle on a click anywhere on them, Done closes and applies, Show all accounts selects every account, Esc and a click outside close", async ({ page }) => {
+test("the account choice (the shared filter bar): a row ticks anywhere on it, Done closes and applies, All client accounts clears, a click outside closes, the buttons are not covered", async ({ page }) => {
   await openToday(page);
-  const picker = page.getByTestId("today-account-picker");
-  const pop = page.getByTestId("picker-popover");
-  const summary = page.getByTestId("picker-summary");
-  await expect(summary).toHaveText(/^All \d+$/);
-  const total = Number((await summary.innerText()).replace("All ", ""));
+  const pop = page.getByTestId("account-list");
+  const button = page.getByTestId("account-button");
+  await expect(button).toHaveText(/^All \d+ client accounts$/);
+  const total = Number((await button.innerText()).match(/\d+/)![0]);
 
-  // A click on the name text of a row (not on the box) ticks it.
-  await picker.getByTestId("picker-button").click();
+  // Tick two rows by clicking the NAME (not the box); the button and the address say it, Done closes.
+  await button.click();
   await expect(pop).toBeVisible();
-  const names = pop.getByTestId("picker-list").getByRole("listitem");
-  await names.nth(0).getByText(/.+/).first().click();
-  await names.nth(1).getByText(/.+/).first().click();
+  await pop.getByText("Bright Smile Dental").click();
+  await pop.getByText("Blue Door Realty").click();
   await expect(pop.getByRole("checkbox", { checked: true })).toHaveCount(2);
-  await pop.getByTestId("picker-done").click();
-  await expect(pop).toHaveCount(0);
-  await expect(summary).toHaveText(`2 of ${total}`);
+  await expect(button).toHaveText(`2 of ${total} client accounts`);
   await expect.poll(() => (new URL(page.url()).hash.match(/ta=([^&]*)/)?.[1] ?? "").split(",").filter(Boolean).length).toBe(2);
-  await expect(page.getByTestId("today-toolbar").getByTestId("showing-chip").first()).toContainText("2 client accounts");
-
-  // Show all accounts: closes, every account counts again, the address has no ta=.
-  await picker.getByTestId("picker-button").click();
-  await expect(pop).toBeVisible();
-  await pop.getByTestId("picker-all").click();
+  await pop.getByRole("button", { name: "Done", exact: true }).click();
   await expect(pop).toHaveCount(0);
-  await expect(summary).toHaveText(`All ${total}`);
-  await expect.poll(() => page.url().includes("ta=")).toBe(false);
+  await expect(page.getByTestId("account-chip")).toHaveCount(2);
+  // Today is narrowed to those two.
+  await expect(page.getByTestId("queue-row").filter({ hasNotText: /Bright Smile Dental|Blue Door Realty/ })).toHaveCount(0);
 
-  // Show all accounts when nothing was picked still closes (it used to do nothing).
-  await picker.getByTestId("picker-button").click();
-  await pop.getByTestId("picker-all").click();
-  await expect(pop).toHaveCount(0);
+  // All client accounts: every client is back, no chips, no ta= in the address.
+  await clearAccounts(page);
+  await expect(button).toHaveText(`All ${total} client accounts`);
+  await expect(page.getByTestId("account-chip")).toHaveCount(0);
+  expect(page.url()).not.toContain("ta=");
 
-  // Esc closes and keeps what was ticked.
-  await picker.getByTestId("picker-button").click();
-  await pop.getByTestId("picker-list").getByRole("listitem").nth(2).click();
-  await page.keyboard.press("Escape");
-  await expect(pop).toHaveCount(0);
-  await expect(summary).not.toHaveText(`All ${total}`);
-
-  // A click outside closes it.
-  await picker.getByTestId("picker-button").click();
+  // A click outside closes the list.
+  await button.click();
   await expect(pop).toBeVisible();
   await page.getByRole("heading", { level: 1, name: "Today" }).click();
   await expect(pop).toHaveCount(0);
 
-  // The footer buttons are the topmost element at their own centre (nothing sits over them).
-  await picker.getByTestId("picker-button").click();
-  for (const id of ["picker-done", "picker-all"]) {
-    const ok = await page.getByTestId(id).evaluate((el) => { const r = el.getBoundingClientRect(); const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return el === top || el.contains(top); });
-    expect(ok, `${id} is covered by something`).toBe(true);
+  // The footer buttons are the topmost element at their own centre, in a short window too.
+  await page.setViewportSize({ width: 1024, height: 560 });
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await button.click();
+  for (const name of ["Done", "All client accounts"]) {
+    const el = pop.getByRole("button", { name, exact: true });
+    const box = await el.boundingBox();
+    expect(box, name).not.toBeNull();
+    const ok = await el.evaluate((e) => { const r = e.getBoundingClientRect(); const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return e === top || e.contains(top); });
+    expect(ok, `${name} is covered by something`).toBe(true);
   }
+  await pop.getByRole("button", { name: "Done", exact: true }).click();
+  await expect(pop).toHaveCount(0);
 });
