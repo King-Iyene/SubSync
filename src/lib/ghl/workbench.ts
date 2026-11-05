@@ -24,7 +24,8 @@ export type Action =
   | { kind: "tag_add" | "tag_remove"; tag: string }
   | { kind: "owner"; userId: string }
   | { kind: "fields"; fields: Partial<Record<"firstName" | "lastName" | "email" | "phone", string>> }
-  | { kind: "deal"; opportunityId: string; pipelineId?: string; stageId?: string; status?: DealStatus; value?: number; ownerId?: string }
+  | { kind: "deal"; opportunityId: string; pipelineId?: string; stageId?: string; status?: DealStatus; value?: number; ownerId?: string; name?: string }
+  | { kind: "deal_create"; pipelineId: string; stageId: string; name: string; value?: number; ownerId?: string }
   | { kind: "appointment"; appointmentId: string; status: ApptStatus }
   | { kind: "delete"; confirmText: string }
   | { kind: "call_note"; outcome: CallOutcome };
@@ -83,7 +84,13 @@ export function parseAction(raw: unknown): { ok: true; action: Action } | { ok: 
       const status = s("status");
       if (status !== null && !["open", "won", "lost", "abandoned"].includes(status)) return bad("Unknown deal status");
       const value = typeof o.value === "number" ? o.value : undefined;
-      return { ok: true, action: { kind: "deal", opportunityId: s("opportunityId") as string, ...(s("pipelineId") && ID.test(s("pipelineId") as string) ? { pipelineId: s("pipelineId") as string } : {}), ...(s("stageId") && ID.test(s("stageId") as string) ? { stageId: s("stageId") as string } : {}), ...(status ? { status: status as DealStatus } : {}), ...(value !== undefined ? { value } : {}), ...(s("ownerId") && ID.test(s("ownerId") as string) ? { ownerId: s("ownerId") as string } : {}) } };
+      return { ok: true, action: { kind: "deal", opportunityId: s("opportunityId") as string, ...(s("pipelineId") && ID.test(s("pipelineId") as string) ? { pipelineId: s("pipelineId") as string } : {}), ...(s("stageId") && ID.test(s("stageId") as string) ? { stageId: s("stageId") as string } : {}), ...(status ? { status: status as DealStatus } : {}), ...(value !== undefined ? { value } : {}), ...(s("name") !== null ? { name: (s("name") as string).slice(0, 120) } : {}), ...(s("ownerId") && ID.test(s("ownerId") as string) ? { ownerId: s("ownerId") as string } : {}) } };
+    }
+    case "deal_create": {
+      if (!s("pipelineId") || !ID.test(s("pipelineId") as string) || !s("stageId") || !ID.test(s("stageId") as string)) return bad("Choose a pipeline and a stage");
+      if (!s("name")) return bad("Name the deal");
+      const value = typeof o.value === "number" ? o.value : undefined;
+      return { ok: true, action: { kind: "deal_create", pipelineId: s("pipelineId") as string, stageId: s("stageId") as string, name: (s("name") as string).slice(0, 120), ...(value !== undefined ? { value } : {}), ...(s("ownerId") && ID.test(s("ownerId") as string) ? { ownerId: s("ownerId") as string } : {}) } };
     }
     case "appointment": {
       const st = s("status");
@@ -170,8 +177,16 @@ export function planAction(a: Action, t: Target, now: Date = new Date()): Plan {
       if (a.status) body.status = a.status;
       if (a.value !== undefined) { if (!Number.isFinite(a.value) || a.value < 0) blockers.push({ id: "value", text: "The value must be zero or more." }); body.monetaryValue = a.value; }
       if (a.ownerId) body.assignedTo = a.ownerId;
+      if (a.name) body.name = a.name;
       if (!Object.keys(body).length) blockers.push({ id: "empty", text: "Nothing to change." });
       return mk("deal.update", { method: "PUT", path: `/opportunities/${seg(a.opportunityId)}`, version: VERSION, scope: "opportunities.write", body }, Object.keys(body), a.status === "won" ? "Mark this deal won" : a.status === "lost" ? "Mark this deal lost" : "Change this deal", true);
+    }
+    case "deal_create": {
+      const body: Record<string, unknown> = { pipelineId: a.pipelineId, locationId: t.locationId, name: a.name, pipelineStageId: a.stageId, status: "open", contactId: t.contactId };
+      if (a.value !== undefined) { if (!Number.isFinite(a.value) || a.value < 0) blockers.push({ id: "value", text: "The value must be zero or more." }); body.monetaryValue = a.value; }
+      if (a.ownerId) body.assignedTo = a.ownerId;
+      // The CRM has no way for SubSync to delete the new deal again, so this one cannot be undone from here.
+      return mk("deal.create", { method: "POST", path: "/opportunities/", version: VERSION, scope: "opportunities.write", body }, Object.keys(body), `Create the deal \u2018${a.name}\u2019 for ${t.name}`, false);
     }
     case "appointment": return mk("appointment.status", { method: "PUT", path: `/calendars/events/appointments/${seg(a.appointmentId)}`, version: VERSION, scope: "calendars/events.write", body: { appointmentStatus: a.status } }, ["appointmentStatus"], a.status === "showed" ? "Mark this appointment as showed up" : a.status === "noshow" ? "Mark this appointment as no-show" : a.status === "cancelled" ? "Cancel this appointment" : "Mark this appointment confirmed", true);
     case "delete": {

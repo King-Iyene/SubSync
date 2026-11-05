@@ -27,7 +27,9 @@ test("composing a message in the demo is a preview, then a confirmed dry run", a
   await page.getByTestId("person-name").first().click();
   await expect(page.getByTestId("wb-work")).toBeVisible({ timeout: 120_000 });
   // A person who asked not to be contacted has no composer: step on to one who did not.
-  for (let i = 0; i < 8 && (await page.getByTestId("wb-composer").count()) === 0; i++) {
+  // The message box starts collapsed (a slim "Write a message" bar): open it.
+  const hasBox = async () => { const o = page.getByTestId("wb-composer-open"); if (await o.count()) await o.click(); return (await page.getByTestId("wb-composer").count()) > 0; };
+  for (let i = 0; i < 8 && !(await hasBox()); i++) {
     await page.getByTestId("drawer-next").click();
     await expect(page.getByTestId("wb-work")).toBeVisible({ timeout: 120_000 });
   }

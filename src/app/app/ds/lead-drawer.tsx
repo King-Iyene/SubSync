@@ -1,5 +1,6 @@
 "use client";
 
+import { createPortal } from "react-dom";
 import { ChevronLeft, ChevronRight, ExternalLink, Maximize2, Minimize2, MoreHorizontal, ShieldCheck, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { tagColor } from "@/lib/people/tag-colors";
@@ -11,11 +12,13 @@ import { fmtMoney, timeAgo } from "../ui";
 import { ActionStrip, dialNoteText, useContactActions, type ActionPerson } from "./contact-actions";
 import { DialerSetting } from "./dial-button";
 import { HeldNote } from "./held";
+import { TimelinePanel } from "./timeline-panel";
+import { Fold } from "./fold";
 import { RecordTab } from "./wb/record-tab";
 import { AppointmentsTab } from "./wb/appointments-tab";
 import { InfoTip } from "./info-tip";
 import { TagsSection } from "./tags-section";
-import { LogCall, Timeline, UndoButton } from "./lead-parts";
+import { LogCall, UndoButton } from "./lead-parts";
 import { PopMenu } from "./pop-menu";
 import { ErrorState, SkeletonRows } from "./states";
 import { Composer, Thread } from "./wb/conversation";
@@ -40,7 +43,7 @@ export type LeadSeed = {
   /** Which work tab opens first (the Deals tab from the pipeline), and the deal to highlight there. */
   tab?: "conversation" | "update" | "deals"; dealId?: string;
 };
-type Tab = "conversation" | "update" | "deals" | "appointments" | "record";
+type Tab = "conversation" | "update" | "deals" | "appointments" | "record" | "timeline";
 
 // The live read of the CRM for one lead (custom fields, calls, messages), which is slower than SubSync's own copy and arrives after it.
 type Live = {
@@ -58,7 +61,7 @@ const H3 = ({ children }: { children: ReactNode }) => <h3 className="mb-1.5 text
 const BUTTON = "ds-press inline-flex min-h-11 items-center justify-center gap-1.5 rounded-md border bg-card px-3.5 text-sm font-medium hover:bg-accent focus-visible:outline-2 focus-visible:outline-[var(--ring)] sm:min-h-9";
 const PRIMARY = "ds-press inline-flex min-h-11 items-center justify-center gap-1.5 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground hover:opacity-90 focus-visible:outline-2 focus-visible:outline-[var(--ring)] sm:min-h-9";
 
-function Body({ seed, top, showAccount, onLogged }: { seed: LeadSeed; top?: ReactNode; showAccount: boolean; onLogged: (label: string, message?: string, id?: string) => void }) {
+function Body({ seed, top, showAccount, wide, onLogged }: { seed: LeadSeed; top?: ReactNode; showAccount: boolean; wide: boolean; onLogged: (label: string, message?: string, id?: string) => void }) {
   const api = useApiClient();
   const path = `${encodeURIComponent(seed.locationId)}/${encodeURIComponent(seed.contactId)}`;
   const person = useData<Person>(`people/person/${path}`);
@@ -69,6 +72,7 @@ function Body({ seed, top, showAccount, onLogged }: { seed: LeadSeed; top?: Reac
   const [tab, setTab] = useState<Tab>(seed.tab ?? "conversation");
   const [threadKey, setThreadKey] = useState(0);
   const [channelPref, setChannelPref] = useState<"SMS" | "Email">("SMS");
+  const [composerOpen, setComposerOpen] = useState(false);
   const runner = useRunner(seed.locationId, seed.contactId, () => { setThreadKey((k) => k + 1); void wbq.reload(); void person.reload(); });
   const data = person.data;
   const c = data?.contact;
@@ -87,8 +91,11 @@ function Body({ seed, top, showAccount, onLogged }: { seed: LeadSeed; top?: Reac
   const timeline = useMemo(() => withLive(data?.timeline ?? [], extra?.live ?? null), [data, extra]);
 
   const tone = data?.headline.tone;
+  const tlNote = extra && extra.live.state !== "off" ? extra.live.note : null;
+  const tz = extra?.timeZone ?? c?.timeZone ?? seed.timeZone ?? null;
   return (
-    <>
+    <div className={wide ? "grid grid-cols-[minmax(0,1fr)_380px] items-start gap-6" : ""}>
+    <div className="min-w-0">
       <div className="min-w-0">
         <h2 className="truncate text-lg font-semibold" data-testid="drawer-name">{name}</h2>
         {(showAccount || !c) && <p className="truncate text-sm text-muted-foreground">{c?.locationName ?? seed.locationName ?? ""}</p>}
@@ -111,8 +118,8 @@ function Body({ seed, top, showAccount, onLogged }: { seed: LeadSeed; top?: Reac
       <HeldNote locationId={seed.locationId} contactId={seed.contactId} name={name} />
       <div className="mt-4 flex flex-wrap items-center gap-2" data-testid="drawer-actions">
         <button type="button" onClick={() => actions.call(ap)} disabled={!phone} className={dnd ? BUTTON : PRIMARY} data-testid="drawer-call">Call{url ? <ExternalLink aria-hidden className="size-3.5" /> : null}</button>
-        <button type="button" onClick={() => { setChannelPref("SMS"); setTab("conversation"); }} disabled={!phone || dnd} title={dnd ? "Asked not to be contacted" : !phone ? "This contact has no phone number" : undefined} className={BUTTON} data-testid="drawer-message">Text</button>
-        <button type="button" onClick={() => { setChannelPref("Email"); setTab("conversation"); }} disabled={!email || dnd} title={dnd ? "Asked not to be contacted" : email ? undefined : "This contact has no email address"} aria-describedby={email ? undefined : "drawer-email-why"} className={BUTTON} data-testid="drawer-email">Email</button>
+        <button type="button" onClick={() => { setChannelPref("SMS"); setComposerOpen(true); setTab("conversation"); }} disabled={!phone || dnd} title={dnd ? "Asked not to be contacted" : !phone ? "This contact has no phone number" : undefined} className={BUTTON} data-testid="drawer-message">Text</button>
+        <button type="button" onClick={() => { setChannelPref("Email"); setComposerOpen(true); setTab("conversation"); }} disabled={!email || dnd} title={dnd ? "Asked not to be contacted" : email ? undefined : "This contact has no email address"} aria-describedby={email ? undefined : "drawer-email-why"} className={BUTTON} data-testid="drawer-email">Email</button>
         <PopMenu label={`More for ${name}`} testId="drawer-more" triggerClassName="ds-press inline-flex size-11 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-[var(--ring)] sm:size-9"
           items={[
             { key: "copy", label: actions.copied === "panel" ? "Copied" : "Copy details", onSelect: () => void actions.copy(ap, showAccount) },
@@ -121,30 +128,31 @@ function Body({ seed, top, showAccount, onLogged }: { seed: LeadSeed; top?: Reac
       </div>
       {(!email || !phone) && <p id="drawer-email-why" className="mt-2 text-xs text-muted-foreground" data-testid="drawer-no-contact-way">{!email && !phone ? "This contact has no email address and no phone number in your CRM." : !email ? "Email is off because this contact has no email address in your CRM." : "Call and Text are off because this contact has no phone number in your CRM."}</p>}
       <ActionStrip actions={actions} k="panel" className="mt-2" />
-      {c && data && <TagsSection key={seed.contactId} locationId={seed.locationId} contactId={seed.contactId} name={name} tags={c.tags} tagDates={data.tagDates} tagExact={data.tagExact ?? {}} />}
+      {c && data && <Fold id="tags" title="Tags" bare className="mt-4"><TagsSection key={seed.contactId} locationId={seed.locationId} contactId={seed.contactId} name={name} tags={c.tags} tagDates={data.tagDates} tagExact={data.tagExact ?? {}} /></Fold>}
       <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1"><DialerSetting /><InfoTip label="About Call and Email" text={dialNoteText(actions.provider)} /></div>
       {person.loading && !data && <div className="mt-5"><SkeletonRows rows={4} label="Loading this person..." /></div>}
 
       {wb && (
         <section className="mt-5" aria-label="Work on this person" data-testid="wb-work">
           {!wb.mode.live && <p className="mb-3 flex items-start gap-2 rounded-lg bg-muted/60 px-3 py-2 text-sm text-muted-foreground" data-testid="wb-mode"><ShieldCheck aria-hidden className="mt-0.5 size-4 shrink-0" />{wb.mode.demo ? "Demo: try everything, nothing is ever sent." : wb.mode.masterOn ? "Changes from SubSync are not allowed for this account yet (Settings). You can try everything: nothing reaches your CRM." : "Changes from SubSync are switched off. You can try everything: it shows what would happen and nothing reaches your CRM."}</p>}
-          <div role="tablist" aria-label="What to do" className="grid grid-cols-5 gap-1 rounded-xl bg-muted p-1">
-            {([["conversation", "Conversation"], ["update", "Update"], ["deals", wb.deals.length ? `Deals (${wb.deals.length})` : "Deals"], ["appointments", wb.appointments.length ? `Appointments (${wb.appointments.length})` : "Appointments"], ["record", "Record"]] as const).map(([k, l]) => (
+          <div role="tablist" aria-label="What to do" className={`grid ${wide ? "grid-cols-5" : "grid-cols-6"} gap-1 rounded-xl bg-muted p-1`}>
+            {([["conversation", "Conversation"], ["update", "Update"], ["deals", wb.deals.length ? `Deals (${wb.deals.length})` : "Deals"], ["appointments", wb.appointments.length ? `Appointments (${wb.appointments.length})` : "Appointments"], ["record", "Record"], ...(wide ? [] : [["timeline", "Timeline"] as const])] as const).map(([k, l]) => (
               <button key={k} type="button" role="tab" id={`wb-tab-${k}`} aria-selected={tab === k} aria-controls="wb-panel" onClick={() => setTab(k)} className={`min-h-10 cursor-pointer rounded-lg px-3.5 text-[15px] font-medium ${tab === k ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`} data-testid={`wb-tab-${k}`}>{l}</button>
             ))}
           </div>
           <div role="tabpanel" id="wb-panel" aria-labelledby={`wb-tab-${tab}`} className="pt-5">
-            {tab === "conversation" && <><Thread locationId={seed.locationId} contactId={seed.contactId} reloadKey={threadKey} crmUrl={wb.crmUrl ?? url} /><Composer key={channelPref} ctx={wb} runner={runner} initial={channelPref} /></>}
+            {tab === "conversation" && <><Thread locationId={seed.locationId} contactId={seed.contactId} reloadKey={threadKey} crmUrl={wb.crmUrl ?? url} /><Composer key={channelPref} ctx={wb} runner={runner} initial={channelPref} open={composerOpen} onOpenChange={setComposerOpen} /></>}
             {tab === "update" && <UpdateTab ctx={wb} runner={runner} />}
+            {tab === "timeline" && data && <TimelinePanel items={timeline} timeZone={tz} note={tlNote} className="max-h-[70vh]" />}
             {tab === "record" && <RecordTab locationId={seed.locationId} contactId={seed.contactId} name={name} account={c?.locationName ?? seed.locationName ?? null} fields={extra?.live.customFields ?? []} />}
-            {tab === "appointments" && <AppointmentsTab ctx={wb} crmUrl={wb.crmUrl ?? url} />}
+            {tab === "appointments" && <AppointmentsTab ctx={wb} crmUrl={wb.crmUrl ?? url} runner={runner} />}
             {tab === "deals" && <DealsTab ctx={wb} runner={runner} focusId={seed.dealId ?? null} />}
           </div>
         </section>
       )}
       {wbq.error && wbq.error.status !== 404 && <p className="mt-4 text-sm text-muted-foreground">The workbench could not be loaded. <button type="button" className="font-medium underline" onClick={() => void wbq.reload()}>Try again</button></p>}
 
-      <h3 className="mb-1 mt-8 text-xs font-semibold uppercase tracking-wide text-muted-foreground">About this person</h3>
+      <Fold id="about" title="About this person" className="mt-6">
       <dl className="divide-y border-y">
         {phone && <Row label="Phone"><span className="tabular-nums">{phone}</span></Row>}
         {email && <Row label="Email"><span className="break-all">{email}</span></Row>}
@@ -152,6 +160,7 @@ function Body({ seed, top, showAccount, onLogged }: { seed: LeadSeed; top?: Reac
         {c && <Row label="Source">{c.source ?? "Not recorded"}</Row>}
         {c && <Row label="Last activity">{c.lastActivityAt ? timeAgo(c.lastActivityAt) : "None recorded"}</Row>}
       </dl>
+      </Fold>
 
 
       {data && data.deals.length > 0 && (
@@ -171,10 +180,11 @@ function Body({ seed, top, showAccount, onLogged }: { seed: LeadSeed; top?: Reac
 
       {phone && !dnd && c && <LogCall locationId={seed.locationId} contactId={seed.contactId} onLogged={onLogged} />}
 
-      {data && <Timeline items={timeline} nowMs={data.now} note={extra && extra.live.state !== "off" ? extra.live.note : null} />}
       {wb && <div className="sticky bottom-0 z-10 -mx-5 -mb-5 mt-6"><ReviewSheet r={runner} name={name} /></div>}
       {url && <p className="mt-6 text-xs"><a href={url} target="_blank" rel="noopener noreferrer" className="text-muted-foreground underline underline-offset-4 hover:text-foreground">Open in your CRM</a></p>}
-    </>
+    </div>
+    {wide && data && <div className="sticky top-0 h-[calc(100vh-7rem)]"><TimelinePanel items={timeline} timeZone={tz} note={tlNote} className="h-full" /></div>}
+    </div>
   );
 }
 
@@ -245,10 +255,14 @@ export function LeadDrawer({ leads, index, onIndex, onClose, top, showAccount = 
     if (message) setSaved({ text: `${label}: ${message}`, id: id ?? null });
     if (nb.next !== null) { setSaid(`Logged: ${label}. Next: ${leads[nb.next].name}.`); onIndex(nb.next); } else setSaid(`Logged: ${label}.`);
   };
-  return (
-    <div className="fixed inset-0 z-50 print:hidden" data-testid="lead-drawer-root">
+  if (typeof document === "undefined") return null;
+  // Rendered on document.body so the panel is the same on every screen (flush right, full height), whatever the page behind it does. It carries the shell's own theme class and
+  // colour variables across, because those live on the shell element, not on the body.
+  const shell = document.querySelector<HTMLElement>("[data-theme]");
+  return createPortal(
+    <div className={`${shell?.classList.contains("dark") ? "dark " : ""}fixed inset-0 z-[90] print:hidden`} ref={(el) => { if (el && shell) el.style.cssText += shell.style.cssText; }} data-testid="lead-drawer-root">
       <div className="absolute inset-0 bg-black/45" onClick={onClose} aria-hidden />
-      <aside ref={box} role="dialog" aria-modal="true" aria-label={`Lead: ${seed.name}`} className={`absolute inset-y-0 right-0 flex w-full flex-col border-l bg-popover text-popover-foreground shadow-[var(--shadow-lift)] transition-[width] ${wide ? "md:w-[min(100vw,960px)]" : "md:w-[min(100vw,700px)]"}`} data-wide={wide} data-testid="lead-drawer">
+      <aside ref={box} role="dialog" aria-modal="true" aria-label={`Lead: ${seed.name}`} className={`absolute inset-y-0 right-0 flex w-full flex-col border-l bg-popover text-popover-foreground shadow-[var(--shadow-lift)] transition-[width] ${wide ? "md:w-[min(92vw,1320px)]" : "md:w-[min(70vw,960px)]"}`} data-wide={wide} data-testid="lead-drawer">
         <header className="flex items-center justify-between gap-2 border-b px-4 py-2">
           <div className="flex items-center gap-1">
             <button type="button" aria-label="Previous lead" disabled={nb.prev === null} onClick={() => nb.prev !== null && onIndex(nb.prev)} className="inline-flex size-11 items-center justify-center rounded-lg hover:bg-muted disabled:opacity-35"><ChevronLeft aria-hidden className="size-5" /></button>
@@ -258,7 +272,7 @@ export function LeadDrawer({ leads, index, onIndex, onClose, top, showAccount = 
           <div className="flex items-center gap-1"><button type="button" onClick={toggleWide} aria-label={wide ? "Make the panel narrower" : "Make the panel wider"} aria-pressed={wide} className="hidden size-11 cursor-pointer items-center justify-center rounded-lg hover:bg-muted md:inline-flex" data-testid="drawer-wide">{wide ? <Minimize2 aria-hidden className="size-4" /> : <Maximize2 aria-hidden className="size-4" />}</button><button ref={close} type="button" aria-label="Close" onClick={onClose} className="inline-flex size-11 items-center justify-center rounded-lg hover:bg-muted"><X aria-hidden className="size-5" /></button></div>
         </header>
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
-          <Body key={seed.locationId + seed.contactId + (seed.note ?? "")} seed={seed} top={top?.(seed, at)} showAccount={showAccount} onLogged={logged} />
+          <Body key={seed.locationId + seed.contactId + (seed.note ?? "")} seed={seed} top={top?.(seed, at)} showAccount={showAccount} wide={wide} onLogged={logged} />
         </div>
         {saved && (
           <div className="flex items-center justify-between gap-2 border-t bg-card px-5 py-3 text-sm" role="status" data-testid="drawer-saved">
@@ -268,6 +282,7 @@ export function LeadDrawer({ leads, index, onIndex, onClose, top, showAccount = 
         )}
         <p className="sr-only" role="status" aria-live="polite">{said}</p>
       </aside>
-    </div>
+    </div>,
+    document.body,
   );
 }

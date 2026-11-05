@@ -1,6 +1,7 @@
 "use client";
 
 import { CalendarClock, ExternalLink } from "lucide-react";
+import type { Runner } from "./runner";
 import type { WbContext } from "./types";
 
 // This contact's appointments from SubSync's own copy (read only): upcoming first, then past. Times are shown in the client account's own time zone.
@@ -20,7 +21,7 @@ function when(iso: string, tz: string | null | undefined) {
   return { day: o({ weekday: "short", day: "numeric", month: "short", year: "numeric" }), time: o({ hour: "2-digit", minute: "2-digit" }) };
 }
 
-export function AppointmentsTab({ ctx, crmUrl }: { ctx: WbContext; crmUrl?: string }) {
+export function AppointmentsTab({ ctx, crmUrl, runner }: { ctx: WbContext; crmUrl?: string; runner?: Runner }) {
   const now = Date.now();
   const rows = ctx.appointments.filter((a) => a.at);
   const upcoming = rows.filter((a) => Date.parse(a.at!) >= now).sort((a, b) => Date.parse(a.at!) - Date.parse(b.at!));
@@ -36,6 +37,20 @@ export function AppointmentsTab({ ctx, crmUrl }: { ctx: WbContext; crmUrl?: stri
               <span className="min-w-0 flex-1"><span className="block truncate text-[15px] font-medium">{a.title}</span><span className="block truncate text-xs text-muted-foreground">{a.calendar ?? "Calendar"}</span></span>
               <span className="text-sm tabular-nums text-muted-foreground">{w.day}, {w.time}</span>
               <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${cls}`} data-testid="appt-status">{label}</span>
+              <details className="w-full text-sm" data-testid="appt-detail">
+                <summary className="min-h-8 cursor-pointer text-xs font-medium text-primary">Details and actions</summary>
+                <dl className="mt-1 divide-y rounded-lg border bg-background px-3 text-sm">
+                  <div className="flex gap-3 py-1.5"><dt className="w-28 shrink-0 text-muted-foreground">When</dt><dd>{w.day}, {w.time}</dd></div>
+                  <div className="flex gap-3 py-1.5"><dt className="w-28 shrink-0 text-muted-foreground">Time zone</dt><dd>{ctx.timeZone ?? "Not recorded"}</dd></div>
+                  <div className="flex gap-3 py-1.5"><dt className="w-28 shrink-0 text-muted-foreground">Calendar</dt><dd>{a.calendar ?? "Not recorded"}</dd></div>
+                  <div className="flex gap-3 py-1.5"><dt className="w-28 shrink-0 text-muted-foreground">Assigned to</dt><dd>{ctx.users.find((u) => u.id === a.assignedTo)?.name ?? (a.assignedTo ? "A team member" : "Nobody")}</dd></div>
+                  <div className="flex gap-3 py-1.5"><dt className="w-28 shrink-0 text-muted-foreground">Title</dt><dd className="break-words">{a.title}</dd></div>
+                </dl>
+                <div className="mt-2 flex flex-wrap gap-2" data-testid="appt-actions">
+                  {runner && (["showed", "noshow", "cancelled"] as const).map((st) => <button key={st} type="button" disabled={runner.busy || apptKind(a.status) === (st === "noshow" ? "noshow" : st)} onClick={() => void runner.preview({ kind: "appointment", appointmentId: a.id, status: st }, { verb: st === "showed" ? "Mark showed" : st === "noshow" ? "Mark no-show" : "Mark cancelled" })} className="min-h-9 cursor-pointer rounded-md border bg-card px-3 text-sm font-medium hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50" data-testid={`appt-set-${st}`}>{st === "showed" ? "Showed" : st === "noshow" ? "No-show" : "Cancelled"}</button>)}
+                  {crmUrl && <a href={crmUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-9 cursor-pointer items-center gap-1 px-1 text-sm font-medium text-primary underline underline-offset-4">Open in your CRM<ExternalLink aria-hidden className="size-3.5" /></a>}
+                </div>
+              </details>
             </li>
           );
         })}

@@ -58,8 +58,8 @@ async function dealsOf(ctx: Ctx, locationId: string, where: { contactId?: string
 }
 
 async function apptsOf(ctx: Ctx, locationId: string, contactId: string) {
-  const rows = await sql()`select appointment_id, title, status, start_at, calendar_name from cached_appointments where installation_id = ${ctx.installationId} and location_id = ${locationId} and contact_id = ${contactId} order by start_at desc nulls last limit 40`;
-  return rows.map((r) => ({ id: r.appointment_id as string, title: (r.title as string | null) ?? "Appointment", status: (r.status as string | null) ?? null, at: r.start_at instanceof Date ? r.start_at.toISOString() : null, calendar: (r.calendar_name as string | null) ?? null }));
+  const rows = await sql()`select appointment_id, title, status, start_at, calendar_name, nullif(assigned_to, '') assigned_to from cached_appointments where installation_id = ${ctx.installationId} and location_id = ${locationId} and contact_id = ${contactId} order by start_at desc nulls last limit 40`;
+  return rows.map((r) => ({ id: r.appointment_id as string, title: (r.title as string | null) ?? "Appointment", status: (r.status as string | null) ?? null, at: r.start_at instanceof Date ? r.start_at.toISOString() : null, calendar: (r.calendar_name as string | null) ?? null, assignedTo: (r.assigned_to as string | null) ?? null }));
 }
 
 /** The people who own something in THIS account (never every user of the company), with names. */
@@ -112,10 +112,11 @@ async function contextRoute(ctx: Ctx, h: WorkbenchHelpers): Promise<Response> {
   const links = await h.links();
   const [tzRow] = await sql()`select timezone from locations where installation_id = ${ctx.installationId} and location_id = ${locationId}`;
   const [mode, deals, appts, users] = await Promise.all([modeOf(ctx, locationId), dealsOf(ctx, locationId, { contactId }), apptsOf(ctx, locationId, contactId), usersOf(ctx, locationId)]);
-  const pipelines = await stagesOf(ctx, locationId, [...new Set(deals.map((d) => d.pipelineId).filter((x): x is string => !!x))]);
+  const allPipelineIds = (await sql()`select pipeline_id from pipelines where installation_id = ${ctx.installationId} and location_id = ${locationId} limit 20`).map((r) => r.pipeline_id as string);
+  const pipelines = await stagesOf(ctx, locationId, [...new Set([...allPipelineIds, ...deals.map((d) => d.pipelineId).filter((x): x is string => !!x)])]);
   const ownerName = users.find((u) => u.id === lead.ownerId)?.name ?? null;
   return json({
-    mode, canDelete: ctx.kind !== "client", name: lead.target.name, dnd: lead.target.dnd, phone: lead.target.phone, email: lead.target.email, hasConversation: !!lead.conversationId, timeZone: (tzRow?.timezone as string | null) ?? null,
+    mode, canDelete: ctx.kind !== "client", name: lead.target.name, dnd: lead.target.dnd, phone: lead.target.phone, email: lead.target.email, hasConversation: !!lead.conversationId, dealsUrl: links.opportunities(locationId), timeZone: (tzRow?.timezone as string | null) ?? null,
     // The link that opens this conversation in the customer's CRM (through the white-label domain helper); the contact when there is no conversation yet.
     crmUrl: lead.conversationId ? links.conversation(locationId, lead.conversationId) : links.contact(locationId, contactId),
     tags: lead.tags, fields: lead.fields, ownerId: lead.ownerId, ownerName, locationName: lead.locationName, users, deals, appointments: appts, pipelines,
@@ -173,6 +174,11 @@ async function actRoute(ctx: Ctx, h: WorkbenchHelpers, doIt: boolean): Promise<R
     dealBefore = { pipelineId: d.pipelineId, stageId: d.stageId, status: d.status, value: d.value, ownerId: d.ownerId };
     if (!lead) lead = { target: { locationId, contactId: "-", name: d.name ?? "This deal", dnd: false, phone: null, email: null, timeZone: null }, before: {}, conversationId: null, locationName: null, ownerId: null, tags: [], fields: { firstName: "", lastName: "", email: "", phone: "" } };
   } else if (!lead) return json({ error: "Send the person" }, 400);
+  if (action.kind === "deal_create") {
+    // The pipeline and stage must be ones this account really has.
+    const [pl] = await sql()`select stages from pipelines where installation_id = ${ctx.installationId} and location_id = ${locationId} and pipeline_id = ${action.pipelineId}`;
+    if (!pl || !((pl.stages as Array<{ id: string }> | null) ?? []).some((st) => st.id === action.stageId)) return json({ error: "That pipeline or stage is not in this account" }, 404);
+  }
   if (action.kind === "appointment" && contactId) {
     const appts = await apptsOf(ctx, locationId, contactId);
     const a = appts.find((x) => x.id === action.appointmentId);

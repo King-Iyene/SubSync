@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowDown, ExternalLink, Mail, MessageCircle, MessageSquare, Phone, RefreshCw, SendHorizonal } from "lucide-react";
+import { ArrowDown, ChevronDown, ExternalLink, Mail, MessageCircle, MessageSquare, Phone, RefreshCw, SendHorizonal } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useData } from "../../session";
 import { InfoTip } from "../info-tip";
@@ -71,7 +71,7 @@ export function Thread({ locationId, contactId, reloadKey, crmUrl }: { locationI
         {t.data && all.length === 0 && <p className="m-4 rounded-xl border border-dashed p-5 text-center text-[15px] text-muted-foreground" data-testid="wb-thread-empty">{t.data.note ?? "No messages yet. Say hello below."}</p>}
         {t.data && all.length > 0 && shown.length === 0 && <p className="m-4 text-center text-sm text-muted-foreground">No messages on this channel.</p>}
         {shown.length > 0 && (
-          <ol ref={scroller} onScroll={onScroll} tabIndex={0} aria-label="Messages" className="thin-scroll h-[clamp(300px,50vh,600px)] space-y-3 overflow-y-auto scroll-smooth px-4 py-4" data-testid="wb-messages">
+          <ol ref={scroller} onScroll={onScroll} tabIndex={0} aria-label="Messages" className="thin-scroll min-h-[55vh] max-h-[75vh] space-y-3 overflow-y-auto scroll-smooth px-4 py-4" data-testid="wb-messages">
             {shown.map((m, i) => (
               <li key={m.id} className="list-none">
                 {(i === 0 || dayKey(shown[i - 1].at) !== dayKey(m.at)) && <p className="mb-3 mt-1 text-center" data-testid="wb-day"><span className="rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">{dayHead(m.at)}</span></p>}
@@ -87,7 +87,7 @@ export function Thread({ locationId, contactId, reloadKey, crmUrl }: { locationI
   );
 }
 
-export function Composer({ ctx, runner, initial = "SMS" }: { ctx: WbContext; runner: Runner; initial?: "SMS" | "Email" }) {
+export function Composer({ ctx, runner, initial = "SMS", open = true, onOpenChange }: { ctx: WbContext; runner: Runner; initial?: "SMS" | "Email"; open?: boolean; onOpenChange?: (o: boolean) => void }) {
   const [channel, setChannel] = useState<"SMS" | "Email" | "WhatsApp">(initial === "SMS" && !ctx.phone ? "Email" : initial);
   const [text, setText] = useState("");
   const [subject, setSubject] = useState("");
@@ -105,12 +105,21 @@ export function Composer({ ctx, runner, initial = "SMS" }: { ctx: WbContext; run
   const sms = !email ? Math.max(1, Math.ceil(text.length / 160)) : 0;
 
   if (ctx.dnd) return <p className="mt-4 rounded-xl border border-destructive/50 p-3.5 text-[15px] font-medium text-destructive" data-testid="wb-dnd">{ctx.name} asked not to be contacted. SubSync will not send them anything.</p>;
+  if (!open) {
+    return (
+      <div className="sticky bottom-0 z-10 mt-3 flex items-center gap-3 rounded-xl border bg-card px-3 py-2 shadow-[0_-8px_14px_-10px_rgb(0_0_0/0.3)]" data-testid="wb-composer-collapsed">
+        <button type="button" onClick={() => onOpenChange?.(true)} className="flex min-h-10 flex-1 cursor-pointer items-center gap-2 text-left text-[15px] font-medium text-muted-foreground hover:text-foreground" data-testid="wb-composer-open"><SendHorizonal aria-hidden className="size-4" />Write a message</button>
+        <span className="inline-flex items-center gap-2 text-muted-foreground" aria-label="Text, Email and WhatsApp"><MessageSquare aria-hidden className="size-4" /><Mail aria-hidden className="size-4" /><MessageCircle aria-hidden className="size-4" /></span>
+      </div>
+    );
+  }
   return (
     <form className="sticky bottom-0 z-10 mt-3 space-y-2.5 rounded-xl border bg-card p-3 shadow-[0_-8px_14px_-10px_rgb(0_0_0/0.3)]" aria-label="Write a message" data-testid="wb-composer" onSubmit={(e) => { e.preventDefault(); void runner.preview({ kind: "message", channel, text, ...(email ? { subject } : {}) }, { quote: email ? `Subject: ${subject}\n\n${text}` : text, verb: "Send now" }); }}>
       <div className="flex flex-wrap items-center gap-2">
         <div role="radiogroup" aria-label="How to send" className="inline-flex rounded-lg border p-0.5">
           {CHANNELS.map(([k, l]) => <button key={k} type="button" role="radio" aria-checked={channel === k} disabled={!canUse(k)} onClick={() => setChannel(k)} className={`min-h-10 rounded-md px-3 text-[15px] font-medium disabled:opacity-40 ${channel === k ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`} data-testid={`wb-ch-${k}`}>{l}</button>)}
         </div>
+        <button type="button" onClick={() => onOpenChange?.(false)} aria-label="Collapse the message box" className="ml-auto inline-flex size-9 cursor-pointer items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground" data-testid="wb-composer-collapse"><ChevronDown aria-hidden className="size-4" /></button>
         <select aria-label="Start from a template" value="" onChange={(e) => applyTemplate(e.target.value)} className={`${INPUT} !w-auto min-w-40`} data-testid="wb-template">
           <option value="">Template...</option>
           {ctx.templates.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
