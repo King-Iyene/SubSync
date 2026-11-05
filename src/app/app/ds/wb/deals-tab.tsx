@@ -28,7 +28,7 @@ function DealCard({ d, ctx, runner, focus }: { d: WbDeal; ctx: WbContext; runner
         <p className="min-w-0 break-words text-[16px] font-semibold leading-snug">{d.name ?? "Untitled deal"}</p>
         <p className="shrink-0 text-[16px] font-semibold tabular-nums">{fmtMoney(d.value)}</p>
       </div>
-      <p className="mt-0.5 text-sm text-muted-foreground">{d.pipelineName ?? "Pipeline"} · {STATUS_WORD[d.status] ?? d.status}</p>
+      <p className="mt-0.5 text-sm text-muted-foreground">{ctx.pipelines.find((x) => x.id === d.pipelineId)?.name ?? d.pipelineName ?? "Pipeline"} · {d.stageName ? `${d.stageName} · ` : ""}{STATUS_WORD[d.status] ?? d.status}</p>
       {d.status === "open" ? (
         <div className="mt-3 grid grid-cols-2 gap-2">
           <label className="col-span-2 block"><span className="mb-1 block text-sm font-medium text-muted-foreground">Stage</span>
