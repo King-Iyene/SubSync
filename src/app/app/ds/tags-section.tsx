@@ -17,7 +17,8 @@ const styleOf = (name: string): CSSProperties => {
   const c = tagColor(name);
   return { "--tg-bg-l": c.light.bg, "--tg-fg-l": c.light.fg, "--tg-dot-l": c.light.dot, "--tg-bg-d": c.dark.bg, "--tg-fg-d": c.dark.fg, "--tg-dot-d": c.dark.dot } as CSSProperties;
 };
-const dayText = (iso: string) => { const d = new Date(iso); return d.toLocaleDateString("en-GB", d.getFullYear() === new Date().getFullYear() ? { day: "numeric", month: "short" } : { day: "numeric", month: "short", year: "numeric" }); };
+// Same style as the CRM shows it: "Nov 5, 2026", always with the year.
+const dayText = (iso: string) => new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 const recentKey = (loc: string) => `subsync.recentTags.${loc}`;
 const readRecent = (loc: string): string[] => { try { return JSON.parse(localStorage.getItem(recentKey(loc)) ?? "[]") as string[]; } catch { return []; } };
 const writeRecent = (loc: string, name: string) => { try { localStorage.setItem(recentKey(loc), JSON.stringify([name, ...readRecent(loc).filter((t) => t.toLowerCase() !== name.toLowerCase())].slice(0, 8))); } catch { /* private window */ } };
