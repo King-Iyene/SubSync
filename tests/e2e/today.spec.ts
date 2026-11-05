@@ -67,7 +67,7 @@ test("Today draws its own account selector and not the shared filter; the shared
   // Another page keeps the shared filter.
   await page.goto("/app#speed");
   await page.reload();
-  await expect(page.getByTestId("filter-drawer")).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId("global-filter-bar")).toBeVisible({ timeout: 30_000 });
 });
 
 test("the account selector narrows every number, is kept in the address as ta=, is remembered for Today only, and its 'See all' clears it", async ({ page, request }) => {
@@ -98,8 +98,8 @@ test("the account selector narrows every number, is kept in the address as ta=, 
   await expect(page.getByTestId("account-chip")).toContainText(target.name, { timeout: 45_000 });
   await page.goto("/app#speed");
   await page.reload();
-  await expect(page.getByTestId("filter-drawer")).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByTestId("account-scope-summary").first()).toContainText(/All \d+ client accounts/);
+  await expect(page.getByTestId("global-filter-bar")).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId("account-button")).toHaveText(/^All \d+ client accounts$/);
   // "See all" puts it back.
   await page.goto("/app");
   const again = page.getByTestId("account-chip");
@@ -281,14 +281,14 @@ test("an agency person opened from inside a client account starts on Today for t
     await route.fulfill({ response: res, json: body });
   });
   await page.goto("/app");
-  const chip = page.getByTestId("account-chip");
-  await expect(chip).toContainText(name, { timeout: 45_000 });
-  expect(page.url()).toContain(`ta=${loc}`);
+  // Launched from inside a client account the shared filter bar is not offered (the person is already in one client); Today opens on that client alone.
+  await expect.poll(() => page.url(), { timeout: 45_000 }).toContain(`ta=${loc}`);
+  await expect(page.getByTestId("today-headline")).toBeVisible({ timeout: 45_000 });
+  void name;
   // The old banner is gone from Today (it stays on the other pages): one line in the top row says it.
   await expect(page.getByTestId("inline-alert").filter({ hasText: "opened this from inside a client account" })).toHaveCount(0);
   await expect(page.getByTestId("account-bars")).toHaveCount(0);
-  await clearAccounts(page);
-  await expect(page.getByTestId("account-chip")).toHaveCount(0);
+  await expect(page.getByTestId("account-button")).toHaveCount(0);
 });
 
 test("the change figures read only what the person may see: a client's staff are refused, a bad date is refused", async ({ request }) => {

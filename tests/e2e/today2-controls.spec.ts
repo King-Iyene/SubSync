@@ -153,7 +153,7 @@ test("the chips: a records chip removes its filter, and 'Show only this client' 
   await expect(panel(page)).toBeVisible();
   const before = await page.getByTestId("records-row").count();
   await page.getByTestId("records-add-filter").click();
-  await page.getByRole("button", { name: /Kind/ }).first().click();
+  await page.getByRole("button", { name: /Source|Owner|Kind/ }).first().click();
   await page.getByTestId("facet-option").first().check();
   await expect.poll(async () => page.getByTestId("records-row").count()).toBeLessThanOrEqual(before);
   await page.getByRole("button", { name: /Remove the .* filter/ }).first().click();

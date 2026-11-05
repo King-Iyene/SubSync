@@ -122,7 +122,7 @@ export function AccountList({
         <p className="t-surface t-small t-quiet px-4 py-6" data-testid="queue-empty">{empty}</p>
       ) : (
         <ul className="@container t-surface divide-y overflow-hidden" data-testid="queue-list">
-          <li aria-hidden className={`hidden gap-x-3 border-l-2 border-transparent py-2 pl-4 pr-1 t-label @3xl:grid ${ACCOUNT_TRACKS}`} data-testid="queue-header">
+          <li aria-hidden className={`hidden gap-x-3 border-l-2 border-transparent py-2 pl-4 pr-2 t-label @3xl:grid ${ACCOUNT_TRACKS}`} data-testid="queue-header">
             <span>Client</span><span className="text-right">Amount</span><span>Status</span><span /><span />
           </li>
           {shown.map((a, n) => {

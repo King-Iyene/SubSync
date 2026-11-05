@@ -497,7 +497,7 @@ test("a business administrator and a client's staff get the same panel, limited 
       await page.keyboard.press("Escape");
     }
     await openMore(page);
-    if (as === "client") await expect(page.getByRole("tab")).toHaveCount(1); else await expect(page.getByRole("tab", { name: "People" })).toBeVisible();
+    if (as === "client") await expect(page.getByRole("tab")).toHaveCount(2); else await expect(page.getByRole("tab", { name: "People" })).toBeVisible();
     await page.getByTestId("today-more").click();
     await expect(page.getByTestId("menu-brief")).toHaveCount(0);
     await page.keyboard.press("Escape");

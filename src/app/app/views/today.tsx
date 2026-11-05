@@ -32,6 +32,8 @@ function useTodayAccounts(enabled: boolean): [string[], (ids: string[]) => void]
     setPicked(ids);
     try { window.history.replaceState(null, "", withTodayAccounts(window.location.hash || "#today", ids)); } catch { /* the choice still applies */ }
     remember(TODAY_KEY, ids.length ? ids.join(",") : null);
+    // The filter bar above the page shows this choice (the button text and the chips), so it is told whenever Today changes it from inside the page.
+    try { window.dispatchEvent(new Event("subsync-today-accounts")); } catch { /* the page still narrows */ }
   };
   useEffect(() => {
     if (picked.length > 0 && parseTodayAccounts(window.location.hash).length === 0) {

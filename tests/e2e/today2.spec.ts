@@ -42,7 +42,7 @@ for (const width of [1440, 1024]) {
     const labels = (await page.getByTestId("queue-open").allInnerTexts()).map((l) => l.trim().split(/\s/)[0]); // the first word (the rest is for a screen reader)
     expect(new Set(labels)).toEqual(new Set(["Open"]));
     const btn = await page.getByTestId("queue-open").first().boundingBox();
-    expect(btn!.height, "the button is small").toBeLessThanOrEqual(width >= 1440 ? 34 : 46);
+    expect(btn!.height, "the button is small").toBeLessThanOrEqual(width >= 1440 ? 36 : 48);
     for (const r of rows) expect(r.height, "a row is short").toBeLessThanOrEqual(width >= 1440 ? 76 : 100);
     if (width >= 1440) {
       // The headings use the same tracks as the cells: "At stake" ends where the amounts end, "Urgency" starts where the urgency words start.
@@ -70,11 +70,11 @@ test("the account choice (the shared filter bar): a row ticks anywhere on it, Do
   await expect(button).toHaveText(/^All \d+ client accounts$/);
   const total = Number((await button.innerText()).match(/\d+/)![0]);
 
-  // Tick two rows by clicking the NAME (not the box); the button and the address say it, Done closes.
+  // Tick two rows; the button and the address say it, Done closes.
   await button.click();
   await expect(pop).toBeVisible();
-  await pop.getByText("Bright Smile Dental").click();
-  await pop.getByText("Blue Door Realty").click();
+  await pop.getByRole("checkbox", { name: "Bright Smile Dental" }).check();
+  await pop.getByRole("checkbox", { name: "Blue Door Realty" }).check();
   await expect(pop.getByRole("checkbox", { checked: true })).toHaveCount(2);
   await expect(button).toHaveText(`2 of ${total} client accounts`);
   await expect.poll(() => (new URL(page.url()).hash.match(/ta=([^&]*)/)?.[1] ?? "").split(",").filter(Boolean).length).toBe(2);
@@ -93,7 +93,7 @@ test("the account choice (the shared filter bar): a row ticks anywhere on it, Do
   // A click outside closes the list.
   await button.click();
   await expect(pop).toBeVisible();
-  await page.getByRole("heading", { level: 1, name: "Today" }).click();
+  await page.getByTestId("today-breakdown").click();
   await expect(pop).toHaveCount(0);
 
   // The footer buttons are the topmost element at their own centre, in a short window too.

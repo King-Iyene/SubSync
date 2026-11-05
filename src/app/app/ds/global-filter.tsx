@@ -72,7 +72,7 @@ function AccountControl({ accounts, picked, onChange, options, value, onValue }:
               <Search aria-hidden className="pointer-events-none absolute left-2.5 top-3 size-4 text-muted-foreground" />
               <input autoFocus type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Find a client account" aria-label="Find a client account" className="min-h-10 w-full rounded-lg border bg-card py-1.5 pl-8 pr-2 text-[0.95rem] outline-none focus-visible:ring-2 focus-visible:ring-ring/40" />
             </label>
-            <ul className="mt-2 max-h-72 overflow-y-auto">
+            <ul className="mt-2 max-h-[min(18rem,calc(100dvh-22rem))] overflow-y-auto">
               {shown.length === 0 && <li className="px-2 py-2 text-sm text-muted-foreground">No client account matches.</li>}
               {shown.map((a) => (
                 <li key={a.id} className="group flex items-center rounded-lg hover:bg-accent" data-testid="account-row">
