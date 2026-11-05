@@ -21,7 +21,7 @@ import { Btn } from "./ui";
 import { FeedbackBox } from "./feedback-box";
 import { BackLink, BackProvider, ModuleTabs, TrailProvider } from "./ds/template";
 import { InlineAlert } from "./ds/alert";
-import { FilterDrawer } from "./ds/filters";
+import { GlobalFilterBar } from "./ds/global-filter";
 import { useTheme } from "./ds/theme";
 import { remember, remembered } from "./ds/remember";
 import { ApiProvider, makeApi, type Api } from "./session";
@@ -453,14 +453,14 @@ export function Dashboard() {
               <div className="min-w-0 flex-1">
                 {/* On Today the quiet freshness line sits here, in the one row with search and the bell (the page below draws its own account filter and "Showing" chip). */}
                 {view.id === "today" && strip}
-                {/* Today draws its own account selector inside the page; the shared one is for every other page. */}
-                {auth.kind === "agency" && baseApi && !fromAccount && view.id !== "today" && view.id !== "workflows" && view.id !== "data-health" && <ApiProvider value={baseApi}><FilterDrawer kind="agency" value={filter} onChange={setFilter} /></ApiProvider>}
               </div>
               <div className="ml-auto flex shrink-0 items-center">
                 {NAV_FOR[auth.kind].has("search") && !off("search") && <GlobalSearch go={go} />}
                 <NotificationBell go={go} />
               </div>
             </div>
+                            {/* ONE filter bar for every page with numbers (KF-11): accounts (agency) and dates, always open. Today keeps its own account choice (ta=) but the bar edits it. */}
+                <ApiProvider value={baseApi ?? api}><GlobalFilterBar view={view.id} agency={auth.kind === "agency" && !fromAccount && Boolean(baseApi)} value={filter} onChange={setFilter} /></ApiProvider>
             {view.id !== "today" && strip}<BackProvider value={back}><TrailProvider value={trailSection}>{content}</TrailProvider></BackProvider>
             <FeedbackBox page={view.id} />
           </main>
