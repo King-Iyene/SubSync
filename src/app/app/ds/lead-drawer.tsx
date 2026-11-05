@@ -7,10 +7,12 @@ import { neighbours } from "@/lib/design/ui-logic";
 import { withLive } from "@/lib/people/person";
 import { useApiClient, useData } from "../session";
 import { fmtMoney, timeAgo } from "../ui";
-import { ActionStrip, DialNote, useContactActions, type ActionPerson } from "./contact-actions";
+import { ActionStrip, dialNoteText, useContactActions, type ActionPerson } from "./contact-actions";
 import { DialerSetting } from "./dial-button";
 import { HeldNote } from "./held";
-import { LogCall, NoteToSelf, TagsEditor, Timeline, UndoButton } from "./lead-parts";
+import { InfoTip } from "./info-tip";
+import { TagsSection } from "./tags-section";
+import { LogCall, NoteToSelf, Timeline, UndoButton } from "./lead-parts";
 import { PopMenu } from "./pop-menu";
 import { ErrorState, SkeletonRows } from "./states";
 
@@ -101,7 +103,8 @@ function Body({ seed, top, showAccount, onLogged }: { seed: LeadSeed; top?: Reac
       </div>
       {(!email || !phone) && <p id="drawer-email-why" className="mt-2 text-xs text-muted-foreground" data-testid="drawer-no-contact-way">{!email && !phone ? "This contact has no email address and no phone number in your CRM." : !email ? "Email is off because this contact has no email address in your CRM." : "Call is off because this contact has no phone number in your CRM."}</p>}
       <ActionStrip actions={actions} k="panel" className="mt-2" />
-      <div className="mt-2 flex flex-wrap items-start justify-between gap-x-4 gap-y-1"><DialNote className="max-w-xs" /><DialerSetting /></div>
+      {c && data && <TagsSection key={seed.contactId} locationId={seed.locationId} contactId={seed.contactId} name={name} tags={c.tags} tagDates={data.tagDates} tagExact={data.tagExact ?? {}} />}
+      <div className="mt-2 flex flex-wrap items-start justify-between gap-x-4 gap-y-1"><DialerSetting /><InfoTip label="About Call and Email" text={dialNoteText(actions.provider)} /></div>
       {person.loading && !data && <div className="mt-5"><SkeletonRows rows={4} label="Loading this person..." /></div>}
 
       <dl className="mt-4 divide-y border-y">
@@ -112,7 +115,6 @@ function Body({ seed, top, showAccount, onLogged }: { seed: LeadSeed; top?: Reac
         {c && <Row label="Last activity">{c.lastActivityAt ? timeAgo(c.lastActivityAt) : "None recorded"}</Row>}
       </dl>
 
-      {c && <TagsEditor key={seed.contactId} locationId={seed.locationId} contactId={seed.contactId} name={name} tags={c.tags} tagDates={data!.tagDates} tagExact={data!.tagExact ?? {}} watchingSince={data!.watchingSince} />}
 
       {data && data.deals.length > 0 && (
         <section className="mt-5" aria-label="Deals">

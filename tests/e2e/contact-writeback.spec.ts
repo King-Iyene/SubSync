@@ -44,7 +44,7 @@ test("a note is saved to the contact, shows each state, can be undone, and Copy 
   const posts = await fake(page, () => mode);
   const drawer = await openPanel(page);
   await drawer.getByText("Add a note to this contact").click();
-  await expect(drawer.getByTestId("note-status")).toContainText("marked as added in SubSync");
+  await expect(drawer.getByTestId("note-to-self").getByRole("tooltip")).toContainText("marked as added in SubSync");
   await expect(drawer.getByTestId("note-save")).toBeDisabled();
   await drawer.getByTestId("note-text").fill("Wants a quote by Friday");
   await drawer.getByTestId("note-save").click();
@@ -108,32 +108,57 @@ test("Email opens the contact in the CRM; a contact with no address has it disab
   expect((await popup).url(), "a new tab opened").toBeTruthy();
 });
 
-test("tags: add with +, remove only after a plain confirmation, undo, dates say added or first seen", async ({ page }, info) => {
+test("tags: a clear section under the actions, searchable picker with create, colour chips, date only, confirmed removal, undo, tooltips instead of sentences", async ({ page }, info) => {
   test.setTimeout(300_000);
   const posts = await fake(page, () => "saved");
-  await page.route(/\/api\/app\/people\/tags\?/, (r) => r.fulfill({ json: { tags: ["qualified", "web lead"] } }));
+  const pool = Array.from({ length: 120 }, (_, i) => ({ name: i === 0 ? "qualified" : `tag ${i}`, count: 120 - i }));
+  await page.route(/\/api\/app\/people\/tags\?/, (r) => r.fulfill({ json: { tags: pool, source: "crm", needsPermission: false } }));
   const drawer = await openPanel(page);
   const tags = drawer.getByTestId("drawer-tags");
-  await expect(tags.getByTestId("drawer-tags-note")).toContainText("Your CRM does not store when a tag was added");
+  await expect(tags).toBeVisible();
+  await expect(tags.getByTestId("tags-count")).toHaveText(/^\d+$/);
+  // Prominence: the section sits above the contact details rows, right under the actions.
+  const [ty, dy] = [await tags.boundingBox(), await drawer.locator("dl").first().boundingBox()];
+  expect(ty!.y, "Tags are above the details").toBeLessThan(dy!.y);
+  // The explanation lives in a tooltip, not in a sentence.
+  await expect(tags.getByText("Your CRM does not keep the date a tag was added")).toBeHidden();
+  await tags.getByTestId("tags-info").focus();
+  await expect(tags.getByRole("tooltip")).toContainText("Your CRM does not keep the date a tag was added");
   await tags.getByTestId("tag-add").click();
-  await tags.getByTestId("tag-input").fill("qualified-test");
-  await tags.getByTestId("tag-add-save").click();
-  await expect(tags.getByTestId("tag-status")).toContainText("Added to the contact in your CRM");
-  expect(posts.at(-1)).toMatchObject({ path: "tag", body: { tag: "qualified-test", remove: false } });
-  await expect(tags.getByText(/qualified-test · added/)).toBeVisible();
+  await expect(tags.getByTestId("tag-input")).toBeFocused();
+  expect(await tags.getByTestId("tag-option").count(), "long lists are windowed, not all rendered").toBeLessThan(30);
+  await tags.getByTestId("tag-input").fill("brand new tag");
+  await expect(tags.getByTestId("tag-create")).toContainText("Create tag");
+  await tags.getByTestId("tag-input").press("Enter");
+  await expect(tags.getByTestId("tag-status")).toContainText(/Tag .brand new tag. added to .+ in your CRM/);
+  expect(posts.at(-1)).toMatchObject({ path: "tag", body: { tag: "brand new tag", remove: false } });
+  const chip = tags.getByTestId("drawer-tag").filter({ hasText: "brand new tag" });
+  await expect(chip.getByTestId("tag-date")).toHaveText(/^\d{1,2} [A-Z][a-z]{2}( \d{4})?$/);
+  await expect(chip).not.toContainText(/added|first seen/i);
   const before = posts.length;
-  await tags.getByRole("button", { name: "Remove the tag qualified-test" }).click();
-  await expect(tags.getByTestId("tag-confirm")).toContainText("Remove the tag \u2018qualified-test\u2019 from");
+  await tags.getByRole("button", { name: "Remove the tag brand new tag" }).click();
   await expect(tags.getByTestId("tag-confirm")).toContainText("This changes your CRM");
   await tags.getByTestId("tag-confirm-cancel").click();
   expect(posts.length, "cancel sends nothing").toBe(before);
-  await tags.getByRole("button", { name: "Remove the tag qualified-test" }).click();
+  await tags.getByRole("button", { name: "Remove the tag brand new tag" }).click();
   await tags.getByTestId("tag-confirm-remove").click();
-  await expect(tags.getByTestId("tag-status")).toContainText("Removed from the contact in your CRM");
-  expect(posts.at(-1)).toMatchObject({ path: "tag", body: { tag: "qualified-test", remove: true, confirm: true } });
+  await expect(tags.getByTestId("tag-status")).toContainText("removed from");
+  expect(posts.at(-1)).toMatchObject({ path: "tag", body: { tag: "brand new tag", remove: true, confirm: true } });
   await tags.getByTestId("tag-undo").click();
-  await expect(tags.getByTestId("tag-status")).toContainText("Undone");
+  await expect(tags.getByTestId("tag-status")).toContainText("is back on");
+  await tags.getByTestId("tag-add").click();
+  await tags.getByTestId("tag-input").fill("qual");
+  await expect(tags.getByTestId("tag-option").first()).toContainText("qualified");
   await page.screenshot({ path: `${SHOTS}/contact-writeback-tags-${info.project.name}.png` });
+});
+
+test("tags: without the optional permission the picker says so", async ({ page }) => {
+  test.setTimeout(300_000);
+  await fake(page, () => "saved");
+  await page.route(/\/api\/app\/people\/tags\?/, (r) => r.fulfill({ json: { tags: [{ name: "from contacts", count: 2 }], source: "contacts", needsPermission: true } }));
+  const drawer = await openPanel(page);
+  await drawer.getByTestId("tag-add").click();
+  await expect(drawer.getByTestId("tags-needs-permission")).toContainText("Needs permission: reconnect");
 });
 
 test("Call with: a connected dialer needs a valid https link and saves only the choice and the link", async ({ page }) => {

@@ -206,3 +206,9 @@
 /* Clean-up: a small pop for the "all clean" check mark. Only when the person has not asked for less motion. */
 @keyframes ds-pop { 0% { transform: scale(.6); opacity: 0; } 60% { transform: scale(1.12); opacity: 1; } 100% { transform: scale(1); } }
 @media (prefers-reduced-motion: no-preference) { .ds-pop { animation: ds-pop .6s ease-out both; } }
+
+/* Tag chips: a stable colour per tag name (src/lib/people/tag-colors.ts sets the variables inline). */
+.tag-pill { background: var(--tg-bg-l); color: var(--tg-fg-l); }
+.tag-dot { background: var(--tg-dot-l); }
+.dark .tag-pill { background: var(--tg-bg-d); color: var(--tg-fg-d); }
+.dark .tag-dot { background: var(--tg-dot-d); }

@@ -1,4 +1,4 @@
-import { accountTags, changeTag, cleanTag } from "../analytics/contact-tags";
+import { accountTagList, changeTag, cleanTag } from "../analytics/contact-tags";
 import { saveContactNote, undoWrite, writeCallOutcome } from "../analytics/contact-writeback";
 import { NOTE_MAX } from "../people/writeback";
 import { parseGranted } from "../scope-groups";
@@ -141,8 +141,11 @@ export async function handlePeopleQueue(ctx: Ctx, h: QueueHelpers): Promise<Resp
   if (m === "GET" && b === "tags") {
     const loc = sp.get("locationId") ?? "";
     const allowed = await h.allowed();
-    if (!ID.test(loc) || (allowed && !allowed.includes(loc))) return json({ tags: [] });
-    return json({ tags: await accountTags({ installationId: ctx.installationId, allowed }, loc).catch(() => []) });
+    if (!ID.test(loc) || (allowed && !allowed.includes(loc))) return json({ tags: [], source: "contacts", needsPermission: false });
+    const [inst] = ctx.demo ? [null] : await sql()`select scope from installations where id = ${ctx.installationId}`;
+    const g = typeof inst?.scope !== "string" || inst.scope.trim() === "" ? null : parseGranted(inst.scope as string);
+    const can = !ctx.demo && (g === null || g.includes("locations/tags.readonly"));
+    return json(await accountTagList({ installationId: ctx.installationId, allowed }, loc, can).catch(() => ({ tags: [], source: "contacts", needsPermission: false })));
   }
 
   // Writing to the lead in the CRM (docs/features/CONTACT_WRITEBACK.md). Who is writing, and which accounts, come from the signed session only.

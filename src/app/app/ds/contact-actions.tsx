@@ -73,16 +73,17 @@ export function ActionStrip({ actions, k, className = "" }: { actions: ContactAc
   );
 }
 
+/** What Call and Email do, per choice. */
+export function dialNoteText(provider: string): string {
+  return provider === "phone"
+    ? "Call opens the phone or softphone on this device, which places the call (your choice in the Call with setting). Email opens the person in your CRM. SubSync itself never places a call or sends a message."
+    : provider === "connected"
+      ? "Call opens your connected dialer in a new tab, which places the call (your choice in the Call with setting). Email opens the person in your CRM. SubSync itself never places a call or sends a message."
+      : "Call and Email open the person in your CRM, where its own dialer and mail box place the call or send the message. SubSync itself never places a call or sends a message.";
+}
+
 /** One line, shown once on a page, that says what Call and Email do (and that SubSync sends nothing). */
 export function DialNote({ className = "" }: { className?: string }) {
   const { provider } = useDialer();
-  return (
-    <p className={`text-xs text-muted-foreground ${className}`} data-testid="dial-note">
-      {provider === "phone"
-        ? "Call opens the phone or softphone on this device, which places the call (your choice in the Call with setting). Email opens the person in your CRM. SubSync itself never places a call or sends a message."
-        : provider === "connected"
-          ? "Call opens your connected dialer in a new tab, which places the call (your choice in the Call with setting). Email opens the person in your CRM. SubSync itself never places a call or sends a message."
-          : "Call and Email open the person in your CRM, where its own dialer and mail box place the call or send the message. SubSync itself never places a call or sends a message."}
-    </p>
-  );
+  return <p className={`text-xs text-muted-foreground ${className}`} data-testid="dial-note">{dialNoteText(provider)}</p>;
 }

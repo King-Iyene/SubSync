@@ -1,3 +1,8 @@
+import { ttlCache } from "../ttl-cache";
+import { ghlFetch } from "../ghl/http";
+import { GHL_API } from "../ghl/client";
+import { locationAccessToken } from "../sync/engine";
+import { readAllPages, rankTags, type TagOption } from "../people/tag-list";
 import { sql } from "../db";
 import { buildTags } from "../ghl/crm-writes";
 import { recordCrmWrite } from "../connections/write-log";
@@ -19,7 +24,7 @@ async function applyTag(w: Who, a: Args): Promise<WriteReply> {
   const id = claimed.id;
   const done = async (status: SaveStatus, httpStatus?: number): Promise<WriteReply> => {
     await db`update contact_writes set status = ${status}, tag = ${a.tag}, tag_added = ${!a.remove} where id = ${id}`;
-    return { ok: status === "saved" || status === "dry_run", status, message: status === "saved" ? (a.remove ? "Removed from the contact in your CRM" : "Added to the contact in your CRM") : saveMessage(status, "note", httpStatus), id, canUndo: status === "saved" };
+    return { ok: status === "saved" || status === "dry_run", status, message: status === "saved" ? (a.remove ? `Tag \u2018${a.tag}\u2019 removed from this contact in your CRM` : `Tag \u2018${a.tag}\u2019 added to this contact in your CRM`) : saveMessage(status, "note", httpStatus), id, canUndo: status === "saved" };
   };
   if (!w.granted) return done("needs_permission");
   const r = await send(w, { locationId: a.locationId, contactId: a.contactId, companyId: a.companyId }, buildTags({ contactId: a.contactId, tags: [a.tag], remove: a.remove }), a.remove ? "tag.remove" : "tag.add");
@@ -33,6 +38,7 @@ async function applyTag(w: Who, a: Args): Promise<WriteReply> {
     // Counts as ours for the activity window (principle 14).
     await recordCrmWrite({ installationId: w.installationId, meetingId: null, locationId: a.locationId, contactId: a.contactId, kind: "field", ghlId: null, authoredBy: w.actor }).catch(() => undefined);
   }
+  if (r.outcome === "written") forgetTagList(w.installationId);
   return done(r.outcome === "dry_run" ? "dry_run" : "saved");
 }
 
@@ -48,12 +54,45 @@ export async function changeTag(w: Who, v: { locationId: string; contactId: stri
   } catch (e) { if (missingTable(e)) return NEEDS_UPDATE; throw e; }
 }
 
-/** The tags already used in one account (most used first), to pick from. SubSync's own call-result tags are left out. */
-export async function accountTags(w: Pick<Who, "installationId" | "allowed">, locationId: string): Promise<string[]> {
+export type TagList = { tags: TagOption[]; source: "crm" | "contacts"; needsPermission: boolean };
+const cache = ttlCache<TagList>(5 * 60_000, 300);
+export const forgetTagList = (installationId: string) => cache.clear(installationId);
+
+/**
+ * Every tag the account has. The earlier version only knew tags that sit on contacts SubSync has copied, which is why a few tags showed. Now the account's own tag list is read from the
+ * CRM (GET /locations/{id}/tags, scope locations/tags.readonly, read in pages and merged, kept 5 minutes per account) and joined with how many contacts use each tag. If the optional
+ * permission is not granted (or the CRM refuses), the list falls back to the tags found on contacts and says "needs permission".
+ */
+export async function accountTagList(w: Pick<Who, "installationId" | "allowed">, locationId: string, canReadTags: boolean): Promise<TagList> {
+  const key = `${w.installationId}:${locationId}:${canReadTags ? 1 : 0}`;
+  const hit = cache.get(key);
+  if (hit) return hit;
   const db = sql();
   const rows = await db`
-    select t.tag, count(*) n from cached_contacts c, unnest(c.tags) as t(tag)
+    select lower(t.tag) k, count(*)::int n from cached_contacts c, unnest(c.tags) as t(tag)
     where c.installation_id = ${w.installationId} and c.location_id = ${locationId} ${w.allowed ? db`and c.location_id = any(${w.allowed}::text[])` : db``}
-    group by t.tag order by n desc, t.tag limit 200`;
-  return rows.map((r) => r.tag as string).filter((t) => !isOurTag(t, tagPrefix()));
+    group by 1`;
+  const prefix = tagPrefix();
+  const used = new Map(rows.map((r) => [r.k as string, r.n as number]).filter(([k]) => !isOurTag(k as string, prefix)) as Array<[string, number]>);
+  let crm: string[] = [];
+  let source: TagList["source"] = "contacts";
+  let needsPermission = !canReadTags;
+  if (canReadTags) {
+    try {
+      const [inst] = await db`select company_id from installations where id = ${w.installationId}`;
+      const token = await locationAccessToken(inst.company_id as string, locationId);
+      let denied = false;
+      crm = await readAllPages(async (skip) => {
+        const res = await ghlFetch(`${GHL_API}/locations/${encodeURIComponent(locationId)}/tags?limit=100&skip=${skip}`, { headers: { Authorization: `Bearer ${token}`, Version: "2021-07-28", Accept: "application/json" }, cache: "no-store" });
+        if (res.status === 401 || res.status === 403) { denied = true; return []; }
+        if (!res.ok) throw new Error(`tags ${res.status}`);
+        const j = (await res.json().catch(() => ({}))) as { tags?: Array<{ name?: unknown }> };
+        return (j.tags ?? []).map((t) => (typeof t.name === "string" ? t.name : "")).filter(Boolean);
+      });
+      if (denied) needsPermission = true; else source = "crm";
+    } catch { /* fall back to the contacts' tags */ }
+  }
+  const out: TagList = { tags: rankTags(crm, used).filter((t) => !isOurTag(t.name, prefix)), source, needsPermission };
+  if (source === "crm" || needsPermission) cache.set(key, out);
+  return out;
 }
