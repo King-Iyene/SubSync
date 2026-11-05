@@ -1,3 +1,4 @@
+import { waitingMoney, waitingMoneyLine } from "./waiting-money";
 import { sql } from "../db";
 import { MIN_CLOSED_DEALS } from "./metrics";
 import { EXCLUSION_LABEL, type Exclusion } from "./lead-rules";
@@ -101,6 +102,9 @@ export async function speedHome(i: HomeInput) {
   const byAccount = new Map<string, number>();
   for (const x of waitingAll) byAccount.set(x.row.locationId, (byAccount.get(x.row.locationId) ?? 0) + 1);
   const cost = costEstimate(byAccount, facts ?? []);
+  // The COUNTED money of the people waiting (a fact), apart from the estimate above; and which clients they are in, so the page can list them.
+  const money = await waitingMoney(i.installationId, waitingAll.map((x) => `${x.row.locationId}:${x.row.contactId}`));
+  const clients = [...byAccount].map(([locationId, count]) => ({ locationId, name: lk.locationNames.get(locationId) ?? "Client account", count })).sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
 
   // ---- the picture over the chosen window ----
   const win = inWindow(all, i.win);
@@ -125,7 +129,7 @@ export async function speedHome(i: HomeInput) {
     now: i.now, targetMinutes: i.targetMinutes, targetsReady: targets.ready, canChangeTarget: i.canChangeTarget,
     access: { ok: locs.filter((l) => l.speed_access === "ok").length, needsPermission: locs.filter((l) => l.speed_access === "needs_permission").map((l) => ({ locationId: l.location_id as string, name: lk.locationNames.get(l.location_id as string) as string })), total: locs.length },
     accounts: locs.map((l) => ({ locationId: l.location_id as string, name: lk.locationNames.get(l.location_id as string) as string, targetMinutes: targets.map.get(l.location_id as string) ?? i.targetMinutes, ownTarget: targets.map.has(l.location_id as string) })).slice(0, multi ? 0 : 1),
-    waiting: { ...wf, headline: headlineOf(wf, multi), rows: waitingRows, cost: { line: costLine(cost), formula: costFormula(cost), amount: cost.amount, leftOutAccounts: cost.leftOutAccounts } },
+    waiting: { ...wf, headline: headlineOf(wf, multi), rows: waitingRows, clients, money: { line: waitingMoneyLine(money, "Next best step: reply to the lead that has waited longest."), dollars: money?.dollars ?? 0, peopleWithDeals: money?.peopleWithDeals ?? 0, deals: money?.deals ?? 0 }, cost: { line: costLine(cost), formula: costFormula(cost), amount: cost.amount, leftOutAccounts: cost.leftOutAccounts } },
     window: { from: i.win.from, to: i.win.to, days: i.win.days, words: windowWords },
     summary: { ...summary, judged: judgedCount(summary), pct: pctOf(summary.withinTarget, judgedCount(summary)), typical: progressToward(summary.answered, MIN_FOR_MEDIAN, "replies"), typicalLine: typicalLine(summary, windowWords) },
     compare: cmpSummary && i.cmp ? { window: { from: i.cmp.from, to: i.cmp.to }, summary: { ...cmpSummary, judged: judgedCount(cmpSummary) } } : null,

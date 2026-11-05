@@ -47,3 +47,24 @@ test("menu order is money first", () => {
   const top = NAV.filter((n) => !n.parent).map((n) => n.id);
   assert.deepEqual(top.slice(0, 8), ["today", "speed", "inbox", "appointments", "clients", "people", "audit", "cleanup"]);
 });
+
+import { summariseWaitingMoney, waitingMoneyLine, type CountedDeal } from "../analytics/waiting-money.ts";
+test("counted money of the waiting people: each deal and person once, equal to the audit's way of summing the same counted deals", () => {
+  const deals: CountedDeal[] = [
+    { opportunityId: "o1", locationId: "L1", contactId: "c1", value: 1000 },
+    { opportunityId: "o1", locationId: "L1", contactId: "c1", value: 1000 }, // the same deal read twice
+    { opportunityId: "o2", locationId: "L1", contactId: "c1", value: 500 }, // a second deal of the same person
+    { opportunityId: "o3", locationId: "L2", contactId: "c2", value: 250 },
+    { opportunityId: "o4", locationId: "L2", contactId: "c9", value: 9999 }, // not waiting
+    { opportunityId: "o5", locationId: "L2", contactId: "c2", value: 0 }, // not a counted deal
+  ];
+  const m = summariseWaitingMoney(["L1:c1", "L2:c2", "L2:c3"], deals);
+  const auditWay = new Map(deals.filter((d) => d.value > 0 && ["L1:c1", "L2:c2", "L2:c3"].includes(`${d.locationId}:${d.contactId}`)).map((d) => [`${d.locationId}:${d.opportunityId}`, d.value])).values();
+  assert.equal(m.dollars, [...auditWay].reduce((a, b) => a + b, 0));
+  assert.equal(m.dollars, 1750);
+  assert.equal(m.deals, 3);
+  assert.equal(m.peopleWithDeals, 2);
+  assert.equal(m.people, 3);
+  assert.equal(waitingMoneyLine(m, "next"), "2 of these people have open deals worth $1,750.");
+  assert.equal(waitingMoneyLine(summariseWaitingMoney(["L1:zz"], deals), "Next best step: reply first."), "Next best step: reply first.");
+});
