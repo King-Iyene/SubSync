@@ -7,6 +7,7 @@ import { captureWhitelabelDomain, captureWhitelabelLogo, getSettings } from "@/l
 import { resolveEntitlements } from "@/lib/flags";
 import { businessInstalled, clientViewOn, getInstallation } from "@/lib/ghl/installations";
 import { decryptSsoPayload, parseSsoUser } from "@/lib/ghl/sso";
+import { resolveBrand } from "@/lib/brand-resolve";
 import { signSession } from "@/lib/session";
 import { MAINTENANCE_MESSAGE, maintenanceOn } from "@/lib/runtime-guards";
 
@@ -14,7 +15,8 @@ import { MAINTENANCE_MESSAGE, maintenanceOn } from "@/lib/runtime-guards";
 async function brandOf(installationId: string) {
   try {
     const s = await getSettings(installationId);
-    return { name: s.brandName, color: s.brandColor && /^#[0-9a-f]{6}$/i.test(s.brandColor) ? s.brandColor : null, logoUrl: s.brandLogoUrl };
+    const b = resolveBrand(s);
+    return { name: b.name, color: b.color, logoUrl: b.logoUrl };
   } catch {
     return { name: null, color: null, logoUrl: null };
   }
