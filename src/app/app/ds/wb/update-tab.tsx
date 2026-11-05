@@ -50,7 +50,7 @@ export function UpdateTab({ ctx, runner }: { ctx: WbContext; runner: Runner }) {
         {ctx.tags.length === 0 ? <p className="mb-2 text-[15px] text-muted-foreground">No tags yet.</p> : (
           <ul className="mb-2 flex flex-wrap gap-1.5">{ctx.tags.slice(0, 40).map((t) => (
             <li key={t} className="inline-flex items-center gap-1 rounded-full border py-0.5 pl-3 pr-1 text-sm">{t}
-              <button type="button" aria-label={`Remove the tag ${t}`} onClick={() => void runner.preview({ kind: "tag_remove", tag: t }, { verb: "Remove tag" })} className="inline-flex size-8 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground" data-testid="wb-tag-remove"><X aria-hidden className="size-3.5" /></button>
+              <button type="button" aria-label={`Remove the tag ${t}`} onClick={() => void runner.preview({ kind: "tag_remove", tag: t }, { verb: "Remove tag" })} className="inline-flex size-10 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground" data-testid="wb-tag-remove"><X aria-hidden className="size-3.5" /></button>
             </li>))}
           </ul>
         )}

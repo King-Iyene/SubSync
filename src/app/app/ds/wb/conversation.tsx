@@ -32,7 +32,7 @@ export function Thread({ locationId, contactId, reloadKey }: { locationId: strin
             <li key={m.id} className={`flex ${m.direction === "out" ? "justify-end" : "justify-start"}`}>
               <div className={`max-w-[86%] rounded-2xl px-3.5 py-2 text-[15px] leading-snug ${m.direction === "out" ? "rounded-br-sm bg-primary text-primary-foreground" : "rounded-bl-sm border bg-card"}`}>
                 {m.text ? <p className="whitespace-pre-wrap break-words">{m.text}</p> : <p className="italic opacity-80">{m.channel === "Call" ? "A phone call" : "No text"}</p>}
-                <p className={`mt-1 text-[11px] ${m.direction === "out" ? "text-primary-foreground/80" : "text-muted-foreground"}`}>{m.channel} · {timeAgo(m.at)}{m.by ? ` · ${m.by}` : ""}</p>
+                <p className={`mt-1 text-xs ${m.direction === "out" ? "text-primary-foreground/80" : "text-muted-foreground"}`}>{m.channel} · {timeAgo(m.at)}{m.by ? ` · ${m.by}` : ""}</p>
               </div>
             </li>
           ))}

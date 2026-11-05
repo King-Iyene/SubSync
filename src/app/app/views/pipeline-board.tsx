@@ -1,7 +1,7 @@
 "use client";
 
 import { Settings2, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { LeadDrawer, type LeadSeed } from "../ds";
 import { useData } from "../session";
 import { Empty, ErrorBox, fmtInt, fmtMoney, Loading, Sparkline } from "../ui";
@@ -30,6 +30,13 @@ const compact = (n: number) => (n >= 1_000_000 ? `$${(n / 1_000_000).toFixed(n >
 
 function PipelinesDrawer({ controls, onClose, onChanged }: { controls: StageControls; onClose: () => void; onChanged: () => void }) {
   const [q, setQ] = useState("");
+  const closeRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    closeRef.current?.focus();
+    const key = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", key);
+    return () => document.removeEventListener("keydown", key);
+  }, [onClose]);
   const shown = useMemo(() => {
     const ql = q.trim().toLowerCase();
     const names = controls.pipelines.map((p) => p.name).filter((n) => (ql ? n.toLowerCase().includes(ql) : true));
@@ -40,7 +47,7 @@ function PipelinesDrawer({ controls, onClose, onChanged }: { controls: StageCont
     <div className="fixed inset-0 z-50 print:hidden" data-testid="pipelines-drawer-root">
       <div className="absolute inset-0 bg-black/45" onClick={onClose} aria-hidden />
       <aside role="dialog" aria-modal="true" aria-label="Pipelines" className="absolute inset-y-0 right-0 flex w-full max-w-2xl flex-col border-l bg-popover shadow-[var(--shadow-lift)]" data-testid="pipelines-drawer">
-        <header className="flex items-center justify-between border-b px-5 py-3"><h2 className="text-lg font-semibold">Pipelines</h2><button type="button" aria-label="Close" onClick={onClose} className="inline-flex size-11 items-center justify-center rounded-lg hover:bg-muted"><X aria-hidden className="size-5" /></button></header>
+        <header className="flex items-center justify-between border-b px-5 py-3"><h2 className="text-lg font-semibold">Pipelines</h2><button ref={closeRef} type="button" aria-label="Close" onClick={onClose} className="inline-flex size-11 items-center justify-center rounded-lg hover:bg-muted"><X aria-hidden className="size-5" /></button></header>
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
           <p className="text-[15px] text-muted-foreground">Say which pipelines you really use. Deals in a pipeline you do not use, or in a closed-out stage, are left out of every dollar figure.</p>
           <label className="mt-3 block"><span className="sr-only">Find a pipeline</span><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Find a pipeline by name" className="block min-h-11 w-full rounded-lg border bg-background px-3 text-[15px]" data-testid="pipelines-search" /></label>
@@ -66,7 +73,7 @@ function StageColumn({ s, pipe, onOpen }: { s: Stage; pipe: Pipe; onOpen: (c: Ca
               <span className="flex items-baseline justify-between gap-2"><span className="min-w-0 truncate text-[15px] font-medium">{c.name}</span><span className="shrink-0 text-[15px] font-semibold tabular-nums">{fmtMoney(c.value)}</span></span>
               <span className="mt-1 block text-sm text-muted-foreground">
                 {c.stuck ? <span className="font-medium text-warning">Stuck: {c.daysInStage} days here (limit for this stage: {s.limitDays})</span> : c.daysInStage !== null ? `${c.daysInStage} ${c.daysInStage === 1 ? "day" : "days"} in this stage` : "Time in stage unknown"}
-                {c.noNextStep ? " · no next step" : ""}{pipe.locationName && c.locationName ? ` · ${c.locationName}` : ""}
+                {c.noNextStep && !c.stuck ? " · no next step" : ""}{pipe.locationName && c.locationName ? ` · ${c.locationName}` : ""}
               </span>
             </button>
           </li>
