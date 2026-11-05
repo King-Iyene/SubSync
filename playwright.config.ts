@@ -17,6 +17,7 @@ export default defineConfig({
     { name: "phone-390", use: { viewport: { width: 390, height: 844 } } },
     { name: "tablet-768", use: { viewport: { width: 768, height: 1024 } } },
     { name: "desktop-1440", use: { viewport: { width: 1440, height: 900 } } },
+    { name: "desktop-1024", use: { viewport: { width: 1024, height: 768 } } },
   ],
   // PW_BASE_URL points the tests at a server that is already running (the demo login must be switched on there).
   webServer: process.env.PW_BASE_URL ? undefined : { command: "node scripts/e2e-server.mjs", url: "http://localhost:3100/app", reuseExistingServer: true, timeout: 180_000 },

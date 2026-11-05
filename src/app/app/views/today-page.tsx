@@ -201,7 +201,18 @@ export function TodayPage({ go, t, kind, reload, sync, syncing, options, picked,
   const forecast = (
     <div data-testid="tab-numbers">
       <ComingBlock forecast={t.forecast} targetMinutes={t.targetMinutes} onOpen={(k) => m.open(specComing(k, t.forecast[k], t.targetMinutes))} />
-      {nothingComing && <p className="t-small t-quiet" data-testid="coming-none">Nothing is about to go wrong today.</p>}
+      {nothingComing && (
+        <div data-testid="coming-none" className="max-w-xl">
+          <p className="t-title">Nothing new is about to slip today.</p>
+          <p className="t-small t-quiet mt-2">No lead is still inside its {t.targetMinutes}-minute reply window, no open deal is about to go quiet and no appointment is about to end without an outcome. This tab looks ahead only.</p>
+          {counts.replies + counts.stale + counts.appointments > 0 ? (
+            <p className="t-small mt-3">
+              Already late: {[counts.replies > 0 ? `${fmtInt(counts.replies)} ${counts.replies === 1 ? "person" : "people"} waiting for a reply` : null, counts.stale > 0 ? `${fmtInt(counts.stale)} quiet ${counts.stale === 1 ? "deal" : "deals"}` : null, counts.appointments > 0 ? `${fmtInt(counts.appointments)} ${counts.appointments === 1 ? "appointment" : "appointments"} with no outcome` : null].filter(Boolean).join(", ")}.
+              {counts.replies > 0 && <> <button type="button" className="ds-press text-primary underline underline-offset-4" onClick={() => m.open(specKind("replies", env))} data-testid="coming-late-open">See them</button></>}
+            </p>
+          ) : <p className="t-small t-quiet mt-3">Nothing is late either.</p>}
+        </div>
+      )}
     </div>
   );
   const proof = t.proof && kind !== "client" ? (

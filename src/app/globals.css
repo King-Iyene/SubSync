@@ -94,14 +94,14 @@
   --chart-5: #c2410c;
   --radius: 0.75rem;
   /* The side menu is light in the light theme and soft blue-grey in the dark one (stage SHELL). */
-  --sidebar: #ffffff;
-  --sidebar-foreground: #17243a;
-  --sidebar-primary: #0a658b;
+  --sidebar: #f8f9fb;
+  --sidebar-foreground: #151c28;
+  --sidebar-primary: #1f4e8c;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #e6eff6;
-  --sidebar-accent-foreground: #02244f;
-  --sidebar-border: #d5dce6;
-  --sidebar-ring: #0a658b;
+  --sidebar-accent: #e4eaf3;
+  --sidebar-accent-foreground: #151c28;
+  --sidebar-border: #d6dbe3;
+  --sidebar-ring: #1f4e8c;
   --shadow-card: 0 1px 2px #000c2510, 0 6px 20px -10px #000c2524;
   --shadow-lift: 0 2px 4px #000c2512, 0 12px 28px -12px #000c2538;
   /* Motion: short, calm. Reduced-motion users get none (below). */
@@ -138,13 +138,13 @@
   --chart-3: #8678e8;
   --chart-4: #2aa876;
   --chart-5: #e8662f;
-  --sidebar: #101827;
-  --sidebar-accent: #223150;
-  --sidebar-primary: #5bbce3;
-  --sidebar-primary-foreground: #0a1424;
-  --sidebar-foreground: #dbe4f1;
+  --sidebar: #151e2e;
+  --sidebar-accent: #1c2740;
+  --sidebar-primary: #6f9ad8;
+  --sidebar-primary-foreground: #0a1220;
+  --sidebar-foreground: #e3e8f0;
   --sidebar-accent-foreground: #ffffff;
-  --sidebar-border: #ffffff1f;
+  --sidebar-border: #232e45;
   --shadow-card: 0 1px 2px #0000004d, 0 6px 20px -10px #00000080;
   --shadow-lift: 0 2px 4px #00000059, 0 12px 28px -12px #00000099;
 }

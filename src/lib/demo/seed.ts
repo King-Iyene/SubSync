@@ -176,7 +176,7 @@ export async function seedDemo(): Promise<{ installationId: string; accounts: nu
         first_name: first,
         last_name: last,
         // A few deliberately bad values so the data quality view has something real to show.
-        email: hasEmail ? (j % 61 === 7 ? `${first}${j}-at-example` : j % 83 === 11 ? `temp${j}@mailinator.com` : `${first}.${last}${j}@example.com`.toLowerCase()) : null,
+        email: hasEmail ? (j % 61 === 7 ? `${first}${j}-at-example` : j % 83 === 11 ? `temp${j}@mailinator.com` : `${first}.${last}${j}@${["gmail.com", "outlook.com", "yahoo.com", "icloud.com"][j % 4]}`.toLowerCase()) : null,
         phone: hasPhone ? (j % 97 === 5 ? "12345" : `+1555${String(1000000 + Math.floor(r() * 8999999))}`) : null,
         tags: r() < p.quality * 0.8 ? [TAGS[Math.floor(r() * TAGS.length)]] : [],
         date_added: added,

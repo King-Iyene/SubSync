@@ -71,7 +71,7 @@ test("one row per account and kind; the count is the rows behind it; the age is 
   assert.equal(maple.itemIds.length, 2);
   assert.equal(maple.ageMinutes, 300);
   assert.equal(maple.text, "2 people need a reply");
-  assert.equal(maple.severity, "critical", "a person waiting an hour or more is critical");
+  assert.equal(maple.severity, "critical", "a person waiting 4 hours or more is urgent");
 });
 
 test("row wording is short plain words and has no jargon", () => {
@@ -86,9 +86,13 @@ test("row wording is short plain words and has no jargon", () => {
 
 test("severity thresholds", () => {
   assert.equal(severityOf("replies", 1, 10, false), "warning");
-  assert.equal(severityOf("replies", 1, 10, true), "critical");
-  assert.equal(severityOf("replies", 5, 0, false), "critical");
-  assert.equal(severityOf("stale", 9, 0, false), "warning");
+  assert.equal(severityOf("replies", 1, 10, true), "warning", "never answered alone is not urgent");
+  assert.equal(severityOf("replies", 1, 59, false), "warning");
+  assert.equal(severityOf("replies", 1, 240, false), "critical");
+  assert.equal(severityOf("replies", 5, 0, false), "warning");
+  assert.equal(severityOf("replies", 10, 0, false), "critical");
+  assert.equal(severityOf("stale", 24, 0, false), "warning");
+  assert.equal(severityOf("stale", 25, 0, false), "critical");
   assert.equal(severityOf("appointments", 2, 0, false), "info");
 });
 
@@ -189,7 +193,7 @@ test("bars: top accounts by things to fix, with the tooltip in words", () => {
 });
 
 test("accounts needing you: one row each, worst first, with the one reason and plain health words", () => {
-  const q = queueOf([item("replies", "aaa", { at: NOW - 3 * H }), item("appointments", "aaa"), item("stale", "ccc", { value: 9000 })]);
+  const q = queueOf([item("replies", "aaa", { at: NOW - 5 * H }), item("appointments", "aaa"), item("stale", "ccc", { value: 9000 })]);
   const r = accountsNeedingYou(q, ACCOUNTS, 5);
   assert.deepEqual(r.rows.map((x) => [x.name, x.state]), [["North Roofing", "Needs a look"], ["Maple Dental", "Needs you now"]]);
   assert.equal(r.rows[1].reason, "1 person needs a reply");

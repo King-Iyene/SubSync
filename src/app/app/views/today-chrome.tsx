@@ -1,9 +1,9 @@
 "use client";
 
 import { ChevronDown } from "lucide-react";
-import type { ReactNode } from "react";
+import { useId, useRef, type KeyboardEvent, type ReactNode } from "react";
 import type { Headline, HeadlineAction } from "@/lib/analytics/today-queue";
-import { PopMenu, type MenuItem, ModuleTabs, type ModuleTab } from "../ds";
+import { PopMenu, type MenuItem, type ModuleTab } from "../ds";
 import { CountUp } from "../ds/count-up";
 
 // The frame of Today, the same for every role. Top to bottom: a small title row (the page name, the date, one "More" menu), ONE plain sentence with the number that matters most,
@@ -63,6 +63,31 @@ export function Block({ id, title, hint, children, testId, className = "" }: { i
   );
 }
 
+/** Today's own tab row: a hairline, an accent underline on the open tab, no scroll bar (the row wraps instead of scrolling), arrow keys move between tabs. */
+export function TodayTabs({ tabs, value, onChange, label }: { tabs: ModuleTab[]; value: number; onChange: (i: number) => void; label: string }) {
+  const base = useId();
+  const refs = useRef<Array<HTMLButtonElement | null>>([]);
+  const i = Math.min(Math.max(value, 0), tabs.length - 1);
+  const select = (n: number) => { onChange(n); refs.current[n]?.focus(); };
+  const onKey = (e: KeyboardEvent) => {
+    const last = tabs.length - 1;
+    const next = e.key === "ArrowRight" ? (i === last ? 0 : i + 1) : e.key === "ArrowLeft" ? (i === 0 ? last : i - 1) : e.key === "Home" ? 0 : e.key === "End" ? last : null;
+    if (next !== null) { e.preventDefault(); select(next); }
+  };
+  return (
+    <div>
+      <div className="mb-6 flex flex-wrap gap-x-6 border-b border-[var(--t-rule)] print:hidden" role="tablist" aria-label={label} onKeyDown={onKey} data-testid="today-tabs">
+        {tabs.map((t, n) => (
+          <button key={t.label} ref={(el) => { refs.current[n] = el; }} type="button" role="tab" id={`${base}-t${n}`} aria-selected={n === i} aria-controls={`${base}-p${n}`} tabIndex={n === i ? 0 : -1}
+            onClick={() => select(n)} data-testid={`today-tab-${t.label.toLowerCase()}`}
+            className={`ds-press -mb-px inline-flex h-10 items-center border-b-2 text-[0.9375rem] transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--ring)] ${n === i ? "border-[var(--t-accent)] font-medium text-[var(--t-ink)]" : "border-transparent text-[var(--t-ink2)] hover:text-[var(--t-ink)]"}`}>{t.label}{t.badge}</button>
+        ))}
+      </div>
+      <div key={i} role="tabpanel" id={`${base}-p${i}`} aria-labelledby={`${base}-t${i}`} className="ds-enter" data-testid="today-tabpanel">{tabs[i].node}</div>
+    </div>
+  );
+}
+
 /** The detail under tabs: closed until asked for. Nothing in it is needed for the first action. */
 export function MoreDetail({ open, onToggle, tab, onTab, tabs }: { open: boolean; onToggle: () => void; tab: number; onTab: (i: number) => void; tabs: ModuleTab[] }) {
   const id = "more-detail";
@@ -72,7 +97,7 @@ export function MoreDetail({ open, onToggle, tab, onTab, tabs }: { open: boolean
         className="ds-press t-label inline-flex h-9 items-center gap-1.5 rounded-[4px] px-1 hover:text-[var(--t-ink)] focus-visible:outline-2 focus-visible:outline-[var(--ring)] print:hidden">
         Break it down<ChevronDown aria-hidden className={`size-4 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
-      {open && <div id={id} className="mt-3"><ModuleTabs label="Break it down" value={tab} onChange={onTab} tabs={tabs} /></div>}
+      {open && <div id={id} className="mt-3"><TodayTabs label="Break it down" value={tab} onChange={onTab} tabs={tabs} /></div>}
     </section>
   );
 }

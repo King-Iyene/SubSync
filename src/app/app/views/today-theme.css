@@ -1,60 +1,61 @@
 /*
   Today's own look. Scoped to `.today`, which the app wrapper carries only while Today is open, so no other module changes.
-  One token block per palette and mode, so a swap is one edit. PALETTE A is the default ("graphite and berry"); PALETTE B ("pine and jade") is switched on with
-  data-palette="b" on the same element (shown beside A on /design). Both are non-blue: the neutrals lean warm (A) or green (B), never navy.
-  Status colours (bad, warn, ok) are reserved for status and always travel with a word or an icon. Chart colours come from the same block (--t-c1 to --t-c4) and
-  were checked with the dataviz validator (categorical, light and dark). Text pairs were checked for 4.5:1 (docs/review/TODAY_DESIGN_CRITIQUE.md).
-  Dark is its own design: surfaces are layered by lightness (ground, raised, lifted), no shadows, off-white ink, and an accent tuned down so it does not glow.
-  The mapping at the end points the app's shared token names (--primary, --card, ...) at these, so shared parts inside Today pick the palette up with no edits.
+  One token block per palette and mode, so a swap is one edit. PALETTE A ("slate and steel") is the default; PALETTE B ("ink and teal-grey") is switched on with
+  data-palette="b" on the same element (shown beside A on /design). Both are mature blues: a deep slate-navy ground in dark, cool greys with a faint blue lean in light, ONE steel
+  or ink-blue accent (never sky blue, never bright royal blue, no purple tint), hairline rules, no gradients and no glows.
+  Status colours (bad, warn, ok) are reserved for status, always travel with a word or an icon, and sit far from the accent in hue (red, amber, green).
+  Chart colours come from the same block (--t-c1 to --t-c4) and were checked with the dataviz validator (categorical, light and dark, each on its own surface). Text pairs were checked for 4.5:1.
+  Dark is its own design: surfaces are layered by lightness (ground, raised, lifted), no shadows, softened off-white ink, and an accent tuned down so it does not glow.
+  The mapping at the end points the app's shared token names (--primary, --card, --sidebar, ...) at these, so shared parts inside Today, and the sidebar and top bar around it, pick the palette up.
 */
 
-/* ---------- PALETTE A, light ---------- */
+/* ---------- PALETTE A, light: cool grey ground, slate ink, steel blue ---------- */
 .today.today {
-  --t-ground: #f2f1ee; --t-raise: #fbfaf8; --t-sunk: #e9e7e2; --t-lift: #ffffff;
-  --t-ink: #1e1c1a; --t-ink2: #5a564f; --t-ink3: #6f6a62; --t-rule: #d9d6d0; --t-rule2: #bdb8b0;
-  --t-accent: #a3205e; --t-on-accent: #ffffff; --t-wash: #ece7e3;
+  --t-ground: #f1f3f6; --t-raise: #f8f9fb; --t-sunk: #e6e9ee; --t-lift: #ffffff;
+  --t-ink: #151c28; --t-ink2: #46505f; --t-ink3: #596475; --t-rule: #d6dbe3; --t-rule2: #b5bdc9;
+  --t-accent: #1f4e8c; --t-on-accent: #ffffff; --t-wash: #e4eaf3;
   --t-bad: #b42318; --t-warn: #8a5a00; --t-ok: #2b7a3d;
-  --t-c1: #9b1d5a; --t-c2: #b38300; --t-c3: #1f8f72; --t-c4: #c2501f;
+  --t-c1: #2c5f9e; --t-c2: #b07a14; --t-c3: #1a8a70; --t-c4: #b5532f;
 }
-/* ---------- PALETTE B, light ---------- */
+/* ---------- PALETTE B, light: teal-grey ground, ink-blue ---------- */
 .today.today[data-palette="b"] {
-  --t-ground: #eef0ec; --t-raise: #f9faf7; --t-sunk: #e4e8e2; --t-lift: #ffffff;
-  --t-ink: #17201c; --t-ink2: #4e5a54; --t-ink3: #64706a; --t-rule: #d3dad4; --t-rule2: #b3beb6;
-  --t-accent: #0f6b5c; --t-on-accent: #ffffff; --t-wash: #e1e9e4;
-  --t-bad: #b42318; --t-warn: #8a5a00; --t-ok: #4a7a12;
-  --t-c1: #1f8f72; --t-c2: #c2501f; --t-c3: #9b1d5a; --t-c4: #b38300;
+  --t-ground: #edf1f3; --t-raise: #f6f9fa; --t-sunk: #e1e8eb; --t-lift: #ffffff;
+  --t-ink: #0f1d2a; --t-ink2: #425564; --t-ink3: #566a7a; --t-rule: #d0d9de; --t-rule2: #aebbc4;
+  --t-accent: #1a416f; --t-on-accent: #ffffff; --t-wash: #dde7ec;
+  --t-bad: #b42318; --t-warn: #8a5a00; --t-ok: #2b7a3d;
+  --t-c1: #2a5f94; --t-c2: #b0721a; --t-c3: #0f8a7a; --t-c4: #b24f3a;
 }
 
-/* ---------- PALETTE A, dark: warm graphite, layered by lightness ---------- */
+/* ---------- PALETTE A, dark: slate-navy, layered by lightness ---------- */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .today.today:not(:where([data-theme="light"], [data-theme="light"] *)) {
-    --t-ground: #191817; --t-raise: #222120; --t-sunk: #151413; --t-lift: #2b2927;
-    --t-ink: #ece8e1; --t-ink2: #a8a29a; --t-ink3: #948e86; --t-rule: #34322f; --t-rule2: #4a4743;
-    --t-accent: #e27ba8; --t-on-accent: #1a0a12; --t-wash: #2b2927;
+    --t-ground: #0f1623; --t-raise: #151e2e; --t-sunk: #0b111b; --t-lift: #1c2740;
+    --t-ink: #e3e8f0; --t-ink2: #9ca8bb; --t-ink3: #8a96aa; --t-rule: #232e45; --t-rule2: #34425e;
+    --t-accent: #6f9ad8; --t-on-accent: #0a1220; --t-wash: #1c2740;
     --t-bad: #f0877d; --t-warn: #e0a63c; --t-ok: #6fc28a;
-    --t-c1: #c9548c; --t-c2: #b08c22; --t-c3: #34a383; --t-c4: #db6a38;
+    --t-c1: #5f8fd0; --t-c2: #b88c22; --t-c3: #2b9a82; --t-c4: #d06a45;
   }
   :root:not([data-theme="light"]) .today.today[data-palette="b"]:not(:where([data-theme="light"], [data-theme="light"] *)) {
-    --t-ground: #101a16; --t-raise: #16231e; --t-sunk: #0c1411; --t-lift: #1d2d27;
-    --t-ink: #e6ede8; --t-ink2: #9badA4; --t-ink3: #86978e; --t-rule: #263630; --t-rule2: #3a4f47;
-    --t-accent: #4fb79f; --t-on-accent: #07130f; --t-wash: #1d2d27;
-    --t-bad: #f0877d; --t-warn: #e0a63c; --t-ok: #a5cc5e;
-    --t-c1: #34a383; --t-c2: #db6a38; --t-c3: #bc4380; --t-c4: #b08c22;
+    --t-ground: #0c161d; --t-raise: #13212b; --t-sunk: #09111a; --t-lift: #1b2e3b;
+    --t-ink: #e2eaee; --t-ink2: #9aaebb; --t-ink3: #869aa8; --t-rule: #223341; --t-rule2: #344a5b;
+    --t-accent: #7aa7d0; --t-on-accent: #0a1822; --t-wash: #1b2e3b;
+    --t-bad: #f0877d; --t-warn: #e0a63c; --t-ok: #6fc28a;
+    --t-c1: #5f95cc; --t-c2: #b48a28; --t-c3: #22a08f; --t-c4: #d2694a;
   }
 }
 [data-theme="dark"] .today.today, .today.today[data-theme="dark"] {
-  --t-ground: #191817; --t-raise: #222120; --t-sunk: #151413; --t-lift: #2b2927;
-  --t-ink: #ece8e1; --t-ink2: #a8a29a; --t-ink3: #948e86; --t-rule: #34322f; --t-rule2: #4a4743;
-  --t-accent: #e27ba8; --t-on-accent: #1a0a12; --t-wash: #2b2927;
+  --t-ground: #0f1623; --t-raise: #151e2e; --t-sunk: #0b111b; --t-lift: #1c2740;
+  --t-ink: #e3e8f0; --t-ink2: #9ca8bb; --t-ink3: #8a96aa; --t-rule: #232e45; --t-rule2: #34425e;
+  --t-accent: #6f9ad8; --t-on-accent: #0a1220; --t-wash: #1c2740;
   --t-bad: #f0877d; --t-warn: #e0a63c; --t-ok: #6fc28a;
-  --t-c1: #c9548c; --t-c2: #b08c22; --t-c3: #34a383; --t-c4: #db6a38;
+  --t-c1: #5f8fd0; --t-c2: #b88c22; --t-c3: #2b9a82; --t-c4: #d06a45;
 }
 [data-theme="dark"] .today.today[data-palette="b"], .today.today[data-theme="dark"][data-palette="b"] {
-  --t-ground: #101a16; --t-raise: #16231e; --t-sunk: #0c1411; --t-lift: #1d2d27;
-  --t-ink: #e6ede8; --t-ink2: #9badA4; --t-ink3: #86978e; --t-rule: #263630; --t-rule2: #3a4f47;
-  --t-accent: #4fb79f; --t-on-accent: #07130f; --t-wash: #1d2d27;
-  --t-bad: #f0877d; --t-warn: #e0a63c; --t-ok: #a5cc5e;
-  --t-c1: #34a383; --t-c2: #db6a38; --t-c3: #bc4380; --t-c4: #b08c22;
+  --t-ground: #0c161d; --t-raise: #13212b; --t-sunk: #09111a; --t-lift: #1b2e3b;
+  --t-ink: #e2eaee; --t-ink2: #9aaebb; --t-ink3: #869aa8; --t-rule: #223341; --t-rule2: #344a5b;
+  --t-accent: #7aa7d0; --t-on-accent: #0a1822; --t-wash: #1b2e3b;
+  --t-bad: #f0877d; --t-warn: #e0a63c; --t-ok: #6fc28a;
+  --t-c1: #5f95cc; --t-c2: #b48a28; --t-c3: #22a08f; --t-c4: #d2694a;
 }
 
 /* ---------- type: one scale, used only on Today (size / line height / weight / tracking) ---------- */
@@ -99,6 +100,9 @@
   --destructive: var(--t-bad); --success: var(--t-ok); --warning: var(--t-warn);
   --border: var(--t-rule); --input: var(--t-rule2); --ring: var(--t-accent);
   --chart-1: var(--t-c1); --chart-2: var(--t-c2); --chart-3: var(--t-c3); --chart-4: var(--t-c4); --chart-5: var(--t-c4);
+  /* The shell around Today (sidebar, top bar) is one family with the page: same ground, same hairline, same accent. */
+  --sidebar: var(--t-raise); --sidebar-foreground: var(--t-ink); --sidebar-primary: var(--t-accent); --sidebar-primary-foreground: var(--t-on-accent);
+  --sidebar-accent: var(--t-wash); --sidebar-accent-foreground: var(--t-ink); --sidebar-border: var(--t-rule); --sidebar-ring: var(--t-accent);
   --radius: 0.375rem;
   --shadow-card: none; --shadow-lift: 0 0 0 1px var(--t-rule2);
 }

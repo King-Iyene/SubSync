@@ -103,11 +103,14 @@ export function rowText(kind: Kind, count: number, staleDays: number): string {
   }
 }
 
-/** Severity of one group. Thresholds are written in docs/METRICS.md: a person waiting an hour or never answered is critical, and so is a pile of 5 or more; 10 or more deals gone quiet is critical. */
+/** Severity of one group. Thresholds are written in docs/METRICS.md. "Urgent" is rare on purpose so a list is not a wall of red: a reply is urgent only when the oldest wait is 4 hours or more, or 10 or more people are waiting; deals gone quiet only at 25 or more; everything else past its limit is "Soon". */
+/** A person who has waited this long for a reply is "Urgent" (4 hours). */
+export const URGENT_WAIT_MINUTES = 240;
 export function severityOf(kind: Kind, count: number, ageMinutes: number, never: boolean): Severity {
+  void never;
   switch (kind) {
-    case "replies": return never || ageMinutes >= 60 || count >= 5 ? "critical" : "warning";
-    case "stale": return count >= 10 ? "critical" : "warning";
+    case "replies": return ageMinutes >= URGENT_WAIT_MINUTES || count >= 10 ? "critical" : "warning";
+    case "stale": return count >= 25 ? "critical" : "warning";
     case "noshows": return "warning";
     case "appointments": return count >= 5 ? "warning" : "info";
   }
@@ -418,7 +421,7 @@ export function personRow(i: TodayItem, now: number): QueueRow {
   const ageMinutes = i.at === null ? 0 : Math.max(0, Math.round((now - i.at) / 60_000));
   return {
     key: `${i.locationId}|replies|${personOf(i)}`, kind: "replies", locationId: i.locationId, accountName: i.accountName, text: `${i.name} is waiting for a reply`, count: 1, dollars: null, estimate: null,
-    since: i.at, ageMinutes, severity: i.never === true || ageMinutes >= 60 ? "critical" : "warning", url: i.url, itemIds: [i.id], partial: false,
+    since: i.at, ageMinutes, severity: ageMinutes >= URGENT_WAIT_MINUTES ? "critical" : "warning", url: i.url, itemIds: [i.id], partial: false,
   };
 }
 /** The people waiting, longest wait first (a person with no known start goes last). */

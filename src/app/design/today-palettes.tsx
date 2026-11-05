@@ -63,12 +63,12 @@ function Panel({ palette, mode, title }: { palette: "a" | "b"; mode: "light" | "
 
 export function TodayPalettes() {
   return (
-    <Section title="Today: palette A and palette B" hint="Both are non-blue. A (graphite and berry) is the default. B (pine and jade) is one attribute away: data-palette=&quot;b&quot;. Each tile reads the real Today tokens; the figures are contrast ratios of the colours shown, 4.5:1 or more passes for text.">
+    <Section title="Today: palette A (slate and steel) and palette B (ink and teal-grey)" hint="Both are mature blues with one accent, no gradients and no glows. A is the default. B is one attribute away: data-palette=&quot;b&quot;. Each tile reads the real Today tokens; the figures are contrast ratios of the colours shown, 4.5:1 or more passes for text.">
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2" data-testid="today-palettes">
-        <Panel palette="a" mode="light" title="Palette A, light: warm stone, graphite ink, berry" />
-        <Panel palette="a" mode="dark" title="Palette A, dark: warm graphite, layered by lightness" />
-        <Panel palette="b" mode="light" title="Palette B, light: green-grey, pine ink, jade" />
-        <Panel palette="b" mode="dark" title="Palette B, dark: green-black, layered by lightness" />
+        <Panel palette="a" mode="light" title="Palette A, light: cool grey, slate ink, steel blue" />
+        <Panel palette="a" mode="dark" title="Palette A, dark: slate-navy, layered by lightness, softened blue" />
+        <Panel palette="b" mode="light" title="Palette B, light: teal-grey, deep ink-blue" />
+        <Panel palette="b" mode="dark" title="Palette B, dark: teal-slate, layered by lightness, soft blue" />
       </div>
     </Section>
   );
