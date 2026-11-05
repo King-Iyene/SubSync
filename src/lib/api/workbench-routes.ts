@@ -7,13 +7,17 @@ import {
 } from "../ghl/workbench";
 import { isPermissionError } from "../sync/ghl-data";
 import { json, type AuthContext } from "./auth";
+import { ghlFetch } from "../ghl/http";
+import { GHL_API } from "../ghl/client";
+import { parseGranted } from "../scope-groups";
+import { isOurNote } from "../people/writeback";
 
 // The Lead workbench endpoints, under /api/app/workbench/... (the one catch-all route, already guarded by the plan and by access.ts). Every handler derives who is asking from the
 // verified session (`ctx`), checks that the account is one the caller may see (`allowed`), re-reads the lead from SubSync's own copy of THAT account (a contact, deal or appointment of
 // another account is "not found"), and never takes an installation, a token or a before-value from the browser. Every write goes through runAction (src/lib/ghl/workbench.ts).
 
 type Ctx = AuthContext & { request: Request; url: URL; segments: string[] };
-export type WorkbenchHelpers = { allowed: () => Promise<string[] | null>; locationToken: (locationId: string) => Promise<string> };
+export type WorkbenchHelpers = { allowed: () => Promise<string[] | null>; links: () => Promise<ReturnType<typeof import("../links").deepLinks>>; locationToken: (locationId: string) => Promise<string> };
 
 const ID = /^[A-Za-z0-9_-]{3,128}$/;
 const actorOf = (ctx: Ctx) => ctx.session.userName ?? ctx.session.userId ?? null;
@@ -54,8 +58,8 @@ async function dealsOf(ctx: Ctx, locationId: string, where: { contactId?: string
 }
 
 async function apptsOf(ctx: Ctx, locationId: string, contactId: string) {
-  const rows = await sql()`select appointment_id, title, status, start_at from cached_appointments where installation_id = ${ctx.installationId} and location_id = ${locationId} and contact_id = ${contactId} order by start_at desc nulls last limit 6`;
-  return rows.map((r) => ({ id: r.appointment_id as string, title: (r.title as string | null) ?? "Appointment", status: (r.status as string | null) ?? null, at: r.start_at instanceof Date ? r.start_at.toISOString() : null }));
+  const rows = await sql()`select appointment_id, title, status, start_at, calendar_name from cached_appointments where installation_id = ${ctx.installationId} and location_id = ${locationId} and contact_id = ${contactId} order by start_at desc nulls last limit 40`;
+  return rows.map((r) => ({ id: r.appointment_id as string, title: (r.title as string | null) ?? "Appointment", status: (r.status as string | null) ?? null, at: r.start_at instanceof Date ? r.start_at.toISOString() : null, calendar: (r.calendar_name as string | null) ?? null }));
 }
 
 /** The people who own something in THIS account (never every user of the company), with names. */
@@ -95,6 +99,7 @@ export async function handleWorkbench(ctx: Ctx, h: WorkbenchHelpers): Promise<Re
   const m = ctx.request.method;
   if (m === "GET" && b === "context") return contextRoute(ctx, h);
   if (m === "GET" && b === "thread") return threadRoute(ctx, h);
+  if (m === "GET" && b === "record") return recordRoute(ctx, h);
   if (m === "POST" && (b === "preview" || b === "do")) return actRoute(ctx, h, b === "do");
   return json({ error: "Not found" }, 404);
 }
@@ -104,11 +109,15 @@ async function contextRoute(ctx: Ctx, h: WorkbenchHelpers): Promise<Response> {
   if (!locationId || !contactId) return json({ error: "Send the account and the person" }, 400);
   const lead = await loadLead(ctx, await h.allowed(), locationId, contactId);
   if (!lead) return json({ error: "Contact not found" }, 404);
+  const links = await h.links();
+  const [tzRow] = await sql()`select timezone from locations where installation_id = ${ctx.installationId} and location_id = ${locationId}`;
   const [mode, deals, appts, users] = await Promise.all([modeOf(ctx, locationId), dealsOf(ctx, locationId, { contactId }), apptsOf(ctx, locationId, contactId), usersOf(ctx, locationId)]);
   const pipelines = await stagesOf(ctx, locationId, [...new Set(deals.map((d) => d.pipelineId).filter((x): x is string => !!x))]);
   const ownerName = users.find((u) => u.id === lead.ownerId)?.name ?? null;
   return json({
-    mode, canDelete: ctx.kind !== "client", name: lead.target.name, dnd: lead.target.dnd, phone: lead.target.phone, email: lead.target.email, hasConversation: !!lead.conversationId,
+    mode, canDelete: ctx.kind !== "client", name: lead.target.name, dnd: lead.target.dnd, phone: lead.target.phone, email: lead.target.email, hasConversation: !!lead.conversationId, timeZone: (tzRow?.timezone as string | null) ?? null,
+    // The link that opens this conversation in the customer's CRM (through the white-label domain helper); the contact when there is no conversation yet.
+    crmUrl: lead.conversationId ? links.conversation(locationId, lead.conversationId) : links.contact(locationId, contactId),
     tags: lead.tags, fields: lead.fields, ownerId: lead.ownerId, ownerName, locationName: lead.locationName, users, deals, appointments: appts, pipelines,
     me: actorOf(ctx),
     templates: TEMPLATES.map((t) => ({ id: t.id, label: t.label, channel: t.channel, subject: t.subject ? fillTemplate(t.subject, { name: lead.target.name, owner: ctx.session.userName ?? ownerName, business: lead.locationName }) : null, text: fillTemplate(t.text, { name: lead.target.name, owner: ctx.session.userName ?? ownerName, business: lead.locationName }) })),
@@ -195,5 +204,48 @@ async function actRoute(ctx: Ctx, h: WorkbenchHelpers, doIt: boolean): Promise<R
     case "failed": return json({ ok: false, message: failureText(res.status), retry: true }, 502);
     case "dry_run": return json({ ok: true, dryRun: true, reason: res.reason, summary: res.summary, message: res.reason === "account" ? "Not allowed for this account yet, so nothing was sent. Here is what would have happened." : "Changes from SubSync are switched off, so nothing was sent. Here is what would have happened." });
     case "done": { const undo = inverseOf(action, before, res.id); return json({ ok: true, done: true, summary: res.summary, undo }); }
+  }
+}
+
+// ---------------- the rest of the contact record, read live when a part is opened (nothing here is stored) ----------------
+//   notes  GET /contacts/{id}/notes   scope contacts.readonly (required scope: granted)
+//   tasks  GET /contacts/{id}/tasks   scope contacts.readonly
+//   money  GET /payments/orders?contactId   scope payments/orders.readonly (NOT in SubSync's scope list today: always "Needs permission: reconnect" until it is added as an optional scope)
+// The lead is re-read from SubSync's own copy of THAT account first (tenancy), and the answers carry only what the screen shows.
+const NOTE_BODY = 4000;
+async function recordRoute(ctx: Ctx, h: WorkbenchHelpers): Promise<Response> {
+  const { locationId, contactId } = ids(ctx, ctx.url.searchParams);
+  const part = ctx.url.searchParams.get("part");
+  if (!locationId || !contactId || (part !== "notes" && part !== "tasks" && part !== "money")) return json({ error: "Send the account, the person and the part" }, 400);
+  const lead = await loadLead(ctx, await h.allowed(), locationId, contactId);
+  if (!lead) return json({ error: "Contact not found" }, 404);
+  if (ctx.demo) return json({ state: "off", note: "The demo does not read your CRM.", items: [] });
+  if (part === "money") {
+    const [inst] = await sql()`select scope from installations where id = ${ctx.installationId}`;
+    const g = typeof inst?.scope === "string" && inst.scope.trim() ? parseGranted(inst.scope as string) : [];
+    if (!g.includes("payments/orders.readonly")) return json({ state: "needs_permission", note: "Needs permission: reconnect to let SubSync read this person's orders and payments.", items: [] });
+  }
+  try {
+    const token = await h.locationToken(locationId);
+    const path = part === "notes" ? `/contacts/${encodeURIComponent(contactId)}/notes` : part === "tasks" ? `/contacts/${encodeURIComponent(contactId)}/tasks` : `/payments/orders?altId=${encodeURIComponent(locationId)}&altType=location&contactId=${encodeURIComponent(contactId)}&limit=20`;
+    const res = await ghlFetch(`${GHL_API}${path}`, { headers: { Authorization: `Bearer ${token}`, Version: "2021-07-28", Accept: "application/json" }, cache: "no-store" });
+    if (res.status === 401 || res.status === 403) return json({ state: "needs_permission", note: "Needs permission: reconnect SubSync to let it read this.", items: [] });
+    if (!res.ok) return json({ state: "unavailable", note: "Your CRM did not answer. Try again later.", items: [] });
+    const j = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    const names = await teamNames(ctx.installationId);
+    const who = (id: unknown) => (typeof id === "string" && id ? names.get(id) ?? null : null);
+    const str = (v: unknown) => (typeof v === "string" ? v : null);
+    if (part === "notes") {
+      const list = (Array.isArray(j.notes) ? j.notes : []) as Array<Record<string, unknown>>;
+      return json({ state: "ok", note: null, items: list.slice(0, 100).map((n) => ({ id: str(n.id), text: (str(n.body) ?? "").slice(0, NOTE_BODY), by: isOurNote(str(n.body)) ? "SubSync" : who(n.userId), at: str(n.dateAdded) ?? str(n.createdAt), ours: isOurNote(str(n.body)) })) });
+    }
+    if (part === "tasks") {
+      const list = (Array.isArray(j.tasks) ? j.tasks : []) as Array<Record<string, unknown>>;
+      return json({ state: "ok", note: null, items: list.slice(0, 100).map((t) => ({ id: str(t.id), title: str(t.title) ?? "Task", due: str(t.dueDate), done: t.completed === true, by: who(t.assignedTo) })) });
+    }
+    const orders = (Array.isArray(j.data) ? j.data : []) as Array<Record<string, unknown>>;
+    return json({ state: "ok", note: null, items: orders.slice(0, 20).map((o) => ({ id: str(o._id) ?? str(o.id), title: str(o.name) ?? str(o.sourceName) ?? "Order", amount: typeof o.amount === "number" ? o.amount : null, currency: str(o.currency), status: str(o.status) ?? str(o.paymentStatus), at: str(o.createdAt) })) });
+  } catch {
+    return json({ state: "unavailable", note: "Your CRM did not answer. Try again later.", items: [] });
   }
 }

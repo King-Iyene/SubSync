@@ -1,7 +1,8 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, ExternalLink, MoreHorizontal, ShieldCheck, X } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { ChevronLeft, ChevronRight, ExternalLink, Maximize2, Minimize2, MoreHorizontal, ShieldCheck, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { tagColor } from "@/lib/people/tag-colors";
 import type { PersonDetail } from "@/lib/analytics/people-person-queries";
 import { neighbours } from "@/lib/design/ui-logic";
 import { withLive } from "@/lib/people/person";
@@ -10,9 +11,11 @@ import { fmtMoney, timeAgo } from "../ui";
 import { ActionStrip, dialNoteText, useContactActions, type ActionPerson } from "./contact-actions";
 import { DialerSetting } from "./dial-button";
 import { HeldNote } from "./held";
+import { RecordTab } from "./wb/record-tab";
+import { AppointmentsTab } from "./wb/appointments-tab";
 import { InfoTip } from "./info-tip";
 import { TagsSection } from "./tags-section";
-import { LogCall, NoteToSelf, Timeline, UndoButton } from "./lead-parts";
+import { LogCall, Timeline, UndoButton } from "./lead-parts";
 import { PopMenu } from "./pop-menu";
 import { ErrorState, SkeletonRows } from "./states";
 import { Composer, Thread } from "./wb/conversation";
@@ -37,7 +40,7 @@ export type LeadSeed = {
   /** Which work tab opens first (the Deals tab from the pipeline), and the deal to highlight there. */
   tab?: "conversation" | "update" | "deals"; dealId?: string;
 };
-type Tab = "conversation" | "update" | "deals";
+type Tab = "conversation" | "update" | "deals" | "appointments" | "record";
 
 // The live read of the CRM for one lead (custom fields, calls, messages), which is slower than SubSync's own copy and arrives after it.
 type Live = {
@@ -119,20 +122,22 @@ function Body({ seed, top, showAccount, onLogged }: { seed: LeadSeed; top?: Reac
       {(!email || !phone) && <p id="drawer-email-why" className="mt-2 text-xs text-muted-foreground" data-testid="drawer-no-contact-way">{!email && !phone ? "This contact has no email address and no phone number in your CRM." : !email ? "Email is off because this contact has no email address in your CRM." : "Call and Text are off because this contact has no phone number in your CRM."}</p>}
       <ActionStrip actions={actions} k="panel" className="mt-2" />
       {c && data && <TagsSection key={seed.contactId} locationId={seed.locationId} contactId={seed.contactId} name={name} tags={c.tags} tagDates={data.tagDates} tagExact={data.tagExact ?? {}} />}
-      <div className="mt-2 flex flex-wrap items-start justify-between gap-x-4 gap-y-1"><DialerSetting /><InfoTip label="About Call and Email" text={dialNoteText(actions.provider)} /></div>
+      <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1"><DialerSetting /><InfoTip label="About Call and Email" text={dialNoteText(actions.provider)} /></div>
       {person.loading && !data && <div className="mt-5"><SkeletonRows rows={4} label="Loading this person..." /></div>}
 
       {wb && (
         <section className="mt-5" aria-label="Work on this person" data-testid="wb-work">
           {!wb.mode.live && <p className="mb-3 flex items-start gap-2 rounded-lg bg-muted/60 px-3 py-2 text-sm text-muted-foreground" data-testid="wb-mode"><ShieldCheck aria-hidden className="mt-0.5 size-4 shrink-0" />{wb.mode.demo ? "Demo: try everything, nothing is ever sent." : wb.mode.masterOn ? "Changes from SubSync are not allowed for this account yet (Settings). You can try everything: nothing reaches your CRM." : "Changes from SubSync are switched off. You can try everything: it shows what would happen and nothing reaches your CRM."}</p>}
-          <div role="tablist" aria-label="What to do" className="flex gap-1 border-b">
-            {([["conversation", "Conversation"], ["update", "Update"], ["deals", wb.deals.length ? `Deals (${wb.deals.length})` : "Deals"]] as const).map(([k, l]) => (
-              <button key={k} type="button" role="tab" id={`wb-tab-${k}`} aria-selected={tab === k} aria-controls="wb-panel" onClick={() => setTab(k)} className={`-mb-px min-h-11 border-b-2 px-3.5 text-[15px] font-medium ${tab === k ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`} data-testid={`wb-tab-${k}`}>{l}</button>
+          <div role="tablist" aria-label="What to do" className="grid grid-cols-5 gap-1 rounded-xl bg-muted p-1">
+            {([["conversation", "Conversation"], ["update", "Update"], ["deals", wb.deals.length ? `Deals (${wb.deals.length})` : "Deals"], ["appointments", wb.appointments.length ? `Appointments (${wb.appointments.length})` : "Appointments"], ["record", "Record"]] as const).map(([k, l]) => (
+              <button key={k} type="button" role="tab" id={`wb-tab-${k}`} aria-selected={tab === k} aria-controls="wb-panel" onClick={() => setTab(k)} className={`min-h-10 cursor-pointer rounded-lg px-3.5 text-[15px] font-medium ${tab === k ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`} data-testid={`wb-tab-${k}`}>{l}</button>
             ))}
           </div>
-          <div role="tabpanel" id="wb-panel" aria-labelledby={`wb-tab-${tab}`} className="pt-4">
-            {tab === "conversation" && <><Thread locationId={seed.locationId} contactId={seed.contactId} reloadKey={threadKey} /><Composer key={channelPref} ctx={wb} runner={runner} initial={channelPref} /></>}
+          <div role="tabpanel" id="wb-panel" aria-labelledby={`wb-tab-${tab}`} className="pt-5">
+            {tab === "conversation" && <><Thread locationId={seed.locationId} contactId={seed.contactId} reloadKey={threadKey} crmUrl={wb.crmUrl ?? url} /><Composer key={channelPref} ctx={wb} runner={runner} initial={channelPref} /></>}
             {tab === "update" && <UpdateTab ctx={wb} runner={runner} />}
+            {tab === "record" && <RecordTab locationId={seed.locationId} contactId={seed.contactId} name={name} account={c?.locationName ?? seed.locationName ?? null} fields={extra?.live.customFields ?? []} />}
+            {tab === "appointments" && <AppointmentsTab ctx={wb} crmUrl={wb.crmUrl ?? url} />}
             {tab === "deals" && <DealsTab ctx={wb} runner={runner} focusId={seed.dealId ?? null} />}
           </div>
         </section>
@@ -155,7 +160,7 @@ function Body({ seed, top, showAccount, onLogged }: { seed: LeadSeed; top?: Reac
           <ul className="divide-y rounded-lg border text-sm">
             {data.deals.slice(0, 8).map((d) => (
               <li key={d.id} className="flex items-center justify-between gap-2 px-3 py-2">
-                <span className="min-w-0 truncate">{d.name ?? "Untitled deal"}<span className="text-muted-foreground">{d.stage ? ` · ${d.stage}` : ""}{d.stale ? " · no movement" : ""}</span></span>
+                <span className="min-w-0 truncate">{d.name ?? "Untitled deal"}{d.stage && <span style={stageStyle(d.stage)} className="tag-pill ml-2 inline-block rounded-full px-2 py-0.5 text-xs font-semibold" data-testid="deal-stage">{d.stage}</span>}<span className="text-muted-foreground">{d.stale ? " · no movement" : ""}</span></span>
                 <span className="shrink-0 tabular-nums text-muted-foreground">{d.status === "open" ? fmtMoney(d.value) : d.status}</span>
               </li>
             ))}
@@ -163,15 +168,8 @@ function Body({ seed, top, showAccount, onLogged }: { seed: LeadSeed; top?: Reac
         </section>
       )}
 
-      {extra && extra.live.customFields.length > 0 && (
-        <section className="mt-5" aria-label="Custom fields" data-testid="drawer-fields">
-          <H3>Custom fields</H3>
-          <dl className="divide-y border-y">{extra.live.customFields.map((f, i) => <Row key={i} label={f.name}>{f.value}</Row>)}</dl>
-        </section>
-      )}
 
       {phone && !dnd && c && <LogCall locationId={seed.locationId} contactId={seed.contactId} onLogged={onLogged} />}
-      <NoteToSelf locationId={seed.locationId} contactId={seed.contactId} name={name} account={c?.locationName ?? seed.locationName ?? null} />
 
       {data && <Timeline items={timeline} nowMs={data.now} note={extra && extra.live.state !== "off" ? extra.live.note : null} />}
       {wb && <div className="sticky bottom-0 z-10 -mx-5 -mb-5 mt-6"><ReviewSheet r={runner} name={name} /></div>}
@@ -180,6 +178,7 @@ function Body({ seed, top, showAccount, onLogged }: { seed: LeadSeed; top?: Reac
   );
 }
 
+const stageStyle = (name: string): CSSProperties => { const c = tagColor(name); return { "--tg-bg-l": c.light.bg, "--tg-fg-l": c.light.fg, "--tg-bg-d": c.dark.bg, "--tg-fg-d": c.dark.fg } as CSSProperties; };
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), summary, [tabindex]:not([tabindex="-1"])';
 
 export function LeadDrawer({ leads, index, onIndex, onClose, top, showAccount = true, onLogged }: {
@@ -195,6 +194,10 @@ export function LeadDrawer({ leads, index, onIndex, onClose, top, showAccount = 
   const box = useRef<HTMLElement>(null);
   const opener = useRef<HTMLElement | null>(null);
   const [said, setSaid] = useState("");
+  // Wide by default; the person can make it extra wide, and the choice is remembered for them (private windows just forget it).
+  const [wide, setWide] = useState(false);
+  useEffect(() => { try { setWide(localStorage.getItem("subsync.panelWide") === "1"); } catch { /* not available */ } }, []);
+  const toggleWide = () => { setWide((w) => { try { localStorage.setItem("subsync.panelWide", w ? "0" : "1"); } catch { /* not available */ } return !w; }); };
   // What was just written to the CRM stays on screen after the panel moves to the next person, with Undo.
   const [saved, setSaved] = useState<{ text: string; id: string | null } | null>(null);
   const [undoBusy, setUndoBusy] = useState(false);
@@ -245,14 +248,14 @@ export function LeadDrawer({ leads, index, onIndex, onClose, top, showAccount = 
   return (
     <div className="fixed inset-0 z-50 print:hidden" data-testid="lead-drawer-root">
       <div className="absolute inset-0 bg-black/45" onClick={onClose} aria-hidden />
-      <aside ref={box} role="dialog" aria-modal="true" aria-label={`Lead: ${seed.name}`} className="absolute inset-y-0 right-0 flex w-full max-w-md flex-col border-l bg-popover text-popover-foreground shadow-[var(--shadow-lift)]" data-testid="lead-drawer">
+      <aside ref={box} role="dialog" aria-modal="true" aria-label={`Lead: ${seed.name}`} className={`absolute inset-y-0 right-0 flex w-full flex-col border-l bg-popover text-popover-foreground shadow-[var(--shadow-lift)] transition-[width] ${wide ? "md:w-[min(100vw,960px)]" : "md:w-[min(100vw,700px)]"}`} data-wide={wide} data-testid="lead-drawer">
         <header className="flex items-center justify-between gap-2 border-b px-4 py-2">
           <div className="flex items-center gap-1">
             <button type="button" aria-label="Previous lead" disabled={nb.prev === null} onClick={() => nb.prev !== null && onIndex(nb.prev)} className="inline-flex size-11 items-center justify-center rounded-lg hover:bg-muted disabled:opacity-35"><ChevronLeft aria-hidden className="size-5" /></button>
             <span className="min-w-14 text-center text-xs text-muted-foreground tabular-nums" data-testid="drawer-position">{at + 1} of {count}</span>
             <button type="button" aria-label="Next lead" disabled={nb.next === null} onClick={() => nb.next !== null && onIndex(nb.next)} className="inline-flex size-11 items-center justify-center rounded-lg hover:bg-muted disabled:opacity-35" data-testid="drawer-next"><ChevronRight aria-hidden className="size-5" /></button>
           </div>
-          <button ref={close} type="button" aria-label="Close" onClick={onClose} className="inline-flex size-11 items-center justify-center rounded-lg hover:bg-muted"><X aria-hidden className="size-5" /></button>
+          <div className="flex items-center gap-1"><button type="button" onClick={toggleWide} aria-label={wide ? "Make the panel narrower" : "Make the panel wider"} aria-pressed={wide} className="hidden size-11 cursor-pointer items-center justify-center rounded-lg hover:bg-muted md:inline-flex" data-testid="drawer-wide">{wide ? <Minimize2 aria-hidden className="size-4" /> : <Maximize2 aria-hidden className="size-4" />}</button><button ref={close} type="button" aria-label="Close" onClick={onClose} className="inline-flex size-11 items-center justify-center rounded-lg hover:bg-muted"><X aria-hidden className="size-5" /></button></div>
         </header>
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
           <Body key={seed.locationId + seed.contactId + (seed.note ?? "")} seed={seed} top={top?.(seed, at)} showAccount={showAccount} onLogged={logged} />
