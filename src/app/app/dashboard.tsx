@@ -404,7 +404,7 @@ export function Dashboard() {
 
   return (
     <ApiProvider value={api}>
-      <div className={`${theme === "dark" ? "dark " : ""}${view.id === "today" ? `today ${TODAY_FONTS} ` : ""}flex min-h-screen bg-background text-foreground`} data-theme={theme} style={accentStyle}>
+      <div className={`${theme === "dark" ? "dark " : ""}${(view.id === "today" || view.id === "speed") ? `today ${TODAY_FONTS} ` : ""}flex min-h-screen bg-background text-foreground`} data-theme={theme} style={accentStyle}>
         <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col self-start border-r border-sidebar-border bg-sidebar p-4 text-sidebar-foreground md:flex print:hidden">
           <div className="flex items-center gap-2.5 px-2 pt-1">
             <BrandLogo

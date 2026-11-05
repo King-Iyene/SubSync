@@ -7,6 +7,7 @@ import { fmtDuration } from "@/lib/analytics/speed-intel";
 import { ageWords } from "@/lib/analytics/today-queue";
 import { dialPlan, dialWarnings, mustStop, type DialWarning } from "@/lib/people/dial";
 import { LeadDrawer, PopMenu, RowButton, useDialer, type LeadSeed, type MenuItem } from "../ds";
+import { ActSheet } from "./speed-act";
 import { PersonName, type PersonView } from "./speed-cards";
 
 // One lead row, one grid, one small button column and a quiet three-dot menu (KF-8). The Reply button opens the lead in the CRM through the white-label link; Call
@@ -18,7 +19,7 @@ export type LeadRow = {
   status: "within" | "late" | "waiting"; neverAnswered: boolean; minutes: number; source: string;
   owner: PersonView | null; unassigned: boolean; repliedBy: PersonView | null; autoSeconds: number | null; detailed: boolean;
   phone: string | null; email: string | null; dnd: boolean; timeZone: string | null;
-  suggestion: { label: string; medianSeconds: number; replies: number } | null;
+  suggestion: { userId?: string; label: string; medianSeconds: number; replies: number } | null;
 };
 
 export const rowKey = (r: LeadRow) => r.locationId + ":" + r.contactId;
@@ -54,6 +55,7 @@ export function useLeadActions(rows: readonly LeadRow[]) {
   const [open, setOpen] = useState<number | null>(null);
   const [strip, setStrip] = useState<{ key: string; warnings: DialWarning[]; href: string; same: boolean } | { key: string; note: string } | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  const [act, setAct] = useState<LeadRow | null>(null);
 
   const call = (r: LeadRow) => {
     const plan = dialPlan(provider, { phone: r.phone, contactUrl: r.url });
@@ -73,6 +75,7 @@ export function useLeadActions(rows: readonly LeadRow[]) {
   };
   const menu = (r: LeadRow, i: number, showAccount: boolean): MenuItem[] => [
     { key: "show", label: "Show this lead", onSelect: () => setOpen(i) },
+    { key: "crm", label: "Open in your CRM", onSelect: () => { window.open(r.url, "_blank", "noopener,noreferrer"); } },
     { key: "call", label: r.dnd ? "Call (asked not to be contacted)" : "Call in your CRM", onSelect: () => call(r), disabled: !r.phone, hint: r.phone ? undefined : "No phone number" },
     { key: "email", label: "Email in your CRM", onSelect: () => email(r), disabled: !r.email, hint: r.email ? undefined : "No email address" },
     { key: "copy", label: copied === rowKey(r) ? "Copied" : "Copy details", onSelect: () => void copy(r, showAccount) },
@@ -92,7 +95,8 @@ export function useLeadActions(rows: readonly LeadRow[]) {
     );
   };
   const drawer = <LeadDrawer leads={rows.map(toSeed)} index={open} onIndex={setOpen} onClose={() => setOpen(null)} />;
-  return { menu, stripFor, drawer, show: setOpen };
+  const sheet = act ? <ActSheet key={rowKey(act)} lead={act} onClose={() => setAct(null)} onChanged={() => { /* the next read shows it */ }} /> : null;
+  return { menu, stripFor, drawer: <>{drawer}{sheet}</>, show: setOpen, reply: setAct };
 }
 
 export function LeadRows({ rows, showAccount, actions, testId = "speed-rows", head = true }: { rows: readonly LeadRow[]; showAccount: boolean; actions: ReturnType<typeof useLeadActions>; testId?: string; head?: boolean }) {
@@ -111,7 +115,7 @@ export function LeadRows({ rows, showAccount, actions, testId = "speed-rows", he
             <p className={`tnum hidden items-center gap-1.5 text-sm @3xl:flex ${bad ? (r.neverAnswered ? "font-medium text-destructive" : "font-medium text-warning") : "text-muted-foreground"}`} data-testid="speed-wait">
               {r.neverAnswered && <TriangleAlert aria-hidden className="size-3.5 shrink-0" />}{waitWords(r)}
             </p>
-            <div><RowButton href={r.url} label="Reply" sr={`${r.name}, in your CRM`} testId="speed-reply" /></div>
+            <div><RowButton onClick={() => actions.reply(r)} label="Reply" sr={`reply to ${r.name}`} testId="speed-reply" /></div>
             <div><PopMenu label={`More for ${r.name}`} items={actions.menu(r, i, showAccount)} testId="speed-row-more" triggerClassName={MENU_TRIGGER}><MoreHorizontal aria-hidden className="size-4" /></PopMenu></div>
             {actions.stripFor(r)}
           </li>
