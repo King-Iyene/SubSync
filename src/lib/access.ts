@@ -116,7 +116,9 @@ const NOTIFY_ADMIN_RULES: Rule[] = [
 // contact inside the accounts they may read (the handler checks the account again); none of them writes to the CRM.
 const PEOPLE_DAILY_RULES: Rule[] = [["PUT", "people", "seen"], ["POST", "people", "recent"], ["DELETE", "people", "recent"], ["POST", "people", "outcome"]];
 
-const CLIENT_RULES: Rule[] = [...BELL_RULES, ...GET_VIEWS.map((a) => ["GET", a] as Rule), ["POST", "usage"], ["POST", "today", "action"], ["POST", "roadmap"], ["POST", "feedback"], ["POST", "problem"], ["POST", "inbox", "views"], ["DELETE", "inbox", "views"], ["POST", "people", "lists"], ["DELETE", "people", "lists"], ["PUT", "people", "dialer"], ...PEOPLE_DAILY_RULES, ["POST", "duplicates"], ...PERSONAL_RULES];
+// The Lead workbench: reading the thread and context, previewing and doing one action. A client's staff may do it on their own account; deleting is refused inside the handler.
+const WORKBENCH_RULES: Rule[] = [["GET", "workbench"], ["POST", "workbench"]];
+const CLIENT_RULES: Rule[] = [...WORKBENCH_RULES, ...BELL_RULES, ...GET_VIEWS.map((a) => ["GET", a] as Rule), ["POST", "usage"], ["POST", "today", "action"], ["POST", "roadmap"], ["POST", "feedback"], ["POST", "problem"], ["POST", "inbox", "views"], ["DELETE", "inbox", "views"], ["POST", "people", "lists"], ["DELETE", "people", "lists"], ["PUT", "people", "dialer"], ...PEOPLE_DAILY_RULES, ["POST", "duplicates"], ...PERSONAL_RULES];
 
 const BUSINESS_RULES: Rule[] = [
   ...GET_VIEWS.map((a) => ["GET", a] as Rule), ...PERSONAL_RULES, ...BELL_RULES, ...NOTIFY_ADMIN_RULES, ...BELL_RULES, ...NOTIFY_ADMIN_RULES,

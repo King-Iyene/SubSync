@@ -10,7 +10,7 @@ export type WriteRecord = {
   meetingId: string | null;
   locationId: string;
   contactId: string;
-  kind: "note" | "comment" | "field";
+  kind: "note" | "comment" | "field" | "message";
   ghlId: string | null;
   partNo?: number;
   authoredBy?: string | null;

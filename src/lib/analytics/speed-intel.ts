@@ -11,7 +11,7 @@
 
 import { isInternalComment } from "./message-kinds.ts";
 
-export type Msg = { at: number; direction: "inbound" | "outbound" | null; userId: string | null; source: string | null; type: string | null };
+export type Msg = { at: number; direction: "inbound" | "outbound" | null; userId: string | null; source: string | null; type: string | null; id?: string | null };
 
 const str = (v: unknown, max = 100) => (typeof v === "string" && v.trim() ? v.trim().slice(0, max) : null);
 
@@ -22,7 +22,7 @@ export function mapMessage(raw: unknown): Msg | null {
   const at = typeof t === "number" ? (t < 1e11 ? t * 1000 : t) : typeof t === "string" ? Date.parse(t) : NaN;
   if (!Number.isFinite(at)) return null;
   const d = str(o.direction)?.toLowerCase();
-  return { at, direction: d === "inbound" || d === "outbound" ? d : null, userId: str(o.userId), source: str(o.source)?.toLowerCase() ?? null, type: str(o.messageType ?? o.type) };
+  return { at, direction: d === "inbound" || d === "outbound" ? d : null, userId: str(o.userId), source: str(o.source)?.toLowerCase() ?? null, type: str(o.messageType ?? o.type), id: str(o.id, 80) };
 }
 
 // A phone call a person placed from the platform is a touch too (the platform records calls as messages of type TYPE_CALL), whether or

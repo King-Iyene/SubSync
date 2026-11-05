@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, ExternalLink, MoreHorizontal, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, ExternalLink, MoreHorizontal, ShieldCheck, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { PersonDetail } from "@/lib/analytics/people-person-queries";
 import { neighbours } from "@/lib/design/ui-logic";
@@ -15,6 +15,11 @@ import { TagsSection } from "./tags-section";
 import { LogCall, NoteToSelf, Timeline, UndoButton } from "./lead-parts";
 import { PopMenu } from "./pop-menu";
 import { ErrorState, SkeletonRows } from "./states";
+import { Composer, Thread } from "./wb/conversation";
+import { DealsTab } from "./wb/deals-tab";
+import { ReviewSheet, useRunner } from "./wb/runner";
+import type { WbContext } from "./wb/types";
+import { UpdateTab } from "./wb/update-tab";
 
 // One panel for any lead, opened from any list or chart (N50). It answers four questions in this order: who is this and what should I do (one sentence and one button), how do I
 // reach them (Call and Email open the CRM through the white-label link, with a warning first if they asked not to be contacted), what is the history (tags with the day SubSync first
@@ -29,7 +34,10 @@ export type LeadSeed = {
   pending?: string;
   /** Asked not to be contacted, and the account's time zone: used for the warning before a call. */
   dnd?: boolean; timeZone?: string | null;
+  /** Which work tab opens first (the Deals tab from the pipeline), and the deal to highlight there. */
+  tab?: "conversation" | "update" | "deals"; dealId?: string;
 };
+type Tab = "conversation" | "update" | "deals";
 
 // The live read of the CRM for one lead (custom fields, calls, messages), which is slower than SubSync's own copy and arrives after it.
 type Live = {
@@ -53,6 +61,12 @@ function Body({ seed, top, showAccount, onLogged }: { seed: LeadSeed; top?: Reac
   const person = useData<Person>(`people/person/${path}`);
   const extra = useData<Live>(`people/contact/${path}`).data;
   const actions = useContactActions();
+  const wbq = useData<WbContext>(`workbench/context?locationId=${encodeURIComponent(seed.locationId)}&contactId=${encodeURIComponent(seed.contactId)}`);
+  const wb = wbq.data;
+  const [tab, setTab] = useState<Tab>(seed.tab ?? "conversation");
+  const [threadKey, setThreadKey] = useState(0);
+  const [channelPref, setChannelPref] = useState<"SMS" | "Email">("SMS");
+  const runner = useRunner(seed.locationId, seed.contactId, () => { setThreadKey((k) => k + 1); void wbq.reload(); void person.reload(); });
   const data = person.data;
   const c = data?.contact;
 
@@ -88,26 +102,45 @@ function Body({ seed, top, showAccount, onLogged }: { seed: LeadSeed; top?: Reac
       {top}
       {data?.changed && <p className="mt-2 text-xs text-muted-foreground" data-testid="drawer-changed">{data.changed.line}</p>}
 
-      {person.error && person.error.status === 404 && <p className="mt-4 text-sm text-muted-foreground" data-testid="drawer-not-copied">SubSync has not copied this contact yet, so its history is not shown. Call and Email still open them in your CRM.</p>}
+      {person.error && person.error.status === 404 && <p className="mt-4 text-sm text-muted-foreground" data-testid="drawer-not-copied">SubSync has not copied this contact yet, so its history is not shown. Open them in your CRM to work on them.</p>}
       {person.error && person.error.status !== 404 && <div className="mt-5"><ErrorState error={person.error} onRetry={person.reload} /></div>}
 
       <HeldNote locationId={seed.locationId} contactId={seed.contactId} name={name} />
       <div className="mt-4 flex flex-wrap items-center gap-2" data-testid="drawer-actions">
         <button type="button" onClick={() => actions.call(ap)} disabled={!phone} className={dnd ? BUTTON : PRIMARY} data-testid="drawer-call">Call{url ? <ExternalLink aria-hidden className="size-3.5" /> : null}</button>
-        <button type="button" onClick={() => actions.email(ap)} disabled={!email} title={email ? undefined : "This contact has no email address"} aria-describedby={email ? undefined : "drawer-email-why"} className={BUTTON} data-testid="drawer-email">Email{url ? <ExternalLink aria-hidden className="size-3.5" /> : null}</button>
+        <button type="button" onClick={() => { setChannelPref("SMS"); setTab("conversation"); }} disabled={!phone || dnd} title={dnd ? "Asked not to be contacted" : !phone ? "This contact has no phone number" : undefined} className={BUTTON} data-testid="drawer-message">Text</button>
+        <button type="button" onClick={() => { setChannelPref("Email"); setTab("conversation"); }} disabled={!email || dnd} title={dnd ? "Asked not to be contacted" : email ? undefined : "This contact has no email address"} aria-describedby={email ? undefined : "drawer-email-why"} className={BUTTON} data-testid="drawer-email">Email</button>
         <PopMenu label={`More for ${name}`} testId="drawer-more" triggerClassName="ds-press inline-flex size-11 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-[var(--ring)] sm:size-9"
           items={[
             { key: "copy", label: actions.copied === "panel" ? "Copied" : "Copy details", onSelect: () => void actions.copy(ap, showAccount) },
             ...(url ? [{ key: "crm", label: "Open in your CRM", onSelect: () => { window.open(url, "_blank", "noopener,noreferrer"); } }] : []),
           ]}><MoreHorizontal aria-hidden className="size-4" /></PopMenu>
       </div>
-      {(!email || !phone) && <p id="drawer-email-why" className="mt-2 text-xs text-muted-foreground" data-testid="drawer-no-contact-way">{!email && !phone ? "This contact has no email address and no phone number in your CRM." : !email ? "Email is off because this contact has no email address in your CRM." : "Call is off because this contact has no phone number in your CRM."}</p>}
+      {(!email || !phone) && <p id="drawer-email-why" className="mt-2 text-xs text-muted-foreground" data-testid="drawer-no-contact-way">{!email && !phone ? "This contact has no email address and no phone number in your CRM." : !email ? "Email is off because this contact has no email address in your CRM." : "Call and Text are off because this contact has no phone number in your CRM."}</p>}
       <ActionStrip actions={actions} k="panel" className="mt-2" />
       {c && data && <TagsSection key={seed.contactId} locationId={seed.locationId} contactId={seed.contactId} name={name} tags={c.tags} tagDates={data.tagDates} tagExact={data.tagExact ?? {}} />}
       <div className="mt-2 flex flex-wrap items-start justify-between gap-x-4 gap-y-1"><DialerSetting /><InfoTip label="About Call and Email" text={dialNoteText(actions.provider)} /></div>
       {person.loading && !data && <div className="mt-5"><SkeletonRows rows={4} label="Loading this person..." /></div>}
 
-      <dl className="mt-4 divide-y border-y">
+      {wb && (
+        <section className="mt-5" aria-label="Work on this person" data-testid="wb-work">
+          {!wb.mode.live && <p className="mb-3 flex items-start gap-2 rounded-lg bg-muted/60 px-3 py-2 text-sm text-muted-foreground" data-testid="wb-mode"><ShieldCheck aria-hidden className="mt-0.5 size-4 shrink-0" />{wb.mode.demo ? "Demo: try everything, nothing is ever sent." : wb.mode.masterOn ? "Changes from SubSync are not allowed for this account yet (Settings). You can try everything: nothing reaches your CRM." : "Changes from SubSync are switched off. You can try everything: it shows what would happen and nothing reaches your CRM."}</p>}
+          <div role="tablist" aria-label="What to do" className="flex gap-1 border-b">
+            {([["conversation", "Conversation"], ["update", "Update"], ["deals", wb.deals.length ? `Deals (${wb.deals.length})` : "Deals"]] as const).map(([k, l]) => (
+              <button key={k} type="button" role="tab" id={`wb-tab-${k}`} aria-selected={tab === k} aria-controls="wb-panel" onClick={() => setTab(k)} className={`-mb-px min-h-11 border-b-2 px-3.5 text-[15px] font-medium ${tab === k ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`} data-testid={`wb-tab-${k}`}>{l}</button>
+            ))}
+          </div>
+          <div role="tabpanel" id="wb-panel" aria-labelledby={`wb-tab-${tab}`} className="pt-4">
+            {tab === "conversation" && <><Thread locationId={seed.locationId} contactId={seed.contactId} reloadKey={threadKey} /><Composer key={channelPref} ctx={wb} runner={runner} initial={channelPref} /></>}
+            {tab === "update" && <UpdateTab ctx={wb} runner={runner} />}
+            {tab === "deals" && <DealsTab ctx={wb} runner={runner} focusId={seed.dealId ?? null} />}
+          </div>
+        </section>
+      )}
+      {wbq.error && wbq.error.status !== 404 && <p className="mt-4 text-sm text-muted-foreground">The workbench could not be loaded. <button type="button" className="font-medium underline" onClick={() => void wbq.reload()}>Try again</button></p>}
+
+      <h3 className="mb-1 mt-8 text-xs font-semibold uppercase tracking-wide text-muted-foreground">About this person</h3>
+      <dl className="divide-y border-y">
         {phone && <Row label="Phone"><span className="tabular-nums">{phone}</span></Row>}
         {email && <Row label="Email"><span className="break-all">{email}</span></Row>}
         {owner && <Row label="Owner">{owner}</Row>}
@@ -141,6 +174,7 @@ function Body({ seed, top, showAccount, onLogged }: { seed: LeadSeed; top?: Reac
       <NoteToSelf locationId={seed.locationId} contactId={seed.contactId} name={name} account={c?.locationName ?? seed.locationName ?? null} />
 
       {data && <Timeline items={timeline} nowMs={data.now} note={extra && extra.live.state !== "off" ? extra.live.note : null} />}
+      {wb && <div className="sticky bottom-0 z-10 -mx-5 -mb-5 mt-6"><ReviewSheet r={runner} name={name} /></div>}
       {url && <p className="mt-6 text-xs"><a href={url} target="_blank" rel="noopener noreferrer" className="text-muted-foreground underline underline-offset-4 hover:text-foreground">Open in your CRM</a></p>}
     </>
   );

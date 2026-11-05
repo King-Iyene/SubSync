@@ -969,4 +969,9 @@ alter table public.contact_writes enable row level security;
 -- Tag dates: a tag SubSync itself added or removed has the exact time; one SubSync only noticed at a sync is the day it first saw it (exact = false).
 alter table public.contact_tag_events add column if not exists exact boolean not null default false;
 
+-- ===== 20261108090000_crm_writes_message_kind.sql =====
+-- Additive: a message sent from the contact panel composer is also kept in the write log, so it is never counted as a first reply (principle 14).
+alter table public.crm_writes drop constraint if exists crm_writes_kind_check;
+alter table public.crm_writes add constraint crm_writes_kind_check check (kind in ('note', 'comment', 'field', 'message'));
+
 commit;

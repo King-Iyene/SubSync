@@ -104,6 +104,8 @@ import { meetingSetupAccountView, meetingSetupFieldsSave, meetingSetupFieldsView
 import { can, personFromSession } from "../connections/person";
 import { handlePeople, timeoutResponse } from "./people-routes";
 import { handleDuplicates } from "./duplicates-routes";
+import { handleWorkbench } from "./workbench-routes";
+import { handleBoard } from "./pipeline-board-routes";
 import { handleCleanupV2 } from "./cleanup-routes";
 import { gatedWriter } from "../ghl/crm-gateway";
 import { writeEnabledFor } from "../analytics/cleanup-config";
@@ -1882,7 +1884,7 @@ const clientDeps: clientRoutes.Deps = { allowedIds, accountsFor, actorOf: (ctx) 
 
 const FEATURE_FOR: Record<string, Feature> = {
   "data-health": "data_health", search: "search", onboarding: "onboarding", stale: "stale", inbox: "inbox", pipelines: "pipelines", duplicates: "duplicates", email: "email",
-  "meeting-inbox": "meetings", "meeting-setup": "meetings", "my-connections": "connections", "team-connections": "connections", "meeting-policy": "connections", alerts: "alerts", notifications: "alerts", "notification-prefs": "alerts", "notification-destinations": "alerts", appointments: "appointments", audit: "audit", speed: "speed", "appointment-insights": "appointments", meetings: "meetings", connections: "connections", cleanup: "cleanup", "setup-compare": "setup_compare", playbooks: "playbooks", daily: "overview", today: "overview", team: "team", "deal-events": "pipelines", contact: "search", settings: "settings", export: "exports", digest: "overview", "api-keys": "ai", hygiene: "stale", "pipeline-intel": "pipelines", "contact-intel": "activity", clients: "clients", qbr: "reports", "comms-intel": "inbox", "deal-gaps": "pipelines", "call-queue": "calls", "call-lists": "calls", "call-outcomes": "calls", people: "search", workflows: "workflows", "client-onboarding": "onboarding",
+  "meeting-inbox": "meetings", "meeting-setup": "meetings", "my-connections": "connections", "team-connections": "connections", "meeting-policy": "connections", alerts: "alerts", notifications: "alerts", "notification-prefs": "alerts", "notification-destinations": "alerts", appointments: "appointments", audit: "audit", speed: "speed", "appointment-insights": "appointments", meetings: "meetings", connections: "connections", cleanup: "cleanup", "setup-compare": "setup_compare", playbooks: "playbooks", daily: "overview", today: "overview", team: "team", "deal-events": "pipelines", contact: "search", settings: "settings", export: "exports", digest: "overview", "api-keys": "ai", hygiene: "stale", "pipeline-intel": "pipelines", "contact-intel": "activity", clients: "clients", qbr: "reports", "comms-intel": "inbox", "deal-gaps": "pipelines", "call-queue": "calls", "call-lists": "calls", "call-outcomes": "calls", people: "search", workbench: "search", workflows: "workflows", "client-onboarding": "onboarding",
 };
 
 export async function handle(request: Request, segments: string[]): Promise<Response> {
@@ -1908,6 +1910,8 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
         settings: async () => { const st = (await scope(ctx)).settings; return { staleDays: st.staleDays, speedTargetMinutes: st.speedTargetMinutes }; },
       });
     }
+    // The Lead workbench (stage MOAT): the live conversation, the preview and the one gateway every write goes through (switched off by default).
+    if (a === "workbench") return await handleWorkbench(ctx, { allowed: () => allowedIds(ctx), locationToken: (locationId) => locationAccessToken(ctx.session.companyId, locationId) });
     // The rebuilt Appointments page: the work lists, "See all" and the comparison (read only).
     if (a === "appointments" && method === "GET" && (b === "work" || b === "list" || b === "compare") && !c) {
       return await handleApptWork(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links });
@@ -1982,6 +1986,9 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       if (a === "export" && b) return await exportCsv(ctx, b);
       if (a === "sync-status") return await syncStatusView(ctx);
       if (a === "freshness") return await freshnessView(ctx);
+      if (a === "pipeline-intel" && ctx.url.searchParams.get("view") === "board") {
+        return await handleBoard(ctx, { allowed: () => allowedIds(ctx), staleDays: async () => (await scope(ctx)).settings.staleDays, stageControls: (allowed, rules) => stageControlsFor(ctx, allowed, rules) });
+      }
       if (a === "pipeline-intel") return await pipelineIntel(ctx);
       if (a === "contact-intel") return await contactIntel(ctx);
       if (a === "team") return await teamView(ctx);

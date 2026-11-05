@@ -107,7 +107,7 @@ export function WorkflowMerge({ workflow, people, switchedOff, onRun }: { workfl
 const when = (iso: string | null) => (iso ? timeAgo(iso) : null);
 
 /** One of the two records as a card: initials, name, and only what differs from the other record (what is identical is said once, under the cards). */
-export function PersonCard({ p, i, keep, best, locked, differ, onKeep }: { p: Person & { url: string }; i: number; keep: boolean; best: boolean; locked: boolean; differ: ReadonlySet<string>; onKeep: () => void }) {
+export function PersonCard({ p, i, keep, best, locked, differ, onKeep, onShow }: { p: Person & { url: string }; i: number; keep: boolean; best: boolean; locked: boolean; differ: ReadonlySet<string>; onKeep: () => void; /** Opens the shared lead panel (full details, conversation, actions) for this record. */ onShow?: () => void }) {
   const rows: Array<[string, string | null]> = [];
   if (differ.has("phone")) rows.push(["Phone", p.phone?.trim() || null]);
   if (differ.has("email")) rows.push(["Email", p.email?.trim() || null]);
@@ -139,6 +139,7 @@ export function PersonCard({ p, i, keep, best, locked, differ, onKeep }: { p: Pe
         <span>{keep ? "Keep this one" : "Keep this one instead"}</span>
       </label>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-0.5 text-sm">
+        {onShow && <button type="button" onClick={onShow} className="inline-flex min-h-11 items-center font-medium text-primary underline underline-offset-2 sm:min-h-9" data-testid="dup-show">Show lead</button>}
         <DialButton compact phone={p.phone} contactUrl={p.url} dnd={p.dnd === true} />
         <ExtLink href={p.url}>Open contact</ExtLink>
       </div>

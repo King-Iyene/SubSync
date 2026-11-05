@@ -502,3 +502,6 @@ Decision: the screen is one sentence, one primary button ("Reply to the oldest w
 - Not built: a lead-count tile on the main view (the headline already carries the number that matters; Worth a look carries a drop or spike), and "ball in whose court" (not synced).
 
 - 2026-11-05 Contact panel write-back (branch contact-writeback). Who: setters and agency staff; next: the lead's CRM record shows the note, result and tags; if missing they retype it. Notes/tags/tasks use contacts.write (already optional); one switch WRITE_GHL_LIVE, off. Today Done/Snooze/Assign stay SubSync-only. Details: docs/features/CONTACT_WRITEBACK.md.
+
+
+- 2026-11-04 | MOAT: work inside SubSync. The lead panel becomes a workbench (thread, composer, note, task, tag, owner, details, deal, appointment, delete) and every write goes through ONE gateway (src/lib/ghl/workbench.ts) on the existing switches (WRITE_GHL_LIVE off, per-account opt-in, preview and confirm, guardrails, audit with ids only, undo). Reason: the CRM API has no call-placing endpoint but can message, note, tag, move deals and set appointment status, so the moat is doing the work here, honestly as a dry run until King switches it on. Pipeline rebuilt money first; the 25 In use dropdowns moved behind a gear.
