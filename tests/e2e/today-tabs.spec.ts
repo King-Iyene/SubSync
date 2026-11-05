@@ -53,8 +53,10 @@ test("agency owner: each of the six tabs switches, shows its content, and its fi
   expect(await page.getByTestId("source-row").count(), "sources are listed").toBeGreaterThan(0);
   await drill(page, "source-row");
   await page.getByRole("tab", { name: "Coverage" }).click();
-  await expect(page.getByTestId("hour-bar")).toHaveCount(24);
-  await drill(page, "hour-bar");
+  await expect(page.getByTestId("hour-mark")).toHaveCount(24);
+  await page.getByTestId("hour-mark").and(page.locator("[data-count]:not([data-count=\"0\"])")).first().click(); // an hour with leads
+  await expect(page.getByTestId("records-panel")).toBeVisible();
+  await page.keyboard.press("Escape");
   await page.getByRole("tab", { name: "Growth" }).click();
   await expect(page.getByTestId("growth-counters").locator("li")).toHaveCount(4);
   await drill(page, "growth-week");

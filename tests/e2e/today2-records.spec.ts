@@ -426,8 +426,8 @@ test("More detail and the rest of the buttons built for Today all do something",
     await expect(page.getByTestId(id)).toBeVisible();
   }
   // Coverage hour bar opens its leads; Sources row opens its leads; People rows open theirs.
-  const hour = page.getByTestId("hour-bar").and(page.locator("[data-leads]:not([disabled])")).first();
-  if (await hour.count()) { const n = Number(await hour.getAttribute("data-leads")); await hour.click(); await expect(page.getByTestId("records-count")).toHaveAttribute("data-count", String(n)); await closePanel(page); }
+  const hour = page.getByTestId("hour-mark").and(page.locator("[data-count]:not([data-count=\"0\"])")).first();
+  if (await hour.count()) { const n = Number(await hour.getAttribute("data-count")); await hour.click(); await expect(page.getByTestId("records-count")).toHaveAttribute("data-count", String(n)); await closePanel(page); }
   await page.getByRole("tab", { name: "Sources" }).click();
   const srcRow = page.getByTestId("source-row").first();
   if (await srcRow.count()) { const n = Number(await srcRow.getAttribute("data-leads")); await srcRow.click(); await expect(page.getByTestId("records-count")).toHaveAttribute("data-count", String(n)); await closePanel(page); }

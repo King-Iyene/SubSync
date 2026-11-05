@@ -181,7 +181,7 @@ test("More detail: the tabs, the junk switch, set aside; More: Share, Preview, P
     await expect(page.getByTestId(id).first()).toBeVisible();
   }
   await page.getByRole("tab", { name: "Coverage" }).click();
-  const hour = page.getByTestId("hour-bar").first();
+  const hour = page.getByTestId("hour-mark").first();
   if (await hour.count()) { await hour.click(); await expect(panel(page)).toBeVisible(); await page.keyboard.press("Escape"); }
   await page.getByRole("tab", { name: "Forecast" }).click();
   // Junk switch changes the dollar figure or at least toggles.
