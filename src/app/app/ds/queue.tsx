@@ -1,5 +1,6 @@
 "use client";
 
+import { StatusChip } from "./status-chip";
 import { TagPill } from "./what-is";
 import { CircleAlert, Clock, ExternalLink, MoreHorizontal, TriangleAlert } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -145,7 +146,7 @@ export function AccountList({
                 <div className="min-w-0" data-col="title">
                   <p className="truncate font-semibold" title={`${actionTitle(a.top.kind, a.top.count)} at ${a.name}`}>{actionTitle(a.top.kind, a.top.count)}</p>
                   <p className="t-small t-quiet line-clamp-2 @3xl:truncate" title={a.reason}>{a.name}{a.count > a.top.count && <span>, plus {a.count - a.top.count} more</span>}{mine ? <span>. Assigned to {mine}</span> : null}</p>
-                  <p className={`flex items-center gap-1 text-xs @3xl:hidden ${s.text}`}><s.Icon aria-hidden className="size-3.5 shrink-0" />{s.word}{age ? <span className="text-muted-foreground"> · {ageLabel(a.top.kind, age)}</span> : null}</p>
+                  <p className="flex flex-wrap items-center gap-1.5 text-xs @3xl:hidden"><StatusChip word={s.word} />{age ? <span className="text-muted-foreground">{ageLabel(a.top.kind, age)}</span> : null}</p>
                 </div>
                 <div className="tnum hidden text-right @3xl:block" data-col="amount">
                   <button type="button" onClick={() => onShow(a)} aria-label={`${stake.main}${stake.sub ? `, ${stake.sub}` : ""}. See everything for ${a.name}.`} data-testid="queue-amount" data-count={a.count}
@@ -155,7 +156,7 @@ export function AccountList({
                   </button>
                 </div>
                 <div className="hidden min-w-0 text-sm @3xl:block" data-col="urgency">
-                  <p className={`flex items-center gap-1.5 font-medium ${s.text}`}><s.Icon aria-hidden className="size-3.5 shrink-0" />{s.word}</p>
+                  <p><StatusChip word={s.word} /></p>
                   {age && <p className="truncate text-xs text-muted-foreground">{ageLabel(a.top.kind, age)}</p>}
                 </div>
                 <div data-col="crm"><RowButton href={a.url} label="Open" sr={a.name} testId="queue-open" /></div>
@@ -202,9 +203,9 @@ export function ReplyNowList({ items, total, newLeads, max = INLINE_ROWS, onSeeA
               <div className="min-w-0">
                 <p className="truncate font-semibold" title={p.name}>Reply to {p.name}</p>
                 <p className="t-small t-quiet line-clamp-2 @3xl:truncate">{!single && <span>{p.accountName}. </span>}{replyContext(p)}{mine ? <span>. Assigned to {mine}</span> : null}</p>
-                <p className={`text-xs @3xl:hidden ${p.never ? "text-destructive" : "text-muted-foreground"}`} data-testid="lead-wait-narrow">{p.never ? wait : `Waiting ${wait}`}</p>
+                <p className="flex items-center gap-1.5 text-xs text-muted-foreground @3xl:hidden" data-testid="lead-wait-narrow">{p.never && <StatusChip word="Urgent" />}{p.never ? wait : `Waiting ${wait}`}</p>
               </div>
-              <p className={`tnum hidden items-center gap-1.5 text-sm @3xl:flex ${p.never ? "font-medium text-destructive" : ""}`} data-testid="lead-wait">{p.never && <TriangleAlert aria-hidden className="size-3.5 shrink-0" />}{p.never ? wait : `Waiting ${wait}`}</p>
+              <p className={`tnum hidden items-center gap-1.5 text-sm @3xl:flex ${p.never ? "font-medium text-destructive" : ""}`} data-testid="lead-wait">{p.never && <StatusChip word="Urgent" />}{p.never ? wait : `Waiting ${wait}`}</p>
               <div><RowButton href={p.url} label="Reply" sr={`${p.name}, in your CRM`} testId="lead-open" /></div>
               <div>{onAct ? <Menu label={`More for ${p.name}`} items={items} testId="reply-more" /> : null}</div>
             </li>

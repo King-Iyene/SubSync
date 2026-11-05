@@ -50,12 +50,20 @@ export function thinLabels(n: number, maxLabels: number): number[] {
   return idx;
 }
 
-/** A short day label that fits the range: "Mon 3" for two weeks or less, "3 Nov" for about four months, "Nov 26" beyond. */
+/** A short day label that fits the range and always names the month: "Mon 3 Nov" for two weeks or less, "3 Nov" for about four months, "Nov 2026" beyond. */
 export function dayLabel(day: string, rangeDays: number): string {
   const d = new Date(`${day}T12:00:00Z`);
-  if (rangeDays <= 14) return d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", timeZone: "UTC" });
+  if (rangeDays <= 14) return d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }).replace(",", "");
   if (rangeDays <= 120) return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
-  return d.toLocaleDateString("en-GB", { month: "short", year: "2-digit", timeZone: "UTC" });
+  return d.toLocaleDateString("en-GB", { month: "short", year: "numeric", timeZone: "UTC" });
+}
+
+/** The friendly full date for a tooltip: "Fri 30 Oct 2026". Takes "2026-10-30"; anything else comes back unchanged. */
+export function fullDate(day: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return day;
+  const d = new Date(`${day}T12:00:00Z`);
+  if (Number.isNaN(d.getTime())) return day;
+  return d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).replace(",", "");
 }
 
 /** A smooth line through the points that never overshoots them (monotone cubic): a flat stretch stays flat, a peak is never drawn higher than the data. */

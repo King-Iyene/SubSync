@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { DayPoint, SourceRow } from "@/lib/analytics/growth";
 import { fmtStat } from "@/lib/analytics/chart-format";
+import { ChartCard } from "./time-chart";
 
 // Growth's two charts, drawn from Today's own tokens (--t-c1 and friends, checked with the dataviz validator). One series each, thin marks, quiet gridlines, direct labels.
 // Every mark is a button: a day opens the leads of that day, a slice or a legend row opens the leads of that source. A hidden table carries every number.
@@ -80,22 +81,29 @@ export function SourceDonut({ rows, total, selected, onPick, label, rangeWord = 
     return full ? `M${x0},${y0} A${R1},${R1} 0 1 1 ${x1},${y1} A${R1},${R1} 0 1 1 ${x0},${y0} M${x3},${y3} A${R0},${R0} 0 1 0 ${x2},${y2} A${R0},${R0} 0 1 0 ${x3},${y3}` : `M${x0},${y0} A${R1},${R1} 0 ${big} 1 ${x1},${y1} L${x2},${y2} A${R0},${R0} 0 ${big} 0 ${x3},${y3} Z`;
   };
   return (
-    <figure className="grid grid-cols-[8.75rem_minmax(0,1fr)] items-center gap-x-6 gap-y-3" data-testid="source-mix">
+    <figure className="relative grid grid-cols-[8.75rem_minmax(0,1fr)] items-center gap-x-6 gap-y-3" data-testid="source-mix">
       <svg viewBox="0 0 140 140" className="block h-auto w-full" role="group" aria-label={label}>
         {arcs.map(({ it, from, to }) => {
           const on = selected === it.source;
           return it.source === "Other" || it.count === 0 ? (
             <path key={it.source} d={arc(from, to)} fillRule="evenodd" fill={it.colour} fillOpacity={0.55} stroke="var(--t-raise)" strokeWidth={1.5} />
           ) : (
-            <path key={it.source} d={arc(from, to)} fillRule="evenodd" fill={it.colour} fillOpacity={selected && !on ? 0.4 : hot && hot !== it.source ? 0.6 : 1} stroke={on ? "var(--t-ink)" : "var(--t-raise)"} strokeWidth={on ? 2 : 1.5} strokeLinejoin="round"
+            <path key={it.source} d={arc(from, to)} fillRule="evenodd" fill={it.colour} fillOpacity={selected && !on ? 0.4 : hot && hot !== it.source ? 0.6 : 1} stroke={on ? "var(--t-ink)" : "var(--t-raise)"} strokeWidth={on ? 2 : 1.5} strokeLinejoin="round" style={{ filter: hot === it.source ? `drop-shadow(0 0 5px ${it.colour})` : undefined, transition: "fill-opacity .15s ease" }}
               role="button" tabIndex={0} aria-pressed={on} aria-label={`${it.source}: ${it.count} email leads, ${Math.round(it.share * 100)}% of the ${rangeWord}. See them.`} data-testid="source-slice" data-source={it.source} data-count={it.count}
-              className="cursor-pointer outline-none [&:focus-visible]:stroke-[var(--ring)] [&:focus-visible]:stroke-[3px]" onClick={() => onPick(it.source)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onPick(it.source); } }}
+              className="cursor-pointer outline-none [&:focus-visible]:stroke-[var(--ring)] [&:focus-visible]:stroke-[3px]" onClick={() => onPick(it.source)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onPick(it.source); } else if (e.key === "ArrowRight" || e.key === "ArrowDown" || e.key === "ArrowLeft" || e.key === "ArrowUp") { e.preventDefault(); const f = e.key === "ArrowRight" || e.key === "ArrowDown"; let nx = (f ? e.currentTarget.nextElementSibling : e.currentTarget.previousElementSibling) as SVGElement | null; while (nx && !nx.hasAttribute("data-source")) nx = (f ? nx.nextElementSibling : nx.previousElementSibling) as SVGElement | null; nx?.focus(); } }}
               onMouseEnter={() => setHot(it.source)} onMouseLeave={() => setHot(null)} onFocus={() => setHot(it.source)} onBlur={() => setHot(null)} />
           );
         })}
         <text x={cx} y={cy - 2} textAnchor="middle" className="t-num" style={{ fontSize: 20, fill: "var(--t-ink)", fontWeight: 500 }}>{fmtStat(total)}</text>
         <text x={cx} y={cy + 14} textAnchor="middle" style={{ fontSize: 9.5, fill: "var(--t-ink2)" }}>{rangeWord.length > 16 ? "in these dates" : rangeWord}</text>
       </svg>
+      {(() => {
+        const h = items.find((i) => i.source === hot);
+        if (!h) return null;
+        const trend = h.change === 0 ? "No change" : h.change > 0 ? `Up ${h.change}` : `Down ${Math.abs(h.change)}`;
+        return <ChartCard testId="source-card" title={h.source} left={30} top={0} lines={[<><span aria-hidden className="size-2 rounded-full" style={{ background: h.colour }} /><span className="t-num font-medium">{h.count.toLocaleString("en-US")}</span> email leads, {Math.round(h.share * 100)}% of the {rangeWord}</>]}
+          compare={`${trend} against the same number of days before (${h.previous.toLocaleString("en-US")} then)`} hint={h.source === "Other" ? undefined : "Click to see the people"} />;
+      })()}
       <ul className="min-w-0" data-testid="source-legend">
         {items.map((it) => {
           const on = selected === it.source;

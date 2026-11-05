@@ -6,6 +6,7 @@ import { filterProof, PROOF_WORDS, proofHeadline, proofSummary } from "@/lib/ana
 import type { Proof } from "@/lib/analytics/today-queue";
 import { specAlerts } from "@/lib/analytics/today-specs";
 import { WhatIs } from "../ds/what-is";
+import { fullDate } from "@/lib/analytics/chart-format";
 import { ModeToggle, TimeChart, useChartMode } from "../ds/time-chart";
 import { fmtFull, fmtStat } from "@/lib/analytics/chart-format";
 import { ReportFilterBar, useReportFilter } from "./report-filter";
@@ -48,7 +49,7 @@ export function ProofTab({ m, proof, agency, clients, who }: { m: TodayModel; pr
         <ModeToggle mode={mode} onChange={setMode} label="Problems found and fixed" />
       </div>
       <TimeChart testId="raised-cleared" mode={mode} selectedId={day} label="Problems found and fixed each day, last 7 days" noun="Day" hint="Select a day to see its problems."
-        points={p.days.map((d) => ({ id: d.day, label: `${d.label}, ${d.day}`, short: d.label }))}
+        points={p.days.map((d) => ({ id: d.day, label: fullDate(d.day), short: d.label }))}
         series={[{ key: "found", name: "Found", colour: "var(--t-c1)", values: p.days.map((d) => d.raised.length) }, { key: "fixed", name: "Fixed", colour: "var(--t-c2)", values: p.days.map((d) => d.cleared.length) }]}
         onPick={(i) => { setDay(p.days[i].day); m.open(specAlerts(p, { day: i })); }} />
       {agency && (

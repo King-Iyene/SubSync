@@ -151,11 +151,12 @@ export function boundsOf(now: number, zone: string): Bounds {
 export type Period = "today" | "week" | "month" | "all";
 export type Change = { count: number; previous: number | null; pct: number | null; /** "up", "down" or "same"; null when there is nothing to compare. */ direction: "up" | "down" | "same" | null; note: string | null };
 
-export const pctChange = (now: number, before: number): number | null => (before >= MIN_PREVIOUS ? Math.round(((now - before) / before) * 100) : null);
+// Both periods together must hold a minimum too: 0 against 5 is a quiet week, not "down 100%".
+export const pctChange = (now: number, before: number): number | null => (before >= MIN_PREVIOUS && now + before >= MIN_PREVIOUS * 2 ? Math.round(((now - before) / before) * 100) : null);
 function changeOf(count: number, previous: number | null): Change {
   if (previous === null) return { count, previous: null, pct: null, direction: null, note: null };
   const pct = pctChange(count, previous);
-  if (pct === null) return { count, previous, pct: null, direction: null, note: `Only ${previous} in the period before, too few to compare.` };
+  if (pct === null) return { count, previous, pct: null, direction: null, note: `Only ${count} now and ${previous} in the period before: not enough leads to compare.` };
   return { count, previous, pct, direction: pct > 0 ? "up" : pct < 0 ? "down" : "same", note: null };
 }
 

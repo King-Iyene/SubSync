@@ -77,7 +77,7 @@ test("today, this week and this month are compared with the same stretch of the 
   assert.equal(ch.today.count, 2);
   assert.equal(ch.today.previous, 1);
   assert.equal(ch.today.pct, null, "one earlier lead is too few for a percentage");
-  assert.match(ch.today.note ?? "", /too few/);
+  assert.match(ch.today.note ?? "", /not enough leads/);
   assert.equal(ch.all.count, 4);
   assert.equal(ch.all.previous, null);
   const many = Array.from({ length: 10 }, (_, k) => at(b.lastWeekStart + k * HOUR)).concat(Array.from({ length: 15 }, (_, k) => at(b.weekStart + k * HOUR)));
