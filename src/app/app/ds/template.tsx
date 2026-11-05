@@ -24,7 +24,7 @@ export function Page({ title, subtitle, actions, children }: { title: string; su
     <div data-testid="page" className="ds-enter">
       <header className="mb-6 flex flex-wrap items-start justify-between gap-x-4 gap-y-3 border-b pb-5">
         <div className="min-w-0">
-          <PageTrail title={title} />
+          
           <h1 className="text-[1.65rem] font-semibold leading-tight tracking-tight">{title}</h1>
           {subtitle && <p className="mt-1.5 line-clamp-3 max-w-2xl sm:line-clamp-2 text-sm leading-6 text-muted-foreground" data-testid="page-subtitle">{subtitle}</p>}
         </div>

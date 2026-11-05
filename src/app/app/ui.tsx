@@ -3,7 +3,6 @@
 import type { ReactNode } from "react";
 import { CountUp } from "./ds/count-up";
 import { EmptyState, ErrorState, Skeleton } from "./ds/states";
-import { PageTrail } from "./ds/template";
 import type { ApiError } from "./session";
 import type { Band } from "./types";
 
@@ -91,7 +90,6 @@ export function PageHeader({ title, subtitle, actions }: { title: string; subtit
   return (
     <div className="mb-7 flex flex-wrap items-start justify-between gap-3 border-b pb-5">
       <div>
-        <PageTrail title={title} />
         <h1 className="text-[1.65rem] font-semibold leading-tight tracking-tight">{title}</h1>
         {subtitle && <p className="mt-1.5 max-w-2xl text-sm leading-6 text-muted-foreground">{subtitle}</p>}
       </div>
