@@ -52,3 +52,11 @@ export function saveMessage(status: SaveStatus, what: "note" | "outcome", httpSt
   if (status === "needs_permission") return "Needs permission: reconnect. SubSync is not allowed to change contacts in your CRM yet.";
   return `Your CRM did not accept it${httpStatus ? ` (error ${httpStatus})` : ""}. Nothing was saved there. Try again.`;
 }
+
+export const TAG_MAX = 60;
+export const cleanTag = (v: unknown): string | null => {
+  if (typeof v !== "string") return null;
+  const t = v.trim().replace(/\s+/g, " ");
+  return t.length >= 1 && t.length <= TAG_MAX && !/[,\n\r]/.test(t) ? t : null;
+};
+

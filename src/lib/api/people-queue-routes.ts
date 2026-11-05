@@ -1,3 +1,4 @@
+import { accountTags, changeTag, cleanTag } from "../analytics/contact-tags";
 import { saveContactNote, undoWrite, writeCallOutcome } from "../analytics/contact-writeback";
 import { NOTE_MAX } from "../people/writeback";
 import { parseGranted } from "../scope-groups";
@@ -120,13 +121,25 @@ export async function handlePeopleQueue(ctx: Ctx, h: QueueHelpers): Promise<Resp
     }
   }
 
+  if (m === "GET" && b === "tags") {
+    const loc = sp.get("locationId") ?? "";
+    const allowed = await h.allowed();
+    if (!ID.test(loc) || (allowed && !allowed.includes(loc))) return json({ tags: [] });
+    return json({ tags: await accountTags({ installationId: ctx.installationId, allowed }, loc).catch(() => []) });
+  }
+
   // Writing to the lead in the CRM (docs/features/CONTACT_WRITEBACK.md). Who is writing, and which accounts, come from the signed session only.
-  if (m === "POST" && (b === "outcome" || b === "note" || b === "write-undo")) {
+  if (m === "POST" && (b === "outcome" || b === "note" || b === "write-undo" || b === "tag")) {
     const [inst] = ctx.demo ? [null] : await sql()`select scope from installations where id = ${ctx.installationId}`;
     const g = typeof inst?.scope !== "string" || inst.scope.trim() === "" ? null : parseGranted(inst.scope as string);
     const who = { installationId: ctx.installationId, allowed: await h.allowed(), actor: ctx.session.userId ?? null, actorName: ctx.session.userName ?? null, granted: g === null || g.includes("contacts.write") };
     const body = (await ctx.request.json().catch(() => null)) as Record<string, unknown> | null;
     const reply = (r: Awaited<ReturnType<typeof saveContactNote>>) => json({ ...r, ...(r.status === "unknown" || r.status === "limit" ? { error: r.message } : {}) }, r.status === "unknown" ? 404 : r.status === "limit" ? 429 : 200);
+    if (b === "tag") {
+      const tag = cleanTag(body?.tag);
+      if (!tag || typeof body?.locationId !== "string" || typeof body?.contactId !== "string" || !CONTACT_ID.test(body.contactId)) return json({ error: "Type a tag of up to 60 characters, without commas" }, 400);
+      return reply(await changeTag(who, { locationId: body.locationId, contactId: body.contactId, tag, remove: body.remove === true, confirm: body.confirm === true }));
+    }
     if (b === "write-undo") return reply(await undoWrite(who, typeof body?.id === "string" ? body.id : ""));
     if (b === "note") {
       const text = typeof body?.text === "string" ? body.text.trim() : "";

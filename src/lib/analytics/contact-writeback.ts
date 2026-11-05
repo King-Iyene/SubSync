@@ -4,6 +4,7 @@ import { recordWrite } from "../ghl/crm-gateway";
 import { recordCrmWrite, markUndone } from "../connections/write-log";
 import { locationAccessToken } from "../sync/engine";
 import { logOutcome } from "./call-queries";
+import { changeTag } from "./contact-tags";
 import { capReached, CAP_MESSAGE, idemKey, noteBody, outcomeNoteBody, saveMessage, tagFor, tagPrefix, type SaveStatus } from "../people/writeback";
 import type { Outcome } from "./call-intel";
 
@@ -12,13 +13,13 @@ import type { Outcome } from "./call-intel";
 // The one switch is WRITE_GHL_LIVE: off, every request is built and recorded as a dry run and nothing is sent. Notes, tags and tasks never message the person,
 // so Do Not Disturb does not stop them (it is shown, not blocked). Every id the CRM gives back is stored so Undo can remove exactly what we made.
 
-type Who = { installationId: string; allowed: string[] | null; actor: string | null; actorName: string | null; granted: boolean };
+export type Who = { installationId: string; allowed: string[] | null; actor: string | null; actorName: string | null; granted: boolean };
 export type WriteReply = { ok: boolean; status: SaveStatus | "limit" | "unknown" | "needs_update"; message: string; id?: string; canUndo?: boolean; duplicate?: boolean };
 
-const missingTable = (e: unknown) => ["42P01", "42703"].includes((e as { code?: string })?.code ?? "");
-const NEEDS_UPDATE: WriteReply = { ok: false, status: "needs_update", message: "Saving to your CRM needs the latest database update. Nothing was saved." };
+export const missingTable = (e: unknown) => ["42P01", "42703"].includes((e as { code?: string })?.code ?? "");
+export const NEEDS_UPDATE: WriteReply = { ok: false, status: "needs_update", message: "Saving to your CRM needs the latest database update. Nothing was saved." };
 
-async function contactOf(w: Who, locationId: string, contactId: string) {
+export async function contactOf(w: Who, locationId: string, contactId: string) {
   const db = sql();
   const [c] = await db`
     select c.tags, i.company_id from cached_contacts c
@@ -26,11 +27,11 @@ async function contactOf(w: Who, locationId: string, contactId: string) {
     join installations i on i.id = c.installation_id
     where c.installation_id = ${w.installationId} and c.location_id = ${locationId} and c.contact_id = ${contactId}
       ${w.allowed ? db`and c.location_id = any(${w.allowed}::text[])` : db``}`;
-  return c ? { tags: ((c.tags as string[] | null) ?? []).map((t) => t.toLowerCase()), companyId: c.company_id as string } : null;
+  return c ? { rawTags: ((c.tags as string[] | null) ?? []), tags: ((c.tags as string[] | null) ?? []).map((t) => t.toLowerCase()), companyId: c.company_id as string } : null;
 }
 
 type Claim = { id: string } | { reply: WriteReply };
-async function claim(w: Who, a: { locationId: string; contactId: string; kind: "note" | "outcome"; outcome: string | null; key: string }): Promise<Claim> {
+export async function claim(w: Who, a: { locationId: string; contactId: string; kind: string; outcome: string | null; key: string }): Promise<Claim> {
   const db = sql();
   const [n] = await db`select count(*)::int n from contact_writes where installation_id = ${w.installationId} and created_at > now() - interval '1 hour' and status <> 'failed'`;
   const fresh = await db`
@@ -49,7 +50,7 @@ async function claim(w: Who, a: { locationId: string; contactId: string; kind: "
   return { reply: { ok: true, status: old.status === "dry_run" ? "dry_run" : "saved", message: "Already saved a moment ago. Nothing was added twice.", id: old.id as string, canUndo: true, duplicate: true } };
 }
 
-async function send(w: Who, ctx: { locationId: string; contactId: string; companyId: string }, request: CrmRequest, op: string): Promise<WriteResult> {
+export async function send(w: Who, ctx: { locationId: string; contactId: string; companyId: string }, request: CrmRequest, op: string): Promise<WriteResult> {
   const r = await writeToCrm({ installationId: w.installationId, locationId: ctx.locationId, contactId: ctx.contactId, request, token: () => locationAccessToken(ctx.companyId, ctx.locationId) });
   await recordWrite({ installationId: w.installationId, actor: w.actor, locationId: ctx.locationId, contactId: ctx.contactId, op, fields: Object.keys(request.body), result: r.outcome }).catch(() => undefined);
   return r;
@@ -116,6 +117,11 @@ export async function undoWrite(w: Who, id: string): Promise<WriteReply> {
     const c = await contactOf(w, r.location_id as string, r.contact_id as string);
     if (!c) return { ok: false, status: "unknown", message: "Contact not found" };
     const ctx = { locationId: r.location_id as string, contactId: r.contact_id as string, companyId: c.companyId };
+    if (r.kind === "tag_add" || r.kind === "tag_remove") {
+      const back = await changeTag(w, { locationId: ctx.locationId, contactId: ctx.contactId, tag: r.tag as string, remove: r.kind === "tag_add", confirm: true });
+      if (back.ok) await db`update contact_writes set status = 'undone', undone_at = now() where id = ${id}`;
+      return back.ok ? { ok: true, status: "saved", message: r.kind === "tag_add" ? "Undone. The tag was removed again." : "Undone. The tag is back on the contact." } : back;
+    }
     if (r.status === "saved" && w.granted) {
       if (r.note_id) await send(w, ctx, buildDeleteOwn({ contactId: ctx.contactId, kind: "notes", id: r.note_id as string }), "undo.note.delete");
       if (r.task_id) await send(w, ctx, buildDeleteOwn({ contactId: ctx.contactId, kind: "tasks", id: r.task_id as string }), "undo.task.delete");

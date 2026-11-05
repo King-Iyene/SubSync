@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { buildDeleteOwn, buildNote, buildTags, buildTask, writeToCrm } from "../ghl/crm-writes.ts";
 import { candidateIds } from "../connections/echo.ts";
-import { capReached, idemKey, isOurNote, isOurTag, noteBody, outcomeNoteBody, saveMessage, tagFor, tagPrefix, CAP_PER_HOUR, MARKER } from "../people/writeback.ts";
+import { cleanTag, capReached, idemKey, isOurNote, isOurTag, noteBody, outcomeNoteBody, saveMessage, tagFor, tagPrefix, CAP_PER_HOUR, MARKER } from "../people/writeback.ts";
 
 const NOW = Date.parse("2026-11-05T10:00:30Z");
 
@@ -68,4 +68,15 @@ test("the plain sentences for every state", () => {
 
 test("echo: the id of a note we made is found in the webhook body", () => {
   assert.deepEqual(candidateIds({ type: "NoteCreate", id: "note123456" }), ["note123456"]);
+});
+
+test("tags: a clean name is kept exactly as typed (no date or marker added); empty, long or comma names are refused", () => {
+  assert.equal(cleanTag("  qualified  "), "qualified");
+  assert.equal(cleanTag("web   lead"), "web lead");
+  assert.equal(cleanTag(""), null);
+  assert.equal(cleanTag("a,b"), null);
+  assert.equal(cleanTag("x".repeat(61)), null);
+  assert.equal(cleanTag(5), null);
+  const t = buildTags({ contactId: "c1", tags: ["qualified"], remove: true });
+  assert.deepEqual([t.method, t.body.tags], ["DELETE", ["qualified"]]);
 });

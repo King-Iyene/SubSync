@@ -9,7 +9,7 @@ import { useApiClient, useData } from "../session";
 import { fmtMoney, timeAgo } from "../ui";
 import { ActionStrip, DialNote, useContactActions, type ActionPerson } from "./contact-actions";
 import { DialerSetting } from "./dial-button";
-import { LogCall, NoteToSelf, Timeline } from "./lead-parts";
+import { LogCall, NoteToSelf, TagsEditor, Timeline } from "./lead-parts";
 import { PopMenu } from "./pop-menu";
 import { ErrorState, SkeletonRows } from "./states";
 
@@ -110,24 +110,7 @@ function Body({ seed, top, showAccount, onLogged }: { seed: LeadSeed; top?: Reac
         {c && <Row label="Last activity">{c.lastActivityAt ? timeAgo(c.lastActivityAt) : "None recorded"}</Row>}
       </dl>
 
-      {c && c.tags.length > 0 && (
-        <section className="mt-5" aria-label="Tags" data-testid="drawer-tags">
-          <H3>Tags</H3>
-          <ul className="flex flex-wrap gap-1.5">
-            {c.tags.slice(0, 30).map((t) => (
-              <li key={t} className="rounded border px-1.5 py-0.5 text-xs" data-testid="drawer-tag">
-                <span className="font-medium">{t}</span>
-                <span className="text-muted-foreground">{data!.tagDates[t] ? ` · added ${dayOf(data!.tagDates[t])}` : ""}</span>
-              </li>
-            ))}
-          </ul>
-          <p className="mt-1.5 text-xs text-muted-foreground" data-testid="drawer-tags-note">
-            {data!.watchingSince
-              ? `Your CRM does not say when a tag was added. A day is when SubSync first saw the tag, since it started watching on ${dayOf(data!.watchingSince)}. Older tags have no day.`
-              : "Your CRM does not say when a tag was added. SubSync records the day from now on."}
-          </p>
-        </section>
-      )}
+      {c && <TagsEditor key={seed.contactId} locationId={seed.locationId} contactId={seed.contactId} name={name} tags={c.tags} tagDates={data!.tagDates} tagExact={data!.tagExact ?? {}} watchingSince={data!.watchingSince} />}
 
       {data && data.deals.length > 0 && (
         <section className="mt-5" aria-label="Deals">
