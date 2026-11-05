@@ -239,7 +239,7 @@ describe("the menu structure", () => {
     // Connections (stage E0) is Settings, Integrations now (4 Nov 2026): not a menu entry of its own. A client's staff, who have no Settings, get an Integrations entry (tests/unit/connections-in-settings.test.ts).
   });
   it("nothing that was visible has gone: every page is still in the menu, under More, or a tab of its parent", () => {
-    for (const id of ["overview", "accounts", "team", "pipeline", "onboarding", "duplicates", "cleanup", "meetings"]) expect(NAV.find((n) => n.id === id)?.group, id).toBe("More");
+    for (const id of ["overview", "team", "pipeline", "meetings", "workflows", "data-health"]) expect(NAV.find((n) => n.id === id)?.group, id).toBe("More");
     // Stage C1: Accounts and Setup became tabs of the Clients module (their addresses still open it), so an agency finds them there, not in the menu.
     for (const id of ["accounts", "onboarding"]) expect(NAV.find((n) => n.id === id)?.parent, id).toBe("clients");
     expect(NAV.find((n) => n.id === "onboarding")?.showWhenLimited, "a business keeps its own Setup in its menu").toBe(true);

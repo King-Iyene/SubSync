@@ -129,7 +129,7 @@ export function SettingsView({ openSection }: { openSection?: SectionId } = {}) 
       <PageHeader title="Settings" subtitle="What counts as late, where alerts go, who can see what, and your data. Pick a section." />
       {msg && <p className={`mb-4 border-l-2 py-1 pl-3 text-sm ${msg.ok ? "border-success" : "border-destructive"}`} role={msg.ok ? "status" : "alert"} data-testid="settings-message">{msg.text}</p>}
 
-      <div className="grid gap-5">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-5">
         <nav aria-label="Settings sections" data-testid="settings-nav" className="flex max-w-full gap-1 overflow-x-auto border-b pb-2">
           {sections.map((s) => (
             <button key={s.id} type="button" onClick={() => choose(s.id)} aria-current={s.id === section ? "page" : undefined}
