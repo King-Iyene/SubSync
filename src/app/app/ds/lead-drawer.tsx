@@ -7,7 +7,7 @@ import { neighbours } from "@/lib/design/ui-logic";
 import { withLive } from "@/lib/people/person";
 import { useApiClient, useData } from "../session";
 import { fmtMoney, timeAgo } from "../ui";
-import { ActionStrip, dialNoteText, useContactActions, type ActionPerson } from "./contact-actions";
+import { ActionStrip, useContactActions, type ActionPerson } from "./contact-actions";
 import { DialerSetting } from "./dial-button";
 import { HeldNote } from "./held";
 import { InfoTip } from "./info-tip";
@@ -45,6 +45,9 @@ type Live = {
   live: { state: "ok" | "needs_permission" | "unavailable" | "off"; customFields: Array<{ name: string; value: string }>; calls: Array<{ at: string; direction: string | null; result: string; by: string | null }>; messages: Array<{ at: string; direction: string | null; channel: string; by: string | null }>; note: string | null };
 };
 type Person = Omit<PersonDetail, "conversationId"> & { ownerName: string; url: string; lastSeenAt: string | null; changed: { count: number; titles: string[]; line: string } | null; now: number };
+
+// What the three buttons do in this panel: Call goes where the person chose, Text and Email open the message form here (a preview first, and nothing is sent unless sending from SubSync is switched on for the account).
+const panelNote = (provider: string) => `${provider === "phone" ? "Call opens the phone or softphone on this device." : provider === "connected" ? "Call opens your connected dialer in a new tab." : "Call opens the person in your CRM, where its own dialer places the call."} Text and Email open the message form below: you see a preview first, and nothing is sent unless sending from SubSync is switched on. SubSync itself never places a call.`;
 
 const dayOf = (iso: string) => new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
 
@@ -119,7 +122,7 @@ function Body({ seed, top, showAccount, onLogged }: { seed: LeadSeed; top?: Reac
       {(!email || !phone) && <p id="drawer-email-why" className="mt-2 text-xs text-muted-foreground" data-testid="drawer-no-contact-way">{!email && !phone ? "This contact has no email address and no phone number in your CRM." : !email ? "Email is off because this contact has no email address in your CRM." : "Call and Text are off because this contact has no phone number in your CRM."}</p>}
       <ActionStrip actions={actions} k="panel" className="mt-2" />
       {c && data && <TagsSection key={seed.contactId} locationId={seed.locationId} contactId={seed.contactId} name={name} tags={c.tags} tagDates={data.tagDates} tagExact={data.tagExact ?? {}} />}
-      <div className="mt-2 flex flex-wrap items-start justify-between gap-x-4 gap-y-1"><DialerSetting /><InfoTip label="About Call and Email" text={dialNoteText(actions.provider)} /></div>
+      <div className="mt-2 flex flex-wrap items-start justify-between gap-x-4 gap-y-1"><DialerSetting /><InfoTip label="About Call and Email" text={panelNote(actions.provider)} /></div>
       {person.loading && !data && <div className="mt-5"><SkeletonRows rows={4} label="Loading this person..." /></div>}
 
       {wb && (

@@ -35,6 +35,7 @@ async function openPanel(page: Page) {
   const drawer = page.getByTestId("lead-drawer");
   await expect(drawer).toBeVisible();
   await expect(drawer.getByTestId("drawer-headline")).toHaveText(/\S/, { timeout: 90_000 });
+  await expect(page.getByTestId("wb-work")).toBeVisible({ timeout: 120_000 }); // the work area loads after the headline and moves what is below it
   return drawer;
 }
 
@@ -43,7 +44,8 @@ test("a note is saved to the contact, shows each state, can be undone, and Copy 
   let mode: Mode = "saved";
   const posts = await fake(page, () => mode);
   const drawer = await openPanel(page);
-  await drawer.getByText("Add a note to this contact").click();
+  await drawer.getByText("Add a note to this contact").click({ position: { x: 24, y: 10 } });
+  await drawer.getByRole("button", { name: "About notes" }).hover();
   await expect(drawer.getByTestId("note-to-self").getByRole("tooltip")).toContainText("marked as added in SubSync");
   await expect(drawer.getByTestId("note-save")).toBeDisabled();
   await drawer.getByTestId("note-text").fill("Wants a quote by Friday");
@@ -75,7 +77,7 @@ test("each call outcome button writes once, double clicks are one save, Undo wor
   if (!(await log.count())) test.skip(true, "this contact has no phone number, so the call log is not offered");
   // The panel moves to the next person after each logged call, so what was written stays in the panel's footer (with Undo).
   const open = async () => { for (let i = 0; i < 8 && !(await drawer.getByTestId("log-call").count()); i++) { await drawer.getByRole("button", { name: "Next lead" }).click(); await page.waitForTimeout(400); }
-    const l = drawer.getByTestId("log-call"); await l.waitFor({ timeout: 20_000 }); if (!(await l.evaluate((el) => (el as HTMLDetailsElement).open))) await l.getByText("Log how the call went").click(); return l; };
+    const l = drawer.getByTestId("log-call"); await l.waitFor({ timeout: 20_000 }); if (!(await l.evaluate((el) => (el as HTMLDetailsElement).open))) await l.getByText("Log how the call went").click({ position: { x: 24, y: 10 } }); return l; };
   for (const k of ["answered", "voicemail", "no_answer", "wrong_number", "booked", "not_interested", "follow_up"]) {
     const l = await open();
     await l.getByTestId(`log-${k}`).click();
@@ -93,19 +95,16 @@ test("each call outcome button writes once, double clicks are one save, Undo wor
   await page.screenshot({ path: `${SHOTS}/contact-writeback-call-${info.project.name}.png` });
 });
 
-test("Email opens the contact in the CRM; a contact with no address has it disabled with the reason", async ({ page, context }) => {
+test("Email opens the message form in the panel (nothing leaves SubSync until switched on); a contact with no address has it disabled with the reason", async ({ page }) => {
   test.setTimeout(300_000);
   const drawer = await openPanel(page);
   const email = drawer.getByTestId("drawer-email");
   if (await email.isDisabled()) {
-    await expect(drawer.getByTestId("drawer-no-contact-way")).toContainText(/no email address/i);
+    await expect(drawer.getByTestId("drawer-no-contact-way")).toContainText(/no email address|asked not to be contacted/i);
     return;
   }
-  const popup = context.waitForEvent("page", { timeout: 15_000 });
   await email.click();
-  const strip = page.getByTestId("dial-warning");
-  if (await strip.count()) await page.getByTestId("dial-anyway").click();
-  expect((await popup).url(), "a new tab opened").toBeTruthy();
+  await expect(drawer.getByTestId("wb-composer")).toBeVisible();
 });
 
 test("tags: a clear section under the actions, searchable picker with create, colour chips, date only, confirmed removal, undo, tooltips instead of sentences", async ({ page }, info) => {
@@ -169,8 +168,8 @@ test("Call with: a connected dialer needs a valid https link and saves only the 
     return r.fulfill({ json: { provider: "phone" } });
   });
   await fake(page, () => "saved");
-  await openPanel(page);
-  const setting = page.getByTestId("dialer-setting").first();
+  const drawer = await openPanel(page);
+  const setting = drawer.getByTestId("dialer-setting").first();
   if (await setting.count()) {
     await setting.getByTestId("dialer-select").selectOption("connected");
     await setting.getByTestId("dialer-template").fill("http://bad.example.com/{phone}");
