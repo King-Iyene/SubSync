@@ -13,9 +13,9 @@ export function validLogoUrl(value: unknown): string | null {
   return u.href;
 }
 
-/** The logo to show: the owner's address, else the detected one. */
-export function effectiveLogo(brandLogoUrl: string | null | undefined, detectedLogoUrl: string | null | undefined): string | null {
-  return validLogoUrl(brandLogoUrl) ?? validLogoUrl(detectedLogoUrl);
+/** The logo to show: only the address the owner typed in Settings. The logo the platform sent is kept but never shown on its own: without a chosen logo the SubSync logo shows. */
+export function effectiveLogo(brandLogoUrl: string | null | undefined, _detectedLogoUrl?: string | null | undefined): string | null {
+  return validLogoUrl(brandLogoUrl);
 }
 
 const escAttr = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");

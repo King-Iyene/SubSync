@@ -50,7 +50,7 @@ export function Timeline({ items, nowMs, note }: { items: readonly TimelineItem[
 const OUTCOMES: Array<[string, string]> = [["answered", "Answered"], ["voicemail", "Voicemail"], ["no_answer", "No answer"], ["wrong_number", "Wrong number"], ["booked", "Booked"], ["not_interested", "Not interested"], ["follow_up", "Follow up in 3 days"]];
 
 /** Undo is a delete in the CRM (the note, task or tag SubSync made), so it asks first, in plain words. */
-function UndoButton({ onConfirm, busy, testId }: { onConfirm: () => void; busy: boolean; testId: string }) {
+export function UndoButton({ onConfirm, busy, testId }: { onConfirm: () => void; busy: boolean; testId: string }) {
   const [asking, setAsking] = useState(false);
   if (!asking) return <button type="button" disabled={busy} onClick={() => setAsking(true)} className="ml-2 min-h-9 cursor-pointer font-medium underline" data-testid={testId}>Undo</button>;
   return (
@@ -66,7 +66,7 @@ type Reply = { ok: boolean; status: string; message: string; id?: string; canUnd
 const BTN = "ds-press inline-flex min-h-11 cursor-pointer items-center rounded-md border bg-card px-3 text-sm font-medium hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-9";
 
 /** One tap to write down how a call went. It is saved on the contact in your CRM (a note, a tag, and for "follow up" a task) and on SubSync's own list, so the person leaves the call lists for 12 hours. */
-export function LogCall({ locationId, contactId, onLogged }: { locationId: string; contactId: string; onLogged: (label: string) => void }) {
+export function LogCall({ locationId, contactId, onLogged }: { locationId: string; contactId: string; onLogged: (label: string, message?: string, id?: string) => void }) {
   const api = useApiClient();
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
@@ -77,7 +77,7 @@ export function LogCall({ locationId, contactId, onLogged }: { locationId: strin
     try {
       const r = await api.post<Reply>("people/outcome", { locationId, contactId, outcome });
       setMsg({ text: `${label}: ${r.message}`, ok: r.ok });
-      if (r.ok) { onLogged(label); setLast(r.id ? { id: r.id, label } : null); }
+      if (r.ok) { onLogged(label, r.message, r.id); setLast(r.id ? { id: r.id, label } : null); }
     } catch (e) { setMsg({ text: (e as Error).message, ok: false }); }
     finally { setBusy(false); }
   };

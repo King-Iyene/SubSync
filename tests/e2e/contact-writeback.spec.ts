@@ -73,19 +73,21 @@ test("each call outcome button writes once, double clicks are one save, Undo wor
   const drawer = await openPanel(page);
   const log = drawer.getByTestId("log-call");
   if (!(await log.count())) test.skip(true, "this contact has no phone number, so the call log is not offered");
-  await log.getByText("Log how the call went").click();
+  // The panel moves to the next person after each logged call, so what was written stays in the panel's footer (with Undo).
+  const open = async () => { const l = drawer.getByTestId("log-call"); await l.waitFor(); if (!(await l.evaluate((el) => (el as HTMLDetailsElement).open))) await l.getByText("Log how the call went").click(); return l; };
   for (const k of ["answered", "voicemail", "no_answer", "wrong_number", "booked", "not_interested", "follow_up"]) {
-    await log.getByTestId(`log-${k}`).click();
-    await expect(log.getByTestId("log-status")).toContainText("Saved to the contact in your CRM");
+    const l = await open();
+    await l.getByTestId(`log-${k}`).click();
+    await expect(drawer.getByTestId("drawer-saved")).toContainText("Saved to the contact in your CRM");
     expect(posts.at(-1)).toMatchObject({ path: "outcome", body: { outcome: k } });
   }
   const before = posts.length;
-  await log.getByTestId("log-voicemail").dblclick();
-  await expect(log.getByTestId("log-status")).toContainText(/Saved|Already saved/);
+  await (await open()).getByTestId("log-voicemail").dblclick();
+  await expect(drawer.getByTestId("drawer-saved")).toContainText(/Saved|Already saved/);
   expect(posts.length - before, "a double click sends at most one request").toBeLessThanOrEqual(1);
-  await log.getByTestId("log-undo").click();
-  await log.getByTestId("log-undo-yes").click();
-  await expect(log.getByTestId("log-status")).toContainText("Undone");
+  await drawer.getByTestId("drawer-saved-undo").click();
+  await drawer.getByTestId("drawer-saved-undo-yes").click();
+  await expect(drawer.getByTestId("drawer-saved")).toContainText("Undone");
   expect(await drawer.innerText()).not.toMatch(/gohighlevel|highlevel|leadconnector|\bghl\b|does not save|Nothing is sent to your CRM/i);
   await page.screenshot({ path: `${SHOTS}/contact-writeback-call-${info.project.name}.png` });
 });

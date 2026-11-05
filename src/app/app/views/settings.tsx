@@ -298,10 +298,10 @@ export function SettingsView({ openSection }: { openSection?: SectionId } = {}) 
                 <div className="sm:col-span-2">
                   <label htmlFor="brand-logo" className="mb-1 block text-sm font-medium">Logo web address</label>
                   <input id="brand-logo" type="url" inputMode="url" className={inputClass} maxLength={500} placeholder="https://example.com/logo.png" value={form.brandLogoUrl ?? ""} onChange={(e) => setForm({ ...form, brandLogoUrl: e.target.value.trim() || null })} data-testid="brand-logo" />
-                  <p className="mt-1 text-xs text-muted-foreground">{form.brandLogoUrl ? "Starts with https://. Leave it empty to use the logo your platform sent." : form.detectedLogoUrl ? "Using the logo your platform sent. Type an address to use another." : "Starts with https://. We never download it. Your browser loads it."}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{form.brandLogoUrl ? "Starts with https://. Leave it empty to go back to the SubSync logo." : "Starts with https://. Leave it empty to show the SubSync logo. We never download it. Your browser loads it."}</p>
                 </div>
               </div>
-              <BrandPreview name={form.brandName} color={form.brandColor} logoUrl={form.brandLogoUrl ?? form.detectedLogoUrl ?? null} />
+              <BrandPreview name={form.brandName} color={form.brandColor} logoUrl={form.brandLogoUrl ?? null} />
             </Card>
           )}
 
