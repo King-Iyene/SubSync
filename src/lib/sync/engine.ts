@@ -1,4 +1,5 @@
 import { isBusinessKey, locationOfBusinessKey } from "../access";
+import { isOurTag, tagPrefix } from "../people/writeback";
 import { safeError } from "../safe-log";
 import { maintenanceOn } from "../runtime-guards";
 import { refreshInsights } from "../analytics/service";
@@ -273,8 +274,11 @@ async function recordTagEvents(installationId: string, loc: string, incoming: Co
       new Map(before.map((r) => [r.contact_id as string, r.tags as string[] | null])),
       prior?.contacts_synced_at != null,
     );
-    if (events.length === 0) return;
-    const rows = events.map((e) => ({ installation_id: installationId, location_id: loc, contact_id: e.contactId, tag: e.tag, kind: e.kind }));
+    // A tag SubSync itself added (the call-outcome tags) is not a change the customer made: it is kept out of tag history (principle 14).
+    const prefix = tagPrefix();
+    const theirs = events.filter((e) => !isOurTag(e.tag, prefix));
+    if (theirs.length === 0) return;
+    const rows = theirs.map((e) => ({ installation_id: installationId, location_id: loc, contact_id: e.contactId, tag: e.tag, kind: e.kind }));
     await db`insert into contact_tag_events ${db(rows as never)}`;
   } catch (error) {
     console.error("tag history not recorded", { message: safeError(error) });

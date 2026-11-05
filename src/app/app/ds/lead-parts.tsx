@@ -49,47 +49,85 @@ export function Timeline({ items, nowMs, note }: { items: readonly TimelineItem[
 
 const OUTCOMES: Array<[string, string]> = [["answered", "Answered"], ["voicemail", "Voicemail"], ["no_answer", "No answer"], ["wrong_number", "Wrong number"], ["booked", "Booked"], ["not_interested", "Not interested"], ["follow_up", "Follow up in 3 days"]];
 
-/** One tap to write down how a call went. It is SubSync's own record (it keeps the lists moving and feeds "last call"); nothing is sent to the CRM. */
+type Reply = { ok: boolean; status: string; message: string; id?: string; canUndo?: boolean };
+const BTN = "ds-press inline-flex min-h-11 cursor-pointer items-center rounded-md border bg-card px-3 text-sm font-medium hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-9";
+
+/** One tap to write down how a call went. It is saved on the contact in your CRM (a note, a tag, and for "follow up" a task) and on SubSync's own list, so the person leaves the call lists for 12 hours. */
 export function LogCall({ locationId, contactId, onLogged }: { locationId: string; contactId: string; onLogged: (label: string) => void }) {
   const api = useApiClient();
   const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
+  const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  const [last, setLast] = useState<{ id: string; label: string } | null>(null);
   const log = async (outcome: string, label: string) => {
-    setBusy(true); setMsg(null);
-    try { await api.post("people/outcome", { locationId, contactId, outcome }); setMsg(`Logged: ${label}.`); onLogged(label); }
-    catch (e) { setMsg((e as Error).message); }
+    if (busy) return;
+    setBusy(true); setMsg({ text: "Saving...", ok: true });
+    try {
+      const r = await api.post<Reply>("people/outcome", { locationId, contactId, outcome });
+      setMsg({ text: `${label}: ${r.message}`, ok: r.ok });
+      if (r.ok) { onLogged(label); setLast(r.id ? { id: r.id, label } : null); }
+    } catch (e) { setMsg({ text: (e as Error).message, ok: false }); }
+    finally { setBusy(false); }
+  };
+  const undo = async () => {
+    if (!last || busy) return;
+    setBusy(true);
+    try { const r = await api.post<Reply>("people/write-undo", { id: last.id }); setMsg({ text: r.message, ok: r.ok }); if (r.ok) setLast(null); }
+    catch (e) { setMsg({ text: (e as Error).message, ok: false }); }
     finally { setBusy(false); }
   };
   return (
     <details className="mt-4 border-t pt-3" data-testid="log-call">
       <summary className="min-h-9 cursor-pointer text-sm font-medium">Log how the call went</summary>
-      <p className="mt-1 text-xs text-muted-foreground">SubSync keeps this on its own list so the person leaves the call lists for 12 hours. Nothing is sent to your CRM.</p>
+      <p className="mt-1 text-xs text-muted-foreground">Saved as a note on this contact in your CRM (and a tag; a task for "Follow up in 3 days"). The person also leaves the call lists for 12 hours. Nothing is ever sent to them.</p>
       <div className="mt-2 flex flex-wrap gap-2">
-        {OUTCOMES.map(([k, l]) => <button key={k} type="button" disabled={busy} onClick={() => void log(k, l)} className="ds-press inline-flex min-h-11 items-center rounded-md border bg-card px-3 text-sm font-medium hover:bg-accent disabled:opacity-50 sm:min-h-9" data-testid={`log-${k}`}>{l}</button>)}
+        {OUTCOMES.map(([k, l]) => <button key={k} type="button" disabled={busy} onClick={() => void log(k, l)} className={BTN} data-testid={`log-${k}`}>{l}</button>)}
       </div>
-      {msg && <p className="mt-2 text-xs text-muted-foreground" role="status">{msg}</p>}
+      {msg && (
+        <p className={`mt-2 text-xs ${msg.ok ? "text-muted-foreground" : "font-medium text-destructive"}`} role="status" data-testid="log-status">
+          {msg.text}
+          {last && <button type="button" disabled={busy} onClick={() => void undo()} className="ml-2 min-h-9 cursor-pointer font-medium underline" data-testid="log-undo">Undo</button>}
+        </p>
+      )}
     </details>
   );
 }
 
-/** A note to paste into the CRM by hand. SubSync writes nothing there, and does not keep what is typed. */
-export function NoteToSelf({ name, account }: { name: string; account: string | null }) {
+/** A note typed here is saved to the contact in the CRM. "Copy note" stays as a fallback. */
+export function NoteToSelf({ locationId, contactId, name, account }: { locationId: string; contactId: string; name: string; account: string | null }) {
+  const api = useApiClient();
   const [text, setText] = useState("");
-  const [state, setState] = useState<"idle" | "copied" | "failed">("idle");
+  const [state, setState] = useState<{ kind: "idle" | "saving" | "saved" | "failed" | "copied"; text?: string; id?: string }>({ kind: "idle" });
+  const save = async () => {
+    if (!text.trim() || state.kind === "saving") return;
+    setState({ kind: "saving" });
+    try {
+      const r = await api.post<Reply>("people/note", { locationId, contactId, text });
+      if (r.status === "saved") { setText(""); setState({ kind: "saved", text: r.message, id: r.id }); }
+      else setState({ kind: r.ok ? "saved" : "failed", text: r.message });
+    } catch (e) { setState({ kind: "failed", text: (e as Error).message }); }
+  };
+  const undo = async () => {
+    if (!state.id) return;
+    try { const r = await api.post<Reply>("people/write-undo", { id: state.id }); setState({ kind: r.ok ? "idle" : "failed", text: r.message }); } catch (e) { setState({ kind: "failed", text: (e as Error).message }); }
+  };
   const copy = async () => {
     const n = noteToSelf({ name, account, text, now: new Date() });
     if (!n) return;
-    try { await navigator.clipboard.writeText(n); setState("copied"); setTimeout(() => setState("idle"), 2500); } catch { setState("failed"); window.prompt("Copy this note", n); }
+    try { await navigator.clipboard.writeText(n); setState({ kind: "copied", text: "Copied." }); setTimeout(() => setState({ kind: "idle" }), 2500); } catch { window.prompt("Copy this note", n); }
   };
   return (
     <details className="mt-3 border-t pt-3" data-testid="note-to-self">
-      <summary className="min-h-9 cursor-pointer text-sm font-medium">Write a note to paste into your CRM</summary>
+      <summary className="min-h-9 cursor-pointer text-sm font-medium">Add a note to this contact</summary>
       <label htmlFor="note-text" className="sr-only">Note about {name}</label>
-      <textarea id="note-text" value={text} onChange={(e) => setText(e.target.value)} maxLength={2000} rows={3} placeholder="What happened, what was promised..." className="mt-2 w-full rounded-md border bg-background px-3 py-2 text-sm" />
-      <div className="mt-1 flex items-center gap-3">
-        <button type="button" disabled={!text.trim()} onClick={() => void copy()} className="ds-press inline-flex min-h-11 items-center rounded-md border bg-card px-3 text-sm font-medium hover:bg-accent disabled:opacity-50 sm:min-h-9" data-testid="note-copy">Copy the note</button>
-        <span className="text-xs text-muted-foreground" role="status">{state === "copied" ? "Copied. Paste it into the contact's notes in your CRM." : "SubSync does not save this or send it anywhere."}</span>
+      <textarea id="note-text" value={text} onChange={(e) => setText(e.target.value)} maxLength={2000} rows={3} placeholder="What happened, what was promised..." className="mt-2 w-full rounded-md border bg-background px-3 py-2 text-sm" data-testid="note-text" />
+      <div className="mt-1 flex flex-wrap items-center gap-2">
+        <button type="button" disabled={!text.trim() || state.kind === "saving"} onClick={() => void save()} className={`${BTN} bg-primary text-primary-foreground hover:bg-primary/90`} data-testid="note-save">{state.kind === "saving" ? "Saving..." : "Save to your CRM"}</button>
+        <button type="button" disabled={!text.trim()} onClick={() => void copy()} className={BTN} data-testid="note-copy">Copy note</button>
       </div>
+      <p className={`mt-1 text-xs ${state.kind === "failed" ? "font-medium text-destructive" : "text-muted-foreground"}`} role="status" data-testid="note-status">
+        {state.text ?? "Saved on this contact in your CRM, marked as added in SubSync."}
+        {state.kind === "saved" && state.id && <button type="button" onClick={() => void undo()} className="ml-2 min-h-9 cursor-pointer font-medium underline" data-testid="note-undo">Undo</button>}
+      </p>
     </details>
   );
 }

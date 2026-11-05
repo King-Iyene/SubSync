@@ -1,4 +1,7 @@
-import { logOutcome } from "../analytics/call-queries";
+import { saveContactNote, undoWrite, writeCallOutcome } from "../analytics/contact-writeback";
+import { NOTE_MAX } from "../people/writeback";
+import { parseGranted } from "../scope-groups";
+import { sql } from "../db";
 import { parseOutcome } from "../analytics/call-intel";
 import { teamNames } from "../analytics/inbox-queries";
 import { forgetPeopleLists, hydratePeople, peopleCounts, peopleQueue, type ListRow } from "../analytics/people-queue-queries";
@@ -19,7 +22,9 @@ import { json, type AuthContext } from "./auth";
 //   GET    people/person/<account>/<id>      the lead panel: headline, deals, tags with days, timeline, what changed since the asker last looked
 //   PUT    people/seen                       the asker opened this person now (for "what changed since you last looked" and "Recently opened")
 //   GET    people/recent / POST / DELETE     recent searches and recently opened people of the asker
-//   POST   people/outcome                    one call logged from SubSync (SubSync's own record, never sent to the CRM)
+//   POST   people/outcome                    one call logged: SubSync's own record AND a note (tag, task) on the lead in the CRM
+//   POST   people/note                       a typed note saved to the lead in the CRM
+//   POST   people/write-undo                 removes what the last save created
 
 type Ctx = AuthContext & { request: Request; url: URL; segments: string[] };
 
@@ -115,13 +120,24 @@ export async function handlePeopleQueue(ctx: Ctx, h: QueueHelpers): Promise<Resp
     }
   }
 
-  if (m === "POST" && b === "outcome") {
-    const parsed = parseOutcome(await ctx.request.json().catch(() => null));
+  // Writing to the lead in the CRM (docs/features/CONTACT_WRITEBACK.md). Who is writing, and which accounts, come from the signed session only.
+  if (m === "POST" && (b === "outcome" || b === "note" || b === "write-undo")) {
+    const [inst] = ctx.demo ? [null] : await sql()`select scope from installations where id = ${ctx.installationId}`;
+    const g = typeof inst?.scope !== "string" || inst.scope.trim() === "" ? null : parseGranted(inst.scope as string);
+    const who = { installationId: ctx.installationId, allowed: await h.allowed(), actor: ctx.session.userId ?? null, actorName: ctx.session.userName ?? null, granted: g === null || g.includes("contacts.write") };
+    const body = (await ctx.request.json().catch(() => null)) as Record<string, unknown> | null;
+    const reply = (r: Awaited<ReturnType<typeof saveContactNote>>) => json({ ...r, ...(r.status === "unknown" || r.status === "limit" ? { error: r.message } : {}) }, r.status === "unknown" ? 404 : r.status === "limit" ? 429 : 200);
+    if (b === "write-undo") return reply(await undoWrite(who, typeof body?.id === "string" ? body.id : ""));
+    if (b === "note") {
+      const text = typeof body?.text === "string" ? body.text.trim() : "";
+      if (!text || text.length > NOTE_MAX || typeof body?.locationId !== "string" || typeof body?.contactId !== "string" || !CONTACT_ID.test(body.contactId)) return json({ error: "Type a note of up to " + NOTE_MAX + " characters" }, 400);
+      return reply(await saveContactNote(who, { locationId: body.locationId, contactId: body.contactId, text }));
+    }
+    const parsed = parseOutcome(body);
     if (!parsed.ok) return json({ error: parsed.error }, 400);
-    const ok = await logOutcome(ctx.installationId, await h.allowed(), parsed.value);
-    if (!ok) return json({ error: "Contact not found" }, 404);
+    const r = await writeCallOutcome(who, parsed.value);
     forgetPeopleLists(ctx.installationId);
-    return json({ ok: true });
+    return reply(r);
   }
 
   return null;

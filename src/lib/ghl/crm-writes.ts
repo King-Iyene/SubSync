@@ -7,7 +7,7 @@ import { ghlFetch } from "./http.ts";
 // "WOULD WRITE ..." (ids and field names only) and NOTHING is sent. The request shapes below follow the documented API
 // (docs/INTEGRATIONS_SPEC.md section 4) and are NOT VERIFIED LIVE: see docs/features/E0.md for the exact test that proves each one.
 
-export type WriteKind = "note" | "comment" | "field";
+export type WriteKind = "note" | "comment" | "field" | "task" | "tag";
 
 /**
  * Conservative size limits, ASSUMED until the morning test (scripts/ghl-write-limits.ts) has measured the real ones. The documentation does not state a
@@ -23,7 +23,10 @@ const CONVERSATION_VERSION = "2021-04-15";
 export type NoteRequest = { method: "POST"; path: string; version: string; scope: "contacts.write"; body: { body: string; userId?: string } };
 export type CommentRequest = { method: "POST"; path: string; version: string; scope: "conversations/message.write"; body: { type: "InternalComment"; contactId: string; message: string; userId?: string } };
 export type FieldRequest = { method: "PUT"; path: string; version: string; scope: "contacts.write"; body: { customFields: Array<{ id: string; field_value: string }> } };
-export type CrmRequest = NoteRequest | CommentRequest | FieldRequest;
+export type TaskRequest = { method: "POST"; path: string; version: string; scope: "contacts.write"; body: { title: string; body?: string; dueDate: string; completed: false } };
+export type TagRequest = { method: "POST" | "DELETE"; path: string; version: string; scope: "contacts.write"; body: { tags: string[] } };
+export type DeleteRequest = { method: "DELETE"; path: string; version: string; scope: "contacts.write"; body: Record<string, never> };
+export type CrmRequest = NoteRequest | CommentRequest | FieldRequest | TaskRequest | TagRequest | DeleteRequest;
 
 const seg = (v: string) => encodeURIComponent(v);
 
@@ -43,6 +46,20 @@ export const buildComment = (a: { contactId: string; message: string; userId?: s
 export const buildFieldUpdate = (a: { contactId: string; fields: Array<{ id: string; value: string }> }): FieldRequest => ({
   method: "PUT", path: `/contacts/${seg(a.contactId)}`, version: NOTE_VERSION, scope: "contacts.write",
   body: { customFields: a.fields.map((f) => ({ id: f.id, field_value: f.value })) },
+});
+
+/** POST /contacts/{contactId}/tasks (VERIFIED in the API description, 5 Nov 2026: title, dueDate and completed are required; scope contacts.write). */
+export const buildTask = (a: { contactId: string; title: string; body?: string; dueDate: Date }): TaskRequest => ({
+  method: "POST", path: `/contacts/${seg(a.contactId)}/tasks`, version: NOTE_VERSION, scope: "contacts.write",
+  body: { title: a.title, ...(a.body ? { body: a.body } : {}), dueDate: a.dueDate.toISOString(), completed: false },
+});
+/** POST or DELETE /contacts/{contactId}/tags (scope contacts.write): add or remove tags on one contact. */
+export const buildTags = (a: { contactId: string; tags: string[]; remove?: boolean }): TagRequest => ({
+  method: a.remove ? "DELETE" : "POST", path: `/contacts/${seg(a.contactId)}/tags`, version: NOTE_VERSION, scope: "contacts.write", body: { tags: a.tags },
+});
+/** DELETE /contacts/{contactId}/notes/{id} or /tasks/{id}: removes one thing SubSync itself created (Undo). */
+export const buildDeleteOwn = (a: { contactId: string; kind: "notes" | "tasks"; id: string }): DeleteRequest => ({
+  method: "DELETE", path: `/contacts/${seg(a.contactId)}/${a.kind}/${seg(a.id)}`, version: NOTE_VERSION, scope: "contacts.write", body: {},
 });
 
 /** Field names a request would write, for the dry-run line (names only, never values). */
@@ -75,14 +92,16 @@ export function idFromAnswer(json: unknown): string | null {
 }
 
 export async function writeToCrm(a: WriteArgs, deps: Deps = {}): Promise<WriteResult> {
-  const kind: WriteKind = a.request.path.startsWith("/conversations") ? "comment" : a.request.method === "PUT" ? "field" : "note";
+  const p = a.request.path;
+  const kind: WriteKind = p.startsWith("/conversations") ? "comment" : a.request.method === "PUT" ? "field" : p.endsWith("/tags") ? "tag" : /\/tasks(\/|$)/.test(p) ? "task" : "note";
+  const del = a.request.method === "DELETE" && kind !== "tag";
   const done = await outward(
-    { flag: "WRITE_GHL_LIVE", verb: "WRITE", what: `crm.${kind}.${kind === "field" ? "update" : "create"}`, installationId: a.installationId, ids: { locationId: a.locationId, contactId: a.contactId, meetingId: a.meetingId ?? null }, fields: fieldNamesOf(a.request) },
+    { flag: "WRITE_GHL_LIVE", verb: "WRITE", what: `crm.${kind}.${del ? "delete" : a.request.method === "DELETE" ? "remove" : kind === "field" ? "update" : "create"}`, installationId: a.installationId, ids: { locationId: a.locationId, contactId: a.contactId, meetingId: a.meetingId ?? null }, fields: fieldNamesOf(a.request) },
     async (): Promise<WriteResult> => {
       const res = await ghlFetch(`${GHL_API}${a.request.path}`, {
         method: a.request.method,
         headers: { Authorization: `Bearer ${await a.token()}`, Version: a.request.version, Accept: "application/json", "Content-Type": "application/json" },
-        body: JSON.stringify(a.request.body),
+        ...(a.request.method === "DELETE" && Object.keys(a.request.body).length === 0 ? {} : { body: JSON.stringify(a.request.body) }),
         cache: "no-store",
       }, a.fetchImpl ? { fetchImpl: a.fetchImpl } : {});
       if (res.status === 401 || res.status === 403) return { outcome: "needs_permission" };

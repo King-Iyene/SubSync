@@ -90,13 +90,14 @@ function Body({ seed, top, showAccount, onLogged }: { seed: LeadSeed; top?: Reac
 
       <div className="mt-4 flex flex-wrap items-center gap-2" data-testid="drawer-actions">
         <button type="button" onClick={() => actions.call(ap)} disabled={!phone} className={dnd ? BUTTON : PRIMARY} data-testid="drawer-call">Call{url ? <ExternalLink aria-hidden className="size-3.5" /> : null}</button>
-        <button type="button" onClick={() => actions.email(ap)} disabled={!email} className={BUTTON} data-testid="drawer-email">Email{url ? <ExternalLink aria-hidden className="size-3.5" /> : null}</button>
+        <button type="button" onClick={() => actions.email(ap)} disabled={!email} title={email ? undefined : "This contact has no email address"} aria-describedby={email ? undefined : "drawer-email-why"} className={BUTTON} data-testid="drawer-email">Email{url ? <ExternalLink aria-hidden className="size-3.5" /> : null}</button>
         <PopMenu label={`More for ${name}`} testId="drawer-more" triggerClassName="ds-press inline-flex size-11 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-[var(--ring)] sm:size-9"
           items={[
             { key: "copy", label: actions.copied === "panel" ? "Copied" : "Copy details", onSelect: () => void actions.copy(ap, showAccount) },
             ...(url ? [{ key: "crm", label: "Open in your CRM", onSelect: () => { window.open(url, "_blank", "noopener,noreferrer"); } }] : []),
           ]}><MoreHorizontal aria-hidden className="size-4" /></PopMenu>
       </div>
+      {(!email || !phone) && <p id="drawer-email-why" className="mt-2 text-xs text-muted-foreground" data-testid="drawer-no-contact-way">{!email && !phone ? "This contact has no email address and no phone number in your CRM." : !email ? "Email is off because this contact has no email address in your CRM." : "Call is off because this contact has no phone number in your CRM."}</p>}
       <ActionStrip actions={actions} k="panel" className="mt-2" />
       <div className="mt-2 flex flex-wrap items-start justify-between gap-x-4 gap-y-1"><DialNote className="max-w-xs" /><DialerSetting /></div>
       {person.loading && !data && <div className="mt-5"><SkeletonRows rows={4} label="Loading this person..." /></div>}
@@ -150,7 +151,7 @@ function Body({ seed, top, showAccount, onLogged }: { seed: LeadSeed; top?: Reac
       )}
 
       {phone && !dnd && c && <LogCall locationId={seed.locationId} contactId={seed.contactId} onLogged={onLogged} />}
-      <NoteToSelf name={name} account={c?.locationName ?? seed.locationName ?? null} />
+      <NoteToSelf locationId={seed.locationId} contactId={seed.contactId} name={name} account={c?.locationName ?? seed.locationName ?? null} />
 
       {data && <Timeline items={timeline} nowMs={data.now} note={extra && extra.live.state !== "off" ? extra.live.note : null} />}
       {url && <p className="mt-6 text-xs"><a href={url} target="_blank" rel="noopener noreferrer" className="text-muted-foreground underline underline-offset-4 hover:text-foreground">Open in your CRM</a></p>}
