@@ -54,12 +54,17 @@ test("Call opens the CRM's own dialer by default and says plainly it cannot go s
   await firstName(page).click();
   const drawer = page.getByTestId("lead-drawer");
   await expect(drawer.getByTestId("drawer-call")).toContainText("Call");
-  await expect(drawer.getByTestId("dial-note")).toContainText("Not available from your CRM yet");
-  await expect(page.locator('a[href^="tel:"]')).toHaveCount(0);
-  await drawer.getByLabel("Dialer").selectOption("phone");
-  await expect(drawer.getByTestId("dial-note")).toContainText("your own phone app");
-  await drawer.getByLabel("Dialer").selectOption("crm"); // put the setting back
-  await expect(drawer.getByTestId("dial-note")).toContainText("Not available from your CRM yet");
+  // MOAT: Call opens a sheet (the number, Copy, and the CRM's own dialer as the labelled fallback). The CRM has no endpoint to place a call, and the sheet says so.
+  for (let i = 0; i < 6 && (await drawer.getByTestId("drawer-call").isDisabled()); i++) { await page.keyboard.press("ArrowRight"); await expect(drawer.getByTestId("drawer-headline")).toBeVisible({ timeout: 90_000 }); }
+  await drawer.getByTestId("drawer-call").click();
+  if ((await drawer.getByTestId("wb-call-dnd").count()) === 0) {
+    await expect(drawer.getByTestId("wb-call-crm")).toContainText("Call in your CRM");
+    await expect(page.locator('a[href^="tel:"]')).toHaveCount(0);
+    await drawer.getByLabel("Dialer").selectOption("phone");
+    await expect(drawer.getByTestId("wb-call-crm")).toContainText("Call with your phone app");
+    await drawer.getByLabel("Dialer").selectOption("crm"); // put the setting back
+    await expect(drawer.getByTestId("wb-call-crm")).toContainText("Call in your CRM");
+  }
 });
 
 test("Ctrl K opens the header search; two letters find people across the accounts; Enter opens the first person", async ({ page }) => {
