@@ -31,10 +31,10 @@ export function ModeToggle({ mode, onChange, label }: { mode: ChartMode; onChang
   );
 }
 
-const W = 640, H = 200, T = 14, B = 26, R = 50;
+const W = 640, H = 200, T = 22, B = 26, R = 50;
 
-export function TimeChart({ points, series, avg, mode, onPick, selectedId, label, noun = "", testId = "time-chart", hint }: {
-  points: ChartPoint[]; series: ChartSeries[]; /** A dashed average line, drawn on both modes. */ avg?: Array<number | null>; mode: ChartMode; onPick?: (i: number) => void; selectedId?: string | null; label: string; noun?: string; testId?: string; hint?: string;
+export function TimeChart({ points, series, avg, mode, onPick, selectedId, label, noun = "", testId = "time-chart", hint, labelEvery, flags, flagWord = "Needs a look" }: {
+  points: ChartPoint[]; series: ChartSeries[]; /** A dashed average line, drawn on both modes. */ avg?: Array<number | null>; mode: ChartMode; onPick?: (i: number) => void; selectedId?: string | null; label: string; noun?: string; testId?: string; hint?: string; /** Draw a label every N points instead of fitting them (hours: every 3). */ labelEvery?: number; /** A warning mark above a point (a gap hour), with the word for the legend. */ flags?: boolean[]; flagWord?: string;
 }) {
   const [hot, setHot] = useState<number | null>(null);
   const n = points.length;
@@ -44,7 +44,7 @@ export function TimeChart({ points, series, avg, mode, onPick, selectedId, label
   const iw = W - L - R, ih = H - T - B;
   const step = iw / Math.max(1, n), x = (i: number) => L + step * i + step / 2, y = (v: number) => T + ih - (v / top) * ih;
   const k = series.length, bar = Math.max(1.5, Math.min(12, (step * 0.72) / k)), gap = k > 1 ? 1.5 : 0;
-  const labels = thinLabels(n, Math.max(2, Math.floor(iw / 58)));
+  const labels = labelEvery ? points.map((_, i) => i).filter((i) => i % labelEvery === 0) : thinLabels(n, Math.max(2, Math.floor(iw / 58)));
   const avgPts = (avg ?? []).map((v, i) => (v === null ? null : ([x(i), y(v)] as const))).filter((p): p is readonly [number, number] => p !== null);
   const lastAvg = [...(avg ?? [])].reverse().find((v) => v !== null && v !== undefined) ?? null;
   const tipP = hot === null ? null : points[hot];
@@ -74,6 +74,7 @@ export function TimeChart({ points, series, avg, mode, onPick, selectedId, label
             </g>
           );
         })}
+        {flags?.map((on, i) => on ? <path key={`flag-${i}`} d={`M${x(i)},${T - 12} l5,9 h-10 z`} fill="var(--t-soon)" pointerEvents="none" data-testid={`${testId}-flag`}><title>{flagWord}</title></path> : null)}
         {hot !== null && <line x1={x(hot)} x2={x(hot)} y1={T} y2={y(0)} stroke="var(--t-rule2)" strokeWidth={1} pointerEvents="none" />}
         {hot !== null && mode === "line" && series.map((s) => <circle key={s.key} cx={x(hot)} cy={y(s.values[hot] ?? 0)} r={4} fill={s.colour} stroke="var(--t-raise)" strokeWidth={1.5} pointerEvents="none" />)}
         {avgPts.length > 1 && <polyline points={avgPts.map((p) => p.join(",")).join(" ")} fill="none" stroke="var(--t-accent)" strokeWidth={2} strokeDasharray="5 4" strokeLinejoin="round" strokeLinecap="round" pointerEvents="none" data-testid="chart-avg" />}
@@ -90,7 +91,7 @@ export function TimeChart({ points, series, avg, mode, onPick, selectedId, label
       <p className="t-small t-quiet mt-1 min-h-5" role="status" aria-live="polite" data-testid={`${testId}-tip`}>
         {tipP && hot !== null ? <><span className="font-medium text-[var(--t-ink)]">{tipP.label}:</span> {series.map((s) => `${fmtFull(s.values[hot] ?? 0)} ${s.name.toLowerCase()}`).join(", ")}{tipP.partial ? " so far today" : ""}{avg && avg[hot] != null ? `. 7 day average ${avg[hot]}.` : "."}</> : hint ?? ""}
       </p>
-      {k > 1 && <ul className="mt-1 flex flex-wrap gap-x-5 gap-y-1 text-xs text-[var(--t-ink2)]" aria-label="What the colours mean">{series.map((s) => <li key={s.key} className="flex items-center gap-1.5"><span aria-hidden className="h-2.5 w-3 rounded-[2px]" style={{ background: s.colour }} />{s.name}</li>)}</ul>}
+      {(k > 1 || flags?.some(Boolean)) && <ul className="mt-1 flex flex-wrap gap-x-5 gap-y-1 text-xs text-[var(--t-ink2)]" aria-label="What the colours mean">{k > 1 && series.map((s) => <li key={s.key} className="flex items-center gap-1.5"><span aria-hidden className="h-2.5 w-3 rounded-[2px]" style={{ background: s.colour }} />{s.name}</li>)}{flags?.some(Boolean) && <li className="flex items-center gap-1.5"><svg aria-hidden viewBox="0 0 10 9" className="h-2.5 w-3"><path d="M5,0 L10,9 H0 Z" fill="var(--t-soon)" /></svg>{flagWord}</li>}</ul>}
       <div className="sr-only"><table><caption>{label}</caption><thead><tr><th>{noun || "Day"}</th>{series.map((s) => <th key={s.key}>{s.name}</th>)}</tr></thead>
         <tbody>{points.map((p, i) => <tr key={p.id}><td>{p.label}</td>{series.map((s) => <td key={s.key}>{s.values[i] ?? 0}</td>)}</tr>)}</tbody></table></div>
     </figure>

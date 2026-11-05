@@ -12,6 +12,7 @@ import type { TodayData } from "@/lib/analytics/today-types";
 import { useData } from "../session";
 import { CompareList, EmptyState, HourStrip, SourceBars, WorkloadList } from "../ds";
 import type { TodayModel } from "./today-model";
+import { ReportFilterBar, useReportFilter } from "./report-filter";
 
 // Pieces of Today shared by the agency page and the one-account page: the controls by the headline, and the People, Sources and Coverage tabs. Each tab is worked out
 // from the lead ledger (the last 14 days of leads, the same rows as Speed to lead) with the rules in docs/METRICS.md, and every number in it opens its records.
@@ -67,10 +68,15 @@ export function PeopleTab({ m, t, agency }: { m: TodayModel; t: TodayData; agenc
   );
 }
 
-export function SourcesTab({ m, t }: { m: TodayModel; t: TodayData }) {
-  const stats = useMemo(() => sourceStats(t.ledger, t.targetMinutes, m.now), [t.ledger, t.targetMinutes, m.now]);
-  if (stats.length === 0) return noLeads;
-  return <div data-testid="tab-sources">{cappedNote(t)}<SourceBars stats={stats} title={sourceTitle(stats)} onOpen={(name) => m.open(specSource(t.ledger, name, t.targetMinutes, m.now))} /></div>;
+const LEDGER_NOTE = "These two tabs read the leads of the last 14 days SubSync already holds, so the dates are fixed. You can choose one client.";
+export function SourcesTab({ m, t, clients, agency }: { m: TodayModel; t: TodayData; clients?: Array<{ id: string; name: string }>; agency?: boolean }) {
+  const f = useReportFilter("s", "7d");
+  const only = f.client && f.client !== "all" ? f.client : null;
+  const ledger = useMemo(() => (only ? t.ledger.filter((l) => l.locationId === only) : t.ledger), [t.ledger, only]);
+  const stats = useMemo(() => sourceStats(ledger, t.targetMinutes, m.now), [ledger, t.targetMinutes, m.now]);
+  const bar = <ReportFilterBar f={f} label="Sources" noDates clients={agency ? clients : undefined} datesNote={LEDGER_NOTE} />;
+  if (stats.length === 0) return <div data-testid="tab-sources">{bar}{noLeads}</div>;
+  return <div data-testid="tab-sources">{bar}{cappedNote(t)}<SourceBars stats={stats} title={sourceTitle(stats)} onOpen={(name) => m.open(specSource(ledger, name, t.targetMinutes, m.now))} /></div>;
 }
 
 /** "Preview the daily email": the text of the daily brief as it would be written today, from the same ranking Today shows. Nothing is sent. */
@@ -102,8 +108,12 @@ export function BriefPreview({ onClose }: { onClose: () => void }) {
   );
 }
 
-export function CoverageTab({ m, t }: { m: TodayModel; t: TodayData }) {
-  const stats = useMemo(() => hourStats(t.ledger, t.targetMinutes, m.now), [t.ledger, t.targetMinutes, m.now]);
-  if (t.ledger.length === 0) return noLeads;
-  return <div data-testid="tab-coverage">{cappedNote(t)}<HourStrip stats={stats} title={hourTitle(stats, t.targetMinutes)} targetMinutes={t.targetMinutes} onOpen={(h) => m.open(specHour(t.ledger, h, t.targetMinutes, m.now))} /></div>;
+export function CoverageTab({ m, t, clients, agency }: { m: TodayModel; t: TodayData; clients?: Array<{ id: string; name: string }>; agency?: boolean }) {
+  const f = useReportFilter("v", "7d");
+  const only = f.client && f.client !== "all" ? f.client : null;
+  const ledger = useMemo(() => (only ? t.ledger.filter((l) => l.locationId === only) : t.ledger), [t.ledger, only]);
+  const stats = useMemo(() => hourStats(ledger, t.targetMinutes, m.now), [ledger, t.targetMinutes, m.now]);
+  const bar = <ReportFilterBar f={f} label="Coverage" noDates clients={agency ? clients : undefined} datesNote={LEDGER_NOTE} />;
+  if (ledger.length === 0) return <div data-testid="tab-coverage">{bar}{noLeads}</div>;
+  return <div data-testid="tab-coverage">{bar}{cappedNote(t)}<HourStrip stats={stats} title={hourTitle(stats, t.targetMinutes)} targetMinutes={t.targetMinutes} onOpen={(h) => m.open(specHour(ledger, h, t.targetMinutes, m.now))} /></div>;
 }
