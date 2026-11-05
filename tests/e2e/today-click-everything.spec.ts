@@ -93,7 +93,7 @@ for (const role of ROLES) {
     const stages: Stage[] = [
       { name: "page", setup: async () => undefined },
       { name: "break-down-open", scope: "[data-testid=today-tabs]", setup: async (p) => { await p.getByTestId("more-detail-toggle").click(); } },
-      ...(role.name === "agency owner" ? ["Forecast", "Proof", "People", "Sources", "Coverage"] : ["Forecast"]).map((tab): Stage => ({
+      ...(role.name === "agency owner" ? ["Forecast", "Proof", "People", "Sources", "Coverage", "Growth"] : ["Forecast", "Growth"]).map((tab): Stage => ({
         name: `tab-${tab}`, scope: "[data-testid=today-tabpanel]", setup: async (p) => { await p.getByTestId("more-detail-toggle").click(); await p.getByRole("tab", { name: tab }).click(); await p.waitForTimeout(600); },
       })),
     ];
@@ -124,7 +124,7 @@ for (const role of ROLES) {
 
       // Every menu (they all live on the page itself, so once): open it, click each item (reopening it each time), and require a visible result.
       if (stage.name !== "page") continue;
-      const triggers = page.locator('[aria-haspopup="menu"]');
+      const triggers = page.locator('[data-theme] [aria-haspopup="menu"]');
       const count = await triggers.count();
       for (let j = 0; j < count; j++) {
         const trig = triggers.nth(j);
@@ -136,7 +136,7 @@ for (const role of ROLES) {
         const menuUrl = page.url();
         for (let k = 0; k < n; k++) {
           if (k > 0) { await page.keyboard.press("Escape"); await page.waitForTimeout(150); if ((await page.locator("[data-testid=records-panel],[role=dialog],[data-testid=pop-menu]").count()) > 0 || page.url() !== menuUrl) await fresh(stage); }
-          const t2 = page.locator('[aria-haspopup="menu"]').nth(j);
+          const t2 = page.locator('[data-theme] [aria-haspopup="menu"]').nth(j);
           await t2.scrollIntoViewIfNeeded();
           await t2.click();
           const menu = page.locator('[data-testid="pop-menu"]');
@@ -144,6 +144,7 @@ for (const role of ROLES) {
           const item = menu.locator("[role=menuitem]").nth(k);
           const label = ((await item.textContent()) ?? "").trim().slice(0, 50);
           if (await item.isDisabled()) continue;
+          const itemKey = (await item.getAttribute("data-testid")) ?? "";
           const before = await signature(page, popups);
           try { await item.click({ timeout: 6000 }); } catch (e) { failures.push(`[${stage.name}] menu ${j} item "${label}": cannot be clicked (${String(e).split("\n")[0]})`); continue; }
           clicked++;
@@ -151,6 +152,19 @@ for (const role of ROLES) {
           const after = await settle(page, before, popups);
           note(`[${stage.name}] menu ${j} item "${label}" ${after === before ? "NOTHING" : "ok"}`);
           if (after === before) failures.push(`[${stage.name}] menu ${j} item "${label}": nothing happened`);
+          // The visible result each kind of item promises, not just "something changed".
+          const toast = page.getByTestId("today-toast");
+          const want: Record<string, () => Promise<void>> = {
+            "menu-done": () => expect(toast).toContainText(/Marked done/),
+            "menu-snooze-day": () => expect(toast).toContainText(/Snoozed until tomorrow/),
+            "menu-snooze-monday": () => expect(toast).toContainText(/Snoozed until Monday/),
+            "menu-assign": () => expect(toast).toContainText(/Assigned to you/),
+            "menu-show": () => expect(page.getByTestId("records-panel")).toBeVisible(),
+            "menu-next": () => expect(page.getByTestId("records-panel")).toBeVisible(),
+            "menu-only": async () => { expect(page.url()).toContain("ta="); },
+          };
+          const fn = want[itemKey] ?? (itemKey.startsWith("menu-why-") ? want["menu-show"] : null);
+          if (fn) { try { await fn(); } catch (e) { failures.push(`[${stage.name}] menu ${j} item "${label}": the visible result is missing (${String(e).split("\n")[0]})`); } }
           const undo = page.getByTestId("today-undo");
           if (await undo.count()) { await undo.click().catch(() => undefined); clicked++; }
         }
