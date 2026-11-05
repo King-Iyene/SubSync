@@ -15,7 +15,7 @@ export function PopMenu({ label, items, testId, triggerClassName, children }: { 
   const button = useRef<HTMLButtonElement>(null);
   const panel = useRef<HTMLDivElement>(null);
   const id = useId();
-  const W = 232;
+  const W = 264;
 
   // Placement: below the button when the whole menu fits there, otherwise above it when it fits there, otherwise on the roomier side with its own scroll, so no item is ever out of reach.
   const measure = useCallback(() => {
