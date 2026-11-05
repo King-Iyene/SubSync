@@ -586,7 +586,7 @@ export function reviewText(r: { client: string; quarter: string; wins: ReadonlyA
 }
 
 export const ALERT_WORDS: Record<string, string> = {
-  dormant: "The account went quiet", churn: "The client looked likely to leave", leadflow: "New contacts dropped sharply", quality: "Contact data problems", sla: "Customer messages were left waiting",
+  dormant: "The account went quiet", churn: "The client looked likely to leave", leadflow: "New contacts dropped sharply", growth: "New email leads dropped or jumped", quality: "Contact data problems", sla: "Customer messages were left waiting",
   speed: "New leads were left unanswered", stale: "Deals stopped moving", email: "An email sender problem", appointments: "Appointments were left without an outcome",
 };
 export type ProofAlert = { kind: string; title: string; createdAt: string; resolvedAt: string | null };

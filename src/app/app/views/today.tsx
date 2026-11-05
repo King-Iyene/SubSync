@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { AccessKind } from "@/lib/access";
 import { accountsQuery, parseTodayAccounts, withTodayAccounts } from "@/lib/analytics/today-queue";
 import type { TodayData } from "@/lib/analytics/today-types";
+import type { GrowthData } from "@/lib/analytics/growth";
 import type { GoFn } from "../nav";
 import { ApiProvider, useApiClient, useData } from "../session";
 import { EmptyState, Page, remember, remembered, Skeleton, SkeletonRows } from "../ds";
@@ -59,6 +60,7 @@ export function TodayView({ go, kind }: { go: GoFn; kind: AccessKind }) {
 function TodayBody({ go, kind, picked, setPicked }: { go: GoFn; kind: AccessKind; picked: string[]; setPicked: (ids: string[]) => void }) {
   const api = useApiClient();
   const today = useData<TodayData>("today");
+  const growth = useData<GrowthData>("today/growth");
   const seg = useData<Segments>(kind === "agency" ? "segments" : null);
   const [syncing, setSyncing] = useState(false);
 
@@ -72,7 +74,7 @@ function TodayBody({ go, kind, picked, setPicked }: { go: GoFn; kind: AccessKind
   }, [seg.data, options, picked, setPicked]);
 
   const t = today.data;
-  const sync = async () => { setSyncing(true); try { await api.post("sync"); await today.reload(); } finally { setSyncing(false); } };
+  const sync = async () => { setSyncing(true); try { await api.post("sync"); await today.reload(); await growth.reload(); } finally { setSyncing(false); } };
   // "See all" next to "Showing KD Squares" also ends the shell's own one-account narrowing (the shell reads this), so every page shows every client account again.
   const clearShell = () => { try { window.dispatchEvent(new Event("subsync-clear-account-filter")); } catch { /* the page still shows every account */ } };
 
@@ -93,5 +95,5 @@ function TodayBody({ go, kind, picked, setPicked }: { go: GoFn; kind: AccessKind
       </Page>
     );
   }
-  return <TodayPage go={go} t={t} kind={kind} reload={async () => { await today.reload(); }} sync={sync} syncing={syncing} options={options} picked={picked} setPicked={setPicked} error={today.error?.message ?? null} clearShell={clearShell} />;
+  return <TodayPage go={go} t={t} kind={kind} reload={async () => { await today.reload(); }} sync={sync} syncing={syncing} options={options} picked={picked} setPicked={setPicked} error={today.error?.message ?? null} clearShell={clearShell} growth={{ data: growth.data, loading: growth.loading, error: growth.error?.message ?? null, reload: () => void growth.reload() }} />;
 }

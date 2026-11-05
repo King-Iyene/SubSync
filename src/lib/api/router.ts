@@ -79,6 +79,7 @@ import { createHook, listHooks, listMeetings, MAX_HOOKS_PER_ACCOUNT, revokeHook,
 import { buildDailyDigest, NOT_WATCHED, seriesByLocation } from "../analytics/digest-service";
 import { portfolioRangeChanges, validFromDay, validToDay } from "../analytics/today-intel";
 import { buildToday } from "./today-api";
+import { growthGoalSave, growthRead, growthSettingsSave, type GrowthDeps } from "./growth-api";
 import { briefFromToday, todayAction, todayBrief, userKeyOf as todayUserKey, type TodayDeps } from "./today-actions";
 import { todayViewRemove, todayViewSave, todayViewsList } from "./today-views";
 import { lanesFor } from "../analytics/today-state";
@@ -729,6 +730,11 @@ async function todayView(ctx: Ctx) {
   return json(await todayData(ctx));
 }
 const todayDeps: TodayDeps = { load: (c) => todayData(c as Ctx), permits: async (c, locationId) => (await scope(c as Ctx)).permits(locationId) };
+const growthDeps: GrowthDeps = {
+  permits: async (c) => (await scope(c as Ctx)).permits,
+  contactUrl: async (c) => (await scope(c as Ctx)).links.contact,
+  accountUrl: async (c) => (await scope(c as Ctx)).links.account,
+};
 
 /** The daily brief for one company, built from the same Today read the screen uses (the scheduled brief calls this; it sends nothing itself). */
 export async function todayBriefForInstallation(installationId: string, plan: Plan, companyId: string): Promise<{ headline: string; lines: string[] }> {
@@ -1921,6 +1927,7 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
     if (method === "GET") {
       if (a === "overview") return await overview(ctx);
       if (a === "today" && !b) return await todayView(ctx);
+      if (a === "today" && b === "growth" && !c) return await growthRead(ctx, growthDeps);
       if (a === "today" && b === "brief" && !c) return await todayBrief(ctx, todayDeps);
       if (a === "today" && b === "views" && !c) return await todayViewsList(ctx);
       if (a === "daily" && b === "changes") return await dailyChanges(ctx);
@@ -1998,6 +2005,8 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       if (a === "client-onboarding" && b === "templates" && c === "starter") return await clientRoutes.templateStarter(ctx);
       if (a === "client-onboarding" && b && b !== "templates" && LOCATION_ID.test(b) && c === "steps") return await clientRoutes.stepAdd(ctx, clientDeps, b);
       if (a === "usage" && !b) return await usagePing(ctx);
+      if (a === "today" && b === "growth" && c === "goal") return await growthGoalSave(ctx, growthDeps);
+      if (a === "today" && b === "growth" && c === "settings") return await growthSettingsSave(ctx);
       if (a === "today" && b === "action" && !c) return await todayAction(ctx, todayDeps);
       if (a === "today" && b === "views" && !c) return await todayViewSave(ctx);
       if (a === "inbox" && b === "views") return await inboxViewSave(ctx);

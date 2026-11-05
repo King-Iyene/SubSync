@@ -55,7 +55,7 @@ export const cleanDomain = (raw: string): string | null => {
 // ---------- who counts ----------
 
 export type GrowthContact = {
-  id: string; locationId: string; name: string; email: string | null; source: string | null; at: number | null; firstName?: string | null; lastName?: string | null; phone?: string | null;
+  id: string; locationId: string; name: string; email: string | null; source: string | null; at: number | null; firstName?: string | null; lastName?: string | null; phone?: string | null; url?: string;
 };
 export type GrowthRules = { excludeRoleAddresses: boolean; internalDomains: string[]; junkWords?: string[] };
 export type Verdict = "counted" | "duplicate" | "junk" | "staff" | "role" | "no_email";
@@ -187,7 +187,7 @@ export function weekBadge(series: DayPoint[]): { pct: number; direction: "up" | 
   if (done.length < 14) return null;
   const a = done.slice(-7).reduce((s, p) => s + p.count, 0), b = done.slice(-14, -7).reduce((s, p) => s + p.count, 0);
   const pct = pctChange(a, b);
-  return pct === null ? null : { pct, direction: pct > 0 ? "up" : pct < 0 ? "down" : "same" };
+  return pct === null ? null : { pct, direction: pct >= 5 ? "up" : pct <= -5 ? "down" : "same" };
 }
 
 // ---------- goal and forecast ----------
@@ -314,7 +314,7 @@ export function buildGrowth(i: GrowthInput): GrowthData {
     const a = acct.get(c.locationId) as GrowthAccount;
     const b = boundsOf(i.now, a.zone);
     const at = c.at as number;
-    return { id: c.id, locationId: c.locationId, accountName: a.name, name: c.name, email: c.email ?? "", source: c.source, at, day: dayKey(at, a.zone), today: at >= b.todayStart, week: at >= b.weekStart, month: at >= b.monthStart, verdict: v, url: "" };
+    return { id: c.id, locationId: c.locationId, accountName: a.name, name: c.name, email: c.email ?? "", source: c.source, at, day: dayKey(at, a.zone), today: at >= b.todayStart, week: at >= b.weekStart, month: at >= b.monthStart, verdict: v, url: c.url || a.url };
   };
   const byRecent = (a: GrowthContact, b: GrowthContact) => (b.at as number) - (a.at as number);
   const records = [
@@ -338,8 +338,6 @@ export function buildGrowth(i: GrowthInput): GrowthData {
   });
   // Fastest growing first; accounts with nothing to compare go last, then by name.
   league.sort((a, b) => (b.week.pct ?? -Infinity) - (a.week.pct ?? -Infinity) || b.week.count - a.week.count || a.name.localeCompare(b.name));
-  for (const r of records) r.url = acct.get(r.locationId)?.url ?? "";
-  for (const r of recentAll) r.url = acct.get(r.locationId)?.url ?? "";
 
   const withGoal = league.filter((r) => r.goal !== null);
   const goalTotal = withGoal.reduce((s, r) => s + (r.goal as number), 0);

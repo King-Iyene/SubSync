@@ -1,5 +1,5 @@
 -- SubSync: paste this WHOLE file into the Supabase SQL Editor and press Run, once.
--- It adds the 16 new migrations. Every statement is safe to run twice.
+-- It adds the new migrations, up to and including the Growth tab (20261106110000). Every statement is safe to run twice.
 -- It runs as ONE transaction: if anything fails, nothing changes.
 begin;
 
@@ -722,7 +722,8 @@ alter table public.workflow_changes enable row level security;
 alter table public.workflow_labels enable row level security;
 alter table public.workflow_snapshots enable row level security;
 
-commit;
+
+-- ===== 20261106100000_data_health.sql =====
 -- Additive: the Data health module. All SubSync's own tables; nothing here is sent to the CRM except through the guarded fix path
 -- (optional contacts.write permission, DATA_HEALTH_WRITE_LIVE, preview, signed confirm, daily cap, 24 hour undo). Safe to run twice.
 
@@ -821,3 +822,107 @@ alter table public.dh_rules enable row level security;
 alter table public.dh_changes enable row level security;
 alter table public.dh_outcomes enable row level security;
 revoke all on public.dh_snapshots, public.dh_flags, public.dh_marks, public.dh_rules, public.dh_changes, public.dh_outcomes from anon, authenticated;
+
+-- ===== 20261105100000_duplicate_snoozes.sql =====
+-- Additive and idempotent: "Not now" on a group of likely duplicates (stage DUP).
+-- A group the person set aside leaves the open list until `until`, then comes back. A person's decision "not a duplicate" or
+-- "merged in the CRM" already lives in duplicate_reviews; nothing there changes. This table holds ids and a date only (no contact detail).
+create table if not exists public.duplicate_snoozes (
+  id uuid primary key default gen_random_uuid(),
+  installation_id uuid not null references public.installations (id) on delete cascade,
+  location_id text not null,
+  group_key text not null,
+  until timestamptz not null,
+  decided_by text,
+  created_at timestamptz not null default now(),
+  unique (installation_id, location_id, group_key)
+);
+create index if not exists duplicate_snoozes_installation_idx on public.duplicate_snoozes (installation_id, until);
+alter table public.duplicate_snoozes enable row level security;
+
+-- ===== 20261105110000_speed_account_target.sql =====
+-- Speed to lead (stage SPEED): each client account may have its OWN reply target in minutes, typed by a person on the Speed to lead screen.
+-- Additive and idempotent: one new nullable column. Null means "use the default target in Settings", which is what every existing account does.
+-- The old code never reads it; the new code works without it (an account without the column simply uses the default target).
+alter table public.locations add column if not exists speed_target_minutes integer;
+do $$ begin
+  if not exists (select 1 from pg_constraint where conname = 'locations_speed_target_minutes_range') then
+    alter table public.locations add constraint locations_speed_target_minutes_range check (speed_target_minutes is null or (speed_target_minutes between 1 and 1440));
+  end if;
+end $$;
+
+-- ===== 20261105120000_cleanup_v2.sql =====
+-- Clean-up module, version 2 (stage CLEANUP). Additive and idempotent: three new nullable or defaulted columns and one new table. Nothing is dropped, renamed or tightened;
+-- the old code never reads any of it, and the new code works without it (an account without a saved choice uses the Balanced rules, nobody has write access switched on,
+-- and a missing snapshot table simply means "no history yet").
+--
+-- locations.cleanup_rules         the duplicate-matching and "which value wins" choices for ONE client account (typed by a person on the Clean-up page). Null = use the company default.
+-- locations.cleanup_write_enabled the per-account opt-in for changing contacts from SubSync. Off by default; a person switches it on in Settings. Even then nothing is sent
+--                                 while the server's master switch (WRITE_GHL_LIVE) is off.
+-- settings.cleanup_defaults       the same choices for the whole company (portfolio-wide rules); an account's own choice overrides it.
+-- cleanup_quality_snapshots       one row per client account per day: the data-quality score and its parts, so a trend can be shown from SubSync's own record. Counts and ids only.
+alter table public.locations add column if not exists cleanup_rules jsonb;
+alter table public.locations add column if not exists cleanup_write_enabled boolean not null default false;
+alter table public.settings add column if not exists cleanup_defaults jsonb;
+
+create table if not exists public.cleanup_quality_snapshots (
+  id uuid primary key default gen_random_uuid(),
+  installation_id uuid not null references public.installations (id) on delete cascade,
+  location_id text not null,
+  day date not null,
+  contacts integer not null default 0,
+  score integer,
+  parts jsonb not null default '{}'::jsonb,
+  counts jsonb not null default '{}'::jsonb,
+  duplicate_groups integer not null default 0,
+  duplicate_extra integer not null default 0,
+  new_groups integer not null default 0,
+  created_at timestamptz not null default now(),
+  unique (installation_id, location_id, day)
+);
+create index if not exists cleanup_quality_snapshots_installation_idx on public.cleanup_quality_snapshots (installation_id, day desc);
+alter table public.cleanup_quality_snapshots enable row level security;
+
+-- possible_duplicates: a contact that arrived (contact-created webhook) and looks like one the account already has. Ids, a score, a tier and short reasons only (no contact detail).
+-- The Duplicates tab shows them as "Possible duplicate of X" cards and the daily alert counts them; a person dismisses one with a click.
+create table if not exists public.possible_duplicates (
+  id uuid primary key default gen_random_uuid(),
+  installation_id uuid not null references public.installations (id) on delete cascade,
+  location_id text not null,
+  contact_id text not null,
+  other_contact_id text not null,
+  score integer not null,
+  tier text not null,
+  reasons jsonb not null default '[]'::jsonb,
+  status text not null default 'new' check (status in ('new', 'dismissed')),
+  created_at timestamptz not null default now(),
+  unique (installation_id, location_id, contact_id, other_contact_id)
+);
+create index if not exists possible_duplicates_installation_idx on public.possible_duplicates (installation_id, status, created_at desc);
+alter table public.possible_duplicates enable row level security;
+
+-- ===== 20261106110000_growth.sql =====
+-- Additive: Today's Growth tab. Two small tables that belong to SubSync (nothing here is ever sent to the CRM, and neither is read by any other module).
+--   growth_goals     one monthly email-lead goal per client account
+--   growth_settings  one row per company: leave out role addresses (info@, sales@) and which email domains are the company's own staff
+-- If this has not been applied yet, Today answers "needs the latest database update" for these two things and everything else works. Safe to run twice.
+
+create table if not exists public.growth_goals (
+  installation_id uuid not null references public.installations (id) on delete cascade,
+  location_id text not null,
+  monthly_goal integer not null check (monthly_goal >= 1 and monthly_goal <= 1000000),
+  set_by text,
+  updated_at timestamptz not null default now(),
+  primary key (installation_id, location_id)
+);
+alter table public.growth_goals enable row level security;
+
+create table if not exists public.growth_settings (
+  installation_id uuid primary key references public.installations (id) on delete cascade,
+  exclude_role_addresses boolean not null default true,
+  internal_domains text[] not null default '{}',
+  updated_at timestamptz not null default now()
+);
+alter table public.growth_settings enable row level security;
+
+commit;

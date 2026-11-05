@@ -15,12 +15,23 @@ import { useNow } from "./live";
 const card = "ds-press group flex w-full items-baseline justify-between gap-4 border-b border-[var(--t-rule)] py-2.5 pr-2 text-left hover:bg-[var(--t-wash)] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--ring)]";
 
 /** "Spotted today": up to three cards. */
-export function InsightStrip({ insights, onOpen }: { insights: Insight[]; onOpen: (i: Insight) => void }) {
-  if (insights.length === 0) return null;
+export type ExtraInsight = { key: string; text: string; label: string; onOpen: () => void };
+export function InsightStrip({ insights, onOpen, extra = [] }: { insights: Insight[]; onOpen: (i: Insight) => void; extra?: ExtraInsight[] }) {
+  if (insights.length === 0 && extra.length === 0) return null;
   return (
     <section className="mb-10 border-t border-[var(--t-rule)] pt-5" aria-labelledby="spotted-h" data-testid="insight-strip">
       <h2 id="spotted-h" className="t-title mb-2">Worth a look</h2>
       <ul>
+        {extra.map((x) => (
+          <li key={x.key} className="min-w-0">
+            <button type="button" onClick={x.onOpen} className={card} data-testid="insight-card" data-key="growth" aria-label={`${x.text} See the people.`}>
+              <span>{x.text}</span>
+              <span className="t-small t-quiet flex shrink-0 items-center gap-1" title="New email leads now against this client's own usual, an estimate.">
+                <span className="t-num">{x.label}</span><span>, estimate</span><ChevronRight aria-hidden className="size-3.5 opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100" />
+              </span>
+            </button>
+          </li>
+        ))}
         {insights.map((i) => (
           <li key={i.key} className="min-w-0">
             <button type="button" onClick={() => onOpen(i)} className={card} data-testid="insight-card" data-key={i.key} data-sample={i.sample} aria-label={`${i.text} Based on ${i.sampleLabel}. See them.`}>

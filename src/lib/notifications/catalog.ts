@@ -75,7 +75,7 @@ export const CATALOG: Record<NotificationType, TypeInfo> = {
   },
   silent_failure: {
     id: "silent_failure", label: "Something stopped quietly", hint: "When an account goes quiet, new contacts drop sharply, or its email sending breaks, with no error message of its own.", kind: "event", active: true,
-    frequencies: ["immediate", "daily"], defaultFrequency: "immediate", defaultSeverity: "warning", openView: "accounts", alertKinds: ["dormant", "leadflow", "email"],
+    frequencies: ["immediate", "daily"], defaultFrequency: "immediate", defaultSeverity: "warning", openView: "accounts", alertKinds: ["dormant", "leadflow", "email", "growth"],
     variables: [ACCOUNT, { name: "problem", label: "What looks wrong", sample: "looks dormant" }],
     defaultTitle: "{account}: {problem}",
     defaultBody: "Open the account to see when it last had activity.",

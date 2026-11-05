@@ -14,6 +14,8 @@ import {
   pointEnd, specAccount, specAlerts, specClients, specComing, specDollars, specInsight, specKind, specNext, specReplies, specSince, specThings,
 } from "@/lib/analytics/today-specs";
 import type { TodayData } from "@/lib/analytics/today-types";
+import type { GrowthData } from "@/lib/analytics/growth";
+import { specPeriod } from "@/lib/analytics/growth-records";
 import type { GoFn } from "../nav";
 import {
   AccountBars, AccountList, CommandPalette, ComingBlock, InlineAlert, InsightStrip, KindList, PrintReport, ProofStrip, PulseSpark, PulseTile,
@@ -24,6 +26,7 @@ import { Block, MoreDetail, PrimaryButton, TodayHeader, TodayHeadline, type Prim
 import { AppointmentsSection, CallsSection, DoneForToday } from "./today-mine";
 import { useTodayModel, TodayLayers } from "./today-model";
 import { BriefPreview, CoverageTab, HeldLink, JunkControl, PeopleTab, SourcesTab } from "./today-parts";
+import { GrowthTab } from "./today-growth";
 
 // Today, one page for every role. One question: "what needs a person today, and what do I do first?". Top to bottom: a small title row, ONE plain sentence with the number that matters
 // most and ONE primary button, "Do this first" (the working queue: a setter's people to reply to, or one row per client for an agency), what changed since the person was last here
@@ -37,9 +40,10 @@ function reasonText(blocked: boolean, kindsOff: string): string | null {
   return blocked ? `Needs permission: ${kindsOff}. Ask whoever manages SubSync to approve it.` : null;
 }
 
-export function TodayPage({ go, t, kind, reload, sync, syncing, options, picked, setPicked, error, clearShell }: {
+export function TodayPage({ go, t, kind, reload, sync, syncing, options, picked, setPicked, error, clearShell, growth }: {
   go: GoFn; t: TodayData; kind: AccessKind; reload: () => Promise<void>; sync: () => Promise<void>; syncing: boolean;
   options: Array<{ id: string; name: string }>; picked: string[]; setPicked: (ids: string[]) => void; error: string | null; clearShell: () => void;
+  growth: { data: GrowthData | null; loading: boolean; error: string | null; reload: () => void };
 }) {
   const m = useTodayModel({ t, kind, reload });
   const { view, env } = m;
@@ -105,11 +109,13 @@ export function TodayPage({ go, t, kind, reload, sync, syncing, options, picked,
   const scrollTo = (id: string) => setTimeout(() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
   const applyView = (v: TodayView) => { changeAccounts(v.accounts); m.setExcludeJunk(v.excludeJunk); };
   const hasProof = !!t.proof && kind !== "client";
+  const growthAt = kind === "client" ? 1 : hasProof ? 5 : 4;
   const tabAt = (n: number) => n + (hasProof ? 0 : -1); // People, Sources and Coverage sit after Forecast and (when shown) Proof
   const commands: PaletteCommand[] = [
     { id: "search-people", group: "Find", title: "Search people", hint: "Names, emails and phone numbers in every client", keywords: "contact lead", run: () => document.querySelector<HTMLElement>('[data-testid="global-search-open"]')?.click() },
     { id: "go-fix", group: "Go to", title: "Do this first", hint: "The first things to do", keywords: "queue top fix reply", run: () => scrollTo("work-h") },
     ...(multi ? [{ id: "go-charts", group: "Go to", title: "Where the work sits", hint: "One bar per client", keywords: "bars", run: () => scrollTo("where-h") }] : []),
+    { id: "tab-growth", group: "Go to", title: "Growth", hint: "New email leads, goal and sources", keywords: "email leads counter goal sources", run: () => openMore(growthAt) },
     { id: "tab-numbers", group: "Go to", title: "Forecast", hint: "What goes wrong if nothing changes", keywords: "tiles figures numbers", run: () => openMore(0) },
     ...(kind !== "client" ? [
       { id: "tab-people", group: "Go to", title: "People", hint: "Workload by person", keywords: "owner workload", run: () => openMore(tabAt(2)) },
@@ -225,6 +231,7 @@ export function TodayPage({ go, t, kind, reload, sync, syncing, options, picked,
     </section>
   ) : null;
 
+  const growthTab = <GrowthTab m={m} g={growth.data} loading={growth.loading} error={growth.error} reload={growth.reload} kind={kind} />;
   const tabs = [
     { label: "Forecast", node: forecast },
     ...(proof ? [{ label: "Proof", node: proof }] : []),
@@ -233,6 +240,7 @@ export function TodayPage({ go, t, kind, reload, sync, syncing, options, picked,
       { label: "Sources", node: <SourcesTab m={m} t={t} /> },
       { label: "Coverage", node: <CoverageTab m={m} t={t} /> },
     ] : []),
+    { label: "Growth", node: growthTab },
   ];
   const allDone = headline.allClear && !t.access.leadsBlocked && !t.access.apptsBlocked && (mine ? mine.calls.noshows.total + mine.calls.confirm.total === 0 : true);
 
@@ -269,7 +277,8 @@ export function TodayPage({ go, t, kind, reload, sync, syncing, options, picked,
         )}
 
         {since && <SinceStrip since={since} showAlerts={kind !== "client"} onOpen={(k) => m.open(specSince(k, since, env))} />}
-        <InsightStrip insights={kind === "client" ? m.insights.filter((i) => i.key !== "idle_owner") : m.insights} onOpen={(i) => m.open(specInsight(i, env))} />
+        <InsightStrip insights={kind === "client" ? m.insights.filter((i) => i.key !== "idle_owner") : m.insights} onOpen={(i) => m.open(specInsight(i, env))}
+          extra={(growth.data?.signals ?? []).slice(0, 2).map((s) => ({ key: `growth-${s.locationId}-${s.scope}-${s.direction}`, text: s.text, label: `${s.count} vs ${s.normal}`, onOpen: () => { const g = growth.data as GrowthData; m.open(specPeriod(g, s.scope === "day" ? "today" : "week", s.locationId)); } }))} />
 
         {multi && bars.bars.length > 1 && (
           <Block id="where-h" title="Where the work sits" testId="today-charts">
