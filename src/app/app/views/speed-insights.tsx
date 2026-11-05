@@ -199,7 +199,7 @@ export function CaptureTab() {
       </Card>
       <Card id="capture-gross">
         <H title="Sign ups, then people" tip="Sign ups with an email, minus copies of the same person, test or junk records and staff, is the number of real leads. It stops a form bug or a spam burst looking like growth." />
-        <p className="text-sm" data-testid="capture-gross"><span className="t-num">{g.gross.signUps.toLocaleString("en-US")}</span> sign ups, <span className="t-num">{removed.toLocaleString("en-US")}</span> taken out, <span className="t-num font-semibold">{g.gross.unique.toLocaleString("en-US")}</span> counted.</p>
+        <p className="text-sm" data-testid="capture-gross-line"><span className="t-num">{g.gross.signUps.toLocaleString("en-US")}</span> sign ups, <span className="t-num">{removed.toLocaleString("en-US")}</span> taken out, <span className="t-num font-semibold">{g.gross.unique.toLocaleString("en-US")}</span> counted.</p>
       </Card>
       <Card id="capture-mix">
         <H title="Where they come from" tip="Each source's email leads against the period before. Best grew most, worst fell most (at least 5 leads in one of the two periods)." />

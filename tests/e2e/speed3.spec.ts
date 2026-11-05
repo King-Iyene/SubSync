@@ -35,9 +35,9 @@ for (const role of ROLES) {
     await expect(page.getByTestId("wb-review")).toBeVisible({ timeout: 30_000 });
     // either the lead has no number (a blocker) or the demo says nothing is ever sent
     const dry = page.getByTestId("wb-review-dry"), blocked = page.getByTestId("wb-review-blockers");
-    await expect(dry.or(blocked)).toBeVisible();
-    if (await dry.count()) {
-      await expect(dry).toContainText(/nothing is ever sent|switched off|not allowed/i);
+    await expect(dry.or(blocked).first()).toBeVisible();
+    await expect(dry).toContainText(/nothing is ever sent|switched off|not allowed/i);
+    if ((await blocked.count()) === 0) {
       await page.getByTestId("wb-confirm").click();
       await expect(page.getByTestId("wb-result")).toHaveAttribute("data-tone", "dry", { timeout: 30_000 });
     }
@@ -69,7 +69,7 @@ test("a mark opens exactly the leads it counted", async ({ page }) => {
   const counted = n(await slow.innerText());
   await slow.click();
   await expect(page.getByTestId("insight-list-count")).toBeVisible({ timeout: 60_000 });
-  const said = n(await page.getByTestId("insight-list-count").innerText());
+  const said = Number(((await page.getByTestId("insight-list-count").innerText()).trim().match(/^[0-9,]+/)?.[0] ?? "0").replace(/,/g, ""));
   expect(said).toBe(counted);
   const rows = await page.getByTestId("insight-rows").getByTestId("speed-row").count();
   expect(rows).toBe(Math.min(said, 100));
@@ -81,5 +81,5 @@ test("Lead capture shows the counters and a drop or rise word", async ({ page })
   await tab(page, "Lead capture").click();
   for (const k of ["today", "week", "month", "all"]) await expect(page.getByTestId(`capture-${k}`)).toBeVisible({ timeout: 90_000 });
   await expect(page.getByTestId("capture-badge")).toContainText(/Rising|Falling|Steady|not enough data/);
-  await expect(page.getByTestId("capture-gross")).toContainText(/sign ups/);
+  await expect(page.getByTestId("capture-gross-line")).toContainText(/sign ups/);
 });
