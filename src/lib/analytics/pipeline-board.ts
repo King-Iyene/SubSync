@@ -24,7 +24,7 @@ export type Board = {
   pipelines: PipelineCol[];
   byClient: Array<{ locationId: string; name: string | null; stuckCount: number; stuckValue: number }>;
   /** All stuck deal ids with their contact, for the one "Move the stuck deals" walk-through. */
-  stuckQueue: Array<{ id: string; contactId: string | null; locationId: string }>;
+  stuckQueue: Array<{ id: string; contactId: string | null; locationId: string; name: string; locationName: string | null }>;
 };
 
 const median = (xs: number[]) => { const s = [...xs].sort((a, b) => a - b); const m = Math.floor(s.length / 2); return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
@@ -76,7 +76,7 @@ export function boardOf(input: BoardInput): Board {
       pipe.stuckCount++; pipe.stuckValue += d.value;
       const c = byClient.get(d.locationId) ?? { locationId: d.locationId, name: d.locationName, stuckCount: 0, stuckValue: 0 };
       c.stuckCount++; c.stuckValue += d.value; byClient.set(d.locationId, c);
-      stuckQueue.push({ id: d.opportunityId, contactId: facts?.contactId ?? null, locationId: d.locationId });
+      stuckQueue.push({ id: d.opportunityId, contactId: facts?.contactId ?? null, locationId: d.locationId, name: d.name ?? d.contactName ?? "Untitled deal", locationName: d.locationName });
     }
     const sk = stageKey(d);
     let col = stageMeta.get(sk);
