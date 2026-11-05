@@ -29,17 +29,17 @@ async function inSection(page: Page, title: string) {
 
 test("Settings names neither Zoom nor Google Meet, and holds the connections in Integrations", async ({ page }) => {
   await open(page, "settings", "Settings");
-  for (const title of ["Team and access", "Notifications", "Reply targets and thresholds", "Brand", "Sync status", "Advanced"]) {
+  for (const title of ["Team", "Notifications", "Replies", "Brand", "Sync status", "Advanced"]) {
     await inSection(page, title);
     expect(await bodyText(page), `Settings, ${title}, names Zoom or Google Meet`).not.toMatch(NAMED);
   }
-  await inSection(page, "Data and privacy");
+  await inSection(page, "Data");
   await expect(page.getByText("Delete my data").first()).toBeVisible();
   await inSection(page, "Integrations");
   await expect(page.getByRole("heading", { name: "My connections", exact: true })).toBeVisible();
   expect(await bodyText(page), "Settings, Integrations, names Zoom or Google Meet").not.toMatch(NAMED);
-  await inSection(page, "Data and privacy");
-  expect(await bodyText(page), "Settings, Data and privacy, names Zoom or Google Meet").not.toMatch(NAMED);
+  await inSection(page, "Data");
+  expect(await bodyText(page), "Settings, Data, names Zoom or Google Meet").not.toMatch(NAMED);
 });
 
 // The connections live in Settings, Integrations (an old #connections address opens it): Slack and Fathom stay visible, Zoom and Google Meet stay hidden.
@@ -67,7 +67,7 @@ for (const [hash, heading] of [["help", "Getting started"], ["roadmap", "What's 
 
 test("the Meeting notes page is off: not in the menu, and an address typed by hand says it is switched off", async ({ page }) => {
   await open(page, "settings", "Settings");
-  await inSection(page, "Data and privacy");
+  await inSection(page, "Data");
   await expect(page.getByRole("complementary").getByRole("button", { name: "Meeting notes", exact: true })).toHaveCount(0);
   await expect(page.getByText("Meeting notes privacy")).toHaveCount(0); // nothing is connected, so its switches are not shown either
   await page.goto("/app#meetings");
@@ -93,7 +93,7 @@ test("the privacy page names Slack and Fathom but not Zoom or Google Meet, and i
 
 test("Settings shows what is stored and what each button removes, produced from the schema's list, and the demo cannot delete", async ({ page }) => {
   await open(page, "settings", "Settings");
-  await inSection(page, "Data and privacy");
+  await inSection(page, "Data");
   await expect(page.getByText("What we store").first()).toBeVisible();
   const text = await bodyText(page);
   for (const l of storeLines({ meetings: false })) expect(text, `What we store lists "${l.title}"`).toContain(flat(`${l.title}: ${l.text}`));

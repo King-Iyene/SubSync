@@ -120,5 +120,5 @@ test("the Settings page is in eight sections with a menu on the left (stage F8; 
   await page.reload();
   const nav = page.getByTestId("settings-nav");
   await expect(nav).toBeVisible();
-  for (const label of ["Team and access", "Notifications", "Integrations", "Reply targets and thresholds", "Brand", "Data and privacy", "Sync status", "Advanced"]) await expect(nav.getByRole("button", { name: label, exact: true })).toBeVisible();
+  for (const label of ["Team", "Notifications", "Integrations", "Replies", "Brand", "Data", "Sync status", "Advanced"]) await expect(nav.getByRole("button", { name: label, exact: true })).toBeVisible();
 });

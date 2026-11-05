@@ -14,12 +14,13 @@ export type Section = {
 };
 
 export const SECTIONS: readonly Section[] = [
-  { id: "team", title: "Team and access", hint: "Who can open SubSync, and which client accounts are left out of every number.", kinds: ["agency", "business"] },
+  // Shown as visible tabs in this order (stage SHELL): Replies, Brand, Notifications, Integrations, Team, Data, then the two technical ones.
+  { id: "targets", title: "Replies", hint: "How fast your team should reply, and what counts as late, stale or gone quiet.", kinds: ["agency", "business"] },
+  { id: "brand", title: "Brand", hint: "Your name and colour on screens, reports and share links.", kinds: ["agency", "business"] },
   { id: "notifications", title: "Notifications", hint: "Where alerts and the daily and weekly summaries go, and when.", kinds: ["agency", "business"] },
   { id: "integrations", title: "Integrations", hint: "Connect your own tools once, see who on your team has connected, and what SubSync may read.", kinds: ["agency", "business"] },
-  { id: "targets", title: "Reply targets and thresholds", hint: "What counts as late, stale or gone quiet.", kinds: ["agency", "business"] },
-  { id: "brand", title: "Brand", hint: "Your name and colour on screens, reports and share links.", kinds: ["agency", "business"] },
-  { id: "privacy", title: "Data and privacy", hint: "What SubSync stores, meeting notes, and deleting everything.", kinds: ["agency", "business"] },
+  { id: "team", title: "Team", hint: "Who can open SubSync, and which client accounts are left out of every number.", kinds: ["agency", "business"] },
+  { id: "privacy", title: "Data", hint: "What SubSync stores, meeting notes, and deleting everything.", kinds: ["agency", "business"] },
   { id: "sync", title: "Sync status", hint: "How fresh your data is and what runs when.", kinds: ["agency", "business"] },
   { id: "advanced", title: "Advanced", hint: "Login address, your own checklist, AI connector keys and the history of settings changes.", kinds: ["agency", "business"] },
 ];

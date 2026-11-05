@@ -27,8 +27,8 @@ const FAQ: Array<[string, string]> = [
   ["Who can open it?", "The people who manage your company see every client account. A client account that installs SubSync for itself sees only its own account. A client's staff see a read-only view of their own account only if your company switches it on."],
   ["Why is a number empty or zero?", "That account has not finished syncing yet, or it genuinely has no data. The sync step above shows progress."],
   ["Why does Today say \"still learning\"?", "Changes are judged against an account's own last week, so a new account needs a few days of history first."],
-  ["How do I hide a test account?", "Open Settings, Team and access, and switch on Test and practice accounts for it. It stops counting in totals, alerts and lists, and you can switch it back."],
-  ["How do I remove SubSync and my data?", "Settings, Data and privacy, has a Delete my data button (only the owner can press it). It removes everything SubSync copied from your CRM. Uninstalling cuts the connection at once and deletes it all. That page lists exactly what is removed and the little we keep."],
+  ["How do I hide a test account?", "Open Settings, Team, and switch on Test and practice accounts for it. It stops counting in totals, alerts and lists, and you can switch it back."],
+  ["How do I remove SubSync and my data?", "Settings, Data, has a Delete my data button (only the owner can press it). It removes everything SubSync copied from your CRM. Uninstalling cuts the connection at once and deletes it all. That page lists exactly what is removed and the little we keep."],
   ["Who do I contact?", `${COMPANY.supportEmail}. We reply within ${COMPANY.supportReply}. You can also use Give feedback or Report a problem at the bottom of any page.`],
 ];
 
