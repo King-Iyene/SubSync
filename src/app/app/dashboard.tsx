@@ -19,9 +19,9 @@ import { useBrandedText } from "./brand-text";
 import { BrandLogo, ProductMark } from "./brand-logo";
 import { Btn } from "./ui";
 import { FeedbackBox } from "./feedback-box";
-import { BackLink, BackProvider, ModuleTabs } from "./ds/template";
+import { BackLink, BackProvider, ModuleTabs, TrailProvider } from "./ds/template";
 import { InlineAlert } from "./ds/alert";
-import { FilterDrawer } from "./ds/filters";
+import { GlobalFilterBar } from "./ds/global-filter";
 import { useTheme } from "./ds/theme";
 import { remember, remembered } from "./ds/remember";
 import { ApiProvider, makeApi, type Api } from "./session";
@@ -308,7 +308,7 @@ export function Dashboard() {
   const footMenu = menu.filter((n) => n.group === "Settings and help");
   const renderNav = (list: typeof menu) => list.map((n, i) => (
       <div key={n.id}>
-        {n.group !== (list[i - 1]?.group ?? null) && (n.group && n.group !== "Settings and help" ? <p className="px-3 pb-1 pt-3 text-[10.5px] font-semibold uppercase tracking-[0.14em] text-sidebar-foreground/70">{n.group}</p> : <div className="my-2 border-t border-sidebar-border" />)}
+        {n.group !== (list[i - 1]?.group ?? null) && (n.group && n.group !== "Settings and help" ? <p data-testid="nav-group" className="px-3 pb-1 pt-3 text-[10.5px] font-semibold uppercase tracking-[0.14em] text-sidebar-foreground/70">{n.group}</p> : i > 0 || n.group === "Settings and help" ? <div className="my-2 border-t border-sidebar-border" /> : null)}
         <button type="button" onClick={() => goTop(n.id)} aria-current={n.id === active ? "page" : undefined}
           className={`group relative flex w-full items-center gap-2.5 rounded-lg px-3 py-1.5 text-left text-[0.86rem] transition-colors ${n.id === active ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground" : "text-sidebar-foreground/75 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"}`}>
           {n.id === active && <span aria-hidden className="absolute inset-y-1.5 left-0 w-[3px] rounded-full bg-sidebar-primary" />}
@@ -323,6 +323,9 @@ export function Dashboard() {
   const shown: ViewId = viewId;
   const parentOfShown = PARENT[shown];
   const active = limited && shown === "onboarding" ? shown : parentOfShown && menu.some((n) => n.id === parentOfShown) ? parentOfShown : shown;
+  // The "Section" of the "Section > Page" trail above each title: the menu group, or the parent module for a page that lives inside one.
+  const activeItem = menu.find((n) => n.id === active);
+  const trailSection = activeItem ? (PARENT[shown] && activeItem.id !== shown ? activeItem.label : activeItem.group && activeItem.group !== "Settings and help" ? activeItem.group : null) : null;
   const agency = auth.demo ? "Demo Company" : limited ? "Your business" : "Your company";
   const own = auth.locationId;
 
@@ -432,13 +435,16 @@ export function Dashboard() {
               Demo mode: this is sample data for a fictional company, not real clients.
             </div>
           )}
-          <nav className="flex gap-1 overflow-x-auto border-b p-2 md:hidden print:hidden" aria-label="Sections">
+          <nav className="fixed inset-x-0 bottom-0 z-30 flex gap-1 overflow-x-auto border-t bg-card p-1.5 shadow-[var(--shadow-lift)] md:hidden print:hidden" aria-label="Sections" data-testid="phone-menu">
             {menu.map((n) => (
               <button key={n.id} type="button" onClick={() => goTop(n.id)} aria-current={n.id === active ? "page" : undefined}
-                className={`shrink-0 border-b-2 px-3 py-2 text-sm transition-colors ${n.id === active ? "border-primary font-medium text-foreground" : "border-transparent text-muted-foreground"}`}>{labelFor(n)}</button>
+                className={`flex min-h-12 min-w-[4.5rem] shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg px-2.5 text-xs leading-tight transition-colors ${n.id === active ? "bg-accent font-semibold text-foreground" : "text-muted-foreground"}`}>
+                {(() => { const Icon = ICONS[n.id]; return Icon ? <Icon aria-hidden className="size-5" /> : null; })()}
+                <span className="max-w-[5.5rem] truncate">{labelFor(n)}</span>
+              </button>
             ))}
           </nav>
-          <main className="mx-auto w-full max-w-[1400px] flex-1 p-4 sm:px-10 sm:py-8">
+          <main className="mx-auto w-full max-w-[1400px] flex-1 p-4 pb-24 sm:px-10 sm:py-8 md:pb-8">
             {fromAccount && view.id !== "today" && (
               <InlineAlert className="mb-3" action={<Btn variant="ghost" onClick={() => { setFilter(EMPTY_FILTER); try { window.history.replaceState(null, "", withTodayAccounts(window.location.hash, [])); window.dispatchEvent(new Event("subsync-today-accounts")); } catch { /* see above */ } }}>See all client accounts</Btn>}>
                 You opened this from inside a client account, so every page shows only that account.
@@ -450,15 +456,16 @@ export function Dashboard() {
               <div className="min-w-0 flex-1">
                 {/* On Today the quiet freshness line sits here, in the one row with search and the bell (the page below draws its own account filter and "Showing" chip). */}
                 {view.id === "today" && strip}
-                {/* Today draws its own account selector inside the page; the shared one is for every other page. */}
-                {auth.kind === "agency" && baseApi && !fromAccount && view.id !== "today" && view.id !== "workflows" && view.id !== "data-health" && <ApiProvider value={baseApi}><FilterDrawer kind="agency" value={filter} onChange={setFilter} /></ApiProvider>}
               </div>
               <div className="ml-auto flex shrink-0 items-center">
                 {NAV_FOR[auth.kind].has("search") && !off("search") && <GlobalSearch go={go} />}
                 <NotificationBell go={go} />
               </div>
             </div>
-            {view.id !== "today" && strip}<BackProvider value={back}>{content}</BackProvider>
+                            {/* ONE filter bar for every page with numbers (KF-11): accounts (agency) and dates, always open. Today keeps its own account choice (ta=) but the bar edits it. */}
+                <ApiProvider value={baseApi ?? api}><GlobalFilterBar view={view.id} agency={auth.kind === "agency" && !fromAccount && Boolean(baseApi)} value={filter} onChange={setFilter} /></ApiProvider>
+            {trailSection && <p data-testid="trail" className="mb-2 text-sm font-medium text-muted-foreground print:hidden">{trailSection} <span aria-hidden>&gt;</span><span className="sr-only">then</span> {NAV.find((n) => n.id === shown)?.label ?? ""}</p>}
+            {view.id !== "today" && strip}<BackProvider value={back}><TrailProvider value={trailSection}>{content}</TrailProvider></BackProvider>
             <FeedbackBox page={view.id} />
           </main>
         </div>

@@ -107,7 +107,7 @@ export function Empty({ title, body }: { title: string; body?: string }) {
 export function Loading({ label = "Loading..." }: { label?: string }) {
   return (
     <div role="status" aria-busy="true" aria-label={label} data-testid="loading" className="space-y-6 py-2">
-      <div className="flex gap-8">{[0, 1, 2].map((i) => <div key={i} className="w-28 space-y-2"><Skeleton className="h-3 w-16" /><Skeleton className="h-8 w-24" /></div>)}</div>
+      <div className="flex flex-wrap gap-x-6 gap-y-3">{[0, 1, 2].map((i) => <div key={i} className="w-28 space-y-2"><Skeleton className="h-3 w-16" /><Skeleton className="h-8 w-24" /></div>)}</div>
       <div className="space-y-3">{[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
       <span className="sr-only">{label}</span>
     </div>

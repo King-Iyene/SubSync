@@ -7,6 +7,7 @@ import { measuringSentence } from "@/lib/design/speed-text";
 import { useData } from "../session";
 import type { GoFn } from "../nav";
 import { EmptyState, ErrorState, HeadlineBlock, HowTo, InlineAlert, PopMenu, SkeletonRows, useCardRange, type MenuItem } from "../ds";
+import { focusClient } from "../ds/global-filter";
 import { PrimaryButton } from "./today-chrome";
 import { SourceCard } from "./speed-cards";
 import { LeadList } from "./speed-all";
@@ -22,7 +23,7 @@ type Home = PictureData & {
   now: number; seePeople: boolean;
   access: { ok: number; needsPermission: Array<{ locationId: string; name: string }>; total: number };
   waiting: {
-    waiting: number; never: number; noOwner: number; accountsWithWaiting: number; oldestMinutes: number | null;
+    waiting: number; clients: Array<{ locationId: string; name: string; count: number }>; money: { line: string; dollars: number; peopleWithDeals: number; deals: number }; never: number; noOwner: number; accountsWithWaiting: number; oldestMinutes: number | null;
     headline: { parts: Array<{ t: string; strong?: boolean }>; text: string; allClear: boolean };
     rows: LeadRow[]; cost: { line: string | null; formula: string; amount: number | null; leftOutAccounts: number };
   };
@@ -104,6 +105,18 @@ export function SpeedView({ go }: { go: GoFn }) {
 
           <HeadlineBlock headline={{ ...w.headline, breakdown: null, accounts: w.accountsWithWaiting, dollars: w.cost.amount ?? 0 } as never}
             action={oldest ? <PrimaryButton p={{ label: "Reply to the oldest waiting lead", sr: `${oldest.name}, the longest wait`, href: oldest.url }} /> : undefined}>
+            {w.waiting > 0 && (
+              <div className="mt-3 max-w-3xl space-y-2" data-testid="speed-money-block">
+                <p className="text-[0.95rem] font-medium" data-testid="speed-money">{w.money.line}</p>
+                {w.clients.length > 1 && (
+                  <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground" data-testid="speed-clients">
+                    <span>Clients with people waiting:</span>
+                    {w.clients.slice(0, 8).map((c) => <button key={c.locationId} type="button" onClick={() => focusClient(c.locationId)} className="min-h-9 rounded-md border bg-card px-2.5 text-foreground hover:border-primary/40" aria-label={`Only ${c.name}, ${c.count} waiting`}>{c.name} ({c.count})</button>)}
+                    {w.clients.length > 8 && <span>and {w.clients.length - 8} more: pick them in the filter above.</span>}
+                  </p>
+                )}
+              </div>
+            )}
             <div className="mt-3 max-w-3xl text-sm leading-6 text-muted-foreground" data-testid="speed-proof">
               {d.summary.typicalLine}{w.cost.line ? <> <span className="font-medium text-foreground" data-testid="speed-cost">{w.cost.line}</span></> : null}
               {w.cost.line && <details className="mt-1 inline-block align-top"><summary className="ds-press min-h-9 cursor-pointer list-none px-1 font-medium text-primary underline underline-offset-4" data-testid="cost-formula-toggle">How this is worked out</summary><span className="block max-w-xl pt-1" data-testid="cost-formula">{w.cost.formula}</span></details>}

@@ -16,7 +16,7 @@ import {
 import type { TodayData } from "@/lib/analytics/today-types";
 import type { GoFn } from "../nav";
 import {
-  AccountBars, AccountList, CommandPalette, ComingBlock, HeadlineBlock, InlineAlert, InsightStrip, KindList, LocalAccountPicker, PrintReport, ProofStrip, PulseSpark, PulseTile,
+  AccountBars, AccountList, CommandPalette, ComingBlock, HeadlineBlock, InlineAlert, InsightStrip, KindList, PrintReport, ProofStrip, PulseSpark, PulseTile,
   RaisedClearedStrip, ReplyNowList, SinceStrip, ViewsMenu, type KindRow, type MenuItem,
 } from "../ds";
 import { Btn, fmtInt, fmtMoney } from "../ui";
@@ -135,18 +135,8 @@ export function TodayPage({ go, t, kind, reload, sync, syncing, options, picked,
     proof: t.proof ? proofLine(t.proof) : null, setAside: view.held.length,
   };
 
-  // ---- the account filter: names the accounts it counts (agency only) ----
-  const filter = agency ? (
-    <span className="flex flex-wrap items-center gap-x-2 gap-y-1" data-testid="today-toolbar">
-      <LocalAccountPicker accounts={options} picked={picked} onChange={changeAccounts} />
-      {picked.length > 0 && (
-        <span className="inline-flex max-w-full items-center gap-1.5 text-sm" data-testid="showing-chip">
-          <span className="min-w-0 truncate"><span className="text-muted-foreground">Showing </span><span className="font-medium">{pickedNames.length === 1 ? pickedNames[0] : `${pickedNames.length} client accounts`}</span></span>
-          <button type="button" onClick={() => { changeAccounts([]); clearShell(); }} data-testid="showing-clear" className="ds-press min-h-8 rounded-md px-1.5 font-medium text-primary underline-offset-4 hover:bg-muted hover:underline focus-visible:outline-2 focus-visible:outline-[var(--ring)]">See all</button>
-        </span>
-      )}
-    </span>
-  ) : null;
+  // The client-account choice lives in the shell's one global filter bar (KF-11); Today only reads it (`picked`).
+  const filter = null;
 
   // ---- the lists ----
   const alsoRows: KindRow[] = (["appointments", "noshows", "stale"] as const)

@@ -81,7 +81,7 @@ for (const theme of ["light", "dark"] as const) {
 
 test("the two themes really differ, and use the KD Squares palette", () => {
   assert.notEqual(light.background, dark.background);
-  assert.equal(dark.background, "#000c25", "dark page is the darkest navy");
+  assert.equal(dark.background, "#141d2f", "dark page is the soft deep blue-grey (stage SHELL lifted it from near-black navy)");
   assert.equal(light.primary, "#0a658b", "light buttons use the brand teal");
   assert.equal(light.gold, "#d4ad58");
   assert.equal(dark.gold, "#d4ad58");

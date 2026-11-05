@@ -6,7 +6,7 @@ import { deleteMyDataText, storeLines } from "../../src/lib/data-inventory";
 // page, the roadmap with suggestions and votes, the Trust page. The demo company has sample data; every test puts back what it changed.
 type Json = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 
-const SECTIONS = ["Team and access", "Notifications", "Integrations", "Reply targets and thresholds", "Brand", "Data and privacy", "Sync status", "Advanced"];
+const SECTIONS = ["Team", "Notifications", "Integrations", "Replies", "Brand", "Data", "Sync status", "Advanced"];
 
 async function noSideScroll(page: Page, where: string) {
   const { sw, cw } = await page.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
@@ -52,7 +52,7 @@ test("Settings is in the eight sections, each opens, nothing scrolls sideways, a
   await expect(nav(page).getByRole("button", { name: "Brand", exact: true })).toHaveAttribute("aria-current", "page");
 });
 
-test("Data and privacy shows what is stored and what each button removes, and the demo cannot delete; Integrations lists Slack, Fathom and the permissions", async ({ page }) => {
+test("Data shows what is stored and what each button removes, and the demo cannot delete; Integrations lists Slack, Fathom and the permissions", async ({ page }) => {
   await openSettings(page, "privacy");
   const text = (await page.getByTestId("section-privacy").innerText()).replace(/\s+/g, " ");
   for (const l of storeLines({ meetings: false })) expect(text, `What we store lists "${l.title}"`).toContain(`${l.title}: ${l.text}`.replace(/\s+/g, " "));
@@ -187,8 +187,8 @@ test("Getting started has a guide for each role, with Do it now links that open 
   const targets = owner.locator("[data-step=targets]");
   // A step that has already ticked (for example when reply targets were saved earlier) offers a small link to the same place instead of "Do it now".
   await targets.getByRole("button", { name: "Do it now" }).or(targets.getByRole("button").last()).click();
-  await expect(page.getByRole("heading", { name: "Reply targets and thresholds", level: 2 })).toBeVisible();
-  await expect(nav(page).getByRole("button", { name: "Reply targets and thresholds" })).toHaveAttribute("aria-current", "page");
+  await expect(page.getByRole("heading", { name: "Replies", level: 2 })).toBeVisible();
+  await expect(nav(page).getByRole("button", { name: "Replies" })).toHaveAttribute("aria-current", "page");
 
   await page.goto("/app?as=business#help");
   await page.reload();

@@ -8,7 +8,7 @@ import { CONTROL_HOME, describeChange, HISTORY_ACTION, isSectionId, MOVED_INTO_S
 const read = (f: string) => readFileSync(join(process.cwd(), f), "utf8");
 
 test("the eight sections of the note, in order, with plain titles", () => {
-  assert.deepEqual(SECTIONS.map((s) => s.title), ["Team and access", "Notifications", "Integrations", "Reply targets and thresholds", "Brand", "Data and privacy", "Sync status", "Advanced"]);
+  assert.deepEqual(SECTIONS.map((s) => s.title), ["Replies", "Brand", "Notifications", "Integrations", "Team", "Data", "Sync status", "Advanced"]);
   assert.equal(new Set(SECTION_IDS).size, 8);
   for (const s of SECTIONS) assert.ok(s.hint.length > 20 && s.hint.length < 120, s.id);
   assert.ok(isSectionId("privacy") && !isSectionId("rules") && !isSectionId(null) && !isSectionId(3));

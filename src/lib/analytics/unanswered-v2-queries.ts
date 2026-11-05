@@ -1,3 +1,5 @@
+import { waitingMoney } from "./waiting-money-queries";
+import { waitingMoneyLine } from "./waiting-money";
 import { sql } from "../db";
 import { conversationCoverage } from "./queries";
 import { properCase, resolveUser, type PersonLabel } from "./people-labels";
@@ -96,11 +98,15 @@ export async function unansweredHome(i: HomeInput) {
   const labelOf = (id: string) => { const l = ownerLabel(id, lk, locs.length === 1 ? (locs[0].location_id as string) : null); return { label: l.label, state: l.state as string }; };
   const home = homeOf(people, { slaHours: i.slaHours, accounts: lk.locationNames, seePeople: i.seePeople, me, labelOf });
   const cost = estimateFor(people, facts ?? []);
+  const money = await waitingMoney(i.installationId, people.map((p) => p.key));
+  const clientCounts = new Map<string, number>();
+  for (const p of people) clientCounts.set(p.locationId, (clientCounts.get(p.locationId) ?? 0) + 1);
+  const clients = [...clientCounts].map(([locationId, count]) => ({ locationId, name: lk.locationNames.get(locationId) ?? "Client account", count })).sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
   const seen = coverage.filter((c) => !i.allowed || i.allowed.includes(c.locationId));
   const countAccounts = lk.locationNames.size;
   return {
     now: i.now, slaHours: i.slaHours, windowDays: WAITING_WINDOW_DAYS, multi: countAccounts > 1, accountCount: countAccounts, seePeople: i.seePeople,
-    waiting: { ...home.facts, headline: home.headline, meaning: meaningLine(i.slaHours, WAITING_WINDOW_DAYS), rows: home.rows.map((p) => personOut(p, lk)), cost: { line: cost.line, formula: cost.formula, amount: cost.amount, leftOutAccounts: cost.leftOutAccounts } },
+    waiting: { ...home.facts, headline: home.headline, meaning: meaningLine(i.slaHours, WAITING_WINDOW_DAYS), rows: home.rows.map((p) => personOut(p, lk)), clients, money: { line: waitingMoneyLine(money, "Next best step: reply to the person who has waited longest."), dollars: money?.dollars ?? 0, peopleWithDeals: money?.peopleWithDeals ?? 0, deals: money?.deals ?? 0 }, cost: { line: cost.line, formula: cost.formula, amount: cost.amount, leftOutAccounts: cost.leftOutAccounts } },
     buckets: home.buckets, channels: home.channels,
     accounts: home.accounts.total > 1 ? { total: home.accounts.total, rows: home.accounts.rows } : null,
     owners: home.owners ? { total: home.owners.total, rows: home.owners.rows } : null,

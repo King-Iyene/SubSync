@@ -478,3 +478,4 @@ Decision: the screen is one sentence, one primary button ("Reply to the oldest w
 
 ### 5 Nov 2026, Clean-up v2 vs Data health: Clean-up's Data quality tab wins
 - One data-quality screen only. Clean-up, Data quality (score, three fix cards, findings, import check, History, Rules) is the one that ships; the separate Data health module stays behind its flag (`data_health`, off) and should fold into this tab (reuse its `health-level.ts` wording where it is better) rather than become a second screen. Reversible: flip the flag.
+- 2026-11-04: SHELL stage: money-first menu, one global filter bar (accounts and dates), brand resolver for the logo rule, lighter dark theme and light side menu, Settings as visible tabs, counted money line on Speed to lead and Unanswered messages. Reason: King's feedback KF-11 and the arrangement notes.

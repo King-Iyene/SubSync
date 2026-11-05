@@ -6,6 +6,7 @@ import { shortWords, summaryText } from "@/lib/analytics/unanswered-v2";
 import { useApiClient, useData } from "../session";
 import type { GoFn } from "../nav";
 import { EmptyState, ErrorState, HeadlineBlock, HowTo, InlineAlert, PopMenu, SkeletonRows, type MenuItem } from "../ds";
+import { focusClient } from "../ds/global-filter";
 import { PrimaryButton } from "./today-chrome";
 import { WaitList } from "./unanswered-all";
 import { WaitedSection, WhereSection, type AccountRankOut, type BucketOut, type OwnerRankOut } from "./unanswered-picture";
@@ -20,7 +21,7 @@ import { PersonRows, usePersonActions, type WaitRow } from "./unanswered-rows";
 type Home = {
   now: number; slaHours: number; windowDays: number; multi: boolean; accountCount: number; seePeople: boolean; kind: string;
   waiting: {
-    people: number; conversations: number; accounts: number; oldestHours: number | null; noOwner: number; newLeads: number; over24: number;
+    people: number; clients: Array<{ locationId: string; name: string; count: number }>; money: { line: string; dollars: number; peopleWithDeals: number; deals: number }; conversations: number; accounts: number; oldestHours: number | null; noOwner: number; newLeads: number; over24: number;
     headline: { parts: Array<{ t: string; strong?: boolean }>; text: string; allClear: boolean }; meaning: string;
     rows: WaitRow[]; cost: { line: string | null; formula: string; amount: number | null; leftOutAccounts: number };
   };
@@ -95,6 +96,18 @@ export function InboxView({ go }: { go: GoFn }) {
 
           <HeadlineBlock headline={{ ...w.headline, breakdown: null, accounts: w.accounts, dollars: w.cost.amount ?? 0 } as never}
             action={oldest ? <PrimaryButton p={{ label: w.people > 1 ? `Reply to the oldest of the ${w.people.toLocaleString("en-US")} people waiting` : "Reply to the person waiting", sr: `${oldest.name}, the longest wait, in your CRM`, href: oldest.url }} /> : undefined}>
+            {w.people > 0 && (
+              <div className="mt-3 max-w-3xl space-y-2" data-testid="wait-money-block">
+                <p className="text-[0.95rem] font-medium" data-testid="wait-money">{w.money.line}</p>
+                {w.clients.length > 1 && (
+                  <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground" data-testid="wait-clients">
+                    <span>Clients with people waiting:</span>
+                    {w.clients.slice(0, 8).map((c) => <button key={c.locationId} type="button" onClick={() => focusClient(c.locationId)} className="min-h-9 rounded-md border bg-card px-2.5 text-foreground hover:border-primary/40" aria-label={`Only ${c.name}, ${c.count} waiting`}>{c.name} ({c.count})</button>)}
+                    {w.clients.length > 8 && <span>and {w.clients.length - 8} more: pick them in the filter above.</span>}
+                  </p>
+                )}
+              </div>
+            )}
             <div className="mt-3 max-w-3xl text-sm leading-6 text-muted-foreground" data-testid="wait-proof">
               {w.people > 0 ? w.meaning : null}{w.cost.line ? <> <span className="font-medium text-foreground" data-testid="wait-cost">{w.cost.line}</span></> : null}
               {w.cost.line && <details className="mt-1 inline-block align-top"><summary className="ds-press min-h-9 cursor-pointer list-none px-1 font-medium text-primary underline underline-offset-4" data-testid="cost-formula-toggle">How this is worked out</summary><span className="block max-w-xl pt-1" data-testid="cost-formula">{w.cost.formula}</span></details>}

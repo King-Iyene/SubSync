@@ -63,7 +63,7 @@ export function onColour(hex: string): string {
 
 export type Theme = "light" | "dark";
 // The surfaces an accent has to read on, per theme (the card colour in each theme's tokens).
-export const SURFACE: Record<Theme, string> = { light: "#ffffff", dark: "#031636" };
+export const SURFACE: Record<Theme, string> = { light: "#ffffff", dark: "#1b263b" };
 
 // An agency's chosen colour, made safe to use. A fill (button, active menu mark) keeps the agency's exact colour when a white or navy label can read on it, and is nudged only when neither can.
 // Text and links in that colour must reach 4.5:1 on the page's surface: when the exact colour does not, it is moved toward white (dark theme) or

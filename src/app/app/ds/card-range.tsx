@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 
 import {
   COMPARES, DEFAULT_RANGE, decodeRange, encodeRange, PRESETS, rangeFromHash, rangeIntoHash, resolveRange, todayOf, type Compare, type RangePreset, type RangeSpec, type Resolved,
 } from "@/lib/design/range";
+import { pageRangeFromHash } from "@/lib/design/global-filter";
 import { remember, remembered } from "./remember";
 
 // The range and comparison of ONE card (KF-4), separate from the page's filter bar. The window is always stated on the card in words; the choice is carried
@@ -19,13 +20,25 @@ const subscribe = (cb: () => void) => {
   return () => { listeners.delete(cb); window.removeEventListener("popstate", cb); window.removeEventListener("hashchange", cb); };
 };
 
+/** Tells every card that the page range changed (the address was rewritten). */
+export const notifyRangeChange = bump;
+
 export type CardRangeState = { spec: RangeSpec; resolved: Resolved | null; setSpec: (s: RangeSpec) => void };
 
 /** The state of one card's range. `key` names the card in the address ("speed-trend"); `initial` is the default when nothing is in the link or remembered. */
 export function useCardRange(key: string, initial: RangeSpec = DEFAULT_RANGE): CardRangeState {
   const fromLink = useSyncExternalStore(subscribe, () => { const s = rangeFromHash(window.location.hash, key); return s ? encodeRange(s) : ""; }, () => "");
   const saved = useSyncExternalStore(subscribe, () => remembered(`range-${key}`) ?? "", () => "");
-  const spec = useMemo(() => decodeRange(fromLink) ?? decodeRange(saved) ?? initial, [fromLink, saved, initial]);
+  // The global filter bar's range (r.page in the address, else the one remembered for this person) applies to every card that has no choice of its own in the address.
+  const pageLink = useSyncExternalStore(subscribe, () => { const s = pageRangeFromHash(window.location.hash); return s ? encodeRange(s) : ""; }, () => "");
+  const pageSaved = useSyncExternalStore(subscribe, () => remembered("range-page") ?? "", () => "");
+  const spec = useMemo(() => {
+    const own = decodeRange(fromLink);
+    if (own) return own;
+    const page = decodeRange(pageLink) ?? decodeRange(pageSaved);
+    const base = decodeRange(saved) ?? initial;
+    return page ? { ...page, compare: base.compare } : base;
+  }, [fromLink, pageLink, pageSaved, saved, initial]);
   // Today is read in the browser after the page is up (never while it is prepared in advance), so the window is worked out only then.
   const [today, setToday] = useState<string | null>(null);
   useEffect(() => {

@@ -129,11 +129,11 @@ export function SettingsView({ openSection }: { openSection?: SectionId } = {}) 
       <PageHeader title="Settings" subtitle="What counts as late, where alerts go, who can see what, and your data. Pick a section." />
       {msg && <p className={`mb-4 border-l-2 py-1 pl-3 text-sm ${msg.ok ? "border-success" : "border-destructive"}`} role={msg.ok ? "status" : "alert"} data-testid="settings-message">{msg.text}</p>}
 
-      <div className="grid gap-6 lg:grid-cols-[13.5rem_minmax(0,1fr)]">
-        <nav aria-label="Settings sections" data-testid="settings-nav" className="flex gap-1 overflow-x-auto lg:sticky lg:top-4 lg:flex-col lg:self-start lg:overflow-visible">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-5">
+        <nav aria-label="Settings sections" data-testid="settings-nav" className="flex max-w-full gap-1 overflow-x-auto border-b pb-2">
           {sections.map((s) => (
             <button key={s.id} type="button" onClick={() => choose(s.id)} aria-current={s.id === section ? "page" : undefined}
-              className={`shrink-0 rounded-lg px-3 py-2 text-left text-sm transition-colors max-sm:min-h-11 ${s.id === section ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"}`}>{s.title}</button>
+              className={`min-h-11 shrink-0 rounded-lg px-4 py-2 text-left text-[0.95rem] transition-colors ${s.id === section ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"}`}>{s.title}</button>
           ))}
         </nav>
 
@@ -262,6 +262,7 @@ export function SettingsView({ openSection }: { openSection?: SectionId } = {}) 
                     <input id="speed-target" type="number" min={1} max={1440} className={`${inputClass} !w-32`} value={form.speedTargetMinutes} onChange={(e) => setForm({ ...form, speedTargetMinutes: Number(e.target.value) })} />
                   </div>
                   <label className="flex items-center gap-2 pb-2 text-sm"><input type="checkbox" className="size-4" checked={form.countAutomatedTouches} onChange={(e) => setForm({ ...form, countAutomatedTouches: e.target.checked })} /> Count automatic messages as a reply</label>
+                  <p className="basis-full text-xs text-muted-foreground">Off by default: a text from a workflow or campaign is not a person replying, so the clock keeps running until your team answers.</p>
                 </div>
                 <div className="mt-4 flex flex-wrap items-end gap-4">
                   <label className="flex items-center gap-2 pb-2 text-sm"><input type="checkbox" className="size-4" checked={form.speedBusinessHours} onChange={(e) => setForm({ ...form, speedBusinessHours: e.target.checked })} /> Only count business hours</label>

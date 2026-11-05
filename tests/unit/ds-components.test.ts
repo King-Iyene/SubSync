@@ -230,16 +230,16 @@ describe("the lead drawer and My day (read from sample data, never signed in)", 
 describe("the menu structure", () => {
   const groups = [...new Set(NAV.filter((n) => !n.parent).map((n) => n.group))];
   it("uses plain group names and none of the old ones", () => {
-    expect(groups).toEqual(["", "Daily work", "Clients and people", "More", "Settings and help"]);
+    expect(groups).toEqual(["", "Reply", "Clients and people", "More", "Settings and help"]);
     expect(JSON.stringify(NAV)).not.toMatch(/Tidy up|Inbox & SLA|SLA/);
   });
   it("the pilot menu is on top, in order", () => {
     const top = NAV.filter((n) => !n.parent && n.group !== "More").map((n) => n.label);
-    expect(top).toEqual(["Today", "Speed to lead", "Appointments", "Unanswered messages", "Workflows", "Data health", "Account audit", "Clients", "People", "Settings", "Getting started", "What's new"]);
+    expect(top).toEqual(["Today", "Speed to lead", "Unanswered messages", "Appointments", "Clients", "People", "Account audit", "Clean-up", "Settings", "Getting started", "What's new"]);
     // Connections (stage E0) is Settings, Integrations now (4 Nov 2026): not a menu entry of its own. A client's staff, who have no Settings, get an Integrations entry (tests/unit/connections-in-settings.test.ts).
   });
   it("nothing that was visible has gone: every page is still in the menu, under More, or a tab of its parent", () => {
-    for (const id of ["overview", "accounts", "team", "pipeline", "onboarding", "duplicates", "cleanup", "meetings"]) expect(NAV.find((n) => n.id === id)?.group, id).toBe("More");
+    for (const id of ["overview", "team", "pipeline", "meetings", "workflows", "data-health"]) expect(NAV.find((n) => n.id === id)?.group, id).toBe("More");
     // Stage C1: Accounts and Setup became tabs of the Clients module (their addresses still open it), so an agency finds them there, not in the menu.
     for (const id of ["accounts", "onboarding"]) expect(NAV.find((n) => n.id === id)?.parent, id).toBe("clients");
     expect(NAV.find((n) => n.id === "onboarding")?.showWhenLimited, "a business keeps its own Setup in its menu").toBe(true);
