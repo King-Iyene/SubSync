@@ -646,3 +646,9 @@ Code: `src/lib/analytics/unanswered-v2.ts` (everything pure: the person, the buc
 - **Quality firewall spike:** per source, bad records (duplicate, junk, invalid phone or email) created in the last 24 hours, at least the account's minimum (default 10), at least 3 times the same source's daily average over the 14 days before (counted as 1 if lower), and at least a third of what that source created.
 - **Since you installed:** first stored score, latest score, flags ever raised, flags that stopped being flagged. **Average time to fix:** mean hours between an alert raised and resolved.
 - **Benchmark:** median and quartiles of the latest score (last 14 days) of accounts in the same size and industry group, only with at least 10 accounts from at least 3 companies and never from opted out companies.
+
+## Pipeline board (stage MOAT)
+- **Counted once:** each open deal id appears in exactly one stage and is added to the headline once; only deals the existing rules count (value above zero, an owner, pipeline in use, not a closed-out stage).
+- **Stuck (per stage):** time in the CURRENT stage (stage change, else created) above that stage's limit AND no activity for 7 days (or unknown). Limit = 2 x the median days open deals have sat in that stage, clamped 5 to 30; stages with fewer than 5 deals use the account's stale-days setting.
+- **No next step:** no upcoming appointment for the deal's contact (not cancelled, no-show or invalid) AND no activity for 7 days.
+- **Forecast shown** only with 20 or more closed deals; **trend line** only with 14 or more days and a change of at least 10 percent of its high. Tests: src/lib/__tests__/pipeline-board.test.ts.

@@ -478,3 +478,5 @@ Decision: the screen is one sentence, one primary button ("Reply to the oldest w
 
 ### 5 Nov 2026, Clean-up v2 vs Data health: Clean-up's Data quality tab wins
 - One data-quality screen only. Clean-up, Data quality (score, three fix cards, findings, import check, History, Rules) is the one that ships; the separate Data health module stays behind its flag (`data_health`, off) and should fold into this tab (reuse its `health-level.ts` wording where it is better) rather than become a second screen. Reversible: flip the flag.
+
+- 2026-11-04 | MOAT: work inside SubSync. The lead panel becomes a workbench (thread, composer, note, task, tag, owner, details, deal, appointment, delete) and every write goes through ONE gateway (src/lib/ghl/workbench.ts) on the existing switches (WRITE_GHL_LIVE off, per-account opt-in, preview and confirm, guardrails, audit with ids only, undo). Reason: the CRM API has no call-placing endpoint but can message, note, tag, move deals and set appointment status, so the moat is doing the work here, honestly as a dry run until King switches it on. Pipeline rebuilt money first; the 25 In use dropdowns moved behind a gear.
