@@ -12,22 +12,22 @@ import { useNow } from "./live";
 // records it was counted from (the page opens the same records panel for all of them). Every block shows how many leads or things it is based on; a comparison is
 // labelled "estimate"; none of them says why something happened. No colour is used for meaning on its own: status has an icon and a word.
 
-const card = "ds-press group flex w-full flex-col items-start gap-1 border-b border-[var(--t-rule)] py-3 pr-2 text-left hover:bg-[var(--t-wash)] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--ring)]";
+const card = "ds-press group flex w-full items-baseline justify-between gap-4 border-b border-[var(--t-rule)] py-2.5 pr-2 text-left hover:bg-[var(--t-wash)] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--ring)]";
 
 /** "Spotted today": up to three cards. */
 export function InsightStrip({ insights, onOpen }: { insights: Insight[]; onOpen: (i: Insight) => void }) {
   if (insights.length === 0) return null;
   return (
-    <section className="mb-12 border-t border-[var(--t-rule)] pt-5" aria-labelledby="spotted-h" data-testid="insight-strip">
-      <h2 id="spotted-h" className="t-title mb-1">Worth a look</h2>
-      <ul className="max-w-3xl">
+    <section className="mb-10 border-t border-[var(--t-rule)] pt-5" aria-labelledby="spotted-h" data-testid="insight-strip">
+      <h2 id="spotted-h" className="t-title mb-2">Worth a look</h2>
+      <ul>
         {insights.map((i) => (
           <li key={i.key} className="min-w-0">
             <button type="button" onClick={() => onOpen(i)} className={card} data-testid="insight-card" data-key={i.key} data-sample={i.sample} aria-label={`${i.text} Based on ${i.sampleLabel}. See them.`}>
-              <span className="font-medium">{i.text}</span>
-              <span className="t-small t-quiet flex w-full items-center justify-between gap-2">
-                <span>Based on <span className="t-num text-[var(--t-ink)]">{i.sampleLabel}</span>{i.estimate ? ", an estimate" : ""}</span>
-                <span className="inline-flex items-center gap-0.5 opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100">See them<ChevronRight aria-hidden className="size-3.5" /></span>
+              <span>{i.text}</span>
+              <span className="t-small t-quiet flex shrink-0 items-center gap-1" title={i.estimate ? "An estimate, based on these leads." : "A count of these records."}>
+                <span className="t-num">{i.sampleLabel}</span>{i.estimate ? <span>, estimate</span> : null}
+                <ChevronRight aria-hidden className="size-3.5 opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100" />
               </span>
             </button>
           </li>
@@ -47,7 +47,7 @@ export function SinceStrip({ since, showAlerts, onOpen }: { since: SinceVisit; s
     ...(showAlerts ? [{ k: "alerts" as const, n: since.clearedAlerts.length, one: "alert cleared", many: "alerts cleared" }] : []),
   ];
   return (
-    <section className="mb-12 border-t border-[var(--t-rule)] pt-5" aria-label="Since you were last here" data-testid="since-strip">
+    <section className="mb-10 border-t border-[var(--t-rule)] pt-5" aria-label="Since you were last here" data-testid="since-strip">
       <h2 className="t-title">Since you were last here <span className="t-small t-quiet font-normal">({day})</span></h2>
       <ul className="mt-3 flex flex-wrap gap-x-8 gap-y-2">
         {cells.map((c) => (
@@ -56,7 +56,7 @@ export function SinceStrip({ since, showAlerts, onOpen }: { since: SinceVisit; s
               <button type="button" onClick={() => onOpen(c.k)} data-testid={`since-${c.k}`} data-count={c.n} className="ds-press rounded-md py-1 text-left hover:underline focus-visible:outline-2 focus-visible:outline-[var(--ring)]">
                 <span className="t-num text-base">{c.n.toLocaleString("en-US")}</span> {c.n === 1 ? c.one : c.many}
               </button>
-            ) : <span className="py-1 text-muted-foreground" data-testid={`since-${c.k}`} data-count={0}><span className="t-num">0</span> {c.many}</span>}
+            ) : null}
           </li>
         ))}
       </ul>
@@ -103,7 +103,7 @@ export function ComingBlock({ forecast, targetMinutes, onOpen }: { forecast: For
   return (
     <section className="mb-12" aria-labelledby="coming-h" data-testid="coming-block">
       <h2 id="coming-h" className="t-title">If nothing changes today</h2>
-      <p className="t-small t-quiet mt-1" data-testid="coming-line">{forecastLine(forecast, targetMinutes)}</p>
+      <p className="sr-only" data-testid="coming-line">{forecastLine(forecast, targetMinutes)}</p>
       {!nothing && (
         <div className="mt-4 grid grid-cols-1 gap-x-10 gap-y-5 md:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
           {next && left !== null ? (

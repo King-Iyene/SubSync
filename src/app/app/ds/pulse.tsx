@@ -23,7 +23,7 @@ export type SparkPoint = { label: string; value: number; note?: string };
  * axis. Hover or focus shows the exact value and the date; a hidden table carries the same numbers for a screen reader. Points are drawn only where a figure
  * exists, so a missing day is a gap in the data, never a guess.
  */
-export function PulseSpark({ points, label, format, height = 72, onPoint, pointInfo }: {
+export function PulseSpark({ points, label, format, height = 96, onPoint, pointInfo }: {
   points: SparkPoint[]; label: string; format: (n: number) => string; height?: number;
   /** Press a point (click, or Enter on the focused point): open the records behind it. */
   onPoint?: (i: number) => void;
@@ -69,16 +69,16 @@ export function PulseSpark({ points, label, format, height = 72, onPoint, pointI
   );
 }
 
-export function PulseTile({ label, value, usual, sub, spark, testId, onOpen, openLabel }: { label: ReactNode; value: ReactNode; usual: Usual | null; sub?: ReactNode; spark?: ReactNode; testId?: string; /** Press the number to open the records behind it. */ onOpen?: () => void; openLabel?: string }) {
+export function PulseTile({ label, value, usual, sub, spark, testId, onOpen, openLabel, info }: { label: ReactNode; /** One sentence that explains the figure, shown on hover, focus or tap, not on the page. */ info?: string; value: ReactNode; usual: Usual | null; sub?: ReactNode; spark?: ReactNode; testId?: string; /** Press the number to open the records behind it. */ onOpen?: () => void; openLabel?: string }) {
   const v = usual ? VERDICT[usual.verdict] : null;
   return (
     <div className="min-w-0 py-0.5" data-testid={testId} data-verdict={usual?.verdict ?? "none"}>
-      <p className="t-label">{label}</p>
+      <p className="t-label flex items-center gap-1.5">{label}{info && <span tabIndex={0} role="img" aria-label={info} title={info} data-testid={testId ? `${testId}-info` : undefined} className="inline-flex cursor-help rounded-full text-[var(--t-ink3)] hover:text-[var(--t-ink)] focus-visible:outline-2 focus-visible:outline-[var(--ring)]"><Info aria-hidden className="size-3.5" /></span>}</p>
       <p className="t-figure mt-2 break-words">
         {onOpen ? <button type="button" onClick={onOpen} data-testid={testId ? `${testId}-open` : undefined} aria-label={openLabel ?? "Show the records behind this number"} title={openLabel ?? "Show the records behind this number"}
           className="ds-press -mx-1 cursor-pointer rounded-md px-1 text-left underline decoration-primary/40 decoration-[0.07em] underline-offset-[0.18em] hover:decoration-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)]"><CountUp value={value} /></button> : <CountUp value={value} />}
       </p>
-      {sub && <div className="mt-2 text-sm leading-5">{sub}</div>}
+      {sub && <div className="t-small t-quiet mt-2">{sub}</div>}
       {usual && v && <p className={`mt-1.5 flex items-start gap-1.5 text-xs leading-5 ${v.text}`} data-testid={testId ? `${testId}-usual` : undefined}><v.Icon aria-hidden className="mt-0.5 size-3.5 shrink-0" /><span>{usual.text}</span></p>}
       {spark}
     </div>

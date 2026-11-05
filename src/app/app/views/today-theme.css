@@ -62,7 +62,7 @@
   --t-serif: var(--font-newsreader), "Iowan Old Style", "Palatino Linotype", Georgia, serif;
   --t-sans: var(--font-hanken), "Segoe UI", system-ui, -apple-system, sans-serif;
   --t-mono: var(--font-plex-mono), ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-  --t-fs-display: clamp(1.75rem, 1.2rem + 1.6vw, 2.5rem);    /* the one headline sentence */
+  --t-fs-display: clamp(1.75rem, 1.2rem + 1.2vw, 2.25rem);    /* the one headline sentence */
   --t-fs-figure: clamp(1.75rem, 1.4rem + 0.9vw, 2.25rem);    /* big figures */
   --t-fs-title: 1.25rem;                                      /* section titles */
   --t-fs-body: 0.9375rem;

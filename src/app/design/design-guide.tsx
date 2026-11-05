@@ -14,6 +14,8 @@ import { NAV } from "../app/nav";
 import { Badge, Btn, Card, Stat } from "../app/ui";
 import { SAMPLE_LEADS, SAMPLE_OPTIONS, SAMPLE_TREND, SAMPLE_WEEKS, sampleApi } from "./sample";
 import { TodayBlocks } from "./today-blocks";
+import { TodayPalettes } from "./today-palettes";
+import { TODAY_FONTS } from "../app/views/today-fonts";
 import { WorkflowsBlocks } from "./workflows-blocks";
 
 const MEMBER_COLUMNS: Array<Column<TrendMember>> = [
@@ -246,7 +248,8 @@ export function DesignGuide() {
             <div className="mt-4 flex flex-wrap gap-2"><Btn variant="primary">Main action</Btn><Btn>Second action</Btn><Btn variant="ghost">Quiet action</Btn></div>
           </Section>
 
-          <TodayBlocks />
+          <TodayPalettes />
+          <div className={`today t-root ${TODAY_FONTS} -mx-2 rounded-[6px] bg-background px-2 text-foreground`}><TodayBlocks /></div>
           <WorkflowsBlocks />
 
           <Section title="Page template" hint="Title, one short sentence, actions, tabs, then the blocks.">

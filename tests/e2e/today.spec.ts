@@ -6,7 +6,7 @@ import { api, counted, moreMenu, openMore, type Json } from "./today-helpers";
 // of the projects. The v3 rules (counting, above the fold, roles, phone) are in today3.spec.ts.
 const thousands = (n: number) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 
-test("the first thing on Today is the one sentence, big, on the first screen, with the work list under it and the numbers behind More detail", async ({ page, request }) => {
+test("the first thing on Today is the one sentence, big, on the first screen, with the work list under it and the numbers behind it", async ({ page, request }) => {
   const { get } = await api(request);
   const today = await get("today");
   await page.goto("/app");
@@ -16,14 +16,12 @@ test("the first thing on Today is the one sentence, big, on the first screen, wi
   const items = counted(today);
   if (items.length > 0) {
     const clients = new Set(items.map((r) => r.locationId)).size;
-    await expect(headline).toContainText(new RegExp(`${clients} clients? needs? you today\\.`), { timeout: 10_000 });
+    await expect(headline).toContainText(new RegExp(`(across ${clients} clients?|${clients} clients? (has|have) something to do today)\\.`), { timeout: 10_000 });
     await expect(page.getByTestId("today-primary-button")).toBeVisible();
   } else {
-    await expect(headline).toContainText("Every client account is on track today.");
+    await expect(headline).toContainText("Every client is on track today.");
   }
-  // The four figures are behind "More detail", closed until it is asked for.
-  await expect(page.getByTestId("today-pulse")).toHaveCount(0);
-  await openMore(page);
+  // The four figures are in "The numbers behind it", always on the page.
   await expect(page.getByTestId("today-pulse")).toBeVisible();
   await expect(page.getByTestId("today-pulse").locator("[data-verdict]")).toHaveCount(4);
   await expect(page.getByTestId("fix-first")).toBeVisible();
@@ -35,7 +33,7 @@ test("the five-second test: a title, one sentence, one button, and nothing on th
   await expect(page.getByRole("heading", { level: 1, name: "Today" })).toBeVisible({ timeout: 45_000 });
   await expect(page.getByTestId("page-subtitle")).toHaveCount(0); // no paragraph under the title
   await expect(page.getByTestId("today-headline-block")).not.toContainText(/updated|synced|last read/i);
-  await expect(page.getByTestId("today-headline")).toContainText(/clients? needs? you today|on track/);
+  await expect(page.getByTestId("today-headline")).toContainText(/across \d+ clients?|something to do today|on track/);
   await expect(page.getByTestId("today-primary").getByRole("link")).toHaveCount(1); // exactly one primary button
   await expect(page.getByTestId("freshness")).toBeVisible(); // the quiet "Updated ..." line is in the top row, once
 });
@@ -117,7 +115,7 @@ test("the work list: at most five rows, one small Open button each, urgency in w
   expect(await rows.count()).toBeLessThanOrEqual(5);
   for (const r of await rows.all()) {
     await expect(r.getByTestId("queue-open")).toHaveText(/^Open/);
-    await expect(r).toContainText(/Urgent|Soon|When you can/);
+    await expect(r).toContainText(/Urgent|Soon|Can wait/);
     await expect(r.getByTestId("queue-more")).toBeVisible();
   }
   await expect(page.getByTestId("queue-show")).toHaveCount(0);
@@ -226,6 +224,7 @@ test("raised and cleared: each day with alerts opens its list; the number on the
   test.setTimeout(240_000);
   await page.goto("/app");
   await openMore(page);
+  await openMore(page, "Proof");
   const strip = page.getByTestId("raised-cleared");
   await expect(strip).toBeVisible({ timeout: 15_000 });
   await expect(page.getByTestId("raised-title")).toContainText(/Last 7 days: \d+ alerts? raised, \d+ cleared, \d+ still open\./);
@@ -256,8 +255,8 @@ test("Share Today (in More) copies the headline and the top three, and sends not
   await expect(page.getByTestId("menu-share")).toContainText("Copied to your clipboard");
   await page.keyboard.press("Escape");
   const text = await page.evaluate(() => navigator.clipboard.readText());
-  expect(text).toMatch(/^Your client accounts: Today\r?\n/);
-  expect(text).toContain("Fix first:");
+  expect(text).toMatch(/^Your clients: Today\r?\n/);
+  expect(text).toContain("Do this first:");
   expect(text.split(/\r?\n/).filter((l) => /^\d\. /.test(l)).length).toBeLessThanOrEqual(3);
   expect(posts).toBe(0);
 });
@@ -351,7 +350,7 @@ test("a client's staff open on Today for their own account: Reply now, calls, ap
   await expect(page.getByTestId("today-headline")).toBeVisible();
   await expect(page.getByTestId("today-account-picker")).toHaveCount(0);
   await expect(page.getByTestId("filter-drawer")).toHaveCount(0);
-  await expect(page.getByRole("heading", { name: "Fix first" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Do this first" })).toHaveCount(0);
   await expect(page.getByTestId("account-bars")).toHaveCount(0);
   await expect(page.getByTestId("donut-chart")).toHaveCount(0);
   await expect(page.getByTestId("today-proof")).toHaveCount(0); // alerts are for the business administrator
@@ -389,6 +388,7 @@ test("the style guide shows Today's building blocks, still opens without signing
   await expect(page.getByTestId("today-headline")).toBeVisible();
   await expect(page.getByTestId("donut-chart")).toBeVisible();
   await expect(page.getByTestId("account-bars")).toBeVisible();
+  await openMore(page, "Proof");
   await expect(page.getByTestId("raised-cleared")).toBeVisible();
   await expect(page.getByTestId("fix-first")).toBeVisible();
   await expect(page.getByTestId("design-pulse")).toBeVisible();

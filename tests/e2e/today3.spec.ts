@@ -42,7 +42,7 @@ for (const role of ROLES) {
     await openMore(page);
     expect(await page.getByText("Not enough history yet", { exact: false }).count(), "the old per-tile line is gone").toBe(0);
     expect(await page.getByText("Comparisons with your usual start after 7 days of history.", { exact: true }).count(), "said at most once").toBeLessThanOrEqual(1);
-    expect((await page.locator("main").innerText()).match(/0 replies/g) ?? [], "no '0 replies' as a headline value").toHaveLength(0);
+    expect((await page.locator("main").innerText()).match(/(^|\n)0 replies/g) ?? [], "no '0 replies' as a headline value").toHaveLength(0);
   });
 }
 
@@ -74,9 +74,9 @@ test("one number per fact (agency, all accounts): the headline, the tile, the wo
   const things = items.length;
   const clients = new Set(items.map((i) => i.locationId)).size;
   await page.goto("/app");
-  await expect(page.getByTestId("today-headline")).toContainText(new RegExp(`${clients} clients? needs? you today`), { timeout: 60_000 });
-  // The breakdown line says the same people count, with the new leads as a subset.
-  await expect(page.getByTestId("today-breakdown")).toContainText(new RegExp(`${thousands(replies)} people? waiting for a reply`));
+  await expect(page.getByTestId("today-headline")).toContainText(new RegExp(`across ${clients} clients?`), { timeout: 60_000 });
+  // The sentence says the people count, and the line under it says how many of them are new leads.
+  await expect(page.getByTestId("today-headline")).toContainText(new RegExp(`${thousands(replies)} people? (is|are) waiting for a reply`));
   const panel = page.getByTestId("records-panel");
   // The headline number opens the clients; its count is the headline's.
   await page.getByTestId("headline-clients").click();
@@ -88,7 +88,6 @@ test("one number per fact (agency, all accounts): the headline, the tile, the wo
   expect(shown).toBeLessThanOrEqual(things);
   if (totals.length === clients) expect(shown).toBe(things);
   // The tile.
-  await openMore(page);
   await expect(page.getByTestId("pulse-replies")).toContainText(thousands(replies));
   await page.getByTestId("pulse-replies-open").click();
   await expect(panel.getByTestId("records-count")).toHaveAttribute("data-count", String(replies));
@@ -111,7 +110,7 @@ test("one number per fact (one account): the sentence, the Reply now list, its '
   const shown = await page.getByTestId("reply-row").count();
   expect(shown).toBeLessThanOrEqual(5);
   if (n > shown) {
-    await expect(page.getByTestId("reply-all")).toContainText(`See all ${thousands(n)}`);
+    await expect(page.getByTestId("reply-all")).toContainText(`Show all ${thousands(n)}`);
     await page.getByTestId("reply-all").click();
     const panel = page.getByTestId("records-panel");
     await expect(panel.getByTestId("records-count")).toHaveAttribute("data-count", String(n));

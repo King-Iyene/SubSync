@@ -105,7 +105,7 @@ test("the headline: clients and counted dollars, built from existing figures", (
   const items = [item("replies", "aaa"), item("replies", "bbb"), item("stale", "ccc", { value: 48_200 })];
   const h = headlineOf({ scope: "all", rows: queueOf(items), totals: totalsFrom(items) });
   assert.equal(h.text, "2 people are waiting for a reply across 3 clients.");
-  assert.equal(h.breakdown, "Also 1 quiet deal, worth $48,200.");
+  assert.equal(h.breakdown, "1 quiet deal worth $48,200.");
   assert.equal(h.allClear, false);
   const one = headlineOf({ scope: "all", rows: queueOf([item("replies", "aaa")]), totals: totalsFrom([item("replies", "aaa")]) });
   assert.equal(one.text, "1 person is waiting for a reply across 1 client.");
@@ -115,7 +115,7 @@ test("one deal that is most of the stalled money is said out loud, never hidden 
   const items = [item("stale", "aaa", { value: 900_000 }), item("stale", "bbb", { value: 100_000 })];
   const h = headlineOf({ scope: "all", rows: queueOf(items), totals: totalsFrom(items), outlier: { value: 900_000, share: 0.9 } });
   assert.equal(h.text, "2 clients have something to do today.");
-  assert.match(h.breakdown ?? "", /\$1,000,000\. One deal is \$900,000 of the quiet-deal money\.$/);
+  assert.match(h.breakdown ?? "", /worth \$1,000,000\.$/);
 });
 
 test("the headline never counts an estimate as money at risk", () => {
@@ -184,7 +184,7 @@ test("bars: top accounts by things to fix, with the tooltip in words", () => {
   assert.deepEqual(b.bars.map((x) => x.name), ["Harbor Realty", "North Roofing"]);
   assert.equal(b.accounts, 3);
   assert.equal(barTooltip(b.bars[0], q), "Harbor Realty: 4 people need a reply, 1 quiet deal, $6,300 in quiet deals");
-  assert.equal(barsTitle(b), "Harbor Realty has the most to do, with 5 things. Each bar is one client.");
+  assert.equal(barsTitle(b), "Harbor Realty has the most to do: 5.");
   assert.equal(accountBars([]).bars.length, 0);
 });
 

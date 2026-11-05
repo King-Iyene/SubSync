@@ -2,7 +2,7 @@
 
 import { CircleAlert, Clock, ExternalLink, MoreHorizontal, TriangleAlert } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { ageLabel, ageWords, INLINE_ROWS, KIND_LABEL, money, personRow, replyContext, type NeedingYou, type QueueRow, type Severity, type TodayItem } from "@/lib/analytics/today-queue";
+import { actionTitle, ageLabel, ageWords, INLINE_ROWS, KIND_LABEL, money, personRow, replyContext, type NeedingYou, type QueueRow, type Severity, type TodayItem } from "@/lib/analytics/today-queue";
 import type { NextAction } from "@/lib/analytics/today-smart";
 import { PopMenu, type MenuItem } from "./pop-menu";
 import { useNow } from "./live";
@@ -116,7 +116,7 @@ export function AccountList({
   useEffect(() => { if (moved.current) document.getElementById(`account-row-${shown[active]?.locationId}`)?.scrollIntoView({ block: "nearest" }); }, [active, shown, moved]);
   return (
     <section className="mb-10" aria-labelledby="work-h" data-testid="fix-first">
-      <ListHead id="work-h" title={title} hint={total === 0 ? undefined : <span data-testid="work-summary">{total.toLocaleString("en-US")} {total === 1 ? "client" : "clients"}, largest amount first{urgent > 0 ? (urgent === total && total > 1 ? ". All are urgent." : `. ${urgent.toLocaleString("en-US")} ${urgent === 1 ? "is" : "are"} urgent.`) : "."}</span>}
+      <ListHead id="work-h" title={title} hint={total === 0 ? undefined : <span data-testid="work-summary">{total.toLocaleString("en-US")} {total === 1 ? "client" : "clients"}, largest amount first{urgent > 0 && urgent < total ? `, ${urgent.toLocaleString("en-US")} urgent` : ""}</span>}
         right={total > shown.length ? <button type="button" onClick={onSeeAll} className={SEE_ALL} data-testid="queue-all">Show all {total.toLocaleString("en-US")} clients</button> : undefined} />
       {rows.length === 0 ? (
         <p className="t-surface t-small t-quiet px-4 py-6" data-testid="queue-empty">{empty}</p>
@@ -140,10 +140,10 @@ export function AccountList({
             const mine = assigned[a.top.key];
             return (
               <li key={a.locationId} id={`account-row-${a.locationId}`} data-testid="queue-row" data-kind={a.top.kind} data-severity={a.severity} aria-current={n === active ? "true" : undefined}
-                className={`ds-row grid grid-cols-[minmax(0,1fr)_6rem_2.5rem] items-center gap-x-3 gap-y-0.5 border-l-2 py-2.5 pl-4 pr-2 ${ACCOUNT_TRACKS} ${s.stripe} ${n === active ? "bg-accent/50 outline outline-2 -outline-offset-2 outline-[var(--ring)]" : ""}`}>
+                className={`ds-row grid grid-cols-[minmax(0,1fr)_6rem_2.5rem] items-center gap-x-3 gap-y-0.5 border-l-2 py-2 pl-4 pr-2 ${ACCOUNT_TRACKS} ${s.stripe} ${n === active ? "bg-accent/50 outline outline-2 -outline-offset-2 outline-[var(--ring)]" : ""}`}>
                 <div className="min-w-0" data-col="title">
-                  <p className="truncate font-semibold" title={a.name}>{a.name}</p>
-                  <p className="t-small t-quiet line-clamp-2 @3xl:truncate" title={a.reason}>{a.reason}{a.count > a.top.count && <span>, plus {a.count - a.top.count} more</span>}{mine ? <span>. Assigned to {mine}</span> : null}</p>
+                  <p className="truncate font-semibold" title={`${actionTitle(a.top.kind, a.top.count)} at ${a.name}`}>{actionTitle(a.top.kind, a.top.count)}</p>
+                  <p className="t-small t-quiet line-clamp-2 @3xl:truncate" title={a.reason}>{a.name}{a.count > a.top.count && <span>, plus {a.count - a.top.count} more</span>}{mine ? <span>. Assigned to {mine}</span> : null}</p>
                   <p className={`flex items-center gap-1 text-xs @3xl:hidden ${s.text}`}><s.Icon aria-hidden className="size-3.5 shrink-0" />{s.word}{age ? <span className="text-muted-foreground"> · {ageLabel(a.top.kind, age)}</span> : null}</p>
                 </div>
                 <div className="tnum hidden text-right @3xl:block" data-col="amount">
@@ -183,7 +183,7 @@ export function ReplyNowList({ items, total, newLeads, max = INLINE_ROWS, onSeeA
   useEffect(() => { if (moved.current) document.getElementById(`reply-${shown[active]?.id}`)?.scrollIntoView({ block: "nearest" }); }, [active, shown, moved]);
   if (total === 0) return null;
   const oldest = items[0]?.at ?? null;
-  const hint = [oldest !== null && now > 0 ? `Longest wait: ${ageWords(Math.max(0, (now - oldest) / 60_000))}.` : null, newLeads > 0 ? `${newLeads.toLocaleString("en-US")} of the ${total.toLocaleString("en-US")} ${newLeads === 1 ? "is a new lead" : "are new leads"}.` : null].filter(Boolean).join(" ");
+  const hint = [oldest !== null && now > 0 ? `Longest wait: ${ageWords(Math.max(0, (now - oldest) / 60_000))}.` : null, newLeads > 0 ? `${newLeads.toLocaleString("en-US")} new ${newLeads === 1 ? "lead" : "leads"}.` : null].filter(Boolean).join(" ");
   return (
     <section className="mb-10" aria-label={title} data-testid="reply-now">
       <ListHead title={title} hint={hint ? <span data-testid="reply-summary">{hint}</span> : undefined}
@@ -197,9 +197,9 @@ export function ReplyNowList({ items, total, newLeads, max = INLINE_ROWS, onSeeA
           const items: MenuItem[] = onAct ? actionItems(row, onAct, canAssign, null) : [];
           return (
             <li key={p.id} id={`reply-${p.id}`} data-testid="reply-row" aria-current={n === active ? "true" : undefined} data-new-lead={p.newLead ? "true" : "false"}
-              className={`ds-row grid grid-cols-[minmax(0,1fr)_6rem_2.5rem] items-center gap-x-3 gap-y-0.5 py-2.5 pl-4 pr-2 ${REPLY_TRACKS} ${n === active ? "bg-accent/50 outline outline-2 -outline-offset-2 outline-[var(--ring)]" : ""}`}>
+              className={`ds-row grid grid-cols-[minmax(0,1fr)_6rem_2.5rem] items-center gap-x-3 gap-y-0.5 py-2 pl-4 pr-2 ${REPLY_TRACKS} ${n === active ? "bg-accent/50 outline outline-2 -outline-offset-2 outline-[var(--ring)]" : ""}`}>
               <div className="min-w-0">
-                <p className="truncate font-semibold" title={p.name}>{p.name}</p>
+                <p className="truncate font-semibold" title={p.name}>Reply to {p.name}</p>
                 <p className="t-small t-quiet line-clamp-2 @3xl:truncate">{!single && <span>{p.accountName}. </span>}{replyContext(p)}{mine ? <span>. Assigned to {mine}</span> : null}</p>
                 <p className={`text-xs @3xl:hidden ${p.never ? "text-destructive" : "text-muted-foreground"}`} data-testid="lead-wait-narrow">{p.never ? wait : `Waiting ${wait}`}</p>
               </div>
@@ -228,7 +228,7 @@ export function KindList({ rows, title = "Also on your list", hint }: { rows: Ki
         {rows.map((r) => (
           <li key={r.kind} data-testid="kind-row" data-kind={r.kind} className={`ds-row grid grid-cols-[minmax(0,1fr)_6rem] items-center gap-x-3 gap-y-0.5 py-2.5 pl-4 pr-2 ${KIND_TRACKS}`}>
             <div className="min-w-0">
-              <p className="truncate font-semibold">{KIND_LABEL[r.kind]}</p>
+              <p className="truncate font-semibold">{actionTitle(r.kind, r.count)}</p>
               <p className="line-clamp-2 text-sm text-muted-foreground @3xl:truncate" title={r.text}>{r.text}</p>
             </div>
             <button type="button" onClick={r.onOpen} data-testid="kind-count" data-count={r.count} aria-label={`${r.count.toLocaleString("en-US")} ${KIND_LABEL[r.kind].toLowerCase()}. Show them.`}

@@ -14,10 +14,10 @@ const stamp = (p: TodayPerson, zone: string) => {
 };
 const GRID = "@container ds-row grid grid-cols-[minmax(0,1fr)_6rem] items-center gap-x-3 py-2.5 pl-4 pr-2";
 
-function CallRow({ name, sub, url, dnd, phone }: { name: string; sub?: string; url: string; dnd?: boolean; phone: boolean }) {
+function CallRow({ name, sub, url, dnd, phone, verb = "Call" }: { name: string; sub?: string; url: string; dnd?: boolean; phone: boolean; verb?: string }) {
   return (
     <li className={GRID} data-testid="call-row" data-dnd={dnd ? "true" : "false"}>
-      <div className="min-w-0"><p className="truncate font-semibold">{name}</p>{sub && <p className="truncate text-sm text-muted-foreground">{sub}</p>}</div>
+      <div className="min-w-0"><p className="truncate font-semibold">{verb} {name}</p>{sub && <p className="truncate text-sm text-muted-foreground">{sub}</p>}</div>
       {dnd
         ? <button type="button" disabled title="This person asked not to be contacted." className="inline-flex h-11 w-full cursor-not-allowed items-center justify-center gap-1.5 rounded-[4px] border px-2 text-sm font-medium text-muted-foreground opacity-70 sm:h-8"><Phone aria-hidden className="size-3.5" />No calls</button>
         : <RowButton href={url} label={phone ? "Call" : "Open"} sr={`${name}, ${phone ? "call in your CRM" : "no phone number"}`} />}
@@ -43,12 +43,12 @@ export function CallsSection({ mine }: { mine: TodayMine }) {
   return (
     <section className="mb-10" aria-labelledby="my-calls-h" data-testid="my-calls">
       <h2 id="my-calls-h" className="t-title">Calls for today</h2>
-      <p className="t-small t-quiet mb-3 mt-0.5">Each call opens the person in your CRM, where you dial.</p>
+      <div className="mb-3" />
       <CallGroup title="No-shows to rebook" total={c.noshows.total} shown={c.noshows.rows.length} testId="calls-noshows">
         {c.noshows.rows.map((p, i) => <CallRow key={`${p.contactId}-${i}`} name={p.name} sub={`Missed ${stamp(p, mine.timeZone)}${p.calendar ? `, ${p.calendar}` : ""}`} url={p.url} dnd={p.dnd} phone={!!p.phone} />)}
       </CallGroup>
       <CallGroup title="Appointments to confirm" total={c.confirm.total} shown={c.confirm.rows.length} testId="calls-confirm">
-        {c.confirm.rows.map((p, i) => <CallRow key={`${p.contactId}-${i}`} name={p.name} sub={`${stamp(p, mine.timeZone)}${p.calendar ? `, ${p.calendar}` : ""}`} url={p.url} dnd={p.dnd} phone={!!p.phone} />)}
+        {c.confirm.rows.map((p, i) => <CallRow key={`${p.contactId}-${i}`} verb="Confirm with" name={p.name} sub={`${stamp(p, mine.timeZone)}${p.calendar ? `, ${p.calendar}` : ""}`} url={p.url} dnd={p.dnd} phone={!!p.phone} />)}
       </CallGroup>
     </section>
   );
@@ -66,7 +66,7 @@ export function AppointmentsSection({ mine, go }: { mine: TodayMine; go: () => v
       <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
         <div className="min-w-0">
           <h2 id="my-appts-h" className="t-title">Appointments today and tomorrow</h2>
-          {appts.length > 0 && <p className="t-small t-quiet mt-0.5">{unmarked > 0 ? `${unmarked} of ${appts.length} have no outcome marked yet.` : "Every appointment that has passed has an outcome marked."}</p>}
+          {unmarked > 0 && <p className="t-small t-quiet mt-0.5">{unmarked} of {appts.length} have no outcome yet</p>}
         </div>
         {unmarked > 0 && <Btn variant="ghost" onClick={() => setOnlyUnmarked(!onlyUnmarked)}>{onlyUnmarked ? "Show all" : "Only unmarked"}</Btn>}
       </div>

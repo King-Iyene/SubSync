@@ -12,7 +12,7 @@ import { CountUp } from "../ds/count-up";
 /** The title row: a quiet label and the date on the left, the "More" menu on the right. `filter` is the client filter chip (agency only). */
 export function TodayHeader({ filter, more, dateText }: { filter?: ReactNode; more: MenuItem[]; dateText?: string }) {
   return (
-    <header className="mb-8 flex flex-wrap items-center gap-x-4 gap-y-2 print:hidden" data-testid="today-header">
+    <header className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2 print:hidden" data-testid="today-header">
       <h1 className="t-label mr-auto flex items-baseline gap-3"><span className="text-[var(--t-ink)]">Today</span>{dateText && <span className="font-normal normal-case tracking-normal">{dateText}</span>}</h1>
       {filter && <div className="order-3 w-full sm:order-none sm:w-auto">{filter}</div>}
       <PopMenu label="More" items={more} testId="today-more"
@@ -26,7 +26,7 @@ export function TodayHeader({ filter, more, dateText }: { filter?: ReactNode; mo
 /** The one sentence. Numbers in it open the records they are counted from. With nothing to do it says so in words, never colour alone. */
 export function TodayHeadline({ headline, onPart, action, children }: { headline: Headline; onPart?: (a: HeadlineAction) => void; action?: ReactNode; children?: ReactNode }) {
   return (
-    <section className="mb-12 max-w-3xl" aria-label="Today in one sentence" data-testid="today-headline-block">
+    <section className="mb-8 max-w-3xl" aria-label="Today in one sentence" data-testid="today-headline-block">
       <h2 className="t-display" data-testid="today-headline" data-clear={headline.allClear}>
         {headline.parts.map((p, n) => {
           if (!p.strong) return <span key={n}>{p.t}</span>;
@@ -37,8 +37,8 @@ export function TodayHeadline({ headline, onPart, action, children }: { headline
             : <span key={n}>{num}</span>;
         })}
       </h2>
-      {headline.breakdown && <p className="mt-3 max-w-2xl text-[var(--t-ink2)]" data-testid="today-breakdown">{headline.breakdown}</p>}
-      {action && <div className="mt-5" data-testid="today-primary">{action}</div>}
+      {headline.breakdown && <p className="t-small t-quiet mt-2" data-testid="today-breakdown">{headline.breakdown}</p>}
+      {action && <div className="mt-4" data-testid="today-primary">{action}</div>}
       {children}
     </section>
   );
@@ -58,7 +58,7 @@ export function Block({ id, title, hint, children, testId, className = "" }: { i
   return (
     <section className={`mb-12 border-t border-[var(--t-rule)] pt-5 ${className}`} aria-labelledby={id} data-testid={testId}>
       <h2 id={id} className="t-title">{title}</h2>
-      {hint && <p className="t-small t-quiet mt-1 max-w-2xl">{hint}</p>}
+      {hint && <p className="t-small t-quiet mt-1">{hint}</p>}
       <div className="mt-4">{children}</div>
     </section>
   );

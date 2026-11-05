@@ -31,10 +31,10 @@ import { BriefPreview, CoverageTab, HeldLink, JunkControl, PeopleTab, SourcesTab
 // tabs (Forecast, Proof, People, Sources, Coverage), closed until asked for. Every number comes from countsOf (src/lib/analytics/today-queue.ts), so the headline, the list, the bars,
 // the figures and every list behind a number cannot disagree. Every mark opens exactly its own records. Nothing here writes to the CRM. Words: docs/features/TODAY.md (glossary).
 
-const SHARED_HISTORY_NOTE = "Comparisons with a normal week start after 7 days of history.";
+const SHARED_HISTORY_NOTE = "Comparisons start after 7 days of history.";
 
 function reasonText(blocked: boolean, kindsOff: string): string | null {
-  return blocked ? `Needs permission: ${kindsOff}. Ask whoever manages SubSync to approve it, then sync.` : null;
+  return blocked ? `Needs permission: ${kindsOff}. Ask whoever manages SubSync to approve it.` : null;
 }
 
 export function TodayPage({ go, t, kind, reload, sync, syncing, options, picked, setPicked, error, clearShell }: {
@@ -149,8 +149,8 @@ export function TodayPage({ go, t, kind, reload, sync, syncing, options, picked,
     .map((k) => {
       const q = rows.find((r) => r.kind === k);
       const n = view.totals[k].count;
-      const text = k === "appointments" ? `${n === 1 ? "1 appointment is" : `${n} appointments are`} over with no outcome marked.` : k === "noshows" ? `${n === 1 ? "1 person" : `${n} people`} missed an appointment and ${n === 1 ? "has" : "have"} not rebooked.`
-        : `${n === 1 ? "1 open deal has" : `${n} open deals have`} not moved in ${t.staleDays}+ days${view.totals.stale.dollars ? `, worth ${fmtMoney(view.totals.stale.dollars)}` : ""}.`;
+      const text = k === "appointments" ? "Over, with no outcome marked" : k === "noshows" ? "Missed an appointment, not rebooked"
+        : `Not moved in ${t.staleDays}+ days${view.totals.stale.dollars ? `, worth ${fmtMoney(view.totals.stale.dollars)}` : ""}`;
       const action = k === "stale" ? { label: "Open", href: q?.url ?? t.accounts[0]?.url, sr: "Deals in your CRM" } : { label: "Mark", onClick: () => go("appointments"), sr: k === "noshows" ? "No-shows in Appointments" : "Appointments to mark" };
       return { kind: k, count: n, text, onOpen: () => m.open(specKind(k, env)), action };
     });
@@ -162,34 +162,34 @@ export function TodayPage({ go, t, kind, reload, sync, syncing, options, picked,
 
   // ---- the evidence: the reply-time line, and the figures beside it ----
   const evidence = (
-    <Block id="evidence-h" title="The numbers behind it" hint="Each number opens the list it was counted from." testId="today-evidence">
-      <div className="grid grid-cols-1 gap-x-14 gap-y-8 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]" data-testid="today-pulse">
-        <PulseTile testId="pulse-reply" label="Typical first reply" usual={known(reply.verdict)} onOpen={reply.current.answered > 0 ? () => m.open(specReplies(env, m.now, 7, "Typical first reply, last 7 days")) : undefined} openLabel="See the replies this is worked out from"
+    <Block id="evidence-h" title="This week" testId="today-evidence">
+      <div className="grid grid-cols-1 gap-x-16 gap-y-8 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]" data-testid="today-pulse">
+        <PulseTile testId="pulse-reply" label="Typical first reply" info="The middle first-reply time of the leads from the last 7 days. The line shows the same figure for each of the last 7 days. It needs 5 or more replies." usual={known(reply.verdict)} onOpen={reply.current.answered > 0 ? () => m.open(specReplies(env, m.now, 7, "Typical first reply, last 7 days")) : undefined} openLabel="See the replies this is worked out from"
           value={reply.current.seconds !== null ? replyWords(reply.current.seconds) : reply.current.answered === 0 ? "No replies yet" : "Not enough yet"}
-          sub={reply.current.seconds === null ? `A typical time needs 5 or more replies in 7 days.${reply.current.answered > 0 ? ` ${reply.current.answered} so far.` : ""}` : `Last 7 days, from ${fmtInt(reply.current.answered)} replies. The line shows the same figure for each of the last 7 days.`}
+          sub={reply.current.seconds === null ? `Needs 5 or more replies. ${reply.current.answered} so far.` : `Last 7 days, ${fmtInt(reply.current.answered)} replies`}
           spark={<PulseSpark points={points} label="Typical first reply, last 7 days" format={replyWords}
             onPoint={(i) => m.open(specReplies(env, pointEnd(reply.points[i].day, m.now), 7, `Typical first reply, 7 days to ${reply.points[i].day}`))}
             pointInfo={(i) => { const c = windowReplies(i); return c > 0 ? { open: true, text: `Select to see the ${c} replies behind it.` } : { open: false, text: "SubSync no longer holds the leads behind this point." }; }} />} />
-        <div className="grid grid-cols-1 content-start gap-y-6 lg:border-l lg:border-[var(--t-rule)] lg:pl-10">
-          <PulseTile testId="pulse-replies" label="Needs a reply" usual={null} onOpen={blockedLeads ? undefined : () => m.open(specKind("replies", env))} openLabel="See the people who need a reply"
+        <div className="grid grid-cols-1 content-start gap-y-7 lg:border-l lg:border-[var(--t-rule)] lg:pl-10">
+          <PulseTile testId="pulse-replies" label="Needs a reply" info="People whose last message nobody has answered. New leads count once the reply target has passed." usual={null} onOpen={blockedLeads ? undefined : () => m.open(specKind("replies", env))} openLabel="See the people who need a reply"
             value={blockedLeads ? "Not available" : fmtInt(counts.replies)}
-            sub={blockedLeads ? "Needs permission: reconnect." : counts.replies === 0 ? "Nobody needs a reply." : <>{oldest !== null && <span data-testid="pulse-oldest">Longest wait: {ageWords(Math.max(0, (m.now - oldest) / 60_000))}.</span>}{counts.newLeads > 0 && <> {fmtInt(counts.newLeads)} {counts.newLeads === 1 ? "is a new lead" : "are new leads"}.</>}{never > 0 && <> {fmtInt(never)} {never === 1 ? "was" : "were"} never answered.</>}</>} />
-          <PulseTile testId="pulse-risk" label="Quiet deals" usual={known(staleVerdict)} onOpen={() => m.open(specDollars(env))} openLabel="See the deals this adds up"
+            sub={blockedLeads ? "Needs permission: reconnect." : counts.replies === 0 ? "Nobody" : <>{oldest !== null && <span data-testid="pulse-oldest">Longest wait: {ageWords(Math.max(0, (m.now - oldest) / 60_000))}</span>}{never > 0 && <>. {fmtInt(never)} never answered</>}</>} />
+          <PulseTile testId="pulse-risk" label="Quiet deals" info={`Open deals with a value and an owner that have not moved in ${t.staleDays} days or more. This is money that could be lost, not a forecast.`} usual={known(staleVerdict)} onOpen={() => m.open(specDollars(env))} openLabel="See the deals this adds up"
             value={counts.staleDollars ? fmtMoney(counts.staleDollars) : "$0"}
-            sub={counts.stale === 0 ? "No open deal has gone quiet." : `${fmtInt(counts.stale)} open ${counts.stale === 1 ? "deal has" : "deals have"} not moved in ${t.staleDays}+ days. This is money that could be lost, not a forecast.`} />
+            sub={counts.stale === 0 ? "None" : `${fmtInt(counts.stale)} ${counts.stale === 1 ? "deal" : "deals"}${view.outlier ? `. One is ${fmtMoney(view.outlier.value)}` : ""}`} />
           {n ? (
             <div data-testid="my-numbers" className="grid grid-cols-1 gap-y-6">
-              <PulseTile testId="my-showrate" label="Show rate, last 30 days" usual={null} onOpen={() => go("appointments")} openLabel="Open Appointments to see the appointments behind this"
+              <PulseTile testId="my-showrate" label="Show rate" info="Of the appointments from the last 30 days that have an outcome, the share that showed up." usual={null} onOpen={() => go("appointments")} openLabel="Open Appointments to see the appointments behind this"
                 value={n.showRate.now === null ? "Not enough yet" : pct(n.showRate.now)}
-                sub={n.showRate.now === null ? `Needs ${n.showRate.minN} appointments with an outcome. ${n.showRate.nNow} so far.` : `Of ${n.showRate.nNow} appointments with an outcome.`} />
-              <PulseTile testId="my-intarget" label="Answered within the target" usual={null} onOpen={inTarget(7).length > 0 ? () => m.open(specTarget()) : undefined} openLabel="See the leads this share is worked out from"
+                sub={n.showRate.now === null ? `Needs ${n.showRate.minN} outcomes. ${n.showRate.nNow} so far.` : `Last 30 days, ${n.showRate.nNow} appointments`} />
+              <PulseTile testId="my-intarget" label="Answered in time" info={`The share of this week's leads that got a reply within ${t.targetMinutes} minutes.`} usual={null} onOpen={inTarget(7).length > 0 ? () => m.open(specTarget()) : undefined} openLabel="See the leads this share is worked out from"
                 value={n.inTarget.now === null ? "Not enough yet" : pct(n.inTarget.now)}
-                sub={n.inTarget.now === null ? `Needs 5 leads past their target. ${n.inTarget.nNow} so far.` : `Of ${n.inTarget.nNow} leads this week. The target is ${t.targetMinutes} minutes.`} />
+                sub={n.inTarget.now === null ? `Needs 5 leads. ${n.inTarget.nNow} so far.` : `This week, ${n.inTarget.nNow} leads`} />
             </div>
           ) : (
-            <PulseTile testId="pulse-appointments" label="Needs an outcome" usual={null} onOpen={blockedAppts ? undefined : () => m.open(specKind("appointments", env))} openLabel="See the appointments with no outcome"
+            <PulseTile testId="pulse-appointments" label="Needs an outcome" info="Appointments that are over with no outcome marked. Show rate needs them marked." usual={null} onOpen={blockedAppts ? undefined : () => m.open(specKind("appointments", env))} openLabel="See the appointments with no outcome"
               value={blockedAppts ? "Not available" : fmtInt(counts.appointments)}
-              sub={blockedAppts ? "Needs permission: reconnect." : counts.appointments === 0 ? "Every past appointment has an outcome." : oldestAppt !== null ? `The oldest started ${ageWords(Math.max(0, (m.now - oldestAppt) / 60_000))} ago. Show rate needs these marked.` : null} />
+              sub={blockedAppts ? "Needs permission: reconnect." : counts.appointments === 0 ? "All marked" : oldestAppt !== null ? `Oldest: ${ageWords(Math.max(0, (m.now - oldestAppt) / 60_000))} ago` : null} />
           )}
         </div>
       </div>
@@ -238,14 +238,14 @@ export function TodayPage({ go, t, kind, reload, sync, syncing, options, picked,
           {blockedLeads && <InlineAlert tone="warning" className="mt-3" action={<Btn onClick={() => go("settings")}>Open Settings</Btn>}>{blockedLeads}</InlineAlert>}
           {blockedAppts && <InlineAlert tone="warning" className="mt-3" action={<Btn onClick={() => go("settings")}>Open Settings</Btn>}>{blockedAppts}</InlineAlert>}
           {headline.allClear && t.proof && !blockedLeads && !blockedAppts && kind !== "client" && <p className="mt-3 text-[var(--t-ink2)]" data-testid="today-proof-line">{proofLine(t.proof)}</p>}
-          {!t.actionsReady && <p className="t-small t-quiet mt-2" data-testid="needs-update">Mark done and Snooze need the latest database update. Everything else works.</p>}
+          {!t.actionsReady && <p className="t-small t-quiet mt-2" data-testid="needs-update">Mark done and Snooze need the latest database update.</p>}
         </TodayHeadline>
 
         {multi ? (
           <>
             <AccountList rows={needing.rows} total={needing.total} urgent={urgent} onShow={(a) => m.open(specAccount(a.locationId, env))} onOnly={(a) => changeAccounts([a.locationId])} onSeeAll={() => m.open(specClients(env))}
               onAct={m.act} canAssign={m.canAssign} assigned={m.assigned} whyOf={m.rowWhy} nextOf={(a) => nextAction(rows, view.items, a.locationId)} onNext={(a, na) => m.open(specNext(na.itemIds, na.text, env))}
-              empty={rows.length === 0 ? (view.held.length > 0 ? "Everything left is snoozed or done. It comes back by itself." : "Nothing needs you right now.") : "Nothing here needs you right now."} />
+              empty={rows.length === 0 ? (view.held.length > 0 ? "Everything left is snoozed or done." : "Nothing needs you right now.") : "Nothing here needs you right now."} />
             <HeldLink m={m} />
           </>
         ) : (

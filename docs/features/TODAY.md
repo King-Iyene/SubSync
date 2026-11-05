@@ -1,3 +1,37 @@
+# Today redesign (5 Nov 2026, branch `today-redesign`): new structure, type, colour and words
+
+King: "the designs are too AI based ... the font, the text, A to Z." Behaviour is unchanged (every number opens the records panel, the working queue, the client filter, saved views, Ctrl Shift K, print, tenancy and entitlements). Critique and before and after: `docs/review/TODAY_DESIGN_CRITIQUE.md`.
+
+## Order of the page
+1. Small title row: "Today", the date, one "More" menu.
+2. One sentence with the number that matters most ("78 people are waiting for a reply across 13 clients."), one line of the rest, one filled button.
+3. **Do this first**: the working queue, the one bordered surface on the page (aligned fixed columns, measured equal by the existing test).
+4. **Since you were last here** and **Worth a look** (plain lines with hairlines, no cards).
+5. **Where the work sits** (agency, many clients): one bar per client. **The numbers behind it**: the reply-time line over 7 days with the figures beside it (needs a reply, quiet deals, show rate or needs an outcome).
+6. **Break it down** (closed until asked): Forecast, Proof, People, Sources, Coverage.
+
+## Type and colour
+- Newsreader (the sentence, section titles, big figures), Hanken Grotesk (everything read), IBM Plex Mono (labels and aligned figures, tabular). Loaded with next/font (self-hosted at build, no CSP change), real fallback stacks. One scale as tokens in `src/app/app/views/today-theme.css`: display, figure, title, body 15px, small, label.
+- Tokens are scoped to `.today` (the app wrapper carries it only while Today is open). Palette A (graphite and berry) is the default, palette B (pine and jade) is `data-palette="b"`. Both light and dark, side by side on /design. Neither is blue. Status colours (Urgent, Soon, Fine) are reserved and always have a word or icon.
+
+## Words (one word per idea, used everywhere on Today)
+| Idea | Word | Not |
+|---|---|---|
+| A business we serve | client | client account, sub-account (the client filter in the shell keeps "client accounts") |
+| Someone who needs an answer | person who needs a reply; kind label "Needs a reply" | waiting for a reply (as a label), unanswered lead |
+| Appointment over, nothing marked | "Needs an outcome" | appointments to mark |
+| Missed an appointment | "No-shows to rebook" | win back, recover |
+| Deal not moved for N days | "Quiet deals" | stale, gone quiet (as a label) |
+| Urgency words | Urgent, Soon, Can wait | When you can |
+| Open the records behind a number | "See" (See them, See the replies) in labels, "Show all" for the full list, "Open" for the CRM | Show them, Click |
+| Time limit | "within 15 minutes" | inside |
+| Set a row aside | "Mark done", "Snooze until tomorrow", "Snooze until Monday" | Done for now, Snooze 1 day |
+| What changed | "Since you were last here" | since your last visit |
+| Notes worth reading | "Worth a look" | Spotted today |
+| Forecast | "If nothing changes today" | If nobody acts today |
+| The queue | "Do this first" | Start here, Fix first, Reply now |
+| Money | "Quiet deals" amount, "estimate" said in words | at risk, at stake |
+
 # Today (third pass, 4 Nov 2026): one question, one number per fact, one page for every role
 
 Status: **BUILT on branch `today-v3`, awaiting King's checks.** No migration. Spec: `docs/TODAY_REVIEW.md`. King's added rules: KF-8, KF-9, KF-10 in `docs/KING_FEEDBACK_LIVE.md`. Decisions: `docs/DECISIONS.md`, "Today v3". Counting rule: `docs/METRICS.md`, "Today, third pass".

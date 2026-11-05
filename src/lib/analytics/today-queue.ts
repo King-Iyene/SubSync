@@ -82,6 +82,17 @@ export function ageWords(minutes: number): string {
   return `${Math.round(m / 1440)} days`;
 }
 
+/** What to do about a group, verb first: "Reply to 13 people", "Rebook 3 no-shows", "Mark 2 appointments", "Review 2 quiet deals". */
+export function actionTitle(kind: Kind, count: number): string {
+  const n = count.toLocaleString("en-US");
+  switch (kind) {
+    case "replies": return count === 1 ? "Reply to 1 person" : `Reply to ${n} people`;
+    case "appointments": return `Mark ${n} ${count === 1 ? "appointment" : "appointments"}`;
+    case "noshows": return `Rebook ${n} ${count === 1 ? "no-show" : "no-shows"}`;
+    case "stale": return `Review ${n} quiet ${count === 1 ? "deal" : "deals"}`;
+  }
+}
+
 /** Six to ten words about what is wrong with this group. */
 export function rowText(kind: Kind, count: number, staleDays: number): string {
   switch (kind) {
@@ -265,15 +276,14 @@ const COUNT_WORDS: Record<Kind, [string, string]> = {
 export function breakdownOf(t: Totals, o: { dollars?: boolean } = {}): string | null {
   const c = countsOf(t, []);
   // The headline already says how many people need a reply; this line adds how many are new leads, then the other kinds in plain words.
-  const lead = c.replies > 0 && c.newLeads > 0 ? `${c.newLeads.toLocaleString("en-US")} of them ${c.newLeads === 1 ? "is a new lead" : "are new leads"}.` : null;
-  const bits = KINDS.filter((k) => k !== "replies" && t[k].count > 0).map((k) => {
-    const w = COUNT_WORDS[k];
-    return `${t[k].count.toLocaleString("en-US")} ${t[k].count === 1 ? w[0] : w[1]}${k === "stale" && t.stale.dollars && o.dollars ? `, worth ${money(t.stale.dollars)}` : ""}`;
-  });
-  const list = bits.length === 0 ? null : (bits.length === 1 ? bits[0] : `${bits.slice(0, -1).join(", ")} and ${bits[bits.length - 1]}`);
-  const rest = list === null ? null : `${c.replies > 0 ? "Also " : ""}${c.replies > 0 ? list : list.charAt(0).toUpperCase() + list.slice(1)}.`;
-  const all = [lead, rest].filter(Boolean).join(" ");
-  return all === "" ? null : all;
+  const n = (x: number) => x.toLocaleString("en-US");
+  const bits: string[] = [];
+  if (c.replies > 0 && c.newLeads > 0) bits.push(`${n(c.newLeads)} new ${c.newLeads === 1 ? "lead" : "leads"}`);
+  if (t.appointments.count > 0) bits.push(`${n(t.appointments.count)} ${t.appointments.count === 1 ? "needs" : "need"} an outcome`);
+  if (t.noshows.count > 0) bits.push(`${n(t.noshows.count)} ${t.noshows.count === 1 ? "no-show" : "no-shows"} to rebook`);
+  if (t.stale.count > 0) bits.push(`${n(t.stale.count)} quiet ${t.stale.count === 1 ? "deal" : "deals"}${t.stale.dollars && o.dollars ? ` worth ${money(t.stale.dollars)}` : ""}`);
+  if (bits.length === 0) return null;
+  return `${bits.join(", ")}.`;
 }
 
 /**
@@ -286,8 +296,7 @@ export function headlineOf(i: { scope: "all" | "account"; rows: QueueRow[]; tota
   const dollars = c.staleDollars;
   // The sentence carries the one number that matters most (people waiting). The line under it carries the rest, the dollars included.
   const breakdown0 = breakdownOf(i.totals, { dollars: true });
-  const outlierNote = i.outlier && dollars > 0 && breakdown0 ? ` One deal is ${money(i.outlier.value)} of the quiet-deal money.` : "";
-  const breakdown = breakdown0 ? breakdown0 + outlierNote : null;
+  const breakdown = breakdown0;
   if (c.things === 0) {
     const text = i.scope === "all" ? "Every client is on track today." : "You are all caught up today.";
     return { parts: [{ t: text }], text, allClear: true, breakdown: null, accounts: 0, dollars: 0 };
@@ -352,7 +361,7 @@ export function accountBars(rows: QueueRow[], max = 8): { bars: AccountBar[]; ac
 export function barsTitle(b: { bars: AccountBar[]; accounts: number }): string {
   if (b.bars.length === 0) return "No client has anything to do";
   const top = b.bars[0];
-  return b.accounts === 1 ? `${top.name} has ${plural(top.count, "thing")} to do` : `${top.name} has the most to do, with ${plural(top.count, "thing")}. Each bar is one client.`;
+  return b.accounts === 1 ? `${top.name} has ${plural(top.count, "thing")} to do` : `${top.name} has the most to do: ${top.count}.`;
 }
 
 /** The tooltip, in words: "Bright Smile Dental: 14 leads waiting, $6,300 at stake". */

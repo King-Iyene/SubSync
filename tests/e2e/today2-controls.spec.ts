@@ -176,14 +176,14 @@ test("More detail: the tabs, the junk switch, set aside; More: Share, Preview, P
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   await openToday(page);
   await expect(page.getByTestId("more-detail")).toHaveAttribute("data-open", "false");
-  for (const [tab, id] of [["People", "tab-people"], ["Sources", "tab-sources"], ["Coverage", "tab-coverage"], ["Numbers", "tab-numbers"]] as const) {
+  for (const [tab, id] of [["People", "tab-people"], ["Sources", "tab-sources"], ["Coverage", "tab-coverage"], ["Forecast", "tab-numbers"]] as const) {
     await openMore(page, tab);
     await expect(page.getByTestId(id).first()).toBeVisible();
   }
   await page.getByRole("tab", { name: "Coverage" }).click();
   const hour = page.getByTestId("hour-bar").first();
   if (await hour.count()) { await hour.click(); await expect(panel(page)).toBeVisible(); await page.keyboard.press("Escape"); }
-  await page.getByRole("tab", { name: "Numbers" }).click();
+  await page.getByRole("tab", { name: "Forecast" }).click();
   // Junk switch changes the dollar figure or at least toggles.
   const toggle = page.getByTestId("junk-toggle");
   const was = await toggle.isChecked();
@@ -197,7 +197,7 @@ test("More detail: the tabs, the junk switch, set aside; More: Share, Preview, P
   await page.getByTestId("today-more").click();
   await expect(page.getByTestId("menu-share")).toContainText(/Copied to your clipboard/);
   await page.keyboard.press("Escape");
-  expect(await page.evaluate(() => navigator.clipboard.readText())).toContain("need you today");
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toContain("Today");
   // Preview of the daily email opens and closes, and says nothing was sent.
   await moreMenu(page, "brief");
   await expect(page.getByTestId("brief-panel")).toBeVisible();

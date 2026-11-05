@@ -127,7 +127,7 @@ test("a tile opens the records panel and its count is the number on the tile", a
   const today = await get("today");
   await openToday(page);
   await openMore(page);
-  const shown = await final(page.getByTestId("pulse-replies").locator("p.tnum"));
+  const shown = await final(page.getByTestId("pulse-replies").locator("p.t-figure"));
   await page.getByTestId("pulse-replies-open").click();
   await expect(panel(page)).toBeVisible();
   const count = page.getByTestId("records-count");
@@ -256,7 +256,7 @@ test("every number opens the records behind it and the count equals the rows: he
   if (await page.getByTestId("headline-dollars").count()) {
     await page.getByTestId("headline-dollars").click();
     await equal();
-    await expect(page.getByTestId("records-title")).toContainText("at risk");
+    await expect(page.getByTestId("records-title")).toContainText("quiet deals");
     await closePanel(page);
   }
   // Bars: every segment and every name; the count on it is the count in the panel.
@@ -444,7 +444,7 @@ test("the Today brief preview uses the same headline and the same top rows, and 
   await moreMenu(page, "brief");
   await expect(page.getByTestId("brief-panel")).toBeVisible();
   await expect(page.getByTestId("brief-subject")).toContainText(brief.headline);
-  await expect(page.getByTestId("brief-lines")).toContainText("Fix first:");
+  await expect(page.getByTestId("brief-lines")).toContainText("Do this first:");
   await expect(page.getByTestId("brief-panel")).toContainText("SubSync has sent nothing");
   await page.getByTestId("brief-close").click();
   await expect(page.getByTestId("brief-panel")).toHaveCount(0);
@@ -455,10 +455,10 @@ test("the junk control recomputes the dollar figure and lists what it left out",
   await openMore(page);
   const toggle = page.getByTestId("junk-toggle");
   await expect(toggle).toBeVisible();
-  const on = String(await final(page.getByTestId("pulse-risk").locator("p.tnum")));
+  const on = String(await final(page.getByTestId("pulse-risk").locator("p.t-figure")));
   await toggle.uncheck();
   await page.waitForTimeout(800);
-  const off = String(await final(page.getByTestId("pulse-risk").locator("p.tnum")));
+  const off = String(await final(page.getByTestId("pulse-risk").locator("p.t-figure")));
   await toggle.check();
   expect(num(off)).toBeGreaterThanOrEqual(num(on));
   if (num(off) > num(on)) {
@@ -488,7 +488,7 @@ test("More detail and the rest of the buttons built for Today all do something",
   if (await w.count()) { const n = Number(await w.getAttribute("data-waiting")); await w.click(); await expect(page.getByTestId("records-count")).toHaveAttribute("data-count", String(n)); await closePanel(page); }
   const cr = page.getByTestId("compare-row").first();
   if (await cr.count()) { const n = Number(await cr.getAttribute("data-answered")); await cr.click(); await expect(page.getByTestId("records-count")).toHaveAttribute("data-count", String(n)); await closePanel(page); }
-  await page.getByRole("tab", { name: "Numbers" }).click();
+  await page.getByRole("tab", { name: "Forecast" }).click();
   // Open opens a new tab.
   await expect(page.getByTestId("queue-open").first()).toHaveAttribute("href", /^https:\/\//);
   const [tab] = await Promise.all([context.waitForEvent("page"), page.getByTestId("queue-open").first().click()]);
@@ -510,7 +510,7 @@ test("More detail and the rest of the buttons built for Today all do something",
   const since = page.getByTestId("since-strip");
   if (await since.count()) for (const b of await since.locator("button").all()) { await b.click(); await expect(panel(page)).toBeVisible(); await closePanel(page); }
   // If nobody acts: the counts.
-  await openMore(page, "Numbers");
+  await openMore(page, "Forecast");
   for (const k of ["leads", "deals", "appointments"]) { const c = page.getByTestId(`coming-${k}`); if ((await c.count()) && (await c.getAttribute("data-count")) !== "0") { await c.click(); await expect(panel(page)).toBeVisible(); await closePanel(page); } }
   // Share copies the summary; Sync now runs; the preview of the email opens and closes.
   await page.context().grantPermissions(["clipboard-read", "clipboard-write"]).catch(() => undefined);

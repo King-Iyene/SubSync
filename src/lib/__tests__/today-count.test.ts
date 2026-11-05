@@ -80,7 +80,7 @@ test("one number per fact: the headline, the tiles, the work list, the bars and 
   const oneKd = applyView({ items: view.items.filter((i) => i.locationId === "kd"), totals: { ...view.totals, replies: { ...view.totals.replies, count: 24, shown: 24 }, appointments: { ...view.totals.appointments }, stale: { count: 1, dollars: 5000, shown: 1 } }, accounts, staleDays: 30, now: NOW }, { holds: {}, excludeJunk: false });
   const h = headlineOf({ scope: "account", rows: oneKd.queue, totals: oneKd.totals });
   assert.match(h.text, /^24 people are waiting for a reply\.$/);
-  assert.match(h.breakdown ?? "", /^8 of them are new leads\./);
+  assert.match(h.breakdown ?? "", /^8 new leads/);
 
   // headline for every account says clients, and the account list has exactly that many
   const all = headlineOf({ scope: "all", rows: view.queue, totals: view.totals });
@@ -164,7 +164,7 @@ test("100 or 1,000 accounts: the totals are right, the inline cut is 5 rows, and
   const bars = accountBars(view.queue);
   assert.equal(bars.bars.length, 8);
   assert.equal(bars.accounts - bars.bars.length, N - 8);
-  assert.match(barsTitle(bars), /Each bar is one client\./);
+  assert.match(barsTitle(bars), /has the most to do: \d+\./);
   // the page itself is paged by the panel: 50 rows a page, so 150 accounts are three pages
   assert.equal(Math.ceil(full.rows.length / 50), 3);
 });

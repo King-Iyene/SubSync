@@ -19,7 +19,7 @@ export function AccountBars({ title, bars, rows, more, onSegment, onAccount, onM
   const present = KINDS.filter((k) => bars.some((b) => (b.byKind[k] ?? 0) > 0));
   return (
     <figure className="min-w-0" data-testid="account-bars">
-      <figcaption className="mb-3 max-w-2xl" data-testid="bars-title">{title}</figcaption>
+      <figcaption className="sr-only" data-testid="bars-title">{title}</figcaption>
       <ul className="space-y-0.5">
         {bars.map((b) => (
           <li key={b.locationId} data-testid="account-bar" data-account={b.locationId} data-count={b.count} className="grid min-h-8 grid-cols-[minmax(5rem,9rem)_minmax(0,1fr)_2.5rem] items-center gap-3 text-sm"
