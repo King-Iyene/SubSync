@@ -42,9 +42,9 @@ test("labels are thinned to fit and keep the first and last, never touching", ()
   assert.deepEqual(thinLabels(0, 5), []);
 });
 test("day labels fit the range", () => {
-  assert.equal(dayLabel("2026-11-03", 7), "Tue 3");
+  assert.equal(dayLabel("2026-11-03", 7), "Tue 3 Nov");
   assert.equal(dayLabel("2026-11-03", 90), "3 Nov");
-  assert.equal(dayLabel("2026-11-03", 365), "Nov 26");
+  assert.equal(dayLabel("2026-11-03", 365), "Nov 2026");
 });
 test("the line passes through every point and never overshoots (no control point beyond the data's range)", () => {
   const pts: Array<[number, number]> = [[0, 100], [10, 100], [20, 10], [30, 10], [40, 90], [50, 20]];
