@@ -15,10 +15,10 @@ test("only a plain https picture address is accepted as a logo", () => {
   }
 });
 
-test("the owner's address wins over the detected one, and a bad one is ignored", () => {
+test("only the address the owner chose is shown; the platform's own logo never is, and a bad one is ignored", () => {
   assert.equal(effectiveLogo("https://a.io/1.png", "https://b.io/2.png"), "https://a.io/1.png");
-  assert.equal(effectiveLogo(null, "https://b.io/2.png"), "https://b.io/2.png");
-  assert.equal(effectiveLogo("http://a.io/1.png", "https://b.io/2.png"), "https://b.io/2.png");
+  assert.equal(effectiveLogo(null, "https://b.io/2.png"), null);
+  assert.equal(effectiveLogo("http://a.io/1.png", "https://b.io/2.png"), null);
   assert.equal(effectiveLogo(null, null), null);
 });
 

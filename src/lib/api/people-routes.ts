@@ -7,7 +7,7 @@ import {
 import { fetchConversationActivity, fetchContactCustomFields, fetchCustomFieldNames, isPermissionError } from "../sync/ghl-data";
 import { callResultLabel, errorRef, isoDay, isQueryTimeout, TIMEOUT_MESSAGE } from "../people/helpers";
 import { describeFilter, listName, parseSmartFilter, scopeFilterTo } from "../people/filters";
-import { parseDialer } from "../people/dial";
+import { parseChoice, validateTemplate } from "../people/dial";
 import { personKey } from "../people/queue";
 import type { deepLinks } from "../links";
 import { json, type AuthContext } from "./auth";
@@ -69,7 +69,7 @@ async function route(ctx: Ctx, h: PeopleHelpers): Promise<Response> {
     const [opts, names, dialer] = await Promise.all([peopleOptions(ctx.installationId, allowed), teamNames(ctx.installationId), getDialer(ctx.installationId, h.voter)]);
     return json({
       ...opts, owners: opts.owners.map((o) => ({ ...o, name: assigneeLabel(o.id, names) })),
-      canShareLists: ctx.kind !== "client", singleAccount: ctx.limitTo !== null, dialer: parseDialer(dialer),
+      canShareLists: ctx.kind !== "client", singleAccount: ctx.limitTo !== null, dialer: dialer.provider,
     });
   }
 
@@ -142,12 +142,17 @@ async function route(ctx: Ctx, h: PeopleHelpers): Promise<Response> {
   }
 
   if (b === "dialer") {
-    if (m === "GET") return json({ provider: parseDialer(await getDialer(ctx.installationId, h.voter)) });
+    if (m === "GET") return json(await getDialer(ctx.installationId, h.voter));
     if (m === "PUT") {
-      const body = (await ctx.request.json().catch(() => null)) as { provider?: unknown } | null;
-      if (body?.provider !== "crm" && body?.provider !== "phone") return json({ error: "Choose the CRM's dialer or your own phone app" }, 400);
-      await setDialer(ctx.installationId, h.voter, body.provider);
-      return json({ ok: true, provider: body.provider });
+      const body = (await ctx.request.json().catch(() => null)) as { provider?: unknown; vendor?: unknown; template?: unknown } | null;
+      if (body?.provider !== "crm" && body?.provider !== "phone" && body?.provider !== "connected") return json({ error: "Choose how Call should work" }, 400);
+      if (body.provider === "connected") {
+        const t = validateTemplate(body.template);
+        if (!t.ok) return json({ error: t.error }, 400);
+      }
+      const choice = parseChoice(body);
+      await setDialer(ctx.installationId, h.voter, choice);
+      return json({ ok: true, ...choice });
     }
   }
 

@@ -1,3 +1,4 @@
+import { parseChoice, type DialerChoice } from "../people/dial";
 import { sql, type Sql } from "../db";
 import { fillDays, QUERY_TIMEOUT_MS } from "../people/helpers";
 import { MAX_LISTS_PER_PERSON, PAGE_SIZE, parseSmartFilter, type SmartFilter } from "../people/filters";
@@ -317,14 +318,14 @@ export async function removeList(installationId: string, owner: string, teamOwne
 
 // ---------------- the dialer setting (kept in saved_views, page 'people-prefs') ----------------
 
-export async function getDialer(installationId: string, owner: string): Promise<string | null> {
+export async function getDialer(installationId: string, owner: string): Promise<DialerChoice> {
   const [r] = await sql()`select filters from saved_views where installation_id = ${installationId} and owner = ${owner} and page = 'people-prefs' and name = 'dialer'`;
-  const v = (r?.filters as { provider?: unknown } | undefined)?.provider;
-  return typeof v === "string" ? v : null;
+  return parseChoice(r?.filters);
 }
 
-export async function setDialer(installationId: string, owner: string, provider: "crm" | "phone"): Promise<void> {
+/** Stores only the choice (and, for a connected dialer, its name and link template). No token, no vendor key. */
+export async function setDialer(installationId: string, owner: string, choice: DialerChoice): Promise<void> {
   const db = sql();
-  await db`insert into saved_views (installation_id, owner, page, name, filters) values (${installationId}, ${owner}, 'people-prefs', 'dialer', ${db.json({ provider } as never)})
+  await db`insert into saved_views (installation_id, owner, page, name, filters) values (${installationId}, ${owner}, 'people-prefs', 'dialer', ${db.json(choice as never)})
     on conflict (installation_id, owner, page, name) do update set filters = excluded.filters`;
 }

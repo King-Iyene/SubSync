@@ -500,3 +500,5 @@ Decision: the screen is one sentence, one primary button ("Reply to the oldest w
 - Menu fix: the shared PopMenu now measures its own height, flips up or scrolls inside itself near the window edge, sits above every layer (z 80), and ignores scrolls inside itself. Today's tab row is its own component with no scroll bar.
 - Demo seed now uses gmail, outlook, yahoo and icloud addresses instead of example.com, because example.com is a junk domain and would make every demo lead "test data".
 - Not built: a lead-count tile on the main view (the headline already carries the number that matters; Worth a look carries a drop or spike), and "ball in whose court" (not synced).
+
+- 2026-11-05 Contact panel write-back (branch contact-writeback). Who: setters and agency staff; next: the lead's CRM record shows the note, result and tags; if missing they retype it. Notes/tags/tasks use contacts.write (already optional); one switch WRITE_GHL_LIVE, off. Today Done/Snooze/Assign stay SubSync-only. Details: docs/features/CONTACT_WRITEBACK.md.

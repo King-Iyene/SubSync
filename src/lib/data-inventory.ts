@@ -123,6 +123,11 @@ export const INVENTORY: Record<string, TableInfo> = {
     noun: "a log of what SubSync wrote to your CRM", line: "meetings",
     personal: { authored_by: "which team member a note or comment was written as" },
   },
+  contact_writes: {
+    noun: "a log of the notes and call results you saved to a lead in your CRM (ids and status only, never the words)", line: "actions",
+    personal: { actor: "the sign-in id of who saved it", actor_name: "the name of who saved it", tag: "the tag SubSync added" },
+    notPersonal: ["kind", "outcome", "idem_key", "status", "note_id", "task_id", "tag_added", "detail"],
+  },
   meeting_deliveries: { noun: "a list of meeting deliveries already handled (ids only)", line: "meetings" },
   field_write_state: { noun: "which meeting last filled each contact field SubSync updates (ids and times only, never the value)", line: "meetings" },
   shared_audits: { noun: "share links", line: "shares", personal: { payload: "a snapshot of totals, finding titles, fix steps and how each number is counted, with client names removed, plus your business name and colour" } },

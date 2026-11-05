@@ -31,6 +31,8 @@ export type PersonDetail = {
   deals: DealOut[];
   unread: number;
   tagDates: Record<string, string>;
+  /** Tags whose date is the exact time (SubSync applied it) rather than the day SubSync first saw it. */
+  tagExact: Record<string, boolean>;
   watchingSince: string | null;
   appointments: Array<{ at: string; status: string | null }>;
   loggedCalls: Array<{ at: string; outcome: string; note: string | null }>;
@@ -63,7 +65,7 @@ export async function personDetail(a: { installationId: string; allowed: string[
        join cached_appointments a on a.installation_id = e.installation_id and a.location_id = e.location_id and a.appointment_id = e.appointment_id
        where a.installation_id = ${inst} and a.location_id = ${loc} and a.contact_id = ${id} and e.kind = 'status' and e.to_value is not null order by e.occurred_at desc limit 20`,
     db`select created_at, outcome, note, follow_up_at from call_outcomes where installation_id = ${inst} and location_id = ${loc} and contact_id = ${id} order by created_at desc limit 20`,
-    db`select at, kind, tag from contact_tag_events where installation_id = ${inst} and location_id = ${loc} and contact_id = ${id} order by at desc limit 60`,
+    db`select at, kind, tag, exact from contact_tag_events where installation_id = ${inst} and location_id = ${loc} and contact_id = ${id} order by at desc limit 60`,
     db`select e.at, e.kind, e.from_value, e.to_value, o.name deal_name from deal_events e
        join cached_opportunities o on o.installation_id = e.installation_id and o.location_id = e.location_id and o.opportunity_id = e.opportunity_id
        where e.installation_id = ${inst} and e.location_id = ${loc} and o.contact_id = ${id} order by e.at desc limit 30`,
@@ -76,7 +78,8 @@ export async function personDetail(a: { installationId: string; allowed: string[
 
   // ---- tags: the day SubSync first saw each tag added (the CRM does not say) ----
   const tagDates: Record<string, string> = {};
-  for (const e of [...tagEvents].reverse()) if (e.kind === "added") tagDates[e.tag as string] = iso(e.at) as string;
+  const tagExact: Record<string, boolean> = {};
+  for (const e of [...tagEvents].reverse()) if (e.kind === "added") { tagDates[e.tag as string] = iso(e.at) as string; tagExact[e.tag as string] = e.exact === true; }
   const [since] = await db`select min(at) at from contact_tag_events where installation_id = ${inst} ${a.allowed ? db`and location_id = any(${a.allowed}::text[])` : db``}`;
 
   // ---- deals ----
@@ -149,7 +152,7 @@ export async function personDetail(a: { installationId: string; allowed: string[
       phone: (c.phone as string | null) ?? null, tags: (c.tags as string[] | null) ?? [], source: (c.source as string | null) ?? null, dnd: c.dnd === true, lastActivityAt: iso(c.last_activity_at), dateAdded: iso(c.date_added),
       owner: (c.owner as string | null) ?? null, timeZone: (c.timezone as string | null) ?? null,
     },
-    deals: dealsOut, unread: (convo?.unread_count as number | undefined) ?? 0, tagDates, watchingSince: iso(since?.at),
+    deals: dealsOut, unread: (convo?.unread_count as number | undefined) ?? 0, tagDates, tagExact, watchingSince: iso(since?.at),
     appointments: appts.filter((r) => r.start_at).map((r) => ({ at: iso(r.start_at) as string, status: (r.status as string | null) ?? null })),
     loggedCalls: calls.map((r) => ({ at: iso(r.created_at) as string, outcome: r.outcome as string, note: (r.note as string | null) ?? null })),
     timeline, headline: personHeadline(facts), conversationId: (convo?.conversation_id as string | undefined) ?? null,

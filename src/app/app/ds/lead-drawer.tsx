@@ -9,7 +9,7 @@ import { useApiClient, useData } from "../session";
 import { fmtMoney, timeAgo } from "../ui";
 import { ActionStrip, DialNote, useContactActions, type ActionPerson } from "./contact-actions";
 import { DialerSetting } from "./dial-button";
-import { LogCall, NoteToSelf, Timeline } from "./lead-parts";
+import { LogCall, NoteToSelf, TagsEditor, Timeline, UndoButton } from "./lead-parts";
 import { PopMenu } from "./pop-menu";
 import { ErrorState, SkeletonRows } from "./states";
 
@@ -44,7 +44,7 @@ const H3 = ({ children }: { children: ReactNode }) => <h3 className="mb-1.5 text
 const BUTTON = "ds-press inline-flex min-h-11 items-center justify-center gap-1.5 rounded-md border bg-card px-3.5 text-sm font-medium hover:bg-accent focus-visible:outline-2 focus-visible:outline-[var(--ring)] sm:min-h-9";
 const PRIMARY = "ds-press inline-flex min-h-11 items-center justify-center gap-1.5 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground hover:opacity-90 focus-visible:outline-2 focus-visible:outline-[var(--ring)] sm:min-h-9";
 
-function Body({ seed, top, showAccount, onLogged }: { seed: LeadSeed; top?: ReactNode; showAccount: boolean; onLogged: (label: string) => void }) {
+function Body({ seed, top, showAccount, onLogged }: { seed: LeadSeed; top?: ReactNode; showAccount: boolean; onLogged: (label: string, message?: string, id?: string) => void }) {
   const api = useApiClient();
   const path = `${encodeURIComponent(seed.locationId)}/${encodeURIComponent(seed.contactId)}`;
   const person = useData<Person>(`people/person/${path}`);
@@ -90,13 +90,14 @@ function Body({ seed, top, showAccount, onLogged }: { seed: LeadSeed; top?: Reac
 
       <div className="mt-4 flex flex-wrap items-center gap-2" data-testid="drawer-actions">
         <button type="button" onClick={() => actions.call(ap)} disabled={!phone} className={dnd ? BUTTON : PRIMARY} data-testid="drawer-call">Call{url ? <ExternalLink aria-hidden className="size-3.5" /> : null}</button>
-        <button type="button" onClick={() => actions.email(ap)} disabled={!email} className={BUTTON} data-testid="drawer-email">Email{url ? <ExternalLink aria-hidden className="size-3.5" /> : null}</button>
+        <button type="button" onClick={() => actions.email(ap)} disabled={!email} title={email ? undefined : "This contact has no email address"} aria-describedby={email ? undefined : "drawer-email-why"} className={BUTTON} data-testid="drawer-email">Email{url ? <ExternalLink aria-hidden className="size-3.5" /> : null}</button>
         <PopMenu label={`More for ${name}`} testId="drawer-more" triggerClassName="ds-press inline-flex size-11 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-[var(--ring)] sm:size-9"
           items={[
             { key: "copy", label: actions.copied === "panel" ? "Copied" : "Copy details", onSelect: () => void actions.copy(ap, showAccount) },
             ...(url ? [{ key: "crm", label: "Open in your CRM", onSelect: () => { window.open(url, "_blank", "noopener,noreferrer"); } }] : []),
           ]}><MoreHorizontal aria-hidden className="size-4" /></PopMenu>
       </div>
+      {(!email || !phone) && <p id="drawer-email-why" className="mt-2 text-xs text-muted-foreground" data-testid="drawer-no-contact-way">{!email && !phone ? "This contact has no email address and no phone number in your CRM." : !email ? "Email is off because this contact has no email address in your CRM." : "Call is off because this contact has no phone number in your CRM."}</p>}
       <ActionStrip actions={actions} k="panel" className="mt-2" />
       <div className="mt-2 flex flex-wrap items-start justify-between gap-x-4 gap-y-1"><DialNote className="max-w-xs" /><DialerSetting /></div>
       {person.loading && !data && <div className="mt-5"><SkeletonRows rows={4} label="Loading this person..." /></div>}
@@ -109,24 +110,7 @@ function Body({ seed, top, showAccount, onLogged }: { seed: LeadSeed; top?: Reac
         {c && <Row label="Last activity">{c.lastActivityAt ? timeAgo(c.lastActivityAt) : "None recorded"}</Row>}
       </dl>
 
-      {c && c.tags.length > 0 && (
-        <section className="mt-5" aria-label="Tags" data-testid="drawer-tags">
-          <H3>Tags</H3>
-          <ul className="flex flex-wrap gap-1.5">
-            {c.tags.slice(0, 30).map((t) => (
-              <li key={t} className="rounded border px-1.5 py-0.5 text-xs" data-testid="drawer-tag">
-                <span className="font-medium">{t}</span>
-                <span className="text-muted-foreground">{data!.tagDates[t] ? ` · added ${dayOf(data!.tagDates[t])}` : ""}</span>
-              </li>
-            ))}
-          </ul>
-          <p className="mt-1.5 text-xs text-muted-foreground" data-testid="drawer-tags-note">
-            {data!.watchingSince
-              ? `Your CRM does not say when a tag was added. A day is when SubSync first saw the tag, since it started watching on ${dayOf(data!.watchingSince)}. Older tags have no day.`
-              : "Your CRM does not say when a tag was added. SubSync records the day from now on."}
-          </p>
-        </section>
-      )}
+      {c && <TagsEditor key={seed.contactId} locationId={seed.locationId} contactId={seed.contactId} name={name} tags={c.tags} tagDates={data!.tagDates} tagExact={data!.tagExact ?? {}} watchingSince={data!.watchingSince} />}
 
       {data && data.deals.length > 0 && (
         <section className="mt-5" aria-label="Deals">
@@ -150,7 +134,7 @@ function Body({ seed, top, showAccount, onLogged }: { seed: LeadSeed; top?: Reac
       )}
 
       {phone && !dnd && c && <LogCall locationId={seed.locationId} contactId={seed.contactId} onLogged={onLogged} />}
-      <NoteToSelf name={name} account={c?.locationName ?? seed.locationName ?? null} />
+      <NoteToSelf locationId={seed.locationId} contactId={seed.contactId} name={name} account={c?.locationName ?? seed.locationName ?? null} />
 
       {data && <Timeline items={timeline} nowMs={data.now} note={extra && extra.live.state !== "off" ? extra.live.note : null} />}
       {url && <p className="mt-6 text-xs"><a href={url} target="_blank" rel="noopener noreferrer" className="text-muted-foreground underline underline-offset-4 hover:text-foreground">Open in your CRM</a></p>}
@@ -173,6 +157,10 @@ export function LeadDrawer({ leads, index, onIndex, onClose, top, showAccount = 
   const box = useRef<HTMLElement>(null);
   const opener = useRef<HTMLElement | null>(null);
   const [said, setSaid] = useState("");
+  // What was just written to the CRM stays on screen after the panel moves to the next person, with Undo.
+  const [saved, setSaved] = useState<{ text: string; id: string | null } | null>(null);
+  const [undoBusy, setUndoBusy] = useState(false);
+  const api = useApiClient();
   const open = index !== null && index >= 0 && index < leads.length;
   const count = leads.length;
   const at = index ?? -1;
@@ -211,8 +199,9 @@ export function LeadDrawer({ leads, index, onIndex, onClose, top, showAccount = 
   const nb = neighbours(at, count);
   const seed = leads[at];
   // After a call is logged the next person is already waiting: move on, and say so for a screen reader.
-  const logged = (label: string) => {
+  const logged = (label: string, message?: string, id?: string) => {
     onLogged?.();
+    if (message) setSaved({ text: `${label}: ${message}`, id: id ?? null });
     if (nb.next !== null) { setSaid(`Logged: ${label}. Next: ${leads[nb.next].name}.`); onIndex(nb.next); } else setSaid(`Logged: ${label}.`);
   };
   return (
@@ -230,6 +219,12 @@ export function LeadDrawer({ leads, index, onIndex, onClose, top, showAccount = 
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
           <Body key={seed.locationId + seed.contactId + (seed.note ?? "")} seed={seed} top={top?.(seed, at)} showAccount={showAccount} onLogged={logged} />
         </div>
+        {saved && (
+          <div className="flex items-center justify-between gap-2 border-t bg-card px-5 py-3 text-sm" role="status" data-testid="drawer-saved">
+            <span>{saved.text}{saved.id && <UndoButton busy={undoBusy} testId="drawer-saved-undo" onConfirm={() => { setUndoBusy(true); void api.post<{ message: string }>("people/write-undo", { id: saved.id }).then((r) => setSaved({ text: r.message, id: null })).catch((e: Error) => setSaved({ text: e.message, id: null })).finally(() => setUndoBusy(false)); }} />}</span>
+            <button type="button" className="min-h-9 cursor-pointer underline" onClick={() => setSaved(null)}>Dismiss</button>
+          </div>
+        )}
         <p className="sr-only" role="status" aria-live="polite">{said}</p>
       </aside>
     </div>
