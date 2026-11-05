@@ -51,7 +51,13 @@ function Pop({ onClose, children, label, wide = false }: { onClose: () => void; 
   return <div ref={ref} role="dialog" aria-label={label} className={`absolute left-0 top-full z-30 mt-1 max-h-72 overflow-y-auto rounded-xl border bg-popover p-1.5 text-sm shadow-[var(--shadow-lift)] ${wide ? "w-72" : "w-60"}`}>{children}</div>;
 }
 
-export function RecordsPanel({ spec, onClose, now, zone = "UTC", canExport = true }: { spec: RecordsSpec; onClose: () => void; now: number; zone?: string; canExport?: boolean }) {
+/** An action on the rows of a list (today only "Bring back" on the set-aside list): one button per row, tick boxes, and one button for all the ticked rows. `run` gets the rows' `ref`s. */
+export type RowActionSpec = { label: string; bulkLabel: string; run: (refs: number[]) => Promise<void> };
+
+export function RecordsPanel({ spec, onClose, now, zone = "UTC", canExport = true, rowAction }: { spec: RecordsSpec; onClose: () => void; now: number; zone?: string; canExport?: boolean; rowAction?: RowActionSpec }) {
+  const [picked, setPicked] = useState<Set<string>>(() => new Set());
+  const [gone, setGone] = useState<Set<string>>(() => new Set());
+  const [working, setWorking] = useState(false);
   const titleId = useId();
   const root = useRef<HTMLDivElement>(null);
   const searchBox = useRef<HTMLInputElement>(null);
@@ -69,7 +75,15 @@ export function RecordsPanel({ spec, onClose, now, zone = "UTC", canExport = tru
   });
   const [lead, setLead] = useState<number | null>(null);
 
-  const rows = useMemo(() => sortRecs(filterRecs(spec, filter), sort), [spec, filter, sort]);
+  const rows = useMemo(() => sortRecs(filterRecs(spec, filter), sort).filter((r) => !gone.has(r.id)), [spec, filter, sort, gone]);
+  const runAction = async (list: Rec[]) => {
+    if (!rowAction || list.length === 0 || working) return;
+    setWorking(true);
+    try {
+      await rowAction.run(list.map((r) => r.ref).filter((x): x is number => typeof x === "number"));
+      setGone((g) => new Set([...g, ...list.map((r) => r.id)])); setPicked(new Set());
+    } finally { setWorking(false); }
+  };
   const pages = Math.max(1, Math.ceil(rows.length / PAGE));
   const at = Math.min(page, pages - 1);
   const shown = rows.slice(at * PAGE, at * PAGE + PAGE);
@@ -223,6 +237,13 @@ export function RecordsPanel({ spec, onClose, now, zone = "UTC", canExport = tru
           </div>
         </div>
 
+        {rowAction && rows.length > 0 && (
+          <div className="flex flex-wrap items-center gap-3 border-b px-5 py-2 text-sm" data-testid="records-bulk">
+            <label className="flex min-h-8 cursor-pointer items-center gap-2"><input type="checkbox" className="size-4 cursor-pointer" aria-label="Select everyone shown" checked={shown.length > 0 && shown.every((r) => picked.has(r.id))} onChange={(e) => setPicked(e.target.checked ? new Set(shown.map((r) => r.id)) : new Set())} data-testid="records-select-all" />Select all shown</label>
+            <span className="text-muted-foreground" aria-live="polite" data-testid="records-picked">{picked.size} selected</span>
+            <button type="button" disabled={picked.size === 0 || working} onClick={() => void runAction(rows.filter((r) => picked.has(r.id)))} data-testid="records-bulk-action" className="ds-press min-h-8 cursor-pointer rounded-lg border px-3 font-medium hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50">{rowAction.bulkLabel}</button>
+          </div>
+        )}
         <div className="min-h-0 flex-1 overflow-auto" data-testid="records-scroll">
           {rows.length === 0 ? (
             <p className="px-5 py-14 text-center text-sm text-muted-foreground" data-testid="records-empty">{spec.rows.length === 0 ? "There is nothing behind this number right now." : "No record matches these filters."}</p>
@@ -253,7 +274,9 @@ export function RecordsPanel({ spec, onClose, now, zone = "UTC", canExport = tru
                       <td key={c.key} className="relative border-b px-3 py-2 align-middle first:pl-5">
                         {c.primary ? (
                           <div className="flex items-center gap-2 pr-1">
+                            {rowAction && <input type="checkbox" className="size-4 shrink-0 cursor-pointer" aria-label={`Select ${String(r.cells[c.key] ?? "this row")}`} checked={picked.has(r.id)} onChange={(e) => setPicked((p) => { const n = new Set(p); if (e.target.checked) n.add(r.id); else n.delete(r.id); return n; })} data-testid="records-pick" />}
                             <span className="min-w-0 flex-1 break-words font-medium"><Cellv col={c} v={r.cells[c.key] ?? null} zone={zone} /></span>
+                            {rowAction && <button type="button" disabled={working} onClick={() => void runAction([r])} data-testid="records-row-action" aria-label={`${rowAction.label}: ${String(r.cells[c.key] ?? "this row")}`} className="ds-press inline-flex min-h-7 shrink-0 cursor-pointer items-center rounded-md border bg-card px-2 text-xs font-medium hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50">{rowAction.label}</button>}
                             <RowOpen rec={r} onLead={() => { const i = leadRows.findIndex((x) => x.id === r.id); if (i >= 0) setLead(i); }} />
                           </div>
                         ) : <Cellv col={c} v={r.cells[c.key] ?? null} zone={zone} />}

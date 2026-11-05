@@ -1,5 +1,6 @@
 "use client";
 
+import { TagPill } from "./what-is";
 import { ChevronRight, CircleAlert, Clock, TriangleAlert, UserRound } from "lucide-react";
 import { useState } from "react";
 import { ageWords, money, replyWords } from "@/lib/analytics/today-queue";
@@ -20,7 +21,7 @@ export function InsightStrip({ insights, onOpen, extra = [] }: { insights: Insig
   if (insights.length === 0 && extra.length === 0) return null;
   return (
     <section className="mb-10 border-t border-[var(--t-rule)] pt-5" aria-labelledby="spotted-h" data-testid="insight-strip">
-      <h2 id="spotted-h" className="t-title mb-2">Worth a look</h2>
+      <h2 id="spotted-h" className="t-title mb-2">Worth a look <TagPill tag="Report" /></h2>
       <ul>
         {extra.map((x) => (
           <li key={x.key} className="min-w-0">
@@ -59,7 +60,7 @@ export function SinceStrip({ since, showAlerts, onOpen }: { since: SinceVisit; s
   ];
   return (
     <section className="mb-10 border-t border-[var(--t-rule)] pt-5" aria-label="Since you were last here" data-testid="since-strip">
-      <h2 className="t-title">Since you were last here <span className="t-small t-quiet font-normal">({day})</span></h2>
+      <h2 className="t-title">Since you were last here <TagPill tag="Report" /> <span className="t-small t-quiet font-normal">({day})</span></h2>
       <ul className="mt-3 flex flex-wrap gap-x-8 gap-y-2">
         {cells.map((c) => (
           <li key={c.k}>

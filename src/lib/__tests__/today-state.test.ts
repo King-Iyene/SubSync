@@ -127,6 +127,11 @@ test("the list behind 'N snoozed' has exactly N rows, and the brief says what th
   assert.equal(s.count, 1);
   assert.equal(s.rows.length, 1);
   assert.equal(s.rows[0].cells.hold, "Done");
+  assert.equal(s.rows[0].ref, 1); // the id of the action that set it aside: what "Bring back" undoes
+  // Once that action is undone the row is back in the list and the counts.
+  const back = applyView({ items, totals: totals(items), accounts: ACCOUNTS, staleDays: 30, now: NOW }, { holds: {}, excludeJunk: false });
+  assert.equal(back.held.length, 0);
+  assert.equal(back.queue.reduce((n, r) => n + r.count, 0), 2);
   const headline = headlineOf({ scope: "all", rows: v.queue, totals: v.totals });
   const lines = briefLines({ headline, rows: v.queue, setAside: v.held.length });
   assert.equal(lines[0], headline.text);

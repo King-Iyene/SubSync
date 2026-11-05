@@ -1,5 +1,5 @@
 -- SubSync: paste this WHOLE file into the Supabase SQL Editor and press Run, once.
--- It adds the new migrations, up to and including the Growth tab (20261106110000). Every statement is safe to run twice.
+-- It adds the new migrations, up to and including the client departures table (20261107100000). Every statement is safe to run twice.
 -- It runs as ONE transaction: if anything fails, nothing changes.
 begin;
 
@@ -924,5 +924,19 @@ create table if not exists public.growth_settings (
   updated_at timestamptz not null default now()
 );
 alter table public.growth_settings enable row level security;
+
+-- ===== 20261107100000_client_departures.sql =====
+-- Additive: Today's "Clients coming and going" tab. A removed client's row in `locations` is deleted, so the date it left was lost. This keeps one line per departure.
+-- History starts the day this runs. Arrivals need no new table (the `created_at` of `locations`). Safe to run twice.
+create table if not exists public.client_departures (
+  installation_id uuid not null references public.installations (id) on delete cascade,
+  location_id text not null,
+  name text,
+  added_at timestamptz,
+  removed_at timestamptz not null default now(),
+  primary key (installation_id, location_id, removed_at)
+);
+create index if not exists client_departures_when_idx on public.client_departures (installation_id, removed_at desc);
+alter table public.client_departures enable row level security;
 
 commit;

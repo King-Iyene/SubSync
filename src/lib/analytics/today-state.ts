@@ -155,11 +155,12 @@ const HELD_COLS: Col[] = [
 ];
 export function heldSpec(held: View["held"]): RecordsSpec {
   const rows: Rec[] = held.map(({ item: i, hold: h }) => ({
+    ref: h.eventId,
     id: i.id, url: i.url, lead: { contactId: i.contactId, locationId: i.locationId, name: i.name, account: i.accountName, note: i.detail },
     cells: { what: i.name, account: i.accountName, kind: KIND_LABEL[i.kind], hold: h.action === "done" ? "Done" : "Snoozed", until: h.until, by: h.by, at: h.at, crm: i.url } as Record<string, Cell>,
   }));
   return {
-    key: "held", title: "Set aside", subtitle: "Marked Done or snoozed in SubSync. They are left out of the headline and the counts, and they come back by themselves. Nothing was changed in your CRM.",
+    key: "held", title: "Set aside", subtitle: "Marked Done or snoozed in SubSync. They are left out of the headline and the counts, and they come back by themselves, or when you press Bring back. Nothing was changed in your CRM.",
     noun: held.length === 1 ? "item" : "items", count: held.length, cols: trimColumns(HELD_COLS, rows), rows, note: null, dateKey: "at", preset: {}, exportName: "set-aside",
   };
 }

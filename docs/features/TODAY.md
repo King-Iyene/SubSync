@@ -1,3 +1,26 @@
+# Today: names, reports and flow (5 Nov 2026, branch `today-flow`)
+
+## To do or Report
+Every tab under "Break it down" and the sections of the page carry one quiet tag. **To do** is something you act on (Do this first, Forecast). **Report** is something you read (Growth, Lead flow, Clients coming and going, Sources, Coverage, People, Proof, This week, Where the work sits, Worth a look, Since you were last here). Each tab also has one line under its name saying what it tells you. Source of truth: `src/lib/analytics/today-tabs.ts`, tested.
+
+## Glossary (one word per idea, on every Today screen, menu, palette entry, alert and email)
+| Idea | Word | Never |
+|---|---|---|
+| Someone whose message nobody answered | waiting for a reply | unanswered, pending |
+| A contact added in the last days | new lead | fresh lead |
+| A lead with a usable email | email lead | email contact, subscriber |
+| Missed an appointment | no-show | no show, missed |
+| A deal that has not moved | quiet deal | stale deal |
+| A business we serve | client | sub-account, location |
+| Set aside and back | Bring back | Restore, Unsnooze |
+
+## New in this pass
+- **Lead flow tab** (Report, after Growth): a flow chart of where leads added in the chosen dates went; every step and band opens its people; dates 7 days (default), 30 days, this month, last month, custom. Definition: `docs/METRICS.md`.
+- **Clients coming and going tab** (Report, company with several clients only): clients added and removed per week, current count, recent list. Departures are recorded from the day `client_departures` exists.
+- **Email leads** (under Growth): list, search, client filter, CSV of what is shown (do-not-contact left out, audit line).
+- **Pointer** on everything pressable (global rule), "What is this?" marks on sections, **Bring back** on the set-aside list.
+- **Growth speed:** the Growth read was 17 s for 20,000 contacts in one client, now 4.6 s; missing table or column (42P01, 42703) never gives an error page.
+
 # Today: blue palettes and the Growth tab (5 Nov 2026, branch `today-blue-growth`)
 
 ## Colours

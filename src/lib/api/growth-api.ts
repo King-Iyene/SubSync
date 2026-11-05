@@ -31,23 +31,23 @@ export async function loadGoals(installationId: string): Promise<{ goals: Record
 }
 
 /** Contacts with an email, newest first, for the accounts given. Capped; `partial` says the cap cut the list. */
-async function loadContacts(installationId: string, ids: string[], contactUrl: (l: string, c: string) => string): Promise<{ contacts: GrowthContact[]; partial: boolean }> {
+export async function loadContacts(installationId: string, ids: string[], contactUrl: (l: string, c: string) => string): Promise<{ contacts: GrowthContact[]; partial: boolean }> {
   if (ids.length === 0) return { contacts: [], partial: false };
   const rows = await sql()`
-    select contact_id, location_id, first_name, last_name, full_name, email, phone, source, date_added
+    select contact_id, location_id, first_name, last_name, full_name, email, phone, source, date_added, dnd, tags
     from cached_contacts
     where installation_id = ${installationId} and location_id = any(${ids}::text[]) and email is not null and btrim(email) <> '' and date_added is not null
     order by date_added desc limit ${ROW_CAP + 1}`;
   const partial = rows.length > ROW_CAP;
   const contacts = rows.slice(0, ROW_CAP).map((r): GrowthContact => ({
     id: `${r.location_id}:${r.contact_id}`, locationId: r.location_id as string, name: ((r.full_name as string | null) || (r.email as string)).trim(), email: r.email as string,
-    source: (r.source as string | null) ?? null, at: (r.date_added as Date).getTime(), firstName: r.first_name as string | null, lastName: r.last_name as string | null, phone: r.phone as string | null,
+    source: (r.source as string | null) ?? null, at: (r.date_added as Date).getTime(), firstName: r.first_name as string | null, lastName: r.last_name as string | null, phone: r.phone as string | null, dnd: r.dnd === true || ((r.tags as string[] | null) ?? []).some((t) => /unsubscrib/i.test(t)),
     url: contactUrl(r.location_id as string, r.contact_id as string),
   }));
   return { contacts, partial };
 }
 
-async function accountsOf(installationId: string, permits: (l: string) => boolean, url: (l: string) => string): Promise<GrowthAccount[]> {
+export async function accountsOf(installationId: string, permits: (l: string) => boolean, url: (l: string) => string): Promise<GrowthAccount[]> {
   const rows = await sql()`select location_id, name, timezone from locations where installation_id = ${installationId} and not ignored order by name`;
   return rows.filter((r) => permits(r.location_id as string)).map((r) => ({ id: r.location_id as string, name: (r.name as string | null) ?? "Client", zone: (r.timezone as string | null) || "UTC", url: url(r.location_id as string) }));
 }
@@ -109,7 +109,7 @@ export async function growthAlertDrafts(installationId: string): Promise<AlertDr
   const now = Date.now();
   const out: AlertDraft[] = [];
   const byLoc = new Map<string, number[]>();
-  for (const c of contacts) if (verdicts.get(c.id) === "counted") byLoc.set(c.locationId, [...(byLoc.get(c.locationId) ?? []), c.at as number]);
+  for (const c of contacts) if (verdicts.get(c.id) === "counted") { const l = byLoc.get(c.locationId); if (l) l.push(c.at as number); else byLoc.set(c.locationId, [c.at as number]); }
   for (const r of rows) {
     const loc = r.location_id as string;
     const ats = byLoc.get(loc) ?? [];

@@ -80,6 +80,9 @@ import { buildDailyDigest, NOT_WATCHED, seriesByLocation } from "../analytics/di
 import { portfolioRangeChanges, validFromDay, validToDay } from "../analytics/today-intel";
 import { buildToday } from "./today-api";
 import { growthGoalSave, growthRead, growthSettingsSave, type GrowthDeps } from "./growth-api";
+import { growthEmails } from "./growth-emails";
+import { leadFlowRead } from "./lead-flow-api";
+import { clientsFlowRead } from "./clients-flow-api";
 import { briefFromToday, todayAction, todayBrief, userKeyOf as todayUserKey, type TodayDeps } from "./today-actions";
 import { todayViewRemove, todayViewSave, todayViewsList } from "./today-views";
 import { lanesFor } from "../analytics/today-state";
@@ -1928,6 +1931,9 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       if (a === "overview") return await overview(ctx);
       if (a === "today" && !b) return await todayView(ctx);
       if (a === "today" && b === "growth" && !c) return await growthRead(ctx, growthDeps);
+      if (a === "today" && b === "growth" && c === "emails") return await growthEmails(ctx, growthDeps);
+      if (a === "today" && b === "lead-flow" && !c) return await leadFlowRead(ctx, growthDeps);
+      if (a === "today" && b === "clients-flow" && !c) return await clientsFlowRead(ctx, growthDeps);
       if (a === "today" && b === "brief" && !c) return await todayBrief(ctx, todayDeps);
       if (a === "today" && b === "views" && !c) return await todayViewsList(ctx);
       if (a === "daily" && b === "changes") return await dailyChanges(ctx);

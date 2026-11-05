@@ -1,5 +1,6 @@
 "use client";
 
+import { createPortal } from "react-dom";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AccessKind } from "@/lib/access";
 import { KIND_LABEL, type Kind, type QueueRow } from "@/lib/analytics/today-queue";
@@ -16,7 +17,7 @@ import { RecordsPanel, remember, remembered, useNow, type RowAction, type RowWhy
 
 const DAY = 86_400_000;
 const JUNK_KEY = "today-junk";
-export type Toast = { text: string; eventId: number | null; error?: boolean };
+export type Toast = { text: string; eventId: number | null; error?: boolean; /** What the Undo button does when it is not the plain undo of one action (bringing things back puts them aside again). */ redo?: () => Promise<void> };
 
 export function useTodayModel({ t, kind, reload }: { t: TodayData; kind: AccessKind; reload: () => Promise<void> }) {
   const api = useApiClient();
@@ -83,9 +84,33 @@ export function useTodayModel({ t, kind, reload }: { t: TodayData; kind: AccessK
     } finally { setBusy(null); }
   };
 
+  /** Bring back what was marked Done or snoozed: undoes those actions (the server only finds actions in the caller's own lane and clients), so the rows return to the list and the counts at once. */
+  const bringBack = async (eventIds: number[]) => {
+    const ids = [...new Set(eventIds)];
+    const held = view.held.filter((h) => ids.includes(h.hold.eventId));
+    if (ids.length === 0) return;
+    const results = await Promise.allSettled(ids.map((id) => api.post("today/action", { action: "undo", eventId: id })));
+    const ok = ids.filter((_, i) => results[i].status === "fulfilled");
+    setUndone((u) => [...u, ...ok]);
+    void reload();
+    const n = held.filter((h) => ok.includes(h.hold.eventId)).length;
+    if (ok.length === 0) { say({ text: "Could not bring that back. Please try again.", eventId: null, error: true }); return; }
+    const first = held.find((h) => ok.includes(h.hold.eventId));
+    // Undo of a bring back: set the same rows aside again.
+    const again = [...new Map(held.filter((h) => ok.includes(h.hold.eventId)).map((h) => [h.hold.eventId, h.hold])).values()];
+    const redo = async () => {
+      for (const h of again) {
+        try { await api.post("today/action", h.action === "done" ? { action: "done", rowKey: h.rowKey } : { action: "snooze", rowKey: h.rowKey, choice: h.until - h.at <= 36 * 3_600_000 ? "day" : "monday" }); } catch { /* the row may be gone; the next one still goes */ }
+      }
+      void reload();
+    };
+    say({ text: `Brought back ${n || ok.length} ${(n || ok.length) === 1 ? "item" : "items"}${first && n === 1 ? `: ${first.item.name}` : ""}. They are in the list again.`, eventId: -1, redo });
+  };
+
   const undo = async () => {
     const id = toast?.eventId;
     if (!id) return;
+    if (toast?.redo) { const r = toast.redo; setToast(null); await r(); return; }
     setToast(null);
     try {
       await api.post("today/action", { action: "undo", eventId: id });
@@ -100,7 +125,7 @@ export function useTodayModel({ t, kind, reload }: { t: TodayData; kind: AccessK
 
   // Hours and the CSV use the browser's own time zone; an account's hours (coverage strip) use the account's own.
   const zone = typeof Intl !== "undefined" ? Intl.DateTimeFormat().resolvedOptions().timeZone : "UTC";
-  return { now: clock, view, env, insights, assigned, panel, open, close, toast, dismissToast: () => setToast(null), act, undo, busy, excludeJunk, setExcludeJunk, canAssign: mayAssign(kind), rowWhy, zone, canExport: true as boolean };
+  return { now: clock, view, env, insights, assigned, panel, open, close, toast, dismissToast: () => setToast(null), act, undo, bringBack, busy, excludeJunk, setExcludeJunk, canAssign: mayAssign(kind), rowWhy, zone, canExport: true as boolean };
 }
 export type TodayModel = ReturnType<typeof useTodayModel>;
 
@@ -108,14 +133,14 @@ export type TodayModel = ReturnType<typeof useTodayModel>;
 export function TodayLayers({ m }: { m: TodayModel }) {
   return (
     <>
-      {m.panel && <RecordsPanel key={m.panel.key} spec={m.panel} onClose={m.close} now={m.now} zone={m.zone} canExport={m.canExport} />}
-      {m.toast && (
-        <div role={m.toast.error ? "alert" : "status"} data-testid="today-toast" className="fixed bottom-4 left-4 z-[55] flex max-w-[min(32rem,calc(100vw-2rem))] items-center gap-3 rounded-xl border bg-popover px-4 py-3 text-sm text-popover-foreground shadow-[var(--shadow-lift)]">
+      {m.panel && <RecordsPanel key={m.panel.key} spec={m.panel} onClose={m.close} now={m.now} zone={m.zone} canExport={m.canExport} rowAction={m.panel.key === "held" ? { label: "Bring back", bulkLabel: "Bring back all selected", run: (refs) => m.bringBack(refs) } : undefined} />}
+      {m.toast && typeof document !== "undefined" && createPortal(
+        <div role={m.toast.error ? "alert" : "status"} data-testid="today-toast" className="fixed bottom-4 left-4 z-[70] flex max-w-[min(32rem,calc(100vw-2rem))] items-center gap-3 rounded-xl border bg-popover px-4 py-3 text-sm text-popover-foreground shadow-[var(--shadow-lift)]">
           <span className="min-w-0 break-words">{m.toast.text}</span>
           {m.toast.eventId !== null && <button type="button" onClick={() => void m.undo()} data-testid="today-undo" className="ds-press shrink-0 rounded-lg px-2.5 py-1 font-semibold text-primary underline underline-offset-4 hover:bg-muted focus-visible:outline-2 focus-visible:outline-[var(--ring)]">Undo</button>}
           <button type="button" onClick={m.dismissToast} aria-label="Dismiss" data-testid="today-toast-close" className="ds-press -mr-1 shrink-0 rounded-md px-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">x</button>
         </div>
-      )}
+      , document.body)}
     </>
   );
 }

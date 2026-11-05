@@ -99,11 +99,26 @@ export async function setPlan(installationId: string, plan: Plan): Promise<void>
   await sql()`update installations set plan = ${plan} where id = ${installationId}`;
 }
 
+// A table that a not-yet-applied database update would have added is simply not there; a purge skips it instead of failing (which would leave the customer's data in place).
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function presentTables(db: any, tables: readonly string[]): Promise<string[]> {
+  const rows = await db`select table_name from information_schema.tables where table_schema = 'public' and table_name = any(${tables as string[]})`;
+  const have = new Set((rows as Array<{ table_name: string }>).map((r) => r.table_name));
+  return tables.filter((t) => have.has(t));
+}
+
 // Delete everything we hold for one client account (it uninstalled the app, or was removed).
 export async function purgeLocationData(installationId: string, locationId: string): Promise<void> {
   const db = sql();
+  // Remember that the client left and when (Today's "Clients coming and going"). Never allowed to stop the removal: if the table is not there yet, it is skipped.
+  try {
+    await db`
+      insert into client_departures (installation_id, location_id, name, added_at)
+      select installation_id, location_id, name, coalesce(installed_at, created_at) from locations where installation_id = ${installationId} and location_id = ${locationId}
+      on conflict do nothing`;
+  } catch (e) { if (!["42P01", "42703"].includes((e as { code?: string })?.code ?? "")) console.error("Recording a departure failed", e instanceof Error ? e.message : "error"); }
   await db.begin(async (tx) => {
-    for (const table of LOCATION_DELETE) {
+    for (const table of await presentTables(tx, LOCATION_DELETE)) {
       await tx`delete from ${tx(table)} where installation_id = ${installationId} and location_id = ${locationId}`;
     }
   });
@@ -113,7 +128,7 @@ export async function purgeLocationData(installationId: string, locationId: stri
 // app keeps working and the next sync starts from scratch); all copied customer data goes.
 export async function purgeSyncedData(installationId: string): Promise<void> {
   await sql().begin(async (tx) => {
-    for (const table of SYNCED_DELETE) {
+    for (const table of await presentTables(tx, SYNCED_DELETE)) {
       await tx`delete from ${tx(table)} where installation_id = ${installationId}`;
     }
   });
@@ -141,7 +156,7 @@ export async function purgeInstallation(companyId: string): Promise<void> {
       set access_token_enc = null, refresh_token_enc = null, token_expires_at = null, uninstalled_at = now()
       where company_id = ${companyId} returning id`;
     if (!row) return;
-    for (const table of UNINSTALL_DELETE) {
+    for (const table of await presentTables(tx, UNINSTALL_DELETE)) {
       await tx`delete from ${tx(table)} where installation_id = ${row.id}`;
     }
   });

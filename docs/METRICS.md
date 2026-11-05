@@ -1,5 +1,20 @@
 # Metric definitions
 
+## Lead flow (Today, Lead flow tab)
+- **Cohort:** contacts CREATED (date added) in the chosen dates, each client's own midnight to midnight, for the clients the person may read. Dates: last 7 days (default), last 30 days, this month, last month, custom (at most 366 days, not in the future). A lead the lead rules set aside (`lead_touches.excluded`) is left out. Followed to where each lead is now; the dates only choose which leads.
+- **Replied to:** a person (not an automatic message) answered: `lead_touches.human_touch_at` is set. **Never answered:** SubSync read the lead's conversation and found no person's reply, or the lead is under 14 days old with no conversation at all. **Not checked:** older than 14 days with no reading (the first-reply check only covers conversations of the last 14 days), or reading conversations is not approved. These three add up to the new leads.
+- **Booked an appointment:** at least one appointment of the contact whose status is not cancelled or invalid. **No appointment:** the rest. Booked and no appointment add up to the new leads, whatever the reply step says.
+- **Showed up / No-show / No outcome yet:** of the booked leads. Showed up wins over no-show (any showed appointment); then no-show; otherwise the appointment is still to come or nobody marked it. These add up to the booked leads.
+- **Won a deal** (a number beside the chart, not a step): the lead has a deal with status won.
+- **Percentages** are of the parent step (replied, never answered, not checked, booked and no appointment: of new leads; showed up, no-show, no outcome yet: of booked). Under 10 leads the chart shows counts only and says "Too few leads to read".
+- **Every step and every band** opens the leads counted in it; the count on the mark equals the rows (the browser holds up to 3,000 leads per read; the counts cover up to 20,000, and the list says when it was cut). Tests: `src/lib/__tests__/lead-flow.test.ts`, `flow-records.test.ts`, `tests/unit/lead-flow-db.test.ts`.
+
+## Clients coming and going (Today, agency only)
+- **Added:** when SubSync first saw the client (`locations.installed_at`, else `created_at`). **Removed:** the day the client's data was removed (uninstall or removed from the list), recorded in `client_departures` from the day that table exists; earlier departures are not known. The tab says both in one line. Weeks start on Monday (UTC), the last 12 weeks, the current week still running. **Current** is the clients on the list now. Tests: `clients-flow.test.ts`, `tests/unit/today-reports-db.test.ts`.
+
+## Email leads list (Today, Growth tab)
+- The same people as the Growth counters (one person once per client, the Growth rules), newest first, with a search over email, name, client and source. The download has exactly the people the filters show, minus anyone marked do not contact or tagged unsubscribed (they stay in the list, marked). A download writes one audit line (counts only).
+
 Every number shown in SubSync is defined here once. If a number on screen disagrees with this file, the
 screen is wrong. Each definition names the code that computes it and the test that pins it.
 Status: FACT means counted directly from synced records. ESTIMATE means built from a rate, and the screen

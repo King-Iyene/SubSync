@@ -19,7 +19,7 @@ export type Col = {
 };
 export type Cell = string | number | null;
 export type LeadRef = { contactId: string | null; locationId: string; name: string; account: string; note: string };
-export type Rec = { id: string; cells: Record<string, Cell>; url: string | null; lead: LeadRef | null };
+export type Rec = { /** Anything the screen needs to act on the row (the id of the action that set it aside). */ ref?: number; id: string; cells: Record<string, Cell>; url: string | null; lead: LeadRef | null };
 export type RecordsSpec = {
   /** A stable key for the mark that opened it (tests, and "the same mark pressed again closes it"). */
   key: string;

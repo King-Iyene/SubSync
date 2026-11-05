@@ -93,7 +93,7 @@ for (const role of ROLES) {
     const stages: Stage[] = [
       { name: "page", setup: async () => undefined },
       { name: "break-down-open", scope: "[data-testid=today-tabs]", setup: async (p) => { await p.getByTestId("more-detail-toggle").click(); } },
-      ...(role.name === "agency owner" ? ["Forecast", "Proof", "People", "Sources", "Coverage", "Growth"] : ["Forecast", "Growth"]).map((tab): Stage => ({
+      ...(role.name === "agency owner" ? ["Forecast", "Proof", "People", "Sources", "Coverage", "Growth", "Lead flow", "Clients coming and going"] : ["Forecast", "Growth", "Lead flow"]).map((tab): Stage => ({
         name: `tab-${tab}`, scope: "[data-testid=today-tabpanel]", setup: async (p) => { await p.getByTestId("more-detail-toggle").click(); await p.getByRole("tab", { name: tab }).click(); await p.waitForTimeout(600); },
       })),
     ];

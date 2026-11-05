@@ -1,5 +1,10 @@
 # Blocked (what was tried, what would unlock it)
 
+## Lead flow: reply step for leads older than 14 days (5 Nov 2026)
+- **Tried:** the reply check (`lead_touches`) is built by the sync from conversations of the last 14 days only (`SPEED_WINDOW_DAYS` in `src/lib/sync/engine.ts`). Older leads have no check, so whether a person replied is not known.
+- **On screen:** those leads are a grey "Not checked" step with a one-line explanation, never counted as replied or never answered. Booking, show up and no-show use appointments and are known for every lead.
+- **Unlocks it:** a longer first-reply window in the sync (cost: more conversation reads per sync), then history fills in forward. Not changed here (it multiplies API calls); King to decide.
+
 ## Workflows module (4 Nov 2026)
 
 | What | Tried | Unlocks it |

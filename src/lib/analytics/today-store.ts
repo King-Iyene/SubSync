@@ -13,7 +13,8 @@ export const NEEDS_UPDATE = "Needs the latest database update. Ask the person wh
 /** Postgres says 42P01 when a table does not exist yet. */
 export function isMissingTable(error: unknown): boolean {
   const e = error as { code?: string; cause?: { code?: string } } | null;
-  return e?.code === "42P01" || e?.cause?.code === "42P01";
+  // 42P01 = missing table, 42703 = missing column: both mean "the database update has not been applied", never a crash.
+  return ["42P01", "42703"].some((c) => e?.code === c || e?.cause?.code === c);
 }
 
 const DAY = 86_400_000;

@@ -9,6 +9,9 @@ import { ApiError, useApiClient } from "../session";
 import { GrowthChart, SourceDonut } from "../ds/growth-chart";
 import { EmptyState, Skeleton } from "../ds";
 import { fmtInt } from "../ui";
+import { WhatIs } from "../ds/what-is";
+import { EmailLeads } from "./today-emails";
+import { TabIntro } from "./today-flow";
 import type { TodayModel } from "./today-model";
 
 // The Growth tab of Today: how many new email leads each client is getting, whether that is rising or falling, and whether the month is on track for its goal. Every number
@@ -37,7 +40,7 @@ function Section({ id, title, hint, children, right }: { id: string; title: stri
   return (
     <section aria-labelledby={id} className="mb-10">
       <div className="mb-3 flex flex-wrap items-end justify-between gap-x-4 gap-y-1">
-        <div><h3 id={id} className="t-title">{title}</h3>{hint && <p className="t-small t-quiet mt-0.5">{hint}</p>}</div>
+        <div><h3 id={id} className="t-title">{title}{hint && <> <WhatIs text={hint} /></>}</h3>{hint && <p className="t-small t-quiet mt-0.5">{hint}</p>}</div>
         {right}
       </div>
       {children}
@@ -122,6 +125,7 @@ export function GrowthTab({ m, g, error, reload, kind }: { m: TodayModel; g: Gro
 
   return (
     <div data-testid="growth-tab" className="max-w-5xl">
+      <TabIntro name="Growth" />
       {g.partial && <p className="t-small t-quiet mb-4" data-testid="growth-partial">SubSync counted the newest 150,000 contacts. Older ones are not in these numbers.</p>}
       {none && <p className="t-small t-quiet mb-6" data-testid="growth-none">No email leads yet. SubSync counts people who have a usable email on their contact. Contacts with no email are not counted.</p>}
 
@@ -199,6 +203,8 @@ export function GrowthTab({ m, g, error, reload, kind }: { m: TodayModel; g: Gro
           </div>
         </Section>
       )}
+
+      <EmailLeads />
 
       <Section id="growth-rules-h" title="How leads are counted">
         <p className="t-small t-quiet max-w-2xl">One person is one lead, found by their email (capital letters, spaces, a +tag and the dots in a Gmail name do not make a new person). A person counts once for each client. Contacts with no email, extra copies, test records, your own staff{g.rules.excludeRoleAddresses ? " and shared mailboxes such as info@" : ""} are left out.</p>

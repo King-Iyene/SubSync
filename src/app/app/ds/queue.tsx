@@ -1,5 +1,6 @@
 "use client";
 
+import { TagPill } from "./what-is";
 import { CircleAlert, Clock, ExternalLink, MoreHorizontal, TriangleAlert } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { actionTitle, ageLabel, ageWords, INLINE_ROWS, KIND_LABEL, money, personRow, replyContext, type NeedingYou, type QueueRow, type Severity, type TodayItem } from "@/lib/analytics/today-queue";
@@ -89,7 +90,7 @@ function ListHead({ title, hint, right, id }: { title: string; hint?: ReactNode;
   return (
     <div className="mb-2 flex flex-wrap items-end justify-between gap-x-4 gap-y-1">
       <div className="min-w-0">
-        <h2 id={id} className="t-title">{title}</h2>
+        <h2 id={id} className="t-title">{title}{title === "Do this first" && <> <TagPill tag="To do" /></>}</h2>
         {hint && <p className="t-small t-quiet mt-0.5">{hint}</p>}
       </div>
       {right}

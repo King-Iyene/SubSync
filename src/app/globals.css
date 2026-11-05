@@ -150,6 +150,9 @@
 }
 
 @layer base {
+  /* Everything that can be pressed shows the pointer (the reset makes buttons an arrow). A disabled one shows not-allowed. Utilities such as cursor-help still win. */
+  button, [role="button"], [role="tab"], [role="menuitem"], [role="option"], [role="link"], a[href], summary, select, input[type="checkbox"], input[type="radio"], input[type="date"]::-webkit-calendar-picker-indicator, label[for], [data-clickable] { cursor: pointer; }
+  button:disabled, [role="button"][aria-disabled="true"], [role="menuitem"][aria-disabled="true"], [role="menuitem"][data-disabled], select:disabled { cursor: not-allowed; }
   /* Body text reads at 15px or more (stage SHELL): every rem size scales with this. */
   html { font-size: 107%; }
   * {

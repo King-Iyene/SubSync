@@ -27,6 +27,8 @@ import { AppointmentsSection, CallsSection, DoneForToday } from "./today-mine";
 import { useTodayModel, TodayLayers } from "./today-model";
 import { BriefPreview, CoverageTab, HeldLink, JunkControl, PeopleTab, SourcesTab } from "./today-parts";
 import { GrowthTab } from "./today-growth";
+import { ClientsFlowTab, LeadFlowTab, TabIntro } from "./today-flow";
+import { SECTION_META } from "@/lib/analytics/today-tabs";
 
 // Today, one page for every role. One question: "what needs a person today, and what do I do first?". Top to bottom: a small title row, ONE plain sentence with the number that matters
 // most and ONE primary button, "Do this first" (the working queue: a setter's people to reply to, or one row per client for an agency), what changed since the person was last here
@@ -110,12 +112,15 @@ export function TodayPage({ go, t, kind, reload, sync, syncing, options, picked,
   const applyView = (v: TodayView) => { changeAccounts(v.accounts); m.setExcludeJunk(v.excludeJunk); };
   const hasProof = !!t.proof && kind !== "client";
   const growthAt = kind === "client" ? 1 : hasProof ? 5 : 4;
+  const coming = agency && t.accounts.length > 1; // clients added and removed: only for a company that looks after several clients
   const tabAt = (n: number) => n + (hasProof ? 0 : -1); // People, Sources and Coverage sit after Forecast and (when shown) Proof
   const commands: PaletteCommand[] = [
     { id: "search-people", group: "Find", title: "Search people", hint: "Names, emails and phone numbers in every client", keywords: "contact lead", run: () => document.querySelector<HTMLElement>('[data-testid="global-search-open"]')?.click() },
     { id: "go-fix", group: "Go to", title: "Do this first", hint: "The first things to do", keywords: "queue top fix reply", run: () => scrollTo("work-h") },
     ...(multi ? [{ id: "go-charts", group: "Go to", title: "Where the work sits", hint: "One bar per client", keywords: "bars", run: () => scrollTo("where-h") }] : []),
     { id: "tab-growth", group: "Go to", title: "Growth", hint: "New email leads, goal and sources", keywords: "email leads counter goal sources", run: () => openMore(growthAt) },
+    { id: "tab-flow", group: "Go to", title: "Lead flow", hint: "Where new leads end up", keywords: "funnel replied booked showed leads flow", run: () => openMore(growthAt + 1) },
+    ...(coming ? [{ id: "tab-coming", group: "Go to", title: "Clients coming and going", hint: "Clients added and removed each week", keywords: "clients added removed left new churn", run: () => openMore(growthAt + 2) }] : []),
     { id: "tab-numbers", group: "Go to", title: "Forecast", hint: "What goes wrong if nothing changes", keywords: "tiles figures numbers", run: () => openMore(0) },
     ...(kind !== "client" ? [
       { id: "tab-people", group: "Go to", title: "People", hint: "Workload by person", keywords: "owner workload", run: () => openMore(tabAt(2)) },
@@ -166,7 +171,7 @@ export function TodayPage({ go, t, kind, reload, sync, syncing, options, picked,
 
   // ---- the evidence: the reply-time line, and the figures beside it ----
   const evidence = (
-    <Block id="evidence-h" title="This week" testId="today-evidence">
+    <Block id="evidence-h" title="This week" tag="Report" hint={SECTION_META["This week"].subtitle} testId="today-evidence">
       <div className="grid grid-cols-1 gap-x-16 gap-y-8 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]" data-testid="today-pulse">
         <PulseTile testId="pulse-reply" label="Typical first reply" info="The middle first-reply time of the leads from the last 7 days. The line shows the same figure for each of the last 7 days. It needs 5 or more replies." usual={known(reply.verdict)} onOpen={reply.current.answered > 0 ? () => m.open(specReplies(env, m.now, 7, "Typical first reply, last 7 days")) : undefined} openLabel="See the replies this is worked out from"
           value={reply.current.seconds !== null ? replyWords(reply.current.seconds) : reply.current.answered === 0 ? "No replies yet" : "Not enough yet"}
@@ -232,15 +237,18 @@ export function TodayPage({ go, t, kind, reload, sync, syncing, options, picked,
   ) : null;
 
   const growthTab = <GrowthTab m={m} g={growth.data} loading={growth.loading} error={growth.error} reload={growth.reload} kind={kind} />;
+  const intro = (name: string, node: React.ReactNode) => <><TabIntro name={name} />{node}</>;
   const tabs = [
-    { label: "Forecast", node: forecast },
-    ...(proof ? [{ label: "Proof", node: proof }] : []),
+    { label: "Forecast", node: intro("Forecast", forecast) },
+    ...(proof ? [{ label: "Proof", node: intro("Proof", proof) }] : []),
     ...(kind !== "client" ? [
-      { label: "People", node: <PeopleTab m={m} t={t} agency={multi} /> },
-      { label: "Sources", node: <SourcesTab m={m} t={t} /> },
-      { label: "Coverage", node: <CoverageTab m={m} t={t} /> },
+      { label: "People", node: intro("People", <PeopleTab m={m} t={t} agency={multi} />) },
+      { label: "Sources", node: intro("Sources", <SourcesTab m={m} t={t} />) },
+      { label: "Coverage", node: intro("Coverage", <CoverageTab m={m} t={t} />) },
     ] : []),
     { label: "Growth", node: growthTab },
+    { label: "Lead flow", node: <LeadFlowTab m={m} /> },
+    ...(coming ? [{ label: "Clients coming and going", node: <ClientsFlowTab m={m} /> }] : []),
   ];
   const allDone = headline.allClear && !t.access.leadsBlocked && !t.access.apptsBlocked && (mine ? mine.calls.noshows.total + mine.calls.confirm.total === 0 : true);
 
@@ -281,7 +289,7 @@ export function TodayPage({ go, t, kind, reload, sync, syncing, options, picked,
           extra={(growth.data?.signals ?? []).slice(0, 2).map((s) => ({ key: `growth-${s.locationId}-${s.scope}-${s.direction}`, text: s.text, label: `${s.count} vs ${s.normal}`, onOpen: () => { const g = growth.data as GrowthData; m.open(specPeriod(g, s.scope === "day" ? "today" : "week", s.locationId)); } }))} />
 
         {multi && bars.bars.length > 1 && (
-          <Block id="where-h" title="Where the work sits" testId="today-charts">
+          <Block id="where-h" title="Where the work sits" tag="Report" hint={SECTION_META["Where the work sits"].subtitle} testId="today-charts">
             <AccountBars title={barsTitle(bars)} bars={bars.bars} rows={rows} more={Math.max(0, bars.accounts - bars.bars.length)}
               onSegment={(id, k) => m.open(specKind(k, env, id))} onAccount={(id) => m.open(specAccount(id, env))} onMore={() => m.open(specClients(env))} />
           </Block>

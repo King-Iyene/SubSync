@@ -5,6 +5,8 @@ import { useId, useRef, type KeyboardEvent, type ReactNode } from "react";
 import type { Headline, HeadlineAction } from "@/lib/analytics/today-queue";
 import { PopMenu, type MenuItem, type ModuleTab } from "../ds";
 import { CountUp } from "../ds/count-up";
+import { TagPill } from "../ds/what-is";
+import type { TabTag } from "@/lib/analytics/today-tabs";
 
 // The frame of Today, the same for every role. Top to bottom: a small title row (the page name, the date, one "More" menu), ONE plain sentence with the number that matters most,
 // the one primary button, then the sections. Nothing in here counts anything; it only places things. Type roles and colours come from today-theme.css.
@@ -53,10 +55,10 @@ export function PrimaryButton({ p }: { p: Primary }) {
 }
 
 /** A titled block with a hairline above it instead of a box. */
-export function Block({ id, title, hint, children, testId, className = "" }: { id: string; title: string; hint?: ReactNode; children: ReactNode; testId?: string; className?: string }) {
+export function Block({ id, title, hint, children, testId, className = "", tag }: { id: string; title: string; hint?: ReactNode; children: ReactNode; testId?: string; className?: string; tag?: TabTag }) {
   return (
     <section className={`mb-12 border-t border-[var(--t-rule)] pt-5 ${className}`} aria-labelledby={id} data-testid={testId}>
-      <h2 id={id} className="t-title">{title}</h2>
+      <h2 id={id} className="t-title">{title}{tag && <> <TagPill tag={tag} /></>}</h2>
       {hint && <p className="t-small t-quiet mt-1">{hint}</p>}
       <div className="mt-4">{children}</div>
     </section>

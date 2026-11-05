@@ -56,6 +56,8 @@ export const cleanDomain = (raw: string): string | null => {
 
 export type GrowthContact = {
   id: string; locationId: string; name: string; email: string | null; source: string | null; at: number | null; firstName?: string | null; lastName?: string | null; phone?: string | null; url?: string;
+  /** Marked do not contact, or tagged as unsubscribed: never in a download. */
+  dnd?: boolean;
 };
 export type GrowthRules = { excludeRoleAddresses: boolean; internalDomains: string[]; junkWords?: string[] };
 export type Verdict = "counted" | "duplicate" | "junk" | "staff" | "role" | "no_email";
@@ -90,9 +92,21 @@ export function classify(contacts: GrowthContact[], rules: GrowthRules): Map<str
 
 // ---------- time, in each client's own time zone ----------
 
+// Building an Intl formatter is slow (about a millisecond), so each zone's two formatters are made once.
+const FMT = new Map<string, Intl.DateTimeFormat>();
+function fmt(kind: "d" | "t", zone: string): Intl.DateTimeFormat {
+  const k = `${kind}|${zone}`;
+  let f = FMT.get(k);
+  if (!f) {
+    f = kind === "d" ? new Intl.DateTimeFormat("en-US", { timeZone: zone, year: "numeric", month: "numeric", day: "numeric", weekday: "short" })
+      : new Intl.DateTimeFormat("en-US", { timeZone: zone, hourCycle: "h23", year: "numeric", month: "numeric", day: "numeric", hour: "numeric", minute: "numeric", second: "numeric" });
+    FMT.set(k, f);
+  }
+  return f;
+}
 function parts(ms: number, zone: string): { y: number; m: number; d: number; wd: number } {
   try {
-    const f = new Intl.DateTimeFormat("en-US", { timeZone: zone, year: "numeric", month: "numeric", day: "numeric", weekday: "short" }).formatToParts(new Date(ms));
+    const f = fmt("d", zone).formatToParts(new Date(ms));
     const get = (t: string) => f.find((p) => p.type === t)?.value ?? "";
     const wd = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(get("weekday"));
     return { y: Number(get("year")), m: Number(get("month")), d: Number(get("day")), wd };
@@ -100,7 +114,7 @@ function parts(ms: number, zone: string): { y: number; m: number; d: number; wd:
 }
 function offsetAt(ms: number, zone: string): number {
   try {
-    const f = new Intl.DateTimeFormat("en-US", { timeZone: zone, hourCycle: "h23", year: "numeric", month: "numeric", day: "numeric", hour: "numeric", minute: "numeric", second: "numeric" }).formatToParts(new Date(ms));
+    const f = fmt("t", zone).formatToParts(new Date(ms));
     const g = (t: string) => Number(f.find((p) => p.type === t)?.value ?? 0);
     return Date.UTC(g("year"), g("month") - 1, g("day"), g("hour"), g("minute"), g("second")) - Math.floor(ms / 1000) * 1000;
   } catch { return 0; }
@@ -325,7 +339,7 @@ export function buildGrowth(i: GrowthInput): GrowthData {
 
   const series = dailySeries(leads, i.now, refZone);
   const perAccount = new Map<string, number[]>();
-  for (const c of counted) perAccount.set(c.locationId, [...(perAccount.get(c.locationId) ?? []), c.at as number]);
+  for (const c of counted) { const l = perAccount.get(c.locationId); if (l) l.push(c.at as number); else perAccount.set(c.locationId, [c.at as number]); }
   const signals: GrowthSignal[] = [];
   const league: LeagueRow[] = i.accounts.map((a) => {
     const ats = perAccount.get(a.id) ?? [];

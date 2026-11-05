@@ -23,7 +23,7 @@ async function drill(page: Page, testId: string) {
 test("agency owner: each of the six tabs switches, shows its content, and its first number opens the records", async ({ page }) => {
   test.setTimeout(240_000);
   await open(page, "/app");
-  const tabs = ["Forecast", "Proof", "People", "Sources", "Coverage", "Growth"];
+  const tabs = ["Forecast", "Proof", "People", "Sources", "Coverage", "Growth", "Lead flow", "Clients coming and going"];
   await expect(page.getByRole("tab")).toHaveText(tabs);
   for (const name of tabs) {
     const tab = page.getByRole("tab", { name, exact: true });
@@ -63,7 +63,7 @@ test("agency owner: each of the six tabs switches, shows its content, and its fi
   // Keyboard: the arrow keys move between tabs.
   await page.getByRole("tab", { name: "Growth" }).focus();
   await page.keyboard.press("ArrowRight");
-  await expect(page.getByRole("tab", { name: "Forecast" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("tab", { name: "Lead flow" })).toHaveAttribute("aria-selected", "true");
   // The tab row never scrolls sideways and shows no scroll bar.
   const row = await page.getByRole("tablist").evaluate((e) => ({ over: e.scrollWidth - e.clientWidth, overflow: getComputedStyle(e).overflowX }));
   expect(row.over).toBeLessThanOrEqual(1);
@@ -73,7 +73,7 @@ test("agency owner: each of the six tabs switches, shows its content, and its fi
 test("a client's staff: Forecast and Growth work for their own client only", async ({ page }) => {
   test.setTimeout(120_000);
   await open(page, "/app?as=client");
-  await expect(page.getByRole("tab")).toHaveText(["Forecast", "Growth"]);
+  await expect(page.getByRole("tab")).toHaveText(["Forecast", "Growth", "Lead flow"]);
   await page.getByRole("tab", { name: "Growth" }).click();
   await expect(page.getByTestId("growth-tab")).toBeVisible();
   await expect(page.getByTestId("growth-league")).toHaveCount(0); // one client: no league table
