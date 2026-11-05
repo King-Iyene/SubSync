@@ -21,8 +21,8 @@ const RECENT_KEY = "recent-clients";
 const btn = "ds-press inline-flex min-h-10 items-center gap-2 rounded-lg border bg-card px-3 text-[0.95rem] hover:border-primary/40 focus-visible:ring-2 focus-visible:ring-ring/40 outline-none";
 
 const subscribeHash = (cb: () => void) => {
-  window.addEventListener("popstate", cb); window.addEventListener("hashchange", cb); window.addEventListener("subsync-today-accounts", cb);
-  return () => { window.removeEventListener("popstate", cb); window.removeEventListener("hashchange", cb); window.removeEventListener("subsync-today-accounts", cb); };
+  window.addEventListener("popstate", cb); window.addEventListener("hashchange", cb); window.addEventListener("subsync-today-accounts", cb); window.addEventListener("subsync-range", cb);
+  return () => { window.removeEventListener("popstate", cb); window.removeEventListener("hashchange", cb); window.removeEventListener("subsync-today-accounts", cb); window.removeEventListener("subsync-range", cb); };
 };
 const useHash = () => useSyncExternalStore(subscribeHash, () => window.location.hash, () => "");
 
@@ -122,6 +122,7 @@ function DateControl({ mode, hash }: { mode: "range" | "now"; hash: string }) {
     remember("range-page", `${s.preset === "custom" ? `custom:${s.from}~${s.to}` : s.preset}`);
     try { window.history.replaceState(null, "", withPageRange(window.location.hash || "#today", s)); } catch { /* the choice still applies */ }
     notifyRangeChange();
+    window.dispatchEvent(new Event("subsync-range"));
   };
   if (mode === "now") return <p className="text-[0.95rem] text-muted-foreground" data-testid="date-now"><span className="font-medium text-foreground">Right now</span> (this page shows what is true at this moment)</p>;
   return (
