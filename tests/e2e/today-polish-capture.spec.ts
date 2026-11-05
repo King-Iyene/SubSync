@@ -40,7 +40,7 @@ for (const mode of ["light", "dark"] as const) {
     await page.waitForTimeout(300);
     await page.getByTestId("growth-chart").screenshot({ path: `${OUT}-growthchart-${mode}.png` });
     const slice = page.getByTestId("source-slice").first();
-    if (await slice.count()) { await slice.hover(); await page.waitForTimeout(300); await page.getByTestId("source-mix").screenshot({ path: `${OUT}-donut-${mode}.png` }); }
+    if (await slice.count()) { { const bb = (await slice.boundingBox())!; await page.mouse.move(bb.x + bb.width / 2, bb.y + bb.height * 0.1); } await page.waitForTimeout(300); await page.getByTestId("source-mix").screenshot({ path: `${OUT}-donut-${mode}.png` }); }
     await page.getByTestId("growth-counters").screenshot({ path: `${OUT}-counters-${mode}.png` });
   });
 }
