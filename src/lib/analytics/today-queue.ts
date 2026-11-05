@@ -264,7 +264,7 @@ export const accountsQuery = (ids: string[]) => (ids.length ? `accounts=${ids.fi
 /** A strong part of the headline is a button: it opens the records behind that number. */
 export type HeadlineAction = "clients" | "dollars" | "things" | "replies";
 export type HeadlinePart = { t: string; strong?: boolean; action?: HeadlineAction };
-export type Headline = { parts: HeadlinePart[]; text: string; allClear: boolean; /** "8 people waiting for a reply (3 new leads), 6 appointments to mark and 9 deals gone quiet worth $48,200." */ breakdown: string | null; accounts: number; dollars: number };
+export type Headline = { /** One deal that is most of the quiet-deal money, said in words so the dollar figure is not read as a pattern. Shown beside the dollars (tile, email, print). */ note?: string | null; parts: HeadlinePart[]; text: string; allClear: boolean; /** "8 people waiting for a reply (3 new leads), 6 appointments to mark and 9 deals gone quiet worth $48,200." */ breakdown: string | null; accounts: number; dollars: number };
 
 /** "1 person waiting for a reply", "14 people waiting for a reply": a count with the right singular or plural, as a person would say it. */
 export const countWords = (k: Kind, n: number) => `${n.toLocaleString("en-US")} ${COUNT_WORDS[k][n === 1 ? 0 : 1]}`;
@@ -295,21 +295,22 @@ export function headlineOf(i: { scope: "all" | "account"; rows: QueueRow[]; tota
   const accounts = c.accounts;
   const dollars = c.staleDollars;
   // The sentence carries the one number that matters most (people waiting). The line under it carries the rest, the dollars included.
-  const breakdown0 = breakdownOf(i.totals, { dollars: true });
-  const breakdown = breakdown0;
+  const breakdown = breakdownOf(i.totals, { dollars: true });
+  const note = i.outlier && dollars > 0 ? `One deal is ${money(i.outlier.value)} of the quiet-deal money.` : null;
+  const replyClients = new Set(i.rows.filter((r) => r.kind === "replies").map((r) => r.locationId)).size;
   if (c.things === 0) {
     const text = i.scope === "all" ? "Every client is on track today." : "You are all caught up today.";
-    return { parts: [{ t: text }], text, allClear: true, breakdown: null, accounts: 0, dollars: 0 };
+    return { parts: [{ t: text }], text, allClear: true, breakdown: null, note: null, accounts: 0, dollars: 0 };
   }
   const replyWord = c.replies === 1 ? "person is" : "people are";
   const parts: HeadlinePart[] = i.scope === "all"
     ? (c.replies > 0
-      ? [{ t: c.replies.toLocaleString("en-US"), strong: true, action: "replies" }, { t: ` ${replyWord} waiting for a reply across ` }, { t: String(accounts), strong: true, action: "clients" }, { t: ` ${accounts === 1 ? "client" : "clients"}.` }]
+      ? [{ t: c.replies.toLocaleString("en-US"), strong: true, action: "replies" }, { t: ` ${replyWord} waiting for a reply across ` }, { t: String(replyClients), strong: true, ...(replyClients === accounts ? { action: "clients" as const } : {}) }, { t: ` ${replyClients === 1 ? "client" : "clients"}.` }]
       : [{ t: String(accounts), strong: true, action: "clients" }, { t: ` ${accounts === 1 ? "client has" : "clients have"} something to do today.` }])
     : c.replies > 0
       ? [{ t: c.replies.toLocaleString("en-US"), strong: true, action: "replies" }, { t: ` ${replyWord} waiting for a reply.` }]
       : [{ t: c.things.toLocaleString("en-US"), strong: true, action: "things" }, { t: ` ${c.things === 1 ? "thing needs" : "things need"} a look today.` }];
-  return { parts, text: parts.map((p) => p.t).join(""), allClear: false, breakdown, accounts, dollars };
+  return { parts, text: parts.map((p) => p.t).join(""), allClear: false, breakdown, note, accounts, dollars };
 }
 
 // ---------- the donut ----------
@@ -555,6 +556,7 @@ export function staleUsual(s: { today: number; usual: number | null; samples: nu
 export function briefLines(i: { headline: Headline; rows: QueueRow[]; setAside: number; limit?: number }): string[] {
   const lines = [i.headline.text];
   if (i.headline.breakdown) lines.push(i.headline.breakdown);
+  if (i.headline.note) lines.push(i.headline.note);
   const top = i.rows.slice(0, i.limit ?? 5);
   if (top.length > 0) {
     lines.push("Do this first:");
@@ -569,6 +571,7 @@ export function briefLines(i: { headline: Headline; rows: QueueRow[]; setAside: 
 export function shareText(i: { who: string; headline: Headline; rows: QueueRow[] }): string {
   const lines = [`${i.who}: Today`, i.headline.text];
   if (i.headline.breakdown) lines.push(i.headline.breakdown);
+  if (i.headline.note) lines.push(i.headline.note);
   const top = i.rows.slice(0, 3);
   if (top.length > 0) {
     lines.push("", "Do this first:");

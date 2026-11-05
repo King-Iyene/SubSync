@@ -34,8 +34,8 @@ export type RowAction = "done" | "snooze_day" | "snooze_monday" | "assign";
 export type RowWhy = { key: string; text: string; onOpen: () => void };
 
 // ONE button height across the page (h-8), one icon size (size-3.5), one menu trigger (size-8).
-export const ACTION_BUTTON = "ds-press inline-flex h-11 w-full items-center justify-center gap-1.5 rounded-[4px] border border-[var(--t-rule2)] bg-transparent px-2.5 text-[0.8125rem] font-medium hover:border-primary hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--ring)] @3xl:h-8";
-const MENU_TRIGGER = "ds-press inline-flex size-11 items-center justify-center rounded-[4px] text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-[var(--ring)] @3xl:size-8";
+export const ACTION_BUTTON = "ds-press inline-flex h-11 w-full items-center justify-center gap-1.5 t-act rounded-md border bg-card px-2.5 text-sm font-medium hover:border-primary/40 hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--ring)] @3xl:h-8";
+const MENU_TRIGGER = "ds-press inline-flex size-11 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-[var(--ring)] @3xl:size-8";
 
 /** The one small action button of a row: an outlined link that leaves the app (with the external-link icon), or a button that stays inside it. */
 export function RowButton({ href, onClick, label, sr, testId }: { href?: string; onClick?: () => void; label: string; sr: string; testId?: string }) {

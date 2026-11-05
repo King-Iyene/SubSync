@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { contrast, parseColour } from "@/lib/design/color";
 import { Section } from "../app/ds";
 import { TODAY_FONTS } from "../app/views/today-fonts";
@@ -7,35 +8,34 @@ import "../app/views/today-theme.css";
 
 // Today's two palette options side by side, light and dark, each drawn by the real Today tokens (src/app/app/views/today-theme.css). A is the default. Nothing here is a screenshot:
 // every swatch reads the same CSS variables the page reads, so a change to the token block shows here at once. The contrast figures are computed from the swatch's own colours.
-const SWATCHES: Array<{ name: string; token: string; onToken?: string; note: string; asText?: boolean }> = [
-  { name: "Ground", token: "--t-ground", onToken: "--t-ink", note: "page" },
-  { name: "Raised", token: "--t-raise", onToken: "--t-ink", note: "queue and panel" },
-  { name: "Accent", token: "--t-accent", onToken: "--t-on-accent", note: "the one colour" },
-  { name: "Urgent", token: "--t-bad", note: "status only", asText: true },
-  { name: "Soon", token: "--t-warn", note: "status only", asText: true },
-  { name: "Fine", token: "--t-ok", note: "status only", asText: true },
+const SWATCHES: Array<{ name: string; token: string; onToken?: string; asText?: boolean }> = [
+  { name: "Ground", token: "--t-ground", onToken: "--t-ink" },
+  { name: "Raised", token: "--t-raise", onToken: "--t-ink" },
+  { name: "Accent", token: "--t-accent", onToken: "--t-on-accent" },
+  { name: "Urgent", token: "--t-bad", asText: true },
+  { name: "Soon", token: "--t-warn", asText: true },
+  { name: "Fine", token: "--t-ok", asText: true },
 ];
 const CHART = ["--t-c1", "--t-c2", "--t-c3", "--t-c4"];
 
-/** Reads two CSS colours from an element's computed style and returns their contrast ratio; the design page calls this after mount. */
+/** The contrast ratio of two colours that were read from the panel's own computed style, so it cannot drift from the token block. */
 function Ratio({ fg, bg }: { fg: string; bg: string }) {
+  if (!fg || !bg) return null;
   const f = parseColour(fg), b = parseColour(bg);
   if (!f || !b) return null;
   const r = contrast(f, b);
   return <span className="t-num">{r.toFixed(1)}:1 {r >= 4.5 ? "AA" : r >= 3 ? "large only" : "fails"}</span>;
 }
 
-const HEX: Record<string, Record<string, string>> = {
-  "a-light": { "--t-ground": "#f2f1ee", "--t-raise": "#fbfaf8", "--t-ink": "#1e1c1a", "--t-ink2": "#5a564f", "--t-accent": "#a3205e", "--t-on-accent": "#ffffff", "--t-bad": "#b42318", "--t-warn": "#8a5a00", "--t-ok": "#2b7a3d" },
-  "a-dark": { "--t-ground": "#191817", "--t-raise": "#222120", "--t-ink": "#ece8e1", "--t-ink2": "#a8a29a", "--t-accent": "#e27ba8", "--t-on-accent": "#1a0a12", "--t-bad": "#f0877d", "--t-warn": "#e0a63c", "--t-ok": "#6fc28a" },
-  "b-light": { "--t-ground": "#eef0ec", "--t-raise": "#f9faf7", "--t-ink": "#17201c", "--t-ink2": "#4e5a54", "--t-accent": "#0f6b5c", "--t-on-accent": "#ffffff", "--t-bad": "#b42318", "--t-warn": "#8a5a00", "--t-ok": "#4a7a12" },
-  "b-dark": { "--t-ground": "#101a16", "--t-raise": "#16231e", "--t-ink": "#e6ede8", "--t-ink2": "#9badA4", "--t-accent": "#4fb79f", "--t-on-accent": "#07130f", "--t-bad": "#f0877d", "--t-warn": "#e0a63c", "--t-ok": "#a5cc5e" },
-};
-
 function Panel({ palette, mode, title }: { palette: "a" | "b"; mode: "light" | "dark"; title: string }) {
-  const hex = HEX[`${palette}-${mode}`];
+  const ref = useRef<HTMLDivElement>(null);
+  const [hex, setHex] = useState<Record<string, string>>({});
+  useEffect(() => {
+    const cs = ref.current ? getComputedStyle(ref.current) : null;
+    if (cs) setHex(Object.fromEntries(["--t-ground", "--t-raise", "--t-ink", "--t-ink2", "--t-accent", "--t-on-accent", "--t-bad", "--t-warn", "--t-ok"].map((k) => [k, cs.getPropertyValue(k).trim()])));
+  }, [palette, mode]);
   return (
-    <div className={`today ${TODAY_FONTS} bg-background text-foreground rounded-[6px] border border-[var(--t-rule)] p-5`} data-palette={palette} data-theme={mode} data-testid={`palette-${palette}-${mode}`}>
+    <div ref={ref} className={`today ${TODAY_FONTS} bg-background text-foreground rounded-[6px] border border-[var(--t-rule)] p-5`} data-palette={palette} data-theme={mode} data-testid={`palette-${palette}-${mode}`}>
       <div className="t-root">
         <p className="t-label">{title}</p>
         <h3 className="t-display mt-3 !text-[1.6rem]"><span className="text-primary">78</span> people are waiting for a reply across <span className="text-primary">13</span> clients.</h3>

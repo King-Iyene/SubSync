@@ -97,7 +97,7 @@ export function TodayPage({ go, t, kind, reload, sync, syncing, options, picked,
   const noHistory = reply.verdict.verdict === "not_enough" || staleVerdict.verdict === "not_enough";
   const points = reply.points.map((p) => ({ label: p.day, value: p.value, note: p.window }));
   const windowReplies = (i: number) => env.ledger.filter((l) => l.touchAt !== null && l.leadAt > pointEnd(reply.points[i].day, m.now) - 7 * 86_400_000 && l.leadAt <= pointEnd(reply.points[i].day, m.now)).length;
-  const since = t.sinceVisit && (t.sinceVisit.newLeads.length + t.sinceVisit.breached.length + t.sinceVisit.answered.length + t.sinceVisit.clearedAlerts.length > 0) ? t.sinceVisit : null;
+  const since = t.sinceVisit && (t.sinceVisit.newLeads.length + t.sinceVisit.breached.length + t.sinceVisit.answered.length + (kind === "client" ? 0 : t.sinceVisit.clearedAlerts.length) > 0) ? t.sinceVisit : null;
   const dateText = m.now > 0 ? new Date(m.now).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" }) : undefined;
 
   // ---- command palette (Ctrl Shift K) and the More menu ----
@@ -135,12 +135,10 @@ export function TodayPage({ go, t, kind, reload, sync, syncing, options, picked,
   ];
   const report = {
     brandName: null, who: picked.length > 0 ? pickedNames.join(", ") : "All clients", generatedAt: new Date(m.now).toLocaleString("en-GB", { dateStyle: "full", timeStyle: "short" }),
-    headline: headline.text, breakdown: headline.breakdown, rows, insights: m.insights.map((i) => i.text), forecast: forecastLine(t.forecast, t.targetMinutes),
+    headline: headline.text, breakdown: [headline.breakdown, headline.note].filter(Boolean).join(" ") || null, rows, insights: m.insights.map((i) => i.text), forecast: forecastLine(t.forecast, t.targetMinutes),
     proof: t.proof ? proofLine(t.proof) : null, setAside: view.held.length,
   };
 
-  // The client choice lives in the shell's one global filter bar (KF-11); Today only reads it (`picked`).
-  const filter = null;
 
   // ---- the lists ----
   const alsoRows: KindRow[] = (["appointments", "noshows", "stale"] as const)
@@ -231,7 +229,7 @@ export function TodayPage({ go, t, kind, reload, sync, syncing, options, picked,
     <div data-testid="page" className="ds-enter t-root">
       <PrintReport r={report} now={m.now} />
       <div className="print:hidden">
-        <TodayHeader filter={filter} more={moreItems} dateText={dateText} />
+        <TodayHeader more={moreItems} dateText={dateText} />
         {error && <InlineAlert tone="danger" className="mb-4" action={<Btn onClick={() => void reload()}>Try again</Btn>}>{error}</InlineAlert>}
 
         <TodayHeadline headline={headline} onPart={onPart} action={primary ? <PrimaryButton p={primary} /> : undefined}>

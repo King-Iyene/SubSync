@@ -17,7 +17,7 @@ const GRID = "@container ds-row grid grid-cols-[minmax(0,1fr)_6rem] items-center
 function CallRow({ name, sub, url, dnd, phone, verb = "Call" }: { name: string; sub?: string; url: string; dnd?: boolean; phone: boolean; verb?: string }) {
   return (
     <li className={GRID} data-testid="call-row" data-dnd={dnd ? "true" : "false"}>
-      <div className="min-w-0"><p className="truncate font-semibold">{verb} {name}</p>{sub && <p className="truncate text-sm text-muted-foreground">{sub}</p>}</div>
+      <div className="min-w-0"><p className="truncate font-semibold">{dnd ? name : `${verb} ${name}`}</p>{sub && <p className="truncate text-sm text-muted-foreground">{sub}</p>}</div>
       {dnd
         ? <button type="button" disabled title="This person asked not to be contacted." className="inline-flex h-11 w-full cursor-not-allowed items-center justify-center gap-1.5 rounded-[4px] border px-2 text-sm font-medium text-muted-foreground opacity-70 sm:h-8"><Phone aria-hidden className="size-3.5" />No calls</button>
         : <RowButton href={url} label={phone ? "Call" : "Open"} sr={`${name}, ${phone ? "call in your CRM" : "no phone number"}`} />}

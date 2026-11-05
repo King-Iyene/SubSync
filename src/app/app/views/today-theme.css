@@ -79,6 +79,10 @@
 
 .today .t-root { font-family: var(--t-sans); font-size: 0.9375rem; line-height: 1.5; /* body 15px */ }
 
+/* The small outlined row button shared with other modules: only inside Today it takes the quieter look. */
+.today .t-act { border-radius: 4px; border-color: var(--t-rule2); background: transparent; font-size: 0.8125rem; }
+.today .t-act:hover { border-color: var(--t-accent); background: transparent; color: var(--t-accent); }
+
 /* ---------- surfaces: hairlines and whitespace; a bordered surface only for the queue and the panel ---------- */
 .today .t-surface { background: var(--t-raise); border: 1px solid var(--t-rule); border-radius: 6px; }
 .today .t-rule { border-color: var(--t-rule); }

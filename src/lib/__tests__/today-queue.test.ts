@@ -104,7 +104,7 @@ test("a capped list is marked partial so the screen says so", () => {
 test("the headline: clients and counted dollars, built from existing figures", () => {
   const items = [item("replies", "aaa"), item("replies", "bbb"), item("stale", "ccc", { value: 48_200 })];
   const h = headlineOf({ scope: "all", rows: queueOf(items), totals: totalsFrom(items) });
-  assert.equal(h.text, "2 people are waiting for a reply across 3 clients.");
+  assert.equal(h.text, "2 people are waiting for a reply across 2 clients.");
   assert.equal(h.breakdown, "1 quiet deal worth $48,200.");
   assert.equal(h.allClear, false);
   const one = headlineOf({ scope: "all", rows: queueOf([item("replies", "aaa")]), totals: totalsFrom([item("replies", "aaa")]) });
@@ -261,7 +261,7 @@ test("share text is the headline and the top three, in plain words", () => {
   const text = shareText({ who: "Your clients", headline: headlineOf({ scope: "all", rows: q, totals: totalsFrom(items) }), rows: q });
   const lines = text.split("\n");
   assert.equal(lines[0], "Your clients: Today");
-  assert.match(lines[1], /across 3 clients\.$/);
+  assert.match(lines[1], /across 1 client\.$/);
   assert.equal(lines.filter((l) => /^\d\. /.test(l)).length, 3);
   assert.match(text, /1\. North Roofing: 1 open deal has gone quiet, \$12,000 in deals, open for 40 days/);
 });
