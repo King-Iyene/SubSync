@@ -51,6 +51,7 @@ export function LeadFlowChart({ flow, onNode, onLink, label }: { flow: Flow; onN
   const press = (fn: () => void) => (e: React.KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fn(); } };
   return (
     <figure className="relative min-w-0" data-testid="lead-flow-chart">
+      <div className="relative">
       <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full overflow-visible" role="group" aria-label={label}>
         {ribbons.map((r) => {
           const text = `${NODE_LABEL[r.from]} then ${NODE_LABEL[r.to].toLowerCase()}: ${r.count} ${r.count === 1 ? "lead" : "leads"}. See them.`;
@@ -85,15 +86,16 @@ export function LeadFlowChart({ flow, onNode, onLink, label }: { flow: Flow; onN
       {hot && (() => {
         if (hot.startsWith("n:")) {
           const id = hot.slice(2) as NodeId, n = node(id), b = boxes.find((x) => x.id === id);
-          return <ChartCard testId="flow-card" title={n.label} left={b ? ((b.x + 40) / W) * 100 : 20} top={b ? Math.max(0, (b.y / H) * 100) : 0}
+          return <ChartCard testId="flow-card" title={n.label} left={b ? ((b.x + NW + 14) / W) * 100 : 20} top={`${b ? Math.min(70, Math.max(0, ((b.y + Math.min(b.h, 40)) / H) * 100)) : 0}%`}
             lines={[<><span className="t-num font-medium">{n.count.toLocaleString("en-US")}</span> {n.count === 1 ? "lead" : "leads"}{n.pct === null ? "" : `, ${n.pct}% ${n.of}`}</>]} compare={NODE_INFO[id]} hint="Click to see them" />;
         }
         const r = ribbons.find((x) => `l:${x.from}>${x.to}` === hot);
         if (!r) return null;
         const a = node(r.from), share = a.count ? Math.round((r.count / a.count) * 100) : 0;
-        return <ChartCard testId="flow-card" title={`${NODE_LABEL[r.from]} then ${NODE_LABEL[r.to].toLowerCase()}`} left={((boxes.find((x) => x.id === r.from)?.x ?? 0) + 120) / W * 100} top={20}
+        return <ChartCard testId="flow-card" title={`${NODE_LABEL[r.from]} then ${NODE_LABEL[r.to].toLowerCase()}`} left={((boxes.find((x) => x.id === r.from)?.x ?? 0) + 120) / W * 100} top="20%"
           lines={[<><span className="t-num font-medium">{r.count.toLocaleString("en-US")}</span> {r.count === 1 ? "lead" : "leads"}</>]} compare={`${share}% of the ${a.count.toLocaleString("en-US")} at "${NODE_LABEL[r.from]}"`} hint="Click to see them" />;
       })()}
+      </div>
       <p className="t-small t-quiet mt-1 min-h-5" role="status" aria-live="polite" data-testid="flow-tip">{tip ?? "Select a step or a band to see the people. Each band is the leads that went from one step to the next."}</p>
       <div className="sr-only">
         <table><caption>{label}</caption><thead><tr><th>Step</th><th>Leads</th><th>Share</th></tr></thead>

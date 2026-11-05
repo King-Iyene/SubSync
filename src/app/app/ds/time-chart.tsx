@@ -32,7 +32,7 @@ export function ModeToggle({ mode, onChange, label }: { mode: ChartMode; onChang
 }
 
 /** The floating card every Today chart shares: a bold title (the full date or the name), one line per figure, an optional comparison line. Sits inside a `relative` figure. */
-export function ChartCard({ title, lines, compare, hint, left, top = 4, testId }: { title: string; lines: ReactNode[]; compare?: ReactNode; hint?: ReactNode; /** Percent from the figure's left edge, 0 to 100. */ left: number; top?: number; testId?: string }) {
+export function ChartCard({ title, lines, compare, hint, left, top = 4, testId }: { title: string; lines: ReactNode[]; compare?: ReactNode; hint?: ReactNode; /** Percent from the figure's left edge, 0 to 100. */ left: number; top?: number | string; testId?: string }) {
   return (
     <div className="pointer-events-none absolute z-20 w-max max-w-[15rem] rounded-xl border border-[var(--t-rule2)] bg-[var(--t-raise)]/90 px-3 py-2 text-xs shadow-lg backdrop-blur-md" data-testid={testId} role="tooltip"
       style={{ left: `${Math.min(76, Math.max(2, left))}%`, top }}>
@@ -104,7 +104,7 @@ export function TimeChart({ points, series, avg, mode, onPick, selectedId, label
             onClick={() => open(i)} onKeyDown={(e) => { if (onPick && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); open(i); } else if (e.key === "ArrowRight" || e.key === "ArrowLeft") { e.preventDefault(); const nx = (e.key === "ArrowRight" ? e.currentTarget.nextElementSibling : e.currentTarget.previousElementSibling) as SVGElement | null; if (nx && nx.hasAttribute("data-id")) nx.focus(); } }}
             onMouseEnter={() => setHot(i)} onMouseLeave={() => setHot(null)} onFocus={() => setHot(i)} onBlur={() => setHot(null)} />
         ))}
-        {labels.map((i) => <text key={i} x={x(i)} y={H - 9} textAnchor={i === 0 ? "start" : i === n - 1 ? "end" : "middle"} style={{ fontSize: 12.5, fill: "var(--t-ink)", fillOpacity: 0.85 }} className="t-num">{points[i].short}</text>)}
+        {labels.map((i) => <text key={i} x={x(i)} y={H - 9} textAnchor={i === 0 ? "start" : i === n - 1 ? "end" : "middle"} style={{ fontSize: 12.5, fill: "var(--t-ink)", fillOpacity: 0.85 }}>{points[i].short}</text>)}
       </svg>
       {tipP && hot !== null && (
         <div className="pointer-events-none absolute top-1 z-20 w-max max-w-[15rem] rounded-xl border border-[var(--t-rule2)] bg-[var(--t-raise)]/85 px-3 py-2 text-xs shadow-lg backdrop-blur-md" data-testid={`${testId}-card`}

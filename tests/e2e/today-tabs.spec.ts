@@ -60,7 +60,7 @@ test("agency owner: each of the six tabs switches, shows its content, and its fi
   await expect(page.getByTestId("records-panel")).toBeVisible();
   await page.keyboard.press("Escape");
   await page.getByRole("tab", { name: "Growth" }).click();
-  await expect(page.getByTestId("growth-counters").locator("li")).toHaveCount(4);
+  await expect(page.getByTestId("growth-counters").locator("li")).toHaveCount(5);
   await drill(page, "growth-week");
   await drill(page, "growth-day");
   await drill(page, "source-slice");

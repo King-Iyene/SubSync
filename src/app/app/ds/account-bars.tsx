@@ -49,7 +49,7 @@ export function AccountBars({ title, bars, rows, more, onSegment, onAccount, onM
       </ul>
       {tip && (() => {
         const d = Math.round((tip.count - avgCount) * 10) / 10;
-        return <ChartCard testId="bars-card" title={tip.name} left={40} top={Math.min(tipAt * 32 + 30, 200)}
+        return <ChartCard testId="bars-card" title={tip.name} left={58} top={Math.min(tipAt * 32 + 30, 200)}
           lines={[...KINDS.filter((k) => (tip.byKind[k] ?? 0) > 0).map((k) => <><span aria-hidden className="size-2 rounded-full" style={{ background: kindColour(k) }} /><span className="t-num font-medium">{tip.byKind[k]}</span> {KIND_LABEL[k].toLowerCase()}</>), <span className="t-num font-medium">{tip.count.toLocaleString("en-US")} in all</span>]}
           compare={bars.length > 1 ? `${d === 0 ? "Same as" : `${d > 0 ? "+" : ""}${d} against`} the average client (${Math.round(avgCount * 10) / 10})` : undefined} hint="Click a colour to see its people" />;
       })()}
