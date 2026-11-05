@@ -110,7 +110,7 @@ test("the work list: Open, the row menu (Show everything, Done for now, Snooze, 
   await page.keyboard.press("Escape");
   // See all opens the full list of clients in the records panel; its count is the headline's.
   if (await page.getByTestId("queue-all").count()) {
-    const clients = Number((await page.getByTestId("today-headline").innerText()).match(/(\d[\d,]*) clients?/)![1].replace(/,/g, ""));
+    const clients = Number((await page.getByTestId("work-summary").innerText()).match(/(\d[\d,]*) clients?/)![1].replace(/,/g, ""));
     await page.getByTestId("queue-all").click();
     await expect(panel(page)).toBeVisible();
     expect(await count(page)).toBe(clients);

@@ -461,7 +461,7 @@ test("More detail and the rest of the buttons built for Today all do something",
   if (await since.count()) for (const b of await since.locator("button").all()) { await b.click(); await expect(panel(page)).toBeVisible(); await closePanel(page); }
   // If nobody acts: the counts.
   await openMore(page, "Forecast");
-  for (const k of ["leads", "deals", "appointments"]) { const c = page.getByTestId(`coming-${k}`); if ((await c.count()) && (await c.getAttribute("data-count")) !== "0") { await c.click(); await expect(panel(page)).toBeVisible(); await closePanel(page); } }
+  for (const k of ["leads", "deals", "appointments"]) { const c = page.getByTestId(`coming-open-${k}`); if (await c.count()) { await c.click(); await expect(panel(page)).toBeVisible(); await closePanel(page); } }
   // Share copies the summary; Sync now runs; the preview of the email opens and closes.
   await page.context().grantPermissions(["clipboard-read", "clipboard-write"]).catch(() => undefined);
   await moreMenu(page, "share");

@@ -62,7 +62,7 @@ test("agency owner: each of the six tabs switches, shows its content, and its fi
   await page.getByRole("tab", { name: "Growth" }).click();
   await expect(page.getByTestId("growth-counters").locator("li")).toHaveCount(5);
   await drill(page, "growth-week");
-  await drill(page, "growth-day");
+  await drill(page, "growth-chart-mark");
   await drill(page, "source-slice");
   // Keyboard: the arrow keys move between tabs.
   await page.getByRole("tab", { name: "Growth" }).focus();

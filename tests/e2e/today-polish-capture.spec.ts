@@ -16,6 +16,8 @@ for (const mode of ["light", "dark"] as const) {
     await theme(page, mode);
     console.log("headline:", await page.getByTestId("today-headline").innerText(), "| held:", (await page.getByTestId("held-link").count()) ? await page.getByTestId("held-link").getAttribute("data-count") : 0);
     await page.getByTestId("fix-first").screenshot({ path: `${OUT}-fixfirst-${mode}.png` });
+    const spark = page.getByTestId("spark-surface");
+    if (await spark.count()) { await spark.first().scrollIntoViewIfNeeded(); await spark.first().hover(); await page.waitForTimeout(300); await spark.first().screenshot({ path: `${OUT}-spark-${mode}.png` }); }
     const bars = page.getByTestId("account-bar").first();
     if (await bars.count()) { await bars.hover(); await page.waitForTimeout(300); await page.getByTestId("account-bars").screenshot({ path: `${OUT}-bars-${mode}.png` }); }
     await openMore(page, "Proof");
@@ -40,7 +42,5 @@ for (const mode of ["light", "dark"] as const) {
     const slice = page.getByTestId("source-slice").first();
     if (await slice.count()) { await slice.hover(); await page.waitForTimeout(300); await page.getByTestId("source-mix").screenshot({ path: `${OUT}-donut-${mode}.png` }); }
     await page.getByTestId("growth-counters").screenshot({ path: `${OUT}-counters-${mode}.png` });
-    const spark = page.getByTestId("spark-surface");
-    if (await spark.count()) { await spark.first().scrollIntoViewIfNeeded(); await spark.first().hover(); await page.waitForTimeout(300); await spark.first().screenshot({ path: `${OUT}-spark-${mode}.png` }); }
   });
 }
