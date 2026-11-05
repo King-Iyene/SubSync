@@ -9,6 +9,7 @@ import { useApiClient, useData } from "../session";
 import { fmtMoney, timeAgo } from "../ui";
 import { ActionStrip, DialNote, useContactActions, type ActionPerson } from "./contact-actions";
 import { DialerSetting } from "./dial-button";
+import { HeldNote } from "./held";
 import { LogCall, NoteToSelf, TagsEditor, Timeline, UndoButton } from "./lead-parts";
 import { PopMenu } from "./pop-menu";
 import { ErrorState, SkeletonRows } from "./states";
@@ -88,6 +89,7 @@ function Body({ seed, top, showAccount, onLogged }: { seed: LeadSeed; top?: Reac
       {person.error && person.error.status === 404 && <p className="mt-4 text-sm text-muted-foreground" data-testid="drawer-not-copied">SubSync has not copied this contact yet, so its history is not shown. Call and Email still open them in your CRM.</p>}
       {person.error && person.error.status !== 404 && <div className="mt-5"><ErrorState error={person.error} onRetry={person.reload} /></div>}
 
+      <HeldNote locationId={seed.locationId} contactId={seed.contactId} name={name} />
       <div className="mt-4 flex flex-wrap items-center gap-2" data-testid="drawer-actions">
         <button type="button" onClick={() => actions.call(ap)} disabled={!phone} className={dnd ? BUTTON : PRIMARY} data-testid="drawer-call">Call{url ? <ExternalLink aria-hidden className="size-3.5" /> : null}</button>
         <button type="button" onClick={() => actions.email(ap)} disabled={!email} title={email ? undefined : "This contact has no email address"} aria-describedby={email ? undefined : "drawer-email-why"} className={BUTTON} data-testid="drawer-email">Email{url ? <ExternalLink aria-hidden className="size-3.5" /> : null}</button>

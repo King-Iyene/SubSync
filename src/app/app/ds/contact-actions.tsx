@@ -22,19 +22,19 @@ export type Strip =
   | null;
 
 export function useContactActions() {
-  const { provider, choice } = useDialer();
+  const { provider, choice, withChoice } = useDialer();
   const [strip, setStrip] = useState<Strip>(null);
   const [copied, setCopied] = useState<string | null>(null);
 
   const open = (href: string, same: boolean) => window.open(href, same ? "_self" : "_blank", "noopener,noreferrer");
 
-  const call = (p: ActionPerson) => {
-    const plan = dialPlan(choice, { phone: p.phone, email: p.email, contactUrl: p.url });
+  const call = (p: ActionPerson) => withChoice((c) => {
+    const plan = dialPlan(c, { phone: p.phone, email: p.email, contactUrl: p.url });
     if (!plan.href) { setStrip({ key: p.key, note: plan.note }); return; }
     const w = dialWarnings({ dnd: p.dnd, phone: p.phone, timeZone: p.timeZone, now: new Date() });
     if (w.length === 0) { open(plan.href, plan.provider === "phone"); setStrip(null); announceCall(); return; }
     setStrip({ key: p.key, kind: "call", warnings: w, href: plan.href, same: plan.provider === "phone" });
-  };
+  });
 
   const email = (p: ActionPerson) => {
     const plan = emailPlan({ email: p.email, contactUrl: p.url });

@@ -2,7 +2,7 @@ import { assigneeLabel } from "../analytics/waiting-view";
 import { teamNames } from "../analytics/inbox-queries";
 import { leadExtras } from "../analytics/people-detail";
 import {
-  coldTagsFor, getDialer, goingCold, listSavedLists, peopleOptions, removeList, saveList, searchPeople, setDialer, tagDetail, watchingSince, type ColdBucket,
+  coldTagsFor, getDialer, hasDialerChoice, goingCold, listSavedLists, peopleOptions, removeList, saveList, searchPeople, setDialer, tagDetail, watchingSince, type ColdBucket,
 } from "../analytics/people-list-queries";
 import { fetchConversationActivity, fetchContactCustomFields, fetchCustomFieldNames, isPermissionError } from "../sync/ghl-data";
 import { callResultLabel, errorRef, isoDay, isQueryTimeout, TIMEOUT_MESSAGE } from "../people/helpers";
@@ -142,7 +142,7 @@ async function route(ctx: Ctx, h: PeopleHelpers): Promise<Response> {
   }
 
   if (b === "dialer") {
-    if (m === "GET") return json(await getDialer(ctx.installationId, h.voter));
+    if (m === "GET") return json({ ...(await getDialer(ctx.installationId, h.voter)), chosen: await hasDialerChoice(ctx.installationId, h.voter) });
     if (m === "PUT") {
       const body = (await ctx.request.json().catch(() => null)) as { provider?: unknown; vendor?: unknown; template?: unknown } | null;
       if (body?.provider !== "crm" && body?.provider !== "phone" && body?.provider !== "connected") return json({ error: "Choose how Call should work" }, 400);

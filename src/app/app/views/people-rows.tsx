@@ -4,7 +4,7 @@ import { ExternalLink, MoreHorizontal } from "lucide-react";
 import { useCallback, type KeyboardEvent } from "react";
 import { rowLine } from "@/lib/people/rows";
 import type { PersonRowOut } from "@/lib/people/types";
-import { ActionStrip, PopMenu, useNow, type ActionPerson, type ContactActions, type LeadSeed, type MenuItem } from "../ds";
+import { ActionStrip, HeldStatus, heldKey, PopMenu, useHeld, useNow, type ActionPerson, type ContactActions, type LeadSeed, type MenuItem } from "../ds";
 
 // One person on a list, the same everywhere People shows people (a search, a call list, a saved list, a tag day, going cold). The rule (KF-8): one line with the name, one line of
 // reason, ONE small button in its own column (Call, 44 px high on a phone so a thumb can hit it) and a quiet three-dot menu for the rest. Colour is only ever status: "Do not
@@ -38,14 +38,18 @@ export function PersonRows({ rows, showAccount, actions, onOpen, testId = "peopl
     const next = names[Math.min(names.length - 1, Math.max(0, at === -1 ? 0 : at + dir))];
     if (next) { e.preventDefault(); next.focus(); next.scrollIntoView({ block: "nearest" }); }
   }, []);
+  const heldState = useHeld();
   if (rows.length === 0) return empty ? <p className="border-y py-6 text-center text-sm text-muted-foreground" data-testid={`${testId}-empty`}>{empty}</p> : null;
   return (
+    <>
+    <HeldStatus />
     <ul className="@container divide-y border-y" data-testid={testId} onKeyDown={move}>
       {rows.map((r, i) => {
         const p = actionPerson(r);
         const line = rowLine({ name: r.name, why: r.why, locationName: r.locationName, phone: r.phone, email: r.email, owner: r.owner, ownerName: r.ownerName, lastActivityAt: r.lastActivityAt, dateAdded: r.dateAdded }, { showAccount, nowMs: now });
         const items: MenuItem[] = [
           { key: "show", label: "Show this person", onSelect: () => onOpen(i) },
+          ...(heldState.held[heldKey(r.locationId, r.contactId)] ? [{ key: "bring", label: "Bring back (set aside on Today)", onSelect: () => void heldState.bringBack(heldKey(r.locationId, r.contactId), r.name) }] : []),
           { key: "call", label: r.dnd ? "Call (asked not to be contacted)" : "Call in your CRM", onSelect: () => actions.call(p), disabled: !r.phone, hint: r.phone ? undefined : "No phone number" },
           { key: "email", label: r.dnd ? "Email (asked not to be contacted)" : "Email in your CRM", onSelect: () => actions.email(p), disabled: !r.email, hint: r.email ? undefined : "No email address" },
           { key: "crm", label: "Open in your CRM", onSelect: () => { window.open(r.url, "_blank", "noopener,noreferrer"); } },
@@ -71,5 +75,6 @@ export function PersonRows({ rows, showAccount, actions, onOpen, testId = "peopl
         );
       })}
     </ul>
+    </>
   );
 }

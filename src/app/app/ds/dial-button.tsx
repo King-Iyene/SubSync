@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useState, useSyncExternalStore } from "react";
+import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 import { dialPlan, dialWarnings, mustStop, validateTemplate, VENDORS, type DialerChoice } from "@/lib/people/dial";
 import { useApiClient } from "../session";
 
@@ -9,6 +9,8 @@ import { useApiClient } from "../session";
 // builds no telephony. Before any dial the person is told if the contact asked not to be contacted, or if it is outside calling hours where the account is.
 
 let current: DialerChoice | null = null;
+let chosen = true; // true until the server says this person has never answered, so nothing asks before it knows
+let asking: ((c: DialerChoice) => void) | null = null;
 
 /** Tells the open lead panel that a call was just started, so "Log how the call went" opens and the result can be written to the CRM. */
 export const CALL_STARTED = "subsync:call-started";
@@ -25,28 +27,32 @@ export function useDialer() {
   useEffect(() => {
     if (current !== null || asked) return;
     asked = true;
-    api.get<DialerChoice>("people/dialer").then((r) => { current = r; emit(); }).catch(() => { current = { provider: "crm" }; emit(); });
+    api.get<DialerChoice & { chosen?: boolean }>("people/dialer").then((r) => { chosen = r.chosen !== false; current = { provider: r.provider, vendor: r.vendor, template: r.template }; emit(); }).catch(() => { current = { provider: "crm" }; emit(); });
   }, [api]);
   const set = async (next: DialerChoice) => {
     const before = current;
-    try { await api.put("people/dialer", next); current = next; emit(); } catch (e) { current = before; emit(); throw new Error((e as Error).message || "Could not save the dialer choice. Try again."); }
+    try { await api.put("people/dialer", next); current = next; chosen = true; emit(); } catch (e) { current = before; emit(); throw new Error((e as Error).message || "Could not save the dialer choice. Try again."); }
   };
   const c = choice ?? { provider: "crm" as const };
-  return { provider: c.provider, choice: c, set };
+  /** Runs `go` with the person's choice. The first time ever, asks "How do you make calls?" first (see DialerAskHost) and continues with the answer. */
+  const withChoice = (go: (c: DialerChoice) => void) => { if (!chosen && choice && asking === null) { asking = go; emit(); } else go(c); };
+  return { provider: c.provider, choice: c, set, withChoice };
 }
 
 export function DialButton({ phone, contactUrl, dnd, timeZone, compact }: { phone: string | null | undefined; contactUrl: string | null | undefined; dnd?: boolean; timeZone?: string | null; compact?: boolean }) {
-  const { choice } = useDialer();
+  const { choice, withChoice } = useDialer();
   const [open, setOpen] = useState(false);
   const plan = dialPlan(choice, { phone, contactUrl });
   if (!plan.href) return <span className="text-xs text-muted-foreground">{plan.note}</span>;
   const href = plan.href;
   const warnings = open ? dialWarnings({ dnd: dnd === true, phone, timeZone: timeZone ?? null, now: new Date() }) : [];
   const go = () => { window.open(href, plan.provider === "phone" ? "_self" : "_blank", "noopener,noreferrer"); setOpen(false); announceCall(); };
-  const press = () => {
+  const press = () => withChoice((c) => {
+    const p = dialPlan(c, { phone, contactUrl });
     const w = dialWarnings({ dnd: dnd === true, phone, timeZone: timeZone ?? null, now: new Date() });
-    if (w.length === 0) go(); else setOpen(true);
-  };
+    if (!p.href) return;
+    if (w.length === 0) { window.open(p.href, p.provider === "phone" ? "_self" : "_blank", "noopener,noreferrer"); announceCall(); } else setOpen(true);
+  });
   return (
     <span className="inline-flex min-w-0 flex-col items-start gap-1">
       <button type="button" onClick={press} className="min-h-9 cursor-pointer text-left text-sm font-medium text-primary underline underline-offset-2" data-testid="dial-button">{plan.label}</button>
@@ -103,5 +109,54 @@ export function DialerSetting() {
       )}
       {msg && <span className="ml-2 text-xs text-destructive" role="alert">{msg}</span>}
     </div>
+  );
+}
+
+/** The one-time question, shown the first time a person presses any Call button. A native modal dialog: Escape and Tab stay inside it. Skipping saves the CRM's dialer and never asks again. */
+export function DialerAskHost() {
+  const { set } = useDialer();
+  useSyncExternalStore(subscribe, () => asking, () => null);
+  const ref = useRef<HTMLDialogElement>(null);
+  const [step, setStep] = useState<"ask" | "link">("ask");
+  const [vendor, setVendor] = useState("Other");
+  const [template, setTemplate] = useState("");
+  const [err, setErr] = useState<string | null>(null);
+  const go = asking;
+  useEffect(() => { const d = ref.current; if (go && d && !d.open) { setStep("ask"); setErr(null); d.showModal(); } if (!go && d?.open) d.close(); }, [go]);
+  if (!go) return null;
+  const done = async (c: DialerChoice) => {
+    try { await set(c); } catch (e) { setErr((e as Error).message); return; }
+    const next = asking; asking = null; emit(); ref.current?.close(); next?.(c);
+  };
+  const bad = template.trim() ? validateTemplate(template) : null;
+  const OPT = "block w-full cursor-pointer rounded-md border bg-card p-3 text-left hover:bg-accent focus-visible:outline-2";
+  return (
+    <dialog ref={ref} aria-labelledby="dialer-ask-title" onCancel={(e) => { e.preventDefault(); void done({ provider: "crm" }); }} className="m-auto w-[min(92vw,26rem)] rounded-lg border bg-popover p-4 text-popover-foreground backdrop:bg-black/40" data-testid="dialer-ask">
+      <h2 id="dialer-ask-title" className="text-base font-semibold">How do you make calls?</h2>
+      {step === "ask" ? (
+        <div className="mt-3 space-y-2">
+          <button type="button" autoFocus onClick={() => void done({ provider: "phone" })} className={OPT} data-testid="dialer-ask-phone"><span className="block text-sm font-medium">Button or extension on my screen (Kixie, Aloware...)</span><span className="block text-xs text-muted-foreground">Uses this computer or phone: Call opens the dialer already set up on this device.</span></button>
+          <button type="button" onClick={() => void done({ provider: "crm" })} className={OPT} data-testid="dialer-ask-crm"><span className="block text-sm font-medium">My CRM&apos;s dialer</span><span className="block text-xs text-muted-foreground">Call opens the contact in your CRM, where you call.</span></button>
+          <button type="button" onClick={() => setStep("link")} className={OPT} data-testid="dialer-ask-connected"><span className="block text-sm font-medium">A connected dialer link</span><span className="block text-xs text-muted-foreground">I will paste a link.</span></button>
+          <p className="flex items-center justify-between text-xs text-muted-foreground">Change anytime in Settings.
+            <button type="button" onClick={() => void done({ provider: "crm" })} className="min-h-9 cursor-pointer underline" data-testid="dialer-ask-skip">Skip</button></p>
+        </div>
+      ) : (
+        <div className="mt-3 space-y-2 text-sm">
+          <label className="block text-xs font-medium">Which dialer
+            <select value={vendor} onChange={(e) => setVendor(e.target.value)} className="ml-2 cursor-pointer rounded-lg border bg-background px-2 py-1 text-sm">{VENDORS.map((v) => <option key={v} value={v}>{v}</option>)}</select></label>
+          <label className="block text-xs font-medium">Link your dialer gave you
+            <input autoFocus value={template} onChange={(e) => setTemplate(e.target.value)} placeholder="Paste the link here, with {phone} where the number goes" className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-sm" data-testid="dialer-ask-template" /></label>
+          <p className="text-xs text-muted-foreground">It must start with https:// and contain {"{phone}"}. It only opens in a new tab when you press Call.</p>
+          {bad && !bad.ok && <p className="text-xs text-destructive" role="alert">{bad.error}</p>}
+          {err && <p className="text-xs text-destructive" role="alert">{err}</p>}
+          <p className="flex gap-3">
+            <button type="button" disabled={!template.trim() || (bad !== null && !bad.ok)} onClick={() => void done({ provider: "connected", vendor, template: template.trim() })} className="min-h-9 cursor-pointer rounded-md border bg-card px-3 font-medium hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50" data-testid="dialer-ask-save">Save and call</button>
+            <button type="button" onClick={() => setStep("ask")} className="min-h-9 cursor-pointer underline">Back</button>
+          </p>
+        </div>
+      )}
+      {err && step === "ask" && <p className="mt-2 text-xs text-destructive" role="alert">{err}</p>}
+    </dialog>
   );
 }

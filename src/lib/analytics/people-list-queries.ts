@@ -323,6 +323,12 @@ export async function getDialer(installationId: string, owner: string): Promise<
   return parseChoice(r?.filters);
 }
 
+/** Has this person ever chosen (or skipped) the dialer question? Until then the first Call press asks. */
+export async function hasDialerChoice(installationId: string, owner: string): Promise<boolean> {
+  const [r] = await sql()`select 1 x from saved_views where installation_id = ${installationId} and owner = ${owner} and page = 'people-prefs' and name = 'dialer'`;
+  return Boolean(r);
+}
+
 /** Stores only the choice (and, for a connected dialer, its name and link template). No token, no vendor key. */
 export async function setDialer(installationId: string, owner: string, choice: DialerChoice): Promise<void> {
   const db = sql();

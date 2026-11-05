@@ -3,6 +3,8 @@ import { saveContactNote, undoWrite, writeCallOutcome } from "../analytics/conta
 import { NOTE_MAX } from "../people/writeback";
 import { parseGranted } from "../scope-groups";
 import { sql } from "../db";
+import { loadActions } from "../analytics/today-store";
+import { lanesFor, resolveEvents } from "../analytics/today-state";
 import { parseOutcome } from "../analytics/call-intel";
 import { teamNames } from "../analytics/inbox-queries";
 import { forgetPeopleLists, hydratePeople, peopleCounts, peopleQueue, type ListRow } from "../analytics/people-queue-queries";
@@ -119,6 +121,21 @@ export async function handlePeopleQueue(ctx: Ctx, h: QueueHelpers): Promise<Resp
       await clearRecent(ctx.installationId, h.voter, what === "opened" || what === "all" ? what : "queries");
       return json({ ok: true });
     }
+  }
+
+  // The people the caller set aside on Today (Done or snoozed), keyed "<account>:<contact>", with the event the existing Today "undo" action brings back. Only the caller's own
+  // lane is read and only accounts the caller may see are returned.
+  if (m === "GET" && b === "held") {
+    const allowed = await h.allowed();
+    const lanes = lanesFor(ctx.kind, ctx.session.userId ?? `co:${ctx.session.companyId}`);
+    const { events } = await loadActions(ctx.installationId, lanes, Date.now());
+    const { holds } = resolveEvents(events.filter((e) => !allowed || allowed.includes(e.locationId)), Date.now(), lanes);
+    const out: Record<string, { eventId: number; until: number; action: string; rowKey: string; by: string | null }> = {};
+    for (const [id, hold] of Object.entries(holds)) {
+      const [kind, loc, person] = id.split(":");
+      if (kind === "replies" && loc && person && (!allowed || allowed.includes(loc))) out[`${loc}:${person}`] = { eventId: hold.eventId, until: hold.until, action: hold.action, rowKey: hold.rowKey, by: hold.by };
+    }
+    return json({ held: out });
   }
 
   if (m === "GET" && b === "tags") {
