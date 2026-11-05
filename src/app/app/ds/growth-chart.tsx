@@ -94,8 +94,8 @@ export function SourceDonut({ rows, total, selected, onPick, label, rangeWord = 
               onMouseEnter={() => setHot(it.source)} onMouseLeave={() => setHot(null)} onFocus={() => setHot(it.source)} onBlur={() => setHot(null)} />
           );
         })}
-        <text x={cx} y={cy - 2} textAnchor="middle" className="t-num" style={{ fontSize: 20, fill: "var(--t-ink)", fontWeight: 500 }}>{fmtStat(total)}</text>
-        <text x={cx} y={cy + 14} textAnchor="middle" style={{ fontSize: 9.5, fill: "var(--t-ink2)" }}>{rangeWord.length > 16 ? "in these dates" : rangeWord}</text>
+        <text x={cx} y={cy - 2} textAnchor="middle" pointerEvents="none" className="t-num" style={{ fontSize: 20, fill: "var(--t-ink)", fontWeight: 500 }}>{fmtStat(total)}</text>
+        <text x={cx} y={cy + 14} textAnchor="middle" pointerEvents="none" style={{ fontSize: 9.5, fill: "var(--t-ink2)" }}>{rangeWord.length > 16 ? "in these dates" : rangeWord}</text>
       </svg>
       {(() => {
         const h = items.find((i) => i.source === hot);
