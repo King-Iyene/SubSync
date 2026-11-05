@@ -46,7 +46,7 @@ test("every number opens its records, and the panel closes with the cross, Esc a
     else await page.getByTestId("records-overlay").click({ position: { x: 4, y: 4 } });
     await expect(panel(page), `${label}: closes with ${how}`).toHaveCount(0);
   }
-  expect(n).toBeGreaterThan(8);
+  expect(n).toBeGreaterThanOrEqual(8); // the raised-alerts day moved to the Proof chart (raised-cleared-mark), which today-tabs opens
 });
 
 test("the records panel: count matches the row total, search, sort, filters, maximise, export and the open buttons", async ({ page }) => {

@@ -103,7 +103,7 @@ test("Lead flow: steps and bands open their people, the numbers add up, and the 
   await expect(page.getByTestId("filter-problem")).toContainText("before");
   await page.getByTestId("filter-from").fill("2026-10-01"); await page.getByTestId("filter-to").fill(today);
   await expect(page.getByTestId("filter-problem")).toHaveCount(0);
-  await expect(page.getByTestId("flow-window")).toContainText("2026-10-01");
+  await expect(page.getByTestId("filter-window")).toContainText("2026-10-01");
   for (const p of ["this-month", "last-month"]) { await page.getByTestId("filter-preset").selectOption(p); await expect(page.getByTestId("filter-window")).toContainText(/\d{4}-\d{2}-\d{2}/); }
 });
 
@@ -111,7 +111,7 @@ test("Clients coming and going: current count, a clickable weekly chart, and one
   test.setTimeout(120_000);
   await openTab(page, "Clients coming and going");
   await expect(page.getByTestId("clients-current")).toContainText("clients now");
-  await expect(page.getByTestId("clients-since")).toContainText("Counts from");
+  await expect(page.getByTestId("clients-current")).toContainText("added");
   const bar = page.getByTestId("clients-chart-mark").filter({ hasNot: page.locator("[data-count='0']") }).first();
   await expect(bar).toHaveCSS("cursor", "pointer");
   const n = await bar.getAttribute("data-count");
@@ -137,9 +137,10 @@ test("Email leads: search, client filter, and a download without anyone marked d
   await expect(box.getByTestId("emails-count")).toBeVisible({ timeout: 45_000 });
   await expect(box.getByTestId("emails-download")).toHaveCSS("cursor", "pointer");
   const total = await box.getByTestId("emails-count").innerText();
-  await box.getByTestId("emails-search").fill("gmail");
+  const domain = ((await box.getByTestId("emails-row").first().innerText()).match(/@([a-z0-9.-]+\.[a-z]+)/i) ?? [])[1] ?? "example";
+  await box.getByTestId("emails-search").fill(domain);
   await expect(box.getByTestId("emails-count")).not.toHaveText(total);
-  for (const row of await box.getByTestId("emails-row").all()) await expect(row).toContainText(/gmail/i);
+  for (const row of await box.getByTestId("emails-row").all()) await expect(row).toContainText(new RegExp(domain.replace(/\./g, "\\."), "i"));
   const [download] = await Promise.all([page.waitForEvent("download"), box.getByTestId("emails-download").click()]);
   expect(download.suggestedFilename()).toBe("email-leads.csv");
   const text = (await (await download.createReadStream()).toArray()).join("");

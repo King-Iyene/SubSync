@@ -40,8 +40,10 @@ test("agency owner: each of the six tabs switches, shows its content, and its fi
     await expect(none).toContainText("reply window");
     await expect(none).toContainText(/Already late|Nothing is late either/);
   } else {
-    await expect(page.getByTestId("coming-block")).toBeVisible();
-    await drill(page, "coming-next");
+    await expect(page.getByTestId("coming-headline")).toBeVisible();
+    await panel(page).locator("[data-testid^=coming-open-]").first().click();
+    await expect(page.getByTestId("records-panel")).toBeVisible();
+    await page.keyboard.press("Escape");
   }
   await page.getByRole("tab", { name: "Proof" }).click();
   await expect(page.getByTestId("today-proof")).toBeVisible();
