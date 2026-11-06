@@ -1,4 +1,4 @@
-import { sendEmail } from "../email";
+import { realTransports } from "../notifications/transports";
 import { isLive } from "../live-flags";
 import { postToSlack } from "../notify";
 import { sql } from "../db";
@@ -50,7 +50,8 @@ export async function deliver(installationId: string, s: DigestSettings, n: Numb
   const subject = o.test ? `Test: ${m.subject}` : m.subject;
   if (s.email && s.recipients.length) {
     const to = o.test ? s.recipients.slice(0, 1) : s.recipients;
-    for (const addr of to) await sendEmail(addr, { subject, text: m.text, html: `<p>${esc(m.text).replace(/\n\n/g, "</p><p>").replace(/\n/g, "<br>")}</p>` });
+    const mailer = realTransports(installationId, () => null);
+    for (const addr of to) await mailer.email(addr, { subject, text: m.text, html: `<p>${esc(m.text).replace(/\n\n/g, "</p><p>").replace(/\n/g, "<br>")}</p>` }, []);
     out.push({ channel: "email", to: to.length, live: isLive("SEND_EMAIL_LIVE") });
   }
   if (s.slack) {
