@@ -108,7 +108,7 @@ export function SpeedView({ go }: { go: GoFn }) {
       <header className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 print:hidden">
         <div className="mr-auto min-w-0">
           <h1 className="text-[1.65rem] font-semibold leading-tight tracking-tight">Speed to lead</h1>
-          <p className="mt-1 max-w-2xl text-sm text-muted-foreground" data-testid="page-subtitle">How long new leads wait for a first reply. SubSync measures it and never sends a reply.</p>
+          <p className="mt-1 max-w-2xl text-sm text-muted-foreground" data-testid="page-subtitle">How long new leads wait for a first reply. SubSync measures this; it never sends a reply.</p>
         </div>
         <GuideButton onClick={() => setGuide(true)} />
         <PopMenu label="More" items={menu} testId="speed-more" triggerClassName={MORE_TRIGGER}>More<ChevronDown aria-hidden className="size-3.5" /></PopMenu>
