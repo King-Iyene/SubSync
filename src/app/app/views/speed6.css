@@ -68,7 +68,7 @@
 
 /* bars and mini histograms */
 .s6-bars { display: flex; align-items: flex-end; gap: 3px; height: 72px; }
-.s6-bars > div { flex: 1; min-width: 3px; border-radius: 3px 3px 0 0; background: linear-gradient(180deg, var(--s6-cyan), rgba(34, 211, 238, 0.35)); transform-origin: bottom; animation: s6-grow 420ms ease both; }
+.s6-bars > div, .s6-bars > button { flex: 1; min-width: 3px; border-radius: 3px 3px 0 0; background: linear-gradient(180deg, var(--s6-cyan), rgba(34, 211, 238, 0.35)); transform-origin: bottom; animation: s6-grow 420ms ease both; }
 .s6-bars[data-tone="violet"] > div { background: linear-gradient(180deg, var(--s6-violet), rgba(167, 139, 250, 0.35)); }
 @keyframes s6-grow { from { transform: scaleY(0); } to { transform: scaleY(1); } }
 .s6-hbar { height: 10px; border-radius: 6px; background: rgba(36, 54, 89, 0.7); overflow: hidden; } .s6-hbar > i { display: block; height: 100%; border-radius: 6px; transition: width 600ms ease; }

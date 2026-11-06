@@ -147,18 +147,19 @@ export function ReasonCard({ multi, p }: { multi: boolean; p: Pulse }) {
   );
 }
 
-function Hist({ q, tip, data, tone, testId }: { q: string; tip: string; data: Array<{ day: string; n: number }>; tone?: "violet"; testId: string }) {
+function Hist({ q, tip, data, tone, testId, multi, win, kind }: { q: string; tip: string; data: Array<{ day: string; n: number }>; tone?: "violet"; testId: string; multi: boolean; win: { from: string; to: string }; kind: "day" | "replyDay" }) {
+  const { open, node } = useListPopup(multi);
   const max = Math.max(1, ...data.map((d) => d.n));
   const total = data.reduce((s, d) => s + d.n, 0);
   return (
     <Q q={q} testId={testId} tip={tip}>
       <p className="s6-big mb-3" data-testid={`${testId}-total`}><CountUp value={total} /></p>
-      <div className="s6-bars" data-tone={tone} role="img" aria-label={`${q} ${total} in all, by day`}>{data.map((d) => <div key={d.day} style={{ height: `${Math.max(d.n ? 6 : 2, (d.n / max) * 100)}%`, opacity: d.n ? 1 : 0.25 }} title={`${d.day}: ${d.n}`} />)}</div>
+      <div className="s6-bars" data-tone={tone} role="group" aria-label={`${q} ${total} in all, by day`}>{data.map((d) => <button type="button" key={d.day} disabled={d.n === 0} data-testid={`${testId}-bar`} aria-label={`${d.day}: ${d.n}. Open the people.`} data-tip={`${d.day}: ${d.n}. Click to see the people.`} onClick={() => open(`${q} ${d.day}`, { status: "all", [kind]: d.day, ...(kind === "day" ? { from: d.day, to: d.day } : win) })} style={{ height: `${Math.max(d.n ? 6 : 2, (d.n / max) * 100)}%`, opacity: d.n ? 1 : 0.25, border: 0, padding: 0, cursor: d.n ? "pointer" : "default" }} />)}</div>{node}
       <p className="s6-label mt-2 flex justify-between"><span>{data[0]?.day.slice(5)}</span><span>{data[data.length - 1]?.day.slice(5)}</span></p>
     </Q>
   );
 }
-export const HistCards = ({ p }: { p: Pulse }) => (<><Hist testId="hist-leads" q="How many new leads came in?" tip="New leads by day (UTC days) in these dates." data={p.leadsByDay} /><Hist testId="hist-replies" q="When did first replies happen?" tone="violet" tip="First replies by a person, by day, for leads that arrived in these dates." data={p.repliesByDay} /></>);
+export const HistCards = ({ p, multi, win }: { p: Pulse; multi: boolean; win: { from: string; to: string } }) => (<><Hist testId="hist-leads" q="How many new leads came in?" tip="New leads by day (UTC days) in these dates. Click a bar to see the people." data={p.leadsByDay} multi={multi} win={win} kind="day" /><Hist testId="hist-replies" q="When did first replies happen?" tone="violet" tip="First replies by a person, by day, for leads that arrived in these dates. Click a bar to see the people." data={p.repliesByDay} multi={multi} win={win} kind="replyDay" /></>);
 
 export function PersonCard({ multi, p }: { multi: boolean; p: Pulse }) {
   const [pick, setPick] = useState<{ title: string; rows: LeadRow[]; n: number } | null>(null);
@@ -267,7 +268,7 @@ export function PaceTab6({ multi, slow, old }: { multi: boolean; slow: SlowProps
             <FlowCard multi={multi} />
             {p ? <ReadyCard multi={multi} p={p} /> : <SkeletonRows rows={3} label="Ranking the leads..." />}
             <WhoWasSlow multi={multi} {...slow} />
-            {p && <><VelocityCard p={p} /><ReasonCard multi={multi} p={p} /><HistCards p={p} /></>}
+            {p && <><VelocityCard p={p} /><ReasonCard multi={multi} p={p} /><HistCards p={p} multi={multi} win={slow.win} /></>}
           </div>
           {old}
         </Fold>

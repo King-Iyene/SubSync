@@ -118,7 +118,7 @@ export async function handleSpeedPart(ctx: Ctx, h: SpeedHelpers): Promise<Respon
     const owner = ownerP === "me" || ownerP === "none" ? ownerP : null;
     const out = await speedList({
       installationId: ctx.installationId, allowed, targetMinutes, now, meId: ctx.session.userId ?? null, status, win, person: seePeople ? personP : null, account: null, owner,
-      noSource: sp.get("source") === "none", week, q: (sp.get("q") ?? "").slice(0, 80), sort: sortP as LeadSort, page: int(sp.get("page"), 0), size: int(sp.get("size"), 25),
+      noSource: sp.get("source") === "none", week, day: /^\d{4}-\d{2}-\d{2}$/.test(sp.get("day") ?? "") ? sp.get("day") : null, replyDay: /^\d{4}-\d{2}-\d{2}$/.test(sp.get("replyDay") ?? "") ? sp.get("replyDay") : null, q: (sp.get("q") ?? "").slice(0, 80), sort: sortP as LeadSort, page: int(sp.get("page"), 0), size: int(sp.get("size"), 25),
     });
     return json(withUrls(out, links.contact));
   }

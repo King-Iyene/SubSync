@@ -98,6 +98,9 @@ test("Pace: the animated journey, drop-off buckets and steps open their people, 
   await page.getByTestId("s6-more").click();
   await expect(page.getByTestId("velocity-value")).toContainText("3.5");
   await expect(page.getByTestId("hist-leads-total")).toHaveText("45");
+  await page.getByTestId("hist-leads-bar").nth(3).click();
+  await expect(page.getByTestId("speed-list")).toBeVisible();
+  await page.keyboard.press("Escape");
   // a reason bar opens exactly its people, and each waiting lead carries its delay reason
   await page.getByTestId("reason-bar").first().click();
   await expect(page.getByTestId("pulse-list-count")).toContainText("2 leads waiting");
