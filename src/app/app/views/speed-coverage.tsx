@@ -26,8 +26,8 @@ const Card = ({ id, title, tip, children }: { id: string; title: string; tip?: s
 
 type Cov = {
   now: number; eventsStored: number;
-  missed: { total: number; recovered15: number; unrecovered: number; dollars: number; rows: Array<LeadRow & { calledAt: number; dollars: number; callState: MissedCall["status"] }>; audit: { missed: number; textedWithin60: number; share: number | null; enough: boolean } };
-  night: { lost: number; countedDollars: number; estimate: { amount: number; line: string } | null; hoursToCover: Array<{ dow: number; hour: number; leads: number }>; afterLeads: number; answeredSameNight: number; share: number | null; cover: Array<{ userId: string; name: string; touches: number }> };
+  missed: { recoveredRows: LeadRow[]; total: number; recovered15: number; unrecovered: number; dollars: number; rows: Array<LeadRow & { calledAt: number; dollars: number; callState: MissedCall["status"] }>; audit: { missed: number; textedWithin60: number; share: number | null; enough: boolean } };
+  night: { rows: LeadRow[]; lost: number; countedDollars: number; estimate: { amount: number; line: string } | null; hoursToCover: Array<{ dow: number; hour: number; leads: number }>; afterLeads: number; answeredSameNight: number; share: number | null; cover: Array<{ userId: string; name: string; touches: number }> };
   best: { hours: Array<{ hour: number; sent: number; replied: number; rate: number | null }>; best: Array<{ hour: number; sent: number; replied: number; rate: number | null }>; enough: boolean; tries: number };
   channels: ChannelRow[];
   routing: { enough: boolean; fair: number | null; noLeads: Array<{ userId: string; name: string }>; overloaded: Array<{ userId: string; name: string; leads: number }> };
@@ -48,6 +48,7 @@ export function CoverageTab({ multi }: { multi: boolean }) {
       <Card id="missed-calls" title="Missed calls nobody called back" tip="A missed call counts as recovered when anyone (a person or an automatic text) reached out within 15 minutes. Dollars are the open deals of those callers, counted.">
         <p className="t-display" data-testid="missed-headline">{m.unrecovered === 0 ? (m.total === 0 ? "No missed calls recorded in the last 30 days." : "Every missed call was followed up within 15 minutes.") : `${m.unrecovered} missed ${m.unrecovered === 1 ? "call" : "calls"} had no callback or text within 15 minutes${m.dollars > 0 ? `: ${usd(m.dollars)} of open deals` : ""}.`}</p>
         <p className="t-small t-quiet mt-1" data-testid="textback-audit">{m.audit.enough ? `${m.audit.share}% of missed calls got a text inside 60 seconds (${m.audit.textedWithin60} of ${m.audit.missed}).` : "A text-back check needs at least 5 missed calls."}</p>
+        <CountLinks m={m} n={n} multi={multi} />
         {m.rows.length > 0 && <div className="mt-3"><LeadRows rows={m.rows} showAccount={multi} actions={actions} testId="missed-rows" head={false} />{actions.drawer}</div>}
       </Card>
 
@@ -193,4 +194,26 @@ function RoutingCard() {
 
 export function RulesTab(p: { who: string; waiting: number; dollars: number | null; typical: string | null; canChange: boolean; targetMinutes: number; go: GoFn; multi?: boolean; accounts?: Array<{ id: string; name: string }> }) {
   return <RulesTab6 {...p} multi={p.multi ?? false} rest={<><RoutingCard /><ProofReport /></>} />;
+}
+
+/** The counts under the missed-call and overnight headlines, each a button that opens exactly those people. */
+function CountLinks({ m, n, multi }: { m: Cov["missed"]; n: Cov["night"]; multi: boolean }) {
+  const [pick, setPick] = useState<{ title: string; rows: LeadRow[]; total: number } | null>(null);
+  const items = [
+    { label: "recovered within 15 minutes", n: m.recovered15, rows: m.recoveredRows, id: "recovered" },
+    { label: "not called back", n: m.unrecovered, rows: m.rows, id: "unrecovered" },
+    { label: "after-hours leads that waited over 12 hours", n: n.lost, rows: n.rows, id: "night" },
+  ];
+  return (
+    <>
+      <p className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-sm" data-testid="count-links">
+        {items.map((x) => x.n > 0 ? <button key={x.id} type="button" className="s6-link underline decoration-dotted underline-offset-4" data-testid={`count-${x.id}`} data-tip="Click to see the people" onClick={() => setPick({ title: x.label, rows: x.rows, total: x.n })}>{x.n.toLocaleString("en-US")} {x.label}</button> : null)}
+      </p>
+      {pick && <SidePopup label={pick.title} onClose={() => setPick(null)}><CountList rows={pick.rows} total={pick.total} title={pick.title} multi={multi} /></SidePopup>}
+    </>
+  );
+}
+function CountList({ rows, total, title, multi }: { rows: LeadRow[]; total: number; title: string; multi: boolean }) {
+  const actions = useLeadActions(rows);
+  return (<div data-testid="count-list"><p className="t-small t-quiet mb-2" data-testid="count-list-count">{total.toLocaleString("en-US")} {title}{total > rows.length ? `. The first ${rows.length} are shown.` : "."}</p><LeadRows rows={rows} showAccount={multi} actions={actions} testId="count-rows" />{actions.drawer}</div>);
 }
