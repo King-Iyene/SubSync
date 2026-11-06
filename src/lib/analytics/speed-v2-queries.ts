@@ -1,15 +1,15 @@
-import { waitingMoney } from "./waiting-money-queries";
+import { autoVsHumanSql, listPage, noSourceSql, peopleGrouped, summaries, suggestions, topWaiting, waitingDeals, waitingNow, weeklyBars, type ListFilter, type Scope } from "./speed-sql";
 import { waitingMoneyLine } from "./waiting-money";
 import { sql } from "../db";
 import { MIN_CLOSED_DEALS } from "./metrics";
 import { EXCLUSION_LABEL, type Exclusion } from "./lead-rules";
 import { resolveUser, type PersonLabel } from "./people-labels";
 import { leadOut, type LeadOut, type LoadedRow, type Lookups } from "./speed-parts";
-import { loadLookups, loadRows, loadTargets } from "./speed-queries";
-import { autoVsHuman, hasNoSource, judge, progressToward, summarise, unknownSource, weeklyTrend, MIN_FOR_MEDIAN, type Summary } from "./speed-intel";
+import { loadLookups, loadTargets } from "./speed-queries";
+import { progressToward, MIN_FOR_MEDIAN, type Summary } from "./speed-intel";
 import {
-  compareAccounts, comparePeople, costEstimate, costFormula, costLine, DAY, headlineOf, judgedCount, nextBestAction, pageOf, parseTarget, pctOf, selectLeads, suggestReplier, typicalLine,
-  waitingFacts, WAITING_WINDOW_DAYS, type AccountFacts, type LeadQuery, type LeadSort, type LeadStatusFilter, type Suggestion,
+  compareAccountsOf, comparePeopleOf, costEstimate, costFormula, costLine, DAY, headlineOf, judgedCount, MAX_PAGE, nextBestAction, pageOf, parseTarget, pctOf, suggestReplier, typicalLine,
+  WAITING_WINDOW_DAYS, type WaitingFacts, type AccountFacts, type LeadSort, type LeadStatusFilter, type Suggestion,
 } from "./speed-v2";
 import type { Win } from "./speed-window";
 
@@ -42,11 +42,6 @@ export function suggestionsFor(rows: readonly LoadedRow[], accounts: Iterable<st
   return out;
 }
 
-const personOut = (userId: string, rows: readonly LoadedRow[], lk: Lookups): PersonLabel => {
-  const sample = rows.find((r) => r.userId === userId);
-  return resolveUser(userId, lk.team, sample ? lk.usersAccess.get(sample.locationId) : null);
-};
-
 /** What the won and lost deals of each account say about its average deal and win rate (the same rule as the Account audit: a win rate needs 20 closed deals). */
 export async function accountFacts(installationId: string, allowed: string[] | null): Promise<AccountFacts[] | null> {
   try {
@@ -69,8 +64,6 @@ export async function accountFacts(installationId: string, allowed: string[] | n
     return null;
   }
 }
-
-const inWindow = (rows: readonly LoadedRow[], w: Pick<Win, "fromMs" | "toMs">) => rows.filter((r) => r.leadAt >= w.fromMs && r.leadAt < w.toMs);
 const weekRange = (now: number, i: number) => ({ start: now - (i + 1) * 7 * DAY, end: now - i * 7 * DAY });
 
 export type HomeInput = {
@@ -79,44 +72,45 @@ export type HomeInput = {
   seePeople: boolean; canChangeTarget: boolean;
 };
 
-/** Everything the first screen shows, bounded: 5 rows of each list, 8 weekly bars, one line of cost. The long lists come from speedList and speedCompare. */
+/** Everything the first screen shows, bounded: 5 rows of each list, 8 weekly bars, one line of cost. Every figure is an SQL aggregate (speed-sql.ts), exact at 100,000+ leads per account. The long lists come from speedList and speedCompare. */
 export async function speedHome(i: HomeInput) {
   const db = sql();
-  const [{ locs, lk }, targets, facts, left] = await Promise.all([
+  const targets = await loadTargets(db, i.installationId);
+  const sc = (fromMs: number, toMs: number): Scope => ({ installationId: i.installationId, allowed: i.allowed, targetMinutes: i.targetMinutes, now: i.now, fromMs, toMs, targetsReady: targets.ready });
+  const winS = sc(i.win.fromMs - 1, Math.min(i.win.toMs, i.now + DAY));
+  const waitS = sc(i.now - WAITING_WINDOW_DAYS * DAY, i.now + DAY);
+  const [{ locs, lk }, facts, left, sumWin, sumCmp, trend, wn, wd, top, ppl, auto, noSrc] = await Promise.all([
     loadLookups(db, i.installationId, i.allowed, i.targetMinutes, i.now),
-    loadTargets(db, i.installationId),
     accountFacts(i.installationId, i.allowed),
     db`select t.excluded, count(*)::int n from lead_touches t join locations l on l.installation_id = t.installation_id and l.location_id = t.location_id and not l.ignored
        where t.installation_id = ${i.installationId} and t.excluded is not null and t.lead_at > ${new Date(i.win.fromMs)} and t.lead_at < ${new Date(i.win.toMs)}
          ${i.allowed ? db`and t.location_id = any(${i.allowed}::text[])` : db``} group by 1 order by 2 desc`.catch(() => []),
+    summaries(db, winS),
+    i.cmp ? summaries(db, sc(i.cmp.fromMs - 1, Math.min(i.cmp.toMs, i.now + DAY))) : Promise.resolve(null),
+    weeklyBars(db, sc(i.now - HISTORY_DAYS * DAY, i.now + DAY)),
+    waitingNow(db, waitS),
+    waitingDeals(db, waitS).catch(() => null),
+    topWaiting(db, waitS, 5),
+    i.seePeople ? peopleGrouped(db, winS) : Promise.resolve([]),
+    autoVsHumanSql(db, winS),
+    noSourceSql(db, winS),
   ]);
-  const earliest = Math.min(i.win.fromMs, i.cmp?.fromMs ?? Infinity, i.now - HISTORY_DAYS * DAY, i.now - WAITING_WINDOW_DAYS * DAY);
-  const all = await loadRows(db, i.installationId, i.allowed, earliest, i.now + DAY);
-  const o = { targetMinutes: i.targetMinutes, now: i.now, accounts: lk.locationNames };
-
-  // ---- right now: the leads waiting (last 14 days), the one counting rule Today uses ----
-  const recent = all.filter((r) => r.leadAt > i.now - WAITING_WINDOW_DAYS * DAY);
-  const wf = waitingFacts(recent, o);
-  const waitingAll = selectLeads(recent, o, { status: "waiting" });
-  const sugg = suggestionsFor(inWindow(all, i.win), new Set(waitingAll.slice(0, 5).map((x) => x.row.locationId)));
-  const waitingRows = waitingAll.slice(0, 5).map((x) => rowOut(x.row, x.status, lk, sugg));
-  const byAccount = new Map<string, number>();
-  for (const x of waitingAll) byAccount.set(x.row.locationId, (byAccount.get(x.row.locationId) ?? 0) + 1);
-  const cost = costEstimate(byAccount, facts ?? []);
-  // The COUNTED money of the people waiting (a fact), apart from the estimate above; and which clients they are in, so the page can list them.
-  const money = await waitingMoney(i.installationId, waitingAll.map((x) => `${x.row.locationId}:${x.row.contactId}`));
-  const clients = [...byAccount].map(([locationId, count]) => ({ locationId, name: lk.locationNames.get(locationId) ?? "Client account", count })).sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+  const wf: WaitingFacts = wn.facts;
+  const sugg = await suggestions(db, winS, [...new Set(top.map((x) => x.row.locationId))]);
+  const waitingRows = top.map((x) => rowOut(x.row, x.status, lk, sugg));
+  const cost = costEstimate(wn.byAccount, facts ?? []);
+  const money = wd ? { people: wf.waiting, peopleWithDeals: wd.peopleWithDeals, deals: wd.deals, dollars: wd.dollars, byLocation: [] } : null;
+  const clients = [...wn.byAccount].map(([locationId, count]) => ({ locationId, name: lk.locationNames.get(locationId) ?? "Client account", count })).sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
 
   // ---- the picture over the chosen window ----
-  const win = inWindow(all, i.win);
-  const summary = summarise(win, i.targetMinutes, i.now);
-  const cmpSummary: Summary | null = i.cmp ? summarise(inWindow(all, i.cmp), i.targetMinutes, i.now) : null;
-  const trend = weeklyTrend(all, i.targetMinutes, i.now);
-  const accountRows = compareAccounts(win, o);
-  const peopleRows = i.seePeople ? comparePeople(win) : [];
+  const summary = sumWin.overall;
+  const cmpSummary: Summary | null = sumCmp ? sumCmp.overall : null;
+  const accountRows = compareAccountsOf(sumWin.byLoc, lk.locationNames);
+  const peopleRows = i.seePeople ? comparePeopleOf(ppl) : [];
+  const personLoc = new Map(ppl.map((p) => [p.userId, p.locationId]));
   const multi = locs.length > 1;
   const slowest = accountRows.find((a) => a.ranked && a.hitRate !== null) ?? null;
-  const un = unknownSource(win.filter((r) => judge(r, i.targetMinutes, i.now) !== null));
+  const un = noSrc;
   const endsToday = i.win.to === new Date(i.now).toISOString().slice(0, 10);
   const windowWords = endsToday ? (i.win.days === 1 ? "last day" : `last ${i.win.days} days`) : "this period";
 
@@ -128,20 +122,20 @@ export async function speedHome(i: HomeInput) {
   const accountsView = accountRows.map((a) => ({ ...a, targetMinutes: targets.map.get(a.id) ?? i.targetMinutes, ownTarget: targets.map.has(a.id) }));
   return {
     now: i.now, targetMinutes: i.targetMinutes, targetsReady: targets.ready, canChangeTarget: i.canChangeTarget,
-    access: { ok: locs.filter((l) => l.speed_access === "ok").length, needsPermission: locs.filter((l) => l.speed_access === "needs_permission").map((l) => ({ locationId: l.location_id as string, name: lk.locationNames.get(l.location_id as string) as string })), total: locs.length },
+    access: { ok: locs.filter((l) => l.speed_access === "ok").length, needsPermission: locs.filter((l) => l.speed_access === "needs_permission").slice(0, 100).map((l) => ({ locationId: l.location_id as string, name: lk.locationNames.get(l.location_id as string) as string })), total: locs.length },
     accounts: locs.map((l) => ({ locationId: l.location_id as string, name: lk.locationNames.get(l.location_id as string) as string, targetMinutes: targets.map.get(l.location_id as string) ?? i.targetMinutes, ownTarget: targets.map.has(l.location_id as string) })).slice(0, multi ? 0 : 1),
-    waiting: { ...wf, headline: headlineOf(wf, multi), rows: waitingRows, clients, money: { line: waitingMoneyLine(money, "Next best step: reply to the lead that has waited longest."), dollars: money?.dollars ?? 0, peopleWithDeals: money?.peopleWithDeals ?? 0, deals: money?.deals ?? 0 }, cost: { line: costLine(cost), formula: costFormula(cost), amount: cost.amount, leftOutAccounts: cost.leftOutAccounts } },
+    waiting: { ...wf, headline: headlineOf(wf, multi), rows: waitingRows, clients: clients.slice(0, 50), clientsTotal: clients.length, money: { line: waitingMoneyLine(money, "Next best step: reply to the lead that has waited longest."), dollars: money?.dollars ?? 0, peopleWithDeals: money?.peopleWithDeals ?? 0, deals: money?.deals ?? 0 }, cost: { line: costLine(cost), formula: costFormula(cost), amount: cost.amount, leftOutAccounts: cost.leftOutAccounts } },
     window: { from: i.win.from, to: i.win.to, days: i.win.days, words: windowWords },
     summary: { ...summary, judged: judgedCount(summary), pct: pctOf(summary.withinTarget, judgedCount(summary)), typical: progressToward(summary.answered, MIN_FOR_MEDIAN, "replies"), typicalLine: typicalLine(summary, windowWords) },
     compare: cmpSummary && i.cmp ? { window: { from: i.cmp.from, to: i.cmp.to }, summary: { ...cmpSummary, judged: judgedCount(cmpSummary) } } : null,
     trend: trend.map((w, k) => ({ ...w, index: trend.length - 1 - k })),
-    autoVsHuman: autoVsHuman(win, i.targetMinutes, i.now),
+    autoVsHuman: auto,
     noSource: { n: un.n, total: un.total, share: un.share, actionable: un.actionable },
     compareAccounts: { total: accountRows.length, rows: accountsView.slice(0, 5) },
-    comparePeople: { total: peopleRows.length, rows: peopleRows.slice(0, 5).map((p) => ({ ...p, ...personOut(p.userId, win, lk) })) },
+    comparePeople: { total: peopleRows.length, rows: peopleRows.slice(0, 5).map((p) => ({ ...p, ...resolveUser(p.userId, lk.team, lk.usersAccess.get(personLoc.get(p.userId) ?? "")) })) },
     leftOut: left.map((r) => ({ reason: r.excluded as string, label: EXCLUSION_LABEL[r.excluded as Exclusion] ?? (r.excluded as string), n: r.n as number })),
     next,
-    truncated: all.length >= SPEED_HOME_ROWS_CAP,
+    truncated: false,
   };
 }
 
@@ -153,36 +147,28 @@ export type ListInput = {
   q: string; sort: LeadSort; page: number; size: number;
 };
 
-/** The leads behind a number. Waiting leads (and "only an automatic message") are always about right now (the last 14 days); any other status needs its window. */
+/** The leads behind a number. Waiting leads (and "only an automatic message") are always about right now (the last 14 days); any other status needs its window. Cut in the database: where, order, limit, offset. */
 export async function speedList(i: ListInput) {
   const db = sql();
-  const { lk } = await loadLookups(db, i.installationId, i.allowed, i.targetMinutes, i.now);
+  const [{ lk }, targets] = await Promise.all([loadLookups(db, i.installationId, i.allowed, i.targetMinutes, i.now), loadTargets(db, i.installationId)]);
   const nowStatus = i.status === "waiting" || i.status === "onlyAuto";
   const fromMs = nowStatus && !i.win ? i.now - WAITING_WINDOW_DAYS * DAY : i.week !== null ? weekRange(i.now, i.week).start : (i.win?.fromMs ?? i.now - 30 * DAY);
   const toMs = i.week !== null ? weekRange(i.now, i.week).end + 1 : i.win?.toMs ?? i.now + DAY;
-  const all = await loadRows(db, i.installationId, i.allowed, fromMs, Math.min(toMs, i.now + DAY));
-  const o = { targetMinutes: i.targetMinutes, now: i.now, accounts: lk.locationNames };
-  const base: LeadQuery = {
-    status: i.status, person: i.person, account: i.account, q: i.q, sort: i.sort,
-    extra: (r) => {
-      if (nowStatus && !i.win && r.leadAt <= i.now - WAITING_WINDOW_DAYS * DAY) return false;
-      if (i.week !== null) { const w = weekRange(i.now, i.week); if (!(r.leadAt > w.start && r.leadAt <= w.end)) return false; }
-      if (i.day && new Date(r.leadAt).toISOString().slice(0, 10) !== i.day) return false;
-      if (i.replyDay && !(r.touchAt !== null && new Date(r.touchAt).toISOString().slice(0, 10) === i.replyDay)) return false;
-      return i.noSource ? hasNoSource(r) : true;
-    },
+  const allowed = i.account ? (!i.allowed || i.allowed.includes(i.account) ? [i.account] : []) : i.allowed;
+  const s: Scope = { installationId: i.installationId, allowed, targetMinutes: i.targetMinutes, now: i.now, fromMs, toMs: Math.min(toMs, i.now + DAY), targetsReady: targets.ready };
+  const size = Math.min(MAX_PAGE, Math.max(1, Math.floor(Number.isFinite(i.size) ? i.size : 25)));
+  const f: ListFilter = {
+    status: i.status, person: i.person, owner: i.owner === "me" ? (i.meId ?? "__nobody__") : i.owner, meId: i.meId, q: i.q, sort: i.sort, noSource: i.noSource,
+    newerThanMs: nowStatus && !i.win ? i.now - WAITING_WINDOW_DAYS * DAY : null, weekRange: i.week !== null ? weekRange(i.now, i.week) : null, day: i.day ?? null, replyDay: i.replyDay ?? null,
   };
-  const owner = i.owner === "me" ? (i.meId ?? "__nobody__") : i.owner;
-  const everyone = selectLeads(all, o, base);
-  const chosen = owner ? selectLeads(all, o, { ...base, owner }) : everyone;
-  const pg = pageOf(chosen, i.page, i.size);
-  const sugg = suggestionsFor(all, new Set(pg.rows.map((x) => x.row.locationId)));
+  const pg = await listPage(db, s, f, i.page, size);
+  const sugg = await suggestions(db, s, [...new Set(pg.rows.map((x) => x.row.locationId))]);
   return {
     total: pg.total, page: pg.page, pages: pg.pages, from: pg.from, to: pg.to,
     // How many the chips would show: all of them, the ones nobody owns, and the ones that belong to the person asking.
-    facets: { all: everyone.length, noOwner: everyone.filter((x) => x.row.assignedTo === null).length, mine: i.meId ? everyone.filter((x) => x.row.assignedTo === i.meId).length : 0, never: everyone.filter((x) => x.status === "waiting" && (i.now - x.row.leadAt) / 60_000 > 3 * 24 * 60).length },
+    facets: pg.facets,
     rows: pg.rows.map((x) => rowOut(x.row, x.status, lk, sugg)),
-    truncated: all.length >= SPEED_HOME_ROWS_CAP,
+    truncated: false,
   };
 }
 
@@ -192,16 +178,18 @@ export type CompareInput = { installationId: string; allowed: string[] | null; t
 export async function speedCompare(i: CompareInput) {
   const db = sql();
   const [{ lk }, targets] = await Promise.all([loadLookups(db, i.installationId, i.allowed, i.targetMinutes, i.now), loadTargets(db, i.installationId)]);
-  const rows = inWindow(await loadRows(db, i.installationId, i.allowed, i.win.fromMs, Math.min(i.win.toMs, i.now + DAY)), i.win);
+  const s: Scope = { installationId: i.installationId, allowed: i.allowed, targetMinutes: i.targetMinutes, now: i.now, fromMs: i.win.fromMs - 1, toMs: Math.min(i.win.toMs, i.now + DAY), targetsReady: targets.ready };
   const q = i.q.trim().toLowerCase();
   if (i.by === "person") {
     if (!i.seePeople) return { by: "person" as const, total: 0, page: 0, pages: 1, from: 0, to: 0, rows: [] };
-    const named = comparePeople(rows).map((p) => ({ ...p, ...personOut(p.userId, rows, lk) })).filter((p) => !q || p.label.toLowerCase().includes(q));
+    const ppl = await peopleGrouped(db, s);
+    const loc = new Map(ppl.map((p) => [p.userId, p.locationId]));
+    const named = comparePeopleOf(ppl).map((p) => ({ ...p, ...resolveUser(p.userId, lk.team, lk.usersAccess.get(loc.get(p.userId) ?? "")) })).filter((p) => !q || p.label.toLowerCase().includes(q));
     const pg = pageOf(named, i.page, i.size);
     return { by: "person" as const, total: pg.total, page: pg.page, pages: pg.pages, from: pg.from, to: pg.to, rows: pg.rows };
   }
-  const o = { targetMinutes: i.targetMinutes, now: i.now, accounts: lk.locationNames };
-  const accs = compareAccounts(rows, o).filter((a) => !q || a.name.toLowerCase().includes(q)).map((a) => ({ ...a, targetMinutes: targets.map.get(a.id) ?? i.targetMinutes, ownTarget: targets.map.has(a.id) }));
+  const { byLoc } = await summaries(db, s);
+  const accs = compareAccountsOf(byLoc, lk.locationNames).filter((a) => !q || a.name.toLowerCase().includes(q)).map((a) => ({ ...a, targetMinutes: targets.map.get(a.id) ?? i.targetMinutes, ownTarget: targets.map.has(a.id) }));
   const pg = pageOf(accs, i.page, i.size);
   return { by: "account" as const, total: pg.total, page: pg.page, pages: pg.pages, from: pg.from, to: pg.to, rows: pg.rows };
 }

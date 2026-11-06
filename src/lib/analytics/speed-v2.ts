@@ -169,9 +169,13 @@ export function judgedCount(s: Summary): number { return s.withinTarget + s.answ
 export function compareAccounts(rows: readonly LoadedRow[], o: { targetMinutes: number; now: number; accounts: Names }): CompareRow[] {
   const by = new Map<string, LoadedRow[]>();
   for (const r of rows) by.set(r.locationId, [...(by.get(r.locationId) ?? []), r]);
+  return compareAccountsOf(new Map([...by].map(([id, mine]) => [id, summarise(mine, o.targetMinutes, o.now)])), o.accounts);
+}
+/** The same ranking from summaries already worked out in the database (one per client account). */
+export function compareAccountsOf(by: ReadonlyMap<string, Summary>, accounts: Names): CompareRow[] {
+  const o = { accounts };
   const out: CompareRow[] = [];
-  for (const [id, mine] of by) {
-    const s = summarise(mine, o.targetMinutes, o.now);
+  for (const [id, s] of by) {
     const judged = judgedCount(s);
     if (judged === 0) continue;
     const ranked = judged >= MIN_JUDGED;
@@ -183,7 +187,11 @@ export function compareAccounts(rows: readonly LoadedRow[], o: { targetMinutes: 
 export type PersonRow = { userId: string; replies: number; medianSeconds: number | null; ranked: boolean; progress: string | null };
 /** People who sent a first reply. Ranked ones (3 or more replies) slowest typical first, so the person to talk to is on top; the rest follow with "2 of 3 replies so far". */
 export function comparePeople(rows: readonly LoadedRow[]): PersonRow[] {
-  const all = peopleProgress(rows as LoadedRow[]).map((p): PersonRow => ({ ...p, progress: p.ranked ? null : `${p.replies} of ${MIN_PER_PERSON} replies so far` }));
+  return comparePeopleOf(peopleProgress(rows as LoadedRow[]));
+}
+/** The same ranking from per-person reply counts and typical times already worked out in the database. */
+export function comparePeopleOf(people: ReadonlyArray<{ userId: string; replies: number; medianSeconds: number | null; ranked: boolean }>): PersonRow[] {
+  const all = people.map((p): PersonRow => ({ ...p, progress: p.ranked ? null : `${p.replies} of ${MIN_PER_PERSON} replies so far` }));
   const ranked = all.filter((p) => p.ranked).sort((a, b) => (b.medianSeconds as number) - (a.medianSeconds as number) || b.replies - a.replies || a.userId.localeCompare(b.userId));
   const rest = all.filter((p) => !p.ranked).sort((a, b) => b.replies - a.replies || a.userId.localeCompare(b.userId));
   return [...ranked, ...rest];

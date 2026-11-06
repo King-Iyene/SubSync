@@ -41,9 +41,14 @@ export function bucketOf(replySeconds: number | null): BookingKey {
 }
 
 export function bookingByReplyTime(leads: readonly BookingLead[]) {
-  const buckets: BookingBucket[] = BOOKING_BUCKETS.map((b) => ({ key: b.key, label: b.label, leads: 0, booked: 0, rate: null, enough: false }));
-  const at = new Map(buckets.map((b) => [b.key, b]));
-  for (const l of leads) { const b = at.get(bucketOf(l.replySeconds)) as BookingBucket; b.leads += 1; if (l.booked) b.booked += 1; }
+  const counts = new Map<BookingKey, { leads: number; booked: number }>();
+  for (const l of leads) { const k = bucketOf(l.replySeconds); const c = counts.get(k) ?? { leads: 0, booked: 0 }; c.leads += 1; if (l.booked) c.booked += 1; counts.set(k, c); }
+  return bookingFromCounts(counts);
+}
+/** The same chart from counts per bucket already worked out in the database (so 100,000 leads are never read one by one). */
+export function bookingFromCounts(counts: ReadonlyMap<BookingKey, { leads: number; booked: number }>) {
+  const buckets: BookingBucket[] = BOOKING_BUCKETS.map((b) => ({ key: b.key, label: b.label, leads: counts.get(b.key)?.leads ?? 0, booked: counts.get(b.key)?.booked ?? 0, rate: null, enough: false }));
+  const leads = { length: buckets.reduce((n, b) => n + b.leads, 0) };
   for (const b of buckets) { b.enough = b.leads >= MIN_BOOKING_BUCKET; b.rate = b.enough ? Math.round((b.booked / b.leads) * 1000) / 10 : null; }
   const total = leads.length;
   const enough = total >= MIN_BOOKING_TOTAL;

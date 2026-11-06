@@ -40,7 +40,8 @@ export type FlowNode = { id: NodeId; label: string; col: number; count: number; 
 export type FlowLink = { from: NodeId; to: NodeId; count: number };
 export type Flow = { total: number; enough: boolean; nodes: FlowNode[]; links: FlowLink[]; won: number; unknown: number };
 
-const inNode = (l: FlowLead, id: NodeId): boolean => {
+type Facts = Pick<FlowLead, "reply" | "booked" | "outcome" | "won">;
+const inNode = (l: Facts, id: NodeId): boolean => {
   switch (id) {
     case "new": return true;
     case "replied": case "never": case "unknown": return l.reply === id;
@@ -54,23 +55,32 @@ const LINKS: Array<[NodeId, NodeId]> = [
   ["replied", "booked"], ["replied", "nobook"], ["never", "booked"], ["never", "nobook"], ["unknown", "booked"], ["unknown", "nobook"],
   ["booked", "showed"], ["booked", "noshow"], ["booked", "waiting"],
 ];
-const inLink = (l: FlowLead, from: NodeId, to: NodeId): boolean => (from === "new" ? l.reply === to : from === "booked" ? l.booked && l.outcome === to : l.reply === from && l.booked === (to === "booked"));
+const inLink = (l: Facts, from: NodeId, to: NodeId): boolean => (from === "new" ? l.reply === to : from === "booked" ? l.booked && l.outcome === to : l.reply === from && l.booked === (to === "booked"));
 
 export const leadsOfNode = (leads: FlowLead[], id: NodeId) => leads.filter((l) => inNode(l, id));
 export const leadsOfLink = (leads: FlowLead[], from: NodeId, to: NodeId) => leads.filter((l) => inLink(l, from, to));
 
-export function buildFlow(leads: FlowLead[], minLeads = MIN_LEADS): Flow {
-  const total = leads.length;
+/** Leads grouped by what happened to them (reply, booked, outcome, won) with how many are in each group: all the flow needs, and small even for 100,000 leads. */
+export type FlowGroup = Facts & { n: number };
+export function buildFlowFromGroups(groups: readonly FlowGroup[], minLeads = MIN_LEADS): Flow {
+  const sum = (f: (g: FlowGroup) => boolean) => groups.filter(f).reduce((n, g) => n + g.n, 0);
+  const total = sum(() => true);
   const enough = total >= minLeads;
-  const count = (id: NodeId) => leads.filter((l) => inNode(l, id)).length;
+  const count = (id: NodeId) => sum((g) => inNode(g, id));
   const bookedN = count("booked");
   const nodes: FlowNode[] = NODE_ORDER.map((id) => {
     const n = count(id);
     const parentN = id === "new" ? total : NODE_COL[id] === 3 ? bookedN : total;
     return { id, label: NODE_LABEL[id], col: NODE_COL[id], count: n, pct: enough && parentN > 0 && id !== "new" ? Math.round((n / parentN) * 100) : null, of: id === "new" ? "" : NODE_COL[id] === 3 ? "of booked" : "of new leads" };
   });
-  const links = LINKS.map(([from, to]) => ({ from, to, count: leads.filter((l) => inLink(l, from, to)).length }));
-  return { total, enough, nodes, links, won: leads.filter((l) => l.won).length, unknown: count("unknown") };
+  const links = LINKS.map(([from, to]) => ({ from, to, count: sum((g) => inLink(g, from, to)) }));
+  return { total, enough, nodes, links, won: sum((g) => g.won), unknown: count("unknown") };
+}
+
+export function buildFlow(leads: FlowLead[], minLeads = MIN_LEADS): Flow {
+  const by = new Map<string, FlowGroup>();
+  for (const l of leads) { const k = `${l.reply}|${l.booked}|${l.outcome}|${l.won}`; const g = by.get(k) ?? { reply: l.reply, booked: l.booked, outcome: l.outcome, won: l.won, n: 0 }; g.n += 1; by.set(k, g); }
+  return buildFlowFromGroups([...by.values()], minLeads);
 }
 
 // ---------- the date choices ----------
