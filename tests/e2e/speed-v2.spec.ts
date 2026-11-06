@@ -17,6 +17,8 @@ async function open(page: Page, path: string, menu = false) {
   if (menu) await page.getByRole("button", { name: "Speed to lead", exact: true }).first().click({ timeout: 90_000 });
   else await page.reload();
   await expect(page.getByTestId("today-headline")).toBeVisible({ timeout: 90_000 });
+  // SPEED4: the first tab is now the Race; the older queue and charts live on the Log tab.
+  await page.getByRole("tab", { name: "Log", exact: true }).click({ timeout: 90_000 });
   await expect(page.getByTestId("speed-fast")).toBeVisible({ timeout: 90_000 });
 }
 const n = (text: string) => Number(text.replace(/[^\d]/g, ""));

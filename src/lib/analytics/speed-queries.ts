@@ -55,7 +55,7 @@ export async function loadRows(db: Db, installationId: string, allowed: string[]
 
 export async function loadLookups(db: Db, installationId: string, allowed: string[] | null, targetMinutes: number, now: number) {
   const [locs, people] = await Promise.all([
-    db`select location_id, name, speed_access, users_access from locations where installation_id = ${installationId} and not ignored ${allowed ? db`and location_id = any(${allowed}::text[])` : db``} order by lower(coalesce(name, ''))`,
+    db`select location_id, name, timezone, speed_access, users_access from locations where installation_id = ${installationId} and not ignored ${allowed ? db`and location_id = any(${allowed}::text[])` : db``} order by lower(coalesce(name, ''))`,
     db`select user_id, name, photo_url from team_names where installation_id = ${installationId}`,
   ]);
   const team = new Map<string, KnownUser>(people.map((p) => [p.user_id as string, { name: p.name as string, photoUrl: safePhotoUrl(p.photo_url) }]));

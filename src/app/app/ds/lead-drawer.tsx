@@ -156,7 +156,9 @@ function Body({ seed, top, showAccount, wide, onLogged }: { seed: LeadSeed; top?
       <dl className="divide-y border-y">
         {phone && <Row label="Phone"><span className="tabular-nums">{phone}</span></Row>}
         {email && <Row label="Email"><span className="break-all">{email}</span></Row>}
-        {owner && <Row label="Owner">{owner}</Row>}
+        {wb && wb.users.length > 0 ? (
+          <Row label="Owner"><select aria-label="Owner" value={wb.ownerId ?? ""} disabled={runner.busy} onChange={(e) => { if (e.target.value && e.target.value !== wb.ownerId) void runner.preview({ kind: "owner", userId: e.target.value }, { verb: "Change owner" }); }} className="h-9 max-w-full rounded-md border bg-card px-2 text-sm" data-testid="drawer-owner-select"><option value="">{wb.ownerId ? "Choose..." : "No owner"}</option>{wb.users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</select></Row>
+        ) : owner ? <Row label="Owner">{owner}</Row> : null}
         {c && <Row label="Source">{c.source ?? "Not recorded"}</Row>}
         {c && <Row label="Last activity">{c.lastActivityAt ? timeAgo(c.lastActivityAt) : "None recorded"}</Row>}
       </dl>

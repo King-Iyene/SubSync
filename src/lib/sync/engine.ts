@@ -2,6 +2,8 @@ import { isBusinessKey, locationOfBusinessKey } from "../access";
 import { isOurTag, tagPrefix } from "../people/writeback";
 import { safeError } from "../safe-log";
 import { maintenanceOn } from "../runtime-guards";
+import { eventsOfMessages, recordTouchEvents } from "../analytics/touch-events-db";
+import { rebuildSpeedDaily } from "../analytics/touch-events-db";
 import { refreshInsights } from "../analytics/service";
 import { sql } from "../db";
 import { getInstalledLocations, getLocationToken } from "../ghl/client";
@@ -499,6 +501,8 @@ async function handleSpeed(job: Job): Promise<Outcome> {
       // Principle 14: a message SubSync itself sent (the composer) is never a first reply, so it never changes the speed numbers.
       const ours = new Set((await db`select ghl_id from crm_writes where installation_id = ${job.installationId} and contact_id = ${c.contact_id} and kind = 'message' and ghl_id is not null and undone_at is null`).map((r) => r.ghl_id as string));
       const msgs = ours.size ? all.filter((m) => !(m.id && ours.has(m.id))) : all;
+      // Touch events (stage SPEED4): one metadata row per message or call, never the text. Idempotent, so a re-read adds nothing.
+      await recordTouchEvents(job.installationId, eventsOfMessages(all, { locationId: loc, contactId: c.contact_id as string, conversationId: c.conversation_id as string }));
       const lead = leadFromMessages(msgs, c.date_added instanceof Date ? c.date_added.getTime() : null, countAutomated);
       if (!lead) continue;
       // The automatic first message and the person's first reply, kept apart whatever the setting counts (N78).
@@ -527,6 +531,27 @@ async function handleSpeed(job: Job): Promise<Outcome> {
   return DONE;
 }
 
+// SPEED4 backfill: the last 30 days of message and call history, a few conversations per run, newest first. Metadata only; idempotent, so a repeat adds nothing. Never fails the account.
+async function backfillTouchEvents(job: Job): Promise<void> {
+  const db = sql();
+  const loc = job.locationId as string;
+  const todo = await db`
+    select v.conversation_id, v.contact_id from cached_conversations v
+    where v.installation_id = ${job.installationId} and v.location_id = ${loc} and v.contact_id is not null and v.last_message_at >= ${new Date(Date.now() - 30 * 86_400_000)}
+      and not exists (select 1 from touch_events e where e.installation_id = v.installation_id and e.location_id = v.location_id and e.conversation_id = v.conversation_id)
+    order by v.last_message_at desc limit 25`;
+  if (todo.length === 0) return;
+  const token = await tokenForLocation(job.companyId, loc);
+  for (const c of todo) {
+    try {
+      const msgs = await fetchConversationMessages(token, loc, c.conversation_id as string);
+      const ev = eventsOfMessages(msgs, { locationId: loc, contactId: c.contact_id as string, conversationId: c.conversation_id as string });
+      // A conversation with nothing to keep still gets one marker row-less pass next run only if it has messages; an empty one is simply skipped.
+      await recordTouchEvents(job.installationId, ev);
+    } catch (error) { if (isPermissionError(error)) return; console.error("Backfilling a conversation failed", safeError(error)); }
+  }
+}
+
 async function runJob(job: Job, deadline: number): Promise<Outcome> {
   switch (job.type) {
     case "locations": return handleLocations(job);
@@ -535,9 +560,11 @@ async function runJob(job: Job, deadline: number): Promise<Outcome> {
     case "opportunities": return handleOpportunities(job, deadline);
     case "conversations": return handleConversations(job);
     case "appointments": return handleAppointments(job);
-    case "speed": return handleSpeed(job);
+    case "speed": { const r = await handleSpeed(job); await backfillTouchEvents(job).catch((e) => console.error("Backfill failed", safeError(e))); return r; }
     case "metrics":
       await refreshInsights(job.installationId);
+      // The nightly reconcile of the speed history: rebuild the daily rollup for the last 35 days and drop events past retention.
+      { const [st] = await sql()`select speed_target_minutes from settings where installation_id = ${job.installationId}`; await rebuildSpeedDaily(job.installationId, Number(st?.speed_target_minutes ?? 15)); }
       return DONE;
   }
 }

@@ -1,0 +1,10 @@
+/* Speed to lead, the race (stage SPEED4): one flash at the breach and nothing else moving fast. Respects a request for less motion. */
+@keyframes s4-flash { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+.s4-flash { animation: s4-flash 0.9s ease-in-out 6; }
+@media (prefers-reduced-motion: reduce) { .s4-flash { animation: none; } }
+/* The printable proof report: while it prints, only the report shows. The class is put on the page by the Print button and removed after printing. */
+@media print {
+  html.s4-printing body * { visibility: hidden; }
+  html.s4-printing .s4-print, html.s4-printing .s4-print * { visibility: visible; }
+  html.s4-printing .s4-print { position: absolute; left: 0; top: 0; width: 100%; color: #000; background: #fff; }
+}

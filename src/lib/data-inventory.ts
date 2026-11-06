@@ -61,6 +61,9 @@ export const INVENTORY: Record<string, TableInfo> = {
     notPersonal: ["booking_channel"],
   },
   appointment_events: { noun: "appointment history", line: "appointments" },
+  touch_events: { noun: "message and call history (who, which way, which channel, when; never the words)", line: "conversations", personal: { user_id: "which team member sent it" }, notPersonal: ["event_key", "channel", "source", "campaign", "outcome"] },
+  lead_events: { noun: "lead history (arrived, owner changes, stage moves)", line: "conversations", personal: { user_id: "which team member made the change" }, notPersonal: ["event_key"] },
+  speed_daily: { noun: "daily reply-speed numbers", line: "conversations", notPersonal: ["by_channel", "by_source", "by_owner", "by_hour", "texted_back_60"] },
   locations: {
     noun: "the list of client accounts", line: "accounts",
     personal: { name: "client account name", email: "the client business's email", phone: "the client business's phone", website: "the client business's website", address: "the client business's address", owner: "the owner label you give an account" },
@@ -183,7 +186,7 @@ export const INVENTORY: Record<string, TableInfo> = {
       slack_webhook_url: "the Slack channel address (kept as typed, so treat it like a password)", digest_email: "the email address that receives alerts",
       brand_name: "the company name you show", brand_logo_url: "the logo address you show", detected_logo_url: "the logo address your platform sent", custom_checklist: "your own checklist steps", cold_tags: "the tags you marked as cold lists", ghl_app_domain: "the address you log in to", detected_app_domain: "the address you log in to", digest_timezone: "your time zone",
     },
-    notPersonal: ["app_domain_source", "keep_transcripts", "push_notes_to_crm", "cleanup_defaults"],
+    notPersonal: ["speed_keep_message_text", "app_domain_source", "keep_transcripts", "push_notes_to_crm", "cleanup_defaults"],
   },
   api_keys: {
     noun: "API keys", line: "sign_in",
@@ -245,6 +248,7 @@ export const NEVER_STORED: Array<{ table: string; columns: RegExp; claim: string
   { table: "meetings", columns: /^(transcript|transcript_text|transcript_body|transcript_content)$/i, claim: "SubSync never keeps the text of a transcript." },
   { table: "cached_contacts", columns: /(note|custom|file|attachment)/i, claim: "No notes, files or custom fields." },
   { table: "cached_conversations", columns: /(^|_)(body|text|content|html|snippet)(_|$)/i, claim: "The text of a message is never copied." },
+  { table: "touch_events", columns: /(^|_)(body|text|content|html|snippet|subject)(_|$)/i, claim: "The text of a message is never copied." },
   { table: "lead_touches", columns: /(^|_)(body|text|content|html|snippet)(_|$)/i, claim: "The text of a message is never copied." },
 ];
 

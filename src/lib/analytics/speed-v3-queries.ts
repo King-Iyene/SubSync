@@ -5,13 +5,14 @@ import { sourceLabel } from "./speed-intel";
 import { accountFacts, rowOut, suggestionsFor } from "./speed-v2-queries";
 import { costEstimate, money } from "./speed-v2";
 import { loadLookups, loadRows } from "./speed-queries";
+import { applyFilter, type LeadFilter } from "./speed-v4-more";
 import { bySourceFunnel, rescueRank, fastVsSlow, gapMap, ownerGaps, pick, setterScorecard, trendVsNormal, DAY, type Outcomes, type Sel } from "./speed-v3";
 
 // The reads behind the Speed to lead extras (stage SPEED3). Read only; every query is bound to the accounts the router allowed. What became of a lead is read from the
 // appointments and deals SubSync already holds: booked (an appointment that is not cancelled, starting after the lead arrived), showed (marked showed), won (a won deal).
 const HISTORY_DAYS = 56;
 
-async function outcomesOf(installationId: string, allowed: string[] | null, fromMs: number): Promise<Outcomes> {
+export async function outcomesOf(installationId: string, allowed: string[] | null, fromMs: number): Promise<Outcomes> {
   const db = sql();
   const out = new Map<string, { booked: boolean; showed: boolean; won: boolean }>();
   const get = (k: string) => out.get(k) ?? (out.set(k, { booked: false, showed: false, won: false }), out.get(k) as { booked: boolean; showed: boolean; won: boolean });
@@ -31,11 +32,12 @@ async function outcomesOf(installationId: string, allowed: string[] | null, from
   return out;
 }
 
-export type InsightInput = { installationId: string; allowed: string[] | null; targetMinutes: number; now: number; seePeople: boolean };
+export type InsightInput = { installationId: string; allowed: string[] | null; targetMinutes: number; now: number; seePeople: boolean; filter?: LeadFilter };
 
 export async function speedInsights(i: InsightInput) {
   const db = sql();
-  const [{ lk }, rows] = await Promise.all([loadLookups(db, i.installationId, i.allowed, i.targetMinutes, i.now), loadRows(db, i.installationId, i.allowed, i.now - HISTORY_DAYS * DAY, i.now + DAY)]);
+  const [{ lk }, loaded] = await Promise.all([loadLookups(db, i.installationId, i.allowed, i.targetMinutes, i.now), loadRows(db, i.installationId, i.allowed, i.now - HISTORY_DAYS * DAY, i.now + DAY)]);
+  const rows = applyFilter(loaded, i.filter ?? {}, { targetMinutes: i.targetMinutes, now: i.now });
   const oc = await outcomesOf(i.installationId, i.allowed, i.now - HISTORY_DAYS * DAY);
   const o = { targetMinutes: i.targetMinutes, now: i.now };
   const recent = rows.filter((r) => r.leadAt > i.now - 28 * DAY);
@@ -65,7 +67,8 @@ export async function speedInsights(i: InsightInput) {
 /** The exact leads behind one mark, capped at 100 with the true count. The same `pick` the figure was counted with. */
 export async function speedInsightList(i: InsightInput & { sel: Sel }) {
   const db = sql();
-  const [{ lk }, rows] = await Promise.all([loadLookups(db, i.installationId, i.allowed, i.targetMinutes, i.now), loadRows(db, i.installationId, i.allowed, i.now - 28 * DAY, i.now + DAY)]);
+  const [{ lk }, loaded] = await Promise.all([loadLookups(db, i.installationId, i.allowed, i.targetMinutes, i.now), loadRows(db, i.installationId, i.allowed, i.now - 28 * DAY, i.now + DAY)]);
+  const rows = applyFilter(loaded, i.filter ?? {}, { targetMinutes: i.targetMinutes, now: i.now });
   const picked = pick(rows, i.sel, { targetMinutes: i.targetMinutes, now: i.now });
   const sugg = suggestionsFor(rows, new Set(picked.slice(0, 100).map((x) => x.row.locationId)));
   return { count: picked.length, shown: Math.min(100, picked.length), rows: picked.slice(0, 100).map((x) => rowOut(x.row, x.status, lk, sugg)) };
