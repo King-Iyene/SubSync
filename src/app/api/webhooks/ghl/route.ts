@@ -8,6 +8,8 @@ import { recordPlanEvent } from "@/lib/entitlements-queries";
 import { captureWhitelabelDomain, captureWhitelabelLogo } from "@/lib/analytics/queries";
 import { enqueueAreaSync, enqueueFullSync } from "@/lib/sync/engine";
 import { isEchoOfOurWrite } from "@/lib/connections/write-log";
+import { eventFromWebhook, leadEventFromWebhook } from "@/lib/analytics/touch-events";
+import { recordLeadEvents, recordTouchEvents } from "@/lib/analytics/touch-events-db";
 import { onContactCreated } from "@/lib/ghl/arrival";
 
 // Receives platform webhooks. Verify the Ed25519 signature on the body, drop duplicates (failed
@@ -82,6 +84,13 @@ export async function POST(request: Request) {
         if (action.kind === "install") await enqueueFullSync(target.id);
         else if (action.kind === "resync" && event.locationId) await enqueueAreaSync(target.id, event.locationId, action.scope);
         // A new contact: compare it with the account's contacts right now (bounded to a couple of seconds, never throws).
+        // A message or call, a new contact, an owner change: keep its metadata (never the text) for the speed screens. A retry writes nothing new.
+        if ((event.type === "InboundMessage" || event.type === "OutboundMessage") && event.locationId) {
+          const te = eventFromWebhook(parsed, event.type);
+          if (te) await recordTouchEvents(target.id, [te]);
+        }
+        const le = leadEventFromWebhook(parsed, event.type);
+        if (le) await recordLeadEvents(target.id, [le]);
         if (event.type === "ContactCreate" && event.locationId) await onContactCreated(target.id, target.companyId, event.locationId, parsed);
       }
     }

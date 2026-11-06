@@ -4,6 +4,8 @@ import { speedInsightList, speedInsights } from "../analytics/speed-v3-queries";
 import { DAY_NAMES, type Sel } from "../analytics/speed-v3";
 import { parseWindow, type Win } from "../analytics/speed-window";
 import type { deepLinks } from "../links";
+import { parseFilter } from "../analytics/speed-v4-more";
+import { isStep, speedCoverage, speedJourney, speedJourneyList, speedProof, speedRace, speedStory } from "../analytics/speed-v4-queries";
 import { json, type AuthContext } from "./auth";
 
 // The rebuilt Speed to lead screen's endpoints: GET /api/app/speed?part=home|list|compare and PUT /api/app/speed/target (the one catch-all route, already guarded).
@@ -117,8 +119,23 @@ export async function handleSpeedPart(ctx: Ctx, h: SpeedHelpers): Promise<Respon
     return json(withUrls(out, links.contact));
   }
 
+  // Stage SPEED4: the race, coverage, the lead journey, the proof report and one lead story. The accounts come from the session; a filter only narrows inside them.
+  if (part === "race" || part === "coverage" || part === "journey" || part === "journey-list" || part === "proof" || part === "story") {
+    const allowed = narrowed(allowedAll, sp.get("account") ?? sp.get("f_account"));
+    if (allowed === "none") return json({ error: "Unknown account" }, 404);
+    const input = { installationId: ctx.installationId, allowed: allowed as string[] | null, targetMinutes, now, seePeople, filter: parseFilter(sp) };
+    if (part === "race") return json(withUrls(await speedRace(input), links.contact));
+    if (part === "coverage") return json(withUrls(await speedCoverage(input), links.contact));
+    if (part === "journey") return json(await speedJourney(input));
+    if (part === "proof") return json(await speedProof(input));
+    if (part === "story") { const l = sp.get("location"), c = sp.get("contact"); return l && c && ID.test(l) && ID.test(c) ? json(await speedStory({ ...input, locationId: l, contactId: c })) : json({ error: "Unknown lead" }, 400); }
+    const step = sp.get("step");
+    if (!isStep(step)) return json({ error: "Unknown step" }, 400);
+    return json(withUrls(await speedJourneyList({ ...input, step, dropped: sp.get("dropped") === "1" }), links.contact));
+  }
+
   if (part === "insights" || part === "insight-list") {
-    const input = { installationId: ctx.installationId, allowed: narrowed(allowedAll, sp.get("account")), targetMinutes, now, seePeople };
+    const input = { installationId: ctx.installationId, allowed: narrowed(allowedAll, sp.get("account")), targetMinutes, now, seePeople, filter: parseFilter(sp) };
     if (input.allowed === "none") return json({ error: "Unknown account" }, 404);
     const base = { ...input, allowed: input.allowed as string[] | null };
     if (part === "insights") return json(await speedInsights(base));

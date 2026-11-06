@@ -1927,7 +1927,7 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
     }
     // The rebuilt Speed to lead screen: its home, lists and comparisons (GET ?part=home|list|compare) and one account's reply target (PUT speed/target).
     const speedHelpers = { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links, targetMinutes: async () => (await scope(ctx)).settings.speedTargetMinutes, measuring: async () => { const st = (await scope(ctx)).settings; return { countAutomated: st.countAutomatedTouches, businessHours: st.speedBusinessHours }; } };
-    if (a === "speed" && method === "GET" && ["home", "list", "compare", "insights", "insight-list"].includes(ctx.url.searchParams.get("part") ?? "")) return await handleSpeedPart(ctx, speedHelpers);
+    if (a === "speed" && method === "GET" && ["home", "list", "compare", "insights", "insight-list", "race", "coverage", "journey", "journey-list", "proof", "story"].includes(ctx.url.searchParams.get("part") ?? "")) return await handleSpeedPart(ctx, speedHelpers);
     if (a === "speed" && b === "target" && method === "PUT") return await handleSpeedTarget(ctx, speedHelpers);
     // The rebuilt Unanswered messages screen: its first screen, the list behind a number and the rankings (GET ?part=home|list|ranks, read only; an unknown part is refused with 400). Without a part the older answer below still serves the exports and the older tests.
     if (a === "inbox" && method === "GET" && !b && ctx.url.searchParams.has("part")) return await handleUnansweredPart(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links, targets: async () => { const st = (await scope(ctx)).settings; return { slaHours: st.slaHours, targetMinutes: st.speedTargetMinutes }; } });
