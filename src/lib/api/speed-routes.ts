@@ -9,6 +9,9 @@ import { isStep, speedCoverage, speedJourney, speedJourneyList, speedProof, spee
 import { ladderPreview, saveLadder, speedBooking } from "../analytics/speed5-queries";
 import { speedPulse } from "../analytics/speed6-queries";
 import { zoneLabel } from "../analytics/speed6";
+import { buildMessage, destination, sanitizeDigest } from "../analytics/speed-digest";
+import { deliver, digestNumbers, loadDigest, saveDigest } from "../analytics/speed-digest-db";
+import { isLive } from "../live-flags";
 import { sql } from "../db";
 import { json, type AuthContext } from "./auth";
 
@@ -197,4 +200,39 @@ export async function handleSpeedLadder(ctx: Ctx): Promise<Response> {
   const body = await ctx.request.json().catch(() => null);
   const r = await saveLadder(ctx.installationId, body);
   return r.ok ? json({ ok: true, ladder: r.ladder }) : json({ error: r.error }, 503);
+}
+
+/**
+ * The Speed summary message. GET speed/digest?account=<id>, PUT speed/digest, POST speed/digest/preview, POST speed/digest/test. Not for a client's staff. An account id only NARROWS inside the caller's accounts.
+ * "Send test" goes through the same outward gate as every send: with the switches off it writes a WOULD SEND audit line and sends nothing.
+ */
+export async function handleSpeedDigest(ctx: Ctx, h: SpeedHelpers): Promise<Response> {
+  if (ctx.kind === "client") return json({ error: "Not available in this view" }, 403);
+  const m = ctx.request.method; const sub = ctx.segments[2] ?? "";
+  const body = m === "GET" ? null : ((await ctx.request.json().catch(() => null)) as Record<string, unknown> | null);
+  const asked = m === "GET" ? ctx.url.searchParams.get("account") : typeof body?.locationId === "string" ? body.locationId : null;
+  const allowed = await h.allowed();
+  let loc = "";
+  if (asked) { if (!ID.test(asked) || (allowed && !allowed.includes(asked))) return json({ error: "Client account not found." }, 404); loc = asked; }
+  const live = { email: isLive("SEND_EMAIL_LIVE"), slack: isLive("SEND_SLACK_LIVE") };
+  if (m === "GET") {
+    const d = await loadDigest(ctx.installationId, loc);
+    return json({ ...d, live, destination: destination(d.settings, live), account: loc || null });
+  }
+  if (m === "PUT") {
+    const r = await saveDigest(ctx.installationId, loc, body?.settings);
+    return r.ok ? json({ ok: true, settings: r.settings, destination: destination(r.settings, live) }) : json({ error: r.error }, 503);
+  }
+  if (m === "POST" && (sub === "preview" || sub === "test")) {
+    const s = sanitizeDigest(body?.settings);
+    let who = "Your accounts";
+    if (loc) { const [l] = await sql()`select name from locations where installation_id = ${ctx.installationId} and location_id = ${loc}`; who = (l?.name as string | null) ?? who; }
+    const n = await digestNumbers(ctx.installationId, loc ? [loc] : allowed, who, await h.targetMinutes(), Date.now());
+    const msg = buildMessage(s, n);
+    if (sub === "preview") return json({ subject: msg.subject, text: msg.text, destination: destination(s, live) });
+    if (!s.recipients.length && !s.slack) return json({ error: "Add an email address or choose Slack first." }, 400);
+    const sent = await deliver(ctx.installationId, s, n, { test: true });
+    return json({ ok: true, wouldSend: sent.filter((x) => !x.live).map((x) => x.channel), sent: sent.filter((x) => x.live).map((x) => x.channel), destination: destination(s, live) });
+  }
+  return json({ error: "Not found" }, 404);
 }

@@ -132,7 +132,7 @@ export function SpeedView({ go }: { go: GoFn }) {
           { label: "Call mode", icon: ic(PhoneCall), badge: seenCall ? undefined : <span className="spd-new rounded-full px-1.5 py-0.5 text-[0.65rem] font-bold uppercase leading-none tracking-wide" data-testid="call-new">New</span>, node: <DialMode /> },
           ...(d.seePeople ? [{ label: "People", icon: ic(Users), node: <PeopleTab6 multi={multi} slow={slow} old={<PeopleTab multi={multi} />} /> }] : [{ label: "Owners", icon: ic(Users), node: <PeopleTab6 multi={multi} slow={slow} old={<PeopleTab multi={multi} />} /> }]),
           { label: "Capture", icon: ic(Inbox), node: <Fold keep={3} testId="capture-fold"><CaptureTab /></Fold> },
-          { label: "Rules", icon: ic(SlidersHorizontal), node: <RulesTab who={multi ? "All client accounts" : d.accounts[0]?.name ?? "Your account"} waiting={w.waiting} dollars={w.money.dollars || null} typical={d.summary.typicalLine} canChange={d.measuring.canChange} targetMinutes={d.measuring.targetMinutes} go={go} multi={multi} /> },
+          { label: "Rules", icon: ic(SlidersHorizontal), node: <RulesTab who={multi ? "All client accounts" : d.accounts[0]?.name ?? "Your account"} waiting={w.waiting} dollars={w.money.dollars || null} typical={d.summary.typicalLine} canChange={d.measuring.canChange} targetMinutes={d.measuring.targetMinutes} go={go} multi={multi} accounts={d.compareAccounts.rows.map((a) => ({ id: a.id, name: a.name }))} /> },
           { label: "Log", icon: ic(ScrollText), node: (
         <Fold keep={3} testId="log-fold">
           <HowTo id="speed2" title="How to use this page">Reply to the lead at the top, then the next. Every number opens the leads behind it, and a lead&apos;s three dots call or email it through your CRM.</HowTo>

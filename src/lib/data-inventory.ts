@@ -63,6 +63,8 @@ export const INVENTORY: Record<string, TableInfo> = {
   appointment_events: { noun: "appointment history", line: "appointments" },
   touch_events: { noun: "message and call history (who, which way, which channel, when; never the words)", line: "conversations", personal: { user_id: "which team member sent it" }, notPersonal: ["event_key", "channel", "source", "campaign", "outcome"] },
   lead_events: { noun: "lead history (arrived, owner changes, stage moves)", line: "conversations", personal: { user_id: "which team member made the change" }, notPersonal: ["event_key"] },
+  speed_digest: { noun: "the Speed summary settings (who gets it, when, what it says)", line: "conversations", personal: { settings: "the email addresses chosen to receive it" }, notPersonal: ["location_id", "last_sent_key"] },
+  speed_prefs: { noun: "Call mode and Speed choices (redial plan, goals, scripts, outcome sets)", line: "conversations", notPersonal: ["scope", "key", "value"] },
   speed_daily: { noun: "daily reply-speed numbers", line: "conversations", notPersonal: ["by_channel", "by_source", "by_owner", "by_hour", "texted_back_60"] },
   locations: {
     noun: "the list of client accounts", line: "accounts",

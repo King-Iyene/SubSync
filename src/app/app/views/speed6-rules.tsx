@@ -2,11 +2,9 @@
 
 import { Bell, Copy, Minus, Plus, Send } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
-import { digestPreview } from "@/lib/analytics/speed-v3";
-import type { GapMap, TrendNormal } from "@/lib/analytics/speed-v3";
+import { destination, LINES, type DigestSettings } from "@/lib/analytics/speed-digest";
 import { useApiClient, useData } from "../session";
 import { ErrorState, LeadDrawer, SkeletonRows, type LeadSeed } from "../ds";
-import { useSpeedFilter } from "./speed-filter";
 import { SidePopup } from "./speed-popup";
 import { Band, Fold, Q } from "./speed6-base";
 import type { GoFn } from "../nav";
@@ -96,29 +94,82 @@ export function WaitingNowCard({ leads, multi }: { leads: Waiting[]; multi: bool
   );
 }
 
-export function DigestCard({ who, waiting, dollars, typical }: { who: string; waiting: number; dollars: number | null; typical: string | null }) {
-  const { query } = useSpeedFilter();
-  const { data: d } = useData<{ trend: TrendNormal; gap: GapMap }>(`speed?part=insights${query}`);
-  const [word, setWord] = useState<"daily" | "weekly">("daily");
-  const [show, setShow] = useState(false);
+type DigestGet = { ready: boolean; settings: DigestSettings; live: { email: boolean; slack: boolean } };
+const DAYNAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const zones = (): string[] => { try { return (Intl as unknown as { supportedValuesOf: (k: string) => string[] }).supportedValuesOf("timeZone"); } catch { return ["UTC"]; } };
+const FIELD = "s6-num !w-full !text-left px-2";
+
+/** The summary message, end to end: who gets it, by email and/or Slack, when (in which time zone), what it says, per account. Preview shows the exact message; Send test is a dry run until sending is switched on. */
+export function DigestCard({ accounts }: { accounts: Array<{ id: string; name: string }> }) {
+  const api = useApiClient();
+  const [acct, setAcct] = useState("");
+  const { data, error, reload } = useData<DigestGet>(`speed/digest${acct ? `?account=${encodeURIComponent(acct)}` : ""}`);
+  const [edit, setEdit] = useState<DigestSettings | null>(null);
+  const [mail, setMail] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
-  const text = useMemo(() => (d ? digestPreview({ who, waiting, dollars, typical, trend: d.trend, gap: d.gap, word }) : ""), [d, who, waiting, dollars, typical, word]);
+  const [show, setShow] = useState<{ subject: string; text: string } | null>(null);
+  const tzList = useMemo(() => zones(), []);
+  if (error) return <ErrorState error={error} onRetry={reload} />;
+  if (!data) return <SkeletonRows rows={3} label="Loading the summary..." />;
+  const s = edit ?? data.settings;
+  const set = (p: Partial<DigestSettings>) => setEdit({ ...s, ...p });
+  const setSch = (p: Partial<DigestSettings["schedule"]>) => set({ schedule: { ...s.schedule, ...p } });
+  const emails = mail ?? s.recipients.join(", ");
+  const withMail = (): DigestSettings => ({ ...s, recipients: emails.split(/[\s,;]+/).filter(Boolean) });
+  const where = destination(withMail(), data.live);
+  const body = (cur: DigestSettings) => ({ locationId: acct || undefined, settings: cur });
+  const save = async () => { setMsg(null); try { await api.put("speed/digest", body(withMail())); setEdit(null); setMail(null); setMsg("Saved."); reload(); } catch (e) { setMsg((e as Error).message || "Could not save."); } };
+  const preview = async () => { setMsg(null); try { setShow(await api.post("speed/digest/preview", body(withMail()))); } catch (e) { setMsg((e as Error).message); } };
+  const test = async () => {
+    setMsg("Working...");
+    try {
+      const r = await api.post<{ wouldSend: string[]; sent: string[] }>("speed/digest/test", body(withMail()));
+      setMsg(r.sent.length ? `Test sent by ${r.sent.join(" and ")}.` : r.wouldSend.length ? `Dry run: WOULD SEND by ${r.wouldSend.join(" and ")}. Nothing was sent because sending is off.` : "Nothing to send: add an address or choose Slack.");
+    } catch (e) { setMsg((e as Error).message); }
+  };
   return (
-    <Q sticky q="What is in my summary email?" testId="digest-card" sub="A short message with who is waiting and how you are doing." tip="Choose daily or weekly. The preview shows what the message would say right now. Send test is a dry run: nothing is sent while sending is switched off.">
-      <div className="flex flex-wrap items-center gap-3">
-        <span className="inline-flex gap-1 rounded-xl border border-[rgba(103,232,249,0.3)] p-1" role="group" aria-label="How often">
-          {(["daily", "weekly"] as const).map((w) => <button key={w} type="button" aria-pressed={word === w} onClick={() => setWord(w)} className="s6-btn !min-h-9 !border-transparent" data-kind={word === w ? "primary" : undefined} data-testid={`digest-${w}`}>{w === "daily" ? "Daily" : "Weekly"}</button>)}
-        </span>
-        <button type="button" className="s6-btn" onClick={() => setShow(true)} disabled={!d} data-testid="digest-preview-open">Preview {word} message</button>
-        <button type="button" className="s6-btn" onClick={() => setMsg("Dry run: a test would go to the people chosen in Alerts. Nothing was sent.")} data-testid="digest-test"><Send aria-hidden className="size-4" />Send test</button>
+    <Q sticky q="What is in my summary message?" testId="digest-card" span sub="A short message about first replies, sent on a schedule." tip="Choose who gets it, by email or Slack, when, and which lines it has. The preview is the exact message, built from the same numbers as this page. Nothing is sent until sending is switched on in Settings.">
+      {accounts.length > 1 && (
+        <label className="mb-4 grid max-w-sm gap-1 text-sm"><span className="s6-label">For</span>
+          <select className={FIELD} value={acct} onChange={(e) => { setAcct(e.target.value); setEdit(null); setMail(null); setMsg(null); }} aria-label="Which account" data-testid="digest-account"><option value="">All accounts (the default)</option>{accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select></label>
+      )}
+      <div className="grid gap-5 md:grid-cols-2">
+        <div className="grid gap-4">
+          <div className="flex items-center gap-3"><button type="button" role="switch" aria-checked={s.enabled} aria-label="Send this summary" className="s6-toggle" onClick={() => set({ enabled: !s.enabled })} data-testid="digest-enabled" /><span className="font-medium">{s.enabled ? "On" : "Off"}</span></div>
+          <div className="flex flex-wrap gap-4 text-sm" role="group" aria-label="Where it goes">
+            <label className="flex min-h-10 items-center gap-2"><input type="checkbox" checked={s.email} onChange={(e) => set({ email: e.target.checked })} data-testid="digest-email" />Email</label>
+            <label className="flex min-h-10 items-center gap-2"><input type="checkbox" checked={s.slack} onChange={(e) => set({ slack: e.target.checked })} data-testid="digest-slack" />Slack channel</label>
+          </div>
+          <label className="grid gap-1 text-sm"><span className="s6-label">Email addresses (you, your team, or the client&apos;s contact)</span><textarea rows={2} className={FIELD} value={emails} onChange={(e) => setMail(e.target.value)} placeholder="ben@example.com, client@example.com" data-testid="digest-recipients" /></label>
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <label className="grid gap-1"><span className="s6-label">How often</span><select className={FIELD} value={s.schedule.cadence} onChange={(e) => setSch({ cadence: e.target.value === "weekly" ? "weekly" : "daily" })} data-testid="digest-cadence"><option value="daily">Every day</option><option value="weekly">Every week</option></select></label>
+            {s.schedule.cadence === "weekly" && <label className="grid gap-1"><span className="s6-label">On</span><select className={FIELD} value={s.schedule.weekday} onChange={(e) => setSch({ weekday: Number(e.target.value) })}>{DAYNAMES.map((d, i) => <option key={d} value={i}>{d}</option>)}</select></label>}
+            <label className="grid gap-1"><span className="s6-label">At</span><select className={FIELD} value={s.schedule.hour} onChange={(e) => setSch({ hour: Number(e.target.value) })} data-testid="digest-hour">{Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>{h}:00</option>)}</select></label>
+            <label className="grid gap-1"><span className="s6-label">Time zone</span><select className={FIELD} value={s.schedule.tz} onChange={(e) => setSch({ tz: e.target.value })} data-testid="digest-tz">{[...new Set(["UTC", s.schedule.tz, ...tzList])].map((z) => <option key={z} value={z}>{z}</option>)}</select></label>
+          </div>
+        </div>
+        <div className="grid gap-4">
+          <fieldset className="grid gap-1 text-sm"><legend className="s6-label mb-1">Lines to include</legend>
+            {LINES.map((l) => <label key={l.key} className="flex min-h-9 items-center gap-2"><input type="checkbox" checked={s.lines.includes(l.key)} onChange={(e) => set({ lines: LINES.map((x) => x.key).filter((k) => (k === l.key ? e.target.checked : s.lines.includes(k))) })} data-testid={`digest-line-${l.key}`} />{l.label}</label>)}
+          </fieldset>
+          <label className="grid gap-1 text-sm"><span className="s6-label">Opening line</span><textarea rows={2} maxLength={500} className={FIELD} value={s.intro} onChange={(e) => set({ intro: e.target.value })} data-testid="digest-intro" /></label>
+          <label className="grid gap-1 text-sm"><span className="s6-label">Sign-off</span><textarea rows={2} maxLength={500} className={FIELD} value={s.outro} onChange={(e) => set({ outro: e.target.value })} data-testid="digest-outro" /></label>
+        </div>
       </div>
-      {msg && <p role="status" className="s6-label mt-3" data-testid="digest-msg">{msg}</p>}
+      <p className="mt-5 text-sm" data-testid="digest-where">{where}</p>
+      {!data.ready && <p className="s6-label mt-1" data-testid="digest-notready">Saving needs the latest database update. Until then this stays on this screen only.</p>}
+      <div className="mt-4 flex flex-wrap items-center gap-3">
+        <button type="button" className="s6-btn" data-kind="primary" onClick={() => void save()} data-testid="digest-save">Save</button>
+        <button type="button" className="s6-btn" onClick={() => void preview()} data-testid="digest-preview-open">Preview message</button>
+        <button type="button" className="s6-btn" onClick={() => void test()} data-testid="digest-test"><Send aria-hidden className="size-4" />Send test</button>
+        {msg && <span role="status" className="s6-label" data-testid="digest-msg">{msg}</span>}
+      </div>
       {show && (
-        <SidePopup label={`${word === "daily" ? "Daily" : "Weekly"} message`} onClose={() => setShow(false)}>
+        <SidePopup label="Summary message" onClose={() => setShow(null)}>
           <div data-testid="digest-popup">
-            <h3 className="text-lg font-semibold">{word === "daily" ? "Daily" : "Weekly"} message</h3>
-            <p className="mt-3 whitespace-pre-line text-[0.95rem] leading-7" data-testid="digest-preview">{text}</p>
-            <button type="button" className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-lg border px-3 text-sm font-medium" onClick={() => void navigator.clipboard?.writeText(text)}><Copy aria-hidden className="size-4" />Copy</button>
+            <p className="s6-label">Subject</p><h3 className="text-lg font-semibold" data-testid="digest-subject">{show.subject}</h3>
+            <p className="mt-4 whitespace-pre-line text-[0.95rem] leading-7" data-testid="digest-preview">{show.text}</p>
+            <button type="button" className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-lg border px-3 text-sm font-medium" onClick={() => void navigator.clipboard?.writeText(show.text)}><Copy aria-hidden className="size-4" />Copy</button>
           </div>
         </SidePopup>
       )}
@@ -127,7 +178,7 @@ export function DigestCard({ who, waiting, dollars, typical }: { who: string; wa
 }
 
 /** The Rules tab: three cards first, the rest behind More (routing check and the printable response-speed report). */
-export function RulesTab6(p: { who: string; waiting: number; dollars: number | null; typical: string | null; canChange: boolean; targetMinutes: number; go: GoFn; multi: boolean; rest: ReactNode }) {
+export function RulesTab6(p: { who: string; waiting: number; dollars: number | null; typical: string | null; canChange: boolean; targetMinutes: number; go: GoFn; multi: boolean; accounts?: Array<{ id: string; name: string }>; rest: ReactNode }) {
   const { data: d, error, reload } = useData<Preview>("speed?part=ladder");
   return (
     <div data-testid="rules-tab">
@@ -135,8 +186,8 @@ export function RulesTab6(p: { who: string; waiting: number; dollars: number | n
         <div className="s6-grid s6-three">
           <TargetCard targetMinutes={p.targetMinutes} canChange={p.canChange} />
           {error ? <ErrorState error={error} onRetry={reload} /> : !d ? <SkeletonRows rows={3} label="Building the preview..." /> : <EscalationCard canChange={p.canChange} d={d} reload={reload} />}
-          {/* The summary email is hidden until it can be edited per account and delivered (recipients, channel, schedule): a preview that goes nowhere is not shown. */}
         </div>
+        <DigestCard accounts={p.accounts ?? []} />
         {d && <><Band title="Right now" /><WaitingNowCard leads={d.leads} multi={p.multi} /></>}
         {p.rest}
       </Fold>
