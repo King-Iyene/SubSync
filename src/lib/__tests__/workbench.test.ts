@@ -157,3 +157,12 @@ test("thread: parsed oldest first, text kept in memory only", async () => {
   const t = await fetchThread("tok", "conv1", { fetchImpl });
   assert.deepEqual(t.map((m) => [m.id, m.direction, m.channel, m.text]), [["m1", "in", "Text", "Hello"], ["m2", "out", "Text", "Reply"]]);
 });
+
+test("do not disturb: parsed, planned as one contact update that can be undone", () => {
+  const p = parseAction({ kind: "dnd", on: true });
+  assert.ok(p.ok);
+  const plan = planAction((p as { ok: true; action: Action }).action, T);
+  assert.equal(plan.op, "dnd.set");
+  assert.deepEqual(plan.req?.body, { dnd: true });
+  assert.deepEqual(inverseOf({ kind: "dnd", on: true }, {}, null), { kind: "dnd", on: false });
+});

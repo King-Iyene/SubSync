@@ -6,6 +6,7 @@ test.beforeEach(async ({}, testInfo) => { test.skip(testInfo.project.name !== "d
 async function checkMenu(page: Page, where: string) {
   const drawer = page.getByTestId("lead-drawer");
   await expect(drawer.getByTestId("drawer-call")).toBeVisible({ timeout: 120_000 });
+  await expect(drawer.getByRole("tab", { name: "Update" })).toBeVisible({ timeout: 120_000 });
   const more = drawer.getByTestId("drawer-more");
   await more.click();
   const menu = page.getByTestId("pop-menu");
@@ -23,7 +24,7 @@ async function checkMenu(page: Page, where: string) {
   // Add note opens the Update tab at the note box.
   await more.click();
   const note = page.getByTestId("menu-note");
-  if (await note.count()) {
+  {
     await note.click();
     await expect(drawer.getByTestId("wb-note")).toBeVisible();
     await expect(drawer.locator("[data-testid=wb-note] textarea")).toBeFocused();
@@ -43,11 +44,10 @@ async function checkMenu(page: Page, where: string) {
 
 test("the lead panel More menu opens on top and works (from a list)", async ({ page }) => {
   test.setTimeout(300_000);
-  await page.goto("/app#speed");
-  const row = page.getByTestId("speed-row").first();
-  await expect(row).toBeVisible({ timeout: 120_000 });
-  await row.getByRole("button").first().click();
-  await checkMenu(page, "speed list");
+  await page.goto("/app#people");
+  await expect(page.getByTestId("people-say")).toBeVisible({ timeout: 120_000 });
+  await page.getByTestId("people-start").click();
+  await checkMenu(page, "people list");
 });
 
 test("the lead panel More menu works when the panel is opened from a popup", async ({ page }) => {
