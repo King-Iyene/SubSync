@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { fmtAxis, fmtFull, monotonePath, niceTicks, thinLabels } from "@/lib/analytics/chart-format";
 
 // ONE chart for everything over time on Today (Growth daily leads, Clients coming and going, What SubSync caught, Coverage by hour), drawn as bars or as a line and switched
@@ -44,12 +44,22 @@ export function ChartCard({ title, lines, compare, hint, left, top = 4, testId }
   );
 }
 
-const W = 640, H = 200, T = 22, B = 30, R = 50;
+const H = 200, T = 22, B = 30;
 
 export function TimeChart({ points, series, avg, mode, onPick, selectedId, label, noun = "", testId = "time-chart", hint, labelEvery, flags, flagWord = "Needs a look" }: {
   points: ChartPoint[]; series: ChartSeries[]; /** A dashed average line, drawn on both modes. */ avg?: Array<number | null>; mode: ChartMode; onPick?: (i: number) => void; selectedId?: string | null; label: string; noun?: string; testId?: string; hint?: string; /** Draw a label every N points instead of fitting them (hours: every 3). */ labelEvery?: number; /** A warning mark above a point (a gap hour), with the word for the legend. */ flags?: boolean[]; flagWord?: string;
 }) {
   const [hot, setHot] = useState<number | null>(null);
+  // The drawing is as wide as its card (measured), so it fills the card and its text keeps its real size on a phone.
+  const box = useRef<HTMLElement>(null);
+  const [W, setW] = useState(640);
+  useEffect(() => {
+    const el = box.current; if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => setW(Math.max(260, Math.round(el.clientWidth))));
+    ro.observe(el); setW(Math.max(260, Math.round(el.clientWidth)));
+    return () => ro.disconnect();
+  }, []);
+  const R = avg && avg.length ? 50 : 14;
   const n = points.length;
   const max = Math.max(1, ...series.flatMap((s) => s.values), ...(avg ?? []).map((v) => v ?? 0));
   const ticks = niceTicks(max, 4), top = ticks[ticks.length - 1] || 1;
@@ -57,15 +67,15 @@ export function TimeChart({ points, series, avg, mode, onPick, selectedId, label
   const iw = W - L - R, ih = H - T - B;
   const step = iw / Math.max(1, n), x = (i: number) => L + step * i + step / 2, y = (v: number) => T + ih - (v / top) * ih;
   const k = series.length, bar = Math.max(1.5, Math.min(12, (step * 0.72) / k)), gap = k > 1 ? 1.5 : 0;
-  const labels = labelEvery ? points.map((_, i) => i).filter((i) => i % labelEvery === 0) : thinLabels(n, Math.max(2, Math.floor(iw / 76)));
+  const labels = labelEvery ? points.map((_, i) => i).filter((i) => i % labelEvery === 0) : thinLabels(n, Math.max(2, Math.floor(iw / (Math.max(...points.map((p) => p.short.length), 4) * 6.6 + 18))));
   const avgPts = (avg ?? []).map((v, i) => (v === null ? null : ([x(i), y(v)] as const))).filter((p): p is readonly [number, number] => p !== null);
   const lastAvg = [...(avg ?? [])].reverse().find((v) => v !== null && v !== undefined) ?? null;
   const tipP = hot === null ? null : points[hot];
   const open = (i: number) => onPick?.(i);
   return (
-    <figure className="relative min-w-0" data-testid={testId} data-mode={mode}>
+    <figure ref={box} className="relative min-w-0" data-testid={testId} data-mode={mode} data-points={n}>
       <style>{`.tc-mark{transition:fill-opacity .15s ease,transform .15s ease,filter .15s ease}.tc-draw{stroke-dasharray:1;stroke-dashoffset:0;animation:tc-draw .7s ease-out}@keyframes tc-draw{from{stroke-dashoffset:1}to{stroke-dashoffset:0}}@media (prefers-reduced-motion:reduce){.tc-mark{transition:none}.tc-draw{animation:none}}`}</style>
-      <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full overflow-visible" role="group" aria-label={label}>
+      <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H} className="block h-auto w-full overflow-visible" role="group" aria-label={label}>
         {ticks.map((t) => (
           <g key={t}>
             <line x1={L} x2={W - R} y1={y(t)} y2={y(t)} stroke="var(--t-rule)" strokeWidth={1} strokeDasharray={t === 0 ? undefined : "2 4"} />
@@ -104,7 +114,7 @@ export function TimeChart({ points, series, avg, mode, onPick, selectedId, label
             onClick={() => open(i)} onKeyDown={(e) => { if (onPick && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); open(i); } else if (e.key === "ArrowRight" || e.key === "ArrowLeft") { e.preventDefault(); const nx = (e.key === "ArrowRight" ? e.currentTarget.nextElementSibling : e.currentTarget.previousElementSibling) as SVGElement | null; if (nx && nx.hasAttribute("data-id")) nx.focus(); } }}
             onMouseEnter={() => setHot(i)} onMouseLeave={() => setHot(null)} onFocus={() => setHot(i)} onBlur={() => setHot(null)} />
         ))}
-        {labels.map((i) => <text key={i} x={x(i)} y={H - 9} textAnchor={i === 0 ? "start" : i === n - 1 ? "end" : "middle"} style={{ fontSize: 12.5, fill: "var(--t-ink)", fillOpacity: 0.85 }}>{points[i].short}</text>)}
+        {labels.map((i) => <text key={i} x={x(i)} y={H - 9} textAnchor={i === 0 ? "start" : i === n - 1 ? "end" : "middle"} style={{ fontSize: 11.5, fill: "var(--t-ink)", fillOpacity: 0.85 }}>{points[i].short}</text>)}
       </svg>
       {tipP && hot !== null && (
         <div className="pointer-events-none absolute top-1 z-20 w-max max-w-[15rem] rounded-xl border border-[var(--t-rule2)] bg-[var(--t-raise)]/85 px-3 py-2 text-xs shadow-lg backdrop-blur-md" data-testid={`${testId}-card`}

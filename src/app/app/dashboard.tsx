@@ -446,7 +446,7 @@ export function Dashboard() {
               </button>
             ))}
           </nav>
-          <main className="mx-auto w-full max-w-[1400px] flex-1 p-4 pb-24 sm:px-10 sm:py-8 md:pb-8">
+          <main className="mx-auto w-full max-w-[1800px] flex-1 p-4 pb-24 sm:px-10 sm:py-8 md:pb-8">
             <DialerAskHost />
             {fromAccount && view.id !== "today" && (
               <InlineAlert className="mb-3" action={<Btn variant="ghost" onClick={() => { setFilter(EMPTY_FILTER); try { window.history.replaceState(null, "", withTodayAccounts(window.location.hash, [])); window.dispatchEvent(new Event("subsync-today-accounts")); } catch { /* see above */ } }}>See all client accounts</Btn>}>

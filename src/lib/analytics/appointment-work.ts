@@ -11,7 +11,7 @@ export const DAY = 86_400_000;
 export const RECORD_DAYS = 30;
 export const RECOVER_DAYS = 14;
 export const UPCOMING_DAYS = 7;
-export const MAX_PAGE = 50;
+export const MAX_PAGE = 100;
 /** Never send more than this many rows from the server in one list read; the count stays the true count. */
 export const INLINE_ROWS = 5;
 

@@ -11,7 +11,7 @@ export const DAY = 86_400_000;
 export const WAITING_WINDOW_DAYS = 14;
 /** A percentage or a ranking of accounts needs this many judged leads. */
 export const MIN_JUDGED = MIN_FOR_MEDIAN;
-export const MAX_PAGE = 50;
+export const MAX_PAGE = 100;
 export const MIN_TARGET = 1;
 export const MAX_TARGET = 1440;
 

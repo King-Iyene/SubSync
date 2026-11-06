@@ -33,7 +33,7 @@ type Story = { events: Array<{ at: number; kind: string; text: string }> };
 type Card = Item & { key: string; step: CadenceStep; attempts: number; callbackDue: boolean; windowOk: boolean; waitingForRedial: boolean };
 type Later = { key: string; name: string; why: string };
 
-const BIG = "ds-press inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-[rgba(103,232,249,0.25)] bg-[rgba(34,211,238,0.06)] px-4 text-[15px] font-medium hover:bg-[rgba(34,211,238,0.16)] focus-visible:outline-2 focus-visible:outline-[var(--ring)] disabled:cursor-not-allowed disabled:opacity-50";
+const BIG = "ds-press inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-[color-mix(in_srgb,var(--s6-edgec)_25%,transparent)] bg-[color-mix(in_srgb,var(--s6-cyan)_6%,transparent)] px-4 text-[15px] font-medium hover:bg-[color-mix(in_srgb,var(--s6-cyan)_16%,transparent)] focus-visible:outline-2 focus-visible:outline-[var(--ring)] disabled:cursor-not-allowed disabled:opacity-50";
 const PRIMARY = "s6-btn !min-h-12 !px-6 !text-base";
 const when = (ms: number) => new Date(ms).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 const EMPTY_STATE: AttemptState = { attempts: 0, lastAt: null, reached: false };
@@ -98,9 +98,9 @@ function DialInner() {
       <div className="mb-6 flex flex-wrap gap-2" role="group" aria-label="Choose a list">
         {(d?.lists ?? [{ id: "missed", label: "Missed calls, no callback", help: "" }]).map((l) => (
           <button key={l.id} type="button" onClick={() => { setList(l.id); setView("lists"); }} aria-pressed={view === "lists" && list === l.id} title={l.help} data-testid={`dial-list-${l.id}`}
-            className={`ds-press min-h-11 rounded-full border px-4 text-sm font-medium sm:min-h-9 ${view === "lists" && list === l.id ? "border-[var(--s6-cyan)] bg-[rgba(34,211,238,0.18)] text-[#e6fbff] shadow-[0_0_14px_-4px_rgba(34,211,238,0.7)]" : "border-[rgba(103,232,249,0.2)] bg-[rgba(13,23,48,0.8)] hover:bg-[rgba(34,211,238,0.1)]"}`}>{l.label}</button>
+            className={`ds-press min-h-11 rounded-full border px-4 text-sm font-medium sm:min-h-9 ${view === "lists" && list === l.id ? "border-[var(--s6-cyan)] bg-[color-mix(in_srgb,var(--s6-cyan)_18%,transparent)] text-[var(--s6-btn-ink)] shadow-[0_0_14px_-4px_color-mix(in_srgb,var(--s6-cyan)_70%,transparent)]" : "border-[color-mix(in_srgb,var(--s6-edgec)_20%,transparent)] bg-[color-mix(in_srgb,var(--s6-surf)_80%,transparent)] hover:bg-[color-mix(in_srgb,var(--s6-cyan)_10%,transparent)]"}`}>{l.label}</button>
         ))}
-        <button type="button" onClick={() => setView("callbacks")} aria-pressed={view === "callbacks"} data-testid="dial-view-callbacks" className={`ds-press inline-flex min-h-11 items-center gap-2 rounded-full border px-4 text-sm font-medium sm:min-h-9 ${view === "callbacks" ? "border-[var(--s6-violet)] bg-[rgba(167,139,250,0.2)]" : "border-[rgba(167,139,250,0.35)] bg-[rgba(13,23,48,0.8)] hover:bg-[rgba(167,139,250,0.12)]"}`}><CalendarClock aria-hidden className="size-4" />Today&apos;s callbacks ({todays.length})</button>
+        <button type="button" onClick={() => setView("callbacks")} aria-pressed={view === "callbacks"} data-testid="dial-view-callbacks" className={`ds-press inline-flex min-h-11 items-center gap-2 rounded-full border px-4 text-sm font-medium sm:min-h-9 ${view === "callbacks" ? "border-[var(--s6-violet)] bg-[color-mix(in_srgb,var(--s6-violet)_20%,transparent)]" : "border-[color-mix(in_srgb,var(--s6-violet)_35%,transparent)] bg-[color-mix(in_srgb,var(--s6-surf)_80%,transparent)] hover:bg-[color-mix(in_srgb,var(--s6-violet)_12%,transparent)]"}`}><CalendarClock aria-hidden className="size-4" />Today&apos;s callbacks ({todays.length})</button>
       </div>
 
       {view === "callbacks" ? (
@@ -143,7 +143,7 @@ function DialInner() {
       {stats.data && stats.data.people.length > 0 && (
         <div className="mt-2" data-testid="dial-stats">
           <h3 className="mb-1 text-sm font-semibold">{stats.data.own ? "Your calls in the last 12 hours" : "Calls logged in the last 12 hours"}</h3>
-          <ul className="divide-y divide-[rgba(36,54,89,0.9)] rounded-lg border border-[rgba(36,54,89,0.9)] text-sm">
+          <ul className="divide-y divide-[color-mix(in_srgb,var(--s6-line)_90%,transparent)] rounded-lg border border-[color-mix(in_srgb,var(--s6-line)_90%,transparent)] text-sm">
             {stats.data.people.map((p) => (
               <li key={p.userId} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2"><span className="font-medium">{p.name}</span><span>{p.calls} {p.calls === 1 ? "call" : "calls"}</span>{p.perHour !== null && <span>{p.perHour} an hour</span>}
                 <span className="text-muted-foreground">{Object.entries(p.outcomes).map(([k, n]) => `${n} ${k.replace("_", " ")}`).join(", ")}</span></li>
@@ -337,7 +337,7 @@ function Session({ s, setS, onExit, me, cadence, goals, cbs, setCbs }: {
       <div className="mb-3 flex items-center gap-3">
         <div className="min-w-0 flex-1">
           <div className="mb-1 flex justify-between text-sm"><span className="font-medium" data-testid="dial-progress-text">{position} of {total}</span><button type="button" onClick={onExit} className="min-h-9 text-muted-foreground underline" data-testid="dial-end">End session</button></div>
-          <div className="h-2 overflow-hidden rounded-full bg-[rgba(36,54,89,0.8)]" role="progressbar" aria-valuemin={0} aria-valuemax={total} aria-valuenow={position} aria-label="Progress through the list"><div className="h-full rounded-full bg-[var(--s6-cyan)] shadow-[0_0_10px_rgba(34,211,238,0.7)] transition-[width] duration-300 motion-reduce:transition-none" style={{ width: `${Math.round((position / Math.max(1, total)) * 100)}%` }} /></div>
+          <div className="h-2 overflow-hidden rounded-full bg-[color-mix(in_srgb,var(--s6-line)_80%,transparent)]" role="progressbar" aria-valuemin={0} aria-valuemax={total} aria-valuenow={position} aria-label="Progress through the list"><div className="h-full rounded-full bg-[var(--s6-cyan)] shadow-[0_0_10px_color-mix(in_srgb,var(--s6-cyan)_70%,transparent)] transition-[width] duration-300 motion-reduce:transition-none" style={{ width: `${Math.round((position / Math.max(1, total)) * 100)}%` }} /></div>
         </div>
       </div>
       <p className="sr-only" role="status" aria-live="polite">{status}</p>
@@ -382,7 +382,7 @@ function Session({ s, setS, onExit, me, cadence, goals, cbs, setCbs }: {
           {!link.trim() && <label className="mt-2 grid gap-1 text-xs"><span className="s6-label">Your booking link (kept in this browser)</span><input className="s6-num !w-full !text-left px-2" placeholder="https://" value={link} onChange={(e) => setLink(e.target.value)} data-testid="dial-link-input" /></label>}
         </div>
 
-        <details className="mt-4 border-t border-[rgba(36,54,89,0.9)] pt-3" open data-testid="dial-script">
+        <details className="mt-4 border-t border-[color-mix(in_srgb,var(--s6-line)_90%,transparent)] pt-3" open data-testid="dial-script">
           <summary className="min-h-9 cursor-pointer text-sm font-medium">Call script{item.source ? ` for ${item.source}` : ""}</summary>
           <p className="mt-1 whitespace-pre-wrap text-sm" data-testid="dial-script-text">{shown}</p>
           <ScriptEditor loc={item.locationId} value={script} canEdit={scriptQ.data?.canEdit !== false} onChange={(t) => setDraft({ loc: item.locationId, text: t })}
@@ -390,22 +390,22 @@ function Session({ s, setS, onExit, me, cadence, goals, cbs, setCbs }: {
             source={sourceKey || null} onSaveSource={(t) => { setScripts({ ...scripts, [sourceKey]: t }); setDraft(null); }} />
         </details>
 
-        <div className="mt-4 border-t border-[rgba(36,54,89,0.9)] pt-3 text-sm" data-testid="dial-story">
+        <div className="mt-4 border-t border-[color-mix(in_srgb,var(--s6-line)_90%,transparent)] pt-3 text-sm" data-testid="dial-story">
           <p className="mb-1 font-medium">Their story</p>
           {ctx.loading && !ctx.data ? <p className="text-muted-foreground">Loading...</p> : (
             <>
-              {(ctx.data?.tags.length ?? 0) > 0 && <p className="mb-1 flex flex-wrap gap-1.5">{ctx.data!.tags.slice(0, 8).map((t) => <span key={t} className="rounded-full border border-[rgba(103,232,249,0.25)] px-2 py-0.5 text-xs">{t}</span>)}</p>}
+              {(ctx.data?.tags.length ?? 0) > 0 && <p className="mb-1 flex flex-wrap gap-1.5">{ctx.data!.tags.slice(0, 8).map((t) => <span key={t} className="rounded-full border border-[color-mix(in_srgb,var(--s6-edgec)_25%,transparent)] px-2 py-0.5 text-xs">{t}</span>)}</p>}
               {open.length > 0 && <p className="mb-1">{open.slice(0, 3).map((x) => `${x.name ?? "Deal"}${x.stageName ? ` (${x.stageName})` : ""}, ${fmtMoney(x.value)}`).join("; ")}</p>}
               {events.length > 0 ? <ul className="space-y-0.5 text-muted-foreground">{events.map((e, i) => <li key={i}>{when(e.at)}: {e.text}</li>)}</ul> : <p className="text-muted-foreground">No earlier touches recorded.</p>}
             </>
           )}
         </div>
 
-        <div className="mt-5 border-t border-[rgba(36,54,89,0.9)] pt-4">
+        <div className="mt-5 border-t border-[color-mix(in_srgb,var(--s6-line)_90%,transparent)] pt-4">
           {chips && (
-            <div className="mb-3 rounded-xl border border-[rgba(34,211,238,0.5)] p-3" data-testid="dial-chips" role="group" aria-label="How did it go?">
+            <div className="mb-3 rounded-xl border border-[color-mix(in_srgb,var(--s6-cyan)_50%,transparent)] p-3" data-testid="dial-chips" role="group" aria-label="How did it go?">
               <p className="mb-2 text-sm font-medium">{chips.correction ? `Change the outcome for ${chips.card?.name ?? "this lead"}` : "How did it go?"}</p>
-              <div className="flex flex-wrap gap-2">{dispo.map((d) => <button key={d.key} type="button" disabled={busy} data-testid={`chip-${d.key}`} aria-pressed={chips.pre === d.base} onClick={() => { const c = chips; if (c.correction && c.card) void record(d, null, { target: c.card, correction: true }); else if (d.next === "callback" || d.base === "call_back") pick(d); else void record(d, null); setChips(null); }} className={`s6-btn ${chips.pre === d.base ? "!border-[var(--s6-cyan)] !bg-[rgba(34,211,238,0.3)]" : ""}`}>{d.label}</button>)}</div>
+              <div className="flex flex-wrap gap-2">{dispo.map((d) => <button key={d.key} type="button" disabled={busy} data-testid={`chip-${d.key}`} aria-pressed={chips.pre === d.base} onClick={() => { const c = chips; if (c.correction && c.card) void record(d, null, { target: c.card, correction: true }); else if (d.next === "callback" || d.base === "call_back") pick(d); else void record(d, null); setChips(null); }} className={`s6-btn ${chips.pre === d.base ? "!border-[var(--s6-cyan)] !bg-[color-mix(in_srgb,var(--s6-cyan)_30%,transparent)]" : ""}`}>{d.label}</button>)}</div>
             </div>
           )}
           {auto && !chips ? <p className="s6-label mb-2" data-testid="dial-auto-note"><Sparkles aria-hidden className="mr-1 inline size-3.5 text-[var(--s6-cyan)]" />Call from your CRM. SubSync notices how it went and moves on by itself.</p> : null}
@@ -413,13 +413,13 @@ function Session({ s, setS, onExit, me, cadence, goals, cbs, setCbs }: {
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3" data-testid="dial-outcomes">
             {dispo.map((d, i) => (
               <button key={d.key} type="button" disabled={busy} onClick={() => pick(d)} onMouseEnter={() => setHover(d)} onFocus={() => setHover(d)} className={`${BIG} justify-between ${d.doNotCall ? "col-span-2 sm:col-span-1" : ""}`} data-testid={`dial-outcome-${d.key}`} aria-keyshortcuts={String(i + 1)}>
-                <span>{d.label}</span><kbd className="hidden rounded border border-[rgba(103,232,249,0.3)] px-1.5 text-xs text-muted-foreground sm:inline">{i + 1}</kbd>
+                <span>{d.label}</span><kbd className="hidden rounded border border-[color-mix(in_srgb,var(--s6-edgec)_30%,transparent)] px-1.5 text-xs text-muted-foreground sm:inline">{i + 1}</kbd>
               </button>
             ))}
           </div>
           </details>
           {callback !== null && (
-            <div className="mt-3 flex flex-wrap items-end gap-2 rounded-lg border border-[rgba(167,139,250,0.4)] p-3" data-testid="dial-callback">
+            <div className="mt-3 flex flex-wrap items-end gap-2 rounded-lg border border-[color-mix(in_srgb,var(--s6-violet)_40%,transparent)] p-3" data-testid="dial-callback">
               <label className="text-sm">Call back at<input type="datetime-local" value={callback} onChange={(e) => setCallback(e.target.value)} className="mt-1 block min-h-11 rounded-md border bg-background px-2" data-testid="dial-callback-time" /></label>
               <button type="button" disabled={busy || !callback} onClick={() => void record(dispo.find((x) => x.base === "call_back") ?? dispo[0], new Date(callback).toISOString())} className={PRIMARY} data-kind="primary" data-testid="dial-callback-save">Save and next</button>
               <button type="button" onClick={() => setCallback(null)} className="min-h-11 px-2 underline">Cancel</button>
@@ -429,7 +429,7 @@ function Session({ s, setS, onExit, me, cadence, goals, cbs, setCbs }: {
             <span>Also write a short note to your CRM{mode ? (mode.live ? "." : ". Writing is switched off, so this is a dry run and nothing in your CRM changes.") : "."}</span></label>
           {writeCrm && <p className="s6-label mt-1" data-testid="dial-note-preview">Note: {previewNote}</p>}
           <div className="mt-3 flex items-center justify-between">
-            <button type="button" onClick={skip} disabled={busy} className={BIG} data-testid="dial-skip"><SkipForward aria-hidden className="size-4" />Skip<kbd className="hidden rounded border border-[rgba(103,232,249,0.3)] px-1.5 text-xs text-muted-foreground sm:inline">N</kbd></button>
+            <button type="button" onClick={skip} disabled={busy} className={BIG} data-testid="dial-skip"><SkipForward aria-hidden className="size-4" />Skip<kbd className="hidden rounded border border-[color-mix(in_srgb,var(--s6-edgec)_30%,transparent)] px-1.5 text-xs text-muted-foreground sm:inline">N</kbd></button>
             <p className="hidden text-xs text-muted-foreground sm:block">Keys: N skip, 1 to {Math.min(9, dispo.length)} outcomes</p>
           </div>
           <DispositionEditor value={dispo} onChange={setDispo} accountName={item.locationName} />
@@ -467,7 +467,7 @@ function Finish({ s, onExit }: { s: S; onExit: () => void }) {
   const list = (title: string, rows: Later[], id: string) => <div className="s6-card mt-4 text-left" data-testid={id}><h3 className="s6-q">{title}</h3><ul className="mt-2 grid gap-1 text-sm">{rows.slice(0, 6).map((l) => <li key={l.key} className="flex justify-between gap-3"><span className="truncate">{l.name}</span><span className="s6-label shrink-0">{l.why}</span></li>)}</ul></div>;
   return (
     <section className="mx-auto max-w-xl text-center" aria-label="Session summary" data-testid="dial-summary">
-      <div className="dial-pop mx-auto mb-3 flex size-16 items-center justify-center rounded-full bg-[rgba(34,211,238,0.15)] text-[var(--s6-cyan)] shadow-[0_0_24px_rgba(34,211,238,0.5)]" aria-hidden><Check className="size-8" /></div>
+      <div className="dial-pop mx-auto mb-3 flex size-16 items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--s6-cyan)_15%,transparent)] text-[var(--s6-cyan)] shadow-[0_0_24px_color-mix(in_srgb,var(--s6-cyan)_50%,transparent)]" aria-hidden><Check className="size-8" /></div>
       <h2 className="text-2xl font-semibold tracking-tight">{sum.calls === 0 ? "Session ended" : "Nice work. The list is done."}</h2>
       <p className="mt-1 text-sm text-muted-foreground">{sum.calls === 0 ? "No calls were logged this time." : `${sum.calls} ${sum.calls === 1 ? "call" : "calls"} logged${sum.perHour !== null ? `, about ${sum.perHour} an hour` : ""}.`}</p>
       {s.streak >= 3 && <p className="s6-chip mt-2" data-tone="amber"><Flame aria-hidden className="size-3.5" />{s.streak} reached in a row</p>}

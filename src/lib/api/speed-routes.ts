@@ -6,7 +6,7 @@ import { parseWindow, type Win } from "../analytics/speed-window";
 import type { deepLinks } from "../links";
 import { parseFilter } from "../analytics/speed-v4-more";
 import { isStep, speedCoverage, speedJourney, speedJourneyList, speedProof, speedRace, speedStory } from "../analytics/speed-v4-queries";
-import { ladderPreview, saveLadder, speedBooking } from "../analytics/speed5-queries";
+import { ladderLeads, ladderPreview, saveLadder, speedBooking } from "../analytics/speed5-queries";
 import { speedPulse } from "../analytics/speed6-queries";
 import { zoneLabel } from "../analytics/speed6";
 import { buildMessage, destination, sanitizeDigest } from "../analytics/speed-digest";
@@ -142,12 +142,17 @@ export async function handleSpeedPart(ctx: Ctx, h: SpeedHelpers): Promise<Respon
     if (allowed === "none") return json({ error: "Unknown account" }, 404);
     return json(withUrls(await speedPulse({ installationId: ctx.installationId, allowed: allowed as string[] | null, targetMinutes, now, seePeople, filter: parseFilter(sp), ...win }), links.contact));
   }
-  if (part === "booking" || part === "ladder") {
+  if (part === "booking" || part === "ladder" || part === "ladder-leads") {
     const allowed = narrowed(allowedAll, sp.get("account"));
     if (allowed === "none") return json({ error: "Unknown account" }, 404);
     const input = { installationId: ctx.installationId, allowed: allowed as string[] | null, targetMinutes, now, seePeople, filter: undefined, ...win };
     // The ladder names people, so a client's staff do not get it (they see their own leads elsewhere).
     if (part === "ladder") return seePeople ? json(withUrls(await ladderPreview(input), links.contact)) : json({ error: "Not available in this view" }, 403);
+    if (part === "ladder-leads") {
+      if (!seePeople) return json({ error: "Not available in this view" }, 403);
+      const st = Number(sp.get("step"));
+      return json(withUrls(await ladderLeads(input, { step: st === 1 || st === 2 || st === 3 ? st : 0, page: int(sp.get("page"), 0), size: int(sp.get("size"), 20), accPage: int(sp.get("accPage"), 0), accSize: int(sp.get("accSize"), 5) }), links.contact));
+    }
     return json(await speedBooking(input));
   }
 

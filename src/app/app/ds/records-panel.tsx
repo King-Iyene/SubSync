@@ -4,6 +4,7 @@ import {
   CalendarDays, ChevronDown, ChevronLeft, ChevronRight, Clock, Download, ExternalLink, Hash, Link2, Maximize2, MoreHorizontal, Minimize2, Plus, Search, Tag, Type, DollarSign, X,
   ArrowDown, ArrowUp, Check, type LucideIcon,
 } from "lucide-react";
+import { ListControls, PageBar, useListPrefs } from "./list-prefs";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { portalRoot } from "./portal-root";
@@ -23,7 +24,7 @@ import { LeadDrawer, type LeadSeed } from "./lead-drawer";
 // The rows are whatever the page already received for this person, so narrowing or exporting can never reach more than they were sent.
 
 import { StatusChip } from "./status-chip";
-const PAGE = 50;
+
 const ICON: Record<ColType, LucideIcon> = { text: Type, date: CalendarDays, number: Hash, money: DollarSign, duration: Clock, link: Link2, kind: Tag };
 const FIRST_CHIPS = ["account", "kind", "state", "what", "owner"];
 const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
@@ -85,6 +86,8 @@ export function RecordsPanel({ spec, onClose, now, zone = "UTC", canExport = tru
       setGone((g) => new Set([...g, ...list.map((r) => r.id)])); setPicked(new Set());
     } finally { setWorking(false); }
   };
+  const prefs = useListPrefs();
+  const PAGE = prefs.size;
   const pages = Math.max(1, Math.ceil(rows.length / PAGE));
   const at = Math.min(page, pages - 1);
   const shown = rows.slice(at * PAGE, at * PAGE + PAGE);
@@ -294,11 +297,8 @@ export function RecordsPanel({ spec, onClose, now, zone = "UTC", canExport = tru
 
         <footer className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-t px-5 py-2.5 text-sm text-muted-foreground" data-testid="records-footer">
           <span data-testid="records-showing"><span className="tnum">Showing {shown.length.toLocaleString("en-US")} of {rows.length.toLocaleString("en-US")}</span>{spec.note && <span className="ml-3 text-xs" data-testid="records-note">{spec.note}</span>}</span>
-          <span className="flex items-center gap-1">
-            <button type="button" aria-label="Previous page" disabled={at <= 0} onClick={() => setPage(at - 1)} data-testid="records-prev" className={`${iconBtn} border disabled:opacity-40`}><ChevronLeft aria-hidden className="size-4" /></button>
-            <span aria-live="polite" className="tnum px-1">Page {at + 1} of {pages}</span>
-            <button type="button" aria-label="Next page" disabled={at >= pages - 1} onClick={() => setPage(at + 1)} data-testid="records-next" className={`${iconBtn} border disabled:opacity-40`}><ChevronRight aria-hidden className="size-4" /></button>
-          </span>
+          <ListControls />
+          <div className="w-full"><PageBar page={at} pages={pages} from={rows.length ? at * PAGE + 1 : 0} to={at * PAGE + shown.length} total={rows.length} onPage={setPage} testId="records-pager" nextTestId="records-next" /></div>
         </footer>
         {lead !== null && seeds.length > 0 && <LeadDrawer leads={seeds} index={lead} onIndex={setLead} onClose={() => setLead(null)} />}
       </div>

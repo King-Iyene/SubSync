@@ -4,7 +4,7 @@ import { Bell, Copy, Minus, Plus, Send } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
 import { destination, LINES, type DigestSettings } from "@/lib/analytics/speed-digest";
 import { useApiClient, useData } from "../session";
-import { ErrorState, LeadDrawer, SkeletonRows, type LeadSeed } from "../ds";
+import { ErrorState, LeadDrawer, ListControls, PageBar, SkeletonRows, useListPrefs, type LeadSeed } from "../ds";
 import { SidePopup } from "./speed-popup";
 import { Band, Fold, Q } from "./speed6-base";
 import type { GoFn } from "../nav";
@@ -69,24 +69,72 @@ export function EscalationCard({ canChange, d, reload }: { canChange: boolean; d
   );
 }
 
-/** "Leads waiting now": each lead past its target as a card; the badge says how far up the ladder it is. A click opens the shared lead panel, never a small popup. */
-export function WaitingNowCard({ leads, multi }: { leads: Waiting[]; multi: boolean }) {
+type Waits = { counts?: { 1: number; 2: number; 3: number }; total?: number; page?: number; pages?: number; from?: number; to?: number; leads: Waiting[]; accounts?: { total: number; page: number; pages: number; rows: Array<{ locationId: string; name: string; waiting: number; topStep: number }> } };
+const STEP_LABEL = ["", "Owner told", "Next person told", "Manager told"] as const;
+/** "Leads waiting now", built for 100+ accounts and thousands of leads: three step tiles that filter, one slim paged list (longest wait first), and for agencies a by-account summary. A click opens the shared lead panel. */
+export function WaitingNowCard({ multi, fallback }: { multi: boolean; fallback?: Waiting[] }) {
+  const [step, setStep] = useState<0 | 1 | 2 | 3>(0);
+  const [pg, setPg] = useState({ k: "", n: 0 });
+  const [account, setAccount] = useState<{ id: string; name: string } | null>(null);
+  const [accAll, setAccAll] = useState(false);
+  const [accPage, setAccPage] = useState(0);
+  const prefs = useListPrefs();
+  const pk = `${prefs.size}|${step}|${account?.id ?? ""}`;
+  const page = pg.k === pk ? pg.n : 0;
+  const setPage = (n: number) => setPg({ k: pk, n });
+  const sp = new URLSearchParams({ part: "ladder-leads", step: String(step), page: String(page), size: String(prefs.size), accPage: String(accAll ? accPage : 0), accSize: accAll ? String(prefs.size) : "5" });
+  if (account) sp.set("account", account.id);
+  const { data, error, reload } = useData<Waits>(`speed?${sp}`);
   const [open, setOpen] = useState<{ i: number; reply: boolean } | null>(null);
+  const leads = data?.leads ?? fallback ?? [];
+  const counts = data?.counts ?? { 1: leads.filter((l) => l.step === 1).length, 2: leads.filter((l) => l.step === 2).length, 3: leads.filter((l) => l.step === 3).length };
+  const all = counts[1] + counts[2] + counts[3];
+  const total = data?.total ?? leads.length;
   const seeds: LeadSeed[] = useMemo(() => leads.map((l) => ({ contactId: l.contactId, locationId: l.locationId, name: l.name, locationName: l.account, url: l.url, owner: l.owner, unassigned: !l.owner, note: `Waiting ${l.waitedMin} minutes, target ${l.targetMin}. ${l.stepWords}.` })), [leads]);
-  const shown = leads.slice(0, 9);
+  const tight = prefs.density === "compact";
   return (
-    <Q sticky q="Which leads are waiting now?" testId="waiting-now" glow={shown.length ? "urgent" : undefined} tip="Leads past their account's reply target, newest worry first. The step badge says whether the owner, the next person or a manager has been told.">
-      {shown.length === 0 ? <p className="s6-label" data-testid="ladder-empty">No lead is past its target right now.</p> : (
-        <div className="s6-wait" data-testid="ladder-leads">
-          {shown.map((l, i) => (
-            <article key={`${l.locationId}:${l.contactId}`} className="rounded-xl border border-[rgba(36,54,89,0.9)] bg-[rgba(13,23,48,0.7)] p-4" data-testid="ladder-lead">
-              <div className="flex items-start justify-between gap-2"><button type="button" className="s6-link min-w-0 font-semibold" onClick={() => setOpen({ i, reply: false })} data-testid="ladder-lead-open"><span className="block truncate">{l.name}</span>{multi && <span className="s6-label block truncate">{l.account}</span>}</button>
-                <span className="s6-step s6-pulse" data-step={l.step} title={l.stepWords}><Bell aria-hidden className="size-3" />Step {l.step} of 3</span></div>
-              <p className="s6-big mt-3 !text-[1.75rem]" data-tone={l.step >= 2 ? "red" : "amber"}>{l.waitedMin} <span className="text-sm font-medium">min</span></p>
-              <p className="s6-label mt-1">Told: {l.step >= 3 ? "a manager" : l.step === 2 ? (l.nextPerson ?? "the next person") : (l.owner ?? "nobody owns it")}</p>
-              <button type="button" className="s6-btn mt-3 w-full" data-kind="primary" onClick={() => setOpen({ i, reply: true })} data-testid="ladder-reply" aria-label={`Reply to ${l.name}`}>Reply</button>
-            </article>
-          ))}
+    <Q sticky q="Which leads are waiting now?" testId="waiting-now" glow={all ? "urgent" : undefined} tip="Leads past their account's reply target, longest wait first. The step badge says whether the owner, the next person or a manager has been told.">
+      <p className="s6-label mb-3" data-testid="ladder-tip">Step 1: the owner is told. Step 2: the next person in line. Step 3: a manager. Each step starts after the minutes set in the card above.</p>
+      <div className="mb-4 grid grid-cols-3 gap-3" role="group" aria-label="Filter by step">
+        {([1, 2, 3] as const).map((n) => (
+          <button key={n} type="button" className="s6-card !p-3 text-left" data-glow={step === n ? "active" : undefined} aria-pressed={step === n} onClick={() => setStep(step === n ? 0 : n)} data-testid={`ladder-step-${n}`}>
+            <span className="s6-step" data-step={n}><Bell aria-hidden className="size-3" />Step {n}</span>
+            <span className="s6-big mt-1 block !text-[1.5rem]" data-tone={n >= 2 ? "red" : "amber"}>{counts[n].toLocaleString("en-US")}</span>
+            <span className="s6-label block">{STEP_LABEL[n]}</span>
+          </button>
+        ))}
+      </div>
+      {account && <p className="mb-2 text-sm">Showing {account.name} <button type="button" className="s6-link underline" onClick={() => setAccount(null)} data-testid="ladder-account-clear">Show all accounts</button></p>}
+      {error && !data && !fallback ? <ErrorState error={error} onRetry={reload} /> : leads.length === 0 && !data && !fallback ? <SkeletonRows rows={3} label="Finding the waiting leads..." /> : leads.length === 0 ? <p className="s6-label" data-testid="ladder-empty">{all === 0 ? "No lead is past its target right now." : "No lead at this step."}</p> : (
+        <>
+          <ListControls className="mb-2" />
+          <ul className="s6-ready" data-testid="ladder-leads" data-density={prefs.density}>
+            {leads.map((l, i) => (
+              <li key={`${l.locationId}:${l.contactId}`} data-testid="ladder-lead" style={{ minHeight: tight ? 34 : 44 }}>
+                <button type="button" className="s6-link flex min-w-0 flex-1 items-baseline gap-2 text-sm font-semibold" onClick={() => setOpen({ i, reply: false })} data-testid="ladder-lead-open"><span className="truncate">{l.name}</span>{multi && <span className="s6-label hidden truncate font-normal sm:inline">{l.account}</span>}</button>
+                <span className="s6-step" data-step={l.step} title={l.stepWords}>Step {l.step}</span>
+                <span className="tnum w-16 text-right text-sm font-semibold" data-testid="ladder-wait">{l.waitedMin} min</span>
+                <button type="button" className="s6-btn" data-size="sm" data-kind="primary" onClick={() => setOpen({ i, reply: true })} data-testid="ladder-reply" aria-label={`Reply to ${l.name}`}>Reply</button>
+              </li>
+            ))}
+          </ul>
+          <PageBar page={data?.page ?? 0} pages={data?.pages ?? 1} from={data?.from ?? 1} to={data?.to ?? leads.length} total={total} onPage={setPage} testId="ladder-pager" />
+        </>
+      )}
+      {multi && data?.accounts && data.accounts.total > 1 && !account && (
+        <div className="mt-5" data-testid="ladder-by-account">
+          <h4 className="mb-1 text-sm font-semibold">By client account</h4>
+          <ul className="s6-ready" data-density={prefs.density}>
+            {data.accounts.rows.map((a) => (
+              <li key={a.locationId} data-testid="ladder-account-row">
+                <button type="button" className="s6-link min-w-0 flex-1 truncate text-left text-sm font-semibold" onClick={() => setAccount({ id: a.locationId, name: a.name })}>{a.name}</button>
+                <span className="s6-step" data-step={a.topStep}>Step {a.topStep}</span>
+                <span className="tnum w-16 text-right text-sm">{a.waiting.toLocaleString("en-US")} waiting</span>
+              </li>
+            ))}
+          </ul>
+          {!accAll && data.accounts.total > 5 && <button type="button" className="s6-link mt-2 text-sm font-semibold underline" onClick={() => setAccAll(true)} data-testid="ladder-accounts-all">See all {data.accounts.total.toLocaleString("en-US")} accounts</button>}
+          {accAll && <><PageBar page={data.accounts.page} pages={data.accounts.pages} from={data.accounts.page * prefs.size + 1} to={data.accounts.page * prefs.size + data.accounts.rows.length} total={data.accounts.total} onPage={setAccPage} testId="ladder-acc-pager" rangeTestId="ladder-acc-range" nextTestId="ladder-acc-next" /><button type="button" className="s6-link text-sm underline" onClick={() => { setAccAll(false); setAccPage(0); }}>Show fewer</button></>}
         </div>
       )}
       {open && <LeadDrawer leads={seeds.map((s, k) => (open.reply && k === open.i ? { ...s, reply: true } : s))} index={open.i} onIndex={(n) => setOpen(n === null ? null : { i: n, reply: false })} onClose={() => setOpen(null)} showAccount={multi} />}
@@ -188,7 +236,7 @@ export function RulesTab6(p: { who: string; waiting: number; dollars: number | n
           {error ? <ErrorState error={error} onRetry={reload} /> : !d ? <SkeletonRows rows={3} label="Building the preview..." /> : <EscalationCard canChange={p.canChange} d={d} reload={reload} />}
         </div>
         <DigestCard accounts={p.accounts ?? []} />
-        {d && <><Band title="Right now" /><WaitingNowCard leads={d.leads} multi={p.multi} /></>}
+        {d && <><Band title="Right now" /><WaitingNowCard multi={p.multi} fallback={d.leads} /></>}
         {p.rest}
       </Fold>
     </div>

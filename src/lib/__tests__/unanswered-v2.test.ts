@@ -120,7 +120,7 @@ test("paging: a page is at most 50, the last page is short, a page past the end 
   assert.deepEqual(pageOf(all, 0, 25), { rows: all.slice(0, 25), page: 0, pages: 3, total: 53, from: 1, to: 25 });
   assert.equal(pageOf(all, 2, 25).rows.length, 3);
   assert.equal(pageOf(all, 99, 25).page, 2);
-  assert.equal(pageOf(all, 0, 500).rows.length, 50, "never more than 50 a page");
+  assert.equal(pageOf(all, 0, 500).rows.length, Math.min(100, all.length), "never more than 100 a page");
   assert.deepEqual(pageOf([], 0, 25), { rows: [], page: 0, pages: 1, total: 0, from: 0, to: 0 });
 });
 

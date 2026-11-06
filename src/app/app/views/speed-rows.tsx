@@ -6,7 +6,7 @@ import { emailPlan } from "@/lib/analytics/dedupe-review";
 import { fmtDuration } from "@/lib/analytics/speed-intel";
 import { ageWords } from "@/lib/analytics/today-queue";
 import { dialPlan, dialWarnings, mustStop, type DialWarning } from "@/lib/people/dial";
-import { LeadDrawer, PopMenu, RowButton, useDialer, type LeadSeed, type MenuItem } from "../ds";
+import { LeadDrawer, PopMenu, RowButton, useDialer, useListPrefs, type LeadSeed, type MenuItem } from "../ds";
 import { PersonName, type PersonView } from "./speed-cards";
 import { delayReasons, type ReasonKey } from "@/lib/analytics/speed6";
 import { DelayChip } from "./delay-chip";
@@ -52,7 +52,7 @@ export const toSeed = (r: LeadRow): LeadSeed => ({
 });
 
 const MENU_TRIGGER = "ds-press inline-flex size-11 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-[var(--ring)] @3xl:size-8";
-const TRACKS = "@3xl:grid-cols-[minmax(0,1fr)_9.5rem_6rem_2rem]";
+const TRACKS = "@3xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1.6fr)_auto_9.5rem_5.5rem_2rem]";
 
 /** What a row's menu does, the warning strip under a row, and the lead panel. One instance serves a whole list. */
 export function useLeadActions(rows: readonly LeadRow[]) {
@@ -108,20 +108,24 @@ export function useLeadActions(rows: readonly LeadRow[]) {
 
 export function LeadRows({ rows, showAccount, actions, testId = "speed-rows", head = true }: { rows: readonly LeadRow[]; showAccount: boolean; actions: ReturnType<typeof useLeadActions>; testId?: string; head?: boolean }) {
   const reasons = useMemo(() => delayReasons(rows), [rows]);
+  const { density } = useListPrefs();
+  const tight = density === "compact";
+  // One slim line on a wide screen (name, details, delay chip, wait, Reply, menu), about 44px comfortable and 34px compact; two lines only on a phone.
   return (
-    <ul className="@container divide-y border-y" data-testid={testId}>
-      {head && <li aria-hidden className={`hidden gap-x-3 py-1.5 pl-1 pr-1 text-[0.7rem] font-semibold uppercase tracking-wide text-muted-foreground @3xl:grid ${TRACKS}`}><span>Lead</span><span>Status</span><span /><span /></li>}
+    <ul className="@container divide-y border-y" data-testid={testId} data-density={density}>
+      {head && <li aria-hidden className={`hidden gap-x-3 py-1.5 pl-1 pr-1 text-[0.7rem] font-semibold uppercase tracking-wide text-muted-foreground @3xl:grid ${TRACKS}`}><span>Lead</span><span>Details</span><span /><span>Status</span><span /><span /></li>}
       {rows.map((r, i) => {
         const bad = r.status === "waiting";
+        const reason = reasons.get(rowKey(r));
         return (
-          <li key={rowKey(r)} data-testid="speed-row" data-status={r.status} data-never={r.neverAnswered ? "true" : "false"} className={`ds-row grid grid-cols-[minmax(0,1fr)_6rem_2.75rem] items-center gap-x-3 gap-y-0.5 py-2 pl-1 pr-1 ${TRACKS}`}>
-            <div className="min-w-0">
-              <button type="button" onClick={() => actions.show(i)} className="block min-h-6 max-w-full truncate text-left font-semibold hover:underline focus-visible:outline-2 focus-visible:outline-[var(--ring)]" title={r.name} data-testid="speed-row-name">{r.name}</button>
-              <p className="line-clamp-2 text-sm text-muted-foreground @3xl:truncate" title={whyLine(r, showAccount)}>{whyLine(r, showAccount)}</p>
-              {reasons.get(rowKey(r)) && <p className="mt-1"><DelayChip reason={reasons.get(rowKey(r)) as ReasonKey} /></p>}
+          <li key={rowKey(r)} data-testid="speed-row" data-status={r.status} data-never={r.neverAnswered ? "true" : "false"} className={`ds-row grid grid-cols-[minmax(0,1fr)_6rem_2.75rem] items-center gap-x-3 gap-y-0.5 pl-1 pr-1 ${tight ? "py-1" : "py-2"} ${TRACKS} ${tight ? "@3xl:min-h-[34px]" : "@3xl:min-h-[44px]"}`}>
+            <div className="min-w-0 @3xl:contents">
+              <button type="button" onClick={() => actions.show(i)} className="block min-h-6 max-w-full truncate text-left text-sm font-semibold hover:underline focus-visible:outline-2 focus-visible:outline-[var(--ring)]" title={r.name} data-testid="speed-row-name">{r.name}</button>
+              <p className="line-clamp-2 text-xs text-muted-foreground @3xl:truncate" title={whyLine(r, showAccount)}>{whyLine(r, showAccount)}</p>
+              {reason ? <p className="mt-1 @3xl:mt-0"><DelayChip reason={reason as ReasonKey} /></p> : <span aria-hidden className="hidden @3xl:block" />}
               <p className={`text-xs @3xl:hidden ${bad ? (r.neverAnswered ? "text-destructive" : "text-warning") : "text-muted-foreground"}`}>{waitWords(r)}</p>
             </div>
-            <p className={`tnum hidden items-center gap-1.5 text-sm @3xl:flex ${bad ? (r.neverAnswered ? "font-medium text-destructive" : "font-medium text-warning") : "text-muted-foreground"}`} data-testid="speed-wait">
+            <p className={`tnum hidden items-center gap-1.5 text-xs @3xl:flex ${bad ? (r.neverAnswered ? "font-medium text-destructive" : "font-medium text-warning") : "text-muted-foreground"}`} data-testid="speed-wait">
               {r.neverAnswered && <TriangleAlert aria-hidden className="size-3.5 shrink-0" />}{waitWords(r)}
             </p>
             <div><RowButton onClick={() => actions.reply(r)} label="Reply" sr={`reply to ${r.name}`} testId="speed-reply" /></div>

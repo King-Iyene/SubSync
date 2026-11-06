@@ -200,7 +200,7 @@ export function CaptureTab() {
             <span className="t-small" data-testid="capture-badge">{g.badge ? `${g.badge.direction === "up" ? "▲ Rising" : g.badge.direction === "down" ? "▼ Falling" : "Steady"}${g.badge.direction === "same" ? "" : ` ${Math.abs(g.badge.pct)}%`} last 7 days` : "Rate: not enough data yet"}</span></span>
         </H>
         {g.signals.length > 0 && <ul className="mb-2 space-y-1 text-sm" data-testid="capture-signals">{g.signals.slice(0, 3).map((s) => <li key={`${s.locationId}${s.scope}`}>{s.text}</li>)}</ul>}
-        <div className="max-w-3xl"><TimeChart testId="capture-series" mode={mode} label={`New email leads a day, ${rangeWord}`} noun="Day"
+        <div className="w-full"><TimeChart testId="capture-series" mode={mode} label={`New email leads a day, ${rangeWord}`} noun="Day"
           points={g.series.map((p) => ({ id: p.day, label: fullDate(p.day), short: dayLabel(p.day, g.range.days), partial: p.partial }))} series={[{ key: "n", name: "New email leads", colour: "var(--t-c1)", values: g.series.map((p) => p.count) }]}
           avg={g.series.map((p) => p.avg7)} onPick={(i) => setPanel(specDay(g, g.series[i].day))} /></div>
         <p className="t-small t-quiet mt-2"><button type="button" className={BTN} onClick={() => setPanel(specRange(g))}>See the {g.range.count.toLocaleString("en-US")} people in these dates</button></p>

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useData } from "../session";
-import { EmptyState, ErrorState, SkeletonRows } from "../ds";
+import { EmptyState, ErrorState, ListControls, PageBar, SkeletonRows, useListPrefs } from "../ds";
 import { LeadRows, useLeadActions, type LeadRow } from "./speed-rows";
 
 // The full list behind a number, the same for every number on the screen: "See all", a bar of the chart, a figure, a person, a client. The server chooses, searches,
@@ -27,7 +27,11 @@ export function LeadList({ title, params, showAccount, canMine, noun = "leads", 
   const [q, setQ] = useState("");
   const [sort, setSort] = useState(params.status === "waiting" || params.status === "onlyAuto" ? "wait" : "newest");
   const [owner, setOwner] = useState("");
-  const [page, setPage] = useState(0);
+  const prefs = useListPrefs();
+  // The page counts from 0 again whenever the rows per page change.
+  const [pg, setPg] = useState({ k: 0, n: 0 });
+  const page = pg.k === prefs.size ? pg.n : 0;
+  const setPage = (n: number) => setPg({ k: prefs.size, n });
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   // A list opened from a number takes the keyboard to its heading, so a screen reader says what opened.
@@ -37,7 +41,7 @@ export function LeadList({ title, params, showAccount, canMine, noun = "leads", 
     return () => { if (timer.current) clearTimeout(timer.current); };
   }, [text]);
 
-  const sp = new URLSearchParams({ part: "list", ...params, sort, page: String(page), size: "40" });
+  const sp = new URLSearchParams({ part: "list", ...params, sort, page: String(page), size: String(prefs.size) });
   if (q) sp.set("q", q);
   if (owner) sp.set("owner", owner);
   const { data, error, loading, reload } = useData<ListData>(`speed?${sp}`);
@@ -52,6 +56,7 @@ export function LeadList({ title, params, showAccount, canMine, noun = "leads", 
         <button type="button" onClick={onBack} className="min-h-11 rounded-md px-2.5 text-sm font-medium text-primary underline-offset-4 hover:bg-muted hover:underline sm:min-h-9" data-testid="speed-list-back">{backLabel}</button>
       </div>
       <div className="mb-2 flex flex-wrap items-center gap-2" role="group" aria-label="Search and sort this list">
+        <ListControls className="order-last sm:ml-auto" />
         <input type="search" value={text} onChange={(e) => setText(e.target.value)} placeholder="Search by name, client, source, email or phone" aria-label="Search this list" className={`${field} min-w-0 flex-1 sm:max-w-sm`} data-testid="speed-list-search" />
         <select value={sort} onChange={(e) => { setSort(e.target.value); setPage(0); }} aria-label="Sort this list" className={field} data-testid="speed-list-sort">
           {SORTS.filter((s) => showAccount || s.key !== "account").map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
@@ -70,16 +75,7 @@ export function LeadList({ title, params, showAccount, canMine, noun = "leads", 
         : (
           <div aria-busy={loading} className={loading ? "opacity-70" : ""}>
             <LeadRows rows={rows} showAccount={showAccount} actions={actions} testId="speed-list-rows" />
-            <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
-              <span data-testid="speed-list-range" aria-live="polite">Showing {data.from.toLocaleString("en-US")} to {data.to.toLocaleString("en-US")} of {data.total.toLocaleString("en-US")}</span>
-              {data.pages > 1 && (
-                <span className="flex items-center gap-1">
-                  <button type="button" disabled={data.page === 0} onClick={() => setPage(data.page - 1)} className={`${chip(false)} disabled:opacity-40`}>Previous</button>
-                  {pageNumbers(data.page, data.pages).map((n, i) => n === null ? <span key={`g${i}`} aria-hidden>...</span> : <button key={n} type="button" aria-current={n === data.page ? "page" : undefined} aria-label={`Page ${n + 1}`} onClick={() => setPage(n)} className={`${chip(n === data.page)} tabular-nums`} data-testid="speed-list-page">{n + 1}</button>)}
-                  <button type="button" disabled={data.page >= data.pages - 1} onClick={() => setPage(data.page + 1)} className={`${chip(false)} disabled:opacity-40`} data-testid="speed-list-next">Next</button>
-                </span>
-              )}
-            </div>
+            <PageBar page={data.page} pages={data.pages} from={data.from} to={data.to} total={data.total} onPage={setPage} testId="speed-list-pager" rangeTestId="speed-list-range" nextTestId="speed-list-next" />
             {data.truncated && <p className="mt-2 text-xs text-muted-foreground">This range holds more leads than SubSync reads at once (20,000, newest first). Choose a shorter range to see the older ones.</p>}
           </div>
         )}

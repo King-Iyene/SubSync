@@ -130,7 +130,7 @@ test("paging: 150 accounts and 5,000 rows never come back in one piece", () => {
   assert.equal(p.pages, 200);
   assert.equal(p.from, 76);
   assert.equal(pageOf(rows, 9999, 25).page, 199, "a page past the end is the last page");
-  assert.equal(pageOf(rows, 0, 9999).rows.length, 50, "never more than 50 at a time");
+  assert.equal(pageOf(rows, 0, 9999).rows.length, 100, "never more than 100 at a time");
   assert.equal(pageOf([], 0, 25).from, 0);
 });
 
