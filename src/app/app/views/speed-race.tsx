@@ -14,6 +14,7 @@ import { DupChips, MoneyMeter, type Risk } from "./speed5-ui";
 import { PrimaryButton } from "./today-chrome";
 import { useSpeedFilter } from "./speed-filter";
 import { rowKey, useLeadActions, whyLine, type LeadRow } from "./speed-rows";
+import { useListPopup } from "./speed6-base";
 import "./speed4.css";
 
 // The first screen of Speed to lead: THE RACE ON NEW LEADS. A headline in money, a live clock on every new lead, one button for the lead closest to losing, and a speed ring per account.
@@ -108,6 +109,7 @@ export function RaceTab({ multi, onCall }: { multi: boolean; onCall?: () => void
   const actions = useLeadActions(rows);
   const now = useNow(d?.now ?? 0);
   const [story, setStory] = useState<string | null>(null);
+  const { open: openList, node: listNode } = useListPopup(multi);
   if (error) return <ErrorState error={error} onRetry={reload} />;
   if (!d) return <SkeletonRows rows={5} label="Lining up the race..." />;
   const waiting = rows.filter((r) => r.touchedAt === null).sort((a, b) => (a.arrivedAt + a.targetMinutes * 60_000 - (a.repeat ? 600_000 : 0)) - (b.arrivedAt + b.targetMinutes * 60_000 - (b.repeat ? 600_000 : 0))); // a repeat enquirer is warm: it counts as ten minutes closer to its deadline
@@ -120,6 +122,7 @@ export function RaceTab({ multi, onCall }: { multi: boolean; onCall?: () => void
     : `${losing.length} new ${losing.length === 1 ? "lead is" : "leads are"} losing the race${losingDollars > 0 ? `: ${usd(losingDollars)} of open deals` : ""}.`;
   return (
     <div data-testid="race-tab">
+      {listNode}
       <section className="mb-8 grid gap-6 md:grid-cols-[1fr_auto] md:items-center" aria-label="The race">
         <div className="max-w-3xl">
           <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
@@ -127,7 +130,7 @@ export function RaceTab({ multi, onCall }: { multi: boolean; onCall?: () => void
             {onCall && <button type="button" onClick={onCall} data-testid="start-calling" className="spd-cta ds-press inline-flex min-h-11 shrink-0 cursor-pointer items-center gap-2 rounded-lg px-5 text-[15px] font-semibold focus-visible:outline-2 focus-visible:outline-[var(--ring)]"><PhoneCall aria-hidden className="size-4" />Start calling</button>}
           </div>
           <p className="t-small t-quiet mt-2" data-testid="race-money">
-            This month, {l.leads.toLocaleString("en-US")} {l.leads === 1 ? "lead" : "leads"} got no person reply or a slow one
+            This month, <button type="button" className="s6-link font-semibold underline decoration-dotted underline-offset-4" data-tip="Click to see these leads" data-testid="race-leak-link" onClick={() => openList("No person reply, or a slow one", { status: "slow" })}>{l.leads.toLocaleString("en-US")} {l.leads === 1 ? "lead" : "leads"}</button> got no person reply or a slow one
             {l.countedDollars > 0 ? <>: <strong className="text-[var(--t-ink)]">{usd(l.countedDollars)}</strong> in open deals belongs to {l.countedPeople} of them (counted).</> : ". No open deals are attached to them."}
             {l.estimate ? <> An estimate of what slow replies cost: <strong className="text-[var(--t-ink)]">{l.estimate.line}</strong> (estimate{l.estimate.leftOut ? `, ${l.estimate.leftOut} accounts left out for too few closed deals` : ""})</> : <> No estimate yet: an account needs 20 closed deals first.</>}
             <WhatIs text="Counted deals are open deals of the people who got no person reply or a slow one. The estimate multiplies those leads by the account's own average deal and win rate, only with 20 or more closed deals." />
@@ -136,15 +139,15 @@ export function RaceTab({ multi, onCall }: { multi: boolean; onCall?: () => void
           {closest && <div className="mt-4 max-w-sm" data-testid="race-primary"><PrimaryButton p={{ label: "Reply to the lead closest to breaching", sr: `${closest.name}, closest to breaching`, onClick: () => actions.reply(closest) }} /></div>}
         </div>
         <div className="flex items-end justify-center gap-6">
-          <Ring score={d.overall.score} label="Answered in time" />
-          <div className="pb-6 text-sm" data-testid="race-median"><p className="t-label">Typical first reply</p><p className="text-2xl font-semibold tabular-nums">{d.overall.medianSeconds === null ? "n/a" : fmtDuration(d.overall.medianSeconds)}</p><p className="t-small t-quiet">target {d.targetMinutes} min</p></div>
+          <button type="button" className="s6-link" data-testid="race-ring-open" data-tip="Answered in time. Click to see those leads." aria-label="Answered in time, open the leads" onClick={() => openList("Answered in time", { status: "within" })}><Ring score={d.overall.score} label="Answered in time" /></button>
+          <button type="button" className="s6-link pb-6 text-sm" data-testid="race-median" data-tip="Typical first reply. Click to see the leads that got one." onClick={() => openList("Leads that got a first reply", { status: "answered" })}><p className="t-label">Typical first reply</p><p className="text-2xl font-semibold tabular-nums">{d.overall.medianSeconds === null ? "n/a" : fmtDuration(d.overall.medianSeconds)}</p><p className="t-small t-quiet">target {d.targetMinutes} min</p></button>
         </div>
       </section>
 
       {d.scores.length > 1 && (
         <section className="mb-8" aria-label="Speed by account" data-testid="race-accounts">
           <h3 className="t-title mb-2">Speed by account <WhatIs text="Share of each account's new leads answered by a person inside the target. Needs 5 judged leads." /></h3>
-          <ul className="flex flex-wrap gap-x-6 gap-y-3">{d.scores.map((a) => <li key={a.locationId} className="w-24 text-center"><Ring score={a.score} size={72} label={a.name} /></li>)}</ul>
+          <ul className="flex flex-wrap gap-x-6 gap-y-3">{d.scores.map((a) => <li key={a.locationId} className="w-24 text-center"><button type="button" className="s6-link w-full" data-testid="account-ring" data-tip={`${a.name}: click to see its leads`} aria-label={`${a.name}, open its leads`} onClick={() => openList(a.name, { status: "all", account: a.locationId })}><Ring score={a.score} size={72} label={a.name} /></button></li>)}</ul>
         </section>
       )}
 

@@ -21,6 +21,8 @@ import { RaceTab } from "./speed-race";
 import { CoverageTab, JourneyCard, RulesTab } from "./speed-coverage";
 import { DialMode } from "./dial-mode";
 import { SidePopup, TipHost } from "./speed-popup";
+import { Fold } from "./speed6-base";
+import { Guide, GuideButton, PaceTab6, PeopleTab6, Tour } from "./speed6-ui";
 import "./speed-ui.css";
 
 // Speed to lead, rebuilt (docs/SPEED_REVIEW.md). One question: "who is waiting for a first reply, and what do I do first?". Top to bottom: one sentence, one button
@@ -63,6 +65,7 @@ export function SpeedView({ go }: { go: GoFn }) {
   const [list, setList] = useState<ListSpec | null>(null);
   const [copied, setCopied] = useState(false);
   const [more, setMore] = useState(false);
+  const [guide, setGuide] = useState(false);
   const top = useRef<HTMLDivElement>(null);
   const rows = data?.waiting.rows ?? [];
   const actions = useLeadActions(rows);
@@ -82,6 +85,7 @@ export function SpeedView({ go }: { go: GoFn }) {
   const open: OpenList = (spec) => setList(spec);
   const waitingList: ListSpec = { title: "Waiting for a reply", params: { status: "waiting" } };
   const oldest = rows[0];
+  const slow = { people: d.comparePeople.rows, accounts: d.compareAccounts.rows, seePeople: d.seePeople, win: { from: d.window.from, to: d.window.to } };
 
   const copy = async () => {
     const text = summaryText({
@@ -99,12 +103,14 @@ export function SpeedView({ go }: { go: GoFn }) {
   ];
 
   return (
-    <div data-testid="page" className="ds-enter" ref={top}>
+    <div data-testid="page" className="ds-enter s6" ref={top}>
+      <Tour />{guide && <Guide onClose={() => setGuide(false)} />}
       <header className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 print:hidden">
         <div className="mr-auto min-w-0">
           <h1 className="text-[1.65rem] font-semibold leading-tight tracking-tight">Speed to lead</h1>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground" data-testid="page-subtitle">How long new leads wait for a first reply from a person. SubSync measures this; it never sends a reply.</p>
         </div>
+        <GuideButton onClick={() => setGuide(true)} />
         <PopMenu label="More" items={menu} testId="speed-more" triggerClassName={MORE_TRIGGER}>More<ChevronDown aria-hidden className="size-3.5" /></PopMenu>
       </header>
 
@@ -121,14 +127,14 @@ export function SpeedView({ go }: { go: GoFn }) {
       ) : (
         <FilterProvider range={r ? { from: r.current.from, to: r.current.to, label: r.current.label, sentence: r.sentence } : null}>{(bar) => (<>{FILTER_TABS.has(tab) && bar}<TipHost /><ModuleTabs pill label="Speed to lead sections" value={tab} onChange={goTab} tabs={[
           { label: "Race", icon: ic(Zap), node: <RaceTab multi={multi} onCall={() => goTab(CALL_TAB)} /> },
-          { label: "Pace", icon: ic(Gauge), node: <><JourneyCard multi={multi} /><BookingCard /><PaceTab multi={multi} /></> },
-          { label: "Coverage", icon: ic(PhoneMissed), node: <CoverageTab multi={multi} /> },
+          { label: "Pace", icon: ic(Gauge), node: <PaceTab6 multi={multi} slow={slow} old={<><JourneyCard multi={multi} /><BookingCard /><PaceTab multi={multi} /></>} /> },
+          { label: "Coverage", icon: ic(PhoneMissed), node: <Fold keep={3} testId="coverage-fold"><CoverageTab multi={multi} /></Fold> },
           { label: "Call mode", icon: ic(PhoneCall), badge: seenCall ? undefined : <span className="spd-new rounded-full px-1.5 py-0.5 text-[0.65rem] font-bold uppercase leading-none tracking-wide" data-testid="call-new">New</span>, node: <DialMode /> },
-          ...(d.seePeople ? [{ label: "People", icon: ic(Users), node: <PeopleTab multi={multi} /> }] : [{ label: "Owners", icon: ic(Users), node: <PeopleTab multi={multi} /> }]),
-          { label: "Capture", icon: ic(Inbox), node: <CaptureTab /> },
-          { label: "Rules", icon: ic(SlidersHorizontal), node: <RulesTab who={multi ? "All client accounts" : d.accounts[0]?.name ?? "Your account"} waiting={w.waiting} dollars={w.money.dollars || null} typical={d.summary.typicalLine} canChange={d.measuring.canChange} targetMinutes={d.measuring.targetMinutes} go={go} /> },
+          ...(d.seePeople ? [{ label: "People", icon: ic(Users), node: <PeopleTab6 multi={multi} slow={slow} old={<PeopleTab multi={multi} />} /> }] : [{ label: "Owners", icon: ic(Users), node: <PeopleTab6 multi={multi} slow={slow} old={<PeopleTab multi={multi} />} /> }]),
+          { label: "Capture", icon: ic(Inbox), node: <Fold keep={3} testId="capture-fold"><CaptureTab /></Fold> },
+          { label: "Rules", icon: ic(SlidersHorizontal), node: <RulesTab who={multi ? "All client accounts" : d.accounts[0]?.name ?? "Your account"} waiting={w.waiting} dollars={w.money.dollars || null} typical={d.summary.typicalLine} canChange={d.measuring.canChange} targetMinutes={d.measuring.targetMinutes} go={go} multi={multi} /> },
           { label: "Log", icon: ic(ScrollText), node: (
-        <>
+        <Fold keep={3} testId="log-fold">
           <HowTo id="speed2" title="How to use this page">Reply to the lead at the top, then the next. Every number opens the leads behind it, and a lead&apos;s three dots call or email it through your CRM.</HowTo>
 
           <HeadlineBlock headline={{ ...w.headline, breakdown: null, accounts: w.accountsWithWaiting, dollars: w.cost.amount ?? 0 } as never}
@@ -194,7 +200,7 @@ export function SpeedView({ go }: { go: GoFn }) {
             {d.measuring.canChange ? <button type="button" onClick={() => go("settings")} className="font-medium text-primary underline" data-testid="speed-settings-link">Change the reply target, or switch on &quot;Count automatic messages as a reply&quot;, in Settings</button> : "Ask the person who manages your account to change these."}
             {d.truncated ? " This range holds more leads than SubSync reads at once; the newest 20,000 are used." : ""}
           </p>
-        </>
+        </Fold>
           ) },
         ]} /></>)}</FilterProvider>
       )}

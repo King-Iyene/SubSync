@@ -22,7 +22,7 @@ const HISTORY_DAYS = 56;
 export const SPEED_HOME_ROWS_CAP = 20_000;
 
 export type LeadRowOut = LeadOut & {
-  phone: string | null; email: string | null; dnd: boolean; timeZone: string | null;
+  phone: string | null; email: string | null; dnd: boolean; timeZone: string | null; /** When the lead arrived (ms); the delay reason uses it. */ leadAt: number;
   /** Only for a lead nobody owns: the person in that account who replies fastest. A display, never an assignment. */
   suggestion: { userId: string; label: string; medianSeconds: number; replies: number } | null;
 };
@@ -31,7 +31,7 @@ export function rowOut(r: LoadedRow, status: Parameters<typeof leadOut>[1], lk: 
   const base = leadOut(r, status, lk);
   const sg = r.assignedTo === null ? suggestions.get(r.locationId) ?? null : null;
   return {
-    ...base, phone: r.phone ?? null, email: r.email ?? null, dnd: r.dnd === true, timeZone: r.timeZone ?? null,
+    ...base, leadAt: r.leadAt, phone: r.phone ?? null, email: r.email ?? null, dnd: r.dnd === true, timeZone: r.timeZone ?? null,
     suggestion: sg ? { userId: sg.userId, label: resolveUser(sg.userId, lk.team, lk.usersAccess.get(r.locationId)).label, medianSeconds: sg.medianSeconds, replies: sg.replies } : null,
   };
 }

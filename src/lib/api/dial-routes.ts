@@ -2,6 +2,7 @@ import { callQueueAll, listCallLists, logOutcome } from "../analytics/call-queri
 import { parseFilters, type Filters } from "../analytics/call-intel";
 import { teamNames } from "../analytics/inbox-queries";
 import { recordTouchEvents } from "../analytics/touch-events-db";
+import { dialInsights, redialRows } from "../analytics/dial6-queries";
 import { sql } from "../db";
 import { DEFAULT_SCRIPT, DIAL_LISTS, followUpDays, isDialOutcome, isListId, outcomeOf, rankQueue, SCRIPT_MAX, statsByUser, type QueueItem } from "../dial/dial";
 import type { deepLinks } from "../links";
@@ -21,6 +22,7 @@ const HOUR = 3_600_000;
 /** The queue rows of a source list, with Do Not Disturb and owner read from SubSync's own copy of the contacts. */
 async function sourceRows(ctx: Ctx, allowed: string[] | null, list: string): Promise<Array<Omit<QueueItem, "url" | "dnd"> & { ownerId: string | null; dnd: boolean }>> {
   const db = sql();
+  if (list === "redial") return redialRows(ctx.installationId, allowed) as never;
   const accountFilter = allowed ? db`and c.location_id = any(${allowed}::text[])` : db``;
   if (list === "missed") {
     const rows = await db`
@@ -57,11 +59,11 @@ async function sourceRows(ctx: Ctx, allowed: string[] | null, list: string): Pro
   const q = await callQueueAll(ctx.installationId, allowed, filters);
   const rows = q.rows.slice(0, 400);
   if (rows.length === 0) return [];
-  const meta = await db`select location_id, contact_id, dnd, nullif(assigned_to, '') owner from cached_contacts where installation_id = ${ctx.installationId} and contact_id = any(${rows.map((r) => r.contactId)}::text[])`;
+  const meta = await db`select location_id, contact_id, dnd, nullif(assigned_to, '') owner, nullif(source, '') source from cached_contacts where installation_id = ${ctx.installationId} and contact_id = any(${rows.map((r) => r.contactId)}::text[])`;
   const by = new Map(meta.map((m) => [`${m.location_id}:${m.contact_id}`, m]));
   return rows.map((r) => {
     const m = by.get(`${r.locationId}:${r.contactId}`);
-    return { contactId: r.contactId, locationId: r.locationId, locationName: r.locationName, name: r.name || "Unknown", phone: r.phone, dnd: m?.dnd === true, timeZone: r.timeZone, openValue: r.openValue, ageHours: r.idleDays === null ? null : r.idleDays * 24, priority: r.priority, reasons: r.reasons, ownerId: (m?.owner as string | null) ?? null };
+    return { contactId: r.contactId, locationId: r.locationId, locationName: r.locationName, name: r.name || "Unknown", phone: r.phone, dnd: m?.dnd === true, timeZone: r.timeZone, openValue: r.openValue, ageHours: r.idleDays === null ? null : r.idleDays * 24, priority: r.priority, reasons: r.reasons, ownerId: (m?.owner as string | null) ?? null, source: (m?.source as string | null) ?? null };
   });
 }
 
@@ -77,7 +79,7 @@ async function queueRoute(ctx: Ctx, h: DialHelpers): Promise<Response> {
   return json({
     list, lists: [...DIAL_LISTS, ...saved.map((s) => ({ id: `saved:${s.id}`, label: s.name, help: "Your saved filter." }))], total: rows.length, ownOnly: ctx.kind === "client",
     me: ctx.session.userName ?? null,
-    items: ranked.map((r) => ({ contactId: r.contactId, locationId: r.locationId, locationName: r.locationName, name: r.name, phone: r.phone, dnd: r.dnd, timeZone: r.timeZone, openValue: r.openValue, ageHours: r.ageHours, priority: r.priority, reasons: r.reasons, url: links.contact(r.locationId, r.contactId) })),
+    items: ranked.map((r) => ({ contactId: r.contactId, locationId: r.locationId, locationName: r.locationName, name: r.name, phone: r.phone, dnd: r.dnd, timeZone: r.timeZone, openValue: r.openValue, ageHours: r.ageHours, priority: r.priority, reasons: r.reasons, source: (r as { source?: string | null }).source ?? null, url: links.contact(r.locationId, r.contactId) })),
   });
 }
 
@@ -138,6 +140,44 @@ export async function handleDial(ctx: Ctx, h: DialHelpers): Promise<Response> {
   if (what === "queue" && m === "GET") return queueRoute(ctx, h);
   if (what === "outcome" && m === "POST") return outcomeRoute(ctx, h);
   if (what === "stats" && m === "GET") return statsRoute(ctx, h);
+  if (what === "insights" && m === "GET") return insightsRoute(ctx, h);
+  if (what === "detect" && m === "GET") return detectRoute(ctx, h);
   if (what === "script" && (m === "GET" || m === "PUT")) return scriptRoute(ctx, h);
   return json({ error: "Not found" }, 404);
+}
+
+/** Attempt counts, which attempt books, the best hour, the board and (for managers) each client's dialing, from calls logged in Call mode. */
+async function insightsRoute(ctx: Ctx, h: DialHelpers): Promise<Response> {
+  const allowed = await h.allowed();
+  const names = await teamNames(ctx.installationId);
+  try { return json(await dialInsights({ installationId: ctx.installationId, allowed, userId: ctx.session.userId ?? null, ownOnly: ctx.kind === "client", names, now: Date.now() })); }
+  catch (e) { console.error("dial insights", e instanceof Error ? e.message : "failed"); return json({ now: Date.now(), states: [], best: null, byAttempt: [], board: [], ownRank: null, teamVisible: ctx.kind !== "client", activity: [] }); }
+}
+
+/**
+ * Auto outcome sync: what the CRM has recorded for ONE lead since a time, read from SubSync's own webhook-fed tables (the call record with its status and length, tags added or removed,
+ * a stage move, a new appointment, do-not-disturb). The browser asks about the lead on screen only. Nothing is read from another account; the lead must be inside the caller's accounts.
+ */
+async function detectRoute(ctx: Ctx, h: DialHelpers): Promise<Response> {
+  const sp = ctx.url.searchParams;
+  const loc = sp.get("locationId") ?? "", contact = sp.get("contactId") ?? "";
+  const since = Number(sp.get("since"));
+  const allowed = await h.allowed();
+  if (!ID.test(loc) || !ID.test(contact) || !Number.isFinite(since) || (allowed && !allowed.includes(loc))) return json({ error: "Lead not found" }, 404);
+  const from = new Date(Math.max(since, Date.now() - 6 * HOUR));
+  const db = sql();
+  const empty = { call: null, tags: [] as Array<{ tag: string; kind: string; at: number }>, stageMoved: false, appointment: false, dnd: false, now: Date.now() };
+  try {
+    const [call] = await db`select outcome, at from touch_events where installation_id = ${ctx.installationId} and location_id = ${loc} and contact_id = ${contact} and kind = 'call' and direction = 'outbound' and source is distinct from 'subsync_call' and at >= ${from} order by at desc limit 1`;
+    const ev = await db`select kind, to_value, at from lead_events where installation_id = ${ctx.installationId} and location_id = ${loc} and contact_id = ${contact} and kind in ('tag_added', 'tag_removed', 'stage_changed') and at >= ${from} order by at desc limit 20`;
+    const [ap] = await db`select 1 x from cached_appointments where installation_id = ${ctx.installationId} and location_id = ${loc} and contact_id = ${contact} and coalesce(created_remote_at, start_at) >= ${from} limit 1`.catch(() => []);
+    const [c] = await db`select dnd from cached_contacts where installation_id = ${ctx.installationId} and location_id = ${loc} and contact_id = ${contact}`;
+    const { splitOutcome } = await import("../dial/autosync");
+    const sp2 = splitOutcome((call?.outcome as string | null) ?? null);
+    return json({
+      call: call ? { status: sp2.status, durationSec: sp2.durationSec, at: new Date(call.at as string).getTime() } : null,
+      tags: ev.filter((e) => e.kind !== "stage_changed" && e.to_value).map((e) => ({ tag: e.to_value as string, kind: e.kind === "tag_added" ? "added" : "removed", at: new Date(e.at as string).getTime() })),
+      stageMoved: ev.some((e) => e.kind === "stage_changed"), appointment: !!ap, dnd: c?.dnd === true, now: Date.now(),
+    });
+  } catch (e) { console.error("dial detect", e instanceof Error ? e.message : "failed"); return json(empty); }
 }

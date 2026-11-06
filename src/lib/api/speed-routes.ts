@@ -7,6 +7,7 @@ import type { deepLinks } from "../links";
 import { parseFilter } from "../analytics/speed-v4-more";
 import { isStep, speedCoverage, speedJourney, speedJourneyList, speedProof, speedRace, speedStory } from "../analytics/speed-v4-queries";
 import { ladderPreview, saveLadder, speedBooking } from "../analytics/speed5-queries";
+import { speedPulse } from "../analytics/speed6-queries";
 import { json, type AuthContext } from "./auth";
 
 // The rebuilt Speed to lead screen's endpoints: GET /api/app/speed?part=home|list|compare and PUT /api/app/speed/target (the one catch-all route, already guarded).
@@ -124,6 +125,11 @@ export async function handleSpeedPart(ctx: Ctx, h: SpeedHelpers): Promise<Respon
   // The bar's dates narrow every part that is about a period; the race is "right now" and ignores them. A bad pair of dates is ignored here (the home read already refuses it).
   const wp = sp.get("from") !== null && sp.get("to") !== null ? parseWindow(sp.get("from"), sp.get("to"), now) : null;
   const win = wp && wp.ok ? { winFrom: wp.win.fromMs, winTo: wp.win.toMs } : {};
+  if (part === "pulse") {
+    const allowed = narrowed(allowedAll, sp.get("account"));
+    if (allowed === "none") return json({ error: "Unknown account" }, 404);
+    return json(withUrls(await speedPulse({ installationId: ctx.installationId, allowed: allowed as string[] | null, targetMinutes, now, seePeople, filter: parseFilter(sp), ...win }), links.contact));
+  }
   if (part === "booking" || part === "ladder") {
     const allowed = narrowed(allowedAll, sp.get("account"));
     if (allowed === "none") return json({ error: "Unknown account" }, 404);

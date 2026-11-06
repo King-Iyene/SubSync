@@ -50,7 +50,7 @@ export function followUpDays(callbackAt: string | null | undefined, now: Date): 
 export type QueueItem = {
   contactId: string; locationId: string; locationName: string | null; name: string; phone: string | null; dnd: boolean; timeZone: string | null;
   openValue: number; /** hours since the thing that makes them worth calling (the missed call, the new lead, the last touch). */ ageHours: number | null;
-  priority: number; reasons: string[]; url: string;
+  priority: number; reasons: string[]; url: string; /** Where the lead came from (the script can differ by source). */ source?: string | null;
 };
 
 /** Money (log scale, up to 40) plus decay (a lead freshly in is worth a call sooner: 20 inside an hour down to 2 after a week) plus the list's own priority (up to 30). */
@@ -106,7 +106,8 @@ export const DIAL_LISTS = [
   { id: "missed", label: "Missed calls, no callback", help: "People who called and nobody has called or texted back yet." },
   { id: "new_unanswered", label: "New leads not yet reached", help: "Came in recently and nobody has messaged them." },
   { id: "hot_uncontacted", label: "Hot leads untouched for 3 days", help: "Open deal, quiet for 3 days or more." },
-  { id: "noshow_recovery", label: "No-shows to recover", help: "Missed an appointment in the last 14 days and not rebooked." },
+  { id: "noshow_recovery", label: "No-show saver", help: "Missed an appointment in the last 14 days and not rebooked." },
+  { id: "redial", label: "Redial list", help: "Called through Call mode, nobody picked up. Another try is due on the redial plan." },
 ] as const;
 export const isListId = (v: string) => DIAL_LISTS.some((l) => l.id === v) || /^saved:[0-9a-fA-F-]{36}$/.test(v);
 

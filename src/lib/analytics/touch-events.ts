@@ -37,6 +37,8 @@ export function toEvent(r: RawTouch, ids: { locationId: string; contactId: strin
   return { key, ...ids, direction: r.direction, channel, kind, at: r.at, userId: r.direction === "outbound" ? r.userId : null, automated, source: r.source, outcome: r.status ?? null };
 }
 
+/** A call keeps its length in the same metadata word ("completed:134"), so a rep's call can be recognised as a real conversation. Never any content. */
+const withDuration = (status: string | null, type: string | null, dur: unknown) => { const n = typeof dur === "number" ? dur : typeof dur === "string" ? Number(dur) : NaN; return /call/i.test(type ?? "") && Number.isFinite(n) && n >= 0 ? `${status ?? "completed"}:${Math.round(n)}` : status; };
 const str = (v: unknown, max = 100) => (typeof v === "string" && v.trim() ? v.trim().slice(0, max) : null);
 /** From an InboundMessage or OutboundMessage webhook. Reads only ids, type, direction, status, user, source and time; the body is never touched. */
 export function eventFromWebhook(body: unknown, type: string | null): TouchEvent | null {
@@ -49,7 +51,7 @@ export function eventFromWebhook(body: unknown, type: string | null): TouchEvent
   const at = typeof t === "number" ? (t < 1e11 ? t * 1000 : t) : typeof t === "string" ? Date.parse(t) : Date.now();
   return toEvent({
     id: str(pick("messageId"), 80) ?? str(pick("id"), 80), at, direction: type === "InboundMessage" ? "inbound" : "outbound", userId: str(pick("userId")),
-    source: str(pick("source"))?.toLowerCase() ?? null, type: str(pick("messageType")), status: str(pick("status")),
+    source: str(pick("source"))?.toLowerCase() ?? null, type: str(pick("messageType")), status: withDuration(str(pick("status")), str(pick("messageType")), pick("duration") ?? (((pick("meta") as Record<string, unknown> | undefined)?.call ?? {}) as Record<string, unknown>).duration),
   }, { locationId, contactId, conversationId: str(pick("conversationId")) });
 }
 
