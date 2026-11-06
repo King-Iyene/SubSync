@@ -111,7 +111,7 @@ export async function speedCoverage(i: Input) {
   };
 }
 
-async function repliedSet(installationId: string, allowed: string[] | null, rows: readonly { locationId: string; contactId: string; touchAt: number | null }[], now: number) {
+export async function repliedSet(installationId: string, allowed: string[] | null, rows: readonly { locationId: string; contactId: string; touchAt: number | null }[], now: number) {
   const events = await loadTouchEvents(installationId, allowed, now - 60 * DAY);
   const first = new Map<string, number>(); const channels = new Map<string, Set<Channel>>();
   const touchAt = new Map(rows.map((r) => [`${r.locationId}:${r.contactId}`, r.touchAt]));
