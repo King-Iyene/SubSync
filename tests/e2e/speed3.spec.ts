@@ -13,6 +13,8 @@ const n = (t: string) => Number(t.replace(/[^\d]/g, ""));
 async function open(page: Page, path: string) {
   await page.goto(path);
   await page.reload();
+  // SPEED4: the first tab is now the Race; the older queue and charts live on the Log tab.
+  await page.getByRole("tab", { name: "Log", exact: true }).click({ timeout: 90_000 });
   await expect(page.getByTestId("speed-fast")).toBeVisible({ timeout: 90_000 });
 }
 const tab = (page: Page, name: string) => page.getByRole("tab", { name, exact: true });
@@ -49,7 +51,7 @@ for (const role of ROLES) {
   test(`${role.name}: Pace, ${role.people ? "People" : "Owners"}, Lead capture and Alerts open, plain words, no sideways scroll`, async ({ page }) => {
     test.setTimeout(240_000);
     await open(page, role.path);
-    for (const [name, id] of [["Pace", "pace-tab"], [role.people ? "People" : "Owners", "people-tab"], ["Lead capture", "capture-tab"], ["Alerts", "alerts-tab"]] as const) {
+    for (const [name, id] of [["Pace", "pace-tab"], [role.people ? "People" : "Owners", "people-tab"], ["Capture", "capture-tab"], ["Rules", "alerts-tab"]] as const) {
       await tab(page, name).click();
       await expect(page.getByTestId(id)).toBeVisible({ timeout: 90_000 });
       expect(await page.locator("main").innerText()).not.toMatch(BANNED);
@@ -78,7 +80,7 @@ test("a mark opens exactly the leads it counted", async ({ page }) => {
 test("Lead capture shows the counters and a drop or rise word", async ({ page }) => {
   test.setTimeout(240_000);
   await open(page, "/app#speed");
-  await tab(page, "Lead capture").click();
+  await tab(page, "Capture").click();
   for (const k of ["today", "week", "month", "all"]) await expect(page.getByTestId(`capture-${k}`)).toBeVisible({ timeout: 90_000 });
   await expect(page.getByTestId("capture-badge")).toContainText(/Rising|Falling|Steady|not enough data/);
   await expect(page.getByTestId("capture-gross-line")).toContainText(/sign ups/);
