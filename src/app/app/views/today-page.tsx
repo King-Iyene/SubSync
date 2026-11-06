@@ -266,7 +266,7 @@ export function TodayPage({ go, t, kind, reload, sync, syncing, options, picked,
         <InsightStrip insights={kind === "client" ? m.insights.filter((i) => i.key !== "idle_owner") : m.insights} onOpen={(i) => m.open(specInsight(i, env))}
           extra={(growth.data?.signals ?? []).slice(0, 2).map((s) => ({ key: `growth-${s.locationId}-${s.scope}-${s.direction}`, text: s.text, label: `${s.count} vs ${s.normal}`, onOpen: () => { const g = growth.data as GrowthData; m.open(specPeriod(g, s.scope === "day" ? "today" : "week", s.locationId)); } }))} />
 
-        {multi && bars.bars.length > 1 && (
+        {agency && bars.bars.length >= 1 && (
           <Block id="where-h" title="Where the work sits" tag="Report" hint={SECTION_META["Where the work sits"].subtitle} testId="today-charts">
             <AccountBars title={barsTitle(bars)} bars={bars.bars} rows={rows} more={Math.max(0, bars.accounts - bars.bars.length)}
               onSegment={(id, k) => m.open(specKind(k, env, id))} onAccount={(id) => m.open(specAccount(id, env))} onMore={() => m.open(specClients(env))} />
