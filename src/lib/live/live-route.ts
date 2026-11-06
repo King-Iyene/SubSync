@@ -6,6 +6,8 @@ import { isPermissionError, mapContact, type ContactRow } from "../sync/ghl-data
 import { json, type AuthContext } from "../api/auth";
 import { cacheContacts, cacheConversations, recordLiveCalls } from "./live-cache";
 import { crmSource, ForeignContact, liveRead, type LiveRead } from "./live-read";
+import { after } from "next/server";
+import { deltaDue, runDelta, crmDeltaDeps } from "./delta";
 import { GHL_API, GhlError } from "../ghl/client";
 import { ghlFetch } from "../ghl/http";
 
@@ -52,6 +54,11 @@ export async function liveRoute(ctx: Ctx, h: H): Promise<Response> {
       await cacheConversations(ctx.installationId, locationId, [read.conversation]).catch(() => undefined);
       await recordLiveCalls(ctx.installationId, { locationId, contactId, conversationId: read.conversation.conversationId }, read.calls);
     }
+    // Somebody has this account open: keep its newest changes fresh (bounded, after the answer is sent).
+    if (deltaDue(`${ctx.installationId}:${locationId}`)) {
+      const token = await h.locationToken(locationId);
+      after(() => runDelta(ctx.installationId, locationId, crmDeltaDeps(token, locationId)).then(() => undefined));
+    }
     const names = await teamNames(ctx.installationId);
     const c = read.contact;
     const body = {
@@ -75,38 +82,40 @@ export async function liveRoute(ctx: Ctx, h: H): Promise<Response> {
 }
 
 /** Write-through after a SubSync write: read the person back from the CRM and keep the copy equal to it, so the panel and every list show the change at once. Never throws. */
-export async function refreshLead(installationId: string, token: string, locationId: string, contactId: string): Promise<void> {
+export async function refreshLead(installationId: string, token: string, locationId: string, contactId: string): Promise<boolean> {
   try {
     const src = crmSource(token, locationId);
     const found = await src.contact(contactId);
-    if (!found || (found.locationId && found.locationId !== locationId)) return;
+    if (!found || (found.locationId && found.locationId !== locationId)) return false;
     await cacheContacts(installationId, locationId, [found.contact]);
     const conv = await src.conversation(contactId).catch(() => null);
     if (conv) await cacheConversations(installationId, locationId, [conv]);
     recent.delete(`${installationId}:${locationId}:${contactId}`);
-  } catch { /* the next live read or sync makes it up */ }
+    return true;
+  } catch { return false; /* the next live read or sync makes it up */ }
 }
 
 /** The contacts the CRM finds for a search term, in the accounts the caller may see (most 5 accounts per search, 10 hits each). Hits are stored, so they open like any other person. */
 export async function findRoute(ctx: Ctx, h: H): Promise<Response> {
-  const q = (ctx.url.searchParams.get("q") ?? "").trim().slice(0, 80);
-  if (q.length < 3) return json({ rows: [] });
   if (ctx.demo) return json({ rows: [] });
-  const allowed = await h.allowed();
-  const only = ctx.url.searchParams.get("locationId");
-  const locs = (await sql()`select location_id, name from locations where installation_id = ${ctx.installationId} and not ignored order by name limit 200`)
-    .filter((l) => (!allowed || allowed.includes(l.location_id as string)) && (!only || l.location_id === only)).slice(0, 5);
+  return json({ rows: await crmFind(ctx.installationId, await h.allowed(), (ctx.url.searchParams.get("q") ?? "").trim().slice(0, 80), h.locationToken, ctx.url.searchParams.get("locationId")) });
+}
+
+export async function crmFind(installationId: string, allowed: string[] | null, q: string, token_: (locationId: string) => Promise<string>, only: string | null = null) {
   const rows: Array<{ locationId: string; locationName: string | null; contactId: string; name: string; email: string | null; phone: string | null; tags: string[] }> = [];
+  if (q.length < 3) return rows;
+  const locs = (await sql()`select location_id, name from locations where installation_id = ${installationId} and not ignored order by name limit 200`)
+    .filter((l) => (!allowed || allowed.includes(l.location_id as string)) && (!only || l.location_id === only)).slice(0, 5);
   await Promise.all(locs.map(async (l) => {
     try {
-      const token = await h.locationToken(l.location_id as string);
+      const token = await token_(l.location_id as string);
       const res = await ghlFetch(`${GHL_API}/contacts/?${new URLSearchParams({ locationId: l.location_id as string, query: q, limit: "10" }).toString()}`, { headers: { Authorization: `Bearer ${token}`, Version: "2021-07-28", Accept: "application/json" }, cache: "no-store" });
       if (!res.ok) return;
       const body = (await res.json()) as { contacts?: unknown[] };
       const found = (Array.isArray(body.contacts) ? body.contacts : []).map(mapContact).filter((c): c is ContactRow => c !== null);
-      await cacheContacts(ctx.installationId, l.location_id as string, found);
+      await cacheContacts(installationId, l.location_id as string, found);
       for (const c of found) rows.push({ locationId: l.location_id as string, locationName: (l.name as string | null) ?? null, contactId: c.contactId, name: [c.firstName, c.lastName].filter(Boolean).join(" ") || c.email || c.phone || "No name", email: c.email, phone: c.phone, tags: c.tags });
     } catch { /* a search that fails for one account leaves the others */ }
   }));
-  return json({ rows: rows.slice(0, 30) });
+  return rows.slice(0, 30);
 }

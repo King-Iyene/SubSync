@@ -12,6 +12,7 @@ import { personKey } from "../people/queue";
 import type { deepLinks } from "../links";
 import { json, type AuthContext } from "./auth";
 import { handlePeopleQueue } from "./people-queue-routes";
+import { crmFind } from "../live/live-route";
 
 // The People module's endpoints, under /api/app/people/... (the one catch-all route, already guarded). Every handler derives who is asking from the verified
 // session (`ctx`), limits every read to the accounts that caller may see, and never takes an account, owner key or installation from the browser.
@@ -79,7 +80,11 @@ async function route(ctx: Ctx, h: PeopleHelpers): Promise<Response> {
     const filter = scopeFilterTo(parsed.filter, ctx.limitTo);
     const allowed = await h.allowed();
     const [cold, links, names] = await Promise.all([filter.cold ? coldTagsFor(ctx.installationId, allowed, await h.coldChoice()) : Promise.resolve([] as string[]), h.links(), teamNames(ctx.installationId)]);
-    const res = await searchPeople(ctx.installationId, allowed, filter, page, cold);
+    let res = await searchPeople(ctx.installationId, allowed, filter, page, cold);
+    // The copy only holds people a sync has read. A typed search that finds few of them also asks the CRM itself (accounts the caller may see), keeps the hits, and searches again.
+    if (page === 1 && !ctx.demo && filter.q && res.rows.length < 5 && (await crmFind(ctx.installationId, allowed, filter.q.trim().slice(0, 80), h.locationToken).catch(() => [])).length > 0) {
+      res = await searchPeople(ctx.installationId, allowed, filter, page, cold);
+    }
     return json({
       // The choices are NOT echoed back: an answer must never name an account the caller did not ask about with their own rights (check-tenancy counts that as a leak).
       ...res, description: describeFilter(filter, { owner: (id) => assigneeLabel(id, names) }),

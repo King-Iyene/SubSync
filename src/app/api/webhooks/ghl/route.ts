@@ -6,7 +6,8 @@ import { getInstallation, purgeInstallation, purgeLocationData } from "@/lib/ghl
 import { actionFor, canonicalType, isForeignApp, parseWebhook, verifyWebhook } from "@/lib/ghl/webhook";
 import { recordPlanEvent } from "@/lib/entitlements-queries";
 import { captureWhitelabelDomain, captureWhitelabelLogo } from "@/lib/analytics/queries";
-import { enqueueAreaSync, enqueueFullSync } from "@/lib/sync/engine";
+import { enqueueAreaSync, enqueueFullSync, locationAccessToken } from "@/lib/sync/engine";
+import { applyLiveWebhook } from "@/lib/live/webhook-apply";
 import { isEchoOfOurWrite } from "@/lib/connections/write-log";
 import { eventFromWebhook, leadEventFromWebhook } from "@/lib/analytics/touch-events";
 import { recordLeadEvents, recordTouchEvents } from "@/lib/analytics/touch-events-db";
@@ -81,8 +82,12 @@ export async function POST(request: Request) {
       // The account may be covered by its own install, the agency's, or both.
       for (const target of [own, installation]) {
         if (!target) continue;
+        // Contacts, deals, appointments and conversations are updated in the copy right now (about a second); the area re-read is only queued when that was not enough.
+        const applied = action.kind === "resync" && event.locationId
+          ? await applyLiveWebhook({ installationId: target.id, locationId: event.locationId, type: event.type, body: parsed }, { token: (loc) => locationAccessToken(target.companyId, loc) })
+          : { skipResync: false };
         if (action.kind === "install") await enqueueFullSync(target.id);
-        else if (action.kind === "resync" && event.locationId) await enqueueAreaSync(target.id, event.locationId, action.scope);
+        else if (action.kind === "resync" && event.locationId && !applied.skipResync) await enqueueAreaSync(target.id, event.locationId, action.scope);
         // A new contact: compare it with the account's contacts right now (bounded to a couple of seconds, never throws).
         // A message or call, a new contact, an owner change: keep its metadata (never the text) for the speed screens. A retry writes nothing new.
         if ((event.type === "InboundMessage" || event.type === "OutboundMessage") && event.locationId) {
