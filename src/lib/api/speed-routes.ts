@@ -121,10 +121,13 @@ export async function handleSpeedPart(ctx: Ctx, h: SpeedHelpers): Promise<Respon
   }
 
   // Stage SPEED4: the race, coverage, the lead journey, the proof report and one lead story. The accounts come from the session; a filter only narrows inside them.
+  // The bar's dates narrow every part that is about a period; the race is "right now" and ignores them. A bad pair of dates is ignored here (the home read already refuses it).
+  const wp = sp.get("from") !== null && sp.get("to") !== null ? parseWindow(sp.get("from"), sp.get("to"), now) : null;
+  const win = wp && wp.ok ? { winFrom: wp.win.fromMs, winTo: wp.win.toMs } : {};
   if (part === "booking" || part === "ladder") {
     const allowed = narrowed(allowedAll, sp.get("account"));
     if (allowed === "none") return json({ error: "Unknown account" }, 404);
-    const input = { installationId: ctx.installationId, allowed: allowed as string[] | null, targetMinutes, now, seePeople, filter: undefined };
+    const input = { installationId: ctx.installationId, allowed: allowed as string[] | null, targetMinutes, now, seePeople, filter: undefined, ...win };
     // The ladder names people, so a client's staff do not get it (they see their own leads elsewhere).
     if (part === "ladder") return seePeople ? json(withUrls(await ladderPreview(input), links.contact)) : json({ error: "Not available in this view" }, 403);
     return json(await speedBooking(input));
@@ -133,7 +136,7 @@ export async function handleSpeedPart(ctx: Ctx, h: SpeedHelpers): Promise<Respon
   if (part === "race" || part === "coverage" || part === "journey" || part === "journey-list" || part === "proof" || part === "story") {
     const allowed = narrowed(allowedAll, sp.get("account") ?? sp.get("f_account"));
     if (allowed === "none") return json({ error: "Unknown account" }, 404);
-    const input = { installationId: ctx.installationId, allowed: allowed as string[] | null, targetMinutes, now, seePeople, filter: parseFilter(sp) };
+    const input = { installationId: ctx.installationId, allowed: allowed as string[] | null, targetMinutes, now, seePeople, filter: parseFilter(sp), ...(part === "race" ? {} : win) };
     if (part === "race") return json(withUrls(await speedRace(input), links.contact));
     if (part === "coverage") return json(withUrls(await speedCoverage(input), links.contact));
     if (part === "journey") return json(await speedJourney(input));
@@ -145,7 +148,7 @@ export async function handleSpeedPart(ctx: Ctx, h: SpeedHelpers): Promise<Respon
   }
 
   if (part === "insights" || part === "insight-list") {
-    const input = { installationId: ctx.installationId, allowed: narrowed(allowedAll, sp.get("account")), targetMinutes, now, seePeople, filter: parseFilter(sp) };
+    const input = { installationId: ctx.installationId, allowed: narrowed(allowedAll, sp.get("account")), targetMinutes, now, seePeople, filter: parseFilter(sp), ...win };
     if (input.allowed === "none") return json({ error: "Unknown account" }, 404);
     const base = { ...input, allowed: input.allowed as string[] | null };
     if (part === "insights") return json(await speedInsights(base));

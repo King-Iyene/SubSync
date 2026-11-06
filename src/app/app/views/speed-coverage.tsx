@@ -80,14 +80,14 @@ export function CoverageTab({ multi }: { multi: boolean }) {
 
 /** The lead journey: how many leads got to each step, where they dropped, how long it took. Each step opens exactly its leads. */
 export function JourneyCard({ multi }: { multi: boolean }) {
-  const { query } = useSpeedFilter();
+  const { query, range } = useSpeedFilter();
   const { data, error, reload } = useData<{ steps: JourneyStep[]; repliedRecorded: boolean }>(`speed?part=journey${query}`);
   const [open, setOpen] = useState<{ step: Step; dropped: boolean } | null>(null);
   if (error) return <ErrorState error={error} onRetry={reload} />;
   if (!data) return <SkeletonRows rows={2} label="Following the leads..." />;
   const top = Math.max(1, data.steps[0]?.count ?? 1);
   return (
-    <Card id="journey" title="Lead journey, last 30 days" tip="Each step is a subset of the one before. Booked, showed and won come from your appointments and deals. Median time is shown where SubSync has both ends recorded.">
+    <Card id="journey" title={`Lead journey, ${range?.sentence ?? "last 30 days"}`} tip="Each step is a subset of the one before. Booked, showed and won come from your appointments and deals. Median time is shown where SubSync has both ends recorded.">
       <ol className="space-y-2" data-testid="journey-steps">
         {data.steps.map((s, i) => (
           <li key={s.step} data-testid="journey-step" data-step={s.step}>

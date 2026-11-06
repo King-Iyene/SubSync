@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ErrorState, SkeletonRows } from "../ds";
 import { WhatIs } from "../ds/what-is";
 import { useApiClient, useData } from "../session";
+import { useSpeedFilter } from "./speed-filter";
 import { SidePopup } from "./speed-popup";
 
 // Speed to lead, fifth pass (stage SPEED5): the booking-by-reply-time chart, the money-at-risk meter, the duplicate and repeat chips, and the escalation ladder with its dry-run preview.
@@ -20,7 +21,8 @@ type Booking = {
 };
 
 export function BookingCard() {
-  const { data: d, error, reload } = useData<Booking>("speed?part=booking");
+  const { range } = useSpeedFilter();
+  const { data: d, error, reload } = useData<Booking>(`speed?part=booking${range ? `&from=${range.from}&to=${range.to}` : ""}`);
   const [open, setOpen] = useState<string | null>(null);
   if (error) return <ErrorState error={error} onRetry={reload} />;
   if (!d) return <SkeletonRows rows={3} label="Counting bookings..." />;

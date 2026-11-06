@@ -52,6 +52,9 @@ type ListSpec = { title: string; params: Record<string, string>; noun?: string }
 
 const MORE_TRIGGER = "ds-press inline-flex h-8 items-center gap-1 rounded-md border bg-card px-2.5 text-sm font-medium hover:border-primary/40 hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--ring)]";
 
+/** The tabs the lead filters can change (Race, Pace, Coverage, People). Call mode, Capture, Rules and Log do not use them, so the control is not shown there. */
+const FILTER_TABS = new Set([0, 1, 2, 4]);
+
 export function SpeedView({ go }: { go: GoFn }) {
   const range = useCardRange("speed", { preset: "30d", compare: "none" });
   const r = range.resolved;
@@ -116,7 +119,7 @@ export function SpeedView({ go }: { go: GoFn }) {
         <EmptyState title={none ? "Waiting for permission" : "No new leads yet"} body={none ? "Approve the new permission when SubSync asks, then run a sync. First replies appear here after that." : "A lead appears here once a new contact has a conversation. Check back after the next sync."}
           action={<button type="button" onClick={() => go("help")} className="ds-press h-10 rounded-lg border bg-card px-4 text-sm font-medium hover:border-primary/40">Open Getting started</button>} />
       ) : (
-        <FilterProvider>{(bar) => (<>{bar}<TipHost /><ModuleTabs pill label="Speed to lead sections" value={tab} onChange={goTab} tabs={[
+        <FilterProvider range={r ? { from: r.current.from, to: r.current.to, label: r.current.label, sentence: r.sentence } : null}>{(bar) => (<>{FILTER_TABS.has(tab) && bar}<TipHost /><ModuleTabs pill label="Speed to lead sections" value={tab} onChange={goTab} tabs={[
           { label: "Race", icon: ic(Zap), node: <RaceTab multi={multi} onCall={() => goTab(CALL_TAB)} /> },
           { label: "Pace", icon: ic(Gauge), node: <><JourneyCard multi={multi} /><BookingCard /><PaceTab multi={multi} /></> },
           { label: "Coverage", icon: ic(PhoneMissed), node: <CoverageTab multi={multi} /> },

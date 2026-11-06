@@ -15,7 +15,7 @@ import { raceExtras } from "./speed5-queries";
 
 // The reads behind the rebuilt Speed to lead (stage SPEED4). Read only. Every query is bound to the accounts the router allowed (`allowed`), never to an id from the browser. Money is shown as
 // counted deals (facts) and, only where the account has enough closed deals, as an estimate that says so. The text of a message is never read.
-export type Input = { installationId: string; allowed: string[] | null; targetMinutes: number; now: number; seePeople: boolean; filter?: LeadFilter };
+export type Input = { installationId: string; allowed: string[] | null; targetMinutes: number; now: number; seePeople: boolean; filter?: LeadFilter; /** The bar's dates in ms (end exclusive). Absent means the usual last 30 days. */ winFrom?: number; winTo?: number };
 const CAP_KEYS = 4000;
 
 async function dollarsOf(installationId: string, keys: readonly string[]): Promise<{ map: Map<string, number>; deals: number }> {
@@ -67,7 +67,7 @@ export async function speedRace(i: Input) {
 export async function speedCoverage(i: Input) {
   const db = sql();
   const o = { targetMinutes: i.targetMinutes, now: i.now };
-  const [{ lk, locs }, all, events] = await Promise.all([loadLookups(db, i.installationId, i.allowed, i.targetMinutes, i.now), loadRows(db, i.installationId, i.allowed, i.now - 30 * DAY, i.now + DAY), loadTouchEvents(i.installationId, i.allowed, i.now - 30 * DAY)]);
+  const [{ lk, locs }, all, events] = await Promise.all([loadLookups(db, i.installationId, i.allowed, i.targetMinutes, i.now), loadRows(db, i.installationId, i.allowed, i.winFrom ?? i.now - 30 * DAY, i.winTo ?? i.now + DAY), loadTouchEvents(i.installationId, i.allowed, i.now - 30 * DAY)]);
   const rows = applyFilter(all, i.filter ?? {}, o);
   const tz = new Map<string, string | null>(locs.map((l) => [l.location_id as string, (l.timezone as string | null) ?? null]));
   const tzOf = (l: string) => tz.get(l) ?? null;
@@ -128,19 +128,19 @@ async function repliedSet(installationId: string, allowed: string[] | null, rows
 export async function speedJourney(i: Input) {
   const db = sql();
   const o = { targetMinutes: i.targetMinutes, now: i.now };
-  const all = await loadRows(db, i.installationId, i.allowed, i.now - 30 * DAY, i.now + DAY);
+  const all = await loadRows(db, i.installationId, i.allowed, i.winFrom ?? i.now - 30 * DAY, i.winTo ?? i.now + DAY);
   const ev = await repliedSet(i.installationId, i.allowed, all, i.now);
   const rows = applyFilter(all, i.filter ?? {}, o, ev.channels);
-  const oc = await outcomesOf(i.installationId, i.allowed, i.now - 30 * DAY);
+  const oc = await outcomesOf(i.installationId, i.allowed, i.winFrom ?? i.now - 30 * DAY);
   return { now: i.now, steps: journey(rows, oc, ev.replied, ev.first), repliedRecorded: ev.replied !== null };
 }
 export async function speedJourneyList(i: Input & { step: Step; dropped: boolean }) {
   const db = sql();
   const o = { targetMinutes: i.targetMinutes, now: i.now };
-  const [{ lk }, all] = await Promise.all([loadLookups(db, i.installationId, i.allowed, i.targetMinutes, i.now), loadRows(db, i.installationId, i.allowed, i.now - 30 * DAY, i.now + DAY)]);
+  const [{ lk }, all] = await Promise.all([loadLookups(db, i.installationId, i.allowed, i.targetMinutes, i.now), loadRows(db, i.installationId, i.allowed, i.winFrom ?? i.now - 30 * DAY, i.winTo ?? i.now + DAY)]);
   const ev = await repliedSet(i.installationId, i.allowed, all, i.now);
   const rows = applyFilter(all, i.filter ?? {}, o, ev.channels);
-  const oc: Outcomes = await outcomesOf(i.installationId, i.allowed, i.now - 30 * DAY);
+  const oc: Outcomes = await outcomesOf(i.installationId, i.allowed, i.winFrom ?? i.now - 30 * DAY);
   const members = journeyMembers(rows, oc, ev.replied, i.step, i.dropped).sort((a, b) => b.leadAt - a.leadAt);
   const sugg = suggestionsFor(members.slice(0, 100), new Set(members.slice(0, 100).map((r) => r.locationId)));
   return { count: members.length, shown: Math.min(100, members.length), rows: members.slice(0, 100).map((r) => rowOut(r, judge(r, i.targetMinutes, i.now) ?? "waiting", lk, sugg)) };

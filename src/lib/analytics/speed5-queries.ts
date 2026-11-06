@@ -62,7 +62,7 @@ const BOOK_WINDOW_DAYS = 14;
 /** The money chart. Leads from 90 days ago to yesterday (so a booking has had time to happen). Booked = an appointment that was not cancelled, made for the contact after the lead arrived and within 14 days. */
 export async function speedBooking(i: Input) {
   const db = sql();
-  const all = await loadRows(db, i.installationId, i.allowed, i.now - 90 * DAY, i.now - DAY);
+  const all = await loadRows(db, i.installationId, i.allowed, i.winFrom ?? i.now - 90 * DAY, Math.min(i.winTo ?? i.now, i.now - DAY));
   const appts = all.length === 0 ? [] : await db`
     select location_id, contact_id, min(coalesce(created_remote_at, start_at)) first_at from cached_appointments
     where installation_id = ${i.installationId} and contact_id is not null and status not in ('cancelled', 'invalid') ${i.allowed ? db`and location_id = any(${i.allowed}::text[])` : db``}
