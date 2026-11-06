@@ -8,3 +8,8 @@
   html.s4-printing .s4-print, html.s4-printing .s4-print * { visibility: visible; }
   html.s4-printing .s4-print { position: absolute; left: 0; top: 0; width: 100%; color: #000; background: #fff; }
 }
+
+/* Call mode: a calm, short pop for the finish mark (stage DIAL). */
+@keyframes dial-pop { from { transform: scale(0.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.dial-pop { animation: dial-pop 450ms ease-out both; }
+@media (prefers-reduced-motion: reduce) { .dial-pop { animation: none; } }
