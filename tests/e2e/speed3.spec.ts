@@ -26,14 +26,21 @@ const noSideways = async (page: Page) => {
 
 for (const role of ROLES) {
   test(`${role.name}: reply sheet previews a dry run and sends nothing`, async ({ page }) => {
-    test.setTimeout(240_000);
+    test.setTimeout(480_000);
     await open(page, role.path);
     const reply = page.getByTestId("speed-reply").first();
     if (!(await reply.count())) { test.skip(true, "no leads are waiting on this demo"); return; }
     await reply.click();
-    await expect(page.getByTestId("act-sheet")).toBeVisible();
-    await page.getByTestId("act-text").fill("Hi, thanks for getting in touch. When suits you for a quick call?");
-    await page.getByTestId("act-preview").click();
+    await expect(page.getByTestId("lead-drawer")).toBeVisible();
+    // Reply opens the full lead panel on the Conversation tab with the thread and the message box focused (no bare side sheet).
+    await expect(page.getByTestId("act-sheet")).toHaveCount(0);
+    await expect(page.getByTestId("wb-tab-conversation")).toHaveAttribute("aria-selected", "true", { timeout: 120_000 });
+    await expect(page.getByTestId("wb-thread")).toBeVisible({ timeout: 120_000 });
+    await expect(page.getByTestId("wb-text")).toBeFocused({ timeout: 60_000 });
+    await page.getByTestId("wb-text").fill("Hi, thanks for getting in touch. When suits you for a quick call?");
+    // a lead with no phone number falls back to Email, which needs a subject
+    if (await page.getByTestId("wb-subject").isVisible()) await page.getByTestId("wb-subject").fill("Your enquiry");
+    await page.getByTestId("wb-preview").click();
     await expect(page.getByTestId("wb-review")).toBeVisible({ timeout: 30_000 });
     // either the lead has no number (a blocker) or the demo says nothing is ever sent
     const dry = page.getByTestId("wb-review-dry"), blocked = page.getByTestId("wb-review-blockers");
@@ -43,9 +50,9 @@ for (const role of ROLES) {
       await page.getByTestId("wb-confirm").click();
       await expect(page.getByTestId("wb-result")).toHaveAttribute("data-tone", "dry", { timeout: 30_000 });
     }
-    expect(await page.getByTestId("act-sheet").innerText()).not.toMatch(BANNED);
+    expect(await page.getByTestId("lead-drawer").innerText()).not.toMatch(BANNED);
     await page.keyboard.press("Escape");
-    await expect(page.getByTestId("act-sheet")).toHaveCount(0);
+    await expect(page.getByTestId("lead-drawer")).toHaveCount(0);
   });
 
   test(`${role.name}: Pace, ${role.people ? "People" : "Owners"}, Lead capture and Alerts open, plain words, no sideways scroll`, async ({ page }) => {
