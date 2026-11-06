@@ -130,7 +130,7 @@ export function TagsSection({ locationId, contactId, name, tags, tagDates, tagEx
             return (
               <li key={t} style={styleOf(t)} className="tag-pill group/chip inline-flex items-center gap-1.5 rounded-full py-1 pl-2.5 pr-1 text-xs font-semibold" data-testid="drawer-tag">
                 <span>{t}</span>
-                {d && <span className="font-normal opacity-80" title={d.exact ? "Added here, at this exact time" : "The day SubSync first saw this tag"} data-testid="tag-date">{dayText(d.at)}</span>}
+                <span className="font-normal opacity-80" title={d ? (d.exact ? "Added here, at this exact time" : "Your CRM does not record when a tag was added. This is the day SubSync first saw it (tags that arrive through a live update are seen within minutes).") : "Your CRM does not record when a tag was added, so tags from before SubSync started watching have no date."} data-testid="tag-date">{d ? dayText(d.at) : "before SubSync"}</span>
                 <button type="button" aria-label={`Remove the tag ${t}`} disabled={busy} onClick={() => setConfirming(t)} className="inline-flex size-5 cursor-pointer items-center justify-center rounded-full opacity-60 hover:bg-black/10 hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-[var(--ring)] group-hover/chip:opacity-100 disabled:cursor-not-allowed dark:hover:bg-white/15" data-testid="tag-remove">&times;</button>
               </li>
             );

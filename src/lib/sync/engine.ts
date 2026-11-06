@@ -409,6 +409,15 @@ async function handleAppointments(job: Job): Promise<Outcome> {
           name = case when team_names.source = 'platform' then excluded.name else team_names.name end,
           photo_url = excluded.photo_url, seen_at = now()`;
     }
+    // Who belongs to THIS account (feeds the Owner picker). A missing table never breaks the rest of the sync.
+    try {
+      const named = users.filter((u) => u.name);
+      for (const u of named) {
+        await db`insert into location_users (installation_id, location_id, user_id, name, seen_at) values (${job.installationId}, ${loc}, ${u.id}, ${u.name}, now())
+          on conflict (installation_id, location_id, user_id) do update set name = excluded.name, seen_at = now()`;
+      }
+      await db`delete from location_users where installation_id = ${job.installationId} and location_id = ${loc} and not (user_id = any(${named.map((u) => u.id)}))`;
+    } catch (error) { console.error("Saving account members failed", safeError(error)); }
   } catch (error) {
     usersAccess = isPermissionError(error) ? "needs_permission" : "error";
     if (usersAccess === "error") console.error("Reading team names failed", safeError(error));

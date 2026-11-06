@@ -8,7 +8,7 @@ export const SYNCED_DELETE = [
   "cleanup_changes", "cleanup_runs", "duplicate_reviews", "duplicate_snoozes", "cleanup_quality_snapshots", "possible_duplicates",
   "cached_contacts", "cached_opportunities", "cached_conversations", "cached_appointments", "pipelines",
   "account_metrics_daily", "alerts", "domain_checks", "onboarding_tasks",
-  "deal_events", "appointment_events", "lead_touches", "touch_events", "lead_events", "speed_daily", "speed_digest", "speed_prefs", "call_outcomes", "contact_tag_events",
+  "deal_events", "appointment_events", "lead_touches", "touch_events", "lead_events", "speed_daily", "speed_digest", "speed_prefs", "call_outcomes", "contact_tag_events", "location_users",
   "notification_states", "notifications", "notification_deliveries",
   "campaign_stats", "workflow_snapshots", "workflow_changes", "workflow_daily", "workflow_items",
   "dh_snapshots", "dh_flags", "dh_changes", "dh_outcomes", // Data health (docs/features/DATA_HEALTH.md)
