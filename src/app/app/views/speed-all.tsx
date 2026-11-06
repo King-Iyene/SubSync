@@ -37,7 +37,7 @@ export function LeadList({ title, params, showAccount, canMine, noun = "leads", 
     return () => { if (timer.current) clearTimeout(timer.current); };
   }, [text]);
 
-  const sp = new URLSearchParams({ part: "list", ...params, sort, page: String(page), size: "25" });
+  const sp = new URLSearchParams({ part: "list", ...params, sort, page: String(page), size: "40" });
   if (q) sp.set("q", q);
   if (owner) sp.set("owner", owner);
   const { data, error, loading, reload } = useData<ListData>(`speed?${sp}`);
@@ -71,11 +71,11 @@ export function LeadList({ title, params, showAccount, canMine, noun = "leads", 
           <div aria-busy={loading} className={loading ? "opacity-70" : ""}>
             <LeadRows rows={rows} showAccount={showAccount} actions={actions} testId="speed-list-rows" />
             <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
-              <span data-testid="speed-list-range" aria-live="polite">{data.from.toLocaleString("en-US")} to {data.to.toLocaleString("en-US")} of {data.total.toLocaleString("en-US")}</span>
+              <span data-testid="speed-list-range" aria-live="polite">Showing {data.from.toLocaleString("en-US")} to {data.to.toLocaleString("en-US")} of {data.total.toLocaleString("en-US")}</span>
               {data.pages > 1 && (
                 <span className="flex items-center gap-1">
                   <button type="button" disabled={data.page === 0} onClick={() => setPage(data.page - 1)} className={`${chip(false)} disabled:opacity-40`}>Previous</button>
-                  <span className="tabular-nums">Page {data.page + 1} of {data.pages}</span>
+                  {pageNumbers(data.page, data.pages).map((n, i) => n === null ? <span key={`g${i}`} aria-hidden>...</span> : <button key={n} type="button" aria-current={n === data.page ? "page" : undefined} aria-label={`Page ${n + 1}`} onClick={() => setPage(n)} className={`${chip(n === data.page)} tabular-nums`} data-testid="speed-list-page">{n + 1}</button>)}
                   <button type="button" disabled={data.page >= data.pages - 1} onClick={() => setPage(data.page + 1)} className={`${chip(false)} disabled:opacity-40`} data-testid="speed-list-next">Next</button>
                 </span>
               )}
@@ -86,4 +86,12 @@ export function LeadList({ title, params, showAccount, canMine, noun = "leads", 
       {actions.drawer}
     </section>
   );
+}
+
+/** Page numbers to show: the first, the last, and two either side of the current one, with a gap mark between. */
+export function pageNumbers(page: number, pages: number): Array<number | null> {
+  const keep = new Set([0, pages - 1, page - 2, page - 1, page, page + 1, page + 2].filter((n) => n >= 0 && n < pages));
+  const out: Array<number | null> = []; let prev = -1;
+  for (const n of [...keep].sort((a, b) => a - b)) { if (n - prev > 1) out.push(null); out.push(n); prev = n; }
+  return out;
 }
