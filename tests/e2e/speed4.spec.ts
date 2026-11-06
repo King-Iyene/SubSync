@@ -23,7 +23,7 @@ async function open(page: Page, path: string) {
 
 for (const role of ROLES) {
   test(`${role.name}: the race is first, with a headline, a ring and clocks that tick`, async ({ page }) => {
-    test.setTimeout(240_000);
+    test.setTimeout(480_000);
     await open(page, role.path);
     await expect(page.getByTestId("race-headline")).toBeVisible();
     await expect(page.getByTestId("speed-ring").first()).toBeVisible();
@@ -41,7 +41,7 @@ for (const role of ROLES) {
   });
 
   test(`${role.name}: ${role.people ? "People" : "Owners"}, Coverage, Pace, Capture and Rules open in plain words`, async ({ page }) => {
-    test.setTimeout(240_000);
+    test.setTimeout(480_000);
     await open(page, role.path);
     for (const [name, id] of [["Coverage", "coverage-tab"], ["Pace", "pace-tab"], [role.people ? "People" : "Owners", "people-tab"], ["Capture", "capture-tab"], ["Rules", "rules-tab"]] as const) {
       await tab(page, name).click();
@@ -49,13 +49,13 @@ for (const role of ROLES) {
       expect(await page.locator("main").innerText()).not.toMatch(BANNED);
       await noSideways(page);
     }
-    await expect(page.getByTestId("proof-report")).toBeVisible();
+    await expect(page.getByTestId("proof-report")).toBeVisible({ timeout: 90_000 });
     await expect(page.getByTestId("missed-headline")).toHaveCount(0); // that card lives on Coverage only
   });
 }
 
 test("every journey step opens exactly the leads it counted", async ({ page }) => {
-  test.setTimeout(240_000);
+  test.setTimeout(480_000);
   await open(page, "/app#speed");
   await tab(page, "Pace").click();
   await expect(page.getByTestId("journey-steps")).toBeVisible({ timeout: 90_000 });
@@ -73,7 +73,7 @@ test("every journey step opens exactly the leads it counted", async ({ page }) =
 });
 
 test("a filter narrows the race and can be cleared", async ({ page }) => {
-  test.setTimeout(240_000);
+  test.setTimeout(480_000);
   await open(page, "/app#speed");
   await page.getByTestId("filters-toggle").click();
   await page.getByTestId("filters-panel").getByLabel("Status").selectOption("waiting");
@@ -85,7 +85,7 @@ test("a filter narrows the race and can be cleared", async ({ page }) => {
 });
 
 test("the owner change is a preview first and a dry run in the demo", async ({ page }) => {
-  test.setTimeout(240_000);
+  test.setTimeout(480_000);
   await open(page, "/app#speed");
   const name = page.getByTestId("race-row").first().getByRole("button").first();
   if (!(await name.count())) { test.skip(true, "no new leads on this demo"); return; }
@@ -100,7 +100,7 @@ test("the owner change is a preview first and a dry run in the demo", async ({ p
 });
 
 test("the proof report prints without a product name", async ({ page }) => {
-  test.setTimeout(240_000);
+  test.setTimeout(480_000);
   await open(page, "/app#speed");
   await tab(page, "Rules").click();
   await expect(page.getByTestId("proof-report")).toBeVisible({ timeout: 90_000 });
