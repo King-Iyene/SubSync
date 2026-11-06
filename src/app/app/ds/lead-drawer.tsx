@@ -78,6 +78,13 @@ function Body({ seed, top, showAccount, wide, onLogged }: { seed: LeadSeed; top?
   const runner = useRunner(seed.locationId, seed.contactId, () => { setThreadKey((k) => k + 1); void wbq.reload(); void person.reload(); });
   const data = person.data;
   const c = data?.contact;
+  // Opens the Update tab, brings one block into view and puts the cursor in its first field.
+  const goUpdate = (block: string, field: string) => {
+    setTab("update");
+    let tries = 0;
+    const tick = () => { const el = document.querySelector<HTMLElement>(`[data-testid="${block}"]`); if (el) { el.scrollIntoView({ block: "center" }); el.querySelector<HTMLElement>(field)?.focus({ preventScroll: true }); } else if (tries++ < 20) requestAnimationFrame(tick); };
+    requestAnimationFrame(tick);
+  };
 
   // Opening a person is remembered for them alone ("Recently opened", "what changed since you last looked"). It is only recorded once the panel has really shown them.
   const seen = useRef(false);
@@ -124,8 +131,19 @@ function Body({ seed, top, showAccount, wide, onLogged }: { seed: LeadSeed; top?
         <button type="button" onClick={() => { setChannelPref("Email"); setComposerOpen(true); setTab("conversation"); }} disabled={!email || dnd} title={dnd ? "Asked not to be contacted" : email ? undefined : "This contact has no email address"} aria-describedby={email ? undefined : "drawer-email-why"} className={BUTTON} data-testid="drawer-email">Email</button>
         <PopMenu label={`More for ${name}`} testId="drawer-more" triggerClassName="ds-press inline-flex size-11 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-[var(--ring)] sm:size-9"
           items={[
+            // Writes go through the same preview-and-confirm sheet as the Update tab (dry-run when writes are off); note, task, tag and owner open the Update tab at that block instead of repeating it.
+            ...(wb ? [
+              { key: "note", label: "Add note", onSelect: () => goUpdate("wb-note", "textarea") },
+              { key: "task", label: "Create task", onSelect: () => goUpdate("wb-task", "input") },
+              { key: "tag", label: "Add tag", onSelect: () => goUpdate("wb-tags", "input") },
+              { key: "owner", label: "Change owner", onSelect: () => goUpdate("wb-owner", "select") },
+              dnd
+                ? { key: "dnd", label: "Allow contact again", hint: "Only if they agreed to be contacted", onSelect: () => void runner.preview({ kind: "dnd", on: false }, { verb: "Allow contact", quote: `${name} asked not to be contacted. Only continue if they have told you it is fine again.` }) }
+                : { key: "dnd", label: "Mark do not disturb", hint: "They asked not to be contacted", onSelect: () => void runner.preview({ kind: "dnd", on: true }, { verb: "Mark do not disturb", quote: `Only do this if ${name} asked not to be contacted. SubSync will then block calls, texts and emails to them.` }) },
+            ] : []),
             { key: "copy", label: actions.copied === "panel" ? "Copied" : "Copy details", onSelect: () => void actions.copy(ap, showAccount) },
             ...(url ? [{ key: "crm", label: "Open in your CRM", onSelect: () => { window.open(url, "_blank", "noopener,noreferrer"); } }] : []),
+            ...(wb?.canDelete ? [{ key: "delete", label: "Delete contact", danger: true, hint: "You will type their name to confirm", onSelect: () => void runner.preview({ kind: "delete", confirmText: "" }, { verb: "Delete forever", typeName: wb.name }) }] : []),
           ]}><MoreHorizontal aria-hidden className="size-4" /></PopMenu>
       </div>
       {(!email || !phone) && <p id="drawer-email-why" className="mt-2 text-xs text-muted-foreground" data-testid="drawer-no-contact-way">{!email && !phone ? "This contact has no email address and no phone number in your CRM." : !email ? "Email is off because this contact has no email address in your CRM." : "Call and Text are off because this contact has no phone number in your CRM."}</p>}
