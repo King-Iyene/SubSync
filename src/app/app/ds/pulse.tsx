@@ -82,7 +82,7 @@ export function PulseTile({ label, value, usual, sub, spark, testId, onOpen, ope
       <p className="t-label flex items-center gap-1.5">{label}{info && <span tabIndex={0} role="img" aria-label={info} title={info} data-testid={testId ? `${testId}-info` : undefined} className="inline-flex cursor-help rounded-full text-[var(--t-ink3)] hover:text-[var(--t-ink)] focus-visible:outline-2 focus-visible:outline-[var(--ring)]"><Info aria-hidden className="size-3.5" /></span>}</p>
       <p className="t-figure mt-2 break-words">
         {onOpen ? <button type="button" onClick={onOpen} data-testid={testId ? `${testId}-open` : undefined} aria-label={openLabel ?? "Show the records behind this number"} title={openLabel ?? "Show the records behind this number"}
-          className="ds-press -mx-1 cursor-pointer rounded-md px-1 text-left underline decoration-primary/40 decoration-[0.07em] underline-offset-[0.18em] hover:decoration-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)]"><CountUp value={value} /></button> : <CountUp value={value} />}
+          className="ds-press -mx-1 cursor-pointer rounded-md px-1 text-left text-primary underline decoration-primary/40 decoration-[0.07em] underline-offset-[0.18em] hover:decoration-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)]"><CountUp value={value} /></button> : <CountUp value={value} />}
       </p>
       {sub && <div className="t-small t-quiet mt-2">{sub}</div>}
       {usual && v && <p className={`mt-1.5 flex items-start gap-1.5 text-xs leading-5 ${v.text}`} data-testid={testId ? `${testId}-usual` : undefined}><v.Icon aria-hidden className="mt-0.5 size-3.5 shrink-0" /><span>{usual.text}</span></p>}

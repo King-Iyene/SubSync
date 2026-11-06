@@ -1,10 +1,11 @@
 "use client";
 
 import { StatusChip } from "./status-chip";
+import { LeadDrawer, type LeadSeed } from "./lead-drawer";
 import { TagPill } from "./what-is";
 import { CircleAlert, Clock, ExternalLink, MoreHorizontal, TriangleAlert } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { actionTitle, ageLabel, ageWords, INLINE_ROWS, KIND_LABEL, money, personRow, replyContext, type NeedingYou, type QueueRow, type Severity, type TodayItem } from "@/lib/analytics/today-queue";
+import { actionTitle, ageLabel, ageWords, INLINE_ROWS, KIND_LABEL, money, personOf, personRow, replyContext, type NeedingYou, type QueueRow, type Severity, type TodayItem } from "@/lib/analytics/today-queue";
 import type { NextAction } from "@/lib/analytics/today-smart";
 import { PopMenu, type MenuItem } from "./pop-menu";
 import { useNow } from "./live";
@@ -181,6 +182,9 @@ export function ReplyNowList({ items, total, newLeads, max = INLINE_ROWS, onSeeA
 }) {
   const now = useNow();
   const shown = items.slice(0, max);
+  // A person's name opens the lead panel (messages, notes, deals, appointments) over Today; the Reply button still opens the CRM.
+  const [lead, setLead] = useState<number | null>(null);
+  const seeds: LeadSeed[] = shown.map((p) => ({ contactId: personOf(p), locationId: p.locationId, name: p.name, locationName: p.accountName, url: p.url, pending: replyContext(p) }));
   const { active, moved } = useRowKeys(shown.length, (i) => { const r = shown[i]; if (r) window.open(r.url, "_blank", "noopener,noreferrer"); });
   useEffect(() => { if (moved.current) document.getElementById(`reply-${shown[active]?.id}`)?.scrollIntoView({ block: "nearest" }); }, [active, shown, moved]);
   if (total === 0) return null;
@@ -191,27 +195,30 @@ export function ReplyNowList({ items, total, newLeads, max = INLINE_ROWS, onSeeA
       <ListHead title={title} hint={hint ? <span data-testid="reply-summary">{hint}</span> : undefined}
         right={total > shown.length ? <button type="button" onClick={onSeeAll} className={SEE_ALL} data-testid="reply-all">Show all {total.toLocaleString("en-US")}</button> : undefined} />
       <ul className="@container t-surface divide-y overflow-hidden" data-testid="my-leads">
-        <li aria-hidden className={`t-label hidden gap-x-3 py-2 pl-4 pr-2 @3xl:grid ${REPLY_TRACKS}`}><span>Person</span><span>Wait</span><span /><span /></li>
+        <li aria-hidden className={`t-label hidden gap-x-3 border-l-2 border-transparent py-2 pl-4 pr-2 @3xl:grid ${REPLY_TRACKS}`}><span>Person</span><span>Status</span><span /><span /></li>
         {shown.map((p, n) => {
           const row = personRow(p, now || p.at || 0);
           const wait = p.never === true ? "Never answered" : p.at === null ? "Waiting" : `${ageWords(Math.max(0, ((now || p.at) - p.at) / 60_000))}`;
           const mine = assigned[row.key];
           const items: MenuItem[] = onAct ? actionItems(row, onAct, canAssign, null) : [];
+          // Same rule as the all-clients rows: waiting 4 hours or more, or never answered, is Urgent; anything else is Soon.
+          const urgent = p.never === true || row.severity === "critical";
           return (
             <li key={p.id} id={`reply-${p.id}`} data-testid="reply-row" aria-current={n === active ? "true" : undefined} data-new-lead={p.newLead ? "true" : "false"}
-              className={`ds-row grid grid-cols-[minmax(0,1fr)_6rem_2.5rem] items-center gap-x-3 gap-y-0.5 py-2 pl-4 pr-2 ${REPLY_TRACKS} ${n === active ? "bg-accent/50 outline outline-2 -outline-offset-2 outline-[var(--ring)]" : ""}`}>
+              className={`ds-row grid grid-cols-[minmax(0,1fr)_6rem_2.5rem] items-center gap-x-3 gap-y-0.5 border-l-2 py-2 pl-4 pr-2 ${REPLY_TRACKS} ${urgent ? "border-destructive" : "border-transparent"} ${n === active ? "bg-accent/50 outline outline-2 -outline-offset-2 outline-[var(--ring)]" : ""}`}>
               <div className="min-w-0">
-                <p className="truncate font-semibold" title={p.name}>Reply to {p.name}</p>
+                <p className="truncate font-semibold">Reply to <button type="button" onClick={() => setLead(n)} data-testid="reply-person" title={`Open ${p.name}`} className="ds-press cursor-pointer rounded-sm font-semibold text-primary underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-[var(--ring)]">{p.name}</button></p>
                 <p className="t-small t-quiet line-clamp-2 @3xl:truncate">{!single && <span>{p.accountName}. </span>}{replyContext(p)}{mine ? <span>. Assigned to {mine}</span> : null}</p>
-                <p className="flex items-center gap-1.5 text-xs text-muted-foreground @3xl:hidden" data-testid="lead-wait-narrow">{p.never && <StatusChip word="Urgent" />}{p.never ? wait : `Waiting ${wait}`}</p>
+                <p className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground @3xl:hidden" data-testid="lead-wait-narrow"><StatusChip word={urgent ? "Urgent" : "Soon"} />{p.never ? wait : `Waiting ${wait}`}</p>
               </div>
-              <p className={`tnum hidden items-center gap-1.5 text-sm @3xl:flex ${p.never ? "font-medium text-destructive" : ""}`} data-testid="lead-wait">{p.never && <StatusChip word="Urgent" />}{p.never ? wait : `Waiting ${wait}`}</p>
+              <div className="hidden min-w-0 text-sm @3xl:block" data-testid="lead-wait"><p><StatusChip word={urgent ? "Urgent" : "Soon"} /></p><p className="tnum truncate text-xs text-muted-foreground">{p.never ? wait : `Waiting ${wait}`}</p></div>
               <div><RowButton href={p.url} label="Reply" sr={`${p.name}, in your CRM`} testId="lead-open" /></div>
               <div>{onAct ? <Menu label={`More for ${p.name}`} items={items} testId="reply-more" /> : null}</div>
             </li>
           );
         })}
       </ul>
+      {lead !== null && seeds.length > 0 && <LeadDrawer leads={seeds} index={lead} onIndex={setLead} onClose={() => setLead(null)} />}
     </section>
   );
 }
@@ -234,7 +241,7 @@ export function KindList({ rows, title = "Also on your list", hint }: { rows: Ki
               <p className="line-clamp-2 text-sm text-muted-foreground @3xl:truncate" title={r.text}>{r.text}</p>
             </div>
             <button type="button" onClick={r.onOpen} data-testid="kind-count" data-count={r.count} aria-label={`${r.count.toLocaleString("en-US")} ${KIND_LABEL[r.kind].toLowerCase()}. Show them.`}
-              className="tnum ds-press order-3 col-span-2 w-fit rounded-md px-1 text-left text-sm text-muted-foreground underline underline-offset-4 hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-[var(--ring)] @3xl:order-none @3xl:col-span-1 @3xl:w-full @3xl:text-right @3xl:text-base @3xl:font-semibold @3xl:text-foreground @3xl:no-underline">{r.count.toLocaleString("en-US")}<span className="@3xl:hidden"> to check</span></button>
+              className="tnum ds-press order-3 col-span-2 w-fit cursor-pointer rounded-md px-1 text-left text-sm text-primary underline underline-offset-4 hover:bg-muted focus-visible:outline-2 focus-visible:outline-[var(--ring)] @3xl:order-none @3xl:col-span-1 @3xl:w-full @3xl:text-right @3xl:text-base @3xl:font-semibold @3xl:text-foreground @3xl:no-underline">{r.count.toLocaleString("en-US")}<span className="@3xl:hidden"> to check</span></button>
             <div><RowButton href={r.action.href} onClick={r.action.onClick} label={r.action.label} sr={r.action.sr} testId="kind-open" /></div>
           </li>
         ))}

@@ -147,7 +147,7 @@ function DateControl({ mode, hash }: { mode: "range" | "now"; hash: string }) {
   );
 }
 
-export function GlobalFilterBar({ view, agency, value, onChange }: { view: string; agency: boolean; value: FilterValue; onChange: (v: FilterValue) => void }) {
+export function GlobalFilterBar({ view, agency, value, onChange, onAllClients }: { view: string; agency: boolean; value: FilterValue; onChange: (v: FilterValue) => void; /** Given while an agency user is inside one client account: a "Back to all clients" button. */ onAllClients?: () => void }) {
   const mode = barMode(view);
   const hash = useHash();
   const { data } = useData<Segments>(agency ? "segments" : null);
@@ -165,14 +165,17 @@ export function GlobalFilterBar({ view, agency, value, onChange }: { view: strin
     return () => window.removeEventListener("subsync-focus-client", on);
   });
   if (mode === "none") return null;
-  const showAccounts = agency && options && (data?.total ?? 0) >= 2;
+  const showAccounts = agency && options && (data?.total ?? 0) >= 1; // an agency user always gets the picker, even with one client (it says which client is counted)
   if (!showAccounts && !agency && mode !== "range") return null;
   const notes = options && !isToday ? describeHidden({ ...value, accounts: picked }, options).filter((n) => n.clear.accounts === undefined) : [];
   return (
     <div className="mb-4 rounded-xl border bg-card/60 px-3 py-2.5 print:hidden" data-testid="global-filter-bar" role="region" aria-label="Filters for this page">
       <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
         {showAccounts ? <AccountControl accounts={options!.accounts!} picked={picked} onChange={setPicked} options={options!} value={isToday ? { ...value, accounts: picked } : value} onValue={onChange} /> : <span />}
-        <DateControl mode={mode} hash={hash} />
+        <div className="flex flex-wrap items-center gap-3">
+          {onAllClients && <button type="button" onClick={onAllClients} data-testid="back-to-all-clients" className="ds-press min-h-10 cursor-pointer rounded-lg border bg-card px-3 text-[0.95rem] font-medium text-primary hover:border-primary/40 hover:underline focus-visible:ring-2 focus-visible:ring-ring/40 outline-none">Back to all clients</button>}
+          <DateControl mode={mode} hash={hash} />
+        </div>
       </div>
       {notes.length > 0 && (
         <ul className="mt-2 space-y-0.5 text-sm text-muted-foreground">
