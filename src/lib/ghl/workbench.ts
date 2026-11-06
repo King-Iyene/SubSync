@@ -23,6 +23,7 @@ export type Action =
   | { kind: "task_delete"; taskId: string }
   | { kind: "tag_add" | "tag_remove"; tag: string }
   | { kind: "owner"; userId: string }
+  | { kind: "dnd"; on: boolean }
   | { kind: "fields"; fields: Partial<Record<"firstName" | "lastName" | "email" | "phone", string>> }
   | { kind: "deal"; opportunityId: string; pipelineId?: string; stageId?: string; status?: DealStatus; value?: number; ownerId?: string; name?: string }
   | { kind: "deal_create"; pipelineId: string; stageId: string; name: string; value?: number; ownerId?: string }
@@ -72,6 +73,7 @@ export function parseAction(raw: unknown): { ok: true; action: Action } | { ok: 
     }
     case "task_delete": return s("taskId") && ID.test(s("taskId") as string) ? { ok: true, action: { kind: "task_delete", taskId: s("taskId") as string } } : bad("Unknown task");
     case "tag_add": case "tag_remove": return s("tag") === null ? bad("Name the tag") : { ok: true, action: { kind: o.kind, tag: s("tag") as string } };
+    case "dnd": return { ok: true, action: { kind: "dnd", on: o.on === true } };
     case "owner": return s("userId") && ID.test(s("userId") as string) ? { ok: true, action: { kind: "owner", userId: s("userId") as string } } : bad("Choose a team member");
     case "fields": {
       const f = (o.fields && typeof o.fields === "object" ? o.fields : {}) as Record<string, unknown>;
@@ -158,6 +160,7 @@ export function planAction(a: Action, t: Target, now: Date = new Date()): Plan {
       if (tag.length > MAX.tag) blockers.push({ id: "too_long", text: "That tag is too long." });
       return mk(a.kind === "tag_add" ? "tag.add" : "tag.remove", { method: a.kind === "tag_add" ? "POST" : "DELETE", path: `/contacts/${c}/tags`, version: VERSION, scope: "contacts.write", body: { tags: [tag] } }, ["tags"], `${a.kind === "tag_add" ? "Add" : "Remove"} the tag "${tag}" ${a.kind === "tag_add" ? "to" : "from"} ${t.name}`, true);
     }
+    case "dnd": return mk("dnd.set", { method: "PUT", path: `/contacts/${c}`, version: VERSION, scope: "contacts.write", body: { dnd: a.on } }, ["dnd"], a.on ? `Mark ${t.name} do not disturb, so nobody is offered a way to contact them` : `Allow contact with ${t.name} again`, true);
     case "owner": return mk("owner.change", { method: "PUT", path: `/contacts/${c}`, version: VERSION, scope: "contacts.write", body: { assignedTo: a.userId } }, ["assignedTo"], `Change who owns ${t.name}`, true);
     case "fields": {
       const body: Record<string, unknown> = {};
@@ -205,6 +208,7 @@ export function inverseOf(a: Action, before: Before, answerId: string | null): A
   switch (a.kind) {
     case "tag_add": return before.tags?.some((x) => same(x, a.tag)) ? null : { kind: "tag_remove", tag: a.tag };
     case "tag_remove": return before.tags?.some((x) => same(x, a.tag)) ? { kind: "tag_add", tag: a.tag } : null;
+    case "dnd": return { kind: "dnd", on: !a.on };
     case "owner": return before.owner ? { kind: "owner", userId: before.owner } : null;
     case "fields": { const f: Partial<Record<"firstName" | "lastName" | "email" | "phone", string>> = {}; for (const k of Object.keys(a.fields) as Array<keyof typeof a.fields>) if (before.fields && k in before.fields) f[k] = before.fields[k] ?? ""; return Object.keys(f).length ? { kind: "fields", fields: f } : null; }
     case "deal": {

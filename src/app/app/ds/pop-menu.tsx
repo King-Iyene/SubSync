@@ -7,7 +7,7 @@ import { portalRoot } from "./portal-root";
 
 // A small menu opened by a button, drawn in a layer of its own on the page (a portal with fixed placement) so no card, scroll area or sticky bar around the button can clip
 // it or sit on top of it. Esc and a click outside close it, and focus goes back to the button. Used for the "more" actions of a Fix first row.
-export type MenuItem = { key: string; label: string; onSelect: () => void; disabled?: boolean; hint?: string };
+export type MenuItem = { key: string; label: string; onSelect: () => void; disabled?: boolean; hint?: string; danger?: boolean };
 
 export function PopMenu({ label, items, testId, triggerClassName, children }: { label: string; items: MenuItem[]; testId?: string; triggerClassName?: string; children?: ReactNode }) {
   const [open, setOpen] = useState(false);
@@ -16,6 +16,10 @@ export function PopMenu({ label, items, testId, triggerClassName, children }: { 
   const panel = useRef<HTMLDivElement>(null);
   const id = useId();
   const W = 264;
+  // ROOT CAUSE of the dead "..." in the lead panel: the panel is drawn straight on document.body at z-90, while the menu was drawn inside the app wrapper at z-80, so the menu opened
+  // underneath the panel's dark backdrop and could not be seen or clicked. A menu opened from inside a dialog is now drawn inside that dialog (it is on top of it by construction, shares its
+  // theme, and stays inside its focus trap); anywhere else it goes to the app wrapper as before.
+  const [dest, setDest] = useState<HTMLElement | null>(null);
 
   // Placement: below the button when the whole menu fits there, otherwise above it when it fits there, otherwise on the roomier side with its own scroll, so no item is ever out of reach.
   const measure = useCallback(() => {
@@ -30,7 +34,7 @@ export function PopMenu({ label, items, testId, triggerClassName, children }: { 
   }, []);
   const placed = pos !== null;
   // Once now, and once more when the menu is on screen so its real height decides the side.
-  useLayoutEffect(() => { if (open) measure(); }, [open, placed, measure]);
+  useLayoutEffect(() => { if (open) { setDest(button.current?.closest<HTMLElement>("[role=dialog]") ?? portalRoot()); measure(); } }, [open, placed, measure]);
   useEffect(() => {
     if (!open) return;
     panel.current?.querySelector<HTMLElement>("button:not([disabled])")?.focus({ preventScroll: true });
@@ -51,16 +55,16 @@ export function PopMenu({ label, items, testId, triggerClassName, children }: { 
         className={triggerClassName ?? "ds-press inline-flex size-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-[var(--ring)]"}>
         {children ?? <MoreHorizontal aria-hidden className="size-4" />}
       </button>
-      {open && pos && typeof document !== "undefined" && createPortal(
+      {open && pos && dest && typeof document !== "undefined" && createPortal(
         <div ref={panel} id={id} role="menu" aria-label={label} data-testid="pop-menu" style={{ position: "fixed", left: pos.left, top: pos.top ?? undefined, bottom: pos.bottom ?? undefined, width: W, maxHeight: pos.maxHeight, zIndex: 80, pointerEvents: "auto" }}
           className="overflow-y-auto overscroll-contain rounded-md border bg-popover p-1 text-popover-foreground shadow-[var(--shadow-lift)]">
           {items.map((it) => (
             <button key={it.key} type="button" role="menuitem" disabled={it.disabled} data-testid={`menu-${it.key}`} onClick={() => { setOpen(false); button.current?.focus({ preventScroll: true }); it.onSelect(); }}
-              className="flex min-h-9 w-full flex-col items-start justify-center rounded-[4px] px-3 py-1.5 text-left text-sm hover:bg-accent focus-visible:bg-accent focus-visible:outline-none disabled:opacity-50">
+              className={`flex min-h-9 w-full flex-col items-start justify-center rounded-[4px] px-3 py-1.5 text-left text-sm hover:bg-accent focus-visible:bg-accent focus-visible:outline-none disabled:opacity-50 ${it.danger ? "text-destructive" : ""}`}>
               <span>{it.label}</span>{it.hint && <span className="text-xs text-muted-foreground">{it.hint}</span>}
             </button>
           ))}
-        </div>, portalRoot())}
+        </div>, dest)}
     </>
   );
 }
