@@ -90,7 +90,10 @@ export async function refreshInsights(installationId: string): Promise<{ account
   // Clean-up: today's data-quality snapshot per account, and an alert for accounts where new likely duplicates appeared. Never stops the refresh.
   const { dailyQualityScan, duplicateAlertDrafts } = await import("./cleanup-scan");
   await dailyQualityScan(installationId).catch(() => undefined);
-  const drafts = [...computeAlerts(accounts, await domainStatuses(installationId), settings), ...(await duplicateAlertDrafts(installationId).catch(() => [])), ...(await (await import("../api/growth-api")).growthAlertDrafts(installationId).catch(() => []))];
+  // Stage SPEED5: each account is judged against its OWN reply target, and the escalation ladder decides how far a breach climbs.
+  const { applyBreaches } = await import("./speed5-queries");
+  const sp5 = await applyBreaches(installationId, accounts, settings.speedTargetMinutes ?? 15).catch(() => ({ accounts, ladder: undefined }));
+  const drafts = [...computeAlerts(sp5.accounts, await domainStatuses(installationId), { ...settings, escalation: sp5.ladder }), ...(await duplicateAlertDrafts(installationId).catch(() => [])), ...(await (await import("./speed5-queries")).newLeadDuplicateDrafts(installationId).catch(() => [])), ...(await (await import("../api/growth-api")).growthAlertDrafts(installationId).catch(() => []))];
   const created = await syncAlerts(installationId, drafts);
 
   // Telling people (the bell, email, Slack) is the dispatcher's job (stage F9): it reads each kind of message's preferences, quiet hours and routing, never

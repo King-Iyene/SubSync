@@ -3,6 +3,7 @@
 import { localParts, isAfterHours } from "./speed-v3.ts";
 import { judge, responseSeconds, MIN_FOR_MEDIAN, type TouchRow } from "./speed-intel.ts";
 import type { TouchEvent, Channel } from "./touch-events.ts";
+import { flagPenalty, leadFlags, type Flag } from "./speed5.ts";
 
 const MIN = 60_000, HOUR = 3_600_000, DAY = 86_400_000;
 export const MIN_BUCKET = 5;       // replies needed in one hour of the day before it can be called best
@@ -43,7 +44,7 @@ export function speedScore(rows: readonly TouchRow[], targetMinutes: number, now
 }
 
 /** Lead quality 0-100 from what the lead gave us (a phone, an email that looks real, a source we know). A starting guess for who to call first, labelled as such. */
-export function leadQuality(l: { phone?: string | null; email?: string | null; source?: string | null }): { score: number; parts: string[] } {
+export function leadQuality(l: { phone?: string | null; email?: string | null; source?: string | null }): { score: number; parts: string[]; flags: Flag[] } {
   let score = 0; const parts: string[] = [];
   const digits = (l.phone ?? "").replace(/\D/g, "");
   if (digits.length >= 10 && digits.length <= 15 && !/^(\d)\1+$/.test(digits)) { score += 45; parts.push("phone"); }
@@ -51,7 +52,9 @@ export function leadQuality(l: { phone?: string | null; email?: string | null; s
   if (/^[^\s@]+@[^\s@]+\.[a-z]{2,}$/.test(e) && !/^(test|none|noemail|asdf)@|@(test|example|mailinator)\./.test(e)) { score += 35; parts.push("email"); }
   const s = (l.source ?? "").trim();
   if (s && !/^(unknown|none|other|no source)/i.test(s)) { score += 20; parts.push("source"); }
-  return { score, parts };
+  // Stage SPEED5: validity at capture. A throwaway or shared-mailbox email and a made-up phone only lower the guess, quietly; they never hide the lead.
+  const flags = leadFlags(l);
+  return { score: Math.max(0, score - flagPenalty(flags)), parts, flags };
 }
 
 // ---------- coverage, from the touch events ----------

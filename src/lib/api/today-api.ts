@@ -70,7 +70,7 @@ export async function buildToday(i: {
     sql()`select location_id, timezone from locations where installation_id = ${installationId} and not ignored`,
     touchVisit(installationId, i.userKey, now),
   ]);
-  const replies = ledgerAll.map((r) => ({ locationId: r.locationId, leadAt: r.leadAt, touchAt: r.touchAt }));
+  const replies = ledgerAll.map((r) => ({ locationId: r.locationId, leadAt: r.leadAt, touchAt: r.touchAt, targetMinutes: r.targetMinutes ?? null }));
   const zones: Record<string, string> = Object.fromEntries(zoneRows.filter((z) => i.permits(z.location_id as string)).map((z) => [z.location_id as string, (z.timezone as string | null) || "UTC"]));
 
   // ---- the four kinds of thing, each from the function its own page uses. Waiting people come from TWO lists (new leads past their reply target, and conversations the

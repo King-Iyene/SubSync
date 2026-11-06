@@ -12,6 +12,7 @@ import { useSpeedFilter } from "./speed-filter";
 import { SidePopup } from "./speed-popup";
 import { LeadRows, useLeadActions, type LeadRow } from "./speed-rows";
 import { AlertsTab } from "./speed-insights";
+import { LadderCard } from "./speed5-ui";
 import type { GoFn } from "../nav";
 import "./speed4.css";
 
@@ -119,7 +120,7 @@ function JourneyList({ step, dropped, multi }: { step: Step; dropped: boolean; m
 }
 export const JOURNEY_STEPS = STEPS;
 
-type Proof = { now: number; targetMinutes: number; accounts: Array<{ locationId: string; name: string; leads: number; now: { judged: number; within: number; score: number | null; medianSeconds: number | null; enough: boolean }; before: { score: number | null; medianSeconds: number | null; enough: boolean } }> };
+type Proof = { now: number; targetMinutes: number; accounts: Array<{ locationId: string; name: string; leads: number; now: { judged: number; within: number; score: number | null; medianSeconds: number | null; enough: boolean }; within5?: { replied: number; inside: number } | null; before: { score: number | null; medianSeconds: number | null; enough: boolean } }> };
 
 /** The white-label printable report an agency shows a client: median first reply, share inside the target, against the month before. Carries no vendor name. */
 function ProofReport() {
@@ -138,16 +139,22 @@ function ProofReport() {
         <button type="button" className="ds-press min-h-9 rounded-md border bg-card px-3 text-sm font-medium hover:border-primary/40" data-testid="proof-print" onClick={() => { document.documentElement.classList.add("s4-printing"); window.print(); }}>Print or save as PDF</button>
       </div>
       <article className="s4-print" data-testid="proof-report">
-        <h4 className="text-lg font-semibold">Our response speed</h4>
-        <p className="t-small t-quiet mb-3">How fast a person replies to a new lead. Target: {data.targetMinutes} minutes. Last 30 days against the 30 before. {new Date(data.now).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</p>
-        {rows.length === 0 ? <p className="t-small">No new leads in the period.</p> : (
-          <table className="w-full text-sm"><thead><tr className="t-small text-left"><th className="py-1">Account</th><th>New leads</th><th>Typical first reply</th><th>Answered in time</th></tr></thead>
-            <tbody>{rows.map((a) => (
-              <tr key={a.locationId} className="border-t align-top" data-testid="proof-row"><td className="py-1.5 font-medium">{a.name}</td><td className="tnum">{a.leads}</td>
-                <td className="tnum">{a.now.medianSeconds === null ? "not enough data" : fmtDuration(a.now.medianSeconds)}<span className="t-small t-quiet block">{secDiff(a.now.medianSeconds, a.before.medianSeconds)}</span></td>
-                <td className="tnum">{a.now.score === null ? "not enough data" : `${a.now.score}%`}<span className="t-small t-quiet block">{diff(a.now.score, a.before.score, " points")}</span></td></tr>
-            ))}</tbody></table>
-        )}
+        <header className="mb-4 border-b pb-3">
+          <h4 className="text-xl font-semibold tracking-tight">Our response speed</h4>
+          <p className="t-small t-quiet">How fast a person replied to every new enquiry. Our promise: a reply within {data.targetMinutes} minutes. Last 30 days, with the 30 days before for comparison. {new Date(data.now).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</p>
+        </header>
+        {rows.length === 0 ? <p className="t-small">No new leads in the period.</p> : rows.map((a) => (
+          <section key={a.locationId} className="proof-account mb-5 border-b pb-4 last:border-b-0" data-testid="proof-row">
+            <h5 className="text-base font-semibold">{a.name}</h5>
+            <p className="t-small t-quiet">{a.leads.toLocaleString("en-US")} new {a.leads === 1 ? "enquiry" : "enquiries"} this period</p>
+            <dl className="mt-2 grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-3">
+              <div><dt className="t-label">Typical first reply</dt><dd className="text-2xl font-semibold tabular-nums">{a.now.medianSeconds === null ? "not enough data" : fmtDuration(a.now.medianSeconds)}</dd><dd className="t-small t-quiet">{secDiff(a.now.medianSeconds, a.before.medianSeconds)}</dd></div>
+              <div><dt className="t-label">Answered in time</dt><dd className="text-2xl font-semibold tabular-nums">{a.now.score === null ? "not enough data" : `${a.now.score}%`}</dd><dd className="t-small t-quiet">{diff(a.now.score, a.before.score, " points")}</dd></div>
+              <div><dt className="t-label">Replied within 5 minutes</dt><dd className="text-2xl font-semibold tabular-nums">{a.within5 ? `${a.within5.inside} of ${a.within5.replied}` : "not enough data"}</dd><dd className="t-small t-quiet">of the enquiries that got a reply</dd></div>
+            </dl>
+          </section>
+        ))}
+        <footer className="t-small t-quiet mt-2">Measured from the moment each enquiry arrived to the first message or call by a person on our team. Automatic replies do not count. A figure needs at least 5 enquiries; below that it says &quot;not enough data&quot; rather than guess.</footer>
       </article>
     </Card>
   );
@@ -172,5 +179,5 @@ function RoutingCard() {
 }
 
 export function RulesTab(p: { who: string; waiting: number; dollars: number | null; typical: string | null; canChange: boolean; targetMinutes: number; go: GoFn }) {
-  return (<div data-testid="rules-tab"><AlertsTab {...p} /><RoutingCard /><ProofReport /></div>);
+  return (<div data-testid="rules-tab"><AlertsTab {...p} />{p.canChange && <LadderCard canChange />}<RoutingCard /><ProofReport /></div>);
 }

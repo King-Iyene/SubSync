@@ -6,6 +6,7 @@ import { parseWindow, type Win } from "../analytics/speed-window";
 import type { deepLinks } from "../links";
 import { parseFilter } from "../analytics/speed-v4-more";
 import { isStep, speedCoverage, speedJourney, speedJourneyList, speedProof, speedRace, speedStory } from "../analytics/speed-v4-queries";
+import { ladderPreview, saveLadder, speedBooking } from "../analytics/speed5-queries";
 import { json, type AuthContext } from "./auth";
 
 // The rebuilt Speed to lead screen's endpoints: GET /api/app/speed?part=home|list|compare and PUT /api/app/speed/target (the one catch-all route, already guarded).
@@ -120,6 +121,15 @@ export async function handleSpeedPart(ctx: Ctx, h: SpeedHelpers): Promise<Respon
   }
 
   // Stage SPEED4: the race, coverage, the lead journey, the proof report and one lead story. The accounts come from the session; a filter only narrows inside them.
+  if (part === "booking" || part === "ladder") {
+    const allowed = narrowed(allowedAll, sp.get("account"));
+    if (allowed === "none") return json({ error: "Unknown account" }, 404);
+    const input = { installationId: ctx.installationId, allowed: allowed as string[] | null, targetMinutes, now, seePeople, filter: undefined };
+    // The ladder names people, so a client's staff do not get it (they see their own leads elsewhere).
+    if (part === "ladder") return seePeople ? json(withUrls(await ladderPreview(input), links.contact)) : json({ error: "Not available in this view" }, 403);
+    return json(await speedBooking(input));
+  }
+
   if (part === "race" || part === "coverage" || part === "journey" || part === "journey-list" || part === "proof" || part === "story") {
     const allowed = narrowed(allowedAll, sp.get("account") ?? sp.get("f_account"));
     if (allowed === "none") return json({ error: "Unknown account" }, 404);
@@ -162,4 +172,12 @@ export async function handleSpeedTarget(ctx: Ctx, h: SpeedHelpers): Promise<Resp
   const r = await setAccountTarget(ctx.installationId, await h.allowed(), body.locationId, body.minutes === undefined ? NaN : body.minutes);
   if (!r.ok) return json({ error: r.error }, r.status);
   return json({ ok: true, minutes: r.minutes });
+}
+
+/** PUT /api/app/speed/ladder { enabled, nextAfterMin, managerAfterMin }: the company-wide escalation ladder. Not for a client's staff. Values are clamped on the server. */
+export async function handleSpeedLadder(ctx: Ctx): Promise<Response> {
+  if (ctx.kind === "client") return json({ error: "Not available in this view" }, 403);
+  const body = await ctx.request.json().catch(() => null);
+  const r = await saveLadder(ctx.installationId, body);
+  return r.ok ? json({ ok: true, ladder: r.ladder }) : json({ error: r.error }, 503);
 }

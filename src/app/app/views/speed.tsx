@@ -12,6 +12,7 @@ import "./today-theme.css";
 import { CaptureTab, PaceTab, PeopleTab } from "./speed-insights";
 import { PrimaryButton } from "./today-chrome";
 import { SourceCard } from "./speed-cards";
+import { BookingCard } from "./speed5-ui";
 import { LeadList } from "./speed-all";
 import { FastSection, SlowSection, type CompareAccountRow, type ComparePersonRow, type OpenList, type PictureData } from "./speed-picture";
 import { LeadRows, useLeadActions, waitWords, type LeadRow } from "./speed-rows";
@@ -117,7 +118,7 @@ export function SpeedView({ go }: { go: GoFn }) {
       ) : (
         <FilterProvider>{(bar) => (<>{bar}<TipHost /><ModuleTabs pill label="Speed to lead sections" value={tab} onChange={goTab} tabs={[
           { label: "Race", icon: ic(Zap), node: <RaceTab multi={multi} onCall={() => goTab(CALL_TAB)} /> },
-          { label: "Pace", icon: ic(Gauge), node: <><JourneyCard multi={multi} /><PaceTab multi={multi} /></> },
+          { label: "Pace", icon: ic(Gauge), node: <><JourneyCard multi={multi} /><BookingCard /><PaceTab multi={multi} /></> },
           { label: "Coverage", icon: ic(PhoneMissed), node: <CoverageTab multi={multi} /> },
           { label: "Call mode", icon: ic(PhoneCall), badge: seenCall ? undefined : <span className="spd-new rounded-full px-1.5 py-0.5 text-[0.65rem] font-bold uppercase leading-none tracking-wide" data-testid="call-new">New</span>, node: <DialMode /> },
           ...(d.seePeople ? [{ label: "People", icon: ic(Users), node: <PeopleTab multi={multi} /> }] : [{ label: "Owners", icon: ic(Users), node: <PeopleTab multi={multi} /> }]),

@@ -6,6 +6,7 @@ import {
   type ChurnRisk, type ScoreBand, type ScoreBreakdown,
 } from "../scoring.ts";
 import { fmtDuration } from "./speed-intel.ts";
+import { DEFAULT_LADDER, ladderStep, STEP_WORDS, targetOf, type Ladder } from "./speed5.ts";
 
 // A win rate built on a handful of deals is noise, so none is shown (or used in an estimate) below this.
 import { followUpEstimate, MIN_CLOSED_DEALS } from "./metrics.ts";
@@ -17,6 +18,8 @@ export type AccountRow = {
   /** Past appointments with no outcome recorded in the last 30 days. */
   unmarkedAppointments?: number;
   oldestWaitMinutes?: number | null;
+  /** This account's own reply target when it set one (stage SPEED5). The breach alert judges against it, not the company default. */
+  speedTargetMinutes?: number | null;
   /** Open deals left out of every dollar figure because they have no value or no owner. */
   excludedOpen?: number;
   /** Of those, the open deals that sit in a closed-out or ignored stage or in a pipeline marked not in use. */
@@ -54,7 +57,7 @@ export type AccountRow = {
   contactsSyncedAt: string | null;
 };
 
-export type AccountSettings = { staleDays: number; dormantDays: number; slaHours: number; /** Minutes a new lead may wait for a first reply (default 15). */ speedTargetMinutes?: number };
+export type AccountSettings = { staleDays: number; dormantDays: number; slaHours: number; /** Minutes a new lead may wait for a first reply (default 15). */ speedTargetMinutes?: number; /** The escalation ladder (stage SPEED5). */ escalation?: Ladder };
 
 export type DerivedAccount = AccountRow & {
   emailPct: number;
@@ -248,11 +251,16 @@ export function computeAlerts(accounts: DerivedAccount[], domains: DomainStatus[
     // because an older lead is not something to rush to any more.
     if ((a.speedWaiting ?? 0) >= 3) {
       const n = a.speedWaiting as number;
-      const target = settings.speedTargetMinutes ?? 15;
+      const target = targetOf({ targetMinutes: a.speedTargetMinutes }, settings.speedTargetMinutes ?? 15);
+      // The ladder: the longer the oldest lead waits past the target, the further the alert climbs (owner, next person, manager). The manager step is critical.
+      // No ladder given (an older caller): no climbing, exactly the earlier behaviour. The refresh always passes the saved one (default 15 and 45).
+      const ladder = settings.escalation ?? { ...DEFAULT_LADDER, enabled: false };
+      const step = ladderStep(a.oldestWaitMinutes ?? 0, target, ladder);
+      const climbed = ladder.enabled && step >= 2 ? ` - ${STEP_WORDS[step]}` : "";
       out.push({
-        dedupeKey: `speed:${loc}`, kind: "speed", severity: n >= 8 ? "critical" : "warning", locationId: loc,
-        title: `${label(a)}: ${n} new leads have waited more than ${target} minutes for a reply${a.oldestWaitMinutes ? ` (longest ${fmtDuration(Math.round(a.oldestWaitMinutes * 60))})` : ""}`,
-        detail: { waiting: n, targetMinutes: target, oldestWaitMinutes: a.oldestWaitMinutes ?? null },
+        dedupeKey: `speed:${loc}`, kind: "speed", severity: n >= 8 || (ladder.enabled && step >= 3) ? "critical" : "warning", locationId: loc,
+        title: `${label(a)}: ${n} new leads have waited more than ${target} minutes for a reply${a.oldestWaitMinutes ? ` (longest ${fmtDuration(Math.round(a.oldestWaitMinutes * 60))})` : ""}${climbed}`,
+        detail: { waiting: n, targetMinutes: target, oldestWaitMinutes: a.oldestWaitMinutes ?? null, ...(ladder.enabled && step > 0 ? { step } : {}) },
       });
     }
     // Past appointments nobody marked as held or no-show make the show rate a guess. Five or more is a habit, not one forgotten click.

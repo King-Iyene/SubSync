@@ -19,6 +19,9 @@ export type LeadRow = {
   owner: PersonView | null; unassigned: boolean; repliedBy: PersonView | null; autoSeconds: number | null; detailed: boolean;
   phone: string | null; email: string | null; dnd: boolean; timeZone: string | null;
   suggestion: { userId?: string; label: string; medianSeconds: number; replies: number } | null;
+  /** Stage SPEED5 (Race only): an older record of the same person, whether this is a repeat enquiry, and the next person in line. */
+  duplicateOf?: { contactId: string; name: string; score: number; tier: string; reasons: string[]; url?: string } | null; repeat?: boolean;
+  roundRobin?: { userId: string; label: string } | null;
 };
 
 export const rowKey = (r: LeadRow) => r.locationId + ":" + r.contactId;
@@ -42,7 +45,7 @@ export const waitWords = (r: Pick<LeadRow, "status" | "neverAnswered" | "minutes
 export const toSeed = (r: LeadRow): LeadSeed => ({
   contactId: r.contactId, locationId: r.locationId, name: r.name, locationName: r.locationName, url: r.url, phone: r.phone, dnd: r.dnd, timeZone: r.timeZone,
   unassigned: r.unassigned, owner: r.owner && r.owner.state === "named" ? r.owner.label : null,
-  note: [`${waitWords(r)}.`, r.suggestion && r.unassigned ? `No owner. ${r.suggestion.label} usually replies fastest here.` : null, r.repliedBy && r.status !== "waiting" ? `Replied by ${r.repliedBy.label}.` : null].filter(Boolean).join(" "),
+  note: [`${waitWords(r)}.`, r.suggestion && r.unassigned ? `No owner. ${r.suggestion.label} usually replies fastest here.` : null, r.repliedBy && r.status !== "waiting" ? `Replied by ${r.repliedBy.label}.` : null, r.duplicateOf ? `Possible duplicate of ${r.duplicateOf.name}: reply to the older record.` : null, r.repeat ? "Repeat enquirer: they asked again." : null].filter(Boolean).join(" "),
 });
 
 const MENU_TRIGGER = "ds-press inline-flex size-11 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-[var(--ring)] @3xl:size-8";

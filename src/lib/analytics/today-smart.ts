@@ -11,6 +11,7 @@
 import { judge, MIN_FOR_MEDIAN, MIN_PER_PERSON, NO_SOURCE, sourceLabel, type Judged } from "./speed-intel.ts";
 import { localClock } from "./digest-intel.ts";
 import type { LedgerLead, Rec, RecordsSpec } from "./today-records.ts";
+import { targetOf } from "./speed5.ts";
 import { leadsSpec, trimColumns } from "./today-records.ts";
 import { KIND_LABEL, money, replyWords, type AlertFact, type Kind, type QueueRow, type TodayItem } from "./today-queue.ts";
 
@@ -314,7 +315,7 @@ export const emptyForecast = (): Forecast => ({ leads: [], deals: [], appointmen
 /** Leads still inside their reply window (nobody has replied, the target has not passed): each passes the target at arrival + target. */
 export function comingLeads(rows: LeadRow[], targetMinutes: number, now: number): Array<Coming & { startedAt: number }> {
   return rows.filter((r) => r.touchAt === null && judge(r, targetMinutes, now) === null && r.leadAt <= now)
-    .map((r) => ({ id: `coming:lead:${r.id}`, kind: "replies" as const, locationId: r.locationId, accountName: r.accountName, name: r.name, at: r.leadAt + targetMinutes * 60_000, startedAt: r.leadAt, value: null, contactId: r.contactId, url: r.url }))
+    .map((r) => ({ id: `coming:lead:${r.id}`, kind: "replies" as const, locationId: r.locationId, accountName: r.accountName, name: r.name, at: r.leadAt + targetOf(r, targetMinutes) * 60_000, startedAt: r.leadAt, value: null, contactId: r.contactId, url: r.url }))
     .sort((a, b) => a.at - b.at || a.name.localeCompare(b.name));
 }
 export const forecastOf = (leads: Array<Coming & { startedAt: number }>, deals: Coming[], appointments: Coming[]): Forecast => ({
@@ -372,9 +373,9 @@ export function sinceVisitOf(i: { since: number | null; ledger: LeadRow[]; alert
   if (i.since === null) return null;
   const since = Math.max(i.since, i.now - 14 * DAY);
   const strip = (l: LeadRow): LedgerLead => stripZone(l);
-  const target = i.targetMinutes * 60_000;
+  const tgt = (l: LeadRow) => targetOf(l, i.targetMinutes) * 60_000; // each account's own reply target
   const newLeads = i.ledger.filter((l) => l.leadAt > since && l.leadAt <= i.now).map(strip);
-  const breached = i.ledger.filter((l) => l.leadAt + target > since && l.leadAt + target <= i.now && (l.touchAt === null || l.touchAt - l.leadAt > target)).map(strip);
+  const breached = i.ledger.filter((l) => l.leadAt + tgt(l) > since && l.leadAt + tgt(l) <= i.now && (l.touchAt === null || l.touchAt - l.leadAt > tgt(l))).map(strip);
   const answered = i.ledger.filter((l) => l.touchAt !== null && l.touchAt > since && l.touchAt <= i.now).map(strip);
   const clearedAlerts = i.alerts.filter((a) => a.resolvedAt !== null && a.resolvedAt > since);
   return { since, newLeads, breached, answered, clearedAlerts };

@@ -126,6 +126,8 @@ export function alertsSpec(rows: AlertRow[], i: SpecInput): RecordsSpec {
 export type LedgerLead = {
   id: string; locationId: string; accountName: string; contactId: string; name: string; source: string | null; ownerName: string | null; touchBy: string | null;
   leadAt: number; touchAt: number | null; url: string;
+  /** The account's own reply target, when it set one (every judgement of this lead uses it). */
+  targetMinutes?: number | null;
 };
 const LEAD_COLS: Col[] = [
   { key: "what", header: "Lead", type: "text", primary: true, w: 15 },
