@@ -8,6 +8,7 @@ import type { Period } from "@/lib/analytics/growth";
 import { DAY_NAMES, digestPreview, hourWords, type GapMap, type TrendNormal } from "@/lib/analytics/speed-v3";
 import { fmtDuration } from "@/lib/analytics/speed-intel";
 import { RecordsPanel, EmptyState, ErrorState, SkeletonRows } from "../ds";
+import { useSlow } from "./speed6-base";
 import { ModeToggle, TimeChart, useChartMode } from "../ds/time-chart";
 import { WhatIs } from "../ds/what-is";
 import { useData } from "../session";
@@ -175,7 +176,9 @@ export function CaptureTab() {
   const { data: g, error, reload } = useData<GrowthData>(range ? `today/growth?from=${range.from}&to=${range.to}` : null);
   const [mode, setMode] = useChartMode("speed-capture");
   const [panel, setPanel] = useState<ReturnType<typeof specDay> | null>(null);
+  const [slow, again] = useSlow(!g && !error);
   if (error) return <ErrorState error={error} onRetry={reload} />;
+  if (!g && slow) return <div data-testid="capture-tab"><EmptyState title="This is taking too long" body="There are a lot of leads in these dates. Try a shorter range, or try again." action={<button type="button" data-testid="capture-retry" className="ds-press h-10 rounded-lg border bg-card px-4 text-sm font-medium" onClick={() => { again(); void reload(); }}>Retry</button>} /></div>;
   if (!g) return <div data-testid="capture-tab"><SkeletonRows rows={5} label="Counting email leads..." /></div>;
   const rangeWord = (range?.sentence ?? g.range.label).toLowerCase();
   const periods = [["today", "Today"], ["week", "This week"], ["month", "This month"], ["all", "All time"]] as const;

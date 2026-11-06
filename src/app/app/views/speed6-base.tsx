@@ -90,5 +90,18 @@ export function Fold({ keep = 3, children, testId = "fold" }: { keep?: number; c
 }
 
 
+/** True once a read has been pending longer than `ms` (default 45 s; a test can shorten it with window.__speedTimeoutMs). `again` starts the wait over (the Retry button). */
+export function useSlow(pending: boolean, ms = 45_000): [boolean, () => void] {
+  const [round, setRound] = useState(0);
+  const [slowRound, setSlowRound] = useState(-1);
+  useEffect(() => {
+    if (!pending) return;
+    const w = typeof window !== "undefined" ? (window as unknown as { __speedTimeoutMs?: number }).__speedTimeoutMs : undefined;
+    const t = setTimeout(() => setSlowRound(round), w ?? ms);
+    return () => clearTimeout(t);
+  }, [pending, round, ms]);
+  return [pending && slowRound === round, () => setRound((r) => r + 1)];
+}
+
 /** A band: a named group on a tab, with a thin luminous divider. */
 export const Band = ({ title }: { title: string }) => <h2 className="s6-band" data-testid="s6-band">{title}</h2>;
