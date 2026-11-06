@@ -6,7 +6,7 @@ import { pctChange } from "../analytics/growth.ts";
 test("tooltip dates are friendly and axis dates name the month", () => {
   assert.equal(fullDate("2026-10-30"), "Fri 30 Oct 2026");
   assert.equal(fullDate("Mon"), "Mon");
-  assert.equal(dayLabel("2026-11-03", 7), "Tue 3 Nov");
+  assert.equal(dayLabel("2026-11-03", 7), "3 Nov");
   assert.equal(dayLabel("2026-11-03", 30), "3 Nov");
   assert.equal(dayLabel("2026-11-03", 365), "Nov 2026");
 });

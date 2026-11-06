@@ -166,6 +166,38 @@ export async function ladderPreview(i: Input) {
   return { now: i.now, ladderReady: ready, ladder, accounts: accounts.slice(0, 40), leads: list, note: "Dry run: nothing is sent from this page. Real alerts follow the alert switches in Settings." };
 }
 
+/** The Rules "waiting now" list, built for 100+ accounts and thousands of leads: counts per step, one page of leads (longest wait first, optionally one step), and the accounts grouped with their counts (paged). Nothing is sent. */
+export async function ladderLeads(i: Input, o: { step: 0 | 1 | 2 | 3; page: number; size: number; accPage: number; accSize: number }) {
+  const db = sql();
+  const [{ lk, locs }, rows, { ladder }] = await Promise.all([loadLookups(db, i.installationId, i.allowed, i.targetMinutes, i.now), loadRows(db, i.installationId, i.allowed, i.now - 2 * DAY, i.now + DAY), loadLadder(i.installationId)]);
+  const waitingRows = rows.filter((r) => r.touchAt === null);
+  const { leads } = escalate(waitingRows.map((r) => ({ locationId: r.locationId, contactId: r.contactId, waitedMin: (i.now - r.leadAt) / 60_000, targetMin: r.targetMinutes ?? i.targetMinutes, ownerId: r.assignedTo })), ladder);
+  const counts = { 1: 0, 2: 0, 3: 0 };
+  const per = new Map<string, { n: number; top: number }>();
+  for (const l of leads) {
+    counts[l.step as 1 | 2 | 3] += 1;
+    const a = per.get(l.locationId) ?? { n: 0, top: 0 };
+    a.n += 1; a.top = Math.max(a.top, l.step); per.set(l.locationId, a);
+  }
+  const names = new Map(locs.map((l) => [l.location_id as string, lk.locationNames.get(l.location_id as string) ?? "Client account"]));
+  const accAll = [...per.entries()].map(([locationId, a]) => ({ locationId, name: names.get(locationId) ?? lk.locationNames.get(locationId) ?? "Client account", waiting: a.n, topStep: a.top })).sort((a, b) => b.waiting - a.waiting || b.topStep - a.topStep);
+  const accSize = Math.min(50, Math.max(1, Math.floor(o.accSize) || 5)), accPages = Math.max(1, Math.ceil(accAll.length / accSize)), accPage = Math.min(Math.max(0, Math.floor(o.accPage) || 0), accPages - 1);
+  const chosen = leads.filter((l) => o.step === 0 || l.step === o.step).sort((a, b) => b.waitedMin - a.waitedMin);
+  const size = Math.min(100, Math.max(1, Math.floor(o.size) || 20)), pages = Math.max(1, Math.ceil(chosen.length / size)), page = Math.min(Math.max(0, Math.floor(o.page) || 0), pages - 1);
+  const byKey = new Map(waitingRows.map((r) => [`${r.locationId}:${r.contactId}`, r]));
+  const nameOf = (loc: string, u: string | null) => (u ? resolveUser(u, lk.team, lk.usersAccess.get(loc)).label : null);
+  const nextPerson = (loc: string, owner: string | null) => {
+    const mine = rows.filter((r) => r.locationId === loc);
+    const people = new Set(mine.filter((r) => r.userId).map((r) => r.userId as string));
+    return roundRobinPick([...people].map((u) => ({ userId: u, open: mine.filter((r) => r.assignedTo === u && r.touchAt === null).length, recent: mine.filter((r) => r.assignedTo === u).length })), new Set(owner ? [owner] : []));
+  };
+  const list = chosen.slice(page * size, page * size + size).map((l) => {
+    const r = byKey.get(`${l.locationId}:${l.contactId}`);
+    return { locationId: l.locationId, contactId: l.contactId, name: r?.name ?? "Lead", account: names.get(l.locationId) ?? "Client account", waitedMin: Math.round(l.waitedMin), targetMin: l.targetMin, step: l.step, stepWords: STEP_WORDS[l.step as 1 | 2 | 3], owner: nameOf(l.locationId, l.ownerId), nextPerson: nameOf(l.locationId, nextPerson(l.locationId, l.ownerId)), toNext: minutesToNextStep(l.waitedMin, l.targetMin, ladder) };
+  });
+  return { now: i.now, counts, total: chosen.length, page, pages, from: chosen.length ? page * size + 1 : 0, to: page * size + list.length, leads: list, accounts: { total: accAll.length, page: accPage, pages: accPages, rows: accAll.slice(accPage * accSize, accPage * accSize + accSize) } };
+}
+
 // ---------------------------------------------------------------- the new-lead duplicate alert (bell, dry run)
 
 /** One info alert per account when 2 or more NEW leads of the last 24 hours look like people already in the account. Rebuilt on every refresh, so it clears itself. */

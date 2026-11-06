@@ -64,46 +64,46 @@
   Values are written as plain hex so the test and the style guide read exactly what the browser reads.
 */
 :root {
-  --background: #f4f6fa;
-  --foreground: #000c25;
+  --background: #eef3fa;
+  --foreground: #0b1730;
   --card: #ffffff;
-  --card-foreground: #000c25;
+  --card-foreground: #0b1730;
   --popover: #ffffff;
-  --popover-foreground: #000c25;
-  --primary: #0a658b;
+  --popover-foreground: #0b1730;
+  --primary: #0b6f9e;
   --primary-foreground: #ffffff;
-  --secondary: #e6eef5;
-  --secondary-foreground: #02244f;
-  --muted: #edf1f6;
-  --muted-foreground: #44546f;
-  --accent: #dcebf3;
-  --accent-foreground: #02244f;
-  --destructive: #b3261e;
-  --success: #0e7a53;
+  --secondary: #e2ecf8;
+  --secondary-foreground: #0b1730;
+  --muted: #e8eff8;
+  --muted-foreground: #3f5170;
+  --accent: #d6e9f6;
+  --accent-foreground: #0b1730;
+  --destructive: #b42318;
+  --success: #0d7a4f;
   --warning: #8a5a00;
   --gold: #d4ad58;
   --gold-foreground: #000c25;
-  --border: #d5dce6;
-  --input: #c4cdda;
-  --ring: #0a658b;
+  --border: #d0dcec;
+  --input: #b9c8dc;
+  --ring: #0b6f9e;
   /* Categorical chart colours, always used in this order, validated for colour-blind separation (docs/features/D0.md). */
-  --chart-1: #0878a6;
+  --chart-1: #0b7fb0;
   --chart-2: #b07f16;
-  --chart-3: #5b5bd6;
+  --chart-3: #6d4fd6;
   --chart-4: #1f8f5f;
   --chart-5: #c2410c;
   --radius: 0.75rem;
   /* The side menu is light in the light theme and soft blue-grey in the dark one (stage SHELL). */
-  --sidebar: #f8f9fb;
-  --sidebar-foreground: #151c28;
-  --sidebar-primary: #1f4e8c;
+  --sidebar: #f9fbff;
+  --sidebar-foreground: #0b1730;
+  --sidebar-primary: #0a6694;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #e4eaf3;
-  --sidebar-accent-foreground: #151c28;
-  --sidebar-border: #d6dbe3;
-  --sidebar-ring: #1f4e8c;
-  --shadow-card: 0 1px 2px #000c2510, 0 6px 20px -10px #000c2524;
-  --shadow-lift: 0 2px 4px #000c2512, 0 12px 28px -12px #000c2538;
+  --sidebar-accent: #dcedf8;
+  --sidebar-accent-foreground: #0b1730;
+  --sidebar-border: #d0dcec;
+  --sidebar-ring: #0b6f9e;
+  --shadow-card: 0 1px 2px #0b173010, 0 8px 24px -12px #0b6f9e40;
+  --shadow-lift: 0 2px 4px #0b173012, 0 14px 32px -12px #0b6f9e52;
   /* Motion: short, calm. Reduced-motion users get none (below). */
   --motion-fast: 120ms;
   --motion-base: 200ms;

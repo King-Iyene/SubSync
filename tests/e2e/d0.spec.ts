@@ -51,10 +51,10 @@ test("the style guide's list, lead panel and charts work", async ({ page }) => {
   const list = page.getByTestId("data-list").first();
   await expect(list).toHaveAttribute("data-mode", "preview");
   await expect(list.getByTestId("list-range")).toHaveText("Showing 10 of 37");
-  await list.getByRole("button", { name: "View all 37" }).click();
-  await expect(list.getByTestId("list-range")).toHaveText("Showing 1 to 25 of 37");
+  await list.getByRole("button", { name: "See all 37" }).click();
+  await expect(list.getByTestId("list-range")).toHaveText("Showing 1 to 20 of 37");
   await list.getByRole("button", { name: "Next page" }).click();
-  await expect(list.getByTestId("list-range")).toHaveText("Showing 26 to 37 of 37");
+  await expect(list.getByTestId("list-range")).toHaveText("Showing 21 to 37 of 37");
   await list.getByRole("button", { name: "Show fewer" }).click();
   // The lead panel: opens from a name, steps with the arrows, closes with Escape.
   await list.getByRole("button", { name: /\w+ \w+/ }).first().click();
@@ -114,8 +114,8 @@ test("Speed to lead: ten rows and View all, a name opens the lead panel, the bad
   const badge = list.locator("[data-tone='bad']").first();
   await expect(badge).toContainText(/never answered|waiting/);
   expect(await badge.evaluate((el) => getComputedStyle(el).borderTopLeftRadius)).toBe("0px");
-  if (await list.getByRole("button", { name: /^View all/ }).count()) {
-    await list.getByRole("button", { name: /^View all/ }).click();
+  if (await list.getByRole("button", { name: /^See all/ }).count()) {
+    await list.getByRole("button", { name: /^See all/ }).click();
     await expect(list).toHaveAttribute("data-mode", "all");
     await noSideScroll(page, "Speed to lead, full list");
     await list.getByRole("button", { name: "Show fewer" }).click();

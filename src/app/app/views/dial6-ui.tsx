@@ -37,7 +37,7 @@ export function Ring6({ pct, size = 76, label, tone = "var(--s6-cyan)", children
     <div className="s6-ring text-center" style={{ width: size }} role="img" aria-label={`${label}: ${pct}%`}>
       <div className="relative" style={{ width: size, height: size }}>
         <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden>
-          <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(36,54,89,0.9)" strokeWidth="6" />
+          <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--s6-track)" strokeWidth="6" />
           <circle className="arc" cx={size / 2} cy={size / 2} r={r} fill="none" stroke={tone} strokeWidth="6" strokeLinecap="round" strokeDasharray={c} strokeDashoffset={c * (1 - Math.min(100, pct) / 100)} transform={`rotate(-90 ${size / 2} ${size / 2})`} style={{ filter: pct >= 100 ? `drop-shadow(0 0 6px ${tone})` : undefined }} />
         </svg>
         <div className="absolute inset-0 grid place-items-center text-sm font-semibold tabular-nums">{children}</div>
@@ -164,7 +164,7 @@ const NEXT_LABEL: Record<NextStep, string> = { next: "Go to the next lead", redi
 export function DispositionEditor({ value, onChange, accountName }: { value: Disposition[]; onChange: (d: Disposition[]) => void; accountName: string | null }) {
   const upd = (i: number, p: Partial<Disposition>) => onChange(value.map((d, k) => (k === i ? { ...d, ...p } : d)));
   return (
-    <details className="mt-4 border-t border-[rgba(36,54,89,0.9)] pt-3" data-testid="dispo-editor">
+    <details className="mt-4 border-t border-[color-mix(in_srgb,var(--s6-line)_90%,transparent)] pt-3" data-testid="dispo-editor">
       <summary className="min-h-9 cursor-pointer text-sm font-medium">Customize the outcomes{accountName ? ` for ${accountName}` : ""}</summary>
       <ul className="mt-3 grid gap-3">
         {value.map((d, i) => (

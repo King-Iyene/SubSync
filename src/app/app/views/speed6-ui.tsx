@@ -11,6 +11,7 @@ import { ErrorState, SkeletonRows } from "../ds";
 import { useSpeedFilter } from "./speed-filter";
 import { SidePopup } from "./speed-popup";
 import { JourneyList } from "./speed-coverage";
+import { useListPrefs } from "../ds";
 import { LeadRows, useLeadActions, type LeadRow } from "./speed-rows";
 import type { ComparePersonRow, CompareAccountRow } from "./speed-picture";
 import "./speed6.css";
@@ -82,7 +83,7 @@ export function usePulse() {
 const money = (n: number) => "$" + Math.round(n).toLocaleString("en-US");
 
 export function DefinitionsBanner() {
-  return <p className="s6-label mb-6 rounded-xl border border-[rgba(103,232,249,0.16)] px-4 py-3" data-testid="definitions">Waiting means a new lead nobody has replied to yet. Replied means a person answered. Click anything to see the people behind it.</p>;
+  return <p className="s6-label mb-6 rounded-xl border border-[color-mix(in_srgb,var(--s6-edgec)_16%,transparent)] px-4 py-3" data-testid="definitions">Waiting means a new lead nobody has replied to yet. Replied means a person answered. Click anything to see the people behind it.</p>;
 }
 
 function PeopleOpen({ rows, multi, note }: { rows: LeadRow[]; multi: boolean; note?: string }) {
@@ -91,24 +92,29 @@ function PeopleOpen({ rows, multi, note }: { rows: LeadRow[]; multi: boolean; no
 }
 
 export function ReadyCard({ multi, p }: { multi: boolean; p: Pulse }) {
-  const rows = p.ready;
+  const all = p.ready;
+  const rows = all.slice(0, 5);
   const actions = useLeadActions(rows);
+  const { open, node } = useListPopup(multi);
+  const { density } = useListPrefs();
+  const more = Math.max(all.length, p.waitingTotal ?? 0);
   return (
     <Q sticky q="Who should I reply to first?" span testId="ready-card" glow={rows.some((r) => r.nextStepNone) ? "warn" : undefined} tip="Leads nobody has replied to, with an open deal first, then the longest wait. A red flag means nobody has touched the lead and no appointment exists, so there is no next step.">
       {rows.length === 0 ? <p className="s6-label" data-testid="ready-empty">Nobody is waiting for a first reply. Nothing to do here.</p> : (
-        <ul className="s6-ready" data-testid="ready-list">
+        <ul className="s6-ready" data-testid="ready-list" data-density={density}>
           {rows.map((r, i) => (
             <li key={rowId(r)} data-testid="ready-row">
-              <button type="button" className="s6-link min-w-0 flex-1 font-semibold" onClick={() => actions.show(i)} data-testid="ready-name"><span className="block truncate">{r.name}</span>{multi && <span className="s6-label block truncate">{r.locationName}</span>}</button>
-              <span className="s6-chip" data-tone={(r.days ?? 0) >= 1 ? "amber" : "cyan"} data-testid="ready-days">{(r.days ?? 0) >= 1 ? `${r.days} ${r.days === 1 ? "day" : "days"} waiting` : `${fmtDuration(r.minutes * 60)} waiting`}</span>
-              {(r.dollars ?? 0) > 0 && <span className="s6-chip" data-tone="green">{money(r.dollars as number)} open</span>}
-              {r.nextStepNone && <span className="s6-chip" data-tone="red" data-testid="ready-nonext">Next step: none set</span>}
-              <button type="button" className="s6-btn" data-kind="primary" onClick={() => actions.reply(r)} aria-label={`Reply to ${r.name}`}>Reply</button>
+              <button type="button" className="s6-link flex min-w-0 flex-1 items-baseline gap-2 text-sm font-semibold" onClick={() => actions.show(i)} data-testid="ready-name"><span className="truncate">{r.name}</span>{multi && <span className="s6-label hidden truncate font-normal sm:inline">{r.locationName}</span>}</button>
+              <span className="s6-chip" data-tone={(r.days ?? 0) >= 1 ? "amber" : "cyan"} data-testid="ready-days">{(r.days ?? 0) >= 1 ? `${r.days} ${r.days === 1 ? "day" : "days"}` : fmtDuration(r.minutes * 60)}</span>
+              {(r.dollars ?? 0) > 0 && <span className="s6-chip" data-tone="green">{money(r.dollars as number)}</span>}
+              {r.nextStepNone && <span className="s6-chip" data-tone="red" data-testid="ready-nonext">No next step</span>}
+              <button type="button" className="s6-btn" data-size="sm" data-kind="primary" onClick={() => actions.reply(r)} aria-label={`Reply to ${r.name}`}>Reply</button>
             </li>
           ))}
         </ul>
       )}
-      {actions.drawer}
+      {more > rows.length && <p className="mt-3"><button type="button" className="s6-link text-sm font-semibold underline" onClick={() => open("Waiting for a first reply", { status: "waiting" })} data-testid="ready-see-all">See all {more.toLocaleString("en-US")} waiting</button></p>}
+      {actions.drawer}{node}
     </Q>
   );
 }
@@ -127,7 +133,7 @@ export function VelocityCard({ p }: { p: Pulse }) {
 export function ReasonCard({ multi, p }: { multi: boolean; p: Pulse }) {
   const [pick, setPick] = useState<{ label: string; n: number; rows: LeadRow[] } | null>(null);
   const total = Math.max(1, p.reasons.reduce((s, r) => s + r.n, 0));
-  const tone: Record<string, string> = { no_owner: "var(--s6-red)", owner_busy: "var(--s6-amber)", after_hours: "var(--s6-violet)", duplicate: "var(--s6-blue)", no_phone: "var(--s6-orange)", dnd: "var(--s6-red)", unclear: "#4a5f8a" };
+  const tone: Record<string, string> = { no_owner: "var(--s6-red)", owner_busy: "var(--s6-amber)", after_hours: "var(--s6-violet)", duplicate: "var(--s6-blue)", no_phone: "var(--s6-orange)", dnd: "var(--s6-red)", unclear: "var(--s6-track)" };
   return (
     <Q q="Why do leads wait?" testId="reason-card" tip="The main reason each waiting lead has not been answered, taken from what SubSync knows: no owner, an owner holding too many, arrived after hours, a duplicate, or no phone number.">
       {p.reasons.length === 0 ? <p className="s6-label">Nobody is waiting.</p> : (
@@ -136,7 +142,7 @@ export function ReasonCard({ multi, p }: { multi: boolean; p: Pulse }) {
             <li key={r.key}>
               <button type="button" className="s6-link w-full" data-testid="reason-bar" onClick={() => setPick({ label: r.label, n: r.n, rows: r.rows })} aria-label={`${r.label}: ${r.n} ${r.n === 1 ? "lead" : "leads"}. Open the people.`}>
                 <span className="flex items-baseline justify-between gap-2 text-sm"><span className="font-medium">{r.label}</span><b className="tnum">{r.n.toLocaleString("en-US")}</b></span>
-                <span className="s6-hbar mt-1 block"><i style={{ width: `${Math.max(3, (r.n / total) * 100)}%`, background: tone[r.key] ?? "#4a5f8a" }} /></span>
+                <span className="s6-hbar mt-1 block"><i style={{ width: `${Math.max(3, (r.n / total) * 100)}%`, background: tone[r.key] ?? "var(--s6-track)" }} /></span>
               </button>
             </li>
           ))}

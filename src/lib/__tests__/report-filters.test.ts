@@ -42,7 +42,7 @@ test("labels are thinned to fit and keep the first and last, never touching", ()
   assert.deepEqual(thinLabels(0, 5), []);
 });
 test("day labels fit the range", () => {
-  assert.equal(dayLabel("2026-11-03", 7), "Tue 3 Nov");
+  assert.equal(dayLabel("2026-11-03", 7), "3 Nov");
   assert.equal(dayLabel("2026-11-03", 90), "3 Nov");
   assert.equal(dayLabel("2026-11-03", 365), "Nov 2026");
 });

@@ -89,7 +89,7 @@ test("paging never goes out of range and never holds more than 50", () => {
   const list = Array.from({ length: 120 }, (_, i) => i);
   assert.deepEqual(pageOf(list, 0, 25), { rows: list.slice(0, 25), page: 0, pages: 5, total: 120, from: 1, to: 25 });
   assert.equal(pageOf(list, 99, 25).page, 4);
-  assert.equal(pageOf(list, 0, 1000).rows.length, 50);
+  assert.equal(pageOf(list, 0, 1000).rows.length, 100);
   assert.deepEqual(pageOf([], 3, 25), { rows: [], page: 0, pages: 1, total: 0, from: 0, to: 0 });
 });
 

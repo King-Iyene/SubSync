@@ -82,7 +82,7 @@ for (const theme of ["light", "dark"] as const) {
 test("the two themes really differ, and use the KD Squares palette", () => {
   assert.notEqual(light.background, dark.background);
   assert.equal(dark.background, "#141d2f", "dark page is the soft deep blue-grey (stage SHELL lifted it from near-black navy)");
-  assert.equal(light.primary, "#0a658b", "light buttons use the brand teal");
+  assert.equal(light.primary, "#0b6f9e", "light buttons use the clear blue-cyan accent");
   assert.equal(light.gold, "#d4ad58");
   assert.equal(dark.gold, "#d4ad58");
   assert.equal(SURFACE.dark, dark.card, "accentTokens checks the dark theme against the real dark card colour");

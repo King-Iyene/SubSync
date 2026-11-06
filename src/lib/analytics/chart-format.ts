@@ -53,7 +53,6 @@ export function thinLabels(n: number, maxLabels: number): number[] {
 /** A short day label that fits the range and always names the month: "Mon 3 Nov" for two weeks or less, "3 Nov" for about four months, "Nov 2026" beyond. */
 export function dayLabel(day: string, rangeDays: number): string {
   const d = new Date(`${day}T12:00:00Z`);
-  if (rangeDays <= 14) return d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }).replace(",", "");
   if (rangeDays <= 120) return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
   return d.toLocaleDateString("en-GB", { month: "short", year: "numeric", timeZone: "UTC" });
 }

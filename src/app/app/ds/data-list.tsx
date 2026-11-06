@@ -2,7 +2,8 @@
 
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useState, type KeyboardEvent, type ReactNode } from "react";
-import { paginate, PAGE_SIZE, PREVIEW_ROWS } from "@/lib/design/ui-logic";
+import { paginate, PREVIEW_ROWS } from "@/lib/design/ui-logic";
+import { ListControls, PageBar, useListPrefs } from "./list-prefs";
 import { EmptyState } from "./states";
 
 // The one list for the whole app (N14): ten rows and a "View all" button, never an endless scroll. "View all" opens the full list in place with a
@@ -19,7 +20,7 @@ export type Column<T> = {
 };
 
 export function DataList<T>({
-  title, rows, columns, rowKey, onOpen, empty = "Nothing to show.", preview = PREVIEW_ROWS, pageSize = PAGE_SIZE, toolbar, total, caption, copyText,
+  title, rows, columns, rowKey, onOpen, empty = "Nothing to show.", preview = PREVIEW_ROWS, pageSize: pageSizeProp, toolbar, total, caption, copyText,
 }: {
   title?: string; rows: readonly T[]; columns: Array<Column<T>>; rowKey: (row: T) => string; onOpen?: (row: T, index: number) => void; empty?: string;
   preview?: number; pageSize?: number; toolbar?: ReactNode;
@@ -28,6 +29,9 @@ export function DataList<T>({
   /** One line of plain text per row. When given, a "Copy list" button puts every loaded row on the clipboard (for a message, a note, a spreadsheet). */
   copyText?: (row: T) => string;
 }) {
+  const prefs = useListPrefs();
+  const pageSize = pageSizeProp ?? prefs.size;
+  const tight = prefs.density === "compact";
   const [all, setAll] = useState(false);
   const [page, setPage] = useState(1);
   const [copied, setCopied] = useState(false);
@@ -56,7 +60,7 @@ export function DataList<T>({
     </div>
   );
   return (
-    <div className="@container min-w-0 rounded-lg border bg-card" data-testid="data-list" data-mode={all ? "all" : "preview"}>
+    <div className="@container min-w-0 rounded-lg border bg-card" data-testid="data-list" data-mode={all ? "all" : "preview"} data-density={prefs.density}>
       {(title || toolbar) && (
         <div className={`${all ? "sticky top-0 z-10 " : ""}flex flex-wrap items-center justify-between gap-2 rounded-t-lg border-b bg-card px-3 py-2.5`}>
           {title && <h3 className="text-sm font-semibold">{title}</h3>}
@@ -66,7 +70,7 @@ export function DataList<T>({
       <div className={all ? "sticky top-0 z-[5]" : ""}>{Header}</div>
       <ul className="divide-y" aria-label={title ?? caption} onKeyDown={onKeys}>
         {shown.map((row, n) => (
-          <li key={rowKey(row)} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2.5 text-sm @3xl:grid @3xl:gap-3 @3xl:py-2 @3xl:[grid-template-columns:var(--cols)]" style={{ ["--cols" as string]: grid }}>
+          <li key={rowKey(row)} className={`flex flex-wrap items-center gap-x-4 gap-y-0.5 px-3 text-sm @3xl:grid @3xl:gap-3 @3xl:[grid-template-columns:var(--cols)] ${tight ? "py-1 @3xl:min-h-[34px] @3xl:py-0.5" : "py-2 @3xl:min-h-[44px] @3xl:py-1"}`} style={{ ["--cols" as string]: grid }}>
             {columns.map((c) => {
               const content = c.cell(row);
               const body = c.primary && onOpen ? <button type="button" data-row-primary onClick={() => onOpen(row, offset + n)} className="min-h-9 text-left font-medium hover:underline">{content}</button> : content;
@@ -83,18 +87,13 @@ export function DataList<T>({
         {copyText && <button type="button" onClick={copy} className="min-h-9 rounded-lg px-2 font-medium text-primary underline" data-testid="list-copy">{copied ? "Copied" : "Copy list"}</button>}
         {all ? (
           <>
-            <span data-testid="list-range">Showing {paged.from} to {paged.to} of {paged.total}</span>
-            <span className="flex items-center gap-1">
-              <button type="button" aria-label="Previous page" disabled={paged.page <= 1} onClick={() => setPage(paged.page - 1)} className="inline-flex size-9 items-center justify-center rounded-lg border hover:bg-muted disabled:opacity-40"><ChevronLeft aria-hidden className="size-4" /></button>
-              <span aria-live="polite">Page {paged.page} of {paged.pages}</span>
-              <button type="button" aria-label="Next page" disabled={paged.page >= paged.pages} onClick={() => setPage(paged.page + 1)} className="inline-flex size-9 items-center justify-center rounded-lg border hover:bg-muted disabled:opacity-40"><ChevronRight aria-hidden className="size-4" /></button>
-              <button type="button" onClick={() => { setAll(false); setPage(1); }} className="ml-2 min-h-9 rounded-lg px-2 font-medium text-primary underline">Show fewer</button>
-            </span>
+            <span className="flex w-full flex-wrap items-center justify-between gap-2"><ListControls /><button type="button" onClick={() => { setAll(false); setPage(1); }} className="min-h-9 rounded-lg px-2 font-medium text-primary underline">Show fewer</button></span>
+            <div className="w-full"><PageBar page={paged.page - 1} pages={paged.pages} from={paged.from} to={paged.to} total={paged.total} onPage={(n) => setPage(n + 1)} /></div>
           </>
         ) : (
           <>
             <span data-testid="list-range">Showing {Math.min(preview, rows.length)} of {size}</span>
-            {rows.length > preview && <button type="button" onClick={() => setAll(true)} className="min-h-9 rounded-lg px-2 font-medium text-primary underline">View all {size}</button>}
+            {rows.length > preview && <button type="button" onClick={() => setAll(true)} className="min-h-9 rounded-lg px-2 font-medium text-primary underline">See all {size}</button>}
           </>
         )}
       </div>

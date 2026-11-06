@@ -8,6 +8,7 @@ export { remember, remembered } from "./remember";
 export { InlineAlert, type AlertTone } from "./alert";
 export { FreshnessStrip as StatusLine } from "../views/sync-status";
 export { DataList, type Column } from "./data-list";
+export { useListPrefs, ListControls, PageBar, pageNumberList, PAGE_SIZES, type Density } from "./list-prefs";
 export { LeadDrawer, type LeadSeed } from "./lead-drawer";
 export { HeldNote, HeldStatus, useHeld, heldKey } from "./held";
 export { DialerAskHost } from "./dial-button";
