@@ -155,14 +155,8 @@ test("Rules: the stepper, the escalation toggle, the digest preview and a dry-ru
     await page.getByTestId("ladder-save").click();
     await expect.poll(() => puts.some((p) => JSON.stringify(p.body).includes('"nextAfterMin":20'))).toBe(true);
   }
-  // digest: a card, a preview popup in plain text, a dry-run test
-  await page.getByTestId("digest-weekly").click();
-  await page.getByTestId("digest-preview-open").click();
-  await expect(page.getByTestId("digest-popup")).toContainText("Weekly message");
-  expect(await page.getByTestId("digest-preview").evaluate((el) => getComputedStyle(el).fontFamily)).not.toMatch(/mono/i);
-  await page.keyboard.press("Escape");
-  await page.getByTestId("digest-test").click();
-  await expect(page.getByTestId("digest-msg")).toContainText("Dry run");
+  // the summary email card is hidden until it can be edited and delivered
+  await expect(page.getByTestId("digest-card")).toHaveCount(0);
   // waiting-now cards open the shared lead panel, never a small popup
   const card = page.getByTestId("ladder-lead");
   await expect(card).toHaveCount(1);

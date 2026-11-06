@@ -1,7 +1,7 @@
 "use client";
 
 import { CircleHelp, Play, RotateCcw, X } from "lucide-react";
-import { CountUp, Fold, Q, useListPopup } from "./speed6-base";
+import { Band, CountUp, Fold, Q, useListPopup } from "./speed6-base";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { flowDots, rowId } from "@/lib/analytics/speed6";
 import { fmtDuration } from "@/lib/analytics/speed-intel";
@@ -169,7 +169,7 @@ export function PersonCard({ multi, p }: { multi: boolean; p: Pulse }) {
     return n === 0 ? <span className="s6-label">0</span> : <button type="button" className="s6-link font-semibold underline decoration-dotted underline-offset-4" data-testid={`person-${col}`} aria-label={`${who.name}: ${n} ${col}. Open the people.`} onClick={() => setPick({ title: `${who.name}: ${col}`, rows, n })}>{n.toLocaleString("en-US")}</button>;
   };
   return (
-    <Q q="Who books the most?" span testId="person-card" tip="Leads each person owns, how many replied, booked and showed, and the booking rate (needs 5 leads). Leads nobody owns are in the Unassigned row.">
+    <Q sticky q="Who books the most?" span testId="person-card" tip="Leads each person owns, how many replied, booked and showed, and the booking rate (needs 5 leads). Leads nobody owns are in the Unassigned row.">
       <div className="overflow-x-auto"><table className="s6-table" data-testid="person-table">
         <thead><tr><th scope="col">Person</th><th scope="col">Leads</th><th scope="col">Replied</th><th scope="col">Booked</th><th scope="col">Showed</th><th scope="col">Rate</th></tr></thead>
         <tbody>{p.people.map((w) => (
@@ -260,7 +260,7 @@ export function PaceTab6({ multi, slow, old }: { multi: boolean; slow: SlowProps
   const { data: p, error, reload } = usePulse();
   return (
     <div data-testid="pace-tab6">
-      <DefinitionsBanner />
+      <DefinitionsBanner /><Band title="Where your leads go" />
       {error ? <ErrorState error={error} onRetry={reload} /> : (
         <Fold keep={3} testId="pace-fold">
           <div className="s6-grid s6-three">
@@ -280,7 +280,7 @@ export function PeopleTab6({ multi, slow, old }: { multi: boolean; slow: SlowPro
   return (
     <div data-testid="people-tab6">
       {error ? <ErrorState error={error} onRetry={reload} /> : (
-        <Fold keep={3} testId="people-fold">
+        <Fold keep={3} testId="people-fold"><Band title="Who does the work" />
           <div className="s6-grid s6-three">
             <WhoWasSlow multi={multi} {...slow} />
             {p ? <PersonCard multi={multi} p={p} /> : <SkeletonRows rows={3} label="Counting who books..." />}

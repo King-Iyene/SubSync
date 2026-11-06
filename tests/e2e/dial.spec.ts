@@ -9,6 +9,7 @@ const item = (o: Record<string, unknown>) => ({ locationId: "L1", locationName: 
 const ITEMS = [item({ contactId: "c-ana", name: "Ana Reyes", openValue: 5000 }), item({ contactId: "c-ben", name: "Ben Ito", dnd: true }), item({ contactId: "c-cy", name: "Cy Park", phone: "+15550002222" })];
 
 async function mock(page: Page, posts: { outcomes: Array<Record<string, unknown>>; actions: Array<Record<string, unknown>> }) {
+  await page.addInitScript(() => { try { localStorage.setItem("subsync.dial.auto", "false"); localStorage.setItem("subsync.speed.tour6", "1"); } catch { /* none */ } }); // the manual outcome buttons are tested here; auto sync is in speed6b
   await page.route(/\/api\/app\/dial\/queue/, (r) => r.fulfill({ json: { list: "missed", lists: [{ id: "missed", label: "Missed calls, no callback", help: "" }, { id: "new_unanswered", label: "New leads not yet reached", help: "" }], total: 3, ownOnly: false, me: "Test Agent", items: ITEMS } }));
   await page.route(/\/api\/app\/dial\/stats/, (r) => r.fulfill({ json: { people: [{ userId: "u1", name: "You", calls: 4, perHour: 8, outcomes: { spoke: 2, no_answer: 2 } }], own: false } }));
   await page.route(/\/api\/app\/dial\/script/, (r) => r.fulfill({ json: { script: null, default: "x", canEdit: true } }));

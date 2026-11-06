@@ -73,3 +73,10 @@ test("ready to act: money and days waiting rank, no next step is flagged when un
   assert.equal(nextStepNone({ touched: false, booked: false }), true); assert.equal(nextStepNone({ touched: true, booked: false }), false); assert.equal(nextStepNone({ touched: false, booked: true }), false);
   assert.equal(moreCardsNote(0), null); assert.equal(moreCardsNote(1), "1 more card needs more data"); assert.equal(moreCardsNote(3), "3 more cards need more data");
 });
+
+test("one date and time reading: weekday, day, month, 12-hour time and the zone abbreviation", async () => {
+  const { fmtWhen } = await import("../analytics/speed6.ts");
+  assert.equal(fmtWhen(Date.UTC(2026, 10, 3, 12), "Africa/Lagos"), "Tue 3 Nov, 1:00 pm GMT+1");
+  assert.match(fmtWhen(Date.UTC(2026, 10, 3, 18), "America/New_York"), /^Tue 3 Nov, 1:00 pm E[SD]T$/);
+  assert.equal(fmtWhen(Date.UTC(2026, 10, 3, 12), null), "Tue 3 Nov, 12:00 pm UTC");
+});

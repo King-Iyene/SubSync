@@ -8,7 +8,7 @@ import { useApiClient, useData } from "../session";
 import { ErrorState, LeadDrawer, SkeletonRows, type LeadSeed } from "../ds";
 import { useSpeedFilter } from "./speed-filter";
 import { SidePopup } from "./speed-popup";
-import { Fold, Q } from "./speed6-base";
+import { Band, Fold, Q } from "./speed6-base";
 import type { GoFn } from "../nav";
 import "./speed6.css";
 
@@ -131,13 +131,13 @@ export function RulesTab6(p: { who: string; waiting: number; dollars: number | n
   const { data: d, error, reload } = useData<Preview>("speed?part=ladder");
   return (
     <div data-testid="rules-tab">
-      <Fold keep={4} testId="rules-fold">
+      <Fold keep={4} testId="rules-fold"><Band title="How we reply" />
         <div className="s6-grid s6-three">
           <TargetCard targetMinutes={p.targetMinutes} canChange={p.canChange} />
           {error ? <ErrorState error={error} onRetry={reload} /> : !d ? <SkeletonRows rows={3} label="Building the preview..." /> : <EscalationCard canChange={p.canChange} d={d} reload={reload} />}
-          <DigestCard who={p.who} waiting={p.waiting} dollars={p.dollars} typical={p.typical} />
+          {/* The summary email is hidden until it can be edited per account and delivered (recipients, channel, schedule): a preview that goes nowhere is not shown. */}
         </div>
-        {d && <WaitingNowCard leads={d.leads} multi={p.multi} />}
+        {d && <><Band title="Right now" /><WaitingNowCard leads={d.leads} multi={p.multi} /></>}
         {p.rest}
       </Fold>
     </div>

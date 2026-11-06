@@ -95,3 +95,15 @@ export const daysWaiting = (minutes: number) => Math.floor(minutes / (60 * 24));
 
 /** The one line that tells how many cards are held back for lack of data. */
 export function moreCardsNote(hidden: number): string | null { return hidden <= 0 ? null : `${hidden} more ${hidden === 1 ? "card needs" : "cards need"} more data`; }
+
+/** One shared date and time reading for Speed: "Mon 3 Nov, 1:00 pm WAT", in the account's own zone (UTC when unknown), with the zone abbreviation. */
+export function fmtWhen(ms: number, tz: string | null | undefined): string {
+  const zone = tz || "UTC";
+  try {
+    const d = new Date(ms);
+    const day = new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: zone }).format(d).replace(",", "");
+    const time = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: zone }).format(d).replace(" PM", " pm").replace(" AM", " am");
+    const abbr = new Intl.DateTimeFormat("en-US", { timeZoneName: "short", timeZone: zone }).formatToParts(d).find((p) => p.type === "timeZoneName")?.value ?? zone;
+    return `${day}, ${time} ${abbr}`;
+  } catch { return new Date(ms).toISOString(); }
+}

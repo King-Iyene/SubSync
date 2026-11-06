@@ -126,3 +126,12 @@ li[data-tier="Surge"] .s6-rank { background: rgba(167, 139, 250, 0.14); border-c
 /* the printable proof report stays as it was: hidden on screen, shown by the Print button */
 .s6-screen-hide { display: none; }
 @media print { html.s4-printing .s6-screen-hide { display: block !important; } }
+
+/* Layout system (strict): 8px grid, 32 to 48px between sections, each section a panel with a title row and a thin luminous divider, at most 2 columns, page width about 1100px, 24px inside cards. */
+.s6.s6 { max-width: 1100px; margin-inline: auto; line-height: 1.6; }
+.s6-grid { gap: 32px; margin-bottom: 40px; }
+@media (min-width: 1180px) { .s6-grid.s6-three { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.s6-band { display: flex; align-items: center; gap: 12px; margin: 8px 0 24px; font-size: 0.8125rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--s6-cyan); }
+.s6-band::after { content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, rgba(103, 232, 249, 0.5), transparent); }
+.s6 [data-testid="race-tab"] > section { border: 1px solid rgba(103, 232, 249, 0.16); border-radius: 16px; padding: 24px; margin-bottom: 40px; background: linear-gradient(180deg, rgba(20, 35, 72, 0.5), rgba(13, 23, 48, 0.85)); }
+.s6 [data-testid="race-tab"] h3 { padding-bottom: 12px; margin-bottom: 16px; border-bottom: 1px solid rgba(103, 232, 249, 0.18); }

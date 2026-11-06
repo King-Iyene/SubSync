@@ -25,8 +25,8 @@ export function parseTarget(v: unknown): { ok: true; minutes: number } | { ok: f
 
 // ---------- which leads a list holds ----------
 
-export type LeadStatusFilter = "waiting" | "within" | "late" | "answered" | "onlyAuto" | "all";
-export const STATUS_FILTERS: readonly LeadStatusFilter[] = ["waiting", "within", "late", "answered", "onlyAuto", "all"];
+export type LeadStatusFilter = "waiting" | "within" | "late" | "slow" | "answered" | "onlyAuto" | "all";
+export const STATUS_FILTERS: readonly LeadStatusFilter[] = ["waiting", "within", "late", "slow", "answered", "onlyAuto", "all"];
 export type LeadSort = "wait" | "newest" | "name" | "account";
 export const SORTS: readonly LeadSort[] = ["wait", "newest", "name", "account"];
 export type LeadQuery = {
@@ -50,6 +50,7 @@ export function passes(r: LoadedRow, status: Judged, q: LeadQuery, accounts: Nam
   if (q.status === "waiting" && status !== "waiting") return false;
   if (q.status === "within" && status !== "within") return false;
   if (q.status === "late" && status !== "late") return false;
+  if (q.status === "slow" && status === "within") return false; // no person reply yet, or a slow one
   if (q.status === "answered" && status === "waiting") return false;
   if (q.status === "onlyAuto" && !(r.detailed === true && r.autoAt != null && r.humanAt == null && status === "waiting")) return false;
   if (q.person && !(r.touchAt !== null && r.userId === q.person)) return false;

@@ -89,3 +89,6 @@ export function Fold({ keep = 3, children, testId = "fold" }: { keep?: number; c
   );
 }
 
+
+/** A band: a named group on a tab, with a thin luminous divider. */
+export const Band = ({ title }: { title: string }) => <h2 className="s6-band" data-testid="s6-band">{title}</h2>;
