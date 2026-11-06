@@ -1,6 +1,6 @@
 "use client";
 
-import { MoreHorizontal } from "lucide-react";
+import { MoreHorizontal, PhoneCall } from "lucide-react";
 import { useEffect, useState } from "react";
 import { raceState, type Score } from "@/lib/analytics/speed-v4";
 import { fmtDuration } from "@/lib/analytics/speed-intel";
@@ -98,7 +98,7 @@ function Assign({ lead, onDone }: { lead: LeadRow; onDone: () => void }) {
   );
 }
 
-export function RaceTab({ multi }: { multi: boolean }) {
+export function RaceTab({ multi, onCall }: { multi: boolean; onCall?: () => void }) {
   const { query } = useSpeedFilter();
   const { data: d, error, reload } = useData<Race>(`speed?part=race${query}`);
   const rows = d?.feed ?? [];
@@ -119,7 +119,10 @@ export function RaceTab({ multi }: { multi: boolean }) {
     <div data-testid="race-tab">
       <section className="mb-8 grid gap-6 md:grid-cols-[1fr_auto] md:items-center" aria-label="The race">
         <div className="max-w-3xl">
-          <h2 className="t-display" data-testid="race-headline" aria-live="polite">{headline}</h2>
+          <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
+            <h2 className="t-display min-w-0 flex-1 basis-64" data-testid="race-headline" aria-live="polite">{headline}</h2>
+            {onCall && <button type="button" onClick={onCall} data-testid="start-calling" className="spd-cta ds-press inline-flex min-h-11 shrink-0 cursor-pointer items-center gap-2 rounded-lg px-5 text-[15px] font-semibold focus-visible:outline-2 focus-visible:outline-[var(--ring)]"><PhoneCall aria-hidden className="size-4" />Start calling</button>}
+          </div>
           <p className="t-small t-quiet mt-2" data-testid="race-money">
             This month, {l.leads.toLocaleString("en-US")} {l.leads === 1 ? "lead" : "leads"} got no person reply or a slow one
             {l.countedDollars > 0 ? <>: <strong className="text-[var(--t-ink)]">{usd(l.countedDollars)}</strong> in open deals belongs to {l.countedPeople} of them (counted).</> : ". No open deals are attached to them."}
@@ -149,7 +152,7 @@ export function RaceTab({ multi }: { multi: boolean }) {
               <li key={rowKey(r)} className="ds-row grid grid-cols-[6rem_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 py-2.5" data-testid="race-row">
                 <LiveTimer lead={r} now={now} />
                 <div className="min-w-0">
-                  <button type="button" onClick={() => actions.show(i)} className="block max-w-full truncate text-left font-semibold hover:underline" title={r.name}>{r.name}</button>
+                  <button type="button" onClick={() => actions.show(i)} className="block max-w-full cursor-pointer truncate text-left font-semibold hover:underline" data-tip="Click to open this lead" title={undefined}>{r.name}</button>
                   <p className="t-small t-quiet truncate" title={whyLine(r, multi)}>{whyLine(r, multi)}</p>
                   <p className="t-small t-quiet">Lead quality <span className="tnum font-medium text-[var(--t-ink)]" data-testid="lead-quality">{r.quality}</span>/100{r.dollars > 0 ? <> · <span className="tnum">{usd(r.dollars)}</span> open</> : null} <WhatIs text="A starting guess from what the lead gave us: a real phone number, a real email, a known source. Not a promise." /></p>
                 </div>

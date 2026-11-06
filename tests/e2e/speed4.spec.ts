@@ -69,7 +69,22 @@ test("every journey step opens exactly the leads it counted", async ({ page }) =
     const said = Number(((await page.getByTestId("journey-list-count").innerText()).trim().match(/^[0-9,]+/)?.[0] ?? "0").replace(/,/g, ""));
     expect(said).toBe(counted);
     expect(await page.getByTestId("journey-rows").getByTestId("speed-row").count()).toBe(Math.min(said, 100));
+    // The leads open in a popup over the page; Esc closes it and the page is still on the same tab.
+    await expect(page.getByTestId("speed-popup")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.getByTestId("speed-popup")).toHaveCount(0);
+    await expect(steps.first()).toBeVisible();
   }
+});
+
+test("Start calling on the Race opens Call mode, whose tab carries New until it is opened", async ({ page }) => {
+  test.setTimeout(240_000);
+  await open(page, "/app#speed");
+  await tab(page, "Race").click();
+  await expect(page.getByTestId("call-new")).toBeVisible({ timeout: 90_000 });
+  await page.getByTestId("start-calling").click();
+  await expect(page.getByRole("tab", { name: /^Call mode/, selected: true })).toBeVisible();
+  await expect(page.getByTestId("call-new")).toHaveCount(0);
 });
 
 test("a filter narrows the race and can be cleared", async ({ page }) => {

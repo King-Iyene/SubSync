@@ -26,8 +26,8 @@ const link = "ds-press min-h-11 rounded-md px-1.5 text-left font-medium text-pri
 /** A big number that opens its list. A real button, so the keyboard and a screen reader get it. */
 export function NumberButton({ children, label, onClick, tone }: { children: ReactNode; label: string; onClick: () => void; tone?: "bad" | "warn" | "good" }) {
   return (
-    <button type="button" onClick={onClick} aria-label={label} data-testid="number-button"
-      className={`ds-press tnum min-h-11 rounded-md px-1 text-left font-semibold underline decoration-1 underline-offset-4 hover:bg-muted focus-visible:outline-2 focus-visible:outline-[var(--ring)] sm:min-h-9 ${tone === "bad" ? "text-destructive" : tone === "warn" ? "text-warning" : tone === "good" ? "text-success" : ""}`}>{children}</button>
+    <button type="button" onClick={onClick} aria-label={label} data-testid="number-button" data-tip="Click to see the people"
+      className={`ds-press spd-row-link tnum min-h-11 rounded-md px-1 text-left font-semibold underline decoration-dotted decoration-1 underline-offset-4 hover:decoration-solid hover:bg-muted focus-visible:outline-2 focus-visible:outline-[var(--ring)] sm:min-h-9 ${tone === "bad" ? "text-destructive" : tone === "warn" ? "text-warning" : tone === "good" ? "text-success" : ""}`}>{children}</button>
   );
 }
 

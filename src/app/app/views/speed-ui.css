@@ -1,0 +1,28 @@
+/* Speed to lead polish: bright tab bar, clickable marks, popup motion. Scoped by class names; nothing else changes. */
+.spd-tabs, .spd-cta { --spd-a: #0e7490; --spd-on: #ffffff; --spd-glow: rgb(14 116 144 / 0.35); }
+@media (prefers-color-scheme: dark) { .spd-tabs, .spd-cta { --spd-a: #22d3ee; --spd-on: #04222b; --spd-glow: rgb(34 211 238 / 0.4); } }
+.dark .spd-tabs, [data-theme="dark"] .spd-tabs, .dark .spd-cta, [data-theme="dark"] .spd-cta { --spd-a: #22d3ee; --spd-on: #04222b; --spd-glow: rgb(34 211 238 / 0.4); }
+.spd-tab { transition: background-color .15s, color .15s, box-shadow .2s, transform .15s; }
+.spd-tab[aria-selected="true"] { background: var(--spd-a); color: var(--spd-on); box-shadow: 0 0 0 1px var(--spd-a), 0 4px 18px var(--spd-glow); }
+.spd-tab[aria-selected="false"]:hover { background: color-mix(in srgb, var(--spd-a) 16%, transparent); color: var(--t-ink, inherit); transform: translateY(-1px); }
+.spd-dot { background: var(--spd-a); box-shadow: 0 0 0 3px var(--spd-glow); }
+.spd-new { background: var(--spd-a); color: var(--spd-on); }
+.spd-tab[aria-selected="true"] .spd-new { background: var(--spd-on); color: var(--spd-a); }
+.spd-cta { background: var(--spd-a, #0e7490); color: var(--spd-on, #fff); box-shadow: 0 4px 18px var(--spd-glow, rgb(14 116 144 / .35)); transition: transform .15s, box-shadow .2s; }
+.spd-cta:hover { transform: translateY(-1px); box-shadow: 0 6px 24px var(--spd-glow, rgb(14 116 144 / .45)); }
+
+/* a mark that opens people: pointer, hover lift, ring */
+.spd-mark { cursor: pointer; transition: filter .12s, outline-color .12s, transform .12s; outline: 2px solid transparent; outline-offset: 1px; }
+.spd-mark:hover:not(:disabled), .spd-mark:focus-visible { filter: brightness(1.25) saturate(1.1); outline-color: var(--t-accent, currentColor); transform: scale(1.12); position: relative; z-index: 1; }
+.spd-mark:disabled { cursor: default; }
+.spd-row-link { cursor: pointer; border-radius: 6px; transition: background-color .12s; }
+.spd-row-link:hover { background: color-mix(in srgb, var(--t-accent, currentColor) 10%, transparent); }
+
+.spd-fade { animation: spd-fade .18s ease-out both; }
+.spd-slide { animation: spd-slide .22s cubic-bezier(.2,.8,.2,1) both; }
+.spd-tip { transform: translate(-50%, -100%); animation: spd-fade .1s ease-out both; }
+.spd-rise { animation: spd-rise .45s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes spd-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes spd-slide { from { transform: translateX(28px); opacity: .4; } to { transform: none; opacity: 1; } }
+@keyframes spd-rise { from { transform: translateY(8px); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .spd-fade, .spd-slide, .spd-tip, .spd-rise { animation: none; } .spd-mark, .spd-tab, .spd-cta { transition: none; } .spd-mark:hover:not(:disabled) { transform: none; } }

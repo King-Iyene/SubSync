@@ -13,6 +13,7 @@ import { useData } from "../session";
 import type { GoFn } from "../nav";
 import { LeadRows, useLeadActions, type LeadRow } from "./speed-rows";
 import { useSpeedFilter } from "./speed-filter";
+import { SidePopup } from "./speed-popup";
 
 // The Speed to lead extras, one small card each (stage SPEED3). Every card has one plain line, one number or chart, and the reason it matters in a small "?" tip. Every mark opens
 // exactly the leads it counted (the same selection on the server). Small samples say "not enough data" instead of a percentage.
@@ -31,12 +32,12 @@ type Pick = { title: string; q: Record<string, string> };
 const H = ({ title, tip, children }: { title: string; tip: string; children?: ReactNode }) => (
   <div className="mb-3 flex flex-wrap items-end justify-between gap-x-4 gap-y-1"><h3 className="t-title">{title} <WhatIs text={tip} /></h3>{children}</div>
 );
-const Card = ({ children, id }: { children: ReactNode; id: string }) => <section aria-labelledby={id} className="mb-10 border-t border-[var(--t-rule)] pt-5" data-testid={id}>{children}</section>;
-const BTN = "ds-press min-h-11 cursor-pointer rounded-md px-2 text-left font-medium text-[var(--t-accent)] underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-[var(--ring)] sm:min-h-8";
+const Card = ({ children, id }: { children: ReactNode; id: string }) => <section aria-labelledby={id} className="spd-rise mb-10 border-t border-[var(--t-rule)] pt-5" data-testid={id}>{children}</section>;
+const BTN = "ds-press spd-row-link min-h-11 cursor-pointer rounded-md px-2 text-left font-medium text-[var(--t-accent)] underline decoration-dotted underline-offset-4 hover:decoration-solid focus-visible:outline-2 focus-visible:outline-[var(--ring)] sm:min-h-8";
 const pct = (x: number | null) => (x === null ? "not enough data" : `${Math.round(x * 100)}%`);
 
 /** The exact leads behind one mark. */
-function Opened({ pick, multi, onBack }: { pick: Pick; multi: boolean; onBack: () => void }) {
+function Opened({ pick, multi }: { pick: Pick; multi: boolean }) {
   const { query } = useSpeedFilter();
   const { data, error, reload } = useData<{ count: number; shown: number; rows: LeadRow[] }>(`speed?part=insight-list&${new URLSearchParams(pick.q)}${query}`);
   const actions = useLeadActions(data?.rows ?? []);
@@ -44,8 +45,7 @@ function Opened({ pick, multi, onBack }: { pick: Pick; multi: boolean; onBack: (
   if (!data) return <SkeletonRows rows={4} label="Opening the leads..." />;
   return (
     <section aria-label={pick.title} data-testid="insight-list">
-      <button type="button" onClick={onBack} className={BTN}>Back</button>
-      <h3 className="t-title mt-1" data-testid="insight-list-title">{pick.title}</h3>
+      <h3 className="t-title" data-testid="insight-list-title">{pick.title}</h3>
       <p className="t-small t-quiet mb-3" data-testid="insight-list-count">{data.count.toLocaleString("en-US")} {data.count === 1 ? "lead" : "leads"}{data.count > data.shown ? `, the first ${data.shown} shown` : ""}</p>
       {data.rows.length === 0 ? <EmptyState title="No leads here" body="Nothing matches this mark right now." /> : <LeadRows rows={data.rows} showAccount={multi} actions={actions} testId="insight-rows" />}
       {actions.drawer}
@@ -63,13 +63,13 @@ export function PaceTab({ multi }: { multi: boolean }) {
   const actions = useLeadActions(d?.rescue ?? []);
   if (error) return <ErrorState error={error} onRetry={reload} />;
   if (!d) return <SkeletonRows rows={5} label="Working out your pace..." />;
-  if (pick) return <Opened pick={pick} multi={multi} onBack={() => setPick(null)} />;
   const open = (title: string, q: Record<string, string>) => setPick({ title, q });
   const t = d.trend;
   const max = Math.max(1, ...d.gap.cells.map((c) => c.leads));
   const cell = (dow: number, hour: number) => d.gap.cells.find((c) => c.dow === dow && c.hour === hour);
   return (
     <div data-testid="pace-tab">
+      {pick && <SidePopup label={pick.title} onClose={() => setPick(null)}><Opened pick={pick} multi={multi} /></SidePopup>}
       {d.rescue.length > 0 && (
         <Card id="rescue">
           <H title="Worth the most if you reply now" tip="Ranked by the open deals of the people waiting, weighted by how long they have been cooling (half the weight lost every day). Without a deal, the longest wait goes first. A lead that waits a day is far less likely to answer." />
@@ -82,8 +82,8 @@ export function PaceTab({ multi }: { multi: boolean }) {
         <H title="Does answering fast book more?" tip="From this account's own leads in the last 28 days. Fast means a person replied within 5 minutes. It is a pattern in your data, not proof: fast leads may also be the better leads. Your CRM's own reports do not put reply time next to bookings." />
         <p className="text-[0.95rem] font-medium" data-testid="proof-line">{d.fastSlow.line}</p>
         <p className="t-small t-quiet mt-1 flex flex-wrap gap-x-4">
-          <button type="button" className={BTN} onClick={() => open("Answered within 5 minutes", { sel: "fast" })}>{d.fastSlow.fast.n} answered within 5 minutes</button>
-          <button type="button" className={BTN} onClick={() => open("Answered after 5 minutes", { sel: "slow" })}>{d.fastSlow.slow.n} answered later</button>
+          <button type="button" data-tip="Click to see the people" className={BTN} onClick={() => open("Answered within 5 minutes", { sel: "fast" })}>{d.fastSlow.fast.n} answered within 5 minutes</button>
+          <button type="button" data-tip="Click to see the people" className={BTN} onClick={() => open("Answered after 5 minutes", { sel: "slow" })}>{d.fastSlow.slow.n} answered later</button>
         </p>
       </Card>
 
@@ -104,18 +104,18 @@ export function PaceTab({ multi }: { multi: boolean }) {
       <Card id="gap">
         <H title="When leads arrive and nobody answers" tip="Each square is an hour of the week in the account's own clock. Darker means more leads arrived. A red edge means half or more were not answered in time. Weekends and before 8am or after 6pm count as after hours." />
         <p className="text-[0.95rem] font-medium" data-testid="gap-line">{d.gap.line ?? "Not enough leads yet to see a pattern (needs 5 after hours)."}</p>
-        <div className="mt-3 max-w-2xl overflow-hidden" data-testid="gap-map" role="group" aria-label="Leads by day and hour">
+        <div className="mt-3 max-w-2xl" data-testid="gap-map" role="group" aria-label="Leads by day and hour">
           {[1, 2, 3, 4, 5, 6, 0].map((dow) => (
             <div key={dow} className="flex items-center gap-1 py-px"><span className="t-small t-quiet w-8 shrink-0">{DAY_NAMES[dow]}</span>
               <div className="flex min-w-0 flex-1 gap-px">{Array.from({ length: 24 }, (_, h) => { const c = cell(dow, h); const bad = c && c.leads >= 3 && c.missed / c.leads >= 0.5; return (
                 <button key={h} type="button" disabled={!c} onClick={() => c && open(`${DAY_NAMES[dow]} ${hourWords(h)}`, { sel: "cell", dow: String(dow), hour: String(h) })} aria-label={c ? `${DAY_NAMES[dow]} ${hourWords(h)}: ${c.leads} leads, ${c.missed} not answered in time` : `${DAY_NAMES[dow]} ${hourWords(h)}: no leads`}
-                  className={`h-6 min-w-0 flex-1 rounded-[2px] disabled:cursor-default ${bad ? "outline outline-1 outline-[var(--t-bad)]" : ""}`} style={{ background: c ? `color-mix(in srgb, var(--t-c1) ${Math.round(18 + (c.leads / max) * 72)}%, transparent)` : "var(--t-sunk)" }} />
+                  data-tip={c ? `${DAY_NAMES[dow]} ${hourWords(h)}: ${c.leads} ${c.leads === 1 ? "lead" : "leads"}, ${c.missed} not answered in time. Click to see the people.` : `${DAY_NAMES[dow]} ${hourWords(h)}: no leads`} className={`spd-mark h-6 min-w-0 flex-1 rounded-[2px] ${bad ? "outline outline-1 outline-[var(--t-bad)]" : ""}`} style={{ background: c ? `color-mix(in srgb, var(--t-c1) ${Math.round(18 + (c.leads / max) * 72)}%, transparent)` : "var(--t-sunk)" }} />
               ); })}</div>
             </div>
           ))}
         </div>
         {d.gap.worst.length > 0 && <p className="t-small t-quiet mt-2 flex flex-wrap gap-x-3">Best hours to have someone there: {d.gap.worst.map((w) => <button key={`${w.dow}${w.hour}`} type="button" className={BTN} onClick={() => open(`${DAY_NAMES[w.dow]} ${hourWords(w.hour)}`, { sel: "cell", dow: String(w.dow), hour: String(w.hour) })}>{DAY_NAMES[w.dow]} {hourWords(w.hour)} ({w.missed} missed)</button>)}</p>}
-        <p className="t-small mt-1 flex flex-wrap gap-x-4"><button type="button" className={BTN} onClick={() => open("Arrived after hours or at the weekend", { sel: "after" })}>{d.gap.afterLeads} after hours</button><button type="button" className={BTN} onClick={() => open("Arrived in opening hours", { sel: "open" })}>{d.gap.openLeads} in opening hours</button></p>
+        <p className="t-small mt-1 flex flex-wrap gap-x-4"><button type="button" data-tip="Click to see the people" className={BTN} onClick={() => open("Arrived after hours or at the weekend", { sel: "after" })}>{d.gap.afterLeads} after hours</button><button type="button" data-tip="Click to see the people" className={BTN} onClick={() => open("Arrived in opening hours", { sel: "open" })}>{d.gap.openLeads} in opening hours</button></p>
       </Card>
 
       <Card id="sources">
@@ -123,7 +123,7 @@ export function PaceTab({ multi }: { multi: boolean }) {
         {d.sources.length === 0 ? <p className="t-small t-quiet">No leads in the last 28 days.</p> : (
           <div className="overflow-hidden"><table className="w-full text-sm" data-testid="sources-table"><thead><tr className="t-label text-left"><th className="py-1.5 pr-2 font-normal">Source</th><th className="px-1 text-right font-normal">First reply</th><th className="px-1 text-right font-normal">Leads</th><th className="px-1 text-right font-normal">Booked</th><th className="hidden px-1 text-right font-normal sm:table-cell">Showed</th><th className="hidden px-1 text-right font-normal sm:table-cell">Won</th><th className="pl-1 text-right font-normal">Slow cost</th></tr></thead>
             <tbody className="divide-y divide-[var(--t-rule)]">{d.sources.map((s) => { const c = d.costBySource.find((x) => x.source === s.source); return (
-              <tr key={s.source}><th scope="row" className="max-w-[9rem] truncate py-1.5 pr-2 text-left font-medium"><button type="button" className={`${BTN} max-w-full truncate`} title={s.source} onClick={() => open(`Source: ${s.source}`, { sel: "source", source: s.source })}>{s.source}</button></th>
+              <tr key={s.source}><th scope="row" className="max-w-[9rem] truncate py-1.5 pr-2 text-left font-medium"><button type="button" data-tip="Click to see the people" className={`${BTN} max-w-full truncate`} title={s.source} onClick={() => open(`Source: ${s.source}`, { sel: "source", source: s.source })}>{s.source}</button></th>
                 <td className="t-num px-1 text-right">{s.medianSeconds === null ? `${s.answered} of 5` : fmtDuration(s.medianSeconds)}</td><td className="t-num px-1 text-right">{s.leads}</td><td className="t-num px-1 text-right">{s.booked}</td><td className="t-num hidden px-1 text-right sm:table-cell">{s.showed}</td><td className="t-num hidden px-1 text-right sm:table-cell">{s.won}</td><td className="t-num pl-1 text-right">{c?.line ?? "-"}</td></tr>); })}</tbody></table></div>
         )}
       </Card>
@@ -137,16 +137,16 @@ export function PeopleTab({ multi }: { multi: boolean }) {
   const [pick, setPick] = useState<Pick | null>(null);
   if (error) return <ErrorState error={error} onRetry={reload} />;
   if (!d) return <SkeletonRows rows={5} label="Counting who replies..." />;
-  if (pick) return <Opened pick={pick} multi={multi} onBack={() => setPick(null)} />;
   const open = (title: string, q: Record<string, string>) => setPick({ title, q });
   return (
     <div data-testid="people-tab">
+      {pick && <SidePopup label={pick.title} onClose={() => setPick(null)}><Opened pick={pick} multi={multi} /></SidePopup>}
       <Card id="owners">
         <H title="Leads nobody owns" tip="A lead with no owner is a lead everyone assumes someone else will answer. Open the list and give each one to the person who replies fastest." />
-        <p className="text-[0.95rem] font-medium" data-testid="owner-line">{d.owners.noOwner === 0 ? "Every lead in the last 28 days has an owner." : <><button type="button" className={BTN} onClick={() => open("Leads with no owner", { sel: "noOwner" })}>{d.owners.noOwner} of {d.owners.total} leads have no owner</button></>}</p>
+        <p className="text-[0.95rem] font-medium" data-testid="owner-line">{d.owners.noOwner === 0 ? "Every lead in the last 28 days has an owner." : <><button type="button" data-tip="Click to see the people" className={BTN} onClick={() => open("Leads with no owner", { sel: "noOwner" })}>{d.owners.noOwner} of {d.owners.total} leads have no owner</button></>}</p>
         {d.seePeople && d.owners.owners.length > 1 && (
           <ul className="mt-2 divide-y divide-[var(--t-rule)] border-y border-[var(--t-rule)] text-sm" data-testid="owner-list">
-            {d.owners.owners.map((o) => <li key={o.userId} className="flex items-center justify-between gap-3 py-1"><button type="button" className={`${BTN} truncate`} onClick={() => open(`Leads owned by ${o.name}`, { sel: "owner", user: o.userId })}>{o.name}</button><span className="t-num shrink-0">{o.leads}{o.overloaded ? <span className="ml-2 text-[var(--t-warn)]">more than twice a fair share ({d.owners.fairShare})</span> : ""}</span></li>)}
+            {d.owners.owners.map((o) => <li key={o.userId} className="flex items-center justify-between gap-3 py-1"><button type="button" data-tip="Click to see the people" className={`${BTN} truncate`} onClick={() => open(`Leads owned by ${o.name}`, { sel: "owner", user: o.userId })}>{o.name}</button><span className="t-num shrink-0">{o.leads}{o.overloaded ? <span className="ml-2 text-[var(--t-warn)]">more than twice a fair share ({d.owners.fairShare})</span> : ""}</span></li>)}
           </ul>
         )}
       </Card>
@@ -158,7 +158,7 @@ export function PeopleTab({ multi }: { multi: boolean }) {
               {d.setters.teamMedianSeconds !== null && <p className="t-small t-quiet mb-1">Typical for the whole team: {fmtDuration(d.setters.teamMedianSeconds)}.</p>}
               <table className="w-full table-fixed text-sm" data-testid="setters-table"><thead><tr className="t-label text-left"><th className="py-1.5 font-normal">Person</th><th className="px-1 text-right font-normal">Typical</th><th className="px-1 text-right font-normal">In time</th><th className="px-1 text-right font-normal">Replies</th><th className="pl-1 text-right font-normal">Booked</th></tr></thead>
                 <tbody className="divide-y divide-[var(--t-rule)]">{d.setters.rows.map((s) => (
-                  <tr key={s.userId}><th scope="row" className="max-w-[10rem] truncate py-1 text-left"><button type="button" className={`${BTN} max-w-full truncate`} onClick={() => open(`Replies by ${s.name}`, { sel: "person", user: s.userId })}>{s.name}</button></th>
+                  <tr key={s.userId}><th scope="row" className="max-w-[10rem] truncate py-1 text-left"><button type="button" data-tip="Click to see the people" className={`${BTN} max-w-full truncate`} onClick={() => open(`Replies by ${s.name}`, { sel: "person", user: s.userId })}>{s.name}</button></th>
                     <td className="t-num px-1 text-right">{s.medianSeconds === null ? `${s.replies} of 3` : fmtDuration(s.medianSeconds)}</td><td className="t-num px-1 text-right">{s.withinShare === null ? "-" : pct(s.withinShare)}</td><td className="t-num px-1 text-right">{s.replies}</td><td className="t-num pl-1 text-right">{s.bookedRate === null ? "-" : pct(s.bookedRate)}</td></tr>))}</tbody></table>
             </>
           )}

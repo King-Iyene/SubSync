@@ -26,7 +26,7 @@ test("call mode: list, start, keyboard outcome, skip past do-not-contact, call b
   await page.goto("/app#speed");
   await page.reload();
   await expect(page.getByTestId("race-tab")).toBeVisible({ timeout: 120_000 });
-  await page.getByRole("tab", { name: "Call mode", exact: true }).click();
+  await page.getByRole("tab", { name: /^Call mode/ }).click();
 
   await expect(page.getByTestId("dial-count")).toContainText("2 people ready to call");
   await expect(page.getByTestId("dial-stats")).toContainText("8 an hour");

@@ -7,6 +7,7 @@ import type { Part } from "@/lib/analytics/speed-window";
 import { useData } from "../session";
 import { CardRange, DrillPanel, ErrorState, InlineAlert, SkeletonRows, useCardRange, useDrill, type CardRangeState, type Column, type LeadSeed } from "../ds";
 import { Badge, Btn, Card, ExtLink, Table, Td, Th } from "../ui";
+import { SidePopup } from "./speed-popup";
 
 // The pieces the Speed to lead screen shares (a person's name and picture, the lead columns) and the "Where leads come from" card, which lives under "More detail".
 // The card has its own range and comparison (KF-4), asks the server for exactly that window, and every figure on it opens the list of leads behind it (KF-6).
@@ -89,7 +90,7 @@ function CardState<T>({ q, children }: { q: { error: Error | null; reload: () =>
 // The list behind a figure, with the lead panel stepping through it. Shared by every card.
 function LeadsPanel({ drill, title, members, showAccount }: { drill: ReturnType<typeof useDrill>; title: string; members: MembersView; showAccount: boolean }) {
   return (
-    <DrillPanel drill={drill} title={title} count={members.count} noun={members.count === 1 ? "lead" : "leads"} rows={members.rows} columns={leadColumns(showAccount)} rowKey={leadKey} toLead={leadSeed} empty="No leads behind this one." />
+    <DrillPanel drill={drill} backLabel="Close" title={title} count={members.count} noun={members.count === 1 ? "lead" : "leads"} rows={members.rows} columns={leadColumns(showAccount)} rowKey={leadKey} toLead={leadSeed} empty="No leads behind this one." />
   );
 }
 
@@ -122,7 +123,7 @@ export function SourceCard({ showAccount }: { showAccount: boolean }) {
                 {d.rows.map((s, i) => (
                   <tr key={s.cls}>
                     <Td className="font-medium">{s.label}{s.names.length > 0 && <span className="block text-xs font-normal text-muted-foreground">{s.names.map((x) => `${x.label} ${x.n}`).join(", ")}</span>}</Td>
-                    <Td className="text-right tabular-nums"><button type="button" className="min-h-9 font-medium text-primary underline" onClick={() => drill.select(i)} aria-label={`${s.label}: ${s.members.count} leads, open the list`}>{s.members.count}</button></Td>
+                    <Td className="text-right tabular-nums"><button type="button" data-tip="Click to see the people" className="spd-row-link min-h-9 px-1 font-medium text-primary underline decoration-dotted underline-offset-4" onClick={() => drill.select(i)} aria-label={`${s.label}: ${s.members.count} leads, open the list`}>{s.members.count}</button></Td>
                     <Td className="text-right tabular-nums">{s.targetMinutes} min</Td>
                     <Td className="text-right tabular-nums">{s.medianSeconds === null ? <>n/a<span className="block text-xs text-muted-foreground">{s.answered} of {MIN_FOR_MEDIAN} replies</span></> : fmtDuration(s.medianSeconds)}</Td>
                     <Td className="text-right tabular-nums">{s.hitRate === null ? <>{s.withinTarget} of {s.leads}</> : <>{pct(s.hitRate)}<span className="block text-xs text-muted-foreground">{s.withinTarget} of {s.leads}</span></>}</Td>
@@ -132,7 +133,7 @@ export function SourceCard({ showAccount }: { showAccount: boolean }) {
               </Table>
             )}
             {!action && d.unknown.n > 0 && <p className="mt-2 text-xs text-muted-foreground">{d.unknown.n} of {d.unknown.total} leads have no source recorded.{" "}<button type="button" className="font-medium text-primary underline" onClick={() => drill.select(d.rows.length)}>Show them</button></p>}
-            {picked && <LeadsPanel drill={drill} title={picked.title} members={picked.members} showAccount={showAccount} />}
+            {picked && drill.open && <SidePopup label={picked.title} onClose={drill.close}><LeadsPanel drill={drill} title={picked.title} members={picked.members} showAccount={showAccount} /></SidePopup>}
           </>
         );
       }}</CardState>

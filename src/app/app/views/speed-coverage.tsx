@@ -9,6 +9,7 @@ import { EmptyState, ErrorState, SkeletonRows } from "../ds";
 import { WhatIs } from "../ds/what-is";
 import { useData } from "../session";
 import { useSpeedFilter } from "./speed-filter";
+import { SidePopup } from "./speed-popup";
 import { LeadRows, useLeadActions, type LeadRow } from "./speed-rows";
 import { AlertsTab } from "./speed-insights";
 import type { GoFn } from "../nav";
@@ -19,7 +20,7 @@ import "./speed4.css";
 const usd = (n: number) => "$" + Math.round(n).toLocaleString("en-US");
 const CH: Record<string, string> = { sms: "Text", email: "Email", whatsapp: "WhatsApp", call: "Call", chat: "Chat", other: "Other" };
 const Card = ({ id, title, tip, children }: { id: string; title: string; tip?: string; children: React.ReactNode }) => (
-  <section aria-labelledby={id} className="mb-10 border-t border-[var(--t-rule)] pt-5" data-testid={id}><h3 id={id} className="t-title mb-2">{title}{tip && <> <WhatIs text={tip} /></>}</h3>{children}</section>
+  <section aria-labelledby={id} className="spd-rise mb-10 border-t border-[var(--t-rule)] pt-5" data-testid={id}><h3 id={id} className="t-title mb-2">{title}{tip && <> <WhatIs text={tip} /></>}</h3>{children}</section>
 );
 
 type Cov = {
@@ -89,28 +90,27 @@ export function JourneyCard({ multi }: { multi: boolean }) {
       <ol className="space-y-2" data-testid="journey-steps">
         {data.steps.map((s, i) => (
           <li key={s.step} data-testid="journey-step" data-step={s.step}>
-            <button type="button" onClick={() => setOpen({ step: s.step, dropped: false })} className="ds-press block w-full text-left" aria-label={`${s.label}: ${s.count} leads. Open them.`}>
+            <button type="button" onClick={() => setOpen({ step: s.step, dropped: false })} data-tip={`${s.label}: ${s.count.toLocaleString("en-US")} ${s.count === 1 ? "lead" : "leads"}. Click to see the people.`} className="ds-press spd-row-link -mx-1 block w-full px-1 text-left" aria-label={`${s.label}: ${s.count} leads. Open them.`}>
               <div className="flex items-baseline justify-between gap-2 text-sm"><span className="font-medium">{s.label}</span><span className="tnum font-semibold" data-testid="journey-count">{s.count.toLocaleString("en-US")}</span></div>
               <div className="mt-1 h-2.5 overflow-hidden rounded-full bg-muted" aria-hidden><div className="h-full rounded-full bg-[var(--t-accent)]" style={{ width: `${Math.max(s.count ? 2 : 0, (s.count / top) * 100)}%`, transition: "width 700ms ease" }} /></div>
             </button>
-            {i > 0 && <p className="t-small t-quiet mt-0.5">{s.dropped > 0 ? <button type="button" onClick={() => setOpen({ step: s.step, dropped: true })} className="min-h-6 font-medium text-[var(--t-accent)] underline underline-offset-4" data-testid="journey-drop">{s.dropped.toLocaleString("en-US")} dropped here{s.dropShare !== null ? ` (${Math.round(s.dropShare * 100)}%)` : ""}</button> : "none dropped here"}{s.medianFromPrev !== null ? ` · typically ${fmtDuration(s.medianFromPrev)} after the step before` : ""}</p>}
+            {i > 0 && <p className="t-small t-quiet mt-0.5">{s.dropped > 0 ? <button type="button" onClick={() => setOpen({ step: s.step, dropped: true })} data-tip="Click to see who dropped here" className="spd-row-link min-h-6 px-1 font-medium text-[var(--t-accent)] underline decoration-dotted underline-offset-4" data-testid="journey-drop">{s.dropped.toLocaleString("en-US")} dropped here{s.dropShare !== null ? ` (${Math.round(s.dropShare * 100)}%)` : ""}</button> : "none dropped here"}{s.medianFromPrev !== null ? ` · typically ${fmtDuration(s.medianFromPrev)} after the step before` : ""}</p>}
           </li>
         ))}
       </ol>
       {!data.repliedRecorded && <p className="t-small t-quiet mt-2">Replies from the lead are not recorded yet; a booked lead counts as replied until they are.</p>}
-      {open && <JourneyList key={open.step + open.dropped} step={open.step} dropped={open.dropped} multi={multi} onBack={() => setOpen(null)} />}
+      {open && <SidePopup label={`${STEP_LABEL[open.step]}${open.dropped ? ", dropped" : ""}`} onClose={() => setOpen(null)}><JourneyList key={open.step + open.dropped} step={open.step} dropped={open.dropped} multi={multi} /></SidePopup>}
     </Card>
   );
 }
-function JourneyList({ step, dropped, multi, onBack }: { step: Step; dropped: boolean; multi: boolean; onBack: () => void }) {
+function JourneyList({ step, dropped, multi }: { step: Step; dropped: boolean; multi: boolean }) {
   const { query } = useSpeedFilter();
   const { data, error, reload } = useData<{ count: number; shown: number; rows: LeadRow[] }>(`speed?part=journey-list&step=${step}&dropped=${dropped ? 1 : 0}${query}`);
   const actions = useLeadActions(data?.rows ?? []);
   if (error) return <ErrorState error={error} onRetry={reload} />;
   if (!data) return <SkeletonRows rows={3} label="Opening the leads..." />;
   return (
-    <div className="mt-4" data-testid="journey-list">
-      <button type="button" onClick={onBack} className="min-h-9 text-sm font-medium text-[var(--t-accent)] underline">Close</button>
+    <div data-testid="journey-list">
       <p className="t-small t-quiet mb-2" data-testid="journey-list-count">{data.count.toLocaleString("en-US")} {data.count === 1 ? "lead" : "leads"} {dropped ? `dropped before "${STEP_LABEL[step]}"` : `reached "${STEP_LABEL[step]}"`}{data.count > data.shown ? `, the first ${data.shown} shown` : ""}</p>
       {data.rows.length === 0 ? <EmptyState title="No leads here" body="Nothing matches this step right now." /> : <LeadRows rows={data.rows} showAccount={multi} actions={actions} testId="journey-rows" />}
       {actions.drawer}
