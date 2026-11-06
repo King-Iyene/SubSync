@@ -67,7 +67,7 @@ export const INVENTORY: Record<string, TableInfo> = {
   locations: {
     noun: "the list of client accounts", line: "accounts",
     personal: { name: "client account name", email: "the client business's email", phone: "the client business's phone", website: "the client business's website", address: "the client business's address", owner: "the owner label you give an account" },
-    notPersonal: ["users_access", "cleanup_rules", "cleanup_write_enabled"],
+    notPersonal: ["users_access", "cleanup_rules", "cleanup_write_enabled", "call_script"],
   },
   account_metrics_daily: { noun: "daily account numbers", line: "accounts" },
   alerts: {

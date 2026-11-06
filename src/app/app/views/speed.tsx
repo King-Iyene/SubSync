@@ -18,6 +18,7 @@ import { LeadRows, useLeadActions, waitWords, type LeadRow } from "./speed-rows"
 import { FilterProvider } from "./speed-filter";
 import { RaceTab } from "./speed-race";
 import { CoverageTab, JourneyCard, RulesTab } from "./speed-coverage";
+import { DialMode } from "./dial-mode";
 
 // Speed to lead, rebuilt (docs/SPEED_REVIEW.md). One question: "who is waiting for a first reply, and what do I do first?". Top to bottom: one sentence, one button
 // ("Reply to the oldest waiting lead"), a short list of the five leads to reply to now (See all opens the whole list, searched and paged on the server), how fast
@@ -109,6 +110,7 @@ export function SpeedView({ go }: { go: GoFn }) {
           { label: "Race", node: <RaceTab multi={multi} /> },
           { label: "Pace", node: <><JourneyCard multi={multi} /><PaceTab multi={multi} /></> },
           { label: "Coverage", node: <CoverageTab multi={multi} /> },
+          { label: "Call mode", node: <DialMode /> },
           ...(d.seePeople ? [{ label: "People", node: <PeopleTab multi={multi} /> }] : [{ label: "Owners", node: <PeopleTab multi={multi} /> }]),
           { label: "Capture", node: <CaptureTab /> },
           { label: "Rules", node: <RulesTab who={multi ? "All client accounts" : d.accounts[0]?.name ?? "Your account"} waiting={w.waiting} dollars={w.money.dollars || null} typical={d.summary.typicalLine} canChange={d.measuring.canChange} targetMinutes={d.measuring.targetMinutes} go={go} /> },

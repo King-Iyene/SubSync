@@ -118,10 +118,12 @@ const PEOPLE_DAILY_RULES: Rule[] = [["PUT", "people", "seen"], ["POST", "people"
 
 // The Lead workbench: reading the thread and context, previewing and doing one action. A client's staff may do it on their own account; deleting is refused inside the handler.
 const WORKBENCH_RULES: Rule[] = [["GET", "workbench"], ["POST", "workbench"]];
-const CLIENT_RULES: Rule[] = [...WORKBENCH_RULES, ...BELL_RULES, ...GET_VIEWS.map((a) => ["GET", a] as Rule), ["POST", "usage"], ["POST", "today", "action"], ["POST", "roadmap"], ["POST", "feedback"], ["POST", "problem"], ["POST", "inbox", "views"], ["DELETE", "inbox", "views"], ["POST", "people", "lists"], ["DELETE", "people", "lists"], ["PUT", "people", "dialer"], ...PEOPLE_DAILY_RULES, ["POST", "duplicates"], ...PERSONAL_RULES];
+// Call mode (stage DIAL): the ordered queue, the script, the outcome tap and the stats. A client's staff may read and log (only their own leads, decided in the handler); changing the script is for the business.
+const DIAL_RULES: Rule[] = [["GET", "dial"], ["POST", "dial"]];
+const CLIENT_RULES: Rule[] = [...WORKBENCH_RULES, ...DIAL_RULES, ...BELL_RULES, ...GET_VIEWS.map((a) => ["GET", a] as Rule), ["POST", "usage"], ["POST", "today", "action"], ["POST", "roadmap"], ["POST", "feedback"], ["POST", "problem"], ["POST", "inbox", "views"], ["DELETE", "inbox", "views"], ["POST", "people", "lists"], ["DELETE", "people", "lists"], ["PUT", "people", "dialer"], ...PEOPLE_DAILY_RULES, ["POST", "duplicates"], ...PERSONAL_RULES];
 
 const BUSINESS_RULES: Rule[] = [
-  ...WORKBENCH_RULES, ...GET_VIEWS.map((a) => ["GET", a] as Rule), ...PERSONAL_RULES, ...BELL_RULES, ...NOTIFY_ADMIN_RULES, ...BELL_RULES, ...NOTIFY_ADMIN_RULES,
+  ...WORKBENCH_RULES, ...DIAL_RULES, ["PUT", "dial", "script"], ...GET_VIEWS.map((a) => ["GET", a] as Rule), ...PERSONAL_RULES, ...BELL_RULES, ...NOTIFY_ADMIN_RULES, ...BELL_RULES, ...NOTIFY_ADMIN_RULES,
   ["GET", "email"], ["GET", "daily"], ["GET", "cleanup"], ["POST", "cleanup"], ["GET", "meetings"], ["POST", "meetings"], ["PUT", "meetings"], ["GET", "connections"], ["POST", "connections"], ["DELETE", "connections"], ["GET", "settings"], ["GET", "api-keys"], ["GET", "sync-status"], ["GET", "call-queue"],
   ["GET", "call-lists"], ["GET", "call-outcomes"], ["GET", "goals"], ["GET", "exec-summary"], ["GET", "daily-brief"], ["GET", "digest"],
   ["GET", "export", "stale"], ["GET", "export", "duplicates"], ["GET", "export", "inbox"], ["GET", "export", "deals"], ["GET", "export", "alerts"],
