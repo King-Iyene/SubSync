@@ -60,10 +60,10 @@ export async function perAccountBreaches(installationId: string, defaultMinutes:
 
 const BOOK_WINDOW_DAYS = 14;
 /** The money chart. Leads from 90 days ago to yesterday (so a booking has had time to happen). Booked = an appointment that was not cancelled, made for the contact after the lead arrived and within 14 days. Counted in the database per reply bucket. */
-export async function speedBooking(i: Input) {
+export async function speedBooking(i: Input, known?: { targetsReady: boolean }) {
   const db = sql();
-  const targets = await loadTargets(db, i.installationId);
-  const s: Scope = { installationId: i.installationId, allowed: i.allowed, targetMinutes: i.targetMinutes, now: i.now, fromMs: i.winFrom ?? i.now - 90 * DAY, toMs: Math.min(i.winTo ?? i.now, i.now - DAY), targetsReady: targets.ready };
+  const targets = known ?? { ready: (await loadTargets(db, i.installationId)).ready };
+  const s: Scope = { installationId: i.installationId, allowed: i.allowed, targetMinutes: i.targetMinutes, now: i.now, fromMs: i.winFrom ?? i.now - 90 * DAY, toMs: Math.min(i.winTo ?? i.now, i.now - DAY), targetsReady: "targetsReady" in targets ? targets.targetsReady : targets.ready };
   const r = await bookingSql(db, s).catch(() => null);
   const { appointmentsRecorded, ...rest } = r ?? { ...bookingFromCounts(new Map()), appointmentsRecorded: false };
   return { now: i.now, days: 90, bookWithinDays: BOOK_WINDOW_DAYS, appointmentsRecorded, ...rest };
@@ -103,14 +103,14 @@ export async function duplicateGuard(installationId: string, allowed: string[] |
 // ---------------------------------------------------------------- Race extras: money meter, round-robin, duplicates
 
 /** What the Race tab adds: the money-at-risk meter and, per feed row, the duplicate hit, the repeat boost and the round-robin suggestion for a lead nobody owns. */
-export async function raceExtras(i: Input, feed: ReadonlyArray<{ locationId: string; contactId: string; name: string; email: string | null; phone: string | null; arrivedAt: number; touchedAt: number | null; unassigned: boolean; dollars: number }>, openDollars: number) {
+export async function raceExtras(i: Input, feed: ReadonlyArray<{ locationId: string; contactId: string; name: string; email: string | null; phone: string | null; arrivedAt: number; touchedAt: number | null; unassigned: boolean; dollars: number }>, openDollars: number, pre?: { lk: Awaited<ReturnType<typeof loadLookups>>["lk"]; facts: Awaited<ReturnType<typeof accountFacts>>; targetsReady: boolean }) {
   const db = sql();
-  const targets = await loadTargets(db, i.installationId);
-  const s: Scope = { installationId: i.installationId, allowed: i.allowed, targetMinutes: i.targetMinutes, now: i.now, fromMs: i.now - 30 * DAY, toMs: i.now + DAY, targetsReady: targets.ready };
+  const ready = pre ? pre.targetsReady : (await loadTargets(db, i.installationId)).ready;
+  const s: Scope = { installationId: i.installationId, allowed: i.allowed, targetMinutes: i.targetMinutes, now: i.now, fromMs: i.now - 30 * DAY, toMs: i.now + DAY, targetsReady: ready };
   const rrLocs = [...new Set(feed.filter((f) => f.unassigned && f.touchedAt === null).map((f) => f.locationId))];
   const [{ lk }, facts, book, dups, holders] = await Promise.all([
-    loadLookups(db, i.installationId, i.allowed, i.targetMinutes, i.now),
-    accountFacts(i.installationId, i.allowed), speedBooking(i), duplicateGuard(i.installationId, i.allowed, feed.map((f) => ({ ...f, leadAt: f.arrivedAt }))), holdersSql(db, s, rrLocs),
+    pre ? Promise.resolve({ lk: pre.lk }) : loadLookups(db, i.installationId, i.allowed, i.targetMinutes, i.now),
+    pre ? Promise.resolve(pre.facts) : accountFacts(i.installationId, i.allowed), speedBooking(i, { targetsReady: ready }), duplicateGuard(i.installationId, i.allowed, feed.map((f) => ({ ...f, leadAt: f.arrivedAt }))), holdersSql(db, s, rrLocs),
   ]);
   // Round-robin per account: among the people who replied in the last 30 days, the one holding the fewest leads still waiting.
   const rr = new Map<string, string | null>();

@@ -49,7 +49,7 @@ export async function speedRace(i: Input) {
   }));
   const losingNow0 = feed.filter((x) => x.touchedAt === null && x.status === "waiting");
   // Stage SPEED5: the money meter, the duplicate guard, repeat enquirers and the round-robin suggestion. A failure here never stops the Race.
-  const ex = await raceExtras(i, feed.map((x) => ({ locationId: x.locationId, contactId: x.contactId, name: x.name, email: x.email, phone: x.phone, arrivedAt: x.arrivedAt, touchedAt: x.touchedAt, unassigned: x.unassigned, dollars: x.dollars })), losingNow0.reduce((n, x) => n + x.dollars, 0)).catch(() => null);
+  const ex = await raceExtras(i, feed.map((x) => ({ locationId: x.locationId, contactId: x.contactId, name: x.name, email: x.email, phone: x.phone, arrivedAt: x.arrivedAt, touchedAt: x.touchedAt, unassigned: x.unassigned, dollars: x.dollars })), losingNow0.reduce((n, x) => n + x.dollars, 0), { lk, facts, targetsReady: targets.ready }).catch(() => null);
   const feed5 = feed.map((x) => { const e = ex?.byKey.get(`${x.locationId}:${x.contactId}`); return { ...x, duplicateOf: e?.dup ?? null, repeat: (e?.boost ?? 0) > 0, roundRobin: e?.roundRobin ?? null }; });
   const score = (r: { judged: number; within: number; secs: number | null } | undefined) => {
     const judged = r?.judged ?? 0, within = r?.within ?? 0, enough = judged >= MIN_FOR_MEDIAN;

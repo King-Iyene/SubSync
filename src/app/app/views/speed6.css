@@ -144,3 +144,11 @@ li[data-tier="Surge"] .s6-rank { background: rgba(167, 139, 250, 0.14); border-c
 .s6-band { color: var(--s6-violet); }
 .s6-band::after { background: linear-gradient(90deg, rgba(167, 139, 250, 0.55), rgba(34, 211, 238, 0.25), transparent); }
 @media (max-width: 640px) { .s6-q { font-size: 1rem; } .s6-big { font-size: 2rem; } .s6-card { padding: 20px; } .s6-grid { gap: 24px; } }
+
+/* SPEED7 design review: phone polish. The tab strip scrolls sideways, so its right edge fades to say there is more, tabs snap, and small grey helper text is lifted to a contrast of at least 4.5:1 on the navy. */
+@media (max-width: 640px) {
+  .s6 [role="tablist"] { scroll-snap-type: x proximity; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent); padding-inline-end: 24px; }
+  .s6 [role="tab"] { scroll-snap-align: center; min-height: 44px; min-width: 44px; }
+  .s6 button, .s6 [role="button"], .s6 summary { min-height: 44px; }
+}
+.s6 .text-muted-foreground { color: rgb(190 203 224); }

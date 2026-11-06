@@ -32,7 +32,8 @@ export function sql(): Sql {
     globalForDb.__subsyncSql = postgres(connectionString(), {
       // The pooler runs in transaction mode, which does not support prepared statements.
       prepare: false,
-      max: 5,
+      // DB_POOL_MAX lets a deployment (or a dev server on a slow link) allow more parallel statements; the default stays 5.
+      max: Math.min(20, Math.max(1, Number(process.env.DB_POOL_MAX) || 5)),
       idle_timeout: 20,
       connect_timeout: 15,
       ssl: "require",
