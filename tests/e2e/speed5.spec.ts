@@ -9,6 +9,19 @@ const noSideways = async (page: Page) => {
   const { s, w } = await page.evaluate(() => ({ s: document.documentElement.scrollWidth, w: window.innerWidth }));
   expect(s, "no sideways scroll").toBeLessThanOrEqual(w + 1);
 };
+// The demo may have no new leads today: then one is added to the answer in the browser so the Race tests always run (nothing is written; the demo can never write).
+function seedLead(body: { feed?: Array<Record<string, unknown>>; now?: number; targetMinutes?: number }) {
+  if (!Array.isArray(body.feed)) body.feed = [];
+  if (body.feed.length === 0) {
+    const now = body.now ?? Date.now();
+    body.feed.push({
+      locationId: "seed-loc", locationName: "Seed Plumbing", contactId: "seed-1", name: "Sam Seeded", url: "https://example.test/seed-1",
+      status: "waiting", neverAnswered: true, minutes: 3, source: "Website form", owner: null, unassigned: false, repliedBy: null, autoSeconds: null, detailed: true,
+      phone: "+15555550101", email: "sam@example.test", dnd: false, timeZone: null, suggestion: null,
+      arrivedAt: now - 3 * 60_000, touchedAt: null, targetMinutes: body.targetMinutes ?? 5, quality: 1, dollars: 0,
+    });
+  }
+}
 async function open(page: Page, path = "/app#speed") {
   await page.goto(path);
   await page.reload();
@@ -21,6 +34,7 @@ test("Race: the money meter opens its popup, a duplicate and a repeat enquirer a
   await page.route("**/api/app/speed?part=race*", async (route) => {
     const res = await route.fetch();
     const body = await res.json();
+    seedLead(body);
     if (Array.isArray(body.feed) && body.feed.length > 0) {
       body.feed[0].duplicateOf = { contactId: "older-1", name: "Ann Older", score: 92, tier: "sure", reasons: ["same email", "same phone"], url: "https://example.test/older-1" };
       body.feed[0].repeat = true; body.feed[0].touchedAt = null;
@@ -47,6 +61,7 @@ test("Race: the money meter opens its popup, a duplicate and a repeat enquirer a
   await expect(page.getByTestId("lead-drawer")).toContainText(/Possible duplicate of Ann Older: reply to the older record/, { timeout: 60_000 });
   expect(await page.locator("main").innerText()).not.toMatch(BANNED);
   await noSideways(page);
+  await page.unrouteAll({ behavior: "ignoreErrors" });
 });
 
 test("Race: a lead nobody owns offers the next person in line, as a preview first (dry run)", async ({ page }) => {
@@ -54,6 +69,7 @@ test("Race: a lead nobody owns offers the next person in line, as a preview firs
   await page.route("**/api/app/speed?part=race*", async (route) => {
     const res = await route.fetch();
     const body = await res.json();
+    seedLead(body);
     if (Array.isArray(body.feed) && body.feed.length > 0) Object.assign(body.feed[0], { unassigned: true, owner: null, touchedAt: null, roundRobin: { userId: "u-next", label: "Next Person" } });
     await route.fulfill({ response: res, json: body });
   });
@@ -64,6 +80,7 @@ test("Race: a lead nobody owns offers the next person in line, as a preview firs
   await rr.click();
   await expect(page.getByTestId("wb-review")).toBeVisible({ timeout: 30_000 });
   await expect(page.getByTestId("wb-review-dry").or(page.getByTestId("wb-review-blockers")).first()).toBeVisible();
+  await page.unrouteAll({ behavior: "ignoreErrors" });
 });
 
 test("Pace: the booking chart says what it knows, and a bar opens its popup", async ({ page }) => {
