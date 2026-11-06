@@ -81,3 +81,11 @@ test("script and list ids: the default fills in a first name; list ids are check
   assert.equal(isListId("saved:x; drop table"), false);
   assert.equal(isListId("anything"), false);
 });
+
+import { readFileSync } from "node:fs";
+test("the missed-calls list reads only tables that exist, and a failing list degrades to empty (regression: 'deals' is not a table)", () => {
+  const src = readFileSync(new URL("../api/dial-routes.ts", import.meta.url), "utf8");
+  assert.doesNotMatch(src, /join deals/, "no join on a table named deals");
+  assert.match(src, /cached_opportunities/);
+  assert.match(src, /sourceRows\(ctx, allowed, list\)\.catch\(/, "an unreadable list returns an empty queue, not an error");
+});

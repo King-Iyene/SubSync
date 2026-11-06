@@ -3,10 +3,12 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { dayLabel, fmtStat, fullDate } from "@/lib/analytics/chart-format";
 import type { GrowthData } from "@/lib/analytics/growth";
-import { specDay, specRange } from "@/lib/analytics/growth-records";
+import { specDay, specPeriod, specRange, specRemoved, specSignUps, specSource } from "@/lib/analytics/growth-records";
+import type { Period } from "@/lib/analytics/growth";
+import { PRESETS, type RangePreset } from "@/lib/design/range";
 import { DAY_NAMES, digestPreview, hourWords, type GapMap, type TrendNormal } from "@/lib/analytics/speed-v3";
 import { fmtDuration } from "@/lib/analytics/speed-intel";
-import { RecordsPanel, EmptyState, ErrorState, SkeletonRows } from "../ds";
+import { RecordsPanel, EmptyState, ErrorState, SkeletonRows, useCardRange, type CardRangeState } from "../ds";
 import { ModeToggle, TimeChart, useChartMode } from "../ds/time-chart";
 import { WhatIs } from "../ds/what-is";
 import { useData } from "../session";
@@ -169,22 +171,51 @@ export function PeopleTab({ multi }: { multi: boolean }) {
 }
 
 // ---------------------------------------------------------------- Lead capture
+/** The shared date buttons (Last 7, 30, 90 days, Custom with two dates) with the window written out. */
+function RangeButtons({ state }: { state: CardRangeState }) {
+  const { spec, resolved, setSpec } = state;
+  const on = "border-primary bg-primary text-primary-foreground", off = "bg-card hover:bg-accent";
+  const pick = (preset: RangePreset) => setSpec({ ...spec, preset, ...(preset === "custom" ? { from: spec.from ?? resolved?.current.from, to: spec.to ?? resolved?.current.to } : {}) });
+  const cls = "ds-press min-h-11 rounded-md border px-3 text-sm font-medium sm:min-h-9";
+  const field = "min-h-11 rounded-md border bg-card px-2 text-sm sm:min-h-9";
+  return (
+    <div className="mb-4" data-testid="capture-range">
+      <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Dates for email leads">
+        {PRESETS.map((x) => <button key={x.key} type="button" aria-pressed={spec.preset === x.key} onClick={() => pick(x.key)} className={`${cls} ${spec.preset === x.key ? on : off}`}>{x.label}</button>)}
+        <button type="button" aria-pressed={spec.preset === "custom"} onClick={() => pick("custom")} className={`${cls} ${spec.preset === "custom" ? on : off}`}>Custom</button>
+        {spec.preset === "custom" && (
+          <>
+            <input type="date" className={field} aria-label="From date" value={spec.from ?? ""} max={resolved?.current.to} onChange={(e) => setSpec({ ...spec, from: e.target.value })} />
+            <input type="date" className={field} aria-label="To date" value={spec.to ?? ""} onChange={(e) => setSpec({ ...spec, to: e.target.value })} />
+          </>
+        )}
+      </div>
+      <p className="t-small t-quiet mt-1.5" aria-live="polite" data-testid="capture-window">{resolved ? `${resolved.sentence}. Today, This week, This month and All time always mean those calendar stretches.` : "Working out the dates..."}</p>
+      {resolved?.problem && <p className="mt-1 border-l-2 border-warning pl-2 text-sm" role="status">{resolved.problem} Showing the last 30 days instead.</p>}
+    </div>
+  );
+}
+
 export function CaptureTab() {
-  const { data: g, error, reload } = useData<GrowthData>("today/growth");
+  const range = useCardRange("capture", { preset: "30d", compare: "none" });
+  const r = range.resolved;
+  const { data: g, error, reload } = useData<GrowthData>(r ? `today/growth?from=${r.current.from}&to=${r.current.to}` : null);
   const [mode, setMode] = useChartMode("speed-capture");
   const [panel, setPanel] = useState<ReturnType<typeof specDay> | null>(null);
   if (error) return <ErrorState error={error} onRetry={reload} />;
-  if (!g) return <SkeletonRows rows={5} label="Counting email leads..." />;
+  if (!g) return <div data-testid="capture-tab"><RangeButtons state={range} /><SkeletonRows rows={5} label="Counting email leads..." /></div>;
   const rangeWord = g.range.label.toLowerCase();
   const periods = [["today", "Today"], ["week", "This week"], ["month", "This month"], ["all", "All time"]] as const;
   const removed = g.gross.removed.duplicate + g.gross.removed.junk + g.gross.removed.staff + g.gross.removed.role;
   return (
     <div data-testid="capture-tab">
+      <RangeButtons state={range} />
       <Card id="capture-counters">
         <H title="People who gave an email" tip="Unique people with a usable email, counted once. Extra copies, test records and your own staff are taken out. Percent compares with the same stretch just before; under 5 earlier it says too few to compare." />
         <ul className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4">
           {periods.map(([k, label]) => { const c = g.changes[k]; return (
-            <li key={k} data-testid={`capture-${k}`}><span className="t-label block">{label}</span><span className="t-figure t-num mt-1 block" title={c.count.toLocaleString("en-US")}>{fmtStat(c.count)}</span>
+            <li key={k} data-testid={`capture-${k}`}><span className="t-label block">{label}</span><button type="button" disabled={c.count === 0} onClick={() => setPanel(specPeriod(g, k as Period))} data-testid={`capture-${k}-open`} data-count={c.count} title={c.count === 0 ? "Nobody yet" : `Click to see the ${c.count.toLocaleString("en-US")} people (${label.toLowerCase()})`} aria-label={`${label}: ${c.count.toLocaleString("en-US")} people. See them.`}
+                className="ds-press t-figure t-num mt-1 block min-h-11 cursor-pointer text-left underline decoration-dotted underline-offset-4 hover:decoration-solid disabled:cursor-default disabled:no-underline sm:min-h-0">{fmtStat(c.count)}</button>
               <span className="t-small t-quiet">{k === "all" ? "" : c.pct === null ? "Too few to compare" : `${c.direction === "up" ? "▲ Up" : c.direction === "down" ? "▼ Down" : "No change"} ${Math.abs(c.pct)}%`}</span></li>); })}
         </ul>
       </Card>
@@ -201,12 +232,12 @@ export function CaptureTab() {
       </Card>
       <Card id="capture-gross">
         <H title="Sign ups, then people" tip="Sign ups with an email, minus copies of the same person, test or junk records and staff, is the number of real leads. It stops a form bug or a spam burst looking like growth." />
-        <p className="text-sm" data-testid="capture-gross-line"><span className="t-num">{g.gross.signUps.toLocaleString("en-US")}</span> sign ups, <span className="t-num">{removed.toLocaleString("en-US")}</span> taken out, <span className="t-num font-semibold">{g.gross.unique.toLocaleString("en-US")}</span> counted.</p>
+        <p className="text-sm" data-testid="capture-gross-line"><button type="button" className={BTN} disabled={g.gross.signUps === 0} title="Click to see every sign up with an email" onClick={() => setPanel(specSignUps(g))}><span className="t-num">{g.gross.signUps.toLocaleString("en-US")}</span> sign ups</button>, <button type="button" className={BTN} disabled={removed === 0} title="Click to see what was taken out, and why" onClick={() => setPanel(specRemoved(g, "all"))}><span className="t-num">{removed.toLocaleString("en-US")}</span> taken out</button>, <button type="button" className={BTN} disabled={g.gross.unique === 0} title="Click to see the people counted" onClick={() => setPanel(specRange(g))}><span className="t-num font-semibold">{g.gross.unique.toLocaleString("en-US")}</span> counted</button>.</p>
       </Card>
       <Card id="capture-mix">
         <H title="Where they come from" tip="Each source's email leads against the period before. Best grew most, worst fell most (at least 5 leads in one of the two periods)." />
         <p className="text-sm font-medium" data-testid="capture-mix-line">{g.mix.line}</p>
-        <ul className="mt-2 divide-y divide-[var(--t-rule)] border-y border-[var(--t-rule)] text-sm">{g.mix.rows.slice(0, 6).map((r) => <li key={r.source} className="flex justify-between gap-3 py-1"><span className="truncate">{r.source}</span><span className="t-num shrink-0">{r.count}</span></li>)}</ul>
+        <ul className="mt-2 divide-y divide-[var(--t-rule)] border-y border-[var(--t-rule)] text-sm">{g.mix.rows.slice(0, 6).map((r) => <li key={r.source} className="flex justify-between gap-3 py-1"><span className="truncate">{r.source}</span><button type="button" className={`${BTN} t-num shrink-0`} disabled={r.count === 0} title={`Click to see the ${r.count} people from ${r.source}`} aria-label={`${r.source}: ${r.count} people. See them.`} onClick={() => setPanel(specSource(g, r.source))}>{r.count}</button></li>)}</ul>
       </Card>
       {g.scope === "agency" && g.league.length > 1 && (
         <Card id="capture-league">

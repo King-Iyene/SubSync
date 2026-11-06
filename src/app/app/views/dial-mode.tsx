@@ -55,7 +55,7 @@ export function DialMode() {
         ))}
       </div>
       {queue.error ? <ErrorState error={queue.error} onRetry={queue.reload} /> : !d ? <SkeletonRows rows={3} label="Building your call list..." /> : d.items.length === 0 ? (
-        <EmptyState title="Nobody to call on this list" body={d.ownOnly ? "Nobody assigned to you is waiting on this list. Pick another list." : "Nothing is waiting here right now. Pick another list, or check back after the next sync."} />
+        <EmptyState title={list === "missed" ? "No missed calls to call back" : "Nobody to call on this list"} body={d.ownOnly ? "Nobody assigned to you is waiting on this list. Pick another list." : "Nothing is waiting here right now. Pick another list, or check back after the next sync."} />
       ) : (
         <div className="rounded-xl border bg-card p-4" data-testid="dial-ready">
           <p className="text-base font-medium" data-testid="dial-count">{ready} {ready === 1 ? "person" : "people"} ready to call{d.total > d.items.length ? `, the top ${d.items.length} of ${d.total}` : ""}.</p>

@@ -35,7 +35,7 @@ async function sourceRows(ctx: Ctx, allowed: string[] | null, list: string): Pro
       ) m
       join cached_contacts c on c.installation_id = ${ctx.installationId} and c.location_id = m.location_id and c.contact_id = m.contact_id ${accountFilter}
       join locations l on l.installation_id = c.installation_id and l.location_id = c.location_id and not l.ignored
-      left join deals d on d.installation_id = c.installation_id and d.location_id = c.location_id and d.contact_id = c.contact_id`;
+      left join (select o.location_id, o.contact_id, sum(coalesce(o.monetary_value, 0)) open_value from cached_opportunities o where o.installation_id = ${ctx.installationId} and o.status = 'open' group by 1, 2) d on d.location_id = c.location_id and d.contact_id = c.contact_id`;
     return rows.map((r) => ({
       contactId: r.contact_id as string, locationId: r.location_id as string, locationName: (r.location_name as string | null) ?? null, name: (r.name as string | null) ?? "Unknown caller", phone: (r.phone as string | null) ?? null,
       dnd: r.dnd === true, timeZone: (r.timezone as string | null) ?? null, openValue: r.open_value as number, ageHours: Math.max(0, (Date.now() - new Date(r.missed_at as string).getTime()) / HOUR),
@@ -69,7 +69,8 @@ async function queueRoute(ctx: Ctx, h: DialHelpers): Promise<Response> {
   const list = ctx.url.searchParams.get("list") ?? "missed";
   if (!isListId(list)) return json({ error: "Unknown list" }, 400);
   const [allowed, links, saved] = await Promise.all([h.allowed(), h.links(), listCallLists(ctx.installationId)]);
-  let rows = await sourceRows(ctx, allowed, list);
+  // A list that cannot be read is an empty list (a calm empty state), never a generic error screen.
+  let rows = await sourceRows(ctx, allowed, list).catch((e) => { console.error("dial queue", list, e instanceof Error ? e.message : "failed"); return []; });
   // A client's staff only ever work their own leads (decided here, from the session, never from the address).
   if (ctx.kind === "client") rows = ctx.session.userId ? rows.filter((r) => r.ownerId === ctx.session.userId) : [];
   const ranked = rankQueue(rows).slice(0, SESSION_CAP);
