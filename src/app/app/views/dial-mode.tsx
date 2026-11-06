@@ -13,7 +13,7 @@ import { EmptyState, ErrorState, InlineAlert, SkeletonRows, useDialer } from "..
 import { announceCall } from "../ds/dial-button";
 import { InfoTip } from "../ds/info-tip";
 import { fmtMoney } from "../ui";
-import { ActivityCard, AttemptCard, BestHourCard, Board6, CadenceCard, DispositionEditor, PowerBar, useCadence, useCallbacks, useDispositions, useGoals, useLocal, useTick, type SavedCallback } from "./dial6-ui";
+import { PrefsCtx, useScripts, ActivityCard, AttemptCard, BestHourCard, Board6, CadenceCard, DispositionEditor, PowerBar, useCadence, useCallbacks, useDispositions, useGoals, useLocal, useTick, type SavedCallback } from "./dial6-ui";
 import { CountUp, Fold, TzNote } from "./speed6-base";
 import "./speed6.css";
 
@@ -38,7 +38,15 @@ const PRIMARY = "s6-btn !min-h-12 !px-6 !text-base";
 const when = (ms: number) => new Date(ms).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 const EMPTY_STATE: AttemptState = { attempts: 0, lastAt: null, reached: false };
 
+/** Provides the server-kept choices (redial plan, goals, scripts, outcome sets) to everything in Call mode; falls back to this browser until the database has them. */
 export function DialMode() {
+  const api = useApiClient();
+  const prefs = useData<{ ready: boolean; prefs: Record<string, unknown> }>("speed/prefs");
+  const put = (key: string, scope: string, value: unknown) => { void api.put("speed/prefs", { key, scope, value }).then(() => prefs.reload()).catch(() => undefined); };
+  return <PrefsCtx.Provider value={{ ready: prefs.data?.ready === true, map: prefs.data?.prefs ?? {}, put }}><DialInner /></PrefsCtx.Provider>;
+}
+
+function DialInner() {
   const [list, setList] = useState("missed");
   const [view, setView] = useState<"lists" | "callbacks">("lists");
   const queue = useData<Queue>(`dial/queue?list=${encodeURIComponent(list)}`);
@@ -166,7 +174,7 @@ function Session({ s, setS, onExit, me, cadence, goals, cbs, setCbs }: {
   const [hover, setHover] = useState<Disposition | null>(null);
   const [link, setLink] = useLocal<string>("subsync.dial.bookingLink", "");
   const [textMsg, setTextMsg] = useState<string | null>(null);
-  const [scripts, setScripts] = useLocal<Record<string, string>>("subsync.dial.scripts", {});
+  const [scripts, setScripts] = useScripts();
   const [dispo, setDispo] = useDispositions(item?.locationId ?? null);
   const now = useTick(s.timed !== null);
 

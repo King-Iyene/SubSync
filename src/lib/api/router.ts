@@ -111,7 +111,7 @@ import { handleCleanupV2 } from "./cleanup-routes";
 import { gatedWriter } from "../ghl/crm-gateway";
 import { writeEnabledFor } from "../analytics/cleanup-config";
 import { isLive } from "../live-flags";
-import { handleSpeedDigest, handleSpeedLadder, handleSpeedPart, handleSpeedTarget } from "./speed-routes";
+import { handleSpeedPrefs, handleSpeedDigest, handleSpeedLadder, handleSpeedPart, handleSpeedTarget } from "./speed-routes";
 import { handleUnansweredPart } from "./unanswered-routes";
 import { handleApptWork } from "./appointment-work-routes";
 import { buildSteps, guideRoleOf } from "../getting-started";
@@ -1933,6 +1933,7 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
     if (a === "speed" && b === "target" && method === "PUT") return await handleSpeedTarget(ctx, speedHelpers);
     if (a === "speed" && b === "ladder" && method === "PUT") return await handleSpeedLadder(ctx);
     if (a === "speed" && b === "digest" && ["PUT", "POST", "GET"].includes(method)) return await handleSpeedDigest(ctx, speedHelpers);
+    if (a === "speed" && b === "prefs" && ["PUT", "GET"].includes(method)) return await handleSpeedPrefs(ctx, speedHelpers);
     // The rebuilt Unanswered messages screen: its first screen, the list behind a number and the rankings (GET ?part=home|list|ranks, read only; an unknown part is refused with 400). Without a part the older answer below still serves the exports and the older tests.
     if (a === "inbox" && method === "GET" && !b && ctx.url.searchParams.has("part")) return await handleUnansweredPart(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links, targets: async () => { const st = (await scope(ctx)).settings; return { slaHours: st.slaHours, targetMinutes: st.speedTargetMinutes }; } });
     if (method === "GET") {

@@ -12,6 +12,7 @@ import { zoneLabel } from "../analytics/speed6";
 import { buildMessage, destination, sanitizeDigest } from "../analytics/speed-digest";
 import { deliver, digestNumbers, loadDigest, saveDigest } from "../analytics/speed-digest-db";
 import { isLive } from "../live-flags";
+import { isPrefKey, loadPrefs, savePref } from "../analytics/speed-prefs-db";
 import { sql } from "../db";
 import { json, type AuthContext } from "./auth";
 
@@ -235,4 +236,16 @@ export async function handleSpeedDigest(ctx: Ctx, h: SpeedHelpers): Promise<Resp
     return json({ ok: true, wouldSend: sent.filter((x) => !x.live).map((x) => x.channel), sent: sent.filter((x) => x.live).map((x) => x.channel), destination: destination(s, live) });
   }
   return json({ error: "Not found" }, 404);
+}
+
+/** GET speed/prefs (everything the caller may read) and PUT speed/prefs { scope, key, value }. A client's staff can read but not change the shared choices; their browser keeps their own. */
+export async function handleSpeedPrefs(ctx: Ctx, h: SpeedHelpers): Promise<Response> {
+  const allowed = await h.allowed();
+  if (ctx.request.method === "GET") return json(await loadPrefs(ctx.installationId, allowed));
+  if (ctx.kind === "client") return json({ error: "Ask your administrator to change this." }, 403);
+  const b = (await ctx.request.json().catch(() => null)) as Record<string, unknown> | null;
+  const scope = typeof b?.scope === "string" ? b.scope : "";
+  if (!isPrefKey(b?.key) || (scope && (!ID.test(scope) || (allowed && !allowed.includes(scope))))) return json({ error: "Unknown choice" }, 400);
+  const r = await savePref(ctx.installationId, scope, b.key, b.value);
+  return r.ok ? json({ ok: true }) : json({ error: r.error }, 503);
 }
