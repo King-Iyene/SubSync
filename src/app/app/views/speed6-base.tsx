@@ -4,7 +4,9 @@ import { ChevronDown } from "lucide-react";
 import { useEffect, useId, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { moreCardsNote } from "@/lib/analytics/speed6";
 import { WhatIs } from "../ds/what-is";
+import { useData } from "../session";
 import { LeadList } from "./speed-all";
+import { useSpeedFilter } from "./speed-filter";
 import { SidePopup } from "./speed-popup";
 import "./speed6.css";
 
@@ -80,6 +82,7 @@ export function Fold({ keep = 3, children, testId = "fold" }: { keep?: number; c
   const note = moreCardsNote(counts.noData);
   return (
     <div ref={root} data-testid={testId}>
+      <TzNote />
       {children}
       <div className="mb-6 flex flex-wrap items-center gap-3">
         {(counts.more > 0 || open) && <button type="button" className="s6-btn" aria-expanded={open} onClick={() => setOpen(!open)} data-testid="s6-more">{open ? "Fewer" : "More"}<ChevronDown aria-hidden className={`size-4 transition-transform ${open ? "rotate-180" : ""}`} /></button>}
@@ -101,6 +104,15 @@ export function useSlow(pending: boolean, ms = 45_000): [boolean, () => void] {
     return () => clearTimeout(t);
   }, [pending, round, ms]);
   return [pending && slowRound === round, () => setRound((r) => r + 1)];
+}
+
+/** Says once per tab which time zone every time on it is in, and which dates a chart covers. */
+export function TzNote() {
+  const { range } = useSpeedFilter();
+  const { data } = useData<{ zones: Array<{ zone: string; label: string }> }>("speed?part=zones");
+  if (!data || data.zones.length === 0) return null;
+  const z = data.zones.map((x) => x.label);
+  return <p className="s6-label mb-4" data-testid="tz-note">{z.length === 1 ? `Times here are in ${z[0]}.` : `Times are in each client account's own time zone (${z.join(", ")}).`}{range ? ` Dates: ${range.sentence}.` : ""}</p>;
 }
 
 /** A band: a named group on a tab, with a thin luminous divider. */

@@ -8,6 +8,8 @@ import { parseFilter } from "../analytics/speed-v4-more";
 import { isStep, speedCoverage, speedJourney, speedJourneyList, speedProof, speedRace, speedStory } from "../analytics/speed-v4-queries";
 import { ladderPreview, saveLadder, speedBooking } from "../analytics/speed5-queries";
 import { speedPulse } from "../analytics/speed6-queries";
+import { zoneLabel } from "../analytics/speed6";
+import { sql } from "../db";
 import { json, type AuthContext } from "./auth";
 
 // The rebuilt Speed to lead screen's endpoints: GET /api/app/speed?part=home|list|compare and PUT /api/app/speed/target (the one catch-all route, already guarded).
@@ -125,6 +127,12 @@ export async function handleSpeedPart(ctx: Ctx, h: SpeedHelpers): Promise<Respon
   // The bar's dates narrow every part that is about a period; the race is "right now" and ignores them. A bad pair of dates is ignored here (the home read already refuses it).
   const wp = sp.get("from") !== null && sp.get("to") !== null ? parseWindow(sp.get("from"), sp.get("to"), now) : null;
   const win = wp && wp.ok ? { winFrom: wp.win.fromMs, winTo: wp.win.toMs } : {};
+  if (part === "zones") {
+    const allowed = narrowed(allowedAll, sp.get("account"));
+    if (allowed === "none") return json({ error: "Unknown account" }, 404);
+    const rows = await sql()`select distinct coalesce(timezone, 'UTC') z from locations where installation_id = ${ctx.installationId} and not ignored ${allowed ? sql()`and location_id = any(${allowed as string[]}::text[])` : sql()``}`;
+    return json({ zones: rows.map((r) => ({ zone: r.z as string, label: zoneLabel(r.z as string, now) })).sort((a, b) => a.label.localeCompare(b.label)).slice(0, 6) });
+  }
   if (part === "pulse") {
     const allowed = narrowed(allowedAll, sp.get("account"));
     if (allowed === "none") return json({ error: "Unknown account" }, 404);

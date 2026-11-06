@@ -110,8 +110,8 @@ export function PaceTab({ multi }: { multi: boolean }) {
           {[1, 2, 3, 4, 5, 6, 0].map((dow) => (
             <div key={dow} className="flex items-center gap-1 py-px"><span className="t-small t-quiet w-8 shrink-0">{DAY_NAMES[dow]}</span>
               <div className="flex min-w-0 flex-1 gap-px">{Array.from({ length: 24 }, (_, h) => { const c = cell(dow, h); const bad = c && c.leads >= 3 && c.missed / c.leads >= 0.5; return (
-                <button key={h} type="button" disabled={!c} onClick={() => c && open(`${DAY_NAMES[dow]} ${hourWords(h)}`, { sel: "cell", dow: String(dow), hour: String(h) })} aria-label={c ? `${DAY_NAMES[dow]} ${hourWords(h)}: ${c.leads} leads, ${c.missed} not answered in time` : `${DAY_NAMES[dow]} ${hourWords(h)}: no leads`}
-                  data-tip={c ? `${DAY_NAMES[dow]} ${hourWords(h)}: ${c.leads} ${c.leads === 1 ? "lead" : "leads"}, ${c.missed} not answered in time. Click to see the people.` : `${DAY_NAMES[dow]} ${hourWords(h)}: no leads`} className={`spd-mark h-6 min-w-0 flex-1 rounded-[2px] ${bad ? "outline outline-1 outline-[var(--t-bad)]" : ""}`} style={{ background: c ? `color-mix(in srgb, var(--t-c1) ${Math.round(18 + (c.leads / max) * 72)}%, transparent)` : "var(--t-sunk)" }} />
+                <button key={h} type="button" disabled={!c} onClick={() => c && open(`${DAY_NAMES[dow]}s at ${hourWords(h)}`, { sel: "cell", dow: String(dow), hour: String(h) })} aria-label={c ? `${DAY_NAMES[dow]}s at ${hourWords(h)}: ${c.leads} leads, ${c.missed} not answered in time` : `${DAY_NAMES[dow]}s at ${hourWords(h)}: no leads`}
+                  data-tip={c ? `${DAY_NAMES[dow]}s at ${hourWords(h)}: ${c.leads} ${c.leads === 1 ? "lead" : "leads"}, ${c.missed} not answered in time. Click to see the people.` : `${DAY_NAMES[dow]}s at ${hourWords(h)}: no leads`} className={`spd-mark h-6 min-w-0 flex-1 rounded-[2px] ${bad ? "outline outline-1 outline-[var(--t-bad)]" : ""}`} style={{ background: c ? `color-mix(in srgb, var(--t-c1) ${Math.round(18 + (c.leads / max) * 72)}%, transparent)` : "var(--t-sunk)" }} />
               ); })}</div>
             </div>
           ))}

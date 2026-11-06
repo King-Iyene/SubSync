@@ -80,3 +80,10 @@ test("one date and time reading: weekday, day, month, 12-hour time and the zone 
   assert.match(fmtWhen(Date.UTC(2026, 10, 3, 18), "America/New_York"), /^Tue 3 Nov, 1:00 pm E[SD]T$/);
   assert.equal(fmtWhen(Date.UTC(2026, 10, 3, 12), null), "Tue 3 Nov, 12:00 pm UTC");
 });
+
+test("zone label names the city and the zone", async () => {
+  const { zoneLabel } = await import("../analytics/speed6.ts");
+  assert.equal(zoneLabel("Africa/Lagos", Date.UTC(2026, 10, 3)), "Lagos time (GMT+1)");
+  assert.equal(zoneLabel("America/New_York", Date.UTC(2026, 10, 3)), "New York time (EST)");
+  assert.equal(zoneLabel(null), "UTC");
+});

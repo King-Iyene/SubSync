@@ -107,3 +107,13 @@ export function fmtWhen(ms: number, tz: string | null | undefined): string {
     return `${day}, ${time} ${abbr}`;
   } catch { return new Date(ms).toISOString(); }
 }
+
+/** "Lagos time (GMT+1)": the city from the zone name and the zone's own short name. */
+export function zoneLabel(tz: string | null | undefined, now = Date.now()): string {
+  const zone = tz || "UTC";
+  try {
+    const abbr = new Intl.DateTimeFormat("en-US", { timeZoneName: "short", timeZone: zone }).formatToParts(new Date(now)).find((p) => p.type === "timeZoneName")?.value ?? zone;
+    const city = zone === "UTC" ? "UTC" : (zone.split("/").pop() ?? zone).replace(/_/g, " ");
+    return zone === "UTC" ? "UTC" : `${city} time (${abbr})`;
+  } catch { return zone; }
+}

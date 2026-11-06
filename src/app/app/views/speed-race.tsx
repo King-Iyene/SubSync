@@ -14,7 +14,7 @@ import { DupChips, MoneyMeter, type Risk } from "./speed5-ui";
 import { PrimaryButton } from "./today-chrome";
 import { useSpeedFilter } from "./speed-filter";
 import { rowKey, useLeadActions, whyLine, type LeadRow } from "./speed-rows";
-import { useListPopup } from "./speed6-base";
+import { TzNote, useListPopup } from "./speed6-base";
 import "./speed4.css";
 
 // The first screen of Speed to lead: THE RACE ON NEW LEADS. A headline in money, a live clock on every new lead, one button for the lead closest to losing, and a speed ring per account.
@@ -123,6 +123,7 @@ export function RaceTab({ multi, onCall }: { multi: boolean; onCall?: () => void
   return (
     <div data-testid="race-tab">
       {listNode}
+      <TzNote />
       <section className="mb-8 grid gap-6 md:grid-cols-[1fr_auto] md:items-center" aria-label="The race">
         <div className="max-w-3xl">
           <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">

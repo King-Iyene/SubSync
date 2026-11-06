@@ -14,7 +14,7 @@ import { announceCall } from "../ds/dial-button";
 import { InfoTip } from "../ds/info-tip";
 import { fmtMoney } from "../ui";
 import { ActivityCard, AttemptCard, BestHourCard, Board6, CadenceCard, DispositionEditor, PowerBar, useCadence, useCallbacks, useDispositions, useGoals, useLocal, useTick, type SavedCallback } from "./dial6-ui";
-import { CountUp, Fold } from "./speed6-base";
+import { CountUp, Fold, TzNote } from "./speed6-base";
 import "./speed6.css";
 
 // Call mode (stages DIAL and SPEED6, docs/features/DIAL.md and SPEED6.md): a power dialer without telephony. The call is placed in the customer's own CRM phone; SubSync orders the list, feeds it one
@@ -87,6 +87,7 @@ export function DialMode() {
         <InfoTip label="How calling works here" testId="dial-how" text="Calls go through your CRM's own phone, with your own number and provider. SubSync costs nothing extra for calling: it puts the people in order, feeds them to you one at a time, and writes down how each call went." />
       </div>
       <p className="s6-sub">Pick a list and press Start. SubSync never places a call.</p>
+      <TzNote />
       <div className="mb-6 flex flex-wrap gap-2" role="group" aria-label="Choose a list">
         {(d?.lists ?? [{ id: "missed", label: "Missed calls, no callback", help: "" }]).map((l) => (
           <button key={l.id} type="button" onClick={() => { setList(l.id); setView("lists"); }} aria-pressed={view === "lists" && list === l.id} title={l.help} data-testid={`dial-list-${l.id}`}
