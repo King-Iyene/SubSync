@@ -5,10 +5,9 @@ import { dayLabel, fmtStat, fullDate } from "@/lib/analytics/chart-format";
 import type { GrowthData } from "@/lib/analytics/growth";
 import { specDay, specPeriod, specRange, specRemoved, specSignUps, specSource } from "@/lib/analytics/growth-records";
 import type { Period } from "@/lib/analytics/growth";
-import { PRESETS, type RangePreset } from "@/lib/design/range";
 import { DAY_NAMES, digestPreview, hourWords, type GapMap, type TrendNormal } from "@/lib/analytics/speed-v3";
 import { fmtDuration } from "@/lib/analytics/speed-intel";
-import { RecordsPanel, EmptyState, ErrorState, SkeletonRows, useCardRange, type CardRangeState } from "../ds";
+import { RecordsPanel, EmptyState, ErrorState, SkeletonRows } from "../ds";
 import { ModeToggle, TimeChart, useChartMode } from "../ds/time-chart";
 import { WhatIs } from "../ds/what-is";
 import { useData } from "../session";
@@ -81,7 +80,7 @@ export function PaceTab({ multi }: { multi: boolean }) {
       )}
 
       <Card id="proof">
-        <H title="Does answering fast book more?" tip="From this account's own leads in the last 28 days. Fast means a person replied within 5 minutes. It is a pattern in your data, not proof: fast leads may also be the better leads. Your CRM's own reports do not put reply time next to bookings." />
+        <H title="Does answering fast book more?" tip="From this account's own leads in these dates. Fast means a person replied within 5 minutes. It is a pattern in your data, not proof: fast leads may also be the better leads. Your CRM's own reports do not put reply time next to bookings." />
         <p className="text-[0.95rem] font-medium" data-testid="proof-line">{d.fastSlow.line}</p>
         <p className="t-small t-quiet mt-1 flex flex-wrap gap-x-4">
           <button type="button" data-tip="Click to see the people" className={BTN} onClick={() => open("Answered within 5 minutes", { sel: "fast" })}>{d.fastSlow.fast.n} answered within 5 minutes</button>
@@ -121,8 +120,8 @@ export function PaceTab({ multi }: { multi: boolean }) {
       </Card>
 
       <Card id="sources">
-        <H title="By lead source" tip="Reply speed, bookings, shows and wins for each source over the last 28 days, with the dollars slow replies cost it (leads answered late or never, times that account's own average deal and win rate; left out where there are fewer than 20 closed deals). Sources with fewer than 5 answered leads show no typical time." />
-        {d.sources.length === 0 ? <p className="t-small t-quiet">No leads in the last 28 days.</p> : (
+        <H title="By lead source" tip="Reply speed, bookings, shows and wins for each source in these dates, with the dollars slow replies cost it (leads answered late or never, times that account's own average deal and win rate; left out where there are fewer than 20 closed deals). Sources with fewer than 5 answered leads show no typical time." />
+        {d.sources.length === 0 ? <p className="t-small t-quiet">No leads in these dates.</p> : (
           <div className="overflow-hidden"><table className="w-full text-sm" data-testid="sources-table"><thead><tr className="t-label text-left"><th className="py-1.5 pr-2 font-normal">Source</th><th className="px-1 text-right font-normal">First reply</th><th className="px-1 text-right font-normal">Leads</th><th className="px-1 text-right font-normal">Booked</th><th className="hidden px-1 text-right font-normal sm:table-cell">Showed</th><th className="hidden px-1 text-right font-normal sm:table-cell">Won</th><th className="pl-1 text-right font-normal">Slow cost</th></tr></thead>
             <tbody className="divide-y divide-[var(--t-rule)]">{d.sources.map((s) => { const c = d.costBySource.find((x) => x.source === s.source); return (
               <tr key={s.source}><th scope="row" className="max-w-[9rem] truncate py-1.5 pr-2 text-left font-medium"><button type="button" data-tip="Click to see the people" className={`${BTN} max-w-full truncate`} title={s.source} onClick={() => open(`Source: ${s.source}`, { sel: "source", source: s.source })}>{s.source}</button></th>
@@ -145,7 +144,7 @@ export function PeopleTab({ multi }: { multi: boolean }) {
       {pick && <SidePopup label={pick.title} onClose={() => setPick(null)}><Opened pick={pick} multi={multi} /></SidePopup>}
       <Card id="owners">
         <H title="Leads nobody owns" tip="A lead with no owner is a lead everyone assumes someone else will answer. Open the list and give each one to the person who replies fastest." />
-        <p className="text-[0.95rem] font-medium" data-testid="owner-line">{d.owners.noOwner === 0 ? "Every lead in the last 28 days has an owner." : <><button type="button" data-tip="Click to see the people" className={BTN} onClick={() => open("Leads with no owner", { sel: "noOwner" })}>{d.owners.noOwner} of {d.owners.total} leads have no owner</button></>}</p>
+        <p className="text-[0.95rem] font-medium" data-testid="owner-line">{d.owners.noOwner === 0 ? "Every lead in these dates has an owner." : <><button type="button" data-tip="Click to see the people" className={BTN} onClick={() => open("Leads with no owner", { sel: "noOwner" })}>{d.owners.noOwner} of {d.owners.total} leads have no owner</button></>}</p>
         {d.seePeople && d.owners.owners.length > 1 && (
           <ul className="mt-2 divide-y divide-[var(--t-rule)] border-y border-[var(--t-rule)] text-sm" data-testid="owner-list">
             {d.owners.owners.map((o) => <li key={o.userId} className="flex items-center justify-between gap-3 py-1"><button type="button" data-tip="Click to see the people" className={`${BTN} truncate`} onClick={() => open(`Leads owned by ${o.name}`, { sel: "owner", user: o.userId })}>{o.name}</button><span className="t-num shrink-0">{o.leads}{o.overloaded ? <span className="ml-2 text-[var(--t-warn)]">more than twice a fair share ({d.owners.fairShare})</span> : ""}</span></li>)}
@@ -154,8 +153,8 @@ export function PeopleTab({ multi }: { multi: boolean }) {
       </Card>
       {d.seePeople ? (
         <Card id="setters">
-          <H title="Who replies" tip="Each person's first replies over 28 days: how many, the typical time, how many were in time, and how many of those leads booked. A person with fewer than 3 replies is listed last without a time. Compared only with others in this company, never with other companies." />
-          {d.setters.rows.length === 0 ? <p className="t-small t-quiet">No first replies in the last 28 days.</p> : (
+          <H title="Who replies" tip="Each person's first replies in these dates: how many, the typical time, how many were in time, and how many of those leads booked. A person with fewer than 3 replies is listed last without a time. Compared only with others in this company, never with other companies." />
+          {d.setters.rows.length === 0 ? <p className="t-small t-quiet">No first replies in these dates.</p> : (
             <>
               {d.setters.teamMedianSeconds !== null && <p className="t-small t-quiet mb-1">Typical for the whole team: {fmtDuration(d.setters.teamMedianSeconds)}.</p>}
               <table className="w-full table-fixed text-sm" data-testid="setters-table"><thead><tr className="t-label text-left"><th className="py-1.5 font-normal">Person</th><th className="px-1 text-right font-normal">Typical</th><th className="px-1 text-right font-normal">In time</th><th className="px-1 text-right font-normal">Replies</th><th className="pl-1 text-right font-normal">Booked</th></tr></thead>
@@ -171,45 +170,18 @@ export function PeopleTab({ multi }: { multi: boolean }) {
 }
 
 // ---------------------------------------------------------------- Lead capture
-/** The shared date buttons (Last 7, 30, 90 days, Custom with two dates) with the window written out. */
-function RangeButtons({ state }: { state: CardRangeState }) {
-  const { spec, resolved, setSpec } = state;
-  const on = "border-primary bg-primary text-primary-foreground", off = "bg-card hover:bg-accent";
-  const pick = (preset: RangePreset) => setSpec({ ...spec, preset, ...(preset === "custom" ? { from: spec.from ?? resolved?.current.from, to: spec.to ?? resolved?.current.to } : {}) });
-  const cls = "ds-press min-h-11 rounded-md border px-3 text-sm font-medium sm:min-h-9";
-  const field = "min-h-11 rounded-md border bg-card px-2 text-sm sm:min-h-9";
-  return (
-    <div className="mb-4" data-testid="capture-range">
-      <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Dates for email leads">
-        {PRESETS.map((x) => <button key={x.key} type="button" aria-pressed={spec.preset === x.key} onClick={() => pick(x.key)} className={`${cls} ${spec.preset === x.key ? on : off}`}>{x.label}</button>)}
-        <button type="button" aria-pressed={spec.preset === "custom"} onClick={() => pick("custom")} className={`${cls} ${spec.preset === "custom" ? on : off}`}>Custom</button>
-        {spec.preset === "custom" && (
-          <>
-            <input type="date" className={field} aria-label="From date" value={spec.from ?? ""} max={resolved?.current.to} onChange={(e) => setSpec({ ...spec, from: e.target.value })} />
-            <input type="date" className={field} aria-label="To date" value={spec.to ?? ""} onChange={(e) => setSpec({ ...spec, to: e.target.value })} />
-          </>
-        )}
-      </div>
-      <p className="t-small t-quiet mt-1.5" aria-live="polite" data-testid="capture-window">{resolved ? `${resolved.sentence}. Today, This week, This month and All time always mean those calendar stretches.` : "Working out the dates..."}</p>
-      {resolved?.problem && <p className="mt-1 border-l-2 border-warning pl-2 text-sm" role="status">{resolved.problem} Showing the last 30 days instead.</p>}
-    </div>
-  );
-}
-
 export function CaptureTab() {
-  const range = useCardRange("capture", { preset: "30d", compare: "none" });
-  const r = range.resolved;
-  const { data: g, error, reload } = useData<GrowthData>(r ? `today/growth?from=${r.current.from}&to=${r.current.to}` : null);
+  const { range } = useSpeedFilter();
+  const { data: g, error, reload } = useData<GrowthData>(range ? `today/growth?from=${range.from}&to=${range.to}` : null);
   const [mode, setMode] = useChartMode("speed-capture");
   const [panel, setPanel] = useState<ReturnType<typeof specDay> | null>(null);
   if (error) return <ErrorState error={error} onRetry={reload} />;
-  if (!g) return <div data-testid="capture-tab"><RangeButtons state={range} /><SkeletonRows rows={5} label="Counting email leads..." /></div>;
-  const rangeWord = g.range.label.toLowerCase();
+  if (!g) return <div data-testid="capture-tab"><SkeletonRows rows={5} label="Counting email leads..." /></div>;
+  const rangeWord = (range?.sentence ?? g.range.label).toLowerCase();
   const periods = [["today", "Today"], ["week", "This week"], ["month", "This month"], ["all", "All time"]] as const;
   const removed = g.gross.removed.duplicate + g.gross.removed.junk + g.gross.removed.staff + g.gross.removed.role;
   return (
     <div data-testid="capture-tab">
-      <RangeButtons state={range} />
       <Card id="capture-counters">
         <H title="People who gave an email" tip="Unique people with a usable email, counted once. Extra copies, test records and your own staff are taken out. Percent compares with the same stretch just before; under 5 earlier it says too few to compare." />
         <ul className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4">

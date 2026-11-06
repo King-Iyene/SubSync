@@ -28,3 +28,22 @@ test("Capture: visible date buttons, and every counter opens exactly its people"
     await expect(page.getByRole("dialog").first()).toBeVisible();
   }
 });
+
+test("The bar's dates reach every Speed tab (Pace, Coverage, People, Capture) and the lead filters hide where they do nothing", async ({ page }) => {
+  test.setTimeout(400_000);
+  const seen: string[] = [];
+  page.on("request", (r) => { if (/\/api\/app\/(speed|today\/growth)/.test(r.url())) seen.push(r.url()); });
+  await page.goto("/app#speed");
+  await page.reload();
+  await expect(page.getByTestId("race-tab")).toBeVisible({ timeout: 90_000 });
+  await page.getByRole("button", { name: "Last 7 days" }).first().click();
+  for (const name of ["Coverage", "Pace", "People", "Capture"]) {
+    seen.length = 0;
+    await page.getByRole("tab", { name, exact: true }).click();
+    await expect.poll(() => seen.length, { timeout: 90_000 }).toBeGreaterThan(0);
+    const bad = seen.filter((u) => !/from=\d{4}-\d{2}-\d{2}/.test(u) || !/to=\d{4}-\d{2}-\d{2}/.test(u));
+    expect(bad, `${name} reads carry the bar's dates`).toEqual([]);
+    const f = page.getByTestId("filters-toggle");
+    if (name === "Capture") await expect(f).toHaveCount(0); else await expect(f).toBeVisible();
+  }
+});

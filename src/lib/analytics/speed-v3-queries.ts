@@ -32,7 +32,7 @@ export async function outcomesOf(installationId: string, allowed: string[] | nul
   return out;
 }
 
-export type InsightInput = { installationId: string; allowed: string[] | null; targetMinutes: number; now: number; seePeople: boolean; filter?: LeadFilter };
+export type InsightInput = { installationId: string; allowed: string[] | null; targetMinutes: number; now: number; seePeople: boolean; filter?: LeadFilter; /** The bar's dates in ms (end exclusive). Absent means the last 28 days. */ winFrom?: number; winTo?: number };
 
 export async function speedInsights(i: InsightInput) {
   const db = sql();
@@ -40,7 +40,7 @@ export async function speedInsights(i: InsightInput) {
   const rows = applyFilter(loaded, i.filter ?? {}, { targetMinutes: i.targetMinutes, now: i.now });
   const oc = await outcomesOf(i.installationId, i.allowed, i.now - HISTORY_DAYS * DAY);
   const o = { targetMinutes: i.targetMinutes, now: i.now };
-  const recent = rows.filter((r) => r.leadAt > i.now - 28 * DAY);
+  const recent = rows.filter((r) => r.leadAt >= (i.winFrom ?? i.now - 28 * DAY) && r.leadAt < (i.winTo ?? i.now + DAY));
   const name = (userId: string, loc: string | undefined) => resolveUser(userId, lk.team, loc ? lk.usersAccess.get(loc) : null).label;
   const locOf = (u: string) => rows.find((r) => r.userId === u || r.assignedTo === u)?.locationId;
   const setters = i.seePeople ? setterScorecard(recent, oc, o) : { rows: [], teamMedianSeconds: null };
@@ -67,8 +67,9 @@ export async function speedInsights(i: InsightInput) {
 /** The exact leads behind one mark, capped at 100 with the true count. The same `pick` the figure was counted with. */
 export async function speedInsightList(i: InsightInput & { sel: Sel }) {
   const db = sql();
-  const [{ lk }, loaded] = await Promise.all([loadLookups(db, i.installationId, i.allowed, i.targetMinutes, i.now), loadRows(db, i.installationId, i.allowed, i.now - 28 * DAY, i.now + DAY)]);
-  const rows = applyFilter(loaded, i.filter ?? {}, { targetMinutes: i.targetMinutes, now: i.now });
+  const [{ lk }, loaded] = await Promise.all([loadLookups(db, i.installationId, i.allowed, i.targetMinutes, i.now), loadRows(db, i.installationId, i.allowed, Math.min(i.winFrom ?? i.now - 28 * DAY, i.now - 28 * DAY), i.now + DAY)]);
+  const inWin = (t: number) => t >= (i.winFrom ?? i.now - 28 * DAY) && t < (i.winTo ?? i.now + DAY);
+  const rows = applyFilter(loaded, i.filter ?? {}, { targetMinutes: i.targetMinutes, now: i.now }).filter((r) => i.sel.kind === "week" || inWin(r.leadAt));
   const picked = pick(rows, i.sel, { targetMinutes: i.targetMinutes, now: i.now });
   const sugg = suggestionsFor(rows, new Set(picked.slice(0, 100).map((x) => x.row.locationId)));
   return { count: picked.length, shown: Math.min(100, picked.length), rows: picked.slice(0, 100).map((x) => rowOut(x.row, x.status, lk, sugg)) };
