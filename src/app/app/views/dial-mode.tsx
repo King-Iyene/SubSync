@@ -13,8 +13,8 @@ import { EmptyState, ErrorState, InlineAlert, SkeletonRows, useDialer } from "..
 import { announceCall } from "../ds/dial-button";
 import { InfoTip } from "../ds/info-tip";
 import { fmtMoney } from "../ui";
-import { ActivityCard, AttemptCard, BestHourCard, Board6, CadenceCard, DispositionEditor, PowerBar, useCadence, useCallbacks, useDispositions, useGoals, useLocal, useTick, type SavedCallback } from "./dial6-ui";
-import { CountUp, Fold } from "./speed6-base";
+import { PrefsCtx, useScripts, ActivityCard, AttemptCard, BestHourCard, Board6, CadenceCard, DispositionEditor, PowerBar, useCadence, useCallbacks, useDispositions, useGoals, useLocal, useTick, type SavedCallback } from "./dial6-ui";
+import { CountUp, Fold, TzNote } from "./speed6-base";
 import "./speed6.css";
 
 // Call mode (stages DIAL and SPEED6, docs/features/DIAL.md and SPEED6.md): a power dialer without telephony. The call is placed in the customer's own CRM phone; SubSync orders the list, feeds it one
@@ -36,10 +36,17 @@ type Later = { key: string; name: string; why: string };
 const BIG = "ds-press inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-[rgba(103,232,249,0.25)] bg-[rgba(34,211,238,0.06)] px-4 text-[15px] font-medium hover:bg-[rgba(34,211,238,0.16)] focus-visible:outline-2 focus-visible:outline-[var(--ring)] disabled:cursor-not-allowed disabled:opacity-50";
 const PRIMARY = "s6-btn !min-h-12 !px-6 !text-base";
 const when = (ms: number) => new Date(ms).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-const clock = (ms: number) => fmtWhen(ms, null);
 const EMPTY_STATE: AttemptState = { attempts: 0, lastAt: null, reached: false };
 
+/** Provides the server-kept choices (redial plan, goals, scripts, outcome sets) to everything in Call mode; falls back to this browser until the database has them. */
 export function DialMode() {
+  const api = useApiClient();
+  const prefs = useData<{ ready: boolean; prefs: Record<string, unknown> }>("speed/prefs");
+  const put = (key: string, scope: string, value: unknown) => { void api.put("speed/prefs", { key, scope, value }).then(() => prefs.reload()).catch(() => undefined); };
+  return <PrefsCtx.Provider value={{ ready: prefs.data?.ready === true, map: prefs.data?.prefs ?? {}, put }}><DialInner /></PrefsCtx.Provider>;
+}
+
+function DialInner() {
   const [list, setList] = useState("missed");
   const [view, setView] = useState<"lists" | "callbacks">("lists");
   const queue = useData<Queue>(`dial/queue?list=${encodeURIComponent(list)}`);
@@ -65,7 +72,7 @@ export function DialMode() {
       if (skipReason(c)) ready.push(c); // the existing rule skips these one by one, with its own message
       else if (step.state === "text_fallback") texts.push({ key, name: c.name, why: `${st.attempts} tries, send a text` });
       else if (!w.ok) later.push({ key, name: c.name, why: w.label ?? "later" });
-      else if (step.state === "waiting" && step.dueAt) later.push({ key, name: c.name, why: `try again at ${clock(step.dueAt)}` });
+      else if (step.state === "waiting" && step.dueAt) later.push({ key, name: c.name, why: `try again at ${fmtWhen(step.dueAt, it.timeZone)}` });
       else ready.push(c);
     }
     const order = reorderByHeat(ready);
@@ -87,6 +94,7 @@ export function DialMode() {
         <InfoTip label="How calling works here" testId="dial-how" text="Calls go through your CRM's own phone, with your own number and provider. SubSync costs nothing extra for calling: it puts the people in order, feeds them to you one at a time, and writes down how each call went." />
       </div>
       <p className="s6-sub">Pick a list and press Start. SubSync never places a call.</p>
+      <TzNote />
       <div className="mb-6 flex flex-wrap gap-2" role="group" aria-label="Choose a list">
         {(d?.lists ?? [{ id: "missed", label: "Missed calls, no callback", help: "" }]).map((l) => (
           <button key={l.id} type="button" onClick={() => { setList(l.id); setView("lists"); }} aria-pressed={view === "lists" && list === l.id} title={l.help} data-testid={`dial-list-${l.id}`}
@@ -100,7 +108,7 @@ export function DialMode() {
           <h3 className="s6-q">Who asked for a callback today?</h3>
           {todays.length === 0 ? <p className="s6-label mt-2" data-testid="callbacks-empty">Nobody has a callback today. When someone says &quot;call me later&quot;, pick Call back later and a time: they show up here.</p> : (
             <ul className="s6-ready mt-3">{todays.map((c) => { const full = cbs.find((x) => x.key === c.key && x.at === c.at) as SavedCallback; return (
-              <li key={c.key + c.at} data-testid="callback-row"><span className="s6-chip" data-tone={c.at <= nowMs ? "red" : "cyan"}>{clock(c.at)}</span><span className="min-w-0 flex-1 truncate font-semibold">{c.name}</span>{c.locationName && <span className="s6-label">{c.locationName}</span>}
+              <li key={c.key + c.at} data-testid="callback-row"><span className="s6-chip" data-tone={c.at <= nowMs ? "red" : "cyan"}>{fmtWhen(c.at, full.timeZone)}</span><span className="min-w-0 flex-1 truncate font-semibold">{c.name}</span>{c.locationName && <span className="s6-label">{c.locationName}</span>}
                 <button type="button" className="s6-btn" data-kind="primary" onClick={() => start([callbackItem(full)], false)} data-testid="callback-call">Call now</button>
                 <button type="button" className="s6-btn" onClick={() => setCbs(cbs.filter((x) => !(x.key === c.key && x.at === c.at)))} aria-label={`Done with ${c.name}`}>Done</button></li>); })}</ul>
           )}
@@ -166,7 +174,7 @@ function Session({ s, setS, onExit, me, cadence, goals, cbs, setCbs }: {
   const [hover, setHover] = useState<Disposition | null>(null);
   const [link, setLink] = useLocal<string>("subsync.dial.bookingLink", "");
   const [textMsg, setTextMsg] = useState<string | null>(null);
-  const [scripts, setScripts] = useLocal<Record<string, string>>("subsync.dial.scripts", {});
+  const [scripts, setScripts] = useScripts();
   const [dispo, setDispo] = useDispositions(item?.locationId ?? null);
   const now = useTick(s.timed !== null);
 

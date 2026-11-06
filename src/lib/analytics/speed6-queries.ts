@@ -4,7 +4,7 @@ import { loadLookups, loadRows } from "./speed-queries";
 import { rowOut, suggestionsFor, type LeadRowOut } from "./speed-v2-queries";
 import { DAY } from "./speed-v3";
 import { outcomesOf } from "./speed-v3-queries";
-import { applyFilter, journeyReach } from "./speed-v4-more";
+import { applyFilter, filterActive, journeyReach } from "./speed-v4-more";
 import { repliedSet, type Input } from "./speed-v4-queries";
 import { dayCounts, daysWaiting, delayReasons, nextStepNone, personTable, readyScore, reasonBars, rowId, velocity, type ReasonKey } from "./speed6";
 import { countedDealsOf } from "./waiting-money-queries";
@@ -12,6 +12,31 @@ import { countedDealsOf } from "./waiting-money-queries";
 // The reads behind the Speed to lead "pulse" cards (stage SPEED6): new leads and first replies by day, the closing velocity, the person table, the ready-to-act list and the main reasons
 // leads wait. Read only, bound to the accounts the router allowed. Every count here is taken from the same rows that are returned, so a number and its list agree. No message text is read.
 const SAMPLE = 40;
+const ymd = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+
+/**
+ * Exact counts by day straight from the database (an aggregate, never a row read), so a client with 100,000 leads is counted exactly and the answer stays small: leads that arrived by day,
+ * and first replies by day for those leads. Days are UTC days. Used whenever no lead filter narrows the rows (a filter needs the rows).
+ */
+export async function pulseDayCounts(installationId: string, allowed: string[] | null, fromMs: number, toMs: number) {
+  const db = sql();
+  const rows = await db`
+    select to_char(coalesce(t.clock_start, t.lead_at) at time zone 'UTC', 'YYYY-MM-DD') ld, to_char(t.touch_at at time zone 'UTC', 'YYYY-MM-DD') td, count(*)::int n
+    from lead_touches t
+    where t.installation_id = ${installationId} and t.excluded is null and coalesce(t.clock_start, t.lead_at) >= ${new Date(fromMs)} and coalesce(t.clock_start, t.lead_at) < ${new Date(toMs)}
+      ${allowed ? db`and t.location_id = any(${allowed}::text[])` : db``}
+    group by 1, 2`;
+  const days: Array<{ day: string; n: number }> = []; const idx = new Map<string, number>();
+  for (let t = Math.floor(fromMs / DAY) * DAY; t < toMs && days.length < 120; t += DAY) { idx.set(ymd(t), days.length); days.push({ day: ymd(t), n: 0 }); }
+  const leadsByDay = days.map((d) => ({ ...d })); const repliesByDay = days.map((d) => ({ ...d }));
+  let total = 0;
+  for (const r of rows) {
+    const n = r.n as number; total += n;
+    const a = idx.get(r.ld as string); if (a !== undefined) leadsByDay[a].n += n;
+    const b = r.td ? idx.get(r.td as string) : undefined; if (b !== undefined) repliesByDay[b].n += n;
+  }
+  return { total, leadsByDay, repliesByDay };
+}
 const MAX_OUT = 1500;
 
 export async function speedPulse(i: Input) {
@@ -35,8 +60,10 @@ export async function speedPulse(i: Input) {
 
   // New leads and first replies by day (UTC days; a day is a calendar day, not a rolling 24 hours).
   const dayTo = Math.min(to, i.now + DAY);
-  const leadsByDay = dayCounts(rows.map((r) => r.leadAt), from, dayTo);
-  const repliesByDay = dayCounts(rows.filter((r) => r.touchAt !== null).map((r) => r.touchAt as number), from, dayTo);
+  let leadsByDay = dayCounts(rows.map((r) => r.leadAt), from, dayTo);
+  let repliesByDay = dayCounts(rows.filter((r) => r.touchAt !== null).map((r) => r.touchAt as number), from, dayTo);
+  let exactTotal = rows.length;
+  if (!filterActive(i.filter ?? {})) { const x = await pulseDayCounts(i.installationId, i.allowed, from, dayTo).catch(() => null); if (x) { leadsByDay = x.leadsByDay; repliesByDay = x.repliesByDay; exactTotal = x.total; } }
   const vel = velocity(rows.map((r) => ({ leadAt: r.leadAt, bookedAt: bookedAt.get(rowId(r)) ?? null })));
 
   // The waiting leads (nobody has touched them yet), their reasons, and the ready-to-act list.
@@ -68,7 +95,7 @@ export async function speedPulse(i: Input) {
     if (list.length < SAMPLE) { const x = reach.get(rowId(r))!; list.push({ row: out(r), replied: x.replied, booked: x.booked, showed: x.showed }); sample.set(k, list); }
   }
   return {
-    now: i.now, from, to: dayTo, total: rows.length, truncated: all.length >= 20_000,
+    now: i.now, from, to: dayTo, total: exactTotal, truncated: all.length >= 20_000 && exactTotal > rows.length,
     leadsByDay, repliesByDay, velocity: vel,
     people: i.seePeople ? people.map((p) => ({ ...p, sample: sample.get(p.key) ?? [] })) : [],
     ready, reasons: bars as Array<{ key: ReasonKey | "unclear"; label: string; n: number; rows: LeadRowOut[] }>,

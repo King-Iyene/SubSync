@@ -15,7 +15,7 @@ export type GrowthDeps = {
   contactUrl: (ctx: Ctx) => Promise<(locationId: string, contactId: string) => string>;
   accountUrl: (ctx: Ctx) => Promise<(locationId: string) => string>;
 };
-const ROW_CAP = 150_000;
+const ROW_CAP = 40_000; // newest first; a bigger account is marked partial (the screen says so) instead of hanging the tab while 150,000 rows are read and counted
 const DEFAULT_RULES: GrowthRules = { excludeRoleAddresses: true, internalDomains: [] };
 
 export async function loadRules(installationId: string): Promise<{ rules: GrowthRules; ready: boolean }> {

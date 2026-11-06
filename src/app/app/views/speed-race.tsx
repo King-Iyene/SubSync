@@ -1,7 +1,7 @@
 "use client";
 
 import { MoreHorizontal, PhoneCall } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { raceState, type Score } from "@/lib/analytics/speed-v4";
 import { fmtDuration } from "@/lib/analytics/speed-intel";
 import { ReviewSheet, useRunner, wbButtons } from "../ds/wb/runner";
@@ -14,7 +14,9 @@ import { DupChips, MoneyMeter, type Risk } from "./speed5-ui";
 import { PrimaryButton } from "./today-chrome";
 import { useSpeedFilter } from "./speed-filter";
 import { rowKey, useLeadActions, whyLine, type LeadRow } from "./speed-rows";
-import { useListPopup } from "./speed6-base";
+import { TzNote, useListPopup } from "./speed6-base";
+import { delayReasons, type ReasonKey } from "@/lib/analytics/speed6";
+import { DelayChip } from "./delay-chip";
 import "./speed4.css";
 
 // The first screen of Speed to lead: THE RACE ON NEW LEADS. A headline in money, a live clock on every new lead, one button for the lead closest to losing, and a speed ring per account.
@@ -106,6 +108,7 @@ export function RaceTab({ multi, onCall }: { multi: boolean; onCall?: () => void
   const { query } = useSpeedFilter();
   const { data: d, error, reload } = useData<Race>(`speed?part=race${query}`);
   const rows = d?.feed ?? [];
+  const reasons = useMemo(() => delayReasons(rows.map((r) => ({ ...r, leadAt: r.arrivedAt }))), [rows]);
   const actions = useLeadActions(rows);
   const now = useNow(d?.now ?? 0);
   const [story, setStory] = useState<string | null>(null);
@@ -123,6 +126,7 @@ export function RaceTab({ multi, onCall }: { multi: boolean; onCall?: () => void
   return (
     <div data-testid="race-tab">
       {listNode}
+      <TzNote />
       <section className="mb-8 grid gap-6 md:grid-cols-[1fr_auto] md:items-center" aria-label="The race">
         <div className="max-w-3xl">
           <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
@@ -162,6 +166,7 @@ export function RaceTab({ multi, onCall }: { multi: boolean; onCall?: () => void
                   <button type="button" onClick={() => actions.show(i)} className="block max-w-full cursor-pointer truncate text-left font-semibold hover:underline" data-tip="Click to open this lead" title={undefined}>{r.name}</button>
                   <p className="t-small t-quiet truncate" title={whyLine(r, multi)}>{whyLine(r, multi)}</p>
                   <DupChips dup={r.duplicateOf ?? null} repeat={r.repeat === true} />
+                {r.touchedAt === null && reasons.get(rowKey(r)) && <p className="mt-1"><DelayChip reason={reasons.get(rowKey(r)) as ReasonKey} /></p>}
                   <p className="t-small t-quiet">Lead quality <span className="tnum font-medium text-[var(--t-ink)]" data-testid="lead-quality">{r.quality}</span>/100{r.dollars > 0 ? <> · <span className="tnum">{usd(r.dollars)}</span> open</> : null} <WhatIs text="A starting guess from what the lead gave us: a real phone number, a real email, a known source. Not a promise." /></p>
                 </div>
                 <div className="flex items-center gap-1">

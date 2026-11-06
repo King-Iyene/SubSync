@@ -8,7 +8,7 @@ export const SYNCED_DELETE = [
   "cleanup_changes", "cleanup_runs", "duplicate_reviews", "duplicate_snoozes", "cleanup_quality_snapshots", "possible_duplicates",
   "cached_contacts", "cached_opportunities", "cached_conversations", "cached_appointments", "pipelines",
   "account_metrics_daily", "alerts", "domain_checks", "onboarding_tasks",
-  "deal_events", "appointment_events", "lead_touches", "touch_events", "lead_events", "speed_daily", "call_outcomes", "contact_tag_events",
+  "deal_events", "appointment_events", "lead_touches", "touch_events", "lead_events", "speed_daily", "speed_digest", "speed_prefs", "call_outcomes", "contact_tag_events",
   "notification_states", "notifications", "notification_deliveries",
   "campaign_stats", "workflow_snapshots", "workflow_changes", "workflow_daily", "workflow_items",
   "dh_snapshots", "dh_flags", "dh_changes", "dh_outcomes", // Data health (docs/features/DATA_HEALTH.md)
@@ -36,7 +36,7 @@ export const LOCATION_DELETE = [
   "cleanup_changes", "cleanup_runs", "duplicate_reviews", "duplicate_snoozes", "cleanup_quality_snapshots", "possible_duplicates",
   "cached_contacts", "cached_opportunities", "cached_conversations", "cached_appointments", "pipelines",
   "account_metrics_daily", "alerts", "domain_checks", "onboarding_tasks",
-  "deal_events", "appointment_events", "lead_touches", "touch_events", "lead_events", "speed_daily", "call_outcomes", "contact_tag_events",
+  "deal_events", "appointment_events", "lead_touches", "touch_events", "lead_events", "speed_daily", "speed_digest", "speed_prefs", "call_outcomes", "contact_tag_events",
   "notification_states", "notifications", "notification_deliveries", "notification_destinations",
   "crm_writes", "contact_writes", "field_write_state", "field_mappings", "meeting_policies", "meeting_notes", "meeting_hooks", "account_profiles", "client_notes", "today_actions", "growth_goals", "workflow_labels", "dh_snapshots", "dh_flags", "dh_changes", "dh_outcomes", "dh_marks", "dh_rules", "campaign_stats", "workflow_snapshots", "workflow_changes", "workflow_daily", "workflow_items", "feedback_items", "client_steps", "client_step_history", "sync_jobs", "locations",
 ] as const;

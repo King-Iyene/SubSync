@@ -35,6 +35,13 @@ async function mock(page: Page, puts: Array<{ url: string; body: unknown }> = []
   await page.route(/part=journey-list/, (r) => r.fulfill({ json: { count: 2, shown: 2, rows: [lead("Dropped One"), lead("Dropped Two")] } }));
   await page.route(/part=journey(&|$)/, (r) => r.fulfill({ json: { repliedRecorded: true, steps: STEPS.map(([step, label, count], i) => ({ step, label, count, dropped: i ? STEPS[i - 1][2] - count : 0, dropShare: null, medianFromPrev: null })) } }));
   await page.route(/part=ladder/, (r) => r.fulfill({ json: LADDER }));
+  await page.route(/\/api\/app\/speed\/digest/, (r) => {
+    const req = r.request();
+    if (req.method() === "GET") return r.fulfill({ json: { ready: true, live: { email: false, slack: false }, lastKey: null, settings: { enabled: false, email: true, slack: false, recipients: [], schedule: { cadence: "daily", hour: 8, weekday: 1, tz: "UTC" }, intro: "Here is how first replies are going.", outro: "Thanks.", lines: ["waiting", "typical", "inTime"] } } });
+    if (req.method() === "PUT") { puts.push({ url: req.url(), body: req.postDataJSON() }); return r.fulfill({ json: { ok: true } }); }
+    if (req.url().includes("/preview")) return r.fulfill({ json: { subject: "Acme Roofing: daily speed to lead summary", text: "Hi team.\n\n- 3 leads are waiting for a first reply.", destination: "x" } });
+    return r.fulfill({ json: { ok: true, wouldSend: ["email"], sent: [] } });
+  });
   await page.route(/\/api\/app\/speed\/ladder/, (r) => { puts.push({ url: r.request().url(), body: r.request().postDataJSON() }); return r.fulfill({ json: { ok: true } }); });
   await page.route(/\/api\/app\/settings$/, (r) => { if (r.request().method() === "PUT") { puts.push({ url: r.request().url(), body: r.request().postDataJSON() }); return r.fulfill({ json: { ok: true } }); } return r.fallback(); });
 }
@@ -98,6 +105,9 @@ test("Pace: the animated journey, drop-off buckets and steps open their people, 
   await page.getByTestId("s6-more").click();
   await expect(page.getByTestId("velocity-value")).toContainText("3.5");
   await expect(page.getByTestId("hist-leads-total")).toHaveText("45");
+  await page.getByTestId("hist-leads-bar").nth(3).click();
+  await expect(page.getByTestId("speed-list")).toBeVisible();
+  await page.keyboard.press("Escape");
   // a reason bar opens exactly its people, and each waiting lead carries its delay reason
   await page.getByTestId("reason-bar").first().click();
   await expect(page.getByTestId("pulse-list-count")).toContainText("2 leads waiting");
@@ -155,8 +165,22 @@ test("Rules: the stepper, the escalation toggle, the digest preview and a dry-ru
     await page.getByTestId("ladder-save").click();
     await expect.poll(() => puts.some((p) => JSON.stringify(p.body).includes('"nextAfterMin":20'))).toBe(true);
   }
-  // the summary email card is hidden until it can be edited and delivered
-  await expect(page.getByTestId("digest-card")).toHaveCount(0);
+  // the summary message: editable, says where it goes, previews the exact message, dry-run test, saves
+  await expect(page.getByTestId("digest-card")).toContainText("What is in my summary message?");
+  await expect(page.getByTestId("digest-where")).toContainText("nobody by email");
+  await page.getByTestId("digest-recipients").fill("ben@example.com");
+  await expect(page.getByTestId("digest-where")).toContainText("Goes to ben@example.com by email at 8:00 every day (UTC)");
+  await expect(page.getByTestId("digest-where")).toContainText("Sending email is off until it is enabled");
+  await page.getByTestId("digest-line-leaked").check();
+  await page.getByTestId("digest-intro").fill("Hi team.");
+  await page.getByTestId("digest-preview-open").click();
+  await expect(page.getByTestId("digest-subject")).toHaveText("Acme Roofing: daily speed to lead summary");
+  await expect(page.getByTestId("digest-preview")).toContainText("Hi team.");
+  await page.keyboard.press("Escape");
+  await page.getByTestId("digest-test").click();
+  await expect(page.getByTestId("digest-msg")).toContainText("WOULD SEND by email");
+  await page.getByTestId("digest-save").click();
+  await expect.poll(() => puts.some((p) => JSON.stringify(p.body).includes("ben@example.com") && JSON.stringify(p.body).includes('"leaked"'))).toBe(true);
   // waiting-now cards open the shared lead panel, never a small popup
   const card = page.getByTestId("ladder-lead");
   await expect(card).toHaveCount(1);

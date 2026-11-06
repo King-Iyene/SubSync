@@ -7,7 +7,7 @@
   --accent: #142348; --accent-foreground: #e6edf9; --border: #243659; --input: #243659; --ring: #67e8f9; --success: #4ade80; --warning: #fbbf24; --destructive: #fb7185;
   --t-ground: #070d1c; --t-raise: #0d1730; --t-sunk: #050a16; --t-lift: #12203f; --t-ink: #e6edf9; --t-ink2: #b4c3da; --t-ink3: #9db0cc; --t-rule: #243659; --t-rule2: #32497a;
   --t-accent: #22d3ee; --t-on-accent: #04121c; --t-wash: #12203f; --t-bad: #fb7185; --t-warn: #fbbf24; --t-ok: #4ade80; --t-c1: #22d3ee; --t-c2: #a78bfa; --t-c3: #4ade80; --t-c4: #f472b6;
-  --s6-cyan: #22d3ee; --s6-violet: #a78bfa; --s6-magenta: #f472b6; --s6-lime: #a3e635; --s6-amber: #fbbf24; --s6-red: #fb7185; --s6-green: #4ade80;
+  --s6-cyan: #22d3ee; --s6-violet: #a78bfa; --s6-magenta: #f472b6; --s6-lime: #a3e635; --s6-blue: #60a5fa; --s6-orange: #fb923c; --s6-amber: #fbbf24; --s6-red: #fb7185; --s6-green: #4ade80;
   background: radial-gradient(1200px 500px at 80% -10%, rgba(34, 211, 238, 0.07), transparent 60%), radial-gradient(900px 500px at -10% 10%, rgba(167, 139, 250, 0.07), transparent 60%), #070d1c;
   color: var(--foreground); border-radius: 20px; padding: 24px; color-scheme: dark;
 }
@@ -68,7 +68,7 @@
 
 /* bars and mini histograms */
 .s6-bars { display: flex; align-items: flex-end; gap: 3px; height: 72px; }
-.s6-bars > div { flex: 1; min-width: 3px; border-radius: 3px 3px 0 0; background: linear-gradient(180deg, var(--s6-cyan), rgba(34, 211, 238, 0.35)); transform-origin: bottom; animation: s6-grow 420ms ease both; }
+.s6-bars > div, .s6-bars > button { flex: 1; min-width: 3px; border-radius: 3px 3px 0 0; background: linear-gradient(180deg, var(--s6-cyan), rgba(34, 211, 238, 0.35)); transform-origin: bottom; animation: s6-grow 420ms ease both; }
 .s6-bars[data-tone="violet"] > div { background: linear-gradient(180deg, var(--s6-violet), rgba(167, 139, 250, 0.35)); }
 @keyframes s6-grow { from { transform: scaleY(0); } to { transform: scaleY(1); } }
 .s6-hbar { height: 10px; border-radius: 6px; background: rgba(36, 54, 89, 0.7); overflow: hidden; } .s6-hbar > i { display: block; height: 100%; border-radius: 6px; transition: width 600ms ease; }
@@ -135,3 +135,12 @@ li[data-tier="Surge"] .s6-rank { background: rgba(167, 139, 250, 0.14); border-c
 .s6-band::after { content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, rgba(103, 232, 249, 0.5), transparent); }
 .s6 [data-testid="race-tab"] > section { border: 1px solid rgba(103, 232, 249, 0.16); border-radius: 16px; padding: 24px; margin-bottom: 40px; background: linear-gradient(180deg, rgba(20, 35, 72, 0.5), rgba(13, 23, 48, 0.85)); }
 .s6 [data-testid="race-tab"] h3 { padding-bottom: 12px; margin-bottom: 16px; border-bottom: 1px solid rgba(103, 232, 249, 0.18); }
+
+/* a richer palette, each colour with one meaning: cyan action, violet people and time, magenta calls, lime fastest or good, amber near breach, orange missing data, red breach, blue duplicates */
+.s6-chip[data-tone="blue"] { color: #d6e8ff; background: rgba(96, 165, 250, 0.16); border-color: rgba(96, 165, 250, 0.55); }
+.s6-chip[data-tone="orange"] { color: #ffe0c7; background: rgba(251, 146, 60, 0.16); border-color: rgba(251, 146, 60, 0.55); }
+.s6-chip[data-tone="lime"] { color: #eaffc2; background: rgba(163, 230, 53, 0.14); border-color: rgba(163, 230, 53, 0.5); }
+.s6-big[data-tone="lime"] { color: var(--s6-lime); }
+.s6-band { color: var(--s6-violet); }
+.s6-band::after { background: linear-gradient(90deg, rgba(167, 139, 250, 0.55), rgba(34, 211, 238, 0.25), transparent); }
+@media (max-width: 640px) { .s6-q { font-size: 1rem; } .s6-big { font-size: 2rem; } .s6-card { padding: 20px; } .s6-grid { gap: 24px; } }

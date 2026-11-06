@@ -8,6 +8,12 @@ import { parseFilter } from "../analytics/speed-v4-more";
 import { isStep, speedCoverage, speedJourney, speedJourneyList, speedProof, speedRace, speedStory } from "../analytics/speed-v4-queries";
 import { ladderPreview, saveLadder, speedBooking } from "../analytics/speed5-queries";
 import { speedPulse } from "../analytics/speed6-queries";
+import { zoneLabel } from "../analytics/speed6";
+import { buildMessage, destination, sanitizeDigest } from "../analytics/speed-digest";
+import { deliver, digestNumbers, loadDigest, saveDigest } from "../analytics/speed-digest-db";
+import { isLive } from "../live-flags";
+import { isPrefKey, loadPrefs, savePref } from "../analytics/speed-prefs-db";
+import { sql } from "../db";
 import { json, type AuthContext } from "./auth";
 
 // The rebuilt Speed to lead screen's endpoints: GET /api/app/speed?part=home|list|compare and PUT /api/app/speed/target (the one catch-all route, already guarded).
@@ -116,7 +122,7 @@ export async function handleSpeedPart(ctx: Ctx, h: SpeedHelpers): Promise<Respon
     const owner = ownerP === "me" || ownerP === "none" ? ownerP : null;
     const out = await speedList({
       installationId: ctx.installationId, allowed, targetMinutes, now, meId: ctx.session.userId ?? null, status, win, person: seePeople ? personP : null, account: null, owner,
-      noSource: sp.get("source") === "none", week, q: (sp.get("q") ?? "").slice(0, 80), sort: sortP as LeadSort, page: int(sp.get("page"), 0), size: int(sp.get("size"), 25),
+      noSource: sp.get("source") === "none", week, day: /^\d{4}-\d{2}-\d{2}$/.test(sp.get("day") ?? "") ? sp.get("day") : null, replyDay: /^\d{4}-\d{2}-\d{2}$/.test(sp.get("replyDay") ?? "") ? sp.get("replyDay") : null, q: (sp.get("q") ?? "").slice(0, 80), sort: sortP as LeadSort, page: int(sp.get("page"), 0), size: int(sp.get("size"), 25),
     });
     return json(withUrls(out, links.contact));
   }
@@ -125,6 +131,12 @@ export async function handleSpeedPart(ctx: Ctx, h: SpeedHelpers): Promise<Respon
   // The bar's dates narrow every part that is about a period; the race is "right now" and ignores them. A bad pair of dates is ignored here (the home read already refuses it).
   const wp = sp.get("from") !== null && sp.get("to") !== null ? parseWindow(sp.get("from"), sp.get("to"), now) : null;
   const win = wp && wp.ok ? { winFrom: wp.win.fromMs, winTo: wp.win.toMs } : {};
+  if (part === "zones") {
+    const allowed = narrowed(allowedAll, sp.get("account"));
+    if (allowed === "none") return json({ error: "Unknown account" }, 404);
+    const rows = await sql()`select distinct coalesce(timezone, 'UTC') z from locations where installation_id = ${ctx.installationId} and not ignored ${allowed ? sql()`and location_id = any(${allowed as string[]}::text[])` : sql()``}`;
+    return json({ zones: rows.map((r) => ({ zone: r.z as string, label: zoneLabel(r.z as string, now) })).sort((a, b) => a.label.localeCompare(b.label)).slice(0, 6) });
+  }
   if (part === "pulse") {
     const allowed = narrowed(allowedAll, sp.get("account"));
     if (allowed === "none") return json({ error: "Unknown account" }, 404);
@@ -189,4 +201,51 @@ export async function handleSpeedLadder(ctx: Ctx): Promise<Response> {
   const body = await ctx.request.json().catch(() => null);
   const r = await saveLadder(ctx.installationId, body);
   return r.ok ? json({ ok: true, ladder: r.ladder }) : json({ error: r.error }, 503);
+}
+
+/**
+ * The Speed summary message. GET speed/digest?account=<id>, PUT speed/digest, POST speed/digest/preview, POST speed/digest/test. Not for a client's staff. An account id only NARROWS inside the caller's accounts.
+ * "Send test" goes through the same outward gate as every send: with the switches off it writes a WOULD SEND audit line and sends nothing.
+ */
+export async function handleSpeedDigest(ctx: Ctx, h: SpeedHelpers): Promise<Response> {
+  if (ctx.kind === "client") return json({ error: "Not available in this view" }, 403);
+  const m = ctx.request.method; const sub = ctx.segments[2] ?? "";
+  const body = m === "GET" ? null : ((await ctx.request.json().catch(() => null)) as Record<string, unknown> | null);
+  const asked = m === "GET" ? ctx.url.searchParams.get("account") : typeof body?.locationId === "string" ? body.locationId : null;
+  const allowed = await h.allowed();
+  let loc = "";
+  if (asked) { if (!ID.test(asked) || (allowed && !allowed.includes(asked))) return json({ error: "Client account not found." }, 404); loc = asked; }
+  const live = { email: isLive("SEND_EMAIL_LIVE"), slack: isLive("SEND_SLACK_LIVE") };
+  if (m === "GET") {
+    const d = await loadDigest(ctx.installationId, loc);
+    return json({ ...d, live, destination: destination(d.settings, live), account: loc || null });
+  }
+  if (m === "PUT") {
+    const r = await saveDigest(ctx.installationId, loc, body?.settings);
+    return r.ok ? json({ ok: true, settings: r.settings, destination: destination(r.settings, live) }) : json({ error: r.error }, 503);
+  }
+  if (m === "POST" && (sub === "preview" || sub === "test")) {
+    const s = sanitizeDigest(body?.settings);
+    let who = "Your accounts";
+    if (loc) { const [l] = await sql()`select name from locations where installation_id = ${ctx.installationId} and location_id = ${loc}`; who = (l?.name as string | null) ?? who; }
+    const n = await digestNumbers(ctx.installationId, loc ? [loc] : allowed, who, await h.targetMinutes(), Date.now());
+    const msg = buildMessage(s, n);
+    if (sub === "preview") return json({ subject: msg.subject, text: msg.text, destination: destination(s, live) });
+    if (!s.recipients.length && !s.slack) return json({ error: "Add an email address or choose Slack first." }, 400);
+    const sent = await deliver(ctx.installationId, s, n, { test: true });
+    return json({ ok: true, wouldSend: sent.filter((x) => !x.live).map((x) => x.channel), sent: sent.filter((x) => x.live).map((x) => x.channel), destination: destination(s, live) });
+  }
+  return json({ error: "Not found" }, 404);
+}
+
+/** GET speed/prefs (everything the caller may read) and PUT speed/prefs { scope, key, value }. A client's staff can read but not change the shared choices; their browser keeps their own. */
+export async function handleSpeedPrefs(ctx: Ctx, h: SpeedHelpers): Promise<Response> {
+  const allowed = await h.allowed();
+  if (ctx.request.method === "GET") return json(await loadPrefs(ctx.installationId, allowed));
+  if (ctx.kind === "client") return json({ error: "Ask your administrator to change this." }, 403);
+  const b = (await ctx.request.json().catch(() => null)) as Record<string, unknown> | null;
+  const scope = typeof b?.scope === "string" ? b.scope : "";
+  if (!isPrefKey(b?.key) || (scope && (!ID.test(scope) || (allowed && !allowed.includes(scope))))) return json({ error: "Unknown choice" }, 400);
+  const r = await savePref(ctx.installationId, scope, b.key, b.value);
+  return r.ok ? json({ ok: true }) : json({ error: r.error }, 503);
 }

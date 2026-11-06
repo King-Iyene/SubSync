@@ -8,6 +8,7 @@ import type { Period } from "@/lib/analytics/growth";
 import { DAY_NAMES, digestPreview, hourWords, type GapMap, type TrendNormal } from "@/lib/analytics/speed-v3";
 import { fmtDuration } from "@/lib/analytics/speed-intel";
 import { RecordsPanel, EmptyState, ErrorState, SkeletonRows } from "../ds";
+import { useSlow } from "./speed6-base";
 import { ModeToggle, TimeChart, useChartMode } from "../ds/time-chart";
 import { WhatIs } from "../ds/what-is";
 import { useData } from "../session";
@@ -109,8 +110,8 @@ export function PaceTab({ multi }: { multi: boolean }) {
           {[1, 2, 3, 4, 5, 6, 0].map((dow) => (
             <div key={dow} className="flex items-center gap-1 py-px"><span className="t-small t-quiet w-8 shrink-0">{DAY_NAMES[dow]}</span>
               <div className="flex min-w-0 flex-1 gap-px">{Array.from({ length: 24 }, (_, h) => { const c = cell(dow, h); const bad = c && c.leads >= 3 && c.missed / c.leads >= 0.5; return (
-                <button key={h} type="button" disabled={!c} onClick={() => c && open(`${DAY_NAMES[dow]} ${hourWords(h)}`, { sel: "cell", dow: String(dow), hour: String(h) })} aria-label={c ? `${DAY_NAMES[dow]} ${hourWords(h)}: ${c.leads} leads, ${c.missed} not answered in time` : `${DAY_NAMES[dow]} ${hourWords(h)}: no leads`}
-                  data-tip={c ? `${DAY_NAMES[dow]} ${hourWords(h)}: ${c.leads} ${c.leads === 1 ? "lead" : "leads"}, ${c.missed} not answered in time. Click to see the people.` : `${DAY_NAMES[dow]} ${hourWords(h)}: no leads`} className={`spd-mark h-6 min-w-0 flex-1 rounded-[2px] ${bad ? "outline outline-1 outline-[var(--t-bad)]" : ""}`} style={{ background: c ? `color-mix(in srgb, var(--t-c1) ${Math.round(18 + (c.leads / max) * 72)}%, transparent)` : "var(--t-sunk)" }} />
+                <button key={h} type="button" disabled={!c} onClick={() => c && open(`${DAY_NAMES[dow]}s at ${hourWords(h)}`, { sel: "cell", dow: String(dow), hour: String(h) })} aria-label={c ? `${DAY_NAMES[dow]}s at ${hourWords(h)}: ${c.leads} leads, ${c.missed} not answered in time` : `${DAY_NAMES[dow]}s at ${hourWords(h)}: no leads`}
+                  data-tip={c ? `${DAY_NAMES[dow]}s at ${hourWords(h)}: ${c.leads} ${c.leads === 1 ? "lead" : "leads"}, ${c.missed} not answered in time. Click to see the people.` : `${DAY_NAMES[dow]}s at ${hourWords(h)}: no leads`} className={`spd-mark h-6 min-w-0 flex-1 rounded-[2px] ${bad ? "outline outline-1 outline-[var(--t-bad)]" : ""}`} style={{ background: c ? `color-mix(in srgb, var(--t-c1) ${Math.round(18 + (c.leads / max) * 72)}%, transparent)` : "var(--t-sunk)" }} />
               ); })}</div>
             </div>
           ))}
@@ -175,7 +176,9 @@ export function CaptureTab() {
   const { data: g, error, reload } = useData<GrowthData>(range ? `today/growth?from=${range.from}&to=${range.to}` : null);
   const [mode, setMode] = useChartMode("speed-capture");
   const [panel, setPanel] = useState<ReturnType<typeof specDay> | null>(null);
+  const [slow, again] = useSlow(!g && !error);
   if (error) return <ErrorState error={error} onRetry={reload} />;
+  if (!g && slow) return <div data-testid="capture-tab"><EmptyState title="This is taking too long" body="There are a lot of leads in these dates. Try a shorter range, or try again." action={<button type="button" data-testid="capture-retry" className="ds-press h-10 rounded-lg border bg-card px-4 text-sm font-medium" onClick={() => { again(); void reload(); }}>Retry</button>} /></div>;
   if (!g) return <div data-testid="capture-tab"><SkeletonRows rows={5} label="Counting email leads..." /></div>;
   const rangeWord = (range?.sentence ?? g.range.label).toLowerCase();
   const periods = [["today", "Today"], ["week", "This week"], ["month", "This month"], ["all", "All time"]] as const;

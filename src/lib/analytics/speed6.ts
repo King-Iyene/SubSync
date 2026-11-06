@@ -6,12 +6,12 @@ const DAY = 86_400_000;
 
 // ---------------------------------------------------------------- why a lead is waiting (delay reasons)
 export type ReasonKey = "dnd" | "no_owner" | "owner_busy" | "after_hours" | "duplicate" | "no_phone";
-export const REASONS: Record<ReasonKey, { label: string; tip: string; tone: "red" | "amber" | "violet" | "cyan" }> = {
+export const REASONS: Record<ReasonKey, { label: string; tip: string; tone: "red" | "amber" | "violet" | "cyan" | "blue" | "orange" }> = {
   no_owner: { label: "No owner", tip: "Nobody is assigned to this lead, so nobody was told to reply.", tone: "red" },
   owner_busy: { label: "Owner busy", tip: "The owner is holding far more waiting leads than the rest of the team.", tone: "amber" },
   after_hours: { label: "After hours", tip: "The lead arrived outside the account's opening hours.", tone: "violet" },
-  duplicate: { label: "Duplicate", tip: "An older record of the same person exists. Reply on the older record.", tone: "cyan" },
-  no_phone: { label: "No phone", tip: "There is no phone number, so a call or text is not possible.", tone: "amber" },
+  duplicate: { label: "Duplicate", tip: "An older record of the same person exists. Reply on the older record.", tone: "blue" },
+  no_phone: { label: "No phone", tip: "There is no phone number, so a call or text is not possible.", tone: "orange" },
   dnd: { label: "Do not contact", tip: "This person asked not to be contacted.", tone: "red" },
 };
 export type ReasonInput = { unassigned: boolean; leadAt?: number | null; timeZone?: string | null; phone: string | null; dnd: boolean; duplicate: boolean; ownerWaiting: number; busyAt: number };
@@ -106,4 +106,14 @@ export function fmtWhen(ms: number, tz: string | null | undefined): string {
     const abbr = new Intl.DateTimeFormat("en-US", { timeZoneName: "short", timeZone: zone }).formatToParts(d).find((p) => p.type === "timeZoneName")?.value ?? zone;
     return `${day}, ${time} ${abbr}`;
   } catch { return new Date(ms).toISOString(); }
+}
+
+/** "Lagos time (GMT+1)": the city from the zone name and the zone's own short name. */
+export function zoneLabel(tz: string | null | undefined, now = Date.now()): string {
+  const zone = tz || "UTC";
+  try {
+    const abbr = new Intl.DateTimeFormat("en-US", { timeZoneName: "short", timeZone: zone }).formatToParts(new Date(now)).find((p) => p.type === "timeZoneName")?.value ?? zone;
+    const city = zone === "UTC" ? "UTC" : (zone.split("/").pop() ?? zone).replace(/_/g, " ");
+    return zone === "UTC" ? "UTC" : `${city} time (${abbr})`;
+  } catch { return zone; }
 }

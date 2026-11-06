@@ -149,7 +149,7 @@ export async function speedHome(i: HomeInput) {
 
 export type ListInput = {
   installationId: string; allowed: string[] | null; targetMinutes: number; now: number; meId: string | null;
-  status: LeadStatusFilter; win: Win | null; person: string | null; account: string | null; owner: string | null; noSource: boolean; week: number | null;
+  status: LeadStatusFilter; win: Win | null; person: string | null; account: string | null; owner: string | null; noSource: boolean; week: number | null; /** A UTC day (YYYY-MM-DD): leads that arrived that day, or whose first reply came that day. */ day?: string | null; replyDay?: string | null;
   q: string; sort: LeadSort; page: number; size: number;
 };
 
@@ -167,6 +167,8 @@ export async function speedList(i: ListInput) {
     extra: (r) => {
       if (nowStatus && !i.win && r.leadAt <= i.now - WAITING_WINDOW_DAYS * DAY) return false;
       if (i.week !== null) { const w = weekRange(i.now, i.week); if (!(r.leadAt > w.start && r.leadAt <= w.end)) return false; }
+      if (i.day && new Date(r.leadAt).toISOString().slice(0, 10) !== i.day) return false;
+      if (i.replyDay && !(r.touchAt !== null && new Date(r.touchAt).toISOString().slice(0, 10) === i.replyDay)) return false;
       return i.noSource ? hasNoSource(r) : true;
     },
   };

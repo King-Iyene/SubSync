@@ -73,16 +73,17 @@ export async function speedCoverage(i: Input) {
   const tzOf = (l: string) => tz.get(l) ?? null;
   const calls = missedCalls(events, i.now);
   const unrecovered = calls.filter((c) => !recoveredIn15(c));
+  const recoveredList = calls.filter(recoveredIn15);
   const keys = unrecovered.map((c) => `${c.locationId}:${c.contactId}`);
   const [{ map: dollars }, facts] = await Promise.all([dollarsOf(i.installationId, keys), accountFacts(i.installationId, i.allowed)]);
   // The people behind the missed calls (name, phone, owner), read from the synced contacts of the caller's own accounts only.
   const people = new Map<string, Record<string, unknown>>();
-  if (unrecovered.length) {
+  if (unrecovered.length || recoveredList.length) {
     const rs = await db`select location_id, contact_id, full_name, email, phone, dnd, source, nullif(assigned_to, '') assigned_to from cached_contacts
-      where installation_id = ${i.installationId} and contact_id = any(${[...new Set(unrecovered.slice(0, 200).map((c) => c.contactId))]}::text[]) ${i.allowed ? db`and location_id = any(${i.allowed}::text[])` : db``}`;
+      where installation_id = ${i.installationId} and contact_id = any(${[...new Set([...unrecovered.slice(0, 200), ...recoveredList.slice(0, 50)].map((c) => c.contactId))]}::text[]) ${i.allowed ? db`and location_id = any(${i.allowed}::text[])` : db``}`;
     for (const r of rs) people.set(`${r.location_id}:${r.contact_id}`, r);
   }
-  const missedRows = unrecovered.slice(0, 200).map((c) => {
+  const rowFor = (c: (typeof calls)[number]) => {
     const p = people.get(`${c.locationId}:${c.contactId}`) ?? {};
     const owner = p.assigned_to ? resolveUser(p.assigned_to as string, lk.team, lk.usersAccess.get(c.locationId)) : null;
     return {
@@ -90,7 +91,9 @@ export async function speedCoverage(i: Input) {
       status: "waiting" as const, neverAnswered: c.status === "dropped", minutes: Math.round((i.now - c.at) / 60_000), source: sourceLabel((p.source as string | null) ?? null), repliedBy: null, owner, unassigned: !owner, autoSeconds: null, personSeconds: null, detailed: false,
       phone: (p.phone as string | null) ?? null, email: (p.email as string | null) ?? null, dnd: p.dnd === true, timeZone: tzOf(c.locationId), suggestion: null, calledAt: c.at, dollars: dollars.get(`${c.locationId}:${c.contactId}`) ?? 0, callState: c.status,
     };
-  }).sort((a, b) => b.dollars - a.dollars || b.calledAt - a.calledAt);
+  };
+  const missedRows = unrecovered.slice(0, 200).map(rowFor).sort((a, b) => b.dollars - a.dollars || b.calledAt - a.calledAt);
+  const recoveredRows = recoveredList.slice(0, 50).map(rowFor);
   const night = lostAtNight(rows, (r) => isAfterHours(r.leadAt, r.timeZone), i.now);
   const nightByLoc = new Map<string, number>();
   for (const r of night.lost) nightByLoc.set(r.locationId, (nightByLoc.get(r.locationId) ?? 0) + 1);
@@ -104,8 +107,8 @@ export async function speedCoverage(i: Input) {
   const cover = afterHoursCover(rows, events, tzOf);
   return {
     now: i.now,
-    missed: { total: calls.length, recovered15: calls.filter(recoveredIn15).length, unrecovered: unrecovered.length, dollars: missedRows.reduce((s, r) => s + r.dollars, 0), rows: missedRows.slice(0, 50), audit: textBackAudit(calls) },
-    night: { lost: night.lost.length, countedDollars: raceMoney(night.lost.map((r) => ({ key: `${r.locationId}:${r.contactId}` })), nd.map).dollars, estimate: nightEst.amount === null ? null : { amount: nightEst.amount, line: money(nightEst.amount) }, hoursToCover: night.hoursToCover.slice(0, 8), afterLeads: cover.afterLeads, answeredSameNight: cover.answeredSameNight, share: cover.share, cover: cover.cover.map((c) => ({ ...c, name: nameOf(c.userId) })) },
+    missed: { total: calls.length, recovered15: calls.filter(recoveredIn15).length, unrecovered: unrecovered.length, dollars: missedRows.reduce((s, r) => s + r.dollars, 0), rows: missedRows.slice(0, 50), recoveredRows, audit: textBackAudit(calls) },
+    night: { rows: night.lost.slice(0, 50).map((r) => rowOut(r, judge(r, i.targetMinutes, i.now) ?? "waiting", lk, new Map())), lost: night.lost.length, countedDollars: raceMoney(night.lost.map((r) => ({ key: `${r.locationId}:${r.contactId}` })), nd.map).dollars, estimate: nightEst.amount === null ? null : { amount: nightEst.amount, line: money(nightEst.amount) }, hoursToCover: night.hoursToCover.slice(0, 8), afterLeads: cover.afterLeads, answeredSameNight: cover.answeredSameNight, share: cover.share, cover: cover.cover.map((c) => ({ ...c, name: nameOf(c.userId) })) },
     best: bestTimes(events, tzOf), channels: channelMix(events), eventsStored: events.length,
     routing: { ...route, noLeads: route.noLeads.map((u) => ({ userId: u, name: nameOf(u) })), overloaded: route.overloaded.map((u) => ({ userId: u, name: nameOf(u), leads: owned.get(u) ?? 0 })) },
   };

@@ -1,7 +1,7 @@
 "use client";
 
 import { Clock, Flame, Minus, Plus, Timer } from "lucide-react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { clampCadence, DEFAULT_CADENCE, DEFAULT_GOALS, hourWord, sanitizeDispositions, type BoardRow, type Cadence, type Disposition, type Goals, type NextStep } from "@/lib/dial/dial6";
 import { CountUp, Q } from "./speed6-base";
 import "./speed6.css";
@@ -15,11 +15,20 @@ export function useLocal<T>(key: string, initial: T): [T, (v: T) => void] {
   const set = (n: T) => { setV(n); try { window.localStorage.setItem(key, JSON.stringify(n)); } catch { /* kept for this visit only */ } };
   return [v, set];
 }
-export const useCadence = () => { const [c, set] = useLocal<Cadence>("subsync.dial.cadence", DEFAULT_CADENCE); return [clampCadence(c), (n: Cadence) => set(clampCadence(n))] as const; };
-export const useGoals = () => useLocal<Goals>("subsync.dial.goals", DEFAULT_GOALS);
+/** Shared choices kept on the server (speed_prefs) once the migration has run; until then, and for a person who cannot change them, this browser keeps them (the old behaviour). */
+export const PrefsCtx = createContext<{ ready: boolean; map: Record<string, unknown>; put: (key: string, scope: string, value: unknown) => void } | null>(null);
+export function usePref<T>(key: string, scope: string, legacyKey: string, initial: T, clean: (raw: unknown) => T): [T, (v: T) => void] {
+  const ctx = useContext(PrefsCtx);
+  const [local, setLocal] = useLocal<T>(legacyKey, initial);
+  const server = ctx?.ready ? ctx.map[`${scope}|${key}`] : undefined;
+  return [server !== undefined ? clean(server) : clean(local), (n: T) => { setLocal(n); ctx?.put(key, scope, n); }];
+}
+export const useCadence = () => { const [c, set] = usePref<Cadence>("cadence", "", "subsync.dial.cadence", DEFAULT_CADENCE, (r) => clampCadence((r ?? {}) as Partial<Cadence>)); return [c, (n: Cadence) => set(clampCadence(n))] as const; };
+export const useGoals = () => usePref<Goals>("goals", "", "subsync.dial.goals", DEFAULT_GOALS, (r) => ({ ...DEFAULT_GOALS, ...((r ?? {}) as Partial<Goals>) }));
+export const useScripts = () => usePref<Record<string, string>>("scripts", "", "subsync.dial.scripts", {}, (r) => (r && typeof r === "object" ? (r as Record<string, string>) : {}));
 export type SavedCallback = { key: string; name: string; at: number; phone: string | null; locationId: string; contactId: string; locationName: string | null; timeZone: string | null; url: string };
 export const useCallbacks = () => useLocal<SavedCallback[]>("subsync.dial.callbacks", []);
-export const useDispositions = (locationId: string | null) => { const [raw, set] = useLocal<unknown>(`subsync.dial.dispo.${locationId ?? "all"}`, null); return [sanitizeDispositions(raw), (d: Disposition[]) => set(d)] as const; };
+export const useDispositions = (locationId: string | null) => usePref<Disposition[]>("dispositions", locationId ?? "", `subsync.dial.dispo.${locationId ?? "all"}`, sanitizeDispositions(null), sanitizeDispositions);
 
 // ---------------------------------------------------------------- rings and the power hour
 export function Ring6({ pct, size = 76, label, tone = "var(--s6-cyan)", children }: { pct: number; size?: number; label: string; tone?: string; children?: ReactNode }) {
