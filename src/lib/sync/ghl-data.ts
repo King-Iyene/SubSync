@@ -3,6 +3,7 @@
 // Never log response bodies: they contain customer data.
 
 import { GHL_API, GhlError } from "../ghl/client.ts";
+import { displayName } from "../ghl/owner-list.ts";
 import { ghlFetch } from "../ghl/http.ts";
 import { isInternalComment } from "../analytics/message-kinds.ts";
 import { mapMessage, type Msg } from "../analytics/speed-intel.ts";
@@ -252,7 +253,7 @@ export function mapUser(raw: unknown): UserRow | null {
   const r = rec(raw);
   const id = str(r.id) ?? str(r._id);
   if (!id) return null;
-  const name = str(r.name) ?? [str(r.firstName), str(r.lastName)].filter(Boolean).join(" ");
+  const name = displayName({ name: str(r.name), firstName: str(r.firstName), lastName: str(r.lastName), email: str(r.email) });
   return { id, name: name || null, photoUrl: safePhotoUrl(r.profilePhoto) };
 }
 
