@@ -1,6 +1,6 @@
 import { sql } from "../db";
 import { localMidnight } from "../analytics/growth";
-import { buildFlow, isIsoDay, MAX_FLOW_DAYS, type FlowLead, type Outcome, type Reply } from "../analytics/lead-flow";
+import { buildFlow, buildFlowFromGroups, isIsoDay, MAX_FLOW_DAYS, type FlowGroup, type FlowLead, type Outcome, type Reply } from "../analytics/lead-flow";
 import { isMissingTable } from "../analytics/today-store";
 import { json, type AuthContext } from "./auth";
 import { parseReportParams } from "../analytics/report-filter";
@@ -11,8 +11,7 @@ import type { GrowthDeps } from "./growth-api";
 // choose WHICH leads, they never widen who may be read.
 
 type Ctx = AuthContext & { request: Request };
-const ROW_CAP = 20_000;
-/** Leads sent to the browser for the lists behind each step; the counts always cover every lead (up to ROW_CAP). */
+/** Leads sent to the browser for the lists behind each step; the counts always cover every lead (counted in the database). */
 const SEND_CAP = 3_000;
 /** The first-reply check covers the conversations of the last 14 days (see handleSpeed in the sync engine). */
 const CHECKED_DAYS = 14;
@@ -42,36 +41,35 @@ export async function leadFlowRead(ctx: Ctx, deps: GrowthDeps): Promise<Response
   const blocked = new Set(accounts.filter((a) => a.speed_access === "needs_permission").map((a) => a.location_id as string));
 
   try {
-    const rows = await sql()`
-      select c.location_id, c.contact_id, c.full_name, c.email, c.date_added,
-        t.n as touch_rows, t.replied, t.excluded,
-        a.booked, a.showed, a.noshow, o.won
-      from cached_contacts c
-      join unnest(${ids}::text[], ${starts}::timestamptz[], ${ends}::timestamptz[]) as r(loc, f, e) on r.loc = c.location_id
-      left join lateral (
-        select count(*) as n, bool_or(human_touch_at is not null) as replied, bool_or(excluded is not null) as excluded
-        from lead_touches x where x.installation_id = c.installation_id and x.location_id = c.location_id and x.contact_id = c.contact_id) t on true
-      left join lateral (
-        select count(*) filter (where status not in ('cancelled', 'invalid')) as booked, count(*) filter (where status = 'showed') as showed, count(*) filter (where status = 'noshow') as noshow
-        from cached_appointments y where y.installation_id = c.installation_id and y.location_id = c.location_id and y.contact_id = c.contact_id) a on true
-      left join lateral (
-        select bool_or(status = 'won') as won from cached_opportunities z where z.installation_id = c.installation_id and z.location_id = c.location_id and z.contact_id = c.contact_id) o on true
-      where c.installation_id = ${ctx.installationId} and c.date_added >= r.f and c.date_added < r.e
-      order by c.date_added desc limit ${ROW_CAP + 1}`;
-    const partial = rows.length > ROW_CAP;
     const now = Date.now();
-    const all: FlowLead[] = [];
-    for (const r of rows.slice(0, ROW_CAP)) {
-      if (r.excluded === true) continue; // a record the lead rules set aside (not a real lead)
-      const loc = r.location_id as string;
-      const at = (r.date_added as Date).getTime();
-      // Checked: SubSync has read the lead's conversation, or the lead is recent enough that no conversation means nobody wrote. Older with no check: not known.
-      const reply: Reply = blocked.has(loc) ? "unknown" : Number(r.touch_rows) > 0 ? (r.replied === true ? "replied" : "never") : at >= now - CHECKED_DAYS * DAY ? "never" : "unknown";
-      const booked = Number(r.booked) > 0;
-      const outcome: Outcome | null = !booked ? null : Number(r.showed) > 0 ? "showed" : Number(r.noshow) > 0 ? "noshow" : "waiting";
-      all.push({ id: `${loc}:${r.contact_id as string}`, locationId: loc, accountName: nameOf.get(loc) ?? "Client", name: ((r.full_name as string | null) || (r.email as string | null) || "Unnamed").trim(), at, reply, booked, outcome, won: r.won === true, url: contactUrl(loc, r.contact_id as string) || accountUrl(loc) });
-    }
-    return json({ from, to, accounts: accounts.length, flow: buildFlow(all), leads: all.slice(0, SEND_CAP), sent: Math.min(all.length, SEND_CAP), partial, needsUpdate: false });
+    // Counted in the database: the flow is the number of leads in each (reply, booked, outcome, won) group, exact at any size; only the newest SEND_CAP leads travel to the browser for the lists behind the steps.
+    const rows = await sql()`
+      with l as materialized (
+        select c.location_id, c.contact_id, c.full_name, c.email, c.date_added,
+          case when c.location_id = any(${[...blocked]}::text[]) then 'unknown' when t.n > 0 then (case when t.replied then 'replied' else 'never' end)
+            when c.date_added >= ${new Date(now - CHECKED_DAYS * DAY)} then 'never' else 'unknown' end reply,
+          coalesce(a.booked, 0) > 0 booked, case when coalesce(a.booked, 0) = 0 then null when a.showed > 0 then 'showed' when a.noshow > 0 then 'noshow' else 'waiting' end outcome, coalesce(o.won, false) won
+        from cached_contacts c
+        join unnest(${ids}::text[], ${starts}::timestamptz[], ${ends}::timestamptz[]) as r(loc, f, e) on r.loc = c.location_id
+        left join lateral (
+          select count(*) as n, bool_or(human_touch_at is not null) as replied, bool_or(excluded is not null) as excluded
+          from lead_touches x where x.installation_id = c.installation_id and x.location_id = c.location_id and x.contact_id = c.contact_id) t on true
+        left join lateral (
+          select count(*) filter (where status not in ('cancelled', 'invalid')) as booked, count(*) filter (where status = 'showed') as showed, count(*) filter (where status = 'noshow') as noshow
+          from cached_appointments y where y.installation_id = c.installation_id and y.location_id = c.location_id and y.contact_id = c.contact_id) a on true
+        left join lateral (
+          select bool_or(status = 'won') as won from cached_opportunities z where z.installation_id = c.installation_id and z.location_id = c.location_id and z.contact_id = c.contact_id) o on true
+        where c.installation_id = ${ctx.installationId} and c.date_added >= r.f and c.date_added < r.e and coalesce(t.excluded, false) = false
+      ), g as (select reply, booked, outcome, won, count(*)::int n from l group by 1, 2, 3, 4),
+      s as (select * from l order by date_added desc, location_id, contact_id limit ${SEND_CAP})
+      select 'g' kind, to_jsonb(g) j from g union all select 's', to_jsonb(s) from s`;
+    const groups: FlowGroup[] = rows.filter((r) => r.kind === "g").map((r) => { const j = r.j as Record<string, unknown>; return { reply: j.reply as Reply, booked: j.booked === true, outcome: (j.outcome as Outcome | null) ?? null, won: j.won === true, n: Number(j.n) }; });
+    const all: FlowLead[] = rows.filter((r) => r.kind === "s").map((r) => {
+      const j = r.j as Record<string, unknown>; const loc = j.location_id as string;
+      return { id: `${loc}:${j.contact_id as string}`, locationId: loc, accountName: nameOf.get(loc) ?? "Client", name: ((j.full_name as string | null) || (j.email as string | null) || "Unnamed").trim(), at: Date.parse(j.date_added as string), reply: j.reply as Reply, booked: j.booked === true, outcome: (j.outcome as Outcome | null) ?? null, won: j.won === true, url: contactUrl(loc, j.contact_id as string) || accountUrl(loc) };
+    });
+    const flow = buildFlowFromGroups(groups);
+    return json({ from, to, accounts: accounts.length, flow, leads: all, sent: all.length, partial: false, needsUpdate: false });
   } catch (e) {
     // A database that has not had its latest update (missing table or column) answers plainly, never with an error page.
     if (isMissingTable(e)) return json({ ...empty(from, to, accounts.length), needsUpdate: true });

@@ -1,104 +1,63 @@
 import { sql } from "../db";
-import { judge } from "./speed-intel";
-import { loadLookups, loadRows } from "./speed-queries";
-import { rowOut, suggestionsFor, type LeadRowOut } from "./speed-v2-queries";
+import { resolveUser } from "./people-labels";
+import { loadLookups, loadTargets } from "./speed-queries";
+import { suggestions, type Scope } from "./speed-sql";
+import { dayCountsSql, eventsRecorded, personAgg, type PersonAgg, readySql, reasonsSql, velocitySql, waitingCountSql } from "./speed-sql-cards";
+import { rowOut, type LeadRowOut } from "./speed-v2-queries";
 import { DAY } from "./speed-v3";
-import { outcomesOf } from "./speed-v3-queries";
-import { applyFilter, filterActive, journeyReach } from "./speed-v4-more";
-import { repliedSet, type Input } from "./speed-v4-queries";
-import { dayCounts, daysWaiting, delayReasons, nextStepNone, personTable, readyScore, reasonBars, rowId, velocity, type ReasonKey } from "./speed6";
-import { countedDealsOf } from "./waiting-money-queries";
+import type { Input } from "./speed-v4-queries";
+import { daysWaiting, nextStepNone, REASONS, type PersonLine, type ReasonKey } from "./speed6";
 
-// The reads behind the Speed to lead "pulse" cards (stage SPEED6): new leads and first replies by day, the closing velocity, the person table, the ready-to-act list and the main reasons
-// leads wait. Read only, bound to the accounts the router allowed. Every count here is taken from the same rows that are returned, so a number and its list agree. No message text is read.
-const SAMPLE = 40;
-const ymd = (ms: number) => new Date(ms).toISOString().slice(0, 10);
-
-/**
- * Exact counts by day straight from the database (an aggregate, never a row read), so a client with 100,000 leads is counted exactly and the answer stays small: leads that arrived by day,
- * and first replies by day for those leads. Days are UTC days. Used whenever no lead filter narrows the rows (a filter needs the rows).
- */
-export async function pulseDayCounts(installationId: string, allowed: string[] | null, fromMs: number, toMs: number) {
-  const db = sql();
-  const rows = await db`
-    select to_char(coalesce(t.clock_start, t.lead_at) at time zone 'UTC', 'YYYY-MM-DD') ld, to_char(t.touch_at at time zone 'UTC', 'YYYY-MM-DD') td, count(*)::int n
-    from lead_touches t
-    where t.installation_id = ${installationId} and t.excluded is null and coalesce(t.clock_start, t.lead_at) >= ${new Date(fromMs)} and coalesce(t.clock_start, t.lead_at) < ${new Date(toMs)}
-      ${allowed ? db`and t.location_id = any(${allowed}::text[])` : db``}
-    group by 1, 2`;
-  const days: Array<{ day: string; n: number }> = []; const idx = new Map<string, number>();
-  for (let t = Math.floor(fromMs / DAY) * DAY; t < toMs && days.length < 120; t += DAY) { idx.set(ymd(t), days.length); days.push({ day: ymd(t), n: 0 }); }
-  const leadsByDay = days.map((d) => ({ ...d })); const repliesByDay = days.map((d) => ({ ...d }));
-  let total = 0;
-  for (const r of rows) {
-    const n = r.n as number; total += n;
-    const a = idx.get(r.ld as string); if (a !== undefined) leadsByDay[a].n += n;
-    const b = r.td ? idx.get(r.td as string) : undefined; if (b !== undefined) repliesByDay[b].n += n;
-  }
-  return { total, leadsByDay, repliesByDay };
-}
-const MAX_OUT = 1500;
-
+// The reads behind the Speed to lead "pulse" cards (stage SPEED6, rebuilt on SQL aggregates in SPEED7): new leads and first replies by day, the closing velocity, the person table, the ready-to-act list and the
+// main reasons leads wait. Read only, bound to the accounts the router allowed. Every count is an aggregate over the lead set (speed-sql.ts), so a client with 100,000 leads is counted exactly and the answer stays
+// small: lists are a sample of 40 per group. No message text is read.
 export async function speedPulse(i: Input) {
   const db = sql();
-  const o = { targetMinutes: i.targetMinutes, now: i.now };
+  const f = i.filter ?? {};
+  const targets = await loadTargets(db, i.installationId);
   const from = i.winFrom ?? i.now - 30 * DAY;
   const to = i.winTo ?? i.now + DAY;
-  const [{ lk }, all] = await Promise.all([loadLookups(db, i.installationId, i.allowed, i.targetMinutes, i.now), loadRows(db, i.installationId, i.allowed, from, to)]);
-  const ev = await repliedSet(i.installationId, i.allowed, all, i.now);
-  const rows = applyFilter(all, i.filter ?? {}, o, ev.channels);
-  const oc = await outcomesOf(i.installationId, i.allowed, from);
-  const appts = rows.length === 0 ? [] : await db`
-    select location_id, contact_id, min(coalesce(created_remote_at, start_at)) first_at from cached_appointments
-    where installation_id = ${i.installationId} and contact_id is not null and status not in ('cancelled', 'invalid') ${i.allowed ? db`and location_id = any(${i.allowed}::text[])` : db``}
-    group by location_id, contact_id`.catch(() => []);
-  const bookedAt = new Map(appts.map((a) => [`${a.location_id}:${a.contact_id}`, a.first_at instanceof Date ? a.first_at.getTime() : null]));
-
-  const reach = new Map(rows.map((r) => [rowId(r), journeyReach(r, oc, ev.replied)]));
-  const sugg = suggestionsFor(rows.slice(0, 200), new Set(rows.slice(0, 200).map((r) => r.locationId)));
-  const out = (r: (typeof rows)[number]): LeadRowOut => rowOut(r, judge(r, i.targetMinutes, i.now) ?? "waiting", lk, sugg);
-
-  // New leads and first replies by day (UTC days; a day is a calendar day, not a rolling 24 hours).
   const dayTo = Math.min(to, i.now + DAY);
-  let leadsByDay = dayCounts(rows.map((r) => r.leadAt), from, dayTo);
-  let repliesByDay = dayCounts(rows.filter((r) => r.touchAt !== null).map((r) => r.touchAt as number), from, dayTo);
-  let exactTotal = rows.length;
-  if (!filterActive(i.filter ?? {})) { const x = await pulseDayCounts(i.installationId, i.allowed, from, dayTo).catch(() => null); if (x) { leadsByDay = x.leadsByDay; repliesByDay = x.repliesByDay; exactTotal = x.total; } }
-  const vel = velocity(rows.map((r) => ({ leadAt: r.leadAt, bookedAt: bookedAt.get(rowId(r)) ?? null })));
+  const s: Scope = { installationId: i.installationId, allowed: i.allowed, targetMinutes: i.targetMinutes, now: i.now, fromMs: from, toMs: to, targetsReady: targets.ready };
+  const recorded = await eventsRecorded(db, s);
+  const [{ lk }, days, vel, reasons, ready, people, waitingTotal] = await Promise.all([
+    loadLookups(db, i.installationId, i.allowed, i.targetMinutes, i.now),
+    dayCountsSql(db, { ...s, fromMs: from - 1, toMs: dayTo }, f),
+    velocitySql(db, s, f),
+    reasonsSql(db, s, f),
+    readySql(db, s, f, 12),
+    i.seePeople ? personAgg(db, s, f, recorded) : Promise.resolve({ aggs: [] as PersonAgg[], sample: new Map() as Awaited<ReturnType<typeof personAgg>>["sample"] }),
+    waitingCountSql(db, s, f),
+  ]);
+  const locs = new Set<string>([...[...reasons.sample.values()].flat().map((x) => x.row.locationId), ...ready.map((x) => x.row.locationId), ...[...people.sample.values()].flat().map((x) => x.row.locationId)]);
+  const sugg = await suggestions(db, s, [...locs]);
+  const out = (r: Parameters<typeof rowOut>[0], st: Parameters<typeof rowOut>[1]): LeadRowOut => rowOut(r, st, lk, sugg);
 
-  // The waiting leads (nobody has touched them yet), their reasons, and the ready-to-act list.
-  const waiting = rows.filter((r) => r.touchAt === null).slice(0, MAX_OUT);
-  const waitingOut = waiting.map(out);
-  const reasons = delayReasons(waitingOut);
-  const bars = reasonBars(reasons).map((b) => ({ ...b, rows: waitingOut.filter((r) => (reasons.get(rowId(r)) ?? "unclear") === b.key).slice(0, SAMPLE) }));
-  const dealKeys = waiting.map(rowId).slice(0, 4000);
-  const dollars = new Map<string, number>();
-  for (const d of await countedDealsOf(i.installationId, dealKeys).catch(() => [])) { const k = `${d.locationId}:${d.contactId}`; dollars.set(k, (dollars.get(k) ?? 0) + d.value); }
-  const ready = waiting
-    .filter((r) => !(oc.get(rowId(r))?.booked))
-    .map((r, n) => {
-      const waited = Math.max(0, Math.round((i.now - r.leadAt) / 60_000));
-      const dl = dollars.get(rowId(r)) ?? 0;
-      return { r, n, score: readyScore({ dollars: dl, waitedMinutes: waited }), dollars: dl, waited };
-    })
-    .sort((a, b) => b.score - a.score || a.n - b.n)
-    .slice(0, 12)
-    .map((x) => ({ ...waitingOut[waiting.indexOf(x.r)], dollars: x.dollars, days: daysWaiting(x.waited), nextStepNone: nextStepNone({ touched: x.r.touchAt !== null, booked: oc.get(rowId(x.r))?.booked === true }) }));
+  const readyOut = ready.map((x) => {
+    const waited = Math.max(0, Math.round((i.now - x.row.leadAt) / 60_000));
+    return { ...out(x.row, x.status), dollars: x.dollars, days: daysWaiting(waited), nextStepNone: nextStepNone({ touched: false, booked: false }) };
+  });
 
-  // The person table. Labels come from the same lookups as every other list; leads nobody owns are one "Unassigned" row.
-  const label = new Map<string, string>();
-  for (const r of rows) if (r.assignedTo && !label.has(r.assignedTo)) label.set(r.assignedTo, out(r).owner?.label ?? "A team member");
-  const people = personTable(rows.map((r) => { const x = reach.get(rowId(r))!; return { owner: r.assignedTo, ownerLabel: r.assignedTo ? label.get(r.assignedTo) ?? null : null, replied: x.replied, booked: x.booked, showed: x.showed }; }));
-  const sample = new Map<string, Array<{ row: LeadRowOut; replied: boolean; booked: boolean; showed: boolean }>>();
-  for (const r of rows) {
-    const k = r.assignedTo ?? "__none"; const list = sample.get(k) ?? [];
-    if (list.length < SAMPLE) { const x = reach.get(rowId(r))!; list.push({ row: out(r), replied: x.replied, booked: x.booked, showed: x.showed }); sample.set(k, list); }
-  }
+  const bars = [...reasons.counts].map(([key, n]) => ({ key: key as ReasonKey | "unclear", label: key === "unclear" ? "No clear reason" : REASONS[key as ReasonKey].label, n }))
+    .sort((a, b) => b.n - a.n || a.label.localeCompare(b.label))
+    .map((b) => ({ ...b, rows: (reasons.sample.get(b.key) ?? []).map((x) => out(x.row, x.status)) }));
+
+  const lines: PersonLine[] = people.aggs.map((a) => ({
+    key: a.owner ?? "__none", name: a.owner ? resolveUser(a.owner, lk.team, lk.usersAccess.get(a.loc)).label : "Unassigned", leads: a.leads, replied: a.replied, booked: a.booked, showed: a.showed,
+    rate: a.leads >= 5 ? Math.round((a.booked / a.leads) * 100) : null, unassigned: !a.owner,
+  })).sort((a, b) => Number(a.unassigned) - Number(b.unassigned) || b.leads - a.leads || a.name.localeCompare(b.name));
+
   return {
-    now: i.now, from, to: dayTo, total: exactTotal, truncated: all.length >= 20_000 && exactTotal > rows.length,
-    leadsByDay, repliesByDay, velocity: vel,
-    people: i.seePeople ? people.map((p) => ({ ...p, sample: sample.get(p.key) ?? [] })) : [],
-    ready, reasons: bars as Array<{ key: ReasonKey | "unclear"; label: string; n: number; rows: LeadRowOut[] }>,
-    waitingTotal: waiting.length,
+    now: i.now, from, to: dayTo, total: days.total, truncated: false,
+    leadsByDay: days.leadsByDay, repliesByDay: days.repliesByDay, velocity: vel,
+    people: i.seePeople ? lines.slice(0, 40).map((p, n) => ({ ...p, sample: (n >= 12 ? [] : people.sample.get(p.key) ?? []).map((x) => ({ row: out(x.row, x.status), replied: x.replied, booked: x.booked, showed: x.showed })) })) : [],
+    ready: readyOut, reasons: bars as Array<{ key: ReasonKey | "unclear"; label: string; n: number; rows: LeadRowOut[] }>,
+    waitingTotal,
   };
+}
+
+/** Exact counts by day straight from the database (an aggregate, never a row read): leads that arrived by day, and first replies by day for those leads. Days are UTC days. */
+export async function pulseDayCounts(installationId: string, allowed: string[] | null, fromMs: number, toMs: number) {
+  const targets = await loadTargets(sql(), installationId);
+  return dayCountsSql(sql(), { installationId, allowed, targetMinutes: 15, now: Date.now(), fromMs: fromMs - 1, toMs, targetsReady: targets.ready }, {});
 }

@@ -50,8 +50,8 @@ export async function loadTouchEvents(installationId: string, allowed: string[] 
   const db = sql();
   try {
     const rows = await db`
-      select location_id, contact_id, conversation_id, event_key, direction, channel, kind, at, user_id, automated, source, outcome from touch_events
-      where installation_id = ${installationId} and at > ${new Date(fromMs)} ${allowed ? db`and location_id = any(${allowed}::text[])` : db``} ${contactId ? db`and contact_id = ${contactId}` : db``} order by at limit 60000`;
+      select * from (select location_id, contact_id, conversation_id, event_key, direction, channel, kind, at, user_id, automated, source, outcome from touch_events
+      where installation_id = ${installationId} and at > ${new Date(fromMs)} ${allowed ? db`and location_id = any(${allowed}::text[])` : db``} ${contactId ? db`and contact_id = ${contactId}` : db``} order by at desc limit 60000) newest order by at`;
     return rows.map((r) => ({ key: r.event_key as string, locationId: r.location_id as string, contactId: r.contact_id as string, conversationId: (r.conversation_id as string | null) ?? null,
       direction: r.direction as "inbound" | "outbound", channel: r.channel as TouchEvent["channel"], kind: r.kind as TouchEvent["kind"], at: new Date(r.at as string).getTime(), userId: (r.user_id as string | null) ?? null,
       automated: r.automated === true, source: (r.source as string | null) ?? null, outcome: (r.outcome as string | null) ?? null }));

@@ -2,13 +2,13 @@ import { sql } from "../db";
 import type { AlertDraft } from "./derive";
 import type { Person } from "./dedupe";
 import { resolveUser } from "./people-labels";
-import { loadLookups, loadRows } from "./speed-queries";
+import { loadLookups, loadRows, loadTargets } from "./speed-queries";
+import { bookingFromCounts } from "./speed5";
+import { bookingSql, holdersSql } from "./speed-sql-cards";
+import type { Scope } from "./speed-sql";
 import { accountFacts } from "./speed-v2-queries";
 import { DAY } from "./speed-v3";
-import { judge } from "./speed-intel";
-import {
-  bookingByReplyTime, duplicateOf, escalate, minutesToNextStep, moneyAtRisk, normLadder, repeatBoost, roundRobinPick, DEFAULT_LADDER, STEP_WORDS,
-  type BookingLead, type Candidate, type DupHit, type Ladder, type WaitingLead,
+import { duplicateOf, escalate, minutesToNextStep, moneyAtRisk, normLadder, repeatBoost, roundRobinPick, DEFAULT_LADDER, STEP_WORDS, type Candidate, type DupHit, type Ladder, type WaitingLead,
 } from "./speed5";
 import type { Input } from "./speed-v4-queries";
 
@@ -59,20 +59,14 @@ export async function perAccountBreaches(installationId: string, defaultMinutes:
 // ---------------------------------------------------------------- booking by first-reply time
 
 const BOOK_WINDOW_DAYS = 14;
-/** The money chart. Leads from 90 days ago to yesterday (so a booking has had time to happen). Booked = an appointment that was not cancelled, made for the contact after the lead arrived and within 14 days. */
+/** The money chart. Leads from 90 days ago to yesterday (so a booking has had time to happen). Booked = an appointment that was not cancelled, made for the contact after the lead arrived and within 14 days. Counted in the database per reply bucket. */
 export async function speedBooking(i: Input) {
   const db = sql();
-  const all = await loadRows(db, i.installationId, i.allowed, i.winFrom ?? i.now - 90 * DAY, Math.min(i.winTo ?? i.now, i.now - DAY));
-  const appts = all.length === 0 ? [] : await db`
-    select location_id, contact_id, min(coalesce(created_remote_at, start_at)) first_at from cached_appointments
-    where installation_id = ${i.installationId} and contact_id is not null and status not in ('cancelled', 'invalid') ${i.allowed ? db`and location_id = any(${i.allowed}::text[])` : db``}
-    group by location_id, contact_id`.catch(() => []);
-  const first = new Map(appts.map((a) => [`${a.location_id}:${a.contact_id}`, a.first_at instanceof Date ? a.first_at.getTime() : null]));
-  const leads: BookingLead[] = all.map((r) => {
-    const at = first.get(`${r.locationId}:${r.contactId}`) ?? null;
-    return { replySeconds: r.touchAt === null ? null : Math.max(0, Math.round((r.touchAt - r.leadAt) / 1000)), booked: at !== null && at >= r.leadAt - 60_000 && at <= r.leadAt + BOOK_WINDOW_DAYS * DAY };
-  });
-  return { now: i.now, days: 90, bookWithinDays: BOOK_WINDOW_DAYS, appointmentsRecorded: appts.length > 0, ...bookingByReplyTime(leads) };
+  const targets = await loadTargets(db, i.installationId);
+  const s: Scope = { installationId: i.installationId, allowed: i.allowed, targetMinutes: i.targetMinutes, now: i.now, fromMs: i.winFrom ?? i.now - 90 * DAY, toMs: Math.min(i.winTo ?? i.now, i.now - DAY), targetsReady: targets.ready };
+  const r = await bookingSql(db, s).catch(() => null);
+  const { appointmentsRecorded, ...rest } = r ?? { ...bookingFromCounts(new Map()), appointmentsRecorded: false };
+  return { now: i.now, days: 90, bookWithinDays: BOOK_WINDOW_DAYS, appointmentsRecorded, ...rest };
 }
 
 // ---------------------------------------------------------------- the duplicate guard and the repeat enquirer
@@ -111,20 +105,16 @@ export async function duplicateGuard(installationId: string, allowed: string[] |
 /** What the Race tab adds: the money-at-risk meter and, per feed row, the duplicate hit, the repeat boost and the round-robin suggestion for a lead nobody owns. */
 export async function raceExtras(i: Input, feed: ReadonlyArray<{ locationId: string; contactId: string; name: string; email: string | null; phone: string | null; arrivedAt: number; touchedAt: number | null; unassigned: boolean; dollars: number }>, openDollars: number) {
   const db = sql();
-  const [{ lk }, rows, facts, book, dups] = await Promise.all([
-    loadLookups(db, i.installationId, i.allowed, i.targetMinutes, i.now), loadRows(db, i.installationId, i.allowed, i.now - 30 * DAY, i.now + DAY),
-    accountFacts(i.installationId, i.allowed), speedBooking(i), duplicateGuard(i.installationId, i.allowed, feed.map((f) => ({ ...f, leadAt: f.arrivedAt }))),
+  const targets = await loadTargets(db, i.installationId);
+  const s: Scope = { installationId: i.installationId, allowed: i.allowed, targetMinutes: i.targetMinutes, now: i.now, fromMs: i.now - 30 * DAY, toMs: i.now + DAY, targetsReady: targets.ready };
+  const rrLocs = [...new Set(feed.filter((f) => f.unassigned && f.touchedAt === null).map((f) => f.locationId))];
+  const [{ lk }, facts, book, dups, holders] = await Promise.all([
+    loadLookups(db, i.installationId, i.allowed, i.targetMinutes, i.now),
+    accountFacts(i.installationId, i.allowed), speedBooking(i), duplicateGuard(i.installationId, i.allowed, feed.map((f) => ({ ...f, leadAt: f.arrivedAt }))), holdersSql(db, s, rrLocs),
   ]);
   // Round-robin per account: among the people who replied in the last 30 days, the one holding the fewest leads still waiting.
   const rr = new Map<string, string | null>();
-  for (const loc of new Set(feed.filter((f) => f.unassigned && f.touchedAt === null).map((f) => f.locationId))) {
-    const mine = rows.filter((r) => r.locationId === loc);
-    const people = new Set(mine.filter((r) => r.userId).map((r) => r.userId as string));
-    const cands: Candidate[] = [...people].map((u) => ({
-      userId: u, open: mine.filter((r) => r.assignedTo === u && r.touchAt === null && judge(r, i.targetMinutes, i.now) !== "within").length, recent: mine.filter((r) => r.assignedTo === u).length,
-    }));
-    rr.set(loc, roundRobinPick(cands));
-  }
+  for (const loc of rrLocs) rr.set(loc, roundRobinPick(holders.filter((h) => h.loc === loc).map((h): Candidate => ({ userId: h.userId, open: h.open, recent: h.recent }))));
   const waiting = feed.filter((f) => f.touchedAt === null).length;
   const avgDeals = (facts ?? []).map((f) => f.avgDealValue).filter((v): v is number => typeof v === "number" && v > 0);
   const avgDeal = avgDeals.length ? avgDeals.reduce((s, v) => s + v, 0) / avgDeals.length : null;
