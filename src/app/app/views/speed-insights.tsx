@@ -12,6 +12,7 @@ import { WhatIs } from "../ds/what-is";
 import { useData } from "../session";
 import type { GoFn } from "../nav";
 import { LeadRows, useLeadActions, type LeadRow } from "./speed-rows";
+import { useSpeedFilter } from "./speed-filter";
 
 // The Speed to lead extras, one small card each (stage SPEED3). Every card has one plain line, one number or chart, and the reason it matters in a small "?" tip. Every mark opens
 // exactly the leads it counted (the same selection on the server). Small samples say "not enough data" instead of a percentage.
@@ -36,7 +37,8 @@ const pct = (x: number | null) => (x === null ? "not enough data" : `${Math.roun
 
 /** The exact leads behind one mark. */
 function Opened({ pick, multi, onBack }: { pick: Pick; multi: boolean; onBack: () => void }) {
-  const { data, error, reload } = useData<{ count: number; shown: number; rows: LeadRow[] }>(`speed?part=insight-list&${new URLSearchParams(pick.q)}`);
+  const { query } = useSpeedFilter();
+  const { data, error, reload } = useData<{ count: number; shown: number; rows: LeadRow[] }>(`speed?part=insight-list&${new URLSearchParams(pick.q)}${query}`);
   const actions = useLeadActions(data?.rows ?? []);
   if (error) return <ErrorState error={error} onRetry={reload} />;
   if (!data) return <SkeletonRows rows={4} label="Opening the leads..." />;
@@ -51,7 +53,7 @@ function Opened({ pick, multi, onBack }: { pick: Pick; multi: boolean; onBack: (
   );
 }
 
-function useInsights() { return useData<Insights>("speed?part=insights"); }
+function useInsights() { const { query } = useSpeedFilter(); return useData<Insights>(`speed?part=insights${query}`); }
 
 // ---------------------------------------------------------------- Pace
 export function PaceTab({ multi }: { multi: boolean }) {
