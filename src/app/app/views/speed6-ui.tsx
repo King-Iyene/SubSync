@@ -118,7 +118,7 @@ export function VelocityCard({ p }: { p: Pulse }) {
   return (
     <Q q="How fast do leads book?" testId="velocity-card" tip="The middle number of days from a lead arriving to its first booked appointment. Needs 5 booked leads in these dates.">
       {v.days === null ? <p className="s6-label" data-testid="velocity-empty">Needs 5 booked leads. {v.n} so far.</p> : (
-        <><p className="s6-big" data-tone="cyan" data-testid="velocity-value"><CountUp value={v.days} decimals={v.days % 1 ? 1 : 0} /> <span className="text-base font-medium">{v.days === 1 ? "day" : "days"}</span></p><p className="s6-label mt-1">Typical time from lead to booking, from {v.n} booked leads.</p></>
+        <><p className="s6-big" data-tone="lime" data-testid="velocity-value"><CountUp value={v.days} decimals={v.days % 1 ? 1 : 0} /> <span className="text-base font-medium">{v.days === 1 ? "day" : "days"}</span></p><p className="s6-label mt-1">Typical time from lead to booking, from {v.n} booked leads.</p></>
       )}
     </Q>
   );
@@ -127,7 +127,7 @@ export function VelocityCard({ p }: { p: Pulse }) {
 export function ReasonCard({ multi, p }: { multi: boolean; p: Pulse }) {
   const [pick, setPick] = useState<{ label: string; n: number; rows: LeadRow[] } | null>(null);
   const total = Math.max(1, p.reasons.reduce((s, r) => s + r.n, 0));
-  const tone: Record<string, string> = { no_owner: "var(--s6-red)", owner_busy: "var(--s6-amber)", after_hours: "var(--s6-violet)", duplicate: "var(--s6-cyan)", no_phone: "var(--s6-amber)", dnd: "var(--s6-red)", unclear: "#4a5f8a" };
+  const tone: Record<string, string> = { no_owner: "var(--s6-red)", owner_busy: "var(--s6-amber)", after_hours: "var(--s6-violet)", duplicate: "var(--s6-blue)", no_phone: "var(--s6-orange)", dnd: "var(--s6-red)", unclear: "#4a5f8a" };
   return (
     <Q q="Why do leads wait?" testId="reason-card" tip="The main reason each waiting lead has not been answered, taken from what SubSync knows: no owner, an owner holding too many, arrived after hours, a duplicate, or no phone number.">
       {p.reasons.length === 0 ? <p className="s6-label">Nobody is waiting.</p> : (

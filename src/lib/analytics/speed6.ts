@@ -6,12 +6,12 @@ const DAY = 86_400_000;
 
 // ---------------------------------------------------------------- why a lead is waiting (delay reasons)
 export type ReasonKey = "dnd" | "no_owner" | "owner_busy" | "after_hours" | "duplicate" | "no_phone";
-export const REASONS: Record<ReasonKey, { label: string; tip: string; tone: "red" | "amber" | "violet" | "cyan" }> = {
+export const REASONS: Record<ReasonKey, { label: string; tip: string; tone: "red" | "amber" | "violet" | "cyan" | "blue" | "orange" }> = {
   no_owner: { label: "No owner", tip: "Nobody is assigned to this lead, so nobody was told to reply.", tone: "red" },
   owner_busy: { label: "Owner busy", tip: "The owner is holding far more waiting leads than the rest of the team.", tone: "amber" },
   after_hours: { label: "After hours", tip: "The lead arrived outside the account's opening hours.", tone: "violet" },
-  duplicate: { label: "Duplicate", tip: "An older record of the same person exists. Reply on the older record.", tone: "cyan" },
-  no_phone: { label: "No phone", tip: "There is no phone number, so a call or text is not possible.", tone: "amber" },
+  duplicate: { label: "Duplicate", tip: "An older record of the same person exists. Reply on the older record.", tone: "blue" },
+  no_phone: { label: "No phone", tip: "There is no phone number, so a call or text is not possible.", tone: "orange" },
   dnd: { label: "Do not contact", tip: "This person asked not to be contacted.", tone: "red" },
 };
 export type ReasonInput = { unassigned: boolean; leadAt?: number | null; timeZone?: string | null; phone: string | null; dnd: boolean; duplicate: boolean; ownerWaiting: number; busyAt: number };

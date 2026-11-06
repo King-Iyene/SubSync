@@ -108,7 +108,7 @@ export function SpeedView({ go }: { go: GoFn }) {
       <header className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 print:hidden">
         <div className="mr-auto min-w-0">
           <h1 className="text-[1.65rem] font-semibold leading-tight tracking-tight">Speed to lead</h1>
-          <p className="mt-1 max-w-2xl text-sm text-muted-foreground" data-testid="page-subtitle">How long new leads wait for a first reply from a person. SubSync measures this; it never sends a reply.</p>
+          <p className="mt-1 max-w-2xl text-sm text-muted-foreground" data-testid="page-subtitle">How long new leads wait for a first reply. SubSync measures it and never sends a reply.</p>
         </div>
         <GuideButton onClick={() => setGuide(true)} />
         <PopMenu label="More" items={menu} testId="speed-more" triggerClassName={MORE_TRIGGER}>More<ChevronDown aria-hidden className="size-3.5" /></PopMenu>
@@ -116,8 +116,8 @@ export function SpeedView({ go }: { go: GoFn }) {
 
       {d.access.needsPermission.length > 0 && (
         <InlineAlert tone="warning" className="mb-4">
-          Needs permission: reconnect. {d.access.needsPermission.length === d.access.total ? "None of your accounts has" : `${d.access.needsPermission.length} of ${d.access.total} accounts ${d.access.needsPermission.length === 1 ? "has" : "have"} not`} approved reading conversations
-          ({d.access.needsPermission.slice(0, 3).map((a) => a.name).join(", ")}{d.access.needsPermission.length > 3 ? " and more" : ""}). Those accounts are left out; nothing is guessed.
+          Needs permission: reconnect. {d.access.needsPermission.length === d.access.total ? "No account has" : `${d.access.needsPermission.length} of ${d.access.total} ${d.access.needsPermission.length === 1 ? "account has" : "accounts have"} not`} approved reading conversations
+          ({d.access.needsPermission.slice(0, 3).map((a) => a.name).join(", ")}{d.access.needsPermission.length > 3 ? " and more" : ""}), so they are left out.
         </InlineAlert>
       )}
 
