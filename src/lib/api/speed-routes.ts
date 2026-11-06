@@ -128,7 +128,7 @@ export async function handleSpeedPart(ctx: Ctx, h: SpeedHelpers): Promise<Respon
     if (part === "coverage") return json(withUrls(await speedCoverage(input), links.contact));
     if (part === "journey") return json(await speedJourney(input));
     if (part === "proof") return json(await speedProof(input));
-    if (part === "story") { const l = sp.get("location"), c = sp.get("contact"); return l && c && ID.test(l) && ID.test(c) ? json(await speedStory({ ...input, locationId: l, contactId: c })) : json({ error: "Unknown lead" }, 400); }
+    if (part === "story") { const l = sp.get("loc"), c = sp.get("contact"); return l && c && ID.test(l) && ID.test(c) ? json(await speedStory({ ...input, locationId: l, contactId: c })) : json({ error: "Unknown lead" }, 400); }
     const step = sp.get("step");
     if (!isStep(step)) return json({ error: "Unknown step" }, 400);
     return json(withUrls(await speedJourneyList({ ...input, step, dropped: sp.get("dropped") === "1" }), links.contact));

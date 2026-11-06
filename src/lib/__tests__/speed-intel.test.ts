@@ -9,7 +9,7 @@ const person = (offsetMin: number, userId = "u1"): Msg => msg(offsetMin, "outbou
 const robot = (offsetMin: number, source = "workflow"): Msg => msg(offsetMin, "outbound", { source });
 
 test("a message is read from the platform's shape, and one with no time is dropped", () => {
-  assert.deepEqual(mapMessage({ dateAdded: "2026-10-30T10:00:00Z", direction: "Inbound", userId: "u1", source: "App", messageType: "TYPE_SMS" }), { at: T0, direction: "inbound", userId: "u1", source: "app", type: "TYPE_SMS", id: null });
+  assert.deepEqual(mapMessage({ dateAdded: "2026-10-30T10:00:00Z", direction: "Inbound", userId: "u1", source: "App", messageType: "TYPE_SMS" }), { at: T0, direction: "inbound", userId: "u1", source: "app", type: "TYPE_SMS", id: null, status: null });
   assert.equal(mapMessage({ direction: "inbound" }), null);
   assert.equal(mapMessage(null), null);
   assert.equal(mapMessage({ dateAdded: "nonsense" }), null);

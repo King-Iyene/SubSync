@@ -78,7 +78,7 @@ export function Ring({ score, size = 112, label }: { score: number | null; size?
 }
 
 function Story({ lead }: { lead: FeedRow }) {
-  const { data, error } = useData<{ events: Array<{ at: number; kind: string; text: string }> }>(`speed?part=story&location=${encodeURIComponent(lead.locationId)}&contact=${encodeURIComponent(lead.contactId)}`);
+  const { data, error } = useData<{ events: Array<{ at: number; kind: string; text: string }> }>(`speed?part=story&loc=${encodeURIComponent(lead.locationId)}&contact=${encodeURIComponent(lead.contactId)}`);
   if (error) return <p className="t-small t-quiet">The story could not be loaded.</p>;
   if (!data) return <p className="t-small t-quiet">Loading...</p>;
   if (data.events.length === 0) return <p className="t-small t-quiet" data-testid="story-empty">Nothing recorded yet. History fills in from the next sync.</p>;
