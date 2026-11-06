@@ -7,7 +7,6 @@ import { fmtDuration } from "@/lib/analytics/speed-intel";
 import { ageWords } from "@/lib/analytics/today-queue";
 import { dialPlan, dialWarnings, mustStop, type DialWarning } from "@/lib/people/dial";
 import { LeadDrawer, PopMenu, RowButton, useDialer, type LeadSeed, type MenuItem } from "../ds";
-import { ActSheet } from "./speed-act";
 import { PersonName, type PersonView } from "./speed-cards";
 
 // One lead row, one grid, one small button column and a quiet three-dot menu (KF-8). The Reply button opens the lead in the CRM through the white-label link; Call
@@ -55,7 +54,7 @@ export function useLeadActions(rows: readonly LeadRow[]) {
   const [open, setOpen] = useState<number | null>(null);
   const [strip, setStrip] = useState<{ key: string; warnings: DialWarning[]; href: string; same: boolean } | { key: string; note: string } | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
-  const [act, setAct] = useState<LeadRow | null>(null);
+  const [replying, setReplying] = useState(false);
 
   const call = (r: LeadRow) => {
     const plan = dialPlan(provider, { phone: r.phone, contactUrl: r.url });
@@ -74,7 +73,7 @@ export function useLeadActions(rows: readonly LeadRow[]) {
     try { await navigator.clipboard.writeText(text); setCopied(rowKey(r)); setTimeout(() => setCopied(null), 2000); } catch { window.prompt("Copy this lead", text); }
   };
   const menu = (r: LeadRow, i: number, showAccount: boolean): MenuItem[] => [
-    { key: "show", label: "Show this lead", onSelect: () => setOpen(i) },
+    { key: "show", label: "Show this lead", onSelect: () => show(i) },
     { key: "crm", label: "Open in your CRM", onSelect: () => { window.open(r.url, "_blank", "noopener,noreferrer"); } },
     { key: "call", label: r.dnd ? "Call (asked not to be contacted)" : "Call in your CRM", onSelect: () => call(r), disabled: !r.phone, hint: r.phone ? undefined : "No phone number" },
     { key: "email", label: "Email in your CRM", onSelect: () => email(r), disabled: !r.email, hint: r.email ? undefined : "No email address" },
@@ -94,9 +93,11 @@ export function useLeadActions(rows: readonly LeadRow[]) {
       </div>
     );
   };
-  const drawer = <LeadDrawer leads={rows.map(toSeed)} index={open} onIndex={setOpen} onClose={() => setOpen(null)} />;
-  const sheet = act ? <ActSheet key={rowKey(act)} lead={act} onClose={() => setAct(null)} onChanged={() => { /* the next read shows it */ }} /> : null;
-  return { menu, stripFor, drawer: <>{drawer}{sheet}</>, show: setOpen, reply: setAct };
+  // Reply opens the same full panel as a click on the name, on the Conversation tab with the message box open and focused, so the last message is in view first. Previous and next keep that mode.
+  const show = (i: number) => { setReplying(false); setOpen(i); };
+  const reply = (r: LeadRow) => { const i = rows.findIndex((x) => rowKey(x) === rowKey(r)); if (i >= 0) { setReplying(true); setOpen(i); } };
+  const drawer = <LeadDrawer leads={rows.map((r) => ({ ...toSeed(r), ...(replying ? { reply: true } : {}) }))} index={open} onIndex={setOpen} onClose={() => { setOpen(null); setReplying(false); }} />;
+  return { menu, stripFor, drawer, show, reply };
 }
 
 export function LeadRows({ rows, showAccount, actions, testId = "speed-rows", head = true }: { rows: readonly LeadRow[]; showAccount: boolean; actions: ReturnType<typeof useLeadActions>; testId?: string; head?: boolean }) {

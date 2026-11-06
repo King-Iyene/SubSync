@@ -42,6 +42,8 @@ export type LeadSeed = {
   dnd?: boolean; timeZone?: string | null;
   /** Which work tab opens first (the Deals tab from the pipeline), and the deal to highlight there. */
   tab?: "conversation" | "update" | "deals"; dealId?: string;
+  /** Opened from a Reply button: the Conversation tab opens with the message box open and focused. */
+  reply?: boolean;
 };
 type Tab = "conversation" | "update" | "deals" | "appointments" | "record" | "timeline";
 
@@ -72,7 +74,7 @@ function Body({ seed, top, showAccount, wide, onLogged }: { seed: LeadSeed; top?
   const [tab, setTab] = useState<Tab>(seed.tab ?? "conversation");
   const [threadKey, setThreadKey] = useState(0);
   const [channelPref, setChannelPref] = useState<"SMS" | "Email">("SMS");
-  const [composerOpen, setComposerOpen] = useState(false);
+  const [composerOpen, setComposerOpen] = useState(!!seed.reply);
   const runner = useRunner(seed.locationId, seed.contactId, () => { setThreadKey((k) => k + 1); void wbq.reload(); void person.reload(); });
   const data = person.data;
   const c = data?.contact;
@@ -141,7 +143,7 @@ function Body({ seed, top, showAccount, wide, onLogged }: { seed: LeadSeed; top?
             ))}
           </div>
           <div role="tabpanel" id="wb-panel" aria-labelledby={`wb-tab-${tab}`} className="pt-5">
-            {tab === "conversation" && <><Thread locationId={seed.locationId} contactId={seed.contactId} reloadKey={threadKey} crmUrl={wb.crmUrl ?? url} /><Composer key={channelPref} ctx={wb} runner={runner} initial={channelPref} open={composerOpen} onOpenChange={setComposerOpen} /></>}
+            {tab === "conversation" && <><Thread locationId={seed.locationId} contactId={seed.contactId} reloadKey={threadKey} crmUrl={wb.crmUrl ?? url} /><Composer key={channelPref} ctx={wb} runner={runner} initial={channelPref} open={composerOpen} onOpenChange={setComposerOpen} focusOnMount={!!seed.reply} /></>}
             {tab === "update" && <UpdateTab ctx={wb} runner={runner} />}
             {tab === "timeline" && data && <TimelinePanel items={timeline} timeZone={tz} note={tlNote} className="max-h-[70vh]" />}
             {tab === "record" && <RecordTab locationId={seed.locationId} contactId={seed.contactId} name={name} account={c?.locationName ?? seed.locationName ?? null} fields={extra?.live.customFields ?? []} />}

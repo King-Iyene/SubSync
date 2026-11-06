@@ -87,7 +87,7 @@ export function Thread({ locationId, contactId, reloadKey, crmUrl }: { locationI
   );
 }
 
-export function Composer({ ctx, runner, initial = "SMS", open = true, onOpenChange }: { ctx: WbContext; runner: Runner; initial?: "SMS" | "Email"; open?: boolean; onOpenChange?: (o: boolean) => void }) {
+export function Composer({ ctx, runner, initial = "SMS", open = true, onOpenChange, focusOnMount = false }: { ctx: WbContext; runner: Runner; initial?: "SMS" | "Email"; open?: boolean; onOpenChange?: (o: boolean) => void; focusOnMount?: boolean }) {
   const [channel, setChannel] = useState<"SMS" | "Email" | "WhatsApp">(initial === "SMS" && !ctx.phone ? "Email" : initial);
   const [text, setText] = useState("");
   const [subject, setSubject] = useState("");
@@ -102,6 +102,7 @@ export function Composer({ ctx, runner, initial = "SMS", open = true, onOpenChan
   };
   const applyTemplate = (id: string) => { const t = ctx.templates.find((x) => x.id === id); if (!t) return; setText(t.text); if (t.subject) setSubject(t.subject); };
   useEffect(() => { const el = box.current; if (el) { el.style.height = "auto"; el.style.height = `${Math.min(el.scrollHeight, 224)}px`; } }, [text]);
+  useEffect(() => { if (focusOnMount) requestAnimationFrame(() => box.current?.focus()); }, [focusOnMount]);
   const sms = !email ? Math.max(1, Math.ceil(text.length / 160)) : 0;
 
   if (ctx.dnd) return <p className="mt-4 rounded-xl border border-destructive/50 p-3.5 text-[15px] font-medium text-destructive" data-testid="wb-dnd">{ctx.name} asked not to be contacted. SubSync will not send them anything.</p>;
