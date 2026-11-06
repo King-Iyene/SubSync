@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Gauge, Inbox, PhoneCall, PhoneMissed, ScrollText, SlidersHorizontal, Users, Zap } from "lucide-react";
 import { useRef, useState } from "react";
 import { summaryText } from "@/lib/analytics/speed-v2";
 import { measuringSentence } from "@/lib/design/speed-text";
@@ -19,11 +19,17 @@ import { FilterProvider } from "./speed-filter";
 import { RaceTab } from "./speed-race";
 import { CoverageTab, JourneyCard, RulesTab } from "./speed-coverage";
 import { DialMode } from "./dial-mode";
+import { SidePopup, TipHost } from "./speed-popup";
+import "./speed-ui.css";
 
 // Speed to lead, rebuilt (docs/SPEED_REVIEW.md). One question: "who is waiting for a first reply, and what do I do first?". Top to bottom: one sentence, one button
 // ("Reply to the oldest waiting lead"), a short list of the five leads to reply to now (See all opens the whole list, searched and paged on the server), how fast
 // replies come, who is slow, and the rest behind "More detail". The leads waiting are the same people Today counts as new leads; every number opens exactly the
 // leads it counts. SubSync measures replies and never sends one.
+
+const CALL_SEEN = "subsync.speed.callSeen";
+const CALL_TAB = 3;
+const ic = (I: typeof Zap) => <I aria-hidden className="size-4" />;
 
 type Home = PictureData & {
   now: number; seePeople: boolean;
@@ -56,6 +62,9 @@ export function SpeedView({ go }: { go: GoFn }) {
   const top = useRef<HTMLDivElement>(null);
   const rows = data?.waiting.rows ?? [];
   const actions = useLeadActions(rows);
+  const [tab, setTab] = useState(0);
+  const [seenCall, setSeenCall] = useState(() => { try { return typeof window === "undefined" || window.localStorage.getItem(CALL_SEEN) === "1"; } catch { return true; } }); // until Call mode is opened once, its tab carries a "New" badge (remembered in this browser)
+  const goTab = (n: number) => { setTab(n); if (n === CALL_TAB && !seenCall) { setSeenCall(true); try { window.localStorage.setItem(CALL_SEEN, "1"); } catch { /* not remembered */ } } };
 
   if (error) return <div data-testid="page"><ErrorState error={error} onRetry={reload} /></div>;
   if (!data || !r) return <div data-testid="page"><SkeletonRows rows={6} label="Timing first replies..." /></div>;
@@ -66,7 +75,7 @@ export function SpeedView({ go }: { go: GoFn }) {
   const none = d.access.total > 0 && d.access.ok === 0;
   const empty = d.summary.judged === 0 && w.waiting === 0;
   const stale = loading && !(d.window.from === r.current.from && d.window.to === r.current.to);
-  const open: OpenList = (spec) => { setList(spec); setTimeout(() => top.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 60); };
+  const open: OpenList = (spec) => setList(spec);
   const waitingList: ListSpec = { title: "Waiting for a reply", params: { status: "waiting" } };
   const oldest = rows[0];
 
@@ -106,15 +115,15 @@ export function SpeedView({ go }: { go: GoFn }) {
         <EmptyState title={none ? "Waiting for permission" : "No new leads yet"} body={none ? "Approve the new permission when SubSync asks, then run a sync. First replies appear here after that." : "A lead appears here once a new contact has a conversation. Check back after the next sync."}
           action={<button type="button" onClick={() => go("help")} className="ds-press h-10 rounded-lg border bg-card px-4 text-sm font-medium hover:border-primary/40">Open Getting started</button>} />
       ) : (
-        <FilterProvider>{(bar) => (<>{bar}<ModuleTabs label="Speed to lead sections" tabs={[
-          { label: "Race", node: <RaceTab multi={multi} /> },
-          { label: "Pace", node: <><JourneyCard multi={multi} /><PaceTab multi={multi} /></> },
-          { label: "Coverage", node: <CoverageTab multi={multi} /> },
-          { label: "Call mode", node: <DialMode /> },
-          ...(d.seePeople ? [{ label: "People", node: <PeopleTab multi={multi} /> }] : [{ label: "Owners", node: <PeopleTab multi={multi} /> }]),
-          { label: "Capture", node: <CaptureTab /> },
-          { label: "Rules", node: <RulesTab who={multi ? "All client accounts" : d.accounts[0]?.name ?? "Your account"} waiting={w.waiting} dollars={w.money.dollars || null} typical={d.summary.typicalLine} canChange={d.measuring.canChange} targetMinutes={d.measuring.targetMinutes} go={go} /> },
-          { label: "Log", node: (
+        <FilterProvider>{(bar) => (<>{bar}<TipHost /><ModuleTabs pill label="Speed to lead sections" value={tab} onChange={goTab} tabs={[
+          { label: "Race", icon: ic(Zap), node: <RaceTab multi={multi} onCall={() => goTab(CALL_TAB)} /> },
+          { label: "Pace", icon: ic(Gauge), node: <><JourneyCard multi={multi} /><PaceTab multi={multi} /></> },
+          { label: "Coverage", icon: ic(PhoneMissed), node: <CoverageTab multi={multi} /> },
+          { label: "Call mode", icon: ic(PhoneCall), badge: seenCall ? undefined : <span className="spd-new rounded-full px-1.5 py-0.5 text-[0.65rem] font-bold uppercase leading-none tracking-wide" data-testid="call-new">New</span>, node: <DialMode /> },
+          ...(d.seePeople ? [{ label: "People", icon: ic(Users), node: <PeopleTab multi={multi} /> }] : [{ label: "Owners", icon: ic(Users), node: <PeopleTab multi={multi} /> }]),
+          { label: "Capture", icon: ic(Inbox), node: <CaptureTab /> },
+          { label: "Rules", icon: ic(SlidersHorizontal), node: <RulesTab who={multi ? "All client accounts" : d.accounts[0]?.name ?? "Your account"} waiting={w.waiting} dollars={w.money.dollars || null} typical={d.summary.typicalLine} canChange={d.measuring.canChange} targetMinutes={d.measuring.targetMinutes} go={go} /> },
+          { label: "Log", icon: ic(ScrollText), node: (
         <>
           <HowTo id="speed2" title="How to use this page">Reply to the lead at the top, then the next. Every number opens the leads behind it, and a lead&apos;s three dots call or email it through your CRM.</HowTo>
 
@@ -140,9 +149,12 @@ export function SpeedView({ go }: { go: GoFn }) {
           </HeadlineBlock>
 
           <div className={stale ? "opacity-70" : ""} aria-busy={stale}>
-            {list ? (
-              <LeadList key={JSON.stringify(list.params)} title={list.title} params={list.params} showAccount={multi} canMine noun={list.noun} onBack={() => { setList(null); setTimeout(() => document.querySelector<HTMLElement>("[data-testid=reply-all], [data-testid=speed-fast] h2")?.focus(), 60); }} backLabel="Back to Reply now" />
-            ) : w.waiting > 0 && (
+            {list && (
+              <SidePopup label={list.title} onClose={() => setList(null)}>
+                <LeadList key={JSON.stringify(list.params)} title={list.title} params={list.params} showAccount={multi} canMine noun={list.noun} onBack={() => setList(null)} backLabel="Close" />
+              </SidePopup>
+            )}
+            {w.waiting > 0 && (
               <section className="mb-10" aria-label="Reply now" data-testid="reply-now">
                 <div className="mb-2 flex flex-wrap items-end justify-between gap-x-4 gap-y-1">
                   <div className="min-w-0">
