@@ -11,8 +11,8 @@ import { useData } from "../session";
 import { useSpeedFilter } from "./speed-filter";
 import { SidePopup } from "./speed-popup";
 import { LeadRows, useLeadActions, type LeadRow } from "./speed-rows";
-import { AlertsTab } from "./speed-insights";
-import { LadderCard } from "./speed5-ui";
+import { useListPopup } from "./speed6-base";
+import { RulesTab6 } from "./speed6-rules";
 import type { GoFn } from "../nav";
 import "./speed4.css";
 
@@ -104,7 +104,7 @@ export function JourneyCard({ multi }: { multi: boolean }) {
     </Card>
   );
 }
-function JourneyList({ step, dropped, multi }: { step: Step; dropped: boolean; multi: boolean }) {
+export function JourneyList({ step, dropped, multi }: { step: Step; dropped: boolean; multi: boolean }) {
   const { query } = useSpeedFilter();
   const { data, error, reload } = useData<{ count: number; shown: number; rows: LeadRow[] }>(`speed?part=journey-list&step=${step}&dropped=${dropped ? 1 : 0}${query}`);
   const actions = useLeadActions(data?.rows ?? []);
@@ -126,6 +126,7 @@ type Proof = { now: number; targetMinutes: number; accounts: Array<{ locationId:
 function ProofReport() {
   const { data, error, reload } = useData<Proof>("speed?part=proof");
   const [pick, setPick] = useState<string>("");
+  const { open: proofOpen, node: proofNode } = useListPopup(true);
   useEffect(() => { const off = () => document.documentElement.classList.remove("s4-printing"); window.addEventListener("afterprint", off); return () => window.removeEventListener("afterprint", off); }, []);
   if (error) return <ErrorState error={error} onRetry={reload} />;
   if (!data) return <SkeletonRows rows={2} label="Preparing the report..." />;
@@ -138,7 +139,19 @@ function ProofReport() {
         {data.accounts.length > 1 && <select aria-label="Which account" className="h-9 rounded-md border bg-card px-2 text-sm" value={pick} onChange={(e) => setPick(e.target.value)} data-testid="proof-account"><option value="">All accounts</option>{data.accounts.map((a) => <option key={a.locationId} value={a.locationId}>{a.name}</option>)}</select>}
         <button type="button" className="ds-press min-h-9 rounded-md border bg-card px-3 text-sm font-medium hover:border-primary/40" data-testid="proof-print" onClick={() => { document.documentElement.classList.add("s4-printing"); window.print(); }}>Print or save as PDF</button>
       </div>
-      <article className="s4-print" data-testid="proof-report">
+      <div className="s6-grid s6-three print:hidden" data-testid="proof-cards">
+        {rows.length === 0 ? <p className="s6-label">No new leads in the period.</p> : rows.map((a) => (
+          <div key={a.locationId} className="s6-card" data-glow={a.now.score !== null && a.now.score < 50 ? "warn" : undefined} data-testid="proof-card">
+            <p className="font-semibold">{a.name}</p>
+            <button type="button" className="s6-link s6-label underline decoration-dotted underline-offset-4" onClick={() => proofOpen(`${a.name}: new leads`, { status: "all", account: a.locationId })} aria-label={`${a.name}: ${a.leads} new leads. Open the people.`} data-testid="proof-leads">{a.leads.toLocaleString("en-US")} new {a.leads === 1 ? "lead" : "leads"}</button>
+            <p className="s6-big mt-3" data-tone={a.now.score === null ? undefined : a.now.score >= 80 ? "green" : a.now.score >= 50 ? "amber" : "red"} data-tip={`Answered by a person inside ${data.targetMinutes} minutes. ${diff(a.now.score, a.before.score, " points")}.`}>{a.now.score === null ? <span className="text-base font-medium">not enough data</span> : `${a.now.score}%`}</p>
+            <p className="s6-label">answered in time</p>
+            <p className="mt-3 text-sm" data-tip={secDiff(a.now.medianSeconds, a.before.medianSeconds)}>{a.now.medianSeconds === null ? "no typical time yet" : `${fmtDuration(a.now.medianSeconds)} typical first reply`}</p>
+          </div>
+        ))}
+      </div>
+      {proofNode}
+      <article className="s4-print s6-screen-hide" data-testid="proof-report">
         <header className="mb-4 border-b pb-3">
           <h4 className="text-xl font-semibold tracking-tight">Our response speed</h4>
           <p className="t-small t-quiet">How fast a person replied to every new enquiry. Our promise: a reply within {data.targetMinutes} minutes. Last 30 days, with the 30 days before for comparison. {new Date(data.now).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</p>
@@ -178,6 +191,6 @@ function RoutingCard() {
   );
 }
 
-export function RulesTab(p: { who: string; waiting: number; dollars: number | null; typical: string | null; canChange: boolean; targetMinutes: number; go: GoFn }) {
-  return (<div data-testid="rules-tab"><AlertsTab {...p} />{p.canChange && <LadderCard canChange />}<RoutingCard /><ProofReport /></div>);
+export function RulesTab(p: { who: string; waiting: number; dollars: number | null; typical: string | null; canChange: boolean; targetMinutes: number; go: GoFn; multi?: boolean }) {
+  return <RulesTab6 {...p} multi={p.multi ?? false} rest={<><RoutingCard /><ProofReport /></>} />;
 }

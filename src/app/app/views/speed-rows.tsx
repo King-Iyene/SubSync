@@ -1,13 +1,15 @@
 "use client";
 
 import { MoreHorizontal, TriangleAlert } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { emailPlan } from "@/lib/analytics/dedupe-review";
 import { fmtDuration } from "@/lib/analytics/speed-intel";
 import { ageWords } from "@/lib/analytics/today-queue";
 import { dialPlan, dialWarnings, mustStop, type DialWarning } from "@/lib/people/dial";
 import { LeadDrawer, PopMenu, RowButton, useDialer, type LeadSeed, type MenuItem } from "../ds";
 import { PersonName, type PersonView } from "./speed-cards";
+import { delayReasons, type ReasonKey } from "@/lib/analytics/speed6";
+import { DelayChip } from "./delay-chip";
 
 // One lead row, one grid, one small button column and a quiet three-dot menu (KF-8). The Reply button opens the lead in the CRM through the white-label link; Call
 // and Email in the menu open the CRM's own dialer and mail box the same way (your own phone app only if the person chose it in the Dialer setting, and never
@@ -22,6 +24,7 @@ export type LeadRow = {
   /** Stage SPEED5 (Race only): an older record of the same person, whether this is a repeat enquiry, and the next person in line. */
   duplicateOf?: { contactId: string; name: string; score: number; tier: string; reasons: string[]; url?: string } | null; repeat?: boolean;
   roundRobin?: { userId: string; label: string } | null;
+  /** When the lead arrived (ms), for the delay reason. */ leadAt?: number;
 };
 
 export const rowKey = (r: LeadRow) => r.locationId + ":" + r.contactId;
@@ -104,6 +107,7 @@ export function useLeadActions(rows: readonly LeadRow[]) {
 }
 
 export function LeadRows({ rows, showAccount, actions, testId = "speed-rows", head = true }: { rows: readonly LeadRow[]; showAccount: boolean; actions: ReturnType<typeof useLeadActions>; testId?: string; head?: boolean }) {
+  const reasons = useMemo(() => delayReasons(rows), [rows]);
   return (
     <ul className="@container divide-y border-y" data-testid={testId}>
       {head && <li aria-hidden className={`hidden gap-x-3 py-1.5 pl-1 pr-1 text-[0.7rem] font-semibold uppercase tracking-wide text-muted-foreground @3xl:grid ${TRACKS}`}><span>Lead</span><span>Status</span><span /><span /></li>}
@@ -114,6 +118,7 @@ export function LeadRows({ rows, showAccount, actions, testId = "speed-rows", he
             <div className="min-w-0">
               <button type="button" onClick={() => actions.show(i)} className="block min-h-6 max-w-full truncate text-left font-semibold hover:underline focus-visible:outline-2 focus-visible:outline-[var(--ring)]" title={r.name} data-testid="speed-row-name">{r.name}</button>
               <p className="line-clamp-2 text-sm text-muted-foreground @3xl:truncate" title={whyLine(r, showAccount)}>{whyLine(r, showAccount)}</p>
+              {reasons.get(rowKey(r)) && <p className="mt-1"><DelayChip reason={reasons.get(rowKey(r)) as ReasonKey} /></p>}
               <p className={`text-xs @3xl:hidden ${bad ? (r.neverAnswered ? "text-destructive" : "text-warning") : "text-muted-foreground"}`}>{waitWords(r)}</p>
             </div>
             <p className={`tnum hidden items-center gap-1.5 text-sm @3xl:flex ${bad ? (r.neverAnswered ? "font-medium text-destructive" : "font-medium text-warning") : "text-muted-foreground"}`} data-testid="speed-wait">
