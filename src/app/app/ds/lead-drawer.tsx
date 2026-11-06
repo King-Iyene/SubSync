@@ -15,6 +15,7 @@ import { HeldNote } from "./held";
 import { TimelinePanel } from "./timeline-panel";
 import { Fold } from "./fold";
 import { RecordTab } from "./wb/record-tab";
+import { LiveBadge, LiveExtras, useLiveLead } from "./live-lead";
 import { AppointmentsTab } from "./wb/appointments-tab";
 import { InfoTip } from "./info-tip";
 import { TagsSection } from "./tags-section";
@@ -67,7 +68,8 @@ function Body({ seed, top, showAccount, wide, onLogged }: { seed: LeadSeed; top?
   const api = useApiClient();
   const path = `${encodeURIComponent(seed.locationId)}/${encodeURIComponent(seed.contactId)}`;
   const person = useData<Person>(`people/person/${path}`);
-  const extra = useData<Live>(`people/contact/${path}`).data;
+  const extraQ = useData<Live>(`people/contact/${path}`);
+  const extra = extraQ.data;
   const actions = useContactActions();
   const wbq = useData<WbContext>(`workbench/context?locationId=${encodeURIComponent(seed.locationId)}&contactId=${encodeURIComponent(seed.contactId)}`);
   const wb = wbq.data;
@@ -85,6 +87,8 @@ function Body({ seed, top, showAccount, wide, onLogged }: { seed: LeadSeed; top?
     const tick = () => { const el = document.querySelector<HTMLElement>(`[data-testid="${block}"]`); if (el) { el.scrollIntoView({ block: "center" }); el.querySelector<HTMLElement>(field)?.focus({ preventScroll: true }); } else if (tries++ < 20) requestAnimationFrame(tick); };
     requestAnimationFrame(tick);
   };
+  // Live read-through: the CRM is asked right away and every few seconds; when something changed the copy-based parts are reloaded (the copy was updated by that read).
+  const { live, stopped } = useLiveLead(seed.locationId, seed.contactId, () => { setThreadKey((k) => k + 1); void wbq.reload(); void person.reload(); void extraQ.reload(); });
 
   // Opening a person is remembered for them alone ("Recently opened", "what changed since you last looked"). It is only recorded once the panel has really shown them.
   const seen = useRef(false);
@@ -110,6 +114,7 @@ function Body({ seed, top, showAccount, wide, onLogged }: { seed: LeadSeed; top?
         {(showAccount || !c) && <p className="truncate text-sm text-muted-foreground">{c?.locationName ?? seed.locationName ?? ""}</p>}
       </div>
 
+      <LiveBadge live={live} stopped={stopped} />
       {data ? (
         <div className="mt-3" data-testid="drawer-headline" data-tone={tone}>
           <p className={`text-base font-medium leading-snug ${tone === "stop" ? "text-destructive" : ""}`}>{data.headline.line}</p>
@@ -119,6 +124,7 @@ function Body({ seed, top, showAccount, wide, onLogged }: { seed: LeadSeed; top?
       {seed.note && <p className="mt-2 text-sm text-muted-foreground" data-testid="drawer-why">{seed.note}</p>}
       {!data && seed.pending && <p className="mt-2 text-sm text-muted-foreground" data-testid="drawer-pending">{seed.pending}</p>}
       {top}
+      <LiveExtras live={live} />
       {data?.changed && <p className="mt-2 text-xs text-muted-foreground" data-testid="drawer-changed">{data.changed.line}</p>}
 
       {person.error && person.error.status === 404 && <p className="mt-4 text-sm text-muted-foreground" data-testid="drawer-not-copied">SubSync has not copied this contact yet, so its history is not shown. Open them in your CRM to work on them.</p>}

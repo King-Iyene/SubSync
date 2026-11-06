@@ -13,6 +13,9 @@ import { parseGranted } from "../scope-groups";
 import { buildOwnerOptions } from "../ghl/owner-list";
 import { installationHasScope } from "../analytics/cleanup-queries";
 import { isOurNote } from "../people/writeback";
+import { liveRoute, findRoute, refreshLead } from "../live/live-route";
+import { crmSource } from "../live/live-read";
+import { cacheConversations } from "../live/live-cache";
 
 // The Lead workbench endpoints, under /api/app/workbench/... (the one catch-all route, already guarded by the plan and by access.ts). Every handler derives who is asking from the
 // verified session (`ctx`), checks that the account is one the caller may see (`allowed`), re-reads the lead from SubSync's own copy of THAT account (a contact, deal or appointment of
@@ -101,6 +104,8 @@ export async function handleWorkbench(ctx: Ctx, h: WorkbenchHelpers): Promise<Re
   if (m === "GET" && b === "context") return contextRoute(ctx, h);
   if (m === "GET" && b === "thread") return threadRoute(ctx, h);
   if (m === "GET" && b === "record") return recordRoute(ctx, h);
+  if (m === "GET" && b === "live") return liveRoute(ctx, h);
+  if (m === "GET" && b === "find") return findRoute(ctx, h);
   if (m === "POST" && (b === "preview" || b === "do")) return actRoute(ctx, h, b === "do");
   return json({ error: "Not found" }, 404);
 }
@@ -133,8 +138,13 @@ async function threadRoute(ctx: Ctx, h: WorkbenchHelpers): Promise<Response> {
   const lead = await loadLead(ctx, await h.allowed(), locationId, contactId);
   if (!lead) return json({ error: "Contact not found" }, 404);
   if (ctx.demo) return json({ state: "off", note: "The demo does not read a CRM.", messages: [] });
-  if (!lead.conversationId) return json({ state: "empty", note: "No conversation with this person yet.", messages: [] });
   try {
+    // The copy only knows conversations a sync has pulled: ask the CRM itself before saying there is none (and keep what it says).
+    if (!lead.conversationId) {
+      const found = await crmSource(await h.locationToken(locationId), locationId).conversation(contactId).catch(() => null);
+      if (found) { await cacheConversations(ctx.installationId, locationId, [found]).catch(() => undefined); lead.conversationId = found.conversationId; }
+    }
+    if (!lead.conversationId) return json({ state: "empty", note: "No conversation with this person yet.", messages: [] });
     const messages = await fetchThread(await h.locationToken(locationId), lead.conversationId);
     const names = await teamNames(ctx.installationId);
     return json({ state: "ok", note: null, messages: messages.map((x) => ({ ...x, by: x.by ? names.get(x.by) ?? null : null })) });
@@ -215,7 +225,7 @@ async function actRoute(ctx: Ctx, h: WorkbenchHelpers, doIt: boolean): Promise<R
     case "needs_permission": return json({ ok: false, needsPermission: true, message: "Needs permission: reconnect SubSync so it may make this change. Nothing was changed." }, 403);
     case "failed": return json({ ok: false, message: failureText(res.status), retry: true }, 502);
     case "dry_run": return json({ ok: true, dryRun: true, reason: res.reason, summary: res.summary, message: res.reason === "account" ? "Not allowed for this account yet, so nothing was sent. Here is what would have happened." : "Changes from SubSync are switched off, so nothing was sent. Here is what would have happened." });
-    case "done": { const undo = inverseOf(action, before, res.id); return json({ ok: true, done: true, summary: res.summary, undo }); }
+    case "done": { if (contactId && !ctx.demo) await refreshLead(ctx.installationId, await h.locationToken(locationId), locationId, contactId); const undo = inverseOf(action, before, res.id); return json({ ok: true, done: true, summary: res.summary, undo }); }
   }
 }
 
