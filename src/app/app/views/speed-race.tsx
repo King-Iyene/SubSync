@@ -10,6 +10,7 @@ import { PopMenu } from "../ds";
 import { WhatIs } from "../ds/what-is";
 import { EmptyState, ErrorState, SkeletonRows } from "../ds";
 import { useData } from "../session";
+import { DupChips, MoneyMeter, type Risk } from "./speed5-ui";
 import { PrimaryButton } from "./today-chrome";
 import { useSpeedFilter } from "./speed-filter";
 import { rowKey, useLeadActions, whyLine, type LeadRow } from "./speed-rows";
@@ -23,7 +24,7 @@ export type FeedRow = LeadRow & { arrivedAt: number; touchedAt: number | null; t
 type Race = {
   now: number; targetMinutes: number; accounts: number; overall: Score; scores: Array<{ locationId: string; name: string } & Score>;
   leak: { leads: number; noTouch: number; slow: number; countedDollars: number; countedPeople: number; countedDeals: number; estimate: { amount: number; line: string; accounts: number; leftOut: number } | null };
-  losing: { count: number; dollars: number }; feed: FeedRow[];
+  losing: { count: number; dollars: number }; feed: FeedRow[]; risk: Risk | null;
 };
 const usd = (n: number) => "$" + Math.round(n).toLocaleString("en-US");
 
@@ -88,11 +89,13 @@ function Story({ lead }: { lead: FeedRow }) {
 /** One-tap assign: preview, then confirm, through the write gateway. */
 function Assign({ lead, onDone }: { lead: LeadRow; onDone: () => void }) {
   const s = lead.suggestion;
+  const rr = lead.roundRobin ?? null;
   const run = useRunner(lead.locationId, lead.contactId, onDone);
-  if (!lead.unassigned || !s?.userId) return null;
+  if (!lead.unassigned || (!s?.userId && !rr)) return null;
   return (
-    <div className="col-span-full">
-      <button type="button" className={`${wbButtons.BTN} !min-h-9 text-sm`} disabled={run.busy} data-testid="race-assign" onClick={() => void run.preview({ kind: "owner", userId: s.userId as string }, { verb: "Assign" })}>Give to {s.label}</button>
+    <div className="col-span-full flex flex-wrap gap-2">
+      {rr && <button type="button" className={`${wbButtons.BTN} !min-h-9 text-sm`} disabled={run.busy} data-testid="race-assign-rr" data-tip="Next in line: the person holding the fewest leads still waiting. Preview first; nothing changes until you confirm." onClick={() => void run.preview({ kind: "owner", userId: rr.userId }, { verb: "Assign" })}>Next in line: {rr.label}</button>}
+      {s?.userId && s.userId !== rr?.userId && <button type="button" className={`${wbButtons.BTN} !min-h-9 text-sm`} disabled={run.busy} data-testid="race-assign" onClick={() => void run.preview({ kind: "owner", userId: s.userId as string }, { verb: "Assign" })}>Give to {s.label}</button>}
       <ReviewSheet r={run} name={lead.name} />
     </div>
   );
@@ -107,7 +110,7 @@ export function RaceTab({ multi, onCall }: { multi: boolean; onCall?: () => void
   const [story, setStory] = useState<string | null>(null);
   if (error) return <ErrorState error={error} onRetry={reload} />;
   if (!d) return <SkeletonRows rows={5} label="Lining up the race..." />;
-  const waiting = rows.filter((r) => r.touchedAt === null).sort((a, b) => (a.arrivedAt + a.targetMinutes * 60_000) - (b.arrivedAt + b.targetMinutes * 60_000));
+  const waiting = rows.filter((r) => r.touchedAt === null).sort((a, b) => (a.arrivedAt + a.targetMinutes * 60_000 - (a.repeat ? 600_000 : 0)) - (b.arrivedAt + b.targetMinutes * 60_000 - (b.repeat ? 600_000 : 0))); // a repeat enquirer is warm: it counts as ten minutes closer to its deadline
   const closest = waiting.find((r) => raceState(r.arrivedAt, null, r.targetMinutes, now).race !== "losing") ?? waiting[0];
   const losing = waiting.filter((r) => raceState(r.arrivedAt, null, r.targetMinutes, now).race === "losing");
   const losingDollars = losing.reduce((s, r) => s + r.dollars, 0);
@@ -129,6 +132,7 @@ export function RaceTab({ multi, onCall }: { multi: boolean; onCall?: () => void
             {l.estimate ? <> An estimate of what slow replies cost: <strong className="text-[var(--t-ink)]">{l.estimate.line}</strong> (estimate{l.estimate.leftOut ? `, ${l.estimate.leftOut} accounts left out for too few closed deals` : ""})</> : <> No estimate yet: an account needs 20 closed deals first.</>}
             <WhatIs text="Counted deals are open deals of the people who got no person reply or a slow one. The estimate multiplies those leads by the account's own average deal and win rate, only with 20 or more closed deals." />
           </p>
+          <MoneyMeter risk={d.risk} losing={losing.length} waiting={waiting.length} />
           {closest && <div className="mt-4 max-w-sm" data-testid="race-primary"><PrimaryButton p={{ label: "Reply to the lead closest to breaching", sr: `${closest.name}, closest to breaching`, onClick: () => actions.reply(closest) }} /></div>}
         </div>
         <div className="flex items-end justify-center gap-6">
@@ -154,6 +158,7 @@ export function RaceTab({ multi, onCall }: { multi: boolean; onCall?: () => void
                 <div className="min-w-0">
                   <button type="button" onClick={() => actions.show(i)} className="block max-w-full cursor-pointer truncate text-left font-semibold hover:underline" data-tip="Click to open this lead" title={undefined}>{r.name}</button>
                   <p className="t-small t-quiet truncate" title={whyLine(r, multi)}>{whyLine(r, multi)}</p>
+                  <DupChips dup={r.duplicateOf ?? null} repeat={r.repeat === true} />
                   <p className="t-small t-quiet">Lead quality <span className="tnum font-medium text-[var(--t-ink)]" data-testid="lead-quality">{r.quality}</span>/100{r.dollars > 0 ? <> · <span className="tnum">{usd(r.dollars)}</span> open</> : null} <WhatIs text="A starting guess from what the lead gave us: a real phone number, a real email, a known source. Not a promise." /></p>
                 </div>
                 <div className="flex items-center gap-1">

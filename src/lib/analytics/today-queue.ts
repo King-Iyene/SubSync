@@ -485,20 +485,20 @@ export function replyWords(seconds: number | null): string {
   return `${d} ${d === 1 ? "day" : "days"}`;
 }
 
-export type WithinRow = { leadAt: number; touchAt: number | null };
+export type WithinRow = { leadAt: number; touchAt: number | null; /** The account's own reply target, when it set one. */ targetMinutes?: number | null };
+const tgtOf = (r: WithinRow, d: number) => (typeof r.targetMinutes === "number" && r.targetMinutes > 0 ? r.targetMinutes : d) * 60_000;
 /**
  * Days in a row, counting back from yesterday, on which at least one lead arrived and every lead that arrived was answered inside the target.
  * A day with no leads neither extends nor breaks the run. Only existing data (the lead's own arrival and first reply) is used.
  */
 export function answeredStreak(rows: WithinRow[], targetMinutes: number, now: number, days = 14): number {
-  const target = targetMinutes * 60_000;
   const byDay = new Map<string, WithinRow[]>();
   for (const r of rows) byDay.set(dayKey(r.leadAt), [...(byDay.get(dayKey(r.leadAt)) ?? []), r]);
   let streak = 0;
   for (let back = 1; back <= days; back++) {
     const list = byDay.get(dayKey(now - back * DAY));
     if (!list || list.length === 0) continue;
-    const ok = list.every((r) => r.touchAt !== null && r.touchAt - r.leadAt <= target);
+    const ok = list.every((r) => r.touchAt !== null && r.touchAt - r.leadAt <= tgtOf(r, targetMinutes));
     if (!ok) break;
     streak += 1;
   }
@@ -507,10 +507,9 @@ export function answeredStreak(rows: WithinRow[], targetMinutes: number, now: nu
 
 /** Share of leads that arrived in (to - days, to] answered inside the target, counting still-waiting ones past the target as misses; null under the minimum. */
 export function withinTargetShare(rows: WithinRow[], targetMinutes: number, to: number, days: number): { share: number | null; judged: number } {
-  const target = targetMinutes * 60_000;
   const mine = rows.filter((r) => r.leadAt > to - days * DAY && r.leadAt <= to);
-  const judged = mine.filter((r) => r.touchAt !== null || to - r.leadAt > target);
-  const within = judged.filter((r) => r.touchAt !== null && r.touchAt - r.leadAt <= target).length;
+  const judged = mine.filter((r) => r.touchAt !== null || to - r.leadAt > tgtOf(r, targetMinutes));
+  const within = judged.filter((r) => r.touchAt !== null && r.touchAt - r.leadAt <= tgtOf(r, targetMinutes)).length;
   return { share: judged.length >= MIN_FOR_MEDIAN ? within / judged.length : null, judged: judged.length };
 }
 

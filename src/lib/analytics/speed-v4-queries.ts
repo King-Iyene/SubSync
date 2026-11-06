@@ -11,6 +11,7 @@ import { applyFilter, journey, journeyMembers, lostAtNight, proofByAccount, STEP
 import { leadStory, loadTouchEvents } from "./touch-events-db";
 import { outcomesOf } from "./speed-v3-queries";
 import type { Channel } from "./touch-events";
+import { raceExtras } from "./speed5-queries";
 
 // The reads behind the rebuilt Speed to lead (stage SPEED4). Read only. Every query is bound to the accounts the router allowed (`allowed`), never to an id from the browser. Money is shown as
 // counted deals (facts) and, only where the account has enough closed deals, as an estimate that says so. The text of a message is never read.
@@ -49,12 +50,16 @@ export async function speedRace(i: Input) {
     ...rowOut(r, judge(r, i.targetMinutes, i.now) ?? "waiting", lk, sugg), arrivedAt: r.leadAt, touchedAt: r.touchAt, targetMinutes: r.targetMinutes ?? i.targetMinutes,
     quality: leadQuality({ phone: r.phone, email: r.email, source: r.source }).score, dollars: fd.map.get(`${r.locationId}:${r.contactId}`) ?? 0,
   }));
-  const losingNow = feed.filter((f) => f.touchedAt === null && f.status === "waiting");
+  const losingNow0 = feed.filter((f) => f.touchedAt === null && f.status === "waiting");
+  // Stage SPEED5: the money meter, the duplicate guard, repeat enquirers and the round-robin suggestion. A failure here never stops the Race.
+  const ex = await raceExtras(i, feed.map((f) => ({ locationId: f.locationId, contactId: f.contactId, name: f.name, email: f.email, phone: f.phone, arrivedAt: f.arrivedAt, touchedAt: f.touchedAt, unassigned: f.unassigned, dollars: f.dollars })), losingNow0.reduce((s, f) => s + f.dollars, 0)).catch(() => null);
+  const feed5 = feed.map((f) => { const x = ex?.byKey.get(`${f.locationId}:${f.contactId}`); return { ...f, duplicateOf: x?.dup ?? null, repeat: (x?.boost ?? 0) > 0, roundRobin: x?.roundRobin ?? null }; });
+  const losingNow = losingNow0;
   const scores = [...new Set(rows.map((r) => r.locationId))].map((loc) => ({ locationId: loc, name: lk.locationNames.get(loc) ?? "Client account", ...speedScore(rows.filter((r) => r.locationId === loc), i.targetMinutes, i.now) })).sort((a, b) => (a.score ?? 101) - (b.score ?? 101));
   return {
     now: i.now, targetMinutes: i.targetMinutes, accounts: locs.length, overall: speedScore(rows, i.targetMinutes, i.now), scores: scores.slice(0, 12),
     leak: { leads: leaked.length, noTouch, slow: leaked.length - noTouch, countedDollars: counted.dollars, countedPeople: counted.withDeals, countedDeals: deals, estimate: est.amount === null ? null : { amount: est.amount, line: money(est.amount), accounts: est.countedAccounts, leftOut: est.leftOutAccounts } },
-    losing: { count: losingNow.length, dollars: losingNow.reduce((s, f) => s + f.dollars, 0) }, feed,
+    losing: { count: losingNow.length, dollars: losingNow.reduce((s, f) => s + f.dollars, 0) }, feed: feed5, risk: ex?.meter ?? null,
   };
 }
 
@@ -147,7 +152,13 @@ export async function speedProof(i: Input) {
   const db = sql();
   const [{ lk }, rows] = await Promise.all([loadLookups(db, i.installationId, i.allowed, i.targetMinutes, i.now), loadRows(db, i.installationId, i.allowed, i.now - 60 * DAY, i.now + DAY)]);
   const lines = proofByAccount(rows, (l) => rows.find((r) => r.locationId === l && r.targetMinutes != null)?.targetMinutes ?? i.targetMinutes, i.now);
-  return { now: i.now, targetMinutes: i.targetMinutes, accounts: lines.map((l) => ({ locationId: l.locationId, name: lk.locationNames.get(l.locationId) ?? "Client account", leads: l.leads, now: l.now, before: l.before })) };
+  // Stage SPEED5: how many of this month's replied leads got a person inside 5 minutes (a plain, printable fact; needs 5 replied leads).
+  const quick = new Map<string, { n: number; q: number }>();
+  for (const r of rows) {
+    if (r.leadAt < i.now - 30 * DAY || r.touchAt === null) continue;
+    const c = quick.get(r.locationId) ?? { n: 0, q: 0 }; c.n += 1; if (r.touchAt - r.leadAt <= 300_000) c.q += 1; quick.set(r.locationId, c);
+  }
+  return { now: i.now, targetMinutes: i.targetMinutes, accounts: lines.map((l) => { const q = quick.get(l.locationId); return { locationId: l.locationId, name: lk.locationNames.get(l.locationId) ?? "Client account", leads: l.leads, now: l.now, before: l.before, within5: q && q.n >= 5 ? { replied: q.n, inside: q.q } : null }; }) };
 }
 
 /** One lead, start to finish (lifecycle events, touches by kind, stage, tag and appointment history). The contact must belong to an account the caller may read. */

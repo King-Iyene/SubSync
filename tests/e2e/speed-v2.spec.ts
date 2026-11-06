@@ -16,9 +16,10 @@ async function open(page: Page, path: string, menu = false) {
   await page.goto(path);
   if (menu) await page.getByRole("button", { name: "Speed to lead", exact: true }).first().click({ timeout: 90_000 });
   else await page.reload();
-  await expect(page.getByTestId("today-headline")).toBeVisible({ timeout: 90_000 });
-  // SPEED4: the first tab is now the Race; the older queue and charts live on the Log tab.
+  // SPEED4: the first tab is now the Race; the older queue, its headline and charts live on the Log tab. The tab exists once the page has loaded, so open it first (SPEED5: the headline is
+  // only on the Log tab, which made waiting for it before opening the tab always time out).
   await page.getByRole("tab", { name: "Log", exact: true }).click({ timeout: 90_000 });
+  await expect(page.getByTestId("today-headline")).toBeVisible({ timeout: 90_000 });
   await expect(page.getByTestId("speed-fast")).toBeVisible({ timeout: 90_000 });
 }
 const n = (text: string) => Number(text.replace(/[^\d]/g, ""));
