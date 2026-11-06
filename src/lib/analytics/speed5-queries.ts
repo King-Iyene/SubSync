@@ -29,7 +29,7 @@ export async function loadLadder(installationId: string): Promise<{ ready: boole
 export async function saveLadder(installationId: string, raw: unknown): Promise<{ ok: true; ladder: Ladder } | { ok: false; error: string }> {
   const ladder = normLadder(raw);
   try {
-    await sql()`update settings set speed_escalation = ${JSON.stringify(ladder)}::jsonb where installation_id = ${installationId}`;
+    await sql()`update settings set speed_escalation = ${JSON.stringify(ladder)}::text::jsonb where installation_id = ${installationId}`;
     return { ok: true, ladder };
   } catch {
     return { ok: false, error: "Saving this needs the latest database update. Ask the person who runs SubSync to apply it." };

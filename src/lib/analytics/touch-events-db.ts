@@ -19,7 +19,7 @@ export async function recordTouchEvents(installationId: string, events: readonly
       await db`
         insert into touch_events (installation_id, location_id, contact_id, conversation_id, event_key, direction, channel, kind, at, user_id, automated, source, outcome)
         select ${installationId}::uuid, x.location_id, x.contact_id, x.conversation_id, x.event_key, x.direction, x.channel, x.kind, x.at, x.user_id, x.automated, x.source, x.outcome
-        from jsonb_to_recordset(${JSON.stringify(rows)}::jsonb)
+        from jsonb_to_recordset(${JSON.stringify(rows)}::text::jsonb)
           as x(location_id text, contact_id text, conversation_id text, event_key text, direction text, channel text, kind text, at timestamptz, user_id text, automated boolean, source text, outcome text)
         on conflict (installation_id, location_id, event_key) do nothing`;
     }
