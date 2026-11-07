@@ -56,15 +56,12 @@ test("Sync now: syncing, then what changed; a second press shows the wait; error
   await expect(page.getByTestId("sync-changes")).toContainText("Bright Smile");
   await page.getByTestId("sync-retry").click();
   await expect(page.getByTestId("sync-error")).toContainText("20 seconds");
-  // The filter bar stays on screen when the page scrolls.
-  await page.evaluate(() => window.scrollTo(0, 600));
-  const top = await page.getByTestId("global-filter-bar").evaluate((e) => Math.round(e.getBoundingClientRect().top));
-  expect(top).toBeLessThanOrEqual(2);
 });
 
 test("Race waiting list with 100 leads grows downward: no overlap with what follows", async ({ page }) => {
   await page.addInitScript(() => { try { localStorage.setItem("subsync.speed.tour6", "1"); } catch { /* none */ } });
   const leads = Array.from({ length: 100 }, (_, i) => ({ contactId: `c${i}`, locationId: "l1", name: `Lead Person ${i}`, account: "Account One", url: "#", owner: null, step: 1 + (i % 3), stepWords: "Owner told", waitedMin: 30 + i * 9, targetMin: 15 }));
+  await page.route(/part=ladder(&|$)/, (r) => r.fulfill({ json: { ladderReady: true, ladder: { enabled: true, nextAfterMin: 45, managerAfterMin: 120 }, leads } }));
   await page.route(/part=ladder-leads/, (r) => r.fulfill({ json: { counts: { 1: 40, 2: 30, 3: 30 }, total: 100, page: 0, pages: 1, from: 1, to: 100, leads } }));
   await page.goto("/app#speed"); await page.reload();
   await page.getByRole("tab", { name: "Rules", exact: true }).first().click({ timeout: 90_000 });
@@ -76,7 +73,11 @@ test("Race waiting list with 100 leads grows downward: no overlap with what foll
   expect(listBox!.y + listBox!.height).toBeLessThanOrEqual(cardBox!.y + cardBox!.height + 1);
   const next = await page.evaluate(() => { const c = document.querySelector("[data-testid=waiting-now]")!; const n = c.nextElementSibling ?? c.parentElement?.nextElementSibling; return n ? Math.round(n.getBoundingClientRect().top) : null; });
   const bottom = Math.round((await card.evaluate((e) => e.getBoundingClientRect().bottom)));
-  if (next !== null) expect(next).toBeGreaterThanOrEqual(bottom);
+  if (next !== null) expect(next).toBeGreaterThanOrEqual(await card.evaluate((e) => e.getBoundingClientRect().bottom));
+  // The filter bar follows on scroll and does not cover the content (it sits in the flow).
+  const y = await page.evaluate(() => { window.scrollTo(0, 900); return window.scrollY; });
+  expect(y).toBeGreaterThan(300);
+  expect(await page.getByTestId("global-filter-bar").evaluate((e) => Math.round(e.getBoundingClientRect().top))).toBeLessThanOrEqual(2);
   const more = page.getByTestId("fold-more-row");
-  if (await more.count()) expect((await more.first().evaluate((e) => e.getBoundingClientRect().top))).toBeGreaterThanOrEqual(bottom);
+  if (await more.count()) expect((await more.first().evaluate((e) => e.getBoundingClientRect().top))).toBeGreaterThanOrEqual(await card.evaluate((e) => e.getBoundingClientRect().bottom));
 });
