@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { topSeriesWithOther } from "@/lib/design/column-layout";
 import { averageSeries, formatMetric, MAX_COMPARE, pointsIn, type CompareCell, type CompareRow } from "@/lib/analytics/client-success";
 import { useData } from "../../session";
 import { CardRange, EmptyState, LineChart, Section, SkeletonRows, useCardRange } from "../../ds";
@@ -32,6 +33,9 @@ export function CompareTab({ accounts, showSetups = true }: { accounts: Array<{ 
   const win = range.resolved;
 
   const series = (trends.data?.clients ?? []).map((c, i) => ({ label: c.name, points: (win ? pointsIn(c.days, win.current.from, win.current.to) : c.days).map((d) => ({ day: d.day, value: d[metric] })), tone: ((i % 5) + 1) as 1 | 2 | 3 | 4 | 5 }));
+  // With many clients, one line each is unreadable: the five biggest (by the total of the measure) plus one summed "Other" line. The average still uses every client.
+  const top = topSeriesWithOther(series, 5);
+  const other = top.other ? [{ label: top.other.label, tone: "muted" as const, dashed: false, points: top.other.points.map((p) => ({ day: p.day, value: p.value === null || def.ceiling === undefined ? p.value : p.value / (top.other?.count ?? 1) })) }] : [];
   const avg = series.length >= 2 ? [{ label: "Average of these clients", tone: "muted" as const, dashed: true, points: averageSeries(series.map((s) => s.points)).map((p) => ({ day: p.day, value: p.value })) }] : [];
   const nameOf = (id: string) => cmp.data?.clients.find((c) => c.locationId === id)?.name ?? "";
   const cell = (r: CompareRow, c: CompareCell) => (
@@ -86,7 +90,7 @@ export function CompareTab({ accounts, showSetups = true }: { accounts: Array<{ 
               <CardRange state={range} label="Compare trend" compares={["none"]} maxDays={200} />
             </div>
             {trends.error ? <ErrorBox error={trends.error} onRetry={trends.reload} /> : trends.loading && !trends.data ? <SkeletonRows rows={3} /> : (
-              <LineChart title={`${def.label}, by day`} series={[...series, ...avg]} format={def.format} ceiling={def.ceiling} axisLabel={def.key === "healthScore" ? "0 to 100" : undefined} />
+              <LineChart title={`${def.label}, by day`} series={[...top.shown, ...other, ...avg]} format={def.format} ceiling={def.ceiling} axisLabel={def.key === "healthScore" ? "0 to 100" : undefined} />
             )}
             <p className="mt-2 text-xs text-muted-foreground">Hover or use the arrow keys to read each day. A day&apos;s figure is not a list of leads, so the lines open nothing.</p>
           </Section>
