@@ -26,6 +26,7 @@ export { PulseTile, PulseSpark, type SparkPoint } from "./pulse";
 export { ProofStrip, RaisedClearedStrip } from "./proof";
 export { DonutChart } from "./donut";
 export { AccountBars } from "./account-bars";
+export { ColumnChart, type ColumnItem, type ColumnSegment } from "./column-chart";
 export { ChartHint, ShowingChip, useUsed } from "./showing";
 export { useNow } from "./live";
 export { RowsPanel } from "./rows-panel";

@@ -112,7 +112,7 @@ export function Board6({ rows, own }: { rows: BoardRow[]; own: { rank: number; o
 }
 
 // ---------------------------------------------------------------- the redial plan
-export function CadenceCard({ cadence, set }: { cadence: Cadence; set: (c: Cadence) => void }) {
+export function CadenceCard({ cadence, set, extra }: { cadence: Cadence; set: (c: Cadence) => void; extra?: React.ReactNode }) {
   const step = (k: "maxAttempts" | "redialAfterHours", d: 1 | -1) => set({ ...cadence, [k]: cadence[k] + d });
   const stepper = (k: "maxAttempts" | "redialAfterHours", label: string, unit: string) => (
     <div className="grid gap-1"><span className="s6-label">{label}</span>
@@ -125,6 +125,7 @@ export function CadenceCard({ cadence, set }: { cadence: Cadence; set: (c: Caden
         {stepper("redialAfterHours", "Wait between tries", "hours")}
         <div className="flex items-center gap-3"><button type="button" role="switch" aria-checked={cadence.nextDay} aria-label="Call again the next morning" className="s6-toggle" onClick={() => set({ ...cadence, nextDay: !cadence.nextDay })} data-testid="cad-nextday" /><span className="text-sm">Next morning instead</span></div>
       </div>
+      {extra}
     </Q>
   );
 }

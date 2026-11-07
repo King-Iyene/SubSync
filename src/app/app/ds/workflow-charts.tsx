@@ -1,5 +1,6 @@
 "use client";
 
+import { ColumnChart } from "./column-chart";
 import { useState } from "react";
 
 // The Workflows charts (docs/features/WORKFLOWS.md). Plain SVG and HTML, no library. Every mark is a real button: a slice, a bar row, a point of the trend
@@ -52,9 +53,15 @@ export function WfDonut({ title, marks, selected, onSelect, centre = "in total",
 }
 
 /** Horizontal bars, one thin bar per row, the longest first, the number at the end. Each row is a button. */
-export function WfBars({ title, rows, selected, onSelect, colour = "var(--chart-1)", flagColour = "var(--destructive)", empty = "Nothing to show yet." }: {
+export function WfBars({ title, rows, selected, onSelect, colour = "var(--chart-1)", flagColour = "var(--destructive)", empty = "Nothing to show yet.", columns = false }: {
   title: string; rows: Array<{ key: string; label: string; value: number; flag?: number; note?: string }>; selected: string | null; onSelect: (key: string) => void; colour?: string; flagColour?: string; empty?: string;
+  /** One vertical column per row (shared ColumnChart): for comparisons across many client accounts. */
+  columns?: boolean;
 }) {
+  if (columns && rows.length > 0) {
+    return <ColumnChart testId="wf-bars" title={title} subject="client" unit="" onSelect={(k) => onSelect(k)}
+      items={rows.map((r) => ({ key: r.key, label: r.label, segments: [{ key: "v", label: title, value: r.value, colour }] }))} />;
+  }
   const max = Math.max(1, ...rows.map((r) => r.value));
   return (
     <figure className="min-w-0" data-testid="wf-bars">

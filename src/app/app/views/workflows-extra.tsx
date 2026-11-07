@@ -81,9 +81,9 @@ export function DeliveryTab({ q, now }: { q: string; now: number }) {
           <div className="mb-8 grid gap-x-10 gap-y-8 lg:grid-cols-2">
             <WfBars title="From sent to clicked" rows={funnel} selected={null} onSelect={(k) => open(`f-${k}`, STAT_LABEL[k as StatKey], "Campaigns that reported this.", withStats.filter((c) => c.stats?.[k as StatKey] !== null), k as StatKey)} />
             <WfBars title="What went wrong" colour="var(--destructive)" rows={bad} selected={null} empty="Nothing went wrong." onSelect={(k) => open(`b-${k}`, STAT_LABEL[k as StatKey], "Campaigns with this problem.", withStats.filter((c) => (c.stats?.[k as StatKey] ?? 0) > 0), k as StatKey)} />
-            <WfBars title="Delivery health by client account (0 to 100)" colour="var(--success)" rows={data.league.filter((a) => a.score !== null).map((a) => ({ key: a.locationId, label: a.name, value: a.score as number }))} selected={null} empty="Needs at least 50 messages sent in a client account."
+            <WfBars columns title="Delivery health by client account (0 to 100)" colour="var(--success)" rows={data.league.filter((a) => a.score !== null).map((a) => ({ key: a.locationId, label: a.name, value: a.score as number }))} selected={null} empty="Needs at least 50 messages sent in a client account."
               onSelect={(k) => open(`a-${k}`, data.league.find((a) => a.locationId === k)?.name ?? "Client account", "This client account's campaigns.", withStats.filter((c) => c.locationId === k))} />
-            <WfBars title="Waiting to send, by client account" colour="var(--warning)" rows={data.league.filter((a) => a.queued > 0).map((a) => ({ key: a.locationId, label: a.name, value: a.queued }))} selected={null} empty="Nothing is waiting."
+            <WfBars columns title="Waiting to send, by client account" colour="var(--warning)" rows={data.league.filter((a) => a.queued > 0).map((a) => ({ key: a.locationId, label: a.name, value: a.queued }))} selected={null} empty="Nothing is waiting."
               onSelect={(k) => open(`q-${k}`, "Waiting to send", "Campaigns with messages waiting.", withStats.filter((c) => c.locationId === k && (c.stats?.queued ?? 0) > 0), "queued")} />
           </div>
           <Section title="League table" hint="Score = delivered share, minus a penalty for bounces, failures and unsubscribes. Shown from 50 messages sent.">
