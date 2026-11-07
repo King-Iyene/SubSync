@@ -7,7 +7,7 @@ import { specDay, specPeriod, specRange, specRemoved, specSignUps, specSource } 
 import type { Period } from "@/lib/analytics/growth";
 import { DAY_NAMES, digestPreview, hourWords, type GapMap, type TrendNormal } from "@/lib/analytics/speed-v3";
 import { fmtDuration } from "@/lib/analytics/speed-intel";
-import { RecordsPanel, EmptyState, ErrorState, SkeletonRows } from "../ds";
+import { CardRange, RecordsPanel, EmptyState, ErrorState, SkeletonRows, useCardRange } from "../ds";
 import { useSlow } from "./speed6-base";
 import { ModeToggle, TimeChart, useChartMode } from "../ds/time-chart";
 import { WhatIs } from "../ds/what-is";
@@ -177,6 +177,12 @@ export function CaptureTab() {
   // The numbers at the top arrive first (a small answer); the chart and the lists follow in the full answer. Both share one computation on the server.
   const head = useData<GrowthData>(range ? `today/growth?from=${range.from}&to=${range.to}&part=counters` : null).data;
   const c0 = g ?? head;
+  // This chart can carry its own dates (a small control on the card, kept in the address as r.capture-chart=...). With no choice it follows the page's dates and reads nothing more.
+  const chartRange = useCardRange("capture-chart", { preset: "30d", compare: "none" });
+  const cur = chartRange.resolved?.current;
+  const differs = Boolean(cur && range && (cur.from !== range.from || cur.to !== range.to));
+  const own = useData<GrowthData>(differs && cur ? `today/growth?from=${cur.from}&to=${cur.to}` : null).data;
+  const gc: GrowthData | null | undefined = differs ? own : g;
   const [mode, setMode] = useChartMode("speed-capture");
   const [panel, setPanel] = useState<ReturnType<typeof specDay> | null>(null);
   const [slow, again] = useSlow(!g && !error);
@@ -184,6 +190,7 @@ export function CaptureTab() {
   if (!g && slow) return <div data-testid="capture-tab"><EmptyState title="This is taking too long" body="There are a lot of leads in these dates. Try a shorter range, or try again." action={<button type="button" data-testid="capture-retry" className="ds-press h-10 rounded-lg border bg-card px-4 text-sm font-medium" onClick={() => { again(); void reload(); }}>Retry</button>} /></div>;
   if (!c0) return <div data-testid="capture-tab"><SkeletonRows rows={5} label="Counting email leads..." /></div>;
   const rangeWord = (range?.sentence ?? c0.range.label).toLowerCase();
+  const chartWord = (gc ? (differs ? chartRange.resolved?.current.label ?? gc.range.label : range?.sentence ?? gc.range.label) : "").toLowerCase();
   const periods = [["today", "Today"], ["week", "This week"], ["month", "This month"], ["all", "All time"]] as const;
   const removed = c0.gross.removed.duplicate + c0.gross.removed.junk + c0.gross.removed.staff + c0.gross.removed.role;
   return (
@@ -199,15 +206,18 @@ export function CaptureTab() {
       </Card>
       {!g ? <SkeletonRows rows={4} label="Loading the chart and the lists..." /> : <>
       <Card id="capture-chart">
-        <H title={`New email leads each day, ${rangeWord}`} tip="One mark a day, one person once. The dashed line is the 7 day average. Select a day to see its people.">
+        {!gc ? <SkeletonRows rows={3} label="Reading these dates..." /> : <>
+        <H title={`New email leads each day, ${chartWord}`} tip="One mark a day, one person once. The dashed line is the 7 day average. Select a day to see its people.">
           <span className="flex items-center gap-3"><ModeToggle mode={mode} onChange={setMode} label="New email leads each day" />
-            <span className="t-small" data-testid="capture-badge">{g.badge ? `${g.badge.direction === "up" ? "▲ Rising" : g.badge.direction === "down" ? "▼ Falling" : "Steady"}${g.badge.direction === "same" ? "" : ` ${Math.abs(g.badge.pct)}%`} last 7 days` : "Rate: not enough data yet"}</span></span>
+            <span className="t-small" data-testid="capture-badge">{gc.badge ? `${gc.badge.direction === "up" ? "▲ Rising" : gc.badge.direction === "down" ? "▼ Falling" : "Steady"}${gc.badge.direction === "same" ? "" : ` ${Math.abs(gc.badge.pct)}%`} last 7 days` : "Rate: not enough data yet"}</span></span>
         </H>
-        {g.signals.length > 0 && <ul className="mb-2 space-y-1 text-sm" data-testid="capture-signals">{g.signals.slice(0, 3).map((s) => <li key={`${s.locationId}${s.scope}`}>{s.text}</li>)}</ul>}
-        <div className="w-full"><TimeChart testId="capture-series" mode={mode} label={`New email leads a day, ${rangeWord}`} noun="Day"
-          points={g.series.map((p) => ({ id: p.day, label: fullDate(p.day), short: dayLabel(p.day, g.range.days), partial: p.partial }))} series={[{ key: "n", name: "New email leads", colour: "var(--t-c1)", values: g.series.map((p) => p.count) }]}
-          avg={g.series.map((p) => p.avg7)} onPick={(i) => setPanel(specDay(g, g.series[i].day))} /></div>
-        <p className="t-small t-quiet mt-2"><button type="button" className={BTN} onClick={() => setPanel(specRange(g))}>See the {g.range.count.toLocaleString("en-US")} people in these dates</button></p>
+        <CardRange state={chartRange} label="New email leads each day" compares={["none"]} />
+        {gc.signals.length > 0 && <ul className="mb-2 space-y-1 text-sm" data-testid="capture-signals">{gc.signals.slice(0, 3).map((s) => <li key={`${s.locationId}${s.scope}`}>{s.text}</li>)}</ul>}
+        <div className="w-full"><TimeChart testId="capture-series" mode={mode} label={`New email leads a day, ${chartWord}`} noun="Day"
+          points={gc.series.map((p) => ({ id: p.day, label: fullDate(p.day), short: dayLabel(p.day, gc.range.days), partial: p.partial }))} series={[{ key: "n", name: "New email leads", colour: "var(--t-c1)", values: gc.series.map((p) => p.count) }]}
+          avg={gc.series.map((p) => p.avg7)} onPick={(i) => setPanel(specDay(gc, gc.series[i].day))} /></div>
+        <p className="t-small t-quiet mt-2"><button type="button" className={BTN} onClick={() => setPanel(specRange(gc))}>See the {gc.range.count.toLocaleString("en-US")} people in these dates</button></p>
+        </>}
       </Card>
       <Card id="capture-gross">
         <H title="Sign ups, then people" tip="Sign ups with an email, minus copies of the same person, test or junk records and staff, is the number of real leads. It stops a form bug or a spam burst looking like growth." />
