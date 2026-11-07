@@ -54,6 +54,7 @@ import { SettingsView } from "./views/settings";
 import { IntegrationsPage } from "./views/connections";
 import { NotificationsPage } from "./views/notifications";
 import { NotificationBell } from "./views/notification-bell";
+import { SyncNow } from "./ds/sync-now";
 
 import { TodayView } from "./views/today";
 
@@ -461,6 +462,7 @@ export function Dashboard() {
                 {view.id === "today" && strip}
               </div>
               <div className="ml-auto flex shrink-0 items-center">
+                {auth.kind !== "client" && <div className="mr-2"><SyncNow agency={auth.kind === "agency" && Boolean(baseApi)} /></div>}
                 {NAV_FOR[auth.kind].has("search") && !off("search") && <GlobalSearch go={go} />}
                 <NotificationBell go={go} />
               </div>

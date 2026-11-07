@@ -1,6 +1,7 @@
 "use client";
 
 import { Bell, Copy, Minus, Plus, Send } from "lucide-react";
+import { humanWait, initialsOf } from "@/lib/design/wait";
 import { useMemo, useState, type ReactNode } from "react";
 import { destination, LINES, type DigestSettings } from "@/lib/analytics/speed-digest";
 import { useApiClient, useData } from "../session";
@@ -93,7 +94,7 @@ export function WaitingNowCard({ multi, fallback }: { multi: boolean; fallback?:
   const seeds: LeadSeed[] = useMemo(() => leads.map((l) => ({ contactId: l.contactId, locationId: l.locationId, name: l.name, locationName: l.account, url: l.url, owner: l.owner, unassigned: !l.owner, note: `Waiting ${l.waitedMin} minutes, target ${l.targetMin}. ${l.stepWords}.` })), [leads]);
   const tight = prefs.density === "compact";
   return (
-    <Q sticky q="Which leads are waiting now?" testId="waiting-now" glow={all ? "urgent" : undefined} tip="Leads past their account's reply target, longest wait first. The step badge says whether the owner, the next person or a manager has been told.">
+    <Q sticky q="Which leads are waiting now?" sub="These are new leads nobody has replied to." testId="waiting-now" glow={all ? "urgent" : undefined} tip="These are new leads nobody has replied to. They are past their account's reply target, longest wait first. The step badge says whether the owner, the next person or a manager has been told.">
       <p className="s6-label mb-3" data-testid="ladder-tip">Step 1: the owner is told. Step 2: the next person in line. Step 3: a manager. Each step starts after the minutes set in the card above.</p>
       <div className="mb-4 grid grid-cols-3 gap-3" role="group" aria-label="Filter by step">
         {([1, 2, 3] as const).map((n) => (
@@ -110,11 +111,12 @@ export function WaitingNowCard({ multi, fallback }: { multi: boolean; fallback?:
           <ListControls className="mb-2" />
           <ul className="s6-ready" data-testid="ladder-leads" data-density={prefs.density}>
             {leads.map((l, i) => (
-              <li key={`${l.locationId}:${l.contactId}`} data-testid="ladder-lead" style={{ minHeight: tight ? 34 : 44 }}>
-                <button type="button" className="s6-link flex min-w-0 flex-1 items-baseline gap-2 text-sm font-semibold" onClick={() => setOpen({ i, reply: false })} data-testid="ladder-lead-open"><span className="truncate">{l.name}</span>{multi && <span className="s6-label hidden truncate font-normal sm:inline">{l.account}</span>}</button>
+              <li key={`${l.locationId}:${l.contactId}`} data-testid="ladder-lead" style={{ minHeight: tight ? 34 : 44 }} onClick={() => setOpen({ i, reply: false })} title={`Open ${l.name}`} className="cursor-pointer rounded-md transition-colors hover:bg-[color-mix(in_srgb,var(--s6-cyan)_10%,transparent)]">
+                <span aria-hidden className="grid size-7 shrink-0 place-items-center rounded-full bg-[color-mix(in_srgb,var(--s6-cyan)_18%,transparent)] text-[11px] font-semibold" data-testid="lead-initials">{initialsOf(l.name)}</span>
+                <button type="button" className="s6-link flex min-w-0 flex-1 items-baseline gap-2 text-left text-sm font-semibold underline-offset-4 hover:underline" onClick={(e) => { e.stopPropagation(); setOpen({ i, reply: false }); }} data-testid="ladder-lead-open"><span className="truncate">{l.name}</span><span className="s6-label shrink-0 font-normal">Lead</span>{multi && <span className="s6-label hidden truncate font-normal sm:inline">{l.account}</span>}</button>
                 <span className="s6-step" data-step={l.step} title={l.stepWords}>Step {l.step}</span>
-                <span className="tnum w-16 text-right text-sm font-semibold" data-testid="ladder-wait">{l.waitedMin} min</span>
-                <button type="button" className="s6-btn" data-size="sm" data-kind="primary" onClick={() => setOpen({ i, reply: true })} data-testid="ladder-reply" aria-label={`Reply to ${l.name}`}>Reply</button>
+                <span className="tnum w-24 text-right text-sm font-semibold" data-testid="ladder-wait" title={`${l.waitedMin} minutes`}>{humanWait(l.waitedMin)}</span>
+                <button type="button" className="s6-btn" data-size="sm" data-kind="primary" onClick={(e) => { e.stopPropagation(); setOpen({ i, reply: true }); }} data-testid="ladder-reply" aria-label={`Reply to ${l.name}`}>Reply</button>
               </li>
             ))}
           </ul>

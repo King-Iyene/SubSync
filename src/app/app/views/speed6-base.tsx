@@ -84,7 +84,7 @@ export function Fold({ keep = 3, children, testId = "fold" }: { keep?: number; c
     <div ref={root} data-testid={testId}>
       <TzNote />
       {children}
-      <div className="mb-6 flex flex-wrap items-center gap-3">
+      <div className="mb-6 mt-8 flex flex-wrap items-center gap-3" data-testid="fold-more-row">
         {(counts.more > 0 || open) && <button type="button" className="s6-btn" aria-expanded={open} onClick={() => setOpen(!open)} data-testid="s6-more">{open ? "Fewer" : "More"}<ChevronDown aria-hidden className={`size-4 transition-transform ${open ? "rotate-180" : ""}`} /></button>}
         {note && <p className="s6-label" data-testid="s6-nodata">{note}</p>}
       </div>

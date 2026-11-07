@@ -169,20 +169,23 @@ export function GlobalFilterBar({ view, agency, value, onChange, onAllClients }:
   if (!showAccounts && !agency && mode !== "range") return null;
   const notes = options && !isToday ? describeHidden({ ...value, accounts: picked }, options).filter((n) => n.clear.accounts === undefined) : [];
   return (
-    <div className="mb-4 rounded-xl border bg-card/60 px-3 py-2.5 print:hidden" data-testid="global-filter-bar" role="region" aria-label="Filters for this page">
-      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
+    <>
+      {/* Sticky: it follows on scroll as one compact line and takes its own place in the flow, so it never covers the content under it. */}
+      <div className="sticky top-0 z-30 mb-3 rounded-xl border bg-card px-3 py-1.5 shadow-sm print:hidden" data-testid="global-filter-bar" role="region" aria-label="Filters for this page"><div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-1">
         {showAccounts ? <AccountControl accounts={options!.accounts!} picked={picked} onChange={setPicked} options={options!} value={isToday ? { ...value, accounts: picked } : value} onValue={onChange} /> : <span />}
         <div className="flex flex-wrap items-center gap-3">
           {onAllClients && <button type="button" onClick={onAllClients} data-testid="back-to-all-clients" className="ds-press min-h-10 cursor-pointer rounded-lg border bg-card px-3 text-[0.95rem] font-medium text-primary hover:border-primary/40 hover:underline focus-visible:ring-2 focus-visible:ring-ring/40 outline-none">Back to all clients</button>}
           <DateControl mode={mode} hash={hash} />
         </div>
-      </div>
+      </div></div>
+      <div className="mb-4 print:hidden">
       {notes.length > 0 && (
-        <ul className="mt-2 space-y-0.5 text-sm text-muted-foreground">
+        <ul className="space-y-0.5 text-sm text-muted-foreground">
           {notes.map((n) => <li key={n.text}>{n.text} <button type="button" className="font-medium text-primary underline" onClick={() => onChange({ ...value, ...n.clear })}>{n.clear.hideTest === false ? "Show them" : "Show all"}</button></li>)}
         </ul>
       )}
       {showAccounts && picked.length > 3 && options && <p className="mt-1.5 text-sm text-muted-foreground">Counting {nameList(scopeOf({ ...value, accounts: picked }, options).included.map((a) => a.name))}.</p>}
-    </div>
+      </div>
+    </>
   );
 }
