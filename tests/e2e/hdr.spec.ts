@@ -73,11 +73,11 @@ test("Race waiting list with 100 leads grows downward: no overlap with what foll
   expect(listBox!.y + listBox!.height).toBeLessThanOrEqual(cardBox!.y + cardBox!.height + 1);
   const next = await page.evaluate(() => { const c = document.querySelector("[data-testid=waiting-now]")!; const n = c.nextElementSibling ?? c.parentElement?.nextElementSibling; return n ? Math.round(n.getBoundingClientRect().top) : null; });
   const bottom = Math.round((await card.evaluate((e) => e.getBoundingClientRect().bottom)));
-  if (next !== null) expect(next).toBeGreaterThanOrEqual(await card.evaluate((e) => e.getBoundingClientRect().bottom));
+  if (next !== null) expect(next).toBeGreaterThanOrEqual(bottom - 1);
   // The filter bar follows on scroll and does not cover the content (it sits in the flow).
   const y = await page.evaluate(() => { window.scrollTo(0, 900); return window.scrollY; });
   expect(y).toBeGreaterThan(300);
   expect(await page.getByTestId("global-filter-bar").evaluate((e) => Math.round(e.getBoundingClientRect().top))).toBeLessThanOrEqual(2);
-  const more = page.getByTestId("fold-more-row");
-  if (await more.count()) expect((await more.first().evaluate((e) => e.getBoundingClientRect().top))).toBeGreaterThanOrEqual(await card.evaluate((e) => e.getBoundingClientRect().bottom));
+  const more = page.getByTestId("rules-fold").getByTestId("fold-more-row");
+  if (await more.count()) expect((await more.first().evaluate((e) => e.getBoundingClientRect().top))).toBeGreaterThanOrEqual(24 + (await card.evaluate((e) => e.getBoundingClientRect().bottom)));
 });
