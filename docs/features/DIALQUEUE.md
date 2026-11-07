@@ -25,7 +25,7 @@ SubSync cannot start a call itself. The call queue is the CRM's own dialer: SubS
 ### Design for install-time setup (build only after King confirms the API is enabled for a test account)
 - Portal: King enables scope `workflows.write` as OPTIONAL (also `workflows.readonly`). No Module needed.
 - Where: INSTALL webhook (location installs) and the "Set up call queue" button both call one function `ensureCallQueueWorkflow(location)`.
-- Create: one workflow in a neutrally named folder ("Call queue"), name "Call queue (tag)", trigger: contact tagged `subsync-call-now`, action: Manual Action: Call (assigned to the contact owner or round robin, CHECK), action: remove the tag. Validate first (Validate Workflow Definition), create, then Update Workflow Status to published. Dry run until WORKFLOWS_WRITE_LIVE is on.
+- Create: one workflow in a neutrally named folder ("Call queue"), name "Call queue (tag)", trigger: contact tagged `call-now`, action: Manual Action: Call (assigned to the contact owner or round robin, CHECK), action: remove the tag. Validate first (Validate Workflow Definition), create, then Update Workflow Status to published. Dry run until WORKFLOWS_WRITE_LIVE is on.
 - Idempotent: store `workflow_id` in `call_queue_settings` (already has the column); before creating, look up by id, then by exact name in the folder (Search); never create twice; a double INSTALL event or button press is a no-op.
 - Failure: on 403 `WORKFLOW_API_NOT_ENABLED_FOR_LOCATION` or a missing step type, show the 3-step guide (tag route) with no error tone.
 - Uninstall: SubSync never deletes the customer's workflow; it stops tagging, and says in Settings "your Call queue workflow is still in your CRM; delete it if you do not want it". Data deletion on uninstall is unchanged.
@@ -35,7 +35,7 @@ SubSync cannot start a call itself. The call queue is the CRM's own dialer: SubS
 
 | Behaviour | Trigger SubSync can set | Workflow action | Today |
 |---|---|---|---|
-| Auto-calling of hot leads | tag `subsync-call-now` | Manual Action: Call | this stage |
+| Auto-calling of hot leads | tag `call-now` | Manual Action: Call | this stage |
 | Text back after a missed call | tag `subsync-missed-call` | SMS with a template the customer edits (writes a message, needs consent rules, so customer-owned) | not built |
 | Appointment reminders | native appointment trigger | SMS/email | the CRM does this natively; do not build |
 | No-show recovery | tag `subsync-noshow` | Manual Action: Call + SMS task | list exists in Call mode |
@@ -48,5 +48,5 @@ SubSync cannot start a call itself. The call queue is the CRM's own dialer: SubS
 - Server `callqueue-run.ts`, routes `/api/app/dial/cq-*`, cron hook in `/api/cron/sync` (every cron run, live accounts only). All writes through `writeToCrm`: WRITE_GHL_LIVE off by default, per-account opt-in, one audit line per write.
 - Tables: migration `20261116090000_call_queue.sql` (NOT applied). Until it runs every route answers that it needs the database update.
 - Un-tag on outcome or reply: a lead leaves the queue when it falls off the lists (called, answered, booked, replied where the list excludes replies, asked not to be contacted). Webhook-triggered fill is not built: the cron path is every few minutes (INFERENCE: closer to 45 to 60 s needs the fast delta path hooked in).
-- The CRM's own smart list on the tag `subsync-call-now` is a live view of the queue.
+- The CRM's own smart list on the tag `call-now` is a live view of the queue.
 - Adding to the queue cannot be undone from SubSync; the screen says so.
