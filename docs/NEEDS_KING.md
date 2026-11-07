@@ -220,3 +220,10 @@ S0.2b needs none (nothing new is read or written in the CRM). S0.4 needs none (i
 4. **Your one-time CRM setup per account (the in-app guide says the same):** create a workflow, trigger "Contact tagged: call-now", action "Manual Action: Call", optional action "Remove tag", publish. Then switch Auto on in Call mode > Call queue setup. A smart list on that tag is a live view of the queue.
 5. **Switches:** nothing is written until `WRITE_GHL_LIVE` is on AND the account's write opt-in is on. Auto starts OFF for every account. First live test: one test account, a manual send of 1 lead.
 6. **Decision for you:** keep the tag route as default (recommended) and decide later whether to request `workflows.write` for one-click workflow creation. Do not build a Marketplace Module for "Add to call queue" (it bills the customer per execution).
+
+## 32. From stage WFSETUP (workflow setup on install): scopes, migration, first live test
+1. **Migration to apply (not applied):** `supabase/migrations/20261117090000_workflow_setup.sql` (two new tables, additive). Until applied the card says it needs the database update.
+2. **Scopes (OPTIONAL, add on your next publish):** `workflows.readonly`, `workflows.write` and `workflows.publish` (the names the app already requests in `src/lib/ghl/scopes.ts`; confirm the exact label of the publish one in the portal, the Update Status scope is CHECK and may be `workflows.write`). Without them setup answers "needs permission" and shows the five-step guide.
+3. **API access:** Create Workflow is enabled for selected accounts only. Ask the platform's developer support to enable it for one test account, then run the first real test there: set the account's write opt-in on, press Set up call queue once.
+4. **Switches:** nothing is created unless `WRITE_GHL_LIVE` is on AND the account's opt-in is on. "Set up automatically when a client account is added" starts OFF.
+5. **Tag renamed:** the default tag is now `call-now` (neutral). Accounts that already saved `subsync-call-now` keep it.

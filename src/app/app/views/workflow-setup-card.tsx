@@ -46,7 +46,7 @@ export function WorkflowSetupCard({ loc, canEdit, tag }: { loc: string; canEdit:
         <button type="button" className="s6-btn" data-testid="wf-setup-check" disabled={busy} onClick={() => void run("dial/cq-wf-check", {})}>Check setup</button>
         <button type="button" className="s6-link text-sm" data-testid="wf-guide-open" onClick={() => setGuide(!guide)}>{guide ? "Hide the steps" : "Do it yourself in 5 steps"}</button>
       </div>
-      <p className="s6-label mt-1">SubSync creates one folder and one workflow in your CRM, only when you press the button, and never changes or deletes them afterwards.{d && !d.live ? " Writing to your CRM is off for this account, so pressing it only shows what would be created." : ""}</p>
+      <p className="s6-label mt-1">One folder and one workflow are created in your CRM, only when you press the button, and are never changed or deleted afterwards.{d && !d.live ? " Writing to your CRM is off for this account, so pressing it only shows what would be created." : ""}</p>
       {d && canEdit && (
         <div className="mt-2 flex flex-wrap items-center gap-3">
           <label className="flex items-center gap-2"><span className="s6-label">Folder name</span><input aria-label="Folder name" data-testid="wf-folder" className="min-h-9 rounded-md border bg-card px-2" defaultValue={folder} onBlur={(e) => { const x = e.target.value.trim(); if (x !== folder) void save({ folderName: x === d.folderDefault ? "" : x }); }} /></label>
