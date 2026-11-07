@@ -1,7 +1,7 @@
 /* Speed to lead polish: bright tab bar, clickable marks, popup motion. Scoped by class names; nothing else changes. */
 .spd-tabs, .spd-cta { --spd-a: #0e7490; --spd-on: #ffffff; --spd-glow: rgb(14 116 144 / 0.35); }
-@media (prefers-color-scheme: dark) { .spd-tabs, .spd-cta { --spd-a: #22d3ee; --spd-on: #04222b; --spd-glow: rgb(34 211 238 / 0.4); } }
-.dark .spd-tabs, [data-theme="dark"] .spd-tabs, .dark .spd-cta, [data-theme="dark"] .spd-cta { --spd-a: #22d3ee; --spd-on: #04222b; --spd-glow: rgb(34 211 238 / 0.4); }
+@media (prefers-color-scheme: dark) { .spd-tabs, .spd-cta { --spd-a: #0e7490; --spd-on: #ffffff; --spd-glow: rgb(14 116 144 / 0.3); } }
+.dark .spd-tabs, [data-theme="dark"] .spd-tabs, .dark .spd-cta, [data-theme="dark"] .spd-cta { --spd-a: #0e7490; --spd-on: #ffffff; --spd-glow: rgb(14 116 144 / 0.3); }
 .spd-tab { transition: background-color .15s, color .15s, box-shadow .2s, transform .15s; }
 .spd-tab[aria-selected="true"] { background: var(--spd-a); color: var(--spd-on); box-shadow: 0 0 0 1px var(--spd-a), 0 4px 18px var(--spd-glow); }
 .spd-tab[aria-selected="false"]:hover { background: color-mix(in srgb, var(--spd-a) 16%, transparent); color: var(--t-ink, inherit); transform: translateY(-1px); }

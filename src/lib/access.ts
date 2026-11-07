@@ -124,7 +124,7 @@ const CLIENT_RULES: Rule[] = [...WORKBENCH_RULES, ...DIAL_RULES, ...BELL_RULES, 
 
 const BUSINESS_RULES: Rule[] = [
   ...WORKBENCH_RULES, ...DIAL_RULES, ["PUT", "dial", "script"], ...GET_VIEWS.map((a) => ["GET", a] as Rule), ...PERSONAL_RULES, ...BELL_RULES, ...NOTIFY_ADMIN_RULES, ...BELL_RULES, ...NOTIFY_ADMIN_RULES,
-  ["GET", "email"], ["GET", "daily"], ["GET", "cleanup"], ["POST", "cleanup"], ["GET", "meetings"], ["POST", "meetings"], ["PUT", "meetings"], ["GET", "connections"], ["POST", "connections"], ["DELETE", "connections"], ["GET", "settings"], ["GET", "api-keys"], ["GET", "sync-status"], ["GET", "call-queue"],
+  ["GET", "email"], ["GET", "sync-run"], ["GET", "daily"], ["GET", "cleanup"], ["POST", "cleanup"], ["GET", "meetings"], ["POST", "meetings"], ["PUT", "meetings"], ["GET", "connections"], ["POST", "connections"], ["DELETE", "connections"], ["GET", "settings"], ["GET", "api-keys"], ["GET", "sync-status"], ["GET", "call-queue"],
   ["GET", "call-lists"], ["GET", "call-outcomes"], ["GET", "goals"], ["GET", "exec-summary"], ["GET", "daily-brief"], ["GET", "digest"],
   ["GET", "export", "stale"], ["GET", "export", "duplicates"], ["GET", "export", "inbox"], ["GET", "export", "deals"], ["GET", "export", "alerts"],
   ["POST", "email", "check"], ["POST", "alerts"], ["POST", "duplicates"], ["POST", "usage"], ["POST", "today", "action"], ["POST", "today", "views"], ["POST", "roadmap"], ["POST", "feedback"], ["POST", "problem"], ["POST", "audit", "share"], ["POST", "audit", "revoke"], ["POST", "sync"], ["POST", "call-lists"], ["POST", "call-outcomes"],
