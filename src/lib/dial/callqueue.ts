@@ -4,7 +4,8 @@
 import { rankScore } from "./dial.ts";
 import { callWindow, DEFAULT_WINDOW, type Window } from "./dial6.ts";
 
-export const DEFAULT_TAG = "subsync-call-now";
+// Neutral on purpose (white-label safe). A tag a customer already saved (for example the earlier default) is kept as it is: cleanQueueTag only replaces a missing or invalid value.
+export const DEFAULT_TAG = "call-now";
 export const TAG_RE = /^[a-z0-9][a-z0-9 _-]{1,48}$/i;
 export const cleanQueueTag = (v: unknown): string => (typeof v === "string" && TAG_RE.test(v.trim()) ? v.trim().toLowerCase() : DEFAULT_TAG);
 export const WORKFLOW_ID_RE = /^[A-Za-z0-9-]{8,64}$/;

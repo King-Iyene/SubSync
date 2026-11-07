@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useApiClient, useData } from "../session";
+import { WorkflowSetupCard } from "./workflow-setup-card";
 
 // "Send to your CRM call queue" and the Auto call queue card (docs/features/DIALQUEUE.md). SubSync cannot start a call itself; the call queue is your CRM's own dialer. SubSync adds a tag
 // (or enrols the lead in a workflow) that you set up once in your CRM, and your CRM's Manual Actions page fills itself. Everything is previewed first, and adding cannot be undone from SubSync.
@@ -85,7 +86,7 @@ function Setup({ accounts, canEdit, onChange }: { accounts: Account[]; canEdit: 
   const would = async () => { try { const r = await api.post<Prev>("dial/cq-preview", { locationId: loc, auto: true }); setPv(r.message); } catch { setPv("Could not preview right now."); } };
   return (
     <div className="mt-3 rounded-lg border p-3 text-sm" data-testid="cq-setup">
-      <ol className="s6-label mb-3 list-decimal pl-5"><li>In your CRM, create a workflow that starts when a contact is tagged <b>{s?.tag ?? "subsync-call-now"}</b>.</li><li>Add a Manual Action: Call step (and, if you like, a step that removes the tag) and publish it.</li><li>Switch Auto on here. Your CRM&apos;s Manual Actions page then fills itself, and a smart list on that tag is a live view of the queue.</li></ol>
+      <WorkflowSetupCard loc={loc} canEdit={canEdit} tag={s?.tag ?? "call-now"} />
       {accounts.length > 1 && <select aria-label="Account" className="mb-2 min-h-9 rounded-md border bg-card px-2" value={loc} onChange={(e) => setLoc(e.target.value)}>{accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select>}
       {!s ? <p className="s6-label">Loading...</p> : (
         <div className="flex flex-col gap-2">

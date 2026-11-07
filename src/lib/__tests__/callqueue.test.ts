@@ -62,7 +62,7 @@ test("executor with a stub client: adds and removes the tag, stops on missing pe
   const seen: CrmRequest[] = []; const rec: string[] = [];
   const plan = planQueue([cand("a"), cand("b")], new Set(["L1:gone"]), none, cfg, NOW);
   const ok = async (r: CrmRequest): Promise<WriteResult> => { seen.push(r); return { outcome: "written", id: null }; };
-  const d = await execute(plan, { route: "tag", tag: "subsync-call-now" }, ok, async (a) => { rec.push(`${a.action}:${a.contactId}:${a.status}`); }, { sleep: async () => undefined });
+  const d = await execute(plan, { route: "tag", tag: "call-now" }, ok, async (a) => { rec.push(`${a.action}:${a.contactId}:${a.status}`); }, { sleep: async () => undefined });
   assert.deepEqual([d.added, d.removed], [2, 1]);
   assert.deepEqual(seen.map((r) => `${r.method} ${r.path}`), ["DELETE /contacts/gone/tags", "POST /contacts/a/tags", "POST /contacts/b/tags"]);
   const slept: number[] = []; seen.length = 0;

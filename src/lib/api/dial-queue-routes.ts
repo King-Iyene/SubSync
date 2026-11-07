@@ -1,6 +1,7 @@
 import { sql } from "../db";
 import { apply, checkSetup, getSettings, preview, saveSettings, status } from "../dial/callqueue-run";
 import { isListId } from "../dial/dial";
+import { checkSetupNow, runSetup, saveSetupSettings, setupView } from "../workflows-setup/run";
 import { BATCH_MAX, statusLine } from "../dial/callqueue";
 import type { deepLinks } from "../links";
 import { json, type AuthContext } from "./auth";
@@ -38,14 +39,26 @@ export async function handleCallQueue(ctx: Ctx, h: H): Promise<Response> {
         status: st.accounts.map((a) => ({ ...a, line: statusLine({ ...a, live: true }, now) })),
       });
     }
+    if (what?.startsWith("cq-wf") && ctx.demo) {
+      // The demo never touches a real account: the setup answers as a dry run.
+      if (what === "cq-wf" && m === "GET") return json({ ready: true, state: "none", workflowId: null, updateAvailable: false, lastError: null, live: false, tag: "call-now", folderDefault: "Lead Response Automations", settings: { folderName: "Lead Response Automations", autoSetup: false, assignMode: "round_robin", assignUserId: null } });
+      return json({ state: "would_create", message: 'Would create folder "Lead Response Automations" and workflow "Call queue". Nothing was sent: this is the demo.', lines: [] });
+    }
     const a = await account(ctx, h, loc);
     if (!a) return json({ error: "Client account not found." }, 404);
     if (what === "cq-setup" && m === "GET") { const s = await getSettings(ctx.installationId, a.id); return json({ ready: s.ready, settings: s.s, canEdit: writer }); }
+    if (what === "cq-wf" && m === "GET") return json({ ...(await setupView(ctx.installationId, a.id)), canEdit: writer });
     if (!writer) return json({ error: "Ask your administrator to change the call queue." }, 403);
     if (what === "cq-setup" && m === "PUT") {
       const r = await saveSettings(ctx.installationId, a.id, body ?? {});
       return json(r, r.ok ? 200 : 400);
     }
+    if (what === "cq-wf-settings" && m === "PUT") { const r = await saveSetupSettings(ctx.installationId, a.id, body ?? {}); return json(r, r.ok ? 200 : 400); }
+    if (what === "cq-wf-setup" && m === "POST") {
+      if (body?.confirm !== true) return json({ error: "Confirm first." }, 400);
+      return json(await runSetup({ installationId: ctx.installationId, companyId: a.companyId, locationId: a.id, manual: true }));
+    }
+    if (what === "cq-wf-check" && m === "POST") return json(await checkSetupNow({ installationId: ctx.installationId, companyId: a.companyId, locationId: a.id }));
     if (what === "cq-check" && m === "POST") {
       const cur = await getSettings(ctx.installationId, a.id);
       const s = { ...cur.s, route: body?.route === "workflow" ? "workflow" as const : cur.s.route, workflowId: typeof body?.workflowId === "string" ? body.workflowId.trim() : cur.s.workflowId };

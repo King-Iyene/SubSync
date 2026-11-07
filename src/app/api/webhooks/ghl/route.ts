@@ -86,7 +86,11 @@ export async function POST(request: Request) {
         const applied = action.kind === "resync" && event.locationId
           ? await applyLiveWebhook({ installationId: target.id, locationId: event.locationId, type: event.type, body: parsed }, { token: (loc) => locationAccessToken(target.companyId, loc) })
           : { skipResync: false };
-        if (action.kind === "install") await enqueueFullSync(target.id);
+        if (action.kind === "install") {
+          await enqueueFullSync(target.id);
+          // Workflow setup runs only when this account switched automatic setup on; it never stops an install.
+          if (event.locationId) await (await import("@/lib/workflows-setup/run")).autoSetupOnInstall(target.id, target.companyId, event.locationId);
+        }
         else if (action.kind === "resync" && event.locationId && !applied.skipResync) await enqueueAreaSync(target.id, event.locationId, action.scope);
         // A new contact: compare it with the account's contacts right now (bounded to a couple of seconds, never throws).
         // A message or call, a new contact, an owner change: keep its metadata (never the text) for the speed screens. A retry writes nothing new.
