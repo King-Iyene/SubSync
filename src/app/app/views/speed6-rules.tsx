@@ -228,16 +228,16 @@ export function DigestCard({ accounts }: { accounts: Array<{ id: string; name: s
 }
 
 /** The Rules tab: three cards first, the rest behind More (routing check and the printable response-speed report). */
-export function RulesTab6(p: { who: string; waiting: number; dollars: number | null; typical: string | null; canChange: boolean; targetMinutes: number; go: GoFn; multi: boolean; accounts?: Array<{ id: string; name: string }>; rest: ReactNode }) {
-  const { data: d, error, reload } = useData<Preview>("speed?part=ladder");
+export function RulesTab6(p: { who: string; waiting: number; dollars: number | null; typical: string | null; canChange: boolean; targetMinutes: number; go: GoFn; multi: boolean; seePeople?: boolean; accounts?: Array<{ id: string; name: string }>; rest: ReactNode }) {
+  const { data: d, error, reload } = useData<Preview>(p.seePeople === false ? null : "speed?part=ladder"); // a client's staff do not see the people on the ladder, so the screen does not ask for it (it would be refused)
   return (
     <div data-testid="rules-tab">
       <Fold keep={4} testId="rules-fold"><Band title="How we reply" />
         <div className="s6-grid s6-three">
           <TargetCard targetMinutes={p.targetMinutes} canChange={p.canChange} />
-          {error ? <ErrorState error={error} onRetry={reload} /> : !d ? <SkeletonRows rows={3} label="Building the preview..." /> : <EscalationCard canChange={p.canChange} d={d} reload={reload} />}
+          {p.seePeople === false ? null : error ? <ErrorState error={error} onRetry={reload} /> : !d ? <SkeletonRows rows={3} label="Building the preview..." /> : <EscalationCard canChange={p.canChange} d={d} reload={reload} />}
         </div>
-        <DigestCard accounts={p.accounts ?? []} />
+        {p.seePeople === false ? null : <DigestCard accounts={p.accounts ?? []} />}
         {d && <><Band title="Right now" /><WaitingNowCard multi={p.multi} fallback={d.leads} /></>}
         {p.rest}
       </Fold>
