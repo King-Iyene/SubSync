@@ -129,9 +129,9 @@ export function FastSection({ d, range, open, showAccount, reload }: { d: Pictur
         </>
       )}
       {single && (
-        <p className="mt-3 text-sm text-muted-foreground" data-testid="speed-target">
+        <div className="mt-3 text-sm text-muted-foreground" data-testid="speed-target">
           Reply target for {single.name}: <TargetEditor locationId={single.locationId} minutes={single.targetMinutes} own={single.ownTarget} defaultMinutes={d.targetMinutes} ready={d.targetsReady} canChange={d.canChangeTarget} accountName={single.name} onSaved={reload} />
-        </p>
+        </div>
       )}
       {weeks.length >= 2 && (
         <div className="mt-6" data-testid="speed-weeks">
@@ -164,7 +164,7 @@ function AccountRows({ rows, d, open, win, reload }: { rows: CompareAccountRow[]
           <div className="col-span-2 flex flex-wrap items-center gap-x-4 text-sm @xl:contents">
             <p className="tnum">{a.ranked && a.hitRate !== null ? `${Math.round(a.hitRate * 100)}% in time` : <span className="text-muted-foreground">{a.progress}</span>}</p>
             <p className="tnum"><NumberButton label={`${a.name}: ${a.judged} leads, open the list`} onClick={() => open({ title: a.name, params: { status: "all", account: a.id, ...win } })}>{a.judged} {a.judged === 1 ? "lead" : "leads"}</NumberButton></p>
-            <p className="min-w-0 text-muted-foreground" data-testid="slow-target">Target <TargetEditor locationId={a.id} minutes={a.targetMinutes} own={a.ownTarget} defaultMinutes={d.targetMinutes} ready={d.targetsReady} canChange={d.canChangeTarget} accountName={a.name} onSaved={reload} /></p>
+            <div className="min-w-0 text-muted-foreground" data-testid="slow-target">Target <TargetEditor locationId={a.id} minutes={a.targetMinutes} own={a.ownTarget} defaultMinutes={d.targetMinutes} ready={d.targetsReady} canChange={d.canChangeTarget} accountName={a.name} onSaved={reload} /></div>
           </div>
         </li>
       ))}

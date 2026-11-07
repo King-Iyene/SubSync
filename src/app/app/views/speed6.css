@@ -177,3 +177,19 @@ li[data-tier="Surge"] .s6-rank { background: color-mix(in srgb, var(--s6-violet)
 .s6-chip { height: 20px; padding: 0 7px; font-size: 0.6875rem; gap: 4px; }
 .s6-btn[data-size="sm"] { min-height: 30px; padding: 0 12px; font-size: 0.8125rem; border-radius: 8px; }
 @media (max-width: 640px) { .s6-ready li { flex-wrap: wrap; } .s6 .s6-btn[data-size="sm"] { min-height: 44px; } }
+
+/* SPEED close-out: on a phone the page header (sync, search, bell, account scope, feedback links) and every popup opened from Speed (lists, menus, notices) had controls of 34 to 39 px; lift them to the 44 px touch size. */
+@media (max-width: 640px) {
+  body:has(.s6) main :is(button, [role="button"], summary):not(.s6 *) { min-height: 44px; }
+  body:has(.s6) :is([role="dialog"], [aria-modal="true"], [role="menu"]) :is(button, [role="menuitem"], summary) { min-height: 44px; }
+  body:has(.s6) :is([role="dialog"], [aria-modal="true"]) :is(button[aria-label="Close"], button[aria-label^="Close"]) { min-width: 44px; }
+}
+@media (max-width: 640px) {
+  .s6 button { min-width: 44px; }
+  .s6 select, .s6 input:not([type="checkbox"], [type="radio"], [type="range"]) { min-height: 44px; }
+  .s6 label:has(> input[type="checkbox"]) { min-height: 44px; display: inline-flex; align-items: center; gap: 8px; }
+  body:has(.s6) [aria-label^="Search people"] { min-width: 44px; }
+}
+
+/* SPEED close-out: in the dark theme the muted-text rule above out-ranked the selected tab's white label (3.3:1 on the teal fill); keep the selected tab white. */
+[data-theme="dark"] .s6 .spd-tab[aria-selected="true"] { color: var(--spd-on, #ffffff); }

@@ -192,7 +192,7 @@ function RoutingCard() {
   );
 }
 
-export function RulesTab(p: { who: string; waiting: number; dollars: number | null; typical: string | null; canChange: boolean; targetMinutes: number; go: GoFn; multi?: boolean; accounts?: Array<{ id: string; name: string }> }) {
+export function RulesTab(p: { who: string; waiting: number; dollars: number | null; typical: string | null; canChange: boolean; targetMinutes: number; go: GoFn; multi?: boolean; seePeople?: boolean; accounts?: Array<{ id: string; name: string }> }) {
   return <RulesTab6 {...p} multi={p.multi ?? false} rest={<><RoutingCard /><ProofReport /></>} />;
 }
 
