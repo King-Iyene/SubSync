@@ -174,26 +174,30 @@ export function PeopleTab({ multi }: { multi: boolean }) {
 export function CaptureTab() {
   const { range } = useSpeedFilter();
   const { data: g, error, reload } = useData<GrowthData>(range ? `today/growth?from=${range.from}&to=${range.to}` : null);
+  // The numbers at the top arrive first (a small answer); the chart and the lists follow in the full answer. Both share one computation on the server.
+  const head = useData<GrowthData>(range ? `today/growth?from=${range.from}&to=${range.to}&part=counters` : null).data;
+  const c0 = g ?? head;
   const [mode, setMode] = useChartMode("speed-capture");
   const [panel, setPanel] = useState<ReturnType<typeof specDay> | null>(null);
   const [slow, again] = useSlow(!g && !error);
   if (error) return <ErrorState error={error} onRetry={reload} />;
   if (!g && slow) return <div data-testid="capture-tab"><EmptyState title="This is taking too long" body="There are a lot of leads in these dates. Try a shorter range, or try again." action={<button type="button" data-testid="capture-retry" className="ds-press h-10 rounded-lg border bg-card px-4 text-sm font-medium" onClick={() => { again(); void reload(); }}>Retry</button>} /></div>;
-  if (!g) return <div data-testid="capture-tab"><SkeletonRows rows={5} label="Counting email leads..." /></div>;
-  const rangeWord = (range?.sentence ?? g.range.label).toLowerCase();
+  if (!c0) return <div data-testid="capture-tab"><SkeletonRows rows={5} label="Counting email leads..." /></div>;
+  const rangeWord = (range?.sentence ?? c0.range.label).toLowerCase();
   const periods = [["today", "Today"], ["week", "This week"], ["month", "This month"], ["all", "All time"]] as const;
-  const removed = g.gross.removed.duplicate + g.gross.removed.junk + g.gross.removed.staff + g.gross.removed.role;
+  const removed = c0.gross.removed.duplicate + c0.gross.removed.junk + c0.gross.removed.staff + c0.gross.removed.role;
   return (
     <div data-testid="capture-tab">
       <Card id="capture-counters">
         <H title="People who gave an email" tip="Unique people with a usable email, counted once. Extra copies, test records and your own staff are taken out. Percent compares with the same stretch just before; under 5 earlier it says too few to compare." />
         <ul className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4">
-          {periods.map(([k, label]) => { const c = g.changes[k]; return (
-            <li key={k} data-testid={`capture-${k}`}><span className="t-label block">{label}</span><button type="button" disabled={c.count === 0} onClick={() => setPanel(specPeriod(g, k as Period))} data-testid={`capture-${k}-open`} data-count={c.count} title={c.count === 0 ? "Nobody yet" : `Click to see the ${c.count.toLocaleString("en-US")} people (${label.toLowerCase()})`} aria-label={`${label}: ${c.count.toLocaleString("en-US")} people. See them.`}
+          {periods.map(([k, label]) => { const c = c0.changes[k]; return (
+            <li key={k} data-testid={`capture-${k}`}><span className="t-label block">{label}</span><button type="button" disabled={c.count === 0 || !g} onClick={() => setPanel(specPeriod(g as GrowthData, k as Period))} data-testid={`capture-${k}-open`} data-count={c.count} title={c.count === 0 ? "Nobody yet" : `Click to see the ${c.count.toLocaleString("en-US")} people (${label.toLowerCase()})`} aria-label={`${label}: ${c.count.toLocaleString("en-US")} people. See them.`}
                 className="ds-press t-figure t-num mt-1 block min-h-11 cursor-pointer text-left underline decoration-dotted underline-offset-4 hover:decoration-solid disabled:cursor-default disabled:no-underline sm:min-h-0">{fmtStat(c.count)}</button>
               <span className="t-small t-quiet">{k === "all" ? "" : c.pct === null ? "Too few to compare" : `${c.direction === "up" ? "▲ Up" : c.direction === "down" ? "▼ Down" : "No change"} ${Math.abs(c.pct)}%`}</span></li>); })}
         </ul>
       </Card>
+      {!g ? <SkeletonRows rows={4} label="Loading the chart and the lists..." /> : <>
       <Card id="capture-chart">
         <H title={`New email leads each day, ${rangeWord}`} tip="One mark a day, one person once. The dashed line is the 7 day average. Select a day to see its people.">
           <span className="flex items-center gap-3"><ModeToggle mode={mode} onChange={setMode} label="New email leads each day" />
@@ -221,6 +225,7 @@ export function CaptureTab() {
         </Card>
       )}
       {panel && <RecordsPanel key={panel.key} spec={panel} onClose={() => setPanel(null)} now={g.now} zone={g.zone} canExport />}
+      </>}
     </div>
   );
 }
