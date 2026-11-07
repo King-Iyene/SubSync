@@ -190,3 +190,6 @@ li[data-tier="Surge"] .s6-rank { background: color-mix(in srgb, var(--s6-violet)
   .s6 label:has(> input[type="checkbox"]) { min-height: 44px; display: inline-flex; align-items: center; gap: 8px; }
   body:has(.s6) [aria-label^="Search people"] { min-width: 44px; }
 }
+
+/* SPEED close-out: in the dark theme the muted-text rule above out-ranked the selected tab's white label (3.3:1 on the teal fill); keep the selected tab white. */
+[data-theme="dark"] .s6 .spd-tab[aria-selected="true"] { color: var(--spd-on, #ffffff); }

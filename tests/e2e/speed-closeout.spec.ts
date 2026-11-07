@@ -56,3 +56,13 @@ test("a business owner's Log tab has no invalid HTML nesting (a form inside a pa
   await expect(page.getByTestId("speed-target")).toBeVisible({ timeout: 90_000 });
   expect(errs).toEqual([]);
 });
+
+test("dark theme: the selected Speed tab keeps a white label on its teal fill", async ({ page }) => {
+  test.setTimeout(240_000);
+  await page.context().addInitScript(() => { try { localStorage.setItem("subsync-theme", "dark"); } catch { /* blocked storage */ } });
+  await page.goto("/app#speed");
+  await page.reload();
+  const tab = page.getByRole("tab", { name: /^Race/ });
+  await tab.waitFor({ timeout: 120_000 });
+  await expect(tab).toHaveCSS("color", "rgb(255, 255, 255)");
+});
