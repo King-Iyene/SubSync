@@ -57,7 +57,7 @@ export async function accountsOf(installationId: string, permits: (l: string) =>
 // A short per-account-and-range cache: the Capture tab reads up to 40,000 contacts and counts them, which takes seconds on a 50,000-contact account, and the same
 // person opening the tab twice (or two people on the same account) should not pay for it twice. 45 seconds is short enough that new leads still show up promptly.
 const GROWTH_TTL_MS = 45_000;
-const growthCache = new Map<string, { at: number; data: ReturnType<typeof buildGrowth> }>();
+const growthCache = new Map<string, { at: number; data: Promise<ReturnType<typeof buildGrowth>> }>();
 export function clearGrowthCache() { growthCache.clear(); }
 
 export async function growthRead(ctx: Ctx, deps: GrowthDeps): Promise<Response> {
@@ -69,17 +69,27 @@ export async function growthRead(ctx: Ctx, deps: GrowthDeps): Promise<Response> 
   const accounts = asked.client ? everyone.filter((a) => a.id === asked.client) : everyone;
   if (asked.client && accounts.length === 0) return json({ error: "That client is not in your list." }, 404);
   const cacheKey = [ctx.installationId, accounts.map((a) => a.id).sort().join(","), asked.from ?? "", asked.to ?? "", ctx.kind === "agency" && accounts.length > 1 ? "agency" : "account"].join("|");
-  const hit = growthCache.get(cacheKey);
-  if (hit && Date.now() - hit.at < GROWTH_TTL_MS) return json(ctx.kind === "client" ? { ...hit.data, rules: { ...hit.data.rules, internalDomains: [] } } : hit.data);
-  const [{ rules, ready: settingsReady }, { goals, ready: goalsReady }, { contacts, partial }] = await Promise.all([
-    loadRules(ctx.installationId), loadGoals(ctx.installationId), deps.contactUrl(ctx).then((u) => loadContacts(ctx.installationId, accounts.map((a) => a.id), u)),
-  ]);
-  const mine = Object.fromEntries(Object.entries(goals).filter(([l]) => permits(l)));
-  const data = buildGrowth({ now: Date.now(), accounts, contacts, rules, goals: mine, scope: ctx.kind === "agency" && accounts.length > 1 ? "agency" : "account", partial, range: asked.from && asked.to ? { from: asked.from, to: asked.to, label: rangeLabel(asked.from, asked.to) } : undefined, setup: { goalsReady, settingsReady } });
-  if (growthCache.size > 50) growthCache.clear();
-  growthCache.set(cacheKey, { at: Date.now(), data });
+  // The same read is shared by the counters request and the full request the tab sends together: one computation, kept for 45 seconds (and dropped if it fails).
+  let hit = growthCache.get(cacheKey);
+  if (!hit || Date.now() - hit.at >= GROWTH_TTL_MS) {
+    if (growthCache.size > 50) growthCache.clear();
+    const compute = (async () => {
+    const [{ rules, ready: settingsReady }, { goals, ready: goalsReady }, { contacts, partial }] = await Promise.all([
+      loadRules(ctx.installationId), loadGoals(ctx.installationId), deps.contactUrl(ctx).then((u) => loadContacts(ctx.installationId, accounts.map((a) => a.id), u)),
+    ]);
+    const mine = Object.fromEntries(Object.entries(goals).filter(([l]) => permits(l)));
+    const data = buildGrowth({ now: Date.now(), accounts, contacts, rules, goals: mine, scope: ctx.kind === "agency" && accounts.length > 1 ? "agency" : "account", partial, range: asked.from && asked.to ? { from: asked.from, to: asked.to, label: rangeLabel(asked.from, asked.to) } : undefined, setup: { goalsReady, settingsReady } });
+      return data;
+    })();
+    hit = { at: Date.now(), data: compute };
+    growthCache.set(cacheKey, hit);
+    compute.catch(() => growthCache.delete(cacheKey));
+  }
+  const data = await hit.data;
+  // part=counters: only the numbers of the top of the tab (a small answer, so the tab can show them first). The lists and the chart follow in the full answer.
+  const shaped = new URL(ctx.request.url).searchParams.get("part") === "counters" ? { ...data, series: [], records: [], recentAll: [], league: [], signals: [], mix: { ...data.mix } } : data;
   // A client's staff never see which internal addresses the company leaves out.
-  return json(ctx.kind === "client" ? { ...data, rules: { ...data.rules, internalDomains: [] } } : data);
+  return json(ctx.kind === "client" ? { ...shaped, rules: { ...shaped.rules, internalDomains: [] } } : shaped);
 }
 
 /** "Last 7 days" when the dates are exactly that many days ending today, otherwise the two dates. */

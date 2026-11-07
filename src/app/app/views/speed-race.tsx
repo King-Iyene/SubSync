@@ -1,6 +1,7 @@
 "use client";
 
 import { MoreHorizontal, PhoneCall } from "lucide-react";
+import { LeadMark, LeadTag, openOnRowClick, ROW_CLICK } from "./speed-lead-row";
 import { useEffect, useState, useMemo } from "react";
 import { raceState, type Score } from "@/lib/analytics/speed-v4";
 import { fmtDuration } from "@/lib/analytics/speed-intel";
@@ -160,10 +161,10 @@ export function RaceTab({ multi, onCall }: { multi: boolean; onCall?: () => void
         {rows.length === 0 ? <EmptyState title="No new leads in the last 2 days" body="A new lead appears here the moment it arrives, with its clock running." /> : (
           <ul className="@container divide-y border-y" data-testid="race-rows">
             {rows.map((r, i) => (
-              <li key={rowKey(r)} className="ds-row grid grid-cols-[6rem_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 py-2.5" data-testid="race-row">
+              <li key={rowKey(r)} onClick={openOnRowClick(() => actions.show(i))} className={`ds-row grid grid-cols-[6rem_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 py-2.5 ${ROW_CLICK}`} data-testid="race-row">
                 <LiveTimer lead={r} now={now} />
                 <div className="min-w-0">
-                  <button type="button" onClick={() => actions.show(i)} className="block max-w-full cursor-pointer truncate text-left font-semibold hover:underline" data-tip="Click to open this lead" title={undefined}>{r.name}</button>
+                  <button type="button" onClick={() => actions.show(i)} className="block max-w-full cursor-pointer truncate text-left font-semibold hover:underline" data-tip="Click to open this lead" title={undefined}><LeadMark name={r.name} />{r.name}<LeadTag /></button>
                   <p className="t-small t-quiet truncate" title={whyLine(r, multi)}>{whyLine(r, multi)}</p>
                   <DupChips dup={r.duplicateOf ?? null} repeat={r.repeat === true} />
                 {r.touchedAt === null && reasons.get(rowKey(r)) && <p className="mt-1"><DelayChip reason={reasons.get(rowKey(r)) as ReasonKey} /></p>}

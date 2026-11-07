@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { LeadMark, LeadTag } from "./speed-lead-row";
+import { humanWait } from "@/lib/design/wait";
 import { ErrorState, SkeletonRows } from "../ds";
 import { WhatIs } from "../ds/what-is";
 import { useApiClient, useData } from "../session";
@@ -173,7 +175,7 @@ export function LadderCard({ canChange }: { canChange: boolean }) {
           {d.leads.slice(0, 8).map((l) => (
             <li key={`${l.locationId}:${l.contactId}`}>
               <button type="button" onClick={() => setPick(l)} data-testid="ladder-lead" data-tip={`Waiting ${l.waitedMin} min. ${l.stepWords}.`} className="ds-press flex min-h-11 w-full cursor-pointer items-center justify-between gap-3 py-1 text-left hover:bg-[var(--t-raise)] focus-visible:outline-2 focus-visible:outline-[var(--ring)]">
-                <span className="truncate font-medium">{l.name}</span><span className="t-small t-quiet shrink-0">Step {l.step} of 3 · {l.waitedMin} min</span>
+                <span className="truncate font-medium"><LeadMark name={l.name} />{l.name}<LeadTag /></span><span className="t-small t-quiet shrink-0">Step {l.step} of 3 · {humanWait(l.waitedMin)}</span>
               </button>
             </li>
           ))}
@@ -183,7 +185,7 @@ export function LadderCard({ canChange }: { canChange: boolean }) {
         <SidePopup label="Escalation" onClose={() => setPick(null)}>
           <div data-testid="ladder-popup">
             <h3 className="t-title">{pick.name}</h3>
-            <p className="t-small t-quiet">{pick.account} · waiting {pick.waitedMin} min, target {pick.targetMin} min</p>
+            <p className="t-small t-quiet">{pick.account} · waiting {humanWait(pick.waitedMin)}, target {pick.targetMin} min</p>
             <ol className="mt-4 space-y-2 text-sm">
               <li className={pick.step >= 1 ? "font-semibold" : ""}>1. The owner is told{pick.owner ? `: ${pick.owner}` : " (nobody owns this lead)"}</li>
               <li className={pick.step >= 2 ? "font-semibold" : ""}>2. The next person is told{pick.nextPerson ? `: ${pick.nextPerson}` : ""}</li>
