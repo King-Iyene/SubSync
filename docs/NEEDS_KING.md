@@ -211,3 +211,12 @@ S0.2b needs none (nothing new is read or written in the CRM). S0.4 needs none (i
 - (e) **Migration:** none needed. Writes are audited in the existing `audit_log` (ids and field names only; never message text).
 - (f) **First live test (throwaway account, after section 29 steps 1-6):** from the workbench add a note, add and remove a tag, change the owner, move a test deal; each should show in the CRM; Undo restores. Then (only after adding `conversations/message.write`) send one SMS to your own phone. Never test on a client.
 - (g) **Delete is typed-confirm and cannot be undone**, and a client's staff cannot delete (they may message and note on their own account).
+
+## 31. From stage DIALQ (CRM call queue): decisions, scopes and the migration (renumber if another stage also took 31)
+
+1. **Migration to apply (not applied):** `supabase/migrations/20261116090000_call_queue.sql` (two new tables, additive). Until applied, the call-queue card says it needs the database update and nothing is sent.
+2. **Scope for the tag route (default): `contacts.write`**, already optional. Without it the first add answers "needs permission" and stops. Nothing else is needed.
+3. **Scopes only for the alternatives (add as OPTIONAL, only if you want them):** `workflows.readonly` (Check setup can verify a pasted workflow id and list workflows; the Workflows API is limited availability, so this may answer 403), `workflows.write` (only for the future "Set up call queue" button that creates the workflow; the Create Workflow API is enabled for selected accounts only). The enrol route (workflow id) uses `contacts.write`.
+4. **Your one-time CRM setup per account (the in-app guide says the same):** create a workflow, trigger "Contact tagged: subsync-call-now", action "Manual Action: Call", optional action "Remove tag", publish. Then switch Auto on in Call mode > Call queue setup. A smart list on that tag is a live view of the queue.
+5. **Switches:** nothing is written until `WRITE_GHL_LIVE` is on AND the account's write opt-in is on. Auto starts OFF for every account. First live test: one test account, a manual send of 1 lead.
+6. **Decision for you:** keep the tag route as default (recommended) and decide later whether to request `workflows.write` for one-click workflow creation. Do not build a Marketplace Module for "Add to call queue" (it bills the customer per execution).

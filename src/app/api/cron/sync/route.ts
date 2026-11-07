@@ -19,9 +19,10 @@ export async function GET(request: Request) {
   try {
     const scheduled = (await scheduleDailyRefresh()) + (await scheduleFastRefresh());
     const slice = await runSlice(240_000);
+    const callQueue = await import("@/lib/dial/callqueue-run").then((m) => m.runAutoCallQueues()).catch(() => null);
     // Keep the de-duplication table small.
     await sql()`delete from webhook_events where received_at < now() - interval '3 days'`;
-    return NextResponse.json({ scheduled, ...slice });
+    return NextResponse.json({ scheduled, ...slice, callQueue });
   } catch (error) {
     console.error("Cron sync failed", safeError(error));
     return NextResponse.json({ error: "Sync failed" }, { status: 500 });

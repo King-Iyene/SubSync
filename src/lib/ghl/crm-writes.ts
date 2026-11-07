@@ -7,7 +7,7 @@ import { ghlFetch } from "./http.ts";
 // "WOULD WRITE ..." (ids and field names only) and NOTHING is sent. The request shapes below follow the documented API
 // (docs/INTEGRATIONS_SPEC.md section 4) and are NOT VERIFIED LIVE: see docs/features/E0.md for the exact test that proves each one.
 
-export type WriteKind = "note" | "comment" | "field" | "task" | "tag";
+export type WriteKind = "note" | "comment" | "field" | "task" | "tag" | "enrol";
 
 /**
  * Conservative size limits, ASSUMED until the morning test (scripts/ghl-write-limits.ts) has measured the real ones. The documentation does not state a
@@ -26,7 +26,8 @@ export type FieldRequest = { method: "PUT"; path: string; version: string; scope
 export type TaskRequest = { method: "POST"; path: string; version: string; scope: "contacts.write"; body: { title: string; body?: string; dueDate: string; completed: false } };
 export type TagRequest = { method: "POST" | "DELETE"; path: string; version: string; scope: "contacts.write"; body: { tags: string[] } };
 export type DeleteRequest = { method: "DELETE"; path: string; version: string; scope: "contacts.write"; body: Record<string, never> };
-export type CrmRequest = NoteRequest | CommentRequest | FieldRequest | TaskRequest | TagRequest | DeleteRequest;
+export type EnrolRequest = { method: "POST"; path: string; version: string; scope: "contacts.write"; body: { eventStartTime?: string } };
+export type CrmRequest = EnrolRequest | NoteRequest | CommentRequest | FieldRequest | TaskRequest | TagRequest | DeleteRequest;
 
 const seg = (v: string) => encodeURIComponent(v);
 
@@ -62,6 +63,11 @@ export const buildDeleteOwn = (a: { contactId: string; kind: "notes" | "tasks"; 
   method: "DELETE", path: `/contacts/${seg(a.contactId)}/${a.kind}/${seg(a.id)}`, version: NOTE_VERSION, scope: "contacts.write", body: {},
 });
 
+/** POST /contacts/{contactId}/workflow/{workflowId} (scope contacts.write): puts one contact into a workflow. Docs read 6 Nov 2026; NOT VERIFIED LIVE (docs/features/DIALQUEUE.md). Cannot be undone. */
+export const buildEnrol = (a: { contactId: string; workflowId: string }): EnrolRequest => ({
+  method: "POST", path: `/contacts/${seg(a.contactId)}/workflow/${seg(a.workflowId)}`, version: NOTE_VERSION, scope: "contacts.write", body: {},
+});
+
 /** Field names a request would write, for the dry-run line (names only, never values). */
 export const fieldNamesOf = (r: CrmRequest): string[] => Object.keys(r.body);
 
@@ -93,7 +99,7 @@ export function idFromAnswer(json: unknown): string | null {
 
 export async function writeToCrm(a: WriteArgs, deps: Deps = {}): Promise<WriteResult> {
   const p = a.request.path;
-  const kind: WriteKind = p.startsWith("/conversations") ? "comment" : a.request.method === "PUT" ? "field" : p.endsWith("/tags") ? "tag" : /\/tasks(\/|$)/.test(p) ? "task" : "note";
+  const kind: WriteKind = /\/workflow\//.test(p) ? "enrol" : p.startsWith("/conversations") ? "comment" : a.request.method === "PUT" ? "field" : p.endsWith("/tags") ? "tag" : /\/tasks(\/|$)/.test(p) ? "task" : "note";
   const del = a.request.method === "DELETE" && kind !== "tag";
   const done = await outward(
     { flag: "WRITE_GHL_LIVE", verb: "WRITE", what: `crm.${kind}.${del ? "delete" : a.request.method === "DELETE" ? "remove" : kind === "field" ? "update" : "create"}`, installationId: a.installationId, ids: { locationId: a.locationId, contactId: a.contactId, meetingId: a.meetingId ?? null }, fields: fieldNamesOf(a.request) },

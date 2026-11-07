@@ -20,7 +20,7 @@ export const SESSION_CAP = 150;
 const HOUR = 3_600_000;
 
 /** The queue rows of a source list, with Do Not Disturb and owner read from SubSync's own copy of the contacts. */
-async function sourceRows(ctx: Ctx, allowed: string[] | null, list: string): Promise<Array<Omit<QueueItem, "url" | "dnd"> & { ownerId: string | null; dnd: boolean }>> {
+export async function sourceRows(ctx: { installationId: string }, allowed: string[] | null, list: string): Promise<Array<Omit<QueueItem, "url" | "dnd"> & { ownerId: string | null; dnd: boolean }>> {
   const db = sql();
   if (list === "redial") return redialRows(ctx.installationId, allowed) as never;
   const accountFilter = allowed ? db`and c.location_id = any(${allowed}::text[])` : db``;
@@ -137,6 +137,7 @@ async function scriptRoute(ctx: Ctx, h: DialHelpers): Promise<Response> {
 export async function handleDial(ctx: Ctx, h: DialHelpers): Promise<Response> {
   const what = ctx.segments[1];
   const m = ctx.request.method;
+  if (what?.startsWith("cq-")) return (await import("./dial-queue-routes")).handleCallQueue(ctx, h);
   if (what === "queue" && m === "GET") return queueRoute(ctx, h);
   if (what === "outcome" && m === "POST") return outcomeRoute(ctx, h);
   if (what === "stats" && m === "GET") return statsRoute(ctx, h);
