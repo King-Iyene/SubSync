@@ -2,13 +2,14 @@ import { sql } from "../db";
 import { apply, checkSetup, getSettings, preview, saveSettings, status } from "../dial/callqueue-run";
 import { isListId } from "../dial/dial";
 import { BATCH_MAX, statusLine } from "../dial/callqueue";
+import type { deepLinks } from "../links";
 import { json, type AuthContext } from "./auth";
 
 // The routes behind "Send to your CRM call queue" and Auto call queue, under /api/app/dial/cq-*. The browser only names an account and (for a manual send) a list or ticked leads; the people, the guards
 // (do not disturb, calling hours, caps, 24-hour memory) and the account's own opt-in are decided here. A client's staff (kind "client") can only look. SubSync cannot start a call itself.
 
 type Ctx = AuthContext & { request: Request; url: URL; segments: string[] };
-type H = { allowed: () => Promise<string[] | null> };
+type H = { allowed: () => Promise<string[] | null>; links: () => Promise<ReturnType<typeof deepLinks>> };
 const ID = /^[A-Za-z0-9_-]{3,128}$/;
 
 async function account(ctx: Ctx, h: H, locationId: unknown): Promise<{ id: string; companyId: string } | null> {
@@ -31,8 +32,9 @@ export async function handleCallQueue(ctx: Ctx, h: H): Promise<Response> {
       const rows = await sql()`select location_id, name from locations where installation_id = ${ctx.installationId} and not ignored ${allowed ? sql()`and location_id = any(${allowed}::text[])` : sql()``} order by name limit 300`;
       const st = await status(ctx.installationId, rows.map((r) => r.location_id as string));
       const now = Date.now();
+      const links = await h.links();
       return json({
-        ready: st.ready, accounts: rows.map((r) => ({ id: r.location_id as string, name: (r.name as string | null) ?? "Account" })), canEdit: writer,
+        ready: st.ready, queueLinks: Object.fromEntries(rows.map((r) => [r.location_id as string, links.manualActions(r.location_id as string)])), accounts: rows.map((r) => ({ id: r.location_id as string, name: (r.name as string | null) ?? "Account" })), canEdit: writer,
         status: st.accounts.map((a) => ({ ...a, line: statusLine({ ...a, live: true }, now) })),
       });
     }

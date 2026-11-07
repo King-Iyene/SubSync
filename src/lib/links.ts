@@ -29,6 +29,8 @@ export function deepLinks(source: DomainSource) {
   return {
     account: (loc: string) => `${base}/${loc}/dashboard`,
     contact: (loc: string, id: string) => `${base}/${loc}/contacts/detail/${id}`,
+    /** The CRM's own call and text task list (manual actions from workflows). */
+    manualActions: (loc: string) => `${base}/${loc}/conversations/manual_actions`,
     opportunities: (loc: string) => `${base}/${loc}/opportunities/list`,
     conversation: (loc: string, id: string) => `${base}/${loc}/conversations/conversations/${id}`,
   };
