@@ -138,3 +138,38 @@ test("colour maths: black on white is 21:1, and oklch converts to the right sRGB
   const black = parseColour("oklch(0 0 0)")!;
   assert.ok(black.r < 1 && black.g < 1 && black.b < 1);
 });
+
+// HDR: the Speed / Call mode accent pairs in both themes (speed6.css, speed-ui.css). A tab, a primary button or a chip on a tinted card must be readable
+// (4.5:1), so no light text on bright cyan and no washed-out chips on dark navy.
+{
+  const s6 = readFileSync(join(process.cwd(), "src", "app", "app", "views", "speed6.css"), "utf8");
+  const ui = readFileSync(join(process.cwd(), "src", "app", "app", "views", "speed-ui.css"), "utf8");
+  const vars = (css: string, header: string) => {
+    const i = css.indexOf(header); assert.ok(i >= 0, header);
+    const out: Record<string, string> = {};
+    for (const m of css.slice(i, css.indexOf("}", i)).matchAll(/--([a-z0-9-]+):\s*([^;]+);/g)) out[m[1]] = m[2].trim();
+    return out;
+  };
+  const l6 = vars(s6, "[data-theme] {");
+  const themes6 = { light: l6, dark: { ...l6, ...vars(s6, '[data-theme="dark"] {') } } as const;
+  const rgb = (v: string) => { const c = parseColour(v); assert.ok(c, v); return c; };
+  for (const theme of ["light", "dark"] as const) {
+    const t = themes6[theme];
+    test(`Speed accents are readable in ${theme}: primary button, chips, link ink`, () => {
+      assert.ok(contrast(rgb(t["s6-on-cyan"]), rgb(t["s6-fill"])) >= 4.5, "primary button text on its fill");
+      const surf = rgb(t["s6-surf"]);
+      assert.ok(contrast(rgb(t["s6-btn-ink"]), mix(surf, rgb(t["s6-cyan"]), 0.18)) >= 4.5, "button text on the tinted button");
+      for (const tone of ["cyan", "violet", "green", "amber", "red", "magenta", "orange", "blue", "lime"]) {
+        const base = rgb(t[`s6-${tone}`]);
+        const text = mix(base, rgb(t["s6-mixfg"]), 1 - parseFloat(t["s6-mixpct"]) / 100);
+        assert.ok(contrast(text, mix(surf, base, 0.16)) >= 4.5, `${tone} chip text on its tint (${theme})`);
+      }
+    });
+  }
+  test("Speed tabs and call-to-action: text on the accent fill passes in every theme block", () => {
+    const base = vars(ui, ".spd-tabs, .spd-cta {");
+    assert.ok(contrast(rgb(base["spd-on"]), rgb(base["spd-a"])) >= 4.5, "light");
+    const dark = vars(ui, '.dark .spd-tabs, [data-theme="dark"] .spd-tabs');
+    assert.ok(contrast(rgb(dark["spd-on"]), rgb(dark["spd-a"])) >= 4.5, "dark");
+  });
+}

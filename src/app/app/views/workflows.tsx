@@ -181,7 +181,7 @@ export function WorkflowsView({ go, kind }: { go: GoFn; kind: AccessKind }) {
             <div className="mb-8 grid gap-x-10 gap-y-8 lg:grid-cols-2">
               <WfDonut title="What state are they in?" marks={slices.map((s): Mark => ({ key: s.bucket, label: s.label, count: s.count, colour: COLOUR[s.bucket] }))} selected={mark}
                 onSelect={(k) => open_(k, BUCKET_LABEL[k as Bucket], "The items in this state.", inBucket(items, failing, k as Bucket))} centre="items" />
-              <WfBars title="Which client accounts need a look?" rows={data.bars.map((b) => ({ key: b.locationId, label: b.name, value: b.total, flag: b.attention }))} selected={mark}
+              <WfBars columns title="Which client accounts need a look?" rows={data.bars.map((b) => ({ key: b.locationId, label: b.name, value: b.total, flag: b.attention }))} selected={mark}
                 onSelect={(k) => open_(k, accounts.find((a) => a.locationId === k)?.name ?? "Client account", "Everything in this client account. The red part is failing or never ran.", inAccount(items, k))} />
               <WfTrend title="How many were failing, day by day" points={data.daily.failing} unit=" failing" colour="var(--destructive)" onPoint={(day) => open_(`day-${day}`, `Failing today`, `SubSync's own record shows ${data.daily.failing.find((p) => p.day === day)?.value ?? 0} failing on ${day}. The list below is the failing ones now.`, inBucket(items, failing, "failing"))} />
               <WfTrend title="Steps run in the last 30 days, as counted each day" points={data.daily.runs} colour="var(--chart-1)" onPoint={(day) => open_(`runs-${day}`, "Items that ran", `Counted on ${day}. Showing items with runs now.`, items.filter((w) => (w.runs30d ?? 0) > 0))} />

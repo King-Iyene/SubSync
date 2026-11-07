@@ -5,6 +5,9 @@ import { accountBars, accountsNeedingYou, barsTitle, donutTitle, headlineOf, KIN
 import {
   AccountBars, AccountList, ComingBlock, DonutChart, HeadlineBlock, InsightStrip, LocalAccountPicker, ProofStrip, PulseSpark, PulseTile, RaisedClearedStrip, RecordsPanel, RowsPanel, Section, ShowingChip, SinceStrip,
 } from "../app/ds";
+import { ColumnChart, type ColumnItem } from "../app/ds/column-chart";
+
+const BIG_SAMPLE: ColumnItem[] = Array.from({ length: 150 }, (_, i) => ({ key: `c${i}`, label: `Sample client ${i + 1}`, segments: [{ key: "a", label: "Replies", value: Math.round(40 / (1 + i / 6)) + (i % 5), colour: "var(--chart-1)" }, { key: "b", label: "Quiet deals", value: (i * 7) % 9, colour: "var(--chart-2)" }] }));
 import { itemsSpec } from "@/lib/analytics/today-records";
 import { forecastOf, type Insight, type SinceVisit } from "@/lib/analytics/today-smart";
 import { SAMPLE_PICKER_ACCOUNTS, SAMPLE_PROOF, SAMPLE_REPLY_POINTS, SAMPLE_TODAY_ITEMS, SAMPLE_TODAY_QUEUE, SAMPLE_TODAY_TOTALS } from "./sample-today";
@@ -66,6 +69,10 @@ export function TodayBlocks() {
             <RowsPanel title={KIND_LABEL[kind]} count={SAMPLE_TODAY_TOTALS[kind].count} noun="items" items={items} onClose={() => setKind(null)} />
           </div>
         )}
+      </Section>
+
+      <Section title="Columns for 150 client accounts" hint="One vertical column per client, sorted, Top 20 / Top 50 / All, hover for the numbers, click for the records, or show it as a table.">
+        <ColumnChart title="Things to do, by client (sample)" items={BIG_SAMPLE} unit="things" subject="client" legend={[{ key: "a", label: "Replies", colour: "var(--chart-1)" }, { key: "b", label: "Quiet deals", colour: "var(--chart-2)" }]} onSelect={() => undefined} />
       </Section>
 
       <Section title="Today: what SubSync caught" hint="Raised above the line, cleared below it. The word is cleared: SubSync can see a problem went away, not whether a person fixed it.">

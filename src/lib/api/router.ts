@@ -19,6 +19,7 @@ import { SYNCED_DELETE } from "../tenant-tables";
 import { SHARE_LINK_DAYS } from "../data-inventory";
 import { createKey, listKeys, MAX_KEYS, revokeKey } from "../mcp/store";
 import { postToSlack } from "../notify";
+import { changedLine, runState, SYNC_THROTTLE_MS, throttle, type RunStatus } from "../sync/run-status";
 import { enqueueFullSync, enqueueLocationSync, runSlice, syncStatus } from "../sync/engine";
 import { freshnessFor, syncPanel } from "../sync/freshness-queries";
 import {
@@ -1383,11 +1384,65 @@ async function purgeData(ctx: Ctx) {
   return json({ ok: true });
 }
 
+// One sync per account per 30 seconds: the latest queued job of this scope (one account, or the whole company) decides.
+async function syncTooSoon(ctx: Ctx, locationId: string | null) {
+  const [r] = await sql()`select max(created_at) t from sync_jobs where installation_id = ${ctx.installationId} and (${locationId}::text is null or location_id = ${locationId})`;
+  const t = throttle(r?.t instanceof Date ? r.t.getTime() : null, Date.now());
+  return t.ok ? null : json({ error: `A sync just started. Try again in ${t.retryAfterSec} seconds.`, retryAfterSec: t.retryAfterSec, throttledMs: SYNC_THROTTLE_MS }, 429);
+}
+
+// The status popup of "Sync now": progress by account while it runs, then what changed. `since` is when the person pressed the button.
+async function syncRunView(ctx: Ctx) {
+  const sinceRaw = ctx.url.searchParams.get("since") ?? "";
+  const sinceMs = Date.parse(sinceRaw);
+  const since = Number.isFinite(sinceMs) ? new Date(Math.min(sinceMs, Date.now())) : new Date(Date.now() - 60_000);
+  if (ctx.demo) {
+    const empty: RunStatus = { state: "done", startedAt: since.toISOString(), lastFinishedAt: new Date().toISOString(), accounts: [], progress: { done: 1, total: 1 }, changed: { contacts: 0, conversations: 0, appointments: 0 }, changes: [], errors: [] };
+    return json(empty);
+  }
+  const allowed = await allowedIds(ctx);
+  const only = allowed ? sql()`and location_id = any(${allowed}::text[])` : sql()``;
+  const db = sql();
+  const [jobs, names, c1, c2, c3, fails, [last]] = await Promise.all([
+    db`select location_id, status, count(*)::int n from sync_jobs where installation_id = ${ctx.installationId} and created_at >= ${since} and location_id is not null ${only} group by location_id, status`,
+    db`select location_id, name from locations where installation_id = ${ctx.installationId} ${only}`,
+    db`select location_id, count(*)::int n from cached_contacts where installation_id = ${ctx.installationId} and synced_at >= ${since} ${only} group by location_id`,
+    db`select location_id, count(*)::int n from cached_conversations where installation_id = ${ctx.installationId} and synced_at >= ${since} ${only} group by location_id`,
+    db`select location_id, count(*)::int n from cached_appointments where installation_id = ${ctx.installationId} and synced_at >= ${since} ${only} group by location_id`,
+    db`select location_id, error from sync_jobs where installation_id = ${ctx.installationId} and created_at >= ${since} and status = 'failed' ${only} order by finished_at desc limit 5`,
+    db`select max(finished_at) f from sync_jobs where installation_id = ${ctx.installationId} and status = 'done'`,
+  ]);
+  const nameOf = new Map(names.map((r) => [r.location_id as string, (r.name as string | null) ?? null]));
+  const acc = new Map<string, { locationId: string; name: string | null; pending: number; done: number; failed: number }>();
+  for (const j of jobs) {
+    const id = j.location_id as string;
+    const a = acc.get(id) ?? { locationId: id, name: nameOf.get(id) ?? null, pending: 0, done: 0, failed: 0 };
+    if (j.status === "pending" || j.status === "running") a.pending += j.n; else if (j.status === "done") a.done += j.n; else a.failed += j.n;
+    acc.set(id, a);
+  }
+  const accounts = [...acc.values()].sort((a, b) => b.pending - a.pending || (a.name ?? "").localeCompare(b.name ?? ""));
+  const tot = accounts.reduce((t, a) => ({ pending: t.pending + a.pending, done: t.done + a.done, failed: t.failed + a.failed }), { pending: 0, done: 0, failed: 0 });
+  const by = new Map<string, { locationId: string; name: string | null; contacts: number; conversations: number; appointments: number }>();
+  const add = (rows: ArrayLike<Record<string, unknown>>, k: "contacts" | "conversations" | "appointments") => {
+    for (const r of Array.from(rows)) { const id = r.location_id as string; const e = by.get(id) ?? { locationId: id, name: nameOf.get(id) ?? null, contacts: 0, conversations: 0, appointments: 0 }; e[k] += Number(r.n); by.set(id, e); }
+  };
+  add(c1, "contacts"); add(c2, "conversations"); add(c3, "appointments");
+  const changes = [...by.values()].sort((a, b) => b.contacts + b.conversations + b.appointments - (a.contacts + a.conversations + a.appointments)).slice(0, 10);
+  const changed = { contacts: c1.reduce((t, r) => t + Number(r.n), 0), conversations: c2.reduce((t, r) => t + Number(r.n), 0), appointments: c3.reduce((t, r) => t + Number(r.n), 0) };
+  const out: RunStatus = {
+    state: runState(tot), startedAt: since.toISOString(), lastFinishedAt: last?.f instanceof Date ? last.f.toISOString() : null, accounts, progress: { done: tot.done + tot.failed, total: tot.pending + tot.done + tot.failed },
+    changed, changes, errors: fails.map((f) => ({ locationId: (f.location_id as string | null) ?? null, error: String(f.error ?? "A read failed").slice(0, 160) })),
+  };
+  return json({ ...out, line: changedLine(changed) });
+}
+
 async function syncStart(ctx: Ctx) {
   if (ctx.demo) {
     await refreshInsights(ctx.installationId);
     return json({ ok: true, demo: true });
   }
+  const tooSoon = await syncTooSoon(ctx, ctx.limitTo ?? null);
+  if (tooSoon) return tooSoon;
   await enqueueFullSync(ctx.installationId);
   // Do a short slice now so the first results appear quickly; cron continues the rest.
   const slice = await runSlice(20_000);
@@ -1860,6 +1915,8 @@ async function resyncOne(ctx: Ctx, locationId: string) {
   if (ctx.limitTo && ctx.limitTo !== locationId) return json({ error: "Account not found" }, 404);
   const known = await sql()`select 1 from locations where installation_id = ${ctx.installationId} and location_id = ${locationId}`;
   if (known.length === 0) return json({ error: "Account not found" }, 404);
+  const tooSoon = await syncTooSoon(ctx, locationId);
+  if (tooSoon) return tooSoon;
   await enqueueLocationSync(ctx.installationId, locationId);
   const slice = await runSlice(15_000);
   return json({ ok: true, ...slice });
@@ -1990,6 +2047,7 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       if (a === "settings") return await settingsView(ctx);
       if (a === "export" && b) return await exportCsv(ctx, b);
       if (a === "sync-status") return await syncStatusView(ctx);
+      if (a === "sync-run") return await syncRunView(ctx);
       if (a === "freshness") return await freshnessView(ctx);
       if (a === "pipeline-intel" && ctx.url.searchParams.get("view") === "board") {
         return await handleBoard(ctx, { allowed: () => allowedIds(ctx), staleDays: async () => (await scope(ctx)).settings.staleDays, stageControls: (allowed, rules) => stageControlsFor(ctx, allowed, rules) });

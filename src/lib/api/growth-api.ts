@@ -35,14 +35,15 @@ export async function loadGoals(installationId: string): Promise<{ goals: Record
 export async function loadContacts(installationId: string, ids: string[], contactUrl: (l: string, c: string) => string): Promise<{ contacts: GrowthContact[]; partial: boolean }> {
   if (ids.length === 0) return { contacts: [], partial: false };
   const rows = await sql()`
-    select contact_id, location_id, first_name, last_name, full_name, email, phone, source, date_added, dnd, tags
+    select contact_id, location_id, first_name, last_name, full_name, email, phone, source, date_added, dnd,
+           exists (select 1 from unnest(tags) t where t ~* 'unsubscrib') as unsub
     from cached_contacts
     where installation_id = ${installationId} and location_id = any(${ids}::text[]) and email is not null and btrim(email) <> '' and date_added is not null
     order by date_added desc limit ${ROW_CAP + 1}`;
   const partial = rows.length > ROW_CAP;
   const contacts = rows.slice(0, ROW_CAP).map((r): GrowthContact => ({
     id: `${r.location_id}:${r.contact_id}`, locationId: r.location_id as string, name: ((r.full_name as string | null) || (r.email as string)).trim(), email: r.email as string,
-    source: (r.source as string | null) ?? null, at: (r.date_added as Date).getTime(), firstName: r.first_name as string | null, lastName: r.last_name as string | null, phone: r.phone as string | null, dnd: r.dnd === true || ((r.tags as string[] | null) ?? []).some((t) => /unsubscrib/i.test(t)),
+    source: (r.source as string | null) ?? null, at: (r.date_added as Date).getTime(), firstName: r.first_name as string | null, lastName: r.last_name as string | null, phone: r.phone as string | null, dnd: r.dnd === true || r.unsub === true,
     url: contactUrl(r.location_id as string, r.contact_id as string),
   }));
   return { contacts, partial };
@@ -53,6 +54,12 @@ export async function accountsOf(installationId: string, permits: (l: string) =>
   return rows.filter((r) => permits(r.location_id as string)).map((r) => ({ id: r.location_id as string, name: (r.name as string | null) ?? "Client", zone: (r.timezone as string | null) || "UTC", url: url(r.location_id as string) }));
 }
 
+// A short per-account-and-range cache: the Capture tab reads up to 40,000 contacts and counts them, which takes seconds on a 50,000-contact account, and the same
+// person opening the tab twice (or two people on the same account) should not pay for it twice. 45 seconds is short enough that new leads still show up promptly.
+const GROWTH_TTL_MS = 45_000;
+const growthCache = new Map<string, { at: number; data: ReturnType<typeof buildGrowth> }>();
+export function clearGrowthCache() { growthCache.clear(); }
+
 export async function growthRead(ctx: Ctx, deps: GrowthDeps): Promise<Response> {
   const permits = await deps.permits(ctx);
   // The tab's own dates and client. A client the caller may not read is refused here, from the signed session's list, never trusted from the address.
@@ -61,11 +68,16 @@ export async function growthRead(ctx: Ctx, deps: GrowthDeps): Promise<Response> 
   const everyone = await accountsOf(ctx.installationId, permits, await deps.accountUrl(ctx));
   const accounts = asked.client ? everyone.filter((a) => a.id === asked.client) : everyone;
   if (asked.client && accounts.length === 0) return json({ error: "That client is not in your list." }, 404);
+  const cacheKey = [ctx.installationId, accounts.map((a) => a.id).sort().join(","), asked.from ?? "", asked.to ?? "", ctx.kind === "agency" && accounts.length > 1 ? "agency" : "account"].join("|");
+  const hit = growthCache.get(cacheKey);
+  if (hit && Date.now() - hit.at < GROWTH_TTL_MS) return json(ctx.kind === "client" ? { ...hit.data, rules: { ...hit.data.rules, internalDomains: [] } } : hit.data);
   const [{ rules, ready: settingsReady }, { goals, ready: goalsReady }, { contacts, partial }] = await Promise.all([
     loadRules(ctx.installationId), loadGoals(ctx.installationId), deps.contactUrl(ctx).then((u) => loadContacts(ctx.installationId, accounts.map((a) => a.id), u)),
   ]);
   const mine = Object.fromEntries(Object.entries(goals).filter(([l]) => permits(l)));
   const data = buildGrowth({ now: Date.now(), accounts, contacts, rules, goals: mine, scope: ctx.kind === "agency" && accounts.length > 1 ? "agency" : "account", partial, range: asked.from && asked.to ? { from: asked.from, to: asked.to, label: rangeLabel(asked.from, asked.to) } : undefined, setup: { goalsReady, settingsReady } });
+  if (growthCache.size > 50) growthCache.clear();
+  growthCache.set(cacheKey, { at: Date.now(), data });
   // A client's staff never see which internal addresses the company leaves out.
   return json(ctx.kind === "client" ? { ...data, rules: { ...data.rules, internalDomains: [] } } : data);
 }

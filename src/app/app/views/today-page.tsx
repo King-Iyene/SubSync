@@ -69,7 +69,7 @@ export function TodayPage({ go, t, kind, reload, sync, syncing, options, picked,
   const accountMap = useMemo(() => new Map(t.accounts.map((a) => [a.id, a])), [t.accounts]);
   const needing = accountsNeedingYou(rows, accountMap, 100_000);
   const urgent = needing.rows.filter((a) => a.urgent).length;
-  const bars = accountBars(rows);
+  const bars = accountBars(rows, 100000);
   const waiting = waitingOldestFirst(view.items);
   const mine = t.mine;
   const pickedNames = picked.map((id) => options.find((o) => o.id === id)?.name ?? t.accounts.find((a) => a.id === id)?.name ?? "1 client");
@@ -268,8 +268,8 @@ export function TodayPage({ go, t, kind, reload, sync, syncing, options, picked,
 
         {agency && bars.bars.length >= 1 && (
           <Block id="where-h" title="Where the work sits" tag="Report" hint={SECTION_META["Where the work sits"].subtitle} testId="today-charts">
-            <AccountBars title={barsTitle(bars)} bars={bars.bars} rows={rows} more={Math.max(0, bars.accounts - bars.bars.length)}
-              onSegment={(id, k) => m.open(specKind(k, env, id))} onAccount={(id) => m.open(specAccount(id, env))} onMore={() => m.open(specClients(env))} />
+            <AccountBars title={barsTitle(bars)} bars={bars.bars} rows={rows}
+              onSegment={(id, k) => m.open(specKind(k, env, id))} onAccount={(id) => m.open(specAccount(id, env))} />
           </Block>
         )}
 

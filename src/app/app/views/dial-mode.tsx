@@ -13,6 +13,8 @@ import { EmptyState, ErrorState, InlineAlert, SkeletonRows, useDialer } from "..
 import { announceCall } from "../ds/dial-button";
 import { InfoTip } from "../ds/info-tip";
 import { fmtMoney } from "../ui";
+import { PeoplePopup, type PersonRow } from "./dial-people";
+import { cadenceSummary, touchRow } from "@/lib/dial/touch";
 import { PrefsCtx, useScripts, ActivityCard, AttemptCard, BestHourCard, Board6, CadenceCard, DispositionEditor, PowerBar, useCadence, useCallbacks, useDispositions, useGoals, useLocal, useTick, type SavedCallback } from "./dial6-ui";
 import { CountUp, Fold, TzNote } from "./speed6-base";
 import "./speed6.css";
@@ -57,6 +59,7 @@ function DialInner() {
   const [cbs, setCbs] = useCallbacks();
   const [autoOn, setAutoOn] = useLocal<boolean>("subsync.dial.auto", true);
   const [session, setSession] = useState<S | null>(null);
+  const [pop, setPop] = useState<{ title: string; note?: string; rows: PersonRow[] } | null>(null);
   const nowMs = useTick(false);
   const states = useMemo(() => new Map(ins.data?.states ?? []), [ins.data]);
 
@@ -86,6 +89,26 @@ function DialInner() {
   const blocked = d ? d.items.filter((i) => skipReason(i)).length : 0;
   const ready = d ? d.items.length - blocked : 0;
   const todays = todaysCallbacks(cbs, nowMs, null);
+  const touches = (d?.items ?? []).map((i) => ({ it: i, t: touchRow(keyOf(i), states.get(keyOf(i)), cadence, nowMs, i.timeZone) }));
+  const toPerson = ({ it, t }: (typeof touches)[number]): PersonRow => ({
+    key: t.key, name: it.name, account: it.locationName, chip: `touch ${t.touch} of ${t.of}`, chipTone: t.state === "waiting" ? "cyan" : t.state === "text_fallback" ? "red" : "amber",
+    detail: t.state === "waiting" && t.nextAt ? `Next try ${fmtWhen(t.nextAt, it.timeZone)}${it.timeZone ? " their time" : ""}` : t.state === "text_fallback" ? "Every try used: a text task" : t.state === "due" ? "Ready for its next try now" : "Not called yet",
+    tip: `${it.name}: ${(it.reasons ?? []).join(", ")}`,
+  });
+  const sum = cadenceSummary(touches.map((x) => x.t));
+  const keysOf = (ks: string[]) => touches.filter((x) => ks.includes(x.t.key)).map(toPerson);
+  const ex = sum.example ? touches.find((x) => x.t.key === sum.example?.key) : undefined;
+  const changes = d ? (
+    <div className="mt-3 border-t pt-3 text-sm" data-testid="cad-changes">
+      <p className="font-medium">What this changes</p>
+      {ex && sum.example ? <p className="s6-label mt-1" data-testid="cad-example">{ex.it.name}: touch {sum.example.touch} of {sum.example.of}{sum.example.nextAt ? `, next try ${fmtWhen(sum.example.nextAt, ex.it.timeZone)}${ex.it.timeZone ? " their time" : ""}` : ", due now"}.</p> : <p className="s6-label mt-1">No lead on this list has been tried yet, so there is no example.</p>}
+      <p className="s6-label mt-1">
+        <button type="button" className="s6-link" data-testid="cad-waiting" onClick={() => setPop({ title: "Waiting for their next try", rows: keysOf(sum.waiting) })}>{sum.waiting.length} {sum.waiting.length === 1 ? "lead" : "leads"} waiting for their next try</button>
+        {", "}<button type="button" className="s6-link" data-testid="cad-text" onClick={() => setPop({ title: "Used every try, now a text task", rows: keysOf(sum.textNow) })}>{sum.textNow.length} reach the text task</button>{" (this list)."}
+      </p>
+      <p className="s6-label mt-1">No-answer leads come back in the Redial list and the queue after this wait; after the last try SubSync makes a text task.</p>
+    </div>
+  ) : null;
   const callbackItem = (c: SavedCallback): Item => ({ contactId: c.contactId, locationId: c.locationId, locationName: c.locationName, name: c.name, phone: c.phone, dnd: false, timeZone: c.timeZone, openValue: 0, ageHours: 0, priority: 90, reasons: ["Promised callback"], url: c.url });
   return (
     <section aria-label="Call mode" data-testid="dial-pick" className="ds-enter">
@@ -117,8 +140,8 @@ function DialInner() {
         <EmptyState title={list === "missed" ? "No missed calls to call back" : list === "redial" ? "Nobody to try again" : "Nobody to call on this list"} body={d.ownOnly ? "Nobody assigned to you is waiting on this list. Pick another list." : list === "redial" ? "People who did not pick up show up here for another try. Call someone first." : "Nothing is waiting here right now. Pick another list, or check back after the next sync."} />
       ) : (
         <div className="s6-card mb-8" data-glow="active" data-testid="dial-ready">
-          <p className="s6-big" data-testid="dial-count"><CountUp value={ready} /> {ready === 1 ? "person" : "people"} ready to call{d.total > d.items.length ? `, the top ${d.items.length} of ${d.total}` : ""}.</p>
-          <p className="s6-sub mt-2">Hottest first. They are fed to your CRM&apos;s dialer one at a time.{blocked > 0 ? ` ${blocked} will be skipped (asked not to be contacted, or no phone number).` : ""}{d.ownOnly ? " Only people assigned to you." : ""}</p>
+          <p className="s6-big" data-testid="dial-count"><button type="button" className="s6-link text-left" data-testid="dial-count-open" onClick={() => setPop({ title: "Ready to call", note: d.total > d.items.length ? `The top ${d.items.length} of ${d.total}, hottest first.` : undefined, rows: touches.filter((x) => !skipReason(x.it)).map(toPerson) })}><CountUp value={ready} /> {ready === 1 ? "person" : "people"} ready to call{d.total > d.items.length ? `, the top ${d.items.length} of ${d.total}` : ""}.</button></p>
+          <p className="s6-sub mt-2">Hottest first. They are fed to your CRM&apos;s dialer one at a time.{blocked > 0 && <> <button type="button" className="s6-link" data-testid="dial-blocked-open" onClick={() => setPop({ title: "Will be skipped", note: "Asked not to be contacted, or no phone number.", rows: touches.filter((x) => skipReason(x.it)).map(toPerson) })}>{blocked} will be skipped</button> (asked not to be contacted, or no phone number).</>}{d.ownOnly ? " Only people assigned to you." : ""}</p>
           <div className="flex flex-wrap items-center gap-3">
             <button type="button" className={PRIMARY} data-kind="primary" onClick={() => start(d.items, false)} disabled={ready === 0} data-testid="dial-start">Start calling</button>
             <button type="button" className="s6-btn !min-h-12" onClick={() => start(d.items, true)} disabled={ready === 0} data-testid="dial-start-power"><Zap aria-hidden className="size-4" />Power hour</button>
@@ -133,7 +156,7 @@ function DialInner() {
 
       <Fold keep={3} testId="dial-fold">
         <div className="s6-grid s6-three">
-          <CadenceCard cadence={cadence} set={setCadence} />
+          <CadenceCard cadence={cadence} set={setCadence} extra={changes} />
           <BestHourCard best={ins.data?.best ?? null} />
           <AttemptCard rows={ins.data?.byAttempt ?? []} />
           {ins.data && ins.data.teamVisible && <ActivityCard rows={ins.data.activity} />}
@@ -151,6 +174,7 @@ function DialInner() {
           </ul>
         </div>
       )}
+      {pop && <PeoplePopup title={pop.title} note={pop.note} rows={pop.rows} onClose={() => setPop(null)} />}
     </section>
   );
 }
