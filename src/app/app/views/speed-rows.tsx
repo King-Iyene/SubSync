@@ -1,6 +1,7 @@
 "use client";
 
 import { MoreHorizontal, TriangleAlert } from "lucide-react";
+import { LeadMark, LeadTag, openOnRowClick, ROW_CLICK } from "./speed-lead-row";
 import { useMemo, useState, type ReactNode } from "react";
 import { emailPlan } from "@/lib/analytics/dedupe-review";
 import { fmtDuration } from "@/lib/analytics/speed-intel";
@@ -118,9 +119,9 @@ export function LeadRows({ rows, showAccount, actions, testId = "speed-rows", he
         const bad = r.status === "waiting";
         const reason = reasons.get(rowKey(r));
         return (
-          <li key={rowKey(r)} data-testid="speed-row" data-status={r.status} data-never={r.neverAnswered ? "true" : "false"} className={`ds-row grid grid-cols-[minmax(0,1fr)_6rem_2.75rem] items-center gap-x-3 gap-y-0.5 pl-1 pr-1 ${tight ? "py-1" : "py-2"} ${TRACKS} ${tight ? "@3xl:min-h-[34px]" : "@3xl:min-h-[44px]"}`}>
+          <li key={rowKey(r)} data-testid="speed-row" data-status={r.status} data-never={r.neverAnswered ? "true" : "false"} onClick={openOnRowClick(() => actions.show(i))} className={`${ROW_CLICK} ds-row grid grid-cols-[minmax(0,1fr)_6rem_2.75rem] items-center gap-x-3 gap-y-0.5 pl-1 pr-1 ${tight ? "py-1" : "py-2"} ${TRACKS} ${tight ? "@3xl:min-h-[34px]" : "@3xl:min-h-[44px]"}`}>
             <div className="min-w-0 @3xl:contents">
-              <button type="button" onClick={() => actions.show(i)} className="block min-h-6 max-w-full truncate text-left text-sm font-semibold hover:underline focus-visible:outline-2 focus-visible:outline-[var(--ring)]" title={r.name} data-testid="speed-row-name">{r.name}</button>
+              <button type="button" onClick={() => actions.show(i)} className="block min-h-6 max-w-full truncate text-left text-sm font-semibold hover:underline focus-visible:outline-2 focus-visible:outline-[var(--ring)]" title={r.name} data-testid="speed-row-name"><LeadMark name={r.name} />{r.name}<LeadTag /></button>
               <p className="line-clamp-2 text-xs text-muted-foreground @3xl:truncate" title={whyLine(r, showAccount)}>{whyLine(r, showAccount)}</p>
               {reason ? <p className="mt-1 @3xl:mt-0"><DelayChip reason={reason as ReasonKey} /></p> : <span aria-hidden className="hidden @3xl:block" />}
               <p className={`text-xs @3xl:hidden ${bad ? (r.neverAnswered ? "text-destructive" : "text-warning") : "text-muted-foreground"}`}>{waitWords(r)}</p>
