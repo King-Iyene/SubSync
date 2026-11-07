@@ -24,6 +24,7 @@ export function PeoplePopup({ title, note, rows, onClose, onSendSelected }: { ti
   const pages = Math.max(1, Math.ceil(rows.length / size));
   const at = Math.min(page, pages - 1);
   const shown = rows.slice(at * size, at * size + size);
+  if (lead !== null) return <LeadDrawer leads={withSeed.map((r) => r.seed as LeadSeed)} index={lead} onIndex={setLead} onClose={() => setLead(null)} />;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-label={title} data-testid="people-popup" onClick={onClose}>
       <div className="s6 flex max-h-[80vh] w-full max-w-lg flex-col rounded-xl border bg-card p-4 text-card-foreground shadow-[var(--shadow-lift)]" onClick={(e) => e.stopPropagation()}>
@@ -34,8 +35,12 @@ export function PeoplePopup({ title, note, rows, onClose, onSendSelected }: { ti
         {rows.length === 0 ? <p className="s6-label py-4">Nobody here.</p> : (
           <ul className="min-h-0 flex-1 divide-y overflow-y-auto rounded-md border text-sm" data-testid="people-rows">
             {shown.map((r) => (
-              <li key={r.key} title={r.tip ?? r.detail ?? r.name} className="flex flex-wrap items-center gap-x-3 gap-y-0.5 px-3 py-2">
-                <span className="min-w-0 flex-1 truncate font-medium">{r.name}{r.account ? <span className="s6-label font-normal"> · {r.account}</span> : null}</span>
+              <li key={r.key} title={r.tip ?? r.detail ?? r.name} data-testid="people-row" className="flex flex-wrap items-center gap-x-3 gap-y-0.5 px-3 py-1.5">
+                {onSendSelected && r.seed && <input type="checkbox" aria-label={`Select ${r.name}`} data-testid="people-pick" checked={picked.includes(r.key)} onChange={(e) => setPicked(e.target.checked ? [...picked, r.key] : picked.filter((k) => k !== r.key))} />}
+                {r.seed ? <button type="button" data-testid="people-open" className="min-w-0 flex-1 cursor-pointer truncate text-left font-medium hover:underline" onClick={() => setLead(withSeed.findIndex((x) => x.key === r.key))}>{r.name}{r.account ? <span className="s6-label font-normal"> · {r.account}</span> : null}</button>
+                  : <span className="min-w-0 flex-1 truncate font-medium">{r.name}{r.account ? <span className="s6-label font-normal"> · {r.account}</span> : null}</span>}
+                {r.seed && r.phone && <span className="s6-label tabular-nums" data-testid="people-phone">{r.phone}</span>}
+                {r.seed && <span title="Opens the lead in your CRM's own dialer. SubSync cannot start a call itself."><DialButton phone={r.phone} contactUrl={r.url} dnd={r.dnd} timeZone={r.timeZone} compact /></span>}
                 {r.chip && <span className="s6-chip" data-tone={r.chipTone ?? "cyan"}>{r.chip}</span>}
                 {r.detail && <span className="s6-label w-full">{r.detail}</span>}
               </li>
