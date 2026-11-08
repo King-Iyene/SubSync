@@ -45,8 +45,8 @@ export function CoverageTab({ multi }: { multi: boolean }) {
     <div data-testid="coverage-tab">
       {d.eventsStored === 0 && <p className="t-small t-quiet mb-4" data-testid="coverage-warming">Message and call history starts filling after the next sync (the last 30 days are read back a few conversations at a time). Numbers below appear as it arrives.</p>}
 
-      <Card id="missed-calls" title="Missed calls nobody called back" tip="A missed call counts as recovered when anyone (a person or an automatic text) reached out within 15 minutes. Dollars are the open deals of those callers, counted.">
-        <p className="t-display" data-testid="missed-headline">{m.unrecovered === 0 ? (m.total === 0 ? "No missed calls recorded in the last 30 days." : "Every missed call was followed up within 15 minutes.") : `${m.unrecovered} missed ${m.unrecovered === 1 ? "call" : "calls"} had no callback or text within 15 minutes${m.dollars > 0 ? `: ${usd(m.dollars)} of open deals` : ""}.`}</p>
+      <Card id="missed-calls" title="Missed calls nobody called back" tip="A caller is waiting when their latest missed call in this period has no call, text or logged call result after it. Call mode lists the same people. Dollars are the open deals of those callers, counted.">
+        <p className="t-display" data-testid="missed-headline">{m.unrecovered === 0 ? (m.total === 0 ? "No missed calls recorded in this period." : "Every caller who phoned and missed us has had a callback or text.") : `${m.unrecovered.toLocaleString("en-US")} ${m.unrecovered === 1 ? "caller is" : "callers are"} still waiting for a callback or text${m.dollars > 0 ? `: ${usd(m.dollars)} of open deals` : ""}.`}</p>
         <p className="t-small t-quiet mt-1" data-testid="textback-audit">{m.audit.enough ? `${m.audit.share}% of missed calls got a text inside 60 seconds (${m.audit.textedWithin60} of ${m.audit.missed}).` : "A text-back check needs at least 5 missed calls."}</p>
         <CountLinks m={m} n={n} multi={multi} />
         {m.rows.length > 0 && <div className="mt-3"><LeadRows rows={m.rows} showAccount={multi} actions={actions} testId="missed-rows" head={false} />{actions.drawer}</div>}

@@ -33,16 +33,17 @@ export async function callQueue(installationId: string, allowed: string[] | null
 }
 
 /** Every row of the list (up to 400 candidates), scored and ordered. The page slices it. */
-export async function callQueueAll(installationId: string, allowed: string[] | null, f: Filters): Promise<{ total: number; rows: QueueRow[]; cached?: boolean }> {
-  const key = `${installationId}|${allowed ? [...allowed].sort().join(",") : "*"}|${JSON.stringify(f)}`;
+export type QueuePage = { offset?: number; limit?: number; /** A client's staff: only the leads assigned to this person. */ ownerId?: string };
+export async function callQueueAll(installationId: string, allowed: string[] | null, f: Filters, page: QueuePage = {}): Promise<{ total: number; rows: QueueRow[]; cached?: boolean }> {
+  const key = `${installationId}|${allowed ? [...allowed].sort().join(",") : "*"}|${JSON.stringify(f)}|${page.offset ?? 0}|${page.limit ?? 400}|${page.ownerId ?? ""}`;
   const hit = queueCache.get(key);
   if (hit) return { ...hit, cached: true };
-  const out = await callQueueRead(installationId, allowed, f);
+  const out = await callQueueRead(installationId, allowed, f, page);
   queueCache.set(key, out);
   return out;
 }
 
-async function callQueueRead(installationId: string, allowed: string[] | null, f: Filters): Promise<{ total: number; rows: QueueRow[] }> {
+async function callQueueRead(installationId: string, allowed: string[] | null, f: Filters, page: QueuePage): Promise<{ total: number; rows: QueueRow[] }> {
   const db = sql();
 
   // The preset decides who is in the list and how the database orders it before we score them.
@@ -110,6 +111,7 @@ async function callQueueRead(installationId: string, allowed: string[] | null, f
       break;
   }
   if (f.location) and(db`c.location_id = ${f.location}`);
+  if (page.ownerId !== undefined) and(db`c.assigned_to = ${page.ownerId}`);
   const followUps = f.preset === "follow_ups_due";
 
   const rows = await timed((tx) => tx`
@@ -135,7 +137,8 @@ async function callQueueRead(installationId: string, allowed: string[] | null, f
       c.phone, c.email, c.date_added, c.last_activity_at,
       coalesce(d.open_count, 0) open_count, coalesce(d.open_value, 0) open_value, coalesce(d.won_value, 0) won_value,
       lo.outcome last_outcome, lo.follow_up_at, lo.created_at last_call_at,
-      (select count(*)::int from call_outcomes o3 where o3.installation_id = ${installationId} and o3.location_id = c.location_id and o3.contact_id = c.contact_id) calls
+      (select count(*)::int from call_outcomes o3 where o3.installation_id = ${installationId} and o3.location_id = c.location_id and o3.contact_id = c.contact_id) calls,
+      count(*) over ()::int total_all
     from cand
     join cached_contacts c on c.installation_id = ${installationId} and c.location_id = cand.location_id and c.contact_id = cand.contact_id
     join loc on loc.location_id = c.location_id
@@ -148,7 +151,7 @@ async function callQueueRead(installationId: string, allowed: string[] | null, f
       and coalesce(lo.outcome, '') not in ('wrong_number', 'not_interested')
       and (lo.created_at is null or lo.created_at < now() - interval '12 hours' or ${followUps}::boolean)
     order by ${order}
-    limit 400`);
+    limit ${Math.max(1, Math.min(400, page.limit ?? 400))} offset ${Math.max(0, page.offset ?? 0)}`);
 
   const now = Date.now();
   const scored: QueueRow[] = rows.map((r) => {
@@ -165,7 +168,7 @@ async function callQueueRead(installationId: string, allowed: string[] | null, f
     };
   });
   scored.sort((a, b) => (followUps ? 0 : b.priority - a.priority));
-  return { total: rows.length, rows: scored };
+  return { total: Number(rows[0]?.total_all ?? 0), rows: scored };
 }
 
 // Speed to lead (8.8): how many fresh leads are waiting right now.

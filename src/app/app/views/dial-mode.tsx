@@ -18,13 +18,14 @@ import { CallQueueCard } from "./dial-queue-panel";
 import { cadenceSummary, touchRow } from "@/lib/dial/touch";
 import { PrefsCtx, useScripts, ActivityCard, AttemptCard, BestHourCard, Board6, CadenceCard, DispositionEditor, PowerBar, useCadence, useCallbacks, useDispositions, useGoals, useLocal, useTick, type SavedCallback } from "./dial6-ui";
 import { CountUp, Fold, TzNote } from "./speed6-base";
+import { useSpeedFilter } from "./speed-filter";
 import "./speed6.css";
 
 // Call mode (stages DIAL and SPEED6, docs/features/DIAL.md and SPEED6.md): a power dialer without telephony. The call is placed in the customer's own CRM phone; SubSync orders the list, feeds it one
 // lead at a time, tracks the redial plan and the lead's own clock, and logs how the call went (its own record, plus a short note, tags and tasks through the one write gateway: a dry run until writes are on).
 
 type Item = QueueItem & { source?: string | null };
-type Queue = { list: string; lists: Array<{ id: string; label: string; help: string }>; total: number; ownOnly: boolean; me: string | null; items: Item[] };
+type Queue = { list: string; lists: Array<{ id: string; label: string; help: string }>; total: number; page?: number; size?: number; dollars?: number | null; ownOnly: boolean; me: string | null; items: Item[] };
 type Stats = { people: Array<{ userId: string; name: string; calls: number; perHour: number | null; outcomes: Record<string, number> }>; own: boolean };
 type Insights = {
   now: number; states: Array<[string, AttemptState]>; best: { hour: number; rate: number; tries: number } | null; byAttempt: Array<{ attempt: number; leads: number; booked: number; rate: number | null }>;
@@ -50,9 +51,18 @@ export function DialMode() {
 }
 
 function DialInner() {
-  const [list, setList] = useState("missed");
+  const [list, setListRaw] = useState("missed");
+  const { range } = useSpeedFilter();
+  // The page and its size are server-side (20, 50 or 100 people at a time); a new list, size or date range starts at the first page.
+  const rangeKey = range ? `${range.from}:${range.to}` : "";
+  const [pg, setPg] = useState({ k: `missed|50|${rangeKey}`, n: 0, size: 50 });
+  const pageKey = `${list}|${pg.size}|${rangeKey}`;
+  const page = pg.k === pageKey ? pg.n : 0;
+  const setPage = (n: number) => setPg({ k: pageKey, n, size: pg.size });
+  const setSize = (size: number) => setPg({ k: `${list}|${size}|${rangeKey}`, n: 0, size });
+  const setList = (l: string) => { setListRaw(l); setPg({ k: `${l}|${pg.size}|${rangeKey}`, n: 0, size: pg.size }); };
   const [view, setView] = useState<"lists" | "callbacks">("lists");
-  const queue = useData<Queue>(`dial/queue?list=${encodeURIComponent(list)}`);
+  const queue = useData<Queue>(`dial/queue?list=${encodeURIComponent(list)}&page=${page}&size=${pg.size}${range ? `&from=${range.from}&to=${range.to}` : ""}`);
   const stats = useData<Stats>("dial/stats");
   const ins = useData<Insights>("dial/insights");
   const [cadence, setCadence] = useCadence();
@@ -144,12 +154,20 @@ function DialInner() {
         <EmptyState title={list === "missed" ? "No missed calls to call back" : list === "redial" ? "Nobody to try again" : "Nobody to call on this list"} body={d.ownOnly ? "Nobody assigned to you is waiting on this list. Pick another list." : list === "redial" ? "People who did not pick up show up here for another try. Call someone first." : "Nothing is waiting here right now. Pick another list, or check back after the next sync."} />
       ) : (
         <div className="s6-card mb-8" data-glow="active" data-testid="dial-ready">
-          <p className="s6-big" data-testid="dial-count"><button type="button" className="s6-link text-left" data-testid="dial-count-open" onClick={() => setPop({ title: "Ready to call", note: d.total > d.items.length ? `The top ${d.items.length} of ${d.total}, hottest first.` : undefined, rows: touches.filter((x) => !skipReason(x.it)).map(toPerson), selectable: true })}><CountUp value={ready} /> {ready === 1 ? "person" : "people"} ready to call{d.total > d.items.length ? `, the top ${d.items.length} of ${d.total}` : ""}.</button></p>
+          <p className="s6-big" data-testid="dial-count"><button type="button" className="s6-link text-left" data-testid="dial-count-open" onClick={() => setPop({ title: "Ready to call", note: d.total > d.items.length ? `${(page * pg.size + 1).toLocaleString("en-US")} to ${(page * pg.size + d.items.length).toLocaleString("en-US")} of ${d.total.toLocaleString("en-US")}, hottest first.` : undefined, rows: touches.filter((x) => !skipReason(x.it)).map(toPerson), selectable: true })}><CountUp value={ready} /> {ready === 1 ? "person" : "people"} ready to call{d.total > d.items.length ? `, showing ${(page * pg.size + 1).toLocaleString("en-US")} to ${(page * pg.size + d.items.length).toLocaleString("en-US")} of ${d.total.toLocaleString("en-US")}` : ""}.</button></p>
           <p className="s6-sub mt-2">Hottest first. They are fed to your CRM&apos;s dialer one at a time.{blocked > 0 && <> <button type="button" className="s6-link" data-testid="dial-blocked-open" onClick={() => setPop({ title: "Will be skipped", note: "Asked not to be contacted, or no phone number.", rows: touches.filter((x) => skipReason(x.it)).map(toPerson) })}>{blocked} will be skipped</button> (asked not to be contacted, or no phone number).</>}{d.ownOnly ? " Only people assigned to you." : ""}</p>
           <div className="flex flex-wrap items-center gap-3">
             <button type="button" className={PRIMARY} data-kind="primary" onClick={() => start(d.items, false)} disabled={ready === 0} data-testid="dial-start">Start calling</button>
             <button type="button" className="s6-btn !min-h-12" onClick={() => start(d.items, true)} disabled={ready === 0} data-testid="dial-start-power"><Zap aria-hidden className="size-4" />Power hour</button>
           </div>
+          {(d.total > 20 || page > 0) && (
+            <div className="mb-3 flex flex-wrap items-center gap-2 text-sm" data-testid="dial-pager">
+              <button type="button" className="s6-btn" disabled={page === 0} onClick={() => setPage(page - 1)} data-testid="dial-prev">Previous</button>
+              <span className="s6-label" data-testid="dial-page-text">Page {page + 1} of {Math.max(1, Math.ceil(d.total / pg.size)).toLocaleString("en-US")}</span>
+              <button type="button" className="s6-btn" disabled={(page + 1) * pg.size >= d.total} onClick={() => setPage(page + 1)} data-testid="dial-next">Next</button>
+              <label className="s6-label ml-auto flex items-center gap-2">People per page<select className="s6-num !w-20" value={pg.size} onChange={(e) => setSize(Number(e.target.value))} data-testid="dial-size">{[20, 50, 100].map((n) => <option key={n} value={n}>{n}</option>)}</select></label>
+            </div>
+          )}
           <CallQueueCard list={list} items={d.items.filter((i) => !skipReason(i))} picked={picked} onPickedDone={() => setPicked([])} />
           <div className="mt-4 flex items-center gap-3" data-testid="auto-row"><button type="button" role="switch" aria-checked={autoOn} aria-label="Auto-detect calls" className="s6-toggle" onClick={() => setAutoOn(!autoOn)} data-testid="auto-toggle" /><span className="text-sm font-medium">Auto-detect calls (recommended)</span><InfoTip label="What auto-detect does" text="When you call from your CRM, SubSync reads the call it records (answered, no answer, voicemail and how long) and the tag, appointment or do-not-disturb you set there, then logs the outcome and moves to the next lead. It only asks when it cannot tell." /></div>
           <div className="mt-4 flex flex-wrap items-center gap-4 text-sm" data-testid="goal-row">
