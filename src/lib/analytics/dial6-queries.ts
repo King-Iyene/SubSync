@@ -8,12 +8,12 @@ const HOUR = 3_600_000;
 const REACHED = new Set(OUTCOMES.filter((o) => o.reached).map((o) => o.key as string));
 
 /** The redial list: leads called through Call mode where every try so far was a no answer or a voicemail, so they are worth another go. */
-export async function redialRows(installationId: string, allowed: string[] | null) {
+export async function redialRows(installationId: string, allowed: string[] | null, page: { offset: number; limit: number; ownerId?: string } = { offset: 0, limit: 400 }): Promise<{ total: number; rows: Array<Record<string, unknown>> }> {
   const db = sql();
   const rows = await db`
     select e.location_id, e.contact_id, max(e.at) last_at, count(*)::int attempts,
       nullif(trim(coalesce(c.first_name, '') || ' ' || coalesce(c.last_name, '')), '') name, c.phone, c.dnd, nullif(c.assigned_to, '') owner, l.name location_name, l.timezone,
-      coalesce(d.open_value, 0)::float8 open_value
+      coalesce(d.open_value, 0)::float8 open_value, count(*) over ()::int total_all
     from touch_events e
     join cached_contacts c on c.installation_id = e.installation_id and c.location_id = e.location_id and c.contact_id = e.contact_id
     join locations l on l.installation_id = e.installation_id and l.location_id = e.location_id and not l.ignored
@@ -21,13 +21,13 @@ export async function redialRows(installationId: string, allowed: string[] | nul
       on d.location_id = e.location_id and d.contact_id = e.contact_id
     where e.installation_id = ${installationId} and e.source = 'subsync_call' and e.at > now() - interval '14 days' ${allowed ? db`and e.location_id = any(${allowed}::text[])` : db``}
     group by e.location_id, e.contact_id, c.first_name, c.last_name, c.phone, c.dnd, c.assigned_to, l.name, l.timezone, d.open_value
-    having bool_and(coalesce(e.outcome, '') in ('no_answer', 'voicemail'))
-    order by max(e.at) desc limit 400`;
-  return rows.map((r) => ({
+    having bool_and(coalesce(e.outcome, '') in ('no_answer', 'voicemail')) ${page.ownerId !== undefined ? db`and nullif(c.assigned_to, '') = ${page.ownerId}` : db``}
+    order by max(e.at) desc limit ${page.limit} offset ${page.offset}`;
+  return { total: Number(rows[0]?.total_all ?? 0), rows: rows.map((r) => ({
     contactId: r.contact_id as string, locationId: r.location_id as string, locationName: (r.location_name as string | null) ?? null, name: (r.name as string | null) ?? "Unknown", phone: (r.phone as string | null) ?? null,
     dnd: r.dnd === true, timeZone: (r.timezone as string | null) ?? null, openValue: r.open_value as number, ageHours: Math.max(0, (Date.now() - new Date(r.last_at as string).getTime()) / HOUR),
     priority: 55, reasons: [`No answer so far, ${r.attempts as number} ${(r.attempts as number) === 1 ? "try" : "tries"}`], ownerId: (r.owner as string | null) ?? null,
-  }));
+  })) };
 }
 
 export type DialInsightsIn = { installationId: string; allowed: string[] | null; userId: string | null; /** A client's staff: only their own calls and rank. */ ownOnly: boolean; names: ReadonlyMap<string, string>; now: number };

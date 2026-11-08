@@ -86,6 +86,9 @@ import { readFileSync } from "node:fs";
 test("the missed-calls list reads only tables that exist, and a failing list degrades to empty (regression: 'deals' is not a table)", () => {
   const src = readFileSync(new URL("../api/dial-routes.ts", import.meta.url), "utf8");
   assert.doesNotMatch(src, /join deals/, "no join on a table named deals");
-  assert.match(src, /cached_opportunities/);
-  assert.match(src, /sourceRows\(ctx, allowed, list\)\.catch\(/, "an unreadable list returns an empty queue, not an error");
+  const missed = readFileSync(new URL("../analytics/missed-calls.ts", import.meta.url), "utf8");
+  assert.doesNotMatch(missed, /join deals/);
+  assert.match(missed, /cached_opportunities/);
+  assert.match(src, /missedWaitingPage\(/, "Call mode reads the one shared missed-call query");
+  assert.match(src, /sourceRowsPage\(ctx, allowed, list, .*\)\.catch\(/, "an unreadable list returns an empty queue, not an error");
 });

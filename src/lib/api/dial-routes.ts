@@ -3,6 +3,8 @@ import { parseFilters, type Filters } from "../analytics/call-intel";
 import { teamNames } from "../analytics/inbox-queries";
 import { recordTouchEvents } from "../analytics/touch-events-db";
 import { dialInsights, redialRows } from "../analytics/dial6-queries";
+import { defaultRange, missedWaitingPage, pageSize } from "../analytics/missed-calls";
+import { parseWindow } from "../analytics/speed-window";
 import { sql } from "../db";
 import { DEFAULT_SCRIPT, DIAL_LISTS, followUpDays, isDialOutcome, isListId, outcomeOf, rankQueue, SCRIPT_MAX, statsByUser, type QueueItem } from "../dial/dial";
 import type { deepLinks } from "../links";
@@ -16,68 +18,88 @@ type Ctx = AuthContext & { request: Request; url: URL; segments: string[] };
 export type DialHelpers = { allowed: () => Promise<string[] | null>; links: () => Promise<ReturnType<typeof deepLinks>> };
 
 const ID = /^[A-Za-z0-9_-]{3,128}$/;
-export const SESSION_CAP = 150;
 const HOUR = 3_600_000;
 
-/** The queue rows of a source list, with Do Not Disturb and owner read from SubSync's own copy of the contacts. */
-export async function sourceRows(ctx: { installationId: string }, allowed: string[] | null, list: string): Promise<Array<Omit<QueueItem, "url" | "dnd"> & { ownerId: string | null; dnd: boolean }>> {
-  const db = sql();
-  if (list === "redial") return redialRows(ctx.installationId, allowed) as never;
-  const accountFilter = allowed ? db`and c.location_id = any(${allowed}::text[])` : db``;
+type SourceRow = Omit<QueueItem, "url" | "dnd"> & { ownerId: string | null; dnd: boolean };
+export type SourceOpts = { offset: number; limit: number; fromMs: number; toMs: number; /** A client's staff: only the leads assigned to this person ("" = none). */ ownerId?: string };
+const defaultOpts = (): SourceOpts => ({ offset: 0, limit: 400, ...defaultRange(Date.now()) });
+
+/** One page of a source list, with the true number of people on it. Every list is read as a ranked, paged SQL query: nothing loads all the rows. */
+export async function sourceRowsPage(ctx: { installationId: string }, allowed: string[] | null, list: string, o: SourceOpts): Promise<{ total: number; rows: SourceRow[]; dollars?: number }> {
+  if (o.ownerId === "") return { total: 0, rows: [] };
+  if (list === "redial") return (await redialRows(ctx.installationId, allowed, { offset: o.offset, limit: o.limit, ownerId: o.ownerId })) as never;
   if (list === "missed") {
-    const rows = await db`
-      select m.location_id, m.contact_id, m.missed_at, nullif(trim(coalesce(c.first_name, '') || ' ' || coalesce(c.last_name, '')), '') name, c.phone, c.dnd, nullif(c.assigned_to, '') owner,
-        l.name location_name, l.timezone, coalesce(d.open_value, 0)::float8 open_value
-      from (
-        select e.location_id, e.contact_id, max(e.at) missed_at from touch_events e
-        where e.installation_id = ${ctx.installationId} and e.kind = 'missed_call' and e.at > now() - interval '7 days'
-          and not exists (select 1 from touch_events o where o.installation_id = e.installation_id and o.location_id = e.location_id and o.contact_id = e.contact_id and o.direction = 'outbound' and o.at > e.at)
-          and not exists (select 1 from call_outcomes co where co.installation_id = e.installation_id and co.location_id = e.location_id and co.contact_id = e.contact_id and co.created_at > e.at)
-        group by e.location_id, e.contact_id limit 400
-      ) m
-      join cached_contacts c on c.installation_id = ${ctx.installationId} and c.location_id = m.location_id and c.contact_id = m.contact_id ${accountFilter}
-      join locations l on l.installation_id = c.installation_id and l.location_id = c.location_id and not l.ignored
-      left join (select o.location_id, o.contact_id, sum(coalesce(o.monetary_value, 0)) open_value from cached_opportunities o where o.installation_id = ${ctx.installationId} and o.status = 'open' group by 1, 2) d on d.location_id = c.location_id and d.contact_id = c.contact_id`;
-    return rows.map((r) => ({
-      contactId: r.contact_id as string, locationId: r.location_id as string, locationName: (r.location_name as string | null) ?? null, name: (r.name as string | null) ?? "Unknown caller", phone: (r.phone as string | null) ?? null,
-      dnd: r.dnd === true, timeZone: (r.timezone as string | null) ?? null, openValue: r.open_value as number, ageHours: Math.max(0, (Date.now() - new Date(r.missed_at as string).getTime()) / HOUR),
-      priority: 50, reasons: ["Missed call, no callback yet"], ownerId: (r.owner as string | null) ?? null,
-    }));
+    // The one definition of "missed calls nobody called back" (missed-calls.ts, docs/METRICS.md): the same people and count as Speed > Coverage.
+    const m = await missedWaitingPage({ installationId: ctx.installationId, allowed, fromMs: o.fromMs, toMs: o.toMs, ownerId: o.ownerId }, { limit: o.limit, offset: o.offset });
+    return {
+      total: m.total, dollars: m.dollars,
+      rows: m.rows.map((r) => ({
+        contactId: r.contactId, locationId: r.locationId, locationName: r.locationName, name: r.name ?? "Unknown caller", phone: r.phone, dnd: r.dnd, timeZone: r.timeZone, openValue: r.dollars,
+        ageHours: Math.max(0, (Date.now() - r.missedAt) / HOUR), priority: 50, reasons: ["Missed call, no callback yet"], ownerId: r.owner, source: r.source,
+      })),
+    };
   }
   let filters: Filters;
   if (list.startsWith("saved:")) {
     const saved = (await listCallLists(ctx.installationId)).find((l) => l.id === list.slice(6));
-    if (!saved) return [];
+    if (!saved) return { total: 0, rows: [] };
     const p = parseFilters(saved.filters);
-    if (!p.ok) return [];
+    if (!p.ok) return { total: 0, rows: [] };
     filters = p.filters;
   } else {
     const p = parseFilters({ preset: list });
-    if (!p.ok) return [];
+    if (!p.ok) return { total: 0, rows: [] };
     filters = p.filters;
   }
-  const q = await callQueueAll(ctx.installationId, allowed, filters);
-  const rows = q.rows.slice(0, 400);
-  if (rows.length === 0) return [];
-  const meta = await db`select location_id, contact_id, dnd, nullif(assigned_to, '') owner, nullif(source, '') source from cached_contacts where installation_id = ${ctx.installationId} and contact_id = any(${rows.map((r) => r.contactId)}::text[])`;
+  const q = await callQueueAll(ctx.installationId, allowed, filters, { offset: o.offset, limit: o.limit, ownerId: o.ownerId });
+  const rows = q.rows;
+  if (rows.length === 0) return { total: q.total, rows: [] };
+  const db = sql();
+  const meta = await db`select location_id, contact_id, dnd, nullif(assigned_to, '') owner, nullif(source, '') source from cached_contacts where installation_id = ${ctx.installationId} and contact_id = any(${rows.map((r) => r.contactId)}::text[]) and location_id = any(${[...new Set(rows.map((r) => r.locationId))]}::text[])`;
   const by = new Map(meta.map((m) => [`${m.location_id}:${m.contact_id}`, m]));
-  return rows.map((r) => {
-    const m = by.get(`${r.locationId}:${r.contactId}`);
-    return { contactId: r.contactId, locationId: r.locationId, locationName: r.locationName, name: r.name || "Unknown", phone: r.phone, dnd: m?.dnd === true, timeZone: r.timeZone, openValue: r.openValue, ageHours: r.idleDays === null ? null : r.idleDays * 24, priority: r.priority, reasons: r.reasons, ownerId: (m?.owner as string | null) ?? null, source: (m?.source as string | null) ?? null };
-  });
+  return {
+    total: q.total,
+    rows: rows.map((r) => {
+      const m = by.get(`${r.locationId}:${r.contactId}`);
+      return { contactId: r.contactId, locationId: r.locationId, locationName: r.locationName, name: r.name || "Unknown", phone: r.phone, dnd: m?.dnd === true, timeZone: r.timeZone, openValue: r.openValue, ageHours: r.idleDays === null ? null : r.idleDays * 24, priority: r.priority, reasons: r.reasons, ownerId: (m?.owner as string | null) ?? null, source: (m?.source as string | null) ?? null };
+    }),
+  };
+}
+
+/** The first rows of a list (up to 400) for the callers that fill the CRM's own queue. */
+export async function sourceRows(ctx: { installationId: string }, allowed: string[] | null, list: string): Promise<SourceRow[]> {
+  return (await sourceRowsPage(ctx, allowed, list, defaultOpts())).rows;
+}
+
+const ACCOUNT = /^[A-Za-z0-9_-]{3,64}$/;
+/** An account picked in Speed's own filter bar narrows inside the accounts the router already allowed; an id from anywhere else matches nothing. */
+function narrowAccount(allowed: string[] | null, id: string | null): string[] | null | "none" {
+  if (!id) return allowed;
+  if (!ACCOUNT.test(id) || (allowed && !allowed.includes(id))) return "none";
+  return [id];
 }
 
 async function queueRoute(ctx: Ctx, h: DialHelpers): Promise<Response> {
-  const list = ctx.url.searchParams.get("list") ?? "missed";
+  const sp = ctx.url.searchParams;
+  const list = sp.get("list") ?? "missed";
   if (!isListId(list)) return json({ error: "Unknown list" }, 400);
-  const [allowed, links, saved] = await Promise.all([h.allowed(), h.links(), listCallLists(ctx.installationId)]);
+  const now = Date.now();
+  // The bar's dates (the missed-call list is about a period; the others are live lists and ignore them). A bad pair falls back to the usual 30 days.
+  const wp = sp.get("from") !== null && sp.get("to") !== null ? parseWindow(sp.get("from"), sp.get("to"), now) : null;
+  const range = wp && wp.ok ? { fromMs: wp.win.fromMs, toMs: wp.win.toMs } : defaultRange(now);
+  const size = pageSize(sp.get("size"));
+  const pageNo = Math.max(0, Math.min(100_000, Math.floor(Number(sp.get("page")) || 0)));
+  const [allowedAll, links, saved] = await Promise.all([h.allowed(), h.links(), listCallLists(ctx.installationId)]);
+  const allowed = narrowAccount(allowedAll, sp.get("f_account") ?? sp.get("account"));
+  // A client's staff only ever work their own leads (decided here, from the session, never from the address, and applied inside the SQL so counts and pages are theirs too).
+  const ownerId = ctx.kind === "client" ? (ctx.session.userId ?? "") : undefined;
+  const lists = [...DIAL_LISTS, ...saved.map((s) => ({ id: `saved:${s.id}`, label: s.name, help: "Your saved filter." }))];
+  if (allowed === "none") return json({ list, lists, total: 0, page: pageNo, size, ownOnly: ctx.kind === "client", me: ctx.session.userName ?? null, items: [] });
   // A list that cannot be read is an empty list (a calm empty state), never a generic error screen.
-  let rows = await sourceRows(ctx, allowed, list).catch((e) => { console.error("dial queue", list, e instanceof Error ? e.message : "failed"); return []; });
-  // A client's staff only ever work their own leads (decided here, from the session, never from the address).
-  if (ctx.kind === "client") rows = ctx.session.userId ? rows.filter((r) => r.ownerId === ctx.session.userId) : [];
-  const ranked = rankQueue(rows).slice(0, SESSION_CAP);
+  const out = await sourceRowsPage(ctx, allowed, list, { offset: pageNo * size, limit: size, ...range, ownerId }).catch((e) => { console.error("dial queue", list, e instanceof Error ? e.message : "failed"); return { total: 0, rows: [] as SourceRow[], dollars: undefined }; });
+  const ranked = list === "missed" ? out.rows : rankQueue(out.rows);
   return json({
-    list, lists: [...DIAL_LISTS, ...saved.map((s) => ({ id: `saved:${s.id}`, label: s.name, help: "Your saved filter." }))], total: rows.length, ownOnly: ctx.kind === "client",
+    list, lists, total: out.total, page: pageNo, size, dollars: out.dollars ?? null, ownOnly: ctx.kind === "client",
     me: ctx.session.userName ?? null,
     items: ranked.map((r) => ({ contactId: r.contactId, locationId: r.locationId, locationName: r.locationName, name: r.name, phone: r.phone, dnd: r.dnd, timeZone: r.timeZone, openValue: r.openValue, ageHours: r.ageHours, priority: r.priority, reasons: r.reasons, source: (r as { source?: string | null }).source ?? null, url: links.contact(r.locationId, r.contactId) })),
   });

@@ -76,8 +76,10 @@ export function missedCalls(events: readonly TouchEvent[], now: number): MissedC
   }
   return out.sort((a, b) => b.at - a.at);
 }
-export function textBackAudit(calls: readonly MissedCall[]) {
-  const n = calls.length, texted = calls.filter((c) => c.textedBackSeconds !== null).length;
+/** From the stored calls (pure, tested) or from the SQL counts of missedStats (missed-calls.ts), which is what the screens use. */
+export function textBackAudit(calls: readonly MissedCall[] | { calls: number; texted60: number }) {
+  const list = Array.isArray(calls) ? (calls as readonly MissedCall[]) : null;
+  const n = list ? list.length : (calls as { calls: number }).calls, texted = list ? list.filter((c) => c.textedBackSeconds !== null).length : (calls as { texted60: number }).texted60;
   return { missed: n, textedWithin60: texted, share: n >= MIN_BUCKET ? Math.round((texted / n) * 100) : null, enough: n >= MIN_BUCKET };
 }
 

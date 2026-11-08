@@ -8,7 +8,9 @@ import { suggestions, type Scope } from "./speed-sql";
 import { coverageSql, eventsRecorded, feedSql, journeyMembersSql, journeySql, leakSql, proofSql, scoresSql } from "./speed-sql-cards";
 import { DAY } from "./speed-v3";
 import { MIN_FOR_MEDIAN, sourceLabel } from "./speed-intel";
-import { afterHoursCover, bestTimes, channelMix, leadQuality, MIN_BUCKET, missedCalls, recoveredIn15, routingCheck, textBackAudit } from "./speed-v4";
+import { FOLLOW_UP_HOURS, leadQuality, MIN_BUCKET, routingCheck, textBackAudit, type MissedCall } from "./speed-v4";
+import { missedRecoveredRows, missedStats, missedWaitingPage, type MissedRow, type MissedScope } from "./missed-calls";
+import { afterHoursCoverSql, bestTimesSql, channelMixSql, eventsInRange } from "./coverage-events-sql";
 import { STEPS, type LeadFilter, type Step } from "./speed-v4-more";
 import { leadStory, loadTouchEvents } from "./touch-events-db";
 import type { Channel } from "./touch-events";
@@ -63,48 +65,39 @@ export async function speedRace(i: Input) {
   };
 }
 
-/** One list of missed calls and what is missing after them, ranked by the open deal dollars of that person. */
+/** Missed calls nobody called back (the same SQL as Call mode, missed-calls.ts), the nights nobody covered, and the event cards, all for the bar's dates and accounts. */
 export async function speedCoverage(i: Input) {
   const db = sql();
   const f = i.filter ?? {};
   const targets = await loadTargets(db, i.installationId);
-  const s: Scope = { installationId: i.installationId, allowed: i.allowed, targetMinutes: i.targetMinutes, now: i.now, fromMs: i.winFrom ?? i.now - 30 * DAY, toMs: i.winTo ?? i.now + DAY, targetsReady: targets.ready };
-  const [{ lk, locs }, events, cov] = await Promise.all([loadLookups(db, i.installationId, i.allowed, i.targetMinutes, i.now), loadTouchEvents(i.installationId, i.allowed, i.now - 30 * DAY), coverageSql(db, s, f)]);
+  const fromMs = i.winFrom ?? i.now - 30 * DAY, toMs = i.winTo ?? i.now + DAY;
+  const s: Scope = { installationId: i.installationId, allowed: i.allowed, targetMinutes: i.targetMinutes, now: i.now, fromMs, toMs, targetsReady: targets.ready };
+  const ms: MissedScope = { installationId: i.installationId, allowed: i.allowed, fromMs, toMs };
+  const [{ lk, locs }, cov, stats, waiting, recovered, best, channels, coverRows, eventsStored, facts] = await Promise.all([
+    loadLookups(db, i.installationId, i.allowed, i.targetMinutes, i.now), coverageSql(db, s, f), missedStats(ms), missedWaitingPage(ms, { limit: 50, offset: 0 }), missedRecoveredRows(ms, 50),
+    bestTimesSql(ms), channelMixSql(ms), afterHoursCoverSql(ms), eventsInRange(ms), accountFacts(i.installationId, i.allowed),
+  ]);
   const tz = new Map<string, string | null>(locs.map((l) => [l.location_id as string, (l.timezone as string | null) ?? null]));
   const tzOf = (l: string) => tz.get(l) ?? null;
-  const calls = missedCalls(events, i.now);
-  const unrecovered = calls.filter((c) => !recoveredIn15(c));
-  const recoveredList = calls.filter(recoveredIn15);
-  const keys = unrecovered.map((c) => `${c.locationId}:${c.contactId}`);
-  const [{ map: dollars }, facts] = await Promise.all([dollarsOf(i.installationId, keys), accountFacts(i.installationId, i.allowed)]);
-  // The people behind the missed calls (name, phone, owner), read from the synced contacts of the caller's own accounts only.
-  const people = new Map<string, Record<string, unknown>>();
-  if (unrecovered.length || recoveredList.length) {
-    const rs = await db`select location_id, contact_id, full_name, email, phone, dnd, source, nullif(assigned_to, '') assigned_to from cached_contacts
-      where installation_id = ${i.installationId} and contact_id = any(${[...new Set([...unrecovered.slice(0, 200), ...recoveredList.slice(0, 50)].map((c) => c.contactId))]}::text[]) ${i.allowed ? db`and location_id = any(${i.allowed}::text[])` : db``}`;
-    for (const r of rs) people.set(`${r.location_id}:${r.contact_id}`, r);
-  }
-  const rowFor = (c: (typeof calls)[number]) => {
-    const p = people.get(`${c.locationId}:${c.contactId}`) ?? {};
-    const owner = p.assigned_to ? resolveUser(p.assigned_to as string, lk.team, lk.usersAccess.get(c.locationId)) : null;
+  const rowFor = (c: MissedRow, open: boolean) => {
+    const owner = c.owner ? resolveUser(c.owner, lk.team, lk.usersAccess.get(c.locationId)) : null;
+    const dropped = open && i.now - c.missedAt > FOLLOW_UP_HOURS * 3_600_000;
     return {
-      locationId: c.locationId, locationName: lk.locationNames.get(c.locationId) ?? "Client account", contactId: c.contactId, name: ((p.full_name as string) || (p.email as string) || (p.phone as string) || "Unknown caller"),
-      status: "waiting" as const, neverAnswered: c.status === "dropped", minutes: Math.round((i.now - c.at) / 60_000), source: sourceLabel((p.source as string | null) ?? null), repliedBy: null, owner, unassigned: !owner, autoSeconds: null, personSeconds: null, detailed: false,
-      phone: (p.phone as string | null) ?? null, email: (p.email as string | null) ?? null, dnd: p.dnd === true, timeZone: tzOf(c.locationId), suggestion: null, calledAt: c.at, dollars: dollars.get(`${c.locationId}:${c.contactId}`) ?? 0, callState: c.status,
+      locationId: c.locationId, locationName: lk.locationNames.get(c.locationId) ?? c.locationName ?? "Client account", contactId: c.contactId, name: c.name || c.email || c.phone || "Unknown caller",
+      status: "waiting" as const, neverAnswered: dropped, minutes: Math.round((i.now - c.missedAt) / 60_000), source: sourceLabel(c.source), repliedBy: null, owner, unassigned: !owner, autoSeconds: null, personSeconds: null, detailed: false,
+      phone: c.phone, email: c.email, dnd: c.dnd, timeZone: tzOf(c.locationId) ?? c.timeZone, suggestion: null, calledAt: c.missedAt, dollars: c.dollars, callState: (open ? (dropped ? "dropped" : "open") : "followed") as MissedCall["status"],
     };
   };
-  const missedRows = unrecovered.slice(0, 200).map(rowFor).sort((a, b) => b.dollars - a.dollars || b.calledAt - a.calledAt);
-  const recoveredRows = recoveredList.slice(0, 50).map(rowFor);
   const nightEst = costEstimate(cov.lostByLoc, facts ?? []);
   const route = routingCheck(cov.owned, cov.repliers);
   const nameOf = (u: string) => resolveUser(u, lk.team, null).label;
-  const cover = afterHoursCover([], events, tzOf);
   const share = cov.afterLeads >= MIN_BUCKET ? Math.round((cov.answeredSameNight / cov.afterLeads) * 100) : null;
   return {
     now: i.now,
-    missed: { total: calls.length, recovered15: calls.filter(recoveredIn15).length, unrecovered: unrecovered.length, dollars: missedRows.reduce((s2, r) => s2 + r.dollars, 0), rows: missedRows.slice(0, 50), recoveredRows, audit: textBackAudit(calls) },
-    night: { rows: cov.lostRows.slice(0, 50).map((x) => rowOut(x.row, x.status, lk, new Map())), lost: cov.lost, countedDollars: cov.lostDollars, estimate: nightEst.amount === null ? null : { amount: nightEst.amount, line: money(nightEst.amount) }, hoursToCover: cov.hoursToCover.slice(0, 8), afterLeads: cov.afterLeads, answeredSameNight: cov.answeredSameNight, share, cover: cover.cover.map((c) => ({ ...c, name: nameOf(c.userId) })) },
-    best: bestTimes(events, tzOf), channels: channelMix(events), eventsStored: events.length,
+    // unrecovered = callers still waiting for any callback or text: the same people, count and dollars as Call mode's first list. recovered15 and the text-back share count missed calls.
+    missed: { total: stats.calls, recovered15: stats.recovered15, unrecovered: waiting.total, dollars: waiting.dollars, rows: waiting.rows.map((r) => rowFor(r, true)), recoveredRows: recovered.map((r) => rowFor(r, false)), audit: textBackAudit(stats) },
+    night: { rows: cov.lostRows.slice(0, 50).map((x) => rowOut(x.row, x.status, lk, new Map())), lost: cov.lost, countedDollars: cov.lostDollars, estimate: nightEst.amount === null ? null : { amount: nightEst.amount, line: money(nightEst.amount) }, hoursToCover: cov.hoursToCover.slice(0, 8), afterLeads: cov.afterLeads, answeredSameNight: cov.answeredSameNight, share, cover: coverRows.map((c) => ({ ...c, name: nameOf(c.userId) })) },
+    best, channels, eventsStored,
     routing: { ...route, noLeads: route.noLeads.map((u) => ({ userId: u, name: nameOf(u) })), overloaded: route.overloaded.map((u) => ({ userId: u, name: nameOf(u), leads: cov.owned.get(u) ?? 0 })) },
   };
 }
