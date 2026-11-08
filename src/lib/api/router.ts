@@ -1992,7 +1992,10 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
     if (a === "speed" && b === "digest" && ["PUT", "POST", "GET"].includes(method)) return await handleSpeedDigest(ctx, speedHelpers);
     if (a === "speed" && b === "prefs" && ["PUT", "GET"].includes(method)) return await handleSpeedPrefs(ctx, speedHelpers);
     // The rebuilt Unanswered messages screen: its first screen, the list behind a number and the rankings (GET ?part=home|list|ranks, read only; an unknown part is refused with 400). Without a part the older answer below still serves the exports and the older tests.
-    if (a === "inbox" && method === "GET" && !b && ctx.url.searchParams.has("part")) return await handleUnansweredPart(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links, targets: async () => { const st = (await scope(ctx)).settings; return { slaHours: st.slaHours, targetMinutes: st.speedTargetMinutes }; } });
+    if (a === "inbox" && method === "GET" && !b && ctx.url.searchParams.has("part")) {
+      // The new Unanswered v2 parts (home/list/ranks) are always available; per-client SLA is gated separately inside handleUnansweredPart
+      return await handleUnansweredPart(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links, targets: async () => { const st = (await scope(ctx)).settings; return { slaHours: st.slaHours, targetMinutes: st.speedTargetMinutes }; } });
+    }
     if (method === "GET") {
       if (a === "overview") return await overview(ctx);
       if (a === "today" && !b) return await todayView(ctx);

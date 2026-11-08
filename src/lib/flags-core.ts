@@ -16,6 +16,18 @@ export const DEFAULT_OFF: ReadonlySet<Feature> = new Set<Feature>([
   "workflows",
   // The Data health module (docs/features/DATA_HEALTH.md): off until King switches it on.
   "data_health",
+  // Unanswered Messages Round 2 (docs/features/UNANSWERED2.md): each behind its own flag, default off.
+  "inbox_per_client_sla",
+  "inbox_sql_aggregates",
+  "inbox_breach_alert",
+  "inbox_ball_in_court",
+  "inbox_working_hours",
+  "inbox_hide_noise",
+  "inbox_workload",
+  "inbox_snooze",
+  "inbox_channel_mix",
+  "inbox_digest",
+  "inbox_assign",
 ]);
 
 export function resolveFeatures(all: readonly Feature[], overrides: Record<string, boolean>, allOn = false): Record<Feature, boolean> {

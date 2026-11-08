@@ -7,7 +7,7 @@ import { isInternalComment } from "./message-kinds.ts";
 /** A conversation whose last message from the customer is older than this is dead, not waiting: nobody is still expecting a reply. */
 export const WAITING_WINDOW_DAYS = 30;
 
-export type ConvLike = { direction: string | null; at: number | null; type: string | null };
+export type ConvLike = { direction: string | null; at: number | null; type: string | null; locationId?: string | null };
 
 /**
  * waiting  the customer wrote last and the reply target has passed (inside the window)

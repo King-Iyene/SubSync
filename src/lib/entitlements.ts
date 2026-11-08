@@ -44,6 +44,18 @@ export const FEATURES = [
   "data_health",
   "data_health_pro",
   "data_health_fix",
+  // Unanswered Messages Round 2 (docs/features/UNANSWERED2.md): each behind its own flag, default off.
+  "inbox_per_client_sla",
+  "inbox_sql_aggregates",
+  "inbox_breach_alert",
+  "inbox_ball_in_court",
+  "inbox_working_hours",
+  "inbox_hide_noise",
+  "inbox_workload",
+  "inbox_snooze",
+  "inbox_channel_mix",
+  "inbox_digest",
+  "inbox_assign",
 ] as const;
 export type Feature = (typeof FEATURES)[number];
 
