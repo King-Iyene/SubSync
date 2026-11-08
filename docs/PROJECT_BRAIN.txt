@@ -1,0 +1,69 @@
+SUBSYNC PROJECT BRAIN (plain text, for a new session to think from)
+Last updated: 8 Nov 2026. Owner: King (KD Squares Ltd; use they/them). Repo: C:\Users\KING\OneDrive\Desktop\SubSync. Live: https://subsync.kdsquares.com. Marketplace app ID 6ae2a79309eaa881c1eb419e (not the old "KD Squares" app).
+Read this first, then SAFETY_RULES.txt, then CLAUDE.md (master brief). Where they disagree, CLAUDE.md and King's latest message win.
+
+1. WHAT IT IS
+SubSync is a GoHighLevel (GHL) Marketplace app for appointment-driven agencies (home services, med spas, solar, real estate, coaches). Positioning: "Know what is happening in every client account before your client does." It watches outcomes (leads never answered, unmarked appointments, SLA breaches, stale deals), sends alerts, and gives shareable audits and weekly digests. It is alerts-first and action-first, not another reporting tool. One app, two views: agency view (all client accounts) and account view (one business). Identity comes from GHL SSO in the iframe. Public wording: say "client accounts", never vendor words in the UI.
+
+2. WHY THIS LANE (from research, see docs/COMPETITORS.md, docs/reference/)
+- Biggest marketplace player All The Apps: about 196.6K installs, 4.7 stars from 61 reviews, $129 / $299 / $499 per month. Owns white-label, onboarding, support desk, integrations, a multi-location dashboard builder. Does not visibly track show rate, speed to lead, setter performance. Weak points: complexity (1,315 features), 165 permission scopes, high entry price.
+- GHL native reports cover appointments, agent performance, pipeline per account, with limited history; reviewers say "wide rather than deep".
+- Client reporting is a commodity (AgencyAnalytics about $12 to $15 per client, Two Minute Reports, Looker Studio, Databox).
+- Our wedge: alerts and queues (push, not pull), our own event history (stage and status changes, appointment outcomes), cross-account setter and closer visibility, speed to value (Instant Audit), few permissions, focus on 8 to 12 outcomes done deeply.
+- Mistakes not to repeat: All The Apps is paid; GHL has native reports; "nobody does cross-account" was overstated; feature count is a weakness.
+
+3. LOCKED DECISIONS
+- Target user: sub-account (locked). Agency can bulk install (locked). Listing: white-label. App type: private for now (cap 5 agencies). Who can install: Everyone. Billing: GHL internal billing only. Free trial 14 days.
+- Pricing: free tier plus one paid plan per client account per month, resellable by agencies with markup. PRICE DECIDED BY KING (8 Nov 2026): Pro is $11.5 per client account per month. CLAUDE.md still says $9 in places; this file and King's latest message win. A temporary $5 Pro plan exists in the portal and must be deleted and replaced before any pilot. Plan IDs are never hardcoded; plan_entitlements table maps planId to tier; ENTITLEMENTS_MODE is open (development) or enforced.
+- Commission by GHL: unresolved (0% per help article, 15% per an older source). Model both.
+- Stack: Next.js 16, Supabase (RLS, additive migrations), Vercel, postgres.js, Playwright, Vitest, Node test runner. Supabase is on the 500 MB plan: no big fixtures.
+
+4. NON-NEGOTIABLE RULES
+- Tenant isolation: a client account never sees another's data; an agency never sees another agency's. Enforced server side from the verified SSO payload. Cross-tenant tests (check-tenancy) run alone before every push to main and must print "nothing changed: ok".
+- All CRM writes go through the safe write gateway: preview first, typed confirmation for delete, dry-run unless WRITE_GHL_LIVE and the per-account opt-in are on. All sends go through gated transports (SEND_EMAIL_LIVE, SEND_SLACK_LIVE).
+- Additive migrations only. Feature flag every module. Idempotent webhooks and sync. Every metric has one written definition in docs/METRICS.md.
+- Design for millions of leads and 100 to 200 client accounts: SQL aggregates, server paging (20/50/100), never load all rows.
+- White-label safe: SubSync logo by default, agency brand only when white-label is on; no vendor words in UI or emails.
+
+5. KING'S STANDING PREFERENCES
+Money first (will a customer buy it, will it make MRR). Simple, classy, sci-fi UI, little text, explanations in hover tips, features named as the question they answer. Light and dark themes both right. Every count of people is clickable and opens exactly those people. One module at a time. Use few tokens: short replies, no recaps. King deletes remote branches himself.
+
+6. WHAT IS BUILT (all on main, tested on demo and test data only, never on a real client account)
+Today, Speed to lead (Race, Pace, Coverage, Call mode, People, Capture, Rules, Log), Unanswered messages, Appointments (status insights and status writes), Account audit (dollars at risk), People, Clients, Clean-up and Duplicates (guided review, history, data quality), Connections inside Settings, lead workbench panel (message, note, task, tags, deals, appointment status, delete with typed confirmation), live sync (about 45 s delta, webhooks, Sync now popup), call queue (tag trigger default "call-now", Manual Actions in the CRM, auto mode off by default), workflow auto-setup framework (neutral folder "Lead Response Automations"), speed digest email, shell with account and date filter bar, plan entitlements, event store, tenant isolation tests.
+Latest: Speed to lead closed (8 Nov). Call mode and Coverage now share one missed-call definition (docs/METRICS.md), SQL-paged for 100k+ rows; 1M leads not tested because of the 500 MB database.
+
+7. FACTS ABOUT THE CRM (see docs/CAPABILITIES.md and docs/BLOCKED.md for the full list)
+Verified or well supported: no API to place calls or start the CRM power dialer; no merge-contacts endpoint; contact API gives tag names only, no tag dates; Workflows API create is limited (403 WORKFLOW_API_NOT_ENABLED_FOR_LOCATION); enrol API exists (contacts.write); bulk install gives a Company token and we mint Location tokens; GHL bills and installs but our code decides features.
+Unverified (never build on these without checking): exact SSO payload for each user type, plan-change webhook payload names, white-label deep-link patterns, whether free-tier-plus-per-account works with bulk install, behavior of existing installs when a plan is deleted.
+No session has ever used the CRM live. All CRM knowledge comes from docs, King's screenshots and test runs.
+
+8. OPEN ITEMS AND THINGS ONLY KING CAN DO
+- Vercel production switches: WRITE_GHL_LIVE is already true; SEND_EMAIL_LIVE, SEND_SLACK_LIVE, FATHOM_WEBHOOK_LIVE still to set, then redeploy.
+- Slack redirect URL: https://subsync.kdsquares.com/api/integrations/slack/callback
+- Add optional scopes in the next publish: conversations/message.write, workflows read/write/publish (confirm exact portal names).
+- Pricing gate before any pilot: add the final Pro plan at $11.5 monthly, delete the $5 plan, map the new plan ID, switch to enforced, rerun tests.
+- One real test on a throwaway CRM account (docs/TEST_SPEED_GUIDE.md).
+- Privacy policy and terms need human review before going Public.
+- Recruit 3 to 5 pilot agencies. Gates: 30 days 3 pilots using it weekly; 60 days 2 would pay; 90 days public listing, 20 installed, 10 paying.
+- Small open UI items from Speed: chart bars narrow on phone, account picker checkboxes small, one "Contact not found" on Log from a stale filter. Two older specs (speed4, speed6b) did not finish due to dev-server database timeouts.
+- About 166 MB of dh_flags rows in the database belong to something else; King should check and drop if not needed.
+
+9. NEXT BUILD QUEUE (in order)
+1. Appointments module in the lead panel: reschedule, add, delete (typed confirmation), reassign, double-booking check, rebook after a no-show. Today only status changes exist.
+2. Chat partner (AI): in-app assistant that answers "what should I do now?" from our own data, drafts replies for approval, never sends on its own, usage-metered.
+3. Going beyond: Today scale pass (100+ clients), "All leads" explorer (20M rows, smart lists, paged), more workflow templates (missed-call text-back, no-show recovery, speed alerts), white-label email (display name, reply-to, own sending domain).
+4. Advanced features: anomaly detection, forecasts, source attribution, churn-risk alerts, AI daily brief, setter and closer leaderboards, stage-history metrics, plus the rest of docs/KING_SELECTED_FEATURES.md.
+Do not build: dialers, GHL theming, support desk, knowledge base, snapshot store, integration catalog, custom report builder, white-label PDF reports.
+
+10. WORKFLOW FOR BUILDING
+Write a short spec in docs/features/. Use agents in worktrees C:\Users\KING\wt\<NAME> (own dev port; agents never run check-tenancy and never push to main). Lead merges with: git merge --no-ff, apply new migration, npx next typegen and npx tsc --noEmit, node --test src/lib/__tests__/, then check-tenancy alone (TEST_PORT=3102 TEST_DIST_DIR=.next-int2 CHECKS=check-tenancy node scripts/with-dev-server.mjs), push only if it prints "nothing changed: ok". Update docs/FEATURE_STATUS.md and docs/DECISIONS.md.
+
+11. RESEARCH TASK (run when King asks for market research)
+Prompt to follow exactly:
+
+"I'm building SubSync, a GoHighLevel (GHL) Marketplace app for appointment-driven agencies (home services, med spas, solar, real estate, coaches). Its positioning is 'Know what is happening in every client account before your client does': it monitors outcomes (leads never answered, unmarked appointments, SLA breaches, stale deals), sends alerts, and gives agencies shareable audits and weekly reports. Pricing is free tier plus $11.5 per client account per month. Research: (1) the closest competitors and GHL Marketplace apps, with pricing and key features; (2) what customers praise and complain about in their reviews; (3) features SubSync is missing that agencies would pay for; (4) gaps nobody serves well. Give sources for each claim and a table comparing us to the top 5."
+
+Existing research to start from, so it is not redone: docs/COMPETITORS.md, docs/DEEP_RESEARCH.md, docs/FEATURE_RESEARCH.md, docs/research/SPEED_COMPETITORS.md, docs/reference/SubSync_Competitive_Intelligence_AllTheApps.md. Label every claim VERIFIED (read in a primary source), INFERENCE, or CHECK. Do not repeat the mistakes in section 2.
+
+12. WHERE EVERYTHING LIVES
+docs/KING_FEEDBACK_LIVE.md (King's rules KF-1 to KF-12), docs/KING_SELECTED_FEATURES.md, docs/NEEDS_KING.md (numbered King-only steps), docs/DECISIONS.md, docs/FEATURE_STATUS.md, docs/METRICS.md, docs/CAPABILITIES.md, docs/BLOCKED.md, docs/TEST_SPEED_GUIDE.md, docs/features/*.md (one per module), docs/NEXT_SESSION_PROMPT.txt, docs/SAFETY_RULES.txt.

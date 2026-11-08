@@ -1,0 +1,52 @@
+# Unanswered Messages Round 2 - Progress
+
+## Branch: stage/unanswered2
+
+## Done Items
+
+### Item 1: Per-Client Reply Target (SLA) - COMPLETE
+- Flag: `inbox_per_client_sla` (default off)
+- Implementation: Reuses existing `locations.speed_target_minutes` column (minutes -> hours ceiling)
+- Modified: `unanswered-v2-queries.ts` - added `loadAccountSlaHours()`, `filterWaitingBySla()`, updated `unansweredHome`, `unansweredList`, `unansweredRanks`
+- Modified: `router.ts` - removed feature flag gate (Unanswered v2 always available; per-client SLA applied inside queries)
+- Verified: `npx tsc --noEmit` passes, `node --test src/lib/__tests__/` passes
+
+### Item 2: SQL Aggregates & Indexed Server-Paged Lists - COMPLETE
+- Flag: `inbox_sql_aggregates` (default off)
+- Implementation: `loadWaitingAgg()` uses SQL window function `COUNT(*) OVER()` for exact totals with SLA filter in WHERE clause
+- Modified: `unanswered-v2-queries.ts` - replaced `loadWaiting` calls with `loadWaitingAgg` in `unansweredHome`, `unansweredList`, `unansweredRanks`
+- SLA filter applied at database level using CASE expression on `locations.speed_target_minutes`
+- Returns `{ rows, total, truncated }` with exact filtered total
+- Verified: `npx tsc --noEmit` passes, `node --test src/lib/__tests__/` passes
+
+### Verification Complete (Items 1-2)
+- [x] TypeScript typecheck: `npx tsc --noEmit` - clean
+- [x] Node unit tests: `node --test src/lib/__tests__/` - 1282 pass
+- [x] Vitest DB tests: `npx vitest run tests/unit/unanswered-v2-db.test.ts` - 7 pass
+- [x] Tenant isolation check - prints "nothing changed: ok"
+- [x] Committed: `git commit 7d5aadb`
+
+## Current Item
+**Item 3: 24-Hour Breach Alert** - Next to build
+- Flag: `inbox_breach_alert` (default off)
+- What: Headline line "12 people have waited more than 24 hours" with link to h24+h48 buckets
+- Where: `unanswered-v2.ts` adds `breach24` to Facts and headlineOf; `unanswered-v2-queries.ts` computes in `unansweredHome`
+
+## Next Items (in order)
+4. Ball in Whose Court (`inbox_ball_in_court`)
+5. Working-Hours Wait Clock (`inbox_working_hours`)
+6. Hide Noise (`inbox_hide_noise`)
+7. Workload Balance (`inbox_workload`)
+8. Snooze & Handled (`inbox_snooze`)
+9. Channel Mix (`inbox_channel_mix`)
+10. Morning Digest Line (`inbox_digest`)
+11. Assign (`inbox_assign`)
+
+## Commands to run after each item
+```
+npx next typegen && npx tsc --noEmit
+node --test src/lib/__tests__/
+npx vitest run tests/unit/unanswered-v2-db.test.ts --no-file-parallelism
+TEST_PORT=3102 TEST_DIST_DIR=.next-int2 CHECKS=check-tenancy node scripts/with-dev-server.mjs
+npx playwright test tests/e2e/unanswered-v2.spec.ts --project=desktop-1440 --project=tablet-768 --project=phone-390
+```

@@ -1,0 +1,23 @@
+SAFETY RULES. Follow these for the whole session.
+
+1. Understand before you act. When I ask for something, first say back in two lines what you think I mean. If it could mean two things, or you are not sure, ask me one question and wait. Do not guess.
+
+2. Facts about the CRM (GoHighLevel). You have never used it live. Only treat a CRM behavior as true if it is (a) marked VERIFIED in the project docs, (b) confirmed in the official docs, or (c) shown by a real API response. Otherwise label it UNVERIFIED and tell me. Never build on an UNVERIFIED fact without telling me first. Read docs/CAPABILITIES.md, docs/NEEDS_KING.md and docs/BLOCKED.md before touching anything that talks to the CRM.
+
+3. Plan before change. Before editing code, tell me in plain words: what you will change, which files, what could break, and how I undo it. Then do it. For anything that writes to the CRM, sends a message, changes the database, or changes billing or permissions, wait for my yes.
+
+4. Small and reversible. Make small changes. New things go behind a feature flag. Database changes are additive only (new tables or columns, never delete or rename). Do not rewrite working code to tidy it. Do not touch code that is not part of the request.
+
+5. Never do these without my explicit yes in this chat: push to main, change Vercel or portal settings, turn on a live switch (WRITE_GHL_LIVE, SEND_EMAIL_LIVE, SEND_SLACK_LIVE), send any real email, SMS or Slack message, delete data, or change a plan or price.
+
+6. Real CRM accounts. Test only on the demo data or my throwaway test account. Never write to a real client account.
+
+7. Prove it. After a change, run typecheck, the unit tests, and for anything that touches data run the tenant isolation check (check-tenancy) alone. Tell me what passed and what you did NOT test. Never say "done" or "works" for something you did not run.
+
+8. Tenant isolation is the top rule. One client account must never see another's data. If a change might weaken that, stop and ask.
+
+9. When you are unsure, say "I am not sure" and tell me what you would need to check. Do not fill gaps with confident guesses. Keep answers short.
+
+10. Each time before you finish, list: what changed, what is untested, what I must do myself.
+
+Confirm you understood these 10 rules in one line, then wait for my request.

@@ -160,19 +160,20 @@ export function channelChoices(people: readonly Person[]): Choice[] {
 
 // ---------- the headline ----------
 
-export type Facts = { people: number; conversations: number; accounts: number; oldestHours: number | null; noOwner: number; newLeads: number; over24: number };
+export type Facts = { people: number; conversations: number; accounts: number; oldestHours: number | null; noOwner: number; newLeads: number; over24: number; breach24: number };
 
 export function factsOf(people: readonly Person[]): Facts {
   const accounts = new Set<string>();
-  let oldest: number | null = null, noOwner = 0, newLeads = 0, over24 = 0, conversations = 0;
+  let oldest: number | null = null, noOwner = 0, newLeads = 0, over24 = 0, breach24 = 0, conversations = 0;
   for (const p of people) {
     accounts.add(p.locationId); conversations += p.conversations;
     if (oldest === null || p.hours > oldest) oldest = p.hours;
     if (p.assignedTo === null) noOwner += 1;
     if (p.newLead) newLeads += 1;
     if (p.hours >= 24) over24 += 1;
+    if (p.hours >= 24) breach24 += 1;
   }
-  return { people: people.length, conversations, accounts: accounts.size, oldestHours: oldest, noOwner, newLeads, over24 };
+  return { people: people.length, conversations, accounts: accounts.size, oldestHours: oldest, noOwner, newLeads, over24, breach24 };
 }
 
 const plural = (n: number, one: string, many = one + "s") => `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
@@ -198,6 +199,12 @@ export function headlineOf(f: Facts, multi: boolean): { parts: HeadlinePart[]; t
   parts.push({ t: "." });
   if (f.oldestHours !== null) parts.push({ t: f.people === 1 ? ` They have waited ${longWords(f.oldestHours)}.` : ` The longest has waited ${longWords(f.oldestHours)}.` });
   return { parts, text: parts.map((p) => p.t).join(""), allClear: false };
+}
+
+/** Breach line for the 24-hour alert (Item 3): returns a line when people have waited 24+ hours. */
+export function breachLine(f: Facts): { parts: HeadlinePart[]; text: string } | null {
+  if (f.breach24 === 0) return null;
+  return { parts: [{ t: `${f.breach24.toLocaleString("en-US")} ${f.breach24 === 1 ? "person has" : "people have"} waited more than 24 hours.` }], text: `${f.breach24.toLocaleString("en-US")} ${f.breach24 === 1 ? "person has" : "people have"} waited more than 24 hours.` };
 }
 
 /** The primary button's words. */

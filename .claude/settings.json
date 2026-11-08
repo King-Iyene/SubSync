@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx next typegen)",
+      "Bash(npx tsc *)",
+      "Bash(npx eslint *)",
+      "Bash(npx vitest run *)",
+      "Bash(npx playwright test *)",
+      "Bash(node --test *)",
+      "Bash(TEST_PORT=3102 TEST_DIST_DIR=.next-int2 CHECKS=check-tenancy node scripts/with-dev-server.mjs)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git branch --show-current)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(ls *)"
+    ],
+    "deny": [
+      "Bash(git push --force*)",
+      "Bash(git push -f*)",
+      "Bash(git reset --hard*)",
+      "Bash(git clean*)",
+      "Bash(rm -rf *)",
+      "Bash(git push origin main*)"
+    ]
+  }
+}

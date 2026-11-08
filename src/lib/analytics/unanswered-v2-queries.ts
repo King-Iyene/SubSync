@@ -11,7 +11,7 @@ import type { Lookups } from "./speed-parts";
 import type { WaitingLead } from "./today-queue";
 import {
   DAY, estimateFor, facetsOf, HOUR, isBucket, leadKey, markNewLeads, meaningLine, nextBestAction, pageOf, peopleOf, rankAccounts, rankOwners, selectPeople, SORTS,
-  todayAgreement, visibleBuckets, waitingConversations, homeOf, type BucketKey, type PeopleSort, type Person, type WaitConv,
+  todayAgreement, visibleBuckets, waitingConversations, homeOf, breachLine, type BucketKey, type PeopleSort, type Person, type WaitConv,
 } from "./unanswered-v2";
 
 // The data behind the rebuilt Unanswered messages screen. Read only: nothing here writes to SubSync's tables or to the CRM, and no message text is ever read (SubSync keeps only
@@ -164,6 +164,7 @@ export async function unansweredHome(i: HomeInput) {
   const me = i.meId && people.some((p) => p.assignedTo === i.meId) ? i.meId : null;
   const labelOf = (id: string) => { const l = ownerLabel(id, lk, locs.length === 1 ? (locs[0].location_id as string) : null); return { label: l.label, state: l.state as string }; };
   const home = homeOf(people, { slaHours: i.slaHours, accounts: lk.locationNames, seePeople: i.seePeople, me, labelOf });
+  const breach = breachLine(home.facts);
   const cost = estimateFor(people, facts ?? []);
   const money = await waitingMoney(i.installationId, people.map((p) => p.key));
   const clientCounts = new Map<string, number>();
@@ -173,7 +174,7 @@ export async function unansweredHome(i: HomeInput) {
   const countAccounts = lk.locationNames.size;
   return {
     now: i.now, slaHours: i.slaHours, windowDays: WAITING_WINDOW_DAYS, multi: countAccounts > 1, accountCount: countAccounts, seePeople: i.seePeople,
-    waiting: { ...home.facts, headline: home.headline, meaning: meaningLine(i.slaHours, WAITING_WINDOW_DAYS), rows: home.rows.map((p) => personOut(p, lk)), clients, money: { line: waitingMoneyLine(money, "Next best step: reply to the person who has waited longest."), dollars: money?.dollars ?? 0, peopleWithDeals: money?.peopleWithDeals ?? 0, deals: money?.deals ?? 0 }, cost: { line: cost.line, formula: cost.formula, amount: cost.amount, leftOutAccounts: cost.leftOutAccounts } },
+    waiting: { ...home.facts, headline: home.headline, breach: breach ? breach.text : null, meaning: meaningLine(i.slaHours, WAITING_WINDOW_DAYS), rows: home.rows.map((p) => personOut(p, lk)), clients, money: { line: waitingMoneyLine(money, "Next best step: reply to the person who has waited longest."), dollars: money?.dollars ?? 0, peopleWithDeals: money?.peopleWithDeals ?? 0, deals: money?.deals ?? 0 }, cost: { line: cost.line, formula: cost.formula, amount: cost.amount, leftOutAccounts: cost.leftOutAccounts } },
     buckets: home.buckets, channels: home.channels,
     accounts: home.accounts.total > 1 ? { total: home.accounts.total, rows: home.accounts.rows } : null,
     owners: home.owners ? { total: home.owners.total, rows: home.owners.rows } : null,

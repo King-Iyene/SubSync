@@ -99,7 +99,7 @@ What we give up: GHL documents the "agency base fee plus per-account fee" (diffe
 - **Deprecation:** minimum 3 days notice. The docs say installs on a deprecated version are uninstalled on the deprecation date, but the portal text says installs stay until the version is deleted. Never deprecate a version with real installs until this is confirmed.
 - **Pricing:** price changes apply to new installs only. Existing installs keep their old price. So finish the plan swap before any pilot installs (the pre-pilot gate in section 6).
 - **Private install cap** applies at the app level. CHECK how GHL counts it (agencies or locations).
-- **Release plan:** the next GHL version (1.1.0) is one batch: add the optional scopes from section 13A, swap the plan to $9, update the listing copy and Getting Started guide, write release notes. Then King reinstalls or re-approves in his own accounts to grant the new scopes. CHECK whether pricing changes live in the draft or are app-wide.
+- **Release plan:** the next GHL version (1.1.0) is one batch: add the optional scopes from section 13A, swap the plan to $11.50, update the listing copy and Getting Started guide, write release notes. Then King reinstalls or re-approves in his own accounts to grant the new scopes. CHECK whether pricing changes live in the draft or are app-wide.
 
 ---
 
@@ -204,7 +204,7 @@ With "Everyone" install there is ONE price line: a price per client account per 
 | Plan | Price | Includes |
 |---|---|---|
 | Free | $0 | Instant Audit, overview, contact search, data health |
-| Pro (final, still to be created) | $9 per client account per month | Everything in Wave 1 |
+| Pro (final, still to be created) | $11.50 per client account per month | Everything in Wave 1 |
 | Higher tier (later, as a new plan) | $9 to $19 per client account per month (hypothesis) | AI brief, anomaly detection, forecasts |
 
 **How it works:**
@@ -213,15 +213,15 @@ With "Everyone" install there is ONE price line: a price per client account per 
 - Each install carries a `planId`. Entitlements are per location. Proposed rule: the agency-wide view unlocks when at least one of the agency's installed accounts is on a paid plan. Tell King if GHL's model makes a better rule easier.
 - CHECK card-on-file friction: GHL docs say a paid app is charged to each sub-account's card on file, and accounts without a card are skipped on bulk install. CHECK how reselling changes this. If agencies would have to chase clients for cards, tell King.
 
-**Configured in the portal (King, Oct 30, 2026):** Freemium, Free Plan $0, Pro $5 monthly, 14-day free trial, no billing meters yet. The Pro feature line reads "All views, alerts and exports for every client account". Keep that line honest: do not promise exports or alerts until they ship. Add one or two feature lines to the Free Plan so the difference is clear (Instant Audit, overview, search). King confirmed a plan's price cannot be edited: to change it, add a new plan and delete the old one. Final decision: Pro at $9 per client account per month. See the plan swap procedure below.
+**Configured in the portal (King, Oct 30, 2026):** Freemium, Free Plan $0, Pro $5 monthly, 14-day free trial, no billing meters yet. The Pro feature line reads "All views, alerts and exports for every client account". Keep that line honest: do not promise exports or alerts until they ship. Add one or two feature lines to the Free Plan so the difference is clear (Instant Audit, overview, search). King confirmed a plan's price cannot be edited: to change it, add a new plan and delete the old one. Final decision: Pro at $11.50 per client account per month. See the plan swap procedure below.
 
-**Math (hypotheses to test with the pilot agencies):** an agency with 20 accounts pays $180 per month at $9. If it charges clients $18, it earns $360 and keeps $180. At 1,000 paid accounts that is $9,000 per month before any commission, about $7,650 if GHL took 15%. Competitor anchors: AgencyAnalytics about $12 to $15 per client per month, All The Apps from $129 per month.
+**Math (hypotheses to test with the pilot agencies):** an agency with 20 accounts pays $230 per month at $11.50. If it charges clients $23, it earns $460 and keeps $230. At 1,000 paid accounts that is $11,500 per month before any commission, about $9,775 if GHL took 15%. Competitor anchors: AgencyAnalytics about $12 to $15 per client per month, All The Apps from $129 per month.
 
 **Plan swap procedure and development mode**
 - Today the portal has Free Plan $0 and a temporary Pro plan at $5. Both unlock the same features while we build, so King can test.
 - Never hardcode plan IDs. Deleting and re-adding a plan creates a new `planId`. Use the `plan_entitlements` table (`planId` to tier). Add an env setting `ENTITLEMENTS_MODE`: `open` (everything unlocked, for development and until pricing is final) or `enforced`.
 - King uses the Free Plan for his own test installs, so nothing is billed and nobody sits on the $5 plan. Test paid-plan behavior by replaying simulated INSTALL webhook payloads with different `planId` values. Do one real paid install only on the final plan.
-- **Pre-pilot gate (must be done before ANY outside agency installs):** (1) King adds Pro at $9 monthly with honest feature lines, (2) King deletes the $5 plan, (3) you add the new plan ID to `plan_entitlements`, (4) switch to `enforced`, then run the entitlement tests and the tenant isolation tests, (5) CHECK what happens to existing installs on a deleted plan, and make sure there are none.
+- **Pre-pilot gate (must be done before ANY outside agency installs):** (1) King adds Pro at $11.50 monthly with honest feature lines, (2) King deletes the $5 plan, (3) you add the new plan ID to `plan_entitlements`, (4) switch to `enforced`, then run the entitlement tests and the tenant isolation tests, (5) CHECK what happens to existing installs on a deleted plan, and make sure there are none.
 
 **This is not "same price for agency and sub-account".** There is one price per account. The agency can mark it up.
 
@@ -306,7 +306,7 @@ As far as I know, and CHECK the pricing pages before launch: Vercel Hobby is non
 ## 11. WHAT ONLY KING CAN DO (give King exact steps for each)
 
 1. Listing Configuration: no change needed. Leave Who can install as Everyone. Also generate the Shared Secret (Advanced Settings > Auth > Shared Secret > Generate) and store it only as an env var `GHL_APP_SHARED_SECRET`, never in chat or git.
-2. Pricing tab: not needed while we build. Before ANY pilot agency installs, add the $9 Pro plan and delete the $5 plan (steps in section 6).
+2. Pricing tab: not needed while we build. Before ANY pilot agency installs, add the $11.50 Pro plan and delete the $5 plan (steps in section 6).
 3. Create a Tipalti account when invited; confirm payouts work for King's bank (UNVERIFIED).
 4. Recruit 3 to 5 pilot agencies (private cap is 5), ideally appointment-driven agencies with setter teams.
 5. Get privacy policy and terms reviewed by a human before Public.
@@ -320,7 +320,7 @@ As far as I know, and CHECK the pricing pages before launch: Vercel Hobby is non
 | Gate | Target |
 |---|---|
 | End of Wave 0 | All visible features verified; tenant tests pass; event store recording |
-| Before any pilot install | $9 plan created, $5 plan deleted, plan IDs mapped, entitlements enforced, all tests pass |
+| Before any pilot install | $11.50 plan created, $5 plan deleted, plan IDs mapped, entitlements enforced, all tests pass |
 | 30 days | 3 or more pilot agencies connected and opening it weekly |
 | 60 days | 2 or more agencies say they would pay the proposed price |
 | 90 days | Public listing live; 20 agencies installed; 10 paying |
