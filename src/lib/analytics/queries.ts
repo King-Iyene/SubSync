@@ -610,11 +610,12 @@ function mapAlert(r: AlertDbRow): AlertRow {
   };
 }
 
-export async function listAlerts(installationId: string, includeResolved = false, limit = 200, locationId?: string): Promise<AlertRow[]> {
+export async function listAlerts(installationId: string, includeResolved = false, limit = 200, locationId?: string, userKey?: string | null): Promise<AlertRow[]> {
   const rows = await sql()`
     select id, location_id, kind, severity, title, detail, created_at, resolved_at from alerts
     where installation_id = ${installationId} and (${includeResolved} or resolved_at is null)
       and (${locationId ?? null}::text is null or location_id = ${locationId ?? null})
+      and (recipient_user_key is null or recipient_user_key = ${userKey ?? null})
     order by (resolved_at is null) desc,
       case severity when 'critical' then 0 when 'warning' then 1 else 2 end, created_at desc
     limit ${limit}`;

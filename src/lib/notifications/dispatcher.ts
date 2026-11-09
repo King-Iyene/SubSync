@@ -31,6 +31,12 @@ export type Intent = {
   type: NotificationType;
   locationId: string | null;
   severity: Severity;
+  /** The verified CRM user who alone should see this bell item. */
+  recipientUserKey?: string | null;
+  /** Hold the passive bell item during quiet hours too. */
+  respectQuietHours?: boolean;
+  /** Email may be rehearsed through the real transport but must never leave the server. */
+  emailDryRunOnly?: boolean;
   /** Identifies this event for dedupe: the same key never creates a second message to the same place (for example "alert:<id>" or "daily_brief:2026-11-02"). */
   dedupeKey: string;
   /** Values for the {variables} of the wording. */
@@ -54,6 +60,9 @@ export type Row = {
   reason: string | null;
   payload: Item;
   alertId: string | null;
+  recipientUserKey?: string | null;
+  respectQuietHours?: boolean;
+  emailDryRunOnly?: boolean;
   attempts: number;
   nextAttemptAt: number | null;
   createdAt: number;
@@ -112,9 +121,9 @@ type Target = { channel: Channel; target: string };
 /** Everywhere a message of this kind should go, from the person's choices. */
 export function targetsFor(intent: Intent, pref: Pref, ctx: Pick<Context, "destinations" | "mode">): Target[] {
   const out: Target[] = [];
-  if (pref.inApp) out.push({ channel: "in_app", target: IN_APP_TARGET });
+  if (pref.inApp || intent.recipientUserKey) out.push({ channel: "in_app", target: intent.recipientUserKey ? `user:${intent.recipientUserKey}` : IN_APP_TARGET });
   if (pref.email) for (const e of pref.recipients) out.push({ channel: "email", target: e });
-  for (const d of eligibleDestinations(ctx.destinations, pref.slackDestinations, intent, ctx.mode)) out.push({ channel: "slack", target: d.id });
+  if (!intent.recipientUserKey) for (const d of eligibleDestinations(ctx.destinations, pref.slackDestinations, intent, ctx.mode)) out.push({ channel: "slack", target: d.id });
   return out;
 }
 
@@ -131,11 +140,12 @@ export async function plan(intents: Intent[], ctx: Context, ledger: Ledger, now:
       let status: Status = "pending";
       let reason: string | null = null;
       // The bell is passive and always immediate. Email and Slack follow the person's time rules; a scheduled kind (a brief) is built at its time, so it is never held.
-      if (t.channel !== "in_app" && info.kind === "event") {
-        const d = decide({ timing: pref.timing, severity: intent.severity, now: new Date(now), zone, lastBatchDate: pref.timing.frequency === "immediate" ? null : await ledger.lastSentDate(ctx.installationId, intent.type, t.channel, t.target, zone) });
+      if (info.kind === "event" && (t.channel !== "in_app" || intent.respectQuietHours)) {
+        const timing = t.channel === "in_app" && intent.respectQuietHours ? { ...pref.timing, frequency: "immediate" as const } : pref.timing;
+        const d = decide({ timing, severity: intent.severity, now: new Date(now), zone, lastBatchDate: timing.frequency === "immediate" ? null : await ledger.lastSentDate(ctx.installationId, intent.type, t.channel, t.target, zone) });
         if (d.action === "hold") { status = "held"; reason = d.reason; }
       }
-      const row = await ledger.insert({ installationId: ctx.installationId, locationId: intent.locationId, type: intent.type, channel: t.channel, target: t.target, dedupeKey: intent.dedupeKey, severity: intent.severity, status, reason, payload: item, alertId: intent.alertId ?? null }, now);
+      const row = await ledger.insert({ installationId: ctx.installationId, locationId: intent.locationId, type: intent.type, channel: t.channel, target: t.target, dedupeKey: intent.dedupeKey, severity: intent.severity, status, reason, payload: item, alertId: intent.alertId ?? null, recipientUserKey: intent.recipientUserKey ?? null, respectQuietHours: intent.respectQuietHours ?? false, emailDryRunOnly: intent.emailDryRunOnly ?? false }, now);
       if (!row) { report.duplicates++; continue; }
       report.planned++;
       if (status === "held") report.held++;
@@ -163,15 +173,16 @@ export async function drain(ctx: Context, ledger: Ledger, transports: Transports
     // Things that changed while the message waited: the kind was switched off, the alert was fixed, the address was removed, the channel was disconnected.
     if (!info.active || !pref.enabled) { await skip(r, "switched_off"); continue; }
     if (r.alertId && !(await ledger.alertOpen(r.alertId))) { await skip(r, "resolved"); continue; }
-    if (r.channel === "in_app" && !pref.inApp) { await skip(r, "switched_off"); continue; }
+    if (r.channel === "in_app" && !pref.inApp && !r.recipientUserKey) { await skip(r, "switched_off"); continue; }
     if (r.channel === "email" && (!pref.email || !pref.recipients.includes(r.target))) { await skip(r, "unsubscribed"); continue; }
     if (r.channel === "slack") {
       const ok = eligibleDestinations(ctx.destinations, pref.slackDestinations, { locationId: r.locationId }, ctx.mode).some((d) => d.id === r.target);
       if (!ok) { await skip(r, "channel_not_available"); continue; }
     }
-    if (r.status === "held" && r.channel !== "in_app") {
+    if (r.status === "held" && (r.channel !== "in_app" || r.respectQuietHours)) {
       const zone = zoneOf(pref.timing, ctx.fallbackZone);
-      const d = decide({ timing: pref.timing, severity: r.severity, now: new Date(now), zone, lastBatchDate: pref.timing.frequency === "immediate" ? null : await ledger.lastSentDate(ctx.installationId, r.type, r.channel, r.target, zone) });
+      const timing = r.channel === "in_app" && r.respectQuietHours ? { ...pref.timing, frequency: "immediate" as const } : pref.timing;
+      const d = decide({ timing, severity: r.severity, now: new Date(now), zone, lastBatchDate: timing.frequency === "immediate" ? null : await ledger.lastSentDate(ctx.installationId, r.type, r.channel, r.target, zone) });
       if (d.action === "hold") { report.stillHeld++; continue; }
     }
     ready.push({ row: r });
@@ -181,7 +192,7 @@ export async function drain(ctx: Context, ledger: Ledger, transports: Transports
   const groups = new Map<string, Row[]>();
   for (const { row } of ready) {
     const merge = row.channel !== "in_app" && CATALOG[row.type].kind === "event";
-    const key = merge ? `${row.channel}|${row.target}|events` : `solo|${row.id}`;
+    const key = merge ? `${row.channel}|${row.target}|events|dry:${row.emailDryRunOnly}` : `solo|${row.id}`;
     groups.set(key, [...(groups.get(key) ?? []), row]);
   }
 

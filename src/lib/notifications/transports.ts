@@ -14,23 +14,23 @@ import { assertAllowlisted, TEST_EMAIL_CAP, type SendResult as TestSendResult, t
 type StopUrl = (email: string) => string | null;
 
 /** One email, through the switch. `rows` are only used for the ids in the log line. */
-async function sendMail(installationId: string, to: string, mail: Mail, stopUrl: StopUrl, what: string, ids: Record<string, string | null>): Promise<SendResult> {
+async function sendMail(installationId: string, to: string, mail: Mail, stopUrl: StopUrl, what: string, ids: Record<string, string | null>, dryRunOnly = false): Promise<SendResult> {
   const stop = stopUrl(to);
   const out = await outward({ flag: "SEND_EMAIL_LIVE", verb: "SEND", what, installationId, ids }, async (): Promise<SendResult> => {
     if (!emailConfigured()) return { ok: false, permanent: false, code: "email_not_configured" };
     const r = await sendEmailResult(to, { ...mail, ...(stop ? { headers: unsubscribeHeaders(stop) } : {}) });
     return r.ok ? { ok: true } : { ok: false, permanent: r.permanent, code: `http_${r.status}` };
-  });
+  }, dryRunOnly ? { env: { ...process.env, SEND_EMAIL_LIVE: "false" } } : {});
   return out.live ? out.result : { ok: true, dryRun: true };
 }
 
 export function realTransports(installationId: string, stopUrl: StopUrl): Transports {
   return {
     async inApp(row: Row): Promise<SendResult> {
-      await insertNotification({ installationId, locationId: row.locationId, type: row.type, severity: row.severity, item: row.payload, alertId: row.alertId, dedupeKey: row.dedupeKey });
+      await insertNotification({ installationId, locationId: row.locationId, type: row.type, severity: row.severity, item: row.payload, alertId: row.alertId, dedupeKey: row.dedupeKey, recipientUserKey: row.recipientUserKey });
       return { ok: true };
     },
-    email: (to: string, mail: Mail, rows: Row[]) => sendMail(installationId, to, mail, stopUrl, "notify.email", { notification: rows[0]?.id ?? null, type: rows[0]?.type ?? null }),
+    email: (to: string, mail: Mail, rows: Row[]) => sendMail(installationId, to, mail, stopUrl, "notify.email", { notification: rows[0]?.id ?? null, type: rows[0]?.type ?? null }, rows.some((row) => row.emailDryRunOnly)),
     async slack(destination: Destination, text: string, rows: Row[]): Promise<SendResult> {
       const out = await outward({ flag: "SEND_SLACK_LIVE", verb: "SEND", what: "notify.slack", installationId, ids: { destination: destination.id, notification: rows[0]?.id ?? null, type: rows[0]?.type ?? null } }, async (): Promise<SendResult> => {
         const url = await webhookOf(installationId, destination.id);

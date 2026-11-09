@@ -46,9 +46,10 @@ test("mapOpportunity reads value, stage and activity dates", () => {
 });
 
 test("mapConversation keeps direction and unread, drops bad values", () => {
-  const c = mapConversation({ id: "v1", contactId: "c1", fullName: "Jo", lastMessageDirection: "INBOUND", lastMessageDate: 1_700_000_000_000, unreadCount: 3, lastMessageType: "TYPE_SMS" });
+  const c = mapConversation({ id: "v1", contactId: "c1", fullName: "Jo", assignedTo: "user-1", lastMessageDirection: "INBOUND", lastMessageDate: 1_700_000_000_000, unreadCount: 3, lastMessageType: "TYPE_SMS" });
   assert.equal(c?.lastMessageDirection, "inbound");
   assert.equal(c?.unreadCount, 3);
+  assert.equal(c?.assignedTo, "user-1");
   assert.equal(mapConversation({ id: "v2", lastMessageDirection: "sideways", unreadCount: -2 })?.lastMessageDirection, null);
   assert.equal(mapConversation({ id: "v2", unreadCount: -2 })?.unreadCount, 0);
   assert.equal(mapConversation({}), null);

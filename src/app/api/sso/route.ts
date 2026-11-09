@@ -10,6 +10,8 @@ import { decryptSsoPayload, parseSsoUser } from "@/lib/ghl/sso";
 import { resolveBrand } from "@/lib/brand-resolve";
 import { signSession } from "@/lib/session";
 import { MAINTENANCE_MESSAGE, maintenanceOn } from "@/lib/runtime-guards";
+import { safeError } from "@/lib/safe-log";
+import { sql } from "@/lib/db";
 
 // The agency's own name and colour, shown in place of ours. Only a plain hex colour is passed on.
 async function brandOf(installationId: string) {
@@ -99,6 +101,17 @@ export async function POST(request: Request) {
   if (!installation) {
     await logIdentity(null, identity, "not_installed");
     return NextResponse.json({ user, installed: false });
+  }
+  if (identity.userType === "account" && identity.userId && decision.locationId) {
+    try {
+      await sql()`
+        insert into location_users (installation_id, location_id, user_id, name, role, seen_at)
+        values (${installation.id}, ${decision.locationId}, ${identity.userId}, ${identity.userName ?? "Account team member"}, ${identity.role}, now())
+        on conflict (installation_id, location_id, user_id) do update set
+          name = excluded.name, role = excluded.role, seen_at = now()`;
+    } catch (error) {
+      console.error("Saving verified account role failed", safeError(error));
+    }
   }
   await logIdentity(installation.id, identity, "ok");
   // An agency that resells the platform under its own domain gets links on that domain.

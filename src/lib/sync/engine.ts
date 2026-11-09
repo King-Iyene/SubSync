@@ -368,7 +368,7 @@ async function handleConversations(job: Job): Promise<Outcome> {
       const rows = unique.map((c) => ({
         installation_id: job.installationId, location_id: loc, conversation_id: c.conversationId, contact_id: c.contactId,
         contact_name: c.contactName, last_message_type: c.lastMessageType, last_message_direction: c.lastMessageDirection,
-        last_message_at: c.lastMessageAt, unread_count: c.unreadCount, synced_at: new Date(),
+        last_message_at: c.lastMessageAt, unread_count: c.unreadCount, assigned_to: c.assignedTo, synced_at: new Date(),
       }));
       await tx`insert into cached_conversations ${tx(rows as never)}`;
     }

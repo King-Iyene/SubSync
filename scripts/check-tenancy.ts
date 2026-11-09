@@ -36,6 +36,8 @@ async function main() {
     const opps: string[] = [];
     for (const [i, loc] of locs.entries()) {
       await sql()`insert into locations (installation_id, location_id, name, email, timezone, client_view) values (${inst.id}, ${loc}, ${`${marker} Location ${i + 1}`}, ${`${key}${i}@${marker.toLowerCase()}.test`}, 'America/New_York', ${i === 1})`;
+      await sql()`insert into notifications (installation_id, location_id, type, severity, title, body, dedupe_key)
+        values (${inst.id}, ${loc}, 'other_alerts', 'warning', ${`${marker} Alert ${i + 1}`}, 'Fixture alert', ${`tenancy:${marker}:${i}`})`;
       const c = `xtestContact${K}${i}`;
       contacts.push(c);
       await sql()`insert into cached_contacts (installation_id, location_id, contact_id, first_name, last_name, email, phone, tags, date_added, last_activity_at)
@@ -69,7 +71,7 @@ async function main() {
     const reads = (me: Side, other: Side) => [
       "/api/app/overview", "/api/app/accounts", `/api/app/accounts/${other.locs[0]}`, `/api/app/accounts/${other.locs[0]}?locationId=${other.locs[0]}`,
       `/api/app/search?q=${other.marker}`, `/api/app/search?q=${other.marker.toLowerCase()}.test`, `/api/app/search?q=${encodeURIComponent("5550102")}`,
-      "/api/app/stale", "/api/app/hygiene", "/api/app/inbox", "/api/app/pipelines", "/api/app/duplicates", "/api/app/alerts", "/api/app/pipeline-intel", "/api/app/contact-intel",
+      "/api/app/stale", "/api/app/hygiene", "/api/app/inbox", "/api/app/pipelines", "/api/app/duplicates", "/api/app/alerts", "/api/app/notifications", "/api/app/pipeline-intel", "/api/app/contact-intel",
       "/api/app/comms-intel", "/api/app/deal-gaps", "/api/app/deal-events", `/api/app/contact/${other.contacts[0]}?locationId=${other.locs[0]}`, `/api/app/contact/${other.contacts[0]}`,
       "/api/app/appointments", "/api/app/appointment-insights", "/api/app/meetings", "/api/app/cleanup", "/api/app/connections", "/api/app/team", "/api/app/clients",
       "/api/app/daily", "/api/app/email", "/api/app/sync-status", "/api/app/freshness", "/api/app/call-queue", "/api/app/call-lists", "/api/app/call-outcomes", "/api/app/goals",
@@ -142,11 +144,12 @@ async function main() {
     const biz = session(A, "business", A.locs[0]);
     const cli = session(A, "client", A.locs[1]);
     const sibling = async (token: string, mineLoc: string, otherLoc: string, label: string) => {
-      for (const path of ["/api/app/overview", "/api/app/accounts", `/api/app/accounts/${otherLoc}`, "/api/app/search?q=zzTenantA", "/api/app/stale", "/api/app/inbox", "/api/app/appointments", "/api/app/pipelines", "/api/app/duplicates", "/api/app/contact-intel", "/api/app/today", `/api/app/today?accounts=${otherLoc}`, `/api/app/today?accounts=${mineLoc},${otherLoc}`, "/api/app/today/views"]) {
+      for (const path of ["/api/app/overview", "/api/app/accounts", `/api/app/accounts/${otherLoc}`, "/api/app/search?q=zzTenantA", "/api/app/stale", "/api/app/inbox", "/api/app/notifications", "/api/app/appointments", "/api/app/pipelines", "/api/app/duplicates", "/api/app/contact-intel", "/api/app/today", `/api/app/today?accounts=${otherLoc}`, `/api/app/today?accounts=${mineLoc},${otherLoc}`, "/api/app/today/views"]) {
         const r = await call(path, token);
         assert.ok(r.status < 500);
         assert.equal(r.text.includes(otherLoc), false, `${label} saw the sibling account ${otherLoc} through ${path}`);
         assert.equal(r.text.includes(`zzTenantA Location ${A.locs.indexOf(otherLoc) + 1}`), false, `${label} saw the sibling account's name through ${path}`);
+        assert.equal(r.text.includes(`zzTenantA Alert ${A.locs.indexOf(otherLoc) + 1}`), false, `${label} saw the sibling account's notification through ${path}`);
       }
       assert.ok((await call("/api/app/overview", token)).text.includes(mineLoc) || true);
     };
@@ -352,14 +355,14 @@ async function main() {
       // Names of settings and agency-only fields that must not appear in any client answer.
       const settingKeys = ["digestEmail", "slackConfigured", "slackWebhookUrl", "keepTranscripts", "pushNotesToCrm", "customChecklist", "digestHour", "monthlyFee", "renewalDate", "keyPrefix", "clientAccounts", "canDeleteData", "meetingTool"];
       const clientPathsFor = (me: Side) => [
-        "/api/app/overview", "/api/app/accounts", `/api/app/accounts/${me.locs[1]}`, "/api/app/onboarding", `/api/app/search?q=${me.marker}`, "/api/app/stale", "/api/app/hygiene", "/api/app/inbox", "/api/app/pipelines", "/api/app/duplicates", "/api/app/alerts",
+        "/api/app/overview", "/api/app/accounts", `/api/app/accounts/${me.locs[1]}`, "/api/app/onboarding", `/api/app/search?q=${me.marker}`, "/api/app/stale", "/api/app/hygiene", "/api/app/inbox", "/api/app/notifications", "/api/app/pipelines", "/api/app/duplicates", "/api/app/alerts",
         "/api/app/pipeline-intel", "/api/app/contact-intel", "/api/app/comms-intel", "/api/app/deal-gaps", "/api/app/deal-events", "/api/app/start", "/api/app/appointments", "/api/app/appointment-insights", "/api/app/audit", "/api/app/speed", "/api/app/roadmap",
         // not allowed for a client at all: each must be refused
         "/api/app/settings", "/api/app/clients", "/api/app/clients?part=home", "/api/app/clients?part=list", "/api/app/clients?part=names", `/api/app/clients?part=one&id=${me.locs[1]}`, "/api/app/clients/compare", `/api/app/qbr/${me.locs[1]}`, "/api/app/api-keys", "/api/app/connections", "/api/app/meetings", "/api/app/cleanup", "/api/app/team", "/api/app/goals", "/api/app/call-lists",
         "/api/app/call-queue", "/api/app/call-outcomes", "/api/app/exec-summary", "/api/app/daily", "/api/app/daily-brief", "/api/app/digest", "/api/app/export/stale", "/api/app/sync-status", "/api/app/freshness", "/api/app/segments", "/api/app/playbooks",
         "/api/app/setup-compare", "/api/app/email", "/api/app/audit/shares", "/api/app/tickets", "/api/app/tickets/1", "/api/app/fees", "/api/app/notes",
       ];
-      const allowedForClient = new Set(["overview", "accounts", "onboarding", "search", "stale", "hygiene", "inbox", "pipelines", "duplicates", "alerts", "pipeline-intel", "contact-intel", "comms-intel", "deal-gaps", "deal-events", "start", "appointments", "appointment-insights", "audit", "speed", "roadmap", "freshness", "client-trends"]);
+      const allowedForClient = new Set(["overview", "accounts", "onboarding", "search", "stale", "hygiene", "inbox", "notifications", "pipelines", "duplicates", "alerts", "pipeline-intel", "contact-intel", "comms-intel", "deal-gaps", "deal-events", "start", "appointments", "appointment-insights", "audit", "speed", "roadmap", "freshness", "client-trends"]);
       let answered = 0;
       let refusedCount = 0;
       for (const [me, other] of sides) {
@@ -390,6 +393,7 @@ async function main() {
       for (const secret of ["4321.77", A.marker + "FeeNote"]) assert.ok(agencyClients.includes(secret), `the agency sees "${secret}" (so the checks above are not passing on empty data)`);
       assert.ok((await call("/api/app/api-keys", session(A, "agency"))).text.includes(A.marker + "KeyName"), "and its key list");
       assert.ok((await call("/api/app/settings", session(A, "agency"))).text.includes("digestEmail"), "and its settings");
+      assert.ok((await call("/api/app/notifications", session(A, "agency"))).text.includes(`${A.marker} Alert 2`), "and its own account notifications");
 
       // Switching client access off removes access on the very next request, on every page a client may read; switching it on restores it.
       const clientTok = session(A, "client", A.locs[1]);

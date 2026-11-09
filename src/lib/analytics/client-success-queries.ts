@@ -233,7 +233,7 @@ export async function quarterFacts(installationId: string, locationId: string, q
     db`select m.day, m.engagement_score from account_metrics_daily m where m.installation_id = ${installationId} and m.location_id = ${locationId} and m.day >= ${q.from}::date and m.day <= ${q.to}::date and ${snapshotOk("m", version)} order by m.day`,
     db`select count(*) filter (where status in ('showed', 'noshow'))::int with_outcome, count(*) filter (where status = 'showed')::int showed from cached_appointments
        where installation_id = ${installationId} and location_id = ${locationId} and start_at >= ${from} and start_at < ${toExclusive}`,
-    db`select count(*)::int raised, count(*) filter (where resolved_at is not null)::int resolved from alerts where installation_id = ${installationId} and location_id = ${locationId} and kind <> 'sync' and created_at >= ${from} and created_at < ${toExclusive}`,
+    db`select count(*)::int raised, count(*) filter (where resolved_at is not null)::int resolved from alerts where installation_id = ${installationId} and location_id = ${locationId} and recipient_user_key is null and kind <> 'sync' and created_at >= ${from} and created_at < ${toExclusive}`,
   ]);
   const money = dealFigures(deals.filter((d) => d.locationId === locationId), from.getTime(), toExclusive.getTime()).get(locationId) ?? { pipelineCreated: 0, wonValue: 0, wonCount: 0 };
   const scores = health.map((h) => h.engagement_score as number);
@@ -246,7 +246,7 @@ export async function quarterFacts(installationId: string, locationId: string, q
 
 /** Every alert of one client with its dates, for the "what SubSync caught" section of a review. */
 export async function alertsOf(installationId: string, locationId: string, limit = 500): Promise<Array<{ kind: string; title: string; createdAt: string; resolvedAt: string | null }>> {
-  const rows = await sql()`select kind, title, created_at, resolved_at from alerts where installation_id = ${installationId} and location_id = ${locationId} order by created_at desc limit ${limit}`;
+  const rows = await sql()`select kind, title, created_at, resolved_at from alerts where installation_id = ${installationId} and location_id = ${locationId} and recipient_user_key is null order by created_at desc limit ${limit}`;
   return rows.map((r) => ({ kind: r.kind as string, title: r.title as string, createdAt: (r.created_at as Date).toISOString(), resolvedAt: r.resolved_at instanceof Date ? r.resolved_at.toISOString() : null }));
 }
 
@@ -255,4 +255,3 @@ export async function historyStart(installationId: string, locationId: string): 
   const [r] = await sql()`select min(day)::text d from account_metrics_daily where installation_id = ${installationId} and location_id = ${locationId}`;
   return (r?.d as string | null) ?? null;
 }
-

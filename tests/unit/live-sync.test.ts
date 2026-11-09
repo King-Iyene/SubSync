@@ -47,7 +47,7 @@ describe("live read refuses another account's person", () => {
     expect(ok.contact.tags).toEqual(["hot"]);
   });
   it("a part the CRM will not give is reported as missing, not as an error", async () => {
-    const r = await liveRead(stub("locMine", { conversation: async () => ({ conversationId: "v1", contactId: "c1", contactName: null, lastMessageType: null, lastMessageDirection: null, lastMessageAt: null, unreadCount: 0 }), calls: async () => { throw new Error("403"); }, notes: async () => { throw new Error("403"); } }), "locMine", "c1", true);
+    const r = await liveRead(stub("locMine", { conversation: async () => ({ conversationId: "v1", contactId: "c1", contactName: null, lastMessageType: null, lastMessageDirection: null, lastMessageAt: null, unreadCount: 0, assignedTo: null }), calls: async () => { throw new Error("403"); }, notes: async () => { throw new Error("403"); } }), "locMine", "c1", true);
     expect(r.missing.sort()).toEqual(["calls", "notes"]);
   });
 });
@@ -93,7 +93,7 @@ describe.skipIf(!HAS_DB)("write-through, webhook apply and delta on fixture comp
     expect(rows.map((r) => r.stage_id)).toEqual(["s2"]);
   });
   it("the delta stores the newest contacts and conversations from a stubbed CRM", async () => {
-    const r = await runDelta(a, LA, { contacts: async () => [contact("cLive4", ["d"])], conversations: async () => [{ conversationId: "vLive4", contactId: "cLive4", contactName: "A B", lastMessageType: "TYPE_SMS", lastMessageDirection: "inbound", lastMessageAt: new Date().toISOString(), unreadCount: 1 }] });
+    const r = await runDelta(a, LA, { contacts: async () => [contact("cLive4", ["d"])], conversations: async () => [{ conversationId: "vLive4", contactId: "cLive4", contactName: "A B", lastMessageType: "TYPE_SMS", lastMessageDirection: "inbound", lastMessageAt: new Date().toISOString(), unreadCount: 1, assignedTo: null }] });
     expect(r).toEqual({ contacts: 1, conversations: 1 });
     expect((await sql()`select conversation_id from cached_conversations where installation_id = ${a} and contact_id = 'cLive4'`).length).toBe(1);
   });

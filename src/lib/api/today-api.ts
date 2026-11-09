@@ -63,7 +63,7 @@ export async function buildToday(i: {
   const [speed, ledgerAll, alerts, series, actionLog, soonDeals, zoneRows, sinceAt] = await Promise.all([
     speedView(installationId, i.allowed, target, now),
     leadLedger(installationId, i.allowed, now),
-    i.kind === "client" ? Promise.resolve([]) : listAlerts(installationId, true, 500, i.limitTo ?? undefined),
+    i.kind === "client" ? Promise.resolve([]) : listAlerts(installationId, true, 500, i.limitTo ?? undefined, i.userKey),
     seriesByLocation(installationId, liveIds, 10),
     loadActions(installationId, i.lanes, now),
     staleSoonList(installationId, liveIds, settings.staleDays).catch(() => []),

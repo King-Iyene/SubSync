@@ -49,7 +49,7 @@ export const INVENTORY: Record<string, TableInfo> = {
   contact_tag_events: { noun: "tag history (the day SubSync first saw a tag added or removed)", line: "contacts", personal: { tag: "tags" } },
   cached_conversations: {
     noun: "conversation details", line: "conversations",
-    personal: { contact_name: "the contact's name" },
+    personal: { contact_name: "the contact's name", assigned_to: "the team member the conversation is assigned to" },
   },
   lead_touches: {
     noun: "first-reply records", line: "conversations",
@@ -66,7 +66,7 @@ export const INVENTORY: Record<string, TableInfo> = {
   speed_digest: { noun: "the Speed summary settings (who gets it, when, what it says)", line: "conversations", personal: { settings: "the email addresses chosen to receive it" }, notPersonal: ["location_id", "last_sent_key"] },
   speed_prefs: { noun: "Call mode and Speed choices (redial plan, goals, scripts, outcome sets)", line: "conversations", notPersonal: ["scope", "key", "value"] },
   speed_daily: { noun: "daily reply-speed numbers", line: "conversations", notPersonal: ["by_channel", "by_source", "by_owner", "by_hour", "texted_back_60", "no_owner", "by_user"] },
-    location_users: { noun: "the team members of each client account (names, to pick an owner)", line: "yours", personal: { name: "the names of the team members of each client account", user_id: "the CRM user id of each team member" }, notPersonal: ["location_id", "seen_at"] },
+    location_users: { noun: "the team members of each client account (names, to pick an owner)", line: "yours", personal: { name: "the names of the team members of each client account", user_id: "the CRM user id of each team member" }, notPersonal: ["location_id", "seen_at", "role"] },
   call_queue_settings: { noun: "the call queue settings (tag, workflow, caps, on or off)", line: "conversations", notPersonal: ["location_id", "route", "tag", "workflow_id"] },
   call_queue_log: { noun: "which leads were added to the call queue and when (ids only)", line: "conversations", notPersonal: ["contact_id", "action", "source", "status", "at"] },
   workflow_setup: { noun: "the workflows SubSync set up for you (ids and names)", line: "conversations", notPersonal: ["location_id", "template_key", "folder_id", "workflow_id"] },
@@ -79,7 +79,7 @@ export const INVENTORY: Record<string, TableInfo> = {
   account_metrics_daily: { noun: "daily account numbers", line: "accounts" },
   alerts: {
     noun: "alerts", line: "accounts",
-    personal: { title: "alert titles", detail: "alert details (they name client accounts and give numbers)" },
+    personal: { title: "alert titles", detail: "alert details (they name client accounts and give numbers)", recipient_user_key: "which team member receives a private alert" },
     notPersonal: ["dedupe_key"],
   },
   domain_checks: { noun: "email sending checks", line: "accounts", personal: { domain: "the email sending domain being checked" } },
@@ -120,14 +120,14 @@ export const INVENTORY: Record<string, TableInfo> = {
   },
   notifications: {
     noun: "your notification centre", line: "accounts",
-    personal: { title: "the words of each notification (they name client accounts and give numbers)", body: "the words of each notification (they name client accounts and give numbers)" },
+    personal: { title: "the words of each notification (they name client accounts and give numbers)", body: "the words of each notification (they name client accounts and give numbers)", recipient_user_key: "which team member alone can see a private notification" },
     notPersonal: ["dedupe_key", "link"],
   },
   notification_states: { noun: "which notifications each person has read, dismissed or snoozed", line: "accounts", personal: { user_key: "the sign-in id of the person who read or dismissed a notification" } },
   notification_deliveries: {
     noun: "a record of the messages SubSync sent, or is waiting to send", line: "accounts",
-    personal: { target: "the email address or Slack channel a message went to", payload: "the words of messages sent or waiting (they name client accounts and give numbers)" },
-    notPersonal: ["dedupe_key", "channel"],
+    personal: { target: "the email address or Slack channel a message went to", payload: "the words of messages sent or waiting (they name client accounts and give numbers)", recipient_user_key: "which team member receives a private alert" },
+    notPersonal: ["dedupe_key", "channel", "respect_quiet_hours", "email_dry_run_only"],
   },
   crm_writes: {
     noun: "a log of what SubSync wrote to your CRM", line: "meetings",

@@ -199,7 +199,7 @@ function slim(a: DerivedAccount, links: ReturnType<typeof deepLinks>, forClient 
 async function overview(ctx: Ctx) {
   // Independent queries run together so the page does not wait on them one after another.
   const [{ settings, accounts, hidden, links }, allAlerts, freshness, coverage] = await Promise.all([
-    accountsFor(ctx), listAlerts(ctx.installationId, false, 500, ctx.limitTo ?? undefined), freshnessFor(ctx.installationId, { limitTo: ctx.limitTo }), conversationCoverage(ctx.installationId),
+    accountsFor(ctx), listAlerts(ctx.installationId, false, 500, ctx.limitTo ?? undefined, ctx.session.userId), freshnessFor(ctx.installationId, { limitTo: ctx.limitTo }), conversationCoverage(ctx.installationId),
   ]);
   const overviewSeg = await segmentSet(ctx);
   const live = accounts.filter((a) => !a.ignored);
@@ -871,7 +871,7 @@ async function accountDetail(ctx: Ctx, locationId: string) {
     staleDeals(ctx.installationId, settings.staleDays, 10, locationId),
     manualTasks(ctx.installationId, locationId),
     listDomainChecks(ctx.installationId),
-    listAlerts(ctx.installationId, false, 200),
+    listAlerts(ctx.installationId, false, 200, undefined, ctx.session.userId),
   ]);
   const mine = domains.filter((d) => d.locationId === locationId);
   const worst = mine.find((d) => d.status === "critical") ?? mine.find((d) => d.status === "warning") ?? mine[0] ?? null;
@@ -1096,7 +1096,7 @@ async function alertsView(ctx: Ctx) {
   const includeResolved = ctx.url.searchParams.get("resolved") === "1";
   const names = new Map((await loadAccounts(ctx.installationId)).accounts.map((a) => [a.locationId, a.name]));
   const seg = await segmentSet(ctx);
-  const rows = (await listAlerts(ctx.installationId, includeResolved, 300, ctx.limitTo ?? undefined)).filter((a) => !seg || (a.locationId !== null && seg.has(a.locationId)));
+  const rows = (await listAlerts(ctx.installationId, includeResolved, 300, ctx.limitTo ?? undefined, ctx.session.userId)).filter((a) => !seg || (a.locationId !== null && seg.has(a.locationId)));
   return json({ alerts: rows.map((a) => ({ ...a, locationName: a.locationId ? names.get(a.locationId) ?? null : null })) });
 }
 
@@ -1321,7 +1321,7 @@ async function exportCsv(ctx: Ctx, kind: string) {
     case "alerts": {
       // The same narrowing as the Alerts page: an alert about an account the filter hides is not exported either.
       const alertSeg = await segmentSet(ctx);
-      const rows = (await listAlerts(ctx.installationId, false, 2000, ctx.limitTo ?? undefined)).filter((a) => !alertSeg || (a.locationId !== null && alertSeg.has(a.locationId)));
+      const rows = (await listAlerts(ctx.installationId, false, 2000, ctx.limitTo ?? undefined, ctx.session.userId)).filter((a) => !alertSeg || (a.locationId !== null && alertSeg.has(a.locationId)));
       return file("subsync-alerts", toCsv(rows, [
         { label: "Severity", value: (a) => a.severity }, { label: "Alert", value: (a) => a.title }, { label: "Type", value: (a) => a.kind }, { label: "Raised", value: (a) => a.createdAt },
       ]));

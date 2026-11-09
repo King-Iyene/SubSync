@@ -49,13 +49,13 @@ export async function cacheConversations(installationId: string, locationId: str
   const db = sql();
   const rows = unique.map((c) => ({
     installation_id: installationId, location_id: locationId, conversation_id: c.conversationId, contact_id: c.contactId, contact_name: c.contactName, last_message_type: c.lastMessageType,
-    last_message_direction: c.lastMessageDirection, last_message_at: c.lastMessageAt, unread_count: c.unreadCount, synced_at: new Date(),
+    last_message_direction: c.lastMessageDirection, last_message_at: c.lastMessageAt, unread_count: c.unreadCount, assigned_to: c.assignedTo, synced_at: new Date(),
   }));
   await db`
     insert into cached_conversations ${db(rows as never)}
     on conflict (installation_id, location_id, conversation_id) do update set
       contact_id = excluded.contact_id, contact_name = excluded.contact_name, last_message_type = excluded.last_message_type, last_message_direction = excluded.last_message_direction,
-      last_message_at = excluded.last_message_at, unread_count = excluded.unread_count, synced_at = excluded.synced_at`;
+      last_message_at = excluded.last_message_at, unread_count = excluded.unread_count, assigned_to = excluded.assigned_to, synced_at = excluded.synced_at`;
 }
 
 /** Calls seen live go into the touch history (who, when, which way, result word; never content). A call the webhook already recorded (same contact, within a minute) is not added twice. */

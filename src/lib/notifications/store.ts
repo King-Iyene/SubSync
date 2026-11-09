@@ -144,11 +144,11 @@ export async function removeDestination(installationId: string, id: string, acto
 
 export type BellScope = { kind: "agency" | "business" | "client"; limitTo: string | null };
 
-export async function insertNotification(n: { installationId: string; locationId: string | null; type: NotificationType; severity: Severity; item: Item; alertId: string | null; dedupeKey: string }): Promise<void> {
+export async function insertNotification(n: { installationId: string; locationId: string | null; type: NotificationType; severity: Severity; item: Item; alertId: string | null; dedupeKey: string; recipientUserKey?: string | null }): Promise<void> {
   const db = sql();
   await db`
-    insert into notifications (installation_id, location_id, type, severity, title, body, link, alert_id, dedupe_key)
-    values (${n.installationId}, ${n.locationId}, ${n.type}, ${n.severity}, ${n.item.title}, ${n.item.body || null}, ${db.json({ view: n.item.link.view, locationId: n.item.link.locationId } as never)}, ${n.alertId}, ${n.dedupeKey})
+    insert into notifications (installation_id, location_id, type, severity, title, body, link, alert_id, dedupe_key, recipient_user_key)
+    values (${n.installationId}, ${n.locationId}, ${n.type}, ${n.severity}, ${n.item.title}, ${n.item.body || null}, ${db.json({ view: n.item.link.view, locationId: n.item.link.locationId } as never)}, ${n.alertId}, ${n.dedupeKey}, ${n.recipientUserKey ?? null})
     on conflict (installation_id, dedupe_key) where dedupe_key is not null do nothing`;
 }
 
@@ -165,6 +165,7 @@ export async function listBell(installationId: string, scope: BellScope, userKey
     left join notification_states s on s.notification_id = n.id and s.user_key = ${userKey}
     left join alerts a on a.id = n.alert_id and a.installation_id = n.installation_id
     where n.installation_id = ${installationId} and n.created_at >= ${since}
+      and (n.recipient_user_key is null or n.recipient_user_key = ${userKey})
       and (${only}::text is null or n.location_id = ${only} or (${includeCompanyWide} and n.location_id is null))
     order by n.created_at desc limit 200`;
   return rows.map((r) => {
@@ -184,7 +185,9 @@ export async function setBellState(installationId: string, scope: BellScope, use
   const db = sql();
   const only = scope.kind === "agency" ? null : scope.limitTo;
   const includeCompanyWide = scope.kind !== "client";
-  const [n] = await db`select id, location_id from notifications where id = ${id} and installation_id = ${installationId} and (${only}::text is null or location_id = ${only} or (${includeCompanyWide} and location_id is null))`;
+  const [n] = await db`select id, location_id from notifications where id = ${id} and installation_id = ${installationId}
+    and (recipient_user_key is null or recipient_user_key = ${userKey})
+    and (${only}::text is null or location_id = ${only} or (${includeCompanyWide} and location_id is null))`;
   if (!n) return false;
   const read = patch.read === true || patch.dismiss === true;
   await db`
@@ -210,7 +213,9 @@ export async function markAllRead(installationId: string, scope: BellScope, user
 const mapRow = (r: Record<string, unknown>): Row => ({
   id: r.id as string, installationId: r.installation_id as string, locationId: (r.location_id as string | null) ?? null, type: r.type as NotificationType, channel: r.channel as Channel,
   target: r.target as string, dedupeKey: r.dedupe_key as string, severity: (r.severity as Severity) ?? "info", status: r.status as Status, reason: (r.reason as string | null) ?? null,
-  payload: r.payload as Item, alertId: (r.alert_id as string | null) ?? null, attempts: (r.attempts as number) ?? 0, nextAttemptAt: ms(r.next_attempt_at), createdAt: ms(r.created_at) ?? 0,
+  payload: r.payload as Item, alertId: (r.alert_id as string | null) ?? null, recipientUserKey: (r.recipient_user_key as string | null) ?? null,
+  respectQuietHours: r.respect_quiet_hours === true, emailDryRunOnly: r.email_dry_run_only === true,
+  attempts: (r.attempts as number) ?? 0, nextAttemptAt: ms(r.next_attempt_at), createdAt: ms(r.created_at) ?? 0,
 });
 
 export function dbLedger(): Ledger {
@@ -218,8 +223,8 @@ export function dbLedger(): Ledger {
     async insert(row: NewRow, now: number): Promise<Row | null> {
       const db = sql();
       const rows = await db`
-        insert into notification_deliveries (installation_id, location_id, type, channel, target, dedupe_key, severity, status, reason, payload, alert_id, created_at)
-        values (${row.installationId}, ${row.locationId}, ${row.type}, ${row.channel}, ${row.target}, ${row.dedupeKey}, ${row.severity}, ${row.status}, ${row.reason ?? null}, ${db.json(row.payload as never)}, ${row.alertId}, ${new Date(now)})
+        insert into notification_deliveries (installation_id, location_id, type, channel, target, dedupe_key, severity, status, reason, payload, alert_id, created_at, recipient_user_key, respect_quiet_hours, email_dry_run_only)
+        values (${row.installationId}, ${row.locationId}, ${row.type}, ${row.channel}, ${row.target}, ${row.dedupeKey}, ${row.severity}, ${row.status}, ${row.reason ?? null}, ${db.json(row.payload as never)}, ${row.alertId}, ${new Date(now)}, ${row.recipientUserKey ?? null}, ${row.respectQuietHours ?? false}, ${row.emailDryRunOnly ?? false})
         on conflict (installation_id, dedupe_key, channel, target) do nothing returning *`;
       return rows.length ? mapRow(rows[0]) : null;
     },

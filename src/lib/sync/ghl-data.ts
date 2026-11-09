@@ -135,6 +135,7 @@ export type ConversationRow = {
   lastMessageDirection: "inbound" | "outbound" | null;
   lastMessageAt: string | null;
   unreadCount: number;
+  assignedTo: string | null;
 };
 
 export function mapConversation(raw: unknown): ConversationRow | null {
@@ -152,6 +153,7 @@ export function mapConversation(raw: unknown): ConversationRow | null {
     lastMessageDirection: isInternalComment(str(r.lastMessageType)) ? null : dir === "inbound" || dir === "outbound" ? dir : null,
     lastMessageAt: toIso(r.lastMessageDate) ?? toIso(r.lastMessageAt),
     unreadCount: Number.isFinite(unread) && unread > 0 ? Math.floor(unread) : 0,
+    assignedTo: str(r.assignedTo),
   };
 }
 

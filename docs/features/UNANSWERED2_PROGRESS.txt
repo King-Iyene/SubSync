@@ -1,4 +1,4 @@
-Unanswered Messages Round 2 - Progress (as of 2026-11-08)
+Unanswered Messages Round 2 - Progress (as of 2026-11-08 21:05 -05:00)
 
 Item 1: Per-Client Reply Target (SLA) - COMPLETE
 - Flag: inbox_per_client_sla (DEFAULT_OFF)
@@ -15,17 +15,16 @@ Item 2: SQL Aggregates & Indexed Server-Paged Lists - COMPLETE
 - API: server-paged lists (25/page) with exact totals
 - Verification: tsc clean, node tests 1282 pass, vitest DB 7 pass
 
-Item 3: 24-Hour Breach Alert - INCOMPLETE
+Item 3: 24-Hour Breach Alert - IMPLEMENTED; DATABASE VERIFICATION BLOCKED
 - Flag: inbox_breach_alert (DEFAULT_OFF)
-- Catalog: breach24 added to other_alerts.alertKinds in catalog.ts
-- Logic: breach24 computed in factsOf() (unanswered-v2.ts: p.hours >= 24)
-- Headline: breachLine() returns text for UI
-- MISSING: No code creates alert rows in database with kind="breach24"
-- MISSING: No cron/refresh job raises breach24 alerts for notification dispatch
-- Tenant isolation: PASSED (b7z3b2gkb, bowxtxpj6 - "nothing changed: ok")
-- Verification: tsc clean, node tests 1282 pass, vitest DB 7 pass
-- BLOCKED: Alert engine integration incomplete - only catalog mapping exists
+- A scheduled, tenant-scoped job creates deduped breach24 alert rows, caps each recipient at 10 per UTC day, and dispatches private in-app alerts through the notification engine
+- Recipients: verified conversation assignee; otherwise the signed-in account admin. Unknown owners are never broadcast to.
+- In-app alerts honor quiet hours. Optional email stays behind the existing gated transport and is forced to dry-run.
+- Conversation assignment is cached from the CRM conversation record; recipient visibility is filtered in the bell, alert views, exports and summaries.
+- Database test attempted but blocked: the configured database is missing the new schema columns. The local DB target is not confirmed as dev/test, so the migration was not applied.
+- TypeScript: clean. Node tests: 1283 passed.
+- Tenancy: last full run PASSED (b7z3b2gkb, bowxtxpj6 - "nothing changed: ok"); notification read probes are added but this expanded sweep has not been rerun.
 
-Current tenancy result: PASSED - "nothing changed: ok" (exit 0)
+Current tenancy result: last verified PASSED; expanded notification checks pending on a confirmed dev/test database.
 
-Next: Complete Item 3 by adding alert creation (raise breach24 alerts in refresh/cron), then Item 4: Ball in Whose Court (UI for court conversations tab)
+Next: Apply the additive migration to a confirmed dev/test database, rerun the breach database test and full check-tenancy sweep, then proceed to Item 4: Ball in Whose Court.

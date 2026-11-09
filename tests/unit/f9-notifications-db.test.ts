@@ -1,13 +1,16 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { closeDb, sql } from "@/lib/db";
+import { listAlerts } from "@/lib/analytics/queries";
+import { drainInstallation } from "@/lib/notifications/service";
 import { drain, plan, type Context, type Intent } from "@/lib/notifications/dispatcher";
 import { defaultPref, type Legacy, type Pref } from "@/lib/notifications/prefs";
 import { NOTIFICATION_TYPES, type NotificationType } from "@/lib/notifications/catalog";
 import { addAdvancedDestination, completeDestination, createPendingDestination, dbLedger, insertNotification, listBell, listDestinations, loadPrefRows, markAllRead, removeDestination, removeRecipientByMatch, savePref, setBellState, webhookOf } from "@/lib/notifications/store";
+import { raiseInboxBreachForInstallation } from "@/lib/analytics/inbox-breach-alerts";
 import { FakeTransports, slackDest } from "../fixtures/notify-fakes";
 
-// Stage F9 against the REAL database, with a fixture company that has no refresh token (so the production cron never touches it). WRITTEN IN PARALLEL MODE AND
-// NOT RUN there (the lead runs it after the merge). Everything created here is removed again. Skipped when no database is configured.
+// Stage F9 and Item 3 against the real database, with a fixture company that has no refresh token (so the production cron never touches it).
+// Everything created here is removed again. Skipped when no database is configured.
 const HAS_DB = Boolean(process.env.DATABASE_URL || process.env.POSTGRES_URL || process.env.SUPABASE_DB_PASSWORD);
 const CO = "xtest-f9-co";
 const HOOK = "https://hooks.slack.com/services/T000/B000/XXXXXXXXXXXX";
@@ -38,6 +41,62 @@ describe.skipIf(!HAS_DB)("notifications against the real database", () => {
     expect(results.filter(Boolean)).toHaveLength(1);
     const [n] = await sql()`select count(*)::int n from notification_deliveries where installation_id = ${inst} and dedupe_key = 'alert:race'`;
     expect(n.n).toBe(1);
+  });
+
+  it("creates private 24-hour alerts for the assigned owner or account admin, caps each recipient at ten per UTC day, and dedupes refreshes", async () => {
+    const loc = "xtest-f9-breach-location";
+    const owner = "xtest-f9-breach-owner";
+    const admin = "xtest-f9-breach-admin";
+    const now = Date.parse("2026-11-02T22:30:00Z");
+    await sql()`insert into locations (installation_id, location_id, name) values (${inst}, ${loc}, 'Breach Clinic')`;
+    await sql()`insert into location_users (installation_id, location_id, user_id, name, role) values
+      (${inst}, ${loc}, ${owner}, 'Breach Owner', 'account_user'),
+      (${inst}, ${loc}, ${admin}, 'Breach Admin', 'account_admin')`;
+    const emailPref = defaultPref("other_alerts", NONE, []);
+    await savePref(inst, { ...emailPref, email: true, recipients: ["owner@x.test"] }, "breach-test");
+    for (let i = 0; i < 11; i++) {
+      const contact = `xtest-f9-breach-contact-${i}`;
+      await sql()`insert into cached_contacts (installation_id, location_id, contact_id, first_name, last_name, assigned_to)
+        values (${inst}, ${loc}, ${contact}, 'Person', ${String(i)}, 'different-user')`;
+      await sql()`insert into cached_conversations (installation_id, location_id, conversation_id, contact_id, contact_name, assigned_to, last_message_direction, last_message_at)
+        values (${inst}, ${loc}, ${`xtest-f9-breach-conv-${i}`}, ${contact}, ${`Person ${i}`}, ${owner}, 'inbound', ${new Date(now - 25 * 60 * 60_000)})`;
+    }
+    await sql()`insert into cached_contacts (installation_id, location_id, contact_id, first_name, last_name)
+      values (${inst}, ${loc}, 'xtest-f9-breach-unassigned', 'Unassigned', 'Person')`;
+    await sql()`insert into cached_conversations (installation_id, location_id, conversation_id, contact_id, contact_name, last_message_direction, last_message_at)
+      values (${inst}, ${loc}, 'xtest-f9-breach-unassigned-conv', 'xtest-f9-breach-unassigned', 'Unassigned Person', 'inbound', ${new Date(now - 25 * 60 * 60_000)})`;
+
+    const first = await raiseInboxBreachForInstallation(inst, now);
+    expect(first).toMatchObject({ created: 11, capped: 1, unroutable: 0 });
+    const [counts] = await sql()`select
+      count(*) filter (where kind = 'breach24' and recipient_user_key = ${owner})::int owner_alerts,
+      count(*) filter (where kind = 'breach24' and recipient_user_key = ${admin})::int admin_alerts
+      from alerts where installation_id = ${inst}`;
+    expect([counts.owner_alerts, counts.admin_alerts]).toEqual([10, 1]);
+    expect(await listAlerts(inst, false, 200, loc)).toHaveLength(0);
+    expect(await listAlerts(inst, false, 200, loc, owner)).toHaveLength(10);
+    expect(await listAlerts(inst, false, 200, loc, admin)).toHaveLength(1);
+    const [held] = await sql()`select count(*)::int n from notification_deliveries
+      where installation_id = ${inst} and type = 'other_alerts' and channel = 'email'
+        and email_dry_run_only and status = 'held'`;
+    expect(held.n).toBe(11);
+    const [notCreatedYet] = await sql()`select count(*)::int n from notifications where installation_id = ${inst} and recipient_user_key in (${owner}, ${admin})`;
+    expect(notCreatedYet.n).toBe(0);
+
+    await drainInstallation(inst, Date.parse("2026-11-03T06:10:00Z"));
+    const [email] = await sql()`select count(*)::int n from notification_deliveries
+      where installation_id = ${inst} and type = 'other_alerts' and channel = 'email'
+        and email_dry_run_only and status = 'dry_run'`;
+    expect(email.n).toBe(11);
+    expect((await listBell(inst, { kind: "client", limitTo: loc }, owner, now)).filter((n) => n.type === "other_alerts")).toHaveLength(10);
+    expect((await listBell(inst, { kind: "client", limitTo: loc }, admin, now)).filter((n) => n.type === "other_alerts")).toHaveLength(1);
+    expect((await listBell(inst, { kind: "client", limitTo: loc }, "not-the-recipient", now)).filter((n) => n.type === "other_alerts")).toHaveLength(0);
+
+    const again = await raiseInboxBreachForInstallation(inst, now + 60_000);
+    expect(again).toMatchObject({ created: 0, capped: 0, unroutable: 0 });
+    const [total] = await sql()`select count(*)::int n from notifications
+      where installation_id = ${inst} and type = 'other_alerts' and recipient_user_key in (${owner}, ${admin})`;
+    expect(total.n).toBe(11);
   });
 
   it("plan and drain with the real ledger: held at night, released in the morning, sent once, and a second plan creates nothing", async () => {

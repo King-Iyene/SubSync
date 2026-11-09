@@ -67,7 +67,7 @@ export async function emailPendingAlerts(installationId: string, settings: Setti
   if (!settings.digestEmail || !emailConfigured()) return 0;
   const rows = await sql()`
     select id, severity, title from alerts
-    where installation_id = ${installationId} and resolved_at is null and severity <> 'info' and email_notified_at is null and created_at > now() - interval '7 days'
+    where installation_id = ${installationId} and recipient_user_key is null and resolved_at is null and severity <> 'info' and email_notified_at is null and created_at > now() - interval '7 days'
     order by case severity when 'critical' then 0 else 1 end, created_at limit 50`;
   if (rows.length === 0) return 0;
   const [first] = await sql()`select timezone from locations where installation_id = ${installationId} and timezone is not null order by name limit 1`;
