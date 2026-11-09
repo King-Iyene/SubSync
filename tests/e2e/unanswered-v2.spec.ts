@@ -56,6 +56,19 @@ for (const role of ROLES) {
   });
 }
 
+test("24-hour wait count is visible and explains private alert routing", async ({ page, request }) => {
+  const { get } = await api(request);
+  const home = await get("inbox?part=home");
+  await open(page, "/app#inbox");
+  if (home.waiting.breach) {
+    await expect(page.getByTestId("wait-breach")).toHaveText(`${home.waiting.breach} The oldest person is at the top of the list.`);
+  } else {
+    await expect(page.getByTestId("wait-breach")).toHaveCount(0);
+  }
+  await expect(page.getByTestId("wait-notes")).toContainText("A 24-hour alert goes to that person");
+  await expect(page.getByTestId("wait-notes")).toContainText("it goes to the account administrator");
+});
+
 /**
  * Presses a number and checks that the list it opens holds exactly that many people. The number was read when the page loaded and the list is read when it is pressed; on the
  * slow demo that is minutes apart, and a person can cross the reply target in between (the clock moves, each number is right at its moment). So when the two differ the page is

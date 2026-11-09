@@ -31,7 +31,7 @@ test("every control lives in a real section, and the screen draws each section",
   for (const label of ["Client access", "Thresholds", "Speed to lead", "Your name on reports", "Links", "Onboarding checklist", "Slack alerts and daily brief", "Meeting notes privacy", "What we store", "Delete my data", "AI assistant connector", "Test and practice accounts", "History of changes"]) {
     assert.ok(screen.includes(label) || read("src/app/app/views/settings-parts.tsx").includes(label), `${label} survived the move`);
   }
-  for (const id of ["stale", "dormant", "sla", "speed-target", "speed-open", "speed-close", "brand-name", "brand-color", "domain", "custom", "slack", "digest-email", "digest-hour", "digest-zone"]) assert.match(screen, new RegExp(`id="${id}"`), `field ${id}`);
+  for (const id of ["stale", "dormant", "sla", "speed-target", "speed-open", "speed-close", "inbox-ack-grace", "brand-name", "brand-color", "domain", "custom", "slack", "digest-email", "digest-hour", "digest-zone"]) assert.match(screen, new RegExp(`id="${id}"`), `field ${id}`);
 });
 
 test("the two slots other stages fill exist and are in the right sections: Watching is filled (F5), Connections is filled with the connection screens (they moved into Settings, Integrations on 4 Nov 2026)", () => {

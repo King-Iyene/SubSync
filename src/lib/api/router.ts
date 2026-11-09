@@ -58,6 +58,7 @@ import { buildSharePayload } from "../analytics/share-intel";
 import { randomBytes } from "node:crypto";
 import { emailConfigured } from "../email";
 import { validEmail } from "../analytics/weekly-email";
+import { ACK_ESCALATION_GRACE_MAX, ACK_ESCALATION_GRACE_MIN } from "../analytics/unanswered-advanced";
 import { appointmentBreakdown, appointmentDetail, appointmentView, setShowRateTarget } from "../analytics/appointment-queries";
 import { clampTarget, parseFilters as parseApptFilters, parseWindow as parseApptWindow } from "../analytics/appointment-f3";
 import { compareSetup, describe as describeDiff } from "../analytics/setup-intel";
@@ -113,7 +114,7 @@ import { gatedWriter } from "../ghl/crm-gateway";
 import { writeEnabledFor } from "../analytics/cleanup-config";
 import { isLive } from "../live-flags";
 import { handleSpeedPrefs, handleSpeedDigest, handleSpeedLadder, handleSpeedPart, handleSpeedTarget } from "./speed-routes";
-import { handleUnansweredPart } from "./unanswered-routes";
+import { handleUnansweredOutcome, handleUnansweredPart } from "./unanswered-routes";
 import { handleApptWork } from "./appointment-work-routes";
 import { buildSteps, guideRoleOf } from "../getting-started";
 import { changedSettingKeys, feedbackGivenBy, logAccountFlags, logKeyChange, logSettingsChange, recordVote } from "../feedback-queries";
@@ -1121,7 +1122,7 @@ const settingsView = async (ctx: Ctx) => {
 
 function publicSettings(s: Settings) {
   // Never send the webhook URL back to the browser: it is a secret.
-  return { staleDays: s.staleDays, dormantDays: s.dormantDays, slaHours: s.slaHours, appDomain: s.appDomain, appDomainSource: s.appDomainSource, detectedDomain: s.detectedDomain, digestEnabled: s.digestEnabled, customChecklist: s.customChecklist, digestHour: s.digestHour, digestTimezone: s.digestTimezone, digestEmail: s.digestEmail, emailReady: emailConfigured(), brandName: s.brandName, brandColor: s.brandColor, brandLogoUrl: s.brandLogoOverride, detectedLogoUrl: s.brandLogoUrl && !s.brandLogoOverride ? s.brandLogoUrl : null, industryTargets: s.industryTargets, keepTranscripts: s.keepTranscripts, pushNotesToCrm: s.pushNotesToCrm, speedTargetMinutes: s.speedTargetMinutes, countAutomatedTouches: s.countAutomatedTouches, speedBusinessHours: s.speedBusinessHours, speedOpenHour: s.speedOpenHour, speedCloseHour: s.speedCloseHour, alertQuietHours: s.alertQuietHours, coldTags: s.coldTags };
+  return { staleDays: s.staleDays, dormantDays: s.dormantDays, slaHours: s.slaHours, appDomain: s.appDomain, appDomainSource: s.appDomainSource, detectedDomain: s.detectedDomain, digestEnabled: s.digestEnabled, customChecklist: s.customChecklist, digestHour: s.digestHour, digestTimezone: s.digestTimezone, digestEmail: s.digestEmail, emailReady: emailConfigured(), brandName: s.brandName, brandColor: s.brandColor, brandLogoUrl: s.brandLogoOverride, detectedLogoUrl: s.brandLogoUrl && !s.brandLogoOverride ? s.brandLogoUrl : null, industryTargets: s.industryTargets, keepTranscripts: s.keepTranscripts, pushNotesToCrm: s.pushNotesToCrm, speedTargetMinutes: s.speedTargetMinutes, countAutomatedTouches: s.countAutomatedTouches, speedBusinessHours: s.speedBusinessHours, speedOpenHour: s.speedOpenHour, speedCloseHour: s.speedCloseHour, alertQuietHours: s.alertQuietHours, inboxAckGraceMinutes: s.inboxAckGraceMinutes, coldTags: s.coldTags };
 }
 
 const INSIGHT_SETTINGS = new Set(["staleDays", "dormantDays", "slaHours", "speedTargetMinutes", "countAutomatedTouches", "speedBusinessHours", "speedOpenHour", "speedCloseHour", "industryTargets", "alertQuietHours"]);
@@ -1145,6 +1146,11 @@ async function settingsUpdate(ctx: Ctx) {
   }
   if ("countAutomatedTouches" in body) patch.countAutomatedTouches = body.countAutomatedTouches === true;
   if ("speedBusinessHours" in body) patch.speedBusinessHours = body.speedBusinessHours === true;
+  if ("inboxAckGraceMinutes" in body) {
+    const v = int(body.inboxAckGraceMinutes, ACK_ESCALATION_GRACE_MIN, ACK_ESCALATION_GRACE_MAX);
+    if (v === null) return json({ error: `Alert escalation must be between ${ACK_ESCALATION_GRACE_MIN} and ${ACK_ESCALATION_GRACE_MAX} minutes` }, 400);
+    patch.inboxAckGraceMinutes = v;
+  }
   if ("alertQuietHours" in body) patch.alertQuietHours = body.alertQuietHours === true;
   if ("speedOpenHour" in body || "speedCloseHour" in body) {
     const open = Number(body.speedOpenHour);
@@ -1995,6 +2001,12 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
     if (a === "inbox" && method === "GET" && !b && ctx.url.searchParams.has("part")) {
       // The new Unanswered v2 parts (home/list/ranks) are always available; per-client SLA is gated separately inside handleUnansweredPart
       return await handleUnansweredPart(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links, targets: async () => { const st = (await scope(ctx)).settings; return { slaHours: st.slaHours, targetMinutes: st.speedTargetMinutes }; } });
+    }
+    if (a === "inbox" && b === "outcome" && method === "POST") {
+      if (!ctx.entitlements.features.inbox_breach_alert || ctx.entitlements.locked.includes("inbox_breach_alert")) {
+        return json({ error: "Follow-up outcomes are not enabled for this account" }, 404);
+      }
+      return await handleUnansweredOutcome(ctx, { allowed: () => allowedIds(ctx) });
     }
     if (method === "GET") {
       if (a === "overview") return await overview(ctx);

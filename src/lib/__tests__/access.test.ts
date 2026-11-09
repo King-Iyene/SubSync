@@ -64,10 +64,11 @@ test("agency routes are open to agencies only", () => {
   }
 });
 
-test("a client view is read-only and cannot reach settings, exports, keys or call logging", () => {
+test("a client view is read-only except for outcomes on assigned conversations", () => {
   assert.equal(routeAllowed("client", "GET", ["overview"]), true);
   assert.equal(routeAllowed("client", "GET", ["accounts", "L1"]), true);
   assert.equal(routeAllowed("client", "GET", ["pipeline-intel"]), true);
+  assert.equal(routeAllowed("client", "POST", ["inbox", "outcome"]), true);
   for (const [m, seg] of [
     ["GET", ["settings"]], ["PUT", ["settings"]], ["GET", ["export", "stale"]], ["GET", ["api-keys"]], ["POST", ["api-keys"]],
     ["GET", ["call-queue"]], ["POST", ["call-outcomes"]], ["POST", ["sync"]], ["POST", ["settings", "purge"]], ["PUT", ["goals"]],

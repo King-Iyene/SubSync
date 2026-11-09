@@ -49,6 +49,8 @@ export type Settings = AccountSettings & {
   countAutomatedTouches: boolean;
   /** When on, a lead that arrives while the team is closed starts its clock at the next opening (Monday to Friday, open to close hour). */
   speedBusinessHours: boolean;
+  /** Minutes an unread 24-hour breach alert waits before it is escalated to the account admin. */
+  inboxAckGraceMinutes: number;
   /** Warning alerts are emailed only between 07:00 and 21:00 local time; critical ones at any hour. */
   alertQuietHours: boolean;
   speedOpenHour: number;
@@ -62,7 +64,7 @@ export type Settings = AccountSettings & {
 export async function getSettings(installationId: string): Promise<Settings> {
   const db = sql();
   const readFull = () => db`
-    select stale_deal_days, dormant_days, sla_hours, slack_webhook_url, ghl_app_domain, app_domain_source, detected_app_domain, digest_enabled, custom_checklist, digest_hour, digest_timezone, digest_email, brand_name, brand_color, brand_logo_url, detected_logo_url, industry_targets, push_notes_to_crm, keep_transcripts, speed_target_minutes, count_automated_touches, speed_business_hours, speed_open_hour, speed_close_hour, alert_quiet_hours, cold_tags, deal_rules_revision
+    select stale_deal_days, dormant_days, sla_hours, slack_webhook_url, ghl_app_domain, app_domain_source, detected_app_domain, digest_enabled, custom_checklist, digest_hour, digest_timezone, digest_email, brand_name, brand_color, brand_logo_url, detected_logo_url, industry_targets, push_notes_to_crm, keep_transcripts, speed_target_minutes, count_automated_touches, speed_business_hours, speed_open_hour, speed_close_hour, alert_quiet_hours, inbox_ack_grace_minutes, cold_tags, deal_rules_revision
     from settings where installation_id = ${installationId}`;
   // Until the logo migration is applied the two logo columns do not exist. Read without them then, so no page breaks (the logo simply stays empty).
   const read = async () => {
@@ -101,6 +103,7 @@ export async function getSettings(installationId: string): Promise<Settings> {
     speedTargetMinutes: typeof r.speed_target_minutes === "number" ? r.speed_target_minutes : 15,
     countAutomatedTouches: r.count_automated_touches === true,
     speedBusinessHours: r.speed_business_hours === true,
+    inboxAckGraceMinutes: typeof r.inbox_ack_grace_minutes === "number" ? r.inbox_ack_grace_minutes : 120,
     alertQuietHours: r.alert_quiet_hours !== false,
     speedOpenHour: typeof r.speed_open_hour === "number" ? r.speed_open_hour : 9,
     speedCloseHour: typeof r.speed_close_hour === "number" ? r.speed_close_hour : 17,
@@ -161,6 +164,7 @@ export async function updateSettings(installationId: string, p: Partial<Settings
       alert_quiet_hours = coalesce(${p.alertQuietHours ?? null}::boolean, alert_quiet_hours),
       speed_open_hour = coalesce(${p.speedOpenHour ?? null}::int, speed_open_hour),
       speed_close_hour = coalesce(${p.speedCloseHour ?? null}::int, speed_close_hour),
+      ${p.inboxAckGraceMinutes !== undefined ? db`inbox_ack_grace_minutes = ${p.inboxAckGraceMinutes},` : db``}
       brand_name = case when ${p.brandName !== undefined} then ${p.brandName ?? null} else brand_name end,
       brand_color = case when ${p.brandColor !== undefined} then ${p.brandColor ?? null} else brand_color end,
       ${p.brandLogoOverride !== undefined ? db`brand_logo_url = ${p.brandLogoOverride ?? null},` : db``}

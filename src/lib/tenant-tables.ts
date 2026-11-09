@@ -5,7 +5,7 @@
 
 /** Copied customer data. "Delete my data" removes exactly this, and so does an uninstall. */
 export const SYNCED_DELETE = [
-  "cleanup_changes", "cleanup_runs", "duplicate_reviews", "duplicate_snoozes", "cleanup_quality_snapshots", "possible_duplicates",
+  "cleanup_changes", "cleanup_runs", "duplicate_reviews", "duplicate_snoozes", "cleanup_quality_snapshots", "possible_duplicates", "unanswered_outcomes",
   "cached_contacts", "cached_opportunities", "cached_conversations", "cached_appointments", "pipelines",
   "account_metrics_daily", "alerts", "domain_checks", "onboarding_tasks",
   "deal_events", "appointment_events", "lead_touches", "touch_events", "lead_events", "speed_daily", "speed_digest", "speed_prefs", "call_outcomes", "workflow_setup_settings", "workflow_setup", "call_queue_log", "call_queue_settings", "contact_tag_events", "location_users",
@@ -33,11 +33,11 @@ export const KEEP_ON_UNINSTALL: readonly string[] = [
 
 /** Removing one client account deletes its rows from these, children first, the account row last. */
 export const LOCATION_DELETE = [
-  "cleanup_changes", "cleanup_runs", "duplicate_reviews", "duplicate_snoozes", "cleanup_quality_snapshots", "possible_duplicates",
+  "cleanup_changes", "cleanup_runs", "duplicate_reviews", "duplicate_snoozes", "cleanup_quality_snapshots", "possible_duplicates", "unanswered_outcomes",
   "cached_contacts", "cached_opportunities", "cached_conversations", "cached_appointments", "pipelines",
   "account_metrics_daily", "alerts", "domain_checks", "onboarding_tasks",
   "deal_events", "appointment_events", "lead_touches", "touch_events", "lead_events", "speed_daily", "speed_digest", "speed_prefs", "call_outcomes", "workflow_setup_settings", "workflow_setup", "call_queue_log", "call_queue_settings", "location_users", "contact_tag_events",
-  "notification_states", "notifications", "notification_deliveries", "notification_destinations",
+  "notification_states", "notifications", "notification_deliveries", "notification_destinations", "client_departures",
   "crm_writes", "contact_writes", "field_write_state", "field_mappings", "meeting_policies", "meeting_notes", "meeting_hooks", "account_profiles", "client_notes", "today_actions", "growth_goals", "workflow_labels", "dh_snapshots", "dh_flags", "dh_changes", "dh_outcomes", "dh_marks", "dh_rules", "campaign_stats", "workflow_snapshots", "workflow_changes", "workflow_daily", "workflow_items", "feedback_items", "client_steps", "client_step_history", "workflow_setup", "workflow_setup_settings", "call_queue_settings", "call_queue_log", "sync_jobs", "locations",
 ] as const;
 

@@ -21,10 +21,27 @@ Item 3: 24-Hour Breach Alert - IMPLEMENTED; DATABASE VERIFICATION BLOCKED
 - Recipients: verified conversation assignee; otherwise the signed-in account admin. Unknown owners are never broadcast to.
 - In-app alerts honor quiet hours. Optional email stays behind the existing gated transport and is forced to dry-run.
 - Conversation assignment is cached from the CRM conversation record; recipient visibility is filtered in the bell, alert views, exports and summaries.
-- Database test attempted but blocked: the configured database is missing the new schema columns. The local DB target is not confirmed as dev/test, so the migration was not applied.
+- Database test attempted but blocked: the configured database does not contain `unanswered_outcomes`. The target is not confirmed as dev/test, so no migration was applied.
 - TypeScript: clean. Node tests: 1283 passed.
 - Tenancy: last full run PASSED (b7z3b2gkb, bowxtxpj6 - "nothing changed: ok"); notification read probes are added but this expanded sweep has not been rerun.
 
 Current tenancy result: last verified PASSED; expanded notification checks pending on a confirmed dev/test database.
 
 Next: Apply the additive migration to a confirmed dev/test database, rerun the breach database test and full check-tenancy sweep, then proceed to Item 4: Ball in Whose Court.
+
+Advanced operations evaluation (2026-11-08):
+Decision: the setter needs a clear next action; the client admin needs safe coverage for ownerless work; the agency owner needs cross-account proof that response failures are being handled.
+Data: conversation direction/time/assignment, unread count, account timezone and touch-event metadata exist in local schema/sync code (VERIFIED); live field quality and role coverage remain CHECK because the configured database is unavailable.
+Competition: native CRM inboxes can notify inside one account; the smallest differentiated version is one cross-account queue with accountable alerts, recovery timing and outcomes.
+Scope: reuse existing account targets, business-hours settings, alert engine, owner ranking and weekly summary; build only on metadata, never message text or CRM writes.
+Risk: bad ownership or reply classification can misroute or misstate alerts; preserve tenant checks, recipient-only visibility, dedupe, caps, quiet hours, dry-run email and the existing default-off flag.
+
+Approved advanced operations update (2026-11-19):
+- Implemented in code: business-hours breach timing; unread-alert escalation after an account-configurable 15–720-minute grace period (default 120); recovery metadata and weekly receipts; ownerless, workload, shift-handoff and breach-spike alerts; owner/source/local-hour pattern summaries; unread-message indication; fixed-choice outcome capture.
+- Flag mapping: `inbox_breach_alert` gates the scheduled runner; `inbox_working_hours` gates business-hours timing; `inbox_workload` gates ownerless/workload/handoff/spike alerts; `inbox_digest` gates weekly receipts. These switches remain default-off.
+- `unanswered_outcomes` is registered for tenant deletion and the data inventory. A tenant-scoped outcome-write case is present in `scripts/check-tenancy.ts`.
+- VERIFIED locally: `npx tsc --noEmit` passed; `npm test` passed 1,297/1,297, including the pure advanced-rule tests.
+- DATABASE CHECK BLOCKED: the targeted Vitest test reached the configured database but failed because `unanswered_outcomes` does not exist. Do not apply the migration until King confirms that database is a safe development/test target. No live-data or expanded tenancy pass is claimed.
+- TENANCY CHECK BLOCKED: the requested sweep was attempted against the configured live database and stopped at the first Overview read (500: `recipient_user_key` does not exist). The script's temporary test installations were verified removed. This is a schema-readiness failure, not a passing tenancy result.
+- Production build: passed. Push to `main` is held because the live database is missing both the existing breach-alert migration and the new outcomes migration.
+- Next: prepare a safe development/test database, apply the migrations there, run the outcome DB test and full tenancy sweep, then deploy. Keep live feature switches off until those checks and role walkthroughs pass.

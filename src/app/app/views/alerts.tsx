@@ -45,10 +45,13 @@ export function AlertsView({ go }: { go: GoFn }) {
                 <div>
                   <p className="text-sm">{a.title}</p>
                   <p className="text-xs text-muted-foreground">Raised {timeAgo(a.createdAt)}</p>
+                  {a.kind === "breach24" && a.detail.recipientReason === "account_admin_fallback" && (
+                    <p className="mt-1 text-xs text-muted-foreground">No assigned team member was verified; this alert went to the account administrator.</p>
+                  )}
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                {a.locationId && <Btn variant="ghost" onClick={() => go("account", a.locationId ?? undefined)}>View account</Btn>}
+                {a.locationId && <Btn variant="ghost" onClick={() => go(a.kind === "breach24" ? "inbox" : "account", a.locationId ?? undefined)}>{a.kind === "breach24" ? "Open unanswered messages" : "View account"}</Btn>}
                 <Btn onClick={() => dismiss(a.id)}>Dismiss</Btn>
               </div>
             </li>

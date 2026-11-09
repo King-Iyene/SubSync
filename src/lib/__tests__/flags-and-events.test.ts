@@ -2,17 +2,18 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { FEATURES } from "../entitlements.ts";
 import { DEFAULT_OFF, resolveFeatures } from "../flags-core.ts";
+import { NAV, visibleNav } from "../../app/app/nav.ts";
+import { NAV_FOR } from "../access.ts";
 import { diffAppointmentEvents } from "../sync/appointment-events.ts";
 
-test("every built feature is on by default except the two King switched off on 1 Nov; a row in the database can still switch one off", () => {
+test("pilot modules are on by default and a database row can still override the default", () => {
   const f = resolveFeatures(FEATURES, {});
   assert.equal(f.ai, true);
   assert.equal(resolveFeatures(FEATURES, { ai: false }).ai, false, "a database row still switches it off without a deploy");
-  for (const on of ["overview", "search", "inbox", "appointments", "calls", "alerts", "pipelines", "stale", "onboarding", "settings", "health", "connections", "reports", "cleanup", "setup_compare", "playbooks", "builder", "duplicates", "clients", "team", "activity"] as const) assert.equal(f[on], true, on);
-  // Stage S0.2b (King, 1 Nov 2026): the Meeting notes page waits for stage E2a, and Zoom and Google Meet are hidden everywhere.
+  for (const on of ["overview", "search", "inbox", "appointments", "calls", "alerts", "pipelines", "stale", "onboarding", "settings", "health", "connections", "setup_compare", "playbooks", "builder", "clients", "activity", "ai", "cleanup", "duplicates", "reports", "team", "meetings", "workflows", "data_health"] as const) assert.equal(f[on], true, on);
+  // Zoom and Google Meet stay hidden everywhere until a pilot asks for them. Optional unanswered-message add-ons also remain individually gated.
   // Unanswered Messages Round 2 (docs/features/UNANSWERED2.md): each behind its own flag, default off.
   assert.deepEqual([...DEFAULT_OFF].sort(), [
-    "data_health",
     "inbox_assign",
     "inbox_ball_in_court",
     "inbox_breach_alert",
@@ -24,11 +25,11 @@ test("every built feature is on by default except the two King switched off on 1
     "inbox_sql_aggregates",
     "inbox_working_hours",
     "inbox_workload",
-    "meetings",
-    "workflows",
     "zoom_meet",
   ]);
-  assert.equal(f.meetings, false);
+  assert.equal(f.meetings, true);
+  assert.equal(f.workflows, true);
+  assert.equal(f.data_health, true);
   assert.equal(f.zoom_meet, false);
   assert.ok([...DEFAULT_OFF].every((x) => (FEATURES as readonly string[]).includes(x)), "every switched-off name is a real feature");
 });
@@ -36,12 +37,24 @@ test("every built feature is on by default except the two King switched off on 1
 test("a database row beats the default in both directions, and FLAGS_ALL_ON only changes defaults", () => {
   const on = resolveFeatures(FEATURES, { meetings: true, inbox: false });
   assert.equal(on.meetings, true, "a row can switch a deferred feature on");
+  assert.equal(resolveFeatures(FEATURES, { reports: true }).reports, true, "a row can restore a hidden screen");
   assert.equal(on.zoom_meet, false, "and only that one");
   assert.equal(on.inbox, false, "or a normal one off");
   const all = resolveFeatures(FEATURES, { inbox: false }, true);
   assert.equal(all.cleanup, true, "all-on turns the deferred ones on");
   assert.equal(all.inbox, false, "but a row still wins");
   assert.equal(resolveFeatures(FEATURES, { notAFeature: false }).overview, true, "an unknown key changes nothing");
+});
+
+test("the production pilot menu keeps all modules available to every authorized role", () => {
+  const after = resolveFeatures(FEATURES, {});
+  const count = (kind: keyof typeof NAV_FOR, features: Record<string, boolean>) =>
+    visibleNav(NAV_FOR[kind], { limited: kind !== "agency", off: (feature) => features[feature] === false }).length;
+  assert.deepEqual(
+    { agency: count("agency", after), business: count("business", after), client: count("client", after) },
+    { agency: 17, business: 17, client: 15 },
+  );
+  assert.equal(NAV.filter((item) => item.id === "team").length, 1, "the Team screen remains in the navigation model");
 });
 
 test("appointment history: first sight, status changes and moves are recorded; the first sync records nothing", () => {

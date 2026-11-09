@@ -58,7 +58,7 @@ export function ExecSummary() {
     <Card title="Executive summary" className="mb-4" action={<Btn variant="ghost" onClick={() => setEditing((v) => !v)}>{editing ? "Cancel" : "Set goals"}</Btn>}>
       <dl className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         {data.kpis.filter((k) => ["contacts", "revenue", "pipeline"].includes(k.key)).map((k) => (
-          <div key={k.key}>
+          <div key={k.key} data-testid="overview-metric">
             <dt className="text-xs text-muted-foreground">{k.label}</dt>
             <dd className="text-xl font-semibold tabular-nums">{k.money ? fmtMoney(k.current) : fmtInt(k.current)}</dd>
             <Arrow pct={k.pct} previous={k.previous} money={k.money} />

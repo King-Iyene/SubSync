@@ -11,7 +11,12 @@ vi.mock("@/lib/db", () => {
   const tag = (first: unknown, ...values: unknown[]) => {
     if (typeof first === "string") return ident(first); // tx("table") used as an identifier
     const strings = first as TemplateStringsArray;
-    executed.push(strings.reduce((acc, s, i) => acc + s + (i < values.length ? ((values[i] as { __ident?: string })?.__ident ?? "?") : ""), "").replace(/\s+/g, " ").trim());
+    const query = strings.reduce((acc, s, i) => acc + s + (i < values.length ? ((values[i] as { __ident?: string })?.__ident ?? "?") : ""), "").replace(/\s+/g, " ").trim();
+    if (query.includes("information_schema.tables")) {
+      const tables = values.find(Array.isArray) as string[] | undefined;
+      return Promise.resolve((tables ?? []).map((table_name) => ({ table_name })));
+    }
+    executed.push(query);
     return Promise.resolve([{ id: "inst-1" }]);
   };
   return { sql: () => ({ begin: async (fn: (tx: unknown) => unknown) => fn(tag), json: (x: unknown) => x }), closeDb: async () => undefined };

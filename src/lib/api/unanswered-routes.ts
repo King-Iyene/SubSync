@@ -1,5 +1,8 @@
 import { unansweredHome, unansweredList, unansweredRanks } from "../analytics/unanswered-v2-queries";
 import { isBucket, SORTS } from "../analytics/unanswered-v2";
+import { WAITING_WINDOW_DAYS } from "../analytics/waiting";
+import { isUnansweredOutcome } from "../analytics/unanswered-advanced";
+import { sql } from "../db";
 import type { deepLinks } from "../links";
 import { json, type AuthContext } from "./auth";
 
@@ -58,7 +61,11 @@ export async function handleUnansweredPart(ctx: Ctx, h: UnansweredHelpers): Prom
 
   if (part === "home") {
     const out = await unansweredHome({ ...base, allowed: allowedAll, meId });
-    return json(withUrls({ ...out, kind: ctx.kind }, links));
+    return json(withUrls({
+      ...out,
+      kind: ctx.kind,
+      canRecordOutcome: ctx.entitlements.features.inbox_breach_alert && !ctx.entitlements.locked.includes("inbox_breach_alert"),
+    }, links));
   }
 
   if (part === "list") {
@@ -85,4 +92,28 @@ export async function handleUnansweredPart(ctx: Ctx, h: UnansweredHelpers): Prom
   }
 
   return json({ error: "Unknown part of this screen" }, 400);
+}
+
+export async function handleUnansweredOutcome(ctx: Ctx, h: Pick<UnansweredHelpers, "allowed">): Promise<Response> {
+  const body = await ctx.request.json().catch(() => null) as Record<string, unknown> | null;
+  if (!body || typeof body.locationId !== "string" || !ID.test(body.locationId) || typeof body.conversationId !== "string" || !ID.test(body.conversationId) || !isUnansweredOutcome(body.outcome)) {
+    return json({ error: "Choose a conversation and a listed outcome" }, 400);
+  }
+  const allowed = narrowed(await h.allowed(), body.locationId);
+  if (allowed === "none" || !allowed?.length) return json({ error: "That conversation is not available in your account view" }, 404);
+  const actor = ctx.session.userId;
+  if (!actor) return json({ error: "Sign in again before recording an outcome" }, 401);
+  const [conversation] = await sql()`
+    select contact_id, assigned_to from cached_conversations
+    where installation_id = ${ctx.installationId} and location_id = ${body.locationId}
+      and conversation_id = ${body.conversationId} and last_message_direction = 'inbound'
+      and last_message_at > now() - ${WAITING_WINDOW_DAYS}::int * interval '1 day'`;
+  if (!conversation) return json({ error: "This conversation is no longer waiting; refresh the list" }, 409);
+  if (ctx.kind === "client" && ctx.session.role !== "admin" && conversation.assigned_to !== actor) {
+    return json({ error: "You can only record an outcome for a conversation assigned to you" }, 403);
+  }
+  await sql()`
+    insert into unanswered_outcomes (installation_id, location_id, conversation_id, contact_id, outcome, recorded_by)
+    values (${ctx.installationId}, ${body.locationId}, ${body.conversationId}, ${conversation.contact_id ?? null}, ${body.outcome}, ${actor})`;
+  return json({ ok: true, outcome: body.outcome });
 }

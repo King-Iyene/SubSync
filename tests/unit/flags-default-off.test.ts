@@ -5,8 +5,9 @@ import { DEFAULT_OFF } from "@/lib/flags-core";
 // Runbook rule: a new feature ships behind a flag that defaults to off. To add a feature you must either put it in
 // DEFAULT_OFF (the normal case) or, for a bug fix to something already live, consciously add it to this reviewed list.
 const REVIEWED_ALWAYS_ON_BASELINE = new Set([
-  "overview", "search", "onboarding", "health", "stale", "activity", "inbox", "pipelines", "duplicates", "email", "alerts", "reports", "builder",
-  "exports", "ai", "connections", "cleanup", "setup_compare", "playbooks", "clients", "team", "calls", "appointments", "audit", "speed", "settings",
+  "overview", "search", "onboarding", "health", "stale", "activity", "inbox", "pipelines", "email", "alerts", "builder",
+  "exports", "connections", "setup_compare", "playbooks", "clients", "calls", "appointments", "audit", "speed", "settings",
+  "ai", "cleanup", "duplicates", "reports", "team", "meetings", "workflows", "data_health",
   // reachable only through the default-off "workflows" gate; they exist so the free plan can be told apart from the paid one
   "workflows_pro", "workflows_write",
   // reachable only through the default-off "data_health" gate

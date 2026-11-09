@@ -13,6 +13,11 @@ test("every default wording is valid for its own kind (a default can never be re
   }
 });
 
+test("other-alert wording points to the page the notification actually links to", () => {
+  assert.match(CATALOG.other_alerts.defaultBody, /linked page/i);
+  assert.doesNotMatch(CATALOG.other_alerts.defaultBody, /open alerts/i);
+});
+
 test("an unknown variable is rejected, and the answer lists the names that do work", () => {
   const r = checkTemplate("speed_breach", "title", "{account}: {leads} waiting");
   assert.equal(r.ok, false);

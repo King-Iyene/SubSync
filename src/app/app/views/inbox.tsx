@@ -20,8 +20,9 @@ import { PersonRows, usePersonActions, type WaitRow } from "./unanswered-rows";
 
 type Home = {
   now: number; slaHours: number; windowDays: number; multi: boolean; accountCount: number; seePeople: boolean; kind: string;
+  canRecordOutcome: boolean;
   waiting: {
-    people: number; clients: Array<{ locationId: string; name: string; count: number }>; money: { line: string; dollars: number; peopleWithDeals: number; deals: number }; conversations: number; accounts: number; oldestHours: number | null; noOwner: number; newLeads: number; over24: number;
+    people: number; clients: Array<{ locationId: string; name: string; count: number }>; money: { line: string; dollars: number; peopleWithDeals: number; deals: number }; conversations: number; accounts: number; oldestHours: number | null; noOwner: number; newLeads: number; over24: number; breach: string | null;
     headline: { parts: Array<{ t: string; strong?: boolean }>; text: string; allClear: boolean }; meaning: string;
     rows: WaitRow[]; cost: { line: string | null; formula: string; amount: number | null; leftOutAccounts: number };
   };
@@ -44,7 +45,7 @@ export function InboxView({ go }: { go: GoFn }) {
   const [copied, setCopied] = useState(false);
   const top = useRef<HTMLDivElement>(null);
   const rows = data?.waiting.rows ?? [];
-  const actions = usePersonActions(rows);
+  const actions = usePersonActions(rows, data?.canRecordOutcome === true);
 
   if (error) return <div data-testid="page"><ErrorState error={error} onRetry={reload} /></div>;
   if (!data) return <div data-testid="page"><SkeletonRows rows={6} label="Reading your conversations..." /></div>;
@@ -96,6 +97,7 @@ export function InboxView({ go }: { go: GoFn }) {
 
           <HeadlineBlock headline={{ ...w.headline, breakdown: null, accounts: w.accounts, dollars: w.cost.amount ?? 0 } as never}
             action={oldest ? <PrimaryButton p={{ label: w.people > 1 ? `Reply to the oldest of the ${w.people.toLocaleString("en-US")} people waiting` : "Reply to the person waiting", sr: `${oldest.name}, the longest wait, in your CRM`, href: oldest.url }} /> : undefined}>
+            {w.breach && <p className="mt-2 text-sm font-medium" data-testid="wait-breach">{w.breach} The oldest person is at the top of the list.</p>}
             {w.people > 0 && (
               <div className="mt-3 max-w-3xl space-y-2" data-testid="wait-money-block">
                 <p className="text-[0.95rem] font-medium" data-testid="wait-money">{w.money.line}</p>
@@ -133,7 +135,7 @@ export function InboxView({ go }: { go: GoFn }) {
           {d.truncated && <InlineAlert tone="warning" className="mb-4">SubSync reads the 20,000 conversations that have waited longest. There are more, so the numbers here are for what was read.</InlineAlert>}
 
           {list ? (
-            <WaitList key={JSON.stringify(list.params)} title={list.title} params={list.params} showAccount={d.multi} canMine noun={list.noun}
+            <WaitList key={JSON.stringify(list.params)} title={list.title} params={list.params} showAccount={d.multi} canMine canRecordOutcome={d.canRecordOutcome} noun={list.noun}
               onBack={() => { setList(null); setTimeout(() => document.querySelector<HTMLElement>("[data-testid=wait-all], [data-testid=wait-picture] h2")?.focus(), 60); }} backLabel="Back to Reply now" />
           ) : w.people > 0 && (
             <section className="mb-10" aria-label="Reply now" data-testid="reply-now">
@@ -162,7 +164,7 @@ export function InboxView({ go }: { go: GoFn }) {
           <div className="mb-2 space-y-1 text-xs text-muted-foreground" data-testid="wait-notes">
             <p>
               SubSync keeps only who wrote, when and on which channel. It never copies message text, so Reply opens the conversation in your CRM.{" "}
-              Owner is the team member the customer is assigned to in your CRM. For a call, SubSync cannot tell whether it was answered.{" "}
+              Owner is the team member the customer is assigned to in your CRM. A 24-hour alert goes to that person; if no owner can be verified, it goes to the account administrator. For a call, SubSync cannot tell whether it was answered.{" "}
               Conversations waiting more than {d.windowDays} days are not counted.{" "}
               {canChange ? <button type="button" onClick={() => go("settings")} className="font-medium text-primary underline" data-testid="wait-settings-link">Change the reply target in Settings</button> : "Ask the person who manages your account to change the reply target."}
             </p>

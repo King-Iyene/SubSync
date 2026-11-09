@@ -145,11 +145,11 @@ test("the outside services on the page are the ones in the code and config, and 
   assert.deepEqual(unknown, [], "a web host the code talks to that the Trust page does not account for");
 });
 
-test("nothing that is switched off is mentioned: no Zoom, no Google Meet, and no Meeting notes page while its switch is off", () => {
-  assert.ok(DEFAULT_OFF.has("zoom_meet") && DEFAULT_OFF.has("meetings"), "the switches are off by default (if one is switched on by default, review this page)");
+test("the disabled Zoom integration is not mentioned, while the Meeting notes module is available", () => {
+  assert.ok(DEFAULT_OFF.has("zoom_meet"), "Zoom remains off by default");
+  assert.ok(!DEFAULT_OFF.has("meetings"), "Meeting notes is available for launch testing");
   const text = trustText();
   assert.doesNotMatch(text, /zoom|google meet/i);
-  assert.doesNotMatch(text, /meeting notes page/i);
   assert.doesNotMatch(text, /\b(GoHighLevel|HighLevel|GHL)\b/);
   // The permission names themselves (for example "locations.readonly") are machine names, not wording.
   const words = text.replace(/[a-z]+(\/[a-zA-Z]+)?\.(readonly|write)/g, "");

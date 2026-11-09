@@ -40,7 +40,7 @@ export function NotificationsPage() {
         New alerts appear in the bell at the top of every page. If you already set an email address or a Slack channel, they go there too. Change anything below: each kind of message has its own channels, time, quiet hours and wording.
       </HowTo>
       {loading && !data ? <SkeletonRows rows={5} label="Loading notification choices" />
-        : error ? (error.status === 403 ? <InlineAlert tone="info">Notification choices are for administrators. The bell at the top of the page shows what needs you.</InlineAlert> : <ErrorState error={error} onRetry={reload} />)
+        : error ? (error.status === 403 ? <InlineAlert tone="info">Only the administrator who manages this app can change notification settings. Your own alerts still appear in the bell.</InlineAlert> : <ErrorState error={error} onRetry={reload} />)
         : data ? <Body data={data} reload={reload} /> : null}
     </Page>
   );

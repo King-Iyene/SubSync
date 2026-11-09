@@ -38,7 +38,7 @@ export async function loadWaitingAgg(db: Db, installationId: string, allowed: st
 
   // Single query with window function for exact total and SLA filter in WHERE
   const rows = await db`
-    select c.conversation_id, c.location_id, c.contact_id, c.last_message_type, c.last_message_at,
+    select c.conversation_id, c.location_id, c.contact_id, c.last_message_type, c.last_message_at, c.unread_count,
       coalesce(nullif(btrim(c.contact_name), ''), nullif(btrim(ct.full_name), ''), nullif(btrim(ct.email), ''), nullif(btrim(ct.phone), '')) name,
       nullif(ct.assigned_to, '') assigned_to, nullif(ct.phone, '') phone, nullif(ct.email, '') email, coalesce(ct.dnd, false) dnd, l.timezone,
       count(*) over() as total
@@ -59,7 +59,7 @@ export async function loadWaitingAgg(db: Db, installationId: string, allowed: st
   const out: WaitConv[] = rows.map((r) => ({
     conversationId: r.conversation_id as string, locationId: r.location_id as string, contactId: (r.contact_id as string | null) ?? null,
     name: r.name ? properCase(r.name as string) : null, lastType: (r.last_message_type as string | null) ?? null, lastAt: (r.last_message_at as Date).getTime(),
-    assignedTo: (r.assigned_to as string | null) ?? null, phone: (r.phone as string | null) ?? null, email: (r.email as string | null) ?? null, dnd: r.dnd === true,
+    assignedTo: (r.assigned_to as string | null) ?? null, unreadCount: Number(r.unread_count ?? 0), phone: (r.phone as string | null) ?? null, email: (r.email as string | null) ?? null, dnd: r.dnd === true,
     timeZone: (r.timezone as string | null) || null,
   }));
   return { rows: out, total, truncated: out.length >= WAITING_READ_CAP };
@@ -68,7 +68,7 @@ export async function loadWaitingAgg(db: Db, installationId: string, allowed: st
 export type OwnerOut = { id: string; label: string; state: PersonLabel["state"] };
 export type PersonOut = {
   key: string; locationId: string; locationName: string; contactId: string | null; conversationId: string; name: string; channel: string; call: boolean;
-  hours: number; conversations: number; owner: OwnerOut | null; unassigned: boolean; phone: string | null; email: string | null; dnd: boolean; timeZone: string | null; newLead: boolean;
+  hours: number; conversations: number; unreadMessages: number; owner: OwnerOut | null; unassigned: boolean; phone: string | null; email: string | null; dnd: boolean; timeZone: string | null; newLead: boolean;
 };
 
 type Db = ReturnType<typeof sql>;
@@ -93,7 +93,7 @@ export async function loadWaiting(db: Db, installationId: string, allowed: strin
   if (allowed && allowed.length === 0) return { rows: [], truncated: false };
   const accountSla = await loadAccountSlaHours(db, installationId);
   const rows = await db`
-    select c.conversation_id, c.location_id, c.contact_id, c.last_message_type, c.last_message_at,
+    select c.conversation_id, c.location_id, c.contact_id, c.last_message_type, c.last_message_at, c.unread_count,
       coalesce(nullif(btrim(c.contact_name), ''), nullif(btrim(ct.full_name), ''), nullif(btrim(ct.email), ''), nullif(btrim(ct.phone), '')) name,
       nullif(ct.assigned_to, '') assigned_to, nullif(ct.phone, '') phone, nullif(ct.email, '') email, coalesce(ct.dnd, false) dnd, l.timezone
     from cached_conversations c
@@ -106,7 +106,7 @@ export async function loadWaiting(db: Db, installationId: string, allowed: strin
   const out: WaitConv[] = rows.map((r) => ({
     conversationId: r.conversation_id as string, locationId: r.location_id as string, contactId: (r.contact_id as string | null) ?? null,
     name: r.name ? properCase(r.name as string) : null, lastType: (r.last_message_type as string | null) ?? null, lastAt: (r.last_message_at as Date).getTime(),
-    assignedTo: (r.assigned_to as string | null) ?? null, phone: (r.phone as string | null) ?? null, email: (r.email as string | null) ?? null, dnd: r.dnd === true,
+    assignedTo: (r.assigned_to as string | null) ?? null, unreadCount: Number(r.unread_count ?? 0), phone: (r.phone as string | null) ?? null, email: (r.email as string | null) ?? null, dnd: r.dnd === true,
     timeZone: (r.timezone as string | null) || null,
   }));
   return { rows: out, truncated: out.length >= WAITING_READ_CAP };
@@ -126,7 +126,7 @@ function personOut(p: Person, lk: Lookups): PersonOut {
   const o = p.assignedTo ? ownerLabel(p.assignedTo, lk, p.locationId) : null;
   return {
     key: p.key, locationId: p.locationId, locationName: lk.locationNames.get(p.locationId) ?? "Client account", contactId: p.contactId, conversationId: p.conversationId, name: p.name,
-    channel: p.channel, call: p.call, hours: p.hours, conversations: p.conversations, owner: o ? { id: p.assignedTo as string, label: o.label, state: o.state } : null, unassigned: p.assignedTo === null,
+    channel: p.channel, call: p.call, hours: p.hours, conversations: p.conversations, unreadMessages: p.unreadMessages, owner: o ? { id: p.assignedTo as string, label: o.label, state: o.state } : null, unassigned: p.assignedTo === null,
     phone: p.phone, email: p.email, dnd: p.dnd, timeZone: p.timeZone, newLead: p.newLead,
   };
 }

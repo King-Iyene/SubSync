@@ -36,7 +36,7 @@ export const CONTROL_HOME: Readonly<Record<string, SectionId>> = {
   "client-access": "team", "test-accounts": "team", "who-can-open": "team", "team-connections": "integrations",
   "quiet-hours": "notifications", "slack": "notifications", "daily-brief": "notifications", "weekly-email": "notifications", "send-at": "notifications", "time-zone": "notifications",
   "connections": "integrations", "my-connections": "integrations", "permissions": "integrations", "watching": "sync",
-  "stale-days": "targets", "dormant-days": "targets", "reply-target-hours": "targets", "speed-target": "targets", "automated-touches": "targets", "business-hours": "targets",
+  "stale-days": "targets", "dormant-days": "targets", "reply-target-hours": "targets", "speed-target": "targets", "automated-touches": "targets", "business-hours": "targets", "inbox-ack-grace": "targets",
   "brand-name": "brand", "brand-colour": "brand",
   "what-we-store": "privacy", "meeting-privacy": "privacy", "delete-my-data": "privacy", "trust-page": "privacy",
   "sync-status": "sync",
@@ -50,7 +50,7 @@ export const NUMBER_SETTINGS = ["staleDays", "dormantDays", "slaHours", "speedTa
 /** What each setting is called on screen. Used to read the audit log back in plain words; a name that is not here is shown as "a setting". */
 export const SETTING_LABEL: Readonly<Record<string, string>> = {
   staleDays: "Stale deal days", dormantDays: "Gone quiet days", slaHours: "Reply target (hours)", speedTargetMinutes: "Speed to lead target", countAutomatedTouches: "Count automatic messages",
-  speedBusinessHours: "Business hours", speedOpenHour: "Opening hour", speedCloseHour: "Closing hour", alertQuietHours: "Quiet hours", digestEnabled: "Daily brief",
+  speedBusinessHours: "Business hours", speedOpenHour: "Opening hour", speedCloseHour: "Closing hour", alertQuietHours: "Quiet hours", inboxAckGraceMinutes: "Unanswered alert escalation", digestEnabled: "Daily brief",
   digestHour: "Send hour", digestTimezone: "Time zone", digestEmail: "Alert email address", slackWebhookUrl: "Slack channel", brandName: "Brand name", brandColor: "Brand colour", brandLogoUrl: "Logo address",
   keepTranscripts: "Keep transcripts", pushNotesToCrm: "Add meeting notes to contacts", customChecklist: "Your checklist steps", appDomainOverride: "Login address", coldTags: "Cold-list tags",
   industryTargets: "Targets by industry", clientViewAll: "Client access for every account",

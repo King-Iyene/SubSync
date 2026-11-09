@@ -18,7 +18,7 @@ let n = 0;
 /** A conversation whose last message is the customer's, `h` hours ago (the default type is a text message). */
 function conv(loc: string, h: number, over: Partial<WaitConv> = {}): WaitConv {
   n += 1;
-  return { conversationId: `conv-${n}`, locationId: loc, contactId: `c${n}`, name: `Person ${String(n).padStart(3, "0")}`, lastType: "TYPE_SMS", lastAt: NOW - h * H - 60_000, assignedTo: "u1", phone: "+15550100", email: "p@example.com", dnd: false, timeZone: "America/New_York", ...over };
+  return { conversationId: `conv-${n}`, locationId: loc, contactId: `c${n}`, name: `Person ${String(n).padStart(3, "0")}`, lastType: "TYPE_SMS", lastAt: NOW - h * H - 60_000, assignedTo: "u1", unreadCount: 0, phone: "+15550100", email: "p@example.com", dnd: false, timeZone: "America/New_York", ...over };
 }
 const people = (rows: WaitConv[], sla = 4) => peopleOf(waitingConversations(rows, { now: NOW, slaHours: sla }), { now: NOW });
 

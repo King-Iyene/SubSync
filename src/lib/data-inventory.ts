@@ -51,6 +51,11 @@ export const INVENTORY: Record<string, TableInfo> = {
     noun: "conversation details", line: "conversations",
     personal: { contact_name: "the contact's name", assigned_to: "the team member the conversation is assigned to" },
   },
+  unanswered_outcomes: {
+    noun: "Unanswered follow-up outcomes", line: "conversations",
+    personal: { conversation_id: "the conversation this follow-up belongs to", contact_id: "the contact this follow-up belongs to", recorded_by: "which team member recorded the outcome" },
+    notPersonal: ["outcome"],
+  },
   lead_touches: {
     noun: "first-reply records", line: "conversations",
     personal: { touch_user_id: "which team member replied first" },
@@ -193,7 +198,7 @@ export const INVENTORY: Record<string, TableInfo> = {
       slack_webhook_url: "the Slack channel address (kept as typed, so treat it like a password)", digest_email: "the email address that receives alerts",
       brand_name: "the company name you show", brand_logo_url: "the logo address you show", detected_logo_url: "the logo address your platform sent", custom_checklist: "your own checklist steps", cold_tags: "the tags you marked as cold lists", ghl_app_domain: "the address you log in to", detected_app_domain: "the address you log in to", digest_timezone: "your time zone",
     },
-    notPersonal: ["speed_keep_message_text", "app_domain_source", "keep_transcripts", "push_notes_to_crm", "cleanup_defaults", "speed_escalation"],
+    notPersonal: ["speed_keep_message_text", "app_domain_source", "keep_transcripts", "push_notes_to_crm", "cleanup_defaults", "speed_escalation", "inbox_ack_grace_minutes"],
   },
   api_keys: {
     noun: "API keys", line: "sign_in",

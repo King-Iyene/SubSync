@@ -19,11 +19,11 @@ const SORTS: Array<{ key: string; label: string }> = [{ key: "wait", label: "Lon
 const field = "min-h-11 rounded-lg border bg-card px-3 text-sm outline-none hover:border-primary/30 focus-visible:ring-2 focus-visible:ring-ring/30 sm:min-h-9";
 const chip = (on: boolean) => `ds-press min-h-11 rounded-md px-2.5 text-sm font-medium sm:min-h-9 ${on ? "bg-accent text-foreground underline underline-offset-4" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`;
 
-export function WaitList({ title, params, showAccount, canMine, noun = "people", onBack, backLabel = "Back" }: {
+export function WaitList({ title, params, showAccount, canMine, canRecordOutcome, noun = "people", onBack, backLabel = "Back" }: {
   title: string;
   /** What the list is about: bucket, account, owner. The search, sort, chips, channel and page are added here. */
   params: Record<string, string>;
-  showAccount: boolean; canMine: boolean; noun?: string; onBack: () => void; backLabel?: string;
+  showAccount: boolean; canMine: boolean; canRecordOutcome: boolean; noun?: string; onBack: () => void; backLabel?: string;
 }) {
   const [text, setText] = useState("");
   const [q, setQ] = useState("");
@@ -49,7 +49,7 @@ export function WaitList({ title, params, showAccount, canMine, noun = "people",
   if (q) sp.set("q", q);
   const { data, error, loading, reload } = useData<ListData>(`inbox?${sp}`);
   const rows = data?.rows ?? [];
-  const actions = usePersonActions(rows);
+  const actions = usePersonActions(rows, canRecordOutcome);
   const f = data?.facets;
   const narrowed = bucket !== "all" || owner !== "" || channel !== "" || q !== "";
 

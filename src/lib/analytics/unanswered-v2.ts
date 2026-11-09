@@ -20,6 +20,7 @@ export type WaitConv = {
   lastType: string | null; lastAt: number;
   /** The team member the contact is assigned to (the conversation list does not say who a conversation is assigned to; the page says so). */
   assignedTo: string | null;
+  unreadCount: number;
   phone: string | null; email: string | null; dnd: boolean; timeZone: string | null;
 };
 
@@ -35,6 +36,7 @@ export type Person = {
   hours: number;
   /** How many conversations of this person are waiting (one person, however many). */
   conversations: number;
+  unreadMessages: number;
   assignedTo: string | null;
   phone: string | null; email: string | null; dnd: boolean; timeZone: string | null;
   /** Also a new lead nobody has answered: a SUBSET of the people waiting, said ("3 are new leads"), never added. */
@@ -63,7 +65,7 @@ export function peopleOf(waiting: readonly WaitConv[], o: { now: number; names?:
     out.push({
       key, locationId: oldest.locationId, contactId: oldest.contactId, conversationId: oldest.conversationId, name: named?.trim() || "Unnamed contact",
       channel: channelLabel(oldest.lastType), call: isCall(oldest.lastType), lastAt: oldest.lastAt, hours: Math.max(0, Math.floor((o.now - oldest.lastAt) / HOUR)),
-      conversations: cs.length, assignedTo: oldest.assignedTo, phone: oldest.phone, email: oldest.email, dnd: oldest.dnd, timeZone: oldest.timeZone, newLead: false,
+      conversations: cs.length, unreadMessages: cs.reduce((sum, c) => sum + c.unreadCount, 0), assignedTo: oldest.assignedTo, phone: oldest.phone, email: oldest.email, dnd: oldest.dnd, timeZone: oldest.timeZone, newLead: false,
     });
   }
   return out;

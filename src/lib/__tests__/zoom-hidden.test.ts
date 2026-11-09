@@ -6,8 +6,8 @@ import { CODE_LIKE, visibleText } from "../../../tests/fixtures/visible-text.ts"
 import { FEATURES } from "../entitlements.ts";
 import { DEFAULT_OFF, resolveFeatures } from "../flags-core.ts";
 
-// King's decision of 1 Nov 2026 (stage S0.2b): Zoom and Google Meet stay hidden behind the switch "zoom_meet", off by default. Nothing a person
-// can read may name them while it is off. The Zoom code, the app registration and the callback address stay in place.
+// King's launch decision of 8 Nov 2026: Zoom and Google Meet stay hidden behind "zoom_meet", off by default; the Meetings module is on for pilot testing.
+// Nothing a person can read may name Zoom or Google Meet while that integration is off. The code, app registration, and callback address stay in place.
 // Three layers: this test (the switch's default state, and every place in the code that can show the words), the integration check
 // scripts/check-flags.ts (the API answers with the switch really off), and tests/e2e/zoom-hidden.spec.ts (the real screens at the default state).
 const ROOT = join(process.cwd(), "src");
@@ -39,13 +39,13 @@ const ALLOWED: Record<string, { count: number; why: string }> = {
   "src/lib/route-guards.ts": { count: 2, why: "notes: the guard table (the Zoom notification route, and the privacy page that reads the switch)" },
 };
 
-test("the Zoom and Google Meet switch is off by default, and on only when the database or the test setting says so", () => {
+test("Zoom and Google Meet stay off by default while the Meetings module is available", () => {
   assert.ok((FEATURES as readonly string[]).includes("zoom_meet"));
   assert.ok(DEFAULT_OFF.has("zoom_meet"), "zoom_meet is in the default-off list");
-  assert.ok(DEFAULT_OFF.has("meetings"), "the Meeting notes page is behind its own switch, off until stage E2a passes");
+  assert.ok(!DEFAULT_OFF.has("meetings"), "the Meeting notes module is available for launch testing");
   const off = resolveFeatures(FEATURES, {}, false);
   assert.equal(off.zoom_meet, false, "off by default");
-  assert.equal(off.meetings, false);
+  assert.equal(off.meetings, true);
   assert.equal(off.connections, true, "Connections itself stays on: Slack and Fathom are not hidden");
   assert.equal(resolveFeatures(FEATURES, {}, true).zoom_meet, true, "the test servers set FLAGS_ALL_ON, which turns every default on");
   assert.equal(resolveFeatures(FEATURES, { zoom_meet: true }, false).zoom_meet, true, "a database row turns it on without a deploy");

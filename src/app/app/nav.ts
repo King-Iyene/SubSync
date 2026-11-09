@@ -3,8 +3,8 @@ export type ViewId =
 
 export type GoFn = (view: ViewId, locationId?: string) => void;
 
-// The pilot menu (stage D0, N43 and UX-11): a short list of plain groups. Everything else the app already shows stays reachable under "More"
-// (or inside a module as a tab); nothing that was visible has been removed, and a page behind a switch stays behind it (the `feature` below).
+// The pilot menu: a short list of plain groups. Active screens stay reachable under "More" or inside their module;
+// deferred screens remain implemented but are absent while their feature switch is off.
 export type NavGroup = "" | "Reply" | "Clients and people" | "More" | "Settings and help";
 
 export type NavItem = {

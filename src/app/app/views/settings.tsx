@@ -14,7 +14,7 @@ import { WatchingSlot } from "./settings-slot-watching";
 import { DailyBriefLine } from "./notifications";
 import { BrandPreview, PermissionsPanel, SettingsHistoryCard, TestAccountsCard, WhoCanOpenCard, type PermissionGroup } from "./settings-parts";
 
-type S = { staleDays: number; dormantDays: number; slaHours: number; appDomain: string; appDomainSource: "manual" | "sso" | "install" | "default"; detectedDomain: string | null; digestEnabled: boolean; customChecklist: string[]; digestHour: number | null; digestTimezone: string | null; digestEmail: string | null; emailReady?: boolean; brandName: string | null; brandColor: string | null; brandLogoUrl?: string | null; detectedLogoUrl?: string | null; industryTargets?: boolean; keepTranscripts: boolean; pushNotesToCrm: boolean; speedTargetMinutes: number; countAutomatedTouches: boolean; speedBusinessHours: boolean; speedOpenHour: number; speedCloseHour: number; alertQuietHours: boolean };
+type S = { staleDays: number; dormantDays: number; slaHours: number; appDomain: string; appDomainSource: "manual" | "sso" | "install" | "default"; detectedDomain: string | null; digestEnabled: boolean; customChecklist: string[]; digestHour: number | null; digestTimezone: string | null; digestEmail: string | null; emailReady?: boolean; brandName: string | null; brandColor: string | null; brandLogoUrl?: string | null; detectedLogoUrl?: string | null; industryTargets?: boolean; keepTranscripts: boolean; pushNotesToCrm: boolean; speedTargetMinutes: number; countAutomatedTouches: boolean; speedBusinessHours: boolean; speedOpenHour: number; speedCloseHour: number; alertQuietHours: boolean; inboxAckGraceMinutes: number };
 
 type Data = {
   features?: Record<string, boolean>; settings: S; slackConfigured: boolean; canDeleteData?: boolean; meetingTool?: boolean; kind?: string;
@@ -84,6 +84,7 @@ export function SettingsView({ openSection }: { openSection?: SectionId } = {}) 
         alertQuietHours: form.alertQuietHours, speedBusinessHours: form.speedBusinessHours, speedOpenHour: form.speedOpenHour, speedCloseHour: form.speedCloseHour,
         customChecklist: checklist.split("\n").map((l) => l.trim()).filter(Boolean),
       };
+      if (data.features?.inbox_breach_alert === true) body.inboxAckGraceMinutes = form.inboxAckGraceMinutes;
       if (slack.trim()) body.slackWebhookUrl = slack.trim();
       // The login address is found automatically. Only a typed one is sent, and it is an override.
       if (override.trim() && override.trim().toLowerCase() !== form.appDomain) body.appDomainOverride = override.trim();
@@ -277,6 +278,13 @@ export function SettingsView({ openSection }: { openSection?: SectionId } = {}) 
                 </div>
                 <p className="mt-2 text-xs text-muted-foreground">With this on, a lead that arrives when your team is closed (evenings, weekends) starts its reply clock at the next opening time in that account&apos;s own time zone, Monday to Friday. A lead that arrives during opening hours and is still unanswered at closing keeps counting overnight.</p>
               </Card>
+              {data.features?.inbox_breach_alert === true && (
+                <Card title="Unanswered alert escalation">
+                  <label htmlFor="inbox-ack-grace" className="mb-1 block text-sm font-medium">Escalate an unread alert after (minutes)</label>
+                  <input id="inbox-ack-grace" type="number" min={15} max={720} step={15} className={`${inputClass} !w-32`} value={form.inboxAckGraceMinutes} onChange={(e) => setForm({ ...form, inboxAckGraceMinutes: Number(e.target.value) })} />
+                  <p className="mt-1 text-xs text-muted-foreground">If the assigned owner has not opened the 24-hour alert by then, notify the account admin. Default: 120 minutes.</p>
+                </Card>
+              )}
             </>
           )}
 

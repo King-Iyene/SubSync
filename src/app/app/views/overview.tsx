@@ -56,9 +56,9 @@ export function OverviewView({ go }: { go: GoFn }) {
       <ExecSummary />
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <Stat label="Stale deal value" value={fmtMoney(k.staleValue)} tone={k.staleValue > 0 ? "warn" : undefined}
-          sub={`${fmtInt(k.staleOpps)} of ${fmtInt(k.openOpps)} open deals have not moved`} />
-        <Stat label="Waiting past your reply target" value={k.unanswered} tone={k.unanswered > 0 ? "warn" : undefined} sub="customer wrote last, no reply" />
+        <div data-testid="overview-metric"><Stat label="Stale deal value" value={fmtMoney(k.staleValue)} tone={k.staleValue > 0 ? "warn" : undefined}
+          sub={`${fmtInt(k.staleOpps)} of ${fmtInt(k.openOpps)} open deals have not moved`} /></div>
+        <div data-testid="overview-metric"><Stat label="Waiting past your reply target" value={k.unanswered} tone={k.unanswered > 0 ? "warn" : undefined} sub="customer wrote last, no reply" /></div>
       </div>
       {k.excludedDeals > 0 && (
         <p className="mt-2 text-xs text-muted-foreground">
@@ -94,12 +94,14 @@ export function OverviewView({ go }: { go: GoFn }) {
 
         <div className="space-y-4">
           <Card title="Account health">
+            <div data-testid="overview-metric">
             <StackedBar parts={[
               { label: "Thriving", value: data.bands.thriving, className: "bg-emerald-500" },
               { label: "Healthy", value: data.bands.healthy, className: "bg-emerald-300" },
               { label: "Watch", value: data.bands.watch, className: "bg-amber-500" },
               { label: "At risk", value: data.bands.at_risk, className: "bg-red-500" },
             ]} />
+            </div>
           </Card>
         </div>
       </div>

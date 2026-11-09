@@ -90,11 +90,11 @@ export const CATALOG: Record<NotificationType, TypeInfo> = {
     defaults: { inApp: true, email: true, slack: false },
   },
   other_alerts: {
-    id: "other_alerts", label: "Other alerts", hint: "Late replies, stale deals, churn risk and data quality, as they are raised.", kind: "event", active: true,
-    frequencies: ["immediate", "daily"], defaultFrequency: "immediate", defaultSeverity: "warning", openView: "alerts", alertKinds: ["sla", "stale", "churn", "quality", "duplicates", "breach24"],
+    id: "other_alerts", label: "Other alerts", hint: "Late replies, stale deals, unanswered-message escalations, churn risk and data quality, as they are raised.", kind: "event", active: true,
+    frequencies: ["immediate", "daily"], defaultFrequency: "immediate", defaultSeverity: "warning", openView: "alerts", alertKinds: ["sla", "stale", "churn", "quality", "duplicates", "breach24", "breach24_escalation", "unanswered_ownerless", "unanswered_workload", "unanswered_handoff", "unanswered_spike", "unanswered_weekly"],
     variables: [ACCOUNT, { name: "problem", label: "What looks wrong", sample: "has 6 conversations waiting over 4h" }],
     defaultTitle: "{account}: {problem}",
-    defaultBody: "Open Alerts to see the details.",
+    defaultBody: "Open the linked page to review this alert and take the next step.",
     defaults: { inApp: true, email: true, slack: true },
   },
   new_ticket: {

@@ -4,8 +4,10 @@ import { MoreHorizontal } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { emailPlan } from "@/lib/analytics/dedupe-review";
 import { OVER_A_WEEK_HOURS, shortWords } from "@/lib/analytics/unanswered-v2";
+import { hasRepeatUnread, UNANSWERED_OUTCOMES, type UnansweredOutcome } from "@/lib/analytics/unanswered-advanced";
 import { CALL_NOTE } from "@/lib/analytics/waiting-view";
 import { dialPlan, dialWarnings, mustStop, type DialWarning } from "@/lib/people/dial";
+import { useApiClient } from "../session";
 import { LeadDrawer, PopMenu, RowButton, useDialer, type LeadSeed, type MenuItem } from "../ds";
 
 // One person who is waiting for a reply: one row, one grid, one small button column and a quiet three-dot menu (KF-8). Reply opens the conversation in the CRM through the
@@ -15,7 +17,7 @@ import { LeadDrawer, PopMenu, RowButton, useDialer, type LeadSeed, type MenuItem
 
 export type WaitRow = {
   key: string; locationId: string; locationName: string; contactId: string | null; conversationId: string; name: string; channel: string; call: boolean;
-  hours: number; conversations: number; owner: { id: string; label: string; state: string } | null; unassigned: boolean;
+  hours: number; conversations: number; unreadMessages: number; owner: { id: string; label: string; state: string } | null; unassigned: boolean;
   phone: string | null; email: string | null; dnd: boolean; timeZone: string | null; newLead: boolean;
   /** The conversation in the CRM (Reply) and the contact in the CRM (the panel, Call, Email), both through the white-label link helper on the server. */
   url: string; contactUrl: string;
@@ -28,6 +30,7 @@ export function whyLine(r: WaitRow, showAccount: boolean): string {
   bits.push(r.call ? "Call, result not known" : r.channel);
   bits.push(r.owner ? `Owner ${r.owner.label}` : "No owner");
   if (r.conversations > 1) bits.push(`${r.conversations} conversations`);
+  if (hasRepeatUnread(r.unreadMessages)) bits.push(`${r.unreadMessages} unread messages`);
   if (r.dnd) bits.push("Asked not to be contacted");
   return bits.join(" · ");
 }
@@ -47,10 +50,11 @@ const MENU_TRIGGER = "ds-press inline-flex size-11 items-center justify-center r
 const TRACKS = "@3xl:grid-cols-[minmax(0,1fr)_9.5rem_6rem_2rem]";
 
 /** What a row's menu does, the warning strip under a row, and the lead panel. One instance serves a whole list. */
-export function usePersonActions(rows: readonly WaitRow[]) {
+export function usePersonActions(rows: readonly WaitRow[], canRecordOutcome = true) {
+  const api = useApiClient();
   const { provider } = useDialer();
   const [open, setOpen] = useState<number | null>(null);
-  const [strip, setStrip] = useState<{ key: string; warnings: DialWarning[]; href: string; same: boolean } | { key: string; note: string } | null>(null);
+  const [strip, setStrip] = useState<{ key: string; warnings: DialWarning[]; href: string; same: boolean } | { key: string; note: string } | { key: string; outcome: true } | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const withContact = rows.filter((r) => r.contactId);
 
@@ -71,14 +75,37 @@ export function usePersonActions(rows: readonly WaitRow[]) {
     try { await navigator.clipboard.writeText(text); setCopied(r.key); setTimeout(() => setCopied(null), 2000); } catch { window.prompt("Copy these details", text); }
   };
   const show = (r: WaitRow) => { const at = withContact.findIndex((x) => x.key === r.key); if (at >= 0) setOpen(at); };
+  const recordOutcome = async (r: WaitRow, outcome: UnansweredOutcome) => {
+    try {
+      await api.post("inbox/outcome", { locationId: r.locationId, conversationId: r.conversationId, outcome });
+      setStrip({ key: r.key, note: "Saved in SubSync. This does not change the CRM." });
+    } catch (error) {
+      setStrip({ key: r.key, note: error instanceof Error ? error.message : "Could not save this outcome." });
+    }
+  };
   const menu = (r: WaitRow, showAccount: boolean): MenuItem[] => [
     { key: "show", label: "Show person", onSelect: () => show(r), disabled: !r.contactId, hint: r.contactId ? undefined : "No contact on file" },
     { key: "call", label: r.dnd ? "Call (asked not to be contacted)" : "Call in your CRM", onSelect: () => call(r), disabled: !r.phone, hint: r.phone ? undefined : "No phone number" },
     { key: "email", label: "Email in your CRM", onSelect: () => email(r), disabled: !r.email, hint: r.email ? undefined : "No email address" },
+    ...(canRecordOutcome ? [{ key: "outcome", label: "Record follow-up outcome", onSelect: () => setStrip({ key: r.key, outcome: true }) }] : []),
     { key: "copy", label: copied === r.key ? "Copied" : "Copy details", onSelect: () => void copy(r, showAccount) },
   ];
   const stripFor = (r: WaitRow): ReactNode => {
     if (!strip || strip.key !== r.key) return null;
+    if ("outcome" in strip) {
+      const labels: Record<UnansweredOutcome, string> = {
+        replied: "Replied", appointment_booked: "Appointment booked", not_a_lead: "Not a lead", needs_follow_up: "Needs follow-up",
+      };
+      return (
+        <div className="col-span-full border-l-2 border-primary/50 py-2 pl-3 text-sm" role="group" aria-label="Record follow-up outcome" data-testid="outcome-choices">
+          <p className="mb-1">This note stays in SubSync; nothing is written to the CRM.</p>
+          <div className="flex flex-wrap gap-2">
+            {UNANSWERED_OUTCOMES.map((outcome) => <button key={outcome} type="button" onClick={() => void recordOutcome(r, outcome)} className="min-h-9 rounded-md border px-2.5 font-medium hover:bg-muted">{labels[outcome]}</button>)}
+            <button type="button" onClick={() => setStrip(null)} className="min-h-9 px-2 font-medium underline">Cancel</button>
+          </div>
+        </div>
+      );
+    }
     if ("note" in strip) return <p className="col-span-full border-l-2 border-warning py-1 pl-3 text-sm" role="status" data-testid="row-note">{strip.note} <button type="button" onClick={() => setStrip(null)} className="ml-2 min-h-9 font-medium underline">Close</button></p>;
     const go = () => { window.open(strip.href, strip.same ? "_self" : "_blank", "noopener,noreferrer"); setStrip(null); };
     return (

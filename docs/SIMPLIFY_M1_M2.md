@@ -1,6 +1,109 @@
-# Simplification pass (Prompt C), end of M1 and M2
+# Simplification pass (Prompt C), updated 8 Nov 2026
 
-Written 3 Nov 2026 by a read-only analyst. **Nothing was cut, hidden or edited.** This is the inventory, the proposed counts and an ordered cut list for the lead to apply. Prompt C in `docs/PROMPTS.md` says: list every screen, tile and setting, say who uses it and what they would lose, cut or hide the weak ones behind a flag with the code kept, cap Overview at about 6 tiles, report before and after counts. `CLAUDE.md` working principle 3 (keep it simple) and section 13A (Overview cap) are the rules behind it.
+The **8 Nov role/feature inventory below is authoritative**; detailed 3 Nov review later in this file is historical evidence. King clarified that launch means testing all modules, then chose to make modules visible on every install. This supersedes the earlier suggestion to hide Team, Clean-up, Duplicates, Compare/Reviews, AI, Meetings, Workflows, and Data health by default. Keep the six-tile Overview cap. Prompt C asks who uses each surface, what they lose without it, and before/after counts.
+
+## 8 Nov execution
+
+### Evaluate before building
+
+1. Decision: agency owners use cross-account health and queues to choose the next client action; setters use their own reply/call queue; client admins use their account's outcomes and setup.
+2. Data: VERIFIED in current code. This is navigation and presentation only; it needs no new live data or permission.
+3. Native/competitor overlap: INFERENCE. Some modules overlap native CRM or paid tools, but King wants them available to test before deciding what to narrow.
+4. Simplest proof: expose all modules in the live app through the existing feature switches; preserve flag-based rollback; keep Overview at its existing six metrics.
+5. Risk: unfinished or unverified screens may confuse live users. Write-capable actions still depend on their explicit write/preview/confirm gates. Individual experimental Inbox add-ons and Zoom/Google Meet remain off; they are add-ons/integrations, not whole modules.
+
+### Current screen inventory
+
+Roles: **A** agency owner/admin, **S** setter/client staff, **B** client admin/business owner. The “without it” column describes the practical loss, not an endorsement to build it.
+
+| Screen or sub-screen | Who uses it | What they lose without it | Default status after this pass |
+|---|---|---|---|
+| Today | A, S, B | The next action and who needs attention | Keep |
+| My day | S, B | Their own work queue | Keep |
+| Speed to lead | A, S, B | Which new leads have not received a human reply in time | Keep |
+| Unanswered messages | A, S, B | The waiting queue and aging picture | Keep |
+| Appointments; Insights | A, S, B | Outcomes to record, no-shows to recover, and show-rate evidence | Keep; five lower-priority insight widgets already start hidden by the page’s widget preference |
+| Clients / account health | A | Which client account needs a call first | Keep |
+| Client onboarding / Setup | A, S, B | Setup steps and sender-health checks | Keep |
+| Client details and industries | A | Fees, renewal dates, and the context used for client comparisons | Keep |
+| Compare and Reviews (QBR) | A | Side-by-side comparison and a printable quarterly summary | Keep; available for launch testing |
+| People: Find and call | A, S, B | Cross-account search and the call queue | Keep |
+| People: Tags, Going cold, Sources | A, S, B | Follow-up lists, contact lifecycle, and source context | Keep |
+| Account audit and share links | A, S, B; A shares with prospects | A prioritized, shareable account-health check | Keep |
+| Overview / My account | A, S, B | A compact account or agency snapshot | Keep; already at six metrics |
+| Pipeline and deals | A, S, B | Stage, stale-deal, and pipeline context | Keep |
+| Team | A, B | Team-level performance and name maintenance | Keep; available for launch testing |
+| Clean-up | A, B | Data-quality and duplicate review | Keep; available for launch testing |
+| Duplicates | A, S, B | Candidate duplicate contacts | Keep inside Clean-up; available for launch testing |
+| Meeting notes | A, B | Meeting capture and summaries | Keep; available for launch testing |
+| Workflows | A, S, B | Workflow-health review | Keep; available for launch testing |
+| Data health | A, S, B | Data-quality trends and fix queues | Keep; available for launch testing |
+| Alerts and notification preferences | A, S, B | Timely notice and control of delivery | Keep; alerts are also available from the bell |
+| Settings | A, B | Reply targets, access, integrations, privacy, and account controls | Keep |
+| Integrations | A, B; S sees their own connection entry | Connection status and permission context | Keep |
+| Getting started / Setup checklist | A, S, B | Guidance for connecting and using the app | Keep |
+| What's new / Roadmap | A, S, B | Changes, planned work, and a way to vote | Keep |
+| Email health | A, S, B | Sender authentication checks | Keep inside Setup |
+
+Legacy addresses remain supported, but do not add menu items: **Accounts** opens Clients health; **Setup** opens onboarding; **Contact search**, **Leads**, and **Call lists** open the matching People tab; **Deals** opens Pipeline; **Connections** opens Settings > Integrations (except for S, who has a standalone Integrations entry); **Alerts** opens from the bell or Today. An agency's account-detail page is opened from Clients or the Overview list.
+
+### Overview inventory: six headline metrics, no cuts needed
+
+The current [overview.tsx](../src/app/app/views/overview.tsx) renders three figures inside Executive summary, two stat tiles, and one account-health bar. “Needs attention” is a working list, not a metric tile.
+
+| Tile | Who uses it | What they lose without it |
+|---|---|---|
+| New contacts | A, B | Recent lead-volume signal |
+| Revenue won | A, B | A compact result measure |
+| Open pipeline | A, B | Deal value still in progress |
+| Stale deal value | A, B | Valuable deals that have gone quiet |
+| Waiting past your reply target | A, S, B | Count of people awaiting a reply |
+| Account-health bar | A | Distribution of client accounts by health |
+
+Optional goals and unusual-change notes appear only when data or goals exist; neither adds another headline tile. Preserve all six because each represents a distinct decision.
+
+### Settings inventory
+
+All eight Settings sections are for **A and B**; **S has no Settings access**. If a section disappeared, the user would lose the control/disclosure listed below. Controls remain available; deferred screens do not erase stored settings or API support.
+
+| Section | Current controls | Who uses it | Loss if removed |
+|---|---|---|---|
+| Team and access | Client access by account; leave test accounts out; who can open the app | A | Control client visibility and understand who has access |
+| Notifications | Quiet hours; Slack; daily brief; weekly email; send time; time zone | A, B | Route alerts and summaries at the right time |
+| Integrations | Team connection status; personal connections; permissions | A, B | Connect tools and understand what data can be read |
+| Replies | Stale days; gone-quiet days; reply target; speed-to-lead target; count automated touches; business hours; unread-alert escalation time (when enabled) | A, B | Set the thresholds behind alerts and metrics |
+| Brand | Brand name and colour | A | Present reports and links consistently |
+| Data | Data stored; meeting-note privacy (when enabled); delete synced data; trust page | A, B | Understand or remove stored data |
+| Sync status | What is watched; per-account sync/freshness | A | Diagnose stale or missing data |
+| Advanced | CRM link address; custom checklist; AI connector keys; settings history | A | Fix links, customize setup, connect an assistant, or audit changes |
+
+**Settings counts:** 8 sections; 32 registered controls in `CONTROL_HOME`. The unread-alert escalation control appears only when `inbox_breach_alert` is enabled (default off); with that flag and the AI connector on, all 32 controls are visible. The legacy Slack/daily-brief editor remains because it still owns persisted settings; merging it is not safe until the dispatcher and Notifications page are verified against the same fields.
+
+### Before and after counts
+
+Count is for the default feature switches with no database overrides. “Menu items” are the actual `visibleNav` entries; module tabs and Settings sections are counted separately.
+
+| Surface | Before | After | Change |
+|---|---:|---:|---:|
+| Agency menu items | 14 | 17 | +3 (Meeting notes, Workflows, Data health) |
+| Client-admin/business menu items | 14 | 17 | +3 (Meeting notes, Workflows, Data health) |
+| Setter/client-staff menu items | 13 | 15 | +2 (Workflows, Data health; Meetings is not authorized for this role) |
+| Client-module tabs | 5 | 5 | no change |
+| Settings sections | 8 | 8 | 0 |
+| Overview headline metrics | 6 | 6 | 0; already meets the cap |
+| AI connector cards in Settings | 1 | 1 | no change |
+
+No whole module is now in `DEFAULT_OFF`; default-off entries are the Zoom/Google Meet connector and optional Inbox add-ons. The feature service still supports per-feature database overrides, but its current schema is global rather than per-install. **CHECK:** existing production overrides have not been read or changed; they can still hide a module until reviewed. The demo has previously shown Workflows and Data health, likely due to such overrides.
+
+### Role walkthrough
+
+- **A:** Today and the account queue remain first; uses account health, the audit, speed and appointments; can change settings. Also has Team, Clean-up, comparison/QBR and AI available to test.
+- **S:** Keeps My day, own reply/call work, appointments, audit and account-scoped views. Can test the client-scoped module views; has no Settings access.
+- **B:** Keeps Today/My account, appointments, setup, audit and account settings. Can test Team, Clean-up, comparison/QBR and AI where authorized.
+
+The extra simplification is keeping all three roles' Wave 1 queues intact and retaining the six-metric Overview; we are not hiding modules while validating launch readiness.
+
+**VERIFIED:** default flags are now on for all whole modules, except Zoom/Google Meet integration; optional Inbox add-ons remain default-off. TypeScript, Node tests, and focused switch tests have been rerun after this reversal. **CHECK:** production is not deployed by this local change, and existing global database overrides may still hide modules. Confirm those before announcing all modules are visible. No database was modified.
 
 **Labels.** VERIFIED means I read it in code and cite `file:line`. INFERENCE means reasoning that could be wrong. **Roles:** A = agency owner, S = setter (a client's staff, access kind `client`), B = client admin (a business that installed for itself, kind `business`). **Switches:** defaults are `meetings` and `zoom_meet` off, everything else on (VERIFIED `src/lib/flags-core.ts:9-16`); a row in `feature_flags` overrides a default either way without a deploy (VERIFIED `flags-core.ts:17-20`, `flags.ts:12-22`, `docs/DECISIONS.md:136`).
 

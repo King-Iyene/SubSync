@@ -7,15 +7,10 @@ import type { Feature } from "./entitlements.ts";
 
 // Brief v3, sections 7 and 8: these are deferred or avoided for now. See docs/FEATURE_STATUS.md for why.
 export const DEFAULT_OFF: ReadonlySet<Feature> = new Set<Feature>([
-  // King's decision of 1 Nov 2026 (docs/ROADMAP_V2.md, stage S0.2b): the Meeting notes page stays off until stage E2a has passed, and
-  // Zoom and Google Meet stay hidden everywhere (card, text, emails, privacy page) until a pilot user asks for them. Slack and Fathom stay visible.
+  // Provider integrations stay hidden until pilots confirm them; core modules remain available for production pilot testing.
+  // Zoom and Google Meet stay hidden everywhere (card, text, emails, privacy page); Slack and Fathom stay visible.
   // A new feature goes in this list until it is verified.
-  "meetings",
   "zoom_meet",
-  // The Workflows module (docs/features/WORKFLOWS.md): off until King switches it on. Its paid parts (workflows_pro, workflows_write) sit behind it.
-  "workflows",
-  // The Data health module (docs/features/DATA_HEALTH.md): off until King switches it on.
-  "data_health",
   // Unanswered Messages Round 2 (docs/features/UNANSWERED2.md): each behind its own flag, default off.
   "inbox_per_client_sla",
   "inbox_sql_aggregates",
