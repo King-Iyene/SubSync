@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { useData } from "../session";
-import { DataList, EmptyState, ErrorState, LeadDrawer, SkeletonRows, type Column, type LeadSeed } from "../ds";
-import { ExtLink, fmtInt, fmtMoney } from "../ui";
+import { DataList, EmptyState, ErrorState, LeadDrawer, OpenLeadButton, SkeletonRows, type Column, type LeadSeed } from "../ds";
+import { fmtInt, fmtMoney } from "../ui";
 
 type Deal = { opportunityId: string; locationId: string; locationName: string | null; contactId: string | null; contactName: string | null; name: string | null; stageName: string; pipelineName: string; value: number; daysSinceContact: number | null; url: string };
 type Data = { days: number; total: number; value: number; stages: Array<{ stage: string; count: number; value: number }>; deals: Deal[] };
@@ -17,7 +17,7 @@ const columns: Array<Column<Deal>> = [
   { key: "stage", header: "Stage", width: "minmax(0,1.5fr)", cell: (d) => <span className="text-muted-foreground">{d.pipelineName}: {d.stageName}</span> },
   { key: "value", header: "Value", width: "7rem", align: "right", cell: (d) => <span className="tabular-nums">{fmtMoney(d.value)}</span> },
   { key: "quiet", header: "Days quiet", width: "6rem", align: "right", cell: (d) => <span className="tabular-nums">{d.daysSinceContact ?? "never"}</span> },
-  { key: "open", header: "", width: "10rem", align: "right", cell: (d) => <ExtLink href={d.url}>Open in your CRM</ExtLink> },
+  { key: "open", header: "", width: "10rem", align: "right", cell: (d) => <OpenLeadButton seed={d.contactId ? { contactId: d.contactId, locationId: d.locationId, name: d.contactName ?? dealName(d), locationName: d.locationName, url: d.url, tab: "deals", dealId: d.opportunityId, note: `${dealName(d)}, ${fmtMoney(d.value)}, ${d.pipelineName}: ${d.stageName}. No contact for ${d.daysSinceContact ?? "many"} days.` } : null} crmUrl={d.url} reason="No person is linked to this deal." name={d.contactName ?? dealName(d)} testId="quiet-open" /> },
 ];
 
 // Open deals that have a value and an owner and are in play (the same deals as the rest of Pipeline: docs/METRICS.md) whose contact has not been written to

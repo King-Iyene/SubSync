@@ -3,7 +3,7 @@
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { useEffect, useRef, useState, useSyncExternalStore, type ComponentType } from "react";
 import type { PlDeal, PlDeals } from "@/lib/analytics/pipeline3-types-interim";
-import { EmptyState, ErrorState, SkeletonRows } from "../../ds";
+import { EmptyState, ErrorState, OpenLeadButton, SkeletonRows, type LeadSeed } from "../../ds";
 import { usePl, type PlFilters } from "./data";
 import { money, moneyShort } from "./format";
 
@@ -26,6 +26,9 @@ export function PlSlot({ name, ...props }: { name: PlSlotName } & SlotProps) {
   return C ? <C {...props} /> : null;
 }
 
+/** What the shared lead panel opens with for a deal: the person, on the Deals tab with this deal highlighted. Null when the deal has no person. */
+export const dealSeed = (d: PlDeal): LeadSeed | null => d.contactId ? { contactId: d.contactId, locationId: d.locationId, name: d.contactName ?? d.name, locationName: d.accountName, url: d.url ?? undefined, tab: "deals", dealId: d.id, note: `Deal: ${d.name}, ${d.stageName}${d.valueCents > 0 ? `, ${moneyShort(d.valueCents)}` : ""}.` } : null;
+
 export function DealTable({ rows, showAccount, onOpen, activeId, selected, onSelect, onChanged }: { rows: PlDeal[]; showAccount: boolean; onOpen: (d: PlDeal) => void; activeId?: string | null; selected?: Set<string>; onSelect?: (id: string, on: boolean) => void; onChanged?: () => void }) {
   const quick = useSlotMounted("RowActions");
   const [cursor, setCursor] = useState(-1);
@@ -37,7 +40,7 @@ export function DealTable({ rows, showAccount, onOpen, activeId, selected, onSel
   return (
     <div className="ap-scroll">
       <table className="ap-t" data-testid="pl-table">
-        <thead><tr>{onSelect && <th aria-label="Select" style={{ width: 34 }} />}<th>Deal</th>{showAccount && <th>Account</th>}<th>Stage</th><th data-num>Value</th><th data-num>In stage</th><th>Owner</th><th>Open</th>{quick && <th aria-label="Actions" />}</tr></thead>
+        <thead><tr>{onSelect && <th aria-label="Select" style={{ width: 34 }} />}<th>Deal</th>{showAccount && <th>Account</th>}<th>Stage</th><th data-num>Value</th><th data-num>In stage</th><th>Owner</th><th className="text-right">Open</th>{quick && <th aria-label="Actions" />}</tr></thead>
         <tbody ref={body}>
           {rows.map((d, i) => (
             <tr key={d.id} tabIndex={cursor === i || (cursor < 0 && i === 0) ? 0 : -1} data-active={activeId === d.id ? "1" : "0"} data-tone={stuck(d) ? "amber" : undefined} onClick={() => onOpen(d)} onKeyDown={(e) => key(e, i, d)} data-testid="pl-row">
@@ -48,7 +51,7 @@ export function DealTable({ rows, showAccount, onOpen, activeId, selected, onSel
               <td data-num>{d.valueCents > 0 ? moneyShort(d.valueCents) : "No value"}</td>
               <td data-num>{stuck(d) ? <Chip tone="amber">{d.daysInStage} d, stuck</Chip> : `${d.daysInStage} d`}</td>
               <td>{d.ownerName ?? <span className="ap-sub">Nobody</span>}</td>
-              <td onClick={(e) => e.stopPropagation()}>{d.url ? <a className="ap-link" href={d.url} target="_blank" rel="noopener noreferrer" data-testid="pl-row-crm">Open in your CRM</a> : <span className="ap-sub">No link</span>}</td>
+              <td className="text-right" onClick={(e) => e.stopPropagation()}><OpenLeadButton seed={dealSeed(d)} crmUrl={d.url} reason="This deal has no person linked, so there is nobody to open. Use the deal panel." name={d.contactName ?? d.name} showAccount={showAccount} testId="pl-row-open" /></td>
               {quick && <td onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}><PlSlot name="RowActions" deal={d} onChanged={onChanged} /></td>}
             </tr>
           ))}
@@ -132,7 +135,7 @@ export function DealPanel({ deal, onClose, onChanged, filters }: { deal: PlDeal;
             <dt>Source</dt><dd>{deal.source ?? "Unknown"}</dd>
           </dl>
           <PlSlot name="Details" deal={deal} onChanged={onChanged} filters={filters} />
-          {deal.url && <p><a className="ap-link" href={deal.url} target="_blank" rel="noopener noreferrer" data-testid="pl-panel-crm">Open in your CRM</a></p>}
+          <p className="flex justify-end"><OpenLeadButton seed={dealSeed(deal)} crmUrl={deal.url} reason="No person is linked to this deal." name={deal.contactName ?? deal.name} showAccount={false} testId="pl-panel-open" /></p>
           <p className="ap-fine">Changes to deals are made in your CRM or, once enabled, through SubSync&apos;s checked change tools (preview first, typed confirmation to delete).</p>
         </div>
       </aside>

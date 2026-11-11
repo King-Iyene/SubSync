@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { Pp3List, Pp3Options } from "@/lib/analytics/people3-types";
-import { EmptyState, ModuleTabs, Page } from "../../ds";
+import { EmptyState, ModuleTabs, OpenLeadButton, Page } from "../../ds";
 import type { GoFn } from "../../nav";
 import "../speed6.css";
 import "../speed-ui.css";
@@ -39,9 +39,9 @@ function DrillList({ d, filters, onClose }: { d: Drill; filters: PpParams; onClo
       <Load r={r} empty={(x) => x.rows.length === 0 && "Nothing behind this one in these dates."}>
         {(x) => (
           <>
-            <div className="ap-scroll"><table className="ap-t" data-testid="pp-drill-list"><thead><tr><th>Name</th><th data-sm="hide">Client account</th><th>What</th><th data-sm="hide">When</th><th /></tr></thead>
+            <div className="ap-scroll"><table className="ap-t" data-testid="pp-drill-list"><thead><tr><th>Name</th><th data-sm="hide">Client account</th><th>What</th><th data-sm="hide">When</th><th className="text-right">Open</th></tr></thead>
               <tbody>{x.rows.map((row) => <tr key={`${row.kind}:${row.id}`} style={{ cursor: "default" }}><td>{row.title}</td><td data-sm="hide">{row.locationName}</td><td>{x.label || KIND_WORD[row.kind]}{row.ageHours !== null ? `, ${row.ageHours < 48 ? `${Math.round(row.ageHours)} h` : `${Math.round(row.ageHours / 24)} d`}` : ""}{row.value ? ` (${money(row.value)})` : ""}</td><td data-sm="hide">{row.at ? ago(row.at) : ""}</td>
-                <td>{row.url ? <a className="ap-link" href={row.url} target="_blank" rel="noopener noreferrer">Open in your CRM</a> : <span className="ap-fine">Link not available</span>}</td></tr>)}</tbody></table></div>
+                <td className="text-right"><OpenLeadButton seed={row.contactId ? { contactId: row.contactId, locationId: row.locationId, name: row.title, locationName: row.locationName, url: row.url ?? undefined, ...(row.kind === "deal" ? { tab: "deals" as const } : {}), note: `${x.label || KIND_WORD[row.kind]}${row.value ? ` (${money(row.value)})` : ""}` } : null} crmUrl={row.url} reason="Not linked to a person in your CRM, so there is nobody to open here." name={row.title} showAccount={!d.location} testId="pp-open-lead" /></td></tr>)}</tbody></table></div>
             <Pager c={c} next={x.next} total={x.total} />
           </>
         )}

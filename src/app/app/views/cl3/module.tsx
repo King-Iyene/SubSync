@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { Cl3Account, Cl3Attention, Cl3List, Cl3Options, Cl3Overview, Cl3Reason } from "@/lib/analytics/clients3-types";
 import { useApiClient, useData } from "../../session";
-import { EmptyState, ModuleTabs, Page } from "../../ds";
+import { EmptyState, ModuleTabs, OpenLeadButton, Page } from "../../ds";
 import { Btn } from "../../ui";
 import type { GoFn } from "../../nav";
 import { ClientPage } from "../clients/client-page";
@@ -37,7 +37,7 @@ const FLAG_OF: Partial<Record<TabKey, string>> = { overview: "cl_overview", need
 const PERIODS = [[7, "Last 7 days"], [30, "Last 30 days"], [90, "Last 90 days"]] as const;
 const ALL_FEATURES: ClientsFeatures = { health: true, onboarding: true, clients: true, reports: true, setupCompare: true, playbooks: true };
 
-function DrillList({ d, filters, onClose }: { d: NonNullable<Drill>; filters: ClParams; onClose: () => void }) {
+function DrillList({ d, filters, onClose, openAccount }: { d: NonNullable<Drill>; filters: ClParams; onClose: () => void; openAccount: (id: string) => void }) {
   const [page, setPage] = useState(0);
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setPage(0); }, [d.reason, d.location]);
@@ -48,9 +48,9 @@ function DrillList({ d, filters, onClose }: { d: NonNullable<Drill>; filters: Cl
       <Load r={r} empty={(x) => x.rows.length === 0 && "Nothing behind this one in these dates."}>
         {(x) => (
           <>
-            <div className="ap-scroll"><table className="ap-t" data-testid="cl-drill-list"><thead><tr><th>Contact</th>{!d.location && <th>Account</th>}<th>What</th><th>When</th><th /></tr></thead>
+            <div className="ap-scroll"><table className="ap-t" data-testid="cl-drill-list"><thead><tr><th>Contact</th>{!d.location && <th>Account</th>}<th>What</th><th>When</th><th className="text-right">Open</th></tr></thead>
               <tbody>{x.rows.map((row, i) => <tr key={`${row.locationId}:${row.contactId ?? i}:${i}`} style={{ cursor: "default" }}><td>{row.contactName}</td>{!d.location && <td>{row.accountName}</td>}<td>{row.detail ?? ""}{row.value ? ` (${money(row.value)})` : ""}</td><td>{row.at ? ago(row.at) : ""}</td>
-                <td>{row.url ? <a className="ap-link" href={row.url} target="_blank" rel="noopener noreferrer">Open in your CRM</a> : <span className="ap-fine">Link not available</span>}</td></tr>)}</tbody></table></div>
+                <td className="text-right">{row.contactId ? <OpenLeadButton seed={{ contactId: row.contactId, locationId: row.locationId, name: row.contactName, locationName: row.accountName, url: row.url ?? undefined, ...(row.detail ? { pending: row.detail } : {}) }} crmUrl={row.url} name={row.contactName} showAccount={!d.location} testId="cl-open-lead" /> : <span className="inline-flex items-center gap-2"><button type="button" className="ap-link" onClick={() => openAccount(row.locationId)} data-testid="cl-open-account">Open account</button>{row.url && <OpenLeadButton seed={null} crmUrl={row.url} reason="" name={row.accountName} testId="cl-account-crm" />}</span>}</td></tr>)}</tbody></table></div>
             <Pager page={x.page} pages={x.pages} total={x.total} set={setPage} />
           </>
         )}
@@ -210,7 +210,7 @@ export function ClientsModule({ go, features = ALL_FEATURES, initialTab = "overv
           </div>
         )}
         <div data-testid={`cl-tab-${active}`}>{body}</div>
-        {drill && readsAccounts && <DrillList d={drill} filters={filters} onClose={() => setDrill(null)} />}
+        {drill && readsAccounts && <DrillList d={drill} filters={filters} onClose={() => setDrill(null)} openAccount={setOpenId} />}
       </Page>
     </div>
   );
