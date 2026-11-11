@@ -60,7 +60,7 @@ export function AuditView() {
   }, [focus, runs]);
   const live = useData<Data>(path);
   const { error, loading, reload } = live;
-  const histPath = live.data?.au?.history && !fxOn ? `audit?part=history${focus ? `&location=${encodeURIComponent(focus)}` : ""}${runs > 0 ? `&r=${runs}` : ""}` : null;
+  const histPath = live.data?.au?.history && !fxOn ? `audit?${new URLSearchParams({ part: "history", ...(focus ? { location: focus } : {}), ...(runs > 0 ? { r: String(runs) } : {}) }).toString()}` : null;
   const hist = useData<{ history: History | null }>(histPath);
   const data = useMemo<Data | null>(() => (fxOn ? (sampleAudit() as unknown as Data) : live.data ? { ...live.data, history: hist.data?.history ?? null } : null), [live.data, hist.data]);
   const [revoking, setRevoking] = useState<string | null>(null);

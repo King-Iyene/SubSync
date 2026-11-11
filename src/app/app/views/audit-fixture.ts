@@ -25,7 +25,7 @@ export function sampleAudit() {
     verdict: audit.verdict, grade: audit.grade, startHere: audit.startHere, totals: audit.totals, notes: audit.notes, healthy,
     progress: [], reading: { reading: false, done: 4, total: 4, text: "" }, findings: audit.findings,
     clients: { ...pageClients(rows, { q: "", sort: "money", page: 0, size: 5 }), sort: "money", withProblems: rows.length, clean: accounts.length - rows.length, accounts: accounts.length },
-    summary: auditSummaryV2(audit, "Sample agency", healthy), scope: "all" as const, staleDays: 30, slaHours: 4, targetMinutes: 15, readLimit: null, now,
+    summary: auditSummaryV2(audit, "Sample company", healthy), scope: "all" as const, staleDays: 30, slaHours: 4, targetMinutes: 15, readLimit: null, now,
     brand: { name: null, color: null, logoUrl: null }, generatedAt: new Date(now).toISOString(), hiddenAccounts: 0, focus: null, canShare: false, demo: true, shareDays: 14,
     history: { ...SAMPLE_HISTORY, thenNow: { ...SAMPLE_HISTORY.thenNow!, lines: SAMPLE_HISTORY.thenNow!.lines.map((l) => { const c = audit.findings.find((x) => x.key === l.key)?.count ?? 0; return { ...l, now: c, change: c - (l.then ?? 0), tone: c < (l.then ?? 0) ? ("better" as const) : c > (l.then ?? 0) ? ("worse" as const) : ("same" as const) }; }) } }, au: { history: true, onepager: true, monthly: true },
   };
