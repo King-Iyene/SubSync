@@ -14,6 +14,7 @@ import { JourneyList } from "./speed-coverage";
 import { useListPrefs } from "../ds";
 import { LeadRows, useLeadActions, type LeadRow } from "./speed-rows";
 import type { ComparePersonRow, CompareAccountRow } from "./speed-picture";
+import { LeadJourneyPro } from "../ds/lead-journey-pro";
 import "./speed6.css";
 
 // Speed to lead, sixth pass: the control-room pieces. Few words: a card is named as the question it answers, one sentence at most, the explanation lives in the (i) mark. Every number that counts people
@@ -23,7 +24,7 @@ import "./speed6.css";
 const POS = (i: number, n: number) => 7 + (i / Math.max(1, n - 1)) * 86;
 export function FlowCard({ multi }: { multi: boolean }) {
   const { query, range } = useSpeedFilter();
-  const { data, error, reload } = useData<{ steps: JourneyStep[]; repliedRecorded: boolean }>(`speed?part=journey${query}`);
+  const { data, error, reload } = useData<{ steps: JourneyStep[]; repliedRecorded: boolean; pro?: boolean }>(`speed?part=journey${query}`);
   const [open, setOpen] = useState<{ step: Step; dropped: boolean } | null>(null);
   const [run, setRun] = useState(0);
   const flow = useMemo(() => (data ? flowDots(data.steps.map((s) => ({ step: s.step, label: s.label, count: s.count })), 48) : null), [data]);
@@ -34,7 +35,8 @@ export function FlowCard({ multi }: { multi: boolean }) {
   return (
     <Q sticky q="Where do my leads go?" span glow="active" testId="flow-card" tip="Each dot is a share of your leads, moving from arrived to first touch, replied, booked, showed and won. Dots that stop early fall into a drop-off bucket. Booked, showed and won come from your appointments and deals."
       sub={`${range?.sentence ?? "Last 30 days"}. Click a step or a drop-off to see the people.`}
-      action={<button type="button" className="s6-btn" onClick={() => setRun((r) => r + 1)} data-testid="flow-replay"><RotateCcw aria-hidden className="size-4" />Replay</button>}>
+      action={data.pro ? undefined : <button type="button" className="s6-btn" onClick={() => setRun((r) => r + 1)} data-testid="flow-replay"><RotateCcw aria-hidden className="size-4" />Replay</button>}>
+      {data.pro ? <LeadJourneyPro steps={data.steps} label="Lead journey" onOpen={(step, dropped) => setOpen({ step: step as Step, dropped })} /> : (<>
       <div className="s6-flow" data-testid="flow" role="group" aria-label="Lead journey">
         <div className="s6-flow-line" aria-hidden />
         <div key={run} aria-hidden>
@@ -61,7 +63,7 @@ export function FlowCard({ multi }: { multi: boolean }) {
           </div>
         ))}
       </div>
-      <p className="s6-label">Each dot is {flow.per === 1 ? "one lead" : `about ${flow.per} leads`}. {data.steps[0].count.toLocaleString("en-US")} arrived.</p>
+      <p className="s6-label">Each dot is {flow.per === 1 ? "one lead" : `about ${flow.per} leads`}. {data.steps[0].count.toLocaleString("en-US")} arrived.</p></>)}
       {!data.repliedRecorded && <p className="s6-label mt-1">Replies from the lead are not recorded yet; a booked lead counts as replied until they are.</p>}
       {open && <SidePopup label={`${STEP_LABEL[open.step]}${open.dropped ? ", dropped" : ""}`} onClose={() => setOpen(null)}><JourneyList key={open.step + open.dropped} step={open.step} dropped={open.dropped} multi={multi} /></SidePopup>}
     </Q>
