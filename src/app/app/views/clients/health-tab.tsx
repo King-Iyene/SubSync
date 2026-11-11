@@ -45,9 +45,9 @@ function HealthAndRisk({ q }: { q: ReturnType<typeof useData<RiskData>> }) {
   const shown = risks.filter((r) => r.level !== "steady");
   return (
     <>
-      <Section title="Agency health" hint="One number for how your whole book is doing, shown only when there is enough data behind it.">
+      <Section title="Overall health" hint="One number for how your whole book is doing, shown only when there is enough data behind it.">
         {health?.score != null
-          ? <p className="text-3xl font-semibold" data-testid="agency-score">{health.score}<span className="text-base font-normal text-muted-foreground"> out of 100 (estimate)</span></p>
+          ? <p className="text-3xl font-semibold" data-testid="overall-score">{health.score}<span className="text-base font-normal text-muted-foreground"> out of 100 (estimate)</span></p>
           : <p className="text-sm">Not enough data yet.</p>}
         {health && <p className="text-sm text-muted-foreground">{health.message}</p>}
         <ul className="grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">{health?.parts.map((p) => <li key={p.id}><span className="font-medium">{p.label}:</span> {p.enough && p.value !== null ? `${Math.round(p.value)}%` : "not enough data"} <span className="text-xs text-muted-foreground">{p.detail}</span></li>)}</ul>
