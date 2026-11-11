@@ -192,7 +192,8 @@ html { scroll-padding-top: 5rem; }
 @keyframes ds-grow { from { transform: scaleY(0); } to { transform: scaleY(1); } }
 @keyframes ds-grow-x { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 @keyframes ds-pop { from { opacity: 0; transform: scale(0.94); } to { opacity: 1; transform: none; } }
-.ds-enter { animation: ds-enter var(--motion-base) var(--ease-out) both; }
+/* backwards, not both: a filling transform animation keeps making the element the anchor of fixed-position side panels inside it, so a panel opened from a page sat far off screen and looked blank. */
+.ds-enter { animation: ds-enter var(--motion-base) var(--ease-out) backwards; }
 .ds-grow { transform-origin: bottom; animation: ds-grow 420ms var(--ease-out) both; }
 .ds-grow-x { transform-origin: left; animation: ds-grow-x 420ms var(--ease-out) both; }
 .ds-pop { animation: ds-pop 420ms var(--ease-out) both; }

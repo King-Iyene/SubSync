@@ -113,6 +113,7 @@ export function LogCall({ locationId, contactId, onLogged }: { locationId: strin
 export function NoteToSelf({ locationId, contactId, name, account }: { locationId: string; contactId: string; name: string; account: string | null }) {
   const api = useApiClient();
   const [text, setText] = useState("");
+  const [noteOpen, setNoteOpen] = useState(false); // kept in state so a refresh of the panel never closes it
   const [state, setState] = useState<{ kind: "idle" | "saving" | "saved" | "failed" | "copied"; text?: string; id?: string }>({ kind: "idle" });
   const save = async () => {
     if (!text.trim() || state.kind === "saving") return;
@@ -133,7 +134,7 @@ export function NoteToSelf({ locationId, contactId, name, account }: { locationI
     try { await navigator.clipboard.writeText(n); setState({ kind: "copied", text: "Copied." }); setTimeout(() => setState({ kind: "idle" }), 2500); } catch { window.prompt("Copy this note", n); }
   };
   return (
-    <details className="mt-3 border-t pt-3" data-testid="note-to-self">
+    <details className="mt-3 border-t pt-3" data-testid="note-to-self" open={noteOpen} onToggle={(e) => setNoteOpen((e.currentTarget as HTMLDetailsElement).open)}>
       <summary className="min-h-9 cursor-pointer text-sm font-medium">Add a note to this contact <InfoTip label="About notes" text="Saved on this contact in your CRM, marked as added in SubSync." /></summary>
       <label htmlFor="note-text" className="sr-only">Note about {name}</label>
       <textarea id="note-text" value={text} onChange={(e) => setText(e.target.value)} maxLength={2000} rows={3} placeholder="What happened, what was promised..." className="mt-2 w-full rounded-md border bg-background px-3 py-2 text-sm" data-testid="note-text" />

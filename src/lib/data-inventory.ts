@@ -71,6 +71,9 @@ export const INVENTORY: Record<string, TableInfo> = {
     personal: { title: "appointment title", calendar_name: "calendar name", assigned_to: "the team member it is assigned to", booked_by_user: "the team member who booked it" },
     notPersonal: ["booking_channel"],
   },
+  cached_calendars: { noun: "calendars", line: "appointments", personal: { name: "calendar name" } },
+  calendar_groups: { noun: "calendar groups", line: "appointments", personal: { name: "calendar group name" } },
+  calendar_members: { noun: "which team members are on a calendar", line: "appointments", personal: { user_id: "a team member's sign-in id" } },
   appointment_events: { noun: "appointment history", line: "appointments" },
   appointment_history: { noun: "appointment history record (every status, time, owner and reminder change; never message text)", line: "appointments", personal: { contact_id: "the contact the appointment is with", actor_id: "which team member made the change" }, notPersonal: ["event_key", "kind", "actor_kind", "detail"] },
   deal_history: { noun: "deal history record (every stage, status, value and owner change with its time; never message text)", line: "deals", personal: { contact_id: "the contact the deal is with", actor_id: "which team member made the change" }, notPersonal: ["event_key", "kind", "actor_kind", "detail", "pipeline_id", "from_value", "to_value", "from_name", "to_name", "value", "dwell_seconds"] },
@@ -92,6 +95,11 @@ export const INVENTORY: Record<string, TableInfo> = {
   speed_prefs: { noun: "Call mode and Speed choices (redial plan, goals, scripts, outcome sets)", line: "conversations", notPersonal: ["scope", "key", "value"] },
   speed_daily: { noun: "daily reply-speed numbers", line: "conversations", notPersonal: ["by_channel", "by_source", "by_owner", "by_hour", "texted_back_60", "no_owner", "by_user"] },
     location_users: { noun: "the team members of each client account (names, to pick an owner)", line: "yours", personal: { name: "the names of the team members of each client account", user_id: "the CRM user id of each team member" }, notPersonal: ["location_id", "seen_at", "role"] },
+  // Today (front page): the daily record of what was found and cleared per client, weekly receipts, put-aside marks and the daily email choice.
+  td_daily_items: { noun: "the daily record of problems found and cleared per client (counts only, never names or message text)", line: "accounts", personal: {}, notPersonal: ["kind", "last_count", "peak_count", "found", "cleared", "opened", "baseline", "fix_minutes"] },
+  td_receipts: { noun: "each week's proof receipt per client (counts and the usual time to fix)", line: "accounts", personal: {}, notPersonal: ["found", "cleared", "still_open", "median_fix_minutes", "fixes"] },
+  td_snoozes: { noun: "the kinds of item you put aside for a few days, and until when", line: "yours", personal: { created_by: "who put it aside" }, notPersonal: ["kind", "until_at", "released_at"] },
+  td_prefs: { noun: "your daily Today email choice (hour, quiet days and who gets it)", line: "yours", personal: { recipients: "the email addresses you chose for the daily Today email", updated_by: "who changed it" }, notPersonal: ["email_on", "email_hour", "quiet_days", "last_sent_key"] },
   // Clients (stages CD/CB): daily client numbers, billing state, risk history, the agency's own owner names, mutes and the log of those changes.
   client_daily: { noun: "each client's daily counts (new leads, bookings, shows, deals; never names or message text)", line: "accounts", personal: {}, notPersonal: ["staff_messages"] },
   client_rollup_state: { noun: "when each client's totals were last refreshed, and how many contacts have no owner or phone", line: "accounts", personal: {}, notPersonal: ["no_owner", "no_phone"] },
@@ -106,6 +114,10 @@ export const INVENTORY: Record<string, TableInfo> = {
   user_away: { noun: "who you marked away, and the reminders you snoozed", line: "yours", personal: { user_id: "which team member is away", set_by: "who marked them away" }, notPersonal: [] },
   people_write_log: { noun: "a log of the leads you moved from one team member to another, so a move can be undone", line: "actions", personal: { contact_id: "which lead was moved", before_owner: "who owned the lead before", after_owner: "who owns the lead now", actor: "who made the move" }, notPersonal: [] },
   people_proof_prefs: { noun: "whether the receipt you give a client names your staff", line: "yours", personal: { updated_by: "who changed the choice" }, notPersonal: ["name_staff"] },
+  // Account audit history (docs/features/AUDIT_BRIEF.md): counts only, kept so the audit can show where an account started.
+  au_runs: { noun: "your Account audit history (how many people and deals needed attention in each client account on each day, and the estimate with the number of closed deals it rests on; never names or messages)", line: "accounts", personal: {}, notPersonal: ["run_day", "run_at", "rules_version", "is_baseline", "counts", "stale_dollars", "est_dollars", "est_low", "est_high", "closed_deals", "partial", "source"] },
+  au_prefs: { noun: "whether the monthly audit message is on", line: "yours", personal: {}, notPersonal: ["monthly_on", "last_monthly_key"] },
+  au_account_prefs: { noun: "which client accounts you muted in the monthly audit message", line: "accounts", personal: {}, notPersonal: ["location_id", "monthly_muted"] },
   team_members: { noun: "the people in your CRM (names, roles and which accounts they can reach, for the Team screens)", line: "yours", personal: { user_id: "the CRM user id of each person", name: "each person's name", email: "each person's email address (shown only to the owner and administrators)", photo_url: "each person's picture" }, notPersonal: ["user_type", "source", "role", "all_accounts", "deleted"] },
   team_member_access: { noun: "which client accounts each person can reach", line: "yours", personal: { user_id: "the CRM user id of each person" }, notPersonal: ["source"] },
   user_daily: { noun: "each person's daily numbers per client account (replies, appointments set, shows, deals won; never message text)", line: "accounts", personal: { user_id: "which team member the numbers are for" }, notPersonal: ["touches_email"] },

@@ -133,10 +133,11 @@ export function Calendars({ filters, onDrill, focus }: SectionProps) {
   if (!res.data) return <div className="ap-tablewrap p-6" role="status" aria-busy="true">Loading calendars...</div>;
   const rows = res.data.rows ?? [], problems = res.data.problems ?? [], calendars = res.data.calendars ?? [], people = res.data.people ?? [];
   if (!rows.length && !calendars.length && !people.length) return <EmptyState title="No calendars seen yet" body="Calendars and team members appear here once appointments have synced. Check that your CRM calendars are connected." />;
-  const idleCal = (c: ApCalendarRow) => c.bookings === 0 || (c.daysSince !== null && c.daysSince >= 30);
+  const day = (iso: string) => new Date(iso + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  const idleCal = (c: ApCalendarRow) => c.active !== false && (c.bookings === 0 || (c.daysSince !== null && c.daysSince >= 30));
   const calRows = show === "idle_calendar" ? calendars.filter(idleCal) : calendars;
   const pplRows = show === "idle_person" ? people.filter((p) => p.idleEverywhere) : show === "not_in_list" ? people.filter((p) => !p.inTeamList) : people;
-  const flag = (days: number | null, n: number) => (days === null ? <Chip tone="amber">Never booked</Chip> : n === 0 ? <Chip tone="amber">No bookings in {days} days</Chip> : days >= 30 ? <Chip tone="amber">Quiet for {days} days</Chip> : null);
+  const flag = (days: number | null, n: number, active?: boolean) => (active === false ? <Chip tone="grey">Switched off</Chip> : days === null ? <Chip tone="amber">Never booked</Chip> : n === 0 ? <Chip tone="amber">No bookings in {days} days</Chip> : days >= 30 ? <Chip tone="amber">Quiet for {days} days</Chip> : null);
   const target = (k: string): typeof show | null => (k === "idle_calendar" ? "idle_calendar" : k === "idle_person" ? "idle_person" : k === "not_in_list" ? "not_in_list" : k === "double_booking" ? "conflicts" : null);
   const calDrill = (r: ApCalendarRow) => onDrill({ title: `${r.calendarName || "Calendar"}, appointments`, count: r.bookings, extra: { location: r.locationId, calendar: r.calendarId, outcome: "booked", expect: r.bookings } });
   const pplDrill = (r: ApPersonCalRow) => onDrill({ title: `${r.name}, appointments`, count: r.bookings, extra: { owner: r.userId, outcome: "booked", expect: r.bookings } });
@@ -149,6 +150,9 @@ export function Calendars({ filters, onDrill, focus }: SectionProps) {
             <span className="ap-kpi-n">{p.available ? p.count : "n/a"}</span><span className="ap-kpi-l">{p.label}{!p.available ? " (not available from the platform yet)" : ""}</span>
           </button>))}
       </div>
+      <p className="ap-headline" data-testid="ap-cal-headline">{calendars.length} calendar{calendars.length === 1 ? "" : "s"}{calendars.filter(idleCal).length > 0 ? `, ${calendars.filter(idleCal).length} with no bookings in the last 30 days: check they are still used or switch them off.` : ", all taking bookings."}</p>
+      {(res.data.calendarsSkipped ?? 0) > 0 && <InlineAlert tone="warning" className="mb-3" title="Not fully read">{res.data.calendarsSkipped} calendar{res.data.calendarsSkipped === 1 ? " was" : "s were"} not read because the account has so many. The list above is complete up to that point.</InlineAlert>}
+      {res.data.historyStarts && <p className="ap-fine mb-2" data-testid="ap-history-starts">History starts {day(res.data.historyStarts)}. Appointments before that date are not in SubSync.</p>}
       {show !== "all" && <p className="ap-fine mb-2">Showing one problem. <button type="button" className="ap-link" onClick={() => setShow("all")}>Show everything</button></p>}
       {(show === "all" || show === "conflicts") && (rows.length > 0 ? <>
         <Lead n={res.data.conflictTotal ?? rows.length} label={(res.data.conflictTotal ?? rows.length) === 1 ? "double booking to fix" : "double bookings to fix"} tone="red" />
@@ -156,10 +160,10 @@ export function Calendars({ filters, onDrill, focus }: SectionProps) {
         <Grid rows={rows} testId="ap-conflict-table" cols={[{ h: "Problem", cell: (r) => <Chip tone={KIND[r.kind].tone}>{KIND[r.kind].label}</Chip> }, { h: "Account", cell: (r) => r.accountName }, { h: "Calendar", cell: (r) => r.calendarName }, { h: "When", cell: (r) => (r.when ? when(r.when) : "Ongoing") }, { h: "Who", cell: (r) => r.people.join(", ") || "-" }, { h: "Note", cell: (r) => <span className="ap-sub">{r.note}</span> }]} />
       </> : show === "conflicts" && <EmptyState title="No double bookings, overlaps or stalled calendars" body="Nothing to fix in these dates." />)}
       {(show === "all" || show === "idle_calendar") && (
-        <Q q="All calendars" tip="Every calendar we have seen bookings on, busiest first, including ones with zero bookings in these dates. Press a calendar to open its appointments." testId="ap-cal-all">
+        <Q q="All calendars" tip="Every calendar in the account, busiest first, including ones with zero bookings in these dates. Press a calendar to open its appointments." testId="ap-cal-all">
           {calRows.length ? <Grid rows={calRows} testId="ap-cal-table" tone={(r) => (idleCal(r) ? "amber" : undefined)} onRow={calDrill}
-            cols={[{ h: "Calendar", cell: (r) => <span className="ap-name">{r.calendarName}</span> }, { h: "Account", cell: (r) => r.accountName }, { h: "Bookings", num: true, cell: (r) => (r.bookings ? <Hit n={r.bookings} label={`Open the ${r.bookings} bookings on ${r.calendarName}`} onClick={() => calDrill(r)} /> : 0) },
-              { h: "Last booking", cell: (r) => (r.lastBookingAt ? when(r.lastBookingAt) : "-") }, { h: "Flag", cell: (r) => flag(r.daysSince, r.bookings) }]} /> : <p className="ap-fine">No calendars seen yet.</p>}
+            cols={[{ h: "Calendar", cell: (r) => <span className="ap-name">{r.calendarName}</span> }, { h: "Group", cell: (r) => <span className="ap-sub">{r.groupName ?? "-"}</span> }, { h: "Account", cell: (r) => r.accountName }, { h: "Bookings", num: true, cell: (r) => (r.bookings ? <Hit n={r.bookings} label={`Open the ${r.bookings} bookings on ${r.calendarName}`} onClick={() => calDrill(r)} /> : 0) },
+              { h: "Last booking", cell: (r) => (r.lastBookingAt ? when(r.lastBookingAt) : "-") }, { h: "Flag", cell: (r) => flag(r.daysSince, r.bookings, r.active) }]} /> : <p className="ap-fine">No calendars seen yet.</p>}
         </Q>
       )}
       {(show === "all" || show === "idle_person" || show === "not_in_list") && (

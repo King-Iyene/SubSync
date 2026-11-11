@@ -1,0 +1,29 @@
+/* Today module: calm and plain. Neutral surfaces from the app theme, one accent (the app cyan), one muted amber for "needs a look". No glow, no gradients. Builds on cl3.css (cl-*) and ap3.css (ap-*). */
+.td-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.td-item { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 12px; align-items: start; border: 1px solid color-mix(in srgb, var(--s6-edgec) 26%, transparent); border-radius: 12px; padding: 14px 16px; background: var(--s6-surf); }
+.td-rank { font-variant-numeric: tabular-nums; font-weight: 650; color: var(--muted-foreground); font-size: 1rem; line-height: 1.5; }
+.td-main { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.td-label { text-align: left; background: none; border: 0; padding: 0; cursor: pointer; color: var(--foreground); font-size: 1.0625rem; font-weight: 600; line-height: 1.4; text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--s6-cyan) 55%, transparent); text-underline-offset: 3px; }
+.td-label:hover { text-decoration-color: var(--s6-cyan); } .td-label:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; border-radius: 4px; }
+.td-side { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; font-size: 0.8125rem; white-space: nowrap; }
+.td-done { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 0.875rem; margin: 0; padding: 0; list-style: none; }
+.td-note { border: 1px solid color-mix(in srgb, var(--s6-amber) 55%, transparent); border-radius: 10px; padding: 10px 14px; font-size: 0.875rem; display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; }
+.td-clear { border: 1px solid color-mix(in srgb, var(--s6-cyan) 45%, transparent); border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 4px; }
+.td-receipt { border: 1px solid color-mix(in srgb, var(--s6-edgec) 26%, transparent); border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; background: var(--s6-surf); }
+.td-big { display: flex; flex-wrap: wrap; gap: 8px 28px; }
+.td-big > div { display: flex; flex-direction: column; } .td-big b { font-size: 1.75rem; font-weight: 650; font-variant-numeric: tabular-nums; line-height: 1.2; } .td-big span { font-size: 0.8125rem; color: var(--muted-foreground); }
+.td-lines { margin: 0; padding: 0; list-style: none; font-size: 0.9375rem; display: flex; flex-direction: column; gap: 3px; }
+.td-tile { display: flex; flex-direction: column; gap: 6px; border: 1px solid color-mix(in srgb, var(--s6-edgec) 26%, transparent); border-radius: 12px; padding: 14px 16px; background: var(--s6-surf); min-width: 0; }
+.td-tile > button.td-open { text-align: left; background: none; border: 0; padding: 0; cursor: pointer; color: var(--foreground); display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.td-tile > button.td-open:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; border-radius: 6px; }
+.td-tile b { font-size: 1.375rem; font-weight: 650; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; } .td-tile .td-name { font-size: 0.8125rem; color: var(--muted-foreground); }
+.td-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+.td-form { display: flex; flex-direction: column; gap: 14px; max-width: 34rem; }
+.td-form label { display: flex; flex-direction: column; gap: 4px; font-size: 0.875rem; }
+.td-days { display: flex; flex-wrap: wrap; gap: 6px 14px; } .td-days label { flex-direction: row; align-items: center; gap: 6px; }
+.td-preview { white-space: pre-wrap; border: 1px dashed color-mix(in srgb, var(--s6-edgec) 40%, transparent); border-radius: 10px; padding: 12px 14px; font-size: 0.8125rem; max-width: 40rem; }
+@media (max-width: 700px) {
+  .td-item { grid-template-columns: 22px minmax(0, 1fr); } .td-side { grid-column: 2; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 4px 14px; }
+  .td-big b { font-size: 1.5rem; }
+}
+@media print { .td-item, .td-receipt { break-inside: avoid; } }
