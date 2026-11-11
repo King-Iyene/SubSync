@@ -15,13 +15,14 @@ import "../ap3/ap3.css";
 import "../cl3/cl3.css";
 import "./td3.css";
 import { fixturesOn, notSwitchedOn, queryOf, useTd } from "./data";
+import { CashSettings, RecoverTab, SaveCard, useCashFlags } from "./cash";
 
 // Today, one screen: Today | Proof | Numbers | Settings. Today is the ranked "what to do first" list with ONE button; Proof is the weekly receipt an agency shows its client; Numbers
 // replaces the old Overview (at most 6 tiles); Settings holds the daily email. Reads only: nothing here messages anyone or changes the CRM (the only writes are SubSync's own notes: a
 // put-aside mark and the email choice). Every count opens exactly its rows. Sample data appears ONLY with ?tdfx=1 and is labelled "Sample data".
-type TabKey = "today" | "proof" | "numbers" | "settings";
+type TabKey = "today" | "recover" | "proof" | "numbers" | "settings";
 const TIPS: Record<TabKey, [string, string]> = {
-  today: ["Today", "What to do first, in one sentence and one button."], proof: ["Proof", "A weekly receipt you can show a client: what we found and what was fixed."],
+  today: ["Today", "What to do first, in one sentence and one button."], recover: ["Recover", "People who wrote, called or booked and were missed, with what they may be worth."], proof: ["Proof", "A weekly receipt you can show a client: what we found and what was fixed."],
   numbers: ["Numbers", "The few numbers that matter, each one opens the people behind it."], settings: ["Settings", "Your daily email and what you put aside."],
 };
 const MODULE_NAME: Record<Td3Module, string> = { speed: "Speed to lead", appointments: "Appointments", pipeline: "Pipeline and deals", clients: "Clients", team: "Team", "data-health": "Data health", settings: "Settings" };
@@ -102,7 +103,7 @@ function useActions(reload: () => void) {
   return { act, busy, problem, tap: (kind: string, location: string | null) => { if (!sample) void api.post("today3/act/opened", { kind, location: location ?? undefined }).catch(() => undefined); } };
 }
 
-function TodayTab({ location, level, go, open, setTab }: { location: string; level: string; go: (m: Td3Module, loc?: string | null) => void; open: (d: NonNullable<Drill>) => void; setTab: (t: TabKey) => void }) {
+function TodayTab({ location, level, go, open, setTab, saveOn, openRecover, nav }: { location: string; level: string; go: (m: Td3Module, loc?: string | null) => void; open: (d: NonNullable<Drill>) => void; setTab: (t: TabKey) => void; saveOn: boolean; openRecover: (loc: string) => void; nav: GoFn }) {
   const r = useTd<Td3Today>("today", { location: location || undefined });
   const { act, busy, problem, tap } = useActions(() => r.reload());
   const admin = level !== "self";
@@ -113,6 +114,7 @@ function TodayTab({ location, level, go, open, setTab }: { location: string; lev
         const openItem = (i: Td3Item) => { tap(i.kind, i.accounts === 1 ? i.top[0]?.locationId ?? null : null); open({ title: i.label, kind: i.kind, location: i.accounts === 1 ? i.top[0]?.locationId ?? null : null, count: i.count }); };
         return (
           <div className="cl-stack" data-testid="td-today">
+            {saveOn && level !== "self" && <SaveCard openList={openRecover} go={(v, loc) => nav(v, loc)} />}
             <section className="cl-today" aria-label="What to do today">
               <h2 className="cl-h">What to do today</h2>
               <p className="cl-sentence" data-testid="td-sentence">{t.headline}</p>
@@ -277,7 +279,7 @@ function LegacyNumbers({ go, kind }: { go: GoFn; kind: AccessKind }) {
   return <TodayView go={go} kind={kind} />;
 }
 
-function SettingsTab({ level }: { level: string }) {
+function SettingsTab({ level, cashOn }: { level: string; cashOn: boolean }) {
   const r = useTd<Td3Settings>("settings");
   const today = useTd<Td3Today>("today");
   const { act, busy, problem } = useActions(() => r.reload());
@@ -309,6 +311,7 @@ function SettingsTab({ level }: { level: string }) {
               <pre className="td-preview" data-testid="td-preview">{(() => { const m = emailText(today.data, "(link to your Today page)", "(link to stop these emails)"); return `Subject: ${m.subject}\n\n${m.text}`; })()}</pre>
             </section>
           )}
+          {cashOn && level !== "self" && <CashSettings />}
           {level !== "self" && <p className="ap-fine">Things you put aside on the Today page come back by themselves after the days you chose, and you can bring them back sooner there.</p>}
         </div>
       )}
@@ -322,10 +325,13 @@ export function TodayModule({ go, kind, initialTab = "today", fromOverview = fal
   const sample = fixturesOn();
   const opt = useTd<Td3Options>("options");
   const level = (opt.data?.level ?? "all") as "all" | "account" | "self";
-  const [tab, setTab] = useState<TabKey>(initialTab), [location, setLocation] = useState(""), [drill, setDrill] = useState<Drill>(null);
+  const cash = useCashFlags();
+  const link = typeof window === "undefined" ? new URLSearchParams() : new URLSearchParams(window.location.hash.split("?")[1] ?? "");
+  const [tab, setTab] = useState<TabKey>(() => (link.get("tab") === "recover" ? "recover" : initialTab)), [location, setLocation] = useState(() => (/^[A-Za-z0-9_-]{3,64}$/.test(link.get("account") ?? "") ? (link.get("account") as string) : "")), [drill, setDrill] = useState<Drill>(null);
   const flags = opt.data?.flags ?? null;
-  const flagOf: Record<TabKey, string | null> = { today: "td_today", proof: "td_proof", numbers: "td_numbers", settings: null };
-  const tabs = useMemo(() => (["today", "proof", "numbers", "settings"] as TabKey[]).filter((k) => (k !== "settings" || level !== "self") && (!flagOf[k] || flags === null || flags[flagOf[k] as string] !== false)), [flags, level]); // eslint-disable-line react-hooks/exhaustive-deps
+  const flagOf: Record<TabKey, string | null> = { today: "td_today", recover: null, proof: "td_proof", numbers: "td_numbers", settings: null };
+  const recoverOn = cash.flags?.cf_recover === true, saveOn = cash.flags?.cf_save === true, cashMail = saveOn || cash.flags?.cf_email === true;
+  const tabs = useMemo(() => (["today", "recover", "proof", "numbers", "settings"] as TabKey[]).filter((k) => (k !== "settings" || level !== "self") && (k !== "recover" || recoverOn) && (!flagOf[k] || flags === null || flags[flagOf[k] as string] !== false)), [flags, level, recoverOn]); // eslint-disable-line react-hooks/exhaustive-deps
   const active = tabs.includes(tab) ? tab : tabs[0];
   const accounts = opt.data?.accounts ?? [];
   // A business or a client's staff have no Clients, Settings or Team-wide pages of the owner's kind: the closest page of their own is used instead.
@@ -338,10 +344,11 @@ export function TodayModule({ go, kind, initialTab = "today", fromOverview = fal
   if (!sample && opt.data && opt.data.canSee === false) return <Page title="Today" subtitle="What to do first today.">{null}</Page>;
   const body = (() => {
     switch (active) {
-      case "today": return <TodayTab location={location} level={level} go={goModule} open={open} setTab={goTab} />;
+      case "today": return <TodayTab location={location} level={level} go={goModule} open={open} setTab={goTab} saveOn={saveOn} openRecover={(loc) => { setLocation(loc); goTab("recover"); }} nav={go} />;
+      case "recover": return <RecoverTab location={location} level={level} accounts={accounts.length} />;
       case "proof": return <ProofTab location={location} accounts={level !== "self"} />;
       case "numbers": return <NumbersTab location={location} go={goModule} open={open} fromOverview={fromOverview} level={level} nav={go} kind={kind} />;
-      case "settings": return <SettingsTab level={level} />;
+      case "settings": return <SettingsTab level={level} cashOn={cashMail} />;
     }
   })();
   return (
@@ -351,6 +358,7 @@ export function TodayModule({ go, kind, initialTab = "today", fromOverview = fal
         {opt.data?.problem && <p className="ap-fine mb-2" role="status">{opt.data.problem}</p>}
         <ModuleTabs pill label="Today sections" tabs={tabs.map((k) => ({ label: TIPS[k][0], tip: TIPS[k][1], node: null }))} value={Math.max(0, tabs.indexOf(active))} onChange={(i) => goTab(tabs[i])} />
         {level !== "self" && accounts.length > 1 && active !== "settings" && (
+          // The account choice follows into Recover too, so a button from the morning email lands on the right account.
           <div className="ap-head print:hidden" role="group" aria-label="Filters">
             <select className="ap-field" aria-label="Client account" value={location} onChange={(e) => { setLocation(e.target.value); setDrill(null); }} data-testid="td-account"><option value="">All client accounts</option>{accounts.map((a) => <option key={a.locationId} value={a.locationId}>{a.name}</option>)}</select>
             <span className="ap-fine">Every number below follows this choice.</span>

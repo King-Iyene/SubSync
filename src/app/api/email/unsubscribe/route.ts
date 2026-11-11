@@ -36,6 +36,13 @@ export async function POST(request: Request) {
     const keep = list.filter((e) => !matchesEmail(u, e));
     if (rows.length && keep.length !== list.length) { await sql()`update td_prefs set recipients = ${keep}::text[], email_on = (email_on and ${keep.length > 0}) where installation_id = ${u.installationId}`; today = list.length - keep.length; }
   } catch { /* the Today table is not there yet */ }
+  // The morning "save this account" email keeps its own list too.
+  try {
+    const rows = await sql()`select recipients from cf_prefs where installation_id = ${u.installationId}`;
+    const list = ((rows[0]?.recipients as string[] | undefined) ?? []);
+    const keep = list.filter((e) => !matchesEmail(u, e));
+    if (rows.length && keep.length !== list.length) { await sql()`update cf_prefs set recipients = ${keep}::text[], save_on = (save_on and ${keep.length > 0}) where installation_id = ${u.installationId}`; today += list.length - keep.length; }
+  } catch { /* the cash tables are not there yet */ }
   if (wasSet || removed > 0 || today > 0) await sql()`insert into audit_log (installation_id, actor, action, detail) values (${u.installationId}, 'email-link', 'email.unsubscribed', ${sql().json({} as never)})`;
   return page("Done", "<p>These emails have stopped. You can add an address again in Settings whenever you like.</p>");
 }

@@ -132,6 +132,12 @@ export const DEFAULT_OFF: ReadonlySet<Feature> = new Set<Feature>([
   "td_email",
   "td_record",
   "ov_screen",
+  // Cash features (docs/features/CASH_FEATURES.md): the morning "save this account" digest, the missed-lead recovery list, stale and lost deal alerts. Default off until verified.
+  "cf_save",
+  "cf_recover",
+  "cf_deals",
+  "cf_email",
+  "cf_record",
 ]);
 
 export function resolveFeatures(all: readonly Feature[], overrides: Record<string, boolean>, allOn = false): Record<Feature, boolean> {

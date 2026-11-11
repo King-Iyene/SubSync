@@ -10,6 +10,7 @@ import "./today-theme.css";
 import { CountUp, Q } from "./speed6-base";
 import { TipHost } from "./speed-popup";
 import { FindBox } from "./unanswered-find";
+import { RecoverLink } from "./td3/cash";
 import { UnansweredList, type AccountChoice, type OwnerChoice } from "./unanswered-list";
 import { ReplayCard, WaitColumns, WhereChart, type OwnerRank, type Paged, type Rank } from "./unanswered-charts";
 import { usePersonActions, type WaitRow } from "./unanswered-rows";
@@ -196,6 +197,7 @@ export function UnansweredRoom({ go, ui, embedded }: { go: GoFn; ui: UiPayload; 
           {ui.flags.inbox_search === true && <FindBox multi={multi} />}
           <PopMenu label="More" items={menu} testId="inbox-more" triggerClassName="s6-btn">More<ChevronDown aria-hidden className="size-3.5" /></PopMenu>
         </header>
+        <RecoverLink go={go} />
 
         {none ? (
           <EmptyState title="Waiting for the first sync" body="Conversations appear here once SubSync has read your accounts. This usually takes a few minutes after you connect; check back soon."
