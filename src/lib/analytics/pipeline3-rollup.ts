@@ -44,17 +44,17 @@ async function rollupFreshNow(s: Scope, location?: string | null): Promise<{ fre
 }
 
 /** Rebuild the totals of one installation (every account, or the ones named). An account is rebuilt when a deal was saved since its last refresh, when it has never been built, or after FULL_EVERY_HOURS (the full fallback, which also catches deals removed in the CRM). `force` rebuilds all. Safe to run twice. */
-export async function refreshRollup(inst: string, o: { locations?: string[] | null; force?: boolean } = {}, h: Db = sql()): Promise<{ accounts: number; rebuilt: number; rows: number }> {
-  const accounts = (await h`select l.location_id from locations l where l.installation_id = ${inst} and not l.ignored ${o.locations ? h`and l.location_id = any(${o.locations}::text[])` : h``}`).map((r) => r.location_id as string);
+export async function refreshRollup(inst: string, o: { locations?: string[] | null; force?: boolean } = {}, db: Db = sql()): Promise<{ accounts: number; rebuilt: number; rows: number }> {
+  const accounts = (await db`select l.location_id from locations l where l.installation_id = ${inst} and not l.ignored ${o.locations ? db`and l.location_id = any(${o.locations}::text[])` : db``}`).map((r) => r.location_id as string);
   let rebuilt = 0, rows = 0;
   for (const loc of accounts) {
-    const st = (await h`select refreshed_at, (select max(o.synced_at) from cached_opportunities o where o.installation_id = ${inst} and o.location_id = ${loc}) last_saved from pipeline_rollup_state where installation_id = ${inst} and location_id = ${loc}`)[0];
+    const st = (await db`select refreshed_at, (select max(o.synced_at) from cached_opportunities o where o.installation_id = ${inst} and o.location_id = ${loc}) last_saved from pipeline_rollup_state where installation_id = ${inst} and location_id = ${loc}`)[0];
     const refreshed = st?.refreshed_at instanceof Date ? st.refreshed_at.getTime() : 0, saved = st?.last_saved instanceof Date ? st.last_saved.getTime() : 0;
     const noState = !st; let needs = o.force === true || noState || saved > refreshed || Date.now() - refreshed > FULL_EVERY_HOURS * 3_600_000;
-    if (!needs && !noState) { const [x] = await h`select count(*)::int n from cached_opportunities where installation_id = ${inst} and location_id = ${loc}`; needs = Number(x.n) !== Number(st.deals ?? -1); }
+    if (!needs && !noState) { const [x] = await db`select count(*)::int n from cached_opportunities where installation_id = ${inst} and location_id = ${loc}`; needs = Number(x.n) !== Number(st.deals ?? -1); }
     if (!needs) continue;
     const scope: Scope = { inst, allowed: [loc] }, now = new Date();
-    await h.begin(async (tx) => {
+    await db.begin(async (tx) => {
       const T = tx as unknown as Db;
       await T`delete from pipeline_rollup where installation_id = ${inst} and location_id = ${loc}`;
       const ins = await T`

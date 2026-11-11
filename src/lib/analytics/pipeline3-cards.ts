@@ -76,7 +76,7 @@ export async function pipelineCards(s: CardScope, o: CardOpts): Promise<Pl3Cards
   // The mini stacks: open money per stage for just the cards on this page, in the pipeline's own stage order; a stage the pipeline no longer has is "Other stage".
   const minis = new Map<string, Array<{ name: string; value: number }>>();
   if (page.length) {
-    const locs = page.map((c) => c.location_id as string), pids = page.map((c) => c.pipeline_id as string);
+    const locs = page.map((c) => c.location_id as string);
     const sv = ((r.stage_values as Array<{ l: string; p: string; s: string; v: number }>) ?? []).map((x) => ({ location_id: x.l, pipeline_id: x.p, stage_id: x.s, v: x.v }));
     const defs = ((r.defs_json as Array<{ l: string; p: string; st: unknown }>) ?? []).map((x) => ({ location_id: x.l, pipeline_id: x.p, stages: x.st }));
     for (const d of defs) {
