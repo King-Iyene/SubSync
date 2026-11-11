@@ -11,13 +11,13 @@ export type Appt3Part = (typeof APPT3_PARTS)[number];
 import type { PersonRollup } from "./appointments3-intel.ts";
 export type Appt3Query = {
   part: Appt3Part; from?: string; to?: string; location?: string; calendar?: string; user?: string; source?: string;
-  page?: number; /** Keyset cursor 'startIso|id' for lists sorted newest first. */ after?: string; size?: 20 | 50 | 100; sort?: string; q?: string; bucket?: Appt3Bucket;
+  page?: number; /** Keyset cursor 'startIso|id|rest' returned as `next` by a list (any sort). */ after?: string; /** Lists: a raw status (new, confirmed) and the fewest days since the appointment time (age). */ status?: string; age?: number; size?: 20 | 50 | 100; sort?: string; q?: string; bucket?: Appt3Bucket;
   /** Flow tree and lists: a booker id or "none" (setter), an owner id or "none" (closer); compare = "idA,idB" (two setters); top = how many setters to show (3 to 30, default 12); week = Monday date (YYYY-MM-DD) for the receipt. */
   setter?: string; closer?: string; compare?: string; top?: number; week?: string; /** Flow tree: skip this many people (See all pages through the rest). */ skip?: number;
 };
 
 /** Our own groups of statuses. `unmarked` = time passed (by 3h) with no outcome. `no_deal` = no deal linked to the contact. */
-export type Appt3Bucket = "booked" | "unmarked" | "showed" | "noshow" | "cancelled" | "invalid" | "completed" | "won" | "lost" | "open" | "no_deal" | "upcoming" | "recovered";
+export type Appt3Bucket = "booked" | "unmarked" | "showed" | "noshow" | "cancelled" | "invalid" | "completed" | "won" | "lost" | "open" | "no_deal" | "upcoming" | "recovered" | "at_risk";
 
 export type Estimate = { value: number | null; low: number | null; high: number | null; enough: boolean; estimate: true; formula: string; minNote: string | null };
 export type Rate = { value: number | null; n: number; of: number; enough: boolean };
@@ -45,6 +45,8 @@ export type Appt3Overview = {
   today: { doubleBookings: number; idlePeople: number };
   noshowToRecover: number; recoveredLast30: number; noDealLinked: number; upcoming: number;
   revenueAtRisk: Estimate; revenueWon: { value: number; n: number };
+  /** How many appointments the revenue-at-risk figure is made of (the rows behind it: bucket at_risk). */
+  riskCount: number;
   /** Booked, confirmed, showed, closed: the numbers of the animated journey. Each step's count equals its list. */
   journey: Array<{ key: "booked" | "showed" | "won"; label: string; count: number; bucket: Appt3Bucket }>;
   cards: Array<{ key: string; title: string; value: number | string; sub: string | null; part: Appt3Part; bucket: Appt3Bucket | null }>;

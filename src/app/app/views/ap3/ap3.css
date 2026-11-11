@@ -25,11 +25,12 @@
 .ap-strong { font-weight: 700; color: var(--s6-cyan); } .ap-strong[data-tone="amber"] { color: var(--s6-amber); } .ap-strong[data-tone="red"] { color: var(--s6-red); } .ap-strong[data-tone="green"] { color: var(--s6-green); }
 .ap-kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 0 0 16px; }
 @media (min-width: 900px) { .ap-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-.ap-kpi { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 2px; min-height: 84px; padding: 12px 16px; text-align: left; cursor: pointer; color: inherit; font: inherit;
+.ap-kpi { width: 100%; height: 100%; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 2px; min-height: 84px; padding: 12px 16px; text-align: left; cursor: pointer; color: inherit; font: inherit;
   border-radius: 14px; border: 1px solid color-mix(in srgb, var(--s6-edgec) 22%, transparent); background: color-mix(in srgb, var(--s6-surf) 80%, transparent); transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease; }
-.ap-kpi:hover { border-color: color-mix(in srgb, var(--s6-edgec) 60%, transparent); box-shadow: 0 0 20px -8px color-mix(in srgb, var(--s6-cyan) 50%, transparent); transform: translateY(-1px); }
+.ap-kpi:hover { border-color: color-mix(in srgb, var(--s6-cyan) 55%, transparent); transform: translateY(-1px); }
+.ap-kpi:disabled { cursor: default; opacity: 0.7; transform: none; }
 .ap-kpi:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
-.ap-kpi-n { font-size: 1.9rem; font-weight: 650; line-height: 1.05; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+.ap-kpi-n { overflow-wrap: anywhere; font-size: clamp(1.35rem, 2.2vw, 1.9rem); font-weight: 650; line-height: 1.05; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
 .ap-kpi-l { font-size: 0.8125rem; color: var(--muted-foreground); }
 .ap-kpi[data-tone="red"] .ap-kpi-n { color: var(--s6-red); } .ap-kpi[data-tone="amber"] .ap-kpi-n { color: var(--s6-amber); } .ap-kpi[data-tone="green"] .ap-kpi-n { color: var(--s6-green); } .ap-kpi[data-tone="violet"] .ap-kpi-n { color: var(--s6-violet); } .ap-kpi[data-tone="cyan"] .ap-kpi-n { color: var(--s6-cyan); }
 .ap-act { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
@@ -142,3 +143,27 @@
   .ap-lk[data-anim="1"] { stroke-dashoffset: 0; stroke-dasharray: none; }
 }
 @media print { .ap-panel, .ap-scrim { display: none; } }
+
+/* ---- Appointments polish: plain numbers, calm link-buttons ---- */
+.ap-meaning { margin: -6px 0 16px; max-width: 46rem; font-size: 0.9375rem; line-height: 1.5; color: var(--muted-foreground); }
+.ap-kpi-card { position: relative; min-width: 0; }
+.ap-kpi-i { position: absolute; top: 10px; right: 12px; display: inline-flex; }
+.ap-kpi-card .ap-kpi { padding-right: 34px; }
+.ap-bignum { display: block; background: none; border: 0; padding: 0; margin: 0; font: inherit; font-size: 2.25rem; font-weight: 650; line-height: 1.1; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; text-align: left; cursor: pointer; color: var(--foreground); text-decoration: underline; text-decoration-color: color-mix(in srgb, currentColor 30%, transparent); text-underline-offset: 6px; text-decoration-thickness: 1px; }
+.ap-bignum[data-tone="red"] { color: var(--s6-red); } .ap-bignum[data-tone="green"] { color: var(--s6-green); } .ap-bignum[data-tone="amber"] { color: var(--s6-amber); }
+.ap-bignum:hover { text-decoration-color: currentColor; } .ap-bignum:focus-visible { outline: 2px solid var(--ring); outline-offset: 4px; border-radius: 6px; }
+.ap-datef .ap-field { min-width: 9.5rem; }
+.ap-chip-x { display: inline-grid; place-items: center; width: 20px; height: 20px; margin: 0 -4px 0 2px; border: 0; border-radius: 999px; background: transparent; color: inherit; cursor: pointer; padding: 0; }
+.ap-chip-x:hover { background: color-mix(in srgb, currentColor 18%, transparent); } .ap-chip-x:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
+@media (pointer: coarse), (max-width: 700px) { .ap-chip-x { width: 44px; height: 44px; margin: -12px -14px -12px -6px; } .ap-chip { min-height: 44px; } }
+
+/* Calm inline action links (Appointments only: .ap3 keeps Clients and Pipeline as they are). Three colours: the accent, the text colour and the muted one. No glow. */
+.ap3 .ap-link { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; margin: 0 -4px; border-radius: 8px; border: 0; background: transparent; color: var(--s6-cyan); font: inherit; font-size: 0.875rem; font-weight: 550; text-decoration: none; cursor: pointer; vertical-align: baseline; transition: background-color 140ms ease, color 140ms ease; }
+.ap3 .ap-link:hover { background: color-mix(in srgb, var(--s6-cyan) 12%, transparent); color: color-mix(in srgb, var(--s6-cyan) 80%, var(--foreground)); }
+.ap3 .ap-link:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.ap3 .ap-link:disabled { opacity: 0.5; cursor: not-allowed; }
+.ap3 .ap-link svg { flex: none; transition: transform 140ms ease; } .ap3 .apx-go:hover svg { transform: translateX(2px); }
+.ap3 .ap-link.tnum { padding: 0 4px; margin: 0 -2px; font-weight: 650; text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--s6-cyan) 40%, transparent); text-underline-offset: 3px; }
+.ap3 .ap-link.tnum:hover { text-decoration-color: currentColor; }
+@media (pointer: coarse), (max-width: 700px) { .ap3 .ap-link { min-height: 44px; } .ap3 .ap-link.tnum { min-width: 44px; justify-content: center; } }
+@media (prefers-reduced-motion: reduce) { .ap3 .ap-link, .ap3 .ap-link svg { transition: none !important; } .ap3 .apx-go:hover svg { transform: none; } }

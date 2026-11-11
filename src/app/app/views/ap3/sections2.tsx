@@ -6,9 +6,11 @@ import { money, pct } from "@/lib/design/appt-coach";
 import { EmptyState, InlineAlert } from "../../ds";
 import { CountUp, Q } from "../speed6-base";
 import { ApSlot, hasApSlot, useAp } from "./data";
-import { ApRowsList, Chip, Pager, when } from "./parts";
+import { LinkBtn } from "./link-btn";
+import { ApWorklist } from "./list";
+import { Chip, when } from "./parts";
 import { Hit, type SectionProps } from "./sections";
-import type { ApCalendarRow, ApCalendarsView, ApPersonCalRow, ApConflictRow, ApHealthRow, ApPage, ApPersonRow, ApProof, ApSourceRow, ApSpeedBand } from "./types";
+import type { ApCalendarRow, ApCalendarsView, ApPersonCalRow, ApConflictRow, ApHealthRow, ApPersonRow, ApProof, ApSourceRow, ApSpeedBand } from "./types";
 
 type Col<T> = { h: string; num?: boolean; cell: (r: T) => ReactNode };
 function Grid<T extends { [k: string]: unknown }>({ rows, cols, onRow, testId, tone }: { rows: T[]; cols: Array<Col<T>>; onRow?: (r: T) => void; testId?: string; tone?: (r: T) => "amber" | "red" | undefined }) {
@@ -23,24 +25,27 @@ const Lead = ({ n, label, tone }: { n: number; label: string; tone?: string }) =
 const Rate = ({ v, tone }: { v: number | null; tone?: "good" | "bad" }) => (v === null ? <span className="ap-sub" title="Not enough marked appointments yet">n/a</span> : <span style={{ color: tone === "bad" ? "var(--s6-red)" : tone === "good" ? "var(--s6-green)" : undefined }}>{pct(v)}</span>);
 
 // ---------- Needs outcome / No-show recovery ----------
-export function NeedsOutcome({ filters, onOpen, activeId, showAccount }: SectionProps) {
+const ORDER_WORDS: Record<string, string> = { value: "Biggest deal first.", oldest: "Oldest first.", newest: "Newest first.", name: "By name, A to Z." };
+export function NeedsOutcome({ filters, onOpen, activeId, showAccount, clear, filtered }: SectionProps) {
   const [n, setN] = useState<number | null>(null);
   return (
     <div data-testid="ap-needs">
       {n !== null && <Lead n={n} label={n === 1 ? "past appointment has no outcome" : "past appointments have no outcome"} tone="amber" />}
-      <p className="ap-fine mb-3">Oldest first. Marking them makes your show rate true. SubSync never marks one by itself: it can suggest, you confirm.</p>
-      <ApRowsList part="needs-outcome" filters={filters} onOpen={onOpen} activeId={activeId} showAccount={showAccount} selectable onRows={(_, t) => setN(t)} testId="ap-needs-list" empty="Every past appointment has an outcome. Your show rate is as true as it can be." />
+      <p className="ap-fine mb-3">{ORDER_WORDS[filters.sort || "value"]} Marking them makes your show rate true. SubSync never marks one by itself: it can suggest, you confirm.</p>
+      <ApWorklist part="needs-outcome" filters={filters} onOpen={onOpen} activeId={activeId} showAccount={showAccount} selectable onRows={(_, t) => setN(t)} testId="ap-needs-list" onClear={filtered ? clear : undefined}
+        empty={filtered ? "No past appointment without an outcome matches these filters." : "Every past appointment has an outcome. Your show rate is as true as it can be."} emptyBody={filtered ? undefined : "Nothing to mark right now. New ones appear here a few hours after an appointment ends."} />
       {!hasApSlot("BulkActions") && <p className="ap-fine mt-2">Marking Showed, No-show, Cancelled, Invalid or Completed from here arrives with the checked edit tools. Until then, open the appointment in your CRM.</p>}
     </div>
   );
 }
-export function Recovery({ filters, onOpen, activeId, showAccount }: SectionProps) {
+export function Recovery({ filters, onOpen, activeId, showAccount, clear, filtered }: SectionProps) {
   const [n, setN] = useState<number | null>(null);
   return (
     <div data-testid="ap-recover">
       {n !== null && <Lead n={n} label={n === 1 ? "no-show has not been booked again" : "no-shows have not been booked again"} tone="red" />}
-      <p className="ap-fine mb-3">Missed in the last 7 days with no new booking. Most valuable first. Call them today.</p>
-      <ApRowsList part="no-show-recovery" filters={filters} onOpen={onOpen} activeId={activeId} showAccount={showAccount} selectable onRows={(_, t) => setN(t)} testId="ap-recover-list" empty="No no-show is waiting for a call. Everyone who missed an appointment this week is booked again." />
+      <p className="ap-fine mb-3">{ORDER_WORDS[filters.sort || "value"]} Missed in the last 7 days with no new booking: the dates above do not change this list. Call them today.</p>
+      <ApWorklist part="no-show-recovery" filters={filters} onOpen={onOpen} activeId={activeId} showAccount={showAccount} selectable onRows={(_, t) => setN(t)} testId="ap-recover-list" onClear={filtered ? clear : undefined}
+        empty={filtered ? "No no-show matches these filters." : "No no-show is waiting for a call."} emptyBody={filtered ? undefined : "Everyone who missed an appointment this week is booked again."} />
     </div>
   );
 }
@@ -55,11 +60,14 @@ export function BookingShare({ filters, onPerson, onDrill }: SectionProps & { on
   const un = res.data.rows.find((r) => r.unassigned);
   return (
     <div data-testid="ap-share">
-      <p className="ap-fine mb-3">Who booked an appointment (the setter) and who took the meeting (the closer). Show rate counts appointments someone marked. Press a name for the coaching card.</p>
-      {un && <InlineAlert tone="warning" className="mb-3" title={`${un.bookings} bookings have no owner`}>Nobody took these meetings, so nobody is held to them. Assign an owner in your CRM, or from the checked edit tools once enabled.</InlineAlert>}
+      <p className="ap-fine mb-3">Who booked an appointment (the setter) and who took the meeting (the closer). Press a name for the coaching card, or a number to see those appointments.</p>
+      {un && (un.bookings > 0 || (un.noOwner ?? 0) > 0) && <InlineAlert tone="warning" className="mb-3" title="Some bookings are missing a person">
+        {un.bookings > 0 && <span className="block">{un.bookings.toLocaleString("en-US")} {un.bookings === 1 ? "booking has" : "bookings have"} no booker recorded, so nobody is credited for them. <LinkBtn onClick={() => onDrill({ title: "Bookings with no booker recorded", count: un.bookings, extra: { booker: "none", outcome: "booked", expect: un.bookings }, labels: { booker: "not recorded" } })} testId="ap-share-nobooker">Open them</LinkBtn></span>}
+        {(un.noOwner ?? 0) > 0 && <span className="block">{un.noOwner!.toLocaleString("en-US")} {un.noOwner === 1 ? "booking has" : "bookings have"} no owner, so nobody is held to the meeting. Give them an owner in your CRM. <LinkBtn onClick={() => onDrill({ title: "Bookings with no owner", count: un.noOwner!, extra: { owner: "none", outcome: "booked", expect: un.noOwner }, labels: { owner: "nobody" } })} testId="ap-share-noowner">Open them</LinkBtn></span>}
+      </InlineAlert>}
       <Grid rows={res.data.rows} testId="ap-share-table" tone={(r) => (r.unassigned ? "amber" : undefined)} onRow={onPerson}
         cols={[
-          { h: "Person", cell: (r) => <><span className="ap-name">{r.name}</span> <Chip tone={r.unassigned ? "amber" : "grey"}>{r.unassigned ? "No owner" : r.role === "setter" ? "Books" : r.role === "closer" ? "Takes" : "Both"}</Chip></> },
+          { h: "Person", cell: (r) => <><span className="ap-name">{r.name}</span> <Chip tone={r.unassigned ? "amber" : "grey"}>{r.unassigned ? "Not recorded" : r.role === "setter" ? "Books" : r.role === "closer" ? "Takes" : "Both"}</Chip></> },
           { h: "Booked", num: true, cell: (r) => <>{r.bookings ? <Hit n={r.bookings} label={`Open the ${r.bookings} appointments of ${r.name}`} onClick={() => onDrill({ title: `${r.name}, appointments`, count: r.bookings, extra: { [r.role === "closer" ? "owner" : "booker"]: r.id, outcome: "booked", expect: r.bookings } })} /> : 0}<span className="ap-bar" aria-hidden><i style={{ width: `${total ? (r.bookings / total) * 100 : 0}%` }} /></span></> },
           { h: "Show", num: true, cell: (r) => <Rate v={r.showRate} /> }, { h: "No-show", num: true, cell: (r) => <Rate v={r.noShowRate} /> }, { h: "Close", num: true, cell: (r) => <Rate v={r.closeRate} /> },
           { h: "Won", num: true, cell: (r) => money(r.revenueCents) },
@@ -105,7 +113,7 @@ export function Sources({ filters, onDrill }: SectionProps) {
   return (
     <div className="ap-grid ap-grid2" data-testid="ap-sources">
       <Q q="Which sources actually show up?" tip="Show rate = showed divided by showed plus no-show, for appointments someone marked. n/a under 5 marked." testId="ap-src-card">
-        <Grid rows={sources} cols={[{ h: "Source", cell: (r) => <span className="ap-name">{r.source}</span> }, { h: "Booked", num: true, cell: (r) => (r.booked ? <Hit n={r.booked} label={`Open the ${r.booked} appointments from ${r.source}`} onClick={() => onDrill({ title: `From ${r.source}`, count: r.booked, extra: { source: r.source, outcome: "booked", expect: r.booked } })} /> : 0) }, { h: "Show", num: true, cell: (r) => <><Rate v={r.showRate} />{r.showRate !== null && <span className="ap-bar" aria-hidden><i style={{ width: `${r.showRate * 100}%` }} /></span>}</> }, { h: "Reply", num: true, cell: (r) => (r.medianFirstReplyMinutes === null ? "n/a" : r.medianFirstReplyMinutes < 60 ? `${r.medianFirstReplyMinutes}m` : `${(r.medianFirstReplyMinutes / 60).toFixed(1)}h`) }, { h: "Won", num: true, cell: (r) => r.won }]} />
+        <Grid rows={sources} cols={[{ h: "Source", cell: (r) => <span className="ap-name">{r.source}</span> }, { h: "Booked", num: true, cell: (r) => (r.booked ? <Hit n={r.booked} label={`Open the ${r.booked} appointments from ${r.source}`} onClick={() => onDrill({ title: `From ${r.source}`, count: r.booked, extra: { source: r.source, outcome: "booked", expect: r.booked } })} /> : 0) }, { h: "Show", num: true, cell: (r) => <><Rate v={r.showRate} />{r.showRate !== null && <span className="ap-bar" aria-hidden><i style={{ width: `${r.showRate * 100}%` }} /></span>}</> }, { h: "Won", num: true, cell: (r) => (r.won ? <Hit n={r.won} label={`Open the ${r.won} won appointments from ${r.source}`} onClick={() => onDrill({ title: `Won, from ${r.source}`, count: r.won, extra: { source: r.source, outcome: "won", expect: r.won } })} /> : 0) }]} />
       </Q>
       <Q q="Does a faster reply mean more shows?" tip="Show rate for appointments grouped by how long the first reply took. Your own data only." testId="ap-speed-card">
         <div className="ap-jr mt-2">{speed.map((s, i) => <div className="ap-jr-row" key={s.label} style={{ gridTemplateColumns: "8.5rem minmax(0,1fr) 3.5rem" }}><span>{s.label}</span><div className="ap-jr-bar"><i style={{ width: `${(s.showRate ?? 0) * 100}%`, ["--i" as string]: i }} /></div><span className="ap-jr-pct"><Rate v={s.showRate} /></span></div>)}</div>
@@ -117,9 +125,10 @@ export function Sources({ filters, onDrill }: SectionProps) {
 
 // ---------- Calendars and conflicts ----------
 const KIND: Record<ApConflictRow["kind"], { label: string; tone: "red" | "amber" | "violet" }> = { "double-booking": { label: "Double booking", tone: "red" } };
-export function Calendars({ filters, onDrill, go }: SectionProps) {
+export function Calendars({ filters, onDrill, focus }: SectionProps) {
   const res = useAp<ApCalendarsView>("calendars", filters);
-  const [show, setShow] = useState<"all" | "conflicts" | "idle_calendar" | "idle_person" | "not_in_list">("all");
+  const [openPerson, setOpenPerson] = useState<string | null>(null);
+  const [show, setShow] = useState<"all" | "conflicts" | "idle_calendar" | "idle_person" | "not_in_list">(focus === "conflicts" || focus === "idle_person" || focus === "idle_calendar" || focus === "not_in_list" ? focus : "all");
   if (res.error) return <InlineAlert tone="warning" title="Could not load calendars">Your calendar numbers did not load. Nothing was changed. <button type="button" className="ap-link" onClick={res.reload}>Try again</button></InlineAlert>;
   if (!res.data) return <div className="ap-tablewrap p-6" role="status" aria-busy="true">Loading calendars...</div>;
   const rows = res.data.rows ?? [], problems = res.data.problems ?? [], calendars = res.data.calendars ?? [], people = res.data.people ?? [];
@@ -131,7 +140,6 @@ export function Calendars({ filters, onDrill, go }: SectionProps) {
   const target = (k: string): typeof show | null => (k === "idle_calendar" ? "idle_calendar" : k === "idle_person" ? "idle_person" : k === "not_in_list" ? "not_in_list" : k === "double_booking" ? "conflicts" : null);
   const calDrill = (r: ApCalendarRow) => onDrill({ title: `${r.calendarName || "Calendar"}, appointments`, count: r.bookings, extra: { location: r.locationId, calendar: r.calendarId, outcome: "booked", expect: r.bookings } });
   const pplDrill = (r: ApPersonCalRow) => onDrill({ title: `${r.name}, appointments`, count: r.bookings, extra: { owner: r.userId, outcome: "booked", expect: r.bookings } });
-  const [openPerson, setOpenPerson] = useState<string | null>(null);
   return (
     <div data-testid="ap-calendars">
       <div className="ap-kpis" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(190px, 1fr))" }} data-testid="ap-problems">
@@ -143,7 +151,8 @@ export function Calendars({ filters, onDrill, go }: SectionProps) {
       </div>
       {show !== "all" && <p className="ap-fine mb-2">Showing one problem. <button type="button" className="ap-link" onClick={() => setShow("all")}>Show everything</button></p>}
       {(show === "all" || show === "conflicts") && (rows.length > 0 ? <>
-        <Lead n={rows.length} label={rows.length === 1 ? "calendar problem to fix" : "calendar problems to fix"} tone="red" />
+        <Lead n={res.data.conflictTotal ?? rows.length} label={(res.data.conflictTotal ?? rows.length) === 1 ? "double booking to fix" : "double bookings to fix"} tone="red" />
+        {(res.data.conflictTotal ?? rows.length) > rows.length && <p className="ap-fine mb-2">Showing the first {rows.length}. Fix these and the rest appear.</p>}
         <Grid rows={rows} testId="ap-conflict-table" cols={[{ h: "Problem", cell: (r) => <Chip tone={KIND[r.kind].tone}>{KIND[r.kind].label}</Chip> }, { h: "Account", cell: (r) => r.accountName }, { h: "Calendar", cell: (r) => r.calendarName }, { h: "When", cell: (r) => (r.when ? when(r.when) : "Ongoing") }, { h: "Who", cell: (r) => r.people.join(", ") || "-" }, { h: "Note", cell: (r) => <span className="ap-sub">{r.note}</span> }]} />
       </> : show === "conflicts" && <EmptyState title="No double bookings, overlaps or stalled calendars" body="Nothing to fix in these dates." />)}
       {(show === "all" || show === "idle_calendar") && (
@@ -154,12 +163,12 @@ export function Calendars({ filters, onDrill, go }: SectionProps) {
         </Q>
       )}
       {(show === "all" || show === "idle_person" || show === "not_in_list") && (
-        <Q q="Who takes the meetings" tip="Everyone in the accounts' team lists, plus anyone seen taking a meeting. A person is only called idle in accounts they belong to. Press a count to open those appointments; press a name to see each account." testId="ap-people-all">
+        <Q q="Who takes the meetings" tip="Everyone in the accounts&apos; team lists, plus anyone seen taking a meeting. A person is only called idle in accounts they belong to. Press a count to open those appointments; press a name to see each account." testId="ap-people-all">
           {pplRows.length ? <Grid rows={pplRows} testId="ap-people-table" tone={(r) => (r.idleEverywhere || !r.inTeamList ? "amber" : undefined)} onRow={(r) => setOpenPerson(openPerson === r.userId ? null : r.userId)}
             cols={[{ h: "Person", cell: (r) => <><span className="ap-name">{r.name}</span>{!r.inTeamList && <> <Chip tone="amber">Not in the team list (left or no access)</Chip></>}{openPerson === r.userId && <span className="ap-sub block">{r.accounts.map((a) => `${a.accountName ?? "Account"}: ${a.bookings}${a.member ? "" : " (not a member)"}`).join(" · ")}</span>}</> },
               { h: "Bookings", num: true, cell: (r) => (r.bookings ? <Hit n={r.bookings} label={`Open the ${r.bookings} appointments of ${r.name}`} onClick={() => pplDrill(r)} /> : 0) },
               { h: "Share", num: true, cell: (r) => <>{r.sharePct}%<span className="ap-bar" aria-hidden><i style={{ width: `${r.sharePct}%` }} /></span></> }, { h: "Last booking", cell: (r) => (r.lastBookingAt ? when(r.lastBookingAt) : "-") },
-              { h: "Flag", cell: (r) => (!r.inTeamList ? null : r.idleEverywhere ? <Chip tone="amber">No bookings in {r.accounts.length > 1 ? "any of their accounts" : "these dates"}</Chip> : r.idleIn.length ? <Chip tone="amber">Idle in {r.idleIn.join(", ")}</Chip> : null) }]} /> : <p className="ap-fine">Nobody to list for this problem. Team members appear here from each account's team list.</p>}
+              { h: "Flag", cell: (r) => (!r.inTeamList ? null : r.idleEverywhere ? <Chip tone="amber">No bookings in {r.accounts.length > 1 ? "any of their accounts" : "these dates"}</Chip> : r.idleIn.length ? <Chip tone="amber">Idle in {r.idleIn.join(", ")}</Chip> : null) }]} /> : <p className="ap-fine">Nobody to list for this problem. Team members appear here from each account&apos;s team list.</p>}
         </Q>
       )}
     </div>
@@ -192,8 +201,8 @@ export function Proof({ filters, onDrill }: SectionProps) {
 }
 
 // ---------- Meetings (slice AB mounts this) ----------
-export function Meetings({ filters }: SectionProps) {
-  if (!hasApSlot("Meetings")) return <EmptyState title="Meetings are not connected yet" body="Connect a meeting recorder to see, for each appointment, whether the meeting happened, a summary, and follow-ups nobody did. Each person connects their own." />;
+export function Meetings({ filters, openView }: SectionProps) {
+  if (!hasApSlot("Meetings")) return <EmptyState title="Meetings are not connected yet" body="Connect a meeting recorder to see, for each appointment, whether the meeting happened, a summary, and follow-ups nobody did. Each person connects their own." action={<LinkBtn onClick={() => openView("connections")} testId="ap-meetings-connect">Connect a meeting tool</LinkBtn>} />;
   return <ApSlot name="Meetings" filters={filters} />;
 }
 

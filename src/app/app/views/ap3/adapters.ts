@@ -28,22 +28,27 @@ export function adaptRow(r: Appt3Row, now = Date.now()): ApRow {
   };
 }
 export function adaptList(p: Appt3NeedsOutcome | Appt3Recovery | Page<Appt3Row>, now?: number) {
-  return { total: p.total, page: p.page + 1, pageSize: p.size, rows: (p.rows ?? []).map((r) => adaptRow(r, now)) };
+  return { total: p.total, page: p.page + 1, pageSize: p.size, rows: (p.rows ?? []).map((r) => adaptRow(r, now)), next: p.next ?? null };
 }
 
 export function adaptOverview(o: Appt3Overview, extra: { health?: Appt3Health | null; tree?: Appt3FlowTree | null } = {}): ApOverview {
   const rank = (extra.health?.rows ?? []).filter((r) => r.noshowRate.enough && r.noshowRate.value !== null).sort((a, b) => (b.noshowRate.value ?? 0) - (a.noshowRate.value ?? 0))[0];
-  const top = (extra.tree?.nodes ?? []).filter((n) => n.level === "setter" && n.badges && n.badges.showRate.enough).sort((a, b) => (b.badges!.showRate.value ?? 0) - (a.badges!.showRate.value ?? 0))[0];
+  // Only a booker we know by name can be the best: "booker not recorded" is a gap in the data, not a person to learn from.
+  const nodes = extra.tree?.nodes ?? [];
+  const top = nodes.filter((n) => n.level === "setter" && n.userId !== null && n.badges && n.badges.showRate.enough).sort((a, b) => (b.badges!.showRate.value ?? 0) - (a.badges!.showRate.value ?? 0))[0];
+  const lk = extra.tree?.leak ?? null, lkNode = lk ? nodes.find((n) => n.id === lk.nodeId) : undefined, lkParent = lkNode ? nodes.find((n) => n.id === lkNode.parentId) : undefined;
+  const who = (v: string | null | undefined) => (v === undefined ? undefined : v ?? "none");
   const at = o.revenueAtRisk;
   return {
     today: o.today,
-    headline: { needsOutcome: o.unmarked, noShowsToRecover: o.noshowToRecover, reportedShowRate: v(o.reportedShowRate), trueShowRate: v(o.trueShowRate), trueRange: null, marked: Math.max(0, (o.trueShowRate?.of ?? 0) - o.unmarked), booked: o.booked },
+    headline: { needsOutcome: o.unmarked, noShowsToRecover: o.noshowToRecover, reportedShowRate: v(o.reportedShowRate), trueShowRate: v(o.trueShowRate), trueRange: null, marked: Math.max(0, (o.trueShowRate?.of ?? 0) - o.unmarked), booked: o.booked, showed: o.trueShowRate?.n ?? 0, passed: o.trueShowRate?.of ?? 0, atRisk: o.riskCount ?? 0 },
     revenueAtRisk: at && at.enough && at.low !== null && at.high !== null ? { lowCents: cents(at.low)!, highCents: cents(at.high)!, basis: at.formula } : null,
     journey: (o.journey ?? []).map((j) => ({ key: j.key, label: j.label, count: j.count })),
     cards: {
-      worstAccount: rank ? { id: rank.locationId, name: rank.accountName ?? "Account", noShowRate: rank.noshowRate.value! } : null,
-      topSetter: top ? { id: top.userId ?? "none", name: top.label, showRate: top.badges!.showRate.value! } : null,
-      leak: extra.tree?.leak?.text ?? null,
+      worstAccount: rank ? { id: rank.locationId, name: rank.accountName ?? "Account", noShowRate: rank.noshowRate.value!, noShows: rank.noshowRate.n, of: rank.noshowRate.of } : null,
+      topSetter: top ? { id: top.userId!, name: top.label, showRate: top.badges!.showRate.value!, showed: top.badges!.showRate.n, of: top.badges!.showRate.of } : null,
+      unrecordedBookers: nodes.find((n) => n.id === "s:none")?.count ?? 0,
+      leak: lk && lkNode ? { text: lk.text, count: lkNode.count, params: { booker: who(lkNode.open.setter), owner: who(lkNode.open.closer), outcome: "booked" }, names: { booker: lkParent?.label, owner: lkNode.label } } : null,
     },
     needsPermission: false,
   };
@@ -63,9 +68,9 @@ export function adaptFlow(t: Appt3FlowTree, periodLabel = "This period"): ApFlow
     const closers: ApFlowCloser[] = kids(s.id).filter((c) => c.level === "closer").map((c) => {
       const outcomes = emptyOutcomes();
       for (const l of kids(c.id)) if (l.leaf && LEAF[l.leaf]) { outcomes[LEAF[l.leaf]] += l.count; totals[LEAF[l.leaf]] += l.count; }
-      return { id: c.userId ?? "none", name: c.label, outcomes, ...stats(c) };
+      return { id: c.userId ?? "none", name: c.userId === null ? "Owner not recorded" : c.label, outcomes, ...stats(c) };
     });
-    return { id: s.userId ?? "none", name: s.label, closers, hiddenClosers: 0, ...stats(s) };
+    return { id: s.userId ?? "none", name: s.userId === null && s.id !== "s:others" ? "Booker not recorded" : s.label, closers, hiddenClosers: 0, ...stats(s) };
   });
   const min = 5;
   return { booked: t.totalBooked ?? 0, periodLabel, setters, hiddenSetters: t.hiddenPeople ?? 0, totals, overall: ratesFromOutcomes(totals, min), minBookings: min };
@@ -74,7 +79,7 @@ export function adaptFlow(t: Appt3FlowTree, periodLabel = "This period"): ApFlow
 export function adaptShare(s: Appt3BookingShare): { rows: ApPersonRow[] } {
   return {
     rows: (s.rows ?? []).map((p) => ({
-      id: p.userId ?? "none", name: p.name, role: p.role === "closer" ? "closer" : p.role === "both" ? "both" : "setter", unassigned: p.userId === null,
+      id: p.userId ?? "none", name: p.userId === null ? "Booker not recorded" : p.name, role: p.role === "closer" ? "closer" : p.role === "both" ? "both" : "setter", unassigned: p.userId === null, noOwner: p.userId === null ? p.owned : undefined,
       bookings: p.role === "closer" ? p.owned : p.booked, showRate: v(p.showRate), noShowRate: v(p.noshowRate), closeRate: v(p.closeRate), revenueCents: cents(p.wonValue) ?? 0,
       avgLeadToBookedHours: p.leadToBookedMedianMinutes === null ? null : p.leadToBookedMedianMinutes / 60, trend: (p.trend ?? []).map((t) => t.booked),
     })),
@@ -87,7 +92,7 @@ export function adaptHealth(h: Appt3Health): { rows: ApHealthRow[] } {
 
 export function adaptSources(s: Appt3Sources): { sources: ApSourceRow[]; speed: ApSpeedBand[] } {
   return {
-    sources: (s.bySource ?? []).map((r) => ({ source: r.source, booked: r.booked, showRate: v(r.showRate), medianFirstReplyMinutes: null, won: r.closeRate.value !== null ? Math.round(r.closeRate.value * r.closeRate.of) : 0 })),
+    sources: (s.bySource ?? []).map((r) => ({ source: r.source, booked: r.booked, showRate: v(r.showRate), medianFirstReplyMinutes: null, won: r.closeRate.n })), // n is the won count whether or not there are enough closed deals for a rate
     speed: (s.bySpeed ?? []).map((r) => ({ label: r.label, booked: r.booked, showRate: v(r.showRate) })),
   };
 }
@@ -98,7 +103,7 @@ export function adaptCalendars(c: Appt3Calendars): ApCalendarsView {
     people: [x.a.contactName, x.b.contactName], note: `${x.overlapMinutes} minutes overlap`,
   }));
   return {
-    rows: conflicts,
+    conflictTotal: c.conflicts?.total, rows: conflicts,
     calendars: (c.calendarsAll ?? []).map((x) => ({ ...x, accountName: x.accountName ?? "", calendarName: x.calendarName ?? "Calendar" })),
     people: c.peopleAll ?? [], problems: c.problems ?? [],
   };

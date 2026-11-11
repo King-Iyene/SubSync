@@ -570,6 +570,10 @@ Decision: the screen is one sentence, one primary button ("Reply to the oldest w
 - Stage drill-downs pass the merged stage key (pipeline|stage, lower case) as `stage`; the read route now accepts it (before, a key never matched the raw stage id).
 - Our own finished changes are written to `deal_history` as actor `subsync` (markOwnChanges, idempotent by batch, deal and kind), so the recorder and metrics never count them as team activity.
 
+## 2026-11-11 Appointments polish (fix/ap-polish)
+- Who: agency owner, setter, client admin. They press any count on Appointments and get exactly those rows (count equals rows) with the filter as a removable chip and "Open in your CRM" on every row. Missing: a number that opens a different list than it counts.
+- One new bucket `at_risk` (open deal dollars on no-shows of the last 7 days not booked again, plus past appointments with no outcome) is the exact set behind "deal money at risk"; the overview returns `riskCount` for it. No-shows snoozed are off the recovery list as well as its number. Worklist filters (owner, booker, status, age, sort, custom dates) travel only to Needs outcome and No-show recovery; every list pages by cursor (keyset) for every sort. The old cursor pattern had lost its digit escapes and never matched; fixed.
+- "Not recorded" is a gap in the data, never a person: it cannot be "who books the best", and reads "Booker not recorded".
 ## 2026-11-11 Team (People) module, slice PD: data and API
 Customer view. Who uses it: the agency owner (who is slow, who is overloaded, who earns the money, who to put on the next client), an account administrator (my staff), and a setter or closer (my own score and queue). What they do next: coach, rebalance leads, give the bonus, show the client proof. If it were missing the owner would say: "I cannot tell which of my setters is the problem in which client."
 - People and Team are one module (nav label Team, code pp, API /api/app/people3, flags pp_*, all default off). The old lead search keeps its id; its label becomes "Find a lead" (the UI slice does this).
