@@ -5,7 +5,7 @@
 export const MIN_CLOSED_DEALS = 20;
 
 /** One deal this large a share of a dollar figure is called out on the card. */
-export const OUTLIER_SHARE = 0.5;
+export const OUTLIER_SHARE = 0.4;
 /** An outlier note needs at least this many deals, so a single-deal account is not flagged for being itself. */
 export const OUTLIER_MIN_DEALS = 3;
 

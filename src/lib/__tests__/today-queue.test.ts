@@ -195,8 +195,8 @@ test("bars: top accounts by things to fix, with the tooltip in words", () => {
 test("accounts needing you: one row each, worst first, with the one reason and plain health words", () => {
   const q = queueOf([item("replies", "aaa", { at: NOW - 5 * H }), item("appointments", "aaa"), item("stale", "ccc", { value: 9000 })]);
   const r = accountsNeedingYou(q, ACCOUNTS, 5);
-  assert.deepEqual(r.rows.map((x) => [x.name, x.state]), [["North Roofing", "Needs a look"], ["Maple Dental", "Needs you now"]]);
-  assert.equal(r.rows[1].reason, "1 person needs a reply");
+  assert.deepEqual(r.rows.map((x) => [x.name, x.state]), [["Maple Dental", "Needs you now"], ["North Roofing", "Needs a look"]]); // a long wait ranks before quiet-deal money
+  assert.equal(r.rows[0].reason, "1 person needs a reply");
   assert.equal(r.total, 2);
 });
 
@@ -275,4 +275,14 @@ test("ages in words", () => {
   assert.equal(ageWords(135), "2 h 15 min");
   assert.equal(ageWords(60 * 30), "30 h");
   assert.equal(ageWords(60 * 24 * 9), "9 days");
+});
+
+test("the people-waiting headline splits into people who wrote and new leads never answered, and the parts add up to it", () => {
+  const t = emptyTotals();
+  t.replies = { count: 73, dollars: null, shown: 73, newLeads: 24 };
+  const h = headlineOf({ scope: "all", rows: [], totals: t });
+  assert.deepEqual(h.split, { total: 73, waiting: 49, never: 24 });
+  assert.equal(h.split!.waiting + h.split!.never, h.split!.total);
+  t.replies = { count: 5, dollars: null, shown: 5, newLeads: 0 };
+  assert.equal(headlineOf({ scope: "all", rows: [], totals: t }).split, null);
 });

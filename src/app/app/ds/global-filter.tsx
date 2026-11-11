@@ -172,7 +172,7 @@ export function GlobalFilterBar({ view, agency, value, onChange, onAllClients }:
     <>
       {/* Sticky: it follows on scroll as one compact line and takes its own place in the flow, so it never covers the content under it. */}
       <div className="sticky top-0 z-30 mb-3 rounded-xl border bg-card px-3 py-1.5 shadow-sm print:hidden" data-testid="global-filter-bar" role="region" aria-label="Filters for this page"><div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-1">
-        {showAccounts ? <AccountControl accounts={options!.accounts!} picked={picked} onChange={setPicked} options={options!} value={isToday ? { ...value, accounts: picked } : value} onValue={onChange} /> : <span />}
+        {showAccounts ? <AccountControl accounts={options!.accounts!} picked={picked} onChange={setPicked} options={options!} value={isToday ? { ...value, accounts: picked } : value} onValue={onChange} /> : agency && !options ? <span className="h-10 w-48 animate-pulse rounded-lg bg-muted" aria-hidden data-testid="account-skeleton" /> : <span />}
         <div className="flex flex-wrap items-center gap-3">
           {onAllClients && <button type="button" onClick={onAllClients} data-testid="back-to-all-clients" className="ds-press min-h-10 cursor-pointer rounded-lg border bg-card px-3 text-[0.95rem] font-medium text-primary hover:border-primary/40 hover:underline focus-visible:ring-2 focus-visible:ring-ring/40 outline-none">Back to all clients</button>}
           <DateControl mode={mode} hash={hash} />

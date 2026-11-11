@@ -216,7 +216,7 @@
   .ur-t:not([data-multi]) .ur-t-head, .ur-t:not([data-multi]) .ur-t-row { grid-template-columns: minmax(10rem, 2.4fr) minmax(6rem, 1.2fr) 6.5rem 9.5rem minmax(6rem, 8.5rem) 8.5rem; }
   .ur-t:has(.ur-tick) .ur-t-head, .ur-t:has(.ur-tick) .ur-t-row { grid-template-columns: 44px minmax(10rem, 2.2fr) minmax(7rem, 1.2fr) minmax(6rem, 1fr) 6.5rem 9.5rem minmax(6rem, 8.5rem) 8.5rem; }
   .ur-t:not([data-multi]):has(.ur-tick) .ur-t-head, .ur-t:not([data-multi]):has(.ur-tick) .ur-t-row { grid-template-columns: 44px minmax(10rem, 2.4fr) minmax(6rem, 1.2fr) 6.5rem 9.5rem minmax(6rem, 8.5rem) 8.5rem; }
-  .ur-t-row { grid-template-areas: none; column-gap: 12px; min-height: 40px; padding: 0 4px 0 12px; }
+  .ur-t-row { grid-template-areas: none; contain-intrinsic-size: auto 40px; column-gap: 12px; min-height: 40px; padding: 0 4px 0 12px; }
   .ur-t-row > * { grid-area: auto; }
   .ur-t-meta { display: none; }
   .ur-t-c { display: block; font-size: 0.8125rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--foreground); }

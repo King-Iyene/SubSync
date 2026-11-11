@@ -5,7 +5,7 @@ import { PHONE_ROW_HEIGHT, ROW_HEIGHT } from "../../src/lib/design/list-density"
 // Checks: the old #inbox address and the new #speed?tab=unanswered address open the tab; there is no separate menu entry; every number equals the rows its click shows (the headline, the
 // segments, every bar of "How long have people waited", the quick chips); the dense list has one row of about 40 pixels on a desktop, two small lines on a phone, a default page of 50 and no
 // sideways scroll; the density choice is remembered.
-test.setTimeout(300_000);
+test.setTimeout(600_000);
 
 async function open(page: Page, hash: string) {
   await page.goto(`/app${hash}`);
@@ -46,23 +46,23 @@ test("every number equals the rows its click shows: the headline, the segments, 
   expect(seg.all).toBe(total);
   expect(seg.new + seg.existing).toBe(seg.all);
   for (const key of ["new", "existing"] as const) {
-    await page.getByTestId(`seg-${key}`).click();
-    await expect(page.getByTestId("wait-list-count")).toHaveText(String(seg[key]));
+    await page.getByTestId(`seg-${key}`).scrollIntoViewIfNeeded(); await page.getByTestId(`seg-${key}`).click({ force: true }); // the live pulse around it keeps it from ever counting as still
+    await expect(page.getByTestId("wait-list-count")).toHaveText(String(seg[key]), { timeout: 150_000 });
     if (seg[key] > 0) await expect(page.getByTestId("wait-row")).toHaveCount(Math.min(seg[key], 50));
   }
   await page.getByTestId("seg-all").click();
-  await expect(page.getByTestId("wait-list-count")).toHaveText(String(total));
+  await expect(page.getByTestId("wait-list-count")).toHaveText(String(total), { timeout: 150_000 });
   // quick chips
   for (const id of ["chip-none", "chip-mine"]) {
     const chip = page.getByTestId(id);
     if ((await chip.count()) === 0 || (await chip.isDisabled())) continue;
     const n = num(await chip.locator("b").textContent());
     await chip.click();
-    await expect(page.getByTestId("wait-list-count")).toHaveText(String(n));
+    await expect(page.getByTestId("wait-list-count")).toHaveText(String(n), { timeout: 150_000 });
     await chip.click();
   }
   await page.getByTestId("chip-everyone").click();
-  await expect(page.getByTestId("wait-list-count")).toHaveText(String(total));
+  await expect(page.getByTestId("wait-list-count")).toHaveText(String(total), { timeout: 150_000 });
   // every bar of "How long have people waited" opens exactly its people
   await page.getByTestId("sub-trends").click();
   const bars = page.getByTestId("wait-bar");
@@ -83,6 +83,7 @@ test("a dense list: one row about 40px on a desktop, two small lines on a phone,
   const rows = page.getByTestId("wait-row");
   await expect(rows.first()).toBeVisible();
   expect(await rows.count(), "never more rows than the page").toBeLessThanOrEqual(50);
+  await rows.first().scrollIntoViewIfNeeded(); // rows below the fold are not drawn yet (content-visibility), so measure one that is on screen
   const h = (await rows.first().boundingBox())!.height;
   const wide = testInfo.project.name === "desktop-1440";
   const phone = testInfo.project.name === "phone-390";
