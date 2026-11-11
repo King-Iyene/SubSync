@@ -8,6 +8,7 @@ import "../speed6.css";
 import "../speed-ui.css";
 import "../ap3/ap3.css";
 import "./pl3.css";
+import { useMountDealActions } from "./actions";
 import { DEFAULT_FILTERS, fixturesOn, usePl, type PlFilters } from "./data";
 import { MoneyFlow, type FlowPick } from "./money-flow";
 import { DealList, DealPanel } from "./parts";
@@ -31,7 +32,8 @@ const readViews = (): SavedView[] => { try { const v = JSON.parse(localStorage.g
 const writeViews = (v: SavedView[]) => { try { localStorage.setItem(VIEWS_KEY, JSON.stringify(v)); } catch { /* private mode: the view simply is not kept */ } };
 type Drill = { tab: TabKey; title: string; count: number; extra: Record<string, string | number | undefined> } | null;
 
-export function PipelineModule({ moneyFlow = true }: { moneyFlow?: boolean }) {
+export function PipelineModule({ moneyFlow = true, actions = false }: { moneyFlow?: boolean; actions?: boolean }) {
+  useMountDealActions(actions);
   const tabs = useMemo(() => TABS.filter((t) => moneyFlow || t.key !== "flow"), [moneyFlow]);
   const [tab, setTab] = useState<TabKey>("overview");
   const [filters, setFilters] = useState<PlFilters>(DEFAULT_FILTERS);
@@ -83,7 +85,7 @@ export function PipelineModule({ moneyFlow = true }: { moneyFlow?: boolean }) {
       case "sources": return <><Sources {...sp} />{drillList}</>;
       case "history": return <StageHistory {...sp} />;
       case "health": return <><Health {...sp} />{drillList}</>;
-      case "proof": return <Proof {...sp} />;
+      case "proof": return <><Proof {...sp} />{drillList}</>;
     }
   })();
 

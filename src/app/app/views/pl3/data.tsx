@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useData } from "../../session";
 import type { PlDeals, PlMoneyFlow, PlPart } from "@/lib/analytics/pipeline3-types-interim";
+import { adapt, queryOf } from "./adapters";
 import { dealsFixture, FLOW_EMPTY, FLOW_FIXTURE, FORECAST_FIXTURE, HEALTH_FIXTURE, HISTORY_FIXTURE, OVERVIEW_FIXTURE, PEOPLE_FIXTURE, page, PROOF_FIXTURE, SOURCES_FIXTURE, WONLOST_FIXTURE } from "./fixtures";
 
 /** What the person picked. `days` becomes from/to on the server's day boundaries; everything is re-checked on the server (never trusted). */
@@ -20,16 +21,7 @@ if (typeof window !== "undefined") fxFound();
 export const fixturesOn = () => fxFound() !== "";
 const fxMode = () => { const v = fxFound(); return v === "empty" || v === "error" ? v : ""; };
 
-export function queryOf(part: PlPart, f: PlFilters, extra: Record<string, string | number | undefined> = {}): string {
-  const to = new Date(), from = new Date(to.getTime() - f.days * 86_400_000);
-  const p = new URLSearchParams({ part, from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10) });
-  if (f.locationId) p.set("location", f.locationId);
-  if (f.pipeline) p.set("pipeline", f.pipeline);
-  if (f.ownerId) p.set("owner", f.ownerId);
-  if (f.q.trim()) p.set("q", f.q.trim());
-  for (const [k, v] of Object.entries(extra)) if (v !== undefined && v !== "" && k !== "expect") p.set(k, String(k === "page" ? Math.max(0, Number(v) - 1) : v));
-  return `pipeline3?${p}`;
-}
+export { queryOf };
 
 function fixtureFor(part: PlPart, extra: Record<string, string | number | undefined>): unknown {
   const pg = Number(extra.page ?? 1), size = Number(extra.pageSize ?? 20);
@@ -56,7 +48,12 @@ const emptyFor = (part: PlPart): unknown => (part === "money-flow" ? FLOW_EMPTY 
 export function usePl<T>(part: PlPart, f: PlFilters, extra: Record<string, string | number | undefined> = {}) {
   const fx = fixturesOn(), mode = fx ? fxMode() : "";
   const key = queryOf(part, f, extra);
-  const live = useData<T>(fx ? null : key);
+  const raw = useData<unknown>(fx ? null : key);
+  // The time-lapse comes from its own part of the API (same filters); the flow shows without it until it arrives.
+  const replayKey = part === "money-flow" ? queryOf("money-flow", f).replace("part=money-flow", "part=replay") + "&days=" + Math.max(30, Math.min(90, f.days)) : null;
+  const aux = useData<unknown>(fx ? null : replayKey);
+  const { data: rawData, error: rawError, loading: rawLoading, reload: reloadRaw } = raw, { data: auxData, reload: reloadAux } = aux;
+  const live = useMemo(() => ({ data: rawData === null ? null : (adapt(part, rawData, auxData) as T), error: rawError, loading: rawLoading, reload: () => { void reloadRaw(); void reloadAux(); } }), [rawData, rawError, rawLoading, reloadRaw, auxData, reloadAux, part]);
   const [fix, setFix] = useState<{ data: T | null; error: boolean; loading: boolean }>({ data: null, error: false, loading: fx });
   const reload = useCallback(() => {
     if (!fx) return void live.reload();

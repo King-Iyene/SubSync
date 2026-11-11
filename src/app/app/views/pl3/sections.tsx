@@ -89,7 +89,7 @@ export function Forecast({ filters }: SectionProps) {
             <section className="s6-card ap-hero"><span className="ap-live">Estimate, not a promise</span><p className="ap-sentence">About <b className="ap-strong">{money(d.midCents)}</b> likely to close from what is open now, in a range of {money(d.lowCents)} to {money(d.highCents)}.</p><p className="ap-fine">Based on {d.closedDeals} closed deals.</p></section>
           )}
           <Formula text={d.formula} />
-          {d.byStage.length > 0 && <Rows head={["Stage", "Open money", "Chance a deal here is won"]} testId="pl-forecast-stages">{d.byStage.map((s) => <tr key={s.stage}><td className="ap-name">{s.stage}</td><td data-num>{money(s.openCents)}</td><td data-num>{pct(s.winChance)}</td></tr>)}</Rows>}
+          {d.byStage.length > 0 && <Rows head={["Stage", "Chance a deal here is won"]} testId="pl-forecast-stages">{d.byStage.map((s) => <tr key={s.stage}><td className="ap-name">{s.stage}</td><td data-num>{pct(s.winChance)}</td></tr>)}</Rows>}
         </div>
       )}
     </Gate>
@@ -102,7 +102,7 @@ export function People(p: SectionProps) {
     <Gate r={r} label="Loading people..." empty={(d) => (d.rows.length === 0 ? { title: "No deal owners yet", body: "When deals have owners, you will see who closes and who lets deals go cold." } : null)}>
       {(d) => (
         <Rows head={["Person", "Open", "Open money", "Stuck", "Won", "Won money", "Lost money", "Win rate"]} testId="pl-people">
-          {d.rows.map((x) => <tr key={x.id} onClick={() => p.onDrill({ title: `${x.name}, open deals`, count: x.open, extra: { owner: x.id, status: "open", expect: x.open } })}><td className="ap-name">{x.name}</td><td data-num>{x.open}</td><td data-num>{moneyShort(x.openCents)}</td><td data-num>{x.stale > 0 ? <Chip tone="amber">{x.stale}</Chip> : 0}</td><td data-num>{x.won}</td><td data-num>{moneyShort(x.wonCents)}</td><td data-num>{moneyShort(x.burnedCents)}</td><td data-num>{pct(x.winRate)}</td></tr>)}
+          {d.rows.map((x) => <tr key={x.id} onClick={() => p.onDrill({ title: `${x.name}, open deals`, count: x.open, extra: { owner: x.id, status: "open", expect: x.open } })}><td className="ap-name">{x.name}</td><td data-num>{x.open}</td><td data-num>{moneyShort(x.openCents)}</td><td data-num>{x.stale > 0 ? <Chip tone="amber">{x.stale}</Chip> : 0}</td><td data-num>{x.won}</td><td data-num>{moneyShort(x.wonCents)}</td><td data-num>{moneyShort(x.lostCents)}</td><td data-num>{pct(x.winRate)}</td></tr>)}
         </Rows>
       )}
     </Gate>
@@ -143,24 +143,25 @@ export function Health({ filters, onDrill }: SectionProps) {
   return (
     <Gate r={r} label="Loading account health..." empty={(d) => (d.rows.length === 0 ? { title: "No accounts with deals yet", body: "Every client account will show here, worst first, once it has deals." } : null)}>
       {(d) => (
-        <Rows head={["Account", "Open money", "Stuck share", "Win rate", "Health"]} testId="pl-health">
-          {[...d.rows].sort((a, b) => (a.health ?? 101) - (b.health ?? 101)).map((x) => <tr key={x.locationId} onClick={() => onDrill({ title: `${x.name}, open deals`, count: 0, extra: { location: x.locationId } })}><td className="ap-name">{x.name}</td><td data-num>{moneyShort(x.openCents)}</td><td data-num>{x.staleShare === null ? "Not enough data" : pct(x.staleShare)}</td><td data-num>{pct(x.winRate)}</td><td data-num><Chip tone={healthTone(x.health)}>{x.health === null ? "Not enough data" : x.health}</Chip></td></tr>)}
+        <Rows head={["Account", "Open deals", "Stuck share", "Health"]} testId="pl-health">
+          {[...d.rows].sort((a, b) => (a.health ?? 101) - (b.health ?? 101)).map((x) => <tr key={x.locationId} onClick={() => onDrill({ title: `${x.name}, open deals`, count: x.open, extra: { location: x.locationId, status: "open" } })}><td className="ap-name">{x.name}</td><td data-num>{x.open}</td><td data-num>{x.staleShare === null ? "Not enough data" : pct(x.staleShare)}</td><td data-num><Chip tone={healthTone(x.health)}>{x.health === null ? "Not enough data" : x.health}</Chip></td></tr>)}
         </Rows>
       )}
     </Gate>
   );
 }
 
-export function Proof({ filters }: SectionProps) {
+export function Proof({ filters, go, onDrill }: SectionProps) {
   const r = usePl<PlProof>("proof", filters);
   return (
-    <Gate r={r} label="Loading the receipt..." empty={(d) => (d.rows.length === 0 ? { title: "No receipt yet", body: "Each week SubSync lists the stuck deals it caught and the money won, per client, so you can show it." } : null)}>
+    <Gate r={r} label="Loading the receipt..." empty={(d) => (d.rows.length === 0 ? { title: "No receipt yet", body: "Each week SubSync lists the stuck deals it caught, what moved on and the money won, so you can show it." } : null)}>
       {(d) => (
         <div data-testid="pl-proof">
-          <p className="ap-fine mb-2">{d.weekLabel}. What SubSync flagged, what was moved on, and the money won, per client.</p>
-          <Rows head={["Client", "Stuck deals caught", "Moved on", "Won", "Still stuck"]} testId="pl-proof-rows">
-            {d.rows.map((x) => <tr key={x.locationId}><td className="ap-name">{x.name}</td><td data-num>{x.caught}</td><td data-num>{x.unclogged}</td><td data-num>{moneyShort(x.wonCents)}</td><td data-num>{moneyShort(x.staleCents)}</td></tr>)}
+          <p className="ap-fine mb-2">{d.weekLabel}. {d.headline}</p>
+          <Rows head={["What happened", "This week"]} testId="pl-proof-rows">
+            {d.rows.map((x) => <tr key={x.label} onClick={x.go === "needs" ? () => go("needs") : x.go ? () => onDrill({ title: x.label, count: 0, extra: { status: x.go as "won" | "lost" } }) : undefined}><td className="ap-name">{x.label}</td><td data-num>{x.value}</td></tr>)}
           </Rows>
+          {d.verifyHash && <p className="ap-fine mt-2">Check code {d.verifyHash}: it is built from these numbers, so a client can ask us to confirm them.</p>}
         </div>
       )}
     </Gate>

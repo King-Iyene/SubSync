@@ -34,11 +34,11 @@ export type PlOverview = {
   headline: { openCount: number; openValueCents: number; staleCount: number; staleValueCents: number; wonCents: number; lostCents: number; winRate: number | null; winRateDeals: number };
   sentence: string; leak: PlMoneyFlow["leak"]; minDeals: number; excluded: PlMoneyFlow["excluded"]; outlier: PlMoneyFlow["outlier"];
 };
-export type PlForecast = { lowCents: number | null; midCents: number | null; highCents: number | null; closedDeals: number; minDeals: number; formula: string; byStage: Array<{ stage: string; openCents: number; winChance: number | null }> };
+export type PlForecast = { lowCents: number | null; midCents: number | null; highCents: number | null; closedDeals: number; minDeals: number; formula: string; byStage: Array<{ stage: string; openCents: number | null; winChance: number | null }> };
 export type PlWonLost = { won: number; lost: number; wonCents: number; lostCents: number; winRate: number | null; byReason: PlDrain[]; bookedToWon: number | null };
-export type PlPerson = { id: string; name: string; open: number; openCents: number; won: number; wonCents: number; lost: number; stale: number; winRate: number | null; burnedCents: number };
+export type PlPerson = { id: string; name: string; open: number; openCents: number; won: number; wonCents: number; lost: number; lostCents: number; stale: number; winRate: number | null; burned: number };
 export type PlSource = { source: string; deals: number; won: number; winRate: number | null; wonCents: number; avgCycleDays: number | null };
 export type PlStageHistory = { stages: Array<{ name: string; medianDays: number | null; p90Days: number | null; sample: number; staleAfterDays: number | null }>; recorded: { since: string | null; changes: number } };
-export type PlHealthRow = { locationId: string; name: string; openCents: number; staleShare: number | null; winRate: number | null; health: number | null };
-export type PlProof = { rows: Array<{ locationId: string; name: string; caught: number; unclogged: number; wonCents: number; staleCents: number }>; weekLabel: string };
+export type PlHealthRow = { locationId: string; name: string; open: number; stale: number; staleShare: number | null; health: number | null };
+export type PlProof = { weekLabel: string; headline: string; verifyHash: string | null; rows: Array<{ label: string; value: string; go: "needs" | "won" | "lost" | null }> };
 export type PlPart = "money-flow" | "overview" | "needs-attention" | "won-lost" | "forecast" | "people" | "sources" | "stage-history" | "health" | "proof" | "list" | "accounts";

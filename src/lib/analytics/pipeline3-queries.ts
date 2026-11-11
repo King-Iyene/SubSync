@@ -19,7 +19,7 @@ import type {
 type Db = ReturnType<typeof sql>;
 type Frag = ReturnType<Db>;
 export type Scope = { inst: string; allowed: string[] | null };
-export type Filters = { from: Date; to: Date; location?: string | null; pipeline?: string | null; stage?: string | null; owner?: string | null; source?: string | null; q?: string | null; bucket?: Pl3Bucket | null; reason?: string | null; includeTest?: boolean };
+export type Filters = { from: Date; to: Date; location?: string | null; pipeline?: string | null; stage?: string | null; stageKey?: string | null; owner?: string | null; source?: string | null; q?: string | null; bucket?: Pl3Bucket | null; reason?: string | null; includeTest?: boolean };
 type Rec = Record<string, unknown>;
 
 const ID = /^[A-Za-z0-9_-]{1,64}$/;
@@ -65,6 +65,7 @@ function deals(s: Scope, f: Filters): Frag {
       where o.installation_id = ${s.inst} and df.removed_at is null
         ${pipe ? db`and lower(btrim(coalesce(sc_pl.name, ''))) = ${pipe}` : db``}
         ${f.stage ? db`and o.stage_id = ${f.stage}` : db``}
+        ${f.stageKey ? db`and lower(regexp_replace(btrim(coalesce(sc_pl.name, '')), '[[:space:]]+', ' ', 'g')) || '|' || lower(regexp_replace(btrim(coalesce(sc_st.nm, '')), '[[:space:]]+', ' ', 'g')) = ${f.stageKey}` : db``}
         ${f.owner ? (f.owner === "none" ? db`and o.assigned_to is null` : db`and o.assigned_to = ${f.owner}`) : db``}
         ${f.source ? (f.source === "none" ? db`and nullif(btrim(o.source), '') is null` : db`and o.source = ${f.source}`) : db``}
         ${like ? db`and (o.name ilike ${like} or o.contact_name ilike ${like} or c.full_name ilike ${like})` : db``}

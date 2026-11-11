@@ -49,6 +49,40 @@ export async function logDeal(installationId: string, rows: readonly DealLogRow[
     const db = sql();
     await db`insert into pipeline_actions ${db(rows.map((r) => ({ installation_id: installationId, location_id: r.locationId, batch_id: r.batchId, action: r.action, opportunity_id: r.opportunityId, contact_id: r.contactId, before_value: db.json(r.before as never), after_value: db.json(r.after as never), lost_reason: r.lostReason ?? null, result: r.result, actor: r.actor })))}`;
   } catch { /* the table may not be applied yet; the audit_log line from the gateway still exists */ }
+  await markOwnChanges(installationId, rows);
+}
+
+/** One word per kind of finished change that the deal history also records. */
+const MARK_KIND = { stage: "stage", owner: "owner", value: "value", status: "status" } as const;
+/**
+ * Our own finished changes go into the deal history as actor 'subsync' (the same table the webhook recorder reads), so a change SubSync made is never counted as the team's activity and the
+ * platform's echo of it adds nothing twice. The key is per batch, deal and kind, so replaying a log line cannot double it. Never throws; the history table may not be applied yet.
+ */
+export async function markOwnChanges(installationId: string, rows: readonly DealLogRow[]): Promise<void> {
+  try {
+    const db = sql();
+    const out: Array<Record<string, unknown>> = [];
+    const str = (v: unknown) => (v === null || v === undefined ? null : String(v));
+    for (const r of rows) {
+      if (r.result !== "done" || !r.opportunityId) continue;
+      if (r.action === "remove") {
+        out.push({ installation_id: installationId, location_id: r.locationId, opportunity_id: r.opportunityId, contact_id: r.contactId, pipeline_id: null, kind: "deleted", event_key: `deleted|${r.opportunityId}`, from_value: null, to_value: null, value: null, actor_id: r.actor, actor_kind: "subsync", at: new Date(), detail: db.json({ marker: "subsync" } as never) });
+        continue;
+      }
+      if (r.action !== "stage" && r.action !== "owner" && r.action !== "value" && r.action !== "status" && r.action !== "undo") continue;
+      const a = r.after as Record<string, unknown>, b = r.before as Record<string, unknown>;
+      const parts: Array<[keyof typeof MARK_KIND, unknown, unknown]> = [["stage", b.stageId, a.stageId], ["owner", b.assignedTo, a.assignedTo], ["value", b.value, a.value], ["status", b.status, a.status]];
+      for (const [k, from, to] of parts) {
+        if (to === undefined || to === null) continue;
+        out.push({
+          installation_id: installationId, location_id: r.locationId, opportunity_id: r.opportunityId, contact_id: r.contactId, pipeline_id: str(a.pipelineId), kind: MARK_KIND[k], event_key: `own|${r.batchId}|${r.opportunityId}|${k}`,
+          from_value: str(from), to_value: str(to), value: k === "value" ? Number(to) : typeof a.value === "number" ? a.value : null, actor_id: r.actor, actor_kind: "subsync", at: new Date(), detail: db.json({ marker: "subsync" } as never),
+        });
+      }
+    }
+    if (out.length === 0) return;
+    await db`insert into deal_history ${db(out)} on conflict (installation_id, location_id, event_key) do nothing`;
+  } catch { /* the history table may not be applied yet; the change itself is already in pipeline_actions */ }
 }
 
 export type FeedRow = { at: string; source: "subsync" | "crm"; text: string; batchId: string | null; undoable: boolean; actor: string | null };

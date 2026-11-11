@@ -13,9 +13,13 @@ export const stuck = (d: PlDeal) => d.staleAfterDays !== null && d.status === "o
 
 // Slice PB mounts the deal panel content (timeline, owner, value, linked appointments, move, won/lost, note, delete) here without touching these files.
 export type PlSlotName = "Details" | "RowActions" | "BulkActions";
-type SlotProps = { deal?: PlDeal; deals?: PlDeal[]; onChanged?: () => void; filters?: PlFilters };
+type SlotProps = { deal?: PlDeal; deals?: PlDeal[]; onChanged?: () => void; onClose?: () => void; filters?: PlFilters };
 const slots = new Map<PlSlotName, ComponentType<SlotProps>>(); const subs = new Set<() => void>(); let ver = 0;
 export function registerPlSlot(name: PlSlotName, c: ComponentType<SlotProps>) { slots.set(name, c); ver++; subs.forEach((f) => f()); }
+/** True once something is mounted in the slot (the checked change tools, when they are switched on for this person). */
+export function useSlotMounted(name: PlSlotName): boolean {
+  return useSyncExternalStore((cb) => { subs.add(cb); return () => { subs.delete(cb); }; }, () => (slots.has(name) ? 1 : 0), () => 0) === 1;
+}
 export function PlSlot({ name, ...props }: { name: PlSlotName } & SlotProps) {
   useSyncExternalStore((cb) => { subs.add(cb); return () => { subs.delete(cb); }; }, () => ver, () => 0);
   const C = slots.get(name);
@@ -23,7 +27,8 @@ export function PlSlot({ name, ...props }: { name: PlSlotName } & SlotProps) {
   return C ? <C {...props} /> : null;
 }
 
-export function DealTable({ rows, showAccount, onOpen, activeId, selected, onSelect }: { rows: PlDeal[]; showAccount: boolean; onOpen: (d: PlDeal) => void; activeId?: string | null; selected?: Set<string>; onSelect?: (id: string, on: boolean) => void }) {
+export function DealTable({ rows, showAccount, onOpen, activeId, selected, onSelect, onChanged }: { rows: PlDeal[]; showAccount: boolean; onOpen: (d: PlDeal) => void; activeId?: string | null; selected?: Set<string>; onSelect?: (id: string, on: boolean) => void; onChanged?: () => void }) {
+  const quick = useSlotMounted("RowActions");
   const [cursor, setCursor] = useState(-1);
   const body = useRef<HTMLTableSectionElement>(null);
   const key = (e: React.KeyboardEvent, i: number, d: PlDeal) => {
@@ -33,7 +38,7 @@ export function DealTable({ rows, showAccount, onOpen, activeId, selected, onSel
   return (
     <div className="ap-scroll">
       <table className="ap-t" data-testid="pl-table">
-        <thead><tr>{onSelect && <th aria-label="Select" style={{ width: 34 }} />}<th>Deal</th>{showAccount && <th>Account</th>}<th>Stage</th><th data-num>Value</th><th data-num>In stage</th><th>Owner</th><th>Health</th></tr></thead>
+        <thead><tr>{onSelect && <th aria-label="Select" style={{ width: 34 }} />}<th>Deal</th>{showAccount && <th>Account</th>}<th>Stage</th><th data-num>Value</th><th data-num>In stage</th><th>Owner</th><th>Health</th><th>Open</th>{quick && <th aria-label="Actions" />}</tr></thead>
         <tbody ref={body}>
           {rows.map((d, i) => (
             <tr key={d.id} tabIndex={cursor === i || (cursor < 0 && i === 0) ? 0 : -1} data-active={activeId === d.id ? "1" : "0"} data-tone={stuck(d) ? "amber" : undefined} onClick={() => onOpen(d)} onKeyDown={(e) => key(e, i, d)} data-testid="pl-row">
@@ -45,6 +50,8 @@ export function DealTable({ rows, showAccount, onOpen, activeId, selected, onSel
               <td data-num>{stuck(d) ? <Chip tone="amber">{d.daysInStage} d, stuck</Chip> : `${d.daysInStage} d`}</td>
               <td>{d.ownerName ?? <span className="ap-sub">Nobody</span>}</td>
               <td><Chip tone={healthTone(d.health)}>{d.health === null ? "Not enough data" : d.health}</Chip></td>
+              <td onClick={(e) => e.stopPropagation()}>{d.url ? <a className="ap-link" href={d.url} target="_blank" rel="noopener noreferrer" data-testid="pl-row-crm">Open in your CRM</a> : <span className="ap-sub">No link</span>}</td>
+              {quick && <td onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}><PlSlot name="RowActions" deal={d} onChanged={onChanged} /></td>}
             </tr>
           ))}
         </tbody>
@@ -84,7 +91,7 @@ export function DealList({ part = "list", filters, extra, onOpen, activeId, show
     <div data-testid={testId} aria-busy={loading}>
       {selectable && sel.size > 0 && <div className="mb-2 flex flex-wrap items-center gap-2 text-sm" data-testid="pl-bulkbar"><b>{sel.size} selected</b><PlSlot name="BulkActions" deals={chosen} onChanged={reload} filters={filters} /><button type="button" className="ap-link" onClick={() => setSel(new Set())}>Clear</button></div>}
       <div className="ap-tablewrap" style={{ opacity: loading ? 0.7 : 1 }}>
-        <DealTable rows={data.rows} showAccount={showAccount} onOpen={onOpen} activeId={activeId} selected={selectable ? sel : undefined} onSelect={selectable ? (id, on) => setSel((s) => { const n = new Set(s); if (on) n.add(id); else n.delete(id); return n; }) : undefined} />
+        <DealTable rows={data.rows} showAccount={showAccount} onChanged={reload} onOpen={onOpen} activeId={activeId} selected={selectable ? sel : undefined} onSelect={selectable ? (id, on) => setSel((s) => { const n = new Set(s); if (on) n.add(id); else n.delete(id); return n; }) : undefined} />
         <Pager total={data.total} page={page} size={size} onPage={setPage} onSize={(s) => { setSize(s); setPage(1); }} />
       </div>
     </div>
@@ -94,7 +101,19 @@ export function DealList({ part = "list", filters, extra, onOpen, activeId, show
 /** The right-side deal panel shell: the facts the table already has, plus the slot where slice PB mounts the timeline and the checked change tools. */
 export function DealPanel({ deal, onClose, onChanged, filters }: { deal: PlDeal; onClose: () => void; onChanged: () => void; filters: PlFilters }) {
   const ref = useRef<HTMLDivElement>(null);
+  const full = useSlotMounted("Details");
   useEffect(() => { ref.current?.focus(); const k = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); }; window.addEventListener("keydown", k); return () => window.removeEventListener("keydown", k); }, [onClose]);
+  if (full) {
+    // The checked change tools own the whole panel (their own header, CRM link, timeline and close).
+    return (
+      <>
+        <div className="ap-scrim" onClick={onClose} aria-hidden />
+        <div className="ap-panel" role="dialog" aria-modal="true" aria-label={`Deal ${deal.name}`} ref={ref} tabIndex={-1} data-testid="pl-panel" style={{ padding: 0 }}>
+          <PlSlot name="Details" deal={deal} onChanged={onChanged} onClose={onClose} filters={filters} />
+        </div>
+      </>
+    );
+  }
   return (
     <>
       <div className="ap-scrim" onClick={onClose} aria-hidden />
@@ -114,6 +133,7 @@ export function DealPanel({ deal, onClose, onChanged, filters }: { deal: PlDeal;
             <dt>Health</dt><dd>{deal.health === null ? "Not enough data to score" : `${deal.health} of 100`}</dd>
           </dl>
           <PlSlot name="Details" deal={deal} onChanged={onChanged} filters={filters} />
+          {deal.url && <p><a className="ap-link" href={deal.url} target="_blank" rel="noopener noreferrer" data-testid="pl-panel-crm">Open in your CRM</a></p>}
           <p className="ap-fine">Changes to deals are made in your CRM or, once enabled, through SubSync&apos;s checked change tools (preview first, typed confirmation to delete).</p>
         </div>
       </aside>

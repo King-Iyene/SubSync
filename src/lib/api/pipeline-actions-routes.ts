@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { ownedAccount } from "./pl-guard";
 import { writeEnabledFor } from "../analytics/cleanup-config";
 import { installationHasScope } from "../analytics/cleanup-queries";
 import {
@@ -28,7 +29,6 @@ import { json, type AuthContext } from "./auth";
 type Ctx = AuthContext & { request: Request; url: URL; segments: string[] };
 export type PipelineActionHelpers = { allowed: () => Promise<string[] | null>; links: () => Promise<ReturnType<typeof import("../links").deepLinks>>; locationToken: (locationId: string) => Promise<string> };
 
-const ID = /^[A-Za-z0-9_-]{3,128}$/;
 const on = (ctx: Ctx, f: Feature) => ctx.entitlements.features[f] === true && !ctx.entitlements.locked.includes(f);
 const off = () => json({ error: "This is not switched on for your account" }, 404);
 const actorOf = (ctx: Ctx) => ctx.session.userName ?? ctx.session.userId ?? null;
@@ -45,10 +45,9 @@ async function readBody(ctx: Ctx): Promise<Record<string, unknown> | null> {
   const b = await ctx.request.json().catch(() => null);
   return b && typeof b === "object" ? (b as Record<string, unknown>) : null;
 }
-async function accountOf(h: PipelineActionHelpers, v: unknown): Promise<string | null> {
-  if (typeof v !== "string" || !ID.test(v)) return null;
-  const allowed = await h.allowed();
-  return allowed && !allowed.includes(v) ? null : v;
+/** The one shared guard (pl-guard.ts): well formed, inside the accounts this session may read, and really in this installation. */
+async function accountOf(ctx: Ctx, h: PipelineActionHelpers, v: unknown): Promise<string | null> {
+  return ownedAccount(ctx.installationId, await h.allowed(), v);
 }
 const idList = (v: unknown, max: number): string[] | null => {
   if (!Array.isArray(v) || v.length === 0 || v.length > max) return null;
@@ -87,7 +86,7 @@ const scopeOk = (ctx: Ctx, scope: string) => (ctx.demo ? Promise.resolve(true) :
 
 /** The pickers for one account (team, pipelines and stages, lost reasons): only inside an account the caller may read. */
 async function metaRoute(ctx: Ctx, h: PipelineActionHelpers): Promise<Response> {
-  const locationId = await accountOf(h, ctx.url.searchParams.get("locationId"));
+  const locationId = await accountOf(ctx, h, ctx.url.searchParams.get("locationId"));
   if (!locationId) return json({ error: "That account is not available" }, 404);
   const ac = await account(ctx, locationId);
   return json({ team: ac.members, pipelines: ac.pipelines, lostReasons: LOST_REASONS.map((r) => ({ id: r, label: LOST_REASON_WORDS[r] })) });
@@ -97,7 +96,7 @@ async function metaRoute(ctx: Ctx, h: PipelineActionHelpers): Promise<Response> 
 
 async function panelRoute(ctx: Ctx, h: PipelineActionHelpers): Promise<Response> {
   const sp = ctx.url.searchParams;
-  const locationId = await accountOf(h, sp.get("locationId"));
+  const locationId = await accountOf(ctx, h, sp.get("locationId"));
   const id = sp.get("id");
   if (!locationId || !isId(id)) return json({ error: "That deal is not available" }, 404);
   const p = await panelFacts(ctx.installationId, locationId, id);
@@ -159,7 +158,7 @@ function answer(r: Outcome, batchId: string, n: number, optedIn: boolean, permis
 
 async function applyRoute(ctx: Ctx, h: PipelineActionHelpers): Promise<Response> {
   const b = await readBody(ctx);
-  const locationId = await accountOf(h, b?.locationId);
+  const locationId = await accountOf(ctx, h, b?.locationId);
   if (!b || !locationId || !isId(b.opportunityId)) return json({ error: "Choose the deal" }, 400);
   const parsed = parseAction(b.action);
   if (!parsed.ok) return json({ error: parsed.error }, 400);
@@ -198,7 +197,7 @@ async function applyRoute(ctx: Ctx, h: PipelineActionHelpers): Promise<Response>
 async function bulkRoute(ctx: Ctx, h: PipelineActionHelpers): Promise<Response> {
   if (!on(ctx, "pl_bulk")) return off();
   const b = await readBody(ctx);
-  const locationId = await accountOf(h, b?.locationId);
+  const locationId = await accountOf(ctx, h, b?.locationId);
   const kind = b?.kind;
   if (kind !== "stage" && kind !== "owner" && kind !== "status" && kind !== "task" && kind !== "delete") return json({ error: "Choose what to do" }, 400);
   const bk: BulkKind = kind;
@@ -261,7 +260,7 @@ async function bulkRoute(ctx: Ctx, h: PipelineActionHelpers): Promise<Response> 
 
 async function undoRoute(ctx: Ctx, h: PipelineActionHelpers): Promise<Response> {
   const b = await readBody(ctx);
-  const locationId = await accountOf(h, b?.locationId);
+  const locationId = await accountOf(ctx, h, b?.locationId);
   if (!b || !locationId || typeof b.batchId !== "string" || !/^[0-9a-f-]{36}$/.test(b.batchId)) return json({ error: "Choose the change" }, 400);
   const rows = await batchRows(ctx.installationId, locationId, b.batchId);
   const fresh = rows.filter((r) => Date.now() - Date.parse(r.at) < UNDO_MINUTES * 60_000);

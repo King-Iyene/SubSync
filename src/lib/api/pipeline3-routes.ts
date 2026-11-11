@@ -5,6 +5,7 @@ import type { Feature } from "../entitlements";
 import { resolveEntitlements } from "../flags";
 import type { deepLinks } from "../links";
 import { json, type AuthContext } from "./auth";
+import { allowedAccount } from "./pl-guard";
 
 // GET /api/app/pipeline3?part=overview|money-flow|attention|won-lost|forecast|people|sources|stage-history|health|receipt|list|detail|replay (read only). Who is asking comes from the
 // verified session; the accounts that caller may read come from `allowed` (decided by the router from the session, never from the request): an account id in the address only
@@ -32,7 +33,7 @@ export async function handlePipeline3(ctx: Ctx, h: Pl3Helpers): Promise<Response
   const seePeople = ctx.kind !== "client";
   const one = cleanId(sp.get("location"));
   // An account id only narrows inside what the caller may read; one outside it is the same answer as nothing there.
-  if (one && allowedAll && !allowedAll.includes(one)) return json(emptyFor(part, flags, ctx.limitTo === null));
+  if (sp.get("location") && (!one || allowedAccount(allowedAll, one) === null)) return json(emptyFor(part, flags, ctx.limitTo === null));
   const scope: Scope = { inst: ctx.installationId, allowed: allowedAll };
   const now = Date.now();
   const w = parsePlWindow(sp.get("from"), sp.get("to"), now);
@@ -40,7 +41,7 @@ export async function handlePipeline3(ctx: Ctx, h: Pl3Helpers): Promise<Response
   const wide = part === "sources" && !sp.get("from") && !sp.get("to") ? { from: new Date(now + DAY - (now % DAY) - 180 * DAY), to: new Date(now + DAY - (now % DAY)), days: 180, problem: null as string | null } : w;
   const bucketP = sp.get("bucket");
   const f: Filters = {
-    from: wide.from, to: wide.to, location: one, pipeline: text(sp.get("pipeline"), 120), stage: cleanId(sp.get("stage")), owner: seePeople ? personParam(sp.get("owner")) : null,
+    from: wide.from, to: wide.to, location: one, pipeline: text(sp.get("pipeline"), 120), stage: cleanId(sp.get("stage")), stageKey: (sp.get("stage") ?? "").includes("|") ? text(sp.get("stage"), 200) : null, owner: seePeople ? personParam(sp.get("owner")) : null,
     source: text(sp.get("source"), 120), q: text(sp.get("q"), 60), bucket: bucketP && BUCKETS.has(bucketP) ? (bucketP as Pl3Bucket) : null, reason: text(sp.get("reason"), 120), includeTest: sp.get("test") === "1",
   };
   const p = Math.max(0, int(sp.get("page"), 0)), size = clampSize(int(sp.get("size"), 20)), dir = sp.get("dir") === "asc" ? "asc" : "desc";
