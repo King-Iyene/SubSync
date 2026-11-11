@@ -1,0 +1,25 @@
+/* Clients v2: calm and flat. Same neutral surfaces and one accent as Clients; amber only for "needs a look". Works in light and dark (colours come from the app theme variables). */
+.cl2-t td, .cl2-t th { vertical-align: top; }
+.cl2-t .w-8 { width: 2rem; }
+.cl2-bulk { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 12px; margin-bottom: 8px; border: 1px solid color-mix(in srgb, var(--s6-cyan) 45%, transparent); border-radius: 10px; background: var(--s6-surf); }
+.cl2-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; align-items: start; }
+.cl2-card { border: 1px solid color-mix(in srgb, var(--s6-edgec) 26%, transparent); border-radius: 12px; padding: 14px 16px; background: var(--s6-surf); min-width: 0; list-style: none; }
+.cl2-wide { grid-column: 1 / -1; }
+.cl2-cards { margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.cl2-dl { margin: 0; display: flex; flex-direction: column; gap: 6px; }
+.cl2-kv { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; font-size: 0.875rem; }
+.cl2-kv dt { color: var(--muted-foreground); } .cl2-kv dd { margin: 0; font-weight: 550; text-align: right; font-variant-numeric: tabular-nums; }
+.cl2-check { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; font-size: 0.875rem; }
+.cl2-check li span { display: inline-block; min-width: 3.2rem; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted-foreground); }
+.cl2-check li[data-ok="true"] span { color: var(--s6-cyan); } .cl2-check li[data-ok="false"] span { color: var(--s6-amber); }
+.cl2-steps { margin: 6px 0 8px; padding-left: 1.2rem; font-size: 0.8125rem; color: var(--muted-foreground); }
+.cl2-confirm { margin-top: 8px; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--s6-amber) 55%, transparent); border-radius: 10px; }
+.cl2-page .cl-notes li[data-done="true"] { opacity: 0.7; }
+@media (max-width: 700px) {
+  .cl2-grid { grid-template-columns: 1fr; }
+  .cl2-card { padding: 12px; }
+  .cl2-kv dd { text-align: left; }
+}
+@media print {
+  .cl2-grid, .cl2-bulk { display: none; }
+}

@@ -116,7 +116,9 @@ export const INVENTORY: Record<string, TableInfo> = {
   // Clients (stages CD/CB): daily client numbers, billing state, risk history, the agency's own owner names, mutes and the log of those changes.
   client_daily: { noun: "each client's daily counts (new leads, bookings, shows, deals; never names or message text)", line: "accounts", personal: {}, notPersonal: ["staff_messages"] },
   client_rollup_state: { noun: "when each client's totals were last refreshed, and how many contacts have no owner or phone", line: "accounts", personal: {}, notPersonal: ["no_owner", "no_phone"] },
-  client_billing: { noun: "which plan each client account is on and whether it is paid up (no card or bank details)", line: "accounts", personal: {}, notPersonal: ["plan_name"] },
+  client_billing: { noun: "which paid plan each client account is on, whether it is paid up, the plan price and the credit balance (no card or bank details)", line: "accounts", personal: {}, notPersonal: ["plan_name", "user_limit"] },
+  cl2_notes: { noun: "your own notes, next steps and promises about each client account (only you and your team see them)", line: "yours", personal: { body: "the notes you wrote about a client account", author: "who wrote the note" }, notPersonal: ["kind", "pinned", "done", "due_on"] },
+  cl2_plan_events: { noun: "when a client account's paid plan changed status (for example paid up to past due), so you can see how long it lasted", line: "accounts", personal: {}, notPersonal: ["from_status", "to_status", "plan_name"] },
   client_risk_history: { noun: "each client's daily risk level, so you can see whether it is getting better or worse", line: "accounts", personal: {}, notPersonal: [] },
   client_owners: { noun: "who looks after each client in your business (a name you type)", line: "yours", personal: { owner_name: "the name of who looks after each client in your business", set_by: "who set it" }, notPersonal: [] },
   client_alert_mutes: { noun: "the clients whose alerts you paused, and until when", line: "yours", personal: { created_by: "who paused the alerts" }, notPersonal: [] },
