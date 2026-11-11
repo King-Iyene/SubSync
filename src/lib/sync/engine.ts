@@ -19,6 +19,7 @@ import { applyLeadRules } from "./lead-rules-apply";
 import { diffDealEvents } from "./deal-events";
 import { recordDealsFromSync } from "../analytics/pipeline3-record";
 import { refreshRollup } from "../analytics/pipeline3-rollup";
+import { saveLocationUsers } from "../analytics/people3-identity";
 import { diffTagEvents } from "./tag-events";
 import { listAllInstalledLocations } from "./installed-locations";
 import { REFRESH_DUE_AFTER_MINUTES, REFRESH_EVERY_MINUTES } from "./schedule";
@@ -423,6 +424,8 @@ async function handleAppointments(job: Job): Promise<Outcome> {
       }
       await db`delete from location_users where installation_id = ${job.installationId} and location_id = ${loc} and not (user_id = any(${named.map((u) => u.id)}))`;
     } catch (error) { console.error("Saving account members failed", safeError(error)); }
+    // Team module: who they are and which accounts they reach (never throws; a missing table is logged once and skipped).
+    await saveLocationUsers(job.installationId, loc, users);
   } catch (error) {
     usersAccess = isPermissionError(error) ? "needs_permission" : "error";
     if (usersAccess === "error") console.error("Reading team names failed", safeError(error));

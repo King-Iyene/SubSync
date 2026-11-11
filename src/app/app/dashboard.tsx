@@ -54,6 +54,8 @@ import { PipelineModule } from "./views/pl3/module";
 import { ClientsModule } from "./views/cl3/module";
 import { fixturesOn as clSample } from "./views/cl3/data";
 import { TeamView } from "./views/people";
+import { TeamModule } from "./views/pp3/module";
+import { fixturesOn as ppSample } from "./views/pp3/data";
 import { SettingsView } from "./views/settings";
 import { IntegrationsPage } from "./views/connections";
 import { NotificationsPage } from "./views/notifications";
@@ -331,7 +333,7 @@ export function Dashboard() {
   // A page that lives inside a module as a tab (People holds Contact search, Leads and Call lists) has no menu entry of its own.
   // (A page that lives inside the Clients module has no entry of its own for an agency; a business and a client's staff have no Clients module, so their Setup stays in their menu.)
   // The Clean-up entry stays while either of its two features is on (a switched-off tab is left out inside it).
-  const menu = visibleNav(NAV_FOR[auth.kind], { limited, off: (f) => (f === "cleanup" ? off("cleanup") && off("duplicates") : off(f)) });
+  const menu = visibleNav(NAV_FOR[auth.kind], { limited, off: (f) => (f === "cleanup" ? off("cleanup") && off("duplicates") : f === "team" && limited ? auth.features.pp_module !== true || locked("pp_module") : off(f)) });
   // The sidebar: the pilot menu in plain groups that scroll, and Settings, Getting started and What's new pinned underneath so they are always visible.
   const mainMenu = menu.filter((n) => n.group !== "Settings and help");
   const footMenu = menu.filter((n) => n.group === "Settings and help");
@@ -406,7 +408,7 @@ export function Dashboard() {
       case "help": return <HelpView go={go} />;
       case "roadmap": return <RoadmapView />;
       case "pipeline": return auth.features.pl_module === true && !auth.locked.includes("pl_module") ? <PipelineModule key="pipe3" moneyFlow={auth.features.pl_money_flow === true && !auth.locked.includes("pl_money_flow")} actions={auth.features.pl_actions === true && !auth.locked.includes("pl_actions")} /> : <ModuleTabs key="pipe" start={0} tabs={pipeTabs} />;
-      case "team": return <TeamView />;
+      case "team": if ((auth.features.pp_module === true && !auth.locked.includes("pp_module")) || ppSample()) return <TeamModule key="pp3" go={go} />; return limited ? <Centered title="Not available" body="This page is switched off right now." /> : <TeamView />;
       case "appointments": return auth.features.appt_module === true && !auth.locked.includes("appt_module") ? <AppointmentsModule key="appts3" go={go} flowTree={auth.features.appt_flow_tree === true} /> : <ModuleTabs key="appts" start={0} tabs={[{ label: "Appointments", node: <AppointmentsView go={go} /> }, { label: "Insights", node: <AppointmentInsights /> }]} />;
       case "meetings": return <MeetingsView />;
       // Workflows reads with the unfiltered client and keeps its own account choice (like Today), so the shared filter never changes what it counts.
