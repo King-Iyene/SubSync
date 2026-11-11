@@ -164,6 +164,12 @@ export const FEATURES = [
   "td_email",
   "td_record",
   "ov_screen",
+  // Payments module (docs/features/PAYMENTS_BRIEF.md): each behind its own flag, default off. pm_resend messages a customer and stays off until King approves it.
+  "pm_module",
+  "pm_recovery",
+  "pm_disputes",
+  "pm_upcoming",
+  "pm_resend",
 ] as const;
 export type Feature = (typeof FEATURES)[number];
 

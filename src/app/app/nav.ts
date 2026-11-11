@@ -1,5 +1,5 @@
 export type ViewId =
-  | "data-health" | "today" | "myday" | "audit" | "speed" | "overview" | "accounts" | "account" | "search" | "deals" | "inbox" | "onboarding" | "email" | "duplicates" | "alerts" | "settings" | "help" | "pipeline" | "leads" | "calls" | "clients" | "team" | "appointments" | "meetings" | "cleanup" | "roadmap" | "people" | "connections" | "notifications" | "workflows";
+  | "data-health" | "today" | "myday" | "audit" | "speed" | "overview" | "accounts" | "account" | "search" | "deals" | "inbox" | "onboarding" | "email" | "duplicates" | "alerts" | "settings" | "help" | "pipeline" | "leads" | "calls" | "clients" | "team" | "appointments" | "meetings" | "cleanup" | "roadmap" | "people" | "connections" | "notifications" | "workflows" | "payments";
 
 export type GoFn = (view: ViewId, locationId?: string) => void;
 
@@ -28,6 +28,7 @@ export const NAV: NavItem[] = [
   { id: "inbox", label: "Unanswered messages", feature: "inbox", group: "Reply", parent: "speed", showWhenParentOff: true },
   { id: "appointments", label: "Appointments", feature: "appointments", group: "" },
   { id: "clients", label: "Clients", feature: "clients", group: "Clients and people" },
+  { id: "payments", label: "Payments", feature: "pm_module", group: "Clients and people" },
   { id: "people", label: "Find a lead", feature: "search", group: "Clients and people" },
   { id: "search", label: "Contact search", feature: "search", group: "Clients and people", parent: "people" },
   { id: "leads", label: "Leads", feature: "activity", group: "Clients and people", parent: "people" },

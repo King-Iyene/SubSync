@@ -14,7 +14,7 @@ import { movedSettingsSection } from "@/lib/settings-sections";
 import {
   Briefcase, CalendarCheck, ClipboardCheck, Zap, CircleHelp, Copy, Eraser, Inbox, Kanban, LayoutDashboard, Mic, Monitor, Moon, PhoneCall, Plug, Search, Settings, Sun, Target, UserRound, Users, Wrench, type LucideIcon,
   Sparkles, UsersRound,
-  Workflow,
+  Workflow, CreditCard,
 } from "lucide-react";
 import { NAV, PARENT, visibleNav, type GoFn, type ViewId } from "./nav";
 import { useBrandedText } from "./brand-text";
@@ -53,6 +53,9 @@ import { PipelineView } from "./views/pipeline";
 import { PipelineModule } from "./views/pl3/module";
 import { ClientsModule } from "./views/cl3/module";
 import { fixturesOn as clSample } from "./views/cl3/data";
+import { PaymentsModule } from "./views/pm/module";
+import { EmptyState } from "./ds/states";
+import { fixturesOn as pmSample } from "./views/pm/data";
 import { TeamView } from "./views/people";
 import { TeamModule } from "./views/pp3/module";
 import { fixturesOn as ppSample } from "./views/pp3/data";
@@ -421,6 +424,7 @@ export function Dashboard() {
       case "meetings": return <MeetingsView />;
       // Workflows reads with the unfiltered client and keeps its own account choice (like Today), so the shared filter never changes what it counts.
       case "data-health": return <ApiProvider value={baseApi}><DataHealthView go={go} kind={auth.kind} /></ApiProvider>;
+      case "payments": return (auth.features.pm_module === true && !auth.locked.includes("pm_module")) || pmSample() ? <PaymentsModule key="pm" go={go} /> : <EmptyState title="Payments is not switched on yet" body="It will appear here as soon as it is ready for your account." />;
       case "workflows": return <ApiProvider value={baseApi}><WorkflowsView go={go} kind={auth.kind} /></ApiProvider>;
       case "clients": if ((auth.features.cl_module === true && !auth.locked.includes("cl_module")) || clSample()) return <ClientsModule key="cl3" go={go} features={clientFeatures} />; return <ClientsView key="clients" go={go} initialTab="health" features={clientFeatures} />;
     }
@@ -522,7 +526,7 @@ const THEME_LABEL: Record<ThemePref, string> = { dark: "Dark appearance", light:
 
 const ICONS: Record<string, LucideIcon> = {
   today: Sun, myday: Sun, people: UsersRound, audit: ClipboardCheck, speed: Zap, overview: LayoutDashboard, inbox: Inbox, appointments: CalendarCheck, meetings: Mic, search: Search, pipeline: Kanban, leads: Target, calls: PhoneCall,
-  accounts: Briefcase, clients: UserRound, team: Users, onboarding: Wrench, duplicates: Copy, cleanup: Eraser, settings: Settings, connections: Plug, help: CircleHelp, roadmap: Sparkles, workflows: Workflow, "data-health": ClipboardCheck,
+  accounts: Briefcase, clients: UserRound, team: Users, onboarding: Wrench, duplicates: Copy, cleanup: Eraser, settings: Settings, connections: Plug, help: CircleHelp, roadmap: Sparkles, workflows: Workflow, payments: CreditCard, "data-health": ClipboardCheck,
 };
 
 function Centered({ title, body }: { title: string; body: string }) {

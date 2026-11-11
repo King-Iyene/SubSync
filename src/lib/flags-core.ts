@@ -132,6 +132,12 @@ export const DEFAULT_OFF: ReadonlySet<Feature> = new Set<Feature>([
   "td_email",
   "td_record",
   "ov_screen",
+  // Payments module (docs/features/PAYMENTS_BRIEF.md): each behind its own flag, default off. pm_resend stays off until King approves messaging a customer.
+  "pm_module",
+  "pm_recovery",
+  "pm_disputes",
+  "pm_upcoming",
+  "pm_resend",
 ]);
 
 export function resolveFeatures(all: readonly Feature[], overrides: Record<string, boolean>, allOn = false): Record<Feature, boolean> {
