@@ -883,3 +883,13 @@ Comparison rules: same rules version only; never a run cut at the read cap; "the
 - **Weekly receipt (td_receipts)**: Monday to Sunday: found, cleared, still open (the latest count of each kind at the end of the week), median minutes to fix (needs 3 fixes, else "Not enough data"). Shown only once the record has at least two days and the week is after "history starts <date>".
 - **Numbers (max 6 tiles)**: typical first reply (median of daily medians, needs 5 answered leads), waiting for a reply, show rate (needs 20 marked outcomes; unmarked are not counted), open deals (dollar figure leaves out $0 and ownerless deals and says how many), deals gone quiet (Pipeline's counted rule), accounts needing a look. Each tile opens its rows or its screen, and "How is this worked out?" shows the formula. No win rate tile (minimum 20 closed deals rule keeps it out until a screen needs it).
 - **Daily email**: once per day at the chosen hour (the business's own time zone), not on quiet weekdays, never to leads; goes only through the gated sender (dry run until the live switch is on).
+
+## Clients v2 (stage CL2): /api/app/clients2, flags cl2_*, default off
+- **Payment status** (from the platform's raw subscription status, stored as received): active, trialing = Paid up; past_due, unpaid, incomplete = Past due; canceled, incomplete_expired = Cancelled; paused = Paused; anything else = "Other: <raw>" (shown, never hidden). No plan row = "Not on a paid plan from you". "Needs permission: reconnect" only when the platform answered 401 or 403; any other failure says "Not available from the platform yet" with the HTTP status.
+- **Days in this status**: whole days since SubSync first saw the status (our own record; the platform keeps no history). Resets when the raw status changes.
+- **Plans needing attention**: Past due, Cancelled, Paused or Other. Sorted by days in status, then monthly price.
+- **Money at risk (estimate)**: sum of the monthly price of those plans, per currency (yearly price / 12, weekly x 4.33), never summed across currencies. Not what was charged.
+- **Quiet N days** (default 14): no message sent by a person on the team and no new contact for N days (an account never read is not quiet).
+- **Last activity**: the latest of a person's outbound message and a new contact.
+- **Today line**: past due plans first, then cancelled or paused, then accounts needing action now, then "needs permission", then accounts to keep an eye on, then "all fine". Each tile count equals the rows it opens (same filter).
+- **Show rate, speed to lead, open pipeline**: the existing Clients 3 definitions (last 30 days), reused so numbers cannot disagree.

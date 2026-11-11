@@ -126,6 +126,7 @@ import { handleAppointments3 } from "./appointments3-routes";
 import { handleApptExec, handleApptExecTarget } from "./appointments-exec-routes";
 import { handlePipeline3 } from "./pipeline3-routes";
 import { handleClients3 } from "./clients3-routes";
+import { handleClients2 } from "./clients2-routes";
 import { handlePeople3 } from "./people3-routes";
 import { handleTeamRoles } from "./team-roles-routes";
 import { handleToday3, handleToday3Act } from "./today3-routes";
@@ -2064,6 +2065,10 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
     // Clients round 3: /api/app/clients3?part=... (overview, needs attention, trends, compare, receipt, people, setup, lists; read only).
     if (a === "clients3" && method === "GET" && !b && ctx.url.searchParams.has("part")) {
       return await handleClients3(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links });
+    }
+    // Clients v2 (client-account management): /api/app/clients2?part=... (accounts, today, plans needing attention, one account) and /api/app/clients2/<op> (SubSync-only notes, kind of business, saved views).
+    if (a === "clients2" && ((method === "GET" && !b && ctx.url.searchParams.has("part")) || (method === "POST" && b && ctx.segments.length === 2))) {
+      return await handleClients2(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links });
     }
     // Today (front page): /api/app/today3?part=... (today, list, proof, numbers, settings, export; read only) and /api/app/today3/act/... (SubSync-only notes).
     if (a === "today3" && method === "GET" && !b && ctx.url.searchParams.has("part")) {

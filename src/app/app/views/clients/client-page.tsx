@@ -20,7 +20,7 @@ import type { BookOne } from "./types";
 const QUIET = "ds-press inline-flex min-h-11 items-center gap-1 rounded-md px-2.5 text-sm font-medium text-primary underline-offset-4 hover:bg-muted hover:underline focus-visible:outline-2 focus-visible:outline-[var(--ring)] sm:min-h-9";
 const H2 = "mb-2 text-lg font-semibold tracking-tight";
 
-export function ClientPage({ id, onBack, onOpen, go }: { id: string; onBack: () => void; onOpen: (id: string) => void; go: GoFn }) {
+export function ClientPage({ id, onBack, onOpen, go, embedded = false }: { id: string; onBack: () => void; onOpen: (id: string) => void; go: GoFn; embedded?: boolean }) {
   const [version, setVersion] = useState(0);
   const [editing, setEditing] = useState<Field | null>(null);
   const [note, setNote] = useState<string | null>(null);
@@ -51,7 +51,7 @@ export function ClientPage({ id, onBack, onOpen, go }: { id: string; onBack: () 
   return (
     <div data-testid="client-page" className="ds-enter">
       <div className="print:hidden">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div className={`mb-3 flex flex-wrap items-center justify-between gap-2 ${embedded ? "hidden" : ""}`}>
           <button type="button" onClick={onBack} className={`${QUIET} -ml-2.5`} data-testid="client-back"><ChevronLeft aria-hidden className="size-4" />All clients</button>
           {d.queue.position !== null && (
             <span className="flex items-center gap-1 text-sm text-muted-foreground" data-testid="client-queue">
@@ -62,7 +62,7 @@ export function ClientPage({ id, onBack, onOpen, go }: { id: string; onBack: () 
           )}
         </div>
 
-        <header className="mb-6 flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
+        <header className={`mb-6 flex flex-wrap items-start justify-between gap-x-4 gap-y-3 ${embedded ? "hidden" : ""}`}>
           <div className="min-w-0">
             <h1 className="text-[1.65rem] font-semibold leading-tight tracking-tight" data-testid="client-name">{r.name}</h1>
             <p className="mt-1.5 flex flex-wrap items-center gap-x-2 text-sm"><HealthWord r={r} inNeeds={needs} /><span className="text-muted-foreground" data-testid="client-summary-line">{r.line}</span></p>

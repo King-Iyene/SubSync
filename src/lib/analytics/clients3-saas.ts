@@ -3,7 +3,12 @@
 // Three honest states per account: "ok" (plan found), "no_plan" (the platform answered and the account is not on a plan), "needs_permission" (ONLY when the platform answered 401 or 403).
 
 export type SaasState = "ok" | "no_plan" | "needs_permission" | "not_available";
-export type SaasRow = { state: SaasState; planId: string | null; planName: string | null; status: string | null };
+export type PlanDetail = { title: string | null; trialDays: number | null; userLimit: number | null; contactLimit: number | null; prices: Array<{ id: string | null; amount: number; currency: string | null; interval: string | null }> };
+export type SaasRow = {
+  state: SaasState; planId: string | null; planName: string | null; status: string | null;
+  /** Extra detail the platform returned (the price line the account is on, trial days, limits). Absent when the plan could not be read. */
+  subscriptionId?: string | null; price?: { amount: number; currency: string | null; interval: string | null } | null; trialDays?: number | null; userLimit?: number | null; contactLimit?: number | null;
+};
 export type Resp = { status: number; body: unknown };
 export type Getter = (path: string, version: string) => Promise<Resp>;
 
@@ -23,10 +28,19 @@ async function call(get: Getter, path: string): Promise<Resp> {
 /** Plan name from a saas-plan response (the platform calls it title; older shapes used name). */
 export function planTitle(body: unknown): string | null { return str(dig(body, "title")) ?? str(dig(body, "name")) ?? str(dig(body, "plan", "title")); }
 
+const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : typeof v === "string" && v.trim() !== "" && Number.isFinite(Number(v)) ? Number(v) : null);
+/** Plan detail from a saas-plan response: title, trial days, limits and every price line (amount, currency, month or year). */
+export function planDetail(body: unknown): PlanDetail {
+  const list = dig(body, "prices");
+  const prices = (Array.isArray(list) ? list : []).flatMap((p) => { const amount = num(dig(p, "amount")); return amount === null ? [] : [{ id: str(dig(p, "_id")) ?? str(dig(p, "id")) ?? str(dig(p, "priceId")), amount, currency: str(dig(p, "currency")), interval: str(dig(p, "billingInterval")) ?? str(dig(p, "interval")) }]; });
+  return { title: planTitle(body), trialDays: num(dig(body, "trialPeriod")), userLimit: num(dig(body, "userLimit")), contactLimit: num(dig(body, "contactLimit")), prices };
+}
+
 /** Fetch every page of the SaaS accounts list and map it to one row per account id. `failed` carries the real HTTP status when the call did not succeed. */
 export async function readSaasPlans(get: Getter, companyId: string): Promise<{ failed: number | null; rows: Map<string, SaasRow> }> {
   const rows = new Map<string, SaasRow>();
-  const plans = new Map<string, string | null>();
+  const plans = new Map<string, PlanDetail | null>();
+  const priceIds = new Map<string, string | null>();
   const base = `/saas/saas-locations/${encodeURIComponent(companyId)}`;
   for (let page = 1; page <= MAX_PAGES; page++) {
     const r = await call(get, `${base}?page=${page}`);
@@ -36,17 +50,24 @@ export async function readSaasPlans(get: Getter, companyId: string): Promise<{ f
       const id = str(dig(l, "locationId"));
       if (!id) continue;
       const planId = str(dig(l, "subscriptionInfo", "saasPlanId")), status = str(dig(l, "subscriptionInfo", "subscriptionStatus"));
-      rows.set(id, planId || status ? { state: "ok", planId, planName: null, status } : { state: "no_plan", planId: null, planName: null, status: null });
+      priceIds.set(id, str(dig(l, "subscriptionInfo", "priceId")));
+      rows.set(id, planId || status ? { state: "ok", planId, planName: null, status, subscriptionId: str(dig(l, "subscriptionId")) } : { state: "no_plan", planId: null, planName: null, status: null });
     }
     if (dig(r.body, "pagination", "hasNext") !== true) break;
   }
-  for (const row of rows.values()) {
+  for (const [id, row] of rows) {
     if (!row.planId) continue;
     if (!plans.has(row.planId)) {
       const p = await call(get, `/saas/saas-plan/${encodeURIComponent(row.planId)}?companyId=${encodeURIComponent(companyId)}`);
-      plans.set(row.planId, p.status >= 200 && p.status < 300 ? planTitle(p.body) : null);
+      plans.set(row.planId, p.status >= 200 && p.status < 300 ? planDetail(p.body) : null);
     }
-    row.planName = plans.get(row.planId) ?? null;
+    const d = plans.get(row.planId) ?? null;
+    row.planName = d?.title ?? null;
+    if (d) {
+      const pid = priceIds.get(id), line = (pid ? d.prices.find((x) => x.id === pid) : null) ?? (d.prices.length === 1 ? d.prices[0] : null);
+      row.price = line ? { amount: line.amount, currency: line.currency, interval: line.interval } : null;
+      row.trialDays = d.trialDays; row.userLimit = d.userLimit; row.contactLimit = d.contactLimit;
+    }
   }
   return { failed: null, rows };
 }
