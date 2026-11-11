@@ -82,6 +82,9 @@ export const FEATURES = [
   "inbox_quiet",
   "inbox_keys",
   "inbox_bulk",
+  // Appointments module (stage AU, the sub-section screens and the Flow Tree): default off.
+  "appt_module",
+  "appt_flow_tree",
 ] as const;
 export type Feature = (typeof FEATURES)[number];
 

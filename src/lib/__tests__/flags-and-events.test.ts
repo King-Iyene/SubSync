@@ -14,6 +14,8 @@ test("pilot modules are on by default and a database row can still override the 
   // Zoom and Google Meet stay hidden everywhere until a pilot asks for them. Optional unanswered-message add-ons also remain individually gated.
   // Unanswered Messages Round 2 (docs/features/UNANSWERED2.md): each behind its own flag, default off.
   assert.deepEqual([...DEFAULT_OFF].sort(), [
+    "appt_flow_tree",
+    "appt_module",
     "inbox_assign",
     "inbox_ball_in_court",
     "inbox_breach_alert",

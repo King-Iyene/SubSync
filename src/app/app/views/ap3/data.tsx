@@ -1,0 +1,91 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore, type ComponentType } from "react";
+import { useData } from "../../session";
+import { CONFLICTS_FIXTURE, FLOW_EMPTY, FLOW_FIXTURE, HEALTH_FIXTURE, OVERVIEW_FIXTURE, PEOPLE_FIXTURE, PROOF_FIXTURE, REMINDERS_FIXTURE, SOURCES_FIXTURE, SPEED_FIXTURE, page, rowsFixture } from "./fixtures";
+import type { ApPart, ApRow, ApScope } from "./types";
+
+/** Scope the user picks. `days` is turned into from/to on the server's day boundaries; everything else is passed through and re-checked on the server (never trusted). */
+export type ApFilters = { days: 7 | 30 | 90; locationId: string; source: string; q: string; userId: string };
+export const DEFAULT_FILTERS: ApFilters = { days: 30, locationId: "", source: "", q: "", userId: "" };
+
+const FX = /[?&]apfx=(1|empty|error)/;
+function fxFound(): string {
+  if (typeof window === "undefined") return "";
+  // The shell may rewrite the address, so the address the page was first opened with counts too.
+  const first = (performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined)?.name ?? "";
+  const m = FX.exec(window.location.href) ?? FX.exec(first);
+  try { if (m) sessionStorage.setItem("ap3.fx", m[1]); return m ? m[1] : sessionStorage.getItem("ap3.fx") ?? ""; } catch { return m ? m[1] : ""; }
+}
+if (typeof window !== "undefined") fxFound(); // remember ?apfx at load: the shell may drop the query before the module renders
+export const fixturesOn = () => fxFound() !== "";
+const fxMode = () => { const v = fxFound(); return v === "empty" || v === "error" ? v : ""; };
+
+export function scopeOf(f: ApFilters): ApScope {
+  const day = 86_400_000, to = new Date(), from = new Date(to.getTime() - f.days * day);
+  return { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10), locationId: f.locationId || undefined, source: f.source || undefined, userId: f.userId || undefined };
+}
+export function queryOf(part: ApPart, f: ApFilters, extra: Record<string, string | number | undefined> = {}): string {
+  const s = scopeOf(f); const p = new URLSearchParams({ part, from: s.from, to: s.to });
+  if (s.locationId) p.set("location", s.locationId);
+  if (s.source) p.set("source", s.source);
+  if (s.userId) p.set("user", s.userId);
+  if (f.q.trim()) p.set("q", f.q.trim());
+  for (const [k, v] of Object.entries(extra)) if (v !== undefined && v !== "") p.set(k, String(v));
+  return `appointments?${p}`;
+}
+
+function fixtureFor(part: ApPart, extra: Record<string, string | number | undefined>): unknown {
+  const pg = Number(extra.page ?? 1), size = Number(extra.pageSize ?? 20);
+  const mk = (kind: "needs" | "recover" | "all", n: number) => page(rowsFixture(n, kind).slice((pg - 1) * size, pg * size), n, pg, size);
+  switch (part) {
+    case "overview": return OVERVIEW_FIXTURE;
+    case "needs-outcome": return mk("needs", 23);
+    case "no-show-recovery": return mk("recover", 17);
+    case "list": return mk("all", Number(extra.expect ?? 41));
+    case "booking-share": return { rows: PEOPLE_FIXTURE };
+    case "flow-tree": return FLOW_FIXTURE;
+    case "health": return { rows: HEALTH_FIXTURE };
+    case "sources": return { sources: SOURCES_FIXTURE, speed: SPEED_FIXTURE };
+    case "calendars": return { rows: CONFLICTS_FIXTURE };
+    case "reminders": return page(REMINDERS_FIXTURE);
+    case "proof": return { rows: PROOF_FIXTURE };
+  }
+}
+
+/** One part of the appointments API, or its typed fixture with ?apfx=1 (?apfx=empty and ?apfx=error show the other two states). */
+export function useAp<T>(part: ApPart, f: ApFilters, extra: Record<string, string | number | undefined> = {}) {
+  const fx = fixturesOn(), mode = fx ? fxMode() : "";
+  const key = queryOf(part, f, extra);
+  const live = useData<T>(fx ? null : key);
+  const [fix, setFix] = useState<{ data: T | null; error: boolean; loading: boolean }>({ data: null, error: false, loading: fx });
+  const reload = useCallback(() => {
+    if (!fx) return void live.reload();
+    setFix((s) => ({ ...s, loading: true }));
+    setTimeout(() => {
+      if (mode === "error") return setFix({ data: null, error: true, loading: false });
+      if (mode === "empty") return setFix({ data: (part === "flow-tree" ? FLOW_EMPTY : part === "overview" ? { ...OVERVIEW_FIXTURE, headline: { ...OVERVIEW_FIXTURE.headline, booked: 0, marked: 0, needsOutcome: 0, noShowsToRecover: 0, trueShowRate: null, reportedShowRate: null, trueRange: null }, revenueAtRisk: null, journey: [], cards: { worstAccount: null, topSetter: null, leak: null } } : { total: 0, page: 1, pageSize: 20, rows: [], sources: [], speed: [] }) as T, error: false, loading: false });
+      setFix({ data: fixtureFor(part, extra) as T, error: false, loading: false });
+    }, 260);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fx, mode, key]);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { if (fx) reload(); }, [fx, reload]);
+  return fx ? { data: fix.data, error: fix.error ? ({ message: "Could not load this" } as never) : null, loading: fix.loading, reload } : live;
+}
+
+export type ApRows = { total: number; page: number; pageSize: number; rows: ApRow[] };
+
+// A tiny registry so slice AB can mount the appointment details content (timeline, booker, deal, reminders, edit, delete) and the Meetings section without touching these files.
+export type ApSlotName = "Details" | "Meetings" | "RowActions" | "BulkActions";
+type SlotProps = { row?: ApRow; rows?: ApRow[]; onChanged?: () => void; filters?: ApFilters };
+const slots = new Map<ApSlotName, ComponentType<SlotProps>>(); const subs = new Set<() => void>(); let ver = 0;
+export function registerApSlot(name: ApSlotName, c: ComponentType<SlotProps>) { slots.set(name, c); ver++; subs.forEach((f) => f()); }
+export function ApSlot({ name, ...props }: { name: ApSlotName } & SlotProps) {
+  useSyncExternalStore((cb) => { subs.add(cb); return () => { subs.delete(cb); }; }, () => ver, () => 0);
+  const C = slots.get(name);
+  // eslint-disable-next-line react-hooks/static-components -- a registered slot is a stable component, registered once at start-up
+  return C ? <C {...props} /> : null;
+}
+export const hasApSlot = (n: ApSlotName) => slots.has(n);
+export const useMemoFilters = (f: ApFilters) => useMemo(() => f, [f.days, f.locationId, f.source, f.q, f.userId]); // eslint-disable-line react-hooks/exhaustive-deps
