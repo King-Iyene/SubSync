@@ -155,8 +155,10 @@ export const valueAtRisk = (r: Pick<QueueRow, "dollars" | "estimate">): number =
  * (critical before warning before info), then the account name and the kind so the order never flickers between two reads.
  */
 export function rankQueue(rows: QueueRow[]): QueueRow[] {
+  // People who are already waiting a long time come first: that money can still be saved today. Quiet-deal money (often one big deal) ranks after.
+  const urgent = (r: QueueRow) => (r.kind === "replies" && r.severity === "critical" ? 0 : 1);
   return [...rows].sort((a, b) =>
-    valueAtRisk(b) - valueAtRisk(a) || b.ageMinutes - a.ageMinutes || SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity]
+    urgent(a) - urgent(b) || valueAtRisk(b) - valueAtRisk(a) || b.ageMinutes - a.ageMinutes || SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity]
     || a.accountName.localeCompare(b.accountName) || a.kind.localeCompare(b.kind));
 }
 
@@ -267,7 +269,7 @@ export const accountsQuery = (ids: string[]) => (ids.length ? `accounts=${ids.fi
 /** A strong part of the headline is a button: it opens the records behind that number. */
 export type HeadlineAction = "clients" | "dollars" | "things" | "replies";
 export type HeadlinePart = { t: string; strong?: boolean; action?: HeadlineAction };
-export type Headline = { /** One deal that is most of the quiet-deal money, said in words so the dollar figure is not read as a pattern. Shown beside the dollars (tile, email, print). */ note?: string | null; parts: HeadlinePart[]; text: string; allClear: boolean; /** "8 people waiting for a reply (3 new leads), 6 appointments to mark and 9 deals gone quiet worth $48,200." */ breakdown: string | null; accounts: number; dollars: number };
+export type Headline = { /** How the people-waiting number is made up, so Today, Unanswered and People can be read together: waiting + new leads never answered = total. */ split?: { total: number; waiting: number; never: number } | null; /** One deal that is most of the quiet-deal money, said in words so the dollar figure is not read as a pattern. Shown beside the dollars (tile, email, print). */ note?: string | null; parts: HeadlinePart[]; text: string; allClear: boolean; /** "8 people waiting for a reply (3 new leads), 6 appointments to mark and 9 deals gone quiet worth $48,200." */ breakdown: string | null; accounts: number; dollars: number };
 
 /** "1 person waiting for a reply", "14 people waiting for a reply": a count with the right singular or plural, as a person would say it. */
 export const countWords = (k: Kind, n: number) => `${n.toLocaleString("en-US")} ${COUNT_WORDS[k][n === 1 ? 0 : 1]}`;
@@ -275,6 +277,13 @@ const COUNT_WORDS: Record<Kind, [string, string]> = {
   replies: ["person needs a reply", "people need a reply"], appointments: ["appointment with no outcome", "appointments with no outcome"], noshows: ["no-show not rebooked", "no-shows not rebooked"],
   stale: ["quiet deal", "quiet deals"],
 };
+
+/** The people-waiting number split in two: people who wrote and wait, and new leads nobody has answered. The two always add up to the headline. */
+export function splitOf(t: Totals): { total: number; waiting: number; never: number } | null {
+  const total = t.replies.count;
+  const never = Math.min(total, t.replies.newLeads ?? 0);
+  return total > 0 && never > 0 ? { total, waiting: total - never, never } : null;
+}
 
 export function breakdownOf(t: Totals, o: { dollars?: boolean } = {}): string | null {
   const c = countsOf(t, []);
@@ -313,7 +322,7 @@ export function headlineOf(i: { scope: "all" | "account"; rows: QueueRow[]; tota
     : c.replies > 0
       ? [{ t: c.replies.toLocaleString("en-US"), strong: true, action: "replies" }, { t: ` ${replyWord} waiting for a reply.` }]
       : [{ t: c.things.toLocaleString("en-US"), strong: true, action: "things" }, { t: ` ${c.things === 1 ? "thing needs" : "things need"} a look today.` }];
-  return { parts, text: parts.map((p) => p.t).join(""), allClear: false, breakdown, note, accounts, dollars };
+  return { parts, text: parts.map((p) => p.t).join(""), allClear: false, breakdown, note, accounts, dollars, split: splitOf(i.totals) };
 }
 
 // ---------- the donut ----------

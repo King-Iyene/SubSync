@@ -494,7 +494,7 @@ export function Dashboard() {
                             {/* ONE filter bar for every page with numbers (KF-11): accounts (agency) and dates, always open. Today keeps its own account choice (ta=) but the bar edits it. */}
                 <ApiProvider value={baseApi ?? api}><GlobalFilterBar view={view.id} agency={auth.kind === "agency" && Boolean(baseApi)} value={filter} onChange={setFilter}
                   onAllClients={fromAccount ? () => { setFilter(EMPTY_FILTER); try { window.history.replaceState(null, "", withTodayAccounts(window.location.hash, [])); window.dispatchEvent(new Event("subsync-today-accounts")); } catch { /* the filter is cleared anyway */ } } : undefined} /></ApiProvider>
-            {trailSection && <p data-testid="trail" className="mb-2 text-sm font-medium text-muted-foreground print:hidden">{trailSection} <span aria-hidden>&gt;</span><span className="sr-only">then</span> {NAV.find((n) => n.id === shown)?.label ?? ""}</p>}
+            {trailSection && <p data-testid="trail" className="mb-2 text-sm max-sm:hidden font-medium text-muted-foreground print:hidden">{trailSection} <span aria-hidden>&gt;</span><span className="sr-only">then</span> {NAV.find((n) => n.id === shown)?.label ?? ""}</p>}
             {view.id !== "today" && strip}<BackProvider value={back}><TrailProvider value={trailSection}>{content}</TrailProvider></BackProvider>
             <FeedbackBox page={view.id} />
           </main>

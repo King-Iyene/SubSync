@@ -38,7 +38,16 @@ export function TodayHeadline({ headline, onPart, action, children }: { headline
             : <span key={n}>{num}</span>;
         })}
       </h2>
+      {headline.split && (
+        <p className="t-small t-quiet mt-2" data-testid="today-split">
+          {headline.split.total.toLocaleString("en-US")} ={" "}
+          {onPart ? <button type="button" onClick={() => onPart("replies")} className="underline underline-offset-2 hover:text-primary">{headline.split.waiting.toLocaleString("en-US")} {headline.split.waiting === 1 ? "person who wrote is" : "people who wrote are"} waiting</button> : <span>{headline.split.waiting.toLocaleString("en-US")} waiting</span>}
+          {" + "}
+          {onPart ? <button type="button" onClick={() => onPart("replies")} className="underline underline-offset-2 hover:text-primary">{headline.split.never.toLocaleString("en-US")} new {headline.split.never === 1 ? "lead" : "leads"} never answered</button> : <span>{headline.split.never.toLocaleString("en-US")} new leads never answered</span>}
+        </p>
+      )}
       {headline.breakdown && <p className="t-small t-quiet mt-2" data-testid="today-breakdown">{headline.breakdown}</p>}
+      {headline.note && <p className="t-small t-quiet mt-1" data-testid="today-outlier">{headline.note} Check it is a real deal before relying on the total.</p>}
       {action && <div className="mt-4" data-testid="today-primary">{action}</div>}
       {children}
     </section>

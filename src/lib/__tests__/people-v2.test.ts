@@ -186,10 +186,10 @@ test("the list to start with is the most urgent one that has anybody on it", () 
 test("the sentence at the top names the most urgent list and the rest in short", () => {
   const counts = [{ id: "waiting" as const, total: 12 }, { id: "noshows" as const, total: 7 }, { id: "followups" as const, total: 0 }, { id: "hot" as const, total: 9 }, { id: "stale" as const, total: 1 }];
   const s = queueSay(counts, 14);
-  assert.equal(s.head, "12 new leads are waiting for a reply.");
+  assert.equal(s.head, "12 new leads have never had a reply.");
   assert.equal(s.also, "Also: 7 no-shows, 9 hot leads, 1 stale deal.");
   assert.equal(s.allClear, false);
-  assert.equal(queueSay([{ id: "waiting", total: 1 }], 14).head, "1 new lead is waiting for a reply.");
+  assert.equal(queueSay([{ id: "waiting", total: 1 }], 14).head, "1 new lead has never had a reply.");
   assert.equal(queueSay([{ id: "stale", total: 4 }], 21).head, "4 deals have not moved for 21 days or more.");
   const clear = queueSay(counts.map((c) => ({ ...c, total: 0 })), 14);
   assert.deepEqual(clear, { head: "Nobody needs a call right now.", also: null, allClear: true });

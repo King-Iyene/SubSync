@@ -35,7 +35,7 @@ test("the Unanswered screen still loads with the actions off and shows no new bu
   test.setTimeout(240_000);
   await page.goto("/app#inbox");
   await page.reload();
-  await expect(page.getByTestId("today-headline")).toBeVisible({ timeout: 90_000 });
+  await expect(page.getByTestId("wait-headline")).toBeVisible({ timeout: 90_000 });
   await expect(page.getByTestId("act-select")).toHaveCount(0);
   await expect(page.getByTestId("hidden-people")).toHaveCount(0);
   const { scrollWidth, innerWidth } = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth }));

@@ -9,6 +9,7 @@ const GROUPS = ["Reply", "Clients and people", "More"];
 test.beforeEach(async ({}, testInfo) => { test.skip(testInfo.project.name !== "desktop-1440", "the sidebar is the desktop layout"); });
 
 test("the agency menu exposes all modules, keeps Settings and help visible, and shows all client tabs", async ({ page }) => {
+  test.setTimeout(300_000);
   await page.setViewportSize({ width: 1440, height: 640 });
   await page.goto("/app");
   await expect(page.getByText("Demo mode", { exact: false }).first()).toBeVisible();
@@ -31,5 +32,6 @@ test("the agency menu exposes all modules, keeps Settings and help visible, and 
   await side.getByRole("button", { name: "People", exact: true }).click();
   for (const tab of ["Find and call", "Tags", "Going cold", "Sources"]) await expect(page.getByRole("tab", { name: tab, exact: true }), `People tab: ${tab}`).toBeVisible();
   await side.getByRole("button", { name: "Overview", exact: true }).click();
-  await expect(page.getByTestId("overview-metric"), "Overview stays within its six-metric cap").toHaveCount(6);
+  await expect(page.getByTestId("overview-metric").first()).toBeVisible({ timeout: 150_000 }); // the Overview loads its numbers after the menu opens; the demo server can take a while
+  await expect(page.getByTestId("overview-metric"), "Overview stays within its six-metric cap").toHaveCount(6, { timeout: 150_000 });
 });

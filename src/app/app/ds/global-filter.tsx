@@ -124,13 +124,13 @@ function DateControl({ mode, hash }: { mode: "range" | "now"; hash: string }) {
     notifyRangeChange();
     window.dispatchEvent(new Event("subsync-range"));
   };
-  if (mode === "now") return <p className="text-[0.95rem] text-muted-foreground" data-testid="date-now"><span className="font-medium text-foreground">Right now</span> (this page shows what is true at this moment)</p>;
+  if (mode === "now") return <p className="text-[0.95rem] text-muted-foreground" data-testid="date-now" title="This page shows what is true at this moment, not a date range."><span className="font-medium text-foreground">Live</span>, as of right now</p>;
   return (
     <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5" data-testid="date-control">
       <div role="group" aria-label="Dates" className="inline-flex overflow-hidden rounded-lg border bg-card">
         {PRESETS.map((p) => (
           <button key={p.key} type="button" aria-pressed={spec.preset === p.key} onClick={() => apply({ preset: p.key, compare: "none" })}
-            className={`min-h-10 px-3 text-[0.95rem] outline-none focus-visible:ring-2 focus-visible:ring-ring/40 ${spec.preset === p.key ? "bg-primary font-medium text-primary-foreground" : "hover:bg-accent"}`}>{p.label}</button>
+            className={`min-h-10 whitespace-nowrap px-2.5 text-[0.95rem] outline-none focus-visible:ring-2 focus-visible:ring-ring/40 sm:px-3 ${spec.preset === p.key ? "bg-primary font-medium text-primary-foreground" : "hover:bg-accent"}`}>{p.label.startsWith("Last ") ? <><span className="max-sm:sr-only">Last </span>{p.label.slice(5)}</> : p.label}</button>
         ))}
         <button type="button" aria-pressed={spec.preset === "custom"} onClick={() => apply({ preset: "custom", from: spec.from ?? resolved?.current.from, to: spec.to ?? resolved?.current.to, compare: "none" })}
           className={`min-h-10 border-l px-3 text-[0.95rem] outline-none focus-visible:ring-2 focus-visible:ring-ring/40 ${spec.preset === "custom" ? "bg-primary font-medium text-primary-foreground" : "hover:bg-accent"}`}>Custom</button>
@@ -172,7 +172,7 @@ export function GlobalFilterBar({ view, agency, value, onChange, onAllClients }:
     <>
       {/* Sticky: it follows on scroll as one compact line and takes its own place in the flow, so it never covers the content under it. */}
       <div className="sticky top-0 z-30 mb-3 rounded-xl border bg-card px-3 py-1.5 shadow-sm print:hidden" data-testid="global-filter-bar" role="region" aria-label="Filters for this page"><div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-1">
-        {showAccounts ? <AccountControl accounts={options!.accounts!} picked={picked} onChange={setPicked} options={options!} value={isToday ? { ...value, accounts: picked } : value} onValue={onChange} /> : <span />}
+        {showAccounts ? <AccountControl accounts={options!.accounts!} picked={picked} onChange={setPicked} options={options!} value={isToday ? { ...value, accounts: picked } : value} onValue={onChange} /> : agency && !options ? <span className="h-10 w-48 animate-pulse rounded-lg bg-muted" aria-hidden data-testid="account-skeleton" /> : <span />}
         <div className="flex flex-wrap items-center gap-3">
           {onAllClients && <button type="button" onClick={onAllClients} data-testid="back-to-all-clients" className="ds-press min-h-10 cursor-pointer rounded-lg border bg-card px-3 text-[0.95rem] font-medium text-primary hover:border-primary/40 hover:underline focus-visible:ring-2 focus-visible:ring-ring/40 outline-none">Back to all clients</button>}
           <DateControl mode={mode} hash={hash} />

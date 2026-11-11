@@ -218,6 +218,7 @@ export function WhoWasSlow({ people, accounts, multi, seePeople, win }: { people
 // ---------------------------------------------------------------- first-run tour and the guide
 const TOUR_KEY = "subsync.speed.tour6";
 const GUIDE: Array<[string, string]> = [
+  ["Who is still waiting for a reply?", "Unanswered: every person waiting, oldest first, across your clients."],
   ["Who is slow?", "Pace and People: the slowest people and client accounts."],
   ["Who should I reply to first?", "Pace: waiting leads, open deals first."],
   ["Where do my leads go?", "Pace: the animated lead journey, with drop-offs."],
