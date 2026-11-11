@@ -88,6 +88,8 @@ export const DEFAULT_OFF: ReadonlySet<Feature> = new Set<Feature>([
   // Pipeline module, slice PB (deal actions): each default off.
   "pl_delete",
   "pl_bulk",
+  "cl_reports",
+  "cl_actions",
 ]);
 
 export function resolveFeatures(all: readonly Feature[], overrides: Record<string, boolean>, allOn = false): Record<Feature, boolean> {

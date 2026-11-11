@@ -31,6 +31,8 @@ test("pilot modules are on by default and a database row can still override the 
     "appt_record",
     "appt_reminders",
     "appt_sources",
+    "cl_actions",
+    "cl_reports",
     "inbox_assign",
     "inbox_ball_in_court",
     "inbox_breach_alert",

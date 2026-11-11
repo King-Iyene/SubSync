@@ -121,6 +121,9 @@ export const FEATURES = [
   // Pipeline module, slice PB (deal actions): default off.
   "pl_delete",
   "pl_bulk",
+  // Clients module, slice CB (weekly receipt, mute, reply targets): default off.
+  "cl_reports",
+  "cl_actions",
 ] as const;
 export type Feature = (typeof FEATURES)[number];
 
