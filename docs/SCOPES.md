@@ -90,8 +90,8 @@ The automations and campaigns in your client accounts, and how they are doing.
 | `campaigns.readonly` | read | optional | The list of campaigns in each client account (name, state, last change), to find stuck or failed ones. Read only: SubSync never starts or sends a campaign. |
 | `emails/campaigns.readonly` | read | optional | The email, bulk and workflow campaigns of each client account, read only, for the same list. |
 | `emails/stats.readonly` | read | optional | How many messages of each campaign were sent, delivered, opened, clicked, bounced or are still waiting, to find campaigns that looked sent but did not arrive. Totals only: SubSync never sees who received what. |
-| `saas/location.read` | read | optional | The plan and subscription status each client account has on your plans, for the Billing view in Clients. Without it the view says: Needs permission, reconnect. |
-| `saas/company.read` | read | optional | The list of client accounts on your plans, so the Billing view can show every account. Optional. |
+| `saas/location.read` | read | optional | Optional. Not used by the Billing view today. |
+| `saas/company.read` | read | optional | The plan and subscription status each client account has on your plans, for the Billing view in Clients. Without it the view says: Needs permission, reconnect. |
 
 ## Email health
 
