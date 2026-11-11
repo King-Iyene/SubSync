@@ -35,6 +35,12 @@ export const GHL_SCOPES = [
   "emails/stats.readonly",
   "saas/location.read",
   "saas/company.read",
+  // Payments module (version 2.1.0, all OPTIONAL, all read only): failed and late payments, repeat payments, invoices, the credit balance, and our own plan check.
+  "payments/transactions.readonly",
+  "payments/subscriptions.readonly",
+  "invoices.readonly",
+  "wallet.readonly",
+  "marketplace-installer-details.readonly",
 ] as const;
 
 // The platform's own help article (OAuth consent for marketplace apps) says branded installs use the leadconnectorhq host, which

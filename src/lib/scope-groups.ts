@@ -62,6 +62,13 @@ export const SCOPE_GROUPS: readonly ScopeGroup[] = [
     { scope: "saas/location.read", kind: "read", required: false, why: "Optional. Not used by the Billing view today." },
     { scope: "saas/company.read", kind: "read", required: false, why: "The plan and subscription status each client account has on your plans, for the Billing view in Clients. Without it the view says: Needs permission, reconnect." },
   ] },
+  { id: "payments", title: "Payments and credit", summary: "Failed and late payments, so you can chase the money, and the credit balance of each client account.", scopes: [
+    { scope: "payments/transactions.readonly", kind: "read", required: false, why: "Each payment's status, amount and who paid, to list failed payments and refunds. Read only: SubSync cannot charge, refund or retry anything. Without it Payments says: Needs permission, reconnect." },
+    { scope: "payments/subscriptions.readonly", kind: "read", required: false, why: "Whether a customer's repeat payment is active or past due, to list failed repeat payments. Read only." },
+    { scope: "invoices.readonly", kind: "read", required: false, why: "Which invoices are sent, partly paid or paid and when they are due, to list late invoices. Read only: SubSync never sends or changes an invoice." },
+    { scope: "wallet.readonly", kind: "read", required: false, why: "The credit balance of each client account, to warn you before it runs out. Read only." },
+    { scope: "marketplace-installer-details.readonly", kind: "read", required: false, why: "Which plan each install is on, to double-check billing against our own records. Read only." },
+  ] },
 ];
 
 /** Groups with no CRM permission at all, said on purpose so nobody goes looking for a switch that does not exist. */
@@ -71,10 +78,8 @@ export const NO_PERMISSION_GROUPS = [
 
 /** What SubSync does NOT ask for, and why (docs/CAPABILITIES.md). Asking for these would need a new release and a new approval from every install. */
 export const NOT_REQUESTED: ReadonlyArray<{ id: string; scope: string; why: string }> = [
-  { id: "payments", scope: "payments/transactions.readonly", why: "Failed payments and wallet balance. Not asked for: financial permissions cost trust and no feature needs them yet." },
-  { id: "invoices", scope: "invoices.readonly", why: "Invoices. Not asked for, for the same reason." },
+  { id: "invoice_send", scope: "invoices.write", why: "Sending an invoice again. Not asked for: it would message your client's customer, and SubSync does not message anyone for you." },
   { id: "forms", scope: "forms.readonly", why: "Form-by-form lead source. Not asked for yet." },
-  { id: "installer", scope: "marketplace-installer-details.readonly", why: "Reading each install's plan, to double-check billing. Planned for a later release." },
   { id: "send", scope: "conversations/message.write", why: "Sending messages. Never asked for: SubSync does not reply to anyone, it measures how fast your team does." },
 ];
 
@@ -108,6 +113,10 @@ export const FEATURE_NEEDS: readonly FeatureNeed[] = [
   { id: "campaign_stats", feature: "Campaign delivery figures", scope: "emails/stats.readonly" },
   { id: "campaigns", feature: "The campaign list and its health", scope: "campaigns.readonly" },
   { id: "client_billing", feature: "Each client's plan and subscription status", scope: "saas/company.read" },
+  { id: "pay_transactions", feature: "Failed payments and refunds", scope: "payments/transactions.readonly" },
+  { id: "pay_subscriptions", feature: "Failed repeat payments", scope: "payments/subscriptions.readonly" },
+  { id: "pay_invoices", feature: "Late invoices", scope: "invoices.readonly" },
+  { id: "pay_wallet", feature: "The credit balance of each client account", scope: "wallet.readonly" },
   { id: "data_health_fix", feature: "Fixing phone formats and name capitals in Data health", scope: "contacts.write" },
   { id: "meeting_notes", feature: "Adding a meeting summary to a contact's notes", scope: "contacts.write" },
 ];

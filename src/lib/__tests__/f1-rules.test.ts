@@ -279,7 +279,7 @@ test("the probe list asks only for permissions the app declares, or ones it says
     assert.ok(!/(?:^|[?&])(?:delete|remove|create)/i.test(p.path("LOC", { calendarId: "C", conversationId: "V" }) ?? ""), "only reads: " + p.key);
   }
   const notAsked = CAPABILITY_PROBES.filter((p) => p.scope && !asked.has(p.scope)).map((p) => p.key).sort();
-  assert.deepEqual(notAsked, ["forms", "invoices", "transactions"], "exactly the permissions the roadmap has not asked for");
+  assert.deepEqual(notAsked, ["forms"], "exactly the permissions the roadmap has not asked for");
 });
 
 test("a field report names the fields and counts the filled ones, never a value", () => {
