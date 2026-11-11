@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { sql } from "../db";
+import { rollupCloses, rollupFlow, rollupFresh, rollupHeadline, rollupOpenByStage } from "./pipeline3-rollup";
 import { ttlCache } from "../ttl-cache";
 import { dealScopeJoins, outOfScope } from "./stage-rules-sql";
 import {
@@ -190,7 +191,16 @@ export async function dealList(s: Scope, o: ListOpts, link: ((loc: string, conta
 // ---------- shared basis: closed deals, stage probabilities, cycle ----------
 
 type Basis = { won: number; closed: number; prior: number | null; cycle: number | null; avgWon: number | null; probs: Map<string, { wins: number; passed: number }>; stageNames: Map<string, string> };
+const basisMemo = ttlCache<Basis>(600_000, 200);
+/** The win-rate basis moves slowly (a year of closed deals), so it is remembered for ten minutes. */
 async function basis(s: Scope, f: Filters, sm: Map<string, StageInfo>): Promise<Basis> {
+  const bk = JSON.stringify([s.inst, s.allowed, f.location ?? null, f.pipeline ?? null, f.owner ?? null, f.source ?? null, f.q ?? null]), hit = basisMemo.get(bk);
+  if (hit) return hit;
+  const v = await basisNow(s, f, sm);
+  basisMemo.set(bk, v);
+  return v;
+}
+async function basisNow(s: Scope, f: Filters, sm: Map<string, StageInfo>): Promise<Basis> {
   const db = sql();
   const w = deals(s, { ...f, bucket: null });
   const [[t], probRows] = await Promise.all([
@@ -214,9 +224,9 @@ async function basis(s: Scope, f: Filters, sm: Map<string, StageInfo>): Promise<
 }
 
 type OpenRow = { key: string; name: string; value: number; n: number; staleValue: number; staleN: number };
-async function openByStage(s: Scope, f: Filters, sm: Map<string, StageInfo>): Promise<OpenRow[]> {
+async function openByStage(s: Scope, f: Filters, sm: Map<string, StageInfo>, fromRollup = false): Promise<OpenRow[]> {
   const db = sql();
-  const rows = await db`with ${deals(s, { ...f, bucket: null })} select d.location_id, d.stage_id, count(*) filter (where ${P_OPEN(db)})::int n, coalesce(sum(d.value) filter (where ${P_OPEN(db)}), 0)::float8 v,
+  const rows = fromRollup ? await rollupOpenByStage(s, f) : await db`with ${deals(s, { ...f, bucket: null })} select d.location_id, d.stage_id, count(*) filter (where ${P_OPEN(db)})::int n, coalesce(sum(d.value) filter (where ${P_OPEN(db)}), 0)::float8 v,
       count(*) filter (where ${P_STALE(db)})::int sn, coalesce(sum(d.value) filter (where ${P_STALE(db)}), 0)::float8 sv from d where d.status = 'open' group by 1, 2`;
   const m = new Map<string, OpenRow>();
   for (const r of rows) {
@@ -233,9 +243,10 @@ const probOf = (b: Basis, key: string) => stageProbability(b.probs.get(key)?.win
 
 export async function overview(s: Scope, f: Filters, windowDays: number): Promise<Pl3Overview> {
   const db = sql(), sm = await stageMap(s, f.location), base = { ...f, bucket: null };
-  const w = deals(s, base), d30 = new Date(Date.now() - 30 * DAY);
-  const [[t], trend, [acc], [since], b, open, closes, [bigRow]] = await Promise.all([
-    db`with ${w} select
+  const w = deals(s, base), d30 = new Date(Math.floor((Date.now() - 30 * DAY) / DAY) * DAY); // whole days, so the rollup and the lists count the same deals
+  const fresh = await rollupFresh(s, f.location);
+  const [[t0], trend, [acc], [since], b, open0, closes0, [bigRow0]] = await Promise.all([
+    fresh.fresh ? rollupHeadline(s, { location: f.location, pipeline: f.pipeline, d30 }).then((x) => [x]) : db`with ${w} select
         count(*) filter (where ${P_OPEN(db)})::int open_n, coalesce(sum(d.value) filter (where ${P_OPEN(db)}), 0)::float8 open_v,
         count(*) filter (where ${P_STALE(db)})::int stale_n, coalesce(sum(d.value) filter (where ${P_STALE(db)}), 0)::float8 stale_v,
         count(*) filter (where d.status = 'won' and not d.is_test and d.last_status_change_at >= ${d30})::int won_n, coalesce(sum(d.value) filter (where d.status = 'won' and not d.is_test and d.last_status_change_at >= ${d30}), 0)::float8 won_v,
@@ -248,14 +259,15 @@ export async function overview(s: Scope, f: Filters, windowDays: number): Promis
       where m.installation_id = ${s.inst} and m.day > current_date - ${Math.min(windowDays, 120)}::int group by m.day order by m.day`,
     db`select count(*)::int n from (${locs(s, f.location)}) x`,
     db`select min(h.at) since from deal_history h join (${locs(s, f.location)}) l on l.location_id = h.location_id where h.installation_id = ${s.inst}`,
-    basis(s, base, sm), openByStage(s, base, sm),
-    db`with ${w} select (d.last_status_change_at at time zone 'UTC')::date dy, count(*) filter (where d.status = 'won')::int won, count(*) filter (where d.status = 'lost')::int lost from d
+    basis(s, base, sm), openByStage(s, base, sm, fresh.fresh),
+    fresh.fresh ? rollupCloses(s, { location: f.location, pipeline: f.pipeline }, Math.min(windowDays, 120)) : db`with ${w} select (d.last_status_change_at at time zone 'UTC')::date dy, count(*) filter (where d.status = 'won')::int won, count(*) filter (where d.status = 'lost')::int lost from d
       where d.status in ('won', 'lost') and not d.is_test and d.last_status_change_at >= now() - ${Math.min(windowDays, 120)}::int * interval '1 day' group by 1`,
     // Big open deals nobody has touched: the top tenth by value (needs 10 open deals), with no stage move, status change or update for 14 days.
-    db`with ${w}, big as (select percentile_cont(0.9) within group (order by d.value) p90, count(*) n from d where ${P_OPEN(db)})
+    fresh.fresh ? Promise.resolve([undefined]) : db`with ${w}, big as (select percentile_cont(0.9) within group (order by d.value) p90, count(*) n from d where ${P_OPEN(db)})
       select count(*)::int n, coalesce(sum(d.value), 0)::float8 v from d, big where big.n >= 10 and ${P_OPEN(db)} and d.value >= big.p90
         and coalesce(greatest(d.last_activity_at, d.last_stage_change_at, d.last_status_change_at), d.created_at) < now() - interval '14 days'`,
   ]);
+  const t = t0, open = open0, closes = closes0, bigRow = fresh.fresh ? { n: t0.big_n, v: t0.big_v } : bigRow0;
   const winRate = rate(b.won, b.closed), openN = num(t.open_n);
   const weighted = weightedPipeline(open.map((o) => ({ value: o.value, p: probOf(b, o.key) })), b.prior, b.closed);
   const atRisk = atRiskEstimate(open.filter((o) => o.staleN > 0).map((o) => ({ value: o.staleValue, p: probOf(b, o.key) })), b.prior, b.closed);
@@ -506,17 +518,19 @@ export async function health(s: Scope, f: Filters, p: number, size: number): Pro
 async function flowParts(s: Scope, f: Filters, sm: Map<string, StageInfo>) {
   const db = sql(), w = deals(s, { ...f, bucket: null, pipeline: f.pipeline ?? null });
   const win = db`d.last_status_change_at >= ${f.from} and d.last_status_change_at < ${f.to} and not d.is_test`;
+  // The stage rows, lost rows and won totals come from the stored totals when they are fresh and nothing narrows them to a person, source or search.
+  const fast = !f.owner && !f.source && !f.q && !f.stage && !f.stageKey && (await rollupFresh(s, f.location)).fresh, rf = fast ? await rollupFlow(s, { location: f.location, pipeline: f.pipeline, from: f.from, to: f.to }) : null;
   const [open, edges, reached, drain, [vault], [hist]] = await Promise.all([
-    db`with ${w} select d.location_id, d.stage_id, count(*)::int n, sum(d.value)::float8 v, count(*) filter (where d.stale)::int sn, coalesce(sum(d.value) filter (where d.stale), 0)::float8 sv,
+    rf ? Promise.resolve(rf.open) : db`with ${w} select d.location_id, d.stage_id, count(*)::int n, sum(d.value)::float8 v, count(*) filter (where d.stale)::int sn, coalesce(sum(d.value) filter (where d.stale), 0)::float8 sv,
         percentile_cont(0.5) within group (order by d.days_in_stage) med, max(d.norm_days) norm, max(d.stays)::int stays from d where ${P_OPEN(db)} group by 1, 2`,
     db`with ${w} select h.location_id, h.from_value, h.to_value, count(*)::int n, coalesce(sum(h.value), 0)::float8 v, percentile_cont(0.5) within group (order by h.dwell_seconds) filter (where h.dwell_seconds is not null) med
       from deal_history h join d on d.location_id = h.location_id and d.opportunity_id = h.opportunity_id where h.installation_id = ${s.inst} and h.kind = 'stage' and h.from_value is not null and h.to_value is not null
         and h.actor_kind <> 'subsync' and h.at >= ${f.from} and h.at < ${f.to} and d.counted group by 1, 2, 3`,
     db`with ${w} select h.location_id, h.to_value stage_id, count(distinct h.opportunity_id)::int n, coalesce(sum(h.value), 0)::float8 v from deal_history h join d on d.location_id = h.location_id and d.opportunity_id = h.opportunity_id
       where h.installation_id = ${s.inst} and h.kind in ('created', 'stage') and h.to_value is not null and h.at >= ${f.from} and h.at < ${f.to} and d.counted group by 1, 2`,
-    db`with ${w} select d.location_id, d.stage_id, coalesce(d.lost_reason, case when d.lost_reason_id is not null then 'Reason ' || right(d.lost_reason_id, 4) end) reason, count(*)::int n, coalesce(sum(d.value), 0)::float8 v
+    rf ? Promise.resolve(rf.drain) : db`with ${w} select d.location_id, d.stage_id, coalesce(d.lost_reason, case when d.lost_reason_id is not null then 'Reason ' || right(d.lost_reason_id, 4) end) reason, count(*)::int n, coalesce(sum(d.value), 0)::float8 v
       from d where d.status = 'lost' and ${win} and d.value > 0 group by 1, 2, 3`,
-    db`with ${w} select coalesce(sum(d.value) filter (where d.status = 'won' and ${win}), 0)::float8 won_v, count(*) filter (where d.status = 'won' and ${win})::int won_n,
+    rf ? Promise.resolve([rf.vault]) : db`with ${w} select coalesce(sum(d.value) filter (where d.status = 'won' and ${win}), 0)::float8 won_v, count(*) filter (where d.status = 'won' and ${win})::int won_n,
         coalesce(sum(d.value) filter (where d.status = 'won' and not d.is_test and d.last_status_change_at >= now() - interval '7 days'), 0)::float8 w7v,
         count(*) filter (where d.status = 'won' and not d.is_test and d.last_status_change_at >= now() - interval '7 days')::int w7n from d`,
     db`select count(*)::int n, min(h.at) since from deal_history h join (${locs(s, f.location)}) l on l.location_id = h.location_id where h.installation_id = ${s.inst} and h.kind = 'stage' and h.at >= ${f.from} and h.at < ${f.to}`,
