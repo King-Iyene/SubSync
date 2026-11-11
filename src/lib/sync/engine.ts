@@ -18,6 +18,7 @@ import { diffAppointmentEvents } from "./appointment-events";
 import { applyLeadRules } from "./lead-rules-apply";
 import { diffDealEvents } from "./deal-events";
 import { recordDealsFromSync } from "../analytics/pipeline3-record";
+import { refreshRollup } from "../analytics/pipeline3-rollup";
 import { diffTagEvents } from "./tag-events";
 import { listAllInstalledLocations } from "./installed-locations";
 import { REFRESH_DUE_AFTER_MINUTES, REFRESH_EVERY_MINUTES } from "./schedule";
@@ -341,6 +342,7 @@ async function handleOpportunities(job: Job, deadline: number): Promise<Outcome>
     if (nextPage === null) {
       await db`delete from cached_opportunities where installation_id = ${job.installationId} and location_id = ${loc} and synced_at < ${job.startedAt}`;
       await db`update locations set opportunities_synced_at = now(), last_synced_at = now() where installation_id = ${job.installationId} and location_id = ${loc}`;
+      void refreshRollup(job.installationId, { locations: [loc] }).catch(() => undefined); // stored deal totals; the hourly sweep rebuilds them too
       return DONE;
     }
     pageNo = nextPage;

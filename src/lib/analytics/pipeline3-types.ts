@@ -163,5 +163,7 @@ export type PipeCard = {
 };
 export type Pl3Cards = {
   cards: PipeCard[]; next: string | null;
+  /** True when the totals come from the live scan because the stored totals are empty or older than two hours (the screen says so). */
+  refreshing?: boolean;
   totals: { pipelines: number; emptyHidden: number; openValue: number; wonValue: number; lostValue: number; openCount: number; wonCount: number; lostCount: number; staleCount: number; noOwnerCount: number };
 };

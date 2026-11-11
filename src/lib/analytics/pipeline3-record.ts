@@ -1,5 +1,6 @@
 import { sql } from "../db";
 import { featureOn } from "../flags";
+import { refreshRollup } from "./pipeline3-rollup";
 import { diffDeal, OWN_WRITE_WINDOW_MS, type DealEvent, type DealKind, type DealSnap } from "./pipeline3-diff.ts";
 import { dealForecastRange, staleLimitFrom } from "./pipeline3-intel.ts";
 export type { DealEvent, DealKind, DealSnap };
@@ -177,6 +178,7 @@ export async function sweepDealHistory(installationId: string, sinceHours = 72):
       and lower(o.status) <> coalesce((select h.to_value from deal_history h where h.installation_id = o.installation_id and h.location_id = o.location_id and h.opportunity_id = o.opportunity_id and h.kind = 'status' order by h.at desc limit 1), 'open')
     on conflict (installation_id, location_id, event_key) do nothing returning 1`).length;
   rep.stats = await refreshStageStats(installationId);
+  try { rep.rollup = (await refreshRollup(installationId)).rebuilt; } catch { rep.rollup = -1; } // the stored deal totals; the screens fall back to the live scan if this fails
   rep.forecast = await logForecast(installationId);
   return rep;
 }

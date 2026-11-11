@@ -1,5 +1,6 @@
 import { sql } from "../db.ts";
 import { parseCursor } from "./pipeline3-intel.ts";
+import { R, rollupFresh } from "./pipeline3-rollup";
 import { deals, P_NO_OWNER, P_NO_VALUE, P_OPEN, P_STALE } from "./pipeline3-queries.ts";
 import type { Pl3Cards, PipeCard } from "./pipeline3-types.ts";
 
@@ -12,12 +13,21 @@ export type CardOpts = { from: Date; to: Date; location?: string | null; q?: str
 export async function pipelineCards(s: CardScope, o: CardOpts): Promise<Pl3Cards> {
   const db = sql(), cur = parseCursor(o.after), size = Math.max(6, Math.min(60, o.size));
   const like = o.q ? `%${o.q.replace(/[\\%_]/g, (m) => "\\" + m).slice(0, 60)}%` : null;
+  const fresh = (await rollupFresh(s, o.location)).fresh;
   const win = db`d.last_status_change_at >= ${o.from} and d.last_status_change_at < ${o.to} and not d.is_test`;
   const r = (await db`
-    with ${deals(s, { from: o.from, to: o.to, location: o.location })},
-    scope as (select l.location_id, l.name from locations l where l.installation_id = ${s.inst} and not l.ignored ${s.allowed ? db`and l.location_id = any(${s.allowed}::text[])` : db``} ${o.location ? db`and l.location_id = ${o.location}` : db``}),
-    -- one pass over the deals, grouped by stage; the cards are sums of these rows, so a card and its stacks can never disagree
-    sg as (
+    with ${fresh ? db`scope as (select l.location_id, l.name from locations l where l.installation_id = ${s.inst} and not l.ignored ${s.allowed ? db`and l.location_id = any(${s.allowed}::text[])` : db``} ${o.location ? db`and l.location_id = ${o.location}` : db``})` : db`${deals(s, { from: o.from, to: o.to, location: o.location })},
+    scope as (select l.location_id, l.name from locations l where l.installation_id = ${s.inst} and not l.ignored ${s.allowed ? db`and l.location_id = any(${s.allowed}::text[])` : db``} ${o.location ? db`and l.location_id = ${o.location}` : db``})
+`},
+    ${fresh ? db`    sg as (
+      select r.location_id, r.pipeline_id, r.stage_id,
+        coalesce(sum(r.n) filter (where ${R.open(db)}), 0)::int open_n, coalesce(sum(r.value) filter (where ${R.open(db)}), 0)::float8 open_v, coalesce(sum(r.n) filter (where ${R.stale(db)}), 0)::int stale_n,
+        coalesce(sum(r.n) filter (where ${R.closedIn(db, "won", o.from, o.to)}), 0)::int won_n, coalesce(sum(r.value) filter (where ${R.closedIn(db, "won", o.from, o.to)}), 0)::float8 won_v,
+        coalesce(sum(r.n) filter (where ${R.closedIn(db, "lost", o.from, o.to)}), 0)::int lost_n, coalesce(sum(r.value) filter (where ${R.closedIn(db, "lost", o.from, o.to)}), 0)::float8 lost_v,
+        coalesce(sum(r.n) filter (where ${R.noOwner(db)}), 0)::int no_owner_n, coalesce(sum(r.n) filter (where ${R.noValue(db)}), 0)::int zero_n,
+        coalesce(sum(r.n) filter (where r.outlier), 0)::int out_n, coalesce(sum(r.value) filter (where r.outlier), 0)::float8 out_v, null::text any_name
+      from pipeline_rollup r where r.installation_id = ${s.inst} and r.location_id in (select location_id from scope) group by 1, 2, 3
+    )` : db`sg as (
       select d.location_id, d.pipeline_id, d.stage_id,
         count(*) filter (where ${P_OPEN(db)})::int open_n, coalesce(sum(d.value) filter (where ${P_OPEN(db)}), 0)::float8 open_v,
         count(*) filter (where ${P_STALE(db)})::int stale_n,
@@ -26,7 +36,7 @@ export async function pipelineCards(s: CardScope, o: CardOpts): Promise<Pl3Cards
         count(*) filter (where ${P_NO_OWNER(db)})::int no_owner_n, count(*) filter (where ${P_NO_VALUE(db)})::int zero_n,
         count(*) filter (where d.outlier)::int out_n, coalesce(sum(d.value) filter (where d.outlier), 0)::float8 out_v, max(d.pipeline_name) any_name
       from d group by 1, 2, 3
-    ),
+    )`},
     agg as (
       select location_id, pipeline_id, max(any_name) any_name, sum(open_n)::int open_n, sum(open_v)::float8 open_v, sum(stale_n)::int stale_n, sum(won_n)::int won_n, sum(won_v)::float8 won_v,
         sum(lost_n)::int lost_n, sum(lost_v)::float8 lost_v, sum(no_owner_n)::int no_owner_n, sum(zero_n)::int zero_n, sum(out_n)::int out_n, sum(out_v)::float8 out_v
@@ -55,7 +65,8 @@ export async function pipelineCards(s: CardScope, o: CardOpts): Promise<Pl3Cards
         ${cur ? db`and (open_v < ${cur.v} or (open_v = ${cur.v} and (location_id, pipeline_id) > (${cur.loc}, ${cur.pid})))` : db``}
       order by open_v desc, location_id, pipeline_id limit ${size + 1}
     )
-    select (select coalesce(json_agg(pg order by pg.open_v desc, pg.location_id, pg.pipeline_id), '[]'::json) from pg) rows, (select row_to_json(tot) from tot) tot,
+    select (select coalesce(json_agg(pg order by pg.open_v desc, pg.location_id, pg.pipeline_id), '[]'::json) from pg) rows,
+      (select coalesce(json_agg(json_build_object('l', p.location_id, 'p', p.pipeline_id, 'st', p.stages)), '[]'::json) from pipelines p where p.installation_id = ${s.inst} and (p.location_id, p.pipeline_id) in (select location_id, pipeline_id from pg)) defs_json, (select row_to_json(tot) from tot) tot,
       (select coalesce(json_agg(json_build_object('l', sg.location_id, 'p', sg.pipeline_id, 's', sg.stage_id, 'v', sg.open_v)), '[]'::json) from sg
         where sg.open_v > 0 and (sg.location_id, sg.pipeline_id) in (select location_id, pipeline_id from pg)) stage_values`)[0] ?? {};
   const rows = ((r.rows as Array<Record<string, unknown>>) ?? []);
@@ -65,9 +76,9 @@ export async function pipelineCards(s: CardScope, o: CardOpts): Promise<Pl3Cards
   // The mini stacks: open money per stage for just the cards on this page, in the pipeline's own stage order; a stage the pipeline no longer has is "Other stage".
   const minis = new Map<string, Array<{ name: string; value: number }>>();
   if (page.length) {
-    const locs = page.map((c) => c.location_id as string), pids = page.map((c) => c.pipeline_id as string);
+    const locs = page.map((c) => c.location_id as string);
     const sv = ((r.stage_values as Array<{ l: string; p: string; s: string; v: number }>) ?? []).map((x) => ({ location_id: x.l, pipeline_id: x.p, stage_id: x.s, v: x.v }));
-    const defs = await db`select p.location_id, p.pipeline_id, p.stages from pipelines p where p.installation_id = ${s.inst} and (p.location_id, p.pipeline_id) in (select * from unnest(${locs}::text[], ${pids}::text[]))`;
+    const defs = ((r.defs_json as Array<{ l: string; p: string; st: unknown }>) ?? []).map((x) => ({ location_id: x.l, pipeline_id: x.p, stages: x.st }));
     for (const d of defs) {
       const key = `${d.location_id}|${d.pipeline_id}`, stages = ((d.stages as Array<{ id?: string; name?: string }>) ?? []).filter((x) => x?.id);
       const have = new Map(sv.filter((x) => x.location_id === d.location_id && x.pipeline_id === d.pipeline_id).map((x) => [x.stage_id as string, Number(x.v)]));
@@ -87,7 +98,7 @@ export async function pipelineCards(s: CardScope, o: CardOpts): Promise<Pl3Cards
   }));
   const last = page[page.length - 1];
   return {
-    cards, next: more && last ? `${Number(last.open_v).toFixed(2).replace(/\.00$/, "")}|${last.location_id}|${last.pipeline_id}` : null,
+    refreshing: !fresh, cards, next: more && last ? `${Number(last.open_v).toFixed(2).replace(/\.00$/, "")}|${last.location_id}|${last.pipeline_id}` : null,
     totals: { pipelines: t.shown, emptyHidden: o.showEmpty ? 0 : t.empty_n, openValue: Math.round(t.open_v), wonValue: Math.round(t.won_v), lostValue: Math.round(t.lost_v), openCount: t.open_n, wonCount: t.won_n, lostCount: t.lost_n, staleCount: t.stale_n, noOwnerCount: t.no_owner_n },
   };
 }
