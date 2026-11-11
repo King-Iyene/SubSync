@@ -7,6 +7,7 @@ import { ModuleTabs, Page } from "../../ds";
 import "../speed6.css";
 import "../speed-ui.css";
 import "./ap3.css";
+import { registerAbSlots } from "./ab-slots";
 import { DEFAULT_FILTERS, fixturesOn, useAp, type ApFilters } from "./data";
 import { FlowTree, type FlowPick } from "./flow-tree";
 import { ApPanel, ApRowsList, PersonPanel } from "./parts";
@@ -17,6 +18,8 @@ import type { ApFlowTree, ApHealthRow, ApPersonRow, ApRow } from "./types";
 // Appointments as a module with sub-sections (the Speed to lead pattern): Overview | Needs outcome | No-show recovery | Booking share | Flow tree | Cross-account health | Sources and
 // speed | Calendars and conflicts | Reminders | Meetings | Proof. One filter bar, one right-side panel, saved views and keys. SubSync never changes an appointment from here;
 // edits go through slice AB's checked gateway tools, which mount into the panel slots.
+
+registerAbSlots(); // slice AB: the checked change tools and the Meetings area mount into the slots below
 
 type TabKey = "overview" | "needs" | "recover" | "share" | "flow" | "health" | "sources" | "calendars" | "reminders" | "meetings" | "proof";
 const TABS: Array<{ key: TabKey; label: string; tip: string }> = [

@@ -1985,6 +1985,7 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
     // Appointments round 3: /api/app/appointments?part=... (overview, lists, booking share, flow tree, health, sources, calendars, reminders, receipt, detail; read only).
     if (a === "appointments" && method === "GET" && !b && ctx.url.searchParams.has("part")) {
       return await handleAppointments3(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links });
+    }
     // Appointments actions and meetings (slice AB): the panel, preview-then-do changes, bulk, undo, and the private Meetings area (each behind its own flag, checked inside).
     if (a === "appointments" && (b === "act" || b === "meetings") && ctx.segments.length === 3) {
       return await handleApptActions(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links, locationToken: (locationId) => locationAccessToken(ctx.session.companyId, locationId) });

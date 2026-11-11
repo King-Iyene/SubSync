@@ -330,6 +330,7 @@ export function BulkBar({ locationId, ids, team, caps, onChanged, onClear }: { l
   const [res, setRes] = useState<{ message?: string; batchId?: string; undoable?: boolean; undoMinutes?: number } | null>(null);
   const body = (step: string) => ({ locationId, ids, kind, status, userId: userId || undefined, step, ...(step === "do" ? { typed } : {}) });
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (!kind || (kind === "reassign" && !userId)) { setPre(null); return; }
     setErr(null);
     void api.post<BulkPreview>("appointments/act/bulk", body("preview")).then(setPre).catch((e) => setErr(blockersOf(e)?.map((b) => b.text).join(" ") ?? msgOf(e)));

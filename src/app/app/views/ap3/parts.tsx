@@ -4,7 +4,7 @@ import { AlertTriangle, ChevronLeft, ChevronRight, X } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { coachingNote, money, pct } from "@/lib/design/appt-coach";
 import { EmptyState, ErrorState, SkeletonRows } from "../../ds";
-import { ApSlot, useAp, type ApFilters, type ApRows } from "./data";
+import { ApSlot, hasApSlot, useAp, type ApFilters, type ApRows } from "./data";
 import type { ApPart, ApRow, ApStats } from "./types";
 
 // Shared pieces of the Appointments module: the 40px server-paged table, status chips, the right-side panel and the coaching card.
@@ -21,8 +21,9 @@ const FLAG_TEXT: Record<ApRow["flags"][number], string> = { "double-booked": "Do
 export const when = (iso: string) => { const d = new Date(iso); return `${d.toLocaleDateString("en-US", { month: "short", day: "numeric" })}, ${d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`; };
 
 /** Compact table of appointments (40px rows). Row click or Enter opens the right-side panel; the arrow keys move between rows. */
-export function ApTable({ rows, showAccount, onOpen, activeId, testId, selectable, selected, onSelect }: { rows: ApRow[]; showAccount: boolean; onOpen: (r: ApRow) => void; activeId?: string | null; testId?: string; selectable?: boolean; selected?: Set<string>; onSelect?: (id: string, on: boolean) => void }) {
+export function ApTable({ rows, showAccount, onOpen, activeId, testId, selectable, selected, onSelect, onChanged }: { rows: ApRow[]; showAccount: boolean; onOpen: (r: ApRow) => void; activeId?: string | null; testId?: string; selectable?: boolean; selected?: Set<string>; onSelect?: (id: string, on: boolean) => void; onChanged?: () => void }) {
   const body = useRef<HTMLTableSectionElement>(null);
+  const [hot, setHot] = useState<string | null>(null); // the row under the pointer or focus: quick actions mount for it only, so a long list stays light
   const move = (e: React.KeyboardEvent, i: number) => {
     const to = e.key === "ArrowDown" || e.key === "j" ? i + 1 : e.key === "ArrowUp" || e.key === "k" ? i - 1 : null;
     if (to !== null) { e.preventDefault(); (body.current?.children[to] as HTMLElement | undefined)?.focus(); }
@@ -31,10 +32,10 @@ export function ApTable({ rows, showAccount, onOpen, activeId, testId, selectabl
   return (
     <div className="ap-scroll" data-testid={testId}>
       <table className="ap-t">
-        <thead><tr>{selectable && <th style={{ width: 36 }}><span className="sr-only">Select</span></th>}<th>Contact</th>{showAccount && <th>Account</th>}<th>When</th><th>Calendar</th><th>Status</th><th>Booked by</th><th>Owner</th><th data-num>Deal</th><th>Notes</th></tr></thead>
+        <thead><tr>{selectable && <th style={{ width: 36 }}><span className="sr-only">Select</span></th>}<th>Contact</th>{showAccount && <th>Account</th>}<th>When</th><th>Calendar</th><th>Status</th><th>Booked by</th><th>Owner</th><th data-num>Deal</th><th>Notes</th>{selectable && hasApSlot("RowActions") && <th><span className="sr-only">Mark</span></th>}</tr></thead>
         <tbody ref={body}>
           {rows.map((r, i) => (
-            <tr key={r.id} tabIndex={0} data-active={activeId === r.id ? "1" : undefined} data-tone={r.flags.includes("double-booked") ? "red" : r.ownerId === null ? "amber" : undefined} onClick={() => onOpen(r)} onKeyDown={(e) => move(e, i)} aria-label={`${r.contactName}, ${when(r.startAt)}`} data-testid="ap-row">
+            <tr key={r.id} tabIndex={0} data-active={activeId === r.id ? "1" : undefined} data-tone={r.flags.includes("double-booked") ? "red" : r.ownerId === null ? "amber" : undefined} onClick={() => onOpen(r)} onKeyDown={(e) => move(e, i)} onMouseEnter={() => setHot(r.id)} onFocus={() => setHot(r.id)} aria-label={`${r.contactName}, ${when(r.startAt)}`} data-testid="ap-row">
               {selectable && <td onClick={(e) => e.stopPropagation()}><input type="checkbox" className="size-4" aria-label={`Select ${r.contactName}`} checked={selected?.has(r.id) ?? false} onChange={(e) => onSelect?.(r.id, e.target.checked)} /></td>}
               <td><span className="ap-name">{r.contactName}</span></td>
               {showAccount && <td className="ap-sub">{r.accountName}</td>}
@@ -45,6 +46,7 @@ export function ApTable({ rows, showAccount, onOpen, activeId, testId, selectabl
               <td>{r.ownerName ?? <Chip tone="amber">Nobody</Chip>}</td>
               <td data-num>{r.dealValueCents ? money(r.dealValueCents) : <span className="ap-sub">{r.dealStatus === "none" ? "No deal" : "n/a"}</span>}</td>
               <td>{r.flags.length ? <span className="inline-flex items-center gap-1 text-[var(--s6-amber)]"><AlertTriangle aria-hidden className="size-3.5" />{FLAG_TEXT[r.flags[0]]}{r.flags.length > 1 ? ` +${r.flags.length - 1}` : ""}</span> : <span className="ap-sub">-</span>}</td>
+              {selectable && hasApSlot("RowActions") && <td onClick={(e) => e.stopPropagation()}>{(hot === r.id || activeId === r.id) && <ApSlot name="RowActions" row={r} onChanged={onChanged} />}</td>}
             </tr>
           ))}
         </tbody>
@@ -86,7 +88,7 @@ export function ApRowsList({ part, filters, extra, onOpen, activeId, showAccount
     <div data-testid={testId} aria-busy={loading}>
       {selectable && sel.size > 0 && <div className="mb-2 flex flex-wrap items-center gap-2 text-sm" data-testid="ap-bulkbar"><b>{sel.size} selected</b><ApSlot name="BulkActions" rows={chosen} onChanged={reload} filters={filters} /><button type="button" className="ap-link" onClick={() => setSel(new Set())}>Clear</button></div>}
       <div className="ap-tablewrap" style={{ opacity: loading ? 0.7 : 1 }}>
-        <ApTable rows={data.rows} showAccount={showAccount} onOpen={onOpen} activeId={activeId} selectable={selectable} selected={sel} onSelect={(id, on) => setSel((s) => { const n = new Set(s); if (on) n.add(id); else n.delete(id); return n; })} />
+        <ApTable rows={data.rows} showAccount={showAccount} onOpen={onOpen} activeId={activeId} selectable={selectable} selected={sel} onChanged={reload} onSelect={(id, on) => setSel((s) => { const n = new Set(s); if (on) n.add(id); else n.delete(id); return n; })} />
         <Pager total={data.total} page={page} size={size} onPage={setPage} onSize={(s) => { setSize(s); setPage(1); }} />
       </div>
     </div>
@@ -116,7 +118,6 @@ export function ApPanel({ row, onClose, onChanged, filters }: { row: ApRow; onCl
             {row.flags.length > 0 && <><dt>Watch</dt><dd>{row.flags.map((f) => FLAG_TEXT[f]).join(", ")}</dd></>}
           </dl>
           <ApSlot name="Details" row={row} onChanged={onChanged} filters={filters} />
-          <ApSlot name="RowActions" row={row} onChanged={onChanged} filters={filters} />
           <p className="ap-fine">Changes to appointments are made in your CRM or, once enabled, through SubSync&apos;s checked edit tools (preview first, typed confirmation to delete).</p>
         </div>
       </aside>

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore, type ComponentType } from "react";
 import { useData } from "../../session";
 import { CONFLICTS_FIXTURE, FLOW_EMPTY, FLOW_FIXTURE, HEALTH_FIXTURE, OVERVIEW_FIXTURE, PEOPLE_FIXTURE, PROOF_FIXTURE, REMINDERS_FIXTURE, SOURCES_FIXTURE, SPEED_FIXTURE, page, rowsFixture } from "./fixtures";
+import { adaptPart, API_PARAM, API_PART } from "./adapters";
 import type { ApPart, ApRow, ApScope } from "./types";
 
 /** Scope the user picks. `days` is turned into from/to on the server's day boundaries; everything else is passed through and re-checked on the server (never trusted). */
@@ -26,12 +27,15 @@ export function scopeOf(f: ApFilters): ApScope {
   return { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10), locationId: f.locationId || undefined, source: f.source || undefined, userId: f.userId || undefined };
 }
 export function queryOf(part: ApPart, f: ApFilters, extra: Record<string, string | number | undefined> = {}): string {
-  const s = scopeOf(f); const p = new URLSearchParams({ part, from: s.from, to: s.to });
+  const s = scopeOf(f); const p = new URLSearchParams({ part: API_PART[part] ?? part, from: s.from, to: s.to });
   if (s.locationId) p.set("location", s.locationId);
   if (s.source) p.set("source", s.source);
   if (s.userId) p.set("user", s.userId);
   if (f.q.trim()) p.set("q", f.q.trim());
-  for (const [k, v] of Object.entries(extra)) if (v !== undefined && v !== "") p.set(k, String(v));
+  for (const [k, v] of Object.entries(extra)) {
+    if (v === undefined || v === "" || k === "expect") continue;
+    p.set(API_PARAM[k] ?? k, String(k === "page" ? Math.max(0, Number(v) - 1) : v)); // the screens count pages from 1, the API from 0
+  }
   return `appointments?${p}`;
 }
 
@@ -57,7 +61,13 @@ function fixtureFor(part: ApPart, extra: Record<string, string | number | undefi
 export function useAp<T>(part: ApPart, f: ApFilters, extra: Record<string, string | number | undefined> = {}) {
   const fx = fixturesOn(), mode = fx ? fxMode() : "";
   const key = queryOf(part, f, extra);
-  const live = useData<T>(fx ? null : key);
+  const raw = useData<unknown>(fx ? null : key);
+  // The overview cards (worst account, best setter, the leak) come from the health and flow-tree parts of the same period.
+  const more = !fx && part === "overview";
+  const hx = useData<unknown>(more ? queryOf("health", { ...f, locationId: f.locationId }) : null);
+  const tx = useData<unknown>(more ? queryOf("flow-tree", f) : null);
+  const adapted = useMemo(() => (raw.data ? (adaptPart(part, raw.data, { health: hx.data, tree: tx.data }) as T) : null), [raw.data, hx.data, tx.data, part]);
+  const live = { data: adapted, error: raw.error, loading: raw.loading, reload: () => { raw.reload(); if (more) { hx.reload(); tx.reload(); } } };
   const [fix, setFix] = useState<{ data: T | null; error: boolean; loading: boolean }>({ data: null, error: false, loading: fx });
   const reload = useCallback(() => {
     if (!fx) return void live.reload();
