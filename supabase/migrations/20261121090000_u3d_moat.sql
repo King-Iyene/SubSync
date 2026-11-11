@@ -35,15 +35,21 @@ begin
   raise exception 'moat_events is append-only';
 end;
 $$;
-drop trigger if exists moat_events_no_update on public.moat_events;
-create trigger moat_events_no_update before update on public.moat_events
-  for each row execute function public.moat_events_append_only();
+do $$ begin
+  if not exists (select 1 from pg_trigger where tgname = 'moat_events_no_update' and tgrelid = 'public.moat_events'::regclass) then
+    create trigger moat_events_no_update before update on public.moat_events
+      for each row execute function public.moat_events_append_only();
+  end if;
+end $$;
 
 -- D1. The kind of business each client account is (optional, set by the agency). Used for benchmarks only when the agency opts in.
 alter table public.account_profiles add column if not exists vertical text;
-alter table public.account_profiles drop constraint if exists account_profiles_vertical_check;
-alter table public.account_profiles add constraint account_profiles_vertical_check
-  check (vertical is null or vertical in ('med_spa', 'solar', 'home_services', 'real_estate', 'legal', 'coaching', 'other'));
+do $$ begin
+  if not exists (select 1 from pg_constraint where conname = 'account_profiles_vertical_check') then
+    alter table public.account_profiles add constraint account_profiles_vertical_check
+      check (vertical is null or vertical in ('med_spa', 'solar', 'home_services', 'real_estate', 'legal', 'coaching', 'other'));
+  end if;
+end $$;
 
 -- D5. Opt-in to the anonymous peer benchmark (off by default). Opting in lets this agency's accounts count toward, and see, the benchmark.
 alter table public.settings add column if not exists benchmark_opt_in boolean not null default false;
