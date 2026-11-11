@@ -314,3 +314,27 @@ export function morningProofLine(r: Receipt): string | null {
   if (!r.alerts) return null;
   return `Last week: ${r.saved} of ${r.alerts} alerted lead${r.alerts === 1 ? "" : "s"} got a reply${r.medianReplyMinutes !== null ? `, typically within ${durationText(r.medianReplyMinutes)}` : ""}.`;
 }
+
+// ---------------------------------------------------------------- calendar helpers shared by the cron and the routes
+
+/** The Monday (UTC) of the week containing `now`, as YYYY-MM-DD: the dedupe week of the weekly proof. */
+export function mondayOf(now: number): string {
+  const d = new Date(now);
+  const back = (d.getUTCDay() + 6) % 7;
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - back)).toISOString().slice(0, 10);
+}
+/** The weekly proof is written on Monday between 08:00 and 09:59 UTC; the hourly run plus the dedupe key make it once. */
+export const weeklyDue = (now: number) => { const d = new Date(now); return d.getUTCDay() === 1 && d.getUTCHours() >= 8 && d.getUTCHours() < 10; };
+
+/** A month as [from, to) in UTC: `YYYY-MM`, default the last full month. Null for a bad or future month. */
+export function monthWindow(raw: string | null, now = Date.now()): { from: Date; to: Date } | null {
+  if (raw === null || raw === "") {
+    const d = new Date(now);
+    return { from: new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - 1, 1)), to: new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1)) };
+  }
+  const m = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(raw);
+  if (!m) return null;
+  const from = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, 1));
+  if (from.getTime() > now) return null;
+  return { from, to: new Date(Date.UTC(Number(m[1]), Number(m[2]), 1)) };
+}

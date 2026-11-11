@@ -228,3 +228,37 @@ export async function waitClockList(i: { installationId: string; allowed: string
 }
 
 export { estimateDollars, percentile };
+
+// ---------------------------------------------------------------- the people behind a receipt count (count equals rows)
+
+export const RECEIPT_KINDS = ["alerts", "saved", "waiting", "booked"] as const;
+export type ReceiptKind = (typeof RECEIPT_KINDS)[number];
+
+/** The alerts counted in one receipt number: the same filter as the count in `rescuedReceipt`, server paged. */
+export async function receiptPeople(i: { installationId: string; allowed: string[] | null; from: Date; to: Date; kind: ReceiptKind; page: number; size: number }) {
+  const db = sql();
+  if (i.allowed && i.allowed.length === 0) return { rows: [], total: 0, page: 0, pages: 1 };
+  const size = [20, 50, 100].includes(i.size) ? i.size : 20;
+  const saved = db`a.resolved_at is not null and a.detail->>'recoveryStatus' = 'human_reply_observed'`;
+  const cond = i.kind === "alerts" ? db`true` : i.kind === "saved" ? saved : i.kind === "waiting" ? db`a.resolved_at is null`
+    : db`${saved} and exists (select 1 from cached_appointments p where p.installation_id = a.installation_id and p.location_id = a.location_id and p.contact_id = a.detail->>'contactId'
+        and coalesce(lower(p.status), '') not in ('cancelled', 'canceled', 'invalid') and coalesce(p.created_remote_at, p.start_at) >= a.created_at)`;
+  const where = db`a.installation_id = ${i.installationId} and a.kind = 'breach24' and a.created_at >= ${i.from} and a.created_at < ${i.to} and ${scopeOf(db, i.allowed, "a.location_id")} and ${cond}`;
+  const [{ n }] = await db`select count(*)::int n from alerts a where ${where}`;
+  const total = num(n);
+  const pages = Math.max(1, Math.ceil(total / size));
+  const page = Math.min(Math.max(0, i.page), pages - 1);
+  const rows = await db`
+    select a.location_id, a.detail->>'contactId' contact_id, a.detail->>'conversationId' conversation_id, coalesce(a.detail->>'personName', 'Unnamed contact') person,
+      coalesce(l.name, 'Unnamed account') account, a.created_at,
+      case when a.detail->>'replyObservedAt' is not null then round(extract(epoch from ((a.detail->>'replyObservedAt')::timestamptz - a.created_at)) / 60)::int end reply_minutes
+    from alerts a left join locations l on l.installation_id = a.installation_id and l.location_id = a.location_id
+    where ${where} order by a.created_at desc limit ${size} offset ${page * size}`;
+  return {
+    total, page, pages,
+    rows: rows.map((r) => ({
+      locationId: r.location_id as string, contactId: (r.contact_id as string | null) ?? null, conversationId: (r.conversation_id as string | null) ?? null,
+      person: r.person as string, account: r.account as string, alertAt: (r.created_at as Date).toISOString(), replyMinutes: r.reply_minutes === null ? null : Number(r.reply_minutes),
+    })),
+  };
+}

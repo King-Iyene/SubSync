@@ -1,11 +1,11 @@
 import { sql } from "../db";
 import type { deepLinks } from "../links";
 import type { Feature } from "../entitlements";
-import { channelMix, rescuedReceipt, scorecards, speedCurve, waitClockList } from "../analytics/moat-queries";
+import { channelMix, receiptPeople, RECEIPT_KINDS, rescuedReceipt, scorecards, speedCurve, waitClockList } from "../analytics/moat-queries";
 import { getBenchmarkOptIn, peerBenchmark, setBenchmarkOptIn } from "../analytics/benchmarks-audited";
 import { createProofPage, listProofPages, PROOF_ID, revokeProofPage } from "../analytics/reply-proof";
 import { recordAlertFeedback, recordTargetChange } from "../analytics/moat-record";
-import { isVertical, VERTICALS, VERTICAL_LABEL } from "../analytics/moat-core";
+import { isVertical, monthWindow, VERTICALS, VERTICAL_LABEL } from "../analytics/moat-core";
 import { setAccountTarget } from "../analytics/speed-v2-queries";
 import { json, type AuthContext } from "./auth";
 
@@ -36,19 +36,6 @@ function narrowed(allowed: string[] | null, id: string | null): string[] | null 
   if (!ID.test(id)) return "none";
   if (allowed && !allowed.includes(id)) return "none";
   return [id];
-}
-
-/** A month as [from, to) in UTC: `month=YYYY-MM`, default the last full month. */
-export function monthWindow(raw: string | null, now = Date.now()): { from: Date; to: Date } | null {
-  if (raw === null || raw === "") {
-    const d = new Date(now);
-    return { from: new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - 1, 1)), to: new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1)) };
-  }
-  const m = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(raw);
-  if (!m) return null;
-  const from = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, 1));
-  if (from.getTime() > now) return null;
-  return { from, to: new Date(Date.UTC(Number(m[1]), Number(m[2]), 1)) };
 }
 
 export async function handleMoat(ctx: Ctx, h: MoatHelpers): Promise<Response> {
@@ -82,6 +69,15 @@ export async function handleMoat(ctx: Ctx, h: MoatHelpers): Promise<Response> {
       const win = monthWindow(sp.get("month"));
       if (!win) return json({ error: "Choose a month like 2026-10" }, 400);
       return json(await rescuedReceipt({ installationId: ctx.installationId, allowed: scope, ...win }));
+    }
+    if (part === "receipt-people") {
+      if (!on(ctx, "moat_receipt")) return off();
+      const win = monthWindow(sp.get("month"));
+      const kind = RECEIPT_KINDS.find((k) => k === sp.get("kind"));
+      if (!win || !kind) return json({ error: "Choose a month and a number to open" }, 400);
+      const links = await h.links();
+      const out = await receiptPeople({ installationId: ctx.installationId, allowed: scope, ...win, kind, page: int(sp.get("page"), 0), size: int(sp.get("size"), 20) });
+      return json({ ...out, rows: out.rows.map((r) => ({ ...r, url: r.conversationId ? links.conversation(r.locationId, r.conversationId) : null, contactUrl: r.contactId ? links.contact(r.locationId, r.contactId) : null })) });
     }
     if (part === "curve") {
       if (!on(ctx, "moat_curve")) return off();
@@ -142,7 +138,7 @@ export async function handleMoat(ctx: Ctx, h: MoatHelpers): Promise<Response> {
   }
   if (method === "PUT" && sub === "benchmark") {
     if (!on(ctx, "moat_benchmark")) return off();
-    if (ctx.kind === "client" || ctx.kind === "business") return json({ error: "Only the agency owner can change this" }, 403);
+    if (ctx.kind === "client" || ctx.kind === "business") return json({ error: "Only the owner of the account can change this" }, 403);
     await setBenchmarkOptIn(ctx.installationId, body.optIn === true);
     await sql()`insert into audit_log (installation_id, actor, action, detail) values (${ctx.installationId}, ${actor ?? ctx.kind}, 'benchmark.opt_in', ${sql().json({ optIn: body.optIn === true } as never)})`;
     return json({ ok: true, optIn: body.optIn === true });
