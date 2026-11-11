@@ -150,6 +150,13 @@ export const FEATURES = [
   "pp_idle",
   "pp_rollup",
   "pp_actions",
+  "td_module",
+  "td_today",
+  "td_proof",
+  "td_numbers",
+  "td_email",
+  "td_record",
+  "ov_screen",
 ] as const;
 export type Feature = (typeof FEATURES)[number];
 

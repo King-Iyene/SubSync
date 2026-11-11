@@ -89,6 +89,11 @@ export const INVENTORY: Record<string, TableInfo> = {
   speed_prefs: { noun: "Call mode and Speed choices (redial plan, goals, scripts, outcome sets)", line: "conversations", notPersonal: ["scope", "key", "value"] },
   speed_daily: { noun: "daily reply-speed numbers", line: "conversations", notPersonal: ["by_channel", "by_source", "by_owner", "by_hour", "texted_back_60", "no_owner", "by_user"] },
     location_users: { noun: "the team members of each client account (names, to pick an owner)", line: "yours", personal: { name: "the names of the team members of each client account", user_id: "the CRM user id of each team member" }, notPersonal: ["location_id", "seen_at", "role"] },
+  // Today (front page): the daily record of what was found and cleared per client, weekly receipts, put-aside marks and the daily email choice.
+  td_daily_items: { noun: "the daily record of problems found and cleared per client (counts only, never names or message text)", line: "accounts", personal: {}, notPersonal: ["kind", "last_count", "peak_count", "found", "cleared", "opened", "baseline", "fix_minutes"] },
+  td_receipts: { noun: "each week's proof receipt per client (counts and the usual time to fix)", line: "accounts", personal: {}, notPersonal: ["found", "cleared", "still_open", "median_fix_minutes", "fixes"] },
+  td_snoozes: { noun: "the kinds of item you put aside for a few days, and until when", line: "yours", personal: { created_by: "who put it aside" }, notPersonal: ["kind", "until_at", "released_at"] },
+  td_prefs: { noun: "your daily Today email choice (hour, quiet days and who gets it)", line: "yours", personal: { recipients: "the email addresses you chose for the daily Today email", updated_by: "who changed it" }, notPersonal: ["email_on", "email_hour", "quiet_days", "last_sent_key"] },
   // Clients (stages CD/CB): daily client numbers, billing state, risk history, the agency's own owner names, mutes and the log of those changes.
   client_daily: { noun: "each client's daily counts (new leads, bookings, shows, deals; never names or message text)", line: "accounts", personal: {}, notPersonal: ["staff_messages"] },
   client_rollup_state: { noun: "when each client's totals were last refreshed, and how many contacts have no owner or phone", line: "accounts", personal: {}, notPersonal: ["no_owner", "no_phone"] },
