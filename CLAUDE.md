@@ -425,3 +425,11 @@ OPERATING PRINCIPLES (apply to every stage)
 7. **Be honest.** Mark everything VERIFIED, INFERENCE or CHECK, and report failures plainly.
 
 Standing routines (customer walkthrough, simplify pass, innovation pass, daily status): `docs/PROMPTS.md`. Run them at the moments named there.
+## King's standing rules (added 10 Nov 2026; follow without being reminded)
+1. Use FEWER TOKENS: short plain replies, no recaps, read only needed files, delegate big jobs to helper agents in worktrees.
+2. Build features people PAY for (daily pain points, moat from our own recorded history). Research competitors and customer pain first, show it to King, then build. Add extra pain-point features while building and list them.
+3. Best quality, fast. Do not ask permission for routine steps. Ask only for irreversible, security, money or login steps.
+4. Plain words. Explain any error or prompt in one line.
+5. Every new module matches the Speed to lead design standard (control-room, sci-fi, light and dark, clickable counts, millions of rows).
+6. Migrations deploy through GitHub: push branch, open PR (fresh-database Check), merge to main, King approves the "production" apply. Never apply to the live database by hand. Features ship flag-off.
+7. Tenancy check alone before main. All CRM writes through the gateway. SubSync never replies for the agency.
