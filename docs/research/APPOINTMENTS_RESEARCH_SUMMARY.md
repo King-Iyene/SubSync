@@ -71,3 +71,14 @@ Fathom integration exists in the code (stage E2a, fixtures, `FATHOM_WEBHOOK_LIVE
 
 ## 9. King's rule: edit, modify and delete appointments (11 Nov 2026)
 From the appointment side panel and from every list, with the safe write gateway: **edit** (time, calendar, owner, notes, status), **modify** (reschedule, reassign, change duration, add an appointment), **delete**. Edit and reschedule show a preview of what changes and can be undone for a short time. **Delete ALWAYS needs a confirmation**: a dialog that names the appointment (who, when, calendar), says it cannot be undone, and requires typing the word DELETE (or the contact's name) before the button works; bulk delete shows the count and the list and needs the same typing. Never deletes silently, never from a keyboard shortcut. Double-booking check before create/reschedule; audit log of every change (who, what, before/after); dry-run unless the live switch and the account opt-in are on; our own writes excluded from our metrics; needs `calendars/events.write` as an OPTIONAL scope with a clear "Needs permission: reconnect" message until granted.
+
+## 10. King's flagship idea: the Appointment Flow Tree (11 Nov 2026)
+A branching tree (or similar new structure, NOT the Unanswered/Speed river pattern) that shows how appointments flow through people, so an agency sees at a glance who earns the money and who burns leads:
+- **Root:** leads booked this period. **First branches:** each setter/booker (who creates the booking). **Second branches:** each closer/owner who receives it. **Leaves:** outcomes (showed, no-show, cancelled, unmarked, won, lost).
+- Branch width = number of appointments; colour = health (green high show and close, amber, red burning leads); glow on the best converters.
+- Per person badges: bookings received, show rate, no-show rate, close rate, leads burned (booked, never shown or never followed up), revenue won, average time lead-to-booked.
+- Click any branch or leaf to open exactly those appointments and people (count equals rows). Filters: account, calendar, source, period; compare two people side by side; "who should get the next lead" suggestion based on conversion (labelled estimate).
+- Scales to 100+ people and millions of appointments (server aggregates, top N people with "see all"), light and dark, phone layout (collapses to an indented list), reduced-motion fallback.
+- Extra ideas to add while building: a "leak finder" highlighting the single biggest drop (for example one closer with 40% no-show after hand-off), weekly coaching note per person, and a verified-proof version for the client.
+
+## 11. Priorities for every build (King): money first, the customer second, innovation third.
