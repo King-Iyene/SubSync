@@ -1,4 +1,5 @@
 import { parseWindow } from "../analytics/appointment-f3";
+import { ownedLocation } from "./tenant-guard";
 import { parseBucket, parseBy, parseSort, WORK_KINDS, type WorkItem, type WorkKind } from "../analytics/appointment-work";
 import { workCompare, workList, workOverview } from "../analytics/appointment-work-queries";
 import type { deepLinks } from "../links";
@@ -37,9 +38,10 @@ export async function handleApptWork(ctx: Ctx, h: ApptWorkHelpers): Promise<Resp
   if (what === "list") {
     const kindP = sp.get("kind");
     const kind = kindP === "all" || kindP === "window" ? kindP : (WORK_KINDS as string[]).includes(kindP ?? "") ? (kindP as WorkKind) : "all";
+    const askedLoc = idOr(sp.get("location"));
     const v = await workList(ctx.installationId, allowed, {
       kind, bucket: parseBucket(sp.get("bucket")), window: windowOf(sp),
-      query: { q: (sp.get("q") ?? "").slice(0, 80), sort: parseSort(sp.get("sort")), location: idOr(sp.get("location")), user: idOr(sp.get("user")), calendar: idOr(sp.get("calendar")) },
+      query: { q: (sp.get("q") ?? "").slice(0, 80), sort: parseSort(sp.get("sort")), location: askedLoc ? ((await ownedLocation(ctx.installationId, allowed, askedLoc)) ?? "no-such-account") : null, user: idOr(sp.get("user")), calendar: idOr(sp.get("calendar")) },
       page: int(sp.get("page"), 0), size: int(sp.get("size"), 25),
     });
     return json({ ...v, rows: v.rows.map(link), canSeeAccounts: ctx.limitTo === null });
