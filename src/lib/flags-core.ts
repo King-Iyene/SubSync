@@ -52,6 +52,7 @@ export const DEFAULT_OFF: ReadonlySet<Feature> = new Set<Feature>([
   "appt_proof",
   "appt_actions",
   "appt_history",
+  "appt_record",
   "inbox_claim",
   "inbox_note",
   "inbox_outcome_ui",

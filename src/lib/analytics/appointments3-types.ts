@@ -11,6 +11,8 @@ export type Appt3Part = (typeof APPT3_PARTS)[number];
 export type Appt3Query = {
   part: Appt3Part; from?: string; to?: string; location?: string; calendar?: string; user?: string; source?: string;
   page?: number; size?: 20 | 50 | 100; sort?: string; q?: string; bucket?: Appt3Bucket;
+  /** Flow tree and lists: a booker id or "none" (setter), an owner id or "none" (closer); compare = "idA,idB" (two setters); top = how many setters to show (3 to 30, default 12); week = Monday date (YYYY-MM-DD) for the receipt. */
+  setter?: string; closer?: string; compare?: string; top?: number; week?: string;
 };
 
 /** Our own groups of statuses. `unmarked` = time passed (by 3h) with no outcome. `no_deal` = no deal linked to the contact. */
@@ -143,6 +145,6 @@ export type Appt3Envelope<T> = T & { generatedAt: string; cached: boolean; canSe
 
 export const APPT3_FLAGS = [
   "appt_overview", "appt_needs_outcome", "appt_noshow_recovery", "appt_booking_share", "appt_flow_tree", "appt_health", "appt_sources", "appt_calendars",
-  "appt_reminders", "appt_meetings", "appt_proof", "appt_actions", "appt_history",
+  "appt_reminders", "appt_meetings", "appt_proof", "appt_actions", "appt_history", "appt_record",
 ] as const;
 export type Appt3Flag = (typeof APPT3_FLAGS)[number];

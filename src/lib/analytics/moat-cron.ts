@@ -3,6 +3,7 @@ import { resolveEntitlements } from "../flags";
 import { safeError } from "../safe-log";
 import { createPrivateAlert, sendOperationalAlerts, type PrivateAlertInput } from "./inbox-breach-alerts";
 import { sweepMoatEvents } from "./moat-record";
+import { sweepAppointmentHistory } from "./appointments3-record";
 import { accountReceipt } from "./moat-queries";
 import { mondayOf, weeklyDue, weeklyProofText } from "./moat-core";
 
@@ -21,8 +22,10 @@ export async function runMoatCron(now = Date.now()): Promise<MoatCronReport> {
       const ent = await resolveEntitlements((row.plan as "free" | "starter" | "pro") ?? "pro", installationId);
       const rec = ent.features.moat_record && !ent.locked.includes("moat_record");
       const mail = ent.features.inbox_proof_email && !ent.locked.includes("inbox_proof_email");
-      if (!rec && !mail) continue;
+      const apr = ent.features.appt_record && !ent.locked.includes("appt_record");
+      if (!rec && !mail && !apr) continue;
       rep.companies++;
+      if (apr) rep.events += Object.values(await sweepAppointmentHistory(installationId)).reduce((x, y) => x + y, 0);
       if (rec) rep.events += Object.values(await sweepMoatEvents(installationId)).reduce((a, b) => a + b, 0);
       if (mail && weeklyDue(now)) rep.receipts += await weeklyProofReceipts(installationId, now);
     } catch (error) {

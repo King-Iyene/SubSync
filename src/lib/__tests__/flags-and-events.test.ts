@@ -25,6 +25,7 @@ test("pilot modules are on by default and a database row can still override the 
     "appt_noshow_recovery",
     "appt_overview",
     "appt_proof",
+    "appt_record",
     "appt_reminders",
     "appt_sources",
     "inbox_assign",
