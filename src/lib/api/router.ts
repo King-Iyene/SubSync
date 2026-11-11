@@ -2072,6 +2072,7 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
     // (SubSync's own notes and dispute log; resend is off). Flags, the account and the person are checked inside.
     if (a === "payments" && ((method === "GET" && !b && ctx.url.searchParams.has("part")) || (method === "POST" && b === "act" && ctx.segments.length === 3))) {
       return await handlePayments(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links, brand: async () => (await scope(ctx)).settings.brandName ?? null, locationToken: (locationId) => locationAccessToken(ctx.session.companyId, locationId) });
+    }
     // Clients v2 (client-account management): /api/app/clients2?part=... (accounts, today, plans needing attention, one account) and /api/app/clients2/<op> (SubSync-only notes, kind of business, saved views).
     if (a === "clients2" && ((method === "GET" && !b && ctx.url.searchParams.has("part")) || (method === "POST" && b && ctx.segments.length === 2))) {
       return await handleClients2(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links });
