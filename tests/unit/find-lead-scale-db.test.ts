@@ -34,8 +34,6 @@ describe.skipIf(!RUN)("Find a lead at scale", () => it("stays quick", async () =
     out.owner = await time("owner filter", () => findPeople(inst.id as string, null, { owner: "u7" }, null, []));
     out.tag = await time("tag filter", () => findPeople(inst.id as string, null, { tags: ["hot"] }, null, []));
     out.account = await time("one account", () => findPeople(inst.id as string, null, { location: "xtest-scale-3" }, null, []));
-" + r.map((x) => x["QUERY PLAN"]).join("
-")); } }
     let after = null as ReturnType<typeof decodeCursor>;
     let worst = 0;
     for (let i = 0; i < 6; i++) {
