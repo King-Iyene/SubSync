@@ -92,3 +92,27 @@ describe.skipIf(!HAS_DB)("clients actions cross-tenant", () => {
     expect((await call(t, "POST", "clients/act/mute", { location: A1, kind: "all", days: 7 })).status).toBeGreaterThanOrEqual(403);
   });
 });
+
+describe.skipIf(!HAS_DB)("clients bulk and owner cross-tenant", () => {
+  it("a foreign id in a bulk list is skipped, never changed, never named", async () => {
+    let ok = false;
+    try { await sql()`select 1 from client_owners limit 1`; ok = true; } catch { ok = false; }
+    if (!ok) return;
+    for (const co of [CO_A, CO_B]) await sql()`delete from installations where company_id = ${co}`;
+    const [{ id: ia }] = (await sql()`insert into installations (company_id, company_name, plan) values (${CO_A}, 'zzAct A', 'pro') returning id`) as unknown as Array<{ id: string }>;
+    const [{ id: ib }] = (await sql()`insert into installations (company_id, company_name, plan) values (${CO_B}, 'zzAct B', 'pro') returning id`) as unknown as Array<{ id: string }>;
+    try {
+      for (const i of [ia, ib]) await sql()`insert into settings (installation_id) values (${i}) on conflict do nothing`;
+      await sql()`insert into locations (installation_id, location_id, name, timezone) values (${ia}, ${A1}, 'zzAct Client A1', 'UTC'), (${ib}, ${B1}, 'zzAct Client B', 'UTC')`;
+      const t = session(CO_A, "agency", null);
+      expect((await call(t, "POST", "clients/act/bulk", { what: "owner", name: "Sam", locations: [B1] })).status).toBe(404);
+      const prev = await call(t, "POST", "clients/act/bulk", { what: "owner", name: "Sam", locations: [A1, B1] });
+      expect(prev.body.count).toBe(1); expect(prev.body.skipped).toBe(1); expect(prev.text).not.toContain(B1);
+      expect((await call(t, "POST", "clients/act/bulk", { step: "do", what: "owner", name: "Sam", locations: [A1, B1] })).body.done).toBe(1);
+      const [n] = await sql()`select count(*)::int n from client_owners where installation_id = ${ib}`;
+      expect(n.n).toBe(0);
+      expect((await call(t, "POST", "clients/act/owner", { location: B1, owner: "Sam" })).status).toBe(404);
+      expect((await call(t, "GET", "clients/act/owners")).text).not.toContain(B1);
+    } finally { for (const co of [CO_A, CO_B]) await sql()`delete from installations where company_id = ${co}`; }
+  });
+});

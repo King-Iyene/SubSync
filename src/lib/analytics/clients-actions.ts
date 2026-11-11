@@ -115,3 +115,31 @@ export function setupItems(f: SetupFacts, now: number): SetupItem[] {
     : { id: "users", ok: false, text: "Staff names have not been checked yet.", fix: "wait" });
   return out;
 }
+
+// ---- owner and bulk ----
+
+export const BULK_CAP = 50;
+export function parseOwner(v: unknown): { ok: true; name: string | null } | { ok: false; error: string } {
+  if (v === null || v === "") return { ok: true, name: null };
+  if (typeof v !== "string") return { ok: false, error: "Type a name." };
+  const t = v.trim().replace(/\s+/g, " ");
+  return t.length >= 1 && t.length <= 60 && !/[<>]/.test(t) ? { ok: true, name: t } : { ok: false, error: "Use 1 to 60 characters, no angle brackets." };
+}
+export type BulkChange = { kind: "mute"; mute: MuteInput } | { kind: "target"; minutes: number | null } | { kind: "owner"; name: string | null };
+export function parseBulk(b: unknown): { ok: true; change: BulkChange; ids: string[]; step: "preview" | "do" } | { ok: false; error: string } {
+  const o = b && typeof b === "object" ? (b as Record<string, unknown>) : {};
+  const ids = Array.isArray(o.locations) ? [...new Set(o.locations.filter((x): x is string => typeof x === "string"))] : [];
+  if (ids.length === 0) return { ok: false, error: "Choose at least one client." };
+  if (ids.length > BULK_CAP) return { ok: false, error: `Choose at most ${BULK_CAP} clients at a time.` };
+  const step = o.step === "do" ? "do" : "preview";
+  if (o.what === "mute") { const m = parseMute({ kind: o.muteKind, days: o.days }); return m.ok ? { ok: true, change: { kind: "mute", mute: m.value }, ids, step } : m; }
+  if (o.what === "target") { const t = parseTargetMinutes(o.minutes); return t.ok ? { ok: true, change: { kind: "target", minutes: t.minutes }, ids, step } : t; }
+  if (o.what === "owner") { const w = parseOwner(o.name); return w.ok ? { ok: true, change: { kind: "owner", name: w.name }, ids, step } : w; }
+  return { ok: false, error: "Choose what to change." };
+}
+export function bulkPreviewLine(c: BulkChange, n: number): string {
+  const who = `${n} ${n === 1 ? "client" : "clients"}`;
+  if (c.kind === "mute") return `Quiet "${MUTE_WORDS[c.mute.kind]}" for ${c.mute.days} days on ${who}. Nothing is changed in your CRM.`;
+  if (c.kind === "target") return c.minutes === null ? `Put ${who} back on your default reply target.` : `Set the reply target to ${c.minutes} minutes on ${who}.`;
+  return c.name === null ? `Clear the person who looks after ${who}.` : `Set ${c.name} as the person who looks after ${who}.`;
+}

@@ -28,3 +28,15 @@ create table if not exists public.client_actions (
 create index if not exists client_actions_loc_idx on public.client_actions (installation_id, location_id, created_at desc);
 alter table public.client_actions enable row level security;
 revoke all on public.client_actions from anon, authenticated;
+
+-- Who at the agency looks after each client (a typed name; SubSync-only, never sent to the CRM).
+create table if not exists public.client_owners (
+  installation_id uuid not null references public.installations (id) on delete cascade,
+  location_id text not null,
+  owner_name text not null check (char_length(owner_name) between 1 and 60),
+  set_by text,
+  updated_at timestamptz not null default now(),
+  primary key (installation_id, location_id)
+);
+alter table public.client_owners enable row level security;
+revoke all on public.client_owners from anon, authenticated;

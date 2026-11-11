@@ -1,9 +1,9 @@
 import { sql } from "../db";
 import { ownedLocation } from "./tenant-guard";
 import {
-  muteLine, muteUntil, parseMute, parseTargetMinutes, receiptCsv, receiptOf, receiptText, setupItems, MUTE_DAYS, MUTE_KINDS, MUTE_WORDS, type Receipt,
+  BULK_CAP, bulkPreviewLine, parseBulk, parseOwner, muteLine, muteUntil, parseMute, parseTargetMinutes, receiptCsv, receiptOf, receiptText, setupItems, MUTE_DAYS, MUTE_KINDS, MUTE_WORDS, type Receipt,
 } from "../analytics/clients-actions";
-import { activeMutes, addMute, currentTarget, lastTargetChange, logTarget, receiptFacts, releaseMute, setupFacts } from "../analytics/clients-actions-queries";
+import { ownersOf, setOwner, activeMutes, addMute, currentTarget, lastTargetChange, logTarget, receiptFacts, releaseMute, setupFacts } from "../analytics/clients-actions-queries";
 import { setAccountTarget } from "../analytics/speed-v2-queries";
 import type { Feature } from "../entitlements";
 import { json, type AuthContext } from "./auth";
@@ -74,6 +74,13 @@ export async function handleClientActions(ctx: Ctx, h: ClientActionHelpers): Pro
     return json({ now, receipts: list.map((r) => ({ ...r, text: receiptText(r, brand) })), capped: req === null && ids.length >= CAP });
   }
 
+  if (m === "GET" && part === "owners") {
+    if (!actions) return off();
+    const ids = await idsOf(ctx, h, null);
+    if (ids === null) return NOT_FOUND();
+    return json(ctx.demo ? { ready: true, owners: {} } : await ownersOf(ctx.installationId, ids));
+  }
+
   if (m === "GET" && part === "mutes") {
     if (!actions) return off();
     const ids = await idsOf(ctx, h, null);
@@ -82,7 +89,7 @@ export async function handleClientActions(ctx: Ctx, h: ClientActionHelpers): Pro
     return json({ ready: r.ready, mutes: r.rows, kinds: MUTE_KINDS.map((k) => ({ kind: k, label: MUTE_WORDS[k] })), days: MUTE_DAYS });
   }
 
-  if (m === "POST" && (part === "mute" || part === "unmute" || part === "target" || part === "target-undo")) {
+  if (m === "POST" && (part === "mute" || part === "unmute" || part === "owner" || part === "bulk" || part === "target" || part === "target-undo")) {
     if (!actions) return off();
     if (ctx.demo) return json({ error: "The sample data cannot be changed." }, 403);
     const body = await readBody(ctx);
@@ -95,6 +102,8 @@ export async function handleClientActions(ctx: Ctx, h: ClientActionHelpers): Pro
       return json({ ok: true, message: "Back to normal. Nothing was changed in your CRM." });
     }
 
+    if (part === "bulk") return bulk(ctx, h, body, now);
+
     const [loc] = (await idsOf(ctx, h, typeof body.location === "string" ? body.location : "")) ?? [];
     if (!loc) return NOT_FOUND();
 
@@ -105,6 +114,13 @@ export async function handleClientActions(ctx: Ctx, h: ClientActionHelpers): Pro
       const r = await addMute(ctx.installationId, loc, p.value.kind, until, actorOf(ctx));
       if (!r.ok) return json({ error: "Quieting a client needs the latest database update, which has not run yet." }, 503);
       return json({ ok: true, id: r.id, until: until.getTime(), message: muteLine(p.value.kind, until.getTime(), now), undo: { part: "unmute", id: r.id } });
+    }
+
+    if (part === "owner") {
+      const p = parseOwner(body.owner);
+      if (!p.ok) return json({ error: p.error }, 400);
+      if (!(await setOwner(ctx.installationId, loc, p.name, actorOf(ctx)))) return json({ error: "Saving who looks after a client needs the latest database update, which has not run yet." }, 503);
+      return json({ ok: true, owner: p.name, message: p.name ? `${p.name} now looks after this client.` : "Cleared." });
     }
 
     if (part === "target") {
@@ -128,4 +144,30 @@ export async function handleClientActions(ctx: Ctx, h: ClientActionHelpers): Pro
   }
 
   return json({ error: "Unknown action" }, 404);
+}
+
+/** Several clients at once: step "preview" says what would change and for how many; step "do" changes them. Every id goes through the same guard; ids that fail it are counted, never named. */
+async function bulk(ctx: Ctx, h: ClientActionHelpers, body: Record<string, unknown>, now: number): Promise<Response> {
+  const p = parseBulk(body);
+  if (!p.ok) return json({ error: p.error }, 400);
+  const allowed = await h.allowed();
+  const ok: string[] = [];
+  for (const id of p.ids) { const one = await ownedLocation(ctx.installationId, allowed, id); if (one) ok.push(one); }
+  const skipped = p.ids.length - ok.length;
+  if (ok.length === 0) return NOT_FOUND();
+  const line = bulkPreviewLine(p.change, ok.length);
+  if (p.step === "preview") return json({ step: "preview", count: ok.length, skipped, cap: BULK_CAP, line, undo: p.change.kind === "target" ? "Each client's last change can be put back one by one." : "Reversible." });
+  let done = 0, failed = 0;
+  for (const id of ok) {
+    try {
+      if (p.change.kind === "mute") { const until = muteUntil(now, p.change.mute.days); if ((await addMute(ctx.installationId, id, p.change.mute.kind, until, actorOf(ctx))).ok) done++; else failed++; }
+      else if (p.change.kind === "owner") { if (await setOwner(ctx.installationId, id, p.change.name, actorOf(ctx))) done++; else failed++; }
+      else {
+        const before = await currentTarget(ctx.installationId, id);
+        const r = await setAccountTarget(ctx.installationId, allowed, id, p.change.minutes);
+        if (r.ok) { await logTarget(ctx.installationId, id, before, r.minutes, actorOf(ctx)); done++; } else failed++;
+      }
+    } catch { failed++; }
+  }
+  return json({ step: "do", done, failed, skipped, message: `${line} Done for ${done}${failed ? `; ${failed} could not be changed` : ""}.` });
 }

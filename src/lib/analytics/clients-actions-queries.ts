@@ -137,3 +137,29 @@ export async function lastTargetChange(inst: string, locationId: string): Promis
     throw e;
   }
 }
+
+// ---- owner (who at the agency looks after a client) ----
+
+export async function ownersOf(inst: string, ids: string[]): Promise<{ ready: boolean; owners: Record<string, string> }> {
+  if (ids.length === 0) return { ready: true, owners: {} };
+  try {
+    const rows = await sql()`select location_id, owner_name from client_owners where installation_id = ${inst} and location_id = any(${ids}::text[])`;
+    return { ready: true, owners: Object.fromEntries(rows.map((r) => [r.location_id as string, r.owner_name as string])) };
+  } catch (e) {
+    if (isMissing(e)) return { ready: false, owners: {} };
+    throw e;
+  }
+}
+/** name null clears the owner. Returns false when the table is not there yet. */
+export async function setOwner(inst: string, locationId: string, name: string | null, actor: string | null): Promise<boolean> {
+  try {
+    const db = sql();
+    if (name === null) await db`delete from client_owners where installation_id = ${inst} and location_id = ${locationId}`;
+    else await db`insert into client_owners (installation_id, location_id, owner_name, set_by) values (${inst}, ${locationId}, ${name}, ${actor})
+      on conflict (installation_id, location_id) do update set owner_name = excluded.owner_name, set_by = excluded.set_by, updated_at = now()`;
+    return true;
+  } catch (e) {
+    if (isMissing(e)) return false;
+    throw e;
+  }
+}

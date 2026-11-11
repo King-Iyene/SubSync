@@ -53,3 +53,17 @@ test("setup health uses the exact words and never blurs unavailable", () => {
   assert.equal(setupItems({ appointmentsAccess: "ok", usersAccess: "ok", contactsSyncedAt: NOW - 3600_000, appointmentsSyncedAt: NOW }, NOW).every((i) => i.ok), true);
   assert.equal(setupItems({ appointmentsAccess: null, usersAccess: null, contactsSyncedAt: null, appointmentsSyncedAt: null }, NOW)[0].fix, "wait");
 });
+
+import { BULK_CAP, bulkPreviewLine, parseBulk, parseOwner } from "../analytics/clients-actions.ts";
+test("bulk: preview first, capped, validated", () => {
+  const ids = ["a1x", "b2x"];
+  assert.equal(parseBulk({ what: "mute", muteKind: "replies", locations: ids, days: 7 }).ok, true);
+  assert.equal(parseBulk({ what: "mute", locations: ids, days: 7 }).ok, false);
+  const t = parseBulk({ what: "target", locations: ids, minutes: 20 });
+  assert.ok(t.ok && t.step === "preview");
+  assert.equal(parseBulk({ what: "target", locations: Array.from({ length: BULK_CAP + 1 }, (_, i) => `id${i}x`), minutes: 20 }).ok, false);
+  assert.equal(parseBulk({ what: "target", locations: [], minutes: 20 }).ok, false);
+  assert.equal(parseBulk({ what: "owner", locations: ids, name: "<b>x" }).ok, false);
+  assert.equal(parseOwner("  Sam   Lee ").ok && (parseOwner("  Sam   Lee ") as { name: string }).name, "Sam Lee");
+  assert.match(bulkPreviewLine({ kind: "target", minutes: 20 }, 2), /20 minutes on 2 clients/);
+});
