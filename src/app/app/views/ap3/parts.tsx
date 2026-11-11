@@ -17,7 +17,7 @@ export function StatusChip({ row }: { row: Pick<ApRow, "status" | "hoursPast"> }
 }
 export const Chip = ({ tone, children }: { tone: "green" | "amber" | "red" | "grey" | "cyan" | "violet"; children: ReactNode }) => <span className="ap-chip" data-tone={tone}>{children}</span>;
 
-const FLAG_TEXT: Record<ApRow["flags"][number], string> = { "double-booked": "Double-booked", "no-reminder": "No reminder", unconfirmed: "Not confirmed", "no-deal": "No deal linked" };
+const FLAG_TEXT: Record<ApRow["flags"][number], string> = { "double-booked": "Double-booked", "no-deal": "No deal linked" };
 export const when = (iso: string) => { const d = new Date(iso); return `${d.toLocaleDateString("en-US", { month: "short", day: "numeric" })}, ${d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`; };
 
 /** Compact table of appointments (40px rows). Row click or Enter opens the right-side panel; the arrow keys move between rows. */
@@ -140,7 +140,7 @@ export function PersonPanel({ person, overall, onClose, onOpenRows }: { person: 
           <dl className="ap-dl">
             <dt>Booked</dt><dd>{person.bookings}</dd><dt>Show rate</dt><dd>{pct(person.showRate)} <span className="ap-sub">(everyone {pct(overall.showRate)})</span></dd>
             <dt>No-show rate</dt><dd>{pct(person.noShowRate)} <span className="ap-sub">(everyone {pct(overall.noShowRate)})</span></dd><dt>Close rate</dt><dd>{pct(person.closeRate)} <span className="ap-sub">(everyone {pct(overall.closeRate)})</span></dd>
-            <dt>Leads burned</dt><dd>{person.burned}</dd><dt>Revenue won</dt><dd>{money(person.revenueCents)}</dd><dt>Lead to booked</dt><dd>{person.avgLeadToBookedHours === null ? "n/a" : `${person.avgLeadToBookedHours.toFixed(1)} hours`}</dd>
+            <dt>Revenue won</dt><dd>{money(person.revenueCents)}</dd><dt>Lead to booked</dt><dd>{person.avgLeadToBookedHours === null ? "n/a" : `${person.avgLeadToBookedHours.toFixed(1)} hours`}</dd>
           </dl>
           <button type="button" className="s6-btn" data-kind="primary" onClick={onOpenRows}>Open their {person.bookings} appointments</button>
           <p className="ap-fine">Compared only with your own team&apos;s averages for these dates.</p>

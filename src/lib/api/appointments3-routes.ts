@@ -1,4 +1,4 @@
-import { apptCache, appointmentList, bookingShare, calendars, cleanId, detail, flowTree, health, needsOutcome, noshowRecovery, overview, receipt, reminders, sources, type Filters, type Scope } from "../analytics/appointments3-queries";
+import { apptCache, appointmentList, bookingShare, calendars, cleanId, detail, flowTree, health, needsOutcome, comparePeople, noshowRecovery, options, overview, receipt, sources, type Filters, type Scope } from "../analytics/appointments3-queries";
 import { clampSize, DAY, parseApptWindow } from "../analytics/appointments3-intel";
 import { APPT3_FLAGS, APPT3_PARTS, type Appt3Bucket, type Appt3Part } from "../analytics/appointments3-types";
 import type { Feature } from "../entitlements";
@@ -16,9 +16,9 @@ export type Appt3Helpers = { allowed: () => Promise<string[] | null>; links: () 
 
 const PART_FLAG: Record<Appt3Part, string> = {
   overview: "appt_overview", "needs-outcome": "appt_needs_outcome", "noshow-recovery": "appt_noshow_recovery", "booking-share": "appt_booking_share", "flow-tree": "appt_flow_tree",
-  health: "appt_health", sources: "appt_sources", calendars: "appt_calendars", reminders: "appt_reminders", receipt: "appt_proof", list: "appt_overview", detail: "appt_history",
+  health: "appt_health", sources: "appt_sources", calendars: "appt_calendars", options: "appt_overview", compare: "appt_flow_tree", receipt: "appt_proof", list: "appt_overview", detail: "appt_history",
 };
-const BUCKETS = new Set(["booked", "unmarked", "showed", "noshow", "cancelled", "invalid", "completed", "won", "lost", "open", "no_deal", "upcoming", "confirmed", "recovered", "burned"]);
+const BUCKETS = new Set(["booked", "unmarked", "showed", "noshow", "cancelled", "invalid", "completed", "won", "lost", "open", "no_deal", "upcoming", "recovered"]);
 const int = (v: string | null, d: number) => { const n = Number(v); return v !== null && Number.isFinite(n) ? Math.floor(n) : d; };
 const text = (v: string | null, max: number) => (v ?? "").trim().slice(0, max) || null;
 const personParam = (v: string | null) => (v === "none" ? "none" : cleanId(v));
@@ -59,15 +59,16 @@ export async function handleAppointments3(ctx: Ctx, h: Appt3Helpers): Promise<Re
     case "booking-share":
       return seePeople ? done(await bookingShare(scope, f, p, size, sp.get("sort"))) : wrap({ rows: [], total: 0, page: 0, size, pages: 1, truncated: false, unassigned: 0, ownerless: 0, fairness: { enough: false, maxSharePct: null, evenSharePct: null, closers: 0 } });
     case "flow-tree": {
-      if (!seePeople) return wrap({ nodes: [], period: { from: w.from.toISOString(), to: w.to.toISOString() }, totalBooked: 0, topN: 0, hiddenPeople: 0, leak: null, nextLead: null });
+      if (!seePeople) return wrap({ nodes: [], period: { from: w.from.toISOString(), to: w.to.toISOString() }, totalBooked: 0, topN: 0, hiddenPeople: 0, leak: null });
       const c = (sp.get("compare") ?? "").split(",").map(cleanId);
-      return done(await flowTree(scope, f, int(sp.get("top"), 12), c.length === 2 && c[0] && c[1] ? [c[0], c[1]] : null));
+      return done(await flowTree(scope, f, int(sp.get("top"), 12), c.length === 2 && c[0] && c[1] ? [c[0], c[1]] : null, Math.max(0, int(sp.get("skip"), 0))));
     }
     case "health":
       return seePeople && ctx.limitTo === null ? done(await health(scope, f, p, size)) : wrap({ rows: [], total: 0, page: 0, size, pages: 1, truncated: false, verticals: [] });
     case "sources": return done(await sources(scope, f));
     case "calendars": return done(await calendars(scope, f, p, size, link));
-    case "reminders": return done(await reminders(scope, f, p, size, link));
+    case "compare": { if (!seePeople) return wrap({ sides: [] }); const ids = (sp.get("ids") ?? "").split(",").map(cleanId).filter((x): x is string => !!x); return done(await comparePeople(scope, f, ids, sp.get("by") === "owner" ? "owner" : "booker")); }
+    case "options": { const o = await options(scope, f); return done(seePeople ? o : { ...o, people: [] }); }
     case "receipt": {
       const wk = sp.get("week") ?? "";
       const t = Date.now() - 7 * DAY;
