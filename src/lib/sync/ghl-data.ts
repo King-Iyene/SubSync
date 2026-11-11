@@ -251,14 +251,20 @@ export function mapCalendar(raw: unknown): CalendarRow | null {
   return id ? { id, name: str(r.name) } : null;
 }
 
-export type UserRow = { id: string; name: string | null; photoUrl: string | null };
+export type UserRow = {
+  id: string; name: string | null; photoUrl: string | null;
+  /** The rest comes from the same read (no extra permission) and feeds the Team screens: who the person is and which accounts they can reach. Absent from older responses. */
+  email: string | null; roleType: string | null; role: string | null; locationIds: string[]; deleted: boolean;
+};
 
 export function mapUser(raw: unknown): UserRow | null {
   const r = rec(raw);
   const id = str(r.id) ?? str(r._id);
   if (!id) return null;
   const name = displayName({ name: str(r.name), firstName: str(r.firstName), lastName: str(r.lastName), email: str(r.email) });
-  return { id, name: name || null, photoUrl: safePhotoUrl(r.profilePhoto) };
+  const roles = rec(r.roles);
+  const ids = Array.isArray(roles.locationIds) ? roles.locationIds.map((x) => str(x)).filter((x): x is string => !!x).slice(0, 2000) : [];
+  return { id, name: name || null, photoUrl: safePhotoUrl(r.profilePhoto), email: str(r.email), roleType: str(roles.type), role: str(roles.role), locationIds: ids, deleted: r.deleted === true };
 }
 
 // ---- fetchers (location-scoped token required) ----
@@ -358,6 +364,18 @@ export async function fetchConversationActivity(token: string, locationId: strin
 export async function fetchUsers(token: string, locationId: string): Promise<UserRow[]> {
   const body = rec(await getJson("/users/", { locationId }, token, "2021-07-28"));
   return (Array.isArray(body.users) ? body.users : []).map(mapUser).filter((u): u is UserRow => u !== null);
+}
+
+// Every person the company can see, with the accounts each one can reach. Needs the company token and users.readonly. Paged; stops at 2,000 people.
+export async function fetchCompanyUsers(companyToken: string, companyId: string): Promise<UserRow[]> {
+  const out: UserRow[] = [];
+  for (let skip = 0; skip < 2000; skip += 100) {
+    const body = rec(await getJson("/users/search", { companyId, limit: "100", skip: String(skip) }, companyToken, "2021-07-28"));
+    const page = (Array.isArray(body.users) ? body.users : []).map(mapUser).filter((u): u is UserRow => u !== null);
+    out.push(...page);
+    if (page.length < 100) break;
+  }
+  return out;
 }
 
 export type ContactCursor = { startAfter?: number; startAfterId?: string } | null;

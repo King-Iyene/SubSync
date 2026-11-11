@@ -122,6 +122,7 @@ import { handleApptWork } from "./appointment-work-routes";
 import { handleAppointments3 } from "./appointments3-routes";
 import { handlePipeline3 } from "./pipeline3-routes";
 import { handleClients3 } from "./clients3-routes";
+import { handlePeople3 } from "./people3-routes";
 import { handleApptActions } from "./appointment-actions-routes";
 import { handlePipelineActions } from "./pipeline-actions-routes";
 import { grantedOf } from "./workflows-api";
@@ -1998,6 +1999,10 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
     // Clients round 3: /api/app/clients3?part=... (overview, needs attention, trends, compare, receipt, people, setup, lists; read only).
     if (a === "clients3" && method === "GET" && !b && ctx.url.searchParams.has("part")) {
       return await handleClients3(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links });
+    }
+    // Team (people) module: /api/app/people3?part=... (today, scorecards, workload, leaderboard, money, coaching, access, proof, person, handoff, next lead, lists; read only).
+    if (a === "people3" && method === "GET" && !b && ctx.url.searchParams.has("part")) {
+      return await handlePeople3(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links });
     }
     // Appointments actions and meetings (slice AB): the panel, preview-then-do changes, bulk, undo, and the private Meetings area (each behind its own flag, checked inside).
     if (a === "appointments" && (b === "act" || b === "meetings") && ctx.segments.length === 3) {
