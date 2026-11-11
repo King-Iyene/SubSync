@@ -16,17 +16,19 @@ import { PipelineGrid, PipelinePicker } from "./pipes";
 import type { PipeCard } from "@/lib/analytics/pipeline3-types";
 import { Health, NeedsAttention, Overview, People, Proof, Sources, StageHistory, WonLost, type SectionProps } from "./sections";
 import type { PlHealthRow } from "@/lib/analytics/pipeline3-types-interim";
+import { SlippingPanel, useCashFlags } from "../td3/cash";
 
 // Pipeline as a module with sub-sections (the Appointments pattern): Overview | Money Flow | Needs attention | Won and lost | People | Sources | Stage history | Health | Proof.
 // One filter bar, one right-side deal panel, saved views and keys. SubSync never changes a deal from here; edits go through slice PB's checked gateway tools, which mount into the panel slots.
 
-type TabKey = "overview" | "flow" | "needs" | "wonlost" | "people" | "sources" | "history" | "health" | "proof";
+type TabKey = "overview" | "flow" | "needs" | "wonlost" | "people" | "sources" | "history" | "health" | "proof" | "slipping";
 const TABS: Array<{ key: TabKey; label: string; tip: string }> = [
   { key: "overview", label: "Overview", tip: "The one sentence, the numbers and where the money leaks." }, { key: "flow", label: "Money flow", tip: "The money in each stage as stacks of coins." },
   { key: "needs", label: "Needs attention", tip: "Deals stuck longer than that step normally takes." }, { key: "wonlost", label: "Won and lost", tip: "What closed, and the lost reason when your CRM has one." },
   { key: "people", label: "People", tip: "Who closes and who lets deals go cold." },
   { key: "sources", label: "Sources", tip: "Which lead sources turn into money." }, { key: "history", label: "Stage history", tip: "How long deals really stay in each step." },
   { key: "health", label: "Accounts", tip: "Every client account, most stuck deals first." }, { key: "proof", label: "Proof", tip: "The weekly receipt per client." },
+  { key: "slipping", label: "Slipping", tip: "Deals going quiet for their stage, about to, or lost this fortnight, with the money behind them." },
 ];
 type SavedView = { name: string; filters: PlFilters; tab: TabKey };
 const VIEWS_KEY = "pl3.views.v1";
@@ -36,7 +38,9 @@ type Drill = { tab: TabKey; title: string; count: number; extra: Record<string, 
 
 export function PipelineModule({ moneyFlow = true, actions = false }: { moneyFlow?: boolean; actions?: boolean }) {
   useMountDealActions(actions);
-  const tabs = useMemo(() => TABS.filter((t) => moneyFlow || t.key !== "flow"), [moneyFlow]);
+  const cash = useCashFlags();
+  const slippingOn = cash.flags?.cf_deals === true;
+  const tabs = useMemo(() => TABS.filter((t) => (moneyFlow || t.key !== "flow") && (slippingOn || t.key !== "slipping")), [moneyFlow, slippingOn]);
   const [tab, setTab] = useState<TabKey>("overview");
   const [filters, setFilters] = useState<PlFilters>(DEFAULT_FILTERS);
   const [q, setQ] = useState("");
@@ -91,6 +95,7 @@ export function PipelineModule({ moneyFlow = true, actions = false }: { moneyFlo
       case "history": return <StageHistory {...sp} />;
       case "health": return <><Health {...sp} />{drillList}</>;
       case "proof": return <><Proof {...sp} />{drillList}</>;
+      case "slipping": return <SlippingPanel location={filters.locationId} showAccount={showAccount} />;
     }
   })();
 

@@ -170,6 +170,11 @@ export const FEATURES = [
   "pm_disputes",
   "pm_upcoming",
   "pm_resend",
+  "cf_save",
+  "cf_recover",
+  "cf_deals",
+  "cf_email",
+  "cf_record",
 ] as const;
 export type Feature = (typeof FEATURES)[number];
 
