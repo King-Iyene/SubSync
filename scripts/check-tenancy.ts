@@ -108,6 +108,9 @@ async function main() {
       ...["overview", "needs-attention", "trends", "compare", "receipt", "people", "setup", "options", "export", "billing"].flatMap((part) => [`/api/app/clients3?part=${part}`, `/api/app/clients3?part=${part}&location=${other.locs[0]}`, `/api/app/clients3?part=${part}&q=${other.marker}&industry=${other.marker}`]),
       ...["leads_down", "waiting", "waiting_old", "unmarked", "noshows", "stale_deals", "no_owner", "no_phone", "staff_quiet", "sync_old", "needs_permission"].flatMap((r) => [`/api/app/clients3?part=list&reason=${r}`, `/api/app/clients3?part=list&reason=${r}&location=${other.locs[0]}`]),
       `/api/app/clients3?part=compare&ids=${other.locs.join(",")}`, `/api/app/clients3?part=receipt&location=${other.locs[0]}&week=2026-01-05`,
+      // Clients v2 (client-account management): every part, asked for the other side's account, name, kind, manager and cursor by every parameter the screen takes.
+      ...["list", "options", "today", "plans", "views", "export"].flatMap((part) => [`/api/app/clients2?part=${part}`, `/api/app/clients2?part=${part}&q=${other.marker}&plan=${other.marker}&vertical=${other.marker}&manager=${other.marker}&status=past_due&level=act&quiet=true`, `/api/app/clients2?part=${part}&cursor=${other.marker}&sort=name&size=100`]),
+      `/api/app/clients2?part=account&id=${other.locs[0]}`, `/api/app/clients2?part=account&id=${other.marker}`, `/api/app/clients2?part=list&location=${other.locs[0]}`,
       // Today (front page): every part, asked for the other side's account by every parameter the page takes (location, kind, week).
       ...["today", "list", "proof", "numbers", "settings", "export", "options"].flatMap((part) => [`/api/app/today3?part=${part}`, `/api/app/today3?part=${part}&location=${other.locs[0]}`, `/api/app/today3?part=${part}&location=${other.marker}`, `/api/app/today3?part=${part}&location=${other.locs[0]}&week=2026-01-05`]),
       ...["waiting_old", "waiting", "unmarked", "noshows", "stale_deals", "needs_permission", "sync_old", "leads_down", "staff_quiet", "no_owner", "no_phone", "open_deals", "all_waiting", "all_noshows", "all_stale", "mine_waiting"].flatMap((k) => [`/api/app/today3?part=list&kind=${k}`, `/api/app/today3?part=list&kind=${k}&location=${other.locs[0]}`]),
@@ -231,6 +234,11 @@ async function main() {
       ["PUT", `/api/app/client-onboarding/${B.locs[0]}/steps`, { key: "manual:kickoff", done: true }],
       ["POST", `/api/app/client-onboarding/${B.locs[0]}/steps`, { label: "hacked" }],
       ["POST", `/api/app/clients/${B.locs[0]}/notes`, { body: "hacked" }],
+      // Clients v2: a note, a tag and a saved view aimed at the other agency's account.
+      ["POST", "/api/app/clients2/note-add", { location: B.locs[0], kind: "note", body: "hacked" }],
+      ["POST", "/api/app/clients2/note-update", { location: B.locs[0], id: "00000000-0000-0000-0000-000000000000", body: "hacked" }],
+      ["POST", "/api/app/clients2/note-delete", { location: B.locs[0], id: "00000000-0000-0000-0000-000000000000", confirm: "x" }],
+      ["POST", "/api/app/clients2/tag", { locations: [B.locs[0]], vertical: "solar", step: "do" }],
       ["DELETE", `/api/app/clients/${B.locs[0]}/notes?id=00000000-0000-0000-0000-000000000000`, {}],
       // Today's working queue: a mark on the other agency's row, and a saved view that names the other agency's account.
       ["POST", "/api/app/today/action", { action: "done", rowKey: `${B.locs[0]}|replies` }],
