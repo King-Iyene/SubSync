@@ -434,3 +434,4 @@ Standing routines (customer walkthrough, simplify pass, innovation pass, daily s
 6. Migrations deploy through GitHub: push branch, open PR (fresh-database Check), merge to main, King approves the "production" apply. Never apply to the live database by hand. Features ship flag-off.
 7. Tenancy check alone before main. All CRM writes through the gateway. SubSync never replies for the agency.
 8. Never do the bare minimum: build the advanced version, add extra helpful features while building (list them), then do a "why would I pay?" review pass and add what is missing. Delete of any item always needs a typed confirmation naming it; edits show a preview.
+9. Use fewer tokens in every build and move fast: short briefs pointing at the shared brief, short reports, no re-reading, no polling.
