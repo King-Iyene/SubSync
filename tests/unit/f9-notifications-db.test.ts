@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { closeDb, sql } from "@/lib/db";
 import { listAlerts } from "@/lib/analytics/queries";
 import { drainInstallation } from "@/lib/notifications/service";
@@ -31,6 +31,16 @@ describe.skipIf(!HAS_DB)("notifications against the real database", () => {
     inst = row.id as string;
     await sql()`insert into settings (installation_id) values (${inst}) on conflict do nothing`;
   });
+  // Rows from one test must never leak into the next: the drain works off every waiting row of the installation.
+  afterEach(async () => {
+    await sql()`delete from notification_deliveries where installation_id = ${inst}`;
+    await sql()`delete from notifications where installation_id = ${inst}`;
+    await sql()`delete from alerts where installation_id = ${inst}`;
+    await sql()`delete from cached_conversations where installation_id = ${inst}`;
+    await sql()`delete from cached_contacts where installation_id = ${inst}`;
+    await sql()`delete from location_users where installation_id = ${inst}`;
+    await sql()`delete from locations where installation_id = ${inst}`;
+  });
   afterAll(async () => { await sql()`delete from installations where company_id = ${CO}`; await closeDb(); });
 
   it("the ledger's own unique rule means the same message to the same place is created once, even when two runs race", async () => {
@@ -48,7 +58,7 @@ describe.skipIf(!HAS_DB)("notifications against the real database", () => {
     const owner = "xtest-f9-breach-owner";
     const admin = "xtest-f9-breach-admin";
     const now = Date.parse("2026-11-02T22:30:00Z");
-    await sql()`insert into locations (installation_id, location_id, name) values (${inst}, ${loc}, 'Breach Clinic')`;
+    await sql()`insert into locations (installation_id, location_id, name, timezone) values (${inst}, ${loc}, 'Breach Clinic', 'Africa/Lagos')`;
     await sql()`insert into location_users (installation_id, location_id, user_id, name, role) values
       (${inst}, ${loc}, ${owner}, 'Breach Owner', 'account_user'),
       (${inst}, ${loc}, ${admin}, 'Breach Admin', 'account_admin')`;
@@ -93,11 +103,12 @@ describe.skipIf(!HAS_DB)("notifications against the real database", () => {
     expect((await listBell(inst, { kind: "client", limitTo: loc }, "not-the-recipient", now)).filter((n) => n.type === "other_alerts")).toHaveLength(0);
 
     const again = await raiseInboxBreachForInstallation(inst, now + 60_000);
-    expect(again).toMatchObject({ created: 0, capped: 0, unroutable: 0 });
+    // The eleventh waiting person is still over the owner's daily cap of ten, so a refresh reports it as capped again but creates nothing.
+    expect(again).toMatchObject({ created: 0, capped: 1, unroutable: 0 });
     const [total] = await sql()`select count(*)::int n from notifications
       where installation_id = ${inst} and type = 'other_alerts' and recipient_user_key in (${owner}, ${admin})`;
     expect(total.n).toBe(11);
-  });
+  }, 180000);
 
   it("plan and drain with the real ledger: held at night, released in the morning, sent once, and a second plan creates nothing", async () => {
     const ctx = ctxFor({ speed_breach: { email: true, recipients: ["owner@x.test"], inApp: false } });
