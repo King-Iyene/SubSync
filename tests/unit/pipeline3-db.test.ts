@@ -42,13 +42,14 @@ describe.skipIf(!HAS_DB)("pipeline round 3", () => {
     await sql()`insert into locations (installation_id, location_id, name, timezone, client_view) values (${instA}, ${A1}, 'zzPl3 Client A', 'UTC', true), (${instB}, ${B1}, 'zzPl3 Client B', 'UTC', true)`;
     await sql()`insert into team_names (installation_id, user_id, name) values (${instA}, 'closer1', 'Zed Closer')`;
     await sql()`insert into pipelines (installation_id, location_id, pipeline_id, name, stages) values
-      (${instA}, ${A1}, ${`${A1}-pl`}, 'Sales', ${JSON.stringify([{ id: "new", name: "New" }, { id: "proposal", name: "Proposal" }])}::jsonb),
-      (${instB}, ${B1}, ${`${B1}-pl`}, 'Sales', ${JSON.stringify([{ id: "new", name: "New" }])}::jsonb)`;
+      (${instA}, ${A1}, ${`${A1}-pl`}, 'Sales', ${sql().json([{ id: "new", name: "New" }, { id: "proposal", name: "Proposal" }])}),
+      (${instB}, ${B1}, ${`${B1}-pl`}, 'Sales', ${sql().json([{ id: "new", name: "New" }])})`;
     await sql()`insert into cached_opportunities ${sql()([
-      deal(instA, A1, "a1", "new"), deal(instA, A1, "a2", "new", { last_stage_change_at: new Date(Date.now() - 40 * DAY) }), deal(instA, A1, "a3", "proposal", { last_stage_change_at: new Date(Date.now() - 60 * DAY), monetary_value: 3000 }),
+      deal(instA, A1, "a1", "new"), deal(instA, A1, "a2", "new", { last_stage_change_at: new Date(Date.now() - 40 * DAY) }), deal(instA, A1, "a3", "proposal", { last_stage_change_at: new Date(Date.now() - 60 * DAY) }),
       deal(instA, A1, "a4", "proposal", { assigned_to: null }), deal(instA, A1, "a5", "new", { monetary_value: 0 }), deal(instA, A1, "a6", "new", { name: "Test deal" }),
       deal(instA, A1, "a7", "proposal", { status: "won", monetary_value: 5000, last_status_change_at: new Date(Date.now() - 3 * DAY) }),
       deal(instA, A1, "a8", "proposal", { status: "lost", monetary_value: 2000, last_status_change_at: new Date(Date.now() - 4 * DAY) }),
+      deal(instA, A1, "a9", "new", { monetary_value: 9000 }),
       deal(instB, B1, "b1", "new"), deal(instB, B1, "b2", "new", { last_stage_change_at: new Date(Date.now() - 50 * DAY) }),
     ] as never)}`;
   });
@@ -65,16 +66,17 @@ describe.skipIf(!HAS_DB)("pipeline round 3", () => {
     const t = session(CO_A, "agency", null);
     const o = await call(t, "pipeline3?part=overview");
     expect(o.status).toBe(200);
-    // Counted open deals: a1, a2, a3 (value above zero, an owner, not a test). a4 has no owner, a5 no value, a6 is a test.
+    // Counted open deals: a1, a2, a3 (value above zero, an owner, not a test). a4 has no owner, a5 no value, a6 is a test, a9 is one large deal (over 40% of the open money) shown apart.
     expect(o.body.openCount).toBe(3);
-    expect(o.body.openValue.value).toBe(5000);
+    expect(o.body.openValue.value).toBe(3000);
+    expect(o.body.health.outliers).toBe(1);
     expect(o.body.health.noOwner).toBe(1);
     expect(o.body.health.noValue).toBe(1);
     expect(o.body.health.test).toBe(1);
     const stuck = await call(t, "pipeline3?part=list&bucket=stale&size=100");
     expect(stuck.body.total).toBe(o.body.stale.count);
     expect(stuck.body.rows.every((r: Json) => r.stale === true)).toBe(true);
-    for (const [bucket, n] of [["open", o.body.openCount], ["no_owner", o.body.health.noOwner], ["no_value", o.body.health.noValue], ["test", o.body.health.test]] as const) {
+    for (const [bucket, n] of [["open", o.body.openCount], ["no_owner", o.body.health.noOwner], ["no_value", o.body.health.noValue], ["test", o.body.health.test], ["outlier", o.body.health.outliers]] as const) {
       expect((await call(t, `pipeline3?part=list&bucket=${bucket}&size=100`)).body.total).toBe(n);
     }
     const all = await call(t, "pipeline3?part=list&size=100");
@@ -104,6 +106,7 @@ describe.skipIf(!HAS_DB)("pipeline round 3", () => {
     const meta = { installationId: instA, locationId: A1, opportunityId: "a1", contactId: "c-a1" };
     expect(await recordDealHistory(meta, ev)).toBe(1);
     expect(await recordDealHistory(meta, ev)).toBe(0);
+    await sql()`update cached_opportunities set stage_id = 'proposal', last_stage_change_at = now() where installation_id = ${instA} and location_id = ${A1} and opportunity_id = 'a1'`;
     await sweepDealHistory(instA);
     const second = await sweepDealHistory(instA);
     expect((second.created ?? 0) + (second.stages ?? 0) + (second.statuses ?? 0)).toBe(0);
@@ -111,6 +114,34 @@ describe.skipIf(!HAS_DB)("pipeline round 3", () => {
     expect(n.n).toBe(1);
     const d = await call(session(CO_A, "agency", null), `pipeline3?part=detail&location=${A1}&id=a1`);
     expect(d.body.timeline.some((e: Json) => e.kind === "stage")).toBe(true);
+  });
+
+  it("every part answers, and the lists the parts open equal their counts", async () => {
+    if (!applied) return;
+    const t = session(CO_A, "agency", null);
+    for (const part of ["overview", "money-flow", "attention", "won-lost", "forecast", "people", "sources", "stage-history", "health", "receipt", "list", "replay"]) {
+      const r = await call(t, `pipeline3?part=${part}`);
+      expect(r.status, part).toBe(200);
+      expect(r.body.flags, part).toBeTruthy();
+    }
+    const a = await call(t, "pipeline3?part=attention&size=100");
+    expect(a.body.total).toBe((await call(t, "pipeline3?part=overview")).body.stale.count);
+    expect(a.body.byStage.reduce((s: number, x: Json) => s + x.stale, 0)).toBe(a.body.total);
+    const wl = await call(t, "pipeline3?part=won-lost");
+    expect(wl.body.won.n).toBe(1);
+    expect(wl.body.lost.n).toBe(1);
+    expect(wl.body.lostReasons[0]).toMatchObject({ reason: "No reason recorded", noReason: true });
+    expect((await call(t, "pipeline3?part=list&bucket=no_reason&size=100")).body.total).toBe(1);
+    expect((await call(t, "pipeline3?part=list&bucket=won&size=100")).body.total).toBe(wl.body.won.n);
+    const pe = await call(t, "pipeline3?part=people");
+    expect(pe.body.rows[0].name).toBe("Zed Closer");
+    expect(pe.body.unowned.n).toBe(1);
+    const h = await call(t, "pipeline3?part=health");
+    expect(h.body.rows[0].noOwner).toBe(1);
+    expect(h.body.rows[0].test).toBe(1);
+    const rp = await call(t, "pipeline3?part=replay&days=30");
+    expect(rp.body.frames.length).toBe(30);
+    expect((await call(t, "pipeline3?part=stage-history")).body.eventsRecorded).toBeGreaterThan(0);
   });
 
   it("gives a client's staff no ranking of people or accounts", async () => {

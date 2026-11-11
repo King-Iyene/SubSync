@@ -603,7 +603,7 @@ export async function replay(s: Scope, f: Filters, days: number): Promise<Pl3Rep
   const from = new Date(Date.now() - n * DAY), w = deals(s, { ...f, bucket: null });
   const [cur, moves, [since]] = await Promise.all([
     db`with ${w} select d.location_id, d.stage_id, count(*)::int n, sum(d.value)::float8 v from d where ${P_OPEN(db)} group by 1, 2`,
-    db`with ${w} select (h.at at time zone 'UTC')::date day, h.kind, h.location_id, h.from_value, h.to_value, d.stage_id cur_stage, count(*)::int n, coalesce(sum(h.value), 0)::float8 v
+    db`with ${w} select (h.at at time zone 'UTC')::date dy, h.kind, h.location_id, h.from_value, h.to_value, d.stage_id cur_stage, count(*)::int n, coalesce(sum(h.value), 0)::float8 v
       from deal_history h join d on d.location_id = h.location_id and d.opportunity_id = h.opportunity_id
       where h.installation_id = ${s.inst} and h.actor_kind <> 'subsync' and d.counted and h.at >= ${from} and ((h.kind in ('stage', 'created') and h.to_value is not null) or (h.kind = 'status' and h.to_value in ('won', 'lost')))
       group by 1, 2, 3, 4, 5, 6`,
@@ -617,7 +617,7 @@ export async function replay(s: Scope, f: Filters, days: number): Promise<Pl3Rep
     const from2 = isStatus ? keyOf(sm, r.location_id, r.cur_stage)?.key ?? null : r.from_value ? keyOf(sm, r.location_id, r.from_value)?.key ?? null : null;
     const to2 = isStatus ? null : keyOf(sm, r.location_id, r.to_value)?.key ?? null;
     if (!isStatus && !to2) continue;
-    dm.push({ day: day(r.day), from: from2, to: to2, status: isStatus ? (r.to_value as "won" | "lost") : null, count: num(r.n), value: num(r.v) });
+    dm.push({ day: day(r.dy), from: from2, to: to2, status: isStatus ? (r.to_value as "won" | "lost") : null, count: num(r.n), value: num(r.v) });
   }
   const dayList: string[] = [];
   for (let i = n - 1; i >= 0; i--) dayList.push(new Date(Date.now() - i * DAY).toISOString().slice(0, 10));
