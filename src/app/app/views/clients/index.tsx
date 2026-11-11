@@ -10,6 +10,7 @@ import { ClientPage } from "./client-page";
 import { CompareTab } from "./compare";
 import { IndustriesTab } from "./industries";
 import { OnboardingTab } from "./onboarding-tab";
+import { HealthTab } from "./health-tab";
 import { ReportsTab } from "./reports-tab";
 import { ReviewsTab } from "./reviews";
 import type { TabId } from "./types";
@@ -44,6 +45,7 @@ export function ClientsView({ go, initialTab = "health", features = ALL }: { go:
     { id: "onboarding", label: "Onboarding", on: f.onboarding, node: <OnboardingTab go={go} /> },
     { id: "compare", label: "Compare", on: f.clients && f.reports, node: <WithNames>{(a) => <CompareTab accounts={a} showSetups={f.setupCompare} />}</WithNames> },
     { id: "reviews", label: "Reviews (QBR)", on: f.clients && f.reports, node: <WithNames>{(a) => <ReviewsTab accounts={a} />}</WithNames> },
+    { id: "healthrisk", label: "Health and risk", on: f.clients, node: <HealthTab /> },
     { id: "reports", label: "Reports", on: f.clients, node: <ReportsTab /> },
     { id: "details", label: "Industries", on: f.clients, node: <IndustriesTab go={go} showPlaybooks={f.playbooks} /> },
   ];

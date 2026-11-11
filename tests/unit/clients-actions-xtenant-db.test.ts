@@ -116,3 +116,29 @@ describe.skipIf(!HAS_DB)("clients bulk and owner cross-tenant", () => {
     } finally { for (const co of [CO_A, CO_B]) await sql()`delete from installations where company_id = ${co}`; }
   });
 });
+
+describe.skipIf(!HAS_DB)("clients risk, health, workflows and new-clients cross-tenant", () => {
+  it("never returns, records or echoes another company's account", async () => {
+    let ok = false;
+    try { await sql()`select 1 from client_risk_history limit 1`; ok = true; } catch { ok = false; }
+    if (!ok) return;
+    for (const co of [CO_A, CO_B]) await sql()`delete from installations where company_id = ${co}`;
+    const [{ id: ia }] = (await sql()`insert into installations (company_id, company_name, plan) values (${CO_A}, 'zzAct A', 'pro') returning id`) as unknown as Array<{ id: string }>;
+    const [{ id: ib }] = (await sql()`insert into installations (company_id, company_name, plan) values (${CO_B}, 'zzAct B', 'pro') returning id`) as unknown as Array<{ id: string }>;
+    try {
+      for (const i of [ia, ib]) await sql()`insert into settings (installation_id) values (${i}) on conflict do nothing`;
+      await sql()`insert into locations (installation_id, location_id, name, timezone) values (${ia}, ${A1}, 'zzAct Client A1', 'UTC'), (${ib}, ${B1}, 'zzAct Client B', 'UTC')`;
+      const t = session(CO_A, "agency", null);
+      for (const p of ["risk", "health", "workflows", "new-clients"]) {
+        const r = await call(t, "GET", `clients/act/${p}`);
+        expect(r.status, p).toBe(200);
+        expect(r.text, p).not.toContain(B1); expect(r.text, p).not.toContain("zzAct Client B");
+      }
+      expect((await call(t, "GET", `clients/act/workflows?location=${B1}`)).status).toBe(404);
+      const [h] = await sql()`select count(*)::int n from client_risk_history where installation_id = ${ib}`;
+      expect(h.n).toBe(0);
+      const c = session(CO_A, "client", A1);
+      for (const p of ["risk", "health", "workflows", "new-clients"]) expect((await call(c, "GET", `clients/act/${p}`)).status, p).toBeGreaterThanOrEqual(403);
+    } finally { for (const co of [CO_A, CO_B]) await sql()`delete from installations where company_id = ${co}`; }
+  });
+});

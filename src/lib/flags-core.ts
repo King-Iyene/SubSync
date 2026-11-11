@@ -90,6 +90,9 @@ export const DEFAULT_OFF: ReadonlySet<Feature> = new Set<Feature>([
   "pl_bulk",
   "cl_reports",
   "cl_actions",
+  "cl_retention",
+  "cl_workflows",
+  "cl_onboarding",
 ]);
 
 export function resolveFeatures(all: readonly Feature[], overrides: Record<string, boolean>, allOn = false): Record<Feature, boolean> {

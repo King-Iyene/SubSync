@@ -124,6 +124,9 @@ export const FEATURES = [
   // Clients module, slice CB (weekly receipt, mute, reply targets): default off.
   "cl_reports",
   "cl_actions",
+  "cl_retention",
+  "cl_workflows",
+  "cl_onboarding",
 ] as const;
 export type Feature = (typeof FEATURES)[number];
 

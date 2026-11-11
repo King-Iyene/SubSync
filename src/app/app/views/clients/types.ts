@@ -28,7 +28,7 @@ export type DayPoint = { day: string; healthScore: number | null; openValue: num
 export type ApptWeek = { weekStart: number; count: number; showed: number; noShow: number; members: Array<{ contactId: string; name: string; status: string; startAt: number; url: string }> };
 export type TrendsData = { locationId: string; name: string; days: DayPoint[]; historyStartsOn: string | null; weeks: ApptWeek[] };
 
-export const TABS = ["health", "onboarding", "details", "compare", "reviews", "reports"] as const;
+export const TABS = ["health", "onboarding", "details", "compare", "reviews", "reports", "healthrisk"] as const;
 export type TabId = (typeof TABS)[number];
 
 // The rebuilt screen's shapes (GET clients?part=home|list|one), the same as src/lib/analytics/clients-v2.ts builds on the server.

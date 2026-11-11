@@ -163,3 +163,39 @@ export async function setOwner(inst: string, locationId: string, name: string | 
     throw e;
   }
 }
+
+// ---- retention: the daily history of many accounts in one read, the quiet marks as a map, and the daily risk record ----
+import type { DayRow, Risk } from "./clients-retention";
+
+
+export async function historyRows(inst: string, ids: string[], days = 60): Promise<Map<string, DayRow[]>> {
+  const out = new Map<string, DayRow[]>();
+  if (ids.length === 0) return out;
+  const rows = await sql()`select location_id, day, new_contacts_30d, open_value::float8 open_value, engagement_score from account_metrics_daily
+    where installation_id = ${inst} and location_id = any(${ids}::text[]) and day >= current_date - ${days}::int order by location_id, day`;
+  for (const r of rows) {
+    const id = r.location_id as string;
+    const list = out.get(id) ?? [];
+    list.push({ day: r.day instanceof Date ? r.day.toISOString().slice(0, 10) : String(r.day), newContacts30d: Number(r.new_contacts_30d), openValue: Number(r.open_value), engagement: Number(r.engagement_score) });
+    out.set(id, list);
+  }
+  return out;
+}
+
+/** What other screens (the needs-attention ranking) call to hide quieted marks: location id to the kinds quieted right now. */
+export async function quietedMap(inst: string, ids: string[], now: number): Promise<Map<string, MuteKind[]>> {
+  const m = new Map<string, MuteKind[]>();
+  for (const r of (await activeMutes(inst, ids, now)).rows) m.set(r.locationId, [...(m.get(r.locationId) ?? []), r.kind]);
+  return m;
+}
+
+/** One row per client per day; the second call on the same day changes nothing. A missing table is not an error. */
+export async function recordRisk(inst: string, risks: Risk[]): Promise<void> {
+  if (risks.length === 0) return;
+  try {
+    const db = sql();
+    await db`insert into client_risk_history ${db(risks.map((r) => ({ installation_id: inst, location_id: r.locationId, day: new Date().toISOString().slice(0, 10), level: r.level, points: r.points, history_days: r.historyDays })))} on conflict do nothing`;
+  } catch (e) {
+    if (!isMissing(e)) throw e;
+  }
+}

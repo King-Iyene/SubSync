@@ -5,6 +5,7 @@ import {
 } from "../analytics/clients-actions";
 import { ownersOf, setOwner, activeMutes, addMute, currentTarget, lastTargetChange, logTarget, receiptFacts, releaseMute, setupFacts } from "../analytics/clients-actions-queries";
 import { setAccountTarget } from "../analytics/speed-v2-queries";
+import { newClientsView, retentionView, workflowsView } from "./clients-retention-routes";
 import type { Feature } from "../entitlements";
 import { json, type AuthContext } from "./auth";
 
@@ -19,7 +20,11 @@ import { json, type AuthContext } from "./auth";
 // is used only after the shared ownedLocation guard says it is inside those accounts, and it is never echoed back. Nothing here writes to the CRM or messages anyone.
 
 type Ctx = AuthContext & { request: Request; url: URL; segments: string[] };
-export type ClientActionHelpers = { allowed: () => Promise<string[] | null>; brand: () => Promise<string | null>; defaultTarget: () => Promise<number> };
+export type ClientActionHelpers = {
+  allowed: () => Promise<string[] | null>; brand: () => Promise<string | null>; defaultTarget: () => Promise<number>;
+  /** The permissions this installation granted (null when not known), and the Onboarding tab's own answer (re-narrowed to the accounts this session may read). */
+  granted: () => Promise<string[] | null>; onboarding: () => Promise<Response>;
+};
 
 const on = (ctx: Ctx, f: Feature) => ctx.entitlements.features[f] === true && !ctx.entitlements.locked.includes(f);
 const off = () => json({ error: "This is not switched on for your account" }, 404);
@@ -72,6 +77,25 @@ export async function handleClientActions(ctx: Ctx, h: ClientActionHelpers): Pro
     }
     const brand = await h.brand();
     return json({ now, receipts: list.map((r) => ({ ...r, text: receiptText(r, brand) })), capped: req === null && ids.length >= CAP });
+  }
+
+  if (m === "GET" && (part === "risk" || part === "health")) {
+    if (!on(ctx, "cl_retention")) return off();
+    const ids = await idsOf(ctx, h, null);
+    if (ids === null) return NOT_FOUND();
+    return await retentionView(ctx, h, ids, part === "health", now);
+  }
+  if (m === "GET" && part === "workflows") {
+    if (!on(ctx, "cl_workflows")) return off();
+    const ids = await idsOf(ctx, h, ctx.url.searchParams.get("location"));
+    if (ids === null) return NOT_FOUND();
+    return await workflowsView(ctx, h, ids, now);
+  }
+  if (m === "GET" && part === "new-clients") {
+    if (!on(ctx, "cl_onboarding")) return off();
+    const ids = await idsOf(ctx, h, null);
+    if (ids === null) return NOT_FOUND();
+    return await newClientsView(ctx, h, ids);
   }
 
   if (m === "GET" && part === "owners") {
