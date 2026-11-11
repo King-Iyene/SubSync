@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowLeft } from "lucide-react";
-import { createContext, useContext, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 
 // ---- the page template ----
 // Every page is: a back link when it was opened from another page, one title, one short sentence, its actions, an optional row of tabs (the module
@@ -70,13 +70,15 @@ export function BackLink({ label, onClick }: { label: string; onClick: () => voi
 // ---- the module sub-navigation ----
 // One pattern for every module: a short row of tabs, each a short view. Arrow keys move between tabs. On a phone the row scrolls sideways on its own,
 // never the page. Pass `value` and `onChange` to control it from outside, or just `start` to let it keep its own place.
-export type ModuleTab = { id?: string; label: string; node: ReactNode; badge?: ReactNode; /** Pill style only: a small icon before the label. */ icon?: ReactNode };
+export type ModuleTab = { id?: string; label: string; /** A hover tip (shown by the page's tip host). */ tip?: string; node: ReactNode; badge?: ReactNode; /** Pill style only: a small icon before the label. */ icon?: ReactNode };
 
 export function ModuleTabs({ tabs, start = 0, value, onChange, label = "Sections of this page", pill = false }: { tabs: ModuleTab[]; start?: number; value?: number; onChange?: (i: number) => void; label?: string; /** A bright segmented bar (Speed to lead) instead of the plain underline row. */ pill?: boolean }) {
   const [own, setOwn] = useState(start);
   const i = Math.min(Math.max(value ?? own, 0), tabs.length - 1);
   const base = useId();
   const refs = useRef<Array<HTMLButtonElement | null>>([]);
+  // On a phone the row of tabs scrolls inside itself; the open tab is brought into view so a link that opens a far tab never leaves it hidden.
+  useEffect(() => { if (pill) refs.current[i]?.scrollIntoView?.({ block: "nearest", inline: "nearest" }); }, [i, pill]);
   const select = (n: number) => { setOwn(n); onChange?.(n); refs.current[n]?.focus(); };
   const onKey = (e: KeyboardEvent) => {
     const last = tabs.length - 1;
@@ -87,7 +89,7 @@ export function ModuleTabs({ tabs, start = 0, value, onChange, label = "Sections
     <div>
       <div className={pill ? "spd-tabs mb-5 max-w-full overflow-x-auto py-1 print:hidden" : "mb-5 max-w-full overflow-x-auto border-b print:hidden"}><div className={pill ? "flex min-w-max gap-1.5 rounded-xl border bg-card/60 p-1.5" : "flex min-w-max gap-5"} role="tablist" aria-label={label} onKeyDown={onKey}>
         {tabs.map((t, n) => (
-          <button key={t.label} ref={(el) => { refs.current[n] = el; }} type="button" role="tab" id={`${base}-t${n}`} aria-selected={n === i} aria-controls={`${base}-p${n}`} tabIndex={n === i ? 0 : -1} onClick={() => select(n)}
+          <button key={t.label} ref={(el) => { refs.current[n] = el; }} type="button" role="tab" id={`${base}-t${n}`} aria-selected={n === i} data-tip={t.tip} aria-controls={`${base}-p${n}`} tabIndex={n === i ? 0 : -1} onClick={() => select(n)}
             className={pill ? "spd-tab ds-press inline-flex min-h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg px-3.5 text-sm font-semibold text-muted-foreground focus-visible:outline-2 focus-visible:outline-[var(--ring)]" : `-mb-px inline-flex min-h-10 shrink-0 items-center gap-1.5 border-b-2 py-2 text-sm transition-colors ${n === i ? "border-primary font-medium text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}>{pill && t.icon}{t.label}{t.badge}</button>
         ))}
       </div></div>

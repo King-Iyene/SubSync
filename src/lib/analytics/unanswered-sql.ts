@@ -15,7 +15,9 @@ import { snoozeHook, type SnoozeFlags, type SnoozeHook } from "./unanswered-snoo
 type Frag = PendingQuery<Row[]>;
 const DAY = 86_400_000;
 
-export type ListScope = { installationId: string; allowed: string[] | null; slaHours: number; targetMinutes: number; now: number; meId: string | null; seePeople: boolean; hook?: SnoozeFlags };
+export type ListScope = { installationId: string; allowed: string[] | null; slaHours: number; targetMinutes: number; now: number; meId: string | null; seePeople: boolean; hook?: SnoozeFlags;
+  /** The `account:contact` keys of the new leads past their reply target with no person's reply (the people Speed to lead times). Loaded only when the caller asks for the segment switch; null means not loaded. */
+  newLeadKeys?: readonly string[] | null };
 
 export type SqlRow = {
   key: string; locationId: string; locationName: string; contactId: string | null; conversationId: string; name: string; channel: string; call: boolean;
@@ -54,7 +56,7 @@ function peopleCte(db: Sql, s: ListScope, p: Pick<ListParams, "tab" | "quiet">):
     )`;
 }
 
-type Omit = "bucket" | "owner" | "channel" | null;
+type Omit = "bucket" | "owner" | "channel" | "lead" | null;
 
 /** Every choice as a condition on `people p`. `omit` leaves one choice out, which is how a chip's number is "the list with that one choice changed". */
 function filters(db: Sql, s: ListScope, p: ListParams, hook: SnoozeHook, omit: Omit = null): Frag {
@@ -67,6 +69,7 @@ function filters(db: Sql, s: ListScope, p: ListParams, hook: SnoozeHook, omit: O
     else if (o === "mine_free") parts.push(s.meId ? db`(p.assigned_to is null or p.assigned_to = ${s.meId})` : db`p.assigned_to is null`);
     else parts.push(db`p.assigned_to = ${o}`);
   }
+  if (omit !== "lead" && p.lead !== "all" && s.newLeadKeys) parts.push(p.lead === "new" ? db`p.pkey = any(${s.newLeadKeys as string[]}::text[])` : db`not (p.pkey = any(${s.newLeadKeys as string[]}::text[]))`);
   if (omit !== "channel" && p.channel) parts.push(db`p.ckey = any(${channelKeys(p.channel)}::text[])`);
   if (omit !== "bucket" && p.bucket) {
     parts.push(p.bucket === "h1" ? db`p.hrs < 4` : p.bucket === "h4" ? db`(p.hrs >= 4 and p.hrs < 24)` : p.bucket === "h24" ? db`(p.hrs >= 24 and p.hrs < 48)` : db`p.hrs >= 48`);
@@ -98,6 +101,8 @@ export type SqlList = {
   facets: {
     buckets: Record<"all" | "h1" | "h4" | "h24" | "h48", number>; owner: { all: number; none: number; mine: number; mineFree: number };
     channels: Array<{ key: string; label: string; count: number }>; snooze: boolean;
+    /** The three segments of the list as it is now (every other choice kept): everyone, new leads, and the people who are not new leads. Null when the segment read was not asked for. */
+    lead: { all: number; new: number; existing: number } | null;
   };
 };
 
@@ -128,11 +133,13 @@ export async function sqlList(s: ListScope, p: ListParams): Promise<SqlList> {
   }
   const total = rows.length ? Number(rows[0].total) : 0;
 
-  const [b, o, ch] = await Promise.all([
+  const keys = s.newLeadKeys ?? null;
+  const [b, o, ch, seg] = await Promise.all([
     db`${cte} select case when p.hrs < 4 then 'h1' when p.hrs < 24 then 'h4' when p.hrs < 48 then 'h24' else 'h48' end k, count(*)::int n from people p where ${filters(db, s, p, hook, "bucket")} group by 1`,
     db`${cte} select count(*)::int a, count(*) filter (where p.assigned_to is null)::int n, count(*) filter (where ${s.meId ? db`p.assigned_to = ${s.meId}` : db`false`})::int m,
         count(*) filter (where p.assigned_to is null or ${s.meId ? db`p.assigned_to = ${s.meId}` : db`false`})::int mf from people p where ${filters(db, s, p, hook, "owner")}`,
     db`${cte} select p.ckey k, count(*)::int n from people p where ${filters(db, s, p, hook, "channel")} group by 1`,
+    keys ? db`${cte} select count(*)::int a, count(*) filter (where p.pkey = any(${keys as string[]}::text[]))::int n from people p where ${filters(db, s, p, hook, "lead")}` : Promise.resolve(null),
   ]);
   const buckets = { all: 0, h1: 0, h4: 0, h24: 0, h48: 0 };
   for (const r of b) { buckets[r.k as "h1"] = Number(r.n); buckets.all += Number(r.n); }
@@ -141,6 +148,7 @@ export async function sqlList(s: ListScope, p: ListParams): Promise<SqlList> {
   const channels = [...byLabel].map(([key, count]) => ({ key, label: key, count })).sort((x, y) => y.count - x.count || x.label.localeCompare(y.label));
 
   const money = await dealValues(db, s.installationId, rows.map((r) => [r.location_id as string, r.contact_id as string | null]));
+  const keySet = keys ? new Set(keys) : null;
   const out: SqlRow[] = rows.map((r) => {
     const call = channelLabel(r.last_message_type as string | null) === "Call";
     const owner = ownerOf((r.assigned_to as string | null) ?? null, lk, r.location_id as string);
@@ -149,19 +157,20 @@ export async function sqlList(s: ListScope, p: ListParams): Promise<SqlList> {
       key: r.pkey as string, locationId: r.location_id as string, locationName: lk.locationNames.get(r.location_id as string) ?? "Client account", contactId: (r.contact_id as string | null) ?? null,
       conversationId: r.conversation_id as string, name: r.name ? properCase(r.name as string) : "Unnamed contact", channel: channelLabel(r.last_message_type as string | null), call,
       hours: Math.max(0, Number(r.hrs)), conversations: Number(r.convs), unreadMessages: Number(r.unread ?? 0), owner, unassigned: owner === null,
-      phone: (r.phone as string | null) ?? null, email: (r.email as string | null) ?? null, dnd: r.dnd === true, timeZone: (r.tz as string | null) || null, newLead: false,
+      phone: (r.phone as string | null) ?? null, email: (r.email as string | null) ?? null, dnd: r.dnd === true, timeZone: (r.tz as string | null) || null, newLead: keySet ? keySet.has(r.pkey as string) : false,
       dealValue: r.contact_id ? money.get(`${r.location_id}:${r.contact_id}`) ?? null : null, lastAt,
     };
   });
   const pages = Math.max(1, Math.ceil(total / p.size));
   return {
     total, page: at, pages, from: total === 0 ? 0 : at * p.size + 1, to: Math.min(total, at * p.size + out.length), rows: out,
-    facets: { buckets, owner: { all: Number(o[0]?.a ?? 0), none: Number(o[0]?.n ?? 0), mine: Number(o[0]?.m ?? 0), mineFree: Number(o[0]?.mf ?? 0) }, channels, snooze: hook.available },
+    facets: { buckets, owner: { all: Number(o[0]?.a ?? 0), none: Number(o[0]?.n ?? 0), mine: Number(o[0]?.m ?? 0), mineFree: Number(o[0]?.mf ?? 0) }, channels, snooze: hook.available,
+      lead: seg ? { all: Number(seg[0]?.a ?? 0), new: Number(seg[0]?.n ?? 0), existing: Number(seg[0]?.a ?? 0) - Number(seg[0]?.n ?? 0) } : null },
   };
 }
 
 function emptyList(): SqlList {
-  return { total: 0, page: 0, pages: 1, from: 0, to: 0, rows: [], facets: { buckets: { all: 0, h1: 0, h4: 0, h24: 0, h48: 0 }, owner: { all: 0, none: 0, mine: 0, mineFree: 0 }, channels: [], snooze: false } };
+  return { total: 0, page: 0, pages: 1, from: 0, to: 0, rows: [], facets: { buckets: { all: 0, h1: 0, h4: 0, h24: 0, h48: 0 }, owner: { all: 0, none: 0, mine: 0, mineFree: 0 }, channels: [], snooze: false, lead: null } };
 }
 
 /** The open deal value of the people on one page (counted: more than zero). One small read for at most 100 people. */
@@ -231,8 +240,10 @@ export async function sqlFind(s: ListScope, i: { q: string; page: number; size: 
 export async function sqlTabCounts(s: ListScope, quiet: ListParams["quiet"]): Promise<{ us: number; them: number }> {
   if (s.allowed && s.allowed.length === 0) return { us: 0, them: 0 };
   const db = sql();
+  // The same default view as the list (not snoozed, not set aside), so a tab's number is the number of rows its list shows.
+  const hook = await snoozeHook(db, s.installationId, s.hook);
   const count = async (tab: "us" | "them") => {
-    const [r] = await db`${peopleCte(db, s, { tab, quiet })} select count(*)::int n from people`;
+    const [r] = await db`${peopleCte(db, s, { tab, quiet })} select count(*)::int n from people p ${hook.available ? db`where not (${hook.snoozed}) and not (${hook.hidden})` : db``}`;
     return Number(r?.n ?? 0);
   };
   const [us, them] = await Promise.all([count("us"), count("them")]);

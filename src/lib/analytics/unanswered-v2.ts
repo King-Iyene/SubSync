@@ -254,6 +254,17 @@ export function todayAgreement(waiting: readonly WaitConv[], leads: readonly Wai
   return { today: merged.count, people: people.size, newLeadsOnly, newLeadsAmongThem: merged.items.filter((i) => i.newLead && people.has(i.id.replace(/^replies:/, ""))).length, partial: merged.partial };
 }
 
+/**
+ * The three segments of the people waiting: everyone, the new leads (the people Speed to lead times; marked with `markNewLeads`) and the rest. The segment counts are the
+ * counts of exactly the rows each segment lists (one `selectPeople` / SQL filter), so a number and its list cannot differ.
+ * Against Speed to lead's "no reply yet" count the exact difference is `newLeadsNotWritten`: new leads past their target with no person's reply who have NOT written yet (no
+ * conversation is waiting), plus any lead older than Today's 14-day window that Speed's date range still counts. See docs/METRICS.md "Unanswered inside Speed to lead".
+ */
+export function segmentCounts(people: readonly Person[]): { everyone: number; newLeads: number; existing: number } {
+  const newLeads = people.filter((p) => p.newLead).length;
+  return { everyone: people.length, newLeads, existing: people.length - newLeads };
+}
+
 /** The lead keys Today would build for these leads: the same `account:contact` key as a person's. */
 export const leadKey = (locationId: string, contactId: string) => `${locationId}:${contactId}`;
 

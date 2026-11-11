@@ -23,7 +23,8 @@ export async function snoozeHook(db: Db, installationId: string, flags: SnoozeFl
   const s = await loadHideSettings(installationId);
   const parts: Fragment[] = [];
   if (s.notALead) {
-    parts.push(db`(select o.outcome from unanswered_outcomes o where o.installation_id = ${installationId} and o.location_id = p.location_id and (o.conversation_id = p.conversation_id or (p.contact_id is not null and o.contact_id = p.contact_id)) order by o.created_at desc limit 1) = 'not_a_lead'`);
+    // coalesce: a person with no outcome at all has a NULL here, and `not (NULL)` is NULL, which dropped EVERY person from the default list (the list said 0 while the page said 23).
+    parts.push(db`coalesce((select o.outcome from unanswered_outcomes o where o.installation_id = ${installationId} and o.location_id = p.location_id and (o.conversation_id = p.conversation_id or (p.contact_id is not null and o.contact_id = p.contact_id)) order by o.created_at desc limit 1) = 'not_a_lead', false)`);
   }
   if (s.internal) {
     parts.push(db`(p.contact_id is not null and exists (select 1 from cached_contacts ct where ct.installation_id = ${installationId} and ct.location_id = p.location_id and ct.contact_id = p.contact_id and exists (select 1 from unnest(ct.tags) t where lower(btrim(t)) = any(${[...NOISE_TAGS]}::text[]))))`);

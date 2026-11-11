@@ -5,10 +5,10 @@ import { channelKeys, cleanView, escapeLike, readListParams, searchTerms, toQuer
 // The address of a list on the Unanswered screen is checked and clamped before any query runs (docs/METRICS.md "Unanswered messages, round 3").
 const read = (q: string, seePeople = true) => readListParams(new URLSearchParams(q), { seePeople });
 
-test("an empty address means the defaults: waiting for us, 20 a page, longest wait first", () => {
+test("an empty address means the defaults: waiting for us, 50 a page, longest wait first, everyone", () => {
   const r = read("");
   assert.ok(r.ok);
-  if (r.ok) assert.deepEqual(r.p, { tab: "us", sort: "wait", state: "active", size: 20, quiet: 24, minValue: 0, account: null, owner: null, channel: null, bucket: null, q: "", page: 0 });
+  if (r.ok) assert.deepEqual(r.p, { tab: "us", sort: "wait", state: "active", size: 50, quiet: 24, lead: "all", minValue: 0, account: null, owner: null, channel: null, bucket: null, q: "", page: 0 });
 });
 
 test("only 20, 50 and 100 are page sizes; unknown choices are refused, not guessed", () => {
@@ -47,10 +47,20 @@ test("a channel in words maps to the platform's message types", () => {
 
 test("a view keeps only known choices and never the page; the address is short and round-trips", () => {
   const v = cleanView({ tab: "them", owner: "none", page: 9, evil: "x", size: 50, q: "ava" }, { seePeople: true });
-  assert.deepEqual(v, { tab: "them", sort: "wait", state: "active", size: 50, quiet: 24, minValue: 0, account: null, owner: "none", channel: null, bucket: null, q: "ava" });
+  assert.deepEqual(v, { tab: "them", sort: "wait", state: "active", size: 50, quiet: 24, lead: "all", minValue: 0, account: null, owner: "none", channel: null, bucket: null, q: "ava" });
   assert.deepEqual(cleanView({ size: 7 }, { seePeople: true }), {});
-  assert.equal(toQuery({ tab: "us", owner: "none", size: 20 }), "owner=none");
+  assert.equal(toQuery({ tab: "us", owner: "none", size: 50 }), "owner=none");
+  assert.equal(toQuery({ tab: "us", size: 20 }), "size=20", "20 is a choice now, so it is written");
+  assert.equal(toQuery({ tab: "us", lead: "new" }), "lead=new");
   const back = read(toQuery(v));
   assert.ok(back.ok);
   if (back.ok) assert.deepEqual({ ...back.p, page: undefined }, { ...v, page: undefined });
+});
+
+test("the kind of person is one of everyone, new or existing; anything else is refused", () => {
+  for (const ok of ["lead=all", "lead=new", "lead=existing", ""]) assert.equal(read(ok).ok, true, ok);
+  for (const bad of ["lead=hot", "lead=NEW", "lead=1; drop"]) assert.equal(read(bad).ok, false, bad);
+  const r = read("lead=existing&size=100");
+  assert.ok(r.ok);
+  if (r.ok) { assert.equal(r.p.lead, "existing"); assert.equal(r.p.size, 100); }
 });

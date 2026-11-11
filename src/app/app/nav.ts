@@ -15,13 +15,17 @@ export type NavItem = {
   showWhenLimited?: boolean;
   /** A page with a parent that stays in the menu only for a kind of session whose menu has no parent (a client's staff have no Settings, so they get the Integrations entry). */
   showWhenParentHidden?: boolean;
+  /** A page with a parent that keeps its own menu entry only while the parent page is switched off or not in this kind of session's menu (Unanswered messages is a tab of Speed to lead; if Speed is off, it must stay reachable). */
+  showWhenParentOff?: boolean;
 };
 
 export const NAV: NavItem[] = [
   // Money-first order (stage SHELL): today's work, then replies, then appointments, then who the clients and people are, then the audit and clean-up, then everything else.
   { id: "today", label: "Today", feature: "overview", group: "" },
   { id: "speed", label: "Speed to lead", feature: "speed", group: "Reply" },
-  { id: "inbox", label: "Unanswered messages", feature: "inbox", group: "Reply" },
+  // Unanswered messages is a tab of Speed to lead now ("Unanswered"). The id stays so every old address and link (#inbox, a notification, an email) opens Speed on that tab; the entry
+  // comes back by itself only if Speed to lead is off, so the screen is never lost.
+  { id: "inbox", label: "Unanswered messages", feature: "inbox", group: "Reply", parent: "speed", showWhenParentOff: true },
   { id: "appointments", label: "Appointments", feature: "appointments", group: "" },
   { id: "clients", label: "Clients", feature: "clients", group: "Clients and people" },
   { id: "people", label: "People", feature: "search", group: "Clients and people" },
@@ -52,7 +56,7 @@ export const NAV: NavItem[] = [
 ];
 
 // Where a page that lives inside another page highlights in the menu, and where "back" lands when there is no trail.
-export const PARENT: Partial<Record<ViewId, ViewId>> = { duplicates: "cleanup", account: "clients", accounts: "clients", onboarding: "clients", deals: "pipeline", email: "clients", alerts: "today", search: "people", leads: "people", calls: "people", notifications: "settings", connections: "settings" };
+export const PARENT: Partial<Record<ViewId, ViewId>> = { inbox: "speed", duplicates: "cleanup", account: "clients", accounts: "clients", onboarding: "clients", deals: "pipeline", email: "clients", alerts: "today", search: "people", leads: "people", calls: "people", notifications: "settings", connections: "settings" };
 
 /**
  * The menu entries one kind of session sees. `allowed` is that kind's page list (NAV_FOR), `limited` is true for a business and a client's staff, `off` says whether a feature
@@ -60,5 +64,6 @@ export const PARENT: Partial<Record<ViewId, ViewId>> = { duplicates: "cleanup", 
  * Integrations for a client's staff, whose menu has no Settings to hold it (showWhenParentHidden). Pure, so a test can prove each kind's menu.
  */
 export function visibleNav(allowed: ReadonlySet<string>, { limited, off }: { limited: boolean; off: (feature: string) => boolean }): NavItem[] {
-  return NAV.filter((n) => allowed.has(n.id) && !off(n.feature) && (!n.parent || (limited && n.showWhenLimited === true) || (n.showWhenParentHidden === true && !allowed.has(n.parent))));
+  const featureOf = (id: string) => NAV.find((x) => x.id === id)?.feature;
+  return NAV.filter((n) => allowed.has(n.id) && !off(n.feature) && (!n.parent || (limited && n.showWhenLimited === true) || (n.showWhenParentHidden === true && !allowed.has(n.parent)) || (n.showWhenParentOff === true && (!allowed.has(n.parent) || off(featureOf(n.parent) ?? n.parent)))));
 }

@@ -99,6 +99,20 @@ function demoView(): "business" | "client" | "location" | undefined {
   return as === "business" || as === "client" || as === "location" ? as : undefined;
 }
 
+/** True when the Unanswered tab can live in Speed to lead for this session: both features are on, not locked, and both pages are in this kind of session's menu. */
+function inboxTabOn(auth: Auth): boolean {
+  if (auth.status !== "ready") return false;
+  const ok = (id: string, feature: string) => NAV_FOR[auth.kind].has(id) && auth.features[feature] !== false && !auth.locked.includes(feature);
+  return ok("speed", "speed") && ok("inbox", "inbox");
+}
+
+/** The tab an address asks Speed to open first (`#speed?tab=unanswered`). */
+function speedStart(): "unanswered" | undefined {
+  if (typeof window === "undefined") return undefined;
+  const q = window.location.hash.split("?")[1];
+  return q && new URLSearchParams(q).get("tab") === "unanswered" ? "unanswered" : undefined;
+}
+
 export function Dashboard() {
   const [auth, setAuth] = useState<Auth>({ status: "waiting" });
   const { pref: themePref, theme, setPref: setThemePref } = useTheme();
@@ -270,6 +284,14 @@ export function Dashboard() {
     setViewState({ id: "settings" });
     try { window.history.replaceState(null, "", buildHash({ id: "settings" }, filterRef.current, keptParams(window.location.hash))); } catch { /* the screen is already right */ }
   }, [auth, view.id]);
+  // Unanswered messages is a tab of Speed to lead (nav.ts). An old address (#inbox, a notification, an email) is rewritten to Speed on that tab, like Connections into Settings.
+  const inboxTab = inboxTabOn(auth);
+  useEffect(() => {
+    if (auth.status !== "ready" || view.id !== "inbox" || !inboxTab) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setViewState({ id: "speed" });
+    try { window.history.replaceState(null, "", `${buildHash({ id: "speed" }, filterRef.current, [keptParams(window.location.hash).replace(/(^|&)tab=unanswered/, ""), "tab=unanswered"].filter(Boolean).join("&").replace(/^&/, ""))}`); } catch { /* the screen is already right */ }
+  }, [auth, view.id, inboxTab]);
   // True while the page shows only the account SubSync was opened from (the filter is that one account). Pages draw no account filter then.
   const fromAccount = auth.status === "ready" && auth.kind === "agency" && Boolean(auth.locationId) && filter.accounts.length === 1 && filter.accounts[0] === auth.locationId;
   useBrandedText(auth.status === "ready" ? auth.brand.name : null);
@@ -363,12 +385,13 @@ export function Dashboard() {
       case "myday": return <ApiProvider value={baseApi}><TodayView go={go} kind={auth.kind} /></ApiProvider>;
       case "people": case "search": case "leads": case "calls": return peopleOn ? <PeopleModule key={"people" + peopleStart} start={peopleStart} callsAllowed={callsAllowed} /> : <Centered title="Not available" body="This page is switched off right now." />;
       case "audit": return <AuditView />;
-      case "speed": return <SpeedView go={go} />;
+      // Speed to lead holds the Unanswered tab (when messages and speed are both on); `#speed?tab=unanswered` and the old #inbox open it first.
+      case "speed": return <SpeedView go={go} unanswered={inboxTab} start={speedStart()} />;
       case "overview": return <OverviewView go={go} />;
       case "accounts": return <ClientsView key="accounts" go={go} initialTab="health" features={clientFeatures} />;
       case "account": return view.locationId ? <AccountDetailView key={view.locationId} locationId={view.locationId} go={go} agency={agency} /> : <ClientsView key="accounts" go={go} initialTab="health" features={clientFeatures} />;
       case "deals": return <ModuleTabs key="pipe" start={1} tabs={pipeTabs} />;
-      case "inbox": return <InboxView go={go} />;
+      case "inbox": return inboxTab ? <SpeedView go={go} unanswered start="unanswered" /> : <InboxView go={go} />;
       case "onboarding": return limited ? <ModuleTabs key="setup" start={0} tabs={setupTabs} /> : <ClientsView key="onboarding" go={go} initialTab="onboarding" features={clientFeatures} />;
       case "email": return limited ? <ModuleTabs key="setup" start={1} tabs={setupTabs} /> : <EmailHealthView />;
       case "duplicates": case "cleanup": return <CleanupModule key={viewId} kind={auth.kind} start={viewId === "cleanup" ? "quality" : "duplicates"} duplicatesOn={!off("duplicates") && NAV_FOR[auth.kind].has("duplicates")} cleanupOn={!off("cleanup") && NAV_FOR[auth.kind].has("cleanup")} />;

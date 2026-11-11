@@ -3,7 +3,7 @@ import { expect, test, type Page } from "@playwright/test";
 // Stage SHELL: the money-first menu, "Section > Page", visible tabs, ONE global filter bar on eight pages (accounts and dates), no account picker for a client's
 // staff, the logo rule, and no sideways scroll on a phone. Demo company, so no real data is read or written.
 test.setTimeout(120_000);
-const PAGES = ["today", "speed", "appointments", "inbox", "people", "audit", "clients", "cleanup"];
+const PAGES = ["today", "speed", "appointments", "people", "audit", "clients", "cleanup"];
 
 async function open(page: Page, hash: string, as = "") {
   await page.goto(`/app${as}#${hash}`);
@@ -15,7 +15,7 @@ test("the menu is money first and the page says where you are", async ({ page },
   await open(page, "speed");
   const side = page.getByRole("complementary");
   const labels = await side.getByRole("navigation", { name: "Sections" }).getByRole("button").allInnerTexts();
-  const order = ["Today", "Speed to lead", "Unanswered messages", "Appointments", "Clients", "People", "Account audit", "Clean-up", "Overview", "Team", "Pipeline and deals"];
+  const order = ["Today", "Speed to lead", "Appointments", "Clients", "People", "Account audit", "Clean-up", "Overview", "Team", "Pipeline and deals"];
   const idx = order.map((l) => labels.findIndex((x) => x.startsWith(l)));
   expect(idx.every((i) => i >= 0)).toBe(true);
   expect(idx).toEqual([...idx].sort((a, b) => a - b));

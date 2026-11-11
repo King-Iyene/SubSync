@@ -7,7 +7,7 @@ import { readListParams, toQuery, type ListParams } from "@/lib/analytics/unansw
 // Only non-default choices are written; the page number is not (a shared link opens the first page). The address is read once, then the screen owns the state.
 
 export type Choices = Omit<ListParams, "page">;
-export const DEFAULT_CHOICES: Choices = { tab: "us", q: "", account: null, owner: null, channel: null, bucket: null, minValue: 0, state: "active", sort: "wait", size: 20, quiet: 24 };
+export const DEFAULT_CHOICES: Choices = { tab: "us", q: "", account: null, owner: null, channel: null, bucket: null, minValue: 0, state: "active", sort: "wait", size: 50, quiet: 24, lead: "all" };
 
 function fromAddress(seePeople: boolean): Choices {
   if (typeof window === "undefined") return DEFAULT_CHOICES;
@@ -42,10 +42,13 @@ export function useChoices(seePeople: boolean, enabled = true) {
 }
 
 /** The list's address for the server (page included). */
-export function listPath(c: Choices, page: number): string {
+export function listPath(c: Choices, page: number, segments = false): string {
   const q = toQuery({ ...c, tab: c.tab });
   const sp = new URLSearchParams(q);
+  // the person choice travels as `who`: `owner` is the shell filter's name for the client account's owner and would narrow the accounts instead (see unanswered-params.ts)
+  sp.delete("owner"); if (c.owner) sp.set("who", c.owner);
   sp.set("part", "list2"); sp.set("tab", c.tab); sp.set("size", String(c.size)); sp.set("page", String(page));
+  if (segments && c.tab === "us") sp.set("segments", "1");
   return `inbox?${sp}`;
 }
 

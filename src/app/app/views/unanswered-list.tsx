@@ -5,7 +5,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useApiClient, useData } from "../session";
 import { EmptyState, ErrorState, SkeletonRows } from "../ds";
 import { DEFAULT_CHOICES, isNarrowed, listPath, shareLink, useNewKeys, type Choices } from "./unanswered-state";
-import { PersonList } from "./unanswered-person";
+import { PersonList, useDensity } from "./unanswered-person";
+import { DENSITIES } from "@/lib/design/list-density";
 import { Slot, hasUnansweredAction, runUnansweredAction, useRoom, type UiRow } from "./unanswered-slots";
 import { usePersonActions } from "./unanswered-rows";
 
@@ -17,7 +18,7 @@ export type Facets = {
   buckets: Record<"all" | "h1" | "h4" | "h24" | "h48", number>; owner: { all: number; none: number; mine: number; mineFree: number };
   channels: Array<{ key: string; label: string; count: number }>; snooze: boolean;
 };
-type ListData = { total: number; page: number; pages: number; from: number; to: number; rows: UiRow[]; facets: Facets; tabs: { us: number; them: number } | null };
+type ListData = { total: number; page: number; pages: number; from: number; to: number; rows: UiRow[]; facets: Facets & { lead: { all: number; new: number; existing: number } | null }; tabs: { us: number; them: number } | null };
 type View = { id: string; name: string; filters: Partial<Choices> };
 export type AccountChoice = { id: string; name: string };
 export type OwnerChoice = { key: string; label: string };
@@ -27,14 +28,17 @@ const field = "ur-field";
 const chip = (on: boolean) => `ur-chipbtn ${on ? "is-on" : ""}`;
 const n = (v: number) => v.toLocaleString("en-US");
 
-export function UnansweredList({ choices, set, page, setPage, reset, multi, accounts, owners, slaHours, headingRef, onTabs, onRows }: {
+export function UnansweredList({ choices, set, page, setPage, reset, multi, accounts, owners, slaHours, headingRef, onTabs, onRows, segments = false }: {
   choices: Choices; set: (patch: Partial<Choices>) => void; page: number; setPage: (p: number) => void; reset: () => void;
   multi: boolean; accounts: AccountChoice[]; owners: OwnerChoice[]; slaHours: number; headingRef: React.RefObject<HTMLHeadingElement | null>;
   onTabs: (t: { us: number; them: number } | null) => void; onRows: (rows: UiRow[]) => void;
+  /** The Everyone | New leads | Existing customers switch (inside Speed to lead). Off: the list is exactly as before. */
+  segments?: boolean;
 }) {
   const room = useRoom();
   const { flags, seePeople } = room;
-  const { data, error, loading, reload } = useData<ListData>(listPath(choices, page));
+  const { data, error, loading, reload } = useData<ListData>(listPath(choices, page, segments));
+  const [density, setDensity] = useDensity();
   const rows = useMemo(() => data?.rows ?? [], [data]);
   const actions = usePersonActions(rows, flags.inbox_breach_alert === true);
   const fresh = useNewKeys(rows.map((r) => r.key));
@@ -105,6 +109,7 @@ export function UnansweredList({ choices, set, page, setPage, reset, multi, acco
   const copyLink = async () => { try { await navigator.clipboard.writeText(shareLink(choices)); setCopied(true); setTimeout(() => setCopied(false), 2200); } catch { window.prompt("Copy this link", shareLink(choices)); } };
   const narrowed = isNarrowed(choices);
   const f = data?.facets;
+  const f2 = data?.facets;
   const tabName = choices.tab === "us" ? "waiting for a reply" : "gone quiet";
 
   return (
@@ -114,8 +119,18 @@ export function UnansweredList({ choices, set, page, setPage, reset, multi, acco
           <Search aria-hidden className="size-4" />
           <input ref={search} type="search" value={text} onChange={(e) => setText(e.target.value)} placeholder="Search name, phone, email or client" aria-label="Search this list" className="ur-search-in" data-testid="wait-list-search" />
         </label>
-        {filtersOn && <button type="button" className="s6-btn ur-filterbtn" aria-expanded={filtersOpen} onClick={() => setFiltersOpen(!filtersOpen)} data-testid="filters-toggle"><Filter aria-hidden className="size-4" />Filters{narrowed ? <span className="ur-dot" aria-label="Filters on" /> : null}</button>}
+        {filtersOn && f2 && (
+          <div className="ur-quick" role="group" aria-label="Quick choices" data-testid="quick-chips">
+            <button type="button" className={chip(choices.owner === null)} aria-pressed={choices.owner === null} onClick={() => set({ owner: null })} data-testid="chip-everyone">Everyone <b className="tnum">{n(f2.owner.all)}</b></button>
+            <button type="button" className={chip(choices.owner === "none")} aria-pressed={choices.owner === "none"} disabled={f2.owner.none === 0 && choices.owner !== "none"} onClick={() => set({ owner: "none" })} data-testid="chip-none" data-tip="Nobody is assigned to these people in your CRM">No owner <b className="tnum">{n(f2.owner.none)}</b></button>
+            {room.me && <button type="button" className={chip(choices.owner === "me")} aria-pressed={choices.owner === "me"} disabled={f2.owner.mine === 0 && choices.owner !== "me"} onClick={() => set({ owner: "me" })} data-testid="chip-mine">Mine <b className="tnum">{n(f2.owner.mine)}</b></button>}
+          </div>
+        )}
+        {filtersOn && <button type="button" className="s6-btn ur-filterbtn" aria-expanded={filtersOpen} onClick={() => setFiltersOpen(!filtersOpen)} data-testid="filters-toggle"><Filter aria-hidden className="size-4" />More filters{narrowed ? <span className="ur-dot" aria-label="Filters on" /> : null}</button>}
         {flags.inbox_views === true && <ViewsMenu choices={choices} apply={(c) => set({ ...DEFAULT_CHOICES, ...c })} />}
+        <div className="ur-density" role="group" aria-label="Row density" data-testid="density">
+          {DENSITIES.map((d) => <button key={d} type="button" aria-pressed={density === d} onClick={() => setDensity(d)} data-testid={`density-${d}`} data-tip={d === "compact" ? "One line per person: more people on the screen." : "Two lines per person."}>{d === "compact" ? "Compact" : "Comfortable"}</button>)}
+        </div>
         <select value={choices.sort} onChange={(e) => set({ sort: e.target.value as Choices["sort"] })} aria-label="Sort this list" className={field} data-testid="wait-list-sort">
           <option value="wait">{choices.tab === "them" ? "Newest first" : "Longest wait first"}</option>
           <option value="newest">{choices.tab === "them" ? "Longest quiet first" : "Newest first"}</option>
@@ -127,6 +142,13 @@ export function UnansweredList({ choices, set, page, setPage, reset, multi, acco
         {keysOn && <span className="ur-keys s6-label" data-tip="Keys: j and k move, o opens, c claims, s snoozes, x ticks, / searches" tabIndex={0} role="img" aria-label="Keyboard shortcuts: j and k move, o opens, c claims, s snoozes, x ticks, slash searches"><Keyboard aria-hidden className="size-4" /></span>}
       </div>
 
+      {segments && choices.tab === "us" && data?.facets.lead && (
+        <div className="ur-seg" role="group" aria-label="Which people" data-testid="segments">
+          {([["all", "Everyone", data.facets.lead.all, "Everyone waiting for a reply."], ["new", "New leads", data.facets.lead.new, "New leads who wrote and are waiting. Speed to lead times their first reply."], ["existing", "Existing customers", data.facets.lead.existing, "People who are not new leads."]] as const).map(([key, label, count, tip]) => (
+            <button key={key} type="button" aria-pressed={choices.lead === key} onClick={() => set({ lead: key })} data-tip={tip} data-testid={`seg-${key}`}>{label} <b data-testid={`seg-${key}-n`}>{n(count)}</b></button>
+          ))}
+        </div>
+      )}
       {filtersOn && f && (
         <div className="ur-filters" data-open={filtersOpen ? "1" : undefined} data-testid="filters">
           <div className="ur-chiprow" role="group" aria-label="How long they have waited">
@@ -135,10 +157,7 @@ export function UnansweredList({ choices, set, page, setPage, reset, multi, acco
               <button key={b.key} type="button" className={chip(choices.bucket === b.key)} aria-pressed={choices.bucket === b.key} disabled={f.buckets[b.key] === 0 && choices.bucket !== b.key} onClick={() => set({ bucket: b.key })} data-testid={`chip-${b.key}`}>{b.label} {n(f.buckets[b.key])}</button>
             ))}
           </div>
-          <div className="ur-chiprow" role="group" aria-label="Who has them">
-            <button type="button" className={chip(choices.owner === null)} aria-pressed={choices.owner === null} onClick={() => set({ owner: null })}>Everyone {n(f.owner.all)}</button>
-            <button type="button" className={chip(choices.owner === "none")} aria-pressed={choices.owner === "none"} disabled={f.owner.none === 0 && choices.owner !== "none"} onClick={() => set({ owner: "none" })} data-testid="chip-none" data-tip="No team member is assigned to these people in your CRM">No owner {n(f.owner.none)}</button>
-            {room.me && <button type="button" className={chip(choices.owner === "me")} aria-pressed={choices.owner === "me"} disabled={f.owner.mine === 0 && choices.owner !== "me"} onClick={() => set({ owner: "me" })} data-testid="chip-mine">Mine {n(f.owner.mine)}</button>}
+          <div className="ur-chiprow" role="group" aria-label="More about who has them">
             {room.me && <button type="button" className={chip(choices.owner === "mine_free")} aria-pressed={choices.owner === "mine_free"} disabled={f.owner.mineFree === 0 && choices.owner !== "mine_free"} onClick={() => set({ owner: "mine_free" })} data-testid="chip-mine-free" data-tip="People assigned to you, plus people nobody owns yet">Mine and unowned {n(f.owner.mineFree)}</button>}
           </div>
           <div className="ur-selects">
@@ -189,7 +208,7 @@ export function UnansweredList({ choices, set, page, setPage, reset, multi, acco
             action={narrowed ? <button type="button" className="s6-btn" onClick={() => { reset(); setText(""); }}>Clear filters</button> : undefined} />
         ) : (
           <div className={loading ? "opacity-70" : ""}>
-            <PersonList rows={rows} showAccount={multi} actions={actions} tab={choices.tab} cursor={cursor} fresh={fresh} selected={selected} onToggle={toggle} onCursor={setCursor} onChanged={reload} />
+            <PersonList rows={rows} showAccount={multi} actions={actions} tab={choices.tab} cursor={cursor} fresh={fresh} selected={selected} onToggle={toggle} onCursor={setCursor} onChanged={reload} density={density} />
             <div className="ur-foot">
               <span data-testid="wait-list-range" aria-live="polite" className="s6-label">{n(data.from)} to {n(data.to)} of {n(data.total)}</span>
               <label className="ur-sel ur-size"><span className="s6-label">Per page</span>

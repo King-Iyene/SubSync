@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, Gauge, Inbox, PhoneCall, PhoneMissed, ScrollText, SlidersHorizontal, Users, Zap } from "lucide-react";
+import { ChevronDown, Gauge, Inbox, MessageSquareWarning, PhoneCall, PhoneMissed, ScrollText, SlidersHorizontal, Users, Zap } from "lucide-react";
 import { useRef, useState } from "react";
 import { summaryText } from "@/lib/analytics/speed-v2";
 import { measuringSentence } from "@/lib/design/speed-text";
@@ -20,6 +20,7 @@ import { FilterProvider } from "./speed-filter";
 import { RaceTab } from "./speed-race";
 import { CoverageTab, JourneyCard, RulesTab } from "./speed-coverage";
 import { DialMode } from "./dial-mode";
+import { InboxView } from "./inbox";
 import { SidePopup, TipHost } from "./speed-popup";
 import { Fold } from "./speed6-base";
 import { Guide, GuideButton, PaceTab6, PeopleTab6, Tour } from "./speed6-ui";
@@ -31,7 +32,6 @@ import "./speed-ui.css";
 // leads it counts. SubSync measures replies and never sends one.
 
 const CALL_SEEN = "subsync.speed.callSeen";
-const CALL_TAB = 3;
 const ic = (I: typeof Zap) => <I aria-hidden className="size-4" />;
 
 type Home = PictureData & {
@@ -55,9 +55,14 @@ type ListSpec = { title: string; params: Record<string, string>; noun?: string }
 const MORE_TRIGGER = "ds-press inline-flex h-8 items-center gap-1 rounded-md border bg-card px-2.5 text-sm font-medium hover:border-primary/40 hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--ring)]";
 
 /** The tabs the lead filters can change (Race, Pace, Coverage, People). Call mode, Capture, Rules and Log do not use them, so the control is not shown there. */
-const FILTER_TABS = new Set([0, 1, 2, 4]);
+const FILTER_TABS = new Set(["race", "pace", "coverage", "people"]);
 
-export function SpeedView({ go }: { go: GoFn }) {
+export type SpeedTabId = "race" | "pace" | "coverage" | "unanswered" | "call" | "people" | "capture" | "rules" | "log";
+/** The Unanswered tab: who is waiting right now. Race and Pace time how fast NEW leads get a first reply; this tab lists everyone waiting, so it sits next to Coverage (the other "who is not being answered" tab). */
+const UNANSWERED_TIP = "Race and Pace measure how fast NEW leads get a first reply. This tab lists everyone who is waiting for a reply right now: new leads and existing customers.";
+
+/** `unanswered` adds the Unanswered tab (the inbox feature is on and allowed for this person); `start` opens a tab first (the old Unanswered messages address). Without them the page is exactly as before. */
+export function SpeedView({ go, unanswered = false, start }: { go: GoFn; unanswered?: boolean; start?: SpeedTabId }) {
   const range = useCardRange("speed", { preset: "30d", compare: "none" });
   const r = range.resolved;
   const path = r ? `speed?${new URLSearchParams({ part: "home", from: r.current.from, to: r.current.to, ...(r.compare ? { cmpFrom: r.compare.from, cmpTo: r.compare.to } : {}) })}` : null;
@@ -69,13 +74,14 @@ export function SpeedView({ go }: { go: GoFn }) {
   const top = useRef<HTMLDivElement>(null);
   const rows = data?.waiting.rows ?? [];
   const actions = useLeadActions(rows);
-  const [tab, setTab] = useState(0);
+  const [tabId, setTabId] = useState<SpeedTabId>(start === "unanswered" && !unanswered ? "race" : start ?? "race");
   const [seenCall, setSeenCall] = useState(() => { try { return typeof window === "undefined" || window.localStorage.getItem(CALL_SEEN) === "1"; } catch { return true; } }); // until Call mode is opened once, its tab carries a "New" badge (remembered in this browser)
-  const goTab = (n: number) => { setTab(n); if (n === CALL_TAB && !seenCall) { setSeenCall(true); try { window.localStorage.setItem(CALL_SEEN, "1"); } catch { /* not remembered */ } } };
+  const goTab = (id: SpeedTabId) => { setTabId(id); try { const h = window.location.hash; const [head, q = ""] = h.split("?"); const p = new URLSearchParams(q); if (id === "unanswered") p.set("tab", id); else p.delete("tab"); const s = p.toString(); window.history.replaceState(window.history.state, "", `${window.location.pathname}${window.location.search}${head || "#speed"}${s ? `?${s}` : ""}`); } catch { /* the address is a convenience */ } if (id === "call" && !seenCall) { setSeenCall(true); try { window.localStorage.setItem(CALL_SEEN, "1"); } catch { /* not remembered */ } } };
 
   if (error) return <div data-testid="page"><ErrorState error={error} onRetry={reload} /></div>;
   if (!data || !r) return <div data-testid="page"><SkeletonRows rows={6} label="Timing first replies..." /></div>;
 
+  const order: SpeedTabId[] = ["race", "pace", "coverage", ...(unanswered ? (["unanswered"] as const) : []), "call", "people", "capture", "rules", "log"];
   const d = data;
   const w = d.waiting;
   const multi = d.access.total > 1;
@@ -125,10 +131,11 @@ export function SpeedView({ go }: { go: GoFn }) {
         <EmptyState title={none ? "Waiting for permission" : "No new leads yet"} body={none ? "Approve the new permission when SubSync asks, then run a sync. First replies appear here after that." : "A lead appears here once a new contact has a conversation. Check back after the next sync."}
           action={<button type="button" onClick={() => go("help")} className="ds-press h-10 rounded-lg border bg-card px-4 text-sm font-medium hover:border-primary/40">Open Getting started</button>} />
       ) : (
-        <FilterProvider range={r ? { from: r.current.from, to: r.current.to, label: r.current.label, sentence: r.sentence } : null}>{(bar) => (<>{FILTER_TABS.has(tab) && bar}<TipHost /><ModuleTabs pill label="Speed to lead sections" value={tab} onChange={goTab} tabs={[
-          { label: "Race", icon: ic(Zap), node: <RaceTab multi={multi} onCall={() => goTab(CALL_TAB)} /> },
+        <FilterProvider range={r ? { from: r.current.from, to: r.current.to, label: r.current.label, sentence: r.sentence } : null}>{(bar) => (<>{FILTER_TABS.has(tabId) && bar}<TipHost /><ModuleTabs pill label="Speed to lead sections" value={Math.max(0, order.indexOf(tabId))} onChange={(n) => goTab(order[n])} tabs={[
+          { label: "Race", icon: ic(Zap), node: <RaceTab multi={multi} onCall={() => goTab("call")} /> },
           { label: "Pace", icon: ic(Gauge), node: <PaceTab6 multi={multi} slow={slow} old={<><JourneyCard multi={multi} /><BookingCard /><PaceTab multi={multi} /></>} /> },
           { label: "Coverage", icon: ic(PhoneMissed), node: <Fold keep={3} testId="coverage-fold"><CoverageTab multi={multi} /></Fold> },
+          ...(unanswered ? [{ label: "Unanswered", tip: UNANSWERED_TIP, icon: ic(MessageSquareWarning), node: <InboxView go={go} embedded={{ onRace: () => goTab("race") }} /> }] : []),
           { label: "Call mode", icon: ic(PhoneCall), badge: seenCall ? undefined : <span className="spd-new rounded-full px-1.5 py-0.5 text-[0.65rem] font-bold uppercase leading-none tracking-wide" data-testid="call-new">New</span>, node: <DialMode /> },
           ...(d.seePeople ? [{ label: "People", icon: ic(Users), node: <PeopleTab6 multi={multi} slow={slow} old={<PeopleTab multi={multi} />} /> }] : [{ label: "Owners", icon: ic(Users), node: <PeopleTab6 multi={multi} slow={slow} old={<PeopleTab multi={multi} />} /> }]),
           { label: "Capture", icon: ic(Inbox), node: <Fold keep={3} testId="capture-fold"><CaptureTab /></Fold> },

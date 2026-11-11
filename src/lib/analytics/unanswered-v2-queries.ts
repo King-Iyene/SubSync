@@ -143,6 +143,12 @@ async function waitingLeads(db: Db, i: { installationId: string; allowed: string
   }));
 }
 
+/** The `account:contact` keys of the new leads past their reply target with no person's reply: the people the segment "New leads" marks. The same selection Home marks `newLead` with (one function), read once and bounded by what Speed to lead reads (20,000 leads). */
+export async function waitingLeadKeys(i: { installationId: string; allowed: string[] | null; targetMinutes: number; now: number }): Promise<string[]> {
+  const leads = await waitingLeads(sql(), i, new Map());
+  return leads.map((l) => leadKey(l.locationId, l.contactId));
+}
+
 export type HomeInput = { installationId: string; allowed: string[] | null; slaHours: number; targetMinutes: number; now: number; seePeople: boolean; meId: string | null; /** Round 3: leave out set-aside, not-a-lead, own-team and automatic people (null = show everyone). */ hide?: HideSettings | null };
 
 /** The first screen, bounded: five rows, the buckets, five clients (or five owners), one line about the money. The long lists come from unansweredList and unansweredRanks. */
