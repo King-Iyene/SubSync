@@ -3,7 +3,7 @@
 import { AlertTriangle, ChevronLeft, ChevronRight, UserRound, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { coachingNote, money, pct } from "@/lib/design/appt-coach";
-import { EmptyState, ErrorState, LeadDrawer, SkeletonRows } from "../../ds";
+import { EmptyState, ErrorState, LeadDrawer, PanelBoundary, SkeletonRows } from "../../ds";
 import { contactReason, contactSeed } from "./contact";
 import { ApSlot, hasApSlot, useAp, type ApFilters, type ApRows } from "./data";
 import type { ApPart, ApRow, ApStats } from "./types";
@@ -140,7 +140,7 @@ export function ApPanel({ row, onClose, onChanged, filters }: { row: ApRow; onCl
             <p id="ap-contact-why" className="ap-fine" data-testid="ap-contact-why">{why ?? `${row.contactName}${row.phone ? `, ${row.phone}` : ""}. See their messages, deal and notes and write to them here.`}</p>
           </div>
           {row.url && <a className="s6-btn" href={row.url} target="_blank" rel="noopener noreferrer" data-testid="ap-open-crm">Open in your CRM</a>}
-          <ApSlot name="Details" row={row} onChanged={onChanged} filters={filters} />
+          <PanelBoundary label="The appointment tools could not be shown."><ApSlot name="Details" row={row} onChanged={onChanged} filters={filters} /></PanelBoundary>
           <p className="ap-fine">Changes to appointments are made in your CRM or, once enabled, through SubSync&apos;s checked edit tools (preview first, typed confirmation to delete).</p>
         </div>
       </aside>

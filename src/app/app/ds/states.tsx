@@ -1,7 +1,7 @@
 "use client";
 
 import { CircleHelp } from "lucide-react";
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { Component, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { errorId } from "@/lib/design/ui-logic";
 import type { ApiError } from "../session";
 import { openProblemReport, rememberErrorId } from "./error-memory";
@@ -95,4 +95,23 @@ export function DefinitionTip({ term, children, label }: { term: ReactNode; chil
       {open && <span role="tooltip" id={id} className="absolute left-0 top-full z-30 mt-1 w-64 max-w-[80vw] rounded-lg border bg-popover p-3 text-left text-xs font-normal leading-5 text-popover-foreground shadow-[var(--shadow-lift)]">{children}</span>}
     </span>
   );
+}
+
+/** Catches a crash inside a side panel and says so in plain words, with Try again and Close, so a panel is never silently blank. */
+export class PanelBoundary extends Component<{ children: ReactNode; onClose?: () => void; label?: string }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() { return { failed: true }; }
+  render() {
+    if (!this.state.failed) return this.props.children;
+    return (
+      <div className="p-4" role="alert" data-testid="panel-crashed">
+        <p className="text-[15px] font-medium">{this.props.label ?? "This panel could not be shown."}</p>
+        <p className="mt-1 text-sm text-muted-foreground">Nothing was changed. Try again, or close it and open it once more.</p>
+        <div className="mt-3 flex gap-2">
+          <button type="button" className="min-h-9 cursor-pointer rounded-md border px-3 text-sm font-medium hover:bg-accent" onClick={() => this.setState({ failed: false })}>Try again</button>
+          {this.props.onClose && <button type="button" className="min-h-9 cursor-pointer rounded-md px-3 text-sm font-medium underline" onClick={this.props.onClose}>Close</button>}
+        </div>
+      </div>
+    );
+  }
 }
