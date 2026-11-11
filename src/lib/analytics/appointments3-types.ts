@@ -3,7 +3,7 @@
 // minimum sample is { enough: false } and the screen says "not enough data", never a made-up number. Definitions: docs/METRICS.md "Appointments 3".
 
 export const APPT3_PARTS = [
-  "overview", "needs-outcome", "noshow-recovery", "booking-share", "flow-tree", "health", "sources", "calendars", "options", "compare", "receipt", "list", "detail",
+  "overview", "needs-outcome", "noshow-recovery", "booking-share", "flow-tree", "health", "sources", "calendars", "options", "compare", "trends", "export", "receipt", "list", "detail",
 ] as const;
 export type Appt3Part = (typeof APPT3_PARTS)[number];
 
@@ -134,6 +134,12 @@ export type Appt3CompareSide = {
   byWeekday: Array<{ weekday: number; booked: number; showed: number; noshow: number }>;
 };
 export type Appt3Compare = { sides: Appt3CompareSide[] };
+
+/** Bookings per person or calendar, this period against the one before. Counts only (start time and status). */
+export type Appt3Trends = {
+  by: "person" | "calendar"; grain: "week" | "month"; currentFrom: string; previousFrom: string;
+  rows: Array<{ id: string; name: string; current: number; previous: number; delta: number; showedCurrent: number; noshowCurrent: number; series: number[] }>;
+};
 
 /** The filter pickers: every calendar, person and source in scope (read from the data, so new ones appear by themselves). */
 export type Appt3Options = {

@@ -1,4 +1,4 @@
-import { apptCache, appointmentList, bookingShare, calendars, cleanId, detail, flowTree, health, needsOutcome, comparePeople, noshowRecovery, options, overview, receipt, sources, type Filters, type Scope } from "../analytics/appointments3-queries";
+import { apptCache, appointmentList, bookingShare, calendars, cleanId, detail, flowTree, health, needsOutcome, comparePeople, exportCsv, trends, noshowRecovery, options, overview, receipt, sources, type Filters, type Scope } from "../analytics/appointments3-queries";
 import { clampSize, DAY, parseApptWindow } from "../analytics/appointments3-intel";
 import { APPT3_FLAGS, APPT3_PARTS, type Appt3Bucket, type Appt3Part } from "../analytics/appointments3-types";
 import type { Feature } from "../entitlements";
@@ -16,7 +16,7 @@ export type Appt3Helpers = { allowed: () => Promise<string[] | null>; links: () 
 
 const PART_FLAG: Record<Appt3Part, string> = {
   overview: "appt_overview", "needs-outcome": "appt_needs_outcome", "noshow-recovery": "appt_noshow_recovery", "booking-share": "appt_booking_share", "flow-tree": "appt_flow_tree",
-  health: "appt_health", sources: "appt_sources", calendars: "appt_calendars", options: "appt_overview", compare: "appt_flow_tree", receipt: "appt_proof", list: "appt_overview", detail: "appt_history",
+  health: "appt_health", sources: "appt_sources", calendars: "appt_calendars", options: "appt_overview", compare: "appt_flow_tree", trends: "appt_booking_share", export: "appt_overview", receipt: "appt_proof", list: "appt_overview", detail: "appt_history",
 };
 const BUCKETS = new Set(["booked", "unmarked", "showed", "noshow", "cancelled", "invalid", "completed", "won", "lost", "open", "no_deal", "upcoming", "recovered"]);
 const int = (v: string | null, d: number) => { const n = Number(v); return v !== null && Number.isFinite(n) ? Math.floor(n) : d; };
@@ -68,6 +68,8 @@ export async function handleAppointments3(ctx: Ctx, h: Appt3Helpers): Promise<Re
     case "sources": return done(await sources(scope, f));
     case "calendars": return done(await calendars(scope, f, p, size, link));
     case "compare": { if (!seePeople) return wrap({ sides: [] }); const ids = (sp.get("ids") ?? "").split(",").map(cleanId).filter((x): x is string => !!x); return done(await comparePeople(scope, f, ids, sp.get("by") === "owner" ? "owner" : "booker")); }
+    case "trends": return seePeople || sp.get("by") === "calendar" ? done(await trends(scope, f, sp.get("by") === "calendar" ? "calendar" : "person", sp.get("grain") === "month" ? "month" : "week")) : wrap({ by: "person", grain: "week", currentFrom: "", previousFrom: "", rows: [] });
+    case "export": { const csv = await exportCsv(scope, f, link); return new Response(csv, { headers: { "content-type": "text/csv; charset=utf-8", "content-disposition": 'attachment; filename="appointments.csv"', "cache-control": "no-store" } }); }
     case "options": { const o = await options(scope, f); return done(seePeople ? o : { ...o, people: [] }); }
     case "receipt": {
       const wk = sp.get("week") ?? "";
