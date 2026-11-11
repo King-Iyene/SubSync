@@ -50,6 +50,10 @@ export const DEFAULT_OFF: ReadonlySet<Feature> = new Set<Feature>([
   "inbox_quiet",
   "inbox_keys",
   "inbox_bulk",
+  "appt_actions",
+  "appt_delete",
+  "appt_bulk",
+  "appt_meetings",
 ]);
 
 export function resolveFeatures(all: readonly Feature[], overrides: Record<string, boolean>, allOn = false): Record<Feature, boolean> {

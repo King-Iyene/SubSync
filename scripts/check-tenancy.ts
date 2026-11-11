@@ -95,6 +95,8 @@ async function main() {
       // The Appointments work lists (stage APPT): the lists, the full list and the comparison, asked for the other side's account and person by every parameter the page takes.
       "/api/app/appointments/work", "/api/app/appointments/list?kind=all&size=50", `/api/app/appointments/list?kind=all&location=${other.locs[0]}&size=50`, `/api/app/appointments/list?kind=record&location=${other.locs[0]}`,
       `/api/app/appointments/list?kind=window&bucket=noshow&location=${other.locs[0]}`, "/api/app/appointments/compare?by=account", "/api/app/appointments/compare?by=person", `/api/app/appointments/${other.locs[0]}/anything`,
+      // Appointments actions and meetings (slice AB): the other side's account and appointment named in every way the endpoints take them (reads; the POST bodies are covered by the unit tests and the typed-delete guard).
+      `/api/app/appointments/act/panel?locationId=${other.locs[0]}&id=anything`, `/api/app/appointments/act/slots?locationId=${other.locs[0]}&id=anything`, "/api/app/appointments/act/caps", "/api/app/appointments/meetings/home", "/api/app/appointments/meetings/matching", "/api/app/appointments/meetings/followup",
       // People (stage PEOPLE): the call lists, the lead panel, the search and the recent list, asked for the other side's accounts, people and words by every parameter they take.
       "/api/app/people/home", "/api/app/people/recent", `/api/app/people/queue?list=waiting&location=${other.locs[0]}`, `/api/app/people/queue?list=hot&accounts=${other.locs.join(",")}`,
       `/api/app/people/queue?list=stale&account=${other.locs[0]}&q=${other.marker}`, `/api/app/people/queue?list=noshows&mine=1&location=${other.locs[0]}`, `/api/app/people/queue?list=followups&q=${other.marker}`,

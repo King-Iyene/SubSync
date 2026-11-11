@@ -82,6 +82,10 @@ export const FEATURES = [
   "inbox_quiet",
   "inbox_keys",
   "inbox_bulk",
+  "appt_actions",
+  "appt_delete",
+  "appt_bulk",
+  "appt_meetings",
 ] as const;
 export type Feature = (typeof FEATURES)[number];
 
