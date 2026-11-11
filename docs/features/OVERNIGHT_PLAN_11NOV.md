@@ -1,0 +1,9 @@
+# Overnight plan (King asleep, 11 Nov 2026). Resume from here if context is lost.
+
+Rules: tokens low; plain words; tenancy alone before any push to main; merges via PR (migrations auto-apply, gate is off); all flags stay ON for testing (remind King before pilots, NEEDS_KING item 33); never touch real client accounts; builders never run tenancy.
+
+Order:
+1. Finish and merge: (a) helper a1e1af75e390367c1 branch stage/merge-speed-waiting (Unanswered becomes a tab in Speed; compact rows; small icons; fix empty-list bug; side panel with reply; simpler sub-sections), (b) helper ae6644a57870eb9e0 branch stage/lead-journey (new 'Where do my leads go?' animation, different structure, no overlap), (c) tenancy sweep (task bxckt8b7z on stage/unanswered3 code) then re-run after merges. Merge each via PR, wait for checks, merge, run tenancy alone, DB tests.
+2. Customer review: act as agency owner, agency staff, client admin and business owner; "why should I pay $11.50 per client account?" Screenshot the real app (dev server, demo data, flags on), write docs/review/CUSTOMER_REVIEW_11NOV.md, fix the clean-up items (clutter, confusing words, empty states, big icons, light/dark, phone). Then test every feature end to end and record in docs/FEATURE_STATUS.md.
+3. Appointments research (4 files docs/research/APPOINTMENTS_R1..R4_*.md + APPOINTMENTS_RESEARCH_SUMMARY.md): what GHL does not have, per-user booking share, other booking platforms (Calendly, Acuity, Cal.com, Chili Piper, SavvyCal, Setmore, Square, Mindbody, Jane, Boulevard, Vagaro, Fresha, Zenoti), their reporting and features, customer pain, no-show data. Money first, moat from our own history.
+4. Build the Appointments module (many sub-sections, same shared-brief and 3 builders + integrator pattern as Unanswered, Speed design standard, flags ON, compact, side panel, clickable counts, scale to millions). Then STOP. King reviews when he wakes.

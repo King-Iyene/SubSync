@@ -227,3 +227,6 @@ S0.2b needs none (nothing new is read or written in the CRM). S0.4 needs none (i
 3. **API access:** Create Workflow is enabled for selected accounts only. Ask the platform's developer support to enable it for one test account, then run the first real test there: set the account's write opt-in on, press Set up call queue once.
 4. **Switches:** nothing is created unless `WRITE_GHL_LIVE` is on AND the account's opt-in is on. "Set up automatically when a client account is added" starts OFF.
 5. **Tag renamed:** the default tag is now `call-now` (neutral). Accounts that already saved `subsync-call-now` keep it.
+
+## 33. REMINDER: all Unanswered and moat feature switches are ON (11 Nov 2026)
+For testing only. Before any pilot or outside install: run `node --env-file=.env.local --import tsx scripts/set-flags.ts off inbox_,moat_` (or switch off only unfinished ones), confirm the per-account write opt-in is off for non-test accounts (WRITE_GHL_LIVE is true), and add the `conversations.write` scope for Clear junk in the next version release.
