@@ -1,3 +1,4 @@
+import { pipelineCards } from "../analytics/pipeline3-cards";
 import { attention, cleanId, dealList, detail, forecast, health, moneyFlow, overview, people, plCache, receipt, replay, sources, stageHistory, wonLost, type Filters, type Scope } from "../analytics/pipeline3-queries";
 import { clampSize, DAY, parsePlWindow } from "../analytics/pipeline3-intel";
 import { PL3_FLAGS, PL3_PARTS, type Pl3Bucket, type Pl3Part } from "../analytics/pipeline3-types";
@@ -16,7 +17,7 @@ export type Pl3Helpers = { allowed: () => Promise<string[] | null>; links: () =>
 
 const PART_FLAG: Record<Pl3Part, string> = {
   overview: "pl_overview", "money-flow": "pl_money_flow", attention: "pl_attention", "won-lost": "pl_won_lost", forecast: "pl_forecast", people: "pl_people", sources: "pl_sources",
-  "stage-history": "pl_stage_history", health: "pl_health", receipt: "pl_proof", list: "pl_overview", detail: "pl_history", replay: "pl_money_flow",
+  "stage-history": "pl_stage_history", health: "pl_health", receipt: "pl_proof", list: "pl_overview", detail: "pl_history", replay: "pl_money_flow", pipelines: "pl_money_flow",
 };
 const BUCKETS = new Set(["open", "won", "lost", "abandoned", "stale", "healthy", "outlier", "no_owner", "no_value", "test", "no_reason", "booked_appt", "no_appt"]);
 const int = (v: string | null, d: number) => { const n = Number(v); return v !== null && Number.isFinite(n) ? Math.floor(n) : d; };
@@ -51,7 +52,7 @@ export async function handlePipeline3(ctx: Ctx, h: Pl3Helpers): Promise<Response
   const hit = plCache.get(key);
   if (hit && part !== "detail") return wrap(hit as object, true);
   const done = (body: object) => { plCache.set(key, body); return wrap(body); };
-  const base = { f, page: p, size, sort: sp.get("sort"), dir };
+  const base = { f, page: p, size, sort: sp.get("sort"), dir, after: sp.get("after"), knownTotal: sp.get("total") !== null ? Math.max(0, int(sp.get("total"), 0)) : null };
 
   switch (part) {
     case "overview": return done(await overview(scope, f, wide.days));
@@ -69,6 +70,7 @@ export async function handlePipeline3(ctx: Ctx, h: Pl3Helpers): Promise<Response
       const m = await moneyFlow(scope, f);
       return done(seePeople ? m : { ...m, people: [] });
     }
+    case "pipelines": return done(await pipelineCards(scope, { from: f.from, to: f.to, location: one, q: f.q, showEmpty: sp.get("empty") === "1", after: sp.get("after"), size: int(sp.get("size"), 24) }));
     case "replay": return done(await replay(scope, f, int(sp.get("days"), 30)));
     case "receipt": {
       const wk = sp.get("week") ?? "";

@@ -263,3 +263,16 @@ export function eventText(kind: string, from: string | null, to: string | null):
     default: return "Note added";
   }
 }
+
+/** Keyset cursor of the default order (value high to low, then deal id): "value|id". Anything else is no cursor. */
+export function parseDealCursor(c: string | null | undefined): { v: number; id: string } | null {
+  const m = /^(\d{1,15}(?:\.\d{1,6})?)\|([A-Za-z0-9_-]{1,64})$/.exec(c ?? "");
+  return m ? { v: Number(m[1]), id: m[2] } : null;
+}
+
+/** The cursor is "value|account|pipeline", checked on the way in (a bad one is the first page). */
+export function parseCursor(c: string | null | undefined): { v: number; loc: string; pid: string } | null {
+  const m = /^(\d{1,15}(?:\.\d{1,2})?)\|([A-Za-z0-9_-]{1,64})\|([A-Za-z0-9_-]{1,64})$/.exec(c ?? "");
+  return m ? { v: Number(m[1]), loc: m[2], pid: m[3] } : null;
+}
+

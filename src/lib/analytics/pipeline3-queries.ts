@@ -5,6 +5,7 @@ import { dealScopeJoins, outOfScope } from "./stage-rules-sql";
 import {
   atRiskEstimate, bucketOf, buildReplay, buildStages, clampSize, coachingLine, DAY, DEFAULT_LIMIT_DAYS, eventText, findLeak, forecastEstimate, headlineOf, healthScore, dealHealth, MIN_CLOSED, MIN_LOST_REASONS,
   MIN_STAYS, median, money, NO_EST, pickButton, rate, slug, stageKey, stageProbability, trackRecord, velocityEstimate, weightedPipeline, type DayMove, type StageAgg, type StageLoss, type StageMeta,
+  parseDealCursor,
 } from "./pipeline3-intel.ts";
 import type {
   FlowDrain, FlowEdge, FlowPerson, Page, Pl3Attention, Pl3Bucket, Pl3Detail, Pl3Forecast, Pl3Health, Pl3HistoryEvent, Pl3MoneyFlow, Pl3Overview, Pl3People, Pl3Person, Pl3Receipt, Pl3Replay, Pl3Row,
@@ -40,7 +41,7 @@ function locs(s: Scope, location?: string | null): Frag {
 }
 
 /** The derived deal set, as CTE definitions to put after `with`: d0 (raw), d1 (counted, stale), lo (open totals per account), d (outlier flag). Alias `d` in every query. */
-function deals(s: Scope, f: Filters): Frag {
+export function deals(s: Scope, f: Filters): Frag {
   const db = sql();
   const like = f.q ? `%${f.q.replace(/[\\%_]/g, (m) => "\\" + m).slice(0, 60)}%` : null;
   const pipe = f.pipeline ? slug(f.pipeline) : null;
@@ -49,7 +50,7 @@ function deals(s: Scope, f: Filters): Frag {
       select o.location_id, o.opportunity_id, o.pipeline_id, o.stage_id, o.contact_id, o.name, lower(coalesce(o.status, 'open')) status, coalesce(o.monetary_value, 0)::float8 value,
         o.assigned_to owner, nullif(btrim(o.source), '') source, o.created_remote_at created_at, o.last_stage_change_at, o.last_status_change_at,
         greatest(o.last_action_at, o.updated_remote_at) last_activity_at, l.name account_name,
-        coalesce(nullif(c.full_name, ''), nullif(o.contact_name, ''), 'Unnamed contact') contact_name, coalesce(c.dnd, false) dnd,
+        ${like ? db`coalesce(nullif(c.full_name, ''), nullif(o.contact_name, ''), 'Unnamed contact')` : db`coalesce(nullif(o.contact_name, ''), 'Unnamed contact')`} contact_name, ${like ? db`coalesce(c.dnd, false)` : db`false`} dnd,
         coalesce(sc_pl.name, 'Pipeline') pipeline_name, coalesce(sc_st.nm, 'Unknown stage') stage_name, coalesce(sc_st.ord, 999)::int stage_ord,
         df.lost_reason_id, df.lost_reason,
         coalesce(ss.limit_days, ${DEFAULT_LIMIT_DAYS})::float8 limit_days, coalesce(ss.is_estimate, true) limit_est, ss.median_days::float8 norm_days, coalesce(ss.stays, 0) stays,
@@ -59,7 +60,7 @@ function deals(s: Scope, f: Filters): Frag {
       from cached_opportunities o
       join (${locs(s, f.location)}) l on l.location_id = o.location_id
       ${dealScopeJoins()}
-      left join cached_contacts c on c.installation_id = o.installation_id and c.location_id = o.location_id and c.contact_id = o.contact_id
+      ${like ? db`left join cached_contacts c on c.installation_id = o.installation_id and c.location_id = o.location_id and c.contact_id = o.contact_id` : db``}
       left join deal_facts df on df.installation_id = o.installation_id and df.location_id = o.location_id and df.opportunity_id = o.opportunity_id
       left join deal_stage_stats ss on ss.installation_id = o.installation_id and ss.location_id = o.location_id and ss.stage_id = o.stage_id
       where o.installation_id = ${s.inst} and df.removed_at is null
@@ -81,10 +82,10 @@ function deals(s: Scope, f: Filters): Frag {
     )`;
 }
 
-const P_OPEN = (db: Db) => db`d.status = 'open' and d.counted and not d.outlier`;
-const P_STALE = (db: Db) => db`d.status = 'open' and d.counted and not d.outlier and d.stale`;
-const P_NO_OWNER = (db: Db) => db`d.status = 'open' and not d.out_of_scope and not d.is_test and d.value > 0 and d.owner is null`;
-const P_NO_VALUE = (db: Db) => db`d.status = 'open' and not d.out_of_scope and not d.is_test and d.value <= 0`;
+export const P_OPEN = (db: Db) => db`d.status = 'open' and d.counted and not d.outlier`;
+export const P_STALE = (db: Db) => db`d.status = 'open' and d.counted and not d.outlier and d.stale`;
+export const P_NO_OWNER = (db: Db) => db`d.status = 'open' and not d.out_of_scope and not d.is_test and d.value > 0 and d.owner is null`;
+export const P_NO_VALUE = (db: Db) => db`d.status = 'open' and not d.out_of_scope and not d.is_test and d.value <= 0`;
 const P_FLAG = (db: Db) => db`(d.status = 'open' and not d.out_of_scope and (d.is_test or d.stale or d.outlier or (d.value > 0 and d.owner is null) or d.value <= 0))`;
 
 function bucketCond(db: Db, s: Scope, f: Filters): Frag {
@@ -129,6 +130,7 @@ async function stageMap(s: Scope, location?: string | null): Promise<Map<string,
   }
   return m;
 }
+const OTHER_STAGE = "other-stage";
 const keyOf = (m: Map<string, StageInfo>, loc: unknown, stage: unknown) => m.get(`${loc}|${stage}`) ?? null;
 
 // ---------- row mapping ----------
@@ -139,28 +141,23 @@ export function toRow(r: Rec, label: (id: string | null | undefined) => string, 
   const limit = r.limit_days === null || r.limit_days === undefined ? null : Number(r.limit_days);
   const stale = r.stale === true, outlier = r.outlier === true, isTest = r.is_test === true, counted = r.counted === true;
   const activity = r.last_activity_at instanceof Date ? Math.floor((Date.now() - r.last_activity_at.getTime()) / DAY) : null;
-  const h = dealHealth({ status, value, ownerId, isTest, daysInStage, staleLimitDays: limit, daysSinceActivity: activity, hasAppointment: !!r.appt_id, dnd: r.dnd === true });
+  const h = dealHealth({ status, value, ownerId, isTest, daysInStage, staleLimitDays: limit, daysSinceActivity: activity, hasAppointment: !!r.appt_id, dnd: (r.cdnd ?? r.dnd) === true });
   const bucket = bucketOf({ status, stale, outlier, isTest, ownerId, value, counted });
   const reason = (r.lost_reason as string | null) ?? (r.lost_reason_id ? `Reason ${String(r.lost_reason_id).slice(-4)}` : null);
   const why = stale ? `In ${r.stage_name} ${Math.floor(daysInStage ?? 0)} days, the usual limit is ${Math.round(limit ?? 0)}${r.limit_est === true ? " (estimate)" : ""}`
     : outlier ? `One large deal: more than 40% of this account's open money` : bucket === "no_owner" ? "Nobody owns this deal" : bucket === "no_value" ? "No value set" : isTest ? "Looks like a test deal" : null;
   return {
     opportunityId: String(r.opportunity_id), locationId: String(r.location_id), accountName: (r.account_name as string | null) ?? null, contactId: (r.contact_id as string | null) ?? null,
-    contactName: (r.contact_name as string | null) ?? "Unnamed contact", name: (r.name as string | null) ?? null, url: link && r.contact_id ? link(String(r.location_id), String(r.contact_id)) : null,
+    contactName: ((r.cfull as string | null) || (r.contact_name as string | null)) ?? "Unnamed contact", name: (r.name as string | null) ?? null, url: link && r.contact_id ? link(String(r.location_id), String(r.contact_id)) : null,
     pipelineId: (r.pipeline_id as string | null) ?? null, pipelineName: (r.pipeline_name as string | null) ?? null, stageId: (r.stage_id as string | null) ?? null, stageName: (r.stage_name as string | null) ?? null,
     status, value, bucket, ownerId, ownerName: ownerId ? label(ownerId) : null, source: (r.source as string | null) ?? null, lostReason: status === "lost" ? reason : null,
     createdAt: iso(r.created_at), lastStageChangeAt: iso(r.last_stage_change_at), daysInStage, staleLimitDays: limit, stale,
     health: h.score, healthWhy: h.why,
     appointment: r.appt_id ? { appointmentId: String(r.appt_id), startAt: iso(r.appt_start) as string, status: String(r.appt_status ?? "") } : null,
-    why, dnd: r.dnd === true, outlier, isTest,
+    why, dnd: (r.cdnd ?? r.dnd) === true, outlier, isTest,
   };
 }
 
-async function pageOf<T>(rowsQ: Promise<Rec[]>, countQ: Promise<Rec[]>, p: number, size: number, map: (r: Rec) => T): Promise<Page<T>> {
-  const [rows, c] = await Promise.all([rowsQ, countQ]);
-  const total = num(c[0]?.n);
-  return { rows: rows.map(map), total, page: p, size, pages: Math.max(1, Math.ceil(total / size)), truncated: false };
-}
 const offsetOf = (p: number, size: number) => Math.min(100_000, Math.max(0, Math.floor(p)) * size);
 function sortOf(db: Db, sort: string | null | undefined, dir?: string | null): Frag {
   const asc = dir === "asc";
@@ -173,19 +170,21 @@ function sortOf(db: Db, sort: string | null | undefined, dir?: string | null): F
   }
 }
 
-export type ListOpts = { f: Filters; page: number; size: number; sort?: string | null; dir?: string | null; extra?: Frag };
+export type ListOpts = { f: Filters; page: number; size: number; sort?: string | null; dir?: string | null; extra?: Frag; after?: string | null; knownTotal?: number | null };
+/** One page of deals. With the default order and a cursor (`after`), the page starts right after that deal (no offset to skip, and the total is not counted again: the caller passes the one it already has). */
 export async function dealList(s: Scope, o: ListOpts, link: ((loc: string, contact: string) => string) | null): Promise<Page<Pl3Row>> {
   const db = sql(), size = clampSize(o.size), label = await names(s.inst);
   const w = deals(s, o.f), cond = bucketCond(db, s, o.f);
   const reasonCond = o.f.reason ? (o.f.reason === "none" ? db`and d.status = 'lost' and d.lost_reason_id is null and d.lost_reason is null` : db`and coalesce(d.lost_reason, 'Reason ' || right(d.lost_reason_id, 4)) = ${o.f.reason}`) : db``;
-  const p = Math.max(0, Math.floor(o.page));
-  return pageOf(
-    db`with ${w} select d.*, ap.appointment_id appt_id, ap.start_at appt_start, ap.status appt_status from d
-      left join lateral (select a.appointment_id, a.start_at, a.status from cached_appointments a where a.installation_id = ${s.inst} and a.location_id = d.location_id and d.contact_id is not null and a.contact_id = d.contact_id and a.status not in ('cancelled', 'invalid') order by a.start_at desc limit 1) ap on true
-      where true ${cond} ${reasonCond} ${o.extra ?? db``} order by ${sortOf(db, o.sort, o.dir)} limit ${size} offset ${offsetOf(p, size)}`,
-    db`with ${w} select count(*)::int n from d where true ${cond} ${reasonCond} ${o.extra ?? db``}`,
-    p, size, (r) => toRow(r, label, link),
-  );
+  const p = Math.max(0, Math.floor(o.page)), plainSort = !o.sort || o.sort === "value", cur = plainSort && o.dir !== "asc" ? parseDealCursor(o.after) : null;
+  const keyset = cur ? db`and (d.value < ${cur.v} or (d.value = ${cur.v} and d.opportunity_id > ${cur.id}))` : db``;
+  const rowsQ = db`with ${w} select pg.*, c.full_name cfull, c.dnd cdnd from (select x.*, ap.appointment_id appt_id, ap.start_at appt_start, ap.status appt_status from (select d.*, row_number() over (order by ${sortOf(db, o.sort, o.dir)}) rn from d where true ${cond} ${reasonCond} ${o.extra ?? db``} ${keyset} order by ${sortOf(db, o.sort, o.dir)} limit ${size + 1} offset ${cur ? 0 : offsetOf(p, size)}) x
+      left join lateral (select a.appointment_id, a.start_at, a.status from cached_appointments a where a.installation_id = ${s.inst} and a.location_id = x.location_id and x.contact_id is not null and a.contact_id = x.contact_id and a.status not in ('cancelled', 'invalid') order by a.start_at desc limit 1) ap on true) pg
+      left join cached_contacts c on c.installation_id = ${s.inst} and c.location_id = pg.location_id and c.contact_id = pg.contact_id order by pg.rn`;
+  const countQ = cur && o.knownTotal != null ? Promise.resolve([{ n: o.knownTotal }] as Rec[]) : db`with ${w} select count(*)::int n from d where true ${cond} ${reasonCond} ${o.extra ?? db``}`;
+  const [rows, c] = await Promise.all([rowsQ, countQ]);
+  const total = num(c[0]?.n), more = rows.length > size, page = rows.slice(0, size), last = page[page.length - 1];
+  return { rows: page.map((r) => toRow(r, label, link)), total, page: p, size, pages: Math.max(1, Math.ceil(total / size)), truncated: false, next: more && last && plainSort ? `${num(last.value)}|${last.opportunity_id}` : null };
 }
 
 // ---------- shared basis: closed deals, stage probabilities, cycle ----------
@@ -235,7 +234,7 @@ const probOf = (b: Basis, key: string) => stageProbability(b.probs.get(key)?.win
 export async function overview(s: Scope, f: Filters, windowDays: number): Promise<Pl3Overview> {
   const db = sql(), sm = await stageMap(s, f.location), base = { ...f, bucket: null };
   const w = deals(s, base), d30 = new Date(Date.now() - 30 * DAY);
-  const [[t], trend, [acc], [since], b, open, closes] = await Promise.all([
+  const [[t], trend, [acc], [since], b, open, closes, [bigRow]] = await Promise.all([
     db`with ${w} select
         count(*) filter (where ${P_OPEN(db)})::int open_n, coalesce(sum(d.value) filter (where ${P_OPEN(db)}), 0)::float8 open_v,
         count(*) filter (where ${P_STALE(db)})::int stale_n, coalesce(sum(d.value) filter (where ${P_STALE(db)}), 0)::float8 stale_v,
@@ -252,6 +251,10 @@ export async function overview(s: Scope, f: Filters, windowDays: number): Promis
     basis(s, base, sm), openByStage(s, base, sm),
     db`with ${w} select (d.last_status_change_at at time zone 'UTC')::date dy, count(*) filter (where d.status = 'won')::int won, count(*) filter (where d.status = 'lost')::int lost from d
       where d.status in ('won', 'lost') and not d.is_test and d.last_status_change_at >= now() - ${Math.min(windowDays, 120)}::int * interval '1 day' group by 1`,
+    // Big open deals nobody has touched: the top tenth by value (needs 10 open deals), with no stage move, status change or update for 14 days.
+    db`with ${w}, big as (select percentile_cont(0.9) within group (order by d.value) p90, count(*) n from d where ${P_OPEN(db)})
+      select count(*)::int n, coalesce(sum(d.value), 0)::float8 v from d, big where big.n >= 10 and ${P_OPEN(db)} and d.value >= big.p90
+        and coalesce(greatest(d.last_activity_at, d.last_stage_change_at, d.last_status_change_at), d.created_at) < now() - interval '14 days'`,
   ]);
   const winRate = rate(b.won, b.closed), openN = num(t.open_n);
   const weighted = weightedPipeline(open.map((o) => ({ value: o.value, p: probOf(b, o.key) })), b.prior, b.closed);
@@ -263,6 +266,7 @@ export async function overview(s: Scope, f: Filters, windowDays: number): Promis
     openCount: openN, openValue: { value: num(t.open_v), n: openN }, weighted, atRisk, stale: { count: staleN, value: staleV },
     wonLast30: { value: num(t.won_v), n: num(t.won_n) }, lostLast30: { value: num(t.lost_v), n: num(t.lost_n) }, winRate,
     velocity: velocityEstimate(openN, b.closed >= MIN_CLOSED ? b.won / b.closed : null, b.avgWon, b.cycle, b.closed), medianWonCycleDays: b.cycle === null ? null : Math.round(b.cycle * 10) / 10,
+    bigUntouched: { count: num(bigRow?.n), value: num(bigRow?.v), days: 14 },
     health: { score: healthScore(num(t.open_all), num(t.flagged)), noOwner, noValue: num(t.no_value), test: num(t.test), outliers: num(t.outliers) },
     cards: [
       { key: "stuck", title: "Which deals are stuck?", value: staleN, sub: staleN ? `${money(staleV)} waiting` : "Nothing past its limit", part: "attention", bucket: "stale" },
@@ -538,12 +542,14 @@ export async function moneyFlow(s: Scope, f: Filters): Promise<Pl3MoneyFlow> {
   const aggs = new Map<string, StageAgg & { medW: number; normW: number }>();
   for (const r of parts.open) {
     const si = keyOf(sm, r.location_id, r.stage_id);
-    if (!si || si.pipelineKey !== chosen) continue;
-    const c = aggs.get(si.key) ?? { key: si.key, openCount: 0, openValue: 0, staleCount: 0, staleValue: 0, medianDays: null, normalDays: null, staysN: 0, medW: 0, normW: 0 };
+    if (si && si.pipelineKey !== chosen) continue;
+    const sk = si ? si.key : OTHER_STAGE; // a stage renamed or deleted in the CRM keeps its money, as "Other stage"
+    const c = aggs.get(sk) ?? { key: sk, openCount: 0, openValue: 0, staleCount: 0, staleValue: 0, medianDays: null, normalDays: null, staysN: 0, medW: 0, normW: 0 };
     const n = num(r.n), med = numOrNull(r.med), norm = numOrNull(r.norm);
-    aggs.set(si.key, { ...c, openCount: c.openCount + n, openValue: c.openValue + num(r.v), staleCount: c.staleCount + num(r.sn), staleValue: c.staleValue + num(r.sv), staysN: c.staysN + num(r.stays),
+    aggs.set(sk, { ...c, openCount: c.openCount + n, openValue: c.openValue + num(r.v), staleCount: c.staleCount + num(r.sn), staleValue: c.staleValue + num(r.sv), staysN: c.staysN + num(r.stays),
       medW: c.medW + (med === null ? 0 : med * n), normW: c.normW + (norm === null ? 0 : norm * n) });
   }
+  if (aggs.has(OTHER_STAGE)) meta.set(OTHER_STAGE, { key: OTHER_STAGE, name: "Other stage", order: 9999, pipelineName: "" });
   const aggList: StageAgg[] = [...aggs.values()].map((a) => ({ ...a, medianDays: a.openCount && a.medW ? Math.round((a.medW / a.openCount) * 10) / 10 : null, normalDays: a.openCount && a.normW ? Math.round((a.normW / a.openCount) * 10) / 10 : null }));
   const stages = buildStages([...meta.values()], aggList, chosen ?? "");
   const inPipe = new Set(stages.map((x) => x.id));

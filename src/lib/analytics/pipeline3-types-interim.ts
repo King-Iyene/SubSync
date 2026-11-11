@@ -29,9 +29,10 @@ export type PlDeal = {
   lostReason: string | null; health: number | null; // 0..100, null = not enough data
   url: string | null;
 };
-export type PlDeals = { total: number; page: number; pageSize: number; rows: PlDeal[] };
+export type PlDeals = { total: number; page: number; pageSize: number; rows: PlDeal[]; next?: string | null };
 export type PlOverview = {
   headline: { openCount: number; openValueCents: number; staleCount: number; staleValueCents: number; wonCents: number; lostCents: number; winRate: number | null; winRateDeals: number };
+  bigUntouched?: { count: number; valueCents: number; days: number };
   sentence: string; leak: PlMoneyFlow["leak"]; minDeals: number; excluded: PlMoneyFlow["excluded"]; outlier: PlMoneyFlow["outlier"];
 };
 export type PlForecast = { lowCents: number | null; midCents: number | null; highCents: number | null; closedDeals: number; minDeals: number; formula: string; byStage: Array<{ stage: string; openCents: number | null; winChance: number | null }> };
@@ -41,4 +42,4 @@ export type PlSource = { source: string; deals: number; won: number; winRate: nu
 export type PlStageHistory = { stages: Array<{ name: string; medianDays: number | null; p90Days: number | null; sample: number; staleAfterDays: number | null }>; recorded: { since: string | null; changes: number } };
 export type PlHealthRow = { locationId: string; name: string; open: number; stale: number; staleShare: number | null; health: number | null };
 export type PlProof = { weekLabel: string; headline: string; verifyHash: string | null; rows: Array<{ label: string; value: string; go: "needs" | "won" | "lost" | null }> };
-export type PlPart = "money-flow" | "overview" | "needs-attention" | "won-lost" | "forecast" | "people" | "sources" | "stage-history" | "health" | "proof" | "list" | "accounts";
+export type PlPart = "money-flow" | "overview" | "needs-attention" | "won-lost" | "forecast" | "people" | "sources" | "stage-history" | "health" | "proof" | "list" | "accounts" | "pipelines";

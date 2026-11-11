@@ -797,4 +797,20 @@ Code: `pipeline3-intel.ts` (pure, unit tested), `pipeline3-queries.ts` (SQL), `p
 - **Undo**: stage, owner, value, status and rename changes can be put back for 30 minutes from the stored "before". A deal that had no owner cannot be put back to no owner. A delete, a note and a task cannot be undone.
 - **Our own writes are never our numbers**: every write is in `pipeline_actions` (result done); `ownWriteSince()` is what the deal history recorder and the metrics call to skip the platform's echo. Notes and tasks go through the shared write log.
 
+## Pipeline cards and scale (stage/pl-calm2)
+- **Card numbers (stage-independent only):** open money and count = open deals with a value above $0 and an owner; won and lost money and count = status won or lost with `last_status_change_at` inside the dates; stuck = open counted deals older in their stage than that stage's own limit (`deal_stage_stats.limit_days`, default when no history); no owner = open deals with no `assigned_to`. Pipelines are never added stage by stage across pipelines.
+- **Empty pipeline:** no open, won or lost deal in the dates. Hidden by default with "N empty hidden".
+- **Other stage:** a deal whose stage id is no longer in its pipeline keeps its money in an "Other stage" bucket (cards and stacks).
+- **Paging:** keyset cursor `open money|account|pipeline` (checked by `parseCursor`), 24 cards a page. Short-TTL cache 30 s (`plCache`). Index: `cached_opportunities_pipe_agg_idx` (additive, covering).
+- **Timings** (`scripts/pl-scale-timing.ts`, read-only, `generate_series` inside one query, nothing inserted, 12 Nov 2026): aggregate plus first page over 1,000,000 generated deals 1.2 s (no index, so a floor); real account data 10,380 deals / 32 pipelines: 0.9 s warm, 3.4 s on the first call (connection start).
+- **Not scaled yet:** the stack view and deal lists still use the full deal set query (offset paging); fine at about 19k deals per account, to be moved to keyset and SQL rollups before 1M deals in one account.
+
+### Round 3 (stage/pl-calm3)
+- **One rule set:** the cards now come from the same `deals()` derivation as the stacks (value above $0, an owner, not a test deal, a deal over 40% of an account shown apart as the outlier, closed-out stages and unused pipelines left out). A card is the sum of its pipeline's per-stage rows from one query. Checked on real data: card open $1,000,000 = stacks $1,000,000.
+- **Deal lists:** keyset cursor `value|deal id` for the default order (next and previous), the total is not recounted on later pages. Checked: 100 rows, then the next 100 with no overlap.
+- **Lighter scan:** contacts are joined only when a search needs them (lists attach names after paging); the stage-name lookup is a plain join instead of a per-deal lateral.
+- **Big open deals untouched (Overview):** top tenth of open counted deals by value (needs 10 open deals) with no stage move, status change or update for 14 days.
+- **Many stages:** columns keep a minimum width (84 px) and the stacks scroll sideways inside their box.
+- **Timings, 12 Nov 2026, real data 10,380 deals:** cards 1.1 s warm (1.9 s cold), stacks 4.8 s, overview 2.4 s, deal list page 1.8 s (both pages). Generated 1M deals, aggregate only: 1.2 s. The deal derivation is still a scan of the account's deals (about 1 s of it is the remote database round trips), so one account with 1M deals still needs a stored rollup table (not built: it needs a sync-time writer).
+
 Timing at 1,000,000 appointments: `scripts/appointments-timing.ts` builds the rows inside one query with generate_series (read-only, no inserts) and times the overview, per-person, weekly-trend and keyset-page shapes. It has not been run: the database login from this machine was refused. Run `node --env-file=.env.local --experimental-strip-types scripts/appointments-timing.ts` and record the milliseconds here; add indexes (see migration 20261125090000) if any shape is over 2000 ms.

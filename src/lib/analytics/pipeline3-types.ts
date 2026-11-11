@@ -3,7 +3,7 @@
 // minimum sample is { enough: false } and the screen says "not enough data", never a made-up number. Definitions: docs/METRICS.md "Pipeline 3".
 
 export const PL3_PARTS = [
-  "overview", "money-flow", "attention", "won-lost", "forecast", "people", "sources", "stage-history", "health", "receipt", "list", "detail", "replay",
+  "overview", "money-flow", "attention", "won-lost", "forecast", "people", "sources", "stage-history", "health", "receipt", "list", "detail", "replay", "pipelines",
 ] as const;
 export type Pl3Part = (typeof PL3_PARTS)[number];
 
@@ -20,7 +20,7 @@ export type Pl3Bucket =
 export type Estimate = { value: number | null; low: number | null; high: number | null; enough: boolean; estimate: true; formula: string; minNote: string | null };
 export type Rate = { value: number | null; n: number; of: number; enough: boolean };
 export type Money = { value: number; n: number };
-export type Page<T> = { rows: T[]; total: number; page: number; size: number; pages: number; truncated: boolean };
+export type Page<T> = { rows: T[]; total: number; page: number; size: number; pages: number; truncated: boolean; next?: string | null };
 
 export type Pl3Row = {
   opportunityId: string; locationId: string; accountName: string | null;
@@ -42,6 +42,8 @@ export type Pl3Overview = {
   openCount: number; openValue: Money; weighted: Estimate; atRisk: Estimate;
   stale: { count: number; value: number };
   wonLast30: Money; lostLast30: Money; winRate: Rate; velocity: Estimate; medianWonCycleDays: number | null;
+  /** Big open deals (top tenth by value) with no movement for `days` days. */
+  bigUntouched: { count: number; value: number; days: number };
   health: { score: number | null; noOwner: number; noValue: number; test: number; outliers: number };
   /** The six tiles at most. Each count equals its list. */
   cards: Array<{ key: string; title: string; value: number | string; sub: string | null; part: Pl3Part; bucket: Pl3Bucket | null }>;
@@ -151,3 +153,15 @@ export const PL3_FLAGS = [
   "pl_overview", "pl_money_flow", "pl_attention", "pl_won_lost", "pl_forecast", "pl_people", "pl_sources", "pl_stage_history", "pl_health", "pl_proof", "pl_actions", "pl_history", "pl_record",
 ] as const;
 export type Pl3Flag = (typeof PL3_FLAGS)[number];
+
+/** part=pipelines: ranked cards, one per (account, pipeline). Only stage-independent measures, so stages of different pipelines are never mixed. Keyset paged: pass `after` = the previous `next`. */
+export type PipeCard = {
+  locationId: string; pipelineId: string; accountName: string; name: string;
+  openCount: number; openValue: number; wonCount: number; wonValue: number; lostCount: number; lostValue: number;
+  staleCount: number; noOwnerCount: number; zeroValueCount: number; outlierCount: number; outlierValue: number; empty: boolean;
+  mini: Array<{ name: string; value: number }>; // open money per stage in the pipeline's own order; a stage it no longer has is "Other stage"
+};
+export type Pl3Cards = {
+  cards: PipeCard[]; next: string | null;
+  totals: { pipelines: number; emptyHidden: number; openValue: number; wonValue: number; lostValue: number; openCount: number; wonCount: number; lostCount: number; staleCount: number; noOwnerCount: number };
+};

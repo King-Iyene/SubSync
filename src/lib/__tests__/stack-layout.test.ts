@@ -44,3 +44,10 @@ test("phones get a vertical list, wide screens columns", () => {
   assert.equal(layoutStacks([stage(0)], 1, 1, [], { width: 390 }).vertical, true);
   assert.equal(layoutStacks([stage(0)], 1, 1, [], { width: 1200 }).vertical, false);
 });
+
+test("many stages: columns keep a minimum width and the picture grows wider than its box instead of squeezing", () => {
+  const L = layoutStacks(Array.from({ length: 25 }, (_, i) => stage(i)), 1_000_00, 3, [], { width: 1000 });
+  assert.ok(L.width > 1000 && !L.vertical);
+  for (const c of L.cols) assert.ok(c.stack.w >= 84);
+  L.cols.forEach((a, i) => L.cols.forEach((b, j) => { if (j > i) assert.equal(hit(a.label, b.label), false); }));
+});

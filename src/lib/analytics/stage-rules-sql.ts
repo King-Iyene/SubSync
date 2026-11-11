@@ -12,9 +12,8 @@ export function dealScopeJoins() {
   const db = sql();
   return db`
     left join pipelines sc_pl on sc_pl.installation_id = o.installation_id and sc_pl.location_id = o.location_id and sc_pl.pipeline_id = o.pipeline_id
-    left join lateral (
-      select s->>'name' nm, t.ord from jsonb_array_elements(coalesce(sc_pl.stages, '[]'::jsonb)) with ordinality t(s, ord) where s->>'id' = o.stage_id limit 1
-    ) sc_st on true
+    left join (select p.installation_id, p.location_id, p.pipeline_id, t.s->>'id' sid, min(t.s->>'name') nm, min(t.ord) ord from pipelines p, jsonb_array_elements(coalesce(p.stages, '[]'::jsonb)) with ordinality t(s, ord) group by 1, 2, 3, 4) sc_st
+      on sc_st.installation_id = o.installation_id and sc_st.location_id = o.location_id and sc_st.pipeline_id = o.pipeline_id and sc_st.sid = o.stage_id
     left join stage_rules sc_pr on sc_pr.installation_id = o.installation_id and sc_pr.pipeline_key = lower(btrim(coalesce(sc_pl.name, ''))) and sc_pr.stage_key = ''
     left join stage_rules sc_sr on sc_sr.installation_id = o.installation_id and sc_sr.pipeline_key = lower(btrim(coalesce(sc_pl.name, '')))
       and sc_sr.stage_key = lower(btrim(coalesce(sc_st.nm, ''))) and sc_sr.stage_key <> ''`;
