@@ -119,7 +119,7 @@ const APPT_ACTION_RULES: Rule[] = [["POST", "appointments", "act"], ["POST", "ap
 // Pipeline deal actions (slice PB): the handler checks the flag, the account and the person; a client staff member only touches deals assigned to them and never deletes or changes an owner.
 const PIPELINE_ACTION_RULES: Rule[] = [["GET", "pipeline3", "act"], ["POST", "pipeline3", "act"]];
 // Team actions and reports (slice PB): the handler checks the flag, the account and the person; a client's staff only read their own targets, focus and shared notes and never write.
-const PEOPLE3_ACTION_RULES: Rule[] = [["GET", "people3", "act"], ["POST", "people3", "act"]];
+const PEOPLE3_ACTION_RULES: Rule[] = [["GET", "people3", "act"], ["POST", "people3", "act"], ["GET", "people3", "roles"], ["POST", "people3", "roles"]]; // roles: the handler lets only managers change anything and shows everyone else only the labels they may see
 const PEOPLE_DAILY_RULES: Rule[] = [["PUT", "people", "seen"], ["POST", "people", "recent"], ["DELETE", "people", "recent"], ["POST", "people", "outcome"]];
 
 // The Lead workbench: reading the thread and context, previewing and doing one action. A client's staff may do it on their own account; deleting is refused inside the handler.

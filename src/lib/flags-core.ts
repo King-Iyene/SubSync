@@ -117,6 +117,7 @@ export const DEFAULT_OFF: ReadonlySet<Feature> = new Set<Feature>([
   "pp_idle",
   "pp_rollup",
   "pp_actions",
+  "pp_roles",
 ]);
 
 export function resolveFeatures(all: readonly Feature[], overrides: Record<string, boolean>, allOn = false): Record<Feature, boolean> {

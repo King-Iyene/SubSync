@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { useEffect, useRef, useState, useSyncExternalStore, type ComponentType } from "react";
 import type { PlDeal, PlDeals } from "@/lib/analytics/pipeline3-types-interim";
 import { EmptyState, ErrorState, SkeletonRows } from "../../ds";
+import { RoleChip } from "../../roles";
 import { usePl, type PlFilters } from "./data";
 import { money, moneyShort } from "./format";
 
@@ -47,7 +48,7 @@ export function DealTable({ rows, showAccount, onOpen, activeId, selected, onSel
               <td>{d.stageName}{d.status === "lost" && d.lostReason ? <span className="ap-sub"> · {d.lostReason}</span> : null}</td>
               <td data-num>{d.valueCents > 0 ? moneyShort(d.valueCents) : "No value"}</td>
               <td data-num>{stuck(d) ? <Chip tone="amber">{d.daysInStage} d, stuck</Chip> : `${d.daysInStage} d`}</td>
-              <td>{d.ownerName ?? <span className="ap-sub">Nobody</span>}</td>
+              <td>{d.ownerName ?? <span className="ap-sub">Nobody</span>}{d.ownerName && <RoleChip userId={d.ownerId} locationId={d.locationId} />}</td>
               <td onClick={(e) => e.stopPropagation()}>{d.url ? <a className="ap-link" href={d.url} target="_blank" rel="noopener noreferrer" data-testid="pl-row-crm">Open in your CRM</a> : <span className="ap-sub">No link</span>}</td>
               {quick && <td onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}><PlSlot name="RowActions" deal={d} onChanged={onChanged} /></td>}
             </tr>
@@ -127,7 +128,7 @@ export function DealPanel({ deal, onClose, onChanged, filters }: { deal: PlDeal;
             <dt>Value</dt><dd>{deal.valueCents > 0 ? money(deal.valueCents) : "No value set"}</dd>
             <dt>Stage</dt><dd>{deal.stageName}{stuck(deal) ? <> <Chip tone="amber">Stuck {deal.daysInStage} days (normal up to {deal.staleAfterDays})</Chip></> : ` · ${deal.daysInStage} days`}</dd>
             <dt>Status</dt><dd>{deal.status === "won" ? "Won" : deal.status === "lost" ? `Lost${deal.lostReason ? `: ${deal.lostReason}` : ""}` : deal.status === "abandoned" ? "Abandoned" : "Open"}</dd>
-            <dt>Owner</dt><dd>{deal.ownerName ?? "Nobody assigned"}</dd>
+            <dt>Owner</dt><dd>{deal.ownerName ?? "Nobody assigned"}{deal.ownerName && <RoleChip userId={deal.ownerId} locationId={deal.locationId} />}</dd>
             <dt>Contact</dt><dd>{deal.contactName ?? "Unknown"}</dd>
             <dt>Source</dt><dd>{deal.source ?? "Unknown"}</dd>
           </dl>

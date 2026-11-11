@@ -150,6 +150,7 @@ export const FEATURES = [
   "pp_idle",
   "pp_rollup",
   "pp_actions",
+  "pp_roles",
 ] as const;
 export type Feature = (typeof FEATURES)[number];
 

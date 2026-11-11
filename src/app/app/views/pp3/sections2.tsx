@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { Pp3Access, Pp3AccessRow, Pp3Board, Pp3Coaching, Pp3Leaderboard, Pp3Money, Pp3Proof } from "@/lib/analytics/people3-types";
+import { RoleChip } from "../../roles";
 import { PersonActionsSlot, ProofActionsSlot } from "./actions-slot";
 import { fixturesOn, usePp } from "./data";
 import type { SecProps } from "./sections";
@@ -18,7 +19,7 @@ function BoardTable({ b, pick }: { b: Pp3Board; pick: (id: string) => void }) {
         <div className="ap-scroll"><table className="ap-t" style={{ minWidth: 0 }}><thead><tr><th>Rank</th><th>Person</th><th data-num data-sm="hide">Leads</th><th data-num>{closers ? "Deals won" : "In time"}</th><th data-num data-sm="hide">Against the same sources</th><th data-sm="hide">Why</th></tr></thead>
           <tbody>{b.shown.map((p) => (
             <tr key={p.person.userId} style={{ cursor: "default" }}><td><span className="pp-rank">{p.rank ?? "n/a"}</span></td>
-              <td className="pp-wrap"><span className="pp-cell"><Initials p={p.person} /><button type="button" className="pp-name" onClick={() => pick(p.person.userId)}>{p.person.name}</button></span></td>
+              <td className="pp-wrap"><span className="pp-cell"><Initials p={p.person} /><button type="button" className="pp-name" onClick={() => pick(p.person.userId)}>{p.person.name}</button><RoleChip userId={p.person.userId} /></span></td>
               <td data-num data-sm="hide">{p.n}</td><td data-num>{p.enough ? share(p.value) : NOT_ENOUGH}</td>
               <td data-num data-sm="hide">{p.enough && p.vsMix !== null ? `${p.vsMix > 0 ? "+" : ""}${Math.round(p.vsMix)} pts` : ""}</td>
               <td className="pp-wrap" data-sm="hide" style={{ maxWidth: "26rem" }}><span className="ap-fine">{p.why}</span></td></tr>
@@ -67,7 +68,7 @@ export function Money({ filters, open, pick }: SecProps) {
                   const loc = m.location?.locationId ?? null, p = m.person;
                   return (
                     <tr key={`${loc}:${p.userId}`} style={{ cursor: "default" }}>
-                      <td className="pp-wrap"><span className="pp-cell"><Initials p={p} /><button type="button" className="pp-name" onClick={() => pick(p.userId)}>{p.name}</button></span></td>
+                      <td className="pp-wrap"><span className="pp-cell"><Initials p={p} /><button type="button" className="pp-name" onClick={() => pick(p.userId)}>{p.name}</button><RoleChip userId={p.userId} /></span></td>
                       <td data-num>{m.enough ? <>{money(m.wonValue)}<span className="ap-sub pp-hide-sm"> ({m.wonCount})</span></> : NOT_ENOUGH}</td>
                       <td data-num data-sm="hide">{link(m.openValue, p.userId, loc, `${p.name}: open deals`, "open_deals")}</td>
                       <td data-num data-sm="hide">{link(m.staleValue, p.userId, loc, `${p.name}: quiet deals`, "stale_deals")}</td>
@@ -136,7 +137,7 @@ export function Access({ filters, pick }: SecProps) {
                 <div className="ap-scroll"><table className="ap-t" data-testid="pp-access-people"><thead><tr><th>Person</th><th>Works in</th><th data-sm="hide">Verified sign-in</th><th data-sm="hide">Last activity</th></tr></thead>
                   <tbody>{x.rows.map((a: Pp3AccessRow) => (
                     <tr key={a.person.userId} style={{ cursor: "default" }}>
-                      <td className="pp-wrap"><span className="pp-cell"><Initials p={a.person} /><span><button type="button" className="pp-name" onClick={() => pick(a.person.userId)}>{a.person.name}</button><br /><span className="ap-fine">{ROLE_LABEL[a.person.role]}{a.flags.length ? `, ${a.flags.map((fl) => FLAG_WORD[fl]).join(", ").toLowerCase()}` : ""}</span></span></span></td>
+                      <td className="pp-wrap"><span className="pp-cell"><Initials p={a.person} /><span><button type="button" className="pp-name" onClick={() => pick(a.person.userId)}>{a.person.name}</button><RoleChip userId={a.person.userId} /><br /><span className="ap-fine">{ROLE_LABEL[a.person.role]}{a.flags.length ? `, ${a.flags.map((fl) => FLAG_WORD[fl]).join(", ").toLowerCase()}` : ""}</span></span></span></td>
                       <td className="pp-wrap" style={{ maxWidth: "26rem" }}>{a.person.allAccounts ? "All client accounts" : a.flags.includes("no_account") ? <Status on>In no account</Status> : <>{a.person.accounts.slice(0, 3).map((k) => k.name).join(", ")}{a.person.accountCount > 3 ? ` and ${a.person.accountCount - 3} more` : ""}</>}</td>
                       <td data-sm="hide">{a.verified === null ? <span className="ap-fine">Not tracked</span> : a.verified ? <Status>Verified</Status> : <Status on>Not verified</Status>}</td>
                       <td data-sm="hide"><span className="ap-fine">{a.person.lastActivityAt ? ago(a.person.lastActivityAt) : NO_ACTIVITY}</span></td>
