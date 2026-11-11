@@ -114,6 +114,10 @@ async function main() {
       // Today (front page): every part, asked for the other side's account by every parameter the page takes (location, kind, week).
       ...["today", "list", "proof", "numbers", "settings", "export", "options"].flatMap((part) => [`/api/app/today3?part=${part}`, `/api/app/today3?part=${part}&location=${other.locs[0]}`, `/api/app/today3?part=${part}&location=${other.marker}`, `/api/app/today3?part=${part}&location=${other.locs[0]}&week=2026-01-05`]),
       ...["waiting_old", "waiting", "unmarked", "noshows", "stale_deals", "needs_permission", "sync_old", "leads_down", "staff_quiet", "no_owner", "no_phone", "open_deals", "all_waiting", "all_noshows", "all_stale", "mine_waiting"].flatMap((k) => [`/api/app/today3?part=list&kind=${k}`, `/api/app/today3?part=list&kind=${k}&location=${other.locs[0]}`]),
+      // Cash features (save this account, missed-lead recovery, deal alerts): every part, asked for the other side's account, kind and cursor by every parameter they take.
+      ...["save", "recover", "recover-list", "deals", "deals-list", "settings", "options", "team"].flatMap((part) => [`/api/app/cash?part=${part}`, `/api/app/cash?part=${part}&account=${other.locs[0]}`, `/api/app/cash?part=${part}&account=${other.marker}`, `/api/app/cash?part=${part}&account=${other.locs[0]}&cursor=1%7C${other.locs[0]}~unanswered~${other.contacts[0]}~x`]),
+      ...["all", "unanswered", "missed_call", "no_show"].flatMap((k) => [`/api/app/cash?part=recover-list&kind=${k}`, `/api/app/cash?part=recover-list&kind=${k}&account=${other.locs[0]}&snoozed=1`]),
+      ...["slipping", "stale", "soon", "lost"].flatMap((k) => [`/api/app/cash?part=deals-list&kind=${k}`, `/api/app/cash?part=deals-list&kind=${k}&account=${other.locs[0]}`]),
       // Team (people) round 3 (stage PD): every part, asked for the other side's account and people by every parameter the page takes (location, user, q, source, after).
       ...["today", "scorecards", "workload", "leaderboard", "money", "coaching", "access", "proof", "person", "handoff", "nextlead", "options", "export"].flatMap((part) => [`/api/app/people3?part=${part}`, `/api/app/people3?part=${part}&location=${other.locs[0]}`, `/api/app/people3?part=${part}&user=${other.marker}&q=${other.marker}&source=${other.marker}`, `/api/app/people3?part=${part}&location=${other.locs[0]}&user=${other.marker}&after=${other.marker}`]),
       ...["waiting", "waiting_old", "stale_deals", "open_deals", "needs_outcome", "upcoming", "no_owner"].flatMap((r) => [`/api/app/people3?part=list&reason=${r}`, `/api/app/people3?part=list&reason=${r}&location=${other.locs[0]}`, `/api/app/people3?part=list&reason=${r}&user=${other.marker}`]),
@@ -241,6 +245,13 @@ async function main() {
       ["POST", "/api/app/today/action", { action: "snooze", rowKey: `${B.locs[0]}|stale`, choice: "day" }],
       ["POST", "/api/app/today/action", { action: "undo", eventId: 1 }],
       ["POST", "/api/app/inbox/outcome", { locationId: B.locs[0], conversationId: "foreign-conversation", outcome: "replied" }],
+      // Cash features: every write names the other agency's account, row and owner, and must be refused (a row key is re-read from the caller's own accounts, never trusted).
+      ["POST", "/api/app/cash/act/snooze", { keys: [`${B.locs[0]}~unanswered~${B.contacts[0]}~x`], for: "d7" }],
+      ["POST", "/api/app/cash/act/unsnooze", { keys: [`${B.locs[0]}~unanswered~${B.contacts[0]}~x`] }],
+      ["POST", "/api/app/cash/act/assign", { keys: [`${B.locs[0]}~unanswered~${B.contacts[0]}~x`], ownerId: "foreign-user", step: "do" }],
+      ["POST", "/api/app/cash/act/mute", { location: B.locs[0], days: 7 }],
+      ["POST", "/api/app/cash/act/unmute", { id: "00000000-0000-0000-0000-000000000000" }],
+      ["POST", "/api/app/cash/act/undo", { batchId: "00000000-0000-0000-0000-000000000000", step: "do" }],
       // Unanswered actions (round 3, slice B): every write names the other agency's account and conversation, and must be refused.
       ["POST", "/api/app/inbox/act/snooze", { locationId: B.locs[0], conversationIds: ["foreign-conversation"], reason: "other", duration: "d7" }],
       ["POST", "/api/app/inbox/act/unsnooze", { locationId: B.locs[0], conversationIds: ["foreign-conversation"] }],

@@ -171,6 +171,11 @@ export const FEATURES = [
   "td_email",
   "td_record",
   "ov_screen",
+  "cf_save",
+  "cf_recover",
+  "cf_deals",
+  "cf_email",
+  "cf_record",
 ] as const;
 export type Feature = (typeof FEATURES)[number];
 
