@@ -127,6 +127,7 @@ import { handleApptActions } from "./appointment-actions-routes";
 import { handlePipelineActions } from "./pipeline-actions-routes";
 import { grantedOf } from "./workflows-api";
 import { handleClientActions } from "./clients-actions-routes";
+import { handlePeopleActions } from "./people-actions-routes";
 import { buildSteps, guideRoleOf } from "../getting-started";
 import { changedSettingKeys, feedbackGivenBy, logAccountFlags, logKeyChange, logSettingsChange, recordVote } from "../feedback-queries";
 import { groupStatus, parseGranted } from "../scope-groups";
@@ -2012,6 +2013,10 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
     // Clients actions and reports (slice CB): /api/app/clients/act/<part> (weekly receipt, CSV, setup health, quiet marks, reply targets). Agency only by the route policy.
     if (a === "clients" && b === "act" && ctx.segments.length === 3) {
       return await handleClientActions(ctx, { allowed: () => allowedIds(ctx), brand: async () => (await scope(ctx)).settings.brandName ?? null, defaultTarget: async () => (await scope(ctx)).settings.speedTargetMinutes, granted: () => grantedOf(ctx), onboarding: () => clientRoutes.onboardingView(ctx, clientDeps) });
+    }
+    // Team actions and reports (slice PB): /api/app/people3/act/<part> (coaching notes, targets, away marks, lead moves with undo, the client receipt). Flags, the account and the person are checked inside.
+    if (a === "people3" && b === "act" && ctx.segments.length === 3) {
+      return await handlePeopleActions(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links, locationToken: (locationId) => locationAccessToken(ctx.session.companyId, locationId), brand: async () => (await scope(ctx)).settings.brandName ?? null });
     }
     if (a === "pipeline3" && b === "act" && ctx.segments.length === 3) {
       return await handlePipelineActions(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links, locationToken: (locationId) => locationAccessToken(ctx.session.companyId, locationId) });

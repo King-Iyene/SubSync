@@ -8,6 +8,7 @@ import { sweepDealHistory } from "./pipeline3-record";
 import { refreshClientRollup } from "./clients3-queries";
 import { refreshClientBilling } from "./clients3-billing";
 import { sweepPeople } from "./people3-sweep";
+import { runPeopleAlerts } from "./people-alerts";
 import { accountReceipt } from "./moat-queries";
 import { mondayOf, weeklyDue, weeklyProofText } from "./moat-core";
 
@@ -31,7 +32,8 @@ export async function runMoatCron(now = Date.now()): Promise<MoatCronReport> {
       const clr = ent.features.cl_rollup && !ent.locked.includes("cl_rollup");
       const clb = ent.features.cl_billing && !ent.locked.includes("cl_billing");
       const ppr = ent.features.pp_rollup && !ent.locked.includes("pp_rollup");
-      if (!rec && !mail && !apr && !plr && !clr && !clb && !ppr) continue;
+      const ppi = ent.features.pp_idle && !ent.locked.includes("pp_idle");
+      if (!rec && !mail && !apr && !plr && !clr && !clb && !ppr && !ppi) continue;
       rep.companies++;
       if (apr) rep.events += Object.values(await sweepAppointmentHistory(installationId)).reduce((x, y) => x + y, 0);
       if (plr) rep.events += Object.values(await sweepDealHistory(installationId)).reduce((x, y) => x + y, 0);
@@ -39,6 +41,7 @@ export async function runMoatCron(now = Date.now()): Promise<MoatCronReport> {
       if (ppr) await sweepPeople(installationId, now).catch((e) => console.error("Team sweep failed", safeError(e)));
       if (ent.features.cl_billing && !ent.locked.includes("cl_billing")) await refreshClientBilling(installationId).catch((e) => console.error("Billing refresh failed", safeError(e)));
       if (rec) rep.events += Object.values(await sweepMoatEvents(installationId)).reduce((a, b) => a + b, 0);
+      if (ppi) await runPeopleAlerts(installationId, now).catch((e) => console.error("Team alerts failed for one company", safeError(e)));
       if (mail && weeklyDue(now)) rep.receipts += await weeklyProofReceipts(installationId, now);
     } catch (error) {
       rep.failures++;

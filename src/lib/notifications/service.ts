@@ -174,7 +174,9 @@ async function buildScheduled(installationId: string, type: "daily_brief" | "wee
       const [inst] = await sql()`select plan, company_id from installations where id = ${installationId}`;
       const { todayBriefForInstallation } = await import("../api/router");
       const t = await todayBriefForInstallation(installationId, inst.plan as never, inst.company_id as string);
-      return { type, locationId: null, severity: "info", dedupeKey: `daily_brief:${date}`, values, details: [...t.lines, `${d.freshness.text}.`] };
+      // On Monday the brief also carries the team lines (who answered how many new leads in time last week), when the Team module is on.
+      const team = now.getUTCDay() === 1 ? await (await import("../analytics/people-alerts")).weeklyTeamLines(installationId, now.getTime()) : [];
+      return { type, locationId: null, severity: "info", dedupeKey: `daily_brief:${date}`, values, details: [...t.lines, ...team, `${d.freshness.text}.`] };
     } catch (error) {
       console.error("The daily brief could not use Today's ranking; using the older lines", safeError(error));
       return { type, locationId: null, severity: "info", dedupeKey: `daily_brief:${date}`, values, details: dailyLines(base) };
@@ -187,7 +189,8 @@ async function buildScheduled(installationId: string, type: "daily_brief" | "wee
     leads: sp ? sp.overall.leads : 0, withinTarget: sp ? sp.overall.withinTarget : 0, targetMinutes: target, neverAnswered: sp ? sp.neverAnswered : 0,
     noShowsToRecover: ap ? ap.recoverTotal : null, unmarked: ap ? ap.unmarkedTotal : null,
   });
-  return { type, locationId: null, severity: "info", dedupeKey: `weekly_summary:${date}`, values, details: weeklyLines({ ...base, facts }) };
+  const team = await (await import("../analytics/people-alerts")).weeklyTeamLines(installationId, now.getTime());
+  return { type, locationId: null, severity: "info", dedupeKey: `weekly_summary:${date}`, values, details: weeklyLines({ ...base, facts: [...facts, ...team] }) };
 }
 
 /** Work off what is waiting for every real company (the hourly job). */
