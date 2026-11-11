@@ -85,6 +85,7 @@ const SIZES = { snooze: 50 };
 export async function handleUnansweredActions(ctx: Ctx, h: ActionHelpers): Promise<Response> {
   const part = ctx.segments[2];
   const m = ctx.request.method;
+  if (m === "GET" && part === "caps") return capsRoute(ctx);
   if (m === "GET" && part === "hidden") return hiddenRoute(ctx, h);
   if (m === "GET" && part === "team") return teamRoute(ctx, h);
   if (m === "PUT" && part === "settings") return settingsRoute(ctx);
@@ -97,6 +98,16 @@ export async function handleUnansweredActions(ctx: Ctx, h: ActionHelpers): Promi
   if (m === "POST" && part === "outcome") return on(ctx, "inbox_outcome_ui") ? handleUnansweredOutcome(ctx, { allowed: h.allowed }) : off();
   if (m === "POST" && part === "clear") return clearRoute(ctx, h);
   return json({ error: "Unknown action" }, 404);
+}
+
+// ---------------- what this person may do (the screen shows only these buttons; the server still checks every request) ----------------
+
+function capsRoute(ctx: Ctx): Response {
+  return json({
+    openLead: on(ctx, "inbox_open_lead"), claim: on(ctx, "inbox_claim"), assign: on(ctx, "inbox_assign") && isAdminSide(ctx), note: on(ctx, "inbox_note"),
+    outcome: on(ctx, "inbox_outcome_ui"), clearJunk: on(ctx, "inbox_clear_junk") && ownerSide(ctx), snooze: on(ctx, "inbox_snooze"), hide: on(ctx, "inbox_hide_noise"),
+    canChangeHiding: isAdminSide(ctx), me: ctx.session.userId ?? null, caps: { assign: BATCH_CAPS.assign, clear: BATCH_CAPS.clear },
+  });
 }
 
 // ---------------- hidden people ----------------
