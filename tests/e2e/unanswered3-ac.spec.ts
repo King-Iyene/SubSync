@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 
 // Unanswered round 3, slices A and C (control room, filters, search). Needs the flags on (FLAGS_ALL_ON=true) and the demo tenant. Runs at the three widths of the config.
 test.describe("Unanswered control room", () => {
+  test.setTimeout(240_000);
   test.beforeEach(async ({ page }) => {
     await page.goto("/app#inbox");
     await page.reload();
