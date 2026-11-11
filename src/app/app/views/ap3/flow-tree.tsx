@@ -1,13 +1,13 @@
 "use client";
 
-import { ChevronDown, Play, Sparkles } from "lucide-react";
+import { ChevronDown, Play, Sparkles, Users } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { closerTotals, findLeak, layoutFlow, LEAF_ORDER, OUTCOME_LABEL, OUTCOME_TONE, type FlowNode, type Tone } from "@/lib/design/appt-flow-layout";
-import { coachingNote, money, pct } from "@/lib/design/appt-coach";
+import { money, pct } from "@/lib/design/appt-coach";
 import { EmptyState, ErrorState, SkeletonRows } from "../../ds";
 import { CountUp, useReducedMotion } from "../speed6-base";
 import { useAp, type ApFilters } from "./data";
-import { ComparePanel } from "./compare-panel";
+import { ComparePanel, type CompareRole, type Ranked } from "./compare-panel";
 import { Chip } from "./parts";
 import type { ApFlowTree, ApOutcome, ApStats } from "./types";
 
@@ -37,7 +37,8 @@ export function FlowTree({ filters, onOpen, go }: { filters: ApFilters; onOpen: 
   const reduced = useReducedMotion();
   const [run, setRun] = useState(0);
   const [hot, setHot] = useState<string | null>(null);
-  const [cmp, setCmp] = useState<string[]>([]);
+  const [cmpIds, setCmpIds] = useState<string[]>([]), [cmpRole, setCmpRole] = useState<CompareRole>("booker"), [cmpOpen, setCmpOpen] = useState(false);
+  const toggleCmpId = (role: CompareRole, id: string) => { setCmpOpen(true); if (role !== cmpRole) { setCmpRole(role); setCmpIds([id]); return; } setCmpIds((c) => (c.includes(id) ? c.filter((x) => x !== id) : [...c.slice(-1), id])); };
   const [setterLimit, setSetterLimit] = useState(5);
   const [leakOn, setLeakOn] = useState(false);
   useEffect(() => {
@@ -55,6 +56,10 @@ export function FlowTree({ filters, onOpen, go }: { filters: ApFilters; onOpen: 
     for (const s of tree.setters) m.set(`s:${s.id}`, s);
     for (const c of closerTotals(tree)) m.set(`k:${c.id}`, c);
     return m;
+  }, [tree]);
+  const ranked = useMemo(() => {
+    const top = (xs: Array<{ id: string; name: string; bookings: number }>): Ranked[] => xs.filter((x) => x.id !== "others").sort((a, b) => b.bookings - a.bookings).map((x) => ({ id: x.id, name: x.name, n: x.bookings }));
+    return tree ? { booker: top(tree.setters), owner: top(closerTotals(tree)) } : { booker: [], owner: [] };
   }, [tree]);
   const hotSet = useMemo(() => {
     if (!hot || !layout) return null;
@@ -76,7 +81,7 @@ export function FlowTree({ filters, onOpen, go }: { filters: ApFilters; onOpen: 
   };
   const setterName = (id?: string) => tree.setters.find((s) => s.id === id)?.name ?? "";
   const closerName = (id?: string) => tree.setters.flatMap((s) => s.closers).find((c) => c.id === id)?.name ?? "";
-  const toggleCmp = (n: FlowNode) => { const k = n.kind === "setter" ? `s:${n.setterId}` : `k:${n.closerId}`; setCmp((c) => (c.includes(k) ? c.filter((x) => x !== k) : c.length && c[0][0] !== k[0] ? [k] : [...c.slice(-1), k])); if (cmp.length === 1) setTimeout(() => document.querySelector('[data-testid="ap-compare"]')?.scrollIntoView({ block: "nearest", behavior: "smooth" }), 80); };
+  const toggleCmp = (n: FlowNode) => { const role: CompareRole = n.kind === "setter" ? "booker" : "owner"; const id = (n.kind === "setter" ? n.setterId : n.closerId) ?? "none"; toggleCmpId(role, id); setTimeout(() => document.querySelector('[data-testid="ap-compare"]')?.scrollIntoView({ block: "nearest", behavior: "smooth" }), 80); };
   const preview = hot && layout ? layout.nodes.find((n) => n.id === hot) : null;
   const showLeak = (leakNode: string) => { setLeakOn(true); setHot(leakNode); setTimeout(() => wrap.current?.querySelector<HTMLElement>(`[data-node="${CSS.escape(leakNode)}"] button`)?.scrollIntoView({ block: "center", behavior: reduced ? "auto" : "smooth" }), 50); };
 
@@ -92,9 +97,10 @@ export function FlowTree({ filters, onOpen, go }: { filters: ApFilters; onOpen: 
       <div className="ap-tree-bar">
         <div className="ap-legend" aria-label="Colour key">{LEGEND.map(([t, l]) => <span key={t}><i style={{ background: COLOR[t] }} />{l}</span>)}<span><Sparkles aria-hidden className="mr-1 inline size-3 text-[var(--s6-cyan)]" />Glow: best converters</span></div>
         <span className="ml-auto inline-flex flex-wrap gap-2">
+          <button type="button" className="s6-btn" onClick={() => setCmpOpen((o) => !o)} aria-expanded={cmpOpen || cmpIds.length > 0} data-testid="ap-compare-open"><Users aria-hidden className="size-4" />Compare people</button>
           {layout && !reduced && <button type="button" className="s6-btn" onClick={() => setRun((r) => r + 1)} data-testid="ap-replay"><Play aria-hidden className="size-4" />Replay</button>}
           {tree.setters.length > 4 && <label className="sr-only" htmlFor="ap-limit">People shown</label>}
-          {tree.setters.length > 4 && <select id="ap-limit" className="ap-field" value={setterLimit} onChange={(e) => setSetterLimit(Number(e.target.value))}><option value={4}>Top 4 bookers</option><option value={8}>Top 8 bookers</option><option value={100}>All bookers</option></select>}
+          {tree.setters.length > 4 && <select id="ap-limit" className="ap-field" value={setterLimit} onChange={(e) => setSetterLimit(Number(e.target.value))}><option value={4}>Top 4 bookers</option><option value={8}>Top 8 bookers</option><option value={12}>Top 12 bookers</option></select>}
         </span>
       </div>
 
@@ -113,37 +119,38 @@ export function FlowTree({ filters, onOpen, go }: { filters: ApFilters; onOpen: 
                   {layout.links.map((l, i) => <path key={l.id} d={l.d} className="ap-lk" data-tone={l.tone} data-hot={hotSet && hotSet.has(l.to) ? "1" : undefined} data-anim={reduced ? undefined : "1"} pathLength={1} strokeWidth={l.width} style={{ ["--d" as string]: `${Math.min(900, i * 28)}ms` }} />)}
                 </svg>
                 {layout.nodes.map((n, i) => {
-                  const canCmp = n.kind === "setter" || n.kind === "closer";
-                  const key = n.kind === "setter" ? `s:${n.setterId}` : `k:${n.closerId}`;
+                  const cid = (n.kind === "setter" ? n.setterId : n.closerId) ?? "none", crole: CompareRole = n.kind === "setter" ? "booker" : "owner";
+                  const canCmp = (n.kind === "setter" || n.kind === "closer") && cid !== "others";
+                  const chosen = cmpRole === crole && cmpIds.includes(cid);
                   return (
                     <div key={n.id} className="ap-node" data-node={n.id} data-kind={n.kind} data-tone={n.tone} data-best={n.best ? "1" : undefined} data-hot={hotSet?.has(n.id) ? "1" : undefined} data-leak={leakOn && leak?.nodeId === n.id ? "1" : undefined}
                       style={{ left: n.x, top: n.y, width: n.w, height: n.h, ["--d" as string]: `${Math.min(700, 120 + i * 18)}ms` }}
                       onMouseEnter={() => setHot(n.id)} onMouseLeave={() => setHot(null)} onFocus={() => setHot(n.id)} onBlur={() => setHot(null)}>
-                      <button type="button" className="ap-node-main" onClick={() => (n.kind === "more" ? setSetterLimit(100) : pick(n))} aria-label={n.kind === "more" ? `Show ${n.label}` : sentence(n)} data-testid={`ap-node-${n.kind}`}>
+                      <button type="button" className="ap-node-main" onClick={() => (n.kind === "more" ? setSetterLimit(12) : pick(n))} aria-label={n.kind === "more" ? `Show ${n.label}` : sentence(n)} data-testid={`ap-node-${n.kind}`}>
                         {n.kind === "root" ? <span className="block text-center"><span className="ap-root-n"><CountUp value={n.count} /></span><span className="ap-root-l block">booked</span></span>
                           : n.kind === "leaf" ? <><i aria-hidden /><span>{n.label}</span><b>{n.count}</b></>
                           : n.kind === "more" ? <span>{n.label}</span>
                           : <><span className="ap-node-name"><span>{n.label}</span>{n.best && <Sparkles aria-hidden className="size-3.5 flex-none text-[var(--tone)]" />}</span><Stats s={n.stats!} /></>}
                       </button>
-                      {canCmp && <button type="button" className="ap-cmp" aria-pressed={cmp.includes(key)} aria-label={`Compare ${n.label}`} title="Pick two people to see them side by side" onClick={() => toggleCmp(n)} data-testid="ap-cmp" style={{ width: "auto", padding: "0 8px", fontSize: 11 }}>{cmp.includes(key) ? "Selected" : "Compare"}</button>}
+                      {canCmp && <button type="button" className="ap-cmp" aria-pressed={chosen} aria-label={`Compare ${n.label}`} title="Put two people side by side" onClick={() => toggleCmp(n)} data-testid="ap-cmp" style={{ width: "auto", padding: "0 8px", fontSize: 11 }}>{chosen ? "Selected" : "Compare"}</button>}
                     </div>
                   );
                 })}
               </div>
             </div>
           </div>
-        ) : <PhoneTree tree={tree} limit={setterLimit} onOpen={onOpen} cmp={cmp} setCmp={setCmp} />}
+        ) : <PhoneTree tree={tree} limit={setterLimit} onOpen={onOpen} isCmp={(id) => cmpRole === "booker" && cmpIds.includes(id)} onCmp={(id) => toggleCmpId("booker", id)} />}
       </div>
       <p className="mt-2 flex flex-wrap items-center gap-3 text-sm" data-testid="ap-tree-pager">{skip > 0 && <button type="button" className="ap-link" onClick={() => { setSkip(Math.max(0, skip - top)); setSetterLimit(5); }}>Previous {top} people</button>}<span className="ap-fine">Showing {skip + 1} to {skip + tree.setters.filter((x) => x.id !== "others").length} people, busiest first.</span>{tree.hiddenSetters > 0 && <><button type="button" className="ap-link" onClick={() => { setSkip(skip + top); setSetterLimit(5); }} data-testid="ap-tree-more">See the next {Math.min(top, tree.hiddenSetters)} people</button>{top < 30 && <button type="button" className="ap-link" onClick={() => setTop(30)}>Show 30 at a time</button>}</>}</p>
 
-      {cmp.length > 0 && <ComparePanel filters={filters} ids={cmp.map((k) => k.slice(2))} role={cmp[0][0] === "s" ? "booker" : "owner"} onClear={() => setCmp([])} onOpen={onOpen} />}
+      {(cmpOpen || cmpIds.length > 0) && <ComparePanel filters={filters} ids={cmpIds} role={cmpRole} ranked={ranked} onIds={setCmpIds} onRole={(r) => { setCmpRole(r); setCmpIds([]); }} onClear={() => { setCmpIds([]); setCmpOpen(false); }} onOpen={onOpen} />}
       <p className="ap-fine mt-3">Colours compare each person with your own team&apos;s average for these dates, never with an outside figure. Under {tree.minBookings} bookings a branch stays grey. {go && <button type="button" className="ap-link" onClick={() => go("help")}>How the numbers are worked out</button>}</p>
     </div>
   );
 }
 
 /** Phone: the same tree as an indented list. Every row opens exactly its appointments; 44px taps. */
-function PhoneTree({ tree, limit, onOpen, cmp, setCmp }: { tree: ApFlowTree; limit: number; onOpen: (p: FlowPick) => void; cmp: string[]; setCmp: (f: (c: string[]) => string[]) => void }) {
+function PhoneTree({ tree, limit, onOpen, isCmp, onCmp }: { tree: ApFlowTree; limit: number; onOpen: (p: FlowPick) => void; isCmp: (id: string) => boolean; onCmp: (id: string) => void }) {
   const tones = (s: ApStats): Tone => { const o = tree.overall; if (s.bookings < tree.minBookings || s.showRate === null || o.showRate === null) return "grey"; const d = s.showRate - o.showRate, dc = s.closeRate !== null && o.closeRate !== null ? s.closeRate - o.closeRate : 0; return d <= -0.1 || dc <= -0.15 ? "red" : d >= 0.03 && dc >= 0 ? "green" : "amber"; };
   return (
     <div className="ap-plist" data-testid="ap-plist" aria-label="Appointment flow">
@@ -152,7 +159,7 @@ function PhoneTree({ tree, limit, onOpen, cmp, setCmp }: { tree: ApFlowTree; lim
         <details key={s.id} className="ap-pnode" data-tone={tones(s)} open={tree.setters.length <= 3}>
           <summary className="ap-pbtn"><ChevronDown aria-hidden className="size-4 flex-none" /><span className="min-w-0 flex-1"><b>{s.name}</b><span className="ap-fine block">{s.bookings} booked · {pct(s.showRate)} show · {pct(s.noShowRate)} no-show · {pct(s.closeRate)} close · {money(s.revenueCents)}</span></span><Chip tone={tones(s)}>{TONE_TEXT[tones(s)]}</Chip></summary>
           <div className="ap-pchips"><button type="button" className="s6-btn" onClick={() => onOpen({ title: `Booked by ${s.name}`, count: s.bookings, params: { booker: s.id } })}>Open {s.bookings}</button>
-            <button type="button" className="s6-btn" aria-pressed={cmp.includes(`s:${s.id}`)} onClick={() => setCmp((c) => (c.includes(`s:${s.id}`) ? c.filter((x) => x !== `s:${s.id}`) : [...c.slice(-1), `s:${s.id}`]))}>{cmp.includes(`s:${s.id}`) ? "In comparison" : "Compare"}</button></div>
+            <button type="button" className="s6-btn" aria-pressed={isCmp(s.id)} onClick={() => onCmp(s.id)}>{isCmp(s.id) ? "In comparison" : "Compare"}</button></div>
           <div className="ap-pkids">
             {s.closers.map((c) => (
               <div key={c.id} className="ap-pnode" data-tone={tones(c)}>

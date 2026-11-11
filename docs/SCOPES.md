@@ -52,7 +52,7 @@ Bookings and what happened to them.
 | --- | --- | --- | --- |
 | `calendars.readonly` | read | required | Calendars, for the setup checklist and to know which calendars exist. |
 | `calendars/events.readonly` | read | optional | Appointments and their status (showed, no-show, never marked), for the appointment checks and the no-show list. |
-| `calendars/groups.readonly` | read | optional | Reserved for calendar groups. Not used yet. |
+| `calendars/groups.readonly` | read | optional | Calendar groups, so every calendar can be listed under its group, even one with no bookings. |
 | `calendars/resources.readonly` | read | optional | Reserved for rooms and equipment. Not used yet. |
 | `calendars/events.write` | change | optional | Reserved for marking an appointment showed or no-show after a preview. Nothing in SubSync uses it today. |
 

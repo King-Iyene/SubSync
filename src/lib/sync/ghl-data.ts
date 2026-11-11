@@ -243,12 +243,21 @@ export function mapAppointment(raw: unknown): AppointmentRow | null {
   };
 }
 
-export type CalendarRow = { id: string; name: string | null };
+export type CalendarRow = { id: string; name: string | null; groupId: string | null; isActive: boolean; calendarType: string | null; roundRobin: boolean; memberIds: string[] };
+export type CalendarGroupRow = { id: string; name: string | null; isActive: boolean };
 
 export function mapCalendar(raw: unknown): CalendarRow | null {
   const r = rec(raw);
   const id = str(r.id) ?? str(r._id);
-  return id ? { id, name: str(r.name) } : null;
+  if (!id) return null;
+  const type = str(r.calendarType) ?? str(r.eventType);
+  const members = (Array.isArray(r.teamMembers) ? r.teamMembers : []).map((m) => str(rec(m).userId) ?? str(rec(m).id)).filter((x): x is string => !!x);
+  return { id, name: str(r.name), groupId: str(r.groupId), isActive: r.isActive !== false, calendarType: type, roundRobin: /round/i.test(type ?? ""), memberIds: [...new Set(members)] };
+}
+export function mapCalendarGroup(raw: unknown): CalendarGroupRow | null {
+  const r = rec(raw);
+  const id = str(r.id) ?? str(r._id);
+  return id ? { id, name: str(r.name), isActive: r.isActive !== false } : null;
 }
 
 export type UserRow = {
@@ -288,6 +297,12 @@ export function isPermissionError(error: unknown): boolean {
 export async function fetchCalendars(token: string, locationId: string): Promise<CalendarRow[]> {
   const body = rec(await getJson("/calendars/", { locationId }, token, "2021-04-15"));
   return (Array.isArray(body.calendars) ? body.calendars : []).map(mapCalendar).filter((c): c is CalendarRow => c !== null);
+}
+
+// The calendar groups of the account. Needs calendars/groups.readonly.
+export async function fetchCalendarGroups(token: string, locationId: string): Promise<CalendarGroupRow[]> {
+  const body = rec(await getJson("/calendars/groups", { locationId }, token, "2021-04-15"));
+  return (Array.isArray(body.groups) ? body.groups : []).map(mapCalendarGroup).filter((g): g is CalendarGroupRow => g !== null);
 }
 
 // Appointments in a window (milliseconds since 1970) for one calendar. Needs calendars/events.readonly.
