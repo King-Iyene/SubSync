@@ -17,7 +17,8 @@ describe.skipIf(!RUN)("Find a lead at scale", () => it("stays under the limit", 
   const inst = "00000000-0000-4000-8000-0000000f1d01";
   await db.unsafe("drop schema if exists findscale cascade");
   await db.unsafe("create schema findscale");
-  for (const t of ["cached_contacts", "locations", "call_outcomes"]) await db.unsafe(`create table findscale.${t} (like public.${t} including all)`);
+  // Tables first WITHOUT indexes, the real indexes after the rows are in (a bulk build is many times faster than keeping three trigram indexes up to date row by row).
+  for (const t of ["cached_contacts", "locations", "call_outcomes"]) await db.unsafe(`create table findscale.${t} (like public.${t} including defaults including generated including constraints)`);
   await db.unsafe("set search_path to findscale, public, extensions");
   await db`insert into locations (installation_id, location_id, name) select ${inst}::uuid, 'xtest-scale-' || g, 'Account ' || g from generate_series(1, 40) g`;
   const t0 = Date.now();
@@ -26,6 +27,13 @@ describe.skipIf(!RUN)("Find a lead at scale", () => it("stays under the limit", 
       case when g % 5 = 0 then array['hot'] else '{}'::text[] end, case when g % 7 = 0 then 'u' || (g % 60) else null end, 'src' || (g % 12),
       now() - ((g % 900) || ' days')::interval, case when g % 3 = 0 then null else now() - ((g % 400) || ' hours')::interval end
     from generate_series(1, ${ROWS}) g`;
+  const tb = Date.now();
+  const defs = await db`select indexname, indexdef from pg_indexes where schemaname = 'public' and tablename = 'cached_contacts'`;
+  for (const d of defs) {
+    if (/ USING btree (id)| (installation_id, location_id, contact_id)$/.test(d.indexdef as string) && (d.indexdef as string).includes("UNIQUE")) continue;
+    await db.unsafe((d.indexdef as string).replace(/INDEX (S+) ON public.cached_contacts/, "INDEX fs_$1 ON findscale.cached_contacts"));
+  }
+  console.log(`built ${defs.length} indexes in ${Date.now() - tb} ms`);
   await db.unsafe("analyze cached_contacts");
   const sizes = await db`select pg_size_pretty(pg_total_relation_size('findscale.cached_contacts')) total, pg_size_pretty(pg_indexes_size('findscale.cached_contacts')) indexes`;
   console.log(`seeded ${ROWS} rows in ${Date.now() - t0} ms; table+indexes ${sizes[0].total}, indexes alone ${sizes[0].indexes}`);
