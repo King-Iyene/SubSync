@@ -6,7 +6,7 @@ import { EmptyState, ErrorState, SkeletonRows } from "../../ds";
 import { CountUp } from "../speed6-base";
 import { usePl, type PlFilters } from "./data";
 import { days, money, moneyShort, pct } from "./format";
-import { Chip, DealList, healthTone } from "./parts";
+import { Chip, DealList } from "./parts";
 import type { PlDeal } from "@/lib/analytics/pipeline3-types-interim";
 
 export type SectionProps = { filters: PlFilters; onOpen: (d: PlDeal) => void; activeId: string | null; showAccount: boolean; go: (tab: string) => void; onDrill: (d: { title: string; count: number; extra: Record<string, string | number | undefined> }) => void };
@@ -28,9 +28,10 @@ export function Overview({ filters, go, onDrill }: SectionProps) {
         const h = d.headline;
         return (
           <div data-testid="pl-overview">
-            <section className="s6-card ap-hero" data-glow={h.staleCount > 0 ? "warn" : "active"}>
-              <span className="ap-live"><i className="ap-pulse" aria-hidden />Your pipeline</span>
+            <section className="s6-card ap-hero">
+              <span className="ap-fine">Your pipeline</span>
               {d.sentence && <p className="ap-sentence" data-testid="pl-sentence">{d.sentence}</p>}
+              {(h.staleCount > 0 || d.excluded.noOwner > 0) && <p className="ap-fine" data-testid="pl-today">What to do today: {[h.staleCount > 0 ? `move ${h.staleCount} stuck deal${h.staleCount === 1 ? "" : "s"} (${moneyShort(h.staleValueCents)})` : "", d.excluded.noOwner > 0 ? `give ${d.excluded.noOwner} deal${d.excluded.noOwner === 1 ? "" : "s"} an owner` : ""].filter(Boolean).join(", then ")}. {h.staleCount > 0 && <button type="button" className="s6-btn" onClick={() => go("needs")}>Open stuck deals</button>}</p>}
               <div className="ap-kpis">
                 <button type="button" className="ap-kpi" data-tone="cyan" onClick={() => go("flow")}><span className="ap-kpi-n">$<CountUp value={Math.round(h.openValueCents / 100)} /></span><span className="ap-kpi-l">Open money, {h.openCount} deals</span></button>
                 <button type="button" className="ap-kpi" data-tone={h.staleCount ? "amber" : "green"} onClick={() => go("needs")}><span className="ap-kpi-n"><CountUp value={h.staleCount} /></span><span className="ap-kpi-l">Stuck deals, {moneyShort(h.staleValueCents)}</span></button>
@@ -60,7 +61,7 @@ export function NeedsAttention(p: SectionProps) {
 export function WonLost(p: SectionProps) {
   const r = usePl<PlWonLost>("won-lost", p.filters);
   return (
-    <Gate r={r} label="Loading won and lost..." empty={(d) => (d.won + d.lost === 0 ? { title: "Nothing closed in these dates", body: "Won and lost deals show up here, with the reasons people gave." } : null)}>
+    <Gate r={r} label="Loading won and lost..." empty={(d) => (d.won + d.lost === 0 ? { title: "Nothing closed in these dates", body: "Won and lost deals show up here, with the lost reason when your CRM has one." } : null)}>
       {(d) => (
         <div data-testid="pl-wonlost">
           <div className="ap-kpis">
@@ -143,8 +144,8 @@ export function Health({ filters, onDrill }: SectionProps) {
   return (
     <Gate r={r} label="Loading account health..." empty={(d) => (d.rows.length === 0 ? { title: "No accounts with deals yet", body: "Every client account will show here, worst first, once it has deals." } : null)}>
       {(d) => (
-        <Rows head={["Account", "Open deals", "Stuck share", "Health"]} testId="pl-health">
-          {[...d.rows].sort((a, b) => (a.health ?? 101) - (b.health ?? 101)).map((x) => <tr key={x.locationId} onClick={() => onDrill({ title: `${x.name}, open deals`, count: x.open, extra: { location: x.locationId, status: "open" } })}><td className="ap-name">{x.name}</td><td data-num>{x.open}</td><td data-num>{x.staleShare === null ? "Not enough data" : pct(x.staleShare)}</td><td data-num><Chip tone={healthTone(x.health)}>{x.health === null ? "Not enough data" : x.health}</Chip></td></tr>)}
+        <Rows head={["Account", "Open deals", "Stuck share"]} testId="pl-health">
+          {[...d.rows].sort((a, b) => (b.staleShare ?? -1) - (a.staleShare ?? -1)).map((x) => <tr key={x.locationId} onClick={() => onDrill({ title: `${x.name}, open deals`, count: x.open, extra: { location: x.locationId, status: "open" } })}><td className="ap-name">{x.name}</td><td data-num>{x.open}</td><td data-num>{x.staleShare === null ? "Not enough data" : pct(x.staleShare)}</td></tr>)}
         </Rows>
       )}
     </Gate>

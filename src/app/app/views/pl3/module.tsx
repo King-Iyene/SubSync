@@ -12,19 +12,19 @@ import { useMountDealActions } from "./actions";
 import { DEFAULT_FILTERS, fixturesOn, usePl, type PlFilters } from "./data";
 import { MoneyFlow, type FlowPick } from "./money-flow";
 import { DealList, DealPanel } from "./parts";
-import { Forecast, Health, NeedsAttention, Overview, People, Proof, Sources, StageHistory, WonLost, type SectionProps } from "./sections";
+import { Health, NeedsAttention, Overview, People, Proof, Sources, StageHistory, WonLost, type SectionProps } from "./sections";
 import type { PlHealthRow } from "@/lib/analytics/pipeline3-types-interim";
 
-// Pipeline as a module with sub-sections (the Appointments pattern): Overview | Money Flow | Needs attention | Won and lost | Forecast | People | Sources | Stage history | Health | Proof.
+// Pipeline as a module with sub-sections (the Appointments pattern): Overview | Money Flow | Needs attention | Won and lost | People | Sources | Stage history | Health | Proof.
 // One filter bar, one right-side deal panel, saved views and keys. SubSync never changes a deal from here; edits go through slice PB's checked gateway tools, which mount into the panel slots.
 
-type TabKey = "overview" | "flow" | "needs" | "wonlost" | "forecast" | "people" | "sources" | "history" | "health" | "proof";
+type TabKey = "overview" | "flow" | "needs" | "wonlost" | "people" | "sources" | "history" | "health" | "proof";
 const TABS: Array<{ key: TabKey; label: string; tip: string }> = [
-  { key: "overview", label: "Overview", tip: "The one sentence, the numbers and where the money leaks." }, { key: "flow", label: "Money flow", tip: "Your pipeline as pipes of cash: where it runs, clogs and leaks." },
-  { key: "needs", label: "Needs attention", tip: "Deals stuck longer than that step normally takes." }, { key: "wonlost", label: "Won and lost", tip: "What closed, and why deals were lost." },
-  { key: "forecast", label: "Forecast", tip: "An honest range, only when there is enough history." }, { key: "people", label: "People", tip: "Who closes and who lets deals go cold." },
+  { key: "overview", label: "Overview", tip: "The one sentence, the numbers and where the money leaks." }, { key: "flow", label: "Money flow", tip: "The money in each stage as stacks of coins." },
+  { key: "needs", label: "Needs attention", tip: "Deals stuck longer than that step normally takes." }, { key: "wonlost", label: "Won and lost", tip: "What closed, and the lost reason when your CRM has one." },
+  { key: "people", label: "People", tip: "Who closes and who lets deals go cold." },
   { key: "sources", label: "Sources", tip: "Which lead sources turn into money." }, { key: "history", label: "Stage history", tip: "How long deals really stay in each step." },
-  { key: "health", label: "Account health", tip: "Every client account, worst first." }, { key: "proof", label: "Proof", tip: "The weekly receipt per client." },
+  { key: "health", label: "Accounts", tip: "Every client account, most stuck deals first." }, { key: "proof", label: "Proof", tip: "The weekly receipt per client." },
 ];
 type SavedView = { name: string; filters: PlFilters; tab: TabKey };
 const VIEWS_KEY = "pl3.views.v1";
@@ -80,7 +80,6 @@ export function PipelineModule({ moneyFlow = true, actions = false }: { moneyFlo
       case "flow": return <><MoneyFlow filters={filters} onPick={onPick} />{drillList}</>;
       case "needs": return <NeedsAttention {...sp} />;
       case "wonlost": return <><WonLost {...sp} />{drillList}</>;
-      case "forecast": return <Forecast {...sp} />;
       case "people": return <><People {...sp} />{drillList}</>;
       case "sources": return <><Sources {...sp} />{drillList}</>;
       case "history": return <StageHistory {...sp} />;
@@ -91,7 +90,7 @@ export function PipelineModule({ moneyFlow = true, actions = false }: { moneyFlo
 
   return (
     <div className="s6 ap pl ds-enter" ref={top} data-testid="pl-module" key={version}>
-      <Page title="Pipeline" subtitle="Where your deal money runs, clogs and leaks." actions={null}>
+      <Page title="Pipeline" subtitle="Where your deal money sits, and what is stuck." actions={null}>
         <div className="ap-head" role="search" aria-label="Filter deals">
           <label className="ap-search"><Search aria-hidden className="size-4" /><span className="sr-only">Search by deal or contact</span><input ref={search} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search a deal (press /)" data-testid="pl-search" /></label>
           <select className="ap-field" aria-label="Dates" value={filters.days} onChange={(e) => setFilters({ ...filters, days: Number(e.target.value) as PlFilters["days"] })} data-testid="pl-days"><option value={30}>Last 30 days</option><option value={45}>Last 45 days</option><option value={90}>Last 90 days</option></select>
@@ -100,7 +99,7 @@ export function PipelineModule({ moneyFlow = true, actions = false }: { moneyFlo
           {naming ? <NameView onSave={saveView} onCancel={() => setNaming(false)} /> : <button type="button" className="s6-btn" onClick={() => setNaming(true)} data-testid="pl-save-view"><Bookmark aria-hidden className="size-4" />Save view</button>}
           {(filters.locationId || filters.q) && <button type="button" className="s6-btn" onClick={() => { setFilters(DEFAULT_FILTERS); setQ(""); }}><X aria-hidden className="size-4" />Clear</button>}
         </div>
-        {fixturesOn() && <p className="ap-fine mb-2" role="status">Showing sample deals (plfx).</p>}
+        {fixturesOn() && <p className="ap-fine mb-2" role="status">Sample data: these are not your real deals.</p>}
         <ModuleTabs pill label="Pipeline sections" tabs={tabs.map((t) => ({ label: t.label, tip: t.tip, node: null }))} value={index < 0 ? 0 : index} onChange={(i) => { setTab(tabs[i].key); setDrill(null); }} />
         <div data-testid={`pl-tab-${tab}`}>{content}</div>
         <p className="ap-fine mt-6">Keys: / search, 1 to 9 switch section, up and down move in a list, Enter opens, Esc closes. Nothing is ever deleted from a key.</p>

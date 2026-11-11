@@ -1,47 +1,39 @@
-/* Pipeline module: the Money Flow pipes. Borrows the .s6 and .ap tokens so light and dark follow the app theme.
-   Colour carries meaning (gold = healthy flow, dark hatched = clog, red = lost, green/amber/red gauges) and never stands alone: every state also has a word. */
-.pl { --pl-gold: #b97a00; --pl-gold-hi: #f3c34a; --pl-clog: #3b2a0a; --pl-clog-hi: #6b4a10; --pl-pipe: #e3ecf7; --pl-pipe-edge: #9db3cf; --pl-liquid: #fff1c4; }
-[data-theme="dark"] .pl { --pl-gold: #f5b301; --pl-gold-hi: #fde68a; --pl-clog: #1f1403; --pl-clog-hi: #5a3b08; --pl-pipe: #0e1a38; --pl-pipe-edge: #35517f; --pl-liquid: #3a2c07; }
+/* Pipeline module: Coin stacks. Calm and minimal: neutral surfaces from the app theme, ONE accent (gold) for money won, grey for lost, one muted amber outline for stuck. No glow, no gradients. */
+.pl { --pl-gold: #b07400; --pl-open: color-mix(in srgb, var(--foreground) 14%, transparent); --pl-open-edge: color-mix(in srgb, var(--foreground) 42%, transparent); --pl-lost: color-mix(in srgb, var(--foreground) 34%, transparent); --pl-stuck: #a8731a; }
+[data-theme="dark"] .pl { --pl-gold: #e2a925; --pl-stuck: #c99a45; }
 .pl-flow-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin-bottom: 8px; }
 .pl-flow-title { font-size: 1.05rem; font-weight: 650; margin: 0; margin-right: auto; }
 .pl-replay { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .pl-replay input[type="range"] { width: clamp(120px, 22vw, 280px); accent-color: var(--pl-gold); min-height: 24px; }
-.pl-pipe { position: relative; width: 100%; border-radius: 16px; overflow: hidden; border: 1px solid color-mix(in srgb, var(--s6-edgec) 22%, transparent); background: radial-gradient(120% 90% at 20% 0%, color-mix(in srgb, var(--pl-gold) 7%, transparent), transparent 60%), color-mix(in srgb, var(--s6-sunk) 55%, var(--s6-surf)); }
-.pl-svg, .pl-canvas { position: absolute; inset: 0; }
-.pl-canvas { pointer-events: none; }
-.pl-pipe-body { fill: var(--pl-pipe); stroke: var(--pl-pipe-edge); stroke-width: 1.5; }
-.pl-liquid { fill: var(--pl-liquid); opacity: 0.9; }
-.pl-seg[data-tone="green"] .pl-pipe-body { filter: drop-shadow(0 0 7px color-mix(in srgb, var(--pl-gold-hi) 75%, transparent)); stroke: var(--pl-gold); }
-.pl-seg[data-tone="amber"] .pl-pipe-body { stroke: var(--s6-amber); }
-.pl-seg[data-tone="red"] .pl-pipe-body { stroke: var(--s6-red); filter: drop-shadow(0 0 6px color-mix(in srgb, var(--s6-red) 45%, transparent)); }
-.pl-seg[data-on="1"] .pl-pipe-body { stroke-width: 2.6; }
-.pl-clog { opacity: 0.92; stroke: var(--s6-amber); stroke-width: 1; }
+.pl-stacks { position: relative; width: 100%; border-radius: 12px; overflow: hidden; border: 1px solid color-mix(in srgb, var(--s6-edgec) 22%, transparent); background: var(--s6-surf); }
+.pl-svg { position: absolute; inset: 0; }
+.pl-base { stroke: color-mix(in srgb, var(--foreground) 18%, transparent); stroke-width: 1; }
+.pl-coin { transition: transform 160ms ease; }
+.pl-coin-open { fill: var(--pl-open); stroke: var(--pl-open-edge); stroke-width: 1; }
+.pl-coin-won { fill: var(--pl-gold); stroke: color-mix(in srgb, var(--pl-gold) 70%, #000); stroke-width: 1; }
+.pl-coin-lost { fill: var(--pl-lost); stroke: color-mix(in srgb, var(--foreground) 45%, transparent); stroke-width: 1; }
+.pl-coin-stuck { fill: url(#pl-hatch); stroke: var(--pl-stuck); stroke-width: 1; }
+.pl-hatch-bg { fill: color-mix(in srgb, var(--foreground) 8%, transparent); } .pl-hatch-line { fill: color-mix(in srgb, var(--pl-stuck) 55%, transparent); }
 .pl-hit { fill: transparent; cursor: pointer; } .pl-hit:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
-.pl-valve circle { fill: var(--s6-surf); stroke: var(--pl-pipe-edge); stroke-width: 1.5; } .pl-valve line { stroke: var(--pl-gold); stroke-width: 1.6; stroke-linecap: round; }
-.pl-gauge-arc { stroke: color-mix(in srgb, var(--s6-line) 90%, transparent); }
-.pl-drip { stroke: var(--s6-red); opacity: 0.55; }
-.pl-channel { fill: color-mix(in srgb, var(--s6-red) 14%, transparent); stroke: color-mix(in srgb, var(--s6-red) 45%, transparent); }
-.pl-trough { fill: color-mix(in srgb, var(--s6-sunk) 70%, transparent); stroke: color-mix(in srgb, var(--s6-red) 40%, transparent); }
-.pl-drain-seg { cursor: pointer; opacity: 0.8; transition: opacity 140ms ease; } .pl-drain-seg:hover, .pl-drain-seg[data-on="1"] { opacity: 1; }
-.pl-vault { cursor: pointer; } .pl-vault:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
-.pl-vault-body { fill: color-mix(in srgb, var(--s6-sunk) 70%, transparent); stroke: var(--pl-gold); stroke-width: 2; filter: drop-shadow(0 0 10px color-mix(in srgb, var(--pl-gold-hi) 35%, transparent)); }
-.pl-vault-fill { transition: y 700ms cubic-bezier(.2,.7,.2,1), height 700ms cubic-bezier(.2,.7,.2,1), transform 700ms cubic-bezier(.2,.7,.2,1); opacity: 0.95; }
-/* the label layer: its own boxes, proven never to overlap */
+.pl-grp:hover .pl-coin, .pl-grp:focus-within .pl-coin { transform: translateY(-2px); }
+@keyframes pl-drop { from { transform: translateY(-28px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+[data-settle="1"] .pl-coin { animation: pl-drop 340ms cubic-bezier(.22,.7,.25,1) both; }
+/* the text layer: its own boxes, proven never to overlap the coins */
 .pl-labels { position: absolute; inset: 0; pointer-events: none; }
-.pl-lab { position: absolute; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; gap: 0; min-width: 0; overflow: hidden; text-align: left; color: var(--foreground); font: inherit; background: none; border: 0; padding: 0 2px; pointer-events: auto; }
+.pl-lab { position: absolute; display: flex; flex-direction: column; justify-content: flex-start; align-items: flex-start; gap: 1px; min-width: 0; overflow: hidden; text-align: left; color: var(--foreground); font: inherit; background: none; border: 0; padding: 0 2px; cursor: pointer; pointer-events: auto; }
 .pl-lab > * { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pl-lab-stage { cursor: pointer; } .pl-lab-stage b { font-size: 0.75rem; font-weight: 650; line-height: 1.2; } .pl-lab-stage .pl-val { font-size: 0.9375rem; font-weight: 700; line-height: 1.15; color: color-mix(in srgb, var(--pl-gold) 80%, var(--foreground)); }
-.pl-lab-stage small, .pl-lab-vault small { font-size: 0.6875rem; line-height: 1.2; color: var(--muted-foreground); } .pl-lab-stage u { text-decoration: none; color: var(--s6-amber); font-weight: 600; }
-.pl-lab-stage:hover b { text-decoration: underline; text-underline-offset: 2px; }
-.pl-lab-gauge { font-size: 0.6875rem; color: var(--muted-foreground); justify-content: flex-start; pointer-events: none; }
-.pl-lab-gauge[data-tone="red"] { color: var(--s6-red); font-weight: 600; } .pl-lab-gauge[data-tone="amber"] { color: var(--s6-amber); } .pl-lab-gauge[data-tone="green"] { color: var(--s6-green); }
-.pl-lab-drain { flex-direction: row; align-items: center; gap: 6px; padding: 0 8px; border-radius: 999px; cursor: pointer; font-size: 0.75rem; border: 1px solid color-mix(in srgb, var(--s6-edgec) 25%, transparent); background: color-mix(in srgb, var(--s6-surf) 80%, transparent); }
-.pl-lab-drain i { width: 8px; height: 8px; border-radius: 50%; flex: none; } .pl-lab-drain span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; } .pl-lab-drain:hover { border-color: var(--s6-red); }
-.pl-lab-vault { cursor: pointer; align-items: center; text-align: center; } .pl-lab-vault b { font-size: 1.05rem; color: color-mix(in srgb, var(--pl-gold) 85%, var(--foreground)); }
-.pl-tip { position: absolute; z-index: 5; width: 220px; display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-radius: 10px; font-size: 0.75rem; pointer-events: none; background: var(--s6-pop); border: 1px solid color-mix(in srgb, var(--s6-edgec) 40%, transparent); box-shadow: 0 10px 30px -12px rgba(0, 0, 0, 0.5); }
+.pl-lab b { font-size: 0.75rem; font-weight: 600; line-height: 1.25; } .pl-lab .pl-val { font-size: 0.9375rem; font-weight: 650; line-height: 1.2; }
+.pl-lab-won .pl-val { color: var(--pl-gold); } .pl-lab-lost { color: var(--muted-foreground); }
+.pl-lab small { font-size: 0.6875rem; line-height: 1.25; color: var(--muted-foreground); } .pl-lab u { text-decoration: none; color: var(--pl-stuck); font-weight: 600; }
+.pl-lab:hover b { text-decoration: underline; text-underline-offset: 2px; }
+[data-vertical="1"] .pl-lab { flex-direction: row; flex-wrap: wrap; align-items: baseline; column-gap: 8px; } [data-vertical="1"] .pl-lab b { max-width: 55%; }
+.pl-reasons { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 14px; }
+.pl-reason { display: inline-flex; align-items: baseline; gap: 8px; font: inherit; font-size: 0.8125rem; min-height: 32px; padding: 0; background: none; border: 0; border-bottom: 1px dotted color-mix(in srgb, var(--foreground) 35%, transparent); color: var(--muted-foreground); cursor: pointer; } .pl-reason:hover { color: var(--foreground); } .pl-reason b { color: var(--foreground); font-weight: 600; }
 .pl-flow-foot { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin-top: 10px; }
-.pl-leak { text-align: left; cursor: pointer; font: inherit; font-size: 0.9rem; padding: 10px 14px; min-height: 44px; border-radius: 12px; color: var(--foreground); border: 1px solid color-mix(in srgb, var(--s6-red) 50%, transparent); background: color-mix(in srgb, var(--s6-red) 10%, transparent); }
-.pl-leak:hover { background: color-mix(in srgb, var(--s6-red) 18%, transparent); } .pl-leak:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
-.ap-formula { margin: 8px 0 16px; } .ap-formula summary { cursor: pointer; font-size: 0.8125rem; color: var(--s6-cyan); min-height: 24px; }
+.pl-leak { text-align: left; cursor: pointer; font: inherit; font-size: 0.9rem; padding: 4px 0; min-height: 36px; background: none; border: 0; color: var(--foreground); text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--foreground) 30%, transparent); text-underline-offset: 3px; } .pl-leak:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.ap-formula { margin: 8px 0 16px; } .ap-formula summary { cursor: pointer; font-size: 0.8125rem; color: var(--muted-foreground); min-height: 24px; }
+/* calm the rest of the page: the coloured number tiles and chips go neutral, only words carry the meaning */
+.pl .ap-kpi .ap-kpi-n { color: var(--foreground); } .pl .ap-kpi:hover { box-shadow: none; }
+.pl .ap-chip[data-tone] { color: var(--muted-foreground); background: transparent; border-color: color-mix(in srgb, var(--foreground) 22%, transparent); }
 @media (max-width: 700px) { .pl-replay { width: 100%; } .pl-replay input[type="range"] { flex: 1; width: auto; } }
-@media (prefers-reduced-motion: reduce) { .pl-vault-fill { transition: none; } }
+@media (prefers-reduced-motion: reduce) { [data-settle="1"] .pl-coin { animation: none; } .pl-coin { transition: none; } }

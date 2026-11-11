@@ -8,7 +8,6 @@ import { usePl, type PlFilters } from "./data";
 import { money, moneyShort } from "./format";
 
 export const Chip = ({ tone, children }: { tone: "green" | "amber" | "red" | "violet" | "cyan" | "grey"; children: React.ReactNode }) => <span className="ap-chip" data-tone={tone}>{children}</span>;
-export const healthTone = (h: number | null) => (h === null ? "grey" : h >= 70 ? "green" : h >= 40 ? "amber" : "red") as "green" | "amber" | "red" | "grey";
 export const stuck = (d: PlDeal) => d.staleAfterDays !== null && d.status === "open" && d.daysInStage > d.staleAfterDays;
 
 // Slice PB mounts the deal panel content (timeline, owner, value, linked appointments, move, won/lost, note, delete) here without touching these files.
@@ -38,7 +37,7 @@ export function DealTable({ rows, showAccount, onOpen, activeId, selected, onSel
   return (
     <div className="ap-scroll">
       <table className="ap-t" data-testid="pl-table">
-        <thead><tr>{onSelect && <th aria-label="Select" style={{ width: 34 }} />}<th>Deal</th>{showAccount && <th>Account</th>}<th>Stage</th><th data-num>Value</th><th data-num>In stage</th><th>Owner</th><th>Health</th><th>Open</th>{quick && <th aria-label="Actions" />}</tr></thead>
+        <thead><tr>{onSelect && <th aria-label="Select" style={{ width: 34 }} />}<th>Deal</th>{showAccount && <th>Account</th>}<th>Stage</th><th data-num>Value</th><th data-num>In stage</th><th>Owner</th><th>Open</th>{quick && <th aria-label="Actions" />}</tr></thead>
         <tbody ref={body}>
           {rows.map((d, i) => (
             <tr key={d.id} tabIndex={cursor === i || (cursor < 0 && i === 0) ? 0 : -1} data-active={activeId === d.id ? "1" : "0"} data-tone={stuck(d) ? "amber" : undefined} onClick={() => onOpen(d)} onKeyDown={(e) => key(e, i, d)} data-testid="pl-row">
@@ -49,7 +48,6 @@ export function DealTable({ rows, showAccount, onOpen, activeId, selected, onSel
               <td data-num>{d.valueCents > 0 ? moneyShort(d.valueCents) : "No value"}</td>
               <td data-num>{stuck(d) ? <Chip tone="amber">{d.daysInStage} d, stuck</Chip> : `${d.daysInStage} d`}</td>
               <td>{d.ownerName ?? <span className="ap-sub">Nobody</span>}</td>
-              <td><Chip tone={healthTone(d.health)}>{d.health === null ? "Not enough data" : d.health}</Chip></td>
               <td onClick={(e) => e.stopPropagation()}>{d.url ? <a className="ap-link" href={d.url} target="_blank" rel="noopener noreferrer" data-testid="pl-row-crm">Open in your CRM</a> : <span className="ap-sub">No link</span>}</td>
               {quick && <td onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}><PlSlot name="RowActions" deal={d} onChanged={onChanged} /></td>}
             </tr>
@@ -130,7 +128,6 @@ export function DealPanel({ deal, onClose, onChanged, filters }: { deal: PlDeal;
             <dt>Owner</dt><dd>{deal.ownerName ?? "Nobody assigned"}</dd>
             <dt>Contact</dt><dd>{deal.contactName ?? "Unknown"}</dd>
             <dt>Source</dt><dd>{deal.source ?? "Unknown"}</dd>
-            <dt>Health</dt><dd>{deal.health === null ? "Not enough data to score" : `${deal.health} of 100`}</dd>
           </dl>
           <PlSlot name="Details" deal={deal} onChanged={onChanged} filters={filters} />
           {deal.url && <p><a className="ap-link" href={deal.url} target="_blank" rel="noopener noreferrer" data-testid="pl-panel-crm">Open in your CRM</a></p>}
