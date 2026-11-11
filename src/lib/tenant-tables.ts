@@ -5,7 +5,7 @@
 
 /** Copied customer data. "Delete my data" removes exactly this, and so does an uninstall. */
 export const SYNCED_DELETE = [
-  "cleanup_changes", "cleanup_runs", "duplicate_reviews", "duplicate_snoozes", "cleanup_quality_snapshots", "possible_duplicates", "unanswered_outcomes", "unanswered_snoozes", "unanswered_actions", "appointment_meeting_links", "appointment_actions",
+  "cleanup_changes", "cleanup_runs", "duplicate_reviews", "duplicate_snoozes", "cleanup_quality_snapshots", "possible_duplicates", "unanswered_outcomes", "unanswered_snoozes", "unanswered_actions", "appointment_meeting_links", "pipeline_actions", "appointment_actions",
   "cached_contacts", "cached_opportunities", "cached_conversations", "cached_appointments", "pipelines",
   "account_metrics_daily", "alerts", "domain_checks", "onboarding_tasks",
   "deal_events", "appointment_events", "appointment_history", "appointment_facts", "lead_touches", "touch_events", "lead_events", "moat_events", "reply_proof_pages", "speed_daily", "speed_digest", "speed_prefs", "call_outcomes", "workflow_setup_settings", "workflow_setup", "call_queue_log", "call_queue_settings", "contact_tag_events", "location_users",
@@ -33,7 +33,7 @@ export const KEEP_ON_UNINSTALL: readonly string[] = [
 
 /** Removing one client account deletes its rows from these, children first, the account row last. */
 export const LOCATION_DELETE = [
-  "cleanup_changes", "cleanup_runs", "duplicate_reviews", "duplicate_snoozes", "cleanup_quality_snapshots", "possible_duplicates", "unanswered_outcomes", "unanswered_snoozes", "unanswered_actions", "appointment_meeting_links", "appointment_actions",
+  "cleanup_changes", "cleanup_runs", "duplicate_reviews", "duplicate_snoozes", "cleanup_quality_snapshots", "possible_duplicates", "unanswered_outcomes", "unanswered_snoozes", "unanswered_actions", "appointment_meeting_links", "pipeline_actions", "appointment_actions",
   "cached_contacts", "cached_opportunities", "cached_conversations", "cached_appointments", "pipelines",
   "account_metrics_daily", "alerts", "domain_checks", "onboarding_tasks",
   "deal_events", "appointment_events", "appointment_history", "appointment_facts", "lead_touches", "touch_events", "lead_events", "moat_events", "reply_proof_pages", "speed_daily", "speed_digest", "speed_prefs", "call_outcomes", "workflow_setup_settings", "workflow_setup", "call_queue_log", "call_queue_settings", "location_users", "contact_tag_events",

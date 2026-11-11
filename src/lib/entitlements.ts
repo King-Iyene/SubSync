@@ -103,6 +103,10 @@ export const FEATURES = [
   "appt_meetings",
   // Appointments module (stage AU, the sub-section screens and the Flow Tree): default off.
   "appt_module",
+  // Pipeline module, slice PB (deal actions): default off.
+  "pl_actions",
+  "pl_delete",
+  "pl_bulk",
 ] as const;
 export type Feature = (typeof FEATURES)[number];
 

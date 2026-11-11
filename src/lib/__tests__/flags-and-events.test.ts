@@ -65,6 +65,9 @@ test("pilot modules are on by default and a database row can still override the 
     "moat_receipt",
     "moat_record",
     "moat_scorecards",
+    "pl_actions",
+    "pl_bulk",
+    "pl_delete",
     "zoom_meet",
   ]);
   assert.equal(f.meetings, true);
