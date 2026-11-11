@@ -47,7 +47,7 @@ function base(s: Scope, f: Filters, dd: number, extra?: Frag): Frag {
   return db`
     select a.location_id, a.appointment_id, a.calendar_id, a.calendar_name, a.contact_id, a.status, a.start_at, a.end_at, a.assigned_to owner, a.booked_by_user booker,
       a.created_remote_at created_at, l.name account_name, l.tz,
-      coalesce(nullif(c.full_name, ''), nullif(c.email, ''), 'Unnamed contact') contact_name, nullif(c.source, '') source, coalesce(c.dnd, false) dnd,
+      coalesce(nullif(c.full_name, ''), nullif(c.email, ''), 'Unnamed contact') contact_name, nullif(c.source, '') source, nullif(c.phone, '') phone, coalesce(c.dnd, false) dnd,
       d.opportunity_id deal_id, d.status deal_status, d.monetary_value deal_value,
       t.lead_at, t.touch_at,
       fa.snoozed_until,
@@ -117,7 +117,7 @@ export function toRow(r: Record<string, unknown>, label: (id: string | null | un
     calendarId: (r.calendar_id as string | null) ?? null, calendarName: (r.calendar_name as string | null) ?? null,
     startAt: new Date(start).toISOString(), endAt: iso(r.end_at), status, bucket,
     ownerId: (r.owner as string | null) ?? null, ownerName: r.owner ? label(r.owner as string) : null, bookerId: (r.booker as string | null) ?? null, bookerName: r.booker ? label(r.booker as string) : null,
-    source: (r.source as string | null) ?? null,
+    phone: (r.phone as string | null) ?? null, source: (r.source as string | null) ?? null,
     dealStatus: r.deal_status === "won" || r.deal_status === "lost" || r.deal_status === "open" ? r.deal_status : null, dealValue: r.deal_value === null || r.deal_value === undefined ? null : Number(r.deal_value),
     leadToBookedMinutes: created !== null && leadAt !== null && created >= leadAt ? Math.round((created - leadAt) / 60_000) : null,
     firstReplyMinutes: touchAt !== null && leadAt !== null && touchAt >= leadAt ? Math.round((touchAt - leadAt) / 60_000) : null,
@@ -137,15 +137,21 @@ const sortOf = (sort: string | null | undefined) => {
   return sort === "value" ? db`deal_value desc nulls last, start_at desc` : sort === "name" ? db`contact_name asc, start_at desc` : sort === "oldest" ? db`start_at asc` : db`start_at desc`;
 };
 
-export type ListOpts = { f: Filters; page: number; size: number; sort?: string | null; extra?: Frag };
+export type ListOpts = { f: Filters; page: number; size: number; sort?: string | null; extra?: Frag; after?: string | null };
 export async function appointmentList(s: Scope, o: ListOpts, link: ((loc: string, contact: string) => string) | null, why?: (r: Record<string, unknown>) => string | null): Promise<Page<Appt3Row>> {
   const db = sql(), size = clampSize(o.size), dd = await dealDays(s.inst), label = await names(s.inst);
   const b = base(s, o.f, dd, o.extra);
-  return page(
-    db`with ap as (${b}) select * from ap where true ${bucketCond(o.f.bucket)} order by ${sortOf(o.sort)} limit ${size} offset ${offsetOf(o.page, size)}`,
+  // Keyset paging (newest first): the cursor continues after the last row seen, so deep pages cost the same as the first. Other sorts use offset (capped).
+  const newest = !o.sort || o.sort === "newest";
+  const cur = newest ? /^(d{4}-d{2}-d{2}T[d:.]+Z)|([A-Za-z0-9_-]{1,64})$/.exec(o.after ?? "") : null;
+  const keyset = cur ? db`and (start_at, appointment_id) < (${new Date(cur[1])}, ${cur[2]})` : db``;
+  const p0 = await page(
+    db`with ap as (${b}) select * from ap where true ${bucketCond(o.f.bucket)} ${keyset} order by ${sortOf(o.sort)}${newest ? db`, appointment_id desc` : db``} limit ${size} offset ${cur ? 0 : offsetOf(o.page, size)}`,
     db`with ap as (${b}) select count(*)::int n from ap where true ${bucketCond(o.f.bucket)}`,
     Math.max(0, Math.floor(o.page)), size, (r) => toRow(r, label, link, why ? why(r) : null),
   );
+  const last = p0.rows[p0.rows.length - 1];
+  return { ...p0, next: last && p0.rows.length === size ? `${last.startAt}|${last.appointmentId}` : null };
 }
 
 // ---------- overview ----------
@@ -172,12 +178,16 @@ export async function overview(s: Scope, f: Filters, windowDays: number): Promis
     db`with ap as (${base(s, { ...f, from: new Date(Date.now() - 30 * DAY), to: new Date(Date.now() - DAY) }, dd, db`and a.status = 'noshow'`)}) select count(*) filter (where rebooked)::int n from ap`,
     db`select count(*)::int n from (${locs(s, f.location)}) x`,
   ]);
+  const [[dbl], [idle]] = await Promise.all([
+    db`select count(*)::int n from cached_appointments a join (${locs(s, f.location)}) l on l.location_id = a.location_id join cached_appointments b on b.installation_id = a.installation_id and b.location_id = a.location_id and b.appointment_id > a.appointment_id and (b.calendar_id = a.calendar_id or (a.assigned_to is not null and b.assigned_to = a.assigned_to)) and b.start_at < a.end_at and a.start_at < b.end_at and b.start_at >= ${f.from} and b.start_at < ${f.to} where a.installation_id = ${s.inst} and a.start_at >= ${f.from} and a.start_at < ${f.to} and a.end_at is not null and b.end_at is not null and a.status not in ('cancelled', 'invalid') and b.status not in ('cancelled', 'invalid')`.catch(() => [{ n: 0 }]),
+    db`select count(*)::int n from (select u.user_id from location_users u join (${locs(s, f.location)}) l on l.location_id = u.location_id where u.installation_id = ${s.inst} group by 1 having not exists (select 1 from cached_appointments a join (${locs(s, f.location)}) l2 on l2.location_id = a.location_id where a.installation_id = ${s.inst} and a.assigned_to = u.user_id and a.start_at >= ${f.from} and a.start_at < ${f.to} and a.status <> 'invalid')) x`.catch(() => [{ n: 0 }]),
+  ]);
   const showed = num(t.showed), noshow = num(t.noshow), unmarked = num(t.unmarked), booked = num(t.booked);
   const trueR = trueShowRate(showed, noshow, unmarked), repR = reportedShowRate(showed, noshow);
   const nsToRecover = num(risk.n);
   const o: Appt3Overview = {
     headline: "", button: pickButton({ unmarked, noshowToRecover: nsToRecover, noDeal: num(t.no_deal) }), booked, unmarked, trueShowRate: trueR, reportedShowRate: repR,
-    noshowToRecover: nsToRecover, recoveredLast30: num(rec.n), noDealLinked: num(t.no_deal), upcoming: num(t.upcoming),
+    today: { doubleBookings: num(dbl?.n), idlePeople: num(idle?.n) }, noshowToRecover: nsToRecover, recoveredLast30: num(rec.n), noDealLinked: num(t.no_deal), upcoming: num(t.upcoming),
     revenueAtRisk: revenueAtRisk({ value: num(risk.value), n: num(risk.deals) }, { value: num(t.unmarked_value), n: num(t.unmarked_deals) }),
     revenueWon: { value: num(t.won_value), n: num(t.won) },
     journey: [

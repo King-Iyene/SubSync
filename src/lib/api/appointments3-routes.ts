@@ -55,7 +55,7 @@ export async function handleAppointments3(ctx: Ctx, h: Appt3Helpers): Promise<Re
     case "overview": return done(await overview(scope, f, w.days));
     case "needs-outcome": return done(await needsOutcome(scope, { f, page: p, size, sort: sp.get("sort") }, link));
     case "noshow-recovery": return done(await noshowRecovery(scope, { f, page: p, size, sort: sp.get("sort") }, link));
-    case "list": return done(await appointmentList(scope, { f, page: p, size, sort: sp.get("sort") }, link));
+    case "list": return done(await appointmentList(scope, { f, page: p, size, sort: sp.get("sort"), after: sp.get("after") }, link));
     case "booking-share":
       return seePeople ? done(await bookingShare(scope, f, p, size, sp.get("sort"))) : wrap({ rows: [], total: 0, page: 0, size, pages: 1, truncated: false, unassigned: 0, ownerless: 0, fairness: { enough: false, maxSharePct: null, evenSharePct: null, closers: 0 } });
     case "flow-tree": {

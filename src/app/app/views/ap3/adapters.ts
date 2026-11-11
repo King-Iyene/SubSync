@@ -22,7 +22,7 @@ export function adaptRow(r: Appt3Row, now = Date.now()): ApRow {
   if (r.dealStatus === null) flags.push("no-deal");
   return {
     id: r.appointmentId, locationId: r.locationId, accountName: r.accountName ?? "", contactId: r.contactId ?? "", contactName: r.contactName, startAt: r.startAt, calendarName: r.calendarName ?? "",
-    status: STATUS[r.bucket] ?? "booked", ownerId: r.ownerId, ownerName: r.ownerName, bookerId: r.bookerId, bookerName: r.bookerName, source: r.source,
+    status: STATUS[r.bucket] ?? "booked", ownerId: r.ownerId, ownerName: r.ownerName, bookerId: r.bookerId, bookerName: r.bookerName, source: r.source, phone: r.phone,
     dealValueCents: cents(r.dealValue), dealStatus: r.dealStatus ?? "none", hoursPast: past ? Math.max(0, (now - start) / 3_600_000) : null, flags, url: r.url ?? null, calendarId: r.calendarId ?? null,
   };
 }
@@ -35,6 +35,7 @@ export function adaptOverview(o: Appt3Overview, extra: { health?: Appt3Health | 
   const top = (extra.tree?.nodes ?? []).filter((n) => n.level === "setter" && n.badges && n.badges.showRate.enough).sort((a, b) => (b.badges!.showRate.value ?? 0) - (a.badges!.showRate.value ?? 0))[0];
   const at = o.revenueAtRisk;
   return {
+    today: o.today,
     headline: { needsOutcome: o.unmarked, noShowsToRecover: o.noshowToRecover, reportedShowRate: v(o.reportedShowRate), trueShowRate: v(o.trueShowRate), trueRange: null, marked: Math.max(0, (o.trueShowRate?.of ?? 0) - o.unmarked), booked: o.booked },
     revenueAtRisk: at && at.enough && at.low !== null && at.high !== null ? { lowCents: cents(at.low)!, highCents: cents(at.high)!, basis: at.formula } : null,
     journey: (o.journey ?? []).map((j) => ({ key: j.key, label: j.label, count: j.count })),
