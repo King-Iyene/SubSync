@@ -36,7 +36,7 @@ export const SCOPE_GROUPS: readonly ScopeGroup[] = [
   { id: "appointments", title: "Appointments", summary: "Bookings and what happened to them.", scopes: [
     { scope: "calendars.readonly", kind: "read", required: true, why: "Calendars, for the setup checklist and to know which calendars exist." },
     { scope: "calendars/events.readonly", kind: "read", required: false, why: "Appointments and their status (showed, no-show, never marked), for the appointment checks and the no-show list." },
-    { scope: "calendars/groups.readonly", kind: "read", required: false, why: "Reserved for calendar groups. Not used yet." },
+    { scope: "calendars/groups.readonly", kind: "read", required: false, why: "Calendar groups, so every calendar can be listed under its group, even one with no bookings." },
     { scope: "calendars/resources.readonly", kind: "read", required: false, why: "Reserved for rooms and equipment. Not used yet." },
     { scope: "calendars/events.write", kind: "change", required: false, why: "Reserved for marking an appointment showed or no-show after a preview. Nothing in SubSync uses it today." },
   ] },

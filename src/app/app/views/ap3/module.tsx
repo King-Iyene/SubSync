@@ -1,5 +1,6 @@
 "use client";
 
+import { SearchSelect } from "./search-select";
 import { Bookmark, Search, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { GoFn } from "../../nav";
@@ -128,6 +129,13 @@ export function AppointmentsModule({ go, flowTree = true }: { go: GoFn; flowTree
     }
   })();
   const people = opts.data?.people ?? [];
+  // Every calendar and person is searchable (accounts can have 50+ users and many calendars); a calendar with no bookings is listed too.
+  const showAcct = !filters.locationId && accounts.length > 1;
+  const groupOptions = (opts.data?.groups ?? []).map((g) => ({ value: g.groupId, label: g.name, hint: showAcct ? accounts.find((x) => x.locationId === g.locationId)?.name : undefined }));
+  const calOptions = (opts.data?.calendars ?? []).filter((c) => (!filters.groupId || c.groupId === filters.groupId) && (!filters.active || (filters.active === "active") === (c.active !== false)))
+    .map((c) => ({ value: c.calendarId, label: c.name ?? "Calendar", hint: [c.active === false ? "inactive" : "", showAcct ? accounts.find((x) => x.locationId === c.locationId)?.name ?? "" : ""].filter(Boolean).join(", ") || undefined }));
+  const peopleOptions = people.map((p) => ({ value: p.userId, label: p.name, hint: p.inTeamList ? undefined : "not in the team list" }));
+  const bookedPreset = filters.bookedFrom && filters.bookedTo ? Math.round((Date.parse(filters.bookedTo) - Date.parse(filters.bookedFrom)) / 86_400_000) + 1 : 0;
   const set = (p: Partial<ApFilters>) => setFilters((f) => ({ ...f, ...p }));
   const custom = !!filters.from && !!filters.to;
 
@@ -144,12 +152,15 @@ export function AppointmentsModule({ go, flowTree = true }: { go: GoFn; flowTree
             <label className="ap-datef"><span className="sr-only">From</span><input type="date" className="ap-field" value={filters.from} max={filters.to} onChange={(e) => e.target.value && set({ from: e.target.value })} data-testid="ap-from" aria-label="From date" /></label>
             <label className="ap-datef"><span className="sr-only">To</span><input type="date" className="ap-field" value={filters.to} min={filters.from} max={today()} onChange={(e) => e.target.value && set({ to: e.target.value })} data-testid="ap-to" aria-label="To date" /></label>
           </>}
-          {accounts.length > 1 && <select className="ap-field" aria-label="Account" value={filters.locationId} onChange={(e) => set({ locationId: e.target.value })} data-testid="ap-account"><option value="">All accounts</option>{accounts.map((a) => <option key={a.locationId} value={a.locationId}>{a.name}</option>)}</select>}
-          {(opts.data?.calendars?.length ?? 0) > 1 && <select className="ap-field" aria-label="Calendar" value={filters.calendarId} onChange={(e) => set({ calendarId: e.target.value })} data-testid="ap-calendar"><option value="">All calendars</option>{opts.data!.calendars.map((c) => <option key={c.calendarId} value={c.calendarId}>{c.name ?? "Calendar"}{!filters.locationId && accounts.length > 1 ? ` (${accounts.find((a) => a.locationId === c.locationId)?.name ?? "account"})` : ""}</option>)}</select>}
+          {accounts.length > 1 && <SearchSelect label="Account" value={filters.locationId} anyLabel="All accounts" options={accounts.map((a) => ({ value: a.locationId, label: a.name }))} onChange={(v) => set({ locationId: v, calendarId: "", groupId: "", userId: "", booker: "", owner: "" })} testId="ap-account" />}
+          {(opts.data?.groups?.length ?? 0) > 0 && <SearchSelect label="Calendar group" value={filters.groupId} anyLabel="All groups" options={groupOptions} onChange={(v) => set({ groupId: v, calendarId: "" })} testId="ap-group" />}
+          {calOptions.length > 1 && <SearchSelect label="Calendar" value={filters.calendarId} anyLabel="All calendars" options={calOptions} onChange={(v) => set({ calendarId: v })} testId="ap-calendar" />}
+          {(opts.data?.calendars ?? []).some((c) => c.active === false) && <select className="ap-field" aria-label="Active calendars" value={filters.active} onChange={(e) => set({ active: e.target.value as ApFilters["active"], calendarId: "" })} data-testid="ap-active"><option value="">Active and inactive</option><option value="active">Active only</option><option value="inactive">Inactive only</option></select>}
           {isList ? <>
-            <select className="ap-field" aria-label="Owner" value={filters.owner} onChange={(e) => set({ owner: e.target.value })} data-testid="ap-owner"><option value="">Any owner</option><option value="none">No owner</option>{people.map((p) => <option key={p.userId} value={p.userId}>{p.name}</option>)}</select>
-            <select className="ap-field" aria-label="Booker" value={filters.booker} onChange={(e) => set({ booker: e.target.value })} data-testid="ap-booker"><option value="">Any booker</option><option value="none">Booker not recorded</option>{people.map((p) => <option key={p.userId} value={p.userId}>{p.name}</option>)}</select>
-          </> : (people.length > 0 && <select className="ap-field" aria-label="Person" value={filters.userId} onChange={(e) => set({ userId: e.target.value })} data-testid="ap-person"><option value="">Everyone</option>{people.map((p) => <option key={p.userId} value={p.userId}>{p.name}{p.inTeamList ? "" : " (not in the team list)"}</option>)}</select>)}
+            <SearchSelect label="Owner" value={filters.owner} anyLabel="Any owner" extra={[{ value: "none", label: "No owner" }]} options={peopleOptions} onChange={(v) => set({ owner: v })} testId="ap-owner" />
+            <SearchSelect label="Booked by" value={filters.booker} anyLabel="Any booker" extra={[{ value: "none", label: "Booker not recorded" }]} options={peopleOptions} onChange={(v) => set({ booker: v })} testId="ap-booker" />
+          </> : (people.length > 0 && <SearchSelect label="Person" value={filters.userId} anyLabel="Everyone" options={peopleOptions} onChange={(v) => set({ userId: v })} testId="ap-person" />)}
+          <select className="ap-field" aria-label="Booked on" value={bookedPreset} onChange={(e) => { const n = Number(e.target.value); set(n ? { bookedFrom: daysAgo(n - 1), bookedTo: today() } : { bookedFrom: "", bookedTo: "" }); }} data-testid="ap-booked"><option value={0}>Booked any time</option><option value={1}>Booked today</option><option value={7}>Booked in the last 7 days</option><option value={30}>Booked in the last 30 days</option><option value={90}>Booked in the last 90 days</option></select>
           {(opts.data?.sources?.length ?? 0) > 0 && <select className="ap-field" aria-label="Source" value={filters.source} onChange={(e) => set({ source: e.target.value })} data-testid="ap-source"><option value="">All sources</option>{opts.data!.sources.map((s) => <option key={s} value={s}>{s}</option>)}</select>}
           {isList && <>
             <select className="ap-field" aria-label="How long ago" value={filters.age} onChange={(e) => set({ age: Number(e.target.value) as ApFilters["age"] })} data-testid="ap-age"><option value={0}>Any age</option>{AGE_OPTIONS.map((n) => <option key={n} value={n}>{tab === "needs" ? `Over ${n} ${n === 1 ? "day" : "days"} overdue` : `Over ${n} ${n === 1 ? "day" : "days"} ago`}</option>)}</select>
@@ -183,6 +194,9 @@ function FilterChips({ filters, opts, accounts, onChange, listTab }: { filters: 
   if (filters.locationId) chips.push(["Account", accounts.find((a) => a.locationId === filters.locationId)?.name ?? "Selected account", { locationId: "", calendarId: "", userId: "", booker: "", owner: "" }]);
   if (filters.calendarId) chips.push(["Calendar", opts?.calendars.find((c) => c.calendarId === filters.calendarId)?.name ?? "Selected calendar", { calendarId: "" }]);
   if (filters.userId) chips.push(["Person", who(filters.userId), { userId: "" }]);
+  if (filters.groupId) chips.push(["Group", opts?.groups?.find((g) => g.groupId === filters.groupId)?.name ?? "Selected group", { groupId: "", calendarId: "" }]);
+  if (filters.active) chips.push(["Calendars", filters.active === "active" ? "active only" : "inactive only", { active: "", calendarId: "" }]);
+  if (filters.bookedFrom && filters.bookedTo) chips.push(["Booked", filters.bookedFrom === filters.bookedTo ? "today" : `${day(filters.bookedFrom)} to ${day(filters.bookedTo)}`, { bookedFrom: "", bookedTo: "" }]);
   if (filters.source) chips.push(["Source", filters.source, { source: "" }]);
   if (filters.q) chips.push(["Search", filters.q, { q: "" }]);
   if (filters.from && filters.to) chips.push(["Dates", `${day(filters.from)} to ${day(filters.to)}`, { from: "", to: "" }]);

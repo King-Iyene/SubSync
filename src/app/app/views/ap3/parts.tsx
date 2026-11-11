@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, ChevronLeft, ChevronRight, UserRound, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, ExternalLink, UserRound, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { coachingNote, money, pct } from "@/lib/design/appt-coach";
 import { EmptyState, ErrorState, LeadDrawer, SkeletonRows } from "../../ds";
@@ -18,7 +18,7 @@ export function StatusChip({ row }: { row: Pick<ApRow, "status" | "hoursPast"> }
 }
 export const Chip = ({ tone, children }: { tone: "green" | "amber" | "red" | "grey" | "cyan" | "violet"; children: ReactNode }) => <span className="ap-chip" data-tone={tone}>{children}</span>;
 
-const FLAG_TEXT: Record<ApRow["flags"][number], string> = { "double-booked": "Double-booked", "no-deal": "No deal linked" };
+const FLAG_TEXT: Record<ApRow["flags"][number], string> = { "double-booked": "Double-booked", "no-deal": "No deal" };
 export const when = (iso: string) => { const d = new Date(iso); return `${d.toLocaleDateString("en-US", { month: "short", day: "numeric" })}, ${d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`; };
 
 /** Compact table of appointments (40px rows). Row click or Enter opens the right-side panel; the arrow keys move between rows. */
@@ -36,21 +36,22 @@ export function ApTable({ rows, showAccount, onOpen, activeId, testId, selectabl
     <>
     <div className="ap-scroll" data-testid={testId}>
       <table className="ap-t">
-        <thead><tr>{selectable && <th style={{ width: 36 }}><span className="sr-only">Select</span></th>}<th>Contact</th><th>Phone</th>{showAccount && <th>Account</th>}<th>When</th><th>Calendar</th><th>Status</th><th>Booked by</th><th>Owner</th><th data-num>Deal</th><th>Notes</th>{selectable && hasApSlot("RowActions") && <th><span className="sr-only">Mark</span></th>}</tr></thead>
+        <thead><tr>{selectable && <th style={{ width: 36 }}><span className="sr-only">Select</span></th>}<th>Contact</th><th>Phone</th>{showAccount && <th>Account</th>}<th>When</th><th>Calendar</th><th>Status</th><th>Booked by</th><th>Owner</th><th data-num>Deal</th><th>Notes</th>{selectable && hasApSlot("RowActions") && <th><span className="sr-only">Mark</span></th>}<th><span className="sr-only">Open</span></th></tr></thead>
         <tbody ref={body}>
           {rows.map((r, i) => (
-            <tr key={r.id} tabIndex={0} data-active={activeId === r.id ? "1" : undefined} data-tone={r.flags.includes("double-booked") ? "red" : r.ownerId === null ? "amber" : undefined} onClick={() => onOpen(r)} onKeyDown={(e) => move(e, i)} onMouseEnter={() => setHot(r.id)} onFocus={() => setHot(r.id)} aria-label={`${r.contactName}, ${when(r.startAt)}`} data-testid="ap-row">
+            <tr key={r.id} tabIndex={0} data-active={activeId === r.id ? "1" : undefined} onClick={() => onOpen(r)} onKeyDown={(e) => move(e, i)} onMouseEnter={() => setHot(r.id)} onFocus={() => setHot(r.id)} aria-label={`${r.contactName}, ${when(r.startAt)}`} data-testid="ap-row">
               {selectable && <td onClick={(e) => e.stopPropagation()}><input type="checkbox" className="size-4" aria-label={`Select ${r.contactName}`} checked={selected?.has(r.id) ?? false} onChange={(e) => onSelect?.(r.id, e.target.checked)} /></td>}
-              <td><span className="ap-name">{r.contactName}</span>{(() => { const at = seeds.findIndex((x) => x.id === r.id); const why = contactReason(r); return at >= 0 ? <button type="button" className="ap-link ml-2 text-xs" onClick={(e) => { e.stopPropagation(); setLead(at); }} onKeyDown={(e) => e.stopPropagation()} aria-label={`Open contact: ${r.contactName}`} title={why ?? "See them and message them without leaving SubSync"} data-testid="ap-row-contact">Open contact</button> : <span className="ap-sub ml-2 text-xs" title={why ?? undefined}>No contact</span>; })()}{r.url && <a className="ap-link ml-2 text-xs" href={r.url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} aria-label={`Open ${r.contactName} in your CRM`} data-testid="ap-row-crm">Open in your CRM</a>}</td>
+              <td><span className="ap-name">{r.contactName}</span></td>
               <td className="ap-sub">{r.phone ?? "-"}</td>{showAccount && <td className="ap-sub">{r.accountName}</td>}
               <td>{when(r.startAt)}{r.hoursPast !== null && r.hoursPast > 0 && <span className="ap-sub"> ({r.hoursPast < 48 ? `${Math.round(r.hoursPast)}h` : `${Math.round(r.hoursPast / 24)}d`} ago)</span>}</td>
               <td className="ap-sub">{r.calendarName}</td>
               <td><StatusChip row={r} /></td>
               <td>{r.bookerName ?? <span className="ap-sub">Unknown</span>}</td>
-              <td>{r.ownerName ?? <Chip tone="amber">Nobody</Chip>}</td>
+              <td>{r.ownerName ?? <span className="ap-sub">Nobody</span>}</td>
               <td data-num>{r.dealValueCents ? money(r.dealValueCents) : <span className="ap-sub">{r.dealStatus === "none" ? "No deal" : "n/a"}</span>}</td>
-              <td>{r.flags.length ? <span className="inline-flex items-center gap-1 text-[var(--s6-amber)]"><AlertTriangle aria-hidden className="size-3.5" />{FLAG_TEXT[r.flags[0]]}{r.flags.length > 1 ? ` +${r.flags.length - 1}` : ""}</span> : <span className="ap-sub">-</span>}</td>
+              <td>{r.flags.length ? <span className="ap-sub">{FLAG_TEXT[r.flags[0]]}{r.flags.length > 1 ? ` +${r.flags.length - 1}` : ""}</span> : <span className="ap-sub">-</span>}</td>
               {selectable && hasApSlot("RowActions") && <td onClick={(e) => e.stopPropagation()}>{(hot === r.id || activeId === r.id) && <ApSlot name="RowActions" row={r} onChanged={onChanged} />}</td>}
+              <td className="ap-end" onClick={(e) => e.stopPropagation()}>{(() => { const at = seeds.findIndex((x) => x.id === r.id); const why = contactReason(r); return at >= 0 ? <button type="button" className="ap-open" onClick={() => setLead(at)} onKeyDown={(e) => e.stopPropagation()} aria-label={`Open ${r.contactName}`} title={why ?? "See them and message them without leaving SubSync"} data-testid="ap-row-contact">Open</button> : <span className="ap-sub" title={why ?? undefined}>No contact</span>; })()}{r.url && <a className="ap-ico" href={r.url} target="_blank" rel="noopener noreferrer" aria-label={`Open ${r.contactName} in your CRM`} title="Open in your CRM" data-testid="ap-row-crm"><ExternalLink aria-hidden className="size-3.5" /></a>}</td>
             </tr>
           ))}
         </tbody>

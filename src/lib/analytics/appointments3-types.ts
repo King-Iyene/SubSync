@@ -118,17 +118,23 @@ export type Appt3Calendars = {
   roundRobin: Array<{ calendarId: string; calendarName: string | null; locationId: string; members: Array<{ userId: string | null; name: string; owned: number; sharePct: number }> }>;
   capacity: Array<{ month: string; booked: number }>;
   /** Every calendar seen for these accounts, with a count that may be zero (idle calendars are listed too). */
-  calendarsAll?: Array<{ locationId: string; accountName: string | null; calendarId: string; calendarName: string | null; bookings: number; lastBookingAt: string | null; daysSince: number | null }>;
+  calendarsAll?: Array<{ locationId: string; accountName: string | null; calendarId: string; calendarName: string | null; bookings: number; lastBookingAt: string | null; daysSince: number | null; groupName?: string | null; active?: boolean }>;
   /** Every person in the accounts' team lists plus anyone seen booking: one row each, with a per-account breakdown. Zero bookings are listed on purpose. */
   peopleAll?: PersonRollup[];
   /** Calendar problems at a glance. `available: false` = the platform does not give us that data yet (never a guess). */
   problems?: Array<{ key: string; label: string; tone: "red" | "amber"; count: number; why: string; available: boolean }>;
   needsPermission: boolean;
+  /** Calendars the sync did not read (a very large account). 0 = all read. */
+  calendarsSkipped?: number;
+  /** The first day appointments are read from; older history is not in SubSync. */
+  historyStarts?: string;
 };
 
 /** Two people side by side, from real fields only: status counts, deal value won (contact to deal join), and splits by calendar, source and weekday. */
 export type Appt3CompareSide = {
   userId: string; name: string; role: "booker" | "owner";
+  /** person, the whole team ("team"), or the bookings with nobody recorded ("none"). */
+  kind?: "person" | "team" | "unrecorded"; /** False when the id has no name on file (the screen says "Unknown user"). */ nameKnown?: boolean; /** Team side only: how many people booked in these dates. */ people?: number;
   booked: number; showed: number; noshow: number; cancelled: number; unmarked: number; won: number; wonValue: number;
   showRate: Rate; noshowRate: Rate;
   byCalendar: Array<{ name: string; booked: number; showed: number; noshow: number }>;
@@ -146,7 +152,8 @@ export type Appt3Trends = {
 /** The filter pickers: every calendar, person and source in scope (read from the data, so new ones appear by themselves). */
 export type Appt3Options = {
   accounts: Array<{ locationId: string; name: string }>;
-  calendars: Array<{ calendarId: string; name: string | null; locationId: string }>;
+  calendars: Array<{ calendarId: string; name: string | null; locationId: string; groupId?: string | null; active?: boolean }>;
+  groups?: Array<{ groupId: string; name: string; locationId: string }>;
   people: Array<{ userId: string; name: string; locationIds: string[]; inTeamList: boolean }>;
   sources: string[];
 };

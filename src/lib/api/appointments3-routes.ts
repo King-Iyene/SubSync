@@ -22,6 +22,7 @@ const BUCKETS = new Set(["booked", "unmarked", "showed", "noshow", "cancelled", 
 const STATUSES = new Set(["new", "confirmed", "booked"]);
 const int = (v: string | null, d: number) => { const n = Number(v); return v !== null && Number.isFinite(n) ? Math.floor(n) : d; };
 const text = (v: string | null, max: number) => (v ?? "").trim().slice(0, max) || null;
+const bookedDay = (v: string | null, end: boolean): Date | null => { if (!v || !/^d{4}-d{2}-d{2}$/.test(v)) return null; const t = Date.parse(v); return Number.isFinite(t) ? new Date(t + (end ? 86_400_000 : 0)) : null; };
 const personParam = (v: string | null) => (v === "none" ? "none" : cleanId(v));
 
 export async function handleAppointments3(ctx: Ctx, h: Appt3Helpers): Promise<Response> {
@@ -40,7 +41,8 @@ export async function handleAppointments3(ctx: Ctx, h: Appt3Helpers): Promise<Re
   const w = parseApptWindow(sp.get("from"), sp.get("to"), Date.now());
   const bucketP = sp.get("bucket");
   const f: Filters = {
-    from: w.from, to: w.to, location: one, calendar: cleanId(sp.get("calendar")), user: seePeople ? cleanId(sp.get("user")) : null, source: text(sp.get("source"), 120), q: text(sp.get("q"), 60),
+    from: w.from, to: w.to, location: one, calendar: cleanId(sp.get("calendar")), group: cleanId(sp.get("group")), active: sp.get("active") === "active" || sp.get("active") === "inactive" ? (sp.get("active") as "active" | "inactive") : null,
+    bookedFrom: bookedDay(sp.get("booked_from"), false), bookedTo: bookedDay(sp.get("booked_to"), true), user: seePeople ? cleanId(sp.get("user")) : null, source: text(sp.get("source"), 120), q: text(sp.get("q"), 60),
     bucket: bucketP && BUCKETS.has(bucketP) ? (bucketP as Appt3Bucket) : null,
     status: STATUSES.has(sp.get("status") ?? "") ? sp.get("status") : null, minAgeDays: ((n) => (n >= 1 && n <= 366 ? n : null))(int(sp.get("age"), 0)),
     setter: seePeople && sp.has("setter") ? personParam(sp.get("setter")) : undefined, closer: seePeople && sp.has("closer") ? personParam(sp.get("closer")) : undefined,
@@ -69,7 +71,7 @@ export async function handleAppointments3(ctx: Ctx, h: Appt3Helpers): Promise<Re
       return seePeople && ctx.limitTo === null ? done(await health(scope, f, p, size)) : wrap({ rows: [], total: 0, page: 0, size, pages: 1, truncated: false, verticals: [] });
     case "sources": return done(await sources(scope, f));
     case "calendars": return done(await calendars(scope, f, p, size, link));
-    case "compare": { if (!seePeople) return wrap({ sides: [] }); const ids = (sp.get("ids") ?? "").split(",").map(cleanId).filter((x): x is string => !!x); return done(await comparePeople(scope, f, ids, sp.get("by") === "owner" ? "owner" : "booker")); }
+    case "compare": { if (!seePeople) return wrap({ sides: [] }); const ids = (sp.get("ids") ?? "").split(",").map((x) => (x === "team" || x === "none" ? x : cleanId(x))).filter((x): x is string => !!x); return done(await comparePeople(scope, f, ids, sp.get("by") === "owner" ? "owner" : "booker")); }
     case "trends": return seePeople || sp.get("by") === "calendar" ? done(await trends(scope, f, sp.get("by") === "calendar" ? "calendar" : "person", sp.get("grain") === "month" ? "month" : "week")) : wrap({ by: "person", grain: "week", currentFrom: "", previousFrom: "", rows: [] });
     case "export": { const csv = await exportCsv(scope, f, link); return new Response(csv, { headers: { "content-type": "text/csv; charset=utf-8", "content-disposition": 'attachment; filename="appointments.csv"', "cache-control": "no-store" } }); }
     case "options": { const o = await options(scope, f); return done(seePeople ? o : { ...o, people: [] }); }
