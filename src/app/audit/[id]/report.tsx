@@ -64,6 +64,7 @@ export const REPORT_CSS = `
 .rp-tn { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
 .rp-tn th, .rp-tn td { text-align: right; padding: 0.5rem 0.4rem; border-top: 1px solid #ffffff1f; font-variant-numeric: tabular-nums; }
 .rp-tn th:first-child, .rp-tn td:first-child { text-align: left; padding-left: 0; font-weight: 400; }
+.rp-tn + .rp-sub { margin-top: 0.75rem; }
 .rp-tn thead th { border-top: 0; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #9fb0cb; }
 .rp-foot { font-size: 0.78rem; color: #9fb0cb; margin-top: 1.75rem; }
 .rp-cta { display: inline-block; margin-top: 1.5rem; padding: 0.75rem 1.25rem; border-radius: 6px; background: #4db3dc; color: #000c25 !important; font-weight: 600; text-decoration: none; }

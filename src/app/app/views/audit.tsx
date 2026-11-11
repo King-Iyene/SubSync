@@ -12,7 +12,8 @@ import { SAMPLE_AUDIT_ID } from "@/lib/analytics/share-intel";
 import { printAccent, printCss } from "@/lib/design/print";
 import { BrandLogo } from "../brand-logo";
 import { MonthlyCard, NewAccounts, SinceLine, ThenNow } from "./audit-history";
-import { SAMPLE_HISTORY, type CountKey, type History } from "@/lib/analytics/au-history";
+import type { CountKey, History } from "@/lib/analytics/au-history";
+import { sampleAudit } from "./audit-fixture";
 import { ClientRowView, FindingRow, GoodNews, LIST_TITLE, Pager, ProgressBlock, ReadingStrip, VerdictBlock, clientControls, num} from "./audit-parts";
 
 // The Account audit, rebuilt (docs/AUDIT_REVIEW.md, docs/features/AUDIT.md). The first thing on the page is one sentence about the money, with the word "estimate"
@@ -59,7 +60,9 @@ export function AuditView() {
   }, [focus, runs]);
   const live = useData<Data>(path);
   const { error, loading, reload } = live;
-  const data = useMemo<Data | null>(() => (live.data && fxOn ? { ...live.data, history: SAMPLE_HISTORY, au: { history: true, onepager: true, monthly: true } } : live.data), [live.data]);
+  const histPath = live.data?.au?.history && !fxOn ? `audit?part=history${focus ? `&location=${encodeURIComponent(focus)}` : ""}${runs > 0 ? `&r=${runs}` : ""}` : null;
+  const hist = useData<{ history: History | null }>(histPath);
+  const data = useMemo<Data | null>(() => (fxOn ? (sampleAudit() as unknown as Data) : live.data ? { ...live.data, history: hist.data?.history ?? null } : null), [live.data, hist.data]);
   const [revoking, setRevoking] = useState<string | null>(null);
   const [typed, setTyped] = useState("");
   const [spec, setSpec] = useState<RecordsSpec | null>(null);
@@ -99,7 +102,7 @@ export function AuditView() {
   };
 
   if (loading && !data) return <Page title="Account audit" subtitle="Checking what is wrong and what it costs."><SkeletonCards cards={3} label="Auditing your accounts..." /></Page>;
-  if (error) return <ErrorState error={error} onRetry={reload} />;
+  if (error && !fxOn) return <ErrorState error={error} onRetry={reload} />;
   if (!data) return null;
 
   const first = data.findings.find((f) => f.key === data.startHere) ?? null;
@@ -139,6 +142,7 @@ export function AuditView() {
             Showing only <span className="font-medium text-foreground">{data.focus.name}</span>. <button type="button" className="min-h-8 text-primary underline underline-offset-4 max-sm:min-h-11" onClick={() => { setFocus(null); setAll(false); setCpage(0); }}>Show all clients</button>
           </p>
         )}
+        {fxOn && <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground" role="status" data-testid="audit-sample">Sample data. Fictional clients, nothing here is read from your accounts.</p>}
         <ReadingStrip r={data.reading} />
         {linkError && <InlineAlert tone="danger" className="mb-4">{linkError}</InlineAlert>}
         {link && (
@@ -153,13 +157,6 @@ export function AuditView() {
           <>
             <VerdictBlock staleDays={data.staleDays} v={data.verdict} grade={data.grade?.line ?? null} accountsLine={accountsLine} start={first} onStart={() => first && open(first)} extra={<SinceLine history={data.history ?? null} />} />
 
-            {data.au?.history && data.history && (
-              <ThenNow history={data.history} sample={fxOn} openable={new Set(data.findings.map((f) => f.key as CountKey))} onOpen={(k) => { const f = data.findings.find((x) => x.key === k); if (f) open(f); }} />
-            )}
-            {data.au?.history && data.history && data.scope === "all" && (
-              <NewAccounts history={data.history} sample={fxOn} onAudit={(id) => { setFocus(id); setAll(false); window.scrollTo?.({ top: 0, behavior: "smooth" }); }} />
-            )}
-
             <Section title={data.findings.length === 0 ? "What needs fixing" : `What needs fixing (${data.findings.length})`} hint="Biggest money first. Among equals, the quick fixes come first.">
               {data.findings.length === 0 ? (
                 <EmptyState compact title="Nothing to fix" body="Nobody is waiting, no deal has gone quiet and every appointment has an outcome. Run the audit again after your next refresh." />
@@ -171,6 +168,13 @@ export function AuditView() {
               {data.notes.length > 0 && <ul className="mt-2 space-y-1 text-xs text-muted-foreground" data-testid="audit-notes">{data.notes.map((n) => <li key={n}>{n}</li>)}</ul>}
               {data.readLimit && <p className="mt-2 text-xs text-muted-foreground">{data.readLimit}</p>}
             </Section>
+
+            {data.au?.history && data.history && (
+              <ThenNow history={data.history} sample={fxOn} openable={new Set(data.findings.map((f) => f.key as CountKey))} onOpen={(k) => { const f = data.findings.find((x) => x.key === k); if (f) open(f); }} />
+            )}
+            {data.au?.history && data.history && data.scope === "all" && (
+              <NewAccounts history={data.history} sample={fxOn} onAudit={(id) => { setFocus(id); setAll(false); window.scrollTo?.({ top: 0, behavior: "smooth" }); }} />
+            )}
 
             {data.clients && data.clients.withProblems > 0 && (
               <Section title="Clients to look at first" hint="Ranked by counted deal money plus the estimate. The two are shown separately, never added on screen." id="audit-clients">

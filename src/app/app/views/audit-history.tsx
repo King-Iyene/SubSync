@@ -66,7 +66,7 @@ export function ThenNow({ history, onOpen, openable, sample }: { history: Histor
                       <th scope="row" className="py-2 pr-3 text-left font-normal">{l.label}</th>
                       <td className="tnum py-2 pr-3 text-right">{l.then === null ? "Not checked" : num(l.then)}</td>
                       <td className="tnum py-2 pr-3 text-right">
-                        {l.now === null ? "Not checked" : !openable.has(l.key) || sample ? num(l.now) : (
+                        {l.now === null ? "Not checked" : !openable.has(l.key) ? num(l.now) : (
                           <button type="button" className="min-h-8 font-medium text-primary underline underline-offset-4 max-sm:min-h-11" onClick={() => onOpen(l.key)} aria-label={`Show the ${num(l.now)} ${l.noun}`}>{num(l.now)}</button>
                         )}
                       </td>
@@ -103,7 +103,7 @@ export function NewAccounts({ history, onAudit, sample }: { history: History; on
         {history.newAccounts.map((n) => (
           <li key={n.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5 text-sm">
             <span><span className="font-medium">{n.name}</span> <span className="text-muted-foreground">· baseline {shortDay(n.baselineDay)}{n.things === null ? ", not fully counted" : `, ${num(n.things)} ${n.things === 1 ? "thing" : "things"} to fix`}</span></span>
-            <Btn variant="ghost" onClick={() => onAudit(n.id)} disabled={sample}>Audit this account</Btn>
+            <Btn variant="ghost" onClick={() => onAudit(n.id)} disabled={sample} title={sample ? "Not available in the sample" : undefined}>Audit this account</Btn>
           </li>
         ))}
       </ul>

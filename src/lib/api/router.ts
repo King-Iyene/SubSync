@@ -366,10 +366,11 @@ async function auditV2View(ctx: Ctx) {
   const sp = ctx.url.searchParams;
   const { s, core } = await auditCore(ctx, sp.get("location"), sp.get("fresh") === "1");
   const who = s.settings.brandName ?? (ctx.limitTo ? "Your business" : "Your company");
-  const history = await auditHistoryOf(ctx, core);
+  // The history is a second, lazy read (?part=history) so the first screen never waits for it.
+  if (sp.get("part") === "history") return json({ history: await auditHistoryOf(ctx, core) });
   return json({
     ...pagePayload(core, sp, { brand: { name: s.settings.brandName, color: s.settings.brandColor, logoUrl: s.settings.brandLogoUrl }, who }),
-    history, au: { history: auOn(ctx, "au_history"), onepager: auOn(ctx, "au_onepager"), monthly: auOn(ctx, "au_monthly") && ctx.kind !== "client" },
+    history: null, au: { history: auOn(ctx, "au_history"), onepager: auOn(ctx, "au_onepager"), monthly: auOn(ctx, "au_monthly") && ctx.kind !== "client" },
     hiddenAccounts: ctx.limitTo ? 0 : s.hidden, focus: s.focus,
     // Sharing is for an agency or a business, never a client's own staff; the demo holds only the public sample.
     canShare: ctx.kind !== "client" && !ctx.demo, demo: ctx.demo, shareDays: SHARE_LINK_DAYS,
