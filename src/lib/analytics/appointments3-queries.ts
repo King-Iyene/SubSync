@@ -93,6 +93,9 @@ function bucketCond(b: Appt3Bucket | null | undefined): Frag {
     case "lost": return db`and deal_status = 'lost' and status <> 'invalid'`;
     case "open": return db`and deal_status = 'open' and status <> 'invalid'`;
     case "no_deal": return db`and deal_id is null and status <> 'invalid'`;
+    case "confirmed": return db`and (status in ('confirmed', 'showed', 'noshow') or confirmed_at is not null)`;
+    case "recovered": return db`and status = 'noshow' and rebooked`;
+    case "burned": return db`and (status in ('noshow', 'cancelled') or (unmarked and start_at < now() - interval '3 days')) and not rebooked and deal_status is distinct from 'won'`;
     default: return db``;
   }
 }
@@ -181,7 +184,7 @@ export async function overview(s: Scope, f: Filters, windowDays: number): Promis
     revenueAtRisk: revenueAtRisk({ value: num(risk.value), n: num(risk.deals) }, { value: num(t.unmarked_value), n: num(t.unmarked_deals) }),
     revenueWon: { value: num(t.won_value), n: num(t.won) },
     journey: [
-      { key: "booked", label: "Booked", count: booked, bucket: "booked" }, { key: "confirmed", label: "Confirmed", count: num(t.confirmed), bucket: "booked" },
+      { key: "booked", label: "Booked", count: booked, bucket: "booked" }, { key: "confirmed", label: "Confirmed", count: num(t.confirmed), bucket: "confirmed" },
       { key: "showed", label: "Showed", count: showed, bucket: "showed" }, { key: "won", label: "Won", count: num(t.won), bucket: "won" },
     ],
     cards: [
@@ -377,12 +380,14 @@ export async function calendars(s: Scope, f: Filters, p: number, size0: number, 
     join (${L}) l on l.location_id = a.location_id
     where a.installation_id = ${s.inst} and a.start_at >= ${from} and a.start_at < ${to} and a.end_at is not null and b.end_at is not null
       and a.status not in ('cancelled', 'invalid') and b.status not in ('cancelled', 'invalid')`;
-  const [crow, cnt, dis, trend, rr, cap, acc] = await Promise.all([
+  const dd = await dealDays(s.inst);
+  const [crow, cnt, dis, trend, rr, cap, acc, calAll, ppl, remGap] = await Promise.all([
     db`select a.location_id, l.name account_name, a.appointment_id a_id, a.calendar_id a_cal, a.calendar_name a_calname, a.contact_id a_contact, a.status a_status, a.start_at a_start, a.end_at a_end, a.assigned_to a_owner, a.booked_by_user a_booker, a.created_remote_at a_created,
         b.appointment_id b_id, b.contact_id b_contact, b.status b_status, b.start_at b_start, b.end_at b_end, b.assigned_to b_owner, b.booked_by_user b_booker, b.created_remote_at b_created, b.calendar_id b_cal, b.calendar_name b_calname,
         (b.calendar_id is not distinct from a.calendar_id) same_cal, extract(epoch from (least(a.end_at, b.end_at) - greatest(a.start_at, b.start_at))) / 60 mins
       ${pair} order by a.start_at desc limit ${size} offset ${offsetOf(p, size)}`,
-    db`select count(*)::int n ${pair}`,
+    db`select count(*)::int n, count(*) filter (where (case when coalesce(b.created_remote_at, 'epoch') > coalesce(a.created_remote_at, 'epoch') then b.booked_by_user else a.booked_by_user end) is not null
+        and greatest(coalesce(a.created_remote_at, 'epoch'), coalesce(b.created_remote_at, 'epoch')) > 'epoch')::int forced ${pair}`,
     db`select l.location_id, l.name account_name, c.calendar_id, max(c.calendar_name) calendar_name, max(c.start_at) last_at
        from cached_appointments c join (${L}) l on l.location_id = c.location_id where c.installation_id = ${s.inst} and c.calendar_id is not null
        group by 1, 2, 3 having max(c.start_at) < now() - interval '30 days' and max(c.start_at) > now() - interval '120 days' limit 50`,
@@ -394,6 +399,15 @@ export async function calendars(s: Scope, f: Filters, p: number, size0: number, 
     db`select to_char(a.start_at, 'YYYY-MM') m, count(*)::int booked from cached_appointments a join (${L}) l on l.location_id = a.location_id
        where a.installation_id = ${s.inst} and a.start_at >= date_trunc('month', now()) and a.start_at < date_trunc('month', now()) + interval '3 months' and a.status not in ('cancelled', 'invalid') group by 1 order by 1`,
     db`select count(*) filter (where appointments_access = 'needs_permission')::int n from locations where installation_id = ${s.inst} ${s.allowed ? db`and location_id = any(${s.allowed}::text[])` : db``}`,
+    db`select l.location_id, l.name account_name, c.calendar_id, max(c.calendar_name) calendar_name,
+        count(*) filter (where c.start_at >= ${from} and c.start_at < ${to} and c.status <> 'invalid')::int n, max(c.start_at) filter (where c.status <> 'invalid' and c.start_at <= now()) last_at
+       from cached_appointments c join (${L}) l on l.location_id = c.location_id where c.installation_id = ${s.inst} and c.calendar_id is not null
+       group by 1, 2, 3 order by 5 desc, 6 desc nulls last limit 200`,
+    db`with x as (select a.assigned_to uid, count(*) filter (where a.start_at >= ${from} and a.start_at < ${to} and a.status <> 'invalid')::int n, max(a.start_at) filter (where a.status <> 'invalid' and a.start_at <= now()) last_at
+         from cached_appointments a join (${L}) l on l.location_id = a.location_id where a.installation_id = ${s.inst} and a.assigned_to is not null group by 1)
+       select coalesce(t.user_id, x.uid) uid, coalesce(x.n, 0)::int n, x.last_at, (x.uid is not null) ever
+       from (select user_id from team_names where installation_id = ${s.inst}) t full join x on x.uid = t.user_id order by 2 desc, 3 desc nulls last limit 200`,
+    db`with ap as (${base(s, { ...f, from: new Date(), to: new Date(Date.now() + 7 * DAY), bucket: undefined }, dd, db`and a.status not in ('cancelled', 'invalid')`)}) select count(*) filter (where reminders = 0)::int n from ap`,
   ]);
   const mk = (r: Record<string, unknown>, k: "a" | "b"): Appt3Row => toRow({
     appointment_id: r[`${k}_id`], location_id: r.location_id, account_name: r.account_name, contact_id: r[`${k}_contact`], contact_name: "Booking", calendar_id: r[`${k}_cal`] ?? r.a_cal, calendar_name: r[`${k}_calname`] ?? r.a_calname,
@@ -416,8 +430,25 @@ export async function calendars(s: Scope, f: Filters, p: number, size0: number, 
     rrMap.set(k, e);
   }
   const roundRobin = [...rrMap.values()].filter((e) => e.members.filter((m) => m.userId).length >= 2).map((e) => { const t = e.members.reduce((x, m) => x + m.owned, 0); for (const m of e.members) m.sharePct = t ? Math.round((m.owned / t) * 100) : 0; return e; }).slice(0, 30);
+  const daysAgo = (v: unknown) => (v instanceof Date ? Math.max(0, Math.floor((Date.now() - v.getTime()) / DAY)) : null);
+  const calendarsAll = calAll.map((r) => ({ locationId: r.location_id as string, accountName: (r.account_name as string | null) ?? null, calendarId: r.calendar_id as string, calendarName: (r.calendar_name as string | null) ?? null, bookings: num(r.n), lastBookingAt: iso(r.last_at), daysSince: daysAgo(r.last_at) }));
+  const totalOwned = ppl.reduce((x, r) => x + num(r.n), 0);
+  const peopleAll = ppl.filter((r) => r.uid).map((r) => ({ userId: r.uid as string, name: label(r.uid as string), bookings: num(r.n), sharePct: totalOwned ? Math.round((num(r.n) / totalOwned) * 100) : 0, lastBookingAt: iso(r.last_at), daysSince: daysAgo(r.last_at), everBooked: r.ever === true }));
+  const forced = num(cnt[0]?.forced), doubles = Math.max(0, num(cnt[0]?.n) - forced);
+  const idle = calendarsAll.filter((c) => c.bookings === 0 || (c.daysSince !== null && c.daysSince >= 30)).length;
+  const problems: NonNullable<Appt3Calendars["problems"]> = [
+    { key: "double_booking", label: "Double bookings", tone: "red", count: doubles, why: "Two people booked into the same slot. One of them will wait or not be seen.", available: true },
+    { key: "forced_overlap", label: "Forced overlaps", tone: "red", count: forced, why: "Someone booked on top of an existing booking by hand. The meeting will run short or one lead is left waiting.", available: true },
+    { key: "disconnected", label: "Calendars not syncing", tone: "red", count: dis.length, why: "No bookings for 30 days after earlier ones. The calendar may be disconnected, so new leads cannot book.", available: true },
+    { key: "idle_calendar", label: "Idle calendars", tone: "amber", count: idle, why: "Calendars with no bookings in these dates or none for 30 days. Paid ads or reps may be pointed at a dead page.", available: true },
+    { key: "idle_person", label: "People with no bookings", tone: "amber", count: peopleAll.filter((x) => x.bookings === 0).length, why: "Named team members who took no meetings in these dates. Their capacity is unused.", available: true },
+    { key: "no_calendar_user", label: "People with no calendar seen", tone: "amber", count: peopleAll.filter((x) => !x.everBooked).length, why: "People who have never owned a booking. They may not have a calendar set up.", available: true },
+    { key: "reminder_gap", label: "Next 7 days with no reminder", tone: "amber", count: num(remGap[0]?.n), why: "Upcoming appointments nobody has been reminded about. Reminders cut no-shows.", available: true },
+    { key: "one_way_sync", label: "One-way calendar sync", tone: "amber", count: 0, why: "Needs the calendar connection details, which the platform does not give us yet.", available: false },
+    { key: "no_availability", label: "Calendars with no availability", tone: "amber", count: 0, why: "Needs the open-hours settings of each calendar, which the platform does not give us yet.", available: false },
+  ];
   return {
-    conflicts, needsPermission: num(acc[0]?.n) > 0,
+    conflicts, needsPermission: num(acc[0]?.n) > 0, calendarsAll, peopleAll, problems,
     disconnected: dis.map((r) => ({ locationId: r.location_id as string, accountName: (r.account_name as string | null) ?? null, calendarId: r.calendar_id as string, calendarName: (r.calendar_name as string | null) ?? null, lastBookingAt: iso(r.last_at), reason: "no_bookings_30d" as const })),
     trend: trend.map((r) => ({ week: String(r.wk instanceof Date ? r.wk.toISOString().slice(0, 10) : r.wk), booked: num(r.booked), rescheduled: num(r.resched), cancelled: num(r.cancelled) })),
     roundRobin, capacity: cap.map((r) => ({ month: r.m as string, booked: num(r.booked) })),
@@ -435,9 +466,11 @@ export async function reminders(s: Scope, f: Filters, p: number, size0: number, 
     (r) => toRow(r, label, link, `Starts ${new Date((r.start_at as Date).getTime()).toISOString().slice(0, 16).replace("T", " ")}, ${num(r.reminders) ? "reminder sent" : "no reminder sent"}${r.status === "new" ? ", not confirmed" : ""}`));
   const [a, b, eff, hist, risk] = await Promise.all([
     mkPage(noRem), mkPage(notConf),
-    db`with ap as (${base(s, { ...f, from: new Date(Date.now() - 90 * DAY), to: new Date(Date.now() - DAY), bucket: undefined }, dd)})
-      select count(*) filter (where status = 'showed' and reminders > 0)::int ws, count(*) filter (where status in ('showed', 'noshow') and reminders > 0)::int wd,
-        count(*) filter (where status = 'showed' and reminders = 0)::int os, count(*) filter (where status in ('showed', 'noshow') and reminders = 0)::int od from ap`,
+    db`select count(*) filter (where a.status = 'showed' and coalesce(fa.reminders_sent, 0) > 0)::int ws, count(*) filter (where a.status in ('showed', 'noshow') and coalesce(fa.reminders_sent, 0) > 0)::int wd,
+        count(*) filter (where a.status = 'showed' and coalesce(fa.reminders_sent, 0) = 0)::int os, count(*) filter (where a.status in ('showed', 'noshow') and coalesce(fa.reminders_sent, 0) = 0)::int od
+      from cached_appointments a join (${locs(s, f.location)}) l on l.location_id = a.location_id
+      left join appointment_facts fa on fa.installation_id = a.installation_id and fa.location_id = a.location_id and fa.appointment_id = a.appointment_id
+      where a.installation_id = ${s.inst} and a.start_at >= ${new Date(Date.now() - 90 * DAY)} and a.start_at < ${new Date(Date.now() - DAY)} and fa.deleted_at is null`,
     db`select extract(day from now() - min(recorded_at))::int d from appointment_history where installation_id = ${s.inst} and kind = 'reminder'`.catch(() => []),
     db`with ap as (${base(s, { ...up, to: new Date(Date.now() + 3 * DAY) }, dd, db`and a.status not in ('cancelled', 'invalid')`)}) select location_id, appointment_id, status = 'new' and confirmed_at is null nc, reminders = 0 nr,
         (created_at is not null and start_at - created_at < interval '3 hours') short,
