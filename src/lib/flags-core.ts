@@ -117,6 +117,14 @@ export const DEFAULT_OFF: ReadonlySet<Feature> = new Set<Feature>([
   "pp_idle",
   "pp_rollup",
   "pp_actions",
+  // Today module (docs/features/TODAY_BRIEF.md): each behind its own flag, default off. ov_screen is the old Overview page (merged into Today, Numbers).
+  "td_module",
+  "td_today",
+  "td_proof",
+  "td_numbers",
+  "td_email",
+  "td_record",
+  "ov_screen",
 ]);
 
 export function resolveFeatures(all: readonly Feature[], overrides: Record<string, boolean>, allOn = false): Record<Feature, boolean> {
