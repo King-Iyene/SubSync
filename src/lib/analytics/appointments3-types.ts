@@ -155,7 +155,7 @@ export type Appt3Options = {
   calendars: Array<{ calendarId: string; name: string | null; locationId: string; groupId?: string | null; active?: boolean }>;
   groups?: Array<{ groupId: string; name: string; locationId: string }>;
   people: Array<{ userId: string; name: string; locationIds: string[]; inTeamList: boolean }>;
-  sources: string[];
+  sources: string[]; stages?: string[];
 };
 
 export type Appt3Receipt = {

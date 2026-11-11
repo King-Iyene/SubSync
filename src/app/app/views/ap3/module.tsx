@@ -1,6 +1,7 @@
 "use client";
 
 import { SearchSelect } from "./search-select";
+import { BookedAxis, DateAxis, MoreFilters, QuickFilters, ResultLine } from "./filters-bar";
 import { Bookmark, Search, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { GoFn } from "../../nav";
@@ -48,8 +49,6 @@ const STATUS_WORDS: Array<[NonNullable<ApFilters["status"]>, string]> = [["new",
 const OUTCOME_WORDS: Record<string, string> = { booked: "All booked", showed: "Showed", noshow: "No-show", unmarked: "No outcome yet", won: "Won", lost: "Lost", recovered: "Won back", at_risk: "Deal money at risk", cancelled: "Cancelled", open: "Deal open", no_deal: "No deal linked", upcoming: "Coming up", invalid: "Invalid", completed: "Completed" };
 const day = (iso: string) => { const d = new Date(`${iso}T12:00:00`); return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString("en-US", { month: "short", day: "numeric" }); };
 const isDefault = (f: ApFilters) => (Object.keys(DEFAULT_FILTERS) as Array<keyof ApFilters>).every((k) => f[k] === DEFAULT_FILTERS[k]);
-const today = () => new Date().toISOString().slice(0, 10);
-const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString().slice(0, 10);
 
 export function AppointmentsModule({ go, flowTree = true }: { go: GoFn; flowTree?: boolean }) {
   const tabs = useMemo(() => TABS.filter((t) => flowTree || t.key !== "flow"), [flowTree]);
@@ -135,23 +134,14 @@ export function AppointmentsModule({ go, flowTree = true }: { go: GoFn; flowTree
   const calOptions = (opts.data?.calendars ?? []).filter((c) => (!filters.groupId || c.groupId === filters.groupId) && (!filters.active || (filters.active === "active") === (c.active !== false)))
     .map((c) => ({ value: c.calendarId, label: c.name ?? "Calendar", hint: [c.active === false ? "inactive" : "", showAcct ? accounts.find((x) => x.locationId === c.locationId)?.name ?? "" : ""].filter(Boolean).join(", ") || undefined }));
   const peopleOptions = people.map((p) => ({ value: p.userId, label: p.name, hint: p.inTeamList ? undefined : "not in the team list" }));
-  const bookedPreset = filters.bookedFrom && filters.bookedTo ? Math.round((Date.parse(filters.bookedTo) - Date.parse(filters.bookedFrom)) / 86_400_000) + 1 : 0;
   const set = (p: Partial<ApFilters>) => setFilters((f) => ({ ...f, ...p }));
-  const custom = !!filters.from && !!filters.to;
 
   return (
     <div className="s6 ap ap3 ds-enter" ref={top} data-testid="ap-module" key={version}>
       <Page title="Appointments" subtitle="Who booked, who showed, and who is burning your leads." actions={null}>
         <div className="ap-head" role="search" aria-label="Filter appointments">
           <label className="ap-search"><Search aria-hidden className="size-4" /><span className="sr-only">Search by name</span><input ref={search} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search a name (press /)" data-testid="ap-search" /></label>
-          <select className="ap-field" aria-label="Dates" value={custom ? "custom" : String(filters.days)} data-testid="ap-days"
-            onChange={(e) => { const v = e.target.value; if (v === "custom") set({ from: daysAgo(30), to: today() }); else set({ days: Number(v) as ApFilters["days"], from: "", to: "" }); }}>
-            <option value={7}>Last 7 days</option><option value={30}>Last 30 days</option><option value={90}>Last 90 days</option><option value="custom">Choose dates</option>
-          </select>
-          {custom && <>
-            <label className="ap-datef"><span className="sr-only">From</span><input type="date" className="ap-field" value={filters.from} max={filters.to} onChange={(e) => e.target.value && set({ from: e.target.value })} data-testid="ap-from" aria-label="From date" /></label>
-            <label className="ap-datef"><span className="sr-only">To</span><input type="date" className="ap-field" value={filters.to} min={filters.from} max={today()} onChange={(e) => e.target.value && set({ to: e.target.value })} data-testid="ap-to" aria-label="To date" /></label>
-          </>}
+          <DateAxis filters={filters} set={set} />
           {accounts.length > 1 && <SearchSelect label="Account" value={filters.locationId} anyLabel="All accounts" options={accounts.map((a) => ({ value: a.locationId, label: a.name }))} onChange={(v) => set({ locationId: v, calendarId: "", groupId: "", userId: "", booker: "", owner: "" })} testId="ap-account" />}
           {(opts.data?.groups?.length ?? 0) > 0 && <SearchSelect label="Calendar group" value={filters.groupId} anyLabel="All groups" options={groupOptions} onChange={(v) => set({ groupId: v, calendarId: "" })} testId="ap-group" />}
           {calOptions.length > 1 && <SearchSelect label="Calendar" value={filters.calendarId} anyLabel="All calendars" options={calOptions} onChange={(v) => set({ calendarId: v })} testId="ap-calendar" />}
@@ -160,17 +150,21 @@ export function AppointmentsModule({ go, flowTree = true }: { go: GoFn; flowTree
             <SearchSelect label="Owner" value={filters.owner} anyLabel="Any owner" extra={[{ value: "none", label: "No owner" }]} options={peopleOptions} onChange={(v) => set({ owner: v })} testId="ap-owner" />
             <SearchSelect label="Booked by" value={filters.booker} anyLabel="Any booker" extra={[{ value: "none", label: "Booker not recorded" }]} options={peopleOptions} onChange={(v) => set({ booker: v })} testId="ap-booker" />
           </> : (people.length > 0 && <SearchSelect label="Person" value={filters.userId} anyLabel="Everyone" options={peopleOptions} onChange={(v) => set({ userId: v })} testId="ap-person" />)}
-          <select className="ap-field" aria-label="Booked on" value={bookedPreset} onChange={(e) => { const n = Number(e.target.value); set(n ? { bookedFrom: daysAgo(n - 1), bookedTo: today() } : { bookedFrom: "", bookedTo: "" }); }} data-testid="ap-booked"><option value={0}>Booked any time</option><option value={1}>Booked today</option><option value={7}>Booked in the last 7 days</option><option value={30}>Booked in the last 30 days</option><option value={90}>Booked in the last 90 days</option></select>
+          <BookedAxis filters={filters} set={set} />
           {(opts.data?.sources?.length ?? 0) > 0 && <select className="ap-field" aria-label="Source" value={filters.source} onChange={(e) => set({ source: e.target.value })} data-testid="ap-source"><option value="">All sources</option>{opts.data!.sources.map((s) => <option key={s} value={s}>{s}</option>)}</select>}
           {isList && <>
             <select className="ap-field" aria-label="How long ago" value={filters.age} onChange={(e) => set({ age: Number(e.target.value) as ApFilters["age"] })} data-testid="ap-age"><option value={0}>Any age</option>{AGE_OPTIONS.map((n) => <option key={n} value={n}>{tab === "needs" ? `Over ${n} ${n === 1 ? "day" : "days"} overdue` : `Over ${n} ${n === 1 ? "day" : "days"} ago`}</option>)}</select>
             {tab === "needs" && <select className="ap-field" aria-label="Status" value={filters.status} onChange={(e) => set({ status: e.target.value as ApFilters["status"] })} data-testid="ap-status"><option value="">Any status</option>{STATUS_WORDS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>}
             <select className="ap-field" aria-label="Sort" value={filters.sort || "value"} onChange={(e) => set({ sort: e.target.value as ApFilters["sort"] })} data-testid="ap-sort">{SORT_WORDS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
           </>}
+          <MoreFilters filters={filters} set={set} opts={opts.data ?? null} />
+          <label className="ap-check"><input type="checkbox" checked={filters.compare} onChange={(e) => set({ compare: e.target.checked })} data-testid="ap-compare-period" />Compare with the period before</label>
           <select className="ap-field" aria-label="Saved views" value="" onChange={(e) => applyView(Number(e.target.value))} data-testid="ap-views"><option value="" disabled>Saved views{views.length ? ` (${views.length})` : ""}</option>{views.map((v, i) => <option key={v.name} value={i}>{v.name}</option>)}</select>
           {naming ? <NameView onSave={saveView} onCancel={() => setNaming(false)} /> : <button type="button" className="s6-btn" onClick={() => setNaming(true)} data-testid="ap-save-view"><Bookmark aria-hidden className="size-4" />Save view</button>}
           {filtered && <button type="button" className="s6-btn" onClick={clear} data-testid="ap-clear"><X aria-hidden className="size-4" />Clear filters</button>}
         </div>
+        <QuickFilters filters={filters} set={set} people={people} />
+        <ResultLine filters={filters} />
         <FilterChips filters={filters} opts={opts.data ?? null} accounts={accounts} onChange={(f) => { setFilters(f); setQ(f.q); }} listTab={isList ? tab : null} />
         {fixturesOn() && <p className="ap-fine mb-2" role="status">Showing sample appointments (apfx).</p>}
         <ModuleTabs pill label="Appointments sections" tabs={tabs.map((t) => ({ label: t.label, tip: t.tip, node: null }))} value={index < 0 ? 0 : index} onChange={(i) => { setFocus(undefined); setTab(tabs[i].key); }} />
@@ -198,6 +192,14 @@ function FilterChips({ filters, opts, accounts, onChange, listTab }: { filters: 
   if (filters.active) chips.push(["Calendars", filters.active === "active" ? "active only" : "inactive only", { active: "", calendarId: "" }]);
   if (filters.bookedFrom && filters.bookedTo) chips.push(["Booked", filters.bookedFrom === filters.bookedTo ? "today" : `${day(filters.bookedFrom)} to ${day(filters.bookedTo)}`, { bookedFrom: "", bookedTo: "" }]);
   if (filters.source) chips.push(["Source", filters.source, { source: "" }]);
+  if (filters.outcome) chips.push(["Outcome", { showed: "showed", noshow: "no-show", noshow_open: "no-show, not booked again", cancelled: "cancelled", unmarked: "no outcome yet" }[filters.outcome], { outcome: "" }]);
+  if (filters.status && !listTab) chips.push(["Booking status", filters.status === "new" ? "not confirmed" : filters.status, { status: "" }]);
+  if (filters.deal) chips.push(["Deal", filters.deal === "has" ? "has a deal" : "no deal", { deal: "" }]);
+  if (filters.stage) chips.push(["Deal stage", filters.stage, { stage: "" }]);
+  if (filters.leadAge) chips.push(["Lead", filters.leadAge === "old" ? "older than 30 days" : `new in the last ${filters.leadAge} days`, { leadAge: "" }]);
+  if (filters.contact) chips.push(["Contact", filters.contact === "new" ? "first appointment" : "has been before", { contact: "" }]);
+  if (filters.attention) chips.push(["Needs attention", "on", { attention: false }]);
+  if (filters.compare) chips.push(["Compare", "with the period before", { compare: false }]);
   if (filters.q) chips.push(["Search", filters.q, { q: "" }]);
   if (filters.from && filters.to) chips.push(["Dates", `${day(filters.from)} to ${day(filters.to)}`, { from: "", to: "" }]);
   else if (filters.days !== 30) chips.push(["Dates", `Last ${filters.days} days`, { days: 30 }]);

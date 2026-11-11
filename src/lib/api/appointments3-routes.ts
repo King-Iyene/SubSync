@@ -42,6 +42,8 @@ export async function handleAppointments3(ctx: Ctx, h: Appt3Helpers): Promise<Re
   const bucketP = sp.get("bucket");
   const f: Filters = {
     from: w.from, to: w.to, location: one, calendar: cleanId(sp.get("calendar")), group: cleanId(sp.get("group")), active: sp.get("active") === "active" || sp.get("active") === "inactive" ? (sp.get("active") as "active" | "inactive") : null,
+    outcome: ((v) => (["showed", "noshow", "noshow_open", "cancelled", "unmarked"].includes(v ?? "") ? v : null) as Filters["outcome"])(sp.get("x_outcome")), deal: ((v) => (v === "has" || v === "none" ? v : null))(sp.get("x_deal")), stage: text(sp.get("x_stage"), 120),
+    leadAge: ((v) => (v === "7" || v === "30" || v === "old" ? v : null))(sp.get("x_lead")), contact: ((v) => (v === "new" || v === "returning" ? v : null))(sp.get("x_contact")), attention: sp.get("x_attention") === "1",
     bookedFrom: bookedDay(sp.get("booked_from"), false), bookedTo: bookedDay(sp.get("booked_to"), true), user: seePeople ? cleanId(sp.get("user")) : null, source: text(sp.get("source"), 120), q: text(sp.get("q"), 60),
     bucket: bucketP && BUCKETS.has(bucketP) ? (bucketP as Appt3Bucket) : null,
     status: STATUSES.has(sp.get("status") ?? "") ? sp.get("status") : null, minAgeDays: ((n) => (n >= 1 && n <= 366 ? n : null))(int(sp.get("age"), 0)),

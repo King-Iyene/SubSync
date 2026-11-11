@@ -18,7 +18,9 @@ import type {
 type Db = ReturnType<typeof sql>;
 type Frag = ReturnType<Db>;
 export type Scope = { inst: string; allowed: string[] | null };
-export type Filters = { from: Date; to: Date; location?: string | null; calendar?: string | null; user?: string | null; /** A calendar group id. */ group?: string | null; /** Only active or only inactive calendars. */ active?: "active" | "inactive" | null; /** Booked on (the date the booking was made) range; the appointment date range stays from/to. */ bookedFrom?: Date | null; bookedTo?: Date | null; source?: string | null; q?: string | null; bucket?: Appt3Bucket | null; setter?: string | null; closer?: string | null; /** A raw status of the booking (new, confirmed): for lists. */ status?: string | null; /** Only appointments whose time passed at least this many days ago. */ minAgeDays?: number | null };
+export type Filters = { from: Date; to: Date; location?: string | null; calendar?: string | null; user?: string | null; /** A calendar group id. */ group?: string | null; /** Only active or only inactive calendars. */ active?: "active" | "inactive" | null; /** Booked on (the date the booking was made) range; the appointment date range stays from/to. */ bookedFrom?: Date | null; bookedTo?: Date | null;
+  /** The manager filters: what happened, whether there is a deal and where it is, how new the lead is, a new or returning contact, and "needs attention". */
+  outcome?: "showed" | "noshow" | "noshow_open" | "cancelled" | "unmarked" | null; deal?: "has" | "none" | null; stage?: string | null; leadAge?: "7" | "30" | "old" | null; contact?: "new" | "returning" | null; attention?: boolean; source?: string | null; q?: string | null; bucket?: Appt3Bucket | null; setter?: string | null; closer?: string | null; /** A raw status of the booking (new, confirmed): for lists. */ status?: string | null; /** Only appointments whose time passed at least this many days ago. */ minAgeDays?: number | null };
 
 const ID = /^[A-Za-z0-9_-]{1,64}$/;
 export const cleanId = (v: unknown): string | null => (typeof v === "string" && ID.test(v) ? v : null);
@@ -39,6 +41,21 @@ function locs(s: Scope, location?: string | null): Frag {
   const one = cleanId(location);
   return db`select l.location_id, l.name, coalesce(z.name, 'UTC') tz from locations l left join pg_timezone_names z on z.name = l.timezone
     where l.installation_id = ${s.inst} and not l.ignored ${s.allowed ? db`and l.location_id = any(${s.allowed}::text[])` : db``} ${one ? db`and l.location_id = ${one}` : db``}`;
+}
+
+/** The manager filters, applied on the same derived set as every number and list (so a filter recomputes everything). a = the appointment, d = the linked deal, c = the contact. */
+function manager(f: Filters): Frag {
+  const db = sql();
+  const unmarkedC = db`(a.status not in ('showed', 'noshow', 'cancelled', 'invalid') and a.start_at < now() - interval '3 hours')`;
+  const rebookedC = db`exists (select 1 from cached_appointments b where b.installation_id = a.installation_id and b.location_id = a.location_id and b.contact_id = a.contact_id and a.contact_id is not null and b.start_at > a.start_at and b.appointment_id <> a.appointment_id and b.status not in ('cancelled', 'invalid'))`;
+  const earlier = db`exists (select 1 from cached_appointments b where b.installation_id = a.installation_id and b.location_id = a.location_id and b.contact_id = a.contact_id and a.contact_id is not null and b.start_at < a.start_at and b.appointment_id <> a.appointment_id and b.status <> 'invalid')`;
+  const out = f.outcome === "showed" ? db`and a.status = 'showed'` : f.outcome === "noshow" ? db`and a.status = 'noshow'` : f.outcome === "noshow_open" ? db`and a.status = 'noshow' and not ${rebookedC}` : f.outcome === "cancelled" ? db`and a.status = 'cancelled'` : f.outcome === "unmarked" ? db`and ${unmarkedC}` : db``;
+  return db`${out}
+    ${f.deal === "has" ? db`and d.opportunity_id is not null` : f.deal === "none" ? db`and d.opportunity_id is null` : db``}
+    ${f.stage ? db`and d.stage_name = ${f.stage.slice(0, 120)}` : db``}
+    ${f.leadAge === "7" ? db`and c.date_added >= a.start_at - interval '7 days'` : f.leadAge === "30" ? db`and c.date_added >= a.start_at - interval '30 days'` : f.leadAge === "old" ? db`and c.date_added < a.start_at - interval '30 days'` : db``}
+    ${f.contact === "returning" ? db`and ${earlier}` : f.contact === "new" ? db`and not ${earlier}` : db``}
+    ${f.attention ? db`and a.status <> 'invalid' and (${unmarkedC} or (a.status = 'noshow' and not ${rebookedC}) or a.assigned_to is null)` : db``}`;
 }
 
 /** Calendar group and active/inactive narrowing, from the full calendar list. `t` is the alias of the appointments table. */
@@ -69,7 +86,7 @@ function base(s: Scope, f: Filters, dd: number, extra?: Frag): Frag {
     left join appointment_facts fa on fa.installation_id = a.installation_id and fa.location_id = a.location_id and fa.appointment_id = a.appointment_id
     left join cached_contacts c on c.installation_id = a.installation_id and c.location_id = a.location_id and c.contact_id = a.contact_id and a.contact_id is not null
     left join lateral (
-      select o.opportunity_id, o.status, o.monetary_value from cached_opportunities o
+      select o.opportunity_id, o.status, o.monetary_value, o.stage_name from cached_opportunities o
       where a.contact_id is not null and o.installation_id = a.installation_id and o.location_id = a.location_id and o.contact_id = a.contact_id
         and (o.status = 'open' or coalesce(o.last_status_change_at, o.synced_at) between a.start_at - interval '1 day' and a.start_at + make_interval(days => ${dd}::int))
       order by case o.status when 'won' then 0 when 'lost' then 1 else 2 end, coalesce(o.last_status_change_at, o.synced_at) desc limit 1) d on true
@@ -81,6 +98,7 @@ function base(s: Scope, f: Filters, dd: number, extra?: Frag): Frag {
       ${f.calendar && cleanId(f.calendar) ? db`and a.calendar_id = ${f.calendar}` : db``}
       ${f.user && cleanId(f.user) ? db`and (a.assigned_to = ${f.user} or a.booked_by_user = ${f.user} or exists (select 1 from calendar_members cm where cm.installation_id = a.installation_id and cm.location_id = a.location_id and cm.calendar_id = a.calendar_id and cm.user_id = ${f.user}))` : db``}
       ${calFilters(f, db`a`)}
+      ${manager(f)}
       ${f.bookedFrom ? db`and coalesce(a.created_remote_at, a.start_at) >= ${f.bookedFrom}` : db``}
       ${f.bookedTo ? db`and coalesce(a.created_remote_at, a.start_at) < ${f.bookedTo}` : db``}
       ${f.setter !== undefined && f.setter !== null ? (f.setter === "none" ? db`and a.booked_by_user is null` : db`and a.booked_by_user = ${f.setter}`) : db``}
@@ -580,7 +598,7 @@ export async function exportCsv(s: Scope, f: Filters, link: ((a: string, b: stri
 /** Filter pickers: every account, calendar, person and source in the caller's scope, read from the data so new ones appear on their own. */
 export async function options(s: Scope, f: Filters): Promise<Appt3Options> {
   const db = sql(), label = await names(s.inst), L = locs(s, f.location);
-  const [acc, cal, mem, own, src, grp] = await Promise.all([
+  const [acc, cal, mem, own, src, stg, grp] = await Promise.all([
     db`select l.location_id, l.name from (${L}) l order by l.name limit 500`,
     // Every calendar we know of: the full list from the platform, plus any seen only through its bookings. Zero-booking calendars are included on purpose.
     db`select u.location_id, u.calendar_id, max(u.name) name, bool_or(u.group_id is not null) _g, max(u.group_id) group_id, coalesce(bool_and(u.is_active), true) is_active from (
@@ -591,6 +609,7 @@ export async function options(s: Scope, f: Filters): Promise<Appt3Options> {
     db`select distinct a.location_id, x.uid from cached_appointments a join (${L}) l on l.location_id = a.location_id, lateral (values (a.assigned_to), (a.booked_by_user)) x(uid) where a.installation_id = ${s.inst} and x.uid is not null and a.start_at >= now() - interval '400 days' limit 5000`,
     db`select c.source k, count(*)::int n from cached_appointments a join (${L}) l on l.location_id = a.location_id join cached_contacts c on c.installation_id = a.installation_id and c.location_id = a.location_id and c.contact_id = a.contact_id
        where a.installation_id = ${s.inst} and a.start_at >= now() - interval '400 days' and nullif(c.source, '') is not null group by 1 order by 2 desc limit 100`,
+    db`select o.stage_name k, count(*)::int n from cached_opportunities o join (${L}) l on l.location_id = o.location_id where o.installation_id = ${s.inst} and nullif(o.stage_name, '') is not null group by 1 order by 2 desc limit 200`.catch(() => []),
     db`select g.location_id, g.group_id, g.name from calendar_groups g join (${L}) l on l.location_id = g.location_id where g.installation_id = ${s.inst} order by g.name limit 300`.catch(() => []),
   ]);
   const people = new Map<string, { name: string; locs: Set<string>; inList: boolean }>();
@@ -601,7 +620,7 @@ export async function options(s: Scope, f: Filters): Promise<Appt3Options> {
     calendars: cal.map((r) => ({ calendarId: r.calendar_id as string, name: (r.name as string | null) ?? null, locationId: r.location_id as string, groupId: (r.group_id as string | null) ?? null, active: r.is_active !== false })),
     groups: grp.map((r) => ({ groupId: r.group_id as string, name: (r.name as string | null) ?? "Group", locationId: r.location_id as string })),
     people: [...people].map(([userId, e]) => ({ userId, name: e.name, locationIds: [...e.locs], inTeamList: e.inList })).sort((a, b) => a.name.localeCompare(b.name)).slice(0, 1000),
-    sources: src.map((r) => r.k as string),
+    sources: src.map((r) => r.k as string), stages: stg.map((r) => r.k as string),
   };
 }
 

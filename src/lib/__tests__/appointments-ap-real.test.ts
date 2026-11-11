@@ -51,3 +51,22 @@ test("calendar group, active and booked-on filters travel in the address and com
   const c = mapCalendar({ id: "xtest-c1", name: "Intro call", groupId: "xtest-g1", isActive: false, calendarType: "round_robin", teamMembers: [{ userId: "xtest-u1" }, { userId: "xtest-u1" }, { userId: "xtest-u2" }] });
   assert.deepEqual(c, { id: "xtest-c1", name: "Intro call", groupId: "xtest-g1", isActive: false, calendarType: "round_robin", roundRobin: true, memberIds: ["xtest-u1", "xtest-u2"] });
 });
+
+test("date presets give whole, inclusive days (weeks start Monday) and the period before is the same length", async () => {
+  const { presetRange, previousRange, rangeKey } = await import("../design/appt-filters.ts");
+  const wed = Date.UTC(2026, 10, 11, 15, 0); // Wednesday 11 Nov 2026
+  assert.deepEqual(presetRange("this_week", wed), { from: "2026-11-09", to: "2026-11-15" });
+  assert.deepEqual(presetRange("last_week", wed), { from: "2026-11-02", to: "2026-11-08" });
+  assert.deepEqual(presetRange("next7", wed), { from: "2026-11-11", to: "2026-11-17" });
+  assert.deepEqual(presetRange("last_month", wed), { from: "2026-10-01", to: "2026-10-31" });
+  assert.equal(rangeKey("2026-11-11", "2026-11-11", wed), "today");
+  assert.equal(rangeKey("2026-11-03", "2026-11-04", wed), "custom");
+  assert.deepEqual(previousRange("2026-11-09", "2026-11-15"), { from: "2026-11-02", to: "2026-11-08" });
+});
+
+test("the manager filters travel in the address and junk is dropped", () => {
+  const f = { ...DEFAULT_FILTERS, outcome: "noshow_open" as const, deal: "has" as const, stage: "Proposal", leadAge: "7" as const, contact: "returning" as const, attention: true, compare: true };
+  const p = filtersToParams(f);
+  assert.deepEqual(filtersFromParams(new URLSearchParams(p)), f);
+  assert.deepEqual(filtersFromParams(new URLSearchParams("ap_out=drop&ap_deal=x&ap_lead=3&ap_ct=y&ap_att=2")), DEFAULT_FILTERS);
+});
