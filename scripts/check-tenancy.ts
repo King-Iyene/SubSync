@@ -106,6 +106,9 @@ async function main() {
       // The rebuilt Unanswered messages screen (stage UNANS): the first screen, the list behind a number, the rankings, the other side's account, owner and name asked for by every parameter.
       "/api/app/inbox?part=home", "/api/app/inbox?part=list", `/api/app/inbox?part=list&account=${other.locs[0]}`, `/api/app/inbox?part=list&account=${other.locs.join(",")}&bucket=h48`, `/api/app/inbox?part=list&owner=${other.marker}`,
       `/api/app/inbox?part=list&q=${other.marker}`, "/api/app/inbox?part=ranks&by=account", "/api/app/inbox?part=ranks&by=owner", `/api/app/inbox?part=ranks&by=account&q=${other.marker}`,
+      // Unanswered round 3, slices A and C: the SQL-paged list, the "waiting on them" tab, the one search and the saved views, asked for the other side by every parameter.
+      "/api/app/inbox?part=list2", `/api/app/inbox?part=list2&account=${other.locs[0]}`, `/api/app/inbox?part=list2&tab=them&account=${other.locs[0]}`, `/api/app/inbox?part=list2&owner=${other.marker}`, `/api/app/inbox?part=list2&q=${other.marker}&size=100`,
+      `/api/app/inbox?part=find&q=${other.marker}`, `/api/app/inbox?part=find&q=${other.marker}&size=100`, "/api/app/inbox?part=views",
     ];
 
     // TENANCY_FAST=1 skips the long cross-read sweep (while iterating on the share link and write attacks); the full run does not.

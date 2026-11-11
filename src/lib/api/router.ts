@@ -115,6 +115,7 @@ import { writeEnabledFor } from "../analytics/cleanup-config";
 import { isLive } from "../live-flags";
 import { handleSpeedPrefs, handleSpeedDigest, handleSpeedLadder, handleSpeedPart, handleSpeedTarget } from "./speed-routes";
 import { handleUnansweredOutcome, handleUnansweredPart } from "./unanswered-routes";
+import { handleUnansweredPart3, handleUnansweredViewRemove, handleUnansweredViewSave } from "./unanswered-routes3";
 import { handleApptWork } from "./appointment-work-routes";
 import { buildSteps, guideRoleOf } from "../getting-started";
 import { changedSettingKeys, feedbackGivenBy, logAccountFlags, logKeyChange, logSettingsChange, recordVote } from "../feedback-queries";
@@ -2000,8 +2001,13 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
     // The rebuilt Unanswered messages screen: its first screen, the list behind a number and the rankings (GET ?part=home|list|ranks, read only; an unknown part is refused with 400). Without a part the older answer below still serves the exports and the older tests.
     if (a === "inbox" && method === "GET" && !b && ctx.url.searchParams.has("part")) {
       // The new Unanswered v2 parts (home/list/ranks) are always available; per-client SLA is gated separately inside handleUnansweredPart
-      return await handleUnansweredPart(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links, targets: async () => { const st = (await scope(ctx)).settings; return { slaHours: st.slaHours, targetMinutes: st.speedTargetMinutes }; } });
+      const unansweredHelpers = { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links, targets: async () => { const st = (await scope(ctx)).settings; return { slaHours: st.slaHours, targetMinutes: st.speedTargetMinutes }; }, owner: () => voterOf(ctx) };
+      const round3 = await handleUnansweredPart3(ctx, unansweredHelpers, ctx.url.searchParams.get("part") ?? ""); // round 3: list2, find, views (each behind its own flag)
+      if (round3) return round3;
+      return await handleUnansweredPart(ctx, unansweredHelpers);
     }
+    if (a === "inbox" && b === "views3" && method === "POST" && !c) return await handleUnansweredViewSave(ctx, { owner: () => voterOf(ctx) });
+    if (a === "inbox" && b === "views3" && method === "DELETE" && c) return await handleUnansweredViewRemove(ctx, { owner: () => voterOf(ctx) }, c);
     if (a === "inbox" && b === "outcome" && method === "POST") {
       if (!ctx.entitlements.features.inbox_breach_alert || ctx.entitlements.locked.includes("inbox_breach_alert")) {
         return json({ error: "Follow-up outcomes are not enabled for this account" }, 404);
