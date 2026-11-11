@@ -9,7 +9,7 @@ const arr = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
 export function dealOf(r: Pl3Row): PlDeal {
   return {
     id: r.opportunityId, name: r.name || r.contactName || "Deal", contactName: r.contactName ?? null, accountName: r.accountName ?? "Account", locationId: r.locationId, pipelineName: r.pipelineName ?? "Pipeline",
-    stageId: r.stageId ?? "", stageName: r.stageName ?? "No stage", status: r.status, valueCents: c(r.value), ownerName: r.ownerName, source: r.source,
+    stageId: r.stageId ?? "", stageName: r.stageName ?? "No stage", status: r.status, valueCents: c(r.value), ownerId: r.ownerId, ownerName: r.ownerName, source: r.source,
     daysInStage: Math.max(0, Math.round(r.daysInStage ?? 0)), staleAfterDays: r.staleLimitDays === null || r.staleLimitDays === undefined ? null : Math.round(r.staleLimitDays), lostReason: r.lostReason, health: r.health, url: r.url,
   };
 }

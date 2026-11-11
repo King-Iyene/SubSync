@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import type { Cl3Billing, Cl3BillingList, Cl3Compare, Cl3Options, Cl3People, Cl3Receipt, Cl3ReceiptList, Cl3SetupList, Cl3Trends } from "@/lib/analytics/clients3-types";
 import { EmptyState } from "../../ds";
+import { RoleChip } from "../../roles";
 import { useCl, type ClParams } from "./data";
 import { AccountSettings } from "./settings";
 import { ago, change, day, Find, Load, minutes, money, NOT_ENOUGH, NOT_FROM_PLATFORM, Pager, RECONNECT, Spark } from "./shared";
@@ -142,7 +143,7 @@ export function People({ filters }: Shared) {
           <>
             <p className="ap-fine mb-2">{p.idleCount > 0 ? `${p.idleCount} ${p.idleCount === 1 ? "person has" : "people have"} gone quiet (no messages sent for 7 days) and ${p.idleCount === 1 ? "is" : "are"} listed first.` : "Nobody has gone quiet."}{p.accountsWithoutStaff > 0 ? ` ${p.accountsWithoutStaff} client ${p.accountsWithoutStaff === 1 ? "account has" : "accounts have"} no team members we can see.` : ""}</p>
             <div className="ap-scroll"><table className="ap-t"><thead><tr><th>Person</th><th>Account</th><th data-num>Messages sent</th><th data-num>Leads touched</th><th>Last active</th></tr></thead>
-              <tbody>{p.rows.map((x) => <tr key={`${x.locationId}:${x.userId}`} style={{ cursor: "default" }}><td><span className="ap-name">{x.name}</span></td><td>{x.accountName}</td><td data-num>{x.messagesSent}</td><td data-num>{x.leadsTouched}</td><td>{x.idle ? <span className="ap-chip" data-tone="amber">Gone quiet</span> : ago(x.lastActiveAt)}</td></tr>)}</tbody></table></div>
+              <tbody>{p.rows.map((x) => <tr key={`${x.locationId}:${x.userId}`} style={{ cursor: "default" }}><td><span className="ap-name">{x.name}</span><RoleChip userId={x.userId} locationId={x.locationId} /></td><td>{x.accountName}</td><td data-num>{x.messagesSent}</td><td data-num>{x.leadsTouched}</td><td>{x.idle ? <span className="ap-chip" data-tone="amber">Gone quiet</span> : ago(x.lastActiveAt)}</td></tr>)}</tbody></table></div>
             <Pager page={p.page} pages={p.pages} total={p.total} set={l.setPage} />
           </>
         )}

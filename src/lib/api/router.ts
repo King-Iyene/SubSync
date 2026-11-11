@@ -127,6 +127,7 @@ import { handleApptExec, handleApptExecTarget } from "./appointments-exec-routes
 import { handlePipeline3 } from "./pipeline3-routes";
 import { handleClients3 } from "./clients3-routes";
 import { handlePeople3 } from "./people3-routes";
+import { handleTeamRoles } from "./team-roles-routes";
 import { handleToday3, handleToday3Act } from "./today3-routes";
 import { handleApptActions } from "./appointment-actions-routes";
 import { handlePipelineActions } from "./pipeline-actions-routes";
@@ -2087,6 +2088,10 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
     // Team actions and reports (slice PB): /api/app/people3/act/<part> (coaching notes, targets, away marks, lead moves with undo, the client receipt). Flags, the account and the person are checked inside.
     if (a === "people3" && b === "act" && ctx.segments.length === 3) {
       return await handlePeopleActions(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links, locationToken: (locationId) => locationAccessToken(ctx.session.companyId, locationId), brand: async () => (await scope(ctx)).settings.brandName ?? null });
+    }
+    // Team roles (Setter, Closer, ...): /api/app/people3/roles/<part>. SubSync-only labels; managers change them, everyone reads the labels they may see. Flag, account and people are checked inside.
+    if (a === "people3" && b === "roles" && ctx.segments.length === 3) {
+      return await handleTeamRoles(ctx, { allowed: () => allowedIds(ctx) });
     }
     if (a === "pipeline3" && b === "act" && ctx.segments.length === 3) {
       return await handlePipelineActions(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links, locationToken: (locationId) => locationAccessToken(ctx.session.companyId, locationId) });

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { Pp3AccountRef, Pp3Handoff, Pp3NextLead, Pp3Options, Pp3Scorecard, Pp3Scorecards, Pp3Today, Pp3Workload } from "@/lib/analytics/people3-types";
+import { RoleChip } from "../../roles";
 import { AssignSlot, MoveLeadsSlot } from "./actions-slot";
 import type { PpParams } from "./data";
 import { usePp } from "./data";
@@ -48,7 +49,7 @@ function Person({ s, onPick }: { s: Pp3Scorecard; onPick: () => void }) {
   const p = s.person;
   return (
     <span className="pp-cell"><Initials p={p} />
-      <span><button type="button" className="pp-name" onClick={(e) => { e.stopPropagation(); onPick(); }}>{p.name}</button>{p.isAdmin && <span className="ap-fine"> Admin, not ranked</span>}
+      <span><button type="button" className="pp-name" onClick={(e) => { e.stopPropagation(); onPick(); }}>{p.name}</button><RoleChip userId={p.userId} />{p.isAdmin && <span className="ap-fine"> Admin, not ranked</span>}
         <br /><span className="ap-fine">{subline(p)}<span className="pp-hide-sm">{p.lastActivityAt ? `, last activity ${ago(p.lastActivityAt)}` : ""}</span></span></span>
     </span>
   );
@@ -160,7 +161,7 @@ export function Workload({ filters, open, pick }: SecProps) {
                 const look = <>{l.idle ? <Status on>{NO_ACTIVITY} for {l.idle.hours} h while {l.idle.waitingLeads} leads wait</Status> : <Status on={l.load === "over"}>{LOAD_WORD[l.load]}</Status>}{l.loadWhy && <><br /><span className="ap-fine">{l.loadWhy}</span></>}{l.needsOutcome > 0 && <><br /><span className="ap-fine">{link(l.needsOutcome, { ...d, title: `${who}: appointments with no outcome`, reason: "needs_outcome" })} appointments with no outcome</span></>}</>;
                 return (
                   <tr key={`${l.location.locationId}:${l.person.userId}`} style={{ cursor: "default" }} data-testid="pp-load-row">
-                    <td className="pp-wrap"><span className="pp-cell"><Initials p={l.person} /><button type="button" className="pp-name" onClick={() => pick(l.person.userId)}>{l.person.name}</button></span><span className="pp-only-sm ap-fine"><br />{l.location.name}<br />{look}</span></td>
+                    <td className="pp-wrap"><span className="pp-cell"><Initials p={l.person} /><button type="button" className="pp-name" onClick={() => pick(l.person.userId)}>{l.person.name}</button><RoleChip userId={l.person.userId} /></span><span className="pp-only-sm ap-fine"><br />{l.location.name}<br />{look}</span></td>
                     <td data-sm="hide">{l.location.name}</td>
                     <td data-num>{x.medianOpen !== null && <span className="pp-bar" data-on={l.load === "over" ? "1" : undefined} aria-hidden><b style={{ width: `${Math.min(100, (items / (x.medianOpen * 2.4)) * 100)}%` }} /><u style={{ left: `${(1 / 2.4) * 100}%` }} /></span>}{link(l.waiting, { ...d, title: `${who}: waiting for a reply`, reason: "waiting" })}</td>
                     <td data-num data-sm="hide">{link(l.openDeals, { ...d, title: `${who}: open deals`, reason: "open_deals" })}</td>

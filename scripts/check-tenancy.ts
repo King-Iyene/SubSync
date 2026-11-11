@@ -126,6 +126,8 @@ async function main() {
       `/api/app/people/contact/${other.locs[0]}/${other.contacts[0]}`,
       // Team actions and reports (slice PB): the other side's account, person, note and batch asked for by every parameter of every read.
       `/api/app/people3/act/proof?locationId=${other.locs[0]}`, `/api/app/people3/act/proof-csv?locationId=${other.locs[0]}`, `/api/app/people3/act/proof-prefs?locationId=${other.locs[0]}`, `/api/app/people3/act/meta?locationId=${other.locs[0]}`, `/api/app/people3/act/suggest?locationId=${other.locs[0]}`, `/api/app/people3/act/log?locationId=${other.locs[0]}`, `/api/app/people3/act/away?locationId=${other.locs[0]}`, `/api/app/people3/act/notes?userId=${other.marker}`, `/api/app/people3/act/targets?userId=${other.marker}`, `/api/app/people3/act/focus?userId=${other.marker}`, `/api/app/people3/act/rebalance?locationId=${other.locs[0]}&userId=${other.marker}`, `/api/app/people3/act/suggest?locationId=${other.locs[0]}&contactId=${other.contacts[0]}`, "/api/app/people3/act/away", "/api/app/people3/act/log", "/api/app/people3/act/caps",
+      // Team roles (Setter, Closer): the other side's account and people asked for by every parameter of the reads.
+      "/api/app/people3/roles/map", "/api/app/people3/roles/list", "/api/app/people3/roles/log", `/api/app/people3/roles/list?location=${other.locs[0]}`, `/api/app/people3/roles/list?q=${other.marker}&role=none&after=${other.marker}`, `/api/app/people3/roles/list?location=${other.locs[0]}&role=setters`,
       // The rebuilt Account audit (stage AUDIT): the read, the client list and a single client, asked for the other side's account by every parameter it takes.
       `/api/app/clients/act/receipt?location=${other.locs[0]}`, `/api/app/clients/act/csv?location=${other.locs[0]}`, `/api/app/clients/act/setup?location=${other.locs[0]}`, "/api/app/clients/act/receipt", "/api/app/clients/act/mutes",
       // Clients actions, second half and the one Clients screen (stage CL-INT): every remaining read part, and the screen's read parts with the other side's account in every parameter (writes: tests/unit/clients-int-xtenant-db.test.ts).
@@ -249,6 +251,11 @@ async function main() {
       ["POST", "/api/app/people3/act/away", { kind: "away", userId: B.marker, reason: "other", until: new Date(Date.now() + 5 * 86_400_000).toISOString(), step: "do" }],
       ["POST", "/api/app/people3/act/away-end", { id: "00000000-0000-0000-0000-000000000000" }],
       ["POST", "/api/app/people3/act/proof-prefs", { locationId: B.locs[0], nameStaff: true, step: "do" }],
+      // Team roles: a label for the other agency's person or account, and an undo of the other agency's batch, must all be refused.
+      ["POST", "/api/app/people3/roles/set", { userIds: [B.marker], role: "setter", step: "do" }],
+      ["POST", "/api/app/people3/roles/set", { userIds: [B.marker], role: "closer", locationId: B.locs[0], step: "do" }],
+      ["POST", "/api/app/people3/roles/set", { userIds: [B.marker], role: null, locationId: B.locs[0], step: "do", typed: "clear role" }],
+      ["POST", "/api/app/people3/roles/undo", { batchId: "00000000-0000-0000-0000-000000000000", step: "do" }],
       // Workflows: a change, a label, a mark and a read of the other agency's workflow in its client account.
       ["POST", "/api/app/workflows/preview", { kind: "delete", items: [{ locationId: B.locs[0], workflowId: "w-1" }] }],
       ["PUT", "/api/app/workflows/labels", { items: [{ locationId: B.locs[0], workflowId: "w-1" }], patch: { decision: "retire" } }],

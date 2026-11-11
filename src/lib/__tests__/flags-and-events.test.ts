@@ -110,6 +110,7 @@ test("pilot modules are on by default and a database row can still override the 
     "pp_money",
     "pp_nextlead",
     "pp_proof",
+    "pp_roles",
     "pp_rollup",
     "pp_scorecards",
     "pp_today",

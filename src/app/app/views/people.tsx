@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { RoleChip } from "../roles";
 import { useApiClient, useData } from "../session";
 import { Badge, Btn, Card, Empty, ErrorBox, ExtLink, fmtInt, fmtMoney, inputClass, Loading, PageHeader, Table, Td, Th, timeAgo } from "../ui";
 
@@ -54,7 +55,7 @@ export function TeamView() {
                     </div>
                   ) : (
                     <div className="flex items-center gap-2">
-                      <span className="font-medium">{m.label}</span>
+                      <span className="font-medium">{m.label}</span>{m.userId !== "unassigned" && <RoleChip userId={m.userId} />}
                       {m.userId !== "unassigned" && (
                         <button type="button" className="text-xs text-muted-foreground underline" onClick={() => { setEditing(m.userId); setDraft(m.name ?? ""); }}>{m.name ? "Rename" : "Add name"}</button>
                       )}

@@ -9,6 +9,7 @@ import { MAX_TARGET, MIN_TARGET } from "@/lib/analytics/speed-v2";
 import { useApiClient, useData } from "../session";
 import { BarChart, CardRange, ChartPlaceholder, DefinitionTip, EmptyState, ErrorState, SkeletonRows, type CardRangeState } from "../ds";
 import { CountUp } from "../ds/count-up";
+import { RoleChip } from "../roles";
 import { PersonName } from "./speed-cards";
 import type { PersonView } from "./speed-cards";
 
@@ -177,7 +178,7 @@ function PeopleRows({ rows, open, win }: { rows: ComparePersonRow[]; open: OpenL
     <ul className="divide-y border-y" data-testid="slow-people">
       {rows.map((p) => (
         <li key={p.userId} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-0.5 py-2" data-testid="slow-person-row">
-          <span className="min-w-0 font-semibold"><PersonName p={p} /></span>
+          <span className="min-w-0 font-semibold"><PersonName p={p} /><RoleChip userId={p.userId} /></span>
           <span className="tnum text-sm text-muted-foreground">
             {p.ranked && p.medianSeconds !== null ? <>{fmtDuration(p.medianSeconds)} typical · </> : <>{p.progress} · </>}
             <NumberButton label={`${p.replies} ${p.replies === 1 ? "reply" : "replies"}, ${p.label}, open the list`} onClick={() => open({ title: `Leads ${p.label} replied to first`, params: { status: "answered", person: p.userId, ...win } })}>{p.replies} {p.replies === 1 ? "reply" : "replies"}</NumberButton>

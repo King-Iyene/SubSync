@@ -119,6 +119,7 @@ export const DEFAULT_OFF: ReadonlySet<Feature> = new Set<Feature>([
   "pp_idle",
   "pp_rollup",
   "pp_actions",
+  "pp_roles",
   // Account audit (docs/features/AUDIT_BRIEF.md): each behind its own flag, default off.
   "au_history",
   "au_onepager",
