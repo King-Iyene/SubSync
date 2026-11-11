@@ -860,3 +860,13 @@ Real synced data only. Dates are UTC days. Period = chosen dates (default last 2
 - **Overload alert**: at least 10 leads waiting and at least twice the team's median in the same account, with at least 3 people present (not away).
 - **Weekly team lines**: last 7 days, people with at least 10 first-answered leads, compared only when two or more qualify; at most three lines; no ranking words.
 - **Moves of leads**: one field (owner) of one contact; batch cap 25; protected leads (do-not-disturb, open deal, won deal, appointment coming up) are left out of a batch; undo only within 30 minutes and only while the lead is still with the person it was moved to; a lead that had no owner cannot be put back. Own moves are rows in people_write_log (result done) and never count as a person's activity.
+
+## Appointments leadership (the Leadership tab, flag `ap_exec`)
+All figures are counted from the account's own appointments; no outside benchmark. Under a minimum sample the screen says "not enough data".
+- True show rate = showed / (showed + no-show + past due with no outcome). Needs 10 counted. Cancelled is its own rate (cancelled / booked).
+- Lead to booking = average minutes from the lead's first record to the booking (needs 10). Booking to meeting = average hours from booking to the appointment (needs 10, cancelled excluded).
+- Revenue lost to no-shows (ESTIMATE) = no-shows x (won / showed) x average won deal, all from the same period. Needs 10 showed and 3 wins.
+- Pace: average of the last 8 full weeks of bookings (needs 4 weeks); month-end projection = bookings so far + weekly average / 7 x days left (ESTIMATE). A target is SubSync-only (`appointment_exec_targets`, one value kept for undo).
+- Fair comparison: a person's show rate is shown against the rate expected for the same lead sources (everyone's own rate per source, weighted by what that person booked); 10 appointments minimum.
+- Heatmap slot needs 8 finished appointments. Capacity = booked against the calendar's or person's own busiest week (open slots are not stored).
+- Counts come from `appointment_exec_daily` (a per-account daily rollup refreshed on demand, at most hourly) or its identical live twin when "Booked on", a status or a deal stage is chosen.

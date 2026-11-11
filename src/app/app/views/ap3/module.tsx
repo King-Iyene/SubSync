@@ -16,6 +16,8 @@ import { ApWorklist } from "./list";
 import { ExportAll, TrendsPanel } from "./trends-panel";
 import { ApPanel, PersonPanel } from "./parts";
 import { BookingShare, Calendars, Health, Meetings, NeedsOutcome, Proof, Recovery, Sources } from "./sections2";
+import { ExecTab } from "./exec/exec-tab";
+import { execScopeOf } from "./exec/exec-types";
 import { Overview, type DrillReq, type SectionProps } from "./sections";
 import type { ApFlowTree, ApHealthRow, ApPersonRow, ApRow } from "./types";
 
@@ -25,7 +27,7 @@ import type { ApFlowTree, ApHealthRow, ApPersonRow, ApRow } from "./types";
 
 registerAbSlots(); // slice AB: the checked change tools and the Meetings area mount into the slots below
 
-type TabKey = "overview" | "needs" | "recover" | "share" | "flow" | "health" | "sources" | "calendars" | "meetings" | "proof";
+type TabKey = "overview" | "needs" | "recover" | "share" | "flow" | "health" | "sources" | "calendars" | "meetings" | "proof" | "exec";
 const TABS: Array<{ key: TabKey; label: string; tip: string }> = [
   { key: "overview", label: "Overview", tip: "The one sentence, the numbers and where the leak is." }, { key: "needs", label: "Needs outcome", tip: "Past appointments nobody marked." },
   { key: "recover", label: "No-show recovery", tip: "No-shows not booked again." }, { key: "share", label: "Booking share", tip: "Who books and who takes the meeting." },
@@ -33,6 +35,7 @@ const TABS: Array<{ key: TabKey; label: string; tip: string }> = [
   { key: "sources", label: "Sources and speed", tip: "Show rate by source and reply speed." }, { key: "calendars", label: "Calendars and people", tip: "Double bookings, quiet calendars and who takes the meetings." },
   { key: "meetings", label: "Meetings", tip: "Recorded meetings matched to appointments." },
   { key: "proof", label: "Proof", tip: "The weekly receipt per client." },
+  { key: "exec", label: "Leadership", tip: "Pace, leaks, who converts and what to fix this week." },
 ];
 type SavedView = { name: string; filters: ApFilters; tab: TabKey };
 const VIEWS_KEY = "ap3.views.v1";
@@ -50,8 +53,8 @@ const isDefault = (f: ApFilters) => (Object.keys(DEFAULT_FILTERS) as Array<keyof
 const today = () => new Date().toISOString().slice(0, 10);
 const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString().slice(0, 10);
 
-export function AppointmentsModule({ go, flowTree = true }: { go: GoFn; flowTree?: boolean }) {
-  const tabs = useMemo(() => TABS.filter((t) => flowTree || t.key !== "flow"), [flowTree]);
+export function AppointmentsModule({ go, flowTree = true, leadership = false }: { go: GoFn; flowTree?: boolean; leadership?: boolean }) {
+  const tabs = useMemo(() => TABS.filter((t) => (flowTree || t.key !== "flow") && (leadership || t.key !== "exec")), [flowTree, leadership]);
   const [tab, setTab] = useState<TabKey>("overview");
   const [filters, setFilters] = useState<ApFilters>(DEFAULT_FILTERS);
   const [q, setQ] = useState("");
@@ -125,6 +128,7 @@ export function AppointmentsModule({ go, flowTree = true }: { go: GoFn; flowTree
       case "calendars": return <><Calendars {...sp} /><TrendsPanel filters={filters} by="calendar" onOpen={(title, count, extra) => openDrill({ title, count, extra })} /></>;
       case "meetings": return <Meetings {...sp} />;
       case "proof": return <Proof {...sp} />;
+      case "exec": return <ExecTab scope={execScopeOf(filters)} onOpenRow={openRow} />;
     }
   })();
   const people = opts.data?.people ?? [];
