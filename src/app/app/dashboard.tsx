@@ -50,6 +50,7 @@ import { InboxView } from "./views/inbox";
 import { OnboardingView } from "./views/onboarding";
 import { OverviewView } from "./views/overview";
 import { PipelineView } from "./views/pipeline";
+import { PipelineModule } from "./views/pl3/module";
 import { TeamView } from "./views/people";
 import { SettingsView } from "./views/settings";
 import { IntegrationsPage } from "./views/connections";
@@ -402,7 +403,7 @@ export function Dashboard() {
       case "notifications": return <NotificationsPage />;
       case "help": return <HelpView go={go} />;
       case "roadmap": return <RoadmapView />;
-      case "pipeline": return <ModuleTabs key="pipe" start={0} tabs={pipeTabs} />;
+      case "pipeline": return auth.features.pl_module === true && !auth.locked.includes("pl_module") ? <PipelineModule key="pipe3" moneyFlow={auth.features.pl_money_flow === true && !auth.locked.includes("pl_money_flow")} actions={auth.features.pl_actions === true && !auth.locked.includes("pl_actions")} /> : <ModuleTabs key="pipe" start={0} tabs={pipeTabs} />;
       case "team": return <TeamView />;
       case "appointments": return auth.features.appt_module === true && !auth.locked.includes("appt_module") ? <AppointmentsModule key="appts3" go={go} flowTree={auth.features.appt_flow_tree === true} /> : <ModuleTabs key="appts" start={0} tabs={[{ label: "Appointments", node: <AppointmentsView go={go} /> }, { label: "Insights", node: <AppointmentInsights /> }]} />;
       case "meetings": return <MeetingsView />;
