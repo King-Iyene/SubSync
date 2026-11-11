@@ -54,7 +54,7 @@ function dailySource(inst: string, ids: string[], since: Date): Frag {
   const db = sql();
   const s = day(since);
   return db`
-    select location_id, d day, sum(new_leads)::int new_leads, sum(booked)::int booked, sum(showed)::int showed, sum(noshow)::int noshow, sum(deals_started)::int deals_started,
+    select location_id, d as day, sum(new_leads)::int new_leads, sum(booked)::int booked, sum(showed)::int showed, sum(noshow)::int noshow, sum(deals_started)::int deals_started,
       sum(won)::int won, sum(won_value)::float8 won_value, sum(lost)::int lost, sum(lost_value)::float8 lost_value, sum(staff_messages)::int staff_messages
     from (
       select location_id, (date_added at time zone 'UTC')::date d, 1 new_leads, 0 booked, 0 showed, 0 noshow, 0 deals_started, 0 won, 0::float8 won_value, 0 lost, 0::float8 lost_value, 0 staff_messages
