@@ -124,6 +124,9 @@ async function main() {
       `/api/app/people/queue?list=stale&account=${other.locs[0]}&q=${other.marker}`, `/api/app/people/queue?list=noshows&mine=1&location=${other.locs[0]}`, `/api/app/people/queue?list=followups&q=${other.marker}`,
       `/api/app/people/person/${other.locs[0]}/${other.contacts[0]}`, `/api/app/people/person/${other.locs[0]}/%2e%2e%2f${other.contacts[0]}`, `/api/app/people/search?q=${other.marker}&location=${other.locs[0]}`,
       `/api/app/people/contact/${other.locs[0]}/${other.contacts[0]}`,
+      // Find a lead: the keyset page and the export, asked for the other side's account, owner, words and a cursor that names the other side's person.
+      `/api/app/people/find?q=${other.marker}`, `/api/app/people/find?location=${other.locs[0]}`, `/api/app/people/find?owner=${other.marker}`, `/api/app/people/find?q=Tester&after=${Buffer.from(JSON.stringify([0, "-infinity", "-infinity", other.locs[0], other.contacts[0]])).toString("base64url")}`,
+      `/api/app/people/export?location=${other.locs[0]}`, `/api/app/people/export?q=${other.marker}`, `/api/app/people/export?owner=${other.marker}`,
       // Team actions and reports (slice PB): the other side's account, person, note and batch asked for by every parameter of every read.
       `/api/app/people3/act/proof?locationId=${other.locs[0]}`, `/api/app/people3/act/proof-csv?locationId=${other.locs[0]}`, `/api/app/people3/act/proof-prefs?locationId=${other.locs[0]}`, `/api/app/people3/act/meta?locationId=${other.locs[0]}`, `/api/app/people3/act/suggest?locationId=${other.locs[0]}`, `/api/app/people3/act/log?locationId=${other.locs[0]}`, `/api/app/people3/act/away?locationId=${other.locs[0]}`, `/api/app/people3/act/notes?userId=${other.marker}`, `/api/app/people3/act/targets?userId=${other.marker}`, `/api/app/people3/act/focus?userId=${other.marker}`, `/api/app/people3/act/rebalance?locationId=${other.locs[0]}&userId=${other.marker}`, `/api/app/people3/act/suggest?locationId=${other.locs[0]}&contactId=${other.contacts[0]}`, "/api/app/people3/act/away", "/api/app/people3/act/log", "/api/app/people3/act/caps",
       // Team roles (Setter, Closer): the other side's account and people asked for by every parameter of the reads.
@@ -243,6 +246,10 @@ async function main() {
       ["POST", "/api/app/inbox/act/outcome", { locationId: B.locs[0], conversationId: "foreign-conversation", outcome: "not_a_lead" }],
       ["POST", "/api/app/inbox/act/clear", { locationId: B.locs[0], conversationIds: ["foreign-conversation"], step: "do", typed: "delete 1" }],
       // Team actions (slice PB): every write names the other agency's account, person, note, away mark or batch, and must be refused.
+      // Find a lead bulk changes: a tag and a note on the other side's person, as a preview and as a real change, must both be refused (counted as "not found", nothing written).
+      ["POST", "/api/app/people/bulk", { action: "tag", tag: "hacked", targets: [{ locationId: B.locs[0], contactId: B.contacts[0] }], step: "preview" }],
+      ["POST", "/api/app/people/bulk", { action: "tag", tag: "hacked", targets: [{ locationId: B.locs[0], contactId: B.contacts[0] }], step: "do", confirm: true }],
+      ["POST", "/api/app/people/bulk", { action: "note", text: "hacked", targets: [{ locationId: B.locs[0], contactId: B.contacts[0] }], step: "do", confirm: true }],
       ["POST", "/api/app/people3/act/reassign", { locationId: B.locs[0], contactIds: [B.contacts[0]], toUserId: "foreign-user", step: "do" }],
       ["POST", "/api/app/people3/act/undo", { locationId: B.locs[0], batchId: "00000000-0000-0000-0000-000000000000", step: "do" }],
       ["POST", "/api/app/people3/act/note", { op: "add", userId: B.marker, locationId: B.locs[0], title: "x", body: "hacked", step: "do" }],

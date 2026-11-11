@@ -25,12 +25,12 @@ export async function timed<T>(fn: (tx: Sql) => Promise<T>, ms = QUERY_TIMEOUT_M
   })) as T;
 }
 
-function visible(db: Sql, installationId: string, allowed: string[] | null) {
+export function visible(db: Sql, installationId: string, allowed: string[] | null) {
   return db`select location_id, name, timezone from locations where installation_id = ${installationId} and not ignored
     ${allowed ? db`and location_id = any(${allowed}::text[])` : db``}`;
 }
 
-const escapeLike = (s: string) => s.replace(/[\\%_]/g, (m) => `\\${m}`);
+export const escapeLike = (s: string) => s.replace(/[\\%_]/g, (m) => `\\${m}`);
 
 // ---------------- options to filter by ----------------
 
@@ -93,7 +93,7 @@ export type PersonRow = {
 };
 
 /** The conditions of a smart filter as one SQL fragment on contacts `c`. Used by the list, the count and by the tag charts, so a number and its list agree. */
-function filterSql(db: Sql, installationId: string, f: SmartFilter, coldTags: string[]) {
+export function filterSql(db: Sql, installationId: string, f: SmartFilter, coldTags: string[]) {
   const parts: Array<ReturnType<Sql>> = [];
   const add = (x: ReturnType<Sql>) => parts.push(x);
   if (f.q) {

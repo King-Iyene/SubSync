@@ -164,6 +164,8 @@ export const FEATURES = [
   "td_email",
   "td_record",
   "ov_screen",
+  "fl_find",
+  "fl_bulk",
 ] as const;
 export type Feature = (typeof FEATURES)[number];
 

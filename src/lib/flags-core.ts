@@ -132,6 +132,9 @@ export const DEFAULT_OFF: ReadonlySet<Feature> = new Set<Feature>([
   "td_email",
   "td_record",
   "ov_screen",
+  // Find a lead (docs/features/FINDLEAD_BRIEF.md): fl_find is the search (keyset paging, pickers, copy); fl_bulk is bulk actions and export. Default off.
+  "fl_find",
+  "fl_bulk",
 ]);
 
 export function resolveFeatures(all: readonly Feature[], overrides: Record<string, boolean>, allOn = false): Record<Feature, boolean> {

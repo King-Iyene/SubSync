@@ -5,6 +5,7 @@ import { describeFilter, isEmptyFilter, type SmartFilter } from "@/lib/people/fi
 import { EmptyState, ErrorState, SkeletonRows } from "../ds";
 import { useApiClient, useData } from "../session";
 import { Btn, fmtInt, inputClass } from "../ui";
+import { SearchPick, type PickOption } from "./find-more";
 
 // The filter builder behind "Filters" on the People page, and the lists a person saves from it. The words typed in the search box are NOT part of this form (the box is at the top of
 // the page), so a saved list is only the choices. A list never holds a contact. Saved per person, or shared with the team (never created by or shown to a client's staff).
@@ -22,7 +23,7 @@ const sel = (label: string, id: string, value: string, set: (v: string) => void,
   </div>
 );
 
-export function FilterBuilder({ opts, value, onChange, onClear }: { opts: Options | null | undefined; value: SmartFilter; onChange: (f: SmartFilter) => void; onClear: () => void }) {
+export function FilterBuilder({ opts, value, onChange, onClear, plus = false }: { opts: Options | null | undefined; value: SmartFilter; onChange: (f: SmartFilter) => void; onClear: () => void; plus?: boolean }) {
   const set = (patch: Partial<SmartFilter>) => {
     const next: Record<string, unknown> = { ...value, ...patch };
     for (const k of Object.keys(next)) if (next[k] === "" || next[k] === undefined || next[k] === false) delete next[k];
@@ -37,11 +38,15 @@ export function FilterBuilder({ opts, value, onChange, onClear }: { opts: Option
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
   const later = (patch: Partial<SmartFilter>) => { if (timer.current) clearTimeout(timer.current); timer.current = setTimeout(() => latest.current(patch), 350); };
   const tag = value.tags?.[0] ?? "";
+  // With the Find a lead flag the long lists (tags, owners, sources, stages, accounts) are typed into instead of scrolled: fifty accounts or three hundred tags stay usable on a phone.
+  const pick = (label: string, id: string, v: string, setV: (v: string) => void, options: Array<[string, string]>, any: string) => plus
+    ? <SearchPick key={id} label={label} value={v} onChange={setV} anyLabel={any} testId={`pick-${id}`} options={options.filter(([val]) => val !== "").map(([val, l]) => ({ value: val, label: l.replace(/ (d[d,]*)$/, ""), hint: /((d[d,]*))$/.exec(l)?.[1] }) satisfies PickOption)} />
+    : sel(label, id, v, setV, [["", any], ...options]);
   return (
     <div className="space-y-3" data-testid="filter-builder">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {sel("Tag", "f-tag", tag, (v) => set({ tags: v ? [v] : undefined, tagMode: undefined, seenFrom: v ? value.seenFrom : undefined, seenTo: v ? value.seenTo : undefined }), [["", "Any tag"], ...(opts?.tags.slice(0, 150).map((t) => [t.tag, `${t.tag} (${fmtInt(t.count)})`] as [string, string]) ?? [])])}
-        {sel("Without the tag", "f-nottag", value.notTag ?? "", (v) => set({ notTag: v }), [["", "No exclusion"], ...(opts?.tags.slice(0, 150).map((t) => [t.tag, t.tag] as [string, string]) ?? [])])}
+        {pick("Tag", "f-tag", tag, (v) => set({ tags: v ? [v] : undefined, tagMode: undefined, seenFrom: v ? value.seenFrom : undefined, seenTo: v ? value.seenTo : undefined }), (opts?.tags.slice(0, plus ? 300 : 150).map((t) => [t.tag, `${t.tag} (${fmtInt(t.count)})`] as [string, string]) ?? []), "Any tag")}
+        {pick("Without the tag", "f-nottag", value.notTag ?? "", (v) => set({ notTag: v }), (opts?.tags.slice(0, plus ? 300 : 150).map((t) => [t.tag, t.tag] as [string, string]) ?? []), "No exclusion")}
         <div>
           <label htmlFor="f-from" className="mb-1 block text-xs font-medium">Tag first seen from</label>
           <input id="f-from" type="date" className={inputClass} disabled={!tag} value={value.seenFrom ?? ""} onChange={(e) => set({ seenFrom: e.target.value })} />
@@ -50,10 +55,10 @@ export function FilterBuilder({ opts, value, onChange, onClear }: { opts: Option
           <label htmlFor="f-to" className="mb-1 block text-xs font-medium">Tag first seen to</label>
           <input id="f-to" type="date" className={inputClass} disabled={!tag} value={value.seenTo ?? ""} onChange={(e) => set({ seenTo: e.target.value })} />
         </div>
-        {sel("Owner", "f-owner", value.owner ?? "", (v) => set({ owner: v }), [["", "Anyone"], ["none", "No owner"], ...(opts?.owners.map((o) => [o.id, `${o.name} (${fmtInt(o.count)})`] as [string, string]) ?? [])])}
-        {sel("Source", "f-source", value.source ?? "", (v) => set({ source: v }), [["", "Any source"], ["none", "No source recorded"], ...(opts?.sources.map((s) => [s.source, `${s.source} (${fmtInt(s.count)})`] as [string, string]) ?? [])])}
-        {sel("Deal stage", "f-stage", value.stage ?? "", (v) => set({ stage: v }), [["", "Any stage"], ...(opts?.stages.map((s) => [s, s] as [string, string]) ?? [])])}
-        {opts && !opts.singleAccount && sel("Client account", "f-acct", value.location ?? "", (v) => set({ location: v }), [["", "All client accounts"], ...opts.accounts.map((a) => [a.id, a.name] as [string, string])])}
+        {pick("Owner", "f-owner", value.owner ?? "", (v) => set({ owner: v }), [["none", "No owner"], ...(opts?.owners.map((o) => [o.id, `${o.name} (${fmtInt(o.count)})`] as [string, string]) ?? [])], "Anyone")}
+        {pick("Source", "f-source", value.source ?? "", (v) => set({ source: v }), [["none", "No source recorded"], ...(opts?.sources.map((s) => [s.source, `${s.source} (${fmtInt(s.count)})`] as [string, string]) ?? [])], "Any source")}
+        {pick("Deal stage", "f-stage", value.stage ?? "", (v) => set({ stage: v }), (opts?.stages.map((s) => [s, s] as [string, string]) ?? []), "Any stage")}
+        {opts && !opts.singleAccount && pick("Client account", "f-acct", value.location ?? "", (v) => set({ location: v }), opts.accounts.map((a) => [a.id, a.name] as [string, string]), "All client accounts")}
         <div>
           <label htmlFor="f-quiet" className="mb-1 block text-xs font-medium">No activity for (days)</label>
           <input id="f-quiet" className={inputClass} inputMode="numeric" value={days} onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, "").slice(0, 4); setDays(v); later({ quietDays: v === "" ? undefined : Number(v) }); }} placeholder="e.g. 30" />
