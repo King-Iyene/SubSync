@@ -44,3 +44,27 @@ Appointments becomes a module with sub-sections (tabs), each with room for 1M+ a
 9. **Proof**: weekly receipt, verified page, benchmark (opt-in, later).
 10. **Actions**: reschedule, add, reassign, delete (typed confirmation), through the gateway with preview, audit log, double-booking check.
 Everything behind its own flag (ON for testing, reminder item 33), additive migrations, tenancy before main.
+
+## 7. Features inside each sub-section (from the research, pain points and advanced ideas)
+Every item below is a pain point or a moat item above. Each sub-section is a full-width area with a compact table (server-paged, 1M+ rows), a right-side panel with the appointment details, clickable counts, flags ON for testing.
+1. **Overview:** headline sentence + one button; true show rate vs reported; revenue-at-risk range; 3 cards; animated "where do my appointments go" journey (booked, confirmed, showed, closed).
+2. **Needs outcome:** past-due appointments with no outcome; one-click Showed / No-show / Cancelled / Invalid / Completed (gateway, preview); bulk mark; "auto-mark suggestion" from a later deal or message, never automatic; weekly alert; extra statuses shown as our own labels (the 236-vote ask) without changing the CRM.
+3. **No-show recovery:** no-shows in the last 7 days not rebooked; rebook (add appointment), call, snooze, mark lost; recovered counter and dollars; "rebooked within 24h" rate.
+4. **Booking share (setter vs closer):** who booked (creator or source) vs who owns it; per person table, trend, book-to-show, show-to-close, speed from lead to booked; leaderboard; unassigned bookings; fairness of round robin (per appointment, not per day); fix ownerless bookings with Assign.
+5. **Cross-account health:** worst account first; show, cancel, no-show, unmarked, reschedule rates per account, per calendar, per vertical; weekly ranking; per-account target.
+6. **Sources and speed:** show rate by lead source/UTM (the 387-vote ask), by first-reply speed, by lead time, by weekday and hour; best slots advice.
+7. **Calendars and conflicts:** double bookings and forced overlaps, disconnected or one-way calendars, reminder gaps (appointments with no reminder sent), reschedule and cancellation trend, capacity view (slots left per month).
+8. **Reminders and no-show prevention:** confirmation status, "not confirmed 24h before" list, reminder effectiveness (needs history), deposit present flag, risk flags for likely no-shows (later, needs data).
+9. **Actions:** reschedule, add, reassign, delete (typed confirmation, never when blocked), double-booking check, audit log, undo note; all through the safe gateway.
+10. **Proof:** weekly appointment receipt per client (booked, showed, recovered, still unmarked), verified page, opt-in peer benchmark later.
+11. **Meetings (Fathom):** see section 8.
+
+## 8. Fathom sub-section (meeting details inside the appointment)
+Fathom integration exists in the code (stage E2a, fixtures, `FATHOM_WEBHOOK_LIVE` switch, per-person connections). In Appointments it becomes the easiest way to see what happened in the meeting:
+- **Easy connect and sync:** one connect button per person (a personal tool belongs to the person who connected it, tokens never visible to others), status line "synced 2 min ago", Sync now, clear error text.
+- **Appointment details panel:** appointment time, owner, booker, status, deal, plus the meeting recording link, summary, action items, next step, duration, who attended, matched automatically.
+- **Match with certainty only:** match meeting to appointment by contact, time window and attendee email; if not certain it waits in the person's private inbox ("Needs matching", one-click match), never guessed (principle 13).
+- **Outcome from the meeting:** suggest Showed (a meeting happened) or No-show (calendar slot passed with no meeting); one tap to confirm, never automatic.
+- **Follow-up:** action items to an internal note and task (gateway, our own writes excluded from metrics), "no next step set" list, "meeting held but deal not moved" list.
+- **Coaching:** per setter and closer: talk time, meeting length, show-to-close, next step set rate (no message text stored in SubSync beyond what the connection returns; privacy rules in docs).
+- **Money angle:** "meetings held, no follow-up within 2 days" is lost revenue; "closer takes 40% shorter meetings and closes less" is coaching an agency can sell.
