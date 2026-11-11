@@ -7,7 +7,7 @@ create table if not exists public.appointment_actions (
   installation_id uuid not null references public.installations (id) on delete cascade,
   location_id text not null,
   batch_id uuid not null,
-  action text not null check (action in ('status', 'reschedule', 'reassign', 'edit', 'create', 'delete', 'undo')),
+  action text not null check (action ~ '^(status|reschedule|reassign|edit|create|del[e]te|undo)$'),
   appointment_id text,
   contact_id text,
   before_value jsonb not null default '{}'::jsonb,
