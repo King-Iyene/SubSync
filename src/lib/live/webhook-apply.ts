@@ -1,3 +1,5 @@
+import { featureOn } from "../flags";
+import { recordFromWebhook } from "../analytics/appointments3-record";
 import { sql } from "../db";
 import { safeError } from "../safe-log";
 import { mapOpportunity } from "../sync/ghl-data";
@@ -77,6 +79,7 @@ export async function applyLiveWebhook(
     if (t === "AppointmentDelete") {
       const id = text(rec(root.appointment).id, root.id);
       if (!id) return none;
+      if (await featureOn("appt_record")) await recordFromWebhook({ installationId: a.installationId, locationId: a.locationId, appointmentId: id, type: "AppointmentDelete" });
       await db`delete from cached_appointments where installation_id = ${a.installationId} and location_id = ${a.locationId} and appointment_id = ${id}`;
       return { skipResync: true };
     }
@@ -88,6 +91,8 @@ export async function applyLiveWebhook(
       const norm = status.toLowerCase().replace(/[\s_-]/g, "");
       const st = norm === "canceled" ? "cancelled" : norm === "noshow" ? "noshow" : norm;
       const start = text(ap.startTime), end = text(ap.endTime);
+      // The payload has no previous status: the recorder compares it with the stored row, before the row is updated (flag appt_record).
+      if (await featureOn("appt_record")) await recordFromWebhook({ installationId: a.installationId, locationId: a.locationId, appointmentId: id, type: "AppointmentUpdate", next: { status: st, startAt: start ? Date.parse(start) : null, ownerId: text(ap.assignedUserId) || null } });
       const done = await db`
         update cached_appointments set status = ${st}, start_at = coalesce(${start ? new Date(start) : null}, start_at), end_at = coalesce(${end ? new Date(end) : null}, end_at),
           assigned_to = coalesce(${text(ap.assignedUserId)}, assigned_to), synced_at = now()

@@ -70,6 +70,21 @@ export const FEATURES = [
   // Unanswered round 3, slice B (actions): each behind its own flag, default off.
   "inbox_open_lead",
   "lead_journey_pro",
+  // Appointments module round 3 (docs/features/APPOINTMENTS_BRIEF.md): each behind its own flag, default off.
+  "appt_overview",
+  "appt_needs_outcome",
+  "appt_noshow_recovery",
+  "appt_booking_share",
+  "appt_flow_tree",
+  "appt_health",
+  "appt_sources",
+  "appt_calendars",
+  "appt_reminders",
+  "appt_meetings",
+  "appt_proof",
+  "appt_actions",
+  "appt_history",
+  "appt_record",
   "inbox_claim",
   "inbox_note",
   "inbox_outcome_ui",
@@ -82,6 +97,12 @@ export const FEATURES = [
   "inbox_quiet",
   "inbox_keys",
   "inbox_bulk",
+  "appt_actions",
+  "appt_delete",
+  "appt_bulk",
+  "appt_meetings",
+  // Appointments module (stage AU, the sub-section screens and the Flow Tree): default off.
+  "appt_module",
 ] as const;
 export type Feature = (typeof FEATURES)[number];
 

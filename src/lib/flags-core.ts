@@ -38,6 +38,21 @@ export const DEFAULT_OFF: ReadonlySet<Feature> = new Set<Feature>([
   "inbox_open_lead",
   // Speed to lead: the river view of the lead journey (the dots view shows when off).
   "lead_journey_pro",
+  // Appointments module round 3 (docs/features/APPOINTMENTS_BRIEF.md): each behind its own flag, default off.
+  "appt_overview",
+  "appt_needs_outcome",
+  "appt_noshow_recovery",
+  "appt_booking_share",
+  "appt_flow_tree",
+  "appt_health",
+  "appt_sources",
+  "appt_calendars",
+  "appt_reminders",
+  "appt_meetings",
+  "appt_proof",
+  "appt_actions",
+  "appt_history",
+  "appt_record",
   "inbox_claim",
   "inbox_note",
   "inbox_outcome_ui",
@@ -50,6 +65,11 @@ export const DEFAULT_OFF: ReadonlySet<Feature> = new Set<Feature>([
   "inbox_quiet",
   "inbox_keys",
   "inbox_bulk",
+  "appt_actions",
+  "appt_delete",
+  "appt_bulk",
+  "appt_meetings",
+  "appt_module",
 ]);
 
 export function resolveFeatures(all: readonly Feature[], overrides: Record<string, boolean>, allOn = false): Record<Feature, boolean> {
