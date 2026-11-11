@@ -6,7 +6,7 @@ import type { Feature } from "../entitlements";
 import { resolveEntitlements } from "../flags";
 import type { deepLinks } from "../links";
 import { json, type AuthContext } from "./auth";
-import { allowedAccount } from "./pl-guard";
+import { ownedAccount } from "./pl-guard";
 
 // GET /api/app/pipeline3?part=overview|money-flow|attention|won-lost|forecast|people|sources|stage-history|health|receipt|list|detail|replay (read only). Who is asking comes from the
 // verified session; the accounts that caller may read come from `allowed` (decided by the router from the session, never from the request): an account id in the address only
@@ -34,7 +34,7 @@ export async function handlePipeline3(ctx: Ctx, h: Pl3Helpers): Promise<Response
   const seePeople = ctx.kind !== "client";
   const one = cleanId(sp.get("location"));
   // An account id only narrows inside what the caller may read; one outside it is the same answer as nothing there.
-  if (sp.get("location") && (!one || allowedAccount(allowedAll, one) === null)) return json(emptyFor(part, flags, ctx.limitTo === null));
+  if (sp.get("location") && (!one || (await ownedAccount(ctx.installationId, allowedAll, one)) === null)) return json(emptyFor(part, flags, ctx.limitTo === null));
   const scope: Scope = { inst: ctx.installationId, allowed: allowedAll };
   const now = Date.now();
   const w = parsePlWindow(sp.get("from"), sp.get("to"), now);
@@ -79,7 +79,9 @@ export async function handlePipeline3(ctx: Ctx, h: Pl3Helpers): Promise<Response
       return done(await receipt(scope, one, /^\d{4}-\d{2}-\d{2}$/.test(wk) && Number.isFinite(Date.parse(wk)) ? new Date(Date.parse(wk)) : new Date(monday)));
     }
     case "detail": {
-      const d = await detail(scope, sp.get("location") ?? "", sp.get("id") ?? sp.get("deal") ?? "", link);
+      const dl = await ownedAccount(ctx.installationId, allowedAll, sp.get("location"));
+      if (!dl) return json({ error: "Deal not found" }, 404);
+      const d = await detail(scope, dl, sp.get("id") ?? sp.get("deal") ?? "", link);
       if (!d) return json({ error: "Deal not found" }, 404);
       return wrap(d);
     }

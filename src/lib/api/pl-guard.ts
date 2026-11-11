@@ -12,13 +12,7 @@ export function allowedAccount(allowed: Allowed, v: unknown): string | null {
   return allowed && !allowed.includes(v) ? null : v;
 }
 
-/** As allowedAccount, and the account must exist in the caller's own installation. */
+/** As allowedAccount, and the account must exist in the caller's own installation (the shared guard; a foreign id is the same answer as nothing there). */
 export async function ownedAccount(installationId: string, allowed: Allowed, v: unknown): Promise<string | null> {
-  const id = allowedAccount(allowed, v);
-  if (!id) return null;
-  try {
-    const { sql } = await import("../db");
-    const rows = await sql()`select 1 from locations where installation_id = ${installationId} and location_id = ${id} limit 1`;
-    return rows.length > 0 ? id : null;
-  } catch { return null; }
+  try { const { ownedLocation } = await import("./tenant-guard"); return await ownedLocation(installationId, allowed ? [...allowed] : null, v); } catch { return null; }
 }

@@ -19,6 +19,7 @@ import { failureText, runAction, type Action, type Target } from "../ghl/workben
 import { isLive } from "../live-flags";
 import type { Feature } from "../entitlements";
 import { accountMembers } from "./workbench-routes";
+import { ownedLocation } from "./tenant-guard";
 import { json, type AuthContext } from "./auth";
 
 // The Appointments ACTIONS and MEETINGS endpoints (slice AB), under /api/app/appointments/act/<part> and /api/app/appointments/meetings/<part>:
@@ -54,10 +55,9 @@ async function readBody(ctx: Ctx): Promise<Record<string, unknown> | null> {
   const b = await ctx.request.json().catch(() => null);
   return b && typeof b === "object" ? (b as Record<string, unknown>) : null;
 }
-async function accountOf(h: ApptActionHelpers, v: unknown): Promise<string | null> {
+async function accountOf(ctx: Ctx, h: ApptActionHelpers, v: unknown): Promise<string | null> {
   if (typeof v !== "string" || !ID.test(v)) return null;
-  const allowed = await h.allowed();
-  return allowed && !allowed.includes(v) ? null : v;
+  return ownedLocation(ctx.installationId, await h.allowed(), v);
 }
 const idList = (v: unknown, max: number): string[] | null => {
   if (!Array.isArray(v) || v.length === 0 || v.length > max) return null;
@@ -110,7 +110,7 @@ async function account(ctx: Ctx, locationId: string, around: { from: number; to:
 
 async function panelRoute(ctx: Ctx, h: ApptActionHelpers): Promise<Response> {
   const sp = ctx.url.searchParams;
-  const locationId = await accountOf(h, sp.get("locationId"));
+  const locationId = await accountOf(ctx, h, sp.get("locationId"));
   const id = sp.get("id");
   if (!locationId || !isId(id)) return json({ error: "That appointment is not available" }, 404);
   const p = await panelFacts(ctx.installationId, locationId, id);
@@ -139,7 +139,7 @@ async function panelRoute(ctx: Ctx, h: ApptActionHelpers): Promise<Response> {
 
 async function slotsRoute(ctx: Ctx, h: ApptActionHelpers): Promise<Response> {
   const sp = ctx.url.searchParams;
-  const locationId = await accountOf(h, sp.get("locationId"));
+  const locationId = await accountOf(ctx, h, sp.get("locationId"));
   const id = sp.get("id");
   if (!locationId || !isId(id)) return json({ error: "That appointment is not available" }, 404);
   const [f] = await loadFacts(ctx.installationId, locationId, [id]);
@@ -163,7 +163,7 @@ const logKind = (k: ApptAction["kind"]): ApptLogRow["action"] => k;
 
 async function applyRoute(ctx: Ctx, h: ApptActionHelpers): Promise<Response> {
   const b = await readBody(ctx);
-  const locationId = await accountOf(h, b?.locationId);
+  const locationId = await accountOf(ctx, h, b?.locationId);
   if (!b || !locationId || !isId(b.appointmentId)) return json({ error: "Choose the appointment" }, 400);
   const parsed = parseAction(b.action);
   if (!parsed.ok) return json({ error: parsed.error }, 400);
@@ -228,7 +228,7 @@ async function createCommon(ctx: Ctx, h: ApptActionHelpers, locationId: string, 
 
 async function createRoute(ctx: Ctx, h: ApptActionHelpers): Promise<Response> {
   const b = await readBody(ctx);
-  const locationId = await accountOf(h, b?.locationId);
+  const locationId = await accountOf(ctx, h, b?.locationId);
   if (!b || !locationId) return json({ error: "Choose the account" }, 400);
   const parsed = parseCreate(b);
   if (!parsed.ok) return json({ error: parsed.error }, 400);
@@ -239,7 +239,7 @@ async function createRoute(ctx: Ctx, h: ApptActionHelpers): Promise<Response> {
 
 async function rebookRoute(ctx: Ctx, h: ApptActionHelpers): Promise<Response> {
   const b = await readBody(ctx);
-  const locationId = await accountOf(h, b?.locationId);
+  const locationId = await accountOf(ctx, h, b?.locationId);
   if (!b || !locationId || !isId(b.appointmentId)) return json({ error: "Choose the appointment" }, 400);
   const [f] = await loadFacts(ctx.installationId, locationId, [b.appointmentId]);
   if (!f || !mayTouch(ctx, f.assignedTo) || !f.contactId || !f.calendarId) return json({ error: "That appointment cannot be booked again from here" }, 404);
@@ -259,7 +259,7 @@ async function rebookRoute(ctx: Ctx, h: ApptActionHelpers): Promise<Response> {
 async function bulkRoute(ctx: Ctx, h: ApptActionHelpers): Promise<Response> {
   if (!on(ctx, "appt_bulk")) return off();
   const b = await readBody(ctx);
-  const locationId = await accountOf(h, b?.locationId);
+  const locationId = await accountOf(ctx, h, b?.locationId);
   const kind = b?.kind;
   if (kind !== "status" && kind !== "delete" && kind !== "reassign") return json({ error: "Choose what to do" }, 400);
   const ids = idList(b?.ids, 300);
@@ -308,7 +308,7 @@ async function bulkRoute(ctx: Ctx, h: ApptActionHelpers): Promise<Response> {
 
 async function undoRoute(ctx: Ctx, h: ApptActionHelpers): Promise<Response> {
   const b = await readBody(ctx);
-  const locationId = await accountOf(h, b?.locationId);
+  const locationId = await accountOf(ctx, h, b?.locationId);
   if (!b || !locationId || typeof b.batchId !== "string" || !/^[0-9a-f-]{36}$/.test(b.batchId)) return json({ error: "Choose the change" }, 400);
   const rows = await batchRows(ctx.installationId, locationId, b.batchId);
   const fresh = rows.filter((r) => Date.now() - Date.parse(r.at) < UNDO_MINUTES * 60_000);
@@ -367,7 +367,7 @@ async function meetingsSync(ctx: Ctx, h: ApptActionHelpers): Promise<Response> {
 async function meetingsMatch(ctx: Ctx, h: ApptActionHelpers): Promise<Response> {
   const bad = needUser(ctx); if (bad) return bad;
   const b = await readBody(ctx);
-  const locationId = await accountOf(h, b?.locationId);
+  const locationId = await accountOf(ctx, h, b?.locationId);
   if (!b || !locationId || !isId(b.appointmentId) || typeof b.meetingId !== "string" || !/^[0-9a-f-]{36}$/.test(b.meetingId)) return json({ error: "Choose the call and the appointment" }, 400);
   const [f] = await loadFacts(ctx.installationId, locationId, [b.appointmentId]);
   if (!f) return json({ error: "That appointment is not available" }, 404);
@@ -377,7 +377,7 @@ async function meetingsMatch(ctx: Ctx, h: ApptActionHelpers): Promise<Response> 
 async function meetingsNote(ctx: Ctx, h: ApptActionHelpers): Promise<Response> {
   const bad = needUser(ctx); if (bad) return bad;
   const b = await readBody(ctx);
-  const locationId = await accountOf(h, b?.locationId);
+  const locationId = await accountOf(ctx, h, b?.locationId);
   if (!b || !locationId || !isId(b.appointmentId)) return json({ error: "Choose the appointment" }, 400);
   const [f] = await loadFacts(ctx.installationId, locationId, [b.appointmentId]);
   const call = f ? await ownMeetingFor(ctx.installationId, ctx.session.userId as string, locationId, b.appointmentId) : null;

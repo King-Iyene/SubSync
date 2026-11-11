@@ -3,7 +3,7 @@ import type { Appt3Bucket, Appt3FlowTree, Appt3Overview, Estimate, FlowNode, Rat
 
 export const DAY = 86_400_000;
 /** Minimums. Under them the screen says "not enough data", never a number. */
-export const MIN_SHOW = 5, MIN_CLOSE = 10, MIN_NEXT_LEAD = 20, MIN_FAIRNESS = 10;
+export const MIN_SHOW = 5, MIN_CLOSE = 10, MIN_FAIRNESS = 10;
 export const GRACE_HOURS = 3;
 export const DEFAULT_DEAL_WINDOW_DAYS = 30;
 export const MAX_WINDOW_DAYS = 366;
@@ -63,7 +63,7 @@ export function pickButton(o: { unmarked: number; noshowToRecover: number; noDea
 /** One row of the SQL aggregate: setter (booker) by closer (owner). null id = not recorded. */
 export type FlowAgg = {
   setter: string | null; closer: string | null; booked: number; showed: number; noshow: number; cancelled: number; unmarked: number; upcoming: number;
-  won: number; lost: number; open: number; wonValue: number; burned: number; ltbMedianMin: number | null;
+  won: number; lost: number; open: number; wonValue: number; ltbMedianMin: number | null;
 };
 
 const sum = <T,>(xs: T[], f: (x: T) => number) => xs.reduce((t, x) => t + f(x), 0);
@@ -79,7 +79,7 @@ function badgesOf(rows: FlowAgg[], median: number | null): NonNullable<FlowNode[
   const won = sum(rows, (r) => r.won), lost = sum(rows, (r) => r.lost);
   return {
     bookings: booked, showRate: trueShowRate(showed, noshow, unmarked), noshowRate: rate(noshow, showed + noshow + unmarked), closeRate: rate(won, won + lost, MIN_CLOSE),
-    burned: sum(rows, (r) => r.burned), wonValue: sum(rows, (r) => r.wonValue), leadToBookedMedianMinutes: median,
+    wonValue: sum(rows, (r) => r.wonValue), leadToBookedMedianMinutes: median,
   };
 }
 const weightedMedian = (rows: FlowAgg[]) => {
@@ -94,12 +94,12 @@ const LEAVES: Array<{ k: NonNullable<FlowNode["leaf"]>; f: (r: FlowAgg) => numbe
 ];
 
 /** Builds the tree from the setter-by-closer aggregate. Top N setters by bookings (the rest are summed into one "Everyone else" node and counted in hiddenPeople). */
-export function buildFlowTree(aggs: FlowAgg[], names: (id: string | null) => string, period: { from: string; to: string }, topN = 12, compareIds: [string, string] | null = null): Appt3FlowTree {
+export function buildFlowTree(aggs: FlowAgg[], names: (id: string | null) => string, period: { from: string; to: string }, topN = 12, compareIds: [string, string] | null = null, skip = 0): Appt3FlowTree {
   const total = sum(aggs, (r) => r.booked);
   const bySetter = new Map<string | null, FlowAgg[]>();
   for (const r of aggs) bySetter.set(r.setter, [...(bySetter.get(r.setter) ?? []), r]);
   const ranked = [...bySetter.entries()].sort((a, b) => sum(b[1], (r) => r.booked) - sum(a[1], (r) => r.booked));
-  const shown = ranked.slice(0, topN), rest = ranked.slice(topN);
+  const shown = ranked.slice(skip, skip + topN), rest = ranked.slice(skip + topN); // 'See all' pages through the people; skip = how many were already shown
   const nodes: FlowNode[] = [{
     id: "root", level: "root", label: "Booked", userId: null, parentId: null, count: total, health: null, best: false,
     badges: badgesOf(aggs, weightedMedian(aggs)), open: {},
@@ -137,7 +137,7 @@ export function buildFlowTree(aggs: FlowAgg[], names: (id: string | null) => str
     for (const n of cand) n.best = true;
   }
   return {
-    nodes, period, totalBooked: total, topN, hiddenPeople: rest.length, leak: findLeak(nodes), nextLead: nextLeadOf(aggs, names),
+    nodes, period, totalBooked: total, topN, hiddenPeople: rest.length, leak: findLeak(nodes),
     compare: compareIds ? { a: nodes.find((n) => n.userId === compareIds[0] && n.level === "setter") ?? nodes[0], b: nodes.find((n) => n.userId === compareIds[1] && n.level === "setter") ?? nodes[0] } : null,
   };
 }
@@ -161,20 +161,6 @@ export function findLeak(nodes: FlowNode[]): Appt3FlowTree["leak"] {
   };
 }
 
-/** Who should get the next lead: the closer with the best true show rate times close rate, with at least MIN_NEXT_LEAD appointments. An estimate. */
-export function nextLeadOf(aggs: FlowAgg[], names: (id: string | null) => string): Appt3FlowTree["nextLead"] {
-  const by = new Map<string, FlowAgg[]>();
-  for (const r of aggs) if (r.closer) by.set(r.closer, [...(by.get(r.closer) ?? []), r]);
-  let best: { id: string; score: number } | null = null;
-  for (const [id, rows] of by) {
-    const b = badgesOf(rows, null);
-    if (b.bookings < MIN_NEXT_LEAD || !b.showRate.enough || !b.closeRate.enough) continue;
-    const score = (b.showRate.value as number) * (b.closeRate.value as number);
-    if (!best || score > best.score) best = { id, score };
-  }
-  return best ? { userId: best.id, name: names(best.id), estimate: true, formula: "The closer with the best show rate times close rate on their own appointments in this period, with at least 20 appointments and 10 closed deals. A guess from the past, not a promise." } : null;
-}
-
 // ---------- calendars ----------
 
 /** Two appointments on the same calendar (or for the same owner) overlap. A forced overlap is one that was booked after the other already existed AND was created by a person (not the booking page). */
@@ -193,3 +179,44 @@ export const speedBand = (minutes: number | null): "under_5m" | "5_to_30m" | "30
   minutes === null ? "none" : minutes < 5 ? "under_5m" : minutes < 30 ? "5_to_30m" : minutes < 120 ? "30m_to_2h" : "over_2h";
 export const SPEED_LABELS = { under_5m: "Under 5 minutes", "5_to_30m": "5 to 30 minutes", "30m_to_2h": "30 minutes to 2 hours", over_2h: "Over 2 hours", none: "No reply recorded" } as const;
 export const leadTimeBand = (days: number) => (days < 1 ? "Same day" : days < 3 ? "1 to 2 days" : days < 7 ? "3 to 6 days" : "A week or more");
+
+// ---------- people (who is in which account) ----------
+
+export type PeopleMember = { locationId: string; userId: string; name: string };
+export type PeopleBooking = { locationId: string; userId: string; n: number; lastAt: string | null };
+export type PersonAccount = { locationId: string; accountName: string | null; bookings: number; lastBookingAt: string | null; member: boolean };
+export type PersonRollup = {
+  userId: string; name: string;
+  /** false = seen as a booker or owner but in no account's team list (left or no access). Never flagged idle. */
+  inTeamList: boolean; bookings: number; sharePct: number; lastBookingAt: string | null;
+  accounts: PersonAccount[];
+  /** Accounts the person belongs to where they have zero bookings in these dates. */
+  idleIn: string[];
+  /** Zero bookings in ALL accounts they belong to. */
+  idleEverywhere: boolean;
+};
+
+/** One row per person. Built from the accounts' team lists (location_users) PLUS anyone seen booking, so a new user appears with zero bookings until they book (no code change) and a removed
+ *  user keeps their history. Membership is per account: a person is only ever idle in an account they belong to. With one account in scope the caller passes only that account's rows. */
+export function buildPeople(members: PeopleMember[], bookings: PeopleBooking[], accountNames: Map<string, string | null>, nameOf: (id: string) => string): PersonRollup[] {
+  const mem = new Set(members.map((m) => `${m.locationId}|${m.userId}`));
+  const memberLocs = new Map<string, Set<string>>();
+  for (const m of members) memberLocs.set(m.userId, (memberLocs.get(m.userId) ?? new Set()).add(m.locationId));
+  const names = new Map(members.map((m) => [m.userId, m.name]));
+  const book = new Map(bookings.map((b) => [`${b.locationId}|${b.userId}`, b]));
+  const ids = new Set([...members.map((m) => m.userId), ...bookings.map((b) => b.userId)]);
+  const total = sum(bookings, (b) => b.n);
+  const out: PersonRollup[] = [];
+  for (const id of ids) {
+    const locs = new Set([...(memberLocs.get(id) ?? []), ...bookings.filter((b) => b.userId === id).map((b) => b.locationId)]);
+    const accounts: PersonAccount[] = [...locs].map((loc) => { const b = book.get(`${loc}|${id}`); return { locationId: loc, accountName: accountNames.get(loc) ?? null, bookings: b?.n ?? 0, lastBookingAt: b?.lastAt ?? null, member: mem.has(`${loc}|${id}`) }; })
+      .sort((a, b) => b.bookings - a.bookings || (a.accountName ?? "").localeCompare(b.accountName ?? ""));
+    const n = sum(accounts, (a) => a.bookings), inList = (memberLocs.get(id)?.size ?? 0) > 0;
+    const last = accounts.map((a) => a.lastBookingAt).filter((x): x is string => !!x).sort().pop() ?? null;
+    out.push({
+      userId: id, name: names.get(id) ?? nameOf(id), inTeamList: inList, bookings: n, sharePct: total ? Math.round((n / total) * 100) : 0, lastBookingAt: last, accounts,
+      idleIn: accounts.filter((a) => a.member && a.bookings === 0).map((a) => a.accountName ?? a.locationId), idleEverywhere: inList && n === 0,
+    });
+  }
+  return out.sort((a, b) => b.bookings - a.bookings || a.name.localeCompare(b.name));
+}

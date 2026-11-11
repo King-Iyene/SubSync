@@ -1,12 +1,13 @@
 "use client";
 
-import { ChevronDown, GitCompareArrows, Play, Sparkles } from "lucide-react";
+import { ChevronDown, Play, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { closerTotals, findLeak, layoutFlow, LEAF_ORDER, nextLead, OUTCOME_LABEL, OUTCOME_TONE, type FlowNode, type Tone } from "@/lib/design/appt-flow-layout";
+import { closerTotals, findLeak, layoutFlow, LEAF_ORDER, OUTCOME_LABEL, OUTCOME_TONE, type FlowNode, type Tone } from "@/lib/design/appt-flow-layout";
 import { coachingNote, money, pct } from "@/lib/design/appt-coach";
 import { EmptyState, ErrorState, SkeletonRows } from "../../ds";
 import { CountUp, useReducedMotion } from "../speed6-base";
 import { useAp, type ApFilters } from "./data";
+import { ComparePanel } from "./compare-panel";
 import { Chip } from "./parts";
 import type { ApFlowTree, ApOutcome, ApStats } from "./types";
 
@@ -19,7 +20,7 @@ const LEGEND: Array<[Tone, string]> = [["green", "Healthy: shows and closes abov
 const COLOR: Record<Tone, string> = { green: "var(--s6-green)", amber: "var(--s6-amber)", red: "var(--s6-red)", grey: "var(--muted-foreground)", cyan: "var(--s6-cyan)", violet: "var(--s6-violet)" };
 
 function Stats({ s }: { s: ApStats }) {
-  const cells: Array<[string, string]> = [["Booked", String(s.bookings)], ["Show", pct(s.showRate)], ["No-show", pct(s.noShowRate)], ["Close", pct(s.closeRate)], ["Burned", String(s.burned)], ["Won", money(s.revenueCents)]];
+  const cells: Array<[string, string]> = [["Booked", String(s.bookings)], ["Show", pct(s.showRate)], ["No-show", pct(s.noShowRate)], ["Close", pct(s.closeRate)], ["Won", money(s.revenueCents)]];
   return <div className="ap-stats">{cells.map(([l, v]) => <div className="ap-stat" key={l}><b>{v}</b><small>{l}</small></div>)}</div>;
 }
 const sentence = (n: FlowNode) => {
@@ -29,7 +30,8 @@ const sentence = (n: FlowNode) => {
 };
 
 export function FlowTree({ filters, onOpen, go }: { filters: ApFilters; onOpen: (p: FlowPick) => void; go?: (to: string) => void }) {
-  const { data, error, loading, reload } = useAp<ApFlowTree>("flow-tree", filters);
+  const [top, setTop] = useState(12), [skip, setSkip] = useState(0);
+  const { data, error, loading, reload } = useAp<ApFlowTree>("flow-tree", filters, { top, skip });
   const wrap = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(1000);
   const reduced = useReducedMotion();
@@ -47,7 +49,6 @@ export function FlowTree({ filters, onOpen, go }: { filters: ApFilters; onOpen: 
   const tree = data;
   const layout = useMemo(() => (tree && width >= 700 ? layoutFlow(tree, { width: width - 18, maxSetters: setterLimit, maxClosers: 4 }) : null), [tree, width, setterLimit]);
   const leak = useMemo(() => (tree ? findLeak(tree) : null), [tree]);
-  const next = useMemo(() => (tree ? nextLead(tree) : null), [tree]);
   const people = useMemo(() => {
     if (!tree) return new Map<string, ApStats & { name: string }>();
     const m = new Map<string, ApStats & { name: string }>();
@@ -75,11 +76,9 @@ export function FlowTree({ filters, onOpen, go }: { filters: ApFilters; onOpen: 
   };
   const setterName = (id?: string) => tree.setters.find((s) => s.id === id)?.name ?? "";
   const closerName = (id?: string) => tree.setters.flatMap((s) => s.closers).find((c) => c.id === id)?.name ?? "";
-  const toggleCmp = (n: FlowNode) => { const k = n.kind === "setter" ? `s:${n.setterId}` : `k:${n.closerId}`; setCmp((c) => (c.includes(k) ? c.filter((x) => x !== k) : [...c.slice(-1), k])); };
+  const toggleCmp = (n: FlowNode) => { const k = n.kind === "setter" ? `s:${n.setterId}` : `k:${n.closerId}`; setCmp((c) => (c.includes(k) ? c.filter((x) => x !== k) : c.length && c[0][0] !== k[0] ? [k] : [...c.slice(-1), k])); if (cmp.length === 1) setTimeout(() => document.querySelector('[data-testid="ap-compare"]')?.scrollIntoView({ block: "nearest", behavior: "smooth" }), 80); };
   const preview = hot && layout ? layout.nodes.find((n) => n.id === hot) : null;
   const showLeak = (leakNode: string) => { setLeakOn(true); setHot(leakNode); setTimeout(() => wrap.current?.querySelector<HTMLElement>(`[data-node="${CSS.escape(leakNode)}"] button`)?.scrollIntoView({ block: "center", behavior: reduced ? "auto" : "smooth" }), 50); };
-  const cmpPeople = cmp.map((k) => ({ k, p: people.get(k) })).filter((x): x is { k: string; p: ApStats & { name: string } } => !!x.p);
-  const hidden = tree.hiddenSetters + Math.max(0, tree.setters.length - setterLimit);
 
   return (
     <div data-testid="ap-flow" aria-busy={loading}>
@@ -89,10 +88,6 @@ export function FlowTree({ filters, onOpen, go }: { filters: ApFilters; onOpen: 
           {width >= 700 ? <button type="button" className="s6-btn" onClick={() => showLeak(leak.nodeId)} data-testid="ap-leak-show">Show me</button> : <button type="button" className="s6-btn" onClick={() => onOpen({ title: `${setterName(leak.setterId)} to ${closerName(leak.closerId ?? "")}, no-shows`, count: leak.excess, params: { booker: leak.setterId, owner: leak.closerId ?? undefined, outcome: "noshow" } })}>Open them</button>}
         </div>
       ) : <div className="ap-leak" data-ok="1" data-testid="ap-leak"><Sparkles aria-hidden className="size-4 text-[var(--s6-green)]" /><span>No single hand-off stands out. Nobody is far above your own no-show rate.</span></div>}
-      {next && (
-        <div className="ap-fine mb-3" data-testid="ap-next-lead"><b className="text-foreground">Who should get the next lead? {next.name}.</b> {next.text} <i>Estimate, from your own results only.</i>{" "}
-          <details className="inline"><summary className="ap-link inline cursor-pointer">How this is worked out</summary><span className="mt-1 block max-w-xl">Won appointments divided by appointments handed over, for each closer with at least {tree.minBookings} bookings. It ignores deal size and lead quality, so use it as a nudge.</span></details></div>
-      )}
 
       <div className="ap-tree-bar">
         <div className="ap-legend" aria-label="Colour key">{LEGEND.map(([t, l]) => <span key={t}><i style={{ background: COLOR[t] }} />{l}</span>)}<span><Sparkles aria-hidden className="mr-1 inline size-3 text-[var(--s6-cyan)]" />Glow: best converters</span></div>
@@ -105,7 +100,7 @@ export function FlowTree({ filters, onOpen, go }: { filters: ApFilters; onOpen: 
 
       <div className="ap-preview" aria-live="polite" data-testid="ap-preview">
         {preview && preview.stats ? <><b>{preview.label}</b><span>{preview.stats.bookings} booked</span><span>{pct(preview.stats.showRate)} show</span><span>{pct(preview.stats.noShowRate)} no-show</span><span>{pct(preview.stats.closeRate)} close</span><span>{money(preview.stats.revenueCents)} won</span>{preview.stats.avgLeadToBookedHours !== null && <span>{preview.stats.avgLeadToBookedHours.toFixed(1)}h lead to booked</span>}<Chip tone={preview.tone}>{TONE_TEXT[preview.tone]}</Chip></>
-          : preview ? <><b>{preview.label}</b><span>{preview.count} appointments. Press to open exactly those.</span></> : <span>Hover or focus a branch to preview it. Press it to open those appointments. Use the compare button on two people to put them side by side.</span>}
+          : preview ? <><b>{preview.label}</b><span>{preview.count} appointments. Press to open exactly those.</span></> : <span>Hover or focus a branch to preview it. Press it to open those appointments. Press Compare on two people to put them side by side.</span>}
       </div>
 
       <div ref={wrap} className="w-full">
@@ -130,40 +125,25 @@ export function FlowTree({ filters, onOpen, go }: { filters: ApFilters; onOpen: 
                           : n.kind === "more" ? <span>{n.label}</span>
                           : <><span className="ap-node-name"><span>{n.label}</span>{n.best && <Sparkles aria-hidden className="size-3.5 flex-none text-[var(--tone)]" />}</span><Stats s={n.stats!} /></>}
                       </button>
-                      {canCmp && <button type="button" className="ap-cmp" aria-pressed={cmp.includes(key)} aria-label={`Compare ${n.label}`} onClick={() => toggleCmp(n)} data-testid="ap-cmp"><GitCompareArrows aria-hidden className="size-3.5" /></button>}
+                      {canCmp && <button type="button" className="ap-cmp" aria-pressed={cmp.includes(key)} aria-label={`Compare ${n.label}`} title="Pick two people to see them side by side" onClick={() => toggleCmp(n)} data-testid="ap-cmp" style={{ width: "auto", padding: "0 8px", fontSize: 11 }}>{cmp.includes(key) ? "Selected" : "Compare"}</button>}
                     </div>
                   );
                 })}
               </div>
             </div>
           </div>
-        ) : <PhoneTree tree={tree} limit={setterLimit} onOpen={onOpen} cmp={cmp} setCmp={setCmp} next={next?.id} />}
+        ) : <PhoneTree tree={tree} limit={setterLimit} onOpen={onOpen} cmp={cmp} setCmp={setCmp} />}
       </div>
-      {hidden > 0 && <p className="mt-2 text-sm"><button type="button" className="ap-link" onClick={() => setSetterLimit(100)}>Show {hidden} more {hidden === 1 ? "booker" : "bookers"}</button> <span className="ap-fine">Busiest people first.</span></p>}
+      <p className="mt-2 flex flex-wrap items-center gap-3 text-sm" data-testid="ap-tree-pager">{skip > 0 && <button type="button" className="ap-link" onClick={() => { setSkip(Math.max(0, skip - top)); setSetterLimit(5); }}>Previous {top} people</button>}<span className="ap-fine">Showing {skip + 1} to {skip + tree.setters.filter((x) => x.id !== "others").length} people, busiest first.</span>{tree.hiddenSetters > 0 && <><button type="button" className="ap-link" onClick={() => { setSkip(skip + top); setSetterLimit(5); }} data-testid="ap-tree-more">See the next {Math.min(top, tree.hiddenSetters)} people</button>{top < 30 && <button type="button" className="ap-link" onClick={() => setTop(30)}>Show 30 at a time</button>}</>}</p>
 
-      {cmpPeople.length > 0 && (
-        <div className="s6-card mt-4" data-testid="ap-compare">
-          <h3 className="s6-q">Side by side</h3>
-          {cmpPeople.length < 2 ? <p className="ap-fine">Pick one more person with the compare button.</p> : (
-            <table className="ap-compare"><thead><tr><th><span className="sr-only">Measure</span></th>{cmpPeople.map(({ p }) => <th key={p.name}>{p.name}</th>)}</tr></thead><tbody>
-              {([["Booked", "bookings", false], ["Show rate", "showRate", true], ["No-show rate", "noShowRate", false], ["Close rate", "closeRate", true], ["Leads burned", "burned", false], ["Revenue won", "revenueCents", true]] as const).map(([label, k, higher]) => {
-                const v = cmpPeople.map(({ p }) => p[k] as number | null); const best = v.every((x) => x !== null) && v[0] !== v[1] ? (higher ? (v[0]! > v[1]! ? 0 : 1) : (v[0]! < v[1]! ? 0 : 1)) : -1;
-                const fmt = (x: number | null) => (x === null ? "n/a" : k === "revenueCents" ? money(x) : k === "bookings" || k === "burned" ? String(x) : pct(x));
-                return <tr key={label}><td>{label}</td>{v.map((x, i) => <td key={i} data-win={best === i && label !== "Booked" ? "1" : undefined}>{fmt(x)}</td>)}</tr>;
-              })}
-            </tbody></table>
-          )}
-          <div className="mt-3 grid gap-2 md:grid-cols-2">{cmpPeople.map(({ p }) => { const c = coachingNote(p, tree.overall, tree.minBookings); return <p key={p.name} className="ap-note" data-tone={c.tone === "red" ? "red" : c.tone === "amber" ? "amber" : undefined}><b>{p.name}.</b> {c.text}</p>; })}</div>
-          <button type="button" className="ap-link mt-2" onClick={() => setCmp([])}>Clear comparison</button>
-        </div>
-      )}
+      {cmp.length > 0 && <ComparePanel filters={filters} ids={cmp.map((k) => k.slice(2))} role={cmp[0][0] === "s" ? "booker" : "owner"} onClear={() => setCmp([])} onOpen={onOpen} />}
       <p className="ap-fine mt-3">Colours compare each person with your own team&apos;s average for these dates, never with an outside figure. Under {tree.minBookings} bookings a branch stays grey. {go && <button type="button" className="ap-link" onClick={() => go("help")}>How the numbers are worked out</button>}</p>
     </div>
   );
 }
 
 /** Phone: the same tree as an indented list. Every row opens exactly its appointments; 44px taps. */
-function PhoneTree({ tree, limit, onOpen, cmp, setCmp, next }: { tree: ApFlowTree; limit: number; onOpen: (p: FlowPick) => void; cmp: string[]; setCmp: (f: (c: string[]) => string[]) => void; next?: string }) {
+function PhoneTree({ tree, limit, onOpen, cmp, setCmp }: { tree: ApFlowTree; limit: number; onOpen: (p: FlowPick) => void; cmp: string[]; setCmp: (f: (c: string[]) => string[]) => void }) {
   const tones = (s: ApStats): Tone => { const o = tree.overall; if (s.bookings < tree.minBookings || s.showRate === null || o.showRate === null) return "grey"; const d = s.showRate - o.showRate, dc = s.closeRate !== null && o.closeRate !== null ? s.closeRate - o.closeRate : 0; return d <= -0.1 || dc <= -0.15 ? "red" : d >= 0.03 && dc >= 0 ? "green" : "amber"; };
   return (
     <div className="ap-plist" data-testid="ap-plist" aria-label="Appointment flow">
@@ -175,7 +155,7 @@ function PhoneTree({ tree, limit, onOpen, cmp, setCmp, next }: { tree: ApFlowTre
             <button type="button" className="s6-btn" aria-pressed={cmp.includes(`s:${s.id}`)} onClick={() => setCmp((c) => (c.includes(`s:${s.id}`) ? c.filter((x) => x !== `s:${s.id}`) : [...c.slice(-1), `s:${s.id}`]))}>{cmp.includes(`s:${s.id}`) ? "In comparison" : "Compare"}</button></div>
           <div className="ap-pkids">
             {s.closers.map((c) => (
-              <div key={c.id} className="ap-pnode" data-tone={tones(c)} data-best={next === c.id ? "1" : undefined}>
+              <div key={c.id} className="ap-pnode" data-tone={tones(c)}>
                 <b>{c.name}</b> <span className="ap-fine">{c.bookings} · {pct(c.showRate)} show · {pct(c.closeRate)} close</span>
                 <div className="ap-pchips">{LEAF_ORDER.filter((k) => c.outcomes[k] > 0).map((k) => (
                   <button key={k} type="button" className="ap-chip" data-tone={OUTCOME_TONE[k]} style={{ minHeight: 44 }} onClick={() => onOpen({ title: `${OUTCOME_LABEL[k]}: ${s.name} to ${c.name}`, count: c.outcomes[k], params: { booker: s.id, owner: c.id, outcome: k } })}>{OUTCOME_LABEL[k]} {c.outcomes[k]}</button>
