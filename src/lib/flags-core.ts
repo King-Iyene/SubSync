@@ -23,6 +23,12 @@ export const DEFAULT_OFF: ReadonlySet<Feature> = new Set<Feature>([
   "inbox_channel_mix",
   "inbox_digest",
   "inbox_assign",
+  // Unanswered round 3, slice B (actions): each behind its own flag, default off.
+  "inbox_open_lead",
+  "inbox_claim",
+  "inbox_note",
+  "inbox_outcome_ui",
+  "inbox_clear_junk",
 ]);
 
 export function resolveFeatures(all: readonly Feature[], overrides: Record<string, boolean>, allOn = false): Record<Feature, boolean> {

@@ -115,6 +115,7 @@ import { writeEnabledFor } from "../analytics/cleanup-config";
 import { isLive } from "../live-flags";
 import { handleSpeedPrefs, handleSpeedDigest, handleSpeedLadder, handleSpeedPart, handleSpeedTarget } from "./speed-routes";
 import { handleUnansweredOutcome, handleUnansweredPart } from "./unanswered-routes";
+import { handleUnansweredActions } from "./unanswered-actions-routes";
 import { handleApptWork } from "./appointment-work-routes";
 import { buildSteps, guideRoleOf } from "../getting-started";
 import { changedSettingKeys, feedbackGivenBy, logAccountFlags, logKeyChange, logSettingsChange, recordVote } from "../feedback-queries";
@@ -2001,6 +2002,10 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
     if (a === "inbox" && method === "GET" && !b && ctx.url.searchParams.has("part")) {
       // The new Unanswered v2 parts (home/list/ranks) are always available; per-client SLA is gated separately inside handleUnansweredPart
       return await handleUnansweredPart(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links, targets: async () => { const st = (await scope(ctx)).settings; return { slaHours: st.slaHours, targetMinutes: st.speedTargetMinutes }; } });
+    }
+    // Unanswered round 3, slice B: hidden people, snooze, claim, assign, note, outcome, clear junk (each behind its own flag, checked inside).
+    if (a === "inbox" && b === "act") {
+      return await handleUnansweredActions(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links, targets: async () => { const st = (await scope(ctx)).settings; return { slaHours: st.slaHours, targetMinutes: st.speedTargetMinutes }; }, locationToken: (locationId) => locationAccessToken(ctx.session.companyId, locationId) });
     }
     if (a === "inbox" && b === "outcome" && method === "POST") {
       if (!ctx.entitlements.features.inbox_breach_alert || ctx.entitlements.locked.includes("inbox_breach_alert")) {

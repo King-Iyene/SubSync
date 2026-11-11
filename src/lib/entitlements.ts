@@ -56,6 +56,12 @@ export const FEATURES = [
   "inbox_channel_mix",
   "inbox_digest",
   "inbox_assign",
+  // Unanswered round 3, slice B (actions): each behind its own flag, default off.
+  "inbox_open_lead",
+  "inbox_claim",
+  "inbox_note",
+  "inbox_outcome_ui",
+  "inbox_clear_junk",
 ] as const;
 export type Feature = (typeof FEATURES)[number];
 
