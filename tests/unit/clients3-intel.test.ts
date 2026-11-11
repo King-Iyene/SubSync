@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { delta, levelOf, parseWindow, rate, reasonsOf, receiptLines, todayOf, type AccountSignals } from "@/lib/analytics/clients3-intel";
+import { applyQuiet, delta, levelOf, parseWindow, rate, reasonsOf, receiptLines, todayOf, type AccountSignals } from "@/lib/analytics/clients3-intel";
 import type { Cl3Account } from "@/lib/analytics/clients3-types";
 
 const base = (o: Partial<AccountSignals> = {}): AccountSignals => ({
@@ -52,5 +52,24 @@ describe("clients 3 rules", () => {
     const l = receiptLines({ cameIn: 1, cameInPrev: 3, answered: 1, stillWaiting: 0, medianReplyMinutes: 12, booked: 2, showed: 1, noshow: 1, won: 1, wonValue: 1500 });
     expect(l[0]).toBe("1 new enquiry came in (3 the week before).");
     expect(l.join(" ")).not.toMatch(/GoHighLevel|HighLevel|GHL|sub-account|location/i);
+  });
+  it("quiet marks leave the ranking but never a connection problem", () => {
+    const loud = base({ waiting: 4, waitingOld: 4, unmarked: 5, noshows: 4, openDeals: 10, staleDeals: 9, staffQuiet: 2, newLeads: delta(5, 20), needsPermission: ["calendar"], syncAgeHours: 100 });
+    const names = (s: AccountSignals) => reasonsOf(s).map((r) => r.reason);
+    expect(names(applyQuiet(loud, ["replies"]))).not.toContain("waiting_old");
+    expect(names(applyQuiet(loud, ["replies"]))).toContain("unmarked");
+    expect(names(applyQuiet(loud, ["noshows"]))).not.toContain("unmarked");
+    expect(names(applyQuiet(loud, ["noshows"]))).not.toContain("noshows");
+    expect(names(applyQuiet(loud, ["stale"]))).not.toContain("stale_deals");
+    const all = names(applyQuiet(loud, ["all"]));
+    expect(all).toEqual(["needs_permission", "sync_old"]);
+    expect(names(applyQuiet(loud, []))).toEqual(names(loud));
+    expect(names(applyQuiet(loud, undefined))).toEqual(names(loud));
+    // "renewal" hides nothing in the ranking; the input is never changed.
+    expect(names(applyQuiet(loud, ["renewal"]))).toEqual(names(loud));
+    expect(loud.waitingOld).toBe(4);
+    // Quieting everything on a healthy-connection account leaves it fine.
+    const calm = applyQuiet(base({ waiting: 2, waitingOld: 2, staffQuiet: 1 }), ["all"]);
+    expect(levelOf(calm, reasonsOf(calm))).toBe("ok");
   });
 });

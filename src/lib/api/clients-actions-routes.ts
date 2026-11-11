@@ -1,5 +1,6 @@
 import { sql } from "../db";
 import { ownedLocation } from "./tenant-guard";
+import { forgetClients } from "../analytics/clients3-queries";
 import {
   BULK_CAP, bulkPreviewLine, parseBulk, parseOwner, muteLine, muteUntil, parseMute, parseTargetMinutes, receiptCsv, receiptOf, receiptText, setupItems, MUTE_DAYS, MUTE_KINDS, MUTE_WORDS, type Receipt,
 } from "../analytics/clients-actions";
@@ -55,7 +56,14 @@ async function receipts(ctx: Ctx, h: ClientActionHelpers, ids: string[], now: nu
   return facts.map((f) => receiptOf(f, now)).sort((a, b) => a.name.localeCompare(b.name));
 }
 
+/** A quiet mark, an owner or a reply target changes what Clients ranks, so the saved Clients answers for this installation are dropped at once. */
 export async function handleClientActions(ctx: Ctx, h: ClientActionHelpers): Promise<Response> {
+  const res = await runClientAction(ctx, h);
+  if (ctx.request.method === "POST" && res.ok) forgetClients(ctx.installationId);
+  return res;
+}
+
+async function runClientAction(ctx: Ctx, h: ClientActionHelpers): Promise<Response> {
   const part = ctx.segments[2];
   const m = ctx.request.method;
   const reports = on(ctx, "cl_reports"), actions = on(ctx, "cl_actions");

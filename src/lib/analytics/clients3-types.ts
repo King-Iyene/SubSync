@@ -38,6 +38,8 @@ export type Cl3Account = {
   /** 8 weekly points of new leads, oldest first, for a sparkline. */
   sparkLeads: number[];
   historyStarts: string | null; enough: boolean; url: string | null;
+  /** Quiet marks on this account right now (all, replies, noshows, stale, renewal): the matching reasons are left out of the ranking and the counts stay real. */
+  quieted?: string[];
 };
 
 export type Cl3Today = { headline: string; button: { label: string; reason: Cl3Reason; locationId: string | null; count: number } | null };

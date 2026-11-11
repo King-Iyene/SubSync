@@ -392,11 +392,11 @@ export function Dashboard() {
       // Speed to lead holds the Unanswered tab (when messages and speed are both on); `#speed?tab=unanswered` and the old #inbox open it first.
       case "speed": return <SpeedView go={go} unanswered={inboxTab} start={speedStart()} />;
       case "overview": return <OverviewView go={go} />;
-      case "accounts": if ((auth.features.cl_module === true && !auth.locked.includes("cl_module")) || clSample()) return <ClientsModule key="cl3" />; return <ClientsView key="accounts" go={go} initialTab="health" features={clientFeatures} />;
+      case "accounts": if ((auth.features.cl_module === true && !auth.locked.includes("cl_module")) || clSample()) return <ClientsModule key="cl3" go={go} features={clientFeatures} />; return <ClientsView key="accounts" go={go} initialTab="health" features={clientFeatures} />;
       case "account": return view.locationId ? <AccountDetailView key={view.locationId} locationId={view.locationId} go={go} agency={agency} /> : <ClientsView key="accounts" go={go} initialTab="health" features={clientFeatures} />;
       case "deals": return <ModuleTabs key="pipe" start={1} tabs={pipeTabs} />;
       case "inbox": return inboxTab ? <SpeedView go={go} unanswered start="unanswered" /> : <InboxView go={go} />;
-      case "onboarding": return limited ? <ModuleTabs key="setup" start={0} tabs={setupTabs} /> : <ClientsView key="onboarding" go={go} initialTab="onboarding" features={clientFeatures} />;
+      case "onboarding": return limited ? <ModuleTabs key="setup" start={0} tabs={setupTabs} /> : (auth.features.cl_module === true && !auth.locked.includes("cl_module")) || clSample() ? <ClientsModule key="cl3" go={go} features={clientFeatures} initialTab="onboarding" /> : <ClientsView key="onboarding" go={go} initialTab="onboarding" features={clientFeatures} />;
       case "email": return limited ? <ModuleTabs key="setup" start={1} tabs={setupTabs} /> : <EmailHealthView />;
       case "duplicates": case "cleanup": return <CleanupModule key={viewId} kind={auth.kind} start={viewId === "cleanup" ? "quality" : "duplicates"} duplicatesOn={!off("duplicates") && NAV_FOR[auth.kind].has("duplicates")} cleanupOn={!off("cleanup") && NAV_FOR[auth.kind].has("cleanup")} />;
       case "alerts": return <AlertsView go={go} />;
@@ -412,7 +412,7 @@ export function Dashboard() {
       // Workflows reads with the unfiltered client and keeps its own account choice (like Today), so the shared filter never changes what it counts.
       case "data-health": return <ApiProvider value={baseApi}><DataHealthView go={go} kind={auth.kind} /></ApiProvider>;
       case "workflows": return <ApiProvider value={baseApi}><WorkflowsView go={go} kind={auth.kind} /></ApiProvider>;
-      case "clients": if ((auth.features.cl_module === true && !auth.locked.includes("cl_module")) || clSample()) return <ClientsModule key="cl3" />; return <ClientsView key="clients" go={go} initialTab="health" features={clientFeatures} />;
+      case "clients": if ((auth.features.cl_module === true && !auth.locked.includes("cl_module")) || clSample()) return <ClientsModule key="cl3" go={go} features={clientFeatures} />; return <ClientsView key="clients" go={go} initialTab="health" features={clientFeatures} />;
     }
   })();
 

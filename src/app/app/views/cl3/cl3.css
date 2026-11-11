@@ -19,6 +19,4 @@
 .cl-drill { margin-top: 20px; border-top: 1px solid color-mix(in srgb, var(--s6-line) 70%, transparent); padding-top: 14px; }
 .cl [data-win="1"] { font-weight: 700; }
 @media (max-width: 700px) { .cl-sentence { font-size: 1.0625rem; } .cl-today { padding: 14px; } .cl-pager { justify-content: flex-start; } }
-.cl-bill { font-size: 0.75rem; } .cl-bill[data-bad="1"] { color: var(--s6-amber); font-weight: 600; }
-.cl-note-box { width: 100%; max-width: 40rem; padding: 8px 10px; min-height: 80px; }
 .cl-notes { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; max-width: 40rem; } .cl-notes p { margin: 2px 0 0; font-size: 0.875rem; white-space: pre-wrap; }

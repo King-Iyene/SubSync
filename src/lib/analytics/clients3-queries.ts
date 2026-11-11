@@ -1,7 +1,8 @@
 import { sql } from "../db";
 import { ttlCache } from "../ttl-cache";
+import { quietedMap } from "./clients-actions-queries";
 import { countedInScope, dealScopeJoins } from "./stage-rules-sql";
-import { byAttention, clampSize, DAY, delta, levelOf, mondayOf, rate, reasonsOf, receiptLines, STALE_DEAL_DAYS, summaryOf, todayOf, QUIET_DAYS, SYNC_OLD_HOURS, WAIT_OLD_HOURS, type AccountSignals } from "./clients3-intel";
+import { byAttention, clampSize, DAY, delta, levelOf, mondayOf, rate, reasonsOf, receiptLines, STALE_DEAL_DAYS, summaryOf, todayOf, applyQuiet, QUIET_DAYS, SYNC_OLD_HOURS, WAIT_OLD_HOURS, type AccountSignals } from "./clients3-intel";
 import type {
   Cl3Account, Cl3Attention, Cl3Compare, Cl3Level, Cl3List, Cl3ListRow, Cl3Options, Cl3Overview, Cl3People, Cl3Person, Cl3Reason, Cl3Receipt, Cl3ReceiptList, Cl3Setup, Cl3SetupList, Cl3Side, Cl3Trends, Cl3TrendPoint,
 } from "./clients3-types";
@@ -17,6 +18,8 @@ export type Filters = { from: Date; to: Date; location?: string | null; q?: stri
 export type Links = { account: (loc: string) => string; contact: (loc: string, contact: string) => string };
 
 export const clientsCache = ttlCache<object>(60_000, 100);
+/** Forget this installation's cached answers (the cache key starts with the installation id), so a quiet mark or a new target moves the ranking at once. */
+export const forgetClients = (inst: string) => clientsCache.clear(JSON.stringify([inst]).slice(0, -1));
 const ID = /^[A-Za-z0-9_-]{1,64}$/;
 export const cleanId = (v: unknown): string | null => (typeof v === "string" && ID.test(v) ? v : null);
 const n = (v: unknown) => (v === null || v === undefined ? 0 : Number(v));
@@ -174,7 +177,7 @@ export async function accountsCore(s: Scope, f: Filters, now = Date.now()): Prom
   const prv = (c: string) => `coalesce(sum(${c}) filter (where day >= '${day(prevFrom)}'::date and day < '${day(f.from)}'::date), 0)`;
   const sums = ["new_leads", "booked", "won_value", "staff_messages", "showed", "noshow", "won", "lost"].map((c) => `${cur(c)}::float8 c_${c}, ${prv(c)}::float8 p_${c}`).join(", ");
 
-  const [dRows, waitRows, apptRows, dealRows, staff, qual, speed, hist] = await Promise.all([
+  const [dRows, waitRows, apptRows, dealRows, staff, qual, speed, hist, quietBy] = await Promise.all([
     db`select d.location_id, ${db.unsafe(sums) as unknown as Frag}, ${db.unsafe(weekCols) as unknown as Frag} from (${daily.f}) d group by d.location_id`,
     db`select location_id, count(*)::int waiting, count(*) filter (where last_message_at < now() - ${`${WAIT_OLD_HOURS} hours`}::interval)::int old
        from cached_conversations where installation_id = ${s.inst} and location_id = any(${ids}::text[]) and last_message_direction = 'inbound' and last_message_at > now() - interval '30 days' group by 1`,
@@ -187,6 +190,7 @@ export async function accountsCore(s: Scope, f: Filters, now = Date.now()): Prom
     db`select location_id, percentile_cont(0.5) within group (order by median_seconds)::float8 m from speed_daily where installation_id = ${s.inst} and location_id = any(${ids}::text[])
        and day >= ${day(f.from)}::date and day < ${day(f.to)}::date and answered > 0 and median_seconds is not null group by 1`.catch(() => []),
     historyStarts(s.inst, ids),
+    quietedMap(s.inst, ids, now).catch(() => new Map<string, string[]>()),
   ]);
   const by = <T extends Record<string, unknown>>(rows: T[]) => new Map(rows.map((r) => [r.location_id as string, r]));
   const D = by(dRows), W = by(waitRows), A = by(apptRows), O = by(dealRows), S = by(speed as Record<string, unknown>[]);
@@ -208,8 +212,11 @@ export async function accountsCore(s: Scope, f: Filters, now = Date.now()): Prom
       newLeads, waiting, waitingOld, unmarked, noshows: noshowsN, staleDeals: stale, openDeals: openN, noOwner: rate(q.noOwner, q.contacts), noPhone: rate(q.noPhone, q.contacts),
       staffQuiet: quiet, syncAgeHours: syncAge, needsPermission, hasAnyData: q.contacts > 0 || n(d.c_new_leads) + n(d.p_new_leads) > 0,
     };
-    const reasons = reasonsOf(sig);
-    const level = levelOf(sig, reasons);
+    // Quiet marks (Reports and Needs attention): a muted kind leaves the ranking; the real counts below stay.
+    const muted = quietBy.get(a.id) ?? [];
+    const shown = applyQuiet(sig, muted);
+    const reasons = reasonsOf(shown);
+    const level = levelOf(shown, reasons);
     const median = S.get(a.id)?.m;
     return {
       locationId: a.id, name: a.name, industry: a.industry, level, summary: level === "ok" || level === "unknown" ? null : summaryOf(reasons), reasons,
@@ -219,7 +226,7 @@ export async function accountsCore(s: Scope, f: Filters, now = Date.now()): Prom
       staffMessages: delta(n(d.c_staff_messages), n(d.p_staff_messages)), staffActive: st.filter((x) => x.msgs > 0).length, staffIdle: quiet,
       noOwnerPct: sig.noOwner, noPhonePct: sig.noPhone,
       lastSyncAt: iso(a.lastSyncAt), syncOld: syncAge === null || syncAge > SYNC_OLD_HOURS, needsPermission,
-      sparkLeads: [...Array(8)].map((_, k) => n(d[`w${k}`])), historyStarts: hist ?? q.firstDay, enough: sig.hasAnyData, url: null,
+      sparkLeads: [...Array(8)].map((_, k) => n(d[`w${k}`])), historyStarts: hist ?? q.firstDay, enough: sig.hasAnyData, url: null, quieted: muted,
       showed: n(d.c_showed), noshowN: noshowsN, lost: n(d.c_lost), won: n(d.c_won),
     };
   });

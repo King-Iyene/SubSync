@@ -1,138 +1,98 @@
 "use client";
 
-import { Search } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import type { ClAgencyInfo, ClNote, ClAccount, ClDrillRow, ClOverview, ClPage, ClPerson, ClReasonKey, ClReportRow, ClSetupRow, ClTrendRow } from "@/lib/analytics/clients3-types-interim";
-import { useApiClient } from "../../session";
-import { EmptyState, ErrorState, ModuleTabs, Page, SkeletonRows } from "../../ds";
+import type { Cl3Account, Cl3Attention, Cl3List, Cl3Options, Cl3Overview, Cl3Reason } from "@/lib/analytics/clients3-types";
+import { useApiClient, useData } from "../../session";
+import { EmptyState, ModuleTabs, Page } from "../../ds";
+import { Btn } from "../../ui";
+import type { GoFn } from "../../nav";
+import { ClientPage } from "../clients/client-page";
+import { HealthTab } from "../clients/health-tab";
+import { IndustriesTab } from "../clients/industries";
+import { OnboardingTab } from "../clients/onboarding-tab";
+import { ReviewsTab } from "../clients/reviews";
+import type { ClientsFeatures } from "../clients";
 import "../speed6.css";
 import "../speed-ui.css";
 import "../ap3/ap3.css";
 import "./cl3.css";
 import { fixturesOn, useCl, type ClParams } from "./data";
+import { AccountSettings } from "./settings";
+import { Compare, People, Reports, Setup, Trends } from "./sections";
+import { ago, change, day, Find, LevelChip, Load, money, Pager, share } from "./shared";
 
-// Clients as a module (the Appointments and Pipeline pattern): Overview | Needs attention | Trends | Compare accounts | Reports | People | Setup health.
-// Reads only. Every number is a count that opens its rows. Nothing here messages anyone or changes the CRM.
-type Drill = { title: string; reason: ClReasonKey | "all"; account: string; accountName: string; count: number } | null;
-const TABS = [
-  { key: "overview", label: "Overview", tip: "What to do today, in one sentence." }, { key: "needs", label: "Needs attention", tip: "Accounts ranked by what is wrong, with the count behind each reason." },
-  { key: "trends", label: "Trends", tip: "Week on week, from our own record." }, { key: "compare", label: "Compare accounts", tip: "Two accounts side by side." },
-  { key: "reports", label: "Reports", tip: "A weekly receipt per client to show them." }, { key: "people", label: "People", tip: "Who works in which account, and who has gone quiet." },
-  { key: "setup", label: "Setup health", tip: "Connection, permissions and how fresh the data is." },
-] as const;
-type Tab = (typeof TABS)[number]["key"];
-const money = (c: number) => `$${Math.round(c / 100).toLocaleString("en-US")}`;
-const ago = (iso: string | null) => { if (!iso) return "Never"; const h = Math.max(0, Math.round((Date.parse("2026-11-11T08:00:00Z") > 0 && fixturesOn() ? Date.parse("2026-11-11T08:00:00Z") - Date.parse(iso) : Date.now() - Date.parse(iso)) / 3_600_000)); return h < 1 ? "Just now" : h < 48 ? `${h} h ago` : `${Math.round(h / 24)} d ago`; };
-const change = (now: number, prev: number) => (prev < 10 ? null : Math.round(((now - prev) / prev) * 100));
+// Clients, one screen (the Appointments and Pipeline module pattern): Overview | Needs attention | Trends | Compare accounts | Reports | People | Setup health | Health and risk,
+// then the older Onboarding, Reviews (QBR) and Industries pages. Reads only; the only writes are SubSync's own quiet marks, reply targets and owner names (settings panel).
+// Every number is a count that opens its rows. Nothing here messages anyone or changes the CRM. Sample data appears ONLY with ?clfx=1 and is labelled "Sample data".
+type Drill = { title: string; reason: Cl3Reason; location: string | null; count: number } | null;
+type TabKey = "overview" | "needs" | "trends" | "compare" | "reports" | "people" | "setup" | "health" | "onboarding" | "reviews" | "industries";
+const TIPS: Record<TabKey, [string, string]> = {
+  overview: ["Overview", "What to do today, in one sentence."], needs: ["Needs attention", "Accounts ranked by what is wrong, with the count behind each reason."],
+  trends: ["Trends", "Week on week or month on month, from our own record."], compare: ["Compare accounts", "Two accounts side by side."],
+  reports: ["Reports", "A weekly proof for each client to show them."], people: ["People", "Who works in which account, and who has gone quiet."],
+  setup: ["Setup health", "Connection, permissions, how fresh the data is, and each client's plan."], health: ["Health and risk", "Overall health, who may be slipping, and the standard workflows each client has."],
+  onboarding: ["Onboarding", "One checklist per client."], reviews: ["Reviews (QBR)", "The quarterly review of one client."], industries: ["Industries", "Clients grouped by industry, with playbooks and reply targets."],
+};
+const FLAG_OF: Partial<Record<TabKey, string>> = { overview: "cl_overview", needs: "cl_attention", trends: "cl_trends", compare: "cl_compare", reports: "cl_reports", people: "cl_people", setup: "cl_setup" };
+const PERIODS = [[7, "Last 7 days"], [30, "Last 30 days"], [90, "Last 90 days"]] as const;
+const ALL_FEATURES: ClientsFeatures = { health: true, onboarding: true, clients: true, reports: true, setupCompare: true, playbooks: true };
 
-const RECONNECT = "Needs permission: reconnect";
-const PLAN_STATUS: Record<string, string> = { active: "Paying", trial: "On trial", failed: "Payment failed", cancelled: "Cancelled" };
-function BillingChip({ info }: { info?: ClAgencyInfo }) {
-  const b = info?.billing;
-  if (!info) return <span className="ap-fine">Loading...</span>;
-  if (!b) return <span className="ap-fine" data-testid="cl-billing-missing">{RECONNECT}</span>;
-  const bad = b.status === "failed" || b.status === "cancelled";
-  return <span className="cl-bill" data-bad={bad ? "1" : undefined} data-testid="cl-billing"><b>{b.plan}</b> {PLAN_STATUS[b.status]}{b.failedCount > 0 ? " (" + b.failedCount + " failed)" : ""}{b.nextPayment ? ", next " + b.nextPayment : ""}</span>;
-}
-/** Billing and apps for up to 200 accounts at once, keyed by account. */
-function useAgency() { const r = useCl<ClPage<ClAgencyInfo>>("agency", { pageSize: 200 }); return useMemo(() => new Map((r.data?.rows ?? []).map((x) => [x.locationId, x])), [r.data]); }
-function Notes({ id, name, onClose }: { id: string; name: string; onClose: () => void }) {
-  const api = useApiClient(), fx = fixturesOn();
-  const r = useCl<ClPage<ClNote>>("notes", { location: id });
-  const [text, setText] = useState(""), [mine, setMine] = useState<ClNote[]>([]), [err, setErr] = useState("");
-  const save = async () => {
-    const t = text.trim(); if (!t) return; setErr("");
-    try { if (!fx) await api.post("clients3?part=notes", { location: id, text: t }); setMine((m) => [{ id: String(Date.now()), text: t, at: new Date().toISOString().slice(0, 10), by: "You" }, ...m]); setText(""); } catch { setErr("Could not save this note. Try again."); }
-  };
-  const all = [...mine, ...(r.data?.rows ?? [])];
-  return (
-    <section className="cl-drill" data-testid="cl-notes" aria-label={"Notes for " + name}>
-      <div className="mb-2 flex flex-wrap items-center gap-3"><h3 className="text-base font-semibold">Notes: {name}</h3><span className="ap-fine">Only your team sees these. They stay in SubSync and are never sent to the client or the CRM.</span><button type="button" className="ap-link ml-auto" onClick={onClose}>Close</button></div>
-      <textarea className="ap-field cl-note-box" rows={3} maxLength={1000} value={text} onChange={(e) => setText(e.target.value)} placeholder="What happened, what was agreed, what to do next" aria-label="New note" />
-      <div className="mt-2 flex items-center gap-3"><button type="button" className="s6-btn" data-kind="primary" disabled={!text.trim()} onClick={() => void save()}>Save note</button>{err && <span className="ap-fine" role="alert">{err}</span>}</div>
-      {r.loading && !r.data ? <SkeletonRows rows={2} label="Loading notes..." /> : all.length === 0 ? <p className="ap-fine mt-3">No notes yet.</p> : <ul className="cl-notes">{all.map((n) => <li key={n.id}><span className="ap-fine">{n.at} by {n.by}</span><p>{n.text}</p></li>)}</ul>}
-    </section>
-  );
-}
-
-function Spark({ values, label }: { values: number[]; label: string }) {
-  if (values.length < 3) return <span className="ap-fine">Not enough data</span>;
-  const lo = Math.min(...values), span = Math.max(...values) - lo || 1, pts = values.map((v, i) => `${(i / (values.length - 1)) * 80},${22 - ((v - lo) / span) * 20}`).join(" ");
-  return <svg className="cl-spark" viewBox="0 0 80 24" role="img" aria-label={label}><polyline points={pts} fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round" /></svg>;
-}
-function Load<T>({ r, children, empty }: { r: { data: T | null; error: unknown; loading: boolean; reload: () => void }; children: (d: T) => ReactNode; empty: (d: T) => boolean | string }) {
-  if (r.loading && !r.data) return <SkeletonRows rows={6} label="Loading clients..." />;
-  if (r.error) return <ErrorState error={r.error as Error} onRetry={r.reload} />;
-  if (!r.data) return null;
-  const e = empty(r.data);
-  return e ? <EmptyState title="Nothing to show yet" body={typeof e === "string" ? e : "Client accounts appear here after the first sync finishes."} /> : <>{children(r.data)}</>;
-}
-function Pager({ p, set }: { p: ClPage<unknown>; set: (n: number) => void }) {
-  const last = Math.max(1, Math.ceil(p.total / p.pageSize));
-  return (
-    <div className="cl-pager" role="navigation" aria-label="Pages">
-      <span className="ap-fine">{p.total.toLocaleString("en-US")} in total</span>
-      <button type="button" className="s6-btn" disabled={p.page <= 1} onClick={() => set(p.page - 1)}>Previous</button>
-      <span className="ap-fine">Page {p.page} of {last}</span>
-      <button type="button" className="s6-btn" disabled={p.page >= last} onClick={() => set(p.page + 1)}>Next</button>
-    </div>
-  );
-}
-function Find({ q, setQ, children }: { q: string; setQ: (s: string) => void; children?: ReactNode }) {
-  return (
-    <div className="ap-head" role="search">
-      <label className="ap-search"><Search aria-hidden className="size-4" /><span className="sr-only">Search accounts</span><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search accounts" data-testid="cl-search" /></label>
-      {children}
-    </div>
-  );
-}
-/** A small paged list hook: search is debounced and any change returns to page 1. */
-function useList<T>(part: Parameters<typeof useCl>[0], extra: ClParams = {}) {
-  const [q, setQ] = useState(""), [dq, setDq] = useState(""), [page, setPage] = useState(1);
-  useEffect(() => { const t = setTimeout(() => { setDq(q); setPage(1); }, 300); return () => clearTimeout(t); }, [q]);
-  const key = JSON.stringify(extra);
+function DrillList({ d, filters, onClose }: { d: NonNullable<Drill>; filters: ClParams; onClose: () => void }) {
+  const [page, setPage] = useState(0);
   // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { setPage(1); }, [key]);
-  const r = useCl<ClPage<T>>(part, { q: dq, page, pageSize: 25, ...extra });
-  return { r, q, setQ, page, setPage };
-}
-
-function DrillList({ d, onClose }: { d: NonNullable<Drill>; onClose: () => void }) {
-  const r = useCl<ClPage<ClDrillRow>>("rows", { reason: d.reason, location: d.account, account: d.accountName, expect: d.count, pageSize: 20 });
+  useEffect(() => { setPage(0); }, [d.reason, d.location]);
+  const r = useCl<Cl3List>("list", { ...filters, reason: d.reason, location: d.location ?? undefined, page, size: 20 });
   return (
     <section id="cl-drill" className="cl-drill" data-testid="cl-drill" aria-label={d.title}>
-      <div className="mb-2 flex flex-wrap items-center gap-3"><h3 className="text-base font-semibold" data-testid="cl-drill-title">{d.title}</h3><span className="ap-chip" data-tone="cyan">{d.count}</span><button type="button" className="ap-link ml-auto" onClick={onClose}>Close</button></div>
+      <div className="mb-2 flex flex-wrap items-center gap-3"><h3 className="text-base font-semibold" data-testid="cl-drill-title">{d.title}</h3><span className="ap-chip" data-tone="cyan">{d.count.toLocaleString("en-US")}</span><button type="button" className="ap-link ml-auto" onClick={onClose}>Close</button></div>
       <Load r={r} empty={(x) => x.rows.length === 0 && "Nothing behind this one in these dates."}>
         {(x) => (
-          <div className="ap-scroll"><table className="ap-t" data-testid="cl-drill-list"><thead><tr><th>Item</th><th>When</th><th /></tr></thead>
-            <tbody>{x.rows.map((row) => <tr key={row.id}><td>{row.title}</td><td>{row.sub}</td><td>{row.url ? <a className="ap-link" href={row.url} target="_blank" rel="noopener noreferrer">Open in your CRM</a> : <span className="ap-fine">Link not available</span>}</td></tr>)}</tbody></table></div>
+          <>
+            <div className="ap-scroll"><table className="ap-t" data-testid="cl-drill-list"><thead><tr><th>Contact</th>{!d.location && <th>Account</th>}<th>What</th><th>When</th><th /></tr></thead>
+              <tbody>{x.rows.map((row, i) => <tr key={`${row.locationId}:${row.contactId ?? i}:${i}`} style={{ cursor: "default" }}><td>{row.contactName}</td>{!d.location && <td>{row.accountName}</td>}<td>{row.detail ?? ""}{row.value ? ` (${money(row.value)})` : ""}</td><td>{row.at ? ago(row.at) : ""}</td>
+                <td>{row.url ? <a className="ap-link" href={row.url} target="_blank" rel="noopener noreferrer">Open in your CRM</a> : <span className="ap-fine">Link not available</span>}</td></tr>)}</tbody></table></div>
+            <Pager page={x.page} pages={x.pages} total={x.total} set={setPage} />
+          </>
         )}
       </Load>
     </section>
   );
 }
 
-function Overview({ open, go }: { open: (d: NonNullable<Drill>) => void; go: (t: Tab) => void }) {
-  const r = useCl<ClOverview>("overview");
+function Overview({ filters, open, go }: { filters: ClParams; open: (d: NonNullable<Drill>) => void; go: (t: TabKey) => void }) {
+  const r = useCl<Cl3Overview>("overview", filters);
   return (
     <Load r={r} empty={(o) => o.accounts === 0}>
       {(o) => {
-        const first = o.today.steps[0];
+        const b = o.today.button, need = o.act + o.watch, nl = change(o.totals.newLeads);
+        const tile = (label: string, n: number, fn: () => void, sub?: string | null) => <button key={label} type="button" className="cl-tile" onClick={fn}><b>{n.toLocaleString("en-US")}</b><span>{label}{sub ? ` (${sub})` : ""}</span></button>;
         return (
           <div className="cl-stack" data-testid="cl-overview">
             <section className="cl-today" aria-label="What to do today">
               <h2 className="cl-h">What to do today</h2>
-              <p className="cl-sentence" data-testid="cl-today-sentence">{o.today.sentence || "All your client accounts look fine today."}</p>
-              {first && <button type="button" className="s6-btn" data-kind="primary" data-testid="cl-today-go" onClick={() => open({ title: `${first.accountName}: ${first.title}`, reason: first.reason, account: first.locationId, accountName: first.accountName, count: first.count })}>See {first.count} {first.title.replace(/^\d+ /, "")}</button>}
-              {o.today.steps.length > 1 && <ol className="cl-steps">{o.today.steps.slice(1).map((s) => <li key={s.locationId}><span>{s.accountName}</span><button type="button" className="ap-link" onClick={() => open({ title: `${s.accountName}: ${s.title}`, reason: s.reason, account: s.locationId, accountName: s.accountName, count: s.count })}>{s.title}</button></li>)}</ol>}
+              <p className="cl-sentence" data-testid="cl-today-sentence">{o.today.headline}</p>
+              {b && <button type="button" className="s6-btn" data-kind="primary" data-testid="cl-today-go" onClick={() => open({ title: `${b.label}: ${o.today.headline}`, reason: b.reason, location: b.locationId, count: b.count })}>{b.label} ({b.count.toLocaleString("en-US")})</button>}
             </section>
-            <PaymentsAtRisk open={open} />
             <div className="cl-tiles">
-              {([["Client accounts", o.accounts, () => go("needs")], ["Need a look", o.needAttention, () => go("needs")], ["Leads waiting for a reply", o.totals.waiting, () => open({ title: "Leads waiting for a reply", reason: "waiting", account: "", accountName: "All accounts", count: o.totals.waiting })], ["Appointments with no outcome", o.totals.unmarked, () => open({ title: "Appointments with no outcome", reason: "unmarked", account: "", accountName: "All accounts", count: o.totals.unmarked })]] as Array<[string, number, () => void]>).map(([label, n, fn]) => (
-                <button key={label} type="button" className="cl-tile" onClick={fn}><b>{n.toLocaleString("en-US")}</b><span>{label}</span></button>
-              ))}
+              {tile("Client accounts", o.accounts, () => go("needs"))}
+              {tile("Need a look", need, () => go("needs"))}
+              {tile("Leads waiting for a reply", o.totals.waiting, () => open({ title: "Leads waiting for a reply", reason: "waiting", location: null, count: o.totals.waiting }))}
+              {tile("Appointments with no outcome", o.totals.unmarked, () => open({ title: "Appointments with no outcome", reason: "unmarked", location: null, count: o.totals.unmarked }))}
+              {tile("New leads", o.totals.newLeads.current, () => go("trends"), nl)}
             </div>
-            <p className="ap-fine">{o.historySince ? `Trends use our own record, which starts ${o.historySince}.` : "Trends start once we have a few weeks of record."}</p>
+            {o.topReasons.length > 0 && (
+              <section aria-label="What is wrong most often">
+                <h2 className="cl-h mb-2">What is wrong most often</h2>
+                <div>{o.topReasons.map((t) => <button key={t.reason} type="button" className="cl-reason" title={t.why} onClick={() => open({ title: t.label, reason: t.reason, location: null, count: t.count })}>{t.label}</button>)}</div>
+              </section>
+            )}
+            {o.worst.length > 0 && (
+              <section aria-label="Needs you most">
+                <h2 className="cl-h mb-2">Needs you most</h2>
+                <ul className="cl-steps">{o.worst.map((w) => <li key={w.locationId}><b>{w.name}</b><span>{w.summary}</span><button type="button" className="ap-link" onClick={() => go("needs")}>See all</button></li>)}</ul>
+              </section>
+            )}
+            <p className="ap-fine">{o.historyStarts ? `Trends use our own record, which starts ${o.historyStarts}.` : "Trends start once we have a few weeks of record."}</p>
           </div>
         );
       }}
@@ -140,193 +100,117 @@ function Overview({ open, go }: { open: (d: NonNullable<Drill>) => void; go: (t:
   );
 }
 
-function PaymentsAtRisk({ open }: { open: (d: NonNullable<Drill>) => void }) {
-  const r = useCl<ClPage<ClAgencyInfo>>("payments", { pageSize: 5 });
-  if (!r.data || r.data.rows.length === 0) return null;
-  return (
-    <section className="cl-today" aria-label="Payments at risk" data-testid="cl-payments">
-      <h2 className="cl-h">Payments at risk</h2>
-      <p className="cl-sentence">{r.data.total} client{r.data.total === 1 ? "" : "s"} with a failed payment or no billing data.</p>
-      <ul className="cl-steps">{r.data.rows.map((x) => <li key={x.locationId}><span>{x.name}</span>{x.billing ? <button type="button" className="ap-link" onClick={() => open({ title: x.name + ": failed payments", reason: "all", account: x.locationId, accountName: x.name, count: x.billing!.failedCount })}>{x.billing.failedCount} failed, {money(x.billing.amountCents)} owed</button> : <span>{RECONNECT}</span>}</li>)}</ul>
-    </section>
-  );
-}
-
-const SORTS: Array<[string, string]> = [["attention", "Most to fix"], ["name", "Name"], ["leads", "New leads"], ["waiting", "Waiting for a reply"], ["stale", "Stuck deals"], ["won", "Money won"]];
-function Needs({ open, onlyNeeds }: { open: (d: NonNullable<Drill>) => void; onlyNeeds: boolean }) {
-  const agency = useAgency(), [notes, setNotes] = useState<{ id: string; name: string } | null>(null);
-  const [only, setOnly] = useState(onlyNeeds), [sort, setSort] = useState("attention");
-  const { r, q, setQ, setPage } = useList<ClAccount>("accounts", { only: only ? "needs" : "", sort, dir: sort === "name" ? "asc" : "desc" });
+const SORTS: Array<[string, string]> = [["", "Most to fix"], ["name", "Name"], ["leads", "New leads"], ["waiting", "Waiting for a reply"], ["unmarked", "No outcome"], ["won", "Money won"]];
+const MUTE_SHORT: Record<string, string> = { all: "everything", replies: "waiting replies", noshows: "no-shows", stale: "quiet deals", renewal: "renewal" };
+function Needs({ filters, open, rev, bump, openClient }: { filters: ClParams; open: (d: NonNullable<Drill>) => void; rev: number; bump: () => void; openClient: (id: string) => void }) {
+  const [q, setQ] = useState(""), [dq, setDq] = useState(""), [page, setPage] = useState(0), [level, setLevel] = useState(""), [sort, setSort] = useState(""), [cfg, setCfg] = useState<{ id: string; name: string } | null>(null);
+  useEffect(() => { const t = setTimeout(() => { setDq(q); setPage(0); }, 300); return () => clearTimeout(t); }, [q]);
+  const key = JSON.stringify(filters);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { setPage(0); }, [key, level, sort]);
+  const r = useCl<Cl3Attention>("needs-attention", { ...filters, q: dq, page, size: 20, level, sort, dir: sort === "name" ? "asc" : undefined, v: rev || undefined });
+  const owners = useData<{ ready: boolean; owners: Record<string, string> }>(fixturesOn() ? null : "clients/act/owners");
   return (
     <div data-testid="cl-needs">
       <Find q={q} setQ={setQ}>
+        <select className="ap-field" aria-label="Show" value={level} onChange={(e) => setLevel(e.target.value)}><option value="">All accounts</option><option value="act">Act now</option><option value="watch">Keep an eye</option><option value="ok">Fine</option></select>
         <select className="ap-field" aria-label="Sort by" value={sort} onChange={(e) => setSort(e.target.value)}>{SORTS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
-        <label className="ap-fine inline-flex items-center gap-2"><input type="checkbox" checked={only} onChange={(e) => setOnly(e.target.checked)} />Only accounts that need a look</label>
       </Find>
-      <Load r={r} empty={(p) => p.rows.length === 0 && (only ? "No account needs a look right now." : false)}>
+      <Load r={r} empty={(p) => p.rows.length === 0 && (level === "act" || level === "watch" ? "No account is in this state right now." : false)}>
         {(p) => (
           <>
-            <div className="ap-scroll"><table className="ap-t" data-testid="cl-table"><thead><tr><th>Account</th><th>What needs a look</th><th data-num>New leads</th><th data-num>Waiting</th><th data-num>Stuck deals</th><th>Billing</th><th /></tr></thead>
-              <tbody>{p.rows.map((a) => {
-                const d = change(a.leads, a.leadsPrev);
+            <p className="ap-fine mb-2">{p.levels.act} act now, {p.levels.watch} to keep an eye on, {p.levels.ok} fine{p.levels.unknown ? `, ${p.levels.unknown} with no data yet` : ""}.</p>
+            <div className="ap-scroll"><table className="ap-t" data-testid="cl-table"><thead><tr><th>Account</th><th>What needs a look</th><th data-num>New leads</th><th data-num>Waiting</th><th data-num>Stuck deals</th><th /></tr></thead>
+              <tbody>{p.rows.map((a: Cl3Account) => {
+                const nl = change(a.newLeads), who = owners.data?.owners?.[a.locationId];
                 return (
-                  <tr key={a.locationId} data-tone={a.reasons.length > 1 ? "amber" : undefined}>
-                    <td><span className="ap-name">{a.name}</span></td>
-                    <td className="cl-reasons">{a.reasons.length ? a.reasons.map((x) => <button key={x.key} type="button" className="cl-reason" onClick={() => open({ title: `${a.name}: ${x.label}`, reason: x.key, account: a.locationId, accountName: a.name, count: x.count })}>{x.count} {x.label}</button>) : <span className="ap-fine">All good</span>}</td>
-                    <td data-num>{a.leads}{d !== null && <span className="ap-sub"> {d > 0 ? "+" : ""}{d}%</span>}</td>
-                    <td data-num>{a.waiting > 0 ? <button type="button" className="ap-link" onClick={() => open({ title: `${a.name}: waiting for a reply`, reason: "waiting", account: a.locationId, accountName: a.name, count: a.waiting })}>{a.waiting}</button> : 0}</td>
-                    <td data-num>{a.staleShare === null ? "Not enough data" : `${Math.round(a.staleShare * 100)}%`}</td>
-                    <td><BillingChip info={agency.get(a.locationId)} /></td>
-                    <td><button type="button" className="ap-link" onClick={() => setNotes({ id: a.locationId, name: a.name })}>Notes</button></td>
+                  <tr key={a.locationId} style={{ cursor: "default" }} data-tone={a.level === "act" ? "amber" : undefined}>
+                    <td><span className="ap-name">{a.name}</span><br /><LevelChip level={a.level} />{who && <span className="ap-fine"> Looked after by {who}</span>}{a.quieted && a.quieted.length > 0 && <span className="ap-fine"> Quiet: {a.quieted.map((k) => MUTE_SHORT[k] ?? k).join(", ")}</span>}</td>
+                    <td className="cl-reasons">{a.reasons.length ? a.reasons.map((x) => <button key={x.reason} type="button" className="cl-reason" title={x.why} onClick={() => open({ title: `${a.name}: ${x.label}`, reason: x.reason, location: a.locationId, count: x.count })}>{x.label}</button>) : <span className="ap-fine">{a.level === "unknown" ? "No data yet" : "All good"}</span>}</td>
+                    <td data-num>{a.newLeads.current}{nl && <span className="ap-sub"> {nl}</span>}</td>
+                    <td data-num>{a.waiting > 0 ? <button type="button" className="ap-link" onClick={() => open({ title: `${a.name}: waiting for a reply`, reason: "waiting", location: a.locationId, count: a.waiting })}>{a.waiting}</button> : 0}</td>
+                    <td data-num>{share(a.staleDealsPct)}</td>
+                    <td><button type="button" className="ap-link" onClick={() => openClient(a.locationId)}>Client page</button>{" "}<button type="button" className="ap-link" onClick={() => setCfg({ id: a.locationId, name: a.name })}>Settings</button></td>
                   </tr>
                 );
               })}</tbody></table></div>
-            <Pager p={p} set={setPage} />
+            <Pager page={p.page} pages={p.pages} total={p.total} set={setPage} />
           </>
         )}
       </Load>
-      {notes && <Notes key={notes.id} id={notes.id} name={notes.name} onClose={() => setNotes(null)} />}
+      {cfg && <AccountSettings key={cfg.id} id={cfg.id} name={cfg.name} onClose={() => setCfg(null)} onChanged={bump} />}
     </div>
   );
 }
 
-function Trends({ since }: { since: string | null }) {
-  const { r, q, setQ, setPage } = useList<ClTrendRow>("trends");
-  const wow = (v: number[]) => { const a = v[v.length - 1], b = v[v.length - 2]; return b === undefined || b < 5 ? "" : `${a >= b ? "+" : ""}${Math.round(((a - b) / b) * 100)}%`; };
-  return (
-    <div data-testid="cl-trends">
-      <Find q={q} setQ={setQ} />
-      <p className="ap-fine mb-2">Last 5 weeks, from our own record{since ? ` (starts ${since})` : ""}. Week on week change is shown only when last week had enough to compare.</p>
-      <Load r={r} empty={(p) => p.rows.length === 0}>
-        {(p) => (
-          <>
-            <div className="ap-scroll"><table className="ap-t"><thead><tr><th>Account</th><th>New leads</th><th>Replied to</th><th>Booked</th><th>Money won</th></tr></thead>
-              <tbody>{p.rows.map((t) => <tr key={t.locationId}><td><span className="ap-name">{t.name}</span></td>
-                <td><span className="cl-cell"><Spark values={t.leads} label={`${t.name} new leads by week`} /><span>{t.leads[t.leads.length - 1]} <span className="ap-sub">{wow(t.leads)}</span></span></span></td>
-                <td><span className="cl-cell"><Spark values={t.answeredPct.filter((x): x is number => x !== null)} label={`${t.name} share of leads replied to`} /><span>{t.answeredPct[t.answeredPct.length - 1] ?? "n/a"}%</span></span></td>
-                <td><span className="cl-cell"><Spark values={t.booked} label={`${t.name} booked by week`} /><span>{t.booked[t.booked.length - 1]} <span className="ap-sub">{wow(t.booked)}</span></span></span></td>
-                <td><span className="cl-cell"><Spark values={t.wonCents} label={`${t.name} money won by week`} /><span>{money(t.wonCents[t.wonCents.length - 1])}</span></span></td></tr>)}</tbody></table></div>
-            <Pager p={p} set={setPage} />
-          </>
-        )}
-      </Load>
-    </div>
-  );
+function Health() {
+  if (fixturesOn()) return <EmptyState title="Sample data has no health and risk" body="Open Clients without the sample switch to see your own clients here." />;
+  return <HealthTab />;
 }
 
-function Compare() {
-  const r = useCl<ClPage<ClAccount>>("accounts", { pageSize: 200, sort: "name", dir: "asc" });
-  const [a, setA] = useState(""), [b, setB] = useState("");
-  const rows = r.data?.rows ?? [];
-  const A = rows.find((x) => x.locationId === a) ?? rows[0], B = rows.find((x) => x.locationId === b) ?? rows[1];
-  const lines: Array<[string, (x: ClAccount) => number | null, (n: number) => string, boolean]> = [
-    ["New leads", (x) => x.leads, String, true], ["Waiting for a reply", (x) => x.waiting, String, false], ["Median first reply", (x) => x.medianReplyMin, (n) => `${n} min`, false],
-    ["Appointments booked", (x) => x.booked, String, true], ["Showed up", (x) => x.showed, String, true], ["No-shows", (x) => x.noShow, String, false], ["Appointments with no outcome", (x) => x.unmarked, String, false],
-    ["Open deals", (x) => x.dealsOpen, String, true], ["Stuck deals", (x) => (x.staleShare === null ? null : Math.round(x.staleShare * 100)), (n) => `${n}%`, false], ["Money won", (x) => x.wonCents, money, true], ["Staff active", (x) => x.staffActive, String, true],
-  ];
-  return (
-    <Load r={r} empty={(p) => p.rows.length < 2 && "Compare needs at least two client accounts."}>
-      {() => (
-        <div data-testid="cl-compare">
-          <div className="ap-head"><select className="ap-field" aria-label="First account" value={A?.locationId} onChange={(e) => setA(e.target.value)}>{rows.map((x) => <option key={x.locationId} value={x.locationId}>{x.name}</option>)}</select>
-            <span className="ap-fine">against</span><select className="ap-field" aria-label="Second account" value={B?.locationId} onChange={(e) => setB(e.target.value)}>{rows.map((x) => <option key={x.locationId} value={x.locationId}>{x.name}</option>)}</select></div>
-          {A && B && <div className="ap-scroll"><table className="ap-t" style={{ minWidth: 420 }}><thead><tr><th>Last 30 days</th><th data-num>{A.name}</th><th data-num>{B.name}</th></tr></thead>
-            <tbody>{lines.map(([label, f, fmt, hi]) => { const x = f(A), y = f(B), win = x === null || y === null || x === y ? 0 : (x > y) === hi ? 1 : 2; return <tr key={label} style={{ cursor: "default" }}><td>{label}</td><td data-num data-win={win === 1 ? "1" : undefined}>{x === null ? "Not enough data" : fmt(x)}</td><td data-num data-win={win === 2 ? "1" : undefined}>{y === null ? "Not enough data" : fmt(y)}</td></tr>; })}</tbody></table></div>}
-          <p className="ap-fine mt-2">The bold number is the stronger of the two. Neither is a score; they are plain counts from your CRM.</p>
-        </div>
-      )}
-    </Load>
-  );
+type Names = { clients: Array<{ locationId: string; name: string; score?: number }> };
+function WithNames({ children }: { children: (a: Names["clients"]) => ReactNode }) {
+  const { data } = useData<Names>("clients?part=names");
+  if (!data) return null;
+  return data.clients.length === 0 ? <EmptyState title="No clients yet" body="Client accounts appear here once the first sync finishes." /> : <>{children(data.clients)}</>;
 }
 
-function Reports() {
-  const { r, q, setQ, setPage } = useList<ClReportRow>("reports");
-  const [done, setDone] = useState("");
-  const text = (x: ClReportRow) => `${x.name}, this week: ${x.came} new leads came in and ${x.answered} were answered. ${x.booked} appointments were booked and ${x.showed} showed up. ${x.won} deals were won for ${money(x.wonCents)}. We caught ${x.caught} things that needed attention.`;
-  const copy = (x: ClReportRow) => { try { void navigator.clipboard.writeText(text(x)); setDone(x.locationId); setTimeout(() => setDone(""), 1500); } catch { setDone(""); } };
-  return (
-    <div data-testid="cl-reports">
-      <Find q={q} setQ={setQ}><button type="button" className="s6-btn" onClick={() => window.print()}>Print</button></Find>
-      <Load r={r} empty={(p) => p.rows.length === 0}>
-        {(p) => (
-          <>
-            <div className="ap-scroll"><table className="ap-t"><thead><tr><th>Client</th><th data-num>Came in</th><th data-num>Answered</th><th data-num>Booked</th><th data-num>Showed</th><th data-num>Won</th><th data-num>Caught</th><th /></tr></thead>
-              <tbody>{p.rows.map((x) => <tr key={x.locationId} style={{ cursor: "default" }}><td><span className="ap-name">{x.name}</span></td><td data-num>{x.came}</td><td data-num>{x.answered}</td><td data-num>{x.booked}</td><td data-num>{x.showed}</td><td data-num>{money(x.wonCents)}</td><td data-num>{x.caught}</td>
-                <td><button type="button" className="ap-link" onClick={() => copy(x)}>{done === x.locationId ? "Copied" : "Copy for client"}</button></td></tr>)}</tbody></table></div>
-            <Pager p={p} set={setPage} />
-          </>
-        )}
-      </Load>
-    </div>
-  );
-}
-
-function People() {
-  const [idle, setIdle] = useState(false);
-  const { r, q, setQ, setPage } = useList<ClPerson>("people", { only: idle ? "idle" : "" });
-  return (
-    <div data-testid="cl-people">
-      <Find q={q} setQ={setQ}><label className="ap-fine inline-flex items-center gap-2"><input type="checkbox" checked={idle} onChange={(e) => setIdle(e.target.checked)} />Only people who have gone quiet</label></Find>
-      <Load r={r} empty={(p) => p.rows.length === 0 && (idle ? "Nobody has gone quiet." : false)}>
-        {(p) => (
-          <>
-            <div className="ap-scroll"><table className="ap-t"><thead><tr><th>Person</th><th>Account</th><th data-num>Messages sent</th><th>Last active</th></tr></thead>
-              <tbody>{p.rows.map((x) => <tr key={x.id} style={{ cursor: "default" }}><td><span className="ap-name">{x.name}</span></td><td>{x.accountName}</td><td data-num>{x.sent}</td><td>{x.idle ? <span className="ap-chip" data-tone="amber">Gone quiet</span> : x.lastActive}</td></tr>)}</tbody></table></div>
-            <Pager p={p} set={setPage} />
-          </>
-        )}
-      </Load>
-    </div>
-  );
-}
-
-function Setup() {
-  const agency = useAgency();
-  const [bad, setBad] = useState(false);
-  const { r, q, setQ, setPage } = useList<ClSetupRow>("setup", { only: bad ? "needs" : "" });
-  return (
-    <div data-testid="cl-setup">
-      <Find q={q} setQ={setQ}><label className="ap-fine inline-flex items-center gap-2"><input type="checkbox" checked={bad} onChange={(e) => setBad(e.target.checked)} />Only accounts with a problem</label></Find>
-      <Load r={r} empty={(p) => p.rows.length === 0 && (bad ? "Every account is connected and up to date." : false)}>
-        {(p) => (
-          <>
-            <div className="ap-scroll"><table className="ap-t"><thead><tr><th>Account</th><th>Connection</th><th>Data last updated</th><th>Marketplace apps</th><th>Setup health</th></tr></thead>
-              <tbody>{p.rows.map((x) => <tr key={x.locationId} style={{ cursor: "default" }} data-tone={x.connection === "ok" ? undefined : "amber"}><td><span className="ap-name">{x.name}</span></td>
-                <td>{x.connection === "ok" ? "Connected" : x.connection === "reconnect" ? "Needs permission: reconnect" : `Missing permission for ${x.missingScopes.join(" and ")}: reconnect`}</td><td>{ago(x.syncedAt)}</td>
-                <td data-testid="cl-apps">{(() => { const ap = agency.get(x.locationId)?.apps; return ap === undefined ? "..." : ap === null ? RECONNECT : ap.installed + ": " + ap.names.join(", "); })()}</td>
-                <td>{(() => { const ap = agency.get(x.locationId)?.apps; return ap === undefined ? "..." : ap === null ? RECONNECT : ap.setupDone + " of " + ap.setupTotal + " steps done"; })()}</td></tr>)}</tbody></table></div>
-            <Pager p={p} set={setPage} />
-          </>
-        )}
-      </Load>
-    </div>
-  );
-}
-
-export function ClientsModule() {
-  const [tab, setTab] = useState<Tab>("overview"), [drill, setDrill] = useState<Drill>(null);
-  const ov = useCl<ClOverview>("overview");
-  const index = TABS.findIndex((t) => t.key === tab);
+export function ClientsModule({ go, features = ALL_FEATURES, initialTab = "overview" }: { go: GoFn; features?: ClientsFeatures; initialTab?: "overview" | "onboarding" }) {
+  const api = useApiClient(), sample = fixturesOn();
+  const opt = useCl<Cl3Options>("options");
+  const flags = (opt.data?.flags ?? null) as Record<string, boolean> | null;
+  const [days, setDays] = useState<number>(30), [industry, setIndustry] = useState(""), [drill, setDrill] = useState<Drill>(null), [rev, setRev] = useState(0), [openId, setOpenId] = useState<string | null>(null);
+  const f = features, [since] = useState(() => Date.now());
+  const tabs = useMemo(() => {
+    const all: TabKey[] = ["overview", "needs", "trends", "compare", "reports", "people", "setup", "health"];
+    const keep = all.filter((k) => !FLAG_OF[k] || flags === null || flags[FLAG_OF[k] as string] !== false);
+    return [...keep, ...(f.onboarding ? (["onboarding"] as TabKey[]) : []), ...(f.clients && f.reports ? (["reviews"] as TabKey[]) : []), ...(f.clients ? (["industries"] as TabKey[]) : [])];
+  }, [flags, f.onboarding, f.clients, f.reports]);
+  const [tab, setTab] = useState<TabKey>(initialTab);
+  const filters = useMemo<ClParams>(() => {
+    const from = new Date(since - days * 86_400_000).toISOString().slice(0, 10);
+    return { from: days === 30 ? undefined : from, industry: industry || undefined };
+  }, [days, industry, since]);
+  const active = tabs.includes(tab) ? tab : tabs[0];
+  const index = Math.max(0, tabs.indexOf(active));
   const open = (d: NonNullable<Drill>) => { setDrill(d); setTimeout(() => document.getElementById("cl-drill")?.scrollIntoView({ block: "nearest", behavior: "smooth" }), 50); };
-  const go = (t: Tab) => { setTab(t); setDrill(null); };
-  const body = useMemo(() => {
-    switch (tab) {
-      case "overview": return <Overview open={open} go={go} />;
-      case "needs": return <Needs open={open} onlyNeeds />;
-      case "trends": return <Trends since={ov.data?.historySince ?? null} />;
-      case "compare": return <Compare />;
-      case "reports": return <Reports />;
-      case "people": return <People />;
-      case "setup": return <Setup />;
+  const goTab = (t: TabKey) => { setTab(t); setDrill(null); };
+  const readsAccounts = !["onboarding", "reviews", "industries", "health"].includes(active);
+  const usesPeriod = ["overview", "needs", "trends", "compare", "people"].includes(active);
+
+  if (openId) return <div className="s6 ap cl ds-enter" data-testid="page"><ClientPage key={openId} id={openId} onBack={() => setOpenId(null)} onOpen={setOpenId} go={go} /></div>;
+  if (opt.data && opt.data.canSeeAccounts === false) return <Page title="Clients" subtitle="All your client accounts in one place." actions={null}><EmptyState title="Clients is for owners and admins" body="It shows every client account together. Ask the owner of your account to open it." /></Page>;
+
+  const body = (() => {
+    switch (active) {
+      case "overview": return <Overview filters={filters} open={open} go={goTab} />;
+      case "needs": return <Needs filters={filters} open={open} rev={rev} bump={() => setRev((n) => n + 1)} openClient={setOpenId} />;
+      case "trends": return <Trends filters={filters} />;
+      case "compare": return <Compare options={opt.data ?? null} filters={filters} />;
+      case "reports": return <Reports filters={filters} onChanged={() => setRev((n) => n + 1)} />;
+      case "people": return <People filters={filters} />;
+      case "setup": return <Setup filters={filters} billingOn={flags === null || flags.cl_billing !== false} />;
+      case "health": return <Health />;
+      case "onboarding": return <OnboardingTab go={go} />;
+      case "reviews": return <WithNames>{(a) => <ReviewsTab accounts={a} />}</WithNames>;
+      case "industries": return <IndustriesTab go={go} showPlaybooks={f.playbooks} />;
     }
-  }, [tab, ov.data?.historySince]);
+  })();
   return (
     <div className="s6 ap cl ds-enter" data-testid="cl-module">
-      <Page title="Clients" subtitle="Which client accounts are fine, which need you, and proof to show them." actions={null}>
-        {fixturesOn() && <p className="ap-fine mb-2" role="status" data-testid="cl-sample">Sample data: these are not your real clients.</p>}
-        <ModuleTabs pill label="Clients sections" tabs={TABS.map((t) => ({ label: t.label, tip: t.tip, node: null }))} value={index} onChange={(i) => go(TABS[i].key)} />
-        <div data-testid={`cl-tab-${tab}`}>{body}</div>
-        {drill && <DrillList d={drill} onClose={() => setDrill(null)} />}
+      <Page title="Clients" subtitle="Which client accounts are fine, which need you, and proof to show them." actions={sample ? null : <Btn onClick={() => api.download("clients3?part=export", "clients.csv")}>Export CSV</Btn>}>
+        {sample && <p className="ap-fine mb-2" role="status" data-testid="cl-sample">Sample data: these are not your real clients.</p>}
+        {opt.data?.problem && <p className="ap-fine mb-2" role="status">{opt.data.problem}</p>}
+        <ModuleTabs pill label="Clients sections" tabs={tabs.map((k) => ({ label: TIPS[k][0], tip: TIPS[k][1], node: null }))} value={index} onChange={(i) => goTab(tabs[i])} />
+        {readsAccounts && (
+          <div className="ap-head print:hidden" role="group" aria-label="Filters">
+            {usesPeriod && <select className="ap-field" aria-label="Period" value={days} onChange={(e) => setDays(Number(e.target.value))}>{PERIODS.map(([d, l]) => <option key={d} value={d}>{l}</option>)}</select>}
+            {(opt.data?.industries.length ?? 0) > 0 && <select className="ap-field" aria-label="Industry" value={industry} onChange={(e) => setIndustry(e.target.value)}><option value="">All industries</option>{opt.data?.industries.map((i) => <option key={i} value={i}>{i}</option>)}</select>}
+            <span className="ap-fine">Every number below follows these choices{opt.data?.generatedAt ? `. Updated ${day(opt.data.generatedAt)}` : ""}.</span>
+          </div>
+        )}
+        <div data-testid={`cl-tab-${active}`}>{body}</div>
+        {drill && readsAccounts && <DrillList d={drill} filters={filters} onClose={() => setDrill(null)} />}
       </Page>
     </div>
   );

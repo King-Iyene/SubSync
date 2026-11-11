@@ -116,6 +116,9 @@ async function main() {
       `/api/app/people/contact/${other.locs[0]}/${other.contacts[0]}`,
       // The rebuilt Account audit (stage AUDIT): the read, the client list and a single client, asked for the other side's account by every parameter it takes.
       `/api/app/clients/act/receipt?location=${other.locs[0]}`, `/api/app/clients/act/csv?location=${other.locs[0]}`, `/api/app/clients/act/setup?location=${other.locs[0]}`, "/api/app/clients/act/receipt", "/api/app/clients/act/mutes",
+      // Clients actions, second half and the one Clients screen (stage CL-INT): every remaining read part, and the screen's read parts with the other side's account in every parameter (writes: tests/unit/clients-int-xtenant-db.test.ts).
+      "/api/app/clients/act/owners", "/api/app/clients/act/risk", "/api/app/clients/act/health", "/api/app/clients/act/workflows", `/api/app/clients/act/workflows?location=${other.locs[0]}`, "/api/app/clients/act/new-clients",
+      `/api/app/clients/act/mutes?location=${other.locs[0]}`, `/api/app/clients/act/owners?location=${other.locs[0]}`, `/api/app/clients3?part=needs-attention&location=${other.locs[0]}&level=act&sort=name`, `/api/app/clients3?part=trends&location=${other.locs[0]}&grain=month`,
       "/api/app/clients?part=home", "/api/app/clients?part=list&size=50", `/api/app/clients?part=list&q=${other.marker}`, `/api/app/clients?part=one&id=${other.locs[0]}`, "/api/app/clients?part=names",
       "/api/app/audit", "/api/app/audit/clients?size=50", `/api/app/audit?location=${other.locs[0]}`, `/api/app/audit/clients?location=${other.locs[0]}&q=${other.marker}`, `/api/app/audit?accounts=${other.locs[0]}&fresh=1`,
       // The rebuilt Unanswered messages screen (stage UNANS): the first screen, the list behind a number, the rankings, the other side's account, owner and name asked for by every parameter.

@@ -58,6 +58,18 @@ export type AccountSignals = {
   syncAgeHours: number | null; needsPermission: string[]; hasAnyData: boolean;
 };
 
+/** Quiet marks (set in Reports and Needs attention, slice CB): what one mark hides from the ranking. Counts on the account stay real; only the reasons, level and summary change.
+ *  "all" hides every client-attention reason but never a connection problem (needs_permission, sync_old), because those make every other number untrustworthy. */
+export function applyQuiet(s: AccountSignals, kinds: readonly string[] | undefined): AccountSignals {
+  if (!kinds || kinds.length === 0) return s;
+  const all = kinds.includes("all"), out: AccountSignals = { ...s };
+  if (all || kinds.includes("replies")) { out.waiting = 0; out.waitingOld = 0; }
+  if (all || kinds.includes("noshows")) { out.noshows = 0; out.unmarked = 0; }
+  if (all || kinds.includes("stale")) out.staleDeals = 0;
+  if (all) { out.newLeads = { ...s.newLeads, change: null, enough: false }; out.staffQuiet = 0; out.noOwner = { ...s.noOwner, value: null, enough: false }; out.noPhone = { ...s.noPhone, value: null, enough: false }; }
+  return out;
+}
+
 /** The reasons an account is flagged, each a count that opens its rows. Order = importance. */
 export function reasonsOf(s: AccountSignals): Cl3ReasonCount[] {
   const out: Cl3ReasonCount[] = [];
