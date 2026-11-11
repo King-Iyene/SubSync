@@ -1,5 +1,6 @@
 import { featureOn } from "../flags";
 import { recordFromWebhook } from "../analytics/appointments3-record";
+import { recordDealFromWebhook } from "../analytics/pipeline3-record";
 import { sql } from "../db";
 import { safeError } from "../safe-log";
 import { mapOpportunity } from "../sync/ghl-data";
@@ -57,12 +58,19 @@ export async function applyLiveWebhook(
     if (t === "OpportunityDelete") {
       const id = text(root.id, data.id);
       if (!id) return none;
+      if (await featureOn("pl_record")) await recordDealFromWebhook({ installationId: a.installationId, locationId: a.locationId, opportunityId: id, type: "OpportunityDelete" });
       await db`delete from cached_opportunities where installation_id = ${a.installationId} and location_id = ${a.locationId} and opportunity_id = ${id}`;
       return { skipResync: true };
     }
     if (t.startsWith("Opportunity")) {
       const o = mapOpportunity(Object.keys(data).length > 1 && data.id ? data : root);
       if (!o) return none;
+      // The payload has no previous values: the recorder compares it with the stored row, before the row is updated (flag pl_record).
+      if (await featureOn("pl_record")) {
+        await recordDealFromWebhook({ installationId: a.installationId, locationId: a.locationId, opportunityId: o.opportunityId, type: t === "OpportunityCreate" ? "OpportunityCreate" : "OpportunityUpdate",
+          next: { stageId: o.stageId, pipelineId: o.pipelineId, status: o.status, value: o.monetaryValue, ownerId: o.assignedTo, source: o.source, lostReasonId: o.lostReasonId, contactId: o.contactId,
+            lastStageChangeAt: o.lastStageChangeAt ? Date.parse(o.lastStageChangeAt) : null, lastStatusChangeAt: o.lastStatusChangeAt ? Date.parse(o.lastStatusChangeAt) : null, createdAt: o.createdAt ? Date.parse(o.createdAt) : null } });
+      }
       await db`
         insert into cached_opportunities (installation_id, location_id, opportunity_id, pipeline_id, stage_id, contact_id, contact_name, name, monetary_value, status, last_stage_change_at, last_status_change_at, last_action_at, created_remote_at, updated_remote_at, synced_at, assigned_to, source)
         values (${a.installationId}, ${a.locationId}, ${o.opportunityId}, ${o.pipelineId}, ${o.stageId}, ${o.contactId}, ${o.contactName}, ${o.name}, ${o.monetaryValue}, ${o.status}, ${o.lastStageChangeAt}, ${o.lastStatusChangeAt}, ${o.lastActionAt}, ${o.createdAt}, ${o.updatedAt}, now(), ${o.assignedTo}, ${o.source})

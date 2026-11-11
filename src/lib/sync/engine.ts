@@ -17,6 +17,7 @@ import { CONVERSATIONS_READ_PER_ACCOUNT, CONVERSATION_PAGE_SIZE } from "../analy
 import { diffAppointmentEvents } from "./appointment-events";
 import { applyLeadRules } from "./lead-rules-apply";
 import { diffDealEvents } from "./deal-events";
+import { recordDealsFromSync } from "../analytics/pipeline3-record";
 import { diffTagEvents } from "./tag-events";
 import { listAllInstalledLocations } from "./installed-locations";
 import { REFRESH_DUE_AFTER_MINUTES, REFRESH_EVERY_MINUTES } from "./schedule";
@@ -318,6 +319,8 @@ async function handleOpportunities(job: Job, deadline: number): Promise<Outcome>
     const unique = [...new Map(opportunities.map((o) => [o.opportunityId, o])).values()];
     if (unique.length > 0) {
       await recordDealEvents(job.installationId, loc, unique);
+      // The deal history (flag pl_record, never throws): diffed against the stored rows, so it runs BEFORE the cache is written below.
+      await recordDealsFromSync(job.installationId, loc, unique);
       const rows = unique.map((o) => ({
         installation_id: job.installationId, location_id: loc, opportunity_id: o.opportunityId, pipeline_id: o.pipelineId,
         stage_id: o.stageId, contact_id: o.contactId, contact_name: o.contactName, name: o.name, monetary_value: o.monetaryValue,

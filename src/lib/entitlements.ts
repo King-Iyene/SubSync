@@ -103,6 +103,21 @@ export const FEATURES = [
   "appt_meetings",
   // Appointments module (stage AU, the sub-section screens and the Flow Tree): default off.
   "appt_module",
+  // Pipeline and deals module round 3 (docs/features/PIPELINE_BRIEF.md): each behind its own flag, default off.
+  "pl_overview",
+  "pl_money_flow",
+  "pl_attention",
+  "pl_won_lost",
+  "pl_forecast",
+  "pl_people",
+  "pl_sources",
+  "pl_stage_history",
+  "pl_health",
+  "pl_proof",
+  "pl_actions",
+  "pl_history",
+  "pl_record",
+  "pl_module",
 ] as const;
 export type Feature = (typeof FEATURES)[number];
 
