@@ -57,6 +57,8 @@ A person in one client account never sees another client account's data. An agen
 | `api/admin/diagnostics` | secret | Bearer CRON_SECRET only, read only; sync health of every real install (short ids, times, counts), no customer data |
 | `api/admin/feedback` | secret | Bearer CRON_SECRET only, read only; the feedback, problem reports, roadmap suggestions and vote counts people sent, companies as short ids |
 | `api/admin/capabilities` | secret | Bearer CRON_SECRET only, read only; which data the platform gives the app, install by install (field names, counts and statuses, never a value or a token); at most 70 GET requests per call |
+| `api/cron/moat` | secret | Bearer CRON_SECRET; keeps SubSync's own append-only lead record current and writes weekly proof notifications (email dry-run only); never writes to the CRM; idle while the kill switch is on |
+| `/reply-proof/[id]` | public_by_design | Shared reply-time page for one client account: 192-bit random id, 30-day expiry, switch-off by its owner, rate limited, never indexed, totals only, hash-chain check, no contact or message on it |
 | `/audit/[id]` | public_by_design | Shared audit snapshot: 192-bit random id, 14-day expiry, switch-off by its owner, rate limited, totals, finding titles and a fix plan only, account names removed |
 | `/` | public_static | Marketing page |
 | `/app` | public_static | App shell with no data; data comes from `api/app` with a session |

@@ -67,6 +67,8 @@ export const INVENTORY: Record<string, TableInfo> = {
   },
   appointment_events: { noun: "appointment history", line: "appointments" },
   touch_events: { noun: "message and call history (who, which way, which channel, when; never the words)", line: "conversations", personal: { user_id: "which team member sent it" }, notPersonal: ["event_key", "channel", "source", "campaign", "outcome"] },
+  moat_events: { noun: "lead history record (arrived, first reply, alerts, bookings, deal results; never the words)", line: "conversations", personal: { contact_id: "the contact this fact is about", conversation_id: "the conversation this fact is about", user_id: "which team member did it", owner_id: "the team member who owned the lead" }, notPersonal: ["event_key", "channel", "vertical", "detail"] },
+  reply_proof_pages: { noun: "reply-time pages you shared", line: "shares", personal: { payload: "a snapshot of reply-time totals for one client account, with your business name and colour", created_by: "which team member made the page" }, notPersonal: ["payload_hash", "prev_hash", "chain_hash", "signature"] },
   lead_events: { noun: "lead history (arrived, owner changes, stage moves)", line: "conversations", personal: { user_id: "which team member made the change" }, notPersonal: ["event_key"] },
   speed_digest: { noun: "the Speed summary settings (who gets it, when, what it says)", line: "conversations", personal: { settings: "the email addresses chosen to receive it" }, notPersonal: ["location_id", "last_sent_key"] },
   speed_prefs: { noun: "Call mode and Speed choices (redial plan, goals, scripts, outcome sets)", line: "conversations", notPersonal: ["scope", "key", "value"] },
@@ -157,7 +159,7 @@ export const INVENTORY: Record<string, TableInfo> = {
   call_lists: { noun: "saved call lists", line: "yours", personal: { name: "saved call list names", filters: "the filters of a saved list" } },
   account_profiles: {
     noun: "your notes and fees for each client", line: "yours",
-    personal: { notes: "your notes about a client", monthly_fee: "what you charge a client", renewal_date: "a client's renewal date", industry: "a client's industry" },
+    personal: { notes: "your notes about a client", monthly_fee: "what you charge a client", renewal_date: "a client's renewal date", industry: "a client's industry", vertical: "the kind of business a client is" },
   },
   goals: { noun: "goals", line: "yours" },
   annotations: { noun: "chart notes", line: "yours", personal: { text: "notes you add to charts" } },

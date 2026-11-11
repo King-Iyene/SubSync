@@ -38,8 +38,8 @@ describe("route registry", () => {
     const doc = readFileSync("docs/TENANCY.md", "utf8");
     expect(ROUTE_GUARDS.filter((r) => !doc.includes("`" + r.route + "`")).map((r) => r.route)).toEqual([]);
   });
-  it("the only routes with no secret of any kind are static pages and the one public snapshot", () => {
+  it("the only routes with no secret of any kind are static pages and the public snapshots", () => {
     const open = ROUTE_GUARDS.filter((r) => r.kind === "public_static" || r.kind === "public_by_design").map((r) => r.route).sort();
-    expect(open).toEqual(["/", "/app", "/audit/[id]", "/design", "/installed", "/installed/error", "/privacy", "/support", "/terms", "/trust"]);
+    expect(open).toEqual(["/", "/app", "/audit/[id]", "/design", "/installed", "/installed/error", "/privacy", "/reply-proof/[id]", "/support", "/terms", "/trust"]);
   });
 });

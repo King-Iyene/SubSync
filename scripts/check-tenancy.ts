@@ -105,7 +105,7 @@ async function main() {
       "/api/app/audit", "/api/app/audit/clients?size=50", `/api/app/audit?location=${other.locs[0]}`, `/api/app/audit/clients?location=${other.locs[0]}&q=${other.marker}`, `/api/app/audit?accounts=${other.locs[0]}&fresh=1`,
       // The rebuilt Unanswered messages screen (stage UNANS): the first screen, the list behind a number, the rankings, the other side's account, owner and name asked for by every parameter.
       "/api/app/inbox?part=home", "/api/app/inbox?part=list", `/api/app/inbox?part=list&account=${other.locs[0]}`, `/api/app/inbox?part=list&account=${other.locs.join(",")}&bucket=h48`, `/api/app/inbox?part=list&owner=${other.marker}`,
-      `/api/app/inbox?part=list&q=${other.marker}`, "/api/app/inbox?part=ranks&by=account", "/api/app/inbox?part=ranks&by=owner", `/api/app/inbox?part=ranks&by=account&q=${other.marker}`,
+      `/api/app/inbox?part=list&q=${other.marker}`, "/api/app/inbox?part=ranks&by=account", "/api/app/inbox?part=ranks&by=owner", `/api/app/inbox?part=ranks&by=account&q=${other.marker}`, "/api/app/moat?part=receipt", `/api/app/moat?part=receipt&account=${other.locs[0]}`, "/api/app/moat?part=curve", `/api/app/moat?part=curve&account=${other.locs[0]}`, "/api/app/moat?part=scorecards", `/api/app/moat?part=scorecards&account=${other.locs.join(",")}`, "/api/app/moat?part=channels", "/api/app/moat?part=clock", `/api/app/moat?part=clock&account=${other.locs[0]}`, "/api/app/moat?part=benchmark&vertical=med_spa", "/api/app/moat?part=setup", "/api/app/moat?part=proofs",
     ];
 
     // TENANCY_FAST=1 skips the long cross-read sweep (while iterating on the share link and write attacks); the full run does not.

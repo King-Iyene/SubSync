@@ -36,6 +36,10 @@
     {
       "path": "/api/cron/inbox-breach",
       "schedule": "10 * * * *"
+    },
+    {
+      "path": "/api/cron/moat",
+      "schedule": "25 * * * *"
     }
   ]
 }
