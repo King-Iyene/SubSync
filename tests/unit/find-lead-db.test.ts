@@ -49,6 +49,9 @@ describe.skipIf(!HAS_DB)("Find a lead keyset search", () => it("is complete, ord
     // the exact email match comes first
     const top = await findPeople(ia.id as string, null, { q: "exact@xtest.example" }, null, [], 5);
     expect(top.rows[0]?.contactId).toBe("xtest-c-0077");
+    // no search words at all (the Browse case): the order has no rank term, and it must still run
+    const browse = await findPeople(ia.id as string, null, {}, null, [], 20);
+    expect(browse.rows.length, "browse with no words").toBe(20);
     // limited to one account: only that account, even when the search words match the other
     const only = await walk(["xtest-loc-a2"], { q: "casey" }, 8);
     expect(only.length).toBe(30);

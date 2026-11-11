@@ -15,7 +15,7 @@ export type FoundPage = { total: number | null; capped: boolean; rows: PersonRow
 export async function findPeople(installationId: string, allowed: string[] | null, f: SmartFilter, after: Cursor | null, coldTags: string[], size = FIND_PAGE): Promise<FoundPage> {
   return timed(async (db) => {
     const q = f.q?.trim() ?? "";
-    const rk = q ? db`((lower(c.email) = ${q.toLowerCase()})::int * 2 + (c.full_name ilike ${`${escapeLike(q)}%`})::int)` : db`0`;
+    const rk = q ? db`((lower(c.email) = ${q.toLowerCase()})::int * 2 + (c.full_name ilike ${`${escapeLike(q)}%`})::int)` : db`0::int`;
     const ra = db`coalesce(c.last_activity_at, '-infinity'::timestamptz)`;
     const rd = db`coalesce(c.date_added, '-infinity'::timestamptz)`;
     const past = after ? db`and (${rk}, ${ra}, ${rd}, c.location_id, c.contact_id) < (${after.rk}::int, ${after.ra}::text::timestamptz, ${after.rd}::text::timestamptz, ${after.loc}::text, ${after.id}::text)` : db``;
