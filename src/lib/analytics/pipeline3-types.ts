@@ -20,7 +20,7 @@ export type Pl3Bucket =
 export type Estimate = { value: number | null; low: number | null; high: number | null; enough: boolean; estimate: true; formula: string; minNote: string | null };
 export type Rate = { value: number | null; n: number; of: number; enough: boolean };
 export type Money = { value: number; n: number };
-export type Page<T> = { rows: T[]; total: number; page: number; size: number; pages: number; truncated: boolean };
+export type Page<T> = { rows: T[]; total: number; page: number; size: number; pages: number; truncated: boolean; next?: string | null };
 
 export type Pl3Row = {
   opportunityId: string; locationId: string; accountName: string | null;
@@ -42,6 +42,8 @@ export type Pl3Overview = {
   openCount: number; openValue: Money; weighted: Estimate; atRisk: Estimate;
   stale: { count: number; value: number };
   wonLast30: Money; lostLast30: Money; winRate: Rate; velocity: Estimate; medianWonCycleDays: number | null;
+  /** Big open deals (top tenth by value) with no movement for `days` days. */
+  bigUntouched: { count: number; value: number; days: number };
   health: { score: number | null; noOwner: number; noValue: number; test: number; outliers: number };
   /** The six tiles at most. Each count equals its list. */
   cards: Array<{ key: string; title: string; value: number | string; sub: string | null; part: Pl3Part; bucket: Pl3Bucket | null }>;
@@ -156,7 +158,7 @@ export type Pl3Flag = (typeof PL3_FLAGS)[number];
 export type PipeCard = {
   locationId: string; pipelineId: string; accountName: string; name: string;
   openCount: number; openValue: number; wonCount: number; wonValue: number; lostCount: number; lostValue: number;
-  staleCount: number; noOwnerCount: number; zeroValueCount: number; empty: boolean;
+  staleCount: number; noOwnerCount: number; zeroValueCount: number; outlierCount: number; outlierValue: number; empty: boolean;
   mini: Array<{ name: string; value: number }>; // open money per stage in the pipeline's own order; a stage it no longer has is "Other stage"
 };
 export type Pl3Cards = {

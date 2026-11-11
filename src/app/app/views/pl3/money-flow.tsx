@@ -95,7 +95,7 @@ export function MoneyFlow({ filters, onPick }: { filters: PlFilters; onPick: (p:
       </div>
       <p className="ap-fine mb-2">One coin = {money(layout.step)}. Taller stack = more money in that stage. The hatched top is deals stuck longer than that stage&apos;s own normal. Click any stack to open exactly those deals.</p>
 
-      <div className="pl-stacks" ref={wrap} style={{ height: layout.height }} data-settle={settle && !reduced ? "1" : "0"} data-vertical={layout.vertical ? "1" : "0"} key={`s${run}`}>
+      <div className="pl-stackscroll" ref={wrap}><div className="pl-stacks" style={{ height: layout.height, width: layout.width }} data-settle={settle && !reduced ? "1" : "0"} data-vertical={layout.vertical ? "1" : "0"} key={`s${run}`}>
         <svg className="pl-svg" width={layout.width} height={layout.height} viewBox={`0 0 ${layout.width} ${layout.height}`} role="group" aria-label="Stacks of coins, one per stage, showing the money in each">
           <defs><pattern id="pl-hatch" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="5" height="5" className="pl-hatch-bg" /><rect width="1.6" height="5" className="pl-hatch-line" /></pattern></defs>
           {!layout.vertical && layout.cols.map((c) => <line key={`b${c.id}`} className="pl-base" x1={c.stack.x} x2={c.stack.x + c.stack.w} y1={c.stack.y + c.stack.h + 2} y2={c.stack.y + c.stack.h + 2} />)}
@@ -109,7 +109,7 @@ export function MoneyFlow({ filters, onPick }: { filters: PlFilters; onPick: (p:
             </button>;
           })}
         </div>
-      </div>
+      </div></div>
 
       {view.drains.length > 0 && (
         <ul className="pl-reasons" aria-label="Why deals were lost">

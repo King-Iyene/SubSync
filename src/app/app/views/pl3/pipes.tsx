@@ -35,6 +35,7 @@ function CardView({ c, onOpen }: { c: PipeCard; onOpen: (c: PipeCard) => void })
           <span>Won {ds(c.wonValue)}</span>
           <span>{c.staleCount > 0 ? <u>{c.staleCount.toLocaleString("en-US")} stuck</u> : "None stuck"}</span>
           {c.noOwnerCount > 0 && <span>{c.noOwnerCount.toLocaleString("en-US")} no owner</span>}
+          {c.outlierCount > 0 && <span title="One deal over 40% of the account is shown apart, not added to open money">{c.outlierCount} big deal{c.outlierCount === 1 ? "" : "s"} apart ({ds(c.outlierValue)})</span>}
         </span>
       </button>
     </li>
@@ -71,7 +72,7 @@ export function PipelineGrid({ filters, onOpen }: { filters: PlFilters; onOpen: 
         <label className="ap-search"><Search aria-hidden className="size-4" /><span className="sr-only">Search pipelines and accounts</span><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search pipelines or accounts" data-testid="pl-psearch" /></label>
         {t && <p className="ap-fine tnum" data-testid="pl-ptotals">{t.pipelines.toLocaleString("en-US")} pipelines · {d(t.openValue)} open · {d(t.wonValue)} won · {d(t.lostValue)} lost · {t.staleCount.toLocaleString("en-US")} stuck · {t.noOwnerCount.toLocaleString("en-US")} with no owner</p>}
       </div>
-      <p className="ap-fine mb-2">Ranked by open money. Each pipeline has its own stages, so they are not added together here. Open money counts deals with a value and an owner. Click a card to see its stacks.</p>
+      <p className="ap-fine mb-2">Ranked by open money. Each pipeline has its own stages, so they are not added together here. Open money leaves out deals with no value, no owner, test deals, and any one deal over 40% of an account (shown apart on the card). It is the same rule as the stacks. Click a card to see its stacks.</p>
       {!head.data.cards.length ? <p className="ap-fine" role="status">No pipeline matches &quot;{q}&quot;.</p> : (
         <>
           <Page key={`p0${q}${showEmpty}`} filters={f} after={null} showEmpty={showEmpty} onOpen={onOpen} onMore={(n) => setCursors((c) => [...c, n])} first />

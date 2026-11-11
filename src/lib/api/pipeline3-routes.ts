@@ -52,7 +52,7 @@ export async function handlePipeline3(ctx: Ctx, h: Pl3Helpers): Promise<Response
   const hit = plCache.get(key);
   if (hit && part !== "detail") return wrap(hit as object, true);
   const done = (body: object) => { plCache.set(key, body); return wrap(body); };
-  const base = { f, page: p, size, sort: sp.get("sort"), dir };
+  const base = { f, page: p, size, sort: sp.get("sort"), dir, after: sp.get("after"), knownTotal: sp.get("total") !== null ? Math.max(0, int(sp.get("total"), 0)) : null };
 
   switch (part) {
     case "overview": return done(await overview(scope, f, wide.days));

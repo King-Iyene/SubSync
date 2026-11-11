@@ -33,7 +33,7 @@ test("deals: dollars become cents, the page counts from 1, a bad answer is an em
   const row = { opportunityId: "o1", locationId: "l1", accountName: "A", contactId: "c", contactName: "Sam", name: "Roof", url: "https://crm/x", pipelineId: "p", pipelineName: "Sales", stageId: "s", stageName: "Proposal", status: "open", value: 1234.5, bucket: "stale", ownerId: null, ownerName: null, source: null, lostReason: null, createdAt: null, lastStageChangeAt: null, daysInStage: 20.4, staleLimitDays: 12, stale: true, health: 30, healthWhy: null, appointment: null, why: null, dnd: false, outlier: false, isTest: false };
   const d = dealsOf({ total: 41, page: 1, size: 20, rows: [row] } as never);
   assert.equal(d.total, 41); assert.equal(d.page, 2); assert.equal(d.rows[0].valueCents, 123450); assert.equal(d.rows[0].daysInStage, 20); assert.equal(d.rows[0].url, "https://crm/x");
-  assert.deepEqual(dealsOf(null), { total: 0, page: 1, pageSize: 20, rows: [] });
+  assert.deepEqual(dealsOf(null), { total: 0, page: 1, pageSize: 20, rows: [], next: null });
 });
 
 test("an empty or missing answer never throws and shows nothing yet", () => {

@@ -77,10 +77,12 @@ export function Pager({ total, page, size, onPage, onSize }: { total: number; pa
 /** A server-paged list of deals for one part. The count in the header is the number of rows behind it. */
 export function DealList({ part = "list", filters, extra, onOpen, activeId, showAccount, empty, testId, selectable }: { part?: "list" | "needs-attention"; filters: PlFilters; extra?: Record<string, string | number | undefined>; onOpen: (d: PlDeal) => void; activeId?: string | null; showAccount: boolean; empty: string; testId: string; selectable?: boolean }) {
   const [page, setPage] = useState(1), [size, setSize] = useState(20), [sel, setSel] = useState<Set<string>>(new Set());
+  // Next and previous use a keyset cursor (the page starts right after the last deal seen), so page 5,000 costs the same as page 1 and the total is not counted again.
+  const [cursors, setCursors] = useState<Record<number, { after: string; total: number }>>({});
   const key = JSON.stringify(extra ?? {}) + filters.days + filters.locationId + filters.pipeline + filters.ownerId + filters.q;
   const [prev, setPrev] = useState(key);
-  if (prev !== key) { setPrev(key); setPage(1); setSel(new Set()); }
-  const { data, error, loading, reload } = usePl<PlDeals>(part, filters, { ...extra, page, pageSize: size });
+  if (prev !== key) { setPrev(key); setPage(1); setSel(new Set()); setCursors({}); }
+  const { data, error, loading, reload } = usePl<PlDeals>(part, filters, { ...extra, page, pageSize: size, after: cursors[page]?.after, total: cursors[page]?.total });
   if (error) return <ErrorState error={error} onRetry={reload} />;
   if (!data) return <SkeletonRows rows={6} label="Loading deals..." />;
   if (data.total === 0) return <EmptyState title={empty} body="Change the dates or filters above to look further back." />;
@@ -90,7 +92,7 @@ export function DealList({ part = "list", filters, extra, onOpen, activeId, show
       {selectable && sel.size > 0 && <div className="mb-2 flex flex-wrap items-center gap-2 text-sm" data-testid="pl-bulkbar"><b>{sel.size} selected</b><PlSlot name="BulkActions" deals={chosen} onChanged={reload} filters={filters} /><button type="button" className="ap-link" onClick={() => setSel(new Set())}>Clear</button></div>}
       <div className="ap-tablewrap" style={{ opacity: loading ? 0.7 : 1 }}>
         <DealTable rows={data.rows} showAccount={showAccount} onChanged={reload} onOpen={onOpen} activeId={activeId} selected={selectable ? sel : undefined} onSelect={selectable ? (id, on) => setSel((s) => { const n = new Set(s); if (on) n.add(id); else n.delete(id); return n; }) : undefined} />
-        <Pager total={data.total} page={page} size={size} onPage={setPage} onSize={(s) => { setSize(s); setPage(1); }} />
+        <Pager total={data.total} page={page} size={size} onPage={(p) => { if (p === page + 1 && data.next) setCursors((c) => ({ ...c, [p]: { after: data.next!, total: data.total } })); setPage(p); }} onSize={(s) => { setSize(s); setPage(1); setCursors({}); }} />
       </div>
     </div>
   );

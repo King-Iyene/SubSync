@@ -13,12 +13,13 @@ export function dealOf(r: Pl3Row): PlDeal {
     daysInStage: Math.max(0, Math.round(r.daysInStage ?? 0)), staleAfterDays: r.staleLimitDays === null || r.staleLimitDays === undefined ? null : Math.round(r.staleLimitDays), lostReason: r.lostReason, health: r.health, url: r.url,
   };
 }
-export const dealsOf = (p: Partial<Page<Pl3Row>> | null | undefined): PlDeals => ({ total: p?.total ?? 0, page: (p?.page ?? 0) + 1, pageSize: p?.size ?? 20, rows: arr<Pl3Row>(p?.rows).map(dealOf) });
+export const dealsOf = (p: Partial<Page<Pl3Row>> | null | undefined): PlDeals => ({ total: p?.total ?? 0, page: (p?.page ?? 0) + 1, pageSize: p?.size ?? 20, rows: arr<Pl3Row>(p?.rows).map(dealOf), next: p?.next ?? null });
 
 export function overviewOf(o: Pl3Overview | null): PlOverview {
   const h = o?.health;
   return {
     headline: { openCount: o?.openCount ?? 0, openValueCents: c(o?.openValue?.value), staleCount: o?.stale?.count ?? 0, staleValueCents: c(o?.stale?.value), wonCents: c(o?.wonLast30?.value), lostCents: c(o?.lostLast30?.value), winRate: o?.winRate?.value ?? null, winRateDeals: o?.winRate?.of ?? 0 },
+    bigUntouched: o?.bigUntouched ? { count: o.bigUntouched.count, valueCents: c(o.bigUntouched.value), days: o.bigUntouched.days } : undefined,
     sentence: typeof o?.headline === "string" ? o.headline : "", leak: null, minDeals: 15, excluded: { zeroValue: h?.noValue ?? 0, noOwner: h?.noOwner ?? 0, test: h?.test ?? 0 }, outlier: null,
   };
 }
@@ -131,6 +132,7 @@ export function queryOf(part: PlPart, f: PlFiltersLike, extra: Record<string, st
   if (part === "list") { const bucket = extra.stale ? "stale" : status; if (bucket) p.set("bucket", bucket); }
   if (extra.stage) p.set("stage", String(extra.stage));
   if (extra.after) p.set("after", String(extra.after));
+  if (extra.total) p.set("total", String(extra.total));
   if (extra.empty) p.set("empty", "1");
   if (extra.owner) p.set("owner", String(extra.owner));
   if (extra.location) p.set("location", String(extra.location));

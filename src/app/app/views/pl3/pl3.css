@@ -5,7 +5,8 @@
 .pl-flow-title { font-size: 1.05rem; font-weight: 650; margin: 0; margin-right: auto; }
 .pl-replay { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .pl-replay input[type="range"] { width: clamp(120px, 22vw, 280px); accent-color: var(--pl-gold); min-height: 24px; }
-.pl-stacks { position: relative; width: 100%; border-radius: 12px; overflow: hidden; border: 1px solid color-mix(in srgb, var(--s6-edgec) 22%, transparent); background: var(--s6-surf); }
+.pl-stackscroll { width: 100%; overflow-x: auto; border-radius: 12px; }
+.pl-stacks { position: relative; min-width: 100%; border-radius: 12px; overflow: hidden; border: 1px solid color-mix(in srgb, var(--s6-edgec) 22%, transparent); background: var(--s6-surf); }
 .pl-svg { position: absolute; inset: 0; }
 .pl-base { stroke: color-mix(in srgb, var(--foreground) 18%, transparent); stroke-width: 1; }
 .pl-coin { transition: transform 160ms ease; }

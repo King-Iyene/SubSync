@@ -24,6 +24,7 @@ export function shareCoins(total: number, weights: number[]): number[] {
   return out;
 }
 
+export const MIN_COL = 84;
 const PITCH = 7, COIN_H = 5.5, LABEL_H = 78;
 export function layoutStacks(stages: StackIn[], wonCents: number, wonCount: number, drains: DrainIn[], opts: { width: number }): StackLayout {
   const lostCents = drains.reduce((a, d) => a + d.valueCents, 0), lostCount = drains.reduce((a, d) => a + d.count, 0);
@@ -56,8 +57,9 @@ export function layoutStacks(stages: StackIn[], wonCents: number, wonCount: numb
     items.forEach((it) => { cols.push(build(it, { x: pad, y: y + 34, w: width - pad * 2, h: 14 }, { x: pad, y, w: width - pad * 2, h: 32 })); y += rowH; });
     return { width, height: y + pad - 10, vertical, step, cols, coinMax };
   }
-  const pad = 16, gap = 10, n = items.length, extra = 18, colW = Math.floor((width - pad * 2 - gap * (n - 1) - extra) / n), stackH = Math.max(120, STACK_COIN_CAP * PITCH + 6);
+  const pad = 16, gap = 10, n = items.length, extra = 18, colW = Math.max(MIN_COL, Math.floor((width - pad * 2 - gap * (n - 1) - extra) / n)), stackH = Math.max(120, STACK_COIN_CAP * PITCH + 6);
   let x = pad;
   items.forEach((it, i) => { if (it.kind === "lost" && i > 0) x += extra; cols.push(build(it, { x, y: 8, w: colW, h: stackH }, { x, y: 8 + stackH + 8, w: colW, h: LABEL_H })); x += colW + gap; });
-  return { width, height: 8 + stackH + 8 + LABEL_H + 4, vertical, step, cols, coinMax };
+  // Many stages: columns keep a readable minimum width and the picture grows wider than its box (the screen scrolls it sideways inside the box).
+  return { width: Math.max(width, x - gap + pad), height: 8 + stackH + 8 + LABEL_H + 4, vertical, step, cols, coinMax };
 }
