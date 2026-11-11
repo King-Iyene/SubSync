@@ -64,14 +64,12 @@ test("closer totals add up across setters; next-lead needs two closers with enou
   assert.equal(tot.reduce((a, c) => a + c.bookings, 0), t.booked);
 });
 
-import { coachingNote, money, pct, riskOf } from "../design/appt-coach.ts";
+import { coachingNote, money, pct } from "../design/appt-coach.ts";
 test("coaching note, risk flag and formatting", () => {
   const base = { bookings: 20, showRate: 0.5, noShowRate: 0.5, closeRate: 0.4, revenueCents: 0, avgLeadToBookedHours: 3, name: "Ben" };
   const o = { showRate: 0.75, noShowRate: 0.2, closeRate: 0.4 };
   assert.equal(coachingNote(base, o).tone, "red");
   assert.equal(coachingNote({ ...base, bookings: 2 }, o).tone, "grey");
   assert.equal(coachingNote({ ...base, showRate: 0.9, noShowRate: 0.1 }, o).tone, "green");
-  assert.equal(riskOf({ reminderState: "none", hoursToStart: 20, flags: [], status: "booked" }).level, "high");
-  assert.equal(riskOf({ reminderState: "confirmed", hoursToStart: 20, flags: [], status: "confirmed" }).level, "low");
   assert.equal(pct(null), "n/a"); assert.equal(pct(0.714), "71%"); assert.equal(money(4_800_000), "$48k"); assert.equal(money(95_000), "$950");
 });

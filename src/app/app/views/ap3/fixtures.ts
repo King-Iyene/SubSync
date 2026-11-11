@@ -1,5 +1,5 @@
 import { ratesFromOutcomes } from "@/lib/design/appt-flow-layout";
-import type { ApConflictRow, ApFlowCloser, ApFlowSetter, ApFlowTree, ApHealthRow, ApOutcome, ApOverview, ApPage, ApPersonRow, ApProof, ApReminderRow, ApRow, ApSourceRow, ApSpeedBand } from "./types";
+import type { ApConflictRow, ApFlowCloser, ApFlowSetter, ApFlowTree, ApHealthRow, ApOutcome, ApOverview, ApPage, ApPersonRow, ApProof, ApRow, ApSourceRow, ApSpeedBand } from "./types";
 
 // Small typed fixtures (a few dozen rows, no database). They show every state of the screens until the API is merged; open any Appointments address with ?apfx=1 to use them.
 const MIN = 5;
@@ -56,10 +56,10 @@ export const PEOPLE_FIXTURE: ApPersonRow[] = [
   { id: "u-none", name: "Nobody assigned", role: "closer", unassigned: true, bookings: 9, showRate: 0.55, noShowRate: 0.45, closeRate: 0.1, revenueCents: 0, avgLeadToBookedHours: null, trend: [] },
 ];
 export const HEALTH_FIXTURE: ApHealthRow[] = [
-  { locationId: "L-2", name: "Brightside Dental", booked: 74, showRate: 0.58, noShowRate: 0.34, cancelRate: 0.12, unmarked: 14, rescheduleRate: 0.1 },
-  { locationId: "L-3", name: "Sunrise Solar", booked: 96, showRate: 0.72, noShowRate: 0.2, cancelRate: 0.09, unmarked: 6, rescheduleRate: 0.07 },
-  { locationId: "L-1", name: "Glow Med Spa", booked: 71, showRate: 0.86, noShowRate: 0.08, cancelRate: 0.05, unmarked: 3, rescheduleRate: 0.04 },
-  { locationId: "L-4", name: "Hartley Realty", booked: 3, showRate: null, noShowRate: null, cancelRate: null, unmarked: 1, rescheduleRate: null },
+  { locationId: "L-2", name: "Brightside Dental", booked: 74, showRate: 0.58, noShowRate: 0.34, cancelRate: 0.12, unmarked: 14 },
+  { locationId: "L-3", name: "Sunrise Solar", booked: 96, showRate: 0.72, noShowRate: 0.2, cancelRate: 0.09, unmarked: 6 },
+  { locationId: "L-1", name: "Glow Med Spa", booked: 71, showRate: 0.86, noShowRate: 0.08, cancelRate: 0.05, unmarked: 3 },
+  { locationId: "L-4", name: "Hartley Realty", booked: 3, showRate: null, noShowRate: null, cancelRate: null, unmarked: 1 },
 ];
 export const SOURCES_FIXTURE: ApSourceRow[] = [
   { source: "Referral", booked: 48, showRate: 0.89, medianFirstReplyMinutes: 12, won: 19 }, { source: "Google", booked: 80, showRate: 0.74, medianFirstReplyMinutes: 31, won: 21 },
@@ -68,8 +68,6 @@ export const SOURCES_FIXTURE: ApSourceRow[] = [
 export const SPEED_FIXTURE: ApSpeedBand[] = [{ label: "Under 5 min", booked: 61, showRate: 0.87 }, { label: "5 to 30 min", booked: 70, showRate: 0.77 }, { label: "30 min to 4 hours", booked: 58, showRate: 0.66 }, { label: "Over 4 hours", booked: 33, showRate: 0.49 }];
 export const CONFLICTS_FIXTURE: ApConflictRow[] = [
   { id: "cf1", kind: "double-booking", accountName: "Brightside Dental", calendarName: "Consult", when: "2026-11-12T10:00:00Z", people: ["Mia Chen"], note: "Two appointments at the same time for Mia Chen." },
-  { id: "cf2", kind: "forced-overlap", accountName: "Sunrise Solar", calendarName: "Strategy call", when: "2026-11-13T15:30:00Z", people: ["Dan Reyes"], note: "A booking was forced into a busy slot." },
-  { id: "cf3", kind: "disconnected", accountName: "Glow Med Spa", calendarName: "Discovery", when: null, people: ["Sol Ibe"], note: "This calendar stopped syncing 3 days ago." },
 ];
 export const PROOF_FIXTURE: ApProof[] = [
   { weekOf: "2026-11-02", accountName: "Glow Med Spa", booked: 19, showed: 16, recovered: 3, stillUnmarked: 1, trueShowRate: 0.86, caught: 5, fixed: 4 },
