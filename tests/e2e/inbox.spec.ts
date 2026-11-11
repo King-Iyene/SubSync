@@ -43,7 +43,7 @@ test("the Inbox screen leads with the number of people waiting in plain words, n
   await page.goto("/app#inbox");
   await page.reload();
   await expect(page.getByText("Demo mode", { exact: false }).first()).toBeVisible();
-  const headline = page.getByTestId("today-headline");
+  const headline = page.getByTestId("wait-headline");
   await expect(headline).toBeVisible({ timeout: 90_000 });
   await expect(headline).toContainText(/(person is|people are) waiting for a reply/);
   await expect(page.getByTestId("wait-proof")).toContainText("in the last 30 days");

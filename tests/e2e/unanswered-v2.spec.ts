@@ -13,10 +13,9 @@ const ROLES = [
 const BANNED = /gohighlevel|highlevel|leadconnector|\bghl\b|sub-?accounts?|\bSLA\b/i;
 
 async function open(page: Page, path: string, menu = false) {
-  await page.goto(path);
-  if (menu) await page.getByRole("button", { name: "Unanswered messages", exact: true }).first().click({ timeout: 90_000 });
-  else await page.reload();
-  await expect(page.getByTestId("today-headline")).toBeVisible({ timeout: 90_000 });
+  await page.goto(menu ? `${path}#speed?tab=unanswered` : path);
+  await page.reload();
+  await expect(page.getByTestId("wait-headline")).toBeVisible({ timeout: 90_000 });
 }
 const n = (text: string) => Number(text.replace(/[^\d]/g, ""));
 
@@ -24,7 +23,7 @@ for (const role of ROLES) {
   test(`${role.name}: one sentence, one primary button, five rows at most, plain words, no sideways scroll`, async ({ page }, testInfo) => {
     test.setTimeout(240_000);
     await open(page, role.path, role.menu);
-    const headline = (await page.getByTestId("today-headline").innerText()).trim();
+    const headline = (await page.getByTestId("wait-headline").innerText()).trim();
     expect(headline).toMatch(/(person is|people are) waiting for a reply|Nobody is waiting for a reply/);
     if (!/Nobody/.test(headline)) {
       await expect(page.getByTestId("today-primary-button")).toHaveText(/^Reply to the (oldest of the [\d,]+ people|person) waiting/);
@@ -37,7 +36,7 @@ for (const role of ROLES) {
       const all = page.getByTestId("wait-all");
       if (await all.count()) {
         const seeAll = n(await all.innerText());
-        await expect.poll(async () => n(((await page.getByTestId("today-headline").innerText()).match(/^[\d,]+/)?.[0]) ?? "0"), { timeout: 15_000 }).toBe(seeAll);
+        await expect.poll(async () => n(((await page.getByTestId("wait-headline").innerText()).match(/^[\d,]+/)?.[0]) ?? "0"), { timeout: 15_000 }).toBe(seeAll);
       }
     }
     expect(await page.locator("main").innerText()).not.toMatch(BANNED);
@@ -77,7 +76,7 @@ test("24-hour wait count is visible and explains private alert routing", async (
 async function opensItsPeople(page: Page, press: () => Promise<number>, back = true) {
   let lastShown = -1, lastCount = -2;
   for (let attempt = 0; attempt < 6; attempt++) {
-    if (attempt > 0) { await page.waitForTimeout(3000 * attempt); await page.reload(); await expect(page.getByTestId("today-headline")).toBeVisible({ timeout: 90_000 }); }
+    if (attempt > 0) { await page.waitForTimeout(3000 * attempt); await page.reload(); await expect(page.getByTestId("wait-headline")).toBeVisible({ timeout: 90_000 }); }
     lastShown = await press();
     try { await expect(page.getByTestId("wait-list-count")).toHaveText(String(lastShown), { timeout: 45_000 }); lastCount = lastShown; break; }
     catch { lastCount = n(await page.getByTestId("wait-list-count").innerText().catch(() => "-1")); }

@@ -46,7 +46,7 @@ export function startOnMine(i: { staff: boolean; mine: number | null }): boolean
 export type Say = { text: string; allClear: boolean };
 
 const THING: Record<ListId, (n: number, staleDays: number) => string> = {
-  waiting: (n) => `${n.toLocaleString("en-US")} ${n === 1 ? "new lead is" : "new leads are"} waiting for a reply`,
+  waiting: (n) => `${n.toLocaleString("en-US")} new ${n === 1 ? "lead has" : "leads have"} never had a reply`,
   noshows: (n) => `${n.toLocaleString("en-US")} ${n === 1 ? "person" : "people"} missed an appointment and could be rebooked`,
   followups: (n) => `${n.toLocaleString("en-US")} ${n === 1 ? "follow-up is" : "follow-ups are"} due`,
   hot: (n) => `${n.toLocaleString("en-US")} hot ${n === 1 ? "lead has" : "leads have"} gone quiet`,

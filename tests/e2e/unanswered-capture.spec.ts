@@ -19,9 +19,8 @@ for (const role of ROLES) {
   test(`capture ${role.slug}`, async ({ page }, testInfo) => {
     test.setTimeout(240_000);
     const width = testInfo.project.name.replace(/\D+/g, "");
-    await page.goto(role.path);
-    if (role.menu) await page.getByRole("button", { name: "Unanswered messages", exact: true }).first().click({ timeout: 90_000 });
-    else await page.reload();
+    await page.goto(role.menu ? `${role.path}#speed?tab=unanswered` : role.path);
+    await page.reload();
     await expect(page.locator("main h1, main h2").first()).toBeVisible({ timeout: 90_000 });
     await page.waitForLoadState("networkidle").catch(() => undefined);
     await page.waitForTimeout(6000);

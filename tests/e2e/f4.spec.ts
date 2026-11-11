@@ -24,7 +24,7 @@ const open = async (page: Page, hash = "#inbox") => {
   await page.goto(`/app${hash}`);
   await page.reload();
   await expect(page.getByText("Demo mode", { exact: false }).first()).toBeVisible();
-  await expect(page.getByRole("heading", { level: 1, name: "Unanswered messages", exact: true })).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByRole("heading", { level: 2, name: "Unanswered messages", exact: true })).toBeVisible({ timeout: 60_000 });
 };
 
 test.describe("the numbers behind the page (API, desktop only)", () => {
@@ -137,7 +137,7 @@ test("a client's staff see the page for their own account only (no client accoun
   await page.goto("/app?as=client#inbox");
   await page.reload();
   await expect(page.getByText("Demo mode", { exact: false }).first()).toBeVisible();
-  await expect(page.getByRole("heading", { level: 1, name: "Unanswered messages", exact: true })).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByRole("heading", { level: 2, name: "Unanswered messages", exact: true })).toBeVisible({ timeout: 60_000 });
   await expect(page.getByLabel("Client account", { exact: true })).toHaveCount(0);
   await noSideScroll(page, "Unanswered messages as a client");
 });

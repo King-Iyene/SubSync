@@ -122,7 +122,7 @@ export function RaceTab({ multi, onCall }: { multi: boolean; onCall?: () => void
   const losingDollars = losing.reduce((s, r) => s + r.dollars, 0);
   const l = d.leak;
   const headline = losing.length === 0
-    ? (waiting.length ? `${waiting.length} new ${waiting.length === 1 ? "lead is" : "leads are"} in the race and none has lost it yet.` : "Every new lead has had a person reach out in time.")
+    ? (waiting.length ? `${waiting.length} new ${waiting.length === 1 ? "lead is" : "leads are"} in the race and none has lost it yet.` : "No new lead is waiting for a first reply right now.")
     : `${losing.length} new ${losing.length === 1 ? "lead is" : "leads are"} losing the race${losingDollars > 0 ? `: ${usd(losingDollars)} of open deals` : ""}.`;
   return (
     <div data-testid="race-tab">

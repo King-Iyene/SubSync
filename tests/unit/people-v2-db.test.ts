@@ -91,7 +91,7 @@ describe.skipIf(!HAS_DB)("People: the call lists, the panel and the search", () 
     const count = (id: string) => (home.body.counts as Json[]).find((c) => c.id === id)!.total as number;
     expect([count("waiting"), count("noshows"), count("hot"), count("stale"), count("followups")]).toEqual([3, 1, 1, 1, 1]);
     expect(home.body.start).toBe("waiting");
-    expect(home.body.say.head).toBe("3 new leads are waiting for a reply.");
+    expect(home.body.say.head).toBe("3 new leads have never had a reply.");
     for (const id of ["waiting", "noshows", "hot", "stale", "followups"]) {
       const q = await call(agency(), "GET", `people/queue?list=${id}`);
       expect(q.status, id).toBe(200);
