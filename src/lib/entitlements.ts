@@ -132,6 +132,10 @@ export const FEATURES = [
   "cl_billing",
   "cl_rollup",
   "cl_module",
+  "cl_actions",
+  "cl_retention",
+  "cl_workflows",
+  "cl_onboarding",
 ] as const;
 export type Feature = (typeof FEATURES)[number];
 

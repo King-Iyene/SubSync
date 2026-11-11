@@ -124,6 +124,8 @@ import { handlePipeline3 } from "./pipeline3-routes";
 import { handleClients3 } from "./clients3-routes";
 import { handleApptActions } from "./appointment-actions-routes";
 import { handlePipelineActions } from "./pipeline-actions-routes";
+import { grantedOf } from "./workflows-api";
+import { handleClientActions } from "./clients-actions-routes";
 import { buildSteps, guideRoleOf } from "../getting-started";
 import { changedSettingKeys, feedbackGivenBy, logAccountFlags, logKeyChange, logSettingsChange, recordVote } from "../feedback-queries";
 import { groupStatus, parseGranted } from "../scope-groups";
@@ -2002,6 +2004,10 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       return await handleApptActions(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links, locationToken: (locationId) => locationAccessToken(ctx.session.companyId, locationId) });
     }
     // Pipeline deal actions (slice PB): the deal panel, preview-then-do changes, bulk and undo (flags and the account are checked inside).
+    // Clients actions and reports (slice CB): /api/app/clients/act/<part> (weekly receipt, CSV, setup health, quiet marks, reply targets). Agency only by the route policy.
+    if (a === "clients" && b === "act" && ctx.segments.length === 3) {
+      return await handleClientActions(ctx, { allowed: () => allowedIds(ctx), brand: async () => (await scope(ctx)).settings.brandName ?? null, defaultTarget: async () => (await scope(ctx)).settings.speedTargetMinutes, granted: () => grantedOf(ctx), onboarding: () => clientRoutes.onboardingView(ctx, clientDeps) });
+    }
     if (a === "pipeline3" && b === "act" && ctx.segments.length === 3) {
       return await handlePipelineActions(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links, locationToken: (locationId) => locationAccessToken(ctx.session.companyId, locationId) });
     }
