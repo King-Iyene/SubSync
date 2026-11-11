@@ -34,7 +34,7 @@ import { json, type AuthContext } from "./auth";
 // accounts; every conversation and contact is then re-read from SubSync's copy of THAT account. Every CRM write goes through runAction (workbench.ts) or deleteConversation
 // (unanswered-gateway.ts): preview first, dry run unless WRITE_GHL_LIVE and the account opt-in, one audit line per write. Nothing here sends a message.
 
-type Ctx = AuthContext & { request: Request; url: URL; segments: string[] };
+export type Ctx = AuthContext & { request: Request; url: URL; segments: string[] };
 export type ActionHelpers = {
   allowed: () => Promise<string[] | null>;
   links: () => Promise<ReturnType<typeof import("../links").deepLinks>>;
@@ -52,7 +52,7 @@ const ownerSide = (ctx: Ctx) => ctx.kind !== "client";
 /** A client's staff act only on conversations assigned to them (an ownerless one only to claim it); administrators and the agency act on any in their accounts. */
 const mayTouch = (ctx: Ctx, assignedTo: string | null, claiming = false) => isAdminSide(ctx) || (claiming ? assignedTo === null : assignedTo === ctx.session.userId);
 
-const mode = async (ctx: Ctx, locationId: string) => {
+export const mode = async (ctx: Ctx, locationId: string) => {
   const master = !ctx.demo && isLive("WRITE_GHL_LIVE");
   const optedIn = ctx.demo ? false : await writeEnabledFor(ctx.installationId, locationId);
   return { masterOn: master, optedIn, live: master && optedIn, demo: ctx.demo === true };
@@ -63,7 +63,7 @@ function withLinks<T extends { locationId: string; conversationId: string; conta
   return rows.map((r) => ({ ...r, url: links.conversation(r.locationId, r.conversationId), contactUrl: r.contactId ? links.contact(r.locationId, r.contactId) : links.conversation(r.locationId, r.conversationId) }));
 }
 
-async function readBody(ctx: Ctx): Promise<Record<string, unknown> | null> {
+export async function readBody(ctx: Ctx): Promise<Record<string, unknown> | null> {
   const b = await ctx.request.json().catch(() => null);
   return b && typeof b === "object" ? (b as Record<string, unknown>) : null;
 }
@@ -183,7 +183,7 @@ async function snoozeRoute(ctx: Ctx, h: ActionHelpers, set: boolean): Promise<Re
 
 // ---------------- shared: run one workbench action and say what happened ----------------
 
-type Item = { conversationId: string | null; contactId: string; name: string };
+export type Item = { conversationId: string | null; contactId: string; name: string };
 
 function targetOf(locationId: string, contactId: string, name: string): Target {
   return { locationId, contactId, name, dnd: false, phone: null, email: null, timeZone: null };
@@ -203,7 +203,7 @@ export function describeRun(res: RunResult): { status: number; body: Record<stri
   }
 }
 
-async function runOwner(ctx: Ctx, h: ActionHelpers, locationId: string, it: Item, ownerId: string, optedIn: boolean): Promise<RunResult> {
+export async function runOwner(ctx: Ctx, h: ActionHelpers, locationId: string, it: Item, ownerId: string, optedIn: boolean): Promise<RunResult> {
   const action: Action = { kind: "owner", userId: ownerId };
   const res = await runAction(
     { installationId: ctx.installationId, actor: actorOf(ctx), target: targetOf(locationId, it.contactId, it.name), action, optedIn, confirmed: true, ack: [], token: () => h.locationToken(locationId) },
@@ -213,7 +213,7 @@ async function runOwner(ctx: Ctx, h: ActionHelpers, locationId: string, it: Item
   return res;
 }
 
-const resultWord = (r: RunResult) => (r.outcome === "dry_run" ? "dry_run" : r.outcome === "done" ? "done" : r.outcome);
+export const resultWord = (r: RunResult) => (r.outcome === "dry_run" ? "dry_run" : r.outcome === "done" ? "done" : r.outcome);
 
 // ---------------- claim ----------------
 
