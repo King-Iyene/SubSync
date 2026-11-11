@@ -162,7 +162,7 @@ export async function overview(s: Scope, f: Filters, windowDays: number): Promis
         count(*) filter (where unmarked and deal_status = 'open' and coalesce(deal_value, 0) > 0)::int unmarked_deals,
         coalesce(sum(deal_value) filter (where unmarked and deal_status = 'open' and deal_value > 0), 0)::float8 unmarked_value
       from ap`,
-    db`with ap as (${b}) select (start_at at time zone tz)::date day, count(*) filter (where status <> 'invalid')::int booked, count(*) filter (where status = 'showed')::int showed,
+    db`with ap as (${b}) select (start_at at time zone tz)::date as day, count(*) filter (where status <> 'invalid')::int booked, count(*) filter (where status = 'showed')::int showed,
         count(*) filter (where status = 'noshow')::int noshow, count(*) filter (where unmarked)::int unmarked from ap group by 1 order by 1`,
     // No-shows of the last 7 days not rebooked, and the open deal dollars on them (independent of the chosen period).
     db`with ap as (${base(s, { ...f, from: new Date(Date.now() - 7 * DAY), to: new Date() }, dd, db`and a.status = 'noshow'`)})
