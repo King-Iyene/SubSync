@@ -18,6 +18,12 @@ const BUCKETS = new Set(["booked", "completed", "showed", "noshow", "cancelled",
 const BANDS = new Set(["same_day", "d1_2", "d3_7", "d8_plus"]);
 const int = (v: string | null, d: number) => { const n = Number(v); return v !== null && Number.isFinite(n) ? Math.floor(n) : d; };
 const text = (v: string | null, max: number) => (v ?? "").trim().slice(0, max) || null;
+const day = (v: string | null) => (v && /^d{4}-d{2}-d{2}$/.test(v) && Number.isFinite(Date.parse(v)) ? Date.parse(v) : null);
+/** "Booked on": both days or neither. The end day is inclusive. */
+function bookedRange(a: string | null, b: string | null) {
+  const f = day(a), t = day(b);
+  return f !== null && t !== null && t >= f && t - f <= 400 * 86_400_000 ? { bookedFrom: new Date(f), bookedTo: new Date(t + 86_400_000) } : {};
+}
 const personParam = (v: string | null) => (v === "none" ? null : cleanId(v));
 
 export async function handleApptExec(ctx: Ctx, h: ExecHelpers): Promise<Response> {
@@ -35,6 +41,7 @@ export async function handleApptExec(ctx: Ctx, h: ExecHelpers): Promise<Response
     from: w.from, to: w.to, basis: sp.get("basis") === "booked" ? "booked" : "appt", location: one, calendar: cleanId(sp.get("calendar")), user: seePeople ? cleanId(sp.get("user")) : null,
     setter: seePeople ? personParam(sp.get("setter")) : null, closer: seePeople ? personParam(sp.get("closer")) : null, source: text(sp.get("source"), 120),
     status: /^[a-z_]{1,20}$/.test(sp.get("status") ?? "") ? sp.get("status") : null, stage: text(sp.get("stage"), 120),
+    ...bookedRange(sp.get("bfrom"), sp.get("bto")),
   };
   const key = JSON.stringify([ctx.installationId, allowedAll, part, sp.toString(), ctx.kind]);
   const wrap = (body: object, cached = false) => json({ ...body, generatedAt: new Date().toISOString(), cached, canSeeAccounts, canSeePeople: seePeople, problem: w.problem });

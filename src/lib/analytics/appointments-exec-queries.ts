@@ -16,7 +16,7 @@ type Db = ReturnType<typeof sql>;
 type Frag = ReturnType<Db>;
 export type ExecFilters = {
   from: Date; to: Date; basis: "appt" | "booked"; location?: string | null; calendar?: string | null; user?: string | null; setter?: string | null; closer?: string | null;
-  source?: string | null; status?: string | null; stage?: string | null;
+  source?: string | null; status?: string | null; stage?: string | null; bookedFrom?: Date | null; bookedTo?: Date | null;
 };
 export const execCache = ttlCache<unknown>(30_000, 200);
 const num = (v: unknown) => (v === null || v === undefined ? 0 : Number(v));
@@ -74,6 +74,7 @@ function liveFacts(s: Scope, f: ExecFilters, locs: Loc[], dd: number, window: { 
       ${f.source ? (f.source === "none" ? db`and nullif(c.source, '') is null` : db`and c.source = ${f.source.slice(0, 120)}`) : db``}
       ${f.status && /^[a-z_]{1,20}$/.test(f.status) ? db`and a.status = ${f.status}` : db``}
       ${f.stage ? db`and d.stage_name = ${f.stage.slice(0, 120)}` : db``}
+      ${f.bookedFrom ? db`and a.created_remote_at >= ${f.bookedFrom} and a.created_remote_at < ${f.bookedTo ?? new Date(Date.now() + DAY)}` : db``}
     group by 1, 2, 3, 4, 5, 6`;
 }
 
@@ -89,7 +90,7 @@ function rollupFacts(s: Scope, f: ExecFilters, locs: Loc[], window: { from: Date
 /** The rollup is used when every account in play is fresh and no filter the rollup does not hold is set. */
 async function facts(s: Scope, f: ExecFilters, locs: Loc[], window: { from: Date; to: Date }): Promise<{ frag: Frag; live: boolean }> {
   const dd = await dealDays(s.inst);
-  const needsLive = f.basis === "booked" || !!f.status || !!f.stage;
+  const needsLive = f.basis === "booked" || !!f.status || !!f.stage || !!f.bookedFrom;
   if (!needsLive && (await ensureFresh(s, locs))) return { frag: rollupFacts(s, f, locs, window), live: false };
   return { frag: liveFacts(s, f, locs, dd, window, f.basis === "booked" ? "created_remote_at" : "start_at"), live: true };
 }
@@ -129,13 +130,12 @@ async function ensureFresh(s: Scope, locs: Loc[]): Promise<boolean> {
   const seen = new Map(st.map((r) => [r.location_id as string, (r.refreshed_at as Date).getTime()]));
   const stale = locs.filter((l) => !seen.has(l.id) || Date.now() - (seen.get(l.id) as number) > FRESH_MS);
   if (stale.length === 0) return true;
-  if (stale.length > 4) return false;
-  try {
-    await Promise.all(stale.map((l) => {
-      const k = `${s.inst}:${l.id}`, cur = refreshing.get(k) ?? refreshExecRollup(s.inst, l, seen.has(l.id) ? 45 : 400).finally(() => refreshing.delete(k));
-      refreshing.set(k, cur); return cur;
-    }));
-  } catch { return false; }
+  const run = (l: Loc) => {
+    const k = `${s.inst}:${l.id}`, cur = refreshing.get(k) ?? refreshExecRollup(s.inst, l, seen.has(l.id) ? 45 : 400).finally(() => refreshing.delete(k));
+    refreshing.set(k, cur); return cur;
+  };
+  if (stale.length > 4) { for (const l of stale.slice(0, 4)) void run(l).catch(() => undefined); return false; } // fill four more in the background; this answer is live, the next ones use the rollup
+  try { await Promise.all(stale.map(run)); } catch { return false; }
   return true;
 }
 async function historyStarts(s: Scope, locs: Loc[]): Promise<string | null> {
@@ -292,7 +292,9 @@ export async function slots(s: Scope, f: ExecFilters) {
       ${f.calendar ? db`and a.calendar_id = ${f.calendar}` : db``} ${f.user ? db`and (a.assigned_to = ${f.user} or a.booked_by_user = ${f.user})` : db``}
       ${f.setter ? db`and a.booked_by_user = ${f.setter}` : db``} ${f.closer ? db`and a.assigned_to = ${f.closer}` : db``}
       ${f.source ? (f.source === "none" ? db`and nullif(c.source, '') is null` : db`and c.source = ${f.source.slice(0, 120)}`) : db``}
-      ${f.status && /^[a-z_]{1,20}$/.test(f.status) ? db`and a.status = ${f.status}` : db``}`;
+      ${f.status && /^[a-z_]{1,20}$/.test(f.status) ? db`and a.status = ${f.status}` : db``}
+      ${f.bookedFrom ? db`and a.created_remote_at >= ${f.bookedFrom} and a.created_remote_at < ${f.bookedTo ?? new Date(Date.now() + DAY)}` : db``}
+      `;
   const counts = db`count(*)::int booked, count(*) filter (where a.status = 'showed')::int showed, count(*) filter (where a.status = 'noshow')::int noshow, count(*) filter (where a.status not in ('showed', 'noshow'))::int unmarked`;
   const [cellRows, bandRows] = await Promise.all([
     db`select extract(dow from a.start_at at time zone l.tz)::int dow, extract(hour from a.start_at at time zone l.tz)::int as hour, ${counts} ${common} group by 1, 2`,
@@ -365,10 +367,11 @@ export async function rows(s: Scope, f: ExecFilters, p: RowsParams, link: ((loc:
     ${p.dow !== null && p.dow !== undefined && p.dow >= 0 && p.dow <= 6 ? db`and extract(dow from a.start_at at time zone l.tz)::int = ${p.dow}` : db``}
     ${p.hour !== null && p.hour !== undefined && p.hour >= 0 && p.hour <= 23 ? db`and extract(hour from a.start_at at time zone l.tz)::int = ${p.hour}` : db``}
     ${band ? db`and a.created_remote_at is not null and a.start_at >= a.created_remote_at and extract(epoch from (a.start_at - a.created_remote_at)) / 3600 >= ${band.key === "same_day" ? 0 : band.key === "d1_2" ? 24 : band.key === "d3_7" ? 72 : 192} and extract(epoch from (a.start_at - a.created_remote_at)) / 3600 < ${band.maxHours === Infinity ? 1e9 : band.maxHours}` : db``}
-    ${f.stage ? db`and d.stage_name = ${f.stage.slice(0, 120)}` : db``}`;
+    ${f.stage ? db`and d.stage_name = ${f.stage.slice(0, 120)}` : db``}
+    ${f.bookedFrom ? db`and a.created_remote_at >= ${f.bookedFrom} and a.created_remote_at < ${f.bookedTo ?? new Date(Date.now() + DAY)}` : db``}`;
   // The base query narrows by start time; a wide window lets the day rule above decide. Deleted and invalid are excluded there as in every number.
   const wide = { from: new Date(w.from.getTime() - 400 * DAY), to: new Date(w.to.getTime() + 400 * DAY) };
-  const flt = { from: booked ? wide.from : new Date(w.from.getTime() - DAY), to: booked ? wide.to : new Date(w.to.getTime() + DAY), location: f.location ?? null, calendar: f.calendar ?? null, user: f.user ?? null, source: f.source ?? null, status: f.status ?? null, setter: p.setter ?? f.setter ?? undefined, closer: p.closer ?? f.closer ?? undefined };
+  const flt = { from: booked || f.bookedFrom ? wide.from : new Date(w.from.getTime() - DAY), to: booked || f.bookedFrom ? wide.to : new Date(w.to.getTime() + DAY), location: f.location ?? null, calendar: f.calendar ?? null, user: f.user ?? null, source: f.source ?? null, status: f.status ?? null, setter: p.setter ?? f.setter ?? undefined, closer: p.closer ?? f.closer ?? undefined };
   const page = await appointmentList(s, { f: flt as never, page: p.page, size: p.size, sort: p.sort ?? "newest", after: p.after ?? null, extra: extra as never }, link);
   return { ...page, rows: page.rows.filter((r) => r.status !== "invalid") };
 }

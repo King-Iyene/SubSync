@@ -68,6 +68,15 @@ try {
     const byBooked = await q.summary(sa, { ...f, basis: "booked", from: new Date(Date.now() - 30 * DAY) });
     assert.equal(byBooked.live, true); assert.equal(byBooked.totals.cur.booked, 20);
   });
+  await step("a booked-on range narrows every number and its rows the same way", async () => {
+    const r = { ...f, bookedFrom: new Date(Date.now() - 12 * DAY), bookedTo: new Date(Date.now() - 6 * DAY) };
+    const s2 = await q.summary(sa, r);
+    assert.equal(s2.live, true);
+    const rows = await q.rows(sa, r, { bucket: "booked", page: 0, size: 100 }, null);
+    assert.equal(rows.total, s2.totals.cur.booked, "the number and its rows agree");
+    for (const [bucket, key] of [["showed", "showed"], ["noshow", "noshow"], ["cancelled", "cancelled"], ["unmarked", "unmarked"], ["won", "won"]] as const) assert.equal((await q.rows(sa, f, { bucket, page: 0, size: 100 }, null)).total, (await q.summary(sa, f)).totals.cur[key], `${bucket}: the number and its rows agree`);
+    assert.ok(s2.totals.cur.booked > 0 && s2.totals.cur.booked < 20);
+  });
   await step("every part answers for its own agency", async () => {
     const [bd, sl, pc, dc, rw] = await Promise.all([q.boards(sa, f), q.slots(sa, f), q.pace(sa, f), q.decisions(sa, f), q.rows(sa, f, { bucket: "noshow", page: 0, size: 20 }, null)]);
     assert.equal(bd.setters.length, 1); assert.equal(bd.setters[0].name, `${A.marker} Setter`);

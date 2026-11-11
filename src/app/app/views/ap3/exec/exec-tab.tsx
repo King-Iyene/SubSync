@@ -23,6 +23,7 @@ const qs = (part: string, s: ExecScope, extra: Q = {}) => {
   if (s.basis === "booked") p.set("basis", "booked");
   const m: Record<string, string> = { location: s.locationId, calendar: s.calendarId, user: s.userId, setter: s.booker, closer: s.owner, source: s.source, status: s.status, stage: s.stage };
   for (const [k, v] of Object.entries(m)) if (v) p.set(k, v);
+  if (s.bookedFrom && s.bookedTo) { p.set("bfrom", s.bookedFrom); p.set("bto", s.bookedTo); }
   for (const [k, v] of Object.entries(extra)) if (v !== undefined && v !== "") p.set(k, String(v));
   return `appointments/exec?${p}`;
 };

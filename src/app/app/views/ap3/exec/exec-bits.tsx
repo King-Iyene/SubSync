@@ -21,7 +21,7 @@ export function fmtKpi(v: number | null, display: string): string {
 }
 
 export function Spark({ points }: { points: number[] }) {
-  if (points.length < 2) return <span className="apx-spark apx-spark-empty" aria-hidden />;
+  if (points.length < 2 || Math.max(...points) === Math.min(...points)) return <span className="apx-spark apx-spark-empty" aria-hidden />;
   const max = Math.max(...points), min = Math.min(...points), span = max - min || 1, w = 84, h = 22;
   const d = points.map((p, i) => `${i === 0 ? "M" : "L"}${((i / (points.length - 1)) * w).toFixed(1)},${(h - 2 - ((p - min) / span) * (h - 4)).toFixed(1)}`).join(" ");
   return <svg className="apx-spark" viewBox={`0 0 ${w} ${h}`} width={w} height={h} aria-hidden><path d={d} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>;
@@ -29,7 +29,7 @@ export function Spark({ points }: { points: number[] }) {
 
 /** A change against another period. Words, not just colour: "up 12%" or "down 3 points". `good` says which direction is better. */
 export function Change({ d, good, label }: { d: { pct: number | null; points: number | null; value: number | null }; good: "up" | "down"; label: string }) {
-  if (d.value === null || (d.pct === null && d.points === null)) return <span className="apx-chg apx-chg-na">{label}: no data</span>;
+  if (d.value === null || (d.pct === null && d.points === null)) return <span className="apx-chg apx-chg-na" aria-label={`${label}: no data`} />;
   const v = d.points !== null ? d.points : (d.pct as number), up = v > 0, flat = v === 0;
   const worse = !flat && (good === "up" ? !up : up);
   return <span className="apx-chg" data-tone={flat ? "flat" : worse ? "warn" : "ok"}>{flat ? "no change" : `${up ? "up" : "down"} ${Math.abs(v)}${d.points !== null ? (Math.abs(v) === 1 ? " point" : " points") : "%"}`} <span className="apx-chg-l">{label}</span></span>;
@@ -47,7 +47,7 @@ export function FunnelBars({ steps, onOpen }: { steps: Array<{ key: string; labe
               : <span className="apx-num apx-num-static">{s.count.toLocaleString("en-US")}</span>}
           </div>
           <div className="apx-track" aria-hidden><div className="apx-fill" style={{ width: `${Math.max(2, ((s.count ?? 0) / top) * 100)}%` }} /></div>
-          {i > 0 && s.dropPct !== null && s.lost !== null && <div className="apx-fine">{s.dropPct}% drop ({s.lost.toLocaleString("en-US")} did not continue)</div>}
+          {i > 0 && s.dropPct !== null && s.lost !== null && <div className="apx-fine">{s.key === "confirmed" ? `${100 - s.dropPct}% were confirmed ahead of time` : `${s.dropPct}% drop (${s.lost.toLocaleString("en-US")} did not continue)`}</div>}
         </li>
       ))}
     </ol>
