@@ -31,7 +31,7 @@ describe.skipIf(!RUN)("Find a lead at scale", () => it("stays under the limit", 
   const defs = await db`select indexname, indexdef from pg_indexes where schemaname = 'public' and tablename = 'cached_contacts'`;
   for (const d of defs) {
     if ((d.indexdef as string).includes("UNIQUE")) continue; // keys are not what is being timed
-    await db.unsafe((d.indexdef as string).replace(/INDEX (S+) ON (?:ONLY )?(?:public.)?cached_contacts/, "INDEX fs_$1 ON findscale.cached_contacts"));
+    await db.unsafe((d.indexdef as string).replace(/INDEX ([^ ]+) ON (?:ONLY )?(?:public[.])?cached_contacts/, "INDEX fs_$1 ON findscale.cached_contacts"));
   }
   console.log(`built ${defs.length} indexes in ${Date.now() - tb} ms`);
   await db.unsafe("analyze cached_contacts");
