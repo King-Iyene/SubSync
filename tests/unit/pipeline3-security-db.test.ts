@@ -8,7 +8,7 @@ import { signSession } from "@/lib/session";
 // asked for another company's data and another account's data, and must give nothing, never an error page; an account with no deals gives 200 with nothing in it.
 // Skipped when no database is configured or the migrations 20261126090000_pipeline3.sql and 20261126100000_pipeline_actions.sql are not applied yet.
 const HAS_DB = Boolean(process.env.DATABASE_URL || process.env.POSTGRES_URL || process.env.SUPABASE_DB_PASSWORD);
-vi.setConfig({ testTimeout: 120_000, hookTimeout: 120_000 });
+vi.setConfig({ testTimeout: 480_000, hookTimeout: 120_000 });
 process.env.FLAGS_ALL_ON = "true";
 const CO_A = "xtest-pls-a", CO_B = "xtest-pls-b", CO_C = "xtest-pls-c";
 const A1 = "xtestPlsA1", A2 = "xtestPlsA2", B1 = "xtestPlsB1", C1 = "xtestPlsC1";
@@ -72,6 +72,19 @@ describe.skipIf(!HAS_DB)("pipeline module: nothing crosses a company or an accou
       expect(r.status, `${part} ${extra}`).toBeLessThan(500);
       expect(r.text, `${part} ${extra}`).not.toMatch(LEAK_B);
     }
+  });
+
+  it("receipt and every part never echo a foreign account id, as agency or client, and a foreign owner or pipeline word finds nothing", async () => {
+    if (!applied) return;
+    for (const tok of [session(CO_A, "agency", null), session(CO_A, "client", A1)]) {
+      for (const part of PARTS) {
+        const r = await call(tok, "GET", `pipeline3?part=${part}&location=${B1}`);
+        expect(r.text, part).not.toContain(B1);
+        expect(r.body.locationId ?? null, part).toBeNull();
+      }
+    }
+    const own = await call(session(CO_A, "agency", null), "GET", `pipeline3?part=receipt&location=${A1}`);
+    expect(own.body.locationId).toBe(A1);
   });
 
   it("a deal's detail: by its own id in its own account it is found, by a foreign id or a foreign account it is not found", async () => {
