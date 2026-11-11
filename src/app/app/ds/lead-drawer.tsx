@@ -219,7 +219,7 @@ function Body({ seed, top, showAccount, wide, onLogged }: { seed: LeadSeed; top?
 const stageStyle = (name: string): CSSProperties => { const c = tagColor(name); return { "--tg-bg-l": c.light.bg, "--tg-fg-l": c.light.fg, "--tg-bg-d": c.dark.bg, "--tg-fg-d": c.dark.fg } as CSSProperties; };
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), summary, [tabindex]:not([tabindex="-1"])';
 
-export function LeadDrawer({ leads, index, onIndex, onClose, top, showAccount = true, onLogged }: {
+export function LeadDrawer({ leads, index, onIndex, onClose, top, showAccount = true, onLogged, above = false }: {
   leads: readonly LeadSeed[]; index: number | null; onIndex: (i: number) => void; onClose: () => void;
   /** A call was logged from the panel (the list behind it may now have moved: refresh it when the panel closes). */
   onLogged?: () => void;
@@ -227,6 +227,8 @@ export function LeadDrawer({ leads, index, onIndex, onClose, top, showAccount = 
   top?: (seed: LeadSeed, index: number) => ReactNode;
   /** Whether to say which client account the person belongs to (a single account does not need it). */
   showAccount?: boolean;
+  /** Opened from inside another side panel: sit above it instead of beside it. */
+  above?: boolean;
 }) {
   const close = useRef<HTMLButtonElement>(null);
   const box = useRef<HTMLElement>(null);
@@ -288,7 +290,7 @@ export function LeadDrawer({ leads, index, onIndex, onClose, top, showAccount = 
   // colour variables across, because those live on the shell element, not on the body.
   const shell = document.querySelector<HTMLElement>("[data-theme]");
   return createPortal(
-    <div className={`${shell?.classList.contains("dark") ? "dark " : ""}fixed inset-0 z-[90] print:hidden`} ref={(el) => { if (el && shell) el.style.cssText += shell.style.cssText; }} data-testid="lead-drawer-root">
+    <div className={`${shell?.classList.contains("dark") ? "dark " : ""}fixed inset-0 ${above ? "z-[1100]" : "z-[90]"} print:hidden`} ref={(el) => { if (el && shell) el.style.cssText += shell.style.cssText; }} data-testid="lead-drawer-root">
       <div className="absolute inset-0 bg-black/45" onClick={onClose} aria-hidden />
       <aside ref={box} role="dialog" aria-modal="true" aria-label={`Lead: ${seed.name}`} className={`absolute inset-y-0 right-0 flex w-full flex-col border-l bg-popover text-popover-foreground shadow-[var(--shadow-lift)] transition-[width] ${wide ? "md:w-[min(92vw,1320px)]" : "md:w-[min(70vw,960px)]"}`} data-wide={wide} data-testid="lead-drawer">
         <header className="flex items-center justify-between gap-2 border-b px-4 py-2">

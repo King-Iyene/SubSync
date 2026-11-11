@@ -13,7 +13,7 @@ export type ApPage<T> = { total: number; page: number; pageSize: number; rows: T
 export type ApRow = {
   id: string; locationId: string; accountName: string; contactId: string; contactName: string; startAt: string; calendarName: string;
   status: ApStatus; ownerId: string | null; ownerName: string | null; bookerId: string | null; bookerName: string | null; source: string | null;
-  dealValueCents: number | null; dealStatus: "open" | "won" | "lost" | "none"; phone?: string | null; hoursPast: number | null; url?: string | null; calendarId?: string | null; flags: Array<"double-booked" | "no-deal">;
+  dealValueCents: number | null; dealStatus: "open" | "won" | "lost" | "none"; phone?: string | null; hoursPast: number | null; url?: string | null; calendarId?: string | null; /** The contact asked not to be contacted. */ dnd?: boolean; flags: Array<"double-booked" | "no-deal">;
 };
 
 export type ApOverview = {
