@@ -85,6 +85,8 @@ export const FEATURES = [
   "appt_actions",
   "appt_history",
   "appt_record",
+  "ap_exec",
+  "ap_exec_targets",
   "inbox_claim",
   "inbox_note",
   "inbox_outcome_ui",

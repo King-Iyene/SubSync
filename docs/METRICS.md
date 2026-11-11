@@ -861,6 +861,15 @@ Real synced data only. Dates are UTC days. Period = chosen dates (default last 2
 - **Weekly team lines**: last 7 days, people with at least 10 first-answered leads, compared only when two or more qualify; at most three lines; no ranking words.
 - **Moves of leads**: one field (owner) of one contact; batch cap 25; protected leads (do-not-disturb, open deal, won deal, appointment coming up) are left out of a batch; undo only within 30 minutes and only while the lead is still with the person it was moved to; a lead that had no owner cannot be put back. Own moves are rows in people_write_log (result done) and never count as a person's activity.
 
+## Appointments leadership (the Leadership tab, flag `ap_exec`)
+All figures are counted from the account's own appointments; no outside benchmark. Under a minimum sample the screen says "not enough data".
+- True show rate = showed / (showed + no-show + past due with no outcome). Needs 10 counted. Cancelled is its own rate (cancelled / booked).
+- Lead to booking = average minutes from the lead's first record to the booking (needs 10). Booking to meeting = average hours from booking to the appointment (needs 10, cancelled excluded).
+- Revenue lost to no-shows (ESTIMATE) = no-shows x (won / showed) x average won deal, all from the same period. Needs 10 showed and 3 wins.
+- Pace: average of the last 8 full weeks of bookings (needs 4 weeks); month-end projection = bookings so far + weekly average / 7 x days left (ESTIMATE). A target is SubSync-only (`appointment_exec_targets`, one value kept for undo).
+- Fair comparison: a person's show rate is shown against the rate expected for the same lead sources (everyone's own rate per source, weighted by what that person booked); 10 appointments minimum.
+- Heatmap slot needs 8 finished appointments. Capacity = booked against the calendar's or person's own busiest week (open slots are not stored).
+- Counts come from `appointment_exec_daily` (a per-account daily rollup refreshed on demand, at most hourly) or its identical live twin when "Booked on", a status or a deal stage is chosen.
 ## Account audit history (stage AU, 11 Nov 2026)
 Stored per client account per day (table au_runs, append-only, first read of the day stands): the count in each of the four findings (people waiting for a reply, deals gone quiet, no-shows not rebooked, appointments with no outcome), counted stale deal money, the estimate as a range, closed deals behind it, and the rules version (AUDIT_RULES_VERSION). Counts only, no names. The first row of an account is its baseline. An account still being read for the first time is never stored (a zero there would be a false baseline).
 Comparison rules: same rules version only; never a run cut at the read cap; "then vs now" needs 7 days between the baseline and now, "since the last audit" needs 1 day; a finding that could not be checked is skipped, never zero; the estimate is compared only for accounts with at least 20 closed deals on both sides, else "Not enough data"; the estimate is never added to counted money. Unit tests: src/lib/__tests__/au-history.test.ts.

@@ -123,6 +123,7 @@ import { handleUnansweredActions } from "./unanswered-actions-routes";
 import { handleUnansweredPart3, handleUnansweredViewRemove, handleUnansweredViewSave } from "./unanswered-routes3";
 import { handleApptWork } from "./appointment-work-routes";
 import { handleAppointments3 } from "./appointments3-routes";
+import { handleApptExec, handleApptExecTarget } from "./appointments-exec-routes";
 import { handlePipeline3 } from "./pipeline3-routes";
 import { handleClients3 } from "./clients3-routes";
 import { handlePeople3 } from "./people3-routes";
@@ -2049,6 +2050,9 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
     if (a === "dial") return await handleDial(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links });
     if (a === "workbench") return await handleWorkbench(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links, locationToken: (locationId) => locationAccessToken(ctx.session.companyId, locationId) });
     // Appointments round 3: /api/app/appointments?part=... (overview, lists, booking share, flow tree, health, sources, calendars, reminders, receipt, detail; read only).
+    // Appointments, Leadership tab: /api/app/appointments/exec?part=... (read only) and PUT .../exec-target (SubSync-only monthly target).
+    if (a === "appointments" && b === "exec" && !c && method === "GET") return await handleApptExec(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links });
+    if (a === "appointments" && b === "exec-target" && !c && method === "PUT") return await handleApptExecTarget(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links });
     if (a === "appointments" && method === "GET" && !b && ctx.url.searchParams.has("part")) {
       return await handleAppointments3(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links });
     }
