@@ -5,6 +5,7 @@ import type { Feature } from "../entitlements";
 import { resolveEntitlements } from "../flags";
 import type { deepLinks } from "../links";
 import { json, type AuthContext } from "./auth";
+import { ownedLocation } from "./tenant-guard";
 
 // GET /api/app/appointments?part=overview|needs-outcome|noshow-recovery|booking-share|flow-tree|health|sources|calendars|reminders|receipt|list|detail (the one catch-all
 // route, already guarded). Read only. Who is asking comes from the verified session; the accounts that caller may read come from `allowed` (decided by the router from
@@ -30,9 +31,10 @@ export async function handleAppointments3(ctx: Ctx, h: Appt3Helpers): Promise<Re
   if (!flags[PART_FLAG[part]]) return json({ error: "This part of Appointments is not switched on yet." }, 404);
 
   const seePeople = ctx.kind !== "client";
-  const one = cleanId(sp.get("location"));
-  // An account id only narrows inside what the caller may read; one outside it is the same answer as nothing there.
-  if (one && allowedAll && !allowedAll.includes(one)) return json(emptyFor(part, flags, ctx.limitTo === null));
+  const asked = cleanId(sp.get("location"));
+  // An account id only narrows inside what the caller may read: it must belong to the caller's own installation AND be inside `allowed`. One that does not is the same answer as nothing there (never echoed).
+  const one = asked ? await ownedLocation(ctx.installationId, allowedAll, asked) : null;
+  if (asked && !one) return part === "detail" ? json({ error: "Appointment not found" }, 404) : json(emptyFor(part, flags, ctx.limitTo === null));
   const scope: Scope = { inst: ctx.installationId, allowed: allowedAll };
   const w = parseApptWindow(sp.get("from"), sp.get("to"), Date.now());
   const bucketP = sp.get("bucket");
@@ -73,7 +75,7 @@ export async function handleAppointments3(ctx: Ctx, h: Appt3Helpers): Promise<Re
       return done(await receipt(scope, one, /^\d{4}-\d{2}-\d{2}$/.test(wk) && Number.isFinite(Date.parse(wk)) ? new Date(Date.parse(wk)) : new Date(monday)));
     }
     case "detail": {
-      const d = await detail(scope, sp.get("location") ?? "", sp.get("id") ?? "", link);
+      const d = await detail(scope, one ?? "", sp.get("id") ?? "", link);
       if (!d) return json({ error: "Appointment not found" }, 404);
       return wrap(d);
     }
