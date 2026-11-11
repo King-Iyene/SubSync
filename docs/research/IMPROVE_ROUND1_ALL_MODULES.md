@@ -4,6 +4,23 @@ Scope: Speed to lead (with Unanswered), Pipeline, Clients, Team, Today (with Num
 Method: read each module brief, R-files and screens in `src/app/app/views/` (ap3, cl3, pl3, pp3, today*, audit*, speed*, unanswered*), plus 3 web searches today. Labels: VERIFIED = read on a page or in our repo; INFERENCE = my reasoning; UNVERIFIED = blog or snippet only. Tags: $ money, C customer, I innovation. "Data: yes" = buildable with data we already hold or read on granted scopes.
 Honest limits: Reddit, forums, GHL ideas board and the marketplace were not reachable; customer voice is from earlier R-files. Web results today were mostly blogs.
 
+## Features customers pay for now (ranked by INSTANT CASH; King's rule, 11 Nov)
+Pricing facts: Pro is $11.50 per client account per month; agency resells at a markup (CLAUDE.md section 6). Anchors: AgencyAnalytics about $20 to $25 per client (UNVERIFIED), consultant audits $150 to $500 per month (INFERENCE). "This week" = buildable in about 5 days on data we already hold. Price ideas are hypotheses for pilots, not facts.
+| # | Feature | Who pays, why now | Data we hold | Effort | Package and price | This week |
+|---|---|---|---|---|---|---|
+| 1 | Client Response Proof one-pager + weekly receipt (branded, no names, shareable link) | Agency owner: sends it to every client to stop "bad leads" churn; justifies the per-account fee at each renewal | speed_daily, touch_events, receipts rollups | M | Core of Pro $11.50 per account; white-label branding as the reason to keep every account on Pro | Yes (v1: one page, link, weekly email) |
+| 2 | Install-day Audit one-pager with dollars at risk (sells the app in minutes) | Agency salesperson shows a prospect or existing client their leak; every audit converts to installs | audit counts and estimate (built) | S-M | Free tier hook; "Audit pack" one-off $49 to $99 per agency for branded PDF/one-pager on 10 accounts (hypothesis) | Yes (branded page on existing audit) |
+| 3 | Morning "save this account" alert email (SLA fell, 14 leads unanswered, automation stopped) | Owner who fears losing a client this month; pays for the first alert that saves one | Speed/Unanswered rollups, alert engine | S | Pro; per-account mute; Slack later as higher tier | Yes (reuse digest) |
+| 4 | Missed-lead recovery list (unanswered, never-touched, ownerless) with one tap to Call mode | Owner and setters: direct revenue, the leads exist today | unanswered, lead_events, Call mode (built) | S | Pro; headline claim "recover leads worth $X this week" (Estimate) | Yes (already built; add dollar line and email) |
+| 5 | No-show recovery list and unmarked-appointment fix (true show rate) | Med spa, solar, coach agencies: no-shows are booked money | appointment_history (built) | S | Pro | Yes (Appointments module covers it; surface in Today/email) |
+| 6 | Failed payment and past-due recovery queue (Payments) | Agency owner chasing its clients' plans; client admin chasing customers: cash in hand | NOT yet held: needs payments/invoices/saas scopes; plan call is buggy today | L | Separate paid add-on, e.g. $5 per account on top of Pro, or inside a higher tier (hypothesis); wallet-low alert included | No (scopes, status strings CHECK). Fix the Clients plan call this week (S) |
+| 7 | White-label client portal link and monthly report (agency logo, colours, no CRM words) | Agencies charge clients for reporting ($20 to $25 anchor); we let them resell | whitelabel settings, rollups | M | Pro; resale markup is the agency's profit; "Reports" tier $15 to $19 per account (hypothesis) | Partly (extend one-pager #1 with logo/colours) |
+| 8 | Pipeline "going stale this week" + lost-reason list with dollars | Owners with big-ticket deals (solar, real estate, home services): saves deals | deal_history (built), per-stage dwell | S-M | Pro; "deals saved" counter feeds receipts | Yes (alert from existing quiet-deals) |
+| 9 | Usage hook: AI daily brief per account, billed through a billing meter | Owners who want a ready-made client message; cost passed through | rollups plus event store | M-L | Usage-based (per brief or per batch) via wallet charge API, or higher tier $9 to $19 (CLAUDE.md hypothesis); needs a CHECK of the meter API | No |
+| 10 | Churn-risk watchlist (Speed drop, no leads, past due, wallet empty) | Owner with 20+ clients: spots the account that will leave next | Speed, activity, partly plan | M | Higher tier or part of Pro for accounts 10+; "agency owner" plan idea | Partly (Speed and activity signals only; add plan and wallet after Clients fix) |
+Cash order: 2 (new installs) and 1 (renewals/retention) first, then 3, 4, 5 (instant value in existing Pro), then 8, 7, 6, 10, 9. Upgrade hooks: the free tier already shows Audit and overview; gate the shareable/branded one-pager, weekly receipt, email alerts and Call mode on Pro so the paid line is honest (keep the Pro description accurate: do not list exports or alerts until live).
+Quick wins this week (all S, data yes): #3, #4, #5, #8, plus a branded v1 of #1 and #2. Biggest unlock needing King: one GHL version bump adding optional scopes (payments, invoices, wallet) before pilots, so #6 and #10 can follow.
+
 ## Fresh web facts used across modules
 - GHL 2026 dashboard additions: a Reselling tab (usage per account), AI spend dashboard with caps, Marketplace Earnings under Labs. UNVERIFIED (blogs): https://rsla.io/blog/gohighlevel-updates-2026 , https://www.softomatesolutions.com/blog/gohighlevel-updates-2026-release-notes/ . No response-time report or failed-payment view found on the agency dashboard (UNVERIFIED, absence in blogs only).
 - AgencyAnalytics now lists goals, alerts, anomaly detection, MCP access for AI tools and a client portal; per-client price about $20 to $25 (UNVERIFIED, conflicting pages): https://dashthis.com/alternatives/agency-analytics/ , https://www.agencyanalytics.com/pricing . Direction: competitors move to alerts plus AI. Our edge stays lead-handling outcomes and our own history.
@@ -119,7 +136,7 @@ Honest limits: Reddit, forums, GHL ideas board and the marketplace were not reac
 
 ---
 
-## TOP 20 across modules (by money impact)
+## TOP 20 across modules (by money impact; the first 10 rows of "Features customers pay for now" take priority on instant cash, this list is the wider backlog)
 1. Today as ranked list with ONE button and 7 am email (retention, the reason to open daily). L
 2. Payments recovery queue (cash found before it is lost). L
 3. Fix Clients plan/billing call and show past-due plans (agency revenue visibility; a bug). S
