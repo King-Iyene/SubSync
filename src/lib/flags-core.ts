@@ -135,6 +135,12 @@ export const DEFAULT_OFF: ReadonlySet<Feature> = new Set<Feature>([
   // Find a lead (docs/features/FINDLEAD_BRIEF.md): fl_find is the search (keyset paging, pickers, copy); fl_bulk is bulk actions and export. Default off.
   "fl_find",
   "fl_bulk",
+  // Cash features (docs/features/CASH_FEATURES.md): the morning "save this account" digest, the missed-lead recovery list, stale and lost deal alerts. Default off until verified.
+  "cf_save",
+  "cf_recover",
+  "cf_deals",
+  "cf_email",
+  "cf_record",
 ]);
 
 export function resolveFeatures(all: readonly Feature[], overrides: Record<string, boolean>, allOn = false): Record<Feature, boolean> {

@@ -1,5 +1,7 @@
 import { exportProof, getSettings, listRows, markOpened, numbers, options, proof, saveSettings, snooze, today, todayCache, unsnooze, zoneForMeta, forgetToday, type Scope } from "../analytics/today3-queries";
 import { accountsIn } from "../analytics/clients3-queries";
+import { cashReceiptLines } from "../analytics/cash-intel";
+import { receiptCash } from "../analytics/cash-queries";
 import { TD3_FLAGS, TD3_KINDS, TD3_PARTS, TD3_LIST_ONLY, type Td3ListKind, type Td3Part } from "../analytics/today3-types";
 import { clampSize } from "../analytics/clients3-intel";
 import type { Feature } from "../entitlements";
@@ -54,7 +56,15 @@ export async function handleToday3(ctx: Ctx, h: Today3Helpers): Promise<Response
       if (!kind || !KINDS.has(kind)) return json({ error: "Not found" }, 404);
       return done(await listRows(scope, one, kind as Td3ListKind, { page, size }, links, now));
     }
-    case "proof": return done(await proof(scope, one, WEEK.test(sp.get("week") ?? "") ? sp.get("week") : null, { page, size }, now));
+    case "proof": {
+      const p = await proof(scope, one, WEEK.test(sp.get("week") ?? "") ? sp.get("week") : null, { page, size }, now);
+      // The cash features add their proof lines to the same weekly receipt: missed leads followed up and flagged deals that moved (estimates are labelled; a line with nothing behind it is left out).
+      if (ent.features.cf_recover === true || ent.features.cf_deals === true) {
+        const lines = cashReceiptLines(await receiptCash(scope, one, new Date(`${p.weekStart}T00:00:00Z`)).catch(() => ({ recovered: 0, recoveredValue: null, moved: 0, movedValue: null, lostNoReason: 0 })));
+        if (lines.length) return done({ ...p, lines: [...p.lines, ...lines] });
+      }
+      return done(p);
+    }
     case "numbers": { const d = int(sp.get("days"), 30); return done(await numbers(scope, one, d <= 7 ? 7 : d <= 30 ? 30 : 90, now)); }
     case "settings": {
       const accts = await accountsIn({ inst: scope.inst, allowed }, {});

@@ -1,0 +1,26 @@
+/* Cash features: calm and flat, the same surfaces and tokens as Today (td3.css) and the shared list styles (ap3.css, cl3.css). No glow, no gradients. Light and dark come from the theme variables. */
+.cf-card { border: 1px solid color-mix(in srgb, var(--s6-edgec) 26%, transparent); border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; background: var(--s6-surf); min-width: 0; }
+.cf-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.cf-acct { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 12px; align-items: start; border-top: 1px solid color-mix(in srgb, var(--s6-line) 55%, transparent); padding-top: 10px; }
+.cf-name { font-size: 1.0625rem; font-weight: 600; overflow-wrap: anywhere; }
+.cf-ev { margin: 0; padding-left: 18px; font-size: 0.875rem; display: flex; flex-direction: column; gap: 2px; }
+.cf-how { align-self: flex-start; font-size: 0.8125rem; }
+.cf-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.cf-chip { display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 12px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--s6-edgec) 30%, transparent); background: transparent; color: var(--foreground); font-size: 0.8125rem; cursor: pointer; }
+.cf-chip b { font-variant-numeric: tabular-nums; }
+.cf-chip[aria-pressed="true"] { background: color-mix(in srgb, var(--s6-cyan) 16%, transparent); border-color: var(--s6-cyan); }
+.cf-chip:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.cf-bar { position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; border: 1px solid var(--s6-cyan); border-radius: 12px; padding: 10px 14px; background: var(--s6-surf); }
+.cf-pick { display: inline-flex; gap: 8px; align-items: center; }
+.cf-toast { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 0; padding: 10px 14px; border: 1px solid color-mix(in srgb, var(--s6-cyan) 45%, transparent); border-radius: 10px; font-size: 0.875rem; }
+.cf-t td { white-space: normal; height: auto; padding-top: 10px; padding-bottom: 10px; }
+.cf-sub { display: block; }
+.cf-wrap { max-width: 22rem; }
+@media (max-width: 700px) {
+  .cf-acct { grid-template-columns: 22px minmax(0, 1fr); }
+  .cf-acct .td-side { grid-column: 2; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 4px 14px; }
+  .cf-bar { position: static; }
+  .cf-t { min-width: 0; }
+}
+@media print { .cf-card { break-inside: avoid; } }
+.cf-link { margin: 0 0 8px; }

@@ -166,6 +166,11 @@ export const FEATURES = [
   "ov_screen",
   "fl_find",
   "fl_bulk",
+  "cf_save",
+  "cf_recover",
+  "cf_deals",
+  "cf_email",
+  "cf_record",
 ] as const;
 export type Feature = (typeof FEATURES)[number];
 
