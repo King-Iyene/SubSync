@@ -75,4 +75,27 @@ describe.skipIf(!HAS_DB)("clients round 3", () => {
     expect([200, 403]).toContain(r.status);
     if (r.status === 200) expect(r.body.rows).toEqual([]);
   });
+
+  // Regression: a bare `d day` alias in the daily rollup SQL made every part answer 500 ("syntax error at or near day") on a real database, and nothing
+  // checked that each part actually runs. Every part and list reason must answer 200 for the agency, with its own account and with a foreign one
+  // (the foreign account is answered with an empty 200: never an error, never echoed).
+  it("answers 200 for every part and reason, own account and foreign account", { timeout: 300_000 }, async () => {
+    if (!applied) return;
+    const t = session(CO_A, "agency", null);
+    const parts = ["overview", "needs-attention", "trends", "compare", "receipt", "people", "setup", "options", "export", "billing"];
+    const reasons = ["leads_down", "waiting", "waiting_old", "unmarked", "noshows", "stale_deals", "no_owner", "no_phone", "staff_quiet", "sync_old", "needs_permission"];
+    const paths = [
+      ...parts.flatMap((p) => [`clients3?part=${p}`, `clients3?part=${p}&location=${A1}`, `clients3?part=${p}&location=${B1}`]),
+      ...reasons.flatMap((r) => [`clients3?part=list&reason=${r}`, `clients3?part=list&reason=${r}&location=${A1}`, `clients3?part=list&reason=${r}&location=${B1}`]),
+      "clients3?part=trends&grain=month", `clients3?part=compare&ids=${A1}`, "clients3?part=needs-attention&level=act&sort=name",
+    ];
+    for (let i = 0; i < paths.length; i += 8) {
+      const batch = paths.slice(i, i + 8);
+      const out = await Promise.all(batch.map((p) => call(t, p)));
+      out.forEach((r, k) => {
+        expect(r.status, batch[k]).toBe(200);
+        if (batch[k].includes(`location=${B1}`)) expect(JSON.stringify(r.body), batch[k]).not.toContain(B1);
+      });
+    }
+  });
 });
