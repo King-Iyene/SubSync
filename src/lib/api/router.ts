@@ -126,6 +126,7 @@ import { handleAppointments3 } from "./appointments3-routes";
 import { handlePipeline3 } from "./pipeline3-routes";
 import { handleClients3 } from "./clients3-routes";
 import { handlePeople3 } from "./people3-routes";
+import { handleToday3, handleToday3Act } from "./today3-routes";
 import { handleApptActions } from "./appointment-actions-routes";
 import { handlePipelineActions } from "./pipeline-actions-routes";
 import { grantedOf } from "./workflows-api";
@@ -2058,6 +2059,13 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
     // Clients round 3: /api/app/clients3?part=... (overview, needs attention, trends, compare, receipt, people, setup, lists; read only).
     if (a === "clients3" && method === "GET" && !b && ctx.url.searchParams.has("part")) {
       return await handleClients3(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links });
+    }
+    // Today (front page): /api/app/today3?part=... (today, list, proof, numbers, settings, export; read only) and /api/app/today3/act/... (SubSync-only notes).
+    if (a === "today3" && method === "GET" && !b && ctx.url.searchParams.has("part")) {
+      return await handleToday3(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links });
+    }
+    if (a === "today3" && b === "act" && ctx.segments.length === 3) {
+      return await handleToday3Act(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links });
     }
     // Team (people) module: /api/app/people3?part=... (today, scorecards, workload, leaderboard, money, coaching, access, proof, person, handoff, next lead, lists; read only).
     if (a === "people3" && method === "GET" && !b && ctx.url.searchParams.has("part")) {

@@ -154,6 +154,13 @@ export const FEATURES = [
   "au_history",
   "au_onepager",
   "au_monthly",
+  "td_module",
+  "td_today",
+  "td_proof",
+  "td_numbers",
+  "td_email",
+  "td_record",
+  "ov_screen",
 ] as const;
 export type Feature = (typeof FEATURES)[number];
 

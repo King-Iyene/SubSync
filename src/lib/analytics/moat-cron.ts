@@ -9,6 +9,8 @@ import { refreshClientRollup } from "./clients3-queries";
 import { refreshClientBilling } from "./clients3-billing";
 import { sweepPeople } from "./people3-sweep";
 import { sendMonthlyAudit, sweepAuditHistory } from "./au-sweep";
+import { recordToday } from "./today3-queries";
+import { runTodayEmail } from "./today3-email";
 import { runPeopleAlerts } from "./people-alerts";
 import { accountReceipt } from "./moat-queries";
 import { mondayOf, weeklyDue, weeklyProofText } from "./moat-core";
@@ -36,7 +38,9 @@ export async function runMoatCron(now = Date.now()): Promise<MoatCronReport> {
       const ppi = ent.features.pp_idle && !ent.locked.includes("pp_idle");
       const auh = ent.features.au_history && !ent.locked.includes("au_history");
       const aum = ent.features.au_monthly && !ent.locked.includes("au_monthly");
-      if (!rec && !mail && !apr && !plr && !clr && !clb && !ppr && !ppi && !auh && !aum) continue;
+      const tdr = ent.features.td_record && !ent.locked.includes("td_record");
+      const tde = ent.features.td_email && !ent.locked.includes("td_email");
+      if (!rec && !mail && !apr && !plr && !clr && !clb && !ppr && !ppi && !auh && !aum && !tdr && !tde) continue;
       rep.companies++;
       if (apr) rep.events += Object.values(await sweepAppointmentHistory(installationId)).reduce((x, y) => x + y, 0);
       if (plr) rep.events += Object.values(await sweepDealHistory(installationId)).reduce((x, y) => x + y, 0);
@@ -45,6 +49,8 @@ export async function runMoatCron(now = Date.now()): Promise<MoatCronReport> {
       if (ent.features.cl_billing && !ent.locked.includes("cl_billing")) await refreshClientBilling(installationId).catch((e) => console.error("Billing refresh failed", safeError(e)));
       if (auh) rep.events += await sweepAuditHistory(installationId, now).catch((e) => { console.error("Audit history sweep failed", safeError(e)); return 0; });
       if (aum) await sendMonthlyAudit(installationId, now).catch((e) => console.error("Monthly audit failed", safeError(e)));
+      if (tdr) rep.events += await recordToday(installationId, now).catch((e) => { console.error("Today record failed", safeError(e)); return 0; });
+      if (tde) await runTodayEmail(installationId, now).catch((e) => console.error("Today email failed", safeError(e)));
       if (rec) rep.events += Object.values(await sweepMoatEvents(installationId)).reduce((a, b) => a + b, 0);
       if (ppi) await runPeopleAlerts(installationId, now).catch((e) => console.error("Team alerts failed for one company", safeError(e)));
       if (mail && weeklyDue(now)) rep.receipts += await weeklyProofReceipts(installationId, now);

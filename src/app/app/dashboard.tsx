@@ -56,6 +56,9 @@ import { fixturesOn as clSample } from "./views/cl3/data";
 import { TeamView } from "./views/people";
 import { TeamModule } from "./views/pp3/module";
 import { fixturesOn as ppSample } from "./views/pp3/data";
+import { TodayModule } from "./views/td3/module";
+import { overviewMerged } from "@/lib/analytics/today3-intel";
+import { fixturesOn as tdSample } from "./views/td3/data";
 import { SettingsView } from "./views/settings";
 import { IntegrationsPage } from "./views/connections";
 import { NotificationsPage } from "./views/notifications";
@@ -333,7 +336,9 @@ export function Dashboard() {
   // A page that lives inside a module as a tab (People holds Contact search, Leads and Call lists) has no menu entry of its own.
   // (A page that lives inside the Clients module has no entry of its own for an agency; a business and a client's staff have no Clients module, so their Setup stays in their menu.)
   // The Clean-up entry stays while either of its two features is on (a switched-off tab is left out inside it).
-  const menu = visibleNav(NAV_FOR[auth.kind], { limited, off: (f) => (f === "cleanup" ? off("cleanup") && off("duplicates") : f === "team" && limited ? auth.features.pp_module !== true || locked("pp_module") : off(f)) });
+  const hideOverview = !limited && overviewMerged(auth.features);
+  const menu0 = visibleNav(NAV_FOR[auth.kind], { limited, off: (f) => (f === "cleanup" ? off("cleanup") && off("duplicates") : f === "team" && limited ? auth.features.pp_module !== true || locked("pp_module") : off(f)) });
+  const menu = hideOverview ? menu0.filter((n) => n.id !== "overview") : menu0;
   // The sidebar: the pilot menu in plain groups that scroll, and Settings, Getting started and What's new pinned underneath so they are always visible.
   const mainMenu = menu.filter((n) => n.group !== "Settings and help");
   const footMenu = menu.filter((n) => n.group === "Settings and help");
@@ -370,6 +375,8 @@ export function Dashboard() {
   const setupTabs = [{ label: "Setup checklists", node: <OnboardingView go={go} /> }, { label: "Email sender health", node: <EmailHealthView /> }];
   const clientFeatures: ClientsFeatures = { health: !off("health"), onboarding: !off("onboarding"), clients: !off("clients"), reports: !off("reports"), setupCompare: !off("setup_compare"), playbooks: !off("playbooks") };
 
+  // Today (front page): the new module replaces the old hub when its flag is on; the older tabs stay reachable under Numbers > More numbers.
+  const tdOn = (auth.features.td_module === true && !auth.locked.includes("td_module")) || tdSample();
   const content = (() => {
     // A business or a client sees its own account as the home page, never an accounts list.
     if (limited) {
@@ -386,14 +393,15 @@ export function Dashboard() {
     if (feature && locked(feature)) return <Centered title="Part of the paid plan" body="This page is included in the Pro plan. Ask whoever manages your SubSync plan to upgrade, and it appears here straight away." />;
     switch (viewId) {
       // Today reads with the unfiltered client and applies its own account choice, so the shared filter never changes what Today counts.
-      case "today": return <ApiProvider value={baseApi}><TodayView go={go} kind={auth.kind} /></ApiProvider>;
+      case "today": return <ApiProvider value={baseApi}>{tdOn ? <TodayModule key="td3" go={go} kind={auth.kind} /> : <TodayView go={go} kind={auth.kind} />}</ApiProvider>;
       // "My day" is Today now (one page, one menu item). The old address still opens it.
-      case "myday": return <ApiProvider value={baseApi}><TodayView go={go} kind={auth.kind} /></ApiProvider>;
+      case "myday": return <ApiProvider value={baseApi}>{tdOn ? <TodayModule key="td3" go={go} kind={auth.kind} /> : <TodayView go={go} kind={auth.kind} />}</ApiProvider>;
       case "people": case "search": case "leads": case "calls": return peopleOn ? <PeopleModule key={"people" + peopleStart} start={peopleStart} callsAllowed={callsAllowed} /> : <Centered title="Not available" body="This page is switched off right now." />;
       case "audit": return <AuditView />;
       // Speed to lead holds the Unanswered tab (when messages and speed are both on); `#speed?tab=unanswered` and the old #inbox open it first.
       case "speed": return <SpeedView go={go} unanswered={inboxTab} start={speedStart()} />;
-      case "overview": return <OverviewView go={go} />;
+      // Overview is merged into Today > Numbers: the old address opens Numbers with a one-line "Overview moved here" (the page itself stays in the code, behind the ov_screen flag).
+      case "overview": return overviewMerged(auth.features) ? <ApiProvider value={baseApi}><TodayModule key="td3-ov" go={go} kind={auth.kind} initialTab="numbers" fromOverview /></ApiProvider> : <OverviewView go={go} />;
       case "accounts": if ((auth.features.cl_module === true && !auth.locked.includes("cl_module")) || clSample()) return <ClientsModule key="cl3" go={go} features={clientFeatures} />; return <ClientsView key="accounts" go={go} initialTab="health" features={clientFeatures} />;
       case "account": return view.locationId ? <AccountDetailView key={view.locationId} locationId={view.locationId} go={go} agency={agency} /> : <ClientsView key="accounts" go={go} initialTab="health" features={clientFeatures} />;
       case "deals": return <ModuleTabs key="pipe" start={1} tabs={pipeTabs} />;

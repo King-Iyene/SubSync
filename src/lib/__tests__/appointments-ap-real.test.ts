@@ -16,7 +16,16 @@ test("selecting two people renders the comparison rows from real counts", () => 
 
 test("filters travel in the address and come back the same", () => {
   assert.deepEqual(filtersToParams(DEFAULT_FILTERS), {});
-  const f = { days: 90 as const, locationId: "L1", calendarId: "c-1", userId: "u9", source: "Facebook ads", q: "kim" };
+  const f = { ...DEFAULT_FILTERS, days: 90 as const, locationId: "L1", calendarId: "c-1", userId: "u9", source: "Facebook ads", q: "kim" };
   assert.deepEqual(filtersFromParams(new URLSearchParams(filtersToParams(f))), f);
   assert.deepEqual(filtersFromParams(new URLSearchParams("ap_loc=../etc&ap_days=5")), DEFAULT_FILTERS); // junk ids and odd ranges are dropped
+});
+
+test("the worklist filters (dates, owner, booker, status, age, sort) travel in the address and come back the same", () => {
+  const f = { ...DEFAULT_FILTERS, from: "2026-10-01", to: "2026-10-31", owner: "none", booker: "u2", status: "confirmed" as const, age: 7 as const, sort: "oldest" as const };
+  const p = filtersToParams(f);
+  assert.deepEqual(p, { ap_from: "2026-10-01", ap_to: "2026-10-31", ap_bk: "u2", ap_ow: "none", ap_st: "confirmed", ap_age: "7", ap_sort: "oldest" });
+  assert.deepEqual(filtersFromParams(new URLSearchParams(p)), f);
+  // junk is dropped, a backwards range is dropped, and only the allowed values come through
+  assert.deepEqual(filtersFromParams(new URLSearchParams("ap_from=2026-11-05&ap_to=2026-11-01&ap_st=deleted&ap_age=4&ap_sort=drop%20table&ap_bk=../x")), DEFAULT_FILTERS);
 });

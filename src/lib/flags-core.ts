@@ -121,6 +121,14 @@ export const DEFAULT_OFF: ReadonlySet<Feature> = new Set<Feature>([
   "au_history",
   "au_onepager",
   "au_monthly",
+  // Today module (docs/features/TODAY_BRIEF.md): each behind its own flag, default off. ov_screen is the old Overview page (merged into Today, Numbers).
+  "td_module",
+  "td_today",
+  "td_proof",
+  "td_numbers",
+  "td_email",
+  "td_record",
+  "ov_screen",
 ]);
 
 export function resolveFeatures(all: readonly Feature[], overrides: Record<string, boolean>, allOn = false): Record<Feature, boolean> {

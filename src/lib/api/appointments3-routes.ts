@@ -18,7 +18,8 @@ const PART_FLAG: Record<Appt3Part, string> = {
   overview: "appt_overview", "needs-outcome": "appt_needs_outcome", "noshow-recovery": "appt_noshow_recovery", "booking-share": "appt_booking_share", "flow-tree": "appt_flow_tree",
   health: "appt_health", sources: "appt_sources", calendars: "appt_calendars", options: "appt_overview", compare: "appt_flow_tree", trends: "appt_booking_share", export: "appt_overview", receipt: "appt_proof", list: "appt_overview", detail: "appt_history",
 };
-const BUCKETS = new Set(["booked", "unmarked", "showed", "noshow", "cancelled", "invalid", "completed", "won", "lost", "open", "no_deal", "upcoming", "recovered"]);
+const BUCKETS = new Set(["booked", "unmarked", "showed", "noshow", "cancelled", "invalid", "completed", "won", "lost", "open", "no_deal", "upcoming", "recovered", "at_risk"]);
+const STATUSES = new Set(["new", "confirmed", "booked"]);
 const int = (v: string | null, d: number) => { const n = Number(v); return v !== null && Number.isFinite(n) ? Math.floor(n) : d; };
 const text = (v: string | null, max: number) => (v ?? "").trim().slice(0, max) || null;
 const personParam = (v: string | null) => (v === "none" ? "none" : cleanId(v));
@@ -41,6 +42,7 @@ export async function handleAppointments3(ctx: Ctx, h: Appt3Helpers): Promise<Re
   const f: Filters = {
     from: w.from, to: w.to, location: one, calendar: cleanId(sp.get("calendar")), user: seePeople ? cleanId(sp.get("user")) : null, source: text(sp.get("source"), 120), q: text(sp.get("q"), 60),
     bucket: bucketP && BUCKETS.has(bucketP) ? (bucketP as Appt3Bucket) : null,
+    status: STATUSES.has(sp.get("status") ?? "") ? sp.get("status") : null, minAgeDays: ((n) => (n >= 1 && n <= 366 ? n : null))(int(sp.get("age"), 0)),
     setter: seePeople && sp.has("setter") ? personParam(sp.get("setter")) : undefined, closer: seePeople && sp.has("closer") ? personParam(sp.get("closer")) : undefined,
   };
   const p = Math.max(0, int(sp.get("page"), 0)), size = clampSize(int(sp.get("size"), 20));
@@ -53,8 +55,8 @@ export async function handleAppointments3(ctx: Ctx, h: Appt3Helpers): Promise<Re
 
   switch (part) {
     case "overview": return done(await overview(scope, f, w.days));
-    case "needs-outcome": return done(await needsOutcome(scope, { f, page: p, size, sort: sp.get("sort") }, link));
-    case "noshow-recovery": return done(await noshowRecovery(scope, { f, page: p, size, sort: sp.get("sort") }, link));
+    case "needs-outcome": return done(await needsOutcome(scope, { f, page: p, size, sort: sp.get("sort"), after: sp.get("after") }, link));
+    case "noshow-recovery": return done(await noshowRecovery(scope, { f, page: p, size, sort: sp.get("sort"), after: sp.get("after") }, link));
     case "list": return done(await appointmentList(scope, { f, page: p, size, sort: sp.get("sort"), after: sp.get("after") }, link));
     case "booking-share":
       return seePeople ? done(await bookingShare(scope, f, p, size, sp.get("sort"))) : wrap({ rows: [], total: 0, page: 0, size, pages: 1, truncated: false, unassigned: 0, ownerless: 0, fairness: { enough: false, maxSharePct: null, evenSharePct: null, closers: 0 } });

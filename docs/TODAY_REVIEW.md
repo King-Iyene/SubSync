@@ -51,3 +51,13 @@ One question: **"What needs a person today, and what do I do first?"** Five-seco
 4. Every chart mark: the count equals the rows opened, and the opened list is only what was clicked (test per mark).
 5. No chart shown for a single account; no duplicate menu item; no repeated "not enough history" lines (test counts the text).
 6. Typecheck, eslint, unit tests and the Today e2e specs pass; real screenshots at three widths for the four roles in `docs/review/today-v3-*.png`; written King's 5 checks in `docs/features/TODAY.md`.
+
+## Today 3 customer's-eye check (11 Nov 2026, stage TD)
+Walked in a real browser (demo data, real API path, sample switch `?tdfx=1`), at 1440 and 390, light and dark, as agency, agency inside one account, business and client staff. Screens: `docs/review/td-*.png`.
+- **Does the first screen say what to do in 5 seconds?** Yes: one sentence ("11 deals gone quiet, and 14 people have waited over a day for a reply.") and one button ("Wake up the 11 deals") above a ranked list of at most five.
+- **Do counts equal rows?** Yes: every count opens its rows with "Open in your CRM"; DB test asserts count = total for waiting over a day; every kind answers 200 for own and foreign accounts.
+- **Anything shown twice?** Found and fixed: the money estimate appeared as a chip and in the "why" line (chip removed); "Every number follows this choice" twice on Numbers (one left); "Needs permission" was both a notice and a list item (now only the notice).
+- **Would an owner forward the receipt?** Yes: plain three lines, "Copy for your client", Print, CSV. It says "history starts <date>" and shows no figures until two days of record exist.
+- **Fixed during the walk**: copy button failed silently where the browser refuses the clipboard (fallback added); staff saw a Settings tab they cannot use (hidden); a recording SQL error (bare `day` alias) and a boolean array error were caught by running the sweep on a fresh database.
+- **Why would I pay?** It replaces opening six screens each morning, and it keeps the only record of what was found and fixed for the "what are we paying for" talk. Weak spot: first-day agencies see "history starts today" until a week passes.
+- **Not verified**: speed against 1M rows on the live database (dev server latency to the remote database is 10 s or more per call, so the 2 s target is by design: shared counts, 30 s cache, parallel reads, not measured); the live email (dry run only).

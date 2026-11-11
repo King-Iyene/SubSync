@@ -17,7 +17,7 @@ import type {
 type Db = ReturnType<typeof sql>;
 type Frag = ReturnType<Db>;
 export type Scope = { inst: string; allowed: string[] | null };
-export type Filters = { from: Date; to: Date; location?: string | null; calendar?: string | null; user?: string | null; source?: string | null; q?: string | null; bucket?: Appt3Bucket | null; setter?: string | null; closer?: string | null };
+export type Filters = { from: Date; to: Date; location?: string | null; calendar?: string | null; user?: string | null; source?: string | null; q?: string | null; bucket?: Appt3Bucket | null; setter?: string | null; closer?: string | null; /** A raw status of the booking (new, confirmed): for lists. */ status?: string | null; /** Only appointments whose time passed at least this many days ago. */ minAgeDays?: number | null };
 
 const ID = /^[A-Za-z0-9_-]{1,64}$/;
 export const cleanId = (v: unknown): string | null => (typeof v === "string" && ID.test(v) ? v : null);
@@ -73,10 +73,15 @@ function base(s: Scope, f: Filters, dd: number, extra?: Frag): Frag {
       ${f.user && cleanId(f.user) ? db`and (a.assigned_to = ${f.user} or a.booked_by_user = ${f.user})` : db``}
       ${f.setter !== undefined && f.setter !== null ? (f.setter === "none" ? db`and a.booked_by_user is null` : db`and a.booked_by_user = ${f.setter}`) : db``}
       ${f.closer !== undefined && f.closer !== null ? (f.closer === "none" ? db`and a.assigned_to is null` : db`and a.assigned_to = ${f.closer}`) : db``}
+      ${f.status && /^[a-z_]{1,20}$/.test(f.status) ? db`and a.status = ${f.status}` : db``}
+      ${f.minAgeDays && Number.isInteger(f.minAgeDays) && f.minAgeDays > 0 && f.minAgeDays <= 366 ? db`and a.start_at < now() - make_interval(days => ${f.minAgeDays}::int)` : db``}
       ${f.source ? (f.source === "none" ? db`and nullif(c.source, '') is null` : db`and c.source = ${f.source.slice(0, 120)}`) : db``}
       ${like ? db`and (c.full_name ilike ${like} or c.email ilike ${like} or a.calendar_name ilike ${like})` : db``}
       ${extra ?? db``}`;
 }
+
+/** Open deal dollars in play: past appointments nobody marked, plus no-shows of the last 7 days not booked again. The set the "revenue at risk" figure is worked out from, so the number and its list agree. */
+const atRiskCond = () => sql()`status <> 'invalid' and deal_status = 'open' and coalesce(deal_value, 0) > 0 and (unmarked or (status = 'noshow' and not rebooked and start_at >= now() - interval '7 days'))`;
 
 /** Filter on one of our groups of statuses, applied on the derived set. */
 function bucketCond(b: Appt3Bucket | null | undefined): Frag {
@@ -94,6 +99,7 @@ function bucketCond(b: Appt3Bucket | null | undefined): Frag {
     case "open": return db`and deal_status = 'open' and status <> 'invalid'`;
     case "no_deal": return db`and deal_id is null and status <> 'invalid'`;
     case "recovered": return db`and status = 'noshow' and rebooked`;
+    case "at_risk": return db`and ${atRiskCond()}`;
     default: return db``;
   }
 }
@@ -132,26 +138,39 @@ async function page<T>(rowsQ: Promise<Array<Record<string, unknown>>>, countQ: P
   return { rows: rows.map(map), total, page: p, size, pages: Math.max(1, Math.ceil(total / size)), truncated: false };
 }
 const offsetOf = (p: number, size: number) => Math.min(100_000, Math.max(0, Math.floor(p)) * size);
-const sortOf = (sort: string | null | undefined) => {
+type SortKey = "value" | "oldest" | "newest" | "name";
+const sortKey = (v?: string | null): SortKey => (v === "oldest" || v === "newest" || v === "name" || v === "value" ? v : "newest");
+const orderOf = (k: SortKey) => {
   const db = sql();
-  return sort === "value" ? db`deal_value desc nulls last, start_at desc` : sort === "name" ? db`contact_name asc, start_at desc` : sort === "oldest" ? db`start_at asc` : db`start_at desc`;
+  return k === "oldest" ? db`start_at asc, appointment_id asc` : k === "value" ? db`coalesce(deal_value, -1)::float8 desc, start_at desc, appointment_id desc` : k === "name" ? db`contact_name asc, start_at asc, appointment_id asc` : db`start_at desc, appointment_id desc`;
 };
+const ISO_AT = /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+Z$/;
+/** Keyset paging: the cursor "startIso|id|rest" (rest = deal value for the value sort, the name for the name sort) continues after the last row seen, so a deep page costs the same as the first. null = no usable cursor (the page number is used instead). */
+function keysetOf(k: SortKey, after?: string | null): Frag | null {
+  if (!after) return null;
+  const i = after.indexOf("|"), j = after.indexOf("|", i + 1);
+  if (i < 0 || j < 0) return null;
+  const at = after.slice(0, i), id = after.slice(i + 1, j), rest = after.slice(j + 1), t = new Date(at);
+  if (!ISO_AT.test(at) || !ID.test(id) || Number.isNaN(t.getTime())) return null;
+  const db = sql();
+  if (k === "oldest") return db`and (start_at, appointment_id) > (${t}, ${id})`;
+  if (k === "value") { const v = Number(rest); return rest !== "" && Number.isFinite(v) ? db`and (coalesce(deal_value, -1)::float8, start_at, appointment_id) < (${v}::float8, ${t}, ${id})` : null; }
+  if (k === "name") return db`and (contact_name, start_at, appointment_id) > (${rest.slice(0, 200)}, ${t}, ${id})`;
+  return db`and (start_at, appointment_id) < (${t}, ${id})`;
+}
+const cursorOf = (k: SortKey, r: Record<string, unknown>) => `${(r.start_at as Date).toISOString()}|${String(r.appointment_id)}|${k === "value" ? (r.deal_value === null || r.deal_value === undefined ? -1 : Number(r.deal_value)) : k === "name" ? String(r.contact_name ?? "") : ""}`;
 
 export type ListOpts = { f: Filters; page: number; size: number; sort?: string | null; extra?: Frag; after?: string | null };
 export async function appointmentList(s: Scope, o: ListOpts, link: ((loc: string, contact: string) => string) | null, why?: (r: Record<string, unknown>) => string | null): Promise<Page<Appt3Row>> {
   const db = sql(), size = clampSize(o.size), dd = await dealDays(s.inst), label = await names(s.inst);
   const b = base(s, o.f, dd, o.extra);
-  // Keyset paging (newest first): the cursor continues after the last row seen, so deep pages cost the same as the first. Other sorts use offset (capped).
-  const newest = !o.sort || o.sort === "newest";
-  const cur = newest ? /^(d{4}-d{2}-d{2}T[d:.]+Z)|([A-Za-z0-9_-]{1,64})$/.exec(o.after ?? "") : null;
-  const keyset = cur ? db`and (start_at, appointment_id) < (${new Date(cur[1])}, ${cur[2]})` : db``;
+  const k = sortKey(o.sort), keyset = keysetOf(k, o.after), raws: Array<Record<string, unknown>> = [];
   const p0 = await page(
-    db`with ap as (${b}) select * from ap where true ${bucketCond(o.f.bucket)} ${keyset} order by ${sortOf(o.sort)}${newest ? db`, appointment_id desc` : db``} limit ${size} offset ${cur ? 0 : offsetOf(o.page, size)}`,
+    db`with ap as (${b}) select * from ap where true ${bucketCond(o.f.bucket)} ${keyset ?? db``} order by ${orderOf(k)} limit ${size} offset ${keyset ? 0 : offsetOf(o.page, size)}`,
     db`with ap as (${b}) select count(*)::int n from ap where true ${bucketCond(o.f.bucket)}`,
-    Math.max(0, Math.floor(o.page)), size, (r) => toRow(r, label, link, why ? why(r) : null),
+    Math.max(0, Math.floor(o.page)), size, (r) => { raws.push(r); return toRow(r, label, link, why ? why(r) : null); },
   );
-  const last = p0.rows[p0.rows.length - 1];
-  return { ...p0, next: last && p0.rows.length === size ? `${last.startAt}|${last.appointmentId}` : null };
+  return { ...p0, next: raws.length === size ? cursorOf(k, raws[raws.length - 1]) : null };
 }
 
 // ---------- overview ----------
@@ -165,7 +184,7 @@ export async function overview(s: Scope, f: Filters, windowDays: number): Promis
         count(*) filter (where status = 'showed')::int showed, count(*) filter (where status = 'noshow')::int noshow,
         count(*) filter (where deal_status = 'won' and status <> 'invalid')::int won, coalesce(sum(deal_value) filter (where deal_status = 'won' and status <> 'invalid'), 0)::float8 won_value,
         count(*) filter (where deal_id is null and status <> 'invalid')::int no_deal, count(*) filter (where upcoming)::int upcoming,
-        count(*) filter (where unmarked and deal_status = 'open' and coalesce(deal_value, 0) > 0)::int unmarked_deals,
+        count(*) filter (where unmarked and deal_status = 'open' and coalesce(deal_value, 0) > 0)::int unmarked_deals, count(*) filter (where ${atRiskCond()})::int at_risk,
         coalesce(sum(deal_value) filter (where unmarked and deal_status = 'open' and deal_value > 0), 0)::float8 unmarked_value
       from ap`,
     db`with ap as (${b}) select (start_at at time zone tz)::date as day, count(*) filter (where status <> 'invalid')::int booked, count(*) filter (where status = 'showed')::int showed,
@@ -189,7 +208,7 @@ export async function overview(s: Scope, f: Filters, windowDays: number): Promis
     headline: "", button: pickButton({ unmarked, noshowToRecover: nsToRecover, noDeal: num(t.no_deal) }), booked, unmarked, trueShowRate: trueR, reportedShowRate: repR,
     today: { doubleBookings: num(dbl?.n), idlePeople: num(idle?.n) }, noshowToRecover: nsToRecover, recoveredLast30: num(rec.n), noDealLinked: num(t.no_deal), upcoming: num(t.upcoming),
     revenueAtRisk: revenueAtRisk({ value: num(risk.value), n: num(risk.deals) }, { value: num(t.unmarked_value), n: num(t.unmarked_deals) }),
-    revenueWon: { value: num(t.won_value), n: num(t.won) },
+    revenueWon: { value: num(t.won_value), n: num(t.won) }, riskCount: num(t.at_risk),
     journey: [
       { key: "booked", label: "Booked", count: booked, bucket: "booked" },
       { key: "showed", label: "Showed", count: showed, bucket: "showed" }, { key: "won", label: "Won", count: num(t.won), bucket: "won" },
@@ -223,13 +242,15 @@ export async function needsOutcome(s: Scope, o: Omit<ListOpts, "extra">, link: (
 export async function noshowRecovery(s: Scope, o: Omit<ListOpts, "extra">, link: ((a: string, b: string) => string) | null): Promise<Appt3Recovery> {
   const db = sql(), dd = await dealDays(s.inst);
   const win = { ...o.f, from: new Date(Date.now() - 7 * DAY), to: new Date(), bucket: undefined };
-  const label = await names(s.inst), size = clampSize(o.size);
+  const label = await names(s.inst), size = clampSize(o.size), k = sortKey(o.sort ?? "value"), keyset = keysetOf(k, o.after), raws: Array<Record<string, unknown>> = [];
   const b = base(s, win, dd, db`and a.status = 'noshow'`);
+  // A no-show someone snoozed is off the list until the snooze ends: the same rule as the number on the overview, so the count and the rows agree.
+  const open = db`not rebooked and (snoozed_until is null or snoozed_until < now())`;
   const [p, [rec]] = await Promise.all([
     page(
-      db`with ap as (${b}) select * from ap where not rebooked order by ${sortOf(o.sort ?? "value")} limit ${size} offset ${offsetOf(o.page, size)}`,
-      db`with ap as (${b}) select count(*)::int n from ap where not rebooked`,
-      Math.max(0, Math.floor(o.page)), size, (r) => ({ ...toRow(r, label, link, `No-show ${Math.max(0, Math.floor((Date.now() - (r.start_at as Date).getTime()) / DAY))} days ago, not rebooked`), rebooked: false, snoozedUntil: iso(r.snoozed_until), daysSince: Math.floor((Date.now() - (r.start_at as Date).getTime()) / DAY) }),
+      db`with ap as (${b}) select * from ap where ${open} ${keyset ?? db``} order by ${orderOf(k)} limit ${size} offset ${keyset ? 0 : offsetOf(o.page, size)}`,
+      db`with ap as (${b}) select count(*)::int n from ap where ${open}`,
+      Math.max(0, Math.floor(o.page)), size, (r) => (raws.push(r), { ...toRow(r, label, link, `No-show ${Math.max(0, Math.floor((Date.now() - (r.start_at as Date).getTime()) / DAY))} days ago, not rebooked`), rebooked: false, snoozedUntil: iso(r.snoozed_until), daysSince: Math.floor((Date.now() - (r.start_at as Date).getTime()) / DAY) }),
     ),
     db`with ap as (${base(s, { ...win, from: new Date(Date.now() - 30 * DAY), to: new Date(Date.now() - DAY) }, dd, db`and a.status = 'noshow'`)})
       select count(*) filter (where rebooked)::int rebooked, count(*)::int total,
@@ -237,7 +258,7 @@ export async function noshowRecovery(s: Scope, o: Omit<ListOpts, "extra">, link:
         count(*) filter (where exists (select 1 from cached_appointments b where b.installation_id = ${s.inst} and b.location_id = ap.location_id and b.contact_id = ap.contact_id
           and b.created_remote_at >= ap.start_at and b.created_remote_at <= ap.start_at + interval '24 hours' and b.start_at > ap.start_at and b.status not in ('cancelled', 'invalid')))::int fast from ap`,
   ]);
-  return { ...p, recovered: { count: num(rec.rebooked), value: num(rec.value), rebookedWithin24hRate: rate(num(rec.fast), num(rec.total)) } };
+  return { ...p, next: raws.length === size ? cursorOf(k, raws[raws.length - 1]) : null, recovered: { count: num(rec.rebooked), value: num(rec.value), rebookedWithin24hRate: rate(num(rec.fast), num(rec.total)) } };
 }
 
 // ---------- booking share, flow tree ----------
@@ -342,7 +363,7 @@ export async function sources(s: Scope, f: Filters): Promise<Appt3Sources> {
   const db = sql(), dd = await dealDays(s.inst);
   const b = base(s, { ...f, bucket: undefined }, dd);
   const d = () => db`count(*) filter (where status <> 'invalid')::int booked, count(*) filter (where status = 'showed')::int showed, count(*) filter (where status in ('showed', 'noshow') or unmarked)::int decided,
-    count(*) filter (where deal_status = 'won')::int won, count(*) filter (where deal_status in ('won', 'lost'))::int closed`;
+    count(*) filter (where deal_status = 'won' and status <> 'invalid')::int won, count(*) filter (where deal_status in ('won', 'lost') and status <> 'invalid')::int closed`;
   const [src, speed, lead, wd] = await Promise.all([
     db`with ap as (${b}) select coalesce(source, '') k, ${d()} from ap group by 1 order by 2 desc limit 25`,
     db`with ap as (${b}) select case when lead_at is null or touch_at is null or touch_at < lead_at then 'none' when touch_at - lead_at < interval '5 minutes' then 'under_5m' when touch_at - lead_at < interval '30 minutes' then '5_to_30m'
