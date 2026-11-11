@@ -153,5 +153,5 @@ export function routeAllowed(kind: AccessKind, method: string, segments: string[
 export const NAV_FOR: Record<AccessKind, ReadonlySet<string>> = {
   agency: new Set(["today", "workflows", "data-health", "people", "audit", "speed", "overview", "accounts", "clients", "team", "appointments", "meetings", "cleanup", "search", "deals", "pipeline", "leads", "calls", "inbox", "onboarding", "email", "duplicates", "alerts", "settings", "notifications", "connections", "help", "roadmap"]),
   business: new Set(["today", "workflows", "data-health", "myday", "people", "audit", "speed", "overview", "team", "appointments", "meetings", "cleanup", "search", "deals", "pipeline", "leads", "calls", "inbox", "onboarding", "email", "duplicates", "alerts", "settings", "notifications", "connections", "help", "roadmap"]),
-  client: new Set(["today", "workflows", "data-health", "myday", "people", "audit", "speed", "overview", "appointments", "search", "deals", "pipeline", "leads", "inbox", "duplicates", "onboarding", "alerts", "connections", "help", "roadmap"]),
+  client: new Set(["today", "workflows", "data-health", "myday", "people", "audit", "speed", "overview", "team", "appointments", "search", "deals", "pipeline", "leads", "inbox", "duplicates", "onboarding", "alerts", "connections", "help", "roadmap"]),
 };

@@ -28,7 +28,7 @@ export const NAV: NavItem[] = [
   { id: "inbox", label: "Unanswered messages", feature: "inbox", group: "Reply", parent: "speed", showWhenParentOff: true },
   { id: "appointments", label: "Appointments", feature: "appointments", group: "" },
   { id: "clients", label: "Clients", feature: "clients", group: "Clients and people" },
-  { id: "people", label: "People", feature: "search", group: "Clients and people" },
+  { id: "people", label: "Find a lead", feature: "search", group: "Clients and people" },
   { id: "search", label: "Contact search", feature: "search", group: "Clients and people", parent: "people" },
   { id: "leads", label: "Leads", feature: "activity", group: "Clients and people", parent: "people" },
   { id: "calls", label: "Call lists", feature: "calls", group: "Clients and people", parent: "people" },

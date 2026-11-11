@@ -136,6 +136,20 @@ export const FEATURES = [
   "cl_retention",
   "cl_workflows",
   "cl_onboarding",
+  // Team (People) module (docs/features/PEOPLE_BRIEF.md): each behind its own flag, default off.
+  "pp_module",
+  "pp_today",
+  "pp_scorecards",
+  "pp_workload",
+  "pp_leaderboard",
+  "pp_money",
+  "pp_coaching",
+  "pp_access",
+  "pp_proof",
+  "pp_nextlead",
+  "pp_idle",
+  "pp_rollup",
+  "pp_actions",
 ] as const;
 export type Feature = (typeof FEATURES)[number];
 
