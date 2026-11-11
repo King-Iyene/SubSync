@@ -36,6 +36,8 @@ export const DEFAULT_OFF: ReadonlySet<Feature> = new Set<Feature>([
   "inbox_proof_email",
   // Unanswered round 3, slice B (actions): each behind its own flag, default off.
   "inbox_open_lead",
+  // Speed to lead: the river view of the lead journey (the dots view shows when off).
+  "lead_journey_pro",
   "inbox_claim",
   "inbox_note",
   "inbox_outcome_ui",

@@ -12,6 +12,7 @@ import { zoneLabel } from "../analytics/speed6";
 import { buildMessage, destination, sanitizeDigest } from "../analytics/speed-digest";
 import { deliver, digestNumbers, loadDigest, saveDigest } from "../analytics/speed-digest-db";
 import { isLive } from "../live-flags";
+import { featureOn } from "../flags";
 import { isPrefKey, loadPrefs, savePref } from "../analytics/speed-prefs-db";
 import { sql } from "../db";
 import { json, type AuthContext } from "./auth";
@@ -162,7 +163,7 @@ export async function handleSpeedPart(ctx: Ctx, h: SpeedHelpers): Promise<Respon
     const input = { installationId: ctx.installationId, allowed: allowed as string[] | null, targetMinutes, now, seePeople, filter: parseFilter(sp), ...(part === "race" ? {} : win) };
     if (part === "race") return json(withUrls(await speedRace(input), links.contact));
     if (part === "coverage") return json(withUrls(await speedCoverage(input), links.contact));
-    if (part === "journey") return json(await speedJourney(input));
+    if (part === "journey") return json({ ...(await speedJourney(input)), pro: await featureOn("lead_journey_pro") });
     if (part === "proof") return json(await speedProof(input));
     if (part === "story") { const l = sp.get("loc"), c = sp.get("contact"); return l && c && ID.test(l) && ID.test(c) ? json(await speedStory({ ...input, locationId: l, contactId: c })) : json({ error: "Unknown lead" }, 400); }
     const step = sp.get("step");

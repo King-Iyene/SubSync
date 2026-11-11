@@ -1,0 +1,33 @@
+/* Lead journey, river view. Text lives in .ljp-text (a normal HTML layer above the canvas); the canvas holds only the river and its sparks. */
+.ljp { min-width: 0; }
+.ljp-bar { display: flex; align-items: center; justify-content: flex-end; gap: 12px; margin-bottom: 6px; }
+.ljp-scrub { display: flex; align-items: center; gap: 8px; font-size: 0.75rem; color: var(--muted-foreground); }
+.ljp-scrub input { width: 120px; accent-color: var(--s6-cyan); }
+.ljp-scrub span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.ljp-stage { position: relative; width: 100%; border-radius: 14px; overflow: hidden; contain: layout paint; transform: perspective(1100px) rotateX(var(--ljp-rx, 0deg)) rotateY(var(--ljp-ry, 0deg)); transition: transform 220ms ease-out; background: var(--s6-sunk); }
+.ljp-mesh { position: absolute; inset: -20%; opacity: 0.55; background:
+  radial-gradient(40% 50% at 20% 30%, color-mix(in srgb, var(--s6-cyan) 22%, transparent), transparent 70%),
+  radial-gradient(40% 50% at 70% 60%, color-mix(in srgb, var(--s6-violet) 20%, transparent), transparent 70%),
+  radial-gradient(35% 45% at 90% 20%, color-mix(in srgb, var(--s6-amber) 16%, transparent), transparent 70%);
+  animation: ljp-mesh 22s ease-in-out infinite alternate; pointer-events: none; }
+@keyframes ljp-mesh { from { transform: translate3d(-3%, -2%, 0) scale(1); } to { transform: translate3d(3%, 2%, 0) scale(1.08); } }
+.ljp-canvas { position: absolute; left: 0; top: 0; pointer-events: none; transition: transform 220ms ease-out; }
+.ljp-leaders { position: absolute; inset: 0; pointer-events: none; }
+.ljp-leaders line { stroke: color-mix(in srgb, var(--s6-cyan) 40%, transparent); stroke-width: 1; stroke-dasharray: 3 3; transition: stroke 150ms; }
+.ljp-leaders line[data-on="1"] { stroke: var(--s6-cyan); stroke-dasharray: none; }
+.ljp-leaders circle { fill: color-mix(in srgb, var(--s6-cyan) 70%, transparent); }
+.ljp-text { position: absolute; inset: 0; pointer-events: none; }
+.ljp-card, .ljp-drop { position: absolute; pointer-events: auto; }
+.ljp-card button, .ljp-drop button { display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; height: 100%; padding: 4px 8px; text-align: center; cursor: pointer; color: var(--foreground); background: var(--s6-pop); border: 1px solid color-mix(in srgb, var(--s6-cyan) 35%, var(--s6-line)); border-radius: 10px; box-shadow: var(--s6-shadow); transition: border-color 150ms, box-shadow 150ms; }
+.ljp-card button:hover, .ljp-card button:focus-visible, .ljp-drop button:hover, .ljp-drop button:focus-visible { border-color: var(--s6-cyan); box-shadow: var(--s6-glow) color-mix(in srgb, var(--s6-cyan) 60%, transparent); }
+.ljp-card button:focus-visible, .ljp-drop button:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
+.ljp-card button[data-win="1"] { border-color: color-mix(in srgb, var(--s6-amber) 70%, var(--s6-line)); }
+.ljp-count { font-weight: 650; line-height: 1.1; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ljp-q { margin-top: 2px; font-size: 0.72rem; line-height: 1.2; color: var(--muted-foreground); }
+.ljp-drop button { background: color-mix(in srgb, var(--s6-red) 7%, var(--s6-pop)); border-color: color-mix(in srgb, var(--s6-red) 38%, var(--s6-line)); color: color-mix(in srgb, var(--s6-red) var(--s6-mixpct), var(--s6-mixfg)); }
+.ljp-drop button b { line-height: 1.1; white-space: nowrap; }
+.ljp-drop button span { font-size: 0.7rem; line-height: 1.2; }
+.ljp-tip { position: absolute; z-index: 3; width: 176px; padding: 8px 10px; border-radius: 10px; background: var(--s6-pop); border: 1px solid var(--s6-line); box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5); font-size: 0.75rem; line-height: 1.35; pointer-events: none; display: flex; flex-direction: column; gap: 2px; }
+.ljp-tip strong { font-size: 0.78rem; }
+.ljp[data-reduced="1"] .ljp-mesh { animation: none; }
+@media (prefers-reduced-motion: reduce) { .ljp-mesh { animation: none; } .ljp-stage, .ljp-canvas { transition: none; transform: none; } }

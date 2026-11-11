@@ -69,6 +69,7 @@ export const FEATURES = [
   "inbox_proof_email",
   // Unanswered round 3, slice B (actions): each behind its own flag, default off.
   "inbox_open_lead",
+  "lead_journey_pro",
   "inbox_claim",
   "inbox_note",
   "inbox_outcome_ui",
