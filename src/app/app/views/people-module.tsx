@@ -30,7 +30,7 @@ export function PeopleModule({ start = 0 }: { start?: number; callsAllowed?: boo
     window.scrollTo({ top: 0 });
   };
   return (
-    <PageShell title="People" subtitle={!opts.data ? undefined : showAccount ? "Find anyone across your client accounts, and call the people who need it most." : "Find anyone in your account, and call the people who need it most."}>
+    <PageShell title="Find a lead" subtitle={!opts.data ? undefined : showAccount ? "Find anyone across your client accounts, and call the people who need it most." : "Find anyone in your account, and call the people who need it most."}>
       <ModuleTabs value={tab} onChange={setTab} label="People" tabs={[
         { label: TABS[0], node: <FindTab key={findKey} /> },
         { label: TABS[1], node: <TagsTab showAccount={showAccount} onSeeAll={seeAll} /> },
