@@ -21,6 +21,8 @@ export type SlotProps = {
   OpenLeadPanel: { rows: UiRow[]; index: number | null; onIndex: (n: number | null) => void; onClose: () => void };
   /** The floating bar that appears when people are selected: the actions for several people at once. */
   BulkActions: { rows: UiRow[]; flags: Flags; clear: () => void; onChanged: () => void };
+  /** Under the list: "N set aside, N hidden, show". */
+  ListFooter: { flags: Flags; account: string | null; onChanged: () => void };
   ReceiptCard: CardProps; CurveCard: CardProps; ScorecardCard: CardProps; BenchmarkCard: CardProps; VerifiedPageCard: CardProps;
 };
 export type CardProps = { flags: Flags; multi: boolean; showPeople: boolean; open: (title: string, params: Record<string, string>) => void; go: (view: string) => void };
@@ -28,9 +30,11 @@ export type SlotName = keyof SlotProps;
 export const CARD_SLOTS: readonly SlotName[] = ["ReceiptCard", "CurveCard", "ScorecardCard", "BenchmarkCard", "VerifiedPageCard"];
 
 const registry = new Map<SlotName, ComponentType<never>>();
+const conditions = new Map<SlotName, (flags: Flags) => boolean>();
 const listeners = new Set<() => void>();
-export function registerUnansweredSlot<N extends SlotName>(name: N, component: ComponentType<SlotProps[N]>): void { registry.set(name, component as ComponentType<never>); listeners.forEach((l) => l()); }
-export const hasUnansweredSlot = (name: SlotName) => registry.has(name);
+/** `when` says from the flags whether the piece shows at all, so a switched-off card leaves no gap in the fold. */
+export function registerUnansweredSlot<N extends SlotName>(name: N, component: ComponentType<SlotProps[N]>, when?: (flags: Flags) => boolean): void { registry.set(name, component as ComponentType<never>); if (when) conditions.set(name, when); listeners.forEach((l) => l()); }
+export const hasUnansweredSlot = (name: SlotName, flags?: Flags) => registry.has(name) && (!flags || !conditions.has(name) || conditions.get(name)!(flags));
 
 /** Re-renders the caller when a slot is registered later (a lazily loaded piece). */
 export function useSlotsVersion(): number {
@@ -49,11 +53,11 @@ export function Slot<N extends SlotName>({ name, ...props }: { name: N } & SlotP
 
 // ---- actions the keyboard (and the bulk bar) can call: "claim" and "snooze" are written by the actions slice and registered here ----
 export type ActionName = "claim" | "snooze";
-type ActionFn = (row: UiRow) => void | Promise<void>;
+type ActionFn = (row: UiRow) => void | boolean | Promise<void>;
 const actions = new Map<ActionName, ActionFn>();
 export function registerUnansweredAction(name: ActionName, fn: ActionFn): void { actions.set(name, fn); }
 /** Runs the action; false when no slice has registered it (the screen then says it is not available yet). */
-export function runUnansweredAction(name: ActionName, row: UiRow): boolean { const fn = actions.get(name); if (!fn) return false; void fn(row); return true; }
+export function runUnansweredAction(name: ActionName, row: UiRow): boolean { const fn = actions.get(name); if (!fn) return false; const r = fn(row); if (r === false) return false; void r; return true; }
 export const hasUnansweredAction = (name: ActionName) => actions.has(name);
 
 // ---- what the screen tells every piece ----

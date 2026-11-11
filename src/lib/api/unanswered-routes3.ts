@@ -15,7 +15,7 @@ const VIEW_PAGE = "unanswered3";
 export const MAX_VIEWS = 20;
 const ID = /^[A-Za-z0-9_-]{3,64}$/;
 
-const on = (ctx: Ctx, f: "inbox_control_room" | "inbox_filters" | "inbox_views" | "inbox_search" | "inbox_quiet") => ctx.entitlements.features[f] === true && !ctx.entitlements.locked.includes(f);
+const on = (ctx: Ctx, f: "inbox_control_room" | "inbox_filters" | "inbox_views" | "inbox_search" | "inbox_quiet" | "inbox_snooze" | "inbox_hide_noise") => ctx.entitlements.features[f] === true && !ctx.entitlements.locked.includes(f);
 const off = () => json({ error: "This is switched off", off: true }, 404);
 
 /** The white-label links on every person row, built on the server from the verified company (never from the request). */
@@ -47,7 +47,7 @@ export async function handleUnansweredPart3(ctx: Ctx, h: UnansweredHelpers & { o
   }
 
   const [allowedAll, targets, links] = await Promise.all([h.allowed(), h.targets(), h.links()]);
-  const base: Omit<ListScope, "allowed"> = { installationId: ctx.installationId, slaHours: targets.slaHours, targetMinutes: targets.targetMinutes, now: Date.now(), meId: ctx.session.userId ?? null, seePeople };
+  const base: Omit<ListScope, "allowed"> = { installationId: ctx.installationId, slaHours: targets.slaHours, targetMinutes: targets.targetMinutes, now: Date.now(), meId: ctx.session.userId ?? null, seePeople, hook: { snooze: on(ctx, "inbox_snooze"), hide: on(ctx, "inbox_hide_noise") } };
 
   if (part === "find") {
     if (!on(ctx, "inbox_search")) return off();

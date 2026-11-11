@@ -310,7 +310,7 @@ export function weeklyProofText(account: string, r: Receipt): string {
   const risk = r.atRisk.ok && r.lateLeads ? ` ${r.lateLeads} lead${r.lateLeads === 1 ? "" : "s"} waited past the target; estimated ${rangeText(r.atRisk)} at risk.` : "";
   return base + risk;
 }
-export function morningProofLine(r: Receipt): string | null {
+export function morningProofLine(r: Pick<Receipt, "alerts" | "saved" | "medianReplyMinutes">): string | null {
   if (!r.alerts) return null;
   return `Last week: ${r.saved} of ${r.alerts} alerted lead${r.alerts === 1 ? "" : "s"} got a reply${r.medianReplyMinutes !== null ? `, typically within ${durationText(r.medianReplyMinutes)}` : ""}.`;
 }

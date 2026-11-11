@@ -1,7 +1,7 @@
 "use client";
 
 import { Check, ChevronDown, EyeOff, Undo2 } from "lucide-react";
-import { useCallback, useMemo, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
 import { SNOOZE_DURATIONS, SNOOZE_DURATION_WORDS, SNOOZE_REASONS, SNOOZE_REASON_WORDS, type SnoozeDuration, type SnoozeReason } from "@/lib/analytics/unanswered-actions";
 import type { UnansweredOutcome } from "@/lib/analytics/unanswered-advanced";
 import { ApiError, useApiClient, useData } from "../session";
@@ -19,8 +19,8 @@ import type { WaitRow } from "./unanswered-rows";
 // (changes from SubSync are switched off) or live. Every change to the CRM shows a preview and waits for a click; clearing conversations also needs the typed count.
 // No message text is read or kept; a note you write is held in this browser only until you confirm it.
 
-type Caps = { openLead: boolean; claim: boolean; assign: boolean; note: boolean; outcome: boolean; clearJunk: boolean; snooze: boolean; hide: boolean; canChangeHiding: boolean; me: string | null; caps: { assign: number; clear: number } };
-type Kind = "snooze" | "assign" | "claim" | "note" | "outcome" | "clear";
+export type Caps = { openLead: boolean; claim: boolean; assign: boolean; note: boolean; outcome: boolean; clearJunk: boolean; snooze: boolean; hide: boolean; canChangeHiding: boolean; me: string | null; caps: { assign: number; clear: number } };
+export type Kind = "snooze" | "assign" | "claim" | "note" | "outcome" | "clear";
 type Mode = { masterOn: boolean; optedIn: boolean; live: boolean; demo: boolean };
 type Blocker = { id: string; text: string };
 
@@ -35,9 +35,21 @@ const msgOf = (e: unknown) => (e instanceof ApiError && typeof e.body.message ==
 const blockersOf = (e: unknown): Blocker[] | null => (e instanceof ApiError && Array.isArray(e.body.blockers) ? (e.body.blockers as Blocker[]) : null);
 
 /** What this person may do on a waiting list. Loaded once; a failed load simply shows no extra buttons. */
+let capsResolved: Caps | null = null;
+/** The answer already loaded by any row (null before it arrives): lets a key press say honestly whether claiming or setting aside is available. */
+export const peekActionCaps = () => capsResolved;
+let capsShared: { api: unknown; at: number; p: Promise<Caps> } | null = null;
 export function useActionCaps(): Caps {
-  const { data } = useData<Caps>("inbox/act/caps");
-  return data ?? NO_CAPS;
+  // One request shared by every row on the screen (each row asks, the answer is kept for a minute).
+  const api = useApiClient();
+  const [caps, setCaps] = useState<Caps>(NO_CAPS);
+  useEffect(() => {
+    if (!capsShared || capsShared.api !== api || Date.now() - capsShared.at > 60_000) capsShared = { api, at: Date.now(), p: api.get<Caps>("inbox/act/caps").catch(() => NO_CAPS) };
+    let live = true;
+    void capsShared.p.then((c) => { capsResolved = c; if (live) setCaps(c); });
+    return () => { live = false; };
+  }, [api]);
+  return caps;
 }
 
 // ---------------- small shared pieces ----------------
@@ -89,7 +101,7 @@ function DoneLine({ done }: { done: Done | null }) {
 
 type PanelProps = { kind: Kind; targets: readonly WaitRow[]; caps: Caps; onClose: () => void; onChanged: () => void };
 
-function ActionPanel({ kind, targets, caps, onClose, onChanged }: PanelProps) {
+export function ActionPanel({ kind, targets, caps, onClose, onChanged }: PanelProps) {
   const first = targets[0];
   const name = targets.length === 1 ? first.name : `${targets.length} people`;
   const conversationIds = useMemo(() => targets.map((t) => t.conversationId), [targets]);
@@ -344,7 +356,7 @@ function PickBox({ row, on, toggle }: { row: WaitRow; on: boolean; toggle: (key:
   );
 }
 
-function BatchPanel({ rows: chosen, caps, batch, setBatch, clearPicked, changed }: { rows: readonly WaitRow[]; caps: Caps; batch: Kind | null; setBatch: (k: Kind | null) => void; clearPicked: () => void; changed: () => void }) {
+export function BatchPanel({ rows: chosen, caps, batch, setBatch, clearPicked, changed }: { rows: readonly WaitRow[]; caps: Caps; batch: Kind | null; setBatch: (k: Kind | null) => void; clearPicked: () => void; changed: () => void }) {
   if (chosen.length === 0) return null;
   const oneAccount = chosen.every((r) => r.locationId === chosen[0].locationId);
   const withContact = chosen.every((r) => r.contactId);
@@ -405,7 +417,7 @@ export function useWaitingActions({ rows, onChanged, openLead }: WaitingActionsO
   const select = (row: WaitRow): ReactNode => (caps.assign || caps.snooze || caps.outcome || caps.clearJunk ? <PickBox row={row} on={picked.has(row.key)} toggle={toggle} /> : null);
   const batchBar = (): ReactNode => <BatchPanel rows={rows.filter((r) => picked.has(r.key))} caps={caps} batch={batch} setBatch={setBatch} clearPicked={() => setPicked(new Set())} changed={changed} />;
 
-  return { caps, rowProps, menuItems, strip, select, batchBar, picked };
+  return { caps, rowProps, menuItems, strip, select, batchBar, picked, open: (r: WaitRow, kind: Kind) => setPanel({ key: r.key, kind }) };
 }
 
 // ---------------- "N set aside, N hidden, show" ----------------

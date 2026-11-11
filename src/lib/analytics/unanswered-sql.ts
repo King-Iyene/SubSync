@@ -4,7 +4,7 @@ import { loadLookups } from "./speed-queries";
 import { properCase, resolveUser } from "./people-labels";
 import { channelLabel, WAITING_WINDOW_DAYS } from "./waiting";
 import { channelKeys, searchTerms, type ListParams } from "./unanswered-params";
-import { snoozeHook, type SnoozeHook } from "./unanswered-snooze-hook";
+import { snoozeHook, type SnoozeFlags, type SnoozeHook } from "./unanswered-snooze-hook";
 
 // The lists of the Unanswered screen, all on the database: the people are grouped, filtered, sorted and counted by SQL and only one page (20, 50 or 100) is ever read, so a million
 // conversations cost the same as ten. The count of a list is the database's count of exactly those people (count(*) over ()), and every chip's number is the same query with that one
@@ -15,7 +15,7 @@ import { snoozeHook, type SnoozeHook } from "./unanswered-snooze-hook";
 type Frag = PendingQuery<Row[]>;
 const DAY = 86_400_000;
 
-export type ListScope = { installationId: string; allowed: string[] | null; slaHours: number; targetMinutes: number; now: number; meId: string | null; seePeople: boolean };
+export type ListScope = { installationId: string; allowed: string[] | null; slaHours: number; targetMinutes: number; now: number; meId: string | null; seePeople: boolean; hook?: SnoozeFlags };
 
 export type SqlRow = {
   key: string; locationId: string; locationName: string; contactId: string | null; conversationId: string; name: string; channel: string; call: boolean;
@@ -105,7 +105,7 @@ export type SqlList = {
 export async function sqlList(s: ListScope, p: ListParams): Promise<SqlList> {
   const db = sql();
   if (s.allowed && s.allowed.length === 0) return emptyList();
-  const [{ lk }, hook] = await Promise.all([loadLookups(db, s.installationId, s.allowed, s.targetMinutes, s.now), snoozeHook(db, s.installationId)]);
+  const [{ lk }, hook] = await Promise.all([loadLookups(db, s.installationId, s.allowed, s.targetMinutes, s.now), snoozeHook(db, s.installationId, s.hook)]);
   const cte = peopleCte(db, s, p);
   const where = filters(db, s, p, hook);
   const order = p.sort === "newest" ? db`p.last_message_at desc, p.pkey`

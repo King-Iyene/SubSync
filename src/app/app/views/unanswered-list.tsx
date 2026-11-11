@@ -94,9 +94,7 @@ export function UnansweredList({ choices, set, page, setPage, reset, multi, acco
         e.preventDefault();
         const name = k === "c" ? "claim" : "snooze";
         if (!runUnansweredAction(name, row)) { said(`${k === "c" ? "Claiming" : "Snoozing"} is not available yet.`); return; }
-        said(`${k === "c" ? "Claimed" : "Snoozed"}: ${row.name}`);
-        if (cursor !== null && cursor < last) moveTo(cursor + 1); // on to the next person
-        setTimeout(reload, 600);
+        said(`${k === "c" ? "Claim" : "Set aside"}: check the details for ${row.name} and confirm.`); // the action opens its own preview first; nothing changes until it is confirmed
       }
     };
     window.addEventListener("keydown", onKey);
@@ -209,11 +207,12 @@ export function UnansweredList({ choices, set, page, setPage, reset, multi, acco
           </div>
         )}
 
+      <Slot name="ListFooter" flags={flags} account={choices.account} onChanged={reload} />
       {selected && picked.length > 0 && (
         <div className="ur-bulk" role="region" aria-label="Selected people" data-testid="bulk-bar">
           <span className="tnum"><strong>{n(picked.length)}</strong> selected</span>
           <Slot name="BulkActions" rows={picked} flags={flags} clear={() => setSelected(new Set())} onChanged={reload} />
-          {!hasUnansweredAction("claim") && <span className="s6-label hidden sm:inline">More actions appear here when they are switched on.</span>}
+          {!hasUnansweredAction("claim") && !hasUnansweredAction("snooze") && <span className="s6-label hidden sm:inline">More actions appear here when they are switched on.</span>}
           <button type="button" className="s6-btn" onClick={() => { void navigator.clipboard?.writeText(picked.map((r) => `${r.name}${multi ? `, ${r.locationName}` : ""}${r.phone ? `, ${r.phone}` : ""}`).join("\n")).then(() => said("Names copied")); }}>Copy names</button>
           <button type="button" className="s6-btn" onClick={() => setSelected(new Set())} aria-label="Clear the selection"><Trash2 aria-hidden className="size-4" />Clear</button>
         </div>

@@ -67,7 +67,7 @@ export function MoatPanel({ features, account }: { features: Features; account?:
 
 // ---------------------------------------------------------------- D2
 
-function ReceiptCard({ q }: { q: string }) {
+export function ReceiptCard({ q }: { q: string }) {
   const month = lastMonth();
   const { data, error, loading, reload } = useData<ReceiptOut>(`moat?part=receipt&month=${month}${q}`);
   const [open, setOpen] = useState<{ kind: string; title: string } | null>(null);
@@ -127,7 +127,7 @@ function PeopleList({ title, path, onClose }: { title: string; path: string; onC
 
 // ---------------------------------------------------------------- D3
 
-function CurveCard({ q }: { q: string }) {
+export function CurveCard({ q }: { q: string }) {
   const { data, error, loading, reload } = useData<Curve>(`moat?part=curve&days=90${q}`);
   return (
     <section className={card} data-testid="curve-card">
@@ -140,7 +140,7 @@ function CurveCard({ q }: { q: string }) {
 // ---------------------------------------------------------------- D4
 
 type ScoreCard = { userId: string; name: string; replies: number; medianMinutes: number | null; p90Minutes: number | null; unansweredShare: number | null; owned: number; afterHoursCoverage: number | null; trend: { dir: string; changePct: number | null }; enough: boolean };
-function ScorecardsCard({ q }: { q: string }) {
+export function ScorecardsCard({ q }: { q: string }) {
   const [page, setPage] = useState(0);
   const { data, error, loading, reload } = useData<{ rows: ScoreCard[]; total: number; pages: number; page: number; scope: string }>(`moat?part=scorecards&days=30&page=${page}${q}`);
   const trend = (t: ScoreCard["trend"]) => (t.dir === "new" ? "not enough replies to compare" : t.dir === "same" ? "about the same as last week" : `${Math.abs(t.changePct ?? 0)}% ${t.dir} than last week`);
@@ -166,7 +166,7 @@ function ScorecardsCard({ q }: { q: string }) {
 
 // ---------------------------------------------------------------- E4
 
-function ChannelsCard({ q }: { q: string }) {
+export function ChannelsCard({ q }: { q: string }) {
   const { data, error, loading, reload } = useData<ChannelMix>(`moat?part=channels&days=30${q}`);
   const label: Record<string, string> = { sms: "Text", email: "Email", whatsapp: "WhatsApp", chat: "Chat", social: "Social", call: "Call", other: "Other" };
   return (
@@ -187,7 +187,7 @@ function ChannelsCard({ q }: { q: string }) {
 // ---------------------------------------------------------------- E1
 
 type ClockRow = { locationId: string; conversationId: string; person: string; account: string; realMinutes: number; workingMinutes: number | null; url: string };
-function ClockCard({ q }: { q: string }) {
+export function ClockCard({ q }: { q: string }) {
   const [page, setPage] = useState(0);
   const { data, error, loading, reload } = useData<{ rows: ClockRow[]; total: number; pages: number; page: number; used: string }>(`moat?part=clock&page=${page}${q}`);
   return (
@@ -210,7 +210,7 @@ function ClockCard({ q }: { q: string }) {
 // ---------------------------------------------------------------- D5
 
 type Bench = { available: false; message: string; reason: string } | { available: true; vertical: string; accounts: number; medianMinutes: number; p25Minutes: number; p75Minutes: number; yours: { medianMinutes: number | null } };
-function BenchmarkCard() {
+export function BenchmarkCard() {
   const setup = useData<{ verticals: Array<{ key: string; label: string }>; benchmarkOptIn: boolean }>("moat?part=setup");
   const [v, setV] = useState("med_spa");
   const { data, error, loading, reload } = useData<Bench>(setup.data?.benchmarkOptIn ? `moat?part=benchmark&vertical=${v}` : null);
@@ -231,7 +231,7 @@ function BenchmarkCard() {
 
 // ---------------------------------------------------------------- D6
 
-function ProofCard() {
+export function ProofCard() {
   const api = useApiClient();
   const setup = useData<{ accounts: Array<{ locationId: string; name: string }> }>("moat?part=setup");
   const list = useData<{ links: Array<{ id: string; account: string; createdAt: string; expiresAt: string; revoked: boolean; views: number }> }>("moat?part=proofs");

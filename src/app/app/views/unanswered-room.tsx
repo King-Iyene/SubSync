@@ -17,6 +17,7 @@ import { CARD_SLOTS, RoomProvider, Slot, hasUnansweredSlot, useSlotsVersion, typ
 import { DEFAULT_CHOICES, isNarrowed, useChoices, type Choices } from "./unanswered-state";
 import "./speed6.css";
 import "./unanswered-ui.css";
+import "./unanswered-slots-mount";
 
 // Unanswered messages, control-room style (the Speed to lead standard): one question ("who do I answer first?"), the numbers that open exactly their people, a fold of three
 // cards with the rest behind More, and a list that is searched, filtered and paged on the database. Behind the flag inbox_control_room; the older screen is untouched. Other slices
@@ -140,7 +141,7 @@ export function UnansweredRoom({ go, ui }: { go: GoFn; ui: UiPayload }) {
       {w.cost.line && <details className="mt-1"><summary className="ur-link" data-testid="cost-formula-toggle">How this is worked out</summary><p className="s6-sub mt-1" data-testid="cost-formula">{w.cost.formula}</p></details>}
     </Q>
   );
-  const slotCards = CARD_SLOTS.filter((s) => hasUnansweredSlot(s)).map((s) => (
+  const slotCards = CARD_SLOTS.filter((s) => hasUnansweredSlot(s, ui.flags)).map((s) => (
     <div key={s} className="ur-slot" data-slot={s}><Slot name={s} flags={ui.flags} multi={multi} showPeople={seePeople} open={open} go={(v) => go(v as Parameters<GoFn>[0])} /></div>
   ));
   const cards = [listCard, waitedCard, whereCard, replayCard, moneyCard, ...slotCards].filter(Boolean) as React.ReactNode[];

@@ -39,3 +39,10 @@ test("where it goes is said plainly, and sending is off until the switch is on; 
   assert.equal(mayReallySend("email", { email: false, slack: true }), false); assert.equal(mayReallySend("slack", { email: true, slack: false }), false);
   assert.equal(mayReallySend("email", { email: true, slack: false }), true);
 });
+
+test("the morning message adds the one proof sentence only when it is given", async () => {
+  const { buildMessage, DEFAULT_DIGEST } = await import("../analytics/speed-digest.ts");
+  const n = { who: "Acme", waiting: 1, typicalSeconds: null, inTimePct: null, leaked: 0, noOwner: 0 };
+  assert.ok(!buildMessage(DEFAULT_DIGEST, n).text.includes("Last week"));
+  assert.ok(buildMessage(DEFAULT_DIGEST, { ...n, proofLine: "Last week: 3 of 4 alerted leads got a reply." }).text.includes("Last week: 3 of 4"));
+});
