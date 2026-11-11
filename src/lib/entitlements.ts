@@ -101,6 +101,8 @@ export const FEATURES = [
   "appt_delete",
   "appt_bulk",
   "appt_meetings",
+  // Appointments module (stage AU, the sub-section screens and the Flow Tree): default off.
+  "appt_module",
 ] as const;
 export type Feature = (typeof FEATURES)[number];
 

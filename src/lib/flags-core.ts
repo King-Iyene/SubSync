@@ -69,6 +69,7 @@ export const DEFAULT_OFF: ReadonlySet<Feature> = new Set<Feature>([
   "appt_delete",
   "appt_bulk",
   "appt_meetings",
+  "appt_module",
 ]);
 
 export function resolveFeatures(all: readonly Feature[], overrides: Record<string, boolean>, allOn = false): Record<Feature, boolean> {
