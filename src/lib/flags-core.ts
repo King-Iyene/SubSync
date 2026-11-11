@@ -23,6 +23,31 @@ export const DEFAULT_OFF: ReadonlySet<Feature> = new Set<Feature>([
   "inbox_channel_mix",
   "inbox_digest",
   "inbox_assign",
+  // Unanswered round 3, slice D and E.
+  "moat_record",
+  "moat_receipt",
+  "moat_curve",
+  "moat_scorecards",
+  "moat_benchmark",
+  "moat_proof_page",
+  "moat_alert_feedback",
+  "inbox_wait_clock",
+  "inbox_reply_target",
+  "inbox_proof_email",
+  // Unanswered round 3, slice B (actions): each behind its own flag, default off.
+  "inbox_open_lead",
+  "inbox_claim",
+  "inbox_note",
+  "inbox_outcome_ui",
+  "inbox_clear_junk",
+  // Unanswered round 3, slices A and C (redesign, filters, search): each default off.
+  "inbox_control_room",
+  "inbox_filters",
+  "inbox_views",
+  "inbox_search",
+  "inbox_quiet",
+  "inbox_keys",
+  "inbox_bulk",
 ]);
 
 export function resolveFeatures(all: readonly Feature[], overrides: Record<string, boolean>, allOn = false): Record<Feature, boolean> {

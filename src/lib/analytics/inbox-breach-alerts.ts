@@ -207,7 +207,7 @@ async function escalateUnacknowledged(installationId: string, now: number, grace
   return created.length;
 }
 
-type PrivateAlertInput = {
+export type PrivateAlertInput = {
   accountName?: string;
   locationId: string;
   recipientUserKey: string;
@@ -217,7 +217,7 @@ type PrivateAlertInput = {
   detail: Record<string, unknown>;
 };
 
-async function createPrivateAlert(installationId: string, input: PrivateAlertInput, now: number): Promise<string | null> {
+export async function createPrivateAlert(installationId: string, input: PrivateAlertInput, now: number): Promise<string | null> {
   const db = sql();
   const midnight = new Date(Date.UTC(new Date(now).getUTCFullYear(), new Date(now).getUTCMonth(), new Date(now).getUTCDate()));
   return db.begin(async (tx) => {
@@ -241,7 +241,7 @@ async function createPrivateAlert(installationId: string, input: PrivateAlertInp
   });
 }
 
-async function sendOperationalAlerts(installationId: string, created: Array<{ id: string; input: PrivateAlertInput }>, now: number): Promise<void> {
+export async function sendOperationalAlerts(installationId: string, created: Array<{ id: string; input: PrivateAlertInput }>, now: number): Promise<void> {
   if (!created.length) return;
   const loaded = await loadContext(installationId);
   const intents: Intent[] = created.map(({ id, input }) => ({

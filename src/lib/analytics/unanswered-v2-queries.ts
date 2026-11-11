@@ -1,3 +1,5 @@
+import { notHidden } from "./unanswered-actions-queries";
+import type { HideSettings } from "./unanswered-actions";
 import { waitingMoney } from "./waiting-money-queries";
 import { waitingMoneyLine } from "./waiting-money";
 import { sql } from "../db";
@@ -24,7 +26,7 @@ export const WAITING_READ_CAP = 20_000;
 
 /** Load waiting conversations with exact total count using SQL window function (Item 2: SQL Aggregates).
  * Applies per-account SLA filter in the database query. Returns exact total matching the filtered results. */
-export async function loadWaitingAgg(db: Db, installationId: string, allowed: string[] | null, now: number, globalSlaHours: number): Promise<{ rows: WaitConv[]; total: number; truncated: boolean }> {
+export async function loadWaitingAgg(db: Db, installationId: string, allowed: string[] | null, now: number, globalSlaHours: number, hide: HideSettings | null = null): Promise<{ rows: WaitConv[]; total: number; truncated: boolean }> {
   if (allowed && allowed.length === 0) return { rows: [], total: 0, truncated: false };
   const accountSla = await loadAccountSlaHours(db, installationId);
 
@@ -50,6 +52,7 @@ export async function loadWaitingAgg(db: Db, installationId: string, allowed: st
       and c.last_message_at > ${new Date(now - WAITING_WINDOW_DAYS * DAY)}
       and c.last_message_at < ${new Date(now)} - ${slaCase} * interval '1 hour'
       ${allowed ? db`and c.location_id = any(${allowed}::text[])` : db``}
+      ${hide ? notHidden(db, hide) : db``}
     order by c.last_message_at asc
     limit ${WAITING_READ_CAP}`;
 
@@ -140,14 +143,14 @@ async function waitingLeads(db: Db, i: { installationId: string; allowed: string
   }));
 }
 
-export type HomeInput = { installationId: string; allowed: string[] | null; slaHours: number; targetMinutes: number; now: number; seePeople: boolean; meId: string | null };
+export type HomeInput = { installationId: string; allowed: string[] | null; slaHours: number; targetMinutes: number; now: number; seePeople: boolean; meId: string | null; /** Round 3: leave out set-aside, not-a-lead, own-team and automatic people (null = show everyone). */ hide?: HideSettings | null };
 
 /** The first screen, bounded: five rows, the buckets, five clients (or five owners), one line about the money. The long lists come from unansweredList and unansweredRanks. */
 export async function unansweredHome(i: HomeInput) {
   const db = sql();
   const [{ lk, locs }, waited, facts, coverage] = await Promise.all([
     loadLookups(db, i.installationId, i.allowed, i.targetMinutes, i.now),
-    loadWaitingAgg(db, i.installationId, i.allowed, i.now, i.slaHours),
+    loadWaitingAgg(db, i.installationId, i.allowed, i.now, i.slaHours, i.hide ?? null),
     accountFacts(i.installationId, i.allowed),
     conversationCoverage(i.installationId).catch(() => []),
   ]);
@@ -190,13 +193,13 @@ export async function unansweredHome(i: HomeInput) {
 
 export type ListInput = {
   installationId: string; allowed: string[] | null; slaHours: number; targetMinutes: number; now: number; meId: string | null; seePeople: boolean;
-  bucket: string | null; channel: string | null; account: string | null; owner: string | null; q: string; sort: string; page: number; size: number;
+  bucket: string | null; channel: string | null; account: string | null; owner: string | null; q: string; sort: string; page: number; size: number; hide?: HideSettings | null;
 };
 
 /** The people behind a number. The count in the heading is the server's total for exactly these people: it is the number that was pressed (KF-6). */
 export async function unansweredList(i: ListInput) {
   const db = sql();
-  const [{ lk }, waited] = await Promise.all([loadLookups(db, i.installationId, i.allowed, i.targetMinutes, i.now), loadWaitingAgg(db, i.installationId, i.allowed, i.now, i.slaHours)]);
+  const [{ lk }, waited] = await Promise.all([loadLookups(db, i.installationId, i.allowed, i.targetMinutes, i.now), loadWaitingAgg(db, i.installationId, i.allowed, i.now, i.slaHours, i.hide ?? null)]);
   const people = peopleOf(waitingConversations(waited.rows, { now: i.now, slaHours: i.slaHours }), { now: i.now });
   const me = i.meId && people.some((p) => p.assignedTo === i.meId) ? i.meId : null;
   // A client's staff cannot look at a colleague's customers by person id: only "mine" and "no owner" narrow for them.
@@ -218,11 +221,11 @@ export async function unansweredList(i: ListInput) {
 
 // ---------- the rankings (clients, owners), searched and paged ----------
 
-export type RanksInput = { installationId: string; allowed: string[] | null; slaHours: number; targetMinutes: number; now: number; by: "account" | "owner"; q: string; page: number; size: number; seePeople: boolean };
+export type RanksInput = { installationId: string; allowed: string[] | null; slaHours: number; targetMinutes: number; now: number; by: "account" | "owner"; q: string; page: number; size: number; seePeople: boolean; hide?: HideSettings | null };
 
 export async function unansweredRanks(i: RanksInput) {
   const db = sql();
-  const [{ lk, locs }, waited] = await Promise.all([loadLookups(db, i.installationId, i.allowed, i.targetMinutes, i.now), loadWaitingAgg(db, i.installationId, i.allowed, i.now, i.slaHours)]);
+  const [{ lk, locs }, waited] = await Promise.all([loadLookups(db, i.installationId, i.allowed, i.targetMinutes, i.now), loadWaitingAgg(db, i.installationId, i.allowed, i.now, i.slaHours, i.hide ?? null)]);
   const people = peopleOf(waitingConversations(waited.rows, { now: i.now, slaHours: i.slaHours }), { now: i.now });
   const needle = i.q.trim().toLowerCase();
   if (i.by === "owner") {

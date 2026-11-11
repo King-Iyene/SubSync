@@ -5,6 +5,9 @@ import { sql } from "../db";
 import { median } from "./pipeline-intel";
 import { responseSeconds, judge } from "./speed-intel";
 import { loadRows } from "./speed-queries";
+import { resolveEntitlements } from "../flags";
+import { morningProofLine } from "./moat-core";
+import { rescuedReceipt } from "./moat-queries";
 import { buildMessage, DEFAULT_DIGEST, isDue, sanitizeDigest, scheduleKey, type DigestSettings, type Numbers } from "./speed-digest";
 
 // Storage and sending for the Speed summary (stage SPEED6). Reads and writes only the caller's installation. A missing table (the migration has not run) answers `ready: false`, never an error screen.
@@ -62,12 +65,22 @@ export async function deliver(installationId: string, s: DigestSettings, n: Numb
   return out;
 }
 
+/** The one proof sentence for the morning message, only when the proof email flag is on. It adds a line of text to a message that is itself sent only through the gated transports (dry run unless the live switch is on). */
+async function proofLineFor(installationId: string, plan: "free" | "starter" | "pro", allowed: string[] | null, now: number): Promise<string | null> {
+  try {
+    const ent = await resolveEntitlements(plan, installationId);
+    if (!ent.features.inbox_proof_email || ent.locked.includes("inbox_proof_email")) return null;
+    const out = await rescuedReceipt({ installationId, allowed, from: new Date(now - 7 * DAY), to: new Date(now) });
+    return morningProofLine(out.total);
+  } catch { return null; }
+}
+
 /** The scheduled run: every enabled summary that is due (its own local time and weekday, once per key). Safe to call every hour, or late. */
 export async function runSpeedDigests(now = Date.now()): Promise<{ checked: number; sent: number }> {
   let rows;
   try {
     rows = await sql()`
-      select d.installation_id, d.location_id, d.settings, d.last_sent_key, coalesce(i.company_name, 'Your company') label, coalesce(st.speed_target_minutes, 15) target
+      select d.installation_id, d.location_id, d.settings, d.last_sent_key, i.plan, coalesce(i.company_name, 'Your company') label, coalesce(st.speed_target_minutes, 15) target
       from speed_digest d join installations i on i.id = d.installation_id left join settings st on st.installation_id = d.installation_id
       where i.uninstalled_at is null and not i.is_demo and d.settings->>'enabled' = 'true' limit 500`;
   } catch { return { checked: 0, sent: 0 }; }
@@ -79,6 +92,7 @@ export async function runSpeedDigests(now = Date.now()): Promise<{ checked: numb
     let who = r.label as string;
     if (loc) { const [l] = await sql()`select name from locations where installation_id = ${inst} and location_id = ${loc}`; who = (l?.name as string | null) ?? who; }
     const n = await digestNumbers(inst, loc ? [loc] : null, who, r.target as number, now);
+    n.proofLine = await proofLineFor(inst, (r.plan as "free" | "starter" | "pro") ?? "pro", loc ? [loc] : null, now);
     // Claim the key first: a second run in the same hour finds it taken and sends nothing.
     const claimed = await sql()`update speed_digest set last_sent_key = ${scheduleKey(now, s.schedule)} where installation_id = ${inst} and location_id = ${loc} and last_sent_key is not distinct from ${(r.last_sent_key as string | null) ?? null} returning 1`;
     if (claimed.length === 0) continue;

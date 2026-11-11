@@ -105,7 +105,12 @@ async function main() {
       "/api/app/audit", "/api/app/audit/clients?size=50", `/api/app/audit?location=${other.locs[0]}`, `/api/app/audit/clients?location=${other.locs[0]}&q=${other.marker}`, `/api/app/audit?accounts=${other.locs[0]}&fresh=1`,
       // The rebuilt Unanswered messages screen (stage UNANS): the first screen, the list behind a number, the rankings, the other side's account, owner and name asked for by every parameter.
       "/api/app/inbox?part=home", "/api/app/inbox?part=list", `/api/app/inbox?part=list&account=${other.locs[0]}`, `/api/app/inbox?part=list&account=${other.locs.join(",")}&bucket=h48`, `/api/app/inbox?part=list&owner=${other.marker}`,
-      `/api/app/inbox?part=list&q=${other.marker}`, "/api/app/inbox?part=ranks&by=account", "/api/app/inbox?part=ranks&by=owner", `/api/app/inbox?part=ranks&by=account&q=${other.marker}`,
+      `/api/app/inbox?part=list&q=${other.marker}`, "/api/app/inbox?part=ranks&by=account", "/api/app/inbox?part=ranks&by=owner", `/api/app/inbox?part=ranks&by=account&q=${other.marker}`, "/api/app/moat?part=receipt", `/api/app/moat?part=receipt&account=${other.locs[0]}`, "/api/app/moat?part=curve", `/api/app/moat?part=curve&account=${other.locs[0]}`, "/api/app/moat?part=scorecards", `/api/app/moat?part=scorecards&account=${other.locs.join(",")}`, "/api/app/moat?part=channels", "/api/app/moat?part=clock", `/api/app/moat?part=clock&account=${other.locs[0]}`, "/api/app/moat?part=benchmark&vertical=med_spa", "/api/app/moat?part=setup", "/api/app/moat?part=proofs",
+      // Unanswered actions (round 3, slice B): the hidden people, the owner picker and the capabilities, asked for the other side's account.
+      "/api/app/inbox/act/caps", "/api/app/inbox/act/hidden", `/api/app/inbox/act/hidden?account=${other.locs[0]}`, `/api/app/inbox/act/hidden?account=${other.locs[0]}&reason=snoozed&size=100`, `/api/app/inbox/act/team?locationId=${other.locs[0]}`,
+      // Unanswered round 3, slices A and C: the SQL-paged list, the "waiting on them" tab, the one search and the saved views, asked for the other side by every parameter.
+      "/api/app/inbox?part=list2", `/api/app/inbox?part=list2&account=${other.locs[0]}`, `/api/app/inbox?part=list2&tab=them&account=${other.locs[0]}`, `/api/app/inbox?part=list2&owner=${other.marker}`, `/api/app/inbox?part=list2&q=${other.marker}&size=100`,
+      `/api/app/inbox?part=find&q=${other.marker}`, `/api/app/inbox?part=find&q=${other.marker}&size=100`, "/api/app/inbox?part=views",
     ];
 
     // TENANCY_FAST=1 skips the long cross-read sweep (while iterating on the share link and write attacks); the full run does not.
@@ -196,6 +201,15 @@ async function main() {
       ["POST", "/api/app/today/action", { action: "snooze", rowKey: `${B.locs[0]}|stale`, choice: "day" }],
       ["POST", "/api/app/today/action", { action: "undo", eventId: 1 }],
       ["POST", "/api/app/inbox/outcome", { locationId: B.locs[0], conversationId: "foreign-conversation", outcome: "replied" }],
+      // Unanswered actions (round 3, slice B): every write names the other agency's account and conversation, and must be refused.
+      ["POST", "/api/app/inbox/act/snooze", { locationId: B.locs[0], conversationIds: ["foreign-conversation"], reason: "other", duration: "d7" }],
+      ["POST", "/api/app/inbox/act/unsnooze", { locationId: B.locs[0], conversationIds: ["foreign-conversation"] }],
+      ["POST", "/api/app/inbox/act/claim", { locationId: B.locs[0], conversationId: "foreign-conversation", step: "do" }],
+      ["POST", "/api/app/inbox/act/assign", { locationId: B.locs[0], conversationIds: ["foreign-conversation"], ownerId: "foreign-user", step: "do" }],
+      ["POST", "/api/app/inbox/act/undo", { batchId: "00000000-0000-0000-0000-000000000000", step: "do" }],
+      ["POST", "/api/app/inbox/act/note", { locationId: B.locs[0], contactId: B.contacts[0], text: "hacked", step: "do", confirm: true }],
+      ["POST", "/api/app/inbox/act/outcome", { locationId: B.locs[0], conversationId: "foreign-conversation", outcome: "not_a_lead" }],
+      ["POST", "/api/app/inbox/act/clear", { locationId: B.locs[0], conversationIds: ["foreign-conversation"], step: "do", typed: "delete 1" }],
       // Workflows: a change, a label, a mark and a read of the other agency's workflow in its client account.
       ["POST", "/api/app/workflows/preview", { kind: "delete", items: [{ locationId: B.locs[0], workflowId: "w-1" }] }],
       ["PUT", "/api/app/workflows/labels", { items: [{ locationId: B.locs[0], workflowId: "w-1" }], patch: { decision: "retire" } }],

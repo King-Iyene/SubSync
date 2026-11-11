@@ -11,7 +11,7 @@ export const DEFAULT_DIGEST: DigestSettings = {
   enabled: false, email: true, slack: false, recipients: [], schedule: { cadence: "daily", hour: 8, weekday: 1, tz: "UTC" },
   intro: "Here is how first replies are going.", outro: "Open SubSync to reply to the leads that are waiting.", lines: ["waiting", "typical", "inTime"],
 };
-export type Numbers = { who: string; waiting: number; typicalSeconds: number | null; inTimePct: number | null; leaked: number; noOwner: number };
+export type Numbers = { who: string; waiting: number; typicalSeconds: number | null; inTimePct: number | null; leaked: number; noOwner: number; /** One extra sentence from the proof receipt (only when that flag is on and there were alerts). */ proofLine?: string | null };
 
 const EMAIL = /^[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>"]{2,}$/;
 const validZone = (z: unknown): z is string => { if (typeof z !== "string" || !z) return false; try { new Intl.DateTimeFormat("en-US", { timeZone: z }); return true; } catch { return false; } };
@@ -42,6 +42,7 @@ export function buildMessage(s: DigestSettings, n: Numbers): { subject: string; 
     if (k === "leaked") body.push(`${n.leaked} ${n.leaked === 1 ? "lead got" : "leads got"} no reply from a person, or a slow one.`);
     if (k === "noOwner") body.push(`${n.noOwner} ${n.noOwner === 1 ? "lead has" : "leads have"} no owner.`);
   }
+  if (n.proofLine) body.push(n.proofLine);
   const subject = `${n.who}: ${s.schedule.cadence === "weekly" ? "weekly" : "daily"} speed to lead summary`;
   const parts = [s.intro.trim(), body.map((l) => `- ${l}`).join("\n"), s.outro.trim()].filter(Boolean);
   return { subject, lines: body, text: parts.join("\n\n") };

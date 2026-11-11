@@ -3,6 +3,8 @@ import { isBucket, SORTS } from "../analytics/unanswered-v2";
 import { WAITING_WINDOW_DAYS } from "../analytics/waiting";
 import { isUnansweredOutcome } from "../analytics/unanswered-advanced";
 import { sql } from "../db";
+import { loadHideSettings } from "../analytics/unanswered-actions-queries";
+import type { HideSettings } from "../analytics/unanswered-actions";
 import type { deepLinks } from "../links";
 import { json, type AuthContext } from "./auth";
 
@@ -57,7 +59,11 @@ export async function handleUnansweredPart(ctx: Ctx, h: UnansweredHelpers): Prom
   const [allowedAll, targets, links] = await Promise.all([h.allowed(), h.targets(), h.links()]);
   const seePeople = ctx.kind !== "client";
   const meId = ctx.session.userId ?? null;
-  const base = { installationId: ctx.installationId, slaHours: targets.slaHours, targetMinutes: targets.targetMinutes, now, seePeople };
+  // Round 3 (flags inbox_snooze / inbox_hide_noise): people set aside, marked not a lead, on your own team or automatic are left out. Off: everyone, and no new table is read.
+  const hideOn = ctx.entitlements.features.inbox_hide_noise && !ctx.entitlements.locked.includes("inbox_hide_noise");
+  const snoozeOn = ctx.entitlements.features.inbox_snooze && !ctx.entitlements.locked.includes("inbox_snooze");
+  const hide: HideSettings | null = hideOn ? await loadHideSettings(ctx.installationId) : snoozeOn ? { notALead: false, internal: false, automatic: false } : null;
+  const base = { installationId: ctx.installationId, slaHours: targets.slaHours, targetMinutes: targets.targetMinutes, now, seePeople, hide };
 
   if (part === "home") {
     const out = await unansweredHome({ ...base, allowed: allowedAll, meId });
