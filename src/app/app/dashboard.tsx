@@ -30,6 +30,7 @@ import { ApiProvider, makeApi, type Api } from "./session";
 import { AccountDetailView } from "./views/account-detail";
 import { AlertsView } from "./views/alerts";
 import { AppointmentInsights } from "./views/appointment-insights";
+import { AppointmentsModule } from "./views/ap3/module";
 import { AuditView } from "./views/audit";
 import { SpeedView } from "./views/speed";
 import { AppointmentsView } from "./views/appointments";
@@ -403,7 +404,7 @@ export function Dashboard() {
       case "roadmap": return <RoadmapView />;
       case "pipeline": return <ModuleTabs key="pipe" start={0} tabs={pipeTabs} />;
       case "team": return <TeamView />;
-      case "appointments": return <ModuleTabs key="appts" start={0} tabs={[{ label: "Appointments", node: <AppointmentsView go={go} /> }, { label: "Insights", node: <AppointmentInsights /> }]} />;
+      case "appointments": return auth.features.appt_module === true && !auth.locked.includes("appt_module") ? <AppointmentsModule key="appts3" go={go} flowTree={auth.features.appt_flow_tree === true} /> : <ModuleTabs key="appts" start={0} tabs={[{ label: "Appointments", node: <AppointmentsView go={go} /> }, { label: "Insights", node: <AppointmentInsights /> }]} />;
       case "meetings": return <MeetingsView />;
       // Workflows reads with the unfiltered client and keeps its own account choice (like Today), so the shared filter never changes what it counts.
       case "data-health": return <ApiProvider value={baseApi}><DataHealthView go={go} kind={auth.kind} /></ApiProvider>;
