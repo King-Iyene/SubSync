@@ -36,7 +36,8 @@ export function sql(): Sql {
       max: Math.min(20, Math.max(1, Number(process.env.DB_POOL_MAX) || 5)),
       idle_timeout: 20,
       connect_timeout: 15,
-      ssl: "require",
+      // DATABASE_SSL=off is for the throwaway CI database (plain Postgres, no TLS). Never set it in production.
+      ssl: process.env.DATABASE_SSL === "off" ? false : "require",
       onnotice: () => {},
     });
   }
