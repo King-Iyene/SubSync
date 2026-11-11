@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useData } from "../../session";
 import type { PlDeals, PlMoneyFlow, PlPart } from "@/lib/analytics/pipeline3-types-interim";
 import { adapt, queryOf } from "./adapters";
-import { dealsFixture, FLOW_EMPTY, FLOW_FIXTURE, FORECAST_FIXTURE, HEALTH_FIXTURE, HISTORY_FIXTURE, OVERVIEW_FIXTURE, PEOPLE_FIXTURE, page, PROOF_FIXTURE, SOURCES_FIXTURE, WONLOST_FIXTURE } from "./fixtures";
+import { dealsFixture, FLOW_EMPTY, FLOW_FIXTURE, PIPES_FIXTURE, FORECAST_FIXTURE, HEALTH_FIXTURE, HISTORY_FIXTURE, OVERVIEW_FIXTURE, PEOPLE_FIXTURE, page, PROOF_FIXTURE, SOURCES_FIXTURE, WONLOST_FIXTURE } from "./fixtures";
 
 /** What the person picked. `days` becomes from/to on the server's day boundaries; everything is re-checked on the server (never trusted). */
 export type PlFilters = { days: 30 | 45 | 90; locationId: string; pipeline: string; ownerId: string; q: string };
@@ -27,6 +27,7 @@ function fixtureFor(part: PlPart, extra: Record<string, string | number | undefi
   const pg = Number(extra.page ?? 1), size = Number(extra.pageSize ?? 20);
   const mk = (kind: "stale" | "won" | "lost" | "all", n: number): PlDeals => page(dealsFixture(n, kind).slice((pg - 1) * size, pg * size), n, pg, size);
   switch (part) {
+    case "pipelines": return PIPES_FIXTURE;
     case "money-flow": return FLOW_FIXTURE;
     case "overview": return OVERVIEW_FIXTURE;
     case "needs-attention": return mk("stale", 31);
@@ -40,7 +41,7 @@ function fixtureFor(part: PlPart, extra: Record<string, string | number | undefi
     case "proof": return PROOF_FIXTURE;
   }
 }
-const emptyFor = (part: PlPart): unknown => (part === "money-flow" ? FLOW_EMPTY : part === "overview" ? { ...OVERVIEW_FIXTURE, headline: { openCount: 0, openValueCents: 0, staleCount: 0, staleValueCents: 0, wonCents: 0, lostCents: 0, winRate: null, winRateDeals: 0 }, leak: null, sentence: "" }
+const emptyFor = (part: PlPart): unknown => (part === "pipelines" ? { cards: [], next: null, totals: { pipelines: 0, emptyHidden: 0, openValue: 0, wonValue: 0, lostValue: 0, openCount: 0, wonCount: 0, lostCount: 0, staleCount: 0, noOwnerCount: 0 } } : part === "money-flow" ? FLOW_EMPTY : part === "overview" ? { ...OVERVIEW_FIXTURE, headline: { openCount: 0, openValueCents: 0, staleCount: 0, staleValueCents: 0, wonCents: 0, lostCents: 0, winRate: null, winRateDeals: 0 }, leak: null, sentence: "" }
   : part === "forecast" ? { ...FORECAST_FIXTURE, lowCents: null, midCents: null, highCents: null, closedDeals: 0, byStage: [] } : part === "won-lost" ? { won: 0, lost: 0, wonCents: 0, lostCents: 0, winRate: null, byReason: [], bookedToWon: null }
   : part === "stage-history" ? { stages: [], recorded: { since: null, changes: 0 } } : part === "proof" ? { weekLabel: "", rows: [] } : part === "needs-attention" || part === "list" ? page([], 0, 1, 20) : { rows: [] });
 

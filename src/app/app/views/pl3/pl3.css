@@ -37,3 +37,19 @@
 .pl .ap-chip[data-tone] { color: var(--muted-foreground); background: transparent; border-color: color-mix(in srgb, var(--foreground) 22%, transparent); }
 @media (max-width: 700px) { .pl-replay { width: 100%; } .pl-replay input[type="range"] { flex: 1; width: auto; } }
 @media (prefers-reduced-motion: reduce) { [data-settle="1"] .pl-coin { animation: none; } .pl-coin { transition: none; } }
+
+/* pipeline cards and picker: calm outlines, one accent, no fills */
+.pl-gridbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin-bottom: 8px; }
+.pl-pgrid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+.pl-pcard-li { content-visibility: auto; contain-intrinsic-size: 150px; }
+.pl-pcard { width: 100%; display: flex; flex-direction: column; gap: 2px; text-align: left; font: inherit; color: var(--foreground); padding: 12px 14px; border-radius: 12px; cursor: pointer; background: var(--s6-surf); border: 1px solid color-mix(in srgb, var(--s6-edgec) 22%, transparent); }
+.pl-pcard:hover { border-color: color-mix(in srgb, var(--pl-gold) 55%, transparent); } .pl-pcard:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.pl-pcard-name { font-weight: 600; font-size: 0.9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pl-pcard-acct { font-size: 0.75rem; color: var(--muted-foreground); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pl-pcard-open { font-size: 1.15rem; font-weight: 650; margin-top: 6px; } .pl-pcard-open small { font-size: 0.7rem; font-weight: 400; color: var(--muted-foreground); }
+.pl-mini { width: 100%; height: 26px; margin: 6px 0; display: block; } .pl-mini-none { height: 26px; }
+.pl-mini-bar { fill: var(--pl-open-edge); } .pl-mini-other { fill: var(--pl-lost); }
+.pl-pcard-foot { display: flex; flex-wrap: wrap; gap: 2px 12px; font-size: 0.75rem; color: var(--muted-foreground); } .pl-pcard-foot u { text-decoration: none; color: var(--pl-stuck); font-weight: 600; }
+.pl-picker { position: relative; } .pl-picker-btn { max-width: 260px; text-align: left; cursor: pointer; } .pl-picker-btn span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pl-picker-pop { position: absolute; z-index: 30; top: calc(100% + 4px); left: 0; width: min(360px, 86vw); max-height: 340px; overflow: auto; display: flex; flex-direction: column; gap: 2px; padding: 8px; border-radius: 10px; background: var(--s6-pop); border: 1px solid color-mix(in srgb, var(--s6-edgec) 40%, transparent); box-shadow: 0 10px 30px -12px rgba(0, 0, 0, 0.4); }
+.pl-picker-opt { text-align: left; font: inherit; font-size: 0.8125rem; padding: 7px 8px; min-height: 32px; border-radius: 6px; background: none; border: 0; cursor: pointer; color: var(--foreground); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .pl-picker-opt:hover, .pl-picker-opt[aria-selected="true"] { background: color-mix(in srgb, var(--foreground) 8%, transparent); } .pl-picker-opt small { color: var(--muted-foreground); }

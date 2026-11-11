@@ -47,3 +47,11 @@ export const SOURCES_FIXTURE: PlSource[] = [{ source: "Referral", deals: 31, won
 export const HISTORY_FIXTURE: PlStageHistory = { stages: NAMES.map((name, i) => ({ name, medianDays: MED[i], p90Days: Math.round(MED[i] * 2.4 * 10) / 10, sample: [120, 90, 64, 40, 22, i === 5 ? 6 : 9][i], staleAfterDays: [3, 7, 10, 14, 10, null][i] ?? null })), recorded: { since: "2026-09-14", changes: 2_184 } };
 export const HEALTH_FIXTURE: PlHealthRow[] = [{ locationId: "loc0", name: "Northside Roofing", open: 40, stale: 6, staleShare: 0.31, health: 41 }, { locationId: "loc1", name: "Bright Smiles Dental", open: 40, stale: 6, staleShare: 0.09, health: 83 }, { locationId: "loc2", name: "Lakeview Realty", open: 40, stale: 6, staleShare: null, health: null }];
 export const PROOF_FIXTURE: PlProof = { weekLabel: "Week of 2026-11-02", headline: "12 stuck deals caught, 7 moved on, $79k won.", verifyHash: "a1b2c3d4", rows: [{ label: "Deals moved on", value: "41", go: null }, { label: "Unclogged (moved after sitting too long)", value: "7", go: null }, { label: "Still stuck now", value: "5", go: "needs" }, { label: "Won", value: "11 deals, $79,000", go: "won" }, { label: "Lost", value: "6 deals, $31,000", go: "lost" }, { label: "New deals", value: "58", go: null }] };
+
+const PN = [["Northside Roofing", "Sales pipeline", 1017000], ["Northside Roofing", "Repeat customers", 188000], ["Bright Smiles Dental", "New patients", 642000], ["Bright Smiles Dental", "Whitening plans", 91000], ["Lakeview Realty", "Buyers", 530000], ["Lakeview Realty", "Sellers", 410000], ["Lakeview Realty", "Rentals", 0]] as const;
+export const PIPES_FIXTURE = {
+  cards: PN.map(([a, n, v], i) => ({ locationId: `loc${i % 3}`, pipelineId: `pl${i}`, accountName: a, name: n, openCount: v ? 20 + i * 17 : 0, openValue: v, wonCount: v ? 4 + i : 0, wonValue: Math.round(v * 0.21), lostCount: v ? 3 + i : 0, lostValue: Math.round(v * 0.18), staleCount: v ? 2 + i * 2 : 0, noOwnerCount: i % 3, zeroValueCount: 0, empty: v === 0,
+    mini: v ? [1, 0.8, 0.55, 0.4, 0.22, 0.1].slice(0, 3 + (i % 4)).map((k, j) => ({ name: `Stage ${j + 1}`, value: Math.round(v * k * 0.3) })) : [] })).filter((c) => !c.empty),
+  next: null,
+  totals: { pipelines: 6, emptyHidden: 1, openValue: 2878000, wonValue: 604000, lostValue: 518000, openCount: 600, wonCount: 41, lostCount: 36, staleCount: 63, noOwnerCount: 7 },
+};

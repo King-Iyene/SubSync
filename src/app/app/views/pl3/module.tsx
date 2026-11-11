@@ -12,6 +12,8 @@ import { useMountDealActions } from "./actions";
 import { DEFAULT_FILTERS, fixturesOn, usePl, type PlFilters } from "./data";
 import { MoneyFlow, type FlowPick } from "./money-flow";
 import { DealList, DealPanel } from "./parts";
+import { PipelineGrid, PipelinePicker } from "./pipes";
+import type { PipeCard } from "@/lib/analytics/pipeline3-types";
 import { Health, NeedsAttention, Overview, People, Proof, Sources, StageHistory, WonLost, type SectionProps } from "./sections";
 import type { PlHealthRow } from "@/lib/analytics/pipeline3-types-interim";
 
@@ -42,6 +44,8 @@ export function PipelineModule({ moneyFlow = true, actions = false }: { moneyFlo
   const [drill, setDrill] = useState<Drill>(null);
   const [views, setViews] = useState<SavedView[]>([]);
   const [naming, setNaming] = useState(false);
+  const [picked, setPicked] = useState<{ name: string; account: string } | null>(null);
+  const openCard = useCallback((c: PipeCard) => { setPicked({ name: c.name, account: c.accountName }); setDrill(null); setFilters((f) => ({ ...f, locationId: c.locationId, pipeline: c.name })); }, []);
   const [version, setVersion] = useState(0);
   const search = useRef<HTMLInputElement>(null), top = useRef<HTMLDivElement>(null);
   const health = usePl<{ rows: PlHealthRow[] }>("accounts", { ...filters, locationId: "" });
@@ -77,7 +81,9 @@ export function PipelineModule({ moneyFlow = true, actions = false }: { moneyFlo
   const content = (() => {
     switch (tab) {
       case "overview": return <><Overview {...sp} />{drillList}</>;
-      case "flow": return <><MoneyFlow filters={filters} onPick={onPick} />{drillList}</>;
+      case "flow": return filters.pipeline && filters.locationId
+        ? <><p className="ap-fine mb-2"><button type="button" className="ap-link" onClick={() => { setPicked(null); setFilters((f) => ({ ...f, pipeline: "" })); }} data-testid="pl-allpipes">All pipelines</button>{picked ? ` / ${picked.account} / ${picked.name}` : ""}</p><MoneyFlow filters={filters} onPick={onPick} />{drillList}</>
+        : <PipelineGrid filters={filters} onOpen={openCard} />;
       case "needs": return <NeedsAttention {...sp} />;
       case "wonlost": return <><WonLost {...sp} />{drillList}</>;
       case "people": return <><People {...sp} />{drillList}</>;
@@ -94,7 +100,8 @@ export function PipelineModule({ moneyFlow = true, actions = false }: { moneyFlo
         <div className="ap-head" role="search" aria-label="Filter deals">
           <label className="ap-search"><Search aria-hidden className="size-4" /><span className="sr-only">Search by deal or contact</span><input ref={search} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search a deal (press /)" data-testid="pl-search" /></label>
           <select className="ap-field" aria-label="Dates" value={filters.days} onChange={(e) => setFilters({ ...filters, days: Number(e.target.value) as PlFilters["days"] })} data-testid="pl-days"><option value={30}>Last 30 days</option><option value={45}>Last 45 days</option><option value={90}>Last 90 days</option></select>
-          {accounts.length > 1 && <select className="ap-field" aria-label="Account" value={filters.locationId} onChange={(e) => setFilters({ ...filters, locationId: e.target.value })} data-testid="pl-account"><option value="">All accounts</option>{accounts.map((a) => <option key={a.locationId} value={a.locationId}>{a.name}</option>)}</select>}
+          {accounts.length > 1 && <select className="ap-field" aria-label="Account" value={filters.locationId} onChange={(e) => { setPicked(null); setFilters({ ...filters, locationId: e.target.value, pipeline: "" }); }} data-testid="pl-account"><option value="">All accounts</option>{accounts.map((a) => <option key={a.locationId} value={a.locationId}>{a.name}</option>)}</select>}
+          {moneyFlow && <PipelinePicker filters={filters} value={picked} onPick={openCard} onClear={() => { setPicked(null); setFilters((f) => ({ ...f, pipeline: "" })); }} />}
           <select className="ap-field" aria-label="Saved views" value="" onChange={(e) => applyView(Number(e.target.value))} data-testid="pl-views"><option value="" disabled>Saved views{views.length ? ` (${views.length})` : ""}</option>{views.map((v, i) => <option key={v.name} value={i}>{v.name}</option>)}</select>
           {naming ? <NameView onSave={saveView} onCancel={() => setNaming(false)} /> : <button type="button" className="s6-btn" onClick={() => setNaming(true)} data-testid="pl-save-view"><Bookmark aria-hidden className="size-4" />Save view</button>}
           {(filters.locationId || filters.q) && <button type="button" className="s6-btn" onClick={() => { setFilters(DEFAULT_FILTERS); setQ(""); }}><X aria-hidden className="size-4" />Clear</button>}

@@ -98,11 +98,12 @@ export function proofOf(r: Pl3Receipt | null): PlProof {
 
 /** What the screens call a part, and how the API names it. */
 export const API_PART: Record<PlPart, string> = {
-  "money-flow": "money-flow", overview: "overview", "needs-attention": "attention", "won-lost": "won-lost", forecast: "forecast", people: "people", sources: "sources", "stage-history": "stage-history", health: "health", proof: "receipt", list: "list", accounts: "health",
+  "money-flow": "money-flow", pipelines: "pipelines", overview: "overview", "needs-attention": "attention", "won-lost": "won-lost", forecast: "forecast", people: "people", sources: "sources", "stage-history": "stage-history", health: "health", proof: "receipt", list: "list", accounts: "health",
 };
 export function adapt(part: PlPart, raw: unknown, aux?: unknown): unknown {
   const r = raw as never;
   switch (part) {
+    case "pipelines": return raw;
     case "money-flow": return flowOf(r, (aux as Pl3Replay | null) ?? null);
     case "overview": return overviewOf(r);
     case "needs-attention": case "list": return dealsOf(r);
@@ -129,6 +130,8 @@ export function queryOf(part: PlPart, f: PlFiltersLike, extra: Record<string, st
   const status = typeof extra.status === "string" && DEAL_STATUS.has(extra.status) ? extra.status : "";
   if (part === "list") { const bucket = extra.stale ? "stale" : status; if (bucket) p.set("bucket", bucket); }
   if (extra.stage) p.set("stage", String(extra.stage));
+  if (extra.after) p.set("after", String(extra.after));
+  if (extra.empty) p.set("empty", "1");
   if (extra.owner) p.set("owner", String(extra.owner));
   if (extra.location) p.set("location", String(extra.location));
   if (extra.source) p.set("source", String(extra.source));

@@ -129,6 +129,7 @@ async function stageMap(s: Scope, location?: string | null): Promise<Map<string,
   }
   return m;
 }
+const OTHER_STAGE = "other-stage";
 const keyOf = (m: Map<string, StageInfo>, loc: unknown, stage: unknown) => m.get(`${loc}|${stage}`) ?? null;
 
 // ---------- row mapping ----------
@@ -538,12 +539,14 @@ export async function moneyFlow(s: Scope, f: Filters): Promise<Pl3MoneyFlow> {
   const aggs = new Map<string, StageAgg & { medW: number; normW: number }>();
   for (const r of parts.open) {
     const si = keyOf(sm, r.location_id, r.stage_id);
-    if (!si || si.pipelineKey !== chosen) continue;
-    const c = aggs.get(si.key) ?? { key: si.key, openCount: 0, openValue: 0, staleCount: 0, staleValue: 0, medianDays: null, normalDays: null, staysN: 0, medW: 0, normW: 0 };
+    if (si && si.pipelineKey !== chosen) continue;
+    const sk = si ? si.key : OTHER_STAGE; // a stage renamed or deleted in the CRM keeps its money, as "Other stage"
+    const c = aggs.get(sk) ?? { key: sk, openCount: 0, openValue: 0, staleCount: 0, staleValue: 0, medianDays: null, normalDays: null, staysN: 0, medW: 0, normW: 0 };
     const n = num(r.n), med = numOrNull(r.med), norm = numOrNull(r.norm);
-    aggs.set(si.key, { ...c, openCount: c.openCount + n, openValue: c.openValue + num(r.v), staleCount: c.staleCount + num(r.sn), staleValue: c.staleValue + num(r.sv), staysN: c.staysN + num(r.stays),
+    aggs.set(sk, { ...c, openCount: c.openCount + n, openValue: c.openValue + num(r.v), staleCount: c.staleCount + num(r.sn), staleValue: c.staleValue + num(r.sv), staysN: c.staysN + num(r.stays),
       medW: c.medW + (med === null ? 0 : med * n), normW: c.normW + (norm === null ? 0 : norm * n) });
   }
+  if (aggs.has(OTHER_STAGE)) meta.set(OTHER_STAGE, { key: OTHER_STAGE, name: "Other stage", order: 9999, pipelineName: "" });
   const aggList: StageAgg[] = [...aggs.values()].map((a) => ({ ...a, medianDays: a.openCount && a.medW ? Math.round((a.medW / a.openCount) * 10) / 10 : null, normalDays: a.openCount && a.normW ? Math.round((a.normW / a.openCount) * 10) / 10 : null }));
   const stages = buildStages([...meta.values()], aggList, chosen ?? "");
   const inPipe = new Set(stages.map((x) => x.id));

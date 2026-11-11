@@ -41,4 +41,4 @@ export type PlSource = { source: string; deals: number; won: number; winRate: nu
 export type PlStageHistory = { stages: Array<{ name: string; medianDays: number | null; p90Days: number | null; sample: number; staleAfterDays: number | null }>; recorded: { since: string | null; changes: number } };
 export type PlHealthRow = { locationId: string; name: string; open: number; stale: number; staleShare: number | null; health: number | null };
 export type PlProof = { weekLabel: string; headline: string; verifyHash: string | null; rows: Array<{ label: string; value: string; go: "needs" | "won" | "lost" | null }> };
-export type PlPart = "money-flow" | "overview" | "needs-attention" | "won-lost" | "forecast" | "people" | "sources" | "stage-history" | "health" | "proof" | "list" | "accounts";
+export type PlPart = "money-flow" | "overview" | "needs-attention" | "won-lost" | "forecast" | "people" | "sources" | "stage-history" | "health" | "proof" | "list" | "accounts" | "pipelines";
