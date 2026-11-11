@@ -556,3 +556,16 @@ Decision: the screen is one sentence, one primary button ("Reply to the oldest w
 
 ## 2026-11-10 Appointments integration (ap-int)
 - Who: agency owner, setter, client admin. Decision: AU screens keep their view shapes; ap3/adapters.ts maps AD API shapes to them (one place, unit tested) instead of rewriting every screen. AB tools mount through registerApSlot (ab-slots.tsx). AB gateway writes subsync marker rows into appointment_history after a live write. Module shows when appt_module is on; otherwise the old page. Migrations (not applied): 20261122090000_appointments3.sql then 20261125100000_appointment_actions.sql.
+
+## 2026-11-11 Pipeline actions (slice PB)
+- Who and why: the agency owner or setter who sees a stale or ownerless deal and must fix it without leaving SubSync (move it, give it an owner, close it with a reason, set a follow-up); without it they bounce to the CRM for every change, and lost reasons never get recorded, so the money-leak numbers stay empty. Delete exists for test and junk deals and is guarded by a typed confirmation naming the deal.
+- Decision: all deal changes go through one new gateway (pipeline-gateway.ts) with preview, practice run by default, audit line and a 30 minute undo; delete is never undoable and never without typing (bulk delete needs the exact count typed and never touches won deals, open deals with money, or people with an upcoming appointment). Notes and tasks on the deal's contact reuse the workbench gateway (internal only, never a message to the lead). A lost mark must carry a reason (fixed list, kept in pipeline_actions.lost_reason, not written to the CRM until its lost-reason field is confirmed live). Our own writes are rows in pipeline_actions (result done); ownWriteSince() lets the deal history recorder and metrics skip the platform echo (rule 14). Needs the optional scope opportunities.write ("Needs permission: reconnect").
+- Alternatives dropped: writing the lost reason as a note on the contact (noise in the client's CRM); a one-tap "close as lost" with no preview (a wrong tap would silently change win rate).
+
+
+## 2026-11-11 Pipeline integration (stage PI)
+- Who: agency owner, client admin, setter. They open Pipeline, click any count and get exactly those deals, open one and fix it. Missing: they would still be in the CRM guessing which deals are stuck.
+- The screens keep their own view models; one pure adapter file (views/pl3/adapters.ts, unit tested) turns the API's dollars and shapes into them. `pl_module` off falls back to the old Pipeline page; `pl_actions` mounts the checked change tools into the panel, row and bulk slots.
+- One shared account guard (api/pl-guard.ts) is used by the read route and every change route: well formed, inside the session's accounts, and (change routes) really in this installation. Every SQL still filters by installation_id.
+- Stage drill-downs pass the merged stage key (pipeline|stage, lower case) as `stage`; the read route now accepts it (before, a key never matched the raw stage id).
+- Our own finished changes are written to `deal_history` as actor `subsync` (markOwnChanges, idempotent by batch, deal and kind), so the recorder and metrics never count them as team activity.

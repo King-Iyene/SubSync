@@ -1,0 +1,39 @@
+/* Pipeline module: Coin stacks. Calm and minimal: neutral surfaces from the app theme, ONE accent (gold) for money won, grey for lost, one muted amber outline for stuck. No glow, no gradients. */
+.pl { --pl-gold: #b07400; --pl-open: color-mix(in srgb, var(--foreground) 14%, transparent); --pl-open-edge: color-mix(in srgb, var(--foreground) 42%, transparent); --pl-lost: color-mix(in srgb, var(--foreground) 34%, transparent); --pl-stuck: #a8731a; }
+[data-theme="dark"] .pl { --pl-gold: #e2a925; --pl-stuck: #c99a45; }
+.pl-flow-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin-bottom: 8px; }
+.pl-flow-title { font-size: 1.05rem; font-weight: 650; margin: 0; margin-right: auto; }
+.pl-replay { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.pl-replay input[type="range"] { width: clamp(120px, 22vw, 280px); accent-color: var(--pl-gold); min-height: 24px; }
+.pl-stacks { position: relative; width: 100%; border-radius: 12px; overflow: hidden; border: 1px solid color-mix(in srgb, var(--s6-edgec) 22%, transparent); background: var(--s6-surf); }
+.pl-svg { position: absolute; inset: 0; }
+.pl-base { stroke: color-mix(in srgb, var(--foreground) 18%, transparent); stroke-width: 1; }
+.pl-coin { transition: transform 160ms ease; }
+.pl-coin-open { fill: var(--pl-open); stroke: var(--pl-open-edge); stroke-width: 1; }
+.pl-coin-won { fill: var(--pl-gold); stroke: color-mix(in srgb, var(--pl-gold) 70%, #000); stroke-width: 1; }
+.pl-coin-lost { fill: var(--pl-lost); stroke: color-mix(in srgb, var(--foreground) 45%, transparent); stroke-width: 1; }
+.pl-coin-stuck { fill: url(#pl-hatch); stroke: var(--pl-stuck); stroke-width: 1; }
+.pl-hatch-bg { fill: color-mix(in srgb, var(--foreground) 8%, transparent); } .pl-hatch-line { fill: color-mix(in srgb, var(--pl-stuck) 55%, transparent); }
+.pl-hit { fill: transparent; cursor: pointer; } .pl-hit:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.pl-grp:hover .pl-coin, .pl-grp:focus-within .pl-coin { transform: translateY(-2px); }
+@keyframes pl-drop { from { transform: translateY(-28px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+[data-settle="1"] .pl-coin { animation: pl-drop 340ms cubic-bezier(.22,.7,.25,1) both; }
+/* the text layer: its own boxes, proven never to overlap the coins */
+.pl-labels { position: absolute; inset: 0; pointer-events: none; }
+.pl-lab { position: absolute; display: flex; flex-direction: column; justify-content: flex-start; align-items: flex-start; gap: 1px; min-width: 0; overflow: hidden; text-align: left; color: var(--foreground); font: inherit; background: none; border: 0; padding: 0 2px; cursor: pointer; pointer-events: auto; }
+.pl-lab > * { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pl-lab b { font-size: 0.75rem; font-weight: 600; line-height: 1.25; } .pl-lab .pl-val { font-size: 0.9375rem; font-weight: 650; line-height: 1.2; }
+.pl-lab-won .pl-val { color: var(--pl-gold); } .pl-lab-lost { color: var(--muted-foreground); }
+.pl-lab small { font-size: 0.6875rem; line-height: 1.25; color: var(--muted-foreground); } .pl-lab u { text-decoration: none; color: var(--pl-stuck); font-weight: 600; }
+.pl-lab:hover b { text-decoration: underline; text-underline-offset: 2px; }
+[data-vertical="1"] .pl-lab { flex-direction: row; flex-wrap: wrap; align-items: baseline; column-gap: 8px; } [data-vertical="1"] .pl-lab b { max-width: 55%; }
+.pl-reasons { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 14px; }
+.pl-reason { display: inline-flex; align-items: baseline; gap: 8px; font: inherit; font-size: 0.8125rem; min-height: 32px; padding: 0; background: none; border: 0; border-bottom: 1px dotted color-mix(in srgb, var(--foreground) 35%, transparent); color: var(--muted-foreground); cursor: pointer; } .pl-reason:hover { color: var(--foreground); } .pl-reason b { color: var(--foreground); font-weight: 600; }
+.pl-flow-foot { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin-top: 10px; }
+.pl-leak { text-align: left; cursor: pointer; font: inherit; font-size: 0.9rem; padding: 4px 0; min-height: 36px; background: none; border: 0; color: var(--foreground); text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--foreground) 30%, transparent); text-underline-offset: 3px; } .pl-leak:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.ap-formula { margin: 8px 0 16px; } .ap-formula summary { cursor: pointer; font-size: 0.8125rem; color: var(--muted-foreground); min-height: 24px; }
+/* calm the rest of the page: the coloured number tiles and chips go neutral, only words carry the meaning */
+.pl .ap-kpi .ap-kpi-n { color: var(--foreground); } .pl .ap-kpi:hover { box-shadow: none; }
+.pl .ap-chip[data-tone] { color: var(--muted-foreground); background: transparent; border-color: color-mix(in srgb, var(--foreground) 22%, transparent); }
+@media (max-width: 700px) { .pl-replay { width: 100%; } .pl-replay input[type="range"] { flex: 1; width: auto; } }
+@media (prefers-reduced-motion: reduce) { [data-settle="1"] .pl-coin { animation: none; } .pl-coin { transition: none; } }
