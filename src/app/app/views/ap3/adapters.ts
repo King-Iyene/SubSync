@@ -24,6 +24,7 @@ export function adaptRow(r: Appt3Row, now = Date.now()): ApRow {
     id: r.appointmentId, locationId: r.locationId, accountName: r.accountName ?? "", contactId: r.contactId ?? "", contactName: r.contactName, startAt: r.startAt, calendarName: r.calendarName ?? "",
     status: STATUS[r.bucket] ?? "booked", ownerId: r.ownerId, ownerName: r.ownerName, bookerId: r.bookerId, bookerName: r.bookerName, source: r.source, phone: r.phone,
     dealValueCents: cents(r.dealValue), dealStatus: r.dealStatus ?? "none", hoursPast: past ? Math.max(0, (now - start) / 3_600_000) : null, flags, url: r.url ?? null, calendarId: r.calendarId ?? null,
+    ...(r.dnd ? { dnd: true } : {}),
   };
 }
 export function adaptList(p: Appt3NeedsOutcome | Appt3Recovery | Page<Appt3Row>, now?: number) {
