@@ -54,7 +54,7 @@ describe.skipIf(!HAS_DB)("appointments round 3", () => {
     const t = session(CO_A, "agency", null);
     const o = await call(t, "appointments?part=overview");
     expect(o.status).toBe(200);
-    expect(o.body.booked).toBe(5);
+    expect(o.body.booked).toBe(4); // default window is the last 30 days to end of today, so the appointment 3 days ahead is outside it
     expect(o.body.unmarked).toBe(1);
     const list = await call(t, "appointments?part=list&bucket=unmarked");
     expect(list.body.total).toBe(o.body.unmarked);
