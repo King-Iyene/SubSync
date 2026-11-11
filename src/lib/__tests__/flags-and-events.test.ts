@@ -16,6 +16,8 @@ test("pilot modules are on by default and a database row can still override the 
   assert.deepEqual([...DEFAULT_OFF].sort(), [
     "appt_actions",
     "appt_booking_share",
+    "appt_bulk",
+    "appt_delete",
     "appt_calendars",
     "appt_flow_tree",
     "appt_health",
@@ -28,6 +30,9 @@ test("pilot modules are on by default and a database row can still override the 
     "appt_record",
     "appt_reminders",
     "appt_sources",
+    "appt_bulk",
+    "appt_delete",
+    "appt_meetings",
     "inbox_assign",
     "inbox_ball_in_court",
     "inbox_breach_alert",
