@@ -150,6 +150,10 @@ export const FEATURES = [
   "pp_idle",
   "pp_rollup",
   "pp_actions",
+  // Account audit (docs/features/AUDIT_BRIEF.md): history and then-vs-now, the client one-pager, the monthly re-audit email.
+  "au_history",
+  "au_onepager",
+  "au_monthly",
   "td_module",
   "td_today",
   "td_proof",

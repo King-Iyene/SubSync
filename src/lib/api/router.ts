@@ -47,7 +47,10 @@ import { appointmentInsights } from "../analytics/appointment-insight-queries";
 import { buildAudit } from "../analytics/audit-intel";
 import { shareSourceOf } from "../analytics/audit-v2";
 import { revokeShared } from "../analytics/share-queries";
-import { clientPage, coreFor, pagePayload, type AuditBase } from "./audit-api";
+import { clientPage, coreFor, pagePayload, type AuditBase, type Core } from "./audit-api";
+import { AUDIT_RULES_VERSION, buildHistory, runsFromAudit, shareThenNow, type History, type RunRow } from "../analytics/au-history";
+import { readPrefs, readStored, recordRuns, setAccountMute, setMonthlyOn } from "../analytics/au-history-queries";
+import { ownedLocation } from "./tenant-guard";
 import { handleClientsPart } from "./clients-book-routes";
 import { appointmentList, staleDealList, waitingList, type AuditList } from "../analytics/audit-queries";
 import { DEAL_RULES_VERSION } from "../analytics/definitions";
@@ -341,12 +344,34 @@ async function auditCore(ctx: Ctx, wanted: string | null, fresh = false) {
   return { s, core };
 }
 
+const auOn = (ctx: Ctx, f: "au_history" | "au_onepager" | "au_monthly") => ctx.entitlements.features[f] !== false && !ctx.entitlements.locked.includes(f);
+
+// The audit history (docs/features/AUDIT_BRIEF.md). Today's counts for the accounts this caller may read are stored once per account per day (the first read of the day stands),
+// then compared with the first run and the last earlier run of the same accounts. The ids come from the audit's own scope (the signed session), never from the request.
+// Accounts still being read for the first time are not stored (a zero there would be a false baseline). Never throws: the audit page works without its history.
+async function auditHistoryOf(ctx: Ctx, core: Core): Promise<History | null> {
+  if (ctx.demo || !auOn(ctx, "au_history")) return null;
+  try {
+    const unread = new Set(core.unreadIds);
+    const runs = runsFromAudit(core.audit, core.accounts, core.calendars).filter((r) => !unread.has(r.locationId));
+    await recordRuns(ctx.installationId, runs, core.now, "view");
+    const ids = core.accounts.map((a) => a.id);
+    const stored = await readStored(ctx.installationId, ids, core.now);
+    const today = new Date(core.now).toISOString().slice(0, 10);
+    const now: RunRow[] = runs.map((r) => ({ ...r, runDay: today, rulesVersion: AUDIT_RULES_VERSION, baseline: false }));
+    return buildHistory({ today, now, stored, names: new Map(core.accounts.map((a) => [a.id, a.name])) });
+  } catch (error) { console.error("Audit history failed", error instanceof Error ? error.message : "unknown"); return null; }
+}
+
 async function auditV2View(ctx: Ctx) {
   const sp = ctx.url.searchParams;
   const { s, core } = await auditCore(ctx, sp.get("location"), sp.get("fresh") === "1");
   const who = s.settings.brandName ?? (ctx.limitTo ? "Your business" : "Your company");
+  // The history is a second, lazy read (?part=history) so the first screen never waits for it.
+  if (sp.get("part") === "history") return json({ history: await auditHistoryOf(ctx, core) });
   return json({
     ...pagePayload(core, sp, { brand: { name: s.settings.brandName, color: s.settings.brandColor, logoUrl: s.settings.brandLogoUrl }, who }),
+    history: null, au: { history: auOn(ctx, "au_history"), onepager: auOn(ctx, "au_onepager"), monthly: auOn(ctx, "au_monthly") && ctx.kind !== "client" },
     hiddenAccounts: ctx.limitTo ? 0 : s.hidden, focus: s.focus,
     // Sharing is for an agency or a business, never a client's own staff; the demo holds only the public sample.
     canShare: ctx.kind !== "client" && !ctx.demo, demo: ctx.demo, shareDays: SHARE_LINK_DAYS,
@@ -361,6 +386,33 @@ async function auditClientsView(ctx: Ctx) {
   return json(clientPage(core, sp));
 }
 
+// The monthly re-audit message settings: on or off for the company, and mute for one client account. SubSync-only settings, for a business or an agency (never a client's staff).
+// The account id passes the shared guard against the accounts this caller may read before anything is written, and is never echoed back.
+async function auditPrefs(ctx: Ctx) {
+  if (ctx.kind === "client") return json({ error: "Not available in this view" }, 403);
+  if (ctx.demo) return json({ error: "Not available in the demo" }, 400);
+  const off = gate(ctx, "au_monthly");
+  if (off) return off;
+  const { accounts } = await accountsFor(ctx);
+  const live = accounts.filter((a) => !a.ignored);
+  const ids = live.map((a) => a.locationId);
+  if (ctx.request.method === "POST") {
+    const body = (await ctx.request.json().catch(() => null)) as { monthly?: unknown; location?: unknown; muted?: unknown } | null;
+    if (typeof body?.monthly === "boolean") {
+      await setMonthlyOn(ctx.installationId, body.monthly);
+      await sql()`insert into audit_log (installation_id, actor, action, detail) values (${ctx.installationId}, ${ctx.session.userId ?? ctx.kind}, 'audit.monthly_toggled', ${sql().json({ on: body.monthly } as never)})`;
+    }
+    if (body?.location !== undefined) {
+      const loc = await ownedLocation(ctx.installationId, ids, body.location);
+      if (!loc || typeof body.muted !== "boolean") return json({ error: "Not found" }, 404);
+      await setAccountMute(ctx.installationId, loc, body.muted);
+    }
+  }
+  const prefs = await readPrefs(ctx.installationId, ids);
+  const muted = new Set(prefs.muted);
+  return json({ monthly: prefs.on, accounts: live.map((a) => ({ id: a.locationId, name: a.name ?? "Unnamed account", muted: muted.has(a.locationId) })) });
+}
+
 // A snapshot of the audit someone can send on: the sentence, the figures, finding titles, fix steps and definitions only, account names scrubbed, expires in SHARE_LINK_DAYS.
 // It covers the same accounts as the page the person was looking at (the page filter, and the one client if they had opened one), and never holds a contact, a deal or a conversation.
 async function auditShare(ctx: Ctx) {
@@ -370,7 +422,10 @@ async function auditShare(ctx: Ctx) {
   const { s, core } = await auditCore(ctx, typeof body?.location === "string" ? body.location : null);
   const who = s.settings.brandName ?? (ctx.limitTo ? "Your business" : "Your company");
   const id = randomBytes(24).toString("base64url");
-  const payload = buildSharePayload(shareSourceOf(core.audit, core.healthy, core.accounts.length), who, core.accountNames, new Date(), { branded: s.settings.brandName !== null, brandColor: s.settings.brandColor, logoUrl: s.settings.brandLogoUrl, rulesVersion: DEAL_RULES_VERSION });
+  // The one-pager also carries the counts then and now (counts only) when the history is on and there is something comparable.
+  const history = auOn(ctx, "au_onepager") ? await auditHistoryOf(ctx, core) : null;
+  const thenNow = history?.thenNow ? shareThenNow(history.thenNow, core.accounts.length) : null;
+  const payload = buildSharePayload(shareSourceOf(core.audit, core.healthy, core.accounts.length), who, core.accountNames, new Date(), { branded: s.settings.brandName !== null, brandColor: s.settings.brandColor, logoUrl: s.settings.brandLogoUrl, rulesVersion: DEAL_RULES_VERSION, thenNow });
   await sql()`insert into shared_audits (installation_id, id, payload, expires_at) values (${ctx.installationId}, ${id}, ${sql().json(payload as never)}, now() + make_interval(days => ${SHARE_LINK_DAYS}))`;
   const origin = (process.env.NEXT_PUBLIC_APP_URL ?? ctx.url.origin).replace(/\/+$/, "");
   return json({ url: `${origin}/audit/${id}`, expiresInDays: SHARE_LINK_DAYS });
@@ -395,6 +450,9 @@ async function auditRevoke(ctx: Ctx) {
   if (ctx.demo) return json({ error: "Sharing is not available in the demo" }, 400);
   const body = (await ctx.request.json().catch(() => null)) as { id?: unknown } | null;
   if (typeof body?.id !== "string" || !/^[A-Za-z0-9_-]{20,64}$/.test(body.id)) return json({ error: "Unknown link" }, 400);
+  // The screen asks for the last six characters of the link to be typed. When they are sent they must match (a mistyped confirmation switches nothing off).
+  const typed = (body as { typed?: unknown }).typed;
+  if (typed !== undefined && typed !== body.id.slice(-6)) return json({ error: "The confirmation does not match this link" }, 400);
   if (!(await revokeShared(ctx.installationId, body.id))) return json({ error: "That link was not found or is already switched off" }, 404);
   await sql()`insert into audit_log (installation_id, actor, action, detail) values (${ctx.installationId}, ${ctx.session.userId ?? ctx.kind}, 'audit.share_revoked', ${sql().json({ ref: body.id.slice(-6) } as never)})`;
   return json({ ok: true });
@@ -2087,6 +2145,7 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       if (a === "appointments" && b && c && LOCATION_ID.test(b) && LOCATION_ID.test(c)) return await appointmentDetailView(ctx, b, c);
       if (a === "appointments") return await appointmentsView(ctx);
       if (a === "audit" && b === "shares") return await auditShares(ctx);
+      if (a === "audit" && b === "prefs") return await auditPrefs(ctx);
       if (a === "audit" && b === "clients") return await auditClientsView(ctx);
       if (a === "audit") return await auditV2View(ctx);
       if (a === "speed") return await speedViewData(ctx);
@@ -2165,6 +2224,7 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       if (a === "today" && b === "views" && !c) return await todayViewSave(ctx);
       if (a === "inbox" && b === "views") return await inboxViewSave(ctx);
       if (a === "audit" && b === "share") return await auditShare(ctx);
+      if (a === "audit" && b === "prefs") return await auditPrefs(ctx);
       if (a === "audit" && b === "revoke") return await auditRevoke(ctx);
       if (a === "roadmap" && !b) return await roadmapVote(ctx);
       if (a === "roadmap" && b === "suggest" && !c) return await suggest(ctx, request);
