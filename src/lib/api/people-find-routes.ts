@@ -77,6 +77,8 @@ export async function handlePeopleFind(ctx: Ctx, h: FindHelpers & { coldChoice: 
       after = page.next ? decodeCursor(page.next) : null;
       if (!after) break;
     }
+    // The audit row says who exported, how many people and which kinds of choice were used (never the words typed, never a name).
+    await sql()`insert into audit_log (installation_id, actor, action, detail) values (${ctx.installationId}, ${ctx.session.userId ?? ctx.kind}, 'people.exported', ${sql().json({ rows: out.length, choices: Object.keys(f.filter), accounts: allowed ? allowed.length : "all" } as never)})`.catch(() => undefined);
     return new Response(exportCsv(out), { headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": 'attachment; filename="people.csv"', "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } });
   }
 
@@ -123,6 +125,7 @@ export async function handlePeopleFind(ctx: Ctx, h: FindHelpers & { coldChoice: 
     if (r.status === "needs_permission") { permission = true; break; }
     if (r.status === "saved") done++; else if (r.status === "dry_run") held++; else failed++;
   }
+  await sql()`insert into audit_log (installation_id, actor, action, detail) values (${ctx.installationId}, ${ctx.session.userId ?? ctx.kind}, 'people.bulk_' || ${input.action}, ${sql().json({ people: plan.go.length, done, held, failed, stoppedByLimit: limited } as never)})`.catch(() => undefined);
   const message = permission ? "Needs permission: reconnect SubSync to let it save to your CRM. Nothing was changed."
     : limited ? `Stopped at the hourly limit after ${done}. The rest were not changed; try again later.`
     : held > 0 ? `Checked ${held} ${held === 1 ? "person" : "people"}: your CRM is in a safe test mode, so nothing was saved yet.`

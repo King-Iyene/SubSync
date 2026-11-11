@@ -155,7 +155,7 @@ export function FindTab({ plus = false, bulk = false }: { plus?: boolean; bulk?:
                 </div>
                 <button type="button" onClick={() => { void navigator.clipboard?.writeText(listText(results.data!.rows, showAccount)).catch(() => undefined); }} className={QUIET}>Copy this page</button>
               </div>
-              {bulk && <BulkBar picked={results.data.rows.filter((r) => ticked.has(r.rowId))} filter={effective} canExport onClear={() => setTick({ fk, ids: new Set() })} onDone={() => { setTick({ fk, ids: new Set() }); fnd.reload(); }} />}
+              {bulk && <BulkBar picked={results.data.rows.filter((r) => ticked.has(r.rowId))} filter={effective} canExport owners={opts.data?.owners ?? []} canOwner onClear={() => setTick({ fk, ids: new Set() })} onDone={() => { setTick({ fk, ids: new Set() }); fnd.reload(); }} />}
               <PersonRows rows={results.data.rows} showAccount={showAccount} actions={actions} onOpen={(i) => openFrom("search", i)} testId="people-list" plus={plus} select={bulk ? { picked: ticked, toggle } : undefined}
                 empty="Nobody matches. Check the spelling, try part of the email or the last digits of the phone number, or clear a filter." />
               {plus ? (
