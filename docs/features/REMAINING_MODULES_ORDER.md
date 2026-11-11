@@ -27,3 +27,11 @@ Migration timestamps (from 20261204090000, one block per builder): TD 20261204*,
 
 ## Shared rules for every builder (restated)
 Real GHL data only, list what is not available on screen; counts equal rows, every number clickable; 1M+ rows (SQL aggregates, rollups, keyset paging); typed confirmation for every delete, preview for edits; writes through the safe gateway; tenant guard on every id with xtest- DB tests; calm design, max 3 colours; record history before building screens; customer's-eye "why would I pay" pass before done; flags ON in the live app after the tenancy check.
+
+## Research loop (11 Nov 2026)
+After each module ships (flag ON in the live app), run one research and learn pass before the next big build:
+1. Use the live module as a customer would (agency owner, setter, client admin); note what is confusing or slow.
+2. Compare with 3 to 5 competitor products and the GHL ideas board, communities and reviews; label VERIFIED / INFERENCE / UNVERIFIED with links.
+3. Check the API for unused data and silent limits (caps, windows, paging); check filters, empty states and numbers against a manual count.
+4. Write docs/research/MODULE_Rn_*.md (under 150 lines): ranked improvements, money first, customer second, innovation third; each with data needed, effort S/M/L, buildable with data we hold yes/no.
+5. King picks; builders take the list. Example: docs/research/APPOINTMENTS_R5_LEADERS_AND_GAPS.md.
