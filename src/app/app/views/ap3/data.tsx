@@ -51,7 +51,7 @@ function fixtureFor(part: ApPart, extra: Record<string, string | number | undefi
     case "flow-tree": return FLOW_FIXTURE;
     case "health": return { rows: HEALTH_FIXTURE };
     case "sources": return { sources: SOURCES_FIXTURE, speed: SPEED_FIXTURE };
-    case "calendars": return { rows: CONFLICTS_FIXTURE };
+    case "calendars": return { rows: CONFLICTS_FIXTURE, calendars: [], people: [], problems: [] };
     case "reminders": return page(REMINDERS_FIXTURE);
     case "proof": return { rows: PROOF_FIXTURE };
   }

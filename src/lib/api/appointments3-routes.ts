@@ -18,7 +18,7 @@ const PART_FLAG: Record<Appt3Part, string> = {
   overview: "appt_overview", "needs-outcome": "appt_needs_outcome", "noshow-recovery": "appt_noshow_recovery", "booking-share": "appt_booking_share", "flow-tree": "appt_flow_tree",
   health: "appt_health", sources: "appt_sources", calendars: "appt_calendars", reminders: "appt_reminders", receipt: "appt_proof", list: "appt_overview", detail: "appt_history",
 };
-const BUCKETS = new Set(["booked", "unmarked", "showed", "noshow", "cancelled", "invalid", "completed", "won", "lost", "open", "no_deal", "upcoming"]);
+const BUCKETS = new Set(["booked", "unmarked", "showed", "noshow", "cancelled", "invalid", "completed", "won", "lost", "open", "no_deal", "upcoming", "confirmed", "recovered", "burned"]);
 const int = (v: string | null, d: number) => { const n = Number(v); return v !== null && Number.isFinite(n) ? Math.floor(n) : d; };
 const text = (v: string | null, max: number) => (v ?? "").trim().slice(0, max) || null;
 const personParam = (v: string | null) => (v === "none" ? "none" : cleanId(v));

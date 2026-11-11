@@ -37,7 +37,7 @@ export function ApTable({ rows, showAccount, onOpen, activeId, testId, selectabl
           {rows.map((r, i) => (
             <tr key={r.id} tabIndex={0} data-active={activeId === r.id ? "1" : undefined} data-tone={r.flags.includes("double-booked") ? "red" : r.ownerId === null ? "amber" : undefined} onClick={() => onOpen(r)} onKeyDown={(e) => move(e, i)} onMouseEnter={() => setHot(r.id)} onFocus={() => setHot(r.id)} aria-label={`${r.contactName}, ${when(r.startAt)}`} data-testid="ap-row">
               {selectable && <td onClick={(e) => e.stopPropagation()}><input type="checkbox" className="size-4" aria-label={`Select ${r.contactName}`} checked={selected?.has(r.id) ?? false} onChange={(e) => onSelect?.(r.id, e.target.checked)} /></td>}
-              <td><span className="ap-name">{r.contactName}</span></td>
+              <td><span className="ap-name">{r.contactName}</span>{r.url && <a className="ap-link ml-2 text-xs" href={r.url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} aria-label={`Open ${r.contactName} in your CRM`} data-testid="ap-row-crm">Open in your CRM</a>}</td>
               {showAccount && <td className="ap-sub">{r.accountName}</td>}
               <td>{when(r.startAt)}{r.hoursPast !== null && r.hoursPast > 0 && <span className="ap-sub"> ({r.hoursPast < 48 ? `${Math.round(r.hoursPast)}h` : `${Math.round(r.hoursPast / 24)}d`} ago)</span>}</td>
               <td className="ap-sub">{r.calendarName}</td>
@@ -117,6 +117,7 @@ export function ApPanel({ row, onClose, onChanged, filters }: { row: ApRow; onCl
             <dt>Deal</dt><dd>{row.dealStatus === "none" ? "No deal linked" : `${row.dealStatus === "won" ? "Won" : row.dealStatus === "lost" ? "Lost" : "Open"}${row.dealValueCents ? `, ${money(row.dealValueCents)}` : ""}`}</dd>
             {row.flags.length > 0 && <><dt>Watch</dt><dd>{row.flags.map((f) => FLAG_TEXT[f]).join(", ")}</dd></>}
           </dl>
+          {row.url && <a className="s6-btn" data-kind="primary" href={row.url} target="_blank" rel="noopener noreferrer" data-testid="ap-open-crm">Open in your CRM</a>}
           <ApSlot name="Details" row={row} onChanged={onChanged} filters={filters} />
           <p className="ap-fine">Changes to appointments are made in your CRM or, once enabled, through SubSync&apos;s checked edit tools (preview first, typed confirmation to delete).</p>
         </div>

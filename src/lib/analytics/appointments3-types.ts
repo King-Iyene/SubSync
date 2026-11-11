@@ -16,7 +16,7 @@ export type Appt3Query = {
 };
 
 /** Our own groups of statuses. `unmarked` = time passed (by 3h) with no outcome. `no_deal` = no deal linked to the contact. */
-export type Appt3Bucket = "booked" | "unmarked" | "showed" | "noshow" | "cancelled" | "invalid" | "completed" | "won" | "lost" | "open" | "no_deal" | "upcoming";
+export type Appt3Bucket = "booked" | "unmarked" | "showed" | "noshow" | "cancelled" | "invalid" | "completed" | "won" | "lost" | "open" | "no_deal" | "upcoming" | "confirmed" | "recovered" | "burned";
 
 export type Estimate = { value: number | null; low: number | null; high: number | null; enough: boolean; estimate: true; formula: string; minNote: string | null };
 export type Rate = { value: number | null; n: number; of: number; enough: boolean };
@@ -115,6 +115,12 @@ export type Appt3Calendars = {
   trend: Array<{ week: string; booked: number; rescheduled: number; cancelled: number }>;
   roundRobin: Array<{ calendarId: string; calendarName: string | null; locationId: string; members: Array<{ userId: string | null; name: string; owned: number; sharePct: number }> }>;
   capacity: Array<{ month: string; booked: number }>;
+  /** Every calendar seen for these accounts, with a count that may be zero (idle calendars are listed too). */
+  calendarsAll?: Array<{ locationId: string; accountName: string | null; calendarId: string; calendarName: string | null; bookings: number; lastBookingAt: string | null; daysSince: number | null }>;
+  /** Every named person (and anyone who owns a booking), with a count that may be zero. `everBooked` = owned any booking at all. */
+  peopleAll?: Array<{ userId: string; name: string; bookings: number; sharePct: number; lastBookingAt: string | null; daysSince: number | null; everBooked: boolean }>;
+  /** Calendar problems at a glance. `available: false` = the platform does not give us that data yet (never a guess). */
+  problems?: Array<{ key: string; label: string; tone: "red" | "amber"; count: number; why: string; available: boolean }>;
   needsPermission: boolean;
 };
 

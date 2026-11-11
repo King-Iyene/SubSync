@@ -12,7 +12,7 @@ export type ApPage<T> = { total: number; page: number; pageSize: number; rows: T
 export type ApRow = {
   id: string; locationId: string; accountName: string; contactId: string; contactName: string; startAt: string; calendarName: string;
   status: ApStatus; ownerId: string | null; ownerName: string | null; bookerId: string | null; bookerName: string | null; source: string | null;
-  dealValueCents: number | null; dealStatus: "open" | "won" | "lost" | "none"; hoursPast: number | null; flags: Array<"double-booked" | "no-reminder" | "unconfirmed" | "no-deal">;
+  dealValueCents: number | null; dealStatus: "open" | "won" | "lost" | "none"; hoursPast: number | null; url?: string | null; calendarId?: string | null; flags: Array<"double-booked" | "no-reminder" | "unconfirmed" | "no-deal">;
 };
 
 export type ApOverview = {
@@ -38,6 +38,10 @@ export type ApHealthRow = { locationId: string; name: string; booked: number; sh
 export type ApSourceRow = { source: string; booked: number; showRate: number | null; medianFirstReplyMinutes: number | null; won: number };
 export type ApSpeedBand = { label: string; booked: number; showRate: number | null };
 export type ApConflictRow = { id: string; kind: "double-booking" | "forced-overlap" | "disconnected"; accountName: string; calendarName: string; when: string | null; people: string[]; note: string };
+export type ApCalendarRow = { locationId: string; accountName: string; calendarId: string; calendarName: string; bookings: number; lastBookingAt: string | null; daysSince: number | null };
+export type ApPersonCalRow = { userId: string; name: string; bookings: number; sharePct: number; lastBookingAt: string | null; daysSince: number | null; everBooked: boolean };
+export type ApProblem = { key: string; label: string; tone: "red" | "amber"; count: number; why: string; available: boolean };
+export type ApCalendarsView = { rows: ApConflictRow[]; calendars: ApCalendarRow[]; people: ApPersonCalRow[]; problems: ApProblem[] };
 export type ApReminderRow = ApRow & { reminderState: "none" | "sent" | "confirmed" | "failed"; hoursToStart: number };
-export type ApProof = { weekOf: string; accountName: string; booked: number; showed: number; recovered: number; stillUnmarked: number; trueShowRate: number | null; caught: number; fixed: number };
+export type ApProof = { weekOf: string; weekEnd?: string; locationId?: string | null; accountName: string; booked: number; showed: number; recovered: number; stillUnmarked: number; trueShowRate: number | null; caught: number; fixed: number };
 export type ApSavedView = { id: string; name: string; scope: Partial<ApScope> & { q?: string } };

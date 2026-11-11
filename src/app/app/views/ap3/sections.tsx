@@ -9,7 +9,13 @@ import { useAp, type ApFilters } from "./data";
 import type { ApOverview, ApRow } from "./types";
 
 type Open = (r: ApRow) => void;
-export type SectionProps = { filters: ApFilters; onOpen: Open; activeId: string | null; showAccount: boolean; go: (tab: string) => void };
+export type DrillReq = { title: string; count: number; extra: Record<string, string | number | undefined> };
+export type SectionProps = { filters: ApFilters; onOpen: Open; activeId: string | null; showAccount: boolean; go: (tab: string) => void; onDrill: (d: DrillReq) => void };
+/** A number that opens the appointments behind it. */
+export const Hit = ({ n, label, onClick, tone }: { n: number | string; label: string; onClick: () => void; tone?: string }) => (
+  <button type="button" className="ap-link tnum" data-tone={tone} onClick={onClick} aria-label={label} title={label} data-testid="ap-hit">{typeof n === "number" ? n.toLocaleString("en-US") : n}</button>
+);
+const JOURNEY_BUCKET: Record<string, string> = { booked: "booked", confirmed: "confirmed", showed: "showed", won: "won" };
 
 function Frame<T>({ res, children, cards }: { res: { data: T | null; error: unknown; reload: () => void }; children: (d: T) => React.ReactNode; cards?: boolean }) {
   if (res.error) return <ErrorState error={res.error as Error} onRetry={res.reload} />;
@@ -18,7 +24,7 @@ function Frame<T>({ res, children, cards }: { res: { data: T | null; error: unkn
 }
 
 // ---------- Overview ----------
-export function Overview({ filters, go }: SectionProps) {
+export function Overview({ filters, go, onDrill }: SectionProps) {
   const res = useAp<ApOverview>("overview", filters);
   const [run, setRun] = useState(0);
   const [more, setMore] = useState(false);
@@ -66,7 +72,7 @@ export function Overview({ filters, go }: SectionProps) {
             <Q q="Where do my appointments go?" tip="Booked, confirmed, showed and won, counted from the same rows as the lists." testId="ap-journey" action={<button type="button" className="s6-btn" onClick={() => setRun((r) => r + 1)}><RotateCcw aria-hidden className="size-4" />Replay</button>}>
               <div className="ap-jr mt-3" key={run}>
                 {d.journey.map((s, i) => (
-                  <div className="ap-jr-row" key={s.key}><span>{s.label}</span><div className="ap-jr-bar"><i style={{ width: `${Math.max(2, (s.count / Math.max(1, d.journey[0].count)) * 100)}%`, ["--i" as string]: i }} /></div><span className="ap-jr-pct"><b className="text-foreground">{s.count}</b> {i > 0 ? `${Math.round((s.count / Math.max(1, d.journey[i - 1].count)) * 100)}%` : ""}</span></div>
+                  <div className="ap-jr-row" key={s.key}><button type="button" className="ap-link" style={{ textAlign: "left" }} onClick={() => onDrill({ title: `${s.label} appointments`, count: s.count, extra: { outcome: JOURNEY_BUCKET[s.key], expect: s.count } })} data-testid={`ap-jr-${s.key}`}>{s.label}</button><div className="ap-jr-bar"><i style={{ width: `${Math.max(2, (s.count / Math.max(1, d.journey[0].count)) * 100)}%`, ["--i" as string]: i }} /></div><span className="ap-jr-pct"><button type="button" className="ap-link tnum" onClick={() => onDrill({ title: `${s.label} appointments`, count: s.count, extra: { outcome: JOURNEY_BUCKET[s.key], expect: s.count } })} aria-label={`Open the ${s.count} ${s.label} appointments`}><b>{s.count}</b></button> {i > 0 ? `${Math.round((s.count / Math.max(1, d.journey[i - 1].count)) * 100)}%` : ""}</span></div>
                 ))}
               </div>
             </Q>
