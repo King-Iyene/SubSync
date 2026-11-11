@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { diffHistory, isReschedule, type Snap } from "../analytics/appointments3-record.ts";
+import { diffHistory, isReschedule, type Snap } from "../analytics/appointments3-diff.ts";
 
 const T = Date.parse("2026-11-10T12:00:00Z");
 const snap = (o: Partial<Snap> = {}): Snap => ({ status: "confirmed", startAt: T + 86_400_000, ownerId: "c1", calendarId: "cal1", bookerId: null, contactId: "p1", ...o });
