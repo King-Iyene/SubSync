@@ -99,6 +99,7 @@ export type OpportunityRow = {
   updatedAt: string | null;
   assignedTo: string | null;
   source: string | null;
+  lostReasonId: string | null;
 };
 
 export function mapOpportunity(raw: unknown): OpportunityRow | null {
@@ -124,6 +125,7 @@ export function mapOpportunity(raw: unknown): OpportunityRow | null {
     updatedAt: toIso(r.updatedAt),
     assignedTo: str(r.assignedTo),
     source: str(r.source),
+    lostReasonId: str(r.lostReasonId),
   };
 }
 

@@ -95,7 +95,7 @@ type Method = "GET" | "POST" | "PUT" | "DELETE";
 // optionally the second. Everything not listed is refused for that kind (default deny).
 type Rule = [Method, string, string?];
 
-const GET_VIEWS = ["today", "overview", "accounts", "onboarding", "search", "stale", "hygiene", "inbox", "pipelines", "duplicates", "alerts", "pipeline-intel", "contact-intel", "comms-intel", "deal-gaps", "deal-events", "contact", "people", "start", "appointments", "appointment-insights", "audit", "speed", "roadmap", "freshness", "client-trends", "workflows", "data-health"];
+const GET_VIEWS = ["today", "overview", "accounts", "onboarding", "search", "stale", "hygiene", "inbox", "pipelines", "duplicates", "alerts", "pipeline-intel", "contact-intel", "comms-intel", "deal-gaps", "deal-events", "contact", "people", "start", "appointments", "appointment-insights", "pipeline3", "audit", "speed", "roadmap", "freshness", "client-trends", "workflows", "data-health"];
 
 // Anyone may send feedback, report a problem or suggest something on the roadmap (stage F8): each is stored against the person and account named in the signed
 // A person may keep their own saved views of the Unanswered messages page (inbox/views): they hold only filter choices, scoped to the person.
