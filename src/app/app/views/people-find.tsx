@@ -124,7 +124,7 @@ export function FindTab({ plus = false, bulk = false }: { plus?: boolean; bulk?:
           {typed && <button type="button" aria-label="Clear the search" onClick={() => { setTyped(""); setDebounced(""); }} className="absolute right-1 top-1/2 inline-flex size-11 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground hover:text-foreground"><X aria-hidden className="size-4" /></button>}
         </div>
         <p className="mt-1.5 text-xs text-muted-foreground">
-          {term.ok || typed.trim().length === 0 ? (showAccount ? "Across every client account. Part of a name or email, or the last digits of a phone, is enough." : "Part of a name or email, or the last digits of a phone, is enough.") : "Type at least two letters, or three digits of a phone number."}
+          {term.ok || typed.trim().length === 0 ? (showAccount ? "Across every client account. The start of a name or email, or the last digits of a phone, is enough." : "The start of a name or email, or the last digits of a phone, is enough.") : "Type at least two letters, or three digits of a phone number."}
         </p>
         {!searching && (recent.data?.queries.length ?? 0) > 0 && (
           <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm" data-testid="recent-searches">

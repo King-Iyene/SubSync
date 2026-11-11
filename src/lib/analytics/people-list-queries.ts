@@ -97,15 +97,14 @@ export function filterSql(db: Sql, installationId: string, f: SmartFilter, coldT
   const parts: Array<ReturnType<Sql>> = [];
   const add = (x: ReturnType<Sql>) => parts.push(x);
   if (f.q) {
-    const like = `%${escapeLike(f.q)}%`;
-    // Only something that looks like a phone number (digits, spaces, brackets, dashes, a plus) is also looked for in the phone numbers: an email or a name that happens to hold digits is not.
+    // A typed word is looked for at the START of a name, last name or email (btree prefix indexes: a range read, however many people there are) and inside the phone digits (trigram).
+    // Never at the middle of a word with a pattern that has to read every row. An @ in the word means an email; digits only means a phone number.
     const t = searchTerm(f.q);
-    const digits = f.q.replace(/\D/g, "");
-    // ONE indexed column per kind of word, so the planner uses ONE trigram index instead of a scan: digits look in the phone numbers only, a word with @ in the emails only,
-    // anything else in the names and emails (two trigram indexes, combined).
+    const digits = f.q.replace(/[^0-9]/g, "");
+    const word = escapeLike(f.q.toLowerCase());
     if (t.ok && t.kind === "phone" && digits.length >= 3) add(db`c.phone_digits like ${`%${digits}%`}`);
-    else if (t.ok && t.kind === "email") add(db`lower(c.email) like ${like.toLowerCase()}`);
-    else add(db`(c.full_name ilike ${like} or lower(c.email) like ${like.toLowerCase()})`);
+    else if (t.ok && t.kind === "email") add(f.q.startsWith("@") ? db`lower(c.email) like ${`%${word}%`}` : db`lower(c.email) like ${`${word}%`}`);
+    else add(db`(lower(c.full_name) like ${`${word}%`} or lower(c.last_name) like ${`${word}%`} or lower(c.email) like ${`${word}%`})`);
   }
   if (f.tags?.length) add(f.tagMode === "all" ? db`c.tags @> ${f.tags}::text[]` : db`c.tags && ${f.tags}::text[]`);
   if (f.notTag) add(db`not (c.tags @> ${[f.notTag]}::text[])`);

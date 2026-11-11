@@ -95,7 +95,7 @@ export function useFound(filter: SmartFilter | null) {
       if (after) p.set("after", after);
       const r = await api.get<FoundPage>(`people/find?${p.toString()}`);
       if (live.current !== key) return;
-      setState((s) => ({ key, rows: after ? [...s.rows, ...r.rows] : r.rows, total: after ? s.total : r.total, capped: after ? s.capped : r.capped, next: r.next, loading: false, error: null, busy: false }));
+      setState((s) => ({ key, rows: after ? [...s.rows, ...r.rows.filter((n) => !s.rows.some((o) => o.rowId === n.rowId))] : r.rows, total: after ? s.total : r.total, capped: after ? s.capped : r.capped, next: r.next, loading: false, error: null, busy: false }));
     } catch (e) {
       if (live.current === key) setState((s) => ({ ...s, loading: false, busy: false, error: (e as Error).message || "Could not load people." }));
     }
