@@ -46,7 +46,7 @@ test("the bar's modes and account helpers", () => {
 test("menu order is money first", () => {
   const top = NAV.filter((n) => !n.parent).map((n) => n.id);
   assert.ok(!top.includes("inbox"), "Unanswered messages is a tab of Speed to lead, not a menu entry");
-  assert.deepEqual(top.slice(0, 8), ["today", "speed", "appointments", "clients", "people", "audit", "cleanup", "overview"]);
+  assert.deepEqual(top.slice(0, 9), ["today", "speed", "appointments", "clients", "payments", "people", "audit", "cleanup", "overview"]);
 });
 
 import { summariseWaitingMoney, waitingMoneyLine, type CountedDeal } from "../analytics/waiting-money.ts";

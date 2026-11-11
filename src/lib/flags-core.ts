@@ -104,6 +104,13 @@ export const DEFAULT_OFF: ReadonlySet<Feature> = new Set<Feature>([
   "cl_actions",
   "cl_retention",
   "cl_workflows",
+  // Clients v2 (client-account management): each behind its own flag, default off.
+  "cl2_accounts",
+  "cl2_account_page",
+  "cl2_plans",
+  "cl2_notes",
+  "cl2_bulk",
+  "cl2_team_move",
   "cl_onboarding",
   // Team (People) module (docs/features/PEOPLE_BRIEF.md): each behind its own flag, default off.
   "pp_module",
@@ -135,6 +142,12 @@ export const DEFAULT_OFF: ReadonlySet<Feature> = new Set<Feature>([
   // Find a lead (docs/features/FINDLEAD_BRIEF.md): fl_find is the search (keyset paging, pickers, copy); fl_bulk is bulk actions and export. Default off.
   "fl_find",
   "fl_bulk",
+  // Payments module (docs/features/PAYMENTS_BRIEF.md): each behind its own flag, default off. pm_resend stays off until King approves messaging a customer.
+  "pm_module",
+  "pm_recovery",
+  "pm_disputes",
+  "pm_upcoming",
+  "pm_resend",
   // Cash features (docs/features/CASH_FEATURES.md): the morning "save this account" digest, the missed-lead recovery list, stale and lost deal alerts. Default off until verified.
   "cf_save",
   "cf_recover",

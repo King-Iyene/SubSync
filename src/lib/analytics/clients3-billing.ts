@@ -28,17 +28,60 @@ export async function refreshClientBilling(inst: string): Promise<number> {
   let token: string;
   try { token = await getCompanyAccessToken(companyKey); } catch { return 0; }
   const accts = await db`select location_id from locations where installation_id = ${inst} and not ignored`;
-  const result = await readSaasPlans(await get(token), companyKey);
+  const getter = await get(token);
+  const result = await readSaasPlans(getter, companyKey);
+  let before = new Map<string, { status: string | null; since: Date | null }>();
+  try {
+    const p = await db`select location_id, subscription_status, status_since from client_billing where installation_id = ${inst}`;
+    before = new Map(p.map((x) => [x.location_id as string, { status: (x.subscription_status as string | null) ?? null, since: (x.status_since as Date | null) ?? null }]));
+  } catch { /* the Clients v2 columns are not there yet: the older write below still works */ }
+  const reason = result.failed === null ? null : result.failed === 401 || result.failed === 403 ? "The platform refused the read (permission). Reconnect and allow plan access." : `The platform answered ${result.failed} when asked for plans.`;
   let written = 0;
   for (const a of accts) {
     const id = a.location_id as string;
     const r = stateFor(result, id);
-    await db`insert into client_billing (installation_id, location_id, state, plan_id, plan_name, subscription_status, fetched_at)
-      values (${inst}, ${id}, ${r.state}, ${r.planId}, ${r.planName}, ${r.status}, now())
-      on conflict (installation_id, location_id) do update set state = excluded.state, plan_id = excluded.plan_id, plan_name = excluded.plan_name, subscription_status = excluded.subscription_status, fetched_at = now()`;
+    const old = before.get(id);
+    const changed = !!old && old.status !== r.status && r.state === "ok";
+    const since = !old || changed || !old.since ? new Date() : old.since;
+    try {
+      await db`insert into client_billing (installation_id, location_id, state, plan_id, plan_name, subscription_status, fetched_at, subscription_id, price_amount, price_currency, billing_interval, trial_days, user_limit, contact_limit, status_since, http_status, reason)
+        values (${inst}, ${id}, ${r.state}, ${r.planId}, ${r.planName}, ${r.status}, now(), ${r.subscriptionId ?? null}, ${r.price?.amount ?? null}, ${r.price?.currency ?? null}, ${r.price?.interval ?? null}, ${r.trialDays ?? null}, ${r.userLimit ?? null}, ${r.contactLimit ?? null}, ${since}, ${result.failed}, ${reason})
+        on conflict (installation_id, location_id) do update set state = excluded.state, plan_id = excluded.plan_id, plan_name = excluded.plan_name, subscription_status = excluded.subscription_status, fetched_at = now(),
+          subscription_id = excluded.subscription_id, price_amount = excluded.price_amount, price_currency = excluded.price_currency, billing_interval = excluded.billing_interval, trial_days = excluded.trial_days,
+          user_limit = excluded.user_limit, contact_limit = excluded.contact_limit, status_since = excluded.status_since, http_status = excluded.http_status, reason = excluded.reason`;
+      if (changed) await db`insert into cl2_plan_events (installation_id, location_id, from_status, to_status, plan_name) values (${inst}, ${id}, ${old?.status ?? null}, ${r.status}, ${r.planName})`;
+    } catch {
+      await db`insert into client_billing (installation_id, location_id, state, plan_id, plan_name, subscription_status, fetched_at)
+        values (${inst}, ${id}, ${r.state}, ${r.planId}, ${r.planName}, ${r.status}, now())
+        on conflict (installation_id, location_id) do update set state = excluded.state, plan_id = excluded.plan_id, plan_name = excluded.plan_name, subscription_status = excluded.subscription_status, fetched_at = now()`;
+    }
     written++;
   }
+  await refreshWallets(inst, getter, accts.map((a) => a.location_id as string)).catch(() => undefined);
   return written;
+}
+
+const WALLET_EVERY_HOURS = 6;
+const WALLET_PER_RUN = 150;
+const WALLET_PACE_MS = 120;
+/** Credit balance per account (optional permission wallet.readonly): at most 150 accounts a run, each at most every 6 hours, stops at the first refusal. Only values the platform returned are stored. */
+async function refreshWallets(inst: string, get: Getter, ids: string[]): Promise<void> {
+  if (!ids.length) return;
+  const db = sql();
+  const due = await db`select l.location_id from locations l left join client_billing b on b.installation_id = l.installation_id and b.location_id = l.location_id
+    where l.installation_id = ${inst} and not l.ignored and l.location_id = any(${ids}::text[]) and (b.wallet_at is null or b.wallet_at < now() - ${`${WALLET_EVERY_HOURS} hours`}::interval)
+    order by b.wallet_at nulls first limit ${WALLET_PER_RUN}`;
+  for (const d of due) {
+    const id = d.location_id as string;
+    const r = await get(`/wallet/balance?locationId=${encodeURIComponent(id)}`, "2021-07-28").catch(() => ({ status: 0, body: null }));
+    const body = (r.body && typeof r.body === "object" ? r.body : {}) as Record<string, unknown>;
+    const n = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : typeof v === "string" && v.trim() !== "" && Number.isFinite(Number(v)) ? Number(v) : null);
+    const ok = r.status >= 200 && r.status < 300;
+    const state = ok ? "ok" : r.status === 401 || r.status === 403 ? "needs_permission" : "not_available";
+    await db`update client_billing set wallet_state = ${state}, wallet_balance = ${ok ? n(body.balance) : null}, wallet_credits = ${ok ? n(body.complimentaryCredits) : null}, wallet_at = now() where installation_id = ${inst} and location_id = ${id}`;
+    if (state === "needs_permission") break;
+    await new Promise((res) => setTimeout(res, WALLET_PACE_MS));
+  }
 }
 
 const MISSING = "Not available from the platform yet";

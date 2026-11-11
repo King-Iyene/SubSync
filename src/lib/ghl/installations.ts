@@ -96,7 +96,14 @@ export async function isInstalled(companyId: string): Promise<boolean> {
 }
 
 export async function setPlan(installationId: string, plan: Plan): Promise<void> {
-  await sql()`update installations set plan = ${plan} where id = ${installationId}`;
+  const db = sql();
+  // Our own history (Payments, the moat): every change of this install's plan is written down once, with the time we saw it. Best effort: a missing table never blocks the change.
+  try {
+    const old = await db`select plan from installations where id = ${installationId}`;
+    const before = (old[0]?.plan as string | undefined) ?? null;
+    if (before !== plan) await db`insert into pm_events (installation_id, location_id, kind, item_id, from_status, to_status, occurred_at) values (${installationId}, '', 'app_plan', ${installationId}, ${before}, ${plan}, now()) on conflict do nothing`;
+  } catch { /* the table may not be applied yet */ }
+  await db`update installations set plan = ${plan} where id = ${installationId}`;
 }
 
 // A table that a not-yet-applied database update would have added is simply not there; a purge skips it instead of failing (which would leave the customer's data in place).

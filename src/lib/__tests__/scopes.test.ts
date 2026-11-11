@@ -12,6 +12,7 @@ test("the permissions requested are exactly the agreed list", () => {
     "locations.readonly", "locations/customFields.readonly", "locations/tags.readonly", "locations/tags.write", "locations/tasks.readonly", "locations/tasks.write",
     "oauth.readonly", "oauth.write", "opportunities.readonly", "opportunities.write", "users.readonly",
     "workflows.readonly", "workflows.logs", "workflows.write", "workflows.publish", "workflows.delete", "campaigns.readonly", "emails/campaigns.readonly", "emails/stats.readonly", "saas/location.read", "saas/company.read",
+    "payments/transactions.readonly", "payments/subscriptions.readonly", "invoices.readonly", "wallet.readonly", "marketplace-installer-details.readonly",
   ].sort());
   assert.equal(new Set(GHL_SCOPES).size, GHL_SCOPES.length, "no duplicates");
 });

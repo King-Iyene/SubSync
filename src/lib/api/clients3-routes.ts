@@ -1,6 +1,7 @@
 import { attention, clientsCache, compare, exportCsv, list, options, overview, people, receipt, setup, trends, type Filters, type Links, type Scope } from "../analytics/clients3-queries";
 import { billing } from "../analytics/clients3-billing";
 import { clampSize, parseWindow } from "../analytics/clients3-intel";
+import { CL2_FLAGS } from "../analytics/clients2-types";
 import { CL3_FLAGS, CL3_PARTS, CL3_REASONS, type Cl3Level, type Cl3Part, type Cl3Reason } from "../analytics/clients3-types";
 import type { Feature } from "../entitlements";
 import { resolveEntitlements } from "../flags";
@@ -27,7 +28,7 @@ export async function handleClients3(ctx: Ctx, h: Clients3Helpers): Promise<Resp
   const sp = ctx.url.searchParams, part = sp.get("part") as Cl3Part | null;
   if (!part || !(CL3_PARTS as readonly string[]).includes(part)) return json({ error: "Not found" }, 404);
   const [allowedAll, dl, ent] = await Promise.all([h.allowed(), h.links(), resolveEntitlements(ctx.plan, ctx.installationId, ctx.demo)]);
-  const flags = Object.fromEntries(CL3_FLAGS.map((f) => [f, ent.features[f as Feature] === true]));
+  const flags = Object.fromEntries([...CL3_FLAGS, ...CL2_FLAGS].map((f) => [f, ent.features[f as Feature] === true]));
   if (!flags[PART_FLAG[part]]) return json({ error: "This part of Clients is not switched on yet." }, 404);
 
   const canSee = ctx.kind === "agency" && ctx.limitTo === null;

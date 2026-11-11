@@ -126,8 +126,10 @@ import { handleAppointments3 } from "./appointments3-routes";
 import { handleApptExec, handleApptExecTarget } from "./appointments-exec-routes";
 import { handlePipeline3 } from "./pipeline3-routes";
 import { handleClients3 } from "./clients3-routes";
+import { handleClients2 } from "./clients2-routes";
 import { handlePeople3 } from "./people3-routes";
 import { handleTeamRoles } from "./team-roles-routes";
+import { handlePayments } from "./payments-routes";
 import { handleToday3, handleToday3Act } from "./today3-routes";
 import { handleCash, handleCashAct } from "./cash-routes";
 import { handleApptActions } from "./appointment-actions-routes";
@@ -825,7 +827,7 @@ export async function todayBriefForInstallation(installationId: string, plan: Pl
   return briefFromToday(await todayData(ctx));
 }
 
-const USAGE_VIEWS = new Set(["today", "overview", "accounts", "clients", "team", "search", "deals", "pipeline", "leads", "calls", "inbox", "onboarding", "email", "duplicates", "alerts", "settings", "help", "account", "meetings", "audit", "speed", "appointments", "people", "myday", "roadmap", "notifications", "workflows"]);
+const USAGE_VIEWS = new Set(["today", "overview", "accounts", "clients", "team", "search", "deals", "pipeline", "leads", "calls", "inbox", "onboarding", "email", "duplicates", "alerts", "settings", "help", "account", "meetings", "audit", "speed", "appointments", "people", "myday", "roadmap", "notifications", "workflows", "payments"]);
 
 // A counter of which pages get opened (no personal data), so the getting-started checklist can
 // tick itself off and so the agency can see what its team uses.
@@ -2065,6 +2067,15 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
     // Clients round 3: /api/app/clients3?part=... (overview, needs attention, trends, compare, receipt, people, setup, lists; read only).
     if (a === "clients3" && method === "GET" && !b && ctx.url.searchParams.has("part")) {
       return await handleClients3(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links });
+    }
+    // Payments: /api/app/payments?part=... (today, queue, item, disputes, upcoming, history, options, setup, export; read only) and /api/app/payments/act/<note|dispute|dispute-edit|dispute-remove|resend>
+    // (SubSync's own notes and dispute log; resend is off). Flags, the account and the person are checked inside.
+    if (a === "payments" && ((method === "GET" && !b && ctx.url.searchParams.has("part")) || (method === "POST" && b === "act" && ctx.segments.length === 3))) {
+      return await handlePayments(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links, brand: async () => (await scope(ctx)).settings.brandName ?? null, locationToken: (locationId) => locationAccessToken(ctx.session.companyId, locationId) });
+    }
+    // Clients v2 (client-account management): /api/app/clients2?part=... (accounts, today, plans needing attention, one account) and /api/app/clients2/<op> (SubSync-only notes, kind of business, saved views).
+    if (a === "clients2" && ((method === "GET" && !b && ctx.url.searchParams.has("part")) || (method === "POST" && b && ctx.segments.length === 2))) {
+      return await handleClients2(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links });
     }
     // Today (front page): /api/app/today3?part=... (today, list, proof, numbers, settings, export; read only) and /api/app/today3/act/... (SubSync-only notes).
     if (a === "today3" && method === "GET" && !b && ctx.url.searchParams.has("part")) {

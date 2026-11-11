@@ -108,6 +108,9 @@ async function main() {
       ...["overview", "needs-attention", "trends", "compare", "receipt", "people", "setup", "options", "export", "billing"].flatMap((part) => [`/api/app/clients3?part=${part}`, `/api/app/clients3?part=${part}&location=${other.locs[0]}`, `/api/app/clients3?part=${part}&q=${other.marker}&industry=${other.marker}`]),
       ...["leads_down", "waiting", "waiting_old", "unmarked", "noshows", "stale_deals", "no_owner", "no_phone", "staff_quiet", "sync_old", "needs_permission"].flatMap((r) => [`/api/app/clients3?part=list&reason=${r}`, `/api/app/clients3?part=list&reason=${r}&location=${other.locs[0]}`]),
       `/api/app/clients3?part=compare&ids=${other.locs.join(",")}`, `/api/app/clients3?part=receipt&location=${other.locs[0]}&week=2026-01-05`,
+      // Clients v2 (client-account management): every part, asked for the other side's account, name, kind, manager and cursor by every parameter the screen takes.
+      ...["list", "options", "today", "plans", "views", "export"].flatMap((part) => [`/api/app/clients2?part=${part}`, `/api/app/clients2?part=${part}&q=${other.marker}&plan=${other.marker}&vertical=${other.marker}&manager=${other.marker}&status=past_due&level=act&quiet=true`, `/api/app/clients2?part=${part}&cursor=${other.marker}&sort=name&size=100`]),
+      `/api/app/clients2?part=account&id=${other.locs[0]}`, `/api/app/clients2?part=account&id=${other.marker}`, `/api/app/clients2?part=list&location=${other.locs[0]}`,
       // Today (front page): every part, asked for the other side's account by every parameter the page takes (location, kind, week).
       ...["today", "list", "proof", "numbers", "settings", "export", "options"].flatMap((part) => [`/api/app/today3?part=${part}`, `/api/app/today3?part=${part}&location=${other.locs[0]}`, `/api/app/today3?part=${part}&location=${other.marker}`, `/api/app/today3?part=${part}&location=${other.locs[0]}&week=2026-01-05`]),
       ...["waiting_old", "waiting", "unmarked", "noshows", "stale_deals", "needs_permission", "sync_old", "leads_down", "staff_quiet", "no_owner", "no_phone", "open_deals", "all_waiting", "all_noshows", "all_stale", "mine_waiting"].flatMap((k) => [`/api/app/today3?part=list&kind=${k}`, `/api/app/today3?part=list&kind=${k}&location=${other.locs[0]}`]),
@@ -135,6 +138,9 @@ async function main() {
       `/api/app/people3/act/proof?locationId=${other.locs[0]}`, `/api/app/people3/act/proof-csv?locationId=${other.locs[0]}`, `/api/app/people3/act/proof-prefs?locationId=${other.locs[0]}`, `/api/app/people3/act/meta?locationId=${other.locs[0]}`, `/api/app/people3/act/suggest?locationId=${other.locs[0]}`, `/api/app/people3/act/log?locationId=${other.locs[0]}`, `/api/app/people3/act/away?locationId=${other.locs[0]}`, `/api/app/people3/act/notes?userId=${other.marker}`, `/api/app/people3/act/targets?userId=${other.marker}`, `/api/app/people3/act/focus?userId=${other.marker}`, `/api/app/people3/act/rebalance?locationId=${other.locs[0]}&userId=${other.marker}`, `/api/app/people3/act/suggest?locationId=${other.locs[0]}&contactId=${other.contacts[0]}`, "/api/app/people3/act/away", "/api/app/people3/act/log", "/api/app/people3/act/caps",
       // Team roles (Setter, Closer): the other side's account and people asked for by every parameter of the reads.
       "/api/app/people3/roles/map", "/api/app/people3/roles/list", "/api/app/people3/roles/log", `/api/app/people3/roles/list?location=${other.locs[0]}`, `/api/app/people3/roles/list?q=${other.marker}&role=none&after=${other.marker}`, `/api/app/people3/roles/list?location=${other.locs[0]}&role=setters`,
+      // Payments: every part, asked for the other side's account and items by every parameter the page takes.
+      ...["today", "queue", "disputes", "upcoming", "history", "options", "setup", "export"].flatMap((part) => [`/api/app/payments?part=${part}`, `/api/app/payments?part=${part}&location=${other.locs[0]}`, `/api/app/payments?part=${part}&location=${other.locs[0]}&q=${other.marker}&currency=USD&problem=failed`]),
+      `/api/app/payments?part=item&loc=${other.locs[0]}&kind=invoice&id=anything`, `/api/app/payments?part=queue&cursor=${other.marker}`,
       // The rebuilt Account audit (stage AUDIT): the read, the client list and a single client, asked for the other side's account by every parameter it takes.
       `/api/app/clients/act/receipt?location=${other.locs[0]}`, `/api/app/clients/act/csv?location=${other.locs[0]}`, `/api/app/clients/act/setup?location=${other.locs[0]}`, "/api/app/clients/act/receipt", "/api/app/clients/act/mutes",
       // Clients actions, second half and the one Clients screen (stage CL-INT): every remaining read part, and the screen's read parts with the other side's account in every parameter (writes: tests/unit/clients-int-xtenant-db.test.ts).
@@ -234,6 +240,11 @@ async function main() {
       ["PUT", `/api/app/client-onboarding/${B.locs[0]}/steps`, { key: "manual:kickoff", done: true }],
       ["POST", `/api/app/client-onboarding/${B.locs[0]}/steps`, { label: "hacked" }],
       ["POST", `/api/app/clients/${B.locs[0]}/notes`, { body: "hacked" }],
+      // Clients v2: a note, a tag and a saved view aimed at the other agency's account.
+      ["POST", "/api/app/clients2/note-add", { location: B.locs[0], kind: "note", body: "hacked" }],
+      ["POST", "/api/app/clients2/note-update", { location: B.locs[0], id: "00000000-0000-0000-0000-000000000000", body: "hacked" }],
+      ["POST", "/api/app/clients2/note-delete", { location: B.locs[0], id: "00000000-0000-0000-0000-000000000000", confirm: "x" }],
+      ["POST", "/api/app/clients2/tag", { locations: [B.locs[0]], vertical: "solar", step: "do" }],
       ["DELETE", `/api/app/clients/${B.locs[0]}/notes?id=00000000-0000-0000-0000-000000000000`, {}],
       // Today's working queue: a mark on the other agency's row, and a saved view that names the other agency's account.
       ["POST", "/api/app/today/action", { action: "done", rowKey: `${B.locs[0]}|replies` }],
@@ -268,6 +279,10 @@ async function main() {
       ["POST", "/api/app/people3/act/target", { userId: B.marker, locationId: B.locs[0], metric: "reply_minutes", value: 5, step: "do" }],
       ["POST", "/api/app/people3/act/away", { kind: "away", userId: B.marker, reason: "other", until: new Date(Date.now() + 5 * 86_400_000).toISOString(), step: "do" }],
       ["POST", "/api/app/people3/act/away-end", { id: "00000000-0000-0000-0000-000000000000" }],
+      ["POST", "/api/app/payments/act/note", { location: B.locs[0], kind: "invoice", id: "anything", action: "contacted" }],
+      ["POST", "/api/app/payments/act/dispute", { location: B.locs[0], customer: "x", openedOn: "2026-01-01", step: "do" }],
+      ["POST", "/api/app/payments/act/dispute-remove", { id: "00000000-0000-0000-0000-000000000000", step: "do", confirm: "x" }],
+      ["POST", "/api/app/payments/act/resend", { location: B.locs[0], id: "anything", step: "do", confirm: "SEND" }],
       ["POST", "/api/app/people3/act/proof-prefs", { locationId: B.locs[0], nameStaff: true, step: "do" }],
       // Team roles: a label for the other agency's person or account, and an undo of the other agency's batch, must all be refused.
       ["POST", "/api/app/people3/roles/set", { userIds: [B.marker], role: "setter", step: "do" }],

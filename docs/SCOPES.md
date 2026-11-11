@@ -2,7 +2,7 @@
 
 This file is generated from `src/lib/scope-groups.ts` (run `scripts/gen-scopes-doc.ts`). A test fails when it is stale, when a permission the app asks for is missing from it, or when it lists one the app does not ask for. Do not edit it by hand.
 
-SubSync asks for 31 permissions: 7 required and 24 optional. Fewer permissions is a trust advantage, and every permission added later makes every installed company approve again, so each one below has a reason. An optional permission can be declined: the feature that needs it then says "Needs permission: reconnect" and everything else keeps working.
+SubSync asks for 36 permissions: 7 required and 29 optional. Fewer permissions is a trust advantage, and every permission added later makes every installed company approve again, so each one below has a reason. An optional permission can be declined: the feature that needs it then says "Needs permission: reconnect" and everything else keeps working.
 
 Wording rule: the screen says one of three things. **Needs permission: reconnect** (the app asked and this install declined, or the app has not asked yet), **Not available from the platform yet** (the platform refuses even with the permission, or has no such data), or it simply shows the data. See `docs/CAPABILITIES.md` for which data point is which.
 
@@ -93,6 +93,18 @@ The automations and campaigns in your client accounts, and how they are doing.
 | `saas/location.read` | read | optional | Optional. Not used by the Billing view today. |
 | `saas/company.read` | read | optional | The plan and subscription status each client account has on your plans, for the Billing view in Clients. Without it the view says: Needs permission, reconnect. |
 
+## Payments and credit
+
+Failed and late payments, so you can chase the money, and the credit balance of each client account.
+
+| Permission | Kind | Required | Why we ask |
+| --- | --- | --- | --- |
+| `payments/transactions.readonly` | read | optional | Each payment's status, amount and who paid, to list failed payments and refunds. Read only: SubSync cannot charge, refund or retry anything. Without it Payments says: Needs permission, reconnect. |
+| `payments/subscriptions.readonly` | read | optional | Whether a customer's repeat payment is active or past due, to list failed repeat payments. Read only. |
+| `invoices.readonly` | read | optional | Which invoices are sent, partly paid or paid and when they are due, to list late invoices. Read only: SubSync never sends or changes an invoice. |
+| `wallet.readonly` | read | optional | The credit balance of each client account, to warn you before it runs out. Read only. |
+| `marketplace-installer-details.readonly` | read | optional | Which plan each install is on, to double-check billing against our own records. Read only. |
+
 ## Email health
 
 No permission needed. SubSync checks the sending domain's public DNS records (SPF, DKIM, DMARC) from the domain it finds on the account's profile.
@@ -101,10 +113,8 @@ No permission needed. SubSync checks the sending domain's public DNS records (SP
 
 | Permission | Why it is not asked for |
 | --- | --- |
-| `payments/transactions.readonly` | Failed payments and wallet balance. Not asked for: financial permissions cost trust and no feature needs them yet. |
-| `invoices.readonly` | Invoices. Not asked for, for the same reason. |
+| `invoices.write` | Sending an invoice again. Not asked for: it would message your client's customer, and SubSync does not message anyone for you. |
 | `forms.readonly` | Form-by-form lead source. Not asked for yet. |
-| `marketplace-installer-details.readonly` | Reading each install's plan, to double-check billing. Planned for a later release. |
 | `conversations/message.write` | Sending messages. Never asked for: SubSync does not reply to anyone, it measures how fast your team does. |
 
 ## Rules for every change permission

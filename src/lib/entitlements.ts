@@ -137,6 +137,13 @@ export const FEATURES = [
   "cl_actions",
   "cl_retention",
   "cl_workflows",
+  // Clients v2 (client-account management): each behind its own flag, default off.
+  "cl2_accounts",
+  "cl2_account_page",
+  "cl2_plans",
+  "cl2_notes",
+  "cl2_bulk",
+  "cl2_team_move",
   "cl_onboarding",
   // Team (People) module (docs/features/PEOPLE_BRIEF.md): each behind its own flag, default off.
   "pp_module",
@@ -166,6 +173,12 @@ export const FEATURES = [
   "ov_screen",
   "fl_find",
   "fl_bulk",
+  // Payments module (docs/features/PAYMENTS_BRIEF.md): each behind its own flag, default off. pm_resend messages a customer and stays off until King approves it.
+  "pm_module",
+  "pm_recovery",
+  "pm_disputes",
+  "pm_upcoming",
+  "pm_resend",
   "cf_save",
   "cf_recover",
   "cf_deals",
