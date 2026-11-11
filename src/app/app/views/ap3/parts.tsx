@@ -32,13 +32,13 @@ export function ApTable({ rows, showAccount, onOpen, activeId, testId, selectabl
   return (
     <div className="ap-scroll" data-testid={testId}>
       <table className="ap-t">
-        <thead><tr>{selectable && <th style={{ width: 36 }}><span className="sr-only">Select</span></th>}<th>Contact</th>{showAccount && <th>Account</th>}<th>When</th><th>Calendar</th><th>Status</th><th>Booked by</th><th>Owner</th><th data-num>Deal</th><th>Notes</th>{selectable && hasApSlot("RowActions") && <th><span className="sr-only">Mark</span></th>}</tr></thead>
+        <thead><tr>{selectable && <th style={{ width: 36 }}><span className="sr-only">Select</span></th>}<th>Contact</th><th>Phone</th>{showAccount && <th>Account</th>}<th>When</th><th>Calendar</th><th>Status</th><th>Booked by</th><th>Owner</th><th data-num>Deal</th><th>Notes</th>{selectable && hasApSlot("RowActions") && <th><span className="sr-only">Mark</span></th>}</tr></thead>
         <tbody ref={body}>
           {rows.map((r, i) => (
             <tr key={r.id} tabIndex={0} data-active={activeId === r.id ? "1" : undefined} data-tone={r.flags.includes("double-booked") ? "red" : r.ownerId === null ? "amber" : undefined} onClick={() => onOpen(r)} onKeyDown={(e) => move(e, i)} onMouseEnter={() => setHot(r.id)} onFocus={() => setHot(r.id)} aria-label={`${r.contactName}, ${when(r.startAt)}`} data-testid="ap-row">
               {selectable && <td onClick={(e) => e.stopPropagation()}><input type="checkbox" className="size-4" aria-label={`Select ${r.contactName}`} checked={selected?.has(r.id) ?? false} onChange={(e) => onSelect?.(r.id, e.target.checked)} /></td>}
               <td><span className="ap-name">{r.contactName}</span>{r.url && <a className="ap-link ml-2 text-xs" href={r.url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} aria-label={`Open ${r.contactName} in your CRM`} data-testid="ap-row-crm">Open in your CRM</a>}</td>
-              {showAccount && <td className="ap-sub">{r.accountName}</td>}
+              <td className="ap-sub">{r.phone ?? "-"}</td>{showAccount && <td className="ap-sub">{r.accountName}</td>}
               <td>{when(r.startAt)}{r.hoursPast !== null && r.hoursPast > 0 && <span className="ap-sub"> ({r.hoursPast < 48 ? `${Math.round(r.hoursPast)}h` : `${Math.round(r.hoursPast / 24)}d`} ago)</span>}</td>
               <td className="ap-sub">{r.calendarName}</td>
               <td><StatusChip row={r} /></td>
@@ -53,6 +53,14 @@ export function ApTable({ rows, showAccount, onOpen, activeId, testId, selectabl
       </table>
     </div>
   );
+}
+
+/** Downloads the rows on the page as CSV (a spreadsheet cannot run a formula from a cell: leading = + - @ are neutralised). */
+export function csvDownload(rows: ApRow[]) {
+  const cell = (v: unknown) => { let t = String(v ?? ""); if (/^[=+-@]/.test(t)) t = "'" + t; return '"' + t.replace(/"/g, '""') + '"'; };
+  const head = ["Name", "Phone", "Account", "Calendar", "Date", "Status", "Booked by", "Owner", "Deal value"];
+  const lines = [head, ...rows.map((r) => [r.contactName, r.phone, r.accountName, r.calendarName, r.startAt, r.status, r.bookerName, r.ownerName, r.dealValueCents === null ? "" : r.dealValueCents / 100])];
+  const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([lines.map((l) => l.map(cell).join(",")).join("\n")], { type: "text/csv" })); a.download = "appointments.csv"; a.click(); URL.revokeObjectURL(a.href);
 }
 
 export function Pager({ total, page, size, onPage, onSize }: { total: number; page: number; size: number; onPage: (p: number) => void; onSize: (s: number) => void }) {
@@ -87,6 +95,7 @@ export function ApRowsList({ part, filters, extra, onOpen, activeId, showAccount
   return (
     <div data-testid={testId} aria-busy={loading}>
       {selectable && sel.size > 0 && <div className="mb-2 flex flex-wrap items-center gap-2 text-sm" data-testid="ap-bulkbar"><b>{sel.size} selected</b><ApSlot name="BulkActions" rows={chosen} onChanged={reload} filters={filters} /><button type="button" className="ap-link" onClick={() => setSel(new Set())}>Clear</button></div>}
+      <div className="mb-2 text-right"><button type="button" className="ap-link" onClick={() => csvDownload(data.rows)} data-testid="ap-csv" title="Download the rows on this page as a spreadsheet file">Download CSV</button></div>
       <div className="ap-tablewrap" style={{ opacity: loading ? 0.7 : 1 }}>
         <ApTable rows={data.rows} showAccount={showAccount} onOpen={onOpen} activeId={activeId} selectable={selectable} selected={sel} onChanged={reload} onSelect={(id, on) => setSel((s) => { const n = new Set(s); if (on) n.add(id); else n.delete(id); return n; })} />
         <Pager total={data.total} page={page} size={size} onPage={setPage} onSize={(s) => { setSize(s); setPage(1); }} />

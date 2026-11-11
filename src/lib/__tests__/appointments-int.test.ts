@@ -4,7 +4,7 @@ import { adaptCalendars, adaptFlow, adaptList, adaptOverview, adaptRow, API_PARA
 import { ownMarkers } from "../ghl/appointment-gateway.ts";
 
 const rate = (value: number | null, n = 10) => ({ value, n, of: n, enough: value !== null });
-const row = { appointmentId: "a1", locationId: "L1", accountName: "Acme", contactId: "c1", contactName: "Sam", url: null, calendarId: "k", calendarName: "Sales", startAt: "2026-11-01T10:00:00Z", endAt: null, status: "noshow", bucket: "noshow" as const, ownerId: null, ownerName: null, bookerId: "u1", bookerName: "Ada", source: null, dealStatus: null, dealValue: 1200.5, leadToBookedMinutes: null, firstReplyMinutes: null, hasConflict: true, why: null, dnd: false };
+const row = { appointmentId: "a1", locationId: "L1", accountName: "Acme", contactId: "c1", contactName: "Sam", url: null, calendarId: "k", calendarName: "Sales", startAt: "2026-11-01T10:00:00Z", endAt: null, status: "noshow", bucket: "noshow" as const, ownerId: null, ownerName: null, phone: "+15550100", bookerId: "u1", bookerName: "Ada", source: null, dealStatus: null, dealValue: 1200.5, leadToBookedMinutes: null, firstReplyMinutes: null, hasConflict: true, why: null, dnd: false };
 
 test("the API row becomes the screen row: dollars to cents, flags, hours past", () => {
   const r = adaptRow(row, Date.parse("2026-11-01T12:00:00Z"));
@@ -48,7 +48,7 @@ test("flow tree: setter, closer and leaves become outcomes; unknown people keep 
 
 test("overview: under-minimum rates stay empty and the cards come from the other parts", () => {
   const o = adaptOverview({
-    headline: "h", button: null, booked: 12, unmarked: 3, trueShowRate: rate(null), reportedShowRate: rate(0.9), noshowToRecover: 2, recoveredLast30: 0, noDealLinked: 0, upcoming: 0,
+    headline: "h", button: null, booked: 12, unmarked: 3, trueShowRate: rate(null), reportedShowRate: rate(0.9), today: { doubleBookings: 0, idlePeople: 0 }, noshowToRecover: 2, recoveredLast30: 0, noDealLinked: 0, upcoming: 0,
     revenueAtRisk: { value: null, low: 100, high: 300, enough: true, estimate: true, formula: "f", minNote: null }, revenueWon: { value: 0, n: 0 }, journey: [], cards: [], trend: [], windowDays: 30, dealWindowDays: 30, accounts: 1,
   }, { health: { rows: [{ locationId: "L9", accountName: "Bad Co", booked: 9, showRate: rate(0.5), cancelRate: rate(0.1), noshowRate: rate(0.4), unmarked: 0, target: 75, belowTarget: true, worstReason: null, vertical: null }], total: 1, page: 0, size: 20, pages: 1, truncated: false, verticals: [] } });
   assert.equal(o.headline.trueShowRate, null);

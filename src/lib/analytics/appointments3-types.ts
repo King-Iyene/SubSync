@@ -3,7 +3,7 @@
 // minimum sample is { enough: false } and the screen says "not enough data", never a made-up number. Definitions: docs/METRICS.md "Appointments 3".
 
 export const APPT3_PARTS = [
-  "overview", "needs-outcome", "noshow-recovery", "booking-share", "flow-tree", "health", "sources", "calendars", "options", "compare", "receipt", "list", "detail",
+  "overview", "needs-outcome", "noshow-recovery", "booking-share", "flow-tree", "health", "sources", "calendars", "options", "compare", "trends", "export", "receipt", "list", "detail",
 ] as const;
 export type Appt3Part = (typeof APPT3_PARTS)[number];
 
@@ -11,7 +11,7 @@ export type Appt3Part = (typeof APPT3_PARTS)[number];
 import type { PersonRollup } from "./appointments3-intel.ts";
 export type Appt3Query = {
   part: Appt3Part; from?: string; to?: string; location?: string; calendar?: string; user?: string; source?: string;
-  page?: number; size?: 20 | 50 | 100; sort?: string; q?: string; bucket?: Appt3Bucket;
+  page?: number; /** Keyset cursor 'startIso|id' for lists sorted newest first. */ after?: string; size?: 20 | 50 | 100; sort?: string; q?: string; bucket?: Appt3Bucket;
   /** Flow tree and lists: a booker id or "none" (setter), an owner id or "none" (closer); compare = "idA,idB" (two setters); top = how many setters to show (3 to 30, default 12); week = Monday date (YYYY-MM-DD) for the receipt. */
   setter?: string; closer?: string; compare?: string; top?: number; week?: string; /** Flow tree: skip this many people (See all pages through the rest). */ skip?: number;
 };
@@ -28,7 +28,7 @@ export type Appt3Row = {
   calendarId: string | null; calendarName: string | null;
   startAt: string; endAt: string | null; status: string; bucket: Appt3Bucket;
   ownerId: string | null; ownerName: string | null; bookerId: string | null; bookerName: string | null;
-  source: string | null; dealStatus: "won" | "lost" | "open" | null; dealValue: number | null;
+  phone: string | null; source: string | null; dealStatus: "won" | "lost" | "open" | null; dealValue: number | null;
   leadToBookedMinutes: number | null; firstReplyMinutes: number | null;
   hasConflict: boolean;
   /** Why it is on this list, in plain words (for example "Time passed 2 days ago, no outcome"). */
@@ -36,11 +36,13 @@ export type Appt3Row = {
   dnd: boolean;
 };
 
-export type Page<T> = { rows: T[]; total: number; page: number; size: number; pages: number; truncated: boolean };
+export type Page<T> = { next?: string | null; rows: T[]; total: number; page: number; size: number; pages: number; truncated: boolean };
 
 export type Appt3Overview = {
   headline: string; button: { label: string; part: Appt3Part; bucket: Appt3Bucket | null; count: number } | null;
   booked: number; unmarked: number; trueShowRate: Rate; reportedShowRate: Rate;
+  /** For the 'What to do today' line. */
+  today: { doubleBookings: number; idlePeople: number };
   noshowToRecover: number; recoveredLast30: number; noDealLinked: number; upcoming: number;
   revenueAtRisk: Estimate; revenueWon: { value: number; n: number };
   /** Booked, confirmed, showed, closed: the numbers of the animated journey. Each step's count equals its list. */
@@ -132,6 +134,12 @@ export type Appt3CompareSide = {
   byWeekday: Array<{ weekday: number; booked: number; showed: number; noshow: number }>;
 };
 export type Appt3Compare = { sides: Appt3CompareSide[] };
+
+/** Bookings per person or calendar, this period against the one before. Counts only (start time and status). */
+export type Appt3Trends = {
+  by: "person" | "calendar"; grain: "week" | "month"; currentFrom: string; previousFrom: string;
+  rows: Array<{ id: string; name: string; current: number; previous: number; delta: number; showedCurrent: number; noshowCurrent: number; series: number[] }>;
+};
 
 /** The filter pickers: every calendar, person and source in scope (read from the data, so new ones appear by themselves). */
 export type Appt3Options = {

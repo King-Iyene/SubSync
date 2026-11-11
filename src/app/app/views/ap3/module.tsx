@@ -12,6 +12,7 @@ import { useData } from "../../session";
 import type { Appt3Options } from "@/lib/analytics/appointments3-types";
 import { DEFAULT_FILTERS, filtersFromParams, filtersToParams, fixturesOn, queryOf, useAp, type ApFilters } from "./data";
 import { FlowTree, type FlowPick } from "./flow-tree";
+import { ExportAll, TrendsPanel } from "./trends-panel";
 import { ApPanel, ApRowsList, PersonPanel } from "./parts";
 import { BookingShare, Calendars, Health, Meetings, NeedsOutcome, Proof, Recovery, Sources } from "./sections2";
 import { Overview, type DrillReq, type SectionProps } from "./sections";
@@ -97,11 +98,11 @@ export function AppointmentsModule({ go, flowTree = true }: { go: GoFn; flowTree
       case "overview": return <Overview {...sp} />;
       case "needs": return <NeedsOutcome {...sp} />;
       case "recover": return <Recovery {...sp} />;
-      case "share": return <BookingShare {...sp} onPerson={setPerson} />;
+      case "share": return <><BookingShare {...sp} onPerson={setPerson} /><TrendsPanel filters={filters} by="person" onOpen={(title, count, extra) => openDrill({ title, count, extra })} /><p className="mt-2 text-right"><ExportAll filters={filters} /></p></>;
       case "flow": return <><FlowTree filters={filters} onOpen={onPick} go={(t) => go(t as never)} /></>;
       case "health": return <><Health {...sp} onAccount={(r) => openDrill({ title: `${r.name}, all appointments`, count: r.booked, extra: { location: r.locationId, outcome: "booked", expect: r.booked } })} /></>;
       case "sources": return <Sources {...sp} />;
-      case "calendars": return <Calendars {...sp} />;
+      case "calendars": return <><Calendars {...sp} /><TrendsPanel filters={filters} by="calendar" onOpen={(title, count, extra) => openDrill({ title, count, extra })} /></>;
       case "meetings": return <Meetings {...sp} />;
       case "proof": return <Proof {...sp} />;
     }
