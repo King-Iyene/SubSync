@@ -14,6 +14,8 @@ test("pilot modules are on by default and a database row can still override the 
   // Zoom and Google Meet stay hidden everywhere until a pilot asks for them. Optional unanswered-message add-ons also remain individually gated.
   // Unanswered Messages Round 2 (docs/features/UNANSWERED2.md): each behind its own flag, default off.
   assert.deepEqual([...DEFAULT_OFF].sort(), [
+    "ap_exec",
+    "ap_exec_targets",
     "appt_actions",
     "appt_booking_share",
     "appt_bulk",
@@ -31,6 +33,9 @@ test("pilot modules are on by default and a database row can still override the 
     "appt_record",
     "appt_reminders",
     "appt_sources",
+    "au_history",
+    "au_monthly",
+    "au_onepager",
     "cl_actions",
     "cl_attention",
     "cl_billing",
@@ -79,6 +84,7 @@ test("pilot modules are on by default and a database row can still override the 
     "moat_receipt",
     "moat_record",
     "moat_scorecards",
+    "ov_screen",
     "pl_actions",
     "pl_attention",
     "pl_bulk",
@@ -109,6 +115,12 @@ test("pilot modules are on by default and a database row can still override the 
     "pp_scorecards",
     "pp_today",
     "pp_workload",
+    "td_email",
+    "td_module",
+    "td_numbers",
+    "td_proof",
+    "td_record",
+    "td_today",
     "zoom_meet",
   ]);
   assert.equal(f.meetings, true);

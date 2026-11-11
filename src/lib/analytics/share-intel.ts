@@ -30,6 +30,16 @@ export type SharePayload = {
   verdictSub?: string;
   healthy?: string[];
   grade?: string | null;
+  /** The one-pager: counts then and now (docs/features/AUDIT_BRIEF.md). Counts only, never a name. The estimate is a range and only present with enough closed deals. */
+  thenNow?: ShareThenNow;
+};
+
+export type ShareThenNow = {
+  /** The day of the baseline and the day of this snapshot (UTC dates). */
+  from: string; to: string; accounts: number;
+  lines: Array<{ label: string; then: number; now: number }>;
+  staleDollars?: { then: number; now: number };
+  estimate?: { thenLow: number; thenHigh: number; nowLow: number; nowHigh: number };
 };
 
 /** The id of the public sample audit (fictional data, made by scripts/make-sample-audit.ts) that the demo points to. */
@@ -53,7 +63,7 @@ export type ShareSource = {
   notes?: ShareNote[];
   verdictSub?: string; healthy?: string[]; grade?: string | null;
 };
-export type ShareExtra = { branded?: boolean; brandColor?: string | null; logoUrl?: string | null; rulesVersion?: number };
+export type ShareExtra = { branded?: boolean; brandColor?: string | null; logoUrl?: string | null; rulesVersion?: number; thenNow?: ShareThenNow | null };
 
 const HEX = /^#[0-9a-f]{6}$/i;
 
@@ -88,5 +98,6 @@ export function buildSharePayload(audit: ShareSource, who: string, accountNames:
     ...(audit.healthy?.length ? { healthy: audit.healthy.slice(0, 4).map((h) => scrub(h, accountNames).slice(0, 200)) } : {}),
     ...(audit.grade ? { grade: scrub(audit.grade, accountNames).slice(0, 200) } : {}),
     ...(extra.rulesVersion !== undefined ? { rulesVersion: extra.rulesVersion } : {}),
+    ...(extra.thenNow ? { thenNow: extra.thenNow } : {}),
   };
 }

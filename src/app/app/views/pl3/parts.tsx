@@ -3,7 +3,7 @@
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { useEffect, useRef, useState, useSyncExternalStore, type ComponentType } from "react";
 import type { PlDeal, PlDeals } from "@/lib/analytics/pipeline3-types-interim";
-import { EmptyState, ErrorState, SkeletonRows } from "../../ds";
+import { EmptyState, ErrorState, PanelBoundary, SkeletonRows } from "../../ds";
 import { RoleChip } from "../../roles";
 import { usePl, type PlFilters } from "./data";
 import { money, moneyShort } from "./format";
@@ -110,7 +110,7 @@ export function DealPanel({ deal, onClose, onChanged, filters }: { deal: PlDeal;
       <>
         <div className="ap-scrim" onClick={onClose} aria-hidden />
         <div className="ap-panel" role="dialog" aria-modal="true" aria-label={`Deal ${deal.name}`} ref={ref} tabIndex={-1} data-testid="pl-panel" style={{ padding: 0 }}>
-          <PlSlot name="Details" deal={deal} onChanged={onChanged} onClose={onClose} filters={filters} />
+          <PanelBoundary onClose={onClose} label="The deal tools could not be shown."><PlSlot name="Details" deal={deal} onChanged={onChanged} onClose={onClose} filters={filters} /></PanelBoundary>
         </div>
       </>
     );
@@ -132,7 +132,7 @@ export function DealPanel({ deal, onClose, onChanged, filters }: { deal: PlDeal;
             <dt>Contact</dt><dd>{deal.contactName ?? "Unknown"}</dd>
             <dt>Source</dt><dd>{deal.source ?? "Unknown"}</dd>
           </dl>
-          <PlSlot name="Details" deal={deal} onChanged={onChanged} filters={filters} />
+          <PanelBoundary label="The deal tools could not be shown."><PlSlot name="Details" deal={deal} onChanged={onChanged} filters={filters} /></PanelBoundary>
           {deal.url && <p><a className="ap-link" href={deal.url} target="_blank" rel="noopener noreferrer" data-testid="pl-panel-crm">Open in your CRM</a></p>}
           <p className="ap-fine">Changes to deals are made in your CRM or, once enabled, through SubSync&apos;s checked change tools (preview first, typed confirmation to delete).</p>
         </div>

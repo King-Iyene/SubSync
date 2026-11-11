@@ -1,3 +1,4 @@
+import { APPOINTMENT_PAST_DAYS } from "../sync/appointment-window";
 import { sql } from "../db";
 import { ttlCache } from "../ttl-cache";
 import {
@@ -6,7 +7,7 @@ import {
 } from "./appointments3-intel.ts";
 import type {
   Appt3Bucket, Appt3BookingShare, Appt3Calendars, Appt3Conflict, Appt3Detail, Appt3FlowTree, Appt3Health, Appt3NeedsOutcome, Appt3Overview, Appt3PersonShare,
-  Appt3Compare, Appt3Options, Appt3Trends, Appt3Receipt, Appt3Recovery, Appt3Row, Appt3Sources, Page, Rate,
+  Appt3Compare, Appt3CompareSide, Appt3Options, Appt3Trends, Appt3Receipt, Appt3Recovery, Appt3Row, Appt3Sources, Page, Rate,
 } from "./appointments3-types.ts";
 
 // The reads behind /api/app/appointments?part=... Read only; every figure is a SQL aggregate and every list is server-paged, so a million appointments cost the
@@ -17,7 +18,9 @@ import type {
 type Db = ReturnType<typeof sql>;
 type Frag = ReturnType<Db>;
 export type Scope = { inst: string; allowed: string[] | null };
-export type Filters = { from: Date; to: Date; location?: string | null; calendar?: string | null; user?: string | null; source?: string | null; q?: string | null; bucket?: Appt3Bucket | null; setter?: string | null; closer?: string | null; /** A raw status of the booking (new, confirmed): for lists. */ status?: string | null; /** Only appointments whose time passed at least this many days ago. */ minAgeDays?: number | null };
+export type Filters = { from: Date; to: Date; location?: string | null; calendar?: string | null; user?: string | null; /** A calendar group id. */ group?: string | null; /** Only active or only inactive calendars. */ active?: "active" | "inactive" | null; /** Booked on (the date the booking was made) range; the appointment date range stays from/to. */ bookedFrom?: Date | null; bookedTo?: Date | null;
+  /** The manager filters: what happened, whether there is a deal and where it is, how new the lead is, a new or returning contact, and "needs attention". */
+  outcome?: "showed" | "noshow" | "noshow_open" | "cancelled" | "unmarked" | null; deal?: "has" | "none" | null; stage?: string | null; leadAge?: "7" | "30" | "old" | null; contact?: "new" | "returning" | null; attention?: boolean; source?: string | null; q?: string | null; bucket?: Appt3Bucket | null; setter?: string | null; closer?: string | null; /** A raw status of the booking (new, confirmed): for lists. */ status?: string | null; /** Only appointments whose time passed at least this many days ago. */ minAgeDays?: number | null };
 
 const ID = /^[A-Za-z0-9_-]{1,64}$/;
 export const cleanId = (v: unknown): string | null => (typeof v === "string" && ID.test(v) ? v : null);
@@ -40,6 +43,29 @@ function locs(s: Scope, location?: string | null): Frag {
     where l.installation_id = ${s.inst} and not l.ignored ${s.allowed ? db`and l.location_id = any(${s.allowed}::text[])` : db``} ${one ? db`and l.location_id = ${one}` : db``}`;
 }
 
+/** The manager filters, applied on the same derived set as every number and list (so a filter recomputes everything). a = the appointment, d = the linked deal, c = the contact. */
+function manager(f: Filters): Frag {
+  const db = sql();
+  const unmarkedC = db`(a.status not in ('showed', 'noshow', 'cancelled', 'invalid') and a.start_at < now() - interval '3 hours')`;
+  const rebookedC = db`exists (select 1 from cached_appointments b where b.installation_id = a.installation_id and b.location_id = a.location_id and b.contact_id = a.contact_id and a.contact_id is not null and b.start_at > a.start_at and b.appointment_id <> a.appointment_id and b.status not in ('cancelled', 'invalid'))`;
+  const earlier = db`exists (select 1 from cached_appointments b where b.installation_id = a.installation_id and b.location_id = a.location_id and b.contact_id = a.contact_id and a.contact_id is not null and b.start_at < a.start_at and b.appointment_id <> a.appointment_id and b.status <> 'invalid')`;
+  const out = f.outcome === "showed" ? db`and a.status = 'showed'` : f.outcome === "noshow" ? db`and a.status = 'noshow'` : f.outcome === "noshow_open" ? db`and a.status = 'noshow' and not ${rebookedC}` : f.outcome === "cancelled" ? db`and a.status = 'cancelled'` : f.outcome === "unmarked" ? db`and ${unmarkedC}` : db``;
+  return db`${out}
+    ${f.deal === "has" ? db`and d.opportunity_id is not null` : f.deal === "none" ? db`and d.opportunity_id is null` : db``}
+    ${f.stage ? db`and d.stage_name = ${f.stage.slice(0, 120)}` : db``}
+    ${f.leadAge === "7" ? db`and c.date_added >= a.start_at - interval '7 days'` : f.leadAge === "30" ? db`and c.date_added >= a.start_at - interval '30 days'` : f.leadAge === "old" ? db`and c.date_added < a.start_at - interval '30 days'` : db``}
+    ${f.contact === "returning" ? db`and ${earlier}` : f.contact === "new" ? db`and not ${earlier}` : db``}
+    ${f.attention ? db`and a.status <> 'invalid' and (${unmarkedC} or (a.status = 'noshow' and not ${rebookedC}) or a.assigned_to is null)` : db``}`;
+}
+
+/** Calendar group and active/inactive narrowing, from the full calendar list. `t` is the alias of the appointments table. */
+function calFilters(f: Filters, t: Frag): Frag {
+  const db = sql(), g = f.group && cleanId(f.group) ? f.group : null;
+  if (!g && !f.active) return db``;
+  return db`and exists (select 1 from cached_calendars cc where cc.installation_id = ${t}.installation_id and cc.location_id = ${t}.location_id and cc.calendar_id = ${t}.calendar_id
+    ${g ? db`and cc.group_id = ${g}` : db``} ${f.active === "active" ? db`and cc.is_active` : f.active === "inactive" ? db`and not cc.is_active` : db``})`;
+}
+
 /** The derived appointment set (alias `ap` when used as a CTE body). `grace` = hours after the start before an appointment "needs an outcome". */
 function base(s: Scope, f: Filters, dd: number, extra?: Frag): Frag {
   const db = sql();
@@ -60,7 +86,7 @@ function base(s: Scope, f: Filters, dd: number, extra?: Frag): Frag {
     left join appointment_facts fa on fa.installation_id = a.installation_id and fa.location_id = a.location_id and fa.appointment_id = a.appointment_id
     left join cached_contacts c on c.installation_id = a.installation_id and c.location_id = a.location_id and c.contact_id = a.contact_id and a.contact_id is not null
     left join lateral (
-      select o.opportunity_id, o.status, o.monetary_value from cached_opportunities o
+      select o.opportunity_id, o.status, o.monetary_value, o.stage_name from cached_opportunities o
       where a.contact_id is not null and o.installation_id = a.installation_id and o.location_id = a.location_id and o.contact_id = a.contact_id
         and (o.status = 'open' or coalesce(o.last_status_change_at, o.synced_at) between a.start_at - interval '1 day' and a.start_at + make_interval(days => ${dd}::int))
       order by case o.status when 'won' then 0 when 'lost' then 1 else 2 end, coalesce(o.last_status_change_at, o.synced_at) desc limit 1) d on true
@@ -70,7 +96,11 @@ function base(s: Scope, f: Filters, dd: number, extra?: Frag): Frag {
       order by x.lead_at desc limit 1) t on true
     where a.installation_id = ${s.inst} and a.start_at >= ${f.from} and a.start_at < ${f.to} and fa.deleted_at is null
       ${f.calendar && cleanId(f.calendar) ? db`and a.calendar_id = ${f.calendar}` : db``}
-      ${f.user && cleanId(f.user) ? db`and (a.assigned_to = ${f.user} or a.booked_by_user = ${f.user})` : db``}
+      ${f.user && cleanId(f.user) ? db`and (a.assigned_to = ${f.user} or a.booked_by_user = ${f.user} or exists (select 1 from calendar_members cm where cm.installation_id = a.installation_id and cm.location_id = a.location_id and cm.calendar_id = a.calendar_id and cm.user_id = ${f.user}))` : db``}
+      ${calFilters(f, db`a`)}
+      ${manager(f)}
+      ${f.bookedFrom ? db`and coalesce(a.created_remote_at, a.start_at) >= ${f.bookedFrom}` : db``}
+      ${f.bookedTo ? db`and coalesce(a.created_remote_at, a.start_at) < ${f.bookedTo}` : db``}
       ${f.setter !== undefined && f.setter !== null ? (f.setter === "none" ? db`and a.booked_by_user is null` : db`and a.booked_by_user = ${f.setter}`) : db``}
       ${f.closer !== undefined && f.closer !== null ? (f.closer === "none" ? db`and a.assigned_to is null` : db`and a.assigned_to = ${f.closer}`) : db``}
       ${f.status && /^[a-z_]{1,20}$/.test(f.status) ? db`and a.status = ${f.status}` : db``}
@@ -104,10 +134,17 @@ function bucketCond(b: Appt3Bucket | null | undefined): Frag {
   }
 }
 
-async function names(inst: string): Promise<(id: string | null | undefined) => string> {
-  const rows = await sql()`select user_id, name from team_names where installation_id = ${inst}`;
-  const m = new Map(rows.map((r) => [r.user_id as string, r.name as string]));
-  return (id) => (!id || id === "unassigned" ? "Not assigned" : m.get(id) ?? "Team member (name not available)");
+type Namer = ((id: string | null | undefined) => string) & { has: (id: string | null | undefined) => boolean };
+async function names(inst: string): Promise<Namer> {
+  const db = sql();
+  // The team names we hold first; a person only in an account's team list (no separate name row) still gets their name from there.
+  const [rows, lu] = await Promise.all([db`select user_id, name from team_names where installation_id = ${inst}`, db`select user_id, max(name) name from location_users where installation_id = ${inst} and nullif(name, '') is not null group by 1`.catch(() => [])]);
+  const m = new Map<string, string>();
+  for (const r of lu) m.set(r.user_id as string, r.name as string);
+  for (const r of rows) if (r.name) m.set(r.user_id as string, r.name as string);
+  const fn = ((id: string | null | undefined) => (!id || id === "unassigned" ? "Not assigned" : m.get(id) ?? "Team member (name not available)")) as Namer;
+  fn.has = (id) => !!id && m.has(id);
+  return fn;
 }
 
 export function toRow(r: Record<string, unknown>, label: (id: string | null | undefined) => string, link: ((loc: string, contact: string) => string) | null, extraWhy: string | null = null): Appt3Row {
@@ -323,7 +360,7 @@ export async function flowTree(s: Scope, f: Filters, topN: number, compare: [str
     unmarked: num(r.unmarked), upcoming: num(r.upcoming), won: num(r.won), lost: num(r.lost), open: num(r.open), wonValue: num(r.won_value),
     ltbMedianMin: r.ltb === null || r.ltb === undefined ? null : Math.round(Number(r.ltb)),
   }));
-  return buildFlowTree(aggs, (id) => (id ? label(id) : "Not recorded"), { from: f.from.toISOString(), to: f.to.toISOString() }, Math.max(3, Math.min(30, topN)), compare, Math.max(0, Math.min(5000, Math.floor(skip))));
+  return buildFlowTree(aggs, (id) => (id ? (label.has(id) ? label(id) : "Unknown user") : "Not recorded"), { from: f.from.toISOString(), to: f.to.toISOString() }, Math.max(3, Math.min(30, topN)), compare, Math.max(0, Math.min(5000, Math.floor(skip))));
 }
 
 // ---------- cross-account health ----------
@@ -399,7 +436,7 @@ export async function calendars(s: Scope, f: Filters, p: number, size0: number, 
   const from = f.from, to = f.to;
   // L = the accounts in play (the caller's own set, narrowed by the account picker). Client roles only ever have their own account here.
   const L = locs(s, f.location);
-  const calF = f.calendar && cleanId(f.calendar) ? db`and a.calendar_id = ${f.calendar}` : db``;
+  const calF = db`${f.calendar && cleanId(f.calendar) ? db`and a.calendar_id = ${f.calendar}` : db``} ${calFilters(f, db`a`)}`;
   const pair = db`
     from cached_appointments a
     join cached_appointments b on b.installation_id = a.installation_id and b.location_id = a.location_id and b.appointment_id > a.appointment_id
@@ -408,7 +445,7 @@ export async function calendars(s: Scope, f: Filters, p: number, size0: number, 
     join (${L}) l on l.location_id = a.location_id
     where a.installation_id = ${s.inst} and a.start_at >= ${from} and a.start_at < ${to} and a.end_at is not null and b.end_at is not null
       and a.status not in ('cancelled', 'invalid') and b.status not in ('cancelled', 'invalid') ${calF}`;
-  const [crow, cnt, trend, rr, cap, acc, calAll, mem, bk] = await Promise.all([
+  const [crow, cnt, trend, rr, cap, acc, calAll, mem, bk, accAll, skip] = await Promise.all([
     db`select a.location_id, l.name account_name, a.appointment_id a_id, a.calendar_id a_cal, a.calendar_name a_calname, a.contact_id a_contact, a.status a_status, a.start_at a_start, a.end_at a_end, a.assigned_to a_owner, a.booked_by_user a_booker, a.created_remote_at a_created,
         b.appointment_id b_id, b.contact_id b_contact, b.status b_status, b.start_at b_start, b.end_at b_end, b.assigned_to b_owner, b.booked_by_user b_booker, b.created_remote_at b_created, b.calendar_id b_cal, b.calendar_name b_calname,
         extract(epoch from (least(a.end_at, b.end_at) - greatest(a.start_at, b.start_at))) / 60 mins
@@ -422,15 +459,29 @@ export async function calendars(s: Scope, f: Filters, p: number, size0: number, 
     db`select to_char(a.start_at, 'YYYY-MM') m, count(*)::int booked from cached_appointments a join (${L}) l on l.location_id = a.location_id
        where a.installation_id = ${s.inst} and a.start_at >= date_trunc('month', now()) and a.start_at < date_trunc('month', now()) + interval '3 months' and a.status not in ('cancelled', 'invalid') ${calF} group by 1 order by 1`,
     db`select count(*) filter (where appointments_access = 'needs_permission')::int n from locations where installation_id = ${s.inst} ${s.allowed ? db`and location_id = any(${s.allowed}::text[])` : db``}`,
-    db`select l.location_id, l.name account_name, c.calendar_id, max(c.calendar_name) calendar_name,
+    // Every calendar of the account (the full list we keep), joined to the bookings we have seen, so a calendar with zero bookings is listed too.
+    db`with seen as (
+          select c.location_id, c.calendar_id, max(c.calendar_name) calendar_name, count(*) filter (where c.start_at >= ${from} and c.start_at < ${to} and c.status <> 'invalid')::int n,
+            max(c.start_at) filter (where c.status <> 'invalid' and c.start_at <= now()) last_at
+          from cached_appointments c join (${L}) l on l.location_id = c.location_id where c.installation_id = ${s.inst} and c.calendar_id is not null group by 1, 2),
+        listed as (select cc.location_id, cc.calendar_id, cc.name, cc.group_id, cc.is_active from cached_calendars cc join (${L}) l on l.location_id = cc.location_id where cc.installation_id = ${s.inst})
+      select coalesce(x.location_id, y.location_id) location_id, l.name account_name, coalesce(x.calendar_id, y.calendar_id) calendar_id, coalesce(x.name, y.calendar_name) calendar_name,
+        x.group_id, g.name group_name, coalesce(x.is_active, true) is_active, (x.calendar_id is not null) listed, coalesce(y.n, 0)::int n, y.last_at
+      from listed x full join seen y on y.location_id = x.location_id and y.calendar_id = x.calendar_id
+      join (${L}) l on l.location_id = coalesce(x.location_id, y.location_id)
+      left join calendar_groups g on g.installation_id = ${s.inst} and g.location_id = x.location_id and g.group_id = x.group_id
+      where true ${f.calendar && cleanId(f.calendar) ? db`and coalesce(x.calendar_id, y.calendar_id) = ${f.calendar}` : db``}
+        ${f.group && cleanId(f.group) ? db`and x.group_id = ${f.group}` : db``} ${f.active === "active" ? db`and coalesce(x.is_active, true)` : f.active === "inactive" ? db`and not coalesce(x.is_active, true)` : db``}
+      order by 9 desc, 10 desc nulls last, 4 limit 500`.catch(async () => db`select l.location_id, l.name account_name, c.calendar_id, max(c.calendar_name) calendar_name, null::text group_id, null::text group_name, true is_active, false listed,
         count(*) filter (where c.start_at >= ${from} and c.start_at < ${to} and c.status <> 'invalid')::int n, max(c.start_at) filter (where c.status <> 'invalid' and c.start_at <= now()) last_at
-       from cached_appointments c join (${L}) l on l.location_id = c.location_id where c.installation_id = ${s.inst} and c.calendar_id is not null
-       group by 1, 2, 3 order by 5 desc, 6 desc nulls last limit 200`,
+       from cached_appointments c join (${L}) l on l.location_id = c.location_id where c.installation_id = ${s.inst} and c.calendar_id is not null group by 1, 2, 3 order by 9 desc, 10 desc nulls last limit 200`),
     // Team lists per account (location_users). A person is only ever idle in an account they belong to.
     db`select u.location_id, u.user_id, u.name from location_users u join (${L}) l on l.location_id = u.location_id where u.installation_id = ${s.inst} limit 5000`.catch(() => []),
     db`select a.location_id, a.assigned_to uid, count(*) filter (where a.start_at >= ${from} and a.start_at < ${to} and a.status <> 'invalid' ${calF})::int n,
         max(a.start_at) filter (where a.status <> 'invalid' and a.start_at <= now()) last_at
        from cached_appointments a join (${L}) l on l.location_id = a.location_id where a.installation_id = ${s.inst} and a.assigned_to is not null group by 1, 2 limit 5000`,
+    db`select l.location_id, l.name from (${L}) l`,
+    db`select coalesce(sum(x.calendars_skipped), 0)::int n from locations x join (${L}) l on l.location_id = x.location_id where x.installation_id = ${s.inst}`.catch(() => [{ n: 0 }]),
   ]);
   const mk = (r: Record<string, unknown>, k: "a" | "b"): Appt3Row => toRow({
     appointment_id: r[`${k}_id`], location_id: r.location_id, account_name: r.account_name, contact_id: r[`${k}_contact`], contact_name: "Booking", calendar_id: r[`${k}_cal`] ?? r.a_cal, calendar_name: r[`${k}_calname`] ?? r.a_calname,
@@ -449,8 +500,8 @@ export async function calendars(s: Scope, f: Filters, p: number, size0: number, 
   }
   const roundRobin = [...rrMap.values()].filter((e) => e.members.filter((m) => m.userId).length >= 2).map((e) => { const t = e.members.reduce((x, m) => x + m.owned, 0); for (const m of e.members) m.sharePct = t ? Math.round((m.owned / t) * 100) : 0; return e; }).slice(0, 30);
   const daysAgo = (v: unknown) => (v instanceof Date ? Math.max(0, Math.floor((Date.now() - v.getTime()) / DAY)) : null);
-  const calendarsAll = calAll.map((r) => ({ locationId: r.location_id as string, accountName: (r.account_name as string | null) ?? null, calendarId: r.calendar_id as string, calendarName: (r.calendar_name as string | null) ?? null, bookings: num(r.n), lastBookingAt: iso(r.last_at), daysSince: daysAgo(r.last_at) }));
-  const accNames = new Map<string, string | null>(calAll.map((r) => [r.location_id as string, (r.account_name as string | null) ?? null]));
+  const calendarsAll = calAll.map((r) => ({ locationId: r.location_id as string, accountName: (r.account_name as string | null) ?? null, calendarId: r.calendar_id as string, calendarName: (r.calendar_name as string | null) ?? null, bookings: num(r.n), lastBookingAt: iso(r.last_at), daysSince: daysAgo(r.last_at), groupName: (r.group_name as string | null) ?? null, active: r.is_active !== false }));
+  const accNames = new Map<string, string | null>(accAll.map((r) => [r.location_id as string, (r.name as string | null) ?? null]));
   const peopleAll = buildPeople(
     mem.map((r) => ({ locationId: r.location_id as string, userId: r.user_id as string, name: r.name as string })),
     bk.filter((r) => r.uid).map((r) => ({ locationId: r.location_id as string, userId: r.uid as string, n: num(r.n), lastAt: iso(r.last_at) })),
@@ -464,7 +515,7 @@ export async function calendars(s: Scope, f: Filters, p: number, size0: number, 
     { key: "not_in_list", label: "Not in the team list", tone: "amber", count: peopleAll.filter((x) => !x.inTeamList).length, why: "Seen as a booker or owner but not in any account's team list (left, or no access).", available: true },
   ];
   return {
-    conflicts, needsPermission: num(acc[0]?.n) > 0, calendarsAll, peopleAll, problems,
+    conflicts, needsPermission: num(acc[0]?.n) > 0, calendarsAll, peopleAll, problems, calendarsSkipped: num(skip[0]?.n), historyStarts: new Date(Date.now() - APPOINTMENT_PAST_DAYS * DAY).toISOString().slice(0, 10),
     trend: trend.map((r) => ({ week: String(r.wk instanceof Date ? r.wk.toISOString().slice(0, 10) : r.wk), booked: num(r.booked), cancelled: num(r.cancelled) })),
     roundRobin, capacity: cap.map((r) => ({ month: r.m as string, booked: num(r.booked) })),
   };
@@ -473,30 +524,36 @@ export async function calendars(s: Scope, f: Filters, p: number, size0: number, 
 /** Two people side by side. `by` says which column identifies them (the booker or the owner). Every figure is a count over the same derived set as the lists. */
 export async function comparePeople(s: Scope, f: Filters, ids: string[], by: "booker" | "owner"): Promise<Appt3Compare> {
   const db = sql(), dd = await dealDays(s.inst), label = await names(s.inst);
-  const list = ids.map(cleanId).filter((x): x is string => !!x).slice(0, 2);
+  // "team" is the whole team in these dates; "none" is the bookings with nobody recorded; anything else must be a clean id.
+  const list = [...new Set(ids.map((x) => (x === "team" || x === "none" ? x : cleanId(x))).filter((x): x is string => !!x))].slice(0, 2);
   if (!list.length) return { sides: [] };
   const col = by === "booker" ? db`booker` : db`owner`;
   const b = base(s, { ...f, bucket: undefined, setter: undefined, closer: undefined }, dd);
   const cnt = db`count(*) filter (where status <> 'invalid')::int booked, count(*) filter (where status = 'showed')::int showed, count(*) filter (where status = 'noshow')::int noshow`;
-  const [tot, cal, src, wd] = await Promise.all([
-    db`with ap as (${b}) select ${col} uid, ${cnt}, count(*) filter (where status = 'cancelled')::int cancelled, count(*) filter (where unmarked)::int unmarked,
-        count(*) filter (where deal_status = 'won' and status <> 'invalid')::int won, coalesce(sum(deal_value) filter (where deal_status = 'won' and status <> 'invalid'), 0)::float8 won_value
-      from ap where ${col} = any(${list}::text[]) group by 1`,
-    db`with ap as (${b}) select ${col} uid, coalesce(calendar_name, 'Calendar') k, ${cnt} from ap where ${col} = any(${list}::text[]) group by 1, 2 order by 3 desc limit 60`,
-    db`with ap as (${b}) select ${col} uid, coalesce(source, 'No source') k, ${cnt} from ap where ${col} = any(${list}::text[]) group by 1, 2 order by 3 desc limit 60`,
-    db`with ap as (${b}) select ${col} uid, extract(dow from start_at at time zone tz)::int k, ${cnt} from ap where ${col} = any(${list}::text[]) group by 1, 2`,
-  ]);
-  const pick = (rows: Array<Record<string, unknown>>, id: string) => rows.filter((r) => r.uid === id);
-  return { sides: list.map((id) => {
-    const t = tot.find((r) => r.uid === id), showed = num(t?.showed), noshow = num(t?.noshow), unmarked = num(t?.unmarked);
+  const who = (id: string) => (id === "team" ? db`true` : id === "none" ? db`${col} is null` : db`${col} = ${id}`);
+  const one = async (id: string): Promise<Appt3CompareSide> => {
+    const w = who(id);
+    const [tot, cal, src, wd, ppl] = await Promise.all([
+      db`with ap as (${b}) select ${cnt}, count(*) filter (where status = 'cancelled')::int cancelled, count(*) filter (where unmarked)::int unmarked,
+          count(*) filter (where deal_status = 'won' and status <> 'invalid')::int won, coalesce(sum(deal_value) filter (where deal_status = 'won' and status <> 'invalid'), 0)::float8 won_value from ap where ${w}`,
+      db`with ap as (${b}) select coalesce(calendar_name, 'Calendar') k, ${cnt} from ap where ${w} group by 1 order by 2 desc limit 60`,
+      db`with ap as (${b}) select coalesce(source, 'No source') k, ${cnt} from ap where ${w} group by 1 order by 2 desc limit 60`,
+      db`with ap as (${b}) select extract(dow from start_at at time zone tz)::int k, ${cnt} from ap where ${w} group by 1`,
+      id === "team" ? db`with ap as (${b}) select count(distinct ${col})::int n from ap` : Promise.resolve([{ n: 0 }]),
+    ]);
+    const t = tot[0], showed = num(t?.showed), noshow = num(t?.noshow), unmarked = num(t?.unmarked);
     const sp = (r: Record<string, unknown>) => ({ booked: num(r.booked), showed: num(r.showed), noshow: num(r.noshow) });
+    const kind = id === "team" ? "team" as const : id === "none" ? "unrecorded" as const : "person" as const;
+    const name = kind === "team" ? "Whole team" : kind === "unrecorded" ? (by === "booker" ? "Booker not recorded" : "Owner not recorded") : label.has(id) ? label(id) : "Unknown user";
     return {
-      userId: id, name: label(id), role: by === "booker" ? "booker" as const : "owner" as const, booked: num(t?.booked), showed, noshow, cancelled: num(t?.cancelled), unmarked, won: num(t?.won), wonValue: num(t?.won_value),
+      userId: kind === "person" && !label.has(id) && !num(t?.booked) ? "" : id, name, kind, nameKnown: kind !== "person" || label.has(id), people: kind === "team" ? num(ppl[0]?.n) : undefined,
+      role: by === "booker" ? "booker" as const : "owner" as const, booked: num(t?.booked), showed, noshow, cancelled: num(t?.cancelled), unmarked, won: num(t?.won), wonValue: num(t?.won_value),
       showRate: trueShowRate(showed, noshow, unmarked), noshowRate: rate(noshow, showed + noshow + unmarked),
-      byCalendar: pick(cal, id).map((r) => ({ name: String(r.k), ...sp(r) })), bySource: pick(src, id).map((r) => ({ source: String(r.k), ...sp(r) })),
-      byWeekday: pick(wd, id).map((r) => ({ weekday: num(r.k), ...sp(r) })),
+      byCalendar: cal.map((r) => ({ name: String(r.k), ...sp(r) })), bySource: src.map((r) => ({ source: String(r.k), ...sp(r) })),
+      byWeekday: wd.map((r) => ({ weekday: num(r.k), ...sp(r) })),
     };
-  }) };
+  };
+  return { sides: await Promise.all(list.map(one)) };
 }
 
 /** Bookings per person (owner) or calendar by week or month: this period, the one before, and the last 8 as a sparkline. SQL aggregate over start time and status only. */
@@ -519,7 +576,13 @@ export async function trends(s: Scope, f: Filters, by: "person" | "calendar", gr
     const current = num(at(cur)?.booked), previous = num(at(prev)?.booked);
     return { id, name: by === "person" ? label(id) : String(rs.find((r) => r.cname)?.cname ?? "Calendar"), current, previous, delta: current - previous, showedCurrent: num(at(cur)?.showed), noshowCurrent: num(at(cur)?.noshow), series: periods.map((p) => num(at(p)?.booked)) };
   }).sort((a, b) => b.current - a.current || b.previous - a.previous).slice(0, 100);
-  return { by, grain, currentFrom: cur, previousFrom: prev, rows: out };
+  // Calendars with no bookings at all still get a row (zeros), so a dead calendar is visible.
+  if (by === "calendar") {
+    const have = new Set(out.map((r) => r.id));
+    const all = await db`select cc.calendar_id id, cc.name from cached_calendars cc join (${locs(s, f.location)}) l on l.location_id = cc.location_id where cc.installation_id = ${s.inst} ${f.calendar && cleanId(f.calendar) ? db`and cc.calendar_id = ${f.calendar}` : db``} ${f.group && cleanId(f.group) ? db`and cc.group_id = ${f.group}` : db``} ${f.active === "active" ? db`and cc.is_active` : f.active === "inactive" ? db`and not cc.is_active` : db``} order by cc.name limit 500`.catch(() => []);
+    for (const c of all) if (!have.has(c.id as string)) { have.add(c.id as string); out.push({ id: c.id as string, name: (c.name as string | null) ?? "Calendar", current: 0, previous: 0, delta: 0, showedCurrent: 0, noshowCurrent: 0, series: periods.map(() => 0) }); }
+  }
+  return { by, grain, currentFrom: cur, previousFrom: prev, rows: out.slice(0, 500) };
 }
 
 /** The whole filtered list as CSV text, capped at 100,000 rows (a streamed download; same derived set as the lists). */
@@ -535,22 +598,29 @@ export async function exportCsv(s: Scope, f: Filters, link: ((a: string, b: stri
 /** Filter pickers: every account, calendar, person and source in the caller's scope, read from the data so new ones appear on their own. */
 export async function options(s: Scope, f: Filters): Promise<Appt3Options> {
   const db = sql(), label = await names(s.inst), L = locs(s, f.location);
-  const [acc, cal, mem, own, src] = await Promise.all([
+  const [acc, cal, mem, own, src, stg, grp] = await Promise.all([
     db`select l.location_id, l.name from (${L}) l order by l.name limit 500`,
-    db`select a.location_id, a.calendar_id, max(a.calendar_name) name from cached_appointments a join (${L}) l on l.location_id = a.location_id where a.installation_id = ${s.inst} and a.calendar_id is not null group by 1, 2 order by 3 limit 500`,
+    // Every calendar we know of: the full list from the platform, plus any seen only through its bookings. Zero-booking calendars are included on purpose.
+    db`select u.location_id, u.calendar_id, max(u.name) name, bool_or(u.group_id is not null) _g, max(u.group_id) group_id, coalesce(bool_and(u.is_active), true) is_active from (
+        select cc.location_id, cc.calendar_id, cc.name, cc.group_id, cc.is_active from cached_calendars cc join (${L}) l on l.location_id = cc.location_id where cc.installation_id = ${s.inst}
+        union all select a.location_id, a.calendar_id, max(a.calendar_name), null::text, true from cached_appointments a join (${L}) l on l.location_id = a.location_id where a.installation_id = ${s.inst} and a.calendar_id is not null group by 1, 2) u
+      group by 1, 2 order by 3 limit 1000`.catch(() => db`select a.location_id, a.calendar_id, max(a.calendar_name) name, false _g, null::text group_id, true is_active from cached_appointments a join (${L}) l on l.location_id = a.location_id where a.installation_id = ${s.inst} and a.calendar_id is not null group by 1, 2 order by 3 limit 500`),
     db`select u.location_id, u.user_id, u.name from location_users u join (${L}) l on l.location_id = u.location_id where u.installation_id = ${s.inst} limit 5000`.catch(() => []),
     db`select distinct a.location_id, x.uid from cached_appointments a join (${L}) l on l.location_id = a.location_id, lateral (values (a.assigned_to), (a.booked_by_user)) x(uid) where a.installation_id = ${s.inst} and x.uid is not null and a.start_at >= now() - interval '400 days' limit 5000`,
     db`select c.source k, count(*)::int n from cached_appointments a join (${L}) l on l.location_id = a.location_id join cached_contacts c on c.installation_id = a.installation_id and c.location_id = a.location_id and c.contact_id = a.contact_id
        where a.installation_id = ${s.inst} and a.start_at >= now() - interval '400 days' and nullif(c.source, '') is not null group by 1 order by 2 desc limit 100`,
+    db`select o.stage_name k, count(*)::int n from cached_opportunities o join (${L}) l on l.location_id = o.location_id where o.installation_id = ${s.inst} and nullif(o.stage_name, '') is not null group by 1 order by 2 desc limit 200`.catch(() => []),
+    db`select g.location_id, g.group_id, g.name from calendar_groups g join (${L}) l on l.location_id = g.location_id where g.installation_id = ${s.inst} order by g.name limit 300`.catch(() => []),
   ]);
   const people = new Map<string, { name: string; locs: Set<string>; inList: boolean }>();
   for (const r of mem) { const e = people.get(r.user_id as string) ?? { name: r.name as string, locs: new Set<string>(), inList: true }; e.locs.add(r.location_id as string); people.set(r.user_id as string, e); }
-  for (const r of own) { const id = r.uid as string; const e = people.get(id) ?? { name: label(id), locs: new Set<string>(), inList: false }; e.locs.add(r.location_id as string); people.set(id, e); }
+  for (const r of own) { const id = r.uid as string; const e = people.get(id) ?? { name: label.has(id) ? label(id) : "Unknown user", locs: new Set<string>(), inList: false }; e.locs.add(r.location_id as string); people.set(id, e); }
   return {
     accounts: acc.map((r) => ({ locationId: r.location_id as string, name: r.name as string })),
-    calendars: cal.map((r) => ({ calendarId: r.calendar_id as string, name: (r.name as string | null) ?? null, locationId: r.location_id as string })),
+    calendars: cal.map((r) => ({ calendarId: r.calendar_id as string, name: (r.name as string | null) ?? null, locationId: r.location_id as string, groupId: (r.group_id as string | null) ?? null, active: r.is_active !== false })),
+    groups: grp.map((r) => ({ groupId: r.group_id as string, name: (r.name as string | null) ?? "Group", locationId: r.location_id as string })),
     people: [...people].map(([userId, e]) => ({ userId, name: e.name, locationIds: [...e.locs], inTeamList: e.inList })).sort((a, b) => a.name.localeCompare(b.name)).slice(0, 1000),
-    sources: src.map((r) => r.k as string),
+    sources: src.map((r) => r.k as string), stages: stg.map((r) => r.k as string),
   };
 }
 

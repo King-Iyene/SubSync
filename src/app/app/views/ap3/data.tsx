@@ -33,6 +33,16 @@ export function queryOf(part: ApPart, f: ApFilters, extra: Record<string, string
   if (s.calendarId) p.set("calendar", s.calendarId);
   if (s.source) p.set("source", s.source);
   if (s.userId) p.set("user", s.userId);
+  if (f.status && part !== "needs-outcome") p.set("status", f.status);
+  if (f.groupId) p.set("group", f.groupId);
+  if (f.outcome) p.set("x_outcome", f.outcome);
+  if (f.deal) p.set("x_deal", f.deal);
+  if (f.stage) p.set("x_stage", f.stage);
+  if (f.leadAge) p.set("x_lead", f.leadAge);
+  if (f.contact) p.set("x_contact", f.contact);
+  if (f.attention) p.set("x_attention", "1");
+  if (f.active) p.set("active", f.active);
+  if (f.bookedFrom && f.bookedTo) { p.set("booked_from", f.bookedFrom); p.set("booked_to", f.bookedTo); }
   if (f.q.trim()) p.set("q", f.q.trim());
   // The worklist filters only travel to the two worklists, so a number on another section is never narrowed by a filter that is not shown there.
   if (part === "needs-outcome" || part === "no-show-recovery") {

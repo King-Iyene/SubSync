@@ -1,3 +1,4 @@
+import { APPOINTMENT_PAST_DAYS } from "./appointment-window";
 import { isBusinessKey, locationOfBusinessKey } from "../access";
 import { isOurTag, tagPrefix } from "../people/writeback";
 import { safeError } from "../safe-log";
@@ -9,7 +10,7 @@ import { sql } from "../db";
 import { getInstalledLocations, getLocationToken } from "../ghl/client";
 import { getCompanyAccessToken, purgeLocationData } from "../ghl/installations";
 import {
-  fetchAppointments, fetchCalendars, fetchConversationMessages, fetchUsers, isPermissionError, fetchCalendarCount, fetchContactsPage, fetchConversationsPage, fetchLocationDetails, fetchOpportunitiesPage, fetchPipelines,
+  fetchAppointments, fetchCalendarGroups, fetchCalendars, type CalendarRow, fetchConversationMessages, fetchUsers, isPermissionError, fetchCalendarCount, fetchContactsPage, fetchConversationsPage, fetchLocationDetails, fetchOpportunitiesPage, fetchPipelines,
   type ContactCursor, type ContactRow, type ConversationRow, type OpportunityRow,
 } from "./ghl-data";
 import { firstTouches, leadFromMessages } from "../analytics/speed-intel";
@@ -383,9 +384,8 @@ async function handleConversations(job: Job): Promise<Outcome> {
   return DONE;
 }
 
-const APPOINTMENT_PAST_DAYS = 90;
 const APPOINTMENT_FUTURE_DAYS = 60;
-const MAX_CALENDARS = 80;
+const MAX_CALENDARS = 500; // a very large account is read up to this many calendars; anything past it is counted and shown as "not fully read"
 
 // Appointments and the account's team names. Both depend on permissions an existing install may not
 // have approved yet; in that case we record "needs permission" for the account and carry on.
@@ -436,8 +436,12 @@ async function handleAppointments(job: Job): Promise<Outcome> {
   const toMs = now + APPOINTMENT_FUTURE_DAYS * 86_400_000;
   let access: "ok" | "needs_permission" | "error" = "ok";
   const rows: Array<Record<string, unknown>> = [];
+  let skipped = 0;
   try {
-    const calendars = (await fetchCalendars(token, loc)).slice(0, MAX_CALENDARS);
+    const all = await fetchCalendars(token, loc);
+    await saveCalendars(job.installationId, loc, all, token);
+    const calendars = all.slice(0, MAX_CALENDARS);
+    skipped = all.length - calendars.length;
     for (const cal of calendars) {
       const events = await fetchAppointments(token, loc, cal.id, fromMs, toMs);
       for (const a of events) {
@@ -485,7 +489,33 @@ async function handleAppointments(job: Job): Promise<Outcome> {
     update locations set appointments_access = ${access}, users_access = ${usersAccess},
       appointments_synced_at = case when ${access} = 'ok' then now() else appointments_synced_at end
     where installation_id = ${job.installationId} and location_id = ${loc}`;
+  try { await db`update locations set calendars_skipped = ${skipped} where installation_id = ${job.installationId} and location_id = ${loc}`; } catch { /* the column arrives with the migration */ }
   return DONE;
+}
+
+/** Keeps the account's FULL calendar list (every calendar, active or not, with its group and the team members on it), so a calendar with no bookings still shows.
+ *  Never fails the sync: a missing permission is recorded as such. A calendar that disappeared from the platform is marked inactive, not removed, so its history stays readable. */
+async function saveCalendars(inst: string, loc: string, cals: CalendarRow[], token: string): Promise<void> {
+  const db = sql();
+  let calAccess: "ok" | "needs_permission" | "error" = "ok", grpAccess: "ok" | "needs_permission" | "error" = "ok";
+  try {
+    for (let i = 0; i < cals.length; i += 200) {
+      const batch = cals.slice(i, i + 200).map((c) => ({ installation_id: inst, location_id: loc, calendar_id: c.id, name: c.name, group_id: c.groupId, is_active: c.isActive, calendar_type: c.calendarType, round_robin: c.roundRobin, synced_at: new Date() }));
+      await db`insert into cached_calendars ${db(batch as never)} on conflict (installation_id, location_id, calendar_id) do update set name = excluded.name, group_id = excluded.group_id, is_active = excluded.is_active, calendar_type = excluded.calendar_type, round_robin = excluded.round_robin, synced_at = excluded.synced_at`;
+    }
+    await db`update cached_calendars set is_active = false where installation_id = ${inst} and location_id = ${loc} and not (calendar_id = any(${cals.map((c) => c.id)}::text[]))`;
+    const members = cals.flatMap((c) => c.memberIds.map((u) => ({ installation_id: inst, location_id: loc, calendar_id: c.id, user_id: u, synced_at: new Date() })));
+    for (let i = 0; i < members.length; i += 500) await db`insert into calendar_members ${db(members.slice(i, i + 500) as never)} on conflict do nothing`;
+    await db`delete from calendar_members where installation_id = ${inst} and location_id = ${loc} and not (calendar_id || ':' || user_id = any(${members.map((m) => m.calendar_id + ":" + m.user_id)}::text[]))`;
+  } catch (error) { calAccess = isPermissionError(error) ? "needs_permission" : "error"; if (calAccess === "error") console.error("Saving calendars failed", safeError(error)); }
+  try {
+    const groups = await fetchCalendarGroups(token, loc);
+    for (let i = 0; i < groups.length; i += 200) {
+      const batch = groups.slice(i, i + 200).map((g) => ({ installation_id: inst, location_id: loc, group_id: g.id, name: g.name, is_active: g.isActive, synced_at: new Date() }));
+      await db`insert into calendar_groups ${db(batch as never)} on conflict (installation_id, location_id, group_id) do update set name = excluded.name, is_active = excluded.is_active, synced_at = excluded.synced_at`;
+    }
+  } catch (error) { grpAccess = isPermissionError(error) ? "needs_permission" : "error"; if (grpAccess === "error") console.error("Reading calendar groups failed", safeError(error)); }
+  try { await db`update locations set calendars_access = ${calAccess}, calendar_groups_access = ${grpAccess} where installation_id = ${inst} and location_id = ${loc}`; } catch { /* the columns arrive with the migration */ }
 }
 
 // Speed to lead: for each recent lead (a new contact with a conversation) read the messages once and keep

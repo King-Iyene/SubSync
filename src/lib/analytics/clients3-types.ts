@@ -114,7 +114,7 @@ export type Cl3Flag = (typeof CL3_FLAGS)[number];
 
 /** Billing view (part=billing): the plan and subscription status the platform reports per account. paymentFailing, nextPaymentAt and appsInstalled are ALWAYS null today: the platform API does not provide them, and the screen says "Not available from the platform yet". */
 export type Cl3Billing = {
-  locationId: string; name: string; state: "ok" | "needs_permission" | "not_available" | "not_checked";
+  locationId: string; name: string; state: "ok" | "no_plan" | "needs_permission" | "not_available" | "not_checked";
   plan: string | null; subscriptionStatus: string | null; paymentFailing: null; nextPaymentAt: null; appsInstalled: null; fetchedAt: string | null; message: string | null;
 };
 export type Cl3BillingList = Page<Cl3Billing> & { needPermission: number; notActive: number };

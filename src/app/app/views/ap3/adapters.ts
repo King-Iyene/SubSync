@@ -105,7 +105,7 @@ export function adaptCalendars(c: Appt3Calendars): ApCalendarsView {
   return {
     conflictTotal: c.conflicts?.total, rows: conflicts,
     calendars: (c.calendarsAll ?? []).map((x) => ({ ...x, accountName: x.accountName ?? "", calendarName: x.calendarName ?? "Calendar" })),
-    people: c.peopleAll ?? [], problems: c.problems ?? [],
+    people: c.peopleAll ?? [], problems: c.problems ?? [], calendarsSkipped: c.calendarsSkipped, historyStarts: c.historyStarts,
   };
 }
 

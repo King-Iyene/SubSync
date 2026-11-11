@@ -95,7 +95,7 @@ type Method = "GET" | "POST" | "PUT" | "DELETE";
 // optionally the second. Everything not listed is refused for that kind (default deny).
 type Rule = [Method, string, string?];
 
-const GET_VIEWS = ["today", "overview", "accounts", "onboarding", "search", "stale", "hygiene", "inbox", "pipelines", "duplicates", "alerts", "pipeline-intel", "contact-intel", "comms-intel", "deal-gaps", "deal-events", "contact", "people", "start", "appointments", "appointment-insights", "pipeline3", "clients3", "people3", "audit", "speed", "roadmap", "freshness", "client-trends", "workflows", "data-health"];
+const GET_VIEWS = ["today", "overview", "accounts", "onboarding", "search", "stale", "hygiene", "inbox", "pipelines", "duplicates", "alerts", "pipeline-intel", "contact-intel", "comms-intel", "deal-gaps", "deal-events", "contact", "people", "start", "appointments", "appointment-insights", "pipeline3", "clients3", "people3", "today3", "audit", "speed", "roadmap", "freshness", "client-trends", "workflows", "data-health"];
 
 // Anyone may send feedback, report a problem or suggest something on the roadmap (stage F8): each is stored against the person and account named in the signed
 // A person may keep their own saved views of the Unanswered messages page (inbox/views): they hold only filter choices, scoped to the person.
@@ -119,7 +119,9 @@ const APPT_ACTION_RULES: Rule[] = [["POST", "appointments", "act"], ["POST", "ap
 // Pipeline deal actions (slice PB): the handler checks the flag, the account and the person; a client staff member only touches deals assigned to them and never deletes or changes an owner.
 const PIPELINE_ACTION_RULES: Rule[] = [["GET", "pipeline3", "act"], ["POST", "pipeline3", "act"]];
 // Team actions and reports (slice PB): the handler checks the flag, the account and the person; a client's staff only read their own targets, focus and shared notes and never write.
-const PEOPLE3_ACTION_RULES: Rule[] = [["GET", "people3", "act"], ["POST", "people3", "act"], ["GET", "people3", "roles"], ["POST", "people3", "roles"]]; // roles: the handler lets only managers change anything and shows everyone else only the labels they may see
+const PEOPLE3_ACTION_RULES: Rule[] = [["GET", "people3", "act"], ["POST", "people3", "act"], ["GET", "people3", "roles"], ["POST", "people3", "roles"]];
+// Today notes (snooze, daily email choice, tap counter): SubSync-only; the handler refuses a team member for the ones that change what the whole business sees.
+const TODAY3_ACTION_RULES: Rule[] = [["POST", "today3", "act"]];
 const PEOPLE_DAILY_RULES: Rule[] = [["PUT", "people", "seen"], ["POST", "people", "recent"], ["DELETE", "people", "recent"], ["POST", "people", "outcome"]];
 
 // The Lead workbench: reading the thread and context, previewing and doing one action. A client's staff may do it on their own account; deleting is refused inside the handler.
@@ -133,10 +135,10 @@ const BUSINESS_RULES: Rule[] = [
   ["GET", "email"], ["GET", "sync-run"], ["GET", "daily"], ["GET", "cleanup"], ["POST", "cleanup"], ["GET", "meetings"], ["POST", "meetings"], ["PUT", "meetings"], ["GET", "connections"], ["POST", "connections"], ["DELETE", "connections"], ["GET", "settings"], ["GET", "api-keys"], ["GET", "sync-status"], ["GET", "call-queue"],
   ["GET", "call-lists"], ["GET", "call-outcomes"], ["GET", "goals"], ["GET", "exec-summary"], ["GET", "daily-brief"], ["GET", "digest"],
   ["GET", "export", "stale"], ["GET", "export", "duplicates"], ["GET", "export", "inbox"], ["GET", "export", "deals"], ["GET", "export", "alerts"],
-  ["POST", "email", "check"], ["POST", "alerts"], ["POST", "duplicates"], ["POST", "usage"], ["POST", "today", "action"], ["POST", "today", "views"], ["POST", "roadmap"], ["POST", "feedback"], ["POST", "problem"], ["POST", "audit", "share"], ["POST", "audit", "revoke"], ["POST", "sync"], ["POST", "call-lists"], ["POST", "call-outcomes"], ["POST", "inbox", "outcome"],
+  ["POST", "email", "check"], ["POST", "alerts"], ["POST", "duplicates"], ["POST", "usage"], ["POST", "today", "action"], ["POST", "today", "views"], ["POST", "roadmap"], ["POST", "feedback"], ["POST", "problem"], ["POST", "audit", "share"], ["POST", "audit", "revoke"], ["POST", "audit", "prefs"], ["POST", "sync"], ["POST", "call-lists"], ["POST", "call-outcomes"], ["POST", "inbox", "outcome"],
   ["POST", "workflows"], ["PUT", "workflows"], ["DELETE", "workflows"], ["POST", "data-health"], ["PUT", "data-health"], ["POST", "settings", "test-slack"], ["POST", "settings", "purge"], ["POST", "api-keys"],
   ["DELETE", "call-lists"], ["DELETE", "today", "views"], ["POST", "inbox", "views"], ["DELETE", "inbox", "views"], ["POST", "people", "lists"], ["DELETE", "people", "lists"], ["PUT", "people", "dialer"], ...PEOPLE_DAILY_RULES,
-  ...APPT_ACTION_RULES, ...PIPELINE_ACTION_RULES, ...PEOPLE3_ACTION_RULES, ["GET", "team"], ["PUT", "team"], ["PUT", "settings"], ["PUT", "goals"], ["PUT", "appointments", "targets"], ["PUT", "speed", "target"], ["PUT", "accounts"], ["PUT", "stage-rules"],
+  ...APPT_ACTION_RULES, ...PIPELINE_ACTION_RULES, ...PEOPLE3_ACTION_RULES, ...TODAY3_ACTION_RULES, ["GET", "team"], ["PUT", "team"], ["PUT", "settings"], ["PUT", "goals"], ["PUT", "appointments", "targets"], ["PUT", "appointments", "exec-target"], ["PUT", "speed", "target"], ["PUT", "accounts"], ["PUT", "stage-rules"],
 ];
 
 export function routeAllowed(kind: AccessKind, method: string, segments: string[]): boolean {

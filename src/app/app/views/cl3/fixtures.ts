@@ -102,8 +102,8 @@ function setup(p: FxParams): Cl3SetupList {
 }
 function billing(p: FxParams) {
   const rows: Cl3Billing[] = filtered(p).map((x, i) => {
-    const state = i % 19 === 3 ? "needs_permission" : i % 23 === 4 ? "not_available" : "ok";
-    return { locationId: x.locationId, name: x.name, state, plan: state === "ok" ? "Growth plan" : null, subscriptionStatus: state === "ok" ? (i % 17 === 2 ? "past_due" : "active") : null, paymentFailing: null, nextPaymentAt: null, appsInstalled: null, fetchedAt: iso(NOW - 3_600_000), message: state === "needs_permission" ? "Needs permission: reconnect" : state === "not_available" ? "Not available from the platform yet" : null } as Cl3Billing;
+    const state = i % 19 === 3 ? "needs_permission" : i % 23 === 4 ? "not_available" : i % 29 === 5 ? "no_plan" : "ok";
+    return { locationId: x.locationId, name: x.name, state, plan: state === "ok" ? "Growth plan" : null, subscriptionStatus: state === "ok" ? (i % 17 === 2 ? "past_due" : "active") : null, paymentFailing: null, nextPaymentAt: null, appsInstalled: null, fetchedAt: iso(NOW - 3_600_000), message: state === "needs_permission" ? "Needs permission: reconnect" : state === "no_plan" ? "Not on a plan" : state === "not_available" ? "Not available from the platform yet" : null } as Cl3Billing;
   });
   return { ...pageOf(rows, Number(p.page ?? 0), Number(p.size ?? 20)), needPermission: rows.filter((x) => x.state === "needs_permission").length, notActive: rows.filter((x) => x.subscriptionStatus === "past_due").length };
 }
