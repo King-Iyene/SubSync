@@ -10,12 +10,14 @@ const RUN = process.env.ROLLUP_DB_TEST === "1";
 test("rollup and live scan agree on a fixture", { skip: !RUN }, async () => {
   const { sql } = await import("../db");
   const { pipelineCards } = await import("../analytics/pipeline3-cards");
-  const { overview } = await import("../analytics/pipeline3-queries");
+  const { overview, dealList } = await import("../analytics/pipeline3-queries");
   const { refreshRollup, rollupFresh } = await import("../analytics/pipeline3-rollup");
   const db = sql();
-  for (const t of ["installations", "locations", "pipelines", "cached_opportunities", "cached_contacts", "deal_facts", "deal_stage_stats", "stage_rules", "pipeline_rollup", "pipeline_rollup_state"]) {
+  for (const t of ["installations", "locations", "pipelines", "cached_opportunities", "cached_contacts", "deal_facts", "deal_stage_stats", "stage_rules"]) {
     await db.unsafe(`create temp table ${t} (like public.${t} including defaults)`);
   }
+  await db`create temp table pipeline_rollup (installation_id uuid, location_id text, pipeline_id text, stage_id text default '', owner_id text default '', source text default '', status text, is_test boolean, oos boolean, has_value boolean, has_owner boolean, outlier boolean, stale boolean, big_untouched boolean default false, closed_day date default date '1970-01-01', lost_reason text default '', n integer, value double precision, med_days double precision, norm_days double precision, stays integer, refreshed_at timestamptz default now())`;
+  await db`create temp table pipeline_rollup_state (installation_id uuid, location_id text, refreshed_at timestamptz default now(), deals integer default 0, rows_written integer default 0, primary key (installation_id, location_id))`;
   const inst = "00000000-0000-4000-8000-000000000001", loc = "locFixture1", day = 86_400_000, ago = (d: number) => new Date(Date.now() - d * day);
   await db`insert into installations (id) values (${inst})`.catch(async () => { await db.unsafe(`insert into installations (id, company_id) values ('${inst}', 'c1')`); });
   await db`insert into locations (installation_id, location_id, name) values (${inst}, ${loc}, 'Fixture account')`;
@@ -46,6 +48,11 @@ test("rollup and live scan agree on a fixture", { skip: !RUN }, async () => {
   assert.deepEqual(fastCards.totals, liveCards.totals);
   const keep = (o: typeof liveOv) => ({ open: o.openCount, ov: o.openValue.value, stale: o.stale, won: o.wonLast30, lost: o.lostLast30, health: o.health, big: o.bigUntouched, cards: o.cards.map((c) => [c.key, c.value]) });
   assert.deepEqual(keep(fastOv), keep(liveOv));
+  // counts equal rows: every number read from the rollup equals the rows of the list behind it
+  for (const [bucket, n] of [["open", fastOv.openCount], ["stale", fastOv.stale.count], ["no_owner", fastOv.health.noOwner], ["no_value", fastOv.health.noValue]] as const) {
+    const l = await dealList(scope, { f: { from, to, bucket }, page: 0, size: 20 }, null);
+    assert.equal(l.total, n, `${bucket}: the count equals its list`);
+  }
   // the rules themselves, spelled out so a change shows up here: 7 normal open deals count (a1 a2 a3 + b0..b5 is 9, minus the outlier a7 is separate, a8 is in an unknown stage but still counted)
   assert.equal(fastCards.cards[0].noOwnerCount, 1);
   assert.equal(fastCards.cards[0].zeroValueCount, 1);
