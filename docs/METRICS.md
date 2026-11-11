@@ -722,3 +722,11 @@ Code: `src/lib/analytics/moat-core.ts` (rules), `moat-queries.ts` (SQL aggregate
 - Owner changes (claim, assign): only someone on that one account's team (`location_users`), at most 20 at a time, one client account per batch; a claim only on an ownerless lead. The owner before is stored (`unanswered_actions`) so a batch can be put back. Our own writes (owner changes, notes) are never replies: they add no message, and a note's id goes in the shared write log (`crm_writes`) so the sync and the webhook echo skip it (principle 14).
 - Unit tests: src/lib/__tests__/unanswered-actions.test.ts; database tests: tests/unit/unanswered-actions-db.test.ts (skip until the migration is applied).
 
+
+## Unanswered messages, round 3 (slices A and C: lists, filters, search)
+
+- **Waiting for us (list).** One row per person (location plus contact, or the conversation when there is no contact). The person's oldest conversation whose last message is the customer's, newer than 30 days and older than the account's reply target, names the wait. The list, its total and every chip are computed by the database (`unanswered-sql.ts`); a chip's number is the same query with that one choice changed, so a number equals the rows behind it. Same rule as `waiting.ts`, so the total equals the home figure (tested in `tests/unit/unanswered-sql-db.test.ts`).
+- **Waiting on them.** Same grouping, but the last message is ours (outbound, internal notes excluded), newer than 30 days and older than the chosen quiet time (4 hours, 1 day or 3 days; default 1 day). Automatic messages count as ours because the platform does not say which they were.
+- **Mine and unowned.** Assigned to the signed-in user, or assigned to nobody.
+- **Deal worth.** At least the chosen amount in open deals (monetary value, status open) for that contact.
+- **Find anyone.** People with a conversation, matched by name, email, client name (all words must match) or phone digits (3 or more digits), in the accounts the caller may read; one row per person with the state of their latest conversation. Paged 20, 50 or 100.

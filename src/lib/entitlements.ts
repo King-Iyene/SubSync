@@ -73,6 +73,14 @@ export const FEATURES = [
   "inbox_note",
   "inbox_outcome_ui",
   "inbox_clear_junk",
+  // Unanswered round 3, slices A and C (redesign, filters, search): each default off.
+  "inbox_control_room",
+  "inbox_filters",
+  "inbox_views",
+  "inbox_search",
+  "inbox_quiet",
+  "inbox_keys",
+  "inbox_bulk",
 ] as const;
 export type Feature = (typeof FEATURES)[number];
 

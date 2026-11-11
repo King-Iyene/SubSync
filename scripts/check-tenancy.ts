@@ -108,6 +108,9 @@ async function main() {
       `/api/app/inbox?part=list&q=${other.marker}`, "/api/app/inbox?part=ranks&by=account", "/api/app/inbox?part=ranks&by=owner", `/api/app/inbox?part=ranks&by=account&q=${other.marker}`, "/api/app/moat?part=receipt", `/api/app/moat?part=receipt&account=${other.locs[0]}`, "/api/app/moat?part=curve", `/api/app/moat?part=curve&account=${other.locs[0]}`, "/api/app/moat?part=scorecards", `/api/app/moat?part=scorecards&account=${other.locs.join(",")}`, "/api/app/moat?part=channels", "/api/app/moat?part=clock", `/api/app/moat?part=clock&account=${other.locs[0]}`, "/api/app/moat?part=benchmark&vertical=med_spa", "/api/app/moat?part=setup", "/api/app/moat?part=proofs",
       // Unanswered actions (round 3, slice B): the hidden people, the owner picker and the capabilities, asked for the other side's account.
       "/api/app/inbox/act/caps", "/api/app/inbox/act/hidden", `/api/app/inbox/act/hidden?account=${other.locs[0]}`, `/api/app/inbox/act/hidden?account=${other.locs[0]}&reason=snoozed&size=100`, `/api/app/inbox/act/team?locationId=${other.locs[0]}`,
+      // Unanswered round 3, slices A and C: the SQL-paged list, the "waiting on them" tab, the one search and the saved views, asked for the other side by every parameter.
+      "/api/app/inbox?part=list2", `/api/app/inbox?part=list2&account=${other.locs[0]}`, `/api/app/inbox?part=list2&tab=them&account=${other.locs[0]}`, `/api/app/inbox?part=list2&owner=${other.marker}`, `/api/app/inbox?part=list2&q=${other.marker}&size=100`,
+      `/api/app/inbox?part=find&q=${other.marker}`, `/api/app/inbox?part=find&q=${other.marker}&size=100`, "/api/app/inbox?part=views",
     ];
 
     // TENANCY_FAST=1 skips the long cross-read sweep (while iterating on the share link and write attacks); the full run does not.
