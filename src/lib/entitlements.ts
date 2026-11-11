@@ -56,6 +56,17 @@ export const FEATURES = [
   "inbox_channel_mix",
   "inbox_digest",
   "inbox_assign",
+  // Unanswered round 3, slice D and E (docs/features/UNANSWERED3_BRIEF.md): the moat and proof features, each default off.
+  "moat_record",
+  "moat_receipt",
+  "moat_curve",
+  "moat_scorecards",
+  "moat_benchmark",
+  "moat_proof_page",
+  "moat_alert_feedback",
+  "inbox_wait_clock",
+  "inbox_reply_target",
+  "inbox_proof_email",
 ] as const;
 export type Feature = (typeof FEATURES)[number];
 

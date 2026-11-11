@@ -115,6 +115,7 @@ import { writeEnabledFor } from "../analytics/cleanup-config";
 import { isLive } from "../live-flags";
 import { handleSpeedPrefs, handleSpeedDigest, handleSpeedLadder, handleSpeedPart, handleSpeedTarget } from "./speed-routes";
 import { handleUnansweredOutcome, handleUnansweredPart } from "./unanswered-routes";
+import { handleMoat } from "./moat-routes";
 import { handleApptWork } from "./appointment-work-routes";
 import { buildSteps, guideRoleOf } from "../getting-started";
 import { changedSettingKeys, feedbackGivenBy, logAccountFlags, logKeyChange, logSettingsChange, recordVote } from "../feedback-queries";
@@ -2002,6 +2003,8 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       // The new Unanswered v2 parts (home/list/ranks) are always available; per-client SLA is gated separately inside handleUnansweredPart
       return await handleUnansweredPart(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links, targets: async () => { const st = (await scope(ctx)).settings; return { slaHours: st.slaHours, targetMinutes: st.speedTargetMinutes }; } });
     }
+    // Moat and proof (round 3, slice D and E): receipts, the speed-to-outcome curve, scorecards, the peer benchmark, wait clocks, channel mix, the verified reply-time page. Each part has its own flag inside.
+    if (a === "moat") return await handleMoat(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links, settings: async () => (await scope(ctx)).settings });
     if (a === "inbox" && b === "outcome" && method === "POST") {
       if (!ctx.entitlements.features.inbox_breach_alert || ctx.entitlements.locked.includes("inbox_breach_alert")) {
         return json({ error: "Follow-up outcomes are not enabled for this account" }, 404);
