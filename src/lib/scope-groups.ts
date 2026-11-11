@@ -59,8 +59,8 @@ export const SCOPE_GROUPS: readonly ScopeGroup[] = [
     { scope: "campaigns.readonly", kind: "read", required: false, why: "The list of campaigns in each client account (name, state, last change), to find stuck or failed ones. Read only: SubSync never starts or sends a campaign." },
     { scope: "emails/campaigns.readonly", kind: "read", required: false, why: "The email, bulk and workflow campaigns of each client account, read only, for the same list." },
     { scope: "emails/stats.readonly", kind: "read", required: false, why: "How many messages of each campaign were sent, delivered, opened, clicked, bounced or are still waiting, to find campaigns that looked sent but did not arrive. Totals only: SubSync never sees who received what." },
-    { scope: "saas/location.read", kind: "read", required: false, why: "The plan and subscription status each client account has on your plans, for the Billing view in Clients. Without it the view says: Needs permission, reconnect." },
-    { scope: "saas/company.read", kind: "read", required: false, why: "The list of client accounts on your plans, so the Billing view can show every account. Optional." },
+    { scope: "saas/location.read", kind: "read", required: false, why: "Optional. Not used by the Billing view today." },
+    { scope: "saas/company.read", kind: "read", required: false, why: "The plan and subscription status each client account has on your plans, for the Billing view in Clients. Without it the view says: Needs permission, reconnect." },
   ] },
 ];
 
@@ -107,7 +107,7 @@ export const FEATURE_NEEDS: readonly FeatureNeed[] = [
   { id: "workflow_history", feature: "Failing and idle workflow checks", scope: "workflows.logs" },
   { id: "campaign_stats", feature: "Campaign delivery figures", scope: "emails/stats.readonly" },
   { id: "campaigns", feature: "The campaign list and its health", scope: "campaigns.readonly" },
-  { id: "client_billing", feature: "Each client's plan and subscription status", scope: "saas/location.read" },
+  { id: "client_billing", feature: "Each client's plan and subscription status", scope: "saas/company.read" },
   { id: "data_health_fix", feature: "Fixing phone formats and name capitals in Data health", scope: "contacts.write" },
   { id: "meeting_notes", feature: "Adding a meeting summary to a contact's notes", scope: "contacts.write" },
 ];
