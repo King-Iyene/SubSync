@@ -18,7 +18,7 @@ describe.skipIf(!RUN)("Find a lead at scale", () => it("stays under the limit", 
   await db.unsafe("drop schema if exists findscale cascade");
   await db.unsafe("create schema findscale");
   // Tables first WITHOUT indexes, the real indexes after the rows are in (a bulk build is many times faster than keeping three trigram indexes up to date row by row).
-  for (const t of ["cached_contacts", "locations", "call_outcomes"]) await db.unsafe(`create table findscale.${t} (like public.${t} including defaults including generated including constraints)`);
+  for (const t of ["cached_contacts", "locations", "call_outcomes"]) await db.unsafe(`create table findscale.${t} (like public.${t} including defaults including generated)`);
   await db.unsafe("set search_path to findscale, public, extensions");
   await db`insert into locations (installation_id, location_id, name) select ${inst}::uuid, 'xtest-scale-' || g, 'Account ' || g from generate_series(1, 40) g`;
   const t0 = Date.now();
@@ -30,7 +30,7 @@ describe.skipIf(!RUN)("Find a lead at scale", () => it("stays under the limit", 
   const tb = Date.now();
   const defs = await db`select indexname, indexdef from pg_indexes where schemaname = 'public' and tablename = 'cached_contacts'`;
   for (const d of defs) {
-    if (/ USING btree (id)| (installation_id, location_id, contact_id)$/.test(d.indexdef as string) && (d.indexdef as string).includes("UNIQUE")) continue;
+    if ((d.indexdef as string).includes("UNIQUE")) continue; // keys are not what is being timed
     await db.unsafe((d.indexdef as string).replace(/INDEX (S+) ON public.cached_contacts/, "INDEX fs_$1 ON findscale.cached_contacts"));
   }
   console.log(`built ${defs.length} indexes in ${Date.now() - tb} ms`);
