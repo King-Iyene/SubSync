@@ -11,6 +11,7 @@ import { PrimaryButton } from "./today-chrome";
 import { WaitList } from "./unanswered-all";
 import { WaitedSection, WhereSection, type AccountRankOut, type BucketOut, type OwnerRankOut } from "./unanswered-picture";
 import { PersonRows, usePersonActions, type WaitRow } from "./unanswered-rows";
+import { UnansweredRoom, type UiPayload } from "./unanswered-room";
 
 // Unanswered messages, rebuilt (docs/UNANSWERED_REVIEW.md). One question: "who wrote to us and is still waiting for a reply, and who do I answer first?". Top to bottom: one
 // sentence, one button ("Reply to the oldest of the 14 people waiting", which opens that conversation in your CRM), the five people to reply to now (See all opens the whole
@@ -38,7 +39,15 @@ type ListSpec = { title: string; params: Record<string, string>; noun?: string }
 const MORE_TRIGGER = "ds-press inline-flex h-8 items-center gap-1 rounded-md border bg-card px-2.5 text-sm font-medium hover:border-primary/40 hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--ring)]";
 const quietButton = "ds-press min-h-11 rounded-md border bg-card px-4 text-sm font-medium hover:border-primary/40 sm:min-h-10";
 
+/** The control-room screen when its flag is on (inbox_control_room); the older screen below stays exactly as it was until then. The flags come from one cheap read that scans nothing. */
 export function InboxView({ go }: { go: GoFn }) {
+  const ui = useData<UiPayload>("inbox?part=ui");
+  if (!ui.data && !ui.error) return <div data-testid="page"><SkeletonRows rows={6} label="Reading your conversations..." /></div>;
+  if (ui.data?.flags.inbox_control_room) return <UnansweredRoom go={go} ui={ui.data} />;
+  return <LegacyInbox go={go} />;
+}
+
+function LegacyInbox({ go }: { go: GoFn }) {
   const api = useApiClient();
   const { data, error, reload } = useData<Home>("inbox?part=home");
   const [list, setList] = useState<ListSpec | null>(null);

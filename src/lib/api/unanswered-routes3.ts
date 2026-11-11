@@ -30,9 +30,16 @@ function narrow(allowed: string[] | null, id: string | null): string[] | null | 
 }
 
 export async function handleUnansweredPart3(ctx: Ctx, h: UnansweredHelpers & { owner: () => string }, part: string): Promise<Response | null> {
-  if (part !== "list2" && part !== "find" && part !== "views") return null;
+  if (part !== "list2" && part !== "find" && part !== "views" && part !== "ui") return null;
   const sp = ctx.url.searchParams;
   const seePeople = ctx.kind !== "client";
+
+  if (part === "ui") {
+    // Which parts of the screen are on for this caller (every inbox_* flag), so the screen draws only what is live. Nothing is scanned here.
+    const flags: Record<string, boolean> = {};
+    for (const [k, v] of Object.entries(ctx.entitlements.features)) if (k.startsWith("inbox_")) flags[k] = v === true && !ctx.entitlements.locked.includes(k as never);
+    return json({ flags, seePeople, kind: ctx.kind, me: ctx.session.userId ?? null });
+  }
 
   if (part === "views") {
     if (!on(ctx, "inbox_views")) return off();
