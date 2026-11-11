@@ -121,6 +121,7 @@ import { handleUnansweredPart3, handleUnansweredViewRemove, handleUnansweredView
 import { handleApptWork } from "./appointment-work-routes";
 import { handleAppointments3 } from "./appointments3-routes";
 import { handlePipeline3 } from "./pipeline3-routes";
+import { handleClients3 } from "./clients3-routes";
 import { handleApptActions } from "./appointment-actions-routes";
 import { handlePipelineActions } from "./pipeline-actions-routes";
 import { buildSteps, guideRoleOf } from "../getting-started";
@@ -1991,6 +1992,10 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
     // Pipeline round 3: /api/app/pipeline3?part=... (overview, money flow, attention, won and lost, forecast, people, sources, stage history, health, receipt, lists, detail; read only).
     if (a === "pipeline3" && method === "GET" && !b && ctx.url.searchParams.has("part")) {
       return await handlePipeline3(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links });
+    }
+    // Clients round 3: /api/app/clients3?part=... (overview, needs attention, trends, compare, receipt, people, setup, lists; read only).
+    if (a === "clients3" && method === "GET" && !b && ctx.url.searchParams.has("part")) {
+      return await handleClients3(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links });
     }
     // Appointments actions and meetings (slice AB): the panel, preview-then-do changes, bulk, undo, and the private Meetings area (each behind its own flag, checked inside).
     if (a === "appointments" && (b === "act" || b === "meetings") && ctx.segments.length === 3) {
