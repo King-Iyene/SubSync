@@ -70,6 +70,9 @@ export const DEFAULT_OFF: ReadonlySet<Feature> = new Set<Feature>([
   "appt_bulk",
   "appt_meetings",
   "appt_module",
+  // Pipeline module (docs/features/PIPELINE_BRIEF.md): default off.
+  "pl_module",
+  "pl_money_flow",
 ]);
 
 export function resolveFeatures(all: readonly Feature[], overrides: Record<string, boolean>, allOn = false): Record<Feature, boolean> {
