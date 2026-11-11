@@ -2,13 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore, type ComponentType } from "react";
 import { useData } from "../../session";
-import { CONFLICTS_FIXTURE, FLOW_EMPTY, FLOW_FIXTURE, HEALTH_FIXTURE, OVERVIEW_FIXTURE, PEOPLE_FIXTURE, PROOF_FIXTURE, REMINDERS_FIXTURE, SOURCES_FIXTURE, SPEED_FIXTURE, page, rowsFixture } from "./fixtures";
+import { CONFLICTS_FIXTURE, FLOW_EMPTY, FLOW_FIXTURE, HEALTH_FIXTURE, OVERVIEW_FIXTURE, PEOPLE_FIXTURE, PROOF_FIXTURE, SOURCES_FIXTURE, SPEED_FIXTURE, page, rowsFixture } from "./fixtures";
 import { adaptPart, API_PARAM, API_PART } from "./adapters";
 import type { ApPart, ApRow, ApScope } from "./types";
 
 /** Scope the user picks. `days` is turned into from/to on the server's day boundaries; everything else is passed through and re-checked on the server (never trusted). */
-export type ApFilters = { days: 7 | 30 | 90; locationId: string; source: string; q: string; userId: string };
-export const DEFAULT_FILTERS: ApFilters = { days: 30, locationId: "", source: "", q: "", userId: "" };
+export { DEFAULT_FILTERS, filtersFromParams, filtersToParams, type ApFilters } from "@/lib/design/appt-filters";
+import { DEFAULT_FILTERS, type ApFilters } from "@/lib/design/appt-filters";
 
 const FX = /[?&]apfx=(1|empty|error)/;
 function fxFound(): string {
@@ -24,11 +24,12 @@ const fxMode = () => { const v = fxFound(); return v === "empty" || v === "error
 
 export function scopeOf(f: ApFilters): ApScope {
   const day = 86_400_000, to = new Date(), from = new Date(to.getTime() - f.days * day);
-  return { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10), locationId: f.locationId || undefined, source: f.source || undefined, userId: f.userId || undefined };
+  return { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10), locationId: f.locationId || undefined, calendarId: f.calendarId || undefined, source: f.source || undefined, userId: f.userId || undefined };
 }
 export function queryOf(part: ApPart, f: ApFilters, extra: Record<string, string | number | undefined> = {}): string {
   const s = scopeOf(f); const p = new URLSearchParams({ part: API_PART[part] ?? part, from: s.from, to: s.to });
   if (s.locationId) p.set("location", s.locationId);
+  if (s.calendarId) p.set("calendar", s.calendarId);
   if (s.source) p.set("source", s.source);
   if (s.userId) p.set("user", s.userId);
   if (f.q.trim()) p.set("q", f.q.trim());
@@ -51,8 +52,7 @@ function fixtureFor(part: ApPart, extra: Record<string, string | number | undefi
     case "flow-tree": return FLOW_FIXTURE;
     case "health": return { rows: HEALTH_FIXTURE };
     case "sources": return { sources: SOURCES_FIXTURE, speed: SPEED_FIXTURE };
-    case "calendars": return { rows: CONFLICTS_FIXTURE };
-    case "reminders": return page(REMINDERS_FIXTURE);
+    case "calendars": return { rows: CONFLICTS_FIXTURE, calendars: [], people: [], problems: [] };
     case "proof": return { rows: PROOF_FIXTURE };
   }
 }
@@ -98,4 +98,4 @@ export function ApSlot({ name, ...props }: { name: ApSlotName } & SlotProps) {
   return C ? <C {...props} /> : null;
 }
 export const hasApSlot = (n: ApSlotName) => slots.has(n);
-export const useMemoFilters = (f: ApFilters) => useMemo(() => f, [f.days, f.locationId, f.source, f.q, f.userId]); // eslint-disable-line react-hooks/exhaustive-deps
+export const useMemoFilters = (f: ApFilters) => useMemo(() => f, [f.days, f.locationId, f.source, f.q, f.userId, f.calendarId]); // eslint-disable-line react-hooks/exhaustive-deps

@@ -3,27 +3,29 @@
 
 export type ApOutcome = "won" | "lost" | "showed" | "noshow" | "cancelled" | "unmarked";
 export type ApStatus = "booked" | "confirmed" | "showed" | "noshow" | "cancelled" | "invalid" | "completed";
-export type ApPart = "overview" | "needs-outcome" | "no-show-recovery" | "booking-share" | "flow-tree" | "health" | "sources" | "calendars" | "reminders" | "proof" | "list";
+export type ApPart = "overview" | "needs-outcome" | "no-show-recovery" | "booking-share" | "flow-tree" | "health" | "sources" | "calendars" | "options" | "compare" | "proof" | "list";
 
 /** Filters every part accepts. Dates are ISO days. */
 export type ApScope = { from: string; to: string; locationId?: string; calendarId?: string; source?: string; userId?: string };
+import type { PersonRollup } from "./appointments3-intel.ts";
 export type ApPage<T> = { total: number; page: number; pageSize: number; rows: T[] };
 
 export type ApRow = {
   id: string; locationId: string; accountName: string; contactId: string; contactName: string; startAt: string; calendarName: string;
   status: ApStatus; ownerId: string | null; ownerName: string | null; bookerId: string | null; bookerName: string | null; source: string | null;
-  dealValueCents: number | null; dealStatus: "open" | "won" | "lost" | "none"; hoursPast: number | null; flags: Array<"double-booked" | "no-reminder" | "unconfirmed" | "no-deal">;
+  dealValueCents: number | null; dealStatus: "open" | "won" | "lost" | "none"; phone?: string | null; hoursPast: number | null; url?: string | null; calendarId?: string | null; flags: Array<"double-booked" | "no-deal">;
 };
 
 export type ApOverview = {
+  today?: { doubleBookings: number; idlePeople: number };
   headline: { needsOutcome: number; noShowsToRecover: number; reportedShowRate: number | null; trueShowRate: number | null; trueRange: [number, number] | null; marked: number; booked: number };
   revenueAtRisk: { lowCents: number; highCents: number; basis: string } | null;
-  journey: Array<{ key: "booked" | "confirmed" | "showed" | "won"; label: string; count: number }>;
+  journey: Array<{ key: "booked" | "showed" | "won"; label: string; count: number }>;
   cards: { worstAccount: { id: string; name: string; noShowRate: number } | null; topSetter: { id: string; name: string; showRate: number } | null; leak: string | null };
   needsPermission: boolean;
 };
 
-export type ApStats = { bookings: number; showRate: number | null; noShowRate: number | null; closeRate: number | null; burned: number; revenueCents: number; avgLeadToBookedHours: number | null };
+export type ApStats = { bookings: number; showRate: number | null; noShowRate: number | null; closeRate: number | null; revenueCents: number; avgLeadToBookedHours: number | null };
 export type ApFlowCloser = ApStats & { id: string; name: string; outcomes: Record<ApOutcome, number> };
 export type ApFlowSetter = ApStats & { id: string; name: string; closers: ApFlowCloser[]; hiddenClosers: number };
 export type ApFlowTree = {
@@ -34,10 +36,13 @@ export type ApFlowTree = {
 };
 
 export type ApPersonRow = ApStats & { id: string; name: string; role: "setter" | "closer" | "both"; unassigned?: boolean; trend: number[] };
-export type ApHealthRow = { locationId: string; name: string; booked: number; showRate: number | null; noShowRate: number | null; cancelRate: number | null; unmarked: number; rescheduleRate: number | null };
+export type ApHealthRow = { locationId: string; name: string; booked: number; showRate: number | null; noShowRate: number | null; cancelRate: number | null; unmarked: number };
 export type ApSourceRow = { source: string; booked: number; showRate: number | null; medianFirstReplyMinutes: number | null; won: number };
 export type ApSpeedBand = { label: string; booked: number; showRate: number | null };
-export type ApConflictRow = { id: string; kind: "double-booking" | "forced-overlap" | "disconnected"; accountName: string; calendarName: string; when: string | null; people: string[]; note: string };
-export type ApReminderRow = ApRow & { reminderState: "none" | "sent" | "confirmed" | "failed"; hoursToStart: number };
-export type ApProof = { weekOf: string; accountName: string; booked: number; showed: number; recovered: number; stillUnmarked: number; trueShowRate: number | null; caught: number; fixed: number };
+export type ApConflictRow = { id: string; kind: "double-booking"; accountName: string; calendarName: string; when: string | null; people: string[]; note: string };
+export type ApCalendarRow = { locationId: string; accountName: string; calendarId: string; calendarName: string; bookings: number; lastBookingAt: string | null; daysSince: number | null };
+export type ApPersonCalRow = PersonRollup;
+export type ApProblem = { key: string; label: string; tone: "red" | "amber"; count: number; why: string; available: boolean };
+export type ApCalendarsView = { rows: ApConflictRow[]; calendars: ApCalendarRow[]; people: ApPersonCalRow[]; problems: ApProblem[] };
+export type ApProof = { weekOf: string; weekEnd?: string; locationId?: string | null; accountName: string; booked: number; showed: number; recovered: number; stillUnmarked: number; trueShowRate: number | null; caught: number; fixed: number };
 export type ApSavedView = { id: string; name: string; scope: Partial<ApScope> & { q?: string } };

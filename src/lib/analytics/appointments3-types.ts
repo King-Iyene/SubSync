@@ -3,20 +3,21 @@
 // minimum sample is { enough: false } and the screen says "not enough data", never a made-up number. Definitions: docs/METRICS.md "Appointments 3".
 
 export const APPT3_PARTS = [
-  "overview", "needs-outcome", "noshow-recovery", "booking-share", "flow-tree", "health", "sources", "calendars", "reminders", "receipt", "list", "detail",
+  "overview", "needs-outcome", "noshow-recovery", "booking-share", "flow-tree", "health", "sources", "calendars", "options", "compare", "trends", "export", "receipt", "list", "detail",
 ] as const;
 export type Appt3Part = (typeof APPT3_PARTS)[number];
 
 /** Shared query parameters (all optional): from, to (ISO dates), location, calendar, user (person), source, page (0-based), size (20|50|100), sort, q, dir. */
+import type { PersonRollup } from "./appointments3-intel.ts";
 export type Appt3Query = {
   part: Appt3Part; from?: string; to?: string; location?: string; calendar?: string; user?: string; source?: string;
-  page?: number; size?: 20 | 50 | 100; sort?: string; q?: string; bucket?: Appt3Bucket;
+  page?: number; /** Keyset cursor 'startIso|id' for lists sorted newest first. */ after?: string; size?: 20 | 50 | 100; sort?: string; q?: string; bucket?: Appt3Bucket;
   /** Flow tree and lists: a booker id or "none" (setter), an owner id or "none" (closer); compare = "idA,idB" (two setters); top = how many setters to show (3 to 30, default 12); week = Monday date (YYYY-MM-DD) for the receipt. */
-  setter?: string; closer?: string; compare?: string; top?: number; week?: string;
+  setter?: string; closer?: string; compare?: string; top?: number; week?: string; /** Flow tree: skip this many people (See all pages through the rest). */ skip?: number;
 };
 
 /** Our own groups of statuses. `unmarked` = time passed (by 3h) with no outcome. `no_deal` = no deal linked to the contact. */
-export type Appt3Bucket = "booked" | "unmarked" | "showed" | "noshow" | "cancelled" | "invalid" | "completed" | "won" | "lost" | "open" | "no_deal" | "upcoming";
+export type Appt3Bucket = "booked" | "unmarked" | "showed" | "noshow" | "cancelled" | "invalid" | "completed" | "won" | "lost" | "open" | "no_deal" | "upcoming" | "recovered";
 
 export type Estimate = { value: number | null; low: number | null; high: number | null; enough: boolean; estimate: true; formula: string; minNote: string | null };
 export type Rate = { value: number | null; n: number; of: number; enough: boolean };
@@ -27,23 +28,25 @@ export type Appt3Row = {
   calendarId: string | null; calendarName: string | null;
   startAt: string; endAt: string | null; status: string; bucket: Appt3Bucket;
   ownerId: string | null; ownerName: string | null; bookerId: string | null; bookerName: string | null;
-  source: string | null; dealStatus: "won" | "lost" | "open" | null; dealValue: number | null;
+  phone: string | null; source: string | null; dealStatus: "won" | "lost" | "open" | null; dealValue: number | null;
   leadToBookedMinutes: number | null; firstReplyMinutes: number | null;
-  rescheduleCount: number; reminders: number; confirmed: boolean; hasConflict: boolean;
+  hasConflict: boolean;
   /** Why it is on this list, in plain words (for example "Time passed 2 days ago, no outcome"). */
   why: string | null;
   dnd: boolean;
 };
 
-export type Page<T> = { rows: T[]; total: number; page: number; size: number; pages: number; truncated: boolean };
+export type Page<T> = { next?: string | null; rows: T[]; total: number; page: number; size: number; pages: number; truncated: boolean };
 
 export type Appt3Overview = {
   headline: string; button: { label: string; part: Appt3Part; bucket: Appt3Bucket | null; count: number } | null;
   booked: number; unmarked: number; trueShowRate: Rate; reportedShowRate: Rate;
+  /** For the 'What to do today' line. */
+  today: { doubleBookings: number; idlePeople: number };
   noshowToRecover: number; recoveredLast30: number; noDealLinked: number; upcoming: number;
   revenueAtRisk: Estimate; revenueWon: { value: number; n: number };
   /** Booked, confirmed, showed, closed: the numbers of the animated journey. Each step's count equals its list. */
-  journey: Array<{ key: "booked" | "confirmed" | "showed" | "won"; label: string; count: number; bucket: Appt3Bucket }>;
+  journey: Array<{ key: "booked" | "showed" | "won"; label: string; count: number; bucket: Appt3Bucket }>;
   cards: Array<{ key: string; title: string; value: number | string; sub: string | null; part: Appt3Part; bucket: Appt3Bucket | null }>;
   trend: Array<{ day: string; booked: number; showed: number; noshow: number; unmarked: number }>;
   windowDays: number; dealWindowDays: number; accounts: number;
@@ -63,7 +66,7 @@ export type Appt3PersonShare = {
   userId: string | null; name: string; role: "setter" | "closer" | "both" | "none";
   booked: number; owned: number; showed: number; noshow: number; unmarked: number; won: number; lost: number;
   showRate: Rate; noshowRate: Rate; closeRate: Rate; wonValue: number; leadToBookedMedianMinutes: number | null;
-  burned: number; trend: Array<{ week: string; booked: number; showRate: number | null }>;
+  trend: Array<{ week: string; booked: number; showRate: number | null }>;
 };
 export type Appt3BookingShare = Page<Appt3PersonShare> & {
   unassigned: number; ownerless: number;
@@ -75,7 +78,7 @@ export type Appt3BookingShare = Page<Appt3PersonShare> & {
 export type FlowNode = {
   id: string; level: "root" | "setter" | "closer" | "leaf"; label: string; userId: string | null; parentId: string | null;
   count: number; health: number | null; best: boolean;
-  badges: null | { bookings: number; showRate: Rate; noshowRate: Rate; closeRate: Rate; burned: number; wonValue: number; leadToBookedMedianMinutes: number | null };
+  badges: null | { bookings: number; showRate: Rate; noshowRate: Rate; closeRate: Rate; wonValue: number; leadToBookedMedianMinutes: number | null };
   leaf?: "showed" | "noshow" | "cancelled" | "unmarked" | "won" | "lost" | "open";
   /** What a click opens: the exact appointment list (count equals rows). */
   open: { setter?: string | null; closer?: string | null; bucket?: Appt3Bucket };
@@ -84,14 +87,12 @@ export type Appt3FlowTree = {
   nodes: FlowNode[]; period: { from: string; to: string }; totalBooked: number; topN: number; hiddenPeople: number;
   /** The single biggest drop, in plain words, with the node to open. */
   leak: null | { text: string; nodeId: string; lostAppointments: number };
-  /** Who should get the next lead: an ESTIMATE from past conversion, null under the minimum. */
-  nextLead: null | { userId: string; name: string; estimate: true; formula: string };
   compare?: null | { a: FlowNode; b: FlowNode };
 };
 
 export type Appt3Health = Page<{
   locationId: string; accountName: string | null; vertical: string | null;
-  booked: number; showRate: Rate; cancelRate: Rate; noshowRate: Rate; unmarked: number; rescheduleRate: Rate; target: number | null; belowTarget: boolean;
+  booked: number; showRate: Rate; cancelRate: Rate; noshowRate: Rate; unmarked: number; target: number | null; belowTarget: boolean;
   worstReason: string | null;
 }> & { verticals: Array<{ vertical: string; accounts: number; showRate: Rate }> };
 
@@ -106,23 +107,46 @@ export type Appt3Sources = {
 };
 
 export type Appt3Conflict = {
-  kind: "double_booking" | "forced_overlap"; locationId: string; accountName: string | null; calendarName: string | null;
+  kind: "double_booking"; locationId: string; accountName: string | null; calendarName: string | null;
   a: Appt3Row; b: Appt3Row; overlapMinutes: number;
 };
 export type Appt3Calendars = {
   conflicts: Page<Appt3Conflict>;
-  disconnected: Array<{ locationId: string; accountName: string | null; calendarId: string; calendarName: string | null; lastBookingAt: string | null; reason: "no_bookings_30d" | "needs_permission" | "sync_stale" }>;
-  trend: Array<{ week: string; booked: number; rescheduled: number; cancelled: number }>;
+  trend: Array<{ week: string; booked: number; cancelled: number }>;
   roundRobin: Array<{ calendarId: string; calendarName: string | null; locationId: string; members: Array<{ userId: string | null; name: string; owned: number; sharePct: number }> }>;
   capacity: Array<{ month: string; booked: number }>;
+  /** Every calendar seen for these accounts, with a count that may be zero (idle calendars are listed too). */
+  calendarsAll?: Array<{ locationId: string; accountName: string | null; calendarId: string; calendarName: string | null; bookings: number; lastBookingAt: string | null; daysSince: number | null }>;
+  /** Every person in the accounts' team lists plus anyone seen booking: one row each, with a per-account breakdown. Zero bookings are listed on purpose. */
+  peopleAll?: PersonRollup[];
+  /** Calendar problems at a glance. `available: false` = the platform does not give us that data yet (never a guess). */
+  problems?: Array<{ key: string; label: string; tone: "red" | "amber"; count: number; why: string; available: boolean }>;
   needsPermission: boolean;
 };
 
-export type Appt3Reminders = {
-  noReminder: Page<Appt3Row>; notConfirmed24h: Page<Appt3Row>;
-  effectiveness: { enough: boolean; withReminder: Rate; without: Rate; minNote: string | null };
-  riskFlags: Array<{ appointmentId: string; locationId: string; flags: Array<"not_confirmed" | "no_reminder" | "first_time_no_show_history" | "short_notice"> }>;
-  historyDays: number;
+/** Two people side by side, from real fields only: status counts, deal value won (contact to deal join), and splits by calendar, source and weekday. */
+export type Appt3CompareSide = {
+  userId: string; name: string; role: "booker" | "owner";
+  booked: number; showed: number; noshow: number; cancelled: number; unmarked: number; won: number; wonValue: number;
+  showRate: Rate; noshowRate: Rate;
+  byCalendar: Array<{ name: string; booked: number; showed: number; noshow: number }>;
+  bySource: Array<{ source: string; booked: number; showed: number; noshow: number }>;
+  byWeekday: Array<{ weekday: number; booked: number; showed: number; noshow: number }>;
+};
+export type Appt3Compare = { sides: Appt3CompareSide[] };
+
+/** Bookings per person or calendar, this period against the one before. Counts only (start time and status). */
+export type Appt3Trends = {
+  by: "person" | "calendar"; grain: "week" | "month"; currentFrom: string; previousFrom: string;
+  rows: Array<{ id: string; name: string; current: number; previous: number; delta: number; showedCurrent: number; noshowCurrent: number; series: number[] }>;
+};
+
+/** The filter pickers: every calendar, person and source in scope (read from the data, so new ones appear by themselves). */
+export type Appt3Options = {
+  accounts: Array<{ locationId: string; name: string }>;
+  calendars: Array<{ calendarId: string; name: string | null; locationId: string }>;
+  people: Array<{ userId: string; name: string; locationIds: string[]; inTeamList: boolean }>;
+  sources: string[];
 };
 
 export type Appt3Receipt = {
@@ -136,7 +160,6 @@ export type Appt3Detail = {
   row: Appt3Row; timeline: Array<{ at: string; kind: string; from: string | null; to: string | null; actorName: string | null; actorKind: "person" | "subsync" | "system" | "unknown"; text: string }>;
   rescheduleChain: Array<{ appointmentId: string; startAt: string; status: string }>;
   deal: null | { opportunityId: string; name: string | null; status: string; value: number | null; stage: string | null };
-  reminders: Array<{ at: string; channel: string | null }>;
   blockers: Array<"dnd" | "active_payment" | "open_deal" | "upcoming">;
 };
 
@@ -145,6 +168,6 @@ export type Appt3Envelope<T> = T & { generatedAt: string; cached: boolean; canSe
 
 export const APPT3_FLAGS = [
   "appt_overview", "appt_needs_outcome", "appt_noshow_recovery", "appt_booking_share", "appt_flow_tree", "appt_health", "appt_sources", "appt_calendars",
-  "appt_reminders", "appt_meetings", "appt_proof", "appt_actions", "appt_history", "appt_record",
+  "appt_meetings", "appt_proof", "appt_actions", "appt_history", "appt_record",
 ] as const;
 export type Appt3Flag = (typeof APPT3_FLAGS)[number];
