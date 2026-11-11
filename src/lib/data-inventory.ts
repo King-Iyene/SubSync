@@ -56,6 +56,9 @@ export const INVENTORY: Record<string, TableInfo> = {
     personal: { conversation_id: "the conversation this follow-up belongs to", contact_id: "the contact this follow-up belongs to", recorded_by: "which team member recorded the outcome" },
     notPersonal: ["outcome"],
   },
+  unanswered_snoozes: { noun: "Unanswered conversations you set aside for later", line: "conversations", personal: { conversation_id: "the conversation you set aside", contact_id: "the contact it belongs to", created_by: "which team member set it aside", released_by: "which team member brought it back" }, notPersonal: ["reason", "until_at"] },
+  unanswered_actions: { noun: "the history of owner changes and clean-ups made from Unanswered messages, with the owner before so a change can be put back", line: "conversations", personal: { conversation_id: "the conversation acted on", contact_id: "the contact acted on", before_owner: "who owned the contact before", after_owner: "who owns the contact after", actor: "who made the change" }, notPersonal: ["action", "result", "batch_id"] },
+  unanswered_hide_settings: { noun: "what Unanswered messages hides by default (not a lead, your own team, automatic messages)", line: "yours", personal: { updated_by: "who changed the choice" }, notPersonal: ["hide_not_a_lead", "hide_internal", "hide_automatic"] },
   lead_touches: {
     noun: "first-reply records", line: "conversations",
     personal: { touch_user_id: "which team member replied first" },

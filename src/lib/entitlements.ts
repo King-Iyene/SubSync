@@ -67,6 +67,12 @@ export const FEATURES = [
   "inbox_wait_clock",
   "inbox_reply_target",
   "inbox_proof_email",
+  // Unanswered round 3, slice B (actions): each behind its own flag, default off.
+  "inbox_open_lead",
+  "inbox_claim",
+  "inbox_note",
+  "inbox_outcome_ui",
+  "inbox_clear_junk",
 ] as const;
 export type Feature = (typeof FEATURES)[number];
 
