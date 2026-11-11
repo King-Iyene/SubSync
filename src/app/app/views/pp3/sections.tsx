@@ -19,8 +19,8 @@ export function Today({ filters, open, pick }: Pick<SecProps, "filters" | "open"
         const b = t.button;
         return (
           <div className="pp-stack" data-testid="pp-today">
-            <section className="pp-card" aria-label="Who needs you today">
-              <h2 className="pp-h">Who needs you today</h2>
+            <section className="pp-card" aria-label="What to do today">
+              <h2 className="pp-h">What to do today</h2>
               <p className="pp-sentence" data-testid="pp-today-sentence">{t.headline}</p>
               {b && (b.reason ? <button type="button" className="s6-btn" data-kind="primary" data-testid="pp-today-go" onClick={() => open({ title: t.headline, reason: b.reason!, userId: b.userId, location: b.locationId, count: b.count })}>{b.label} ({b.count.toLocaleString("en-US")})</button>
                 : b.userId ? <button type="button" className="s6-btn" data-kind="primary" data-testid="pp-today-go" onClick={() => pick(b.userId!)}>{b.label}</button> : null)}

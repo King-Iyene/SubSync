@@ -21,8 +21,10 @@ test("who may do what: owners and admins manage, staff and a client's people see
   assert.equal(viewerOf({ kind: "agency", personRole: null, sessionRole: "user" }).role, "self", "an older session gets the least privileged reading");
   assert.equal(viewerOf({ kind: "agency", personRole: null, sessionRole: "admin" }).role, "manager");
   assert.equal(viewerOf({ kind: "client", userId: "xtest-u1" }).role, "self");
-  const biz = viewerOf({ kind: "business", userId: "xtest-a1" });
+  const biz = viewerOf({ kind: "business", personRole: "account_admin", userId: "xtest-a1" });
   assert.equal(biz.role, "manager"); assert.equal(biz.notes, "authored");
+  assert.equal(viewerOf({ kind: "business", personRole: "account_user", userId: "xtest-a2" }).role, "self", "an account user (a setter) never manages other people");
+  assert.equal(viewerOf({ kind: "business", personRole: null, userId: "xtest-a3" }).role, "self", "no recorded role: least access");
 });
 
 test("coaching notes: managers read them, a person reads only what is shared with them, a client admin never reads the agency's private notes", () => {

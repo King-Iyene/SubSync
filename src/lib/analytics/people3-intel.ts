@@ -68,7 +68,7 @@ export function nameStateOf(p: { name: string | null; deleted: boolean; usersSta
   if (p.name && p.name.trim()) return "named";
   return p.usersState === "needs_permission" ? "needs_permission" : "unnamed";
 }
-export const NAME_PLACEHOLDER = { unnamed: "Unnamed user", former: "Former team member", needs_permission: "Needs permission: reconnect" } as const;
+export const NAME_PLACEHOLDER = { unnamed: "Unnamed user", former: "Former team member", needs_permission: "A team member" } as const; // the one banner on the screen says why names are missing; a name is never replaced by a permission message
 
 // ---- fair ranking (indirect standardisation) ----
 

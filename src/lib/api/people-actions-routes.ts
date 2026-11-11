@@ -16,6 +16,7 @@ import { REASSIGN_SCOPE, writeOwner } from "../ghl/people-gateway";
 import { isLive } from "../live-flags";
 import type { Feature } from "../entitlements";
 import { sql } from "../db";
+import { forgetPeople } from "../analytics/people3-queries";
 import { json, type AuthContext } from "./auth";
 
 // The Team ACTIONS and REPORTS endpoints (slice PB), under /api/app/people3/act/<part>:
@@ -89,7 +90,14 @@ const noteOut = (n: { id: string; subjectUserId: string; title: string; body: st
   id: n.id, title: n.title, body: n.body, shared: n.shared, authorName: viewer.role === "manager" || n.shared ? n.authorName : null, createdAt: n.createdAt, updatedAt: n.updatedAt,
 });
 
+/** Any successful write (a note, a target, an away mark, a lead move, a proof choice) drops this company's cached Team answers, so the screens show it at once. */
 export async function handlePeopleActions(ctx: Ctx, h: PeopleActionHelpers): Promise<Response> {
+  const res = await dispatchPeopleAction(ctx, h);
+  if (ctx.request.method === "POST" && res.ok) forgetPeople(ctx.installationId);
+  return res;
+}
+
+async function dispatchPeopleAction(ctx: Ctx, h: PeopleActionHelpers): Promise<Response> {
   const part = ctx.segments[2];
   const m = ctx.request.method;
   if (m === "GET") {

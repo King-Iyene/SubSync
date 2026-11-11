@@ -119,7 +119,7 @@ async function main() {
       `/api/app/people/person/${other.locs[0]}/${other.contacts[0]}`, `/api/app/people/person/${other.locs[0]}/%2e%2e%2f${other.contacts[0]}`, `/api/app/people/search?q=${other.marker}&location=${other.locs[0]}`,
       `/api/app/people/contact/${other.locs[0]}/${other.contacts[0]}`,
       // Team actions and reports (slice PB): the other side's account, person, note and batch asked for by every parameter of every read.
-      `/api/app/people3/act/proof?locationId=${other.locs[0]}`, `/api/app/people3/act/proof-csv?locationId=${other.locs[0]}`, `/api/app/people3/act/proof-prefs?locationId=${other.locs[0]}`, `/api/app/people3/act/meta?locationId=${other.locs[0]}`, `/api/app/people3/act/suggest?locationId=${other.locs[0]}`, `/api/app/people3/act/log?locationId=${other.locs[0]}`, `/api/app/people3/act/away?locationId=${other.locs[0]}`, `/api/app/people3/act/notes?userId=${other.marker}`, `/api/app/people3/act/targets?userId=${other.marker}`, `/api/app/people3/act/focus?userId=${other.marker}`, "/api/app/people3/act/away", "/api/app/people3/act/log", "/api/app/people3/act/caps",
+      `/api/app/people3/act/proof?locationId=${other.locs[0]}`, `/api/app/people3/act/proof-csv?locationId=${other.locs[0]}`, `/api/app/people3/act/proof-prefs?locationId=${other.locs[0]}`, `/api/app/people3/act/meta?locationId=${other.locs[0]}`, `/api/app/people3/act/suggest?locationId=${other.locs[0]}`, `/api/app/people3/act/log?locationId=${other.locs[0]}`, `/api/app/people3/act/away?locationId=${other.locs[0]}`, `/api/app/people3/act/notes?userId=${other.marker}`, `/api/app/people3/act/targets?userId=${other.marker}`, `/api/app/people3/act/focus?userId=${other.marker}`, `/api/app/people3/act/rebalance?locationId=${other.locs[0]}&userId=${other.marker}`, `/api/app/people3/act/suggest?locationId=${other.locs[0]}&contactId=${other.contacts[0]}`, "/api/app/people3/act/away", "/api/app/people3/act/log", "/api/app/people3/act/caps",
       // The rebuilt Account audit (stage AUDIT): the read, the client list and a single client, asked for the other side's account by every parameter it takes.
       `/api/app/clients/act/receipt?location=${other.locs[0]}`, `/api/app/clients/act/csv?location=${other.locs[0]}`, `/api/app/clients/act/setup?location=${other.locs[0]}`, "/api/app/clients/act/receipt", "/api/app/clients/act/mutes",
       // Clients actions, second half and the one Clients screen (stage CL-INT): every remaining read part, and the screen's read parts with the other side's account in every parameter (writes: tests/unit/clients-int-xtenant-db.test.ts).
@@ -234,6 +234,15 @@ async function main() {
       ["POST", "/api/app/inbox/act/note", { locationId: B.locs[0], contactId: B.contacts[0], text: "hacked", step: "do", confirm: true }],
       ["POST", "/api/app/inbox/act/outcome", { locationId: B.locs[0], conversationId: "foreign-conversation", outcome: "not_a_lead" }],
       ["POST", "/api/app/inbox/act/clear", { locationId: B.locs[0], conversationIds: ["foreign-conversation"], step: "do", typed: "delete 1" }],
+      // Team actions (slice PB): every write names the other agency's account, person, note, away mark or batch, and must be refused.
+      ["POST", "/api/app/people3/act/reassign", { locationId: B.locs[0], contactIds: [B.contacts[0]], toUserId: "foreign-user", step: "do" }],
+      ["POST", "/api/app/people3/act/undo", { locationId: B.locs[0], batchId: "00000000-0000-0000-0000-000000000000", step: "do" }],
+      ["POST", "/api/app/people3/act/note", { op: "add", userId: B.marker, locationId: B.locs[0], title: "x", body: "hacked", step: "do" }],
+      ["POST", "/api/app/people3/act/note", { op: "remove", id: "00000000-0000-0000-0000-000000000000", step: "do", typed: "DELETE" }],
+      ["POST", "/api/app/people3/act/target", { userId: B.marker, locationId: B.locs[0], metric: "reply_minutes", value: 5, step: "do" }],
+      ["POST", "/api/app/people3/act/away", { kind: "away", userId: B.marker, reason: "other", until: new Date(Date.now() + 5 * 86_400_000).toISOString(), step: "do" }],
+      ["POST", "/api/app/people3/act/away-end", { id: "00000000-0000-0000-0000-000000000000" }],
+      ["POST", "/api/app/people3/act/proof-prefs", { locationId: B.locs[0], nameStaff: true, step: "do" }],
       // Workflows: a change, a label, a mark and a read of the other agency's workflow in its client account.
       ["POST", "/api/app/workflows/preview", { kind: "delete", items: [{ locationId: B.locs[0], workflowId: "w-1" }] }],
       ["PUT", "/api/app/workflows/labels", { items: [{ locationId: B.locs[0], workflowId: "w-1" }], patch: { decision: "retire" } }],

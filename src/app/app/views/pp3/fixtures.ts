@@ -101,7 +101,7 @@ function money(p: FxParams): Pp3Money {
   return { ...page(rows, p), period: PERIOD, totals: { wonValue: sum((r) => r.wonValue), openValue: sum((r) => r.openValue), atRiskValue: sum((r) => r.atRiskValue) }, formula: "At risk is the value of open deals that have gone quiet for longer than their stage allows, plus open deals on leads still waiting for a reply, each deal counted once. It is an estimate of what may slip, not money already lost.", isEstimate: true, historyStarts: HISTORY };
 }
 
-const notes = (id: string): Pp3Note[] => (Number(id.slice(1)) % 3 === 0 ? [{ id: `n${id}`, userId: id, locationId: null, authorName: "Dana Whitfield", body: "Talked through the evening gap. Agreed to check the inbox at 5pm.", shared: true, createdAt: iso(NOW - 4 * 86_400_000), canDelete: true }] : []);
+const notes = (id: string): Pp3Note[] => (Number(id.slice(1)) % 3 === 0 ? [{ id: `n${id}`, userId: id, locationId: null, authorName: "Dana Whitfield", title: "Evening gap", body: "Talked through the evening gap. Agreed to check the inbox at 5pm.", shared: true, createdAt: iso(NOW - 4 * 86_400_000), canDelete: true }] : []);
 function coaching(p: FxParams): Pp3Coaching {
   const id = text(p, "user"), x = RAW.find((r) => r.p.userId === id);
   const people = RAW.filter((r) => r.staff).filter((r) => !text(p, "q") || r.p.name.toLowerCase().includes(text(p, "q").toLowerCase())).map((r, i) => ({ person: r.p, lastNoteAt: i % 3 === 0 ? iso(NOW - (2 + i) * 86_400_000) : null }));
@@ -110,7 +110,7 @@ function coaching(p: FxParams): Pp3Coaching {
   return {
     person: x.p, oneThing: x.sc.enough ? { metric: ["reply_minutes", "in_time_pct", "appts_per_week", "show_pct"][k], line: `Work on ${names[k].toLowerCase()}.`, evidence: "It is lower than their own number over the four weeks before." } : null,
     moves: x.sc.enough ? [{ metric: "reply_minutes", label: "First reply", current: 8, previous: 11, unit: "minutes", better: true, line: "First reply went from 11 min to 8 min" }, { metric: "show_pct", label: "Showed up", current: 71, previous: 75, unit: "pct", better: false, line: "Showed up went from 75% to 71%" }] : [],
-    notes: notes(id), targets: [{ userId: id, locationId: null, metric: "reply_minutes", value: 10, label: "First reply under 10 min" }, { userId: id, locationId: null, metric: "in_time_pct", value: 85, label: "Replied in time 85%" }], people: [], historyStarts: HISTORY,
+    notes: notes(id), targets: [{ userId: id, locationId: null, metric: "reply_minutes", value: 10, label: "First reply under 10 min" }, { userId: id, locationId: null, metric: "in_time_share", value: 85, label: "Replied in time 85%" }], people: [], historyStarts: HISTORY,
   };
 }
 
@@ -148,7 +148,7 @@ function panel(p: FxParams): Pp3PersonPanel {
 function list(p: FxParams): Pp3List {
   const n = Number(p.expect ?? 8), reason = (text(p, "reason") || "waiting") as Pp3List["reason"], acct = text(p, "location") ? ACCT[Number(text(p, "location").slice(3))] : ACCT[0];
   const kind = reason === "stale_deals" || reason === "open_deals" ? "deal" : reason === "upcoming" || reason === "needs_outcome" ? "appointment" : "lead";
-  const rows: Pp3ListRow[] = Array.from({ length: n }, (_, i) => ({ id: `r${i}`, kind, title: `${FIRST[(i * 3) % FIRST.length]} ${LAST[(i * 5) % LAST.length]}`, locationId: "loc0", locationName: acct, ageHours: 3 + i * 2, value: kind === "deal" ? 1500 + i * 120 : null, at: iso(NOW - (3 + i * 2) * 3_600_000), url: null }));
+  const rows: Pp3ListRow[] = Array.from({ length: n }, (_, i) => ({ id: `r${i}`, contactId: null, kind, title: `${FIRST[(i * 3) % FIRST.length]} ${LAST[(i * 5) % LAST.length]}`, locationId: "loc0", locationName: acct, ageHours: 3 + i * 2, value: kind === "deal" ? 1500 + i * 120 : null, at: iso(NOW - (3 + i * 2) * 3_600_000), url: null }));
   const labels: Record<string, string> = { waiting: "Waiting for a reply", waiting_old: "Waiting over 2 hours", stale_deals: "Quiet deals", open_deals: "Open deals", needs_outcome: "Appointments with no outcome", upcoming: "Appointments coming", no_owner: "No owner" };
   return { ...page(rows, p, 20), reason, label: labels[reason] ?? reason };
 }

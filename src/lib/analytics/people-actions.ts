@@ -39,7 +39,8 @@ export type Viewer = {
 };
 export function viewerOf(i: { kind: string; personRole?: string | null; sessionRole?: string | null; userId?: string | null }): Viewer {
   const userId = i.userId ?? null;
-  if (i.kind === "business") return { role: "manager", userId, notes: "authored" };
+  // A business account's own administrator is a manager of their own account. A business account user (a setter) and a session with no recorded person role get the least access: their own row.
+  if (i.kind === "business") return i.personRole === "account_admin" ? { role: "manager", userId, notes: "authored" } : { role: "self", userId, notes: "all" };
   if (i.kind === "client") return { role: "self", userId, notes: "all" };
   const r = i.personRole ?? null;
   if (r === "agency_owner" || r === "agency_admin") return { role: "manager", userId, notes: "all" };
@@ -124,7 +125,7 @@ export function parseAway(raw: unknown, now: number): { ok: true; away: AwayInpu
   if (!isId(o.userId)) return { ok: false, error: "Choose the person" };
   if (o.kind === "idle_snooze") {
     const h = Number(o.hours);
-    if (!(SNOOZE_HOURS as readonly number[]).includes(h)) return { ok: false, error: "Choose 4 hours, 1 day, 3 days or 7 days" };
+    if (!(SNOOZE_HOURS as readonly number[]).includes(h)) return { ok: false, error: "Choose 4 hours, 24 hours, 3 days or 7 days" };
     return { ok: true, away: { kind: "idle_snooze", userId: o.userId, hours: h, until: now + h * 3_600_000 } };
   }
   const reason = (AWAY_REASONS as readonly unknown[]).includes(o.reason) ? (o.reason as AwayReason) : "other";

@@ -247,7 +247,7 @@ export async function nextLead(s: Scope, f: { location?: string | null; source?:
 
 // ---- proof (the client-facing receipt of how the team handled one account's leads) ----
 
-export async function proof(s: Scope, f: Window & { location?: string | null }, o: { named: boolean }, days: number, now = Date.now()): Promise<Pp3Proof> {
+export async function proof(s: Scope, f: Window & { location?: string | null }, _o: { named: boolean }, days: number, now = Date.now()): Promise<Pp3Proof> {
   const db = sql();
   const accts = await accountsIn(s, f.location);
   const a = f.location && accts.length === 1 ? accts[0] : null;
@@ -271,7 +271,9 @@ export async function proof(s: Scope, f: Window & { location?: string | null }, 
   const med = lt[0]?.med === null || lt[0]?.med === undefined ? null : Math.round((Number(lt[0].med) / 60) * 10) / 10;
   const showed = n(ap[0]?.showed), noShow = n(ap[0]?.noshow), booked = n(ap[0]?.booked);
   let staff: Pp3Proof["staff"] = null;
-  const named = o.named && s.level === "all";
+  // Naming staff on a client receipt is the agency's choice for THAT client (PB table people_proof_prefs, default no). The address cannot override it; only the owner and administrators ever see names.
+  const pref = s.level === "all" ? await db`select name_staff from people_proof_prefs where installation_id = ${s.inst} and location_id = ${a.id}`.catch(() => []) : [];
+  const named = s.level === "all" && pref[0]?.name_staff === true;
   if (named) {
     const rows = await db`select lt.touch_user_id user_id, count(*)::int answered,
         (percentile_cont(0.5) within group (order by greatest(0, extract(epoch from (lt.touch_at - coalesce(lt.clock_start, lt.lead_at))))))::float8 med
@@ -307,7 +309,7 @@ export async function list(s: Scope, f: { reason: Pp3Reason; user?: string | nul
   const cur = decodeCursor(o.after);
   const cap = Math.min(o.size, MAX_ROWS);
   const row = (r: Record<string, unknown>, kind: Pp3ListRow["kind"], title: string, at: unknown, value: number | null, age: number | null): Pp3ListRow => ({
-    id: r.id as string, kind, title, locationId: r.location_id as string, locationName: names.get(r.location_id as string) ?? "Client account", ageHours: age, value, at: at ? iso(at) : null,
+    id: r.id as string, contactId: (r.contact_id as string | null) ?? null, kind, title, locationId: r.location_id as string, locationName: names.get(r.location_id as string) ?? "Client account", ageHours: age, value, at: at ? iso(at) : null,
     url: r.contact_id ? links.contact(r.location_id as string, r.contact_id as string) : kind === "deal" ? links.opportunities(r.location_id as string) : links.account(r.location_id as string),
   });
   if (reason === "waiting" || reason === "waiting_old" || reason === "no_owner") {

@@ -143,8 +143,8 @@ export type Pp3Money = Page<Pp3MoneyRow> & {
 
 // ---- coaching (PB owns the notes, targets and away tables; this part reads them) ----
 
-export type Pp3Note = { id: string; userId: string; locationId: string | null; authorName: string; body: string; shared: boolean; createdAt: string; canDelete: boolean };
-export type Pp3Target = { userId: string; locationId: string | null; metric: "reply_minutes" | "in_time_pct" | "appts_per_week" | "show_pct" | "won_value"; value: number; label: string };
+export type Pp3Note = { id: string; userId: string; locationId: string | null; authorName: string; title: string; body: string; shared: boolean; createdAt: string; canDelete: boolean };
+export type Pp3Target = { userId: string; locationId: string | null; metric: "reply_minutes" | "in_time_share" | "appointments_week" | "show_share" | "won_value_month"; value: number; label: string };
 export type Pp3Move = { metric: string; label: string; current: number | null; previous: number | null; unit: "minutes" | "pct" | "count" | "money"; better: boolean | null; line: string };
 export type Pp3Coaching = {
   person: Pp3Person | null;
@@ -238,14 +238,14 @@ export type Pp3Options = {
 };
 
 /** One row of part=list: the exact item a count was made from. url opens it in the CRM (the account's own domain). */
-export type Pp3ListRow = { id: string; kind: "lead" | "deal" | "appointment"; title: string; locationId: string; locationName: string; ageHours: number | null; value: number | null; at: string | null; url: string | null };
+export type Pp3ListRow = { id: string; /** The contact behind the row (used to move a lead to another owner); null when the row has none. */ contactId: string | null; kind: "lead" | "deal" | "appointment"; title: string; locationId: string; locationName: string; ageHours: number | null; value: number | null; at: string | null; url: string | null };
 export type Pp3List = Page<Pp3ListRow> & { reason: Pp3Reason; label: string };
 
 /** The response envelope added by the route to every body. */
 export type Pp3Envelope = { generatedAt: string; cached: boolean; canSee: boolean; flags: Record<string, boolean>; problem: string | null };
 
-// ---- tables owned by the PB (actions) builder, read here (all columns plain; installation_id first in each key) ----
-//   coaching_notes(installation_id uuid, id bigint, user_id text, location_id text null, author_user_id text, author_name text, body text, shared boolean, created_at timestamptz, removed_at timestamptz null)
-//   user_targets(installation_id uuid, user_id text, location_id text not null default '', metric text, value double precision, updated_at timestamptz)  -- unique (installation_id, user_id, location_id, metric)
-//   user_away(installation_id uuid, user_id text, until timestamptz, set_by text, created_at timestamptz)  -- one row per person
+// ---- tables owned by the PB (actions) builder, read here (supabase/migrations/20261203090000_people_actions.sql) ----
+//   coaching_notes(installation_id, id, subject_user_id, location_id, title, body, shared_with_subject, author_user_id, author_name, created_at, removed_at)
+//   user_targets(installation_id, user_id, location_id ('' = every account), metric, target)   metrics: reply_minutes | in_time_share | appointments_week | show_share | won_value_month
+//   user_away(installation_id, user_id, kind 'away' | 'idle_snooze', starts_at, until, released_at)
 // A missing table never breaks a screen: the part answers with empty notes, targets and no away flag.

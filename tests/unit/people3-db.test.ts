@@ -299,7 +299,7 @@ describe.skipIf(!HAS_DB)("team module", () => {
     }
   });
 
-  it("the client receipt is team level by default and names staff only for the owner who asks", async () => {
+  it("the client receipt is team level by default and names staff only when the agency chose that for the client", async () => {
     if (!applied) return;
     const owner = session(CO_A, "agency", null, "ppOwnerA", "agency_owner");
     const plain = await call(owner, `people3?part=proof&location=${A1}`);
@@ -307,10 +307,14 @@ describe.skipIf(!HAS_DB)("team module", () => {
     expect(plain.body.naming).toBe("team");
     expect(plain.body.leads).toBe(50);
     expect(plain.body.answered).toBe(50);
-    const named = await call(owner, `people3?part=proof&location=${A1}&named=1`);
+    // The address cannot switch naming on: only the saved choice for this client does (PB table people_proof_prefs, applied by 20261203090000).
+    expect((await call(owner, `people3?part=proof&location=${A1}&named=1`)).body.staff).toBeNull();
+    try { await sql()`insert into people_proof_prefs (installation_id, location_id, name_staff) values (${instA}, ${A1}, true) on conflict (installation_id, location_id) do update set name_staff = true`; } catch { return; }
+    const named = await call(owner, `people3?part=proof&location=${A1}`);
     expect((named.body.staff as Json[]).map((x) => x.name).sort()).toEqual(["Dee Setter", "Sam Setter"]);
     const staff = await call(session(CO_A, "agency", null, "ppSet1", "agency_staff"), `people3?part=proof&location=${A1}&named=1`);
     expect(staff.body.staff).toBeNull();
     expect(staff.body.leads).toBe(0);
+    await sql()`delete from people_proof_prefs where installation_id = ${instA}`;
   });
 });

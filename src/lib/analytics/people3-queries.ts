@@ -86,10 +86,10 @@ export async function ownedUser(s: Scope, ids: string[], v: unknown): Promise<st
 }
 
 type Away = Map<string, number>;
-/** People marked away by the team lead (PB table user_away). A missing table means nobody is away. */
-export async function awayMap(inst: string): Promise<Away> {
+/** People marked away by the team lead (PB table user_away, kind 'away', not released, running now). A missing table means nobody is away. `withSnooze` also counts a snoozed idle reminder (used only by the idle rule). */
+export async function awayMap(inst: string, withSnooze = false): Promise<Away> {
   try {
-    const rows = await sql()`select user_id, until from user_away where installation_id = ${inst} and until > now()`;
+    const rows = await sql()`select user_id, max(until) until from user_away where installation_id = ${inst} and released_at is null and starts_at <= now() and until > now() and (kind = 'away' or ${withSnooze}) group by user_id`;
     return new Map(rows.map((r) => [r.user_id as string, (r.until as Date).getTime()]));
   } catch { return new Map(); }
 }
@@ -329,7 +329,7 @@ export async function workloadRows(s: Scope, accts: Acct[], flags: Flags, now = 
     teamOf.set(w.locationId, [...(teamOf.get(w.locationId) ?? []), items(w)]);
   }
   const medianBy = new Map([...teamOf].map(([l, xs]) => [l, median(xs)]));
-  const away = await awayMap(s.inst);
+  const away = await awayMap(s.inst, true);
   const rows: Pp3WorkloadRow[] = [];
   for (const w of work.values()) {
     const p = people.get(w.userId), a = byAcct.get(w.locationId);
@@ -568,7 +568,7 @@ export async function coaching(s: Scope, userId: string | null, f: { from: Date;
   if (!userId) {
     if (s.level !== "all") return { ...empty, historyStarts: hist };
     const people = await loadPeople(s, accts, undefined, now);
-    const notes = await db`select user_id, max(created_at) last_at from coaching_notes where installation_id = ${s.inst} and removed_at is null group by 1`.catch(() => []);
+    const notes = await db`select subject_user_id user_id, max(created_at) last_at from coaching_notes where installation_id = ${s.inst} and removed_at is null group by 1`.catch(() => []);
     const lastBy = new Map(notes.map((r) => [r.user_id as string, r.last_at as Date]));
     return { ...empty, historyStarts: hist, people: [...people.values()].filter((p) => !p.deleted && !p.isAdmin).map((p) => ({ person: p, lastNoteAt: iso(lastBy.get(p.userId) ?? null) })).sort((a, b) => (a.lastNoteAt ?? "").localeCompare(b.lastNoteAt ?? "")).slice(0, 100) };
   }
@@ -580,14 +580,14 @@ export async function coaching(s: Scope, userId: string | null, f: { from: Date;
   const rows = await db`select d.day::text as day, d.first_replies, d.in_time, d.median_seconds, d.appts_set, d.held, d.no_show from (${daily.f}) d where d.user_id = ${userId}`;
   const ms: Pp3Move[] = moves(periodStats(rows, mid, end, 4), periodStats(rows, begin, mid, 4));
   const viewerAll = s.level === "all";
-  const notes = await db`select id::text id, user_id, location_id, author_user_id, author_name, body, shared, created_at from coaching_notes
-    where installation_id = ${s.inst} and user_id = ${userId} and removed_at is null
-      ${viewerAll ? db`` : db`and (author_user_id = ${s.selfId ?? ""} or (shared and user_id = ${s.selfId ?? ""}))`} order by created_at desc limit 50`.catch(() => []);
-  const targets = await db`select user_id, location_id, metric, value from user_targets where installation_id = ${s.inst} and user_id = ${userId}`.catch(() => []);
-  const LABEL: Record<string, string> = { reply_minutes: "Reply within (minutes)", in_time_pct: "Answered in time (%)", appts_per_week: "Appointments set per week", show_pct: "Showed share (%)", won_value: "Won value" };
+  const notes = await db`select id::text id, subject_user_id, location_id, author_user_id, author_name, title, body, shared_with_subject shared, created_at from coaching_notes
+    where installation_id = ${s.inst} and subject_user_id = ${userId} and removed_at is null
+      ${viewerAll ? db`` : db`and (author_user_id = ${s.selfId ?? ""} or (shared_with_subject and subject_user_id = ${s.selfId ?? ""}))`} order by created_at desc limit 50`.catch(() => []);
+  const targets = await db`select user_id, location_id, metric, target value from user_targets where installation_id = ${s.inst} and user_id = ${userId}`.catch(() => []);
+  const LABEL: Record<string, string> = { reply_minutes: "Reply within (minutes)", in_time_share: "Answered in time (%)", appointments_week: "Appointments set per week", show_share: "Showed share (%)", won_value_month: "Won value per month" };
   return {
     person, oneThing: oneThing(ms), moves: ms, historyStarts: hist, people: [],
-    notes: notes.map((r): Pp3Note => ({ id: r.id as string, userId: r.user_id as string, locationId: (r.location_id as string | null) ?? null, authorName: (r.author_name as string | null) ?? "A team member", body: r.body as string, shared: r.shared === true, createdAt: iso(r.created_at) as string, canDelete: viewerAll || r.author_user_id === s.selfId })),
+    notes: notes.map((r): Pp3Note => ({ id: r.id as string, userId: r.subject_user_id as string, locationId: (r.location_id as string | null) ?? null, title: (r.title as string) ?? "", authorName: (r.author_name as string | null) ?? "A team member", body: r.body as string, shared: r.shared === true, createdAt: iso(r.created_at) as string, canDelete: viewerAll || r.author_user_id === s.selfId })),
     targets: targets.map((r): Pp3Target => ({ userId: r.user_id as string, locationId: (r.location_id as string) || null, metric: r.metric as Pp3Target["metric"], value: n(r.value), label: LABEL[r.metric as string] ?? String(r.metric) })),
   };
 }

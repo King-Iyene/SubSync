@@ -19,7 +19,7 @@ import { ago, Load, money, Pager, RECONNECT, useCursor } from "./shared";
 // Every number is a count that opens its rows. Sample data appears ONLY with ?ppfx=1 and is labelled "Sample data".
 type TabKey = "today" | "scorecards" | "workload" | "leaderboard" | "money" | "coaching" | "access" | "proof";
 const TIPS: Record<TabKey, [string, string]> = {
-  today: ["Today", "Who needs you today, in one sentence."], scorecards: ["Scorecards", "One row per person: replies, appointments, shows, deals won."],
+  today: ["Today", "What to do today, in one sentence."], scorecards: ["Scorecards", "One row per person: replies, appointments, shows, deals won."],
   workload: ["Workload", "Who has too much and who has room, against the team's own middle."], leaderboard: ["Leaderboard", "A fair ranking inside each account."],
   money: ["Money", "Deals won, open and at risk, per person."], coaching: ["Coaching", "One thing to work on for each person, and your notes."],
   access: ["Access", "Which accounts each person works in, and where one person does it all."], proof: ["Proof", "A summary for a client of how the team handled their leads."],
@@ -68,7 +68,7 @@ export function TeamModule({ go }: { go: GoFn }) {
   const coach = (id: string) => { setPerson(null); setDrill(null); setCoachId(id); setTab("coaching"); };
   const props: SecProps = { filters, open, pick: setPerson, coach, accounts, viewer };
 
-  if (opt.data && !own && accounts.length === 0 && opt.data.usersState === "ok") return <Page title="Team" subtitle="Who is slow, who is overloaded, and who earns the money." actions={null}><EmptyState title="No people to show yet" body="Your team appears here once its first messages and calls have synced." /></Page>;
+  if (opt.data && !own && accounts.length === 0 && opt.data.usersState === "ok") return <Page title="Team" subtitle="Who is slow, who is overloaded, and who earns the money." actions={null}><EmptyState title="No people to show yet" body="Your team appears here once its first messages and calls have synced, usually within the hour. If this is still empty tomorrow, reconnect SubSync so it can read the list of people in your CRM." /></Page>;
   const body = (() => {
     switch (active) {
       case "today": return <Today filters={filters} open={open} pick={setPerson} />;

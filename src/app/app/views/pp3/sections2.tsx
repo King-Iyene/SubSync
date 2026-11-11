@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { Pp3Access, Pp3AccessRow, Pp3Board, Pp3Coaching, Pp3Leaderboard, Pp3Money, Pp3Proof } from "@/lib/analytics/people3-types";
 import { PersonActionsSlot, ProofActionsSlot } from "./actions-slot";
-import { usePp } from "./data";
+import { fixturesOn, usePp } from "./data";
 import type { SecProps } from "./sections";
 import { ago, Find, Initials, Load, minutes, money, NOT_ENOUGH, NO_ACTIVITY, Note, Pager, RECONNECT, ROLE_LABEL, share, Status, subline, useCursor, useDebounced } from "./shared";
 
@@ -161,7 +161,7 @@ export function Proof({ filters, accounts, viewer }: SecProps) {
   return (
     <div data-testid="pp-proof">
       <div className="ap-head">{accounts.length > 1 && <select className="ap-field" aria-label="Client account" value={pickLoc} onChange={(e) => setLoc(e.target.value)} disabled={Boolean(filters.location)}>{accounts.map((a) => <option key={a.locationId} value={a.locationId}>{a.name}</option>)}</select>}
-        {viewer.level === "all" && <label className="ap-fine inline-flex min-h-11 items-center gap-2"><input type="checkbox" checked={named} onChange={(e) => setNamed(e.target.checked)} />Show team members by name</label>}
+        {fixturesOn() && viewer.level === "all" && <label className="ap-fine inline-flex min-h-11 items-center gap-2"><input type="checkbox" checked={named} onChange={(e) => setNamed(e.target.checked)} />Show team members by name</label>}
         <span className="ap-fine">A summary for one client, for one period of up to 90 days.</span></div>
       <Load r={r} empty={(p) => !p.location && "Choose a client account to see how the team handled its leads."}>
         {(p) => (
@@ -179,7 +179,7 @@ export function Proof({ filters, accounts, viewer }: SecProps) {
             {p.staff && p.naming === "named" && (
               <div className="ap-scroll w-full"><table className="ap-t" style={{ minWidth: 0 }}><thead><tr><th>Team member</th><th data-num>Answered</th><th data-num>First reply</th></tr></thead><tbody>{p.staff.map((s) => <tr key={s.name} style={{ cursor: "default" }}><td>{s.name}</td><td data-num>{s.answered}</td><td data-num>{minutes(s.typicalReplyMinutes)}</td></tr>)}</tbody></table></div>
             )}
-            <p className="ap-fine">{p.naming === "named" ? "Team members are named because you chose that for this client." : "Shows the team as a whole. Individual names are left out unless you choose to show them for this client."}{p.historyStarts ? ` Based on SubSync's own record, which starts ${p.historyStarts}.` : ""}</p>
+            <p className="ap-fine">{p.naming === "named" ? "Team members are named because you chose that for this client." : "Shows the team as a whole. Individual names are left out unless you choose Show staff names below for this client."}{p.historyStarts ? ` Based on SubSync's own record, which starts ${p.historyStarts}.` : ""}</p>
             <ProofActionsSlot proof={p} />
           </section>
         )}
