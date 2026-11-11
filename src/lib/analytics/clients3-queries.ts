@@ -380,7 +380,11 @@ export async function setup(s: Scope, f: Filters, o: { page: number; size: numbe
   if (!ids.length) return { ...pageOf<Cl3Setup>([], 0, 20), needAction: 0 };
   const cnt = async (t: string) => by(await db`select location_id, count(*)::int c from ${db(t)} where installation_id = ${s.inst} and location_id = any(${ids}::text[]) group by 1`);
   const by = (rows: Record<string, unknown>[]) => new Map(rows.map((r) => [r.location_id as string, n(r.c)]));
-  const [conv, appt, deals, qual] = await Promise.all([cnt("cached_conversations"), cnt("cached_appointments"), cnt("cached_opportunities"), quality(s.inst, ids)]);
+  const [conv, appt, deals, qual, ch, us] = await Promise.all([cnt("cached_conversations"), cnt("cached_appointments"), cnt("cached_opportunities"), quality(s.inst, ids),
+    db`select location_id, array_agg(distinct channel) chans from touch_events where installation_id = ${s.inst} and location_id = any(${ids}::text[]) and at > now() - interval '30 days' and kind = 'message' group by 1`.catch(() => []),
+    db`select location_id, count(*)::int c from location_users where installation_id = ${s.inst} and location_id = any(${ids}::text[]) group by 1`.catch(() => [])]);
+  const chans = new Map((ch as Record<string, unknown>[]).map((r) => [r.location_id as string, (r.chans as string[]) ?? []]));
+  const usersBy = new Map((us as Record<string, unknown>[]).map((r) => [r.location_id as string, n(r.c)]));
   const state = (v: string | null): "ok" | "needs_permission" | "unknown" => (v === "ok" ? "ok" : v === "needs_permission" ? "needs_permission" : "unknown");
   const rows: Cl3Setup[] = accts.map((a) => {
     const old = !a.lastSyncAt || now - a.lastSyncAt.getTime() > SYNC_OLD_HOURS * 3_600_000;
@@ -389,9 +393,14 @@ export async function setup(s: Scope, f: Filters, o: { page: number; size: numbe
       locationId: a.id, name: a.name, connected: !!a.lastSyncAt, lastSyncAt: iso(a.lastSyncAt), syncOld: old, scopes: { calendar: state(a.appt), users: state(a.users) },
       message: missing.length ? "Needs permission: reconnect" : old ? (a.lastSyncAt ? "Not available from the platform yet: data is out of date" : "Waiting for the first sync") : null,
       contacts: qual.get(a.id)?.contacts ?? 0, conversations: conv.get(a.id) ?? 0, appointments: appt.get(a.id) ?? 0, deals: deals.get(a.id) ?? 0,
+      channelsSeen: (chans.get(a.id) ?? []).sort(), users: usersBy.get(a.id) ?? 0, usersState: state(a.users),
+      needsHelp: [
+        ...(missing.length ? ["Reconnect to grant permission"] : []), ...(old ? ["Data is out of date"] : []),
+        ...(state(a.users) === "ok" && !(usersBy.get(a.id) ?? 0) ? ["No team members found"] : []), ...((chans.get(a.id) ?? []).length === 0 && (conv.get(a.id) ?? 0) > 0 ? ["No messages sent or received in 30 days"] : []),
+      ],
     };
-  }).sort((a, b) => Number(!!b.message) - Number(!!a.message) || a.name.localeCompare(b.name));
-  return { ...pageOf(rows, o.page, clampSize(o.size)), needAction: rows.filter((r) => r.message).length };
+  }).sort((a, b) => b.needsHelp.length - a.needsHelp.length || a.name.localeCompare(b.name));
+  return { ...pageOf(rows, o.page, clampSize(o.size)), needAction: rows.filter((r) => r.needsHelp.length).length };
 }
 
 export async function options(s: Scope): Promise<Cl3Options> {

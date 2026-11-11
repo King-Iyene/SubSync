@@ -1,4 +1,5 @@
 import { attention, clientsCache, compare, exportCsv, list, options, overview, people, receipt, setup, trends, type Filters, type Links, type Scope } from "../analytics/clients3-queries";
+import { billing } from "../analytics/clients3-billing";
 import { clampSize, parseWindow } from "../analytics/clients3-intel";
 import { CL3_FLAGS, CL3_PARTS, CL3_REASONS, type Cl3Level, type Cl3Part, type Cl3Reason } from "../analytics/clients3-types";
 import type { Feature } from "../entitlements";
@@ -16,7 +17,7 @@ type Ctx = AuthContext & { request: Request; url: URL; segments: string[] };
 export type Clients3Helpers = { allowed: () => Promise<string[] | null>; links: () => Promise<ReturnType<typeof deepLinks>> };
 
 const PART_FLAG: Record<Cl3Part, string> = {
-  overview: "cl_overview", "needs-attention": "cl_attention", trends: "cl_trends", compare: "cl_compare", receipt: "cl_reports", people: "cl_people", setup: "cl_setup", list: "cl_attention", options: "cl_overview", export: "cl_reports",
+  overview: "cl_overview", "needs-attention": "cl_attention", trends: "cl_trends", compare: "cl_compare", receipt: "cl_reports", people: "cl_people", setup: "cl_setup", billing: "cl_billing", list: "cl_attention", options: "cl_overview", export: "cl_reports",
 };
 const LEVELS = new Set(["ok", "watch", "act", "unknown"]);
 const int = (v: string | null, d: number) => { const n = Number(v); return v !== null && Number.isFinite(n) ? Math.floor(n) : d; };
@@ -57,6 +58,7 @@ export async function handleClients3(ctx: Ctx, h: Clients3Helpers): Promise<Resp
       return done(await compare(scope, f, owned));
     }
     case "receipt": return done((await receipt(scope, f, one, sp.get("week"))) ?? { rows: [], total: 0, weekStart: "" });
+    case "billing": return done(await billing(scope, f, { page: p, size }));
     case "people": return done(await people(scope, f, { page: p, size }));
     case "setup": return done(await setup(scope, f, { page: p, size }));
     case "options": return done(await options(scope));

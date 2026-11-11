@@ -41,7 +41,7 @@ describe.skipIf(!HAS_DB)("clients round 3", () => {
   it("isolates companies in every part and parameter", async () => {
     if (!applied) return;
     const t = session(CO_A, "agency", null);
-    for (const part of ["overview", "needs-attention", "trends", "receipt", "people", "setup", "options"]) {
+    for (const part of ["overview", "needs-attention", "trends", "receipt", "people", "setup", "options", "billing"]) {
       const r = await call(t, `clients3?part=${part}`);
       expect(r.status).toBe(200);
       expect(JSON.stringify(r.body)).not.toContain(B1);

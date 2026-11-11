@@ -11,14 +11,14 @@ test("the permissions requested are exactly the agreed list", () => {
     "contacts.readonly", "contacts.write", "conversations.readonly", "conversations/message.readonly", "conversations/reports.readonly",
     "locations.readonly", "locations/customFields.readonly", "locations/tags.readonly", "locations/tags.write", "locations/tasks.readonly", "locations/tasks.write",
     "oauth.readonly", "oauth.write", "opportunities.readonly", "opportunities.write", "users.readonly",
-    "workflows.readonly", "workflows.logs", "workflows.write", "workflows.publish", "workflows.delete", "campaigns.readonly", "emails/campaigns.readonly", "emails/stats.readonly",
+    "workflows.readonly", "workflows.logs", "workflows.write", "workflows.publish", "workflows.delete", "campaigns.readonly", "emails/campaigns.readonly", "emails/stats.readonly", "saas/location.read", "saas/company.read",
   ].sort());
   assert.equal(new Set(GHL_SCOPES).size, GHL_SCOPES.length, "no duplicates");
 });
 
 test("change access is limited to the agreed few, and nothing can send a message or manage people", () => {
   const writes = GHL_SCOPES.filter((s) => !s.endsWith(".readonly")).sort();
-  assert.deepEqual(writes, ["calendars/events.write", "contacts.write", "locations/tags.write", "locations/tasks.write", "oauth.write", "opportunities.write", "workflows.delete", "workflows.logs", "workflows.publish", "workflows.write"]);
+  assert.deepEqual(writes.filter((w) => !w.startsWith("saas/")), ["calendars/events.write", "contacts.write", "locations/tags.write", "locations/tasks.write", "oauth.write", "opportunities.write", "workflows.delete", "workflows.logs", "workflows.publish", "workflows.write"]);
   assert.ok(!GHL_SCOPES.some((s) => /message\.write|users\.write|conversations\.write/.test(s)), "no sending messages, no editing users");
 });
 

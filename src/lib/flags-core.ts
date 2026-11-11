@@ -96,6 +96,7 @@ export const DEFAULT_OFF: ReadonlySet<Feature> = new Set<Feature>([
   "cl_reports",
   "cl_people",
   "cl_setup",
+  "cl_billing",
   "cl_rollup",
   "cl_module",
 ]);

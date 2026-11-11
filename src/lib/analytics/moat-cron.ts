@@ -6,6 +6,7 @@ import { sweepMoatEvents } from "./moat-record";
 import { sweepAppointmentHistory } from "./appointments3-record";
 import { sweepDealHistory } from "./pipeline3-record";
 import { refreshClientRollup } from "./clients3-queries";
+import { refreshClientBilling } from "./clients3-billing";
 import { accountReceipt } from "./moat-queries";
 import { mondayOf, weeklyDue, weeklyProofText } from "./moat-core";
 
@@ -27,11 +28,13 @@ export async function runMoatCron(now = Date.now()): Promise<MoatCronReport> {
       const apr = ent.features.appt_record && !ent.locked.includes("appt_record");
       const plr = ent.features.pl_record && !ent.locked.includes("pl_record");
       const clr = ent.features.cl_rollup && !ent.locked.includes("cl_rollup");
-      if (!rec && !mail && !apr && !plr && !clr) continue;
+      const clb = ent.features.cl_billing && !ent.locked.includes("cl_billing");
+      if (!rec && !mail && !apr && !plr && !clr && !clb) continue;
       rep.companies++;
       if (apr) rep.events += Object.values(await sweepAppointmentHistory(installationId)).reduce((x, y) => x + y, 0);
       if (plr) rep.events += Object.values(await sweepDealHistory(installationId)).reduce((x, y) => x + y, 0);
       if (clr) await refreshClientRollup(installationId);
+      if (ent.features.cl_billing && !ent.locked.includes("cl_billing")) await refreshClientBilling(installationId).catch((e) => console.error("Billing refresh failed", safeError(e)));
       if (rec) rep.events += Object.values(await sweepMoatEvents(installationId)).reduce((a, b) => a + b, 0);
       if (mail && weeklyDue(now)) rep.receipts += await weeklyProofReceipts(installationId, now);
     } catch (error) {

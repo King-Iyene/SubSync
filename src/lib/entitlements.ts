@@ -129,6 +129,7 @@ export const FEATURES = [
   "cl_reports",
   "cl_people",
   "cl_setup",
+  "cl_billing",
   "cl_rollup",
   "cl_module",
 ] as const;

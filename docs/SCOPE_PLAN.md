@@ -84,3 +84,6 @@ All optional, so an install that declines them keeps working and the Workflows p
 (read campaigns and their delivery totals), and the change scopes `workflows.write` (rename, copy), `workflows.publish` and `workflows.delete`, each used only after
 a preview and a confirm and only with `WORKFLOWS_WRITE_LIVE` switched on. SubSync still asks for 29 scopes in total (7 required and 22 optional). Nothing here can send a message or start a campaign.
 Batch it into the 1.1.0 release with the other scope and pricing changes (docs/DECISIONS.md).
+
+## Clients billing view (stage CD)
+The app now asks for 31 scopes: two new OPTIONAL read scopes, saas/location.read and saas/company.read (names INFERENCE, CHECK in the portal list before release 2.3.0). They feed only the Billing view in Clients (plan and subscription status per client account). Without them the view says: Needs permission, reconnect.

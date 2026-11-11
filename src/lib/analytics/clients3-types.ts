@@ -2,7 +2,7 @@
 // REAL synced data only. Anything under its minimum is { enough: false } (screen says "not enough data"). Trends are from our own timestamps;
 // history-based figures carry `historyStarts` (YYYY-MM-DD). No invented scores or "churn probability". Definitions: docs/METRICS.md "Clients 3".
 
-export const CL3_PARTS = ["overview", "needs-attention", "trends", "compare", "receipt", "people", "setup", "list", "options", "export"] as const;
+export const CL3_PARTS = ["overview", "needs-attention", "trends", "compare", "receipt", "people", "setup", "list", "options", "export", "billing"] as const;
 export type Cl3Part = (typeof CL3_PARTS)[number];
 
 /** Shared query parameters (all optional): from, to (ISO dates, default last 30 days), location (one account id), q (account name search), sort, dir, page (0-based), size (20|50|100),
@@ -92,6 +92,8 @@ export type Cl3Setup = {
   scopes: { calendar: "ok" | "needs_permission" | "unknown"; users: "ok" | "needs_permission" | "unknown" };
   /** "Needs permission: reconnect" when a scope is missing, otherwise null. */
   message: string | null; contacts: number; conversations: number; appointments: number; deals: number;
+  /** Channels we actually saw messages on in the last 30 days (sms, email, whatsapp, call, chat), from real message records. Empty means none seen, not "not connected". */
+  channelsSeen: string[]; /** Team members the platform lists for this account (0 = none found, or users permission missing). */ users: number; usersState: "ok" | "needs_permission" | "unknown"; needsHelp: string[];
 };
 export type Cl3SetupList = Page<Cl3Setup> & { needAction: number };
 
@@ -105,5 +107,12 @@ export type Cl3Options = { accounts: { locationId: string; name: string }[]; ind
 /** Every JSON response also carries these. */
 export type Cl3Meta = { generatedAt: string; cached: boolean; canSeeAccounts: boolean; flags: Record<string, boolean>; problem: string | null };
 
-export const CL3_FLAGS = ["cl_overview", "cl_attention", "cl_trends", "cl_compare", "cl_reports", "cl_people", "cl_setup", "cl_rollup", "cl_module"] as const;
+export const CL3_FLAGS = ["cl_overview", "cl_attention", "cl_trends", "cl_compare", "cl_reports", "cl_people", "cl_setup", "cl_billing", "cl_rollup", "cl_module"] as const;
 export type Cl3Flag = (typeof CL3_FLAGS)[number];
+
+/** Billing view (part=billing): the plan and subscription status the platform reports per account. paymentFailing, nextPaymentAt and appsInstalled are ALWAYS null today: the platform API does not provide them, and the screen says "Not available from the platform yet". */
+export type Cl3Billing = {
+  locationId: string; name: string; state: "ok" | "needs_permission" | "not_available" | "not_checked";
+  plan: string | null; subscriptionStatus: string | null; paymentFailing: null; nextPaymentAt: null; appsInstalled: null; fetchedAt: string | null; message: string | null;
+};
+export type Cl3BillingList = Page<Cl3Billing> & { needPermission: number; notActive: number };
