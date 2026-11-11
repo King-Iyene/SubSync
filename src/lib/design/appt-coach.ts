@@ -27,7 +27,6 @@ export function coachingNote(p: ApStats & { name: string }, overall: { showRate:
   let tone: "green" | "amber" | "red" = "green";
   if (overall.noShowRate !== null && p.noShowRate !== null && p.noShowRate - overall.noShowRate >= 0.1) { tone = "red"; parts.push(`${Math.round(p.noShowRate * 100)}% of their appointments are no-shows, against ${Math.round(overall.noShowRate * 100)}% for everyone. Try a same-day confirmation call.`); }
   if (overall.closeRate !== null && p.closeRate !== null && overall.closeRate - p.closeRate >= 0.15) { if (tone === "green") tone = "amber"; parts.push(`Of the people who show, ${Math.round(p.closeRate * 100)}% close, against ${Math.round(overall.closeRate * 100)}%. Review a recording with them.`); }
-  if (p.burned >= 3 && tone === "green") { tone = "amber"; parts.push(`${p.burned} leads were burned (never shown or never followed up).`); }
   if (!parts.length) parts.push(`${p.name} is at or above your own average on show rate (${pct(p.showRate)}) and close rate (${pct(p.closeRate)}). Hand them more of the hard leads.`);
   return { tone, text: parts.join(" ") };
 }

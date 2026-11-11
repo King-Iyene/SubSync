@@ -2,13 +2,13 @@
 
 import { Copy } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
-import { money, pct, riskOf } from "@/lib/design/appt-coach";
+import { money, pct } from "@/lib/design/appt-coach";
 import { EmptyState, InlineAlert } from "../../ds";
 import { CountUp, Q } from "../speed6-base";
 import { ApSlot, hasApSlot, useAp } from "./data";
 import { ApRowsList, Chip, Pager, when } from "./parts";
 import { Hit, type SectionProps } from "./sections";
-import type { ApCalendarRow, ApCalendarsView, ApPersonCalRow, ApConflictRow, ApHealthRow, ApPage, ApPersonRow, ApProof, ApReminderRow, ApSourceRow, ApSpeedBand } from "./types";
+import type { ApCalendarRow, ApCalendarsView, ApPersonCalRow, ApConflictRow, ApHealthRow, ApPage, ApPersonRow, ApProof, ApSourceRow, ApSpeedBand } from "./types";
 
 type Col<T> = { h: string; num?: boolean; cell: (r: T) => ReactNode };
 function Grid<T extends { [k: string]: unknown }>({ rows, cols, onRow, testId, tone }: { rows: T[]; cols: Array<Col<T>>; onRow?: (r: T) => void; testId?: string; tone?: (r: T) => "amber" | "red" | undefined }) {
@@ -62,7 +62,7 @@ export function BookingShare({ filters, onPerson, onDrill }: SectionProps & { on
           { h: "Person", cell: (r) => <><span className="ap-name">{r.name}</span> <Chip tone={r.unassigned ? "amber" : "grey"}>{r.unassigned ? "No owner" : r.role === "setter" ? "Books" : r.role === "closer" ? "Takes" : "Both"}</Chip></> },
           { h: "Booked", num: true, cell: (r) => <>{r.bookings ? <Hit n={r.bookings} label={`Open the ${r.bookings} appointments of ${r.name}`} onClick={() => onDrill({ title: `${r.name}, appointments`, count: r.bookings, extra: { [r.role === "closer" ? "owner" : "booker"]: r.id, outcome: "booked", expect: r.bookings } })} /> : 0}<span className="ap-bar" aria-hidden><i style={{ width: `${total ? (r.bookings / total) * 100 : 0}%` }} /></span></> },
           { h: "Show", num: true, cell: (r) => <Rate v={r.showRate} /> }, { h: "No-show", num: true, cell: (r) => <Rate v={r.noShowRate} /> }, { h: "Close", num: true, cell: (r) => <Rate v={r.closeRate} /> },
-          { h: "Burned", num: true, cell: (r) => (r.burned ? <Hit n={r.burned} label={`Open the ${r.burned} burned leads of ${r.name}`} onClick={() => onDrill({ title: `${r.name}, burned leads`, count: r.burned, extra: { [r.role === "closer" ? "owner" : "booker"]: r.id, outcome: "burned", expect: r.burned } })} /> : 0) }, { h: "Won", num: true, cell: (r) => money(r.revenueCents) },
+          { h: "Won", num: true, cell: (r) => money(r.revenueCents) },
           { h: "Lead to booked", num: true, cell: (r) => (r.avgLeadToBookedHours === null ? "n/a" : `${r.avgLeadToBookedHours.toFixed(1)}h`) },
           { h: "Show trend", cell: (r) => <Spark values={r.trend} /> },
         ]} />
@@ -88,7 +88,7 @@ export function Health({ filters, onAccount, onDrill }: SectionProps & { onAccou
       <Grid rows={res.data.rows} onRow={onAccount} testId="ap-health-table" tone={(r) => (r.noShowRate !== null && r.noShowRate >= 0.3 ? "red" : undefined)}
         cols={[{ h: "Account", cell: (r) => <span className="ap-name">{r.name}</span> }, { h: "Booked", num: true, cell: (r) => (r.booked ? <Hit n={r.booked} label={`Open the ${r.booked} appointments of ${r.name}`} onClick={() => onDrill({ title: `${r.name}, all appointments`, count: r.booked, extra: { location: r.locationId, outcome: "booked", expect: r.booked } })} /> : 0) }, { h: "Show", num: true, cell: (r) => <Rate v={r.showRate} /> },
           { h: "No-show", num: true, cell: (r) => <Rate v={r.noShowRate} tone={r.noShowRate !== null && r.noShowRate >= 0.3 ? "bad" : undefined} /> }, { h: "Cancelled", num: true, cell: (r) => <Rate v={r.cancelRate} /> },
-          { h: "Rescheduled", num: true, cell: (r) => <Rate v={r.rescheduleRate} /> }, { h: "No outcome", num: true, cell: (r) => (r.unmarked ? <Hit n={r.unmarked} tone="violet" label={`Open the ${r.unmarked} appointments of ${r.name} with no outcome`} onClick={() => onDrill({ title: `${r.name}, no outcome`, count: r.unmarked, extra: { location: r.locationId, outcome: "unmarked", expect: r.unmarked } })} /> : 0) }]} />
+          { h: "No outcome", num: true, cell: (r) => (r.unmarked ? <Hit n={r.unmarked} tone="violet" label={`Open the ${r.unmarked} appointments of ${r.name} with no outcome`} onClick={() => onDrill({ title: `${r.name}, no outcome`, count: r.unmarked, extra: { location: r.locationId, outcome: "unmarked", expect: r.unmarked } })} /> : 0) }]} />
     </div>
   );
 }
@@ -116,27 +116,28 @@ export function Sources({ filters, onDrill }: SectionProps) {
 }
 
 // ---------- Calendars and conflicts ----------
-const KIND: Record<ApConflictRow["kind"], { label: string; tone: "red" | "amber" | "violet" }> = { "double-booking": { label: "Double booking", tone: "red" }, "forced-overlap": { label: "Forced overlap", tone: "amber" }, disconnected: { label: "Calendar not syncing", tone: "violet" } };
+const KIND: Record<ApConflictRow["kind"], { label: string; tone: "red" | "amber" | "violet" }> = { "double-booking": { label: "Double booking", tone: "red" } };
 export function Calendars({ filters, onDrill, go }: SectionProps) {
   const res = useAp<ApCalendarsView>("calendars", filters);
-  const [show, setShow] = useState<"all" | "conflicts" | "idle_calendar" | "idle_person" | "no_calendar_user">("all");
+  const [show, setShow] = useState<"all" | "conflicts" | "idle_calendar" | "idle_person" | "not_in_list">("all");
   if (res.error) return <InlineAlert tone="warning" title="Could not load calendars">Your calendar numbers did not load. Nothing was changed. <button type="button" className="ap-link" onClick={res.reload}>Try again</button></InlineAlert>;
   if (!res.data) return <div className="ap-tablewrap p-6" role="status" aria-busy="true">Loading calendars...</div>;
   const rows = res.data.rows ?? [], problems = res.data.problems ?? [], calendars = res.data.calendars ?? [], people = res.data.people ?? [];
   if (!rows.length && !calendars.length && !people.length) return <EmptyState title="No calendars seen yet" body="Calendars and team members appear here once appointments have synced. Check that your CRM calendars are connected." />;
   const idleCal = (c: ApCalendarRow) => c.bookings === 0 || (c.daysSince !== null && c.daysSince >= 30);
   const calRows = show === "idle_calendar" ? calendars.filter(idleCal) : calendars;
-  const pplRows = show === "idle_person" ? people.filter((p) => p.bookings === 0) : show === "no_calendar_user" ? people.filter((p) => !p.everBooked) : people;
+  const pplRows = show === "idle_person" ? people.filter((p) => p.idleEverywhere) : show === "not_in_list" ? people.filter((p) => !p.inTeamList) : people;
   const flag = (days: number | null, n: number) => (days === null ? <Chip tone="amber">Never booked</Chip> : n === 0 ? <Chip tone="amber">No bookings in {days} days</Chip> : days >= 30 ? <Chip tone="amber">Quiet for {days} days</Chip> : null);
-  const target = (k: string): typeof show | null => (k === "idle_calendar" ? "idle_calendar" : k === "idle_person" ? "idle_person" : k === "no_calendar_user" ? "no_calendar_user" : k === "double_booking" || k === "forced_overlap" || k === "disconnected" ? "conflicts" : null);
+  const target = (k: string): typeof show | null => (k === "idle_calendar" ? "idle_calendar" : k === "idle_person" ? "idle_person" : k === "not_in_list" ? "not_in_list" : k === "double_booking" ? "conflicts" : null);
   const calDrill = (r: ApCalendarRow) => onDrill({ title: `${r.calendarName || "Calendar"}, appointments`, count: r.bookings, extra: { location: r.locationId, calendar: r.calendarId, outcome: "booked", expect: r.bookings } });
   const pplDrill = (r: ApPersonCalRow) => onDrill({ title: `${r.name}, appointments`, count: r.bookings, extra: { owner: r.userId, outcome: "booked", expect: r.bookings } });
+  const [openPerson, setOpenPerson] = useState<string | null>(null);
   return (
     <div data-testid="ap-calendars">
       <div className="ap-kpis" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(190px, 1fr))" }} data-testid="ap-problems">
         {problems.map((p) => (
           <button key={p.key} type="button" className="ap-kpi" data-tone={!p.available ? undefined : p.count === 0 ? "green" : p.tone} title={`Why it matters: ${p.why}`} aria-label={`${p.label}: ${p.available ? p.count : "not available"}. ${p.why}`}
-            onClick={() => { if (p.key === "reminder_gap") go("reminders"); else { const t = target(p.key); if (t) setShow(t); } }} data-testid={`ap-problem-${p.key}`}>
+            onClick={() => { const t = target(p.key); if (t) setShow(t); }} data-testid={`ap-problem-${p.key}`}>
             <span className="ap-kpi-n">{p.available ? p.count : "n/a"}</span><span className="ap-kpi-l">{p.label}{!p.available ? " (not available from the platform yet)" : ""}</span>
           </button>))}
       </div>
@@ -152,40 +153,15 @@ export function Calendars({ filters, onDrill, go }: SectionProps) {
               { h: "Last booking", cell: (r) => (r.lastBookingAt ? when(r.lastBookingAt) : "-") }, { h: "Flag", cell: (r) => flag(r.daysSince, r.bookings) }]} /> : <p className="ap-fine">No calendars seen yet.</p>}
         </Q>
       )}
-      {(show === "all" || show === "idle_person" || show === "no_calendar_user") && (
-        <Q q="Who takes the meetings (everyone, including nobody)" tip="Every named team member, busiest first, with their share of bookings. People with zero are listed on purpose: their time is unused. Press a person to open their appointments." testId="ap-people-all">
-          {pplRows.length ? <Grid rows={pplRows} testId="ap-people-table" tone={(r) => (r.bookings === 0 ? "amber" : undefined)} onRow={pplDrill}
-            cols={[{ h: "Person", cell: (r) => <span className="ap-name">{r.name}</span> }, { h: "Bookings", num: true, cell: (r) => (r.bookings ? <Hit n={r.bookings} label={`Open the ${r.bookings} appointments of ${r.name}`} onClick={() => pplDrill(r)} /> : 0) },
+      {(show === "all" || show === "idle_person" || show === "not_in_list") && (
+        <Q q="Who takes the meetings" tip="Everyone in the accounts' team lists, plus anyone seen taking a meeting. A person is only called idle in accounts they belong to. Press a count to open those appointments; press a name to see each account." testId="ap-people-all">
+          {pplRows.length ? <Grid rows={pplRows} testId="ap-people-table" tone={(r) => (r.idleEverywhere || !r.inTeamList ? "amber" : undefined)} onRow={(r) => setOpenPerson(openPerson === r.userId ? null : r.userId)}
+            cols={[{ h: "Person", cell: (r) => <><span className="ap-name">{r.name}</span>{!r.inTeamList && <> <Chip tone="amber">Not in the team list (left or no access)</Chip></>}{openPerson === r.userId && <span className="ap-sub block">{r.accounts.map((a) => `${a.accountName ?? "Account"}: ${a.bookings}${a.member ? "" : " (not a member)"}`).join(" · ")}</span>}</> },
+              { h: "Bookings", num: true, cell: (r) => (r.bookings ? <Hit n={r.bookings} label={`Open the ${r.bookings} appointments of ${r.name}`} onClick={() => pplDrill(r)} /> : 0) },
               { h: "Share", num: true, cell: (r) => <>{r.sharePct}%<span className="ap-bar" aria-hidden><i style={{ width: `${r.sharePct}%` }} /></span></> }, { h: "Last booking", cell: (r) => (r.lastBookingAt ? when(r.lastBookingAt) : "-") },
-              { h: "Flag", cell: (r) => (!r.everBooked ? <Chip tone="amber">No calendar seen</Chip> : flag(r.daysSince, r.bookings)) }]} /> : <p className="ap-fine">Nobody to list for this problem. Team member names appear once they are added under Team.</p>}
+              { h: "Flag", cell: (r) => (!r.inTeamList ? null : r.idleEverywhere ? <Chip tone="amber">No bookings in {r.accounts.length > 1 ? "any of their accounts" : "these dates"}</Chip> : r.idleIn.length ? <Chip tone="amber">Idle in {r.idleIn.join(", ")}</Chip> : null) }]} /> : <p className="ap-fine">Nobody to list for this problem. Team members appear here from each account's team list.</p>}
         </Q>
       )}
-    </div>
-  );
-}
-
-// ---------- Reminders and no-show risk ----------
-const RS: Record<ApReminderRow["reminderState"], { label: string; tone: "green" | "cyan" | "red" | "amber" }> = { confirmed: { label: "Confirmed", tone: "green" }, sent: { label: "Reminder sent", tone: "cyan" }, failed: { label: "Reminder failed", tone: "red" }, none: { label: "No reminder", tone: "amber" } };
-export function Reminders({ filters, onOpen }: SectionProps) {
-  const res = useAp<ApPage<ApReminderRow>>("reminders", filters, { pageSize: 100 });
-  const [page, setPage] = useState(1), [size, setSize] = useState(20), [onlyHigh, setOnlyHigh] = useState(false);
-  if (res.error) return <InlineAlert tone="warning" title="Could not load reminders">Try again. <button type="button" className="ap-link" onClick={res.reload}>Retry</button></InlineAlert>;
-  if (!res.data) return <div className="ap-tablewrap p-6" role="status" aria-busy="true">Loading...</div>;
-  if (!res.data.total) return <EmptyState title="Nothing coming up" body="Upcoming appointments and whether each was reminded or confirmed appear here." />;
-  const rows = res.data.rows.map((r) => ({ r, risk: riskOf(r) })).sort((a, b) => ({ high: 0, watch: 1, low: 2 }[a.risk.level] - { high: 0, watch: 1, low: 2 }[b.risk.level]) || a.r.hoursToStart - b.r.hoursToStart);
-  const high = rows.filter((x) => x.risk.level === "high").length;
-  const shown = onlyHigh ? rows.filter((x) => x.risk.level === "high") : rows;
-  return (
-    <div data-testid="ap-reminders">
-      <p className="mb-3 text-[1.05rem] font-semibold" data-testid="ap-lead"><button type="button" className="ap-strong ap-link" data-tone="red" onClick={() => { setOnlyHigh((v) => !v); setPage(1); }} aria-pressed={onlyHigh} title="Show only these" data-testid="ap-rem-high">{high}</button> {high === 1 ? "upcoming appointment is likely to miss" : "upcoming appointments are likely to miss"}{onlyHigh ? <> <button type="button" className="ap-link" onClick={() => setOnlyHigh(false)}>Show all {rows.length}</button></> : null}</p>
-      <p className="ap-fine mb-3">Likely to miss is an estimate from reminders and confirmation only: no reminder, a failed reminder, or not confirmed close to the start. It does not predict who the person is.</p>
-      <div className="ap-tablewrap"><div className="ap-scroll"><table className="ap-t"><thead><tr><th>Contact</th><th>Starts in</th><th>Reminder</th><th>Risk</th><th>Why</th></tr></thead><tbody>
-        {shown.slice((page - 1) * size, page * size).map(({ r, risk }) => (
-          <tr key={r.id} tabIndex={0} onClick={() => onOpen(r)} onKeyDown={(e) => { if (e.key === "Enter") onOpen(r); }} data-tone={risk.level === "high" ? "red" : risk.level === "watch" ? "amber" : undefined} data-testid="ap-row">
-            <td><span className="ap-name">{r.contactName}</span> <span className="ap-sub">{r.accountName}</span></td><td>{r.hoursToStart < 48 ? `${Math.round(r.hoursToStart)}h` : `${Math.round(r.hoursToStart / 24)}d`}</td>
-            <td><Chip tone={RS[r.reminderState].tone}>{RS[r.reminderState].label}</Chip></td><td><Chip tone={risk.level === "high" ? "red" : risk.level === "watch" ? "amber" : "green"}>{risk.level === "high" ? "Likely to miss" : risk.level === "watch" ? "Watch" : "Low"}</Chip></td><td className="ap-sub">{risk.why}</td>
-          </tr>))}
-      </tbody></table></div><Pager total={shown.length} page={page} size={size} onPage={setPage} onSize={(s) => { setSize(s); setPage(1); }} /></div>
     </div>
   );
 }

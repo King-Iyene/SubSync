@@ -8,10 +8,12 @@ import "../speed6.css";
 import "../speed-ui.css";
 import "./ap3.css";
 import { registerAbSlots } from "./ab-slots";
-import { DEFAULT_FILTERS, fixturesOn, useAp, type ApFilters } from "./data";
+import { useData } from "../../session";
+import type { Appt3Options } from "@/lib/analytics/appointments3-types";
+import { DEFAULT_FILTERS, filtersFromParams, filtersToParams, fixturesOn, queryOf, useAp, type ApFilters } from "./data";
 import { FlowTree, type FlowPick } from "./flow-tree";
 import { ApPanel, ApRowsList, PersonPanel } from "./parts";
-import { BookingShare, Calendars, Health, Meetings, NeedsOutcome, Proof, Recovery, Reminders, Sources } from "./sections2";
+import { BookingShare, Calendars, Health, Meetings, NeedsOutcome, Proof, Recovery, Sources } from "./sections2";
 import { Overview, type DrillReq, type SectionProps } from "./sections";
 import type { ApFlowTree, ApHealthRow, ApPersonRow, ApRow } from "./types";
 
@@ -21,13 +23,13 @@ import type { ApFlowTree, ApHealthRow, ApPersonRow, ApRow } from "./types";
 
 registerAbSlots(); // slice AB: the checked change tools and the Meetings area mount into the slots below
 
-type TabKey = "overview" | "needs" | "recover" | "share" | "flow" | "health" | "sources" | "calendars" | "reminders" | "meetings" | "proof";
+type TabKey = "overview" | "needs" | "recover" | "share" | "flow" | "health" | "sources" | "calendars" | "meetings" | "proof";
 const TABS: Array<{ key: TabKey; label: string; tip: string }> = [
   { key: "overview", label: "Overview", tip: "The one sentence, the numbers and where the leak is." }, { key: "needs", label: "Needs outcome", tip: "Past appointments nobody marked." },
   { key: "recover", label: "No-show recovery", tip: "No-shows not booked again." }, { key: "share", label: "Booking share", tip: "Who books and who takes the meeting." },
   { key: "flow", label: "Flow tree", tip: "How appointments flow through your people." }, { key: "health", label: "Account health", tip: "Every client account, worst first." },
-  { key: "sources", label: "Sources and speed", tip: "Show rate by source and reply speed." }, { key: "calendars", label: "Calendars", tip: "Double bookings and calendars that stopped syncing." },
-  { key: "reminders", label: "Reminders", tip: "Who may not show, from reminders and confirmation." }, { key: "meetings", label: "Meetings", tip: "Recorded meetings matched to appointments." },
+  { key: "sources", label: "Sources and speed", tip: "Show rate by source and reply speed." }, { key: "calendars", label: "Calendars and people", tip: "Double bookings, quiet calendars and who takes the meetings." },
+  { key: "meetings", label: "Meetings", tip: "Recorded meetings matched to appointments." },
   { key: "proof", label: "Proof", tip: "The weekly receipt per client." },
 ];
 type SavedView = { name: string; filters: ApFilters; tab: TabKey };
@@ -51,8 +53,20 @@ export function AppointmentsModule({ go, flowTree = true }: { go: GoFn; flowTree
   const search = useRef<HTMLInputElement>(null);
   const top = useRef<HTMLDivElement>(null);
   const health = useAp<{ rows: ApHealthRow[] }>("health", { ...filters, locationId: "" });
+  // The filters live in the address, so a view can be shared and survives a reload.
   // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { setViews(readViews()); }, []);
+  useEffect(() => { setViews(readViews()); const f = filtersFromParams(new URLSearchParams(window.location.search)); if (JSON.stringify(f) !== JSON.stringify(DEFAULT_FILTERS)) { setFilters(f); setQ(f.q); } }, []);
+  useEffect(() => {
+    try {
+      const u = new URL(window.location.href);
+      for (const k of ["ap_days", "ap_loc", "ap_cal", "ap_user", "ap_src", "ap_q"]) u.searchParams.delete(k);
+      for (const [k, v] of Object.entries(filtersToParams(filters))) u.searchParams.set(k, v);
+      if (u.href !== window.location.href) window.history.replaceState(window.history.state, "", u.href);
+    } catch { /* an address that cannot be changed simply is not updated */ }
+  }, [filters]);
+  // Pickers are read from the data (never listed in code), narrowed by the chosen account, so a new calendar, person or source appears on its own.
+  const optKey = queryOf("options" as never, { ...filters, calendarId: "", userId: "", source: "", q: "" });
+  const opts = useData<Appt3Options>(fixturesOn() ? null : optKey);
   useEffect(() => { const t = setTimeout(() => setFilters((f) => (f.q === q ? f : { ...f, q })), 300); return () => clearTimeout(t); }, [q]);
 
   const index = tabs.findIndex((t) => t.key === tab);
@@ -88,7 +102,6 @@ export function AppointmentsModule({ go, flowTree = true }: { go: GoFn; flowTree
       case "health": return <><Health {...sp} onAccount={(r) => openDrill({ title: `${r.name}, all appointments`, count: r.booked, extra: { location: r.locationId, outcome: "booked", expect: r.booked } })} /></>;
       case "sources": return <Sources {...sp} />;
       case "calendars": return <Calendars {...sp} />;
-      case "reminders": return <Reminders {...sp} />;
       case "meetings": return <Meetings {...sp} />;
       case "proof": return <Proof {...sp} />;
     }
@@ -101,10 +114,14 @@ export function AppointmentsModule({ go, flowTree = true }: { go: GoFn; flowTree
           <label className="ap-search"><Search aria-hidden className="size-4" /><span className="sr-only">Search by name</span><input ref={search} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search a name (press /)" data-testid="ap-search" /></label>
           <select className="ap-field" aria-label="Dates" value={filters.days} onChange={(e) => setFilters({ ...filters, days: Number(e.target.value) as ApFilters["days"] })} data-testid="ap-days"><option value={7}>Last 7 days</option><option value={30}>Last 30 days</option><option value={90}>Last 90 days</option></select>
           {accounts.length > 1 && <select className="ap-field" aria-label="Account" value={filters.locationId} onChange={(e) => setFilters({ ...filters, locationId: e.target.value })} data-testid="ap-account"><option value="">All accounts</option>{accounts.map((a) => <option key={a.locationId} value={a.locationId}>{a.name}</option>)}</select>}
+          {(opts.data?.calendars?.length ?? 0) > 1 && <select className="ap-field" aria-label="Calendar" value={filters.calendarId} onChange={(e) => setFilters({ ...filters, calendarId: e.target.value })} data-testid="ap-calendar"><option value="">All calendars</option>{opts.data!.calendars.map((c) => <option key={c.calendarId} value={c.calendarId}>{c.name ?? "Calendar"}</option>)}</select>}
+          {(opts.data?.people?.length ?? 0) > 0 && <select className="ap-field" aria-label="Person" value={filters.userId} onChange={(e) => setFilters({ ...filters, userId: e.target.value })} data-testid="ap-person"><option value="">Everyone</option>{opts.data!.people.map((p) => <option key={p.userId} value={p.userId}>{p.name}{p.inTeamList ? "" : " (not in the team list)"}</option>)}</select>}
+          {(opts.data?.sources?.length ?? 0) > 0 && <select className="ap-field" aria-label="Source" value={filters.source} onChange={(e) => setFilters({ ...filters, source: e.target.value })} data-testid="ap-source"><option value="">All sources</option>{opts.data!.sources.map((s) => <option key={s} value={s}>{s}</option>)}</select>}
           <select className="ap-field" aria-label="Saved views" value="" onChange={(e) => applyView(Number(e.target.value))} data-testid="ap-views"><option value="" disabled>Saved views{views.length ? ` (${views.length})` : ""}</option>{views.map((v, i) => <option key={v.name} value={i}>{v.name}</option>)}</select>
           {naming ? <NameView onSave={saveView} onCancel={() => setNaming(false)} /> : <button type="button" className="s6-btn" onClick={() => setNaming(true)} data-testid="ap-save-view"><Bookmark aria-hidden className="size-4" />Save view</button>}
-          {(filters.locationId || filters.q) && <button type="button" className="s6-btn" onClick={() => { setFilters(DEFAULT_FILTERS); setQ(""); }}><X aria-hidden className="size-4" />Clear</button>}
+          {(filters.locationId || filters.q || filters.calendarId || filters.userId || filters.source) && <button type="button" className="s6-btn" onClick={() => { setFilters(DEFAULT_FILTERS); setQ(""); }}><X aria-hidden className="size-4" />Clear</button>}
         </div>
+        <FilterChips filters={filters} opts={opts.data ?? null} accounts={accounts} onChange={(f) => { setFilters(f); setQ(f.q); }} />
         {fixturesOn() && <p className="ap-fine mb-2" role="status">Showing sample appointments (apfx).</p>}
         <ModuleTabs pill label="Appointments sections" tabs={tabs.map((t) => ({ label: t.label, tip: t.tip, node: null }))} value={index < 0 ? 0 : index} onChange={(i) => setTab(tabs[i].key)} />
         <div data-testid={`ap-tab-${tab}`}>{content}{drill && drill.tab === tab && <DrillList drill={drill} sp={sp} onClose={() => setDrill(null)} />}</div>
@@ -114,6 +131,19 @@ export function AppointmentsModule({ go, flowTree = true }: { go: GoFn; flowTree
       </Page>
     </div>
   );
+}
+
+/** The chosen filters as removable chips, so it is always clear what the numbers are for. */
+function FilterChips({ filters, opts, accounts, onChange }: { filters: ApFilters; opts: Appt3Options | null; accounts: ApHealthRow[]; onChange: (f: ApFilters) => void }) {
+  const chips: Array<[string, string, Partial<ApFilters>]> = [];
+  if (filters.locationId) chips.push(["Account", accounts.find((a) => a.locationId === filters.locationId)?.name ?? "Selected account", { locationId: "", calendarId: "", userId: "" }]);
+  if (filters.calendarId) chips.push(["Calendar", opts?.calendars.find((c) => c.calendarId === filters.calendarId)?.name ?? "Selected calendar", { calendarId: "" }]);
+  if (filters.userId) chips.push(["Person", opts?.people.find((p) => p.userId === filters.userId)?.name ?? "Selected person", { userId: "" }]);
+  if (filters.source) chips.push(["Source", filters.source, { source: "" }]);
+  if (filters.q) chips.push(["Search", filters.q, { q: "" }]);
+  if (filters.days !== 30) chips.push(["Dates", `Last ${filters.days} days`, { days: 30 }]);
+  if (!chips.length) return null;
+  return <div className="mb-2 flex flex-wrap items-center gap-2" aria-label="Chosen filters" data-testid="ap-chips">{chips.map(([k, v, clear]) => <span className="ap-chip" key={k} data-tone="cyan">{k}: {v}<button type="button" className="ap-link ml-1" aria-label={`Remove the ${k.toLowerCase()} filter`} onClick={() => onChange({ ...filters, ...clear })}><X aria-hidden className="inline size-3" /></button></span>)}</div>;
 }
 
 function DrillList({ drill, sp, onClose }: { drill: NonNullable<Drill>; sp: SectionProps; onClose: () => void }) {

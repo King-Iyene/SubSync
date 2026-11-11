@@ -1,15 +1,15 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { ApFlowTree, ApOutcome } from "../analytics/appointments3-types-interim.ts";
-import { closerTotals, findLeak, healthTone, layoutFlow, nextLead, ratesFromOutcomes } from "../design/appt-flow-layout.ts";
+import { closerTotals, findLeak, healthTone, layoutFlow, ratesFromOutcomes } from "../design/appt-flow-layout.ts";
 
 const oc = (o: Partial<Record<ApOutcome, number>>): Record<ApOutcome, number> => ({ won: 0, lost: 0, showed: 0, noshow: 0, cancelled: 0, unmarked: 0, ...o });
-const stats = (o: Record<ApOutcome, number>) => ({ bookings: Object.values(o).reduce((a, b) => a + b, 0), ...ratesFromOutcomes(o, 5), burned: o.noshow, revenueCents: o.won * 100_000, avgLeadToBookedHours: 4 });
+const stats = (o: Record<ApOutcome, number>) => ({ bookings: Object.values(o).reduce((a, b) => a + b, 0), ...ratesFromOutcomes(o, 5), revenueCents: o.won * 100_000, avgLeadToBookedHours: 4 });
 const closer = (id: string, o: Partial<Record<ApOutcome, number>>) => ({ id, name: `Closer ${id}`, outcomes: oc(o), ...stats(oc(o)) });
 function tree(nSetters: number, nClosers: number): ApFlowTree {
   const setters = Array.from({ length: nSetters }, (_, i) => {
     const closers = Array.from({ length: nClosers }, (_, j) => closer(`c${j}`, { won: 3 + j, showed: 4, lost: 2, noshow: i + j, unmarked: j, cancelled: 1 }));
-    return { id: `s${i}`, name: `Setter ${i}`, closers, hiddenClosers: 0, bookings: closers.reduce((a, c) => a + c.bookings, 0), showRate: 0.7, noShowRate: 0.2, closeRate: 0.4, burned: 5, revenueCents: 1, avgLeadToBookedHours: 3 };
+    return { id: `s${i}`, name: `Setter ${i}`, closers, hiddenClosers: 0, bookings: closers.reduce((a, c) => a + c.bookings, 0), showRate: 0.7, noShowRate: 0.2, closeRate: 0.4, revenueCents: 1, avgLeadToBookedHours: 3 };
   });
   const booked = setters.reduce((a, s) => a + s.bookings, 0);
   return { booked, periodLabel: "Last 30 days", setters, hiddenSetters: 0, totals: oc({}), overall: { showRate: 0.75, noShowRate: 0.15, closeRate: 0.4 }, minBookings: 5 };
@@ -62,13 +62,11 @@ test("closer totals add up across setters; next-lead needs two closers with enou
   const tot = closerTotals(t);
   assert.equal(tot.length, 2);
   assert.equal(tot.reduce((a, c) => a + c.bookings, 0), t.booked);
-  assert.ok(nextLead(t));
-  assert.equal(nextLead(tree(1, 1)), null);
 });
 
 import { coachingNote, money, pct, riskOf } from "../design/appt-coach.ts";
 test("coaching note, risk flag and formatting", () => {
-  const base = { bookings: 20, showRate: 0.5, noShowRate: 0.5, closeRate: 0.4, burned: 2, revenueCents: 0, avgLeadToBookedHours: 3, name: "Ben" };
+  const base = { bookings: 20, showRate: 0.5, noShowRate: 0.5, closeRate: 0.4, revenueCents: 0, avgLeadToBookedHours: 3, name: "Ben" };
   const o = { showRate: 0.75, noShowRate: 0.2, closeRate: 0.4 };
   assert.equal(coachingNote(base, o).tone, "red");
   assert.equal(coachingNote({ ...base, bookings: 2 }, o).tone, "grey");

@@ -42,9 +42,9 @@ export type ClosersTotal = ApStats & { id: string; name: string; outcomes: Recor
 export function closerTotals(tree: ApFlowTree): ClosersTotal[] {
   const by = new Map<string, ClosersTotal & { _lead: number }>();
   for (const s of tree.setters) for (const c of s.closers) {
-    const t = by.get(c.id) ?? { id: c.id, name: c.name, outcomes: { won: 0, lost: 0, showed: 0, noshow: 0, cancelled: 0, unmarked: 0 }, bookings: 0, showRate: null, noShowRate: null, closeRate: null, burned: 0, revenueCents: 0, avgLeadToBookedHours: null, _lead: 0 };
+    const t = by.get(c.id) ?? { id: c.id, name: c.name, outcomes: { won: 0, lost: 0, showed: 0, noshow: 0, cancelled: 0, unmarked: 0 }, bookings: 0, showRate: null, noShowRate: null, closeRate: null, revenueCents: 0, avgLeadToBookedHours: null, _lead: 0 };
     for (const k of LEAF_ORDER) t.outcomes[k] += c.outcomes[k];
-    t.bookings += c.bookings; t.burned += c.burned; t.revenueCents += c.revenueCents; t._lead += (c.avgLeadToBookedHours ?? 0) * c.bookings;
+    t.bookings += c.bookings; t.revenueCents += c.revenueCents; t._lead += (c.avgLeadToBookedHours ?? 0) * c.bookings;
     by.set(c.id, t);
   }
   return [...by.values()].map(({ _lead, ...t }) => ({ ...t, ...ratesFromOutcomes(t.outcomes, tree.minBookings), avgLeadToBookedHours: t.bookings ? _lead / t.bookings : null })).sort((a, b) => b.bookings - a.bookings);
@@ -66,14 +66,6 @@ export function findLeak(tree: ApFlowTree): Leak | null {
     }
   }
   return best;
-}
-
-/** "Who should get the next lead": the closer with the best won-per-booking among those with enough bookings, shown as a labelled estimate. Null under the minimum. */
-export function nextLead(tree: ApFlowTree): { id: string; name: string; winRate: number; text: string } | null {
-  const ok = closerTotals(tree).filter((c) => c.bookings >= tree.minBookings && c.showRate !== null);
-  if (ok.length < 2) return null;
-  const best = ok.map((c) => ({ c, w: c.outcomes.won / Math.max(1, c.bookings) })).sort((a, b) => b.w - a.w)[0];
-  return { id: best.c.id, name: best.c.name, winRate: best.w, text: `${best.c.name} won ${Math.round(best.w * 100)}% of the appointments they were handed.` };
 }
 
 export type LayoutOptions = { width: number; maxSetters?: number; maxClosers?: number };

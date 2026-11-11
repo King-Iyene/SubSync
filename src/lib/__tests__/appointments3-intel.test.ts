@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
-  buildFlowTree, fairness, findLeak, headlineOf, leadTimeBand, nextLeadOf, overlapMinutes, parseApptWindow, pickButton, rate, reportedShowRate, revenueAtRisk, speedBand, trueShowRate, type FlowAgg,
+  buildFlowTree, buildPeople, fairness, findLeak, headlineOf, leadTimeBand, overlapMinutes, parseApptWindow, pickButton, rate, reportedShowRate, revenueAtRisk, speedBand, trueShowRate, type FlowAgg,
 } from "../analytics/appointments3-intel.ts";
 
 const NOW = Date.parse("2026-11-10T12:00:00Z");
-const agg = (o: Partial<FlowAgg>): FlowAgg => ({ setter: "s1", closer: "c1", booked: 0, showed: 0, noshow: 0, cancelled: 0, unmarked: 0, upcoming: 0, won: 0, lost: 0, open: 0, wonValue: 0, burned: 0, ltbMedianMin: null, ...o });
+const agg = (o: Partial<FlowAgg>): FlowAgg => ({ setter: "s1", closer: "c1", booked: 0, showed: 0, noshow: 0, cancelled: 0, unmarked: 0, upcoming: 0, won: 0, lost: 0, open: 0, wonValue: 0, ltbMedianMin: null, ...o });
 const nm = (id: string | null) => id ?? "none";
 
 test("true show rate counts forgotten outcomes; reported does not", () => {
@@ -64,11 +64,42 @@ test("leak finder names the closer that loses far more than the account", () => 
   assert.equal(findLeak(buildFlowTree([agg({ booked: 40, showed: 36, noshow: 4 })], nm, { from: "a", to: "b" }).nodes), null);
 });
 
-test("who should get the next lead needs 20 appointments and 10 closed deals", () => {
-  assert.equal(nextLeadOf([agg({ closer: "c1", booked: 10, showed: 10, won: 5, lost: 5 })], nm), null);
-  const n = nextLeadOf([agg({ closer: "c1", booked: 30, showed: 25, noshow: 5, won: 10, lost: 5 }), agg({ closer: "c2", booked: 30, showed: 15, noshow: 15, won: 3, lost: 12 })], nm);
-  assert.equal(n?.userId, "c1");
-  assert.equal(n?.estimate, true);
+test("people: a user in two accounts, a user in one, and an unlisted booker", () => {
+  const members = [
+    { locationId: "L1", userId: "u2", name: "Two Accounts" }, { locationId: "L2", userId: "u2", name: "Two Accounts" },
+    { locationId: "L1", userId: "u1", name: "One Account" },
+  ];
+  const accounts = new Map<string, string | null>([["L1", "Acme"], ["L2", "Beta"]]);
+  const rows = buildPeople(members, [{ locationId: "L1", userId: "u2", n: 4, lastAt: "2026-11-01T10:00:00Z" }, { locationId: "L2", userId: "ghost", n: 3, lastAt: null }], accounts, (id) => `Team member ${id}`);
+  const by = new Map(rows.map((r) => [r.userId, r]));
+  // u2 booked in Acme only: idle in Beta (a member there), but not idle everywhere
+  assert.equal(by.get("u2")?.bookings, 4); assert.deepEqual(by.get("u2")?.idleIn, ["Beta"]); assert.equal(by.get("u2")?.idleEverywhere, false); assert.equal(by.get("u2")?.accounts.length, 2);
+  // u1 is idle in their one account, zero everywhere
+  assert.equal(by.get("u1")?.idleEverywhere, true); assert.deepEqual(by.get("u1")?.idleIn, ["Acme"]);
+  // an unlisted booker is shown but never called idle and is marked as not in the team list
+  assert.equal(by.get("ghost")?.inTeamList, false); assert.equal(by.get("ghost")?.idleEverywhere, false); assert.deepEqual(by.get("ghost")?.idleIn, []);
+  // one account chosen: only that account's rows are passed in, so u2 is a single-account person and u1 is the only idle one
+  const one = buildPeople(members.filter((m) => m.locationId === "L1"), [{ locationId: "L1", userId: "u2", n: 4, lastAt: null }], accounts, (id) => id);
+  assert.equal(one.find((r) => r.userId === "u2")?.accounts.length, 1); assert.equal(one.filter((r) => r.idleEverywhere).length, 1);
+});
+
+test("adapts without code changes: a new user, calendar-less booking or setter changes the output", () => {
+  const before = buildPeople([{ locationId: "L1", userId: "a", name: "A" }], [{ locationId: "L1", userId: "a", n: 2, lastAt: null }], new Map([["L1", "Acme"]]), (i) => i);
+  const after = buildPeople([{ locationId: "L1", userId: "a", name: "A" }, { locationId: "L1", userId: "new", name: "New Hire" }], [{ locationId: "L1", userId: "a", n: 2, lastAt: null }], new Map([["L1", "Acme"]]), (i) => i);
+  assert.equal(before.length, 1); assert.equal(after.length, 2);
+  assert.equal(after.find((r) => r.userId === "new")?.bookings, 0); // appears with zero bookings until they book
+  const tA = buildFlowTree([agg({ setter: "a", booked: 5, showed: 5 })], nm, { from: "a", to: "b" });
+  const tB = buildFlowTree([agg({ setter: "a", booked: 5, showed: 5 }), agg({ setter: "new", closer: "c9", booked: 3, showed: 2, noshow: 1 })], nm, { from: "a", to: "b" });
+  assert.equal(tA.nodes.filter((n) => n.level === "setter").length, 1);
+  assert.equal(tB.nodes.filter((n) => n.level === "setter").length, 2); assert.equal(tB.totalBooked, 8);
+});
+
+test("flow tree pages through many people (top N, See all) without losing anyone", () => {
+  const aggs = Array.from({ length: 40 }, (_, i) => agg({ setter: `s${i}`, booked: 100 - i, showed: 50 }));
+  const p1 = buildFlowTree(aggs, nm, { from: "a", to: "b" }, 12, null, 0), p2 = buildFlowTree(aggs, nm, { from: "a", to: "b" }, 12, null, 12);
+  const ids = (t: typeof p1) => t.nodes.filter((n) => n.level === "setter" && n.id !== "s:others").map((n) => n.userId);
+  assert.equal(ids(p1).length, 12); assert.equal(ids(p2).length, 12); assert.equal(p1.hiddenPeople, 28); assert.equal(p2.hiddenPeople, 16);
+  assert.equal(new Set([...ids(p1), ...ids(p2)]).size, 24); assert.equal(ids(p1)[0], "s0"); assert.equal(ids(p2)[0], "s12");
 });
 
 test("overlap, fairness and bands", () => {
