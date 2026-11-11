@@ -16,6 +16,9 @@ export class ApiError extends Error {
   }
 }
 
+/** How long a read may take before it stops with a message (milliseconds). */
+export const REQUEST_TIMEOUT_MS = 60_000;
+
 export type Api = {
   get: <T>(path: string) => Promise<T>;
   post: <T>(path: string, body?: unknown) => Promise<T>;
@@ -45,11 +48,19 @@ export function makeApi(initialToken: string, refresh: () => Promise<string | nu
     // A filter only narrows what is read; it is added to every GET. A share link of the audit is made from a read, so it carries the filter too:
     // the link covers the client accounts the person was looking at (N8), and the server decides which accounts those are.
     const url = (method === "GET" || path === "audit/share") && filterQuery && !path.startsWith("segments") ? `${path}${path.includes("?") ? "&" : "?"}${filterQuery}` : path;
-    const res = await fetch(`/api/app/${url}`, {
-      method,
-      headers: { Authorization: `Bearer ${shared.token}`, ...(body !== undefined ? { "Content-Type": "application/json" } : {}) },
-      body: body !== undefined ? JSON.stringify(body) : undefined,
-    });
+    // Nothing waits forever: a read that has not answered in a minute (a change in two) stops with a plain message and a Try again, so a panel is never silently blank.
+    const ctl = new AbortController(); const timer = setTimeout(() => ctl.abort(), method === "GET" ? REQUEST_TIMEOUT_MS : REQUEST_TIMEOUT_MS * 2);
+    let res: Response;
+    try {
+      res = await fetch(`/api/app/${url}`, {
+        method,
+        headers: { Authorization: `Bearer ${shared.token}`, ...(body !== undefined ? { "Content-Type": "application/json" } : {}) },
+        body: body !== undefined ? JSON.stringify(body) : undefined,
+        signal: ctl.signal,
+      });
+    } catch (e) {
+      throw e instanceof DOMException && e.name === "AbortError" ? new ApiError(408, { error: "This is taking too long. Nothing was lost: try again in a moment." }) : new ApiError(0, { error: "SubSync could not be reached. Check your connection and try again." });
+    } finally { clearTimeout(timer); }
     if (res.status === 401 && !retried) {
       const fresh = await refresh();
       if (fresh) {
@@ -88,17 +99,19 @@ export function makeApi(initialToken: string, refresh: () => Promise<string | nu
 export function useData<T>(path: string | null) {
   const api = useApiClient();
   const [state, setState] = useState<{ data: T | null; error: ApiError | null; loading: boolean }>({ data: null, error: null, loading: path !== null });
-  const latest = useRef(0);
+  // The path being shown right now. An answer is used when it is for this path, even if a newer request for the same path started meanwhile: a screen that asks again every few seconds
+  // (a refresh, a poll) must not throw away every slow answer and stay on its loading state forever. An answer for a path the screen has moved away from is dropped.
+  const current = useRef<string | null>(path);
+  useEffect(() => { current.current = path; }, [path]);
 
   const load = useCallback(async () => {
     if (path === null) return;
-    const id = ++latest.current;
     setState((s) => ({ ...s, loading: true }));
     try {
       const data = await api.get<T>(path);
-      if (id === latest.current) setState({ data, error: null, loading: false });
+      if (current.current === path) setState({ data, error: null, loading: false });
     } catch (error) {
-      if (id === latest.current) setState({ data: null, error: error as ApiError, loading: false });
+      if (current.current === path) setState({ data: null, error: error as ApiError, loading: false });
     }
   }, [api, path]);
 
