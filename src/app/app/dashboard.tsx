@@ -51,6 +51,8 @@ import { OnboardingView } from "./views/onboarding";
 import { OverviewView } from "./views/overview";
 import { PipelineView } from "./views/pipeline";
 import { PipelineModule } from "./views/pl3/module";
+import { ClientsModule } from "./views/cl3/module";
+import { fixturesOn as clSample } from "./views/cl3/data";
 import { TeamView } from "./views/people";
 import { SettingsView } from "./views/settings";
 import { IntegrationsPage } from "./views/connections";
@@ -390,7 +392,7 @@ export function Dashboard() {
       // Speed to lead holds the Unanswered tab (when messages and speed are both on); `#speed?tab=unanswered` and the old #inbox open it first.
       case "speed": return <SpeedView go={go} unanswered={inboxTab} start={speedStart()} />;
       case "overview": return <OverviewView go={go} />;
-      case "accounts": return <ClientsView key="accounts" go={go} initialTab="health" features={clientFeatures} />;
+      case "accounts": if ((auth.features.cl_module === true && !auth.locked.includes("cl_module")) || clSample()) return <ClientsModule key="cl3" />; return <ClientsView key="accounts" go={go} initialTab="health" features={clientFeatures} />;
       case "account": return view.locationId ? <AccountDetailView key={view.locationId} locationId={view.locationId} go={go} agency={agency} /> : <ClientsView key="accounts" go={go} initialTab="health" features={clientFeatures} />;
       case "deals": return <ModuleTabs key="pipe" start={1} tabs={pipeTabs} />;
       case "inbox": return inboxTab ? <SpeedView go={go} unanswered start="unanswered" /> : <InboxView go={go} />;
@@ -410,7 +412,7 @@ export function Dashboard() {
       // Workflows reads with the unfiltered client and keeps its own account choice (like Today), so the shared filter never changes what it counts.
       case "data-health": return <ApiProvider value={baseApi}><DataHealthView go={go} kind={auth.kind} /></ApiProvider>;
       case "workflows": return <ApiProvider value={baseApi}><WorkflowsView go={go} kind={auth.kind} /></ApiProvider>;
-      case "clients": return <ClientsView key="clients" go={go} initialTab="health" features={clientFeatures} />;
+      case "clients": if ((auth.features.cl_module === true && !auth.locked.includes("cl_module")) || clSample()) return <ClientsModule key="cl3" />; return <ClientsView key="clients" go={go} initialTab="health" features={clientFeatures} />;
     }
   })();
 

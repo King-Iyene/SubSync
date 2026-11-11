@@ -1,0 +1,24 @@
+/* Clients module: calm and plain. Neutral surfaces from the app theme, one accent (the app cyan), one muted amber for "needs a look". No glow, no gradients. */
+.cl .ap-search:focus-within { box-shadow: none; outline: 2px solid var(--ring); outline-offset: 1px; }
+.cl-stack { display: flex; flex-direction: column; gap: 18px; }
+.cl-today { border: 1px solid color-mix(in srgb, var(--s6-edgec) 26%, transparent); border-radius: 12px; padding: 18px 20px; display: flex; flex-direction: column; align-items: flex-start; gap: 10px; background: var(--s6-surf); }
+.cl-h { margin: 0; font-size: 0.75rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted-foreground); font-weight: 600; }
+.cl-sentence { margin: 0; font-size: 1.25rem; font-weight: 600; line-height: 1.35; max-width: 42rem; }
+.cl-steps { margin: 4px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; font-size: 0.875rem; }
+.cl-steps li { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; } .cl-steps li span { color: var(--muted-foreground); }
+.cl-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; }
+.cl-tile { text-align: left; cursor: pointer; border: 1px solid color-mix(in srgb, var(--s6-edgec) 26%, transparent); border-radius: 12px; padding: 14px 16px; background: var(--s6-surf); color: var(--foreground); min-height: 44px; display: flex; flex-direction: column; gap: 2px; }
+.cl-tile b { font-size: 1.5rem; font-weight: 650; font-variant-numeric: tabular-nums; } .cl-tile span { font-size: 0.8125rem; color: var(--muted-foreground); }
+.cl-tile:hover { border-color: var(--s6-cyan); } .cl-tile:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.cl-reasons { white-space: normal !important; }
+.cl-reason { cursor: pointer; background: none; border: 1px solid color-mix(in srgb, var(--s6-amber) 55%, transparent); color: var(--foreground); border-radius: 999px; padding: 1px 9px; margin: 2px 6px 2px 0; font-size: 0.75rem; min-height: 24px; }
+.cl-reason:hover { background: color-mix(in srgb, var(--s6-amber) 14%, transparent); } .cl-reason:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
+.cl-pager { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 10px; margin-top: 10px; }
+.cl-spark { width: 80px; height: 24px; color: var(--s6-cyan); flex: none; }
+.cl-cell { display: inline-flex; align-items: center; gap: 10px; }
+.cl-drill { margin-top: 20px; border-top: 1px solid color-mix(in srgb, var(--s6-line) 70%, transparent); padding-top: 14px; }
+.cl [data-win="1"] { font-weight: 700; }
+@media (max-width: 700px) { .cl-sentence { font-size: 1.0625rem; } .cl-today { padding: 14px; } .cl-pager { justify-content: flex-start; } }
+.cl-bill { font-size: 0.75rem; } .cl-bill[data-bad="1"] { color: var(--s6-amber); font-weight: 600; }
+.cl-note-box { width: 100%; max-width: 40rem; padding: 8px 10px; min-height: 80px; }
+.cl-notes { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; max-width: 40rem; } .cl-notes p { margin: 2px 0 0; font-size: 0.875rem; white-space: pre-wrap; }
