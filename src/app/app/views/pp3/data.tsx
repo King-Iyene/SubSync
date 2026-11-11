@@ -1,14 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { PpMeta, PpPart, PpWith } from "@/lib/analytics/people3-types-interim";
+import type { Pp3Envelope, Pp3Part } from "@/lib/analytics/people3-types";
 import { useData } from "../../session";
 import { sample, type FxParams } from "./fixtures";
 
-// The one place the Team screen reads: GET /api/app/people3?part=... (types: src/lib/analytics/people3-types-interim.ts, to be swapped for the data builder's people3-types.ts).
-// Every answer also carries PpMeta (flags, ownRowOnly, problem). Sample data is used ONLY when the address carries ?ppfx=1 (or empty / error) and the screen says "Sample data".
+// The one place the Team screen reads: GET /api/app/people3?part=... (types: src/lib/analytics/people3-types.ts).
+// Every answer also carries Pp3Envelope (flags, problem, canSee). Sample data is used ONLY when the address carries ?ppfx=1 (or empty / error) and the screen says "Sample data".
 export type PpParams = FxParams;
-export type { PpMeta, PpWith };
+export type PpWith<T> = T & Pp3Envelope;
 
 const FX = /[?&]ppfx=(1|empty|error)/;
 function fxFound(): string {
@@ -21,14 +21,14 @@ export const fixturesOn = () => fxFound() !== "";
 const mode = () => { const v = fxFound(); return v === "empty" || v === "error" ? v : ""; };
 
 /** The address of one part. Only plain filters go in it; the server decides which people the caller may see and never trusts an id from here. */
-export const queryOf = (part: PpPart, p: PpParams): string => {
+export const queryOf = (part: Pp3Part, p: PpParams): string => {
   const u = new URLSearchParams({ part });
   for (const [k, v] of Object.entries(p)) if (v !== undefined && v !== "") u.set(k, String(v));
   return `people3?${u.toString()}`;
 };
 
 /** One part of the Team API, or typed sample data with ?ppfx=1. `off` skips the read (used while a choice is incomplete). */
-export function usePp<T>(part: PpPart, p: PpParams = {}, off = false) {
+export function usePp<T>(part: Pp3Part, p: PpParams = {}, off = false) {
   const fx = fixturesOn(), m = fx ? mode() : "";
   const key = queryOf(part, p);
   const live = useData<PpWith<T>>(fx || off ? null : key);

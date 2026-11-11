@@ -2,7 +2,7 @@
 
 import { Search } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
-import type { PpDelta, PpRate } from "@/lib/analytics/people3-types-interim";
+import type { Delta, Pp3Person, Pp3Role, Rate } from "@/lib/analytics/people3-types";
 import { EmptyState, ErrorState, SkeletonRows } from "../../ds";
 import { notSwitchedOn } from "./data";
 
@@ -12,23 +12,27 @@ export const NOT_ENOUGH = "Not enough data";
 export const RECONNECT = "Needs permission: reconnect";
 export const NO_ACTIVITY = "No activity recorded in your CRM";
 
-export const share = (r: PpRate): string => (r.enough && r.value !== null ? `${Math.round(r.value * 100)}%` : NOT_ENOUGH);
+export const share = (r: Rate): string => (r.enough && r.value !== null ? `${Math.round(r.value * 100)}%` : NOT_ENOUGH);
 /** "+12%" or "-8%", only when the earlier period had enough to compare (the server decides: enough). */
-export const change = (d: PpDelta): string | null => (d.enough && d.change !== null ? `${d.change > 0 ? "+" : ""}${Math.round(d.change * 100)}%` : null);
+export const change = (d: Delta): string | null => (d.enough && d.change !== null ? `${d.change > 0 ? "+" : ""}${Math.round(d.change * 100)}%` : null);
 export const ago = (iso: string | null): string => { if (!iso) return "Nothing recorded"; const h = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 3_600_000)); return h < 1 ? "Just now" : h < 48 ? `${h} h ago` : `${Math.round(h / 24)} d ago`; };
 export const minutes = (m: number | null): string => (m === null ? NOT_ENOUGH : m < 1 ? "Under a minute" : m < 60 ? `${Math.round(m)} min` : m < 1440 ? `${Math.round(m / 6) / 10} h` : `${Math.round(m / 144) / 10} d`);
 export const day = (iso: string | null): string => (iso ? new Date(iso).toISOString().slice(0, 10) : "");
-export const initials = (name: string): string => name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase()).join("") || "?";
+export const ROLE_LABEL: Record<Pp3Role, string> = { agency_admin: "Admin", agency_staff: "Staff", account_admin: "Account admin", account_user: "Staff", unknown: "Role not known" };
+/** Seconds as plain words: 45 sec, 12 min, 3.5 h. */
+export const secs = (n: number | null): string => (n === null ? NOT_ENOUGH : n < 90 ? `${Math.round(n)} sec` : minutes(n / 60));
+/** The small line under a name: where they work, or that they are no longer in the CRM, away, or not named yet. */
+export const subline = (p: Pp3Person): string => [p.nameState === "former" || p.deleted ? "no longer in your CRM" : p.nameState === "unnamed" ? "not named yet" : "", p.away ? `away until ${p.away.until.slice(0, 10)}` : "", p.allAccounts ? "all client accounts" : p.accountCount === 1 ? p.accounts[0]?.name ?? "1 account" : `${p.accountCount} accounts`].filter(Boolean).join(", ");
 
 /** The change against the previous period as a small arrow and a percentage, only when there was enough before to compare. */
-export function Trend({ d }: { d: PpDelta }) {
+export function Trend({ d }: { d: Delta }) {
   if (!d.enough || d.change === null) return null;
   const up = d.change > 0.02, down = d.change < -0.02, pct = Math.round(Math.abs(d.change) * 100);
   return <span className="ap-sub pp-hide-sm" title={`${up ? "Up" : down ? "Down" : "About the same"} ${pct}% on the previous period`}> {up ? "▲" : down ? "▼" : "–"} {pct}%</span>;
 }
 
 /** A small neutral circle with the person's initials. It is never a status colour. */
-export function Initials({ name }: { name: string }) { return <span className="pp-init" aria-hidden>{initials(name)}</span>; }
+export function Initials({ p }: { p: Pick<Pp3Person, "initials" | "nameState"> }) { return <span className="pp-init" aria-hidden data-former={p.nameState === "former" ? "1" : undefined}>{p.initials || "?"}</span>; }
 
 /** A status in words plus a small mark, so it never relies on colour. `on` draws the filled mark (needs a look); otherwise a hollow one. */
 export function Status({ on, children }: { on?: boolean; children: ReactNode }) { return <span className="pp-status" data-on={on ? "1" : undefined}><i aria-hidden />{children}</span>; }
@@ -47,8 +51,6 @@ export function Load<T>({ r, children, empty }: { r: Loaded<T>; children: (d: T)
   if (r.error && notSwitchedOn(r.error)) return <EmptyState title="Not switched on yet" body="This part of Team is not switched on for your account yet." />;
   if (r.error) return <ErrorState error={r.error as Error} onRetry={r.reload} />;
   if (!r.data) return null;
-  const m = r.data as { needsUsersPermission?: boolean };
-  if (m.needsUsersPermission) return <EmptyState title={RECONNECT} body="To list your team we need permission to read the users in your CRM. Reconnect SubSync and approve it." />;
   const e = empty(r.data);
   return e ? <EmptyState title="Nothing to show yet" body={typeof e === "string" ? e : "People appear here once their first messages and calls have synced."} /> : <>{children(r.data)}</>;
 }

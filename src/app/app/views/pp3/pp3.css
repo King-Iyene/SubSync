@@ -15,12 +15,13 @@
 .pp-spark { width: 80px; height: 24px; color: var(--s6-cyan); flex: none; }
 .pp-cell { display: inline-flex; align-items: center; gap: 10px; }
 .pp-init { width: 28px; height: 28px; border-radius: 50%; display: inline-grid; place-items: center; flex: none; font-size: 0.6875rem; font-weight: 650; color: var(--muted-foreground); background: color-mix(in srgb, var(--s6-line) 55%, transparent); border: 1px solid color-mix(in srgb, var(--s6-line) 90%, transparent); }
-.pp-status { display: inline-flex; align-items: center; gap: 6px; font-size: 0.8125rem; color: var(--muted-foreground); white-space: nowrap; }
-.pp-status i { width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid var(--muted-foreground); flex: none; }
+.pp-init[data-former="1"] { opacity: 0.55; }
+.pp-status { display: inline-flex; align-items: flex-start; gap: 6px; font-size: 0.8125rem; color: var(--muted-foreground); }
+.pp-status i { width: 8px; height: 8px; margin-top: 5px; border-radius: 50%; border: 1.5px solid var(--muted-foreground); flex: none; }
 .pp-status[data-on="1"] { color: var(--foreground); font-weight: 600; } .pp-status[data-on="1"] i { background: var(--s6-cyan); border-color: var(--s6-cyan); }
 .pp-name { background: none; border: 0; padding: 0; font: inherit; font-weight: 600; color: var(--foreground); cursor: pointer; text-align: left; min-height: 24px; } .pp-name:hover { color: var(--s6-cyan); } .pp-name:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
 .pp-drill { margin-top: 20px; border-top: 1px solid color-mix(in srgb, var(--s6-line) 70%, transparent); padding-top: 14px; }
-.pp-bar { display: inline-block; width: 90px; height: 6px; border-radius: 4px; background: color-mix(in srgb, var(--s6-line) 55%, transparent); vertical-align: middle; position: relative; margin-right: 8px; }
+.pp-bar { display: inline-block; width: 64px; height: 6px; border-radius: 4px; background: color-mix(in srgb, var(--s6-line) 55%, transparent); vertical-align: middle; position: relative; margin-right: 8px; }
 .pp-bar b { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 4px; background: var(--muted-foreground); } .pp-bar[data-on="1"] b { background: var(--s6-cyan); }
 .pp-bar u { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--foreground); opacity: 0.7; text-decoration: none; }
 .pp-sub { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; } .pp-sub button[aria-pressed="true"] { border-color: var(--s6-cyan); font-weight: 600; }
@@ -37,7 +38,7 @@
 @container (max-width: 700px) { .pp-sentence { font-size: 1.0625rem; } .pp-card { padding: 14px; } .pp-pager { justify-content: flex-start; } .pp-receipt dl { grid-template-columns: minmax(0, 1fr); gap: 0; } .pp-receipt dt { margin-top: 8px; } .pp-lens { grid-template-columns: minmax(0, 1fr); } .pp-bar { width: 56px; } }
 /* The compact layout follows the width of the content box (the menu takes room on a tablet), not the screen. */
 /* a cell that may wrap (names with a second line, plain sentences) */
-.pp .ap-t td.pp-wrap { white-space: normal; max-width: 22rem; }
-@container (max-width: 700px) { .pp-only-sm { display: inline; } .pp-bar { display: none; } .pp .ap-t td.pp-wrap { max-width: 9.5rem; } .pp .pp-hide-sm { display: none; } .pp-wrap .pp-status { white-space: normal; align-items: flex-start; } .pp-wrap .pp-status i { margin-top: 4px; } .pp [data-sm="hide"] { display: none; } .pp .ap-t { min-width: 0; } .pp .ap-t td { max-width: 11rem; } }
+.pp .ap-t td.pp-wrap { white-space: normal; max-width: 20rem; }
+@container (max-width: 700px) { .pp-only-sm { display: inline; } .pp-bar { display: none; } .pp .ap-t td.pp-wrap { max-width: 9.5rem; } .pp .pp-hide-sm { display: none; } .pp [data-sm="hide"] { display: none; } .pp .ap-t { min-width: 0; } .pp .ap-t td { max-width: 11rem; } }
 @media (prefers-reduced-motion: reduce) { .pp * { transition: none !important; animation: none !important; } }
 @media print { .pp-sub, .pp-pager { display: none; } }
