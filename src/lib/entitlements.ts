@@ -121,6 +121,21 @@ export const FEATURES = [
   // Pipeline module, slice PB (deal actions): default off.
   "pl_delete",
   "pl_bulk",
+  // Clients module round 3 (docs/features/CLIENTS_BRIEF.md): each behind its own flag, default off.
+  "cl_overview",
+  "cl_attention",
+  "cl_trends",
+  "cl_compare",
+  "cl_reports",
+  "cl_people",
+  "cl_setup",
+  "cl_billing",
+  "cl_rollup",
+  "cl_module",
+  "cl_actions",
+  "cl_retention",
+  "cl_workflows",
+  "cl_onboarding",
 ] as const;
 export type Feature = (typeof FEATURES)[number];
 
