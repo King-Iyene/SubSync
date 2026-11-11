@@ -79,6 +79,8 @@ test("pilot modules are on by default and a database row can still override the 
     "pl_sources",
     "pl_stage_history",
     "pl_won_lost",
+    "pl_bulk",
+    "pl_delete",
     "zoom_meet",
   ]);
   assert.equal(f.meetings, true);

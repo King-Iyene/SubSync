@@ -118,6 +118,9 @@ export const FEATURES = [
   "pl_history",
   "pl_record",
   "pl_module",
+  // Pipeline module, slice PB (deal actions): default off.
+  "pl_delete",
+  "pl_bulk",
 ] as const;
 export type Feature = (typeof FEATURES)[number];
 

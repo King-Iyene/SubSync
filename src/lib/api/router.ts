@@ -122,6 +122,7 @@ import { handleApptWork } from "./appointment-work-routes";
 import { handleAppointments3 } from "./appointments3-routes";
 import { handlePipeline3 } from "./pipeline3-routes";
 import { handleApptActions } from "./appointment-actions-routes";
+import { handlePipelineActions } from "./pipeline-actions-routes";
 import { buildSteps, guideRoleOf } from "../getting-started";
 import { changedSettingKeys, feedbackGivenBy, logAccountFlags, logKeyChange, logSettingsChange, recordVote } from "../feedback-queries";
 import { groupStatus, parseGranted } from "../scope-groups";
@@ -1994,6 +1995,10 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
     // Appointments actions and meetings (slice AB): the panel, preview-then-do changes, bulk, undo, and the private Meetings area (each behind its own flag, checked inside).
     if (a === "appointments" && (b === "act" || b === "meetings") && ctx.segments.length === 3) {
       return await handleApptActions(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links, locationToken: (locationId) => locationAccessToken(ctx.session.companyId, locationId) });
+    }
+    // Pipeline deal actions (slice PB): the deal panel, preview-then-do changes, bulk and undo (flags and the account are checked inside).
+    if (a === "pipeline3" && b === "act" && ctx.segments.length === 3) {
+      return await handlePipelineActions(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links, locationToken: (locationId) => locationAccessToken(ctx.session.companyId, locationId) });
     }
     // The rebuilt Appointments page: the work lists, "See all" and the comparison (read only).
     if (a === "appointments" && method === "GET" && (b === "work" || b === "list" || b === "compare") && !c) {
