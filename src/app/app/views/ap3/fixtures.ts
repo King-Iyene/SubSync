@@ -29,10 +29,10 @@ export const FLOW_FIXTURE: ApFlowTree = {
 export const FLOW_EMPTY: ApFlowTree = { booked: 0, periodLabel: "Last 30 days", setters: [], hiddenSetters: 0, totals: oc({}), overall: { showRate: null, noShowRate: null, closeRate: null }, minBookings: MIN };
 
 export const OVERVIEW_FIXTURE: ApOverview = {
-  headline: { needsOutcome: 23, noShowsToRecover: 17, reportedShowRate: 0.88, trueShowRate: 0.71, trueRange: [0.66, 0.79], marked: 212, booked: 241 },
+  headline: { needsOutcome: 23, noShowsToRecover: 17, reportedShowRate: 0.88, trueShowRate: 0.71, trueRange: [0.66, 0.79], marked: 212, booked: 241, showed: 150, passed: 211, atRisk: 12 },
   revenueAtRisk: { lowCents: 4_800_000, highCents: 9_600_000, basis: "No-shows and appointments with no outcome, times the average won deal of the last 90 days, times the share of those leads that closed after a rebook (4% to 8%)." },
   journey: [{ key: "booked", label: "Booked", count: 241 }, { key: "showed", label: "Showed", count: 150 }, { key: "won", label: "Won", count: 52 }],
-  cards: { worstAccount: { id: "L-2", name: "Brightside Dental", noShowRate: 0.34 }, topSetter: { id: "u-cy", name: "Cy Mensah", showRate: 0.9 }, leak: "16 no-shows when Ben Hart hands to Dan Reyes: 57% against 24% across everyone." },
+  cards: { unrecordedBookers: 9, worstAccount: { id: "L-2", name: "Brightside Dental", noShowRate: 0.34, noShows: 25, of: 74 }, topSetter: { id: "u-cy", name: "Cy Mensah", showRate: 0.9, showed: 36, of: 40 }, leak: { text: "16 no-shows when Ben Hart hands to Dan Reyes: 57% against 24% across everyone.", count: 16, params: { booker: "b1", owner: "o0", outcome: "booked" }, names: { booker: "Ben Hart", owner: "Dan Reyes" } } },
   needsPermission: false,
 };
 
@@ -53,7 +53,7 @@ export const page = <T,>(rows: T[], total = rows.length, p = 1, size = 20): ApPa
 
 export const PEOPLE_FIXTURE: ApPersonRow[] = [
   ...setters.map((s, i) => ({ id: s.id, name: s.name, role: "setter" as const, bookings: s.bookings, showRate: s.showRate, noShowRate: s.noShowRate, closeRate: s.closeRate, revenueCents: s.revenueCents, avgLeadToBookedHours: s.avgLeadToBookedHours, trend: [60, 64, 58, 70, 66 + i, 72].map((v) => v / 100) })),
-  { id: "u-none", name: "Nobody assigned", role: "closer", unassigned: true, bookings: 9, showRate: 0.55, noShowRate: 0.45, closeRate: 0.1, revenueCents: 0, avgLeadToBookedHours: null, trend: [] },
+  { id: "none", name: "Booker not recorded", role: "setter", unassigned: true, noOwner: 4, bookings: 9, showRate: 0.55, noShowRate: 0.45, closeRate: 0.1, revenueCents: 0, avgLeadToBookedHours: null, trend: [] },
 ];
 export const HEALTH_FIXTURE: ApHealthRow[] = [
   { locationId: "L-2", name: "Brightside Dental", booked: 74, showRate: 0.58, noShowRate: 0.34, cancelRate: 0.12, unmarked: 14 },

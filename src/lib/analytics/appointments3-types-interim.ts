@@ -18,10 +18,17 @@ export type ApRow = {
 
 export type ApOverview = {
   today?: { doubleBookings: number; idlePeople: number };
-  headline: { needsOutcome: number; noShowsToRecover: number; reportedShowRate: number | null; trueShowRate: number | null; trueRange: [number, number] | null; marked: number; booked: number };
+  headline: { needsOutcome: number; noShowsToRecover: number; reportedShowRate: number | null; trueShowRate: number | null; trueRange: [number, number] | null; marked: number; booked: number;
+    /** Appointments confirmed as shown, and everything that has passed (showed + no-show + no outcome): the two numbers behind the true show rate. */ showed: number; passed: number;
+    /** The appointments the revenue-at-risk figure is made of. */ atRisk: number };
   revenueAtRisk: { lowCents: number; highCents: number; basis: string } | null;
   journey: Array<{ key: "booked" | "showed" | "won"; label: string; count: number }>;
-  cards: { worstAccount: { id: string; name: string; noShowRate: number } | null; topSetter: { id: string; name: string; showRate: number } | null; leak: string | null };
+  cards: {
+    worstAccount: { id: string; name: string; noShowRate: number; noShows: number; of: number } | null;
+    topSetter: { id: string; name: string; showRate: number; showed: number; of: number } | null;
+    /** Bookings with no booker recorded (left out of "who books the best"). */ unrecordedBookers: number;
+    leak: { text: string; count: number; params: { booker?: string; owner?: string; outcome?: string }; names: { booker?: string; owner?: string } } | null;
+  };
   needsPermission: boolean;
 };
 
@@ -35,7 +42,7 @@ export type ApFlowTree = {
   minBookings: number;
 };
 
-export type ApPersonRow = ApStats & { id: string; name: string; role: "setter" | "closer" | "both"; unassigned?: boolean; trend: number[] };
+export type ApPersonRow = ApStats & { id: string; name: string; role: "setter" | "closer" | "both"; /** The row for bookings with no booker recorded. */ unassigned?: boolean; /** On that row: bookings with no owner. */ noOwner?: number; trend: number[] };
 export type ApHealthRow = { locationId: string; name: string; booked: number; showRate: number | null; noShowRate: number | null; cancelRate: number | null; unmarked: number };
 export type ApSourceRow = { source: string; booked: number; showRate: number | null; medianFirstReplyMinutes: number | null; won: number };
 export type ApSpeedBand = { label: string; booked: number; showRate: number | null };
@@ -43,6 +50,6 @@ export type ApConflictRow = { id: string; kind: "double-booking"; accountName: s
 export type ApCalendarRow = { locationId: string; accountName: string; calendarId: string; calendarName: string; bookings: number; lastBookingAt: string | null; daysSince: number | null };
 export type ApPersonCalRow = PersonRollup;
 export type ApProblem = { key: string; label: string; tone: "red" | "amber"; count: number; why: string; available: boolean };
-export type ApCalendarsView = { rows: ApConflictRow[]; calendars: ApCalendarRow[]; people: ApPersonCalRow[]; problems: ApProblem[] };
+export type ApCalendarsView = { /** All double bookings found (the rows are the first page of them). */ conflictTotal?: number; rows: ApConflictRow[]; calendars: ApCalendarRow[]; people: ApPersonCalRow[]; problems: ApProblem[] };
 export type ApProof = { weekOf: string; weekEnd?: string; locationId?: string | null; accountName: string; booked: number; showed: number; recovered: number; stillUnmarked: number; trueShowRate: number | null; caught: number; fixed: number };
 export type ApSavedView = { id: string; name: string; scope: Partial<ApScope> & { q?: string } };

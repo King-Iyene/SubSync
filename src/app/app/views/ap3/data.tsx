@@ -7,7 +7,7 @@ import { adaptPart, API_PARAM, API_PART } from "./adapters";
 import type { ApPart, ApRow, ApScope } from "./types";
 
 /** Scope the user picks. `days` is turned into from/to on the server's day boundaries; everything else is passed through and re-checked on the server (never trusted). */
-export { DEFAULT_FILTERS, filtersFromParams, filtersToParams, type ApFilters } from "@/lib/design/appt-filters";
+export { DEFAULT_FILTERS, filtersFromParams, filtersToParams, FILTER_KEYS, AGE_OPTIONS, STATUS_OPTIONS, SORT_OPTIONS, type ApFilters } from "@/lib/design/appt-filters";
 import { DEFAULT_FILTERS, type ApFilters } from "@/lib/design/appt-filters";
 
 const FX = /[?&]apfx=(1|empty|error)/;
@@ -24,7 +24,8 @@ const fxMode = () => { const v = fxFound(); return v === "empty" || v === "error
 
 export function scopeOf(f: ApFilters): ApScope {
   const day = 86_400_000, to = new Date(), from = new Date(to.getTime() - f.days * day);
-  return { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10), locationId: f.locationId || undefined, calendarId: f.calendarId || undefined, source: f.source || undefined, userId: f.userId || undefined };
+  const custom = !!f.from && !!f.to; // a chosen date range replaces the preset days
+  return { from: custom ? f.from : from.toISOString().slice(0, 10), to: custom ? f.to : to.toISOString().slice(0, 10), locationId: f.locationId || undefined, calendarId: f.calendarId || undefined, source: f.source || undefined, userId: f.userId || undefined };
 }
 export function queryOf(part: ApPart, f: ApFilters, extra: Record<string, string | number | undefined> = {}): string {
   const s = scopeOf(f); const p = new URLSearchParams({ part: API_PART[part] ?? part, from: s.from, to: s.to });
@@ -33,6 +34,14 @@ export function queryOf(part: ApPart, f: ApFilters, extra: Record<string, string
   if (s.source) p.set("source", s.source);
   if (s.userId) p.set("user", s.userId);
   if (f.q.trim()) p.set("q", f.q.trim());
+  // The worklist filters only travel to the two worklists, so a number on another section is never narrowed by a filter that is not shown there.
+  if (part === "needs-outcome" || part === "no-show-recovery") {
+    if (f.booker) p.set("setter", f.booker);
+    if (f.owner) p.set("closer", f.owner);
+    if (f.age) p.set("age", String(f.age));
+    if (f.sort) p.set("sort", f.sort);
+    if (f.status && part === "needs-outcome") p.set("status", f.status);
+  }
   for (const [k, v] of Object.entries(extra)) {
     if (v === undefined || v === "" || k === "expect") continue;
     p.set(API_PARAM[k] ?? k, String(k === "page" ? Math.max(0, Number(v) - 1) : v)); // the screens count pages from 1, the API from 0
@@ -74,7 +83,7 @@ export function useAp<T>(part: ApPart, f: ApFilters, extra: Record<string, strin
     setFix((s) => ({ ...s, loading: true }));
     setTimeout(() => {
       if (mode === "error") return setFix({ data: null, error: true, loading: false });
-      if (mode === "empty") return setFix({ data: (part === "flow-tree" ? FLOW_EMPTY : part === "overview" ? { ...OVERVIEW_FIXTURE, headline: { ...OVERVIEW_FIXTURE.headline, booked: 0, marked: 0, needsOutcome: 0, noShowsToRecover: 0, trueShowRate: null, reportedShowRate: null, trueRange: null }, revenueAtRisk: null, journey: [], cards: { worstAccount: null, topSetter: null, leak: null } } : { total: 0, page: 1, pageSize: 20, rows: [], sources: [], speed: [] }) as T, error: false, loading: false });
+      if (mode === "empty") return setFix({ data: (part === "flow-tree" ? FLOW_EMPTY : part === "overview" ? { ...OVERVIEW_FIXTURE, headline: { ...OVERVIEW_FIXTURE.headline, booked: 0, marked: 0, needsOutcome: 0, noShowsToRecover: 0, showed: 0, passed: 0, atRisk: 0, trueShowRate: null, reportedShowRate: null, trueRange: null }, revenueAtRisk: null, journey: [], cards: { worstAccount: null, topSetter: null, leak: null } } : { total: 0, page: 1, pageSize: 20, rows: [], sources: [], speed: [] }) as T, error: false, loading: false });
       setFix({ data: fixtureFor(part, extra) as T, error: false, loading: false });
     }, 260);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -84,7 +93,7 @@ export function useAp<T>(part: ApPart, f: ApFilters, extra: Record<string, strin
   return fx ? { data: fix.data, error: fix.error ? ({ message: "Could not load this" } as never) : null, loading: fix.loading, reload } : live;
 }
 
-export type ApRows = { total: number; page: number; pageSize: number; rows: ApRow[] };
+export type ApRows = { total: number; page: number; pageSize: number; rows: ApRow[]; /** The keyset cursor of the next page (null on the last page). */ next?: string | null };
 
 // A tiny registry so slice AB can mount the appointment details content (timeline, booker, deal, reminders, edit, delete) and the Meetings section without touching these files.
 export type ApSlotName = "Details" | "Meetings" | "RowActions" | "BulkActions";
@@ -98,4 +107,4 @@ export function ApSlot({ name, ...props }: { name: ApSlotName } & SlotProps) {
   return C ? <C {...props} /> : null;
 }
 export const hasApSlot = (n: ApSlotName) => slots.has(n);
-export const useMemoFilters = (f: ApFilters) => useMemo(() => f, [f.days, f.locationId, f.source, f.q, f.userId, f.calendarId]); // eslint-disable-line react-hooks/exhaustive-deps
+export const useMemoFilters = (f: ApFilters) => useMemo(() => f, [f.days, f.locationId, f.source, f.q, f.userId, f.calendarId, f.from, f.to, f.booker, f.owner, f.status, f.age, f.sort]); // eslint-disable-line react-hooks/exhaustive-deps
