@@ -11,6 +11,8 @@ import { itemsSpec, type RecordsSpec } from "@/lib/analytics/today-records";
 import { SAMPLE_AUDIT_ID } from "@/lib/analytics/share-intel";
 import { printAccent, printCss } from "@/lib/design/print";
 import { BrandLogo } from "../brand-logo";
+import { MonthlyCard, NewAccounts, SinceLine, ThenNow } from "./audit-history";
+import { SAMPLE_HISTORY, type CountKey, type History } from "@/lib/analytics/au-history";
 import { ClientRowView, FindingRow, GoodNews, LIST_TITLE, Pager, ProgressBlock, ReadingStrip, VerdictBlock, clientControls, num} from "./audit-parts";
 
 // The Account audit, rebuilt (docs/AUDIT_REVIEW.md, docs/features/AUDIT.md). The first thing on the page is one sentence about the money, with the word "estimate"
@@ -25,7 +27,13 @@ type Data = {
   summary: string; scope: "all" | "account"; staleDays: number; slaHours: number; targetMinutes: number; readLimit: string | null; now: number;
   brand: { name: string | null; color: string | null; logoUrl?: string | null }; generatedAt: string; hiddenAccounts: number; focus: { id: string; name: string } | null;
   canShare: boolean; demo: boolean; shareDays: number;
+  history?: History | null; au?: { history: boolean; onepager: boolean; monthly: boolean };
 };
+
+// ?aufx=1 shows a small typed sample of the history blocks (labelled "Sample data"); the real path never reads it. The shell may drop the query, so it is remembered at load.
+const FX = /[?&]aufx=1/;
+let fxOn = false;
+if (typeof window !== "undefined") fxOn = FX.test(window.location.href);
 
 const shortDate = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
 const longDate = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
@@ -49,7 +57,11 @@ export function AuditView() {
     const q = sp.toString();
     return q ? `audit?${q}` : "audit";
   }, [focus, runs]);
-  const { data, error, loading, reload } = useData<Data>(path);
+  const live = useData<Data>(path);
+  const { error, loading, reload } = live;
+  const data = useMemo<Data | null>(() => (live.data && fxOn ? { ...live.data, history: SAMPLE_HISTORY, au: { history: true, onepager: true, monthly: true } } : live.data), [live.data]);
+  const [revoking, setRevoking] = useState<string | null>(null);
+  const [typed, setTyped] = useState("");
   const [spec, setSpec] = useState<RecordsSpec | null>(null);
   const [copied, setCopied] = useState<"summary" | "link" | null>(null);
   const [link, setLink] = useState<string | null>(null);
@@ -77,7 +89,7 @@ export function AuditView() {
     : null;
   const list = useData<ClientPage & { sort: string; withProblems: number; clean: number; accounts: number }>(clientsPath);
 
-  const revoke = async (id: string) => { try { await api.post("audit/revoke", { id }); } finally { loadLinks(); } };
+  const revoke = async (id: string) => { try { await api.post("audit/revoke", { id, typed: id.slice(-6) }); setRevoking(null); setTyped(""); } finally { loadLinks(); } };
   const share = async () => {
     setSharing(true); setLinkError(null);
     try { setLink((await api.post<{ url: string }>("audit/share", focus ? { location: focus } : {})).url); loadLinks(); } catch { setLink(null); setLinkError("Could not create a link. Try again."); } finally { setSharing(false); }
@@ -99,7 +111,7 @@ export function AuditView() {
 
   const menu: MenuItem[] = [
     { key: "again", label: "Run the audit again", onSelect: () => setRuns((n) => n + 1) },
-    ...(data.canShare ? [{ key: "share", label: sharing ? "Creating link..." : "Share a link with a client", onSelect: () => { void share(); }, disabled: sharing }] : []),
+    ...(data.canShare ? [{ key: "share", label: sharing ? "Creating link..." : data.au?.onepager ? "Make a one-pager link for a client" : "Share a link with a client", onSelect: () => { void share(); }, disabled: sharing }] : []),
     { key: "copy", label: copied === "summary" ? "Copied" : "Copy a summary", onSelect: () => { void copy(data.summary, "summary"); } },
     { key: "print", label: "Print", onSelect: () => window.print() },
     ...(data.demo ? [{ key: "sample", label: "See a sample to send a client", onSelect: () => { window.open(`/audit/${SAMPLE_AUDIT_ID}`, "_blank", "noopener"); } }] : []),
@@ -131,7 +143,7 @@ export function AuditView() {
         {linkError && <InlineAlert tone="danger" className="mb-4">{linkError}</InlineAlert>}
         {link && (
           <InlineAlert tone="success" className="mb-4 break-all" action={<Btn onClick={() => copy(link, "link")}>{copied === "link" ? "Copied" : "Copy link"}</Btn>}>
-            Send this link. It shows the sentence, the figures, what to fix and how each number is counted. It has no client names and works for {data.shareDays} days. You can switch it off below: <a className="font-medium underline" href={link} target="_blank" rel="noreferrer">{link}</a>
+            Send this link. It shows the sentence, the figures, what to fix{data.au?.onepager ? ", then and now" : ""} and how each number is counted. It has no client names and works for {data.shareDays} days. You can switch it off below: <a className="font-medium underline" href={link} target="_blank" rel="noreferrer">{link}</a>
           </InlineAlert>
         )}
 
@@ -139,7 +151,14 @@ export function AuditView() {
           <EmptyState title="No client accounts to audit yet" body="Client accounts appear here as SubSync reads them for the first time. It usually takes a few minutes." />
         ) : (
           <>
-            <VerdictBlock staleDays={data.staleDays} v={data.verdict} grade={data.grade?.line ?? null} accountsLine={accountsLine} start={first} onStart={() => first && open(first)} />
+            <VerdictBlock staleDays={data.staleDays} v={data.verdict} grade={data.grade?.line ?? null} accountsLine={accountsLine} start={first} onStart={() => first && open(first)} extra={<SinceLine history={data.history ?? null} />} />
+
+            {data.au?.history && data.history && (
+              <ThenNow history={data.history} sample={fxOn} openable={new Set(data.findings.map((f) => f.key as CountKey))} onOpen={(k) => { const f = data.findings.find((x) => x.key === k); if (f) open(f); }} />
+            )}
+            {data.au?.history && data.history && data.scope === "all" && (
+              <NewAccounts history={data.history} sample={fxOn} onAudit={(id) => { setFocus(id); setAll(false); window.scrollTo?.({ top: 0, behavior: "smooth" }); }} />
+            )}
 
             <Section title={data.findings.length === 0 ? "What needs fixing" : `What needs fixing (${data.findings.length})`} hint="Biggest money first. Among equals, the quick fixes come first.">
               {data.findings.length === 0 ? (
@@ -203,12 +222,21 @@ export function AuditView() {
                   Made {shortDate(l.createdAt)} · {l.revoked ? "switched off" : l.expired ? "expired" : `works until ${shortDate(l.expiresAt)}`} · opened {l.views} {l.views === 1 ? "time" : "times"}
                   <span className="ml-2 text-xs text-muted-foreground">ends ...{l.id.slice(-6)}</span>
                 </span>
-                {!l.revoked && !l.expired && <Btn variant="ghost" onClick={() => revoke(l.id)}>Switch off</Btn>}
+                {!l.revoked && !l.expired && revoking !== l.id && <Btn variant="ghost" onClick={() => { setRevoking(l.id); setTyped(""); }}>Switch off</Btn>}
+                {revoking === l.id && (
+                  <span className="flex w-full flex-wrap items-center gap-2" data-testid="audit-revoke-confirm">
+                    <label className="text-xs text-muted-foreground" htmlFor={`rv-${l.id}`}>Type the last six characters, {l.id.slice(-6)}, to switch off this link</label>
+                    <input id={`rv-${l.id}`} value={typed} onChange={(e) => setTyped(e.target.value)} autoComplete="off" className="h-11 w-32 rounded-lg border bg-background px-3 text-sm sm:h-9" />
+                    <Btn variant="primary" disabled={typed !== l.id.slice(-6)} onClick={() => revoke(l.id)}>Switch off this link</Btn>
+                    <Btn variant="ghost" onClick={() => { setRevoking(null); setTyped(""); }}>Keep it</Btn>
+                  </span>
+                )}
               </li>
             ))}
           </ul>
         </Card>
       )}
+      {data.au?.monthly && (!data.demo || fxOn) && <MonthlyCard sample={fxOn} />}
       {spec && <RecordsPanel key={spec.key} spec={spec} onClose={() => setSpec(null)} now={data.now} canExport={data.canShare || data.demo} />}
     </Page>
   );

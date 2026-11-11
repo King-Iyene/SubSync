@@ -117,6 +117,10 @@ export const DEFAULT_OFF: ReadonlySet<Feature> = new Set<Feature>([
   "pp_idle",
   "pp_rollup",
   "pp_actions",
+  // Account audit (docs/features/AUDIT_BRIEF.md): each behind its own flag, default off.
+  "au_history",
+  "au_onepager",
+  "au_monthly",
 ]);
 
 export function resolveFeatures(all: readonly Feature[], overrides: Record<string, boolean>, allOn = false): Record<Feature, boolean> {

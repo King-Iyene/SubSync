@@ -10,7 +10,7 @@ export const SYNCED_DELETE = [
   "account_metrics_daily", "alerts", "domain_checks", "onboarding_tasks",
   "deal_events", "appointment_events", "appointment_history", "appointment_facts", "deal_history", "deal_facts", "deal_stage_stats", "pipeline_rollup", "pipeline_rollup_state", "deal_forecast_log", "deal_record_state", "lead_touches", "touch_events", "lead_events", "moat_events", "reply_proof_pages", "speed_daily", "speed_digest", "speed_prefs", "call_outcomes", "workflow_setup_settings", "workflow_setup", "call_queue_log", "call_queue_settings", "contact_tag_events", "location_users", "team_member_access", "user_daily", "user_rollup_state", "user_workload_daily", 
   "notification_states", "notifications", "notification_deliveries",
-  "client_rollup_state", "client_daily", "client_risk_history", "client_billing", "client_actions", "team_members", "people_write_log", // Clients and Team: derived numbers, the people list, and the log of lead moves
+  "client_rollup_state", "client_daily", "client_risk_history", "client_billing", "client_actions", "team_members", "people_write_log", "au_runs", "au_prefs", "au_account_prefs", // Clients and Team: derived numbers, the people list, and the log of lead moves
   "campaign_stats", "workflow_snapshots", "workflow_changes", "workflow_daily", "workflow_items",
   "dh_snapshots", "dh_flags", "dh_changes", "dh_outcomes", // Data health (docs/features/DATA_HEALTH.md)
   "call_queue_log", "meeting_deliveries", "crm_writes", "contact_writes", "field_write_state", "meetings", "meeting_notes", "shared_audits", "sync_jobs", "locations",

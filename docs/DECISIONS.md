@@ -594,3 +594,10 @@ Customer view. Who uses it: the agency owner (who is slow, who is overloaded, wh
 - A business account's user (a setter) and a session with no recorded person role get the least access (their own row). Only an account administrator manages people of a business account.
 - Registered in tenant-tables and data-inventory: client_* (7 tables), team_members (installation only: removed with "delete my data" and on uninstall, NOT in the per-account purge, which would fail on its missing location column), the people tables, and pipeline_rollup.has_owner.
 - A person whose name cannot be read shows as "A team member"; the single banner says why. A permission message is never used as a name.
+
+## 11 Nov 2026: Account audit history, one-pager, monthly message (stage AU)
+- Who: the agency owner and salesperson. They show a client where an account started and what changed; without it there is no proof. Missing: "I cannot show the client where we started".
+- Runs are recorded when the audit is read and by the hourly sweep (new account or newest run 6 or more days old); history is per account, so agency totals are sums of comparable accounts.
+- The one-pager is the existing share link plus a counts-only "Then and now" block (flag au_onepager). Switching a link off now asks for the last six characters; the server checks them when sent (older callers without it still work).
+- Monthly message goes through the gated email transport (dry run until the live switch is on) to the company's own summary address only; per-account mute; once a month by key.
+- Flags au_history, au_onepager, au_monthly default off. Migrations 20261205090000_au_runs.sql and 20261205100000_au_prefs.sql are not applied by the builder.
