@@ -119,6 +119,7 @@ import { handleMoat } from "./moat-routes";
 import { handleUnansweredActions } from "./unanswered-actions-routes";
 import { handleUnansweredPart3, handleUnansweredViewRemove, handleUnansweredViewSave } from "./unanswered-routes3";
 import { handleApptWork } from "./appointment-work-routes";
+import { handleAppointments3 } from "./appointments3-routes";
 import { buildSteps, guideRoleOf } from "../getting-started";
 import { changedSettingKeys, feedbackGivenBy, logAccountFlags, logKeyChange, logSettingsChange, recordVote } from "../feedback-queries";
 import { groupStatus, parseGranted } from "../scope-groups";
@@ -1980,6 +1981,10 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
     // The Lead workbench (stage MOAT): the live conversation, the preview and the one gateway every write goes through (switched off by default).
     if (a === "dial") return await handleDial(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links });
     if (a === "workbench") return await handleWorkbench(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links, locationToken: (locationId) => locationAccessToken(ctx.session.companyId, locationId) });
+    // Appointments round 3: /api/app/appointments?part=... (overview, lists, booking share, flow tree, health, sources, calendars, reminders, receipt, detail; read only).
+    if (a === "appointments" && method === "GET" && !b && ctx.url.searchParams.has("part")) {
+      return await handleAppointments3(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links });
+    }
     // The rebuilt Appointments page: the work lists, "See all" and the comparison (read only).
     if (a === "appointments" && method === "GET" && (b === "work" || b === "list" || b === "compare") && !c) {
       return await handleApptWork(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links });

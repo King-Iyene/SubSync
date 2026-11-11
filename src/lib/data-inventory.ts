@@ -69,6 +69,8 @@ export const INVENTORY: Record<string, TableInfo> = {
     notPersonal: ["booking_channel"],
   },
   appointment_events: { noun: "appointment history", line: "appointments" },
+  appointment_history: { noun: "appointment history record (every status, time, owner and reminder change; never message text)", line: "appointments", personal: { contact_id: "the contact the appointment is with", actor_id: "which team member made the change" }, notPersonal: ["event_key", "kind", "actor_kind", "detail"] },
+  appointment_facts: { noun: "appointment reminder, confirmation and reschedule facts", line: "appointments", notPersonal: ["reminders_sent", "confirmed_at", "reschedule_count", "rescheduled_from", "snoozed_until"] },
   touch_events: { noun: "message and call history (who, which way, which channel, when; never the words)", line: "conversations", personal: { user_id: "which team member sent it" }, notPersonal: ["event_key", "channel", "source", "campaign", "outcome"] },
   moat_events: { noun: "lead history record (arrived, first reply, alerts, bookings, deal results; never the words)", line: "conversations", personal: { contact_id: "the contact this fact is about", conversation_id: "the conversation this fact is about", user_id: "which team member did it", owner_id: "the team member who owned the lead" }, notPersonal: ["event_key", "channel", "vertical", "detail"] },
   reply_proof_pages: { noun: "reply-time pages you shared", line: "shares", personal: { payload: "a snapshot of reply-time totals for one client account, with your business name and colour", created_by: "which team member made the page" }, notPersonal: ["payload_hash", "prev_hash", "chain_hash", "signature"] },
