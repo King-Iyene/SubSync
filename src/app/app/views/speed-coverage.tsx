@@ -7,6 +7,7 @@ import { STEP_LABEL, STEPS, type JourneyStep, type Step } from "@/lib/analytics/
 import type { ChannelRow, MissedCall } from "@/lib/analytics/speed-v4";
 import { EmptyState, ErrorState, SkeletonRows } from "../ds";
 import { WhatIs } from "../ds/what-is";
+import { RoleChip } from "../roles";
 import { useData } from "../session";
 import { useSpeedFilter } from "./speed-filter";
 import { SidePopup } from "./speed-popup";
@@ -184,8 +185,8 @@ function RoutingCard() {
       {!r.enough ? <p className="t-small t-quiet" data-testid="routing-empty">Not enough owned leads yet to judge the routing.</p> : (
         <ul className="t-small space-y-1" data-testid="routing-list">
           {r.noLeads.length === 0 && r.overloaded.length === 0 && <li>Leads are spread evenly enough. Nothing to fix.</li>}
-          {r.noLeads.map((p) => <li key={p.userId}>{p.name} answers leads but is given none.</li>)}
-          {r.overloaded.map((p) => <li key={p.userId}>{p.name} holds {p.leads} leads, more than twice an even share ({Math.round(r.fair ?? 0)}).</li>)}
+          {r.noLeads.map((p) => <li key={p.userId}>{p.name}<RoleChip userId={p.userId} /> answers leads but is given none.</li>)}
+          {r.overloaded.map((p) => <li key={p.userId}>{p.name}<RoleChip userId={p.userId} /> holds {p.leads} leads, more than twice an even share ({Math.round(r.fair ?? 0)}).</li>)}
         </ul>
       )}
     </Card>

@@ -14,7 +14,7 @@ export { OpenLeadButton } from "./open-lead-button";
 export { HeldNote, HeldStatus, useHeld, heldKey } from "./held";
 export { DialerAskHost } from "./dial-button";
 export { DialButton, DialerSetting, useDialer } from "./dial-button";
-export { EmptyState, Skeleton, SkeletonRows, SkeletonCards, ErrorState, DefinitionTip } from "./states";
+export { EmptyState, Skeleton, SkeletonRows, SkeletonCards, ErrorState, DefinitionTip, PanelBoundary } from "./states";
 export { BarChart, Distribution, Sparkline, ChartPlaceholder, type Bar, type ChartTone } from "./charts";
 export { MyDayView } from "./my-day";
 export { useTheme } from "./theme";

@@ -11,23 +11,25 @@ import "./pp3.css";
 import { fixturesOn, usePp, type PpParams } from "./data";
 import { PersonPanel, type Drill } from "./panel";
 import { Scorecards, Today, Workload, type SecProps } from "./sections";
+import { Roles } from "./roles-tab";
 import { Access, Coaching, Leaderboard, Money, Proof } from "./sections2";
 import { ago, Load, money, Pager, RECONNECT, useCursor } from "./shared";
 
 // Team, one screen (the Clients module pattern): Today | Scorecards | Workload | Leaderboard | Money | Coaching | Access | Proof, and a panel for one person.
 // REAL synced data only; "idle" always reads "no activity recorded in your CRM". Reads only here; the actions builder mounts its pieces through actions-slot.tsx.
 // Every number is a count that opens its rows. Sample data appears ONLY with ?ppfx=1 and is labelled "Sample data".
-type TabKey = "today" | "scorecards" | "workload" | "leaderboard" | "money" | "coaching" | "access" | "proof";
+type TabKey = "today" | "scorecards" | "workload" | "leaderboard" | "money" | "coaching" | "access" | "proof" | "roles";
 const TIPS: Record<TabKey, [string, string]> = {
   today: ["Today", "What to do today, in one sentence."], scorecards: ["Scorecards", "One row per person: replies, appointments, shows, deals won."],
   workload: ["Workload", "Who has too much and who has room, against the team's own middle."], leaderboard: ["Leaderboard", "A fair ranking inside each account."],
   money: ["Money", "Deals won, open and at risk, per person."], coaching: ["Coaching", "One thing to work on for each person, and your notes."],
   access: ["Access", "Which accounts each person works in, and where one person does it all."], proof: ["Proof", "A summary for a client of how the team handled their leads."],
+  roles: ["Roles", "Who is a setter, a closer or something else. Shown next to every name."],
 };
-const FLAG_OF: Record<TabKey, string> = { today: "pp_today", scorecards: "pp_scorecards", workload: "pp_workload", leaderboard: "pp_leaderboard", money: "pp_money", coaching: "pp_coaching", access: "pp_access", proof: "pp_proof" };
+const FLAG_OF: Record<TabKey, string> = { today: "pp_today", scorecards: "pp_scorecards", workload: "pp_workload", leaderboard: "pp_leaderboard", money: "pp_money", coaching: "pp_coaching", access: "pp_access", proof: "pp_proof", roles: "pp_roles" };
 const OWN_TABS: TabKey[] = ["today", "scorecards", "leaderboard", "coaching"];
 const PERIODS = [[7, "Last 7 days"], [28, "Last 28 days"], [90, "Last 90 days"]] as const;
-const NO_PERIOD: TabKey[] = ["today", "workload", "coaching", "access"];
+const NO_PERIOD: TabKey[] = ["today", "workload", "coaching", "access", "roles"];
 
 const KIND_WORD = { lead: "Lead waiting", deal: "Deal", appointment: "Appointment" } as const;
 function DrillList({ d, filters, onClose }: { d: Drill; filters: PpParams; onClose: () => void }) {
@@ -79,9 +81,10 @@ export function TeamModule({ go }: { go: GoFn }) {
       case "coaching": return <Coaching key={coachId ?? "list"} {...props} coachUser={coachId} />;
       case "access": return <Access {...props} />;
       case "proof": return <Proof {...props} />;
+      case "roles": return <Roles />;
     }
   })();
-  const showAccount = !own && accounts.length > 1 && active !== "access" && active !== "proof" && active !== "coaching";
+  const showAccount = !own && accounts.length > 1 && active !== "access" && active !== "proof" && active !== "coaching" && active !== "roles";
   const showPeriod = !NO_PERIOD.includes(active);
   return (
     <div className="s6 ap pp ds-enter" data-testid="pp-module">

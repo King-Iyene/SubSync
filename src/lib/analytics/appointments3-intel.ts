@@ -215,7 +215,7 @@ export function buildPeople(members: PeopleMember[], bookings: PeopleBooking[], 
     const last = accounts.map((a) => a.lastBookingAt).filter((x): x is string => !!x).sort().pop() ?? null;
     out.push({
       userId: id, name: names.get(id) ?? nameOf(id), inTeamList: inList, bookings: n, sharePct: total ? Math.round((n / total) * 100) : 0, lastBookingAt: last, accounts,
-      idleIn: accounts.filter((a) => a.member && a.bookings === 0).map((a) => a.accountName ?? a.locationId), idleEverywhere: inList && n === 0,
+      idleIn: accounts.filter((a) => a.member && a.bookings === 0).map((a) => a.accountName ?? "another account"), idleEverywhere: inList && n === 0,
     });
   }
   return out.sort((a, b) => b.bookings - a.bookings || a.name.localeCompare(b.name));

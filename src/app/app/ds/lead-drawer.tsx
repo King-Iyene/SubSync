@@ -21,7 +21,7 @@ import { InfoTip } from "./info-tip";
 import { TagsSection } from "./tags-section";
 import { LogCall, UndoButton } from "./lead-parts";
 import { PopMenu } from "./pop-menu";
-import { ErrorState, SkeletonRows } from "./states";
+import { ErrorState, PanelBoundary, SkeletonRows } from "./states";
 import { Composer, Thread } from "./wb/conversation";
 import { DealsTab } from "./wb/deals-tab";
 import { ReviewSheet, useRunner } from "./wb/runner";
@@ -171,7 +171,7 @@ function Body({ seed, top, showAccount, wide, onLogged }: { seed: LeadSeed; top?
             {tab === "update" && <UpdateTab ctx={wb} runner={runner} />}
             {tab === "timeline" && data && <TimelinePanel items={timeline} timeZone={tz} note={tlNote} className="max-h-[70vh]" />}
             {tab === "record" && <RecordTab locationId={seed.locationId} contactId={seed.contactId} name={name} account={c?.locationName ?? seed.locationName ?? null} fields={extra?.live.customFields ?? []} />}
-            {tab === "appointments" && <AppointmentsTab ctx={wb} crmUrl={wb.crmUrl ?? url} runner={runner} />}
+            {tab === "appointments" && <AppointmentsTab ctx={wb} crmUrl={wb.crmUrl ?? url} runner={runner} locationId={seed.locationId} onChanged={() => { setThreadKey((k) => k + 1); void wbq.reload(); void person.reload(); }} />}
             {tab === "deals" && <DealsTab ctx={wb} runner={runner} focusId={seed.dealId ?? null} />}
           </div>
         </section>
@@ -258,7 +258,7 @@ export function LeadDrawer({ leads, index, onIndex, onClose, top, showAccount = 
     const key = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement | null;
       const typing = !!el && (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || el.isContentEditable);
-      if (e.key === "Escape") { onClose(); return; }
+      if (e.key === "Escape") { e.stopPropagation(); onClose(); return; } // stop here: a panel underneath must not also close on the same key
       if (e.key === "Tab" && box.current) {
         const items = [...box.current.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((x) => x.offsetParent !== null);
         if (items.length === 0) return;
@@ -302,7 +302,7 @@ export function LeadDrawer({ leads, index, onIndex, onClose, top, showAccount = 
           <div className="flex items-center gap-1"><button type="button" onClick={toggleWide} aria-label={wide ? "Make the panel narrower" : "Make the panel wider"} aria-pressed={wide} className="hidden size-11 cursor-pointer items-center justify-center rounded-lg hover:bg-muted md:inline-flex" data-testid="drawer-wide">{wide ? <Minimize2 aria-hidden className="size-4" /> : <Maximize2 aria-hidden className="size-4" />}</button><button ref={close} type="button" aria-label="Close" onClick={onClose} className="inline-flex size-11 items-center justify-center rounded-lg hover:bg-muted"><X aria-hidden className="size-5" /></button></div>
         </header>
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
-          <Body key={seed.locationId + seed.contactId + (seed.note ?? "")} seed={seed} top={top?.(seed, at)} showAccount={showAccount} wide={wide} onLogged={logged} />
+          <PanelBoundary key={seed.locationId + seed.contactId} onClose={onClose}><Body key={seed.locationId + seed.contactId + (seed.note ?? "")} seed={seed} top={top?.(seed, at)} showAccount={showAccount} wide={wide} onLogged={logged} /></PanelBoundary>
         </div>
         {saved && (
           <div className="flex items-center justify-between gap-2 border-t bg-card px-5 py-3 text-sm" role="status" data-testid="drawer-saved">

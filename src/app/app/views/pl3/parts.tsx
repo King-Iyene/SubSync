@@ -3,7 +3,8 @@
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { useEffect, useRef, useState, useSyncExternalStore, type ComponentType } from "react";
 import type { PlDeal, PlDeals } from "@/lib/analytics/pipeline3-types-interim";
-import { EmptyState, ErrorState, OpenLeadButton, SkeletonRows, type LeadSeed } from "../../ds";
+import { EmptyState, ErrorState, OpenLeadButton, PanelBoundary, SkeletonRows, type LeadSeed } from "../../ds";
+import { RoleChip } from "../../roles";
 import { usePl, type PlFilters } from "./data";
 import { money, moneyShort } from "./format";
 
@@ -50,7 +51,7 @@ export function DealTable({ rows, showAccount, onOpen, activeId, selected, onSel
               <td>{d.stageName}{d.status === "lost" && d.lostReason ? <span className="ap-sub"> · {d.lostReason}</span> : null}</td>
               <td data-num>{d.valueCents > 0 ? moneyShort(d.valueCents) : "No value"}</td>
               <td data-num>{stuck(d) ? <Chip tone="amber">{d.daysInStage} d, stuck</Chip> : `${d.daysInStage} d`}</td>
-              <td>{d.ownerName ?? <span className="ap-sub">Nobody</span>}</td>
+              <td>{d.ownerName ?? <span className="ap-sub">Nobody</span>}{d.ownerName && <RoleChip userId={d.ownerId} locationId={d.locationId} />}</td>
               <td className="text-right" onClick={(e) => e.stopPropagation()}><OpenLeadButton seed={dealSeed(d)} crmUrl={d.url} reason="This deal has no person linked, so there is nobody to open. Use the deal panel." name={d.contactName ?? d.name} showAccount={showAccount} testId="pl-row-open" /></td>
               {quick && <td onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}><PlSlot name="RowActions" deal={d} onChanged={onChanged} /></td>}
             </tr>
@@ -112,7 +113,7 @@ export function DealPanel({ deal, onClose, onChanged, filters }: { deal: PlDeal;
       <>
         <div className="ap-scrim" onClick={onClose} aria-hidden />
         <div className="ap-panel" role="dialog" aria-modal="true" aria-label={`Deal ${deal.name}`} ref={ref} tabIndex={-1} data-testid="pl-panel" style={{ padding: 0 }}>
-          <PlSlot name="Details" deal={deal} onChanged={onChanged} onClose={onClose} filters={filters} />
+          <PanelBoundary onClose={onClose} label="The deal tools could not be shown."><PlSlot name="Details" deal={deal} onChanged={onChanged} onClose={onClose} filters={filters} /></PanelBoundary>
         </div>
       </>
     );
@@ -130,11 +131,11 @@ export function DealPanel({ deal, onClose, onChanged, filters }: { deal: PlDeal;
             <dt>Value</dt><dd>{deal.valueCents > 0 ? money(deal.valueCents) : "No value set"}</dd>
             <dt>Stage</dt><dd>{deal.stageName}{stuck(deal) ? <> <Chip tone="amber">Stuck {deal.daysInStage} days (normal up to {deal.staleAfterDays})</Chip></> : ` · ${deal.daysInStage} days`}</dd>
             <dt>Status</dt><dd>{deal.status === "won" ? "Won" : deal.status === "lost" ? `Lost${deal.lostReason ? `: ${deal.lostReason}` : ""}` : deal.status === "abandoned" ? "Abandoned" : "Open"}</dd>
-            <dt>Owner</dt><dd>{deal.ownerName ?? "Nobody assigned"}</dd>
+            <dt>Owner</dt><dd>{deal.ownerName ?? "Nobody assigned"}{deal.ownerName && <RoleChip userId={deal.ownerId} locationId={deal.locationId} />}</dd>
             <dt>Contact</dt><dd>{deal.contactName ?? "Unknown"}</dd>
             <dt>Source</dt><dd>{deal.source ?? "Unknown"}</dd>
           </dl>
-          <PlSlot name="Details" deal={deal} onChanged={onChanged} filters={filters} />
+          <PanelBoundary label="The deal tools could not be shown."><PlSlot name="Details" deal={deal} onChanged={onChanged} filters={filters} /></PanelBoundary>
           <p className="flex justify-end"><OpenLeadButton seed={dealSeed(deal)} crmUrl={deal.url} reason="No person is linked to this deal." name={deal.contactName ?? deal.name} showAccount={false} testId="pl-panel-open" /></p>
           <p className="ap-fine">Changes to deals are made in your CRM or, once enabled, through SubSync&apos;s checked change tools (preview first, typed confirmation to delete).</p>
         </div>

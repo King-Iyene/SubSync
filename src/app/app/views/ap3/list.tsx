@@ -31,6 +31,8 @@ export function ApWorklist({ part, filters, extra, onOpen, activeId, showAccount
     const action: ReactNode = onClear ? <button type="button" className="s6-btn" onClick={onClear} data-testid="ap-empty-clear">Clear filters</button> : undefined;
     return <EmptyState title={empty} body={emptyBody ?? (onClear ? "Nothing matches the filters you chose. Clear them to see everything again." : "Change the dates or filters above to look further back.")} action={action} />;
   }
+  const unmarkedHere = data.rows.filter((r) => (r.status === "booked" || r.status === "confirmed") && r.hoursPast !== null && r.hoursPast > 0).length;
+  const headline = part === "needs-outcome" ? `${data.total} past appointment${data.total === 1 ? " has" : "s have"} no outcome. Open each one and mark it showed or no-show.` : part === "no-show-recovery" ? `${data.total} no-show${data.total === 1 ? "" : "s"} not booked again. Open each one and win them back.` : `${data.total} appointment${data.total === 1 ? "" : "s"} in this list${unmarkedHere ? `, ${unmarkedHere} on this page still need an outcome` : ""}. Open one to see the person and decide the next step.`;
   const chosen = data.rows.filter((r) => sel.has(r.id));
   const go = (p: number) => {
     if (p > page && data.next) setCursors((c) => ({ ...c, [p]: data.next as string })); // the next page continues after the last row seen
@@ -39,6 +41,7 @@ export function ApWorklist({ part, filters, extra, onOpen, activeId, showAccount
   return (
     <div data-testid={testId} aria-busy={loading}>
       {selectable && sel.size > 0 && <div className="mb-2 flex flex-wrap items-center gap-2 text-sm" data-testid="ap-bulkbar"><b>{sel.size} selected</b><ApSlot name="BulkActions" rows={chosen} onChanged={reload} filters={filters} /><button type="button" className="ap-link" onClick={() => setSel(new Set())}>Clear</button></div>}
+      <p className="ap-headline" data-testid="ap-list-headline">{headline}</p>
       <div className="mb-2 text-right"><button type="button" className="ap-link" onClick={() => csvDownload(data.rows)} data-testid="ap-csv" title="Download the rows on this page as a spreadsheet file">Download CSV</button></div>
       <div className="ap-tablewrap" style={{ opacity: loading ? 0.7 : 1 }}>
         <ApTable rows={data.rows} showAccount={showAccount} onOpen={onOpen} activeId={activeId} selectable={selectable} selected={sel} onChanged={reload} onSelect={(id, on) => setSel((s) => { const n = new Set(s); if (on) n.add(id); else n.delete(id); return n; })} />

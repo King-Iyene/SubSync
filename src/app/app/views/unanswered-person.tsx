@@ -5,6 +5,7 @@ import { useCallback, useState } from "react";
 import { shortWords } from "@/lib/analytics/unanswered-v2";
 import { DEFAULT_DENSITY, DENSITY_KEY, parseDensity, type Density } from "@/lib/design/list-density";
 import { PopMenu } from "../ds";
+import { RoleChip } from "../roles";
 import { fmtMoney } from "../ui";
 import { Slot, useRoom, type UiRow } from "./unanswered-slots";
 import { waitTone, whyLine, type usePersonActions } from "./unanswered-rows";
@@ -74,7 +75,7 @@ export function PersonList({ rows, showAccount, actions, tab, cursor, fresh, sel
                   {density === "comfortable" && <span className="ur-t-sub">{whyLine(r, showAccount)}</span>}
                 </button>
                 {showAccount && <span className="ur-t-c ur-t-c-acct" title={r.locationName}>{r.locationName}</span>}
-                <span className="ur-t-c ur-t-c-owner" data-none={r.owner ? undefined : "1"} title={owner}>{owner}</span>
+                <span className="ur-t-c ur-t-c-owner" data-none={r.owner ? undefined : "1"} title={owner}>{owner}{r.owner && <RoleChip userId={r.owner.id} locationId={r.locationId} />}</span>
                 <span className="ur-t-c ur-t-c-chan" title={r.call ? "Call, result not known" : r.channel}>{channel}</span>
                 <span className="ur-t-wait" data-tone={tone(r, tab)} data-testid="wait-time" data-quiet={waitTone(r.hours) === "quiet" ? "1" : undefined}>
                   {tab === "us" && waitTone(r.hours) === "warn" && <AlertTriangle aria-hidden className="size-3.5" />}{wordsFor(r, tab)}

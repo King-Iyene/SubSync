@@ -61,6 +61,11 @@ export const REPORT_CSS = `
 .rp-notes { margin: 0; padding-left: 1.4rem; font-size: 0.82rem; color: #c9d4e6; }
 .rp-notes li { padding: 0.25rem 0; }
 .rp-ref { font-size: 0.7em; vertical-align: super; line-height: 0; margin-left: 0.15rem; }
+.rp-tn { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+.rp-tn th, .rp-tn td { text-align: right; padding: 0.5rem 0.4rem; border-top: 1px solid #ffffff1f; font-variant-numeric: tabular-nums; }
+.rp-tn th:first-child, .rp-tn td:first-child { text-align: left; padding-left: 0; font-weight: 400; }
+.rp-tn + .rp-sub { margin-top: 0.75rem; }
+.rp-tn thead th { border-top: 0; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #9fb0cb; }
 .rp-foot { font-size: 0.78rem; color: #9fb0cb; margin-top: 1.75rem; }
 .rp-cta { display: inline-block; margin-top: 1.5rem; padding: 0.75rem 1.25rem; border-radius: 6px; background: #4db3dc; color: #000c25 !important; font-weight: 600; text-decoration: none; }
 .rp-print { margin-top: 1rem; padding: 0.45rem 0.9rem; border-radius: 6px; border: 1px solid #ffffff40; background: transparent; color: inherit; font: inherit; font-size: 0.85rem; cursor: pointer; }
@@ -137,6 +142,21 @@ export function AuditReport({ payload: p, expiresAt }: { payload: SharePayload; 
           </div>
         </section>
         {(p.leftOut ?? 0) > 0 && <p className="rp-sub" style={{ marginTop: "0.75rem" }}>{(p.leftOut as number).toLocaleString("en-US")} open {p.leftOut === 1 ? "deal is" : "deals are"} left out of every dollar figure (no value, no owner, or in a closed-out stage).{refFor(notes, "left_out")}</p>}
+
+        {p.thenNow && (
+          <section aria-label="Then and now" data-testid="report-then-now">
+            <h2>Then and now</h2>
+            <p className="rp-sub" style={{ marginTop: 0, marginBottom: "0.5rem" }}>Counts from the first audit on {day(`${p.thenNow.from}T00:00:00Z`)} and the latest on {day(`${p.thenNow.to}T00:00:00Z`)}, for {p.thenNow.accounts} client {p.thenNow.accounts === 1 ? "account" : "accounts"}.</p>
+            <table className="rp-tn">
+              <thead><tr><th scope="col">What</th><th scope="col">Then</th><th scope="col">Now</th></tr></thead>
+              <tbody>{p.thenNow.lines.map((l) => <tr key={l.label}><th scope="row">{l.label}</th><td>{l.then.toLocaleString("en-US")}</td><td>{l.now.toLocaleString("en-US")}</td></tr>)}</tbody>
+            </table>
+            {p.thenNow.staleDollars && <p className="rp-sub">Counted from the CRM: deals that stopped moving were {usd(p.thenNow.staleDollars.then)} then and {usd(p.thenNow.staleDollars.now)} now.</p>}
+            {p.thenNow.estimate
+              ? <p className="rp-sub">Estimate, not a fact: the monthly leak was about {usd(p.thenNow.estimate.thenLow)} to {usd(p.thenNow.estimate.thenHigh)} then and about {usd(p.thenNow.estimate.nowLow)} to {usd(p.thenNow.estimate.nowHigh)} now. It is never added to the counted figure.</p>
+              : <p className="rp-sub">Estimate: not enough data to compare.</p>}
+          </section>
+        )}
 
         {p.findings.length > 0 && (
           <section aria-label="What we found">

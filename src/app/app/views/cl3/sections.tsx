@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import type { Cl3Billing, Cl3BillingList, Cl3Compare, Cl3Options, Cl3People, Cl3Receipt, Cl3ReceiptList, Cl3SetupList, Cl3Trends } from "@/lib/analytics/clients3-types";
 import { EmptyState } from "../../ds";
+import { RoleChip } from "../../roles";
 import { useCl, type ClParams } from "./data";
 import { AccountSettings } from "./settings";
 import { ago, change, day, Find, Load, minutes, money, NOT_ENOUGH, NOT_FROM_PLATFORM, Pager, RECONNECT, Spark } from "./shared";
@@ -142,7 +143,7 @@ export function People({ filters }: Shared) {
           <>
             <p className="ap-fine mb-2">{p.idleCount > 0 ? `${p.idleCount} ${p.idleCount === 1 ? "person has" : "people have"} gone quiet (no messages sent for 7 days) and ${p.idleCount === 1 ? "is" : "are"} listed first.` : "Nobody has gone quiet."}{p.accountsWithoutStaff > 0 ? ` ${p.accountsWithoutStaff} client ${p.accountsWithoutStaff === 1 ? "account has" : "accounts have"} no team members we can see.` : ""}</p>
             <div className="ap-scroll"><table className="ap-t"><thead><tr><th>Person</th><th>Account</th><th data-num>Messages sent</th><th data-num>Leads touched</th><th>Last active</th></tr></thead>
-              <tbody>{p.rows.map((x) => <tr key={`${x.locationId}:${x.userId}`} style={{ cursor: "default" }}><td><span className="ap-name">{x.name}</span></td><td>{x.accountName}</td><td data-num>{x.messagesSent}</td><td data-num>{x.leadsTouched}</td><td>{x.idle ? <span className="ap-chip" data-tone="amber">Gone quiet</span> : ago(x.lastActiveAt)}</td></tr>)}</tbody></table></div>
+              <tbody>{p.rows.map((x) => <tr key={`${x.locationId}:${x.userId}`} style={{ cursor: "default" }}><td><span className="ap-name">{x.name}</span><RoleChip userId={x.userId} locationId={x.locationId} /></td><td>{x.accountName}</td><td data-num>{x.messagesSent}</td><td data-num>{x.leadsTouched}</td><td>{x.idle ? <span className="ap-chip" data-tone="amber">Gone quiet</span> : ago(x.lastActiveAt)}</td></tr>)}</tbody></table></div>
             <Pager page={p.page} pages={p.pages} total={p.total} set={l.setPage} />
           </>
         )}
@@ -186,7 +187,7 @@ function Plans({ filters }: Shared) {
   return (
     <section className="cl-drill" data-testid="cl-billing" aria-label="Plan and subscription">
       <h3 className="mb-1 text-base font-semibold">Plan and subscription</h3>
-      <p className="ap-fine mb-2">The plan and status your platform reports for each client. Failed payments, the next payment date and installed apps: {NOT_FROM_PLATFORM}.</p>
+      <p className="ap-fine mb-2">Plan is the plan your platform bills this client account on. Failed payments, the next payment date and installed apps: {NOT_FROM_PLATFORM}.</p>
       <Load r={r} empty={(b) => b.rows.length === 0}>
         {(b) => (
           <>
@@ -194,7 +195,7 @@ function Plans({ filters }: Shared) {
             <div className="ap-scroll"><table className="ap-t"><thead><tr><th>Account</th><th>Plan</th><th>Subscription</th><th>Failed payments, next payment, apps</th></tr></thead>
               <tbody>{b.rows.map((x: Cl3Billing) => (
                 <tr key={x.locationId} style={{ cursor: "default" }} data-tone={x.subscriptionStatus && !SUB_OK.test(x.subscriptionStatus) ? "amber" : undefined}><td><span className="ap-name">{x.name}</span></td>
-                  <td>{x.state === "ok" ? x.plan ?? "No plan name" : x.message ?? "Not checked yet"}</td><td>{x.subscriptionStatus ? x.subscriptionStatus.replace(/_/g, " ") : x.state === "ok" ? "Not given" : ""}</td><td className="ap-fine">{NOT_FROM_PLATFORM}</td></tr>
+                  <td>{x.state === "ok" ? x.plan ?? "Plan name not given" : x.state === "no_plan" ? <span title="This account is not on a plan from you, or plan billing is switched off for it.">Not on a plan</span> : x.message ?? "Not checked yet"}</td><td>{x.subscriptionStatus ? x.subscriptionStatus.replace(/_/g, " ") : x.state === "ok" ? "Not given" : ""}</td><td className="ap-fine">{NOT_FROM_PLATFORM}</td></tr>
               ))}</tbody></table></div>
             <Pager page={b.page} pages={b.pages} total={b.total} set={l.setPage} />
             {b.rows[0]?.fetchedAt && <p className="ap-fine">Last read {day(b.rows[0].fetchedAt)}.</p>}

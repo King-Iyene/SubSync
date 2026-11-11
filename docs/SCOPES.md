@@ -52,7 +52,7 @@ Bookings and what happened to them.
 | --- | --- | --- | --- |
 | `calendars.readonly` | read | required | Calendars, for the setup checklist and to know which calendars exist. |
 | `calendars/events.readonly` | read | optional | Appointments and their status (showed, no-show, never marked), for the appointment checks and the no-show list. |
-| `calendars/groups.readonly` | read | optional | Reserved for calendar groups. Not used yet. |
+| `calendars/groups.readonly` | read | optional | Calendar groups, so every calendar can be listed under its group, even one with no bookings. |
 | `calendars/resources.readonly` | read | optional | Reserved for rooms and equipment. Not used yet. |
 | `calendars/events.write` | change | optional | Reserved for marking an appointment showed or no-show after a preview. Nothing in SubSync uses it today. |
 
@@ -90,8 +90,8 @@ The automations and campaigns in your client accounts, and how they are doing.
 | `campaigns.readonly` | read | optional | The list of campaigns in each client account (name, state, last change), to find stuck or failed ones. Read only: SubSync never starts or sends a campaign. |
 | `emails/campaigns.readonly` | read | optional | The email, bulk and workflow campaigns of each client account, read only, for the same list. |
 | `emails/stats.readonly` | read | optional | How many messages of each campaign were sent, delivered, opened, clicked, bounced or are still waiting, to find campaigns that looked sent but did not arrive. Totals only: SubSync never sees who received what. |
-| `saas/location.read` | read | optional | The plan and subscription status each client account has on your plans, for the Billing view in Clients. Without it the view says: Needs permission, reconnect. |
-| `saas/company.read` | read | optional | The list of client accounts on your plans, so the Billing view can show every account. Optional. |
+| `saas/location.read` | read | optional | Optional. Not used by the Billing view today. |
+| `saas/company.read` | read | optional | The plan and subscription status each client account has on your plans, for the Billing view in Clients. Without it the view says: Needs permission, reconnect. |
 
 ## Email health
 

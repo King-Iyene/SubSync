@@ -28,6 +28,14 @@ export async function POST(request: Request) {
   if (wasSet) await sql()`update settings set digest_email = null where installation_id = ${u.installationId}`;
   // The address is also taken out of every kind of message in Notifications (F9), so one click stops all of them; a held or waiting message to it is skipped.
   const removed = await removeRecipientByMatch(u.installationId, (e) => matchesEmail(u, e));
-  if (wasSet || removed > 0) await sql()`insert into audit_log (installation_id, actor, action, detail) values (${u.installationId}, 'email-link', 'email.unsubscribed', ${sql().json({} as never)})`;
+  // The daily Today email keeps its own list of addresses: the same click takes the address out of it too.
+  let today = 0;
+  try {
+    const rows = await sql()`select recipients from td_prefs where installation_id = ${u.installationId}`;
+    const list = ((rows[0]?.recipients as string[] | undefined) ?? []);
+    const keep = list.filter((e) => !matchesEmail(u, e));
+    if (rows.length && keep.length !== list.length) { await sql()`update td_prefs set recipients = ${keep}::text[], email_on = (email_on and ${keep.length > 0}) where installation_id = ${u.installationId}`; today = list.length - keep.length; }
+  } catch { /* the Today table is not there yet */ }
+  if (wasSet || removed > 0 || today > 0) await sql()`insert into audit_log (installation_id, actor, action, detail) values (${u.installationId}, 'email-link', 'email.unsubscribed', ${sql().json({} as never)})`;
   return page("Done", "<p>These emails have stopped. You can add an address again in Settings whenever you like.</p>");
 }

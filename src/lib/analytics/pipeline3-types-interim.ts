@@ -26,7 +26,7 @@ export type PlDeal = {
   id: string; name: string; contactName: string | null; accountName: string; locationId: string; pipelineName: string;
   /** The person behind the deal (opens in the shared lead panel); absent when none. */ contactId?: string | null;
   stageId: string; stageName: string; status: PlStatus; valueCents: number;
-  ownerName: string | null; source: string | null; daysInStage: number; staleAfterDays: number | null; // per stage, from the account's own dwell times
+  ownerId?: string | null; ownerName: string | null; source: string | null; daysInStage: number; staleAfterDays: number | null; // per stage, from the account's own dwell times
   lostReason: string | null; health: number | null; // 0..100, null = not enough data
   url: string | null;
 };

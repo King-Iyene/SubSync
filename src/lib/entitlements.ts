@@ -85,6 +85,8 @@ export const FEATURES = [
   "appt_actions",
   "appt_history",
   "appt_record",
+  "ap_exec",
+  "ap_exec_targets",
   "inbox_claim",
   "inbox_note",
   "inbox_outcome_ui",
@@ -150,6 +152,18 @@ export const FEATURES = [
   "pp_idle",
   "pp_rollup",
   "pp_actions",
+  "pp_roles",
+  // Account audit (docs/features/AUDIT_BRIEF.md): history and then-vs-now, the client one-pager, the monthly re-audit email.
+  "au_history",
+  "au_onepager",
+  "au_monthly",
+  "td_module",
+  "td_today",
+  "td_proof",
+  "td_numbers",
+  "td_email",
+  "td_record",
+  "ov_screen",
 ] as const;
 export type Feature = (typeof FEATURES)[number];
 

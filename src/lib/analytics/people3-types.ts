@@ -9,7 +9,7 @@ export type Pp3Part = (typeof PP3_PARTS)[number];
 
 /** Flags of the module (default off in code; switched on after the tenancy check). */
 export const PP3_FLAGS = [
-  "pp_module", "pp_today", "pp_scorecards", "pp_workload", "pp_leaderboard", "pp_money", "pp_coaching", "pp_access", "pp_proof", "pp_nextlead", "pp_idle", "pp_rollup", "pp_actions",
+  "pp_module", "pp_today", "pp_scorecards", "pp_workload", "pp_leaderboard", "pp_money", "pp_coaching", "pp_access", "pp_proof", "pp_nextlead", "pp_idle", "pp_rollup", "pp_actions", "pp_roles",
 ] as const;
 export type Pp3Flag = (typeof PP3_FLAGS)[number];
 

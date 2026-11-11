@@ -6,6 +6,8 @@ import { createPortal } from "react-dom";
 import type { Pp3PersonPanel, Pp3Reason } from "@/lib/analytics/people3-types";
 import { ErrorState, SkeletonRows } from "../../ds";
 import { portalRoot } from "../../ds/portal-root";
+import { RolePicker } from "../../roles";
+import { SETTER_CLOSER_TIP } from "@/lib/people/roles";
 import { PersonActionsSlot } from "./actions-slot";
 import { usePp } from "./data";
 import { ago, Initials, money, NO_ACTIVITY, NOT_ENOUGH, ROLE_LABEL, secs, share, Spark, Status, subline } from "./shared";
@@ -92,6 +94,7 @@ export function PersonPanel({ userId, onSelect, onClose, onDrill, onCoach, filte
                 </dl>
               )}
               <dl className="ap-dl">
+                <dt>Team role</dt><dd data-testid="pp-panel-role"><RolePicker userId={p.userId} name={p.name} />{" "}<span className="ap-fine" title={SETTER_CLOSER_TIP}>What is this?</span></dd>
                 <dt>Last activity</dt><dd>{p.lastActivityAt ? ago(p.lastActivityAt) : <Status on>{NO_ACTIVITY}</Status>}</dd>
                 <dt>Works in</dt><dd>{subline(p)}</dd>
                 {p.email && <><dt>Email</dt><dd>{p.email}</dd></>}
