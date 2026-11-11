@@ -4,6 +4,7 @@ import { sqlFind, sqlList, sqlTabCounts, type ListScope } from "../analytics/una
 import type { deepLinks } from "../links";
 import { json, type AuthContext } from "./auth";
 import type { UnansweredHelpers } from "./unanswered-routes";
+import { waitingLeadKeys } from "../analytics/unanswered-v2-queries";
 
 // Round 3, slices A and C of the Unanswered screen: the SQL-paged list (GET inbox?part=list2), the one search across accounts (part=find), the saved views of a person
 // (part=views, POST inbox/views3, DELETE inbox/views3/:id). Who is asking comes from the verified session; the accounts they may read come from `allowed` (derived by the router,
@@ -66,7 +67,11 @@ export async function handleUnansweredPart3(ctx: Ctx, h: UnansweredHelpers & { o
   const allowed = narrow(allowedAll, read.p.account);
   if (allowed === "none") return json({ error: "That account is not available in your view" }, 404);
   // A client's staff never narrow to a colleague (the parser already refused an id); "mine" and "no owner" stay.
-  const scope: ListScope = { ...base, allowed };
+  // The segment switch (Everyone | New leads | Existing customers) of the Speed to lead tab: the new-lead marking is read only when it is asked for (segments=1 or a segment chosen), only for the people waiting for us.
+  const wantsSegments = read.p.tab === "us" && (sp.get("segments") === "1" || read.p.lead !== "all");
+  const newLeadKeys = wantsSegments ? await waitingLeadKeys({ installationId: ctx.installationId, allowed, targetMinutes: targets.targetMinutes, now: base.now }).catch(() => null) : null;
+  if (read.p.lead !== "all" && newLeadKeys === null) return json({ error: "The new-lead marking could not be read just now. Try again." }, 503);
+  const scope: ListScope = { ...base, allowed, newLeadKeys };
   const [out, tabs] = await Promise.all([sqlList(scope, { ...read.p, account: null }), on(ctx, "inbox_quiet") ? sqlTabCounts({ ...base, allowed: allowedAll }, read.p.quiet) : Promise.resolve(null)]);
   return json({ ...withLinks(out, links), tabs });
 }

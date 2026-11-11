@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 // Every enabled module is reachable from the menu, and Settings, Getting started and What's new stay in view on a short window
 // (they used to sit below a scroll area that looked like the end of the menu).
 // The pilot menu: plain group names, a short list on top, and active secondary pages under "More". Contact search, Leads and Call lists are People tabs.
-const LABELS = ["Today", "Speed to lead", "Appointments", "Unanswered messages", "Account audit", "Clients", "People", "Overview", "Team", "Pipeline and deals", "Clean-up", "Meeting notes", "Workflows", "Data health", "Settings", "Getting started", "What's new"];
+const LABELS = ["Today", "Speed to lead", "Appointments", "Account audit", "Clients", "People", "Overview", "Team", "Pipeline and deals", "Clean-up", "Meeting notes", "Workflows", "Data health", "Settings", "Getting started", "What's new"];
 const GROUPS = ["Reply", "Clients and people", "More"];
 
 test.beforeEach(async ({}, testInfo) => { test.skip(testInfo.project.name !== "desktop-1440", "the sidebar is the desktop layout"); });
@@ -16,6 +16,8 @@ test("the agency menu exposes all modules, keeps Settings and help visible, and 
   for (const label of LABELS) await expect(side.getByRole("button", { name: label, exact: true }), label).toBeAttached();
   await expect(side.getByRole("button", { name: "Duplicates", exact: true }), "Duplicates is available in the Clean-up module, not a second menu item").toHaveCount(0);
   for (const label of ["Settings", "Getting started", "What's new"]) await expect(side.getByRole("button", { name: label, exact: true }), `${label} is in view without scrolling`).toBeInViewport();
+  // Unanswered messages is a tab of Speed to lead now (stage merge-speed-waiting), not a menu entry.
+  await expect(side.getByRole("button", { name: "Unanswered messages", exact: true }), "no separate Unanswered entry").toHaveCount(0);
   for (const group of GROUPS) await expect(side.getByText(group, { exact: true }), `group "${group}"`).toBeAttached();
   await expect(side.getByText("Tidy up", { exact: true }), "no vague group name").toHaveCount(0);
   // Connections is Settings, Integrations now: no menu entry of its own, and no second Integrations entry either (Settings holds it).

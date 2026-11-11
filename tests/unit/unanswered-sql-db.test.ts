@@ -65,6 +65,31 @@ describe.skipIf(!HAS_DB)("Unanswered round 3, SQL list", () => {
     expect((await L("channel=Email")).total).toBe(email?.count);
   });
 
+  it("with snooze and hide switched on, the default list is everyone: its total, the tab number, every bar and chip and every segment equal the rows they open", async () => {
+    // A person with no outcome gave NULL in the hide rule, and `not (NULL)` dropped EVERYONE: the page said 23 waiting and the list said nobody. Every number is checked against its own list.
+    const s = { ...scope, installationId: instA, allowed: null, hook: { snooze: true, hide: true } };
+    const keys = [`${LOC_1}:ct-w1`, `${LOC_1}:ct-w2`];
+    const withKeys = { ...s, newLeadKeys: keys };
+    const plain = await sqlList({ ...scope, installationId: instA, allowed: null }, P("size=50"));
+    const all = await sqlList(withKeys, P("size=50"));
+    expect(all.total).toBeGreaterThan(0);
+    expect(all.total).toBe(plain.total);
+    expect((await sqlTabCounts(s, 24)).us, "the tab number is the number of rows").toBe(all.total);
+    expect(all.rows.length).toBe(all.total);
+    for (const b of ["h1", "h4", "h24", "h48"] as const) expect((await sqlList(withKeys, P(`bucket=${b}&size=50`))).total, `bar ${b}`).toBe(all.facets.buckets[b]);
+    expect(all.facets.buckets.all).toBe(all.total);
+    expect((await sqlList(withKeys, P("owner=none&size=50"))).total, "No owner").toBe(all.facets.owner.none);
+    expect((await sqlList(withKeys, P("owner=me&size=50"))).total, "Mine").toBe(all.facets.owner.mine);
+    for (const c of all.facets.channels) expect((await sqlList(withKeys, P(`channel=${encodeURIComponent(c.key)}&size=50`))).total, `channel ${c.key}`).toBe(c.count);
+    const lead = all.facets.lead!;
+    expect(lead.all).toBe(all.total);
+    expect(lead.new + lead.existing).toBe(lead.all);
+    expect((await sqlList(withKeys, P("lead=new&size=50"))).total, "New leads").toBe(lead.new);
+    expect((await sqlList(withKeys, P("lead=existing&size=50"))).total, "Existing customers").toBe(lead.existing);
+    expect(lead.new).toBe(2);
+    expect((await sqlList(withKeys, P("lead=new&size=50"))).rows.every((r) => r.newLead)).toBe(true);
+  });
+
   it("a page past the end answers the last page, with exact totals", async () => {
     const a = await L("size=20");
     expect(a.total).toBe(5);

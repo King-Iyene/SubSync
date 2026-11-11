@@ -1,5 +1,7 @@
 # Unanswered messages: rebuilt as "the people waiting" (stage UNANS)
 
+> **Update 10 Nov 2026 (stage merge-speed-waiting):** this screen is now the tab "Unanswered" of Speed to lead (Proposals item 2 was taken). The old menu entry is gone; #inbox and every old link still land on that tab. See docs/DECISIONS.md and "Unanswered inside Speed to lead" in docs/METRICS.md. The text below describes the screen itself and is still true.
+
 Status: **BUILT, awaiting King's checks** (5 Nov 2026, parallel mode: worktree `C:\Users\KING\wt\UNANS`, branch `stage/unans`). Not marked passed. The money-first test, the overlap with Speed to lead and Today, and the review of the old screen are in `docs/UNANSWERED_REVIEW.md`.
 
 ## What was built

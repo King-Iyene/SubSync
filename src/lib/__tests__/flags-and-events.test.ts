@@ -74,8 +74,16 @@ test("the production pilot menu keeps all modules available to every authorized 
     visibleNav(NAV_FOR[kind], { limited: kind !== "agency", off: (feature) => features[feature] === false }).length;
   assert.deepEqual(
     { agency: count("agency", after), business: count("business", after), client: count("client", after) },
-    { agency: 17, business: 17, client: 15 },
+    { agency: 16, business: 16, client: 14 },
+    "Unanswered messages is a tab of Speed to lead now, so each menu is one shorter",
   );
+  // Speed to lead off: the Unanswered screen is not lost, its own entry comes back.
+  for (const kind of ["agency", "business", "client"] as const) {
+    const ids = visibleNav(NAV_FOR[kind], { limited: kind !== "agency", off: (f) => f === "speed" }).map((n) => n.id);
+    assert.ok(ids.includes("inbox") && !ids.includes("speed"), `${kind}: Speed is off, so Unanswered keeps its own entry`);
+    const on = visibleNav(NAV_FOR[kind], { limited: kind !== "agency", off: () => false }).map((n) => n.id);
+    assert.ok(!on.includes("inbox") && on.includes("speed"), `${kind}: with Speed on there is no separate Unanswered entry`);
+  }
   assert.equal(NAV.filter((item) => item.id === "team").length, 1, "the Team screen remains in the navigation model");
 });
 

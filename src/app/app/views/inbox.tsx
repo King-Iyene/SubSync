@@ -11,7 +11,7 @@ import { PrimaryButton } from "./today-chrome";
 import { WaitList } from "./unanswered-all";
 import { WaitedSection, WhereSection, type AccountRankOut, type BucketOut, type OwnerRankOut } from "./unanswered-picture";
 import { PersonRows, usePersonActions, type WaitRow } from "./unanswered-rows";
-import { UnansweredRoom, type UiPayload } from "./unanswered-room";
+import { UnansweredRoom, type Embedded, type UiPayload } from "./unanswered-room";
 
 // Unanswered messages, rebuilt (docs/UNANSWERED_REVIEW.md). One question: "who wrote to us and is still waiting for a reply, and who do I answer first?". Top to bottom: one
 // sentence, one button ("Reply to the oldest of the 14 people waiting", which opens that conversation in your CRM), the five people to reply to now (See all opens the whole
@@ -40,14 +40,14 @@ const MORE_TRIGGER = "ds-press inline-flex h-8 items-center gap-1 rounded-md bor
 const quietButton = "ds-press min-h-11 rounded-md border bg-card px-4 text-sm font-medium hover:border-primary/40 sm:min-h-10";
 
 /** The control-room screen when its flag is on (inbox_control_room); the older screen below stays exactly as it was until then. The flags come from one cheap read that scans nothing. */
-export function InboxView({ go }: { go: GoFn }) {
+export function InboxView({ go, embedded }: { go: GoFn; embedded?: Embedded }) {
   const ui = useData<UiPayload>("inbox?part=ui");
-  if (!ui.data && !ui.error) return <div data-testid="page"><SkeletonRows rows={6} label="Reading your conversations..." /></div>;
-  if (ui.data?.flags.inbox_control_room) return <UnansweredRoom go={go} ui={ui.data} />;
-  return <LegacyInbox go={go} />;
+  if (!ui.data && !ui.error) return <div data-testid={embedded ? "unanswered-tab" : "page"}><SkeletonRows rows={6} label="Reading your conversations..." /></div>;
+  if (ui.data?.flags.inbox_control_room) return <UnansweredRoom go={go} ui={ui.data} embedded={embedded} />;
+  return <LegacyInbox go={go} embedded={embedded} />;
 }
 
-function LegacyInbox({ go }: { go: GoFn }) {
+function LegacyInbox({ go, embedded }: { go: GoFn; embedded?: Embedded }) {
   const api = useApiClient();
   const { data, error, reload } = useData<Home>("inbox?part=home");
   const [list, setList] = useState<ListSpec | null>(null);
@@ -88,10 +88,10 @@ function LegacyInbox({ go }: { go: GoFn }) {
   const agree = d.today;
 
   return (
-    <div data-testid="page" className="ds-enter" ref={top}>
+    <div data-testid={embedded ? "unanswered-tab" : "page"} className="ds-enter" ref={top}>
       <header className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 print:hidden">
         <div className="mr-auto min-w-0">
-          <h1 className="text-[1.65rem] font-semibold leading-tight tracking-tight">Unanswered messages</h1>
+          {embedded ? <h2 className="sr-only">Unanswered messages</h2> : <h1 className="text-[1.65rem] font-semibold leading-tight tracking-tight">Unanswered messages</h1>}
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground" data-testid="page-subtitle">Customers who wrote and are still waiting for a reply. SubSync shows who they are; it never sends a reply.</p>
         </div>
         <PopMenu label="More" items={menu} testId="inbox-more" triggerClassName={MORE_TRIGGER}>More<ChevronDown aria-hidden className="size-3.5" /></PopMenu>

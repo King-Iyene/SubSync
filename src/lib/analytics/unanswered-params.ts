@@ -10,14 +10,21 @@ export const TABS = ["us", "them"] as const;
 export const STATES = ["active", "snoozed", "hidden"] as const;
 export const OWNER_CHOICES = ["me", "none", "mine_free"] as const;
 export const BUCKET_CHOICES = ["h1", "h4", "h24", "h48"] as const;
+/** Which people: everyone waiting, only the new leads (the ones Speed to lead times), or only the people who are not new leads. */
+export const LEAD_CHOICES = ["all", "new", "existing"] as const;
+/** The default page: 50 rows (20 and 100 stay a choice). A dense list makes 50 a screenful; the count in the heading is the server's exact total. */
+export const DEFAULT_SIZE = 50;
 
 export type ListTab = (typeof TABS)[number];
 export type ListSort = (typeof LIST_SORTS)[number];
 export type ListState = (typeof STATES)[number];
+export type LeadChoice = (typeof LEAD_CHOICES)[number];
 
 export type ListParams = {
   tab: ListTab; q: string; account: string | null; owner: string | null; channel: string | null; bucket: (typeof BUCKET_CHOICES)[number] | null;
   minValue: number; state: ListState; sort: ListSort; page: number; size: (typeof LIST_SIZES)[number]; quiet: (typeof QUIET_HOURS)[number];
+  /** "new" and "existing" need the new-lead marking (ListScope.newLeadKeys); "all" never reads it. */
+  lead: LeadChoice;
 };
 
 const ID = /^[A-Za-z0-9_-]{3,64}$/;
@@ -34,8 +41,9 @@ export function readListParams(sp: URLSearchParams, o: { seePeople: boolean }): 
   const tab = pick(TABS, sp.get("tab"), "us"); if (tab === null) return { ok: false, error: "Unknown tab" };
   const sort = pick(LIST_SORTS, sp.get("sort"), "wait"); if (sort === null) return { ok: false, error: "Unknown sort" };
   const state = pick(STATES, sp.get("state"), "active"); if (state === null) return { ok: false, error: "Unknown state" };
-  const size = pick(LIST_SIZES, sp.get("size"), 20); if (size === null) return { ok: false, error: "Unknown page size" };
+  const size = pick(LIST_SIZES, sp.get("size"), DEFAULT_SIZE); if (size === null) return { ok: false, error: "Unknown page size" };
   const quiet = pick(QUIET_HOURS, sp.get("quiet"), 24); if (quiet === null) return { ok: false, error: "Unknown quiet time" };
+  const lead = pick(LEAD_CHOICES, sp.get("lead"), "all"); if (lead === null) return { ok: false, error: "Unknown kind of person" };
   const minValue = pick(VALUE_STEPS, sp.get("minValue"), 0); if (minValue === null) return { ok: false, error: "Unknown deal value" };
   const bucketP = sp.get("bucket");
   if (bucketP && bucketP !== "all" && !(BUCKET_CHOICES as readonly string[]).includes(bucketP)) return { ok: false, error: "Unknown wait" };
@@ -43,12 +51,14 @@ export function readListParams(sp: URLSearchParams, o: { seePeople: boolean }): 
   if (channel && !CHANNEL.test(channel)) return { ok: false, error: "Unknown channel" };
   const account = sp.get("account");
   if (account && !ID.test(account)) return { ok: false, error: "Unknown account" };
-  const owner = sp.get("owner");
+  // `who` is the wire name. The shell's own "show only" filter already uses `owner` (the account owner it narrows the CLIENT ACCOUNTS by), so a list sent as `owner=none` was read by the
+  // router as "accounts whose owner is none": no account, an empty list and every chip at 0. `owner` is still read (an old link, a saved view), `who` wins.
+  const owner = sp.get("who") ?? sp.get("owner");
   if (owner && !(OWNER_CHOICES as readonly string[]).includes(owner) && !(o.seePeople && ID.test(owner))) return { ok: false, error: "Unknown owner" };
   return {
     ok: true,
     p: {
-      tab, sort, state, size, quiet, minValue, account: account || null, owner: owner || null, channel: channel || null,
+      tab, sort, state, size, quiet, lead, minValue, account: account || null, owner: owner || null, channel: channel || null,
       bucket: bucketP && bucketP !== "all" ? (bucketP as ListParams["bucket"]) : null,
       q: (sp.get("q") ?? "").trim().slice(0, 80), page: Math.max(0, Math.min(num(sp.get("page"), 0), 100_000)),
     },
@@ -82,7 +92,7 @@ export function toQuery(p: Partial<ListParams>): string {
   const sp = new URLSearchParams();
   const put = (k: string, v: unknown, d: unknown = null) => { if (v !== undefined && v !== null && v !== "" && v !== d) sp.set(k, String(v)); };
   put("tab", p.tab, "us"); put("q", p.q); put("account", p.account); put("owner", p.owner); put("channel", p.channel); put("bucket", p.bucket);
-  put("minValue", p.minValue, 0); put("state", p.state, "active"); put("sort", p.sort, "wait"); put("size", p.size, 20); put("quiet", p.quiet, 24);
+  put("minValue", p.minValue, 0); put("state", p.state, "active"); put("sort", p.sort, "wait"); put("size", p.size, DEFAULT_SIZE); put("lead", p.lead, "all"); put("quiet", p.quiet, 24);
   return sp.toString();
 }
 
