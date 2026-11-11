@@ -3,6 +3,7 @@
 // means every account of the caller's own installation). The writing routes also confirm the account really belongs to the caller's installation before anything is read or minted for it.
 // Every SQL behind these routes additionally filters by installation_id, so a wrong id can only ever find nothing.
 
+import { ownedLocation } from "./tenant-guard";
 const ID = /^[A-Za-z0-9_-]{3,64}$/;
 export type Allowed = readonly string[] | null;
 
@@ -12,13 +13,7 @@ export function allowedAccount(allowed: Allowed, v: unknown): string | null {
   return allowed && !allowed.includes(v) ? null : v;
 }
 
-/** As allowedAccount, and the account must exist in the caller's own installation. */
+/** As allowedAccount, and the account must exist in the caller's own installation (the shared guard; a foreign id is the same answer as nothing there). */
 export async function ownedAccount(installationId: string, allowed: Allowed, v: unknown): Promise<string | null> {
-  const id = allowedAccount(allowed, v);
-  if (!id) return null;
-  try {
-    const { sql } = await import("../db");
-    const rows = await sql()`select 1 from locations where installation_id = ${installationId} and location_id = ${id} limit 1`;
-    return rows.length > 0 ? id : null;
-  } catch { return null; }
+  try { return await ownedLocation(installationId, allowed ? [...allowed] : null, v); } catch { return null; }
 }
