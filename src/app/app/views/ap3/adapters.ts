@@ -79,11 +79,13 @@ export function adaptFlow(t: Appt3FlowTree, periodLabel = "This period"): ApFlow
 
 export function adaptShare(s: Appt3BookingShare): ApShareView {
   return {
-    total: s.total ?? 0, rosterTotal: s.rosterTotal ?? 0, roles: s.roles ?? [], historyStarts: s.historyStarts, counts: s.counts,
+    total: s.total ?? 0, rosterTotal: s.rosterTotal ?? 0, roles: s.roles ?? [], historyStarts: s.historyStarts, counts: s.counts, sections: s.sections, sale: s.sale,
+    summary: s.summary ? { peopleBooked: s.summary.peopleBooked, booked: s.summary.booked, showed: s.summary.showed, showRate: v(s.summary.showRate), sold: s.summary.sold, soldCents: cents(s.summary.soldValue) ?? 0 } : undefined,
     rows: (s.rows ?? []).map((p) => ({
       id: p.userId ?? "none", name: p.userId === null ? "Booker not recorded" : p.name, role: p.role === "closer" ? "closer" : p.role === "both" ? "both" : "setter", unassigned: p.userId === null, noOwner: p.userId === null ? p.owned : undefined,
-      bookings: p.role === "closer" ? p.owned : p.booked, showRate: v(p.showRate), noShowRate: v(p.noshowRate), closeRate: v(p.closeRate), revenueCents: cents(p.wonValue) ?? 0,
+      bookings: p.role === "closer" ? p.owned : p.booked, showRate: v(p.showRate), noShowRate: v(p.noshowRate), closeRate: v(p.closeRate), revenueCents: cents(p.soldValue ?? p.wonValue) ?? 0,
       avgLeadToBookedHours: p.leadToBookedMedianMinutes === null ? null : p.leadToBookedMedianMinutes / 60, trend: (p.trend ?? []).map((t) => t.booked),
+      setRole: p.setRole, sold: p.sold, soldCents: cents(p.soldValue) ?? 0, soldFromBookings: p.soldFromBookings, soldRate: p.soldRate, ownedShowed: p.ownedShowed, calendarCount: p.calendarCount, showed: p.showed, noShow: p.noshow,
       roleLabel: p.roleLabel, state: p.state, owned: p.owned, lastBookingAt: p.lastBookingAt, inTeam: p.inTeam, teamActive: p.teamActive, calendars: p.calendars, byCalendar: p.byCalendar,
     })),
   };

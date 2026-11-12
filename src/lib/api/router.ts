@@ -131,6 +131,7 @@ import { handleUnansweredActions } from "./unanswered-actions-routes";
 import { handleUnansweredPart3, handleUnansweredViewRemove, handleUnansweredViewSave } from "./unanswered-routes3";
 import { handleApptWork } from "./appointment-work-routes";
 import { handleAppointments3 } from "./appointments3-routes";
+import { handleSaleBasis } from "./sale-basis-routes";
 import { handleApptExec, handleApptExecTarget } from "./appointments-exec-routes";
 import { handleBfFunnel, handleBfRecover } from "./bf-routes";
 import { handlePipeline3, handlePipelineHistorySettings } from "./pipeline3-routes";
@@ -2130,6 +2131,7 @@ async function dispatch(ctx: Ctx): Promise<Response> {
     if (a === "workbench") return await handleWorkbench(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links, locationToken: (locationId) => locationAccessToken(ctx.session.companyId, locationId) });
     // Appointments round 3: /api/app/appointments?part=... (overview, lists, booking share, flow tree, health, sources, calendars, reminders, receipt, detail; read only).
     // Appointments, Leadership tab: /api/app/appointments/exec?part=... (read only) and PUT .../exec-target (SubSync-only monthly target).
+    if (a === "appointments" && b === "sale-basis" && !c && (method === "GET" || method === "PUT")) return await handleSaleBasis(ctx);
     if (a === "appointments" && b === "exec" && !c && method === "GET") return await handleApptExec(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links });
     // Appointments, Booking funnel: GET /api/app/appointments/funnel?part=... (read only) and POST .../funnel-recover (tags dropped leads; preview, caps, dry run unless live; flags bf_*).
     if (a === "appointments" && b === "funnel" && !c && method === "GET") return await handleBfFunnel(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links, locationToken: (locationId) => locationAccessToken(ctx.session.companyId, locationId), actor: actorOf });
@@ -2421,6 +2423,7 @@ async function dispatch(ctx: Ctx): Promise<Response> {
     if (method === "PUT") {
       if (a === "settings") return await settingsUpdate(ctx);
       if (a === "appointments" && b === "targets") return await appointmentTargetUpdate(ctx);
+      if (a === "appointments" && b === "sale-basis") return await handleSaleBasis(ctx);
       if (a === "goals") return await goalsUpdate(ctx);
       if (a === "stage-rules") return await stageRuleSave(ctx);
       if (a === "meeting-policy" && !b) return await policySave(ctx);

@@ -696,3 +696,6 @@ Who: agency owner, client admin, setter. Next: merge or dismiss a duplicate grou
 
 ## Today figure strip (12 Nov)
 Who: agency owner and setters opening Today. They act on the one money-at-risk figure and the biggest-win button; if it were missing they would see two different answers for the same deal. Decision: one editorial strip (src/app/app/views/td3/today-strip.tsx), Money at risk has ONE source (the money read); the older item-list figure is a stand-in only when the money read is hidden. MoneyHero and Hero code are kept, no longer drawn on the Today tab.
+
+## 2026-11-12 People table redesign and how a sale is counted
+Who: agency owner reading the Appointments people table. Next action: see who books and who sells first, fix the people not on a calendar; if the table were missing they would read 25 near-empty rows. Decision: results row, three groups (the idle two closed), one setting for how a sale is counted (deals won, payments, assigned closer) with a "no dollar value" option, basis printed beside each figure. Reason: many agencies never put money on deals. Not yet wired to the Team module and Today (they use their own daily rollups): logged as the next slice. Migration 20261231110000 adds two columns to settings.

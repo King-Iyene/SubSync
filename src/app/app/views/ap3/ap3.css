@@ -240,3 +240,25 @@
 .ap-bycal summary { cursor: pointer; font-size: 0.8125rem; color: var(--muted-foreground); min-height: 24px; } .ap-bycal[open] summary { color: var(--foreground); }
 .ap-bycal-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 4px 0; }
 @media (max-width: 700px) { .ap-bycal summary { min-height: 44px; display: flex; align-items: center; } }
+/* People table: results first, then three groups. Muted markers only (Ledger tokens), the label says it too, so colour is never the only signal. */
+.ap-sumrow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 4px 0 8px; }
+.ap-sum { display: flex; flex-direction: column; gap: 2px; align-items: flex-start; text-align: left; padding: 10px 12px; min-height: 44px; border: 1px solid color-mix(in srgb, var(--s6-line) 90%, transparent); border-radius: 12px; background: var(--s6-surf); color: var(--foreground); font: inherit; cursor: pointer; }
+.ap-sum[data-static] { cursor: default; }
+button.ap-sum:hover { border-color: color-mix(in srgb, var(--s6-cyan) 55%, var(--s6-line)); } button.ap-sum:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.ap-sum-l { font-size: 0.75rem; color: var(--muted-foreground); } .ap-sum-v { font-size: 1.5rem; font-weight: 650; line-height: 1.15; } .ap-sum-s { font-size: 0.75rem; color: var(--muted-foreground); overflow-wrap: anywhere; }
+.ap-sec { margin: 0 0 10px; }
+.ap-sec-h { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 12px 0 6px; font-size: 0.9375rem; font-weight: 600; cursor: default; list-style: none; }
+details.ap-sec > summary.ap-sec-h { cursor: pointer; min-height: 44px; padding: 4px 10px; margin: 0; border: 1px solid color-mix(in srgb, var(--s6-line) 90%, transparent); border-radius: 12px; background: var(--s6-surf); }
+details.ap-sec[open] > summary.ap-sec-h { margin-bottom: 6px; }
+details.ap-sec > summary.ap-sec-h::-webkit-details-marker { display: none; }
+.ap-sec-hint { font-weight: 400; font-size: 0.8125rem; }
+.ap-dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; background: var(--muted-foreground); flex: none; }
+.ap-sec[data-sec="active"] .ap-dot { background: color-mix(in srgb, var(--s6-green) 70%, var(--s6-line)); }
+.ap-sec[data-sec="oncal"] .ap-dot { background: color-mix(in srgb, var(--s6-cyan) 70%, var(--s6-line)); }
+.ap-sec[data-sec="off"] .ap-dot { background: color-mix(in srgb, var(--muted-foreground) 60%, var(--s6-line)); }
+.ap-line2 { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin-top: 2px; font-size: 0.75rem; }
+.ap-status { display: inline-flex; align-items: center; gap: 5px; color: var(--muted-foreground); }
+.ap-status i { width: 7px; height: 7px; border-radius: 2px; background: var(--muted-foreground); }
+.ap-status[data-on="1"] i { background: color-mix(in srgb, var(--s6-cyan) 70%, var(--s6-line)); } .ap-status[data-on="1"] { color: var(--foreground); }
+.ap-calpop { display: inline-block; } .ap-calpop summary { font-size: 0.75rem; }
+@media (max-width: 700px) { .ap-sumrow { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
