@@ -143,6 +143,7 @@ import { handleWg, handleWgAct } from "./wg-routes";
 import { handleBr } from "./br-routes";
 import { handleApptActions } from "./appointment-actions-routes";
 import { handleMeetingList } from "./mn2-routes";
+import { handleAm } from "./am-routes";
 import { handlePipelineActions } from "./pipeline-actions-routes";
 import { grantedOf } from "./workflows-api";
 import { handleClientActions } from "./clients-actions-routes";
@@ -2198,6 +2199,7 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       return await handleUnansweredOutcome(ctx, { allowed: () => allowedIds(ctx) });
     }
     // Meeting notes list, detail, follow-up lists, tasks and coaching (flags checked inside; every read is the signed-in person's own calls).
+    if (a === "am") return await handleAm(ctx, { allowed: () => allowedIds(ctx) });
     if (a === "meeting-list") return await handleMeetingList(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links });
     if (method === "GET") {
       if (a === "overview") return await overview(ctx);

@@ -5,6 +5,7 @@ import { planFieldWrites, type FieldItem, type FieldMapping, type FieldPlan } fr
 import { composeDelivery, includesFor, type DeliveryInput, type Limits } from "./delivery.ts";
 import { planMeeting, retentionDays, type Candidate, type InboxReason, type Plan, type PlanTarget } from "./meeting-plan.ts";
 import type { Includes } from "./note-template.ts";
+import { toShortNote } from "./auto-note.ts";
 import { accessibleAccounts, type InstalledAccount, type Person } from "./person.ts";
 import { DEFAULT_CHOICES, effectiveChoices, effectivePolicy, matrixFor, type Matrix, type PersonChoices, type PolicyFlags, type Preset } from "./policy.ts";
 import { cleanPriority, decideSource, type SeenMeeting } from "./source-priority.ts";
@@ -22,6 +23,8 @@ export type PersonSettings = {
   masterSwitch: boolean; unmatchedMode: "inbox" | "discard"; preset: Preset; custom: unknown; previewConfirmedAt: number | null;
   /** Stage E2b, all optional so older callers keep working: the person's own text layout, whether they ever picked a layout, and their tool order. */
   template?: string | null; presetChosen?: boolean; sourcePriority?: string[];
+  /** Automation pass: add short notes to contacts by itself when the match is certain. On only after the person accepted the one-line explanation. */
+  autoNotes?: { on: boolean; acceptedAt: number | null };
 };
 
 /** The person's own choices, ready for the account rules to sit over them. */
@@ -85,6 +88,8 @@ export type IngestStore = {
   /** Meeting notes list: keeps what the call knows about itself next to it (its length, the share of the talking, the contact it was matched to with certainty). Optional and best effort: a store without it, or a database not updated yet, simply keeps nothing. */
   noteDetails?: (meetingId: string, d: { durationMinutes: number | null; talkPct: number | null; matched: { locationId: string; contactId: string } | null }) => Promise<void>;
   /** Writes what happened to each contact field into the audit log (ids, item names and plain reasons: never a value). Optional. */
+  /** Automation pass: tells the person what happened (in-app, and Slack when connected). Optional. */
+  notify?: (n: { installationId: string; userId: string; meetingId: string; kind: "added" | "needs_matching"; title: string | null; contactName: string | null; locationId: string | null; contactId: string | null }) => Promise<void>;
   logDelivery?: (installationId: string, userId: string, meetingId: string, fields: FieldReport[]) => Promise<void>;
 };
 
@@ -125,7 +130,7 @@ export type DeliveredTo = { locationId: string; contactId: string; outcome: Outc
  * to each part and field. Used for a meeting that just arrived, for a held meeting that was released, and for a meeting the person linked by hand.
  */
 export async function deliverNotes(a: {
-  conn: PersonalConnection; meetingId: string; targets: PlanTarget[]; input: DeliveryInput; store: IngestStore; write: Writer; sentToday: number; capFor: (locationId: string) => number; limits?: Limits;
+  conn: PersonalConnection; meetingId: string; targets: PlanTarget[]; input: DeliveryInput; store: IngestStore; write: Writer; sentToday: number; capFor: (locationId: string) => number; limits?: Limits; shortNote?: boolean;
 }): Promise<{ done: DeliveredTo[]; clips: number; fields: FieldReport[]; remarks: string[] }> {
   const { conn, store } = a;
   const done: DeliveredTo[] = [];
@@ -157,7 +162,8 @@ export async function deliverNotes(a: {
   for (const t of a.targets) {
     clips += t.clips.length;
     if (!t.allowed) continue;
-    const composed = composeDelivery({ input: a.input, items: t.items, template: t.template, limits: a.limits });
+    const full = composeDelivery({ input: a.input, items: t.items, template: t.template, limits: a.limits });
+    const composed = a.shortNote ? toShortNote(full, a.input) : full;
     remarks.push(...composed.remarks);
     if (composed.messages.length === 0 && composed.fieldItems.length === 0) continue;
     if (count >= a.capFor(t.locationId)) { done.push({ locationId: t.locationId, contactId: t.contactId, outcome: "over_cap" }); continue; }
@@ -334,13 +340,18 @@ export async function ingestPersonalMeeting(
     await store.bump(conn.id, "skipped");
     return { kind: "inbox", meetingId: id, reason };
   };
-  if (plan.kind === "inbox") return waits(plan.reason);
+  if (plan.kind === "inbox") {
+    const r = await waits(plan.reason);
+    if (r.kind === "inbox" && settings.autoNotes?.on) await store.notify?.({ installationId, userId: person.userId, meetingId: r.meetingId, kind: "needs_matching", title: m.title, contactName: null, locationId: null, contactId: null });
+    return r;
+  }
 
   // A plan to write. Without the permission to add notes nothing is attempted, in a dry run too (a "WOULD WRITE" that could never succeed would mislead).
   if (!canWrite) return waits("needs_permission");
   // The first automatic write needs the person's confirmed preview (spec 5.2 D): until then the meeting waits in their inbox, and nothing is written.
   const live = isLive("WRITE_GHL_LIVE");
-  if (settings.previewConfirmedAt === null) {
+  const auto = settings.autoNotes?.on === true && settings.autoNotes.acceptedAt !== null;
+  if (settings.previewConfirmedAt === null && !auto) {
     const id = await store.insertMeeting({ ...base, status: "needs_contact", reason: "preview_needed", expiresAt: store.now() + waitDays * DAY });
     if (id === null) return { kind: "duplicate" };
     await supersede();
@@ -360,10 +371,15 @@ export async function ingestPersonalMeeting(
     transcript: extras.transcript ?? null, transcriptUrl: extras.callUrl ?? null,
   };
   const { done, clips, fields } = await deliverNotes({
+    shortNote: auto,
     conn, meetingId: id, targets: plan.targets, input, store, write, sentToday: today.user, capFor: (loc) => (policies[loc]?.dailyCapPerUser ?? 50),
   });
   await store.logDelivery?.(installationId, person.userId, id, fields);
   const end = settle(done, live);
+  if (auto) {
+    const hit = done.find((d) => d.outcome === "written" || (!live && d.outcome === "dry_run"));
+    if (hit) await store.notify?.({ installationId, userId: person.userId, meetingId: id, kind: "added", title: m.title, contactName: (extras.withNames ?? [])[0] ?? null, locationId: hit.locationId, contactId: hit.contactId });
+  }
   if (end.status !== (live ? "saved" : "dry_run") || end.reason !== (live ? null : "WOULD WRITE")) {
     await store.updateMeeting(id, end.status, end.reason, end.holdInInbox ? store.now() + waitDays * DAY : null);
   }

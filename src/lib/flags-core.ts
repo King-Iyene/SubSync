@@ -198,6 +198,9 @@ export const DEFAULT_OFF: ReadonlySet<Feature> = new Set<Feature>([
   "mn_followups",
   "mn_tasks",
   "mn_coach",
+  // Automation pass (docs/AI_AGENTS_PLAN.md is a plan only): am_auto_notes automatic short meeting notes, notices and the Added today list; am_slack_auto automatic Slack routing, pause, mutes. Default off.
+  "am_auto_notes",
+  "am_slack_auto",
   // Clean-up v2 (docs/research/DATAQUALITY_R1.md): dq_module is the rebuilt Clean-up screen, dq_dupes duplicates with merge, delete and bulk, dq_intake the Lead intake tab, dq_alerts its alerts,
   // dq_gate the sorting-gate animation, dq_score the quality score. Default off.
   "dq_module",
