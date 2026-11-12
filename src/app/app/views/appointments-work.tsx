@@ -81,7 +81,7 @@ export function RowList({ rows, kind, showAccount, empty, testId = "appt-rows" }
           // A call that needs a word of warning (asked not to be contacted, quiet hours) opens the panel, where the warning is shown before the call. Never straight out.
           const button = callable && warnings.length > 0
             ? <RowButton onClick={() => show(r)} label="Call" sr={`${r.name}: check first, then call`} testId="appt-row-button" />
-            : r.url ? <RowButton href={callable ? (plan.href as string) : r.url} label={label} sr={`${r.name}, in your CRM`} testId="appt-row-button" /> : <span />;
+            : r.url ? <RowButton {...(!callable && withContact.some((x) => x.key === r.key) ? { onClick: () => show(r) } : { href: callable ? (plan.href as string) : r.url })} label={label} sr={`${r.name}, open them here`} testId="appt-row-button" /> : <span />;
           const items: MenuItem[] = [
             ...(r.contactId ? [{ key: "show", label: "Show the person and the appointment", onSelect: () => show(r) }] : []),
             ...(r.url && r.phone ? [{ key: "call", label: warnings.length > 0 ? "Call in your CRM (check first)" : "Call in your CRM", onSelect: () => (warnings.length > 0 ? show(r) : window.open(plan.href ?? r.url ?? "", "_blank", "noopener,noreferrer")) }] : []),

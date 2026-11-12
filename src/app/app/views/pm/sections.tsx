@@ -161,20 +161,32 @@ export function DisputesTab({ options, initialStatus, rev, bump }: { options: Pm
   );
 }
 
-export function UpcomingTab() {
+/** What the clients' plans bring in a month (an estimate). One card, used in Payments > Upcoming and, inside the Money page, on Plans and churn only (so the fact is shown once). */
+function PlansSection({ u }: { u: PmUpcoming }) {
+  return (
+    <section className="pm-card" aria-label="Expected from your clients">
+      <h2 className="pm-h mb-2">From your clients (estimate)</h2>
+      {u.plans.state === "needs_permission" && <p className="text-sm"><b>{RECONNECT}</b></p>}
+      {u.plans.items.map((i) => <p key={i.currency} className="text-sm"><b className="pm-amt">{fmtMoney(i.amount, i.currency)}</b> a month from {i.accounts} paying client {i.accounts === 1 ? "account" : "accounts"}. <span className="ap-fine">{i.formula}</span></p>)}
+      {u.plans.items.length === 0 && u.plans.state !== "needs_permission" && <NotFromPlatform>the price of the plans you sell to your clients.</NotFromPlatform>}
+      {u.plans.items.length > 0 && <p className="ap-fine mt-1">{u.plans.note}</p>}
+    </section>
+  );
+}
+
+export function ClientPlansCard() {
+  const r = usePm<PmUpcoming>("upcoming");
+  return <Load r={r}>{(u) => <div className="pm-stack" data-testid="money-client-plans"><PlansSection u={u} /></div>}</Load>;
+}
+
+export function UpcomingTab({ hidePlans = false }: { hidePlans?: boolean } = {}) {
   const r = usePm<PmUpcoming>("upcoming");
   return (
     <Load r={r}>
       {(u) => (
         <div className="pm-stack" data-testid="pm-upcoming">
           <p className="ap-fine" data-testid="pm-upcoming-dates">The dates in the bar do not change this tab: the platform does not give the day each client is charged, so there are no due dates to place in a range.</p>
-          <section className="pm-card" aria-label="Expected from your clients">
-            <h2 className="pm-h mb-2">From your clients (estimate)</h2>
-            {u.plans.state === "needs_permission" && <p className="text-sm"><b>{RECONNECT}</b></p>}
-            {u.plans.items.map((i) => <p key={i.currency} className="text-sm"><b className="pm-amt">{fmtMoney(i.amount, i.currency)}</b> a month from {i.accounts} paying client {i.accounts === 1 ? "account" : "accounts"}. <span className="ap-fine">{i.formula}</span></p>)}
-            {u.plans.items.length === 0 && u.plans.state !== "needs_permission" && <NotFromPlatform>the price of the plans you sell to your clients.</NotFromPlatform>}
-            {u.plans.items.length > 0 && <p className="ap-fine mt-1">{u.plans.note}</p>}
-          </section>
+          {!hidePlans && <PlansSection u={u} />}
           <section className="pm-card" aria-label="Your clients' customers"><h2 className="pm-h mb-2">From your clients&apos; customers</h2><NotFromPlatform>{u.customers.note.replace(/^Not available from the platform yet: /, "")}</NotFromPlatform></section>
           <section className="pm-card" aria-label="What the platform does not give us">
             <h2 className="pm-h mb-2">Not available from the platform yet</h2>

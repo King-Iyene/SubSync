@@ -4,7 +4,7 @@ import { realTransports } from "../notifications/transports";
 import { loadCore, type AuditBase } from "../api/audit-api";
 import { appointmentView } from "./appointment-queries";
 import { conversationCoverage } from "./queries";
-import { loadAccounts } from "./service";
+import { loadAccountsNow } from "./service";
 import { CONVERSATIONS_READ_PER_ACCOUNT, readLimitNote } from "./waiting";
 import { MIN_DAYS_THEN_NOW, comparePairs, monthlyMessage, runsFromAudit, type Pair } from "./au-history";
 import { claimMonthly, latestRuns, readPrefs, recordRuns, runsNear } from "./au-history-queries";
@@ -18,7 +18,7 @@ const day = (now: number) => new Date(now).toISOString().slice(0, 10);
 
 /** Records today's counts for every account that has none yet or whose newest run is 6 or more days old. Accounts still being read for the first time are skipped. */
 export async function sweepAuditHistory(installationId: string, now: number): Promise<number> {
-  const { settings, accounts } = await loadAccounts(installationId);
+  const { settings, accounts } = await loadAccountsNow(installationId);
   const live = accounts.filter((a) => !a.ignored);
   const ids = live.map((a) => a.locationId);
   if (ids.length === 0) return 0;
@@ -41,7 +41,7 @@ export async function sweepAuditHistory(installationId: string, now: number): Pr
 export async function sendMonthlyAudit(installationId: string, now: number): Promise<{ sent: boolean; reason?: string }> {
   const dt = new Date(now);
   if (dt.getUTCDate() > 7 || dt.getUTCHours() < 8) return { sent: false, reason: "not due" };
-  const { settings, accounts } = await loadAccounts(installationId);
+  const { settings, accounts } = await loadAccountsNow(installationId);
   const to = settings.digestEmail;
   if (!to) return { sent: false, reason: "no address" };
   const live = accounts.filter((a) => !a.ignored);

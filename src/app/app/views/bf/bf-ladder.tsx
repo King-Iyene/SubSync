@@ -50,22 +50,33 @@ export function BookingLadder({ steps, biggest = null, onPick, compact = false, 
     return () => cancelAnimationFrame(raf);
   }, [animate, paths, run]);
 
-  const press = (fn: () => void) => ({ onClick: fn, onKeyDown: (e: React.KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fn(); } }, tabIndex: 0, role: "button" as const });
+  const live = Boolean(onPick);
+  const press = (fn: () => void) => !live ? { role: "img" as const, tabIndex: 0, "data-static": "1" } : ({ onClick: fn, onKeyDown: (e: React.KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fn(); } }, tabIndex: 0, role: "button" as const });
   const total = counts[0] ?? 0;
   if (total <= 0) return <p className="bf-empty" data-testid={`${testId}-empty`}>No new leads in these dates. When leads come in you will see where they stop on the way to a booking.</p>;
   const maxLost = Math.max(1, ...L.leaks.map((k) => k.lost));
-  const caption = hot ?? `${fmt(total)} leads came in. ${fmt(counts[counts.length - 1] ?? 0)} were won. Click a step to open those leads, or a basin to open the ones that fell.`;
+  const caption = hot ?? `${fmt(total)} leads came in. ${fmt(counts[counts.length - 1] ?? 0)} were won. ${live ? "Click a step or ribbon to open those leads, or a basin to open the ones that fell." : "Hover a step or basin for its count."}`;
 
   return (
     <div ref={wrap} className="bf-ladder" data-testid={testId} data-animated={animate ? "1" : "0"}>
       <svg width={L.width} height={L.height} viewBox={`0 0 ${L.width} ${L.height}`} role="group" aria-label="Booking funnel as a staircase. Each step is as wide as the leads that reached it; leads that stop fall into a basin beside the next step.">
-        {L.chutes.map((c, i) => <rect key={`c${i}`} x={c.x} y={c.y} width={c.w} height={c.h} className="bf-chute" />)}
+        {L.chutes.map((c, i) => {
+          const next = steps[i + 1]; if (!next) return <rect key={`c${i}`} x={c.x} y={c.y} width={c.w} height={c.h} className="bf-chute" />;
+          const say = `${fmt(next.count)} of ${fmt(steps[i].count)} leads went on from "${steps[i].label}" to "${next.label}".${live ? " Open the list." : ""}`;
+          return (
+            <g key={`c${i}`} className="bf-ribbon" data-testid={`${testId}-ribbon-${next.key}`} aria-label={say} {...press(() => onPick?.({ step: next.key as StepKey, mode: "reached", title: `Reached: ${next.label}`, count: next.count }))} onMouseEnter={() => setHot(say)} onMouseLeave={() => setHot(null)} onFocus={() => setHot(say)} onBlur={() => setHot(null)}>
+              <title>{say}</title>
+              <rect x={c.x} y={c.y} width={c.w} height={c.h} className="bf-chute" />
+            </g>
+          );
+        })}
         {L.leaks.map((k, i) => {
           const cur = k.toKey === biggest, label = BASIN[k.toKey] ?? "Stopped here";
           const level = k.lost > 0 ? Math.max(0.12, k.lost / maxLost) : 0, pick = () => onPick?.({ step: k.toKey as StepKey, mode: "dropped", title: label, count: k.lost });
-          const say = `${label}: ${fmt(k.lost)} leads${steps[i].count > 0 ? ` (${Math.round((k.lost / steps[i].count) * 100)}% of those that reached the step before)` : ""}. Open the list.`;
+          const say = `${label}: ${fmt(k.lost)} leads${steps[i].count > 0 ? ` (${Math.round((k.lost / steps[i].count) * 100)}% of those that reached the step before)` : ""}.${live ? " Open the list." : ""}`;
           return (
             <g key={`k${i}`} className="bf-basin" data-hot={cur ? "1" : undefined} data-testid={`${testId}-basin-${k.toKey}`} aria-label={say} {...press(pick)} onMouseEnter={() => setHot(say)} onMouseLeave={() => setHot(null)} onFocus={() => setHot(say)} onBlur={() => setHot(null)}>
+              <title>{say}</title>
               <path d={`M${k.x0} ${k.y0} Q${k.cx} ${k.cy} ${k.x1} ${k.y1}`} className="bf-stream" strokeWidth={k.stream} fill="none" />
               <rect x={k.basin.x} y={k.basin.y} width={k.basin.w} height={k.basin.h} rx={8} className="bf-basin-box" />
               <rect x={k.basin.x + 1} y={k.basin.y + k.basin.h - 1 - (k.basin.h - 2) * level} width={k.basin.w - 2} height={Math.max(0, (k.basin.h - 2) * level)} rx={7} className="bf-basin-fill" />
@@ -77,10 +88,11 @@ export function BookingLadder({ steps, biggest = null, onPick, compact = false, 
         })}
         {L.steps.map((s, i) => {
           const row = steps[i], inside = s.w >= 190, pick = () => onPick?.({ step: s.key as StepKey, mode: "reached", title: `Reached: ${row.label}`, count: row.count });
-          const say = `${row.label}: ${fmt(row.count)} leads${row.passPct !== null ? `, ${row.passPct}% of the step before` : ""}. Open the list.`;
+          const say = `${row.label}: ${fmt(row.count)} leads${row.passPct !== null ? `, ${row.passPct}% of the step before` : ""}.${live ? " Open the list." : ""}`;
           const tx = inside ? s.x + 12 : L.narrow ? s.x + 8 : s.x + s.w + 10, halo = !inside && L.narrow;
           return (
             <g key={s.key} className="bf-step" data-testid={`${testId}-step-${s.key}`} aria-label={say} {...press(pick)} onMouseEnter={() => setHot(say)} onMouseLeave={() => setHot(null)} onFocus={() => setHot(say)} onBlur={() => setHot(null)}>
+              <title>{say}</title>
               <rect x={s.x} y={s.y} width={s.w} height={s.h} rx={7} className="bf-ledge" data-last={i === L.steps.length - 1 ? "1" : undefined} />
               <text x={tx} y={s.y + s.h / 2 - 2} className={inside ? "bf-step-l bf-on" : halo ? "bf-step-l bf-halo" : "bf-step-l"}>{row.label}</text>
               <text x={tx} y={s.y + s.h / 2 + (compact || L.narrow ? 12 : 15)} className={inside ? "bf-step-n bf-on" : halo ? "bf-step-n bf-halo" : "bf-step-n"}>{fmt(row.count)}{row.passPct !== null ? <tspan className="bf-step-p">{`  ${row.passPct}% pass`}</tspan> : null}</text>

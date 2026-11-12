@@ -86,3 +86,20 @@ King said the extra breakdown in Speed to lead was gone. The cards were in the c
 Other modules (Clients, Pipeline, Appointments, Payments, Team, Meetings, Find a lead, Calls): checked their module tabs and sections against the manifest in `tests/unit/required-sections.test.ts`; none uses a card-hiding wrapper like Speed's Fold. Today is handled in a separate change.
 
 Booking funnel and animations (12 Nov 2026, same PR): the funnel's step bars and drop-off basins already had click handlers, but the list they opened was drawn at the very bottom of the page, so a click looked dead. It now opens in the side panel on top. Basins and bars have a pointer cursor, hover underline and keyboard (Enter, Space); the picture is clipped to its box so nothing runs off the right edge. The "not enough leads" rule now starts at 10 leads (was 30) and names the real count. The lead journey river now finds the ribbon under the finger on the tap itself, so touch works without a hover first, and the cursor is a pointer over a ribbon. Race counts are real buttons already.
+
+## Money, Today fixes (round 5, 12 Nov 2026)
+
+Money: Payments and Finance are ONE menu item "Money" (entry id `payments`; `finance` is its other address and keeps its own entry only while Payments is off). Nothing was removed; only the duplicate menu entry is hidden. Where each part went:
+
+| From | Part | Now in |
+|---|---|---|
+| Finance | Overview (plans a month, what moved, at risk), Client revenue, Churn watch, headline strip "Money today" | Money > Plans and churn |
+| Payments | Upcoming > "From your clients (estimate)" (what the plans bring a month) | Money > Plans and churn (shown once; hidden from Upcoming when inside Money) |
+| Payments | Today, Recovery queue, Disputes, Upcoming (rest), History, Setup, Export CSV | Money > Client payments |
+| Finance | Payouts (and "My payouts" for non-managers), Billing notes, Setup | Money > Payouts |
+
+Old addresses: #payments opens Client payments, #finance opens Plans and churn; links inside Money switch the top tab when the target tab lives in the other group. Guard: `tests/unit/required-sections.test.ts` (new Money block).
+
+Not deduplicated beyond the plans card: Finance Overview still shows its own "plans a month" figure (a different calculation from Finance data); both stay until King confirms which to keep.
+
+Today: Try again now sends a new request (never joins a stuck one), shows progress and stops after 3 presses; the Reply / Open buttons on Today open the person inside SubSync (lead panel with a smaller "Open in your CRM"); Today > Settings shows an at-a-glance strip and a clear Saved state.

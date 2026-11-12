@@ -28,26 +28,29 @@ const TIPS: Record<TabKey, [string, string]> = {
 };
 const FLAG_OF: Record<TabKey, string> = { overview: "fn_mrr", revenue: "fn_revenue", churn: "fn_churn", payouts: "fn_payouts", ledger: "fn_ledger", setup: "fn_module" };
 
-export function FinanceModule({ go }: { go: GoFn }) {
+/** Which tabs of Finance sit in which Money tab: Plans and churn, or Payouts (payouts, billing notes, setup). */
+export const FN_GROUPS = { plans: ["overview", "revenue", "churn"], payouts: ["payouts", "ledger", "setup"] } as const;
+
+export function FinanceModule({ go, embed, initialTab, switchTo }: { go: GoFn; /** Inside the Money page: only that group of tabs, and no page title of its own. */ embed?: "plans" | "payouts"; initialTab?: string; /** Money page: a link to a tab that lives in the other group switches the top tab. */ switchTo?: (top: "plans" | "payouts", tab: string) => void }) {
   const opt = useFn<FnOptions>("options");
   const win = useWindow();
-  const [tab, setTab] = useState<TabKey>("overview");
+  const [tab, setTab] = useState<TabKey>((initialTab as TabKey) || (embed === "payouts" ? "payouts" : "overview"));
   const flags = opt.data?.flags ?? null;
-  const tabs = useMemo(() => (opt.data ? (opt.data.tabs as TabKey[]).filter((k) => flags === null || flags[FLAG_OF[k]] !== false) : []), [opt.data, flags]);
+  const tabs = useMemo(() => (opt.data ? (opt.data.tabs as TabKey[]).filter((k) => (flags === null || flags[FLAG_OF[k]] !== false) && (!embed || (FN_GROUPS[embed] as readonly string[]).includes(k))) : []), [opt.data, flags, embed]);
   const active = tabs.includes(tab) ? tab : tabs[0];
-  const goTab = (t: string) => setTab(t as TabKey);
+  const goTab = (t: string) => { const other = embed && !(FN_GROUPS[embed] as readonly string[]).includes(t) ? (embed === "plans" ? "payouts" : "plans") : null; if (other && switchTo) switchTo(other, t); else setTab(t as TabKey); };
   const manager = opt.data?.manager === true;
   const ranged = active === "overview" || active === "revenue" || active === "payouts";
 
   if (!fnfxOn() && opt.error && notSwitchedOn(opt.error)) return <div className="s6 ap fn ds-enter" data-testid="fn-module"><Page title="Finance" subtitle="Your own money: plans, what clients made, who may leave, and what you pay your team."><EmptyState title="Finance is not switched on yet" body="It will appear here as soon as it is ready for your account." /></Page></div>;
   return (
     <div className="s6 ap fn ds-enter" data-testid="fn-module">
-      <Page title="Finance" subtitle={manager ? "Your own money: plans, what clients made, who may leave, and what you pay your team." : "Your own payout statement, line by line."}>
+      <FnFrame embed={!!embed} subtitle={manager ? "Your own money: plans, what clients made, who may leave, and what you pay your team." : "Your own payout statement, line by line."}>
         {fnfxOn() && <div className="mb-2"><SampleNote /></div>}
         <Load r={opt} label="Opening Finance...">
           {() => (
             <>
-              {manager && <HeadlineStrip goTab={goTab} go={go} />}
+              {manager && embed !== "payouts" && <HeadlineStrip goTab={goTab} go={go} />}
               {tabs.length === 0 ? <EmptyState title="Nothing is switched on yet" body="The parts of Finance will appear here as soon as they are ready for your account." /> : (
                 <>
                   <ModuleTabs pill label="Finance sections" tabs={tabs.map((k) => ({ label: manager || k !== "payouts" ? TIPS[k][0] : "My payouts", tip: TIPS[k][1], node: null }))} value={Math.max(0, tabs.indexOf(active))} onChange={(i) => setTab(tabs[i])} />
@@ -65,9 +68,13 @@ export function FinanceModule({ go }: { go: GoFn }) {
             </>
           )}
         </Load>
-      </Page>
+      </FnFrame>
     </div>
   );
+}
+
+function FnFrame({ embed, subtitle, children }: { embed: boolean; subtitle: string; children: React.ReactNode }) {
+  return embed ? <>{children}</> : <Page title="Finance" subtitle={subtitle}>{children}</Page>;
 }
 
 /** The CEO money line and the one "what to do today" line, from the counts. */

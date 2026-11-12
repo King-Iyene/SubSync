@@ -37,6 +37,15 @@ const MANIFEST: Record<string, Req[]> = {
     { file: `${V}/appointments.tsx`, has: ["Copy a summary", "Print this page", "Open the call lists", "True show rate"] },
     { file: `${V}/appointment-insights.tsx`, has: ["Calendar health", "From lead to customer", "Best times to book", "Repeat no-shows", "Show rate by lead source", "How fast leads get booked", "Reminders and confirmations", "Who gets the appointments", "What an appointment is worth", "No follow-up after the appointment", "Double bookings", "Before your next appointments"] },
   ],
+  "Money (Payments and Finance merged into one menu item, 12 Nov: nothing removed, the duplicate menu entry hidden)": [
+    { file: `${V}/money/module.tsx`, has: ['"Plans and churn"', '"Client payments"', '"Payouts"', "<FinanceModule", "<PaymentsModule", "<ClientPlansCard"] },
+    { file: `${V}/pm/module.tsx`, has: ['"Recovery queue"', '"Disputes"', '"Upcoming"', '"History"', '"Setup"', "Export CSV"] },
+    { file: `${V}/pm/sections.tsx`, has: ["Money at risk (estimate)", "Fixed after we flagged it", "From your clients (estimate)", "PlansSection"] },
+    { file: `${V}/fn/module.tsx`, has: ['"Client revenue"', '"Churn watch"', '"Billing notes"', "My payouts", "Money today", "FN_GROUPS"] },
+    // Both old addresses must still open Money, and Payments must keep the menu entry named Money.
+    { file: "src/app/app/dashboard.tsx", has: ['case "payments": case "finance"', "<MoneyModule"] },
+    { file: "src/app/app/nav.ts", has: ['id: "payments", label: "Money"', 'id: "finance", label: "Money"'] },
+  ],
   "Pipeline and deals": [
     { file: `${V}/pl3/module.tsx`, has: ['label: "Overview"', 'label: "Money flow"', 'label: "Needs attention"', 'label: "Won and lost"', 'label: "People"', 'label: "Sources"', 'label: "Stage history"', 'label: "Accounts"', 'label: "Proof"', 'label: "Slipping"', 'label: "Forecast and stages"', 'label: "Stale deals and hygiene"', "<PipelineView", "<DealsView", "<DealMoves"] },
     { file: `${V}/pipeline.tsx`, has: ["Pipeline coverage", "Open pipeline over time", "Stages, bottlenecks and conversion", "Deals most at risk", "How old is the pipeline", "Wins and losses by month", "Abandoned deals worth reopening", "Dead pipeline to clean up", "Compare client accounts", "Every pipeline", "Export open deals"] },

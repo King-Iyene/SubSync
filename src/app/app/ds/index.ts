@@ -1,4 +1,5 @@
 // The shared building blocks (stage D0). Import from here. Each has a usage example on /design and its props are written up in docs/features/D0.md.
+import "./pill-link.css";
 export { Page, Section, ModuleTabs, BackLink, BackProvider, useBack, SUBTITLE_MAX, type ModuleTab, type BackTarget } from "./template";
 export { ScopeFilterBar, FilterDrawer, AccountScope, FilterHelp } from "./filters";
 export { CardRange, useCardRange, type CardRangeState } from "./card-range";

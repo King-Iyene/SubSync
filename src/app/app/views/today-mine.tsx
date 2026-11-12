@@ -3,7 +3,7 @@
 import { CalendarCheck, CircleCheck, Phone, TriangleAlert } from "lucide-react";
 import { useState } from "react";
 import type { TodayData, TodayMine, TodayPerson } from "@/lib/analytics/today-types";
-import { EmptyState, RowButton } from "../ds";
+import { EmptyState, RowButton, type LeadSeed } from "../ds";
 import { Btn } from "../ui";
 
 // What a client's staff, a business owner or a setter also needs on Today (what "My day" used to be, now on Today itself): the calls to make and today's and tomorrow's
@@ -14,13 +14,13 @@ const stamp = (p: TodayPerson, zone: string) => {
 };
 const GRID = "@container ds-row grid grid-cols-[minmax(0,1fr)_6rem] items-center gap-x-3 py-2.5 pl-4 pr-2";
 
-function CallRow({ name, sub, url, dnd, phone, verb = "Call" }: { name: string; sub?: string; url: string; dnd?: boolean; phone: boolean; verb?: string }) {
+function CallRow({ name, sub, url, dnd, phone, verb = "Call", seed }: { name: string; sub?: string; url: string; dnd?: boolean; phone: boolean; verb?: string; seed?: LeadSeed | null }) {
   return (
     <li className={GRID} data-testid="call-row" data-dnd={dnd ? "true" : "false"}>
       <div className="min-w-0"><p className="truncate font-semibold">{dnd ? name : `${verb} ${name}`}</p>{sub && <p className="truncate text-sm text-muted-foreground">{sub}</p>}</div>
       {dnd
         ? <button type="button" disabled title="This person asked not to be contacted." className="inline-flex h-11 w-full cursor-not-allowed items-center justify-center gap-1.5 rounded-[4px] border px-2 text-sm font-medium text-muted-foreground opacity-70 sm:h-8"><Phone aria-hidden className="size-3.5" />No calls</button>
-        : <RowButton href={url} label={phone ? "Call" : "Open"} sr={`${name}, ${phone ? "call in your CRM" : "no phone number"}`} />}
+        : <RowButton href={url} seed={seed} label={phone ? "Call" : "Open"} sr={`${name}, ${phone ? "call in your CRM" : "no phone number"}`} />}
     </li>
   );
 }
@@ -45,10 +45,10 @@ export function CallsSection({ mine }: { mine: TodayMine }) {
       <h2 id="my-calls-h" className="t-title">Calls for today</h2>
       <div className="mb-3" />
       <CallGroup title="No-shows to rebook" total={c.noshows.total} shown={c.noshows.rows.length} testId="calls-noshows">
-        {c.noshows.rows.map((p, i) => <CallRow key={`${p.contactId}-${i}`} name={p.name} sub={`Missed ${stamp(p, mine.timeZone)}${p.calendar ? `, ${p.calendar}` : ""}`} url={p.url} dnd={p.dnd} phone={!!p.phone} />)}
+        {c.noshows.rows.map((p, i) => <CallRow key={`${p.contactId}-${i}`} name={p.name} sub={`Missed ${stamp(p, mine.timeZone)}${p.calendar ? `, ${p.calendar}` : ""}`} url={p.url} seed={p.contactId ? { contactId: p.contactId, locationId: p.locationId, name: p.name, url: p.url, phone: p.phone, dnd: p.dnd } : null} dnd={p.dnd} phone={!!p.phone} />)}
       </CallGroup>
       <CallGroup title="Appointments to confirm" total={c.confirm.total} shown={c.confirm.rows.length} testId="calls-confirm">
-        {c.confirm.rows.map((p, i) => <CallRow key={`${p.contactId}-${i}`} verb="Confirm with" name={p.name} sub={`${stamp(p, mine.timeZone)}${p.calendar ? `, ${p.calendar}` : ""}`} url={p.url} dnd={p.dnd} phone={!!p.phone} />)}
+        {c.confirm.rows.map((p, i) => <CallRow key={`${p.contactId}-${i}`} verb="Confirm with" name={p.name} sub={`${stamp(p, mine.timeZone)}${p.calendar ? `, ${p.calendar}` : ""}`} url={p.url} seed={p.contactId ? { contactId: p.contactId, locationId: p.locationId, name: p.name, url: p.url, phone: p.phone, dnd: p.dnd } : null} dnd={p.dnd} phone={!!p.phone} />)}
       </CallGroup>
     </section>
   );
@@ -83,7 +83,7 @@ export function AppointmentsSection({ mine, go }: { mine: TodayMine; go: () => v
                   <p className="truncate text-sm text-muted-foreground">{d}, {stamp(p, mine.timeZone).replace(/^\w+, /, "")}{p.calendar ? `, ${p.calendar}` : ""}{p.noOutcome && <span className="inline-flex items-center gap-1 pl-2 font-medium text-warning"><TriangleAlert aria-hidden className="size-3.5" />No outcome marked</span>}</p>
                 </div>
               </div>
-              <RowButton href={p.url} label="Open" sr={p.name} />
+              <RowButton href={p.url} seed={p.contactId ? { contactId: p.contactId, locationId: p.locationId, name: p.name, url: p.url, phone: p.phone, dnd: p.dnd } : null} label="Open" sr={p.name} />
             </li>
           ))}
         </ul>

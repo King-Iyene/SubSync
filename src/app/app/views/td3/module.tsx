@@ -12,6 +12,7 @@ import { remember } from "../../ds/remember";
 import { useApiClient } from "../../session";
 import { EmptyState, ErrorState, ModuleTabs, SkeletonRows } from "../../ds";
 import { OpenLeadButton } from "../../ds/open-lead-button";
+import { SlowRetry } from "../../ds/slow-retry";
 import { Btn } from "../../ui";
 import type { GoFn, ViewId } from "../../nav";
 import { TodayView } from "../today";
@@ -67,7 +68,7 @@ type Loaded<T> = { data: T | null; error: unknown; loading: boolean; reload: () 
 
 function Load<T>({ r, children, empty }: { r: Loaded<T>; children: (d: T) => ReactNode; empty?: (d: T) => boolean | string }) {
   const slow = useSlow(r.loading && !r.data);
-  if (r.loading && !r.data && slow) return <EmptyState title="This is taking longer than usual" body="Nothing was lost. The numbers are still being worked out." action={<Btn onClick={() => r.reload()}>Try again</Btn>} />;
+  if (r.loading && !r.data && slow) return <SlowRetry reload={r.reload} />;
   if (r.loading && !r.data) return <SkeletonRows rows={3} label="Working out what to do first..." />;
   if (r.error && notSwitchedOn(r.error)) return <EmptyState title="Not switched on yet" body="This part of Today is not switched on for your account yet." />;
   if (r.error) return <ErrorState error={r.error as Error} onRetry={r.reload} />;
@@ -389,24 +390,40 @@ function SettingsTab({ level, cashOn, saveOn, nav }: { level: string; cashOn: bo
   const r = useTd<Td3Settings>("settings");
   const today = useTd<Td3Today>("today");
   const { act, busy, problem } = useActions(() => r.reload());
-  const [form, setForm] = useState<{ on: boolean; hour: number; quiet: number[]; list: string } | null>(null), [saved, setSaved] = useState(false);
+  type Form = { on: boolean; hour: number; quiet: number[]; list: string };
+  const [form, setFormRaw] = useState<Form | null>(null), [saved, setSaved] = useState<number | null>(null);
   const s = r.data;
+  // Any edit clears the "Saved" mark, so it never claims more than what was saved.
+  const setForm = (f: Form) => { setSaved(null); setFormRaw(f); };
   // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { if (s && !form) setForm({ on: s.emailOn, hour: s.emailHour, quiet: s.quietDays, list: s.recipients.join("\n") }); }, [s, form]);
+  useEffect(() => { if (s && !form) setFormRaw({ on: s.emailOn, hour: s.emailHour, quiet: s.quietDays, list: s.recipients.join("\n") }); }, [s, form]);
+  // After a save the page asks again and shows what the server now holds, so what is on screen is always what is stored.
+  const resync = (d: Td3Settings) => setFormRaw({ on: d.emailOn, hour: d.emailHour, quiet: d.quietDays, list: d.recipients.join("\n") });
+  useEffect(() => { if (saved === null) return; const t = setTimeout(() => setSaved(null), 6000); return () => clearTimeout(t); }, [saved]);
+  const save = async (d: Td3Settings, f: Form) => {
+    const ok = await act("settings", { emailOn: f.on, emailHour: f.hour, quietDays: f.quiet, recipients: f.list.split(/[\s,;]+/).filter(Boolean) });
+    if (ok) { setSaved(Date.now()); resync({ ...d, emailOn: f.on, emailHour: f.hour, quietDays: f.quiet, recipients: f.list.split(/[\s,;]+/).filter(Boolean) }); }
+  };
   return (
     <Load r={r}>
       {(d) => form && (
         <div className="cl-stack td-compact td-settings" data-testid="td-settings">
+          <div className="td-glance" data-testid="td-settings-glance" style={{ gridColumn: "1 / -1", display: "flex", flexWrap: "wrap", gap: 8 }} aria-label="Your settings at a glance">
+            <span className="ap-chip" data-tone={form.on ? "green" : "amber"}>Daily email: {form.on ? `on, ${String(form.hour).padStart(2, "0")}:00` : "off"}</span>
+            <span className="ap-chip" data-tone="cyan">{form.list.split(/[\s,;]+/).filter(Boolean).length} {form.list.split(/[\s,;]+/).filter(Boolean).length === 1 ? "person gets it" : "people get it"}</span>
+            {today.data && <span className="ap-chip" data-tone="plain">{today.data.snoozed.length} put aside</span>}
+            {saved !== null && <span className="ap-chip" data-tone="green" role="status" data-testid="td-saved">Saved. Your changes are live.</span>}
+          </div>
           <section className="td-card2" aria-label="Daily email">
             <h2 className="td-h2">Daily email</h2>
             <p className="ap-fine mb-2">One short email a day with the same ranked list as Today and one link. It never messages your leads. Your day is in {d.timezone}.</p>
             {!d.canEdit && <p className="ap-fine" role="status">Ask your administrator to change this.</p>}
-            <form className="td-form" onSubmit={(e) => { e.preventDefault(); void act("settings", { emailOn: form.on, emailHour: form.hour, quietDays: form.quiet, recipients: form.list.split(/[\s,;]+/).filter(Boolean) }).then((ok) => setSaved(ok)); }}>
+            <form className="td-form" onSubmit={(e) => { e.preventDefault(); void save(d, form); }}>
               <label className="flex-row items-center gap-2" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}><input type="checkbox" disabled={!d.canEdit} checked={form.on} onChange={(e) => setForm({ ...form, on: e.target.checked })} /> Send me the daily email</label>
               <label>Send at<select className="ap-field" disabled={!d.canEdit} value={form.hour} onChange={(e) => setForm({ ...form, hour: Number(e.target.value) })}>{[...Array(24)].map((_, h) => <option key={h} value={h}>{String(h).padStart(2, "0")}:00</option>)}</select></label>
               <fieldset className="td-days"><legend className="ap-fine">No email on</legend>{DAYS.map((n, i) => <label key={n}><input type="checkbox" disabled={!d.canEdit} checked={form.quiet.includes(i)} onChange={(e) => setForm({ ...form, quiet: e.target.checked ? [...form.quiet, i] : form.quiet.filter((x) => x !== i) })} /> {n}</label>)}</fieldset>
               <label>Who gets it (one address per line, one email per person)<textarea className="ap-field" rows={3} disabled={!d.canEdit} value={form.list} onChange={(e) => setForm({ ...form, list: e.target.value })} placeholder="you@yourcompany.com" /></label>
-              {d.canEdit && <div className="flex flex-wrap items-center gap-3"><button type="submit" className="s6-btn" data-kind="primary" disabled={busy}>{busy ? "Saving..." : "Save"}</button>{saved && !problem && <span className="ap-fine" role="status">Saved.</span>}</div>}
+              {d.canEdit && <div className="flex flex-wrap items-center gap-3"><button type="submit" className="s6-btn" data-kind="primary" disabled={busy}>{busy ? "Saving..." : saved !== null ? "Saved" : "Save"}</button>{saved !== null && !problem && <span className="ap-fine" role="status">Saved just now.</span>}</div>}
               {problem && <p className="ap-fine" role="alert">{problem}</p>}
             </form>
             <p className="ap-fine mt-2">Emails go out only once sending is switched on for your business. Until then this page shows exactly what would be sent. Every email has a link to stop it.</p>

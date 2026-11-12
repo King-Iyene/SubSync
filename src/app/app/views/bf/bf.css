@@ -113,3 +113,13 @@
 .bf-err { color: var(--bf-warm); margin: 0; }
 
 @media (prefers-reduced-motion: reduce) { .bf-ledge { transition: none; } }
+
+/* Round 5: ribbons (the chutes between steps) open their leads too; a ladder with no click action (no list to open) shows a plain cursor. Nothing in the animation layer takes a click: the dots ignore the mouse. */
+.bf-ribbon { cursor: pointer; outline: none; }
+.bf-ribbon:hover .bf-chute, .bf-ribbon:focus-visible .bf-chute { fill: color-mix(in srgb, var(--bf-accent) 34%, transparent); }
+.bf-ribbon:focus-visible .bf-chute { stroke: var(--foreground); stroke-width: 2; }
+.bf-ribbon, .bf-ribbon * { pointer-events: auto; }
+.bf-ladder svg .bf-dot, .bf-ladder svg circle { pointer-events: none; }
+.bf-step[data-static], .bf-basin[data-static] { cursor: default; }
+.bf-basin:hover .bf-basin-box { fill: color-mix(in srgb, var(--bf-warm) 8%, transparent); }
+.bf-basin-box, .bf-ledge, .bf-chute { pointer-events: all; }
