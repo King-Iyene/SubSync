@@ -209,6 +209,11 @@ export const FEATURES = [
   "dq_alerts",
   "dq_gate",
   "dq_score",
+  "bf_funnel",
+  "bf_cohorts",
+  "bf_forecast",
+  "bf_recover",
+  "bf_today",
 ] as const;
 export type Feature = (typeof FEATURES)[number];
 

@@ -183,6 +183,13 @@ export const DEFAULT_OFF: ReadonlySet<Feature> = new Set<Feature>([
   "dq_alerts",
   "dq_gate",
   "dq_score",
+  // Booking funnel (Appointments tab): bf_funnel the tab and its numbers, bf_cohorts the weekly cohorts, bf_forecast the 30 day forecast, bf_recover the tag-the-dropped-leads action,
+  // bf_today the small version on Today. Default off.
+  "bf_funnel",
+  "bf_cohorts",
+  "bf_forecast",
+  "bf_recover",
+  "bf_today",
 ]);
 
 export function resolveFeatures(all: readonly Feature[], overrides: Record<string, boolean>, allOn = false): Record<Feature, boolean> {

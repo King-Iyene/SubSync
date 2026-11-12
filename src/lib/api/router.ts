@@ -126,6 +126,7 @@ import { handleUnansweredPart3, handleUnansweredViewRemove, handleUnansweredView
 import { handleApptWork } from "./appointment-work-routes";
 import { handleAppointments3 } from "./appointments3-routes";
 import { handleApptExec, handleApptExecTarget } from "./appointments-exec-routes";
+import { handleBfFunnel, handleBfRecover } from "./bf-routes";
 import { handlePipeline3 } from "./pipeline3-routes";
 import { handleClients3 } from "./clients3-routes";
 import { handleProof } from "./proof-routes";
@@ -2060,6 +2061,9 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
     // Appointments round 3: /api/app/appointments?part=... (overview, lists, booking share, flow tree, health, sources, calendars, reminders, receipt, detail; read only).
     // Appointments, Leadership tab: /api/app/appointments/exec?part=... (read only) and PUT .../exec-target (SubSync-only monthly target).
     if (a === "appointments" && b === "exec" && !c && method === "GET") return await handleApptExec(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links });
+    // Appointments, Booking funnel: GET /api/app/appointments/funnel?part=... (read only) and POST .../funnel-recover (tags dropped leads; preview, caps, dry run unless live; flags bf_*).
+    if (a === "appointments" && b === "funnel" && !c && method === "GET") return await handleBfFunnel(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links, locationToken: (locationId) => locationAccessToken(ctx.session.companyId, locationId), actor: actorOf });
+    if (a === "appointments" && b === "funnel-recover" && !c && method === "POST") return await handleBfRecover(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links, locationToken: (locationId) => locationAccessToken(ctx.session.companyId, locationId), actor: actorOf });
     if (a === "appointments" && b === "exec-target" && !c && method === "PUT") return await handleApptExecTarget(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links });
     if (a === "appointments" && method === "GET" && !b && ctx.url.searchParams.has("part")) {
       return await handleAppointments3(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links });
