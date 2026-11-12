@@ -3,6 +3,7 @@
 import { ExternalLink } from "lucide-react";
 import { useEffect, useId, useMemo, useState } from "react";
 import { bulkMergePhrase, deletePhrase, mergePhrase, previewLine } from "@/lib/dq/dq-core";
+import { BULK_NOTE, SKIP_TITLE, WILL_TITLE, skipLine, willLine } from "@/lib/dq/bulk-merge";
 import { DELETE_BLOCKED_WHY } from "@/lib/dq/dupe-copies";
 import { CopiesPanel, CopiesToggle, ProtectedBadge, WhyDisabled } from "./dq-copies";
 import { DeleteExtras, MergeTable } from "./dq-merge";
@@ -129,7 +130,8 @@ function GroupItem({ g, opts, onGone, multi }: { g: GroupRow; opts: Opts; onGone
 
 function BulkMerge({ account, onClose, onDone }: { account: string | null; onClose: () => void; onDone: (msg: string) => void }) {
   const api = useApiClient();
-  const [pv, setPv] = useState<{ ready: number; blocked: number; cap: number; phrase: string; mode: "dry_run" | "live"; sample: Array<{ name: string; account: string | null; shared: string | null }>; blockedWhy: Array<{ text: string; n: number }>; note: string } | null>(() => (sampleOn() ? { ready: 5, blocked: 2, cap: 50, phrase: bulkMergePhrase(5), mode: "dry_run" as const, sample: [{ name: "Ann Lee", account: "Sample Roofing", shared: "+1 555 0100" }], blockedWhy: [{ text: "Someone here has an open deal", n: 2 }], note: "Only certain matches, pairs, nobody protected." } : null));
+  type Line = { key: string; account: string | null; names: string[]; keepName?: string; goneName?: string; why: string };
+  const [pv, setPv] = useState<{ ready: number; blocked: number; cap: number; phrase: string; mode: "dry_run" | "live"; will: Line[]; skipped: Line[]; note: string } | null>(() => (sampleOn() ? { ready: 1, blocked: 1, cap: 50, phrase: bulkMergePhrase(1), mode: "dry_run" as const, will: [{ key: "w1", account: "Sample Roofing", names: ["Ann Lee", "Ann Lee"], keepName: "Ann Lee", goneName: "Ann Lee", why: "Ann Lee has a won deal" }], skipped: [{ key: "k1", account: "Sample Roofing", names: ["Bo Chen", "Bob Chen"], why: "Bob Chen has an open deal. Protected people are never merged in bulk." }], note: BULK_NOTE } : null));
   const [typed, setTyped] = useState(""), [msg, setMsg] = useState<string | null>(null), [busy, setBusy] = useState(false);
   useEffect(() => {
     if (sampleOn()) return;
@@ -143,9 +145,11 @@ function BulkMerge({ account, onClose, onDone }: { account: string | null; onClo
     <section className="rounded-xl border bg-card p-4" aria-label="Merge all certain matches" data-testid="dq-bulk">
       {!pv ? <SkeletonRows rows={2} label="Checking the certain matches..." /> : (
         <div className="space-y-2 text-sm">
-          <p className="text-base"><b className="tabular-nums">{fmtInt(pv.ready)}</b> pairs ready to merge · <span className="text-muted-foreground">{fmtInt(pv.blocked)} left for you to check · up to {pv.cap} at a time</span></p>
-          {pv.sample.length > 0 && <p className="text-muted-foreground">e.g. {pv.sample.map((s) => `${s.name}${s.shared ? ` (${s.shared})` : ""}`).join(", ")}</p>}
-          {pv.blockedWhy.length > 0 && <ul className="list-disc pl-5 text-xs text-muted-foreground">{pv.blockedWhy.map((w) => <li key={w.text}>{w.n} × {w.text}</li>)}</ul>}
+          <p className="text-base" data-testid="dq-bulk-will-title"><b>{WILL_TITLE(pv.ready)}</b> <span className="text-muted-foreground">· up to {pv.cap} at a time</span></p>
+          {pv.will.length === 0 ? <p className="text-xs text-muted-foreground">Nothing is completely safe to merge in bulk right now. Open each group and choose the primary contact yourself.</p>
+            : <ul className="max-h-64 list-disc space-y-0.5 overflow-y-auto pl-5 text-xs" data-testid="dq-bulk-will">{pv.will.map((l) => <li key={l.key}>{willLine(l)}{l.account ? <span className="text-muted-foreground"> ({l.account})</span> : null}</li>)}</ul>}
+          <p className="pt-1 text-base" data-testid="dq-bulk-skip-title"><b>{SKIP_TITLE(pv.blocked)}</b></p>
+          {pv.skipped.length > 0 && <ul className="max-h-64 list-disc space-y-0.5 overflow-y-auto pl-5 text-xs text-muted-foreground" data-testid="dq-bulk-skipped">{pv.skipped.map((l) => <li key={l.key}>{skipLine(l)}{l.account ? ` (${l.account})` : ""}</li>)}</ul>}
           <p className="text-xs text-muted-foreground">{pv.note}</p>
           {pv.mode === "dry_run" && <p className="text-xs text-muted-foreground">Not switched on yet: this shows the plan and changes nothing.</p>}
           {pv.ready > 0 && (

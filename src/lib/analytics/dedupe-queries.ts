@@ -1,4 +1,5 @@
 import { sql } from "../db";
+import type { DetailFacts } from "../dq/dupe-impact";
 import { ttlCache } from "../ttl-cache";
 import { classify, groupDuplicates, planFields, type FieldChoice, type Group, type Person } from "./dedupe";
 import { loadConfigs, type AccountConfig } from "./cleanup-config";
@@ -216,6 +217,38 @@ export async function loadPeople(installationId: string, allowed: string[] | nul
     };
   });
   return { locationName: (loc[0].name as string | null) ?? null, people, watchingSince: iso(watch[0]?.at) };
+}
+
+// ---------------- the facts behind the merge comparison (all from our own copy) ----------------
+
+/** The conversation, deal and booking details of each copy of one group, read from SubSync's own copy. The account is checked against `allowed` first. A contact with none gets empty facts (readable, and "none"). */
+export async function loadDetailFacts(installationId: string, allowed: string[] | null, locationId: string, contactIds: string[]): Promise<Record<string, DetailFacts> | null> {
+  if (allowed && !allowed.includes(locationId)) return null;
+  if (contactIds.length < 2 || contactIds.length > 40) return null;
+  const db = sql();
+  const [conv, deals, appts] = await Promise.all([
+    db`select distinct on (contact_id) contact_id, last_message_type, last_message_direction, last_message_at from cached_conversations
+       where installation_id = ${installationId} and location_id = ${locationId} and contact_id = any(${contactIds}::text[]) order by contact_id, last_message_at desc nulls last`,
+    db`select o.contact_id, o.status, o.pipeline_name, o.stage_name, o.monetary_value, t.name owner_name from cached_opportunities o
+       left join team_names t on t.installation_id = o.installation_id and t.user_id = o.assigned_to
+       where o.installation_id = ${installationId} and o.location_id = ${locationId} and o.contact_id = any(${contactIds}::text[]) and o.status in ('open', 'won') order by o.status, o.monetary_value desc nulls last limit 200`,
+    db`select contact_id, calendar_name, start_at from cached_appointments
+       where installation_id = ${installationId} and location_id = ${locationId} and contact_id = any(${contactIds}::text[]) order by start_at limit 400`,
+  ]);
+  const out: Record<string, DetailFacts> = {};
+  for (const id of contactIds) out[id] = { lastConversation: null, deals: [], calendars: [], nextCalendar: null };
+  for (const r of conv) { const f = out[r.contact_id as string]; if (f) f.lastConversation = { at: iso(r.last_message_at), type: (r.last_message_type as string | null) ?? null, direction: (r.last_message_direction as string | null) ?? null }; }
+  for (const r of deals) out[r.contact_id as string]?.deals.push({ status: r.status as "open" | "won", pipeline: (r.pipeline_name as string | null) ?? null, stage: (r.stage_name as string | null) ?? null, value: Number(r.monetary_value) || 0, owner: (r.owner_name as string | null) ?? null });
+  const now = Date.now();
+  for (const r of appts) {
+    const f = out[r.contact_id as string];
+    if (!f) continue;
+    const cal = ((r.calendar_name as string | null) ?? "").trim();
+    if (cal && !f.calendars.includes(cal)) f.calendars.push(cal);
+    const at = iso(r.start_at);
+    if (cal && !f.nextCalendar && at && Date.parse(at) > now) f.nextCalendar = cal;
+  }
+  return out;
 }
 
 // ---------------- decisions ----------------

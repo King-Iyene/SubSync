@@ -50,13 +50,30 @@ export const LABEL_SECONDARY = "Secondary contact (will be merged into the prima
 export const MAKE_PRIMARY = "Make this the primary contact";
 export const TICK_WORDS = "I checked the secondary contacts' payments, bookings and automations";
 
-export type DetailPerson = ImpactPerson & { lastActivityAt?: string | null };
+/** What SubSync holds about one copy beyond the basics (conversation, deals, bookings). Undefined on a person = not loaded = shown as unreadable, never as none. */
+export type DetailFacts = {
+  lastConversation: { at: string | null; type: string | null; direction: string | null } | null;
+  deals: Array<{ status: "open" | "won"; pipeline: string | null; stage: string | null; value: number; owner: string | null }>;
+  calendars: string[]; nextCalendar: string | null;
+};
+export type DetailPerson = ImpactPerson & { lastActivityAt?: string | null; facts?: DetailFacts };
+
+const CHANNEL: Record<string, string> = { sms: "text message", email: "email", call: "phone call", whatsapp: "WhatsApp", facebook: "Facebook Messenger", instagram: "Instagram", gmb: "Google Business chat", live_chat: "website chat", custom: "a custom channel" };
+/** TYPE_SMS, TYPE_EMAIL, ... to plain words. Unknown kinds are shown as they are, never invented. */
+export const channelWords = (t: string | null | undefined): string | null => { if (!t) return null; const k = t.replace(/^TYPE_/i, "").toLowerCase(); return CHANNEL[k] ?? k.replace(/_/g, " "); };
+const dealLine = (d: DetailFacts["deals"][number]) => `${d.pipeline ?? "A pipeline"} > ${d.stage ?? "a stage"}${d.value > 0 ? `, ${money(d.value)}` : ""}`;
+export const lastConversationLine = (c: NonNullable<DetailFacts["lastConversation"]>): string => {
+  const who = c.direction === "inbound" ? "the contact wrote last" : c.direction === "outbound" ? "your team wrote last" : "who wrote last is not recorded";
+  return [c.at ? day(c.at) : "date not recorded", channelWords(c.type) ?? "channel not recorded", who].join(", ");
+};
 /** value null = SubSync cannot read it (never blank, never zero). `note` is a smaller second line. */
 export type FieldRow = { id: string; label: string; value: string | null; note?: string };
 
 const shortDay = (iso: string | null | undefined) => (iso ? day(iso) : null);
 /** Every row for one copy. Names and values are shown exactly as stored (no case changes). */
 export function fieldRows(p: DetailPerson): FieldRow[] {
+  const f = p.facts, open = f?.deals.filter((d) => d.status === "open") ?? [], won = f?.deals.filter((d) => d.status === "won") ?? [];
+  const owners = [...new Set((f?.deals ?? []).map((d) => d.owner).filter((o): o is string => !!o))];
   const deals = p.openDeals > 0 ? `${plural(p.openDeals, "open deal", "open deals")}${(p.openValue ?? 0) > 0 ? `, ${money(p.openValue ?? 0)}` : ""}` : "No open deals";
   return [
     { id: "name", label: "Name", value: p.name },
@@ -67,16 +84,16 @@ export function fieldRows(p: DetailPerson): FieldRow[] {
     { id: "tags", label: "Tags", value: p.tags.length ? p.tags.join(", ") : "No tags" },
     { id: "created", label: "Created", value: shortDay(p.createdAt) ?? "Not known" },
     { id: "last", label: "Last activity", value: shortDay(p.lastActivityAt) ?? "No activity recorded" },
-    { id: "conv", label: "Last conversation", value: p.hasConversation ? "A conversation is on file" : "No conversation", note: p.hasConversation ? "Date, channel and who wrote last: we cannot see this yet (needs permission)" : undefined },
-    { id: "open", label: "Open deals", value: deals, note: p.openDeals > 0 ? "Pipeline and stage: open it in your CRM" : undefined },
-    { id: "won", label: "Won deals", value: p.wonDeals > 0 ? plural(p.wonDeals, "won deal", "won deals") : "No won deals" },
-    { id: "next", label: "Upcoming appointment", value: p.nextAppointmentAt ? day(p.nextAppointmentAt) : "None coming", note: p.nextAppointmentAt ? "Calendar name: open it in your CRM" : undefined },
-    { id: "appts", label: "Appointments booked", value: plural(p.appointments ?? 0, "appointment", "appointments") },
+    { id: "conv", label: "Last conversation", value: f?.lastConversation ? lastConversationLine(f.lastConversation) : p.hasConversation ? "A conversation is on file" : "No conversation", note: p.hasConversation && !f ? "Date, channel and who wrote last: we cannot see this yet (needs permission)" : undefined },
+    { id: "open", label: "Open deals", value: deals, note: open.length ? open.map(dealLine).join("; ") : p.openDeals > 0 && !f ? "Pipeline and stage: open it in your CRM" : undefined },
+    { id: "won", label: "Won deals", value: p.wonDeals > 0 ? plural(p.wonDeals, "won deal", "won deals") : "No won deals", note: won.length ? won.map(dealLine).join("; ") : undefined },
+    { id: "next", label: "Upcoming appointment", value: p.nextAppointmentAt ? day(p.nextAppointmentAt) : "None coming", note: f?.nextCalendar ? `Calendar: ${f.nextCalendar}` : p.nextAppointmentAt && !f ? "Calendar name: open it in your CRM" : undefined },
+    { id: "appts", label: "Appointments booked", value: plural(p.appointments ?? 0, "appointment", "appointments"), note: f?.calendars.length ? `Calendars: ${f.calendars.join(", ")}` : undefined },
     { id: "pay", label: "Ongoing payments and subscriptions", value: null }, { id: "inv", label: "Invoices", value: null },
     { id: "wf", label: "Automations enrolled in", value: null }, { id: "camp", label: "Campaigns", value: null }, { id: "course", label: "Courses, memberships and products", value: null },
     { id: "notes", label: "Notes and tasks", value: null },
     { id: "dnd", label: "Do Not Disturb", value: p.dnd === true ? "On" : "Not on", note: "Per-channel flags: we cannot see this yet (needs permission)" },
-    { id: "oppowner", label: "Opportunities owner", value: null }, { id: "cf", label: "Custom fields that differ", value: null },
+    { id: "oppowner", label: "Opportunities owner", value: f ? (owners.length ? owners.join(", ") : "No deals, or no owner on them") : null }, { id: "cf", label: "Custom fields that differ", value: null },
   ];
 }
 

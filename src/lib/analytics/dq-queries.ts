@@ -154,13 +154,13 @@ export async function listGroups(s: Scope, tier: Tier, after: Array<string | num
   return { rows: out, next: rows.length > lim && last ? encodeCur([last.location_id as string, last.group_key as string]) : null };
 }
 
-/** The "certain" groups with nobody protected in them, for the bulk merge preview. Capped. */
-export async function certainSafe(s: Scope, cap: number): Promise<GroupRow[]> {
+/** The "certain" groups for the bulk merge preview. Capped. By default nobody protected is in them; with includeProtected every group comes back so the preview can say why it skipped it. */
+export async function certainSafe(s: Scope, cap: number, includeProtected = false): Promise<GroupRow[]> {
   const out: GroupRow[] = [];
   let after: Array<string | number> | null = null;
   for (let n = 0; n < 12 && out.length < cap; n++) {
     const p = await listGroups(s, "certain", after, 50);
-    out.push(...p.rows.filter((r) => r.protectedCount === 0 && !r.trimmed));
+    out.push(...(includeProtected ? p.rows : p.rows.filter((r) => r.protectedCount === 0 && !r.trimmed)));
     after = p.next ? decodeCur(p.next, 2) : null;
     if (!after) break;
   }
