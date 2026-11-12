@@ -2,7 +2,7 @@
 
 import { Check, RefreshCw, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { changedLine, progressWords, type AccountProgress, type RunStatus } from "@/lib/sync/run-status";
+import { changedLine, progressWords, stepTime, STUCK_AFTER_MS, verdict, type RunStatus, type StepRow } from "@/lib/sync/run-status";
 import type { Freshness } from "@/lib/sync/freshness";
 import { useApiClient, useData } from "../session";
 
@@ -10,9 +10,9 @@ import { useApiClient, useData } from "../session";
 // "Synced just now: N contacts, M conversations, K appointments updated" with what changed, or an error with Retry. An agency can sync one client or all of them.
 // The server lets one sync start per account every 30 seconds and answers a second press with how long to wait.
 type Run = RunStatus & { line?: string };
-type Phase = { kind: "idle" } | { kind: "running"; since: string; run: Run | null } | { kind: "done"; run: Run } | { kind: "error"; message: string; retryAfterSec?: number };
+type Phase = { kind: "idle" } | { kind: "running"; since: string; run: Run | null; elapsed: number } | { kind: "done"; run: Run } | { kind: "error"; message: string; retryAfterSec?: number } | { kind: "stuck"; message: string; run: Run };
 const POLL_MS = 2000;
-const GIVE_UP_MS = 120_000;
+const GIVE_UP_MS = STUCK_AFTER_MS;
 
 export function SyncNow({ agency = false }: { agency?: boolean }) {
   const api = useApiClient();
@@ -33,8 +33,16 @@ export function SyncNow({ agency = false }: { agency?: boolean }) {
       try {
         const run = await api.get<Run>(`sync-run?since=${encodeURIComponent(since)}`);
         if (!alive.current) return;
-        if (run.state === "syncing" && Date.now() - started < GIVE_UP_MS) { setPhase({ kind: "running", since, run }); poll.current(since, started); return; }
-        if (run.state === "error") { setPhase({ kind: "error", message: run.errors[0]?.error ?? "A read failed." }); return; }
+        const elapsed = Date.now() - started;
+        if (run.state === "syncing" && elapsed < GIVE_UP_MS) { setPhase({ kind: "running", since, run, elapsed }); poll.current(since, started); return; }
+        // Past two minutes the popup stops waiting and says which step is holding it up, instead of "Syncing..." for ever (the work carries on in the background).
+        if (run.state === "syncing") { setPhase({ kind: "stuck", message: verdict(elapsed, run.steps ?? []).text, run }); void fresh.reload(); return; }
+        if (run.state === "error") {
+          const bad = (run.steps ?? []).filter((x) => x.state === "failed");
+          const named = bad.slice(0, 3).map((x) => `${x.label}${x.name ? ` for ${x.name}` : ""}`).join(", ");
+          setPhase({ kind: "error", message: bad.length ? `${named} did not finish: ${bad[0].error ?? "a read failed"}` : run.errors[0]?.error ?? "A read failed." });
+          return;
+        }
         setPhase({ kind: "done", run }); void fresh.reload();
       } catch (e) { if (alive.current) setPhase({ kind: "error", message: (e as Error).message }); }
     }, POLL_MS);
@@ -42,10 +50,14 @@ export function SyncNow({ agency = false }: { agency?: boolean }) {
 
   const start = async () => {
     const since = new Date().toISOString();
-    setOpen(true); setPhase({ kind: "running", since, run: null });
-    poll.current(since, Date.now());
-    try { await api.post(target === "all" ? "sync" : `sync/${target}`); }
-    catch (e) {
+    setOpen(true); setPhase({ kind: "running", since, run: null, elapsed: 0 });
+    const started = Date.now();
+    poll.current(since, started);
+    try {
+      await api.post(target === "all" ? "sync" : `sync/${target}`);
+      // Keep the work going side by side until nothing is left (each call works a few seconds), so the sync does not wait for the next scheduled run.
+      void (async () => { while (alive.current && Date.now() - started < GIVE_UP_MS) { const w = await api.post<{ moreWork?: boolean }>("sync/work").catch(() => null); if (!w || w.moreWork === false) break; } })();
+    } catch (e) {
       if (timer.current) clearTimeout(timer.current);
       const msg = (e as Error).message; const wait = /in (\d+) seconds/.exec(msg)?.[1];
       setPhase({ kind: "error", message: msg, retryAfterSec: wait ? Number(wait) : undefined });
@@ -65,7 +77,7 @@ export function SyncNow({ agency = false }: { agency?: boolean }) {
       {open && (
         <div role="dialog" aria-label="Sync status" data-testid="sync-popup" className="absolute right-0 top-full z-50 mt-2 w-[min(24rem,90vw)] rounded-xl border bg-popover p-4 text-sm text-popover-foreground shadow-[var(--shadow-lift)]">
           <div className="mb-2 flex items-start justify-between gap-2">
-            <p className="font-semibold" data-testid="sync-title">{phase.kind === "running" ? "Syncing..." : phase.kind === "done" ? "Synced just now" : phase.kind === "error" ? "The sync did not finish" : "Sync"}</p>
+            <p className="font-semibold" data-testid="sync-title">{phase.kind === "running" ? "Syncing..." : phase.kind === "done" ? "Synced just now" : phase.kind === "error" ? "The sync did not finish" : phase.kind === "stuck" ? "Still working" : "Sync"}</p>
             <button type="button" aria-label="Close" onClick={() => setOpen(false)} className="-m-1 rounded-md p-1.5 hover:bg-muted"><X aria-hidden className="size-4" /></button>
           </div>
           {accounts && accounts.length > 1 && phase.kind !== "running" && (
@@ -75,9 +87,10 @@ export function SyncNow({ agency = false }: { agency?: boolean }) {
               </select>
             </label>
           )}
-          {phase.kind === "running" && <Progress run={phase.run} />}
+          {phase.kind === "running" && <Progress run={phase.run} elapsedMs={phase.elapsed} />}
           {phase.kind === "done" && <Done run={phase.run} />}
           {phase.kind === "error" && <p className="text-[var(--destructive)]" data-testid="sync-error">{phase.message}</p>}
+          {phase.kind === "stuck" && (<div data-testid="sync-stuck"><p className="text-[var(--warning,#b45309)]">{phase.message}</p><Steps steps={phase.run.steps ?? []} /></div>)}
           {phase.kind !== "running" && (
             <button type="button" onClick={() => void start()} data-testid="sync-retry" className="ds-press mt-3 inline-flex min-h-9 items-center rounded-lg border px-3 font-medium hover:bg-muted">{phase.kind === "error" ? "Retry" : "Sync again"}</button>
           )}
@@ -87,14 +100,30 @@ export function SyncNow({ agency = false }: { agency?: boolean }) {
   );
 }
 
-function Progress({ run }: { run: Run | null }) {
+function Steps({ steps }: { steps: StepRow[] }) {
+  if (steps.length === 0) return null;
+  const mark = { waiting: "Waiting", running: "Working", done: "Done", failed: "Failed" } as const;
+  return (
+    <ul className="mt-2 max-h-48 space-y-0.5 overflow-y-auto text-xs" data-testid="sync-steps">
+      {steps.slice(0, 24).map((x, i) => (
+        <li key={`${x.locationId}${x.type}${i}`} className="flex justify-between gap-2" title={x.error ?? undefined}>
+          <span className="truncate">{x.label}{x.name ? ` - ${x.name}` : ""}</span>
+          <span className={`tabular-nums ${x.state === "failed" ? "text-[var(--destructive)]" : "text-muted-foreground"}`}>{mark[x.state]}{x.ms !== null && x.state !== "waiting" ? ` ${stepTime(x.ms)}` : ""}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function Progress({ run, elapsedMs }: { run: Run | null; elapsedMs: number }) {
   const total = run?.progress.total ?? 0; const pct = total > 0 ? Math.round(((run?.progress.done ?? 0) / total) * 100) : 0;
-  const rows: AccountProgress[] = (run?.accounts ?? []).slice(0, 8);
+  const v = verdict(elapsedMs, run?.steps ?? []);
   return (
     <div data-testid="sync-progress">
       <div className="h-1.5 overflow-hidden rounded-full bg-muted" aria-hidden><div className="h-full rounded-full bg-primary transition-all" style={{ width: `${pct}%` }} /></div>
       <p className="mt-1.5 text-xs text-muted-foreground" role="status">{progressWords(run?.progress ?? { done: 0, total: 0 })}</p>
-      {rows.length > 0 && <ul className="mt-2 max-h-40 space-y-0.5 overflow-y-auto text-xs">{rows.map((a) => <li key={a.locationId} className="flex justify-between gap-2"><span className="truncate">{a.name ?? "Client"}</span><span className="tabular-nums text-muted-foreground">{a.pending > 0 ? `${a.done}/${a.done + a.pending + a.failed}` : "done"}</span></li>)}</ul>}
+      {v.kind !== "working" && <p className="mt-1.5 text-xs text-[var(--warning,#b45309)]" data-testid="sync-slow">{v.text}</p>}
+      <Steps steps={run?.steps ?? []} />
     </div>
   );
 }

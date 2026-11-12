@@ -21,7 +21,7 @@ import { SYNCED_DELETE } from "../tenant-tables";
 import { SHARE_LINK_DAYS } from "../data-inventory";
 import { createKey, listKeys, MAX_KEYS, revokeKey } from "../mcp/store";
 import { postToSlack } from "../notify";
-import { changedLine, runState, SYNC_THROTTLE_MS, throttle, type RunStatus } from "../sync/run-status";
+import { changedLine, runState, stepRows, SYNC_THROTTLE_MS, throttle, type RunStatus } from "../sync/run-status";
 import { enqueueFullSync, enqueueLocationSync, runSlice, syncStatus } from "../sync/engine";
 import { freshnessFor, syncPanel } from "../sync/freshness-queries";
 import {
@@ -1487,6 +1487,9 @@ async function purgeData(ctx: Ctx) {
   return json({ ok: true });
 }
 
+const SYNC_SLICE_MS = 12_000;
+const SYNC_WORKERS = 4;
+
 // One sync per account per 30 seconds: the latest queued job of this scope (one account, or the whole company) decides.
 async function syncTooSoon(ctx: Ctx, locationId: string | null) {
   const [r] = await sql()`select max(created_at) t from sync_jobs where installation_id = ${ctx.installationId} and (${locationId}::text is null or location_id = ${locationId})`;
@@ -1506,7 +1509,7 @@ async function syncRunView(ctx: Ctx) {
   const allowed = await allowedIds(ctx);
   const only = allowed ? sql()`and location_id = any(${allowed}::text[])` : sql()``;
   const db = sql();
-  const [jobs, names, c1, c2, c3, fails, [last]] = await Promise.all([
+  const [jobs, names, c1, c2, c3, fails, [last], stepJobs] = await Promise.all([
     db`select location_id, status, count(*)::int n from sync_jobs where installation_id = ${ctx.installationId} and created_at >= ${since} and location_id is not null ${only} group by location_id, status`,
     db`select location_id, name from locations where installation_id = ${ctx.installationId} ${only}`,
     db`select location_id, count(*)::int n from cached_contacts where installation_id = ${ctx.installationId} and synced_at >= ${since} ${only} group by location_id`,
@@ -1514,6 +1517,7 @@ async function syncRunView(ctx: Ctx) {
     db`select location_id, count(*)::int n from cached_appointments where installation_id = ${ctx.installationId} and synced_at >= ${since} ${only} group by location_id`,
     db`select location_id, error from sync_jobs where installation_id = ${ctx.installationId} and created_at >= ${since} and status = 'failed' ${only} order by finished_at desc limit 5`,
     db`select max(finished_at) f from sync_jobs where installation_id = ${ctx.installationId} and status = 'done'`,
+    db`select type, location_id, status, started_at, finished_at, error from sync_jobs where installation_id = ${ctx.installationId} and created_at >= ${since} and location_id is not null ${only} order by created_at, id limit 60`,
   ]);
   const nameOf = new Map(names.map((r) => [r.location_id as string, (r.name as string | null) ?? null]));
   const acc = new Map<string, { locationId: string; name: string | null; pending: number; done: number; failed: number }>();
@@ -1535,6 +1539,7 @@ async function syncRunView(ctx: Ctx) {
   const out: RunStatus = {
     state: runState(tot), startedAt: since.toISOString(), lastFinishedAt: last?.f instanceof Date ? last.f.toISOString() : null, accounts, progress: { done: tot.done + tot.failed, total: tot.pending + tot.done + tot.failed },
     changed, changes, errors: fails.map((f) => ({ locationId: (f.location_id as string | null) ?? null, error: String(f.error ?? "A read failed").slice(0, 160) })),
+    steps: stepRows(stepJobs as never, nameOf, Date.now()),
   };
   return json({ ...out, line: changedLine(changed) });
 }
@@ -1547,8 +1552,8 @@ async function syncStart(ctx: Ctx) {
   const tooSoon = await syncTooSoon(ctx, ctx.limitTo ?? null);
   if (tooSoon) return tooSoon;
   await enqueueFullSync(ctx.installationId);
-  // Do a short slice now so the first results appear quickly; cron continues the rest.
-  const slice = await runSlice(20_000);
+  // Work now, side by side, on this install only; the popup keeps calling sync/work until nothing is left, and cron catches anything that is still open.
+  const slice = await runSlice(SYNC_SLICE_MS, { installationId: ctx.installationId, locationId: ctx.limitTo ?? null, concurrency: SYNC_WORKERS });
   return json({ ok: true, ...slice, status: await syncStatus(ctx.installationId) });
 }
 
@@ -2025,7 +2030,15 @@ async function resyncOne(ctx: Ctx, locationId: string) {
   const tooSoon = await syncTooSoon(ctx, locationId);
   if (tooSoon) return tooSoon;
   await enqueueLocationSync(ctx.installationId, locationId);
-  const slice = await runSlice(15_000);
+  // Only this account's steps, side by side: a small account is finished in well under 20 seconds, whoever else is queued.
+  const slice = await runSlice(SYNC_SLICE_MS, { installationId: ctx.installationId, locationId, concurrency: SYNC_WORKERS });
+  return json({ ok: true, ...slice });
+}
+
+// The sync popup keeps calling this while steps are still waiting (each call works for a few seconds, side by side), so a sync never waits for the next 5-minute tick.
+async function syncWork(ctx: Ctx) {
+  if (ctx.demo) return json({ ok: true, moreWork: false });
+  const slice = await runSlice(SYNC_SLICE_MS, { installationId: ctx.installationId, locationId: ctx.limitTo ?? null, concurrency: SYNC_WORKERS });
   return json({ ok: true, ...slice });
 }
 
@@ -2382,8 +2395,9 @@ async function dispatch(ctx: Ctx): Promise<Response> {
         await dismissAlert(ctx.installationId, b);
         return json({ ok: true });
       }
-      if (a === "sync" && b && LOCATION_ID.test(b)) return await resyncOne(ctx, b);
+      if (a === "sync" && b && b !== "work" && LOCATION_ID.test(b)) return await resyncOne(ctx, b);
       if (a === "sync" && !b) return await syncStart(ctx);
+      if (a === "sync" && b === "work") return await syncWork(ctx);
       if (a === "call-lists" && !b) return await callListCreate(ctx);
       if (a === "call-outcomes" && !b) return await callOutcomeCreate(ctx);
       if (a === "settings" && b === "test-slack") return await testSlack(ctx);

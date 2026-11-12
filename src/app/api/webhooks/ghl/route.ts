@@ -13,6 +13,23 @@ import { eventFromWebhook, leadEventFromWebhook } from "@/lib/analytics/touch-ev
 import { recordLeadEvents, recordTouchEvents } from "@/lib/analytics/touch-events-db";
 import { onContactCreated } from "@/lib/ghl/arrival";
 
+/** The company that holds this client account, when the event did not name one. */
+async function companyOfLocation(locationId: string): Promise<string | null> {
+  const [r] = await sql()`
+    select i.company_id from locations l join installations i on i.id = l.installation_id
+    where l.location_id = ${locationId} and i.uninstalled_at is null and not i.is_demo and i.mode <> 'business' limit 1`;
+  return (r?.company_id as string | undefined) ?? null;
+}
+/** What became of an event, for the support view (webhook_events.outcome, added by migration 20261230090000; never stops the handler if it is not there yet). */
+async function markOutcome(webhookId: string | null, outcome: string): Promise<void> {
+  if (!webhookId) return;
+  await sql()`update webhook_events set outcome = ${outcome.slice(0, 120)}, handled_at = now() where webhook_id = ${webhookId}`.catch(() => undefined);
+}
+async function liftDuplicateMark(webhookId: string | null): Promise<void> {
+  if (!webhookId) return;
+  await sql()`delete from webhook_events where webhook_id = ${webhookId}`.catch(() => undefined);
+}
+
 // Receives platform webhooks. Verify the Ed25519 signature on the body, drop duplicates (failed
 // deliveries are retried up to 12 times), then queue work and return fast: heavy lifting
 // happens in the sync worker, never here.
@@ -60,11 +77,15 @@ export async function POST(request: Request) {
       }
       if (event.type === "PlanChange") return NextResponse.json({ ok: true });
     }
-    if (action.kind === "ignore" || !event.companyId) return NextResponse.json({ ok: true });
+    if (action.kind === "ignore") return NextResponse.json({ ok: true });
 
     // A client account that installed the app for itself has its own install, keyed by its location.
     const own = event.locationId ? await getInstallation(businessKey(event.locationId)) : null;
-    const installation = await getInstallation(event.companyId);
+    // Contact, message and appointment events name the account (locationId) but often NOT the company: the company then comes from the accounts we hold. Dropping those
+    // events (the old behaviour) meant a person added in the CRM never reached SubSync until the next full read.
+    const companyId = event.companyId ?? (event.locationId ? await companyOfLocation(event.locationId) : null);
+    if (!companyId && !own) { await markOutcome(event.webhookId, "ignored: no company or account found"); return NextResponse.json({ ok: true }); }
+    const installation = companyId ? await getInstallation(companyId) : null;
     // The platform tells us about the notes and comments SubSync itself wrote. Those echoes are dropped (INTEGRATIONS_SPEC section 10): no loop, no recount.
     if (event.type === "OutboundMessage" || event.type === "NoteCreate") {
       for (const target of [own, installation]) {
@@ -77,7 +98,7 @@ export async function POST(request: Request) {
       // A single client account removing the app deletes just its data from the agency's install;
       // the agency removing it deletes everything and the tokens.
       if (event.locationId && installation) await purgeLocationData(installation.id, event.locationId);
-      else if (!own) await purgeInstallation(event.companyId);
+      else if (!own && event.companyId) await purgeInstallation(event.companyId);
     } else {
       // The account may be covered by its own install, the agency's, or both.
       for (const target of [own, installation]) {
@@ -103,9 +124,12 @@ export async function POST(request: Request) {
         if (event.type === "ContactCreate" && event.locationId) await onContactCreated(target.id, target.companyId, event.locationId, parsed);
       }
     }
+    await markOutcome(event.webhookId, "handled");
     return NextResponse.json({ ok: true });
   } catch (error) {
-    // A non-2xx makes the platform retry, which is what we want for transient failures.
+    // A non-2xx makes the platform retry, which is what we want for transient failures. The duplicate mark is lifted first: otherwise the retry would be
+    // dropped as "already seen" and the event lost for good.
+    await liftDuplicateMark(event.webhookId);
     console.error("Webhook handling failed", { type: event.type, message: safeError(error) });
     return NextResponse.json({ error: "Temporary failure" }, { status: 500 });
   }
