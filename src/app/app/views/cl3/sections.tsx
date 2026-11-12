@@ -6,7 +6,7 @@ import { EmptyState } from "../../ds";
 import { RoleChip } from "../../roles";
 import { useCl, type ClParams } from "./data";
 import { AccountSettings } from "./settings";
-import { ago, change, day, Find, Load, minutes, money, NOT_ENOUGH, NOT_FROM_PLATFORM, Pager, RECONNECT, Spark } from "./shared";
+import { ago, change, day, Find, LevelChip, Load, minutes, money, NOT_ENOUGH, NOT_FROM_PLATFORM, Pager, RECONNECT, Spark } from "./shared";
 
 // The sections of the Clients screen that read their own part: Trends, Compare accounts, Reports, People, Setup health (with the plan and subscription list). Reads only, except the settings
 // panel opened from Reports. Every figure is a count from synced data; anything under its minimum says "Not enough data".
@@ -56,32 +56,75 @@ export function Trends({ filters }: Shared) {
   );
 }
 
+type Side = Cl3Compare["sides"][number];
+type CmpLine = [label: string, get: (s: Side) => number | null, fmt: (n: number) => string, higherBetter: boolean];
+const pct = (n: number) => `${Math.round(n * 100)}%`;
+const CMP_GROUPS: Array<[string, CmpLine[]]> = [
+  ["Leads and replies", [["New leads", (s) => s.newLeads, String, true], ["Waiting for a reply", (s) => s.waiting, String, false], ["Median first reply", (s) => s.medianReplyMinutes, (n) => minutes(n), false]]],
+  ["Appointments", [["Booked", (s) => s.booked, String, true], ["Show rate", (s) => s.showRate.value, pct, true]]],
+  ["Deals and money", [["Money won", (s) => s.wonValue, money, true], ["Open deal value", (s) => s.openValue, money, true], ["Stuck deals", (s) => s.staleDealsPct.value, pct, false]]],
+  ["Team and data", [["Staff messages", (s) => s.staffMessages, String, true], ["Contacts with no owner", (s) => s.noOwnerPct.value, pct, false]]],
+];
+
+/** A searchable account picker (works for 50+ accounts): type to filter, pick from the list. */
+function AccountPick({ label, value, accounts, onPick }: { label: string; value: string; accounts: Array<{ locationId: string; name: string }>; onPick: (id: string) => void }) {
+  const current = accounts.find((x) => x.locationId === value)?.name ?? "";
+  const [text, setText] = useState(current);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { setText(current); }, [current]);
+  const listId = `cl-cmp-${label.replace(/\W/g, "")}`;
+  return (
+    <label className="ap-search" style={{ minWidth: 200 }}><span className="sr-only">{label}</span>
+      <input list={listId} value={text} placeholder={label} aria-label={label} data-testid={`cl-pick-${label.split(" ")[0].toLowerCase()}`}
+        onFocus={(e) => e.currentTarget.select()}
+        onChange={(e) => { setText(e.target.value); const hit = accounts.find((x) => x.name === e.target.value); if (hit) onPick(hit.locationId); }} />
+      <datalist id={listId}>{accounts.map((x) => <option key={x.locationId} value={x.name} />)}</datalist>
+    </label>
+  );
+}
+
 export function Compare({ options, filters }: { options: Cl3Options | null; filters: ClParams }) {
   const accts = options?.accounts ?? [];
   const [a, setA] = useState(""), [b, setB] = useState("");
   const A = a || accts[0]?.locationId || "", B = b || accts[1]?.locationId || "";
   const r = useCl<Cl3Compare>("compare", { ...filters, ids: A && B ? `${A},${B}` : undefined }, !(A && B));
   if (accts.length < 2) return <EmptyState title="Compare needs two client accounts" body="Once at least two client accounts have synced, you can put them side by side here." />;
-  const lines: Array<[string, (s: Cl3Compare["sides"][number]) => number | null, (n: number) => string, boolean]> = [
-    ["New leads", (s) => s.newLeads, String, true], ["Waiting for a reply", (s) => s.waiting, String, false], ["Median first reply", (s) => s.medianReplyMinutes, (n) => minutes(n), false],
-    ["Appointments booked", (s) => s.booked, String, true], ["Show rate", (s) => s.showRate.value, (n) => `${Math.round(n * 100)}%`, true], ["Money won", (s) => s.wonValue, money, true], ["Open deal value", (s) => s.openValue, money, true],
-    ["Stuck deals", (s) => s.staleDealsPct.value, (n) => `${Math.round(n * 100)}%`, false], ["Staff messages", (s) => s.staffMessages, String, true], ["Contacts with no owner", (s) => s.noOwnerPct.value, (n) => `${Math.round(n * 100)}%`, false],
-  ];
-  const sel = (label: string, v: string, set: (s: string) => void) => <select className="ap-field" aria-label={label} value={v} onChange={(e) => set(e.target.value)}>{accts.map((x) => <option key={x.locationId} value={x.locationId}>{x.name}</option>)}</select>;
   return (
     <div data-testid="cl-compare">
-      <div className="ap-head print:hidden">{sel("First account", A, setA)}<span className="ap-fine">against</span>{sel("Second account", B, setB)}</div>
+      <div className="ap-head print:hidden"><AccountPick label="First account" value={A} accounts={accts} onPick={setA} /><span className="ap-fine">against</span><AccountPick label="Second account" value={B} accounts={accts} onPick={setB} /></div>
       <Load r={r} empty={(c) => c.sides.length < 2 && "Pick two different accounts."}>
-        {(c) => (
-          <>
-            <div className="ap-scroll"><table className="ap-t" style={{ minWidth: 420 }}><thead><tr><th>Selected period</th>{c.sides.map((s) => <th key={s.locationId} data-num>{s.name}</th>)}</tr></thead>
-              <tbody>{lines.map(([label, f, fmt, high]) => {
-                const v = c.sides.map(f), x = v[0], y = v[1], win = x === null || y === null || x === y ? -1 : (x > y) === high ? 0 : 1;
-                return <tr key={label} style={{ cursor: "default" }}><td>{label}</td>{v.map((n, i) => <td key={i} data-num data-win={win === i ? "1" : undefined}>{n === null ? NOT_ENOUGH : fmt(n)}</td>)}</tr>;
-              })}</tbody></table></div>
-            <p className="ap-fine mt-2">The bold number is the stronger of the two. Neither is a score: they are plain counts from your CRM.</p>
-          </>
-        )}
+        {(c) => {
+          const [x, y] = c.sides;
+          // Only rows where at least one account has a value; the better value (when both have one and they differ) is marked.
+          const groups = CMP_GROUPS.map(([title, lines]) => [title, lines.flatMap(([label, get, fmt, high]) => {
+            const v = [get(x), get(y)] as [number | null, number | null];
+            if (v[0] === null && v[1] === null) return [];
+            const win = v[0] === null || v[1] === null || v[0] === v[1] ? -1 : (v[0] > v[1]) === high ? 0 : 1;
+            return [{ label, text: v.map((n) => (n === null ? "No data" : fmt(n))) as [string, string], win }];
+          })] as const).filter(([, rows]) => rows.length > 0);
+          const better = [0, 0];
+          for (const [, rows] of groups) for (const r2 of rows) if (r2.win >= 0) better[r2.win]++;
+          const lead = better[0] === better[1] ? null : better[0] > better[1] ? 0 : 1;
+          const sentence = groups.length === 0 ? "Neither account has enough data to compare yet." : lead === null ? `${x.name} and ${y.name} are level on the numbers that differ.` : `${c.sides[lead].name} is ahead on ${better[lead]} of ${better[0] + better[1]} measures that differ.`;
+          return (
+            <div className="cl-cmp" data-testid="cl-cmp-cards">
+              <p className="cl-cmp-sum" data-testid="cl-cmp-summary">{sentence}</p>
+              <div className="cl-cmp-grid">
+                {[x, y].map((s, i) => (
+                  <section key={s.locationId} className="cl-cmp-card" aria-label={s.name}>
+                    <header><b>{s.name}</b><LevelChip level={s.level} /></header>
+                    {groups.map(([title, rows], gi) => (
+                      <details key={title} open={gi === 0}><summary>{title}</summary>
+                        <dl>{rows.map((row) => <div key={row.label} data-better={row.win === i ? "1" : undefined}><dt>{row.label}</dt><dd>{row.text[i]}{row.win === i && <span className="cl-cmp-mark" title="The stronger of the two"> ▲</span>}</dd></div>)}</dl>
+                      </details>
+                    ))}
+                  </section>
+                ))}
+              </div>
+              <p className="ap-fine mt-2">The marked value is the stronger of the two. Neither is a score: they are plain counts from your CRM. Rows with no data are left out.</p>
+            </div>
+          );
+        }}
       </Load>
     </div>
   );

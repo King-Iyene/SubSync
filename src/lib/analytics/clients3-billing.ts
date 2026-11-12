@@ -30,10 +30,10 @@ export async function refreshClientBilling(inst: string): Promise<number> {
   const accts = await db`select location_id from locations where installation_id = ${inst} and not ignored`;
   const getter = await get(token);
   const result = await readSaasPlans(getter, companyKey);
-  let before = new Map<string, { status: string | null; since: Date | null }>();
+  let before = new Map<string, { status: string | null; since: Date | null; plan: string | null }>();
   try {
-    const p = await db`select location_id, subscription_status, status_since from client_billing where installation_id = ${inst}`;
-    before = new Map(p.map((x) => [x.location_id as string, { status: (x.subscription_status as string | null) ?? null, since: (x.status_since as Date | null) ?? null }]));
+    const p = await db`select location_id, subscription_status, status_since, plan_name from client_billing where installation_id = ${inst}`;
+    before = new Map(p.map((x) => [x.location_id as string, { status: (x.subscription_status as string | null) ?? null, since: (x.status_since as Date | null) ?? null, plan: (x.plan_name as string | null) ?? null }]));
   } catch { /* the Clients v2 columns are not there yet: the older write below still works */ }
   const reason = result.failed === null ? null : result.failed === 401 || result.failed === 403 ? "The platform refused the read (permission). Reconnect and allow plan access." : `The platform answered ${result.failed} when asked for plans.`;
   let written = 0;
@@ -49,6 +49,8 @@ export async function refreshClientBilling(inst: string): Promise<number> {
         on conflict (installation_id, location_id) do update set state = excluded.state, plan_id = excluded.plan_id, plan_name = excluded.plan_name, subscription_status = excluded.subscription_status, fetched_at = now(),
           subscription_id = excluded.subscription_id, price_amount = excluded.price_amount, price_currency = excluded.price_currency, billing_interval = excluded.billing_interval, trial_days = excluded.trial_days,
           user_limit = excluded.user_limit, contact_limit = excluded.contact_limit, status_since = excluded.status_since, http_status = excluded.http_status, reason = excluded.reason`;
+      if (old && r.state === "ok" && old.plan !== null && r.planName !== null && old.plan !== r.planName) await db`insert into cl3_history (installation_id, location_id, kind, from_value, to_value) values (${inst}, ${id}, 'plan', ${old.plan}, ${r.planName})`.catch(() => undefined);
+      if (changed) await db`insert into cl3_history (installation_id, location_id, kind, from_value, to_value) values (${inst}, ${id}, 'status', ${old?.status ?? null}, ${r.status})`.catch(() => undefined);
       if (changed) await db`insert into cl2_plan_events (installation_id, location_id, from_status, to_status, plan_name) values (${inst}, ${id}, ${old?.status ?? null}, ${r.status}, ${r.planName})`;
     } catch {
       await db`insert into client_billing (installation_id, location_id, state, plan_id, plan_name, subscription_status, fetched_at)
@@ -58,6 +60,7 @@ export async function refreshClientBilling(inst: string): Promise<number> {
     written++;
   }
   await refreshWallets(inst, getter, accts.map((a) => a.location_id as string)).catch(() => undefined);
+  await refreshAppInstalls(inst, getter, companyKey).catch(() => undefined);
   return written;
 }
 
@@ -68,7 +71,7 @@ const WALLET_PACE_MS = 120;
 async function refreshWallets(inst: string, get: Getter, ids: string[]): Promise<void> {
   if (!ids.length) return;
   const db = sql();
-  const due = await db`select l.location_id from locations l left join client_billing b on b.installation_id = l.installation_id and b.location_id = l.location_id
+  const due = await db`select l.location_id, b.wallet_balance prev from locations l left join client_billing b on b.installation_id = l.installation_id and b.location_id = l.location_id
     where l.installation_id = ${inst} and not l.ignored and l.location_id = any(${ids}::text[]) and (b.wallet_at is null or b.wallet_at < now() - ${`${WALLET_EVERY_HOURS} hours`}::interval)
     order by b.wallet_at nulls first limit ${WALLET_PER_RUN}`;
   for (const d of due) {
@@ -78,6 +81,8 @@ async function refreshWallets(inst: string, get: Getter, ids: string[]): Promise
     const n = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : typeof v === "string" && v.trim() !== "" && Number.isFinite(Number(v)) ? Number(v) : null);
     const ok = r.status >= 200 && r.status < 300;
     const state = ok ? "ok" : r.status === 401 || r.status === 403 ? "needs_permission" : "not_available";
+    const now = ok ? n(body.balance) : null, was = d.prev === null || d.prev === undefined ? null : Number(d.prev);
+    if (now !== null && now <= 0 && was !== null && was > 0) await db`insert into cl3_history (installation_id, location_id, kind) values (${inst}, ${id}, 'wallet_low')`.catch(() => undefined);
     await db`update client_billing set wallet_state = ${state}, wallet_balance = ${ok ? n(body.balance) : null}, wallet_credits = ${ok ? n(body.complimentaryCredits) : null}, wallet_at = now() where installation_id = ${inst} and location_id = ${id}`;
     if (state === "needs_permission") break;
     await new Promise((res) => setTimeout(res, WALLET_PACE_MS));
@@ -108,4 +113,35 @@ export async function billing(s: Scope, f: { q?: string | null; industry?: strin
   const size = o.size, pages = Math.max(1, Math.ceil(out.length / size)), p = Math.min(Math.max(0, o.page), pages - 1);
   const bad = (x: Cl3Billing) => !!x.subscriptionStatus && !/^(active|trialing|trial|paid)$/i.test(x.subscriptionStatus);
   return { rows: out.slice(p * size, p * size + size), total: out.length, page: p, size, pages, truncated: out.length >= 1000, needPermission: out.filter((x) => x.state === "needs_permission").length, notActive: out.filter(bad).length };
+}
+
+const INSTALL_PAGES = 30;
+/** Whether SubSync is installed on each client account, from the platform installed list (agency token, optional permission oauth.readonly, Version v3, up to 100 a page). Only SubSync can be read:
+ *  the platform has no list of other apps in an account. The page-token field name is read as nextPageToken (INFERENCE until scripts/saas-probe.mts is run); without it only the first 100 are stored. */
+async function refreshAppInstalls(inst: string, get: Getter, companyKey: string): Promise<void> {
+  const appId = process.env.GHL_APP_ID;
+  if (!appId) return;
+  const db = sql();
+  const prev = new Map<string, boolean>((await db`select location_id, is_installed from cl3_app_installs where installation_id = ${inst}`.catch(() => [])).map((r) => [r.location_id as string, r.is_installed === true]));
+  let token = "";
+  for (let i = 0; i < INSTALL_PAGES; i++) {
+    const q = `/oauth/installed-${"locations"}?companyId=${encodeURIComponent(companyKey)}&appId=${encodeURIComponent(appId)}&pageSize=100${token ? `&pageToken=${encodeURIComponent(token)}` : ""}`;
+    const r = await get(q, "v3").catch(() => ({ status: 0, body: null }));
+    if (r.status < 200 || r.status >= 300) return;
+    const body = (r.body && typeof r.body === "object" ? r.body : {}) as { items?: unknown; pagination?: { nextPageToken?: unknown; hasNextPage?: unknown } };
+    for (const it of Array.isArray(body.items) ? (body.items as Array<Record<string, unknown>>) : []) {
+      const id = typeof it._id === "string" ? it._id : null;
+      if (!id) continue;
+      const installed = it.isInstalled === true;
+      const at = typeof it.installedAt === "string" && !Number.isNaN(Date.parse(it.installedAt)) ? it.installedAt : null;
+      await db`insert into cl3_app_installs (installation_id, location_id, name, is_installed, version_id, installed_at, seen_at)
+        values (${inst}, ${id}, ${typeof it.name === "string" ? it.name.slice(0, 120) : null}, ${installed}, ${typeof it.versionId === "string" ? it.versionId : null}, ${at}, now())
+        on conflict (installation_id, location_id) do update set name = excluded.name, is_installed = excluded.is_installed, version_id = excluded.version_id, installed_at = excluded.installed_at, seen_at = now()`;
+      const was = prev.get(id);
+      if (was !== undefined && was !== installed) await db`insert into cl3_history (installation_id, location_id, kind) values (${inst}, ${id}, ${installed ? "app_installed" : "app_removed"})`.catch(() => undefined);
+    }
+    const nxt = body.pagination?.nextPageToken;
+    if (body.pagination?.hasNextPage !== true || typeof nxt !== "string" || !nxt) return;
+    token = nxt;
+  }
 }

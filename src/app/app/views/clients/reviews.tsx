@@ -105,9 +105,9 @@ export function ReviewsTab({ accounts }: { accounts: Array<{ locationId: string;
 
           <Section title="How the quarter moved" hint={`Solid line: ${data.quarter.key.replace("-", " ")}. Dashed grey line: ${data.previous.key.replace("-", " ")}, drawn on the same dates.`}>
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-              <LineChart title="Health score" series={trend((d) => d.healthScore)} ceiling={100} axisLabel="0 to 100" min={3} />
-              <LineChart title="Open pipeline" series={trend((d) => d.openValue)} format={moneyShort} axisLabel="deals with a value and an owner" />
-              <LineChart title="New contacts" series={trend((d) => d.newContacts30d)} axisLabel="added in the 30 days before each day" />
+              <LineChart hideFlat title="Health score" series={trend((d) => d.healthScore)} ceiling={100} axisLabel="0 to 100" min={3} />
+              <LineChart hideFlat title="Open pipeline" series={trend((d) => d.openValue)} format={moneyShort} axisLabel="deals with a value and an owner" />
+              <LineChart hideFlat title="New contacts" series={trend((d) => d.newContacts30d)} axisLabel="added in the 30 days before each day" />
             </div>
             <p className="mt-2 text-xs text-muted-foreground">{note}</p>
           </Section>

@@ -20,3 +20,14 @@
 .cl [data-win="1"] { font-weight: 700; }
 @media (max-width: 700px) { .cl-sentence { font-size: 1.0625rem; } .cl-today { padding: 14px; } .cl-pager { justify-content: flex-start; } }
 .cl-notes { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; max-width: 40rem; } .cl-notes p { margin: 2px 0 0; font-size: 0.875rem; white-space: pre-wrap; }
+/* Compare accounts: two compact cards, collapsible groups, only rows with data. */
+.cl-cmp-sum { margin: 0 0 12px; font-size: 1rem; font-weight: 600; }
+.cl-cmp-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.cl-cmp-card { border: 1px solid color-mix(in srgb, var(--s6-edgec) 26%, transparent); border-radius: 12px; padding: 12px 14px; background: var(--s6-surf); min-width: 0; }
+.cl-cmp-card header { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 6px; } .cl-cmp-card header b { overflow-wrap: anywhere; }
+.cl-cmp-card summary { cursor: pointer; font-size: 0.75rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted-foreground); padding: 6px 0; min-height: 28px; }
+.cl-cmp-card dl { margin: 0 0 4px; } .cl-cmp-card dl div { display: flex; justify-content: space-between; gap: 10px; padding: 5px 6px; border-radius: 6px; font-size: 0.875rem; }
+.cl-cmp-card dt { color: var(--muted-foreground); } .cl-cmp-card dd { margin: 0; font-variant-numeric: tabular-nums; text-align: right; }
+.cl-cmp-card [data-better="1"] { background: color-mix(in srgb, var(--s6-cyan) 10%, transparent); } .cl-cmp-card [data-better="1"] dd { font-weight: 650; }
+.cl-cmp-mark { color: var(--s6-cyan); font-size: 0.7rem; }
+@media (max-width: 520px) { .cl-cmp-grid { gap: 8px; } .cl-cmp-card { padding: 10px; } .cl-cmp-card dl div { flex-direction: column; gap: 0; align-items: flex-start; } .cl-cmp-card dd { text-align: left; } }
