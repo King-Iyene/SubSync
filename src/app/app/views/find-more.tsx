@@ -93,7 +93,8 @@ export function useFound(filter: SmartFilter | null) {
     const filter = latest.current;
     if (!filter || !key) return;
     live.current = key;
-    setState((s) => (after ? { ...s, busy: true } : { key, rows: [], total: null, capped: false, next: null, loading: true, error: null, busy: false }));
+    // A new search (another key) starts empty. Reading the SAME search again (a refresh) keeps the people on screen until the new answer lands, so rows are never torn out from under someone who is working on one.
+    setState((s) => (after ? { ...s, busy: true } : s.key === key && s.rows.length > 0 ? { ...s, loading: false, busy: true, error: null } : { key, rows: [], total: null, capped: false, next: null, loading: true, error: null, busy: false }));
     try {
       const p = filterToParams(filter);
       if (after) p.set("after", after);

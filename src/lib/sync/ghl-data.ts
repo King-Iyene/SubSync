@@ -1,3 +1,4 @@
+import { properName } from "../people/names.ts";
 // Fetchers and mappers for the GHL data we cache. Mappers are pure and defensive: the spec for
 // some endpoints (notably contacts) is incomplete, so every field is optional and checked.
 // Never log response bodies: they contain customer data.
@@ -61,7 +62,7 @@ export function mapContact(raw: unknown): ContactRow | null {
   if (!first && !last) {
     const full = str(r.contactName) ?? str(r.name);
     if (full) {
-      const parts = full.split(/\s+/);
+      const parts = properName(full).split(/\s+/);
       first = parts[0] ?? null;
       last = parts.slice(1).join(" ") || null;
     }

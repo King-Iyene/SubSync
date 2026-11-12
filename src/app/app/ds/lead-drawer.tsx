@@ -5,7 +5,8 @@ import { ChevronLeft, ChevronRight, ExternalLink, Maximize2, Minimize2, MoreHori
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { tagColor } from "@/lib/people/tag-colors";
 import type { PersonDetail } from "@/lib/analytics/people-person-queries";
-import { neighbours } from "@/lib/design/ui-logic";
+import { isEditableTarget, neighbours } from "@/lib/design/ui-logic";
+import { draftKey, getDraft } from "@/lib/design/drafts";
 import { withLive } from "@/lib/people/person";
 import { useApiClient, useData } from "../session";
 import { fmtMoney, timeAgo } from "../ui";
@@ -75,7 +76,19 @@ function Body({ seed, top, showAccount, wide, onLogged }: { seed: LeadSeed; top?
   const [tab, setTab] = useState<Tab>(seed.tab ?? "conversation");
   const [threadKey, setThreadKey] = useState(0);
   const [channelPref, setChannelPref] = useState<"SMS" | "Email">("SMS");
-  const [composerOpen, setComposerOpen] = useState(!!seed.reply);
+  // The message box opens by itself when this person has an unsent draft, so the words are never hidden behind "Write a message".
+  const [composerOpen, setComposerOpen] = useState(!!seed.reply || !!getDraft(draftKey(seed.locationId, seed.contactId)));
+  // Re-reading the panel's parts after a change. A re-read never starts while one is still on its way (a new one would cancel the old answer, so a slow CRM would starve the panel
+  // of any answer at all); one more follows when something changed meanwhile. The message box is never part of this: it is not remounted, so a draft is never lost.
+  const refreshing = useRef(false), again = useRef(false);
+  const reloadRef = useRef<() => Promise<unknown>[]>(() => []);
+  useEffect(() => { reloadRef.current = () => [wbq.reload(), person.reload(), extraQ.reload()]; });
+  const refresh = useRef(() => {
+    if (refreshing.current) { again.current = true; return; }
+    refreshing.current = true;
+    setThreadKey((k) => k + 1);
+    void Promise.allSettled(reloadRef.current()).finally(() => { refreshing.current = false; if (again.current) { again.current = false; refresh.current(); } });
+  });
   const runner = useRunner(seed.locationId, seed.contactId, () => { setThreadKey((k) => k + 1); void wbq.reload(); void person.reload(); });
   const data = person.data;
   const c = data?.contact;
@@ -87,7 +100,7 @@ function Body({ seed, top, showAccount, wide, onLogged }: { seed: LeadSeed; top?
     requestAnimationFrame(tick);
   };
   // Live read-through: the CRM is asked right away and every few seconds; when something changed the copy-based parts are reloaded (the copy was updated by that read).
-  const { live, stopped } = useLiveLead(seed.locationId, seed.contactId, () => { setThreadKey((k) => k + 1); void wbq.reload(); void person.reload(); void extraQ.reload(); });
+  const { live, stopped } = useLiveLead(seed.locationId, seed.contactId, () => refresh.current());
 
   // Opening a person is remembered for them alone ("Recently opened", "what changed since you last looked"). It is only recorded once the panel has really shown them.
   const seen = useRef(false);
@@ -166,7 +179,7 @@ function Body({ seed, top, showAccount, wide, onLogged }: { seed: LeadSeed; top?
             ))}
           </div>
           <div role="tabpanel" id="wb-panel" aria-labelledby={`wb-tab-${tab}`} className="pt-5">
-            {tab === "conversation" && <><Thread locationId={seed.locationId} contactId={seed.contactId} reloadKey={threadKey} crmUrl={wb.crmUrl ?? url} /><Composer key={channelPref} ctx={wb} runner={runner} initial={channelPref} open={composerOpen} onOpenChange={setComposerOpen} focusOnMount={!!seed.reply} /></>}
+            {tab === "conversation" && <><Thread locationId={seed.locationId} contactId={seed.contactId} reloadKey={threadKey} crmUrl={wb.crmUrl ?? url} /><Composer ctx={wb} runner={runner} initial={channelPref} open={composerOpen} onOpenChange={setComposerOpen} focusOnMount={!!seed.reply} draftKey={draftKey(seed.locationId, seed.contactId)} /></>}
             {tab === "update" && <UpdateTab ctx={wb} runner={runner} />}
             {tab === "timeline" && data && <TimelinePanel items={timeline} timeZone={tz} note={tlNote} className="max-h-[70vh]" />}
             {tab === "record" && <RecordTab locationId={seed.locationId} contactId={seed.contactId} name={name} account={c?.locationName ?? seed.locationName ?? null} fields={extra?.live.customFields ?? []} />}
@@ -256,7 +269,7 @@ export function LeadDrawer({ leads, index, onIndex, onClose, top, showAccount = 
     if (!open) return;
     const key = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement | null;
-      const typing = !!el && (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || el.isContentEditable);
+      const typing = isEditableTarget(el) || e.isComposing;
       if (e.key === "Escape") { e.stopPropagation(); onClose(); return; } // stop here: a panel underneath must not also close on the same key
       if (e.key === "Tab" && box.current) {
         const items = [...box.current.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((x) => x.offsetParent !== null);

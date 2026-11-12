@@ -53,6 +53,22 @@ export function neighbours(index: number, length: number): { prev: number | null
   return { prev: index > 0 ? index - 1 : null, next: index < length - 1 ? index + 1 : null };
 }
 
+// Typing is never a shortcut. True when a key press came from somewhere text is typed (a box, a text area, a menu list, an editable block) or from an IME that is still composing, so a
+// page shortcut (j, k, /, n, a number) must ignore it. Takes the minimum shape of an element so it can be tested without a browser.
+type MaybeEl = { tagName?: string; isContentEditable?: boolean; getAttribute?: (n: string) => string | null; closest?: (s: string) => unknown } | null | undefined;
+export function isEditableTarget(t: MaybeEl): boolean {
+  if (!t) return false;
+  if (t.isContentEditable) return true;
+  if (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName ?? "")) return true;
+  const ce = t.getAttribute?.("contenteditable");
+  if (ce === "" || ce === "true" || ce === "plaintext-only") return true;
+  return !!t.closest?.("input, textarea, select, [contenteditable='true'], [role='textbox'], [role='combobox'], [role='searchbox']");
+}
+/** A page-level shortcut should do nothing for this key press: a modifier is held, the person is typing, or an input method is composing. */
+export function hotkeyIgnored(e: { target: EventTarget | null; metaKey?: boolean; ctrlKey?: boolean; altKey?: boolean; isComposing?: boolean }): boolean {
+  return !!(e.metaKey || e.ctrlKey || e.altKey || e.isComposing || isEditableTarget(e.target as MaybeEl));
+}
+
 // How long someone has waited, in the shortest plain words: "20 min", "3 hours", "2 days". Never "13 d 0 h" (N30).
 export function waitLabel(minutes: number): string {
   if (!Number.isFinite(minutes) || minutes < 0) return "unknown";

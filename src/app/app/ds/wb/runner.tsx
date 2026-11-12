@@ -3,6 +3,7 @@
 import { Check, RotateCcw, ShieldAlert, X } from "lucide-react";
 import { useCallback, useState, type ReactNode } from "react";
 import type { Action } from "@/lib/ghl/workbench";
+import { resultText } from "@/lib/design/send-result";
 import { ApiError, useApiClient } from "../../session";
 
 // The one way the Lead workbench changes anything: ask the server for a preview, show exactly what will happen, wait for a click, then send it through the server's write gateway.
@@ -12,7 +13,7 @@ export type Mode = { masterOn: boolean; optedIn: boolean; live: boolean; demo: b
 export type Warn = { id: string; text: string };
 export type Plan = { summary: string; blockers: Warn[]; warnings: Warn[]; reversible: boolean; fields: string[] };
 export type Pending = { action: Action; plan: Plan; mode: Mode; /** What will be sent, shown in a quote (a message or a note). Held in the browser only. */ quote?: string; verb: string; typeName?: string };
-export type Result = { tone: "done" | "dry" | "error"; text: string; undo?: Action | null; retry?: Action | null };
+export type Result = { tone: "done" | "dry" | "error"; text: string; /** Which kind of change this is about ("message", "note"...). */ kind?: string; undo?: Action | null; retry?: Action | null };
 
 const BTN = "ds-press inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg border bg-card px-4 text-[15px] font-medium hover:bg-accent focus-visible:outline-2 focus-visible:outline-[var(--ring)] disabled:opacity-50 sm:min-h-10";
 const PRIMARY = "ds-press inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg bg-primary px-5 text-[15px] font-semibold text-primary-foreground hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)] disabled:opacity-50 sm:min-h-10";
@@ -43,8 +44,9 @@ export function useRunner(locationId: string, contactId: string | null, onChange
     try {
       const r = await api.post<{ dryRun?: boolean; message?: string; summary?: string; undo?: Action | null }>("workbench/do", { ...base(action), confirm: true, ack: acks });
       setPending(null);
-      if (r.dryRun) setResult({ tone: "dry", text: `${r.message ?? "Nothing was sent."} ${r.summary ?? ""}`.trim() });
-      else { setResult({ tone: "done", text: `Done. ${r.summary ?? ""}`.trim(), undo: r.undo ?? null }); onChanged(); }
+      // Never silent: a message says "Sent." or "Not sent: ..." in plain words, and the text stays in the box when it was not sent.
+      if (r.dryRun) setResult({ tone: "dry", kind: action.kind, text: resultText(action.kind, true, r.message, r.summary) });
+      else { setResult({ tone: "done", kind: action.kind, text: resultText(action.kind, false, r.message, r.summary), undo: r.undo ?? null }); onChanged(); }
     } catch (e) {
       const body = e instanceof ApiError ? e.body : {};
       if (e instanceof ApiError && e.status === 409 && Array.isArray(body.warnings)) { setPending((p) => (p ? { ...p, plan: { ...p.plan, warnings: body.warnings as Warn[] } } : p)); setResult({ tone: "error", text: "Tick the box to go ahead." }); }

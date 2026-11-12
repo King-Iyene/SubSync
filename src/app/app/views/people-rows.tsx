@@ -1,5 +1,6 @@
 "use client";
 
+import { hotkeyIgnored } from "@/lib/design/ui-logic";
 import { ExternalLink, MoreHorizontal } from "lucide-react";
 import { useCallback, type KeyboardEvent } from "react";
 import { rowLine } from "@/lib/people/rows";
@@ -34,7 +35,7 @@ export function PersonRows({ rows, showAccount, actions, onOpen, testId = "peopl
   const now = useNow(60_000);
   const move = useCallback((e: KeyboardEvent<HTMLUListElement>) => {
     const el = e.target as HTMLElement;
-    if (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (hotkeyIgnored(e)) return;
     const dir = e.key === "j" || e.key === "ArrowDown" ? 1 : e.key === "k" || e.key === "ArrowUp" ? -1 : 0;
     if (dir === 0) return;
     const names = [...e.currentTarget.querySelectorAll<HTMLElement>("[data-row-primary]")];

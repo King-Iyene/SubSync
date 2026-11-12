@@ -1,3 +1,4 @@
+import { properName } from "../people/names.ts";
 import { COUNT_CAP } from "../people/queue";
 import { FIND_PAGE, encodeCursor, type Cursor } from "../people/find";
 import type { SmartFilter } from "../people/filters";
@@ -57,7 +58,7 @@ export async function findPeople(installationId: string, allowed: string[] | nul
       total: counting ? Math.min(n, COUNT_CAP) : null, capped: counting ? n > COUNT_CAP : false, plan,
       next: more && last ? encodeCursor({ rk: 0, ra: last.ra_t as string, rd: last.rd_t as string, loc: last.location_id as string, id: last.contact_id as string }) : null,
       rows: page.map((r) => ({
-        contactId: r.contact_id, locationId: r.location_id, locationName: r.location_name, name: r.name, email: r.email, phone: r.phone, tags: r.tags ?? [], source: r.source,
+        contactId: r.contact_id, locationId: r.location_id, locationName: r.location_name, name: properName(r.name as string), email: r.email, phone: r.phone, tags: r.tags ?? [], source: r.source,
         owner: r.owner, dnd: r.dnd === true, timeZone: r.timezone ?? null, dateAdded: iso(r.date_added), lastActivityAt: iso(r.last_activity_at),
         lastCallAt: iso(r.last_call_at), calls: r.calls, lastResult: r.last_result ?? null,
       })),
