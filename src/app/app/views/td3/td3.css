@@ -41,7 +41,7 @@
 .td-card header p { margin: 2px 0 0; font-size: 0.8125rem; color: var(--muted-foreground); }
 .td-ico { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 8px; color: var(--s6-cyan); background: color-mix(in srgb, var(--s6-cyan) 12%, transparent); }
 .td-card-action { font-size: 0.8125rem; white-space: nowrap; }
-.td-card-body { min-width: 0; overflow-x: auto; }
+.td-card-body { min-width: 0; overflow: auto; max-height: 760px; }
 .td-card-body [data-testid="report-filter"], .td-card-body [data-testid="tab-intro"], .td-card-body [data-testid="today-evidence"] > h2 { display: none; }
 .td-card-body [data-testid="today-evidence"] { margin-bottom: 0; border-top: 0; padding-top: 0; }
 .td-card-body section.mb-12 { margin-bottom: 0; border-top: 0; padding-top: 0; }
