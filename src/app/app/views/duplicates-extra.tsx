@@ -55,9 +55,9 @@ export function Picks({ picks, people }: { picks: FieldPick[]; people: Person[] 
 }
 
 /** Starting the merge from SubSync, through the customer's own merge workflow. Shown only to an administrator; every limit is stated in words. */
-export function WorkflowMerge({ workflow, people, switchedOff, onRun }: { workflow: Workflow; people: Array<Person & { url: string }>; switchedOff: boolean; onRun: () => Promise<string> }) {
+export function WorkflowMerge({ workflow, people, switchedOff, onRun }: { workflow: Workflow; people: Array<Person & { url: string }>; switchedOff: boolean; onRun: (typed: string) => Promise<string> }) {
   const [open, setOpen] = useState(false);
-  const [sure, setSure] = useState(false);
+  const [typed, setTyped] = useState("");
   const [checked, setChecked] = useState(workflow.warnings.length === 0);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -65,6 +65,7 @@ export function WorkflowMerge({ workflow, people, switchedOff, onRun }: { workfl
   const survivor = people.find((p) => p.contactId === workflow.survivorId);
   const enrol = people.find((p) => p.contactId !== workflow.survivorId);
   const blocked = workflow.blockers.length > 0;
+  const phrase = `merge ${(enrol?.name ?? "these contacts").replace(/\s+/g, " ").trim()}`;
   return (
     <div className="mt-5 border-t pt-4" data-testid="dup-workflow">
       {!open ? (
@@ -88,8 +89,8 @@ export function WorkflowMerge({ workflow, people, switchedOff, onRun }: { workfl
               )}
               {checked && (
                 <>
-                  <label className="mt-3 flex min-h-11 items-start gap-2"><input type="checkbox" className="mt-1 size-5" checked={sure} onChange={(e) => setSure(e.target.checked)} data-testid="dup-workflow-sure" /><span>I have looked at both records and want them merged. I understand it cannot be undone.</span></label>
-                  <button type="button" className={`${PRIMARY} mt-2`} disabled={!sure || busy} onClick={async () => { setBusy(true); try { setMsg(await onRun()); } finally { setBusy(false); } }} data-testid="dup-workflow-run">{busy ? "Sending..." : "Start the merge"}</button>
+                  <label className="mt-3 block"><span>This cannot be undone. To go on, type <code className="rounded bg-muted px-1" data-testid="dup-workflow-phrase">{phrase}</code></span><input className="mt-1 min-h-11 w-full rounded-lg border bg-card px-3 text-sm" value={typed} onChange={(e) => setTyped(e.target.value)} autoComplete="off" data-testid="dup-workflow-sure" /></label>
+                  <button type="button" className={`${PRIMARY} mt-2`} disabled={typed.trim().toLowerCase() !== phrase.toLowerCase() || busy} onClick={async () => { setBusy(true); try { setMsg(await onRun(typed)); } finally { setBusy(false); } }} data-testid="dup-workflow-run">{busy ? "Sending..." : "Start the merge"}</button>
                   {switchedOff && !msg && <p className="mt-2 text-sm text-muted-foreground">Sending is switched off on the server for now: confirming records a dry run and nothing reaches your CRM.</p>}
                 </>
               )}

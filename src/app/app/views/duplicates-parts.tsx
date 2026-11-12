@@ -108,7 +108,7 @@ export function Compare({ people, watchingSince }: { people: Person[]; watchingS
 export function MergeSheet({ accountName, people, keepId, why, switchedOff, onClose, onMerged, copy, picks, workflow, onWorkflowMerge }: {
   accountName: string | null; people: WithUrl[]; keepId: string; why: string; switchedOff: boolean;
   onClose: () => void; onMerged: () => Promise<void>; copy: (text: string) => Promise<void>;
-  picks?: FieldPick[]; workflow?: Workflow; onWorkflowMerge?: () => Promise<string>;
+  picks?: FieldPick[]; workflow?: Workflow; onWorkflowMerge?: (typed: string) => Promise<string>;
 }) {
   const plan = mergePlan(people, keepId);
   const keep = people.find((p) => p.contactId === keepId)!;

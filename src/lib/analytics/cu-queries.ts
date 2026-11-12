@@ -180,7 +180,7 @@ export async function latestPerAccount(s: Scope, search: string | null, limit: n
 export async function portfolioCounts(s: Scope): Promise<{ counts: Counts; accounts: number; day: string; protectedContacts: number } | null> {
   const db = sql();
   const [r] = await db`
-    select count(*)::int accounts, max(day) day, coalesce(sum(contacts), 0)::int contacts, coalesce(sum(deals_open), 0)::int deals_open, coalesce(sum(dup_extra), 0)::int dup_extra, coalesce(sum(junk), 0)::int junk,
+    select count(*)::int accounts, max(day) as day, coalesce(sum(contacts), 0)::int contacts, coalesce(sum(deals_open), 0)::int deals_open, coalesce(sum(dup_extra), 0)::int dup_extra, coalesce(sum(junk), 0)::int junk,
       coalesce(sum(no_owner), 0)::int no_owner, coalesce(sum(no_phone), 0)::int no_phone, coalesce(sum(no_email), 0)::int no_email, coalesce(sum(no_source), 0)::int no_source, coalesce(sum(bad_phone), 0)::int bad_phone,
       coalesce(sum(bad_email), 0)::int bad_email, coalesce(sum(stale_deals), 0)::int stale_deals, coalesce(sum(ownerless_deals), 0)::int ownerless_deals, coalesce(sum(orphan_deals), 0)::int orphan_deals,
       coalesce(sum(protected_contacts), 0)::int protected_contacts

@@ -639,3 +639,7 @@ Customer view. Who uses it: the agency owner (who is slow, who is overloaded, wh
 - **Plan changes of our own install** are written to `pm_events` (kind `app_plan`) in `setPlan`, so billing history starts recording now.
 - **Scopes.** Five new OPTIONAL read scopes added (36 in total): payments/transactions.readonly, payments/subscriptions.readonly, invoices.readonly, wallet.readonly, marketplace-installer-details.readonly. Names for the first three and invoices checked against the platform's public API pages today. `saas/location.read` kept until the live check. One GHL release (Clone as Draft, minor version, "Adds payment and credit visibility, read only").
 - **Not done here (Clients owns it):** wallet-low alert, past-due-plan alert in the daily brief; the plan price columns of `client_billing`. Payments reads the plan price itself from the plan call.
+
+## 11 Nov 2026: Clean-up fix lists, Health and bulk runs (stage CU)
+Who: agency owner and client admin. Next: open the records, tag them for review, remove obvious junk. If missing: "I find out about a bad list weeks later".
+Decisions: counts come from a daily record (cu_scans, counts only) with capped live counts before the first scan; partial indexes per problem (cost is only the matching rows); removal is limited to junk, capped at 25, never undoable, typed words required; merges also need typed words (flag cu_confirm); Data health stays as code under the Health tab.

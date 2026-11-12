@@ -170,8 +170,8 @@ test("the production pilot menu keeps all modules available to every authorized 
     visibleNav(NAV_FOR[kind], { limited: kind !== "agency", off: (feature) => features[feature] === false }).length;
   assert.deepEqual(
     { agency: count("agency", after), business: count("business", after), client: count("client", after) },
-    { agency: 16, business: 16, client: 15 },
-    "Unanswered messages is a tab of Speed to lead now, so each menu is one shorter; a client account user also sees Team, limited to their own numbers",
+    { agency: 15, business: 15, client: 15 },
+    "Unanswered messages is a tab of Speed to lead now, and Data health is a tab of Clean-up (it stays in a client account user's menu, which has no Clean-up), so each menu is shorter; a client account user also sees Team, limited to their own numbers",
   );
   // Speed to lead off: the Unanswered screen is not lost, its own entry comes back.
   for (const kind of ["agency", "business", "client"] as const) {
