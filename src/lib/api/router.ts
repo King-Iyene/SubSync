@@ -134,6 +134,8 @@ import { handleSettings2 } from "./settings2-routes";
 import { handlePayments } from "./payments-routes";
 import { handleToday3, handleToday3Act } from "./today3-routes";
 import { handleCash, handleCashAct } from "./cash-routes";
+import { handleWg, handleWgAct } from "./wg-routes";
+import { handleBr } from "./br-routes";
 import { handleApptActions } from "./appointment-actions-routes";
 import { handlePipelineActions } from "./pipeline-actions-routes";
 import { grantedOf } from "./workflows-api";
@@ -2094,6 +2096,17 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
     }
     if (a === "cash" && b === "act" && ctx.segments.length === 3) {
       return await handleCashAct(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links, targets: async () => { const st = (await scope(ctx)).settings; return { slaHours: st.slaHours, targetMinutes: st.speedTargetMinutes }; }, locationToken: (locationId) => locationAccessToken(ctx.session.companyId, locationId) });
+    }
+    // Wallet guard: /api/app/wg?part=... (summary, list, account, settings, usage, options; read only) and /api/app/wg/act/... (SubSync's own limits, pauses and who is alerted). Owners and admins only.
+    if (a === "wg" && method === "GET" && !b && ctx.url.searchParams.has("part")) {
+      return await handleWg(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links });
+    }
+    if (a === "wg" && b === "act" && ctx.segments.length === 3) {
+      return await handleWgAct(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links });
+    }
+    // The 7 am brief: /api/app/br?part=brief|text|settings|history and /api/app/br/act/<settings|test|seen|acted>. Owners and admins only; every choice is the signed-in person's own.
+    if (a === "br" && ((method === "GET" && !b && ctx.url.searchParams.has("part")) || (b === "act" && ctx.segments.length === 3))) {
+      return await handleBr(ctx);
     }
     // Team (people) module: /api/app/people3?part=... (today, scorecards, workload, leaderboard, money, coaching, access, proof, person, handoff, next lead, lists; read only).
     if (a === "people3" && method === "GET" && !b && ctx.url.searchParams.has("part")) {
