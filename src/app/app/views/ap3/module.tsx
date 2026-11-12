@@ -11,6 +11,9 @@ import "../speed-ui.css";
 import "./ap3.css";
 import { registerAbSlots } from "./ab-slots";
 import { useData } from "../../session";
+import { remembered } from "../../ds/remember";
+import { decodeRange } from "@/lib/design/range";
+import { pageRangeFromHash } from "@/lib/design/global-filter";
 import type { Appt3Options } from "@/lib/analytics/appointments3-types";
 import { AGE_OPTIONS, DEFAULT_FILTERS, FILTER_KEYS, filtersFromParams, filtersToParams, fixturesOn, queryOf, useAp, type ApFilters } from "./data";
 import { FlowTree, type FlowPick } from "./flow-tree";
@@ -69,8 +72,17 @@ export function AppointmentsModule({ go, flowTree = true, leadership = false }: 
   const top = useRef<HTMLDivElement>(null);
   const health = useAp<{ rows: ApHealthRow[] }>("health", { ...filters, locationId: "" });
   // The filters live in the address, so a view can be shared and survives a reload.
+  // The bar at the top (7, 30 or 90 days, or chosen dates) is the date for every number here, so the date choice in this screen follows it. Without this the two disagreed.
+  const followBar = useCallback(() => {
+    const spec = pageRangeFromHash(window.location.hash) ?? decodeRange(remembered("range-page"));
+    if (!spec) return;
+    const days = spec.preset === "7d" ? 7 : spec.preset === "30d" ? 30 : spec.preset === "90d" ? 90 : 0;
+    setFilters((f) => (days ? (f.days === days && !f.from && !f.to ? f : { ...f, days: days as ApFilters["days"], from: "", to: "" }) : spec.from && spec.to ? (f.from === spec.from && f.to === spec.to ? f : { ...f, from: spec.from as string, to: spec.to as string }) : f));
+  }, []);
+  // The filters live in the address, so a view can be shared and survives a reload.
   // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { setViews(readViews()); const f = filtersFromParams(new URLSearchParams(window.location.search)); if (!isDefault(f)) { setFilters(f); setQ(f.q); } }, []);
+  useEffect(() => { setViews(readViews()); const f = filtersFromParams(new URLSearchParams(window.location.search)); if (!isDefault(f)) { setFilters(f); setQ(f.q); } else followBar(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { window.addEventListener("subsync-range", followBar); return () => window.removeEventListener("subsync-range", followBar); }, [followBar]);
   useEffect(() => {
     try {
       const u = new URL(window.location.href);

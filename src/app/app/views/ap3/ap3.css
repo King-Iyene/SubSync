@@ -226,3 +226,6 @@
 .ap3 .ap-leak { box-shadow: none; }
 .ap3 .s6-q { font-size: 1rem; font-weight: 600; letter-spacing: -0.005em; }
 @media (prefers-reduced-motion: reduce) { .ap3 .ap-kpi { transition: none; } }
+
+/* QA round 1: when a list is wider than the screen the Open button stays in view at the right edge instead of being cut off. */
+.ap-t td.ap-end { position: sticky; right: 0; background: var(--s6-surf); box-shadow: -10px 0 8px -8px color-mix(in srgb, var(--foreground) 14%, transparent); }
