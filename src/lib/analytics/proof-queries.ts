@@ -87,11 +87,11 @@ async function replyWindow(inst: string, loc: string, l: Loc, from: string, to: 
   const [r] = await db()`
     select count(t.id)::int leads, count(${reply})::int answered,
       percentile_cont(0.5) within group (order by extract(epoch from (${reply} - coalesce(t.clock_start, t.lead_at))) / 60) filter (where ${reply} is not null) med,
-      count(*) filter (where ${reply} is not null and extract(epoch from (${reply} - coalesce(t.clock_start, t.lead_at))) / 60 <= ${l.target})::int within
+      count(*) filter (where ${reply} is not null and extract(epoch from (${reply} - coalesce(t.clock_start, t.lead_at))) / 60 <= ${l.target})::int within_n
     from lead_touches t
     where t.installation_id = ${inst} and t.location_id = ${loc} and t.excluded is null
       and t.lead_at >= (${from}::date::timestamp at time zone ${l.tz}) and t.lead_at < least((${to}::date::timestamp at time zone ${l.tz}), now() - interval '1 hour')`;
-  return { leads: Number(r.leads), answered: Number(r.answered), median: r.med === null ? null : Math.round(Number(r.med)), within: Number(r.within) };
+  return { leads: Number(r.leads), answered: Number(r.answered), median: r.med === null ? null : Math.round(Number(r.med)), within: Number(r.within_n) };
 }
 
 type Daily = { rows: number; leads: number; booked: number; showed: number; noshow: number; wonDeals: number; wonValue: number };

@@ -17,6 +17,8 @@ export const metadata: Metadata = {
   description: "A monthly report of how new leads were handled.",
   robots: { index: false, follow: false, noarchive: true, nosnippet: true, noimageindex: true },
   referrer: "no-referrer",
+  // A plain coloured square, so the tab never shows the product's own icon.
+  icons: { icon: [{ url: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='4' fill='%230a658b'/%3E%3C/svg%3E", type: "image/svg+xml" }], shortcut: [], apple: [] },
   openGraph: { title: "Monthly report", description: "A monthly report of how new leads were handled.", type: "website" },
   twitter: { card: "summary", title: "Monthly report", description: "A monthly report of how new leads were handled." },
 };
