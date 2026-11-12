@@ -85,7 +85,7 @@ async function home(ctx: Ctx): Promise<Response> {
     connectionStatus(ctx.installationId, person.userId),
     flags.followups ? followCounts(ctx.installationId, person.userId, reach) : Promise.resolve(null),
     sql()`select count(*)::int n from meetings m where m.installation_id = ${ctx.installationId} and m.owner_ghl_user_id = ${person.userId} and m.status = 'needs_contact' and m.matched_contact_id is null`.then((r) => Number(r[0]?.n ?? 0)).catch(() => 0),
-    weekCounts(ctx.installationId, person.kind === "agency" ? null : [person.homeLocationId ?? ""]),
+    weekCounts(ctx.installationId, person.kind === "agency" ? null : [person.homeLocationId ?? ""], person.userId),
   ]);
   return json({ demo: false, flags, connection, follow, waiting, week: { ...week, line: weeklyLine(week) } });
 }

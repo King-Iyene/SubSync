@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { Cl2Today } from "@/lib/analytics/clients2-types";
 import type { Cl3Account, Cl3Attention, Cl3List, Cl3Options, Cl3Overview, Cl3Reason } from "@/lib/analytics/clients3-types";
 import { useApiClient, useData } from "../../session";
-import { EmptyState, ModuleTabs, OpenLeadButton, Page, PopMenu } from "../../ds";
+import { EmptyState, GroupedTabs, OpenLeadButton, Page } from "../../ds";
 import { Btn } from "../../ui";
 import type { GoFn } from "../../nav";
 import { ClientPage } from "../clients/client-page";
@@ -39,7 +39,13 @@ import { ago, change, day, Find, LevelChip, Load, money, Pager, share } from "./
 // Every number is a count that opens its rows. Nothing here messages anyone or changes the CRM. Sample data appears ONLY with ?clfx=1 and is labelled "Sample data".
 type Drill = { title: string; reason: Cl3Reason; location: string | null; count: number } | null;
 type TabKey = "overview" | "money" | "wallet" | "accounts" | "plans" | "needs" | "trends" | "compare" | "reports" | "proof" | "people" | "setup" | "health" | "onboarding" | "reviews" | "industries" | "book" | "oldcompare" | "oldreports";
-const OLDER: TabKey[] = ["health", "onboarding", "reviews", "industries", "book", "oldcompare", "oldreports"];
+// The pages are grouped under four plain names. Every page is in a group; none is removed.
+const GROUPS = [
+  { label: "Overview", tip: "What to do today and who needs you.", keys: ["overview", "needs", "accounts", "trends", "compare", "oldcompare", "people", "industries", "book"] },
+  { label: "Money and plans", tip: "Plans, who has not paid, credit balances.", keys: ["money", "plans", "wallet"] },
+  { label: "Health", tip: "Setup, health and onboarding.", keys: ["setup", "health", "onboarding"] },
+  { label: "Reports and proof", tip: "What to show your clients.", keys: ["reports", "oldreports", "proof", "reviews"] },
+];
 const TIPS: Record<TabKey, [string, string]> = {
   overview: ["Overview", "What to do today, in one sentence."], money: ["Money", "Plans, who has not paid, credit balances, and whether SubSync is installed, for every client account."], accounts: ["Accounts", "Every client account: paid plan, payment status, health, who looks after it."], plans: ["Plans", "Paid plans that are past due, cancelled or paused, with a note field."], needs: ["Needs attention", "Accounts ranked by what is wrong, with the count behind each reason."],
   wallet: ["Wallet", "Every client account's credit balance, lowest days left first, with alerts before it runs out."],
@@ -48,7 +54,7 @@ const TIPS: Record<TabKey, [string, string]> = {
   setup: ["Setup health", "Connection, permissions, how fresh the data is, and each client's plan."], health: ["Health and risk", "Overall health, who may be slipping, and the standard workflows each client has."],
   onboarding: ["Onboarding", "One checklist per client."], reviews: ["Reviews (QBR)", "The quarterly review of one client."], industries: ["Industries", "Clients grouped by industry, with playbooks and reply targets."],
   // Restored from the earlier Clients (a revamp adds, never removes).
-  book: ["Client book", "Who may leave, renewals coming, and what each client pays you."], oldcompare: ["Compare clients", "The earlier compare page: scores, setups and a trend, side by side."], oldreports: ["Weekly reports", "The earlier weekly report for each client."],
+  book: ["Client book", "Who may leave, renewals coming, and what each client pays you."], oldcompare: ["Compare clients (earlier)", "The earlier compare page: scores, setups and a trend, side by side."], oldreports: ["Weekly reports (earlier)", "The earlier weekly report for each client."],
 };
 // Clients v2 tabs show only when their flag is on (a missing flag means off); the older tabs hide only when their flag is explicitly off.
 const C2_FLAG_OF: Partial<Record<TabKey, string>> = { money: "cl3_money", wallet: "wg_wallet", accounts: "cl2_accounts", plans: "cl2_plans", proof: "pr_report" };
@@ -201,10 +207,6 @@ export function ClientsModule({ go, features = ALL_FEATURES, initialTab = "overv
   // The dates are the date bar's (one range for the whole app); every read below asks for exactly them.
   const filters = useMemo<ClParams>(() => ({ from: bar.ready ? bar.from : undefined, to: bar.ready ? bar.to : undefined, industry: industry || undefined }), [bar.ready, bar.from, bar.to, industry]);
   const active = tabs.includes(tab) ? tab : tabs[0];
-  // The four older pages live under "More" so the main tabs fit on one screen without sideways scrolling. Nothing is removed: each is one click away and keeps its address.
-  const mainTabs = tabs.filter((k) => !OLDER.includes(k)), olderTabs = tabs.filter((k) => OLDER.includes(k));
-  const olderOpen = OLDER.includes(active);
-  const index = Math.max(0, mainTabs.indexOf(active));
   const open = (d: NonNullable<Drill>) => { setDrill(d); setTimeout(() => document.getElementById("cl-drill")?.scrollIntoView({ block: "nearest", behavior: "smooth" }), 50); };
   const goTab = (t: TabKey) => { setTab(t); setDrill(null); };
   const readsAccounts = !["onboarding", "reviews", "industries", "health", "accounts", "plans", "money", "wallet", "proof", "book", "oldcompare", "oldreports"].includes(active);
@@ -254,8 +256,7 @@ export function ClientsModule({ go, features = ALL_FEATURES, initialTab = "overv
       <Page title="Clients" subtitle="Which client accounts are fine, which need you, and proof to show them." actions={sample ? null : <><Btn onClick={() => api.download("clients3?part=export", "clients.csv")}>Export CSV</Btn>{f.clients && <Btn onClick={() => api.download("export/clients", "subsync-clients.csv")}>Export fees and renewals</Btn>}</>}>
         {sample && <p className="ap-fine mb-2" role="status" data-testid="cl-sample">Sample data: these are not your real clients.</p>}
         {opt.data?.problem && <p className="ap-fine mb-2" role="status">{opt.data.problem}</p>}
-        <ModuleTabs pill wrap label="Clients sections" tabs={mainTabs.map((k) => ({ label: TIPS[k][0], tip: TIPS[k][1], node: null }))} value={index} onChange={(i) => goTab(mainTabs[i])} noneActive={olderOpen}
-          trailing={olderTabs.length > 0 ? <PopMenu label={olderOpen ? `More: ${TIPS[active][0]}` : "More"} testId="cl-more" triggerClassName={`spd-tab ds-press inline-flex min-h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg px-3.5 text-sm font-semibold ${olderOpen ? "bg-[var(--spd-a)] text-[var(--spd-on)]" : "text-muted-foreground"}`} items={olderTabs.map((k) => ({ key: k, label: TIPS[k][0], hint: TIPS[k][1], onSelect: () => goTab(k) }))} /> : null} />
+        <GroupedTabs testId="cl-groups" groups={GROUPS} available={tabs} active={active} labels={Object.fromEntries(tabs.map((k) => [k, TIPS[k][0]]))} tips={Object.fromEntries(tabs.map((k) => [k, TIPS[k][1]]))} onSelect={(k) => goTab(k as TabKey)} label="Clients sections" />
         {readsAccounts && (
           <div className="ap-head print:hidden" role="group" aria-label="Filters">
             {usesPeriod && <span className="ap-fine" data-testid="cl-dates">Dates: {bar.label}, from the bar above.</span>}

@@ -33,4 +33,11 @@ test("today line goes failing, then unpaid, then calm; the estimate is labelled 
   assert.match(todayLine(counts({ failing: 1 }), [{ currency: "USD", monthly: 297 }]).headline, /about \$297 a month at the plan price/);
   assert.equal(todayLine(counts({ unpaid: 1 }), []).bucket, "unpaid");
   assert.equal(todayLine(counts(), []).bucket, null);
+  assert.match(todayLine(counts(), [], "ok").headline, /paid up/);
+});
+test("today line never says paid up when plans cannot be read", () => {
+  const a = todayLine(counts(), [], "needs_permission").headline;
+  assert.match(a, /Not known: needs permission/);
+  assert.doesNotMatch(a, /paid up. Nothing/);
+  assert.match(todayLine(counts(), [], "not_checked").headline, /Not known yet/);
 });

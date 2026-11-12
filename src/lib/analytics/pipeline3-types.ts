@@ -59,6 +59,8 @@ export type Pl3Overview = {
 export type FlowStage = {
   id: string; pipelineId: string; name: string; order: number;
   openCount: number; openValue: number;
+  /** Open deals in this stage with no value. They are real deals but are left out of openCount and openValue (money). */
+  noValueCount?: number;
   /** Pressure: median days in this stage now (open deals) against the account's own normal. null under the minimum. */
   dwell: { medianDays: number | null; normalDays: number | null; pressure: number | null; enough: boolean };
   /** Clog: stale deals that slow this segment. */

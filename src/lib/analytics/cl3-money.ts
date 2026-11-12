@@ -50,7 +50,7 @@ export async function money(s: Scope, links: Links, f: { bucket: Cl3Bucket; plan
       accounts: r.rows.length, counts, expectedMonthly, atRisk,
       plans: facetsOf(r.rows, (y) => y.plan.name),
       apps: { state: installRows.length ? "ok" : "not_read", installed: installRows.filter((v) => v.installed).length, missing: installRows.filter((v) => !v.installed).length, unknown: r.rows.filter((y) => !x.installs.has(y.locationId)).length },
-      needsPermission: [...needs], today: todayLine(counts, atRisk),
+      needsPermission: [...needs], today: todayLine(counts, atRisk, r.rows.some((y) => y.plan.state === "needs_permission") ? "needs_permission" : r.rows.length > 0 && r.rows.every((y) => y.plan.state === "ok" || y.plan.state === "no_plan") ? "ok" : "not_checked"),
       historyStarts: hist[0]?.m ? new Date(hist[0].m as string).toISOString().slice(0, 10) : null,
     },
   };

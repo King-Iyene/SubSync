@@ -584,6 +584,14 @@ export async function moneyFlow(s: Scope, f: Filters): Promise<Pl3MoneyFlow> {
   if (aggs.has(OTHER_STAGE)) meta.set(OTHER_STAGE, { key: OTHER_STAGE, name: "Other stage", order: 9999, pipelineName: "" });
   const aggList: StageAgg[] = [...aggs.values()].map((a) => ({ ...a, medianDays: a.openCount && a.medW ? Math.round((a.medW / a.openCount) * 10) / 10 : null, normalDays: a.openCount && a.normW ? Math.round((a.normW / a.openCount) * 10) / 10 : null }));
   const stages = buildStages([...meta.values()], aggList, chosen ?? "");
+  // Open deals with no value are real deals but not money: count them per step so a step is never shown as "0 deals" when it holds some.
+  const nv = new Map<string, number>();
+  for (const r of await db`with ${deals(s, { ...f, bucket: null, pipeline: chosen })} select d.location_id, d.stage_id, count(*)::int n from d where ${P_NO_VALUE(db)} group by 1, 2`) {
+    const si = keyOf(sm, r.location_id, r.stage_id), k = si ? si.key : OTHER_STAGE;
+    if (si && si.pipelineKey !== chosen) continue;
+    nv.set(k, (nv.get(k) ?? 0) + num(r.n));
+  }
+  for (const st of stages) st.noValueCount = nv.get(st.id) ?? 0;
   const inPipe = new Set(stages.map((x) => x.id));
 
   const edgeMap = new Map<string, FlowEdge>();

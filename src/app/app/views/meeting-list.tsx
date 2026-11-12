@@ -48,10 +48,14 @@ export function useBarDays(): { from: string; to: string } | null {
 const TONE: Record<string, string> = { on_contact: "bg-emerald-500", practice: "bg-sky-500", waiting_pick: "bg-amber-500", waiting_ok: "bg-amber-500", needs_permission: "bg-red-500", refused: "bg-red-500", other: "bg-muted-foreground/50" };
 const SELECT = "min-h-11 rounded-lg border bg-card px-2 text-sm sm:min-h-10";
 
-export function MeetingsList({ onOpenAppointment }: { onOpenAppointment?: (locationId: string, appointmentId: string) => void }) {
+/** The last 7 days as two UTC days: the window the Fathom card counts. */
+export function lastSevenDays(now = Date.now()): { from: string; to: string } { return { from: new Date(now - 7 * 86_400_000).toISOString().slice(0, 10), to: new Date(now).toISOString().slice(0, 10) }; }
+
+export function MeetingsList({ onOpenAppointment, week = null, onClearWeek }: { onOpenAppointment?: (locationId: string, appointmentId: string) => void; week?: { from: string; to: string } | null; onClearWeek?: () => void }) {
   const api = useApiClient();
   const fx = mnFx();
-  const bar = useBarDays();
+  const picked = useBarDays();
+  const bar = week ?? picked;
   const [q, setQ] = useState("");
   const [qNow, setQNow] = useState("");
   const [state, setState] = useState("all");
@@ -121,7 +125,7 @@ export function MeetingsList({ onOpenAppointment }: { onOpenAppointment?: (locat
       {phase === "error" && error && <ErrorState error={error} onRetry={() => void load()} />}
       {phase === "ready" && (
         <section aria-label="Your recorded calls">
-          <h2 className="mb-2 text-sm font-semibold" data-testid="mn-count">{total} {total === 1 ? "call" : "calls"}{filtered ? " match" : ""} <span className="font-normal text-muted-foreground">{bar ? "in the dates chosen above" : ""}</span></h2>
+          <h2 className="mb-2 text-sm font-semibold" data-testid="mn-count">{total} {total === 1 ? "call" : "calls"}{filtered ? " match" : ""} <span className="font-normal text-muted-foreground">{week ? "in the last 7 days (the same calls as the card above)" : bar ? "in the dates chosen above" : ""}{week && onClearWeek && <> <button type="button" className="underline" onClick={onClearWeek} data-testid="mn-week-clear">Use the dates chosen above</button></>}</span></h2>
           {rows.length === 0 ? (
             <EmptyState title={filtered ? "No call matches those filters" : demo ? "The demo has no recorded calls" : "No recorded calls in these dates"} body={filtered ? "Clear a filter, or widen the dates at the top." : "When a call you recorded finishes, it shows here, on the contact when it is certain."} action={filtered ? <button type="button" className={BTN} onClick={clear}>Clear filters</button> : undefined} />
           ) : (

@@ -10,13 +10,19 @@ import { EmptyState, ErrorState, SkeletonRows } from "../../ds";
 import { useReducedMotion } from "../speed6-base";
 import { usePl, type PlFilters } from "./data";
 import { money, moneyShort, pct } from "./format";
+import { FLOW_FIXTURE } from "./fixtures";
+
+/** Fake numbers for looking at the shape of the funnel. Shown only when the user asks, always marked Example, never mixed with real data. */
+export const FLOW_EXAMPLE: PlMoneyFlow = { ...FLOW_FIXTURE, pipelineName: "Example pipeline", periodLabel: "Example numbers, not yours", people: [], replay: null, excluded: { zeroValue: 0, noOwner: 0, test: 0 }, outlier: null };
+/** True when real deals exist but none has a value, so the funnel has nothing to draw. */
+export const hasNoValuedDeals = (f: PlMoneyFlow | null): boolean => !!f && f.stages.length > 0 && f.won.valueCents === 0 && f.stages.every((s) => s.valueCents === 0);
 
 // MONEY FLOW. Default view is the stage FUNNEL (tapered bands, width = money in the stage, drops fall down it, % between stages, biggest leak marked). The "Coins" toggle keeps the older view:
 // "Coin stacks": one column per stage in the account's own order. Each stack is flat coins, height = the money in that stage (one coin = one value step, never more than 40 coins).
 // Won is a tall stack in the one accent colour, lost is a muted grey stack, stuck money is the hatched top of a stack. Coins settle once on load.
 // Text lives in its own layer (stack-layout.test.ts proves it never overlaps the coins).
 
-export type FlowPick = { title: string; count: number; params: { stageId?: string; stale?: boolean; status?: "won" | "lost"; lostReason?: string; ownerId?: string } };
+export type FlowPick = { title: string; count: number; params: { stageId?: string; bucket?: "no_value"; stale?: boolean; status?: "won" | "lost"; lostReason?: string; ownerId?: string } };
 
 function applyView(f: PlMoneyFlow, person: string, day: number | null): { stages: PlStage[]; drains: PlDrain[]; wonCents: number; wonCount: number } {
   let stages = f.stages, drains = f.drains, wonCents = f.won.valueCents, wonCount = f.won.count;
@@ -32,8 +38,14 @@ function applyView(f: PlMoneyFlow, person: string, day: number | null): { stages
   return { stages, drains, wonCents, wonCount };
 }
 
-export function MoneyFlow({ filters, onPick }: { filters: PlFilters; onPick: (p: FlowPick) => void }) {
-  const { data, error, loading, reload } = usePl<PlMoneyFlow>("money-flow", filters);
+export function MoneyFlow({ filters, onPick: realPick }: { filters: PlFilters; onPick: (p: FlowPick) => void }) {
+  const real = usePl<PlMoneyFlow>("money-flow", filters), { error, loading, reload } = real;
+  const [example, setExample] = useState(false);
+  const noValued = hasNoValuedDeals(real.data);
+  // The example is only ever offered when the pipeline has no valued deals. It never replaces real data otherwise.
+  const showExample = example && noValued;
+  const data = showExample ? FLOW_EXAMPLE : real.data;
+  const onPick = showExample ? () => {} : realPick;
   const wrap = useRef<HTMLDivElement>(null);
   const [view2, setView2] = useState<"funnel" | "coins">("funnel"), [width, setWidth] = useState(1000), [person, setPerson] = useState(""), [day, setDay] = useState<number | null>(null), [settle, setSettle] = useState(true), [run, setRun] = useState(0);
   const reduced = useReducedMotion();
@@ -54,10 +66,16 @@ export function MoneyFlow({ filters, onPick }: { filters: PlFilters; onPick: (p:
 
   if (error) return <ErrorState error={error} onRetry={reload} />;
   if (!data || (loading && !data)) return <SkeletonRows rows={6} label="Loading the money by stage..." />;
+  if ((!layout || !view || !fl) && noValued && real.data) {
+    const nv = real.data.stages.reduce((a, s) => a + (s.noValueCount ?? 0), 0);
+    return <div className="pl-flow" data-testid="pl-flow"><EmptyState title={nv > 0 ? `${nv.toLocaleString("en-US")} ${nv === 1 ? "deal has" : "deals have"} no value yet` : "No deal here has a value yet"} body="They are counted as deals but not as money, so the money stays at $0. Add a value to a deal and it appears here." action={<button type="button" className="s6-btn" onClick={() => setExample(true)} data-testid="pl-example-on">See an example</button>} /></div>;
+  }
   if (!layout || !view || !fl) return <EmptyState title="No open deals in these dates" body="When deals are in your pipeline, the money in each stage shows here. Change the dates or the account above to look further back." />;
 
   const stageOf = (id: string) => view.stages.find((s) => s.id === id)!;
   const pickStage = (s: PlStage, stale = false) => onPick({ title: stale ? `${s.name}, stuck deals` : `${s.name}, open deals`, count: stale ? s.staleCount : s.count, params: { stageId: s.id, stale, ownerId: person || undefined } });
+  const pickNoValue = (s: PlStage) => onPick({ title: `${s.name}, deals without a value`, count: s.noValueCount ?? 0, params: { stageId: s.id, bucket: "no_value" } });
+  const noValueSteps = person ? [] : view.stages.filter((s) => (s.noValueCount ?? 0) > 0);
   const pickWon = () => onPick({ title: "Won deals", count: view.wonCount, params: { status: "won", ownerId: person || undefined } });
   const pickLost = (d?: PlDrain) => onPick(d ? { title: `Lost: ${d.reason}`, count: d.count, params: { status: "lost", lostReason: d.reason } } : { title: "Lost deals", count: view.drains.reduce((a, x) => a + x.count, 0), params: { status: "lost" } });
   const dayLabel = day !== null && data.replay ? data.replay[Math.min(day, data.replay.length - 1)].date : null;
@@ -81,6 +99,8 @@ export function MoneyFlow({ filters, onPick }: { filters: PlFilters; onPick: (p:
 
   return (
     <div className="pl-flow" data-testid="pl-flow" aria-busy={loading}>
+      {showExample && <p className="ap-fine mb-2" role="status" data-testid="pl-example-banner"><b>Example.</b> These are made-up numbers so you can see the shape. They are not your deals. <button type="button" className="ap-link" onClick={() => setExample(false)} data-testid="pl-example-off">Back to my deals</button></p>}
+      {!showExample && noValued && <p className="ap-fine mb-2" role="status" data-testid="pl-example-offer">None of the deals here has a value yet, so there is no money to draw. <button type="button" className="ap-link" onClick={() => setExample(true)} data-testid="pl-example-on">See an example</button></p>}
       <div className="pl-flow-bar">
         <h3 className="pl-flow-title">{data.pipelineName}<span className="ap-sub"> · {data.periodLabel}</span></h3>
         <label className="sr-only" htmlFor="pl-person">Whose deals</label>
@@ -114,7 +134,7 @@ export function MoneyFlow({ filters, onPick }: { filters: PlFilters; onPick: (p:
           const wide = Math.max(r.topW, r.bottomW);
           return <li key={r.id} className="fn-item" data-leak={leak ? "1" : "0"}>
             <div className="fn-row">
-              <div className="fn-label"><b>{r.name}</b><span className="fn-val tnum">{moneyShort(r.valueCents)}</span><small>{r.count} deals{r.staleCount > 0 && <> · <u>{r.staleCount} stuck</u></>}</small></div>
+              <div className="fn-label"><b>{r.name}</b><span className="fn-val tnum">{moneyShort(r.valueCents)}</span><small>{r.count} deals{r.staleCount > 0 && <> · <u>{r.staleCount} stuck</u></>}{(s.noValueCount ?? 0) > 0 && <> · {s.noValueCount} without a value</>}</small></div>
               <div className="fn-band">
                 <svg viewBox="0 0 100 40" preserveAspectRatio="none" aria-hidden className="fn-svg">
                   {r.topW > 0 && <polygon className="fn-open" points={`${50 - half(0)},0 ${50 + half(0)},0 ${50 + half(1)},40 ${50 - half(1)},40`} vectorEffect="non-scaling-stroke" />}
@@ -166,6 +186,12 @@ export function MoneyFlow({ filters, onPick }: { filters: PlFilters; onPick: (p:
         <ul className="pl-reasons" aria-label="Why deals were lost">
           {[...view.drains].sort((a, b) => b.valueCents - a.valueCents).map((d) => <li key={d.reason}><button type="button" className="pl-reason" onClick={() => pickLost(d)} title={`${d.reason}: ${d.count} deals, ${money(d.valueCents)}`}><span>{d.reason}</span><b className="tnum">{d.count}</b><span className="tnum">{moneyShort(d.valueCents)}</span></button></li>)}
         </ul>
+      )}
+      {noValueSteps.length > 0 && (
+        <p className="ap-fine mb-2" data-testid="pl-novalue">
+          {noValueSteps.map((s, i) => <span key={s.id}>{i > 0 && " · "}<button type="button" className="ap-link" onClick={() => pickNoValue(s)} data-testid={`pl-novalue-${s.id}`}>{s.name}: {s.noValueCount} {s.noValueCount === 1 ? "deal" : "deals"} without a value</button></span>)}
+          {" "}(not counted in money; money stays at $0 for them.)
+        </p>
       )}
       <ul className="sr-only" aria-label="Money by stage in words">{view.stages.map((s) => <li key={s.id}>{s.name}: {s.count} deals, {money(s.valueCents)}, {s.staleCount} stuck, {s.lostCount} lost.</li>)}<li>Won: {view.wonCount} deals, {money(view.wonCents)}.</li><li>Lost: {money(lostTotal)}.</li></ul>
       <div className="pl-flow-foot">

@@ -6,7 +6,7 @@ import { Bookmark, Search, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { takeDeepLink } from "@/lib/design/deep-link";
 import type { PlDeal } from "@/lib/analytics/pipeline3-types-interim";
-import { ModuleTabs, Page } from "../../ds";
+import { GroupedTabs, Page } from "../../ds";
 import "../speed6.css";
 import "../speed-ui.css";
 import "../ap3/ap3.css";
@@ -41,6 +41,14 @@ const TABS: Array<{ key: TabKey; label: string; tip: string }> = [
   // Restored from the earlier Pipeline (a revamp adds, never removes): the forecast, coverage, bottleneck and risk cards, and the stale-deal list with its export.
   { key: "classic", label: "Forecast and stages", tip: "Forecast, coverage, bottlenecks, deal risk, aging, wins and losses by month, and the export of open deals." },
   { key: "stale", label: "Stale deals and hygiene", tip: "Open deals that have not moved, by stage, with the CSV export." },
+];
+// Grouped under plain names; every page is in a group and none is removed.
+const PL_GROUPS = [
+  { label: "Overview", tip: "The one sentence and what needs you.", keys: ["overview", "needs", "slipping", "stuck", "stale"] },
+  { label: "Money and forecast", tip: "Where the money sits, what closed and the forecast.", keys: ["flow", "wonlost", "sources", "classic"] },
+  { label: "Stage history", tip: "How deals moved and how long they stayed.", keys: ["history", "funnel"] },
+  { label: "People and accounts", tip: "Who closes and which client accounts have stuck deals.", keys: ["people", "health"] },
+  { label: "Proof", tip: "The weekly receipt per client.", keys: ["proof"] },
 ];
 type SavedView = { name: string; filters: PlFilters; tab: TabKey };
 const VIEWS_KEY = "pl3.views.v1";
@@ -90,7 +98,7 @@ export function PipelineModule({ moneyFlow = true, actions = false }: { moneyFlo
   }, [tabs]);
 
   const openDrill = (d: { title: string; count: number; extra: Record<string, string | number | undefined> }) => { setDrill({ ...d, tab }); setTimeout(() => document.getElementById("pl-drill")?.scrollIntoView({ block: "nearest", behavior: "smooth" }), 60); };
-  const onPick = (p: FlowPick) => openDrill({ title: p.title, count: p.count, extra: { stage: p.params.stageId, stale: p.params.stale ? 1 : undefined, status: p.params.status ?? "open", reason: p.params.lostReason, owner: p.params.ownerId, expect: p.count } });
+  const onPick = (p: FlowPick) => openDrill({ title: p.title, count: p.count, extra: { stage: p.params.stageId, bucket: p.params.bucket, stale: p.params.stale ? 1 : undefined, status: p.params.status ?? "open", reason: p.params.lostReason, owner: p.params.ownerId, expect: p.count } });
   const sp: SectionProps = { filters, onOpen: setDeal, activeId: deal?.id ?? null, showAccount, go: goTab, onDrill: openDrill };
   const saveView = (name: string) => { const next = [{ name: name.trim().slice(0, 40), filters, tab }, ...views.filter((v) => v.name !== name.trim())].slice(0, 20); setViews(next); writeViews(next); setNaming(false); };
   const applyView = (i: number) => { const v = views[i]; if (!v) return; setFilters(v.filters); setQ(v.filters.q); if (tabs.some((t) => t.key === v.tab)) setTab(v.tab); };
@@ -135,7 +143,7 @@ export function PipelineModule({ moneyFlow = true, actions = false }: { moneyFlo
           {(filters.locationId || filters.q) && <button type="button" className="s6-btn" onClick={() => { setFilters(DEFAULT_FILTERS); setQ(""); }}><X aria-hidden className="size-4" />Clear</button>}
         </div>
         {fixturesOn() && <p className="ap-fine mb-2" role="status">Sample data: these are not your real deals.</p>}
-        <ModuleTabs pill label="Pipeline sections" tabs={tabs.map((t) => ({ label: t.label, tip: t.tip, node: null }))} value={index < 0 ? 0 : index} onChange={(i) => { setTab(tabs[i].key); setDrill(null); }} />
+        <GroupedTabs testId="pl-groups" groups={PL_GROUPS} available={tabs.map((t) => t.key)} active={index < 0 ? tabs[0]?.key ?? "overview" : tab} labels={Object.fromEntries(tabs.map((t) => [t.key, t.label]))} tips={Object.fromEntries(tabs.map((t) => [t.key, t.tip]))} onSelect={(k) => { setTab(k as TabKey); setDrill(null); }} label="Pipeline sections" />
         <div data-testid={`pl-tab-${tab}`}>{content}</div>
         <p className="ap-fine mt-6">Keys: / search, 1 to 9 switch section, up and down move in a list, Enter opens, Esc closes. Nothing is ever deleted from a key.</p>
         {deal && <DealPanel deal={deal} onClose={() => setDeal(null)} onChanged={() => setVersion((v) => v + 1)} filters={filters} />}

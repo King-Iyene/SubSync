@@ -6,6 +6,8 @@ export type PlStatus = "open" | "won" | "lost" | "abandoned";
 export type PlStage = {
   id: string; name: string; order: number;
   count: number; valueCents: number;
+  /** Open deals with no value in this step: real deals, left out of count and money. */
+  noValueCount?: number;
   staleCount: number; staleValueCents: number;
   medianDwellDays: number | null; normalDwellDays: number | null; // this stage's dwell now vs the account's own normal
   lostCount: number; lostValueCents: number; // deals that left the pipeline from this stage in the period
