@@ -130,6 +130,10 @@ export const DEFAULT_OFF: ReadonlySet<Feature> = new Set<Feature>([
   "pp_rollup",
   "pp_actions",
   "pp_roles",
+  // Branded client Proof page and monthly report (stage PR): each behind its own flag, default off.
+  "pr_report",
+  "pr_page",
+  "pr_auto",
   // Account audit (docs/features/AUDIT_BRIEF.md): each behind its own flag, default off.
   "au_history",
   "au_onepager",
