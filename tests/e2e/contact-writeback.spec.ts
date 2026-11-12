@@ -160,23 +160,10 @@ test("tags: without the optional permission the picker says so", async ({ page }
   await expect(drawer.getByTestId("tags-needs-permission")).toContainText("Needs permission: reconnect");
 });
 
-test("Call with: a connected dialer needs a valid https link and saves only the choice and the link", async ({ page }) => {
+test("Call: the lead panel has one plain Call action and no call-provider picker", async ({ page }) => {
   test.setTimeout(300_000);
-  let saved: Record<string, unknown> | null = null;
-  await page.route(/\/api\/app\/people\/dialer$/, (r) => {
-    if (r.request().method() === "PUT") { saved = r.request().postDataJSON(); return r.fulfill({ json: { ok: true, ...saved } }); }
-    return r.fulfill({ json: { provider: "phone" } });
-  });
   await fake(page, () => "saved");
   const drawer = await openPanel(page);
-  const setting = drawer.getByTestId("dialer-setting");
-  if (await setting.count()) {
-    await setting.getByTestId("dialer-select").selectOption("connected");
-    await setting.getByTestId("dialer-template").fill("http://bad.example.com/{phone}");
-    await expect(setting.getByTestId("dialer-template-error")).toContainText("https://");
-    await expect(setting.getByTestId("dialer-save")).toBeDisabled();
-    await setting.getByTestId("dialer-template").fill("https://dialer.example.com/call?to={phone}");
-    await setting.getByTestId("dialer-save").click();
-    expect(saved).toMatchObject({ provider: "connected", template: "https://dialer.example.com/call?to={phone}" });
-  }
+  await expect(drawer.getByTestId("dialer-setting")).toHaveCount(0);
+  await expect(drawer.getByText("Call with", { exact: true })).toHaveCount(0);
 });
