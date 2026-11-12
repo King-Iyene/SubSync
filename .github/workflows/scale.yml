@@ -1,0 +1,87 @@
+# Scale and correctness check (scripts/seed-scale.mts + scripts/check-scale.ts) on a throwaway Postgres. Manual only: it is too slow for every pull request.
+# Run it from the Actions tab (Run workflow) and pick a size: 120, 5000 (default) or 100000. It never touches the production database. See docs/QA_SCALE.md.
+name: scale
+
+on:
+  workflow_dispatch:
+    inputs:
+      size:
+        description: "Leads in the test agency (120, 5000 or 100000)"
+        default: "5000"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  scale:
+    name: Scale and correctness
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: ci
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      PGPASSWORD: ci
+      MIGRATE_DATABASE_URL: postgresql://postgres:ci@localhost:5432/postgres
+      MIGRATE_SSL: "off"
+      PGOPTIONS: "-c search_path=public,extensions"
+      DATABASE_URL: postgresql://postgres:ci@localhost:5432/postgres
+      DATABASE_SSL: "off"
+      DB_POOL_MAX: "10"
+      FLAGS_ALL_ON: "true"
+      ENTITLEMENTS_MODE: open
+      TEST_PORT: "3103"
+      TEST_DIST_DIR: .next-scale
+      CHECKS: check-scale
+      SCALE_OUT: scale-result.md
+      SCALE_WALK_PAGES: "150"
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Make the database look like Supabase
+        run: |
+          psql -h localhost -U postgres -v ON_ERROR_STOP=1 -c "create schema if not exists extensions; create extension if not exists pgcrypto schema extensions; create extension if not exists pg_trgm schema extensions; create role anon nologin; create role authenticated nologin; create role service_role nologin bypassrls;"
+      - name: Apply every migration
+        run: node --import tsx scripts/migrate.ts
+      - name: Write a test-only .env.local (made-up values, no real secrets)
+        run: |
+          {
+            echo "TOKEN_ENCRYPTION_KEY=$(head -c 32 /dev/urandom | base64)"
+            echo "NEXT_PUBLIC_APP_URL=http://localhost:3103"
+            echo "NEXT_PUBLIC_SUPABASE_URL=http://localhost:54321"
+            echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=ci-anon"
+            echo "SUPABASE_SERVICE_ROLE_KEY=ci-service"
+            echo "GHL_APP_ID=ci-app"
+            echo "GHL_CLIENT_ID=ci-client"
+            echo "GHL_CLIENT_SECRET=ci-secret"
+            echo "GHL_APP_SHARED_SECRET=ci-shared"
+            echo "GHL_REDIRECT_URI=http://localhost:3103/api/oauth/callback"
+            echo "DEMO_MODE=true"
+          } > .env.local
+      - name: Seed the synthetic agency
+        run: node --env-file=.env.local --import tsx scripts/seed-scale.mts --size "${{ inputs.size }}"
+      - name: Run the scale check
+        run: |
+          set -o pipefail
+          node scripts/with-dev-server.mjs 2>&1 | tee scale.log
+          grep -q "scale check: ok" scale.log
+      - name: Upload the log and the table
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scale-result
+          path: |
+            scale.log
+            scale-result.md
+          if-no-files-found: ignore
