@@ -1,6 +1,7 @@
 "use client";
 
 import { TODAY_FONTS } from "./views/today-fonts";
+import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { accentTokens } from "@/lib/design/color";
 import { EMPTY_FILTER, filterFromLink, filterToLink, filterToQuery, isFiltered, type FilterValue } from "@/lib/design/filters";
@@ -26,55 +27,105 @@ import { GlobalFilterBar } from "./ds/global-filter";
 import { useTheme } from "./ds/theme";
 import { remember, remembered } from "./ds/remember";
 import { ApiProvider, makeApi, type Api } from "./session";
-import { AccountDetailView } from "./views/account-detail";
-import { AlertsView } from "./views/alerts";
-import { AppointmentInsights } from "./views/appointment-insights";
-import { AppointmentsModule } from "./views/ap3/module";
-import { AuditView } from "./views/audit";
-import { SpeedView } from "./views/speed";
-import { AppointmentsView } from "./views/appointments";
-import { CleanupModule } from "./views/cleanup-hub";
-import { DqModule } from "./views/dq/dq-module";
+const AppointmentInsights = dynamic(() => import("./views/appointment-insights").then((m) => m.AppointmentInsights), { ssr: false });
 import { sampleOn as dqSample } from "./views/dq/dq-data";
-import { MeetingsView } from "./views/meetings";
-import { WorkflowsView } from "./views/workflows";
-import { DataHealthView } from "./views/data-health";
 import { GlobalSearch } from "./views/global-search";
-import { PeopleModule } from "./views/people-module";
-import { ClientsView, type ClientsFeatures } from "./views/clients";
-import { DealsView } from "./views/deals";
-import { EmailHealthView } from "./views/email-health";
-import { HelpView } from "./views/help";
-import { SettingsHub } from "./views/settings-hub";
-import { GuidesView } from "./views/guides-view";
-import { NewsView } from "./views/news-view";
+import type { ClientsFeatures } from "./views/clients";
 import { GuideHelpButton, NewMark, StNavEntry, StProvider } from "./views/st-state";
-import { RoadmapView } from "./views/roadmap";
 import { FreshnessStrip as StatusLine } from "./views/sync-status";
-import { InboxView } from "./views/inbox";
-import { OnboardingView } from "./views/onboarding";
-import { OverviewView } from "./views/overview";
-import { PipelineView } from "./views/pipeline";
-import { PipelineModule } from "./views/pl3/module";
-import { ClientsModule } from "./views/cl3/module";
 import { fixturesOn as clSample } from "./views/cl3/data";
-import { MoneyModule } from "./views/money/module";
 import { fnfxOn as fnSample } from "./views/fn/data";
 import { EmptyState } from "./ds/states";
 import { fixturesOn as pmSample } from "./views/pm/data";
-import { TeamView } from "./views/people";
-import { TeamModule } from "./views/pp3/module";
 import { fixturesOn as ppSample } from "./views/pp3/data";
 import { TodayModule } from "./views/td3/module";
 import { overviewMerged } from "@/lib/analytics/today3-intel";
 import { fixturesOn as tdSample } from "./views/td3/data";
-import { SettingsView } from "./views/settings";
-import { IntegrationsPage } from "./views/connections";
-import { NotificationsPage } from "./views/notifications";
 import { NotificationBell } from "./views/notification-bell";
 import { SyncNow } from "./ds/sync-now";
 
 import { TodayView } from "./views/today";
+
+// Round 6 (cold start): every page except Today is loaded when first needed (and warmed on hover and when the browser is idle), so the first paint carries only the shell and Today.
+function ViewLoading() {
+  return <div aria-busy="true" aria-label="Loading" className="space-y-3 p-1">{[0, 1, 2].map((i) => <div key={i} className="h-16 animate-pulse rounded-lg bg-muted/60" />)}</div>;
+}
+const AccountDetailView = dynamic(() => import("./views/account-detail").then((m) => m.AccountDetailView), { ssr: false, loading: () => <ViewLoading /> });
+const AlertsView = dynamic(() => import("./views/alerts").then((m) => m.AlertsView), { ssr: false, loading: () => <ViewLoading /> });
+const AppointmentsModule = dynamic(() => import("./views/ap3/module").then((m) => m.AppointmentsModule), { ssr: false, loading: () => <ViewLoading /> });
+const AuditView = dynamic(() => import("./views/audit").then((m) => m.AuditView), { ssr: false, loading: () => <ViewLoading /> });
+const SpeedView = dynamic(() => import("./views/speed").then((m) => m.SpeedView), { ssr: false, loading: () => <ViewLoading /> });
+const AppointmentsView = dynamic(() => import("./views/appointments").then((m) => m.AppointmentsView), { ssr: false, loading: () => <ViewLoading /> });
+const CleanupModule = dynamic(() => import("./views/cleanup-hub").then((m) => m.CleanupModule), { ssr: false, loading: () => <ViewLoading /> });
+const DqModule = dynamic(() => import("./views/dq/dq-module").then((m) => m.DqModule), { ssr: false, loading: () => <ViewLoading /> });
+const MeetingsView = dynamic(() => import("./views/meetings").then((m) => m.MeetingsView), { ssr: false, loading: () => <ViewLoading /> });
+const WorkflowsView = dynamic(() => import("./views/workflows").then((m) => m.WorkflowsView), { ssr: false, loading: () => <ViewLoading /> });
+const DataHealthView = dynamic(() => import("./views/data-health").then((m) => m.DataHealthView), { ssr: false, loading: () => <ViewLoading /> });
+const PeopleModule = dynamic(() => import("./views/people-module").then((m) => m.PeopleModule), { ssr: false, loading: () => <ViewLoading /> });
+const ClientsView = dynamic(() => import("./views/clients").then((m) => m.ClientsView), { ssr: false, loading: () => <ViewLoading /> });
+const DealsView = dynamic(() => import("./views/deals").then((m) => m.DealsView), { ssr: false, loading: () => <ViewLoading /> });
+const EmailHealthView = dynamic(() => import("./views/email-health").then((m) => m.EmailHealthView), { ssr: false, loading: () => <ViewLoading /> });
+const HelpView = dynamic(() => import("./views/help").then((m) => m.HelpView), { ssr: false, loading: () => <ViewLoading /> });
+const SettingsHub = dynamic(() => import("./views/settings-hub").then((m) => m.SettingsHub), { ssr: false, loading: () => <ViewLoading /> });
+const GuidesView = dynamic(() => import("./views/guides-view").then((m) => m.GuidesView), { ssr: false, loading: () => <ViewLoading /> });
+const NewsView = dynamic(() => import("./views/news-view").then((m) => m.NewsView), { ssr: false, loading: () => <ViewLoading /> });
+const RoadmapView = dynamic(() => import("./views/roadmap").then((m) => m.RoadmapView), { ssr: false, loading: () => <ViewLoading /> });
+const InboxView = dynamic(() => import("./views/inbox").then((m) => m.InboxView), { ssr: false, loading: () => <ViewLoading /> });
+const OnboardingView = dynamic(() => import("./views/onboarding").then((m) => m.OnboardingView), { ssr: false, loading: () => <ViewLoading /> });
+const OverviewView = dynamic(() => import("./views/overview").then((m) => m.OverviewView), { ssr: false, loading: () => <ViewLoading /> });
+const PipelineView = dynamic(() => import("./views/pipeline").then((m) => m.PipelineView), { ssr: false, loading: () => <ViewLoading /> });
+const PipelineModule = dynamic(() => import("./views/pl3/module").then((m) => m.PipelineModule), { ssr: false, loading: () => <ViewLoading /> });
+const ClientsModule = dynamic(() => import("./views/cl3/module").then((m) => m.ClientsModule), { ssr: false, loading: () => <ViewLoading /> });
+const MoneyModule = dynamic(() => import("./views/money/module").then((m) => m.MoneyModule), { ssr: false, loading: () => <ViewLoading /> });
+const TeamView = dynamic(() => import("./views/people").then((m) => m.TeamView), { ssr: false, loading: () => <ViewLoading /> });
+const TeamModule = dynamic(() => import("./views/pp3/module").then((m) => m.TeamModule), { ssr: false, loading: () => <ViewLoading /> });
+const SettingsView = dynamic(() => import("./views/settings").then((m) => m.SettingsView), { ssr: false, loading: () => <ViewLoading /> });
+const IntegrationsPage = dynamic(() => import("./views/connections").then((m) => m.IntegrationsPage), { ssr: false, loading: () => <ViewLoading /> });
+const NotificationsPage = dynamic(() => import("./views/notifications").then((m) => m.NotificationsPage), { ssr: false, loading: () => <ViewLoading /> });
+
+/** Starts loading a page's code ahead of the click. Never throws. */
+const PRELOAD: Record<string, () => Promise<unknown>> = {
+  AccountDetailView: () => import("./views/account-detail"),
+  AlertsView: () => import("./views/alerts"),
+  AppointmentsModule: () => import("./views/ap3/module"),
+  AuditView: () => import("./views/audit"),
+  SpeedView: () => import("./views/speed"),
+  AppointmentsView: () => import("./views/appointments"),
+  CleanupModule: () => import("./views/cleanup-hub"),
+  DqModule: () => import("./views/dq/dq-module"),
+  MeetingsView: () => import("./views/meetings"),
+  WorkflowsView: () => import("./views/workflows"),
+  DataHealthView: () => import("./views/data-health"),
+  PeopleModule: () => import("./views/people-module"),
+  ClientsView: () => import("./views/clients"),
+  DealsView: () => import("./views/deals"),
+  EmailHealthView: () => import("./views/email-health"),
+  HelpView: () => import("./views/help"),
+  SettingsHub: () => import("./views/settings-hub"),
+  GuidesView: () => import("./views/guides-view"),
+  NewsView: () => import("./views/news-view"),
+  RoadmapView: () => import("./views/roadmap"),
+  InboxView: () => import("./views/inbox"),
+  OnboardingView: () => import("./views/onboarding"),
+  OverviewView: () => import("./views/overview"),
+  PipelineView: () => import("./views/pipeline"),
+  PipelineModule: () => import("./views/pl3/module"),
+  ClientsModule: () => import("./views/cl3/module"),
+  MoneyModule: () => import("./views/money/module"),
+  TeamView: () => import("./views/people"),
+  TeamModule: () => import("./views/pp3/module"),
+  SettingsView: () => import("./views/settings"),
+  IntegrationsPage: () => import("./views/connections"),
+  NotificationsPage: () => import("./views/notifications"),
+};
+const NAV_WARM: Record<string, string[]> = {
+  speed: ["SpeedView"], appointments: ["AppointmentsModule", "AppointmentsView"], accounts: ["ClientsModule", "ClientsView"], clients: ["ClientsModule", "ClientsView"], account: ["AccountDetailView"],
+  settings: ["SettingsHub", "SettingsView"], cleanup: ["CleanupModule", "DqModule"], duplicates: ["CleanupModule", "DqModule"], "data-health": ["DataHealthView", "CleanupModule"],
+  people: ["PeopleModule"], search: ["PeopleModule"], leads: ["PeopleModule"], calls: ["PeopleModule"], team: ["TeamModule", "TeamView"], pipeline: ["PipelineModule", "PipelineView"], deals: ["PipelineView", "DealsView"],
+  payments: ["MoneyModule"], finance: ["MoneyModule"], meetings: ["MeetingsView"], workflows: ["WorkflowsView"], alerts: ["AlertsView"], help: ["GuidesView", "HelpView"], roadmap: ["NewsView", "RoadmapView"],
+  overview: ["OverviewView"], audit: ["AuditView"], inbox: ["InboxView"], onboarding: ["ClientsModule", "OnboardingView"], notifications: ["NotificationsPage"], connections: ["IntegrationsPage"],
+};
+export function warmView(id: string): void { for (const n of NAV_WARM[id] ?? []) void PRELOAD[n]?.().catch(() => undefined); }
 
 type Auth =
   | { status: "waiting" }
@@ -284,6 +335,17 @@ export function Dashboard() {
   const baseApi = auth.status === "ready" ? auth.api : null;
   // Opened from inside one client account (the platform sends that account with the sign-in): start on it, with a way back to all of them.
   const launched = useRef(false);
+  // Once Today is on screen and the browser is idle, load the code of the pages people open next, one at a time, so the first click on any of them has nothing left to download.
+  const ready = auth.status === "ready";
+  useEffect(() => {
+    if (!ready) return;
+    const ric = (window as unknown as { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number }).requestIdleCallback;
+    const order = ["speed", "appointments", "accounts", "people", "settings", "cleanup", "alerts", "pipeline", "team"];
+    let i = 0, stopped = false;
+    const next = () => { if (stopped || i >= order.length) return; warmView(order[i++]); if (ric) ric(next, { timeout: 4000 }); else setTimeout(next, 600); };
+    const start = window.setTimeout(() => { if (ric) ric(next, { timeout: 4000 }); else next(); }, 1200);
+    return () => { stopped = true; window.clearTimeout(start); };
+  }, [ready]);
   useEffect(() => {
     if (auth.status !== "ready" || launched.current) return;
     launched.current = true;
@@ -355,7 +417,7 @@ export function Dashboard() {
   const mainMenu = menu.filter((n) => n.group !== "Settings and help");
   const footMenu = menu.filter((n) => n.group === "Settings and help");
   const renderNav = (list: typeof menu) => list.map((n, i) => (
-      <StNavEntry key={n.id} id={n.id}><div>
+      <StNavEntry key={n.id} id={n.id} onWarm={warmView}><div>
         {n.group !== (list[i - 1]?.group ?? null) && (n.group && n.group !== "Settings and help" ? <p data-testid="nav-group" className="px-3 pb-1 pt-3 text-[10.5px] font-semibold uppercase tracking-[0.14em] text-sidebar-foreground/70">{n.group}</p> : i > 0 || n.group === "Settings and help" ? <div className="my-2 border-t border-sidebar-border" /> : null)}
         <button type="button" onClick={() => goTop(n.id)} aria-current={n.id === active ? "page" : undefined}
           className={`group relative flex w-full items-center gap-2.5 rounded-lg px-3 py-1.5 text-left text-[0.86rem] transition-colors ${n.id === active ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground" : "text-sidebar-foreground/75 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"}`}>
@@ -499,7 +561,7 @@ export function Dashboard() {
           )}
           <nav className="fixed inset-x-0 bottom-0 z-30 flex gap-1 overflow-x-auto border-t bg-card p-1.5 shadow-[var(--shadow-lift)] md:hidden print:hidden" aria-label="Sections" data-testid="phone-menu">
             {menu.map((n) => (
-              <StNavEntry key={n.id} id={n.id}><button type="button" onClick={() => goTop(n.id)} aria-current={n.id === active ? "page" : undefined}
+              <StNavEntry key={n.id} id={n.id} onWarm={warmView}><button type="button" onClick={() => goTop(n.id)} aria-current={n.id === active ? "page" : undefined}
                 className={`flex min-h-12 min-w-[4.5rem] shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg px-2.5 text-xs leading-tight transition-colors ${n.id === active ? "bg-accent font-semibold text-foreground" : "text-muted-foreground"}`}>
                 {(() => { const Icon = ICONS[n.id]; return Icon ? <Icon aria-hidden className="size-5" /> : null; })()}
                 <span className="max-w-[5.5rem] truncate">{labelFor(n)}</span>

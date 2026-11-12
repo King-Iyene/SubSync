@@ -8,6 +8,8 @@ import {
   visibleLocationIds, type Settings,
 } from "../analytics/queries";
 import { loadAccounts, refreshInsights } from "../analytics/service";
+import { DIRTY_EXEMPT } from "../analytics/account-rollup";
+import { markRollupDirty } from "../analytics/account-rollup-db";
 import { isSlackWebhook, MIN_CLOSED_DEALS } from "../analytics/derive";
 import { demoDomainReport } from "../demo/seed";
 import { checkDomain, extractDomain } from "../dns/email-auth";
@@ -119,7 +121,9 @@ import { handleCleanupV2 } from "./cleanup-routes";
 import { gatedWriter } from "../ghl/crm-gateway";
 import { writeEnabledFor } from "../analytics/cleanup-config";
 import { isLive } from "../live-flags";
-import { answerKey, cachedAnswer, forgetAllReads, forgetAnswers } from "../read-cache";
+import { answerKey, cachedAnswer, forgetAllReads, forgetAnswers, readCacheOn } from "../read-cache";
+import { answerStoreKey, judgeAnswer, storable } from "../analytics/read-answers";
+import { readAnswer, storeAnswer } from "../analytics/read-answers-db";
 import { handleSpeedPrefs, handleSpeedDigest, handleSpeedLadder, handleSpeedPart, handleSpeedTarget } from "./speed-routes";
 import { handleUnansweredOutcome, handleUnansweredPart } from "./unanswered-routes";
 import { handleMoat } from "./moat-routes";
@@ -2058,13 +2062,30 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
   if (isResponse(auth)) return auth;
   const ctx: Ctx = { ...auth, request, url: new URL(request.url), segments };
   if (request.method !== "GET") {
-    try { return await dispatch(ctx); } finally { forgetAllReads(); forgetAnswers(ctx.installationId); }
+    try { return await dispatch(ctx); } finally { forgetAllReads(); forgetAnswers(ctx.installationId); if (!DIRTY_EXEMPT.test(segments[0] ?? "")) await markRollupDirty(ctx.installationId).catch(() => undefined); }
   }
   // The race is "right now" (it refreshes itself), so it is always read fresh.
-  if (HEAVY_READ.has(segments[0]) && ctx.url.searchParams.has("part") && ctx.url.searchParams.get("part") !== "race") {
+  const stored = storable(request.method, segments, ctx.url.searchParams);
+  if ((HEAVY_READ.has(segments[0]) && ctx.url.searchParams.has("part") && ctx.url.searchParams.get("part") !== "race") || stored) {
     const who = `${ctx.kind}:${ctx.limitTo ?? ""}:${ctx.session.userId ?? ""}`;
     const key = answerKey(ctx.installationId, who, `${ctx.url.pathname}?${ctx.url.searchParams.toString()}`);
-    const out = await cachedAnswer(key, async () => { const r = await dispatch(ctx); return { status: r.status, body: await r.text() }; });
+    const compute = async () => { const r = await dispatch(ctx); return { status: r.status, body: await r.text() }; };
+    // Round 6: the finished answer is also kept in the database (read_answers), so the first click on a cold server instance is one lookup. Fresh for 5 minutes, shown while a new one is made for 30,
+    // never used after a change was made through SubSync (dirty), never shared between people or installations (the key holds both). A "Try again" (_r) always recomputes.
+    const make = async () => {
+      if (!stored || !readCacheOn()) return compute();
+      const sk = answerStoreKey(who, ctx.url.pathname, ctx.url.searchParams);
+      const hit = ctx.url.searchParams.has("_r") ? null : await readAnswer(ctx.installationId, sk).catch(() => null);
+      const verdict = judgeAnswer(hit);
+      if (hit && verdict !== "unusable") {
+        if (verdict === "stale") void compute().then((o) => o.status === 200 ? storeAnswer(ctx.installationId, sk, o.body) : undefined).catch(() => undefined);
+        return { status: 200, body: hit.body };
+      }
+      const o = await compute();
+      if (o.status === 200) void storeAnswer(ctx.installationId, sk, o.body).catch(() => undefined);
+      return o;
+    };
+    const out = await cachedAnswer(key, make);
     return new Response(out.body, { status: out.status, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } });
   }
   return dispatch(ctx);
