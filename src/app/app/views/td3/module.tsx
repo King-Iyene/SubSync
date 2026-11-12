@@ -402,7 +402,7 @@ function SettingsTab({ level, cashOn, saveOn, nav }: { level: string; cashOn: bo
   useEffect(() => { if (saved === null) return; const t = setTimeout(() => setSaved(null), 6000); return () => clearTimeout(t); }, [saved]);
   const save = async (d: Td3Settings, f: Form) => {
     const ok = await act("settings", { emailOn: f.on, emailHour: f.hour, quietDays: f.quiet, recipients: f.list.split(/[\s,;]+/).filter(Boolean) });
-    if (ok) { setSaved(Date.now()); resync({ ...d, emailOn: f.on, emailHour: f.hour, quietDays: f.quiet, recipients: f.list.split(/[\s,;]+/).filter(Boolean) }); }
+    if (ok) { setSaved((n) => (n ?? 0) + 1); resync({ ...d, emailOn: f.on, emailHour: f.hour, quietDays: f.quiet, recipients: f.list.split(/[\s,;]+/).filter(Boolean) }); }
   };
   return (
     <Load r={r}>
