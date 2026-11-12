@@ -93,6 +93,22 @@ describe.skipIf(!HAS_DB)("missed calls nobody called back: golden dataset", () =
     expect(cov.missed.rows.map((r) => `${r.locationId}:${r.contactId}`).sort()).toEqual(call.rows.map((r) => `${r.locationId}:${r.contactId}`).sort());
     expect(cov.missed.dollars).toBe(call.dollars ?? 0);
   });
+  it("a missed call from a number with no contact record is a row named 'Unknown caller' with no number and noRecord set; a nameless caller with a saved number is named by the number; Coverage names them the same", async () => {
+    const U = await make("unk");
+    await sql()`insert into locations (installation_id, location_id, name, timezone) values (${U}, 'LU', 'Unknown test', 'UTC')`;
+    await ev(U, "LU", 'ghost', 'u1', { at: now - 10 * MIN });
+    await sql()`insert into cached_contacts (installation_id, location_id, contact_id, phone, date_added) values (${U}, 'LU', 'nameless', '5550199', now())`;
+    await ev(U, "LU", 'nameless', 'u2', { at: now - 20 * MIN });
+    const call = await sourceRowsPage({ installationId: U }, null, 'missed', { offset: 0, limit: 50, fromMs: now - 30 * DAY, toMs: now + DAY });
+    const by = new Map(call.rows.map((r) => [r.contactId, r]));
+    expect(call.total).toBe(2);
+    expect(by.get('ghost')).toMatchObject({ name: 'Unknown caller', phone: null, noRecord: true });
+    expect(by.get('nameless')).toMatchObject({ name: '5550199', phone: '5550199' });
+    expect((by.get('nameless') as { noRecord?: boolean }).noRecord).toBeFalsy();
+    const cov = await speedCoverage({ installationId: U, allowed: null, targetMinutes: 15, now, seePeople: true });
+    expect(new Map(cov.missed.rows.map((r) => [r.contactId, r.name])).get('ghost')).toBe('Unknown caller');
+    expect(new Map(cov.missed.rows.map((r) => [r.contactId, r.name])).get('nameless')).toBe('5550199');
+  });
 });
 
 // ---------------------------------------------------------------- scale

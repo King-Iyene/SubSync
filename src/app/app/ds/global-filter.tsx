@@ -139,10 +139,10 @@ function DateControl({ mode }: { mode: "range" | "now" | "dates" }) {
   const updating = pending && inflight > 0;
   return (
     <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5" data-testid="date-control">
-      <div role="group" aria-label="Dates" className="inline-flex overflow-hidden rounded-lg border bg-card">
+      <div role="group" aria-label="Dates" className="inline-flex max-w-full overflow-x-auto rounded-lg border bg-card">
         {PRESETS.map((p) => (
           <button key={p.key} type="button" aria-pressed={spec.preset === p.key} onClick={() => applyPreset({ preset: p.key, compare: spec.compare })}
-            className={`min-h-10 whitespace-nowrap px-2.5 text-[0.95rem] outline-none focus-visible:ring-2 focus-visible:ring-ring/40 sm:px-3 ${spec.preset === p.key ? "bg-primary font-medium text-primary-foreground" : "hover:bg-accent"}`}>{p.label.startsWith("Last ") ? <><span className="max-sm:sr-only">Last </span>{p.label.slice(5)}</> : p.label}</button>
+            className={`min-h-11 sm:min-h-10 whitespace-nowrap px-2.5 text-[0.95rem] outline-none focus-visible:ring-2 focus-visible:ring-ring/40 sm:px-3 ${spec.preset === p.key ? "bg-primary font-medium text-primary-foreground" : "hover:bg-accent"}`}>{p.label.startsWith("Last ") ? <><span className="max-sm:sr-only">Last </span>{p.label.slice(5)}</> : p.label}</button>
         ))}
         <button type="button" aria-pressed={spec.preset === "custom"} onClick={() => { setDraft(null); pr.apply({ preset: "custom", from: spec.from ?? pr.from, to: spec.to ?? pr.to, compare: spec.compare }); }}
           className={`min-h-10 border-l px-3 text-[0.95rem] outline-none focus-visible:ring-2 focus-visible:ring-ring/40 ${spec.preset === "custom" ? "bg-primary font-medium text-primary-foreground" : "hover:bg-accent"}`}>Custom</button>

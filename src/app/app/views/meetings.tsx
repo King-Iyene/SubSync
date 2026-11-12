@@ -4,9 +4,9 @@ import { useState } from "react";
 import { ModuleTabs, Page } from "../ds";
 import { crmNoteFootnote } from "@/lib/meeting-wording";
 import { useApiClient, useData } from "../session";
-import { usePageRange } from "../ds/page-range";
 import { Badge, Btn, Card, Empty, ErrorBox, ExtLink, inputClass, Loading, timeAgo } from "../ui";
 import { MeetingInbox } from "./meeting-inbox";
+import { CallsToLog } from "./meeting-logged";
 import { AccountSetup, MyMeetingSetup, type SetupData } from "./meeting-setup";
 
 type Hook = { id: string; locationId: string; locationName: string | null; label: string | null; createdAt: string | null; lastUsedAt: string | null };
@@ -21,13 +21,15 @@ type Data = { meetings: Meeting[]; hooks: Hook[]; accounts: Array<{ locationId: 
 const sourceName = (source: string, zoom: boolean) => (source === "fathom" ? "Fathom" : source === "zoom" && zoom ? "Zoom" : "Meeting tool");
 
 // Meeting notes (stage E2a): the person's own Meeting inbox first, then the older list of meetings that arrived through a private address.
-export function MeetingsView() {
+export function MeetingsView({ logged = false, outcomes = false }: { logged?: boolean; outcomes?: boolean } = {}) {
+  const [tab, setTab] = useState(0);
   // Stage E2b: what a person saves and where, and (for admins) the account's rules and contact fields. Read once, shared by both tabs.
   const setup = useData<SetupData>("meeting-setup");
   return (
     <Page title="Meeting notes" subtitle="After a recorded call, SubSync adds the summary and action items to the contact, written as you. A call it cannot place waits in your private inbox.">
-      <ModuleTabs label="Meeting notes sections" tabs={[
+      <ModuleTabs label="Meeting notes sections" value={tab} onChange={setTab} tabs={[
         { label: "My Meeting inbox", node: <MeetingInbox /> },
+        ...(logged || outcomes ? [{ label: "Calls to log", node: <CallsToLog openInbox={() => setTab(0)} /> }] : []),
         { label: "What to save and where", node: <MyMeetingSetup data={setup.data} loading={setup.loading} error={setup.error} reload={setup.reload} /> },
         ...(setup.data?.admin.can ? [{ label: "Account setup", node: <AccountSetup setup={setup.data} /> }] : []),
         { label: "Older meeting notes", node: <OlderMeetings /> },
@@ -39,8 +41,6 @@ export function MeetingsView() {
 function OlderMeetings() {
   const api = useApiClient();
   const { data, error, loading, reload } = useData<Data>("meetings");
-  // The list is narrowed to the date bar's dates (by the day the meeting started, else the day it arrived).
-  const bar = usePageRange();
   const [account, setAccount] = useState("");
   const [created, setCreated] = useState<{ url: string; accountName: string } | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
@@ -50,7 +50,6 @@ function OlderMeetings() {
   if (error) return <ErrorBox error={error} onRetry={reload} />;
   if (!data) return null;
   const chosen = account || data.accounts[0]?.locationId || "";
-  const inRange = data.meetings.filter((m) => { const d = (m.startedAt ?? m.receivedAt ?? "").slice(0, 10); return !bar.ready || !d || (d >= bar.from && d <= bar.to); });
 
   const act = async (fn: () => Promise<unknown>, done?: string) => {
     setMsg(null);
@@ -120,12 +119,11 @@ function OlderMeetings() {
         </Card>
       )}
 
-      <p className="mb-3 text-sm text-muted-foreground" data-testid="meetings-dates">Dates: {bar.label}, from the bar above. {inRange.length} of {data.meetings.length} meeting notes fall in them.</p>
-      {inRange.length === 0 ? (
+      {data.meetings.length === 0 ? (
         <Empty title="No older meeting notes" body="Meetings from people's own connected tools are in My Meeting inbox. This list is only for meetings that came through a private address." />
       ) : (
         <ul className="space-y-3">
-          {inRange.map((m) => (
+          {data.meetings.map((m) => (
             <li key={m.id} className="rounded-xl border bg-card p-4">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>

@@ -610,6 +610,8 @@ async function runJob(job: Job, deadline: number): Promise<Outcome> {
     case "speed": { const r = await handleSpeed(job); await backfillTouchEvents(job).catch((e) => console.error("Backfill failed", safeError(e))); return r; }
     case "metrics":
       await refreshInsights(job.installationId);
+      // Lead intake (stage DQ): forms, surveys and funnels, read only, at most every 30 minutes per account. Never stops the nightly work.
+      await (await import("./dq-sync")).pollIntake(job.installationId, (l) => tokenForLocation(job.companyId, l), 15_000).catch(() => undefined);
       // The nightly reconcile of the speed history: rebuild the daily rollup for the last 35 days and drop events past retention.
       { const [st] = await sql()`select speed_target_minutes from settings where installation_id = ${job.installationId}`; await rebuildSpeedDaily(job.installationId, Number(st?.speed_target_minutes ?? 15)); }
       return DONE;

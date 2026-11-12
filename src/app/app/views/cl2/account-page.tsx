@@ -125,10 +125,14 @@ export function AccountPage({ id, onBack, flags, drill, onDrill, legacy, go, goT
           <Card title="Setup checklist" testId="cl2-setup">
             <ul className="cl2-check">{a.checklist.map((c) => <li key={c.id} data-ok={c.ok}><span aria-hidden>{c.ok ? "Done" : "To do"}</span> {c.text}</li>)}</ul>
             {a.setup.channelsSeen.length > 0 ? <p className="ap-fine mt-2">Channels seen in the last 30 days: {a.setup.channelsSeen.join(", ")}.</p> : <p className="ap-fine mt-2">No messages seen in the last 30 days.</p>}
-            {(a.setup.message || a.setup.needsHelp.length > 0) && (
-              <details className="mt-2 text-sm"><summary className="ap-link cursor-pointer">Why &quot;Needs permission&quot;?</summary>
-                <p className="mt-1">SubSync shows that only when your CRM refused a read. Reconnect SubSync and allow: calendars and appointments, team members{p.state === "needs_permission" ? ", and paid plans" : ""}. {a.setup.needsHelp.join(". ")}{a.setup.needsHelp.length ? "." : ""}</p></details>
-            )}
+            {(a.setup.message || a.setup.needsHelp.length > 0) && (() => {
+              // The permission explanation appears only when a read was really refused; otherwise the plain reasons are listed.
+              const refused = a.setup.scopes.calendar === "needs_permission" || a.setup.scopes.users === "needs_permission" || p.state === "needs_permission";
+              return (
+                <details className="mt-2 text-sm"><summary className="ap-link cursor-pointer">{refused ? "Why \"Needs permission\"?" : "What needs fixing here?"}</summary>
+                  <p className="mt-1">{refused ? `SubSync shows that only when your CRM refused a read. Reconnect SubSync and allow: calendars and appointments, team members${p.state === "needs_permission" ? ", and paid plans" : ""}. ` : ""}{a.setup.needsHelp.join(". ")}{a.setup.needsHelp.length ? "." : ""}</p></details>
+              );
+            })()}
           </Card>
 
           <Card title="Team" testId="cl2-team">

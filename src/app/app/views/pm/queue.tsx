@@ -76,7 +76,9 @@ export function QueueTab({ initial, options, rev, bump }: { initial: QFilters; o
   const set = (patch: Partial<QFilters>) => setF((x) => ({ ...x, ...patch }));
   const accounts = options?.accounts ?? [], currencies = options?.currencies ?? [];
   const changed = useMemo(() => JSON.stringify({ ...f, q: "" }) !== JSON.stringify({ ...NO_FILTERS }) || f.q !== "", [f]);
-  const saveView = () => { const name = window.prompt("Name this view"); if (!name?.trim()) return; const v = [...views.filter((x) => x.name !== name.trim()), { name: name.trim().slice(0, 40), f }]; setViews(v); saveViews(v); };
+  // The name is typed in a small form on the page: a browser pop-up is blocked inside some embedded frames and then does nothing.
+  const [naming, setNaming] = useState<string | null>(null);
+  const saveView = () => { const name = (naming ?? "").trim(); if (!name) return; const v = [...views.filter((x) => x.name !== name), { name: name.slice(0, 40), f }]; setViews(v); saveViews(v); setNaming(null); };
   const dropView = (name: string) => { const v = views.filter((x) => x.name !== name); setViews(v); saveViews(v); };
 
   return (
@@ -93,7 +95,13 @@ export function QueueTab({ initial, options, rev, bump }: { initial: QFilters; o
         <label className="ap-fine inline-flex items-center gap-1"><input type="checkbox" checked={f.test} onChange={(e) => set({ test: e.target.checked })} /> Show test payments</label>
       </div>
       <div className="pm-views" aria-label="Saved views">
-        <button type="button" className="s6-btn" onClick={saveView} disabled={!changed}>Save this view</button>
+        {naming === null ? <button type="button" className="s6-btn" onClick={() => setNaming("")} disabled={!changed}>Save this view</button> : (
+          <form className="inline-flex flex-wrap items-center gap-2" onSubmit={(e) => { e.preventDefault(); saveView(); }}>
+            <input className="ap-field" autoFocus maxLength={40} aria-label="Name this view" placeholder="Name this view" value={naming} onChange={(e) => setNaming(e.target.value)} onKeyDown={(e) => { if (e.key === "Escape") setNaming(null); }} />
+            <button type="submit" className="s6-btn" data-kind="primary" disabled={!naming.trim()}>Save</button>
+            <button type="button" className="ap-link" onClick={() => setNaming(null)}>Cancel</button>
+          </form>
+        )}
         {views.map((v) => <span key={v.name} className="ap-chip"><button type="button" className="ap-link" onClick={() => { setF(v.f); setQ(v.f.q); }}>{v.name}</button> <button type="button" className="ap-link" aria-label={`Remove the view ${v.name}`} onClick={() => dropView(v.name)}><X aria-hidden className="inline size-3" /></button></span>)}
         {changed && <button type="button" className="ap-link" onClick={() => { setF(NO_FILTERS); setQ(""); }}>Clear filters</button>}
         {!sample1 && <button type="button" className="ap-link ml-auto" onClick={() => void api.download(queryOf("export", { ...paramsOf(f), ...(bar.ready ? { from: bar.from, to: bar.to } : {}) }), "payments.csv")}>Export CSV</button>}

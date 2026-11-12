@@ -105,11 +105,13 @@ import { parsePickedAccounts } from "../design/filters";
 import { myConnectionRemove, myConnectionsView, myConnectionStart, myConnectionTest, policySave, teamConnectionRevoke, teamConnectionsView } from "./connections-api";
 import { bellAction, bellView, copyPreview, copyReset, copySave, destinationAdvanced, destinationRemove, destinationsView, destinationStart, destinationTest, prefSave, prefsView, prefTest } from "./notifications-api";
 import { meetingConfirm, meetingContactSearch, meetingDismiss, meetingIgnore, meetingInboxView, meetingLink, meetingSettingsSave } from "./meetings-api";
+import { meetingLoggedView } from "./meeting-logged-api";
 import { meetingSetupAccountView, meetingSetupFieldsSave, meetingSetupFieldsView, meetingSetupPreview, meetingSetupSaveMine, meetingSetupView } from "./meeting-setup-api";
 import { can, personFromSession } from "../connections/person";
 import { handlePeople, timeoutResponse } from "./people-routes";
 import { handleDuplicates } from "./duplicates-routes";
 import { handleCu } from "./cu-routes";
+import { handleDq } from "./dq-routes";
 import { handleWorkbench } from "./workbench-routes";
 import { handleDial } from "./dial-routes";
 import { handleBoard } from "./pipeline-board-routes";
@@ -127,6 +129,7 @@ import { handleAppointments3 } from "./appointments3-routes";
 import { handleApptExec, handleApptExecTarget } from "./appointments-exec-routes";
 import { handlePipeline3 } from "./pipeline3-routes";
 import { handleClients3 } from "./clients3-routes";
+import { handleProof } from "./proof-routes";
 import { handleClients2 } from "./clients2-routes";
 import { handlePeople3 } from "./people3-routes";
 import { handleTeamRoles } from "./team-roles-routes";
@@ -134,6 +137,8 @@ import { handleSettings2 } from "./settings2-routes";
 import { handlePayments } from "./payments-routes";
 import { handleToday3, handleToday3Act } from "./today3-routes";
 import { handleCash, handleCashAct } from "./cash-routes";
+import { handleWg, handleWgAct } from "./wg-routes";
+import { handleBr } from "./br-routes";
 import { handleApptActions } from "./appointment-actions-routes";
 import { handlePipelineActions } from "./pipeline-actions-routes";
 import { grantedOf } from "./workflows-api";
@@ -829,7 +834,7 @@ export async function todayBriefForInstallation(installationId: string, plan: Pl
   return briefFromToday(await todayData(ctx));
 }
 
-const USAGE_VIEWS = new Set(["today", "overview", "accounts", "clients", "team", "search", "deals", "pipeline", "leads", "calls", "inbox", "onboarding", "email", "duplicates", "alerts", "settings", "help", "account", "meetings", "audit", "speed", "appointments", "people", "myday", "roadmap", "notifications", "workflows", "payments"]);
+const USAGE_VIEWS = new Set(["today", "overview", "accounts", "clients", "team", "search", "deals", "pipeline", "leads", "calls", "inbox", "onboarding", "email", "duplicates", "alerts", "settings", "help", "account", "meetings", "audit", "speed", "appointments", "people", "myday", "roadmap", "notifications", "workflows", "payments", "cleanup", "data-health", "connections"]);
 
 // A counter of which pages get opened (no personal data), so the getting-started checklist can
 // tick itself off and so the agency can see what its team uses.
@@ -2026,7 +2031,7 @@ const clientDeps: clientRoutes.Deps = { allowedIds, accountsFor, actorOf: (ctx) 
 
 const FEATURE_FOR: Record<string, Feature> = {
   "data-health": "data_health", search: "search", onboarding: "onboarding", stale: "stale", inbox: "inbox", pipelines: "pipelines", duplicates: "duplicates", email: "email",
-  "meeting-inbox": "meetings", "meeting-setup": "meetings", "my-connections": "connections", "team-connections": "connections", "meeting-policy": "connections", alerts: "alerts", notifications: "alerts", "notification-prefs": "alerts", "notification-destinations": "alerts", appointments: "appointments", audit: "audit", speed: "speed", "appointment-insights": "appointments", meetings: "meetings", connections: "connections", cleanup: "cleanup", cu: "cleanup", "setup-compare": "setup_compare", playbooks: "playbooks", daily: "overview", today: "overview", team: "team", "deal-events": "pipelines", contact: "search", settings: "settings", export: "exports", digest: "overview", "api-keys": "ai", hygiene: "stale", "pipeline-intel": "pipelines", "contact-intel": "activity", clients: "clients", qbr: "reports", "comms-intel": "inbox", "deal-gaps": "pipelines", "call-queue": "calls", "call-lists": "calls", "call-outcomes": "calls", people: "search", workbench: "search", dial: "calls", workflows: "workflows", "client-onboarding": "onboarding",
+  "meeting-inbox": "meetings", "meeting-setup": "meetings", "meeting-logged": "meetings", "my-connections": "connections", "team-connections": "connections", "meeting-policy": "connections", alerts: "alerts", notifications: "alerts", "notification-prefs": "alerts", "notification-destinations": "alerts", appointments: "appointments", audit: "audit", speed: "speed", "appointment-insights": "appointments", meetings: "meetings", connections: "connections", cleanup: "cleanup", cu: "cleanup", "setup-compare": "setup_compare", playbooks: "playbooks", daily: "overview", today: "overview", team: "team", "deal-events": "pipelines", contact: "search", settings: "settings", export: "exports", digest: "overview", "api-keys": "ai", hygiene: "stale", "pipeline-intel": "pipelines", "contact-intel": "activity", clients: "clients", qbr: "reports", "comms-intel": "inbox", "deal-gaps": "pipelines", "call-queue": "calls", "call-lists": "calls", "call-outcomes": "calls", people: "search", workbench: "search", dial: "calls", workflows: "workflows", "client-onboarding": "onboarding",
 };
 
 export async function handle(request: Request, segments: string[]): Promise<Response> {
@@ -2066,6 +2071,8 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
     if (a === "pipeline3" && method === "GET" && !b && ctx.url.searchParams.has("part")) {
       return await handlePipeline3(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links });
     }
+    // Branded client Proof page and monthly report (stage PR): reports per client account, the secret client link, settings. Agency staff only; flags pr_* checked inside.
+    if (a === "proof") return await handleProof(ctx, { allowed: () => allowedIds(ctx), settings: async () => (await scope(ctx)).settings });
     // Clients round 3: /api/app/clients3?part=... (overview, needs attention, trends, compare, receipt, people, setup, lists; read only).
     if (a === "clients3" && method === "GET" && !b && ctx.url.searchParams.has("part")) {
       return await handleClients3(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links });
@@ -2094,6 +2101,17 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
     }
     if (a === "cash" && b === "act" && ctx.segments.length === 3) {
       return await handleCashAct(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links, targets: async () => { const st = (await scope(ctx)).settings; return { slaHours: st.slaHours, targetMinutes: st.speedTargetMinutes }; }, locationToken: (locationId) => locationAccessToken(ctx.session.companyId, locationId) });
+    }
+    // Wallet guard: /api/app/wg?part=... (summary, list, account, settings, usage, options; read only) and /api/app/wg/act/... (SubSync's own limits, pauses and who is alerted). Owners and admins only.
+    if (a === "wg" && method === "GET" && !b && ctx.url.searchParams.has("part")) {
+      return await handleWg(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links });
+    }
+    if (a === "wg" && b === "act" && ctx.segments.length === 3) {
+      return await handleWgAct(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links });
+    }
+    // The 7 am brief: /api/app/br?part=brief|text|settings|history and /api/app/br/act/<settings|test|seen|acted>. Owners and admins only; every choice is the signed-in person's own.
+    if (a === "br" && ((method === "GET" && !b && ctx.url.searchParams.has("part")) || (b === "act" && ctx.segments.length === 3))) {
+      return await handleBr(ctx);
     }
     // Team (people) module: /api/app/people3?part=... (today, scorecards, workload, leaderboard, money, coaching, access, proof, person, handoff, next lead, lists; read only).
     if (a === "people3" && method === "GET" && !b && ctx.url.searchParams.has("part")) {
@@ -2130,6 +2148,11 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
     // Clean-up fix lists, Health and bulk runs (stage CU): flags cu_fix, cu_health, cu_bulk, checked inside the handler.
     if (a === "cu") {
       const r = await handleCu(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links, locationToken: (locationId) => locationAccessToken(ctx.session.companyId, locationId), actor: actorOf });
+      if (r) return r;
+    }
+    // Clean-up v2 (stage DQ): duplicate groups, lead intake, quality score and history. Flags dq_*, checked inside the handler.
+    if (a === "dq") {
+      const r = await handleDq(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links, locationToken: (locationId) => locationAccessToken(ctx.session.companyId, locationId), actor: actorOf });
       if (r) return r;
     }
     // Clean-up v2: rules, data quality, import check, the per-account switch for changing contacts. Anything else under cleanup falls through to the run endpoints below.
@@ -2193,6 +2216,7 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
       if (a === "connections" && !b) return await connectionsView(ctx);
       if (a === "my-connections" && !b) return await myConnectionsView(ctx);
       if (a === "meeting-inbox" && !b) return await meetingInboxView(ctx);
+      if (a === "meeting-logged" && !b) return await meetingLoggedView(ctx);
       if (a === "meeting-setup" && !b) return await meetingSetupView(ctx);
       if (a === "meeting-setup" && b === "fields" && !c) return await meetingSetupFieldsView(ctx);
       if (a === "meeting-setup" && b === "account" && !c) return await meetingSetupAccountView(ctx);

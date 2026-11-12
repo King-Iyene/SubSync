@@ -31,7 +31,7 @@ Root cause of the reported bug: a custom range over 366 days was refused in sile
 | Clean-up, Duplicates, Data health | right now | bar | n/a | OWN (note) |
 | Workflows overview | platform's own last 30 days | dates only | n/a | OWN (note) |
 | Workflows Proof | bar | dates only | own 7/30 | FIXED |
-| Meeting notes | bar (by meeting day) | n/a | no date filter | FIXED |
+| Meeting notes | none: a person's own inbox, the bar draws no dates there | n/a | n/a | OWN |
 
 Cross-cutting
 - Label: always the applied range; typed range needs Apply; reason shown for a bad one; Reset; compare-with-previous toggle (`pc=prev`); "Updating the numbers" while reads are in flight. FIXED.

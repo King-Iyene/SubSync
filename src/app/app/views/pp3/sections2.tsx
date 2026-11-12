@@ -18,7 +18,7 @@ function BoardTable({ b, pick }: { b: Pp3Board; pick: (id: string) => void }) {
       {b.note ? <p className="ap-fine">{b.note}</p> : (
         <div className="ap-scroll"><table className="ap-t" style={{ minWidth: 0 }}><thead><tr><th>Rank</th><th>Person</th><th data-num data-sm="hide">Leads</th><th data-num>{closers ? "Deals won" : "In time"}</th><th data-num data-sm="hide">Against the same sources</th><th data-sm="hide">Why</th></tr></thead>
           <tbody>{b.shown.map((p) => (
-            <tr key={p.person.userId} style={{ cursor: "default" }}><td><span className="pp-rank">{p.rank ?? "n/a"}</span></td>
+            <tr key={p.person.userId} style={{ cursor: "default" }}><td><span className="pp-rank">{p.rank ?? "Not ranked"}</span></td>
               <td className="pp-wrap"><span className="pp-cell"><Initials p={p.person} /><button type="button" className="pp-name" onClick={() => pick(p.person.userId)}>{p.person.name}</button><RoleChip userId={p.person.userId} /></span></td>
               <td data-num data-sm="hide">{p.n}</td><td data-num>{p.enough ? share(p.value) : NOT_ENOUGH}</td>
               <td data-num data-sm="hide">{p.enough && p.vsMix !== null ? `${p.vsMix > 0 ? "+" : ""}${Math.round(p.vsMix)} pts` : ""}</td>
