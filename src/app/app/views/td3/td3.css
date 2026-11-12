@@ -137,3 +137,16 @@ button.td-hnum:focus-visible { outline: 2px solid var(--ring); outline-offset: 2
 .td-compact .td-dash { gap: 12px; } .td-compact .td-card > header { margin-bottom: 8px; }
 .td-compact .cl-steps li { padding: 6px 0; font-size: 0.875rem; }
 @media (max-width: 900px) { .td-settings { grid-template-columns: minmax(0, 1fr); } }
+
+/* Proof: a figure is either a button that opens its rows (underlined, pointer, hover) or a plain total with an "i" (never underlined, default cursor). */
+.td-total { display: inline-flex; align-items: center; gap: 6px; cursor: default; text-decoration: none; }
+.td-totalnum { font-variant-numeric: tabular-nums; }
+.td-cellnum { background: none; border: 0; padding: 2px 4px; margin: 0; font: inherit; font-variant-numeric: tabular-nums; color: var(--foreground); cursor: pointer; text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--s6-cyan) 55%, transparent); text-underline-offset: 4px; border-radius: 4px; }
+.td-cellnum:hover, button.td-hnum:hover { color: var(--s6-cyan); text-decoration-color: currentColor; }
+.td-cellnum:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.td-caughtrow { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; width: 100%; text-align: left; background: none; border: 0; border-radius: 6px; padding: 4px 6px; margin: -4px -6px; font: inherit; color: var(--foreground); cursor: pointer; }
+.td-caughtrow span { color: var(--muted-foreground); }
+.td-caughtrow:hover { background: color-mix(in srgb, var(--s6-cyan) 10%, transparent); }
+.td-caughtrow:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.td-caughtrow .td-caughtgo { margin-left: auto; color: var(--s6-cyan); text-decoration: underline; text-underline-offset: 4px; }
+.td-openpanel { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; }

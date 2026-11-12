@@ -1,5 +1,6 @@
 import { DAY, fmtMinutes, mondayOf } from "./clients3-intel";
-import type { Td3Item, Td3Kind, Td3Module, Td3Today } from "./today3-types";
+import type { Td3Item, Td3Kind, Td3Module, Td3OpenKind, Td3Today } from "./today3-types";
+import { openKindsOf } from "./today3-proof-core";
 
 // Pure rules behind Today (no database, unit tested). Definitions: docs/METRICS.md "Today 3".
 export { DAY, mondayOf };
@@ -111,6 +112,12 @@ export function medianOf(v: readonly number[]): number | null {
 }
 
 // ---- proof ----
+
+/** The kinds still open, biggest first, zero dropped. The counts add up to the still-open total, so the rows behind them can be checked against it. */
+export function openKinds(m: ReadonlyMap<Td3Kind, number>): Td3OpenKind[] {
+  return openKindsOf(m, (kind, count) => KIND_TEXT[kind].label(count).replace(/^\d+ /, ""));
+}
+
 
 export function proofLines(t: { found: number; cleared: number; stillOpen: number; medianFixMinutes: number | null; enough: boolean }, who: string | null, historyStarts: string | null): string[] {
   const subject = who ?? "your client accounts";

@@ -71,13 +71,17 @@ export type Td3Row = { locationId: string; accountName: string; contactId: strin
 export type Td3Page<T> = { rows: T[]; total: number; page: number; size: number; pages: number; truncated: boolean };
 export type Td3List = Td3Page<Td3Row> & { kind: Td3ListKind; label: string };
 
-export type Td3ProofRow = { locationId: string; name: string; found: number; cleared: number; stillOpen: number; medianFixMinutes: number | null; fixes: number };
+/** One kind of problem still open, with how many. The rows behind it come from part=list&kind=... (the same count). */
+export type Td3OpenKind = { kind: Td3Kind; label: string; count: number };
+export type Td3ProofRow = { locationId: string; name: string; found: number; cleared: number; stillOpen: number; medianFixMinutes: number | null; fixes: number; /** Still open now per kind (each opens its rows). */ openByKind: Td3OpenKind[] };
 export type Td3Proof = {
   weekStart: string; weekEnd: string; weeks: string[];
   /** The whole business (or the one account) for the week. `enough` is false until the record holds at least one full day after its start. */
-  total: { found: number; cleared: number; stillOpen: number; medianFixMinutes: number | null; fixes: number; enough: boolean };
+  total: { found: number; cleared: number; stillOpen: number; medianFixMinutes: number | null; fixes: number; enough: boolean; openByKind: Td3OpenKind[] };
+  /** True for the newest week: its still-open figure is today's, so it opens real rows. Older weeks keep only the total counted that week. */
+  isCurrent: boolean;
   /** Per kind, plain words. */
-  byKind: Array<{ kind: Td3Kind; label: string; found: number; cleared: number }>;
+  byKind: Array<{ kind: Td3Kind; label: string; found: number; cleared: number; stillOpen: number }>;
   rows: Td3Page<Td3ProofRow>;
   /** Plain lines safe to paste to a client (no internal terms). */
   lines: string[];
