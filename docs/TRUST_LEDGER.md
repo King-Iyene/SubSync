@@ -84,3 +84,17 @@ Seen live and clicked: Today money strip (test deal now left out, plain reason, 
 
 ### Not seen because of permissions (what King does)
 Payment, workflow, course and automation signals stay empty until the optional permissions in release 1.1.0 are granted (docs/RELEASE_1_1_0.md). Until then: bulk merge shows an empty list, "Sold" by payments shows "Not available (needs permission)", and the merge detail screen shows "Not available" for workflows, payments, courses and campaigns. King: reinstall or approve 1.1.0 in KD Squares Test, then I re-run these screens.
+
+### Walk-through #3, part 2: real actions on the test account (13 Nov night)
+| Action | Result |
+|---|---|
+| Today: View appointments, Proof "Show who", Numbers leak and "Waiting for a reply" | Each opens exactly the rows its number says (23, 46, 19, 25). |
+| Speed to lead: Race, Pace, Coverage, Waiting on the client, Unanswered tabs | All open and load. Queue "Open the oldest of the 2 people waiting" opens the contact in SubSync. |
+| Contact panel: Add tag (create "test-lead") | Works. Tag appears with date, count goes 0 to 1, message says it was added, Undo offered. |
+| Contact panel: Text, type, "Review and send" | Works up to the final step. Shows exact text, a quiet-hours warning (outside 8am-9pm) that must be ticked, and "cannot be taken back". The tick and "Send now" were NOT pressed (see below). |
+| Contact panel: Call | Shows "It is 22:00 where this account is. Calls are best placed between 8 am and 9 pm" with "Do not call" and "Call now". "Do not call" works. "Call now" NOT pressed. |
+| Mark outcome on one appointment | Preview with the person named, then Confirm; result not seen (the page moved on before the screenshot). |
+
+Found: after adding the tag the panel title changed from the phone number to "Unnamed contact".
+
+Not done, and why: a real text or call needs the quiet-hours or calling-hours override, and the contact has a real-looking conversation history. I did not override those warnings. King decides: do those two clicks himself in the daytime, or tell me which test contact is safe to message.
