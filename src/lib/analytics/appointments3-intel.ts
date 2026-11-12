@@ -240,3 +240,24 @@ export const TEAM_ROLE_LABEL: Record<string, string> = { agency_admin: "Admin, a
 export const teamRoleLabel = (role: string | null | undefined) => TEAM_ROLE_LABEL[role ?? "unknown"] ?? "Team member";
 /** "none this period" and "never" are different things: the first has history, the second has no bookings in anything we hold. */
 export const bookingState = (inPeriod: number, ever: number): "booked" | "none_this_period" | "never" => (inPeriod > 0 ? "booked" : ever > 0 ? "none_this_period" : "never");
+
+/**
+ * The periods of the week-over-week or month-over-month table, ending at the REAL current one (never "the latest period that has data").
+ * `curStart` is the first day (YYYY-MM-DD) of the current week (a Monday) or month in the account's time zone. Returns n + 1 period start days, oldest first, and `endOf`, the last day (inclusive) of a period.
+ */
+export function trendPeriods(curStart: string, grain: "week" | "month", n: number): { starts: string[]; endOf: (start: string) => string } {
+  const d0 = new Date(`${curStart}T00:00:00Z`);
+  const iso = (d: Date) => d.toISOString().slice(0, 10);
+  const starts: string[] = [];
+  for (let i = n; i >= 0; i--) {
+    const d = new Date(d0);
+    if (grain === "week") d.setUTCDate(d.getUTCDate() - 7 * i); else d.setUTCMonth(d.getUTCMonth() - i, 1);
+    starts.push(iso(d));
+  }
+  const endOf = (start: string) => {
+    const d = new Date(`${start}T00:00:00Z`);
+    if (grain === "week") d.setUTCDate(d.getUTCDate() + 6); else { d.setUTCMonth(d.getUTCMonth() + 1, 0); }
+    return iso(d);
+  };
+  return { starts, endOf };
+}

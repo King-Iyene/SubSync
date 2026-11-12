@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { Appt3Trends } from "@/lib/analytics/appointments3-types";
 import { useApiClient, useData } from "../../session";
 import { queryOf, type ApFilters } from "./data";
+import { shortDay } from "./parts";
 
 // Week-over-week and month-over-month bookings per person or calendar, from start time and status only (SQL aggregate). Small sparkline and the change.
 
@@ -26,12 +27,12 @@ export function TrendsPanel({ filters, by, onOpen }: { filters: ApFilters; by: "
         <div className="ap-scroll"><table className="ap-t"><thead><tr><th>{by === "person" ? "Person" : "Calendar"}</th><th data-num>This {unit}</th><th data-num>Last {unit}</th><th data-num>Change</th><th>Last 8 {unit}s</th></tr></thead><tbody>
           {res.data.rows.slice(0, 30).map((r) => (
             <tr key={r.id}><td><span className="ap-name">{r.name}</span></td>
-              <td data-num>{r.current ? <button type="button" className="ap-link tnum" onClick={() => onOpen(`${r.name}, this ${unit}`, r.current, { [by === "person" ? "owner" : "calendar"]: r.id, from: res.data!.currentFrom, outcome: "booked", expect: r.current })}>{r.current}</button> : 0}</td>
+              <td data-num>{r.current ? <button type="button" className="ap-link tnum" onClick={() => onOpen(`${r.name}, ${unit === "week" ? "this week" : "this month"} (${shortDay(res.data!.currentFrom)} to ${shortDay(res.data!.currentTo)})`, r.current, { [by === "person" ? "owner" : "calendar"]: r.id, from: res.data!.currentFrom, to: res.data!.currentTo, local: 1, outcome: "booked", expect: r.current })}>{r.current}</button> : 0}</td>
               <td data-num>{r.previous}</td><td data-num style={{ color: r.delta < 0 ? "var(--s6-red)" : r.delta > 0 ? "var(--s6-green)" : undefined }}>{r.delta > 0 ? "+" : ""}{r.delta}</td><td><Spark values={r.series} /></td></tr>
           ))}
         </tbody></table></div>
       )}
-      <p className="ap-fine mt-2">Counts of appointments by their start time, not counting invalid ones. {grain === "month" ? "A month is the calendar month." : "A week starts on Monday."}</p>
+      <p className="ap-fine mt-2" data-testid="ap-trends-window">{res.data ? `This ${unit} is ${shortDay(res.data.currentFrom)} to ${shortDay(res.data.currentTo)}, last ${unit} ${shortDay(res.data.previousFrom)} to ${shortDay(res.data.previousTo)} (${grain === "month" ? "calendar months" : "Monday to Sunday"}, ${res.data.timeZone.replace(/_/g, " ")} time). This table always covers the last 8 ${unit}s up to now; the figures above follow your date range. ` : ""}Counts of appointments by their start time, not counting invalid ones.</p>
     </div>
   );
 }

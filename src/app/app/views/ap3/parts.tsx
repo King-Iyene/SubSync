@@ -23,6 +23,8 @@ const FLAG_TEXT: Record<ApRow["flags"][number], string> = { "double-booked": "Do
 export function CalChip({ name, group }: { name: string | null; group?: string | null }) {
   return <span className="ap-calchip" title={group ? `Calendar group: ${group}` : undefined}>{name ?? "Calendar"}{group ? <i>{group}</i> : null}</span>;
 }
+/** "5 Oct" from a YYYY-MM-DD day. */
+export const shortDay = (iso: string) => { const d = new Date(`${iso}T12:00:00`); return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString("en-US", { month: "short", day: "numeric" }); };
 export const when = (iso: string) => { const d = new Date(iso); return `${d.toLocaleDateString("en-US", { month: "short", day: "numeric" })}, ${d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`; };
 
 /** Compact table of appointments (40px rows). Row click or Enter opens the right-side panel; the arrow keys move between rows. */

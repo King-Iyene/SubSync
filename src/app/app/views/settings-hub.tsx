@@ -8,6 +8,7 @@ import type { GoFn } from "../nav";
 import { useData } from "../session";
 import { Btn, Card, ErrorBox, Loading, PageHeader, inputClass } from "../ui";
 import { SettingsView } from "./settings";
+import { SaleBasisSettings } from "./sale-basis-settings";
 import { ConnectionsSection, HelpSection, ModulesSection, PermissionsSection, PlanCard, ReadOnlyNote, SafetySection, type Home } from "./settings-hub-parts";
 
 const KEY = "settings-hub-section";
@@ -28,7 +29,10 @@ export function SettingsHub({ go, features, openOld }: { go: GoFn; features: Rec
   if (loading && !home) return <Loading />;
   if (error) return <ErrorBox error={error} onRetry={reload} />;
   if (!home) return null;
-  const choose = (id: HubSectionId) => { setPicked(id); remember(KEY, id); setQ(""); };
+  const choose = (id: HubSectionId, then?: string) => {
+    setPicked(id); remember(KEY, id); setQ("");
+    if (then) setTimeout(() => document.getElementById(then)?.scrollIntoView({ block: "start", behavior: "smooth" }), 80);
+  };
   const section = HUB_SECTIONS.find((s) => s.id === picked) ?? HUB_SECTIONS[0];
   const hits = searchSettings(q);
   // Sections that hold fields are for people who may change settings; everyone else reads them.
@@ -50,6 +54,8 @@ export function SettingsHub({ go, features, openOld }: { go: GoFn; features: Rec
         </Card>
       )}
       {section.id === "help" && <HelpSection go={() => go("help")} />}
+      {/* Everyone who may open Settings sees how a sale is counted; only the owner or an administrator can change it (the card says so). */}
+      {section.id === "targets" && features.appt_booking_share !== false && <div id="sale-basis-card" data-testid="hub-sale-basis"><SaleBasisSettings /></div>}
       {/* One form, always mounted, drawn only for the sections that hold fields; a change in one section is kept while you look at another. */}
       <div hidden={!forms || !home.canManage}><SettingsView embedded={home.canManage ? [...section.old] : []} /></div>
     </div>
@@ -63,7 +69,7 @@ export function SettingsHub({ go, features, openOld }: { go: GoFn; features: Rec
         {q.trim() && (
           <ul className="mt-2 divide-y rounded-lg border bg-card text-sm" data-testid="hub-results" aria-label="Search results">
             {hits.length === 0 ? <li className="px-3 py-3 text-muted-foreground">Nothing matches. Try another word, or pick a section.</li> : hits.map((h) => (
-              <li key={h.id}><button type="button" className="flex min-h-11 w-full items-center justify-between gap-3 px-3 py-2 text-left hover:bg-muted" onClick={() => choose(h.section)}><span>{h.label}</span><span className="text-xs text-muted-foreground">{HUB_SECTIONS.find((s) => s.id === h.section)?.title}</span></button></li>
+              <li key={h.id}><button type="button" className="flex min-h-11 w-full items-center justify-between gap-3 px-3 py-2 text-left hover:bg-muted" onClick={() => choose(h.section, h.id === "sale" ? "sale-basis-card" : undefined)}><span>{h.label}</span><span className="text-xs text-muted-foreground">{HUB_SECTIONS.find((s) => s.id === h.section)?.title}</span></button></li>
             ))}
           </ul>
         )}
