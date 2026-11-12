@@ -108,3 +108,19 @@ Not done, and why: a real text or call needs the quiet-hours or calling-hours ov
 New findings: (8) bare "Request failed (403)" on a blocked send, must say why in plain words; (9) Find a lead search cannot find text in the middle of an email.
 
 Still not tested: Money, Clients, Team, Pipeline (live funnel), Meetings and the Fathom line, Workflows, Settings, bookings and deals on the imported leads, bulk screens with 100+ leads, dark/light and 390/768 widths.
+
+### Walk-through #3, part 4: every module opened and clicked (13 Nov, late)
+Opened and clicked, loads, no crash: Money (all 3 groups, 6 client-payment tabs), Clients (all 11 tabs and the menu), Team, Pipeline (Overview, Money flow, funnel, Coins toggle), Meeting notes, Workflows, Settings, Account audit, Clean-up > Duplicates, What's new.
+
+| # | Where | Finding |
+|---|---|---|
+| 10 | Clients > Money | Says "Every client plan is paid up. Nothing to chase today." while the same screen says plans cannot be read. Must not claim "paid up" when payments are unreadable. |
+| 11 | Clients tab bar and "..." menu | Menu repeats the bar ("Compare clients" vs "Compare accounts", "Weekly reports" vs "Reports"). 11 tabs on one bar is too many. |
+| 12 | Pipeline > Money flow | Cards and funnel steps say "$0 open, 0 deals" for pipelines that hold open deals with no value (counted but left out). Reads as "no deals". Say "n deals without a value". |
+| 13 | Pipeline funnel | Cannot be judged with the test data: every deal is $0. Needs a few test deals with real values and owners. |
+| 14 | Meeting notes | Fathom logo is back ("Your Fathom is connected"). The card says 4 recorded calls this week; the list below says 0 calls in the dates chosen. Same mismatch as before. |
+| 15 | What's new | Does not list this release: sale-basis setting, stale-deal rules, funnel, call panel, richer Deals. |
+| 16 | Clean-up > Duplicates | "Merge all certain matches (13)" exists next to a per-group "Merge" button, while the Protected tooltip says protected people are never bulk-merged. Label the per-group button "Merge this person" and show which of the 13 are skipped. |
+| 17 | Today | Mark outcome worked: "Appointments to confirm" went 23 to 22. |
+
+Needs King's permissions (no data until granted): payments, plans, wallet balances, workflows, campaigns (release 1.1.0 optional permissions). Not yet clicked: Settings sections one by one, light mode, 390 and 768 widths, bookings and deals on the 120 imported leads.
