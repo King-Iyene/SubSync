@@ -1,6 +1,8 @@
 import { sql } from "../db";
 import { ttlCache } from "../ttl-cache";
 import { quietedMap } from "./clients-actions-queries";
+import { receiptLine } from "./mn2";
+import { meetingsOn, weekCountsByAccount } from "./mn2-queries";
 import { countedInScope, dealScopeJoins } from "./stage-rules-sql";
 import { byAttention, clampSize, DAY, delta, levelOf, mondayOf, rate, reasonsOf, receiptLines, STALE_DEAL_DAYS, summaryOf, todayOf, applyQuiet, QUIET_DAYS, SYNC_OLD_HOURS, WAIT_OLD_HOURS, type AccountSignals } from "./clients3-intel";
 import type {
@@ -343,6 +345,8 @@ async function receiptsFor(s: Scope, ids: string[], accts: Acct[], week: Date, n
   ]);
   const by = (rows: Record<string, unknown>[]) => new Map(rows.map((r) => [r.location_id as string, r]));
   const D = by(dRows), P = by(spd as Record<string, unknown>[]), W = by(wait), U = by(unm);
+  // Recorded calls matched to each client this week (Meeting notes): one counts-only line, and only while the Meetings list is on.
+  const calls = (await meetingsOn(s.inst)) ? await weekCountsByAccount(s.inst, ids, start, end) : new Map<string, { held: number; logged: number; noNextStep: number }>();
   return accts.map((a) => {
     const d = D.get(a.id) ?? {}, sp = P.get(a.id) ?? {};
     const r = {
@@ -352,7 +356,7 @@ async function receiptsFor(s: Scope, ids: string[], accts: Acct[], week: Date, n
     };
     return {
       locationId: a.id, name: a.name, weekStart: day(start), weekEnd: day(new Date(end.getTime() - DAY)), enough: r.cameIn + r.booked + r.won > 0,
-      ...r, answeredFast: n(sp.fast), unmarked: n(U.get(a.id)?.c), dealsStarted: n(d.c_deals_started), lostValue: n(d.c_lost_value), lines: receiptLines(r), historyStarts: hist,
+      ...r, answeredFast: n(sp.fast), unmarked: n(U.get(a.id)?.c), dealsStarted: n(d.c_deals_started), lostValue: n(d.c_lost_value), lines: [...receiptLines(r), ...(receiptLine(calls.get(a.id) ?? { held: 0, logged: 0, noNextStep: 0 }) ? [receiptLine(calls.get(a.id) as { held: number; logged: number; noNextStep: number }) as string] : [])], historyStarts: hist,
     };
   });
 }

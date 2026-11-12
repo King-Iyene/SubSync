@@ -193,6 +193,11 @@ export const DEFAULT_OFF: ReadonlySet<Feature> = new Set<Feature>([
   // Meeting notes revamp (docs/features/MEETINGS_BRIEF.md): mn_logged is the calls held but not logged counts, mn_outcomes the history of what followed a call. Default off.
   "mn_logged",
   "mn_outcomes",
+  // Meeting notes, finished (slices 1, 2, 6): mn_list the Meetings list, detail panel and connect strip, mn_followups the follow-up lists, mn_tasks action items to CRM tasks, mn_coach the coaching view. Default off.
+  "mn_list",
+  "mn_followups",
+  "mn_tasks",
+  "mn_coach",
   // Clean-up v2 (docs/research/DATAQUALITY_R1.md): dq_module is the rebuilt Clean-up screen, dq_dupes duplicates with merge, delete and bulk, dq_intake the Lead intake tab, dq_alerts its alerts,
   // dq_gate the sorting-gate animation, dq_score the quality score. Default off.
   "dq_module",

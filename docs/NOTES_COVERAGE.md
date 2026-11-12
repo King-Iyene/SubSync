@@ -135,3 +135,9 @@ ORPHANS (notes with no stage in docs/ROADMAP_V2.md): none found.
 | KF-5 | Think like the customer and make things easier (guides, defaults, next steps) | every stage | PLANNED-LATER | F2 part DONE: customer-eyes table in docs/features/F2.md section 5 |
 | KF-6 | Clickable charts: click a bar or slice to see the leads, click a lead for details | D0, all chart stages | PLANNED-LATER | F2 part DONE: every figure and row on Speed to lead opens the list behind it with the same count (speed-f2.test.ts) |
 | KF-7 | Clients module: fees and renewals unexplained, demo shows none | C1 (demo seed too) | PLANNED-LATER | King's live feedback |
+
+## Meeting notes, finished (12 Nov 2026), customer's-eye check
+- Closer: "Is my call on the right contact, can I fix it in one click?" Yes: each call says "On the contact" or "Waiting for you to pick the contact", and the panel offers the exact-email contacts with one tap. Never guessed.
+- Owner: "Who is not logging calls?" Calls to log (counts) and Coaching (calls, length, next-step rate) by person; never what was said.
+- Words used: "Waiting for you to pick the contact", "Needs permission: reconnect", "Followed up". No vendor words.
+- Why would I pay: weak alone, strong inside the bundle: it only has value for agencies whose closers use Fathom (ask the 5 pilots), and the moat is the meeting-to-outcome history (mn_outcomes) it feeds.

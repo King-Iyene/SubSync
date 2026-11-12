@@ -134,6 +134,8 @@ export async function linkMeeting(store: InboxStore, person: Person, installatio
       : { ok: false, code: "write_failed", message: "Your CRM did not accept the note. Nothing was saved. Try again in a moment." };
   }
   await store.updateMeeting(row.id, end.status, end.reason, null);
+  // The person picked this contact, so the call now belongs to it (the Meeting notes list shows it there). Best effort: a store without it keeps nothing.
+  try { await store.noteDetails?.(row.id, { durationMinutes: null, talkPct: null, matched: { locationId: hit.locationId, contactId: hit.contactId } }); } catch { /* the list simply lacks the contact */ }
   if (row.connectionId) await store.bump(row.connectionId, "saved");
   return { ok: true, dryRun: !live, notes: done.filter((d) => d.outcome === "written").length };
 }

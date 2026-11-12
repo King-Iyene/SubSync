@@ -70,7 +70,7 @@ export async function handleFathomDelivery(input: HookInput, deps: HookDeps): Pr
   try {
     const done: IngestResult = await ingestPersonalMeeting(conn, parsed.meeting, parsed.recordingId, deps.store, deps.write(conn), {
       internalEmails: parsed.internalEmails, rep: parsed.recordedByName ?? conn.person.name, withNames: parsed.withNames, durationMinutes: parsed.durationMinutes,
-      transcript: parsed.transcriptText, callUrl: parsed.callUrl,
+      transcript: parsed.transcriptText, callUrl: parsed.callUrl, talkPct: parsed.talkPct,
     });
     return { status: 200, body: { ok: true, result: done.kind } };
   } catch (error) {

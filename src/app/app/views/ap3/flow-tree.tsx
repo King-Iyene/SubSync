@@ -128,7 +128,7 @@ export function FlowTree({ filters, onOpen, go }: { filters: ApFilters; onOpen: 
                       onMouseEnter={() => setHot(n.id)} onMouseLeave={() => setHot(null)} onFocus={() => setHot(n.id)} onBlur={() => setHot(null)}>
                       <button type="button" className="ap-node-main" onClick={() => (n.kind === "more" ? setSetterLimit(12) : pick(n))} aria-label={n.kind === "more" ? `Show ${n.label}` : sentence(n)} data-testid={`ap-node-${n.kind}`}>
                         {n.kind === "root" ? <span className="block text-center"><span className="ap-root-n"><CountUp value={n.count} /></span><span className="ap-root-l block">booked</span></span>
-                          : n.kind === "leaf" ? <><i aria-hidden /><span>{n.label}</span><b>{n.count}</b></>
+                          : n.kind === "leaf" ? <><i aria-hidden /><span>{n.label}</span>{n.calendar && <em className="ap-cal" title={`Booked on ${n.calendar}`} data-testid="ap-leaf-calendar">{n.calendar}</em>}<b>{n.count}</b></>
                           : n.kind === "more" ? <span>{n.label}</span>
                           : <><span className="ap-node-name"><span>{n.label}</span>{n.best && <Sparkles aria-hidden className="size-3.5 flex-none text-[var(--tone)]" />}</span><Stats s={n.stats!} /></>}
                       </button>

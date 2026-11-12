@@ -67,8 +67,9 @@ export function adaptFlow(t: Appt3FlowTree, periodLabel = "This period"): ApFlow
   const setters: ApFlowSetter[] = nodes.filter((n) => n.level === "setter").map((s) => {
     const closers: ApFlowCloser[] = kids(s.id).filter((c) => c.level === "closer").map((c) => {
       const outcomes = emptyOutcomes();
-      for (const l of kids(c.id)) if (l.leaf && LEAF[l.leaf]) { outcomes[LEAF[l.leaf]] += l.count; totals[LEAF[l.leaf]] += l.count; }
-      return { id: c.userId ?? "none", name: c.userId === null ? "Owner not recorded" : c.label, outcomes, ...stats(c) };
+      let calendar: string | null = null;
+      for (const l of kids(c.id)) if (l.leaf && LEAF[l.leaf]) { outcomes[LEAF[l.leaf]] += l.count; totals[LEAF[l.leaf]] += l.count; calendar = calendar ?? l.calendar ?? null; }
+      return { id: c.userId ?? "none", name: c.userId === null ? "Owner not recorded" : c.label, outcomes, ...(calendar ? { calendar } : {}), ...stats(c) };
     });
     return { id: s.userId ?? "none", name: s.userId === null && s.id !== "s:others" ? "Booker not recorded" : s.label, closers, hiddenClosers: 0, ...stats(s) };
   });

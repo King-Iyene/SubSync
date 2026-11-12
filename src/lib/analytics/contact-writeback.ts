@@ -141,6 +141,8 @@ export async function isOurContactWrite(installationId: string, ids: string[]): 
   if (ids.length === 0) return false;
   try {
     const r = await sql()`select 1 from contact_writes where installation_id = ${installationId} and (note_id = any(${ids}::text[]) or task_id = any(${ids}::text[])) limit 1`;
-    return r.length > 0;
+    if (r.length > 0) return true;
+    const made = await sql()`select 1 from mn_tasks where installation_id = ${installationId} and ghl_task_id = any(${ids}::text[]) limit 1`.catch(() => []);
+    return made.length > 0;
   } catch { return false; }
 }

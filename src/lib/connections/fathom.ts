@@ -5,6 +5,7 @@
 // assignee), transcript. NOT VERIFIED LIVE: nobody has received a real delivery yet.
 
 import type { Attendee, Meeting } from "../analytics/meeting-intel.ts";
+import { talkShare } from "../analytics/mn2.ts";
 
 /**
  * Which recordings a person's delivery address is created for. `my_recordings` works for everybody. On a Team plan it does NOT include the person's own
@@ -31,6 +32,8 @@ export type FathomDelivery = {
   /** Attendees for the note's "With:" line: everybody invited except the recorder. */
   withNames: string[];
   durationMinutes: number | null;
+  /** The share (0 to 100) of the words the recorder spoke, from counts of the transcript turns of this one delivery. Null unless the transcript was read (the words are never kept). */
+  talkPct: number | null;
   /**
    * The call's full text, one line per turn ("Name: words"), only when Fathom sent it. It is held in memory for the one delivery and written to the CRM only
    * where the person's table, the account's rules and the person's switch all allow it. It is never stored by SubSync (stage E2b).
@@ -87,6 +90,16 @@ function transcriptOf(v: unknown): string | null {
     lines.push(line);
   }
   return lines.length ? lines.join("\n") : null;
+}
+
+/** Words per speaker, as counts only: the share of the talking the recorder did. Nothing of the text is returned. */
+function talkOf(v: unknown, me: { name: string | null; email: string | null }): number | null {
+  if (!Array.isArray(v)) return null;
+  const turns = v.slice(0, 20_000).map((raw) => {
+    const o = rec(raw), sp = rec(o.speaker);
+    return { speaker: text(sp.display_name, 80), email: email(sp.matched_calendar_invitee_email), words: (text(o.text, 4_000) ?? "").split(/\s+/).filter(Boolean).length };
+  });
+  return talkShare(turns, me);
 }
 
 /**
@@ -148,6 +161,7 @@ export function parseFathomDelivery(input: unknown, options: { transcript?: bool
   return {
     recordingId, meeting, recordedByEmail, recordedByName, internalEmails: [...internal], withNames: withNames.filter(Boolean).slice(0, 12),
     durationMinutes: minutes !== null && minutes > 0 && minutes < 24 * 60 ? minutes : null,
+    talkPct: options.transcript === true ? talkOf(b.transcript, { name: recordedByName, email: recordedByEmail }) : null,
     transcriptText: options.transcript === true ? transcriptOf(b.transcript) : null, callUrl: httpsUrl(b.url),
   };
 }

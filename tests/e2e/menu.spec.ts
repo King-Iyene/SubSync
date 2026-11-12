@@ -3,8 +3,8 @@ import { expect, test } from "@playwright/test";
 // Every enabled module is reachable from the menu, and Settings, Getting started and What's new stay in view on a short window
 // (they used to sit below a scroll area that looked like the end of the menu).
 // The pilot menu: plain group names, a short list on top, and active secondary pages under "More". Contact search, Leads and Call lists are People tabs.
-const LABELS = ["Today", "Speed to lead", "Appointments", "Account audit", "Clients", "People", "Overview", "Team", "Pipeline and deals", "Clean-up", "Meeting notes", "Workflows", "Data health", "Settings", "Getting started", "What's new"];
-const GROUPS = ["Reply", "Clients and people", "More"];
+const LABELS = ["Today", "Speed to lead", "Appointments", "Account audit", "Clients", "Payments", "Find a lead", "Overview", "Team", "Pipeline and deals", "Clean-up", "Meeting notes", "Workflows", "Data health", "Settings", "Getting started", "What's new"];
+const GROUPS = ["Clients and money", "Checks", "Team and tools"];
 
 test.beforeEach(async ({}, testInfo) => { test.skip(testInfo.project.name !== "desktop-1440", "the sidebar is the desktop layout"); });
 
@@ -29,7 +29,7 @@ test("the agency menu exposes all modules, keeps Settings and help visible, and 
   for (const tab of ["Clients", "Onboarding", "Industries"]) await expect(page.getByRole("tab", { name: tab, exact: true }), `Clients tab: ${tab}`).toBeVisible();
   for (const tab of ["Compare", "Reviews (QBR)"]) await expect(page.getByRole("tab", { name: tab, exact: true }), `available module tab: ${tab}`).toBeVisible();
   // The pages that became tabs are still one click away, inside People.
-  await side.getByRole("button", { name: "People", exact: true }).click();
+  await side.getByRole("button", { name: "Find a lead", exact: true }).click();
   for (const tab of ["Find and call", "Tags", "Going cold", "Sources"]) await expect(page.getByRole("tab", { name: tab, exact: true }), `People tab: ${tab}`).toBeVisible();
   await side.getByRole("button", { name: "Overview", exact: true }).click();
   await expect(page.getByTestId("overview-metric").first()).toBeVisible({ timeout: 150_000 }); // the Overview loads its numbers after the menu opens; the demo server can take a while

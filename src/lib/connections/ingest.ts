@@ -82,6 +82,8 @@ export type IngestStore = {
   claimPart?: (r: PartRef) => Promise<boolean>;
   finishPart?: (r: PartRef, ghlId: string | null) => Promise<void>;
   releasePart?: (r: PartRef) => Promise<void>;
+  /** Meeting notes list: keeps what the call knows about itself next to it (its length, the share of the talking, the contact it was matched to with certainty). Optional and best effort: a store without it, or a database not updated yet, simply keeps nothing. */
+  noteDetails?: (meetingId: string, d: { durationMinutes: number | null; talkPct: number | null; matched: { locationId: string; contactId: string } | null }) => Promise<void>;
   /** Writes what happened to each contact field into the audit log (ids, item names and plain reasons: never a value). Optional. */
   logDelivery?: (installationId: string, userId: string, meetingId: string, fields: FieldReport[]) => Promise<void>;
 };
@@ -92,7 +94,7 @@ export type Writer = (a: { installationId: string; locationId: string; contactId
  * What the delivery adds to the meeting, for the note's header (all optional: a source that has none leaves the line out). `transcript` is the call's
  * full text and exists only in memory for this one delivery (SubSync never stores a transcript); `callUrl` is the call's page in the meeting tool.
  */
-export type DeliveryExtras = { internalEmails?: string[]; rep?: string | null; withNames?: string[]; durationMinutes?: number | null; transcript?: string | null; callUrl?: string | null };
+export type DeliveryExtras = { internalEmails?: string[]; rep?: string | null; withNames?: string[]; durationMinutes?: number | null; transcript?: string | null; callUrl?: string | null; talkPct?: number | null };
 
 export type IngestResult =
   | { kind: "duplicate" }
@@ -321,12 +323,14 @@ export async function ingestPersonalMeeting(
     }
     supersedes = decision.supersedes;
   }
+  const details = async (id: string, matched: { locationId: string; contactId: string } | null) => { try { await store.noteDetails?.(id, { durationMinutes: extras.durationMinutes ?? null, talkPct: extras.talkPct ?? null, matched }); } catch { /* the list simply lacks these facts */ } };
   const supersede = async () => { if (supersedes.length && store.markDuplicates) await store.markDuplicates(installationId, person.userId, supersedes, "preferred_tool_has_it"); };
 
   const waits = async (reason: InboxReason): Promise<IngestResult> => {
     const id = await store.insertMeeting({ ...base, status: "needs_contact", reason, expiresAt: store.now() + (plan.kind === "inbox" ? plan.retentionDays : waitDays) * DAY });
     if (id === null) return { kind: "duplicate" };
     await supersede();
+    await details(id, null);
     await store.bump(conn.id, "skipped");
     return { kind: "inbox", meetingId: id, reason };
   };
@@ -340,12 +344,14 @@ export async function ingestPersonalMeeting(
     const id = await store.insertMeeting({ ...base, status: "needs_contact", reason: "preview_needed", expiresAt: store.now() + waitDays * DAY });
     if (id === null) return { kind: "duplicate" };
     await supersede();
+    await details(id, plan.targets[0] ? { locationId: plan.targets[0].locationId, contactId: plan.targets[0].contactId } : null);
     return { kind: "kept", meetingId: id, reason: "preview_needed" };
   }
 
   const id = await store.insertMeeting({ ...base, status: live ? "saved" : "dry_run", reason: live ? null : "WOULD WRITE", expiresAt: null });
   if (id === null) return { kind: "duplicate" };
   await supersede();
+  await details(id, plan.targets[0] ? { locationId: plan.targets[0].locationId, contactId: plan.targets[0].contactId } : null);
   const input: DeliveryInput = {
     title: m.title, startedAt: m.startedAt, durationMinutes: extras.durationMinutes ?? null,
     attendeeNames: extras.withNames ?? m.attendees.map((a) => a.name ?? a.email ?? "").filter(Boolean), rep: extras.rep ?? person.name, tool: toolName(conn.provider),
