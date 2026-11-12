@@ -80,11 +80,23 @@ export type Appt3PersonShare = {
   /** The calendars this person is on (from the calendar list), and what they booked / took in these dates, per calendar. */
   calendars?: Array<{ calendarId: string; name: string | null; groupName: string | null; active: boolean }>;
   byCalendar?: Array<{ calendarId: string | null; name: string | null; groupName: string | null; booked: number; owned: number }>;
+  /** Sales credited to this person as the closer, under the company's chosen way of counting a sale (Settings), their value, and the sales that came from meetings they booked. */
+  sold: number; soldValue: number; soldFromBookings: number;
+  /** The role the company gave this person inside SubSync (setter, closer, ...), null when none is set. */
+  setRole: string | null;
+  /** Sales as a share of meetings taken; null under 5 meetings taken. */
+  soldRate: number | null; ownedShowed: number;
+  /** How many calendars the person is on. */
+  calendarCount: number;
 };
 export type Appt3BookingShare = Page<Appt3PersonShare> & {
   unassigned: number; ownerless: number;
   /** Everyone in the selected accounts' team lists (before the role/has-bookings narrowing), and the roles to filter by. */
   counts?: { withBookings: number; none: number };
+  /** The three groups of people (before the page is cut), the four summary figures, and how a sale is counted. */
+  sections?: { active: number; oncal: number; off: number };
+  summary?: { peopleBooked: number; booked: number; showed: number; showRate: Rate; sold: number; soldValue: number };
+  sale?: { basis: "deal_won" | "payment" | "assigned_closer"; countWithoutValue: boolean; available: boolean; phrase: string; rule: string; reason: string | null; roleFallback: boolean };
   rosterTotal?: number; roles?: Array<{ key: string; label: string; n: number }>;
   /** First day appointments are read from. Older history is not in SubSync. */
   historyStarts?: string;

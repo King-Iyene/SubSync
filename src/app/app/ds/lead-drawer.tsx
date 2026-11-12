@@ -184,7 +184,7 @@ function Body({ seed, top, showAccount, wide, onLogged }: { seed: LeadSeed; top?
             {tab === "timeline" && data && <TimelinePanel items={timeline} timeZone={tz} note={tlNote} className="max-h-[70vh]" />}
             {tab === "record" && <RecordTab locationId={seed.locationId} contactId={seed.contactId} name={name} account={c?.locationName ?? seed.locationName ?? null} fields={extra?.live.customFields ?? []} />}
             {tab === "appointments" && <AppointmentsTab ctx={wb} crmUrl={wb.crmUrl ?? url} runner={runner} locationId={seed.locationId} onChanged={() => { setThreadKey((k) => k + 1); void wbq.reload(); void person.reload(); }} />}
-            {tab === "deals" && <DealsTab ctx={wb} runner={runner} focusId={seed.dealId ?? null} />}
+            {tab === "deals" && <DealsTab ctx={wb} runner={runner} focusId={seed.dealId ?? null} contactId={seed.contactId} locationId={seed.locationId} />}
           </div>
         </section>
       )}

@@ -6,6 +6,7 @@ import { resolveEntitlements } from "../flags";
 import type { deepLinks } from "../links";
 import { json, type AuthContext } from "./auth";
 import { ownedLocation } from "./tenant-guard";
+import { isSection } from "../analytics/sale-basis-core";
 
 // GET /api/app/appointments?part=overview|needs-outcome|noshow-recovery|booking-share|flow-tree|health|sources|calendars|reminders|receipt|list|detail (the one catch-all
 // route, already guarded). Read only. Who is asking comes from the verified session; the accounts that caller may read come from `allowed` (decided by the router from
@@ -63,7 +64,7 @@ export async function handleAppointments3(ctx: Ctx, h: Appt3Helpers): Promise<Re
     case "noshow-recovery": return done(await noshowRecovery(scope, { f, page: p, size, sort: sp.get("sort"), after: sp.get("after") }, link));
     case "list": return done(await appointmentList(scope, { f, page: p, size, sort: sp.get("sort"), after: sp.get("after") }, link));
     case "booking-share":
-      return seePeople ? done(await bookingShare(scope, f, p, size, sp.get("sort"), { teamRole: ["agency_admin", "agency_staff", "account_admin", "account_user", "unknown"].includes(sp.get("team_role") ?? "") ? sp.get("team_role") : null, has: sp.get("has") === "yes" || sp.get("has") === "no" ? (sp.get("has") as "yes" | "no") : null })) : wrap({ rows: [], total: 0, page: 0, size, pages: 1, truncated: false, unassigned: 0, ownerless: 0, fairness: { enough: false, maxSharePct: null, evenSharePct: null, closers: 0 } });
+      return seePeople ? done(await bookingShare(scope, f, p, size, sp.get("sort"), { teamRole: ["agency_admin", "agency_staff", "account_admin", "account_user", "unknown"].includes(sp.get("team_role") ?? "") ? sp.get("team_role") : null, has: sp.get("has") === "yes" || sp.get("has") === "no" ? (sp.get("has") as "yes" | "no") : null, section: isSection(sp.get("section")) ? (sp.get("section") as "active" | "oncal" | "off") : null })) : wrap({ rows: [], total: 0, page: 0, size, pages: 1, truncated: false, unassigned: 0, ownerless: 0, fairness: { enough: false, maxSharePct: null, evenSharePct: null, closers: 0 } });
     case "flow-tree": {
       if (!seePeople) return wrap({ nodes: [], period: { from: w.from.toISOString(), to: w.to.toISOString() }, totalBooked: 0, topN: 0, hiddenPeople: 0, leak: null });
       const c = (sp.get("compare") ?? "").split(",").map(cleanId);
