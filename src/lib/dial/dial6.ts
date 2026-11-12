@@ -240,6 +240,21 @@ export function waitingLine(waiting: ReadonlyArray<{ kind: WaitKind; why: string
   return `${bits.join("; ")}.`;
 }
 
+/** What the Call mode screen says and offers (plain words, no dead buttons): the headline, the one next step, and the label of the always-live main button. */
+export type CallScreen = { mode: "ready" | "waiting" | "empty"; headline: string; line: string; primary: string; powerNote: string | null };
+export function callScreen(c: { ready: number; waiting: ReadonlyArray<{ kind: WaitKind; why: string }> }): CallScreen {
+  if (c.ready > 0) return { mode: "ready", headline: `${c.ready.toLocaleString("en-US")} ${c.ready === 1 ? "person" : "people"} ready to call now`, line: "Hottest first. They are fed to your CRM's dialer one at a time.", primary: `Start calling (${c.ready.toLocaleString("en-US")})`, powerNote: null };
+  const n = c.waiting.length;
+  if (n > 0) {
+    const hours = c.waiting.filter((x) => x.kind === "hours").length;
+    const line = hours === n
+      ? `${n} ${n === 1 ? "person can" : "people can"} be called from ${DEFAULT_WINDOW.start}:00 (their time). We'll show them here then.`
+      : `${waitingLine(c.waiting)} We'll show them here when they can be called.`;
+    return { mode: "waiting", headline: "Nobody to call right now", line, primary: `Send the ${n.toLocaleString("en-US")} waiting to my CRM call queue`, powerNote: `Power hour starts when someone can be called. ${line}` };
+  }
+  return { mode: "empty", headline: "Nobody to call right now", line: "Nobody on this list can be called from here. Try another list.", primary: "Try another list", powerNote: "Power hour needs someone to call. Try another list." };
+}
+
 /** Whether Start can be pressed, and when it cannot, the reason in plain words (shown under the count and used if a session is asked for anyway). */
 export function startState<T>(c: Classified<T & { name?: string }>): { enabled: boolean; reason: string | null } {
   if (c.ready.length > 0) return { enabled: true, reason: null };
