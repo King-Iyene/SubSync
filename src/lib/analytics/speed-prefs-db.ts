@@ -1,9 +1,10 @@
 import { sql } from "../db";
+import { cleanIgnoredPref } from "./ignored-leads-core";
 import { clampCadence, DEFAULT_GOALS, sanitizeDispositions } from "../dial/dial6";
 
 // Call mode and Speed choices kept on the server (stage SPEED6): the redial plan, hour goals, scripts per lead source and outcome sets, for the company ('') or one client account. A missing table answers
 // ready: false and the browser keeps the choice (the old behaviour) until the migration has run. Every value is cleaned before it is stored.
-export const PREF_KEYS = ["cadence", "goals", "scripts", "dispositions"] as const;
+export const PREF_KEYS = ["cadence", "goals", "scripts", "dispositions", "ignored"] as const;
 export type PrefKey = (typeof PREF_KEYS)[number];
 export const isPrefKey = (k: unknown): k is PrefKey => typeof k === "string" && (PREF_KEYS as readonly string[]).includes(k);
 
@@ -11,6 +12,7 @@ export function cleanPref(key: PrefKey, raw: unknown): unknown {
   if (key === "cadence") return clampCadence((raw ?? {}) as never);
   if (key === "goals") { const g = (raw ?? {}) as Record<string, unknown>; const n = (k: string, d: number) => { const v = Math.round(Number(g[k])); return Number.isFinite(v) ? Math.min(500, Math.max(1, v)) : d; }; return { calls: n("calls", DEFAULT_GOALS.calls), reached: n("reached", DEFAULT_GOALS.reached), booked: n("booked", DEFAULT_GOALS.booked) }; }
   if (key === "dispositions") return sanitizeDispositions(raw);
+  if (key === "ignored") return cleanIgnoredPref(raw);
   const out: Record<string, string> = {};
   for (const [k, v] of Object.entries((raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>).slice(0, 30)) if (typeof v === "string" && k.length <= 80) out[k.toLowerCase().slice(0, 80)] = v.slice(0, 1000);
   return out;

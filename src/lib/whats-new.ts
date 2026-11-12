@@ -9,6 +9,7 @@ export type NewsEntry = {
 export const NEW_WINDOW_DAYS = 14;
 
 export const NEWS: readonly NewsEntry[] = [
+  { id: "sp-ignored", date: "2026-11-12", title: "Clients not answering leads", line: "See which client accounts are ignoring the leads you send them: leads nobody answered, customers with no reply or only an automatic one, and missed calls nobody returned. Every number opens the people, and you are told once.", view: "speed", feature: "sp_ignored_leads" },
   { id: "mn-meetings", date: "2026-11-12", title: "Meeting notes, finished", line: "Your recorded calls in one list, each on the right contact or waiting for you to pick, with next steps, follow-up lists and coaching.", view: "meetings", feature: "mn_list" },
   { id: "br-brief", date: "2026-11-11", title: "Your 7 am brief", line: "The five things that need you today, each with one line of why and a button to the exact list. By email at your hour, and at the top of Today.", view: "today", feature: "br_brief" },
   { id: "wg-wallet", date: "2026-11-11", title: "Credit balance watchlist", line: "Every client account's credit balance, lowest days left first, with alerts before it runs out or spending jumps.", view: "clients", feature: "wg_wallet" },

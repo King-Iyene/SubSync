@@ -172,6 +172,7 @@ test("pilot modules are on by default and a database row can still override the 
     "pr_auto",
     "pr_page",
     "pr_report",
+    "sp_ignored_leads",
     "st_guides",
     "st_news",
     "st_settings",

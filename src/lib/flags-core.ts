@@ -38,6 +38,7 @@ export const DEFAULT_OFF: ReadonlySet<Feature> = new Set<Feature>([
   "inbox_open_lead",
   // Speed to lead: the river view of the lead journey (the dots view shows when off).
   "lead_journey_pro",
+  "sp_ignored_leads",
   // Appointments module round 3 (docs/features/APPOINTMENTS_BRIEF.md): each behind its own flag, default off.
   "appt_overview",
   "appt_needs_outcome",

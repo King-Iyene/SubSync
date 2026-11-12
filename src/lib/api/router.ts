@@ -2235,7 +2235,7 @@ async function dispatch(ctx: Ctx): Promise<Response> {
     }
     // The rebuilt Speed to lead screen: its home, lists and comparisons (GET ?part=home|list|compare) and one account's reply target (PUT speed/target).
     const speedHelpers = { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links, targetMinutes: async () => (await scope(ctx)).settings.speedTargetMinutes, measuring: async () => { const st = (await scope(ctx)).settings; return { countAutomated: st.countAutomatedTouches, businessHours: st.speedBusinessHours }; } };
-    if (a === "speed" && method === "GET" && ["home", "list", "compare", "insights", "insight-list", "race", "coverage", "journey", "journey-list", "proof", "story", "booking", "ladder", "ladder-leads", "pulse", "zones", "digest"].includes(ctx.url.searchParams.get("part") ?? "")) return await handleSpeedPart(ctx, speedHelpers);
+    if (a === "speed" && method === "GET" && ["home", "list", "compare", "insights", "insight-list", "race", "coverage", "journey", "journey-list", "proof", "story", "booking", "ladder", "ladder-leads", "pulse", "zones", "digest", "ignored", "ignored-list"].includes(ctx.url.searchParams.get("part") ?? "")) return await handleSpeedPart(ctx, speedHelpers);
     if (a === "speed" && b === "target" && method === "PUT") return await handleSpeedTarget(ctx, speedHelpers);
     if (a === "speed" && b === "ladder" && method === "PUT") return await handleSpeedLadder(ctx);
     if (a === "speed" && b === "digest" && ["PUT", "POST", "GET"].includes(method)) return await handleSpeedDigest(ctx, speedHelpers);
