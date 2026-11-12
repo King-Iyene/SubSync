@@ -645,4 +645,8 @@ Customer view. Who uses it: the agency owner (who is slow, who is overloaded, wh
 - Settings is ten sections with a search box (flag st_settings). The older form is reused through `SettingsView embedded`, so every control keeps its checked server route; the old page stays until the flag is on.
 - Per-person marks (dismissed New badges, read guides, hidden menu pages) live in one table, st_user_state, keyed by the signed-in person. Flags: st_settings, st_guides, st_news, all default off.
 - Zoom and Google Meet marks are not shipped: those tools stay hidden everywhere (a test enforces it). Slack, Fathom, Gmail and Google Calendar marks are in docs/BRAND_ASSETS.md.
+## 11 Nov 2026: Clean-up fix lists, Health and bulk runs (stage CU)
+Who: agency owner and client admin. Next: open the records, tag them for review, remove obvious junk. If missing: "I find out about a bad list weeks later".
+Decisions: counts come from a daily record (cu_scans, counts only) with capped live counts before the first scan; partial indexes per problem (cost is only the matching rows); removal is limited to junk, capped at 25, never undoable, typed words required; merges also need typed words (flag cu_confirm); Data health stays as code under the Health tab.
+
 - 2026-11-11, Workflows second pass: outcome gaps from data we already hold, not from workflow internals. No new `wf_status_events` table: `workflow_changes` and `workflow_items` already record status changes; added only `wf_outcome_daily` (daily leak counts, additive). Library installs only automations that give staff a task; ones that message customers are guides. Flags wf_* default off per brief.

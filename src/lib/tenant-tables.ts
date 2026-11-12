@@ -16,7 +16,7 @@ export const SYNCED_DELETE = [
   "td_daily_items", "td_receipts", "td_snoozes", // Today: the daily record of what was found and cleared, the weekly receipts and the put-aside marks
   "cf_recover_items", "cf_deal_flags", "cf_mutes", "cf_state", // Cash features: the missed-lead ledger, deal flags, digest mutes and sweep state
   "campaign_stats", "wf_outcome_daily", "workflow_snapshots", "workflow_changes", "workflow_daily", "workflow_items",
-  "dh_snapshots", "dh_flags", "dh_changes", "dh_outcomes", // Data health (docs/features/DATA_HEALTH.md)
+  "dh_snapshots", "dh_flags", "dh_changes", "dh_outcomes", "cu_scans", "cu_actions", // Data health (docs/features/DATA_HEALTH.md)
   "call_queue_log", "meeting_deliveries", "crm_writes", "contact_writes", "field_write_state", "meetings", "meeting_notes", "shared_audits", "sync_jobs", "locations",
 ] as const;
 
@@ -48,7 +48,7 @@ export const LOCATION_DELETE = [
   "pm_items", "pm_events", "pm_sync_state", "pm_rollup_daily", "pm_notes", "pm_disputes",
   "pm_notes", "pm_disputes",
   "td_daily_items", "td_receipts", "td_snoozes", "cf_recover_items", "cf_deal_flags", "cf_mutes", "notification_states", "notifications", "notification_deliveries", "notification_destinations", "client_departures", "client_rollup_state", "client_daily", "client_risk_history", "client_billing", "cl2_notes", "cl2_plan_events", "client_actions", "client_owners", "client_alert_mutes", "coaching_notes", "user_targets", "people_write_log", "people_proof_prefs",
-  "crm_writes", "contact_writes", "field_write_state", "field_mappings", "meeting_policies", "meeting_notes", "meeting_hooks", "account_profiles", "client_notes", "today_actions", "growth_goals", "workflow_labels", "dh_snapshots", "dh_flags", "dh_changes", "dh_outcomes", "dh_marks", "dh_rules", "campaign_stats", "wf_outcome_daily", "workflow_snapshots", "workflow_changes", "workflow_daily", "workflow_items", "feedback_items", "client_steps", "client_step_history", "workflow_setup", "workflow_setup_settings", "call_queue_settings", "call_queue_log", "sync_jobs", "locations",
+  "crm_writes", "contact_writes", "field_write_state", "field_mappings", "meeting_policies", "meeting_notes", "meeting_hooks", "account_profiles", "client_notes", "today_actions", "growth_goals", "workflow_labels", "dh_snapshots", "dh_flags", "dh_changes", "dh_outcomes", "cu_scans", "cu_actions", "dh_marks", "dh_rules", "campaign_stats", "wf_outcome_daily", "workflow_snapshots", "workflow_changes", "workflow_daily", "workflow_items", "feedback_items", "client_steps", "client_step_history", "workflow_setup", "workflow_setup_settings", "call_queue_settings", "call_queue_log", "sync_jobs", "locations",
 ] as const;
 
 /** Tables with a location column that the per-account purge leaves alone, with the reason. */

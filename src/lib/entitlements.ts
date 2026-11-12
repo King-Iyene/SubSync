@@ -192,6 +192,10 @@ export const FEATURES = [
   "st_settings",
   "st_guides",
   "st_news",
+  "cu_fix",
+  "cu_health",
+  "cu_bulk",
+  "cu_confirm",
 ] as const;
 export type Feature = (typeof FEATURES)[number];
 

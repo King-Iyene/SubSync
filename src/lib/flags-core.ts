@@ -163,6 +163,11 @@ export const DEFAULT_OFF: ReadonlySet<Feature> = new Set<Feature>([
   "st_settings",
   "st_guides",
   "st_news",
+  // Clean-up (docs/features/CLEANUP_BRIEF.md): cu_fix is the fix lists, cu_health the Health tab and the daily record, cu_bulk the tag and remove runs, cu_confirm typed confirmation on merges. Default off.
+  "cu_fix",
+  "cu_health",
+  "cu_bulk",
+  "cu_confirm",
 ]);
 
 export function resolveFeatures(all: readonly Feature[], overrides: Record<string, boolean>, allOn = false): Record<Feature, boolean> {

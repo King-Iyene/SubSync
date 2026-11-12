@@ -10,6 +10,7 @@ import { historyPage } from "../analytics/history-queries";
 import { mergeViaWorkflow, planWorkflowMerge } from "../ghl/crm-gateway";
 import { dismissArrival, listArrivals } from "../analytics/prevention";
 import { mergeContacts } from "../ghl/crm-merge";
+import { typedMatches } from "../cleanup/cu-core";
 import { isLive } from "../live-flags";
 import type { deepLinks } from "../links";
 import { sql } from "../db";
@@ -211,7 +212,7 @@ async function mergeRoute(ctx: Ctx, h: DuplicatesHelpers): Promise<Response> {
 /** The merge through the customer's own merge workflow. With preview:true it only says what would happen. Never for a client's staff, never without the account's opt-in. */
 async function mergeWorkflowRoute(ctx: Ctx, h: DuplicatesHelpers): Promise<Response> {
   if (ctx.kind === "client") return json({ error: "Ask your administrator to start a merge from SubSync, or merge in your CRM." }, 403);
-  const body0 = (await ctx.request.clone().json().catch(() => null)) as { confirm?: unknown; preview?: unknown } | null;
+  const body0 = (await ctx.request.clone().json().catch(() => null)) as { confirm?: unknown; preview?: unknown; typed?: unknown } | null;
   const g = await readGroup(ctx);
   if (g instanceof Response) return g;
   if (!g.keepContactId) return json({ error: "Choose the record to keep" }, 400);
@@ -224,6 +225,12 @@ async function mergeWorkflowRoute(ctx: Ctx, h: DuplicatesHelpers): Promise<Respo
   if (body0?.preview === true) {
     const plan = planWorkflowMerge(loaded.people, g.keepContactId, { workflowId: cfg.mergeWorkflowId, others });
     return json({ ok: true, preview: true, plan, optedIn, masterSwitchOn: !ctx.demo && isLive("WRITE_GHL_LIVE") });
+  }
+  // Typed confirmation (flag cu_confirm): the person types words naming the record that is merged away. A tick alone is not enough.
+  if (ctx.entitlements.features.cu_confirm === true && !ctx.entitlements.locked.includes("cu_confirm")) {
+    const plan = planWorkflowMerge(loaded.people, g.keepContactId, { workflowId: cfg.mergeWorkflowId, others });
+    const gone = loaded.people.find((p) => p.contactId === plan.enrolId);
+    if (!typedMatches(body0?.typed, `merge ${(gone?.name ?? "these contacts").replace(/\s+/g, " ").trim()}`)) return json({ error: "Type the words shown to confirm the merge. Nothing was changed." }, 400);
   }
   const result = await mergeViaWorkflow(
     {

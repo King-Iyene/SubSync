@@ -90,6 +90,8 @@ export async function refreshInsights(installationId: string): Promise<{ account
   // Clean-up: today's data-quality snapshot per account, and an alert for accounts where new likely duplicates appeared. Never stops the refresh.
   const { dailyQualityScan, duplicateAlertDrafts } = await import("./cleanup-scan");
   await dailyQualityScan(installationId).catch(() => undefined);
+  // Clean-up record (stage CU): one row of COUNTS per account per day, written whether or not the screen is on, so the history (the trend on the Health tab) starts now. Before the migration it just does nothing.
+  await (await import("./cu-queries")).sweep(installationId, 12_000).catch(() => undefined);
   // Stage SPEED5: each account is judged against its OWN reply target, and the escalation ladder decides how far a breach climbs.
   const { applyBreaches } = await import("./speed5-queries");
   const sp5 = await applyBreaches(installationId, accounts, settings.speedTargetMinutes ?? 15).catch(() => ({ accounts, ladder: undefined }));
