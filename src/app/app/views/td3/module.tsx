@@ -1,5 +1,7 @@
 "use client";
 
+import { usePageRange } from "../../ds/page-range";
+import { historyLimitNote } from "@/lib/design/page-range";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import type { AccessKind } from "@/lib/access";
 import type { Td3Item, Td3List, Td3ListKind, Td3Module, Td3Numbers, Td3Options, Td3Proof, Td3Settings, Td3Today } from "@/lib/analytics/today3-types";
@@ -246,13 +248,14 @@ function ProofTab({ location, accounts }: { location: string; accounts: boolean 
 }
 
 function NumbersTab({ location, go, open, fromOverview, level, nav, kind }: { location: string; go: (m: Td3Module, loc?: string | null) => void; open: (d: NonNullable<Drill>) => void; fromOverview: boolean; level: string; nav: GoFn; kind: AccessKind }) {
-  const [days, setDays] = useState(30), [more, setMore] = useState(false), [how, setHow] = useState<string | null>(null);
-  const r = useTd<Td3Numbers>("numbers", { location: location || undefined, days });
+  const bar = usePageRange(), [more, setMore] = useState(false), [how, setHow] = useState<string | null>(null);
+  // The dates are the date bar's (one range for the whole app): the numbers below are for exactly the dates written next to them.
+  const r = useTd<Td3Numbers>("numbers", { location: location || undefined, from: bar.from || undefined, to: bar.to || undefined }, !bar.ready);
   return (
     <div className="cl-stack" data-testid="td-numbers">
       {fromOverview && <p className="ap-fine" role="status" data-testid="td-moved">Overview moved here. Same numbers, fewer of them, and each one opens the people behind it.</p>}
       <div className="ap-head print:hidden" role="group" aria-label="Period">
-        <select className="ap-field" aria-label="Period" value={days} onChange={(e) => setDays(Number(e.target.value))}><option value={7}>Last 7 days</option><option value={30}>Last 30 days</option><option value={90}>Last 90 days</option></select>
+        <span className="ap-fine" data-testid="td-dates">Dates: {bar.label}, from the bar above. <b>Waiting for a reply</b> and <b>Deals gone quiet</b> are about right now, so these dates do not change them.</span>
       </div>
       <Load r={r} empty={(n) => n.tiles.length === 0}>
         {(n) => (
@@ -270,7 +273,7 @@ function NumbersTab({ location, go, open, fromOverview, level, nav, kind }: { lo
               ))}
             </div>
             {n.testDealsLeftOut > 0 && <p className="ap-fine">{num(n.testDealsLeftOut)} open deals with no value or no owner are left out of the dollar figure (usually test or junk deals).</p>}
-            <p className="ap-fine">{n.historyStarts ? `Our own record starts ${n.historyStarts}.` : "Trends start once we have a few weeks of record."}</p>
+            <p className="ap-fine">{n.historyStarts ? `Our own record starts ${n.historyStarts}.` : "Trends start once we have a few weeks of record."}{bar.resolved && historyLimitNote(n.historyStarts, bar.resolved) ? ` ${historyLimitNote(n.historyStarts, bar.resolved)}` : ""}</p>
           </>
         )}
       </Load>

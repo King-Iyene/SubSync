@@ -1,5 +1,6 @@
 "use client";
 
+import { usePageRange } from "../../ds/page-range";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { Cl2Today } from "@/lib/analytics/clients2-types";
 import type { Cl3Account, Cl3Attention, Cl3List, Cl3Options, Cl3Overview, Cl3Reason } from "@/lib/analytics/clients3-types";
@@ -42,7 +43,6 @@ const TIPS: Record<TabKey, [string, string]> = {
 // Clients v2 tabs show only when their flag is on (a missing flag means off); the older tabs hide only when their flag is explicitly off.
 const C2_FLAG_OF: Partial<Record<TabKey, string>> = { money: "cl3_money", accounts: "cl2_accounts", plans: "cl2_plans" };
 const FLAG_OF: Partial<Record<TabKey, string>> = { overview: "cl_overview", needs: "cl_attention", trends: "cl_trends", compare: "cl_compare", reports: "cl_reports", people: "cl_people", setup: "cl_setup" };
-const PERIODS = [[7, "Last 7 days"], [30, "Last 30 days"], [90, "Last 90 days"]] as const;
 const ALL_FEATURES: ClientsFeatures = { health: true, onboarding: true, clients: true, reports: true, setupCompare: true, playbooks: true };
 
 function DrillList({ d, filters, onClose, openAccount }: { d: NonNullable<Drill>; filters: ClParams; onClose: () => void; openAccount: (id: string) => void }) {
@@ -168,8 +168,8 @@ export function ClientsModule({ go, features = ALL_FEATURES, initialTab = "overv
   const api = useApiClient(), sample = fixturesOn();
   const opt = useCl<Cl3Options>("options");
   const flags = (opt.data?.flags ?? null) as Record<string, boolean> | null;
-  const [days, setDays] = useState<number>(30), [industry, setIndustry] = useState(""), [drill, setDrill] = useState<Drill>(null), [rev, setRev] = useState(0), [openId, setOpenId] = useState<string | null>(() => { try { const a = new URLSearchParams(window.location.search).get("account"); return a && /^[A-Za-z0-9_-]{3,128}$/.test(a) ? a : null; } catch { return null; } });
-  const f = features, [since] = useState(() => Date.now());
+  const bar = usePageRange(), [industry, setIndustry] = useState(""), [drill, setDrill] = useState<Drill>(null), [rev, setRev] = useState(0), [openId, setOpenId] = useState<string | null>(() => { try { const a = new URLSearchParams(window.location.search).get("account"); return a && /^[A-Za-z0-9_-]{3,128}$/.test(a) ? a : null; } catch { return null; } });
+  const f = features;
   const on2 = (k: string) => flags?.[k] === true;
   const [acctPreset, setAcctPreset] = useState<Partial<AcctFilter> | null>(null);
   const tabs = useMemo(() => {
@@ -178,10 +178,8 @@ export function ClientsModule({ go, features = ALL_FEATURES, initialTab = "overv
     return [...keep, ...(f.onboarding ? (["onboarding"] as TabKey[]) : []), ...(f.clients && f.reports ? (["reviews"] as TabKey[]) : []), ...(f.clients ? (["industries"] as TabKey[]) : [])];
   }, [flags, f.onboarding, f.clients, f.reports]);
   const [tab, setTab] = useState<TabKey>(initialTab);
-  const filters = useMemo<ClParams>(() => {
-    const from = new Date(since - days * 86_400_000).toISOString().slice(0, 10);
-    return { from: days === 30 ? undefined : from, industry: industry || undefined };
-  }, [days, industry, since]);
+  // The dates are the date bar's (one range for the whole app); every read below asks for exactly them.
+  const filters = useMemo<ClParams>(() => ({ from: bar.ready ? bar.from : undefined, to: bar.ready ? bar.to : undefined, industry: industry || undefined }), [bar.ready, bar.from, bar.to, industry]);
   const active = tabs.includes(tab) ? tab : tabs[0];
   const index = Math.max(0, tabs.indexOf(active));
   const open = (d: NonNullable<Drill>) => { setDrill(d); setTimeout(() => document.getElementById("cl-drill")?.scrollIntoView({ block: "nearest", behavior: "smooth" }), 50); };
@@ -231,12 +229,12 @@ export function ClientsModule({ go, features = ALL_FEATURES, initialTab = "overv
         <ModuleTabs pill label="Clients sections" tabs={tabs.map((k) => ({ label: TIPS[k][0], tip: TIPS[k][1], node: null }))} value={index} onChange={(i) => goTab(tabs[i])} />
         {readsAccounts && (
           <div className="ap-head print:hidden" role="group" aria-label="Filters">
-            {usesPeriod && <select className="ap-field" aria-label="Period" value={days} onChange={(e) => setDays(Number(e.target.value))}>{PERIODS.map(([d, l]) => <option key={d} value={d}>{l}</option>)}</select>}
+            {usesPeriod && <span className="ap-fine" data-testid="cl-dates">Dates: {bar.label}, from the bar above.</span>}
             {(opt.data?.industries.length ?? 0) > 0 && <select className="ap-field" aria-label="Industry" value={industry} onChange={(e) => setIndustry(e.target.value)}><option value="">All industries</option>{opt.data?.industries.map((i) => <option key={i} value={i}>{i}</option>)}</select>}
             <span className="ap-fine">Every number below follows these choices{opt.data?.generatedAt ? `. Updated ${day(opt.data.generatedAt)}` : ""}.</span>
           </div>
         )}
-        <div data-testid={`cl-tab-${active}`}>{body}</div>
+        <div data-testid={`cl-tab-${active}`}>{bar.ready || !usesPeriod ? body : <p className="ap-fine" role="status">Working out the dates...</p>}</div>
         {drill && readsAccounts && <DrillList d={drill} filters={filters} onClose={() => setDrill(null)} openAccount={setOpenId} />}
       </Page>
     </div>

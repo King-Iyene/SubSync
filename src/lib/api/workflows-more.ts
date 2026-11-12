@@ -1,3 +1,4 @@
+import { MAX_RANGE_DAYS } from "../design/range-limits.ts";
 import {
   againstOwnNormal, byAccount, filterCamps, flagsFor, pct, rate, totals, STAT_KEYS, type Camp, type DateRange,
 } from "../workflows/delivery";
@@ -93,13 +94,17 @@ export async function delivery(ctx: Ctx, deps: Deps) {
 export async function proof(ctx: Ctx, deps: Deps) {
   const allowed = await accountsOf(ctx, deps);
   const now = Date.now();
-  const days = ctx.url.searchParams.get("days") === "30" ? 30 : 7;
-  const [alerts, accounts, { items }] = await Promise.all([loadWorkflowAlerts(ctx.installationId, allowed, now - days * 86_400_000), accountNames(ctx.installationId, allowed), loadItems(ctx.installationId, allowed)]);
-  const p = proofOf(alerts, now, days);
+  // The date bar's dates (from, to) when they are valid (checked here, never trusted); otherwise the old 7 or 30 days.
+  const day = (v: string | null) => (v && /^\d{4}-\d{2}-\d{2}$/.test(v) && Number.isFinite(Date.parse(`${v}T00:00:00Z`)) ? Date.parse(`${v}T00:00:00Z`) : null);
+  const f0 = day(ctx.url.searchParams.get("from")), t0 = day(ctx.url.searchParams.get("to"));
+  const win = f0 !== null && t0 !== null && f0 <= t0 && t0 < now && (t0 - f0) / 86_400_000 + 1 <= MAX_RANGE_DAYS ? { from: f0, until: t0 + 86_400_000 } : undefined;
+  const days = win ? Math.round((win.until - win.from) / 86_400_000) : ctx.url.searchParams.get("days") === "30" ? 30 : 7;
+  const [alerts, accounts, { items }] = await Promise.all([loadWorkflowAlerts(ctx.installationId, allowed, win ? win.from : now - days * 86_400_000), accountNames(ctx.installationId, allowed), loadItems(ctx.installationId, allowed)]);
+  const p = proofOf(alerts, now, days, win);
   const name = new Map(accounts.map((a) => [a.locationId, a.name]));
   const row = (a: (typeof alerts)[number]) => ({ title: a.title, kind: a.kind, account: a.locationId ? name.get(a.locationId) ?? "Client account" : "", at: a.createdAt, clearedAt: a.resolvedAt });
   return json({
-    days, now, raised: p.raised.map(row), cleared: p.cleared.map(row), open: p.open.map(row), watched: items.filter((w) => !w.removedSeenAt).length,
+    days, now, ...(win ? { from: new Date(win.from).toISOString().slice(0, 10), to: new Date(win.until - 86_400_000).toISOString().slice(0, 10) } : {}), raised: p.raised.map(row), cleared: p.cleared.map(row), open: p.open.map(row), watched: items.filter((w) => !w.removedSeenAt).length,
     // "Cleared" is the honest word: SubSync can tell the condition went away, not who fixed it.
     note: "Cleared means the problem is no longer there at the latest update. SubSync cannot tell who fixed it.",
   });

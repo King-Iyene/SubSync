@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import type { PmOptions } from "@/lib/analytics/payments-types";
 import { useApiClient } from "../../session";
 import { EmptyState, ModuleTabs, Page } from "../../ds";
+import { usePageRange } from "../../ds/page-range";
 import type { GoFn } from "../../nav";
 import { Btn } from "../../ui";
 import "../speed6.css";
@@ -27,6 +28,7 @@ const FLAG_OF: Partial<Record<TabKey, string>> = { queue: "pm_recovery", dispute
 export function PaymentsModule({ go }: { go: GoFn }) {
   void go;
   const api = useApiClient(), sample = fixturesOn();
+  const bar = usePageRange();
   const opt = usePm<PmOptions>("options");
   const flags = (opt.data?.flags ?? null) as Record<string, boolean> | null;
   const tabs = useMemo(() => (["today", "queue", "disputes", "upcoming", "history", "setup"] as TabKey[]).filter((k) => !FLAG_OF[k] || flags === null || flags[FLAG_OF[k] as string] !== false), [flags]);
@@ -42,6 +44,7 @@ export function PaymentsModule({ go }: { go: GoFn }) {
       <Page title="Payments" subtitle="Who has not paid, how much, for how long, and what to do next." actions={sample ? null : <Btn onClick={() => void api.download("payments?part=export", "payments.csv")}>Export CSV</Btn>}>
         {sample && <p className="ap-fine mb-2" role="status" data-testid="pm-sample">Sample data: these are not your real payments.</p>}
         {opt.data?.problem && <p className="ap-fine mb-2" role="status">{opt.data.problem}</p>}
+        <p className="ap-fine mb-2" data-testid="pm-dates">Dates: {bar.label}, from the bar above. They set the problems listed (by the day they were flagged), disputes opened or due in them, the recovered money, the refunds and the history.</p>
         <ModuleTabs pill label="Payments sections" tabs={tabs.map((k) => ({ label: TIPS[k][0], tip: TIPS[k][1], node: null }))} value={Math.max(0, tabs.indexOf(active))} onChange={(i) => setTab(tabs[i])} />
         <div data-testid={`pm-tab-${active}`}>
           {active === "today" && <TodayTab go={goTab} openQueue={openQueue} openDisputes={() => { setDStatus("open"); setTab("disputes"); }} />}

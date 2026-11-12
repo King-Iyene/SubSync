@@ -160,12 +160,12 @@ export function Access({ filters, pick }: SecProps) {
 }
 
 export function Proof({ filters, accounts, viewer }: SecProps) {
-  const [loc, setLoc] = useState(String(accounts[0]?.locationId ?? "")), [named, setNamed] = useState(false), pickLoc = String(filters.location ?? loc), r = usePp<Pp3Proof>("proof", { from: filters.from, location: pickLoc || undefined, named: named ? 1 : undefined }, !pickLoc && accounts.length > 1);
+  const [loc, setLoc] = useState(String(accounts[0]?.locationId ?? "")), [named, setNamed] = useState(false), pickLoc = String(filters.location ?? loc), r = usePp<Pp3Proof>("proof", { from: filters.from, to: filters.to, location: pickLoc || undefined, named: named ? 1 : undefined }, !pickLoc && accounts.length > 1);
   return (
     <div data-testid="pp-proof">
       <div className="ap-head">{accounts.length > 1 && <select className="ap-field" aria-label="Client account" value={pickLoc} onChange={(e) => setLoc(e.target.value)} disabled={Boolean(filters.location)}>{accounts.map((a) => <option key={a.locationId} value={a.locationId}>{a.name}</option>)}</select>}
         {fixturesOn() && viewer.level === "all" && <label className="ap-fine inline-flex min-h-11 items-center gap-2"><input type="checkbox" checked={named} onChange={(e) => setNamed(e.target.checked)} />Show team members by name</label>}
-        <span className="ap-fine">A summary for one client, for one period of up to 90 days.</span></div>
+        <span className="ap-fine">A summary for one client, for one period of up to 90 days{filters.from && filters.to && (Date.parse(String(filters.to)) - Date.parse(String(filters.from))) / 86_400_000 + 1 > 90 ? `. The dates above are longer, so this shows the 90 days up to ${filters.to}` : ""}.</span></div>
       <Load r={r} empty={(p) => !p.location && "Choose a client account to see how the team handled its leads."}>
         {(p) => (
           <section className="pp-card pp-receipt" aria-label={`Team summary for ${p.location?.name ?? ""}`} data-testid="pp-receipt">

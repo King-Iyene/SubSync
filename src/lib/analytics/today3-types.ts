@@ -100,7 +100,7 @@ export type Td3Tile = {
   opens: { list: Td3ListKind } | { module: Td3Module };
   count: number;
 };
-export type Td3Numbers = { tiles: Td3Tile[]; days: number; historyStarts: string | null; testDealsLeftOut: number };
+export type Td3Numbers = { tiles: Td3Tile[]; days: number; /** The first and last day counted (YYYY-MM-DD), the date bar's window. */ from?: string; to?: string; historyStarts: string | null; testDealsLeftOut: number };
 
 export type Td3Settings = {
   emailOn: boolean; emailHour: number; quietDays: number[]; recipients: string[]; timezone: string; canEdit: boolean;

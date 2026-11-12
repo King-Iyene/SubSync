@@ -1,3 +1,4 @@
+import { MAX_RANGE_DAYS } from "../design/range-limits.ts";
 // Lead flow: where the leads of a chosen stretch of time went. Pure functions, unit tested on fixtures (src/lib/__tests__/lead-flow.test.ts). Definition: docs/METRICS.md, "Lead flow".
 //
 // A lead is a contact CREATED in the stretch (each client's own midnight to midnight), followed to where it is now. Four steps, each from data SubSync already holds:
@@ -93,7 +94,7 @@ const DAY = 86_400_000;
 const toMs = (iso: string) => Date.parse(`${iso}T00:00:00Z`);
 const toIso = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 export const isIsoDay = (s: unknown): s is string => typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s) && Number.isFinite(toMs(s)) && toIso(toMs(s)) === s;
-export const MAX_FLOW_DAYS = 366;
+export const MAX_FLOW_DAYS = MAX_RANGE_DAYS;
 
 /** The first and last day (inclusive, "YYYY-MM-DD") of a choice, given today's date. A bad custom choice gives a plain problem and the last 7 days. */
 export function resolveFlowRange(preset: FlowPreset, today: string, from?: string, to?: string): { from: string; to: string; label: string; problem: string | null } {

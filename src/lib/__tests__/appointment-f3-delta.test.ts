@@ -67,7 +67,7 @@ test("chosen dates are whole UTC days with the end date included; the comparison
 
 test("a bad window is refused with a reason and the default is used", () => {
   for (const [q, text] of [
-    [{ from: "2026-10-30", to: "2026-10-01" }, /before the start/], [{ from: "2026-10-01", to: "2026-12-25" }, /future/], [{ from: "2025-01-01", to: "2026-10-01" }, /at most 366/],
+    [{ from: "2026-10-30", to: "2026-10-01" }, /before the start/], [{ from: "2026-10-01", to: "2026-12-25" }, /future/], [{ from: "2022-01-01", to: "2026-10-01" }, /at most 1096/],
     [{ from: "nonsense", to: "2026-10-01" }, /not understood/], [{ from: "2026-02-31", to: "2026-03-05" }, /not understood/], [{ from: "2026-10-01" }, /not understood/],
   ] as const) {
     const w = parseWindow(q, NOW);

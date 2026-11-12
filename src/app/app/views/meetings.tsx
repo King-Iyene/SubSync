@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ModuleTabs, Page } from "../ds";
 import { crmNoteFootnote } from "@/lib/meeting-wording";
 import { useApiClient, useData } from "../session";
+import { usePageRange } from "../ds/page-range";
 import { Badge, Btn, Card, Empty, ErrorBox, ExtLink, inputClass, Loading, timeAgo } from "../ui";
 import { MeetingInbox } from "./meeting-inbox";
 import { AccountSetup, MyMeetingSetup, type SetupData } from "./meeting-setup";
@@ -38,6 +39,8 @@ export function MeetingsView() {
 function OlderMeetings() {
   const api = useApiClient();
   const { data, error, loading, reload } = useData<Data>("meetings");
+  // The list is narrowed to the date bar's dates (by the day the meeting started, else the day it arrived).
+  const bar = usePageRange();
   const [account, setAccount] = useState("");
   const [created, setCreated] = useState<{ url: string; accountName: string } | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
@@ -47,6 +50,7 @@ function OlderMeetings() {
   if (error) return <ErrorBox error={error} onRetry={reload} />;
   if (!data) return null;
   const chosen = account || data.accounts[0]?.locationId || "";
+  const inRange = data.meetings.filter((m) => { const d = (m.startedAt ?? m.receivedAt ?? "").slice(0, 10); return !bar.ready || !d || (d >= bar.from && d <= bar.to); });
 
   const act = async (fn: () => Promise<unknown>, done?: string) => {
     setMsg(null);
@@ -116,11 +120,12 @@ function OlderMeetings() {
         </Card>
       )}
 
-      {data.meetings.length === 0 ? (
+      <p className="mb-3 text-sm text-muted-foreground" data-testid="meetings-dates">Dates: {bar.label}, from the bar above. {inRange.length} of {data.meetings.length} meeting notes fall in them.</p>
+      {inRange.length === 0 ? (
         <Empty title="No older meeting notes" body="Meetings from people's own connected tools are in My Meeting inbox. This list is only for meetings that came through a private address." />
       ) : (
         <ul className="space-y-3">
-          {data.meetings.map((m) => (
+          {inRange.map((m) => (
             <li key={m.id} className="rounded-xl border bg-card p-4">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>

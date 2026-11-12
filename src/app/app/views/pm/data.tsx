@@ -1,5 +1,6 @@
 "use client";
 
+import { usePageRange } from "../../ds/page-range";
 import { useCallback, useEffect, useState } from "react";
 import type { PmPart, PmMeta } from "@/lib/analytics/payments-types";
 import { useData } from "../../session";
@@ -27,8 +28,10 @@ export const queryOf = (part: PmPart, p: PmParams): string => {
 
 export function usePm<T>(part: PmPart, p: PmParams = {}, off = false) {
   const fx = fixturesOn(), m = fx ? mode() : "";
-  const key = queryOf(part, p);
-  const live = useData<WithMeta<T>>(fx || off ? null : key);
+  // The parts that count things over time (the recovered money, the refunds, the history, disputes opened or due in the dates) are for the date bar's dates; a list of problems that are open is about right now, so the dates never narrow it.
+  const bar = usePageRange(), windowed = part === "today" || part === "history" || part === "disputes";
+  const key = queryOf(part, windowed && bar.ready ? { ...p, wfrom: bar.from, wto: bar.to } : p);
+  const live = useData<WithMeta<T>>(fx || off || (windowed && !bar.ready) ? null : key);
   const [fix, setFix] = useState<{ data: WithMeta<T> | null; error: boolean; loading: boolean }>({ data: null, error: false, loading: fx && !off });
   const reload = useCallback(() => {
     if (!fx) return void live.reload();
