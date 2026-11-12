@@ -218,7 +218,7 @@ export async function recomputeSourceDaily(inst: string, loc: string, days: numb
       select (c.date_added at time zone 'UTC')::date as day, ${db.unsafe(SRC_KEY_SQL)} as src, left(btrim(coalesce(c.source, '')), 60) label,
         ${db.unsafe(LEAD_SQL.dup)} is_dup, ${db.unsafe(LEAD_SQL.junk)} is_junk, ${db.unsafe(LEAD_SQL.answered)} ans, ${db.unsafe(LEAD_SQL.booked)} bk, ${db.unsafe(LEAD_SQL.showed)} sh,
         ${db.unsafe(LEAD_SQL.won)} wn, ${db.unsafe(LEAD_SQL.wonValue)} wv, ${db.unsafe(LEAD_SQL.touchSecs)} ts
-      from cached_contacts c where c.installation_id = ${inst} and c.location_id = ${loc} and c.date_added is not null and (c.date_added at time zone 'UTC')::date >= ${db.unsafe(TODAY)} - ${d - 1}::int)
+      from cached_contacts c where c.installation_id = ${inst} and c.location_id = ${loc} and c.date_added is not null and c.date_added >= (${db.unsafe(TODAY)} - ${d - 1}::int)::timestamp at time zone 'UTC')
     select day, src, coalesce(nullif(max(label), ''), 'No source') label, count(*)::int leads, count(*) filter (where is_dup)::int dups, count(*) filter (where is_junk and not is_dup)::int junk, count(*) filter (where ans)::int answered,
       count(*) filter (where not is_dup and not is_junk and ans)::int quality, count(*) filter (where bk)::int booked, count(*) filter (where sh)::int showed, count(*) filter (where wn)::int won,
       coalesce(sum(wv), 0)::float8 won_value, coalesce(sum(ts) filter (where ts is not null), 0)::bigint touch_secs, count(ts)::int touched
@@ -268,7 +268,7 @@ export type LeadRow = { contactId: string; locationId: string; locationName: str
 type LeadFilter = { src: string | null; flag: LeadFlag; days: number; form?: { kind: "form" | "survey"; id: string } | null };
 /** The one WHERE of every lead list and count: the same window, source, form and definition, so a number and its rows are the same set. */
 const leadWhere = (db: Db, s: Scope, f: LeadFilter) => db`c.installation_id = ${s.inst} ${scopeOf(db, "c", s.allowed)} ${locOf(db, "c", s.location)} and c.date_added is not null
-  ${f.form ? db`and exists (select 1 from dq_submissions x where x.installation_id = c.installation_id and x.location_id = c.location_id and x.kind = ${f.form.kind} and x.ext_id = ${f.form.id} and x.contact_id = c.contact_id and x.submitted_at >= now() - ${Math.max(1, f.days)}::int * interval '1 day')` : db`and (c.date_added at time zone 'UTC')::date >= ${db.unsafe(TODAY)} - ${Math.max(1, f.days) - 1}::int`}
+  ${f.form ? db`and exists (select 1 from dq_submissions x where x.installation_id = c.installation_id and x.location_id = c.location_id and x.kind = ${f.form.kind} and x.ext_id = ${f.form.id} and x.contact_id = c.contact_id and x.submitted_at >= now() - ${Math.max(1, f.days)}::int * interval '1 day')` : db`and c.date_added >= (${db.unsafe(TODAY)} - ${Math.max(1, f.days) - 1}::int)::timestamp at time zone 'UTC'`}
   ${f.src ? db`and ${db.unsafe(SRC_KEY_SQL)} = ${f.src}` : db``} and ${db.unsafe(FLAG_WHERE[f.flag])}`;
 /** One keyset page of the leads behind a number: the same window, source and definition as the rollup, so a count opens exactly its rows. */
 export async function listLeads(s: Scope, f: LeadFilter, after: Array<string | number> | null, limit = 25): Promise<{ rows: LeadRow[]; next: string | null }> {
