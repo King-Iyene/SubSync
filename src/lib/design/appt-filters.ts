@@ -76,7 +76,7 @@ export function filtersFromParams(p: URLSearchParams): ApFilters {
 }
 
 // ---- date presets (both date axes: "Appointment date" and "Booked on") ----
-export const DATE_PRESETS = [["today", "Today"], ["yesterday", "Yesterday"], ["this_week", "This week"], ["last_week", "Last week"], ["this_month", "This month"], ["last_month", "Last month"], ["next7", "Next 7 days"], ["last7", "Last 7 days"], ["last30", "Last 30 days"], ["last90", "Last 90 days"]] as const;
+export const DATE_PRESETS = [["today", "Today"], ["yesterday", "Yesterday"], ["this_week", "This week"], ["last_week", "Last week"], ["this_month", "This month"], ["last_month", "Last month"], ["next7", "Next 7 days"], ["last7", "Last 7 days"], ["last30", "Last 30 days"], ["last90", "Last 90 days"], ["last180", "Last 180 days"], ["last365", "Last 12 months"]] as const;
 export type DatePreset = (typeof DATE_PRESETS)[number][0];
 const iso = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 const DAYMS = 86_400_000;
@@ -94,6 +94,8 @@ export function presetRange(key: DatePreset, now: number): { from: string; to: s
     case "next7": return { from: iso(t), to: iso(t + 6 * DAYMS) };
     case "last7": return { from: iso(t - 6 * DAYMS), to: iso(t) };
     case "last30": return { from: iso(t - 29 * DAYMS), to: iso(t) };
+    case "last180": return { from: iso(t - 179 * DAYMS), to: iso(t) };
+    case "last365": return { from: iso(t - 364 * DAYMS), to: iso(t) };
     default: return { from: iso(t - 89 * DAYMS), to: iso(t) };
   }
 }

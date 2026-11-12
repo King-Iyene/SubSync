@@ -69,7 +69,8 @@ function Slot({ id, side, name, role, ranked, exclude, filters, onPick, onClear 
     <div className="apc-card" data-testid="ap-compare-card">
       <Avatar name={shownName} team={team} />
       <div className="apc-who"><b title={shownName}>{shownName}</b>
-        <small>{team ? `Everyone who booked${side?.people ? `, ${side.people} people` : ""}` : unknown ? "No name on file for this user" : role === "booker" ? "Booked the appointments" : "Took the meetings"}</small></div>
+        <small>{team ? `Everyone who booked${side?.people ? `, ${side.people} people` : ""}` : unknown ? "No name on file for this user" : role === "booker" ? "Booked the appointments" : "Took the meetings"}</small>
+        {side && side.byCalendar.length > 0 && <span className="ap-calrow">{side.byCalendar.slice(0, 3).map((c) => <span key={c.name} className="ap-calchip">{c.name}<i>{c.booked}</i></span>)}{side.byCalendar.length > 3 && <span className="ap-sub">+{side.byCalendar.length - 3}</span>}</span>}</div>
       <button type="button" className="apc-x" onClick={onClear} aria-label={`Remove ${shownName}`} title="Choose someone else"><X aria-hidden className="size-4" /></button>
     </div>
   );

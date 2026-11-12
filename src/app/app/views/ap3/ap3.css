@@ -229,3 +229,12 @@
 
 /* QA round 1: when a list is wider than the screen the Open button stays in view at the right edge instead of being cut off. */
 .ap-t td.ap-end { position: sticky; right: 0; background: var(--s6-surf); box-shadow: -10px 0 8px -8px color-mix(in srgb, var(--foreground) 14%, transparent); }
+
+/* calendar chips, per-person calendar rows, share filters */
+.ap-calchip { display: inline-flex; align-items: center; gap: 6px; max-width: 14rem; padding: 1px 8px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--s6-line) 90%, transparent); background: color-mix(in srgb, var(--foreground) 4%, transparent); font-size: 0.75rem; font-weight: 500; color: var(--foreground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; }
+.ap-calchip i { font-style: normal; color: var(--muted-foreground); font-weight: 400; }
+.ap-calrow { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 4px; }
+.ap-sharebar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 12px; }
+.ap-bycal summary { cursor: pointer; font-size: 0.8125rem; color: var(--muted-foreground); min-height: 24px; } .ap-bycal[open] summary { color: var(--foreground); }
+.ap-bycal-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 4px 0; }
+@media (max-width: 700px) { .ap-bycal summary { min-height: 44px; display: flex; align-items: center; } }

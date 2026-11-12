@@ -25,7 +25,7 @@ export type Rate = { value: number | null; n: number; of: number; enough: boolea
 export type Appt3Row = {
   appointmentId: string; locationId: string; accountName: string | null;
   contactId: string | null; contactName: string; url: string | null;
-  calendarId: string | null; calendarName: string | null;
+  calendarId: string | null; calendarName: string | null; /** The calendar group it belongs to, when the calendar list is known. */ calendarGroup?: string | null;
   startAt: string; endAt: string | null; status: string; bucket: Appt3Bucket;
   ownerId: string | null; ownerName: string | null; bookerId: string | null; bookerName: string | null;
   phone: string | null; source: string | null; dealStatus: "won" | "lost" | "open" | null; dealValue: number | null;
@@ -69,9 +69,25 @@ export type Appt3PersonShare = {
   booked: number; owned: number; showed: number; noshow: number; unmarked: number; won: number; lost: number;
   showRate: Rate; noshowRate: Rate; closeRate: Rate; wonValue: number; leadToBookedMedianMinutes: number | null;
   trend: Array<{ week: string; booked: number; showRate: number | null }>;
+  /** Team role as a plain label ("Account admin", "Account user", ...). Null for the not-recorded row. */
+  roleLabel?: string | null;
+  /** booked: has bookings in these dates; none_this_period: none now but has before; never: no bookings in anything we hold. */
+  state?: "booked" | "none_this_period" | "never";
+  /** Bookings in anything we hold, any date. */
+  everBooked?: number; lastBookingAt?: string | null;
+  /** False = seen booking but not in any selected account's team list (left, or no access). */
+  inTeam?: boolean; teamActive?: boolean;
+  /** The calendars this person is on (from the calendar list), and what they booked / took in these dates, per calendar. */
+  calendars?: Array<{ calendarId: string; name: string | null; groupName: string | null; active: boolean }>;
+  byCalendar?: Array<{ calendarId: string | null; name: string | null; groupName: string | null; booked: number; owned: number }>;
 };
 export type Appt3BookingShare = Page<Appt3PersonShare> & {
   unassigned: number; ownerless: number;
+  /** Everyone in the selected accounts' team lists (before the role/has-bookings narrowing), and the roles to filter by. */
+  counts?: { withBookings: number; none: number };
+  rosterTotal?: number; roles?: Array<{ key: string; label: string; n: number }>;
+  /** First day appointments are read from. Older history is not in SubSync. */
+  historyStarts?: string;
   /** Round-robin fairness per appointment, not per day: share of owned bookings per closer against an even split. */
   fairness: { enough: boolean; maxSharePct: number | null; evenSharePct: number | null; closers: number };
 };
