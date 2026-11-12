@@ -213,7 +213,7 @@ function MyStatement({ options, basis, periods }: { options: FnOptions; basis: P
           <p className="ap-fine">Frozen periods with your lines: {periods.map((p) => <button key={p.id} type="button" className="ap-link" style={{ marginRight: 8 }} onClick={() => setSel(p.id)}>{p.label}</button>)}<button type="button" className="ap-link" onClick={() => setSel(null)}>Current period</button></p>
         )}
       </section>
-      <StatementBody open={{ personId: options.selfId ?? "", kind: null, role: null, period: sel, title: "My statement" }} basis={basis} manager={false} />
+      <div className="fn-print"><StatementBody open={{ personId: options.selfId ?? "", kind: null, role: null, period: sel, title: "My statement" }} basis={basis} manager={false} /></div>
     </div>
   );
 }
