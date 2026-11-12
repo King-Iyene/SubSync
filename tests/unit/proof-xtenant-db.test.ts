@@ -76,7 +76,7 @@ describe.skipIf(!HAS_DB)("client Proof page cross-tenant", () => {
     expect(la.text).not.toContain("zzPr B1");
     const lb = await call(b, "GET", `proof?part=list&period=${MONTH}&size=50`);
     expect(lb.body.rows.map((r: Json) => r.locationId)).toEqual([B1]);
-    for (const [m, p, body] of [["POST", "proof/prepare", { locationId: B1, month: MONTH }], ["GET", `proof?part=report&location=${B1}&period=${MONTH}`, undefined], ["POST", "proof/share", { locationId: B1, month: MONTH }], ["POST", "proof/unshare", { locationId: B1, month: MONTH }],
+    for (const [m, p, body] of [["POST", "proof/prepare", { locationId: B1, month: MONTH }], ["GET", `proof?part=report&account=${B1}&period=${MONTH}`, undefined], ["POST", "proof/share", { locationId: B1, month: MONTH }], ["POST", "proof/unshare", { locationId: B1, month: MONTH }],
       ["PUT", "proof/report", { locationId: B1, month: MONTH, intro: "x" }], ["POST", "proof/link", { locationId: B1, month: MONTH, action: "revoke", confirm: "zzPr B1" }]] as const) {
       const r = await call(a, m, p, body);
       expect(r.status, `${m} ${p}`).toBe(404);
@@ -98,7 +98,7 @@ describe.skipIf(!HAS_DB)("client Proof page cross-tenant", () => {
     const a = session(CO_A);
     expect((await call(a, "POST", "proof/prepare", { locationId: A1, month: MONTH })).status).toBe(200);
     expect((await call(a, "POST", "proof/prepare", { locationId: A2, month: MONTH })).status).toBe(200);
-    const r1 = (await call(a, "GET", `proof?part=report&location=${A1}&period=${MONTH}`)).body;
+    const r1 = (await call(a, "GET", `proof?part=report&account=${A1}&period=${MONTH}`)).body;
     const p1 = r1.report.payload;
     expect(p1.leads.current).toBe(12);
     expect(p1.withinTarget.current).not.toBeNull();
@@ -111,7 +111,7 @@ describe.skipIf(!HAS_DB)("client Proof page cross-tenant", () => {
     expect(p1.caught).toMatchObject({ found: 5, fixed: 4, stillOpen: 1 });
     expect(p1.timeline.length).toBeGreaterThan(0);
     expect(JSON.stringify(r1)).not.toMatch(/Zed|Person\d|zzPr B1|xtest-c-/i);
-    const p2 = (await call(a, "GET", `proof?part=report&location=${A2}&period=${MONTH}`)).body.report.payload;
+    const p2 = (await call(a, "GET", `proof?part=report&account=${A2}&period=${MONTH}`)).body.report.payload;
     expect(p2.replyMedian.current).toBeNull();
     expect(p2.withinTarget.current).toBeNull();
     expect(p2.neverAnswered).toBeNull();
@@ -150,11 +150,11 @@ describe.skipIf(!HAS_DB)("client Proof page cross-tenant", () => {
   it("a shared report does not change when prepared again, and can be taken back to a draft", async () => {
     if (!ready) return;
     const a = session(CO_A);
-    const before = (await call(a, "GET", `proof?part=report&location=${A1}&period=${MONTH}`)).body.report;
+    const before = (await call(a, "GET", `proof?part=report&account=${A1}&period=${MONTH}`)).body.report;
     expect(before.status).toBe("shared");
     const again = await call(a, "POST", "proof/prepare", { locationId: A1, month: MONTH });
     expect(again.body.kept).toBe(true);
-    expect((await call(a, "GET", `proof?part=report&location=${A1}&period=${MONTH}`)).body.report.builtAt).toBe(before.builtAt);
+    expect((await call(a, "GET", `proof?part=report&account=${A1}&period=${MONTH}`)).body.report.builtAt).toBe(before.builtAt);
     expect((await call(a, "PUT", "proof/report", { locationId: A1, month: MONTH, intro: "x" })).status).toBe(409);
     expect((await call(a, "POST", "proof/unshare", { locationId: A1, month: MONTH })).body.ok).toBe(true);
     expect((await call(a, "PUT", "proof/report", { locationId: A1, month: MONTH, intro: "Thanks for trusting us." })).status).toBe(200);
@@ -164,7 +164,7 @@ describe.skipIf(!HAS_DB)("client Proof page cross-tenant", () => {
   it("replacing or switching off a link needs the typed account name; the old token stops working", async () => {
     if (!ready) return;
     const a = session(CO_A);
-    const cur = (await call(a, "GET", `proof?part=report&location=${A1}&period=${MONTH}`)).body.link.url as string;
+    const cur = (await call(a, "GET", `proof?part=report&account=${A1}&period=${MONTH}`)).body.link.url as string;
     const t0 = tokenOf(cur);
     expect((await call(a, "POST", "proof/link", { locationId: A1, month: MONTH, action: "regenerate", confirm: "wrong" })).status).toBe(400);
     expect((await call(a, "POST", "proof/link", { locationId: A1, month: MONTH, action: "regenerate" })).status).toBe(400);
@@ -177,7 +177,7 @@ describe.skipIf(!HAS_DB)("client Proof page cross-tenant", () => {
     expect((await findPublic(t1, null))?.report?.payload.account).toBe("zzPr A1");
     expect((await call(a, "POST", "proof/link", { locationId: A1, month: MONTH, action: "revoke", confirm: "zzPr A1" })).body.ok).toBe(true);
     expect(await findPublic(t1, null)).toBeNull();
-    const off = (await call(a, "GET", `proof?part=report&location=${A1}&period=${MONTH}`)).body.link;
+    const off = (await call(a, "GET", `proof?part=report&account=${A1}&period=${MONTH}`)).body.link;
     expect(off.revoked).toBe(true);
     expect(off.url).toBeNull();
     const again = await call(a, "POST", "proof/share", { locationId: A1, month: MONTH });

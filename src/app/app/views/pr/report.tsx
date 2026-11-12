@@ -72,7 +72,7 @@ export function ProofReport({ p, brand, intro, sections, nameStaff, sample = fal
       <div className="pr-wrap">
         {sample && <p className="pr-sample" role="status" data-testid="pr-sample">Sample data: this is an example, not a real client.</p>}
         <header className="pr-head">
-          <div className="pr-brand">{brand.logoUrl ? <BrandLogo url={brand.logoUrl} name={brand.name} height={40} fallback={<span className="pr-brand-name">{brand.name}</span>} /> : <span className="pr-brand-name">{brand.name}</span>}</div>
+          <div className="pr-brand">{brand.logoUrl ? <BrandLogo url={brand.logoUrl} name={brand.name} height={40} fallback={<span className="pr-brand-name">{brand.name}</span>} /> : brand.name === "Monthly report" ? null : <span className="pr-brand-name">{brand.name}</span>}</div>
           <p className="pr-eyebrow">Monthly report</p>
           <h1 data-testid="pr-account">{p.account}</h1>
           <p className="pr-meta">{per}{p.partial ? `, to ${longDay(p.to)}` : ""}. Counted from this account&apos;s own records.</p>
@@ -81,24 +81,18 @@ export function ProofReport({ p, brand, intro, sections, nameStaff, sample = fal
         {intro && <p className="pr-intro" data-testid="pr-intro">{intro}</p>}
         <p className="pr-lead" data-testid="pr-headline">{headline(p)}</p>
 
-        <section className="pr-sec" aria-label="Leads">
-          <h2>New leads</h2>
+        <section className="pr-sec" aria-label="Leads and reply speed">
+          <h2>{sections.reply ? "Leads and reply speed" : "Leads"}</h2>
           <div className="pr-grid">
             <Card info="leads" value={lead.current === null ? undefined : fmtInt(lead.current)} na={lead.current === null ? NOT_RECORDED : undefined} change={changeOf("count", lead.current, lead.previous, prev)} />
-          </div>
-        </section>
-
-        {sections.reply && (
-          <section className="pr-sec" aria-label="How fast new leads were answered">
-            <h2>How fast new leads were answered</h2>
-            <div className="pr-grid">
+            {sections.reply && <>
               <Card info="reply" value={p.replyMedian.current === null ? undefined : fmtMinutes(p.replyMedian.current)} na={p.replyMedian.current === null ? (noLeads ? NOT_ENOUGH_LEADS : NOT_ENOUGH_DATA) : undefined} change={changeOf("minutes", p.replyMedian.current, p.replyMedian.previous, prev, "down")} />
               <Card info="within" value={p.withinTarget.current === null ? undefined : fmtPct(p.withinTarget.current)} sub={p.withinTarget.current === null ? undefined : `answered within ${durationText(p.targetMinutes)}`} na={p.withinTarget.current === null ? (noLeads ? NOT_ENOUGH_LEADS : NOT_ENOUGH_DATA) : undefined} change={changeOf("pct", p.withinTarget.current, p.withinTarget.previous, prev)}
                 note={`${METRIC_INFO.within.meaning} The reply time agreed for this account is ${durationText(p.targetMinutes)}, counted in ${p.clock}.`} />
               <Card info="recovered" value={p.recovered.current === null ? undefined : fmtInt(p.recovered.current)} na={p.recovered.current === null ? NOT_RECORDED : undefined} change={changeOf("count", p.recovered.current, p.recovered.previous, prev)} />
-            </div>
-          </section>
-        )}
+            </>}
+          </div>
+        </section>
 
         {sections.appointments && (
           <section className="pr-sec" aria-label="Appointments">
@@ -126,7 +120,7 @@ export function ProofReport({ p, brand, intro, sections, nameStaff, sample = fal
             {caught.found === null ? <p className="pr-calm">{NOT_RECORDED}. Our daily checks have not recorded anything for this account this month yet.</p> : (
               <div className="pr-grid">
                 <Card info="caught" value={fmtInt(caught.found)} sub={caught.found === 1 ? "problem" : "problems"} />
-                <Card info="fixed" value={fmtInt(caught.fixed ?? 0)} sub={caught.stillOpen ? `${fmtInt(caught.stillOpen)} still open` : "none still open"} note={caught.typicalFixMinutes !== null && (caught.fixed ?? 0) > 0 ? `${METRIC_INFO.fixed.meaning} Typically cleared within ${durationText(caught.typicalFixMinutes)}.` : undefined} />
+                <Card info="fixed" value={fmtInt(caught.fixed ?? 0)} sub={`of ${fmtInt(caught.found)}`} note={`${METRIC_INFO.fixed.meaning}${caught.stillOpen ? ` ${fmtInt(caught.stillOpen)} still open.` : " None are still open."}${caught.typicalFixMinutes !== null && (caught.fixed ?? 0) > 0 ? ` Typically cleared within ${durationText(caught.typicalFixMinutes)}.` : ""}`} />
               </div>
             )}
           </section>

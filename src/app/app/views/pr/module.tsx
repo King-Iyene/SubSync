@@ -166,7 +166,7 @@ function SettingsPanel({ options, sample, onSaved, onClose }: { options: Options
 function ReviewPanel({ row, month, options, sample, canShare, onBack }: { row: PrRow; month: string; options: Options; sample: boolean; canShare: boolean; onBack: () => void }) {
   const api = useApiClient();
   const [rev, setRev] = useState(0);
-  const live = useData<ReportData>(sample ? null : `proof?part=report&location=${encodeURIComponent(row.locationId)}&period=${month}&v=${rev}`);
+  const live = useData<ReportData>(sample ? null : `proof?${new URLSearchParams({ part: "report", account: row.locationId, period: month, v: String(rev) })}`);
   const fx: ReportData | null = useMemo(() => {
     if (!sample) return null;
     const p = { ...samplePayload(), account: row.name };

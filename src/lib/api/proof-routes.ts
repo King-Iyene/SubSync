@@ -67,7 +67,7 @@ async function run(ctx: Ctx, h: ProofHelpers): Promise<Response> {
       return json({ ...r, month, label: monthLabel(month), generatedAt: now.toISOString() });
     }
     if (part === "report") {
-      const loc = await ownedLocation(inst, allowed, sp.get("location"));
+      const loc = await ownedLocation(inst, allowed, sp.get("account"));
       if (!loc) return notFound();
       const row = await getReport(inst, loc, month);
       const k = await getLink(inst, loc, link);

@@ -450,7 +450,7 @@ async function main() {
         assert.equal(r.status, 404, `proof/${p} on the other company's account is refused`);
         assert.ok(!r.text.includes(B.locs[0]), "and never echoes its id");
       }
-      assert.equal((await call(`/api/app/proof?part=report&location=${B.locs[0]}&period=${month}`, tA)).status, 404, "the other company's report cannot be read");
+      assert.equal((await call(`/api/app/proof?part=report&account=${B.locs[0]}&period=${month}`, tA)).status, 404, "the other company's report cannot be read");
       assert.equal((await call(`/api/app/proof?part=list&period=${month}`, session(A, "client", A.locs[0]))).status, 403, "an account user cannot reach it");
       assert.equal((await post(session(A, "business", A.locs[0]), "prepare", { locationId: A.locs[0], month })).status, 403, "nor can a business session write");
       assert.equal((await post(tA, "prepare", { locationId: A.locs[0], month })).status, 200);
@@ -468,10 +468,14 @@ async function main() {
       assert.match(htmlA, /noindex/, "never indexed");
       const htmlB = await (await fetch(`${BASE}/proof/${idB}`)).text();
       assert.ok(htmlB.includes(`${B.marker} Location 1`) && !htmlB.includes(A.marker), "the other company's token shows only that company's account");
+      let refBody = "";
       for (const bad of ["A".repeat(43), idA.slice(0, -1) + (idA.endsWith("A") ? "B" : "A"), "short", idA + "x", "%27%20or%201%3D1--"]) {
         const r = await fetch(`${BASE}/proof/${bad}`);
         assert.equal(r.status, 404, "a forged or malformed token finds nothing");
-        assert.ok(!(await r.text()).includes(A.marker));
+        const bodyText = await r.text();
+        assert.ok(!bodyText.includes(A.marker) && !bodyText.includes(bad.slice(0, 8)), "and the answer never repeats the address");
+        if (!refBody) refBody = bodyText;
+        assert.equal(bodyText, refBody, "every bad link gets the same page");
       }
       const wrong = await post(tA, "link", { locationId: A.locs[0], month, action: "regenerate", confirm: "wrong" });
       assert.equal(wrong.status, 400, "replacing needs the typed account name");

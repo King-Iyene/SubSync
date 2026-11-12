@@ -10,7 +10,7 @@ export const SECTION_KEYS = ["reply", "appointments", "pipeline", "caught", "tim
 export type SectionKey = (typeof SECTION_KEYS)[number];
 export type Sections = Record<SectionKey, boolean>;
 export const SECTION_LABEL: Record<SectionKey, string> = {
-  reply: "How fast new leads were answered", appointments: "Appointments", pipeline: "Deals", caught: "What was caught and fixed", timeline: "What we did for you", trends: "Trend lines",
+  reply: "Reply speed and leads won back", appointments: "Appointments", pipeline: "Deals", caught: "What was caught and fixed", timeline: "What we did for you", trends: "Trend lines",
 };
 
 export const MIN_LEADS = 5; // fewer new leads than this and a reply time is not measured

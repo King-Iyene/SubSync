@@ -8,7 +8,7 @@ export const PR_CSS = `
 @media (prefers-color-scheme: dark) { .pr-doc[data-auto] { --pr-bg: #111a2b; --pr-fg: #eef2f8; --pr-muted: #a3b1c8; --pr-card: #18233a; --pr-line: #2b3a56; --pr-good: #4cc994; --pr-bad: #ff8a80; --pr-flat: #a3b1c8; --pr-accent-text: var(--pr-accent-text-d); } }
 .pr-doc[data-auto] { min-height: 100vh; }
 .pr-doc *, .pr-doc *::before, .pr-doc *::after { box-sizing: border-box; }
-.pr-doc p, .pr-doc h1, .pr-doc h2, .pr-doc h3, .pr-doc ul, .pr-doc ol, .pr-doc dl, .pr-doc dd { margin: 0; padding: 0; }
+:where(.pr-doc) :is(p, h1, h2, h3, ul, ol, dl, dd) { margin: 0; padding: 0; }
 .pr-wrap { max-width: 46rem; margin: 0 auto; padding: 2rem 1rem 3rem; }
 .pr-head { border-top: 4px solid var(--pr-accent); padding-top: 1.1rem; display: grid; gap: 0.35rem; }
 .pr-brand { display: flex; align-items: center; gap: 0.75rem; min-height: 2.25rem; flex-wrap: wrap; }
@@ -21,7 +21,7 @@ export const PR_CSS = `
 .pr-lead { margin-top: 1.25rem; font-size: clamp(1.05rem, 3.4vw, 1.25rem); line-height: 1.45; font-weight: 500; border-left: 3px solid var(--pr-accent); padding: 0.15rem 0 0.15rem 1rem; }
 .pr-sec { margin-top: 2.25rem; break-inside: avoid-page; }
 .pr-doc h2 { font-size: 1.02rem; font-weight: 650; padding-bottom: 0.45rem; margin-bottom: 0.9rem; border-bottom: 1px solid var(--pr-line); }
-.pr-grid { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fit, minmax(min(100%, 13.5rem), 1fr)); }
+.pr-grid { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr)); }
 .pr-card { background: var(--pr-card); border: 1px solid var(--pr-line); border-radius: 10px; padding: 0.95rem 1rem 0.85rem; display: grid; gap: 0.2rem; align-content: start; break-inside: avoid; }
 .pr-kicker { font-size: 0.8rem; color: var(--pr-muted); font-weight: 600; }
 .pr-value { font-size: 1.85rem; line-height: 1.1; font-weight: 650; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
@@ -53,7 +53,7 @@ export const PR_CSS = `
 .pr-foot { margin-top: 2.5rem; border-top: 1px solid var(--pr-line); padding-top: 1rem; font-size: 0.84rem; color: var(--pr-muted); display: grid; gap: 0.5rem; }
 .pr-formulas { display: none; }
 .pr-formulas dt { font-weight: 650; color: var(--pr-fg); margin-top: 0.5rem; }
-.pr-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; }
+.pr-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; margin-bottom: 0.25rem; }
 .pr-btn { appearance: none; border: 1px solid var(--pr-line); background: var(--pr-bg); color: var(--pr-fg); border-radius: 8px; padding: 0.5rem 0.9rem; font: inherit; font-size: 0.9rem; font-weight: 600; cursor: pointer; min-height: 2.5rem; }
 .pr-btn[data-kind="primary"] { background: var(--pr-accent); border-color: var(--pr-accent); color: var(--pr-on-accent); }
 .pr-btn:focus-visible, .pr-how summary:focus-visible { outline: 2px solid var(--pr-accent-text); outline-offset: 2px; }
