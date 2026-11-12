@@ -2,7 +2,7 @@ import { APPOINTMENT_PAST_DAYS } from "../sync/appointment-window";
 import { sql } from "../db";
 import { ttlCache } from "../ttl-cache";
 import {
-  bookingState, buildFlowTree, buildPeople, clampSize, DAY, DEFAULT_DEAL_WINDOW_DAYS, fairness, headlineOf, leadTimeBand, MIN_SHOW, parseApptWindow, pickButton, rate, reportedShowRate, revenueAtRisk,
+  bookingState, buildFlowTree, buildPeople, clampSize, DAY, DEFAULT_DEAL_WINDOW_DAYS, fairness, headlineOf, leadTimeBand, MIN_SHOW, parseApptWindow, pickButton, rate, reportedShowRate, revenueAtRisk, trendPeriods,
   SPEED_LABELS, teamRoleLabel, trueShowRate, type FlowAgg,
 } from "./appointments3-intel.ts";
 import type {
@@ -23,8 +23,10 @@ type Frag = ReturnType<Db>;
 export type Scope = { inst: string; allowed: string[] | null };
 export type Filters = { from: Date; to: Date; location?: string | null; calendar?: string | null; user?: string | null; /** A calendar group id. */ group?: string | null; /** Only active or only inactive calendars. */ active?: "active" | "inactive" | null; /** Booked on (the date the booking was made) range; the appointment date range stays from/to. */ bookedFrom?: Date | null; bookedTo?: Date | null;
   /** The manager filters: what happened, whether there is a deal and where it is, how new the lead is, a new or returning contact, and "needs attention". */
-  outcome?: "showed" | "noshow" | "noshow_open" | "cancelled" | "unmarked" | null; deal?: "has" | "none" | null; stage?: string | null; leadAge?: "7" | "30" | "old" | null; contact?: "new" | "returning" | null; attention?: boolean; source?: string | null; q?: string | null; bucket?: Appt3Bucket | null; setter?: string | null; closer?: string | null; /** A raw status of the booking (new, confirmed): for lists. */ status?: string | null; /** Only appointments whose time passed at least this many days ago. */ minAgeDays?: number | null };
+  outcome?: "showed" | "noshow" | "noshow_open" | "cancelled" | "unmarked" | null; deal?: "has" | "none" | null; stage?: string | null; leadAge?: "7" | "30" | "old" | null; contact?: "new" | "returning" | null; attention?: boolean; source?: string | null; q?: string | null; bucket?: Appt3Bucket | null; setter?: string | null; closer?: string | null; /** A raw status of the booking (new, confirmed): for lists. */ status?: string | null; /** Only appointments whose time passed at least this many days ago. */ minAgeDays?: number | null; /** from/to are calendar days in each account's own time zone (for example a Monday-to-Sunday week), not UTC days. The week and month drill-downs use it so a number and its rows are the same set. */ local?: boolean };
 
+/** YYYY-MM-DD of a Date (UTC), the calendar-day form used for local windows. */
+const dayOf = (d: Date) => d.toISOString().slice(0, 10);
 const ID = /^[A-Za-z0-9_-]{1,64}$/;
 export const cleanId = (v: unknown): string | null => (typeof v === "string" && ID.test(v) ? v : null);
 const num = (v: unknown) => (v === null || v === undefined ? 0 : Number(v));
@@ -115,7 +117,7 @@ function base(s: Scope, f: Filters, dd: number, extra?: Frag): Frag {
       select x.lead_at, x.touch_at from lead_touches x
       where a.contact_id is not null and x.installation_id = a.installation_id and x.location_id = a.location_id and x.contact_id = a.contact_id and x.lead_at <= coalesce(a.created_remote_at, a.start_at)
       order by x.lead_at desc limit 1) t on true
-    where a.installation_id = ${s.inst} and a.start_at >= ${f.from} and a.start_at < ${f.to} and fa.deleted_at is null
+    where a.installation_id = ${s.inst} and ${f.local ? db`a.start_at >= ${new Date(f.from.getTime() - DAY)} and a.start_at < ${new Date(f.to.getTime() + DAY)} and (a.start_at at time zone l.tz)::date >= ${dayOf(f.from)}::date and (a.start_at at time zone l.tz)::date < ${dayOf(f.to)}::date` : db`a.start_at >= ${f.from} and a.start_at < ${f.to}`} and fa.deleted_at is null
       ${f.calendar && cleanId(f.calendar) ? db`and a.calendar_id = ${f.calendar}` : db``}
       ${f.user && cleanId(f.user) ? db`and (a.assigned_to = ${f.user} or a.booked_by_user = ${f.user} or exists (select 1 from calendar_members cm where cm.installation_id = a.installation_id and cm.location_id = a.location_id and cm.calendar_id = a.calendar_id and cm.user_id = ${f.user}))` : db``}
       ${calFilters(f, db`a`)}
@@ -224,8 +226,8 @@ export async function appointmentList(s: Scope, o: ListOpts, link: ((loc: string
   const b = base(s, o.f, dd, o.extra);
   const k = sortKey(o.sort), keyset = keysetOf(k, o.after), raws: Array<Record<string, unknown>> = [];
   const p0 = await page(
-    db`with ap as (${b}) select * from ap where true ${bucketCond(o.f.bucket)} ${keyset ?? db``} order by ${orderOf(k)} limit ${size} offset ${keyset ? 0 : offsetOf(o.page, size)}`,
-    db`with ap as (${b}) select count(*)::int n from ap where true ${bucketCond(o.f.bucket)}`,
+    db`with ap as (${b}) select * from ap where true ${bucketCond(o.f.bucket ?? "booked")} ${keyset ?? db``} order by ${orderOf(k)} limit ${size} offset ${keyset ? 0 : offsetOf(o.page, size)}`,
+    db`with ap as (${b}) select count(*)::int n from ap where true ${bucketCond(o.f.bucket ?? "booked")}`,
     Math.max(0, Math.floor(o.page)), size, (r) => { raws.push(r); return toRow(r, label, link, why ? why(r) : null); },
   );
   return { ...p0, next: raws.length === size ? cursorOf(k, raws[raws.length - 1]) : null };
@@ -695,30 +697,35 @@ export async function comparePeople(s: Scope, f: Filters, ids: string[], by: "bo
 /** Bookings per person (owner) or calendar by week or month: this period, the one before, and the last 8 as a sparkline. SQL aggregate over start time and status only. */
 export async function trends(s: Scope, f: Filters, by: "person" | "calendar", grain: "week" | "month"): Promise<Appt3Trends> {
   const db = sql(), dd = await dealDays(s.inst), label = await names(s.inst);
-  const unit = grain === "week" ? 7 * DAY : 31 * DAY, n = 8;
+  const n = 8;
+  // "This week" is the real current week: Monday to Sunday of today in the account's own time zone (the most common one when several accounts are in play), never the latest week that has data.
+  const [tzRow] = await db`select tz from (${locs(s, f.location)}) l group by tz order by count(*) desc, tz limit 1`;
+  const tz = (tzRow?.tz as string | undefined) ?? "UTC";
+  const [nowRow] = await db`select (date_trunc(${grain}, now() at time zone ${tz}))::date::text d`;
+  const win = trendPeriods(String(nowRow.d), grain, n);
   const g = grain === "week" ? db`'week'` : db`'month'`;
-  const from = new Date(Date.now() - (n + 1) * unit);
   const col = by === "person" ? db`owner` : db`coalesce(calendar_id, '')`;
-  const rows = await db`with ap as (${base(s, { ...f, from, to: new Date(Date.now() + DAY), bucket: undefined }, dd)})
-    select ${col} id, max(calendar_name) cname, date_trunc(${g}, start_at)::date p, count(*) filter (where status <> 'invalid')::int booked,
+  const wide = { ...f, from: new Date(Date.parse(win.starts[0]) - 2 * DAY), to: new Date(Date.parse(win.endOf(win.starts[win.starts.length - 1])) + 3 * DAY), bucket: undefined, local: false };
+  const rows = await db`with ap as (${base(s, wide, dd)})
+    select ${col} id, max(calendar_name) cname, date_trunc(${g}, start_at at time zone tz)::date p, count(*) filter (where status <> 'invalid')::int booked,
       count(*) filter (where status = 'showed')::int showed, count(*) filter (where status = 'noshow')::int noshow
     from ap where ${col} is not null group by 1, 3 order by 1, 3`;
-  const periods = [...new Set(rows.map((r) => (r.p as Date).toISOString().slice(0, 10)))].sort().slice(-(n + 1));
-  const cur = periods[periods.length - 1] ?? "", prev = periods[periods.length - 2] ?? "";
+  const periods = win.starts, cur = periods[periods.length - 1], prev = periods[periods.length - 2];
+  const key = (r: Record<string, unknown>) => (r.p as Date).toISOString().slice(0, 10);
   const byId = new Map<string, Array<Record<string, unknown>>>();
   for (const r of rows) byId.set(r.id as string, [...(byId.get(r.id as string) ?? []), r]);
   const out = [...byId].map(([id, rs]) => {
-    const at = (p: string) => rs.find((r) => (r.p as Date).toISOString().slice(0, 10) === p);
+    const at = (p: string) => rs.find((r) => key(r) === p);
     const current = num(at(cur)?.booked), previous = num(at(prev)?.booked);
     return { id, name: by === "person" ? label(id) : String(rs.find((r) => r.cname)?.cname ?? "Calendar"), current, previous, delta: current - previous, showedCurrent: num(at(cur)?.showed), noshowCurrent: num(at(cur)?.noshow), series: periods.map((p) => num(at(p)?.booked)) };
-  }).sort((a, b) => b.current - a.current || b.previous - a.previous).slice(0, 100);
+  }).filter((r) => r.series.some((v) => v > 0)).sort((a, b) => b.current - a.current || b.previous - a.previous).slice(0, 100);
   // Calendars with no bookings at all still get a row (zeros), so a dead calendar is visible.
   if (by === "calendar") {
     const have = new Set(out.map((r) => r.id));
     const all = await db`select cc.calendar_id id, cc.name from cached_calendars cc join (${locs(s, f.location)}) l on l.location_id = cc.location_id where cc.installation_id = ${s.inst} ${f.calendar && cleanId(f.calendar) ? db`and cc.calendar_id = ${f.calendar}` : db``} ${f.group && cleanId(f.group) ? db`and cc.group_id = ${f.group}` : db``} ${f.active === "active" ? db`and cc.is_active` : f.active === "inactive" ? db`and not cc.is_active` : db``} order by cc.name limit 500`.catch(() => []);
     for (const c of all) if (!have.has(c.id as string)) { have.add(c.id as string); out.push({ id: c.id as string, name: (c.name as string | null) ?? "Calendar", current: 0, previous: 0, delta: 0, showedCurrent: 0, noshowCurrent: 0, series: periods.map(() => 0) }); }
   }
-  return { by, grain, currentFrom: cur, previousFrom: prev, rows: out.slice(0, 500) };
+  return { by, grain, currentFrom: cur, currentTo: win.endOf(cur), previousFrom: prev, previousTo: win.endOf(prev), firstFrom: periods[0], timeZone: tz, rows: out.slice(0, 500) };
 }
 
 /** The whole filtered list as CSV text, capped at 100,000 rows (a streamed download; same derived set as the lists). */

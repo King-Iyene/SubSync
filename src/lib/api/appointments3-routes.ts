@@ -46,7 +46,7 @@ export async function handleAppointments3(ctx: Ctx, h: Appt3Helpers): Promise<Re
     outcome: ((v) => (["showed", "noshow", "noshow_open", "cancelled", "unmarked"].includes(v ?? "") ? v : null) as Filters["outcome"])(sp.get("x_outcome")), deal: ((v) => (v === "has" || v === "none" ? v : null))(sp.get("x_deal")), stage: text(sp.get("x_stage"), 120),
     leadAge: ((v) => (v === "7" || v === "30" || v === "old" ? v : null))(sp.get("x_lead")), contact: ((v) => (v === "new" || v === "returning" ? v : null))(sp.get("x_contact")), attention: sp.get("x_attention") === "1",
     bookedFrom: bookedDay(sp.get("booked_from"), false), bookedTo: bookedDay(sp.get("booked_to"), true), user: seePeople ? cleanId(sp.get("user")) : null, source: text(sp.get("source"), 120), q: text(sp.get("q"), 60),
-    bucket: bucketP && BUCKETS.has(bucketP) ? (bucketP as Appt3Bucket) : null,
+    bucket: bucketP && BUCKETS.has(bucketP) ? (bucketP as Appt3Bucket) : null, local: sp.get("local") === "1",
     status: STATUSES.has(sp.get("status") ?? "") ? sp.get("status") : null, minAgeDays: ((n) => (n >= 1 && n <= 366 ? n : null))(int(sp.get("age"), 0)),
     setter: seePeople && sp.has("setter") ? personParam(sp.get("setter")) : undefined, closer: seePeople && sp.has("closer") ? personParam(sp.get("closer")) : undefined,
   };

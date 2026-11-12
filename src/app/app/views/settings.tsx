@@ -284,7 +284,7 @@ export function SettingsView({ openSection, embedded }: { openSection?: SectionI
                 <p className="mt-2 text-xs text-muted-foreground">With this on, a lead that arrives when your team is closed (evenings, weekends) starts its reply clock at the next opening time in that account&apos;s own time zone, Monday to Friday. A lead that arrives during opening hours and is still unanswered at closing keeps counting overnight.</p>
               </Card>
               {data.features?.sp_ignored_leads === true && <IgnoredLeadsSettings />}
-              {data.features?.appt_booking_share === true && <SaleBasisSettings />}
+              {!embedded && data.features?.appt_booking_share !== false && <SaleBasisSettings />}
               {data.features?.inbox_breach_alert === true && (
                 <Card title="Unanswered alert escalation">
                   <label htmlFor="inbox-ack-grace" className="mb-1 block text-sm font-medium">Escalate an unread alert after (minutes)</label>

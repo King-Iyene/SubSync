@@ -11,7 +11,9 @@ import { CountUp, Q } from "../speed6-base";
 import { ApSlot, hasApSlot, useAp } from "./data";
 import { LinkBtn } from "./link-btn";
 import { ApWorklist } from "./list";
-import { CalChip, Chip, Pager, when } from "./parts";
+import { CalChip, Chip, Pager, shortDay, when } from "./parts";
+import { remember } from "../../ds/remember";
+import { SETTINGS_SECTION_KEY } from "@/lib/settings-sections";
 import { Hit, type SectionProps } from "./sections";
 import { RateTag, StatusLegend, toneVar } from "./status-ui";
 import { SCALES, toneOf, type Scale } from "@/lib/design/status-tone";
@@ -154,7 +156,7 @@ function SumTile({ label, value, sub, onClick, testId, aria }: { label: string; 
   return onClick ? <button type="button" className="ap-sum" onClick={onClick} aria-label={aria} title={aria} data-testid={testId}>{body}</button> : <div className="ap-sum" data-static="" data-testid={testId}>{body}</div>;
 }
 
-export function BookingShare({ filters, onPerson, onDrill }: SectionProps & { onPerson: (p: ApPersonRow) => void }) {
+export function BookingShare({ filters, onPerson, onDrill, openView }: SectionProps & { onPerson: (p: ApPersonRow) => void }) {
   const [page, setPage] = useState(1), [size, setSize] = useState(20), [sort, setSort] = useState("sold"), [role, setRole] = useState(""), [has, setHas] = useState("");
   const [openOn, setOpenOn] = useState(false), [openOff, setOpenOff] = useState(false);
   const key = JSON.stringify(filters) + sort + role + has;
@@ -165,8 +167,10 @@ export function BookingShare({ filters, onPerson, onDrill }: SectionProps & { on
   if (!res.data) return <div className="ap-tablewrap p-6" role="status" aria-busy="true">Loading...</div>;
   const d = res.data, rows = d.rows;
   const un = rows.find((r) => r.unassigned);
-  const period = filters.from && filters.to ? "these dates" : `the last ${filters.days} days`;
   const wantFrom = filters.from || new Date(now - filters.days * 86_400_000).toISOString().slice(0, 10);
+  const wantTo = filters.to || new Date(now).toISOString().slice(0, 10);
+  // The window is always printed as dates, so every figure on this screen says exactly which days it covers.
+  const period = `${filters.from && filters.to ? "these dates" : `the last ${filters.days} days`} (${shortDay(wantFrom)} to ${shortDay(wantTo)})`;
   const total = rows.reduce((a2, r) => a2 + (r.role === "closer" ? (r.owned ?? 0) : r.bookings), 0);
   const sale = d.sale, sum = d.summary, sec = d.sections ?? { active: d.total, oncal: 0, off: 0 };
   const ctx: ShareCtx = { onPerson, onDrill, sale, period };
@@ -183,7 +187,7 @@ export function BookingShare({ filters, onPerson, onDrill }: SectionProps & { on
           sub={sale && !sale.available ? (sale.reason ?? "") : `${(sum?.soldCents ?? 0) > 0 ? `${money(sum?.soldCents)}, ` : ""}${sale?.phrase ?? "counted from deals won"}`} onClick={sale && !sale.available ? undefined : salesTile} aria="Show the sales" />
       </div>
       <p className="ap-headline" data-testid="ap-share-headline">{d.rosterTotal > 0 ? `${d.counts?.withBookings ?? 0} of ${d.rosterTotal} team member${d.rosterTotal === 1 ? "" : "s"} booked or took a meeting in ${period}. Press a count to see those appointments.` : "Who booked an appointment (the setter) and who took the meeting (the closer). Press a count to see those appointments."}</p>
-      {sale && <p className="ap-fine mb-2" data-testid="ap-share-basis">Sold is {sale.phrase}. {sale.rule}{sale.roleFallback ? " No roles are set yet, so anyone who takes meetings counts as a closer." : ""} Change this in Settings, under How do we count a sale?</p>}
+      {sale && <p className="ap-fine mb-2" data-testid="ap-share-basis">Sold is {sale.phrase}. {sale.rule}{sale.roleFallback ? " No roles are set yet, so anyone who takes meetings counts as a closer." : ""} <LinkBtn onClick={() => { remember(SETTINGS_SECTION_KEY, "targets"); openView("settings"); }} testId="ap-share-basis-settings">Change this in Settings</LinkBtn> (Targets, How do we count a sale?)</p>}
       {sale && !sale.available && <InlineAlert tone="warning" className="mb-2" title="Sales are not available yet">{sale.reason}. Reconnect with the payments permission, or choose another way to count a sale in Settings.</InlineAlert>}
       {d.historyStarts && wantFrom < d.historyStarts && <p className="ap-fine mb-2" data-testid="ap-share-history">History starts {new Date(d.historyStarts + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}. Appointments before that day are not in SubSync yet, so older dates show less.</p>}
       <div className="ap-sharebar" role="group" aria-label="Narrow this list">

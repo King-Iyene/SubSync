@@ -175,7 +175,7 @@ export type Appt3Compare = { sides: Appt3CompareSide[] };
 
 /** Bookings per person or calendar, this period against the one before. Counts only (start time and status). */
 export type Appt3Trends = {
-  by: "person" | "calendar"; grain: "week" | "month"; currentFrom: string; previousFrom: string;
+  by: "person" | "calendar"; grain: "week" | "month"; currentFrom: string; currentTo: string; previousFrom: string; previousTo: string; firstFrom: string; timeZone: string;
   rows: Array<{ id: string; name: string; current: number; previous: number; delta: number; showedCurrent: number; noshowCurrent: number; series: number[] }>;
 };
 
