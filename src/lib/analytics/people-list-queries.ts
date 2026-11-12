@@ -104,7 +104,11 @@ export function filterSql(db: Sql, installationId: string, f: SmartFilter, coldT
     const word = escapeLike(f.q.toLowerCase());
     if (t.ok && t.kind === "phone" && digits.length >= 3) add(db`c.phone_digits like ${`%${digits}%`}`);
     else if (t.ok && t.kind === "email") add(f.q.startsWith("@") ? db`lower(c.email) like ${`%${word}%`}` : db`lower(c.email) like ${`${word}%`}`);
-    else add(db`(lower(c.full_name) like ${`${word}%`} or lower(c.last_name) like ${`${word}%`} or lower(c.email) like ${`${word}%`})`);
+    // A word that starts any part of the name also counts ("Lead One" finds "Test Lead One"): the second condition is a trigram look-up of " lead one" (index cached_contacts_name_trgm),
+    // used from three characters on; shorter words keep the start-of-name rule so they never read every row.
+    else add(word.length >= 3
+      ? db`(lower(c.full_name) like ${`${word}%`} or lower(c.last_name) like ${`${word}%`} or lower(c.email) like ${`${word}%`} or c.full_name ilike ${`% ${word}%`})`
+      : db`(lower(c.full_name) like ${`${word}%`} or lower(c.last_name) like ${`${word}%`} or lower(c.email) like ${`${word}%`})`);
   }
   if (f.tags?.length) add(f.tagMode === "all" ? db`c.tags @> ${f.tags}::text[]` : db`c.tags && ${f.tags}::text[]`);
   if (f.notTag) add(db`not (c.tags @> ${[f.notTag]}::text[])`);

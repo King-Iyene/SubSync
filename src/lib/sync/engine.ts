@@ -620,12 +620,17 @@ async function runJob(job: Job, deadline: number): Promise<Outcome> {
 
 // ---------------- the worker loop ----------------
 
-async function claimJob(): Promise<Job | null> {
+export type SliceScope = { installationId?: string | null; locationId?: string | null };
+
+async function claimJob(scope: SliceScope = {}): Promise<Job | null> {
+  const scopeInst = scope.installationId ?? null, scopeLoc = scope.locationId ?? null;
   const rows = await sql()`
     update sync_jobs set status = 'running', started_at = coalesce(started_at, now()), updated_at = now()
     where id = (
       select j.id from sync_jobs j
       where (j.status = 'pending' or (j.status = 'running' and j.updated_at < now() - interval '10 minutes'))
+        and (${scopeInst}::uuid is null or j.installation_id = ${scopeInst}::uuid)
+        and (${scopeLoc}::text is null or j.location_id = ${scopeLoc}::text or j.location_id is null)
         and (j.type <> 'metrics' or not exists (
           select 1 from sync_jobs o
           where o.installation_id = j.installation_id and o.id <> j.id and o.type <> 'metrics' and o.status in ('pending', 'running')))
@@ -643,7 +648,7 @@ async function claimJob(): Promise<Job | null> {
   const [inst] = await sql()`select company_id from installations where id = ${r.installation_id} and uninstalled_at is null`;
   if (!inst) {
     await sql()`update sync_jobs set status = 'failed', error = 'Installation no longer exists', finished_at = now() where id = ${r.id}`;
-    return claimJob();
+    return claimJob(scope);
   }
   return {
     id: r.id, installationId: r.installation_id, companyId: inst.company_id, locationId: r.location_id, type: r.type as JobType,
@@ -669,36 +674,62 @@ export async function clearResolvedError(installationId: string, locationId: str
 
 export type SliceResult = { jobs: number; failed: number; moreWork: boolean };
 
-export async function runSlice(budgetMs = 45_000): Promise<SliceResult> {
+// A step that has not answered in this long is given up on and marked failed ("took too long"), so a hung CRM call or database statement shows as a clear failed step
+// instead of an endless "Syncing..." (the next cycle retries it). Resumable steps (contacts, deals) hand back their cursor well before this.
+export const JOB_TIMEOUT_MS = 90_000;
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+function withJobTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
+  const t = new Promise<never>((_, rej) => { timer = setTimeout(() => rej(new Error(`Took longer than ${Math.round(ms / 1000)} seconds and was stopped. It is tried again on the next sync.`)), ms); });
+  return Promise.race([p, t]).finally(() => clearTimeout(timer));
+}
+
+// Several workers claim jobs at once (FOR UPDATE SKIP LOCKED keeps them apart), so the six steps of a small account run side by side instead of one after another.
+// `scope` limits the slice to one install (and one account): a person who pressed "Sync now" is never queued behind other companies' jobs. A worker that finds nothing
+// claimable while other steps are still running waits a moment (the metrics step is released only when everything else is done) until the time budget ends.
+export async function runSlice(budgetMs = 45_000, opts: SliceScope & { concurrency?: number } = {}): Promise<SliceResult> {
   if (maintenanceOn(process.env)) return { jobs: 0, failed: 0, moreWork: false }; // kill switch: nothing runs
   const db = sql();
   const deadline = Date.now() + budgetMs;
-  let jobs = 0;
-  let failed = 0;
-  while (Date.now() < deadline) {
-    const job = await claimJob();
-    if (!job) break;
-    jobs++;
-    try {
-      const outcome = await runJob(job, deadline);
-      if (outcome.done) {
-        await db`update sync_jobs set status = 'done', cursor = null, error = null, finished_at = now(), updated_at = now() where id = ${job.id}`;
-        if (job.locationId) await clearResolvedError(job.installationId, job.locationId).catch((e) => console.error("Clearing a resolved sync error failed", safeError(e)));
-      } else {
-        await db`update sync_jobs set status = 'pending', cursor = ${db.json(outcome.cursor as never)}, updated_at = now() where id = ${job.id}`;
+  const scope: SliceScope = { installationId: opts.installationId ?? null, locationId: opts.locationId ?? null };
+  const counts = { jobs: 0, failed: 0 };
+  const inScope = async () => {
+    const [r] = await db`select count(*)::int n from sync_jobs where status in ('pending', 'running')
+      and (${scope.installationId ?? null}::uuid is null or installation_id = ${scope.installationId ?? null}::uuid)
+      and (${scope.locationId ?? null}::text is null or location_id = ${scope.locationId ?? null}::text or location_id is null)`;
+    return r.n as number;
+  };
+  const worker = async () => {
+    while (Date.now() < deadline) {
+      const job = await claimJob(scope);
+      if (!job) {
+        if (!opts.installationId || (await inScope()) === 0) break;
+        await sleep(500);
+        continue;
       }
-    } catch (error) {
-      failed++;
-      const message = safeMessage(error);
-      console.error("Sync job failed", { type: job.type, message });
-      await db`update sync_jobs set status = 'failed', error = ${message}, finished_at = now(), updated_at = now() where id = ${job.id}`;
-      if (job.locationId) {
-        await db`update locations set sync_error = ${message} where installation_id = ${job.installationId} and location_id = ${job.locationId}`;
+      counts.jobs++;
+      try {
+        const outcome = await withJobTimeout(runJob(job, deadline), JOB_TIMEOUT_MS);
+        if (outcome.done) {
+          await db`update sync_jobs set status = 'done', cursor = null, error = null, finished_at = now(), updated_at = now() where id = ${job.id}`;
+          if (job.locationId) await clearResolvedError(job.installationId, job.locationId).catch((e) => console.error("Clearing a resolved sync error failed", safeError(e)));
+        } else {
+          await db`update sync_jobs set status = 'pending', cursor = ${db.json(outcome.cursor as never)}, updated_at = now() where id = ${job.id}`;
+        }
+      } catch (error) {
+        counts.failed++;
+        const message = safeMessage(error);
+        console.error("Sync job failed", { type: job.type, message });
+        await db`update sync_jobs set status = 'failed', error = ${message}, finished_at = now(), updated_at = now() where id = ${job.id}`;
+        if (job.locationId) {
+          await db`update locations set sync_error = ${message} where installation_id = ${job.installationId} and location_id = ${job.locationId}`;
+        }
       }
     }
-  }
+  };
+  await Promise.all(Array.from({ length: Math.max(1, Math.min(opts.concurrency ?? 1, 6)) }, () => worker()));
   const [pending] = await db`select count(*)::int n from sync_jobs where status in ('pending', 'running')`;
-  return { jobs, failed, moreWork: pending.n > 0 };
+  return { jobs: counts.jobs, failed: counts.failed, moreWork: pending.n > 0 };
 }
 
 // `onlyLocation` limits the report to one account (a business or client view), keeping other accounts' jobs out of it.

@@ -3,8 +3,8 @@ import { recordFromWebhook } from "../analytics/appointments3-record";
 import { recordDealFromWebhook } from "../analytics/pipeline3-record";
 import { sql } from "../db";
 import { safeError } from "../safe-log";
-import { mapOpportunity } from "../sync/ghl-data";
-import { cacheConversations } from "./live-cache";
+import { mapContact, mapOpportunity } from "../sync/ghl-data";
+import { cacheContacts, cacheConversations } from "./live-cache";
 import { crmSource } from "./live-read";
 import { refreshLead } from "./live-route";
 
@@ -44,8 +44,15 @@ export async function applyLiveWebhook(
     if (CONTACT_EVENTS.has(t)) {
       const id = text(root.id, root.contactId, data.id, data.contactId);
       if (!id) return none;
-      const ok = await withTimeout(refreshLead(a.installationId, await deps.token(a.locationId), a.locationId, id), 4000, false);
-      return { skipResync: ok };
+      // The CRM read gets 4 seconds. The event itself already carries the person (name, email, phone, tags), so when the read is slow or fails the copy is
+      // filled from the event: a new person shows in Find a lead within seconds either way. The full read is still queued then (skipResync false) to complete the rest.
+      const ok = await withTimeout(refreshLead(a.installationId, await deps.token(a.locationId), a.locationId, id).catch(() => false), 4000, false);
+      if (ok) return { skipResync: true };
+      if (t !== "ContactDndUpdate") {
+        const row = mapContact({ ...data, ...root, id });
+        if (row) await cacheContacts(a.installationId, a.locationId, [row]).catch((e) => console.error("contact from webhook not stored", safeError(e)));
+      }
+      return none;
     }
     if (MESSAGE_EVENTS.has(t)) {
       const id = text(root.contactId, data.contactId);
