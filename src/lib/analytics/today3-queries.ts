@@ -128,7 +128,7 @@ async function mineOf(s: Scope, ids: string[]): Promise<Td3Mine | null> {
 export type Board = { cores: Core[]; f: Filters };
 // The per-account counts are the heaviest read; the ranked list and the list a tap opens share them for 30 seconds (same caller, same account choice, same day).
 const boardCache = ttlCache<Board>(30_000, 50);
-async function board(s: Scope, one: string | null, now: number): Promise<Board> {
+export async function board(s: Scope, one: string | null, now: number): Promise<Board> {
   const f = { ...window7(now), location: one };
   const key = JSON.stringify([s.inst, s.allowed, one, Math.floor(now / DAY)]);
   const hit = boardCache.get(key);
@@ -181,7 +181,7 @@ export async function today(s: Scope, one: string | null, now = Date.now()): Pro
   };
 }
 
-async function historyStartsOf(inst: string, ids: string[]): Promise<string | null> {
+export async function historyStartsOf(inst: string, ids: string[]): Promise<string | null> {
   if (!ids.length) return null;
   try {
     const r = await sql()`select min(day)::text as d from td_daily_items where installation_id = ${inst} and location_id = any(${ids}::text[]) and baseline`;

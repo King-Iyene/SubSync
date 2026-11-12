@@ -80,6 +80,24 @@ button.td-hnum { cursor: pointer; text-decoration: underline; text-decoration-co
 button.td-hnum:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; border-radius: 4px; }
 .td-hnote { font-size: 0.75rem; color: var(--muted-foreground); line-height: 1.35; }
 .td-hgo { align-self: flex-start; font-size: 0.75rem; margin-top: 2px; }
+/* The money row (above the hero strip): five flat cards, one number each, status colour only on the top edge dot. */
+.td-mhero { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 8px; }
+.td-mskel { min-height: 118px; border: 1px solid color-mix(in srgb, var(--s6-edgec) 26%, transparent); border-radius: 12px; background: var(--s6-surf); opacity: 0.6; }
+.td-mcard { position: relative; display: flex; flex-direction: column; gap: 3px; min-width: 0; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--s6-edgec) 26%, transparent); border-radius: 12px; background: var(--s6-surf); transition: border-color 0.15s, background-color 0.15s; }
+.td-mcard:hover, .td-mcard:focus-within { border-color: color-mix(in srgb, var(--s6-cyan) 55%, transparent); }
+.td-mcard[data-tone="red"] .td-micon { color: var(--s6-red); } .td-mcard[data-tone="amber"] .td-micon { color: var(--s6-amber); } .td-mcard[data-tone="green"] .td-micon { color: var(--s6-green); }
+.td-mtop { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.td-mtop .td-hlabel { flex: 1; min-width: 0; }
+.td-micon { display: inline-flex; color: var(--muted-foreground); }
+.td-minfo { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; min-height: 0; padding: 0; border: 0; border-radius: 6px; background: none; color: var(--muted-foreground); cursor: pointer; }
+.td-minfo:hover { color: var(--foreground); background: color-mix(in srgb, var(--s6-line) 40%, transparent); } .td-minfo:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
+.td-mnum { font-size: 1.25rem; }
+.td-munk { font-size: 0.9375rem; font-weight: 600; color: var(--muted-foreground); }
+.td-mval { display: inline-flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.td-mdelta { font-size: 0.75rem; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--s6-red); } .td-mdelta[data-up="1"] { color: var(--s6-green); }
+.td-mcauses { display: flex; flex-wrap: wrap; gap: 2px 10px; font-size: 0.75rem; }
+.td-mhow { margin: 4px 0 0; padding-top: 6px; border-top: 1px solid color-mix(in srgb, var(--s6-line) 60%, transparent); }
+.td-mgo { align-self: flex-start; margin-top: 4px; }
 .td-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: start; }
 .td-col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .td-grid:empty, .td-col:empty { display: none; }
