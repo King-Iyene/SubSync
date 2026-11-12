@@ -46,8 +46,12 @@ export type ApPersonRow = ApStats & { id: string; name: string; role: "setter" |
   /** Plain team role, whether they have bookings in these dates, and the calendars they are on / booked into. */
   roleLabel?: string | null; state?: "booked" | "none_this_period" | "never"; owned?: number; lastBookingAt?: string | null; inTeam?: boolean; teamActive?: boolean;
   calendars?: Array<{ calendarId: string; name: string | null; groupName: string | null; active: boolean }>;
-  byCalendar?: Array<{ calendarId: string | null; name: string | null; groupName: string | null; booked: number; owned: number }> };
-export type ApShareView = { rows: ApPersonRow[]; total: number; rosterTotal: number; roles: Array<{ key: string; label: string; n: number }>; historyStarts?: string; counts?: { withBookings: number; none: number } };
+  byCalendar?: Array<{ calendarId: string | null; name: string | null; groupName: string | null; booked: number; owned: number }>;
+  /** Sales credited to the closer, their value in cents, sales from meetings this person booked, sales as a share of meetings taken, meetings taken that showed, and calendars the person is on. */
+  sold?: number; soldCents?: number; setRole?: string | null; soldFromBookings?: number; soldRate?: number | null; ownedShowed?: number; calendarCount?: number; showed?: number; noShow?: number };
+export type ApSaleInfo = { basis: "deal_won" | "payment" | "assigned_closer"; countWithoutValue: boolean; available: boolean; phrase: string; rule: string; reason: string | null; roleFallback: boolean };
+export type ApShareView = { rows: ApPersonRow[]; total: number; rosterTotal: number; roles: Array<{ key: string; label: string; n: number }>; historyStarts?: string; counts?: { withBookings: number; none: number };
+  sections?: { active: number; oncal: number; off: number }; summary?: { peopleBooked: number; booked: number; showed: number; showRate: number | null; sold: number; soldCents: number }; sale?: ApSaleInfo };
 export type ApHealthRow = { locationId: string; name: string; booked: number; showRate: number | null; noShowRate: number | null; cancelRate: number | null; unmarked: number };
 export type ApSourceRow = { source: string; booked: number; showRate: number | null; medianFirstReplyMinutes: number | null; won: number };
 export type ApSpeedBand = { label: string; booked: number; showRate: number | null };

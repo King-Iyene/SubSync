@@ -8,6 +8,8 @@ import {
   callDetail, claimTask, coachCalls, coachRows, connectedPeople, exactContacts, finishTask, followCounts, followRows, listCalls, markTaskUndone, roleLabels, taskTarget, tasksDoneToday, undoableTasks, weekCounts,
 } from "../analytics/mn2-queries";
 import { pgIngestStore } from "../connections/ingest-store";
+import { accessTokenFor, secretRowOf } from "../connections/personal";
+import { fetchFathomTranscript, unavailable } from "../connections/transcript";
 import { accessibleAccounts, personFromSession, statusScope, covers, type Person } from "../connections/person";
 import { buildDeleteOwn, buildTask, writeToCrm } from "../ghl/crm-writes";
 import { recordWrite } from "../ghl/crm-gateway";
@@ -54,6 +56,7 @@ export async function handleMeetingList(ctx: Ctx, h: MnHelpers): Promise<Respons
   if (part === "sync" && m === "POST") return sync(ctx, h);
   if (part && isUuid(part)) {
     if (!ctx.segments[2] && m === "GET") return detail(ctx, h, part);
+    if (ctx.segments[2] === "transcript" && m === "GET") return transcript(ctx, part);
     if (ctx.segments[2] === "tasks" && m === "POST") return on(ctx, "mn_tasks") ? tasks(ctx, part) : OFF();
   }
   return NOT_FOUND();
@@ -102,6 +105,24 @@ async function detail(ctx: Ctx, h: MnHelpers, id: string): Promise<Response> {
     candidates: candidates.map((c) => ({ ...c, url: links.contact(c.locationId, c.contactId) })),
     canTasks: on(ctx, "mn_tasks"), canOutcome: on(ctx, "appt_actions"),
   });
+}
+
+/**
+ * The transcript of one call, read ON DEMAND from the provider with the owner's OWN connection and returned to the owner only (rule 12). It is never stored and never logged: it goes from
+ * the meeting tool to this one answer. The call is looked up by the signed-in person's own user id, so another person's call id answers "not found"; an administrator has no route to the words.
+ */
+async function transcript(ctx: Ctx, id: string): Promise<Response> {
+  if (ctx.demo) return NOT_FOUND();
+  const person = personOf(ctx);
+  if (!person) return NEED_SIGN_IN();
+  const [m] = await sql()`select provider, provider_meeting_id, connection_id from meetings where id = ${id} and installation_id = ${ctx.installationId} and owner_ghl_user_id = ${person.userId}`;
+  if (!m) return NOT_FOUND();
+  if (m.provider !== "fathom" || !m.connection_id) return json(unavailable("not_supported"));
+  const row = await secretRowOf(person, m.connection_id as string);
+  if (!row || row.status !== "connected") return json(unavailable("reconnect"));
+  const token = await accessTokenFor(row);
+  if (!token) return json(unavailable("reconnect"));
+  return json(await fetchFathomTranscript(token, m.provider_meeting_id as string));
 }
 
 async function follow(ctx: Ctx, h: MnHelpers): Promise<Response> {

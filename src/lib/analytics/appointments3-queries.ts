@@ -9,6 +9,9 @@ import type {
   Appt3Bucket, Appt3BookingShare, Appt3Calendars, Appt3Conflict, Appt3Detail, Appt3FlowTree, Appt3Health, Appt3NeedsOutcome, Appt3Overview, Appt3PersonShare,
   Appt3Compare, Appt3CompareSide, Appt3Options, Appt3Trends, Appt3Receipt, Appt3Recovery, Appt3Row, Appt3Sources, Page, Rate,
 } from "./appointments3-types.ts";
+import { BASIS_PHRASE, CREDIT_RULE, NOT_READABLE, rankActive, sectionOf, soldRate, tallySales, type SaleFact, type ShareSection } from "./sale-basis-core.ts";
+import { loadSaleSettings } from "./sale-settings.ts";
+import { indexRoles, resolveRole, type RoleRow } from "../people/roles.ts";
 
 // The reads behind /api/app/appointments?part=... Read only; every figure is a SQL aggregate and every list is server-paged, so a million appointments cost the
 // same as a hundred. The accounts a caller may see (`allowed`) come from the signed session in the router, never from the request; a `location` filter can only
@@ -90,7 +93,7 @@ function base(s: Scope, f: Filters, dd: number, extra?: Frag): Frag {
     select a.location_id, a.appointment_id, a.calendar_id, a.calendar_name, a.contact_id, a.status, a.start_at, a.end_at, a.assigned_to owner, a.booked_by_user booker,
       a.created_remote_at created_at, l.name account_name, l.tz, cg0.name calendar_group,
       coalesce(nullif(c.full_name, ''), nullif(c.email, ''), 'Unnamed contact') contact_name, nullif(c.source, '') source, nullif(c.phone, '') phone, coalesce(c.dnd, false) dnd,
-      d.opportunity_id deal_id, d.status deal_status, d.monetary_value deal_value,
+      d.opportunity_id deal_id, d.status deal_status, d.monetary_value deal_value, coalesce(nullif(d.assigned_to, ''), nullif(c.assigned_to, '')) assignee,
       t.lead_at, t.touch_at,
       fa.snoozed_until,
       (a.status not in ('showed', 'noshow', 'cancelled', 'invalid') and a.start_at < now() - interval '3 hours') unmarked,
@@ -104,7 +107,7 @@ function base(s: Scope, f: Filters, dd: number, extra?: Frag): Frag {
     left join appointment_facts fa on fa.installation_id = a.installation_id and fa.location_id = a.location_id and fa.appointment_id = a.appointment_id
     left join cached_contacts c on c.installation_id = a.installation_id and c.location_id = a.location_id and c.contact_id = a.contact_id and a.contact_id is not null
     left join lateral (
-      select o.opportunity_id, o.status, o.monetary_value, o.stage_name from cached_opportunities o
+      select o.opportunity_id, o.status, o.monetary_value, o.stage_name, o.assigned_to from cached_opportunities o
       where a.contact_id is not null and o.installation_id = a.installation_id and o.location_id = a.location_id and o.contact_id = a.contact_id
         and (o.status = 'open' or coalesce(o.last_status_change_at, o.synced_at) between a.start_at - interval '1 day' and a.start_at + make_interval(days => ${dd}::int))
       order by case o.status when 'won' then 0 when 'lost' then 1 else 2 end, coalesce(o.last_status_change_at, o.synced_at) desc limit 1) d on true
@@ -353,11 +356,43 @@ async function roster(s: Scope, f: Filters, withTeam = false) {
   return [...fromLists, ...fromTeam];
 }
 
-export type ShareOpts = { teamRole?: string | null; has?: "yes" | "no" | null };
+export type ShareOpts = { teamRole?: string | null; has?: "yes" | "no" | null; section?: ShareSection | null };
+
+/** The sale facts behind the Sold column, grouped so the number of rows stays small however many appointments there are. The credit rule itself lives in sale-basis-core.ts. */
+async function saleFacts(s: Scope, f: Filters, dd: number, withPayments: boolean): Promise<SaleFact[]> {
+  const db = sql();
+  const pay = withPayments
+    ? db`left join lateral (select sum(p.amount - coalesce(p.amount_refunded, 0)) amt from pm_items p where p.installation_id = ${s.inst} and p.location_id = ap.location_id and p.kind = 'transaction' and p.status_mapped = 'paid' and p.live_mode
+          and ap.contact_id is not null and p.contact_id = ap.contact_id and p.occurred_at >= ap.start_at - interval '1 day' and p.occurred_at < ap.start_at + make_interval(days => ${dd}::int)) pm on true`
+    : db`left join lateral (select null::numeric amt) pm on true`;
+  const rows = await db`with ap as (${base(s, { ...f, bucket: undefined }, dd)}) select ap.location_id, ap.owner, ap.booker, ap.assignee, (ap.deal_status = 'won') dw, (coalesce(ap.deal_value, 0) > 0) dpos,
+      (coalesce(pm.amt, 0) > 0) paid, coalesce(sum(coalesce(ap.deal_value, 0)), 0)::float8 dv, coalesce(sum(greatest(coalesce(pm.amt, 0), 0)), 0)::float8 pv, count(*)::int n
+    from ap ${pay} where ap.status <> 'invalid' and (ap.deal_status = 'won' or coalesce(pm.amt, 0) > 0) group by 1, 2, 3, 4, 5, 6, 7 limit 50000`.catch(() => [] as Array<Record<string, unknown>>);
+  // dv and pv are sums over the group; the core wants one appointment's value, so they are divided back by the group size (every row in a group has the same flags, and the totals are what is added up).
+  return rows.map((r) => ({ locationId: r.location_id as string, owner: (r.owner as string | null) ?? null, booker: (r.booker as string | null) ?? null, assignee: (r.assignee as string | null) ?? null,
+    dealWon: r.dw === true, dealHasValue: r.dpos === true, paid: r.paid === true, paidHasValue: r.paid === true, dealValue: num(r.dv) / Math.max(1, num(r.n)), paidAmount: num(r.pv) / Math.max(1, num(r.n)), n: num(r.n) }));
+}
+async function paymentsReadable(s: Scope, f: Filters): Promise<boolean> {
+  try { return (await sql()`select 1 from pm_sync_state y join (${locs(s, f.location)}) l on l.location_id = y.location_id where y.installation_id = ${s.inst} and y.last_ok_at is not null limit 1`).length > 0; } catch { return false; }
+}
+async function roleRows(inst: string): Promise<RoleRow[]> {
+  try { return (await sql()`select user_id, location_id, role from team_member_roles where installation_id = ${inst}`).map((r) => ({ userId: r.user_id as string, locationId: (r.location_id as string | null) ?? "", role: r.role as RoleRow["role"] })); } catch { return []; }
+}
+/** How many calendars each person is on, across the accounts in play. */
+async function calendarCounts(s: Scope, f: Filters): Promise<Map<string, number>> {
+  try { const r = await sql()`select cm.user_id uid, count(distinct (cm.location_id, cm.calendar_id))::int n from calendar_members cm join (${locs(s, f.location)}) l on l.location_id = cm.location_id where cm.installation_id = ${s.inst} group by 1 limit 20000`; return new Map(r.map((x) => [x.uid as string, num(x.n)])); } catch { return new Map(); }
+}
 
 export async function bookingShare(s: Scope, f: Filters, p: number, size0: number, sort?: string | null, opt: ShareOpts = {}): Promise<Appt3BookingShare> {
   const db = sql(), dd = await dealDays(s.inst), size = clampSize(size0), label = await names(s.inst), L = locs(s, f.location);
-  const [bk, ow, ros] = await Promise.all([personStats(s, f, dd, "booker"), personStats(s, f, dd, "owner"), roster(s, f, true)]);
+  const [bk, ow, ros, sale, rrows, readable, calN] = await Promise.all([personStats(s, f, dd, "booker"), personStats(s, f, dd, "owner"), roster(s, f, true), loadSaleSettings(s.inst), roleRows(s.inst), paymentsReadable(s, f), calendarCounts(s, f)]);
+  const facts = await saleFacts(s, f, dd, readable && sale.basis !== "deal_won");
+  const RI = indexRoles(rrows), owners = new Set(ow.filter((r) => num(r.booked) > 0).map((r) => r.uid as string | null));
+  // Who is a closer: the role the agency set inside SubSync; with no roles set at all, anyone who takes meetings.
+  const isCloser = (u: string, loc: string) => (rrows.length ? ["closer", "both"].includes(resolveRole(RI, u, loc) ?? "") : owners.has(u));
+  const anyRole = (u: string) => { const per = RI.get(u); return per ? per.get("") ?? [...per.values()][0] ?? null : null; };
+  const available = sale.basis !== "payment" || readable;
+  const tally = tallySales(facts, sale, isCloser, readable);
   const R = new Map<string, { name: string; role: string; gone: boolean }>();
   for (const r of ros) { const id = r.user_id as string; const e = R.get(id); R.set(id, { name: (e?.name || (r.name as string)) ?? "", role: e?.role && e.role !== "unknown" ? e.role : ((r.role as string | null) ?? "unknown"), gone: (e?.gone ?? true) && r.gone === true }); }
   const ids = new Set<string | null>([...bk.map((r) => r.uid as string | null), ...ow.map((r) => r.uid as string | null), ...R.keys()]);
@@ -368,7 +403,10 @@ export async function bookingShare(s: Scope, f: Filters, p: number, size0: numbe
     const m = booked >= owned ? b : o; // the side this person mostly works on gives the outcome figures
     const showed = num(m?.showed), noshow = num(m?.noshow), unmarked = num(m?.unmarked), won = num(m?.won), lost = num(m?.lost);
     const known = id !== null && R.has(id);
+    const ownedShowed = num(o?.showed), sc = available ? tally.byCloser.get(id ?? "\u0000") : undefined, sb = available ? tally.byBooker.get(id ?? "\u0000") : undefined;
+    const sold = sc?.count ?? 0;
     return {
+      setRole: id ? anyRole(id) : null, sold, soldValue: sc?.value ?? 0, soldFromBookings: sb?.count ?? 0, soldRate: soldRate(sold, ownedShowed), ownedShowed, calendarCount: id ? calN.get(id) ?? 0 : 0,
       userId: id, name: id ? nameOf(id) : "Not recorded", role: !id ? "none" : booked && owned ? "both" : booked ? "setter" : owned ? "closer" : "none",
       booked, owned, showed, noshow, unmarked, won, lost, showRate: trueShowRate(showed, noshow, unmarked), noshowRate: rate(noshow, showed + noshow + unmarked),
       closeRate: rate(won, won + lost, 10), wonValue: num(m?.won_value), leadToBookedMedianMinutes: b?.ltb === null || b?.ltb === undefined ? null : Math.round(Number(b.ltb)),
@@ -381,11 +419,17 @@ export async function bookingShare(s: Scope, f: Filters, p: number, size0: numbe
   const roles = [...roleCount].map(([key, n]) => ({ key, label: teamRoleLabel(key), n })).sort((x, y) => y.n - x.n);
   if (f.q) people = people.filter((x) => x.name.toLowerCase().includes(f.q!.toLowerCase()));
   if (opt.teamRole) people = people.filter((x) => x.userId !== null && (R.get(x.userId)?.role ?? "unknown") === opt.teamRole);
+  const secOf = (x: Appt3PersonShare): ShareSection => (x.userId === null ? "active" : sectionOf({ booked: x.booked, owned: x.owned, sold: x.sold, calendars: x.calendarCount }));
+  const sections = { active: people.filter((x) => secOf(x) === "active").length, oncal: people.filter((x) => secOf(x) === "oncal").length, off: people.filter((x) => secOf(x) === "off").length };
+  const bookedAll = bk.reduce((a2, r) => a2 + num(r.booked), 0), showedAll = bk.reduce((a2, r) => a2 + num(r.showed), 0), noshowAll = bk.reduce((a2, r) => a2 + num(r.noshow), 0), unmarkedAll = bk.reduce((a2, r) => a2 + num(r.unmarked), 0);
+  const summary = { peopleBooked: people.filter((x) => x.userId !== null && x.booked > 0).length, booked: bookedAll, showed: showedAll, showRate: trueShowRate(showedAll, noshowAll, unmarkedAll), sold: available ? tally.total.count : 0, soldValue: available ? tally.total.value : 0 };
   const counts = { withBookings: people.filter((x) => x.userId !== null && x.booked + x.owned > 0).length, none: people.filter((x) => x.userId !== null && x.booked + x.owned === 0).length };
   if (opt.has === "yes") people = people.filter((x) => x.booked + x.owned > 0);
   if (opt.has === "no") people = people.filter((x) => x.userId !== null && x.booked + x.owned === 0);
-  const key = (x: Appt3PersonShare) => (sort === "show" ? x.showRate.value ?? -1 : sort === "revenue" ? x.wonValue : sort === "owned" ? x.owned : x.booked);
-  people.sort((a, b) => (sort === "name" ? a.name.localeCompare(b.name) : key(b) - key(a) || (b.booked + b.owned) - (a.booked + a.owned) || a.name.localeCompare(b.name)));
+  if (opt.section) people = people.filter((x) => secOf(x) === opt.section);
+  const key = (x: Appt3PersonShare) => (sort === "show" ? x.showRate.value ?? -1 : sort === "revenue" ? x.soldValue : sort === "owned" ? x.owned : x.booked);
+  if (sort === "sold") people = rankActive(people);
+  else people.sort((a, b) => (sort === "name" ? a.name.localeCompare(b.name) : key(b) - key(a) || (b.booked + b.owned) - (a.booked + a.owned) || a.name.localeCompare(b.name)));
   const total = people.length, off = offsetOf(p, size);
   const rows = people.slice(off, off + size);
   const uids = rows.map((r) => r.userId).filter((x): x is string => !!x);
@@ -427,7 +471,7 @@ export async function bookingShare(s: Scope, f: Filters, p: number, size0: numbe
   return {
     rows, total, page: Math.max(0, Math.floor(p)), size, pages: Math.max(1, Math.ceil(total / size)), truncated: false,
     unassigned: num(B.get(null)?.booked), ownerless: num(O.get(null)?.booked), fairness: fairness(owned),
-    rosterTotal, roles, counts, historyStarts: new Date(Date.now() - APPOINTMENT_PAST_DAYS * DAY).toISOString().slice(0, 10),
+    rosterTotal, roles, counts, sections, summary, sale: { basis: sale.basis, countWithoutValue: sale.countWithoutValue, available, phrase: BASIS_PHRASE[sale.basis], rule: CREDIT_RULE[sale.basis], reason: available ? null : NOT_READABLE, roleFallback: sale.basis === "assigned_closer" && rrows.length === 0 }, historyStarts: new Date(Date.now() - APPOINTMENT_PAST_DAYS * DAY).toISOString().slice(0, 10),
   };
 }
 

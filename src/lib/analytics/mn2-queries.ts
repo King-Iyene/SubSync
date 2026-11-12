@@ -70,6 +70,7 @@ export async function listCalls(installationId: string, userId: string, q: ListQ
 }
 
 export type CallDetail = {
+  provider: string; noteAddedAt: string | null;
   id: string; title: string | null; startedAt: string | null; minutes: number | null; talkPct: number | null; statusKey: string; statusLabel: string; reason: string | null;
   attendees: string[]; summary: string | null; actionItems: string[]; recordingUrl: string | null; expiresAt: string | null;
   locationId: string | null; locationName: string | null; contactId: string | null; contactName: string | null;
@@ -84,7 +85,7 @@ export type CallDetail = {
 export async function callDetail(installationId: string, userId: string, id: string, allowed: string[] | null): Promise<CallDetail | null> {
   const db = sql();
   const [r] = await db`
-    select m.id, m.title, m.started_at, m.duration_minutes, m.talk_pct, m.status, m.reason, m.attendee_emails, m.summary, m.action_items, m.recording_url, m.expires_at,
+    select m.id, m.provider, m.title, m.started_at, m.duration_minutes, m.talk_pct, m.status, m.reason, m.attendee_emails, m.summary, m.action_items, m.recording_url, m.expires_at,
       coalesce(m.matched_location_id, a.location_id) loc, coalesce(m.matched_contact_id, a.contact_id) contact,
       l.suggested_outcome, l.outcome_confirmed_at, l.appointment_id, a.start_at a_start, a.status a_status, a.calendar_name a_cal
     from meetings m
@@ -99,9 +100,12 @@ export async function callDetail(installationId: string, userId: string, id: str
   const [dl] = contactId ? await db`select name, monetary_value, stage_name from cached_opportunities where installation_id = ${installationId} and location_id = ${loc} and contact_id = ${contactId} and status = 'open' order by monetary_value desc nulls last limit 1`.catch(() => []) : [];
   const tasks = await db`select item_no, status from mn_tasks where installation_id = ${installationId} and owner_ghl_user_id = ${userId} and meeting_id = ${id} and status <> 'undone' order by item_no`.catch(() => []);
   const items = strings(r.action_items);
+  // The note SubSync added for this call (our own write, logged so it never counts as a reply): when it was added, never what it said.
+  const [nw] = contactId ? await db`select created_at from crm_writes where installation_id = ${installationId} and meeting_id = ${id} and kind = 'note' and undone_at is null order by created_at limit 1`.catch(() => []) : [];
   const st = callStatus({ status: r.status as string, reason: (r.reason as string | null) ?? null, matched: contactId !== null });
   const oc = outcomeState(r.appointment_id ? { suggested: (r.suggested_outcome as string | null) ?? null, confirmedAt: iso(r.outcome_confirmed_at) } : null);
   return {
+    provider: r.provider as string, noteAddedAt: iso(nw?.created_at),
     id, title: (r.title as string | null) ?? null, startedAt: iso(r.started_at), minutes: (r.duration_minutes as number | null) ?? null, talkPct: (r.talk_pct as number | null) ?? null,
     statusKey: st.key, statusLabel: st.label, reason: (r.reason as string | null) ?? null, attendees: strings(r.attendee_emails), summary: (r.summary as string | null) ?? null, actionItems: items,
     recordingUrl: (r.recording_url as string | null) ?? null, expiresAt: iso(r.expires_at), locationId: loc, locationName: loc ? ((lo?.name as string | null) ?? "Unnamed account") : null,

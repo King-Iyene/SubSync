@@ -10,6 +10,7 @@ import { SearchSelect, type SelectOption } from "../ap3/search-select";
 import type { ExecScope } from "../ap3/exec/exec-types";
 import { AGE_BANDS, DIM_LABEL, cohortRate, pctText, type Dim, type StepKey, type StepRow } from "@/lib/analytics/bf-core";
 import { BookingLadder, type LadderPick } from "./bf-ladder";
+import { LeakLadder } from "./bf-leak-ladder";
 import { SidePopup } from "../speed-popup";
 import { SAMPLE, bffxOn, type BreakdownRes, type CohortsRes, type ForecastRes, type LeaksRes, type OptionsRes, type RecoverDone, type RecoverPreview, type RowsRes, type SummaryRes } from "./bf-data";
 import "./bf.css";
@@ -65,7 +66,10 @@ export function BfTab({ scope, people, accounts, sources, flags, testId = "bf-ta
   const [prevKey, setPrevKey] = useState(scopeKey);
   if (prevKey !== scopeKey) { setPrevKey(scopeKey); setDrill(null); } // a list belongs to the filters it was opened under, so a number and its rows never disagree
 
+  const [view, setView] = useState<"ladder" | "flow">("ladder");
   const sum = useBf<SummaryRes>("summary", scope, local);
+  const prevSum = useBf<SummaryRes>("summary", prevScope(scope), local);
+  const srcSplit = useBf<BreakdownRes>("breakdown", scope, local, { by: "source" });
   const leaks = useBf<LeaksRes>("leaks", scope, local);
   const opts = useBf<OptionsRes>("options", scope, NO_LOCAL);
   const open = useCallback((d: Drill) => { setDrill(d); }, []);
@@ -113,17 +117,25 @@ export function BfTab({ scope, people, accounts, sources, flags, testId = "bf-ta
           <p className="bf-fine">Leads that came in {dayLabel(sum.data.period.from)} to {dayLabel(sum.data.period.to)}, from the date bar at the top.{sum.data.historyStarts ? ` History starts ${dayLabel(sum.data.historyStarts)}.` : ""}{sum.data.live ? " Calculated live for this view." : ""}{sum.data.problem ? ` ${sum.data.problem}` : ""}</p>
         </section>
         <section className="bf-card" aria-label="The booking funnel">
-          <BookingLadder steps={sum.data.steps} biggest={sum.data.leak?.key ?? null} onPick={pick} />
+          <div className="bf-view" role="group" aria-label="How to see the funnel" data-testid="bf-view">
+            <button type="button" aria-pressed={view === "ladder"} onClick={() => setView("ladder")} data-testid="bf-view-ladder">Leak ladder</button>
+            <button type="button" aria-pressed={view === "flow"} onClick={() => setView("flow")} data-testid="bf-view-flow">Flow view</button>
+          </div>
+          {view === "ladder"
+            ? <LeakLadder sum={sum.data} prev={prevSum.data} sources={srcSplit.data} onPick={pick} onSource={(id, name, count) => open({ title: `${name}: leads`, step: "lead", mode: "reached", extra: { source: idParam(id) }, count })} />
+            : <BookingLadder steps={sum.data.steps} biggest={sum.data.leak?.key ?? null} onPick={pick} />}
           <ul className="bf-times" aria-label="How long each step takes">
             {sum.data.times.map((t) => <li key={t.key}><span className="bf-fine">{t.label}</span><b>{t.text}</b></li>)}
           </ul>
           {sum.data.timesNote && <p className="bf-fine">{sum.data.timesNote} <InfoTip text="A median is the middle value: half of the leads were faster, half slower. It is read from the latest 20,000 leads of the filters." label="What a median is" /></p>}
         </section>
         {cmp !== "none" && (cmp === "prev" || cmpVal) && <Compare a={sum.data} scope={scope} local={local} cmp={cmp} value={cmpVal} labelA={cmp === "prev" ? "This period" : "Now showing"} people={people} accounts={accounts} />}
+        <details className="bf-more" data-testid="bf-more"><summary className="bf-link">More: leak finder, split by account or person, weekly cohorts and forecast</summary>
         <LeakFinder res={leaks} onOpen={(title, step, extra) => open({ title, step, mode: "dropped", extra, count: null })} />
         <Split scope={scope} local={local} by={by} setBy={setBy} dims={dims} onOpen={open} onSet={(d, id) => set(d === "dow" ? { dow: id } : d === "hour" ? { hour: id } : d === "age" ? { age: id } : d === "setter" ? { setter: idParam(id) } : d === "closer" ? { closer: idParam(id) } : d === "owner" ? { owner: idParam(id) } : d === "form" ? { form: idParam(id) } : {})} />
         {flags.cohorts && <Cohorts scope={scope} local={local} />}
         {flags.forecast && <Forecast scope={scope} local={local} />}
+        </details>
         {drill && <SidePopup label={drill.title} onClose={() => setDrill(null)}><div ref={drillRef}><DrillList key={JSON.stringify(drill)} drill={drill} scope={scope} local={local} flags={flags} onClose={() => setDrill(null)} /></div></SidePopup>}
       </>}
     </div>

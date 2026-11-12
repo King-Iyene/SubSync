@@ -4,6 +4,8 @@ import { Copy } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { money, pct } from "@/lib/design/appt-coach";
 import { arrivalNote } from "@/lib/design/deep-link";
+import { SECTION_FIX, SECTION_LABEL, type ShareSection } from "@/lib/analytics/sale-basis-core";
+import { ROLE_SHORT } from "@/lib/people/roles";
 import { EmptyState, InlineAlert } from "../../ds";
 import { CountUp, Q } from "../speed6-base";
 import { ApSlot, hasApSlot, useAp } from "./data";
@@ -11,7 +13,9 @@ import { LinkBtn } from "./link-btn";
 import { ApWorklist } from "./list";
 import { CalChip, Chip, Pager, when } from "./parts";
 import { Hit, type SectionProps } from "./sections";
-import type { ApCalendarRow, ApCalendarsView, ApPersonCalRow, ApConflictRow, ApHealthRow, ApPersonRow, ApProof, ApShareView, ApSourceRow, ApSpeedBand } from "./types";
+import { RateTag, StatusLegend, toneVar } from "./status-ui";
+import { SCALES, toneOf, type Scale } from "@/lib/design/status-tone";
+import type { ApCalendarRow, ApCalendarsView, ApPersonCalRow, ApConflictRow, ApHealthRow, ApPersonRow, ApProof, ApSaleInfo, ApShareView, ApSourceRow, ApSpeedBand } from "./types";
 
 type Col<T> = { h: string; num?: boolean; cell: (r: T) => ReactNode };
 function Grid<T extends { [k: string]: unknown }>({ rows, cols, onRow, testId, tone }: { rows: T[]; cols: Array<Col<T>>; onRow?: (r: T) => void; testId?: string; tone?: (r: T) => "amber" | "red" | undefined }) {
@@ -23,7 +27,8 @@ function Grid<T extends { [k: string]: unknown }>({ rows, cols, onRow, testId, t
   );
 }
 const Lead = ({ n, label, tone }: { n: number; label: string; tone?: string }) => <p className="mb-3 text-[1.05rem] font-semibold" data-testid="ap-lead"><span className="ap-strong" data-tone={tone}><CountUp value={n} /></span> {label}</p>;
-const Rate = ({ v, tone }: { v: number | null; tone?: "good" | "bad" }) => (v === null ? <span className="ap-sub" title="Not enough marked appointments yet">n/a</span> : <span style={{ color: tone === "bad" ? "var(--s6-red)" : tone === "good" ? "var(--s6-green)" : undefined }}>{pct(v)}</span>);
+// A rate in its status colour (green, ochre, red) with a glyph and a word; with no scale (for example the close rate) it is plain text. n/a stays grey.
+const Rate = ({ v, scale }: { v: number | null; scale?: Scale }) => (v === null ? <span className="ap-sub" title="Not enough marked appointments yet">n/a</span> : scale ? <RateTag v={v} scale={scale} /> : <span>{pct(v)}</span>);
 
 // ---------- Needs outcome / No-show recovery ----------
 const ORDER_WORDS: Record<string, string> = { value: "Biggest deal first.", oldest: "Oldest first.", newest: "Newest first.", name: "By name, A to Z." };
@@ -67,14 +72,95 @@ export function Recovery({ filters, onOpen, activeId, showAccount, clear, widen,
 }
 
 // ---------- Booking share (setter vs closer) ----------
-const SHARE_SORTS: Array<[string, string]> = [["booked", "Most booked"], ["owned", "Most meetings taken"], ["show", "Best show rate"], ["revenue", "Most won"], ["name", "Name, A to Z"]];
+// Lead with results (four figures), then three groups of people: those booking and selling, those on a calendar with no bookings yet, those on no calendar. The last two start closed.
+// Each group is its own server-paged read, so a thousand people cost the same as ten. How a sale is counted is the company's choice in Settings; the basis is printed beside every sold figure.
+const SHARE_SORTS: Array<[string, string]> = [["sold", "Most sold"], ["booked", "Most booked"], ["owned", "Most meetings taken"], ["show", "Best show rate"], ["revenue", "Highest sales value"], ["name", "Name, A to Z"]];
 const calChip = (name: string | null, group?: string | null) => <CalChip name={name} group={group} />;
+const Dash = () => <span className="ap-sub" aria-label="none">-</span>;
+const Pc = ({ v, scale }: { v: number | null | undefined; scale?: Scale }) => (v === null || v === undefined ? <Dash /> : <Rate v={v} scale={scale} />);
+const roleChip = (r: ApPersonRow) => {
+  const w = r.setRole ? (ROLE_SHORT as Record<string, string>)[r.setRole] : undefined;
+  if (w) return <Chip tone={r.setRole === "closer" ? "violet" : r.setRole === "setter" ? "cyan" : "grey"}>{w}</Chip>;
+  return r.roleLabel ? <Chip tone="grey">{r.roleLabel}</Chip> : null;
+};
+type ShareCtx = { onPerson: (p: ApPersonRow) => void; onDrill: SectionProps["onDrill"]; sale: ApSaleInfo | undefined; period: string };
+
+/** The calendars a person is on, as one small control that opens a list (with what they booked and took on each). Never wraps chips into the row. */
+function CalPop({ r, onDrill }: { r: ApPersonRow; onDrill: SectionProps["onDrill"] }) {
+  const on = r.calendars ?? [], by = r.byCalendar ?? [];
+  const ids = new Map<string, { calendarId: string | null; name: string | null; groupName: string | null; booked: number; owned: number }>();
+  for (const c of on) ids.set(c.calendarId, { calendarId: c.calendarId, name: c.name, groupName: c.groupName, booked: 0, owned: 0 });
+  for (const c of by) ids.set(c.calendarId ?? "", { ...(ids.get(c.calendarId ?? "") ?? c), booked: c.booked, owned: c.owned });
+  const list = [...ids.values()];
+  if (!list.length) return null;
+  const calOf = (cid: string | null, field: "booker" | "owner", n: number, nm: string | null) => onDrill({ title: `${r.name}, ${nm ?? "calendar"}`, count: n, extra: { [field]: r.id, ...(cid ? { calendar: cid } : {}), outcome: "booked", expect: n }, labels: { [field]: r.name } });
+  return (
+    <details className="ap-bycal ap-calpop" onClick={(e) => e.stopPropagation()} data-testid="ap-share-cals">
+      <summary>{list.length} calendar{list.length === 1 ? "" : "s"}</summary>
+      <div>{list.map((c) => <div key={c.calendarId ?? "none"} className="ap-bycal-row">{calChip(c.name, c.groupName)}
+        {c.booked > 0 && <><Hit n={c.booked} label={`Open ${c.booked} booked by ${r.name} on ${c.name ?? "this calendar"}`} onClick={() => calOf(c.calendarId, "booker", c.booked, c.name)} /><span className="ap-sub"> booked</span></>}
+        {c.owned > 0 && <><Hit n={c.owned} label={`Open ${c.owned} meetings taken by ${r.name} on ${c.name ?? "this calendar"}`} onClick={() => calOf(c.calendarId, "owner", c.owned, c.name)} /><span className="ap-sub"> taken</span></>}</div>)}</div>
+    </details>
+  );
+}
+
+function ShareTable({ rows, ctx, total, testId }: { rows: ApPersonRow[]; ctx: ShareCtx; total: number; testId?: string }) {
+  const { onDrill, sale } = ctx;
+  const drillSold = !!sale && sale.available && sale.basis === "deal_won" && sale.countWithoutValue;
+  const asCloser = (r: ApPersonRow) => r.role === "closer";
+  const n = (r: ApPersonRow) => (asCloser(r) ? (r.owned ?? 0) : r.bookings);
+  return (
+    <Grid rows={rows} testId={testId ?? "ap-share-table"} tone={(r) => (r.unassigned ? "amber" : undefined)} onRow={ctx.onPerson}
+      cols={[
+        { h: "Person", cell: (r) => <>
+            <span className="ap-name">{r.name}</span> {r.unassigned ? <Chip tone="amber">Not recorded</Chip> : roleChip(r)}
+            {r.inTeam === false && <> <Chip tone="grey">Not in the team list</Chip></>}{r.teamActive === false && <> <Chip tone="grey">Inactive</Chip></>}
+            {r.unassigned ? <span className="ap-sub block">Booked by the lead through a booking page, or no booker was recorded.</span> : <span className="ap-line2">
+              <span className="ap-status" data-on={(r.calendarCount ?? 0) > 0 ? "1" : "0"} data-testid="ap-share-status"><i aria-hidden />{(r.calendarCount ?? 0) > 0 ? "On a calendar" : "Not on a calendar"}</span>
+              <CalPop r={r} onDrill={onDrill} /></span>}
+          </> },
+        { h: "Booked", num: true, cell: (r) => n(r) > 0 ? <><Hit n={n(r)} label={`Open the ${n(r)} appointments of ${r.name}`} onClick={() => onDrill({ title: `${r.name}, appointments`, count: n(r), extra: { [asCloser(r) ? "owner" : "booker"]: r.id, outcome: "booked", expect: n(r) }, labels: { [asCloser(r) ? "owner" : "booker"]: r.name } })} />
+            <span className="ap-sub block">{asCloser(r) ? "taken" : "booked"}</span><span className="ap-bar" aria-hidden><i style={{ width: `${total ? (n(r) / total) * 100 : 0}%` }} /></span></> : <Dash /> },
+        { h: "Showed", num: true, cell: (r) => ((r.showed ?? 0) > 0 ? <><span className="tnum">{r.showed}</span> <Pc v={r.showRate} scale={SCALES.show} /></> : <Dash />) },
+        { h: "No-show", num: true, cell: (r) => ((r.noShow ?? 0) > 0 ? <><span className="tnum">{r.noShow}</span> <Pc v={r.noShowRate} scale={SCALES.noShow} /></> : <Dash />) },
+        { h: "Closed", num: true, cell: (r) => (r.soldRate !== null && r.soldRate !== undefined ? <><Pc v={r.soldRate} /><span className="ap-sub block">{r.sold} of {r.ownedShowed}</span></> : (r.ownedShowed ?? 0) > 0 ? <span className="ap-sub" title="Fewer than 5 meetings taken, too few to give a rate.">{r.ownedShowed} met</span> : <Dash />) },
+        { h: "Sold", num: true, cell: (r) => {
+            if (sale && !sale.available) return <span className="ap-sub" title={sale.reason ?? undefined}>-</span>;
+            const sold = r.sold ?? 0, fb = r.soldFromBookings ?? 0;
+            if (!sold && !fb) return <Dash />;
+            return <>
+              {sold > 0 ? (drillSold ? <Hit n={sold} label={`Open the ${sold} sales of ${r.name}`} onClick={() => onDrill({ title: `${r.name}, sold`, count: sold, extra: { owner: r.id, outcome: "won", expect: sold }, labels: { owner: r.name } })} /> : <span className="tnum" title={sale?.phrase}>{sold.toLocaleString("en-US")}</span>) : null}
+              {sold > 0 && <span className="ap-sub block">{(r.soldCents ?? 0) > 0 ? money(r.soldCents) : "no dollar value"}</span>}
+              {fb > 0 && <span className="ap-sub block" title="Sales that came from meetings this person booked.">{fb.toLocaleString("en-US")} from bookings</span>}
+            </>;
+          } },
+        { h: "Show trend", cell: (r) => (r.trend.length >= 2 ? <Spark values={r.trend} /> : <Dash />) },
+      ]} />
+  );
+}
+
+/** One of the two closed groups: fetched only when opened. Keyed by the filters so a change starts it again on page 1. */
+function ShareLazy({ sec, filters, sort, role, has, ctx, total }: { sec: ShareSection; filters: SectionProps["filters"]; sort: string; role: string; has: string; ctx: ShareCtx; total: number }) {
+  const [page, setPage] = useState(1), [size, setSize] = useState(20);
+  const res = useAp<ApShareView>("booking-share", filters, { page, pageSize: size, sort, team_role: role || undefined, has: has || undefined, section: sec });
+  if (res.error) return <InlineAlert tone="warning" title="Could not load this group">Try again in a moment. <button type="button" className="ap-link" onClick={res.reload}>Retry</button></InlineAlert>;
+  if (!res.data) return <div className="p-4 ap-fine" role="status" aria-busy="true">Loading...</div>;
+  if (!res.data.rows.length) return <p className="ap-fine p-3">Nobody here matches the filters above.</p>;
+  return <><ShareTable rows={res.data.rows} ctx={ctx} total={total} testId={`ap-share-table-${sec}`} /><Pager total={res.data.total} page={page} size={size} onPage={setPage} onSize={(n) => { setSize(n); setPage(1); }} /></>;
+}
+
+function SumTile({ label, value, sub, onClick, testId, aria }: { label: string; value: string; sub: string; onClick?: () => void; testId: string; aria: string }) {
+  const body = <><span className="ap-sum-l">{label}</span><span className="ap-sum-v tnum">{value}</span><span className="ap-sum-s">{sub}</span></>;
+  return onClick ? <button type="button" className="ap-sum" onClick={onClick} aria-label={aria} title={aria} data-testid={testId}>{body}</button> : <div className="ap-sum" data-static="" data-testid={testId}>{body}</div>;
+}
+
 export function BookingShare({ filters, onPerson, onDrill }: SectionProps & { onPerson: (p: ApPersonRow) => void }) {
-  const [page, setPage] = useState(1), [size, setSize] = useState(20), [sort, setSort] = useState("booked"), [role, setRole] = useState(""), [has, setHas] = useState("");
+  const [page, setPage] = useState(1), [size, setSize] = useState(20), [sort, setSort] = useState("sold"), [role, setRole] = useState(""), [has, setHas] = useState("");
+  const [openOn, setOpenOn] = useState(false), [openOff, setOpenOff] = useState(false);
   const key = JSON.stringify(filters) + sort + role + has;
   const [prev, setPrev] = useState(key), [now] = useState(() => Date.now());
   if (prev !== key) { setPrev(key); setPage(1); }
-  const res = useAp<ApShareView>("booking-share", filters, { page, pageSize: size, sort, team_role: role || undefined, has: has || undefined });
+  const res = useAp<ApShareView>("booking-share", filters, { page, pageSize: size, sort, team_role: role || undefined, has: has || undefined, section: "active" });
   if (res.error) return <InlineAlert tone="warning" title="Could not load booking share">Try again in a moment. <button type="button" className="ap-link" onClick={res.reload}>Retry</button></InlineAlert>;
   if (!res.data) return <div className="ap-tablewrap p-6" role="status" aria-busy="true">Loading...</div>;
   const d = res.data, rows = d.rows;
@@ -82,10 +168,23 @@ export function BookingShare({ filters, onPerson, onDrill }: SectionProps & { on
   const period = filters.from && filters.to ? "these dates" : `the last ${filters.days} days`;
   const wantFrom = filters.from || new Date(now - filters.days * 86_400_000).toISOString().slice(0, 10);
   const total = rows.reduce((a2, r) => a2 + (r.role === "closer" ? (r.owned ?? 0) : r.bookings), 0);
-  const calOf = (r: ApPersonRow, cid: string | null, field: "booker" | "owner", n: number, nm: string | null) => onDrill({ title: `${r.name}, ${nm ?? "calendar"}`, count: n, extra: { [field]: r.id, ...(cid ? { calendar: cid } : {}), outcome: "booked", expect: n }, labels: { [field]: r.name } });
+  const sale = d.sale, sum = d.summary, sec = d.sections ?? { active: d.total, oncal: 0, off: 0 };
+  const ctx: ShareCtx = { onPerson, onDrill, sale, period };
+  const toActive = () => document.getElementById("ap-sec-active")?.scrollIntoView({ block: "start", behavior: "smooth" });
+  const salesTile = () => (sale?.available && sale.basis === "deal_won" && sale.countWithoutValue && sum && sum.sold > 0 ? onDrill({ title: "Sales", count: sum.sold, extra: { outcome: "won", expect: sum.sold } }) : (setSort("sold"), toActive()));
   return (
     <div data-testid="ap-share">
-      <p className="ap-headline" data-testid="ap-share-headline">{d.rosterTotal > 0 ? `${d.rosterTotal} team member${d.rosterTotal === 1 ? "" : "s"}: ${d.counts?.withBookings ?? 0} booked or took a meeting in ${period}, ${d.counts?.none ?? 0} had none. Press a count to see those appointments.` : "Who booked an appointment (the setter) and who took the meeting (the closer). Press a count to see those appointments."}</p>
+      <div className="mb-2"><StatusLegend scale={SCALES.show} note="No-show: 15% or less is good, over 30% is bad." /></div>
+      <div className="ap-sumrow" role="group" aria-label="Results" data-testid="ap-share-summary">
+        <SumTile testId="ap-sum-people" label="People who booked" value={(sum?.peopleBooked ?? 0).toLocaleString("en-US")} sub={`of ${d.rosterTotal.toLocaleString("en-US")} on the team`} onClick={toActive} aria="Show the people who booked" />
+        <SumTile testId="ap-sum-booked" label="Meetings booked" value={(sum?.booked ?? 0).toLocaleString("en-US")} sub={`in ${period}`} onClick={sum && sum.booked > 0 ? () => onDrill({ title: "All booked appointments", count: sum.booked, extra: { outcome: "booked", expect: sum.booked } }) : undefined} aria={`Open the ${sum?.booked ?? 0} booked appointments`} />
+        <SumTile testId="ap-sum-show" label="Show rate" value={sum?.showRate === null || sum?.showRate === undefined ? "-" : pct(sum.showRate)} sub={`${(sum?.showed ?? 0).toLocaleString("en-US")} showed`} onClick={sum && sum.showed > 0 ? () => onDrill({ title: "Showed", count: sum.showed, extra: { outcome: "showed", expect: sum.showed } }) : undefined} aria={`Open the ${sum?.showed ?? 0} appointments that showed`} />
+        <SumTile testId="ap-sum-sold" label="Sales" value={sale && !sale.available ? "-" : (sum?.sold ?? 0).toLocaleString("en-US")}
+          sub={sale && !sale.available ? (sale.reason ?? "") : `${(sum?.soldCents ?? 0) > 0 ? `${money(sum?.soldCents)}, ` : ""}${sale?.phrase ?? "counted from deals won"}`} onClick={sale && !sale.available ? undefined : salesTile} aria="Show the sales" />
+      </div>
+      <p className="ap-headline" data-testid="ap-share-headline">{d.rosterTotal > 0 ? `${d.counts?.withBookings ?? 0} of ${d.rosterTotal} team member${d.rosterTotal === 1 ? "" : "s"} booked or took a meeting in ${period}. Press a count to see those appointments.` : "Who booked an appointment (the setter) and who took the meeting (the closer). Press a count to see those appointments."}</p>
+      {sale && <p className="ap-fine mb-2" data-testid="ap-share-basis">Sold is {sale.phrase}. {sale.rule}{sale.roleFallback ? " No roles are set yet, so anyone who takes meetings counts as a closer." : ""} Change this in Settings, under How do we count a sale?</p>}
+      {sale && !sale.available && <InlineAlert tone="warning" className="mb-2" title="Sales are not available yet">{sale.reason}. Reconnect with the payments permission, or choose another way to count a sale in Settings.</InlineAlert>}
       {d.historyStarts && wantFrom < d.historyStarts && <p className="ap-fine mb-2" data-testid="ap-share-history">History starts {new Date(d.historyStarts + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}. Appointments before that day are not in SubSync yet, so older dates show less.</p>}
       <div className="ap-sharebar" role="group" aria-label="Narrow this list">
         <select className="ap-field" aria-label="Sort" value={sort} onChange={(e) => setSort(e.target.value)} data-testid="ap-share-sort">{SHARE_SORTS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
@@ -96,27 +195,21 @@ export function BookingShare({ filters, onPerson, onDrill }: SectionProps & { on
         {un.bookings > 0 && <span className="block">{un.bookings.toLocaleString("en-US")} {un.bookings === 1 ? "booking was" : "bookings were"} made by the lead through a booking page (or no booker was recorded), so no team member is credited. <LinkBtn onClick={() => onDrill({ title: "Bookings with no booker recorded", count: un.bookings, extra: { booker: "none", outcome: "booked", expect: un.bookings }, labels: { booker: "not recorded" } })} testId="ap-share-nobooker">Open them</LinkBtn></span>}
         {(un.noOwner ?? 0) > 0 && <span className="block">{un.noOwner!.toLocaleString("en-US")} {un.noOwner === 1 ? "booking has" : "bookings have"} no owner, so nobody is held to the meeting. Give them an owner in your CRM. <LinkBtn onClick={() => onDrill({ title: "Bookings with no owner", count: un.noOwner!, extra: { owner: "none", outcome: "booked", expect: un.noOwner }, labels: { owner: "nobody" } })} testId="ap-share-noowner">Open them</LinkBtn></span>}
       </InlineAlert>}
-      {!rows.length ? <EmptyState title="Nobody matches" body="Nobody in the chosen accounts, calendars and roles matches. Clear a filter to see more people." /> : (
-      <Grid rows={rows} testId="ap-share-table" tone={(r) => (r.unassigned ? "amber" : undefined)} onRow={onPerson}
-        cols={[
-          { h: "Person", cell: (r) => <>
-              <span className="ap-name">{r.name}</span> {r.unassigned ? <Chip tone="amber">Not recorded</Chip> : <span className="ap-sub">{r.roleLabel ?? (r.role === "setter" ? "Books" : r.role === "closer" ? "Takes" : "Both")}</span>}
-              {r.inTeam === false && <> <Chip tone="grey">Not in the team list</Chip></>}{r.teamActive === false && <> <Chip tone="grey">Inactive</Chip></>}
-              {r.unassigned ? <span className="ap-sub block">Booked by the lead through a booking page, or no booker was recorded.</span> : (r.calendars?.length ?? 0) > 0 && <span className="ap-calrow">{r.calendars!.slice(0, 3).map((c) => <span key={c.calendarId}>{calChip(c.name, c.groupName)}</span>)}{r.calendars!.length > 3 && <span className="ap-sub">+{r.calendars!.length - 3} more</span>}</span>}
-            </> },
-          { h: "Booked", num: true, cell: (r) => (r.role === "closer" ? (r.owned ?? 0) : r.bookings) > 0 ? <><Hit n={r.role === "closer" ? (r.owned ?? 0) : r.bookings} label={`Open the ${r.role === "closer" ? r.owned : r.bookings} appointments of ${r.name}` } onClick={() => onDrill({ title: `${r.name}, appointments`, count: r.role === "closer" ? (r.owned ?? 0) : r.bookings, extra: { [r.role === "closer" ? "owner" : "booker"]: r.id, outcome: "booked", expect: r.role === "closer" ? (r.owned ?? 0) : r.bookings }, labels: { [r.role === "closer" ? "owner" : "booker"]: r.name } })} /><span className="ap-bar" aria-hidden><i style={{ width: `${total ? ((r.role === "closer" ? (r.owned ?? 0) : r.bookings) / total) * 100 : 0}%` }} /></span></>
-              : r.state === "never" ? <span className="ap-sub" title="No bookings in anything SubSync holds for this person.">No bookings yet</span> : <span className="ap-sub" title="Has bookings on other dates.">0 in {period}</span> },
-          { h: "Show", num: true, cell: (r) => <Rate v={r.showRate} /> }, { h: "No-show", num: true, cell: (r) => <Rate v={r.noShowRate} /> }, { h: "Close", num: true, cell: (r) => <Rate v={r.closeRate} /> },
-          { h: "Won", num: true, cell: (r) => money(r.revenueCents) },
-          { h: "By calendar", cell: (r) => ((r.byCalendar?.length ?? 0) === 0 ? <span className="ap-sub">{r.state === "booked" || r.unassigned ? "-" : "none"}</span> : (
-              <details className="ap-bycal" onClick={(e) => e.stopPropagation()}><summary>{r.byCalendar!.length} calendar{r.byCalendar!.length === 1 ? "" : "s"}</summary>
-                <div>{r.byCalendar!.map((c) => <div key={c.calendarId ?? "none"} className="ap-bycal-row">{calChip(c.name, c.groupName)}
-                  {c.booked > 0 && <Hit n={c.booked} label={`Open ${c.booked} booked by ${r.name} on ${c.name ?? "this calendar"}` } onClick={() => calOf(r, c.calendarId, "booker", c.booked, c.name)} />}{c.booked > 0 && <span className="ap-sub"> booked</span>}
-                  {c.owned > 0 && <> <Hit n={c.owned} label={`Open ${c.owned} meetings taken by ${r.name} on ${c.name ?? "this calendar"}` } onClick={() => calOf(r, c.calendarId, "owner", c.owned, c.name)} /><span className="ap-sub"> taken</span></>}</div>)}</div>
-              </details>)) },
-          { h: "Show trend", cell: (r) => <Spark values={r.trend} /> },
-        ]} />)}
-      <Pager total={d.total} page={page} size={size} onPage={setPage} onSize={(n) => { setSize(n); setPage(1); }} />
+      <section className="ap-sec" data-sec="active" id="ap-sec-active" aria-labelledby="ap-sec-active-h" data-testid="ap-sec-active">
+        <h3 className="ap-sec-h" id="ap-sec-active-h"><i className="ap-dot" aria-hidden /><span>{SECTION_LABEL.active}</span><Chip tone="grey">{sec.active.toLocaleString("en-US")}</Chip></h3>
+        {!rows.length ? <EmptyState title="No bookings or sales yet" body={`Nobody booked or sold in ${period}. Try longer dates, or add people to a calendar below so they can be booked.`} /> : (<>
+          <ShareTable rows={rows} ctx={ctx} total={total} />
+          <Pager total={d.total} page={page} size={size} onPage={setPage} onSize={(n) => { setSize(n); setPage(1); }} /></>)}
+      </section>
+      {(["oncal", "off"] as const).map((s) => {
+        const open = s === "oncal" ? openOn : openOff;
+        return (
+          <details key={s} className="ap-sec" data-sec={s} open={open} onToggle={(e) => (s === "oncal" ? setOpenOn : setOpenOff)((e.currentTarget as HTMLDetailsElement).open)} data-testid={`ap-sec-${s}`}>
+            <summary className="ap-sec-h"><i className="ap-dot" aria-hidden /><span>{SECTION_LABEL[s]}</span><Chip tone="grey">{sec[s].toLocaleString("en-US")}</Chip><span className="ap-sub ap-sec-hint">{SECTION_FIX[s]}</span></summary>
+            {open && <ShareLazy key={key + s} sec={s} filters={filters} sort={sort} role={role} has={has} ctx={ctx} total={total} />}
+          </details>
+        );
+      })}
     </div>
   );
 }
@@ -135,10 +228,11 @@ export function Health({ filters, onAccount, onDrill }: SectionProps & { onAccou
   if (!res.data.rows.length) return <EmptyState title="No accounts with bookings" body="Each client account is ranked here, worst first, once it has appointments." />;
   return (
     <div data-testid="ap-health">
-      <p className="ap-fine mb-3">Worst account first. Accounts with fewer than 5 marked appointments show n/a instead of a guess. Press an account to open its appointments.</p>
+      <p className="ap-fine mb-2">Worst account first. Accounts with fewer than 5 marked appointments show n/a instead of a guess. Press an account to open its appointments.</p>
+      <div className="mb-3"><StatusLegend scale={SCALES.show} note="No-show: 15% or less is good, over 30% is bad. Cancelled: 10% or less is good, over 20% is bad." /></div>
       <Grid rows={res.data.rows} onRow={onAccount} testId="ap-health-table" tone={(r) => (r.noShowRate !== null && r.noShowRate >= 0.3 ? "red" : undefined)}
         cols={[{ h: "Account", cell: (r) => <span className="ap-name">{r.name}</span> }, { h: "Booked", num: true, cell: (r) => (r.booked ? <Hit n={r.booked} label={`Open the ${r.booked} appointments of ${r.name}`} onClick={() => onDrill({ title: `${r.name}, all appointments`, count: r.booked, extra: { location: r.locationId, outcome: "booked", expect: r.booked } })} /> : 0) }, { h: "Show", num: true, cell: (r) => <Rate v={r.showRate} /> },
-          { h: "No-show", num: true, cell: (r) => <Rate v={r.noShowRate} tone={r.noShowRate !== null && r.noShowRate >= 0.3 ? "bad" : undefined} /> }, { h: "Cancelled", num: true, cell: (r) => <Rate v={r.cancelRate} /> },
+          { h: "No-show", num: true, cell: (r) => <Rate v={r.noShowRate} scale={SCALES.noShow} /> }, { h: "Cancelled", num: true, cell: (r) => <Rate v={r.cancelRate} scale={SCALES.cancel} /> },
           { h: "No outcome", num: true, cell: (r) => (r.unmarked ? <Hit n={r.unmarked} tone="violet" label={`Open the ${r.unmarked} appointments of ${r.name} with no outcome`} onClick={() => onDrill({ title: `${r.name}, no outcome`, count: r.unmarked, extra: { location: r.locationId, outcome: "unmarked", expect: r.unmarked } })} /> : 0) }]} />
     </div>
   );
@@ -154,14 +248,16 @@ export function Sources({ filters, onDrill }: SectionProps) {
   const fast = speed.find((s) => s.showRate !== null), slow = [...speed].reverse().find((s) => s.showRate !== null);
   const gap = fast && slow && fast !== slow && fast.showRate !== null && slow.showRate !== null ? Math.round((fast.showRate - slow.showRate) * 100) : null;
   return (
+    <div data-testid="ap-sources-wrap"><div className="mb-3"><StatusLegend scale={SCALES.show} /></div>
     <div className="ap-grid ap-grid2" data-testid="ap-sources">
       <Q q="Which sources actually show up?" tip="Show rate = showed divided by showed plus no-show, for appointments someone marked. n/a under 5 marked." testId="ap-src-card">
-        <Grid rows={sources} cols={[{ h: "Source", cell: (r) => <span className="ap-name">{r.source}</span> }, { h: "Booked", num: true, cell: (r) => (r.booked ? <Hit n={r.booked} label={`Open the ${r.booked} appointments from ${r.source}`} onClick={() => onDrill({ title: `From ${r.source}`, count: r.booked, extra: { source: r.source, outcome: "booked", expect: r.booked } })} /> : 0) }, { h: "Show", num: true, cell: (r) => <><Rate v={r.showRate} />{r.showRate !== null && <span className="ap-bar" aria-hidden><i style={{ width: `${r.showRate * 100}%` }} /></span>}</> }, { h: "Won", num: true, cell: (r) => (r.won ? <Hit n={r.won} label={`Open the ${r.won} won appointments from ${r.source}`} onClick={() => onDrill({ title: `Won, from ${r.source}`, count: r.won, extra: { source: r.source, outcome: "won", expect: r.won } })} /> : 0) }]} />
+        <Grid rows={sources} cols={[{ h: "Source", cell: (r) => <span className="ap-name">{r.source}</span> }, { h: "Booked", num: true, cell: (r) => (r.booked ? <Hit n={r.booked} label={`Open the ${r.booked} appointments from ${r.source}`} onClick={() => onDrill({ title: `From ${r.source}`, count: r.booked, extra: { source: r.source, outcome: "booked", expect: r.booked } })} /> : 0) }, { h: "Show", num: true, cell: (r) => <><Rate v={r.showRate} scale={SCALES.show} />{r.showRate !== null && <span className="ap-bar" aria-hidden><i style={{ width: `${r.showRate * 100}%`, background: toneVar(toneOf(r.showRate, SCALES.show)) }} /></span>}</> }, { h: "Won", num: true, cell: (r) => (r.won ? <Hit n={r.won} label={`Open the ${r.won} won appointments from ${r.source}`} onClick={() => onDrill({ title: `Won, from ${r.source}`, count: r.won, extra: { source: r.source, outcome: "won", expect: r.won } })} /> : 0) }]} />
       </Q>
       <Q q="Does a faster reply mean more shows?" tip="Show rate for appointments grouped by how long the first reply took. Your own data only." testId="ap-speed-card">
-        <div className="ap-jr mt-2">{speed.map((s, i) => <div className="ap-jr-row" key={s.label} style={{ gridTemplateColumns: "8.5rem minmax(0,1fr) 3.5rem" }}><span>{s.label}</span><div className="ap-jr-bar"><i style={{ width: `${(s.showRate ?? 0) * 100}%`, ["--i" as string]: i }} /></div><span className="ap-jr-pct"><Rate v={s.showRate} /></span></div>)}</div>
+        <div className="ap-jr mt-2">{speed.map((s, i) => <div className="ap-jr-row" key={s.label} style={{ gridTemplateColumns: "8.5rem minmax(0,1fr) 3.5rem" }}><span>{s.label}</span><div className="ap-jr-bar"><i style={{ width: `${(s.showRate ?? 0) * 100}%`, ["--i" as string]: i, background: toneVar(toneOf(s.showRate, SCALES.show)) }} /></div><span className="ap-jr-pct"><Rate v={s.showRate} scale={SCALES.show} /></span></div>)}</div>
         {gap !== null && gap > 0 && <p className="ap-note mt-3" data-testid="ap-speed-insight">In your data, leads you answered fastest showed up {gap} points more often than the slowest. <i>Based on your own numbers.</i></p>}
       </Q>
+    </div>
     </div>
   );
 }
