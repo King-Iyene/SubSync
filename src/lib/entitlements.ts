@@ -173,6 +173,11 @@ export const FEATURES = [
   "ov_screen",
   "fl_find",
   "fl_bulk",
+  // Workflows module, second pass (docs/features/WORKFLOWS_BRIEF.md): outcome health and gaps, the template library, bulk install, the Today feed. Default off.
+  "wf_outcomes",
+  "wf_library",
+  "wf_bulk",
+  "wf_today",
   // Payments module (docs/features/PAYMENTS_BRIEF.md): each behind its own flag, default off. pm_resend messages a customer and stays off until King approves it.
   "pm_module",
   "pm_recovery",

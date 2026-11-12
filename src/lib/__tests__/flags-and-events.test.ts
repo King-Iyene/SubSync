@@ -138,6 +138,10 @@ test("pilot modules are on by default and a database row can still override the 
     "td_numbers",
     "td_proof",
     "td_record",
+    "wf_bulk",
+    "wf_library",
+    "wf_outcomes",
+    "wf_today",
     "td_today",
     "zoom_meet",
   ]);
