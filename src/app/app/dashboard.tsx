@@ -13,7 +13,7 @@ import { movedSettingsSection } from "@/lib/settings-sections";
 import {
   Briefcase, CalendarCheck, ClipboardCheck, Zap, CircleHelp, Copy, Eraser, Inbox, Kanban, LayoutDashboard, Mic, Monitor, Moon, PhoneCall, Plug, Search, Settings, Sun, Target, UserRound, Users, Wrench, type LucideIcon,
   Sparkles, UsersRound,
-  Workflow, CreditCard,
+  Workflow, CreditCard, Landmark,
 } from "lucide-react";
 import { NAV, PARENT, visibleNav, type GoFn, type ViewId } from "./nav";
 import { useBrandedText } from "./brand-text";
@@ -59,6 +59,8 @@ import { PipelineModule } from "./views/pl3/module";
 import { ClientsModule } from "./views/cl3/module";
 import { fixturesOn as clSample } from "./views/cl3/data";
 import { PaymentsModule } from "./views/pm/module";
+import { FinanceModule } from "./views/fn/module";
+import { fnfxOn as fnSample } from "./views/fn/data";
 import { EmptyState } from "./ds/states";
 import { fixturesOn as pmSample } from "./views/pm/data";
 import { TeamView } from "./views/people";
@@ -437,6 +439,7 @@ export function Dashboard() {
         if (auth.features.cu_health === true && !auth.locked.includes("cu_health")) return <CleanupModule key="dh" kind={auth.kind} start="health" duplicatesOn={!off("duplicates") && NAV_FOR[auth.kind].has("duplicates")} cleanupOn={!off("cleanup") && NAV_FOR[auth.kind].has("cleanup")} fixOn={auth.features.cu_fix === true && !auth.locked.includes("cu_fix")} healthOn legacyHealth={<ApiProvider value={baseApi}><DataHealthView go={go} kind={auth.kind} /></ApiProvider>} />;
         return <ApiProvider value={baseApi}><DataHealthView go={go} kind={auth.kind} /></ApiProvider>;
       case "payments": return (auth.features.pm_module === true && !auth.locked.includes("pm_module")) || pmSample() ? <PaymentsModule key="pm" go={go} /> : <EmptyState title="Payments is not switched on yet" body="It will appear here as soon as it is ready for your account." />;
+      case "finance": return (auth.features.fn_module === true && !auth.locked.includes("fn_module")) || fnSample() ? <FinanceModule key="fn" go={go} /> : <EmptyState title="Finance is not switched on yet" body="It will appear here as soon as it is ready for your account." />;
       case "workflows": return <ApiProvider value={baseApi}><WorkflowsView go={go} kind={auth.kind} /></ApiProvider>;
       case "clients": if ((auth.features.cl_module === true && !auth.locked.includes("cl_module")) || clSample()) return <ClientsModule key="cl3" go={go} features={clientFeatures} />; return <ClientsView key="clients" go={go} initialTab="health" features={clientFeatures} />;
     }
@@ -540,7 +543,7 @@ const THEME_LABEL: Record<ThemePref, string> = { dark: "Dark appearance", light:
 
 const ICONS: Record<string, LucideIcon> = {
   today: Sun, myday: Sun, people: UsersRound, audit: ClipboardCheck, speed: Zap, overview: LayoutDashboard, inbox: Inbox, appointments: CalendarCheck, meetings: Mic, search: Search, pipeline: Kanban, leads: Target, calls: PhoneCall,
-  accounts: Briefcase, clients: UserRound, team: Users, onboarding: Wrench, duplicates: Copy, cleanup: Eraser, settings: Settings, connections: Plug, help: CircleHelp, roadmap: Sparkles, workflows: Workflow, payments: CreditCard, "data-health": ClipboardCheck,
+  accounts: Briefcase, clients: UserRound, team: Users, onboarding: Wrench, duplicates: Copy, cleanup: Eraser, settings: Settings, connections: Plug, help: CircleHelp, roadmap: Sparkles, workflows: Workflow, payments: CreditCard, finance: Landmark, "data-health": ClipboardCheck,
 };
 
 function Centered({ title, body }: { title: string; body: string }) {

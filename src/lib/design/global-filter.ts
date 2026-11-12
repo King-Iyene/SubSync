@@ -3,7 +3,7 @@ import { decodeRange, encodeRange, type RangeSpec } from "./range.ts";
 // The ONE global filter bar (KF-11): which pages draw it, what its date part means on each page, and how the page range lives in the address. Pure.
 
 /** Pages whose numbers, charts and lists depend on a date range. Every card on them follows the bar unless the card has its own choice in the address. */
-const RANGE_VIEWS = new Set(["speed", "appointments", "overview", "leads", "deals", "meetings"]);
+const RANGE_VIEWS = new Set(["speed", "appointments", "overview", "leads", "deals", "meetings", "finance"]);
 /** Pages that keep their own period choice (Team, Pipeline): the bar offers the account choice only, so two date controls never disagree. */
 const ACCOUNTS_VIEWS = new Set(["team", "pipeline"]);
 /** Pages that show what is true right now (a queue, a list of people, an audit of today's state): the bar says "Right now" instead of a range. */

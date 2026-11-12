@@ -14,6 +14,7 @@ export const SYNCED_DELETE = [
   "client_rollup_state", "client_daily", "client_risk_history", "client_billing", "cl2_plan_events", "cl3_history", "cl3_app_installs", "client_actions", "team_members", "people_write_log", "au_runs", "au_prefs", "au_account_prefs", // Clients and Team: derived numbers, the people list, and the log of lead moves
   "pm_items", "pm_events", "pm_sync_state", "pm_rollup_daily", // Payments: the current state and the history of each payment, invoice and paid plan, and the daily totals
   "pr_reports", "pr_links", // Proof page: the monthly reports prepared for each client account and its one secret link
+  "fn_mrr_snapshot", // Finance: our own daily money record per client account
   "td_daily_items", "td_receipts", "td_snoozes", // Today: the daily record of what was found and cleared, the weekly receipts and the put-aside marks
   "cf_recover_items", "cf_deal_flags", "cf_mutes", "cf_state", // Cash features: the missed-lead ledger, deal flags, digest mutes and sweep state
   "campaign_stats", "wf_outcome_daily", "workflow_snapshots", "workflow_changes", "workflow_daily", "workflow_items",
@@ -26,6 +27,7 @@ export const CONFIG_DELETE_ON_UNINSTALL = [
   "call_lists", "account_profiles", "goals", "annotations", "usage_events", "team_names", "report_templates",
   "td_prefs", "cf_prefs", "st_user_state", "client_owners", "team_member_roles", "team_member_role_history", "client_alert_mutes", "coaching_notes", "user_targets", "user_away", "people_proof_prefs", // the agency's own choices and notes (Clients, Team)
   "pm_notes", "pm_disputes", "pr_settings",
+  "fn_pay_lines", "fn_pay_periods", "fn_pay_disputes", "fn_pay_rates", "fn_churn_state", "fn_ad_spend", "fn_ledger", "fn_plan_prices", "fn_settings", // Finance: the agency's own entries
   "api_keys", "connections", "user_connections", "notification_prefs", "notification_destinations", "meeting_note_settings", "meeting_ignored_emails", "meeting_policies", "field_mappings", "meeting_hooks", "roadmap_votes", "saved_views", "feedback_items", "roadmap_suggestions", "stage_rules", "client_notes", "cl2_notes", "today_actions", "growth_goals", "growth_settings", "client_departures", "workflow_labels", "dh_marks", "dh_rules", "onboarding_templates", "client_steps", "client_step_history", "workflow_setup", "workflow_setup_settings", "call_queue_settings", "settings", "unanswered_hide_settings",
 ] as const;
 
@@ -48,7 +50,7 @@ export const LOCATION_DELETE = [
   "deal_events", "appointment_events", "appointment_history", "appointment_facts", "appointment_exec_daily", "appointment_exec_state", "appointment_exec_targets", "deal_history", "deal_facts", "deal_stage_stats", "pipeline_rollup", "pipeline_rollup_state", "deal_forecast_log", "deal_record_state", "lead_touches", "touch_events", "lead_events", "moat_events", "reply_proof_pages", "speed_daily", "speed_digest", "speed_prefs", "call_outcomes", "workflow_setup_settings", "workflow_setup", "call_queue_log", "call_queue_settings", "location_users", "contact_tag_events", "team_member_access", "user_daily", "user_rollup_state", "user_workload_daily",
   "pm_items", "pm_events", "pm_sync_state", "pm_rollup_daily", "pm_notes", "pm_disputes",
   "pm_notes", "pm_disputes",
-  "pr_reports", "pr_links", "td_daily_items", "td_receipts", "td_snoozes", "cf_recover_items", "cf_deal_flags", "cf_mutes", "notification_states", "notifications", "notification_deliveries", "notification_destinations", "client_departures", "client_rollup_state", "client_daily", "client_risk_history", "client_billing", "cl2_notes", "cl2_plan_events", "client_actions", "client_owners", "client_alert_mutes", "coaching_notes", "user_targets", "people_write_log", "people_proof_prefs",
+  "fn_mrr_snapshot", "fn_pay_lines", "fn_pay_disputes", "fn_pay_rates", "fn_churn_state", "fn_ad_spend", "fn_ledger", "pr_reports", "pr_links", "td_daily_items", "td_receipts", "td_snoozes", "cf_recover_items", "cf_deal_flags", "cf_mutes", "notification_states", "notifications", "notification_deliveries", "notification_destinations", "client_departures", "client_rollup_state", "client_daily", "client_risk_history", "client_billing", "cl2_notes", "cl2_plan_events", "client_actions", "client_owners", "client_alert_mutes", "coaching_notes", "user_targets", "people_write_log", "people_proof_prefs",
   "crm_writes", "contact_writes", "field_write_state", "field_mappings", "meeting_policies", "meeting_notes", "meeting_hooks", "account_profiles", "client_notes", "today_actions", "growth_goals", "workflow_labels", "dh_snapshots", "dh_flags", "dh_changes", "dh_outcomes", "cu_scans", "cu_actions", "dh_marks", "dh_rules", "campaign_stats", "wf_outcome_daily", "workflow_snapshots", "workflow_changes", "workflow_daily", "workflow_items", "feedback_items", "client_steps", "client_step_history", "workflow_setup", "workflow_setup_settings", "call_queue_settings", "call_queue_log", "sync_jobs", "locations",
 ] as const;
 

@@ -132,6 +132,14 @@ export const DEFAULT_OFF: ReadonlySet<Feature> = new Set<Feature>([
   "pp_roles",
   // Branded client Proof page and monthly report (stage PR): each behind its own flag, default off.
   "pr_report",
+  // Finance (stage FN): each behind its own flag, default off.
+  "fn_module",
+  "fn_mrr",
+  "fn_revenue",
+  "fn_churn",
+  "fn_payouts",
+  "fn_ledger",
+  "fn_today",
   "pr_page",
   "pr_auto",
   // Account audit (docs/features/AUDIT_BRIEF.md): each behind its own flag, default off.

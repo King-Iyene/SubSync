@@ -1,5 +1,5 @@
 export type ViewId =
-  | "data-health" | "today" | "myday" | "audit" | "speed" | "overview" | "accounts" | "account" | "search" | "deals" | "inbox" | "onboarding" | "email" | "duplicates" | "alerts" | "settings" | "help" | "pipeline" | "leads" | "calls" | "clients" | "team" | "appointments" | "meetings" | "cleanup" | "roadmap" | "people" | "connections" | "notifications" | "workflows" | "payments";
+  | "data-health" | "today" | "myday" | "audit" | "speed" | "overview" | "accounts" | "account" | "search" | "deals" | "inbox" | "onboarding" | "email" | "duplicates" | "alerts" | "settings" | "help" | "pipeline" | "leads" | "calls" | "clients" | "team" | "appointments" | "meetings" | "cleanup" | "roadmap" | "people" | "connections" | "notifications" | "workflows" | "payments" | "finance";
 
 export type GoFn = (view: ViewId, locationId?: string) => void;
 
@@ -29,6 +29,8 @@ export const NAV: NavItem[] = [
   { id: "appointments", label: "Appointments", feature: "appointments", group: "" },
   { id: "clients", label: "Clients", feature: "clients", group: "Clients and people" },
   { id: "payments", label: "Payments", feature: "pm_module", group: "Clients and people" },
+  // Finance (stage FN) is its own menu entry: Payments is what a client owes the agency right now; Finance is the agency's own money (plans, revenue, who may leave, what it pays its people).
+  { id: "finance", label: "Finance", feature: "fn_module", group: "Clients and people" },
   { id: "people", label: "Find a lead", feature: "search", group: "Clients and people" },
   { id: "search", label: "Contact search", feature: "search", group: "Clients and people", parent: "people" },
   { id: "leads", label: "Leads", feature: "activity", group: "Clients and people", parent: "people" },
