@@ -58,3 +58,11 @@ Brand palette (seen by King), Proof clickable numbers (PR open), Appointments re
 | What's new | loads; real entries (Clients not answering leads, Step history and stuck deals, Meeting notes) | none |
 
 Still NOT opened in this pass: Appointments (all tabs after the first two), Speed to lead tabs Unanswered, Capture, Rules, Log, Money > Payouts, Find a lead tabs other than search, Pipeline tabs other than Stuck/Step history, Today > Numbers and Settings, light mode, 768/390 widths. These stay "MERGED, NOT SEEN" until opened.
+
+## Walk-through #2, started from Today (13 Nov late)
+| Module / tab | Result | Finding |
+|---|---|---|
+| Today > Today | loads, new editorial money strip, Ledger colours | headline Money at risk $1,000,000 and Open pipeline $1,000,000 are the same test deal (tagged "Looks like a test deal" but still counted); the "This week" report says Quiet deals $0, None: three different answers for the same deals; "View deals ->" on the money cards gave no visible result in the viewport (unverified); fix in PR for stale deal value |
+| Today > Numbers | loads; 6 tiles | every tile has the same bold "How is this worked out?" pill (cluttered); Open deals shows 1 worth $1,000,000 estimate (same test deal) |
+| Today > Proof, Settings | not opened in this pass | |
+| Pipeline stale list (King's screenshot) | 500 deals, $1,400,000 | misleading: one $1,000,000 test deal, ~480 identical $2,000 deals in the first stage of a cold-email outreach pipeline (927 days stale); fix in progress (placeholder detection, pipeline inclusion setting, one shared function) |
