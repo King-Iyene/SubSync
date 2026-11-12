@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 // Holds the signed session in memory (never storage or cookies: third-party cookies are
 // unreliable inside an iframe) and wraps fetch so every call carries it. On a 401 it asks the
@@ -28,7 +28,26 @@ export type Api = {
   demo: boolean;
   /** The same client with a filter (like industry=medical) added to every read. */
   filtered: (query: string) => Api;
+  /** The filter added to every read ("" when none). It is part of what an answer is FOR: an answer read under another filter is never shown under this one. */
+  scope?: string;
 };
+
+// How many reads are on their way right now, so the filter bar can say "Updating the numbers" after a date or client change instead of leaving old numbers
+// under a new label with no sign that they are about to change.
+let readsOnTheWay = 0;
+const inflightListeners = new Set<() => void>();
+const touchInflight = (by: number) => { readsOnTheWay = Math.max(0, readsOnTheWay + by); inflightListeners.forEach((l) => l()); };
+export function useInflight(): number {
+  return useSyncExternalStore((cb) => { inflightListeners.add(cb); return () => { inflightListeners.delete(cb); }; }, () => readsOnTheWay, () => 0);
+}
+/** The part of a read's address that decides which dates it is for (from, to, days and the comparison). Two reads with the same key are for the same window. */
+export function rangeKeyOfPath(path: string | null): string {
+  if (!path) return "";
+  const q = path.indexOf("?");
+  if (q === -1) return "";
+  const p = new URLSearchParams(path.slice(q + 1));
+  return ["from", "to", "wfrom", "wto", "days", "cmpFrom", "cmpTo", "period", "since", "weeks", "months"].map((k) => p.get(k) ?? "").join("|");
+}
 
 const ApiContext = createContext<Api | null>(null);
 export const ApiProvider = ApiContext.Provider;
@@ -54,6 +73,7 @@ export function makeApi(initialToken: string, refresh: () => Promise<string | nu
     // the link covers the client accounts the person was looking at (N8), and the server decides which accounts those are.
     const url = (method === "GET" || path === "audit/share") && filterQuery && !path.startsWith("segments") ? `${path}${path.includes("?") ? "&" : "?"}${filterQuery}` : path;
     // Nothing waits forever: a read that has not answered in a minute (a change in two) stops with a plain message and a Try again, so a panel is never silently blank.
+    const counted = method === "GET"; if (counted) touchInflight(1);
     const ctl = new AbortController(); const timer = setTimeout(() => ctl.abort(), method === "GET" ? REQUEST_TIMEOUT_MS : REQUEST_TIMEOUT_MS * 2);
     let res: Response;
     try {
@@ -65,7 +85,7 @@ export function makeApi(initialToken: string, refresh: () => Promise<string | nu
       });
     } catch (e) {
       throw e instanceof DOMException && e.name === "AbortError" ? new ApiError(408, { error: "This is taking too long. Nothing was lost: try again in a moment." }) : new ApiError(0, { error: "SubSync could not be reached. Check your connection and try again." });
-    } finally { clearTimeout(timer); }
+    } finally { clearTimeout(timer); if (counted) touchInflight(-1); }
     if (res.status === 401 && !retried) {
       const fresh = await refresh();
       if (fresh) {
@@ -82,6 +102,7 @@ export function makeApi(initialToken: string, refresh: () => Promise<string | nu
   };
   return {
     demo,
+    scope: filterQuery,
     filtered: (query: string) => makeApi(initialToken, refresh, demo, query, shared),
     get: async <T,>(path: string): Promise<T> => {
       const reads = sharedReads(), key = `${filterQuery}|${path}`, running = reads.get(key);
@@ -111,7 +132,10 @@ export function makeApi(initialToken: string, refresh: () => Promise<string | nu
 // Load data for a view. `reload` refetches; changing `path` refetches automatically.
 export function useData<T>(path: string | null) {
   const api = useApiClient();
-  const [state, setState] = useState<{ data: T | null; error: ApiError | null; loading: boolean }>({ data: null, error: null, loading: path !== null });
+  const [state, setState] = useState<{ data: T | null; error: ApiError | null; loading: boolean; key: string }>({ data: null, error: null, loading: path !== null, key: "" });
+  // What an answer is FOR: the client accounts counted (the api's filter) and the dates asked. An answer for another window or another set of clients is never
+  // handed to a screen that now shows this one (stale numbers under a new label), only a Loading state until the new answer arrives.
+  const askedKey = `${api.scope ?? ""}#${rangeKeyOfPath(path)}`;
   // The path being shown right now. An answer is used when it is for this path, even if a newer request for the same path started meanwhile: a screen that asks again every few seconds
   // (a refresh, a poll) must not throw away every slow answer and stay on its loading state forever. An answer for a path the screen has moved away from is dropped.
   const current = useRef<string | null>(path);
@@ -120,11 +144,12 @@ export function useData<T>(path: string | null) {
   const load = useCallback(async () => {
     if (path === null) return;
     setState((s) => ({ ...s, loading: true }));
+    const key = `${api.scope ?? ""}#${rangeKeyOfPath(path)}`;
     try {
       const data = await api.get<T>(path);
-      if (current.current === path) setState({ data, error: null, loading: false });
+      if (current.current === path) setState({ data, error: null, loading: false, key });
     } catch (error) {
-      if (current.current === path) setState({ data: null, error: error as ApiError, loading: false });
+      if (current.current === path) setState({ data: null, error: error as ApiError, loading: false, key });
     }
   }, [api, path]);
 
@@ -134,5 +159,6 @@ export function useData<T>(path: string | null) {
     void load();
   }, [load]);
 
-  return { ...state, reload: load };
+  const stale = path !== null && state.key !== askedKey && (state.data !== null || state.error !== null);
+  return stale ? { data: null, error: null, loading: true, reload: load } : { data: state.data, error: state.error, loading: state.loading, reload: load };
 }

@@ -1,3 +1,4 @@
+import { MAX_RANGE_DAYS } from "../design/range-limits.ts";
 // Today, the front door (stage F5). Pure: no database, no React, so every sentence and every number on Today can be unit tested.
 //
 // Today calculates nothing of its own that another page also shows. The leads sentence uses Speed to lead's own counts, the appointments line uses
@@ -160,10 +161,10 @@ export function describeRangeChange(c: RangeChange, fmt: (n: number) => string =
 const dayMs = (d: string) => Date.parse(`${d}T00:00:00Z`);
 const isDay = (d: unknown): d is string => typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d) && Number.isFinite(dayMs(d)) && new Date(dayMs(d)).toISOString().slice(0, 10) === d;
 
-/** The server-side check on the start day a caller asks for: a real date, before today, and not more than a year back. */
+/** The server-side check on the start day a caller asks for: a real date, before today, and not more than the longest range back. */
 export function validFromDay(from: unknown, today: string): string | null {
   if (!isDay(from)) return null;
-  if (dayMs(from) >= dayMs(today) || dayMs(today) - dayMs(from) > 366 * 86_400_000) return null;
+  if (dayMs(from) >= dayMs(today) || dayMs(today) - dayMs(from) > MAX_RANGE_DAYS * 86_400_000) return null;
   return from;
 }
 

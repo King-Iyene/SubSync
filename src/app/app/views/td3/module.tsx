@@ -1,5 +1,7 @@
 "use client";
 
+import { usePageRange } from "../../ds/page-range";
+import { historyLimitNote } from "@/lib/design/page-range";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import type { AccessKind } from "@/lib/access";
 import type { Td3Item, Td3List, Td3ListKind, Td3Module, Td3Numbers, Td3Options, Td3Proof, Td3Settings, Td3Today } from "@/lib/analytics/today3-types";
@@ -262,11 +264,9 @@ const TILE_ICON: Record<string, ReactNode> = {
 
 /** Numbers: the headline row (six numbers, each opens its rows) and under it the whole dashboard of charts, one bar of dates for all of them. */
 function NumbersTab({ location, go, open, fromOverview, level, nav, kind }: { location: string; go: (m: Td3Module, loc?: string | null) => void; open: (d: NonNullable<Drill>) => void; fromOverview: boolean; level: string; nav: GoFn; kind: AccessKind }) {
-  const [how, setHow] = useState<string | null>(null);
-  const f = useReportFilter("g", "30d");
-  const span = f.range && !f.range.problem ? Math.round((Date.parse(`${f.range.to}T00:00:00Z`) - Date.parse(`${f.range.from}T00:00:00Z`)) / 86_400_000) + 1 : 30;
-  const days = span <= 7 ? 7 : span <= 30 ? 30 : 90;
-  const r = useTd<Td3Numbers>("numbers", { location: location || undefined, days });
+  const bar = usePageRange(), [how, setHow] = useState<string | null>(null);
+  // The dates are the date bar's (one range for the whole app): the numbers below are for exactly the dates in the bar.
+  const r = useTd<Td3Numbers>("numbers", { location: location || undefined, from: bar.from || undefined, to: bar.to || undefined }, !bar.ready);
   return (
     <div className="cl-stack" data-testid="td-numbers">
       {fromOverview && <p className="ap-fine" role="status" data-testid="td-moved">Overview moved here. Its numbers are in the row below and its account list is at the bottom of this page.</p>}
@@ -290,7 +290,7 @@ function NumbersTab({ location, go, open, fromOverview, level, nav, kind }: { lo
               ))}
             </div>
             {n.testDealsLeftOut > 0 && <p className="ap-fine">{num(n.testDealsLeftOut)} open deals with no value or no owner are left out of the dollar figure (usually test or junk deals).</p>}
-            <p className="ap-fine">{n.historyStarts ? `Our own record starts ${n.historyStarts}.` : "Our own record has not started yet, so there are no trends to show."}</p>
+            <p className="ap-fine">{n.historyStarts ? `Our own record starts ${n.historyStarts}.` : "Our own record has not started yet, so there are no trends to show."}{bar.resolved && historyLimitNote(n.historyStarts, bar.resolved) ? ` ${historyLimitNote(n.historyStarts, bar.resolved)}` : ""}</p>
           </>
         )}
       </Load>

@@ -1,5 +1,6 @@
 "use client";
 
+import { usePageRange } from "../../ds/page-range";
 import { Bookmark, Search, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PlDeal } from "@/lib/analytics/pipeline3-types-interim";
@@ -48,7 +49,10 @@ export function PipelineModule({ moneyFlow = true, actions = false }: { moneyFlo
   const slippingOn = cash.flags?.cf_deals === true;
   const tabs = useMemo(() => TABS.filter((t) => (moneyFlow || t.key !== "flow") && (slippingOn || t.key !== "slipping")), [moneyFlow, slippingOn]);
   const [tab, setTab] = useState<TabKey>("overview");
-  const [filters, setFilters] = useState<PlFilters>(DEFAULT_FILTERS);
+  // The dates are the date bar's (one range for the whole app). What this screen keeps is the account, pipeline, owner and search; the dates are laid over them.
+  const bar = usePageRange();
+  const [picks, setFilters] = useState<PlFilters>(DEFAULT_FILTERS);
+  const filters = useMemo<PlFilters>(() => ({ ...picks, from: bar.ready ? bar.from : undefined, to: bar.ready ? bar.to : undefined, days: bar.days || picks.days }), [picks, bar.ready, bar.from, bar.to, bar.days]);
   const [q, setQ] = useState("");
   const [deal, setDeal] = useState<PlDeal | null>(null);
   const [drill, setDrill] = useState<Drill>(null);
@@ -112,7 +116,7 @@ export function PipelineModule({ moneyFlow = true, actions = false }: { moneyFlo
       <Page title="Pipeline" subtitle="Where your deal money sits, and what is stuck." actions={null}>
         <div className="ap-head" role="search" aria-label="Filter deals" hidden={tab === "classic" || tab === "stale"}>
           <label className="ap-search"><Search aria-hidden className="size-4" /><span className="sr-only">Search by deal or contact</span><input ref={search} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search a deal (press /)" data-testid="pl-search" /></label>
-          <select className="ap-field" aria-label="Dates" value={filters.days} onChange={(e) => setFilters({ ...filters, days: Number(e.target.value) as PlFilters["days"] })} data-testid="pl-days"><option value={30}>Last 30 days</option><option value={45}>Last 45 days</option><option value={90}>Last 90 days</option></select>
+          <span className="ap-fine" data-testid="pl-days">Dates: {bar.label}, from the bar above.</span>
           {accounts.length > 1 && <select className="ap-field" aria-label="Account" value={filters.locationId} onChange={(e) => { setPicked(null); setFilters({ ...filters, locationId: e.target.value, pipeline: "" }); }} data-testid="pl-account"><option value="">All accounts</option>{accounts.map((a) => <option key={a.locationId} value={a.locationId}>{a.name}</option>)}</select>}
           {moneyFlow && <PipelinePicker filters={filters} value={picked} onPick={openCard} onClear={() => { setPicked(null); setFilters((f) => ({ ...f, pipeline: "" })); }} />}
           <select className="ap-field" aria-label="Saved views" value="" onChange={(e) => applyView(Number(e.target.value))} data-testid="pl-views"><option value="" disabled>Saved views{views.length ? ` (${views.length})` : ""}</option>{views.map((v, i) => <option key={v.name} value={i}>{v.name}</option>)}</select>

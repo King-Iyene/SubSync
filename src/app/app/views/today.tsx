@@ -10,6 +10,7 @@ import { ApiProvider, RootApiProvider, useApiClient, useData } from "../session"
 import { EmptyState, Page, remember, remembered, Skeleton, SkeletonRows } from "../ds";
 import { Btn, ErrorBox } from "../ui";
 import { TodayPage } from "./today-page";
+import { usePageRange } from "../ds/page-range";
 import "./today-theme.css";
 
 // Today's container: it loads the read, keeps the client-account choice (in this page's address as `ta=`, and in this browser, for Today only), and hands everything to TodayPage
@@ -64,7 +65,9 @@ export function TodayView({ go, kind, mode = "full" }: { go: GoFn; kind: AccessK
 function TodayBody({ go, kind, picked, setPicked, mode }: { go: GoFn; kind: AccessKind; picked: string[]; setPicked: (ids: string[]) => void; mode: TodayMode }) {
   const api = useApiClient();
   const today = useData<TodayData>("today");
-  const growth = useData<GrowthData>("today/growth");
+  // The growth counters and charts are for the dates in the date bar (one range for the whole app).
+  const bar = usePageRange();
+  const growth = useData<GrowthData>(bar.ready ? `today/growth?${bar.qs}` : null);
   const seg = useData<Segments>(kind === "agency" ? "segments" : null);
   const [syncing, setSyncing] = useState(false);
 

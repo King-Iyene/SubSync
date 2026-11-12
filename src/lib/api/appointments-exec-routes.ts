@@ -18,7 +18,7 @@ const BUCKETS = new Set(["booked", "completed", "showed", "noshow", "cancelled",
 const BANDS = new Set(["same_day", "d1_2", "d3_7", "d8_plus"]);
 const int = (v: string | null, d: number) => { const n = Number(v); return v !== null && Number.isFinite(n) ? Math.floor(n) : d; };
 const text = (v: string | null, max: number) => (v ?? "").trim().slice(0, max) || null;
-const day = (v: string | null) => (v && /^d{4}-d{2}-d{2}$/.test(v) && Number.isFinite(Date.parse(v)) ? Date.parse(v) : null);
+const day = (v: string | null) => (v && /^\d{4}-\d{2}-\d{2}$/.test(v) && Number.isFinite(Date.parse(v)) ? Date.parse(v) : null);
 /** "Booked on": both days or neither. The end day is inclusive. */
 function bookedRange(a: string | null, b: string | null) {
   const f = day(a), t = day(b);
