@@ -23,10 +23,12 @@ const inList = (allowed: string[] | null, id: string | null) => (id !== null && 
 export async function listCalls(installationId: string, userId: string, q: ListQuery, allowed: string[] | null): Promise<{ rows: CallRow[]; total: number; next: string | null }> {
   const db = sql();
   const accounts = q.accounts.length ? q.accounts : null;
+  // A contact or account belongs to a row only when it is inside the accounts the person may open (so a matched id that points elsewhere is simply not there, in the filters too).
+  const ok = allowed === null ? db`true` : db`r.loc0 = any(${allowed}::text[])`;
   const base = db`
     select m.id, m.title, m.started_at, coalesce(m.started_at, m.created_at) at, m.status, m.reason, m.duration_minutes, m.recording_url is not null has_rec, m.summary is not null has_sum,
       jsonb_array_length(m.attendee_emails) attendees, jsonb_array_length(m.action_items) items, m.attendee_emails,
-      coalesce(m.matched_location_id, a.location_id) loc, coalesce(m.matched_contact_id, a.contact_id) contact,
+      coalesce(m.matched_location_id, a.location_id) loc0, coalesce(m.matched_contact_id, a.contact_id) contact0,
       l.suggested_outcome, l.outcome_confirmed_at, l.appointment_id
     from meetings m
     left join lateral (select x.* from appointment_meeting_links x where x.installation_id = m.installation_id and x.meeting_id = m.id order by x.created_at limit 1) l on true
@@ -42,12 +44,12 @@ export async function listCalls(installationId: string, userId: string, q: ListQ
     ${q.follow === "has" ? db`and c.contact is not null and exists (select 1 from touch_events t where t.installation_id = ${installationId} and t.location_id = c.loc and t.contact_id = c.contact and t.direction = 'outbound' and not t.automated and t.at > c.at)` : q.follow === "none" ? db`and c.contact is not null and not exists (select 1 from touch_events t where t.installation_id = ${installationId} and t.location_id = c.loc and t.contact_id = c.contact and t.direction = 'outbound' and not t.automated and t.at > c.at)` : db``}`;
   const cursor = q.cursor ? db`and (c.at, c.id) < (${q.cursor.at}::timestamptz, ${q.cursor.id}::uuid)` : db``;
   const [rows, tot] = await Promise.all([
-    db`with c as (${base}) select c.*, ct.full_name contact_name, lo.name location_name,
+    db`with r as (${base}), c as (select r.*, case when ${ok} then r.loc0 end loc, case when ${ok} then r.contact0 end contact from r) select c.*, ct.full_name contact_name, lo.name location_name,
          case when c.contact is null then null else exists (select 1 from touch_events t where t.installation_id = ${installationId} and t.location_id = c.loc and t.contact_id = c.contact and t.direction = 'outbound' and not t.automated and t.at > c.at) end followed
        from c left join cached_contacts ct on ct.installation_id = ${installationId} and ct.location_id = c.loc and ct.contact_id = c.contact
        left join locations lo on lo.installation_id = ${installationId} and lo.location_id = c.loc
        where true ${filt} ${cursor} order by c.at desc, c.id desc limit ${q.limit + 1}`,
-    db`with c as (${base}) select count(*)::int n from c where true ${filt}`,
+    db`with r as (${base}), c as (select r.*, case when ${ok} then r.loc0 end loc, case when ${ok} then r.contact0 end contact from r) select count(*)::int n from c where true ${filt}`,
   ]);
   const page = rows.slice(0, q.limit);
   const out: CallRow[] = page.map((r) => {
