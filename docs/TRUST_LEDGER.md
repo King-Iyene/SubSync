@@ -66,3 +66,72 @@ Still NOT opened in this pass: Appointments (all tabs after the first two), Spee
 | Today > Numbers | loads; 6 tiles | every tile has the same bold "How is this worked out?" pill (cluttered); Open deals shows 1 worth $1,000,000 estimate (same test deal) |
 | Today > Proof, Settings | not opened in this pass | |
 | Pipeline stale list (King's screenshot) | 500 deals, $1,400,000 | misleading: one $1,000,000 test deal, ~480 identical $2,000 deals in the first stage of a cold-email outreach pipeline (927 days stale); fix in progress (placeholder detection, pipeline inclusion setting, one shared function) |
+
+## Walk-through #3, live after the sale-setting migration and stale-value fix (13 Nov night, KD Squares Test)
+
+Seen live and clicked: Today money strip (test deal now left out, plain reason, "Show the deals left out"), Today > View appointments (23 on Today = 23 rows), Appointments > Booking share (new results strip, colour legend, three groups, calendars control), per-person "this week" drill, contact panel Deals tab (richer, New deal form with a preview-and-confirm step), Today > Proof "Show who" (46 = 46 rows), Today > Numbers leak click (19 = 19 rows) and "Waiting for a reply" (25 = 25 rows).
+
+### Found, not yet fixed
+| # | Where | What is wrong |
+|---|---|---|
+| 1 | Appointments > Booking share, "Bookings per person, week over week" | "This week: 2" for one person opens appointments dated 22-23 Sep (51 days ago). The week column is not this week. |
+| 2 | Same page | "Booking and selling: 0, nobody booked in the last 30 days" while the week table above shows people with bookings. Two answers on one screen. |
+| 3 | Appointments | Header said 36 appointments, then 35 after a click, same filters. |
+| 4 | Contact panel > Deals > New deal | The pipeline box starts on an unrelated pipeline instead of the pipeline this person already has a deal in. |
+| 5 | New deal > Create | Says "Done" and shows a $750 deal straight away. Not yet confirmed whether this was a practice run or reached the CRM; Today money still says "Not enough data" afterwards. |
+| 6 | Today > Numbers | Booking funnel says 21 new leads in 30 days; "New leads and growth" says 4 for the same dates (the second counts email leads only but does not say why). |
+| 7 | Today vs Proof | "Waiting for a reply" is 25 on Numbers and 23 on Proof (different rules, not explained). |
+
+### Not seen because of permissions (what King does)
+Payment, workflow, course and automation signals stay empty until the optional permissions in release 1.1.0 are granted (docs/RELEASE_1_1_0.md). Until then: bulk merge shows an empty list, "Sold" by payments shows "Not available (needs permission)", and the merge detail screen shows "Not available" for workflows, payments, courses and campaigns. King: reinstall or approve 1.1.0 in KD Squares Test, then I re-run these screens.
+
+### Walk-through #3, part 2: real actions on the test account (13 Nov night)
+| Action | Result |
+|---|---|
+| Today: View appointments, Proof "Show who", Numbers leak and "Waiting for a reply" | Each opens exactly the rows its number says (23, 46, 19, 25). |
+| Speed to lead: Race, Pace, Coverage, Waiting on the client, Unanswered tabs | All open and load. Queue "Open the oldest of the 2 people waiting" opens the contact in SubSync. |
+| Contact panel: Add tag (create "test-lead") | Works. Tag appears with date, count goes 0 to 1, message says it was added, Undo offered. |
+| Contact panel: Text, type, "Review and send" | Works up to the final step. Shows exact text, a quiet-hours warning (outside 8am-9pm) that must be ticked, and "cannot be taken back". The tick and "Send now" were NOT pressed (see below). |
+| Contact panel: Call | Shows "It is 22:00 where this account is. Calls are best placed between 8 am and 9 pm" with "Do not call" and "Call now". "Do not call" works. "Call now" NOT pressed. |
+| Mark outcome on one appointment | Preview with the person named, then Confirm; result not seen (the page moved on before the screenshot). |
+
+Found: after adding the tag the panel title changed from the phone number to "Unnamed contact".
+
+Not done, and why: a real text or call needs the quiet-hours or calling-hours override, and the contact has a real-looking conversation history. I did not override those warnings. King decides: do those two clicks himself in the daytime, or tell me which test contact is safe to message.
+
+### Walk-through #3, part 3: imported test leads (fictional numbers), 13 Nov night
+- The 120-lead file was imported by King. After "Sync now" (425 contacts, 265 conversations, 35 appointments updated) the leads are findable in Find a lead by name ("Bola" gives 6). Searching "lead0" gives 0: search matches the start of a name or email, not the middle of an email like king+lead101.
+- Lead panel for "Bola Sample 101": opens inside SubSync, "A new contact from the last day", tags from the import shown as "before SubSync", Call, Text, Email.
+- Call: shows the 8am-9pm warning; "Call now" tries to open the CRM phone window as a pop-up, which this browser pane blocks (pop-ups only from the user's own click). A real call must be started by King's click.
+- Text: composer, personalised preview ("Send this text to Bola Sample 101"), outside-hours box. The send failed with "Request failed (403)". Retry then said "Tick the box to go ahead." So the first message should have said "Confirm the outside-hours box" in plain words.
+
+New findings: (8) bare "Request failed (403)" on a blocked send, must say why in plain words; (9) Find a lead search cannot find text in the middle of an email.
+
+Still not tested: Money, Clients, Team, Pipeline (live funnel), Meetings and the Fathom line, Workflows, Settings, bookings and deals on the imported leads, bulk screens with 100+ leads, dark/light and 390/768 widths.
+
+### Walk-through #3, part 4: every module opened and clicked (13 Nov, late)
+Opened and clicked, loads, no crash: Money (all 3 groups, 6 client-payment tabs), Clients (all 11 tabs and the menu), Team, Pipeline (Overview, Money flow, funnel, Coins toggle), Meeting notes, Workflows, Settings, Account audit, Clean-up > Duplicates, What's new.
+
+| # | Where | Finding |
+|---|---|---|
+| 10 | Clients > Money | Says "Every client plan is paid up. Nothing to chase today." while the same screen says plans cannot be read. Must not claim "paid up" when payments are unreadable. |
+| 11 | Clients tab bar and "..." menu | Menu repeats the bar ("Compare clients" vs "Compare accounts", "Weekly reports" vs "Reports"). 11 tabs on one bar is too many. |
+| 12 | Pipeline > Money flow | Cards and funnel steps say "$0 open, 0 deals" for pipelines that hold open deals with no value (counted but left out). Reads as "no deals". Say "n deals without a value". |
+| 13 | Pipeline funnel | Cannot be judged with the test data: every deal is $0. Needs a few test deals with real values and owners. |
+| 14 | Meeting notes | Fathom logo is back ("Your Fathom is connected"). The card says 4 recorded calls this week; the list below says 0 calls in the dates chosen. Same mismatch as before. |
+| 15 | What's new | Does not list this release: sale-basis setting, stale-deal rules, funnel, call panel, richer Deals. |
+| 16 | Clean-up > Duplicates | "Merge all certain matches (13)" exists next to a per-group "Merge" button, while the Protected tooltip says protected people are never bulk-merged. Label the per-group button "Merge this person" and show which of the 13 are skipped. |
+| 17 | Today | Mark outcome worked: "Appointments to confirm" went 23 to 22. |
+
+Needs King's permissions (no data until granted): payments, plans, wallet balances, workflows, campaigns (release 1.1.0 optional permissions). Not yet clicked: Settings sections one by one, light mode, 390 and 768 widths, bookings and deals on the 120 imported leads.
+
+### Walk-through #3, part 5: duplicates, Settings, light mode
+| # | Where | Finding |
+|---|---|---|
+| 18 | Clean-up > Duplicates "Certain" group | Group "jordan smith, Same email, 9 copies" holds different names (jordan smith, steve wonders, jayden anthony, mike steven) that share one email and phone. Labelled "Certain". Merging would join different people. Name mismatch must lower the label to "Likely". |
+| 19 | Same group | "Merge" on the Protected group does nothing visible and says nothing. Must either open the chooser or say why not. |
+| 20 | Settings search | Searching "sale" says "Nothing matches"; Appointments says the sale rule is under Settings > How do we count a sale?. Not found in Targets; not located in the nine sections. |
+
+Works: copies dropdown (names, emails, Open, Open in your CRM, hover preview), merge chooser on a clear group (user picks the master, says payments, automations and courses are not visible, asks to check the CRM first). All nine Settings sections open (Account and plan, Connections with Slack and Fathom connected, Permissions "18 not approved" with steps, Alerts, Team and roles, Targets, Data, Modules, Safety). Light mode renders correctly.
+
+Not tested: 390 and 768 widths; bookings and deals created on the imported leads (Create deal reports "Done" but no deal appears in Pipeline, so writes are practice-only); Settings "ten sections" (nine seen).
