@@ -44,3 +44,17 @@ Brand palette (seen by King), Proof clickable numbers (PR open), Appointments re
 3. I never overwrite or remove anything of King's (logo, features, files) without asking first; removals are listed and approved.
 4. If a builder's report says "not checked in a browser", I repeat that to King verbatim.
 5. Before King is told something works, I click it myself in the real CRM.
+
+## Walk-through, 13 Nov late (opened and clicked in the real CRM, KD Squares Test)
+| Module | Result | Finding |
+|---|---|---|
+| Clients | loads; "2 people waiting for a reply" opens exactly 2 rows with Open buttons | plan tiles (Past due, Need you now, Plans to look at, Quiet 14 days) show 0 while the page says plans cannot be read: zeros mean nothing; about 12 tabs |
+| Account audit | loads, "We found 2 things to fix", honest note about no dollar figure | none |
+| Team | loads; tabs Today, Scorecards, Workload, Leaderboard, Money, Coaching, Access and more | many tabs |
+| Meeting notes | loads; Fathom card with icon shown | header says "4 recorded calls this week" but the list says "0 calls in the dates chosen": count does not match rows (bug logged) |
+| Workflows | loads; honest "Needs permission: reconnect" | none |
+| Settings | loads; ten sections, search box | none |
+| Getting started | loads; 12 of 19 done | none |
+| What's new | loads; real entries (Clients not answering leads, Step history and stuck deals, Meeting notes) | none |
+
+Still NOT opened in this pass: Appointments (all tabs after the first two), Speed to lead tabs Unanswered, Capture, Rules, Log, Money > Payouts, Find a lead tabs other than search, Pipeline tabs other than Stuck/Step history, Today > Numbers and Settings, light mode, 768/390 widths. These stay "MERGED, NOT SEEN" until opened.
