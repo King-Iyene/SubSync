@@ -70,3 +70,20 @@ test("the manager filters travel in the address and junk is dropped", () => {
   assert.deepEqual(filtersFromParams(new URLSearchParams(p)), f);
   assert.deepEqual(filtersFromParams(new URLSearchParams("ap_out=drop&ap_deal=x&ap_lead=3&ap_ct=y&ap_att=2")), DEFAULT_FILTERS);
 });
+
+test("a team member with no bookings is told apart: none this period, versus never", async () => {
+  const { bookingState, teamRoleLabel } = await import("../analytics/appointments3-intel.ts");
+  assert.equal(bookingState(3, 3), "booked");
+  assert.equal(bookingState(0, 12), "none_this_period"); // has history, nothing in these dates
+  assert.equal(bookingState(0, 0), "never");
+  assert.equal(teamRoleLabel("account_admin"), "Account admin");
+  assert.equal(teamRoleLabel(null), "Team member");
+  assert.equal(teamRoleLabel("xtest-odd"), "Team member");
+});
+
+test("the date presets reach past 90 days", async () => {
+  const { presetRange } = await import("../design/appt-filters.ts");
+  const wed = Date.UTC(2026, 10, 11, 15, 0);
+  assert.equal(presetRange("last180", wed).from, "2026-05-16");
+  assert.equal(presetRange("last365", wed).to, "2026-11-11");
+});

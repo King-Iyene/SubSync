@@ -2,14 +2,14 @@
 // REAL synced data only. Anything under its minimum is { enough: false } (screen says "not enough data"). Trends are from our own timestamps;
 // history-based figures carry `historyStarts` (YYYY-MM-DD). No invented scores or "churn probability". Definitions: docs/METRICS.md "Clients 3".
 
-export const CL3_PARTS = ["overview", "needs-attention", "trends", "compare", "receipt", "people", "setup", "list", "options", "export", "billing"] as const;
+export const CL3_PARTS = ["overview", "needs-attention", "trends", "compare", "receipt", "people", "setup", "list", "options", "export", "billing", "money", "money-history"] as const;
 export type Cl3Part = (typeof CL3_PARTS)[number];
 
 /** Shared query parameters (all optional): from, to (ISO dates, default last 30 days), location (one account id), q (account name search), sort, dir, page (0-based), size (20|50|100),
  *  reason (a Cl3Reason, for part=list), grain (week|month, trends), ids (two account ids, compare), week (Monday YYYY-MM-DD, receipt), industry, level (Cl3Level). */
 export type Cl3Query = {
   part: Cl3Part; from?: string; to?: string; location?: string; q?: string; sort?: string; dir?: "asc" | "desc"; page?: number; size?: 20 | 50 | 100;
-  reason?: Cl3Reason; grain?: "week" | "month"; ids?: string; week?: string; industry?: string; level?: Cl3Level;
+  reason?: Cl3Reason; bucket?: string; plan?: string; cursor?: string; grain?: "week" | "month"; ids?: string; week?: string; industry?: string; level?: Cl3Level;
 };
 
 export type Rate = { value: number | null; n: number; of: number; enough: boolean };
@@ -118,3 +118,39 @@ export type Cl3Billing = {
   plan: string | null; subscriptionStatus: string | null; paymentFailing: null; nextPaymentAt: null; appsInstalled: null; fetchedAt: string | null; message: string | null;
 };
 export type Cl3BillingList = Page<Cl3Billing> & { needPermission: number; notActive: number };
+
+// ---- Clients v3: money control center (parts money, money-history). Real synced data only; what the platform cannot give is null and the screen says "Not available from the platform yet". ----
+export const CL3_BUCKETS = ["all", "unpaid", "failing", "no_plan", "paid", "empty_wallet", "app_missing"] as const;
+export type Cl3Bucket = (typeof CL3_BUCKETS)[number];
+export const CL3_MONEY_FLAGS = ["cl3_money", "cl3_apps", "cl3_history"] as const;
+
+export type Cl3MoneyRow = {
+  locationId: string; name: string; email: string | null;
+  plan: { name: string | null; pay: string; payLabel: string; statusRaw: string | null; monthly: number | null; currency: string | null; interval: string | null; daysInStatus: number | null; since: string | null; state: string; explain: string };
+  level: "ok" | "watch" | "act" | "unknown"; summary: string | null;
+  /** The platform's credit balance as it reports it (units not stated by the platform); null when not read. */
+  wallet: { balance: number | null; state: string | null };
+  /** Whether SubSync is installed on this account, from the platform's installed list. Other apps cannot be read. */
+  subsync: "installed" | "missing" | "unknown";
+  /** ALWAYS null today: the platform API does not give a next charge date or a failure reason. */
+  nextChargeAt: null; failureReason: null;
+  url: string | null;
+};
+export type Cl3Money = {
+  rows: Cl3MoneyRow[]; total: number; next: string | null; size: number;
+  summary: {
+    accounts: number; counts: Record<Cl3Bucket, number>;
+    /** Monthly price of paid plans, per currency. An estimate: the plan price, not what was charged. */
+    expectedMonthly: Array<{ currency: string; monthly: number; accounts: number }>;
+    /** Monthly price of plans that are past due, cancelled, paused or in an unknown state. Same estimate. */
+    atRisk: Array<{ currency: string; monthly: number; accounts: number }>;
+    plans: Array<{ key: string; label: string; count: number }>;
+    apps: { state: "ok" | "not_read"; installed: number; missing: number; unknown: number };
+    /** Exact permissions to allow, when a read was refused. Empty when none. */
+    needsPermission: string[];
+    today: { headline: string; bucket: Cl3Bucket | null };
+    historyStarts: string | null;
+  };
+};
+export type Cl3HistoryRow = { id: string; locationId: string; name: string; kind: string; text: string; at: string; url: string | null };
+export type Cl3HistoryList = { rows: Cl3HistoryRow[]; next: string | null; size: number; historyStarts: string | null };

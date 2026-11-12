@@ -1,8 +1,9 @@
 import { attention, clientsCache, compare, exportCsv, list, options, overview, people, receipt, setup, trends, type Filters, type Links, type Scope } from "../analytics/clients3-queries";
 import { billing } from "../analytics/clients3-billing";
+import { money, moneyHistory } from "../analytics/cl3-money";
 import { clampSize, parseWindow } from "../analytics/clients3-intel";
 import { CL2_FLAGS } from "../analytics/clients2-types";
-import { CL3_FLAGS, CL3_PARTS, CL3_REASONS, type Cl3Level, type Cl3Part, type Cl3Reason } from "../analytics/clients3-types";
+import { CL3_BUCKETS, CL3_FLAGS, CL3_MONEY_FLAGS, CL3_PARTS, CL3_REASONS, type Cl3Bucket, type Cl3Level, type Cl3Part, type Cl3Reason } from "../analytics/clients3-types";
 import type { Feature } from "../entitlements";
 import { resolveEntitlements } from "../flags";
 import type { deepLinks } from "../links";
@@ -18,7 +19,7 @@ type Ctx = AuthContext & { request: Request; url: URL; segments: string[] };
 export type Clients3Helpers = { allowed: () => Promise<string[] | null>; links: () => Promise<ReturnType<typeof deepLinks>> };
 
 const PART_FLAG: Record<Cl3Part, string> = {
-  overview: "cl_overview", "needs-attention": "cl_attention", trends: "cl_trends", compare: "cl_compare", receipt: "cl_reports", people: "cl_people", setup: "cl_setup", billing: "cl_billing", list: "cl_attention", options: "cl_overview", export: "cl_reports",
+  overview: "cl_overview", "needs-attention": "cl_attention", trends: "cl_trends", compare: "cl_compare", receipt: "cl_reports", people: "cl_people", setup: "cl_setup", billing: "cl_billing", list: "cl_attention", options: "cl_overview", export: "cl_reports", money: "cl3_money", "money-history": "cl3_history",
 };
 const LEVELS = new Set(["ok", "watch", "act", "unknown"]);
 const int = (v: string | null, d: number) => { const n = Number(v); return v !== null && Number.isFinite(n) ? Math.floor(n) : d; };
@@ -28,7 +29,7 @@ export async function handleClients3(ctx: Ctx, h: Clients3Helpers): Promise<Resp
   const sp = ctx.url.searchParams, part = sp.get("part") as Cl3Part | null;
   if (!part || !(CL3_PARTS as readonly string[]).includes(part)) return json({ error: "Not found" }, 404);
   const [allowedAll, dl, ent] = await Promise.all([h.allowed(), h.links(), resolveEntitlements(ctx.plan, ctx.installationId, ctx.demo)]);
-  const flags = Object.fromEntries([...CL3_FLAGS, ...CL2_FLAGS].map((f) => [f, ent.features[f as Feature] === true]));
+  const flags = Object.fromEntries([...CL3_FLAGS, ...CL3_MONEY_FLAGS, ...CL2_FLAGS].map((f) => [f, ent.features[f as Feature] === true]));
   if (!flags[PART_FLAG[part]]) return json({ error: "This part of Clients is not switched on yet." }, 404);
 
   const canSee = ctx.kind === "agency" && ctx.limitTo === null;
@@ -59,6 +60,11 @@ export async function handleClients3(ctx: Ctx, h: Clients3Helpers): Promise<Resp
       return done(await compare(scope, f, owned));
     }
     case "receipt": return done((await receipt(scope, f, one, sp.get("week"))) ?? { rows: [], total: 0, weekStart: "" });
+    case "money": {
+      const b = sp.get("bucket"), bucket: Cl3Bucket = b && (CL3_BUCKETS as readonly string[]).includes(b) ? (b as Cl3Bucket) : "all";
+      return done(await money(scope, links, { bucket, plan: text(sp.get("plan"), 80), q: f.q ?? null }, { cursor: text(sp.get("cursor"), 400), size }));
+    }
+    case "money-history": return done(await moneyHistory(scope, links, { location: one }, { cursor: text(sp.get("cursor"), 20), size }));
     case "billing": return done(await billing(scope, f, { page: p, size }));
     case "people": return done(await people(scope, f, { page: p, size }));
     case "setup": return done(await setup(scope, f, { page: p, size }));

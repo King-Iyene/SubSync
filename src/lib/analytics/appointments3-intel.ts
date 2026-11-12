@@ -189,6 +189,8 @@ export type PersonRollup = {
   userId: string; name: string;
   /** false = seen as a booker or owner but in no account's team list (left or no access). Never flagged idle. */
   inTeamList: boolean; bookings: number; sharePct: number; lastBookingAt: string | null;
+  /** Team role as a plain label, and the calendars the person is on. */
+  roleLabel?: string; calendars?: string[];
   accounts: PersonAccount[];
   /** Accounts the person belongs to where they have zero bookings in these dates. */
   idleIn: string[];
@@ -220,3 +222,9 @@ export function buildPeople(members: PeopleMember[], bookings: PeopleBooking[], 
   }
   return out.sort((a, b) => b.bookings - a.bookings || a.name.localeCompare(b.name));
 }
+
+/** Team role keys (as stored) to the plain labels people see. */
+export const TEAM_ROLE_LABEL: Record<string, string> = { agency_admin: "Admin, all accounts", agency_staff: "Staff, all accounts", account_admin: "Account admin", account_user: "Account user", unknown: "Team member" };
+export const teamRoleLabel = (role: string | null | undefined) => TEAM_ROLE_LABEL[role ?? "unknown"] ?? "Team member";
+/** "none this period" and "never" are different things: the first has history, the second has no bookings in anything we hold. */
+export const bookingState = (inPeriod: number, ever: number): "booked" | "none_this_period" | "never" => (inPeriod > 0 ? "booked" : ever > 0 ? "none_this_period" : "never");

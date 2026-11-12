@@ -215,3 +215,13 @@ test("the new screens use no banned words (the CRM is called the CRM)", () => {
     assert.ok(!/GoHighLevel|HighLevel|\bGHL\b|sub-account|\bSLA\b/i.test(text), `${f} names the platform or uses a banned word`);
   }
 });
+
+test("Call has no provider picker: the screens never offer 'Call with' and always use the CRM's own dialer", () => {
+  const dir = new URL("../../app/app/", import.meta.url);
+  const files = ["ds/dial-button.tsx", "ds/lead-drawer.tsx", "ds/contact-actions.tsx", "views/calls.tsx", "views/people-find.tsx", "dashboard.tsx"];
+  for (const f of files) {
+    const text = readFileSync(new URL(f, dir), "utf8");
+    assert.ok(!/DialerSetting|DialerAskHost|dialer-select|How do you make calls|>Call with</.test(text), `${f} offers a call provider choice`);
+  }
+  assert.equal(dialPlan({ provider: "crm" }, { phone: "+15551234567", contactUrl: "https://crm.example.com/c/1" }).href, "https://crm.example.com/c/1");
+});

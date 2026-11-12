@@ -140,6 +140,7 @@ export function changeWords(kind: string, before: Record<string, unknown> | null
     case "removed": return `"${b("name")}" is no longer there`;
     case "delete": return `Deleted "${b("name")}"`;
     case "clone": return `Copied "${a("name")}" into another client account`;
+    case "install": return `Set up "${a("name")}" from the library`;
     case "restore": return `Recreated "${a("name")}" as a draft`;
     case "edited": return "Edited in the CRM";
     case "label": return "Organised in SubSync";

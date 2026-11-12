@@ -16,3 +16,8 @@
 | Who is inside a workflow right now | Logs show enrolments and exits in the last 60 days only | A "contacts currently in workflow" call. Delete uses an estimate from the logs instead |
 | Folders and tags on a workflow in the CRM | No write call for either | Folders and labels stay in SubSync only |
 | Live test of any of this | No real account was touched; no write call was made | A test client account and `WORKFLOWS_WRITE_LIVE=true` on a preview deployment |
+
+| Live probe of the Workflows API | Ran scripts/wf-probe.mts: the live install has no workflow permissions, and this machine has no platform client credentials | King reconnects the install with the optional workflow permissions, then runs the script |
+
+| Next charge date, failed-payment reason, apps other than SubSync per account, bulk install and buying an app for all accounts (Clients v3) | Read the official SaaS, marketplace, wallet and installer pages and searched help articles (docs/research/CLIENTS_V3_R1.md): no field or endpoint gives them. Installed-locations takes an app id but is likely limited to our own app | A platform endpoint for per-account subscription dates and app installs; until then Money says "Not available from the platform yet" and links to the CRM |
+| Live probe of billing endpoints (Clients v3) | A probe needs a token refresh, which rotates the refresh token in the live database, so it was not run from a copied key | King runs `node --env-file=.env.local --import tsx scripts/saas-probe.mts [other app id]` once and sends back the output (status words, field names) |

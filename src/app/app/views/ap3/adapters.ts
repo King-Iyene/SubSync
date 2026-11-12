@@ -1,7 +1,7 @@
 import { ratesFromOutcomes } from "../../../../lib/design/appt-flow-layout.ts";
 import type {
   Appt3BookingShare, Appt3Calendars, Appt3FlowTree, Appt3Health, Appt3NeedsOutcome, Appt3Overview, Appt3Receipt, Appt3Recovery, Appt3Row, Appt3Sources, FlowNode, Page, Rate,
-  ApCalendarsView, ApConflictRow, ApFlowCloser, ApFlowSetter, ApFlowTree, ApHealthRow, ApOutcome, ApOverview, ApPersonRow, ApProof, ApRow, ApSourceRow, ApSpeedBand, ApStatus,
+  ApCalendarsView, ApConflictRow, ApFlowCloser, ApFlowSetter, ApFlowTree, ApHealthRow, ApOutcome, ApOverview, ApProof, ApShareView, ApRow, ApSourceRow, ApSpeedBand, ApStatus,
 } from "./types";
 
 // Turns the real response of /api/app/appointments?part=... (slice AD's types, appointments3-types.ts) into the shapes the screens draw. Pure, so it is unit tested.
@@ -21,7 +21,7 @@ export function adaptRow(r: Appt3Row, now = Date.now()): ApRow {
   if (r.hasConflict) flags.push("double-booked");
   if (r.dealStatus === null) flags.push("no-deal");
   return {
-    id: r.appointmentId, locationId: r.locationId, accountName: r.accountName ?? "", contactId: r.contactId ?? "", contactName: r.contactName, startAt: r.startAt, calendarName: r.calendarName ?? "",
+    id: r.appointmentId, locationId: r.locationId, accountName: r.accountName ?? "", contactId: r.contactId ?? "", contactName: r.contactName, startAt: r.startAt, calendarName: r.calendarName ?? "", calendarGroup: r.calendarGroup ?? null,
     status: STATUS[r.bucket] ?? "booked", ownerId: r.ownerId, ownerName: r.ownerName, bookerId: r.bookerId, bookerName: r.bookerName, source: r.source, phone: r.phone,
     dealValueCents: cents(r.dealValue), dealStatus: r.dealStatus ?? "none", hoursPast: past ? Math.max(0, (now - start) / 3_600_000) : null, flags, url: r.url ?? null, calendarId: r.calendarId ?? null,
     ...(r.dnd ? { dnd: true } : {}),
@@ -76,12 +76,14 @@ export function adaptFlow(t: Appt3FlowTree, periodLabel = "This period"): ApFlow
   return { booked: t.totalBooked ?? 0, periodLabel, setters, hiddenSetters: t.hiddenPeople ?? 0, totals, overall: ratesFromOutcomes(totals, min), minBookings: min };
 }
 
-export function adaptShare(s: Appt3BookingShare): { rows: ApPersonRow[] } {
+export function adaptShare(s: Appt3BookingShare): ApShareView {
   return {
+    total: s.total ?? 0, rosterTotal: s.rosterTotal ?? 0, roles: s.roles ?? [], historyStarts: s.historyStarts, counts: s.counts,
     rows: (s.rows ?? []).map((p) => ({
       id: p.userId ?? "none", name: p.userId === null ? "Booker not recorded" : p.name, role: p.role === "closer" ? "closer" : p.role === "both" ? "both" : "setter", unassigned: p.userId === null, noOwner: p.userId === null ? p.owned : undefined,
       bookings: p.role === "closer" ? p.owned : p.booked, showRate: v(p.showRate), noShowRate: v(p.noshowRate), closeRate: v(p.closeRate), revenueCents: cents(p.wonValue) ?? 0,
       avgLeadToBookedHours: p.leadToBookedMedianMinutes === null ? null : p.leadToBookedMedianMinutes / 60, trend: (p.trend ?? []).map((t) => t.booked),
+      roleLabel: p.roleLabel, state: p.state, owned: p.owned, lastBookingAt: p.lastBookingAt, inTeam: p.inTeam, teamActive: p.teamActive, calendars: p.calendars, byCalendar: p.byCalendar,
     })),
   };
 }

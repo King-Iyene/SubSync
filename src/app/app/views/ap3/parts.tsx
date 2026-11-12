@@ -19,6 +19,10 @@ export function StatusChip({ row }: { row: Pick<ApRow, "status" | "hoursPast"> }
 export const Chip = ({ tone, children }: { tone: "green" | "amber" | "red" | "grey" | "cyan" | "violet"; children: ReactNode }) => <span className="ap-chip" data-tone={tone}>{children}</span>;
 
 const FLAG_TEXT: Record<ApRow["flags"][number], string> = { "double-booked": "Double-booked", "no-deal": "No deal" };
+/** The calendar an appointment is on, with its group, as a small chip. */
+export function CalChip({ name, group }: { name: string | null; group?: string | null }) {
+  return <span className="ap-calchip" title={group ? `Calendar group: ${group}` : undefined}>{name ?? "Calendar"}{group ? <i>{group}</i> : null}</span>;
+}
 export const when = (iso: string) => { const d = new Date(iso); return `${d.toLocaleDateString("en-US", { month: "short", day: "numeric" })}, ${d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`; };
 
 /** Compact table of appointments (40px rows). Row click or Enter opens the right-side panel; the arrow keys move between rows. */
@@ -44,7 +48,7 @@ export function ApTable({ rows, showAccount, onOpen, activeId, testId, selectabl
               <td><span className="ap-name">{r.contactName}</span></td>
               <td className="ap-sub">{r.phone ?? "-"}</td>{showAccount && <td className="ap-sub">{r.accountName}</td>}
               <td>{when(r.startAt)}{r.hoursPast !== null && r.hoursPast > 0 && <span className="ap-sub"> ({r.hoursPast < 48 ? `${Math.round(r.hoursPast)}h` : `${Math.round(r.hoursPast / 24)}d`} ago)</span>}</td>
-              <td className="ap-sub">{r.calendarName}</td>
+              <td>{r.calendarName ? <CalChip name={r.calendarName} group={r.calendarGroup} /> : <span className="ap-sub">-</span>}</td>
               <td><StatusChip row={r} /></td>
               <td>{r.bookerName ?? <span className="ap-sub">Unknown</span>}</td>
               <td>{r.ownerName ?? <span className="ap-sub">Nobody</span>}</td>
@@ -123,7 +127,7 @@ export function ApPanel({ row, onClose, onChanged, filters }: { row: ApRow; onCl
       <div className="ap-scrim" onClick={onClose} aria-hidden />
       <aside className="ap-panel" role="dialog" aria-modal="true" aria-label={`Appointment with ${row.contactName}`} ref={ref} tabIndex={-1} data-testid="ap-panel">
         <div className="ap-panel-h">
-          <div className="min-w-0 flex-1"><h2 className="text-lg font-semibold leading-tight">{row.contactName}</h2><p className="ap-fine">{row.accountName} · {row.calendarName}</p></div>
+          <div className="min-w-0 flex-1"><h2 className="text-lg font-semibold leading-tight">{row.contactName}</h2><p className="ap-fine">{row.accountName} <CalChip name={row.calendarName || null} group={row.calendarGroup} /></p></div>
           <button type="button" className="ap-iconbtn" onClick={onClose} aria-label="Close panel" data-testid="ap-panel-close"><X aria-hidden className="size-4" /></button>
         </div>
         <div className="ap-panel-b">

@@ -16,6 +16,7 @@ import {
 } from "../workflows/store";
 import { json, type AuthContext } from "./auth";
 import { delivery, detail, mark, proof, viewsList, viewsRemove, viewsSave } from "./workflows-more";
+import { gapPeople, install, installPreview, library, outcomes } from "./workflows-wf";
 
 // The Workflows module's routes (docs/features/WORKFLOWS.md). Same rule as every route: the company, the person and the client accounts come from the signed
 // session, never from the request. A client's staff may read their own account's list and health; only an agency owner or administrator, or a business
@@ -82,6 +83,7 @@ async function view(ctx: Ctx, deps: Deps) {
   return json({
     kind: ctx.kind, available, demo: ctx.demo, now,
     // What this person may do. The server decides again on every change; this only decides which buttons are drawn.
+    wf: { gaps: ctx.entitlements.features.wf_outcomes === true, library: ctx.entitlements.features.wf_library === true },
     can: { organise: staff && me.may && isOn(ctx, "workflows_pro"), change: staff && me.may && isOn(ctx, "workflows_write"), health: isOn(ctx, "workflows_pro"), sync: staff },
     needs: { upgradeHealth: !isOn(ctx, "workflows_pro"), upgradeChange: !isOn(ctx, "workflows_write") },
     permissions: {
@@ -387,6 +389,11 @@ export async function handleWorkflows(ctx: Ctx, deps: Deps): Promise<Response> {
     if (m === "POST" && a === "mark") return await mark(ctx, deps);
     if (m === "GET" && a === "delivery") return await delivery(ctx, deps);
     if (m === "GET" && a === "proof") return await proof(ctx, deps);
+    if (m === "GET" && a === "outcomes") return await outcomes(ctx, deps);
+    if (m === "GET" && a === "gap-people") return await gapPeople(ctx, deps);
+    if (m === "GET" && a === "library") return await library(ctx, deps);
+    if (m === "POST" && a === "install-preview") return await installPreview(ctx, deps);
+    if (m === "POST" && a === "install") return await install(ctx, deps);
     if (m === "GET" && a === "views") return await viewsList(ctx);
     if (m === "POST" && a === "views") return await viewsSave(ctx, deps);
     if (m === "DELETE" && a === "views") return await viewsRemove(ctx);

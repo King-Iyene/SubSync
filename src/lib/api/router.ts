@@ -109,6 +109,7 @@ import { meetingSetupAccountView, meetingSetupFieldsSave, meetingSetupFieldsView
 import { can, personFromSession } from "../connections/person";
 import { handlePeople, timeoutResponse } from "./people-routes";
 import { handleDuplicates } from "./duplicates-routes";
+import { handleCu } from "./cu-routes";
 import { handleWorkbench } from "./workbench-routes";
 import { handleDial } from "./dial-routes";
 import { handleBoard } from "./pipeline-board-routes";
@@ -129,6 +130,7 @@ import { handleClients3 } from "./clients3-routes";
 import { handleClients2 } from "./clients2-routes";
 import { handlePeople3 } from "./people3-routes";
 import { handleTeamRoles } from "./team-roles-routes";
+import { handleSettings2 } from "./settings2-routes";
 import { handlePayments } from "./payments-routes";
 import { handleToday3, handleToday3Act } from "./today3-routes";
 import { handleCash, handleCashAct } from "./cash-routes";
@@ -2024,7 +2026,7 @@ const clientDeps: clientRoutes.Deps = { allowedIds, accountsFor, actorOf: (ctx) 
 
 const FEATURE_FOR: Record<string, Feature> = {
   "data-health": "data_health", search: "search", onboarding: "onboarding", stale: "stale", inbox: "inbox", pipelines: "pipelines", duplicates: "duplicates", email: "email",
-  "meeting-inbox": "meetings", "meeting-setup": "meetings", "my-connections": "connections", "team-connections": "connections", "meeting-policy": "connections", alerts: "alerts", notifications: "alerts", "notification-prefs": "alerts", "notification-destinations": "alerts", appointments: "appointments", audit: "audit", speed: "speed", "appointment-insights": "appointments", meetings: "meetings", connections: "connections", cleanup: "cleanup", "setup-compare": "setup_compare", playbooks: "playbooks", daily: "overview", today: "overview", team: "team", "deal-events": "pipelines", contact: "search", settings: "settings", export: "exports", digest: "overview", "api-keys": "ai", hygiene: "stale", "pipeline-intel": "pipelines", "contact-intel": "activity", clients: "clients", qbr: "reports", "comms-intel": "inbox", "deal-gaps": "pipelines", "call-queue": "calls", "call-lists": "calls", "call-outcomes": "calls", people: "search", workbench: "search", dial: "calls", workflows: "workflows", "client-onboarding": "onboarding",
+  "meeting-inbox": "meetings", "meeting-setup": "meetings", "my-connections": "connections", "team-connections": "connections", "meeting-policy": "connections", alerts: "alerts", notifications: "alerts", "notification-prefs": "alerts", "notification-destinations": "alerts", appointments: "appointments", audit: "audit", speed: "speed", "appointment-insights": "appointments", meetings: "meetings", connections: "connections", cleanup: "cleanup", cu: "cleanup", "setup-compare": "setup_compare", playbooks: "playbooks", daily: "overview", today: "overview", team: "team", "deal-events": "pipelines", contact: "search", settings: "settings", export: "exports", digest: "overview", "api-keys": "ai", hygiene: "stale", "pipeline-intel": "pipelines", "contact-intel": "activity", clients: "clients", qbr: "reports", "comms-intel": "inbox", "deal-gaps": "pipelines", "call-queue": "calls", "call-lists": "calls", "call-outcomes": "calls", people: "search", workbench: "search", dial: "calls", workflows: "workflows", "client-onboarding": "onboarding",
 };
 
 export async function handle(request: Request, segments: string[]): Promise<Response> {
@@ -2084,6 +2086,8 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
     if (a === "today3" && b === "act" && ctx.segments.length === 3) {
       return await handleToday3Act(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links });
     }
+    // Settings, guides and What's new (stage ST): /api/app/st/<home|state|connections|progress>. Per-person marks only; never changes the CRM or a setting.
+    if (a === "st" && ctx.segments.length === 2) return await handleSettings2(ctx);
     // Cash features: /api/app/cash?part=... (save this account, recover, deals; read only) and /api/app/cash/act/... (SubSync notes; the one CRM change, an owner change, goes through the safe gateway).
     if (a === "cash" && method === "GET" && !b && ctx.url.searchParams.has("part")) {
       return await handleCash(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links, targets: async () => { const st = (await scope(ctx)).settings; return { slaHours: st.slaHours, targetMinutes: st.speedTargetMinutes }; }, locationToken: (locationId) => locationAccessToken(ctx.session.companyId, locationId) });
@@ -2122,6 +2126,11 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
     // The guided duplicate review (reading, setting a group aside, the one-click merge, which is switched off). Deciding and undoing stay below.
     if (a === "duplicates" && (method === "GET" || ["snooze", "unsnooze", "merge", "merge-workflow", "undo-snooze", "arrivals-dismiss"].includes(b ?? ""))) {
       return await handleDuplicates(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links, locationToken: (locationId) => locationAccessToken(ctx.session.companyId, locationId) });
+    }
+    // Clean-up fix lists, Health and bulk runs (stage CU): flags cu_fix, cu_health, cu_bulk, checked inside the handler.
+    if (a === "cu") {
+      const r = await handleCu(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links, locationToken: (locationId) => locationAccessToken(ctx.session.companyId, locationId), actor: actorOf });
+      if (r) return r;
     }
     // Clean-up v2: rules, data quality, import check, the per-account switch for changing contacts. Anything else under cleanup falls through to the run endpoints below.
     if (a === "cleanup" && ["rules", "quality", "write", "import-check"].includes(b ?? "")) {

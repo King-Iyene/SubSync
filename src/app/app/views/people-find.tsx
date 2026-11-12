@@ -6,7 +6,7 @@ import { describeFilter, filterToParams, isEmptyFilter, parseSmartFilter, type S
 import { countWords, LIST_IDS, searchTerm, type ListCount, type ListId, type ListInfo } from "@/lib/people/queue";
 import { listText } from "@/lib/people/rows";
 import type { PersonRowOut } from "@/lib/people/types";
-import { DialerSetting, DialNote, ErrorState, LeadDrawer, SkeletonRows, useContactActions } from "../ds";
+import { DialNote, ErrorState, LeadDrawer, SkeletonRows, useContactActions } from "../ds";
 import { remember, remembered, takeHandOff } from "../ds/remember";
 import { ApiError, useApiClient, useData } from "../session";
 import { Btn, fmtInt, inputClass } from "../ui";
@@ -167,7 +167,7 @@ export function FindTab({ plus = false, bulk = false }: { plus?: boolean; bulk?:
               {results.data.total > 0 && !isEmptyFilter(filter) && (
                 <div className="mt-4 border-t pt-3"><SaveList filter={effective} canShare={opts.data?.canShareLists ?? false} onSaved={() => void saved.reload()} /></div>
               )}
-              {results.data.total > 0 && <div className="mt-3 space-y-1"><DialNote /><DialerSetting /></div>}
+              {results.data.total > 0 && <div className="mt-3 space-y-1"><DialNote /></div>}
             </>
           ) : null}
         </section>
@@ -223,7 +223,7 @@ export function FindTab({ plus = false, bulk = false }: { plus?: boolean; bulk?:
                     {page.rows.length > 0 && (
                       <div className="mt-3 flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
                         <DialNote className="max-w-md" />
-                        <span className="flex items-center gap-4"><DialerSetting /><button type="button" onClick={() => { void navigator.clipboard?.writeText(listText(page.rows, showAccount)).catch(() => undefined); }} className={QUIET}>Copy this page</button></span>
+                        <span className="flex items-center gap-4"><button type="button" onClick={() => { void navigator.clipboard?.writeText(listText(page.rows, showAccount)).catch(() => undefined); }} className={QUIET}>Copy this page</button></span>
                       </div>
                     )}
                   </>

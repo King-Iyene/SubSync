@@ -1,6 +1,5 @@
 "use client";
 
-import { DialerAskHost } from "./ds/dial-button";
 import { TODAY_FONTS } from "./views/today-fonts";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { accentTokens } from "@/lib/design/color";
@@ -44,6 +43,10 @@ import { ClientsView, type ClientsFeatures } from "./views/clients";
 import { DealsView } from "./views/deals";
 import { EmailHealthView } from "./views/email-health";
 import { HelpView } from "./views/help";
+import { SettingsHub } from "./views/settings-hub";
+import { GuidesView } from "./views/guides-view";
+import { NewsView } from "./views/news-view";
+import { GuideHelpButton, NewMark, StNavEntry, StProvider } from "./views/st-state";
 import { RoadmapView } from "./views/roadmap";
 import { FreshnessStrip as StatusLine } from "./views/sync-status";
 import { InboxView } from "./views/inbox";
@@ -346,7 +349,7 @@ export function Dashboard() {
   const mainMenu = menu.filter((n) => n.group !== "Settings and help");
   const footMenu = menu.filter((n) => n.group === "Settings and help");
   const renderNav = (list: typeof menu) => list.map((n, i) => (
-      <div key={n.id}>
+      <StNavEntry key={n.id} id={n.id}><div>
         {n.group !== (list[i - 1]?.group ?? null) && (n.group && n.group !== "Settings and help" ? <p data-testid="nav-group" className="px-3 pb-1 pt-3 text-[10.5px] font-semibold uppercase tracking-[0.14em] text-sidebar-foreground/70">{n.group}</p> : i > 0 || n.group === "Settings and help" ? <div className="my-2 border-t border-sidebar-border" /> : null)}
         <button type="button" onClick={() => goTop(n.id)} aria-current={n.id === active ? "page" : undefined}
           className={`group relative flex w-full items-center gap-2.5 rounded-lg px-3 py-1.5 text-left text-[0.86rem] transition-colors ${n.id === active ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground" : "text-sidebar-foreground/75 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"}`}>
@@ -354,8 +357,9 @@ export function Dashboard() {
           {(() => { const Icon = ICONS[n.id]; return Icon ? <Icon aria-hidden className={`size-[17px] shrink-0 ${n.id === active ? "text-sidebar-primary" : "opacity-70 group-hover:opacity-100"}`} /> : null; })()}
           <span className="flex-1">{labelFor(n)}</span>
           {locked(n.feature) && <span className="text-[10px] font-semibold uppercase tracking-wide text-sidebar-primary">Pro</span>}
+          <NewMark view={n.id} />
         </button>
-      </div>
+      </div></StNavEntry>
   ));
   const labelFor = (n: (typeof NAV)[number]) => (limited && n.id === "overview" ? "My account" : n.label);
   // Pages that live inside another page highlight their parent in the menu.
@@ -411,19 +415,20 @@ export function Dashboard() {
       case "inbox": return inboxTab ? <SpeedView go={go} unanswered start="unanswered" /> : <InboxView go={go} />;
       case "onboarding": return limited ? <ModuleTabs key="setup" start={0} tabs={setupTabs} /> : (auth.features.cl_module === true && !auth.locked.includes("cl_module")) || clSample() ? <ClientsModule key="cl3" go={go} features={clientFeatures} initialTab="onboarding" /> : <ClientsView key="onboarding" go={go} initialTab="onboarding" features={clientFeatures} />;
       case "email": return limited ? <ModuleTabs key="setup" start={1} tabs={setupTabs} /> : <EmailHealthView />;
-      case "duplicates": case "cleanup": return <CleanupModule key={viewId} kind={auth.kind} start={viewId === "cleanup" ? "quality" : "duplicates"} duplicatesOn={!off("duplicates") && NAV_FOR[auth.kind].has("duplicates")} cleanupOn={!off("cleanup") && NAV_FOR[auth.kind].has("cleanup")} />;
+      case "duplicates": case "cleanup": return <CleanupModule key={viewId} kind={auth.kind} start={viewId === "cleanup" ? "quality" : "duplicates"} duplicatesOn={!off("duplicates") && NAV_FOR[auth.kind].has("duplicates")} cleanupOn={!off("cleanup") && NAV_FOR[auth.kind].has("cleanup")} fixOn={auth.features.cu_fix === true && !auth.locked.includes("cu_fix")} healthOn={auth.features.cu_health === true && !auth.locked.includes("cu_health")} legacyHealth={auth.features.cu_health === true && !off("data_health") ? <ApiProvider value={baseApi}><DataHealthView go={go} kind={auth.kind} /></ApiProvider> : null} />;
       case "alerts": return <AlertsView go={go} />;
-      case "settings": return <SettingsView openSection={movedTo ?? undefined} />;
+      case "settings": return auth.features.st_settings === true && !auth.locked.includes("st_settings") ? <SettingsHub go={go} features={auth.features} openOld={movedTo ?? undefined} /> : <SettingsView openSection={movedTo ?? undefined} />;
       case "connections": return <IntegrationsPage />;
       case "notifications": return <NotificationsPage />;
-      case "help": return <HelpView go={go} />;
-      case "roadmap": return <RoadmapView />;
+      case "help": return auth.features.st_guides === true && !auth.locked.includes("st_guides") ? <GuidesView go={go} /> : <HelpView go={go} />;
+      case "roadmap": return auth.features.st_news === true && !auth.locked.includes("st_news") ? <NewsView go={go} features={auth.features} /> : <RoadmapView />;
       case "pipeline": return auth.features.pl_module === true && !auth.locked.includes("pl_module") ? <PipelineModule key="pipe3" moneyFlow={auth.features.pl_money_flow === true && !auth.locked.includes("pl_money_flow")} actions={auth.features.pl_actions === true && !auth.locked.includes("pl_actions")} /> : <ModuleTabs key="pipe" start={0} tabs={pipeTabs} />;
       case "team": if ((auth.features.pp_module === true && !auth.locked.includes("pp_module")) || ppSample()) return <TeamModule key="pp3" go={go} />; return limited ? <Centered title="Not available" body="This page is switched off right now." /> : <TeamView />;
       case "appointments": return auth.features.appt_module === true && !auth.locked.includes("appt_module") ? <AppointmentsModule key="appts3" go={go} flowTree={auth.features.appt_flow_tree === true} leadership={auth.features.ap_exec === true} /> : <ModuleTabs key="appts" start={0} tabs={[{ label: "Appointments", node: <AppointmentsView go={go} /> }, { label: "Insights", node: <AppointmentInsights /> }]} />;
       case "meetings": return <MeetingsView />;
       // Workflows reads with the unfiltered client and keeps its own account choice (like Today), so the shared filter never changes what it counts.
-      case "data-health": return <ApiProvider value={baseApi}><DataHealthView go={go} kind={auth.kind} /></ApiProvider>;
+      case "data-health": if (auth.features.cu_health === true && !auth.locked.includes("cu_health")) return <CleanupModule key="dh" kind={auth.kind} start="health" duplicatesOn={!off("duplicates") && NAV_FOR[auth.kind].has("duplicates")} cleanupOn={!off("cleanup") && NAV_FOR[auth.kind].has("cleanup")} fixOn={auth.features.cu_fix === true && !auth.locked.includes("cu_fix")} healthOn legacyHealth={<ApiProvider value={baseApi}><DataHealthView go={go} kind={auth.kind} /></ApiProvider>} />;
+        return <ApiProvider value={baseApi}><DataHealthView go={go} kind={auth.kind} /></ApiProvider>;
       case "payments": return (auth.features.pm_module === true && !auth.locked.includes("pm_module")) || pmSample() ? <PaymentsModule key="pm" go={go} /> : <EmptyState title="Payments is not switched on yet" body="It will appear here as soon as it is ready for your account." />;
       case "workflows": return <ApiProvider value={baseApi}><WorkflowsView go={go} kind={auth.kind} /></ApiProvider>;
       case "clients": if ((auth.features.cl_module === true && !auth.locked.includes("cl_module")) || clSample()) return <ClientsModule key="cl3" go={go} features={clientFeatures} />; return <ClientsView key="clients" go={go} initialTab="health" features={clientFeatures} />;
@@ -446,6 +451,7 @@ export function Dashboard() {
 
   return (
     <ApiProvider value={api}>
+      <StProvider features={auth.features}>
       <div className={`${theme === "dark" ? "dark " : ""}${(view.id === "today" || view.id === "speed") ? `today ${TODAY_FONTS} ` : ""}flex min-h-screen bg-background text-foreground`} data-theme={theme} style={accentStyle}>
         <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col self-start border-r border-sidebar-border bg-sidebar p-4 text-sidebar-foreground md:flex print:hidden">
           <div className="flex items-center gap-2.5 px-2 pt-1">
@@ -481,15 +487,14 @@ export function Dashboard() {
           )}
           <nav className="fixed inset-x-0 bottom-0 z-30 flex gap-1 overflow-x-auto border-t bg-card p-1.5 shadow-[var(--shadow-lift)] md:hidden print:hidden" aria-label="Sections" data-testid="phone-menu">
             {menu.map((n) => (
-              <button key={n.id} type="button" onClick={() => goTop(n.id)} aria-current={n.id === active ? "page" : undefined}
+              <StNavEntry key={n.id} id={n.id}><button type="button" onClick={() => goTop(n.id)} aria-current={n.id === active ? "page" : undefined}
                 className={`flex min-h-12 min-w-[4.5rem] shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg px-2.5 text-xs leading-tight transition-colors ${n.id === active ? "bg-accent font-semibold text-foreground" : "text-muted-foreground"}`}>
                 {(() => { const Icon = ICONS[n.id]; return Icon ? <Icon aria-hidden className="size-5" /> : null; })()}
                 <span className="max-w-[5.5rem] truncate">{labelFor(n)}</span>
-              </button>
+              </button></StNavEntry>
             ))}
           </nav>
           <main className="mx-auto w-full max-w-[1800px] flex-1 p-4 pb-24 sm:px-10 sm:py-8 md:pb-8">
-            <DialerAskHost />
             {fromAccount && view.id !== "today" && (
               <InlineAlert className="mb-3" action={<Btn variant="ghost" onClick={() => { setFilter(EMPTY_FILTER); try { window.history.replaceState(null, "", withTodayAccounts(window.location.hash, [])); window.dispatchEvent(new Event("subsync-today-accounts")); } catch { /* see above */ } }}>See all client accounts</Btn>}>
                 You opened this from inside a client account, so every page shows only that account.
@@ -504,6 +509,7 @@ export function Dashboard() {
               </div>
               <div className="ml-auto flex shrink-0 items-center">
                 {auth.kind !== "client" && <div className="mr-2"><SyncNow agency={auth.kind === "agency" && Boolean(baseApi)} /></div>}
+                <GuideHelpButton view={view.id} go={go} />
                 {NAV_FOR[auth.kind].has("search") && !off("search") && <GlobalSearch go={go} />}
                 <NotificationBell go={go} />
               </div>
@@ -517,6 +523,7 @@ export function Dashboard() {
           </main>
         </div>
       </div>
+      </StProvider>
     </ApiProvider>
   );
 }

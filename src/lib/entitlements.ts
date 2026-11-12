@@ -144,6 +144,9 @@ export const FEATURES = [
   "cl2_notes",
   "cl2_bulk",
   "cl2_team_move",
+  "cl3_money",
+  "cl3_apps",
+  "cl3_history",
   "cl_onboarding",
   // Team (People) module (docs/features/PEOPLE_BRIEF.md): each behind its own flag, default off.
   "pp_module",
@@ -173,6 +176,11 @@ export const FEATURES = [
   "ov_screen",
   "fl_find",
   "fl_bulk",
+  // Workflows module, second pass (docs/features/WORKFLOWS_BRIEF.md): outcome health and gaps, the template library, bulk install, the Today feed. Default off.
+  "wf_outcomes",
+  "wf_library",
+  "wf_bulk",
+  "wf_today",
   // Payments module (docs/features/PAYMENTS_BRIEF.md): each behind its own flag, default off. pm_resend messages a customer and stays off until King approves it.
   "pm_module",
   "pm_recovery",
@@ -184,6 +192,13 @@ export const FEATURES = [
   "cf_deals",
   "cf_email",
   "cf_record",
+  "st_settings",
+  "st_guides",
+  "st_news",
+  "cu_fix",
+  "cu_health",
+  "cu_bulk",
+  "cu_confirm",
 ] as const;
 export type Feature = (typeof FEATURES)[number];
 

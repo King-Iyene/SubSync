@@ -47,6 +47,9 @@ test("pilot modules are on by default and a database row can still override the 
     "cl2_notes",
     "cl2_plans",
     "cl2_team_move",
+    "cl3_apps",
+    "cl3_history",
+    "cl3_money",
     "cl_actions",
     "cl_attention",
     "cl_billing",
@@ -61,6 +64,10 @@ test("pilot modules are on by default and a database row can still override the 
     "cl_setup",
     "cl_trends",
     "cl_workflows",
+    "cu_bulk",
+    "cu_confirm",
+    "cu_fix",
+    "cu_health",
     "fl_bulk",
     "fl_find",
     "inbox_assign",
@@ -133,12 +140,19 @@ test("pilot modules are on by default and a database row can still override the 
     "pp_scorecards",
     "pp_today",
     "pp_workload",
+    "st_guides",
+    "st_news",
+    "st_settings",
     "td_email",
     "td_module",
     "td_numbers",
     "td_proof",
     "td_record",
     "td_today",
+    "wf_bulk",
+    "wf_library",
+    "wf_outcomes",
+    "wf_today",
     "zoom_meet",
   ]);
   assert.equal(f.meetings, true);
@@ -166,8 +180,8 @@ test("the production pilot menu keeps all modules available to every authorized 
     visibleNav(NAV_FOR[kind], { limited: kind !== "agency", off: (feature) => features[feature] === false }).length;
   assert.deepEqual(
     { agency: count("agency", after), business: count("business", after), client: count("client", after) },
-    { agency: 16, business: 16, client: 15 },
-    "Unanswered messages is a tab of Speed to lead now, so each menu is one shorter; a client account user also sees Team, limited to their own numbers",
+    { agency: 15, business: 15, client: 15 },
+    "Unanswered messages is a tab of Speed to lead now, and Data health is a tab of Clean-up (it stays in a client account user's menu, which has no Clean-up), so each menu is shorter; a client account user also sees Team, limited to their own numbers",
   );
   // Speed to lead off: the Unanswered screen is not lost, its own entry comes back.
   for (const kind of ["agency", "business", "client"] as const) {

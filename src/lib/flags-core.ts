@@ -111,6 +111,9 @@ export const DEFAULT_OFF: ReadonlySet<Feature> = new Set<Feature>([
   "cl2_notes",
   "cl2_bulk",
   "cl2_team_move",
+  "cl3_money",
+  "cl3_apps",
+  "cl3_history",
   "cl_onboarding",
   // Team (People) module (docs/features/PEOPLE_BRIEF.md): each behind its own flag, default off.
   "pp_module",
@@ -142,6 +145,11 @@ export const DEFAULT_OFF: ReadonlySet<Feature> = new Set<Feature>([
   // Find a lead (docs/features/FINDLEAD_BRIEF.md): fl_find is the search (keyset paging, pickers, copy); fl_bulk is bulk actions and export. Default off.
   "fl_find",
   "fl_bulk",
+  // Workflows second pass (docs/features/WORKFLOWS_BRIEF.md): wf_outcomes is the Gaps tab and our daily outcome record; wf_library the template library; wf_bulk install in many accounts; wf_today the Today line. Default off.
+  "wf_outcomes",
+  "wf_library",
+  "wf_bulk",
+  "wf_today",
   // Payments module (docs/features/PAYMENTS_BRIEF.md): each behind its own flag, default off. pm_resend stays off until King approves messaging a customer.
   "pm_module",
   "pm_recovery",
@@ -154,6 +162,15 @@ export const DEFAULT_OFF: ReadonlySet<Feature> = new Set<Feature>([
   "cf_deals",
   "cf_email",
   "cf_record",
+  // Settings rebuild, guides and the change log (stage ST): each default off.
+  "st_settings",
+  "st_guides",
+  "st_news",
+  // Clean-up (docs/features/CLEANUP_BRIEF.md): cu_fix is the fix lists, cu_health the Health tab and the daily record, cu_bulk the tag and remove runs, cu_confirm typed confirmation on merges. Default off.
+  "cu_fix",
+  "cu_health",
+  "cu_bulk",
+  "cu_confirm",
 ]);
 
 export function resolveFeatures(all: readonly Feature[], overrides: Record<string, boolean>, allOn = false): Record<Feature, boolean> {

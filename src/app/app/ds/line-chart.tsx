@@ -12,11 +12,13 @@ import { ChartPlaceholder } from "./charts";
 const COLOUR: Record<string, string> = { "1": "var(--chart-1)", "2": "var(--chart-2)", "3": "var(--chart-3)", "4": "var(--chart-4)", "5": "var(--chart-5)", muted: "var(--muted-foreground)" };
 const colourOf = (s: LineSeries, i: number) => COLOUR[String(s.tone ?? ((i % 5) + 1))];
 
-export function LineChart({ title, series, format = (n: number) => String(Math.round(n)), unit = "", axisLabel, floor, ceiling, height = 168, min = 3, need = "days of history", note }: {
+export function LineChart({ title, series, format = (n: number) => String(Math.round(n)), unit = "", axisLabel, floor, ceiling, height = 168, min = 3, need = "days of history", note, hideFlat = false }: {
   title: string; series: ReadonlyArray<LineSeries>;
   format?: (n: number) => string; unit?: string; axisLabel?: string; floor?: number; ceiling?: number; height?: number;
   /** The fewest days with a value before a line is drawn. */
   min?: number; need?: string;
+  /** A main line that never changes (all one value, often zero) shows a calm empty state instead of a flat curve. */
+  hideFlat?: boolean;
   /** One quiet line under the chart (what the chart does not show, or why part of it is missing). */
   note?: string;
 }) {
@@ -24,6 +26,17 @@ export function LineChart({ title, series, format = (n: number) => String(Math.r
   const box = useRef<HTMLDivElement>(null);
   const l = layoutLines(series, { floor, ceiling });
   if (belowMinimum(l.days.length, min)) return <ChartPlaceholder title={title} need={min} have={l.days.length} unit={need}>{note ? ` ${note}` : null}</ChartPlaceholder>;
+  const mainValues = (series[0]?.points ?? []).flatMap((p) => (p.value === null ? [] : [p.value as number]));
+  if (hideFlat && mainValues.length > 0 && new Set(mainValues).size < 2) {
+    return (
+      <div className="rounded-lg border border-dashed p-5" role="img" aria-label={`${title}: not enough history yet`} data-testid="chart-flat-empty">
+        <p className="text-sm font-medium">{title}</p>
+        <p className="mt-1 text-xs text-muted-foreground">Not enough history yet: SubSync has recorded {l.days.length} {l.days.length === 1 ? "day" : "days"}, and this line has not changed in them. It fills in as data arrives.{note ? ` ${note}` : ""}</p>
+      </div>
+    );
+  }
+  // Axis labels closer than a fifth of the width are dropped so they never overlap.
+  const xTicks = l.xTicks.reduce<typeof l.xTicks>((kept, t) => (kept.length === 0 || t.at - kept[kept.length - 1].at >= 0.2 ? [...kept, t] : kept), []);
   const point = (e: PointerEvent) => {
     const r = box.current?.getBoundingClientRect();
     if (!r || r.width === 0) return;
@@ -66,7 +79,7 @@ export function LineChart({ title, series, format = (n: number) => String(Math.r
         </div>
       </div>
       <div className="relative ml-14 mt-1 h-4 text-[11px] text-muted-foreground" aria-hidden>
-        {l.xTicks.map((t, i) => <span key={t.day} className={`absolute whitespace-nowrap ${i === 0 ? "" : i === l.xTicks.length - 1 ? "-translate-x-full" : "-translate-x-1/2"}`} style={{ left: `${t.at * 100}%` }}>{t.label}</span>)}
+        {xTicks.map((t, i) => <span key={t.day} className={`absolute whitespace-nowrap ${i === 0 ? "" : i === xTicks.length - 1 ?"-translate-x-full" : "-translate-x-1/2"}`} style={{ left: `${t.at * 100}%` }}>{t.label}</span>)}
       </div>
       <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
         {series.map((s, i) => (
