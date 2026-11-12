@@ -25,6 +25,7 @@ import "../cl3/cl3.css";
 import "./td3.css";
 import { fixturesOn, notSwitchedOn, queryOf, useTd } from "./data";
 import { CashSettings, RecoverTab, SaveCard, useCashFlags } from "./cash";
+import { FinanceTodayCard } from "../fn/today-card";
 import { BriefCard, WalletCard } from "../wg/today-cards";
 
 // Today, one screen: Today | Proof | Numbers | Settings. Today is the ranked "what to do first" list with ONE button; Proof is the weekly receipt an agency shows its client; Numbers
@@ -132,6 +133,7 @@ function TodayTab({ location, level, go, open, setTab, saveOn, openRecover, nav,
         return (
           <div className="cl-stack" data-testid="td-today">
             {level === "all" && <BriefCard go={nav} openRecover={openRecover} />}
+            {level !== "self" && <FinanceTodayCard go={nav} />}
             {saveOn && level !== "self" && <SaveCard openList={openRecover} go={(v, loc) => nav(v, loc)} />}
             {level === "all" && <WalletCard go={nav} />}
             <section className="cl-today" aria-label="What to do today">

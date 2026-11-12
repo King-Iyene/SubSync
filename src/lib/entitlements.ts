@@ -165,6 +165,14 @@ export const FEATURES = [
   "pp_roles",
   // Branded client Proof page and monthly report: the Proof tab and drafts in Clients, the secret client link and printable page, the monthly auto-prepared draft.
   "pr_report",
+  // Finance (stage FN): the module, then each part behind its own flag, all default off.
+  "fn_module",
+  "fn_mrr",
+  "fn_revenue",
+  "fn_churn",
+  "fn_payouts",
+  "fn_ledger",
+  "fn_today",
   "pr_page",
   "pr_auto",
   // Account audit (docs/features/AUDIT_BRIEF.md): history and then-vs-now, the client one-pager, the monthly re-audit email.

@@ -131,6 +131,7 @@ import { handleBfFunnel, handleBfRecover } from "./bf-routes";
 import { handlePipeline3 } from "./pipeline3-routes";
 import { handleClients3 } from "./clients3-routes";
 import { handleProof } from "./proof-routes";
+import { handleFinance } from "./finance-routes";
 import { handleClients2 } from "./clients2-routes";
 import { handlePeople3 } from "./people3-routes";
 import { handleTeamRoles } from "./team-roles-routes";
@@ -835,7 +836,7 @@ export async function todayBriefForInstallation(installationId: string, plan: Pl
   return briefFromToday(await todayData(ctx));
 }
 
-const USAGE_VIEWS = new Set(["today", "overview", "accounts", "clients", "team", "search", "deals", "pipeline", "leads", "calls", "inbox", "onboarding", "email", "duplicates", "alerts", "settings", "help", "account", "meetings", "audit", "speed", "appointments", "people", "myday", "roadmap", "notifications", "workflows", "payments", "cleanup", "data-health", "connections"]);
+const USAGE_VIEWS = new Set(["today", "overview", "accounts", "clients", "team", "search", "deals", "pipeline", "leads", "calls", "inbox", "onboarding", "email", "duplicates", "alerts", "settings", "help", "account", "meetings", "audit", "speed", "appointments", "people", "myday", "roadmap", "notifications", "workflows", "payments", "finance", "cleanup", "data-health", "connections"]);
 
 // A counter of which pages get opened (no personal data), so the getting-started checklist can
 // tick itself off and so the agency can see what its team uses.
@@ -2077,6 +2078,8 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
     }
     // Branded client Proof page and monthly report (stage PR): reports per client account, the secret client link, settings. Agency staff only; flags pr_* checked inside.
     if (a === "proof") return await handleProof(ctx, { allowed: () => allowedIds(ctx), settings: async () => (await scope(ctx)).settings });
+    // Finance (stage FN): money overview, client revenue, churn watch, setter and closer payouts, billing notes. Managers see everything; anyone else only their own payout statement (decided inside).
+    if (a === "finance") return await handleFinance(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links });
     // Clients round 3: /api/app/clients3?part=... (overview, needs attention, trends, compare, receipt, people, setup, lists; read only).
     if (a === "clients3" && method === "GET" && !b && ctx.url.searchParams.has("part")) {
       return await handleClients3(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links });

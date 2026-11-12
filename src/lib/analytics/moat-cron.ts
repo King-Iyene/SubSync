@@ -23,6 +23,7 @@ import { accountReceipt } from "./moat-queries";
 import { mondayOf, weeklyDue, weeklyProofText } from "./moat-core";
 import { autoPrepare } from "./proof-queries";
 import { getSettings } from "./queries";
+import { recordSnapshot } from "./finance-queries";
 
 // Hourly: (1) D1 keeps the raw record current (flag moat_record), (2) E3 on Monday morning (UTC 08:00 to 09:59) writes one weekly proof receipt per client account to its
 // account admin through the notification dispatcher, EMAIL IN DRY-RUN ONLY (the gated transport writes "would send" and sends nothing until the live switch is on).
@@ -56,7 +57,8 @@ export async function runMoatCron(now = Date.now()): Promise<MoatCronReport> {
       const wga = ent.features.wg_alerts && !ent.locked.includes("wg_alerts");
       const bre = ent.features.br_email && !ent.locked.includes("br_email");
       const pra = ent.features.pr_auto && ent.features.pr_report && !ent.locked.includes("pr_auto") && !ent.locked.includes("pr_report");
-      if (!rec && !mail && !apr && !plr && !clr && !clb && !ppr && !ppi && !auh && !aum && !tdr && !tde && !cfr && !cfe && !pmr && !wgr && !wga && !bre && !pra) continue;
+      const fnr = ent.features.fn_mrr && ent.features.fn_module && !ent.locked.includes("fn_mrr") && !ent.locked.includes("fn_module");
+      if (!rec && !mail && !apr && !plr && !clr && !clb && !ppr && !ppi && !auh && !aum && !tdr && !tde && !cfr && !cfe && !pmr && !wgr && !wga && !bre && !pra && !fnr) continue;
       rep.companies++;
       if (apr) rep.events += Object.values(await sweepAppointmentHistory(installationId)).reduce((x, y) => x + y, 0);
       if (plr) rep.events += Object.values(await sweepDealHistory(installationId)).reduce((x, y) => x + y, 0);
@@ -79,11 +81,13 @@ export async function runMoatCron(now = Date.now()): Promise<MoatCronReport> {
       // The 7 am brief, at each person's own hour of their own day (br_email). One per person per day; email stays a dry run until the live switch is on.
       if (bre) {
         const on = (k: string) => ent.features[k as keyof typeof ent.features] === true && !ent.locked.includes(k);
-        await runBriefs(installationId, { cf_save: on("cf_save"), cf_recover: on("cf_recover"), cf_deals: on("cf_deals"), wg_wallet: on("wg_wallet"), pm_module: on("pm_module"), td_today: on("td_today") }, now).catch((e) => console.error("Brief failed", safeError(e)));
+        await runBriefs(installationId, { cf_save: on("cf_save"), cf_recover: on("cf_recover"), cf_deals: on("cf_deals"), wg_wallet: on("wg_wallet"), pm_module: on("pm_module"), td_today: on("td_today"), fn_today: on("fn_today") }, now).catch((e) => console.error("Brief failed", safeError(e)));
       }
       if (tde) await runTodayEmail(installationId, now).catch((e) => console.error("Today email failed", safeError(e)));
       if (rec) rep.events += Object.values(await sweepMoatEvents(installationId)).reduce((a, b) => a + b, 0);
       if (ppi) await runPeopleAlerts(installationId, now).catch((e) => console.error("Team alerts failed for one company", safeError(e)));
+      // Finance: one money record per client account per day (plan, payment status, monthly price). Our own history: the platform only shows "now". Idempotent (the same day is rewritten).
+      if (fnr) rep.events += await recordSnapshot(installationId, now).catch((e) => { console.error("Money record failed", safeError(e)); return 0; });
       if (pra) {
         // The first days of a month: a draft report for last month for every client account that has none. It is only a draft; nothing goes to a client until the owner shares it.
         const st = await getSettings(installationId);

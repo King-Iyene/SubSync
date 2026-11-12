@@ -3,7 +3,7 @@ import { decodeRange, encodeRange, type RangeSpec } from "./range.ts";
 // The ONE global filter bar (KF-11): which pages draw it, what its date part means on each page, and how the page range lives in the address. Pure.
 
 /** Pages whose numbers, charts and lists depend on a date range, with the client accounts picked in the bar. Every card on them follows the bar unless the card has its own labelled choice in the address. */
-const RANGE_VIEWS = new Set(["speed", "appointments", "overview", "leads", "deals", "team", "pipeline", "accounts", "clients", "today", "myday", "payments"]);
+const RANGE_VIEWS = new Set(["speed", "appointments", "overview", "leads", "deals", "team", "pipeline", "accounts", "clients", "today", "myday", "payments", "finance"]);
 /** Pages that read their own client accounts (their own picker) but whose numbers still follow the date bar: the bar offers the dates only, so the two never disagree. */
 const DATES_VIEWS = new Set(["workflows"]);
 /** Meeting notes (a person's own inbox and set-up) takes no date or account choice from the bar, so it draws none. */
