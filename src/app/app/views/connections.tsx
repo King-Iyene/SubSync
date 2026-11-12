@@ -40,9 +40,9 @@ type TeamData = {
 /** Every button in these two sections is a thumb target on a phone (44 px), as in the Today lists; on a laptop they keep the shared 32 px height. */
 const PHONE_TARGETS = "max-sm:[&_button]:min-h-11";
 
-const INFO: Record<PersonalProvider, { name: string; brand: BrandId; what: string }> = {
+const INFO: Record<PersonalProvider, { name: string; brand: BrandId | null; what: string }> = {
   fathom: { name: "Fathom", brand: "fathom", what: "After each recorded call, SubSync receives the summary and action items of YOUR calls, finds the contact by exact email, and adds a note to that contact, written as you. Nothing is ever saved to a guessed contact: if nobody matches, or two contacts share the email, the call waits in your own Meeting inbox for you to choose." },
-  zoom: { name: "Zoom", brand: "zoom", what: "When Zoom writes a summary of a meeting you hosted, it reaches you. The host needs a paid Zoom plan with meeting summaries switched on." },
+  zoom: { name: "Zoom", brand: null, what: "When Zoom writes a summary of a meeting you hosted, it reaches you. The host needs a paid Zoom plan with meeting summaries switched on." },
 };
 
 const TONE: Record<Shown, Tone> = { not_connected: "neutral", waiting: "info", expired: "warn", connected: "good", needs_reconnect: "warn", revoked: "bad", error: "bad" };
@@ -147,7 +147,6 @@ function MySection({ data, reload, level }: { data: MyData; reload: () => Promis
       <ul className="divide-y border-y" data-testid="my-connections">
         {data.cards.map((card) => {
           const info = INFO[card.provider];
-          const Icon = info.icon;
           const mine = data.connections.find((c) => c.provider === card.provider) ?? null;
           const isWaiting = waiting?.provider === card.provider;
           const status: Shown = isWaiting ? "waiting" : mine?.status ?? "not_connected";
@@ -156,7 +155,7 @@ function MySection({ data, reload, level }: { data: MyData; reload: () => Promis
           return (
             <li key={card.provider} className="py-4" data-testid={`my-${card.provider}`}>
               <div className="flex flex-wrap items-start gap-3">
-                <BrandIcon id={info.brand} size={22} decorative className="mt-0.5" />
+                {info.brand && <BrandIcon id={info.brand} size={22} decorative className="mt-0.5" />}
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="text-sm font-semibold">{info.name}</h3>

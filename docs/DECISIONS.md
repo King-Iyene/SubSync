@@ -639,3 +639,9 @@ Customer view. Who uses it: the agency owner (who is slow, who is overloaded, wh
 - **Plan changes of our own install** are written to `pm_events` (kind `app_plan`) in `setPlan`, so billing history starts recording now.
 - **Scopes.** Five new OPTIONAL read scopes added (36 in total): payments/transactions.readonly, payments/subscriptions.readonly, invoices.readonly, wallet.readonly, marketplace-installer-details.readonly. Names for the first three and invoices checked against the platform's public API pages today. `saas/location.read` kept until the live check. One GHL release (Clone as Draft, minor version, "Adds payment and credit visibility, read only").
 - **Not done here (Clients owns it):** wallet-low alert, past-due-plan alert in the daily brief; the plan price columns of `client_billing`. Payments reads the plan price itself from the plan call.
+
+## 2026-11-12 Settings, guides and What's new (stage ST)
+- Who uses it: an agency owner or business admin looking for one setting; a setter finding out what a page means. They no longer hunt through eight tabs or read a changelog; a "?" and a search box answer. If missing: they ask support.
+- Settings is ten sections with a search box (flag st_settings). The older form is reused through `SettingsView embedded`, so every control keeps its checked server route; the old page stays until the flag is on.
+- Per-person marks (dismissed New badges, read guides, hidden menu pages) live in one table, st_user_state, keyed by the signed-in person. Flags: st_settings, st_guides, st_news, all default off.
+- Zoom and Google Meet marks are not shipped: those tools stay hidden everywhere (a test enforces it). Slack, Fathom, Gmail and Google Calendar marks are in docs/BRAND_ASSETS.md.

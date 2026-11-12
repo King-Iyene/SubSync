@@ -154,6 +154,10 @@ export const DEFAULT_OFF: ReadonlySet<Feature> = new Set<Feature>([
   "cf_deals",
   "cf_email",
   "cf_record",
+  // Settings rebuild, guides and the change log (stage ST): each default off.
+  "st_settings",
+  "st_guides",
+  "st_news",
 ]);
 
 export function resolveFeatures(all: readonly Feature[], overrides: Record<string, boolean>, allOn = false): Record<Feature, boolean> {
