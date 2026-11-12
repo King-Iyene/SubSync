@@ -2,7 +2,7 @@ import { PROTECT_WORDS, protectedReason, type ProtectReason } from "../cleanup/c
 
 // The "Show copies" panel and the "Protected" explainer on the Duplicates list. Pure words and rules, so the screen and the tests read the same thing.
 
-export const PROTECTED_EXPLAINER = "Protected means one of these copies has Do Not Disturb, an open deal, or a coming appointment. SubSync never deletes or bulk-merges protected people, so nobody loses consent or a live sale. You can still merge them one at a time after checking.";
+export const PROTECTED_EXPLAINER = "Protected means one of these copies has Do Not Disturb, an open deal, or a coming appointment. Merge all certain matches skips protected people and SubSync never deletes them, so nobody loses consent or a live sale. You can still use Merge this person for protected people one at a time, after checking.";
 export const DELETE_BLOCKED_WHY = "Everyone else here is protected";
 
 export type CopyChip = { reason: ProtectReason; text: string; title: string };

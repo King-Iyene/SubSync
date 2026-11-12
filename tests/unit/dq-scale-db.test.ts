@@ -29,7 +29,7 @@ describe.skipIf(!RUN)("Clean-up v2 at scale", () => it("the scan is a grouping, 
   const t0 = Date.now();
   // Every 100th contact is a copy of the one 'ACCOUNTS' rows before it (the same account): the same email and phone, so about 1% of contacts are certain duplicates. Sources are 12 names; a third of contacts are leads of the last 90 days.
   await db`insert into cached_contacts (installation_id, location_id, contact_id, first_name, last_name, email, phone, assigned_to, source, dnd, date_added)
-    select ${inst}::uuid, 'xtest-dq-' || (1 + g % ${ACCOUNTS}), 'xtest-c-' || g, (array['Ava','Ben','Chloe','Dan','Eve','Femi','Gus','Hana'])[1 + g % 8], 'Lead' || g,
+    select ${inst}::uuid, 'xtest-dq-' || (1 + g % ${ACCOUNTS}), 'xtest-c-' || g, (array['Ava','Ben','Chloe','Dan','Eve','Femi','Gus','Hana'])[1 + (case when g % 100 = 0 then g - ${ACCOUNTS} else g end) % 8], 'Lead' || (case when g % 100 = 0 then g - ${ACCOUNTS} else g end),
       'lead' || (case when g % 100 = 0 then g - ${ACCOUNTS} else g end) || '@x.test', '555' || lpad(((case when g % 100 = 0 then g - ${ACCOUNTS} else g end) % 10000000)::text, 7, '0') || '0',
       case when g % 3 = 0 then null else 'u' || (g % 60) end, 'source ' || (g % 12), g % 17 = 0, now() - ((g % 900) || ' days')::interval
     from generate_series(1, ${ROWS}) g`;

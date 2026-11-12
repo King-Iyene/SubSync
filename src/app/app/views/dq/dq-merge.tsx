@@ -29,7 +29,7 @@ export function MergeTable({ g, onGone }: { g: GroupRow; onGone: (key: string, m
   const det = d.data;
   if (d.loading && !det) return <div className="px-3 pb-4"><SkeletonRows rows={3} label="Loading the copies..." /></div>;
   if (d.error) return <div className="px-3 pb-4"><ErrorState error={d.error} onRetry={d.reload} /></div>;
-  if (!det) return null;
+  if (!det) return <div className="px-3 pb-4"><p className="text-sm text-muted-foreground" role="status" data-testid="dq-merge-unavailable">SubSync could not load these copies, so there is nothing to merge here yet. Try again in a moment, or open them in your CRM.</p> <button type="button" className={QUIET} onClick={d.reload}>Try again</button></div>;
   const primaryId = keep ?? d.pick?.suggestedId ?? null; // never "the first one": null until the ranking is sure or the person chooses
   const wf = det.workflow;
   const canWorkflow = wf.set && wf.optedIn && wf.canAsk && wf.blockers.length === 0 && det.people.length === 2 && !det.different;
@@ -57,6 +57,8 @@ export function MergeTable({ g, onGone }: { g: GroupRow; onGone: (key: string, m
 
   return (
     <div className="space-y-3 border-t bg-muted/20 px-3 py-4" data-testid="dq-merge-table">
+      {g.protectedCount > 0 && <p className="rounded-lg border bg-card px-3 py-2 text-sm" role="status" data-testid="dq-merge-protected">Someone in this group is protected ({g.people.filter((p) => p.protect).map((p) => `${p.name}: ${p.protectWords ?? "protected"}`).join("; ")}). &quot;Merge all certain matches&quot; skips protected people, but you can merge this one yourself after checking below.</p>}
+      {g.nameNote && <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm" role="status" data-testid="dq-merge-names">{g.nameNote}</p>}
       {det.different && <p className="text-sm text-destructive" role="alert">These look like different people (a different email and a different phone). Check before you merge.</p>}
       <PickNote pick={d.pick} people={d.people} />
       <CopyCards people={d.people} primaryId={primaryId} pick={d.pick} onPick={setKeep} name={`keep-${g.key}`} />
