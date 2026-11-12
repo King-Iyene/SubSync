@@ -30,12 +30,12 @@ export async function handleWg(ctx: Ctx, h: WgHelpers): Promise<Response> {
   const { level, selfId } = viewerOf(ctx);
   const wrap = (body: object, cached = false) => json({ ...body, generatedAt: new Date().toISOString(), cached, level, flags, problem: null });
   // Owners and admins only: the balances are the agency's own money.
-  if (level !== "all" || ctx.limitTo !== null) return wrap({ rows: [], total: 0, accounts: 0, counts: {}, top: [] });
+  if (level !== "all" || ctx.limitTo !== null) return wrap({ rows: [], total: 0, accounts: 0, counts: {}, top: [], restricted: true });
   const scope = { inst: ctx.installationId, allowed };
   const links: Links = { account: (l) => dl.account(l) };
   const asked = sp.get("account");
   const one = asked ? await ownedLocation(ctx.installationId, allowed, asked) : null;
-  if (asked && !one) return wrap({ rows: [], total: 0, accounts: 0, counts: {}, top: [] });
+  if (asked && !one) return wrap({ rows: [], total: 0, accounts: 0, counts: {}, top: [], restricted: true });
   const key = JSON.stringify([ctx.installationId, allowed, level, selfId, part, sp.toString()]);
   const hit = wgCache.get(key);
   if (hit) return wrap(hit, true);

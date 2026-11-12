@@ -925,3 +925,17 @@ Read only. Test-mode rows (`liveMode` false) are stored but never counted unless
 
 ## Workflows outcome gaps (second pass)
 People are counted once per gap per client account, from SubSync's own record. no_touch: leads of the last 14 days with no first reply an hour after arriving. no_textback: callers whose latest missed call (last 14 days) got no outbound message within 5 minutes. noshow_open: no-shows of the last 7 days with no later outbound message and no later non-cancelled booking. no_reminder: bookings in the next 2 days, booked at least 2 hours ago, with no outbound message since booking. A gap is open at 3 people or more. Dollars: open deals (value above zero) of those people, each person once; deal value on file, not money lost. An automation is present when a published workflow with a matching name exists (estimate). Code: src/lib/workflows/outcomes.ts, outcomes-db.ts.
+
+## Wallet guard (src/lib/analytics/wg-core.ts, tests src/lib/__tests__/wg-core.test.ts; docs/DECISIONS.md 11 Nov 2026)
+- **Reading**: the credit balance the platform returned for a client account, kept once per platform answer (wg_samples). Units: dollars (INFERENCE).
+- **Spend per day**: drops between consecutive readings, attributed to the later reading's UTC day. A rise of $1 or more is a top-up (not spend). A gap longer than 36 hours is not counted as one day's spend.
+- **Average spend per day (burn rate)**: spend over the last 7 days divided by the days those readings cover. Needs 4 readings over 3 days, else "not enough data".
+- **Days left (estimate)**: balance / burn rate. Empty balance = 0. Not enough data or no spend seen = no figure.
+- **Spending jump**: the latest covered day's spend is at least 3 times the middle value of the previous 14 days AND at least $5 more; needs 7 earlier covered days; when the account's normal is zero, at least $10 in a day.
+- **Low**: balance at or under the limit (default $10, per account override) or days left at or under 3 (default). **Empty**: balance 0 or less. Levels are applied when read, so a changed limit takes effect at once. Watchlist order: empty, fewest days left, lowest balance, no estimate, not readable.
+- **Counts equal rows**: every count on the screen, the Today card and the brief comes from the same list the bucket opens.
+
+## The 7 am brief (src/lib/analytics/br-core.ts, tests src/lib/__tests__/br-core.test.ts)
+- Candidates come from sections the person kept on (needs a look today, accounts to save, missed leads, deals going quiet, credit balances, payments at risk). Ranked by tier (1 something stops working today, 2 money at risk, 3 people waiting, 4 tidy-up), then dollars, then count. At most 5 shown, the rest counted ("and N more").
+- **Dollar line**: missed-lead estimate + slipping-deal value + failed/late payment amount (one currency only; mixed currencies give no figure). A deal can be in two lists, so it is a ceiling. Estimate, with the formula one tap away.
+- **Sent**: at the person's chosen hour of their own day (up to 2 hours late), not on a quiet weekday, once per local day; nothing is sent on a day with nothing to say.

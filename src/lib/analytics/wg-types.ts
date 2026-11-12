@@ -18,6 +18,8 @@ export type WgRow = {
 };
 
 export type WgSummary = {
+  /** True when the person may not see the wallet watchlist (it is for owners and admins). */
+  restricted?: boolean;
   accounts: number; counts: Record<WgBucket, number>; headline: string; needsPermission: number; top: WgRow[];
   formulaBurn: string; formulaSpike: string; historyStarts: string | null;
   prefs: { lowAmount: number; lowDays: number; alertsOn: boolean; spikeOn: boolean };
