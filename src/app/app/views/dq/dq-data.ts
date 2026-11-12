@@ -27,7 +27,7 @@ export type Overview = {
 export type Person = {
   contactId: string; name: string; email: string | null; phone: string | null; owner: string | null; source: string | null; createdAt: string | null; dnd: boolean; protect: string | null; openDeals: number; url: string; protectWords: string | null;
 };
-export type GroupRow = { key: string; locationId: string; locationName: string | null; tier: Tier; badge: string; kinds: string[]; trimmed: boolean; shared: string | null; people: Person[]; protectedCount: number; why: string[] };
+export type GroupRow = { key: string; nameNote?: string | null; locationId: string; locationName: string | null; tier: Tier; badge: string; kinds: string[]; trimmed: boolean; shared: string | null; people: Person[]; protectedCount: number; why: string[] };
 export type DupesRes = { tier: Tier; counts: Record<Tier, { groups: number; extra: number }> | null; next: string | null; rows: GroupRow[] };
 export type DupeDetail = {
   locationId: string; locationName: string | null; key: string; keepId: string; different: boolean;

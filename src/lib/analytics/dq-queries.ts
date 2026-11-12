@@ -6,6 +6,7 @@ import {
   type DayCount, type EdgeKind, type IntakeAlert, type Quality, type RawGroup, type SrcCounts, type Tier, BASELINE_DAYS, RECENT_DAYS,
 } from "../dq/dq-core";
 import { groupKey } from "./dedupe";
+import { DIFFERENT_NAMES_WHY, effectiveTier, namesConflict, withNameNote } from "../dq/dupe-tier";
 
 // Clean-up v2 (stage DQ): every read and write of the duplicate groups, the lead-intake record, the quality score and the history. It reads the contact, appointment, message-event and deal copies
 // SubSync already holds; nothing here talks to the CRM. Every query filters by the installation AND by the accounts the caller may see (`allowed`, null = all of that installation's).
@@ -64,6 +65,14 @@ export async function scanGroups(inst: string, loc: string): Promise<ScanGroups>
   const raw = await candidateGroups(inst, loc);
   const { rejected, keys } = await decided(inst, loc);
   const found = components(raw, { rejected }).filter((g) => !keys.has(groupKey(g.ids))).slice(0, GROUP_CAP);
+  // A shared email or phone is only "certain" when the names agree: otherwise the group is "likely" (shared mailbox, household).
+  const certainIds = [...new Set(found.filter((g) => g.tier === "certain").flatMap((g) => g.ids))];
+  const nameOf = new Map<string, string | null>();
+  for (let i = 0; i < certainIds.length; i += 2000) {
+    const rs = await db`select contact_id, full_name from cached_contacts where installation_id = ${inst} and location_id = ${loc} and contact_id = any(${certainIds.slice(i, i + 2000)}::text[])`;
+    for (const r of rs) nameOf.set(r.contact_id as string, (r.full_name as string | null) ?? null);
+  }
+  for (const g of found) if (g.tier === "certain") { const t = effectiveTier("certain", g.ids.map((id) => nameOf.get(id))); if (t !== "certain") g.tier = t; }
   const rows = found.map((g) => ({ installation_id: inst, location_id: loc, group_key: groupKey(g.ids), tier: g.tier, tier_rank: TIER_RANK[g.tier], kinds: g.kinds, contact_ids: g.ids, size: g.ids.length, trimmed: g.trimmed }));
   let added = 0;
   await db.begin(async (tx) => {
@@ -101,7 +110,7 @@ export async function tierCounts(s: Scope): Promise<TierCounts> {
 }
 
 export type GroupPerson = { contactId: string; name: string; email: string | null; phone: string | null; owner: string | null; source: string | null; createdAt: string | null; dnd: boolean; protect: ProtectReason | null; openDeals: number };
-export type GroupRow = { key: string; locationId: string; locationName: string | null; tier: Tier; badge: string; kinds: string[]; trimmed: boolean; shared: string | null; people: GroupPerson[]; protectedCount: number };
+export type GroupRow = { key: string; nameNote?: string | null; locationId: string; locationName: string | null; tier: Tier; badge: string; kinds: string[]; trimmed: boolean; shared: string | null; people: GroupPerson[]; protectedCount: number };
 
 async function peopleOf(inst: string, pairs: Array<{ loc: string; id: string }>): Promise<Map<string, GroupPerson>> {
   const out = new Map<string, GroupPerson>();
@@ -148,7 +157,8 @@ export async function listGroups(s: Scope, tier: Tier, after: Array<string | num
     const ps = (r.contact_ids as string[]).map((id) => people.get(`${r.location_id}:${id}`)).filter((p): p is GroupPerson => !!p);
     if (ps.length < 2) continue; // a contact was removed since the scan: the next scan drops the group
     const kinds = r.kinds as string[];
-    out.push({ key: r.group_key as string, locationId: r.location_id as string, locationName: (r.loc_name as string | null) ?? null, tier, badge: badgeOf(kinds as EdgeKind[]), kinds, trimmed: r.trimmed === true, shared: sharedValue(kinds, ps), people: ps, protectedCount: ps.filter((p) => p.protect).length });
+    const lowered = tier === "certain" && namesConflict(ps.map((p) => p.name)); // stored before the name rule, or names edited since the scan
+    out.push({ key: r.group_key as string, locationId: r.location_id as string, locationName: (r.loc_name as string | null) ?? null, tier: lowered ? "likely" : tier, nameNote: lowered || (tier === "likely" && kinds.some((k) => k === "email" || k === "phone") && namesConflict(ps.map((p) => p.name))) ? DIFFERENT_NAMES_WHY : null, badge: lowered || (tier === "likely" && kinds.some((k) => k === "email" || k === "phone") && namesConflict(ps.map((p) => p.name))) ? withNameNote(badgeOf(kinds as EdgeKind[])) : badgeOf(kinds as EdgeKind[]), kinds, trimmed: r.trimmed === true, shared: sharedValue(kinds, ps), people: ps, protectedCount: ps.filter((p) => p.protect).length });
   }
   const last = page[page.length - 1];
   return { rows: out, next: rows.length > lim && last ? encodeCur([last.location_id as string, last.group_key as string]) : null };
@@ -160,7 +170,8 @@ export async function certainSafe(s: Scope, cap: number, includeProtected = fals
   let after: Array<string | number> | null = null;
   for (let n = 0; n < 12 && out.length < cap; n++) {
     const p = await listGroups(s, "certain", after, 50);
-    out.push(...(includeProtected ? p.rows : p.rows.filter((r) => r.protectedCount === 0 && !r.trimmed)));
+    const certain = p.rows.filter((r) => r.tier === "certain"); // a group lowered to "likely" for different names is never in the bulk merge
+    out.push(...(includeProtected ? certain : certain.filter((r) => r.protectedCount === 0 && !r.trimmed)));
     after = p.next ? decodeCur(p.next, 2) : null;
     if (!after) break;
   }

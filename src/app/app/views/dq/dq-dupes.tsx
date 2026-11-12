@@ -3,7 +3,7 @@
 import { ExternalLink } from "lucide-react";
 import { useEffect, useId, useMemo, useState } from "react";
 import { bulkMergePhrase, deletePhrase, mergePhrase, previewLine } from "@/lib/dq/dq-core";
-import { BULK_NOTE, SKIP_TITLE, WILL_TITLE, skipLine, willLine } from "@/lib/dq/bulk-merge";
+import { BULK_BUTTON, BULK_NOTE, ONE_BUTTON, SKIP_TITLE, WILL_TITLE, skipLine, skipSummary, willLine } from "@/lib/dq/bulk-merge";
 import { DELETE_BLOCKED_WHY } from "@/lib/dq/dupe-copies";
 import { CopiesPanel, CopiesToggle, ProtectedBadge, WhyDisabled } from "./dq-copies";
 import { DeleteExtras, MergeTable } from "./dq-merge";
@@ -57,7 +57,7 @@ export function DupesTab({ opts, account, setAccount }: { opts: Opts; account: s
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {opts.accounts.length > 1 && <LocalAccountPicker accounts={opts.accounts} picked={account ? [account] : []} onChange={(ids) => setAccount(ids.length ? ids[ids.length - 1] : null)} label="Client account" />}
-          {opts.canChange && counts && counts.certain.groups > 0 && <button type="button" className={Q_BTN} onClick={() => setBulk((b) => !b)} data-testid="dq-bulk-open">Merge all certain matches ({fmtInt(counts.certain.groups)})</button>}
+          {opts.canChange && counts && counts.certain.groups > 0 && <button type="button" className={Q_BTN} onClick={() => setBulk((b) => !b)} data-testid="dq-bulk-open">{BULK_BUTTON(counts.certain.groups)}</button>}
         </div>
       </div>
       {bulk && <BulkMerge account={account} onClose={() => setBulk(false)} onDone={(m) => { setBulk(false); setNote(m); setNonce((n) => n + 1); }} />}
@@ -109,12 +109,13 @@ function GroupItem({ g, opts, onGone, multi }: { g: GroupRow; opts: Opts; onGone
           <p className="flex flex-wrap items-center gap-2 text-sm"><b className="truncate">{first.name}</b>
             <span className="rounded-md border bg-muted/50 px-1.5 py-0.5 text-xs" data-testid="dq-badge" title={g.why[0] ?? ""}>{g.badge}</span>
             <CopiesToggle g={g} open={show} onToggle={() => setShow((s) => !s)} panelId={panelId} />
+            {g.nameNote && <span className="rounded-md border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-xs" data-testid="dq-name-note" title={g.nameNote}>{g.tier === "likely" ? "Likely" : g.tier}: names differ</span>}
             {g.protectedCount > 0 && <ProtectedBadge />}
           </p>
           <p className="truncate text-xs text-muted-foreground">{[label, multi ? g.locationName : ""].filter(Boolean).join(" · ")}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <button type="button" className={P_BTN} aria-expanded={mode === "merge"} onClick={() => setMode(mode === "merge" ? null : "merge")} data-testid="dq-merge">Merge</button>
+          <button type="button" className={P_BTN} aria-expanded={mode === "merge"} onClick={() => setMode(mode === "merge" ? null : "merge")} data-testid="dq-merge" title={g.protectedCount > 0 ? "Someone here is protected. You can merge them one at a time after checking." : "Choose which copy to keep, then merge"}>{ONE_BUTTON}</button>
           <button type="button" className={Q_BTN} disabled={busy} onClick={() => void notSame()} data-testid="dq-notsame">Not the same</button>
           {opts.canChange && <WhyDisabled disabled={allExtrasProtected} why={DELETE_BLOCKED_WHY}><button type="button" className={D_BTN} disabled={allExtrasProtected} title={allExtrasProtected ? DELETE_BLOCKED_WHY : "Delete the other copies"} aria-expanded={mode === "delete"} onClick={() => setMode(mode === "delete" ? null : "delete")} data-testid="dq-delete">Delete extras</button></WhyDisabled>}
         </div>
@@ -130,7 +131,7 @@ function GroupItem({ g, opts, onGone, multi }: { g: GroupRow; opts: Opts; onGone
 
 function BulkMerge({ account, onClose, onDone }: { account: string | null; onClose: () => void; onDone: (msg: string) => void }) {
   const api = useApiClient();
-  type Line = { key: string; account: string | null; names: string[]; keepName?: string; goneName?: string; why: string };
+  type Line = { key: string; code?: string; account: string | null; names: string[]; keepName?: string; goneName?: string; why: string };
   const [pv, setPv] = useState<{ ready: number; blocked: number; cap: number; phrase: string; mode: "dry_run" | "live"; will: Line[]; skipped: Line[]; note: string } | null>(() => (sampleOn() ? { ready: 1, blocked: 1, cap: 50, phrase: bulkMergePhrase(1), mode: "dry_run" as const, will: [{ key: "w1", account: "Sample Roofing", names: ["Ann Lee", "Ann Lee"], keepName: "Ann Lee", goneName: "Ann Lee", why: "Ann Lee has a won deal" }], skipped: [{ key: "k1", account: "Sample Roofing", names: ["Bo Chen", "Bob Chen"], why: "Bob Chen has an open deal. Protected people are never merged in bulk." }], note: BULK_NOTE } : null));
   const [typed, setTyped] = useState(""), [msg, setMsg] = useState<string | null>(null), [busy, setBusy] = useState(false);
   useEffect(() => {
@@ -149,6 +150,7 @@ function BulkMerge({ account, onClose, onDone }: { account: string | null; onClo
           {pv.will.length === 0 ? <p className="text-xs text-muted-foreground">Nothing is completely safe to merge in bulk right now. Open each group and choose the primary contact yourself.</p>
             : <ul className="max-h-64 list-disc space-y-0.5 overflow-y-auto pl-5 text-xs" data-testid="dq-bulk-will">{pv.will.map((l) => <li key={l.key}>{willLine(l)}{l.account ? <span className="text-muted-foreground"> ({l.account})</span> : null}</li>)}</ul>}
           <p className="pt-1 text-base" data-testid="dq-bulk-skip-title"><b>{SKIP_TITLE(pv.blocked)}</b></p>
+          {pv.skipped.length > 0 && <p className="text-sm" data-testid="dq-bulk-skip-summary">{skipSummary(pv.skipped)}</p>}
           {pv.skipped.length > 0 && <ul className="max-h-64 list-disc space-y-0.5 overflow-y-auto pl-5 text-xs text-muted-foreground" data-testid="dq-bulk-skipped">{pv.skipped.map((l) => <li key={l.key}>{skipLine(l)}{l.account ? ` (${l.account})` : ""}</li>)}</ul>}
           <p className="text-xs text-muted-foreground">{pv.note}</p>
           {pv.mode === "dry_run" && <p className="text-xs text-muted-foreground">Not switched on yet: this shows the plan and changes nothing.</p>}
