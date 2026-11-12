@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fmtWhen } from "@/lib/analytics/speed6";
 import { dialPlan } from "@/lib/people/dial";
 import { DEFAULT_SCRIPT, fillScript, keyOf, outcomeOf, quietWarning, sessionSummary, skipReason, taskFor, type Logged, type QueueItem } from "@/lib/dial/dial";
-import { bookingText, BOOKING_TEXT, callWindow, cadenceStep, dispositionWrites, cleanTag, DEFAULT_WINDOW, noteDraft, powerHour, reorderByHeat, scriptFor, todaysCallbacks, type AttemptState, type BoardRow, type CadenceStep, type Disposition } from "@/lib/dial/dial6";
+import { bookingText, BOOKING_TEXT, callWindow, classifyQueue, planSession, startState, dispositionWrites, cleanTag, DEFAULT_WINDOW, noteDraft, powerHour, reorderByHeat, scriptFor, todaysCallbacks, waitingLine, type AttemptState, type BoardRow, type CadenceStep, type Disposition, type Waiting } from "@/lib/dial/dial6";
 import { detectionKey, firstTime, inferDetected, POLL_EVERY_MS, pollDue, rulesFrom, skipOwnNote, toastText, type Inferred, type Signals } from "@/lib/dial/autosync";
 import type { Action } from "@/lib/ghl/workbench";
 import { useApiClient, useData } from "../session";
@@ -36,11 +36,15 @@ type Story = { events: Array<{ at: number; kind: string; text: string }> };
 /** A lead in a running session: the queue row plus where it stands in the redial plan and in its own clock. */
 type Card = Item & { key: string; step: CadenceStep; attempts: number; callbackDue: boolean; windowOk: boolean; waitingForRedial: boolean };
 type Later = { key: string; name: string; why: string };
+function useNowEvery(ms: number) {
+  const [n, setN] = useState(() => Date.now());
+  useEffect(() => { const t = setInterval(() => setN(Date.now()), ms); return () => clearInterval(t); }, [ms]);
+  return n;
+}
 
 const BIG = "ds-press inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-[color-mix(in_srgb,var(--s6-edgec)_25%,transparent)] bg-[color-mix(in_srgb,var(--s6-cyan)_6%,transparent)] px-4 text-[15px] font-medium hover:bg-[color-mix(in_srgb,var(--s6-cyan)_16%,transparent)] focus-visible:outline-2 focus-visible:outline-[var(--ring)] disabled:cursor-not-allowed disabled:opacity-50";
 const PRIMARY = "s6-btn !min-h-12 !px-6 !text-base";
 const when = (ms: number) => new Date(ms).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-const EMPTY_STATE: AttemptState = { attempts: 0, lastAt: null, reached: false };
 
 /** Provides the server-kept choices (redial plan, goals, scripts, outcome sets) to everything in Call mode; falls back to this browser until the database has them. */
 export function DialMode() {
@@ -60,7 +64,7 @@ function DialInner() {
   const page = pg.k === pageKey ? pg.n : 0;
   const setPage = (n: number) => setPg({ k: pageKey, n, size: pg.size });
   const setSize = (size: number) => setPg({ k: `${list}|${size}|${rangeKey}`, n: 0, size });
-  const setList = (l: string) => { setListRaw(l); setPg({ k: `${l}|${pg.size}|${rangeKey}`, n: 0, size: pg.size }); };
+  const setList = (l: string) => { setNotice(null); setListRaw(l); setPg({ k: `${l}|${pg.size}|${rangeKey}`, n: 0, size: pg.size }); };
   const [view, setView] = useState<"lists" | "callbacks">("lists");
   const queue = useData<Queue>(`dial/queue?list=${encodeURIComponent(list)}&page=${page}&size=${pg.size}${range ? `&from=${range.from}&to=${range.to}` : ""}`);
   const stats = useData<Stats>("dial/stats");
@@ -72,34 +76,32 @@ function DialInner() {
   const [session, setSession] = useState<S | null>(null);
   const [pop, setPop] = useState<{ title: string; note?: string; rows: PersonRow[]; selectable?: boolean } | null>(null);
   const [picked, setPicked] = useState<string[]>([]);
-  const nowMs = useTick(false);
+  const nowMs = useNowEvery(30_000); // calling hours open and close while the page stays open, so the counts are re-read twice a minute
+  const [notice, setNotice] = useState<string | null>(null);
   const states = useMemo(() => new Map(ins.data?.states ?? []), [ins.data]);
 
-  const start = (items: Item[], power: boolean) => {
+  /** The one rule for who can be called now (classifyQueue): the count, the Start button and the session all come from it. */
+  const place = (items: Item[], now: number, o: { ignoreSnooze?: boolean; skipReached?: boolean } = {}) => classifyQueue(items, { now, cadence, states, callbacks: cbs, ...o });
+  const laterRow = (w: Waiting<Item>): Later => ({ key: w.key, name: w.name, why: w.kind === "hours" ? w.why : w.kind === "redial" ? `try again at ${fmtWhen(w.at ?? 0, w.timeZone)}` : `call at ${fmtWhen(w.at ?? 0, w.timeZone)}` });
+  const start = (items: Item[], power: boolean, o: { ignoreSnooze?: boolean } = {}) => {
     const now = Number(new Date());
-    const later: Later[] = []; const texts: Later[] = []; const ready: Card[] = [];
-    for (const it of items) {
-      const key = keyOf(it);
-      const st = states.get(key) ?? EMPTY_STATE;
-      const step = cadenceStep(cadence, st, now, it.timeZone);
-      const w = callWindow(now, it.timeZone, DEFAULT_WINDOW);
-      const c: Card = { ...it, key, step, attempts: st.attempts, callbackDue: cbs.some((x) => x.key === key && x.at <= now), windowOk: w.ok, waitingForRedial: step.state === "waiting" };
-      if (skipReason(c)) ready.push(c); // the existing rule skips these one by one, with its own message
-      else if (step.state === "text_fallback") texts.push({ key, name: c.name, why: `${st.attempts} tries, send a text` });
-      else if (!w.ok) later.push({ key, name: c.name, why: w.label ?? "later" });
-      else if (step.state === "waiting" && step.dueAt) later.push({ key, name: c.name, why: `try again at ${fmtWhen(step.dueAt, it.timeZone)}` });
-      else ready.push(c);
-    }
-    const order = reorderByHeat(ready);
-    const first = order.findIndex((c) => !skipReason(c));
-    setSession({ items: order, idx: first, done: new Set(), logged: [], skips: 0, finished: first === -1, later, texts, timed: power ? { startedAt: now, minutes: 60 } : null, streak: 0 });
+    const plan = planSession(items, { now, cadence, states, callbacks: cbs, ...o, skipReached: list !== "missed" && !o.ignoreSnooze });
+    // Never open a session that would end at once: with nobody callable now, say why and what happens next.
+    if (!plan.started) { setNotice(`${plan.reason} Start switches on when someone can be called. Pick another list in the meantime.`); return; }
+    setNotice(null);
+    setSession({ items: plan.items, idx: 0, done: new Set(), logged: [], skips: 0, finished: false, later: plan.waiting.map(laterRow), texts: plan.texts.map((t) => ({ key: t.key, name: t.name, why: `${t.attempts} tries, send a text` })), timed: power ? { startedAt: now, minutes: 60 } : null, streak: 0, skippedAtStart: plan.skipped });
   };
 
   if (session) return <Session s={session} setS={setSession} cadence={cadence} goals={goals} setCbs={setCbs} cbs={cbs} onExit={() => { setSession(null); void queue.reload(); void stats.reload(); void ins.reload(); }} me={queue.data?.me ?? null} />;
 
   const d = queue.data;
-  const blocked = d ? d.items.filter((i) => skipReason(i)).length : 0;
-  const ready = d ? d.items.length - blocked : 0;
+  // Who can be called NOW, who waits (and why) and who cannot be called from here: one rule (classifyQueue), so the count, the Start button and the session agree.
+  const cls = place(d?.items ?? [], nowMs, { skipReached: list !== "missed" });
+  const ready = cls.ready.length;
+  const go = startState(cls);
+  const readyKeys = new Set(cls.ready.map((x) => x.key));
+  const blocked = cls.skipped.length;
+  const waiting = cls.waiting;
   const todays = todaysCallbacks(cbs, nowMs, null);
   const touches = (d?.items ?? []).map((i) => ({ it: i, t: touchRow(keyOf(i), states.get(keyOf(i)), cadence, nowMs, i.timeZone) }));
   const toPerson = ({ it, t }: (typeof touches)[number]): PersonRow => ({
@@ -109,6 +111,9 @@ function DialInner() {
     seed: { contactId: it.contactId, locationId: it.locationId, name: it.name, locationName: it.locationName, phone: it.phone, url: it.url, dnd: it.dnd, timeZone: it.timeZone, note: (it.reasons ?? [])[0] },
     phone: it.phone, dnd: it.dnd, timeZone: it.timeZone, url: it.url,
   });
+  /** A person who is not callable now: no Call button (calling hours and the other rules hold), but their number and a link to open them in the CRM stay. */
+  const heldRow = (it: Item, chip: string, tone: "cyan" | "amber" | "red", detail: string): PersonRow => ({ key: keyOf(it), name: it.name, account: it.locationName, chip, chipTone: tone, detail, tip: `${it.name}: ${detail}`, phone: it.phone, dnd: it.dnd, timeZone: it.timeZone, url: it.url, openCrm: true });
+  const waitRow = (w: Waiting<Item>) => heldRow(w, w.kind === "hours" ? "calling hours" : w.kind === "redial" ? "next try" : "call later", w.kind === "hours" ? "amber" : "cyan", w.kind === "hours" ? `Opens ${DEFAULT_WINDOW.start}:00 their time${w.at ? ` (${fmtWhen(w.at, w.timeZone)})` : ""}` : w.kind === "redial" ? `Next try ${fmtWhen(w.at ?? 0, w.timeZone)}` : `Asked for a call ${fmtWhen(w.at ?? 0, w.timeZone)}`);
   const sum = cadenceSummary(touches.map((x) => x.t));
   const keysOf = (ks: string[]) => touches.filter((x) => ks.includes(x.t.key)).map(toPerson);
   const ex = sum.example ? touches.find((x) => x.t.key === sum.example?.key) : undefined;
@@ -144,9 +149,10 @@ function DialInner() {
         <div className="s6-card mb-8" data-testid="dial-callbacks">
           <h3 className="s6-q">Who asked for a callback today?</h3>
           {todays.length === 0 ? <p className="s6-label mt-2" data-testid="callbacks-empty">Nobody has a callback today. When someone says &quot;call me later&quot;, pick Call back later and a time: they show up here.</p> : (
-            <ul className="s6-ready mt-3">{todays.map((c) => { const full = cbs.find((x) => x.key === c.key && x.at === c.at) as SavedCallback; return (
+            <ul className="s6-ready mt-3">{todays.map((c) => { const full = cbs.find((x) => x.key === c.key && x.at === c.at) as SavedCallback; const can = place([callbackItem(full)], nowMs, { ignoreSnooze: true }); const closed = can.waiting.find((w) => w.kind === "hours"); const noNumber = can.skipped[0]; return (
               <li key={c.key + c.at} data-testid="callback-row"><span className="s6-chip" data-tone={c.at <= nowMs ? "red" : "cyan"}>{fmtWhen(c.at, full.timeZone)}</span><span className="min-w-0 flex-1 truncate font-semibold">{c.name}</span>{c.locationName && <span className="s6-label">{c.locationName}</span>}
-                <button type="button" className="s6-btn" data-kind="primary" onClick={() => start([callbackItem(full)], false)} data-testid="callback-call">Call now</button>
+                {closed && <span className="s6-chip" data-tone="amber" data-testid="callback-closed">{closed.why}</span>}{noNumber && <span className="s6-chip" data-tone="red" data-testid="callback-skipped" title={noNumber.block.text}>cannot be called from here</span>}
+                <button type="button" className="s6-btn" data-kind="primary" disabled={can.ready.length === 0} title={can.ready.length === 0 ? (closed ? `Calling hours are closed where they are: ${closed.why}.` : noNumber?.block.text) : undefined} onClick={() => start([callbackItem(full)], false, { ignoreSnooze: true })} data-testid="callback-call">Call now</button>
                 <button type="button" className="s6-btn" onClick={() => setCbs(cbs.filter((x) => !(x.key === c.key && x.at === c.at)))} aria-label={`Done with ${c.name}`}>Done</button></li>); })}</ul>
           )}
         </div>
@@ -154,11 +160,17 @@ function DialInner() {
         <EmptyState title={list === "missed" ? "No missed calls to call back" : list === "redial" ? "Nobody to try again" : "Nobody to call on this list"} body={d.ownOnly ? "Nobody assigned to you is waiting on this list. Pick another list." : list === "redial" ? "People who did not pick up show up here for another try. Call someone first." : "Nothing is waiting here right now. Pick another list, or check back after the next sync."} />
       ) : (
         <div className="s6-card mb-8" data-glow="active" data-testid="dial-ready">
-          <p className="s6-big" data-testid="dial-count"><button type="button" className="s6-link text-left" data-testid="dial-count-open" onClick={() => setPop({ title: "Ready to call", note: d.total > d.items.length ? `${(page * pg.size + 1).toLocaleString("en-US")} to ${(page * pg.size + d.items.length).toLocaleString("en-US")} of ${d.total.toLocaleString("en-US")}, hottest first.` : undefined, rows: touches.filter((x) => !skipReason(x.it)).map(toPerson), selectable: true })}><CountUp value={ready} /> {ready === 1 ? "person" : "people"} ready to call{d.total > d.items.length ? `, showing ${(page * pg.size + 1).toLocaleString("en-US")} to ${(page * pg.size + d.items.length).toLocaleString("en-US")} of ${d.total.toLocaleString("en-US")}` : ""}.</button></p>
-          <p className="s6-sub mt-2">Hottest first. They are fed to your CRM&apos;s dialer one at a time.{blocked > 0 && <> <button type="button" className="s6-link" data-testid="dial-blocked-open" onClick={() => setPop({ title: "Will be skipped", note: "Asked not to be contacted, or no phone number.", rows: touches.filter((x) => skipReason(x.it)).map(toPerson) })}>{blocked} will be skipped</button> (asked not to be contacted, or no phone number).</>}{d.ownOnly ? " Only people assigned to you." : ""}</p>
+          <p className="s6-big" data-testid="dial-count"><button type="button" className="s6-link text-left" data-testid="dial-count-open" onClick={() => setPop({ title: "Ready to call", note: d.total > d.items.length ? `${(page * pg.size + 1).toLocaleString("en-US")} to ${(page * pg.size + d.items.length).toLocaleString("en-US")} of ${d.total.toLocaleString("en-US")}, hottest first.` : undefined, rows: touches.filter((x) => readyKeys.has(x.t.key)).map(toPerson), selectable: true })}><CountUp value={ready} /> {ready === 1 ? "person" : "people"} ready to call now{d.total > d.items.length ? `, showing ${(page * pg.size + 1).toLocaleString("en-US")} to ${(page * pg.size + d.items.length).toLocaleString("en-US")} of ${d.total.toLocaleString("en-US")}` : ""}.</button></p>
+          <p className="s6-sub mt-2">{ready > 0 ? "Hottest first. They are fed to your CRM's dialer one at a time." : "Nobody can be called right now."}{blocked > 0 && <> <button type="button" className="s6-link" data-testid="dial-blocked-open" onClick={() => setPop({ title: "Will be skipped", note: "Asked not to be contacted, no number saved here, or already reached. Open them in your CRM if you need to.", rows: cls.skipped.map((x) => heldRow(x, x.block.kind === "dnd" ? "do not contact" : x.block.kind === "done" ? "already reached" : x.noRecord ? "no record yet" : "no number", "red", x.block.text)) })}>{blocked} will be skipped</button> (asked not to be contacted, no number saved, or already reached).</>}{d.ownOnly ? " Only people assigned to you." : ""}</p>
+          {waiting.length > 0 && (
+            <p className="mt-2 text-sm" data-testid="dial-waiting" role="status"><span className="s6-chip mr-2" data-tone="amber">waiting</span><button type="button" className="s6-link text-left" data-testid="dial-waiting-open" onClick={() => setPop({ title: "Not callable yet", note: "They will be callable once their calling hours open, their next try is due, or the call they asked for is due. Calling hours are 9:00 to 20:00 their time.", rows: waiting.map(waitRow) })}>{waitingLine(waiting)}</button></p>
+          )}
+          {cls.texts.length > 0 && <p className="s6-label mt-1" data-testid="dial-texts"><button type="button" className="s6-link text-left" onClick={() => setPop({ title: "Used every try, now a text task", rows: cls.texts.map((x) => heldRow(x, "text instead", "red", "Every try used: a text task")) })}>{cls.texts.length} {cls.texts.length === 1 ? "person has" : "people have"} used every try: text instead</button>.</p>}
+          {!go.enabled && <p className="mt-2 rounded-lg border-l-4 border-warning bg-warning/10 p-3 text-sm" data-testid="dial-none-ready" id="dial-none-ready">Start is off because nobody on this list can be called right now.{waiting.length > 0 ? " It switches on by itself when calling hours open (this page checks every 30 seconds)." : " Pick another list."}</p>}
+          {notice && <p className="mt-2 rounded-lg border-l-4 border-warning bg-warning/10 p-3 text-sm" role="status" data-testid="dial-notice">{notice}</p>}
           <div className="flex flex-wrap items-center gap-3">
-            <button type="button" className={PRIMARY} data-kind="primary" onClick={() => start(d.items, false)} disabled={ready === 0} data-testid="dial-start">Start calling</button>
-            <button type="button" className="s6-btn !min-h-12" onClick={() => start(d.items, true)} disabled={ready === 0} data-testid="dial-start-power"><Zap aria-hidden className="size-4" />Power hour</button>
+            <button type="button" className={PRIMARY} data-kind="primary" onClick={() => start(d.items, false)} disabled={!go.enabled} aria-describedby={!go.enabled ? "dial-none-ready" : undefined} data-testid="dial-start">Start calling</button>
+            <button type="button" className="s6-btn !min-h-12" onClick={() => start(d.items, true)} disabled={!go.enabled} aria-describedby={!go.enabled ? "dial-none-ready" : undefined} data-testid="dial-start-power"><Zap aria-hidden className="size-4" />Power hour</button>
           </div>
           {(d.total > 20 || page > 0) && (
             <div className="mb-3 flex flex-wrap items-center gap-2 text-sm" data-testid="dial-pager">
@@ -202,7 +214,7 @@ function DialInner() {
   );
 }
 
-type S = { items: Card[]; idx: number; done: Set<string>; logged: Logged[]; skips: number; finished: boolean; later: Later[]; texts: Later[]; timed: { startedAt: number; minutes: number } | null; streak: number };
+type S = { skippedAtStart?: number; items: Card[]; idx: number; done: Set<string>; logged: Logged[]; skips: number; finished: boolean; later: Later[]; texts: Later[]; timed: { startedAt: number; minutes: number } | null; streak: number };
 
 function Session({ s, setS, onExit, me, cadence, goals, cbs, setCbs }: {
   s: S; setS: (f: (p: S | null) => S | null) => void; onExit: () => void; me: string | null;
@@ -508,15 +520,19 @@ function ScriptEditor({ loc, value, canEdit, onChange, onSaved, source, onSaveSo
 }
 
 function Finish({ s, onExit }: { s: S; onExit: () => void }) {
-  const skipped = s.skips + s.items.filter((i) => skipReason(i)).length;
+  const skipped = s.skips + (s.skippedAtStart ?? 0) + s.items.filter((i) => skipReason(i)).length;
   const sum = sessionSummary(s.logged, skipped);
+  // Never a bare "Session ended": say what actually happened and what to do next.
+  const why = s.items.length === 0
+    ? `Nobody on this list can be called right now.${s.later.length > 0 ? " The people below are waiting for calling hours or their next try." : ""} Pick another list, or come back when they can be called.`
+    : s.skips > 0 ? `You skipped ${s.skips === 1 ? "the person" : "everyone"} on the list, so no call was logged. Go back to the lists to start again.` : "You ended the session before logging a call. Go back to the lists to start again.";
   const tile = (n: string | number, label: string, id: string) => <div className="s6-card !p-3 text-center"><p className="s6-big !text-[1.75rem]" data-testid={id}>{n}</p><p className="s6-label">{label}</p></div>;
   const list = (title: string, rows: Later[], id: string) => <div className="s6-card mt-4 text-left" data-testid={id}><h3 className="s6-q">{title}</h3><ul className="mt-2 grid gap-1 text-sm">{rows.slice(0, 6).map((l) => <li key={l.key} className="flex justify-between gap-3"><span className="truncate">{l.name}</span><span className="s6-label shrink-0">{l.why}</span></li>)}</ul></div>;
   return (
     <section className="mx-auto max-w-xl text-center" aria-label="Session summary" data-testid="dial-summary">
       <div className="dial-pop mx-auto mb-3 flex size-16 items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--s6-cyan)_15%,transparent)] text-[var(--s6-cyan)] shadow-[0_0_24px_color-mix(in_srgb,var(--s6-cyan)_50%,transparent)]" aria-hidden><Check className="size-8" /></div>
-      <h2 className="text-2xl font-semibold tracking-tight">{sum.calls === 0 ? "Session ended" : "Nice work. The list is done."}</h2>
-      <p className="mt-1 text-sm text-muted-foreground">{sum.calls === 0 ? "No calls were logged this time." : `${sum.calls} ${sum.calls === 1 ? "call" : "calls"} logged${sum.perHour !== null ? `, about ${sum.perHour} an hour` : ""}.`}</p>
+      <h2 className="text-2xl font-semibold tracking-tight" data-testid="sum-title">{sum.calls === 0 ? (s.items.length === 0 ? "Nobody could be called" : "No calls logged") : "Nice work. The list is done."}</h2>
+      <p className="mt-1 text-sm text-muted-foreground" data-testid="sum-reason">{sum.calls === 0 ? why : `${sum.calls} ${sum.calls === 1 ? "call" : "calls"} logged${sum.perHour !== null ? `, about ${sum.perHour} an hour` : ""}.`}</p>
       {s.streak >= 3 && <p className="s6-chip mt-2" data-tone="amber"><Flame aria-hidden className="size-3.5" />{s.streak} reached in a row</p>}
       <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {tile(sum.calls, "calls", "sum-calls")}{tile(sum.reached, "reached", "sum-reached")}{tile(sum.booked, "booked", "sum-booked")}{tile(`${sum.minutesSaved} min`, "saved (estimate)", "sum-minutes")}

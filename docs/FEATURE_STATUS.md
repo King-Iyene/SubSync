@@ -314,4 +314,8 @@ Customer review test results (11 Nov, demo server, desktop-1440, one spec at a t
 | Clean-up: Fix lists, Health, bulk runs (cu_fix, cu_health, cu_bulk, cu_confirm) | built, flags default off | our synced contacts and deals, daily record cu_scans | tested on fixtures and generated data in CI; live-data check after flags ON |
 
 | Workflows gaps, library, bulk install (wf_*) | built, flags off | lead_touches, touch_events, appointments, opportunities | SQL run against live schema in cross-tenant test; workflow API itself NOT probed (no permission granted on the live install) |
+
+| Wallet guard (wg_wallet, wg_record, wg_alerts) | built, flags default off | platform wallet balance (optional wallet.readonly) into our own append-only readings (wg_samples) | cross-tenant DB test and unit tests pass on a local database; platform call NOT yet probed with a real token (response shape per its docs) |
+| 7 am brief (br_brief, br_email, br_record) | built, flags default off | Today, missed leads, slipping deals, save-this-account, wallet, payments; own tables br_prefs, br_history | cross-tenant DB test and unit tests pass; email is a dry run until SEND_EMAIL_LIVE is on |
+
 | Clean-up v2: duplicates, Lead intake, sorting gate, quality score (dq_*) | built, flags default off | our synced contacts, touch events, appointments, deals; forms, surveys, funnels polled when permitted | tested on fixtures (tests/unit/dq-db.test.ts) and generated data; forms API shapes NOT verified live |

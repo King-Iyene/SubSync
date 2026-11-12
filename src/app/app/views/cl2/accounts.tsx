@@ -53,18 +53,19 @@ export function AccountsTab({ preset, onOpen, go, bulkOn }: { preset: Partial<Fi
     const v = views.data?.views.find((x) => x.id === id);
     if (v) { const nf = { ...NO_FILTER, ...v.filters, quiet: v.filters.quiet === "true" } as Filter; setF(nf); setDq(nf.q); }
   };
+  // Naming and deleting a view happen in a small form on the page: a browser pop-up is blocked inside some embedded frames and then silently does nothing.
+  const [viewForm, setViewForm] = useState<null | "save" | "delete">(null), [viewText, setViewText] = useState("");
   const saveView = async () => {
-    const name = window.prompt("Name this view (for example: Past due solar clients)");
+    const name = viewText.trim();
     if (!name) return;
-    try { await c2post(api, "view-save", { name, filters: { ...f, quiet: f.quiet ? "true" : "" } }); setMsg(`Saved the view "${name}".`); setRev((n) => n + 1); } catch (e) { setMsg(e instanceof Error ? e.message : "That did not work."); }
+    try { await c2post(api, "view-save", { name, filters: { ...f, quiet: f.quiet ? "true" : "" } }); setMsg(`Saved the view "${name}".`); setRev((n) => n + 1); setViewForm(null); setViewText(""); } catch (e) { setMsg(e instanceof Error ? e.message : "That did not work."); }
   };
   const dropView = async () => {
     const v = views.data?.views.find((x) => x.id === view);
     if (!v) return;
-    const typed = window.prompt(`To delete this saved view, type its name: ${v.name}`);
-    if (typed === null) return;
-    try { await c2post(api, "view-delete", { id: v.id, confirm: typed }); setView(""); setMsg(`Deleted the view "${v.name}".`); setRev((n) => n + 1); } catch (e) { setMsg(e instanceof Error ? e.message : "That did not work."); }
+    try { await c2post(api, "view-delete", { id: v.id, confirm: viewText }); setView(""); setMsg(`Deleted the view "${v.name}".`); setRev((n) => n + 1); setViewForm(null); setViewText(""); } catch (e) { setMsg(e instanceof Error ? e.message : "That did not work."); }
   };
+  const viewName = views.data?.views.find((x) => x.id === view)?.name ?? "";
 
   return (
     <div data-testid="cl2-accounts">
@@ -79,11 +80,28 @@ export function AccountsTab({ preset, onOpen, go, bulkOn }: { preset: Partial<Fi
       </Find>
       <div className="ap-head print:hidden" role="group" aria-label="Views and export">
         <select className="ap-field" aria-label="Saved views" value={view} onChange={(e) => applyView(e.target.value)}><option value="">Saved views{(views.data?.views.length ?? 0) ? ` (${views.data?.views.length})` : ""}</option>{views.data?.views.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}</select>
-        <button type="button" className="ap-link" onClick={saveView} disabled={!filtered && f.sort === "attention"} data-testid="cl2-save-view">Save this view</button>
-        {view && <button type="button" className="ap-link" onClick={dropView}>Delete this view</button>}
+        <button type="button" className="ap-link" onClick={() => { setViewForm("save"); setViewText(""); }} disabled={!filtered && f.sort === "attention"} data-testid="cl2-save-view">Save this view</button>
+        {view && <button type="button" className="ap-link" onClick={() => { setViewForm("delete"); setViewText(""); }}>Delete this view</button>}
         {filtered && <button type="button" className="ap-link" onClick={() => { setF(NO_FILTER); setDq(""); setView(""); }}>Clear filters</button>}
         <button type="button" className="ap-link ml-auto" onClick={() => api.download(c2q("export", { q: f.q, status: f.status, plan: f.plan, level: f.level, vertical: f.vertical, manager: f.manager, quiet: f.quiet }), "client-accounts.csv")}>Export these to CSV</button>
       </div>
+      {viewForm === "save" && (
+        <form className="mb-2 flex flex-wrap items-center gap-2" data-testid="cl2-view-form" onSubmit={(e) => { e.preventDefault(); void saveView(); }}>
+          <input className="ap-field" autoFocus maxLength={60} aria-label="Name this view" placeholder="For example: Past due solar clients" value={viewText} onChange={(e) => setViewText(e.target.value)} onKeyDown={(e) => { if (e.key === "Escape") setViewForm(null); }} />
+          <button type="submit" className="s6-btn" data-kind="primary" disabled={!viewText.trim()}>Save</button>
+          <button type="button" className="ap-link" onClick={() => setViewForm(null)}>Cancel</button>
+        </form>
+      )}
+      {viewForm === "delete" && viewName && (
+        <form className="cl2-confirm mb-2" role="alertdialog" aria-label="Confirm delete" data-testid="cl2-view-delete" onSubmit={(e) => { e.preventDefault(); void dropView(); }}>
+          <p className="text-sm">To delete this saved view, type its name: <b>{viewName}</b></p>
+          <div className="mt-1 flex flex-wrap gap-2">
+            <input className="ap-field" autoFocus aria-label="Type the name of the view" value={viewText} onChange={(e) => setViewText(e.target.value)} onKeyDown={(e) => { if (e.key === "Escape") setViewForm(null); }} />
+            <button type="submit" className="s6-btn" disabled={viewText.trim() !== viewName.trim()}>Delete the view</button>
+            <button type="button" className="ap-link" onClick={() => setViewForm(null)}>Keep it</button>
+          </div>
+        </form>
+      )}
       {msg && <p className="ap-fine mb-2" role="status">{msg}</p>}
       {bulkOn && picked.length > 0 && (
         <div className="cl2-bulk print:hidden" role="region" aria-label="Selected client accounts" data-testid="cl2-bulk">
@@ -113,7 +131,7 @@ function RowView({ r, sel, setSel, onOpen, go }: { r: Cl2Row; sel: Record<string
       <td><LevelDot level={r.level} />{r.summary && <><br /><span className="ap-fine">{r.summary}</span></>}</td>
       <td>{r.lastActivityAt ? agoText(r.lastActivityAt) : <span className="ap-fine">None seen</span>}{r.quiet && <><br /><span className="ap-fine">Quiet</span></>}</td>
       <td>{r.manager ?? <span className="ap-fine">Nobody yet</span>}{r.people > 0 && <><br /><button type="button" className="ap-link ap-fine" onClick={() => go(r.locationId)}>{r.people} {r.people === 1 ? "person" : "people"}{r.peopleQuiet ? `, ${r.peopleQuiet} quiet` : ""}</button></>}</td>
-      <td className="text-right"><span className="inline-flex items-center gap-2"><button type="button" className="s6-btn" data-kind="primary" onClick={() => onOpen(r.locationId)}>Open</button>{r.url && <a href={r.url} target="_blank" rel="noopener noreferrer" className="ap-link" aria-label={`Open ${r.name} in your CRM (new tab)`} title="Open in your CRM"><ExternalLink aria-hidden className="size-3.5" /></a>}</span></td>
+      <td className="text-right"><span className="inline-flex items-center gap-2"><button type="button" className="s6-btn" data-kind="primary" onClick={() => onOpen(r.locationId)}>Open</button>{r.url && <a href={r.url} target="_blank" rel="noopener noreferrer" className="ap-link inline-flex size-11 items-center justify-center sm:size-auto" aria-label={`Open ${r.name} in your CRM (new tab)`} title="Open in your CRM"><ExternalLink aria-hidden className="size-3.5" /></a>}</span></td>
     </tr>
   );
 }

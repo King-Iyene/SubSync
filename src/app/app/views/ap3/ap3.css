@@ -66,6 +66,7 @@
 .ap-pager { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px; border-top: 1px solid color-mix(in srgb, var(--s6-line) 70%, transparent); font-size: 0.8125rem; color: var(--muted-foreground); }
 .ap-pager button { min-height: 36px; min-width: 44px; border-radius: 8px; border: 1px solid color-mix(in srgb, var(--s6-edgec) 30%, transparent); background: transparent; color: var(--foreground); cursor: pointer; font: inherit; }
 .ap-pager button:disabled { opacity: 0.4; cursor: not-allowed; }
+@media (max-width: 640px) { .ap-pager button, .ap-pager select { min-height: 44px !important; } }
 .ap-chip { display: inline-flex; align-items: center; gap: 4px; padding: 1px 8px; border-radius: 999px; font-size: 0.6875rem; font-weight: 600; border: 1px solid transparent; }
 .ap-chip[data-tone="green"] { color: color-mix(in srgb, var(--s6-green) var(--s6-mixpct), var(--s6-mixfg)); background: color-mix(in srgb, var(--s6-green) 14%, transparent); border-color: color-mix(in srgb, var(--s6-green) 45%, transparent); }
 .ap-chip[data-tone="amber"] { color: color-mix(in srgb, var(--s6-amber) var(--s6-mixpct), var(--s6-mixfg)); background: color-mix(in srgb, var(--s6-amber) 14%, transparent); border-color: color-mix(in srgb, var(--s6-amber) 45%, transparent); }

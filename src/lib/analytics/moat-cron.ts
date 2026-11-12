@@ -14,6 +14,9 @@ import { sendMonthlyAudit, sweepAuditHistory } from "./au-sweep";
 import { recordToday } from "./today3-queries";
 import { runTodayEmail } from "./today3-email";
 import { runSaveDigest } from "./cash-email";
+import { sweepWallet } from "./wg-queries";
+import { runWalletAlerts } from "./wg-alerts";
+import { runBriefs } from "./br-queries";
 import { sweepDeals, sweepRecover } from "./cash-queries";
 import { runPeopleAlerts } from "./people-alerts";
 import { accountReceipt } from "./moat-queries";
@@ -49,8 +52,11 @@ export async function runMoatCron(now = Date.now()): Promise<MoatCronReport> {
       const pmr = (ent.features.pm_module && !ent.locked.includes("pm_module")) || (ent.features.pm_disputes && !ent.locked.includes("pm_disputes"));
       const cfr = ent.features.cf_record && !ent.locked.includes("cf_record");
       const cfe = ent.features.cf_email && !ent.locked.includes("cf_email");
+      const wgr = ent.features.wg_record && !ent.locked.includes("wg_record");
+      const wga = ent.features.wg_alerts && !ent.locked.includes("wg_alerts");
+      const bre = ent.features.br_email && !ent.locked.includes("br_email");
       const pra = ent.features.pr_auto && ent.features.pr_report && !ent.locked.includes("pr_auto") && !ent.locked.includes("pr_report");
-      if (!rec && !mail && !apr && !plr && !clr && !clb && !ppr && !ppi && !auh && !aum && !tdr && !tde && !cfr && !cfe && !pmr && !pra) continue;
+      if (!rec && !mail && !apr && !plr && !clr && !clb && !ppr && !ppi && !auh && !aum && !tdr && !tde && !cfr && !cfe && !pmr && !wgr && !wga && !bre && !pra) continue;
       rep.companies++;
       if (apr) rep.events += Object.values(await sweepAppointmentHistory(installationId)).reduce((x, y) => x + y, 0);
       if (plr) rep.events += Object.values(await sweepDealHistory(installationId)).reduce((x, y) => x + y, 0);
@@ -67,6 +73,14 @@ export async function runMoatCron(now = Date.now()): Promise<MoatCronReport> {
         await sweepDeals(installationId, { force: true }).catch((e) => console.error("Deals sweep failed", safeError(e)));
       }
       if (cfe) await runSaveDigest(installationId, now).catch((e) => console.error("Save digest failed", safeError(e)));
+      // Wallet guard: keep our own record of each credit balance and work out burn, days left and spikes (wg_record); alerts for low, empty and spikes (wg_alerts, they need the record).
+      if (wgr || wga) await sweepWallet(installationId, now).catch((e) => console.error("Wallet sweep failed", safeError(e)));
+      if (wga) await runWalletAlerts(installationId, now).catch((e) => console.error("Wallet alerts failed", safeError(e)));
+      // The 7 am brief, at each person's own hour of their own day (br_email). One per person per day; email stays a dry run until the live switch is on.
+      if (bre) {
+        const on = (k: string) => ent.features[k as keyof typeof ent.features] === true && !ent.locked.includes(k);
+        await runBriefs(installationId, { cf_save: on("cf_save"), cf_recover: on("cf_recover"), cf_deals: on("cf_deals"), wg_wallet: on("wg_wallet"), pm_module: on("pm_module"), td_today: on("td_today") }, now).catch((e) => console.error("Brief failed", safeError(e)));
+      }
       if (tde) await runTodayEmail(installationId, now).catch((e) => console.error("Today email failed", safeError(e)));
       if (rec) rep.events += Object.values(await sweepMoatEvents(installationId)).reduce((a, b) => a + b, 0);
       if (ppi) await runPeopleAlerts(installationId, now).catch((e) => console.error("Team alerts failed for one company", safeError(e)));

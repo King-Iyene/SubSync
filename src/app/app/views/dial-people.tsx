@@ -8,7 +8,9 @@ import { LeadDrawer, type LeadSeed } from "../ds/lead-drawer";
 // A slim popup that lists exactly the people behind a count in Call mode, paged 20/50/100. Each row says who, where, and (when known) the touch counter and next try.
 export type PersonRow = { key: string; name: string; account?: string | null; chip?: string; chipTone?: "cyan" | "amber" | "red"; detail?: string; tip?: string;
   /** When set, the row opens the shared lead panel, shows the number and a Call button, and can be ticked. */
-  seed?: LeadSeed; phone?: string | null; dnd?: boolean; timeZone?: string | null; url?: string };
+  seed?: LeadSeed; phone?: string | null; dnd?: boolean; timeZone?: string | null; url?: string;
+  /** A person who cannot be called from here right now: shows their number and an "Open in your CRM" link instead of a Call button. */
+  openCrm?: boolean };
 
 export function PeoplePopup({ title, note, rows, onClose, onSendSelected }: { title: string; note?: string; rows: PersonRow[]; onClose: () => void; onSendSelected?: (keys: string[]) => void }) {
   const [picked, setPicked] = useState<string[]>([]);
@@ -39,7 +41,8 @@ export function PeoplePopup({ title, note, rows, onClose, onSendSelected }: { ti
                 {onSendSelected && r.seed && <input type="checkbox" aria-label={`Select ${r.name}`} data-testid="people-pick" checked={picked.includes(r.key)} onChange={(e) => setPicked(e.target.checked ? [...picked, r.key] : picked.filter((k) => k !== r.key))} />}
                 {r.seed ? <button type="button" data-testid="people-open" className="min-w-0 flex-1 cursor-pointer truncate text-left font-medium hover:underline" onClick={() => setLead(withSeed.findIndex((x) => x.key === r.key))}>{r.name}{r.account ? <span className="s6-label font-normal"> · {r.account}</span> : null}</button>
                   : <span className="min-w-0 flex-1 truncate font-medium">{r.name}{r.account ? <span className="s6-label font-normal"> · {r.account}</span> : null}</span>}
-                {r.seed && r.phone && <span className="s6-label tabular-nums" data-testid="people-phone">{r.phone}</span>}
+                {(r.seed || r.openCrm) && r.phone && <span className="s6-label tabular-nums" data-testid="people-phone">{r.phone}</span>}
+                {r.openCrm && r.url && <a className="s6-link text-sm" data-testid="people-open-crm" href={r.url} target="_blank" rel="noopener noreferrer">Open in your CRM</a>}
                 {r.seed && <span title="Opens the lead in your CRM's own dialer. SubSync cannot start a call itself."><DialButton phone={r.phone} contactUrl={r.url} dnd={r.dnd} timeZone={r.timeZone} compact /></span>}
                 {r.chip && <span className="s6-chip" data-tone={r.chipTone ?? "cyan"}>{r.chip}</span>}
                 {r.detail && <span className="s6-label w-full">{r.detail}</span>}

@@ -23,6 +23,8 @@ import "./cl3.css";
 import { fixturesOn, useCl, type ClParams } from "./data";
 import { AccountSettings } from "./settings";
 import { MoneyTab } from "./money";
+import { WalletTab } from "../wg/wallet";
+import { wgfxOn } from "../wg/data";
 import { AccountPage } from "../cl2/account-page";
 import { AccountsTab, type Filter as AcctFilter } from "../cl2/accounts";
 import { Plans as PlansTab, TodayPanel } from "../cl2/plans";
@@ -35,9 +37,10 @@ import { ago, change, day, Find, LevelChip, Load, money, Pager, share } from "./
 // then the older Onboarding, Reviews (QBR) and Industries pages. Reads only; the only writes are SubSync's own quiet marks, reply targets and owner names (settings panel).
 // Every number is a count that opens its rows. Nothing here messages anyone or changes the CRM. Sample data appears ONLY with ?clfx=1 and is labelled "Sample data".
 type Drill = { title: string; reason: Cl3Reason; location: string | null; count: number } | null;
-type TabKey = "overview" | "money" | "accounts" | "plans" | "needs" | "trends" | "compare" | "reports" | "proof" | "people" | "setup" | "health" | "onboarding" | "reviews" | "industries" | "book" | "oldcompare" | "oldreports";
+type TabKey = "overview" | "money" | "wallet" | "accounts" | "plans" | "needs" | "trends" | "compare" | "reports" | "proof" | "people" | "setup" | "health" | "onboarding" | "reviews" | "industries" | "book" | "oldcompare" | "oldreports";
 const TIPS: Record<TabKey, [string, string]> = {
   overview: ["Overview", "What to do today, in one sentence."], money: ["Money", "Plans, who has not paid, credit balances, and whether SubSync is installed, for every client account."], accounts: ["Accounts", "Every client account: paid plan, payment status, health, who looks after it."], plans: ["Plans", "Paid plans that are past due, cancelled or paused, with a note field."], needs: ["Needs attention", "Accounts ranked by what is wrong, with the count behind each reason."],
+  wallet: ["Wallet", "Every client account's credit balance, lowest days left first, with alerts before it runs out."],
   trends: ["Trends", "Week on week or month on month, from our own record."], compare: ["Compare accounts", "Two accounts side by side."],
   reports: ["Reports", "A weekly proof for each client to show them."], proof: ["Proof", "One branded page and a monthly report for each client, to send them yourself."], people: ["People", "Who works in which account, and who has gone quiet."],
   setup: ["Setup health", "Connection, permissions, how fresh the data is, and each client's plan."], health: ["Health and risk", "Overall health, who may be slipping, and the standard workflows each client has."],
@@ -46,10 +49,20 @@ const TIPS: Record<TabKey, [string, string]> = {
   book: ["Client book", "Who may leave, renewals coming, and what each client pays you."], oldcompare: ["Compare clients", "The earlier compare page: scores, setups and a trend, side by side."], oldreports: ["Weekly reports", "The earlier weekly report for each client."],
 };
 // Clients v2 tabs show only when their flag is on (a missing flag means off); the older tabs hide only when their flag is explicitly off.
-const C2_FLAG_OF: Partial<Record<TabKey, string>> = { money: "cl3_money", accounts: "cl2_accounts", plans: "cl2_plans", proof: "pr_report" };
+const C2_FLAG_OF: Partial<Record<TabKey, string>> = { money: "cl3_money", wallet: "wg_wallet", accounts: "cl2_accounts", plans: "cl2_plans", proof: "pr_report" };
 const FLAG_OF: Partial<Record<TabKey, string>> = { overview: "cl_overview", needs: "cl_attention", trends: "cl_trends", compare: "cl_compare", reports: "cl_reports", people: "cl_people", setup: "cl_setup" };
 const PERIODS = [[7, "Last 7 days"], [30, "Last 30 days"], [90, "Last 90 days"]] as const;
 const ALL_FEATURES: ClientsFeatures = { health: true, onboarding: true, clients: true, reports: true, setupCompare: true, playbooks: true };
+
+/** A button elsewhere (Today, the 7 am brief) can ask for the Wallet tab by name: it leaves the word in the session for one read, or in the address as ?tab=wallet. */
+function wantedTab(): TabKey | null {
+  try {
+    const w = sessionStorage.getItem("clients.tab");
+    if (w) sessionStorage.removeItem("clients.tab");
+    const h = new URLSearchParams(window.location.hash.split("?")[1] ?? "").get("tab");
+    return (w ?? h) === "wallet" ? "wallet" : null;
+  } catch { return null; }
+}
 
 function DrillList({ d, filters, onClose, openAccount }: { d: NonNullable<Drill>; filters: ClParams; onClose: () => void; openAccount: (id: string) => void }) {
   const [page, setPage] = useState(0);
@@ -179,11 +192,11 @@ export function ClientsModule({ go, features = ALL_FEATURES, initialTab = "overv
   const on2 = (k: string) => flags?.[k] === true;
   const [acctPreset, setAcctPreset] = useState<Partial<AcctFilter> | null>(null);
   const tabs = useMemo(() => {
-    const all: TabKey[] = ["overview", "money", "accounts", "plans", "needs", "trends", "compare", "reports", "proof", "people", "setup", "health"];
-    const keep = all.filter((k) => (C2_FLAG_OF[k] ? flags?.[C2_FLAG_OF[k] as string] === true : k === "people" && flags?.cl2_team_move === true ? false : !FLAG_OF[k] || flags === null || flags[FLAG_OF[k] as string] !== false));
+    const all: TabKey[] = ["overview", "money", "wallet", "accounts", "plans", "needs", "trends", "compare", "reports", "proof", "people", "setup", "health"];
+    const keep = all.filter((k) => (C2_FLAG_OF[k] ? flags?.[C2_FLAG_OF[k] as string] === true || (k === "wallet" && wgfxOn()) : k === "people" && flags?.cl2_team_move === true ? false : !FLAG_OF[k] || flags === null || flags[FLAG_OF[k] as string] !== false));
     return [...keep, ...(f.onboarding ? (["onboarding"] as TabKey[]) : []), ...(f.clients && f.reports ? (["reviews"] as TabKey[]) : []), ...(f.clients ? (["industries"] as TabKey[]) : []), ...(f.health || f.clients ? (["book"] as TabKey[]) : []), ...(f.clients && f.reports ? (["oldcompare"] as TabKey[]) : []), ...(f.clients ? (["oldreports"] as TabKey[]) : [])];
   }, [flags, f.onboarding, f.clients, f.reports, f.health]);
-  const [tab, setTab] = useState<TabKey>(initialTab);
+  const [tab, setTab] = useState<TabKey>(() => wantedTab() ?? initialTab);
   const filters = useMemo<ClParams>(() => {
     const from = new Date(since - days * 86_400_000).toISOString().slice(0, 10);
     return { from: days === 30 ? undefined : from, industry: industry || undefined };
@@ -192,7 +205,7 @@ export function ClientsModule({ go, features = ALL_FEATURES, initialTab = "overv
   const index = Math.max(0, tabs.indexOf(active));
   const open = (d: NonNullable<Drill>) => { setDrill(d); setTimeout(() => document.getElementById("cl-drill")?.scrollIntoView({ block: "nearest", behavior: "smooth" }), 50); };
   const goTab = (t: TabKey) => { setTab(t); setDrill(null); };
-  const readsAccounts = !["onboarding", "reviews", "industries", "health", "accounts", "plans", "money", "proof", "book", "oldcompare", "oldreports"].includes(active);
+  const readsAccounts = !["onboarding", "reviews", "industries", "health", "accounts", "plans", "money", "wallet", "proof", "book", "oldcompare", "oldreports"].includes(active);
   // A deep link (?account=<id>) opens that account's page. The server checks the id again; an id that is not yours shows "not found".
   const openAccount = (id: string | null) => { setOpenId(id); setDrill(null); try { const u = new URL(window.location.href); if (id) u.searchParams.set("account", id); else u.searchParams.delete("account"); window.history.replaceState(null, "", u.toString()); } catch { /* ignore */ } };
   const tileTo = (t: Cl2Today["tiles"][number]) => { setAcctPreset({ status: t.filter.status ?? "", level: t.filter.level ?? "", quiet: t.filter.quiet === true, plan: t.filter.plan ?? "" }); goTab("accounts"); };
@@ -215,6 +228,7 @@ export function ClientsModule({ go, features = ALL_FEATURES, initialTab = "overv
     switch (active) {
       case "overview": return <Overview filters={filters} open={open} go={goTab} c2={on2("cl2_accounts")} onTile={tileTo} onButton={buttonTo} />;
       case "money": return <MoneyTab onOpen={openAccount} onPayments={(id) => go("payments" as never, id)} showApps={on2("cl3_apps")} showHistory={on2("cl3_history")} />;
+      case "wallet": return <WalletTab onOpen={openAccount} />;
       case "accounts": return <AccountsTab preset={acctPreset} onOpen={openAccount} go={(id) => go("team", id)} bulkOn={on2("cl2_bulk")} />;
       case "plans": return <PlansTab onOpen={openAccount} onPayments={(id) => go("payments" as never, id)} />;
       case "needs": return <Needs filters={filters} open={open} rev={rev} bump={() => setRev((n) => n + 1)} openClient={openAccount} />;

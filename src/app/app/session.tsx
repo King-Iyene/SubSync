@@ -43,7 +43,12 @@ export function useApiClient(): Api {
   return api;
 }
 
+// Two parts of a screen often ask for the very same read at the same moment (the options of a list, the freshness line). One request answers them all: an identical GET that is
+// still on its way is shared, each asker gets its own copy of the answer, and any change (POST, PUT, DELETE) drops the shared reads so a refresh after a change always asks again.
+const inflight = new WeakMap<object, Map<string, Promise<unknown>>>();
+
 export function makeApi(initialToken: string, refresh: () => Promise<string | null>, demo: boolean, filterQuery = "", shared: { token: string } = { token: initialToken }): Api {
+  const sharedReads = (): Map<string, Promise<unknown>> => { let m = inflight.get(shared); if (!m) { m = new Map(); inflight.set(shared, m); } return m; };
   const request = async (method: string, path: string, body?: unknown, retried = false): Promise<Response> => {
     // A filter only narrows what is read; it is added to every GET. A share link of the audit is made from a read, so it carries the filter too:
     // the link covers the client accounts the person was looking at (N8), and the server decides which accounts those are.
@@ -78,10 +83,18 @@ export function makeApi(initialToken: string, refresh: () => Promise<string | nu
   return {
     demo,
     filtered: (query: string) => makeApi(initialToken, refresh, demo, query, shared),
-    get: async (path) => parse(await request("GET", path)),
-    post: async (path, body) => parse(await request("POST", path, body ?? {})),
-    put: async (path, body) => parse(await request("PUT", path, body ?? {})),
-    del: async (path) => parse(await request("DELETE", path)),
+    get: async <T,>(path: string): Promise<T> => {
+      const reads = sharedReads(), key = `${filterQuery}|${path}`, running = reads.get(key);
+      if (running) { const data = await (running as Promise<T>); return typeof structuredClone === "function" ? structuredClone(data) : data; }
+      const p = (async () => parse<T>(await request("GET", path)))();
+      reads.set(key, p);
+      const done = () => { if (reads.get(key) === p) reads.delete(key); };
+      p.then(done, done);
+      return p;
+    },
+    post: async (path, body) => { sharedReads().clear(); try { return await parse(await request("POST", path, body ?? {})); } finally { sharedReads().clear(); } },
+    put: async (path, body) => { sharedReads().clear(); try { return await parse(await request("PUT", path, body ?? {})); } finally { sharedReads().clear(); } },
+    del: async (path) => { sharedReads().clear(); try { return await parse(await request("DELETE", path)); } finally { sharedReads().clear(); } },
     download: async (path, filename) => {
       const res = await request("GET", path);
       if (!res.ok) throw new ApiError(res.status, await res.json().catch(() => ({})));
