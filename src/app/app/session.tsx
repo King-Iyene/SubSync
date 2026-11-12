@@ -1,5 +1,6 @@
 "use client";
 
+import { plainError } from "@/lib/design/plain-error";
 import { createContext, useCallback, useContext, useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 // Holds the signed session in memory (never storage or cookies: third-party cookies are
@@ -10,7 +11,7 @@ export class ApiError extends Error {
   status: number;
   body: Record<string, unknown>;
   constructor(status: number, body: Record<string, unknown>) {
-    super(typeof body.error === "string" ? body.error : `Request failed (${status})`);
+    super(plainError(status, body));
     this.status = status;
     this.body = body;
   }

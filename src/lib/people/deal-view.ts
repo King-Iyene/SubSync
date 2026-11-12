@@ -116,3 +116,14 @@ export function orderDeals<T extends SummaryDeal>(deals: T[]): T[] {
   const rank = (s: string) => (s === "open" ? 0 : s === "won" ? 1 : 2);
   return [...deals].sort((a, b) => rank(a.status) - rank(b.status) || b.value - a.value);
 }
+
+/** The pipeline a new deal starts in: the one this person already has a deal in (the most recent open one first), else the account's most-used pipeline, else none ("" so the box asks to choose). Pure. */
+export function defaultPipelineId(pipelines: Array<{ id: string }>, personDeals: Array<{ pipelineId: string | null; status: string }>, use: Record<string, number> | undefined): string {
+  const ids = new Set(pipelines.map((p) => p.id));
+  const mine = personDeals.filter((d) => d.pipelineId && ids.has(d.pipelineId));
+  const pick = mine.find((d) => d.status === "open") ?? mine[0];
+  if (pick?.pipelineId) return pick.pipelineId;
+  let best = ""; let bestN = 0;
+  for (const p of pipelines) { const n = use?.[p.id] ?? 0; if (n > bestN) { best = p.id; bestN = n; } }
+  return best;
+}

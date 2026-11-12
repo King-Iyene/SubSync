@@ -11,6 +11,7 @@ import type { GoFn } from "../nav";
 import { useReportFilter } from "./report-filter";
 import { OverviewView } from "./overview";
 import { PipelineView } from "./pipeline";
+import { InfoTip } from "../ds/info-tip";
 import type { TodayModel } from "./today-model";
 import "./td3/td3.css";
 
@@ -52,12 +53,16 @@ export function DatesBar() {
   );
 }
 
-function Card({ id, title, sub, icon, wide, action, children }: { id: string; title: string; sub: string; icon: ReactNode; wide?: boolean; action?: ReactNode; children: ReactNode }) {
+/** Two honest definitions of a "new lead" on one page. The growth card counts people with a usable email, one per person; the funnel counts every new contact. Both say so. */
+export const EMAIL_LEADS_RULE = "This card counts new email leads only: one per person, with a usable email. Test and junk records, extra copies of the same person and your own team are left out. The funnel below counts every new contact, so it is usually the bigger number.";
+export const ALL_LEADS_RULE = "This counts every new contact in the dates you picked, with or without an email, so it can be bigger than the email leads card above.";
+
+function Card({ id, title, sub, tip, icon, wide, action, children }: { id: string; title: string; sub: string; tip?: string; icon: ReactNode; wide?: boolean; action?: ReactNode; children: ReactNode }) {
   return (
     <section className={`td-card${wide ? " wide" : ""}`} data-testid={`td-card-${id}`} aria-labelledby={`td-card-h-${id}`}>
       <header>
         <span className="td-ico" aria-hidden>{icon}</span>
-        <div><h3 id={`td-card-h-${id}`}>{title}</h3><p>{sub}</p></div>
+        <div><h3 id={`td-card-h-${id}`}>{title}</h3><p>{sub}{tip && <> <InfoTip text={tip} label={`Why this number can differ: ${title}`} testId={`td-tip-${id}`} /></>}</p></div>
         {action && <div className="td-card-action">{action}</div>}
       </header>
       <div className="td-card-body">{children}</div>
@@ -75,12 +80,14 @@ export function TodayDashboard({ t, kind, agency, go, evidence, growthTab, forec
     <div className="td-dash-wrap" data-testid="td-dashboard">
       <div className="td-dash">
         {/* 1. Are leads coming in? */}
-        <Card id="growth" wide title="New leads and growth" sub="Email leads against your goal, and where the new ones came from." icon={<TrendingUp className="size-4" />}>{growthTab}</Card>
+        <Card id="growth" wide title="New leads and growth" sub="Email leads only, against your goal, and where they came from."
+          tip={EMAIL_LEADS_RULE} icon={<TrendingUp className="size-4" />}>{growthTab}</Card>
         {/* 2. Are we answering them? */}
         <Card id="reply" title="How fast we answer" sub="Typical first reply, who is waiting and appointments with no outcome." icon={<Timer className="size-4" />} action={link("Open Speed to lead", "speed")}>{evidence}</Card>
         {coverage && <Card id="coverage" title="Which hours miss leads" sub="The hours of the day when leads arrive and nobody answers." icon={<Clock className="size-4" />}>{coverage}</Card>}
         {/* 3. Where do they go? */}
-        <Card id="flow" wide title="Where do my leads go?" sub="Every new lead followed to where they are now: replied, booked, showed, won." icon={<Workflow className="size-4" />}>{flow}</Card>
+        <Card id="flow" wide title="Where do my leads go?" sub="Every new contact followed to where they are now: replied, booked, showed, won."
+          tip={ALL_LEADS_RULE} icon={<Workflow className="size-4" />}>{flow}</Card>
         {/* 4. Do they show up, and what is the money doing? */}
         <Card id="appointments" title="Appointments" sub="Show rate, outcomes still to mark and no-shows." icon={<CalendarCheck className="size-4" />} action={<button type="button" className="ap-link" onClick={() => goWith(go, { ...cardLink(t.totals.appointments.count > 0 || t.totals.noshows.count === 0 ? "unmarked" : "noshows", { count: 0 }), expect: null })}>Open Appointments</button>}>
           <p className="ap-fine">{t.totals.appointments.count > 0 ? `${t.totals.appointments.count.toLocaleString("en-US")} appointments are over with no outcome marked.` : "Every past appointment has an outcome."} {t.totals.noshows.count > 0 ? `${t.totals.noshows.count.toLocaleString("en-US")} no-shows are not rebooked.` : ""}</p>

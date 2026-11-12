@@ -4,6 +4,7 @@ import { Check, RotateCcw, ShieldAlert, X } from "lucide-react";
 import { useCallback, useState, type ReactNode } from "react";
 import type { Action } from "@/lib/ghl/workbench";
 import { resultText } from "@/lib/design/send-result";
+import { needsTickText } from "@/lib/design/plain-error";
 import { ApiError, useApiClient } from "../../session";
 
 // The one way the Lead workbench changes anything: ask the server for a preview, show exactly what will happen, wait for a click, then send it through the server's write gateway.
@@ -49,7 +50,7 @@ export function useRunner(locationId: string, contactId: string | null, onChange
       else { setResult({ tone: "done", kind: action.kind, text: resultText(action.kind, false, r.message, r.summary), undo: r.undo ?? null }); onChanged(); }
     } catch (e) {
       const body = e instanceof ApiError ? e.body : {};
-      if (e instanceof ApiError && e.status === 409 && Array.isArray(body.warnings)) { setPending((p) => (p ? { ...p, plan: { ...p.plan, warnings: body.warnings as Warn[] } } : p)); setResult({ tone: "error", text: "Tick the box to go ahead." }); }
+      if (e instanceof ApiError && e.status === 409 && Array.isArray(body.warnings)) { setPending((p) => (p ? { ...p, plan: { ...p.plan, warnings: body.warnings as Warn[] } } : p)); setResult({ tone: "error", text: needsTickText(body.warnings as Warn[]) }); }
       else if (e instanceof ApiError && e.status === 422 && Array.isArray(body.blockers)) { setPending((p) => (p ? { ...p, plan: { ...p.plan, blockers: body.blockers as Warn[] } } : p)); }
       else { setPending(null); setResult({ tone: "error", text: (e as Error).message, retry: action }); }
     } finally { setBusy(false); }

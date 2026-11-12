@@ -361,7 +361,7 @@ function ProofTab({ location, accounts, open }: { location: string; accounts: bo
                   <ul className="cl-steps">{panel.kinds.map((k) => <li key={k.kind}><button type="button" className="td-cellnum" data-testid="td-proof-kind" onClick={() => open({ title: `${panel.title}: ${k.label}`, kind: k.kind, location: panel.location, count: k.count })} aria-label={`${num(k.count)} ${k.label}. Show the rows`}>{num(k.count)}</button><span>{k.label}</span></li>)}</ul>
                 </div>
               )}
-              <p className="ap-fine">{p.historyStarts ? `Found and fixed come from our own daily record, which starts ${p.historyStarts}. SubSync keeps those as totals, not the people, so they show an "i" instead of opening a list. Still open for the newest week opens the people.` :"Our daily record has not started yet."} A problem counts as fixed only when the next refresh shows it cleared.</p>
+              <p className="ap-fine">{p.historyStarts ? `Found and fixed come from our own daily record, which starts ${p.historyStarts}. SubSync keeps those as totals, not the people, so they show an "i" instead of opening a list. Still open for the newest week opens the people.` :"Our daily record has not started yet."} A problem counts as fixed only when the next refresh shows it cleared. "Still open" is the count at our last daily check, so it can differ by a few from "Waiting for a reply" on Numbers, which is counted right now.</p>
             </section>
             {p.byKind.length > 0 && <section aria-label="What we found"><h2 className="td-h2">What we caught</h2><ul className="cl-steps" data-testid="td-caught">{p.byKind.map((k) => {
               const canOpen = p.isCurrent && k.stillOpen > 0;

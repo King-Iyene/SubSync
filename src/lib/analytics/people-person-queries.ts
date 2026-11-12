@@ -49,7 +49,7 @@ export async function personDetail(a: { installationId: string; allowed: string[
   const db = sql();
   const { installationId: inst, locationId: loc, contactId: id } = a;
   const [[c], deals, [convo], touches, appts, apptEvents, calls, tagEvents, dealEvents, stages] = await Promise.all([
-    db`select c.contact_id, c.location_id, l.name location_name, l.timezone, coalesce(nullif(c.full_name, ''), nullif(c.email, ''), 'Unnamed contact') name, c.email, c.phone, c.tags, c.source, c.dnd,
+    db`select c.contact_id, c.location_id, l.name location_name, l.timezone, coalesce(nullif(c.full_name, ''), nullif(c.phone, ''), nullif(c.email, ''), 'Unnamed contact') name, c.email, c.phone, c.tags, c.source, c.dnd,
         c.date_added, c.last_activity_at, nullif(c.assigned_to, '') owner
        from cached_contacts c join locations l on l.installation_id = c.installation_id and l.location_id = c.location_id and not l.ignored
        where c.installation_id = ${inst} and c.location_id = ${loc} and c.contact_id = ${id}`,

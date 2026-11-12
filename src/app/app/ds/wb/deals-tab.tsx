@@ -3,7 +3,7 @@
 import { ExternalLink, Plus } from "lucide-react";
 import { useState } from "react";
 import { tagColor } from "@/lib/people/tag-colors";
-import { cleanMoneyInput, fmtMoneyExact, groupThousands, orderDeals, valueChangeWarning } from "@/lib/people/deal-view";
+import { cleanMoneyInput, defaultPipelineId, fmtMoneyExact, groupThousands, orderDeals, valueChangeWarning } from "@/lib/people/deal-view";
 import { fmtMoney } from "../../ui";
 import { DealFacts, DealGroup, DealHistory, DealSummary, MoveStage, StageSteps } from "./deals-rich";
 import { INPUT, wbButtons, type Runner } from "./runner";
@@ -68,7 +68,7 @@ function DealCard({ d, ctx, runner, focus, now, contactId, locationId }: { d: Wb
 }
 
 function NewDeal({ ctx, runner, onClose }: { ctx: WbContext; runner: Runner; onClose: () => void }) {
-  const [pipeline, setPipeline] = useState(ctx.pipelines[0]?.id ?? "");
+  const [pipeline, setPipeline] = useState(() => defaultPipelineId(ctx.pipelines, ctx.deals, ctx.pipelineUse));
   const stages = ctx.pipelines.find((p) => p.id === pipeline)?.stages ?? [];
   const [stage, setStage] = useState(stages[0]?.id ?? "");
   const [name, setName] = useState(`${ctx.name}`);
@@ -79,7 +79,7 @@ function NewDeal({ ctx, runner, onClose }: { ctx: WbContext; runner: Runner; onC
   return (
     <form className="grid grid-cols-2 gap-2 rounded-xl border bg-card p-4" data-testid="wb-newdeal" onSubmit={(e) => { e.preventDefault(); if (ok) void runner.preview({ kind: "deal_create", pipelineId: pipeline, stageId: stage, name: name.trim(), ...(value.trim() ? { value: Number(value) } : {}), ...(owner ? { ownerId: owner } : {}) }, { verb: "Create deal" }); }}>
       <label className="col-span-2 block"><span className="mb-1 block text-sm font-medium text-muted-foreground">Deal name</span><input value={name} onChange={(e) => setName(e.target.value)} maxLength={120} className={INPUT} data-testid="wb-newdeal-name" /></label>
-      <label className="block"><span className="mb-1 block text-sm font-medium text-muted-foreground">Pipeline</span><select value={pipeline} onChange={(e) => { setPipeline(e.target.value); setStage(ctx.pipelines.find((p) => p.id === e.target.value)?.stages[0]?.id ?? ""); }} className={INPUT} data-testid="wb-newdeal-pipeline">{ctx.pipelines.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
+      <label className="block"><span className="mb-1 block text-sm font-medium text-muted-foreground">Pipeline</span><select value={pipeline} onChange={(e) => { setPipeline(e.target.value); setStage(ctx.pipelines.find((p) => p.id === e.target.value)?.stages[0]?.id ?? ""); }} className={INPUT} data-testid="wb-newdeal-pipeline">{!pipeline && <option value="">Choose a pipeline</option>}{ctx.pipelines.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
       <label className="block"><span className="mb-1 block text-sm font-medium text-muted-foreground">Stage</span><select value={stage} onChange={(e) => setStage(e.target.value)} className={INPUT} data-testid="wb-newdeal-stage">{stages.map((st) => <option key={st.id} value={st.id}>{st.name}</option>)}</select></label>
       <label className="block"><span className="mb-1 block text-sm font-medium text-muted-foreground">Value ($)</span><input inputMode="numeric" value={value} onChange={(e) => setValue(e.target.value.replace(/[^0-9.]/g, ""))} className={INPUT} data-testid="wb-newdeal-value" /></label>
       <label className="block"><span className="mb-1 block text-sm font-medium text-muted-foreground">Owner</span><select value={owner} onChange={(e) => setOwner(e.target.value)} className={INPUT}><option value="">No owner</option>{ctx.users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</select></label>

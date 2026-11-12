@@ -27,6 +27,7 @@ import { DealsTab } from "./wb/deals-tab";
 import { ReviewSheet, useRunner } from "./wb/runner";
 import type { WbContext } from "./wb/types";
 import { UpdateTab } from "./wb/update-tab";
+import { bestName } from "@/lib/people/names";
 
 // One panel for any lead, opened from any list or chart (N50). It answers four questions in this order: who is this and what should I do (one sentence and one button), how do I
 // reach them (Call and Email open the CRM through the white-label link, with a warning first if they asked not to be contacted), what is the history (tags with the day SubSync first
@@ -110,7 +111,7 @@ function Body({ seed, top, showAccount, wide, onLogged }: { seed: LeadSeed; top?
   const email = c?.email ?? seed.email ?? null;
   const dnd = c?.dnd ?? extra?.dnd ?? seed.dnd ?? false;
   const url = data?.url ?? seed.url ?? "";
-  const name = c?.name ?? seed.name;
+  const name = bestName(c?.name, seed.name, phone, email);
   const owner = seed.unassigned ? "No owner" : c ? (c.owner ? data!.ownerName : "No owner") : seed.owner ?? null;
   const ap: ActionPerson = useMemo(() => ({ key: "panel", name, phone, email, dnd, timeZone: extra?.timeZone ?? c?.timeZone ?? seed.timeZone ?? null, url, locationName: c?.locationName ?? seed.locationName ?? null, ownerName: owner, why: seed.note ?? seed.pending ?? null }), [name, phone, email, dnd, extra, c, seed, url, owner]);
   const timeline = useMemo(() => withLive(data?.timeline ?? [], extra?.live ?? null), [data, extra]);

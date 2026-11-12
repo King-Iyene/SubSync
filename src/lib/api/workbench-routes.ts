@@ -167,11 +167,13 @@ async function contextRoute(ctx: Ctx, h: WorkbenchHelpers): Promise<Response> {
   const allPipelineIds = (await sql()`select pipeline_id from pipelines where installation_id = ${ctx.installationId} and location_id = ${locationId} limit 20`).map((r) => r.pipeline_id as string);
   const pipelines = await stagesOf(ctx, locationId, [...new Set([...allPipelineIds, ...deals.map((d) => d.pipelineId).filter((x): x is string => !!x)])]);
   const ownerName = users.find((u) => u.id === lead.ownerId)?.name ?? null;
+  const pipelineUse: Record<string, number> = {};
+  for (const r of await sql()`select pipeline_id, count(*)::int n from cached_opportunities where installation_id = ${ctx.installationId} and location_id = ${locationId} group by pipeline_id`) if (r.pipeline_id) pipelineUse[r.pipeline_id as string] = Number(r.n);
   return json({
     mode, canDelete: ctx.kind !== "client", name: lead.target.name, dnd: lead.target.dnd, phone: lead.target.phone, email: lead.target.email, hasConversation: !!lead.conversationId, dealsUrl: links.opportunities(locationId), timeZone: (tzRow?.timezone as string | null) ?? null,
     // The link that opens this conversation in the customer's CRM (through the white-label domain helper); the contact when there is no conversation yet.
     crmUrl: lead.conversationId ? links.conversation(locationId, lead.conversationId) : links.contact(locationId, contactId),
-    usersNeedPermission: users.every((u) => u.id === lead.ownerId) && !(await installationHasScope(ctx.installationId, "users.readonly")), tags: lead.tags, fields: lead.fields, ownerId: lead.ownerId, ownerName, locationName: lead.locationName, users, deals, dealExtra, lastConversation, appointments: appts, pipelines,
+    usersNeedPermission: users.every((u) => u.id === lead.ownerId) && !(await installationHasScope(ctx.installationId, "users.readonly")), tags: lead.tags, fields: lead.fields, ownerId: lead.ownerId, ownerName, locationName: lead.locationName, users, deals, dealExtra, lastConversation, appointments: appts, pipelines, pipelineUse,
     me: actorOf(ctx),
     templates: TEMPLATES.map((t) => ({ id: t.id, label: t.label, channel: t.channel, subject: t.subject ? fillTemplate(t.subject, { name: lead.target.name, owner: ctx.session.userName ?? ownerName, business: lead.locationName }) : null, text: fillTemplate(t.text, { name: lead.target.name, owner: ctx.session.userName ?? ownerName, business: lead.locationName }) })),
   });
