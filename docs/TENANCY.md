@@ -60,6 +60,7 @@ A person in one client account never sees another client account's data. An agen
 | `api/cron/moat` | secret | Bearer CRON_SECRET; keeps SubSync's own append-only lead record current and writes weekly proof notifications (email dry-run only); never writes to the CRM; idle while the kill switch is on |
 | `api/cron/inbox-breach` | secret | Bearer CRON_SECRET; raises private 24-hour breach alerts from SubSync copies; never writes to the CRM; idle while the kill switch is on |
 | `api/cron/speed-digest` | secret | Bearer CRON_SECRET; builds scheduled speed summaries and hands them to the gated transports (dry run unless live); never writes to the CRM; idle while the kill switch is on |
+| `/proof/[id]` | public_by_design | Branded monthly report for one client account (a front gate, src/proxy.ts, answers a true 404 with one generic page for any bad link): 256-bit random token (hash stored), account derived only from the token, switched off or replaced by the owner, rate limited, never indexed, totals only, no contact, message, other account or vendor name |
 | `/reply-proof/[id]` | public_by_design | Shared reply-time page for one client account: 192-bit random id, 30-day expiry, switch-off by its owner, rate limited, never indexed, totals only, hash-chain check, no contact or message on it |
 | `/audit/[id]` | public_by_design | Shared audit snapshot: 192-bit random id, 14-day expiry, switch-off by its owner, rate limited, totals, finding titles and a fix plan only, account names removed |
 | `/` | public_static | Marketing page |

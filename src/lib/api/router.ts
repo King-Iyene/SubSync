@@ -128,6 +128,7 @@ import { handleAppointments3 } from "./appointments3-routes";
 import { handleApptExec, handleApptExecTarget } from "./appointments-exec-routes";
 import { handlePipeline3 } from "./pipeline3-routes";
 import { handleClients3 } from "./clients3-routes";
+import { handleProof } from "./proof-routes";
 import { handleClients2 } from "./clients2-routes";
 import { handlePeople3 } from "./people3-routes";
 import { handleTeamRoles } from "./team-roles-routes";
@@ -2069,6 +2070,8 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
     if (a === "pipeline3" && method === "GET" && !b && ctx.url.searchParams.has("part")) {
       return await handlePipeline3(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links });
     }
+    // Branded client Proof page and monthly report (stage PR): reports per client account, the secret client link, settings. Agency staff only; flags pr_* checked inside.
+    if (a === "proof") return await handleProof(ctx, { allowed: () => allowedIds(ctx), settings: async () => (await scope(ctx)).settings });
     // Clients round 3: /api/app/clients3?part=... (overview, needs attention, trends, compare, receipt, people, setup, lists; read only).
     if (a === "clients3" && method === "GET" && !b && ctx.url.searchParams.has("part")) {
       return await handleClients3(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links });

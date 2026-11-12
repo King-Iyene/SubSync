@@ -21,6 +21,8 @@ import { sweepDeals, sweepRecover } from "./cash-queries";
 import { runPeopleAlerts } from "./people-alerts";
 import { accountReceipt } from "./moat-queries";
 import { mondayOf, weeklyDue, weeklyProofText } from "./moat-core";
+import { autoPrepare } from "./proof-queries";
+import { getSettings } from "./queries";
 
 // Hourly: (1) D1 keeps the raw record current (flag moat_record), (2) E3 on Monday morning (UTC 08:00 to 09:59) writes one weekly proof receipt per client account to its
 // account admin through the notification dispatcher, EMAIL IN DRY-RUN ONLY (the gated transport writes "would send" and sends nothing until the live switch is on).
@@ -53,7 +55,8 @@ export async function runMoatCron(now = Date.now()): Promise<MoatCronReport> {
       const wgr = ent.features.wg_record && !ent.locked.includes("wg_record");
       const wga = ent.features.wg_alerts && !ent.locked.includes("wg_alerts");
       const bre = ent.features.br_email && !ent.locked.includes("br_email");
-      if (!rec && !mail && !apr && !plr && !clr && !clb && !ppr && !ppi && !auh && !aum && !tdr && !tde && !cfr && !cfe && !pmr && !wgr && !wga && !bre) continue;
+      const pra = ent.features.pr_auto && ent.features.pr_report && !ent.locked.includes("pr_auto") && !ent.locked.includes("pr_report");
+      if (!rec && !mail && !apr && !plr && !clr && !clb && !ppr && !ppi && !auh && !aum && !tdr && !tde && !cfr && !cfe && !pmr && !wgr && !wga && !bre && !pra) continue;
       rep.companies++;
       if (apr) rep.events += Object.values(await sweepAppointmentHistory(installationId)).reduce((x, y) => x + y, 0);
       if (plr) rep.events += Object.values(await sweepDealHistory(installationId)).reduce((x, y) => x + y, 0);
@@ -81,6 +84,11 @@ export async function runMoatCron(now = Date.now()): Promise<MoatCronReport> {
       if (tde) await runTodayEmail(installationId, now).catch((e) => console.error("Today email failed", safeError(e)));
       if (rec) rep.events += Object.values(await sweepMoatEvents(installationId)).reduce((a, b) => a + b, 0);
       if (ppi) await runPeopleAlerts(installationId, now).catch((e) => console.error("Team alerts failed for one company", safeError(e)));
+      if (pra) {
+        // The first days of a month: a draft report for last month for every client account that has none. It is only a draft; nothing goes to a client until the owner shares it.
+        const st = await getSettings(installationId);
+        await autoPrepare(installationId, { countAutomated: st.countAutomatedTouches, defaultTarget: st.speedTargetMinutes, businessHours: st.speedBusinessHours }, new Date(now)).catch((e) => console.error("Monthly draft failed", safeError(e)));
+      }
       if (mail && weeklyDue(now)) rep.receipts += await weeklyProofReceipts(installationId, now);
     } catch (error) {
       rep.failures++;
