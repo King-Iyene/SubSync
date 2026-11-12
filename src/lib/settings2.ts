@@ -45,6 +45,7 @@ export const SEARCH_INDEX: readonly SearchEntry[] = [
   { id: "test-accounts", label: "Leave test accounts out", section: "team", words: "test practice demo ignore account" },
   { id: "reply-target", label: "Reply target", section: "targets", words: "sla reply target minutes hours late speed" },
   { id: "stale", label: "Stale deal and gone quiet days", section: "targets", words: "stale dormant quiet days deal" },
+  { id: "pipeline-history", label: "Pipeline history", section: "targets", words: "pipeline history funnel step stuck minimum sample test deals" },
   { id: "hours", label: "Business hours", section: "targets", words: "business hours open close weekend" },
   { id: "history", label: "Where my history starts", section: "data", words: "history window since start data kept" },
   { id: "delete", label: "Delete my data", section: "data", words: "delete purge remove erase data uninstall privacy" },
