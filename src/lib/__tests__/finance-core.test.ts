@@ -172,3 +172,17 @@ test("money is written per currency in plain words", () => {
   assert.equal(money(2780, "USD"), "$2,780");
   assert.equal(money(12.5, "USD"), "$12.50");
 });
+
+import { buildBrief, SECTIONS, type BriefInputs } from "../analytics/br-core.ts";
+test("the morning brief names accounts that may leave and overdue billing notes, and says they are the agency's own notes", () => {
+  const base: BriefInputs = { attention: [], save: null, recover: null, deals: null, wallet: null, payments: null, accounts: 12 };
+  const on = new Set(SECTIONS);
+  assert.equal(buildBrief({ ...base, finance: null }, on, "2026-11-12").items.length, 0);
+  const b = buildBrief({ ...base, finance: { highRisk: 2, highRiskMrr: { amount: 794, currency: "USD" }, overdue: 1, overdueTotal: { amount: 1200, currency: "USD" } } }, on, "2026-11-12");
+  assert.deepEqual(b.items.map((x) => x.key).sort(), ["finance_churn", "finance_overdue"]);
+  assert.match(b.items.find((x) => x.key === "finance_churn")!.why, /\$794 a month/);
+  assert.match(b.items.find((x) => x.key === "finance_overdue")!.why, /your own notes/);
+  assert.ok(b.items.every((x) => x.hash === "#finance" && x.dollars === null), "recurring plan money is never added into the brief's one-off dollar estimate");
+  const off = buildBrief({ ...base, finance: { highRisk: 2, highRiskMrr: null, overdue: 1, overdueTotal: null } }, new Set(SECTIONS.filter((x) => x !== "finance")), "2026-11-12");
+  assert.equal(off.items.length, 0);
+});

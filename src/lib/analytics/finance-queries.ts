@@ -516,7 +516,7 @@ export async function headline(s: Scope, links: Links, now = Date.now()) {
     atRisk: risk ? { amount: risk.amount, currency: risk.currency } : null, failing, highRisk: hi.length, highRiskMrr: hiM > 0 && primary ? { amount: Math.round(hiM), currency: primary.currency } : null,
     overdue: { count: lg?.counts.overdue ?? 0, total: od }, dueSoon: lg?.counts.due_soon ?? 0, disputes, mrr: primary ? { amount: primary.amount, currency: primary.currency } : null, noPrice: t.noPrice.accounts,
   });
-  return { ...h, mrr: t.mrr, atRisk: t.atRisk, failing, highRisk: hi.length, overdue: lg?.counts.overdue ?? 0, dueSoon: lg?.counts.due_soon ?? 0, disputes, reminders: lg?.reminders ?? 0, noPrice: t.noPrice.accounts, accounts: t.accounts.total };
+  return { ...h, mrr: t.mrr, atRisk: t.atRisk, failing, highRisk: hi.length, highRiskMrr: hiM > 0 && primary ? { amount: Math.round(hiM), currency: primary.currency } : null, overdueTotal: od ? { amount: od.amount, currency: od.currency } : null, overdue: lg?.counts.overdue ?? 0, dueSoon: lg?.counts.due_soon ?? 0, disputes, reminders: lg?.reminders ?? 0, noPrice: t.noPrice.accounts, accounts: t.accounts.total };
 }
 
 export { monthlyFrom, snapMrr, daysBetween };

@@ -7,6 +7,7 @@ import { buildBrief, briefDue, briefEmail, sectionsOf, SECTIONS, type Brief, typ
 import { localDay, validZone } from "./cash-intel";
 import { dealsSummary, recoverSummary, saveBoard } from "./cash-queries";
 import { today as paymentsToday } from "./payments-queries";
+import { headline as financeHeadline } from "./finance-queries";
 import { today } from "./today3-queries";
 import { summary as walletSummary } from "./wg-queries";
 
@@ -15,7 +16,7 @@ import { summary as walletSummary } from "./wg-queries";
 // and sends nothing. It never messages a lead and never changes the CRM. A person's choices (br_prefs) are that person's own: every read and write here is keyed by the installation AND the
 // verified user, never by anything the browser sends.
 
-export type BriefFlags = { cf_save: boolean; cf_recover: boolean; cf_deals: boolean; wg_wallet: boolean; pm_module: boolean; td_today: boolean };
+export type BriefFlags = { cf_save: boolean; cf_recover: boolean; cf_deals: boolean; wg_wallet: boolean; pm_module: boolean; td_today: boolean; fn_today?: boolean };
 const cache = ttlCache<BriefInputs>(60_000, 50);
 export const forgetBrief = (inst: string) => cache.clear(JSON.stringify([inst]).slice(0, -1));
 
@@ -29,13 +30,14 @@ export async function gather(inst: string, f: BriefFlags, now = Date.now()): Pro
   if (hit) return hit;
   const scope = { inst, allowed: null, level: "all" as const, selfId: null };
   const quiet = async <T>(on: boolean, fn: () => Promise<T>): Promise<T | null> => (on ? fn().catch(() => null) : null);
-  const [td, save, rec, deals, wallet, pay] = await Promise.all([
+  const [td, save, rec, deals, wallet, pay, fin] = await Promise.all([
     quiet(true, () => today(scope, null, now)),
     quiet(f.cf_save, () => saveBoard(scope, now)),
     quiet(f.cf_recover, () => recoverSummary(scope, null, now)),
     quiet(f.cf_deals, () => dealsSummary(scope, null, now)),
     quiet(f.wg_wallet, () => walletSummary({ inst, allowed: null }, { account: () => "" }, now)),
     quiet(f.pm_module, () => paymentsToday({ inst, allowed: null }, {})),
+    quiet(f.fn_today === true, () => financeHeadline({ inst, allowed: null }, { account: () => "" }, now)),
   ]);
   const out: BriefInputs = {
     accounts: td?.accounts ?? 0,
@@ -45,6 +47,7 @@ export async function gather(inst: string, f: BriefFlags, now = Date.now()): Pro
     deals: deals ? { slipping: deals.stale.count + deals.soon.count, value: deals.stale.value !== null || deals.soon.value !== null ? (deals.stale.value ?? 0) + (deals.soon.value ?? 0) : null, lost: deals.lost.count, lostNoReason: deals.lost.noReason } : null,
     wallet: wallet ? { empty: wallet.counts.empty, low: wallet.counts.low, spike: wallet.counts.spike, names: wallet.top.map((r) => r.name) } : null,
     payments: pay ? paymentsOf(pay.atRisk) : null,
+    finance: fin ? { highRisk: fin.highRisk, highRiskMrr: fin.highRiskMrr, overdue: fin.overdue, overdueTotal: fin.overdueTotal } : null,
   };
   cache.set(key, out);
   return out;

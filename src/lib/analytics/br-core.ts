@@ -4,10 +4,10 @@ import { digestDue } from "./cash-intel.ts";
 // the exact list, and one dollar line. Built only from numbers SubSync already computes; this file only chooses, ranks and words them. Definitions: docs/METRICS.md "The 7 am brief".
 // Every dollar figure is an ESTIMATE and says so. Nothing here changes the CRM or messages a lead. No vendor words: "client accounts", "your CRM".
 
-export const SECTIONS = ["attention", "save", "recover", "deals", "wallet", "payments"] as const;
+export const SECTIONS = ["attention", "save", "recover", "deals", "wallet", "payments", "finance"] as const;
 export type Section = (typeof SECTIONS)[number];
 export const SECTION_LABEL: Record<Section, string> = {
-  attention: "Needs a look today", save: "Accounts to save", recover: "Missed leads to win back", deals: "Deals going quiet", wallet: "Credit balances", payments: "Payments at risk",
+  attention: "Needs a look today", save: "Accounts to save", recover: "Missed leads to win back", deals: "Deals going quiet", wallet: "Credit balances", payments: "Payments at risk", finance: "Money and accounts that may leave",
 };
 export const BRIEF_MAX = 5;
 
@@ -29,6 +29,8 @@ export type BriefInputs = {
   deals: { slipping: number; value: number | null; lost: number; lostNoReason: number } | null;
   wallet: { empty: number; low: number; spike: number; names: string[] } | null;
   payments: { count: number; amount: number | null } | null;
+  /** Finance (stage FN): accounts that look likely to leave (with the monthly plan price behind them) and billing notes that are overdue. Optional: absent while Finance is off. */
+  finance?: { highRisk: number; highRiskMrr: { amount: number; currency: string } | null; overdue: number; overdueTotal: { amount: number; currency: string } | null } | null;
   accounts: number;
 };
 
@@ -59,6 +61,11 @@ export function candidates(i: BriefInputs, on: ReadonlySet<Section>): BriefItem[
   if (on.has("payments") && i.payments && i.payments.count > 0) {
     const p = i.payments;
     out.push({ key: "payments", section: "payments", title: `${s(p.count, "payment has", "payments have")} failed or gone late`, why: "Chase them before they are written off.", count: p.count, dollars: p.amount, tier: 2, hash: "#payments" });
+  }
+  if (on.has("finance") && i.finance) {
+    const f = i.finance, cash = (m: { amount: number; currency: string }) => (m.currency === "USD" ? money(m.amount) : `${Math.round(m.amount).toLocaleString("en-US")} ${m.currency}`);
+    if (f.highRisk > 0) out.push({ key: "finance_churn", section: "finance", title: `${s(f.highRisk, "client account looks", "client accounts look")} likely to leave`, why: `${f.highRiskMrr ? `About ${cash(f.highRiskMrr)} a month in plans (estimate). ` : ""}Open the watch list and call the first one.`, count: f.highRisk, dollars: null, tier: 2, hash: "#finance" });
+    if (f.overdue > 0) out.push({ key: "finance_overdue", section: "finance", title: `${s(f.overdue, "billing note is", "billing notes are")} overdue`, why: `${f.overdueTotal ? `${cash(f.overdueTotal)} is waiting to come in. ` : ""}These are your own notes: send the reminders yourself.`, count: f.overdue, dollars: null, tier: 2, hash: "#finance" });
   }
   if (on.has("recover") && i.recover && i.recover.total > 0) {
     out.push({ key: "recover", section: "recover", title: `${s(i.recover.total, "person is", "people are")} waiting to be won back`, why: "They wrote, called or booked and nobody followed up.", count: i.recover.total, dollars: i.recover.estValue, tier: 2, hash: "#today?tab=recover" });

@@ -81,7 +81,7 @@ export async function runMoatCron(now = Date.now()): Promise<MoatCronReport> {
       // The 7 am brief, at each person's own hour of their own day (br_email). One per person per day; email stays a dry run until the live switch is on.
       if (bre) {
         const on = (k: string) => ent.features[k as keyof typeof ent.features] === true && !ent.locked.includes(k);
-        await runBriefs(installationId, { cf_save: on("cf_save"), cf_recover: on("cf_recover"), cf_deals: on("cf_deals"), wg_wallet: on("wg_wallet"), pm_module: on("pm_module"), td_today: on("td_today") }, now).catch((e) => console.error("Brief failed", safeError(e)));
+        await runBriefs(installationId, { cf_save: on("cf_save"), cf_recover: on("cf_recover"), cf_deals: on("cf_deals"), wg_wallet: on("wg_wallet"), pm_module: on("pm_module"), td_today: on("td_today"), fn_today: on("fn_today") }, now).catch((e) => console.error("Brief failed", safeError(e)));
       }
       if (tde) await runTodayEmail(installationId, now).catch((e) => console.error("Today email failed", safeError(e)));
       if (rec) rep.events += Object.values(await sweepMoatEvents(installationId)).reduce((a, b) => a + b, 0);
