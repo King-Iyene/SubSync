@@ -98,3 +98,13 @@ Payment, workflow, course and automation signals stay empty until the optional p
 Found: after adding the tag the panel title changed from the phone number to "Unnamed contact".
 
 Not done, and why: a real text or call needs the quiet-hours or calling-hours override, and the contact has a real-looking conversation history. I did not override those warnings. King decides: do those two clicks himself in the daytime, or tell me which test contact is safe to message.
+
+### Walk-through #3, part 3: imported test leads (fictional numbers), 13 Nov night
+- The 120-lead file was imported by King. After "Sync now" (425 contacts, 265 conversations, 35 appointments updated) the leads are findable in Find a lead by name ("Bola" gives 6). Searching "lead0" gives 0: search matches the start of a name or email, not the middle of an email like king+lead101.
+- Lead panel for "Bola Sample 101": opens inside SubSync, "A new contact from the last day", tags from the import shown as "before SubSync", Call, Text, Email.
+- Call: shows the 8am-9pm warning; "Call now" tries to open the CRM phone window as a pop-up, which this browser pane blocks (pop-ups only from the user's own click). A real call must be started by King's click.
+- Text: composer, personalised preview ("Send this text to Bola Sample 101"), outside-hours box. The send failed with "Request failed (403)". Retry then said "Tick the box to go ahead." So the first message should have said "Confirm the outside-hours box" in plain words.
+
+New findings: (8) bare "Request failed (403)" on a blocked send, must say why in plain words; (9) Find a lead search cannot find text in the middle of an email.
+
+Still not tested: Money, Clients, Team, Pipeline (live funnel), Meetings and the Fathom line, Workflows, Settings, bookings and deals on the imported leads, bulk screens with 100+ leads, dark/light and 390/768 widths.
