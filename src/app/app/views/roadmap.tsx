@@ -21,7 +21,7 @@ const SUGGESTION_LABEL: Record<string, string> = { new: "Received", planned: "Pl
 
 // What is coming next (with a vote), what you can suggest, and what changed lately. Votes help us decide what to build next; they do not set the order, because
 // we also sequence by risk and by what has to come first (N86).
-export function RoadmapView() {
+export function RoadmapView({ embedded = false }: { embedded?: boolean } = {}) {
   const api = useApiClient();
   const { data, error, loading, reload } = useData<Data>("roadmap");
   const [busy, setBusy] = useState<string | null>(null);
@@ -50,7 +50,10 @@ export function RoadmapView() {
 
   return (
     <div className="max-w-3xl">
-      <PageHeader title="What's new and next" subtitle="Votes help us decide what to build next. Vote once for anything you want, and suggest what is missing." />
+      {/* Inside What's new the page already has its one h1, so this part is a section with an h2 (one h1 per page). */}
+      {embedded
+        ? <div className="mb-4"><h2 className="text-lg font-semibold tracking-tight">What&apos;s new and next</h2><p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">Votes help us decide what to build next. Vote once for anything you want, and suggest what is missing.</p></div>
+        : <PageHeader title="What's new and next" subtitle="Votes help us decide what to build next. Vote once for anything you want, and suggest what is missing." />}
 
       {GROUPS.map(({ status, tone }) => {
         const items = data.items.filter((i) => i.status === status);

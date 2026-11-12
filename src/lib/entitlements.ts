@@ -209,6 +209,8 @@ export const FEATURES = [
   "cu_health",
   "cu_bulk",
   "cu_confirm",
+  "mn_logged",
+  "mn_outcomes",
   "dq_module",
   "dq_dupes",
   "dq_intake",
