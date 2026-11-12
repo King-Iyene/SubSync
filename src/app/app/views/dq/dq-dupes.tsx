@@ -1,8 +1,10 @@
 "use client";
 
-import { ExternalLink, ShieldCheck } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { ExternalLink } from "lucide-react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { bulkMergePhrase, deletePhrase, mergePhrase, previewLine } from "@/lib/dq/dq-core";
+import { DELETE_BLOCKED_WHY } from "@/lib/dq/dupe-copies";
+import { CopiesPanel, CopiesToggle, ProtectedBadge, WhyDisabled } from "./dq-copies";
 import { EmptyState, ErrorState, LocalAccountPicker, SkeletonRows } from "../../ds";
 import { InfoTip } from "../../ds/info-tip";
 import { useApiClient } from "../../session";
@@ -88,6 +90,7 @@ export function DupesTab({ opts, account, setAccount }: { opts: Opts; account: s
 function GroupItem({ g, opts, onGone, multi }: { g: GroupRow; opts: Opts; onGone: (key: string, msg: string) => void; multi: boolean }) {
   const api = useApiClient();
   const [mode, setMode] = useState<"merge" | "delete" | null>(null), [err, setErr] = useState<string | null>(null), [busy, setBusy] = useState(false);
+  const [show, setShow] = useState(false), panelId = useId();
   const first = g.people[0];
   const ids = g.people.map((p) => p.contactId);
   const label = g.shared && g.shared !== first.name ? g.shared : "";
@@ -103,18 +106,19 @@ function GroupItem({ g, opts, onGone, multi }: { g: GroupRow; opts: Opts; onGone
         <div className="min-w-0 flex-1 basis-56">
           <p className="flex flex-wrap items-center gap-2 text-sm"><b className="truncate">{first.name}</b>
             <span className="rounded-md border bg-muted/50 px-1.5 py-0.5 text-xs" data-testid="dq-badge" title={g.why[0] ?? ""}>{g.badge}</span>
-            <span className="text-xs text-muted-foreground">{g.people.length} copies</span>
-            {g.protectedCount > 0 && <span className="inline-flex items-center gap-1 text-xs text-muted-foreground" title={g.people.find((p) => p.protectWords)?.protectWords ?? "Protected"} data-testid="dq-protected"><ShieldCheck aria-hidden className="size-3.5" />Protected</span>}
+            <CopiesToggle g={g} open={show} onToggle={() => setShow((s) => !s)} panelId={panelId} />
+            {g.protectedCount > 0 && <ProtectedBadge />}
           </p>
           <p className="truncate text-xs text-muted-foreground">{[label, multi ? g.locationName : ""].filter(Boolean).join(" · ")}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button type="button" className={P_BTN} aria-expanded={mode === "merge"} onClick={() => setMode(mode === "merge" ? null : "merge")} data-testid="dq-merge">Merge</button>
           <button type="button" className={Q_BTN} disabled={busy} onClick={() => void notSame()} data-testid="dq-notsame">Not the same</button>
-          {opts.canChange && <button type="button" className={D_BTN} disabled={allExtrasProtected} title={allExtrasProtected ? "Everyone else here is protected" : "Delete the other copies"} aria-expanded={mode === "delete"} onClick={() => setMode(mode === "delete" ? null : "delete")} data-testid="dq-delete">Delete extras</button>}
+          {opts.canChange && <WhyDisabled disabled={allExtrasProtected} why={DELETE_BLOCKED_WHY}><button type="button" className={D_BTN} disabled={allExtrasProtected} title={allExtrasProtected ? DELETE_BLOCKED_WHY : "Delete the other copies"} aria-expanded={mode === "delete"} onClick={() => setMode(mode === "delete" ? null : "delete")} data-testid="dq-delete">Delete extras</button></WhyDisabled>}
         </div>
       </div>
       {err && <p className="px-3 pb-2 text-sm text-destructive" role="alert">{err}</p>}
+      {show && <CopiesPanel g={g} panelId={panelId} />}
       {mode === "merge" && <MergeTable g={g} onGone={onGone} />}
       {mode === "delete" && <DeleteExtras g={g} onGone={onGone} />}
     </li>
