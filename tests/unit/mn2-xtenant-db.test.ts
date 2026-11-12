@@ -50,8 +50,8 @@ describe.skipIf(!HAS_DB)("Meeting notes cross-tenant", () => {
     for (const i of [instA, instB]) await sql()`insert into settings (installation_id) values (${i}) on conflict do nothing`;
     await sql()`update installations set scope = 'contacts.write' where id = ${instA}`;
     await sql()`insert into locations (installation_id, location_id, name, timezone, client_view) values (${instA}, ${A1}, 'zzMn Client A1', 'UTC', true), (${instB}, ${B1}, 'zzMn Client B1', 'UTC', true)`;
-    await sql()`insert into cached_contacts (installation_id, location_id, contact_id, first_name, last_name, full_name, email, tags) values
-      (${instA}, ${A1}, 'xtest-mn-ca', 'Zed', 'MnA', 'Zed MnA', 'zed-a@mn-xtest.test', '{}'), (${instA}, ${A1}, 'xtest-mn-ca2', 'Quinn', 'MnA', 'Quinn MnA', 'quinn@mn-xtest.test', '{}'), (${instB}, ${B1}, 'xtest-mn-cb', 'Zed', 'MnB', 'Zed MnB', 'zed-b@mn-xtest.test', '{}')`;
+    await sql()`insert into cached_contacts (installation_id, location_id, contact_id, first_name, last_name, email, tags) values
+      (${instA}, ${A1}, 'xtest-mn-ca', 'Zed', 'MnA', 'zed-a@mn-xtest.test', '{}'), (${instA}, ${A1}, 'xtest-mn-ca2', 'Quinn', 'MnA', 'quinn@mn-xtest.test', '{}'), (${instB}, ${B1}, 'xtest-mn-cb', 'Zed', 'MnB', 'zed-b@mn-xtest.test', '{}')`;
     await sql()`insert into user_connections (installation_id, company_key, ghl_user_id, person_name, provider, status) values
       (${instA}, ${CO_A}, ${U_A}, 'Ada Xtest', 'fathom', 'connected'), (${instA}, ${CO_A}, ${U_A2}, 'Bo Xtest', 'fathom', 'connected'), (${instB}, ${CO_B}, ${U_B}, 'Cy Xtest', 'fathom', 'connected')`;
     await meeting(instA, U_A, "xt-a1", { title: "xtest MN A saved call", summary: "xtest A secret summary", items: ["Send quote", "Book visit"], loc: A1, contact: "xtest-mn-ca", days: 3, minutes: 30 });
