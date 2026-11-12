@@ -3,7 +3,7 @@ import { parseFilters, type Filters } from "../analytics/call-intel";
 import { teamNames } from "../analytics/inbox-queries";
 import { recordTouchEvents } from "../analytics/touch-events-db";
 import { dialInsights, redialRows } from "../analytics/dial6-queries";
-import { defaultRange, missedWaitingPage, pageSize } from "../analytics/missed-calls";
+import { callerLabel, defaultRange, missedWaitingPage, pageSize } from "../analytics/missed-calls";
 import { parseWindow } from "../analytics/speed-window";
 import { sql } from "../db";
 import { DEFAULT_SCRIPT, DIAL_LISTS, followUpDays, isDialOutcome, isListId, outcomeOf, rankQueue, SCRIPT_MAX, statsByUser, type QueueItem } from "../dial/dial";
@@ -34,7 +34,7 @@ export async function sourceRowsPage(ctx: { installationId: string }, allowed: s
     return {
       total: m.total, dollars: m.dollars,
       rows: m.rows.map((r) => ({
-        contactId: r.contactId, locationId: r.locationId, locationName: r.locationName, name: r.name ?? "Unknown caller", phone: r.phone, dnd: r.dnd, timeZone: r.timeZone, openValue: r.dollars,
+        contactId: r.contactId, locationId: r.locationId, locationName: r.locationName, name: callerLabel(r), phone: r.phone, dnd: r.dnd, timeZone: r.timeZone, openValue: r.dollars, noRecord: !r.hasRecord,
         ageHours: Math.max(0, (Date.now() - r.missedAt) / HOUR), priority: 50, reasons: ["Missed call, no callback yet"], ownerId: r.owner, source: r.source,
       })),
     };
@@ -101,7 +101,7 @@ async function queueRoute(ctx: Ctx, h: DialHelpers): Promise<Response> {
   return json({
     list, lists, total: out.total, page: pageNo, size, dollars: out.dollars ?? null, ownOnly: ctx.kind === "client",
     me: ctx.session.userName ?? null,
-    items: ranked.map((r) => ({ contactId: r.contactId, locationId: r.locationId, locationName: r.locationName, name: r.name, phone: r.phone, dnd: r.dnd, timeZone: r.timeZone, openValue: r.openValue, ageHours: r.ageHours, priority: r.priority, reasons: r.reasons, source: (r as { source?: string | null }).source ?? null, url: links.contact(r.locationId, r.contactId) })),
+    items: ranked.map((r) => ({ contactId: r.contactId, locationId: r.locationId, locationName: r.locationName, name: r.name, phone: r.phone, dnd: r.dnd, timeZone: r.timeZone, openValue: r.openValue, ageHours: r.ageHours, priority: r.priority, reasons: r.reasons, source: (r as { source?: string | null }).source ?? null, noRecord: (r as { noRecord?: boolean }).noRecord === true, url: links.contact(r.locationId, r.contactId) })),
   });
 }
 

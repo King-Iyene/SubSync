@@ -127,10 +127,10 @@ function DateControl({ mode, hash }: { mode: "range" | "now"; hash: string }) {
   if (mode === "now") return <p className="text-[0.95rem] text-muted-foreground" data-testid="date-now" title="This page shows what is true at this moment, not a date range."><span className="font-medium text-foreground">Live</span>, as of right now</p>;
   return (
     <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5" data-testid="date-control">
-      <div role="group" aria-label="Dates" className="inline-flex overflow-hidden rounded-lg border bg-card">
+      <div role="group" aria-label="Dates" className="inline-flex max-w-full overflow-x-auto rounded-lg border bg-card">
         {PRESETS.map((p) => (
           <button key={p.key} type="button" aria-pressed={spec.preset === p.key} onClick={() => apply({ preset: p.key, compare: "none" })}
-            className={`min-h-10 whitespace-nowrap px-2.5 text-[0.95rem] outline-none focus-visible:ring-2 focus-visible:ring-ring/40 sm:px-3 ${spec.preset === p.key ? "bg-primary font-medium text-primary-foreground" : "hover:bg-accent"}`}>{p.label.startsWith("Last ") ? <><span className="max-sm:sr-only">Last </span>{p.label.slice(5)}</> : p.label}</button>
+            className={`min-h-11 sm:min-h-10 whitespace-nowrap px-2.5 text-[0.95rem] outline-none focus-visible:ring-2 focus-visible:ring-ring/40 sm:px-3 ${spec.preset === p.key ? "bg-primary font-medium text-primary-foreground" : "hover:bg-accent"}`}>{p.label.startsWith("Last ") ? <><span className="max-sm:sr-only">Last </span>{p.label.slice(5)}</> : p.label}</button>
         ))}
         <button type="button" aria-pressed={spec.preset === "custom"} onClick={() => apply({ preset: "custom", from: spec.from ?? resolved?.current.from, to: spec.to ?? resolved?.current.to, compare: "none" })}
           className={`min-h-10 border-l px-3 text-[0.95rem] outline-none focus-visible:ring-2 focus-visible:ring-ring/40 ${spec.preset === "custom" ? "bg-primary font-medium text-primary-foreground" : "hover:bg-accent"}`}>Custom</button>

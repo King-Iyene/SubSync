@@ -1,0 +1,35 @@
+/* Wallet guard and the 7 am brief: calm and flat, the same surfaces and tokens as Clients (cl3.css) and Today (td3.css). No glow, no gradients. Light and dark come from the theme variables. */
+.wg-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.wg-row { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 2fr) auto; gap: 8px 18px; align-items: center; border: 1px solid color-mix(in srgb, var(--s6-edgec) 26%, transparent); border-radius: 12px; padding: 12px 14px; background: var(--s6-surf); min-width: 0; }
+.wg-row[data-level="empty"] { border-color: color-mix(in srgb, var(--s6-amber) 70%, transparent); }
+.wg-row[data-level="low"] { border-color: color-mix(in srgb, var(--s6-amber) 45%, transparent); }
+.wg-main { min-width: 0; } .wg-name { font-size: 1.0625rem; overflow-wrap: anywhere; } .wg-main p { margin: 4px 0 0; }
+.wg-nums { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px 14px; } .wg-nums > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.wg-nums b { font-variant-numeric: tabular-nums; font-weight: 650; overflow-wrap: anywhere; }
+.wg-act { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px 12px; }
+.wg-bar { display: block; height: 6px; border-radius: 999px; background: color-mix(in srgb, var(--s6-line) 60%, transparent); overflow: hidden; margin-top: 4px; }
+.wg-bar i { display: block; height: 100%; border-radius: 999px; background: var(--s6-cyan); } .wg-bar i[data-level="low"], .wg-bar i[data-level="empty"] { background: var(--s6-amber); }
+.wg-two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.wg-line { width: 100%; height: 62px; color: var(--s6-cyan); display: block; }
+.wg-bars { display: flex; align-items: flex-end; gap: 2px; height: 62px; } .wg-bars i { flex: 1 1 0; min-width: 2px; background: color-mix(in srgb, var(--s6-cyan) 70%, transparent); border-radius: 2px 2px 0 0; } .wg-bars i[data-top="1"] { background: var(--s6-amber); }
+.wg-form { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; } .wg-form .ap-field { max-width: 14rem; }
+.wg-usage { margin-top: 8px; } .wg-settings { margin-top: 6px; }
+@media (max-width: 760px) {
+  .wg-row { grid-template-columns: minmax(0, 1fr); }
+  .wg-nums { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .wg-act { justify-content: flex-start; }
+  .wg-two { grid-template-columns: minmax(0, 1fr); }
+}
+/* Today cards: the wallet card and the 7 am brief. */
+.br-card { border: 1px solid color-mix(in srgb, var(--s6-edgec) 26%, transparent); border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; background: var(--s6-surf); min-width: 0; }
+.br-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.br-item { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 12px; align-items: start; border-top: 1px solid color-mix(in srgb, var(--s6-line) 55%, transparent); padding-top: 10px; }
+.br-item b { overflow-wrap: anywhere; } .br-item p { margin: 2px 0 0; }
+.br-tools { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; }
+.br-pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 0.8125rem; border: 1px solid color-mix(in srgb, var(--s6-line) 60%, transparent); border-radius: 8px; padding: 10px 12px; max-height: 16rem; overflow: auto; margin: 0; }
+.br-form { display: flex; flex-direction: column; gap: 10px; max-width: 34rem; } .br-form label { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.br-days { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+@media (max-width: 700px) {
+  .br-item { grid-template-columns: 22px minmax(0, 1fr); } .br-item .br-go { grid-column: 2; }
+}
+@media print { .br-card { break-inside: avoid; } }

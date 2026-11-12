@@ -20,7 +20,11 @@ export type MissedScope = { installationId: string; allowed: string[] | null; fr
 export type MissedRow = {
   locationId: string; contactId: string; missedAt: number; name: string | null; email: string | null; phone: string | null; dnd: boolean; source: string | null; owner: string | null;
   locationName: string | null; timeZone: string | null; dollars: number;
+  /** False when SubSync holds no record of this caller yet (the missed call is known, the contact is not synced): no name, no number, but the CRM has them. */
+  hasRecord: boolean;
 };
+// How a caller is named on every screen (Coverage and Call mode) lives in dial.ts so it can be tested without a database.
+export { callerLabel } from "../dial/dial";
 export const defaultRange = (now: number) => ({ fromMs: now - MISSED_DEFAULT_DAYS * 86_400_000, toMs: now + 86_400_000 });
 
 type Db = ReturnType<typeof sql>;
@@ -49,7 +53,7 @@ function waitingCte(db: Db, s: MissedScope) {
 const rowOf = (r: Record<string, unknown>): MissedRow => ({
   locationId: r.location_id as string, contactId: r.contact_id as string, missedAt: new Date(r.missed_at as string).getTime(), name: (r.name as string | null) ?? null, email: (r.email as string | null) ?? null,
   phone: (r.phone as string | null) ?? null, dnd: r.dnd === true, source: (r.source as string | null) ?? null, owner: (r.owner as string | null) ?? null,
-  locationName: (r.location_name as string | null) ?? null, timeZone: (r.timezone as string | null) ?? null, dollars: Number(r.dollars ?? 0),
+  locationName: (r.location_name as string | null) ?? null, timeZone: (r.timezone as string | null) ?? null, dollars: Number(r.dollars ?? 0), hasRecord: r.has_record !== false,
 });
 
 /** One ranked page of the waiting callers, with the true count and dollars of all of them. */
@@ -61,7 +65,7 @@ export async function missedWaitingPage(s: MissedScope, page: { limit: number; o
     with ${waitingCte(db, s)},
     r as (
       select w.location_id, w.contact_id, w.missed_at, l.name location_name, l.timezone,
-        nullif(coalesce(nullif(c.full_name, ''), nullif(trim(coalesce(c.first_name, '') || ' ' || coalesce(c.last_name, '')), '')), '') name, c.email, c.phone, c.dnd, nullif(c.source, '') source, nullif(c.assigned_to, '') owner,
+        nullif(coalesce(nullif(c.full_name, ''), nullif(trim(coalesce(c.first_name, '') || ' ' || coalesce(c.last_name, '')), '')), '') name, c.email, c.phone, c.dnd, nullif(c.source, '') source, nullif(c.assigned_to, '') owner, (c.contact_id is not null) has_record,
         coalesce(d.v, 0)::float8 dollars
       from w
       join locations l on l.installation_id = ${s.installationId} and l.location_id = w.location_id and not l.ignored
@@ -99,7 +103,7 @@ export async function missedRecoveredRows(s: MissedScope, limit: number): Promis
   const rows = await db`
     with ${latestMissed(db, s)}
     select m.location_id, m.contact_id, m.missed_at, l.name location_name, l.timezone, nullif(coalesce(nullif(c.full_name, ''), nullif(trim(coalesce(c.first_name, '') || ' ' || coalesce(c.last_name, '')), '')), '') name,
-      c.email, c.phone, c.dnd, nullif(c.source, '') source, nullif(c.assigned_to, '') owner, 0::float8 dollars
+      c.email, c.phone, c.dnd, nullif(c.source, '') source, nullif(c.assigned_to, '') owner, (c.contact_id is not null) has_record, 0::float8 dollars
     from m join locations l on l.installation_id = ${s.installationId} and l.location_id = m.location_id and not l.ignored
     left join cached_contacts c on c.installation_id = ${s.installationId} and c.location_id = m.location_id and c.contact_id = m.contact_id
     where exists (select 1 from touch_events o where o.installation_id = ${s.installationId} and o.location_id = m.location_id and o.contact_id = m.contact_id

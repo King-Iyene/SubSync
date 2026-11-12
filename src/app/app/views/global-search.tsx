@@ -48,7 +48,7 @@ export function GlobalSearch({ go }: { go: GoFn }) {
 
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className="ds-press inline-flex min-h-9 items-center gap-2 rounded-lg px-2.5 text-sm text-muted-foreground hover:bg-muted hover:text-foreground print:hidden" data-testid="global-search-open" aria-label="Search people, Control K">
+      <button type="button" onClick={() => setOpen(true)} className="ds-press inline-flex min-h-11 min-w-11 items-center sm:min-h-9 sm:min-w-0 gap-2 rounded-lg px-2.5 text-sm text-muted-foreground hover:bg-muted hover:text-foreground print:hidden" data-testid="global-search-open" aria-label="Search people, Control K">
         <Search aria-hidden className="size-4" /><span className="hidden sm:inline">Search people</span> <kbd className="hidden font-sans text-xs text-muted-foreground sm:inline">Ctrl K</kbd>
       </button>
       {open && (

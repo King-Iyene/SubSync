@@ -41,6 +41,9 @@ test("pilot modules are on by default and a database row can still override the 
     "bf_funnel",
     "bf_recover",
     "bf_today",
+    "br_brief",
+    "br_email",
+    "br_record",
     "cf_deals",
     "cf_email",
     "cf_record",
@@ -108,6 +111,8 @@ test("pilot modules are on by default and a database row can still override the 
     "inbox_working_hours",
     "inbox_workload",
     "lead_journey_pro",
+    "mn_logged",
+    "mn_outcomes",
     "moat_alert_feedback",
     "moat_benchmark",
     "moat_curve",
@@ -167,6 +172,9 @@ test("pilot modules are on by default and a database row can still override the 
     "wf_library",
     "wf_outcomes",
     "wf_today",
+    "wg_alerts",
+    "wg_record",
+    "wg_wallet",
     "zoom_meet",
   ]);
   assert.equal(f.meetings, true);

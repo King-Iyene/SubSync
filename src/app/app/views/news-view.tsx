@@ -30,7 +30,7 @@ export function NewsView({ go, features }: { go: GoFn; features: Record<string, 
           ))}
         </ul>
       </Card>
-      <RoadmapView />
+      <RoadmapView embedded />
     </div>
   );
 }

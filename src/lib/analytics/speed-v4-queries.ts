@@ -9,7 +9,7 @@ import { coverageSql, eventsRecorded, feedSql, journeyMembersSql, journeySql, le
 import { DAY } from "./speed-v3";
 import { MIN_FOR_MEDIAN, sourceLabel } from "./speed-intel";
 import { FOLLOW_UP_HOURS, leadQuality, MIN_BUCKET, routingCheck, textBackAudit, type MissedCall } from "./speed-v4";
-import { missedRecoveredRows, missedStats, missedWaitingPage, type MissedRow, type MissedScope } from "./missed-calls";
+import { callerLabel, missedRecoveredRows, missedStats, missedWaitingPage, type MissedRow, type MissedScope } from "./missed-calls";
 import { afterHoursCoverSql, bestTimesSql, channelMixSql, eventsInRange } from "./coverage-events-sql";
 import { STEPS, type LeadFilter, type Step } from "./speed-v4-more";
 import { leadStory, loadTouchEvents } from "./touch-events-db";
@@ -83,7 +83,7 @@ export async function speedCoverage(i: Input) {
     const owner = c.owner ? resolveUser(c.owner, lk.team, lk.usersAccess.get(c.locationId)) : null;
     const dropped = open && i.now - c.missedAt > FOLLOW_UP_HOURS * 3_600_000;
     return {
-      locationId: c.locationId, locationName: lk.locationNames.get(c.locationId) ?? c.locationName ?? "Client account", contactId: c.contactId, name: c.name || c.email || c.phone || "Unknown caller",
+      locationId: c.locationId, locationName: lk.locationNames.get(c.locationId) ?? c.locationName ?? "Client account", contactId: c.contactId, name: callerLabel(c),
       status: "waiting" as const, neverAnswered: dropped, minutes: Math.round((i.now - c.missedAt) / 60_000), source: sourceLabel(c.source), repliedBy: null, owner, unassigned: !owner, autoSeconds: null, personSeconds: null, detailed: false,
       phone: c.phone, email: c.email, dnd: c.dnd, timeZone: tzOf(c.locationId) ?? c.timeZone, suggestion: null, calledAt: c.missedAt, dollars: c.dollars, callState: (open ? (dropped ? "dropped" : "open") : "followed") as MissedCall["status"],
     };

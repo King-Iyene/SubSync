@@ -43,12 +43,12 @@ function numbersSample(): Td3Numbers {
   return {
     days: 30, historyStarts: "2026-10-28", testDealsLeftOut: 12,
     tiles: [
-      { id: "reply", label: "Typical first reply", value: "9 min", enough: true, formula: "The middle first-reply time of the leads answered in the last 30 days, across 20 accounts. Needs 5 answered leads.", change: "-12%", estimate: false, opens: { module: "speed" }, count: 412 },
-      { id: "waiting", label: "Waiting for a reply", value: "27", enough: true, formula: "People whose last message is from the customer and nobody has answered, in the last 30 days.", change: null, estimate: false, opens: { list: "all_waiting" }, count: 27 },
-      { id: "showrate", label: "Show rate", value: "71%", enough: true, formula: "People who came as a share of appointments marked came or no-show in the last 30 days. Needs 20 marked outcomes; unmarked appointments are not counted.", change: "+4%", estimate: false, opens: { list: "all_noshows" }, count: 38 },
-      { id: "open_deals", label: "Open deals", value: "184 worth $412,300", enough: true, formula: "Open deals counted by Pipeline's rule, leaving out deals with no value and deals with no owner (usually test or junk). The dollar figure is the deals' own value, not a forecast.", change: null, estimate: true, opens: { list: "open_deals" }, count: 184 },
-      { id: "stale", label: "Deals gone quiet", value: "41", enough: true, formula: "Open deals with no movement for 30 days, by Pipeline's counted-deal rule.", change: null, estimate: false, opens: { list: "all_stale" }, count: 41 },
-      { id: "attention", label: "Accounts needing a look", value: "5 of 20", enough: true, formula: "Client accounts Clients marks Act now or Keep an eye.", change: null, estimate: false, opens: { module: "clients" }, count: 5 },
+      { id: "reply", label: "Typical first reply", value: "9 min", enough: true, caption: null, formula: "The middle first-reply time of the leads answered in the last 30 days, across 20 accounts. Needs 5 answered leads.", change: "-12%", estimate: false, opens: { module: "speed" }, count: 412 },
+      { id: "waiting", label: "Waiting for a reply", value: "27", enough: true, caption: null, formula: "People whose last message is from the customer and nobody has answered, in the last 30 days.", change: null, estimate: false, opens: { list: "all_waiting" }, count: 27 },
+      { id: "showrate", label: "Show rate", value: "71%", enough: true, caption: null, formula: "People who came as a share of appointments marked came or no-show in the last 30 days. Needs 20 marked outcomes; unmarked appointments are not counted.", change: "+4%", estimate: false, opens: { list: "all_noshows" }, count: 38 },
+      { id: "open_deals", label: "Open deals", value: "184 worth $412,300", enough: true, caption: null, formula: "Open deals counted by Pipeline's rule, leaving out deals with no value and deals with no owner (usually test or junk). The dollar figure is the deals' own value, not a forecast.", change: null, estimate: true, opens: { list: "open_deals" }, count: 184 },
+      { id: "stale", label: "Deals gone quiet", value: "41", enough: true, caption: null, formula: "Open deals with no movement for 30 days, by Pipeline's counted-deal rule.", change: null, estimate: false, opens: { list: "all_stale" }, count: 41 },
+      { id: "attention", label: "Accounts needing a look", value: "5 of 20", enough: true, caption: null, formula: "Client accounts Clients marks Act now or Keep an eye.", change: null, estimate: false, opens: { module: "clients" }, count: 5 },
     ],
   };
 }
