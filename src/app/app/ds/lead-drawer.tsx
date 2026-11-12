@@ -10,7 +10,6 @@ import { withLive } from "@/lib/people/person";
 import { useApiClient, useData } from "../session";
 import { fmtMoney, timeAgo } from "../ui";
 import { ActionStrip, dialNoteText, useContactActions, type ActionPerson } from "./contact-actions";
-import { DialerSetting } from "./dial-button";
 import { HeldNote } from "./held";
 import { TimelinePanel } from "./timeline-panel";
 import { Fold } from "./fold";
@@ -155,7 +154,7 @@ function Body({ seed, top, showAccount, wide, onLogged }: { seed: LeadSeed; top?
       {(!email || !phone) && <p id="drawer-email-why" className="mt-2 text-xs text-muted-foreground" data-testid="drawer-no-contact-way">{!email && !phone ? "This contact has no email address and no phone number in your CRM." : !email ? "Email is off because this contact has no email address in your CRM." : "Call and Text are off because this contact has no phone number in your CRM."}</p>}
       <ActionStrip actions={actions} k="panel" className="mt-2" />
       {c && data && <Fold id="tags" title="Tags" bare className="mt-4"><TagsSection key={seed.contactId} locationId={seed.locationId} contactId={seed.contactId} name={name} tags={c.tags} tagDates={data.tagDates} tagExact={data.tagExact ?? {}} /></Fold>}
-      <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1"><DialerSetting /><InfoTip label="About Call and Email" text={dialNoteText(actions.provider)} /></div>
+      <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1"><InfoTip label="About Call and Email" text={dialNoteText(actions.provider)} /></div>
       {person.loading && !data && <div className="mt-5"><SkeletonRows rows={4} label="Loading this person..." /></div>}
 
       {wb && (

@@ -1,6 +1,5 @@
 "use client";
 
-import { DialerAskHost } from "./ds/dial-button";
 import { TODAY_FONTS } from "./views/today-fonts";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { accentTokens } from "@/lib/design/color";
@@ -496,7 +495,6 @@ export function Dashboard() {
             ))}
           </nav>
           <main className="mx-auto w-full max-w-[1800px] flex-1 p-4 pb-24 sm:px-10 sm:py-8 md:pb-8">
-            <DialerAskHost />
             {fromAccount && view.id !== "today" && (
               <InlineAlert className="mb-3" action={<Btn variant="ghost" onClick={() => { setFilter(EMPTY_FILTER); try { window.history.replaceState(null, "", withTodayAccounts(window.location.hash, [])); window.dispatchEvent(new Event("subsync-today-accounts")); } catch { /* see above */ } }}>See all client accounts</Btn>}>
                 You opened this from inside a client account, so every page shows only that account.

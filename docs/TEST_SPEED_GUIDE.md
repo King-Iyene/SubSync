@@ -35,3 +35,5 @@ Set SEND_EMAIL_LIVE=true, redeploy, send the digest to yourself. Slack needs the
 
 ## What to tell me
 For each step: worked / did not, plus a screenshot of the CRM side.
+
+See also docs/TEST_AUTOMATIONS_GUIDE.md (one section per automation) and scripts/automation-readiness.mts (read-only report).

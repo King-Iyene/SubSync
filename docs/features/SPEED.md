@@ -110,3 +110,5 @@ Written and run, with the commands and results in "Verification". `src/lib/__tes
 | Screenshots | `docs/review/speed-<role>-<390|768|1440>.png` and `-full.png` (new), `docs/review/speed-old-<role>-<width>.png` (before; the client's staff at 1440 was not captured) |
 
 One fix found by the tests: the first role test failed because the headline number counts up when the page opens (the test read it mid-animation); the test now waits for it. The target test failed because the write answered 503 before it checked the account existed; `setAccountTarget` now checks the account belongs to the caller's company first, so another company's account is always "not found" with or without the database update.
+
+> Update 11 Nov 2026: Call mode and every Call button use the CRM's own calling only. The "Call with" picker (CRM / this device / connected dialer) was removed from the screens; the stored preference is kept but unused.

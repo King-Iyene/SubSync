@@ -9,7 +9,7 @@ import { announceCall, useDialer } from "./dial-button";
 // Call and Email for ONE person, the same way everywhere People shows one (a list row, the lead panel, the header search). Both open the CRM through the white-label link:
 // the CRM's own dialer and mail box do the rest (it publishes no link straight to them yet, so today they open the person and the page says so once). SubSync never
 // places a call and never sends a message. Before a call or an email the person is told if this contact asked not to be contacted, or if it is outside calling hours.
-// The Dialer setting (the person's own phone app) is honoured only when they chose it.
+// There is no call-provider choice: Call always uses the CRM's own dialer.
 
 export type ActionPerson = {
   key: string; name: string; phone: string | null; email: string | null; dnd: boolean; timeZone: string | null; url: string;
@@ -73,13 +73,9 @@ export function ActionStrip({ actions, k, className = "" }: { actions: ContactAc
   );
 }
 
-/** What Call and Email do, per choice. */
-export function dialNoteText(provider: string): string {
-  return provider === "phone"
-    ? "Call opens the phone or softphone on this device, which places the call (your choice in the Call with setting). Email opens the person in your CRM. SubSync itself never places a call or sends a message."
-    : provider === "connected"
-      ? "Call opens your connected dialer in a new tab, which places the call (your choice in the Call with setting). Email opens the person in your CRM. SubSync itself never places a call or sends a message."
-      : "Call and Email open the person in your CRM, where its own dialer and mail box place the call or send the message. SubSync itself never places a call or sends a message.";
+/** What Call and Email do. SubSync uses the CRM's own calling only. */
+export function dialNoteText(_provider?: string): string {
+  return "Call and Email open the person in your CRM, where its own dialer and mail box place the call or send the message. SubSync itself never places a call or sends a message.";
 }
 
 /** One line, shown once on a page, that says what Call and Email do (and that SubSync sends nothing). */
