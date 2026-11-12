@@ -17,7 +17,7 @@ function todaySample(empty: boolean): Td3Today {
   ];
   const items = rankItems(raw), h = headlineOf(items, 20);
   return {
-    ...h, items, snoozed: [], done: empty ? [] : [{ kind: "waiting_old", label: "waited over a day for a reply", cleared: 3, lastAt: "2026-11-11T06:30:00.000Z" }],
+    ...h, items, counts: { unmarked: empty ? 0 : 9, noshows: empty ? 0 : 4 }, snoozed: [], done: empty ? [] : [{ kind: "waiting_old", label: "waited over a day for a reply", cleared: 3, lastAt: "2026-11-11T06:30:00.000Z" }],
     allClear: empty ? { fixedSinceYesterday: 3, lastFixedAt: "2026-11-11T06:00:00.000Z" } : null, accounts: 20, scope: "All 20 client accounts", mine: null, needsPermission: empty ? 0 : 1, historyStarts: "2026-10-28", timezone: "UTC",
   };
 }

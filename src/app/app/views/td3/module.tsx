@@ -14,6 +14,7 @@ import { EmptyState, ErrorState, ModuleTabs, SkeletonRows } from "../../ds";
 import { OpenLeadButton } from "../../ds/open-lead-button";
 import { SlowRetry } from "../../ds/slow-retry";
 import { Btn } from "../../ui";
+import { cardLink, setDeepLink } from "@/lib/design/deep-link";
 import type { GoFn, ViewId } from "../../nav";
 import { TodayView } from "../today";
 import { DatesBar } from "../today-dash";
@@ -137,14 +138,16 @@ function Hero({ t, go, open, location }: { t: Td3Today; go: (m: Td3Module, loc?:
   const item = (k: string) => t.items.find((i) => i.kind === k) ?? null;
   const stale = item("stale_deals"), unmarked = item("unmarked");
   const noshows = item("noshows");
+  // The two appointment cards count every client account with the Appointments rule (t.counts), so the number equals the rows it opens (items only list the flagged accounts, at most five kinds).
+  const nUnmarked = t.counts?.unmarked ?? unmarked?.count ?? 0, nNoshows = t.counts?.noshows ?? noshows?.count ?? 0;
   const cleared = t.done.reduce((s, d) => s + d.cleared, 0);
   const since = t.historyStarts ? `History starts ${t.historyStarts}` : "No earlier record yet";
   const money = t.items.reduce((s, i) => s + (i.money ?? 0), 0);
   const loc = location || null;
   const cards: HeroCard[] = [
-    { id: "money", label: "Money at risk", value: money > 0 ? moneyText(money) : "None", note: money > 0 ? `Estimate, from ${num(stale?.count ?? 0)} quiet deals` : "No deal has gone quiet", tone: money > 0 ? "red" : "green", onOpen: stale ? () => open({ title: stale.label, kind: "stale_deals", location: stale.accounts === 1 ? stale.top[0]?.locationId ?? loc : loc, count: stale.count }) : null, to: "Open Pipeline", onGo: () => go("pipeline", loc) },
-    { id: "noshows", label: "No-shows to rebook", value: num(noshows?.count ?? 0), note: noshows ? "Missed in the last 7 days, not rebooked" : "Nobody to rebook", tone: noshows ? "amber" : "green", onOpen: noshows ? () => open({ title: noshows.label, kind: "noshows", location: noshows.accounts === 1 ? noshows.top[0]?.locationId ?? loc : loc, count: noshows.count }) : null, to: "Open Appointments", onGo: () => go("appointments", loc) },
-    { id: "appts", label: "Appointments to confirm", value: num(unmarked?.count ?? 0), note: unmarked ? "Past their time, no result marked" : "Every past appointment is marked", tone: unmarked ? "amber" : "green", onOpen: unmarked ? () => open({ title: unmarked.label, kind: "unmarked", location: unmarked.accounts === 1 ? unmarked.top[0]?.locationId ?? loc : loc, count: unmarked.count }) : null, to: "Open Appointments", onGo: () => go("appointments", loc) },
+    { id: "money", label: "Money at risk", value: money > 0 ? moneyText(money) : "None", note: money > 0 ? `Estimate, from ${num(stale?.count ?? 0)} quiet deals` : "No deal has gone quiet", tone: money > 0 ? "red" : "green", onOpen: stale ? () => open({ title: stale.label, kind: "stale_deals", location: stale.accounts === 1 ? stale.top[0]?.locationId ?? loc : loc, count: stale.count }) : null, to: "Open Pipeline", onGo: () => { setDeepLink(cardLink("stale_deals", { count: stale?.count ?? 0, location: loc })); go("pipeline", loc); } },
+    { id: "noshows", label: "No-shows to rebook", value: num(nNoshows), note: nNoshows > 0 ? "Missed in the last 7 days, not rebooked" : "Nobody to rebook", tone: nNoshows > 0 ? "amber" : "green", onOpen: nNoshows > 0 ? () => open({ title: "No-shows not booked again", kind: "open_noshows", location: loc, count: nNoshows }) : null, to: "Open Appointments", onGo: () => { setDeepLink(cardLink("noshows", { count: nNoshows, location: loc })); go("appointments", loc); } },
+    { id: "appts", label: "Appointments to confirm", value: num(nUnmarked), note: nUnmarked > 0 ? "Past their time, no result marked" : "Every past appointment is marked", tone: nUnmarked > 0 ? "amber" : "green", onOpen: nUnmarked > 0 ? () => open({ title: "Appointments with no outcome marked", kind: "all_unmarked", location: loc, count: nUnmarked }) : null, to: "Open Appointments", onGo: () => { setDeepLink(cardLink("unmarked", { count: nUnmarked, location: loc })); go("appointments", loc); } },
     { id: "done", label: "Done today", value: num(cleared), note: t.historyStarts ? "Problems cleared since midnight" : since, tone: cleared > 0 ? "green" : "plain", onOpen: () => document.getElementById("td-done")?.scrollIntoView({ block: "nearest", behavior: "smooth" }), to: "Open Proof", onGo: () => undefined },
   ];
   return (

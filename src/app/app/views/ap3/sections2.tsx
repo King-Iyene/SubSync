@@ -3,6 +3,7 @@
 import { Copy } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { money, pct } from "@/lib/design/appt-coach";
+import { arrivalNote } from "@/lib/design/deep-link";
 import { EmptyState, InlineAlert } from "../../ds";
 import { CountUp, Q } from "../speed6-base";
 import { ApSlot, hasApSlot, useAp } from "./data";
@@ -26,10 +27,23 @@ const Rate = ({ v, tone }: { v: number | null; tone?: "good" | "bad" }) => (v ==
 
 // ---------- Needs outcome / No-show recovery ----------
 const ORDER_WORDS: Record<string, string> = { value: "Biggest deal first.", oldest: "Oldest first.", newest: "Newest first.", name: "By name, A to Z." };
-export function NeedsOutcome({ filters, onOpen, activeId, showAccount, clear, widen, filtered }: SectionProps) {
+/** One line after a click from Today: which dates it opened with, and, when the rows do not match what Today counted, why and a button to widen the dates. */
+function Arrival({ arrival, n, widen, canWiden }: { arrival: SectionProps["arrival"]; n: number | null; widen: () => void; canWiden: boolean }) {
+  if (!arrival) return null;
+  const note = arrivalNote(arrival, n);
+  return (
+    <p className="ap-fine mb-2" role="status" data-testid="ap-arrival" data-tone={note?.tone ?? "ok"}>
+      Opened from Today: {arrival.what}{arrival.expect !== null ? ` (${arrival.expect.toLocaleString("en-US")})` : ""}. Showing the last {arrival.days} days, the same dates Today counted.{note ? ` ${note.text}` : ""}
+      {note && note.tone === "empty" && canWiden && <> <button type="button" className="underline" onClick={widen} data-testid="ap-arrival-widen">Widen dates</button></>}
+    </p>
+  );
+}
+
+export function NeedsOutcome({ filters, onOpen, activeId, showAccount, clear, widen, filtered, arrival }: SectionProps) {
   const [n, setN] = useState<number | null>(null);
   return (
     <div data-testid="ap-needs">
+      <Arrival arrival={arrival} n={n} widen={widen} canWiden />
       {n !== null && <Lead n={n} label={n === 1 ? "past appointment has no outcome" : "past appointments have no outcome"} tone="amber" />}
       <p className="ap-fine mb-3">{ORDER_WORDS[filters.sort || "value"]} Marking them makes your show rate true. SubSync never marks one by itself: it can suggest, you confirm.</p>
       <ApWorklist part="needs-outcome" filters={filters} onOpen={onOpen} activeId={activeId} showAccount={showAccount} selectable onRows={(_, t) => setN(t)} testId="ap-needs-list" onClear={filtered ? clear : undefined}
@@ -39,10 +53,11 @@ export function NeedsOutcome({ filters, onOpen, activeId, showAccount, clear, wi
     </div>
   );
 }
-export function Recovery({ filters, onOpen, activeId, showAccount, clear, filtered }: SectionProps) {
+export function Recovery({ filters, onOpen, activeId, showAccount, clear, widen, filtered, arrival }: SectionProps) {
   const [n, setN] = useState<number | null>(null);
   return (
     <div data-testid="ap-recover">
+      <Arrival arrival={arrival} n={n} widen={widen} canWiden={false} />
       {n !== null && <Lead n={n} label={n === 1 ? "no-show has not been booked again" : "no-shows have not been booked again"} tone="red" />}
       <p className="ap-fine mb-3">{ORDER_WORDS[filters.sort || "value"]} Missed in the last 7 days with no new booking: the dates above do not change this list. Call them today.</p>
       <ApWorklist part="no-show-recovery" filters={filters} onOpen={onOpen} activeId={activeId} showAccount={showAccount} selectable onRows={(_, t) => setN(t)} testId="ap-recover-list" onClear={filtered ? clear : undefined}
