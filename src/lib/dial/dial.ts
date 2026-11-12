@@ -51,6 +51,7 @@ export type QueueItem = {
   contactId: string; locationId: string; locationName: string | null; name: string; phone: string | null; dnd: boolean; timeZone: string | null;
   openValue: number; /** hours since the thing that makes them worth calling (the missed call, the new lead, the last touch). */ ageHours: number | null;
   priority: number; reasons: string[]; url: string; /** Where the lead came from (the script can differ by source). */ source?: string | null;
+  /** True when SubSync has no contact record for this caller yet (a missed call from a number it has not synced): no name and no number here, but the CRM has them. */ noRecord?: boolean;
 };
 
 /** Money (log scale, up to 40) plus decay (a lead freshly in is worth a call sooner: 20 inside an hour down to 2 after a week) plus the list's own priority (up to 30). */
@@ -66,14 +67,17 @@ export function rankQueue<T extends Pick<QueueItem, "openValue" | "ageHours" | "
 
 export type Block = { kind: "dnd" | "no_phone" | "done"; text: string };
 /** A lead who must be skipped (never shown as the current card). Quiet hours are a warning, not a skip (see quietWarning). */
-export function skipReason(i: Pick<QueueItem, "dnd" | "phone" | "name">, doneKeys?: ReadonlySet<string>, key?: string): Block | null {
+export function skipReason(i: Pick<QueueItem, "dnd" | "phone" | "name"> & { noRecord?: boolean }, doneKeys?: ReadonlySet<string>, key?: string): Block | null {
   if (i.dnd) return { kind: "dnd", text: `${i.name} asked not to be contacted. Skipped.` };
-  if (!i.phone) return { kind: "no_phone", text: `${i.name} has no phone number. Skipped.` };
+  if (!i.phone) return { kind: "no_phone", text: i.noRecord ? "SubSync has no record of this caller yet, so no number to show. Open them in your CRM to call. Skipped." : `${i.name} has no phone number. Skipped.` };
   if (key && doneKeys?.has(key)) return { kind: "done", text: "Already handled in this session." };
   return null;
 }
 export const quietWarning = (timeZone: string | null, now: Date): string | null =>
   outsideCallingHours(timeZone, now) === true ? "It is outside 8am to 9pm where this person is. Many places restrict calls at these hours. Call only if you are allowed to." : null;
+
+/** How a caller is named on every screen (Coverage and Call mode): the name, else the email, else the number, else "Unknown caller". One rule so both screens read the same. */
+export const callerLabel = (c: { name: string | null; email: string | null; phone: string | null }): string => c.name || c.email || c.phone || "Unknown caller";
 
 export const keyOf = (i: Pick<QueueItem, "locationId" | "contactId">) => `${i.locationId}:${i.contactId}`;
 /** The next index after `from` that is not skipped, or -1 at the end. */
