@@ -26,7 +26,7 @@ type Detail = {
   id: string; title: string | null; startedAt: string | null; minutes: number | null; talkPct: number | null; statusKey: string; statusLabel: string; attendees: string[]; summary: string | null; actionItems: string[];
   recordingUrl: string | null; locationId: string | null; locationName: string | null; contactId: string | null; contactName: string | null; contactUrl: string | null;
   appointment: { id: string; startAt: string | null; status: string | null; calendar: string | null } | null; outcome: { state: string; words: string; suggested: string | null };
-  tasks: Array<{ itemNo: number; status: string }>; nextStep: string | null; candidates: Array<{ locationId: string; locationName: string; contactId: string; name: string; email: string; url: string }>; canTasks: boolean; canOutcome: boolean;
+  tasks: Array<{ itemNo: number; status: string }>; nextStep: string | null; deal?: { name: string | null; value: number | null; stage: string | null } | null; candidates: Array<{ locationId: string; locationName: string; contactId: string; name: string; email: string; url: string }>; canTasks: boolean; canOutcome: boolean;
 };
 type TaskPreview = { plans: Array<{ itemNo: number; title: string; dueAt: string }>; skipped: number; room: number; contactName: string; accountName: string; mode: { live: boolean; practice: boolean }; needsPermission: boolean; message: string | null };
 
@@ -213,6 +213,7 @@ function CallBody({ d, fx, reload, onOpenAppointment }: { d: Detail; fx: boolean
         <Fact k="Length">{d.minutes ? `${d.minutes} minutes` : <span className="text-muted-foreground">Not given by your meeting tool</span>}</Fact>
         {d.talkPct !== null && <Fact k="You spoke">{d.talkPct}% of the words</Fact>}
         <Fact k="Appointment">{d.appointment ? <span>{whenOf(d.appointment.startAt)}{d.appointment.calendar ? ` | ${d.appointment.calendar}` : ""}{d.locationId && onOpenAppointment ? <> <button type="button" className="min-h-9 text-primary underline" onClick={() => onOpenAppointment(d.locationId as string, d.appointment!.id)}>View</button></> : null}</span> : <span className="text-muted-foreground">None tied to this call</span>}</Fact>
+        {d.contactId && <Fact k="Deal">{d.deal ? <span>{d.deal.name ?? "Open deal"}{d.deal.stage ? <span className="text-muted-foreground"> | {d.deal.stage}</span> : null}{d.deal.value ? <span className="text-muted-foreground"> | {Math.round(d.deal.value).toLocaleString("en-US")}</span> : null}</span> : <span className="text-muted-foreground">No open deal on this contact</span>}</Fact>}
         <Fact k="Who was there">{d.attendees.length ? <span className="break-words">{d.attendees.join(", ")}</span> : <span className="text-muted-foreground">No other email on the invite</span>}</Fact>
       </dl>
 

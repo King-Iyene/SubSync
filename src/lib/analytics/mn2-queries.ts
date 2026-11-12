@@ -76,6 +76,8 @@ export type CallDetail = {
   appointment: { id: string; startAt: string | null; status: string | null; calendar: string | null } | null;
   outcome: { state: string; words: string; suggested: string | null };
   tasks: Array<{ itemNo: number; status: string }>; nextStep: string | null;
+  /** The contact's biggest open deal (name, value, stage), when the call is on a contact. */
+  deal: { name: string | null; value: number | null; stage: string | null } | null;
 };
 
 /** One of the person's own calls, in full. Null when it is not theirs (the same answer as "no such call"). */
@@ -94,6 +96,7 @@ export async function callDetail(installationId: string, userId: string, id: str
   const contactId = loc ? ((r.contact as string | null) ?? null) : null;
   const [c] = contactId ? await db`select full_name from cached_contacts where installation_id = ${installationId} and location_id = ${loc} and contact_id = ${contactId}` : [];
   const [lo] = loc ? await db`select name from locations where installation_id = ${installationId} and location_id = ${loc}` : [];
+  const [dl] = contactId ? await db`select name, monetary_value, stage_name from cached_opportunities where installation_id = ${installationId} and location_id = ${loc} and contact_id = ${contactId} and status = 'open' order by monetary_value desc nulls last limit 1`.catch(() => []) : [];
   const tasks = await db`select item_no, status from mn_tasks where installation_id = ${installationId} and owner_ghl_user_id = ${userId} and meeting_id = ${id} and status <> 'undone' order by item_no`.catch(() => []);
   const items = strings(r.action_items);
   const st = callStatus({ status: r.status as string, reason: (r.reason as string | null) ?? null, matched: contactId !== null });
@@ -106,6 +109,7 @@ export async function callDetail(installationId: string, userId: string, id: str
     appointment: loc && r.appointment_id ? { id: r.appointment_id as string, startAt: iso(r.a_start), status: (r.a_status as string | null) ?? null, calendar: (r.a_cal as string | null) ?? null } : null,
     outcome: { state: oc, words: outcomeWords(oc, (r.suggested_outcome as string | null) ?? null), suggested: (r.suggested_outcome as string | null) ?? null },
     tasks: tasks.map((t) => ({ itemNo: t.item_no as number, status: t.status as string })), nextStep: nextStep(items),
+    deal: dl ? { name: (dl.name as string | null) ?? null, value: dl.monetary_value === null || dl.monetary_value === undefined ? null : Number(dl.monetary_value), stage: (dl.stage_name as string | null) ?? null } : null,
   };
 }
 
