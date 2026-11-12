@@ -40,3 +40,15 @@ Preview (a table of before and after), signed confirm token (15 minutes, tied to
 
 - **PROPOSAL 1: Template library and snapshot restore.** Keep a library of the agency's best workflows (from snapshots), push one to many accounts with validate first, restore a broken one to last week's version. Evidence: agencies rebuild the same five workflows per client; All The Apps sells snapshot stores.
 - **PROPOSAL 2: Proof in the weekly Receipts.** One line per account per week from the logs: "Missed-call text back ran 31 times, 0 failures, 4 leads replied" next to the lead-handling numbers, so the agency can show the automation worked. Evidence: the thesis in the brief (prove it to clients); needs the logs permission and a minimum sample.
+
+## Second pass (11 Nov 2026): outcome gaps, library, bulk install
+
+**Customer view.** Who: agency owner (all accounts), client admin (own account). Next: open the people who fell through, set up the missing automation from the library after a preview. If missing: "I cannot tell which client's lead handling is leaking." Pays: the gap list with the open deal value (estimate) is the consultant check, every hour.
+
+**Evaluation.** (a) decision above. (b) Data: lead_touches, touch_events, cached_appointments, cached_opportunities, all held already, verified by running the SQL against the live schema in the cross-tenant test. Automations present/missing is by workflow name (estimate). (c) Native and competitors: no cross-account outcome check found (WORKFLOWS_R1.md). (d) Simplest: four outcome gaps per account, each with the automation that prevents it. (e) Risk: writes (rehearsal unless live switch plus per-account opt-in), false "missing" when a workflow has an unusual name (labelled estimate).
+
+**Live probe (read-only, scripts/wf-probe.mts).** Run 11 Nov against the live database: the one real install has NO workflow permissions granted (`workflows.readonly`, `workflows.logs`, none in its scope), and this machine has no platform client credentials to refresh a token, so no workflow call was made. Response field names stay CHECK; parsers still read several spellings and show "not known". Unlock: King reconnects the install with the optional workflow permissions, then run the script.
+
+**Built (flags default off: wf_outcomes, wf_library, wf_bulk, wf_today).** Gaps tab (tiles, ranked accounts with keyset paging, search, filters, every count opens the exact people with Open), "What to do today" line plus one alert per account and gap through the alert engine (feeds Today), daily record `wf_outcome_daily` (our moat: history of leaks per account), Library tab (templates: call queue, slow-first-reply call task, no-show call task; guides for the two that message customers), install in one or up to 25 accounts with preview, signed confirm, caps, audit and History rows, rehearsal by default. Change history already exists (`workflow_changes`); install rows added. Sample data only with `?wffx`.
+
+**Not available (said on screen).** Who is inside a workflow now, per-recipient delivery. Missed call text back and reminders are not created by SubSync (they message customers).

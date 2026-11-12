@@ -43,7 +43,7 @@ export async function saveSetupSettings(installationId: string, locationId: stri
   return { ok: true };
 }
 
-const storeFor = (installationId: string, locationId: string): Store => ({
+export const storeFor = (installationId: string, locationId: string): Store => ({
   async get(templateKey) {
     const [r] = await sql()`select folder_id, workflow_id, template_version, status, last_error from workflow_setup where installation_id = ${installationId} and location_id = ${locationId} and template_key = ${templateKey}`;
     return r ? { templateKey, folderId: (r.folder_id as string | null) ?? null, workflowId: (r.workflow_id as string | null) ?? null, templateVersion: r.template_version as number, status: r.status as Row["status"], lastError: (r.last_error as string | null) ?? null } : null;
