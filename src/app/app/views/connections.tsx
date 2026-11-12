@@ -1,7 +1,8 @@
 "use client";
 
-import { Hash, Mic, Video, type LucideIcon } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { BrandIcon } from "../ds/brand-icon";
+import type { BrandId } from "@/lib/brand-marks";
 import { DataList, ErrorState, HowTo, InlineAlert, Page, Section, SkeletonRows } from "../ds";
 import { PENDING_MS, STATUS_WORDS, type Shown } from "@/lib/connections/messages";
 import type { PolicyFlags } from "@/lib/connections/policy";
@@ -39,9 +40,9 @@ type TeamData = {
 /** Every button in these two sections is a thumb target on a phone (44 px), as in the Today lists; on a laptop they keep the shared 32 px height. */
 const PHONE_TARGETS = "max-sm:[&_button]:min-h-11";
 
-const INFO: Record<PersonalProvider, { name: string; icon: LucideIcon; what: string }> = {
-  fathom: { name: "Fathom", icon: Mic, what: "After each recorded call, SubSync receives the summary and action items of YOUR calls, finds the contact by exact email, and adds a note to that contact, written as you. Nothing is ever saved to a guessed contact: if nobody matches, or two contacts share the email, the call waits in your own Meeting inbox for you to choose." },
-  zoom: { name: "Zoom", icon: Video, what: "When Zoom writes a summary of a meeting you hosted, it reaches you. The host needs a paid Zoom plan with meeting summaries switched on." },
+const INFO: Record<PersonalProvider, { name: string; brand: BrandId; what: string }> = {
+  fathom: { name: "Fathom", brand: "fathom", what: "After each recorded call, SubSync receives the summary and action items of YOUR calls, finds the contact by exact email, and adds a note to that contact, written as you. Nothing is ever saved to a guessed contact: if nobody matches, or two contacts share the email, the call waits in your own Meeting inbox for you to choose." },
+  zoom: { name: "Zoom", brand: "zoom", what: "When Zoom writes a summary of a meeting you hosted, it reaches you. The host needs a paid Zoom plan with meeting summaries switched on." },
 };
 
 const TONE: Record<Shown, Tone> = { not_connected: "neutral", waiting: "info", expired: "warn", connected: "good", needs_reconnect: "warn", revoked: "bad", error: "bad" };
@@ -155,7 +156,7 @@ function MySection({ data, reload, level }: { data: MyData; reload: () => Promis
           return (
             <li key={card.provider} className="py-4" data-testid={`my-${card.provider}`}>
               <div className="flex flex-wrap items-start gap-3">
-                <span aria-hidden className="mt-0.5 text-muted-foreground"><Icon className="size-5" /></span>
+                <BrandIcon id={info.brand} size={22} decorative className="mt-0.5" />
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="text-sm font-semibold">{info.name}</h3>
@@ -288,7 +289,7 @@ function TeamSection({ level }: { level: 2 | 3 }) {
 
       {data.scope === "all" && (
         <div className="mt-6" data-testid="slack-card">
-          <h3 className="flex items-center gap-2 text-sm font-semibold"><Hash aria-hidden className="size-4 text-muted-foreground" /> Slack <span className="font-normal text-muted-foreground">(one for the whole team)</span></h3>
+          <h3 className="flex items-center gap-2 text-sm font-semibold"><BrandIcon id="slack" size={18} decorative /> Slack <span className="font-normal text-muted-foreground">(one for the whole team)</span></h3>
           <p className="mt-0.5 text-sm text-muted-foreground">Alerts and the daily brief arrive in the channel you pick on Slack&apos;s own page. Only an admin connects it.</p>
           {data.slack.length === 0 ? (
             <div className="mt-2"><Btn variant="primary" disabled={!data.slackAvailable || waitingSlack !== null} onClick={() => void connectSlack()}>{waitingSlack !== null ? "Waiting for you..." : "Connect Slack"}</Btn>
