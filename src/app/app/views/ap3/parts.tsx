@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronLeft, ChevronRight, ExternalLink, UserRound, X } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { coachingNote, money, pct } from "@/lib/design/appt-coach";
 import { EmptyState, ErrorState, LeadDrawer, PanelBoundary, SkeletonRows } from "../../ds";
 import { contactReason, contactSeed } from "./contact";
@@ -75,13 +75,14 @@ export function csvDownload(rows: ApRow[]) {
 }
 
 export function Pager({ total, page, size, onPage, onSize }: { total: number; page: number; size: number; onPage: (p: number) => void; onSize: (s: number) => void }) {
+  const uid = useId();
   const pages = Math.max(1, Math.ceil(total / size)), from = total === 0 ? 0 : (page - 1) * size + 1, to = Math.min(total, page * size);
   return (
     <div className="ap-pager">
       <span data-testid="ap-count">{from.toLocaleString("en-US")} to {to.toLocaleString("en-US")} of {total.toLocaleString("en-US")}</span>
       <span className="inline-flex items-center gap-2">
-        <label className="sr-only" htmlFor="ap-size">Rows per page</label>
-        <select id="ap-size" className="ap-field" style={{ minHeight: 36 }} value={size} onChange={(e) => onSize(Number(e.target.value))}>{[20, 50, 100].map((n) => <option key={n} value={n}>{n} per page</option>)}</select>
+        <label className="sr-only" htmlFor={uid}>Rows per page</label>
+        <select id={uid} className="ap-field" style={{ minHeight: 36 }} value={size} onChange={(e) => onSize(Number(e.target.value))}>{[20, 50, 100].map((n) => <option key={n} value={n}>{n} per page</option>)}</select>
         <button type="button" disabled={page <= 1} onClick={() => onPage(page - 1)} aria-label="Previous page"><ChevronLeft aria-hidden className="mx-auto size-4" /></button>
         <span className="tnum">{page} / {pages}</span>
         <button type="button" disabled={page >= pages} onClick={() => onPage(page + 1)} aria-label="Next page"><ChevronRight aria-hidden className="mx-auto size-4" /></button>

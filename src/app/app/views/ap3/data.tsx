@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState, useSyncExternalStore, type C
 import { useData } from "../../session";
 import { CONFLICTS_FIXTURE, FLOW_EMPTY, FLOW_FIXTURE, HEALTH_FIXTURE, OVERVIEW_FIXTURE, PEOPLE_FIXTURE, PROOF_FIXTURE, SOURCES_FIXTURE, SPEED_FIXTURE, page, rowsFixture } from "./fixtures";
 import { adaptPart, API_PARAM, API_PART } from "./adapters";
-import type { ApPart, ApRow, ApScope } from "./types";
+import type { ApPart, ApPersonRow, ApRow, ApScope } from "./types";
 
 /** Scope the user picks. `days` is turned into from/to on the server's day boundaries; everything else is passed through and re-checked on the server (never trusted). */
 export { DEFAULT_FILTERS, filtersFromParams, filtersToParams, FILTER_KEYS, AGE_OPTIONS, STATUS_OPTIONS, SORT_OPTIONS, type ApFilters } from "@/lib/design/appt-filters";
@@ -67,7 +67,15 @@ function fixtureFor(part: ApPart, extra: Record<string, string | number | undefi
     case "needs-outcome": return mk("needs", 23);
     case "no-show-recovery": return mk("recover", 17);
     case "list": return mk("all", Number(extra.expect ?? 41));
-    case "booking-share": return { rows: PEOPLE_FIXTURE };
+    case "booking-share": {
+      const sec = String(extra.section ?? "active"), calP = (n: number) => Array.from({ length: n }, (_, i) => ({ calendarId: `c${i}`, name: `Calendar ${i + 1}`, groupName: null, active: true }));
+      const idle = (id: string, name: string, cals: number, setRole: string | null): ApPersonRow => ({ id, name, role: "setter", bookings: 0, showRate: null, noShowRate: null, closeRate: null, revenueCents: 0, avgLeadToBookedHours: null, trend: [], setRole, calendarCount: cals, calendars: calP(cals), state: "never", sold: 0, soldCents: 0, soldFromBookings: 0, soldRate: null, ownedShowed: 0, showed: 0, noShow: 0 });
+      const active = PEOPLE_FIXTURE.map((p, i) => (p.unassigned ? p : { ...p, setRole: i % 3 === 2 ? "closer" : "setter", calendarCount: 2 + (i % 3), calendars: calP(2 + (i % 3)), showed: Math.round(p.bookings * (p.showRate ?? 0)), noShow: Math.round(p.bookings * (p.noShowRate ?? 0)), sold: i % 3 === 2 ? 3 + i : 0, soldCents: i % 3 === 2 ? 180_000 * (i + 1) : 0, soldFromBookings: i % 3 === 2 ? 0 : 2 + i, soldRate: i % 3 === 2 ? 0.3 : null, ownedShowed: i % 3 === 2 ? 12 : 0 }));
+      const rows = sec === "oncal" ? [idle("i1", "Amara Eze", 2, "setter"), idle("i2", "Tunde Bello", 1, "closer"), idle("i3", "Rita Cole", 3, null)] : sec === "off" ? [idle("o1", "Sam Reed", 0, null), idle("o2", "Joy Okoro", 0, "setter")] : active;
+      const sold = active.reduce((a, p) => a + (p.sold ?? 0), 0);
+      return { rows, total: rows.length, rosterTotal: 25, roles: [{ key: "account_user", label: "Account user", n: 20 }, { key: "account_admin", label: "Account admin", n: 5 }], counts: { withBookings: active.length - 1, none: 5 }, sections: { active: active.length, oncal: 3, off: 2 },
+        summary: { peopleBooked: active.length - 1, booked: 142, showed: 88, showRate: 0.71, sold, soldCents: active.reduce((a, p) => a + (p.soldCents ?? 0), 0) }, sale: { basis: "deal_won", countWithoutValue: true, available: true, phrase: "counted from deals won", rule: "Closer: whoever the meeting was assigned to. Setter: whoever booked it.", reason: null, roleFallback: false } };
+    }
     case "flow-tree": return FLOW_FIXTURE;
     case "health": return { rows: HEALTH_FIXTURE };
     case "sources": return { sources: SOURCES_FIXTURE, speed: SPEED_FIXTURE };
