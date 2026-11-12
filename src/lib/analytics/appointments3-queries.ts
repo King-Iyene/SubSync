@@ -315,11 +315,11 @@ async function personStats(s: Scope, f: Filters, dd: number, by: "booker" | "own
 }
 
 /** Everyone in the selected accounts' team lists, narrowed by the same filters as every number: account, calendar group, calendar, active, and a chosen person. Zero bookings is fine. */
-async function roster(s: Scope, f: Filters) {
+async function roster(s: Scope, f: Filters, withTeam = false) {
   const db = sql(), L = locs(s, f.location);
   const g = f.group && cleanId(f.group) ? f.group : null, c = f.calendar && cleanId(f.calendar) ? f.calendar : null, u = f.user && cleanId(f.user) ? f.user : null;
   const narrow = !!(g || c || f.active);
-  return db`select u.location_id, u.user_id, max(u.name) name, max(t.role) role, bool_or(coalesce(t.deleted, false)) gone
+  const fromLists = await db`select u.location_id, u.user_id, max(u.name) name, max(t.role) role, bool_or(coalesce(t.deleted, false)) gone
     from location_users u join (${L}) l on l.location_id = u.location_id
     left join team_members t on t.installation_id = u.installation_id and t.user_id = u.user_id
     where u.installation_id = ${s.inst} ${u ? db`and u.user_id = ${u}` : db``}
@@ -327,13 +327,19 @@ async function roster(s: Scope, f: Filters) {
         where cm.installation_id = u.installation_id and cm.location_id = u.location_id and cm.user_id = u.user_id ${c ? db`and cc.calendar_id = ${c}` : db``} ${g ? db`and cc.group_id = ${g}` : db``}
         ${f.active === "active" ? db`and cc.is_active` : f.active === "inactive" ? db`and not cc.is_active` : db``})` : db``}
     group by 1, 2 limit 5000`.catch(() => [] as Array<Record<string, unknown>>);
+  if (narrow || !withTeam) return fromLists;
+  // The people list the Team screens keep (who can reach which accounts) fills in anyone an account's own list does not carry.
+  const fromTeam = await db`select coalesce(a.location_id, '') location_id, t.user_id, t.name, t.role, t.deleted gone from team_members t
+    left join team_member_access a on a.installation_id = t.installation_id and a.user_id = t.user_id
+    where t.installation_id = ${s.inst} ${u ? db`and t.user_id = ${u}` : db``} and (t.all_accounts or a.location_id in (select l2.location_id from (${L}) l2)) limit 5000`.catch(() => [] as Array<Record<string, unknown>>);
+  return [...fromLists, ...fromTeam];
 }
 
 export type ShareOpts = { teamRole?: string | null; has?: "yes" | "no" | null };
 
 export async function bookingShare(s: Scope, f: Filters, p: number, size0: number, sort?: string | null, opt: ShareOpts = {}): Promise<Appt3BookingShare> {
   const db = sql(), dd = await dealDays(s.inst), size = clampSize(size0), label = await names(s.inst), L = locs(s, f.location);
-  const [bk, ow, ros] = await Promise.all([personStats(s, f, dd, "booker"), personStats(s, f, dd, "owner"), roster(s, f)]);
+  const [bk, ow, ros] = await Promise.all([personStats(s, f, dd, "booker"), personStats(s, f, dd, "owner"), roster(s, f, true)]);
   const R = new Map<string, { name: string; role: string; gone: boolean }>();
   for (const r of ros) { const id = r.user_id as string; const e = R.get(id); R.set(id, { name: (e?.name || (r.name as string)) ?? "", role: e?.role && e.role !== "unknown" ? e.role : ((r.role as string | null) ?? "unknown"), gone: (e?.gone ?? true) && r.gone === true }); }
   const ids = new Set<string | null>([...bk.map((r) => r.uid as string | null), ...ow.map((r) => r.uid as string | null), ...R.keys()]);
