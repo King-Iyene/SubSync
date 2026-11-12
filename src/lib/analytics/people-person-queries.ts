@@ -1,3 +1,4 @@
+import { properName } from "../people/names.ts";
 import { sql } from "../db";
 import { changedLine, changedSince, mergeTimeline, noShowToRebook, personHeadline, spanWords, type Headline, type PersonFacts, type TimelineItem } from "../people/person";
 import { channelLabel, waitingState } from "./waiting";
@@ -148,7 +149,7 @@ export async function personDetail(a: { installationId: string; allowed: string[
 
   return {
     contact: {
-      contactId: c.contact_id as string, locationId: c.location_id as string, locationName: (c.location_name as string | null) ?? null, name: c.name as string, email: (c.email as string | null) ?? null,
+      contactId: c.contact_id as string, locationId: c.location_id as string, locationName: (c.location_name as string | null) ?? null, name: properName(c.name as string), email: (c.email as string | null) ?? null,
       phone: (c.phone as string | null) ?? null, tags: (c.tags as string[] | null) ?? [], source: (c.source as string | null) ?? null, dnd: c.dnd === true, lastActivityAt: iso(c.last_activity_at), dateAdded: iso(c.date_added),
       owner: (c.owner as string | null) ?? null, timeZone: (c.timezone as string | null) ?? null,
     },

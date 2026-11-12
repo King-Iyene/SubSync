@@ -1,3 +1,4 @@
+import { properName } from "../people/names.ts";
 import { parseChoice, type DialerChoice } from "../people/dial";
 import { sql, type Sql } from "../db";
 import { fillDays, QUERY_TIMEOUT_MS } from "../people/helpers";
@@ -168,7 +169,7 @@ export async function searchPeople(installationId: string, allowed: string[] | n
     return {
       total: Math.min(n, COUNT_CAP), capped: n > COUNT_CAP, page: Math.max(1, Math.floor(page)), pageSize: size,
       rows: rows.map((r) => ({
-        contactId: r.contact_id, locationId: r.location_id, locationName: r.location_name, name: r.name, email: r.email, phone: r.phone, tags: r.tags ?? [], source: r.source,
+        contactId: r.contact_id, locationId: r.location_id, locationName: r.location_name, name: properName(r.name as string), email: r.email, phone: r.phone, tags: r.tags ?? [], source: r.source,
         owner: r.owner, dnd: r.dnd === true, timeZone: r.timezone ?? null, dateAdded: iso(r.date_added), lastActivityAt: iso(r.last_activity_at),
         lastCallAt: iso(r.last_call_at), calls: r.calls, lastResult: r.last_result ?? null,
       })),
@@ -220,7 +221,7 @@ export async function goingCold(installationId: string, allowed: string[] | null
     return {
       total: Number(rows[0]?.total ?? 0), page: Math.max(1, Math.floor(page)), pageSize: size,
       rows: rows.map((r) => ({
-        contactId: r.contact_id, locationId: r.location_id, locationName: r.location_name, name: r.name, email: r.email, phone: r.phone, tags: r.tags ?? [], source: r.source,
+        contactId: r.contact_id, locationId: r.location_id, locationName: r.location_name, name: properName(r.name as string), email: r.email, phone: r.phone, tags: r.tags ?? [], source: r.source,
         owner: r.owner, dnd: r.dnd === true, timeZone: r.timezone ?? null, dateAdded: iso(r.date_added), lastActivityAt: iso(r.last_activity_at), lastSignalAt: iso(r.last_signal),
         lastCallAt: iso(r.last_call_at), calls: r.calls, lastResult: r.last_result ?? null,
       })),
@@ -268,7 +269,7 @@ export async function tagDetail(installationId: string, allowed: string[] | null
     const by = new Map<string, TagDay>();
     for (const r of members) {
       const d = by.get(r.day as string) ?? { day: r.day as string, count: Number(r.n), members: [] };
-      d.members.push({ contactId: r.contact_id, locationId: r.location_id, locationName: r.location_name, name: r.name, phone: r.phone, owner: r.owner, dnd: r.dnd === true, timeZone: r.timezone ?? null });
+      d.members.push({ contactId: r.contact_id, locationId: r.location_id, locationName: r.location_name, name: properName(r.name as string), phone: r.phone, owner: r.owner, dnd: r.dnd === true, timeZone: r.timezone ?? null });
       by.set(d.day, d);
     }
     const filled = fillDays([...by.values()].map((d) => ({ day: d.day, n: d.count })), fromDay, toDay);

@@ -27,6 +27,7 @@ import { GlobalFilterBar } from "./ds/global-filter";
 import { useTheme } from "./ds/theme";
 import { remember, remembered } from "./ds/remember";
 import { ApiProvider, makeApi, type Api } from "./session";
+import { LeadDrawerHost } from "./ds/lead-drawer-host";
 const AppointmentInsights = dynamic(() => import("./views/appointment-insights").then((m) => m.AppointmentInsights), { ssr: false });
 import { sampleOn as dqSample } from "./views/dq/dq-data";
 import { GlobalSearch } from "./views/global-search";
@@ -597,6 +598,7 @@ export function Dashboard() {
           </main>
         </div>
       </div>
+      <LeadDrawerHost />
       </StProvider>
     </ApiProvider>
   );

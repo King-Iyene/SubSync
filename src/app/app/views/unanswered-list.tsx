@@ -1,5 +1,6 @@
 "use client";
 
+import { hotkeyIgnored } from "@/lib/design/ui-logic";
 import { Check, ChevronDown, Filter, Keyboard, Link2, Search, Star, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useApiClient, useData } from "../session";
@@ -82,9 +83,7 @@ export function UnansweredList({ choices, set, page, setPage, reset, multi, acco
   useEffect(() => {
     if (!keysOn) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
-      const el = e.target as HTMLElement | null;
-      if (el && (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || el.isContentEditable)) return;
+      if (hotkeyIgnored(e)) return;
       if (document.querySelector("[role=dialog], [role=menu]")) return; // the panel and menus keep their own keys
       const k = e.key.toLowerCase();
       const last = rows.length - 1;

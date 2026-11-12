@@ -1,5 +1,6 @@
 "use client";
 
+import { hotkeyIgnored } from "@/lib/design/ui-logic";
 import { CalendarClock, Check, Copy, Flame, MessageSquareText, PhoneCall, SkipForward, Sparkles, Zap } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fmtWhen } from "@/lib/analytics/speed6";
@@ -376,8 +377,7 @@ function Session({ s, setS, onExit, me, cadence, goals, cbs, setCbs }: {
   useEffect(() => { latest.current = { pick, skip, callback, dispo }; });
   useEffect(() => {
     const on = (e: KeyboardEvent) => {
-      const t = e.target as HTMLElement | null;
-      if (e.metaKey || e.ctrlKey || e.altKey || (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) || latest.current.callback !== null) return;
+      if (hotkeyIgnored(e) || latest.current.callback !== null) return;
       if (e.key === "n" || e.key === "N") { e.preventDefault(); latest.current.skip(); return; }
       const d = latest.current.dispo[Number(e.key) - 1];
       if (d && /^[1-9]$/.test(e.key)) { e.preventDefault(); latest.current.pick(d); }

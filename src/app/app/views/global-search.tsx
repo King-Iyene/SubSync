@@ -1,5 +1,6 @@
 "use client";
 
+import { isEditableTarget } from "@/lib/design/ui-logic";
 import { ExternalLink, Search } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { searchTerm } from "@/lib/people/queue";
@@ -25,7 +26,7 @@ export function GlobalSearch({ go }: { go: GoFn }) {
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
-      const typing = !!target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT" || target.isContentEditable);
+      const typing = isEditableTarget(target);
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") { e.preventDefault(); setOpen(true); }
       else if (e.key === "/" && !typing && !e.ctrlKey && !e.metaKey) { e.preventDefault(); setOpen(true); }
       else if (e.key === "Escape") setOpen((o) => (lead === null ? false : o));

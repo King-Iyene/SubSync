@@ -1,5 +1,6 @@
 "use client";
 
+import { hotkeyIgnored } from "@/lib/design/ui-logic";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { diffFields, guardrails, REASON_LABELS, SORT_LABELS } from "@/lib/analytics/dedupe-review";
@@ -145,7 +146,7 @@ export function DuplicatesView({ embedded = false }: { embedded?: boolean } = {}
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null;
-      if (e.metaKey || e.ctrlKey || e.altKey || t?.closest("input, textarea, select, [contenteditable='true']")) return;
+      if (hotkeyIgnored(e)) return;
       const k = keys.current;
       if (e.key === "ArrowLeft") { e.preventDefault(); k.prev(); }
       else if (e.key === "ArrowRight") { e.preventDefault(); k.next(); }

@@ -2,6 +2,7 @@
 
 import { ArrowDown, ChevronDown, ExternalLink, Mail, MessageCircle, MessageSquare, Phone, RefreshCw, SendHorizonal } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { clearDraft, getDraft, putDraft } from "@/lib/design/drafts";
 import { useData } from "../../session";
 import { InfoTip } from "../info-tip";
 import { INPUT, wbButtons, type Runner } from "./runner";
@@ -87,10 +88,18 @@ export function Thread({ locationId, contactId, reloadKey, crmUrl }: { locationI
   );
 }
 
-export function Composer({ ctx, runner, initial = "SMS", open = true, onOpenChange, focusOnMount = false }: { ctx: WbContext; runner: Runner; initial?: "SMS" | "Email"; open?: boolean; onOpenChange?: (o: boolean) => void; focusOnMount?: boolean }) {
-  const [channel, setChannel] = useState<"SMS" | "Email" | "WhatsApp">(initial === "SMS" && !ctx.phone ? "Email" : initial);
-  const [text, setText] = useState("");
-  const [subject, setSubject] = useState("");
+export function Composer({ ctx, runner, initial = "SMS", open = true, onOpenChange, focusOnMount = false, draftKey }: { ctx: WbContext; runner: Runner; initial?: "SMS" | "Email"; open?: boolean; onOpenChange?: (o: boolean) => void; focusOnMount?: boolean; /** Where this person's unsent text is kept while the panel closes, reopens or refreshes. */ draftKey?: string }) {
+  const saved = draftKey ? getDraft(draftKey) : undefined;
+  const [channel, setChannel] = useState<"SMS" | "Email" | "WhatsApp">(saved?.channel ?? (initial === "SMS" && !ctx.phone ? "Email" : initial));
+  const [text, setText] = useState(saved?.text ?? "");
+  const [subject, setSubject] = useState(saved?.subject ?? "");
+  // Pressing Text or Email on the panel changes the way to send without throwing the box away (the first run is the opening itself).
+  const firstInitial = useRef(true);
+  useEffect(() => { if (firstInitial.current) { firstInitial.current = false; return; } setChannel(initial === "SMS" && !ctx.phone ? "Email" : initial); }, [initial, ctx.phone]);
+  // The draft is kept as it is typed, and cleared when the message was really sent.
+  useEffect(() => { if (draftKey) putDraft(draftKey, { text, subject, channel }); }, [draftKey, text, subject, channel]);
+  const sentKind = runner.result?.tone === "done" ? runner.result.kind : null;
+  useEffect(() => { if (sentKind === "message") { setText(""); setSubject(""); if (draftKey) clearDraft(draftKey); } }, [sentKind, draftKey]);
   const box = useRef<HTMLTextAreaElement>(null);
   const first = ctx.name.trim().split(/\s+/)[0] ?? "";
   const email = channel === "Email";

@@ -1,5 +1,6 @@
 "use client";
 
+import { hotkeyIgnored } from "@/lib/design/ui-logic";
 import { SearchSelect } from "./search-select";
 import { BookedAxis, DateAxis, MoreFilters, QuickFilters, ResultLine } from "./filters-bar";
 import { Bookmark, Search, X } from "lucide-react";
@@ -142,8 +143,7 @@ export function AppointmentsModule({ go, flowTree = true, leadership = false, fu
 
   useEffect(() => {
     const k = (e: KeyboardEvent) => {
-      const t = e.target as HTMLElement | null;
-      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable) || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (hotkeyIgnored(e) || document.querySelector("[data-testid=lead-drawer-root]")) return;
       if (e.key === "/") { e.preventDefault(); search.current?.focus(); }
       else if (/^[1-9]$/.test(e.key) && tabs[Number(e.key) - 1]) { setFocus(undefined); setTab(tabs[Number(e.key) - 1].key); }
     };

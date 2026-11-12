@@ -1,5 +1,6 @@
 "use client";
 
+import { hotkeyIgnored } from "@/lib/design/ui-logic";
 import { StatusChip } from "./status-chip";
 import { LeadDrawer, type LeadSeed } from "./lead-drawer";
 import { TagPill } from "./what-is";
@@ -76,8 +77,7 @@ function useRowKeys(count: number, onEnter: (index: number) => void) {
   useEffect(() => {
     const on = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement | null;
-      if (el && (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || el.isContentEditable)) return;
-      if (e.metaKey || e.ctrlKey || e.altKey || count === 0) return;
+      if (hotkeyIgnored(e) || count === 0) return;
       if (document.querySelector("[data-testid=records-panel]")) return;
       if (e.key === "j") { moved.current = true; setUsed(true); setAt((n) => Math.min(count - 1, n + 1)); }
       else if (e.key === "k") { moved.current = true; setUsed(true); setAt((n) => Math.max(0, n - 1)); }

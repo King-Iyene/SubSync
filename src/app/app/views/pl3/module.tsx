@@ -1,5 +1,6 @@
 "use client";
 
+import { hotkeyIgnored } from "@/lib/design/ui-logic";
 import { usePageRange } from "../../ds/page-range";
 import { Bookmark, Search, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -78,8 +79,7 @@ export function PipelineModule({ moneyFlow = true, actions = false }: { moneyFlo
   const showAccount = !filters.locationId && (accounts.length || 2) > 1;
   useEffect(() => {
     const k = (e: KeyboardEvent) => {
-      const t = e.target as HTMLElement | null;
-      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable) || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (hotkeyIgnored(e) || document.querySelector("[data-testid=lead-drawer-root]")) return;
       if (e.key === "/") { e.preventDefault(); search.current?.focus(); } else if (/^[1-9]$/.test(e.key) && tabs[Number(e.key) - 1]) setTab(tabs[Number(e.key) - 1].key);
     };
     window.addEventListener("keydown", k); return () => window.removeEventListener("keydown", k);
