@@ -23,7 +23,7 @@ export type BriefItem = {
 
 export type BriefInputs = {
   /** Today's ranked items (the same list the Today screen shows). */
-  attention: Array<{ kind: string; label: string; why: string; count: number; accounts: number; money: number | null; hash: string; topName: string | null }>;
+  attention: Array<{ kind: string; label: string; why: string; count: number; accounts: number; money: number | null; hash: string; topName: string | null; /** Hours the oldest thing behind the count has waited, when known. */ oldestHours?: number | null }>;
   save: { accounts: Array<{ locationId: string; name: string; evidence: string[]; dollarText: string; hash: string }>; more: number } | null;
   recover: { total: number; estValue: number | null } | null;
   deals: { slipping: number; value: number | null; lost: number; lostNoReason: number } | null;
@@ -35,7 +35,7 @@ export type BriefInputs = {
 };
 
 export type Brief = {
-  day: string; headline: string; items: BriefItem[]; more: number;
+  day: string; /** The day in plain words, for example "Thursday 12 Nov". */ dayText: string; headline: string; items: BriefItem[]; more: number;
   dollar: { amount: number | null; text: string }; formula: string; accounts: number;
   /** Per section how many candidate items there were, so a person can see what a switched-off section would have said. */
   bySection: Record<Section, number>;
@@ -44,6 +44,16 @@ export type Brief = {
 export const FORMULA =
   "Adds the estimates of missed leads, deals past their usual time in a stage, and failed or late payments. A deal that is in two lists may be counted twice, so read it as a ceiling, not a promise. Each part is an estimate from your own history.";
 
+const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"], MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+/** "2026-11-12" as "Thursday 12 Nov". Anything that is not a day is returned unchanged. */
+export function dayLabel(iso: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  if (!m) return iso;
+  const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+  return `${WEEKDAYS[d.getUTCDay()]} ${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`;
+}
+/** Hours as the plain age of the oldest item: "5 hours", "3 days". */
+export function ageWords(h: number): string { return h < 1 ? "under an hour" : h < 48 ? `${Math.round(h)} hour${Math.round(h) === 1 ? "" : "s"}` : `${Math.round(h / 24)} days`; }
 const money = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
 const s = (n: number, one: string, many: string) => `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
 /** Today kinds that another section of the brief already covers, so one problem never appears twice. */
@@ -51,7 +61,7 @@ const COVERED_BY: Record<string, Section> = { waiting_old: "recover", waiting: "
 
 /** Every candidate item for the sections a person kept switched on. Pure. */
 export function candidates(i: BriefInputs, on: ReadonlySet<Section>): BriefItem[] {
-  const out: BriefItem[] = [];
+  const out: BriefItem[] = [], saveEv = new Map<string, string[]>();
   if (on.has("wallet") && i.wallet) {
     const w = i.wallet, who = w.names.slice(0, 2).join(", ");
     if (w.empty > 0) out.push({ key: "wallet_empty", section: "wallet", title: `${s(w.empty, "client account has", "client accounts have")} run out of credit`, why: `Texts, calls and emails can stop until it is topped up${who ? ` (${who}${w.empty > 2 ? "..." : ""})` : ""}.`, count: w.empty, dollars: null, tier: 1, hash: "#clients?tab=wallet" });
@@ -74,16 +84,19 @@ export function candidates(i: BriefInputs, on: ReadonlySet<Section>): BriefItem[
     out.push({ key: "deals", section: "deals", title: `${s(i.deals.slipping, "deal is", "deals are")} past their usual time in a stage`, why: "They have gone quiet for longer than your usual deals do.", count: i.deals.slipping, dollars: i.deals.value, tier: 2, hash: "#pipeline" });
   }
   if (on.has("save") && i.save) {
-    for (const a of i.save.accounts.slice(0, 2)) out.push({ key: `save:${a.locationId}`, section: "save", title: `Save ${a.name}`, why: `${a.evidence.slice(0, 2).join("; ")}.`, count: 1, dollars: null, tier: 2, hash: a.hash });
+    for (const a of i.save.accounts.slice(0, 2)) saveEv.set(`save:${a.locationId}`, a.evidence), out.push({ key: `save:${a.locationId}`, section: "save", title: `Save ${a.name}`, why: `${a.evidence.slice(0, 2).join("; ")}.`, count: 1, dollars: null, tier: 2, hash: a.hash });
   }
   if (on.has("attention")) {
     for (const a of i.attention) {
       const cover = COVERED_BY[a.kind];
       if (cover && on.has(cover)) continue;
-      out.push({ key: `today:${a.kind}`, section: "attention", title: a.label, why: a.why, count: a.count, dollars: a.money, tier: a.kind === "waiting_old" || a.kind === "needs_permission" ? 2 : a.kind === "unmarked" || a.kind === "waiting" || a.kind === "noshows" ? 3 : 4, hash: a.hash });
+      out.push({ key: `today:${a.kind}`, section: "attention", title: a.label, why: a.oldestHours ? `${a.why} The oldest has waited ${ageWords(a.oldestHours)}.` : a.why, count: a.count, dollars: a.money, tier: a.kind === "waiting_old" || a.kind === "needs_permission" ? 2 : a.kind === "unmarked" || a.kind === "waiting" || a.kind === "noshows" ? 3 : 4, hash: a.hash });
     }
   }
-  return out;
+  // One fact, one place: a Save line that only repeats a number another item already shows (for example "23 appointments with no outcome") is cut; a Save item with nothing new left is dropped.
+  const facts = out.filter((x) => x.section !== "save").map((x) => x.count).filter((n) => n >= 2);
+  const repeats = (e: string) => (e.match(/\d[\d,]*/g) ?? []).map((t) => Number(t.replace(/,/g, ""))).some((n) => n >= 2 && facts.includes(n));
+  return out.flatMap((x) => { if (x.section !== "save") return [x]; const ev = (saveEv.get(x.key) ?? []).filter((e) => !repeats(e)); return ev.length ? [{ ...x, why: `${ev.slice(0, 2).join("; ")}.` }] : []; });
 }
 
 const bySection = (items: readonly BriefItem[]): Record<Section, number> => Object.fromEntries(SECTIONS.map((x) => [x, items.filter((y) => y.section === x).length])) as Record<Section, number>;
@@ -96,8 +109,8 @@ export function buildBrief(i: BriefInputs, on: ReadonlySet<Section>, day: string
   const dollarParts = all.filter((x) => (x.section === "recover" || x.section === "deals" || x.section === "payments") && x.dollars !== null && x.dollars > 0).map((x) => x.dollars as number);
   const amount = dollarParts.length ? dollarParts.reduce((t, x) => t + x, 0) : null;
   const dollar = { amount, text: amount !== null ? `Up to about ${money(amount)} could be at stake across these lists (estimate).` : all.length ? "No dollar estimate yet: not enough deal history in these accounts." : "Nothing to estimate." };
-  const headline = i.accounts === 0 ? "No client accounts yet." : items.length === 0 ? "Nothing needs you today. Every list is clear." : items.length === 1 && all.length === 1 ? "One thing needs you today." : `${items.length}${all.length > items.length ? ` of ${all.length}` : ""} things need you today.`;
-  return { day, headline, items, more: Math.max(0, all.length - items.length), dollar, formula: FORMULA, accounts: i.accounts, bySection: bySection(all) };
+  const headline = i.accounts === 0 ? "No client accounts yet." : items.length === 0 ? "Nothing needs you today. Every list is clear." : items.length === 1 && all.length === 1 ? "One thing needs you today." : all.length > items.length ? `${all.length} things need you. The ${items.length} most important are below; the other ${all.length - items.length} are in each list.` : `${items.length} things need you today.`;
+  return { day, dayText: dayLabel(day), headline, items, more: Math.max(0, all.length - items.length), dollar, formula: FORMULA, accounts: i.accounts, bySection: bySection(all) };
 }
 
 // ---- words ----

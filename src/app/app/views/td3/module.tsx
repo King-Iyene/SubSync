@@ -10,23 +10,23 @@ import { emailText, moneyText } from "@/lib/analytics/today3-intel";
 import { parseTodayAccounts, withTodayAccounts } from "@/lib/analytics/today-queue";
 import { remember } from "../../ds/remember";
 import { useApiClient } from "../../session";
-import { EmptyState, ErrorState, ModuleTabs, Page, SkeletonRows } from "../../ds";
+import { EmptyState, ErrorState, ModuleTabs, SkeletonRows } from "../../ds";
 import { OpenLeadButton } from "../../ds/open-lead-button";
 import { Btn } from "../../ui";
 import type { GoFn, ViewId } from "../../nav";
 import { TodayView } from "../today";
 import { DatesBar } from "../today-dash";
-import { useReportFilter } from "../report-filter";
+
 import { Banknote, CalendarCheck, Gauge, Hourglass, MessageCircle, Timer } from "lucide-react";
 import "../speed6.css";
 import "../speed-ui.css";
 import "../ap3/ap3.css";
 import "../cl3/cl3.css";
 import "./td3.css";
-import { fixturesOn, notSwitchedOn, queryOf, useTd } from "./data";
+import { fixturesOn, notSwitchedOn, queryOf, useSlow, useTd } from "./data";
 import { CashSettings, RecoverTab, SaveCard, useCashFlags } from "./cash";
 import { FinanceTodayCard } from "../fn/today-card";
-import { BriefCard, WalletCard } from "../wg/today-cards";
+import { BriefCard, BriefTools, WalletCard } from "../wg/today-cards";
 
 // Today, one screen: Today | Proof | Numbers | Settings. Today is the ranked "what to do first" list with ONE button; Proof is the weekly receipt an agency shows its client; Numbers
 // replaces the old Overview (at most 6 tiles); Settings holds the daily email. Reads only: nothing here messages anyone or changes the CRM (the only writes are SubSync's own notes: a
@@ -59,13 +59,16 @@ function writeTa(ids: string[]) {
   remember("today-accounts", ids.length ? ids.join(",") : null);
   window.dispatchEvent(new Event("subsync-today-accounts"));
 }
+const todayText = () => { const d = new Date(); return `${["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][d.getDay()]} ${d.getDate()} ${["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][d.getMonth()]}`; };
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 type Drill = { title: string; kind: Td3ListKind; location: string | null; count: number } | null;
 type Loaded<T> = { data: T | null; error: unknown; loading: boolean; reload: () => void };
 
 function Load<T>({ r, children, empty }: { r: Loaded<T>; children: (d: T) => ReactNode; empty?: (d: T) => boolean | string }) {
-  if (r.loading && !r.data) return <SkeletonRows rows={4} label="Working out what to do first..." />;
+  const slow = useSlow(r.loading && !r.data);
+  if (r.loading && !r.data && slow) return <EmptyState title="This is taking longer than usual" body="Nothing was lost. The numbers are still being worked out." action={<Btn onClick={() => r.reload()}>Try again</Btn>} />;
+  if (r.loading && !r.data) return <SkeletonRows rows={3} label="Working out what to do first..." />;
   if (r.error && notSwitchedOn(r.error)) return <EmptyState title="Not switched on yet" body="This part of Today is not switched on for your account yet." />;
   if (r.error) return <ErrorState error={r.error as Error} onRetry={r.reload} />;
   if (!r.data) return null;
@@ -121,86 +124,165 @@ function useActions(reload: () => void) {
   return { act, busy, problem, tap: (kind: string, location: string | null) => { if (!sample) void api.post("today3/act/opened", { kind, location: location ?? undefined }).catch(() => undefined); } };
 }
 
-function TodayTab({ location, level, go, open, setTab, saveOn, openRecover, nav, kind }: { kind: AccessKind; location: string; level: string; go: (m: Td3Module, loc?: string | null) => void; open: (d: NonNullable<Drill>) => void; setTab: (t: TabKey) => void; saveOn: boolean; openRecover: (loc: string) => void; nav: GoFn }) {
+/** Kinds Speed to lead already shows in full (who is waiting for a reply, with the age of each wait). Today does not list them again: the hero card "Waiting for a reply" opens Speed to lead. */
+const IN_SPEED = new Set<string>(["waiting_old", "waiting"]);
+/** Brief rows Speed to lead (Coverage: missed calls, nights) already covers: the "won back" row and the waiting items it replaces. */
+const BRIEF_IN_SPEED = (key: string) => key === "recover" || key === "today:waiting_old" || key === "today:waiting";
+
+type HeroCard = { id: string; label: string; value: string; note: string; tone: "red" | "amber" | "green" | "plain"; onOpen: (() => void) | null; to: string; onGo: () => void };
+
+/** Four small number cards (none repeats what Speed to lead shows). Each opens exactly its rows (the same drill the Numbers tab uses) and says where the full list lives. Real data only: no sparkline is drawn without a record behind it. */
+function Hero({ t, go, open, location }: { t: Td3Today; go: (m: Td3Module, loc?: string | null) => void; open: (d: NonNullable<Drill>) => void; location: string }) {
+  const item = (k: string) => t.items.find((i) => i.kind === k) ?? null;
+  const stale = item("stale_deals"), unmarked = item("unmarked");
+  const noshows = item("noshows");
+  const cleared = t.done.reduce((s, d) => s + d.cleared, 0);
+  const since = t.historyStarts ? `History starts ${t.historyStarts}` : "No earlier record yet";
+  const money = t.items.reduce((s, i) => s + (i.money ?? 0), 0);
+  const loc = location || null;
+  const cards: HeroCard[] = [
+    { id: "money", label: "Money at risk", value: money > 0 ? moneyText(money) : "None", note: money > 0 ? `Estimate, from ${num(stale?.count ?? 0)} quiet deals` : "No deal has gone quiet", tone: money > 0 ? "red" : "green", onOpen: stale ? () => open({ title: stale.label, kind: "stale_deals", location: stale.accounts === 1 ? stale.top[0]?.locationId ?? loc : loc, count: stale.count }) : null, to: "Open Pipeline", onGo: () => go("pipeline", loc) },
+    { id: "noshows", label: "No-shows to rebook", value: num(noshows?.count ?? 0), note: noshows ? "Missed in the last 7 days, not rebooked" : "Nobody to rebook", tone: noshows ? "amber" : "green", onOpen: noshows ? () => open({ title: noshows.label, kind: "noshows", location: noshows.accounts === 1 ? noshows.top[0]?.locationId ?? loc : loc, count: noshows.count }) : null, to: "Open Appointments", onGo: () => go("appointments", loc) },
+    { id: "appts", label: "Appointments to confirm", value: num(unmarked?.count ?? 0), note: unmarked ? "Past their time, no result marked" : "Every past appointment is marked", tone: unmarked ? "amber" : "green", onOpen: unmarked ? () => open({ title: unmarked.label, kind: "unmarked", location: unmarked.accounts === 1 ? unmarked.top[0]?.locationId ?? loc : loc, count: unmarked.count }) : null, to: "Open Appointments", onGo: () => go("appointments", loc) },
+    { id: "done", label: "Done today", value: num(cleared), note: t.historyStarts ? "Problems cleared since midnight" : since, tone: cleared > 0 ? "green" : "plain", onOpen: () => document.getElementById("td-done")?.scrollIntoView({ block: "nearest", behavior: "smooth" }), to: "Open Proof", onGo: () => undefined },
+  ];
+  return (
+    <div className="td-hero" data-testid="td-hero" role="group" aria-label="Today at a glance">
+      {cards.map((c) => (
+        <div key={c.id} className="td-hcard" data-tone={c.tone} data-testid={`td-hero-${c.id}`}>
+          <span className="td-hlabel">{c.label}</span>
+          {c.onOpen ? <button type="button" className="td-hnum" onClick={c.onOpen} aria-label={`${c.label}: ${c.value}. Show the rows`}>{c.value}</button> : <b className="td-hnum">{c.value}</b>}
+          <span className="td-hnote">{c.note}</span>
+          {c.id !== "done" && <button type="button" className="ap-link td-hgo" onClick={c.onGo}>{c.to}</button>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** The Today tab: the slim number strip, the money cards (Finance, Wallet) and the older Today (headline, accounts, lists) exactly as it was before the rebuild. The blocks the rebuild added (the brief card, accounts to save,
+ *  What to do today, In this order, Done today) are NOT drawn here; their code is kept in TodayTabBlocks below. Where each one lives now: docs/DECISIONS.md "Today, 12 Nov". */
+function TodayTab({ location, level, go, open, nav, kind }: { kind: AccessKind; location: string; level: string; go: (m: Td3Module, loc?: string | null) => void; open: (d: NonNullable<Drill>) => void; nav: GoFn }) {
+  const r = useTd<Td3Today>("today", { location: location || undefined });
+  return (
+    <div className="cl-stack td-compact" data-testid="td-today">
+      <Load r={r} empty={(t) => t.accounts === 0 && "Your client accounts appear here after the first sync finishes. It takes a few minutes after install."}>
+        {(t) => (
+          <>
+            <Hero t={t} go={go} open={open} location={location} />
+            {t.needsPermission > 0 && (
+              <div className="td-note" role="status" data-testid="td-permission">
+                <b>Needs permission: reconnect</b>
+                <span>{t.needsPermission === 1 ? "One account" : `${t.needsPermission} accounts`} could not be fully read, so some counts may be missing.</span>
+                <button type="button" className="ap-link" onClick={() => open({ title: "Accounts that need permission", kind: "needs_permission", location: null, count: t.needsPermission })}>See which</button>
+              </div>
+            )}
+          </>
+        )}
+      </Load>
+      {level !== "self" && <FinanceTodayCard go={nav} />}
+      {level === "all" && <WalletCard go={nav} />}
+      <section className="td-more-below" aria-label="More about today" data-testid="td-below">
+        <h2 className="sr-only">More about today</h2>
+        <TodayView go={nav} kind={kind} mode="below" />
+      </section>
+    </div>
+  );
+}
+
+/** The blocks the rebuild added to Today, kept as they were (hidden from the page, not deleted). */
+export function TodayTabBlocks({ location, level, go, open, setTab, saveOn, openRecover, nav, kind }: { kind: AccessKind; location: string; level: string; go: (m: Td3Module, loc?: string | null) => void; open: (d: NonNullable<Drill>) => void; setTab: (t: TabKey) => void; saveOn: boolean; openRecover: (loc: string) => void; nav: GoFn }) {
   const r = useTd<Td3Today>("today", { location: location || undefined });
   const { act, busy, problem, tap } = useActions(() => r.reload());
   const admin = level !== "self";
+  const [all, setAll] = useState(false);
   return (
     <Load r={r} empty={(t) => t.accounts === 0 && "Your client accounts appear here after the first sync finishes. It takes a few minutes after install."}>
       {(t) => {
         const b = t.button;
         const openItem = (i: Td3Item) => { tap(i.kind, i.accounts === 1 ? i.top[0]?.locationId ?? null : null); open({ title: i.label, kind: i.kind, location: i.accounts === 1 ? i.top[0]?.locationId ?? null : null, count: i.count }); };
+        const shown = t.items.filter((i) => !IN_SPEED.has(i.kind));
+        const rows = all ? shown : shown.slice(0, 5);
         return (
-          <div className="cl-stack" data-testid="td-today">
-            {level === "all" && <BriefCard go={nav} openRecover={openRecover} />}
-            {level !== "self" && <FinanceTodayCard go={nav} />}
-            {saveOn && level !== "self" && <SaveCard openList={openRecover} go={(v, loc) => nav(v, loc)} />}
-            {level === "all" && <WalletCard go={nav} />}
-            <section className="cl-today" aria-label="What to do today">
-              <h2 className="cl-h">What to do today</h2>
-              <p className="cl-sentence" data-testid="td-sentence">{t.headline}</p>
-              {b && <button type="button" className="s6-btn" data-kind="primary" data-testid="td-go" onClick={() => { tap(b.kind, b.locationId); go(b.module, b.locationId); }}>{b.label}</button>}
-              {t.mine && t.mine.button && (
-                <button type="button" className="s6-btn" data-kind="primary" data-testid="td-mine-go" onClick={() => open({ title: t.mine?.button?.label ?? "My queue", kind: t.mine?.button?.list as Td3ListKind, location: null, count: t.mine?.button?.count ?? 0 })}>{t.mine.button.label}</button>
-              )}
-              <p className="ap-fine">{t.scope}</p>
-            </section>
+          <div className="cl-stack td-compact" data-testid="td-today">
+            <Hero t={t} go={go} open={open} location={location} />
 
             {t.needsPermission > 0 && (
               <div className="td-note" role="status" data-testid="td-permission">
                 <b>Needs permission: reconnect</b>
-                <span>{t.needsPermission === 1 ? "One account" : `${t.needsPermission} accounts`} could not be fully read, so some counts here may be missing.</span>
+                <span>{t.needsPermission === 1 ? "One account" : `${t.needsPermission} accounts`} could not be fully read, so some counts may be missing.</span>
                 <button type="button" className="ap-link" onClick={() => open({ title: "Accounts that need permission", kind: "needs_permission", location: null, count: t.needsPermission })}>See which</button>
               </div>
             )}
 
+            <div className="td-grid">
+              <div className="td-col">
+                {level === "all" && <BriefCard go={nav} openRecover={openRecover} hide={BRIEF_IN_SPEED} />}
+                {level !== "self" && <FinanceTodayCard go={nav} />}
+                {level === "all" && <WalletCard go={nav} />}
+              </div>
+              <div className="td-col">
+                {saveOn && level !== "self" && <SaveCard openList={openRecover} go={(v, loc) => nav(v, loc)} />}
+                <section className="cl-today" aria-label="What to do today">
+                  <h2 className="td-h2">What to do today</h2>
+                  <p className="cl-sentence" data-testid="td-sentence">{t.headline}</p>
+                  <div className="td-btns">
+                    {b && <button type="button" className="s6-btn" data-kind="primary" data-testid="td-go" onClick={() => { tap(b.kind, b.locationId); go(b.module, b.locationId); }}>{b.label}</button>}
+                    {t.mine && t.mine.button && <button type="button" className="s6-btn" data-kind="primary" data-testid="td-mine-go" onClick={() => open({ title: t.mine?.button?.label ?? "My queue", kind: t.mine?.button?.list as Td3ListKind, location: null, count: t.mine?.button?.count ?? 0 })}>{t.mine.button.label}</button>}
+                  </div>
+                </section>
+              </div>
+            </div>
+
             {t.items.length === 0 && t.accounts > 0 ? (
               <section className="td-clear" data-testid="td-allclear" aria-label="All clear">
-                <h2 className="cl-sentence">Nothing needs you right now.</h2>
-                <p className="ap-fine">{t.allClear && t.allClear.fixedSinceYesterday > 0 ? `${num(t.allClear.fixedSinceYesterday)} ${t.allClear.fixedSinceYesterday === 1 ? "thing was" : "things were"} fixed since yesterday${t.allClear.lastFixedAt ? `. The last one ${ago(t.allClear.lastFixedAt)}` : ""}.` : "We will tell you here the moment something needs someone."}</p>
-                <p className="ap-fine">Next step: open Proof to see what we caught this week.</p>
-                <div><button type="button" className="ap-link" onClick={() => setTab("proof")}>Open Proof</button></div>
+                <h2 className="td-h2">Nothing needs you right now.</h2>
+                <p className="ap-fine">{t.allClear && t.allClear.fixedSinceYesterday > 0 ? `${num(t.allClear.fixedSinceYesterday)} ${t.allClear.fixedSinceYesterday === 1 ? "thing was" : "things were"} fixed since yesterday${t.allClear.lastFixedAt ? `. The last one ${ago(t.allClear.lastFixedAt)}` : ""}.` : "We will tell you here the moment something needs someone."} <button type="button" className="ap-link" onClick={() => setTab("proof")}>Open Proof</button></p>
               </section>
             ) : (
               <section aria-label="Ranked list">
-                <h2 className="cl-h mb-2">In this order</h2>
+                <h2 className="td-h2">In this order</h2>
                 <ol className="td-list" data-testid="td-items">
-                  {t.items.map((i, n) => (
-                    <li key={i.kind} className="td-item" data-testid={`td-item-${i.kind}`}>
+                  {rows.map((i, n) => (
+                    <li key={i.kind} className="td-item" data-bar={i.oldestHours !== null && i.oldestHours >= 24 ? "red" : i.kind === "unmarked" || i.kind === "stale_deals" || i.kind === "noshows" ? "amber" : "grey"} data-testid={`td-item-${i.kind}`}>
                       <span className="td-rank" aria-hidden>{n + 1}</span>
                       <div className="td-main">
                         <button type="button" className="td-label" title={i.why} onClick={() => openItem(i)}>{i.label}</button>
-                        <p className="ap-fine">{i.rankWhy}</p>
-                        {i.accounts > 1 && i.top.length > 0 && <p className="ap-fine">Most in: {i.top.map((a) => `${a.name} (${num(a.count)})`).join(", ")}</p>}
-                        {i.accounts === 1 && i.top[0] && t.accounts > 1 && <p className="ap-fine">In {i.top[0].name}</p>}
+                        <p className="ap-fine">{i.rankWhy}{i.accounts > 1 && i.top.length > 0 ? ` Most in: ${i.top.map((a) => `${a.name} (${num(a.count)})`).join(", ")}.` : ""}{i.accounts === 1 && i.top[0] && t.accounts > 1 ? ` In ${i.top[0].name}.` : ""}</p>
                       </div>
                       <div className="td-side">
-                        <button type="button" className="ap-link" onClick={() => { tap(i.kind, null); go(i.module, i.accounts === 1 ? i.top[0]?.locationId ?? null : null); }}>Open in {MODULE_NAME[i.module]}</button>
-                        {admin && <button type="button" className="ap-link" disabled={busy} onClick={() => void act("snooze", { kind: i.kind, days: 1 })}>Put aside for a day</button>}
+                        <button type="button" className="s6-btn" data-kind="primary" onClick={() => { tap(i.kind, null); go(i.module, i.accounts === 1 ? i.top[0]?.locationId ?? null : null); }}>Open in {MODULE_NAME[i.module]}</button>
+                        {admin && <button type="button" className="ap-link" disabled={busy} onClick={() => void act("snooze", { kind: i.kind, days: 1 })}>Put aside</button>}
                       </div>
                     </li>
                   ))}
                 </ol>
+                {shown.length > 5 && <button type="button" className="ap-link" onClick={() => setAll(!all)}>{all ? "Show fewer" : `Show ${shown.length - 5} more`}</button>}
               </section>
             )}
             {problem && <p className="ap-fine" role="alert">{problem}</p>}
 
-            {t.snoozed.length > 0 && (
-              <section aria-label="Put aside">
-                <h2 className="cl-h mb-2">Put aside for now</h2>
-                <ul className="cl-steps" data-testid="td-snoozed">{t.snoozed.map((s) => <li key={s.id}><b>{s.label}</b><span>until {new Date(s.until).toISOString().slice(0, 10)}</span><button type="button" className="ap-link" disabled={busy} onClick={() => void act("unsnooze", { id: s.id })}>Bring back</button></li>)}</ul>
+            <div className="td-grid">
+              {t.snoozed.length > 0 && (
+                <section aria-label="Put aside">
+                  <h2 className="td-h2">Put aside for now</h2>
+                  <ul className="cl-steps" data-testid="td-snoozed">{t.snoozed.map((s) => <li key={s.id}><b>{s.label}</b><span>until {new Date(s.until).toISOString().slice(0, 10)}</span><button type="button" className="ap-link" disabled={busy} onClick={() => void act("unsnooze", { id: s.id })}>Bring back</button></li>)}</ul>
+                </section>
+              )}
+              <section id="td-done" aria-label="Done today">
+                <h2 className="td-h2">Done today</h2>
+                {t.done.length > 0
+                  ? <ul className="td-done" data-testid="td-done">{t.done.map((d) => <li key={d.kind}><b>{num(d.cleared)}</b> cleared: {d.label}{d.lastAt ? ` (last ${ago(d.lastAt)})` : ""}</li>)}</ul>
+                  : <p className="ap-fine" data-testid="td-done-empty">{t.historyStarts ? "Nothing cleared yet today." : "We start keeping this record at the next refresh."}</p>}
               </section>
-            )}
+            </div>
 
-            <section aria-label="Done today">
-              <h2 className="cl-h mb-2">Done today</h2>
-              {t.done.length > 0
-                ? <ul className="td-done" data-testid="td-done">{t.done.map((d) => <li key={d.kind}><b>{num(d.cleared)}</b> cleared: {d.label}{d.lastAt ? ` (last ${ago(d.lastAt)})` : ""}</li>)}</ul>
-                : <p className="ap-fine" data-testid="td-done-empty">{t.historyStarts ? "Nothing cleared yet today." : "We start keeping this record at the next refresh, so you will see what was cleared each day from then on."}</p>}
-            </section>
-            <p className="ap-fine">{t.historyStarts ? `Our record of what was found and fixed starts ${t.historyStarts}.` : "Our record of what was found and fixed has not started yet."} Counts here equal the same counts in each screen. Nothing on this page changes your CRM or messages your leads.</p>
+            <details className="td-about" data-testid="td-about">
+              <summary>About these numbers</summary>
+              <p className="ap-fine">{t.scope}. {t.historyStarts ? `Our record of what was found and fixed starts ${t.historyStarts}.` : "Our record of what was found and fixed has not started yet."} Counts here equal the same counts in each screen. Nothing on this page changes your CRM or messages your leads. Who is waiting for a reply, and the missed calls and nights nobody answered, are in Speed to lead.</p>
+            </details>
             <section className="td-more-below" aria-label="More about today" data-testid="td-below">
-              <h2 className="cl-h mb-3">More about today</h2>
+              <h2 className="sr-only">More about today</h2>
               <TodayView go={nav} kind={kind} mode="below" />
             </section>
           </div>
@@ -221,14 +303,14 @@ function ProofTab({ location, accounts }: { location: string; accounts: boolean 
       {(p) => {
         const text = [`${p.accountName ?? "Your client accounts"}: week of ${p.weekStart}`, ...p.lines, ...p.clientLines].join("\n");
         return (
-          <div className="cl-stack" data-testid="td-proof">
+          <div className="cl-stack td-compact" data-testid="td-proof">
             <div className="ap-head print:hidden" role="group" aria-label="Choose a week">
               <select className="ap-field" aria-label="Week" value={week || p.weekStart} onChange={(e) => setWeek(e.target.value)}>{p.weeks.map((w) => <option key={w} value={w}>Week starting {w}</option>)}</select>
               {!sample && <Btn onClick={() => api.download(queryOf("export", { week: p.weekStart, location: location || undefined }), "proof.csv")}>Download CSV</Btn>}
               <Btn onClick={() => window.print()}>Print</Btn>
             </div>
             <section className="td-receipt" aria-label="Weekly receipt" data-testid="td-receipt">
-              <h2 className="cl-h">Receipt for the week starting {p.weekStart}{p.accountName ? `: ${p.accountName}` : ""}</h2>
+              <h2 className="td-h2">Weekly receipt: week of {p.weekStart}{p.accountName ? `, ${p.accountName}` : ""}</h2>
               {p.total.enough ? (
                 <div className="td-big">
                   <div><b>{num(p.total.found)}</b><span title="Problems that appeared this week and needed someone">Found</span></div>
@@ -239,15 +321,15 @@ function ProofTab({ location, accounts }: { location: string; accounts: boolean 
               ) : null}
               <ul className="td-lines" data-testid="td-lines">{[...p.lines, ...p.clientLines].map((l, i) => <li key={i}>{l}</li>)}</ul>
               <div className="flex flex-wrap gap-3 print:hidden">
-                <button type="button" className="s6-btn" data-kind="primary" data-testid="td-copy" onClick={() => { void copyText(text).then(setCopied); }}>{copied ? "Copied" : "Copy for your client"}</button>
+                <button type="button" className="s6-btn" data-kind="primary" data-testid="td-copy" onClick={() => { void copyText(text).then(setCopied); }}>{copied ? "Copied" : "Copy client report"}</button>
                 {p.total.stillOpen > 0 && <span className="ap-fine">The {num(p.total.stillOpen)} still open are on the Today page.</span>}
               </div>
               <p className="ap-fine">{p.historyStarts ? `Found and fixed come from our own daily record, which starts ${p.historyStarts}. They are totals, so there is no list behind them.` : "Our daily record has not started yet."} A problem counts as fixed only when the next refresh shows it cleared.</p>
             </section>
-            {p.byKind.length > 0 && <section aria-label="What we found"><h2 className="cl-h mb-2">What we found</h2><ul className="cl-steps">{p.byKind.map((k) => <li key={k.kind}><b>{num(k.found)}</b><span>{k.label}</span><span>{num(k.cleared)} fixed</span></li>)}</ul></section>}
+            {p.byKind.length > 0 && <section aria-label="What we found"><h2 className="td-h2">What we caught</h2><ul className="cl-steps">{p.byKind.map((k) => <li key={k.kind}><b>{num(k.found)}</b><span>{k.label}</span><span>{num(k.cleared)} fixed</span></li>)}</ul></section>}
             {accounts && p.rows.rows.length > 0 && (
               <section aria-label="By account">
-                <h2 className="cl-h mb-2">By client account</h2>
+                <h2 className="td-h2">By client account</h2>
                 <div className="ap-scroll"><table className="ap-t" data-testid="td-proof-table"><thead><tr><th>Account</th><th data-num>Found</th><th data-num>Fixed</th><th data-num>Still open</th><th data-num>Usual time to fix</th></tr></thead>
                   <tbody>{p.rows.rows.map((x) => <tr key={x.locationId} style={{ cursor: "default" }}><td>{x.name}</td><td data-num>{num(x.found)}</td><td data-num>{num(x.cleared)}</td><td data-num>{num(x.stillOpen)}</td><td data-num>{mins(x.medianFixMinutes)}</td></tr>)}</tbody></table></div>
                 <Pager page={p.rows.page} pages={p.rows.pages} total={p.rows.total} set={setPage} />
@@ -271,7 +353,7 @@ function NumbersTab({ location, go, open, fromOverview, level, nav, kind }: { lo
   // The dates are the date bar's (one range for the whole app): the numbers below are for exactly the dates in the bar.
   const r = useTd<Td3Numbers>("numbers", { location: location || undefined, from: bar.from || undefined, to: bar.to || undefined }, !bar.ready);
   return (
-    <div className="cl-stack" data-testid="td-numbers">
+    <div className="cl-stack td-compact" data-testid="td-numbers">
       {fromOverview && <p className="ap-fine" role="status" data-testid="td-moved">Overview moved here. Its numbers are in the row below and its account list is at the bottom of this page.</p>}
       {level !== "self" && <DatesBar />}
       <Load r={r} empty={(n) => n.tiles.length === 0}>
@@ -303,7 +385,7 @@ function NumbersTab({ location, go, open, fromOverview, level, nav, kind }: { lo
   );
 }
 
-function SettingsTab({ level, cashOn }: { level: string; cashOn: boolean }) {
+function SettingsTab({ level, cashOn, saveOn, nav }: { level: string; cashOn: boolean; saveOn: boolean; nav: GoFn }) {
   const r = useTd<Td3Settings>("settings");
   const today = useTd<Td3Today>("today");
   const { act, busy, problem } = useActions(() => r.reload());
@@ -314,9 +396,9 @@ function SettingsTab({ level, cashOn }: { level: string; cashOn: boolean }) {
   return (
     <Load r={r}>
       {(d) => form && (
-        <div className="cl-stack" data-testid="td-settings">
-          <section aria-label="Daily email">
-            <h2 className="cl-h mb-2">Daily email</h2>
+        <div className="cl-stack td-compact td-settings" data-testid="td-settings">
+          <section className="td-card2" aria-label="Daily email">
+            <h2 className="td-h2">Daily email</h2>
             <p className="ap-fine mb-2">One short email a day with the same ranked list as Today and one link. It never messages your leads. Your day is in {d.timezone}.</p>
             {!d.canEdit && <p className="ap-fine" role="status">Ask your administrator to change this.</p>}
             <form className="td-form" onSubmit={(e) => { e.preventDefault(); void act("settings", { emailOn: form.on, emailHour: form.hour, quietDays: form.quiet, recipients: form.list.split(/[\s,;]+/).filter(Boolean) }).then((ok) => setSaved(ok)); }}>
@@ -330,12 +412,22 @@ function SettingsTab({ level, cashOn }: { level: string; cashOn: boolean }) {
             <p className="ap-fine mt-2">Emails go out only once sending is switched on for your business. Until then this page shows exactly what would be sent. Every email has a link to stop it.</p>
           </section>
           {today.data && (
-            <section aria-label="Preview">
-              <h2 className="cl-h mb-2">What today&apos;s email would say</h2>
+            <section className="td-card2" aria-label="Preview">
+              <h2 className="td-h2">What today&apos;s email would say</h2>
               <pre className="td-preview" data-testid="td-preview">{(() => { const m = emailText(today.data, "(link to your Today page)", "(link to stop these emails)"); return `Subject: ${m.subject}\n\n${m.text}`; })()}</pre>
             </section>
           )}
-          {cashOn && level !== "self" && <CashSettings />}
+          {level === "all" && <div className="td-card2"><BriefTools /></div>}
+          {saveOn && level !== "self" && <details className="td-card2" data-testid="td-settings-save"><summary className="td-h2">Accounts to save (the list and the paused ones)</summary><SaveCard openList={(loc) => nav("speed", loc || undefined)} go={(v, loc) => nav(v, loc)} /></details>}
+          {cashOn && level !== "self" && <div className="td-card2"><CashSettings /></div>}
+          {level !== "self" && today.data && (
+            <section className="td-card2" aria-label="Put aside" data-testid="td-settings-aside">
+              <h2 className="td-h2">Put aside</h2>
+              {today.data.snoozed.length === 0
+                ? <p className="ap-fine">Nothing is put aside. Use Put aside on the Today list and it waits here until it comes back by itself.</p>
+                : <ul className="cl-steps">{today.data.snoozed.map((x) => <li key={x.id}><b>{x.label}</b><span>until {new Date(x.until).toISOString().slice(0, 10)}</span><button type="button" className="ap-link" disabled={busy} onClick={() => void act("unsnooze", { id: x.id }).then(() => today.reload())}>Bring back</button></li>)}</ul>}
+            </section>
+          )}
           {level !== "self" && <p className="ap-fine">Things you put aside on the Today page come back by themselves after the days you chose, and you can bring them back sooner there.</p>}
         </div>
       )}
@@ -351,14 +443,14 @@ export function TodayModule({ go, kind, initialTab = "today", fromOverview = fal
   const level = (opt.data?.level ?? "all") as "all" | "account" | "self";
   const cash = useCashFlags();
   const link = typeof window === "undefined" ? new URLSearchParams() : new URLSearchParams(window.location.hash.split("?")[1] ?? "");
-  const [tab, setTab] = useState<TabKey>(() => (link.get("tab") === "recover" ? "recover" : initialTab)), [location, setLocation] = useState(() => (/^[A-Za-z0-9_-]{3,64}$/.test(link.get("account") ?? "") ? (link.get("account") as string) : "")), [drill, setDrill] = useState<Drill>(null);
+  const [tab, setTab] = useState<TabKey>(() => initialTab), [location, setLocation] = useState(() => (/^[A-Za-z0-9_-]{3,64}$/.test(link.get("account") ?? "") ? (link.get("account") as string) : "")), [drill, setDrill] = useState<Drill>(null);
   const ta = parseTodayAccounts(useSyncExternalStore(subscribeTa, () => window.location.hash, () => "")), taKey = ta.join(","), taSeen = useRef(false);
   // The account choice in the bar at the top and the one on this page are one choice: one account narrows every number here; several are counted as all, and the page says so.
   useEffect(() => { if (taKey || taSeen.current) setLocation(taKey && !taKey.includes(",") ? taKey : ""); taSeen.current = taKey !== ""; }, [taKey]);
   const flags = opt.data?.flags ?? null;
   const flagOf: Record<TabKey, string | null> = { today: "td_today", recover: null, proof: "td_proof", numbers: "td_numbers", settings: null };
-  const recoverOn = cash.flags?.cf_recover === true, saveOn = cash.flags?.cf_save === true, cashMail = saveOn || cash.flags?.cf_email === true;
-  const tabs = useMemo(() => (["today", "recover", "proof", "numbers", "settings"] as TabKey[]).filter((k) => (k !== "settings" || level !== "self") && (k !== "recover" || recoverOn) && (!flagOf[k] || flags === null || flags[flagOf[k] as string] !== false)), [flags, level, recoverOn]); // eslint-disable-line react-hooks/exhaustive-deps
+  const saveOn = cash.flags?.cf_save === true, cashMail = saveOn || cash.flags?.cf_email === true;
+  const tabs = useMemo(() => (["today", "proof", "numbers", "settings"] as TabKey[]).filter((k) => (k !== "settings" || level !== "self") && (!flagOf[k] || flags === null || flags[flagOf[k] as string] !== false)), [flags, level]); // eslint-disable-line react-hooks/exhaustive-deps
   const active = tabs.includes(tab) ? tab : tabs[0];
   const accounts = opt.data?.accounts ?? [];
   // A business or a client's staff have no Clients, Settings or Team-wide pages of the owner's kind: the closest page of their own is used instead.
@@ -368,19 +460,19 @@ export function TodayModule({ go, kind, initialTab = "today", fromOverview = fal
   };
   const open = (d: NonNullable<Drill>) => { setDrill(d); setTimeout(() => document.getElementById("td-drill")?.scrollIntoView({ block: "nearest", behavior: "smooth" }), 50); };
   const goTab = (t: TabKey) => { setTab(t); setDrill(null); };
-  if (!sample && opt.data && opt.data.canSee === false) return <Page title="Today" subtitle="What to do first today.">{null}</Page>;
+  if (!sample && opt.data && opt.data.canSee === false) return <div data-testid="page" className="td-page"><header className="td-head"><h1>Today</h1></header></div>;
   const body = (() => {
     switch (active) {
-      case "today": return <TodayTab location={location} level={level} go={goModule} open={open} setTab={goTab} saveOn={saveOn} openRecover={(loc) => { setLocation(loc); goTab("recover"); }} nav={go} kind={kind} />;
+      case "today": return <TodayTab location={location} level={level} go={goModule} open={open} nav={go} kind={kind} />;
       case "recover": return <RecoverTab location={location} level={level} accounts={accounts.length} />;
       case "proof": return <ProofTab location={location} accounts={level !== "self"} />;
       case "numbers": return <NumbersTab location={location} go={goModule} open={open} fromOverview={fromOverview} level={level} nav={go} kind={kind} />;
-      case "settings": return <SettingsTab level={level} cashOn={cashMail} />;
+      case "settings": return <SettingsTab level={level} cashOn={cashMail} saveOn={saveOn} nav={go} />;
     }
   })();
   return (
     <div className="s6 ap cl td ds-enter" data-testid="td-module">
-      <Page title="Today" subtitle="What to do first, and proof it is getting done.">
+      <div data-testid="page" className="td-page"><header className="td-head"><h1>Today</h1><span>{todayText()}</span></header>
         {sample && <p className="ap-fine mb-2" role="status" data-testid="td-sample">Sample data: these are not your real clients.</p>}
         {opt.data?.problem && <p className="ap-fine mb-2" role="status">{opt.data.problem}</p>}
         <ModuleTabs pill label="Today sections" tabs={tabs.map((k) => ({ label: TIPS[k][0], tip: TIPS[k][1], node: null }))} value={Math.max(0, tabs.indexOf(active))} onChange={(i) => goTab(tabs[i])} />
@@ -393,7 +485,7 @@ export function TodayModule({ go, kind, initialTab = "today", fromOverview = fal
         )}
         <div data-testid={`td-tab-${active}`}>{body}</div>
         {drill && active !== "settings" && <DrillList d={drill} location={location} onClose={() => setDrill(null)} />}
-      </Page>
+      </div>
     </div>
   );
 }

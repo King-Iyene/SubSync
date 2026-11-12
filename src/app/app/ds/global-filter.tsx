@@ -20,7 +20,7 @@ type Segments = { total: number; testAccounts?: number; accounts?: Array<{ id: s
 
 const TODAY_KEY = "today-accounts";
 const RECENT_KEY = "recent-clients";
-const btn = "ds-press inline-flex min-h-10 items-center gap-2 rounded-lg border bg-card px-3 text-[0.95rem] hover:border-primary/40 focus-visible:ring-2 focus-visible:ring-ring/40 outline-none";
+const btn = "ds-press inline-flex min-h-9 items-center gap-1.5 rounded-lg border bg-card px-2.5 text-sm hover:border-primary/40 focus-visible:ring-2 focus-visible:ring-ring/40 outline-none";
 
 const subscribeHash = (cb: () => void) => {
   window.addEventListener("popstate", cb); window.addEventListener("hashchange", cb); window.addEventListener("subsync-today-accounts", cb); window.addEventListener("subsync-range", cb);
@@ -62,10 +62,10 @@ function AccountControl({ accounts, picked, onChange, options, value, onValue }:
   const scope = scopeOf({ ...value, accounts: picked }, { ...options, accounts });
   const left = scope.left.filter((a) => a.reason !== "not picked" || picked.length > 0);
   return (
-    <div className="flex min-w-0 flex-wrap items-center gap-2" data-testid="account-control">
+    <div className="flex min-w-0 items-center gap-1.5" data-testid="account-control">
       <div ref={box} className="relative">
         <button type="button" aria-expanded={open} aria-haspopup="dialog" onClick={() => setOpen(!open)} className={btn} data-testid="account-button">
-          <span className="font-medium">{accountButtonText(picked.length, live.length)}</span>
+          <span className="max-w-[11rem] truncate font-medium sm:max-w-none">{accountButtonText(picked.length, live.length)}</span>
           <ChevronDown aria-hidden className="size-4 text-muted-foreground" />
         </button>
         {open && (
@@ -103,7 +103,7 @@ function AccountControl({ accounts, picked, onChange, options, value, onValue }:
         )}
       </div>
       {chosen.length > 0 && chosen.length <= 3 && picked.length <= 3 && chosen.map((a) => (
-        <span key={a.id} className="inline-flex min-h-9 items-center gap-1 rounded-lg border bg-muted/50 pl-2.5 pr-1 text-[0.95rem]" data-testid="account-chip">
+        <span key={a.id} className="inline-flex min-h-9 max-w-[9rem] items-center gap-1 truncate rounded-lg border bg-muted/50 pl-2 pr-0.5 text-sm max-sm:hidden" data-testid="account-chip">
           {a.name}
           <button type="button" aria-label={`Remove ${a.name}`} onClick={() => commit(picked.filter((x) => x !== a.id))} className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"><X aria-hidden className="size-4" /></button>
         </span>
@@ -135,32 +135,32 @@ function DateControl({ mode }: { mode: "range" | "now" | "dates" }) {
   }, [pending, inflight]);
   const applyPreset = (s: RangeSpec) => { setDraft(null); pr.apply(s); };
   const applyDraft = () => { if (!problem && dirty) { pr.apply({ preset: "custom", from, to, compare: spec.compare }); setDraft(null); } };
-  if (mode === "now") return <p className="text-[0.95rem] text-muted-foreground" data-testid="date-now" title="This page shows what is true at this moment, not a date range."><span className="font-medium text-foreground">Live</span>, as of right now</p>;
+  if (mode === "now") return <p className="text-sm text-muted-foreground" data-testid="date-now" title="This page shows what is true at this moment, not a date range."><span className="font-medium text-foreground">Live</span>, as of right now</p>;
   const updating = pending && inflight > 0;
   return (
-    <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5" data-testid="date-control">
-      <div role="group" aria-label="Dates" className="inline-flex max-w-full overflow-x-auto rounded-lg border bg-card">
+    <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5 sm:gap-x-2.5" data-testid="date-control">
+      <div role="group" aria-label="Dates" className="inline-flex max-w-full divide-x overflow-x-auto rounded-lg border bg-card">
         {PRESETS.map((p) => (
           <button key={p.key} type="button" aria-pressed={spec.preset === p.key} onClick={() => applyPreset({ preset: p.key, compare: spec.compare })}
-            className={`min-h-11 sm:min-h-10 whitespace-nowrap px-2.5 text-[0.95rem] outline-none focus-visible:ring-2 focus-visible:ring-ring/40 sm:px-3 ${spec.preset === p.key ? "bg-primary font-medium text-primary-foreground" : "hover:bg-accent"}`}>{p.label.startsWith("Last ") ? <><span className="max-sm:sr-only">Last </span>{p.label.slice(5)}</> : p.label}</button>
+            className={`min-h-9 whitespace-nowrap px-2 text-sm outline-none sm:px-2.5 focus-visible:ring-2 focus-visible:ring-ring/40 ${spec.preset === p.key ? "bg-primary font-medium text-primary-foreground" : "hover:bg-accent"}`}>{p.label.startsWith("Last ") ? <><span className="sm:hidden" aria-hidden>{p.label.slice(5).replace(" days", "d")}</span><span className="max-sm:sr-only">{p.label.slice(5)}</span></> : p.label}</button>
         ))}
         <button type="button" aria-pressed={spec.preset === "custom"} onClick={() => { setDraft(null); pr.apply({ preset: "custom", from: spec.from ?? pr.from, to: spec.to ?? pr.to, compare: spec.compare }); }}
-          className={`min-h-10 border-l px-3 text-[0.95rem] outline-none focus-visible:ring-2 focus-visible:ring-ring/40 ${spec.preset === "custom" ? "bg-primary font-medium text-primary-foreground" : "hover:bg-accent"}`}>Custom</button>
+          className={`min-h-9 px-2 text-sm outline-none sm:px-2.5 focus-visible:ring-2 focus-visible:ring-ring/40 ${spec.preset === "custom" ? "bg-primary font-medium text-primary-foreground" : "hover:bg-accent"}`}>Custom</button>
       </div>
       {spec.preset === "custom" && (
         <form className="inline-flex flex-wrap items-center gap-1.5" onSubmit={(e) => { e.preventDefault(); applyDraft(); }} data-testid="custom-range">
-          <input type="date" aria-label="From date" aria-invalid={Boolean(problem)} value={from} max={to || today || undefined} onChange={(e) => setDraft({ from: e.target.value, to })} className="min-h-10 rounded-lg border bg-card px-2 text-[0.95rem]" />
+          <input type="date" aria-label="From date" aria-invalid={Boolean(problem)} value={from} max={to || today || undefined} onChange={(e) => setDraft({ from: e.target.value, to })} className="min-h-9 rounded-lg border bg-card px-2 text-sm" />
           <span aria-hidden className="text-muted-foreground">to</span>
-          <input type="date" aria-label="To date" aria-invalid={Boolean(problem)} value={to} max={today ?? undefined} onChange={(e) => setDraft({ from, to: e.target.value })} className="min-h-10 rounded-lg border bg-card px-2 text-[0.95rem]" />
-          <button type="submit" disabled={Boolean(problem) || !dirty} data-testid="apply-range" className="min-h-10 rounded-lg bg-primary px-3 text-[0.95rem] font-medium text-primary-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-50">Apply</button>
+          <input type="date" aria-label="To date" aria-invalid={Boolean(problem)} value={to} max={today ?? undefined} onChange={(e) => setDraft({ from, to: e.target.value })} className="min-h-9 rounded-lg border bg-card px-2 text-sm" />
+          <button type="submit" disabled={Boolean(problem) || !dirty} data-testid="apply-range" className="min-h-9 rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-50">Apply</button>
         </form>
       )}
-      <span className="text-[0.95rem] text-muted-foreground" data-testid="date-window" aria-live="polite">{pr.label}</span>
-      <label className="inline-flex min-h-10 cursor-pointer items-center gap-1.5 text-[0.95rem]" title="Show the change against the period just before, where a number has one">
+      <span className="text-xs text-muted-foreground max-lg:sr-only" data-testid="date-window" aria-live="polite">{pr.label}</span>
+      <label className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-lg border bg-card px-2 text-sm sm:px-2.5" title="Compare with the previous period: shows the change against the period just before, where a number has one">
         <input type="checkbox" className="size-4" checked={spec.compare !== "none"} onChange={(e) => applyPreset({ ...spec, compare: e.target.checked ? "previous" : "none" })} data-testid="compare-previous" />
-        Compare with the previous period
+        <span aria-hidden className="max-sm:hidden">Compare</span><span className="sr-only">Compare with the previous period</span><span aria-hidden className="sm:hidden">vs before</span>
       </label>
-      {!isDefaultRange(spec) && <button type="button" className="min-h-9 text-sm underline" onClick={() => { setDraft(null); pr.apply(null); }} data-testid="reset-range">Reset</button>}
+      {!isDefaultRange(spec) && <button type="button" className="min-h-9 text-xs text-muted-foreground underline" onClick={() => { setDraft(null); pr.apply(null); }} data-testid="reset-range">Reset</button>}
       {updating && <span role="status" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground" data-testid="range-updating"><Loader2 aria-hidden className="size-4 animate-spin" />Updating the numbers</span>}
       {(problem || pr.problem) && <p role="alert" className="basis-full border-l-2 border-warning pl-2 text-sm text-foreground" data-testid="range-problem">{problem ?? pr.problem}{!problem && pr.problem ? " Showing the last 30 days instead." : ""}</p>}
     </div>
@@ -194,10 +194,10 @@ export function GlobalFilterBar({ view, agency, value, onChange, onAllClients }:
   return (
     <>
       {/* Sticky: it follows on scroll as one compact line and takes its own place in the flow, so it never covers the content under it. */}
-      <div className="sticky top-0 z-30 mb-3 rounded-xl border bg-card px-3 py-1.5 shadow-sm print:hidden" data-testid="global-filter-bar" role="region" aria-label="Filters for this page"><div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-1">
-        {showAccounts ? <AccountControl accounts={options!.accounts!} picked={picked} onChange={setPicked} options={options!} value={isToday ? { ...value, accounts: picked } : value} onValue={onChange} />   : mode !== "dates" && agency && !options ? <span className="h-10 w-48 animate-pulse rounded-lg bg-muted" aria-hidden data-testid="account-skeleton" /> : <span />}
-        <div className="flex min-w-0 max-w-full flex-wrap items-center gap-3">
-          {onAllClients && <button type="button" onClick={onAllClients} data-testid="back-to-all-clients" className="ds-press min-h-10 cursor-pointer rounded-lg border bg-card px-3 text-[0.95rem] font-medium text-primary hover:border-primary/40 hover:underline focus-visible:ring-2 focus-visible:ring-ring/40 outline-none">Back to all clients</button>}
+      <div className="sticky top-0 z-30 mb-3 rounded-xl border bg-card/95 px-2.5 py-1.5 backdrop-blur print:hidden" data-testid="global-filter-bar" role="region" aria-label="Filters for this page"><div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5">
+        {showAccounts ? <AccountControl accounts={options!.accounts!} picked={picked} onChange={setPicked} options={options!} value={isToday ? { ...value, accounts: picked } : value} onValue={onChange} />   : mode !== "dates" && agency && !options ? <span className="h-9 w-40 animate-pulse rounded-lg bg-muted" aria-hidden data-testid="account-skeleton" /> : <span />}
+        <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2.5">
+          {onAllClients && <button type="button" onClick={onAllClients} data-testid="back-to-all-clients" className="ds-press min-h-9 cursor-pointer rounded-lg border bg-card px-2.5 text-sm font-medium text-primary hover:border-primary/40 hover:underline focus-visible:ring-2 focus-visible:ring-ring/40 outline-none">Back to all clients</button>}
           <DateControl mode={mode} />
         </div>
       </div></div>

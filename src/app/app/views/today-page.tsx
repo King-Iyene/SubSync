@@ -250,8 +250,7 @@ export function TodayPage({ mode = "full", go, t, kind, reload, sync, syncing, o
         {error && <InlineAlert tone="danger" className="mb-4" action={<Btn onClick={() => void reload()}>Try again</Btn>}>{error}</InlineAlert>}
 
         {mode === "below" ? (
-          <div className="mb-4 td-oldhead" data-testid="today-below-alerts">
-            <p className="cl-h mb-2">The older one-sentence summary</p>
+          <div className="mb-4 td-oldhead" data-testid="today-below-alerts"><p className="sr-only">The older one-sentence summary</p>
             <TodayHeadline headline={headline} onPart={onPart} action={primary ? <PrimaryButton p={primary} /> : undefined} />
             {blockedLeads && <InlineAlert tone="warning" className="mt-3" action={<Btn onClick={() => go("settings")}>Open Settings</Btn>}>{blockedLeads}</InlineAlert>}
             {blockedAppts && <InlineAlert tone="warning" className="mt-3" action={<Btn onClick={() => go("settings")}>Open Settings</Btn>}>{blockedAppts}</InlineAlert>}

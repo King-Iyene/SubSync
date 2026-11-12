@@ -41,7 +41,7 @@ export async function gather(inst: string, f: BriefFlags, now = Date.now()): Pro
   ]);
   const out: BriefInputs = {
     accounts: td?.accounts ?? 0,
-    attention: (td?.items ?? []).map((i) => ({ kind: i.kind, label: i.label, why: i.why, count: i.count, accounts: i.accounts, money: i.money, hash: HASH[i.module] ?? "#today", topName: i.top[0]?.name ?? null })),
+    attention: (td?.items ?? []).map((i) => ({ kind: i.kind, label: i.label, why: i.why, count: i.count, accounts: i.accounts, money: i.money, hash: HASH[i.module] ?? "#today", topName: i.top[0]?.name ?? null, oldestHours: i.oldestHours })),
     save: save ? { accounts: save.accounts.map((a) => ({ locationId: a.locationId, name: a.name, evidence: a.evidence.map((e) => e.text), dollarText: a.dollarText, hash: a.list === "recover" ? `#today?tab=recover&account=${encodeURIComponent(a.locationId)}` : a.list === "deals" ? "#pipeline" : a.list === "speed" ? "#speed" : "#clients" })), more: save.more } : null,
     recover: rec ? { total: rec.total, estValue: rec.estValue } : null,
     deals: deals ? { slipping: deals.stale.count + deals.soon.count, value: deals.stale.value !== null || deals.soon.value !== null ? (deals.stale.value ?? 0) + (deals.soon.value ?? 0) : null, lost: deals.lost.count, lostNoReason: deals.lost.noReason } : null,

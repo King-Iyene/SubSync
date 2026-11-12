@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { BRIEF_MAX, briefDue, briefEmail, briefSlack, briefText, buildBrief, SECTIONS, sectionsOf, type BriefInputs, type Section } from "../analytics/br-core.ts";
+import { BRIEF_MAX, candidates, dayLabel, briefDue, briefEmail, briefSlack, briefText, buildBrief, SECTIONS, sectionsOf, type BriefInputs, type Section } from "../analytics/br-core.ts";
 
 const ALL = new Set<Section>(SECTIONS);
 const base = (over: Partial<BriefInputs> = {}): BriefInputs => ({
@@ -85,4 +85,29 @@ test("sections from stored text: unknown words dropped, empty means all", () => 
   assert.equal(sectionsOf([]).size, SECTIONS.length);
   assert.deepEqual([...sectionsOf(["wallet", "nonsense"])], ["wallet"]);
   assert.equal(sectionsOf(null).size, SECTIONS.length);
+});
+
+test("the day reads as a weekday and date, not a code", () => {
+  assert.equal(dayLabel("2026-11-12"), "Thursday 12 Nov");
+  assert.equal(buildBrief(base(), ALL, "2026-11-12").dayText, "Thursday 12 Nov");
+});
+
+test("each fact appears once: a Save line that repeats another item's number is cut, and an empty Save item is dropped", () => {
+  const b = buildBrief(base({ attention: [], save: { accounts: [{ locationId: "L2", name: "Test Co", evidence: ["12 people are waiting", "Setup is failing"], dollarText: "", hash: "#clients" }, { locationId: "L3", name: "Only Repeats", evidence: ["12 people are waiting"], dollarText: "", hash: "#clients" }], more: 0 } }), ALL, "2026-11-12");
+  const all = candidates(base({ attention: [], save: { accounts: [{ locationId: "L2", name: "Test Co", evidence: ["12 people are waiting", "Setup is failing"], dollarText: "", hash: "#clients" }, { locationId: "L3", name: "Only Repeats", evidence: ["12 people are waiting"], dollarText: "", hash: "#clients" }], more: 0 } }), ALL); void b;
+  const save = all.find((x) => x.key === "save:L2");
+  assert.ok(save && !/\b14\b/.test(save.why) && /Setup is failing/.test(save.why), "the repeated number is cut, the new fact stays");
+  assert.ok(!all.some((x) => x.key === "save:L3"), "a Save item that only repeats the missed-people count (12) is dropped");
+  assert.equal(new Set(all.map((x) => x.key)).size, all.length, "no item appears twice");
+});
+
+test("each item's count equals the number of rows its list opens (the input total), and an old wait is labelled with its age", () => {
+  const i = base({ attention: [{ kind: "no_phone", label: "Contacts with no phone", why: "Cannot be called.", count: 40, accounts: 5, money: null, hash: "#data-health", topName: null, oldestHours: 72 }] });
+  const b = buildBrief(i, ALL, "2026-11-12");
+  const by = (k: string) => candidates(i, ALL).find((x) => x.key === k);
+  assert.equal(by("recover")?.count, i.recover?.total);
+  assert.equal(by("deals")?.count, i.deals?.slipping);
+  assert.equal(by("payments")?.count, i.payments?.count);
+  assert.equal(by("wallet_empty")?.count, i.wallet?.empty);
+  assert.match(by("today:no_phone")?.why ?? "", /oldest has waited 3 days/);
 });
