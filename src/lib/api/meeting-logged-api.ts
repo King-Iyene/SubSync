@@ -24,12 +24,35 @@ async function accountNames(installationId: string, ids: string[]): Promise<Map<
 /** The accounts an administrator's scope covers, for the outcome history: null means every account of the installation. */
 const accountsOfScope = (s: StatusScope): string[] | null => (s.kind === "all" ? null : s.kind === "account" ? [s.locationId] : s.kind === "listed" ? s.locationIds : []);
 
+// The demo has no connected meeting tool, so it shows made-up counts for a fictional company (the whole demo is labelled sample data).
+const c = (logged: number, needsContact: number, needsOk: number, needsPermission: number, failed: number, overdue: number) => {
+  const notLogged = needsContact + needsOk + needsPermission + failed, held = logged + notLogged;
+  return { held, logged, notLogged, overdue, needsContact, needsOk, needsPermission, failed, share: loggedShare({ ...sumCounts([]), held, logged }) };
+};
+function sampleLogged(logged: boolean, outcomes: boolean) {
+  const reps = [
+    { ...c(9, 3, 0, 0, 1, 3), name: "Dana (sample)", accountName: "Summit HVAC Services", isMe: true },
+    { ...c(11, 2, 1, 0, 0, 1), name: "Marcus (sample)", accountName: "Summit HVAC Services", isMe: false },
+    { ...c(14, 0, 0, 0, 0, 0), name: "Priya (sample)", accountName: "Harbor Law Group", isMe: false },
+  ];
+  const accounts = [
+    { ...c(20, 5, 1, 0, 1, 4), name: "Summit HVAC Services" },
+    { ...c(14, 0, 0, 0, 0, 0), name: "Harbor Law Group" },
+  ];
+  const total = c(34, 5, 1, 0, 1, 4);
+  return {
+    mine: logged ? reps[0] : null,
+    team: logged ? { scope: "all", total, reps, accounts } : null,
+    outcomes: outcomes ? { enough: true, total: 46, needed: 0, historyStarts: "2026-10-02", logged24hShare: 78, nextStepShare: 61, movedOrBookedShare: 37, logged24h: 36, nextStepSet: 28, movedOrBooked7d: 17 } : null,
+  };
+}
+
 export async function meetingLoggedView(ctx: Ctx): Promise<Response> {
   const logged = on(ctx, "mn_logged"), outcomes = on(ctx, "mn_outcomes");
   const flags = { logged, outcomes };
   const base = { windowHours: LOG_WINDOW_HOURS, windowDays: COUNT_WINDOW_DAYS, minOutcomeMeetings: MIN_OUTCOME_MEETINGS };
   if (!logged && !outcomes) return json({ ...base, flags, mine: null, team: null, outcomes: null });
-  if (ctx.demo) return json({ ...base, flags, demo: true, mine: null, team: null, outcomes: null });
+  if (ctx.demo) return json({ ...base, flags, demo: true, ...sampleLogged(logged, outcomes) });
   const person: Person | null = personFromSession(ctx.session, ctx.kind, ctx.limitTo);
   if (!person) return json({ error: "Please sign in again" }, 401);
   const scope = statusScope(person, null);

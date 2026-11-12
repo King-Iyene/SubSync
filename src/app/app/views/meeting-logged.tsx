@@ -84,7 +84,6 @@ export function CallsToLog({ openInbox }: { openInbox: () => void }) {
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox error={error} onRetry={reload} />;
   if (!data) return null;
-  if (data.demo) return <EmptyState title="Sample data has no recorded calls" body="Connect a meeting tool to see which calls are logged and which are waiting." />;
   return (
     <div data-testid="mn-logged">
       {data.notReady && <p className="mb-4 rounded-lg border bg-muted/40 px-3 py-2 text-sm" role="status">The history of what followed calls is not switched on for your account yet. The counts below still work.</p>}
