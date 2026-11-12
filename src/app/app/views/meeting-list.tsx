@@ -62,7 +62,8 @@ export function MeetingsList({ onOpenAppointment }: { onOpenAppointment?: (locat
   const [error, setError] = useState<ApiError | null>(null);
   const [open, setOpen] = useState<string | null>(null);
   const [demo, setDemo] = useState(false);
-  const seq = useRef(0);
+  // The address being shown. An answer is used when it is for this address, even if a newer request for the same address started meanwhile (the shell may hand over a new client object while a read is on its way); an answer for an address the screen has moved on from is dropped.
+  const current = useRef<string>("");
   useEffect(() => { const t = setTimeout(() => setQNow(q.trim()), 300); return () => clearTimeout(t); }, [q]);
 
   const path = useCallback((cursor: string | null) => {
@@ -78,14 +79,15 @@ export function MeetingsList({ onOpenAppointment }: { onOpenAppointment?: (locat
   }, [qNow, state, outcome, follow, bar]);
 
   const load = useCallback(async () => {
-    const mine = ++seq.current;
+    const mine = path(null);
+    current.current = mine;
     setPhase((x) => (x === "ready" ? x : "loading")); setError(null);
     if (fx) { setRows(FX_LIST.filter((r) => (state === "all" || (state === "needs" ? r.contactId === null : r.contactId !== null)) && (!qNow || `${r.title} ${r.contactName}`.toLowerCase().includes(qNow.toLowerCase())))); setTotal(FX_LIST.length); setNext(null); setPhase("ready"); return; }
     try {
       const a = await api.get<ListAnswer>(path(null));
-      if (mine !== seq.current) return;
+      if (mine !== current.current) return;
       setRows(a.rows); setTotal(a.total); setNext(a.next); setDemo(a.demo === true); setPhase("ready");
-    } catch (e) { if (mine === seq.current) { setError(e as ApiError); setPhase("error"); } }
+    } catch (e) { if (mine === current.current) { setError(e as ApiError); setPhase("error"); } }
   }, [api, path, fx, state, qNow]);
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { void load(); }, [load]);
