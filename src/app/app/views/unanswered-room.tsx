@@ -248,6 +248,7 @@ export function UnansweredRoom({ go, ui, embedded }: { go: GoFn; ui: UiPayload; 
               {d.kind !== "client" ? <button type="button" onClick={() => go("settings")} className="ur-link" data-testid="wait-settings-link">Change the reply target</button> : "Ask the person who manages your account to change the reply target."}
               {d.readLimit ? ` ${d.readLimit}` : ""}
             </p>
+            <p className="ap-fine" data-testid="wait-unread-note">Unread is not the same as waiting for a reply: a conversation can hold a message nobody opened and already have your answer. Today shows the unread conversations.</p>
           </>
         )}
       </div>

@@ -41,7 +41,7 @@ export async function handlePayments(ctx: Ctx, h: PaymentsHelpers): Promise<Resp
   if (asked && !one) return emptyWrap(flags, true, null);
   const scope: Scope = { inst: ctx.installationId, allowed };
   const links: Links = { account: (l) => dl.account(l), contact: (l, c) => dl.contact(l, c) };
-  const f: Filters = { location: one, problem: text(sp.get("problem"), 24), currency: text(sp.get("currency"), 3), age: text(sp.get("age"), 6), min: numOrNull(sp.get("min")), max: numOrNull(sp.get("max")), status: text(sp.get("status"), 12), showTest: sp.get("test") === "1", q: text(sp.get("q"), 60), from: text(sp.get("from"), 10), to: text(sp.get("to"), 10) };
+  const f: Filters = { location: one, problem: text(sp.get("problem"), 24), currency: text(sp.get("currency"), 3), age: text(sp.get("age"), 6), min: numOrNull(sp.get("min")), max: numOrNull(sp.get("max")), status: text(sp.get("status"), 12), showTest: sp.get("test") === "1", q: text(sp.get("q"), 60), from: text(sp.get("from"), 10), to: text(sp.get("to"), 10), wfrom: text(sp.get("wfrom"), 10), wto: text(sp.get("wto"), 10) };
   const size = Math.max(5, Math.min(100, int(sp.get("size"), 25)));
   const key = JSON.stringify([ctx.installationId, allowed, part, sp.toString()]);
   const hit = part === "export" ? undefined : paymentsCache.get(key);
@@ -58,7 +58,7 @@ export async function handlePayments(ctx: Ctx, h: PaymentsHelpers): Promise<Resp
       const r = await item(scope, loc, kind, id, links, await h.brand(), flags.pm_resend === true);
       return r ? wrap(r) : json({ error: "That is not available" }, 404);
     }
-    case "disputes": return done(await disputes(scope, { location: one, status: text(sp.get("status"), 14) }));
+    case "disputes": return done(await disputes(scope, { location: one, status: text(sp.get("status"), 14), wfrom: f.wfrom, wto: f.wto }));
     case "upcoming": return done(await upcoming(scope, f));
     case "history": return done(await history(scope, f));
     case "options": return done(await options(scope, flags));

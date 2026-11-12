@@ -95,7 +95,7 @@ describe("proof", () => {
 describe("numbers rules", () => {
   it("a show rate needs 20 marked outcomes", () => {
     expect(showRate(8, 4)).toMatchObject({ enough: false, rate: null });
-    expect(showRate(8, 4).value).toMatch(/Not enough data/);
+    expect(showRate(8, 4).caption).toBe("Needs 20 marked outcomes (12 so far)");
     expect(showRate(15, 5)).toMatchObject({ enough: true, rate: 75, value: "75%" });
   });
   it("a change only with a real base", () => { expect(changeText(10, 3, 5)).toBeNull(); expect(changeText(12, 10, 5)).toBe("+20%"); });

@@ -56,10 +56,11 @@ export const snoozeUntil = (choice: string, now: number): number | null => (choi
 
 /** The weekly Proof: what was caught, what cleared, what is still open. Counts come from the alerts table rows passed in. */
 export type ProofAlert = { kind: string; title: string; createdAt: number; resolvedAt: number | null; locationId: string | null };
-export function proofOf(alerts: ProofAlert[], now: number, days: number) {
-  const from = now - days * 86_400_000;
-  const raised = alerts.filter((a) => a.createdAt >= from);
-  const cleared = alerts.filter((a) => a.resolvedAt !== null && a.resolvedAt >= from);
-  const open = alerts.filter((a) => a.resolvedAt === null);
+/** `days` counts back from `now`; or give `win` (the date bar's dates, `until` is the start of the day after the last day) and the window is exactly that: what was raised and cleared inside it, and what was still open at its end. */
+export function proofOf(alerts: ProofAlert[], now: number, days: number, win?: { from: number; until: number }) {
+  const from = win ? win.from : now - days * 86_400_000, until = win ? Math.min(win.until, Number.MAX_SAFE_INTEGER) : Infinity;
+  const raised = alerts.filter((a) => a.createdAt >= from && a.createdAt < until);
+  const cleared = alerts.filter((a) => a.resolvedAt !== null && a.resolvedAt >= from && a.resolvedAt < until);
+  const open = win && win.until <= now ? alerts.filter((a) => a.createdAt < until && (a.resolvedAt === null || a.resolvedAt >= until)) : alerts.filter((a) => a.resolvedAt === null);
   return { from, raised, cleared, open };
 }

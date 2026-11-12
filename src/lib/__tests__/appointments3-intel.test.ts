@@ -19,7 +19,7 @@ test("window: defaults, caps, bad input", () => {
   const d = parseApptWindow(null, null, NOW);
   assert.equal(d.days, 30);
   assert.equal(parseApptWindow("2026-01-01", "2026-12-31", NOW).days, 365);
-  assert.equal(parseApptWindow("2024-01-01", "2026-12-31", NOW).days, 366);
+  assert.equal(parseApptWindow("2020-01-01", "2026-12-31", NOW).days, 1096);
   assert.ok(parseApptWindow("zzz", "2026-01-01", NOW).problem);
   assert.ok(parseApptWindow("2026-05-02", "2026-05-01", NOW).problem);
 });

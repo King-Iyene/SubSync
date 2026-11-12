@@ -1,3 +1,4 @@
+import { MAX_RANGE_DAYS } from "../design/range-limits.ts";
 import { sql } from "../db";
 import { ttlCache } from "../ttl-cache";
 import { ageBucket, ageDays, csvCell, daysUntil, decodeCursor, disputeAlert, encodeCursor, headlineWords, nextStepWords, priorityOf, reasonWords, reminderTexts, riskFormula, todayIn, totalsByCurrency } from "./payments-logic";
@@ -9,8 +10,10 @@ import type { PmAgeBucket, PmDispute, PmDisputes, PmHistory, PmItem, PmKind, PmM
 type Frag = import("postgres").PendingQuery<import("postgres").Row[]>;
 export type Scope = { inst: string; allowed: string[] | null };
 export type Links = { account: (loc: string) => string; contact: (loc: string, id: string) => string };
-export type Filters = { location?: string | null; problem?: string | null; currency?: string | null; age?: string | null; min?: number | null; max?: number | null; status?: string | null; showTest?: boolean; q?: string | null; from?: string | null; to?: string | null };
+export type Filters = { /** The date bar's dates (YYYY-MM-DD) for the parts that count things over time (recovered, refunds, history). They never narrow the list of open problems, which is about right now. */ wfrom?: string | null; wto?: string | null; location?: string | null; problem?: string | null; currency?: string | null; age?: string | null; min?: number | null; max?: number | null; status?: string | null; showTest?: boolean; q?: string | null; from?: string | null; to?: string | null };
 
+export { windowOf } from "./payments-window.ts";
+import { windowOf, realDay } from "./payments-window.ts";
 export const paymentsCache = ttlCache<object>(30_000, 200);
 export const forgetPayments = (inst: string) => paymentsCache.clear(JSON.stringify([inst]).slice(0, -1));
 const n = (v: unknown) => (v === null || v === undefined ? 0 : Number(v));
@@ -69,11 +72,11 @@ function rowOf(r: Record<string, unknown>, now: number, links: Links, nameOf: Ma
   };
 }
 
-/** The refunds of the last 30 days (the Refunds tile): payments that were paid and then partly or fully given back. Same days as the daily totals, so the count equals the rows. */
+/** The refunds in the dates asked, the last 30 days when none (the Refunds tile): payments that were paid and then partly or fully given back. Same days as the daily totals, so the count equals the rows. */
 async function refundsQueue(s: Scope, f: Filters, cursor: string | null, size: number, links: Links, ids: string[], names: Map<string, string>, now: number): Promise<PmQueue> {
-  const db = sql(), c = decodeCursor(cursor);
+  const db = sql(), c = decodeCursor(cursor), win = windowOf(f, 30, now);
   const q = (f.q ?? "").trim().slice(0, 60), like = `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
-  const base = db`i.installation_id = ${s.inst} and i.location_id = any(${ids}::text[]) and i.kind = 'transaction' and i.amount_refunded > 0 and (i.live_mode or ${!!f.showTest}) and (i.occurred_at at time zone 'UTC')::date >= (now() - interval '30 days')::date
+  const base = db`i.installation_id = ${s.inst} and i.location_id = any(${ids}::text[]) and i.kind = 'transaction' and i.amount_refunded > 0 and (i.live_mode or ${!!f.showTest}) and (i.occurred_at at time zone 'UTC')::date >= ${win.from}::date and (i.occurred_at at time zone 'UTC')::date <= ${win.to}::date
     ${f.currency && /^[A-Za-z]{3}$/.test(f.currency) ? db`and i.currency = ${f.currency.toUpperCase()}` : db``} ${q ? db`and (i.contact_name ilike ${like} or i.contact_email ilike ${like})` : db``}`;
   const key = c ? db`and (extract(epoch from i.occurred_at) < ${c.r} or (extract(epoch from i.occurred_at) = ${c.r} and (i.location_id, i.kind, i.item_id) > (${c.l}, ${c.k}, ${c.i})))` : db``;
   const [rows, agg] = await Promise.all([
@@ -131,17 +134,17 @@ export async function today(s: Scope, f: Filters): Promise<PmToday> {
   const accts = await accountsOf(s, f.location);
   const empty: PmToday = { headline: "No client accounts yet.", button: null, tiles: [], atRisk: [], recoveredLast30: [], avgDaysToRecover: null, recoveryRate: null, historyStarts: null, sources: [], accounts: 0, testRowsHidden: 0, setupNote: null, expectedMonthly: [] };
   if (!accts.length) return empty;
-  const ids = accts.map((a) => a.id), db = sql();
+  const ids = accts.map((a) => a.id), db = sql(), win = windowOf(f, 30);
   const where = conds({ ...f, problem: null, status: "open" }, ids);
   const [grp, recent, disp, hist, plans, src, testRows, live] = await Promise.all([
     db`select i.problem_kind, coalesce(i.currency, '') currency, count(*)::int c, coalesce(sum(case when i.amount > 0 then i.amount else 0 end), 0) a, count(distinct i.location_id)::int accts
        from pm_items i ${lateral()} where i.installation_id = ${s.inst} and i.problem_kind is not null and i.resolved_at is null and ${where} group by 1, 2`,
-    db`select coalesce(currency, '') currency, sum(recovered_count)::int rc, sum(recovered_amount) ra, sum(refund_count)::int fc, sum(refund_amount) fa from pm_rollup_daily where installation_id = ${s.inst} and location_id = any(${ids}::text[]) and day >= (now() - interval '30 days')::date group by 1`,
+    db`select coalesce(currency, '') currency, sum(recovered_count)::int rc, sum(recovered_amount) ra, sum(refund_count)::int fc, sum(refund_amount) fa from pm_rollup_daily where installation_id = ${s.inst} and location_id = any(${ids}::text[]) and day >= ${win.from}::date and day <= ${win.to}::date group by 1`,
     db`select coalesce(currency, '') currency, count(*)::int c, coalesce(sum(amount), 0) a from pm_disputes where installation_id = ${s.inst} and location_id = any(${ids}::text[]) and status = 'open' group by 1`,
     db`select (select min(observed_at) from pm_events where installation_id = ${s.inst} and location_id = any(${ids}::text[])) first_at,
-        (select count(*) from pm_items where installation_id = ${s.inst} and location_id = any(${ids}::text[]) and problem_since is not null and live_mode and problem_since >= now() - interval '90 days')::int flagged,
-        (select count(*) from pm_items where installation_id = ${s.inst} and location_id = any(${ids}::text[]) and problem_since is not null and resolved_at is not null and live_mode and problem_since >= now() - interval '90 days')::int fixed,
-        (select avg(extract(epoch from (resolved_at - problem_since)) / 86400) from pm_items where installation_id = ${s.inst} and location_id = any(${ids}::text[]) and resolved_at is not null and problem_since is not null and live_mode and resolved_at >= now() - interval '90 days') avg_days`,
+        (select count(*) from pm_items where installation_id = ${s.inst} and location_id = any(${ids}::text[]) and problem_since is not null and live_mode and problem_since >= ${win.from}::date and problem_since < ${win.next}::date)::int flagged,
+        (select count(*) from pm_items where installation_id = ${s.inst} and location_id = any(${ids}::text[]) and problem_since is not null and resolved_at is not null and live_mode and problem_since >= ${win.from}::date and problem_since < ${win.next}::date)::int fixed,
+        (select avg(extract(epoch from (resolved_at - problem_since)) / 86400) from pm_items where installation_id = ${s.inst} and location_id = any(${ids}::text[]) and resolved_at is not null and problem_since is not null and live_mode and resolved_at >= ${win.from}::date and resolved_at < ${win.next}::date) avg_days`,
     db`select coalesce(currency, '') currency, count(*)::int c, coalesce(sum(amount), 0) a from pm_items where installation_id = ${s.inst} and location_id = any(${ids}::text[]) and kind = 'plan' and status_mapped = 'active' and amount is not null group by 1`,
     sources(s, ids),
     db`select count(*)::int c from pm_items where installation_id = ${s.inst} and location_id = any(${ids}::text[]) and problem_kind is not null and resolved_at is null and not live_mode`,
@@ -157,7 +160,7 @@ export async function today(s: Scope, f: Filters): Promise<PmToday> {
     { key: "late", label: "Late invoices", count: cnt(late), money: late, note: null, filter: { problem: "late_invoice" } },
     { key: "past_due_plans", label: "Past due plans", count: cnt(pastDue), money: pastDue, note: "Money your clients owe you for the plan you sell them.", filter: { problem: "past_due_plan" } },
     { key: "disputes", label: "Open payment disputes", count: cnt(disputes), money: disputes, note: "Entered by you; not read from your payment processor.", filter: { disputes: true } },
-    { key: "refunds", label: "Refunds, last 30 days", count: cnt(refunds), money: refunds, note: null, filter: { problem: "refund" } },
+    { key: "refunds", label: `Refunds, ${win.asked ? `${win.from} to ${win.to}` : "last 30 days"}`, count: cnt(refunds), money: refunds, note: null, filter: { problem: "refund" } },
   ];
   const need = cnt(failed) + cnt(late) + cnt(pastDue);
   const accountsWith = Math.max(0, ...grp.map((g) => n(g.accts)));
@@ -168,6 +171,7 @@ export async function today(s: Scope, f: Filters): Promise<PmToday> {
   const noLive = n(live[0]?.c) === 0 && src.some((x) => x.state === "ok");
   return {
     headline: headlineWords({ needAction: need, accountsWithProblems: accountsWith }), button: need > 0 ? { label: "Review them", count: need } : null, tiles, atRisk,
+    windowFrom: win.from, windowTo: win.to,
     recoveredLast30: recent.filter((r) => n(r.rc) > 0).map((r) => ({ currency: r.currency as string, count: n(r.rc), amount: n(r.ra) })),
     avgDaysToRecover: h.avg_days !== null && h.avg_days !== undefined ? Math.round(Number(h.avg_days) * 10) / 10 : null, recoveryRate: n(h.flagged) > 0 ? Math.round((n(h.fixed) / n(h.flagged)) * 100) : null,
     historyStarts: h.first_at ? iso(h.first_at)!.slice(0, 10) : null, sources: src, accounts: accts.length, testRowsHidden: n(testRows[0]?.c),
@@ -197,13 +201,14 @@ export async function item(s: Scope, loc: string, kind: string, id: string, link
   };
 }
 
-export async function disputes(s: Scope, f: { location?: string | null; status?: string | null }, now = Date.now()): Promise<PmDisputes> {
+export async function disputes(s: Scope, f: { location?: string | null; status?: string | null; wfrom?: string | null; wto?: string | null }, now = Date.now()): Promise<PmDisputes> {
+  const win = realDay(f.wfrom) && realDay(f.wto) ? windowOf(f, 30, now) : null;
   const accts = await accountsOf(s, f.location);
   const label = "Entered by you; not read from your payment processor.";
   if (!accts.length) return { rows: [], total: 0, open: 0, due: 0, label };
   const ids = accts.map((a) => a.id), by = new Map(accts.map((a) => [a.id, a]));
   const st = f.status && ["open", "evidence_sent", "won", "lost"].includes(f.status) ? f.status : null;
-  const rows = await sql()`select * from pm_disputes where installation_id = ${s.inst} and location_id = any(${ids}::text[]) ${st ? sql()`and status = ${st}` : sql()``} order by (status in ('won', 'lost')), evidence_due_on nulls last, opened_on desc limit 500`;
+  const rows = await sql()`select * from pm_disputes where installation_id = ${s.inst} and location_id = any(${ids}::text[]) ${st ? sql()`and status = ${st}` : sql()``} ${win ? sql()`and ((opened_on >= ${win.from}::date and opened_on <= ${win.to}::date) or (evidence_due_on >= ${win.from}::date and evidence_due_on <= ${win.to}::date))` : sql()``} order by (status in ('won', 'lost')), evidence_due_on nulls last, opened_on desc limit 500`;
   const out: PmDispute[] = rows.map((r) => {
     const a = by.get(r.location_id as string), today = todayIn(a?.tz, now), due = r.evidence_due_on ? String(r.evidence_due_on instanceof Date ? r.evidence_due_on.toISOString() : r.evidence_due_on).slice(0, 10) : null;
     const left = daysUntil(due, today);
@@ -237,19 +242,21 @@ export async function upcoming(s: Scope, f: Filters): Promise<PmUpcoming> {
 }
 
 export async function history(s: Scope, f: Filters): Promise<PmHistory> {
+  const win = windowOf(f, 90);
   const accts = await accountsOf(s, f.location);
   const empty: PmHistory = { historyStarts: null, days: [], repeat: [], avgDaysToRecover: null, recoveryRate: null, recovered: [], flagged: 0, fixed: 0 };
   if (!accts.length) return empty;
   const ids = accts.map((a) => a.id), names = new Map(accts.map((a) => [a.id, a.name])), db = sql();
   const [days, rep, st, first, rec] = await Promise.all([
-    db`select day, sum(failed_count)::int f, sum(recovered_count)::int r, sum(late_count)::int l from pm_rollup_daily where installation_id = ${s.inst} and location_id = any(${ids}::text[]) and day >= (now() - interval '90 days')::date group by day order by day`,
+    db`select day, sum(failed_count)::int f, sum(recovered_count)::int r, sum(late_count)::int l from pm_rollup_daily where installation_id = ${s.inst} and location_id = any(${ids}::text[]) and day >= ${win.from}::date and day <= ${win.to}::date group by day order by day`,
     db`select location_id, coalesce(max(contact_name), 'A customer') who, count(*)::int c from pm_items where installation_id = ${s.inst} and location_id = any(${ids}::text[]) and kind <> 'plan' and problem_since is not null and live_mode and problem_since >= now() - interval '180 days' and contact_id is not null group by location_id, contact_id having count(*) >= 2 order by 3 desc, 1 limit 20`,
-    db`select count(*) filter (where problem_since >= now() - interval '90 days')::int flagged, count(*) filter (where resolved_at is not null and problem_since >= now() - interval '90 days')::int fixed, avg(extract(epoch from (resolved_at - problem_since)) / 86400) filter (where resolved_at is not null and problem_since >= now() - interval '90 days') avg_days from pm_items where installation_id = ${s.inst} and location_id = any(${ids}::text[]) and problem_since is not null and live_mode`,
+    db`select count(*) filter (where problem_since >= ${win.from}::date and problem_since < ${win.next}::date)::int flagged, count(*) filter (where resolved_at is not null and problem_since >= ${win.from}::date and problem_since < ${win.next}::date)::int fixed, avg(extract(epoch from (resolved_at - problem_since)) / 86400) filter (where resolved_at is not null and problem_since >= ${win.from}::date and problem_since < ${win.next}::date) avg_days from pm_items where installation_id = ${s.inst} and location_id = any(${ids}::text[]) and problem_since is not null and live_mode`,
     db`select min(observed_at) at from pm_events where installation_id = ${s.inst} and location_id = any(${ids}::text[])`,
-    db`select coalesce(currency, '') currency, sum(recovered_count)::int c, sum(recovered_amount) a from pm_rollup_daily where installation_id = ${s.inst} and location_id = any(${ids}::text[]) and day >= (now() - interval '90 days')::date group by 1 having sum(recovered_count) > 0`,
+    db`select coalesce(currency, '') currency, sum(recovered_count)::int c, sum(recovered_amount) a from pm_rollup_daily where installation_id = ${s.inst} and location_id = any(${ids}::text[]) and day >= ${win.from}::date and day <= ${win.to}::date group by 1 having sum(recovered_count) > 0`,
   ]);
   const t = st[0] ?? {};
   return {
+    windowFrom: win.from, windowTo: win.to,
     historyStarts: first[0]?.at ? iso(first[0].at)!.slice(0, 10) : null,
     days: days.map((d) => ({ day: String(d.day instanceof Date ? d.day.toISOString() : d.day).slice(0, 10), failed: n(d.f), recovered: n(d.r), late: n(d.l) })),
     repeat: rep.map((r) => ({ locationId: r.location_id as string, accountName: names.get(r.location_id as string) ?? "Client account", who: r.who as string, count: n(r.c) })),

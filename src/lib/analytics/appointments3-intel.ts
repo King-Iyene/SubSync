@@ -1,3 +1,4 @@
+import { MAX_RANGE_DAYS } from "../design/range-limits.ts";
 // Appointments round 3: the pure part (no database, no network), unit tested. Definitions: docs/METRICS.md "Appointments 3".
 import type { Appt3Bucket, Appt3FlowTree, Appt3Overview, Estimate, FlowNode, Rate } from "./appointments3-types.ts";
 
@@ -6,7 +7,7 @@ export const DAY = 86_400_000;
 export const MIN_SHOW = 5, MIN_CLOSE = 10, MIN_FAIRNESS = 10;
 export const GRACE_HOURS = 3;
 export const DEFAULT_DEAL_WINDOW_DAYS = 30;
-export const MAX_WINDOW_DAYS = 366;
+export const MAX_WINDOW_DAYS = MAX_RANGE_DAYS;
 
 export const rate = (n: number, of: number, min = MIN_SHOW): Rate => ({ value: of >= min && of > 0 ? n / of : null, n, of, enough: of >= min });
 
@@ -21,7 +22,7 @@ export function parseApptWindow(from: string | null | undefined, to: string | nu
   if (e !== null) e += DAY; // "to" is a whole day, inclusive
   if (f === null || e === null) { e = now + DAY - (now % DAY); f = e - 30 * DAY; if (from || to) problem = "That date range was not understood, so the last 30 days are shown."; }
   if (e <= f) { e = now + DAY - (now % DAY); f = e - 30 * DAY; problem = "The end date was before the start date, so the last 30 days are shown."; }
-  if (e - f > MAX_WINDOW_DAYS * DAY) { f = e - MAX_WINDOW_DAYS * DAY; problem = "The range is capped at one year."; }
+  if (e - f > MAX_WINDOW_DAYS * DAY) { f = e - MAX_WINDOW_DAYS * DAY; problem = `The range is capped at ${MAX_RANGE_DAYS} days (about 3 years).`; }
   return { from: new Date(f), to: new Date(e), days: Math.round((e - f) / DAY), problem };
 }
 

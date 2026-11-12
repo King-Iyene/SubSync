@@ -168,6 +168,7 @@ export function WorkflowsView({ go, kind }: { go: GoFn; kind: AccessKind }) {
           <EmptyState title={noList ? "SubSync cannot read workflows yet" : "No workflows found yet"} body={noList ? "Allow the workflow permission, then press Update now." : data.can.sync ? "Press Update now to read them from your client accounts." : "Your team has not updated this page yet."} />
         ) : (
           <div data-testid="wf-overview">
+            <p className="mb-4 text-sm text-muted-foreground" data-testid="wf-own-window">The step counts here are the platform&apos;s own last 30 days, so the dates in the bar do not change them. The dates set the Proof tab.</p>
             <section className="mb-8" aria-label="What to do next" data-testid="wf-next">
               <h2 className="text-base font-semibold">{headline}</h2>
               {data.nextSteps.length ? <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm">{data.nextSteps.map((s, i) => <li key={`${i}:${s}`}>{s}</li>)}</ol> : <p className="mt-1 text-sm text-muted-foreground">Nothing needs you right now. SubSync keeps checking.</p>}

@@ -118,12 +118,13 @@ export function adapt(part: PlPart, raw: unknown, aux?: unknown): unknown {
   }
 }
 // ---- the address of one part of the real API ----
-export type PlFiltersLike = { days: number; locationId: string; pipeline: string; ownerId: string; q: string };
+export type PlFiltersLike = { days: number; from?: string; to?: string; locationId: string; pipeline: string; ownerId: string; q: string };
 const DEAL_STATUS = new Set(["open", "won", "lost", "abandoned"]);
 /** Drill-down words are translated to the server's own (status or stale become bucket, lostReason becomes reason, pageSize becomes size); the server re-checks every one of them. */
 export function queryOf(part: PlPart, f: PlFiltersLike, extra: Record<string, string | number | undefined> = {}, now = new Date()): string {
   const from = new Date(now.getTime() - f.days * 86_400_000);
-  const p = new URLSearchParams({ part: API_PART[part], from: from.toISOString().slice(0, 10), to: now.toISOString().slice(0, 10) });
+  // The date bar's dates win; `days` counted back from today is only the fallback before they are known.
+  const p = new URLSearchParams({ part: API_PART[part], from: f.from && f.to ? f.from : from.toISOString().slice(0, 10), to: f.from && f.to ? f.to : now.toISOString().slice(0, 10) });
   if (f.locationId) p.set("location", f.locationId);
   if (f.pipeline) p.set("pipeline", f.pipeline);
   if (f.ownerId) p.set("owner", f.ownerId);

@@ -3,7 +3,7 @@ import { accountsIn } from "../analytics/clients3-queries";
 import { cashReceiptLines } from "../analytics/cash-intel";
 import { receiptCash } from "../analytics/cash-queries";
 import { TD3_FLAGS, TD3_KINDS, TD3_PARTS, TD3_LIST_ONLY, type Td3ListKind, type Td3Part } from "../analytics/today3-types";
-import { clampSize } from "../analytics/clients3-intel";
+import { clampSize, parseWindow } from "../analytics/clients3-intel";
 import type { Feature } from "../entitlements";
 import { resolveEntitlements } from "../flags";
 import type { deepLinks } from "../links";
@@ -65,7 +65,11 @@ export async function handleToday3(ctx: Ctx, h: Today3Helpers): Promise<Response
       }
       return done(p);
     }
-    case "numbers": { const d = int(sp.get("days"), 30); return done(await numbers(scope, one, d <= 7 ? 7 : d <= 30 ? 30 : 90, now)); }
+    case "numbers": {
+      // The date bar's dates (from and to) are read first, and checked here (never trusted); without them the old days choice still works.
+      if (sp.get("from") && sp.get("to")) { const w = parseWindow(sp.get("from"), sp.get("to"), now); return done(await numbers(scope, one, { from: w.from, to: w.to }, now)); }
+      const d = int(sp.get("days"), 30); return done(await numbers(scope, one, d <= 7 ? 7 : d <= 30 ? 30 : 90, now));
+    }
     case "settings": {
       const accts = await accountsIn({ inst: scope.inst, allowed }, {});
       return done(await getSettings(scope.inst, accts.map((a) => a.id), level !== "self"));

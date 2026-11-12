@@ -130,11 +130,11 @@ export function recentWeeks(nowMs: number, n: number): string[] {
 // ---- numbers ----
 
 export const pct = (n: number, of: number) => (of > 0 ? Math.round((n / of) * 100) : null);
-export function showRate(showed: number, noshow: number): { value: string; enough: boolean; rate: number | null } {
+export function showRate(showed: number, noshow: number): { value: string; caption: string | null; enough: boolean; rate: number | null } {
   const of = showed + noshow;
-  if (of < MIN_OUTCOMES) return { value: `Not enough data (${of} of ${MIN_OUTCOMES} outcomes marked)`, enough: false, rate: null };
+  if (of < MIN_OUTCOMES) return { value: "-", caption: `Needs ${MIN_OUTCOMES} marked outcomes (${of} so far)`, enough: false, rate: null };
   const r = Math.round((showed / of) * 100);
-  return { value: `${r}%`, enough: true, rate: r };
+  return { value: `${r}%`, caption: null, enough: true, rate: r };
 }
 export const changeText = (cur: number | null, prev: number | null, minBase: number): string | null => (cur === null || prev === null || prev < minBase ? null : `${cur - prev >= 0 ? "+" : ""}${Math.round(((cur - prev) / prev) * 100)}%`);
 

@@ -4,41 +4,36 @@ import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 
 import {
   COMPARES, DEFAULT_RANGE, decodeRange, encodeRange, PRESETS, rangeFromHash, rangeIntoHash, resolveRange, todayOf, type Compare, type RangePreset, type RangeSpec, type Resolved,
 } from "@/lib/design/range";
-import { pageRangeFromHash } from "@/lib/design/global-filter";
+import { pageSpecOf } from "@/lib/design/page-range";
+import { readSaved } from "./page-range";
+import { bumpRange, subscribeRange } from "./range-store";
 import { remember, remembered } from "./remember";
 
 // The range and comparison of ONE card (KF-4), separate from the page's filter bar. The window is always stated on the card in words; the choice is carried
 // in the page address (r.<key>=30d.prev), remembered in this browser for next time, and overrides the page for this card only. The numbers under it are
 // the page's job: it reads resolved.current (and resolved.compare) and filters or asks for exactly that window, then uses changeBetween / shareChange from
 // src/lib/design/range.ts so a tiny base never gets a percentage.
-const listeners = new Set<() => void>();
-const bump = () => listeners.forEach((l) => l());
-const subscribe = (cb: () => void) => {
-  listeners.add(cb);
-  window.addEventListener("popstate", cb);
-  window.addEventListener("hashchange", cb);
-  return () => { listeners.delete(cb); window.removeEventListener("popstate", cb); window.removeEventListener("hashchange", cb); };
-};
-
 /** Tells every card that the page range changed (the address was rewritten). */
-export const notifyRangeChange = bump;
+export const notifyRangeChange = bumpRange;
+const pageSnapshot = () => encodeRange(pageSpecOf(window.location.hash, readSaved()).spec);
 
 export type CardRangeState = { spec: RangeSpec; resolved: Resolved | null; setSpec: (s: RangeSpec) => void };
 
 /** The state of one card's range. `key` names the card in the address ("speed-trend"); `initial` is the default when nothing is in the link or remembered. */
 export function useCardRange(key: string, initial: RangeSpec = DEFAULT_RANGE): CardRangeState {
+  const subscribe = subscribeRange;
   const fromLink = useSyncExternalStore(subscribe, () => { const s = rangeFromHash(window.location.hash, key); return s ? encodeRange(s) : ""; }, () => "");
   const saved = useSyncExternalStore(subscribe, () => remembered(`range-${key}`) ?? "", () => "");
-  // The global filter bar's range (r.page in the address, else the one remembered for this person) applies to every card that has no choice of its own in the address.
-  const pageLink = useSyncExternalStore(subscribe, () => { const s = pageRangeFromHash(window.location.hash); return s ? encodeRange(s) : ""; }, () => "");
-  const pageSaved = useSyncExternalStore(subscribe, () => remembered("range-page") ?? "", () => "");
+  // The global filter bar's range (r.page in the address, else this tab's choice, else the default) is where every card starts, so the numbers under the bar and the
+  // label on the card are for the same dates. Only a choice made ON the card (in the address, until the bar changes again) overrides it.
+  const pageSnap = useSyncExternalStore(subscribe, pageSnapshot, () => "");
   const spec = useMemo(() => {
     const own = decodeRange(fromLink);
     if (own) return own;
-    const page = decodeRange(pageLink) ?? decodeRange(pageSaved);
+    const page = decodeRange(pageSnap);
     const base = decodeRange(saved) ?? initial;
-    return page ? { ...page, compare: base.compare } : base;
-  }, [fromLink, pageLink, pageSaved, saved, initial]);
+    return page ? { ...page, compare: page.compare !== "none" ? page.compare : base.compare } : base;
+  }, [fromLink, pageSnap, saved, initial]);
   // Today is read in the browser after the page is up (never while it is prepared in advance), so the window is worked out only then.
   const [today, setToday] = useState<string | null>(null);
   useEffect(() => {
@@ -49,7 +44,7 @@ export function useCardRange(key: string, initial: RangeSpec = DEFAULT_RANGE): C
   const setSpec = useCallback((s: RangeSpec) => {
     remember(`range-${key}`, encodeRange(s));
     try { window.history.replaceState(null, "", rangeIntoHash(window.location.hash, key, s)); } catch { /* the choice still applies until the page changes */ }
-    bump();
+    bumpRange();
   }, [key]);
   return { spec, resolved, setSpec };
 }
