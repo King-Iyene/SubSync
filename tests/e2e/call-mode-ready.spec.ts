@@ -25,11 +25,16 @@ test("only person is outside calling hours: 0 ready, waiting line with the reaso
   test.setTimeout(300_000);
   await mock(page, [item({ contactId: "c-unk", name: "Unknown caller", timeZone: closedZone })]);
   await open(page);
-  await expect(page.getByTestId("dial-count")).toContainText("0 people ready to call now");
-  await expect(page.getByTestId("dial-waiting")).toContainText("1 person is waiting for calling hours: opens 9:00 their time");
-  await expect(page.getByTestId("dial-start")).toBeDisabled();
-  await expect(page.getByTestId("dial-start-power")).toBeDisabled();
-  await expect(page.getByTestId("dial-none-ready")).toBeVisible();
+  await expect(page.getByTestId("dial-count")).toContainText("Nobody to call right now");
+  await expect(page.getByTestId("dial-next-step")).toContainText("1 person can be called from 9:00 (their time). We'll show them here then.");
+  await expect(page.getByTestId("dial-waiting")).toBeVisible();
+  // Never a dead button: the main button is live and says what it does; Power hour answers in one line.
+  await expect(page.getByTestId("cq-send")).toBeEnabled();
+  await expect(page.getByTestId("cq-send")).toContainText("Send the 1 waiting to my CRM call queue");
+  await expect(page.getByTestId("dial-start-power")).toBeEnabled();
+  await page.getByTestId("dial-start-power").click();
+  await expect(page.getByTestId("dial-notice")).toContainText("Power hour starts when someone can be called");
+  await expect(page.getByText(/Start is off|switches on by itself|every 30 seconds/)).toHaveCount(0);
 });
 
 test("one callable, one after hours, one unknown with no number: 1 ready, Start opens a session of exactly that person", async ({ page }) => {

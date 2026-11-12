@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useApiClient, useData } from "../session";
 import { WorkflowSetupCard } from "./workflow-setup-card";
 
@@ -15,7 +15,8 @@ type Item = { locationId: string; contactId: string };
 
 export const QUEUE_HONESTY = "SubSync cannot start a call itself. The call queue is your CRM's own dialer.";
 
-export function CallQueueCard({ list, items, onPickedDone, picked }: { list: string; items: Item[]; picked?: string[]; onPickedDone?: () => void }) {
+/** `primary` is the always-live main button of the screen (it can start the review below); `showSend` keeps the plain "Send to your CRM call queue" button when the main button is something else. */
+export function CallQueueCard({ list, items, onPickedDone, picked, primary, showSend = true }: { list: string; items: Item[]; picked?: string[]; onPickedDone?: () => void; primary?: (review: () => void, busy: boolean) => ReactNode; showSend?: boolean }) {
   const api = useApiClient();
   const st = useData<St>("dial/cq-status");
   const [open, setOpen] = useState(false);
@@ -49,10 +50,11 @@ export function CallQueueCard({ list, items, onPickedDone, picked }: { list: str
 
   return (
     <div className="mt-4 border-t pt-4" data-testid="cq-card">
-      <div className="flex flex-wrap items-center gap-3">
-        <button type="button" className="s6-btn" data-testid="cq-send" disabled={busy || locs.length === 0} onClick={() => void review()}>{picked && picked.length ? "Send selected to CRM call queue" : "Send to your CRM call queue"}</button>
-        {link && <a className="s6-link text-sm" data-testid="cq-open" href={link} target="_blank" rel="noopener noreferrer">Open your call queue</a>}
-        <button type="button" className="s6-link text-sm" data-testid="cq-setup-open" onClick={() => setOpen(!open)}>{open ? "Hide call queue setup" : "Call queue setup"}</button>
+      {primary && <div className="flex flex-wrap items-center gap-3" data-testid="cq-primary-row">{primary(() => void review(), busy)}</div>}
+      <div className={`flex flex-wrap items-center gap-2 ${primary ? "mt-3" : ""}`} role="group" aria-label="Your CRM call queue" data-testid="cq-group">
+        {showSend && <button type="button" className="s6-btn" data-testid="cq-send" disabled={busy || locs.length === 0} onClick={() => void review()}>{picked && picked.length ? "Send selected to CRM call queue" : "Send to your CRM call queue"}</button>}
+        {link && <a className="s6-btn" data-testid="cq-open" href={link} target="_blank" rel="noopener noreferrer">Open your call queue</a>}
+        <button type="button" className="s6-btn" data-testid="cq-setup-open" aria-expanded={open} onClick={() => setOpen(!open)}>{open ? "Hide call queue setup" : "Call queue setup"}</button>
       </div>
       <p className="s6-label mt-1">{QUEUE_HONESTY}</p>
       {lines.map((s) => <p key={s.locationId} className="s6-label mt-1" data-testid="cq-status">{nameOf(s.locationId)}: {s.line}</p>)}
@@ -63,6 +65,7 @@ export function CallQueueCard({ list, items, onPickedDone, picked }: { list: str
             <div key={x.loc} className="mb-2"><p className="font-medium" data-testid="cq-would">{x.name}: {x.p.message}</p>
               {x.p.plan && <p className="s6-label">Skipped: {x.p.plan.skipped.dnd} asked not to be contacted, {x.p.plan.skipped.noPhone} with no phone, {x.p.plan.skipped.outsideHours} outside calling hours, {x.p.plan.skipped.recent} added in the last 24 hours.</p>}
               {x.p.names.length > 0 && <p className="s6-label">{x.p.names.slice(0, 8).map((n) => n.name).join(", ")}{x.p.names.length > 8 ? `, and ${x.p.names.length - 8} more` : ""}</p>}
+              {x.p.plan && x.p.names.length === 0 && x.p.plan.skipped.outsideHours > 0 && <p className="s6-label" data-testid="cq-hours-note">Their calling hours have not opened yet, so none were added. Turn on Auto call queue in Call queue setup and they are added when hours open.</p>}
               {!x.p.live && x.p.ok && <p className="s6-label">Writing to your CRM is off for this account, so nothing will be sent.</p>}</div>
           ))}
           <p className="s6-label">Adding to the queue cannot be undone from SubSync. Take a lead off in your CRM if needed.</p>

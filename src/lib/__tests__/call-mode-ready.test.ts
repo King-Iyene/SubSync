@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { callerLabel, keyOf, skipReason, type QueueItem } from "../dial/dial.ts";
-import { classifyQueue, DEFAULT_CADENCE, planSession, startState, waitingLine } from "../dial/dial6.ts";
+import { callScreen, classifyQueue, DEFAULT_CADENCE, planSession, startState, waitingLine } from "../dial/dial6.ts";
 
 // Regression (11 Nov 2026): Call mode said "1 person ready to call", the person pressed Start calling and landed on "Session ended, 0 calls". The count only left out people who
 // asked not to be contacted or had no number; calling hours (their own clock) were applied later, inside Start, which then moved the one person to "waits for a better time".
@@ -87,6 +87,31 @@ test("do not contact, snoozed callbacks, waiting redials, used-up tries and alre
   // The missed-call list does not drop someone because an old call reached them: a newer missed call is a fresh reason.
   assert.equal(classifyQueue([reached], { ...o, skipReached: false }).ready.length, 1);
   assert.equal(skipReason(dnd)?.kind, "dnd");
+});
+
+test("call screen: the main button is always live and the words are plain (no 'Start is off')", () => {
+  const banned = /start is off|switches on by itself|checks every 30 seconds|gohighlevel|highlevel|ghl|sub-account/i;
+  const hrs = (n: number) => Array.from({ length: n }, () => ({ kind: "hours" as const, why: "opens 9:00 their time" }));
+  const r = callScreen({ ready: 3, waiting: [] });
+  assert.equal(r.mode, "ready");
+  assert.equal(r.primary, "Start calling (3)");
+  assert.equal(r.powerNote, null);
+  const w = callScreen({ ready: 0, waiting: hrs(12) });
+  assert.equal(w.mode, "waiting");
+  assert.equal(w.headline, "Nobody to call right now");
+  assert.equal(w.primary, "Send the 12 waiting to my CRM call queue");
+  assert.equal(w.line, "12 people can be called from 9:00 (their time). We'll show them here then.");
+  assert.equal(callScreen({ ready: 0, waiting: hrs(1) }).line, "1 person can be called from 9:00 (their time). We'll show them here then.");
+  assert.match(w.powerNote ?? "", /^Power hour starts when someone can be called\. 12 people can be called from 9:00/);
+  const mixed = callScreen({ ready: 0, waiting: [...hrs(1), { kind: "redial", why: "x" }] });
+  assert.match(mixed.line, /waiting for their next try.*We'll show them here when they can be called\./);
+  const e = callScreen({ ready: 0, waiting: [] });
+  assert.equal(e.mode, "empty");
+  assert.equal(e.primary, "Try another list");
+  for (const s of [r, w, e, mixed]) for (const t of [s.headline, s.line, s.primary, s.powerNote ?? ""]) assert.doesNotMatch(t, banned);
+  for (const s of [r, w, e]) assert.ok(s.primary.split(" ").length <= 9, "labels stay short");
+  // The safety rule is unchanged: the people behind the button are still not ready, so nobody is called outside their hours.
+  assert.equal(classifyQueue([afterHours], base).ready.length, 0);
 });
 
 test("the waiting sentence names the reason and the opening time, in plain words", () => {
