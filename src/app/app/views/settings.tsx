@@ -11,6 +11,7 @@ import { SyncStatusPanel } from "./sync-status";
 import { ConnectionsSlot } from "./settings-slot-connections";
 import { WriteAccessCard } from "./write-access";
 import { IgnoredLeadsSettings } from "./speed-ignored-settings";
+import { PipelineHistoryCard } from "./settings-pipeline-history";
 import { WatchingSlot } from "./settings-slot-watching";
 import { DailyBriefLine } from "./notifications";
 import { BrandPreview, PermissionsPanel, SettingsHistoryCard, TestAccountsCard, WhoCanOpenCard, type PermissionGroup } from "./settings-parts";
@@ -257,6 +258,7 @@ export function SettingsView({ openSection, embedded }: { openSection?: SectionI
                   </div>
                 </div>
               </Card>
+              <PipelineHistoryCard />
               <Card title="Speed to lead">
                 <p className="mb-3 text-sm text-muted-foreground">How fast a new lead should hear from a person. A lead cools in minutes, so the target is short. SubSync does not send replies: it measures how long your team took. Messages from workflows and campaigns are not replies unless you say so.</p>
                 <div className="flex flex-wrap items-end gap-4">

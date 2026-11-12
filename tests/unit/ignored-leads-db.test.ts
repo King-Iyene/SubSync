@@ -107,12 +107,12 @@ describe.skipIf(!HAS_DB)("Clients ignoring leads", () => {
 
   it("an account's own wait changes who counts", async () => {
     if (!ready) return;
-    await sql()`insert into speed_prefs (installation_id, scope, key, value) values (${instA}, ${A1}, 'ignored', ${JSON.stringify({ waitHours: 100 })}::text::jsonb) on conflict (installation_id, scope, key) do update set value = excluded.value`;
+    await sql()`insert into ignored_leads_prefs (installation_id, scope, value) values (${instA}, ${A1}, ${JSON.stringify({ waitHours: 100 })}::text::jsonb) on conflict (installation_id, scope) do update set value = excluded.value`;
     try {
       const [a] = await ignoredByAccount(scope(instA, null));
       expect(a.never).toBe(0); // the lead is 3 days (72 hours) old, under the 100 hours this account allows
       expect(a.replyNobody).toBe(0);
-    } finally { await sql()`delete from speed_prefs where installation_id = ${instA} and key = 'ignored'`; }
+    } finally { await sql()`delete from ignored_leads_prefs where installation_id = ${instA}`; }
   });
 
   it("another company never appears, and asking for its account by id changes nothing", async () => {

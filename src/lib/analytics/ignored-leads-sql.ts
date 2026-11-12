@@ -22,7 +22,7 @@ export type IgnoredScope = { installationId: string; allowed: string[] | null; f
 /** Each account's own choice (the company's, then the account's). Missing table or row = built-in defaults. */
 export async function loadIgnoredPrefs(installationId: string): Promise<{ company: unknown; byLoc: Map<string, unknown> }> {
   try {
-    const rows = await sql()`select scope, value from speed_prefs where installation_id = ${installationId} and key = 'ignored'`;
+    const rows = await sql()`select scope, value from ignored_leads_prefs where installation_id = ${installationId}`;
     const byLoc = new Map<string, unknown>(); let company: unknown = null;
     for (const r of rows) { if ((r.scope as string) === "") company = r.value; else byLoc.set(r.scope as string, r.value); }
     return { company, byLoc };

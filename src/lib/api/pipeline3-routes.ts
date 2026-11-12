@@ -1,5 +1,6 @@
 import { pipelineCards } from "../analytics/pipeline3-cards";
 import { attention, cleanId, dealList, detail, forecast, health, moneyFlow, overview, people, plCache, receipt, replay, sources, stageHistory, wonLost, type Filters, type Scope } from "../analytics/pipeline3-queries";
+import { funnel, funnelDeals, historySettings, pipelineNames, saveHistorySettings, stuck } from "../analytics/pipeline3-funnel";
 import { clampSize, DAY, parsePlWindow } from "../analytics/pipeline3-intel";
 import { PL3_FLAGS, PL3_PARTS, type Pl3Bucket, type Pl3Part } from "../analytics/pipeline3-types";
 import type { Feature } from "../entitlements";
@@ -18,6 +19,7 @@ export type Pl3Helpers = { allowed: () => Promise<string[] | null>; links: () =>
 const PART_FLAG: Record<Pl3Part, string> = {
   overview: "pl_overview", "money-flow": "pl_money_flow", attention: "pl_attention", "won-lost": "pl_won_lost", forecast: "pl_forecast", people: "pl_people", sources: "pl_sources",
   "stage-history": "pl_stage_history", health: "pl_health", receipt: "pl_proof", list: "pl_overview", detail: "pl_history", replay: "pl_money_flow", pipelines: "pl_money_flow",
+  funnel: "pl_history_funnel", "funnel-deals": "pl_history_funnel", stuck: "pl_history_funnel", "funnel-settings": "pl_history_funnel",
 };
 const BUCKETS = new Set(["open", "won", "lost", "abandoned", "stale", "healthy", "outlier", "no_owner", "no_value", "test", "no_reason", "booked_appt", "no_appt"]);
 const int = (v: string | null, d: number) => { const n = Number(v); return v !== null && Number.isFinite(n) ? Math.floor(n) : d; };
@@ -70,6 +72,14 @@ export async function handlePipeline3(ctx: Ctx, h: Pl3Helpers): Promise<Response
       const m = await moneyFlow(scope, f);
       return done(seePeople ? m : { ...m, people: [] });
     }
+    case "funnel": return done(await funnel(scope, f, await historySettings(ctx.installationId)));
+    case "funnel-deals": {
+      const dr = sp.get("drill") ?? "entered", step = text(sp.get("step"), 120);
+      if (!step || !["entered", "advanced", "dropped", "here", "other"].includes(dr)) return json({ error: "Not found" }, 404);
+      return done(await funnelDeals(scope, f, await historySettings(ctx.installationId), step.toLowerCase(), dr as "entered", p, size, link));
+    }
+    case "stuck": return done(await stuck(scope, f, await historySettings(ctx.installationId), p, size, link));
+    case "funnel-settings": return wrap({ ...(await historySettings(ctx.installationId)), canEdit: ctx.kind === "agency", pipelines: (await pipelineNames(scope, { from: f.from, to: f.to, location: null })).map((x) => x.name).slice(0, 100) });
     case "pipelines": return done(await pipelineCards(scope, { from: f.from, to: f.to, location: one, q: f.q, showEmpty: sp.get("empty") === "1", after: sp.get("after"), size: int(sp.get("size"), 24) }));
     case "replay": return done(await replay(scope, f, int(sp.get("days"), 30)));
     case "receipt": {
@@ -87,6 +97,16 @@ export async function handlePipeline3(ctx: Ctx, h: Pl3Helpers): Promise<Response
     }
   }
   return json({ error: "Not found" }, 404);
+}
+
+// PUT /api/app/pipeline3/history-settings: the person's own choices for the history funnel (fewest deals before a number shows, leave test deals out, which pipeline opens first). Agency owners and staff only.
+export async function handlePipelineHistorySettings(ctx: Ctx): Promise<Response> {
+  if (ctx.kind !== "agency") return json({ error: "Only the account owner's team can change this." }, 403);
+  const ent = await resolveEntitlements(ctx.plan, ctx.installationId, ctx.demo);
+  if (ent.features["pl_history_funnel" as Feature] !== true) return json({ error: "This part of Pipeline is not switched on yet." }, 404);
+  const body = (await ctx.request.json().catch(() => null)) as { minSample?: unknown; excludeTest?: unknown; defaultPipeline?: unknown } | null;
+  if (!body || typeof body !== "object") return json({ error: "Bad request" }, 400);
+  return json({ ...(await saveHistorySettings(ctx.installationId, body)), canEdit: true });
 }
 
 function emptyFor(part: Pl3Part, flags: Record<string, boolean>, canSee: boolean) {

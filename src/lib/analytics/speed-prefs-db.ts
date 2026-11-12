@@ -23,13 +23,16 @@ export async function loadPrefs(installationId: string, allowed: string[] | null
     const rows = await sql()`select scope, key, value from speed_prefs where installation_id = ${installationId}`;
     const prefs: Record<string, unknown> = {};
     for (const r of rows) { const scope = r.scope as string; if (scope === "" || !allowed || allowed.includes(scope)) prefs[`${scope}|${r.key as string}`] = r.value; }
+    const ign = await sql()`select scope, value from ignored_leads_prefs where installation_id = ${installationId}`.catch(() => []);
+    for (const r of ign) { const scope = r.scope as string; if (scope === "" || !allowed || allowed.includes(scope)) prefs[`${scope}|ignored`] = r.value; }
     return { ready: true, prefs };
   } catch { return { ready: false, prefs: {} }; }
 }
 export async function savePref(installationId: string, scope: string, key: PrefKey, raw: unknown): Promise<{ ok: true; value: unknown } | { ok: false; error: string }> {
   const value = cleanPref(key, raw);
   try {
-    await sql()`insert into speed_prefs (installation_id, scope, key, value) values (${installationId}, ${scope}, ${key}, ${JSON.stringify(value)}::text::jsonb)
+    if (key === "ignored") await sql()`insert into ignored_leads_prefs (installation_id, scope, value) values (${installationId}, ${scope}, ${JSON.stringify(value)}::text::jsonb) on conflict (installation_id, scope) do update set value = excluded.value, updated_at = now()`;
+    else await sql()`insert into speed_prefs (installation_id, scope, key, value) values (${installationId}, ${scope}, ${key}, ${JSON.stringify(value)}::text::jsonb)
       on conflict (installation_id, scope, key) do update set value = excluded.value, updated_at = now()`;
     return { ok: true, value };
   } catch { return { ok: false, error: "Saving needs the latest database update. Your choice is kept in this browser meanwhile." }; }

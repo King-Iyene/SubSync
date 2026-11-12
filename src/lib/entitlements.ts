@@ -119,6 +119,7 @@ export const FEATURES = [
   "pl_proof",
   "pl_actions",
   "pl_history",
+  "pl_history_funnel",
   "pl_record",
   "pl_module",
   // Pipeline module, slice PB (deal actions): default off.

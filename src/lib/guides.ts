@@ -22,7 +22,7 @@ export const GUIDES: readonly Guide[] = [
   { id: "team", view: "team", title: "Team", shows: "Who replies, books and closes, per person.", tabs: ["Today", "Scorecards", "Roles"],
     read: ["Scorecards compare a person with their own recent past.", "Roles are labels only you and your team see. They are not sent anywhere.", "Settings, Team and roles says who can see what."], next: "Give each person a role so the lists make sense." },
   { id: "pipeline", view: "pipeline", title: "Pipeline and deals", shows: "Open deals by stage, and deals that stopped moving.", tabs: ["Forecast and stages", "Stale deals and hygiene"],
-    read: ["A deal is stale when it has not moved for your stale-days setting.", "Forecasts need enough closed deals; until then the page says not enough data."], next: "Open the biggest stale deal." },
+    read: ["A deal is stale when it has not moved for your stale-days setting.", "Forecasts need enough closed deals; until then the page says not enough data.", "Step history and Stuck in a step use the moves SubSync wrote down itself, so they start from the day recording began. Settings, Replies, Pipeline history sets the smallest sample."], next: "Open the biggest stale deal." },
   { id: "meetings", view: "meetings", title: "Meeting notes", shows: "Summaries from the meeting tool each person connects.", tabs: [],
     read: ["A note is saved on a contact only when the guest matches exactly one contact.", "Everything else waits in your private inbox.", "You are responsible for telling people a meeting is recorded."], next: "Connect your own Fathom under Settings, Connections." },
   { id: "workflows", view: "workflows", title: "Workflows", shows: "Automations that failed or sat idle in each client account.", tabs: [],

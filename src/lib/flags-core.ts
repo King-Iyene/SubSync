@@ -86,6 +86,7 @@ export const DEFAULT_OFF: ReadonlySet<Feature> = new Set<Feature>([
   "pl_proof",
   "pl_actions",
   "pl_history",
+  "pl_history_funnel",
   "pl_record",
   "pl_module",
   // Pipeline module, slice PB (deal actions): each default off.

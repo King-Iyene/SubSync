@@ -28,7 +28,7 @@ import "./td3.css";
 import { fixturesOn, notSwitchedOn, queryOf, useSlow, useTd } from "./data";
 import { CashSettings, RecoverTab, SaveCard, useCashFlags } from "./cash";
 import { FinanceTodayCard } from "../fn/today-card";
-import { MoneyHero } from "./money-hero";
+import { TodayStrip } from "./today-strip";
 import { BriefCard, BriefTools, WalletCard } from "../wg/today-cards";
 
 // Today, one screen: Today | Proof | Numbers | Settings. Today is the ranked "what to do first" list with ONE button; Proof is the weekly receipt an agency shows its client; Numbers
@@ -174,8 +174,7 @@ function TodayTab({ location, level, go, open, nav, kind }: { kind: AccessKind; 
       <Load r={r} empty={(t) => t.accounts === 0 && "Your client accounts appear here after the first sync finishes. It takes a few minutes after install."}>
         {(t) => (
           <>
-            <MoneyHero t={t} location={location} level={level as "all" | "account" | "self"} go={go} nav={nav} open={open} />
-            <Hero t={t} go={go} open={open} location={location} />
+            <TodayStrip t={t} location={location} level={level as "all" | "account" | "self"} go={go} nav={nav} open={open} />
             {t.needsPermission > 0 && (
               <div className="td-note" role="status" data-testid="td-permission">
                 <b>Needs permission: reconnect</b>
