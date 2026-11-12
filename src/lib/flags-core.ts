@@ -142,6 +142,11 @@ export const DEFAULT_OFF: ReadonlySet<Feature> = new Set<Feature>([
   // Find a lead (docs/features/FINDLEAD_BRIEF.md): fl_find is the search (keyset paging, pickers, copy); fl_bulk is bulk actions and export. Default off.
   "fl_find",
   "fl_bulk",
+  // Workflows second pass (docs/features/WORKFLOWS_BRIEF.md): wf_outcomes is the Gaps tab and our daily outcome record; wf_library the template library; wf_bulk install in many accounts; wf_today the Today line. Default off.
+  "wf_outcomes",
+  "wf_library",
+  "wf_bulk",
+  "wf_today",
   // Payments module (docs/features/PAYMENTS_BRIEF.md): each behind its own flag, default off. pm_resend stays off until King approves messaging a customer.
   "pm_module",
   "pm_recovery",

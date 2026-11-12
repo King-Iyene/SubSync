@@ -14,6 +14,7 @@ import { WfBars, WfDonut, WfNumber, WfTrend, type Mark } from "../ds/workflow-ch
 import { useApiClient, useData } from "../session";
 import { Btn, ErrorBox } from "../ui";
 import { DeliveryTab, ProofTab } from "./workflows-extra";
+import { GapsTab, LibraryTab } from "./workflows-gaps";
 import { TidyTab, type TidyData } from "./workflows-tidy";
 import { WfPalette, type Command } from "./workflows-palette";
 import type { RenameRule } from "@/lib/workflows/rename";
@@ -34,13 +35,13 @@ type Data = {
   slices: Slice[]; bars: Array<{ locationId: string; name: string; total: number; attention: number }>; top: Array<{ workflowId: string; locationId: string; name: string; failed: number | null; runs: number | null; share: number }>;
   decisions: Array<{ decision: Decision; count: number }>; ratings: Array<{ rating: number; label: string; count: number }>;
   daily: { failing: Array<{ day: string; value: number | null }>; total: Array<{ day: string; value: number | null }>; runs: Array<{ day: string; value: number | null }>; errors: Array<{ day: string; value: number | null }> };
-  tidy: TidyData | null;
+  tidy: TidyData | null; wf?: { gaps: boolean; library: boolean };
   muted: Array<Finding & { why: "fixed" | "snoozed"; until: number; key: string }>; since: { at: number; changes: number } | null;
   coverage: Array<{ locationId: string; have: string[]; missing: string[]; none: boolean }>; standard: string[]; syncedAt: number | null; caps: { deletesToday: number; writesToday: number };
 };
 type History = { rows: Array<{ id: number; at: number; account: string; name: string; type: string; what: string; source: string; who: string; outcome: string; undone: boolean; undoable: boolean }> };
 type Show = "workflow" | "campaign" | "both";
-type TabId = "overview" | "list" | "health" | "tidy" | "delivery" | "proof" | "history";
+type TabId = "overview" | "list" | "health" | "tidy" | "delivery" | "proof" | "history" | "gaps" | "library";
 
 const COLOUR: Record<Bucket, string> = { failing: "var(--destructive)", never_run: "var(--warning)", running: "var(--success)", draft: "var(--chart-1)", stopped: "var(--muted-foreground)" };
 const DEC_COLOUR: Record<Decision, string> = { keep: "var(--success)", review: "var(--warning)", retire: "var(--destructive)", unsorted: "var(--muted-foreground)" };
@@ -160,7 +161,7 @@ export function WorkflowsView({ go, kind }: { go: GoFn; kind: AccessKind }) {
       {noList ? <InlineAlert tone="warning" title="Needs permission: reconnect" className="mb-4">SubSync needs <code>workflows.readonly</code> to list workflows, and <code>workflows.logs</code> to see which ones fail or never run. Open SubSync again from your CRM&apos;s app list and accept it. Campaigns need <code>campaigns.readonly</code>.</InlineAlert> : null}
       {!data.available ? <InlineAlert tone="info" title="Needs the latest database update" className="mb-4">Ask the person who manages SubSync to apply the newest update. Until then this page stays empty.</InlineAlert> : null}
       {!data.permissions.history && !noList ? <InlineAlert tone="info" title="Needs permission: reconnect" className="mb-4">Allow <code>workflows.logs</code> to see failing and idle workflows. Until then those checks are not shown, and nothing is guessed.</InlineAlert> : null}
-      <Tabs tabs={[{ id: "overview", label: "Overview" }, { id: "list", label: `List (${total})` }, { id: "health", label: `Health${data.findings.length ? ` (${data.findings.length})` : ""}` }, { id: "tidy", label: "Tidy up" }, { id: "delivery", label: "Campaign delivery" }, { id: "proof", label: "Proof" }, { id: "history", label: "History" }]} value={tab} onChange={(t) => { setTab(t); setSel(new Set()); }} />
+      <Tabs tabs={[{ id: "overview", label: "Overview" }, { id: "list", label: `List (${total})` }, { id: "health", label: `Health${data.findings.length ? ` (${data.findings.length})` : ""}` }, { id: "tidy", label: "Tidy up" }, { id: "delivery", label: "Campaign delivery" }, { id: "proof", label: "Proof" }, { id: "history", label: "History" }, ...(data.wf?.gaps ? [{ id: "gaps" as const, label: "Gaps" }] : []), ...(data.wf?.library && data.can.change ? [{ id: "library" as const, label: "Library" }] : [])]} value={tab} onChange={(t) => { setTab(t); setSel(new Set()); }} />
 
       {tab === "overview" ? (
         total === 0 ? (
@@ -264,6 +265,8 @@ export function WorkflowsView({ go, kind }: { go: GoFn; kind: AccessKind }) {
         onFix={(rule, list) => { setPreset(rule); setFixItems(list); setDialog("rename"); }} onShow={(key, title, sub, list) => open_(key, title, sub, list)} /> : <EmptyState title="Not available in this view" body="Tidying is for administrators." />) : null}
       {tab === "delivery" ? <DeliveryTab q={q} now={data.now} /> : null}
       {tab === "proof" ? <ProofTab q={q} /> : null}
+      {tab === "gaps" ? <GapsTab q={q} onLibrary={() => setTab("library")} /> : null}
+      {tab === "library" ? <LibraryTab q={q} accounts={accounts} onDone={reload} /> : null}
 
       {tab === "history" ? (
         <Section title="What changed" hint="What SubSync did, and what it noticed changed in your CRM between two updates.">

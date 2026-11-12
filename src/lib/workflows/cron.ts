@@ -9,6 +9,8 @@ import { applyMarks, proofOf } from "./detail";
 import { failingIds } from "./reports";
 import { dueToday, proofEmail } from "./proof-email";
 import { currentFindings, raiseAlerts, syncAccount } from "./sync";
+import { gapDraftsFor } from "./outcomes-run";
+import { recordOutcomes } from "./outcomes-db";
 import { accountNames, loadItems, loadLabels, loadWorkflowAlerts, recordDaily } from "./store";
 
 // The scheduled refresh (hourly) and the weekly Proof email. Per company: read each client account's workflows and campaigns (a few per run, the least recently
@@ -43,7 +45,16 @@ export async function runWorkflowsCron(now = new Date()): Promise<CronReport> {
     const { findings } = await currentFindings(installationId, null, now.getTime());
     const labels = await loadLabels(installationId, null);
     const { open } = applyMarks(findings, new Map([...labels].map(([k, v]) => [k, { fixedAt: v.fixedAt, snoozedUntil: v.snoozedUntil }])), now.getTime());
-    const created = await raiseAlerts(installationId, open);
+    // Outcome gaps (second pass): our daily record is kept whenever the flag is on; the alerts only when the Today feed is on too, so a switched-off feed also clears its alerts.
+    let gapDrafts: Awaited<ReturnType<typeof gapDraftsFor>>["drafts"] = [];
+    if (ent.features.wf_outcomes === true) {
+      const g = await gapDraftsFor(installationId, now.getTime()).catch(() => null);
+      if (g) {
+        await recordOutcomes(installationId, g.rows.map((r) => ({ locationId: r.locationId, counts: r.counts })), now.toISOString().slice(0, 10)).catch(() => null);
+        if (ent.features.wf_today === true) gapDrafts = g.drafts;
+      }
+    }
+    const created = await raiseAlerts(installationId, open, gapDrafts);
     if (created.length) { rep.alerts += created.length; await dispatchAlerts(installationId, created).catch(() => null); }
     const { items } = await loadItems(installationId, null);
     await recordDaily(installationId, items, failingIds(open), now.toISOString().slice(0, 10));

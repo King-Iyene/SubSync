@@ -1,11 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import type { AccessKind } from "@/lib/access";
 import type { Td3Item, Td3List, Td3ListKind, Td3Module, Td3Numbers, Td3Options, Td3Proof, Td3Settings, Td3Today } from "@/lib/analytics/today3-types";
 import { emailText, moneyText } from "@/lib/analytics/today3-intel";
+import { parseTodayAccounts, withTodayAccounts } from "@/lib/analytics/today-queue";
+import { remember } from "../../ds/remember";
 import { useApiClient } from "../../session";
 import { EmptyState, ErrorState, ModuleTabs, Page, SkeletonRows } from "../../ds";
+import { OpenLeadButton } from "../../ds/open-lead-button";
 import { Btn } from "../../ui";
 import type { GoFn, ViewId } from "../../nav";
 import { TodayView } from "../today";
@@ -40,6 +43,13 @@ async function copyText(text: string): Promise<boolean> {
     document.body.removeChild(t);
     return ok;
   } catch { return false; }
+}
+const subscribeTa = (cb: () => void) => { window.addEventListener("hashchange", cb); window.addEventListener("popstate", cb); window.addEventListener("subsync-today-accounts", cb); return () => { window.removeEventListener("hashchange", cb); window.removeEventListener("popstate", cb); window.removeEventListener("subsync-today-accounts", cb); }; };
+/** Writes the account choice into the address (the same place the bar at the top keeps it) so the bar and this page always show the same choice. */
+function writeTa(ids: string[]) {
+  try { window.history.replaceState(null, "", withTodayAccounts(window.location.hash || "#today", ids)); } catch { /* the choice still applies on this page */ }
+  remember("today-accounts", ids.length ? ids.join(",") : null);
+  window.dispatchEvent(new Event("subsync-today-accounts"));
 }
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
@@ -82,7 +92,7 @@ function DrillList({ d, location, onClose }: { d: NonNullable<Drill>; location: 
               <tbody>{x.rows.map((row, i) => (
                 <tr key={`${row.locationId}:${row.contactId ?? i}:${i}`} style={{ cursor: "default" }}>
                   <td>{row.contactName}</td><td>{row.accountName}</td><td>{row.detail ?? ""}{row.value ? ` (${moneyText(row.value)})` : ""}</td>
-                  <td>{row.url ? <a className="ap-link" href={row.url} target="_blank" rel="noopener noreferrer">Open in your CRM</a> : <span className="ap-fine">Link not available</span>}</td>
+                  <td className="text-right"><OpenLeadButton seed={row.contactId ? { contactId: row.contactId, locationId: row.locationId, name: row.contactName, locationName: row.accountName, url: row.url ?? undefined, note: row.detail ?? undefined } : null} crmUrl={row.url} reason="Not linked to a person in your CRM, so there is nobody to open here." name={row.contactName} showAccount={!d.location} testId="td-open-lead" /></td>
                 </tr>))}</tbody></table></div>
             <Pager page={x.page} pages={x.pages} total={x.total} set={setPage} />
           </>
@@ -328,6 +338,9 @@ export function TodayModule({ go, kind, initialTab = "today", fromOverview = fal
   const cash = useCashFlags();
   const link = typeof window === "undefined" ? new URLSearchParams() : new URLSearchParams(window.location.hash.split("?")[1] ?? "");
   const [tab, setTab] = useState<TabKey>(() => (link.get("tab") === "recover" ? "recover" : initialTab)), [location, setLocation] = useState(() => (/^[A-Za-z0-9_-]{3,64}$/.test(link.get("account") ?? "") ? (link.get("account") as string) : "")), [drill, setDrill] = useState<Drill>(null);
+  const ta = parseTodayAccounts(useSyncExternalStore(subscribeTa, () => window.location.hash, () => "")), taKey = ta.join(","), taSeen = useRef(false);
+  // The account choice in the bar at the top and the one on this page are one choice: one account narrows every number here; several are counted as all, and the page says so.
+  useEffect(() => { if (taKey || taSeen.current) setLocation(taKey && !taKey.includes(",") ? taKey : ""); taSeen.current = taKey !== ""; }, [taKey]);
   const flags = opt.data?.flags ?? null;
   const flagOf: Record<TabKey, string | null> = { today: "td_today", recover: null, proof: "td_proof", numbers: "td_numbers", settings: null };
   const recoverOn = cash.flags?.cf_recover === true, saveOn = cash.flags?.cf_save === true, cashMail = saveOn || cash.flags?.cf_email === true;
@@ -357,11 +370,11 @@ export function TodayModule({ go, kind, initialTab = "today", fromOverview = fal
         {sample && <p className="ap-fine mb-2" role="status" data-testid="td-sample">Sample data: these are not your real clients.</p>}
         {opt.data?.problem && <p className="ap-fine mb-2" role="status">{opt.data.problem}</p>}
         <ModuleTabs pill label="Today sections" tabs={tabs.map((k) => ({ label: TIPS[k][0], tip: TIPS[k][1], node: null }))} value={Math.max(0, tabs.indexOf(active))} onChange={(i) => goTab(tabs[i])} />
-        {level !== "self" && accounts.length > 1 && active !== "settings" && (
+        {level !== "self" && accounts.length > 1 && active !== "settings" && (kind !== "agency" || ta.length > 1) && (
           // The account choice follows into Recover too, so a button from the morning email lands on the right account.
           <div className="ap-head print:hidden" role="group" aria-label="Filters">
-            <select className="ap-field" aria-label="Client account" value={location} onChange={(e) => { setLocation(e.target.value); setDrill(null); }} data-testid="td-account"><option value="">All client accounts</option>{accounts.map((a) => <option key={a.locationId} value={a.locationId}>{a.name}</option>)}</select>
-            <span className="ap-fine">Every number below follows this choice.</span>
+            {kind !== "agency" && <select className="ap-field" aria-label="Client account" value={location} onChange={(e) => { setLocation(e.target.value); setDrill(null); writeTa(e.target.value ? [e.target.value] : []); }} data-testid="td-account"><option value="">All client accounts</option>{accounts.map((a) => <option key={a.locationId} value={a.locationId}>{a.name}</option>)}</select>}
+            {(kind !== "agency" || ta.length > 1) && <span className="ap-fine">{ta.length > 1 ? `The bar above has ${ta.length} client accounts chosen. Today shows one at a time, so the numbers below count every client account.` : "Every number below follows this choice."}</span>}
           </div>
         )}
         <div data-testid={`td-tab-${active}`}>{body}</div>

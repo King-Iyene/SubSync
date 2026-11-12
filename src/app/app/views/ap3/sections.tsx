@@ -21,7 +21,7 @@ export type SectionProps = {
 };
 /** A number that opens the appointments behind it. */
 export const Hit = ({ n, label, onClick, tone }: { n: number | string; label: string; onClick: () => void; tone?: string }) => (
-  <button type="button" className="ap-link tnum" data-tone={tone} onClick={onClick} aria-label={label} title={label} data-testid="ap-hit">{typeof n === "number" ? n.toLocaleString("en-US") : n}</button>
+  <button type="button" className="ap-link tnum" data-tone={tone} onClick={(e) => { e.stopPropagation(); onClick(); }} aria-label={label} title={label} data-testid="ap-hit">{typeof n === "number" ? n.toLocaleString("en-US") : n}</button>
 );
 const JOURNEY_BUCKET: Record<string, string> = { booked: "booked", showed: "showed", won: "won" };
 
