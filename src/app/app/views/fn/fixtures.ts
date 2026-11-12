@@ -35,8 +35,8 @@ export function sample(part: string, p: P, empty: boolean): unknown {
       return { ...base, ...page(rows, p), counts: { high: 2, watch: 2, snoozed: 0, left: 1, notEnough: 2, steady: 3, all: 10 }, mrrAtRisk: [{ currency: "USD", amount: 1011 }], historyNote: "2 accounts have under 28 days of record, so the activity checks wait for more days." };
     }
     case "payouts": {
-      const rows = empty ? [] : PEOPLE.map(([id, name, role], i) => ({ personId: id, name, roleLabel: role, booked: 30 - i * 6, showed: 21 - i * 4, closed: i === 0 ? 2 : 9 - i, wonValue: 12000 + i * 3000, setWonValue: 8000, counted: 9 - i, disputed: i === 1 ? 1 : 0, payable: 900 - i * 160, held: i === 1 ? 100 : 0 }));
-      return { ...base, rows, total: rows.length, next: null, totals: { booked: 66, showed: 46, closed: 24, wonValue: 54000, payable: 2420, held: 100, counted: 24, disputed: 1 }, currency: "USD", unattributed: { count: 2, value: 4400 }, basis: String(p.basis || "won"), range: { from, to }, windowDays: 30,
+      const rows = empty ? [] : PEOPLE.map(([id, name, role], i) => ({ personId: id, name, roleLabel: role, booked: 30 - i * 6, showed: 21 - i * 4, closed: i === 0 ? 2 : 9 - i, wonValue: 12000 + i * 3000, setWonValue: 8000, counted: 9 - i, paying: 9 - i, disputed: i === 1 ? 1 : 0, payable: 900 - i * 160, held: i === 1 ? 100 : 0 }));
+      return { ...base, rows, total: rows.length, next: null, totals: { booked: 66, showed: 46, closed: 24, wonValue: 54000, payable: 2420, held: 100, counted: 24, paying: 24, disputed: 1 }, currency: "USD", unattributed: { count: 2, value: 4400 }, basis: String(p.basis || "won"), range: { from, to }, windowDays: 30,
         rates: [{ personId: "", person: null, locationId: "", account: null, role: "setter", pct: 0, flat: 25 }, { personId: "", person: null, locationId: "", account: null, role: "closer", pct: 8, flat: 0 }], disputes: empty ? [] : [{ lineKey: "won:sample1:opp1:setter", locationId: "sample1", account: "Sample Dental", personId: "u2", person: "Sample Setter Two", note: "This deal was mine.", raisedAt: new Date().toISOString() }] };
     }
     case "statement": {

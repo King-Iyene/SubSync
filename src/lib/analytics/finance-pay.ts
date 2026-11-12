@@ -61,12 +61,12 @@ async function idsOf(s: Scope): Promise<string[]> {
 
 export const rangeWin = (r: Range, basis: PayBasis, windowDays: number): PayWin => ({ from: r.from, toEx: addDays(r.to, 1), basis, windowDays });
 
-export type PayPerson = { personId: string; name: string; roleLabel: string | null; booked: number; showed: number; closed: number; wonValue: number; setWonValue: number; counted: number; disputed: number; payable: number; held: number };
+export type PayPerson = { personId: string; name: string; roleLabel: string | null; booked: number; showed: number; closed: number; wonValue: number; setWonValue: number; counted: number; paying: number; disputed: number; payable: number; held: number };
 
 export async function summary(s: Scope, who: Who, r: Range, basis: PayBasis, o: { cursor: string | null; size: number; q: string | null }) {
   const db = sql(), st = await getSettings(s.inst);
   const ids = await idsOf(s);
-  const empty = { rows: [] as PayPerson[], total: 0, next: null as string | null, totals: { booked: 0, showed: 0, closed: 0, wonValue: 0, payable: 0, held: 0, counted: 0, disputed: 0 }, currency: st.currency, unattributed: { count: 0, value: 0 }, basis, range: r, windowDays: st.dealWindowDays };
+  const empty = { rows: [] as PayPerson[], total: 0, next: null as string | null, totals: { booked: 0, showed: 0, closed: 0, wonValue: 0, payable: 0, held: 0, counted: 0, paying: 0, disputed: 0 }, currency: st.currency, unattributed: { count: 0, value: 0 }, basis, range: r, windowDays: st.dealWindowDays };
   if (who.level !== "all" || !ids.length) return empty;
   const w = rangeWin(r, basis, st.dealWindowDays);
   const key = JSON.stringify([s.inst, "paysum", createHash("sha1").update(ids.join(",")).digest("hex").slice(0, 16), r, basis, st.dealWindowDays]);
@@ -76,7 +76,7 @@ export async function summary(s: Scope, who: Who, r: Range, basis: PayBasis, o: 
     const rows = await db`
       select b.person, count(*) filter (where b.role = 'setter' and b.kind = 'booked')::int booked, count(*) filter (where b.role = 'setter' and b.kind = 'showed')::int showed,
         count(*) filter (where b.role = 'closer' and b.kind = 'won')::int closed, coalesce(sum(b.value) filter (where b.role = 'closer' and b.kind = 'won'), 0)::float8 won_value,
-        coalesce(sum(b.value) filter (where b.role = 'setter' and b.kind = 'won'), 0)::float8 set_won, count(*) filter (where b.kind = ${basis})::int counted,
+        coalesce(sum(b.value) filter (where b.role = 'setter' and b.kind = 'won'), 0)::float8 set_won, count(*) filter (where b.kind = ${basis})::int counted, count(*) filter (where b.kind = ${basis} and b.amount > 0)::int paying,
         count(*) filter (where b.kind = ${basis} and d.line_key is not null)::int disputed, coalesce(sum(b.amount) filter (where d.line_key is null), 0)::float8 payable, coalesce(sum(b.amount) filter (where d.line_key is not null), 0)::float8 held
       from (${rated(db, s.inst, ids, w, null)}) b
       left join fn_pay_disputes d on d.installation_id = ${s.inst} and d.line_key = b.line_key and d.status = 'open'
@@ -89,7 +89,7 @@ export async function summary(s: Scope, who: Who, r: Range, basis: PayBasis, o: 
     const roles = await db`select user_id, role from team_member_roles where installation_id = ${s.inst} and location_id = '' and user_id = any(${rows.map((x) => x.person as string)}::text[])`.catch(() => []);
     const RL = new Map(roles.map((x) => [x.user_id as string, x.role as string]));
     sum = {
-      rows: rows.map((x) => ({ personId: x.person as string, name: names.get(x.person as string) ?? "Team member", roleLabel: RL.get(x.person as string) ?? null, booked: n(x.booked), showed: n(x.showed), closed: n(x.closed), wonValue: n(x.won_value), setWonValue: n(x.set_won), counted: n(x.counted), disputed: n(x.disputed), payable: n(x.payable), held: n(x.held) })),
+      rows: rows.map((x) => ({ personId: x.person as string, name: names.get(x.person as string) ?? "Team member", roleLabel: RL.get(x.person as string) ?? null, booked: n(x.booked), showed: n(x.showed), closed: n(x.closed), wonValue: n(x.won_value), setWonValue: n(x.set_won), counted: n(x.counted), paying: n(x.paying), disputed: n(x.disputed), payable: n(x.payable), held: n(x.held) })),
       unatt: { count: n(un[0]?.c), value: n(un[0]?.v) },
     };
     financeCache.set(key, sum);
@@ -99,7 +99,7 @@ export async function summary(s: Scope, who: Who, r: Range, basis: PayBasis, o: 
   const cur = decodeKey(o.cursor);
   const start = cur ? all.findIndex((x) => x.payable < Number(cur.k) || (x.payable === Number(cur.k) && x.personId < cur.id)) : 0;
   const from = start === -1 ? all.length : start, page = all.slice(from, from + o.size), last = page[page.length - 1];
-  const t = all.reduce((a, x) => ({ booked: a.booked + x.booked, showed: a.showed + x.showed, closed: a.closed + x.closed, wonValue: a.wonValue + x.wonValue, payable: a.payable + x.payable, held: a.held + x.held, counted: a.counted + x.counted, disputed: a.disputed + x.disputed }), { booked: 0, showed: 0, closed: 0, wonValue: 0, payable: 0, held: 0, counted: 0, disputed: 0 });
+  const t = all.reduce((a, x) => ({ booked: a.booked + x.booked, showed: a.showed + x.showed, closed: a.closed + x.closed, wonValue: a.wonValue + x.wonValue, payable: a.payable + x.payable, held: a.held + x.held, counted: a.counted + x.counted, paying: a.paying + x.paying, disputed: a.disputed + x.disputed }), { booked: 0, showed: 0, closed: 0, wonValue: 0, payable: 0, held: 0, counted: 0, paying: 0, disputed: 0 });
   return { rows: page, total: all.length, next: from + o.size < all.length && last ? encodeKey({ k: last.payable, id: last.personId }) : null, totals: { ...t, payable: Math.round(t.payable * 100) / 100, held: Math.round(t.held * 100) / 100 }, currency: st.currency, unattributed: sum.unatt, basis, range: r, windowDays: st.dealWindowDays };
 }
 

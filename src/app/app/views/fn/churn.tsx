@@ -79,7 +79,6 @@ function ChurnRow({ r, rank, go, reload }: { r: Row; rank: number; go: GoFn; rel
         {snoozedNow && <div className="fn-sub">{r.muted ? "Muted" : `Snoozed for ${days(r.snoozedUntil)} more ${days(r.snoozedUntil) === 1 ? "day" : "days"}`}</div>}
       </div>
       <div>
-        <div className="fn-sub">Owner</div>
         <Picker what="person" label="Owner" value={r.owner.userId ? { id: r.owner.userId, name: r.owner.name ?? "Team member" } : null} clearable placeholder={r.owner.manager ? `Manager: ${r.owner.manager}` : "Nobody yet"} onPick={(v) => void put({ owner: v ? v.id : null }, "Owner saved.")} testId="fn-churn-owner" />
         <select className="ap-field" style={{ marginTop: 6 }} aria-label={`Status for ${r.name}`} value={r.status} onChange={(e) => void put({ status: e.target.value }, "Status saved.")} disabled={busy} data-testid="fn-churn-set-status">{STATUS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
       </div>

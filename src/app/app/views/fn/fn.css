@@ -53,6 +53,9 @@
 .fn-line-head { display: contents; }
 .fn [data-alert="overdue"] { color: var(--s6-amber); font-weight: 650; }
 .fn-pr-only { display: none; }
+.fn .cl-reason { border-color: var(--border); }
+.fn .cl-reason:hover { background: color-mix(in srgb, var(--s6-cyan) 10%, transparent); }
+.fn .cl-reason[aria-pressed="true"], .fn .cl-reason[aria-checked="true"] { background: color-mix(in srgb, var(--s6-cyan) 22%, transparent); border-color: var(--s6-cyan); font-weight: 600; }
 @media print {
   body * { visibility: hidden !important; }
   .fn-print, .fn-print * { visibility: visible !important; }

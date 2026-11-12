@@ -44,7 +44,7 @@ export function PayoutsTab({ options, goTab }: { options: FnOptions; goTab: (t: 
         <h2 className="fn-h">This period</h2>
         {d ? (
           <>
-            <p className="fn-sentence" data-testid="fn-pay-sentence">{d.totals.counted === 0 ? `Nothing counted ${basis === "booked" ? "as booked" : basis === "showed" ? "as showed" : "as won"} in this period.` : `${usd(d.totals.payable)} to pay ${num(d.total)} ${d.total === 1 ? "person" : "people"} across ${num(d.totals.counted)} ${d.totals.counted === 1 ? "line" : "lines"}.`}</p>
+            <p className="fn-sentence" data-testid="fn-pay-sentence">{d.totals.counted === 0 ? `Nothing counted ${basis === "booked" ? "as booked" : basis === "showed" ? "as showed" : "as won"} in this period.` : `${usd(d.totals.payable)} to pay ${num(d.total)} ${d.total === 1 ? "person" : "people"} across ${num(d.totals.paying)} paying ${d.totals.paying === 1 ? "line" : "lines"}${d.totals.counted > d.totals.paying ? ` (${num(d.totals.counted - d.totals.paying)} more ${d.totals.counted - d.totals.paying === 1 ? "line has" : "lines have"} no rate yet)` : ""}.`}</p>
             {d.totals.held > 0 && <p className="ap-fine" data-testid="fn-pay-held">{usd(d.totals.held)} is held back on {num(d.totals.disputed)} disputed {d.totals.disputed === 1 ? "line" : "lines"}.</p>}
             {d.unattributed.count > 0 && <p className="ap-fine" data-testid="fn-pay-unattributed">{num(d.unattributed.count)} won {d.unattributed.count === 1 ? "deal" : "deals"} ({usd(d.unattributed.value)}) had no appointment in the {d.windowDays} days before, so they are not counted for anyone.</p>}
             <div className="fn-end" style={{ justifyContent: "flex-start", marginTop: 8 }}>
@@ -78,7 +78,7 @@ export function PayoutsTab({ options, goTab }: { options: FnOptions; goTab: (t: 
                   <Count n={p.closed} label="closed" onClick={() => setOpen({ personId: p.personId, kind: "won", role: "closer", title: `${p.name}: deals closed` })} />
                   <span className="fn-sub">Won {usd(p.wonValue)}{p.setWonValue > 0 ? ` · set ${usd(p.setWonValue)}` : ""}</span>
                 </div>
-                <div><span className="fn-amt" data-testid="fn-pay-amount">{usd(p.payable)}</span><div className="fn-sub">{num(p.counted)} {p.counted === 1 ? "line" : "lines"}{p.held > 0 ? ` · ${usd(p.held)} held` : ""}</div></div>
+                <div><span className="fn-amt" data-testid="fn-pay-amount">{usd(p.payable)}</span><div className="fn-sub">{num(p.counted)} {p.counted === 1 ? "line" : "lines"}{p.paying < p.counted ? `, ${num(p.paying)} pay` : ""}{p.held > 0 ? ` · ${usd(p.held)} held` : ""}</div></div>
                 <div className="fn-end"><button type="button" className="s6-btn" data-kind="primary" onClick={() => setOpen({ personId: p.personId, kind: null, role: null, title: `${p.name}: statement` })} data-testid="fn-pay-statement">Statement</button></div>
               </li>
             ))}

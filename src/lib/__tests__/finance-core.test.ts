@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
-  avgDealOf, bucketOf, churnOf, cplOf, csvCell, decodeKey, encodeKey, factOf, headlineOf, lineAmount, lineKey, money, pageDesc, playbookOf, rateFor, roasOf, spendInRange, statementCsv, totalsOf, trendOf, waterfallOf, winRateOf,
+  avgDealOf, bucketOf, isDay, isMonth, churnOf, cplOf, csvCell, decodeKey, encodeKey, factOf, headlineOf, lineAmount, lineKey, money, pageDesc, playbookOf, rateFor, roasOf, spendInRange, statementCsv, totalsOf, trendOf, waterfallOf, winRateOf,
   type ChurnInput, type EnteredPrice, type PlanFact, type SnapRow,
 } from "../analytics/finance-core.ts";
 
@@ -159,6 +159,13 @@ test("keyset paging resumes after the cursor without repeating or skipping a row
   assert.deepEqual(seen, ["c", "e", "b", "a", "d"]);
   assert.equal(decodeKey("not a cursor"), null);
   assert.deepEqual(decodeKey(encodeKey({ k: 3, id: "x" })), { k: 3, id: "x" });
+});
+
+test("a malformed date is refused, never thrown on", () => {
+  for (const bad of ["2026-13-40", "2026-02-31", "abc", "", null, 5, "2026-1-1"]) assert.equal(isDay(bad), false, String(bad));
+  assert.equal(isDay("2026-02-28"), true);
+  assert.equal(isMonth("2026-13"), false);
+  assert.equal(isMonth("2026-11"), true);
 });
 
 test("money is written per currency in plain words", () => {
