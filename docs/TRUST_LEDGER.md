@@ -135,3 +135,11 @@ Needs King's permissions (no data until granted): payments, plans, wallet balanc
 Works: copies dropdown (names, emails, Open, Open in your CRM, hover preview), merge chooser on a clear group (user picks the master, says payments, automations and courses are not visible, asks to check the CRM first). All nine Settings sections open (Account and plan, Connections with Slack and Fathom connected, Permissions "18 not approved" with steps, Alerts, Team and roles, Targets, Data, Modules, Safety). Light mode renders correctly.
 
 Not tested: 390 and 768 widths; bookings and deals created on the imported leads (Create deal reports "Done" but no deal appears in Pipeline, so writes are practice-only); Settings "ten sections" (nine seen).
+
+## Fixes for walk-through #3 (13 Nov night): PRs #102-#105 merged
+
+Seen working live: Clients tabs grouped into four with a page row (#11); Clients > Money says "Not known: needs permission... cannot say who is paid up" (#10); What's new and menu "New" badges present (#15); Duplicates: jordan smith group now shows "Same email, different names" and "Likely: names differ", button reads "Merge this person" (#16, #18); Merge on the protected group opens the chooser with a banner (#19).
+
+Merged, NOT yet seen live: #1 #2 #3 week table and one window per screen; #20 sale card in Settings > Targets and its search; #4 #5 #8 #9 contact panel and Find a lead; #6 #7 labelled (not merged into one definition); #12 "n deals without a value"; #13 example funnel (needs 5 valued test deals from King); #14 Meetings card.
+
+Left over: Duplicates tab counts and "Merge all certain matches (13)" still count the mixed-name group until the nightly scan runs; they should move to Likely at once.
