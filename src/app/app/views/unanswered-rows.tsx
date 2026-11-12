@@ -139,7 +139,7 @@ export function PersonRows({ rows, showAccount, actions, testId = "wait-rows", h
             <p className={`tnum hidden items-center gap-1.5 text-sm @3xl:flex ${toneClass(r.hours)}`} data-testid="wait-time">
               {waitText(r)}
             </p>
-            <div><RowButton href={r.url} label="Reply" sr={`${r.name}, the conversation in your CRM`} testId="wait-reply" /></div>
+            <div><RowButton {...(r.contactId ? { onClick: () => actions.show(r) } : { href: r.url })} label="Reply" sr={`${r.name}, open them here`} testId="wait-reply" /></div>
             <div><PopMenu label={`More for ${r.name}`} items={actions.menu(r, showAccount)} testId="wait-row-more" triggerClassName={MENU_TRIGGER}><MoreHorizontal aria-hidden className="size-4" /></PopMenu></div>
             {actions.stripFor(r)}
           </li>

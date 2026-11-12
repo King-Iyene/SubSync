@@ -20,7 +20,8 @@ export class ApiError extends Error {
 export const REQUEST_TIMEOUT_MS = 60_000;
 
 export type Api = {
-  get: <T>(path: string) => Promise<T>;
+  /** `fresh` (a Try again) skips the shared and held answers and sends a new request, so it never joins a read that is stuck. */
+  get: <T>(path: string, opts?: { fresh?: boolean }) => Promise<T>;
   post: <T>(path: string, body?: unknown) => Promise<T>;
   put: <T>(path: string, body?: unknown) => Promise<T>;
   del: <T>(path: string) => Promise<T>;
@@ -121,8 +122,17 @@ export function makeApi(initialToken: string, refresh: () => Promise<string | nu
     demo,
     scope: filterQuery,
     filtered: (query: string) => makeApi(initialToken, refresh, demo, query, shared),
-    get: async <T,>(path: string): Promise<T> => {
-      const reads = sharedReads(), key = `${filterQuery}|${path}`, running = reads.get(key);
+    get: async <T,>(path: string, opts?: { fresh?: boolean }): Promise<T> => {
+      const reads = sharedReads(), key = `${filterQuery}|${path}`, running = opts?.fresh ? undefined : reads.get(key);
+      if (opts?.fresh) {
+        // Try again: a new request that is not tied to one already on its way (which may be the stuck one); the answer replaces what is shared.
+        const sep = path.includes("?") ? "&" : "?";
+        const p = (async () => { const data = await parse<T>(await request("GET", `${path}${sep}_r=${Date.now().toString(36)}`)); rememberAnswer(shared, key, path, data); return data; })();
+        reads.set(key, p);
+        const done = () => { if (reads.get(key) === p) reads.delete(key); };
+        p.then(done, done);
+        return p;
+      }
       if (running) { const data = await (running as Promise<T>); return typeof structuredClone === "function" ? structuredClone(data) : data; }
       // Round 4: going back to a Speed to lead or Appointments tab within 20 seconds shows the answer already held (a change drops them; the server also keeps its own for 30 s).
       const recentHit = recentAnswer(shared, key, path);
@@ -161,23 +171,28 @@ export function useData<T>(path: string | null) {
   const current = useRef<string | null>(path);
   useEffect(() => { current.current = path; }, [path]);
 
-  const load = useCallback(async () => {
+  // Only the newest request of this screen may answer: an older one that is still stuck must not overwrite a retry that came back.
+  const seq = useRef(0);
+  const run = useCallback(async (fresh: boolean) => {
     if (path === null) return;
-    setState((s) => ({ ...s, loading: true }));
+    const mine = ++seq.current;
+    setState((s) => ({ ...s, loading: true, error: null }));
     const key = `${api.scope ?? ""}#${rangeKeyOfPath(path)}`;
     try {
-      const data = await api.get<T>(path);
-      if (current.current === path) setState({ data, error: null, loading: false, key });
+      const data = await api.get<T>(path, fresh ? { fresh: true } : undefined);
+      if (current.current === path && mine === seq.current) setState({ data, error: null, loading: false, key });
     } catch (error) {
-      if (current.current === path) setState({ data: null, error: error as ApiError, loading: false, key });
+      if (current.current === path && mine === seq.current) setState({ data: null, error: error as ApiError, loading: false, key });
     }
   }, [api, path]);
+  // `reload` is what "Try again" and every refresh after a change call: it always asks the server again.
+  const load = useCallback(() => run(true), [run]);
 
   useEffect(() => {
     // Subscribing to the server for this path; the result is stored when it arrives.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    void load();
-  }, [load]);
+    void run(false);
+  }, [run]);
 
   const stale = path !== null && state.key !== askedKey && (state.data !== null || state.error !== null);
   return stale ? { data: null, error: null, loading: true, reload: load } : { data: state.data, error: state.error, loading: state.loading, reload: load };

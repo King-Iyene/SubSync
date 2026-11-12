@@ -19,9 +19,9 @@ import "./bf.css";
 // The dates are the ones in the bar at the top of the app. Dollar lines and the forecast are estimates; each says how it was worked out, and says "not enough data" under a minimum.
 
 type Local = { setter: string; closer: string; owner: string; form: string; hour: string; dow: string; age: string };
-const NO_LOCAL: Local = { setter: "", closer: "", owner: "", form: "", hour: "", dow: "", age: "" };
+export const NO_LOCAL: Local = { setter: "", closer: "", owner: "", form: "", hour: "", dow: "", age: "" };
 type Extra = Record<string, string>;
-type Drill = { title: string; step: StepKey; mode: "reached" | "dropped"; extra: Extra; count: number | null };
+export type Drill = { title: string; step: StepKey; mode: "reached" | "dropped"; extra: Extra; count: number | null };
 export type BfFlags = { cohorts: boolean; forecast: boolean; recover: boolean };
 export type BfPick = { value: string; label: string; hint?: string };
 type Props = { scope: ExecScope; people: BfPick[]; accounts: BfPick[]; sources: string[]; flags: BfFlags; testId?: string };
@@ -273,7 +273,7 @@ function Forecast({ scope, local }: { scope: ExecScope; local: Local }) {
 }
 
 // ------------------------------------------------------------------ the people behind a number
-function DrillList({ drill, scope, local, flags, onClose }: { drill: Drill; scope: ExecScope; local: Local; flags: BfFlags; onClose: () => void }) {
+export function DrillList({ drill, scope, local, flags, onClose }: { drill: Drill; scope: ExecScope; local: Local; flags: BfFlags; onClose: () => void }) {
   const api = useApiClient();
   type S = { key: string; rows: RowsRes["rows"]; next: string | null; total: RowsRes["total"]; label: string; err: Error | null };
   const [s, setS] = useState<S | null>(null), [nonce, setNonce] = useState(0), [more, setMore] = useState(false);

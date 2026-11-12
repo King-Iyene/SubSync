@@ -1,9 +1,9 @@
 "use client";
 
 import { ChevronDown } from "lucide-react";
-import { useId, useRef, type KeyboardEvent, type ReactNode } from "react";
+import { useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import type { Headline, HeadlineAction } from "@/lib/analytics/today-queue";
-import { PopMenu, type MenuItem, type ModuleTab } from "../ds";
+import { LeadDrawer, PopMenu, type LeadSeed, type MenuItem, type ModuleTab } from "../ds";
 import { CountUp } from "../ds/count-up";
 import { TagPill } from "../ds/what-is";
 import type { TabTag } from "@/lib/analytics/today-tabs";
@@ -56,8 +56,10 @@ export function TodayHeadline({ headline, onPart, action, children }: { headline
 
 /** The one filled button of the page. A link that leaves the app, or a button that stays in it. */
 const PRIMARY = "ds-press inline-flex h-11 w-full items-center justify-center gap-2 rounded-[4px] bg-primary px-5 text-[0.9375rem] font-medium text-primary-foreground hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)] active:translate-y-px sm:h-10 sm:w-auto";
-export type Primary = { label: string; sr: string; href?: string; onClick?: () => void };
+export type Primary = { label: string; sr: string; href?: string; onClick?: () => void; /** A person: the button opens them inside SubSync (the panel keeps a smaller "Open in your CRM" link). */ seed?: LeadSeed | null };
 export function PrimaryButton({ p }: { p: Primary }) {
+  const [open, setOpen] = useState(false);
+  if (p.seed) return (<><button type="button" onClick={() => setOpen(true)} className={PRIMARY} data-testid="today-primary-button">{p.label}<span className="sr-only"> ({p.sr})</span></button>{open && <LeadDrawer leads={[p.seed]} index={0} onIndex={() => undefined} onClose={() => setOpen(false)} />}</>);
   return p.href
     ? <a href={p.href} target="_blank" rel="noopener noreferrer" className={PRIMARY} data-testid="today-primary-button">{p.label}<span className="sr-only"> ({p.sr}, opens in a new tab)</span></a>
     : <button type="button" onClick={p.onClick} className={PRIMARY} data-testid="today-primary-button">{p.label}<span className="sr-only"> ({p.sr})</span></button>;

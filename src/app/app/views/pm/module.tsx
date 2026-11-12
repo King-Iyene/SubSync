@@ -25,7 +25,7 @@ const TIPS: Record<TabKey, [string, string]> = {
 };
 const FLAG_OF: Partial<Record<TabKey, string>> = { queue: "pm_recovery", disputes: "pm_disputes", upcoming: "pm_upcoming", history: "pm_recovery" };
 
-export function PaymentsModule({ go }: { go: GoFn }) {
+export function PaymentsModule({ go, embed = false }: { go: GoFn; /** Inside the Money page: no page title of its own, and the plans card lives on Plans and churn instead. */ embed?: boolean }) {
   void go;
   const api = useApiClient(), sample = fixturesOn();
   const bar = usePageRange();
@@ -41,7 +41,7 @@ export function PaymentsModule({ go }: { go: GoFn }) {
   if (opt.data && opt.data.canSee === false) return <div className="s6 ap pm ds-enter" data-testid="pm-module"><Page title="Payments" subtitle="Who has not paid, how much, and for how long." actions={null}><EmptyState title="Payments is for owners and administrators" body="It shows money that needs chasing. Ask the owner of your account to open it." /></Page></div>;
   return (
     <div className="s6 ap pm ds-enter" data-testid="pm-module">
-      <Page title="Payments" subtitle="Who has not paid, how much, for how long, and what to do next." actions={sample ? null : <Btn onClick={() => void api.download("payments?part=export", "payments.csv")}>Export CSV</Btn>}>
+      <Shell embed={embed} title="Payments" subtitle="Who has not paid, how much, for how long, and what to do next." actions={sample ? null : <Btn onClick={() => void api.download("payments?part=export", "payments.csv")}>Export CSV</Btn>}>
         {sample && <p className="ap-fine mb-2" role="status" data-testid="pm-sample">Sample data: these are not your real payments.</p>}
         {opt.data?.problem && <p className="ap-fine mb-2" role="status">{opt.data.problem}</p>}
         <p className="ap-fine mb-2" data-testid="pm-dates">Dates: {bar.label}, from the bar above. They set the problems listed (by the day they were flagged), disputes opened or due in them, the recovered money, the refunds and the history.</p>
@@ -50,11 +50,16 @@ export function PaymentsModule({ go }: { go: GoFn }) {
           {active === "today" && <TodayTab go={goTab} openQueue={openQueue} openDisputes={() => { setDStatus("open"); setTab("disputes"); }} />}
           {active === "queue" && <QueueTab key={qKey} initial={q} options={opt.data ?? null} rev={rev} bump={bump} />}
           {active === "disputes" && <DisputesTab key={dStatus} options={opt.data ?? null} initialStatus={dStatus} rev={rev} bump={bump} />}
-          {active === "upcoming" && <UpcomingTab />}
+          {active === "upcoming" && <UpcomingTab hidePlans={embed} />}
           {active === "history" && <HistoryTab openAccount={(id) => openQueue({ location: id, status: "all" })} />}
           {active === "setup" && <SetupTab />}
         </div>
-      </Page>
+      </Shell>
     </div>
   );
+}
+
+/** The page frame: the full Payments page, or (inside the Money page, which has its own title) just the content with the Export button kept at the top. */
+function Shell({ embed, title, subtitle, actions, children }: { embed: boolean; title: string; subtitle: string; actions: React.ReactNode; children: React.ReactNode }) {
+  return embed ? <>{actions && <div className="mb-2 flex justify-end">{actions}</div>}{children}</> : <Page title={title} subtitle={subtitle} actions={actions}>{children}</Page>;
 }

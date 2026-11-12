@@ -58,8 +58,7 @@ import { PipelineView } from "./views/pipeline";
 import { PipelineModule } from "./views/pl3/module";
 import { ClientsModule } from "./views/cl3/module";
 import { fixturesOn as clSample } from "./views/cl3/data";
-import { PaymentsModule } from "./views/pm/module";
-import { FinanceModule } from "./views/fn/module";
+import { MoneyModule } from "./views/money/module";
 import { fnfxOn as fnSample } from "./views/fn/data";
 import { EmptyState } from "./ds/states";
 import { fixturesOn as pmSample } from "./views/pm/data";
@@ -438,8 +437,11 @@ export function Dashboard() {
       case "data-health": if (dqOn) return <DqModule key="dq" kind={auth.kind} start="overview" duplicatesOn={dqFlag("dq_dupes")} intakeOn={dqFlag("dq_intake")} fixOn={auth.features.cu_fix === true && !auth.locked.includes("cu_fix")} cleanupOn={!off("cleanup") && NAV_FOR[auth.kind].has("cleanup")} legacyHealth={<ApiProvider value={baseApi}><DataHealthView go={go} kind={auth.kind} /></ApiProvider>} />;
         if (auth.features.cu_health === true && !auth.locked.includes("cu_health")) return <CleanupModule key="dh" kind={auth.kind} start="health" duplicatesOn={!off("duplicates") && NAV_FOR[auth.kind].has("duplicates")} cleanupOn={!off("cleanup") && NAV_FOR[auth.kind].has("cleanup")} fixOn={auth.features.cu_fix === true && !auth.locked.includes("cu_fix")} healthOn legacyHealth={<ApiProvider value={baseApi}><DataHealthView go={go} kind={auth.kind} /></ApiProvider>} />;
         return <ApiProvider value={baseApi}><DataHealthView go={go} kind={auth.kind} /></ApiProvider>;
-      case "payments": return (auth.features.pm_module === true && !auth.locked.includes("pm_module")) || pmSample() ? <PaymentsModule key="pm" go={go} /> : <EmptyState title="Payments is not switched on yet" body="It will appear here as soon as it is ready for your account." />;
-      case "finance": return (auth.features.fn_module === true && !auth.locked.includes("fn_module")) || fnSample() ? <FinanceModule key="fn" go={go} /> : <EmptyState title="Finance is not switched on yet" body="It will appear here as soon as it is ready for your account." />;
+      // Money: Payments and Finance are ONE page now (Plans and churn | Client payments | Payouts). Both old addresses open it on the right tab; the code, flags and data of both stay.
+      case "payments": case "finance": {
+        const pmOn = (auth.features.pm_module === true && !auth.locked.includes("pm_module")) || pmSample(), fnOn = (auth.features.fn_module === true && !auth.locked.includes("fn_module")) || fnSample();
+        return pmOn || fnOn ? <MoneyModule key={`money-${view.id}`} go={go} start={view.id === "finance" ? (fnOn ? "plans" : "payments") : (pmOn ? "payments" : "plans")} pmOn={pmOn} fnOn={fnOn} /> : <EmptyState title="Money is not switched on yet" body="It will appear here as soon as it is ready for your account." />;
+      }
       case "workflows": return <ApiProvider value={baseApi}><WorkflowsView go={go} kind={auth.kind} /></ApiProvider>;
       case "clients": if ((auth.features.cl_module === true && !auth.locked.includes("cl_module")) || clSample()) return <ClientsModule key="cl3" go={go} features={clientFeatures} />; return <ClientsView key="clients" go={go} initialTab="health" features={clientFeatures} />;
     }

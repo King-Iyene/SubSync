@@ -29,9 +29,10 @@ export const NAV: NavItem[] = [
   { id: "inbox", label: "Unanswered messages", feature: "inbox", group: "", parent: "speed", showWhenParentOff: true },
   { id: "appointments", label: "Appointments", feature: "appointments", group: "" },
   { id: "clients", label: "Clients", feature: "clients", group: "Clients and money" },
-  { id: "payments", label: "Payments", feature: "pm_module", group: "Clients and money" },
-  // Finance (stage FN): the agency's own money (plans, revenue, who may leave, what it pays its people). Payments is what a client owes right now.
-  { id: "finance", label: "Finance", feature: "fn_module", group: "Clients and money" },
+  // Money (12 Nov 2026): Payments and Finance are ONE menu item with three tabs (Plans and churn | Client payments | Payouts). "payments" is the entry; "finance" is its other address (#finance still opens
+  // Money on Plans and churn) and keeps its own entry only while Payments is switched off, so the page is never lost.
+  { id: "payments", label: "Money", feature: "pm_module", group: "Clients and money" },
+  { id: "finance", label: "Money", feature: "fn_module", group: "Clients and money", parent: "payments", showWhenParentOff: true },
   { id: "people", label: "Find a lead", feature: "search", group: "Clients and money" },
   { id: "search", label: "Contact search", feature: "search", group: "Clients and money", parent: "people" },
   { id: "leads", label: "Leads", feature: "activity", group: "Clients and money", parent: "people" },

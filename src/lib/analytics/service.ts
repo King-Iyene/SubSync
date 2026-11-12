@@ -1,4 +1,5 @@
 import { sql } from "../db";
+import { cachedSwr } from "../read-cache";
 import { postToSlack } from "../notify";
 import { emailConfigured, unsubscribeHeaders, type Mail } from "../email";
 import { unsubscribeUrl } from "../unsubscribe";
@@ -11,7 +12,13 @@ import {
   accountRows, getSettings, listAlerts, listDomainChecks, scoreHistory, syncAlerts, type Settings,
 } from "./queries";
 
+// Round 5: every screen starts with this read (all accounts and their numbers, 0.2 to 20 s on a busy database). It is shared between screens that ask at the same moment and an answer up to
+// 90 s old is shown at once while a fresh one loads (any change made through SubSync forgets it first; see read-cache.ts).
 export async function loadAccounts(installationId: string): Promise<{ settings: Settings; accounts: DerivedAccount[] }> {
+  return cachedSwr(installationId, "accounts", () => loadAccountsNow(installationId));
+}
+
+export async function loadAccountsNow(installationId: string): Promise<{ settings: Settings; accounts: DerivedAccount[] }> {
   const settings = await getSettings(installationId);
   const [rows, history] = await Promise.all([accountRows(installationId, settings), scoreHistory(installationId, 30)]);
   const now = Date.now();
@@ -85,7 +92,7 @@ export async function emailPendingAlerts(installationId: string, settings: Setti
 // Recompute alerts and today's snapshot, and push newly raised critical/warning alerts to
 // Slack if the agency configured a webhook. Returns a small summary.
 export async function refreshInsights(installationId: string): Promise<{ accounts: number; openAlerts: number; created: number }> {
-  const { settings, accounts } = await loadAccounts(installationId);
+  const { settings, accounts } = await loadAccountsNow(installationId);
   await snapshotMetrics(installationId, accounts, settings.dealRulesRevision);
   // Clean-up: today's data-quality snapshot per account, and an alert for accounts where new likely duplicates appeared. Never stops the refresh.
   const { dailyQualityScan, duplicateAlertDrafts } = await import("./cleanup-scan");
@@ -110,7 +117,7 @@ export async function refreshInsights(installationId: string): Promise<{ account
 }
 
 export async function sendDigest(installationId: string, agencyLabel: string): Promise<boolean> {
-  const { settings, accounts } = await loadAccounts(installationId);
+  const { settings, accounts } = await loadAccountsNow(installationId);
   if (!settings.slackWebhookUrl) return false;
   const open = await listAlerts(installationId, false, 500);
   return postToSlack(settings.slackWebhookUrl, buildDigest(agencyLabel, accounts, open.length), { installationId, what: "slack.weekly_digest" });

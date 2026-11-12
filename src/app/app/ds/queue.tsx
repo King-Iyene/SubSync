@@ -41,7 +41,10 @@ export const ACTION_BUTTON = "ds-press inline-flex h-11 w-full items-center just
 const MENU_TRIGGER = "ds-press inline-flex size-11 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-[var(--ring)] @3xl:size-8";
 
 /** The one small action button of a row: an outlined link that leaves the app (with the external-link icon), or a button that stays inside it. */
-export function RowButton({ href, onClick, label, sr, testId }: { href?: string; onClick?: () => void; label: string; sr: string; testId?: string }) {
+/** One row button. With a `seed` (a person) it opens them INSIDE SubSync in the shared lead panel (which keeps a smaller "Open in your CRM" link); with only a `href` it leaves for the CRM. */
+export function RowButton({ href, onClick, label, sr, testId, seed }: { href?: string; onClick?: () => void; label: string; sr: string; testId?: string; seed?: LeadSeed | null }) {
+  const [open, setOpen] = useState(false);
+  if (seed) return (<><button type="button" onClick={() => setOpen(true)} className={ACTION_BUTTON} data-testid={testId}>{label}<span className="sr-only"> ({sr})</span></button>{open && <LeadDrawer leads={[seed]} index={0} onIndex={() => undefined} onClose={() => setOpen(false)} />}</>);
   return href
     ? <a href={href} target="_blank" rel="noopener noreferrer" className={ACTION_BUTTON} data-testid={testId} title="Opens in your CRM">{label}<ExternalLink aria-hidden className="size-3.5" /><span className="sr-only"> ({sr}, opens in a new tab)</span></a>
     : <button type="button" onClick={onClick} className={ACTION_BUTTON} data-testid={testId}>{label}<span className="sr-only"> ({sr})</span></button>;
@@ -212,7 +215,7 @@ export function ReplyNowList({ items, total, newLeads, max = INLINE_ROWS, onSeeA
                 <p className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground @3xl:hidden" data-testid="lead-wait-narrow"><StatusChip word={urgent ? "Urgent" : "Soon"} />{p.never ? wait : `Waiting ${wait}`}</p>
               </div>
               <div className="hidden min-w-0 text-sm @3xl:block" data-testid="lead-wait"><p><StatusChip word={urgent ? "Urgent" : "Soon"} /></p><p className="tnum truncate text-xs text-muted-foreground">{p.never ? wait : `Waiting ${wait}`}</p></div>
-              <div><RowButton href={p.url} label="Reply" sr={`${p.name}, in your CRM`} testId="lead-open" /></div>
+              <div><RowButton onClick={() => setLead(n)} label="Reply" sr={`${p.name}, open them here`} testId="lead-open" /></div>
               <div>{onAct ? <Menu label={`More for ${p.name}`} items={items} testId="reply-more" /> : null}</div>
             </li>
           );

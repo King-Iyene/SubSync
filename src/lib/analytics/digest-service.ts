@@ -4,7 +4,7 @@ import { portfolioHeadlines, rank, type AccountInput, type SeriesPoint } from ".
 import { inbox, listDomainChecks, visibleLocationIds } from "./queries";
 import { appointmentSignals } from "./appointment-queries";
 import { replyHoursFor } from "./playbooks";
-import { loadAccounts } from "./service";
+import { loadAccountsNow } from "./service";
 import { notWatchedRows } from "./coverage";
 import { currentSnapshotVersion, snapshotOk } from "./definitions-sql";
 
@@ -40,7 +40,7 @@ export async function seriesByLocation(installationId: string, locationIds: stri
 // Everything the daily brief needs for one install. `limitTo` restricts it to a single account
 // (a business or client view); `planLimit` applies the free plan's account limit.
 export async function buildDailyDigest(installationId: string, opts: { limitTo?: string | null; planLimit?: number | null; onlyIds?: Set<string> | null } = {}) {
-  const [{ settings, accounts }, freshness] = await Promise.all([loadAccounts(installationId), freshnessFor(installationId, { limitTo: opts.limitTo })]);
+  const [{ settings, accounts }, freshness] = await Promise.all([loadAccountsNow(installationId), freshnessFor(installationId, { limitTo: opts.limitTo })]);
   let live = accounts.filter((a) => !a.ignored);
   if (opts.limitTo) live = live.filter((a) => a.locationId === opts.limitTo);
   else if (opts.planLimit) {

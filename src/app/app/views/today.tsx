@@ -12,6 +12,7 @@ import { Btn, ErrorBox } from "../ui";
 import { TodayPage } from "./today-page";
 import { useSlow } from "./td3/data";
 import { usePageRange } from "../ds/page-range";
+import { SlowRetry } from "../ds/slow-retry";
 import "./today-theme.css";
 
 // Today's container: it loads the read, keeps the client-account choice (in this page's address as `ta=`, and in this browser, for Today only), and hands everything to TodayPage
@@ -68,7 +69,9 @@ function TodayBody({ go, kind, picked, setPicked, mode }: { go: GoFn; kind: Acce
   const today = useData<TodayData>("today");
   // The growth counters and charts are for the dates in the date bar (one range for the whole app).
   const bar = usePageRange();
-  const growth = useData<GrowthData>(bar.ready ? `today/growth?${bar.qs}` : null);
+  // The growth read is the heaviest one on this page (every contact of the chosen clients), so it starts only after the main read has answered and never competes with it for the database or the server.
+  const growthOn = bar.ready && (today.data !== null || today.error !== null);
+  const growth = useData<GrowthData>(growthOn ? `today/growth?${bar.qs}` : null);
   const seg = useData<Segments>(kind === "agency" ? "segments" : null);
   const [syncing, setSyncing] = useState(false);
   const slow = useSlow(today.loading && !today.data);
@@ -91,7 +94,7 @@ function TodayBody({ go, kind, picked, setPicked, mode }: { go: GoFn; kind: Acce
   const inside = mode !== "full";
   if (today.error && !t) return inside ? <ErrorBox error={today.error} onRetry={today.reload} /> : <Page title="Today"><ErrorBox error={today.error} onRetry={today.reload} /></Page>;
   if (!t) {
-    if (inside) return slow ? <EmptyState title="This is taking longer than usual" body="Nothing was lost. The numbers are still being worked out." action={<Btn onClick={() => void today.reload()}>Try again</Btn>} /> : <div role="status" aria-busy="true" aria-label="Working out what needs you today"><Skeleton className="h-10 w-full" /></div>;
+    if (inside) return slow ? <SlowRetry compact reload={today.reload} /> : <div role="status" aria-busy="true" aria-label="Working out what needs you today"><Skeleton className="h-10 w-full" /></div>;
     return (
       <Page title="Today">
         <div className="mb-8 space-y-3" role="status" aria-busy="true" aria-label="Working out what needs you today"><Skeleton className="h-14 w-3/4" /><Skeleton className="h-10 w-40" /></div>
@@ -107,5 +110,5 @@ function TodayBody({ go, kind, picked, setPicked, mode }: { go: GoFn; kind: Acce
       </Page>
     );
   }
-  return <TodayPage mode={mode} go={go} t={t} kind={kind} reload={async () => { await today.reload(); }} sync={sync} syncing={syncing} options={options} picked={picked} setPicked={setPicked} error={today.error?.message ?? null} clearShell={clearShell} growth={{ data: growth.data, loading: growth.loading, error: growth.error?.message ?? null, reload: () => void growth.reload() }} />;
+  return <TodayPage mode={mode} go={go} t={t} kind={kind} reload={async () => { await today.reload(); }} sync={sync} syncing={syncing} options={options} picked={picked} setPicked={setPicked} error={today.error?.message ?? null} clearShell={clearShell} growth={{ data: growth.data, loading: growth.loading || !growthOn, error: growth.error?.message ?? null, reload: () => void growth.reload() }} />;
 }

@@ -91,7 +91,7 @@ export function TodayPage({ mode = "full", go, t, kind, reload, sync, syncing, o
   let primary: Primary | null = null;
   if (!headline.allClear) {
     if (multi && needing.rows[0]) primary = { label: `Open ${needing.rows[0].name}`, sr: `${needing.rows[0].name}, the client that needs you most`, href: needing.rows[0].url };
-    else if (!multi && waiting[0]) primary = { label: `Reply to ${waiting[0].name}`, sr: `${waiting[0].name}, the longest wait`, href: waiting[0].url };
+    else if (!multi && waiting[0]) primary = { label: `Reply to ${waiting[0].name}`, sr: `${waiting[0].name}, the longest wait`, href: waiting[0].url, seed: waiting[0].contactId ? { contactId: waiting[0].contactId, locationId: waiting[0].locationId, name: waiting[0].name, locationName: waiting[0].accountName, url: waiting[0].url, pending: waiting[0].detail } : null };
     else if (!multi && counts.appointments > 0) primary = { label: "Mark outcomes", sr: "Appointments", onClick: () => go("appointments") };
     else if (!multi && counts.noshows > 0) primary = { label: "Rebook no-shows", sr: "No-shows", onClick: () => m.open(specKind("noshows", env)) };
     else if (!multi && counts.stale > 0) primary = { label: "Review quiet deals", sr: "Quiet deals", onClick: () => m.open(specKind("stale", env)) };
