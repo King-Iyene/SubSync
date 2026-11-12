@@ -46,6 +46,22 @@ function locs(s: Scope, location?: string | null): Frag {
     where l.installation_id = ${s.inst} and not l.ignored ${s.allowed ? db`and l.location_id = any(${s.allowed}::text[])` : db``} ${one ? db`and l.location_id = ${one}` : db``}`;
 }
 
+/**
+ * The pairs of bookings that clash: one starts in the window (a), the other overlaps it (b, starting up to a day either side), and they share a calendar or a person.
+ * ONE definition for the "double bookings" figure and the Calendars list behind it, so the number and its rows are the same set. Two passes joined on equality plus a 24 hour start
+ * window (assumes no booking lasts a day or more) instead of one join on "calendar OR person", which cannot use an index and compared every pair in an account (35 s at 40,000
+ * appointments; docs/QA_SCALE.md). UNION counts a pair once. `extra` narrows a (alias a) and is applied in both passes. Columns: location_id, aid, bid.
+ */
+export function clashKeys(s: Scope, f: Filters, extra?: Frag, cols?: Frag): Frag {
+  const db = sql();
+  const one = (key: Frag) => db`select ${cols ?? db`a.location_id, a.appointment_id aid, b.appointment_id bid`} from cached_appointments a join (${locs(s, f.location)}) l on l.location_id = a.location_id
+    join cached_appointments b on b.installation_id = a.installation_id and b.location_id = a.location_id and b.appointment_id > a.appointment_id and ${key}
+      and b.start_at < a.end_at and a.start_at < b.end_at and b.start_at > a.start_at - interval '24 hours' and b.start_at >= ${new Date(f.from.getTime() - DAY)} and b.start_at < ${new Date(f.to.getTime() + DAY)}
+    where a.installation_id = ${s.inst} and a.start_at >= ${f.from} and a.start_at < ${f.to} and a.end_at is not null and b.end_at is not null
+      and a.status not in ('cancelled', 'invalid') and b.status not in ('cancelled', 'invalid') ${extra ?? db``}`;
+  return db`${one(db`b.calendar_id = a.calendar_id`)} union ${one(db`a.assigned_to is not null and b.assigned_to = a.assigned_to`)}`;
+}
+
 /** The manager filters, applied on the same derived set as every number and list (so a filter recomputes everything). a = the appointment, d = the linked deal, c = the contact. */
 function manager(f: Filters): Frag {
   const db = sql();
@@ -240,7 +256,9 @@ export async function overview(s: Scope, f: Filters, windowDays: number): Promis
     db`select count(*)::int n from (${locs(s, f.location)}) x`,
   ]);
   const [[dbl], [idle]] = await Promise.all([
-    db`select count(*)::int n from cached_appointments a join (${locs(s, f.location)}) l on l.location_id = a.location_id join cached_appointments b on b.installation_id = a.installation_id and b.location_id = a.location_id and b.appointment_id > a.appointment_id and (b.calendar_id = a.calendar_id or (a.assigned_to is not null and b.assigned_to = a.assigned_to)) and b.start_at < a.end_at and a.start_at < b.end_at and b.start_at >= ${f.from} and b.start_at < ${f.to} where a.installation_id = ${s.inst} and a.start_at >= ${f.from} and a.start_at < ${f.to} and a.end_at is not null and b.end_at is not null and a.status not in ('cancelled', 'invalid') and b.status not in ('cancelled', 'invalid')`.catch(() => [{ n: 0 }]),
+    // Two bookings clash when they share a calendar or a person and their times overlap. One pass per key (calendar, person) joined on equality and a 24 hour start window instead of one
+    // join on "calendar OR person", which cannot use an index and compared every pair in an account (35 s at 40,000 appointments; see docs/QA_SCALE.md). UNION counts a pair once.
+    db`select count(*)::int n from (${clashKeys(s, f)}) p`.catch(() => [{ n: 0 }]),
     db`select count(*)::int n from (select u.user_id from location_users u join (${locs(s, f.location)}) l on l.location_id = u.location_id where u.installation_id = ${s.inst} group by 1 having not exists (select 1 from cached_appointments a join (${locs(s, f.location)}) l2 on l2.location_id = a.location_id where a.installation_id = ${s.inst} and a.assigned_to = u.user_id and a.start_at >= ${f.from} and a.start_at < ${f.to} and a.status <> 'invalid')) x`.catch(() => [{ n: 0 }]),
   ]);
   const showed = num(t.showed), noshow = num(t.noshow), unmarked = num(t.unmarked), booked = num(t.booked);
@@ -550,20 +568,14 @@ export async function calendars(s: Scope, f: Filters, p: number, size0: number, 
   // L = the accounts in play (the caller's own set, narrowed by the account picker). Client roles only ever have their own account here.
   const L = locs(s, f.location);
   const calF = db`${f.calendar && cleanId(f.calendar) ? db`and a.calendar_id = ${f.calendar}` : db``} ${calFilters(f, db`a`)}`;
-  const pair = db`
-    from cached_appointments a
-    join cached_appointments b on b.installation_id = a.installation_id and b.location_id = a.location_id and b.appointment_id > a.appointment_id
-      and (b.calendar_id = a.calendar_id or (a.assigned_to is not null and b.assigned_to = a.assigned_to))
-      and b.start_at < a.end_at and a.start_at < b.end_at and b.start_at >= ${new Date(from.getTime() - DAY)} and b.start_at < ${new Date(to.getTime() + DAY)}
-    join (${L}) l on l.location_id = a.location_id
-    where a.installation_id = ${s.inst} and a.start_at >= ${from} and a.start_at < ${to} and a.end_at is not null and b.end_at is not null
-      and a.status not in ('cancelled', 'invalid') and b.status not in ('cancelled', 'invalid') ${calF}`;
-  const [crow, cnt, trend, rr, cap, acc, calAll, mem, bk, accAll, skip] = await Promise.all([
-    db`select a.location_id, l.name account_name, a.appointment_id a_id, a.calendar_id a_cal, a.calendar_name a_calname, a.contact_id a_contact, a.status a_status, a.start_at a_start, a.end_at a_end, a.assigned_to a_owner, a.booked_by_user a_booker, a.created_remote_at a_created,
+  // The same pairs as the "double bookings" figure (clashKeys). The rows come from the same two passes with the full columns (a pair found by both passes is one identical row, and UNION keeps one);
+  // joining the pairs back to the table afterwards made the planner compare every pair with every booking (minutes at 40,000 bookings).
+  const rowCols = db`a.location_id, l.name account_name, a.appointment_id a_id, a.calendar_id a_cal, a.calendar_name a_calname, a.contact_id a_contact, a.status a_status, a.start_at a_start, a.end_at a_end, a.assigned_to a_owner, a.booked_by_user a_booker, a.created_remote_at a_created,
         b.appointment_id b_id, b.contact_id b_contact, b.status b_status, b.start_at b_start, b.end_at b_end, b.assigned_to b_owner, b.booked_by_user b_booker, b.created_remote_at b_created, b.calendar_id b_cal, b.calendar_name b_calname,
-        extract(epoch from (least(a.end_at, b.end_at) - greatest(a.start_at, b.start_at))) / 60 mins
-      ${pair} order by a.start_at desc limit ${size} offset ${offsetOf(p, size)}`,
-    db`select count(*)::int n ${pair}`,
+        extract(epoch from (least(a.end_at, b.end_at) - greatest(a.start_at, b.start_at))) / 60 mins`;
+  const [crow, cnt, trend, rr, cap, acc, calAll, mem, bk, accAll, skip] = await Promise.all([
+    db`select * from (${clashKeys(s, f, calF as never, rowCols as never)}) p order by p.a_start desc, p.location_id, p.a_id, p.b_id limit ${size} offset ${offsetOf(p, size)}`,
+    db`select count(*)::int n from (${clashKeys(s, f, calF as never)}) k`,
     db`select date_trunc('week', a.start_at)::date wk, count(*) filter (where a.status <> 'invalid')::int booked, count(*) filter (where a.status = 'cancelled')::int cancelled
        from cached_appointments a join (${L}) l on l.location_id = a.location_id
        where a.installation_id = ${s.inst} and a.start_at >= ${from} and a.start_at < ${to} ${calF} group by 1 order by 1`,

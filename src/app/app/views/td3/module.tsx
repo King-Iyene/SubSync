@@ -5,13 +5,14 @@ import { usePageRange } from "../../ds/page-range";
 import { historyLimitNote } from "@/lib/design/page-range";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import type { AccessKind } from "@/lib/access";
-import type { Td3Item, Td3List, Td3ListKind, Td3Module, Td3Numbers, Td3Options, Td3Proof, Td3Settings, Td3Today } from "@/lib/analytics/today3-types";
+import type { Td3Item, Td3List, Td3ListKind, Td3Module, Td3Numbers, Td3OpenKind, Td3Options, Td3Proof, Td3Settings, Td3Today } from "@/lib/analytics/today3-types";
 import { emailText, moneyText } from "@/lib/analytics/today3-intel";
 import { parseTodayAccounts, withTodayAccounts } from "@/lib/analytics/today-queue";
 import { remember } from "../../ds/remember";
 import { useApiClient } from "../../session";
 import { EmptyState, ErrorState, ModuleTabs, SkeletonRows } from "../../ds";
 import { OpenLeadButton } from "../../ds/open-lead-button";
+import { InfoTip } from "../../ds/info-tip";
 import { SlowRetry } from "../../ds/slow-retry";
 import { Btn } from "../../ui";
 import { cardLink, setDeepLink } from "@/lib/design/deep-link";
@@ -297,11 +298,23 @@ export function TodayTabBlocks({ location, level, go, open, setTab, saveOn, open
   );
 }
 
-function ProofTab({ location, accounts }: { location: string; accounts: boolean }) {
+const RECORD_TIP = "Counted from our daily record: SubSync keeps the total, not the people.";
+const PAST_TIP = "This is the total counted at the end of that week. The people are not kept for past weeks, only for the current one.";
+/** A figure that is only a total: plain text with an "i", never an underlined link. */
+function TotalNum({ value, tip }: { value: string; tip: string }) {
+  return <span className="td-total" data-total="true"><span className="td-totalnum">{value}</span><InfoTip text={tip} label="Why this does not open a list" /></span>;
+}
+type ProofPanel = { title: string; location: string | null; kinds: Td3OpenKind[] } | null;
+
+function ProofTab({ location, accounts, open }: { location: string; accounts: boolean; open: (d: NonNullable<Drill>) => void }) {
   const api = useApiClient(), sample = fixturesOn();
-  const [week, setWeek] = useState(""), [page, setPage] = useState(0), [copied, setCopied] = useState(false);
+  const [week, setWeek] = useState(""), [page, setPage] = useState(0), [copied, setCopied] = useState(false), [panel, setPanel] = useState<ProofPanel>(null);
   // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { setPage(0); }, [week, location]);
+  useEffect(() => { setPage(0); setPanel(null); }, [week, location]);
+  // One kind opens its rows at once; several kinds first show each kind with its count, and each of those opens its rows.
+  const openKinds = (title: string, loc: string | null, kinds: Td3OpenKind[]) => {
+    if (kinds.length === 1) { setPanel(null); open({ title: `${title}: ${kinds[0].label}`, kind: kinds[0].kind, location: loc, count: kinds[0].count }); } else setPanel({ title, location: loc, kinds });
+  };
   const r = useTd<Td3Proof>("proof", { location: location || undefined, week: week || undefined, page, size: 20 });
   return (
     <Load r={r}>
@@ -318,25 +331,43 @@ function ProofTab({ location, accounts }: { location: string; accounts: boolean 
               <h2 className="td-h2">Weekly receipt: week of {p.weekStart}{p.accountName ? `, ${p.accountName}` : ""}</h2>
               {p.total.enough ? (
                 <div className="td-big">
-                  <div><b>{num(p.total.found)}</b><span title="Problems that appeared this week and needed someone">Found</span></div>
-                  <div><b>{num(p.total.cleared)}</b><span title="Problems that were cleared this week">Fixed</span></div>
-                  <div><b>{num(p.total.stillOpen)}</b><span>Still open</span></div>
+                  <div><b><TotalNum value={num(p.total.found)} tip={RECORD_TIP} /></b><span title="Problems that appeared this week and needed someone">Found</span></div>
+                  <div><b><TotalNum value={num(p.total.cleared)} tip={RECORD_TIP} /></b><span title="Problems that were cleared this week">Fixed</span></div>
+                  <div>
+                    <b>{p.isCurrent && p.total.stillOpen > 0 && p.total.openByKind.length > 0
+                      ? <button type="button" className="td-hnum" data-testid="td-proof-open" onClick={() => openKinds("Still open", location || null, p.total.openByKind)} aria-label={`Still open: ${num(p.total.stillOpen)}. Show the rows`}>{num(p.total.stillOpen)}</button>
+                      : p.total.stillOpen > 0 ? <TotalNum value={num(p.total.stillOpen)} tip={p.isCurrent ? RECORD_TIP : PAST_TIP} /> : <span className="td-totalnum">{num(p.total.stillOpen)}</span>}</b>
+                    <span>Still open</span>
+                  </div>
                   <div><b>{mins(p.total.medianFixMinutes)}</b><span title="The middle time between a problem appearing and being cleared. Needs 3 fixes.">Usual time to fix</span></div>
                 </div>
               ) : null}
               <ul className="td-lines" data-testid="td-lines">{[...p.lines, ...p.clientLines].map((l, i) => <li key={i}>{l}</li>)}</ul>
               <div className="flex flex-wrap gap-3 print:hidden">
                 <button type="button" className="s6-btn" data-kind="primary" data-testid="td-copy" onClick={() => { void copyText(text).then(setCopied); }}>{copied ? "Copied" : "Copy client report"}</button>
-                {p.total.stillOpen > 0 && <span className="ap-fine">The {num(p.total.stillOpen)} still open are on the Today page.</span>}
+                {p.isCurrent && p.total.stillOpen > 0 && p.total.openByKind.length > 0 && <button type="button" className="ap-link" data-testid="td-proof-open-link" onClick={() => openKinds("Still open", location || null, p.total.openByKind)}>See the {num(p.total.stillOpen)} still open</button>}
+                {!p.isCurrent && p.total.stillOpen > 0 && <span className="ap-fine">{num(p.total.stillOpen)} were still open at the end of this week. Pick the newest week to see who is open now.</span>}
               </div>
-              <p className="ap-fine">{p.historyStarts ? `Found and fixed come from our own daily record, which starts ${p.historyStarts}. They are totals, so there is no list behind them.` : "Our daily record has not started yet."} A problem counts as fixed only when the next refresh shows it cleared.</p>
+              {panel && (
+                <div className="td-openpanel" data-testid="td-proof-panel" role="group" aria-label={panel.title}>
+                  <b>{panel.title}{panel.location ? `: ${accounts ? p.rows.rows.find((x) => x.locationId === panel.location)?.name ?? "this account" : "your account"}` : ""}</b>
+                  <ul className="cl-steps">{panel.kinds.map((k) => <li key={k.kind}><button type="button" className="td-cellnum" data-testid="td-proof-kind" onClick={() => open({ title: `${panel.title}: ${k.label}`, kind: k.kind, location: panel.location, count: k.count })} aria-label={`${num(k.count)} ${k.label}. Show the rows`}>{num(k.count)}</button><span>{k.label}</span></li>)}</ul>
+                </div>
+              )}
+              <p className="ap-fine">{p.historyStarts ? `Found and fixed come from our own daily record, which starts ${p.historyStarts}. SubSync keeps those as totals, not the people, so they show an "i" instead of opening a list. Still open for the newest week opens the people.` :"Our daily record has not started yet."} A problem counts as fixed only when the next refresh shows it cleared.</p>
             </section>
-            {p.byKind.length > 0 && <section aria-label="What we found"><h2 className="td-h2">What we caught</h2><ul className="cl-steps">{p.byKind.map((k) => <li key={k.kind}><b>{num(k.found)}</b><span>{k.label}</span><span>{num(k.cleared)} fixed</span></li>)}</ul></section>}
+            {p.byKind.length > 0 && <section aria-label="What we found"><h2 className="td-h2">What we caught</h2><ul className="cl-steps" data-testid="td-caught">{p.byKind.map((k) => {
+              const canOpen = p.isCurrent && k.stillOpen > 0;
+              const row = <><b><TotalNum value={num(k.found)} tip={RECORD_TIP} /></b><span>{k.label}</span><span>{num(k.cleared)} fixed</span>{k.stillOpen > 0 && <span>{num(k.stillOpen)} still open</span>}</>;
+              return canOpen
+                ? <li key={k.kind}><button type="button" className="td-caughtrow" data-testid="td-caught-open" aria-label={`${num(k.stillOpen)} ${k.label} still open. Show the rows`} onClick={() => open({ title: `Still open: ${k.label}`, kind: k.kind, location: location || null, count: k.stillOpen })}>{row}<span className="td-caughtgo">Show who</span></button></li>
+                : <li key={k.kind}>{row}</li>;
+            })}</ul></section>}
             {accounts && p.rows.rows.length > 0 && (
               <section aria-label="By account">
                 <h2 className="td-h2">By client account</h2>
                 <div className="ap-scroll"><table className="ap-t" data-testid="td-proof-table"><thead><tr><th>Account</th><th data-num>Found</th><th data-num>Fixed</th><th data-num>Still open</th><th data-num>Usual time to fix</th></tr></thead>
-                  <tbody>{p.rows.rows.map((x) => <tr key={x.locationId} style={{ cursor: "default" }}><td>{x.name}</td><td data-num>{num(x.found)}</td><td data-num>{num(x.cleared)}</td><td data-num>{num(x.stillOpen)}</td><td data-num>{mins(x.medianFixMinutes)}</td></tr>)}</tbody></table></div>
+                  <tbody>{p.rows.rows.map((x) => <tr key={x.locationId} style={{ cursor: "default" }}><td>{x.name}</td><td data-num><TotalNum value={num(x.found)} tip={RECORD_TIP} /></td><td data-num><TotalNum value={num(x.cleared)} tip={RECORD_TIP} /></td><td data-num>{p.isCurrent && x.stillOpen > 0 && x.openByKind.length > 0 ? <button type="button" className="td-cellnum" data-testid="td-proof-account-open" aria-label={`${x.name}: ${num(x.stillOpen)} still open. Show the rows`} onClick={() => openKinds(`Still open in ${x.name}`, x.locationId, x.openByKind)}>{num(x.stillOpen)}</button> : x.stillOpen > 0 ? <TotalNum value={num(x.stillOpen)} tip={p.isCurrent ? RECORD_TIP : PAST_TIP} /> : <span className="td-totalnum">{num(x.stillOpen)}</span>}</td><td data-num>{mins(x.medianFixMinutes)}</td></tr>)}</tbody></table></div>
                 <Pager page={p.rows.page} pages={p.rows.pages} total={p.rows.total} set={setPage} />
               </section>
             )}
@@ -486,7 +517,7 @@ export function TodayModule({ go, kind, initialTab = "today", fromOverview = fal
     switch (active) {
       case "today": return <TodayTab location={location} level={level} go={goModule} open={open} nav={go} kind={kind} />;
       case "recover": return <RecoverTab location={location} level={level} accounts={accounts.length} />;
-      case "proof": return <ProofTab location={location} accounts={level !== "self"} />;
+      case "proof": return <ProofTab location={location} accounts={level !== "self"} open={open} />;
       case "numbers": return <NumbersTab location={location} go={goModule} open={open} fromOverview={fromOverview} level={level} nav={go} kind={kind} />;
       case "settings": return <SettingsTab level={level} cashOn={cashMail} saveOn={saveOn} nav={go} />;
     }

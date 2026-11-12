@@ -3,7 +3,7 @@ import { ttlCache } from "../ttl-cache";
 import { accountsCore, accountsIn, clientsCache, list as clientList, receipt as clientReceipt, type Core, type Filters, type Links } from "./clients3-queries";
 import { clampSize, STALE_DEAL_DAYS, WAIT_OLD_HOURS } from "./clients3-intel";
 import { NOSHOW_WINDOW_DAYS, UNMARKED_WINDOW_DAYS } from "../design/deep-link";
-import { changeText, DAY, headlineOf, KIND_SHORT, KIND_TEXT, localDay, MAX_ITEMS, medianOf, MIN_FIX_SAMPLES, MIN_REPLIES, planRecord, proofLines, rankItems, recentWeeks, showRate, validZone, type Prev } from "./today3-intel";
+import { openKinds, changeText, DAY, headlineOf, KIND_SHORT, KIND_TEXT, localDay, MAX_ITEMS, medianOf, MIN_FIX_SAMPLES, MIN_REPLIES, planRecord, proofLines, rankItems, recentWeeks, showRate, validZone, type Prev } from "./today3-intel";
 import { countedInScope, dealScopeJoins } from "./stage-rules-sql";
 import type {
   Td3Account, Td3Done, Td3Item, Td3Kind, Td3List, Td3ListKind, Td3Mine, Td3Numbers, Td3Options, Td3Proof, Td3ProofRow, Td3Row, Td3Settings, Td3Tile, Td3Today,
@@ -326,23 +326,27 @@ export async function recordToday(inst: string, now = Date.now()): Promise<numbe
 
 // ---- proof ----
 
-type Agg = { found: number; cleared: number; stillOpen: number; median: number | null; fixes: number };
-async function weekAgg(inst: string, ids: string[], weekStart: string): Promise<{ total: Agg; byKind: Map<Td3Kind, { found: number; cleared: number }>; rows: Map<string, Agg> }> {
+type Agg = { found: number; cleared: number; stillOpen: number; median: number | null; fixes: number; open: Map<Td3Kind, number> };
+async function weekAgg(inst: string, ids: string[], weekStart: string): Promise<{ total: Agg; byKind: Map<Td3Kind, { found: number; cleared: number; open: number }>; rows: Map<string, Agg> }> {
   const db = sql();
   const end = new Date(Date.parse(`${weekStart}T00:00:00Z`) + 7 * DAY).toISOString().slice(0, 10);
   const [sums, open, fix] = await Promise.all([
     db`select location_id, kind, sum(found)::int found, sum(cleared)::int cleared from td_daily_items where installation_id = ${inst} and location_id = any(${ids}::text[]) and day >= ${weekStart}::date and day < ${end}::date and kind = any(${[...TD3_KINDS]}::text[]) group by 1, 2`,
-    db`select location_id, sum(last_count)::int as open from (select distinct on (location_id, kind) location_id, kind, last_count from td_daily_items where installation_id = ${inst} and location_id = any(${ids}::text[]) and day < ${end}::date and kind = any(${[...TD3_KINDS]}::text[]) order by location_id, kind, day desc) x group by 1`,
+    db`select location_id, kind, last_count::int as open from (select distinct on (location_id, kind) location_id, kind, last_count from td_daily_items where installation_id = ${inst} and location_id = any(${ids}::text[]) and day < ${end}::date and kind = any(${[...TD3_KINDS]}::text[]) order by location_id, kind, day desc) x`,
     db`select location_id, x::int m from td_daily_items d, jsonb_array_elements_text(to_jsonb(d.fix_minutes)) x where d.installation_id = ${inst} and d.location_id = any(${ids}::text[]) and d.day >= ${weekStart}::date and d.day < ${end}::date`,
   ]);
-  const rows = new Map<string, Agg>(), byKind = new Map<Td3Kind, { found: number; cleared: number }>(), allFix: number[] = [], fixBy = new Map<string, number[]>();
-  const get = (l: string) => rows.get(l) ?? (rows.set(l, { found: 0, cleared: 0, stillOpen: 0, median: null, fixes: 0 }), rows.get(l) as Agg);
-  for (const r of sums) { const a = get(r.location_id as string); a.found += n(r.found); a.cleared += n(r.cleared); const k = byKind.get(r.kind as Td3Kind) ?? { found: 0, cleared: 0 }; k.found += n(r.found); k.cleared += n(r.cleared); byKind.set(r.kind as Td3Kind, k); }
-  for (const r of open) get(r.location_id as string).stillOpen = n(r.open);
+  const rows = new Map<string, Agg>(), byKind = new Map<Td3Kind, { found: number; cleared: number; open: number }>(), allFix: number[] = [], fixBy = new Map<string, number[]>();
+  const get = (l: string) => rows.get(l) ?? (rows.set(l, { found: 0, cleared: 0, stillOpen: 0, median: null, fixes: 0, open: new Map() }), rows.get(l) as Agg);
+  for (const r of sums) { const a = get(r.location_id as string); a.found += n(r.found); a.cleared += n(r.cleared); const k = byKind.get(r.kind as Td3Kind) ?? { found: 0, cleared: 0, open: 0 }; k.found += n(r.found); k.cleared += n(r.cleared); byKind.set(r.kind as Td3Kind, k); }
+  for (const r of open) {
+    const a = get(r.location_id as string), c = n(r.open), kd = r.kind as Td3Kind;
+    a.stillOpen += c; if (c > 0) a.open.set(kd, c);
+    const k = byKind.get(kd) ?? { found: 0, cleared: 0, open: 0 }; k.open += c; byKind.set(kd, k);
+  }
   for (const r of fix) { allFix.push(n(r.m)); fixBy.set(r.location_id as string, [...(fixBy.get(r.location_id as string) ?? []), n(r.m)]); }
   for (const [l, a] of rows) { const v = fixBy.get(l) ?? []; a.fixes = v.length; a.median = v.length >= MIN_FIX_SAMPLES ? medianOf(v) : null; }
-  const total: Agg = { found: 0, cleared: 0, stillOpen: 0, median: allFix.length >= MIN_FIX_SAMPLES ? medianOf(allFix) : null, fixes: allFix.length };
-  for (const a of rows.values()) { total.found += a.found; total.cleared += a.cleared; total.stillOpen += a.stillOpen; }
+  const total: Agg = { found: 0, cleared: 0, stillOpen: 0, median: allFix.length >= MIN_FIX_SAMPLES ? medianOf(allFix) : null, fixes: allFix.length, open: new Map() };
+  for (const a of rows.values()) { total.found += a.found; total.cleared += a.cleared; total.stillOpen += a.stillOpen; for (const [kd, c] of a.open) total.open.set(kd, (total.open.get(kd) ?? 0) + c); }
   return { total, byKind, rows };
 }
 
@@ -368,7 +372,7 @@ export async function proof(s: Scope, one: string | null, weekParam: string | nu
   const week = weekParam && weeks.includes(weekParam) ? weekParam : weeks[0];
   const weekEnd = new Date(Date.parse(`${week}T00:00:00Z`) + 6 * DAY).toISOString().slice(0, 10);
   const size = clampSize(o.size);
-  const empty: Td3Proof = { weekStart: week, weekEnd, weeks, total: { found: 0, cleared: 0, stillOpen: 0, medianFixMinutes: null, fixes: 0, enough: false }, byKind: [], rows: { ...pageOf<Td3ProofRow>([], 0, 0, size) }, lines: [], clientLines: [], historyStarts: null, accountName: one ? accts[0]?.name ?? null : null };
+  const empty: Td3Proof = { weekStart: week, weekEnd, weeks, total: { found: 0, cleared: 0, stillOpen: 0, medianFixMinutes: null, fixes: 0, enough: false, openByKind: [] }, isCurrent: week === weeks[0], byKind: [], rows: { ...pageOf<Td3ProofRow>([], 0, 0, size) }, lines: [], clientLines: [], historyStarts: null, accountName: one ? accts[0]?.name ?? null : null };
   if (!ids.length) return empty;
   const [agg, hist, days] = await Promise.all([
     weekAgg(s.inst, ids, week).catch(() => null),
@@ -377,19 +381,19 @@ export async function proof(s: Scope, one: string | null, weekParam: string | nu
   ]);
   if (!agg) return { ...empty, lines: proofLines({ found: 0, cleared: 0, stillOpen: 0, medianFixMinutes: null, enough: false }, null, null) };
   const enough = n(days[0]?.d) >= 2 && hist !== null && hist < new Date(Date.parse(`${week}T00:00:00Z`) + 7 * DAY).toISOString().slice(0, 10);
-  const total = { found: agg.total.found, cleared: agg.total.cleared, stillOpen: agg.total.stillOpen, medianFixMinutes: agg.total.median, fixes: agg.total.fixes, enough };
+  const total = { found: agg.total.found, cleared: agg.total.cleared, stillOpen: agg.total.stillOpen, medianFixMinutes: agg.total.median, fixes: agg.total.fixes, enough, openByKind: openKinds(agg.total.open) };
   const names = new Map(accts.map((a) => [a.id, a.name]));
-  const all = [...names.entries()].map(([id, name]): Td3ProofRow => { const a = agg.rows.get(id); return { locationId: id, name, found: a?.found ?? 0, cleared: a?.cleared ?? 0, stillOpen: a?.stillOpen ?? 0, medianFixMinutes: a?.median ?? null, fixes: a?.fixes ?? 0 }; })
+  const all = [...names.entries()].map(([id, name]): Td3ProofRow => { const a = agg.rows.get(id); return { locationId: id, name, found: a?.found ?? 0, cleared: a?.cleared ?? 0, stillOpen: a?.stillOpen ?? 0, medianFixMinutes: a?.median ?? null, fixes: a?.fixes ?? 0, openByKind: openKinds(a?.open ?? new Map()) }; })
     .sort((a, b) => b.found - a.found || b.stillOpen - a.stillOpen || a.name.localeCompare(b.name));
   const pages = Math.max(1, Math.ceil(all.length / size)), p = Math.min(Math.max(0, o.page), pages - 1);
-  const byKind = [...agg.byKind.entries()].filter(([, v]) => v.found + v.cleared > 0).map(([kind, v]) => ({ kind, label: KIND_TEXT[kind].label(v.found).replace(/^\d+ /, ""), ...v })).sort((a, b) => b.found - a.found);
+  const byKind = [...agg.byKind.entries()].filter(([, v]) => v.found + v.cleared + v.open > 0).map(([kind, v]) => ({ kind, label: KIND_TEXT[kind].label(v.found).replace(/^\d+ /, ""), found: v.found, cleared: v.cleared, stillOpen: v.open })).sort((a, b) => b.found - a.found);
   let clientLines: string[] = [];
   if (one) {
     try { const r = await clientReceipt({ inst: s.inst, allowed: s.allowed }, {}, one, week, now); clientLines = r && "lines" in r ? r.lines : []; } catch { clientLines = []; }
   }
   const lines = proofLines(total, one ? accts[0]?.name ?? null : null, hist);
   if (enough) for (const k of byKind.slice(0, 3)) lines.push(`${k.found} ${k.label}: ${k.cleared} fixed.`);
-  return { weekStart: week, weekEnd, weeks, total, byKind, rows: { rows: all.slice(p * size, p * size + size), total: all.length, page: p, size, pages, truncated: false }, lines, clientLines, historyStarts: hist, accountName: one ? accts[0]?.name ?? null : null };
+  return { weekStart: week, weekEnd, weeks, total, isCurrent: week === weeks[0], byKind, rows: { rows: all.slice(p * size, p * size + size), total: all.length, page: p, size, pages, truncated: false }, lines, clientLines, historyStarts: hist, accountName: one ? accts[0]?.name ?? null : null };
 }
 
 export async function exportProof(s: Scope, one: string | null, weekParam: string | null, now = Date.now()): Promise<string> {

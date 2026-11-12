@@ -91,3 +91,18 @@ Before (profile-today.ts, biggest installation, 52,929 contacts): Today cold 490
 profile-rollup.ts (5 runs): live "all accounts with numbers" p50 1172 ms, p95 3117 ms; one-lookup stand-in p50 388 ms, p95 404 ms (pure network here, about 2 ms in production).
 **NOT measured (honest):** after-numbers per screen. The migration cannot be applied by hand (rule), so the rollup/answers tables do not exist yet on the live database and this branch could not be timed end to end; the logged-in CRM tab was not touched. Expected after merge + production apply: every stored read = 1 statement (plus settings, held 10 s per instance); first ever read after a change or after 30 min is still the live path (unchanged). **King / next session: after the "production" apply, run `scripts/profile-today.ts` and `scripts/profile-rollup.ts`, and time first load in the CRM; paste p50/p95 here.**
 Not done: data prefetch on menu hover (needs each screen's exact first address; the hook `api.prefetch` is in place), Today's own 29 statements are unchanged (stored answer hides them after the first read), a real next build (local junction blocks Turbopack; CI/preview builds it).
+
+## Proof and number-link audit (12 Nov)
+Rule: a figure either opens exactly its rows or is marked as a total with an "i" popover. Guarded by src/lib/__tests__/proof-clickable.test.ts (number-link classes need a handler, plain totals have none and no underline, Ledger tokens only).
+
+**Fixed in Today > Proof:** Still open (receipt, per kind, per account, "What we caught" rows, "See the N still open") now opens the rows (server-paged, Open buttons, scoped to the account) for the newest week; Found and Fixed (receipt, per kind, per account) are plain totals with the popover "Counted from our daily record: SubSync keeps the total, not the people." Older weeks: still open is plain text with its own popover (rows cannot be rebuilt for a past date).
+
+**Audit, other tabs:**
+- Numbers tiles: all six are buttons; a tile with "not enough data" is disabled and says why. OK.
+- Numbers footer "N open deals with no value or no owner are left out": a sentence with a count and no list kind. FOLLOW-UP (add a list kind `left_out_deals`).
+- Settings: no figures that look clickable. OK.
+- Today strip and Money hero: the big figures and cause links open rows (`drill`). The notes beside them ("Estimate, N deals", "N deals won", "N open deals") restate the figure above that already opens the same rows; "N accounts may cancel" has no list of its own (Open Money button beside it). FOLLOW-UP: make "may cancel" open the Money churn list.
+- Clients (cl3/module.tsx): reasons and Waiting open rows. "New leads" per account and "Stale deals %%" are rate/trend figures with no row list (cl3/module.tsx:159,161). Trend tiles (sections.tsx:41) are marked cursor default. Receipt table cameIn/answered/stillWaiting/booked/showed (sections.tsx:164) are plain numbers with no list. FOLLOW-UP: add the "i" popover or lists.
+- Speed to lead: coverage channel counts (speed-coverage.tsx:77) are plain counts. FOLLOW-UP.
+- Money (cl3/money.tsx): "Who owes" and "Missing" tiles are buttons; the monthly price tile (line 58) is plain and says Estimate. OK.
+- Not audited line by line: Speed to lead race/insights panels and the Clients Book, Compare and Trends tabs.
