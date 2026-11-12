@@ -17,3 +17,10 @@ export function properName(name: string | null | undefined): string {
     return w.replace(/(^|[-'’])(\p{L})/gu, (_m, p: string, c: string) => p + c.toLocaleUpperCase());
   }).join("");
 }
+
+const NONAME = new Set(["", "unnamed contact", "this person", "a contact with no name"]);
+/** The best name to show for a person, after any update: their name, else their phone number, else their email, else "Unnamed contact". A placeholder never beats a real phone or email. Pure. */
+export function bestName(...candidates: Array<string | null | undefined>): string {
+  for (const c of candidates) { const t = (c ?? "").trim(); if (!NONAME.has(t.toLowerCase())) return t; }
+  return "Unnamed contact";
+}

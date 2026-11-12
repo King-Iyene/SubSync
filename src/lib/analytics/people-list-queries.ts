@@ -98,17 +98,16 @@ export function filterSql(db: Sql, installationId: string, f: SmartFilter, coldT
   const parts: Array<ReturnType<Sql>> = [];
   const add = (x: ReturnType<Sql>) => parts.push(x);
   if (f.q) {
-    // A typed word is looked for at the START of a name, last name or email (btree prefix indexes: a range read, however many people there are) and inside the phone digits (trigram).
-    // Never at the middle of a word with a pattern that has to read every row. An @ in the word means an email; digits only means a phone number.
+    // A typed word of 3+ letters is looked for ANYWHERE in a name or email (so "lead101" finds king+lead101@x.com) through the trigram indexes cached_contacts_name_trgm and cached_contacts_email_trgm; shorter words keep the start-of-name rule. Digits only means a phone number (any run of its digits).
     const t = searchTerm(f.q);
     const digits = f.q.replace(/[^0-9]/g, "");
     const word = escapeLike(f.q.toLowerCase());
     if (t.ok && t.kind === "phone" && digits.length >= 3) add(db`c.phone_digits like ${`%${digits}%`}`);
-    else if (t.ok && t.kind === "email") add(f.q.startsWith("@") ? db`lower(c.email) like ${`%${word}%`}` : db`lower(c.email) like ${`${word}%`}`);
+    else if (t.ok && t.kind === "email") add(f.q.startsWith("@") || word.length >= 3 ? db`lower(c.email) like ${`%${word}%`}` : db`lower(c.email) like ${`${word}%`}`);
     // A word that starts any part of the name also counts ("Lead One" finds "Test Lead One"): the second condition is a trigram look-up of " lead one" (index cached_contacts_name_trgm),
     // used from three characters on; shorter words keep the start-of-name rule so they never read every row.
     else add(word.length >= 3
-      ? db`(lower(c.full_name) like ${`${word}%`} or lower(c.last_name) like ${`${word}%`} or lower(c.email) like ${`${word}%`} or c.full_name ilike ${`% ${word}%`})`
+      ? db`(lower(c.full_name) like ${`${word}%`} or lower(c.last_name) like ${`${word}%`} or lower(c.email) like ${`%${word}%`} or c.full_name ilike ${`%${word}%`})`
       : db`(lower(c.full_name) like ${`${word}%`} or lower(c.last_name) like ${`${word}%`} or lower(c.email) like ${`${word}%`})`);
   }
   if (f.tags?.length) add(f.tagMode === "all" ? db`c.tags @> ${f.tags}::text[]` : db`c.tags && ${f.tags}::text[]`);
