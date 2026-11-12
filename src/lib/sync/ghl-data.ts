@@ -454,3 +454,47 @@ export async function fetchConversationsPage(token: string, locationId: string, 
   const more = conversations.length >= limit && Number.isFinite(lastMs);
   return { conversations, next: more ? ({ startAfterDate: lastMs } as ConversationCursor) : null };
 }
+
+// ---- Forms, surveys and funnels (stage DQ). Read only. NOT VERIFIED LIVE: written from the documented shapes (docs/research/DATAQUALITY_R1.md) and read defensively. Each needs an optional
+// permission (forms.readonly, surveys.readonly, funnels/funnel.readonly); a 401 or 403 is shown as "Needs permission: reconnect", never as a failure.
+export type IntakeItem = { id: string; name: string; steps: number | null };
+export type SubmissionRow = { id: string; formId: string; contactId: string | null; at: string };
+
+const items = (raw: unknown, key: string): IntakeItem[] => {
+  const body = rec(raw);
+  const list = Array.isArray(body[key]) ? (body[key] as unknown[]) : [];
+  return list.map((x) => { const r = rec(x); const id = str(r._id) ?? str(r.id); return id ? { id, name: (str(r.name) ?? "Untitled").slice(0, 120), steps: Array.isArray(r.steps) ? r.steps.length : null } : null; }).filter((x): x is IntakeItem => x !== null);
+};
+export async function fetchForms(token: string, locationId: string, kind: "forms" | "surveys"): Promise<IntakeItem[]> {
+  const out: IntakeItem[] = [];
+  for (let skip = 0; skip < 500; skip += 100) {
+    const page = items(await getJson(`/${kind}/`, { locationId, limit: "100", skip: String(skip) }, token, "2021-07-28"), kind);
+    out.push(...page);
+    if (page.length < 100) break;
+  }
+  return out;
+}
+export async function fetchFunnels(token: string, locationId: string): Promise<IntakeItem[]> {
+  const out: IntakeItem[] = [];
+  for (let offset = 0; offset < 300; offset += 100) {
+    const page = items(await getJson("/funnels/funnel/list", { locationId, limit: "100", offset: String(offset) }, token, "2021-07-28"), "funnels");
+    out.push(...page);
+    if (page.length < 100) break;
+  }
+  return out;
+}
+/** Submissions since `startAt` (YYYY-MM-DD), newest first, at most `maxPages` pages of 100. */
+export async function fetchSubmissions(token: string, locationId: string, kind: "forms" | "surveys", startAt: string, maxPages = 10): Promise<SubmissionRow[]> {
+  const out: SubmissionRow[] = [];
+  for (let page = 1; page <= maxPages; page++) {
+    const body = rec(await getJson(`/${kind}/submissions`, { locationId, limit: "100", page: String(page), startAt }, token, "2021-07-28"));
+    const list = Array.isArray(body.submissions) ? (body.submissions as unknown[]) : [];
+    for (const x of list) {
+      const r = rec(x); const id = str(r.id) ?? str(r._id); const at = toIso(r.createdAt);
+      const formId = str(r.formId) ?? str(r.surveyId);
+      if (id && at && formId) out.push({ id, formId, contactId: str(r.contactId), at });
+    }
+    if (list.length < 100) break;
+  }
+  return out;
+}

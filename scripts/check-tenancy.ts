@@ -92,6 +92,9 @@ async function main() {
       // Clean-up fix lists, Health and bulk runs (stage CU), aimed at the other side's accounts by every parameter they take.
       "/api/app/cu/options", "/api/app/cu/home", `/api/app/cu/home?account=${other.locs[0]}`, "/api/app/cu/accounts", `/api/app/cu/accounts?q=${other.marker}`, "/api/app/cu/actions",
       "/api/app/cu/list?kind=junk", `/api/app/cu/list?kind=no_phone&account=${other.locs[0]}`, `/api/app/cu/list?kind=orphan_deals&account=${other.locs[0]}`, `/api/app/cu/csv?kind=no_owner&account=${other.locs[0]}`,
+      // Clean-up v2 (stage DQ): reads with another account's id, and a cursor, must come back empty or not found.
+      "/api/app/dq/options", "/api/app/dq/overview", `/api/app/dq/overview?account=${other.locs[0]}`, "/api/app/dq/dupes?tier=certain", `/api/app/dq/dupes?tier=likely&account=${other.locs[0]}`, `/api/app/dq/dupe?account=${other.locs[0]}&ids=${other.contacts[0]},${other.contacts[0]}dup`,
+      "/api/app/dq/intake?range=30", `/api/app/dq/intake?range=30&account=${other.locs[0]}`, `/api/app/dq/intake-source?src=website%20form&account=${other.locs[0]}`, `/api/app/dq/leads?flag=all&account=${other.locs[0]}`, "/api/app/dq/leads?flag=dup&src=website%20form", "/api/app/dq/accounts", "/api/app/dq/events",
       "/api/app/cleanup/rules", `/api/app/cleanup/rules?account=${other.locs[0]}`, `/api/app/cleanup/rules/preview?account=${other.locs[0]}&preset=loose`, "/api/app/duplicates/history", `/api/app/duplicates/history?location=${other.locs[0]}`, "/api/app/duplicates/rules",
       // Speed to lead (stage SPEED): the first screen, the list behind a number and the comparisons, the other side's account asked for by every parameter they take.
       "/api/app/speed?part=home", `/api/app/speed?part=list&status=all&account=${other.locs[0]}`, `/api/app/speed?part=list&status=waiting&account=${other.locs.join(",")}`, `/api/app/speed?part=list&status=all&person=${other.marker}`, "/api/app/speed?part=compare&by=account", "/api/app/speed?part=compare&by=person",
@@ -323,6 +326,9 @@ async function main() {
       ["POST", "/api/app/cleanup/quality/scan", { locationId: B.locs[0] }],
       ["POST", "/api/app/duplicates/merge-workflow", { locationId: B.locs[0], contactIds: [B.contacts[0], B.contacts[0] + "dup"], keepContactId: B.contacts[0], confirm: true }],
       ["POST", "/api/app/duplicates/undo-snooze", { locationId: B.locs[0], key: "00000000-2" }],
+      ["POST", "/api/app/dq/decide", { locationId: B.locs[0], contactIds: [B.contacts[0], B.contacts[0] + "dup"], decision: "not_duplicate" }],
+      ["POST", "/api/app/dq/delete", { step: "do", locationId: B.locs[0], contactIds: [B.contacts[0], B.contacts[0] + "dup"], keepContactId: B.contacts[0], typed: "delete 1 contact" }],
+      ["POST", "/api/app/dq/mute", { account: B.locs[0], src: "website form", on: true }],
       // People: marking the other agency's person as opened, and logging a call on the other agency's person.
       ["PUT", "/api/app/people/seen", { locationId: B.locs[0], contactId: B.contacts[0] }],
       ["POST", "/api/app/people/outcome", { locationId: B.locs[0], contactId: B.contacts[0], outcome: "answered" }],

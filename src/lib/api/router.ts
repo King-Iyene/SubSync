@@ -110,6 +110,7 @@ import { can, personFromSession } from "../connections/person";
 import { handlePeople, timeoutResponse } from "./people-routes";
 import { handleDuplicates } from "./duplicates-routes";
 import { handleCu } from "./cu-routes";
+import { handleDq } from "./dq-routes";
 import { handleWorkbench } from "./workbench-routes";
 import { handleDial } from "./dial-routes";
 import { handleBoard } from "./pipeline-board-routes";
@@ -2130,6 +2131,11 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
     // Clean-up fix lists, Health and bulk runs (stage CU): flags cu_fix, cu_health, cu_bulk, checked inside the handler.
     if (a === "cu") {
       const r = await handleCu(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links, locationToken: (locationId) => locationAccessToken(ctx.session.companyId, locationId), actor: actorOf });
+      if (r) return r;
+    }
+    // Clean-up v2 (stage DQ): duplicate groups, lead intake, quality score and history. Flags dq_*, checked inside the handler.
+    if (a === "dq") {
+      const r = await handleDq(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links, locationToken: (locationId) => locationAccessToken(ctx.session.companyId, locationId), actor: actorOf });
       if (r) return r;
     }
     // Clean-up v2: rules, data quality, import check, the per-account switch for changing contacts. Anything else under cleanup falls through to the run endpoints below.

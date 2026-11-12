@@ -199,6 +199,12 @@ export const FEATURES = [
   "cu_health",
   "cu_bulk",
   "cu_confirm",
+  "dq_module",
+  "dq_dupes",
+  "dq_intake",
+  "dq_alerts",
+  "dq_gate",
+  "dq_score",
 ] as const;
 export type Feature = (typeof FEATURES)[number];
 

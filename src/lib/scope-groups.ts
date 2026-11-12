@@ -69,6 +69,11 @@ export const SCOPE_GROUPS: readonly ScopeGroup[] = [
     { scope: "wallet.readonly", kind: "read", required: false, why: "The credit balance of each client account, to warn you before it runs out. Read only." },
     { scope: "marketplace-installer-details.readonly", kind: "read", required: false, why: "Which plan each install is on, to double-check billing against our own records. Read only." },
   ] },
+  { id: "intake", title: "Lead intake", summary: "Which form, survey or funnel each lead came from, so you can see which one brings good leads and which one goes quiet.", scopes: [
+    { scope: "forms.readonly", kind: "read", required: false, why: "The names of your forms and when each was submitted, to count submissions per form and warn you when one goes quiet. SubSync never reads the answers. Without it Lead intake says: Needs permission, reconnect." },
+    { scope: "surveys.readonly", kind: "read", required: false, why: "The same for surveys and applications: names and submission times only, never the answers." },
+    { scope: "funnels/funnel.readonly", kind: "read", required: false, why: "The names and number of steps of your funnels, so a lead whose source carries a funnel name can be shown under it. Funnel views and conversion are not available from the platform." },
+  ] },
 ];
 
 /** Groups with no CRM permission at all, said on purpose so nobody goes looking for a switch that does not exist. */
@@ -79,7 +84,6 @@ export const NO_PERMISSION_GROUPS = [
 /** What SubSync does NOT ask for, and why (docs/CAPABILITIES.md). Asking for these would need a new release and a new approval from every install. */
 export const NOT_REQUESTED: ReadonlyArray<{ id: string; scope: string; why: string }> = [
   { id: "invoice_send", scope: "invoices.write", why: "Sending an invoice again. Not asked for: it would message your client's customer, and SubSync does not message anyone for you." },
-  { id: "forms", scope: "forms.readonly", why: "Form-by-form lead source. Not asked for yet." },
   { id: "send", scope: "conversations/message.write", why: "Sending messages. Never asked for: SubSync does not reply to anyone, it measures how fast your team does." },
 ];
 
@@ -116,6 +120,7 @@ export const FEATURE_NEEDS: readonly FeatureNeed[] = [
   { id: "pay_transactions", feature: "Failed payments and refunds", scope: "payments/transactions.readonly" },
   { id: "pay_subscriptions", feature: "Failed repeat payments", scope: "payments/subscriptions.readonly" },
   { id: "pay_invoices", feature: "Late invoices", scope: "invoices.readonly" },
+  { id: "intake_forms", feature: "Submissions per form and survey", scope: "forms.readonly" },
   { id: "pay_wallet", feature: "The credit balance of each client account", scope: "wallet.readonly" },
   { id: "data_health_fix", feature: "Fixing phone formats and name capitals in Data health", scope: "contacts.write" },
   { id: "meeting_notes", feature: "Adding a meeting summary to a contact's notes", scope: "contacts.write" },

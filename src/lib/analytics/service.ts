@@ -92,10 +92,13 @@ export async function refreshInsights(installationId: string): Promise<{ account
   await dailyQualityScan(installationId).catch(() => undefined);
   // Clean-up record (stage CU): one row of COUNTS per account per day, written whether or not the screen is on, so the history (the trend on the Health tab) starts now. Before the migration it just does nothing.
   await (await import("./cu-queries")).sweep(installationId, 12_000).catch(() => undefined);
+  // Data quality (stage DQ): duplicate groups, the lead-intake record and the quality score, written whether or not the screens are on, so the history starts now. Before the migration it does nothing.
+  const dq = await import("./dq-queries");
+  await dq.dqSweep(installationId, 15_000).catch(() => undefined);
   // Stage SPEED5: each account is judged against its OWN reply target, and the escalation ladder decides how far a breach climbs.
   const { applyBreaches } = await import("./speed5-queries");
   const sp5 = await applyBreaches(installationId, accounts, settings.speedTargetMinutes ?? 15).catch(() => ({ accounts, ladder: undefined }));
-  const drafts = [...computeAlerts(sp5.accounts, await domainStatuses(installationId), { ...settings, escalation: sp5.ladder }), ...(await duplicateAlertDrafts(installationId).catch(() => [])), ...(await (await import("./speed5-queries")).newLeadDuplicateDrafts(installationId).catch(() => [])), ...(await (await import("../api/growth-api")).growthAlertDrafts(installationId).catch(() => []))];
+  const drafts = [...computeAlerts(sp5.accounts, await domainStatuses(installationId), { ...settings, escalation: sp5.ladder }), ...(await duplicateAlertDrafts(installationId).catch(() => [])), ...(await dq.dqAlertDrafts(installationId).catch(() => [])), ...(await (await import("./speed5-queries")).newLeadDuplicateDrafts(installationId).catch(() => [])), ...(await (await import("../api/growth-api")).growthAlertDrafts(installationId).catch(() => []))];
   const created = await syncAlerts(installationId, drafts);
 
   // Telling people (the bell, email, Slack) is the dispatcher's job (stage F9): it reads each kind of message's preferences, quiet hours and routing, never

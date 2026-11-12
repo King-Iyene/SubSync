@@ -16,7 +16,7 @@ export const SYNCED_DELETE = [
   "td_daily_items", "td_receipts", "td_snoozes", // Today: the daily record of what was found and cleared, the weekly receipts and the put-aside marks
   "cf_recover_items", "cf_deal_flags", "cf_mutes", "cf_state", // Cash features: the missed-lead ledger, deal flags, digest mutes and sweep state
   "campaign_stats", "wf_outcome_daily", "workflow_snapshots", "workflow_changes", "workflow_daily", "workflow_items",
-  "dh_snapshots", "dh_flags", "dh_changes", "dh_outcomes", "cu_scans", "cu_actions", // Data health (docs/features/DATA_HEALTH.md)
+  "dh_snapshots", "dh_flags", "dh_changes", "dh_outcomes", "cu_scans", "cu_actions", "dq_groups", "dq_events", "dq_source_daily", "dq_forms", "dq_submissions", "dq_scores", "dq_poll", "dq_mutes", // Data health (docs/features/DATA_HEALTH.md)
   "call_queue_log", "meeting_deliveries", "crm_writes", "contact_writes", "field_write_state", "meetings", "meeting_notes", "shared_audits", "sync_jobs", "locations",
 ] as const;
 
