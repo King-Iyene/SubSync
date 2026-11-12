@@ -42,3 +42,7 @@
 @container (max-width: 700px) { .pp-only-sm { display: inline; } .pp-bar { display: none; } .pp .ap-t td.pp-wrap { max-width: 9.5rem; } .pp .pp-hide-sm { display: none; } .pp [data-sm="hide"] { display: none; } .pp .ap-t { min-width: 0; } .pp .ap-t td { max-width: 11rem; } }
 @media (prefers-reduced-motion: reduce) { .pp * { transition: none !important; animation: none !important; } }
 @media print { .pp-sub, .pp-pager { display: none; } }
+
+/* QA round 1: a total that opens nothing is a plain box, not a button; and the search box below the totals gets room. */
+.pp-tile[data-static] { cursor: default; } .pp-tile[data-static]:hover { border-color: color-mix(in srgb, var(--s6-edgec) 26%, transparent); }
+.pp-tiles { margin-bottom: 12px; }
