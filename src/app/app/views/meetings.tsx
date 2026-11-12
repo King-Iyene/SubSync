@@ -6,6 +6,7 @@ import { crmNoteFootnote } from "@/lib/meeting-wording";
 import { useApiClient, useData } from "../session";
 import { Badge, Btn, Card, Empty, ErrorBox, ExtLink, inputClass, Loading, timeAgo } from "../ui";
 import { MeetingInbox } from "./meeting-inbox";
+import { CallsToLog } from "./meeting-logged";
 import { AccountSetup, MyMeetingSetup, type SetupData } from "./meeting-setup";
 
 type Hook = { id: string; locationId: string; locationName: string | null; label: string | null; createdAt: string | null; lastUsedAt: string | null };
@@ -20,13 +21,15 @@ type Data = { meetings: Meeting[]; hooks: Hook[]; accounts: Array<{ locationId: 
 const sourceName = (source: string, zoom: boolean) => (source === "fathom" ? "Fathom" : source === "zoom" && zoom ? "Zoom" : "Meeting tool");
 
 // Meeting notes (stage E2a): the person's own Meeting inbox first, then the older list of meetings that arrived through a private address.
-export function MeetingsView() {
+export function MeetingsView({ logged = false, outcomes = false }: { logged?: boolean; outcomes?: boolean } = {}) {
+  const [tab, setTab] = useState(0);
   // Stage E2b: what a person saves and where, and (for admins) the account's rules and contact fields. Read once, shared by both tabs.
   const setup = useData<SetupData>("meeting-setup");
   return (
     <Page title="Meeting notes" subtitle="After a recorded call, SubSync adds the summary and action items to the contact, written as you. A call it cannot place waits in your private inbox.">
-      <ModuleTabs label="Meeting notes sections" tabs={[
+      <ModuleTabs label="Meeting notes sections" value={tab} onChange={setTab} tabs={[
         { label: "My Meeting inbox", node: <MeetingInbox /> },
+        ...(logged || outcomes ? [{ label: "Calls to log", node: <CallsToLog openInbox={() => setTab(0)} /> }] : []),
         { label: "What to save and where", node: <MyMeetingSetup data={setup.data} loading={setup.loading} error={setup.error} reload={setup.reload} /> },
         ...(setup.data?.admin.can ? [{ label: "Account setup", node: <AccountSetup setup={setup.data} /> }] : []),
         { label: "Older meeting notes", node: <OlderMeetings /> },

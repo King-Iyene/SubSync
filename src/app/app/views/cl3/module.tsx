@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { Cl2Today } from "@/lib/analytics/clients2-types";
 import type { Cl3Account, Cl3Attention, Cl3List, Cl3Options, Cl3Overview, Cl3Reason } from "@/lib/analytics/clients3-types";
 import { useApiClient, useData } from "../../session";
-import { EmptyState, ModuleTabs, OpenLeadButton, Page } from "../../ds";
+import { EmptyState, ModuleTabs, OpenLeadButton, Page, PopMenu } from "../../ds";
 import { Btn } from "../../ui";
 import type { GoFn } from "../../nav";
 import { ClientPage } from "../clients/client-page";
@@ -35,6 +35,7 @@ import { ago, change, day, Find, LevelChip, Load, money, Pager, share } from "./
 // Every number is a count that opens its rows. Nothing here messages anyone or changes the CRM. Sample data appears ONLY with ?clfx=1 and is labelled "Sample data".
 type Drill = { title: string; reason: Cl3Reason; location: string | null; count: number } | null;
 type TabKey = "overview" | "money" | "wallet" | "accounts" | "plans" | "needs" | "trends" | "compare" | "reports" | "proof" | "people" | "setup" | "health" | "onboarding" | "reviews" | "industries";
+const OLDER: TabKey[] = ["health", "onboarding", "reviews", "industries"];
 const TIPS: Record<TabKey, [string, string]> = {
   overview: ["Overview", "What to do today, in one sentence."], money: ["Money", "Plans, who has not paid, credit balances, and whether SubSync is installed, for every client account."], accounts: ["Accounts", "Every client account: paid plan, payment status, health, who looks after it."], plans: ["Plans", "Paid plans that are past due, cancelled or paused, with a note field."], needs: ["Needs attention", "Accounts ranked by what is wrong, with the count behind each reason."],
   wallet: ["Wallet", "Every client account's credit balance, lowest days left first, with alerts before it runs out."],
@@ -197,7 +198,10 @@ export function ClientsModule({ go, features = ALL_FEATURES, initialTab = "overv
     return { from: days === 30 ? undefined : from, industry: industry || undefined };
   }, [days, industry, since]);
   const active = tabs.includes(tab) ? tab : tabs[0];
-  const index = Math.max(0, tabs.indexOf(active));
+  // The four older pages live under "More" so the main tabs fit on one screen without sideways scrolling. Nothing is removed: each is one click away and keeps its address.
+  const mainTabs = tabs.filter((k) => !OLDER.includes(k)), olderTabs = tabs.filter((k) => OLDER.includes(k));
+  const olderOpen = OLDER.includes(active);
+  const index = Math.max(0, mainTabs.indexOf(active));
   const open = (d: NonNullable<Drill>) => { setDrill(d); setTimeout(() => document.getElementById("cl-drill")?.scrollIntoView({ block: "nearest", behavior: "smooth" }), 50); };
   const goTab = (t: TabKey) => { setTab(t); setDrill(null); };
   const readsAccounts = !["onboarding", "reviews", "industries", "health", "accounts", "plans", "money", "wallet", "proof"].includes(active);
@@ -244,7 +248,8 @@ export function ClientsModule({ go, features = ALL_FEATURES, initialTab = "overv
       <Page title="Clients" subtitle="Which client accounts are fine, which need you, and proof to show them." actions={sample ? null : <Btn onClick={() => api.download("clients3?part=export", "clients.csv")}>Export CSV</Btn>}>
         {sample && <p className="ap-fine mb-2" role="status" data-testid="cl-sample">Sample data: these are not your real clients.</p>}
         {opt.data?.problem && <p className="ap-fine mb-2" role="status">{opt.data.problem}</p>}
-        <ModuleTabs pill label="Clients sections" tabs={tabs.map((k) => ({ label: TIPS[k][0], tip: TIPS[k][1], node: null }))} value={index} onChange={(i) => goTab(tabs[i])} />
+        <ModuleTabs pill wrap label="Clients sections" tabs={mainTabs.map((k) => ({ label: TIPS[k][0], tip: TIPS[k][1], node: null }))} value={index} onChange={(i) => goTab(mainTabs[i])} noneActive={olderOpen}
+          trailing={olderTabs.length > 0 ? <PopMenu label={olderOpen ? `More: ${TIPS[active][0]}` : "More"} testId="cl-more" triggerClassName={`spd-tab ds-press inline-flex min-h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg px-3.5 text-sm font-semibold ${olderOpen ? "bg-[var(--spd-a)] text-[var(--spd-on)]" : "text-muted-foreground"}`} items={olderTabs.map((k) => ({ key: k, label: TIPS[k][0], hint: TIPS[k][1], onSelect: () => goTab(k) }))} /> : null} />
         {readsAccounts && (
           <div className="ap-head print:hidden" role="group" aria-label="Filters">
             {usesPeriod && <select className="ap-field" aria-label="Period" value={days} onChange={(e) => setDays(Number(e.target.value))}>{PERIODS.map(([d, l]) => <option key={d} value={d}>{l}</option>)}</select>}
