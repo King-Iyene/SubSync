@@ -72,8 +72,8 @@ export function GuideHelpButton({ view, go }: { view: string; go: (v: "help") =>
 /** Under every empty state: a link to the guide of the page it is on (read from the address), when guides are switched on. */
 export function EmptyGuideLink() {
   const { guides } = useStState();
-  const [view, setView] = useState<string | null>(null);
-  useEffect(() => { const h = window.location.hash.replace(/^#/, "").split(/[?=]/)[0]; setView(h || "today"); }, []);
+  // Read once when the empty state is drawn (the address does not change while it is on screen).
+  const [view] = useState<string | null>(() => (typeof window === "undefined" ? null : window.location.hash.replace(/^#/, "").split(/[?=]/)[0] || "today"));
   const g = view ? guideForView(view) : null;
   if (!guides || !g) return null;
   return <p className="mt-3 text-sm"><a href="#help" className="font-medium underline underline-offset-4" data-testid="empty-guide-link" onClick={() => remember(GUIDE_REQUEST_KEY, g.id)}>How {g.title} works: 60-second guide</a></p>;
