@@ -11,6 +11,8 @@ import { LinkBtn } from "./link-btn";
 import { ApWorklist } from "./list";
 import { CalChip, Chip, Pager, when } from "./parts";
 import { Hit, type SectionProps } from "./sections";
+import { RateTag, StatusLegend, toneVar } from "./status-ui";
+import { SCALES, toneOf, type Scale } from "@/lib/design/status-tone";
 import type { ApCalendarRow, ApCalendarsView, ApPersonCalRow, ApConflictRow, ApHealthRow, ApPersonRow, ApProof, ApShareView, ApSourceRow, ApSpeedBand } from "./types";
 
 type Col<T> = { h: string; num?: boolean; cell: (r: T) => ReactNode };
@@ -23,7 +25,8 @@ function Grid<T extends { [k: string]: unknown }>({ rows, cols, onRow, testId, t
   );
 }
 const Lead = ({ n, label, tone }: { n: number; label: string; tone?: string }) => <p className="mb-3 text-[1.05rem] font-semibold" data-testid="ap-lead"><span className="ap-strong" data-tone={tone}><CountUp value={n} /></span> {label}</p>;
-const Rate = ({ v, tone }: { v: number | null; tone?: "good" | "bad" }) => (v === null ? <span className="ap-sub" title="Not enough marked appointments yet">n/a</span> : <span style={{ color: tone === "bad" ? "var(--s6-red)" : tone === "good" ? "var(--s6-green)" : undefined }}>{pct(v)}</span>);
+// A rate in its status colour (green, ochre, red) with a glyph and a word; with no scale (for example the close rate) it is plain text. n/a stays grey.
+const Rate = ({ v, scale }: { v: number | null; scale?: Scale }) => (v === null ? <span className="ap-sub" title="Not enough marked appointments yet">n/a</span> : scale ? <RateTag v={v} scale={scale} /> : <span>{pct(v)}</span>);
 
 // ---------- Needs outcome / No-show recovery ----------
 const ORDER_WORDS: Record<string, string> = { value: "Biggest deal first.", oldest: "Oldest first.", newest: "Newest first.", name: "By name, A to Z." };
@@ -70,7 +73,7 @@ export function Recovery({ filters, onOpen, activeId, showAccount, clear, widen,
 const SHARE_SORTS: Array<[string, string]> = [["booked", "Most booked"], ["owned", "Most meetings taken"], ["show", "Best show rate"], ["revenue", "Most won"], ["name", "Name, A to Z"]];
 const calChip = (name: string | null, group?: string | null) => <CalChip name={name} group={group} />;
 export function BookingShare({ filters, onPerson, onDrill }: SectionProps & { onPerson: (p: ApPersonRow) => void }) {
-  const [page, setPage] = useState(1), [size, setSize] = useState(20), [sort, setSort] = useState("booked"), [role, setRole] = useState(""), [has, setHas] = useState("");
+  const [page, setPage] = useState(1), [size, setSize] = useState(20), [sort, setSort] = useState("booked"), [role, setRole] = useState(""), [has, setHas] = useState(""), [more, setMore] = useState(false);
   const key = JSON.stringify(filters) + sort + role + has;
   const [prev, setPrev] = useState(key), [now] = useState(() => Date.now());
   if (prev !== key) { setPrev(key); setPage(1); }
@@ -96,9 +99,10 @@ export function BookingShare({ filters, onPerson, onDrill }: SectionProps & { on
         {un.bookings > 0 && <span className="block">{un.bookings.toLocaleString("en-US")} {un.bookings === 1 ? "booking was" : "bookings were"} made by the lead through a booking page (or no booker was recorded), so no team member is credited. <LinkBtn onClick={() => onDrill({ title: "Bookings with no booker recorded", count: un.bookings, extra: { booker: "none", outcome: "booked", expect: un.bookings }, labels: { booker: "not recorded" } })} testId="ap-share-nobooker">Open them</LinkBtn></span>}
         {(un.noOwner ?? 0) > 0 && <span className="block">{un.noOwner!.toLocaleString("en-US")} {un.noOwner === 1 ? "booking has" : "bookings have"} no owner, so nobody is held to the meeting. Give them an owner in your CRM. <LinkBtn onClick={() => onDrill({ title: "Bookings with no owner", count: un.noOwner!, extra: { owner: "none", outcome: "booked", expect: un.noOwner }, labels: { owner: "nobody" } })} testId="ap-share-noowner">Open them</LinkBtn></span>}
       </InlineAlert>}
+      {rows.length > 0 && <div className="mb-2 flex flex-wrap items-center justify-between gap-2"><StatusLegend scale={SCALES.show} note="No-show colours use 15% or less as good and over 30% as bad." /><button type="button" className="ap-link text-xs" aria-expanded={more} onClick={() => setMore(!more)} data-testid="ap-share-more">{more ? "Fewer columns" : "More columns (close rate, calendars, trend)"}</button></div>}
       {!rows.length ? <EmptyState title="Nobody matches" body="Nobody in the chosen accounts, calendars and roles matches. Clear a filter to see more people." /> : (
       <Grid rows={rows} testId="ap-share-table" tone={(r) => (r.unassigned ? "amber" : undefined)} onRow={onPerson}
-        cols={[
+        cols={([
           { h: "Person", cell: (r) => <>
               <span className="ap-name">{r.name}</span> {r.unassigned ? <Chip tone="amber">Not recorded</Chip> : <span className="ap-sub">{r.roleLabel ?? (r.role === "setter" ? "Books" : r.role === "closer" ? "Takes" : "Both")}</span>}
               {r.inTeam === false && <> <Chip tone="grey">Not in the team list</Chip></>}{r.teamActive === false && <> <Chip tone="grey">Inactive</Chip></>}
@@ -106,7 +110,7 @@ export function BookingShare({ filters, onPerson, onDrill }: SectionProps & { on
             </> },
           { h: "Booked", num: true, cell: (r) => (r.role === "closer" ? (r.owned ?? 0) : r.bookings) > 0 ? <><Hit n={r.role === "closer" ? (r.owned ?? 0) : r.bookings} label={`Open the ${r.role === "closer" ? r.owned : r.bookings} appointments of ${r.name}` } onClick={() => onDrill({ title: `${r.name}, appointments`, count: r.role === "closer" ? (r.owned ?? 0) : r.bookings, extra: { [r.role === "closer" ? "owner" : "booker"]: r.id, outcome: "booked", expect: r.role === "closer" ? (r.owned ?? 0) : r.bookings }, labels: { [r.role === "closer" ? "owner" : "booker"]: r.name } })} /><span className="ap-bar" aria-hidden><i style={{ width: `${total ? ((r.role === "closer" ? (r.owned ?? 0) : r.bookings) / total) * 100 : 0}%` }} /></span></>
               : r.state === "never" ? <span className="ap-sub" title="No bookings in anything SubSync holds for this person.">No bookings yet</span> : <span className="ap-sub" title="Has bookings on other dates.">0 in {period}</span> },
-          { h: "Show", num: true, cell: (r) => <Rate v={r.showRate} /> }, { h: "No-show", num: true, cell: (r) => <Rate v={r.noShowRate} /> }, { h: "Close", num: true, cell: (r) => <Rate v={r.closeRate} /> },
+          { h: "Show", num: true, cell: (r) => <Rate v={r.showRate} scale={SCALES.show} /> }, { h: "No-show", num: true, cell: (r) => <Rate v={r.noShowRate} scale={SCALES.noShow} /> }, { h: "Close", num: true, cell: (r) => <Rate v={r.closeRate} /> },
           { h: "Won", num: true, cell: (r) => money(r.revenueCents) },
           { h: "By calendar", cell: (r) => ((r.byCalendar?.length ?? 0) === 0 ? <span className="ap-sub">{r.state === "booked" || r.unassigned ? "-" : "none"}</span> : (
               <details className="ap-bycal" onClick={(e) => e.stopPropagation()}><summary>{r.byCalendar!.length} calendar{r.byCalendar!.length === 1 ? "" : "s"}</summary>
@@ -115,7 +119,7 @@ export function BookingShare({ filters, onPerson, onDrill }: SectionProps & { on
                   {c.owned > 0 && <> <Hit n={c.owned} label={`Open ${c.owned} meetings taken by ${r.name} on ${c.name ?? "this calendar"}` } onClick={() => calOf(r, c.calendarId, "owner", c.owned, c.name)} /><span className="ap-sub"> taken</span></>}</div>)}</div>
               </details>)) },
           { h: "Show trend", cell: (r) => <Spark values={r.trend} /> },
-        ]} />)}
+        ] as Array<Col<ApPersonRow>>).filter((c) => more || !["Close", "By calendar", "Show trend"].includes(c.h))} />)}
       <Pager total={d.total} page={page} size={size} onPage={setPage} onSize={(n) => { setSize(n); setPage(1); }} />
     </div>
   );
@@ -135,10 +139,11 @@ export function Health({ filters, onAccount, onDrill }: SectionProps & { onAccou
   if (!res.data.rows.length) return <EmptyState title="No accounts with bookings" body="Each client account is ranked here, worst first, once it has appointments." />;
   return (
     <div data-testid="ap-health">
-      <p className="ap-fine mb-3">Worst account first. Accounts with fewer than 5 marked appointments show n/a instead of a guess. Press an account to open its appointments.</p>
+      <p className="ap-fine mb-2">Worst account first. Accounts with fewer than 5 marked appointments show n/a instead of a guess. Press an account to open its appointments.</p>
+      <div className="mb-3"><StatusLegend scale={SCALES.show} note="No-show: 15% or less is good, over 30% is bad. Cancelled: 10% or less is good, over 20% is bad." /></div>
       <Grid rows={res.data.rows} onRow={onAccount} testId="ap-health-table" tone={(r) => (r.noShowRate !== null && r.noShowRate >= 0.3 ? "red" : undefined)}
         cols={[{ h: "Account", cell: (r) => <span className="ap-name">{r.name}</span> }, { h: "Booked", num: true, cell: (r) => (r.booked ? <Hit n={r.booked} label={`Open the ${r.booked} appointments of ${r.name}`} onClick={() => onDrill({ title: `${r.name}, all appointments`, count: r.booked, extra: { location: r.locationId, outcome: "booked", expect: r.booked } })} /> : 0) }, { h: "Show", num: true, cell: (r) => <Rate v={r.showRate} /> },
-          { h: "No-show", num: true, cell: (r) => <Rate v={r.noShowRate} tone={r.noShowRate !== null && r.noShowRate >= 0.3 ? "bad" : undefined} /> }, { h: "Cancelled", num: true, cell: (r) => <Rate v={r.cancelRate} /> },
+          { h: "No-show", num: true, cell: (r) => <Rate v={r.noShowRate} scale={SCALES.noShow} /> }, { h: "Cancelled", num: true, cell: (r) => <Rate v={r.cancelRate} scale={SCALES.cancel} /> },
           { h: "No outcome", num: true, cell: (r) => (r.unmarked ? <Hit n={r.unmarked} tone="violet" label={`Open the ${r.unmarked} appointments of ${r.name} with no outcome`} onClick={() => onDrill({ title: `${r.name}, no outcome`, count: r.unmarked, extra: { location: r.locationId, outcome: "unmarked", expect: r.unmarked } })} /> : 0) }]} />
     </div>
   );
@@ -154,14 +159,16 @@ export function Sources({ filters, onDrill }: SectionProps) {
   const fast = speed.find((s) => s.showRate !== null), slow = [...speed].reverse().find((s) => s.showRate !== null);
   const gap = fast && slow && fast !== slow && fast.showRate !== null && slow.showRate !== null ? Math.round((fast.showRate - slow.showRate) * 100) : null;
   return (
+    <div data-testid="ap-sources-wrap"><div className="mb-3"><StatusLegend scale={SCALES.show} /></div>
     <div className="ap-grid ap-grid2" data-testid="ap-sources">
       <Q q="Which sources actually show up?" tip="Show rate = showed divided by showed plus no-show, for appointments someone marked. n/a under 5 marked." testId="ap-src-card">
-        <Grid rows={sources} cols={[{ h: "Source", cell: (r) => <span className="ap-name">{r.source}</span> }, { h: "Booked", num: true, cell: (r) => (r.booked ? <Hit n={r.booked} label={`Open the ${r.booked} appointments from ${r.source}`} onClick={() => onDrill({ title: `From ${r.source}`, count: r.booked, extra: { source: r.source, outcome: "booked", expect: r.booked } })} /> : 0) }, { h: "Show", num: true, cell: (r) => <><Rate v={r.showRate} />{r.showRate !== null && <span className="ap-bar" aria-hidden><i style={{ width: `${r.showRate * 100}%` }} /></span>}</> }, { h: "Won", num: true, cell: (r) => (r.won ? <Hit n={r.won} label={`Open the ${r.won} won appointments from ${r.source}`} onClick={() => onDrill({ title: `Won, from ${r.source}`, count: r.won, extra: { source: r.source, outcome: "won", expect: r.won } })} /> : 0) }]} />
+        <Grid rows={sources} cols={[{ h: "Source", cell: (r) => <span className="ap-name">{r.source}</span> }, { h: "Booked", num: true, cell: (r) => (r.booked ? <Hit n={r.booked} label={`Open the ${r.booked} appointments from ${r.source}`} onClick={() => onDrill({ title: `From ${r.source}`, count: r.booked, extra: { source: r.source, outcome: "booked", expect: r.booked } })} /> : 0) }, { h: "Show", num: true, cell: (r) => <><Rate v={r.showRate} scale={SCALES.show} />{r.showRate !== null && <span className="ap-bar" aria-hidden><i style={{ width: `${r.showRate * 100}%`, background: toneVar(toneOf(r.showRate, SCALES.show)) }} /></span>}</> }, { h: "Won", num: true, cell: (r) => (r.won ? <Hit n={r.won} label={`Open the ${r.won} won appointments from ${r.source}`} onClick={() => onDrill({ title: `Won, from ${r.source}`, count: r.won, extra: { source: r.source, outcome: "won", expect: r.won } })} /> : 0) }]} />
       </Q>
       <Q q="Does a faster reply mean more shows?" tip="Show rate for appointments grouped by how long the first reply took. Your own data only." testId="ap-speed-card">
-        <div className="ap-jr mt-2">{speed.map((s, i) => <div className="ap-jr-row" key={s.label} style={{ gridTemplateColumns: "8.5rem minmax(0,1fr) 3.5rem" }}><span>{s.label}</span><div className="ap-jr-bar"><i style={{ width: `${(s.showRate ?? 0) * 100}%`, ["--i" as string]: i }} /></div><span className="ap-jr-pct"><Rate v={s.showRate} /></span></div>)}</div>
+        <div className="ap-jr mt-2">{speed.map((s, i) => <div className="ap-jr-row" key={s.label} style={{ gridTemplateColumns: "8.5rem minmax(0,1fr) 3.5rem" }}><span>{s.label}</span><div className="ap-jr-bar"><i style={{ width: `${(s.showRate ?? 0) * 100}%`, ["--i" as string]: i, background: toneVar(toneOf(s.showRate, SCALES.show)) }} /></div><span className="ap-jr-pct"><Rate v={s.showRate} scale={SCALES.show} /></span></div>)}</div>
         {gap !== null && gap > 0 && <p className="ap-note mt-3" data-testid="ap-speed-insight">In your data, leads you answered fastest showed up {gap} points more often than the slowest. <i>Based on your own numbers.</i></p>}
       </Q>
+    </div>
     </div>
   );
 }

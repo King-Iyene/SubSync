@@ -5,6 +5,8 @@ import { filterQueryOf, joinQuery, pathWith, windowQuery, type WidgetId } from "
 import { useData } from "../session";
 import { CardRange, ChartPlaceholder, DataList, EmptyState, LeadDrawer, remember, remembered, SkeletonCards, useCardRange, type Column, type LeadSeed } from "../ds";
 import { Badge, Card, ErrorBox, ExtLink, fmtInt, fmtMoney, Stat } from "../ui";
+import { HEAT_LEGEND, SCALES, heatLevel, heatSentence, toneOf } from "@/lib/design/status-tone";
+import { RateTag, StatusLegend, TONE_TEXT, toneVar } from "./ap3/status-ui";
 import { ApptFilterBar, ApptListPanel, Explainer, pct, TargetEditor, useApptFilter, when, type ApptRow, type FilterOptionsData } from "./appointment-parts";
 
 type Heat = { weekday: number; hour: number; booked: number; held: number; noShow: number; showRate: number | null };
@@ -45,10 +47,12 @@ const DEFAULT_HIDDEN: WidgetId[] = ["funnel", "velocity", "fair", "value", "foll
 const INITIAL = { preset: "90d", compare: "none" } as const;
 const GRACE = 3 * 3_600_000;
 
-// A colour from red (low show rate) to green (high); a cell below 5 recorded outcomes has no colour and no number.
+// A diverging scale: red below 60%, ochre 60 to 79%, green 80% and up (six steps, stronger at the ends). A cell below 5 recorded outcomes has no colour and no number.
+// The number is always printed in the cell and the legend names every step, so colour is never the only signal.
 function cellStyle(c: Heat | undefined): React.CSSProperties {
-  if (!c || c.showRate === null) return { background: "transparent" };
-  return { background: `hsl(${Math.round(c.showRate * 120)} 30% 42% / 0.5)` };
+  const lv = c ? heatLevel(c.showRate) : null;
+  if (!c || !lv) return { background: "transparent" };
+  return { background: `color-mix(in srgb, ${toneVar(lv.tone)} ${Math.round(lv.strength * 100)}%, var(--card))` };
 }
 
 const leadColumns: Array<Column<Member>> = [
@@ -89,6 +93,12 @@ export function AppointmentInsights() {
   const openLeads = (title: string, count: number, rows: Member[]) => { setApptList(null); setLeadList({ title, count, rows }); };
   const f = d.heat;
   const w = d.window;
+  const heat = f.ready ? heatSentence(f.cells) : null;
+  const outcomeHeld = f.cells.reduce((a, c) => a + c.held, 0), outcomeMiss = f.cells.reduce((a, c) => a + c.noShow, 0);
+  const overallShow = outcomeHeld + outcomeMiss >= 5 ? outcomeHeld / (outcomeHeld + outcomeMiss) : null;
+  const bandTone = d.health.band === "healthy" ? "good" : d.health.band === "watch" ? "caution" : d.health.band ? "bad" : "neutral";
+  const headline = d.health.score === null && overallShow === null ? "Not enough marked appointments yet to say much. Mark outcomes and this fills in."
+    : `${d.health.score !== null ? `Calendar health is ${d.health.score} out of 100 (${d.health.band}).` : ""}${overallShow !== null ? ` Show rate is ${Math.round(overallShow * 100)}% (${toneOf(overallShow, SCALES.show) === "good" ? "good" : toneOf(overallShow, SCALES.show) === "caution" ? "worth watching" : "low"}).` : ""}${heat ? ` ${heat.text}` : ""}`.trim();
 
   // Cards that have not got enough data are one list with their progress, not a row of empty cards.
   const pending: Array<{ id: WidgetId; label: string; have: number; need: number; unit: string }> = [];
@@ -135,11 +145,22 @@ export function AppointmentInsights() {
         )}
       </div>
 
+      <Card title="In short">
+        <p className="text-lg font-semibold leading-snug" data-testid="insights-headline">{headline}</p>
+        <dl className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4" data-testid="insights-figures">
+          <div><dt className="text-xs text-muted-foreground">Show rate</dt><dd className="text-2xl font-semibold"><RateTag v={overallShow} scale={SCALES.show} strong /></dd></div>
+          <div><dt className="text-xs text-muted-foreground">Calendar health</dt><dd className={`text-2xl font-semibold tabular-nums ${TONE_TEXT[bandTone]}`}>{d.health.score === null ? "n/a" : d.health.score}</dd></div>
+          <div><dt className="text-xs text-muted-foreground">No-shows rebooked</dt><dd className="text-2xl font-semibold tabular-nums">{pct(d.recovery.rebookRate)}</dd></div>
+          <div><dt className="text-xs text-muted-foreground">Past, no outcome</dt><dd className={`text-2xl font-semibold tabular-nums ${d.funnel.unmarked > 0 ? "text-warning" : ""}`}>{fmtInt(d.funnel.unmarked)}</dd></div>
+        </dl>
+        <div className="mt-3"><StatusLegend scale={SCALES.show} /></div>
+      </Card>
+
       {(show("health") || show("funnel")) && (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           {show("health") && (
             <Card title="Calendar health" className="lg:col-span-1">
-              <p className="text-4xl font-semibold tabular-nums" data-testid="health-score">{d.health.score === null ? "n/a" : d.health.score}{d.health.score !== null && <span className="text-base font-normal text-muted-foreground"> / 100</span>}</p>
+              <p className={`text-4xl font-semibold tabular-nums ${TONE_TEXT[bandTone]}`} data-testid="health-score">{d.health.score === null ? "n/a" : d.health.score}{d.health.score !== null && <span className="text-base font-normal text-muted-foreground"> / 100</span>}</p>
               <p className="mb-3 mt-1">
                 {d.health.band ? <Badge tone={d.health.band === "healthy" ? "good" : d.health.band === "watch" ? "warn" : "bad"}>{d.health.band}</Badge> : <span className="text-xs text-muted-foreground">Needs at least 3 of the 4 checks. {d.health.used} of {d.health.of} have data.</span>}
               </p>
@@ -179,19 +200,23 @@ export function AppointmentInsights() {
 
       {ready("heat") && (
         <Card title={`Best times to book (show rate by day and hour, ${w.days} days)`}>
+          {heat && <p className="mb-1 text-base font-semibold" data-testid="heat-sentence">{heat.text}</p>}
           {f.best && f.worst && f.best.label !== f.worst.label && (
-            <p className="mb-3 text-sm font-medium">
-              People show most on {f.best.label} ({pct(f.best.showRate)}) and least on {f.worst.label} ({pct(f.worst.showRate)}){f.ratio && f.ratio >= 1.5 ? `: about ${f.ratio.toFixed(1)} times as likely` : ""}. Consider moving availability toward the better slots.
+            <p className="mb-3 text-sm text-muted-foreground">
+              Best slot: {f.best.label} ({pct(f.best.showRate)}). Weakest: {f.worst.label} ({pct(f.worst.showRate)}). Consider moving availability toward the better slots.
             </p>
           )}
           <HeatGrid cells={f.cells} onOpen={(c) => openAppts(`${DAYS[c.weekday]} at ${hourLabel(c.hour)}`, c.booked, d.items.filter((i) => i.weekday === c.weekday && i.hour === c.hour && i.status !== "cancelled"))} />
-          <p className="mt-2 text-xs text-muted-foreground">Each coloured square is a day and hour with at least 5 recorded outcomes; the number is its show rate. Press one to see its appointments. Times are in each account&apos;s own time zone.</p>
+          <HeatLegend />
+          <p className="mt-2 text-xs text-muted-foreground">Each square is a day and hour with at least 5 recorded outcomes; the number is its show rate. Hover for the counts, press one to see its appointments. Times are in each account&apos;s own time zone.</p>
           <Explainer id="heat" />
         </Card>
       )}
 
+      <details className="group space-y-6 rounded-xl border p-4" data-testid="insights-more">
+        <summary className="cursor-pointer select-none text-sm font-medium">More: recovery, sources, speed, fairness, follow-up and what is next</summary>
       {(ready("recovery") || ready("repeat")) && (
-        <div className="grid gap-4 xl:grid-cols-2">
+        <div className="mt-4 grid gap-4 xl:grid-cols-2">
           {ready("recovery") && (
             <Card title="No-show recovery">
               <div className="grid grid-cols-2 gap-3">
@@ -228,7 +253,7 @@ export function AppointmentInsights() {
                   { key: "s", header: "Source", primary: true, width: "minmax(0,2fr)", cell: (s) => s.source },
                   { key: "b", header: "Booked", width: "4.5rem", align: "right", cell: (s) => <span className="tabular-nums">{s.booked}</span> },
                   { key: "h", header: "Showed", width: "4.5rem", align: "right", cell: (s) => <span className="tabular-nums">{s.held}</span> },
-                  { key: "r", header: "Show rate", width: "5rem", align: "right", cell: (s) => <span className="tabular-nums">{pct(s.showRate)}</span> },
+                  { key: "r", header: "Show rate", width: "5rem", align: "right", cell: (s) => <RateTag v={s.showRate} scale={SCALES.show} /> },
                 ] satisfies Array<Column<SourceRow>>}
                 onOpen={(s) => { const ids = new Set(s.ids ?? []); openAppts(s.source, s.booked, d.items.filter((i) => ids.has(i.id))); }} />
               {d.sourceNote && <p className="mt-2 text-xs text-muted-foreground">{d.sourceNote}</p>}
@@ -308,6 +333,7 @@ export function AppointmentInsights() {
           <Explainer id="briefs" />
         </Card>
       )}
+      </details>
 
       {waiting.length > 0 && (
         <Card title="Not enough data yet" >
@@ -329,6 +355,19 @@ export function AppointmentInsights() {
   );
 }
 
+/** The key to the heat map: every step of the scale with its range and its word, light to strong. */
+function HeatLegend(): ReactNode {
+  return (
+    <div className="mt-3 space-y-1" data-testid="heat-legend">
+      <ul className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground" aria-label="Colour key for show rate">
+        {HEAT_LEGEND.map((lv) => <li key={lv.step} className="inline-flex items-center gap-1.5"><span aria-hidden className="size-3 rounded-sm border" style={{ background: `color-mix(in srgb, ${toneVar(lv.tone)} ${Math.round(lv.strength * 100)}%, var(--card))` }} />{lv.label}</li>)}
+        <li className="inline-flex items-center gap-1.5"><span aria-hidden className="size-3 rounded-sm border border-dashed" />Blank: fewer than 5 outcomes</li>
+      </ul>
+      <StatusLegend scale={SCALES.show} />
+    </div>
+  );
+}
+
 function HeatGrid({ cells, onOpen }: { cells: Heat[]; onOpen: (c: Heat) => void }): ReactNode {
   const grid = new Map(cells.map((c) => [`${c.weekday}:${c.hour}`, c]));
   const used = cells.filter((c) => c.booked > 0).map((c) => c.hour);
@@ -346,7 +385,7 @@ function HeatGrid({ cells, onOpen }: { cells: Heat[]; onOpen: (c: Heat) => void 
                 const c = grid.get(`${wd}:${h}`);
                 return (
                   <td key={h} className="h-8 w-10 border border-background p-0 text-center tabular-nums" style={cellStyle(c)}>
-                    {c && c.showRate !== null ? <button type="button" className="size-full min-h-8 min-w-10 hover:underline" aria-label={`${day} at ${hourLabel(h)}: ${pct(c.showRate)} show rate, ${c.booked} appointments, open the list`} title={`${c.booked} booked, ${c.held} showed, ${c.noShow} no-shows. Click to see them`} onClick={() => onOpen(c)}>{Math.round(c.showRate * 100)}</button> : null}
+                    {c && c.showRate !== null ? <button type="button" className="size-full min-h-8 min-w-10 hover:underline" aria-label={`${day} at ${hourLabel(h)}: ${pct(c.showRate)} show rate, ${c.booked} appointments, open the list`} title={`${day} at ${hourLabel(h)}: ${pct(c.showRate)} show rate (${heatLevel(c.showRate)?.tone === "good" ? "good" : heatLevel(c.showRate)?.tone === "caution" ? "watch" : "low"}). ${c.held} showed, ${c.noShow} no-shows, ${c.booked} booked. Click to see them`} onClick={() => onOpen(c)}>{Math.round(c.showRate * 100)}</button> : null}
                   </td>
                 );
               })}

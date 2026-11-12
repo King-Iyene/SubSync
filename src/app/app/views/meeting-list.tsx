@@ -6,6 +6,8 @@ import { decodeRange, resolveRange, todayOf } from "@/lib/design/range";
 import { pageRangeFromHash } from "@/lib/design/global-filter";
 import { EmptyState, ErrorState, SkeletonRows } from "../ds";
 import { OpenLeadButton } from "../ds/open-lead-button";
+import { BrandIcon } from "../ds/brand-icon";
+import { ManualMatch, TranscriptBox } from "./meeting-call-parts";
 import { remembered } from "../ds/remember";
 import { ApiError, useApiClient, useData } from "../session";
 import { BTN, ChangeFlow, PRIMARY } from "./appointment-actions-ui";
@@ -26,6 +28,7 @@ type Detail = {
   id: string; title: string | null; startedAt: string | null; minutes: number | null; talkPct: number | null; statusKey: string; statusLabel: string; attendees: string[]; summary: string | null; actionItems: string[];
   recordingUrl: string | null; locationId: string | null; locationName: string | null; contactId: string | null; contactName: string | null; contactUrl: string | null;
   appointment: { id: string; startAt: string | null; status: string | null; calendar: string | null } | null; outcome: { state: string; words: string; suggested: string | null };
+  provider?: string; noteAddedAt?: string | null;
   tasks: Array<{ itemNo: number; status: string }>; nextStep: string | null; deal?: { name: string | null; value: number | null; stage: string | null } | null; candidates: Array<{ locationId: string; locationName: string; contactId: string; name: string; email: string; url: string }>; canTasks: boolean; canOutcome: boolean;
 };
 type TaskPreview = { plans: Array<{ itemNo: number; title: string; dueAt: string }>; skipped: number; room: number; contactName: string; accountName: string; mode: { live: boolean; practice: boolean }; needsPermission: boolean; message: string | null };
@@ -202,14 +205,15 @@ function CallBody({ d, fx, reload, onOpenAppointment }: { d: Detail; fx: boolean
   const taken = new Set(d.tasks.map((t) => t.itemNo));
   return (
     <div className="space-y-4" data-testid="mn-detail">
-      <p className="flex flex-wrap items-center gap-2 text-sm"><span aria-hidden className={`size-2.5 rounded-full ${TONE[d.statusKey] ?? TONE.other}`} /><span className="font-medium">{d.statusLabel}</span><span className="text-muted-foreground">{whenOf(d.startedAt)}</span></p>
+      <p className="flex flex-wrap items-center gap-2 text-sm">{d.provider === "fathom" ? <BrandIcon id="fathom" size={18} /> : null}<span aria-hidden className={`size-2.5 rounded-full ${TONE[d.statusKey] ?? TONE.other}`} /><span className="font-medium">{d.statusLabel}</span><span className="text-muted-foreground">{whenOf(d.startedAt)}</span></p>
       {msg && <p role={msg.ok ? "status" : "alert"} className={`rounded-md border px-3 py-2 text-sm ${msg.ok ? "" : "border-destructive/40 text-destructive"}`}>{msg.text}</p>}
       <div className="flex flex-wrap gap-2">
-        {d.recordingUrl && <a href={d.recordingUrl} target="_blank" rel="noopener noreferrer" className={BTN} data-testid="mn-recording"><Video aria-hidden className="size-4" />Open the recording</a>}
+        {d.recordingUrl && <a href={d.recordingUrl} target="_blank" rel="noopener noreferrer" className={BTN} data-testid="mn-recording"><Video aria-hidden className="size-4" />Open the call link</a>}
         {d.contactUrl && <a href={d.contactUrl} target="_blank" rel="noopener noreferrer" className={BTN}><ExternalLink aria-hidden className="size-4" />Open the contact in your CRM</a>}
       </div>
       <dl className="divide-y rounded-xl border px-3">
         <Fact k="Contact">{d.contactName ? <span>{d.contactName}{d.locationName ? <span className="text-muted-foreground"> | {d.locationName}</span> : null}</span> : <span className="text-muted-foreground">Not matched yet</span>}</Fact>
+        <Fact k="Note on the contact">{d.noteAddedAt ? <span data-testid="mn-note-added">Added {whenOf(d.noteAddedAt)}</span> : <span className="text-muted-foreground" data-testid="mn-note-added">{d.contactId ? "No note added yet" : "Nothing is added until the contact is certain"}</span>}</Fact>
         <Fact k="Length">{d.minutes ? `${d.minutes} minutes` : <span className="text-muted-foreground">Not given by your meeting tool</span>}</Fact>
         {d.talkPct !== null && <Fact k="You spoke">{d.talkPct}% of the words</Fact>}
         <Fact k="Appointment">{d.appointment ? <span>{whenOf(d.appointment.startAt)}{d.appointment.calendar ? ` | ${d.appointment.calendar}` : ""}{d.locationId && onOpenAppointment ? <> <button type="button" className="min-h-9 text-primary underline" onClick={() => onOpenAppointment(d.locationId as string, d.appointment!.id)}>View</button></> : null}</span> : <span className="text-muted-foreground">None tied to this call</span>}</Fact>
@@ -226,6 +230,7 @@ function CallBody({ d, fx, reload, onOpenAppointment }: { d: Detail; fx: boolean
               <ul className="mt-2 space-y-2">{d.candidates.map((c) => <li key={c.contactId + c.locationId}><button type="button" className={`${BTN} w-full justify-start`} disabled={busy || fx} onClick={() => void match(c)} data-testid="mn-match"><Link2 aria-hidden className="size-4" />Put it on {c.name} <span className="text-muted-foreground">({c.email}, {c.locationName})</span></button></li>)}</ul>
             </>
           )}
+          <ManualMatch id={d.id} disabled={fx} onDone={(text) => { setMsg({ ok: true, text }); reload(); }} />
         </section>
       )}
 
@@ -256,6 +261,7 @@ function CallBody({ d, fx, reload, onOpenAppointment }: { d: Detail; fx: boolean
           <TaskMaker d={d} taken={taken} fx={fx} reload={reload} />
         )}
       </section>
+      <TranscriptBox id={d.id} fx={fx} />
       <p className="text-xs text-muted-foreground">Only you can see this call. Your administrator sees counts, never what was said.</p>
     </div>
   );
