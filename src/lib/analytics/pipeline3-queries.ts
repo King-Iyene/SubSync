@@ -75,7 +75,8 @@ export function deals(s: Scope, f: Filters): Frag {
     d1 as (
       select d0.*, (d0.value > 0 and d0.owner is not null and not d0.out_of_scope ${f.includeTest ? db`` : db`and not d0.is_test`}) counted from d0
     ),
-    lo as (select location_id, sum(value)::float8 total, count(*)::int n from d1 where status = 'open' and counted group by 1),
+    /* MATERIALIZED: left inlined, the planner re-ran this total once per deal (92 s at 55,000 deals; 2.5 s now). docs/QA_SCALE.md */
+    lo as materialized (select location_id, sum(value)::float8 total, count(*)::int n from d1 where status = 'open' and counted group by 1),
     d as (
       select d1.*, lo.total loc_total, (d1.status = 'open' and d1.counted and lo.n >= 3 and d1.value > 0.4 * lo.total) outlier,
         (d1.status = 'open' and d1.counted and d1.days_in_stage > d1.limit_days) stale
