@@ -17,29 +17,32 @@ export type Who = { level: "all" | "other"; selfId: string | null };
 export type PayWin = { from: string; toEx: string; basis: PayBasis; windowDays: number };
 
 /** The counted source rows for one period, all three kinds. Each row names the three people who could be paid: who booked, the lead's owner, and who the appointment is assigned to. */
-function source(db: Db, inst: string, ids: string[], w: PayWin): Frag {
+function source(db: Db, inst: string, ids: string[], w: PayWin, only: string | null): Frag {
+  // For one person's statement the rows are narrowed to the appointments and deals that name them, before anything else is built (so a private statement never scans everyone's lines).
+  const mine = (booker: Frag, owner: Frag, closer: Frag) => (only ? db`and ${only} in (${booker}, ${owner}, ${closer})` : db``);
   const base = (kind: string, at: Frag, cond: Frag) => db`
     select a.location_id, a.appointment_id::text ref_id, ${kind}::text kind, ${at} at, null::numeric value, a.booked_by_user, c.assigned_to lead_owner, a.assigned_to closer
     from cached_appointments a left join cached_contacts c on c.installation_id = a.installation_id and c.location_id = a.location_id and c.contact_id = a.contact_id
-    where a.installation_id = ${inst} and a.location_id = any(${ids}::text[]) and ${cond}`;
+    where a.installation_id = ${inst} and a.location_id = any(${ids}::text[]) and ${cond} ${mine(db`a.booked_by_user`, db`c.assigned_to`, db`a.assigned_to`)}`;
   return db`
     ${base("booked", db`a.created_remote_at`, db`a.created_remote_at >= ${w.from}::date and a.created_remote_at < ${w.toEx}::date and lower(coalesce(a.status, '')) not in ('cancelled', 'invalid')`)}
     union all
     ${base("showed", db`a.start_at`, db`a.start_at >= ${w.from}::date and a.start_at < ${w.toEx}::date and lower(coalesce(a.status, '')) = 'showed'`)}
     union all
-    select o.location_id, o.opportunity_id::text ref_id, 'won'::text kind, o.last_status_change_at at, o.monetary_value value, ap.booked_by_user, c.assigned_to lead_owner, ap.assigned_to closer
+    -- A won deal is credited to the latest appointment of the same contact in the days before the win. A set-based join (not one lookup per deal) so it stays fast at millions of rows.
+    (select distinct on (o.location_id, o.opportunity_id) o.location_id, o.opportunity_id::text ref_id, 'won'::text kind, o.last_status_change_at at, o.monetary_value value, ap.booked_by_user, c.assigned_to lead_owner, ap.assigned_to closer
     from cached_opportunities o
-    join lateral (select a.booked_by_user, a.assigned_to from cached_appointments a
-      where a.installation_id = o.installation_id and a.location_id = o.location_id and a.contact_id = o.contact_id and a.start_at <= o.last_status_change_at
-        and a.start_at >= o.last_status_change_at - make_interval(days => ${w.windowDays}) and lower(coalesce(a.status, '')) not in ('cancelled', 'invalid') order by a.start_at desc limit 1) ap on true
+    join cached_appointments ap on ap.installation_id = o.installation_id and ap.location_id = o.location_id and ap.contact_id = o.contact_id and ap.start_at <= o.last_status_change_at
+      and ap.start_at >= o.last_status_change_at - make_interval(days => ${w.windowDays}) and lower(coalesce(ap.status, '')) not in ('cancelled', 'invalid')
     left join cached_contacts c on c.installation_id = o.installation_id and c.location_id = o.location_id and c.contact_id = o.contact_id
-    where o.installation_id = ${inst} and o.location_id = any(${ids}::text[]) and o.status = 'won' and coalesce(o.monetary_value, 0) > 0 and o.last_status_change_at >= ${w.from}::date and o.last_status_change_at < ${w.toEx}::date`;
+    where o.installation_id = ${inst} and o.location_id = any(${ids}::text[]) and o.status = 'won' and coalesce(o.monetary_value, 0) > 0 and o.last_status_change_at >= ${w.from}::date and o.last_status_change_at < ${w.toEx}::date ${mine(db`ap.booked_by_user`, db`c.assigned_to`, db`ap.assigned_to`)}
+    order by o.location_id, o.opportunity_id, ap.start_at desc)`;
 }
 
 /** Every counted line with its person, rate and amount. Only lines of the chosen basis carry an amount. `only` narrows to one person (the private statement). */
 function rated(db: Db, inst: string, ids: string[], w: PayWin, only: string | null): Frag {
   return db`
-    with s as materialized (${source(db, inst, ids, w)})
+    with s as materialized (${source(db, inst, ids, w, only)})
     select l.*, l.kind || ':' || l.location_id || ':' || l.ref_id || ':' || l.role line_key, coalesce(r.pct, 0)::float8 pct, coalesce(r.flat, 0)::float8 flat,
       case when l.kind = ${w.basis} then round((coalesce(r.flat, 0) + case when l.kind = 'won' then coalesce(l.value, 0) * coalesce(r.pct, 0) / 100 else 0 end)::numeric, 2) else 0 end::float8 amount
     from (
@@ -47,7 +50,7 @@ function rated(db: Db, inst: string, ids: string[], w: PayWin, only: string | nu
       union all
       select s.location_id, s.ref_id, s.kind, s.at, s.value::float8 value, 'closer'::text role, nullif(s.closer, '') person from s
     ) l
-    left join lateral (select r.pct, r.flat from fn_pay_rates r where r.installation_id = ${inst} and r.role = l.role and r.person_id in (l.person, '') and r.location_id in (l.location_id, '')
+    left join lateral (select r.pct, r.flat from fn_pay_rates r where l.kind = ${w.basis} and r.installation_id = ${inst} and r.role = l.role and r.person_id in (l.person, '') and r.location_id in (l.location_id, '')
       order by (r.person_id <> '')::int * 2 + (r.location_id <> '')::int desc limit 1) r on true
     where l.person is not null and l.person not like '~%' ${only ? db`and l.person = ${only}` : db``}`;
 }
