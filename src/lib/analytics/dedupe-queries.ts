@@ -190,7 +190,8 @@ export async function loadPeople(installationId: string, allowed: string[] | nul
       select c.contact_id, c.full_name, c.email, c.phone, c.tags, c.date_added, c.last_activity_at, c.source, c.dnd, nullif(c.assigned_to, '') owner_id, t.name owner_name,
         coalesce(d.open_deals, 0) open_deals, coalesce(d.won_deals, 0) won_deals, coalesce(d.open_value, 0) open_value,
         exists (select 1 from cached_conversations v where v.installation_id = c.installation_id and v.location_id = c.location_id and v.contact_id = c.contact_id) has_conv,
-        (select count(*)::int from cached_appointments a where a.installation_id = c.installation_id and a.location_id = c.location_id and a.contact_id = c.contact_id) appts
+        (select count(*)::int from cached_appointments a where a.installation_id = c.installation_id and a.location_id = c.location_id and a.contact_id = c.contact_id) appts,
+        (select min(a.start_at) from cached_appointments a where a.installation_id = c.installation_id and a.location_id = c.location_id and a.contact_id = c.contact_id and a.start_at > now()) next_appt
       from cached_contacts c
       left join team_names t on t.installation_id = c.installation_id and t.user_id = c.assigned_to
       left join (
@@ -211,7 +212,7 @@ export async function loadPeople(installationId: string, allowed: string[] | nul
       contactId: id, name: (r.full_name as string | null)?.trim() || "Unnamed contact", email: r.email, phone: r.phone, tags: r.tags ?? [],
       createdAt: iso(r.date_added), lastActivityAt: iso(r.last_activity_at), source: r.source, openDeals: r.open_deals, wonDeals: r.won_deals, hasConversation: r.has_conv === true,
       dnd: r.dnd === true, ownerId: (r.owner_id as string | null) ?? null, ownerName: (r.owner_name as string | null) ?? null, openValue: Number(r.open_value) || 0,
-      appointments: r.appts as number, tagDates: dates.get(id) ?? {},
+      appointments: r.appts as number, nextAppointmentAt: iso(r.next_appt), tagDates: dates.get(id) ?? {},
     };
   });
   return { locationName: (loc[0].name as string | null) ?? null, people, watchingSince: iso(watch[0]?.at) };

@@ -30,7 +30,7 @@ export type GroupRow = { key: string; locationId: string; locationName: string |
 export type DupesRes = { tier: Tier; counts: Record<Tier, { groups: number; extra: number }> | null; next: string | null; rows: GroupRow[] };
 export type DupeDetail = {
   locationId: string; locationName: string | null; key: string; keepId: string; different: boolean;
-  people: Array<{ contactId: string; name: string; email: string | null; phone: string | null; tags: string[]; createdAt: string | null; source: string | null; ownerName: string | null; ownerId?: string | null; openDeals: number; wonDeals: number; hasConversation: boolean; appointments?: number; dnd?: boolean; url: string; protectWords: string | null }>;
+  people: Array<{ contactId: string; name: string; email: string | null; phone: string | null; tags: string[]; createdAt: string | null; source: string | null; ownerName: string | null; ownerId?: string | null; openDeals: number; wonDeals: number; hasConversation: boolean; appointments?: number; nextAppointmentAt?: string | null; openValue?: number; lastActivityAt?: string | null; dnd?: boolean; url: string; protectWords: string | null }>;
   guard: string[]; picks: Array<{ field: string; label: string; value: string; from: string; reason: string; conflict: boolean; values: string[] }>;
   workflow: { set: boolean; optedIn: boolean; canAsk: boolean; blockers: string[]; goneName: string | null; survivorId: string; switchOn: boolean };
 };

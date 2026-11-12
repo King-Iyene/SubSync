@@ -134,7 +134,7 @@ export async function handleDq(ctx: Ctx, h: DqHelpers): Promise<Response | null>
       const gone = people.find((p) => p.contactId === wf.enrolId);
       return json({
         locationId: loc, locationName: loaded.locationName, key: groupKey(ids), keepId, different: anyClearlyDiffer(people),
-        people: people.map((p) => ({ ...p, url: links.contact(loc, p.contactId), protectWords: p.dnd ? PROTECT_WORDS.dnd : p.openDeals > 0 ? PROTECT_WORDS.open_deal : null })),
+        people: people.map((p) => ({ ...p, url: links.contact(loc, p.contactId), protectWords: p.dnd ? PROTECT_WORDS.dnd : p.openDeals > 0 ? PROTECT_WORDS.open_deal : p.nextAppointmentAt ? PROTECT_WORDS.appointment : null })),
         guard: guardrails(people, keepId).map((g) => g.text), picks: pickFields(people, keepId, cfg.survive),
         workflow: { set: !!cfg.mergeWorkflowId, optedIn, canAsk: ctx.kind !== "client", blockers: wf.blockers.map((x) => x.text), goneName: gone?.name ?? null, survivorId: wf.survivorId, switchOn: !ctx.demo && isLive("WRITE_GHL_LIVE") },
       });
