@@ -31,8 +31,8 @@ export function layoutLadder(steps: readonly LadderStepIn[], o: LadderOpts): Lad
     const a = out[i - 1], b = out[i];
     chutes.push({ x: b.x, y: a.y + a.h, w: b.w, h: gap });
     const lost = Math.max(0, a.count - b.count), basin: Rect = { x: reach, y: b.y, w: basinW, h: basinH };
-    const x0 = a.x + a.w, y0 = a.y + a.h / 2;
-    leaks.push({ toKey: b.key, lost, basin, x0, y0, cx: Math.min(reach + 6, x0 + (reach - x0) * 0.7 + 14), cy: y0 + 4, x1: basin.x + 12, y1: basin.y, stream: Math.max(2, Math.min(rowH - 8, Math.round((lost / first) * (rowH - 8) * 3))) });
+    const x0 = a.x + a.w, y0 = a.y + a.h;
+    leaks.push({ toKey: b.key, lost, basin, x0, y0, cx: Math.min(reach + 6, x0 + (reach - x0) * 0.7 + 14), cy: y0 + 8, x1: basin.x + 12, y1: basin.y, stream: Math.max(2, Math.min(rowH - 8, Math.round((lost / first) * (rowH - 8) * 3))) });
   }
   const last = out[out.length - 1];
   return { width: o.width, height: last ? last.y + last.h + pad : 0, steps: out, chutes, leaks, narrow };
@@ -73,7 +73,7 @@ export function pathFor(L: LadderLayout, j: number, depth: number): Waypoint[] {
   }
   if (depth < L.steps.length - 1) {
     const leak = L.leaks[depth];
-    pts.push({ x: leak.x0 - 3, y: leak.y0 });
+    pts.push({ x: leak.x0 - 3, y: leak.y0 - 6 });
     for (let k = 1; k <= 6; k++) pts.push(pointOnLeak(leak, k / 6));
     pts.push({ x: leak.basin.x + leak.basin.w / 2, y: leak.basin.y + leak.basin.h - 8 });
   }
