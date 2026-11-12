@@ -78,7 +78,7 @@
 
 /* right-side panel */
 .ap-scrim { position: fixed; inset: 0; z-index: 999; background: var(--s6-scrim); animation: ap-fade 160ms ease both; }
-.ap-panel { position: fixed; top: 0; right: 0; bottom: 0; z-index: 1000; width: min(440px, 100vw); display: flex; flex-direction: column; background: var(--s6-pop); border-left: 1px solid color-mix(in srgb, var(--s6-edgec) 35%, transparent); box-shadow: -18px 0 50px -20px rgba(0,0,0,0.5); animation: ap-slide 220ms cubic-bezier(.2,.7,.2,1) both; }
+.ap-panel { position: fixed; top: 0; right: 0; bottom: 0; z-index: 1000; width: min(440px, 100vw); display: flex; flex-direction: column; background: var(--s6-pop); border-left: 1px solid color-mix(in srgb, var(--s6-edgec) 35%, transparent); box-shadow: -18px 0 50px -20px rgba(0, 0, 0,0.5); animation: ap-slide 220ms cubic-bezier(.2,.7,.2,1) both; }
 @keyframes ap-slide { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } } @keyframes ap-fade { from { opacity: 0; } to { opacity: 1; } }
 .ap-panel-h { display: flex; align-items: flex-start; gap: 10px; padding: 16px 16px 12px; border-bottom: 1px solid color-mix(in srgb, var(--s6-line) 80%, transparent); }
 .ap-panel-b { padding: 16px; overflow-y: auto; flex: 1; display: grid; gap: 14px; align-content: start; }
@@ -122,7 +122,7 @@
 .ap-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2px 6px; margin-top: 6px; }
 .ap-stat { min-width: 0; line-height: 1.15; } .ap-stat b { display: block; font-size: 0.8125rem; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .ap-stat small { display: block; font-size: 0.625rem; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap; }
 .ap-node[data-kind="leaf"] { border-radius: 999px; } .ap-node[data-kind="leaf"] .ap-node-main { display: flex; align-items: center; gap: 6px; padding: 0 10px; font-size: 0.75rem; white-space: nowrap; }
-.ap-node[data-kind="leaf"] i { width: 8px; height: 8px; border-radius: 50%; background: var(--tone); flex: none; } .ap-node[data-kind="leaf"] .ap-cal { font-style: normal; font-size: 0.68rem; color: var(--muted-foreground, #8a93a6); border: 1px solid color-mix(in srgb, var(--tone) 40%, transparent); border-radius: 999px; padding: 0 6px; max-width: 7.5rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 0 1 auto; }
+.ap-node[data-kind="leaf"] i { width: 8px; height: 8px; border-radius: 50%; background: var(--tone); flex: none; } .ap-node[data-kind="leaf"] .ap-cal { font-style: normal; font-size: 0.68rem; color: var(--muted-foreground, #9e9a92); border: 1px solid color-mix(in srgb, var(--tone) 40%, transparent); border-radius: 999px; padding: 0 6px; max-width: 7.5rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 0 1 auto; }
 .ap-node[data-kind="leaf"] b { margin-left: auto; font-variant-numeric: tabular-nums; }
 .ap-node[data-kind="more"] { border-style: dashed; } .ap-node[data-kind="more"] .ap-node-main { display: grid; place-items: center; padding: 0; font-size: 0.75rem; color: var(--muted-foreground); }
 .ap-node[data-kind="root"] { display: grid; place-items: center; text-align: center; border-width: 2px; }

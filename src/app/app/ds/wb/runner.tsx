@@ -77,7 +77,7 @@ export function ReviewSheet({ r, name }: { r: Runner; name: string }) {
   const tickOk = (p?.plan.warnings ?? []).every((w) => r.ack.includes(w.id));
   const danger = p?.action.kind === "delete";
   return (
-    <section className="border-t bg-popover px-5 py-4 shadow-[0_-8px_24px_-12px_rgba(0,0,0,0.25)]" aria-label="Review before it happens" data-testid="wb-review">
+    <section className="border-t bg-popover px-5 py-4 shadow-[0_-8px_24px_-12px_rgba(0, 0, 0,0.25)]" aria-label="Review before it happens" data-testid="wb-review">
       {p && (
         <div>
           <div className="flex items-start justify-between gap-3">

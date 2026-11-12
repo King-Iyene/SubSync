@@ -19,8 +19,8 @@ export function tagColor(name: string): TagColor {
   const h = HUES[index];
   return {
     index,
-    light: { bg: hsl(h, 85, 92), fg: hsl(h, 75, 22), dot: hsl(h, 85, 30) },
-    dark: { bg: hsl(h, 45, 24), fg: hsl(h, 90, 86), dot: hsl(h, 90, 74) },
+    light: { bg: hsl(h, 32, 91), fg: hsl(h, 38, 22), dot: hsl(h, 34, 38) },
+    dark: { bg: hsl(h, 18, 24), fg: hsl(h, 40, 86), dot: hsl(h, 38, 68) },
   };
 }
 

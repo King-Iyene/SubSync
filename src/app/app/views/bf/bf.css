@@ -1,5 +1,5 @@
 /* Appointments > Booking funnel. Calm and flat: ink, one accent, one warm colour for the leaks. Light and dark follow the app theme. No sideways scroll at 390 or 768. */
-.bf { --bf-accent: var(--s6-cyan, #0e7490); --bf-warm: var(--s6-amber, #b45309); --bf-line: color-mix(in srgb, var(--foreground) 14%, transparent); --bf-soft: color-mix(in srgb, var(--foreground) 5%, transparent); display: grid; gap: 16px; min-width: 0; }
+.bf { --bf-accent: var(--s6-cyan, #37674d); --bf-warm: var(--s6-amber, #8e582f); --bf-line: color-mix(in srgb, var(--foreground) 14%, transparent); --bf-soft: color-mix(in srgb, var(--foreground) 5%, transparent); display: grid; gap: 16px; min-width: 0; }
 .bf { max-width: 100%; overflow-x: clip; }
 .bf * { box-sizing: border-box; }
 .bf-sample { margin: 0; padding: 8px 12px; border-radius: 8px; border: 1px dashed var(--bf-line); font-size: 0.8125rem; color: var(--muted-foreground); }
@@ -27,14 +27,14 @@
 .bf-step:hover .bf-step-l, .bf-basin:hover .bf-basin-n { text-decoration: underline; }
 .bf-chute { fill: color-mix(in srgb, var(--bf-accent) 14%, transparent); }
 .bf-ledge { fill: var(--bf-accent); fill-opacity: 0.82; stroke: color-mix(in srgb, var(--bf-accent) 70%, var(--foreground)); stroke-width: 1; transition: fill-opacity 0.2s; }
-.bf-ledge[data-last="1"] { fill: color-mix(in srgb, var(--bf-accent) 70%, #16a34a); }
+.bf-ledge[data-last="1"] { fill: color-mix(in srgb, var(--bf-accent) 70%, #3b7e54); }
 .bf-step, .bf-basin { cursor: pointer; outline: none; }
 .bf-step:hover .bf-ledge, .bf-step:focus-visible .bf-ledge { fill-opacity: 1; }
 .bf-step:focus-visible .bf-ledge, .bf-basin:focus-visible .bf-basin-box { stroke: var(--foreground); stroke-width: 2; }
 .bf-step-l { font-size: 12px; fill: var(--muted-foreground); dominant-baseline: auto; }
 .bf-step-n { font-size: 15px; font-weight: 650; fill: var(--foreground); font-variant-numeric: tabular-nums; }
 .bf-step-p { font-size: 11px; font-weight: 500; fill: var(--muted-foreground); }
-.bf-on { fill: #fff; }
+.bf-on { fill: #ffffff; }
 .bf-halo { paint-order: stroke; stroke: var(--background); stroke-width: 3px; stroke-linejoin: round; }
 .bf-on .bf-step-p, .bf-step-n.bf-on .bf-step-p { fill: rgba(255, 255, 255, 0.85); }
 .bf-stream { stroke: color-mix(in srgb, var(--bf-warm) 55%, transparent); stroke-linecap: round; }
@@ -47,7 +47,7 @@
 .bf-tag { font-size: 10px; letter-spacing: 0.05em; text-transform: uppercase; fill: var(--bf-warm); font-weight: 700; }
 .bf-dot { fill: var(--foreground); pointer-events: none; }
 .bf-dot[data-fate="fell"] { fill: var(--bf-warm); }
-.bf-dot[data-fate="won"] { fill: #16a34a; }
+.bf-dot[data-fate="won"] { fill: #3b7e54; }
 .bf-ladder-foot { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; justify-content: space-between; min-height: 44px; }
 .bf-caption { margin: 0; font-size: 0.875rem; color: var(--muted-foreground); max-width: 46rem; }
 .bf-replay { min-height: 40px; }

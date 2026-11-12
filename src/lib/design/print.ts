@@ -7,8 +7,8 @@
 import { accentTokens, parseHex } from "./color";
 
 export const PRINT_LIGHT_TOKENS = {
-  "--background": "#f4f6fa", "--foreground": "#000c25", "--card": "#ffffff", "--card-foreground": "#000c25", "--muted": "#edf1f6", "--muted-foreground": "#44546f",
-  "--border": "#d5dce6", "--primary": "#0a658b", "--destructive": "#b3261e", "--success": "#0e7a53", "--warning": "#8a5a00", "--accent": "#dcebf3",
+  "--background": "#f8f7f6", "--foreground": "#141311", "--card": "#ffffff", "--card-foreground": "#141311", "--muted": "#f4f2ef", "--muted-foreground": "#5f5b54",
+  "--border": "#e3dfd8", "--primary": "#504c45", "--destructive": "#9d3a34", "--success": "#2c5c4b", "--warning": "#685023", "--accent": "#ebe9e4",
 } as const;
 
 /** The sender's colour as it prints on white (readable text, 4.5 to 1), or null when they have not set a valid one. */
@@ -23,5 +23,5 @@ export function printAccent(brandColor: string | null | undefined): string | nul
  */
 export function printCss(brandColor: string | null | undefined, wrapper = ".audit-print"): string {
   const vars = Object.entries({ ...PRINT_LIGHT_TOKENS, "--primary": printAccent(brandColor) ?? PRINT_LIGHT_TOKENS["--primary"] }).map(([k, v]) => `${k}: ${v};`).join(" ");
-  return `@page { margin: 14mm; } @media print { .dark, ${wrapper} { ${vars} } ${wrapper} { background: #fff; color: ${PRINT_LIGHT_TOKENS["--foreground"]}; } ${wrapper} li, ${wrapper} section { break-inside: avoid; } }`;
+  return `@page { margin: 14mm; } @media print { .dark, ${wrapper} { ${vars} } ${wrapper} { background: #ffffff; color: ${PRINT_LIGHT_TOKENS["--foreground"]}; } ${wrapper} li, ${wrapper} section { break-inside: avoid; } }`;
 }

@@ -69,7 +69,7 @@ export function LiveBadge({ live, stopped }: { live: LiveBody | null; stopped: b
     : !live ? "Checking your CRM..." : live.state === "ok" ? `Live. Updated ${secs ?? 0} s ago` : live.state === "off" ? "Sample data" : live.state === "needs_permission" ? "From the last sync. Reconnect to see it live." : "From the last sync. Your CRM is not answering right now.";
   return (
     <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground" data-testid="live-badge" data-live={ok ? "1" : "0"} aria-live="polite">
-      <span className={`inline-block size-2 rounded-full ${ok ? "bg-[var(--ok,#16a34a)]" : "bg-muted-foreground/50"}`} aria-hidden />
+      <span className={`inline-block size-2 rounded-full ${ok ? "bg-[var(--ok,#3b7e54)]" : "bg-muted-foreground/50"}`} aria-hidden />
       {text}
     </p>
   );

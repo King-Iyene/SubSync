@@ -8,7 +8,7 @@
   html.s4-printing .s4-print, html.s4-printing .s4-print * { visibility: visible; }
   @page { margin: 16mm; }
   html.s4-printing .s4-print .proof-account { break-inside: avoid; }
-  html.s4-printing .s4-print { position: absolute; left: 0; top: 0; width: 100%; color: #000; background: #fff; }
+  html.s4-printing .s4-print { position: absolute; left: 0; top: 0; width: 100%; color: #000000; background: #ffffff; }
 }
 
 /* Call mode: a calm, short pop for the finish mark (stage DIAL). */

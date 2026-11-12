@@ -15,7 +15,7 @@ const fmt = (n: number) => n.toLocaleString("en-US");
 const MAX_PARTICLES = 300;
 
 type Hot = { kind: "seg" | "drop"; i: number } | null;
-const hsl = (w: number, dark: boolean, a: number, gold = false) => (gold ? `hsla(46,96%,${dark ? 62 : 44}%,${a})` : `hsla(${Math.round(196 - w * 168)},${dark ? 92 : 85}%,${dark ? 62 : 40}%,${a})`);
+const hsl = (w: number, dark: boolean, a: number, gold = false) => (gold ? `hsla(42,42%,${dark ? 62 : 38}%,${a})` : `hsla(${Math.round(150 - w * 112)},${dark ? 26 : 30}%,${dark ? 62 : 36}%,${a})`);
 
 function reducedMotion() { return typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches; }
 
@@ -84,8 +84,7 @@ export function LeadJourneyPro({ steps, onOpen, label = "Lead journey", pulseKey
     const sprite = (key: string, col: string) => {
       let s = sprites.get(key); if (s) return s;
       s = document.createElement("canvas"); s.width = s.height = 32; const x = s.getContext("2d")!;
-      const gr = x.createRadialGradient(16, 16, 0, 16, 16, 16); gr.addColorStop(0, "rgba(255,255,255,0.95)"); gr.addColorStop(0.25, col); gr.addColorStop(1, "rgba(0,0,0,0)");
-      x.fillStyle = gr; x.fillRect(0, 0, 32, 32); sprites.set(key, s); return s;
+      x.fillStyle = col; x.beginPath(); x.arc(16, 16, 6, 0, Math.PI * 2); x.fill(); sprites.set(key, s); return s;
     };
     const buildStatic = (d: boolean) => {
       const off = document.createElement("canvas"); off.width = cv.width; off.height = cv.height;
@@ -94,14 +93,14 @@ export function LeadJourneyPro({ steps, onOpen, label = "Lead journey", pulseKey
         if (g.thick[i] <= 0) continue;
         const ramp = segs > 1 ? 0.5 + 0.45 * (i / (segs - 1)) : 0.8, m0 = g.m[i], m1 = g.m[i + 1];
         const gr = x.createLinearGradient(m0, 0, m1, 0); gr.addColorStop(0, colour(i, ramp * (d ? 0.62 : 0.7), d)); gr.addColorStop(1, colour(Math.min(segs - 1, i + 1), ramp * (d ? 0.62 : 0.7), d));
-        x.save(); x.shadowColor = colour(i, d ? 0.9 : 0.4, d); x.shadowBlur = (isWin(i) ? 30 : 18) * dpr; x.fillStyle = gr; segPath(x, i, 28); x.fill(); x.restore();
+        x.save(); x.shadowBlur = 0; x.fillStyle = gr; segPath(x, i, 28); x.fill(); x.restore();
         x.fillStyle = gr; segPath(x, i, 28); x.fill();
         x.strokeStyle = colour(i, d ? 0.9 : 0.8, d); x.lineWidth = 1.2; x.beginPath(); x.moveTo(m0, g.rT); x.lineTo(m1, g.rT); x.stroke();
       }
       g.branches.forEach((b) => {
         if (!b) return; const i = b.i - 1;
         const gr = x.createLinearGradient(b.m0, b.c0, b.m1, b.c1); gr.addColorStop(0, colour(i, d ? 0.55 : 0.6, d)); gr.addColorStop(1, colour(i, 0, d));
-        x.save(); x.lineCap = "butt"; x.strokeStyle = gr; x.lineWidth = b.d; x.shadowColor = colour(i, d ? 0.7 : 0.3, d); x.shadowBlur = 12 * dpr;
+        x.save(); x.lineCap = "butt"; x.strokeStyle = gr; x.lineWidth = b.d; x.shadowBlur = 0;
         branchPath(x, b); x.stroke(); x.restore();
       });
       // Stations: a thin tick across the river and a dot where the leader line lands.

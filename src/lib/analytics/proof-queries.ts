@@ -39,7 +39,7 @@ export function checkSettings(cur: PrSettings, p: SettingsPatch): { ok: true; va
   }
   if ("brandColor" in p) {
     if (p.brandColor === null || p.brandColor === "") next.brandColor = null;
-    else { const c = cleanColor(p.brandColor); if (!c) return { ok: false, error: "Colour must look like #1a73e8" }; next.brandColor = c; }
+    else { const c = cleanColor(p.brandColor); if (!c) return { ok: false, error: "Colour must look like #607fa2" }; next.brandColor = c; }
   }
   if ("intro" in p) next.intro = cleanText(p.intro, 400);
   if ("sections" in p) next.sections = normalizeSections(p.sections);

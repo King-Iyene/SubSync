@@ -148,11 +148,11 @@ export function digestEmail(i: { scope: string; accounts: SaveAccount[]; more: n
   const names = i.accounts.slice(0, 2).map((a) => a.name).join(", ");
   const subject = i.accounts.length ? `${i.accounts.length}${i.more ? "+" : ""} client account${i.accounts.length === 1 && !i.more ? "" : "s"} to save today: ${names}${i.accounts.length > 2 ? "..." : ""}` : "Save this account: nothing at risk today";
   const text: string[] = [i.scope, ""];
-  const html: string[] = [`<p style="margin:0 0 12px;color:#555">${esc(i.scope)}</p>`];
+  const html: string[] = [`<p style="margin:0 0 12px;color:#555555">${esc(i.scope)}</p>`];
   if (!i.accounts.length) { text.push("No client account looks at risk this morning."); html.push("<p>No client account looks at risk this morning.</p>"); }
   i.accounts.forEach((a, n) => {
     text.push(`${n + 1}. ${a.name}`, ...a.evidence.slice(0, 3).map((e) => `   - ${e.text}`), `   ${a.dollarText}`, `   Open the list: ${link(a)}`, "");
-    html.push(`<div style="margin:0 0 16px;padding:12px;border:1px solid #ddd;border-radius:8px"><b>${n + 1}. ${esc(a.name)}</b><ul style="margin:6px 0;padding-left:18px">${a.evidence.slice(0, 3).map((e) => `<li>${esc(e.text)}</li>`).join("")}</ul><p style="margin:6px 0;color:#555">${esc(a.dollarText)}</p><a href="${esc(link(a))}" style="display:inline-block;padding:8px 14px;background:#1a56db;color:#fff;border-radius:6px;text-decoration:none">Open the list</a></div>`);
+    html.push(`<div style="margin:0 0 16px;padding:12px;border:1px solid #dddddd;border-radius:8px"><b>${n + 1}. ${esc(a.name)}</b><ul style="margin:6px 0;padding-left:18px">${a.evidence.slice(0, 3).map((e) => `<li>${esc(e.text)}</li>`).join("")}</ul><p style="margin:6px 0;color:#555555">${esc(a.dollarText)}</p><a href="${esc(link(a))}" style="display:inline-block;padding:8px 14px;background:#5b789a;color:#ffffff;border-radius:6px;text-decoration:none">Open the list</a></div>`);
   });
   if (i.more > 0) { text.push(`And ${i.more} more. Open your list: ${i.appUrl}/app#today`, ""); html.push(`<p>And ${i.more} more. <a href="${esc(i.appUrl)}/app#today">Open your list</a>.</p>`); }
   if (i.monday && i.deals) {
@@ -161,7 +161,7 @@ export function digestEmail(i: { scope: string; accounts: SaveAccount[]; more: n
     text.push(line, `Open the deals: ${i.appUrl}/app#pipeline`, ""); html.push(`<p>${esc(line)} <a href="${esc(i.appUrl)}/app#pipeline">Open the deals</a>.</p>`);
   }
   text.push("You get one email a day. Dollar figures are estimates. Nothing here changes your CRM or messages your leads.", `Stop these emails: ${i.stopUrl}`);
-  html.push(`<p style="color:#777;font-size:12px">You get one email a day. Dollar figures are estimates. Nothing here changes your CRM or messages your leads. <a href="${esc(i.stopUrl)}">Stop these emails</a>.</p>`);
+  html.push(`<p style="color:#777777;font-size:12px">You get one email a day. Dollar figures are estimates. Nothing here changes your CRM or messages your leads. <a href="${esc(i.stopUrl)}">Stop these emails</a>.</p>`);
   return { subject, text: text.join("\n"), html: html.join("") };
 }
 

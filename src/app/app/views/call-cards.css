@@ -2,10 +2,10 @@
    Colours: neutral surfaces, ONE accent (the app's action colour) and status colours only for meaning. No glow. Motion is 150 ms, transform and opacity only,
    and prefers-reduced-motion switches it all off. Scoped by the cm- prefix; the rest of the app is untouched. */
 .cm { --cm-line: color-mix(in srgb, var(--s6-line) 100%, transparent); --cm-ink: var(--foreground); --cm-soft: var(--muted-foreground); --cm-accent: var(--s6-fill); --cm-hover: color-mix(in srgb, var(--cm-ink) 7%, transparent); --cm-sunk: color-mix(in srgb, var(--s6-sunk) 70%, transparent); }
-[data-theme="dark"] .cm { --cm-line: color-mix(in srgb, var(--s6-line) 85%, transparent); --cm-hover: color-mix(in srgb, #fff 8%, transparent); --cm-sunk: color-mix(in srgb, #fff 3.5%, transparent); }
+[data-theme="dark"] .cm { --cm-line: color-mix(in srgb, var(--s6-line) 85%, transparent); --cm-hover: color-mix(in srgb, #ffffff 8%, transparent); --cm-sunk: color-mix(in srgb, #ffffff 3.5%, transparent); }
 
 /* ---- the card ---- */
-.cm-card { border: 1px solid var(--cm-line); border-radius: 14px; background: var(--s6-surf); box-shadow: 0 1px 2px rgb(11 23 48 / .05), 0 8px 24px -18px rgb(11 23 48 / .25); overflow: hidden; min-width: 0; }
+.cm-card { border: 1px solid var(--cm-line); border-radius: 14px; background: var(--s6-surf); box-shadow: 0 1px 2px rgb(29 28 25 / .05), 0 8px 24px -18px rgb(29 28 25 / .25); overflow: hidden; min-width: 0; }
 [data-theme="dark"] .cm-card { box-shadow: none; }
 .cm-sec { padding: 20px 24px; }
 .cm-sec, .cm-toolbar { border-top: 1px solid var(--cm-line); }
@@ -19,7 +19,7 @@
 
 /* ---- buttons: one solid primary, quiet tools ---- */
 .cm-primary { position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 44px; padding: 0 18px; border-radius: 10px; border: 0; background: var(--cm-accent); color: var(--s6-on-cyan); font-size: .9375rem; font-weight: 600; cursor: pointer; isolation: isolate; transition: transform 150ms ease; }
-.cm-primary::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: #fff; opacity: 0; transition: opacity 150ms ease; z-index: -1; pointer-events: none; }
+.cm-primary::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: #ffffff; opacity: 0; transition: opacity 150ms ease; z-index: -1; pointer-events: none; }
 .cm-primary:hover:not(:disabled) { transform: translateY(-1px); }
 .cm-primary:hover:not(:disabled)::after { opacity: .12; }
 .cm-primary:active:not(:disabled) { transform: translateY(0) scale(.99); }
@@ -48,7 +48,7 @@
 .cm-seg { display: flex; gap: 2px; padding: 3px; margin: 0 0 20px; border-radius: 12px; border: 1px solid var(--cm-line); background: var(--cm-sunk); overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; scroll-snap-type: x proximity; }
 .cm-seg::-webkit-scrollbar { display: none; }
 .cm-seg-i { position: relative; flex: none; display: inline-flex; align-items: center; gap: 7px; min-height: 36px; padding: 0 13px; border-radius: 9px; border: 0; background: none; color: var(--cm-soft); font-size: .8125rem; font-weight: 500; white-space: nowrap; cursor: pointer; isolation: isolate; scroll-snap-align: center; transition: transform 150ms ease, color 150ms ease; }
-.cm-seg-i::before { content: ""; position: absolute; inset: 0; border-radius: inherit; background: var(--s6-surf); box-shadow: 0 0 0 1px var(--cm-line), 0 1px 3px rgb(11 23 48 / .12); opacity: 0; transition: opacity 150ms ease; z-index: -1; pointer-events: none; }
+.cm-seg-i::before { content: ""; position: absolute; inset: 0; border-radius: inherit; background: var(--s6-surf); box-shadow: 0 0 0 1px var(--cm-line), 0 1px 3px rgb(29 28 25 / .12); opacity: 0; transition: opacity 150ms ease; z-index: -1; pointer-events: none; }
 [data-theme="dark"] .cm-seg-i::before { background: var(--s6-surf2); box-shadow: 0 0 0 1px color-mix(in srgb, var(--s6-edgec) 22%, transparent); }
 .cm-seg-i:hover { color: var(--cm-ink); }
 .cm-seg-i:hover::before { opacity: .55; }
@@ -59,7 +59,7 @@
 .cm-seg-i svg { width: 15px; height: 15px; flex: none; }
 .cm-n { min-width: 20px; padding: 0 6px; height: 18px; display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; font-size: .6875rem; font-weight: 600; font-variant-numeric: tabular-nums; background: color-mix(in srgb, var(--cm-ink) 9%, transparent); color: var(--cm-soft); }
 .cm-seg-i[aria-pressed="true"] .cm-n { background: var(--cm-accent); color: var(--s6-on-cyan); }
-@media (max-width: 640px) { .cm-seg { margin-bottom: 16px; mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); } .cm-seg-i { min-height: 44px; } }
+@media (max-width: 640px) { .cm-seg { margin-bottom: 16px; mask-image: linear-gradient(to right, #000000 calc(100% - 28px), transparent); -webkit-mask-image: linear-gradient(to right, #000000 calc(100% - 28px), transparent); } .cm-seg-i { min-height: 44px; } }
 
 /* ---- quiet embedded panels and rows inside the card ---- */
 .cm-panel { margin-top: 12px; padding: 12px; border-radius: 10px; border: 1px solid var(--cm-line); background: var(--cm-sunk); font-size: .875rem; }
@@ -67,7 +67,7 @@
 .cm .s6-btn { min-height: 36px; border-radius: 8px; background: transparent; border-color: var(--cm-line); color: var(--cm-ink); font-weight: 500; box-shadow: none; transition: background-color 150ms ease, border-color 150ms ease; }
 .cm .s6-btn:hover { background: var(--cm-hover); border-color: color-mix(in srgb, var(--cm-ink) 24%, transparent); }
 .cm .s6-btn[data-kind="primary"] { background: var(--cm-accent); border-color: var(--cm-accent); color: var(--s6-on-cyan); box-shadow: none; }
-.cm .s6-btn[data-kind="primary"]:hover { background: color-mix(in srgb, var(--cm-accent) 88%, #fff); }
+.cm .s6-btn[data-kind="primary"]:hover { background: color-mix(in srgb, var(--cm-accent) 88%, #ffffff); }
 .cm .s6-chip[data-tone="neutral"] { color: var(--cm-soft); background: color-mix(in srgb, var(--cm-ink) 6%, transparent); border-color: var(--cm-line); }
 .cm .s6-chip { background-clip: padding-box; }
 
