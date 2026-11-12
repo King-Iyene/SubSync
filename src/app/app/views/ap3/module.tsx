@@ -11,11 +11,9 @@ import "../speed-ui.css";
 import "./ap3.css";
 import { registerAbSlots } from "./ab-slots";
 import { useData } from "../../session";
-import { remembered } from "../../ds/remember";
-import { decodeRange } from "@/lib/design/range";
-import { pageRangeFromHash } from "@/lib/design/global-filter";
+import { usePageRange } from "../../ds/page-range";
 import type { Appt3Options } from "@/lib/analytics/appointments3-types";
-import { AGE_OPTIONS, DEFAULT_FILTERS, FILTER_KEYS, filtersFromParams, filtersToParams, fixturesOn, queryOf, useAp, type ApFilters } from "./data";
+import { AGE_OPTIONS, DEFAULT_FILTERS, FILTER_KEYS, filtersFromParams, filtersToParams, fixturesOn, queryOf, scopeOf, useAp, type ApFilters } from "./data";
 import { FlowTree, type FlowPick } from "./flow-tree";
 import { ApWorklist } from "./list";
 import { ExportAll, TrendsPanel } from "./trends-panel";
@@ -79,17 +77,24 @@ export function AppointmentsModule({ go, flowTree = true, leadership = false, fu
   const top = useRef<HTMLDivElement>(null);
   const health = useAp<{ rows: ApHealthRow[] }>("health", { ...filters, locationId: "" });
   // The filters live in the address, so a view can be shared and survives a reload.
-  // The bar at the top (7, 30 or 90 days, or chosen dates) is the date for every number here, so the date choice in this screen follows it. Without this the two disagreed.
-  const followBar = useCallback(() => {
-    const spec = pageRangeFromHash(window.location.hash) ?? decodeRange(remembered("range-page"));
-    if (!spec) return;
-    const days = spec.preset === "7d" ? 7 : spec.preset === "30d" ? 30 : spec.preset === "90d" ? 90 : 0;
-    setFilters((f) => (days ? (f.days === days && !f.from && !f.to ? f : { ...f, days: days as ApFilters["days"], from: "", to: "" }) : spec.from && spec.to ? (f.from === spec.from && f.to === spec.to ? f : { ...f, from: spec.from as string, to: spec.to as string }) : f));
-  }, []);
+  // The date bar at the top of the app is the date for every number here: this screen starts from it and re-reads it whenever it changes. The screen's own "Appointment date"
+  // choice (for example "Next 7 days", which the bar cannot express) is a labelled override that lasts until the bar changes again (see the note under the filters).
+  const bar = usePageRange();
+  const urlOwns = useRef(false);
   // The filters live in the address, so a view can be shared and survives a reload.
   // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { setViews(readViews()); const f = filtersFromParams(new URLSearchParams(window.location.search)); if (!isDefault(f)) { setFilters(f); setQ(f.q); } else followBar(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { window.addEventListener("subsync-range", followBar); return () => window.removeEventListener("subsync-range", followBar); }, [followBar]);
+  useEffect(() => { setViews(readViews()); const f = filtersFromParams(new URLSearchParams(window.location.search)); if (!isDefault(f)) { urlOwns.current = true; setFilters(f); setQ(f.q); } }, []);
+  useEffect(() => {
+    if (!bar.ready) return;
+    if (urlOwns.current) { urlOwns.current = false; return; }
+    const p = bar.spec.preset, days = p === "7d" ? 7 : p === "30d" ? 30 : p === "90d" ? 90 : 0, compare = bar.spec.compare !== "none";
+    setFilters((f) => {
+      const next = days ? { ...f, days: days as ApFilters["days"], from: "", to: "", compare } : { ...f, from: bar.from, to: bar.to, compare };
+      return next.days === f.days && next.from === f.from && next.to === f.to && next.compare === f.compare ? f : next;
+    });
+  }, [bar.key, bar.ready]); // eslint-disable-line react-hooks/exhaustive-deps
+  const own = scopeOf(filters);
+  const overridden = bar.ready && (own.from !== bar.from || own.to !== bar.to);
   useEffect(() => {
     try {
       const u = new URL(window.location.href);
@@ -192,6 +197,7 @@ export function AppointmentsModule({ go, flowTree = true, leadership = false, fu
         </div>
         {!embedded && <><QuickFilters filters={filters} set={set} people={people} />
         <ResultLine filters={filters} /></>}
+        {overridden && <p className="ap-fine mb-2" role="status" data-testid="ap-own-dates">This screen is showing {own.from} to {own.to} (its own date choice), not the dates in the bar above ({bar.label}). <button type="button" className="underline" onClick={() => setFilters((f) => ({ ...f, days: bar.spec.preset === "7d" ? 7 : bar.spec.preset === "90d" ? 90 : 30, from: bar.spec.preset === "custom" ? bar.from : "", to: bar.spec.preset === "custom" ? bar.to : "" }))}>Use the bar&apos;s dates</button></p>}
         <FilterChips filters={filters} opts={opts.data ?? null} accounts={accounts} onChange={(f) => { setFilters(f); setQ(f.q); }} listTab={isList ? tab : null} />
         {fixturesOn() && <p className="ap-fine mb-2" role="status">Showing sample appointments (apfx).</p>}
         <ModuleTabs pill label="Appointments sections" tabs={tabs.map((t) => ({ label: t.label, tip: t.tip, node: null }))} value={index < 0 ? 0 : index} onChange={(i) => { setFocus(undefined); setTab(tabs[i].key); }} />

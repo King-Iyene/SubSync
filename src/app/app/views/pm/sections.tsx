@@ -45,8 +45,8 @@ export function TodayTab({ go, openQueue, openDisputes }: { go: (tab: string) =>
             <h2 className="pm-h mb-2">Fixed after we flagged it</h2>
             {t.historyStarts === null ? <p className="ap-fine">History starts today. Once payments are flagged and paid, how many and how fast shows here.</p> : (
               <>
-                <p className="text-sm">{t.recoveredLast30.length ? <>Recovered in the last 30 days: <Money items={t.recoveredLast30} /></> : "Nothing recovered in the last 30 days yet."}</p>
-                <p className="ap-fine mt-1">{t.avgDaysToRecover !== null ? `Usually fixed in ${t.avgDaysToRecover} days. ` : ""}{t.recoveryRate !== null ? `${t.recoveryRate}% of the payments we flagged in the last 90 days were fixed. ` : ""}History starts {t.historyStarts}. <button type="button" className="ap-link" onClick={() => go("history")}>See the history</button></p>
+                <p className="text-sm">{t.recoveredLast30.length ? <>Recovered {t.windowFrom && t.windowTo ? `from ${t.windowFrom} to ${t.windowTo}` : "in the last 30 days"}: <Money items={t.recoveredLast30} /></> : `Nothing recovered ${t.windowFrom && t.windowTo ? `from ${t.windowFrom} to ${t.windowTo}` : "in the last 30 days"} yet.`}</p>
+                <p className="ap-fine mt-1">{t.avgDaysToRecover !== null ? `Usually fixed in ${t.avgDaysToRecover} days. ` : ""}{t.recoveryRate !== null ? `${t.recoveryRate}% of the payments we flagged in these dates were fixed. ` : ""}History starts {t.historyStarts}. <button type="button" className="ap-link" onClick={() => go("history")}>See the history</button></p>
               </>
             )}
           </section>
@@ -167,6 +167,7 @@ export function UpcomingTab() {
     <Load r={r}>
       {(u) => (
         <div className="pm-stack" data-testid="pm-upcoming">
+          <p className="ap-fine" data-testid="pm-upcoming-dates">The dates in the bar do not change this tab: the platform does not give the day each client is charged, so there are no due dates to place in a range.</p>
           <section className="pm-card" aria-label="Expected from your clients">
             <h2 className="pm-h mb-2">From your clients (estimate)</h2>
             {u.plans.state === "needs_permission" && <p className="text-sm"><b>{RECONNECT}</b></p>}
@@ -195,11 +196,11 @@ export function HistoryTab({ openAccount }: { openAccount: (id: string) => void 
         const peak = Math.max(1, ...h.days.map((d) => Math.max(d.failed, d.recovered)));
         return (
           <div className="pm-stack" data-testid="pm-history">
-            <p className="ap-fine">History starts {h.historyStarts}. This is our own record: the platform only shows today.</p>
+            <p className="ap-fine">History starts {h.historyStarts}. This is our own record: the platform only shows today.{h.historyStarts && h.windowFrom && h.historyStarts > h.windowFrom ? ` Our record starts ${h.historyStarts}, so the dates before that (${h.windowFrom} onward) are empty, not zero.` : ""} Customers who pay late again and again are counted over the last 6 months, whatever the dates.</p>
             <div className="pm-tiles">
               <div className="pm-tile"><b>{h.avgDaysToRecover ?? "-"}</b><span>Days to fix, on average</span></div>
-              <div className="pm-tile"><b>{h.recoveryRate !== null ? `${h.recoveryRate}%` : "-"}</b><span>Fixed after we flagged them ({h.fixed} of {h.flagged}, 90 days)</span></div>
-              <div className="pm-tile"><b>{h.recovered.reduce((a, x) => a + x.count, 0)}</b><span>Recovered, 90 days</span>{h.recovered.length > 0 && <Money items={h.recovered} />}</div>
+              <div className="pm-tile"><b>{h.recoveryRate !== null ? `${h.recoveryRate}%` : "-"}</b><span>Fixed after we flagged them ({h.fixed} of {h.flagged}, {h.windowFrom} to {h.windowTo})</span></div>
+              <div className="pm-tile"><b>{h.recovered.reduce((a, x) => a + x.count, 0)}</b><span>Recovered, {h.windowFrom} to {h.windowTo}</span>{h.recovered.length > 0 && <Money items={h.recovered} />}</div>
             </div>
             {h.days.length > 0 && (
               <section className="pm-card" aria-label="Failed and recovered per day">

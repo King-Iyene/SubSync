@@ -1,3 +1,4 @@
+import { MAX_RANGE_DAYS } from "../design/range-limits.ts";
 import { unansweredBusinessElapsedMs } from "./unanswered-advanced.ts";
 import type {
   Pp3AccountRisk, Pp3LoadState, Pp3Move, Pp3NameState, Pp3Reason, Pp3Role, Pp3TodayLine,
@@ -33,7 +34,7 @@ export function parseWindow(from: string | null | undefined, to: string | null |
   const start = Number.isFinite(f) ? f : end - 28 * DAY;
   if (end <= start) return { from: new Date(end - 28 * DAY), to: new Date(end), days: 28, problem: "The start date was after the end date, so the last 28 days are shown." };
   const days = Math.round((end - start) / DAY);
-  if (days > 366) return { from: new Date(end - 366 * DAY), to: new Date(end), days: 366, problem: "Periods are limited to 366 days." };
+  if (days > MAX_RANGE_DAYS) return { from: new Date(end - MAX_RANGE_DAYS * DAY), to: new Date(end), days: MAX_RANGE_DAYS, problem: `Periods are limited to ${MAX_RANGE_DAYS} days.` };
   return { from: new Date(start), to: new Date(end), days, problem: null };
 }
 export const mondayOf = (ms: number) => {

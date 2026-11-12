@@ -1,3 +1,4 @@
+import { MAX_RANGE_DAYS } from "../design/range-limits.ts";
 import type { Cl3Account, Cl3Level, Cl3Reason, Cl3ReasonCount, Cl3Today, Delta, Rate } from "./clients3-types";
 
 // Pure rules behind the Clients screens (no database, unit tested). Definitions: docs/METRICS.md "Clients 3".
@@ -29,7 +30,7 @@ export function parseWindow(from: string | null | undefined, to: string | null |
   const start = Number.isFinite(f) ? f : end - 30 * DAY;
   if (end <= start) return { from: new Date(end - 30 * DAY), to: new Date(end), days: 30, problem: "The start date was after the end date, so the last 30 days are shown." };
   const days = Math.round((end - start) / DAY);
-  if (days > 366) return { from: new Date(end - 366 * DAY), to: new Date(end), days: 366, problem: "Periods are limited to 366 days." };
+  if (days > MAX_RANGE_DAYS) return { from: new Date(end - MAX_RANGE_DAYS * DAY), to: new Date(end), days: MAX_RANGE_DAYS, problem: `Periods are limited to ${MAX_RANGE_DAYS} days.` };
   return { from: new Date(start), to: new Date(end), days, problem: null };
 }
 export const clampSize = (n: number): 20 | 50 | 100 => (n >= 100 ? 100 : n >= 50 ? 50 : 20);

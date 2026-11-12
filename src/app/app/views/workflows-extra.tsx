@@ -1,5 +1,6 @@
 "use client";
 
+import { usePageRange } from "./../ds/page-range";
 import { Printer } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { RecordsSpec, Rec } from "@/lib/analytics/today-records";
@@ -114,14 +115,15 @@ export function DeliveryTab({ q, now }: { q: string; now: number }) {
   );
 }
 
-type Proof = { days: number; now: number; raised: Row[]; cleared: Row[]; open: Row[]; note: string };
+type Proof = { days: number; from?: string; to?: string; now: number; raised: Row[]; cleared: Row[]; open: Row[]; note: string };
 type Row = { title: string; kind: string; account: string; at: number; clearedAt: number | null };
 
 export function ProofTab({ q }: { q: string }) {
-  const [days, setDays] = useState(7);
+  const bar = usePageRange();
   const [panel, setPanel] = useState<RecordsSpec | null>(null);
   const sep = q ? "&" : "?";
-  const { data, error, loading, reload } = useData<Proof>(`workflows/proof${q}${sep}days=${days}`);
+  // The dates are the date bar's: what was caught and what cleared inside exactly those dates.
+  const { data, error, loading, reload } = useData<Proof>(bar.ready ? `workflows/proof${q}${sep}${bar.qs}` : null);
   if (loading && !data) return <SkeletonCards cards={2} label="Loading..." />;
   if (error) return <ErrorBox error={error} onRetry={reload} />;
   if (!data) return null;
@@ -133,11 +135,11 @@ export function ProofTab({ q }: { q: string }) {
   return (
     <div data-testid="wf-proof">
       <div className="mb-4 flex flex-wrap items-center gap-2 print:hidden">
-        <div role="group" aria-label="Period" className="inline-flex overflow-hidden rounded-lg border text-sm">{[7, 30].map((d) => <button key={d} type="button" aria-pressed={days === d} onClick={() => setDays(d)} data-testid={`wf-proof-${d}`} className={`min-h-9 px-3 ${days === d ? "bg-accent font-semibold" : "hover:bg-accent/50"}`}>Last {d} days</button>)}</div>
+        <span className="text-sm text-muted-foreground" data-testid="wf-proof-dates">Dates: {bar.label}, from the bar above.</span>
         <button type="button" onClick={() => window.print()} data-testid="wf-proof-print" className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border px-3 text-sm hover:bg-accent"><Printer aria-hidden className="size-4" />Print or save as PDF</button>
       </div>
       <h2 className="mb-1 text-base font-semibold">What SubSync watched over for you</h2>
-      <p className="mb-4 text-sm text-muted-foreground">A page you can show your clients: what was caught, what cleared, and what is still open.</p>
+      <p className="mb-4 text-sm text-muted-foreground">A page you can show your clients: what was caught, what cleared, and what is still open{data.from && data.to ? `, for ${data.from} to ${data.to}` : ""}.</p>
       <div className="mb-6 grid grid-cols-3 gap-3">
         <WfNumber label="Caught" value={data.raised.length} onClick={() => open("raised", "Caught", data.raised)} testId="wf-proof-raised" />
         <WfNumber label="Cleared" value={data.cleared.length} tone="good" onClick={() => open("cleared", "Cleared", data.cleared)} testId="wf-proof-cleared" />

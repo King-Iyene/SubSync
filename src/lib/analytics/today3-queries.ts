@@ -371,9 +371,13 @@ export async function exportProof(s: Scope, one: string | null, weekParam: strin
 }
 
 // ---- numbers (replaces Overview) ----
+const day0 = (d: Date) => d.toISOString().slice(0, 10);
 
-export async function numbers(s: Scope, one: string | null, days: number, now = Date.now()): Promise<Td3Numbers> {
-  const to = new Date(Math.floor(now / DAY) * DAY + DAY), from = new Date(to.getTime() - days * DAY), pFrom = new Date(from.getTime() - days * DAY);
+/** `win` is the dates of the date bar (whole UTC days: `to` is the start of the day AFTER the last day), or a number of days counted back from today (the old way, kept for callers that have no dates). */
+export async function numbers(s: Scope, one: string | null, win: number | { from: Date; to: Date }, now = Date.now()): Promise<Td3Numbers> {
+  const to = typeof win === "number" ? new Date(Math.floor(now / DAY) * DAY + DAY) : win.to, from = typeof win === "number" ? new Date(to.getTime() - win * DAY) : win.from;
+  const days = Math.max(1, Math.round((to.getTime() - from.getTime()) / DAY)), pFrom = new Date(from.getTime() - days * DAY);
+  const range = `${day0(from)} to ${day0(new Date(to.getTime() - DAY))}`;
   const f: Filters = { from, to, location: one, q: null, industry: null, level: null };
   const cores = await accountsCore({ inst: s.inst, allowed: s.allowed }, f, now);
   const ids = cores.map((c) => c.locationId);
@@ -399,16 +403,16 @@ export async function numbers(s: Scope, one: string | null, days: number, now = 
   const mins = (m: number) => (m < 1 ? "Under a minute" : m < 60 ? `${Math.round(m)} min` : m < 1440 ? `${Math.round(m / 6) / 10} h` : `${Math.round(m / 144) / 10} d`);
   const money = (v: number) => `$${Math.round(v).toLocaleString("en-US")}`;
   const tiles: Td3Tile[] = [
-    { id: "reply", label: "Typical first reply", value: enoughReply ? mins(median as number) : "-", caption: enoughReply ? null : `Needs ${MIN_REPLIES} answered leads (${n(speedNow[0]?.a)} so far)`, enough: enoughReply, formula: `The middle first-reply time of the leads answered in the last ${days} days, across ${ids.length} ${ids.length === 1 ? "account" : "accounts"}. Needs ${MIN_REPLIES} answered leads.`,
+    { id: "reply", label: "Typical first reply", value: enoughReply ? mins(median as number) : "-", caption: enoughReply ? null : `Needs ${MIN_REPLIES} answered leads (${n(speedNow[0]?.a)} so far)`, enough: enoughReply, formula: `The middle first-reply time of the leads answered from ${range} (${days} ${days === 1 ? "day" : "days"}), across ${ids.length} ${ids.length === 1 ? "account" : "accounts"}. Needs ${MIN_REPLIES} answered leads.`,
       change: enoughReply && n(speedPrev[0]?.a) >= MIN_REPLIES ? changeText(median, medianPrev, 0.1) : null, estimate: false, opens: { module: "speed" }, count: n(speedNow[0]?.a) },
-    { id: "waiting", label: "Waiting for a reply", value: String(waiting), caption: null, enough: true, formula: "People whose last message is from the customer and nobody has answered, in the last 30 days.", change: null, estimate: false, opens: { list: "all_waiting" }, count: waiting },
-    { id: "showrate", label: "Show rate", value: sr.value, caption: sr.caption, enough: sr.enough, formula: `People who came as a share of appointments marked came or no-show in the last ${days} days. Needs ${20} marked outcomes; unmarked appointments are not counted.`,
+    { id: "waiting", label: "Waiting for a reply", value: String(waiting), caption: null, enough: true, formula: "People whose last message is from the customer and nobody has answered, right now (conversations active in the last 30 days). The dates do not change this one.", change: null, estimate: false, opens: { list: "all_waiting" }, count: waiting },
+    { id: "showrate", label: "Show rate", value: sr.value, caption: sr.caption, enough: sr.enough, formula: `People who came as a share of appointments marked came or no-show from ${range}. Needs ${20} marked outcomes; unmarked appointments are not counted.`,
       change: sr.enough && prevRate !== null ? changeText(sr.rate, prevRate, 1) : null, estimate: false, opens: { list: "all_noshows" }, count: noshow },
     { id: "open_deals", label: "Open deals", value: n(deals[0]?.n) ? `${n(deals[0]?.n).toLocaleString("en-US")} worth ${money(n(deals[0]?.v))}` : "None", caption: null, enough: true, formula: "Open deals counted by Pipeline's rule, leaving out deals with no value and deals with no owner (usually test or junk). The dollar figure is the deals' own value, not a forecast.", change: null, estimate: true, opens: { list: "open_deals" }, count: n(deals[0]?.n) },
     { id: "stale", label: "Deals gone quiet", value: String(stale), caption: null, enough: true, formula: `Open deals with no movement for ${STALE_DEAL_DAYS} days, by Pipeline's counted-deal rule.`, change: null, estimate: false, opens: { list: "all_stale" }, count: stale },
     { id: "attention", label: "Accounts needing a look", value: `${needAttn} of ${cores.length}`, caption: null, enough: true, formula: "Client accounts Clients marks Act now or Keep an eye.", change: null, estimate: false, opens: { module: "clients" }, count: needAttn },
   ];
-  return { tiles, days, historyStarts: await historyStartsOf(s.inst, ids), testDealsLeftOut: n(deals[0]?.skipped) };
+  return { tiles, days, from: day0(from), to: day0(new Date(to.getTime() - DAY)), historyStarts: await historyStartsOf(s.inst, ids), testDealsLeftOut: n(deals[0]?.skipped) };
 }
 
 // ---- SubSync-only notes: snooze, opened, settings ----

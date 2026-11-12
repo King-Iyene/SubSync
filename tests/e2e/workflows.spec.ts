@@ -212,9 +212,11 @@ test("proof: the weekly numbers open their alerts, the period switches, and it p
   await open(page);
   await tab(page, "proof");
   await expect(page.getByTestId("wf-proof")).toBeVisible();
-  await page.getByTestId("wf-proof-30").click();
-  await expect(page.getByTestId("wf-proof-30")).toHaveAttribute("aria-pressed", "true");
-  await page.getByTestId("wf-proof-7").click();
+  // The period is the date bar's now (one range for the whole app): pressing 30 or 7 days there changes what the Proof tab counts.
+  await page.getByTestId("date-control").getByRole("button", { name: /30/ }).click();
+  await expect(page.getByTestId("wf-proof-dates")).toContainText("Last 30 days");
+  await page.getByTestId("date-control").getByRole("button", { name: /7/ }).click();
+  await expect(page.getByTestId("wf-proof-dates")).toContainText("Last 7 days");
   for (const id of ["wf-proof-raised", "wf-proof-cleared", "wf-proof-open"]) {
     await page.getByTestId(id).click();
     await expect(panel(page)).toBeVisible();

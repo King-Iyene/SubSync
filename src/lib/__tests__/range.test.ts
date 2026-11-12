@@ -29,7 +29,7 @@ test("a bad custom range falls back to the default window and says why", () => {
   for (const [spec, why] of [
     [{ preset: "custom", from: "2026-10-10", to: "2026-10-01", compare: "none" }, /end date is before/],
     [{ preset: "custom", from: "2026-10-10", to: "2026-12-01", compare: "none" }, /in the future/],
-    [{ preset: "custom", from: "2024-01-01", to: "2026-10-01", compare: "none" }, /at most 366/],
+    [{ preset: "custom", from: "2022-01-01", to: "2026-10-01", compare: "none" }, /at most 1096/],
     [{ preset: "custom", from: "nonsense", to: "2026-10-01", compare: "none" }, /start and an end/],
   ] as Array<[RangeSpec, RegExp]>) {
     const r = resolveRange(spec, TODAY);

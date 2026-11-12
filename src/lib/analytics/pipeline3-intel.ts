@@ -1,3 +1,4 @@
+import { MAX_RANGE_DAYS } from "../design/range-limits.ts";
 // Pipeline round 3: the pure part (no database, no network), unit tested. Definitions: docs/METRICS.md "Pipeline 3".
 import { rateRange } from "./pipeline-intel.ts";
 import type { Estimate, FlowStage, Pl3Overview, Pl3Row, Rate } from "./pipeline3-types.ts";
@@ -8,7 +9,7 @@ export const MIN_CLOSED = 15, MIN_STAGE_PASSED = 20, MIN_STAYS = 20, MIN_LOST_RE
 export const OUTLIER_SHARE = 0.4;
 export const STALE_FLOOR_DAYS = 3, STALE_CAP_DAYS = 60, DEFAULT_LIMIT_DAYS = 14;
 export const SHRINK_K = 10;
-export const MAX_WINDOW_DAYS = 366;
+export const MAX_WINDOW_DAYS = MAX_RANGE_DAYS;
 export const clampSize = (n: number): 20 | 50 | 100 => (n >= 100 ? 100 : n >= 50 ? 50 : 20);
 export const rate = (n: number, of: number, min = MIN_WIN_RATE): Rate => ({ value: of >= min && of > 0 ? n / of : null, n, of, enough: of >= min });
 export const money = (n: number) => "$" + Math.round(n).toLocaleString("en-US");
@@ -22,7 +23,7 @@ export function parsePlWindow(from: string | null | undefined, to: string | null
   if (e !== null) e += DAY;
   if (f === null || e === null) { e = now + DAY - (now % DAY); f = e - 30 * DAY; if (from || to) problem = "That date range was not understood, so the last 30 days are shown."; }
   if (e <= f) { e = now + DAY - (now % DAY); f = e - 30 * DAY; problem = "The end date was before the start date, so the last 30 days are shown."; }
-  if (e - f > MAX_WINDOW_DAYS * DAY) { f = e - MAX_WINDOW_DAYS * DAY; problem = "The range is capped at one year."; }
+  if (e - f > MAX_WINDOW_DAYS * DAY) { f = e - MAX_WINDOW_DAYS * DAY; problem = `The range is capped at ${MAX_RANGE_DAYS} days (about 3 years).`; }
   return { from: new Date(f), to: new Date(e), days: Math.round((e - f) / DAY), problem };
 }
 

@@ -22,7 +22,7 @@ const BUCKETS = new Set(["booked", "unmarked", "showed", "noshow", "cancelled", 
 const STATUSES = new Set(["new", "confirmed", "booked"]);
 const int = (v: string | null, d: number) => { const n = Number(v); return v !== null && Number.isFinite(n) ? Math.floor(n) : d; };
 const text = (v: string | null, max: number) => (v ?? "").trim().slice(0, max) || null;
-const bookedDay = (v: string | null, end: boolean): Date | null => { if (!v || !/^d{4}-d{2}-d{2}$/.test(v)) return null; const t = Date.parse(v); return Number.isFinite(t) ? new Date(t + (end ? 86_400_000 : 0)) : null; };
+const bookedDay = (v: string | null, end: boolean): Date | null => { if (!v || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return null; const t = Date.parse(v); return Number.isFinite(t) ? new Date(t + (end ? 86_400_000 : 0)) : null; };
 const personParam = (v: string | null) => (v === "none" ? "none" : cleanId(v));
 
 export async function handleAppointments3(ctx: Ctx, h: Appt3Helpers): Promise<Response> {
