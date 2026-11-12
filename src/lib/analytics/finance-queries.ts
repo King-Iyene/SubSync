@@ -437,7 +437,7 @@ export async function setup(s: Scope, links: Links, now = Date.now()) {
   const accts = await accounts(s, links, now), db = sql();
   const [entered, spend, settings] = await Promise.all([
     db`select plan_key, plan_name, amount::float8 amount, currency, billing_interval from fn_plan_prices where installation_id = ${s.inst} order by lower(coalesce(plan_name, plan_key))`,
-    db`select s.location_id, l.name, s.month::text month, s.amount::float8 amount, s.currency from fn_ad_spend s left join locations l on l.installation_id = s.installation_id and l.location_id = s.location_id
+    db`select s.location_id, l.name, s.month::text as month, s.amount::float8 amount, s.currency from fn_ad_spend s left join locations l on l.installation_id = s.installation_id and l.location_id = s.location_id
        where s.installation_id = ${s.inst} ${s.allowed ? db`and s.location_id = any(${s.allowed}::text[])` : db``} order by s.month desc, lower(l.name) limit 200`,
     getSettings(s.inst),
   ]);
