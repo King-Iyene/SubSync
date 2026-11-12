@@ -254,3 +254,23 @@ export async function weekCounts(installationId: string, accounts: string[] | nu
       ${accounts ? db`and (m.matched_location_id = any(${accounts}::text[]) or m.owner_ghl_user_id in (select u.ghl_user_id from user_connections u where u.installation_id = ${installationId} and u.provider = 'fathom' and u.home_location_id = any(${accounts}::text[])))` : db``}`.catch(() => [undefined]);
   return { held: Number(r?.held ?? 0), logged: Number(r?.logged ?? 0), noNextStep: Number(r?.no_next ?? 0), waiting: Number(r?.waiting ?? 0) };
 }
+
+/** The same counts for a window (a receipt's week), one row per client account that has a call matched to it. Only calls matched with certainty count, so a call is never counted for the wrong client. */
+export async function weekCountsByAccount(installationId: string, accounts: string[], from: Date, to: Date): Promise<Map<string, { held: number; logged: number; noNextStep: number }>> {
+  if (accounts.length === 0) return new Map();
+  const rows = await sql()`
+    select m.matched_location_id loc, count(*)::int held, (count(*) filter (where m.status in ('saved', 'dry_run')))::int logged, (count(*) filter (where jsonb_array_length(m.action_items) = 0))::int no_next
+    from meetings m where m.installation_id = ${installationId} and m.status = any(${LIVE}::text[]) and m.matched_location_id = any(${accounts}::text[])
+      and coalesce(m.started_at, m.created_at) >= ${from} and coalesce(m.started_at, m.created_at) < ${to} group by 1`.catch(() => []);
+  return new Map(rows.map((r) => [r.loc as string, { held: r.held as number, logged: r.logged as number, noNextStep: r.no_next as number }]));
+}
+
+/** Is the Meetings list switched on for this company? The receipt gets its meetings line only then (flags default off). */
+export async function meetingsOn(installationId: string): Promise<boolean> {
+  try {
+    const [r] = await sql()`select plan from installations where id = ${installationId}`;
+    const { resolveEntitlements } = await import("../flags");
+    const ent = await resolveEntitlements((r?.plan as "free" | "starter" | "pro" | undefined) ?? "pro", installationId);
+    return ent.features.mn_list === true && !ent.locked.includes("mn_list");
+  } catch { return false; }
+}

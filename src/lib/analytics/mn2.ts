@@ -148,3 +148,9 @@ export function weeklyLine(w: { held: number; logged: number; noNextStep: number
   if (w.waiting > 0) parts.push(`${w.waiting} waiting to be matched`);
   return `${parts.join(", ")}.`;
 }
+
+/** The meetings line of one client's weekly receipt: counts only, in words a client reads. Null when no call was held, so a quiet week says nothing rather than "0 calls". */
+export function receiptLine(w: { held: number; logged: number; noNextStep: number }): string | null {
+  if (w.held <= 0) return null;
+  return `${w.held} recorded ${w.held === 1 ? "call was" : "calls were"} held, ${w.logged} on a contact${w.noNextStep > 0 ? `, ${w.noNextStep} with no next step set` : ""}.`;
+}

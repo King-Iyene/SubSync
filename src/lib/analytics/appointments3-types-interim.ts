@@ -33,7 +33,7 @@ export type ApOverview = {
 };
 
 export type ApStats = { bookings: number; showRate: number | null; noShowRate: number | null; closeRate: number | null; revenueCents: number; avgLeadToBookedHours: number | null };
-export type ApFlowCloser = ApStats & { id: string; name: string; outcomes: Record<ApOutcome, number> };
+export type ApFlowCloser = ApStats & { id: string; name: string; outcomes: Record<ApOutcome, number>; /** The calendar this pair booked on (a name, or "N calendars"). Shown as a chip on each leaf. */ calendar?: string | null };
 export type ApFlowSetter = ApStats & { id: string; name: string; closers: ApFlowCloser[]; hiddenClosers: number };
 export type ApFlowTree = {
   booked: number; periodLabel: string; setters: ApFlowSetter[]; hiddenSetters: number;

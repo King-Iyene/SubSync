@@ -5,7 +5,7 @@ export type GoFn = (view: ViewId, locationId?: string) => void;
 
 // The pilot menu: a short list of plain groups. Active screens stay reachable under "More" or inside their module;
 // deferred screens remain implemented but are absent while their feature switch is off.
-export type NavGroup = "" | "Reply" | "Clients and people" | "More" | "Settings and help";
+export type NavGroup = "" | "Clients and money" | "Checks" | "Team and tools" | "Settings and help";
 
 export type NavItem = {
   id: Exclude<ViewId, "account">; label: string; feature: string; group: NavGroup;
@@ -20,32 +20,33 @@ export type NavItem = {
 };
 
 export const NAV: NavItem[] = [
-  // Money-first order (stage SHELL): today's work, then replies, then appointments, then who the clients and people are, then the audit and clean-up, then everything else.
+  // Order by money and daily use (stage MN2, 12 Nov 2026): the day first (Today, Speed to lead, Appointments), then clients and money, then the checks, then the team and the tools.
+  // Overview lives inside Today (Today > Numbers): its entry shows only while that merge is off (flags td_module and td_numbers), so the page is never lost.
   { id: "today", label: "Today", feature: "overview", group: "" },
-  { id: "speed", label: "Speed to lead", feature: "speed", group: "Reply" },
+  { id: "speed", label: "Speed to lead", feature: "speed", group: "" },
   // Unanswered messages is a tab of Speed to lead now ("Unanswered"). The id stays so every old address and link (#inbox, a notification, an email) opens Speed on that tab; the entry
   // comes back by itself only if Speed to lead is off, so the screen is never lost.
-  { id: "inbox", label: "Unanswered messages", feature: "inbox", group: "Reply", parent: "speed", showWhenParentOff: true },
+  { id: "inbox", label: "Unanswered messages", feature: "inbox", group: "", parent: "speed", showWhenParentOff: true },
   { id: "appointments", label: "Appointments", feature: "appointments", group: "" },
-  { id: "clients", label: "Clients", feature: "clients", group: "Clients and people" },
-  { id: "payments", label: "Payments", feature: "pm_module", group: "Clients and people" },
-  { id: "people", label: "Find a lead", feature: "search", group: "Clients and people" },
-  { id: "search", label: "Contact search", feature: "search", group: "Clients and people", parent: "people" },
-  { id: "leads", label: "Leads", feature: "activity", group: "Clients and people", parent: "people" },
-  { id: "calls", label: "Call lists", feature: "calls", group: "Clients and people", parent: "people" },
-  { id: "accounts", label: "Accounts", feature: "health", group: "Clients and people", parent: "clients" },
-  { id: "onboarding", label: "Setup", feature: "onboarding", group: "Clients and people", parent: "clients", showWhenLimited: true },
-  { id: "audit", label: "Account audit", feature: "audit", group: "" },
+  { id: "clients", label: "Clients", feature: "clients", group: "Clients and money" },
+  { id: "payments", label: "Payments", feature: "pm_module", group: "Clients and money" },
+  { id: "people", label: "Find a lead", feature: "search", group: "Clients and money" },
+  { id: "search", label: "Contact search", feature: "search", group: "Clients and money", parent: "people" },
+  { id: "leads", label: "Leads", feature: "activity", group: "Clients and money", parent: "people" },
+  { id: "calls", label: "Call lists", feature: "calls", group: "Clients and money", parent: "people" },
+  { id: "accounts", label: "Accounts", feature: "health", group: "Clients and money", parent: "clients" },
+  { id: "onboarding", label: "Setup", feature: "onboarding", group: "Clients and money", parent: "clients", showWhenLimited: true },
+  { id: "audit", label: "Account audit", feature: "audit", group: "Checks" },
   // Clean-up is ONE entry (stage CLEANUP) holding Duplicates, Data quality, History and Rules. The old ids stay, so #duplicates and #cleanup still open the right tab. A client's staff have no
   // Clean-up of their own, so for them the Duplicates page is the Clean-up entry (showWhenParentHidden); their tabs are Duplicates and History.
-  { id: "cleanup", label: "Clean-up", feature: "cleanup", group: "" },
-  { id: "duplicates", label: "Clean-up", feature: "duplicates", group: "", parent: "cleanup", showWhenParentHidden: true },
-  { id: "overview", label: "Overview", feature: "overview", group: "More" },
-  { id: "team", label: "Team", feature: "team", group: "More" },
-  { id: "pipeline", label: "Pipeline and deals", feature: "pipelines", group: "More" },
-  { id: "meetings", label: "Meeting notes", feature: "meetings", group: "More" },
-  { id: "workflows", label: "Workflows", feature: "workflows", group: "More" },
-  { id: "data-health", label: "Data health", feature: "data_health", group: "More", parent: "cleanup", showWhenParentOff: true, showWhenParentHidden: true },
+  { id: "cleanup", label: "Clean-up", feature: "cleanup", group: "Checks" },
+  { id: "duplicates", label: "Clean-up", feature: "duplicates", group: "Checks", parent: "cleanup", showWhenParentHidden: true },
+  { id: "data-health", label: "Data health", feature: "data_health", group: "Checks", parent: "cleanup", showWhenParentOff: true, showWhenParentHidden: true },
+  { id: "team", label: "Team", feature: "team", group: "Team and tools" },
+  { id: "pipeline", label: "Pipeline and deals", feature: "pipelines", group: "Team and tools" },
+  { id: "meetings", label: "Meeting notes", feature: "meetings", group: "Team and tools" },
+  { id: "workflows", label: "Workflows", feature: "workflows", group: "Team and tools" },
+  { id: "overview", label: "Overview", feature: "overview", group: "Team and tools" },
   { id: "settings", label: "Settings", feature: "settings", group: "Settings and help" },
   // Connections moved into Settings, Integrations (4 Nov 2026). The id stays so every old address (#connections) and link still works: it opens Settings on Integrations.
   // A client's staff have no Settings, so for them it stays one menu entry, called Integrations (showWhenParentHidden).

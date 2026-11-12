@@ -9,6 +9,8 @@ export type FlowKind = "root" | "setter" | "closer" | "leaf" | "more";
 export type FlowNode = {
   id: string; kind: FlowKind; label: string; x: number; y: number; w: number; h: number; count: number; tone: Tone; best: boolean; parent: string | null;
   setterId?: string; closerId?: string; outcome?: ApOutcome; stats?: ApStats;
+  /** On a leaf: where the pair's appointments were booked (a calendar name, or "N calendars"). */
+  calendar?: string;
 };
 export type FlowLink = { id: string; from: string; to: string; d: string; width: number; tone: Tone };
 export type FlowLayout = { width: number; height: number; nodes: FlowNode[]; links: FlowLink[]; columns: { x: number; w: number; title: string }[] };
@@ -74,7 +76,7 @@ const leafCount = (c: ApFlowCloser) => Math.max(1, LEAF_ORDER.filter((k) => c.ou
 
 export function layoutFlow(tree: ApFlowTree, opts: LayoutOptions): FlowLayout {
   const compact = opts.width < 860;
-  const W = { root: compact ? 92 : 128, setter: compact ? 176 : 224, closer: compact ? 176 : 224, leaf: compact ? 124 : 150 };
+  const W = { root: compact ? 92 : 128, setter: compact ? 176 : 224, closer: compact ? 176 : 224, leaf: compact ? 188 : 220 };
   const sum = W.root + W.setter + W.closer + W.leaf;
   const gap = Math.max(36, (opts.width - sum) / 3);
   const X = { root: 0, setter: W.root + gap, closer: W.root + W.setter + 2 * gap, leaf: W.root + W.setter + W.closer + 3 * gap };
@@ -116,7 +118,7 @@ export function layoutFlow(tree: ApFlowTree, opts: LayoutOptions): FlowLayout {
       const leaves = LEAF_ORDER.filter((k) => c.outcomes[k] > 0);
       const gh = leaves.length * (LEAF_H + LEAF_GAP) - LEAF_GAP;
       leaves.forEach((k, j) => {
-        const leaf: FlowNode = { id: `l:${s.id}:${c.id}:${k}`, kind: "leaf", label: OUTCOME_LABEL[k], x: X.leaf, y: cy + (bandH - gh) / 2 + j * (LEAF_H + LEAF_GAP), w: W.leaf, h: LEAF_H, count: c.outcomes[k], tone: OUTCOME_TONE[k], best: false, parent: cNode.id, setterId: s.id, closerId: c.id, outcome: k };
+        const leaf: FlowNode = { id: `l:${s.id}:${c.id}:${k}`, kind: "leaf", label: OUTCOME_LABEL[k], ...(c.calendar ? { calendar: c.calendar } : {}), x: X.leaf, y: cy + (bandH - gh) / 2 + j * (LEAF_H + LEAF_GAP), w: W.leaf, h: LEAF_H, count: c.outcomes[k], tone: OUTCOME_TONE[k], best: false, parent: cNode.id, setterId: s.id, closerId: c.id, outcome: k };
         nodes.push(leaf); addLink(cNode, leaf, c.outcomes[k], leaf.tone);
       });
       cy += bandH + PAIR_GAP;

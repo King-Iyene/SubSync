@@ -5,9 +5,11 @@ export type NewsEntry = {
   view: string | null; feature: string | null;
 };
 
-export const NEW_WINDOW_DAYS = 21;
+/** A page carries the "New" badge for this many days after its entry date, and only while its feature is on and the person has not opened or dismissed it. */
+export const NEW_WINDOW_DAYS = 14;
 
 export const NEWS: readonly NewsEntry[] = [
+  { id: "mn-meetings", date: "2026-11-12", title: "Meeting notes, finished", line: "Your recorded calls in one list, each on the right contact or waiting for you to pick, with next steps, follow-up lists and coaching.", view: "meetings", feature: "mn_list" },
   { id: "br-brief", date: "2026-11-11", title: "Your 7 am brief", line: "The five things that need you today, each with one line of why and a button to the exact list. By email at your hour, and at the top of Today.", view: "today", feature: "br_brief" },
   { id: "wg-wallet", date: "2026-11-11", title: "Credit balance watchlist", line: "Every client account's credit balance, lowest days left first, with alerts before it runs out or spending jumps.", view: "clients", feature: "wg_wallet" },
   { id: "st-settings", date: "2026-11-11", title: "Settings, rearranged", line: "Ten plain sections with a search box, real tool logos, and a Permissions page that says what each permission is for.", view: "settings", feature: "st_settings" },

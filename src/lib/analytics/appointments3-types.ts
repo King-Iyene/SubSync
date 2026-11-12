@@ -98,6 +98,8 @@ export type FlowNode = {
   count: number; health: number | null; best: boolean;
   badges: null | { bookings: number; showRate: Rate; noshowRate: Rate; closeRate: Rate; wonValue: number; leadToBookedMedianMinutes: number | null };
   leaf?: "showed" | "noshow" | "cancelled" | "unmarked" | "won" | "lost" | "open";
+  /** On a leaf: the calendar its setter-and-closer pair booked on (a name, or "N calendars"). */
+  calendar?: string | null;
   /** What a click opens: the exact appointment list (count equals rows). */
   open: { setter?: string | null; closer?: string | null; bucket?: Appt3Bucket };
 };

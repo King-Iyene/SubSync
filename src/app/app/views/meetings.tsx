@@ -35,7 +35,7 @@ export function MeetingsView({ logged = false, outcomes = false, list = false, f
   return (
     <Page title="Meeting notes" subtitle="After a recorded call, SubSync adds the summary and action items to the contact, written as you. A call it cannot place waits for you to pick the contact.">
       {list && home.data && <div className="mb-4"><ConnectStrip home={home.data} reload={home.reload} fx={home.fx} /></div>}
-      <ModuleTabs label="Meeting notes sections" value={tab} onChange={setTab} tabs={[
+      <ModuleTabs label="Meeting notes sections" pill wrap value={tab} onChange={setTab} tabs={[
         ...(list ? [{ label: "Meetings", node: <MeetingsList onOpenAppointment={go ? () => go("appointments") : undefined} /> }] : []),
         ...(list && followups ? [{ label: "Follow-ups", node: <FollowUps home={home.data} onOpenCall={setOpenCall} /> }] : []),
         ...(list && coach ? [{ label: "Coaching", node: <CoachView /> }] : []),

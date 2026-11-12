@@ -15,13 +15,13 @@ test("the menu is money first and the page says where you are", async ({ page },
   await open(page, "speed");
   const side = page.getByRole("complementary");
   const labels = await side.getByRole("navigation", { name: "Sections" }).getByRole("button").allInnerTexts();
-  const order = ["Today", "Speed to lead", "Appointments", "Clients", "People", "Account audit", "Clean-up", "Overview", "Team", "Pipeline and deals"];
+  const order = ["Today", "Speed to lead", "Appointments", "Clients", "Find a lead", "Account audit", "Clean-up", "Team", "Pipeline and deals", "Overview"];
   const idx = order.map((l) => labels.findIndex((x) => x.startsWith(l)));
   expect(idx.every((i) => i >= 0)).toBe(true);
   expect(idx).toEqual([...idx].sort((a, b) => a - b));
   await expect(side.getByRole("button", { name: "Speed to lead", exact: true })).toHaveAttribute("aria-current", "page");
-  await expect(page.getByTestId("trail")).toContainText("Reply");
-  await expect(page.getByTestId("trail")).toContainText("Speed to lead");
+  // Speed to lead is one of the three day-to-day pages at the top, with no group heading, so it has no "section > page" trail.
+  await expect(page.getByTestId("trail")).toHaveCount(0);
   // Sub-sections are visible tabs, never behind a triangle.
   await open(page, "appointments");
   await expect(page.getByRole("tab", { name: "Insights" })).toBeVisible();

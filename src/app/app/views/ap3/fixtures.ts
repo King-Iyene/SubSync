@@ -20,6 +20,9 @@ const setters: ApFlowSetter[] = [
   setter("u-cy", "Cy Mensah", [closer("u-mia", "Mia Chen", { won: 11, showed: 5, lost: 3, noshow: 2, unmarked: 1, cancelled: 1 }), closer("u-sol", "Sol Ibe", { won: 3, showed: 2, lost: 2, noshow: 2 })]),
   setter("u-eve", "Eve Park", [closer("u-dan", "Dan Reyes", { won: 2, showed: 2, lost: 1, noshow: 1 })]),
 ];
+// The calendar chip on each leaf (sample): where each closer's appointments were booked.
+const CAL: Record<string, string> = { "u-dan": "Estimates", "u-mia": "Consults", "u-sol": "2 calendars" };
+for (const s of setters) for (const c of s.closers) if (CAL[c.id]) c.calendar = CAL[c.id];
 const totals = oc({}); for (const s of setters) for (const c of s.closers) for (const k of Object.keys(totals) as ApOutcome[]) totals[k] += c.outcomes[k];
 const rt = ratesFromOutcomes(totals, MIN);
 

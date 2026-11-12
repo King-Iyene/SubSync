@@ -64,7 +64,18 @@ export function pickButton(o: { unmarked: number; noshowToRecover: number; noDea
 export type FlowAgg = {
   setter: string | null; closer: string | null; booked: number; showed: number; noshow: number; cancelled: number; unmarked: number; upcoming: number;
   won: number; lost: number; open: number; wonValue: number; ltbMedianMin: number | null;
+  /** The calendars this setter-and-closer pair's appointments were on (up to 3 names) and how many calendars in all. Optional: an older caller leaves them out and no calendar chip is drawn. */
+  calendars?: string[]; calendarCount?: number;
 };
+
+/** What a calendar chip says for a group of rows: the calendar's name when they all share one, "N calendars" when they do not, nothing when no calendar is known. */
+export function calendarOf(rows: readonly FlowAgg[]): string | null {
+  const names = new Set<string>();
+  let n = 0;
+  for (const r of rows) { for (const c of r.calendars ?? []) names.add(c); n = Math.max(n, r.calendarCount ?? 0); }
+  const count = Math.max(names.size, n);
+  return count === 1 && names.size === 1 ? [...names][0] : count > 1 ? `${count} calendars` : null;
+}
 
 const sum = <T,>(xs: T[], f: (x: T) => number) => xs.reduce((t, x) => t + f(x), 0);
 /** Health 0..1: show rate (true) blended with close rate when both are known; null when the show rate is not known. */
@@ -111,7 +122,7 @@ export function buildFlowTree(aggs: FlowAgg[], names: (id: string | null) => str
   const addLeaves = (parent: string, rows: FlowAgg[], open: FlowNode["open"]) => {
     for (const l of LEAVES) {
       const n = sum(rows, l.f);
-      if (n > 0) nodes.push({ id: `${parent}:${l.k}`, level: "leaf", label: l.k, userId: null, parentId: parent, count: n, health: null, best: false, badges: null, leaf: l.k, open: { ...open, bucket: l.bucket } });
+      if (n > 0) nodes.push({ id: `${parent}:${l.k}`, level: "leaf", label: l.k, userId: null, parentId: parent, count: n, health: null, best: false, badges: null, leaf: l.k, ...(calendarOf(rows) ? { calendar: calendarOf(rows) } : {}), open: { ...open, bucket: l.bucket } });
     }
   };
   for (const [sid, rows] of shown) {

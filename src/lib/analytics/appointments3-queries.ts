@@ -420,12 +420,14 @@ export async function flowTree(s: Scope, f: Filters, topN: number, compare: [str
       count(*) filter (where unmarked)::int unmarked, count(*) filter (where upcoming)::int upcoming, count(*) filter (where deal_status = 'won' and status <> 'invalid')::int won,
       count(*) filter (where deal_status = 'lost' and status <> 'invalid')::int lost, count(*) filter (where deal_status = 'open' and status <> 'invalid')::int open,
       coalesce(sum(deal_value) filter (where deal_status = 'won' and status <> 'invalid'), 0)::float8 won_value,
-      (percentile_cont(0.5) within group (order by extract(epoch from (created_at - lead_at)) / 60) filter (where lead_at is not null and created_at >= lead_at))::float8 ltb
+      (percentile_cont(0.5) within group (order by extract(epoch from (created_at - lead_at)) / 60) filter (where lead_at is not null and created_at >= lead_at))::float8 ltb,
+      (array_agg(distinct calendar_name) filter (where calendar_name is not null))[1:3] cals, count(distinct calendar_id)::int ncals
     from ap group by 1, 2 having count(*) filter (where status <> 'invalid') > 0`;
   const aggs: FlowAgg[] = rows.map((r) => ({
     setter: (r.setter as string | null) ?? null, closer: (r.closer as string | null) ?? null, booked: num(r.booked), showed: num(r.showed), noshow: num(r.noshow), cancelled: num(r.cancelled),
     unmarked: num(r.unmarked), upcoming: num(r.upcoming), won: num(r.won), lost: num(r.lost), open: num(r.open), wonValue: num(r.won_value),
     ltbMedianMin: r.ltb === null || r.ltb === undefined ? null : Math.round(Number(r.ltb)),
+    calendars: Array.isArray(r.cals) ? (r.cals as unknown[]).filter((x): x is string => typeof x === "string") : [], calendarCount: num(r.ncals),
   }));
   return buildFlowTree(aggs, (id) => (id ? (label.has(id) ? label(id) : "Unknown user") : "Not recorded"), { from: f.from.toISOString(), to: f.to.toISOString() }, Math.max(3, Math.min(30, topN)), compare, Math.max(0, Math.min(5000, Math.floor(skip))));
 }
