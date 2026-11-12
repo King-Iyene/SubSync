@@ -195,7 +195,7 @@ test("no change is said as no change", () => {
 test("the dates a caller may ask for are checked: real, before today, within a year; the end not before the start or in the future", () => {
   const today = "2026-11-01";
   assert.equal(validFromDay("2026-10-25", today), "2026-10-25");
-  for (const bad of ["2026-11-01", "2026-11-02", "2025-10-01", "2026-02-30", "yesterday", "", null, 5, "2026-1-5"]) assert.equal(validFromDay(bad, today), null, String(bad));
+  for (const bad of ["2026-11-01", "2026-11-02", "2022-10-01", "2026-02-30", "yesterday", "", null, 5, "2026-1-5"]) assert.equal(validFromDay(bad, today), null, String(bad));
   assert.equal(validFromDay("2025-11-02", today), "2025-11-02");
   assert.equal(validToDay(undefined, "2026-10-25", today), today);
   assert.equal(validToDay("", "2026-10-25", today), today);

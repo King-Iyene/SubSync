@@ -35,7 +35,7 @@ test("call mode: list, start, keyboard outcome, skip past do-not-contact, call b
   await expect(page.getByText("SubSync costs nothing extra for calling").first()).toBeVisible();
   await page.getByTestId("dial-start").click();
 
-  await expect(page.getByTestId("dial-progress-text")).toHaveText("1 of 3");
+  await expect(page.getByTestId("dial-progress-text")).toHaveText("1 of 2");
   await expect(page.getByTestId("dial-name")).toHaveText("Ana Reyes");
   await expect(page.getByTestId("dial-phone")).toContainText("555");
   await expect(page.getByTestId("dial-story")).toContainText("Roof repair");

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { FLOW_PRESETS, type FlowPreset } from "@/lib/analytics/lead-flow";
 import { isDefaultState, rangeOf, readReportState, writeReportState, type ReportState } from "@/lib/analytics/report-filter";
 import { WhatIs } from "../ds/what-is";
+import { usePageRange } from "../ds/page-range";
 import { useApiClient, useRootApi, type Api } from "../session";
 
 // ONE filter bar for every report tab of Today (Growth, Lead flow, Clients coming and going, Proof, Forecast, Sources, Coverage): dates and a client. It is the date choice Lead flow
@@ -25,15 +26,17 @@ export function useReportFilter(prefix: string, defaultPreset: FlowPreset) {
     try { window.history.replaceState(null, "", writeReportState(window.location.hash || "#today", prefix, p)); window.dispatchEvent(new Event("subsync-report-filter")); } catch { setState((s) => ({ ...s, ...p })); }
   }, [prefix]);
   const reset = useCallback(() => patch({ preset: null, from: "", to: "", client: null }), [patch]);
-  const range = useMemo(() => (today ? rangeOf(state, defaultPreset, today) : null), [state, defaultPreset, today]);
-  return { state, today, range, preset: (state.preset ?? defaultPreset) as FlowPreset, patch, reset, differs: !isDefaultState(state, defaultPreset), /** "all" or one client id when chosen on purpose; null follows the header. */ client: state.client };
+  // Until the person picks dates on this tab, it follows the date bar at the top of the app (one range for the whole app); a choice made here is a labelled override, and "Reset to header" returns to the bar.
+  const bar = usePageRange(), followsBar = state.preset === null && bar.ready;
+  const range = useMemo(() => (followsBar && bar.resolved ? { from: bar.from, to: bar.to, label: bar.label, problem: bar.problem } : today ? rangeOf(state, defaultPreset, today) : null), [followsBar, bar.resolved, bar.from, bar.to, bar.label, bar.problem, state, defaultPreset, today]);
+  return { state, today, range, followsBar, preset: (state.preset ?? defaultPreset) as FlowPreset, patch, reset, differs: !isDefaultState(state, defaultPreset), /** "all" or one client id when chosen on purpose; null follows the header. */ client: state.client };
 }
 export type ReportFilter = ReturnType<typeof useReportFilter>;
 
 /** The query to add to a read: the dates and the client, only when the person changed them. */
 export function filterQuery(f: ReportFilter, withDates = true): string {
   const q: string[] = [];
-  if (withDates && f.range && !f.range.problem && (f.state.preset !== null)) q.push(`from=${f.range.from}`, `to=${f.range.to}`);
+  if (withDates && f.range && !f.range.problem && (f.state.preset !== null || f.followsBar)) q.push(`from=${f.range.from}`, `to=${f.range.to}`);
   if (f.client && f.client !== "all") q.push(`client=${encodeURIComponent(f.client)}`);
   return q.join("&");
 }
@@ -49,7 +52,8 @@ export function ReportFilterBar({ f, label, clients, noDates, datesNote }: { f: 
     <div className="mb-5 flex flex-wrap items-center gap-2" role="group" aria-label={`Filters for ${label}`} data-testid="report-filter">
       {!noDates && (
         <>
-          <select className={field} aria-label={`${label}: dates`} value={preset} onChange={(e) => pickPreset(e.target.value as FlowPreset)} data-testid="filter-preset">
+          <select className={field} aria-label={`${label}: dates`} value={state.preset ?? ""} onChange={(e) => (e.target.value ? pickPreset(e.target.value as FlowPreset) : f.patch({ preset: null, from: "", to: "" }))} data-testid="filter-preset">
+            <option value="">Dates at the top of the page</option>
             {FLOW_PRESETS.map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}
           </select>
           {preset === "custom" && (

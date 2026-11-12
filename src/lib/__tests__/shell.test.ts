@@ -38,6 +38,7 @@ test("the bar's modes and account helpers", () => {
   assert.equal(barMode("speed"), "range");
   assert.equal(barMode("inbox"), "now");
   assert.equal(barMode("settings"), "none");
+  assert.equal(barMode("meetings"), "none", "Meeting notes does not use the bar's dates, so it does not draw a date control that does nothing");
   assert.equal(accountButtonText(0, 13), "All 13 client accounts");
   assert.equal(accountButtonText(3, 13), "3 of 13 client accounts");
   assert.deepEqual(recentFirst([{ id: "a" }, { id: "b" }, { id: "c" }], ["c", "zz", "b"]).map((x) => x.id), ["c", "b", "a"]);

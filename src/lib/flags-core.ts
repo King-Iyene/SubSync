@@ -174,6 +174,13 @@ export const DEFAULT_OFF: ReadonlySet<Feature> = new Set<Feature>([
   "cf_deals",
   "cf_email",
   "cf_record",
+  // Wallet guard (wg_*: credit balance watchlist, our own record of it, alerts) and the 7 am brief (br_*: in-app brief, email, history). Default off until verified.
+  "wg_wallet",
+  "wg_record",
+  "wg_alerts",
+  "br_brief",
+  "br_email",
+  "br_record",
   // Settings rebuild, guides and the change log (stage ST): each default off.
   "st_settings",
   "st_guides",
@@ -183,6 +190,9 @@ export const DEFAULT_OFF: ReadonlySet<Feature> = new Set<Feature>([
   "cu_health",
   "cu_bulk",
   "cu_confirm",
+  // Meeting notes revamp (docs/features/MEETINGS_BRIEF.md): mn_logged is the calls held but not logged counts, mn_outcomes the history of what followed a call. Default off.
+  "mn_logged",
+  "mn_outcomes",
   // Clean-up v2 (docs/research/DATAQUALITY_R1.md): dq_module is the rebuilt Clean-up screen, dq_dupes duplicates with merge, delete and bulk, dq_intake the Lead intake tab, dq_alerts its alerts,
   // dq_gate the sorting-gate animation, dq_score the quality score. Default off.
   "dq_module",

@@ -1,6 +1,6 @@
 // Call mode v2 (stage SPEED6): the pure rules for redial cadence, lead-local call windows, best time to call, the heat score, custom dispositions, booking-link texts, power hours and the
 // setter board. No database, no network, no model call: everything is unit tested (src/lib/__tests__/dial6.test.ts). SubSync still places no call; it orders, shows and records.
-import { OUTCOMES, rankScore, type DialOutcome } from "./dial.ts";
+import { keyOf, OUTCOMES, rankScore, skipReason, type Block, type DialOutcome, type QueueItem } from "./dial.ts";
 
 const H = 3_600_000;
 
@@ -182,4 +182,79 @@ export function todaysCallbacks(list: readonly Callback[], now: number, tz: stri
   const day = (ms: number) => new Intl.DateTimeFormat("en-CA", { timeZone: tz || undefined }).format(new Date(ms));
   const today = day(now);
   return list.filter((c) => day(c.at) === today).sort((a, b) => a.at - b.at);
+}
+
+// ---------------------------------------------------------------- who can be called NOW (the one rule behind the count, the Start button and the session)
+/** What is added to a person once they are placed against the redial plan, their own clock and their promised callbacks. */
+export type Placement = { key: string; step: CadenceStep; attempts: number; callbackDue: boolean; windowOk: boolean; waitingForRedial: boolean };
+export type WaitKind = "hours" | "redial" | "callback";
+export type Waiting<T> = T & Placement & { kind: WaitKind; /** Plain words for the reason ("opens 9:00 their time"). */ why: string; /** When they become callable, when known. */ at: number | null };
+export type Classified<T> = {
+  /** Can be called right now: inside their calling hours, not snoozed, not waiting for the next redial, not asked-not-to-be-contacted, has a number. */
+  ready: Array<T & Placement>;
+  /** Will not be called from here: asked not to be contacted, no number saved, or already reached. */
+  skipped: Array<T & Placement & { block: Block }>;
+  /** Callable later today or soon: outside their calling hours, waiting for the next try, or a callback promised for later. */
+  waiting: Array<Waiting<T>>;
+  /** Used every try: a text task instead of another call. */
+  texts: Array<T & Placement>;
+};
+/**
+ * Splits the people in front of the person into who can be called NOW and who is waiting, and why. Every number on the screen (the "ready to call" count, whether Start is
+ * on, the people in a session) comes from this one function, so they cannot disagree. Nobody is dropped silently: each person lands in exactly one of ready, skipped, waiting or texts.
+ * `ignoreSnooze` is for a person who was promised a call and was picked by name ("Call now" on a callback): their saved callback does not hold them back, calling hours still do.
+ */
+export function classifyQueue<T extends QueueItem>(items: readonly T[], o: { now: number; cadence: Cadence; states: ReadonlyMap<string, AttemptState>; callbacks: ReadonlyArray<{ key: string; at: number }>; window?: Window; ignoreSnooze?: boolean; /** Leave out people a call already reached. Off for the missed-call list: a newer missed call is a fresh reason to call. */ skipReached?: boolean }): Classified<T> {
+  const win = o.window ?? DEFAULT_WINDOW;
+  const out: Classified<T> = { ready: [], skipped: [], waiting: [], texts: [] };
+  for (const it of items) {
+    const key = keyOf(it);
+    const st = o.states.get(key) ?? { attempts: 0, lastAt: null, reached: false };
+    const step = cadenceStep(o.cadence, st, o.now, it.timeZone);
+    const w = callWindow(o.now, it.timeZone, win);
+    const cb = o.callbacks.filter((x) => x.key === key).sort((a, b) => a.at - b.at);
+    const callbackDue = cb.some((x) => x.at <= o.now);
+    const p: Placement = { key, step, attempts: st.attempts, callbackDue, windowOk: w.ok, waitingForRedial: step.state === "waiting" };
+    const card = { ...it, ...p };
+    const block = skipReason(it);
+    if (block) { out.skipped.push({ ...card, block }); continue; }
+    if (o.skipReached && st.reached) { out.skipped.push({ ...card, block: { kind: "done", text: `${it.name} was already reached. Skipped.` } }); continue; }
+    if (step.state === "text_fallback") { out.texts.push(card); continue; }
+    if (!w.ok) { out.waiting.push({ ...card, kind: "hours", why: `opens ${win.start}:00 their time`, at: w.nextAt }); continue; }
+    const later = o.ignoreSnooze ? undefined : cb.find((x) => x.at > o.now);
+    if (later && !callbackDue) { out.waiting.push({ ...card, kind: "callback", why: "asked for a call later", at: later.at }); continue; }
+    if (step.state === "waiting" && step.dueAt) { out.waiting.push({ ...card, kind: "redial", why: "waiting for the next try", at: step.dueAt }); continue; }
+    out.ready.push(card);
+  }
+  return out;
+}
+/** One plain sentence about who is waiting, for under the count: "1 person is waiting for calling hours: opens 9:00 their time." Empty when nobody waits. */
+export function waitingLine(waiting: ReadonlyArray<{ kind: WaitKind; why: string }>): string {
+  if (waiting.length === 0) return "";
+  const n = (k: WaitKind) => waiting.filter((x) => x.kind === k).length;
+  const bits: string[] = [];
+  const hours = waiting.filter((x) => x.kind === "hours");
+  if (hours.length) { const why = hours.every((x) => x.why === hours[0].why) ? `: ${hours[0].why}` : ""; bits.push(`${hours.length} ${hours.length === 1 ? "person is" : "people are"} waiting for calling hours${why}`); }
+  if (n("redial")) bits.push(`${n("redial")} ${n("redial") === 1 ? "person is" : "people are"} waiting for their next try`);
+  if (n("callback")) bits.push(`${n("callback")} asked for a call later`);
+  return `${bits.join("; ")}.`;
+}
+
+/** Whether Start can be pressed, and when it cannot, the reason in plain words (shown under the count and used if a session is asked for anyway). */
+export function startState<T>(c: Classified<T & { name?: string }>): { enabled: boolean; reason: string | null } {
+  if (c.ready.length > 0) return { enabled: true, reason: null };
+  const why = waitingLine(c.waiting);
+  const rest = c.skipped.length > 0 && !why ? " The rest cannot be called from here (asked not to be contacted, no number saved, or already reached)." : c.texts.length > 0 && !why ? " Everyone left has used every try: a text task is next." : "";
+  return { enabled: false, reason: `Nobody can be called right now.${why ? ` ${why}` : ""}${rest}` };
+}
+
+export type SessionPlan<T> =
+  | { started: false; reason: string }
+  | { started: true; items: Array<T & Placement>; waiting: Array<Waiting<T>>; texts: Array<T & Placement>; skipped: number };
+/** What a press of Start does. A session only opens when at least one person can be called now; otherwise nothing starts and the reason is given. Heat order inside the session. */
+export function planSession<T extends QueueItem>(items: readonly T[], o: Parameters<typeof classifyQueue<T>>[1]): SessionPlan<T> {
+  const c = classifyQueue(items, o);
+  const s = startState(c);
+  if (!s.enabled) return { started: false, reason: s.reason ?? "Nobody can be called right now." };
+  return { started: true, items: reorderByHeat(c.ready), waiting: c.waiting, texts: c.texts, skipped: c.skipped.length };
 }

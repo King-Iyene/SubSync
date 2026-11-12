@@ -1,5 +1,6 @@
 "use client";
 
+import { usePageRange } from "../../ds/page-range";
 import { useEffect, useMemo, useState } from "react";
 import type { Pp3List, Pp3Options } from "@/lib/analytics/people3-types";
 import { EmptyState, ModuleTabs, OpenLeadButton, Page } from "../../ds";
@@ -12,24 +13,26 @@ import { fixturesOn, usePp, type PpParams } from "./data";
 import { PersonPanel, type Drill } from "./panel";
 import { Scorecards, Today, Workload, type SecProps } from "./sections";
 import { Roles } from "./roles-tab";
+import { TeamView } from "../people";
 import { Access, Coaching, Leaderboard, Money, Proof } from "./sections2";
 import { ago, Load, money, Pager, RECONNECT, useCursor } from "./shared";
 
 // Team, one screen (the Clients module pattern): Today | Scorecards | Workload | Leaderboard | Money | Coaching | Access | Proof, and a panel for one person.
 // REAL synced data only; "idle" always reads "no activity recorded in your CRM". Reads only here; the actions builder mounts its pieces through actions-slot.tsx.
 // Every number is a count that opens its rows. Sample data appears ONLY with ?ppfx=1 and is labelled "Sample data".
-type TabKey = "today" | "scorecards" | "workload" | "leaderboard" | "money" | "coaching" | "access" | "proof" | "roles";
+type TabKey = "today" | "scorecards" | "workload" | "leaderboard" | "money" | "coaching" | "access" | "proof" | "roles" | "owners";
 const TIPS: Record<TabKey, [string, string]> = {
   today: ["Today", "What to do today, in one sentence."], scorecards: ["Scorecards", "One row per person: replies, appointments, shows, deals won."],
   workload: ["Workload", "Who has too much and who has room, against the team's own middle."], leaderboard: ["Leaderboard", "A fair ranking inside each account."],
   money: ["Money", "Deals won, open and at risk, per person."], coaching: ["Coaching", "One thing to work on for each person, and your notes."],
   access: ["Access", "Which accounts each person works in, and where one person does it all."], proof: ["Proof", "A summary for a client of how the team handled their leads."],
   roles: ["Roles", "Who is a setter, a closer or something else. Shown next to every name."],
+  // Restored from the earlier Team page (a revamp adds, never removes): open and won value, stale deals, win rate, reply pace and show rate per owner, and the rename.
+  owners: ["Pipeline owners", "Open and won value, stale deals, win rate, reply pace and show rate for each owner. You can rename a person."],
 };
-const FLAG_OF: Record<TabKey, string> = { today: "pp_today", scorecards: "pp_scorecards", workload: "pp_workload", leaderboard: "pp_leaderboard", money: "pp_money", coaching: "pp_coaching", access: "pp_access", proof: "pp_proof", roles: "pp_roles" };
+const FLAG_OF: Record<TabKey, string> = { today: "pp_today", scorecards: "pp_scorecards", workload: "pp_workload", leaderboard: "pp_leaderboard", money: "pp_money", coaching: "pp_coaching", access: "pp_access", proof: "pp_proof", roles: "pp_roles", owners: "pp_module" };
 const OWN_TABS: TabKey[] = ["today", "scorecards", "leaderboard", "coaching"];
-const PERIODS = [[7, "Last 7 days"], [28, "Last 28 days"], [90, "Last 90 days"]] as const;
-const NO_PERIOD: TabKey[] = ["today", "workload", "coaching", "access", "roles"];
+const NO_PERIOD: TabKey[] = ["today", "workload", "coaching", "access", "roles", "owners"];
 
 const KIND_WORD = { lead: "Lead waiting", deal: "Deal", appointment: "Appointment" } as const;
 function DrillList({ d, filters, onClose }: { d: Drill; filters: PpParams; onClose: () => void }) {
@@ -56,13 +59,15 @@ export function TeamModule({ go }: { go: GoFn }) {
   void go;
   const sample = fixturesOn(), opt = usePp<Pp3Options>("options");
   const flags = (opt.data?.flags ?? null) as Record<string, boolean> | null, viewer = opt.data?.viewer ?? { level: "all" as const, userId: null, canSeeEmail: false, canRankAll: false }, own = viewer.level === "self";
-  const [days, setDays] = useState<number>(28), [location, setLocation] = useState(""), [drill, setDrill] = useState<Drill | null>(null), [person, setPerson] = useState<string | null>(null), [coachId, setCoachId] = useState<string | undefined>(undefined), [since] = useState(() => Date.now());
+  const bar = usePageRange();
+  const [location, setLocation] = useState(""), [drill, setDrill] = useState<Drill | null>(null), [person, setPerson] = useState<string | null>(null), [coachId, setCoachId] = useState<string | undefined>(undefined);
   const tabs = useMemo(() => {
     const all = (Object.keys(TIPS) as TabKey[]).filter((k) => !own || OWN_TABS.includes(k));
     return all.filter((k) => flags === null || flags[FLAG_OF[k]] !== false);
   }, [flags, own]);
   const [tab, setTab] = useState<TabKey>("today"), active = tabs.includes(tab) ? tab : tabs[0] ?? "today", index = Math.max(0, tabs.indexOf(active));
-  const filters = useMemo<PpParams>(() => ({ from: days === 28 ? undefined : new Date(since - days * 86_400_000).toISOString().slice(0, 10), location: location || undefined }), [days, location, since]);
+  // The dates are the date bar's (one range for the whole app): every read below asks for exactly them, and waits until they are known.
+  const filters = useMemo<PpParams>(() => ({ from: bar.ready ? bar.from : undefined, to: bar.ready ? bar.to : undefined, location: location || undefined }), [bar.ready, bar.from, bar.to, location]);
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setDrill(null); }, [active]);
   const accounts = opt.data?.accounts ?? [];
@@ -82,9 +87,10 @@ export function TeamModule({ go }: { go: GoFn }) {
       case "access": return <Access {...props} />;
       case "proof": return <Proof {...props} />;
       case "roles": return <Roles />;
+      case "owners": return <div className="[&_[data-testid=page-subtitle]]:hidden [&_h1]:sr-only"><TeamView /></div>;
     }
   })();
-  const showAccount = !own && accounts.length > 1 && active !== "access" && active !== "proof" && active !== "coaching" && active !== "roles";
+  const showAccount = !own && accounts.length > 1 && active !== "owners" && active !== "access" && active !== "proof" && active !== "coaching" && active !== "roles";
   const showPeriod = !NO_PERIOD.includes(active);
   return (
     <div className="s6 ap pp ds-enter" data-testid="pp-module">
@@ -96,16 +102,16 @@ export function TeamModule({ go }: { go: GoFn }) {
           <ModuleTabs pill label="Team sections" tabs={tabs.map((k) => ({ label: TIPS[k][0], tip: TIPS[k][1], node: null }))} value={index} onChange={(i) => { setCoachId(undefined); setTab(tabs[i]); }} />
           {(showPeriod || showAccount) && (
             <div className="ap-head print:hidden" role="group" aria-label="Filters">
-              {showPeriod && <select className="ap-field" aria-label="Period" value={days} onChange={(e) => setDays(Number(e.target.value))}>{PERIODS.map(([n, l]) => <option key={n} value={n}>{l}</option>)}</select>}
+              {showPeriod && <span className="ap-fine" data-testid="pp-dates">Dates: {bar.label}, from the bar above.</span>}
               {showAccount && <select className="ap-field" aria-label="Client account" value={location} onChange={(e) => setLocation(e.target.value)} data-testid="pp-account"><option value="">All client accounts</option>{accounts.map((a) => <option key={a.locationId} value={a.locationId}>{a.name}</option>)}</select>}
               <span className="ap-fine">Every number below follows these choices{opt.data?.generatedAt ? `. Updated ${opt.data.generatedAt.slice(0, 10)}` : ""}.</span>
             </div>
           )}
-          <div data-testid={`pp-tab-${active}`}>{body}</div>
+          <div data-testid={`pp-tab-${active}`}>{bar.ready || NO_PERIOD.includes(active) ? body : <p className="ap-fine" role="status">Working out the dates...</p>}</div>
           {drill && <DrillList d={drill} filters={filters} onClose={() => setDrill(null)} />}
           <p className="ap-fine mt-6">SubSync reads message and call metadata, never the words. History starts when SubSync first synced; every trend says when its history begins.</p>
         </div>
-        {person && <PersonPanel key="panel" userId={person} onSelect={setPerson} onClose={() => setPerson(null)} onDrill={open} onCoach={coach} filters={{ from: filters.from }} />}
+        {person && <PersonPanel key="panel" userId={person} onSelect={setPerson} onClose={() => setPerson(null)} onDrill={open} onCoach={coach} filters={{ from: filters.from, to: filters.to }} />}
       </Page>
     </div>
   );

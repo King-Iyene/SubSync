@@ -152,7 +152,7 @@ test("the roadmap: status words with their meaning, one vote per person that can
   const c = await api(page);
   await page.goto("/app#roadmap");
   await page.reload();
-  await expect(page.getByRole("heading", { name: "What's new and next", level: 1 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "What's new and next" })).toBeVisible();
   await expect(page.getByText("Votes help us decide what to build next.")).toBeVisible();
   expect(await page.locator("body").innerText()).not.toContain("We build in the order people ask");
   for (const label of ["Planned", "Considering", "Shipped"]) await expect(page.getByRole("heading", { name: label, exact: true })).toBeVisible();

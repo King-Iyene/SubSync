@@ -25,7 +25,12 @@ function fetchMap(api: Api, force = false): void {
   if (fixturesOn()) return;
   if (!force && store.api === api && store.p && Date.now() - store.at < TTL) return;
   store.api = api; store.at = Date.now();
-  store.p = api.get<MapData>("people3/roles/map").then((d) => { store.data = d; }).catch(() => { store.data = EMPTY; }).finally(() => { store.subs.forEach((f) => f()); });
+  store.p = api.get<MapData>("people3/roles/map").then((d) => {
+    // An answer that is not the expected shape (the feature is off, or the demo gives a short one) means "no labels", never a broken page.
+    const roles: MapData["roles"] = {};
+    for (const [id, v] of Object.entries(d?.roles ?? {})) roles[id] = { role: v?.role ?? null, byAccount: v?.byAccount ?? {} };
+    store.data = { roles, any: d?.any === true, canChange: d?.canChange === true };
+  }).catch(() => { store.data = EMPTY; }).finally(() => { store.subs.forEach((f) => f()); });
 }
 /** Call after any change of a role so every chip on screen reads the new label at once. */
 export function refreshRoles(): void { if (store.api) fetchMap(store.api, true); }

@@ -34,7 +34,7 @@ export function OpenLeadButton({ seed, crmUrl, reason, name, showAccount = true,
       ) : <span className="max-w-[16rem] text-right text-xs text-muted-foreground" data-testid={`${testId}-reason`}>{reason ?? "No person is linked to this row."}</span>}
       {crmUrl && (
         <a href={crmUrl} target="_blank" rel="noopener noreferrer" aria-label={`Open ${who} in your CRM (new tab)`} title="Open in your CRM" data-testid={`${testId}-crm`}
-          className="inline-flex size-9 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary sm:size-8"><ExternalLink aria-hidden className="size-3.5" /></a>
+          className="inline-flex size-11 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary sm:size-8"><ExternalLink aria-hidden className="size-3.5" /></a>
       )}
       {seed && open && <LeadDrawer leads={[seed]} index={0} onIndex={() => undefined} onClose={() => setOpen(false)} showAccount={showAccount} />}
     </span>

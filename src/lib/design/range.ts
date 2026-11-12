@@ -1,3 +1,5 @@
+import { MAX_RANGE_DAYS } from "./range-limits.ts";
+
 // The window and comparison of ONE card (KF-4): "Last 30 days, 3 Oct to 1 Nov, compared with 3 Sep to 2 Oct". Pure: no clock of its own (the caller passes
 // today), no React. A card's range overrides the page range for that card only, is carried in the page address as `r.<card>=30d.prev`, and the comparison
 // obeys the same minimum-sample rule as the rest of the app: no percentage change on a tiny base.
@@ -9,7 +11,7 @@ export type RangeSpec = { preset: RangePreset; from?: string; to?: string; compa
 export const PRESETS: Array<{ key: Exclude<RangePreset, "custom">; label: string; days: number }> = [{ key: "7d", label: "Last 7 days", days: 7 }, { key: "30d", label: "Last 30 days", days: 30 }, { key: "90d", label: "Last 90 days", days: 90 }];
 export const COMPARES: Array<{ key: Compare; label: string }> = [{ key: "none", label: "No comparison" }, { key: "previous", label: "Previous period" }, { key: "month", label: "Same dates last month" }, { key: "year", label: "Same dates last year" }];
 export const DEFAULT_RANGE: RangeSpec = { preset: "30d", compare: "none" };
-export const MAX_CUSTOM_DAYS = 366;
+export const MAX_CUSTOM_DAYS = MAX_RANGE_DAYS;
 
 const DAY = 86_400_000;
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
@@ -44,7 +46,7 @@ export function resolveRange(specIn: RangeSpec, today: string): Resolved {
   else if (validDate(spec.from) && validDate(spec.to)) {
     if (spec.from > spec.to) problem = "The end date is before the start date.";
     else if (spec.to > today) problem = "The end date is in the future.";
-    else if ((toMs(spec.to) - toMs(spec.from)) / DAY + 1 > MAX_CUSTOM_DAYS) problem = `A custom range can be at most ${MAX_CUSTOM_DAYS} days.`;
+    else if ((toMs(spec.to) - toMs(spec.from)) / DAY + 1 > MAX_CUSTOM_DAYS) problem = `A custom range can be at most ${MAX_CUSTOM_DAYS} days (about 3 years).`;
     if (problem) { spec = { ...DEFAULT_RANGE, compare: spec.compare }; to = today; from = toIso(toMs(today) - 29 * DAY); }
     else { from = spec.from; to = spec.to; }
   } else { problem = "Pick a start and an end date."; spec = { ...DEFAULT_RANGE, compare: spec.compare }; to = today; from = toIso(toMs(today) - 29 * DAY); }

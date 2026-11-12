@@ -1,13 +1,15 @@
 "use client";
 
-import { Check, ChevronDown, Search, X } from "lucide-react";
+import { Check, ChevronDown, Loader2, Search, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { accountButtonText, barMode, pageRangeFromHash, recentFirst, withPageRange } from "@/lib/design/global-filter";
+import { accountButtonText, barMode, recentFirst } from "@/lib/design/global-filter";
 import { describeHidden, isFiltered, EMPTY_FILTER, nameList, scopeOf, type FilterOptions, type FilterValue } from "@/lib/design/filters";
-import { PRESETS, decodeRange, resolveRange, todayOf, type RangeSpec } from "@/lib/design/range";
+import { PRESETS, todayOf, type RangeSpec } from "@/lib/design/range";
+import { checkCustom, isDefaultRange } from "@/lib/design/page-range";
 import { parseTodayAccounts, withTodayAccounts } from "@/lib/analytics/today-queue";
-import { useData } from "../session";
-import { notifyRangeChange } from "./card-range";
+import { useData, useInflight } from "../session";
+import { usePageRange } from "./page-range";
+import { RightNowNote } from "./own-window";
 import { remember, remembered } from "./remember";
 
 // ONE filter bar for every page that shows numbers (KF-11): always open, never behind a triangle. Left: which client accounts are counted (agency only), a button
@@ -111,38 +113,56 @@ function AccountControl({ accounts, picked, onChange, options, value, onValue }:
   );
 }
 
-function DateControl({ mode, hash }: { mode: "range" | "now"; hash: string }) {
-  const [today, setToday] = useState<string | null>(null);
-  // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { setToday(todayOf(Date.now())); }, []);
-  const saved = remembered("range-page");
-  const spec: RangeSpec = pageRangeFromHash(hash) ?? decodeRange(saved) ?? { preset: "30d", compare: "none" };
-  const resolved = today ? resolveRange(spec, today) : null;
-  const apply = (s: RangeSpec) => {
-    remember("range-page", `${s.preset === "custom" ? `custom:${s.from}~${s.to}` : s.preset}`);
-    try { window.history.replaceState(null, "", withPageRange(window.location.hash || "#today", s)); } catch { /* the choice still applies */ }
-    notifyRangeChange();
-    window.dispatchEvent(new Event("subsync-range"));
-  };
+function DateControl({ mode }: { mode: "range" | "now" | "dates" }) {
+  const pr = usePageRange();
+  const inflight = useInflight();
+  const { spec } = pr;
+  const [today] = useState(() => todayOf(Date.now()));
+  // The two typed dates of a custom range are kept here until they are applied, so a half-typed date never reaches a screen and the label always shows what is applied.
+  const [draft, setDraft] = useState<{ from: string; to: string } | null>(null);
+  const from = draft?.from ?? spec.from ?? pr.from;
+  const to = draft?.to ?? spec.to ?? pr.to;
+  const problem = spec.preset === "custom" && today ? checkCustom(from, to, today) : null;
+  const dirty = spec.preset === "custom" && (from !== (spec.from ?? "") || to !== (spec.to ?? ""));
+  const [pending, setPending] = useState(false);
+  const busy = useRef(inflight);
+  useEffect(() => { busy.current = inflight; }, [inflight]);
+  useEffect(() => { const on = () => setPending(true); window.addEventListener("subsync-range", on); return () => window.removeEventListener("subsync-range", on); }, []);
+  useEffect(() => {
+    if (!pending) return;
+    const t = setTimeout(() => { if (busy.current === 0) setPending(false); }, 500);
+    return () => clearTimeout(t);
+  }, [pending, inflight]);
+  const applyPreset = (s: RangeSpec) => { setDraft(null); pr.apply(s); };
+  const applyDraft = () => { if (!problem && dirty) { pr.apply({ preset: "custom", from, to, compare: spec.compare }); setDraft(null); } };
   if (mode === "now") return <p className="text-[0.95rem] text-muted-foreground" data-testid="date-now" title="This page shows what is true at this moment, not a date range."><span className="font-medium text-foreground">Live</span>, as of right now</p>;
+  const updating = pending && inflight > 0;
   return (
     <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5" data-testid="date-control">
-      <div role="group" aria-label="Dates" className="inline-flex overflow-hidden rounded-lg border bg-card">
+      <div role="group" aria-label="Dates" className="inline-flex max-w-full overflow-x-auto rounded-lg border bg-card">
         {PRESETS.map((p) => (
-          <button key={p.key} type="button" aria-pressed={spec.preset === p.key} onClick={() => apply({ preset: p.key, compare: "none" })}
-            className={`min-h-10 whitespace-nowrap px-2.5 text-[0.95rem] outline-none focus-visible:ring-2 focus-visible:ring-ring/40 sm:px-3 ${spec.preset === p.key ? "bg-primary font-medium text-primary-foreground" : "hover:bg-accent"}`}>{p.label.startsWith("Last ") ? <><span className="max-sm:sr-only">Last </span>{p.label.slice(5)}</> : p.label}</button>
+          <button key={p.key} type="button" aria-pressed={spec.preset === p.key} onClick={() => applyPreset({ preset: p.key, compare: spec.compare })}
+            className={`min-h-11 sm:min-h-10 whitespace-nowrap px-2.5 text-[0.95rem] outline-none focus-visible:ring-2 focus-visible:ring-ring/40 sm:px-3 ${spec.preset === p.key ? "bg-primary font-medium text-primary-foreground" : "hover:bg-accent"}`}>{p.label.startsWith("Last ") ? <><span className="max-sm:sr-only">Last </span>{p.label.slice(5)}</> : p.label}</button>
         ))}
-        <button type="button" aria-pressed={spec.preset === "custom"} onClick={() => apply({ preset: "custom", from: spec.from ?? resolved?.current.from, to: spec.to ?? resolved?.current.to, compare: "none" })}
+        <button type="button" aria-pressed={spec.preset === "custom"} onClick={() => { setDraft(null); pr.apply({ preset: "custom", from: spec.from ?? pr.from, to: spec.to ?? pr.to, compare: spec.compare }); }}
           className={`min-h-10 border-l px-3 text-[0.95rem] outline-none focus-visible:ring-2 focus-visible:ring-ring/40 ${spec.preset === "custom" ? "bg-primary font-medium text-primary-foreground" : "hover:bg-accent"}`}>Custom</button>
       </div>
       {spec.preset === "custom" && (
-        <span className="inline-flex items-center gap-1.5">
-          <input type="date" aria-label="From date" value={spec.from ?? ""} max={resolved?.current.to} onChange={(e) => e.target.value && apply({ ...spec, from: e.target.value })} className="min-h-10 rounded-lg border bg-card px-2 text-[0.95rem]" />
+        <form className="inline-flex flex-wrap items-center gap-1.5" onSubmit={(e) => { e.preventDefault(); applyDraft(); }} data-testid="custom-range">
+          <input type="date" aria-label="From date" aria-invalid={Boolean(problem)} value={from} max={to || today || undefined} onChange={(e) => setDraft({ from: e.target.value, to })} className="min-h-10 rounded-lg border bg-card px-2 text-[0.95rem]" />
           <span aria-hidden className="text-muted-foreground">to</span>
-          <input type="date" aria-label="To date" value={spec.to ?? ""} onChange={(e) => e.target.value && apply({ ...spec, to: e.target.value })} className="min-h-10 rounded-lg border bg-card px-2 text-[0.95rem]" />
-        </span>
+          <input type="date" aria-label="To date" aria-invalid={Boolean(problem)} value={to} max={today ?? undefined} onChange={(e) => setDraft({ from, to: e.target.value })} className="min-h-10 rounded-lg border bg-card px-2 text-[0.95rem]" />
+          <button type="submit" disabled={Boolean(problem) || !dirty} data-testid="apply-range" className="min-h-10 rounded-lg bg-primary px-3 text-[0.95rem] font-medium text-primary-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-50">Apply</button>
+        </form>
       )}
-      <span className="text-[0.95rem] text-muted-foreground" data-testid="date-window" aria-live="polite">{resolved ? resolved.current.label : ""}</span>
+      <span className="text-[0.95rem] text-muted-foreground" data-testid="date-window" aria-live="polite">{pr.label}</span>
+      <label className="inline-flex min-h-10 cursor-pointer items-center gap-1.5 text-[0.95rem]" title="Show the change against the period just before, where a number has one">
+        <input type="checkbox" className="size-4" checked={spec.compare !== "none"} onChange={(e) => applyPreset({ ...spec, compare: e.target.checked ? "previous" : "none" })} data-testid="compare-previous" />
+        Compare with the previous period
+      </label>
+      {!isDefaultRange(spec) && <button type="button" className="min-h-9 text-sm underline" onClick={() => { setDraft(null); pr.apply(null); }} data-testid="reset-range">Reset</button>}
+      {updating && <span role="status" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground" data-testid="range-updating"><Loader2 aria-hidden className="size-4 animate-spin" />Updating the numbers</span>}
+      {(problem || pr.problem) && <p role="alert" className="basis-full border-l-2 border-warning pl-2 text-sm text-foreground" data-testid="range-problem">{problem ?? pr.problem}{!problem && pr.problem ? " Showing the last 30 days instead." : ""}</p>}
     </div>
   );
 }
@@ -150,6 +170,7 @@ function DateControl({ mode, hash }: { mode: "range" | "now"; hash: string }) {
 export function GlobalFilterBar({ view, agency, value, onChange, onAllClients }: { view: string; agency: boolean; value: FilterValue; onChange: (v: FilterValue) => void; /** Given while an agency user is inside one client account: a "Back to all clients" button. */ onAllClients?: () => void }) {
   const mode = barMode(view);
   const hash = useHash();
+  const pageLabel = usePageRange().label;
   const { data } = useData<Segments>(agency ? "segments" : null);
   const options = useMemo<FilterOptions | null>(() => data ? ({
     accounts: data.accounts ?? [], testAccounts: data.testAccounts ?? 0,
@@ -158,27 +179,30 @@ export function GlobalFilterBar({ view, agency, value, onChange, onAllClients }:
   }) : null, [data]);
   const isToday = view === "today";
   const picked = isToday ? parseTodayAccounts(hash) : value.accounts;
-  const setPicked = (ids: string[]) => (isToday ? setTodayIds(ids) : onChange({ ...value, accounts: ids }));
+  // ONE account choice for the whole app: whichever page it is made on, Today's own choice (ta=) and the shared filter every other page reads are set together,
+  // so the client accounts counted never differ from one screen to the next.
+  const setPicked = (ids: string[]) => { setTodayIds(ids); onChange({ ...value, accounts: ids }); };
   useEffect(() => {
     const on = (e: Event) => { const id = (e as CustomEvent<{ id: string }>).detail?.id; if (id) { noteRecent([id]); setPicked([id]); } };
     window.addEventListener("subsync-focus-client", on);
     return () => window.removeEventListener("subsync-focus-client", on);
   });
   if (mode === "none") return null;
-  const showAccounts = agency && options && (data?.total ?? 0) >= 1; // an agency user always gets the picker, even with one client (it says which client is counted)
-  if (!showAccounts && !agency && mode !== "range") return null;
+  const showAccounts = mode !== "dates" && agency && options && (data?.total ?? 0) >= 1; // an agency user always gets the picker, even with one client (it says which client is counted)
+  if (!showAccounts && !agency && mode !== "range" && mode !== "dates") return null;
   const notes = options && !isToday ? describeHidden({ ...value, accounts: picked }, options).filter((n) => n.clear.accounts === undefined) : [];
   return (
     <>
       {/* Sticky: it follows on scroll as one compact line and takes its own place in the flow, so it never covers the content under it. */}
       <div className="sticky top-0 z-30 mb-3 rounded-xl border bg-card px-3 py-1.5 shadow-sm print:hidden" data-testid="global-filter-bar" role="region" aria-label="Filters for this page"><div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-1">
-        {showAccounts ? <AccountControl accounts={options!.accounts!} picked={picked} onChange={setPicked} options={options!} value={isToday ? { ...value, accounts: picked } : value} onValue={onChange} /> : agency && !options ? <span className="h-10 w-48 animate-pulse rounded-lg bg-muted" aria-hidden data-testid="account-skeleton" /> : <span />}
+        {showAccounts ? <AccountControl accounts={options!.accounts!} picked={picked} onChange={setPicked} options={options!} value={isToday ? { ...value, accounts: picked } : value} onValue={onChange} />   : mode !== "dates" && agency && !options ? <span className="h-10 w-48 animate-pulse rounded-lg bg-muted" aria-hidden data-testid="account-skeleton" /> : <span />}
         <div className="flex flex-wrap items-center gap-3">
           {onAllClients && <button type="button" onClick={onAllClients} data-testid="back-to-all-clients" className="ds-press min-h-10 cursor-pointer rounded-lg border bg-card px-3 text-[0.95rem] font-medium text-primary hover:border-primary/40 hover:underline focus-visible:ring-2 focus-visible:ring-ring/40 outline-none">Back to all clients</button>}
-          {mode !== "accounts" && <DateControl mode={mode} hash={hash} />}
+          <DateControl mode={mode} />
         </div>
       </div></div>
       <div className="mb-4 print:hidden">
+      {mode === "now" && <RightNowNote view={view} label={pageLabel} />}
       {notes.length > 0 && (
         <ul className="space-y-0.5 text-sm text-muted-foreground">
           {notes.map((n) => <li key={n.text}>{n.text} <button type="button" className="font-medium text-primary underline" onClick={() => onChange({ ...value, ...n.clear })}>{n.clear.hideTest === false ? "Show them" : "Show all"}</button></li>)}

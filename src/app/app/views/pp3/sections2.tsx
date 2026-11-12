@@ -18,7 +18,7 @@ function BoardTable({ b, pick }: { b: Pp3Board; pick: (id: string) => void }) {
       {b.note ? <p className="ap-fine">{b.note}</p> : (
         <div className="ap-scroll"><table className="ap-t" style={{ minWidth: 0 }}><thead><tr><th>Rank</th><th>Person</th><th data-num data-sm="hide">Leads</th><th data-num>{closers ? "Deals won" : "In time"}</th><th data-num data-sm="hide">Against the same sources</th><th data-sm="hide">Why</th></tr></thead>
           <tbody>{b.shown.map((p) => (
-            <tr key={p.person.userId} style={{ cursor: "default" }}><td><span className="pp-rank">{p.rank ?? "n/a"}</span></td>
+            <tr key={p.person.userId} style={{ cursor: "default" }}><td><span className="pp-rank">{p.rank ?? "Not ranked"}</span></td>
               <td className="pp-wrap"><span className="pp-cell"><Initials p={p.person} /><button type="button" className="pp-name" onClick={() => pick(p.person.userId)}>{p.person.name}</button><RoleChip userId={p.person.userId} /></span></td>
               <td data-num data-sm="hide">{p.n}</td><td data-num>{p.enough ? share(p.value) : NOT_ENOUGH}</td>
               <td data-num data-sm="hide">{p.enough && p.vsMix !== null ? `${p.vsMix > 0 ? "+" : ""}${Math.round(p.vsMix)} pts` : ""}</td>
@@ -160,12 +160,12 @@ export function Access({ filters, pick }: SecProps) {
 }
 
 export function Proof({ filters, accounts, viewer }: SecProps) {
-  const [loc, setLoc] = useState(String(accounts[0]?.locationId ?? "")), [named, setNamed] = useState(false), pickLoc = String(filters.location ?? loc), r = usePp<Pp3Proof>("proof", { from: filters.from, location: pickLoc || undefined, named: named ? 1 : undefined }, !pickLoc && accounts.length > 1);
+  const [loc, setLoc] = useState(String(accounts[0]?.locationId ?? "")), [named, setNamed] = useState(false), pickLoc = String(filters.location ?? loc), r = usePp<Pp3Proof>("proof", { from: filters.from, to: filters.to, location: pickLoc || undefined, named: named ? 1 : undefined }, !pickLoc && accounts.length > 1);
   return (
     <div data-testid="pp-proof">
       <div className="ap-head">{accounts.length > 1 && <select className="ap-field" aria-label="Client account" value={pickLoc} onChange={(e) => setLoc(e.target.value)} disabled={Boolean(filters.location)}>{accounts.map((a) => <option key={a.locationId} value={a.locationId}>{a.name}</option>)}</select>}
         {fixturesOn() && viewer.level === "all" && <label className="ap-fine inline-flex min-h-11 items-center gap-2"><input type="checkbox" checked={named} onChange={(e) => setNamed(e.target.checked)} />Show team members by name</label>}
-        <span className="ap-fine">A summary for one client, for one period of up to 90 days.</span></div>
+        <span className="ap-fine">A summary for one client, for one period of up to 90 days{filters.from && filters.to && (Date.parse(String(filters.to)) - Date.parse(String(filters.from))) / 86_400_000 + 1 > 90 ? `. The dates above are longer, so this shows the 90 days up to ${filters.to}` : ""}.</span></div>
       <Load r={r} empty={(p) => !p.location && "Choose a client account to see how the team handled its leads."}>
         {(p) => (
           <section className="pp-card pp-receipt" aria-label={`Team summary for ${p.location?.name ?? ""}`} data-testid="pp-receipt">

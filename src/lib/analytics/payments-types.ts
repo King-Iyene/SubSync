@@ -20,7 +20,7 @@ export type PmMoney = { currency: string; amount: number; count: number };
 export type PmTile = { key: "failed" | "late" | "past_due_plans" | "disputes" | "refunds"; label: string; count: number; money: PmMoney[]; note: string | null; filter: { problem?: PmProblem | "failed"; disputes?: boolean } };
 export type PmToday = {
   headline: string; button: { label: string; count: number } | null; tiles: PmTile[];
-  atRisk: Array<PmMoney & { formula: string }>; recoveredLast30: PmMoney[]; avgDaysToRecover: number | null; recoveryRate: number | null;
+  atRisk: Array<PmMoney & { formula: string }>; /** Recovered in the dates asked (the date bar; the last 30 days when none were asked). The name is old, the window is `windowFrom` to `windowTo`. */ recoveredLast30: PmMoney[]; windowFrom?: string; windowTo?: string; avgDaysToRecover: number | null; recoveryRate: number | null;
   historyStarts: string | null; sources: PmSource[]; accounts: number; testRowsHidden: number; setupNote: string | null; expectedMonthly: Array<PmMoney & { formula: string }>;
 };
 export type PmRow = {
@@ -38,7 +38,7 @@ export type PmUpcoming = {
   plans: { state: PmSource["state"]; items: Array<PmMoney & { formula: string; accounts: number }>; note: string };
   customers: { available: boolean; note: string }; missing: string[];
 };
-export type PmHistory = { historyStarts: string | null; days: Array<{ day: string; failed: number; recovered: number; late: number }>; repeat: Array<{ locationId: string; accountName: string; who: string; count: number }>; avgDaysToRecover: number | null; recoveryRate: number | null; recovered: PmMoney[]; flagged: number; fixed: number };
+export type PmHistory = { windowFrom?: string; windowTo?: string; historyStarts: string | null; days: Array<{ day: string; failed: number; recovered: number; late: number }>; repeat: Array<{ locationId: string; accountName: string; who: string; count: number }>; avgDaysToRecover: number | null; recoveryRate: number | null; recovered: PmMoney[]; flagged: number; fixed: number };
 export type PmOptions = { accounts: Array<{ id: string; name: string }>; currencies: string[]; flags: Record<string, boolean>; roleLevel: "agency" | "account"; lastSync: string | null };
 export type PmSetup = { sources: PmSource[]; checks: Array<{ key: string; title: string; ok: boolean; detail: string }>; scopes: string[] };
 export type WithMeta<T> = T & PmMeta;

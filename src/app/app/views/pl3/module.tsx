@@ -1,5 +1,6 @@
 "use client";
 
+import { usePageRange } from "../../ds/page-range";
 import { Bookmark, Search, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PlDeal } from "@/lib/analytics/pipeline3-types-interim";
@@ -17,11 +18,14 @@ import type { PipeCard } from "@/lib/analytics/pipeline3-types";
 import { Health, NeedsAttention, Overview, People, Proof, Sources, StageHistory, WonLost, type SectionProps } from "./sections";
 import type { PlHealthRow } from "@/lib/analytics/pipeline3-types-interim";
 import { SlippingPanel, useCashFlags } from "../td3/cash";
+import { PipelineView } from "../pipeline";
+import { DealsView } from "../deals";
+import { DealMoves } from "../people";
 
 // Pipeline as a module with sub-sections (the Appointments pattern): Overview | Money Flow | Needs attention | Won and lost | People | Sources | Stage history | Health | Proof.
 // One filter bar, one right-side deal panel, saved views and keys. SubSync never changes a deal from here; edits go through slice PB's checked gateway tools, which mount into the panel slots.
 
-type TabKey = "overview" | "flow" | "needs" | "wonlost" | "people" | "sources" | "history" | "health" | "proof" | "slipping";
+type TabKey = "overview" | "flow" | "needs" | "wonlost" | "people" | "sources" | "history" | "health" | "proof" | "slipping" | "classic" | "stale";
 const TABS: Array<{ key: TabKey; label: string; tip: string }> = [
   { key: "overview", label: "Overview", tip: "The one sentence, the numbers and where the money leaks." }, { key: "flow", label: "Money flow", tip: "The money in each stage as stacks of coins." },
   { key: "needs", label: "Needs attention", tip: "Deals stuck longer than that step normally takes." }, { key: "wonlost", label: "Won and lost", tip: "What closed, and the lost reason when your CRM has one." },
@@ -29,6 +33,9 @@ const TABS: Array<{ key: TabKey; label: string; tip: string }> = [
   { key: "sources", label: "Sources", tip: "Which lead sources turn into money." }, { key: "history", label: "Stage history", tip: "How long deals really stay in each step." },
   { key: "health", label: "Accounts", tip: "Every client account, most stuck deals first." }, { key: "proof", label: "Proof", tip: "The weekly receipt per client." },
   { key: "slipping", label: "Slipping", tip: "Deals going quiet for their stage, about to, or lost this fortnight, with the money behind them." },
+  // Restored from the earlier Pipeline (a revamp adds, never removes): the forecast, coverage, bottleneck and risk cards, and the stale-deal list with its export.
+  { key: "classic", label: "Forecast and stages", tip: "Forecast, coverage, bottlenecks, deal risk, aging, wins and losses by month, and the export of open deals." },
+  { key: "stale", label: "Stale deals and hygiene", tip: "Open deals that have not moved, by stage, with the CSV export." },
 ];
 type SavedView = { name: string; filters: PlFilters; tab: TabKey };
 const VIEWS_KEY = "pl3.views.v1";
@@ -42,7 +49,10 @@ export function PipelineModule({ moneyFlow = true, actions = false }: { moneyFlo
   const slippingOn = cash.flags?.cf_deals === true;
   const tabs = useMemo(() => TABS.filter((t) => (moneyFlow || t.key !== "flow") && (slippingOn || t.key !== "slipping")), [moneyFlow, slippingOn]);
   const [tab, setTab] = useState<TabKey>("overview");
-  const [filters, setFilters] = useState<PlFilters>(DEFAULT_FILTERS);
+  // The dates are the date bar's (one range for the whole app). What this screen keeps is the account, pipeline, owner and search; the dates are laid over them.
+  const bar = usePageRange();
+  const [picks, setFilters] = useState<PlFilters>(DEFAULT_FILTERS);
+  const filters = useMemo<PlFilters>(() => ({ ...picks, from: bar.ready ? bar.from : undefined, to: bar.ready ? bar.to : undefined, days: bar.days || picks.days }), [picks, bar.ready, bar.from, bar.to, bar.days]);
   const [q, setQ] = useState("");
   const [deal, setDeal] = useState<PlDeal | null>(null);
   const [drill, setDrill] = useState<Drill>(null);
@@ -96,15 +106,17 @@ export function PipelineModule({ moneyFlow = true, actions = false }: { moneyFlo
       case "health": return <><Health {...sp} />{drillList}</>;
       case "proof": return <><Proof {...sp} />{drillList}</>;
       case "slipping": return <SlippingPanel location={filters.locationId} showAccount={showAccount} />;
+      case "classic": return <div className="[&_h1]:sr-only"><PipelineView /><DealMoves /></div>;
+      case "stale": return <div className="[&_h1]:sr-only"><DealsView /></div>;
     }
   })();
 
   return (
     <div className="s6 ap pl ds-enter" ref={top} data-testid="pl-module" key={version}>
       <Page title="Pipeline" subtitle="Where your deal money sits, and what is stuck." actions={null}>
-        <div className="ap-head" role="search" aria-label="Filter deals">
+        <div className="ap-head" role="search" aria-label="Filter deals" hidden={tab === "classic" || tab === "stale"}>
           <label className="ap-search"><Search aria-hidden className="size-4" /><span className="sr-only">Search by deal or contact</span><input ref={search} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search a deal (press /)" data-testid="pl-search" /></label>
-          <select className="ap-field" aria-label="Dates" value={filters.days} onChange={(e) => setFilters({ ...filters, days: Number(e.target.value) as PlFilters["days"] })} data-testid="pl-days"><option value={30}>Last 30 days</option><option value={45}>Last 45 days</option><option value={90}>Last 90 days</option></select>
+          <span className="ap-fine" data-testid="pl-days">Dates: {bar.label}, from the bar above.</span>
           {accounts.length > 1 && <select className="ap-field" aria-label="Account" value={filters.locationId} onChange={(e) => { setPicked(null); setFilters({ ...filters, locationId: e.target.value, pipeline: "" }); }} data-testid="pl-account"><option value="">All accounts</option>{accounts.map((a) => <option key={a.locationId} value={a.locationId}>{a.name}</option>)}</select>}
           {moneyFlow && <PipelinePicker filters={filters} value={picked} onPick={openCard} onClear={() => { setPicked(null); setFilters((f) => ({ ...f, pipeline: "" })); }} />}
           <select className="ap-field" aria-label="Saved views" value="" onChange={(e) => applyView(Number(e.target.value))} data-testid="pl-views"><option value="" disabled>Saved views{views.length ? ` (${views.length})` : ""}</option>{views.map((v, i) => <option key={v.name} value={i}>{v.name}</option>)}</select>

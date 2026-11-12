@@ -57,5 +57,5 @@ test("date choices: last 7 and 30 days, this and last month, custom with plain p
   assert.match(resolveFlowRange("custom", "2026-11-05", "2026-10-15", "2026-10-01").problem ?? "", /before/);
   assert.match(resolveFlowRange("custom", "2026-11-05", "2026-10-15", "2026-12-01").problem ?? "", /future/);
   assert.match(resolveFlowRange("custom", "2026-11-05", undefined, undefined).problem ?? "", /Pick/);
-  assert.match(resolveFlowRange("custom", "2026-11-05", "2024-01-01", "2026-11-01").problem ?? "", /at most/);
+  assert.match(resolveFlowRange("custom", "2026-11-05", "2022-01-01", "2026-11-01").problem ?? "", /at most/);
 });

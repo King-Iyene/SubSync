@@ -168,9 +168,10 @@ export function WorkflowsView({ go, kind }: { go: GoFn; kind: AccessKind }) {
           <EmptyState title={noList ? "SubSync cannot read workflows yet" : "No workflows found yet"} body={noList ? "Allow the workflow permission, then press Update now." : data.can.sync ? "Press Update now to read them from your client accounts." : "Your team has not updated this page yet."} />
         ) : (
           <div data-testid="wf-overview">
+            <p className="mb-4 text-sm text-muted-foreground" data-testid="wf-own-window">The step counts here are the platform&apos;s own last 30 days, so the dates in the bar do not change them. The dates set the Proof tab.</p>
             <section className="mb-8" aria-label="What to do next" data-testid="wf-next">
               <h2 className="text-base font-semibold">{headline}</h2>
-              {data.nextSteps.length ? <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm">{data.nextSteps.map((s) => <li key={s}>{s}</li>)}</ol> : <p className="mt-1 text-sm text-muted-foreground">Nothing needs you right now. SubSync keeps checking.</p>}
+              {data.nextSteps.length ? <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm">{data.nextSteps.map((s, i) => <li key={`${i}:${s}`}>{s}</li>)}</ol> : <p className="mt-1 text-sm text-muted-foreground">Nothing needs you right now. SubSync keeps checking.</p>}
               {data.findings.length ? <button type="button" onClick={() => setTab("health")} className="mt-2 min-h-9 text-sm font-medium text-primary hover:underline" data-testid="wf-see-health">See all {data.findings.length} checks</button> : null}
             </section>
             <div className="mb-8 grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -303,7 +304,7 @@ export function WorkflowsView({ go, kind }: { go: GoFn; kind: AccessKind }) {
       <article className="hidden print:block" data-testid="wf-print-area" aria-hidden>
         <h1 className="text-xl font-bold">Workflows report</h1>
         <p className="text-sm">{new Date(data.now).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}</p>
-        <ul className="mt-3 list-disc pl-5 text-sm">{reportLines(slices, data.findings, accounts.length).map((l) => <li key={l}>{l}</li>)}</ul>
+        <ul className="mt-3 list-disc pl-5 text-sm">{reportLines(slices, data.findings, accounts.length).map((l, i) => <li key={`${i}:${l}`}>{l}</li>)}</ul>
         <table className="mt-4 w-full text-xs"><thead><tr className="text-left"><th>Name</th><th>Client account</th><th>State</th><th>Errors</th></tr></thead><tbody>
           {items.filter((w) => bucketOf(w, failing) === "failing" || bucketOf(w, failing) === "never_run").slice(0, 40).map((w) => <tr key={keyOf(w)}><td>{w.name}</td><td>{accounts.find((a) => a.locationId === w.locationId)?.name}</td><td>{BUCKET_LABEL[bucketOf(w, failing)]}</td><td>{w.failed30d ?? ""}</td></tr>)}
         </tbody></table>
