@@ -17,7 +17,7 @@ export const isStepKey = (v: unknown): v is StepKey => typeof v === "string" && 
 export const stepIndex = (k: StepKey) => STEP_KEYS.indexOf(k);
 
 /** Minimums: under these a rate, a ranking or a dollar line says "not enough data" instead of a number. */
-export const MIN_LEADS = 30;
+export const MIN_LEADS = 10; // 10 leads are enough to show the funnel and say where it leaks; fewer are shown with a plain note
 export const MIN_STEP = 10;
 export const MIN_WON = 5;
 export const DAY_MS = 86_400_000;
@@ -104,7 +104,7 @@ export function hotspot(cells: readonly Cell[]): { dow: number | null; part: (ty
 
 /** The plain sentence over the funnel. */
 export function headlineOf(t: Tot, hot: ReturnType<typeof hotspot> = null): string {
-  if (t.leads < MIN_LEADS) return "Not enough leads in these dates to say where the funnel leaks. Widen the dates.";
+  if (t.leads < MIN_LEADS) return `Only ${t.leads} ${t.leads === 1 ? "lead" : "leads"} in these dates. We need at least ${MIN_LEADS} to say where the funnel leaks, so widen the dates. The steps below show what happened to them.`;
   const leak = biggestLeak(t);
   if (!leak) return "No clear leak in these dates: leads move through every step at a healthy pace.";
   const w: Record<StepKey, string> = {

@@ -10,6 +10,7 @@ import { SearchSelect, type SelectOption } from "../ap3/search-select";
 import type { ExecScope } from "../ap3/exec/exec-types";
 import { AGE_BANDS, DIM_LABEL, cohortRate, pctText, type Dim, type StepKey, type StepRow } from "@/lib/analytics/bf-core";
 import { BookingLadder, type LadderPick } from "./bf-ladder";
+import { SidePopup } from "../speed-popup";
 import { SAMPLE, bffxOn, type BreakdownRes, type CohortsRes, type ForecastRes, type LeaksRes, type OptionsRes, type RecoverDone, type RecoverPreview, type RowsRes, type SummaryRes } from "./bf-data";
 import "./bf.css";
 
@@ -67,7 +68,7 @@ export function BfTab({ scope, people, accounts, sources, flags, testId = "bf-ta
   const sum = useBf<SummaryRes>("summary", scope, local);
   const leaks = useBf<LeaksRes>("leaks", scope, local);
   const opts = useBf<OptionsRes>("options", scope, NO_LOCAL);
-  const open = useCallback((d: Drill) => { setDrill(d); setTimeout(() => drillRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" }), 60); }, []);
+  const open = useCallback((d: Drill) => { setDrill(d); }, []);
   const pick = (p: LadderPick) => open({ title: p.title, step: p.step, mode: p.mode, extra: {}, count: p.count });
   const set = (p: Partial<Local>) => setLocal((c) => ({ ...c, ...p }));
   const canPeople = sum.data?.canSeePeople ?? true, canAccounts = sum.data?.canSeeAccounts ?? true;
@@ -123,7 +124,7 @@ export function BfTab({ scope, people, accounts, sources, flags, testId = "bf-ta
         <Split scope={scope} local={local} by={by} setBy={setBy} dims={dims} onOpen={open} onSet={(d, id) => set(d === "dow" ? { dow: id } : d === "hour" ? { hour: id } : d === "age" ? { age: id } : d === "setter" ? { setter: idParam(id) } : d === "closer" ? { closer: idParam(id) } : d === "owner" ? { owner: idParam(id) } : d === "form" ? { form: idParam(id) } : {})} />
         {flags.cohorts && <Cohorts scope={scope} local={local} />}
         {flags.forecast && <Forecast scope={scope} local={local} />}
-        {drill && <div ref={drillRef}><DrillList key={JSON.stringify(drill)} drill={drill} scope={scope} local={local} flags={flags} onClose={() => setDrill(null)} /></div>}
+        {drill && <SidePopup label={drill.title} onClose={() => setDrill(null)}><div ref={drillRef}><DrillList key={JSON.stringify(drill)} drill={drill} scope={scope} local={local} flags={flags} onClose={() => setDrill(null)} /></div></SidePopup>}
       </>}
     </div>
   );
