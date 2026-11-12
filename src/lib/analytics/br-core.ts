@@ -31,6 +31,8 @@ export type BriefInputs = {
   payments: { count: number; amount: number | null } | null;
   /** Finance (stage FN): accounts that look likely to leave (with the monthly plan price behind them) and billing notes that are overdue. Optional: absent while Finance is off. */
   finance?: { highRisk: number; highRiskMrr: { amount: number; currency: string } | null; overdue: number; overdueTotal: { amount: number; currency: string } | null } | null;
+  /** Clients ignoring leads (flag sp_ignored_leads): accounts past their own threshold and the people behind them. Absent while the flag is off. */
+  ignored?: { accounts: number; people: number; names: string[] } | null;
   accounts: number;
 };
 
@@ -85,6 +87,10 @@ export function candidates(i: BriefInputs, on: ReadonlySet<Section>): BriefItem[
   }
   if (on.has("save") && i.save) {
     for (const a of i.save.accounts.slice(0, 2)) saveEv.set(`save:${a.locationId}`, a.evidence), out.push({ key: `save:${a.locationId}`, section: "save", title: `Save ${a.name}`, why: `${a.evidence.slice(0, 2).join("; ")}.`, count: 1, dollars: null, tier: 2, hash: a.hash });
+  }
+  if (on.has("attention") && i.ignored && i.ignored.people > 0) {
+    const g = i.ignored;
+    out.push({ key: "ignored_leads", section: "attention", title: `${s(g.accounts, "client account is", "client accounts are")} not answering ${g.people.toLocaleString("en-US")} ${g.people === 1 ? "person" : "people"}`, why: `${g.names.slice(0, 2).join(", ")}${g.accounts > 2 ? " and more" : ""}: leads, replies and missed calls nobody has answered.`, count: g.people, dollars: null, tier: 2, hash: "#speed?tab=ignored" });
   }
   if (on.has("attention")) {
     for (const a of i.attention) {

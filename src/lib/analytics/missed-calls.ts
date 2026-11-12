@@ -40,7 +40,7 @@ function latestMissed(db: Db, s: MissedScope) {
 }
 
 /** The callers nobody reached after their latest missed call. */
-function waitingCte(db: Db, s: MissedScope) {
+export function waitingCte(db: Db, s: MissedScope) {
   return db`
     ${latestMissed(db, s)},
     w as (

@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, Gauge, Inbox, MessageSquareWarning, PhoneCall, PhoneMissed, ScrollText, SlidersHorizontal, Users, Zap } from "lucide-react";
+import { ChevronDown, Gauge, Inbox, UserX, MessageSquareWarning, PhoneCall, PhoneMissed, ScrollText, SlidersHorizontal, Users, Zap } from "lucide-react";
 import { useRef, useState } from "react";
 import { summaryText } from "@/lib/analytics/speed-v2";
 import { measuringSentence } from "@/lib/design/speed-text";
@@ -19,6 +19,7 @@ import { LeadRows, useLeadActions, waitWords, type LeadRow } from "./speed-rows"
 import { FilterProvider } from "./speed-filter";
 import { RaceTab } from "./speed-race";
 import { CoverageTab, JourneyCard, RulesTab } from "./speed-coverage";
+import { IgnoredTab } from "./speed-ignored";
 import { DialMode } from "./dial-mode";
 import { InboxView } from "./inbox";
 import { SidePopup, TipHost } from "./speed-popup";
@@ -48,6 +49,7 @@ type Home = PictureData & {
   leftOut: Array<{ reason: string; label: string; n: number }>;
   next: { key: string; text: string };
   measuring: { targetMinutes: number; countAutomated: boolean; businessHours: boolean; canChange: boolean };
+  ignoredOn?: boolean;
   truncated: boolean;
 };
 type ListSpec = { title: string; params: Record<string, string>; noun?: string };
@@ -55,9 +57,9 @@ type ListSpec = { title: string; params: Record<string, string>; noun?: string }
 const MORE_TRIGGER = "ds-press inline-flex h-8 items-center gap-1 rounded-md border bg-card px-2.5 text-sm font-medium hover:border-primary/40 hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--ring)]";
 
 /** The tabs the lead filters can change (Race, Pace, Coverage, People). Call mode, Capture, Rules and Log do not use them, so the control is not shown there. */
-const FILTER_TABS = new Set(["race", "pace", "coverage", "people"]);
+const FILTER_TABS = new Set(["race", "pace", "coverage", "people", "ignored"]);
 
-export type SpeedTabId = "race" | "pace" | "coverage" | "unanswered" | "call" | "people" | "capture" | "rules" | "log";
+export type SpeedTabId = "race" | "pace" | "coverage" | "ignored" | "unanswered" | "call" | "people" | "capture" | "rules" | "log";
 /** The Unanswered tab: who is waiting right now. Race and Pace time how fast NEW leads get a first reply; this tab lists everyone waiting, so it sits next to Coverage (the other "who is not being answered" tab). */
 const UNANSWERED_TIP = "Race and Pace measure how fast NEW leads get a first reply. This tab lists everyone who is waiting for a reply right now: new leads and existing customers.";
 
@@ -74,14 +76,14 @@ export function SpeedView({ go, unanswered = false, start }: { go: GoFn; unanswe
   const top = useRef<HTMLDivElement>(null);
   const rows = data?.waiting.rows ?? [];
   const actions = useLeadActions(rows);
-  const [tabId, setTabId] = useState<SpeedTabId>(start === "unanswered" && !unanswered ? "race" : start ?? "race");
+  const [tabId, setTabId] = useState<SpeedTabId>(() => { if (start === "unanswered" && !unanswered) return "race"; if (start) return start; try { return typeof window !== "undefined" && /[?&]tab=ignored(&|$)/.test(window.location.hash) ? "ignored" : "race"; } catch { return "race"; } });
   const [seenCall, setSeenCall] = useState(() => { try { return typeof window === "undefined" || window.localStorage.getItem(CALL_SEEN) === "1"; } catch { return true; } }); // until Call mode is opened once, its tab carries a "New" badge (remembered in this browser)
-  const goTab = (id: SpeedTabId) => { setTabId(id); try { const h = window.location.hash; const [head, q = ""] = h.split("?"); const p = new URLSearchParams(q); if (id === "unanswered") p.set("tab", id); else p.delete("tab"); const s = p.toString(); window.history.replaceState(window.history.state, "", `${window.location.pathname}${window.location.search}${head || "#speed"}${s ? `?${s}` : ""}`); } catch { /* the address is a convenience */ } if (id === "call" && !seenCall) { setSeenCall(true); try { window.localStorage.setItem(CALL_SEEN, "1"); } catch { /* not remembered */ } } };
+  const goTab = (id: SpeedTabId) => { setTabId(id); try { const h = window.location.hash; const [head, q = ""] = h.split("?"); const p = new URLSearchParams(q); if (id === "unanswered" || id === "ignored") p.set("tab", id); else p.delete("tab"); const s = p.toString(); window.history.replaceState(window.history.state, "", `${window.location.pathname}${window.location.search}${head || "#speed"}${s ? `?${s}` : ""}`); } catch { /* the address is a convenience */ } if (id === "call" && !seenCall) { setSeenCall(true); try { window.localStorage.setItem(CALL_SEEN, "1"); } catch { /* not remembered */ } } };
 
   if (error) return <div data-testid="page"><ErrorState error={error} onRetry={reload} /></div>;
   if (!data || !r) return <div data-testid="page"><SkeletonRows rows={6} label="Timing first replies..." /></div>;
 
-  const order: SpeedTabId[] = ["race", "pace", "coverage", ...(unanswered ? (["unanswered"] as const) : []), "call", "people", "capture", "rules", "log"];
+  const order: SpeedTabId[] = ["race", "pace", "coverage", ...(data.ignoredOn ? (["ignored"] as const) : []), ...(unanswered ? (["unanswered"] as const) : []), "call", "people", "capture", "rules", "log"];
   const d = data;
   const w = d.waiting;
   const multi = d.access.total > 1;
@@ -135,6 +137,7 @@ export function SpeedView({ go, unanswered = false, start }: { go: GoFn; unanswe
           { label: "Race", icon: ic(Zap), node: <RaceTab multi={multi} onCall={() => goTab("call")} /> },
           { label: "Pace", icon: ic(Gauge), node: <PaceTab6 multi={multi} slow={slow} old={<><JourneyCard multi={multi} /><BookingCard /><PaceTab multi={multi} /></>} /> },
           { label: "Coverage", icon: ic(PhoneMissed), node: <Fold keep={3} testId="coverage-fold"><CoverageTab multi={multi} /></Fold> },
+          ...(d.ignoredOn ? [{ label: "Waiting on the client", tip: "Client accounts that are not answering the leads sent to them: leads nobody answered, customers who got no reply, and missed calls nobody returned.", icon: ic(UserX), node: <IgnoredTab multi={multi} /> }] : []),
           ...(unanswered ? [{ label: "Unanswered", tip: UNANSWERED_TIP, icon: ic(MessageSquareWarning), node: <InboxView go={go} embedded={{ onRace: () => goTab("race") }} /> }] : []),
           { label: "Call mode", icon: ic(PhoneCall), badge: seenCall ? undefined : <span className="spd-new rounded-full px-1.5 py-0.5 text-[0.65rem] font-bold uppercase leading-none tracking-wide" data-testid="call-new">New</span>, node: <DialMode /> },
           ...(d.seePeople ? [{ label: "People", icon: ic(Users), node: <PeopleTab6 multi={multi} slow={slow} old={<PeopleTab multi={multi} />} /> }] : [{ label: "Owners", icon: ic(Users), node: <PeopleTab6 multi={multi} slow={slow} old={<PeopleTab multi={multi} />} /> }]),

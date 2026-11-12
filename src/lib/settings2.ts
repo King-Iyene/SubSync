@@ -43,6 +43,7 @@ export const SEARCH_INDEX: readonly SearchEntry[] = [
   { id: "roles", label: "Setter and closer roles", section: "team", words: "role setter closer manager team label" },
   { id: "client-access", label: "Client access to their own account", section: "team", words: "client view access staff read only" },
   { id: "test-accounts", label: "Leave test accounts out", section: "team", words: "test practice demo ignore account" },
+  { id: "ignored", label: "Clients not answering leads (alert)", section: "targets", words: "ignored ignoring not answering client leads alert threshold waiting missed calls" },
   { id: "reply-target", label: "Reply target", section: "targets", words: "sla reply target minutes hours late speed" },
   { id: "stale", label: "Stale deal and gone quiet days", section: "targets", words: "stale dormant quiet days deal" },
   { id: "pipeline-history", label: "Pipeline history", section: "targets", words: "pipeline history funnel step stuck minimum sample test deals" },

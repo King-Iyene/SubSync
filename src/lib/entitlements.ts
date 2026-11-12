@@ -70,6 +70,7 @@ export const FEATURES = [
   // Unanswered round 3, slice B (actions): each behind its own flag, default off.
   "inbox_open_lead",
   "lead_journey_pro",
+  "sp_ignored_leads",
   // Appointments module round 3 (docs/features/APPOINTMENTS_BRIEF.md): each behind its own flag, default off.
   "appt_overview",
   "appt_needs_outcome",

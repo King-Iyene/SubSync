@@ -10,6 +10,7 @@ import { Badge, Btn, Card, ErrorBox, inputClass, Loading, PageHeader, timeAgo } 
 import { SyncStatusPanel } from "./sync-status";
 import { ConnectionsSlot } from "./settings-slot-connections";
 import { WriteAccessCard } from "./write-access";
+import { IgnoredLeadsSettings } from "./speed-ignored-settings";
 import { PipelineHistoryCard } from "./settings-pipeline-history";
 import { WatchingSlot } from "./settings-slot-watching";
 import { DailyBriefLine } from "./notifications";
@@ -281,6 +282,7 @@ export function SettingsView({ openSection, embedded }: { openSection?: SectionI
                 </div>
                 <p className="mt-2 text-xs text-muted-foreground">With this on, a lead that arrives when your team is closed (evenings, weekends) starts its reply clock at the next opening time in that account&apos;s own time zone, Monday to Friday. A lead that arrives during opening hours and is still unanswered at closing keeps counting overnight.</p>
               </Card>
+              {data.features?.sp_ignored_leads === true && <IgnoredLeadsSettings />}
               {data.features?.inbox_breach_alert === true && (
                 <Card title="Unanswered alert escalation">
                   <label htmlFor="inbox-ack-grace" className="mb-1 block text-sm font-medium">Escalate an unread alert after (minutes)</label>
