@@ -5,14 +5,14 @@ import { Check, CircleAlert, Clock, Flag, Moon, TriangleAlert, type LucideIcon }
 
 type Tone = { Icon: LucideIcon; colour: string };
 const TONES: Record<string, Tone> = {
-  urgent: { Icon: CircleAlert, colour: "var(--t-bad, #b42318)" },
-  soon: { Icon: TriangleAlert, colour: "var(--t-warn, #8a5a00)" },
-  "can wait": { Icon: Clock, colour: "var(--t-ink3, #5b6678)" },
-  raised: { Icon: Flag, colour: "var(--t-warn, #8a5a00)" },
-  cleared: { Icon: Check, colour: "var(--t-ok, #2b7a3d)" },
-  fixed: { Icon: Check, colour: "var(--t-ok, #2b7a3d)" },
-  done: { Icon: Check, colour: "var(--t-ok, #2b7a3d)" },
-  snoozed: { Icon: Moon, colour: "var(--t-accent, #1f4e8c)" },
+  urgent: { Icon: CircleAlert, colour: "var(--t-bad, #993a33)" },
+  soon: { Icon: TriangleAlert, colour: "var(--t-warn, #685023)" },
+  "can wait": { Icon: Clock, colour: "var(--t-ink3, #706c63)" },
+  raised: { Icon: Flag, colour: "var(--t-warn, #685023)" },
+  cleared: { Icon: Check, colour: "var(--t-ok, #357042)" },
+  fixed: { Icon: Check, colour: "var(--t-ok, #357042)" },
+  done: { Icon: Check, colour: "var(--t-ok, #357042)" },
+  snoozed: { Icon: Moon, colour: "var(--t-accent, #3f546c)" },
 };
 export const statusTone = (word: string): Tone | null => TONES[word.trim().toLowerCase()] ?? null;
 export const isStatusWord = (word: string) => statusTone(word) !== null;

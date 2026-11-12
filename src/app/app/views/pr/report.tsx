@@ -12,12 +12,12 @@ import { PR_CSS } from "./report-css";
 // that was not measured says so in words; nothing is drawn as a flat line or a zero that was not counted.
 
 const SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const DEFAULT_ACCENT = "#0a658b";
+const DEFAULT_ACCENT = "#504c45";
 
 export function accentVars(color: string | null): CSSProperties {
   const c = color ?? DEFAULT_ACCENT;
   const l = accentTokens(c, "light"), d = accentTokens(c, "dark");
-  return { "--pr-accent": l?.fill ?? DEFAULT_ACCENT, "--pr-on-accent": l?.onFill ?? "#ffffff", "--pr-accent-text": l?.text ?? DEFAULT_ACCENT, "--pr-accent-text-l": l?.text ?? DEFAULT_ACCENT, "--pr-accent-text-d": d?.text ?? "#6fc3e6" } as CSSProperties;
+  return { "--pr-accent": l?.fill ?? DEFAULT_ACCENT, "--pr-on-accent": l?.onFill ?? "#ffffff", "--pr-accent-text": l?.text ?? DEFAULT_ACCENT, "--pr-accent-text-l": l?.text ?? DEFAULT_ACCENT, "--pr-accent-text-d": d?.text ?? "#91c4a9" } as CSSProperties;
 }
 
 function Card({ info, value, sub, change, note, na }: { info: InfoKey; value?: ReactNode; sub?: string; change?: Change; note?: string; na?: string }) {

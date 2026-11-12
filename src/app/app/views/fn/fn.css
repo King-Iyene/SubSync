@@ -60,11 +60,11 @@
 @media print {
   body:has(.fn-print) * { visibility: hidden !important; }
   body:has(.fn-print) .fn-print, body:has(.fn-print) .fn-print * { visibility: visible !important; }
-  .fn-print { position: absolute; inset: 0 auto auto 0; width: 100%; background: #fff; color: #000; padding: 16px; }
+  .fn-print { position: absolute; inset: 0 auto auto 0; width: 100%; background: #ffffff; color: #000000; padding: 16px; }
   .fn-print button, .fn-print .fn-noprint { display: none !important; }
   .fn-pr-only { display: block !important; }
   .fn-side { position: static; width: 100%; border: 0; overflow: visible; }
-  .fn-line { color: #000; }
+  .fn-line { color: #000000; }
 }
 @media (max-width: 760px) {
   .fn-row { grid-template-columns: minmax(0, 1fr); }

@@ -30,7 +30,7 @@ const copyText = async (t: string) => { try { await navigator.clipboard.writeTex
 
 function sampleOptions(): Options {
   const periods = periodChoices(new Date()).map((m) => ({ month: m, label: monthLabel(m) }));
-  return { flags: { pr_report: true, pr_page: true, pr_auto: true }, periods, defaultPeriod: periods[0].month, settings: { displayName: "Sample Marketing Co", logoUrl: null, brandColor: "#0a658b", intro: "Here is how your leads were handled this month.", sections: defaultSections(), nameStaff: false, autoDraft: true }, sections: [], general: { name: null, color: null, logoUrl: null } };
+  return { flags: { pr_report: true, pr_page: true, pr_auto: true }, periods, defaultPeriod: periods[0].month, settings: { displayName: "Sample Marketing Co", logoUrl: null, brandColor: "#504c45", intro: "Here is how your leads were handled this month.", sections: defaultSections(), nameStaff: false, autoDraft: true }, sections: [], general: { name: null, color: null, logoUrl: null } };
 }
 const SAMPLE_ROWS: PrRow[] = [
   ["sample1", "Sample Roofing Co", "viewed", 142], ["sample2", "Sample Dental", "shared", 88], ["sample3", "Sample Realty", "draft", 61], ["sample4", "Sample Solar", "draft", 40], ["sample5", "Sample Med Spa", "none", null], ["sample6", "Sample Coaching", "none", null],
@@ -148,7 +148,7 @@ function SettingsPanel({ options, sample, onSaved, onClose }: { options: Options
         <div className="grid gap-3">
           <label className="grid gap-1 text-sm font-medium">Name shown to clients<input className="ap-field" maxLength={60} value={name} onChange={(e) => setName(e.target.value)} placeholder={options.general.name ?? "Your company name"} data-testid="pr-set-name" /></label>
           <label className="grid gap-1 text-sm font-medium">Logo address<input className="ap-field" inputMode="url" maxLength={500} value={logo} onChange={(e) => setLogo(e.target.value)} placeholder="https://..." data-testid="pr-set-logo" /><span className="ap-fine">A web address that starts with https://. Leave empty to show your name.</span></label>
-          <label className="grid gap-1 text-sm font-medium">Brand colour<span className="flex gap-2"><input type="color" aria-label="Pick a colour" value={/^#[0-9a-f]{6}$/i.test(color) ? color : "#0a658b"} onChange={(e) => setColor(e.target.value)} style={{ width: 48, height: 40 }} /><input className="ap-field w-32" maxLength={7} value={color} onChange={(e) => setColor(e.target.value)} placeholder="#0a658b" data-testid="pr-set-color" /></span></label>
+          <label className="grid gap-1 text-sm font-medium">Brand colour<span className="flex gap-2"><input type="color" aria-label="Pick a colour" value={/^#[0-9a-f]{6}$/i.test(color) ? color : "#504c45"} onChange={(e) => setColor(e.target.value)} style={{ width: 48, height: 40 }} /><input className="ap-field w-32" maxLength={7} value={color} onChange={(e) => setColor(e.target.value)} placeholder="#504c45" data-testid="pr-set-color" /></span></label>
           <label className="grid gap-1 text-sm font-medium">Intro sentence (shown above the figures)<textarea className="ap-field" style={{ padding: 10, minHeight: 80 }} maxLength={400} value={intro} onChange={(e) => setIntro(e.target.value)} data-testid="pr-set-intro" /></label>
         </div>
         <div className="grid content-start gap-2 text-sm">

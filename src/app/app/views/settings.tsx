@@ -302,7 +302,7 @@ export function SettingsView({ openSection, embedded }: { openSection?: SectionI
                 <div>
                   <label htmlFor="brand-color" className="mb-1 block text-sm font-medium">Colour</label>
                   <div className="flex items-center gap-2">
-                    <input id="brand-color" type="color" className="h-9 w-14 cursor-pointer rounded-lg border bg-background p-1" value={form.brandColor ?? "#1d4ed8"} onChange={(e) => setForm({ ...form, brandColor: e.target.value })} />
+                    <input id="brand-color" type="color" className="h-9 w-14 cursor-pointer rounded-lg border bg-background p-1" value={form.brandColor ?? "#5b789a"} onChange={(e) => setForm({ ...form, brandColor: e.target.value })} />
                     {form.brandColor && <Btn variant="ghost" onClick={() => setForm({ ...form, brandColor: null })}>Clear</Btn>}
                   </div>
                 </div>

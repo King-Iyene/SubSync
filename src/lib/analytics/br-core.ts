@@ -139,11 +139,11 @@ export function briefSlack(b: Brief, base: string): string {
 export function briefEmail(b: Brief, o: { appUrl: string; stopUrl: string; settingsUrl: string }): { subject: string; text: string; html: string } {
   const subject = b.items.length === 0 ? "Your 7 am brief: nothing needs you today" : `Your 7 am brief: ${b.headline.replace(/\.$/, "")}`;
   const html: string[] = [`<p style="margin:0 0 14px;font-size:16px"><b>${esc(b.headline)}</b></p>`];
-  b.items.forEach((it, n) => html.push(`<div style="margin:0 0 12px;padding:12px;border:1px solid #ddd;border-radius:8px"><b>${n + 1}. ${esc(it.title)}</b><p style="margin:6px 0;color:#444">${esc(it.why)}${it.dollars !== null && it.dollars > 0 ? ` About ${esc(money(it.dollars))} (estimate).` : ""}</p><a href="${esc(link(o.appUrl, it))}" style="display:inline-block;padding:8px 14px;background:#1a56db;color:#fff;border-radius:6px;text-decoration:none">Open the list</a></div>`));
+  b.items.forEach((it, n) => html.push(`<div style="margin:0 0 12px;padding:12px;border:1px solid #dddddd;border-radius:8px"><b>${n + 1}. ${esc(it.title)}</b><p style="margin:6px 0;color:#444444">${esc(it.why)}${it.dollars !== null && it.dollars > 0 ? ` About ${esc(money(it.dollars))} (estimate).` : ""}</p><a href="${esc(link(o.appUrl, it))}" style="display:inline-block;padding:8px 14px;background:#5b789a;color:#ffffff;border-radius:6px;text-decoration:none">Open the list</a></div>`));
   if (b.more > 0) html.push(`<p>And ${b.more} more. <a href="${esc(o.appUrl.replace(/\/+$/, ""))}/app#today">Open your list</a>.</p>`);
-  html.push(`<p style="margin:12px 0;color:#444">${esc(b.dollar.text)}</p>`);
+  html.push(`<p style="margin:12px 0;color:#444444">${esc(b.dollar.text)}</p>`);
   const foot = "You get one brief a day, at the time you chose. Dollar figures are estimates. Nothing here changes your CRM or messages your leads.";
-  html.push(`<p style="color:#777;font-size:12px">${esc(foot)} <a href="${esc(o.settingsUrl)}">Change the time or sections</a>. <a href="${esc(o.stopUrl)}">Stop these emails</a>.</p>`);
+  html.push(`<p style="color:#777777;font-size:12px">${esc(foot)} <a href="${esc(o.settingsUrl)}">Change the time or sections</a>. <a href="${esc(o.stopUrl)}">Stop these emails</a>.</p>`);
   return { subject, text: `${briefText(b, o.appUrl)}\n\n${foot}\nChange the time or sections: ${o.settingsUrl}\nStop these emails: ${o.stopUrl}`, html: html.join("") };
 }
 

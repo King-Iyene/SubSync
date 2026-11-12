@@ -4,24 +4,21 @@
 /* Theme tokens. Defined on the app wrapper (it carries data-theme), so the page, the dialogs and every portal inside it follow the light or dark theme.
    Each accent has one meaning and is deep enough to be text on white (light) or bright enough to glow on navy (dark). */
 [data-theme] {
-  --s6-cyan: #0b6f9e; --s6-cyan-hi: #0b6f9e; --s6-violet: #6d4fd6; --s6-magenta: #b8236f; --s6-lime: #4d7c0f; --s6-blue: #1d5fc4; --s6-orange: #b45309; --s6-amber: #92580a; --s6-red: #b42318; --s6-green: #0d7a4f;
-  --s6-edgec: #0b6f9e; --s6-line: #d0dcec; --s6-surf: #ffffff; --s6-surf2: #f3f8ff; --s6-sunk: #e8eff8; --s6-pop: #ffffff; --s6-knob: #ffffff;
-  --s6-btn-ink: #0b4f73; --s6-on-cyan: #ffffff; --s6-fill: #0b6f9e; --s6-mixfg: #0b1730; --s6-mixpct: 78%; --s6-fast-ink: #ffffff; --s6-track: #d0dcec; --s6-scrim: rgba(11, 23, 48, 0.45);
-  --s6-glow: 0 6px 22px -10px; --s6-shadow: 0 1px 2px rgba(11, 23, 48, 0.06), 0 10px 28px -16px rgba(11, 111, 158, 0.35);
-  --s6-band: linear-gradient(180deg, rgba(11, 111, 158, 0.06), rgba(109, 79, 214, 0.04));
+  --s6-cyan: #2d5c45; --s6-cyan-hi: #2d5c45; --s6-violet: #4f6f8f; --s6-magenta: #8f5a6b; --s6-lime: #5b7a3a; --s6-blue: #4f6f8f; --s6-orange: #96653a; --s6-amber: #84570f; --s6-red: #a23a2d; --s6-green: #3a7339;
+  --s6-edgec: #2d5c45; --s6-line: #dcd7cb; --s6-surf: #fffefb; --s6-surf2: #faf8f3; --s6-sunk: #ece8df; --s6-pop: #fffefb; --s6-knob: #fffefb;
+  --s6-btn-ink: #2d5c45; --s6-on-cyan: #ffffff; --s6-fill: #2d5c45; --s6-mixfg: #1d1c19; --s6-mixpct: 80%; --s6-fast-ink: #ffffff; --s6-track: #dcd7cb; --s6-scrim: rgba(29, 28, 25, 0.45);
+  --s6-glow: 0 0 0 0; --s6-shadow: none; --s6-band: none;
 }
 [data-theme="dark"] {
-  --s6-cyan: #22d3ee; --s6-cyan-hi: #67e8f9; --s6-violet: #a78bfa; --s6-magenta: #f472b6; --s6-lime: #a3e635; --s6-blue: #60a5fa; --s6-orange: #fb923c; --s6-amber: #fbbf24; --s6-red: #fb7185; --s6-green: #4ade80;
-  --s6-edgec: #67e8f9; --s6-line: #243659; --s6-surf: #0a1329; --s6-surf2: #101c3b; --s6-sunk: #060b19; --s6-pop: #0f1a36; --s6-knob: #cfe0f5;
-  --s6-btn-ink: #d6f6fc; --s6-on-cyan: #ffffff; --s6-fill: #0e7490; --s6-mixfg: #ffffff; --s6-mixpct: 55%; --s6-fast-ink: #1a2e00; --s6-track: #243659; --s6-scrim: rgba(3, 7, 18, 0.7);
-  --s6-glow: 0 0 24px -6px; --s6-shadow: none;
-  --s6-band: linear-gradient(180deg, color-mix(in srgb, var(--s6-cyan) 5%, transparent), color-mix(in srgb, var(--s6-violet) 4%, transparent));
+  --s6-cyan: #8fbf9f; --s6-cyan-hi: #8fbf9f; --s6-violet: #8aa6c4; --s6-magenta: #c58d9c; --s6-lime: #a3bf86; --s6-blue: #8aa6c4; --s6-orange: #cc9a6c; --s6-amber: #d9a74f; --s6-red: #e08a7d; --s6-green: #8dbf78;
+  --s6-edgec: #8fbf9f; --s6-line: #2c2c27; --s6-surf: #1d1d1a; --s6-surf2: #22221f; --s6-sunk: #10100e; --s6-pop: #242421; --s6-knob: #ece9e2;
+  --s6-btn-ink: #8fbf9f; --s6-on-cyan: #ffffff; --s6-fill: #3a6b53; --s6-mixfg: #ffffff; --s6-mixpct: 60%; --s6-fast-ink: #10160f; --s6-track: #2c2c27; --s6-scrim: rgba(8, 8, 7, 0.7);
+  --s6-glow: 0 0 0 0; --s6-shadow: none; --s6-band: none;
 }
-/* Dark keeps its control-room surfaces for shared parts inside the page; light uses the app's own light tokens. No box, no max width: the page fills the content area. */
 [data-theme="dark"] .s6.s6 {
-  --card: #0d1730; --card-foreground: #e6edf9; --popover: #0f1a36; --popover-foreground: #e6edf9;
-  --primary: #22d3ee; --primary-foreground: #04121c; --secondary: #13203f; --secondary-foreground: #cfe0f5; --muted: #101b36; --muted-foreground: #9db0cc;
-  --accent: #142348; --accent-foreground: #e6edf9; --border: #243659; --input: #243659; --ring: #67e8f9;
+  --card: #1d1d1a; --card-foreground: #ece9e2; --popover: #242421; --popover-foreground: #ece9e2;
+  --primary: #8fbf9f; --primary-foreground: #10160f; --secondary: #262622; --secondary-foreground: #ece9e2; --muted: #22221f; --muted-foreground: #aaa599;
+  --accent: #2c352e; --accent-foreground: #ece9e2; --border: #ffffff1f; --input: #ffffff2e; --ring: #8fbf9f;
 }
 .s6.s6 { color: var(--foreground); line-height: 1.6; }
 .s6-span2 { grid-column: 1 / -1; }
@@ -150,11 +147,11 @@ li[data-tier="Surge"] .s6-rank { background: color-mix(in srgb, var(--s6-violet)
 
 /* SPEED7 design review: phone polish. The tab strip scrolls sideways, so its right edge fades to say there is more, tabs snap, and small grey helper text is lifted to a contrast of at least 4.5:1 on the navy. */
 @media (max-width: 640px) {
-  .s6 [role="tablist"] { scroll-snap-type: x proximity; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent); padding-inline-end: 24px; }
+  .s6 [role="tablist"] { scroll-snap-type: x proximity; -webkit-mask-image: linear-gradient(to right, #000000 calc(100% - 32px), transparent); mask-image: linear-gradient(to right, #000000 calc(100% - 32px), transparent); padding-inline-end: 24px; }
   .s6 [role="tab"] { scroll-snap-align: center; min-height: 44px; min-width: 44px; }
   .s6 button, .s6 [role="button"], .s6 summary { min-height: 44px; }
 }
-[data-theme="dark"] .s6 .text-muted-foreground { color: rgb(190 203 224); }
+[data-theme="dark"] .s6 .text-muted-foreground { color: rgb(170 165 153); }
 
 .s6-grid { display: grid; gap: 24px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr)); margin-bottom: 32px; }
 .s6-grid.s6-three { grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); }
@@ -163,10 +160,10 @@ li[data-tier="Surge"] .s6-rank { background: color-mix(in srgb, var(--s6-violet)
 .s6 [data-testid="race-tab"] > section { border: 0; border-radius: 0; padding: 0; margin-bottom: 32px; background: none; }
 /* modal dialogs (tour, guide) */
 .s6-tour > div { color: var(--foreground); }
-[data-theme="light"] .s6-card[data-glow="active"] { box-shadow: var(--s6-glow) rgba(11, 111, 158, 0.55); }
-[data-theme="light"] .s6-card[data-glow="urgent"] { box-shadow: var(--s6-glow) rgba(180, 35, 24, 0.5); }
-[data-theme="light"] .s6-card[data-glow="warn"] { box-shadow: var(--s6-glow) rgba(146, 88, 10, 0.5); }
-[data-theme="light"] .s6-btn[data-kind="primary"] { box-shadow: 0 4px 14px -6px rgba(11, 111, 158, 0.7); }
+[data-theme="light"] .s6-card[data-glow="active"] { box-shadow: var(--s6-glow) rgba(59, 110, 83, 0.55); }
+[data-theme="light"] .s6-card[data-glow="urgent"] { box-shadow: var(--s6-glow) rgba(153, 58, 51, 0.5); }
+[data-theme="light"] .s6-card[data-glow="warn"] { box-shadow: var(--s6-glow) rgba(117, 84, 39, 0.5); }
+[data-theme="light"] .s6-btn[data-kind="primary"] { box-shadow: 0 4px 14px -6px rgba(59, 110, 83, 0.7); }
 [data-theme="light"] .s6-band { background: var(--s6-band); padding: 10px 14px; border-radius: 10px; }
 
 /* Slim lists: one line per lead, small chips, a small Reply button; Compact tightens the rows further. */
@@ -193,3 +190,24 @@ li[data-tier="Surge"] .s6-rank { background: color-mix(in srgb, var(--s6-violet)
 
 /* SPEED close-out: in the dark theme the muted-text rule above out-ranked the selected tab's white label (3.3:1 on the teal fill); keep the selected tab white. */
 [data-theme="dark"] .s6 .spd-tab[aria-selected="true"] { color: var(--spd-on, #ffffff); }
+
+
+/* ===== SubSync "Ledger" brand pass (docs/design/BRAND_SYSTEM.md): one muted palette, flat cards, no glow, no gradients. Last in the file so it wins. ===== */
+[data-theme="dark"] .s6 .text-muted-foreground { color: #aaa599; }
+.s6-card, .s6-card[data-glow], .s6-btn, .s6-btn[data-kind="primary"], .s6-dot, .s6-dot[data-lost="1"], .s6-dot[data-won="1"], .s6-fast,
+.s6-board li, .s6-board li[data-tier], .s6-card:hover,
+.ur-kpi:hover:not(:disabled), .ur-tab[aria-selected="true"], .ur-dot, .ur-chipbtn.is-on, .ur-col[data-hot="1"] .ur-col-bar > i, .ur-dot[data-hot="1"], .ur-clear-ic,
+[data-theme="light"] .s6-card[data-glow], [data-theme="light"] .s6-btn[data-kind="primary"] { box-shadow: none !important; filter: none !important; }
+.s6-card { background: var(--s6-surf) !important; }
+.s6-bars > div, .s6-bars > button, .s6-bars[data-tone="violet"] > div, .ur-col-bar > i, .ur-col[data-hot="1"] .ur-col-bar > i { background-image: none !important; }
+.s6-bars > div, .s6-bars > button, .ur-col-bar > i { background-color: var(--s6-cyan) !important; }
+.s6-bars[data-tone="violet"] > div { background-color: var(--s6-violet) !important; }
+.ur-col[data-hot="1"] .ur-col-bar > i { background-color: var(--s6-amber) !important; }
+.ap-jr-bar > i, .ap-jr-row:last-child .ap-jr-bar > i { background-image: none !important; background-color: var(--s6-cyan) !important; }
+.s6-flow-line, .ur-flow-line { background: var(--s6-line) !important; }
+.s6-band::after { background: var(--s6-line) !important; }
+.ur-clear { background-image: none !important; background-color: color-mix(in srgb, var(--s6-green) 8%, transparent) !important; }
+.ljp-mesh { display: none !important; }
+.ap-tree[data-hot] .ap-lk[data-hot="1"] { filter: none !important; }
+@keyframes s6-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+.s6-dot, .ur-dot { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
