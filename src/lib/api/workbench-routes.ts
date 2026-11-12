@@ -62,6 +62,50 @@ async function dealsOf(ctx: Ctx, locationId: string, where: { contactId?: string
   return rows.map((r) => ({ id: r.opportunity_id as string, name: r.name as string | null, pipelineId: r.pipeline_id as string | null, pipelineName: r.pipeline_name as string | null, stageId: r.stage_id as string | null, stageName: r.stage_name as string | null, value: r.value as number, status: r.status as string, ownerId: (r.owner as string | null) ?? null }));
 }
 
+type DealExtra = { source: string | null; lostReason: string | null; createdAt: string | null; stageSince: string | null; statusSince: string | null; lastActivityAt: string | null; usualP75Days: number | null; stays: number };
+
+/** Extra, read-only facts for the deals panel, from SubSync's own copy and event store (one query each, scoped to this account and these deals). A failure leaves the facts out, never the panel. */
+async function dealExtras(ctx: Ctx, locationId: string, deals: DealRow[]): Promise<Record<string, DealExtra>> {
+  const out: Record<string, DealExtra> = {};
+  if (!deals.length) return out;
+  const db = sql();
+  const oppIds = deals.map((d) => d.id);
+  const stageIds = [...new Set(deals.map((d) => d.stageId).filter((x): x is string => !!x))];
+  try {
+    const [base, facts, hist, stats] = await Promise.all([
+      db`select opportunity_id, source, last_stage_change_at, last_status_change_at from cached_opportunities where installation_id = ${ctx.installationId} and location_id = ${locationId} and opportunity_id = any(${oppIds}::text[])`,
+      db`select opportunity_id, lost_reason from deal_facts where installation_id = ${ctx.installationId} and location_id = ${locationId} and opportunity_id = any(${oppIds}::text[])`.catch(() => []),
+      db`select opportunity_id, min(at) filter (where kind = 'created') created_at, max(at) last_at from deal_history where installation_id = ${ctx.installationId} and location_id = ${locationId} and opportunity_id = any(${oppIds}::text[]) group by opportunity_id`.catch(() => []),
+      stageIds.length ? db`select stage_id, p75_days::float8 p75, stays from deal_stage_stats where installation_id = ${ctx.installationId} and location_id = ${locationId} and stage_id = any(${stageIds}::text[])`.catch(() => []) : Promise.resolve([]),
+    ]);
+    const iso = (v: unknown) => (v instanceof Date ? v.toISOString() : null);
+    const f = new Map(facts.map((r) => [r.opportunity_id as string, r.lost_reason as string | null]));
+    const h = new Map(hist.map((r) => [r.opportunity_id as string, r]));
+    const st = new Map(stats.map((r) => [r.stage_id as string, r]));
+    for (const b of base) {
+      const id = b.opportunity_id as string;
+      const d = deals.find((x) => x.id === id);
+      const s = d?.stageId ? st.get(d.stageId) : undefined;
+      const hh = h.get(id);
+      out[id] = {
+        source: (b.source as string | null) ?? null, lostReason: f.get(id) ?? null, createdAt: iso(hh?.created_at), stageSince: iso(b.last_stage_change_at), statusSince: iso(b.last_status_change_at),
+        lastActivityAt: iso(hh?.last_at) ?? iso(b.last_stage_change_at), usualP75Days: (s?.p75 as number | null | undefined) ?? null, stays: Number(s?.stays ?? 0),
+      };
+    }
+  } catch { /* the panel shows the facts it has */ }
+  return out;
+}
+
+/** The last conversation with this person (date, channel, who wrote last), from SubSync's copy. */
+async function lastConversationOf(ctx: Ctx, locationId: string, contactId: string) {
+  try {
+    const [r] = await sql()`select last_message_type, last_message_direction, last_message_at from cached_conversations where installation_id = ${ctx.installationId} and location_id = ${locationId} and contact_id = ${contactId} and last_message_at is not null order by last_message_at desc limit 1`;
+    if (!r) return null;
+    const dir = String(r.last_message_direction ?? "").toLowerCase();
+    return { at: (r.last_message_at as Date).toISOString(), channel: (r.last_message_type as string | null) ?? null, by: dir.startsWith("in") ? "them" : dir.startsWith("out") ? "you" : null };
+  } catch { return null; }
+}
+
 async function apptsOf(ctx: Ctx, locationId: string, contactId: string) {
   const rows = await sql()`select appointment_id, title, status, start_at, calendar_name, nullif(assigned_to, '') assigned_to from cached_appointments where installation_id = ${ctx.installationId} and location_id = ${locationId} and contact_id = ${contactId} order by start_at desc nulls last limit 40`;
   return rows.map((r) => ({ id: r.appointment_id as string, title: (r.title as string | null) ?? "Appointment", status: (r.status as string | null) ?? null, at: r.start_at instanceof Date ? r.start_at.toISOString() : null, calendar: (r.calendar_name as string | null) ?? null, assignedTo: (r.assigned_to as string | null) ?? null }));
@@ -103,6 +147,7 @@ export async function handleWorkbench(ctx: Ctx, h: WorkbenchHelpers): Promise<Re
   const m = ctx.request.method;
   if (m === "GET" && b === "context") return contextRoute(ctx, h);
   if (m === "GET" && b === "thread") return threadRoute(ctx, h);
+  if (m === "GET" && b === "deal-history") return dealHistoryRoute(ctx, h);
   if (m === "GET" && b === "record") return recordRoute(ctx, h);
   if (m === "GET" && b === "live") return liveRoute(ctx, h);
   if (m === "GET" && b === "find") return findRoute(ctx, h);
@@ -117,7 +162,8 @@ async function contextRoute(ctx: Ctx, h: WorkbenchHelpers): Promise<Response> {
   if (!lead) return json({ error: "Contact not found" }, 404);
   const links = await h.links();
   const [tzRow] = await sql()`select timezone from locations where installation_id = ${ctx.installationId} and location_id = ${locationId}`;
-  const [mode, deals, appts, users] = await Promise.all([modeOf(ctx, locationId), dealsOf(ctx, locationId, { contactId }), apptsOf(ctx, locationId, contactId), usersOf(ctx, locationId, lead.ownerId)]);
+  const [mode, deals, appts, users, lastConversation] = await Promise.all([modeOf(ctx, locationId), dealsOf(ctx, locationId, { contactId }), apptsOf(ctx, locationId, contactId), usersOf(ctx, locationId, lead.ownerId), lastConversationOf(ctx, locationId, contactId)]);
+  const dealExtra = await dealExtras(ctx, locationId, deals);
   const allPipelineIds = (await sql()`select pipeline_id from pipelines where installation_id = ${ctx.installationId} and location_id = ${locationId} limit 20`).map((r) => r.pipeline_id as string);
   const pipelines = await stagesOf(ctx, locationId, [...new Set([...allPipelineIds, ...deals.map((d) => d.pipelineId).filter((x): x is string => !!x)])]);
   const ownerName = users.find((u) => u.id === lead.ownerId)?.name ?? null;
@@ -125,10 +171,28 @@ async function contextRoute(ctx: Ctx, h: WorkbenchHelpers): Promise<Response> {
     mode, canDelete: ctx.kind !== "client", name: lead.target.name, dnd: lead.target.dnd, phone: lead.target.phone, email: lead.target.email, hasConversation: !!lead.conversationId, dealsUrl: links.opportunities(locationId), timeZone: (tzRow?.timezone as string | null) ?? null,
     // The link that opens this conversation in the customer's CRM (through the white-label domain helper); the contact when there is no conversation yet.
     crmUrl: lead.conversationId ? links.conversation(locationId, lead.conversationId) : links.contact(locationId, contactId),
-    usersNeedPermission: users.every((u) => u.id === lead.ownerId) && !(await installationHasScope(ctx.installationId, "users.readonly")), tags: lead.tags, fields: lead.fields, ownerId: lead.ownerId, ownerName, locationName: lead.locationName, users, deals, appointments: appts, pipelines,
+    usersNeedPermission: users.every((u) => u.id === lead.ownerId) && !(await installationHasScope(ctx.installationId, "users.readonly")), tags: lead.tags, fields: lead.fields, ownerId: lead.ownerId, ownerName, locationName: lead.locationName, users, deals, dealExtra, lastConversation, appointments: appts, pipelines,
     me: actorOf(ctx),
     templates: TEMPLATES.map((t) => ({ id: t.id, label: t.label, channel: t.channel, subject: t.subject ? fillTemplate(t.subject, { name: lead.target.name, owner: ctx.session.userName ?? ownerName, business: lead.locationName }) : null, text: fillTemplate(t.text, { name: lead.target.name, owner: ctx.session.userName ?? ownerName, business: lead.locationName }) })),
   });
+}
+
+/** One deal's recorded history (our own event store), loaded when the person expands it. The deal must belong to a contact of an account the caller may see. */
+async function dealHistoryRoute(ctx: Ctx, h: WorkbenchHelpers): Promise<Response> {
+  const { locationId, contactId } = ids(ctx, ctx.url.searchParams);
+  const oppId = ctx.url.searchParams.get("opportunityId");
+  if (!locationId || !contactId || !oppId || !ID.test(oppId)) return json({ error: "Send the account, the person and the deal" }, 400);
+  const lead = await loadLead(ctx, await h.allowed(), locationId, contactId);
+  if (!lead) return json({ error: "Contact not found" }, 404);
+  const [deal] = await dealsOf(ctx, locationId, { contactId, opportunityId: oppId });
+  if (!deal) return json({ error: "Deal not found" }, 404);
+  try {
+    const [rows, names] = await Promise.all([
+      sql()`select id, kind, at, from_value, to_value, from_name, to_name, value::float8 value, actor_id, actor_kind from deal_history where installation_id = ${ctx.installationId} and location_id = ${locationId} and opportunity_id = ${oppId} order by at desc, id desc limit 200`,
+      teamNames(ctx.installationId),
+    ]);
+    return json({ state: rows.length ? "ok" : "empty", rows: rows.map((r) => ({ id: String(r.id), kind: r.kind as string, at: (r.at as Date).toISOString(), from: (r.from_value as string | null) ?? null, to: (r.to_value as string | null) ?? null, fromName: (r.from_name as string | null) ?? null, toName: (r.to_name as string | null) ?? null, value: (r.value as number | null) ?? null, actor: r.actor_id ? names.get(r.actor_id as string) ?? null : null, byUs: r.actor_kind === "subsync" })) });
+  } catch { return json({ state: "unavailable", rows: [] }); }
 }
 
 /** The live conversation. Fetched when the panel opens, held in this answer only, never stored. */
