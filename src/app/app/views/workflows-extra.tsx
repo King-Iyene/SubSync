@@ -65,7 +65,7 @@ export function DeliveryTab({ q, now }: { q: string; now: number }) {
         <label className="text-sm"><span className="sr-only">Kind</span><select value={source} onChange={(e) => setSource(e.target.value)} data-testid="wf-d-source" className="h-10 rounded-lg border bg-background px-2"><option value="all">Every kind</option>{data.sources.map((s) => <option key={s} value={s}>{SOURCE[s] ?? s}</option>)}</select></label>
         <span className="text-sm text-muted-foreground">{data.camps.length} campaigns, {data.withStats} with delivery figures</span>
       </div>
-      {!data.statsPermitted ? <InlineAlert tone="warning" title="Needs permission: reconnect" className="mb-4">SubSync needs <code>{data.permissionName}</code> to read how many messages were delivered. Until then no delivery figure is shown.</InlineAlert> : null}
+      {!data.statsPermitted ? <InlineAlert tone="warning" title="Needs permission: reconnect" className="mb-4">SubSync needs permission to read how many emails were sent and opened. Until then no delivery figure is shown.</InlineAlert> : null}
       {data.camps.length === 0 ? <EmptyState title="No campaigns yet" body="Press Update now on the Overview. Campaigns need the campaign permission." /> : data.withStats === 0 ? <EmptyState title="Delivery figures not read yet" body="Press Update now to read how many messages of each campaign were delivered." /> : (
         <>
           {data.flags.length ? (

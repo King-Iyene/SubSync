@@ -95,7 +95,7 @@ export function GapsTab({ q, onLibrary }: { q: string; onLibrary: () => void }) 
     <div data-testid="wf-gaps">
       {fx ? <InlineAlert tone="info" className="mb-4">Sample data. Nothing here is from your accounts.</InlineAlert> : null}
       {data.today ? <InlineAlert tone="warning" title="What to do today" className="mb-4"><span data-testid="wf-today-line">{data.today.line}</span></InlineAlert> : null}
-      {!data.permissions.list ? <InlineAlert tone="info" title="Needs permission: reconnect" className="mb-4">Allow <code>workflows.readonly</code> so SubSync can tell which automation is missing. The people counted below are still real.</InlineAlert> : null}
+      {!data.permissions.list ? <InlineAlert tone="info" title="Needs permission: reconnect" className="mb-4">Reconnect to let SubSync read your workflows, so it can tell which automation is missing. The people counted below are still real.</InlineAlert> : null}
       <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4" data-testid="wf-gap-tiles">
         {t.byGap.map((g) => (
           <button key={g.id} type="button" onClick={() => setGap(gap === g.id ? "all" : g.id)} aria-pressed={gap === g.id} className={`min-h-20 rounded-xl border p-3 text-left hover:bg-muted ${gap === g.id ? "border-primary" : ""}`}>

@@ -1,4 +1,5 @@
 import { sql } from "../db";
+import { cachedRead } from "../read-cache";
 import type { AccountRow, AccountSettings, AlertDraft } from "./derive";
 import type { DomainReport } from "../dns/email-auth";
 import { DEFAULT_APP_DOMAIN } from "../links";
@@ -61,7 +62,11 @@ export type Settings = AccountSettings & {
   dealRulesRevision: number;
 };
 
-export async function getSettings(installationId: string): Promise<Settings> {
+export function getSettings(installationId: string): Promise<Settings> {
+  return cachedRead(installationId, "settings", () => loadSettings(installationId));
+}
+
+async function loadSettings(installationId: string): Promise<Settings> {
   const db = sql();
   const readFull = () => db`
     select stale_deal_days, dormant_days, sla_hours, slack_webhook_url, ghl_app_domain, app_domain_source, detected_app_domain, digest_enabled, custom_checklist, digest_hour, digest_timezone, digest_email, brand_name, brand_color, brand_logo_url, detected_logo_url, industry_targets, push_notes_to_crm, keep_transcripts, speed_target_minutes, count_automated_touches, speed_business_hours, speed_open_hour, speed_close_hour, alert_quiet_hours, inbox_ack_grace_minutes, cold_tags, deal_rules_revision
@@ -175,7 +180,11 @@ export async function updateSettings(installationId: string, p: Partial<Settings
 
 // The accounts a plan may see (name order, ignored accounts excluded). Used to enforce the free
 // plan's account limit without loading and scoring every account.
-export async function visibleLocationIds(installationId: string, limit: number): Promise<string[]> {
+export function visibleLocationIds(installationId: string, limit: number): Promise<string[]> {
+  return cachedRead(installationId, `visible:${limit}`, () => loadVisibleLocationIds(installationId, limit));
+}
+
+async function loadVisibleLocationIds(installationId: string, limit: number): Promise<string[]> {
   const rows = await sql()`
     select location_id from locations where installation_id = ${installationId} and not ignored
     order by lower(coalesce(name, '')), location_id limit ${limit}`;

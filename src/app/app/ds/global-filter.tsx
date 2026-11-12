@@ -139,13 +139,13 @@ function DateControl({ mode }: { mode: "range" | "now" | "dates" }) {
   const updating = pending && inflight > 0;
   return (
     <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5 sm:gap-x-2.5" data-testid="date-control">
-      <div role="group" aria-label="Dates" className="inline-flex max-w-full divide-x overflow-x-auto rounded-lg border bg-card">
+      <div role="group" aria-label="Dates" className="inline-flex max-w-full flex-wrap divide-x overflow-hidden rounded-lg border bg-card">
         {PRESETS.map((p) => (
           <button key={p.key} type="button" aria-pressed={spec.preset === p.key} onClick={() => applyPreset({ preset: p.key, compare: spec.compare })}
-            className={`min-h-9 whitespace-nowrap px-2 text-sm outline-none sm:px-2.5 focus-visible:ring-2 focus-visible:ring-ring/40 ${spec.preset === p.key ? "bg-primary font-medium text-primary-foreground" : "hover:bg-accent"}`}>{p.label.startsWith("Last ") ? <><span className="sm:hidden" aria-hidden>{p.label.slice(5).replace(" days", "d")}</span><span className="max-sm:sr-only">{p.label.slice(5)}</span></> : p.label}</button>
+            className={`min-h-9 whitespace-nowrap px-1.5 text-sm outline-none sm:px-2.5 focus-visible:ring-2 focus-visible:ring-ring/40 ${spec.preset === p.key ? "bg-primary font-medium text-primary-foreground" : "hover:bg-accent"}`}>{p.label.startsWith("Last ") ? <><span className="sm:hidden" aria-hidden>{p.label.slice(5).replace(" days", "d")}</span><span className="max-sm:sr-only">{p.label.slice(5)}</span></> : p.label}</button>
         ))}
         <button type="button" aria-pressed={spec.preset === "custom"} onClick={() => { setDraft(null); pr.apply({ preset: "custom", from: spec.from ?? pr.from, to: spec.to ?? pr.to, compare: spec.compare }); }}
-          className={`min-h-9 px-2 text-sm outline-none sm:px-2.5 focus-visible:ring-2 focus-visible:ring-ring/40 ${spec.preset === "custom" ? "bg-primary font-medium text-primary-foreground" : "hover:bg-accent"}`}>Custom</button>
+          className={`min-h-9 px-1.5 text-sm outline-none sm:px-2.5 focus-visible:ring-2 focus-visible:ring-ring/40 ${spec.preset === "custom" ? "bg-primary font-medium text-primary-foreground" : "hover:bg-accent"}`}>Custom</button>
       </div>
       {spec.preset === "custom" && (
         <form className="inline-flex flex-wrap items-center gap-1.5" onSubmit={(e) => { e.preventDefault(); applyDraft(); }} data-testid="custom-range">

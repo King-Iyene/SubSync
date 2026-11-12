@@ -1,5 +1,6 @@
 "use client";
 
+import { scopeList } from "@/lib/scope-words";
 import { ChevronLeft, ChevronRight, ExternalLink, Search, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { LabelRow } from "@/lib/workflows/store-types";
@@ -140,7 +141,7 @@ export function ItemPanel({ item, account, label, bucket, now, canOrganise, onCl
           <h3 className="mb-2 text-sm font-semibold">What it does</h3>
           {det.loading && !det.data ? <p className="text-sm text-muted-foreground">Reading it...</p> : det.error ? <p className="text-sm text-muted-foreground">Could not read it right now.</p> : det.data?.kind === "campaign" ? <p className="text-sm text-muted-foreground">{det.data.note}</p> : (
             <>
-              {det.data?.needs?.length ? <p className="text-sm text-warning">Needs permission: reconnect ({det.data.needs.join(", ")}).</p> : null}
+              {det.data?.needs?.length ? <p className="text-sm text-warning">Needs permission: reconnect to let SubSync {scopeList(det.data.needs)}.</p> : null}
               {det.data?.summary ? (
                 <div className="text-sm">
                   <p><span className="text-muted-foreground">Starts when: </span>{det.data.summary.triggers.length ? det.data.summary.triggers.join(", ") : "Nothing starts it by itself"}</p>
@@ -223,7 +224,7 @@ export function ChangeDialog({ kind, items, accounts, permitted, preset, onClose
           <div><h2 className="text-lg font-semibold">{TITLE[kind]} {items.length} item{items.length === 1 ? "" : "s"}</h2><p className="text-sm text-muted-foreground">You see exactly what will change before anything is sent.</p></div>
           <button type="button" onClick={onClose} aria-label="Close" data-testid="wf-dialog-close" className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg border"><X aria-hidden className="size-4" /></button>
         </div>
-        {!permitted ? <InlineAlert tone="warning" title="Needs permission: reconnect">SubSync needs {NEEDS[kind].join(" and ")}. Open SubSync again from your CRM&apos;s app list and accept it. Nothing else changes.</InlineAlert> : null}
+        {!permitted ? <InlineAlert tone="warning" title="Needs permission: reconnect">SubSync needs permission to {scopeList(NEEDS[kind])}. Open SubSync again from your CRM&apos;s app list and accept it. Nothing else changes.</InlineAlert> : null}
         {done ? (
           <div data-testid="wf-result">
             {done.dryRun ? <InlineAlert tone="info" title="Nothing was sent">Live changes are switched off for this install, so this was a rehearsal. It is recorded in History.</InlineAlert> : null}

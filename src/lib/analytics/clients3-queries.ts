@@ -1,5 +1,8 @@
 import { sql } from "../db";
 import { ttlCache } from "../ttl-cache";
+import { featureOn } from "../flags";
+import { getSettings } from "./queries";
+import { waitingPeopleByAccount, waitingPeoplePage, type ListScope } from "./unanswered-sql";
 import { quietedMap } from "./clients-actions-queries";
 import { receiptLine } from "./mn2";
 import { meetingsOn, weekCountsByAccount } from "./mn2-queries";
@@ -19,7 +22,13 @@ export type Scope = { inst: string; allowed: string[] | null };
 export type Filters = { from: Date; to: Date; location?: string | null; q?: string | null; industry?: string | null; level?: Cl3Level | null };
 export type Links = { account: (loc: string) => string; contact: (loc: string, contact: string) => string };
 
-export const clientsCache = ttlCache<object>(60_000, 100);
+/** The scope the Unanswered screen uses, so "people waiting for a reply" is the same people here (round 4, docs/METRICS.md). */
+async function waitScope(s: Scope, ids: string[], now: number): Promise<ListScope> {
+  const [st, snooze, hide] = await Promise.all([getSettings(s.inst), featureOn("inbox_snooze"), featureOn("inbox_hide_noise")]);
+  return { installationId: s.inst, allowed: ids, slaHours: st.slaHours, targetMinutes: st.speedTargetMinutes, now, meId: null, seePeople: true, hook: { snooze, hide } };
+}
+
+export const clientsCache =ttlCache<object>(60_000, 100);
 /** Forget this installation's cached answers (the cache key starts with the installation id), so a quiet mark or a new target moves the ranking at once. */
 export const forgetClients = (inst: string) => clientsCache.clear(JSON.stringify([inst]).slice(0, -1));
 const ID = /^[A-Za-z0-9_-]{1,64}$/;
@@ -181,8 +190,8 @@ export async function accountsCore(s: Scope, f: Filters, now = Date.now()): Prom
 
   const [dRows, waitRows, apptRows, dealRows, staff, qual, speed, hist, quietBy] = await Promise.all([
     db`select d.location_id, ${db.unsafe(sums) as unknown as Frag}, ${db.unsafe(weekCols) as unknown as Frag} from (${daily.f}) d group by d.location_id`,
-    db`select location_id, count(*)::int waiting, count(*) filter (where last_message_at < now() - ${`${WAIT_OLD_HOURS} hours`}::interval)::int old
-       from cached_conversations where installation_id = ${s.inst} and location_id = any(${ids}::text[]) and last_message_direction = 'inbound' and last_message_at > now() - interval '30 days' group by 1`,
+    // Round 4: the people the Unanswered screen lists (one definition, docs/METRICS.md), not raw conversations.
+    waitScope(s, ids, now).then(waitingPeopleByAccount).then((m) => [...m].map(([location_id, v]) => ({ location_id, waiting: v.waiting, old: v.old }))),
     db`select location_id, count(*)::int unmarked from cached_appointments where installation_id = ${s.inst} and location_id = any(${ids}::text[])
        and status not in ('showed', 'noshow', 'cancelled', 'invalid') and start_at < now() - interval '3 hours' and start_at > now() - interval '90 days' group by 1`,
     db`select o.location_id, count(*)::int open_n, count(*) filter (where coalesce(o.last_stage_change_at, o.created_remote_at) < now() - ${`${STALE_DEAL_DAYS} days`}::interval)::int stale, coalesce(sum(o.monetary_value), 0)::float8 open_value
@@ -439,9 +448,9 @@ export async function list(s: Scope, f: Filters, reason: Cl3Reason, o: { page: n
   switch (reason) {
     case "waiting": case "waiting_old": {
       const old = reason === "waiting_old";
-      const cond = db`installation_id = ${s.inst} and location_id = any(${ids}::text[]) and last_message_direction = 'inbound' and last_message_at > now() - interval '30 days' ${old ? db`and last_message_at < now() - ${`${WAIT_OLD_HOURS} hours`}::interval` : db``}`;
-      total = n((await db`select count(*)::int c from cached_conversations where ${cond}`)[0]?.c);
-      rows = (await db`select location_id, contact_id, contact_name, last_message_at from cached_conversations where ${cond} order by last_message_at asc, conversation_id limit ${size} offset ${off}`).map((r) => row(r, `Waiting ${Math.max(0, Math.round((now - new Date(r.last_message_at as Date).getTime()) / 3_600_000))} hours`, r.last_message_at));
+      const pg = await waitingPeoplePage(await waitScope(s, ids, now), { old, size, offset: off });
+      total = pg.total;
+      rows = pg.rows.map((r) => row({ location_id: r.locationId, contact_id: r.contactId, contact_name: r.name }, `Waiting ${r.hours} hours`, r.lastAt));
       break;
     }
     case "unmarked": case "noshows": {

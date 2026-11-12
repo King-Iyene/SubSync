@@ -5,6 +5,7 @@ import { fmtMoney } from "@/lib/analytics/payments-format";
 import type { PmMoney, PmSource } from "@/lib/analytics/payments-types";
 import { EmptyState, ErrorState, SkeletonRows } from "../../ds";
 import { notSwitchedOn } from "./data";
+import { scopeWords } from "@/lib/scope-words";
 
 // Small pieces shared by the Payments screens. Plain words. Money is always one currency at a time.
 export const RECONNECT = "Needs permission: reconnect";
@@ -36,7 +37,7 @@ export function PermissionNotice({ sources }: { sources: PmSource[] }) {
   if (!need.length) return null;
   return (
     <div className="pm-notice" role="status" data-testid="pm-permission">
-      <b>{RECONNECT}.</b> To read {need.map((s) => s.label.toLowerCase()).join(", ")} SubSync needs {need.length === 1 ? "this permission" : "these permissions"}: {need.map((s, i) => <span key={s.scope}>{i ? ", " : ""}<code>{s.scope}</code></span>)}. Open SubSync again from your CRM&apos;s app list and accept {need.length === 1 ? "it" : "them"}. The rest of this page keeps working.
+      <b>{RECONNECT}.</b> To read {need.map((s) => s.label.toLowerCase()).join(", ")} SubSync needs {need.length === 1 ? "this permission" : "these permissions"}: {need.map((s, i) => <span key={s.scope}>{i ? ", " : ""}{scopeWords(s.scope)}</span>)}. Open SubSync again from your CRM&apos;s app list and accept {need.length === 1 ? "it" : "them"}. The rest of this page keeps working.
     </div>
   );
 }

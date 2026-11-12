@@ -91,8 +91,8 @@ export function AccountPage({ id, onBack, flags, drill, onDrill, legacy, go, goT
           <Card title="Speed to lead and replies" testId="cl2-work">
             <dl className="cl2-dl">
               <Row k="Typical first reply">{minutes(a.work.medianReplyMinutes)}</Row>
-              <Row k="Leads waiting for a reply">{a.work.waiting > 0 ? <button type="button" className="ap-link" onClick={() => setDrillOpen("waiting", "waiting for a reply", a.work.waiting)}>{a.work.waiting}</button> : 0}{a.work.waitingOld > 0 && <span className="ap-fine"> ({a.work.waitingOld} over a day)</span>}</Row>
-              <Row k="New leads (30 days)">{a.work.newLeads}</Row>
+              <Row k="People waiting for a reply">{a.work.waiting > 0 ? <button type="button" className="ap-link" onClick={() => setDrillOpen("waiting", "waiting for a reply", a.work.waiting)}>{a.work.waiting}</button> : 0}{a.work.waitingOld > 0 && <span className="ap-fine"> ({a.work.waitingOld} over a day)</span>}</Row>
+              <Row k="New contacts (last 30 days, every contact added)">{a.work.newLeads}</Row>
             </dl>
           </Card>
 

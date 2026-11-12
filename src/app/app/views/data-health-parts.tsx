@@ -97,7 +97,7 @@ export function FixTab({ data, target, reload }: Common & { reload: () => void }
   if (!target) return <Pick />;
   if (data.needs.upgradeFix) return <Locked what="Safe fixes" />;
   if (!data.can.fix) return <InlineAlert tone="info">Only an administrator can fix records.</InlineAlert>;
-  if (!data.permissions.fix) return <InlineAlert tone="warning" title="Needs permission: reconnect">Open SubSync again from your CRM and allow <code>{data.permissions.scope}</code>. Until then nothing can be changed.</InlineAlert>;
+  if (!data.permissions.fix) return <InlineAlert tone="warning" title="Needs permission: reconnect">Open SubSync again from your CRM and allow SubSync to change contacts. Until then nothing can be changed.</InlineAlert>;
   const run = async (fn: () => Promise<void>) => { setBusy(true); setMsg(null); try { await fn(); } catch (e) { setMsg({ ok: false, text: (e as Error).message }); } finally { setBusy(false); } };
   return (
     <div data-testid="dh-fix">

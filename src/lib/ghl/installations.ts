@@ -1,6 +1,7 @@
 import { decryptSecret, encryptSecret } from "../crypto";
 import { LOCATION_DELETE, SYNCED_DELETE, UNINSTALL_DELETE } from "../tenant-tables";
 import { sql } from "../db";
+import { cachedRead } from "../read-cache";
 import { safeError } from "../safe-log";
 import { businessKey, isBusinessKey } from "../access";
 import { normalisePlan, planFromMarketplaceId, type Plan } from "../entitlements";
@@ -62,7 +63,12 @@ export async function saveInstallation(tokens: TokenResponse): Promise<string> {
   return row.id as string;
 }
 
-export async function getInstallation(companyKey: string): Promise<Installation | null> {
+export function getInstallation(companyKey: string): Promise<Installation | null> {
+  // A company that is not installed (yet) is never remembered (cachedRead skips null): right after an install the next read must see it.
+  return cachedRead(`co:${companyKey}`, "installation", () => loadInstallation(companyKey));
+}
+
+async function loadInstallation(companyKey: string): Promise<Installation | null> {
   const [row] = await sql()`
     select id, company_id, plan, is_demo, location_limit, mode, location_id
     from installations where company_id = ${companyKey} and uninstalled_at is null`;
@@ -84,11 +90,13 @@ export async function businessInstalled(locationId: string): Promise<boolean> {
 }
 
 // Has this agency switched the app on for this client's own staff?
-export async function clientViewOn(companyId: string, locationId: string): Promise<boolean> {
-  const [row] = await sql()`
-    select l.client_view from locations l join installations i on i.id = l.installation_id
-    where i.company_id = ${companyId} and i.uninstalled_at is null and l.location_id = ${locationId}`;
-  return row?.client_view === true;
+export function clientViewOn(companyId: string, locationId: string): Promise<boolean> {
+  return cachedRead(`co:${companyId}`, `clientview:${locationId}`, async () => {
+    const [row] = await sql()`
+      select l.client_view from locations l join installations i on i.id = l.installation_id
+      where i.company_id = ${companyId} and i.uninstalled_at is null and l.location_id = ${locationId}`;
+    return row?.client_view === true;
+  });
 }
 
 export async function isInstalled(companyId: string): Promise<boolean> {

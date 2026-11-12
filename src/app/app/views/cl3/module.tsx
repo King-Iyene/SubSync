@@ -105,9 +105,9 @@ function Overview({ filters, open, go, c2, onTile, onButton }: { filters: ClPara
             <div className="cl-tiles">
               {tile("Client accounts", o.accounts, () => go(c2 ? "accounts" : "needs"))}
               {tile("Need a look", need, () => go("needs"))}
-              {tile("Leads waiting for a reply", o.totals.waiting, () => open({ title: "Leads waiting for a reply", reason: "waiting", location: null, count: o.totals.waiting }))}
+              {tile("People waiting for a reply", o.totals.waiting, () => open({ title: "People waiting for a reply", reason: "waiting", location: null, count: o.totals.waiting }))}
               {tile("Appointments with no outcome", o.totals.unmarked, () => open({ title: "Appointments with no outcome", reason: "unmarked", location: null, count: o.totals.unmarked }))}
-              {tile("New leads", o.totals.newLeads.current, () => go("trends"), nl)}
+              {tile("New contacts (every contact added)", o.totals.newLeads.current, () => go("trends"), nl)}
             </div>
             {o.topReasons.length > 0 && (
               <section aria-label="What is wrong most often">

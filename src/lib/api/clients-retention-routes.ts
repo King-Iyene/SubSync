@@ -35,8 +35,8 @@ export async function workflowsView(ctx: Ctx, h: ClientActionHelpers, ids: strin
   const dryRun = process.env.WORKFLOWS_WRITE_LIVE !== "true" && !ctx.demo;
   const perm = {
     canRead: has("workflows.readonly"), canInstall: has("workflows.readonly", "workflows.write"), dryRun,
-    readText: has("workflows.readonly") ? null : "Needs permission: reconnect so SubSync can read workflows. Missing: workflows.readonly.",
-    installText: has("workflows.readonly", "workflows.write") ? null : "Needs permission: reconnect so SubSync can copy a workflow into a client. Missing: workflows.write.",
+    readText: has("workflows.readonly") ? null : "Needs permission: reconnect to let SubSync read your workflows.",
+    installText: has("workflows.readonly", "workflows.write") ? null : "Needs permission: reconnect to let SubSync copy a workflow into a client.",
   };
   const standard = STANDARD.map((s) => ({ id: s.id, label: s.label }));
   if (!perm.canRead) return json({ permission: perm, standard, clients: [], reason: perm.readText });
