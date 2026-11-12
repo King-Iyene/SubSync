@@ -133,7 +133,7 @@ import { handleApptWork } from "./appointment-work-routes";
 import { handleAppointments3 } from "./appointments3-routes";
 import { handleApptExec, handleApptExecTarget } from "./appointments-exec-routes";
 import { handleBfFunnel, handleBfRecover } from "./bf-routes";
-import { handlePipeline3 } from "./pipeline3-routes";
+import { handlePipeline3, handlePipelineHistorySettings } from "./pipeline3-routes";
 import { handleClients3 } from "./clients3-routes";
 import { handleProof } from "./proof-routes";
 import { handleFinance } from "./finance-routes";
@@ -2139,6 +2139,7 @@ async function dispatch(ctx: Ctx): Promise<Response> {
       return await handleAppointments3(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links });
     }
     // Pipeline round 3: /api/app/pipeline3?part=... (overview, money flow, attention, won and lost, forecast, people, sources, stage history, health, receipt, lists, detail; read only).
+    if (a === "pipeline3" && b === "history-settings" && !c && method === "PUT") return await handlePipelineHistorySettings(ctx);
     if (a === "pipeline3" && method === "GET" && !b && ctx.url.searchParams.has("part")) {
       return await handlePipeline3(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links });
     }

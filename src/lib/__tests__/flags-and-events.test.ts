@@ -141,6 +141,7 @@ test("pilot modules are on by default and a database row can still override the 
     "pl_forecast",
     "pl_health",
     "pl_history",
+    "pl_history_funnel",
     "pl_module",
     "pl_money_flow",
     "pl_overview",

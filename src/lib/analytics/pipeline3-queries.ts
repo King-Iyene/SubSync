@@ -18,11 +18,11 @@ import type {
 // every derived column lives in `deals()` below, so a count and the list behind it cannot disagree. Deals removed in the CRM (deal_facts.removed_at) are in no number. Our own
 // writes (deal_history.actor_kind = 'subsync') are never counted as team activity. Definitions: docs/METRICS.md "Pipeline 3".
 
-type Db = ReturnType<typeof sql>;
-type Frag = ReturnType<Db>;
+export type Db = ReturnType<typeof sql>;
+export type Frag = ReturnType<Db>;
 export type Scope = { inst: string; allowed: string[] | null };
 export type Filters = { from: Date; to: Date; location?: string | null; pipeline?: string | null; stage?: string | null; stageKey?: string | null; owner?: string | null; source?: string | null; q?: string | null; bucket?: Pl3Bucket | null; reason?: string | null; includeTest?: boolean };
-type Rec = Record<string, unknown>;
+export type Rec = Record<string, unknown>;
 
 const ID = /^[A-Za-z0-9_-]{1,64}$/;
 export const cleanId = (v: unknown): string | null => (typeof v === "string" && ID.test(v) ? v : null);
@@ -35,7 +35,7 @@ export const plCache = ttlCache<unknown>(30_000, 300);
 /** Whole words that make a deal look like a test (the same words the cleanup rules use for test contacts). A user toggle can include them. */
 const TEST_RE = "(^|[^a-z0-9])(test|testing|demo|dummy|sample|fake)([^a-z0-9]|$)|^xtest-";
 
-function locs(s: Scope, location?: string | null): Frag {
+export function locs(s: Scope, location?: string | null): Frag {
   const db = sql();
   const one = cleanId(location);
   return db`select l.location_id, l.name from locations l where l.installation_id = ${s.inst} and not l.ignored ${s.allowed ? db`and l.location_id = any(${s.allowed}::text[])` : db``} ${one ? db`and l.location_id = ${one}` : db``}`;
@@ -109,7 +109,7 @@ function bucketCond(db: Db, s: Scope, f: Filters): Frag {
   }
 }
 
-async function names(inst: string): Promise<(id: string | null | undefined) => string> {
+export async function names(inst: string): Promise<(id: string | null | undefined) => string> {
   const rows = await sql()`select user_id, name from team_names where installation_id = ${inst}`;
   const m = new Map(rows.map((r) => [r.user_id as string, r.name as string]));
   return (id) => (!id || id === "unassigned" ? "Not assigned" : m.get(id) ?? "Team member (name not available)");
@@ -159,7 +159,7 @@ export function toRow(r: Rec, label: (id: string | null | undefined) => string, 
   };
 }
 
-const offsetOf = (p: number, size: number) => Math.min(100_000, Math.max(0, Math.floor(p)) * size);
+export const offsetOf = (p: number, size: number) => Math.min(100_000, Math.max(0, Math.floor(p)) * size);
 function sortOf(db: Db, sort: string | null | undefined, dir?: string | null): Frag {
   const asc = dir === "asc";
   switch (sort) {
