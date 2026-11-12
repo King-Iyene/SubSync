@@ -18,6 +18,7 @@ export type SectionProps = {
   /** Open a section. `focus` picks one problem inside it (Calendars: conflicts or idle_person). Arriving from a number always starts the list without its own filters, so the count and the rows agree. */
   go: (tab: string, focus?: string) => void; onDrill: (d: DrillReq) => void;
   /** Open another screen of the app (for example the integrations page). */ openView: (id: string) => void; /** Clear every filter. */ clear: () => void; /** Look back 90 days. */ widen: () => void; /** Any filter is on. */ filtered: boolean; focus?: string;
+  /** Set when the person came from a Today number: what it counted and the dates it looked at, so the list can say whether its rows match. */ arrival?: { expect: number | null; what: string; days: number } | null;
 };
 /** A number that opens the appointments behind it. */
 export const Hit = ({ n, label, onClick, tone }: { n: number | string; label: string; onClick: () => void; tone?: string }) => (

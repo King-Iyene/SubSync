@@ -15,7 +15,7 @@ export const TD3_KINDS = [
 export type Td3Kind = (typeof TD3_KINDS)[number];
 
 /** Lists that are not an item of the ranked list: the tiles of Numbers and "my queue". */
-export const TD3_LIST_ONLY = ["open_deals", "all_waiting", "all_noshows", "all_stale", "mine_waiting", "mine_unmarked", "mine_stale"] as const;
+export const TD3_LIST_ONLY = ["open_deals", "all_waiting", "all_noshows", "all_unmarked", "open_noshows", "all_stale", "mine_waiting", "mine_unmarked", "mine_stale"] as const;
 export type Td3ListKind = Td3Kind | (typeof TD3_LIST_ONLY)[number];
 
 /** Which screen of the app holds the full working list for a kind (the one button links there). */
@@ -47,6 +47,8 @@ export type Td3Today = {
   button: { label: string; kind: Td3Kind; count: number; module: Td3Module; locationId: string | null } | null;
   /** At most five, ranked. */
   items: Td3Item[];
+  /** The two appointment numbers on the Today cards, over EVERY client account in view (not only the flagged ones), worked out with the same rule as Appointments (Needs outcome, No-show recovery), so each number equals the rows it opens. */
+  counts: { unmarked: number; noshows: number };
   /** What the owner put aside for now (SubSync only). Counts stay real; the items just leave the list. */
   snoozed: Array<{ id: string; kind: Td3Kind; label: string; count: number; until: string; locationId: string | null }>;
   /** Cleared today (the account's own day) from our record. Empty until the record has a day. */

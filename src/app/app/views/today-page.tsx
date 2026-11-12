@@ -33,6 +33,7 @@ import { ForecastTab } from "./today-forecast";
 import { ProofTab } from "./today-proof";
 import { ClientsFlowTab, LeadFlowTab, TabIntro } from "./today-flow";
 import { SECTION_META } from "@/lib/analytics/today-tabs";
+import { cardLink, goWith } from "@/lib/design/deep-link";
 
 // Today, one page for every role. One question: "what needs a person today, and what do I do first?". Top to bottom: a small title row, ONE plain sentence with the number that matters
 // most and ONE primary button, "Do this first" (the working queue: a setter's people to reply to, or one row per client for an agency), what changed since the person was last here
@@ -92,7 +93,7 @@ export function TodayPage({ mode = "full", go, t, kind, reload, sync, syncing, o
   if (!headline.allClear) {
     if (multi && needing.rows[0]) primary = { label: `Open ${needing.rows[0].name}`, sr: `${needing.rows[0].name}, the client that needs you most`, href: needing.rows[0].url };
     else if (!multi && waiting[0]) primary = { label: `Reply to ${waiting[0].name}`, sr: `${waiting[0].name}, the longest wait`, href: waiting[0].url, seed: waiting[0].contactId ? { contactId: waiting[0].contactId, locationId: waiting[0].locationId, name: waiting[0].name, locationName: waiting[0].accountName, url: waiting[0].url, pending: waiting[0].detail } : null };
-    else if (!multi && counts.appointments > 0) primary = { label: "Mark outcomes", sr: "Appointments", onClick: () => go("appointments") };
+    else if (!multi && counts.appointments > 0) primary = { label: "Mark outcomes", sr: "Appointments", onClick: () => goWith(go, { ...cardLink("unmarked", { count: 0 }), expect: null }) };
     else if (!multi && counts.noshows > 0) primary = { label: "Rebook no-shows", sr: "No-shows", onClick: () => m.open(specKind("noshows", env)) };
     else if (!multi && counts.stale > 0) primary = { label: "Review quiet deals", sr: "Quiet deals", onClick: () => m.open(specKind("stale", env)) };
   }
@@ -164,7 +165,7 @@ export function TodayPage({ mode = "full", go, t, kind, reload, sync, syncing, o
       const n = view.totals[k].count;
       const text = k === "appointments" ? "Over, with no outcome marked" : k === "noshows" ? "Missed an appointment, not rebooked"
         : `Not moved in ${t.staleDays}+ days${view.totals.stale.dollars ? `, worth ${fmtMoney(view.totals.stale.dollars)}` : ""}`;
-      const action = k === "stale" ? { label: "Open", href: q?.url ?? t.accounts[0]?.url, sr: "Deals in your CRM" } : { label: "Mark", onClick: () => go("appointments"), sr: k === "noshows" ? "No-shows in Appointments" : "Appointments to mark" };
+      const action = k === "stale" ? { label: "Open", href: q?.url ?? t.accounts[0]?.url, sr: "Deals in your CRM" } : { label: "Mark", onClick: () => goWith(go, { ...cardLink(k === "noshows" ? "noshows" : "unmarked", { count: 0 }), expect: null }), sr: k === "noshows" ? "No-shows in Appointments" : "Appointments to mark" };
       return { kind: k, count: n, text, onOpen: () => m.open(specKind(k, env)), action };
     });
 

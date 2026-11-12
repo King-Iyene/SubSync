@@ -24,6 +24,7 @@ import { BfTab, type BfFlags } from "../bf/bf-tab";
 import { AppointmentsView } from "../appointments";
 import { AppointmentInsights } from "../appointment-insights";
 import { execScopeOf } from "./exec/exec-types";
+import { takeDeepLink } from "@/lib/design/deep-link";
 import { Overview, type DrillReq, type SectionProps } from "./sections";
 import type { ApFlowTree, ApHealthRow, ApPersonRow, ApRow } from "./types";
 
@@ -73,6 +74,8 @@ export function AppointmentsModule({ go, flowTree = true, leadership = false, fu
   const [views, setViews] = useState<SavedView[]>([]);
   const [naming, setNaming] = useState(false);
   const [version, setVersion] = useState(0);
+  const [arrival, setArrival] = useState<{ tab: string; expect: number | null; what: string; days: number } | null>(null);
+  const arrived = useRef(false);
   const search = useRef<HTMLInputElement>(null);
   const top = useRef<HTMLDivElement>(null);
   const health = useAp<{ rows: ApHealthRow[] }>("health", { ...filters, locationId: "" });
@@ -81,9 +84,21 @@ export function AppointmentsModule({ go, flowTree = true, leadership = false, fu
   // choice (for example "Next 7 days", which the bar cannot express) is a labelled override that lasts until the bar changes again (see the note under the filters).
   const bar = usePageRange();
   const urlOwns = useRef(false);
+  // A click from a Today number opens the exact section and dates that reproduce its count (see deep-link.ts); it wins over an old address.
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    if (arrived.current) return;
+    const dl = takeDeepLink("appointments");
+    if (!dl) return;
+    arrived.current = true; urlOwns.current = true;
+    setFilters({ ...DEFAULT_FILTERS, days: dl.days ?? 30, locationId: dl.location ?? "" }); setQ("");
+    if (tabs.some((t) => t.key === dl.tab)) setTab(dl.tab as TabKey);
+    setArrival({ tab: dl.tab, expect: dl.expect ?? null, what: dl.what ?? "Today", days: dl.days ?? 30 });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  /* eslint-enable react-hooks/set-state-in-effect */
   // The filters live in the address, so a view can be shared and survives a reload.
   // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { setViews(readViews()); const f = filtersFromParams(new URLSearchParams(window.location.search)); if (!isDefault(f)) { urlOwns.current = true; setFilters(f); setQ(f.q); } }, []);
+  useEffect(() => { setViews(readViews()); if (arrived.current) return; const f = filtersFromParams(new URLSearchParams(window.location.search)); if (!isDefault(f)) { urlOwns.current = true; setFilters(f); setQ(f.q); } }, []);
   useEffect(() => {
     if (!bar.ready) return;
     if (urlOwns.current) { urlOwns.current = false; return; }
@@ -136,7 +151,7 @@ export function AppointmentsModule({ go, flowTree = true, leadership = false, fu
   }, [tabs]);
 
   const openDrill = (d: DrillReq) => { setDrill({ tab, title: d.title, count: d.count, extra: d.extra, labels: d.labels ?? {} }); setTimeout(() => document.getElementById("ap-drill")?.scrollIntoView({ block: "nearest", behavior: "smooth" }), 60); };
-  const sp: SectionProps = { filters, onOpen: openRow, activeId: row?.id ?? null, showAccount, go: goTab, onDrill: openDrill, openView: (id) => go(id as never), clear, widen, filtered, focus };
+  const sp: SectionProps = { filters, onOpen: openRow, activeId: row?.id ?? null, showAccount, go: goTab, onDrill: openDrill, openView: (id) => go(id as never), clear, widen, filtered, focus, arrival: arrival && arrival.tab === tab && arrival.days === filters.days && !filters.from ? arrival : null };
   const accounts = Array.isArray(health.data?.rows) ? health.data.rows : [];
   const saveView = (name: string) => { const next = [{ name: name.trim().slice(0, 40), filters, tab }, ...views.filter((v) => v.name !== name.trim())].slice(0, 20); setViews(next); writeViews(next); setNaming(false); };
   const applyView = (i: number) => { const v = views[i]; if (!v) return; const f = { ...DEFAULT_FILTERS, ...v.filters }; setFilters(f); setQ(f.q); if (tabs.some((t) => t.key === v.tab)) { setFocus(undefined); setTab(v.tab); } };

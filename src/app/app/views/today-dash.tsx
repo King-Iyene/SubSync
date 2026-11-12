@@ -3,6 +3,7 @@
 import { Banknote, BarChart3, CalendarCheck, Clock, Compass, Kanban, LayoutDashboard, Timer, TrendingUp, Users, Workflow, ArrowLeftRight } from "lucide-react";
 import { useCallback, type ReactNode } from "react";
 import type { AccessKind } from "@/lib/access";
+import { cardLink, goWith } from "@/lib/design/deep-link";
 import { FLOW_PRESETS, type FlowPreset } from "@/lib/analytics/lead-flow";
 import { writeReportState } from "@/lib/analytics/report-filter";
 import type { TodayData } from "@/lib/analytics/today-types";
@@ -81,7 +82,7 @@ export function TodayDashboard({ t, kind, agency, go, evidence, growthTab, forec
         {/* 3. Where do they go? */}
         <Card id="flow" wide title="Where do my leads go?" sub="Every new lead followed to where they are now: replied, booked, showed, won." icon={<Workflow className="size-4" />}>{flow}</Card>
         {/* 4. Do they show up, and what is the money doing? */}
-        <Card id="appointments" title="Appointments" sub="Show rate, outcomes still to mark and no-shows." icon={<CalendarCheck className="size-4" />} action={link("Open Appointments", "appointments")}>
+        <Card id="appointments" title="Appointments" sub="Show rate, outcomes still to mark and no-shows." icon={<CalendarCheck className="size-4" />} action={<button type="button" className="ap-link" onClick={() => goWith(go, { ...cardLink(t.totals.appointments.count > 0 || t.totals.noshows.count === 0 ? "unmarked" : "noshows", { count: 0 }), expect: null })}>Open Appointments</button>}>
           <p className="ap-fine">{t.totals.appointments.count > 0 ? `${t.totals.appointments.count.toLocaleString("en-US")} appointments are over with no outcome marked.` : "Every past appointment has an outcome."} {t.totals.noshows.count > 0 ? `${t.totals.noshows.count.toLocaleString("en-US")} no-shows are not rebooked.` : ""}</p>
         </Card>
         <Card id="forecast" title="What goes wrong if nothing changes" sub="The forecast: leads that will wait too long, and deals that go quiet." icon={<Banknote className="size-4" />}>{forecast}</Card>

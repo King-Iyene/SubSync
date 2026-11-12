@@ -3,6 +3,7 @@
 import { usePageRange } from "../../ds/page-range";
 import { Bookmark, Search, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { takeDeepLink } from "@/lib/design/deep-link";
 import type { PlDeal } from "@/lib/analytics/pipeline3-types-interim";
 import { ModuleTabs, Page } from "../../ds";
 import "../speed6.css";
@@ -49,6 +50,10 @@ export function PipelineModule({ moneyFlow = true, actions = false }: { moneyFlo
   const slippingOn = cash.flags?.cf_deals === true;
   const tabs = useMemo(() => TABS.filter((t) => (moneyFlow || t.key !== "flow") && (slippingOn || t.key !== "slipping")), [moneyFlow, slippingOn]);
   const [tab, setTab] = useState<TabKey>("overview");
+  // A click from the Today "Money at risk" card opens the quiet-deals section (see deep-link.ts).
+  const arrived = useRef(false);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { if (arrived.current) return; const dl = takeDeepLink("pipeline"); if (!dl) return; arrived.current = true; if (tabs.some((t) => t.key === dl.tab)) setTab(dl.tab as TabKey); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   // The dates are the date bar's (one range for the whole app). What this screen keeps is the account, pipeline, owner and search; the dates are laid over them.
   const bar = usePageRange();
   const [picks, setFilters] = useState<PlFilters>(DEFAULT_FILTERS);

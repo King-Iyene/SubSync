@@ -2,6 +2,7 @@ import { sql } from "../db";
 import { ttlCache } from "../ttl-cache";
 import { accountsCore, accountsIn, clientsCache, list as clientList, receipt as clientReceipt, type Core, type Filters, type Links } from "./clients3-queries";
 import { clampSize, STALE_DEAL_DAYS, WAIT_OLD_HOURS } from "./clients3-intel";
+import { NOSHOW_WINDOW_DAYS, UNMARKED_WINDOW_DAYS } from "../design/deep-link";
 import { changeText, DAY, headlineOf, KIND_SHORT, KIND_TEXT, localDay, MAX_ITEMS, medianOf, MIN_FIX_SAMPLES, MIN_REPLIES, planRecord, proofLines, rankItems, recentWeeks, showRate, validZone, type Prev } from "./today3-intel";
 import { countedInScope, dealScopeJoins } from "./stage-rules-sql";
 import type {
@@ -166,13 +167,14 @@ export async function today(s: Scope, one: string | null, now = Date.now()): Pro
   const ranked = rankItems(raw.map((r) => ({ ...r, ...(extra.get(r.kind) ?? {}) }))).map((it) => { const o = raw.find((r) => r.kind === it.kind)?.labelOverride; return o ? { ...it, label: o } : it; });
   const items = ranked.slice(0, MAX_ITEMS);
   const { headline, button } = headlineOf(items, cores.length);
+  const counts = await apptCounts(s.inst, ids);
   const needsPermission = cores.filter((c) => c.needsPermission.length > 0).length;
   void f;
   const scope = one ? (cores[0]?.name ?? "This client account") : cores.length === 1 ? cores[0].name : `All ${cores.length} client accounts`;
   return {
     headline: mine && mine.total > 0 && s.level === "self" ? `You have ${mine.total} ${mine.total === 1 ? "thing" : "things"} waiting on you today.` : headline,
     button: mine && mine.button && s.level === "self" ? null : button,
-    items, snoozed,
+    items, counts, snoozed,
     done: ledger.done,
     allClear: items.length === 0 && cores.length > 0 ? { fixedSinceYesterday: ledger.sinceYesterday, lastFixedAt: ledger.lastAt } : null,
     accounts: cores.length, scope, mine, needsPermission, historyStarts: hist, timezone: tz,
@@ -204,6 +206,30 @@ async function doneToday(inst: string, ids: string[], now: number): Promise<{ do
   } catch { return none; }
 }
 
+// ---- the two appointment cards: one rule, shared with Appointments (Needs outcome, No-show recovery) ----
+
+/** Past appointments nobody marked: 3 hours after the start, not showed, no-show, cancelled or invalid, from the first day of the last 90 days (UTC, like the Appointments dates), not deleted.
+ *  No-shows: the last 7 days, not booked again, not snoozed. Same conditions as appointments3-queries `base()` (unmarked, rebooked, snoozed_until), so the card and the list agree. */
+function apptFrom(inst: string, ids: string[], kind: "unmarked" | "noshows") {
+  const db = sql();
+  const cond = kind === "unmarked"
+    ? db`a.status not in ('showed', 'noshow', 'cancelled', 'invalid') and a.start_at < now() - interval '3 hours' and a.start_at >= (date_trunc('day', now() at time zone 'UTC') - ${`${UNMARKED_WINDOW_DAYS} days`}::interval) at time zone 'UTC'`
+    : db`a.status = 'noshow' and a.start_at >= now() - ${`${NOSHOW_WINDOW_DAYS} days`}::interval and a.start_at < now() and (fa.snoozed_until is null or fa.snoozed_until < now())
+        and not exists (select 1 from cached_appointments b where b.installation_id = a.installation_id and b.location_id = a.location_id and b.contact_id = a.contact_id and a.contact_id is not null and b.start_at > a.start_at and b.appointment_id <> a.appointment_id and b.status not in ('cancelled', 'invalid'))`;
+  return db`from cached_appointments a left join appointment_facts fa on fa.installation_id = a.installation_id and fa.location_id = a.location_id and fa.appointment_id = a.appointment_id
+    left join cached_contacts c on c.installation_id = a.installation_id and c.location_id = a.location_id and c.contact_id = a.contact_id and a.contact_id is not null
+    where a.installation_id = ${inst} and a.location_id = any(${ids}::text[]) and fa.deleted_at is null and ${cond}`;
+}
+async function apptCounts(inst: string, ids: string[]): Promise<{ unmarked: number; noshows: number }> {
+  if (!ids.length) return { unmarked: 0, noshows: 0 };
+  const db = sql();
+  const [u, ns] = await Promise.all([
+    db`select count(*)::int c ${apptFrom(inst, ids, "unmarked")}`.catch(() => [{ c: 0 }]),
+    db`select count(*)::int c ${apptFrom(inst, ids, "noshows")}`.catch(() => [{ c: 0 }]),
+  ]);
+  return { unmarked: n(u[0]?.c), noshows: n(ns[0]?.c) };
+}
+
 // ---- the rows behind a count ----
 
 const pageOf = <T,>(rows: T[], total: number, page: number, size: number) => ({ rows, total, page, size, pages: Math.max(1, Math.ceil(total / size)), truncated: total > 500 * size });
@@ -229,6 +255,12 @@ export async function listRows(s: Scope, one: string | null, kind: Td3ListKind, 
       : kind === "mine_unmarked" ? await db`select a.location_id, a.contact_id, c.full_name contact_name, a.start_at at, a.calendar_name det ${base} order by a.start_at desc, a.appointment_id limit ${size} offset ${off}`
       : await db`select o.location_id, o.contact_id, coalesce(o.contact_name, o.name) contact_name, o.stage_name det, o.monetary_value::float8 v, coalesce(o.last_stage_change_at, o.created_remote_at) at ${base} order by v desc nulls last, o.opportunity_id limit ${size} offset ${off}`;
     return { ...pageOf(rows.map((r) => row(r, kind === "mine_waiting" ? `Waiting ${Math.max(0, Math.round((now - new Date(r.at as Date).getTime()) / 3_600_000))} hours` : ((r.det as string | null) ?? null), r.at, kind === "mine_stale" ? n(r.v) : null)), total, page, size), kind, label: kind === "mine_waiting" ? "Waiting on you" : kind === "mine_unmarked" ? "Your appointments with no outcome" : "Your quiet deals" };
+  }
+  if (kind === "all_unmarked" || kind === "open_noshows") {
+    const k = kind === "all_unmarked" ? "unmarked" : "noshows", base = apptFrom(s.inst, ids, k);
+    const total = n((await db`select count(*)::int c ${base}`)[0]?.c);
+    const rows = await db`select a.location_id, a.contact_id, c.full_name contact_name, a.start_at, a.calendar_name ${base} order by a.start_at desc, a.appointment_id limit ${size} offset ${off}`;
+    return { ...pageOf(rows.map((r) => row(r, (r.calendar_name as string | null) ?? null, r.start_at)), total, page, size), kind, label: k === "unmarked" ? "Appointments with no outcome marked" : "No-shows not booked again" };
   }
   if (kind === "open_deals") {
     const base = db`from cached_opportunities o ${dealScopeJoins()} where o.installation_id = ${s.inst} and o.location_id = any(${ids}::text[]) and o.status = 'open' and ${countedInScope()} and coalesce(o.monetary_value, 0) > 0 and o.assigned_to is not null`;
