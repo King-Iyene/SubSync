@@ -131,7 +131,7 @@ function RowView({ r, sel, setSel, onOpen, go }: { r: Cl2Row; sel: Record<string
       <td><LevelDot level={r.level} />{r.summary && <><br /><span className="ap-fine">{r.summary}</span></>}</td>
       <td>{r.lastActivityAt ? agoText(r.lastActivityAt) : <span className="ap-fine">None seen</span>}{r.quiet && <><br /><span className="ap-fine">Quiet</span></>}</td>
       <td>{r.manager ?? <span className="ap-fine">Nobody yet</span>}{r.people > 0 && <><br /><button type="button" className="ap-link ap-fine" onClick={() => go(r.locationId)}>{r.people} {r.people === 1 ? "person" : "people"}{r.peopleQuiet ? `, ${r.peopleQuiet} quiet` : ""}</button></>}</td>
-      <td className="text-right"><span className="inline-flex items-center gap-2"><button type="button" className="s6-btn" data-kind="primary" onClick={() => onOpen(r.locationId)}>Open</button>{r.url && <a href={r.url} target="_blank" rel="noopener noreferrer" className="ap-link" aria-label={`Open ${r.name} in your CRM (new tab)`} title="Open in your CRM"><ExternalLink aria-hidden className="size-3.5" /></a>}</span></td>
+      <td className="text-right"><span className="inline-flex items-center gap-2"><button type="button" className="s6-btn" data-kind="primary" onClick={() => onOpen(r.locationId)}>Open</button>{r.url && <a href={r.url} target="_blank" rel="noopener noreferrer" className="ap-link inline-flex size-11 items-center justify-center sm:size-auto" aria-label={`Open ${r.name} in your CRM (new tab)`} title="Open in your CRM"><ExternalLink aria-hidden className="size-3.5" /></a>}</span></td>
     </tr>
   );
 }
