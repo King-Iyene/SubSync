@@ -399,7 +399,7 @@ export function Dashboard() {
       case "today": return <ApiProvider value={baseApi}>{tdOn ? <TodayModule key="td3" go={go} kind={auth.kind} /> : <TodayView go={go} kind={auth.kind} />}</ApiProvider>;
       // "My day" is Today now (one page, one menu item). The old address still opens it.
       case "myday": return <ApiProvider value={baseApi}>{tdOn ? <TodayModule key="td3" go={go} kind={auth.kind} /> : <TodayView go={go} kind={auth.kind} />}</ApiProvider>;
-      case "people": case "search": case "leads": case "calls": return peopleOn ? <PeopleModule key={"people" + peopleStart} start={peopleStart} callsAllowed={callsAllowed} /> : <Centered title="Not available" body="This page is switched off right now." />;
+      case "people": case "search": case "leads": case "calls": return peopleOn ? <PeopleModule key={"people" + peopleStart} start={peopleStart} callsAllowed={callsAllowed} find={auth.features.fl_find === true && !auth.locked.includes("fl_find")} bulk={auth.features.fl_bulk === true && !auth.locked.includes("fl_bulk")} /> : <Centered title="Not available" body="This page is switched off right now." />;
       case "audit": return <AuditView />;
       // Speed to lead holds the Unanswered tab (when messages and speed are both on); `#speed?tab=unanswered` and the old #inbox open it first.
       case "speed": return <SpeedView go={go} unanswered={inboxTab} start={speedStart()} />;

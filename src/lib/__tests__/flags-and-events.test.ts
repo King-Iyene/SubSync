@@ -61,6 +61,8 @@ test("pilot modules are on by default and a database row can still override the 
     "cl_setup",
     "cl_trends",
     "cl_workflows",
+    "fl_bulk",
+    "fl_find",
     "inbox_assign",
     "inbox_ball_in_court",
     "inbox_breach_alert",

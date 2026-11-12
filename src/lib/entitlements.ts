@@ -171,6 +171,8 @@ export const FEATURES = [
   "td_email",
   "td_record",
   "ov_screen",
+  "fl_find",
+  "fl_bulk",
   // Payments module (docs/features/PAYMENTS_BRIEF.md): each behind its own flag, default off. pm_resend messages a customer and stays off until King approves it.
   "pm_module",
   "pm_recovery",

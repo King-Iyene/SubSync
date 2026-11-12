@@ -61,6 +61,14 @@ jobs:
         run: node --import tsx scripts/migrate.ts
       - name: Applying again must change nothing
         run: node --import tsx scripts/migrate.ts | tee /tmp/second.txt && grep -q " 0 to apply" /tmp/second.txt
+      - name: Find a lead at 1,000,000 contacts (throwaway schema on this CI database; every search and page must answer in under 1 second)
+        env:
+          FIND_SCALE_DB: "1"
+          FIND_ROWS: "1000000"
+          DATABASE_URL: postgresql://postgres:ci@localhost:5432/postgres
+          DATABASE_SSL: "off"
+          DB_POOL_MAX: "1"
+        run: npx vitest run tests/unit/find-lead-scale-db.test.ts --disableConsoleIntercept
       - name: Generate the framework types (a clean checkout does not have them)
         run: npx next typegen
       - run: npx tsc --noEmit

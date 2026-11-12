@@ -12,6 +12,7 @@ import { personKey } from "../people/queue";
 import type { deepLinks } from "../links";
 import { json, type AuthContext } from "./auth";
 import { handlePeopleQueue } from "./people-queue-routes";
+import { handlePeopleFind } from "./people-find-routes";
 import { crmFind } from "../live/live-route";
 
 // The People module's endpoints, under /api/app/people/... (the one catch-all route, already guarded). Every handler derives who is asking from the verified
@@ -64,6 +65,10 @@ async function route(ctx: Ctx, h: PeopleHelpers): Promise<Response> {
   // The call lists, the lead panel (headline, timeline, what changed) and recent searches have their own file.
   const queued = await handlePeopleQueue(ctx, { allowed: h.allowed, links: h.links, voter: h.voter, settings: h.settings });
   if (queued) return queued;
+
+  // Find a lead: the keyset page, the export and the bulk tag or note (their own file; each is behind its own flag).
+  const finding = await handlePeopleFind(ctx, { allowed: h.allowed, links: h.links, voter: h.voter, coldChoice: h.coldChoice });
+  if (finding) return finding;
 
   if (m === "GET" && b === "options") {
     const allowed = await h.allowed();

@@ -8,10 +8,11 @@ import { listText } from "@/lib/people/rows";
 import type { PersonRowOut } from "@/lib/people/types";
 import { DialerSetting, DialNote, ErrorState, LeadDrawer, SkeletonRows, useContactActions } from "../ds";
 import { remember, remembered, takeHandOff } from "../ds/remember";
-import { useApiClient, useData } from "../session";
+import { ApiError, useApiClient, useData } from "../session";
 import { Btn, fmtInt, inputClass } from "../ui";
 import { FilterBuilder, ManageLists, SaveList, useSavedLists, type Options } from "./people-filters";
 import { PersonRows, toSeed } from "./people-rows";
+import { BulkBar, useFound } from "./find-more";
 
 // People, the first tab: find a person, or work the call lists. One search box at the top (name, phone or email, across every client account the person may see), then ONE sentence
 // about who needs a call and ONE button to start, then the five ready-made lists (each is the list another page already uses) as plain tabs, then the list. Saved filters sit beside
@@ -42,7 +43,8 @@ function Pager({ page, pages, from, to, total, capped, onPage }: { page: number;
   );
 }
 
-export function FindTab() {
+/** `plus`: the Find a lead search (typed pickers, Load more that keeps its place, the Open button on every row). `bulk`: tick boxes, add a tag or a note to several people, export. Both are switched on per account. */
+export function FindTab({ plus = false, bulk = false }: { plus?: boolean; bulk?: boolean }) {
   const api = useApiClient();
   const actions = useContactActions();
   const opts = useData<Options>("people/options");
@@ -72,7 +74,15 @@ export function FindTab() {
   const [sp, setSp] = useState({ fk, n: 1 });
   const searchNo = sp.fk === fk ? sp.n : 1;
   const searchPath = searching ? `people/search?${(() => { const p = filterToParams(effective); p.set("page", String(searchNo)); return p.toString(); })()}` : null;
-  const results = useData<SearchPage>(searchPath);
+  const plain = useData<SearchPage>(plus ? null : searchPath);
+  const fnd = useFound(plus && searching ? effective : null);
+  const results = plus
+    ? { data: fnd.key ? ({ total: fnd.total ?? fnd.rows.length, capped: fnd.capped, page: 1, pageSize: Math.max(1, fnd.rows.length), rows: fnd.rows } as SearchPage) : null, loading: fnd.loading, error: fnd.error ? new ApiError(0, { error: fnd.error }) : null, reload: fnd.reload }
+    : plain;
+  // Ticked people belong to the search they were ticked in: a new search starts with nobody ticked.
+  const [tick, setTick] = useState<{ fk: string; ids: ReadonlySet<string> }>({ fk, ids: new Set() });
+  const ticked = tick.fk === fk ? tick.ids : new Set<string>();
+  const toggle = (id: string) => { const n = new Set(ticked); if (n.has(id)) n.delete(id); else n.add(id); setTick({ fk, ids: n }); };
 
   // ---- the call lists ----
   const [picked, setPicked] = useState<{ list: ListId; mine: boolean | null } | null>(null);
@@ -114,7 +124,7 @@ export function FindTab() {
           {typed && <button type="button" aria-label="Clear the search" onClick={() => { setTyped(""); setDebounced(""); }} className="absolute right-1 top-1/2 inline-flex size-11 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground hover:text-foreground"><X aria-hidden className="size-4" /></button>}
         </div>
         <p className="mt-1.5 text-xs text-muted-foreground">
-          {term.ok || typed.trim().length === 0 ? (showAccount ? "Across every client account. Part of a name or email, or the last digits of a phone, is enough." : "Part of a name or email, or the last digits of a phone, is enough.") : "Type at least two letters, or three digits of a phone number."}
+          {term.ok || typed.trim().length === 0 ? (showAccount ? "Across every client account. The start of a name or email, or the last digits of a phone, is enough." : "The start of a name or email, or the last digits of a phone, is enough.") : "Type at least two letters, or three digits of a phone number."}
         </p>
         {!searching && (recent.data?.queries.length ?? 0) > 0 && (
           <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm" data-testid="recent-searches">
@@ -128,7 +138,7 @@ export function FindTab() {
         </div>
         {filtersOpen && (
           <div className="mt-2 space-y-3 border-t pt-3">
-            <FilterBuilder key={version} opts={opts.data} value={filter} onChange={setFilter} onClear={() => replaceFilter({})} />
+            <FilterBuilder key={version} opts={opts.data} value={filter} onChange={setFilter} onClear={() => replaceFilter({})} plus={plus} />
           </div>
         )}
       </div>
@@ -145,9 +155,15 @@ export function FindTab() {
                 </div>
                 <button type="button" onClick={() => { void navigator.clipboard?.writeText(listText(results.data!.rows, showAccount)).catch(() => undefined); }} className={QUIET}>Copy this page</button>
               </div>
-              <PersonRows rows={results.data.rows} showAccount={showAccount} actions={actions} onOpen={(i) => openFrom("search", i)} testId="people-list"
+              {bulk && <BulkBar picked={results.data.rows.filter((r) => ticked.has(r.rowId))} filter={effective} canExport owners={opts.data?.owners ?? []} canOwner onClear={() => setTick({ fk, ids: new Set() })} onDone={() => { setTick({ fk, ids: new Set() }); fnd.reload(); }} />}
+              <PersonRows rows={results.data.rows} showAccount={showAccount} actions={actions} onOpen={(i) => openFrom("search", i)} testId="people-list" plus={plus} select={bulk ? { picked: ticked, toggle } : undefined}
                 empty="Nobody matches. Check the spelling, try part of the email or the last digits of the phone number, or clear a filter." />
-              <Pager page={results.data.page} pages={Math.ceil(results.data.total / results.data.pageSize)} from={(results.data.page - 1) * results.data.pageSize + 1} to={Math.min(results.data.total, results.data.page * results.data.pageSize)} total={results.data.total} capped={results.data.capped} onPage={(n) => setSp({ fk, n })} />
+              {plus ? (
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground" data-testid="people-more">
+                  <span>Showing {fmtInt(results.data.rows.length)} of {countWords(results.data.total, results.data.capped)}</span>
+                  {fnd.next && <Btn variant="secondary" onClick={fnd.more} disabled={fnd.busy} testId="load-more">{fnd.busy ? "Loading..." : "Load more"}</Btn>}
+                </div>
+              ) : <Pager page={results.data.page} pages={Math.ceil(results.data.total / results.data.pageSize)} from={(results.data.page - 1) * results.data.pageSize + 1} to={Math.min(results.data.total, results.data.page * results.data.pageSize)} total={results.data.total} capped={results.data.capped} onPage={(n) => setSp({ fk, n })} />}
               {results.data.total > 0 && !isEmptyFilter(filter) && (
                 <div className="mt-4 border-t pt-3"><SaveList filter={effective} canShare={opts.data?.canShareLists ?? false} onSaved={() => void saved.reload()} /></div>
               )}
@@ -199,7 +215,7 @@ export function FindTab() {
 
                 {!first && queue.loading && !queue.data ? <SkeletonRows rows={5} label="Loading this list..." /> : !first && queue.error ? <ErrorState error={queue.error} onRetry={queue.reload} /> : page ? (
                   <>
-                    <PersonRows rows={page.rows} showAccount={showAccount} actions={actions} onOpen={(i) => setOpen({ src: "list", i })} testId="people-rows"
+                    <PersonRows rows={page.rows} showAccount={showAccount} actions={actions} onOpen={(i) => setOpen({ src: "list", i })} testId="people-rows" plus={plus}
                       empty={mine ? "Nobody assigned to you is on this list. Choose Everyone to see the rest." : "Nobody is on this list right now. That is good news."} />
                     <Pager page={page.page} pages={page.pages} from={page.from} to={page.to} total={page.total} capped={page.capped} onPage={setPageNo} />
                     {page.withoutContact > 0 && <p className="mt-2 text-xs text-muted-foreground" data-testid="no-contact-note">{page.withoutContact} {list === "stale" ? (page.withoutContact === 1 ? "deal has" : "deals have") : (page.withoutContact === 1 ? "booking has" : "bookings have")} no contact attached, so there is nobody to call. They are not listed.</p>}
