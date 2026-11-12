@@ -110,6 +110,7 @@ import { can, personFromSession } from "../connections/person";
 import { handlePeople, timeoutResponse } from "./people-routes";
 import { handleDuplicates } from "./duplicates-routes";
 import { handleCu } from "./cu-routes";
+import { handleDq } from "./dq-routes";
 import { handleWorkbench } from "./workbench-routes";
 import { handleDial } from "./dial-routes";
 import { handleBoard } from "./pipeline-board-routes";
@@ -127,6 +128,7 @@ import { handleAppointments3 } from "./appointments3-routes";
 import { handleApptExec, handleApptExecTarget } from "./appointments-exec-routes";
 import { handlePipeline3 } from "./pipeline3-routes";
 import { handleClients3 } from "./clients3-routes";
+import { handleProof } from "./proof-routes";
 import { handleClients2 } from "./clients2-routes";
 import { handlePeople3 } from "./people3-routes";
 import { handleTeamRoles } from "./team-roles-routes";
@@ -2066,6 +2068,8 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
     if (a === "pipeline3" && method === "GET" && !b && ctx.url.searchParams.has("part")) {
       return await handlePipeline3(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links });
     }
+    // Branded client Proof page and monthly report (stage PR): reports per client account, the secret client link, settings. Agency staff only; flags pr_* checked inside.
+    if (a === "proof") return await handleProof(ctx, { allowed: () => allowedIds(ctx), settings: async () => (await scope(ctx)).settings });
     // Clients round 3: /api/app/clients3?part=... (overview, needs attention, trends, compare, receipt, people, setup, lists; read only).
     if (a === "clients3" && method === "GET" && !b && ctx.url.searchParams.has("part")) {
       return await handleClients3(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links });
@@ -2130,6 +2134,11 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
     // Clean-up fix lists, Health and bulk runs (stage CU): flags cu_fix, cu_health, cu_bulk, checked inside the handler.
     if (a === "cu") {
       const r = await handleCu(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links, locationToken: (locationId) => locationAccessToken(ctx.session.companyId, locationId), actor: actorOf });
+      if (r) return r;
+    }
+    // Clean-up v2 (stage DQ): duplicate groups, lead intake, quality score and history. Flags dq_*, checked inside the handler.
+    if (a === "dq") {
+      const r = await handleDq(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links, locationToken: (locationId) => locationAccessToken(ctx.session.companyId, locationId), actor: actorOf });
       if (r) return r;
     }
     // Clean-up v2: rules, data quality, import check, the per-account switch for changing contacts. Anything else under cleanup falls through to the run endpoints below.

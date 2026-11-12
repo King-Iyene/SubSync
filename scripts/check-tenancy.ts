@@ -92,6 +92,9 @@ async function main() {
       // Clean-up fix lists, Health and bulk runs (stage CU), aimed at the other side's accounts by every parameter they take.
       "/api/app/cu/options", "/api/app/cu/home", `/api/app/cu/home?account=${other.locs[0]}`, "/api/app/cu/accounts", `/api/app/cu/accounts?q=${other.marker}`, "/api/app/cu/actions",
       "/api/app/cu/list?kind=junk", `/api/app/cu/list?kind=no_phone&account=${other.locs[0]}`, `/api/app/cu/list?kind=orphan_deals&account=${other.locs[0]}`, `/api/app/cu/csv?kind=no_owner&account=${other.locs[0]}`,
+      // Clean-up v2 (stage DQ): reads with another account's id, and a cursor, must come back empty or not found.
+      "/api/app/dq/options", "/api/app/dq/overview", `/api/app/dq/overview?account=${other.locs[0]}`, "/api/app/dq/dupes?tier=certain", `/api/app/dq/dupes?tier=likely&account=${other.locs[0]}`, `/api/app/dq/dupe?account=${other.locs[0]}&ids=${other.contacts[0]},${other.contacts[0]}dup`,
+      "/api/app/dq/intake?range=30", `/api/app/dq/intake?range=30&account=${other.locs[0]}`, `/api/app/dq/intake-source?src=website%20form&account=${other.locs[0]}`, `/api/app/dq/leads?flag=all&account=${other.locs[0]}`, "/api/app/dq/leads?flag=dup&src=website%20form", "/api/app/dq/accounts", "/api/app/dq/events",
       "/api/app/cleanup/rules", `/api/app/cleanup/rules?account=${other.locs[0]}`, `/api/app/cleanup/rules/preview?account=${other.locs[0]}&preset=loose`, "/api/app/duplicates/history", `/api/app/duplicates/history?location=${other.locs[0]}`, "/api/app/duplicates/rules",
       // Speed to lead (stage SPEED): the first screen, the list behind a number and the comparisons, the other side's account asked for by every parameter they take.
       "/api/app/speed?part=home", `/api/app/speed?part=list&status=all&account=${other.locs[0]}`, `/api/app/speed?part=list&status=waiting&account=${other.locs.join(",")}`, `/api/app/speed?part=list&status=all&person=${other.marker}`, "/api/app/speed?part=compare&by=account", "/api/app/speed?part=compare&by=person",
@@ -323,6 +326,9 @@ async function main() {
       ["POST", "/api/app/cleanup/quality/scan", { locationId: B.locs[0] }],
       ["POST", "/api/app/duplicates/merge-workflow", { locationId: B.locs[0], contactIds: [B.contacts[0], B.contacts[0] + "dup"], keepContactId: B.contacts[0], confirm: true }],
       ["POST", "/api/app/duplicates/undo-snooze", { locationId: B.locs[0], key: "00000000-2" }],
+      ["POST", "/api/app/dq/decide", { locationId: B.locs[0], contactIds: [B.contacts[0], B.contacts[0] + "dup"], decision: "not_duplicate" }],
+      ["POST", "/api/app/dq/delete", { step: "do", locationId: B.locs[0], contactIds: [B.contacts[0], B.contacts[0] + "dup"], keepContactId: B.contacts[0], typed: "delete 1 contact" }],
+      ["POST", "/api/app/dq/mute", { account: B.locs[0], src: "website form", on: true }],
       // People: marking the other agency's person as opened, and logging a call on the other agency's person.
       ["PUT", "/api/app/people/seen", { locationId: B.locs[0], contactId: B.contacts[0] }],
       ["POST", "/api/app/people/outcome", { locationId: B.locs[0], contactId: B.contacts[0], outcome: "answered" }],
@@ -431,6 +437,62 @@ async function main() {
       // The refusal lasts for the rest of the minute, for every later lookup from this address. Wait it out so the checks after this one see real pages.
       await new Promise((r) => setTimeout(r, 61_000));
       await call("/api/app/audit/revoke", tokenA, { method: "POST", body: JSON.stringify({ id: idC }) });
+    }
+
+    // The branded client Proof page (stage PR): each company prepares and shares a report only for its own accounts; the public page is opened by the token alone, shows that one account and nothing of
+    // the other company, never names the product or the platform, and a forged, malformed, replaced or switched-off token finds nothing.
+    {
+      const d = new Date();
+      const month = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - 1, 1)).toISOString().slice(0, 7);
+      const tok = (side: Side) => session(side, "agency", undefined, true);
+      const [tA, tB] = [tok(A), tok(B)];
+      const post = (t: string, p: string, body: unknown, method = "POST") => call(`/api/app/proof/${p}`, t, { method, body: JSON.stringify(body) });
+      const listA = JSON.parse((await call(`/api/app/proof?part=list&period=${month}&size=50`, tA)).text);
+      assert.deepEqual(listA.rows.map((r: { locationId: string }) => r.locationId).sort(), [...A.locs].sort(), "the list holds only this company's accounts");
+      assert.ok(!JSON.stringify(listA).includes(B.marker), "and none of the other company's names");
+      assert.equal(listA.total, listA.rows.length, "the count equals the rows");
+      for (const [m, p, body] of [["POST", "prepare", { locationId: B.locs[0], month }], ["POST", "share", { locationId: B.locs[0], month }], ["POST", "unshare", { locationId: B.locs[0], month }], ["PUT", "report", { locationId: B.locs[0], month, intro: "x" }], ["POST", "link", { locationId: B.locs[0], month, action: "revoke", confirm: B.marker + " Location 1" }]] as const) {
+        const r = await post(tA, p, body, m);
+        assert.equal(r.status, 404, `proof/${p} on the other company's account is refused`);
+        assert.ok(!r.text.includes(B.locs[0]), "and never echoes its id");
+      }
+      assert.equal((await call(`/api/app/proof?part=report&account=${B.locs[0]}&period=${month}`, tA)).status, 404, "the other company's report cannot be read");
+      assert.equal((await call(`/api/app/proof?part=list&period=${month}`, session(A, "client", A.locs[0]))).status, 403, "an account user cannot reach it");
+      assert.equal((await post(session(A, "business", A.locs[0]), "prepare", { locationId: A.locs[0], month })).status, 403, "nor can a business session write");
+      assert.equal((await post(tA, "prepare", { locationId: A.locs[0], month })).status, 200);
+      assert.equal((await post(tB, "prepare", { locationId: B.locs[0], month })).status, 200);
+      const shA = await post(tA, "share", { locationId: A.locs[0], month }), shB = await post(tB, "share", { locationId: B.locs[0], month });
+      assert.equal(shA.status, 200, shA.text.slice(0, 200));
+      const urlOf = (r: { text: string }) => (JSON.parse(r.text).url as string).split("/proof/")[1];
+      const [idA, idB] = [urlOf(shA), urlOf(shB)];
+      assert.match(idA, /^[A-Za-z0-9_-]{43}$/, "the token is long and random");
+      const pageA = await fetch(`${BASE}/proof/${idA}`), htmlA = await pageA.text();
+      assert.equal(pageA.status, 200);
+      assert.ok(htmlA.includes(`${A.marker} Location 1`), "the page shows this client account");
+      assert.ok(!htmlA.includes(B.marker) && !htmlA.includes(A.contacts[0]) && !htmlA.includes(`${A.marker} Person`), "and no other company's data and no contact name");
+      assert.ok(!/subsync|gohighlevel|highlevel|leadconnector|sub-?account/i.test(htmlA.replace(/<style[\s\S]*?<\/style>/g, "").replace(/<script[\s\S]*?<\/script>/g, "")), "no product or platform name is on the page");
+      assert.match(htmlA, /noindex/, "never indexed");
+      const htmlB = await (await fetch(`${BASE}/proof/${idB}`)).text();
+      assert.ok(htmlB.includes(`${B.marker} Location 1`) && !htmlB.includes(A.marker), "the other company's token shows only that company's account");
+      let refBody = "";
+      for (const bad of ["A".repeat(43), idA.slice(0, -1) + (idA.endsWith("A") ? "B" : "A"), "short", idA + "x", "%27%20or%201%3D1--"]) {
+        const r = await fetch(`${BASE}/proof/${bad}`);
+        assert.equal(r.status, 404, "a forged or malformed token finds nothing");
+        const bodyText = await r.text();
+        assert.ok(!bodyText.includes(A.marker) && !bodyText.includes(bad.slice(0, 8)), "and the answer never repeats the address");
+        if (!refBody) refBody = bodyText;
+        assert.equal(bodyText, refBody, "every bad link gets the same page");
+      }
+      const wrong = await post(tA, "link", { locationId: A.locs[0], month, action: "regenerate", confirm: "wrong" });
+      assert.equal(wrong.status, 400, "replacing needs the typed account name");
+      const re = await post(tA, "link", { locationId: A.locs[0], month, action: "regenerate", confirm: `${A.marker} Location 1` });
+      assert.equal(re.status, 200);
+      assert.equal((await fetch(`${BASE}/proof/${idA}`)).status, 404, "the replaced link no longer works");
+      const idA2 = urlOf(re);
+      assert.equal((await fetch(`${BASE}/proof/${idA2}`)).status, 200);
+      assert.equal((await post(tA, "link", { locationId: A.locs[0], month, action: "revoke", confirm: `${A.marker} Location 1` })).status, 200);
+      assert.equal((await fetch(`${BASE}/proof/${idA2}`)).status, 404, "a switched-off link shows nothing");
+      assert.equal((await fetch(`${BASE}/proof/${idB}`)).status, 200, "and the other company's link is untouched");
     }
 
     // Client access is enforced on the server: switched off, a client's own session is refused at once; switched on, it works; and it
@@ -602,7 +664,7 @@ async function main() {
       assert.equal((await countsOf(B)).contacts, 0);
     }
 
-    console.log(`tenant isolation: two agencies, ${sweeps} cross-reads as agency, business, client and forged sessions, attacks refused, account user read-only, client secrets never sent, client access off at once, Delete my data owner-only and audited, share link and webhook safe, nothing changed: ok`);
+    console.log(`tenant isolation: two agencies, ${sweeps} cross-reads as agency, business, client and forged sessions, attacks refused, account user read-only, client secrets never sent, client access off at once, Delete my data owner-only and audited, share link, client report page and webhook safe, nothing changed: ok`);
   } finally {
     await sql()`delete from installations where company_id in ('xtest-agency-a', 'xtest-agency-b')`;
     await closeDb();

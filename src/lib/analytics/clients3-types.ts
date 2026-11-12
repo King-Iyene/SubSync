@@ -122,7 +122,7 @@ export type Cl3BillingList = Page<Cl3Billing> & { needPermission: number; notAct
 // ---- Clients v3: money control center (parts money, money-history). Real synced data only; what the platform cannot give is null and the screen says "Not available from the platform yet". ----
 export const CL3_BUCKETS = ["all", "unpaid", "failing", "no_plan", "paid", "empty_wallet", "app_missing"] as const;
 export type Cl3Bucket = (typeof CL3_BUCKETS)[number];
-export const CL3_MONEY_FLAGS = ["cl3_money", "cl3_apps", "cl3_history"] as const;
+export const CL3_MONEY_FLAGS = ["cl3_money", "cl3_apps", "cl3_history", "pr_report", "pr_page", "pr_auto"] as const;
 
 export type Cl3MoneyRow = {
   locationId: string; name: string; email: string | null;
