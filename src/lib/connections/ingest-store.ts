@@ -76,6 +76,10 @@ export function pgIngestStore(): IngestStore {
     async updateMeeting(id, status, reason, expiresAt) {
       await sql()`update meetings set status = ${status}, reason = ${reason}, expires_at = ${expiresAt === undefined ? sql()`expires_at` : expiresAt === null ? null : new Date(expiresAt)} where id = ${id}`;
     },
+    async noteDetails(id, d) {
+      // Best effort and additive: until the update with these columns is applied this simply keeps nothing.
+      await sql()`update meetings set duration_minutes = coalesce(${d.durationMinutes}::int, duration_minutes), talk_pct = coalesce(${d.talkPct}::smallint, talk_pct), matched_location_id = coalesce(${d.matched?.locationId ?? null}, matched_location_id), matched_contact_id = coalesce(${d.matched?.contactId ?? null}, matched_contact_id), matched_at = coalesce(${d.matched ? new Date() : null}::timestamptz, matched_at) where id = ${id}`.catch(() => undefined);
+    },
     async ignoredEmails(installationId, userId) {
       const rows = await sql()`select email from meeting_ignored_emails where installation_id = ${installationId} and ghl_user_id = ${userId}`;
       return rows.map((r) => r.email as string);

@@ -282,6 +282,7 @@ export const INVENTORY: Record<string, TableInfo> = {
   dq_mutes: { noun: "the lead sources you muted alerts for", line: "yours" },
   dh_outcomes: { noun: "each data health alert, when it was raised and when and how it ended, to measure how fast problems are fixed", line: "records", personal: { resolved_by: "who resolved an alert" }, notPersonal: ["title", "how", "dedupe_key"] },
   workflow_daily: { noun: "daily counts of workflows and failures", line: "records" },
+  mn_tasks: { noun: "a record of each task SubSync made in your CRM from a call's action items (ids and a status only, never the words)", line: "records" },
   mn_outcomes: { noun: "a daily record per client account of how many calls were held, logged within a day, got a next step and were followed by a booking or a deal move (counts only, never who or what was said)", line: "records" },
   wf_outcome_daily: { noun: "a daily record per client account of how many new leads had no first touch, missed calls had no text back, no-shows had no follow up and bookings had no reminder (counts only, never who)", line: "records" },
   workflow_labels: { noun: "the labels, ratings and notes you give your workflows", line: "yours", personal: { labels: "labels you give a workflow", group_name: "group names you type", note: "notes you write about a workflow", owner: "who you set as the owner of a workflow", updated_by: "who last changed a label" }, notPersonal: ["decision", "rating"] },
