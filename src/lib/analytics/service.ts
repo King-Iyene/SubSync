@@ -4,6 +4,8 @@ import { postToSlack } from "../notify";
 import { emailConfigured, unsubscribeHeaders, type Mail } from "../email";
 import { unsubscribeUrl } from "../unsubscribe";
 
+import { assemble, judge, settingsKey } from "./account-rollup";
+import { readRollup, writeRollup } from "./account-rollup-db";
 import { localParts } from "./digest-intel";
 import { alertEmail, alertsToSendNow } from "./weekly-email";
 import { currentVersion } from "./definitions";
@@ -15,20 +17,43 @@ import {
 // Round 5: every screen starts with this read (all accounts and their numbers, 0.2 to 20 s on a busy database). It is shared between screens that ask at the same moment and an answer up to
 // 90 s old is shown at once while a fresh one loads (any change made through SubSync forgets it first; see read-cache.ts).
 export async function loadAccounts(installationId: string): Promise<{ settings: Settings; accounts: DerivedAccount[] }> {
-  return cachedSwr(installationId, "accounts", () => loadAccountsNow(installationId));
+  return cachedSwr(installationId, "accounts", () => loadAccountsFast(installationId));
 }
 
+// Round 6: screens read the stored per-account numbers (one lookup, see account-rollup.ts). When they are missing, made under other rules, marked changed or too old, this runs the live
+// query (which stores its answer for the next reader). A slightly old stored answer is shown at once while a new one is made in the background. The rollup can never make this fail.
+const refreshing = new Set<string>();
+export async function loadAccountsFast(installationId: string): Promise<{ settings: Settings; accounts: DerivedAccount[] }> {
+  const settings = await getSettings(installationId);
+  const stored = await readRollup(installationId).catch(() => null);
+  if (stored) {
+    const verdict = judge(stored.stored, stored.locationCount, settingsKey(settings), Date.now());
+    if (verdict !== "unusable") {
+      if (verdict === "stale" && !refreshing.has(installationId)) {
+        refreshing.add(installationId);
+        void loadAccountsNow(installationId).catch(() => undefined).finally(() => refreshing.delete(installationId));
+      }
+      const a = assemble(stored.stored);
+      return { settings, accounts: derive(a.rows, a.history, settings) };
+    }
+  }
+  return loadAccountsNow(installationId);
+}
+
+function derive(rows: Awaited<ReturnType<typeof accountRows>>, history: Awaited<ReturnType<typeof scoreHistory>>, settings: Settings): DerivedAccount[] {
+  const now = Date.now();
+  return rows.map((r) => {
+    const h = history.get(r.locationId);
+    return deriveAccount(r, settings, h?.scores ?? [], now, h?.newContacts ?? []);
+  });
+}
+
+/** The live query: always right, used by sync, digests and as the fallback. Stores what it found. */
 export async function loadAccountsNow(installationId: string): Promise<{ settings: Settings; accounts: DerivedAccount[] }> {
   const settings = await getSettings(installationId);
   const [rows, history] = await Promise.all([accountRows(installationId, settings), scoreHistory(installationId, 30)]);
-  const now = Date.now();
-  return {
-    settings,
-    accounts: rows.map((r) => {
-      const h = history.get(r.locationId);
-      return deriveAccount(r, settings, h?.scores ?? [], now, h?.newContacts ?? []);
-    }),
-  };
+  void writeRollup(installationId, settings, rows, history).catch(() => undefined);
+  return { settings, accounts: derive(rows, history, settings) };
 }
 
 // Write today's snapshot for every account (feeds trends and churn detection).

@@ -80,9 +80,9 @@ export function EmptyGuideLink() {
 }
 
 /** One menu entry: left out when the person hid that page, and a click anywhere on it dismisses its "New" badge. Takes no space of its own. */
-export function StNavEntry({ id, children }: { id: string; children: ReactNode }) {
+export function StNavEntry({ id, children, onWarm }: { id: string; children: ReactNode; onWarm?: (id: string) => void }) {
   const { hidden } = useStState();
   const dismiss = useDismissNew();
   if (hidden.has(id)) return null;
-  return <div className="contents" onClickCapture={() => dismiss(id)}>{children}</div>;
+  return <div className="contents" onClickCapture={() => dismiss(id)} onPointerOver={onWarm ? () => onWarm(id) : undefined} onFocus={onWarm ? () => onWarm(id) : undefined} onTouchStart={onWarm ? () => onWarm(id) : undefined}>{children}</div>;
 }

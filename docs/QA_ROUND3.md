@@ -73,3 +73,21 @@ Each was read; the failing assertion is a test that no longer matches the produc
 - data-inventory, e0-live-flags, freshness-one-source: also failed in the full run (text and data drift; slow against the remote database).
 - **For King to check:** client-access.test.ts says a CLIENT user may call GET /finance and GET/PUT /team. access.ts allows them on purpose (the finance handler gives a non-manager only their own payout statement; team is the client's own people), but the test still lists them as forbidden. If you did not mean a client's staff to open Finance or Team, tell me and I will close those two rules.
 - Run them with: npx vitest run tests/unit/<file> after removing the file from the exclude list in vitest.config.ts. Rewrite against the current product, do not copy output into assertions.
+
+---
+
+# Round 6 (12 Nov 2026): lightning-fast pass (target: under 1 s warm, under 2 s cold, skeleton under 300 ms)
+
+## What changed (root causes, not more caching of the slow path)
+1. **Per-account rollup** (migration 20261229090000, table `account_rollup`): the finished numbers of every client account (the exact output of accountRows and scoreHistory, stored as-is, so numbers cannot drift) are one indexed lookup. Used only when made under today's counting rules (stale days, reply hours, reply target, deal-rule revision), not marked changed, covering exactly today's client accounts, and under 10 min old (shown up to 60 min while a new one is made). Otherwise the live query runs and stores its answer. Sync refresh (refreshInsights) rewrites it. Before the migration is applied everything falls back to the live query.
+2. **Stored finished answers** (table `read_answers`): Today, Speed to lead, Appointments, Clients, Clean-up, Accounts, Overview. Fresh 5 min, shown while recomputed up to 30 min, never after a change through SubSync (dirty flag set by every write except notification/feedback/help/meeting-setup ones), key = installation + kind + client limit + person + exact address, "Try again" always recomputes. Cold server instance first click = one lookup.
+3. **Cold start (browser)**: every page except Today is loaded on first use (next/dynamic) and warmed on hover/focus/touch of the menu and, when the browser is idle after Today shows, one at a time. First paint carries the shell and Today only.
+4. **Browser holds the last answer of every read in memory** (never storage: customer data) keyed by filter + exact address: a screen opened again renders at once and refreshes quietly; a failed refresh keeps what is shown; "Try again" still shows loading. `api.prefetch(path)` exists for data warming.
+5. **Sign-in** (/api/sso): five sequential database round trips (role save, audit log, white-label capture x2, entitlements, brand) now run together.
+6. Tests: src/lib/__tests__/account-rollup.test.ts (stored rows equal live rows and derive identically, ordering, every invalidation rule, tenant keys) and read-answers.test.ts. Full node suite: 1747 pass, 0 fail.
+
+## Numbers (this machine -> real DB, ~200 ms per statement; production is next to the DB, a statement costs a few ms)
+Before (profile-today.ts, biggest installation, 52,929 contacts): Today cold 4908 ms / 29 statements, 2nd 812 ms / 7, Numbers 30d 3000 ms / 20.
+profile-rollup.ts (5 runs): live "all accounts with numbers" p50 1172 ms, p95 3117 ms; one-lookup stand-in p50 388 ms, p95 404 ms (pure network here, about 2 ms in production).
+**NOT measured (honest):** after-numbers per screen. The migration cannot be applied by hand (rule), so the rollup/answers tables do not exist yet on the live database and this branch could not be timed end to end; the logged-in CRM tab was not touched. Expected after merge + production apply: every stored read = 1 statement (plus settings, held 10 s per instance); first ever read after a change or after 30 min is still the live path (unchanged). **King / next session: after the "production" apply, run `scripts/profile-today.ts` and `scripts/profile-rollup.ts`, and time first load in the CRM; paste p50/p95 here.**
+Not done: data prefetch on menu hover (needs each screen's exact first address; the hook `api.prefetch` is in place), Today's own 29 statements are unchanged (stored answer hides them after the first read), a real next build (local junction blocks Turbopack; CI/preview builds it).

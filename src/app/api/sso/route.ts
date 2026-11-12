@@ -102,25 +102,27 @@ export async function POST(request: Request) {
     await logIdentity(null, identity, "not_installed");
     return NextResponse.json({ user, installed: false });
   }
-  if (identity.userType === "account" && identity.userId && decision.locationId) {
-    try {
-      await sql()`
+  // Round 6: these used to run one after the other (each a round trip to the database); they do not depend on each other, so they run together. None of them can fail the sign-in.
+  const installationId = installation.id;
+  const saveRole = identity.userType === "account" && identity.userId && decision.locationId
+    ? sql()`
         insert into location_users (installation_id, location_id, user_id, name, role, seen_at)
-        values (${installation.id}, ${decision.locationId}, ${identity.userId}, ${identity.userName ?? "Account team member"}, ${identity.role}, now())
+        values (${installationId}, ${decision.locationId}, ${identity.userId}, ${identity.userName ?? "Account team member"}, ${identity.role}, now())
         on conflict (installation_id, location_id, user_id) do update set
-          name = excluded.name, role = excluded.role, seen_at = now()`;
-    } catch (error) {
-      console.error("Saving verified account role failed", safeError(error));
-    }
-  }
-  await logIdentity(installation.id, identity, "ok");
+          name = excluded.name, role = excluded.role, seen_at = now()`.then(() => undefined, (error) => { console.error("Saving verified account role failed", safeError(error)); })
+    : Promise.resolve();
   // An agency that resells the platform under its own domain gets links on that domain.
-  if (user.whitelabelDomain) await captureWhitelabelDomain(installation.id, user.whitelabelDomain, "sso").catch(() => undefined);
-  if (user.whitelabelLogoUrl) await captureWhitelabelLogo(installation.id, user.whitelabelLogoUrl).catch(() => undefined);
-
+  const [entitlements, brand] = await Promise.all([
+    resolveEntitlements(installation.plan, installationId),
+    brandOf(installationId),
+    saveRole,
+    logIdentity(installationId, identity, "ok"),
+    user.whitelabelDomain ? captureWhitelabelDomain(installationId, user.whitelabelDomain, "sso").catch(() => undefined) : Promise.resolve(),
+    user.whitelabelLogoUrl ? captureWhitelabelLogo(installationId, user.whitelabelLogoUrl).catch(() => undefined) : Promise.resolve(),
+  ]);
   const session = signSession({
     companyId: decision.companyKey, userId: user.userId, role: user.role, userName: user.userName, demo: false,
     kind: decision.kind, locationId: decision.locationId, dataOwner: mayDeleteData(identity, decision.kind), personRole: identity.role,
   });
-  return NextResponse.json({ user, installed: true, kind: decision.kind, session, entitlements: await resolveEntitlements(installation.plan, installation.id), brand: await brandOf(installation.id) });
+  return NextResponse.json({ user, installed: true, kind: decision.kind, session, entitlements, brand });
 }

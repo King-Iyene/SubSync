@@ -21,12 +21,16 @@ export const REQUEST_TIMEOUT_MS = 60_000;
 
 export type Api = {
   /** `fresh` (a Try again) skips the shared and held answers and sends a new request, so it never joins a read that is stuck. */
-  get: <T>(path: string, opts?: { fresh?: boolean }) => Promise<T>;
+  get: <T>(path: string, opts?: { fresh?: boolean; swr?: boolean }) => Promise<T>;
   post: <T>(path: string, body?: unknown) => Promise<T>;
   put: <T>(path: string, body?: unknown) => Promise<T>;
   del: <T>(path: string) => Promise<T>;
   download: (path: string, filename: string) => Promise<void>;
   demo: boolean;
+  /** The last answer this browser tab got for a read (kept in memory only, never in storage), or undefined. A screen shows it at once and refreshes it in the background. */
+  peek?: <T>(path: string) => T | undefined;
+  /** Start a read now so the answer is waiting when the person clicks (hover, idle). Never throws. */
+  prefetch?: (path: string) => void;
   /** The same client with a filter (like industry=medical) added to every read. */
   filtered: (query: string) => Api;
   /** The filter added to every read ("" when none). It is part of what an answer is FOR: an answer read under another filter is never shown under this one. */
@@ -84,6 +88,16 @@ function rememberAnswer(shared: object, key: string, path: string, data: unknown
 }
 function forgetRecent(shared: object) { recent.get(shared)?.clear(); }
 
+// Round 6 (lightning fast): the LAST answer of every read, kept in memory for the life of the page (never localStorage or cookies: it is customer data). A screen opened again renders from it
+// at once and asks again in the background; the new answer replaces it. The key holds the filter and the exact address (dates included), so an answer is never shown for another window or client set.
+const held = new WeakMap<object, Map<string, unknown>>();
+function holdAnswer(shared: object, key: string, data: unknown) {
+  let m = held.get(shared); if (!m) { m = new Map(); held.set(shared, m); }
+  if (m.size > 150) m.delete(m.keys().next().value as string);
+  m.delete(key); m.set(key, data);
+}
+const copy = <T,>(v: T): T => (typeof structuredClone === "function" ? structuredClone(v) : v);
+
 export function makeApi(initialToken: string, refresh: () => Promise<string | null>, demo: boolean, filterQuery = "", shared: { token: string } = { token: initialToken }): Api {
   const sharedReads = (): Map<string, Promise<unknown>> => { let m = inflight.get(shared); if (!m) { m = new Map(); inflight.set(shared, m); } return m; };
   const request = async (method: string, path: string, body?: unknown, retried = false): Promise<Response> => {
@@ -122,12 +136,14 @@ export function makeApi(initialToken: string, refresh: () => Promise<string | nu
     demo,
     scope: filterQuery,
     filtered: (query: string) => makeApi(initialToken, refresh, demo, query, shared),
-    get: async <T,>(path: string, opts?: { fresh?: boolean }): Promise<T> => {
+    peek: <T,>(path: string) => { const v = held.get(shared)?.get(`${filterQuery}|${path}`); return v === undefined ? undefined : copy(v as T); },
+    prefetch: (path: string) => { const key = `${filterQuery}|${path}`; if (held.get(shared)?.has(key) || sharedReads().has(key)) return; void makeApi(initialToken, refresh, demo, filterQuery, shared).get(path).catch(() => undefined); },
+    get: async <T,>(path: string, opts?: { fresh?: boolean; swr?: boolean }): Promise<T> => {
       const reads = sharedReads(), key = `${filterQuery}|${path}`, running = opts?.fresh ? undefined : reads.get(key);
       if (opts?.fresh) {
         // Try again: a new request that is not tied to one already on its way (which may be the stuck one); the answer replaces what is shared.
         const sep = path.includes("?") ? "&" : "?";
-        const p = (async () => { const data = await parse<T>(await request("GET", `${path}${sep}_r=${Date.now().toString(36)}`)); rememberAnswer(shared, key, path, data); return data; })();
+        const p = (async () => { const data = await parse<T>(await request("GET", `${path}${sep}_r=${Date.now().toString(36)}`)); rememberAnswer(shared, key, path, data); holdAnswer(shared, key, data); return data; })();
         reads.set(key, p);
         const done = () => { if (reads.get(key) === p) reads.delete(key); };
         p.then(done, done);
@@ -135,9 +151,9 @@ export function makeApi(initialToken: string, refresh: () => Promise<string | nu
       }
       if (running) { const data = await (running as Promise<T>); return typeof structuredClone === "function" ? structuredClone(data) : data; }
       // Round 4: going back to a Speed to lead or Appointments tab within 20 seconds shows the answer already held (a change drops them; the server also keeps its own for 30 s).
-      const recentHit = recentAnswer(shared, key, path);
+      const recentHit = opts?.swr ? undefined : recentAnswer(shared, key, path);
       if (recentHit !== undefined) return (typeof structuredClone === "function" ? structuredClone(recentHit) : recentHit) as T;
-      const p = (async () => { const data = await parse<T>(await request("GET", path)); rememberAnswer(shared, key, path, data); return data; })();
+      const p = (async () => { const data = await parse<T>(await request("GET", path)); rememberAnswer(shared, key, path, data); holdAnswer(shared, key, data); return data; })();
       reads.set(key, p);
       const done = () => { if (reads.get(key) === p) reads.delete(key); };
       p.then(done, done);
@@ -162,7 +178,10 @@ export function makeApi(initialToken: string, refresh: () => Promise<string | nu
 // Load data for a view. `reload` refetches; changing `path` refetches automatically.
 export function useData<T>(path: string | null) {
   const api = useApiClient();
-  const [state, setState] = useState<{ data: T | null; error: ApiError | null; loading: boolean; key: string }>({ data: null, error: null, loading: path !== null, key: "" });
+  const [state, setState] = useState<{ data: T | null; error: ApiError | null; loading: boolean; key: string }>(() => {
+    const h = path !== null ? api.peek?.<T>(path) : undefined;
+    return h !== undefined ? { data: h, error: null, loading: false, key: `${api.scope ?? ""}#${rangeKeyOfPath(path)}` } : { data: null, error: null, loading: path !== null, key: "" };
+  });
   // What an answer is FOR: the client accounts counted (the api's filter) and the dates asked. An answer for another window or another set of clients is never
   // handed to a screen that now shows this one (stale numbers under a new label), only a Loading state until the new answer arrives.
   const askedKey = `${api.scope ?? ""}#${rangeKeyOfPath(path)}`;
@@ -176,13 +195,17 @@ export function useData<T>(path: string | null) {
   const run = useCallback(async (fresh: boolean) => {
     if (path === null) return;
     const mine = ++seq.current;
-    setState((s) => ({ ...s, loading: true, error: null }));
     const key = `${api.scope ?? ""}#${rangeKeyOfPath(path)}`;
+    // Last answer for exactly this read (same dates, same client filter): show it now, refresh quietly. A "Try again" always shows its loading state.
+    const heldAnswer = fresh ? undefined : api.peek?.<T>(path);
+    if (heldAnswer !== undefined) setState({ data: heldAnswer, error: null, loading: false, key });
+    else setState((s) => ({ ...s, loading: true, error: null }));
     try {
-      const data = await api.get<T>(path, fresh ? { fresh: true } : undefined);
+      const data = await api.get<T>(path, fresh ? { fresh: true } : heldAnswer !== undefined ? { swr: true } : undefined);
       if (current.current === path && mine === seq.current) setState({ data, error: null, loading: false, key });
     } catch (error) {
-      if (current.current === path && mine === seq.current) setState({ data: null, error: error as ApiError, loading: false, key });
+      // A background refresh that fails keeps the answer already on screen.
+      if (current.current === path && mine === seq.current && !(heldAnswer !== undefined && !fresh)) setState({ data: null, error: error as ApiError, loading: false, key });
     }
   }, [api, path]);
   // `reload` is what "Try again" and every refresh after a change call: it always asks the server again.
