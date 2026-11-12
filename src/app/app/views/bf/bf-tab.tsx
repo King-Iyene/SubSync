@@ -243,7 +243,7 @@ function Cohorts({ scope, local }: { scope: ExecScope; local: Local }) {
       {r.data && rows.length >= 2 && (
         <table className="bf-table"><thead><tr><th scope="col">Week of</th><th scope="col">Leads</th><th scope="col">Within 7 days</th><th scope="col">14 days</th><th scope="col">30 days</th></tr></thead>
           <tbody>{rows.map((c) => {
-            const cell = (days: 7 | 14 | 30) => { const v = cohortRate(c[`${m}${days}` as keyof typeof c] as number, c[`mature${days}` as keyof typeof c] as number); return <td key={days} data-testid={`bf-coh-${days}`} style={v === null ? undefined : { background: `color-mix(in srgb, var(--s6-cyan, #0e7490) ${Math.min(60, Math.round(v))}%, transparent)` }}>{v === null ? <span className="bf-fine">not yet</span> : `${v}%`}</td>; };
+            const cell = (days: 7 | 14 | 30) => { const v = cohortRate(c[`${m}${days}` as keyof typeof c] as number, c[`mature${days}` as keyof typeof c] as number); return <td key={days} data-testid={`bf-coh-${days}`} style={v === null ? undefined : { background: `color-mix(in srgb, var(--s6-cyan, #37674d) ${Math.min(60, Math.round(v))}%, transparent)` }}>{v === null ? <span className="bf-fine">not yet</span> : `${v}%`}</td>; };
             return <tr key={c.week}><th scope="row">{dayLabel(c.week)}</th><td>{fmtInt(c.leads)}</td>{cell(7)}{cell(14)}{cell(30)}</tr>;
           })}</tbody></table>
       )}

@@ -26,9 +26,9 @@ export function CurveChart({ curve, onPick }: { curve: Curve; onPick?: (key: str
             <g key={b.key} onClick={() => onPick?.(b.key)} style={{ cursor: onPick ? "pointer" : "default" }} data-testid={`curve-band-${b.key}`}>
               <title>{b.enough ? `${b.label}: ${Math.round((b.bookRate ?? 0) * 100)}% booked (${b.booked} of ${b.leads} leads)` : `${b.label}: ${b.leads} leads, too few to show a rate`}</title>
               <rect x={x} y={H - shown} width={bw} height={shown} rx="6"
-                fill={b.enough ? "var(--primary, #2563eb)" : "transparent"} fillOpacity={b.key === "never" ? 0.45 : 0.9}
+                fill={b.enough ? "var(--primary, #6986a7)" : "transparent"} fillOpacity={b.key === "never" ? 0.45 : 0.9}
                 stroke={b.enough ? "none" : "currentColor"} strokeOpacity="0.4" strokeDasharray={b.enough ? undefined : "4 4"}
-                className="motion-reduce:!transition-none" style={{ transition: "height 700ms cubic-bezier(.2,.8,.2,1), y 700ms cubic-bezier(.2,.8,.2,1)", filter: b.enough ? "drop-shadow(0 0 8px color-mix(in srgb, var(--primary, #2563eb) 45%, transparent))" : undefined }} />
+                className="motion-reduce:!transition-none" style={{ transition: "height 700ms cubic-bezier(.2,.8,.2,1), y 700ms cubic-bezier(.2,.8,.2,1)", filter: b.enough ? "drop-shadow(0 0 8px color-mix(in srgb, var(--primary, #6986a7) 45%, transparent))" : undefined }} />
               <text x={x + bw / 2} y={H - shown - 8} textAnchor="middle" fontSize="15" fontWeight="600" fill="currentColor">{b.bookRate === null ? "n/a" : `${Math.round(b.bookRate * 100)}%`}</text>
               <text x={x + bw / 2} y={H + 18} textAnchor="middle" fontSize="11" fill="currentColor" fillOpacity="0.75">{b.label}</text>
               <text x={x + bw / 2} y={H + 34} textAnchor="middle" fontSize="10" fill="currentColor" fillOpacity="0.55">{b.leads} leads</text>

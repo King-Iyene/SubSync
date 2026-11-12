@@ -48,7 +48,7 @@ const GRACE = 3 * 3_600_000;
 // A colour from red (low show rate) to green (high); a cell below 5 recorded outcomes has no colour and no number.
 function cellStyle(c: Heat | undefined): React.CSSProperties {
   if (!c || c.showRate === null) return { background: "transparent" };
-  return { background: `hsl(${Math.round(c.showRate * 120)} 65% 45% / 0.55)` };
+  return { background: `hsl(${Math.round(c.showRate * 120)} 30% 42% / 0.5)` };
 }
 
 const leadColumns: Array<Column<Member>> = [

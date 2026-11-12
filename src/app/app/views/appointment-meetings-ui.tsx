@@ -41,7 +41,7 @@ export function AppointmentMeetings({ onOpen }: { onOpen?: (locationId: string, 
     <div className="space-y-4" data-testid="appt-meetings">
       <section className="rounded-xl border bg-card/60 p-4 shadow-[0_0_30px_-18px_var(--primary)]" aria-label="Your meeting tool">
         <div className="flex flex-wrap items-center gap-3">
-          <span aria-hidden className={`size-2.5 rounded-full ${ok ? "bg-emerald-500 shadow-[0_0_10px_#10b981]" : c ? "bg-amber-500" : "bg-muted-foreground/50"}`} />
+          <span aria-hidden className={`size-2.5 rounded-full ${ok ? "bg-emerald-500 shadow-[0_0_10px_#408971]" : c ? "bg-amber-500" : "bg-muted-foreground/50"}`} />
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold">{ok ? "Your Fathom is connected" : c ? (c.status === "needs_reconnect" ? "Your Fathom needs to be connected again" : "Your Fathom is not working yet") : "Connect your Fathom"}</p>
             <p className="text-xs text-muted-foreground">{ok ? `Last call received ${ago(c?.lastEventAt ?? null)}${c?.email ? ` | ${c.email}` : ""}` : c?.errorCode ? "Fathom reported a problem. Connect again to fix it." : "Only you can see your calls. SubSync ties a call to an appointment only when it is certain."}</p>

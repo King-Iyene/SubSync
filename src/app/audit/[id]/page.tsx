@@ -26,7 +26,7 @@ const lookups = createLimiter(30, 60_000);
 // The data is read per request, so it sits behind a Suspense boundary (required by this project's rendering mode).
 export default function SharedAudit({ params }: { params: Promise<{ id: string }> }) {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-[#000c25]" />}>
+    <Suspense fallback={<div className="min-h-screen bg-[#141311]" />}>
       <AuditBody params={params} />
     </Suspense>
   );

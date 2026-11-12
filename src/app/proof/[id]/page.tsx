@@ -33,7 +33,7 @@ export default function ProofPage({ params, searchParams }: { params: Promise<{ 
   );
 }
 
-const SAMPLE_BRAND: Brand = { name: "Sample Marketing Co", logoUrl: null, color: "#0a658b" };
+const SAMPLE_BRAND: Brand = { name: "Sample Marketing Co", logoUrl: null, color: "#504c45" };
 
 async function Body({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ m?: string | string[] }> }) {
   await connection();
@@ -71,7 +71,7 @@ async function Body({ params, searchParams }: { params: Promise<{ id: string }>;
   const r = found.report;
   const cur = r.payload.month;
   return (
-    <main className="pr-print-root" style={{ minHeight: "100vh", background: "var(--pr-bg, #fff)", ...accentVars(found.brand.color) }}>
+    <main className="pr-print-root" style={{ minHeight: "100vh", background: "var(--pr-bg, #ffffff)", ...accentVars(found.brand.color) }}>
       <ProofReport p={r.payload} brand={found.brand} intro={r.intro} sections={r.sections} nameStaff={r.nameStaff} auto>
         <ReportActions text={reportText(r.payload, found.brand, r.intro, r.sections)} />
         {found.months.length > 1 && (

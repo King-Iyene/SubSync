@@ -13,6 +13,7 @@ import "../ap3/ap3.css";
 import "./pl3.css";
 import { useMountDealActions } from "./actions";
 import { DEFAULT_FILTERS, fixturesOn, usePl, type PlFilters } from "./data";
+import { HistoryFunnel, StuckInStep, useHistoryFunnelOn } from "./history-funnel";
 import { MoneyFlow, type FlowPick } from "./money-flow";
 import { DealList, DealPanel } from "./parts";
 import { PipelineGrid, PipelinePicker } from "./pipes";
@@ -27,13 +28,15 @@ import { DealMoves } from "../people";
 // Pipeline as a module with sub-sections (the Appointments pattern): Overview | Money Flow | Needs attention | Won and lost | People | Sources | Stage history | Health | Proof.
 // One filter bar, one right-side deal panel, saved views and keys. SubSync never changes a deal from here; edits go through slice PB's checked gateway tools, which mount into the panel slots.
 
-type TabKey = "overview" | "flow" | "needs" | "wonlost" | "people" | "sources" | "history" | "health" | "proof" | "slipping" | "classic" | "stale";
+type TabKey = "overview" | "flow" | "needs" | "wonlost" | "people" | "sources" | "history" | "health" | "proof" | "slipping" | "classic" | "stale" | "funnel" | "stuck";
 const TABS: Array<{ key: TabKey; label: string; tip: string }> = [
   { key: "overview", label: "Overview", tip: "The one sentence, the numbers and where the money leaks." }, { key: "flow", label: "Money flow", tip: "The money in each stage as stacks of coins." },
   { key: "needs", label: "Needs attention", tip: "Deals stuck longer than that step normally takes." }, { key: "wonlost", label: "Won and lost", tip: "What closed, and the lost reason when your CRM has one." },
   { key: "people", label: "People", tip: "Who closes and who lets deals go cold." },
   { key: "sources", label: "Sources", tip: "Which lead sources turn into money." }, { key: "history", label: "Stage history", tip: "How long deals really stay in each step." },
   { key: "health", label: "Accounts", tip: "Every client account, most stuck deals first." }, { key: "proof", label: "Proof", tip: "The weekly receipt per client." },
+  { key: "funnel", label: "Step history", tip: "How many deals entered each step, how many moved on, and how long they stayed, from the moves SubSync recorded." },
+  { key: "stuck", label: "Stuck in a step", tip: "Open deals past the usual time for their own step, biggest money first." },
   { key: "slipping", label: "Slipping", tip: "Deals going quiet for their stage, about to, or lost this fortnight, with the money behind them." },
   // Restored from the earlier Pipeline (a revamp adds, never removes): the forecast, coverage, bottleneck and risk cards, and the stale-deal list with its export.
   { key: "classic", label: "Forecast and stages", tip: "Forecast, coverage, bottlenecks, deal risk, aging, wins and losses by month, and the export of open deals." },
@@ -49,7 +52,8 @@ export function PipelineModule({ moneyFlow = true, actions = false }: { moneyFlo
   useMountDealActions(actions);
   const cash = useCashFlags();
   const slippingOn = cash.flags?.cf_deals === true;
-  const tabs = useMemo(() => TABS.filter((t) => (moneyFlow || t.key !== "flow") && (slippingOn || t.key !== "slipping")), [moneyFlow, slippingOn]);
+  const funnelOn = useHistoryFunnelOn();
+  const tabs = useMemo(() => TABS.filter((t) => (moneyFlow || t.key !== "flow") && (slippingOn || t.key !== "slipping") && (funnelOn || (t.key !== "funnel" && t.key !== "stuck"))), [moneyFlow, slippingOn, funnelOn]);
   const [tab, setTab] = useState<TabKey>("overview");
   // A click from the Today "Money at risk" card opens the quiet-deals section (see deep-link.ts).
   const arrived = useRef(false);
@@ -110,6 +114,8 @@ export function PipelineModule({ moneyFlow = true, actions = false }: { moneyFlo
       case "history": return <StageHistory {...sp} />;
       case "health": return <><Health {...sp} />{drillList}</>;
       case "proof": return <><Proof {...sp} />{drillList}</>;
+      case "funnel": return <HistoryFunnel filters={filters} onOpen={setDeal} activeId={deal?.id ?? null} showAccount={showAccount} />;
+      case "stuck": return <StuckInStep filters={filters} onOpen={setDeal} activeId={deal?.id ?? null} showAccount={showAccount} />;
       case "slipping": return <SlippingPanel location={filters.locationId} showAccount={showAccount} />;
       case "classic": return <div className="[&_h1]:sr-only"><PipelineView /><DealMoves /></div>;
       case "stale": return <div className="[&_h1]:sr-only"><DealsView /></div>;

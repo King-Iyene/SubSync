@@ -1,5 +1,5 @@
 /* Appointments > Leadership. Calm and flat: ink, one accent, one warning colour. No glow. Light and dark follow the app theme. */
-.apx { --apx-accent: var(--s6-cyan, #0e7490); --apx-warn: var(--s6-amber, #b45309); --apx-line: color-mix(in srgb, var(--foreground) 14%, transparent); --apx-soft: color-mix(in srgb, var(--foreground) 5%, transparent); display: grid; gap: 16px; min-width: 0; }
+.apx { --apx-accent: var(--s6-cyan, #37674d); --apx-warn: var(--s6-amber, #8e582f); --apx-line: color-mix(in srgb, var(--foreground) 14%, transparent); --apx-soft: color-mix(in srgb, var(--foreground) 5%, transparent); display: grid; gap: 16px; min-width: 0; }
 .apx * { box-sizing: border-box; }
 .apx-sample { margin: 0; padding: 8px 12px; border-radius: 8px; border: 1px dashed var(--apx-line); font-size: 0.8125rem; color: var(--muted-foreground); }
 .apx-controls { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: flex-end; }
@@ -82,7 +82,7 @@ button.apx-cell { cursor: pointer; } button.apx-cell:hover { outline: 1px solid 
 @media print {
   body * { visibility: hidden !important; }
   .apx-brief, .apx-brief * { visibility: visible !important; }
-  .apx-brief { position: absolute; inset: 0 auto auto 0; width: 100%; border: 0; background: #fff; color: #111; padding: 0; }
+  .apx-brief { position: absolute; inset: 0 auto auto 0; width: 100%; border: 0; background: #ffffff; color: #111111; padding: 0; }
   .apx-noprint { display: none !important; }
 }
 

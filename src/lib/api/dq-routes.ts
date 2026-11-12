@@ -1,7 +1,9 @@
 import { BUILTIN, loadConfigs, writeEnabledFor } from "../analytics/cleanup-config";
 import { pickFields } from "../analytics/cleanup-rules";
-import { chooseSurvivor, groupKey } from "../analytics/dedupe";
-import { loadPeople, othersSharing, recordDecision } from "../analytics/dedupe-queries";
+import { chooseSurvivor, groupKey, type Person } from "../analytics/dedupe";
+import { loadDetailFacts, loadPeople, othersSharing, recordDecision } from "../analytics/dedupe-queries";
+import { BULK_NOTE, planBulk, undoRecord } from "../dq/bulk-merge";
+import { pickMaster } from "../dq/master-rank";
 import { anyClearlyDiffer, guardrails } from "../analytics/dedupe-review";
 import {
   certainSafe, countLeads, formDays, formsRollup, funnelsList, intakeAlertList, intakeAsOf, isLeadFlag, listEvents, listGroups, listLeads, listMutes, logEvent, pollStatus, portfolioQuality, scoreDetail, scoreTrend, scoresLatest,
@@ -35,6 +37,9 @@ const off = () => json({ error: "This is not switched on for your account" }, 40
 const adminSide = (ctx: Ctx) => ctx.kind !== "client" || ctx.session.role === "admin";
 const missing = (e: unknown) => { const c = (e as { code?: string } | null)?.code; return c === "42P01" || c === "42703"; };
 const ID = /^[A-Za-z0-9_-]{3,128}$/;
+const BULK_EVAL_CAP = 100;
+/** One line in the audit log (who, what, the details). Never fails the request. */
+const logAudit = async (inst: string, actor: string | null, action: string, detail: Record<string, unknown>) => { const db = sql(); await db`insert into audit_log (installation_id, actor, action, detail) values (${inst}, ${actor}, ${action}, ${db.json(detail as never)})`.catch(() => undefined); };
 const SRC = /^[\x20-\x7e]{1,80}$/;
 
 const GET = ["options", "overview", "dupes", "dupe", "intake", "intake-source", "leads", "accounts", "events", "form"];
@@ -126,7 +131,10 @@ export async function handleDq(ctx: Ctx, h: DqHelpers): Promise<Response | null>
       if (!loaded) return json({ error: "Those contacts were not found" }, 404);
       const links = await h.links();
       const people = loaded.people;
-      const keepId = chooseSurvivor(people).contactId;
+      // The master is chosen by the SAME function the screen uses (master-rank.ts). chooseSurvivor only fills the wording of the preview when nobody is suggested (the person chooses).
+      const master = pickMaster(people);
+      const keepId = master.suggestedId ?? chooseSurvivor(people).contactId;
+      const facts = await loadDetailFacts(ctx.installationId, allowed, loc, ids);
       const cfg = (await loadConfigs(ctx.installationId, allowed)).get(loc) ?? BUILTIN;
       const optedIn = ctx.demo || (await writeEnabledFor(ctx.installationId, loc));
       const others = people.length === 2 ? await othersSharing(ctx.installationId, loc, ids) : 0;
@@ -134,7 +142,8 @@ export async function handleDq(ctx: Ctx, h: DqHelpers): Promise<Response | null>
       const gone = people.find((p) => p.contactId === wf.enrolId);
       return json({
         locationId: loc, locationName: loaded.locationName, key: groupKey(ids), keepId, different: anyClearlyDiffer(people),
-        people: people.map((p) => ({ ...p, url: links.contact(loc, p.contactId), protectWords: p.dnd ? PROTECT_WORDS.dnd : p.openDeals > 0 ? PROTECT_WORDS.open_deal : null })),
+        master: { suggestedId: master.suggestedId, mustChoose: master.mustChoose, why: master.why },
+        people: people.map((p) => ({ ...p, facts: facts?.[p.contactId], url: links.contact(loc, p.contactId), protectWords: p.dnd ? PROTECT_WORDS.dnd : p.openDeals > 0 ? PROTECT_WORDS.open_deal : p.nextAppointmentAt ? PROTECT_WORDS.appointment : null })),
         guard: guardrails(people, keepId).map((g) => g.text), picks: pickFields(people, keepId, cfg.survive),
         workflow: { set: !!cfg.mergeWorkflowId, optedIn, canAsk: ctx.kind !== "client", blockers: wf.blockers.map((x) => x.text), goneName: gone?.name ?? null, survivorId: wf.survivorId, switchOn: !ctx.demo && isLive("WRITE_GHL_LIVE") },
       });
@@ -205,47 +214,53 @@ export async function handleDq(ctx: Ctx, h: DqHelpers): Promise<Response | null>
       let location: string | null = null;
       if (body?.account) { location = await ownedLocation(ctx.installationId, allowed, body.account); if (location === null) return json({ error: "That client account is not available" }, 404); }
       const s: Scope = { inst: ctx.installationId, allowed, location };
-      const groups = await certainSafe(s, BULK_MERGE_CAP);
+      // Every certain group is judged (protected ones too, so the list can say why they were skipped). The rules and the ranking are in dq/bulk-merge.ts and dq/master-rank.ts, shared with the screen.
+      const groups = await certainSafe(s, BULK_EVAL_CAP, true);
       const cfgs = await loadConfigs(ctx.installationId, allowed);
       const switchOn = isLive("WRITE_GHL_LIVE");
-      type Plan = { g: (typeof groups)[number]; ready: boolean; why: string | null; keepId: string; goneName: string | null; people: Awaited<ReturnType<typeof loadPeople>> };
-      const plans: Plan[] = [];
-      const optedCache = new Map<string, boolean>();
+      type Item = { key: string; locationId: string; locationName: string | null; people: Person[]; workflowSurvivorId: string | null; blocker: string | null };
+      const items: Item[] = [];
+      const early: Array<{ key: string; locationId: string; account: string | null; names: string[]; why: string }> = [];
       for (const g of groups) {
+        const names = g.people.map((p) => p.name);
+        if (g.trimmed) { early.push({ key: g.key, locationId: g.locationId, account: g.locationName, names, why: "This group was cut short because it has too many copies. Check it yourself." }); continue; }
         const loaded = await loadPeople(ctx.installationId, allowed, g.locationId, g.people.map((p) => p.contactId));
-        if (!loaded || loaded.people.length !== 2) { plans.push({ g, ready: false, why: "Only pairs are merged in bulk", keepId: "", goneName: null, people: loaded }); continue; }
+        if (!loaded) { early.push({ key: g.key, locationId: g.locationId, account: g.locationName, names, why: "These contacts changed since the last scan. Run a scan, then try again." }); continue; }
         const cfg = cfgs.get(g.locationId) ?? BUILTIN;
-        const others = await othersSharing(ctx.installationId, g.locationId, g.people.map((p) => p.contactId));
-        const wf = planWorkflowMerge(loaded.people, chooseSurvivor(loaded.people).contactId, { workflowId: cfg.mergeWorkflowId, others });
-        const gone = loaded.people.find((p) => p.contactId === wf.enrolId);
-        plans.push({ g, ready: wf.blockers.length === 0, why: wf.blockers[0]?.text ?? null, keepId: wf.survivorId, goneName: gone?.name ?? null, people: loaded });
-        if (!optedCache.has(g.locationId)) optedCache.set(g.locationId, ctx.demo || (await writeEnabledFor(ctx.installationId, g.locationId)));
+        const others = loaded.people.length === 2 ? await othersSharing(ctx.installationId, g.locationId, g.people.map((p) => p.contactId)) : 0;
+        const wf = planWorkflowMerge(loaded.people, loaded.people[0]?.contactId ?? "", { workflowId: cfg.mergeWorkflowId, others });
+        items.push({ key: g.key, locationId: g.locationId, locationName: g.locationName, people: loaded.people, workflowSurvivorId: wf.survivorId || null, blocker: wf.blockers[0]?.text ?? null });
       }
-      const ready = plans.filter((p) => p.ready);
-      const anyOpted = [...optedCache.values()].some(Boolean);
-      const mode = switchOn && anyOpted ? "live" : "dry_run";
-      const phrase = bulkMergePhrase(ready.length);
+      // The workflow's own blockers (no workflow set, another contact shares the number, ...) skip a pair before the ranking is even asked.
+      const judged = planBulk(items.filter((i) => !i.blocker), BULK_MERGE_CAP, {});
+      const skipped = [...early, ...items.filter((i) => i.blocker).map((i) => ({ key: i.key, locationId: i.locationId, account: i.locationName, names: i.people.map((p) => p.name), why: i.blocker! })), ...judged.skipped];
+      const optedCache = new Map<string, boolean>();
+      for (const w of judged.willItems) if (!optedCache.has(w.locationId)) optedCache.set(w.locationId, ctx.demo || (await writeEnabledFor(ctx.installationId, w.locationId)));
+      const mode = switchOn && [...optedCache.values()].some(Boolean) ? "live" : "dry_run";
+      const phrase = bulkMergePhrase(judged.will.length);
       if (step === "preview") {
-        const why: Record<string, number> = {};
-        for (const p of plans.filter((x) => !x.ready && x.why)) why[p.why!] = (why[p.why!] ?? 0) + 1;
-        return json({ ready: ready.length, blocked: plans.length - ready.length, cap: BULK_MERGE_CAP, phrase, mode, sample: ready.slice(0, 6).map((p) => ({ name: p.g.people[0].name, account: p.g.locationName, shared: p.g.shared })), blockedWhy: Object.entries(why).map(([text, n]) => ({ text, n })).slice(0, 5),
-          note: "Only certain matches (same phone or email) with two records, nobody on Do Not Disturb, no open deal and no coming appointment. Each pair goes to your account's merge workflow." });
+        return json({ ready: judged.will.length, blocked: skipped.length, cap: BULK_MERGE_CAP, phrase, mode, will: judged.will.slice(0, 100), skipped: skipped.slice(0, 200), note: BULK_NOTE });
       }
-      if (ready.length === 0) return json({ error: "There is nothing safe to merge." }, 400);
+      if (judged.will.length === 0) return json({ error: "There is nothing safe to merge." }, 400);
       if (!typedMatches(body?.typed, phrase)) return json({ error: "The words do not match, so nothing was merged.", phrase }, 400);
       const actor = h.actor(ctx);
-      let requested = 0, switchedOff = 0, optedOut = 0, failed = 0;
-      for (const p of ready) {
-        const people = p.people!.people;
-        const optedIn = optedCache.get(p.g.locationId) === true;
+      let requested = 0, switchedOff = 0, optedOut = 0, failed = 0, refused = 0;
+      for (const w of judged.willItems) {
+        const optedIn = optedCache.get(w.locationId) === true;
+        // The pair is judged again right before the write, from a fresh read: something may have changed since the preview.
+        const fresh = await loadPeople(ctx.installationId, allowed, w.locationId, w.people.map((p) => p.contactId));
+        const again = fresh ? planBulk([{ key: w.key, locationId: w.locationId, locationName: w.locationName, people: fresh.people }], 1, {}) : null;
+        if (!fresh || !again || again.will.length !== 1 || again.willItems[0].keepId !== w.keepId) { refused++; await logAudit(ctx.installationId, actor, "duplicates.bulk_merge_refused", { locationId: w.locationId, key: w.key, reason: "Changed since the preview" }); continue; }
         const r = await mergeViaWorkflow({
-          installationId: ctx.installationId, locationId: p.g.locationId, actor, optedIn, workflowId: (cfgs.get(p.g.locationId) ?? BUILTIN).mergeWorkflowId, people, pickedKeepId: p.keepId, others: 0, confirmed: true,
-          token: () => h.locationToken(p.g.locationId), workflowPublished: null,
+          installationId: ctx.installationId, locationId: w.locationId, actor, optedIn, workflowId: (cfgs.get(w.locationId) ?? BUILTIN).mergeWorkflowId, people: fresh.people, pickedKeepId: w.keepId, others: 0, confirmed: true,
+          token: () => h.locationToken(w.locationId), workflowPublished: null,
         }, ctx.demo ? { env: {} } : {});
         if (r.outcome === "requested") requested++; else if (r.outcome === "switched_off") switchedOff++; else if (r.outcome === "opted_out") optedOut++; else failed++;
+        // Every merge, sent or not, is written down with the reason and what is needed to undo it by hand.
+        await logAudit(ctx.installationId, actor, "duplicates.bulk_merge", { locationId: w.locationId, key: w.key, outcome: r.outcome, mode, ...undoRecord({ people: fresh.people, keepId: w.keepId, goneId: w.goneId, why: w.why }) });
       }
-      await logEvent(ctx.installationId, location, "bulk_merge", null, { mode, ready: ready.length, requested, switchedOff, optedOut, failed }, actor).catch(() => undefined);
-      return json({ mode, ready: ready.length, requested, failed, message: requested > 0 ? `Sent ${requested} to your merge workflow. They leave this list after the next refresh.` : "Not switched on yet: nothing was merged. The plan is recorded in the history as a dry run." });
+      await logEvent(ctx.installationId, location, "bulk_merge", null, { mode, ready: judged.will.length, requested, switchedOff, optedOut, failed, refused }, actor).catch(() => undefined);
+      return json({ mode, ready: judged.will.length, requested, failed, refused, message: requested > 0 ? `Sent ${requested} to your merge workflow. They leave this list after the next refresh.${refused ? ` ${refused} changed since the preview and were left alone.` : ""}` : "Not switched on yet: nothing was merged. The plan is recorded in the history as a dry run." });
     }
 
     // ---------------------------------------------------------------- lead intake

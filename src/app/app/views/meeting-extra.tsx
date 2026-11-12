@@ -61,7 +61,7 @@ export function ConnectStrip({ home, reload, fx }: { home: Home; reload: () => v
     <section aria-label="Your Fathom" className="rounded-xl border bg-card/60 p-3 sm:p-4" data-testid="mn-connect">
       <div className="flex flex-wrap items-center gap-3">
         <BrandIcon id="fathom" size={24} decorative />
-        <span aria-hidden className={`size-2.5 rounded-full ${ok ? "bg-emerald-500 shadow-[0_0_10px_#10b981]" : c ? "bg-amber-500" : "bg-muted-foreground/50"}`} />
+        <span aria-hidden className={`size-2.5 rounded-full ${ok ? "bg-emerald-500 shadow-[0_0_10px_#408971]" : c ? "bg-amber-500" : "bg-muted-foreground/50"}`} />
         <div className="min-w-0 flex-1" data-testid="mn-connect-status">
           <p className="text-sm font-semibold">{ok ? "Your Fathom is connected" : c ? (c.status === "needs_reconnect" ? "Your Fathom needs to be connected again" : "Your Fathom is not working yet") : "Connect your Fathom"}</p>
           <p className="text-xs text-muted-foreground">{ok ? `Last call received ${ago(c?.lastEventAt ?? null)}${c?.email ? ` | ${c.email}` : ""}` : c?.errorCode ? "Fathom reported a problem. Connect again to fix it." : "Only you can see your calls. A call goes on a contact only when it is certain."}</p>

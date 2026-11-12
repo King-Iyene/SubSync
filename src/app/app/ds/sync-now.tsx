@@ -90,7 +90,7 @@ export function SyncNow({ agency = false }: { agency?: boolean }) {
           {phase.kind === "running" && <Progress run={phase.run} elapsedMs={phase.elapsed} />}
           {phase.kind === "done" && <Done run={phase.run} />}
           {phase.kind === "error" && <p className="text-[var(--destructive)]" data-testid="sync-error">{phase.message}</p>}
-          {phase.kind === "stuck" && (<div data-testid="sync-stuck"><p className="text-[var(--warning,#b45309)]">{phase.message}</p><Steps steps={phase.run.steps ?? []} /></div>)}
+          {phase.kind === "stuck" && (<div data-testid="sync-stuck"><p className="text-[var(--warning,#8e582f)]">{phase.message}</p><Steps steps={phase.run.steps ?? []} /></div>)}
           {phase.kind !== "running" && (
             <button type="button" onClick={() => void start()} data-testid="sync-retry" className="ds-press mt-3 inline-flex min-h-9 items-center rounded-lg border px-3 font-medium hover:bg-muted">{phase.kind === "error" ? "Retry" : "Sync again"}</button>
           )}
@@ -122,7 +122,7 @@ function Progress({ run, elapsedMs }: { run: Run | null; elapsedMs: number }) {
     <div data-testid="sync-progress">
       <div className="h-1.5 overflow-hidden rounded-full bg-muted" aria-hidden><div className="h-full rounded-full bg-primary transition-all" style={{ width: `${pct}%` }} /></div>
       <p className="mt-1.5 text-xs text-muted-foreground" role="status">{progressWords(run?.progress ?? { done: 0, total: 0 })}</p>
-      {v.kind !== "working" && <p className="mt-1.5 text-xs text-[var(--warning,#b45309)]" data-testid="sync-slow">{v.text}</p>}
+      {v.kind !== "working" && <p className="mt-1.5 text-xs text-[var(--warning,#8e582f)]" data-testid="sync-slow">{v.text}</p>}
       <Steps steps={run?.steps ?? []} />
     </div>
   );

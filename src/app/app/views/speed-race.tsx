@@ -72,7 +72,7 @@ export function Ring({ score, size = 112, label }: { score: number | null; size?
       <div className="relative mx-auto" style={{ width: size, height: size }}>
         <svg width={size} height={size} viewBox={"0 0 " + size + " " + size} aria-hidden>
           <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--t-rule)" strokeWidth="8" />
-          <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={v >= 80 ? "var(--t-accent)" : v >= 50 ? "var(--warning, #b7791f)" : "var(--destructive, #c53030)"} strokeWidth="8" strokeLinecap="round" strokeDasharray={c}
+          <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={v >= 80 ? "var(--t-accent)" : v >= 50 ? "var(--warning, #a17536)" : "var(--destructive, #b83d3d)"} strokeWidth="8" strokeLinecap="round" strokeDasharray={c}
             strokeDashoffset={on && score !== null ? c * (1 - v / 100) : c} transform={"rotate(-90 " + size / 2 + " " + size / 2 + ")"} style={{ transition: "stroke-dashoffset 900ms cubic-bezier(.2,.8,.2,1)" }} />
         </svg>
         <div className="absolute inset-0 flex items-center justify-center font-semibold tabular-nums" style={{ fontSize: size / 4.2 }}>{score === null ? "n/a" : <><CountUp value={String(score)} />%</>}</div>

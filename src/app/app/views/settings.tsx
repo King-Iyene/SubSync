@@ -10,6 +10,8 @@ import { Badge, Btn, Card, ErrorBox, inputClass, Loading, PageHeader, timeAgo } 
 import { SyncStatusPanel } from "./sync-status";
 import { ConnectionsSlot } from "./settings-slot-connections";
 import { WriteAccessCard } from "./write-access";
+import { IgnoredLeadsSettings } from "./speed-ignored-settings";
+import { PipelineHistoryCard } from "./settings-pipeline-history";
 import { WatchingSlot } from "./settings-slot-watching";
 import { DailyBriefLine } from "./notifications";
 import { BrandPreview, PermissionsPanel, SettingsHistoryCard, TestAccountsCard, WhoCanOpenCard, type PermissionGroup } from "./settings-parts";
@@ -256,6 +258,7 @@ export function SettingsView({ openSection, embedded }: { openSection?: SectionI
                   </div>
                 </div>
               </Card>
+              <PipelineHistoryCard />
               <Card title="Speed to lead">
                 <p className="mb-3 text-sm text-muted-foreground">How fast a new lead should hear from a person. A lead cools in minutes, so the target is short. SubSync does not send replies: it measures how long your team took. Messages from workflows and campaigns are not replies unless you say so.</p>
                 <div className="flex flex-wrap items-end gap-4">
@@ -279,6 +282,7 @@ export function SettingsView({ openSection, embedded }: { openSection?: SectionI
                 </div>
                 <p className="mt-2 text-xs text-muted-foreground">With this on, a lead that arrives when your team is closed (evenings, weekends) starts its reply clock at the next opening time in that account&apos;s own time zone, Monday to Friday. A lead that arrives during opening hours and is still unanswered at closing keeps counting overnight.</p>
               </Card>
+              {data.features?.sp_ignored_leads === true && <IgnoredLeadsSettings />}
               {data.features?.inbox_breach_alert === true && (
                 <Card title="Unanswered alert escalation">
                   <label htmlFor="inbox-ack-grace" className="mb-1 block text-sm font-medium">Escalate an unread alert after (minutes)</label>
@@ -300,7 +304,7 @@ export function SettingsView({ openSection, embedded }: { openSection?: SectionI
                 <div>
                   <label htmlFor="brand-color" className="mb-1 block text-sm font-medium">Colour</label>
                   <div className="flex items-center gap-2">
-                    <input id="brand-color" type="color" className="h-9 w-14 cursor-pointer rounded-lg border bg-background p-1" value={form.brandColor ?? "#1d4ed8"} onChange={(e) => setForm({ ...form, brandColor: e.target.value })} />
+                    <input id="brand-color" type="color" className="h-9 w-14 cursor-pointer rounded-lg border bg-background p-1" value={form.brandColor ?? "#5b789a"} onChange={(e) => setForm({ ...form, brandColor: e.target.value })} />
                     {form.brandColor && <Btn variant="ghost" onClick={() => setForm({ ...form, brandColor: null })}>Clear</Btn>}
                   </div>
                 </div>

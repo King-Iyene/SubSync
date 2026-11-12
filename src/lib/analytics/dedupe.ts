@@ -31,6 +31,8 @@ export type Person = {
   openValue?: number;
   /** Appointments linked to the contact (only filled in for the group on screen). */
   appointments?: number;
+  /** Start of the next appointment that has not happened yet (only filled in for the group on screen). */
+  nextAppointmentAt?: string | null;
   /** The day SubSync first saw each tag on this contact ("since SubSync started watching"). Only filled in for the group on screen. */
   tagDates?: Record<string, string>;
 };

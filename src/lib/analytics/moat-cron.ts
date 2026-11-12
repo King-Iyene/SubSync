@@ -10,6 +10,7 @@ import { refreshClientBilling } from "./clients3-billing";
 import { sweepPeople } from "./people3-sweep";
 import { sweepPayments } from "./payments-sweep";
 import { runDisputeAlerts } from "./payments-alerts";
+import { runIgnoredAlerts } from "./ignored-leads-alerts";
 import { sendMonthlyAudit, sweepAuditHistory } from "./au-sweep";
 import { recordToday } from "./today3-queries";
 import { runTodayEmail } from "./today3-email";
@@ -57,8 +58,9 @@ export async function runMoatCron(now = Date.now()): Promise<MoatCronReport> {
       const wga = ent.features.wg_alerts && !ent.locked.includes("wg_alerts");
       const bre = ent.features.br_email && !ent.locked.includes("br_email");
       const pra = ent.features.pr_auto && ent.features.pr_report && !ent.locked.includes("pr_auto") && !ent.locked.includes("pr_report");
+      const spi = ent.features.sp_ignored_leads && !ent.locked.includes("sp_ignored_leads");
       const fnr = ent.features.fn_mrr && ent.features.fn_module && !ent.locked.includes("fn_mrr") && !ent.locked.includes("fn_module");
-      if (!rec && !mail && !apr && !plr && !clr && !clb && !ppr && !ppi && !auh && !aum && !tdr && !tde && !cfr && !cfe && !pmr && !wgr && !wga && !bre && !pra && !fnr) continue;
+      if (!spi && !rec && !mail && !apr && !plr && !clr && !clb && !ppr && !ppi && !auh && !aum && !tdr && !tde && !cfr && !cfe && !pmr && !wgr && !wga && !bre && !pra && !fnr) continue;
       rep.companies++;
       if (apr) rep.events += Object.values(await sweepAppointmentHistory(installationId)).reduce((x, y) => x + y, 0);
       if (plr) rep.events += Object.values(await sweepDealHistory(installationId)).reduce((x, y) => x + y, 0);
@@ -66,6 +68,7 @@ export async function runMoatCron(now = Date.now()): Promise<MoatCronReport> {
       if (ppr) await sweepPeople(installationId, now).catch((e) => console.error("Team sweep failed", safeError(e)));
       if (ent.features.cl_billing && !ent.locked.includes("cl_billing")) await refreshClientBilling(installationId).catch((e) => console.error("Billing refresh failed", safeError(e)));
       if (ent.features.pm_disputes && !ent.locked.includes("pm_disputes")) await runDisputeAlerts(installationId, now).catch((e) => console.error("Dispute alerts failed", safeError(e)));
+      if (spi) await runIgnoredAlerts(installationId, now).catch((e) => console.error("Ignored-leads alerts failed", safeError(e)));
       if (pmr) rep.events += (await sweepPayments(installationId, now).catch((e) => { console.error("Payments sweep failed", safeError(e)); return { events: 0 }; })).events;
       if (auh) rep.events += await sweepAuditHistory(installationId, now).catch((e) => { console.error("Audit history sweep failed", safeError(e)); return 0; });
       if (aum) await sendMonthlyAudit(installationId, now).catch((e) => console.error("Monthly audit failed", safeError(e)));
@@ -81,7 +84,7 @@ export async function runMoatCron(now = Date.now()): Promise<MoatCronReport> {
       // The 7 am brief, at each person's own hour of their own day (br_email). One per person per day; email stays a dry run until the live switch is on.
       if (bre) {
         const on = (k: string) => ent.features[k as keyof typeof ent.features] === true && !ent.locked.includes(k);
-        await runBriefs(installationId, { cf_save: on("cf_save"), cf_recover: on("cf_recover"), cf_deals: on("cf_deals"), wg_wallet: on("wg_wallet"), pm_module: on("pm_module"), td_today: on("td_today"), fn_today: on("fn_today") }, now).catch((e) => console.error("Brief failed", safeError(e)));
+        await runBriefs(installationId, { cf_save: on("cf_save"), cf_recover: on("cf_recover"), cf_deals: on("cf_deals"), wg_wallet: on("wg_wallet"), pm_module: on("pm_module"), td_today: on("td_today"), fn_today: on("fn_today"), sp_ignored: on("sp_ignored_leads") }, now).catch((e) => console.error("Brief failed", safeError(e)));
       }
       if (tde) await runTodayEmail(installationId, now).catch((e) => console.error("Today email failed", safeError(e)));
       if (rec) rep.events += Object.values(await sweepMoatEvents(installationId)).reduce((a, b) => a + b, 0);

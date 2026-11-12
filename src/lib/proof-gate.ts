@@ -21,8 +21,8 @@ const ICON = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewB
 const BODY = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Monthly report</title>`
   + `<meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex"><meta name="referrer" content="no-referrer"><meta name="color-scheme" content="light dark">`
   + `<link rel="icon" href="${ICON}" type="image/svg+xml">`
-  + `<style>html,body{margin:0}body{background:#fff;color:#0b1b33;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}main{max-width:32rem;margin:0 auto;padding:4rem 1rem}h1{font-size:1.5rem;margin:0 0 .5rem}p{margin:0;color:#51617a;line-height:1.5}`
-  + `@media (prefers-color-scheme:dark){body{background:#111a2b;color:#eef2f8}p{color:#a3b1c8}}</style></head>`
+  + `<style>html,body{margin:0}body{background:#ffffff;color:#21201d;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}main{max-width:32rem;margin:0 auto;padding:4rem 1rem}h1{font-size:1.5rem;margin:0 0 .5rem}p{margin:0;color:#6c685f;line-height:1.5}`
+  + `@media (prefers-color-scheme:dark){body{background:#201f1c;color:#f5f4f1}p{color:#bab7b1}}</style></head>`
   + `<body><main><h1>This page is not available</h1><p>The link may have been switched off or replaced. Please ask the sender for a new one.</p></main></body></html>`;
 
 /** The one answer for every bad link: a real 404, the same body every time. */

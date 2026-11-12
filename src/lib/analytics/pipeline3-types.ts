@@ -3,7 +3,7 @@
 // minimum sample is { enough: false } and the screen says "not enough data", never a made-up number. Definitions: docs/METRICS.md "Pipeline 3".
 
 export const PL3_PARTS = [
-  "overview", "money-flow", "attention", "won-lost", "forecast", "people", "sources", "stage-history", "health", "receipt", "list", "detail", "replay", "pipelines",
+  "overview", "money-flow", "attention", "won-lost", "forecast", "people", "sources", "stage-history", "health", "receipt", "list", "detail", "replay", "pipelines", "funnel", "funnel-deals", "stuck", "funnel-settings",
 ] as const;
 export type Pl3Part = (typeof PL3_PARTS)[number];
 
@@ -150,7 +150,7 @@ export type Pl3Detail = {
 export type Pl3Envelope<T> = T & { generatedAt: string; cached: boolean; canSeeAccounts: boolean; flags: Record<string, boolean> };
 
 export const PL3_FLAGS = [
-  "pl_overview", "pl_money_flow", "pl_attention", "pl_won_lost", "pl_forecast", "pl_people", "pl_sources", "pl_stage_history", "pl_health", "pl_proof", "pl_actions", "pl_history", "pl_record",
+  "pl_overview", "pl_money_flow", "pl_attention", "pl_won_lost", "pl_forecast", "pl_people", "pl_sources", "pl_stage_history", "pl_health", "pl_proof", "pl_actions", "pl_history", "pl_record", "pl_history_funnel",
 ] as const;
 export type Pl3Flag = (typeof PL3_FLAGS)[number];
 

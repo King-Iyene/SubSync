@@ -33,7 +33,7 @@ const GROUPS: Array<{ title: string; tokens: Array<[string, string]> }> = [
   { title: "Status (only ever for status, always with an icon or a word)", tokens: [["destructive", "background"], ["warning", "background"], ["success", "background"]] },
 ];
 const CHARTS = ["chart-1", "chart-2", "chart-3", "chart-4", "chart-5"];
-const SWATCHES = ["#0a658b", "#d4ad58", "#e11d48", "#6366f1", "#02244f", "#facc15"];
+const SWATCHES = ["#504c45", "#cba962", "#bf405b", "#94a9c0", "#2b2926", "#c3ab4c"];
 
 function useTokenValues(root: React.RefObject<HTMLDivElement | null>, names: string[], key: string): Record<string, string> {
   const [v, setV] = useState<Record<string, string>>({});

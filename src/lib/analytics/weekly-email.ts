@@ -51,15 +51,15 @@ export function weeklyEmail(i: WeeklyInput): { subject: string; text: string; ht
     "", `Open it: ${link}`,
     ...(i.stopUrl ? ["", `Stop these emails: ${i.stopUrl}`] : []),
   ].join("\n");
-  const html = `<div style="font-family:system-ui,sans-serif;max-width:560px;margin:0 auto;color:#111">
+  const html = `<div style="font-family:system-ui,sans-serif;max-width:560px;margin:0 auto;color:#111111">
 ${emailLogoHtml(i.logoUrl, i.who)}<h2 style="margin:0 0 12px">${esc(subject)}</h2>
-<ul style="padding-left:18px;color:#444">${bits.map((b) => `<li>${esc(b)}</li>`).join("")}</ul>
+<ul style="padding-left:18px;color:#444444">${bits.map((b) => `<li>${esc(b)}</li>`).join("")}</ul>
 ${facts.length ? `<h3 style="margin:20px 0 6px">The last 14 days</h3><ul style="padding-left:18px">${facts.map((f) => `<li>${esc(f)}</li>`).join("")}</ul>` : ""}
 <h3 style="margin:20px 0 6px">${count === 0 ? "Nothing needs you" : "Needs attention"}</h3>
 <ul style="padding-left:18px">${top.map((a) => `<li><strong>${esc(a.name)}</strong>: ${esc(a.title)}</li>`).join("")}</ul>
 ${count > top.length ? `<p>...and ${count - top.length} more in the app.</p>` : ""}
-<p><a href="${esc(link)}" style="display:inline-block;background:#0f766e;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none">Open it</a></p>
-${i.stopUrl ? `<p style="font-size:12px;color:#666"><a href="${esc(i.stopUrl)}" style="color:#666">Stop these emails</a></p>` : ""}
+<p><a href="${esc(link)}" style="display:inline-block;background:#47443e;color:#ffffff;padding:10px 16px;border-radius:8px;text-decoration:none">Open it</a></p>
+${i.stopUrl ? `<p style="font-size:12px;color:#666666"><a href="${esc(i.stopUrl)}" style="color:#666666">Stop these emails</a></p>` : ""}
 </div>`;
   return { subject, text, html };
 }
@@ -71,7 +71,7 @@ export function alertEmail(who: string, alerts: Array<{ severity: string; title:
   const top = alerts.slice(0, 10);
   const link = `${appUrl}/app#alerts`;
   const text = [subject, "", ...top.map((a) => `- ${a.title}`), ...(n > top.length ? [`...and ${n - top.length} more`] : []), "", `Open it: ${link}`, ...(stopUrl ? ["", `Stop these emails: ${stopUrl}`] : [])].join("\n");
-  const html = `<div style="font-family:system-ui,sans-serif;max-width:560px;margin:0 auto;color:#111">${emailLogoHtml(logoUrl, who)}<h2>${esc(subject)}</h2><ul style="padding-left:18px">${top.map((a) => `<li>${esc(a.title)}</li>`).join("")}</ul>${n > top.length ? `<p>...and ${n - top.length} more.</p>` : ""}<p><a href="${esc(link)}">Open it</a></p>${stopUrl ? `<p style="font-size:12px;color:#666"><a href="${esc(stopUrl)}" style="color:#666">Stop these emails</a></p>` : ""}</div>`;
+  const html = `<div style="font-family:system-ui,sans-serif;max-width:560px;margin:0 auto;color:#111111">${emailLogoHtml(logoUrl, who)}<h2>${esc(subject)}</h2><ul style="padding-left:18px">${top.map((a) => `<li>${esc(a.title)}</li>`).join("")}</ul>${n > top.length ? `<p>...and ${n - top.length} more.</p>` : ""}<p><a href="${esc(link)}">Open it</a></p>${stopUrl ? `<p style="font-size:12px;color:#666666"><a href="${esc(stopUrl)}" style="color:#666666">Stop these emails</a></p>` : ""}</div>`;
   return { subject, text, html };
 }
 

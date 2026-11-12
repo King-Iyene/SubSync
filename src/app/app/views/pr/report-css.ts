@@ -2,10 +2,10 @@
 // (the company's own colour), thin lines, no shadows. Light by default; dark follows the app's own theme (.dark) or, on the public page, the reader's system setting. Print is always the
 // light theme, on A4 or Letter margins, with nothing split across two sheets. Nothing here names the product or the platform.
 export const PR_CSS = `
-.pr-doc { --pr-bg: #ffffff; --pr-fg: #0b1b33; --pr-muted: #51617a; --pr-card: #f6f8fb; --pr-line: #dbe2ec; --pr-good: #0b7a4f; --pr-bad: #b3261e; --pr-flat: #51617a;
+.pr-doc { --pr-bg: #ffffff; --pr-fg: #21201d; --pr-muted: #6c685f; --pr-card: #faf9f7; --pr-line: #e8e5df; --pr-good: #2b5a48; --pr-bad: #9d3a34; --pr-flat: #6c685f;
   background: var(--pr-bg); color: var(--pr-fg); line-height: 1.55; font-family: var(--font-geist-sans, system-ui), system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; -webkit-text-size-adjust: 100%; }
-.dark .pr-doc { --pr-bg: #111a2b; --pr-fg: #eef2f8; --pr-muted: #a3b1c8; --pr-card: #18233a; --pr-line: #2b3a56; --pr-good: #4cc994; --pr-bad: #ff8a80; --pr-flat: #a3b1c8; --pr-accent-text: var(--pr-accent-text-d); }
-@media (prefers-color-scheme: dark) { .pr-doc[data-auto] { --pr-bg: #111a2b; --pr-fg: #eef2f8; --pr-muted: #a3b1c8; --pr-card: #18233a; --pr-line: #2b3a56; --pr-good: #4cc994; --pr-bad: #ff8a80; --pr-flat: #a3b1c8; --pr-accent-text: var(--pr-accent-text-d); } }
+.dark .pr-doc { --pr-bg: #201f1c; --pr-fg: #f5f4f1; --pr-muted: #bab7b1; --pr-card: #2c2a26; --pr-line: #45423c; --pr-good: #61b491; --pr-bad: #dfa5a0; --pr-flat: #bab7b1; --pr-accent-text: var(--pr-accent-text-d); }
+@media (prefers-color-scheme: dark) { .pr-doc[data-auto] { --pr-bg: #201f1c; --pr-fg: #f5f4f1; --pr-muted: #bab7b1; --pr-card: #2c2a26; --pr-line: #45423c; --pr-good: #61b491; --pr-bad: #dfa5a0; --pr-flat: #bab7b1; --pr-accent-text: var(--pr-accent-text-d); } }
 .pr-doc[data-auto] { min-height: 100vh; }
 .pr-doc *, .pr-doc *::before, .pr-doc *::after { box-sizing: border-box; }
 :where(.pr-doc) :is(p, h1, h2, h3, ul, ol, dl, dd) { margin: 0; padding: 0; }
@@ -60,18 +60,18 @@ export const PR_CSS = `
 .pr-switch { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.75rem; }
 .pr-switch a { font-size: 0.84rem; padding: 0.25rem 0.65rem; border: 1px solid var(--pr-line); border-radius: 999px; color: var(--pr-fg); text-decoration: none; }
 .pr-switch a[aria-current="page"] { background: var(--pr-accent); border-color: var(--pr-accent); color: var(--pr-on-accent); }
-.pr-sample { background: #fff7e0; color: #5a4300; border: 1px solid #ecd48a; border-radius: 8px; padding: 0.5rem 0.8rem; font-size: 0.88rem; font-weight: 600; margin-bottom: 1rem; }
+.pr-sample { background: #f7f3e8; color: #443816; border: 1px solid #ddcc99; border-radius: 8px; padding: 0.5rem 0.8rem; font-size: 0.88rem; font-weight: 600; margin-bottom: 1rem; }
 @page { margin: 14mm; }
 .pr-portal { display: none; }
 @media print {
-  .pr-doc, .dark .pr-doc { --pr-bg: #ffffff; --pr-fg: #0b1b33; --pr-muted: #44546f; --pr-card: #ffffff; --pr-line: #c9d2df; --pr-good: #0b6a44; --pr-bad: #a02019; --pr-flat: #44546f; --pr-accent-text: var(--pr-accent-text-l); }
-  .pr-doc { background: #fff; font-size: 10.5pt; }
+  .pr-doc, .dark .pr-doc { --pr-bg: #ffffff; --pr-fg: #21201d; --pr-muted: #5f5b54; --pr-card: #ffffff; --pr-line: #d7d5d1; --pr-good: #25503f; --pr-bad: #8b332e; --pr-flat: #5f5b54; --pr-accent-text: var(--pr-accent-text-l); }
+  .pr-doc { background: #ffffff; font-size: 10.5pt; }
   .pr-wrap { max-width: none; padding: 0; }
   .pr-noprint, .pr-actions, .pr-switch { display: none !important; }
   .pr-how { display: none; } .pr-formulas { display: block; }
   .pr-card, .pr-tl li, .pr-chart, .pr-sec h2 { break-inside: avoid; }
   .pr-sec h2 { break-after: avoid; }
-  .pr-card { background: #fff; }
+  .pr-card { background: #ffffff; }
   .pr-head { border-top-color: var(--pr-accent-text-l); }
   .pr-lead, .pr-tl li::before { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   html[data-pr-printing] body > *:not(.pr-portal) { display: none !important; }

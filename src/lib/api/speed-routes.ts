@@ -11,6 +11,8 @@ import { speedPulse } from "../analytics/speed6-queries";
 import { zoneLabel } from "../analytics/speed6";
 import { buildMessage, destination, sanitizeDigest } from "../analytics/speed-digest";
 import { deliver, digestNumbers, loadDigest, saveDigest } from "../analytics/speed-digest-db";
+import { ignoredPage, ignoredReport } from "../analytics/ignored-leads-sql";
+import { isReason } from "../analytics/ignored-leads-core";
 import { isLive } from "../live-flags";
 import { featureOn } from "../flags";
 import { isPrefKey, loadPrefs, savePref } from "../analytics/speed-prefs-db";
@@ -93,7 +95,7 @@ export async function handleSpeedPart(ctx: Ctx, h: SpeedHelpers): Promise<Respon
     if (cmp && !cmp.ok) return json({ error: "The comparison range is not valid: " + cmp.error }, 400);
     const out = await speedHome({ installationId: ctx.installationId, allowed: allowedAll, targetMinutes, now, win: w.win, cmp: cmp && cmp.ok ? cmp.win : null, seePeople, canChangeTarget: ctx.kind !== "client" });
     const m = await h.measuring();
-    return json(withUrls({ ...out, measuring: { targetMinutes, countAutomated: m.countAutomated, businessHours: m.businessHours, canChange: ctx.kind !== "client" }, seePeople }, links.contact));
+    return json(withUrls({ ...out, measuring: { targetMinutes, countAutomated: m.countAutomated, businessHours: m.businessHours, canChange: ctx.kind !== "client" }, seePeople, ignoredOn: await featureOn("sp_ignored_leads") }, links.contact));
   }
 
   if (part === "list") {
@@ -179,6 +181,26 @@ export async function handleSpeedPart(ctx: Ctx, h: SpeedHelpers): Promise<Respon
     const sel = parseSel(sp, seePeople);
     if (!sel) return json({ error: "Unknown list" }, 400);
     return json(withUrls(await speedInsightList({ ...base, sel }), links.contact));
+  }
+
+  // Clients ignoring leads (flag sp_ignored_leads): the report per client account and the exact people behind any count. The accounts come from the session; an account id only narrows inside them.
+  if (part === "ignored" || part === "ignored-list") {
+    if (!(await featureOn("sp_ignored_leads"))) return part === "ignored" ? json({ enabled: false }) : json({ error: "Not available" }, 404);
+    const w = windowOf(ctx.url, now);
+    if (!w.ok) return json({ error: w.error }, 400);
+    const allowed = narrowed(allowedAll, sp.get("account"));
+    if (allowed === "none") return part === "ignored" ? json({ enabled: true, accounts: [], totals: null }) : json({ total: 0, page: 0, rows: [] });
+    const scope = { installationId: ctx.installationId, allowed: allowed as string[] | null, fromMs: w.win.fromMs, toMs: w.win.toMs, now };
+    if (part === "ignored") return json({ enabled: true, ...(await ignoredReport(scope)), measuring: await h.measuring() });
+    const reasonP = sp.get("reason") ?? "all";
+    if (reasonP !== "all" && !isReason(reasonP)) return json({ error: "Unknown list" }, 400);
+    const size = [20, 50, 100].includes(int(sp.get("size"), 50)) ? int(sp.get("size"), 50) : 50;
+    const out = await ignoredPage(scope, { reason: reasonP, account: null, page: Math.max(0, int(sp.get("page"), 0)), size });
+    const rows = out.rows.map((r) => ({
+      locationId: r.locationId, locationName: r.locationName, contactId: r.contactId, name: r.name, status: "waiting" as const, neverAnswered: r.reasons.includes("never") && r.reasons.length === 1, minutes: Math.max(0, Math.round((now - r.since) / 60_000)),
+      source: r.source ?? "No source recorded", repliedBy: null, owner: r.owner, unassigned: !r.owner, autoSeconds: null, detailed: false, phone: r.phone, email: r.email, dnd: r.dnd, timeZone: r.timeZone, suggestion: null, dollars: r.dollars, reasons: r.reasons,
+    }));
+    return json(withUrls({ total: out.total, page: out.page, size, rows }, links.contact));
   }
 
   if (part === "compare") {

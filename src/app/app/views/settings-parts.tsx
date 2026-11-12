@@ -134,7 +134,7 @@ export function SettingsHistoryCard() {
 }
 
 export function BrandPreview({ name, color, logoUrl }: { name: string | null; color: string | null; logoUrl?: string | null }) {
-  const accent = color ?? "#1d4ed8";
+  const accent = color ?? "#5b789a";
   return (
     <div className="mt-4 rounded-lg border p-3" aria-label="Preview" data-testid="brand-preview">
       <p className="mb-2 text-xs text-muted-foreground">Preview: your name and colour, as they appear on printed reports and share links.</p>

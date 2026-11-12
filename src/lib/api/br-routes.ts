@@ -29,7 +29,7 @@ export async function handleBr(ctx: Ctx): Promise<Response> {
   const wrap = (body: object) => json({ ...body, generatedAt: new Date().toISOString(), level, flags, problem: null });
   if (level !== "all" || ctx.limitTo !== null) return isAct ? json({ error: "Ask the owner of your account to do this." }, 403) : wrap({ brief: null });
   if (!user) return json({ error: "Please sign in again" }, 401);
-  const f: BriefFlags = { cf_save: on("cf_save"), cf_recover: on("cf_recover"), cf_deals: on("cf_deals"), wg_wallet: on("wg_wallet"), pm_module: on("pm_module"), td_today: on("td_today"), fn_today: on("fn_today") };
+  const f: BriefFlags = { cf_save: on("cf_save"), cf_recover: on("cf_recover"), cf_deals: on("cf_deals"), wg_wallet: on("wg_wallet"), pm_module: on("pm_module"), td_today: on("td_today"), fn_today: on("fn_today"), sp_ignored: on("sp_ignored_leads") };
   const base = (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/+$/, "");
 
   if (isAct) return act(ctx, ctx.segments[2], user, f, on("br_email"), on("br_record"));

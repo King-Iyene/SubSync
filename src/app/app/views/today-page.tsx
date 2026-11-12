@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { IgnoredLine } from "./speed-ignored";
 import type { AccessKind } from "@/lib/access";
 import {
   accountBars, accountsNeedingYou, ageWords, barsTitle, countsOf, headlineOf, KIND_LABEL, KINDS, proofLine, replyWords, shareText, staleUsual, waitingOldestFirst,
@@ -263,6 +264,7 @@ export function TodayPage({ mode = "full", go, t, kind, reload, sync, syncing, o
           {!t.actionsReady && <p className="t-small t-quiet mt-2" data-testid="needs-update">Mark done and Snooze need the latest database update.</p>}
         </TodayHeadline>}
 
+        {agency && <IgnoredLine />}
         {multi ? (
           <>
             <AccountList rows={needing.rows} total={needing.total} urgent={urgent} onShow={(a) => m.open(specAccount(a.locationId, env))} onOnly={(a) => changeAccounts([a.locationId])} onSeeAll={() => m.open(specClients(env))}

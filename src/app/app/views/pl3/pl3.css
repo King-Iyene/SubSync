@@ -1,6 +1,6 @@
 /* Pipeline module: Coin stacks. Calm and minimal: neutral surfaces from the app theme, ONE accent (gold) for money won, grey for lost, one muted amber outline for stuck. No glow, no gradients. */
-.pl { --pl-gold: #b07400; --pl-open: color-mix(in srgb, var(--foreground) 14%, transparent); --pl-open-edge: color-mix(in srgb, var(--foreground) 42%, transparent); --pl-lost: color-mix(in srgb, var(--foreground) 34%, transparent); --pl-stuck: #a8731a; }
-[data-theme="dark"] .pl { --pl-gold: #e2a925; --pl-stuck: #c99a45; }
+.pl { --pl-gold: #84662c; --pl-open: color-mix(in srgb, var(--foreground) 14%, transparent); --pl-open-edge: color-mix(in srgb, var(--foreground) 42%, transparent); --pl-lost: color-mix(in srgb, var(--foreground) 34%, transparent); --pl-stuck: #926d31; }
+[data-theme="dark"] .pl { --pl-gold: #c19c46; --pl-stuck: #c3984b; }
 .pl-flow-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin-bottom: 8px; }
 .pl-flow-title { font-size: 1.05rem; font-weight: 650; margin: 0; margin-right: auto; }
 .pl-replay { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 10px; }
@@ -11,7 +11,7 @@
 .pl-base { stroke: color-mix(in srgb, var(--foreground) 18%, transparent); stroke-width: 1; }
 .pl-coin { transition: transform 160ms ease; }
 .pl-coin-open { fill: var(--pl-open); stroke: var(--pl-open-edge); stroke-width: 1; }
-.pl-coin-won { fill: var(--pl-gold); stroke: color-mix(in srgb, var(--pl-gold) 70%, #000); stroke-width: 1; }
+.pl-coin-won { fill: var(--pl-gold); stroke: color-mix(in srgb, var(--pl-gold) 70%, #000000); stroke-width: 1; }
 .pl-coin-lost { fill: var(--pl-lost); stroke: color-mix(in srgb, var(--foreground) 45%, transparent); stroke-width: 1; }
 .pl-coin-stuck { fill: url(#pl-hatch); stroke: var(--pl-stuck); stroke-width: 1; }
 .pl-hatch-bg { fill: color-mix(in srgb, var(--foreground) 8%, transparent); } .pl-hatch-line { fill: color-mix(in srgb, var(--pl-stuck) 55%, transparent); }
@@ -38,6 +38,16 @@
 .pl .ap-chip[data-tone] { color: var(--muted-foreground); background: transparent; border-color: color-mix(in srgb, var(--foreground) 22%, transparent); }
 @media (max-width: 700px) { .pl-replay { width: 100%; } .pl-replay input[type="range"] { flex: 1; width: auto; } }
 @media (prefers-reduced-motion: reduce) { [data-settle="1"] .pl-coin { animation: none; } .pl-coin { transition: none; } }
+
+/* history funnel and stuck list: flat bars, existing tokens only */
+.plhf-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.plhf-step { padding: 10px 12px; border-radius: 12px; background: var(--s6-surf); border: 1px solid color-mix(in srgb, var(--s6-edgec) 22%, transparent); }
+.plhf-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; margin-bottom: 8px; }
+.plhf-bar { display: flex; gap: 2px; min-height: 30px; }
+.plhf-seg { flex-basis: 0; min-width: 34px; border: 0; border-radius: 6px; cursor: pointer; font: inherit; font-size: 0.75rem; font-weight: 600; color: var(--foreground); padding: 4px 6px; background: color-mix(in srgb, var(--s6-cyan) 22%, transparent); }
+.plhf-seg[data-tone="green"] { background: color-mix(in srgb, var(--s6-green) 28%, transparent); } .plhf-seg[data-tone="red"] { background: color-mix(in srgb, var(--s6-red) 28%, transparent); } .plhf-seg[data-tone="grey"] { background: color-mix(in srgb, var(--foreground) 12%, transparent); }
+.plhf-seg:hover { outline: 1px solid var(--s6-cyan); } .plhf-seg:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
+.plhf-key { margin-top: 4px; }
 
 /* pipeline cards and picker: calm outlines, one accent, no fills */
 .pl-gridbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin-bottom: 8px; }

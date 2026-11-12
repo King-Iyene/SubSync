@@ -24,7 +24,7 @@ const day = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { day: "n
 
 export default function ReplyProof({ params }: { params: Promise<{ id: string }> }) {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-[#000c25]" />}>
+    <Suspense fallback={<div className="min-h-screen bg-[#141311]" />}>
       <Body params={params} />
     </Suspense>
   );
