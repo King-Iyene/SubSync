@@ -26,7 +26,8 @@ type Data = {
 // page says so when something is not saved yet. Which section opens is remembered in this browser; Getting started opens the right one with "Do it now".
 
 /** `openSection` is set when an old address (#connections) asks for one section; the person can still pick another afterwards. */
-export function SettingsView({ openSection }: { openSection?: SectionId } = {}) {
+/** `embedded` (the new Settings hub) draws only those old sections, without this page's own title and menu, and keeps one form across them. */
+export function SettingsView({ openSection, embedded }: { openSection?: SectionId; embedded?: SectionId[] } = {}) {
   const api = useApiClient();
   const { data, error, loading, reload } = useData<Data>("settings");
   const keys = useData<{ keys: Array<{ id: string; name: string; prefix: string; createdAt: string; lastUsedAt: string | null }>; max: number; endpoint: string }>("api-keys");
@@ -67,7 +68,7 @@ export function SettingsView({ openSection }: { openSection?: SectionId } = {}) 
 
   const kind = data.kind === "business" ? "business" : "agency";
   const sections = sectionsFor(kind);
-  const section: SectionId = isSectionId(picked) && sections.some((s) => s.id === picked) ? picked : sections[0].id;
+  const section: SectionId = embedded ? ("" as SectionId) : isSectionId(picked) && sections.some((s) => s.id === picked) ? picked : sections[0].id;
   const current = sections.find((s) => s.id === section)!;
   const choose = (id: SectionId) => { setPicked(id); remember(SETTINGS_SECTION_KEY, id); setMsg(null); };
 
@@ -127,21 +128,21 @@ export function SettingsView({ openSection }: { openSection?: SectionId } = {}) 
 
   return (
     <div className="max-w-5xl">
-      <PageHeader title="Settings" subtitle="What counts as late, where alerts go, who can see what, and your data. Pick a section." />
+      {!embedded && <PageHeader title="Settings" subtitle="What counts as late, where alerts go, who can see what, and your data. Pick a section." />}
       {msg && <p className={`mb-4 border-l-2 py-1 pl-3 text-sm ${msg.ok ? "border-success" : "border-destructive"}`} role={msg.ok ? "status" : "alert"} data-testid="settings-message">{msg.text}</p>}
 
       <div className="grid grid-cols-[minmax(0,1fr)] gap-5">
-        <nav aria-label="Settings sections" data-testid="settings-nav" className="flex max-w-full gap-1 overflow-x-auto border-b pb-2">
+        {!embedded && <nav aria-label="Settings sections" data-testid="settings-nav" className="flex max-w-full gap-1 overflow-x-auto border-b pb-2">
           {sections.map((s) => (
             <button key={s.id} type="button" onClick={() => choose(s.id)} aria-current={s.id === section ? "page" : undefined}
               className={`min-h-11 shrink-0 rounded-lg px-4 py-2 text-left text-[0.95rem] transition-colors ${s.id === section ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"}`}>{s.title}</button>
           ))}
-        </nav>
+        </nav>}
 
         <div className="min-w-0 space-y-4" data-testid={`section-${section}`}>
-          {section !== "sync" && <div><h2 className="text-lg font-semibold tracking-tight">{current.title}</h2><p className="text-sm text-muted-foreground">{current.hint}</p></div>}
+          {!embedded && section !== "sync" && <div><h2 className="text-lg font-semibold tracking-tight">{current.title}</h2><p className="text-sm text-muted-foreground">{current.hint}</p></div>}
 
-          {section === "team" && (
+          {(section === "team" || embedded?.includes("team")) && (
             <>
               {data.clientView && (
                 <Card title="Client access">
@@ -178,7 +179,7 @@ export function SettingsView({ openSection }: { openSection?: SectionId } = {}) 
             </>
           )}
 
-          {section === "notifications" && (
+          {(section === "notifications" || embedded?.includes("notifications")) && (
             <Card title="Daily brief and alerts">
               <DailyBriefLine />
               <p className="mt-1 text-sm text-muted-foreground">Choose where each alert, the daily brief and the weekly summary go (the bell, email, one or more Slack channels), when, the quiet hours and the wording. It works without any setup.</p>
@@ -186,7 +187,7 @@ export function SettingsView({ openSection }: { openSection?: SectionId } = {}) 
             </Card>
           )}
 
-          {section === "notifications" && (
+          {(section === "notifications" || embedded?.includes("notifications")) && (
             <Card title="Slack alerts and daily brief">
               <label className="mb-3 flex items-start gap-2 text-sm"><input type="checkbox" className="mt-0.5 size-4" checked={form.alertQuietHours} onChange={(e) => setForm({ ...form, alertQuietHours: e.target.checked })} /> <span>Quiet hours: warnings are emailed between 07:00 and 21:00 in your time zone, and wait for the morning otherwise. Critical alerts are always sent at once. Every email has a link to stop it.</span></label>
               <p className="mb-3 text-sm text-muted-foreground">
@@ -225,7 +226,7 @@ export function SettingsView({ openSection }: { openSection?: SectionId } = {}) 
             </Card>
           )}
 
-          {section === "integrations" && (
+          {(section === "integrations" || embedded?.includes("integrations")) && (
             <>
               {data.features?.connections !== false && <ConnectionsSlot />}
               <PermissionsPanel groups={data.permissions} />
@@ -233,7 +234,7 @@ export function SettingsView({ openSection }: { openSection?: SectionId } = {}) 
             </>
           )}
 
-          {section === "targets" && (
+          {(section === "targets" || embedded?.includes("targets")) && (
             <>
               <Card title="Thresholds">
                 <p className="mb-3 text-sm text-muted-foreground" data-testid="you-enter-this">You choose these numbers. SubSync does not read them from your CRM, and every count of late, stale and quiet uses the ones shown here.</p>
@@ -288,7 +289,7 @@ export function SettingsView({ openSection }: { openSection?: SectionId } = {}) 
             </>
           )}
 
-          {section === "brand" && (
+          {(section === "brand" || embedded?.includes("brand")) && (
             <Card title="Your name on reports">
               <p className="mb-3 text-sm text-muted-foreground">Replaces our name on every screen, in the browser tab, on printed client reports and quarterly reviews, in emails and on share links, so what you hand to a client carries your name, not ours.</p>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -313,7 +314,7 @@ export function SettingsView({ openSection }: { openSection?: SectionId } = {}) 
             </Card>
           )}
 
-          {section === "privacy" && (
+          {(section === "privacy" || embedded?.includes("privacy")) && (
             <>
               {meetingsShown && (
                 <Card title="Meeting notes privacy">
@@ -344,14 +345,14 @@ export function SettingsView({ openSection }: { openSection?: SectionId } = {}) 
             </>
           )}
 
-          {section === "sync" && (
+          {(section === "sync" || embedded?.includes("sync")) && (
             <>
               <WatchingSlot />
               <SyncStatusPanel />
             </>
           )}
 
-          {section === "advanced" && (
+          {(section === "advanced" || embedded?.includes("advanced")) && (
             <>
               <Card title="Links">
                 <p className="text-sm">&quot;Open&quot; links go to <strong>{data.settings.appDomain}</strong>.</p>
@@ -430,7 +431,7 @@ export function SettingsView({ openSection }: { openSection?: SectionId } = {}) 
             </>
           )}
 
-          {(section === "team" || section === "integrations" ? dirty : section !== "sync") && saveBar}
+          {(embedded ? embedded.length > 0 && dirty : (section === "team" || section === "integrations" ? dirty : section !== "sync")) && saveBar}
         </div>
       </div>
     </div>

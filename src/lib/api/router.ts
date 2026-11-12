@@ -130,6 +130,7 @@ import { handleClients3 } from "./clients3-routes";
 import { handleClients2 } from "./clients2-routes";
 import { handlePeople3 } from "./people3-routes";
 import { handleTeamRoles } from "./team-roles-routes";
+import { handleSettings2 } from "./settings2-routes";
 import { handlePayments } from "./payments-routes";
 import { handleToday3, handleToday3Act } from "./today3-routes";
 import { handleCash, handleCashAct } from "./cash-routes";
@@ -2085,6 +2086,8 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
     if (a === "today3" && b === "act" && ctx.segments.length === 3) {
       return await handleToday3Act(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links });
     }
+    // Settings, guides and What's new (stage ST): /api/app/st/<home|state|connections|progress>. Per-person marks only; never changes the CRM or a setting.
+    if (a === "st" && ctx.segments.length === 2) return await handleSettings2(ctx);
     // Cash features: /api/app/cash?part=... (save this account, recover, deals; read only) and /api/app/cash/act/... (SubSync notes; the one CRM change, an owner change, goes through the safe gateway).
     if (a === "cash" && method === "GET" && !b && ctx.url.searchParams.has("part")) {
       return await handleCash(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links, targets: async () => { const st = (await scope(ctx)).settings; return { slaHours: st.slaHours, targetMinutes: st.speedTargetMinutes }; }, locationToken: (locationId) => locationAccessToken(ctx.session.companyId, locationId) });

@@ -4,6 +4,7 @@ import { CircleHelp } from "lucide-react";
 import { Component, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { errorId } from "@/lib/design/ui-logic";
 import type { ApiError } from "../session";
+import { EmptyGuideLink } from "../views/st-state";
 import { openProblemReport, rememberErrorId } from "./error-memory";
 
 // The four "nothing to show yet" states every screen needs (loading, empty, error, and a definition one tap away). This file must not import
@@ -16,6 +17,7 @@ export function EmptyState({ title, body, action, compact = false }: { title: st
       <p className="text-sm font-semibold">{title}</p>
       {body && <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">{body}</p>}
       {action && <div className="mt-4 flex justify-center">{action}</div>}
+      {!compact && <EmptyGuideLink />}
     </div>
   );
 }

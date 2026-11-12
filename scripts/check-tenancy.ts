@@ -140,6 +140,7 @@ async function main() {
       // Team actions and reports (slice PB): the other side's account, person, note and batch asked for by every parameter of every read.
       `/api/app/people3/act/proof?locationId=${other.locs[0]}`, `/api/app/people3/act/proof-csv?locationId=${other.locs[0]}`, `/api/app/people3/act/proof-prefs?locationId=${other.locs[0]}`, `/api/app/people3/act/meta?locationId=${other.locs[0]}`, `/api/app/people3/act/suggest?locationId=${other.locs[0]}`, `/api/app/people3/act/log?locationId=${other.locs[0]}`, `/api/app/people3/act/away?locationId=${other.locs[0]}`, `/api/app/people3/act/notes?userId=${other.marker}`, `/api/app/people3/act/targets?userId=${other.marker}`, `/api/app/people3/act/focus?userId=${other.marker}`, `/api/app/people3/act/rebalance?locationId=${other.locs[0]}&userId=${other.marker}`, `/api/app/people3/act/suggest?locationId=${other.locs[0]}&contactId=${other.contacts[0]}`, "/api/app/people3/act/away", "/api/app/people3/act/log", "/api/app/people3/act/caps",
       // Team roles (Setter, Closer): the other side's account and people asked for by every parameter of the reads.
+      "/api/app/st/home", "/api/app/st/state", "/api/app/st/connections", "/api/app/st/progress", `/api/app/st/state?location=${other.locs[0]}&user=${other.marker}`,
       "/api/app/people3/roles/map", "/api/app/people3/roles/list", "/api/app/people3/roles/log", `/api/app/people3/roles/list?location=${other.locs[0]}`, `/api/app/people3/roles/list?q=${other.marker}&role=none&after=${other.marker}`, `/api/app/people3/roles/list?location=${other.locs[0]}&role=setters`,
       // Payments: every part, asked for the other side's account and items by every parameter the page takes.
       ...["today", "queue", "disputes", "upcoming", "history", "options", "setup", "export"].flatMap((part) => [`/api/app/payments?part=${part}`, `/api/app/payments?part=${part}&location=${other.locs[0]}`, `/api/app/payments?part=${part}&location=${other.locs[0]}&q=${other.marker}&currency=USD&problem=failed`]),
@@ -291,6 +292,8 @@ async function main() {
       ["POST", "/api/app/people3/roles/set", { userIds: [B.marker], role: "setter", step: "do" }],
       ["POST", "/api/app/people3/roles/set", { userIds: [B.marker], role: "closer", locationId: B.locs[0], step: "do" }],
       ["POST", "/api/app/people3/roles/set", { userIds: [B.marker], role: null, locationId: B.locs[0], step: "do", typed: "clear role" }],
+      ["POST", "/api/app/st/state", { kind: "module_hidden", key: B.marker, on: true }],
+      ["POST", "/api/app/st/state", { kind: "news_seen", key: B.locs[0], on: true, location: B.locs[0] }],
       ["POST", "/api/app/people3/roles/undo", { batchId: "00000000-0000-0000-0000-000000000000", step: "do" }],
       // Workflows: a change, a label, a mark and a read of the other agency's workflow in its client account.
       ["POST", "/api/app/workflows/preview", { kind: "delete", items: [{ locationId: B.locs[0], workflowId: "w-1" }] }],
