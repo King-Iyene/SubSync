@@ -22,6 +22,8 @@ export type Overview = {
   plan: "free" | "starter" | "pro";
   entitlements: { enforced: boolean; accountLimit: number | null; features: Record<string, boolean> };
   hiddenAccounts: number;
+  /** The basis under the dollar tiles (one shared function): what was counted and what was left out. Null in the demo. */
+  trust?: { counting: string; leftOutLine: string | null; leftOutDeals: number; notJudged: number; howStale: string; howLeftOut: string } | null;
   kpis: {
     accounts: number; ignored: number; contacts: number; openOpps: number; openValue: number; staleValue: number;
     staleOpps: number; dormant: number; unread: number; unanswered: number; expectedRevenue: number | null;

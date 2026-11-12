@@ -2,7 +2,9 @@ import { createHash } from "node:crypto";
 import { sql } from "../db";
 import { rollupCloses, rollupFlow, rollupFresh, rollupHeadline, rollupOpenByStage } from "./pipeline3-rollup";
 import { ttlCache } from "../ttl-cache";
-import { dealScopeJoins, outOfScope } from "./stage-rules-sql";
+import { dealScopeJoins, outOfScope, valueSuspect } from "./stage-rules-sql";
+import { dealTrust } from "./deal-trust-queries";
+import { HOW_LEFT_OUT, HOW_STALE_WORKED_OUT, countingLine, leftOutLine, MIN_STAGE_STAYS, STAGE_LIMIT_CAP_DAYS, STAGE_LIMIT_FLOOR_DAYS } from "./deal-trust";
 import {
   atRiskEstimate, bucketOf, buildReplay, buildStages, clampSize, coachingLine, DAY, DEFAULT_LIMIT_DAYS, eventText, findLeak, forecastEstimate, headlineOf, healthScore, dealHealth, MIN_CLOSED, MIN_LOST_REASONS,
   MIN_STAYS, median, money, NO_EST, pickButton, rate, slug, stageKey, stageProbability, trackRecord, velocityEstimate, weightedPipeline, type DayMove, type StageAgg, type StageLoss, type StageMeta,
@@ -54,10 +56,10 @@ export function deals(s: Scope, f: Filters): Frag {
         ${like ? db`coalesce(nullif(c.full_name, ''), nullif(o.contact_name, ''), 'Unnamed contact')` : db`coalesce(nullif(o.contact_name, ''), 'Unnamed contact')`} contact_name, ${like ? db`coalesce(c.dnd, false)` : db`false`} dnd,
         coalesce(sc_pl.name, 'Pipeline') pipeline_name, coalesce(sc_st.nm, 'Unknown stage') stage_name, coalesce(sc_st.ord, 999)::int stage_ord,
         df.lost_reason_id, df.lost_reason,
-        coalesce(ss.limit_days, ${DEFAULT_LIMIT_DAYS})::float8 limit_days, coalesce(ss.is_estimate, true) limit_est, ss.median_days::float8 norm_days, coalesce(ss.stays, 0) stays,
+        (case when ss.stays >= ${MIN_STAGE_STAYS} and ss.p75_days is not null then greatest(${STAGE_LIMIT_FLOOR_DAYS}::numeric, least(${STAGE_LIMIT_CAP_DAYS}::numeric, ss.p75_days)) end)::float8 limit_days, false limit_est, ss.median_days::float8 norm_days, coalesce(ss.stays, 0) stays,
         extract(epoch from (now() - coalesce(o.last_stage_change_at, o.created_remote_at, o.synced_at))) / 86400 days_in_stage,
         (coalesce(o.name, '') ~* ${TEST_RE} or coalesce(o.contact_name, '') ~* ${TEST_RE}) is_test,
-        ${outOfScope()} out_of_scope
+        ${outOfScope()} out_of_scope, ${valueSuspect()} suspect
       from cached_opportunities o
       join (${locs(s, f.location)}) l on l.location_id = o.location_id
       ${dealScopeJoins()}
@@ -78,8 +80,8 @@ export function deals(s: Scope, f: Filters): Frag {
     /* MATERIALIZED: left inlined, the planner re-ran this total once per deal (92 s at 55,000 deals; 2.5 s now). docs/QA_SCALE.md */
     lo as materialized (select location_id, sum(value)::float8 total, count(*)::int n from d1 where status = 'open' and counted group by 1),
     d as (
-      select d1.*, lo.total loc_total, (d1.status = 'open' and d1.counted and lo.n >= 3 and d1.value > 0.4 * lo.total) outlier,
-        (d1.status = 'open' and d1.counted and d1.days_in_stage > d1.limit_days) stale
+      select d1.*, lo.total loc_total, (d1.status = 'open' and d1.counted and ((lo.n >= 3 and d1.value > 0.4 * lo.total) or d1.suspect is not null)) outlier,
+        (d1.status = 'open' and d1.counted and coalesce(d1.days_in_stage > d1.limit_days, false)) stale
       from d1 left join lo on lo.location_id = d1.location_id
     )`;
 }
@@ -137,6 +139,19 @@ const keyOf = (m: Map<string, StageInfo>, loc: unknown, stage: unknown) => m.get
 
 // ---------- row mapping ----------
 
+async function trustFor(s: Scope, location?: string | null): Promise<Pl3Overview["trust"]> {
+  try {
+    const rows = await sql()`select x.location_id from (${locs(s, location)}) x`;
+    const ids = rows.map((r) => r.location_id as string), t = await dealTrust(s.inst, ids);
+    return { counting: countingLine(t.counted.deals, t.leftOut), leftOutLine: leftOutLine(t.leftOut), leftOutDeals: t.leftOut.deals, notJudged: t.leftOut.notJudged, howStale: HOW_STALE_WORKED_OUT, howLeftOut: HOW_LEFT_OUT };
+  } catch { return null; }
+}
+const LEFT_OUT_WHY: Record<string, string> = {
+  outreach: "Looks like part of an outreach list, not a sales deal (left out of the dollar totals)",
+  default_value: "Looks like a default value: the same amount is on many deals in this step (left out of the dollar totals)",
+  outlier: "Looks like a test or placeholder amount (left out of the dollar totals)",
+  test: "Looks like a test deal (left out of the dollar totals)",
+};
 export function toRow(r: Rec, label: (id: string | null | undefined) => string, link: ((loc: string, contact: string) => string) | null): Pl3Row {
   const st = String(r.status ?? "open"), status: Pl3Row["status"] = st === "won" || st === "lost" || st === "abandoned" ? st : "open";
   const value = num(r.value), ownerId = (r.owner as string | null) ?? null, daysInStage = r.days_in_stage === null || r.days_in_stage === undefined ? null : Math.round(Number(r.days_in_stage) * 10) / 10;
@@ -147,7 +162,7 @@ export function toRow(r: Rec, label: (id: string | null | undefined) => string, 
   const bucket = bucketOf({ status, stale, outlier, isTest, ownerId, value, counted });
   const reason = (r.lost_reason as string | null) ?? (r.lost_reason_id ? `Reason ${String(r.lost_reason_id).slice(-4)}` : null);
   const why = stale ? `In ${r.stage_name} ${Math.floor(daysInStage ?? 0)} days, the usual limit is ${Math.round(limit ?? 0)}${r.limit_est === true ? " (estimate)" : ""}`
-    : outlier ? `One large deal: more than 40% of this account's open money` : bucket === "no_owner" ? "Nobody owns this deal" : bucket === "no_value" ? "No value set" : isTest ? "Looks like a test deal" : null;
+    : outlier ? (LEFT_OUT_WHY[String(r.suspect ?? "")] ?? `One large deal: more than 40% of this account's open money`) : bucket === "no_owner" ? "Nobody owns this deal" : bucket === "no_value" ? "No value set" : isTest ? "Looks like a test deal" : null;
   return {
     opportunityId: String(r.opportunity_id), locationId: String(r.location_id), accountName: (r.account_name as string | null) ?? null, contactId: (r.contact_id as string | null) ?? null,
     contactName: ((r.cfull as string | null) || (r.contact_name as string | null)) ?? "Unnamed contact", name: (r.name as string | null) ?? null, url: link && r.contact_id ? link(String(r.location_id), String(r.contact_id)) : null,
@@ -156,7 +171,7 @@ export function toRow(r: Rec, label: (id: string | null | undefined) => string, 
     createdAt: iso(r.created_at), lastStageChangeAt: iso(r.last_stage_change_at), daysInStage, staleLimitDays: limit, stale,
     health: h.score, healthWhy: h.why,
     appointment: r.appt_id ? { appointmentId: String(r.appt_id), startAt: iso(r.appt_start) as string, status: String(r.appt_status ?? "") } : null,
-    why, dnd: (r.cdnd ?? r.dnd) === true, outlier, isTest,
+    why, dnd: (r.cdnd ?? r.dnd) === true, outlier, isTest, leftOutReason: ((r.suspect as Pl3Row["leftOutReason"] | undefined) ?? null),
   };
 }
 
@@ -243,6 +258,8 @@ const probOf = (b: Basis, key: string) => stageProbability(b.probs.get(key)?.win
 // ---------- overview ----------
 
 export async function overview(s: Scope, f: Filters, windowDays: number): Promise<Pl3Overview> {
+  // The basis under every dollar figure: the same shared function as Today, the Account audit and the Overview (deal-trust-queries.ts).
+  const trust = await trustFor(s, f.location);
   const db = sql(), sm = await stageMap(s, f.location), base = { ...f, bucket: null };
   const w = deals(s, base), d30 = new Date(Math.floor((Date.now() - 30 * DAY) / DAY) * DAY); // whole days, so the rollup and the lists count the same deals
   const fresh = await rollupFresh(s, f.location);
@@ -287,7 +304,7 @@ export async function overview(s: Scope, f: Filters, windowDays: number): Promis
       { key: "won", title: "What did we win lately?", value: money(num(t.won_v)), sub: `${num(t.won_n)} won in 30 days`, part: "won-lost", bucket: "won" },
     ],
     trend: trend.map((r) => { const c = closes.find((x) => day(x.dy) === day(r.day)); return { day: day(r.day), openValue: num(r.v), openCount: num(r.n), won: num(c?.won), lost: num(c?.lost) }; }),
-    windowDays, accounts: num(acc.n), historySince: iso(since?.since),
+    windowDays, accounts: num(acc.n), historySince: iso(since?.since), trust,
   };
   return o;
 }

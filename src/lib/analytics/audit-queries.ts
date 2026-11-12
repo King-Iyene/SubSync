@@ -1,6 +1,6 @@
 import { sql } from "../db";
 import { waitLabel } from "../design/ui-logic";
-import { countedInScope, dealScopeJoins } from "./stage-rules-sql";
+import { countedInScope, dealIsStale, dealScopeJoins, daysInStepSql } from "./stage-rules-sql";
 import { channelLabel, WAITING_WINDOW_DAYS } from "./waiting";
 
 // The lists behind the numbers of the Account audit (stage F6, KF-6). A number on the audit opens the rows it was counted from, and the count on the number
@@ -40,15 +40,15 @@ export async function staleDealList(installationId: string, locationIds: string[
   if (locationIds.length === 0) return empty();
   const rows = await sql()`
     select x.*, count(*) over ()::int total, coalesce(sum(x.monetary_value) over (), 0)::float8 total_value, l.name location_name,
-      floor(extract(epoch from (now() - x.act)) / 86400)::int days_stale
+      x.days_in_step days_stale
     from (
       select o.opportunity_id, o.location_id, o.contact_id, o.contact_name, o.name, o.monetary_value::float8 monetary_value, sc_pl.name pipeline_name, sc_st.nm stage_name,
-        coalesce(greatest(o.last_stage_change_at, o.last_action_at, o.updated_remote_at, o.last_status_change_at), o.created_remote_at, o.synced_at) act
+        coalesce(o.last_stage_change_at, o.created_remote_at, o.synced_at) act, ${daysInStepSql()} days_in_step, ${dealIsStale()} is_stale, least(60, greatest(3, sc_ss.p75_days))::float8 lim
       from cached_opportunities o ${dealScopeJoins()}
       where o.installation_id = ${installationId} and o.status = 'open' and o.location_id = any(${locationIds}::text[]) and ${countedInScope()}
     ) x
     join locations l on l.installation_id = ${installationId} and l.location_id = x.location_id and not l.ignored
-    where x.act < now() - make_interval(days => ${staleDays}::int)
+    where x.is_stale
     order by x.monetary_value desc, x.act asc
     limit ${limit}`;
   if (rows.length === 0) return empty();
@@ -57,7 +57,7 @@ export async function staleDealList(installationId: string, locationIds: string[
     rows: rows.map((r) => ({
       id: r.opportunity_id as string, name: ((r.contact_name as string | null) || (r.name as string | null) || "Unnamed deal"), locationId: r.location_id as string, locationName: r.location_name as string | null,
       contactId: (r.contact_id as string | null) ?? "",
-      detail: `${usd(r.monetary_value as number)}${r.stage_name ? ` in ${r.stage_name as string}` : ""}${r.pipeline_name ? ` (${r.pipeline_name as string})` : ""}, no change for ${r.days_stale as number} ${r.days_stale === 1 ? "day" : "days"}`,
+      detail: `${usd(r.monetary_value as number)}${r.stage_name ? ` in ${r.stage_name as string}` : ""}${r.pipeline_name ? ` (${r.pipeline_name as string})` : ""}, in this step ${r.days_stale as number} ${r.days_stale === 1 ? "day" : "days"}${r.lim ? ` (usually up to ${Math.round(r.lim as number)})` : ""}`,
       value: r.monetary_value as number, at: iso(r.act),
     })),
   };
@@ -110,21 +110,21 @@ export function appointmentList(people: Person[], total: number, what: string): 
 export async function staleSoonList(installationId: string, locationIds: string[], staleDays: number, limit = AUDIT_LIST_ROWS) {
   if (locationIds.length === 0) return [] as Array<{ id: string; name: string; locationId: string; contactId: string | null; value: number; at: number }>;
   const rows = await sql()`
-    select x.opportunity_id, x.location_id, x.contact_id, x.contact_name, x.name, x.monetary_value, x.act
+    select x.opportunity_id, x.location_id, x.contact_id, x.contact_name, x.name, x.monetary_value, x.act, x.lim
     from (
       select o.opportunity_id, o.location_id, o.contact_id, o.contact_name, o.name, o.monetary_value::float8 monetary_value,
-        coalesce(greatest(o.last_stage_change_at, o.last_action_at, o.updated_remote_at, o.last_status_change_at), o.created_remote_at, o.synced_at) act
+        coalesce(o.last_stage_change_at, o.created_remote_at, o.synced_at) act, least(60, greatest(3, sc_ss.p75_days))::float8 lim, ${dealIsStale()} is_stale, (coalesce(sc_ss.stays, 0) >= 10 and sc_ss.p75_days is not null) judged
       from cached_opportunities o ${dealScopeJoins()}
       where o.installation_id = ${installationId} and o.status = 'open' and o.location_id = any(${locationIds}::text[]) and ${countedInScope()}
     ) x
     join locations l on l.installation_id = ${installationId} and l.location_id = x.location_id and not l.ignored
-    where x.act < now() - make_interval(days => ${staleDays}::int) and x.act >= now() - make_interval(days => ${staleDays}::int) - interval '1 day'
+    where x.judged and not x.is_stale and x.act < now() - (x.lim * interval '1 day') + interval '1 day'
     order by x.monetary_value desc, x.act asc
     limit ${limit}`;
   return rows.map((r) => ({
     id: r.opportunity_id as string, name: ((r.contact_name as string | null) || (r.name as string | null) || "Unnamed deal"), locationId: r.location_id as string,
     contactId: (r.contact_id as string | null) ?? null, value: r.monetary_value as number,
-    // The moment it turns stale: staleDays after its last movement.
-    at: (r.act as Date).getTime() + staleDays * 86_400_000,
+    // The moment it turns stale: its step's usual time after its last stage change.
+    at: (r.act as Date).getTime() + (r.lim as number) * 86_400_000,
   }));
 }

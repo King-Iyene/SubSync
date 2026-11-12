@@ -63,8 +63,11 @@ export function boardOf(input: BoardInput): Board {
   for (const d of open) {
     const days = since(inStageSince(d), now);
     const quiet = since(d.lastActivityAt, now);
-    const limit = limits.get(stageKey(d)) ?? input.fallbackStaleDays;
-    const stuck = days !== null && days > limit && (quiet === null || quiet > QUIET_DAYS);
+    // Judged from the account's own FINISHED stays in that step (stageLimitDays, set by loadDeals): a step with too little history has no limit, so nothing in it is stuck.
+    // Without the field (older callers) the old rule applies.
+    const judgedRule = d.stageLimitDays !== undefined;
+    const limit = judgedRule ? (d.stageLimitDays ?? 0) : (limits.get(stageKey(d)) ?? input.fallbackStaleDays);
+    const stuck = days !== null && (!judgedRule || d.stageLimitDays !== null) && days > limit && (quiet === null || quiet > QUIET_DAYS);
     const facts = input.contacts.get(d.opportunityId);
     const noNextStep = !facts?.upcoming && (quiet === null || quiet > QUIET_DAYS);
     if (noNextStep) noNext++;

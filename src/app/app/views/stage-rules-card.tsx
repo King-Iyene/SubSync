@@ -10,7 +10,7 @@ import { Badge, Card, fmtInt, inputClass, Table, Td, Th } from "../ui";
 export type StageControls = {
   canEdit: boolean;
   totals: { deals: number; countedDeals: number; closedOutByName: number };
-  pipelines: Array<{ name: string; notInUse: boolean; source: "owner" | "name" | "default"; why: string }>;
+  pipelines: Array<{ name: string; notInUse: boolean; source: "owner" | "name" | "default"; why: string; outreach?: boolean; counted?: number }>;
   stages: Array<{ pipeline: string; stage: string; deals: number; countedDeals: number; treatment: string; out: boolean; source: "owner" | "name" | "default"; why: string; probability: number | null }>;
 };
 
@@ -38,19 +38,20 @@ export function StageRulesCard({ controls, onChanged }: { controls: StageControl
   const byPipeline = [...new Set(controls.stages.map((s) => s.pipeline))];
   const rows = controls.totals.closedOutByName;
   return (
-    <Card title="Stages and pipelines" action={rows > 0 ? <Badge tone="info">{rows} {rows === 1 ? "stage is" : "stages are"} closed out by name</Badge> : undefined}>
+    <Card title="Stages and pipelines: which pipelines count as real sales?" action={rows > 0 ? <Badge tone="info">{rows} {rows === 1 ? "stage is" : "stages are"} closed out by name</Badge> : undefined}>
       <p className="mb-3 text-sm text-muted-foreground">
         Deals in a closed-out stage, or in a pipeline you do not use, are left out of open pipeline, stale deals and the forecast. A stage whose name says &quot;Disqualified&quot; or &quot;Wrong number&quot; is treated as closed out until you say otherwise. The win probability is your own assumption for that stage; the forecast uses it until there are 20 closed deals.
       </p>
       {controls.pipelines.length > 1 || controls.pipelines.some((p) => p.notInUse) ? (
-        <ul className="mb-4 space-y-2 text-sm" aria-label="Pipelines">
+        <ul className="mb-4 space-y-2 text-sm" aria-label="Pipelines" data-testid="pipeline-counting">
+          <li className="text-xs text-muted-foreground" data-testid="pipeline-counting-line">Counting {controls.pipelines.filter((p) => !p.notInUse).length} of {controls.pipelines.length} pipelines in every dollar figure.</li>
           {controls.pipelines.map((p) => (
             <li key={p.name} className="flex flex-wrap items-center justify-between gap-2">
               <span><span className="font-medium">{p.name}</span> <span className="text-xs text-muted-foreground">{p.why}</span></span>
               <select className="rounded-lg border bg-background px-2 py-1 text-sm" aria-label={`${p.name}: in use or not`} disabled={busy} value={p.notInUse ? "not_in_use" : "in_use"}
                 onChange={(e) => save({ pipeline: p.name, stage: null, cls: e.target.value })}>
-                <option value="in_use">In use</option>
-                <option value="not_in_use">Not in use</option>
+                <option value="in_use">In use: count its deals</option>
+                <option value="not_in_use">Not in use: leave its dollars out</option>
               </select>
               {p.source === "owner" && <button type="button" className="ml-2 text-xs underline" disabled={busy} onClick={() => save({ pipeline: p.name, stage: null, cls: null })}>Use the name instead</button>}
             </li>

@@ -1,4 +1,5 @@
 import { headlineOf, rankItems } from "@/lib/analytics/today3-intel";
+import { HOW_LEFT_OUT, HOW_STALE_WORKED_OUT } from "@/lib/analytics/deal-trust";
 import { AT_RISK_FORMULA, PIPELINE_FORMULA, RECOVERED_FORMULA, biggestOf } from "@/lib/analytics/today3-money-core";
 import type { Td3List, Td3Money, Td3Numbers, Td3Options, Td3Proof, Td3ProofRow, Td3Row, Td3Settings, Td3Today } from "@/lib/analytics/today3-types";
 
@@ -70,6 +71,7 @@ export function sample(part: string, p: FxParams, empty: boolean): object {
         recovered: { dollars: empty ? null : 9800, deals: empty ? 0 : 4, people: empty ? 0 : 9, days: 30, previousDollars: empty ? null : 7600, previousDeals: empty ? null : 3, historyStarts: "2026-09-02", short: empty, why: null, formula: RECOVERED_FORMULA },
         pipeline: { open: empty ? 0 : 184, dollars: empty ? null : 412300, expected: empty ? null : 98000, expectedWhy: empty ? "Not enough data yet." : "14 of 20 accounts have 20 won or lost deals; the others are not priced.", leftOut: 12, formula: PIPELINE_FORMULA },
         biggest: empty ? null : biggestOf(by),
+        trust: empty ? null : { counting: "Estimate. Counting 184 deals in 3 of 4 pipelines.", leftOutLine: "Left out: 481 deals worth $1,062,000 (480 deals worth $960,000 (the same $2,000 on 480 deals: looks like a default value); 1 deal worth $1,000,000 looks like a test or placeholder (largest $1,000,000)).", leftOutDeals: 481, leftOutDollars: 1_062_000, notJudged: 12, howStale: HOW_STALE_WORKED_OUT, howLeftOut: HOW_LEFT_OUT },
       };
       return { ...m, ...META };
     }

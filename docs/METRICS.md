@@ -183,6 +183,26 @@ person on two different calendars within 30 minutes is a clash.
 Code: `appointment-intel.ts`, `appointment-deep.ts`. Tests: `appointment-intel.test.ts`, `appointment-deep.test.ts`, `appointment-f3.test.ts`
 (golden cases), `tests/e2e/appointments.spec.ts` (demo tenant, Insights tab).
 
+## Deal dollars you can trust (13A; code `deal-trust.ts`, `deal-trust-queries.ts`, `stage-rules-sql.ts`)
+
+**One rule, one function.** Every dollar figure (Pipeline, Today's money row, This week and Numbers, the Account audit, Clients, People, the brief, the Overview) counts deals with the same SQL fragment (`countedInScope`) and judges "stale" with the same fragment (`dealIsStale`). The basis line under the figures ("Estimate. Counting N deals in M pipelines. Left out: ...") comes from one function (`dealTrust`). A test asserts that no screen keeps its own age or its own counted-deal formula, and a database test compares the SQL with the pure rules and with an independent sum.
+
+**Counted deal** (extends "Counted deal" above): an open deal with a value above $0, an owner, in play (not a closed-out stage, not an unused pipeline) AND whose dollars look real (`valueSuspect` is null). Deals that fail the last test are LEFT OUT of every dollar figure and count, never deleted.
+
+**Why a deal's dollars are left out** (first rule that fits; each is shown on the row as a chip and in the muted "Left out" line):
+1. **Test deal** (`test`): the deal or contact name has a whole word test, testing, demo, dummy, sample or fake, or starts with "xtest-".
+2. **Test or placeholder amount** (`outlier`): a round $1,000,000 or more (a multiple of $1,000,000), or at least 100 times the account's median valued open deal (needs 5 valued deals to know the median).
+3. **Outreach list** (`outreach`): the deal is in a pipeline of at least 20 valued open deals where ONE step-and-amount holds at least 80% of them (a bulk cold-email list is not a sales pipeline). Only when the owner has not set a rule for that pipeline.
+4. **Default value** (`default_value`): the same amount on at least 20 deals in one step, or on at least 30% of a step's valued deals when that is at least 5 deals (2 of 3 is not a pattern). Not applied to a pipeline the owner marked In use.
+The owner's rule wins: Settings, "Which pipelines count as real sales?" (the existing pipeline In use / Not in use control on the Pipeline page). A pipeline suggested as an outreach list shows "Not in use: leave its dollars out" with the reason; choosing In use counts it (and skips rules 3 and 4 for it; rules 1 and 2 still apply). Every figure says "Counting N of M pipelines".
+
+**Stale deal (replaces the 30-day rule).** A counted open deal that has sat in its step longer than that step usually takes in the same account: the 75th percentile of finished stays (`deal_stage_stats.p75_days`), at least 3 and at most 60 days, judged only from at least 10 finished stays. A step with fewer stays is **not judged**: its deals are in the open total and never called stale (the screens say how many: "N open deals are in steps with too little history to judge"). The days are measured from the last STEP change (else created), not from the last activity; the column header says so. **Stale deal value** is the sum of those deals' values and is part of open pipeline. The old single "no movement for N days" setting no longer decides what is stale (the Settings value stays as the alert's own wording until it is retired). `floorDays` on the deal list and the MCP tool only adds "and at least N days in the step".
+
+**What every headline says.** "Estimate. Counting N deals in M pipelines." then the muted "Left out: N deals worth $X (...)" with the shared reasons ("the same $2,000 on 480 deals: looks like a default value", "1 deal worth $1,000,000 looks like a test or placeholder"), a "How this is worked out" panel (a button, not a bare link), and "Show the deals left out" (the toggle on the Today lists and the Stale deals page). Counts equal rows: the left-out line's deal count is the row count of the left-out list.
+
+**Tests.** `src/lib/__tests__/deal-trust.test.ts` (placeholder detection, thresholds, per-step staleness, wording, one-function parity across screens), `src/lib/__tests__/deal-trust.db.test.ts` (SQL equals pure rules, count equals rows, totals equal an independent sum, the owner's rule wins; `ROLLUP_DB_TEST=1`).
+
+
 ## Stage rules: which deals are in play (stage F1, N38)
 
 A deal in a stage named "Disqualified", "Wrong Phone Number", "Unreachable", "Not interested", "Lost" and the like is closed out by design, and a pipeline

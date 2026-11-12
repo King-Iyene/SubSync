@@ -9,6 +9,7 @@ import { cardLink, setDeepLink } from "@/lib/design/deep-link";
 import { useData } from "../../session";
 import type { GoFn } from "../../nav";
 import { useTd } from "./data";
+import { TrustBasis } from "./trust-basis";
 import "./strip.css";
 
 // The Today figure strip: ONE editorial strip (hairlines, serif figures, mono small-caps labels, the same language as the headline and the table below it).
@@ -207,6 +208,7 @@ export function TodayStrip({ t, location, level, go, nav, open }: { t: Td3Today;
   return (
     <section className="td-strip" data-testid="td-strip" aria-label="Today at a glance">
       {moneyLine}
+      {moneyShown && m?.trust && <TrustBasis t={m.trust} onShowLeftOut={drill("Deals left out of the dollar figures", "left_out", m.trust.leftOutDeals)} />}
       <div className="td-srow" data-n={subN} data-sub="1" role="group" aria-label="Today at a glance" data-testid="td-hero">{subFigs}</div>
       {win}
     </section>

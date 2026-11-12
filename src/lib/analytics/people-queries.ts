@@ -1,6 +1,6 @@
 import { sql } from "../db";
 import { daysUntilBirthday, type PaceRow, type SourceRow, type TeamRow } from "./people-intel";
-import { countedInScope, dealScopeJoins } from "./stage-rules-sql";
+import { countedInScope, dealIsStale, dealScopeJoins } from "./stage-rules-sql";
 
 const iso = (v: unknown) => (v instanceof Date ? v.toISOString() : null);
 
@@ -71,7 +71,7 @@ export async function teamStats(installationId: string, allowed: string[] | null
         -- Open deals are the counted deals in play, the same as the Pipeline and Today (docs/METRICS.md): a person's open value never differs from the total it belongs to.
         count(*) filter (where o.status = 'open' and ${countedInScope()})::int open_count,
         coalesce(sum(o.monetary_value) filter (where o.status = 'open' and ${countedInScope()}), 0)::float8 open_value,
-        count(*) filter (where o.status = 'open' and ${countedInScope()} and coalesce(o.last_stage_change_at, o.created_remote_at) < now() - make_interval(days => ${staleDays}::int))::int stale_count,
+        count(*) filter (where o.status = 'open' and ${countedInScope()} and ${dealIsStale()})::int stale_count,
         count(*) filter (where o.status = 'won')::int won_count,
         coalesce(sum(o.monetary_value) filter (where o.status = 'won'), 0)::float8 won_value,
         count(*) filter (where o.status = 'lost')::int lost_count,

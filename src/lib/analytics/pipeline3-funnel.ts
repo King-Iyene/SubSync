@@ -127,13 +127,13 @@ export async function stuck(s: Scope, f: Filters, st: Omit<HistorySettings, "can
   const ff: Filters = { ...f, bucket: null, includeTest: !st.excludeTest };
   const w = deals(s, ff);
   const from = db`from d join deal_stage_stats ss on ss.installation_id = ${s.inst} and ss.location_id = d.location_id and ss.stage_id = d.stage_id
-    where d.status = 'open' and d.counted and ss.stays >= ${st.minSample} and ss.p75_days is not null and d.days_in_stage > greatest(${STUCK_FLOOR_DAYS}, ss.p75_days)`;
+    where d.status = 'open' and d.counted and not d.outlier and ss.stays >= ${st.minSample} and ss.p75_days is not null and d.days_in_stage > greatest(${STUCK_FLOOR_DAYS}, ss.p75_days)`;
   const [rows, [t], by, [nj]] = await Promise.all([
     db`with ${w} select d.*, ss.p75_days::float8 p75, ss.median_days::float8 med, ss.stays ss_stays ${from} order by d.value desc, d.opportunity_id limit ${sz} offset ${offsetOf(page, sz)}`,
     db`with ${w} select count(*)::int n, coalesce(sum(d.value), 0)::float8 v ${from}`,
     db`with ${w} select d.pipeline_name, d.stage_name, count(*)::int n, sum(d.value)::float8 v, avg(ss.p75_days)::float8 usual ${from} group by 1, 2 order by v desc limit 12`,
     db`with ${w} select count(*)::int n from d left join deal_stage_stats ss on ss.installation_id = ${s.inst} and ss.location_id = d.location_id and ss.stage_id = d.stage_id
-      where d.status = 'open' and d.counted and (ss.stays is null or ss.stays < ${st.minSample} or ss.p75_days is null)`,
+      where d.status = 'open' and d.counted and not d.outlier and (ss.stays is null or ss.stays < ${st.minSample} or ss.p75_days is null)`,
   ]);
   const total = num(t?.n);
   return {

@@ -16,7 +16,7 @@ export type Td3Kind = (typeof TD3_KINDS)[number];
 
 /** Lists that are not an item of the ranked list: the tiles of Numbers and "my queue". */
 export const TD3_LIST_ONLY = ["open_deals", "all_waiting", "all_noshows", "all_unmarked", "open_noshows", "all_stale", "mine_waiting", "mine_unmarked", "mine_stale",
-  "risk_all", "risk_stale", "risk_waiting", "risk_noshow", "recovered_won"] as const;
+  "risk_all", "risk_stale", "risk_waiting", "risk_noshow", "recovered_won", "left_out"] as const;
 export type Td3ListKind = Td3Kind | (typeof TD3_LIST_ONLY)[number];
 
 /** Which screen of the app holds the full working list for a kind (the one button links there). */
@@ -138,6 +138,16 @@ export type Td3Money = {
     historyStarts: string | null; short: boolean; why: string | null; formula: string;
   };
   pipeline: { open: number; dollars: number | null; expected: number | null; expectedWhy: string | null; leftOut: number; formula: string };
+  /** The basis under every dollar figure here (one shared function: deal-trust-queries.ts). Null when it could not be read. */
+  trust: {
+    /** "Estimate. Counting 12 deals in 2 of 3 pipelines." */
+    counting: string;
+    /** "Left out: 481 deals worth $962,000 (...)." or null when nothing was left out. */
+    leftOutLine: string | null; leftOutDeals: number; leftOutDollars: number;
+    /** Counted open deals in steps with too little history to judge: in the open total, never called quiet. */
+    notJudged: number;
+    howStale: string; howLeftOut: string;
+  } | null;
   /** The one action worth the most today, or null when nothing can be priced. */
   biggest: { cause: Td3RiskCause; deals: number; dollars: number; label: string; why: string; list: Td3ListKind } | null;
 };

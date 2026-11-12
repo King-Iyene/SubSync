@@ -35,6 +35,8 @@ export type Pl3Row = {
   /** In plain words, why it is on this list (for example "In Proposal 21 days, the usual limit is 12"). */
   why: string | null;
   dnd: boolean; outlier: boolean; isTest: boolean;
+  /** Why the deal's dollars are left out of the totals (a bulk outreach list, a default value, a test or placeholder amount, a test name), or null. */
+  leftOutReason?: "outreach" | "default_value" | "outlier" | "test" | null;
 };
 
 export type Pl3Overview = {
@@ -49,6 +51,8 @@ export type Pl3Overview = {
   cards: Array<{ key: string; title: string; value: number | string; sub: string | null; part: Pl3Part; bucket: Pl3Bucket | null }>;
   trend: Array<{ day: string; openValue: number; openCount: number; won: number; lost: number }>;
   windowDays: number; accounts: number; historySince: string | null;
+  /** What was counted and what was left out under every dollar figure (one shared function). Null when it could not be read. */
+  trust?: { counting: string; leftOutLine: string | null; leftOutDeals: number; notJudged: number; howStale: string; howLeftOut: string } | null;
 };
 
 /** Money Flow graph. A node is a stage (a pipe segment with a valve). A flow is the money that moved from one stage to the next in the window. */

@@ -4,7 +4,7 @@ import { accountsCore, accountsIn, clientsCache, list as clientList, receipt as 
 import { clampSize, STALE_DEAL_DAYS, WAIT_OLD_HOURS } from "./clients3-intel";
 import { NOSHOW_WINDOW_DAYS, UNMARKED_WINDOW_DAYS } from "../design/deep-link";
 import { openKinds, changeText, DAY, headlineOf, KIND_SHORT, KIND_TEXT, localDay, MAX_ITEMS, medianOf, MIN_FIX_SAMPLES, MIN_REPLIES, planRecord, proofLines, rankItems, recentWeeks, showRate, validZone, type Prev } from "./today3-intel";
-import { countedInScope, dealScopeJoins } from "./stage-rules-sql";
+import { countedInScope, dealIsStale, dealScopeJoins } from "./stage-rules-sql";
 import type {
   Td3Account, Td3Done, Td3Item, Td3Kind, Td3List, Td3ListKind, Td3Mine, Td3Numbers, Td3Options, Td3Proof, Td3ProofRow, Td3Row, Td3Settings, Td3Tile, Td3Today,
 } from "./today3-types";
@@ -97,7 +97,7 @@ async function oldestAndMoney(inst: string, byKind: Map<Td3Kind, string[]>, now:
     const o = await db`
       select coalesce(sum(o.monetary_value), 0)::float8 v, min(coalesce(o.last_stage_change_at, o.created_remote_at)) d
       from cached_opportunities o ${dealScopeJoins()} where o.installation_id = ${inst} and o.location_id = any(${st}::text[]) and o.status = 'open' and ${countedInScope()}
-        and coalesce(o.last_stage_change_at, o.created_remote_at) < now() - ${`${STALE_DEAL_DAYS} days`}::interval`.catch(() => []);
+        and ${dealIsStale()}`.catch(() => []);
     out.set("stale_deals", { oldestHours: hours(o[0]?.d), money: n(o[0]?.v) > 0 ? Math.round(n(o[0]?.v)) : null });
   })());
   await Promise.all(tasks);
@@ -112,7 +112,7 @@ function mineCond(kind: "mine_waiting" | "mine_unmarked" | "mine_stale", inst: s
   if (kind === "mine_unmarked") return db`from cached_appointments a left join cached_contacts c on c.installation_id = a.installation_id and c.location_id = a.location_id and c.contact_id = a.contact_id
     where a.installation_id = ${inst} and a.location_id = any(${ids}::text[]) and a.assigned_to = ${me} and a.status not in ('showed', 'noshow', 'cancelled', 'invalid') and a.start_at < now() - interval '3 hours' and a.start_at > now() - interval '90 days'`;
   return db`from cached_opportunities o ${dealScopeJoins()} where o.installation_id = ${inst} and o.location_id = any(${ids}::text[]) and o.assigned_to = ${me} and o.status = 'open' and ${countedInScope()}
-    and coalesce(o.last_stage_change_at, o.created_remote_at) < now() - ${`${STALE_DEAL_DAYS} days`}::interval`;
+    and ${dealIsStale()}`;
 }
 async function mineOf(s: Scope, ids: string[]): Promise<Td3Mine | null> {
   if (s.level !== "self" || !s.selfId || !ids.length) return null;

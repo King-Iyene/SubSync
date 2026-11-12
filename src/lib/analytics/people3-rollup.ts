@@ -1,5 +1,5 @@
 import { sql } from "../db";
-import { countedInScope, dealScopeJoins } from "./stage-rules-sql";
+import { countedInScope, dealIsStale, dealScopeJoins } from "./stage-rules-sql";
 import { DAY, WAIT_HOURS } from "./people3-intel";
 
 // The database side of the per-person numbers: the daily rollup (user_daily), its identical live twin, and the "right now" workload. Every read starts from a list of account ids the
@@ -153,7 +153,8 @@ export function openDealsFrom(inst: string, ids: string[]): Frag {
   const db = sql();
   return db`from cached_opportunities o ${dealScopeJoins()} where o.installation_id = ${inst} and o.location_id = any(${ids}::text[]) and o.status = 'open' and ${countedInScope()}`;
 }
-export const staleDeal = () => sql()`coalesce(o.last_stage_change_at, o.created_remote_at) < now() - ${`${STALE_DEAL_DAYS} days`}::interval`;
+/** Past this step's own usual time (stage-rules-sql dealIsStale): the one stale rule. Needs dealScopeJoins() (openDealsFrom adds it). */
+export const staleDeal = () => dealIsStale();
 export const upcomingFrom = (inst: string, ids: string[]): Frag => sql()`from cached_appointments a where a.installation_id = ${inst} and a.location_id = any(${ids}::text[]) and a.assigned_to is not null and a.start_at >= now() and coalesce(a.status, '') not in ('cancelled', 'invalid')`;
 export const needsOutcomeFrom = (inst: string, ids: string[]): Frag => sql()`from cached_appointments a where a.installation_id = ${inst} and a.location_id = any(${ids}::text[]) and a.assigned_to is not null
   and a.status not in ('showed', 'noshow', 'cancelled', 'invalid') and a.start_at < now() - interval '3 hours' and a.start_at > now() - interval '90 days'`;
