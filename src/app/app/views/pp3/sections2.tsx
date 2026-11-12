@@ -56,7 +56,9 @@ export function Money({ filters, open, pick }: SecProps) {
     <div data-testid="pp-money">
       <Load r={r} empty={(x) => x.rows.length === 0 && (dq ? "No one matches that search." : true)}>
         {(x) => {
-          const tile = (label: string, n: number, on?: () => void, est?: boolean) => <button type="button" className="pp-tile" aria-expanded={on ? tip : undefined} onClick={on}><b>{money(n)}</b><span>{label}{est ? " (estimate)" : ""}</span></button>;
+          const tile = (label: string, n: number, on?: () => void, est?: boolean) => (on
+            ? <button type="button" className="pp-tile" aria-expanded={tip} onClick={on}><b>{money(n)}</b><span>{label}{est ? " (estimate)" : ""}</span></button>
+            : <div className="pp-tile" data-static="1"><b>{money(n)}</b><span>{label}{est ? " (estimate)" : ""}</span></div>);
           const link = (n: number, userId: string, loc: string | null, title: string, reason: "open_deals" | "stale_deals" | "waiting") => (n > 0 ? <button type="button" className="ap-link" onClick={() => open({ title, reason, userId, location: loc ?? (filters.location ? String(filters.location) : null), count: null })}>{money(n)}</button> : money(0));
           return (
             <>

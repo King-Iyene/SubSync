@@ -71,8 +71,8 @@ export async function currentFindings(installationId: string, allowed: string[] 
 }
 
 /** Raises this module's alerts and clears the ones whose condition went away. Only keys that start with wf: are touched, so no other alert is ever resolved. */
-export async function raiseAlerts(installationId: string, findings: Finding[]): Promise<AlertRow[]> {
-  const drafts = alertDrafts(findings);
+export async function raiseAlerts(installationId: string, findings: Finding[], extra: ReturnType<typeof alertDrafts> = []): Promise<AlertRow[]> {
+  const drafts = [...alertDrafts(findings), ...extra];
   try {
     return await sql().begin(async (tx) => {
       const created: AlertRow[] = [];

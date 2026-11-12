@@ -16,3 +16,5 @@
 | Who is inside a workflow right now | Logs show enrolments and exits in the last 60 days only | A "contacts currently in workflow" call. Delete uses an estimate from the logs instead |
 | Folders and tags on a workflow in the CRM | No write call for either | Folders and labels stay in SubSync only |
 | Live test of any of this | No real account was touched; no write call was made | A test client account and `WORKFLOWS_WRITE_LIVE=true` on a preview deployment |
+
+| Live probe of the Workflows API | Ran scripts/wf-probe.mts: the live install has no workflow permissions, and this machine has no platform client credentials | King reconnects the install with the optional workflow permissions, then runs the script |

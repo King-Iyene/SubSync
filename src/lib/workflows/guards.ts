@@ -1,13 +1,14 @@
 // Workflows module: the guardrails of every write. Pure, so each rule has a test.
 import { createHmac, timingSafeEqual } from "node:crypto";
 
-export type WriteKind = "rename" | "publish" | "unpublish" | "delete" | "clone";
+export type WriteKind = "rename" | "publish" | "unpublish" | "delete" | "clone" | "install";
 export const WRITE_SCOPES: Record<WriteKind, string[]> = {
   rename: ["workflows.readonly", "workflows.write"],
   publish: ["workflows.publish"],
   unpublish: ["workflows.publish"],
   delete: ["workflows.delete", "workflows.readonly"],
   clone: ["workflows.readonly", "workflows.write"],
+  install: ["workflows.readonly", "workflows.write"],
 };
 export const CAPS = { perRequest: 50, deletesPerDay: 5, writesPerDay: 100, tokenMinutes: 15 } as const;
 

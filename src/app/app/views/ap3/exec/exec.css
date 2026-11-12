@@ -85,3 +85,7 @@ button.apx-cell { cursor: pointer; } button.apx-cell:hover { outline: 1px solid 
   .apx-brief { position: absolute; inset: 0 auto auto 0; width: 100%; border: 0; background: #fff; color: #111; padding: 0; }
   .apx-noprint { display: none !important; }
 }
+
+/* QA round 1: one column that can shrink, so a wide child (the heatmap, a long line) can never push the whole tab past the screen edge. */
+.apx { grid-template-columns: minmax(0, 1fr); }
+.apx > * { min-width: 0; }
