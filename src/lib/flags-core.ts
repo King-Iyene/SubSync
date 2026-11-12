@@ -130,6 +130,10 @@ export const DEFAULT_OFF: ReadonlySet<Feature> = new Set<Feature>([
   "pp_rollup",
   "pp_actions",
   "pp_roles",
+  // Branded client Proof page and monthly report (stage PR): each behind its own flag, default off.
+  "pr_report",
+  "pr_page",
+  "pr_auto",
   // Account audit (docs/features/AUDIT_BRIEF.md): each behind its own flag, default off.
   "au_history",
   "au_onepager",
@@ -174,6 +178,14 @@ export const DEFAULT_OFF: ReadonlySet<Feature> = new Set<Feature>([
   // Meeting notes revamp (docs/features/MEETINGS_BRIEF.md): mn_logged is the calls held but not logged counts, mn_outcomes the history of what followed a call. Default off.
   "mn_logged",
   "mn_outcomes",
+  // Clean-up v2 (docs/research/DATAQUALITY_R1.md): dq_module is the rebuilt Clean-up screen, dq_dupes duplicates with merge, delete and bulk, dq_intake the Lead intake tab, dq_alerts its alerts,
+  // dq_gate the sorting-gate animation, dq_score the quality score. Default off.
+  "dq_module",
+  "dq_dupes",
+  "dq_intake",
+  "dq_alerts",
+  "dq_gate",
+  "dq_score",
 ]);
 
 export function resolveFeatures(all: readonly Feature[], overrides: Record<string, boolean>, allOn = false): Record<Feature, boolean> {

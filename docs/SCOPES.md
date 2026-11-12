@@ -2,7 +2,7 @@
 
 This file is generated from `src/lib/scope-groups.ts` (run `scripts/gen-scopes-doc.ts`). A test fails when it is stale, when a permission the app asks for is missing from it, or when it lists one the app does not ask for. Do not edit it by hand.
 
-SubSync asks for 36 permissions: 7 required and 29 optional. Fewer permissions is a trust advantage, and every permission added later makes every installed company approve again, so each one below has a reason. An optional permission can be declined: the feature that needs it then says "Needs permission: reconnect" and everything else keeps working.
+SubSync asks for 39 permissions: 7 required and 32 optional. Fewer permissions is a trust advantage, and every permission added later makes every installed company approve again, so each one below has a reason. An optional permission can be declined: the feature that needs it then says "Needs permission: reconnect" and everything else keeps working.
 
 Wording rule: the screen says one of three things. **Needs permission: reconnect** (the app asked and this install declined, or the app has not asked yet), **Not available from the platform yet** (the platform refuses even with the permission, or has no such data), or it simply shows the data. See `docs/CAPABILITIES.md` for which data point is which.
 
@@ -105,6 +105,16 @@ Failed and late payments, so you can chase the money, and the credit balance of 
 | `wallet.readonly` | read | optional | The credit balance of each client account, to warn you before it runs out. Read only. |
 | `marketplace-installer-details.readonly` | read | optional | Which plan each install is on, to double-check billing against our own records. Read only. |
 
+## Lead intake
+
+Which form, survey or funnel each lead came from, so you can see which one brings good leads and which one goes quiet.
+
+| Permission | Kind | Required | Why we ask |
+| --- | --- | --- | --- |
+| `forms.readonly` | read | optional | The names of your forms and when each was submitted, to count submissions per form and warn you when one goes quiet. SubSync never reads the answers. Without it Lead intake says: Needs permission, reconnect. |
+| `surveys.readonly` | read | optional | The same for surveys and applications: names and submission times only, never the answers. |
+| `funnels/funnel.readonly` | read | optional | The names and number of steps of your funnels, so a lead whose source carries a funnel name can be shown under it. Funnel views and conversion are not available from the platform. |
+
 ## Email health
 
 No permission needed. SubSync checks the sending domain's public DNS records (SPF, DKIM, DMARC) from the domain it finds on the account's profile.
@@ -114,7 +124,6 @@ No permission needed. SubSync checks the sending domain's public DNS records (SP
 | Permission | Why it is not asked for |
 | --- | --- |
 | `invoices.write` | Sending an invoice again. Not asked for: it would message your client's customer, and SubSync does not message anyone for you. |
-| `forms.readonly` | Form-by-form lead source. Not asked for yet. |
 | `conversations/message.write` | Sending messages. Never asked for: SubSync does not reply to anyone, it measures how fast your team does. |
 
 ## Rules for every change permission

@@ -53,7 +53,16 @@ async function idsOf(ctx: Ctx, h: ClientActionHelpers, requested: string | null)
 async function receipts(ctx: Ctx, h: ClientActionHelpers, ids: string[], now: number): Promise<Receipt[]> {
   if (ctx.demo) return [];
   const facts = await receiptFacts(ctx.installationId, ids, await h.defaultTarget(), now);
-  return facts.map((f) => receiptOf(f, now)).sort((a, b) => a.name.localeCompare(b.name));
+  const list = facts.map((f) => receiptOf(f, now)).sort((a, b) => a.name.localeCompare(b.name));
+  // Data quality (stage DQ): the account's score is one more line of the weekly report, when the quality score is on and the account has one.
+  if (ctx.entitlements.features.dq_score === true && !ctx.entitlements.locked.includes("dq_score")) {
+    const scores = await (await import("../analytics/dq-queries")).scoreMap(ctx.installationId, ids).catch(() => new Map<string, number | null>());
+    for (const r of list) {
+      const sc = scores.get(r.locationId);
+      if (typeof sc === "number") r.lines.push({ id: "quality", label: "Data quality", value: `${sc} of 100`, note: "How clean the contact list is: duplicates, missing details, junk and new leads." });
+    }
+  }
+  return list;
 }
 
 /** A quiet mark, an owner or a reply target changes what Clients ranks, so the saved Clients answers for this installation are dropped at once. */

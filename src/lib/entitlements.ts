@@ -163,6 +163,10 @@ export const FEATURES = [
   "pp_rollup",
   "pp_actions",
   "pp_roles",
+  // Branded client Proof page and monthly report: the Proof tab and drafts in Clients, the secret client link and printable page, the monthly auto-prepared draft.
+  "pr_report",
+  "pr_page",
+  "pr_auto",
   // Account audit (docs/features/AUDIT_BRIEF.md): history and then-vs-now, the client one-pager, the monthly re-audit email.
   "au_history",
   "au_onepager",
@@ -201,6 +205,12 @@ export const FEATURES = [
   "cu_confirm",
   "mn_logged",
   "mn_outcomes",
+  "dq_module",
+  "dq_dupes",
+  "dq_intake",
+  "dq_alerts",
+  "dq_gate",
+  "dq_score",
 ] as const;
 export type Feature = (typeof FEATURES)[number];
 

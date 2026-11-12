@@ -41,6 +41,10 @@ export const GHL_SCOPES = [
   "invoices.readonly",
   "wallet.readonly",
   "marketplace-installer-details.readonly",
+  // Lead intake (version 2.2.0, all OPTIONAL, all read only): which form, survey or funnel each lead came from, for the Lead intake tab in Clean-up.
+  "forms.readonly",
+  "surveys.readonly",
+  "funnels/funnel.readonly",
 ] as const;
 
 // The platform's own help article (OAuth consent for marketplace apps) says branded installs use the leadconnectorhq host, which
