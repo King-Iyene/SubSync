@@ -166,6 +166,13 @@ export const DEFAULT_OFF: ReadonlySet<Feature> = new Set<Feature>([
   "cf_deals",
   "cf_email",
   "cf_record",
+  // Wallet guard (wg_*: credit balance watchlist, our own record of it, alerts) and the 7 am brief (br_*: in-app brief, email, history). Default off until verified.
+  "wg_wallet",
+  "wg_record",
+  "wg_alerts",
+  "br_brief",
+  "br_email",
+  "br_record",
   // Settings rebuild, guides and the change log (stage ST): each default off.
   "st_settings",
   "st_guides",

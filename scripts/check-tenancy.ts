@@ -56,6 +56,17 @@ async function main() {
     await sql()`insert into call_lists (installation_id, name, filters) values (${inst.id}, ${marker + "ListName"}, '{}')`;
     await sql()`insert into connections (installation_id, provider, label, external_id, access_token_enc, refresh_token_enc, token_expires_at, webhook_secret_enc, public_key)
       values (${inst.id}, 'fathom', ${marker + " Fathom"}, 'wh', ${encryptSecret("x")}, ${encryptSecret("y")}, now() + interval '1 hour', ${encryptSecret("whsec_AAAA")}, ${`xtestkey${K}`.padEnd(24, K)})`;
+    // Wallet guard and the 7 am brief: each agency holds readings, working numbers, events, a limit, a watcher, a brief choice and a brief record that carry its marker. The SAME user id is used on both sides on purpose.
+    for (const [i, loc] of locs.entries()) {
+      await sql()`insert into wg_samples (installation_id, location_id, observed_at, balance) values (${inst.id}, ${loc}, now() - interval '2 days', 40.5), (${inst.id}, ${loc}, now() - interval '1 day', 22.25)`;
+      await sql()`insert into wg_state (installation_id, location_id, wallet_state, balance, samples, burn_per_day, days_left, computed_at) values (${inst.id}, ${loc}, 'ok', ${12.34 + i}, 14, 8, ${1.5 + i}, now())`;
+      await sql()`insert into wg_events (installation_id, location_id, kind, episode, balance, detail) values (${inst.id}, ${loc}, 'low', 'x', 12.34, ${sql().json({ marker } as never)})`;
+      await sql()`insert into wg_rules (installation_id, location_id, low_amount) values (${inst.id}, ${loc}, ${31.5 + i})`;
+    }
+    await sql()`insert into wg_prefs (installation_id, low_amount) values (${inst.id}, 17.5)`;
+    await sql()`insert into wg_watchers (installation_id, user_key) values (${inst.id}, 'u-owner')`;
+    await sql()`insert into br_prefs (installation_id, user_key, email, email_on) values (${inst.id}, 'u-owner', ${`${marker.toLowerCase()}owner@example.test`}, false)`;
+    await sql()`insert into br_history (installation_id, user_key, day, channel, mode, items, item_count) values (${inst.id}, 'u-owner', '2026-11-10', 'app', 'shown', ${sql().json([{ key: "k1", title: `${marker} item`, count: 1 }] as never)}, 1)`;
     return { company, marker, inst: inst.id as string, locs, contacts, opps };
   };
 
@@ -195,6 +206,41 @@ async function main() {
       assert.ok(own.text.includes(me.marker), "an agency sees its own accounts");
       assert.ok((await call(`/api/app/search?q=${me.marker}`, session(me, "agency"))).text.includes(me.marker + ""), "and finds its own contacts");
       assert.ok((await call("/api/app/meetings", session(me, "agency"))).text.includes(me.marker + " Meeting"), "and its own meeting notes");
+    }
+
+    // Wallet guard and the 7 am brief (owners only): the other agency's account, search text, cursor and bucket give nothing and are never echoed, its limits and choices are out of reach,
+    // and the same user id on both sides sees only its own.
+    for (const [me, other] of sides) {
+      const owner = signSession({ companyId: me.company, userId: "u-owner", role: "admin", userName: "Tester", demo: false, kind: "agency", locationId: null, personRole: "agency_owner" });
+      const addresses = [
+        ...["summary", "list", "account", "settings", "usage", "options"].flatMap((part) => [`/api/app/wg?part=${part}`, `/api/app/wg?part=${part}&account=${other.locs[0]}`, `/api/app/wg?part=${part}&account=${other.marker}`, ...(part === "usage" ? [] : [`/api/app/wg?part=${part}&account=${me.locs[0]}&q=${other.marker}`])]), // usage of the caller's own account would call the platform, so only the refused cases are asked here
+        ...["all", "empty", "low", "spike", "unknown", "paused"].map((b) => `/api/app/wg?part=list&bucket=${b}&q=${other.marker}`),
+        ...["brief", "text", "settings", "history"].map((part) => `/api/app/br?part=${part}`),
+      ];
+      for (const path of addresses) {
+        const r = await call(path, owner);
+        assert.ok(r.status < 500, `${path} -> ${r.status} ${r.text.slice(0, 120)}`);
+        for (const needle of [other.marker, other.marker.toLowerCase(), other.company, ...other.locs, ...other.contacts, ...other.opps]) {
+          assert.equal(r.text.includes(needle), false, `${me.company} saw "${needle}" of ${other.company} through ${path}`);
+        }
+      }
+      // A positive control: the owner sees its own rows, so the checks above are not passing on empty answers.
+      assert.ok((await call("/api/app/wg?part=list&bucket=all", owner)).text.includes(me.marker), "an owner sees its own wallet watchlist");
+      assert.ok((await call("/api/app/br?part=history", owner)).text.includes("shown"), "and its own brief record");
+      assert.ok((await call("/api/app/br?part=settings", owner)).text.includes(me.marker.toLowerCase()), "and its own brief choices");
+      // Writes that name the other agency: refused, and nothing of theirs changes.
+      const before = JSON.stringify(await sql()`select low_amount::float8 la from wg_rules where installation_id = ${other.inst} and location_id = ${other.locs[0]}`);
+      const rule = await call("/api/app/wg/act/rule", owner, { method: "POST", body: JSON.stringify({ location: other.locs[0], lowAmount: 1, pauseDays: 30 }) });
+      assert.equal(rule.status, 404, `a limit on the other agency's account answered ${rule.status}`);
+      assert.equal(JSON.stringify(await sql()`select low_amount::float8 la from wg_rules where installation_id = ${other.inst} and location_id = ${other.locs[0]}`), before, "the other agency's limit did not change");
+      // A client or business session gets nothing from the wallet or the brief at all.
+      for (const kind of ["business", "client"] as const) {
+        const t = session(me, kind, me.locs[0]);
+        for (const path of ["/api/app/wg?part=summary", "/api/app/wg?part=list&bucket=all", "/api/app/br?part=brief", "/api/app/br?part=settings"]) {
+          const r = await call(path, t);
+          assert.ok(r.status === 403 || (r.status === 200 && !r.text.includes(me.marker)), `${kind} must not read ${path} (${r.status})`);
+        }
+      }
     }
 
     // Inside one agency: a business or client view sees its own account and never a sibling account.

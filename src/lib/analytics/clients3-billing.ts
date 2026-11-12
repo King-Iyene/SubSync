@@ -64,6 +64,21 @@ export async function refreshClientBilling(inst: string): Promise<number> {
   return written;
 }
 
+/** Reads the credit balances only (no plan calls), for the wallet guard when the Clients billing refresh is not switched on. Skips installs with no agency token. Returns false when it could not run. */
+export async function refreshWalletsFor(inst: string): Promise<boolean> {
+  const db = sql();
+  const inRow = await db`select company_id from installations where id = ${inst}`;
+  const companyKey = inRow[0]?.company_id as string | undefined;
+  if (!companyKey || companyKey.startsWith("loc:")) return false;
+  let token: string;
+  try { token = await getCompanyAccessToken(companyKey); } catch { return false; }
+  const accts = await db`select location_id from locations where installation_id = ${inst} and not ignored`;
+  // A client_billing row must exist for the balance to be stored.
+  for (const a of accts) await db`insert into client_billing (installation_id, location_id, state) values (${inst}, ${a.location_id as string}, 'unknown') on conflict (installation_id, location_id) do nothing`.catch(() => undefined);
+  await refreshWallets(inst, await get(token), accts.map((a) => a.location_id as string));
+  return true;
+}
+
 const WALLET_EVERY_HOURS = 6;
 const WALLET_PER_RUN = 150;
 const WALLET_PACE_MS = 120;
@@ -76,7 +91,10 @@ async function refreshWallets(inst: string, get: Getter, ids: string[]): Promise
     order by b.wallet_at nulls first limit ${WALLET_PER_RUN}`;
   for (const d of due) {
     const id = d.location_id as string;
-    const r = await get(`/wallet/balance?locationId=${encodeURIComponent(id)}`, "2021-07-28").catch(() => ({ status: 0, body: null }));
+    // The platform's wallet page says Version v3 (read in its docs); the older date stays as the fallback for a refusal that is not about permission.
+    const wallet = (version: string) => get(`/wallet/balance?locationId=${encodeURIComponent(id)}`, version).catch(() => ({ status: 0, body: null as unknown }));
+    let r = await wallet("v3");
+    if (r.status !== 0 && (r.status < 200 || r.status >= 300) && r.status !== 401 && r.status !== 403 && r.status !== 429) r = await wallet("2021-07-28");
     const body = (r.body && typeof r.body === "object" ? r.body : {}) as Record<string, unknown>;
     const n = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : typeof v === "string" && v.trim() !== "" && Number.isFinite(Number(v)) ? Number(v) : null);
     const ok = r.status >= 200 && r.status < 300;

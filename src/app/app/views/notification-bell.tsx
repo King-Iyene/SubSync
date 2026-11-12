@@ -68,7 +68,7 @@ export function NotificationBell({ go }: { go: GoFn }) {
   return (
     <div ref={root} className="relative" data-testid="bell">
       <button type="button" aria-haspopup="dialog" aria-expanded={open} aria-label={unread > 0 ? `Notifications, ${unread} unread` : "Notifications"} onClick={() => { setOpen((v) => !v); void load(); }}
-        className="relative flex min-h-9 items-center gap-1.5 rounded-lg px-2.5 text-sm text-muted-foreground hover:text-foreground">
+        className="relative flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-lg px-2.5 sm:min-h-9 sm:min-w-0 text-sm text-muted-foreground hover:text-foreground">
         <Bell aria-hidden className="size-[18px]" />
         {unread > 0 && <span data-testid="bell-count" className="text-xs font-semibold tabular-nums text-foreground">{unread > 99 ? "99+" : unread}</span>}
       </button>
