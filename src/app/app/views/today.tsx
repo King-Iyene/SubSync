@@ -51,15 +51,17 @@ function useTodayAccounts(enabled: boolean): [string[], (ids: string[]) => void]
   return [enabled ? picked : [], enabled ? commit : () => undefined];
 }
 
-export function TodayView({ go, kind }: { go: GoFn; kind: AccessKind }) {
+/** `mode`: "full" is the whole older page; "below" is the same page without its own headline (it sits under the new What to do today block); "dashboard" is the charts only, for Numbers. */
+export type TodayMode = "full" | "below" | "dashboard";
+export function TodayView({ go, kind, mode = "full" }: { go: GoFn; kind: AccessKind; mode?: TodayMode }) {
   const base = useApiClient();
   const agency = kind === "agency";
   const [picked, setPicked] = useTodayAccounts(agency);
   const scoped = useMemo(() => (picked.length ? base.filtered(accountsQuery(picked)) : base), [base, picked]);
-  return <RootApiProvider value={base}><ApiProvider value={scoped}><TodayBody go={go} kind={kind} picked={picked} setPicked={setPicked} /></ApiProvider></RootApiProvider>;
+  return <RootApiProvider value={base}><ApiProvider value={scoped}><TodayBody go={go} kind={kind} picked={picked} setPicked={setPicked} mode={mode} /></ApiProvider></RootApiProvider>;
 }
 
-function TodayBody({ go, kind, picked, setPicked }: { go: GoFn; kind: AccessKind; picked: string[]; setPicked: (ids: string[]) => void }) {
+function TodayBody({ go, kind, picked, setPicked, mode }: { go: GoFn; kind: AccessKind; picked: string[]; setPicked: (ids: string[]) => void; mode: TodayMode }) {
   const api = useApiClient();
   const today = useData<TodayData>("today");
   const growth = useData<GrowthData>("today/growth");
@@ -97,5 +99,5 @@ function TodayBody({ go, kind, picked, setPicked }: { go: GoFn; kind: AccessKind
       </Page>
     );
   }
-  return <TodayPage go={go} t={t} kind={kind} reload={async () => { await today.reload(); }} sync={sync} syncing={syncing} options={options} picked={picked} setPicked={setPicked} error={today.error?.message ?? null} clearShell={clearShell} growth={{ data: growth.data, loading: growth.loading, error: growth.error?.message ?? null, reload: () => void growth.reload() }} />;
+  return <TodayPage mode={mode} go={go} t={t} kind={kind} reload={async () => { await today.reload(); }} sync={sync} syncing={syncing} options={options} picked={picked} setPicked={setPicked} error={today.error?.message ?? null} clearShell={clearShell} growth={{ data: growth.data, loading: growth.loading, error: growth.error?.message ?? null, reload: () => void growth.reload() }} />;
 }

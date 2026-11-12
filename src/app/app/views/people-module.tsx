@@ -6,6 +6,7 @@ import { ModuleTabs, Page as PageShell } from "../ds";
 import { remember } from "../ds/remember";
 import { useData } from "../session";
 import { FindTab } from "./people-find";
+import { LeadsView } from "./leads";
 import { GoingColdTab, SourcesTab, TagsTab } from "./people-more";
 import type { Options } from "./people-filters";
 
@@ -14,7 +15,7 @@ import type { Options } from "./people-filters";
 
 export { toSeed, type PersonUi } from "./people-rows";
 
-const TABS = ["Find and call", "Tags", "Going cold", "Sources"] as const;
+const TABS = ["Find and call", "Tags", "Going cold", "Sources", "More about your leads"] as const;
 
 export function PeopleModule({ start = 0, find = false, bulk = false }: { start?: number; callsAllowed?: boolean; find?: boolean; bulk?: boolean }) {
   // The old numbering: 0 search, 1 call lists, 2 leads. Both of the first two are the first tab now; 2 is Going cold.
@@ -36,6 +37,8 @@ export function PeopleModule({ start = 0, find = false, bulk = false }: { start?
         { label: TABS[1], node: <TagsTab showAccount={showAccount} onSeeAll={seeAll} /> },
         { label: TABS[2], node: <GoingColdTab showAccount={showAccount} /> },
         { label: TABS[3], node: <SourcesTab /> },
+        // Restored from the earlier Leads page (a revamp adds, never removes): cohorts, best leads to work now, most valuable contacts, new contacts per week, growth by account, do not disturb and birthdays.
+        { label: TABS[4], node: <LeadsView part="more" /> },
       ]} />
     </PageShell>
   );

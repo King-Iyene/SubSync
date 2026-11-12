@@ -22,6 +22,8 @@ import {
   RaisedClearedStrip, ReplyNowList, SinceStrip, ViewsMenu, type KindRow, type MenuItem,
 } from "../ds";
 import { Btn, fmtInt, fmtMoney } from "../ui";
+import type { TodayMode } from "./today";
+import { TodayDashboard } from "./today-dash";
 import { Block, MoreDetail, PrimaryButton, TodayHeader, TodayHeadline, type Primary } from "./today-chrome";
 import { AppointmentsSection, CallsSection, DoneForToday } from "./today-mine";
 import { useTodayModel, TodayLayers } from "./today-model";
@@ -44,8 +46,8 @@ function reasonText(blocked: boolean, kindsOff: string): string | null {
   return blocked ? `Needs permission: ${kindsOff}. Ask whoever manages SubSync to approve it.` : null;
 }
 
-export function TodayPage({ go, t, kind, reload, sync, syncing, options, picked, setPicked, error, clearShell, growth }: {
-  go: GoFn; t: TodayData; kind: AccessKind; reload: () => Promise<void>; sync: () => Promise<void>; syncing: boolean;
+export function TodayPage({ mode = "full", go, t, kind, reload, sync, syncing, options, picked, setPicked, error, clearShell, growth }: {
+  mode?: TodayMode; go: GoFn; t: TodayData; kind: AccessKind; reload: () => Promise<void>; sync: () => Promise<void>; syncing: boolean;
   options: Array<{ id: string; name: string }>; picked: string[]; setPicked: (ids: string[]) => void; error: string | null; clearShell: () => void;
   growth: { data: GrowthData | null; loading: boolean; error: string | null; reload: () => void };
 }) {
@@ -230,19 +232,34 @@ export function TodayPage({ go, t, kind, reload, sync, syncing, options, picked,
   ];
   const allDone = headline.allClear && !t.access.leadsBlocked && !t.access.apptsBlocked && (mine ? mine.calls.noshows.total + mine.calls.confirm.total === 0 : true);
 
+  if (mode === "dashboard") {
+    return (
+      <div className="t-root" data-testid="today-dashboard-root">
+        <TodayDashboard m={m} t={t} kind={kind} agency={agency} multi={multi} go={go} options={options} evidence={evidence} growthTab={growthTab} forecast={forecast} where={agency && bars.bars.length >= 1 ? <AccountBars title={barsTitle(bars)} bars={bars.bars} rows={rows} onSegment={(id, k) => m.open(specKind(k, env, id))} onAccount={(id) => m.open(specAccount(id, env))} /> : null}
+          sources={kind !== "client" ? <SourcesTab m={m} t={t} clients={clientList} agency={agency} /> : null} coverage={kind !== "client" ? <CoverageTab m={m} t={t} clients={clientList} agency={agency} /> : null}
+          people={kind !== "client" ? <PeopleTab m={m} t={t} agency={multi} /> : null} proof={proof} coming={coming ? <ClientsFlowTab m={m} /> : null} flow={<LeadFlowTab m={m} clients={options} kind={kind} />} />
+        <TodayLayers m={m} />
+      </div>
+    );
+  }
   return (
     <div data-testid="page" className="ds-enter t-root">
       <PrintReport r={report} now={m.now} />
       <div className="print:hidden">
-        <TodayHeader more={moreItems} dateText={dateText} />
+        <TodayHeader more={moreItems} dateText={dateText} hideTitle={mode === "below"} />
         {error && <InlineAlert tone="danger" className="mb-4" action={<Btn onClick={() => void reload()}>Try again</Btn>}>{error}</InlineAlert>}
 
-        <TodayHeadline headline={headline} onPart={onPart} action={primary ? <PrimaryButton p={primary} /> : undefined}>
+        {mode === "below" ? (
+          <div className="mb-4" data-testid="today-below-alerts">
+            {blockedLeads && <InlineAlert tone="warning" className="mt-3" action={<Btn onClick={() => go("settings")}>Open Settings</Btn>}>{blockedLeads}</InlineAlert>}
+            {blockedAppts && <InlineAlert tone="warning" className="mt-3" action={<Btn onClick={() => go("settings")}>Open Settings</Btn>}>{blockedAppts}</InlineAlert>}
+          </div>
+        ) : <TodayHeadline headline={headline} onPart={onPart} action={primary ? <PrimaryButton p={primary} /> : undefined}>
           {blockedLeads && <InlineAlert tone="warning" className="mt-3" action={<Btn onClick={() => go("settings")}>Open Settings</Btn>}>{blockedLeads}</InlineAlert>}
           {blockedAppts && <InlineAlert tone="warning" className="mt-3" action={<Btn onClick={() => go("settings")}>Open Settings</Btn>}>{blockedAppts}</InlineAlert>}
           {headline.allClear && t.proof && !blockedLeads && !blockedAppts && kind !== "client" && <p className="mt-3 text-[var(--t-ink2)]" data-testid="today-proof-line">{proofLine(t.proof)}</p>}
           {!t.actionsReady && <p className="t-small t-quiet mt-2" data-testid="needs-update">Mark done and Snooze need the latest database update.</p>}
-        </TodayHeadline>
+        </TodayHeadline>}
 
         {multi ? (
           <>

@@ -12,10 +12,10 @@ import type { TabTag } from "@/lib/analytics/today-tabs";
 // the one primary button, then the sections. Nothing in here counts anything; it only places things. Type roles and colours come from today-theme.css.
 
 /** The title row: a quiet label and the date on the left, the "More" menu on the right. `filter` is the client filter chip (agency only). */
-export function TodayHeader({ more, dateText }: { more: MenuItem[]; dateText?: string }) {
+export function TodayHeader({ more, dateText, hideTitle = false }: { more: MenuItem[]; dateText?: string; hideTitle?: boolean }) {
   return (
     <header className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2 print:hidden" data-testid="today-header">
-      <h1 className="t-label mr-auto flex items-baseline gap-3"><span className="text-[var(--t-ink)]">Today</span>{dateText && <span className="font-normal normal-case tracking-normal">{dateText}</span>}</h1>
+      {hideTitle ? <p className="t-label mr-auto" data-testid="today-date">{dateText}</p> : <h1 className="t-label mr-auto flex items-baseline gap-3"><span className="text-[var(--t-ink)]">Today</span>{dateText && <span className="font-normal normal-case tracking-normal">{dateText}</span>}</h1>}
       <PopMenu label="More" items={more} testId="today-more"
         triggerClassName="ds-press t-small inline-flex h-8 items-center gap-1 rounded-[4px] border border-[var(--t-rule2)] px-2.5 font-medium hover:border-primary hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--ring)]">
         More<ChevronDown aria-hidden className="size-3.5" />

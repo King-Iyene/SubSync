@@ -12,6 +12,9 @@ import { OpenLeadButton } from "../../ds/open-lead-button";
 import { Btn } from "../../ui";
 import type { GoFn, ViewId } from "../../nav";
 import { TodayView } from "../today";
+import { DatesBar } from "../today-dash";
+import { useReportFilter } from "../report-filter";
+import { Banknote, CalendarCheck, Gauge, Hourglass, MessageCircle, Timer } from "lucide-react";
 import "../speed6.css";
 import "../speed-ui.css";
 import "../ap3/ap3.css";
@@ -113,7 +116,7 @@ function useActions(reload: () => void) {
   return { act, busy, problem, tap: (kind: string, location: string | null) => { if (!sample) void api.post("today3/act/opened", { kind, location: location ?? undefined }).catch(() => undefined); } };
 }
 
-function TodayTab({ location, level, go, open, setTab, saveOn, openRecover, nav }: { location: string; level: string; go: (m: Td3Module, loc?: string | null) => void; open: (d: NonNullable<Drill>) => void; setTab: (t: TabKey) => void; saveOn: boolean; openRecover: (loc: string) => void; nav: GoFn }) {
+function TodayTab({ location, level, go, open, setTab, saveOn, openRecover, nav, kind }: { kind: AccessKind; location: string; level: string; go: (m: Td3Module, loc?: string | null) => void; open: (d: NonNullable<Drill>) => void; setTab: (t: TabKey) => void; saveOn: boolean; openRecover: (loc: string) => void; nav: GoFn }) {
   const r = useTd<Td3Today>("today", { location: location || undefined });
   const { act, busy, problem, tap } = useActions(() => r.reload());
   const admin = level !== "self";
@@ -188,6 +191,10 @@ function TodayTab({ location, level, go, open, setTab, saveOn, openRecover, nav 
                 : <p className="ap-fine" data-testid="td-done-empty">{t.historyStarts ? "Nothing cleared yet today." : "We start keeping this record at the next refresh, so you will see what was cleared each day from then on."}</p>}
             </section>
             <p className="ap-fine">{t.historyStarts ? `Our record of what was found and fixed starts ${t.historyStarts}.` : "Our record of what was found and fixed has not started yet."} Counts here equal the same counts in each screen. Nothing on this page changes your CRM or messages your leads.</p>
+            <section className="td-more-below" aria-label="More about today" data-testid="td-below">
+              <h2 className="cl-h mb-3">More about today</h2>
+              <TodayView go={nav} kind={kind} mode="below" />
+            </section>
           </div>
         );
       }}
@@ -245,24 +252,34 @@ function ProofTab({ location, accounts }: { location: string; accounts: boolean 
   );
 }
 
+const TILE_ICON: Record<string, ReactNode> = {
+  reply: <Timer className="size-3.5" />, waiting: <MessageCircle className="size-3.5" />, showrate: <CalendarCheck className="size-3.5" />,
+  open_deals: <Banknote className="size-3.5" />, stale: <Hourglass className="size-3.5" />, attention: <Gauge className="size-3.5" />,
+};
+
+/** Numbers: the headline row (six numbers, each opens its rows) and under it the whole dashboard of charts, one bar of dates for all of them. */
 function NumbersTab({ location, go, open, fromOverview, level, nav, kind }: { location: string; go: (m: Td3Module, loc?: string | null) => void; open: (d: NonNullable<Drill>) => void; fromOverview: boolean; level: string; nav: GoFn; kind: AccessKind }) {
-  const [days, setDays] = useState(30), [more, setMore] = useState(false), [how, setHow] = useState<string | null>(null);
+  const [how, setHow] = useState<string | null>(null);
+  const f = useReportFilter("g", "30d");
+  const span = f.range && !f.range.problem ? Math.round((Date.parse(`${f.range.to}T00:00:00Z`) - Date.parse(`${f.range.from}T00:00:00Z`)) / 86_400_000) + 1 : 30;
+  const days = span <= 7 ? 7 : span <= 30 ? 30 : 90;
   const r = useTd<Td3Numbers>("numbers", { location: location || undefined, days });
   return (
     <div className="cl-stack" data-testid="td-numbers">
-      {fromOverview && <p className="ap-fine" role="status" data-testid="td-moved">Overview moved here. Same numbers, fewer of them, and each one opens the people behind it.</p>}
-      <div className="ap-head print:hidden" role="group" aria-label="Period">
-        <select className="ap-field" aria-label="Period" value={days} onChange={(e) => setDays(Number(e.target.value))}><option value={7}>Last 7 days</option><option value={30}>Last 30 days</option><option value={90}>Last 90 days</option></select>
-      </div>
+      {fromOverview && <p className="ap-fine" role="status" data-testid="td-moved">Overview moved here. Its numbers are in the row below and its account list is at the bottom of this page.</p>}
+      {level !== "self" && <DatesBar />}
       <Load r={r} empty={(n) => n.tiles.length === 0}>
         {(n) => (
           <>
-            <div className="td-tiles">
+            <div className="td-tiles" data-testid="td-tiles">
               {n.tiles.map((t) => (
                 <div key={t.id} className="td-tile" data-testid={`td-tile-${t.id}`}>
+                  <div className="td-top"><span className="td-ico" aria-hidden>{TILE_ICON[t.id]}</span><span className="td-name">{t.label}</span></div>
                   <button type="button" className="td-open" disabled={!t.enough && !("module" in t.opens)} onClick={() => { if ("list" in t.opens) open({ title: t.label, kind: t.opens.list, location: location || null, count: t.count }); else go(t.opens.module, location || null); }}>
-                    <b>{t.value}</b><span className="td-name">{t.label}{t.change ? ` (${t.change} vs before)` : ""}</span>
+                    <b>{t.value}</b>
                   </button>
+                  {t.change && <span><span className="td-chg">{t.change} vs before</span></span>}
+                  {t.caption && <span className="td-cap" data-testid={`td-caption-${t.id}`}>{t.caption}</span>}
                   {t.estimate && <span><span className="ap-chip" data-tone="cyan">Estimate</span></span>}
                   <button type="button" className="ap-link" style={{ textAlign: "left" }} aria-expanded={how === t.id} onClick={() => setHow(how === t.id ? null : t.id)}>How is this worked out?</button>
                   {how === t.id && <p className="ap-fine" data-testid={`td-formula-${t.id}`}>{t.formula}</p>}
@@ -270,23 +287,13 @@ function NumbersTab({ location, go, open, fromOverview, level, nav, kind }: { lo
               ))}
             </div>
             {n.testDealsLeftOut > 0 && <p className="ap-fine">{num(n.testDealsLeftOut)} open deals with no value or no owner are left out of the dollar figure (usually test or junk deals).</p>}
-            <p className="ap-fine">{n.historyStarts ? `Our own record starts ${n.historyStarts}.` : "Trends start once we have a few weeks of record."}</p>
+            <p className="ap-fine">{n.historyStarts ? `Our own record starts ${n.historyStarts}.` : "Our own record has not started yet, so there are no trends to show."}</p>
           </>
         )}
       </Load>
-      {level !== "self" && (
-        <section aria-label="More numbers">
-          <button type="button" className="ap-link" aria-expanded={more} onClick={() => setMore(!more)} data-testid="td-more">{more ? "Hide more numbers" : "More numbers (growth, lead flow, sources, forecast)"}</button>
-          {more && <div className="mt-3"><LegacyNumbers go={nav} kind={kind} /></div>}
-        </section>
-      )}
+      <TodayView go={nav} kind={kind} mode="dashboard" />
     </div>
   );
-}
-
-/** The older Today pages (growth, lead flow, clients coming and going, forecast, sources, coverage) are kept as they were, under "More numbers". */
-function LegacyNumbers({ go, kind }: { go: GoFn; kind: AccessKind }) {
-  return <TodayView go={go} kind={kind} />;
 }
 
 function SettingsTab({ level, cashOn }: { level: string; cashOn: boolean }) {
@@ -357,7 +364,7 @@ export function TodayModule({ go, kind, initialTab = "today", fromOverview = fal
   if (!sample && opt.data && opt.data.canSee === false) return <Page title="Today" subtitle="What to do first today.">{null}</Page>;
   const body = (() => {
     switch (active) {
-      case "today": return <TodayTab location={location} level={level} go={goModule} open={open} setTab={goTab} saveOn={saveOn} openRecover={(loc) => { setLocation(loc); goTab("recover"); }} nav={go} />;
+      case "today": return <TodayTab location={location} level={level} go={goModule} open={open} setTab={goTab} saveOn={saveOn} openRecover={(loc) => { setLocation(loc); goTab("recover"); }} nav={go} kind={kind} />;
       case "recover": return <RecoverTab location={location} level={level} accounts={accounts.length} />;
       case "proof": return <ProofTab location={location} accounts={level !== "self"} />;
       case "numbers": return <NumbersTab location={location} go={goModule} open={open} fromOverview={fromOverview} level={level} nav={go} kind={kind} />;
