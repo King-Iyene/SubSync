@@ -259,17 +259,22 @@ export async function coverageSql(db: Db, s: Scope, f: LeadFilter) {
   const h = DEFAULT_HOURS;
   const after = db`(extract(dow from (x.lead_at at time zone x.tzn)) in (0, 6) or extract(hour from (x.lead_at at time zone x.tzn)) < ${h.start} or extract(hour from (x.lead_at at time zone x.tzn)) >= ${h.end})`;
   const lostP = db`(${after} and (case when x.touch_at is null then extract(epoch from (${new Date(s.now)}::timestamptz - x.lead_at)) > 43200 else extract(epoch from (x.touch_at - x.lead_at)) > 43200 end))`;
-  const agg = (await db`select count(*) filter (where ${after})::int after_leads, count(*) filter (where ${after} and x.touch_at is not null and extract(epoch from (x.touch_at - x.lead_at)) <= 43200)::int answered,
-    count(*) filter (where ${lostP})::int lost from ${set} where ${where}`)[0] ?? {};
-  const cells = await db`select extract(dow from (x.lead_at at time zone x.tzn))::int dow, extract(hour from (x.lead_at at time zone x.tzn))::int hr, count(*)::int n from ${set} where ${where} and ${lostP} group by 1, 2 having count(*) >= 2 order by 3 desc limit 8`;
-  const lostByLoc = await db`select x.location_id, count(*)::int n from ${set} where ${where} and ${lostP} group by 1`;
-  const lostRows = await db`select x.* from ${set} where ${where} and ${lostP} order by x.lead_at desc limit 50`;
-  const owned = await db`select x.assigned_to u, count(*)::int n from ${set} where ${where} and x.assigned_to is not null group by 1`;
-  const repliers = await db`select distinct x.touch_user_id u from ${set} where ${where} and x.touch_user_id is not null and x.touch_user_id <> ''`;
-  // Dollars of the lost leads: counted deals of those people.
-  const d = (await db`select count(distinct (o.location_id || ':' || o.contact_id))::int people, coalesce(sum(o.monetary_value), 0)::float8 dollars
-    from ${set} join cached_opportunities o on o.installation_id = ${s.installationId} and o.location_id = x.location_id and o.contact_id = x.contact_id and o.status = 'open' ${dealScopeJoins()}
-    where ${where} and ${lostP} and ${countedInScope()}`.catch(() => [{} as Row]))[0] ?? {};
+  // Seven independent reads of the same lead set: run together, not one after another (6 s in a row, 1.6 s together at 100,000 leads; docs/QA_SCALE.md). The last one (dollars) is optional.
+  const [aggRows, cells, lostByLoc, lostRows, owned, repliers, dRows] = await Promise.all([
+    db`select count(*) filter (where ${after})::int after_leads, count(*) filter (where ${after} and x.touch_at is not null and extract(epoch from (x.touch_at - x.lead_at)) <= 43200)::int answered,
+      count(*) filter (where ${lostP})::int lost from ${set} where ${where}`,
+    db`select extract(dow from (x.lead_at at time zone x.tzn))::int dow, extract(hour from (x.lead_at at time zone x.tzn))::int hr, count(*)::int n from ${set} where ${where} and ${lostP} group by 1, 2 having count(*) >= 2 order by 3 desc limit 8`,
+    db`select x.location_id, count(*)::int n from ${set} where ${where} and ${lostP} group by 1`,
+    db`select x.* from ${set} where ${where} and ${lostP} order by x.lead_at desc limit 50`,
+    db`select x.assigned_to u, count(*)::int n from ${set} where ${where} and x.assigned_to is not null group by 1`,
+    db`select distinct x.touch_user_id u from ${set} where ${where} and x.touch_user_id is not null and x.touch_user_id <> ''`,
+    // Dollars of the lost leads: counted deals of those people.
+    db`select count(distinct (o.location_id || ':' || o.contact_id))::int people, coalesce(sum(o.monetary_value), 0)::float8 dollars
+      from ${set} join cached_opportunities o on o.installation_id = ${s.installationId} and o.location_id = x.location_id and o.contact_id = x.contact_id and o.status = 'open' ${dealScopeJoins()}
+      where ${where} and ${lostP} and ${countedInScope()}`.catch(() => [{} as Row]),
+  ]);
+  const agg = aggRows[0] ?? {};
+  const d = dRows[0] ?? {};
   return {
     afterLeads: Number(agg.after_leads ?? 0), answeredSameNight: Number(agg.answered ?? 0), lost: Number(agg.lost ?? 0),
     hoursToCover: cells.map((r) => ({ dow: Number(r.dow), hour: Number(r.hr), leads: Number(r.n) })),
