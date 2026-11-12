@@ -101,11 +101,11 @@ test("the headline counts people once and says never answered is part of them", 
   assert.equal(f.accountsWithWaiting, 2);
   assert.equal(f.oldestMinutes, 6000);
   const h = headlineOf(f, true);
-  assert.equal(h.text, "3 leads are waiting for a reply across 2 clients. 2 of them were never answered.");
+  assert.equal(h.text, "3 new leads are waiting for a first reply across 2 clients. 2 of them were never answered.");
   assert.equal(h.allClear, false);
-  assert.equal(headlineOf({ waiting: 1, never: 1, noOwner: 0, accountsWithWaiting: 1, oldestMinutes: 9000 }, false).text, "1 lead is waiting for a reply. One of them was never answered.");
-  assert.equal(headlineOf({ waiting: 2, never: 2, noOwner: 0, accountsWithWaiting: 1, oldestMinutes: 9000 }, false).text, "2 leads are waiting for a reply. All of them were never answered.");
-  assert.deepEqual(headlineOf({ waiting: 0, never: 0, noOwner: 0, accountsWithWaiting: 0, oldestMinutes: null }, true), { parts: [{ t: "Nobody is waiting for a reply right now." }], text: "Nobody is waiting for a reply right now.", allClear: true });
+  assert.equal(headlineOf({ waiting: 1, never: 1, noOwner: 0, accountsWithWaiting: 1, oldestMinutes: 9000 }, false).text, "1 new lead is waiting for a first reply. One of them was never answered.");
+  assert.equal(headlineOf({ waiting: 2, never: 2, noOwner: 0, accountsWithWaiting: 1, oldestMinutes: 9000 }, false).text, "2 new leads are waiting for a first reply. All of them were never answered.");
+  assert.deepEqual(headlineOf({ waiting: 0, never: 0, noOwner: 0, accountsWithWaiting: 0, oldestMinutes: null }, true), { parts: [{ t: "No new lead is waiting for a first reply right now." }], text: "No new lead is waiting for a first reply right now.", allClear: true });
 });
 
 test("leads older than 14 days are not 'waiting now'", () => {

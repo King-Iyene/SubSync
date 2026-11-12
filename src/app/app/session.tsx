@@ -66,6 +66,23 @@ export function useApiClient(): Api {
 // still on its way is shared, each asker gets its own copy of the answer, and any change (POST, PUT, DELETE) drops the shared reads so a refresh after a change always asks again.
 const inflight = new WeakMap<object, Map<string, Promise<unknown>>>();
 
+// Answers held for 20 seconds so a click back to a heavy tab is instant. Only the Speed to lead and Appointments part reads (not the live race); every change drops them.
+const RECENT_MS = 20_000;
+const recent = new WeakMap<object, Map<string, { at: number; data: unknown }>>();
+const heavyPath = (path: string) => /^(speed|appointments)(\/[a-z-]+)?\?/.test(path) && path.includes("part=") && !path.includes("part=race");
+function recentAnswer(shared: object, key: string, path: string): unknown {
+  if (!heavyPath(path)) return undefined;
+  const hit = recent.get(shared)?.get(key);
+  return hit && Date.now() - hit.at < RECENT_MS ? hit.data : undefined;
+}
+function rememberAnswer(shared: object, key: string, path: string, data: unknown) {
+  if (!heavyPath(path)) return;
+  let m = recent.get(shared); if (!m) { m = new Map(); recent.set(shared, m); }
+  if (m.size > 60) m.clear();
+  m.set(key, { at: Date.now(), data });
+}
+function forgetRecent(shared: object) { recent.get(shared)?.clear(); }
+
 export function makeApi(initialToken: string, refresh: () => Promise<string | null>, demo: boolean, filterQuery = "", shared: { token: string } = { token: initialToken }): Api {
   const sharedReads = (): Map<string, Promise<unknown>> => { let m = inflight.get(shared); if (!m) { m = new Map(); inflight.set(shared, m); } return m; };
   const request = async (method: string, path: string, body?: unknown, retried = false): Promise<Response> => {
@@ -107,15 +124,18 @@ export function makeApi(initialToken: string, refresh: () => Promise<string | nu
     get: async <T,>(path: string): Promise<T> => {
       const reads = sharedReads(), key = `${filterQuery}|${path}`, running = reads.get(key);
       if (running) { const data = await (running as Promise<T>); return typeof structuredClone === "function" ? structuredClone(data) : data; }
-      const p = (async () => parse<T>(await request("GET", path)))();
+      // Round 4: going back to a Speed to lead or Appointments tab within 20 seconds shows the answer already held (a change drops them; the server also keeps its own for 30 s).
+      const recentHit = recentAnswer(shared, key, path);
+      if (recentHit !== undefined) return (typeof structuredClone === "function" ? structuredClone(recentHit) : recentHit) as T;
+      const p = (async () => { const data = await parse<T>(await request("GET", path)); rememberAnswer(shared, key, path, data); return data; })();
       reads.set(key, p);
       const done = () => { if (reads.get(key) === p) reads.delete(key); };
       p.then(done, done);
       return p;
     },
-    post: async (path, body) => { sharedReads().clear(); try { return await parse(await request("POST", path, body ?? {})); } finally { sharedReads().clear(); } },
-    put: async (path, body) => { sharedReads().clear(); try { return await parse(await request("PUT", path, body ?? {})); } finally { sharedReads().clear(); } },
-    del: async (path) => { sharedReads().clear(); try { return await parse(await request("DELETE", path)); } finally { sharedReads().clear(); } },
+    post: async (path, body) => { sharedReads().clear(); forgetRecent(shared); try { return await parse(await request("POST", path, body ?? {})); } finally { sharedReads().clear(); } },
+    put: async (path, body) => { sharedReads().clear(); forgetRecent(shared); try { return await parse(await request("PUT", path, body ?? {})); } finally { sharedReads().clear(); } },
+    del: async (path) => { sharedReads().clear(); forgetRecent(shared); try { return await parse(await request("DELETE", path)); } finally { sharedReads().clear(); } },
     download: async (path, filename) => {
       const res = await request("GET", path);
       if (!res.ok) throw new ApiError(res.status, await res.json().catch(() => ({})));

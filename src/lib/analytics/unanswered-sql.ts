@@ -249,3 +249,37 @@ export async function sqlTabCounts(s: ListScope, quiet: ListParams["quiet"]): Pr
   const [us, them] = await Promise.all([count("us"), count("them")]);
   return { us, them };
 }
+
+// ---------- round 4: ONE definition of "people waiting for a reply" for Clients and Today ----------
+// The Unanswered screen (Speed to lead, Unanswered tab) counts people, not conversations: the customer wrote last, the reply target of that account has passed, within the last
+// WAITING_WINDOW_DAYS, one row per person, minus what was snoozed or set aside. Clients and Today used to count raw conversations instead (so 24 against 14). They now ask the same
+// query, so the headline is the same number everywhere (docs/METRICS.md, "People waiting for a reply").
+
+const OLD_HOURS = 24;
+
+/** People waiting for a reply per client account, and how many of them have waited a day or more. Same people as the Unanswered list's default view. */
+export async function waitingPeopleByAccount(s: ListScope): Promise<Map<string, { waiting: number; old: number }>> {
+  const out = new Map<string, { waiting: number; old: number }>();
+  if (s.allowed && s.allowed.length === 0) return out;
+  const db = sql();
+  const hook = await snoozeHook(db, s.installationId, s.hook);
+  const rows = await db`${peopleCte(db, s, { tab: "us", quiet: 24 })}
+    select p.location_id, count(*)::int n, count(*) filter (where p.hrs >= ${OLD_HOURS})::int old from people p
+    ${hook.available ? db`where not (${hook.snoozed}) and not (${hook.hidden})` : db``} group by 1`;
+  for (const r of rows) out.set(r.location_id as string, { waiting: Number(r.n), old: Number(r.old) });
+  return out;
+}
+
+/** The people behind those counts (oldest wait first), one page. `old` keeps only those who have waited a day or more. */
+export async function waitingPeoplePage(s: ListScope, o: { old: boolean; size: number; offset: number }): Promise<{ total: number; rows: Array<{ locationId: string; contactId: string | null; name: string; lastAt: number; hours: number }> }> {
+  if (s.allowed && s.allowed.length === 0) return { total: 0, rows: [] };
+  const db = sql();
+  const hook = await snoozeHook(db, s.installationId, s.hook);
+  const conds: Frag[] = [];
+  if (o.old) conds.push(db`p.hrs >= ${OLD_HOURS}`);
+  if (hook.available) conds.push(db`not (${hook.snoozed}) and not (${hook.hidden})`);
+  const rows = await db`${peopleCte(db, s, { tab: "us", quiet: 24 })}
+    select p.location_id, p.contact_id, p.name, p.last_message_at, p.hrs, count(*) over ()::int total from people p where ${and(db, conds)}
+    order by p.last_message_at, p.pkey limit ${o.size} offset ${o.offset}`;
+  return { total: rows.length ? Number(rows[0].total) : 0, rows: rows.map((r) => ({ locationId: r.location_id as string, contactId: (r.contact_id as string | null) ?? null, name: r.name ? properCase(r.name as string) : "Unnamed contact", lastAt: (r.last_message_at as Date).getTime(), hours: Math.max(0, Number(r.hrs)) })) };
+}

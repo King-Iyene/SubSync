@@ -119,6 +119,7 @@ import { handleCleanupV2 } from "./cleanup-routes";
 import { gatedWriter } from "../ghl/crm-gateway";
 import { writeEnabledFor } from "../analytics/cleanup-config";
 import { isLive } from "../live-flags";
+import { answerKey, cachedAnswer, forgetAllReads, forgetAnswers } from "../read-cache";
 import { handleSpeedPrefs, handleSpeedDigest, handleSpeedLadder, handleSpeedPart, handleSpeedTarget } from "./speed-routes";
 import { handleUnansweredOutcome, handleUnansweredPart } from "./unanswered-routes";
 import { handleMoat } from "./moat-routes";
@@ -197,7 +198,12 @@ async function accountsFor(ctx: Ctx) {
 
 // Lightweight scope for endpoints that do not need every account scored: just the settings and,
 // only when the plan limits accounts, which ones are visible.
-async function scope(ctx: Ctx) {
+// One request often asks for its settings, links and visible accounts several times (each handler's own helpers); work them out once per request.
+const scopeMemo = new WeakMap<object, ReturnType<typeof computeScope>>();
+function scope(ctx: Ctx) { let m = scopeMemo.get(ctx); if (!m) { m = computeScope(ctx); scopeMemo.set(ctx, m); } return m; }
+const allowedMemo = new WeakMap<object, Promise<string[] | null>>();
+
+async function computeScope(ctx: Ctx) {
   const limit = accountLimit(ctx.plan, ctx.entitlements.enforced);
   const [settings, ids] = await Promise.all([
     getSettings(ctx.installationId),
@@ -1542,7 +1548,11 @@ async function syncStart(ctx: Ctx) {
   return json({ ok: true, ...slice, status: await syncStatus(ctx.installationId) });
 }
 
-async function allowedIds(ctx: Ctx): Promise<string[] | null> {
+function allowedIds(ctx: Ctx): Promise<string[] | null> {
+  let m = allowedMemo.get(ctx); if (!m) { m = computeAllowedIds(ctx); allowedMemo.set(ctx, m); } return m;
+}
+
+async function computeAllowedIds(ctx: Ctx): Promise<string[] | null> {
   if (ctx.limitTo) return [ctx.limitTo];
   const limit = accountLimit(ctx.plan, ctx.entitlements.enforced);
   const base = limit === null ? null : await visibleLocationIds(ctx.installationId, limit);
@@ -2038,10 +2048,30 @@ const FEATURE_FOR: Record<string, Feature> = {
   "meeting-inbox": "meetings", "meeting-setup": "meetings", "meeting-logged": "meetings", "meeting-list": "meetings", "my-connections": "connections", "team-connections": "connections", "meeting-policy": "connections", alerts: "alerts", notifications: "alerts", "notification-prefs": "alerts", "notification-destinations": "alerts", appointments: "appointments", audit: "audit", speed: "speed", "appointment-insights": "appointments", meetings: "meetings", connections: "connections", cleanup: "cleanup", cu: "cleanup", "setup-compare": "setup_compare", playbooks: "playbooks", daily: "overview", today: "overview", team: "team", "deal-events": "pipelines", contact: "search", settings: "settings", export: "exports", digest: "overview", "api-keys": "ai", hygiene: "stale", "pipeline-intel": "pipelines", "contact-intel": "activity", clients: "clients", qbr: "reports", "comms-intel": "inbox", "deal-gaps": "pipelines", "call-queue": "calls", "call-lists": "calls", "call-outcomes": "calls", people: "search", workbench: "search", dial: "calls", workflows: "workflows", "client-onboarding": "onboarding",
 };
 
+// The reads that are heavy and are opened again and again (Speed to lead and Appointments, every part). Their finished answer is kept for 30 seconds per installation + person + exact
+// address (read-cache.ts), so a second click, or a colleague on the same screen, is instant. Any change (POST, PUT, DELETE) forgets them as soon as it finishes. The digest read and the lists that carry a
+// person's own marks are included because the key holds the person.
+const HEAVY_READ = new Set(["speed", "appointments"]);
+
 export async function handle(request: Request, segments: string[]): Promise<Response> {
   const auth = await authenticate(request, segments);
   if (isResponse(auth)) return auth;
   const ctx: Ctx = { ...auth, request, url: new URL(request.url), segments };
+  if (request.method !== "GET") {
+    try { return await dispatch(ctx); } finally { forgetAllReads(); forgetAnswers(ctx.installationId); }
+  }
+  // The race is "right now" (it refreshes itself), so it is always read fresh.
+  if (HEAVY_READ.has(segments[0]) && ctx.url.searchParams.has("part") && ctx.url.searchParams.get("part") !== "race") {
+    const who = `${ctx.kind}:${ctx.limitTo ?? ""}:${ctx.session.userId ?? ""}`;
+    const key = answerKey(ctx.installationId, who, `${ctx.url.pathname}?${ctx.url.searchParams.toString()}`);
+    const out = await cachedAnswer(key, async () => { const r = await dispatch(ctx); return { status: r.status, body: await r.text() }; });
+    return new Response(out.body, { status: out.status, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } });
+  }
+  return dispatch(ctx);
+}
+
+async function dispatch(ctx: Ctx): Promise<Response> {
+  const { segments, request } = ctx;
   const [a, b, c] = segments;
   const method = request.method;
 

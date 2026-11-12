@@ -199,7 +199,7 @@ async function fixGate(ctx: Ctx, deps: Deps, b: Record<string, unknown> | null):
   const kinds = KINDS(b?.kinds);
   if (!loc || kinds.length === 0) return { err: json({ error: "Choose a client account and what to fix." }, 400) };
   const granted = await grantedOf(ctx);
-  if (!has(granted, "contacts.write")) return { err: json({ error: "Needs permission: reconnect and allow contacts.write.", needsPermission: "contacts.write" }, 403) };
+  if (!has(granted, "contacts.write")) return { err: json({ error: "Needs permission: reconnect to let SubSync change contacts.", needsPermission: "contacts.write" }, 403) };
   return { loc, kinds, me };
 }
 async function planFor(ctx: Ctx, loc: string, kinds: FixKind[], now: number) {

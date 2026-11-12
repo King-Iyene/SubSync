@@ -124,9 +124,9 @@ const plural = (n: number, one: string, many = one + "s") => `${n.toLocaleString
 export type HeadlinePart = { t: string; strong?: boolean };
 /** One sentence. Same rule as Today: "never answered" is part of the people waiting ("4 of them"), never added to them. */
 export function headlineOf(f: WaitingFacts, multi: boolean): { parts: HeadlinePart[]; text: string; allClear: boolean } {
-  if (f.waiting === 0) return { parts: [{ t: "Nobody is waiting for a reply right now." }], text: "Nobody is waiting for a reply right now.", allClear: true };
+  if (f.waiting === 0) return { parts: [{ t: "No new lead is waiting for a first reply right now." }], text: "No new lead is waiting for a first reply right now.", allClear: true };
   const parts: HeadlinePart[] = [
-    { t: f.waiting.toLocaleString("en-US"), strong: true }, { t: ` ${f.waiting === 1 ? "lead is" : "leads are"} waiting for a reply` },
+    { t: f.waiting.toLocaleString("en-US"), strong: true }, { t: ` ${f.waiting === 1 ? "new lead is" : "new leads are"} waiting for a first reply` },
   ];
   if (multi && f.accountsWithWaiting > 1) parts.push({ t: ` across ${plural(f.accountsWithWaiting, "client")}` });
   parts.push({ t: "." });

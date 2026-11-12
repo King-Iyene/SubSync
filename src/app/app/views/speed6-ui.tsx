@@ -72,7 +72,7 @@ export function FlowCard({ multi }: { multi: boolean }) {
           </div>
         ))}
       </div>
-      <p className="s6-label">Each dot is {flow.per === 1 ? "one lead" : `about ${flow.per} leads`}. {data.steps[0].count.toLocaleString("en-US")} arrived.</p></>)}
+      <p className="s6-label">Each dot is {flow.per === 1 ? "one lead" : `about ${flow.per} leads`}. {data.steps[0].count.toLocaleString("en-US")} real leads arrived (new contacts, not counting staff, test or repeat contacts, so this can be lower than the new-contacts number on Clients and Numbers).</p></>)}
       {!data.repliedRecorded && <p className="s6-label mt-1">Replies from the lead are not recorded yet; a booked lead counts as replied until they are.</p>}
       {open && <SidePopup label={`${STEP_LABEL[open.step]}${open.dropped ? ", dropped" : ""}`} onClose={() => setOpen(null)}><JourneyList key={open.step + open.dropped} step={open.step} dropped={open.dropped} multi={multi} /></SidePopup>}
     </Q>

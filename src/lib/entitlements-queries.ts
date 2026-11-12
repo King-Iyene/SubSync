@@ -1,4 +1,5 @@
 import { sql } from "./db";
+import { cachedRead } from "./read-cache";
 import { agencyTier, modeFrom, parsePlanEvent, tierForPlan, type Mode, type Tier } from "./entitlements-core";
 
 // Reads and writes for plans. Every read falls back to "free" (which only matters in enforced mode) if the
@@ -12,7 +13,11 @@ async function planMap(): Promise<Record<string, Tier>> {
 }
 
 // The tier an install is on: the best of the plan on the install itself and the plan of each account.
-export async function tierForInstallation(installationId: string): Promise<Tier> {
+export function tierForInstallation(installationId: string): Promise<Tier> {
+  return cachedRead(installationId, "tier", () => loadTier(installationId));
+}
+
+async function loadTier(installationId: string): Promise<Tier> {
   try {
     const [map, own, rows] = await Promise.all([
       planMap(),

@@ -107,7 +107,7 @@ export function WorkflowsView({ go, kind }: { go: GoFn; kind: AccessKind }) {
     try {
       const r = await api.post<{ accounts: Array<{ name: string; workflows: string; campaigns: string }> }>(`workflows/sync${q}`, {});
       const refused = r.accounts.filter((a) => a.workflows === "needs_permission").length;
-      setNote(refused ? { ok: false, text: `Needs permission: reconnect. ${refused} client account${refused === 1 ? "" : "s"} did not allow SubSync to read workflows (workflows.readonly).` } : { ok: true, text: "Updated." });
+      setNote(refused ? { ok: false, text: `Needs permission: reconnect. ${refused} client account${refused === 1 ? "" : "s"} did not allow SubSync to read your workflows.` } : { ok: true, text: "Updated." });
       await reload();
     } catch (e) { setNote({ ok: false, text: (e as Error).message }); } finally { setSyncing(false); }
   };
@@ -158,7 +158,7 @@ export function WorkflowsView({ go, kind }: { go: GoFn; kind: AccessKind }) {
       </div>
       {data.since && data.since.changes > 0 ? <InlineAlert tone="info" className="mb-4"><span data-testid="wf-since">Since your last visit ({when(data.since.at, data.now).toLowerCase()}): {data.since.changes} change{data.since.changes === 1 ? "" : "s"} to your workflows and campaigns.</span> <button type="button" className="font-medium text-primary hover:underline" onClick={() => setTab("history")}>See them</button></InlineAlert> : null}
       {note ? <InlineAlert tone={note.ok ? "success" : "warning"} onDismiss={() => setNote(null)} className="mb-4">{note.text}</InlineAlert> : null}
-      {noList ? <InlineAlert tone="warning" title="Needs permission: reconnect" className="mb-4">SubSync needs <code>workflows.readonly</code> to list workflows, and <code>workflows.logs</code> to see which ones fail or never run. Open SubSync again from your CRM&apos;s app list and accept it. Campaigns need <code>campaigns.readonly</code>.</InlineAlert> : null}
+      {noList ? <InlineAlert tone="warning" title="Needs permission: reconnect" className="mb-4">SubSync needs permission to read your workflows, and to read what they did (to see which ones fail or never run). Open SubSync again from your CRM&apos;s app list and accept it. Campaigns need permission to read campaigns.</InlineAlert> : null}
       {!data.available ? <InlineAlert tone="info" title="Needs the latest database update" className="mb-4">Ask the person who manages SubSync to apply the newest update. Until then this page stays empty.</InlineAlert> : null}
       {!data.permissions.history && !noList ? <InlineAlert tone="info" title="Needs permission: reconnect" className="mb-4">Allow <code>workflows.logs</code> to see failing and idle workflows. Until then those checks are not shown, and nothing is guessed.</InlineAlert> : null}
       <Tabs tabs={[{ id: "overview", label: "Overview" }, { id: "list", label: `List (${total})` }, { id: "health", label: `Health${data.findings.length ? ` (${data.findings.length})` : ""}` }, { id: "tidy", label: "Tidy up" }, { id: "delivery", label: "Campaign delivery" }, { id: "proof", label: "Proof" }, { id: "history", label: "History" }, ...(data.wf?.gaps ? [{ id: "gaps" as const, label: "Gaps" }] : []), ...(data.wf?.library && data.can.change ? [{ id: "library" as const, label: "Library" }] : [])]} value={tab} onChange={(t) => { setTab(t); setSel(new Set()); }} />

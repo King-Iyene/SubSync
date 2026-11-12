@@ -6,6 +6,7 @@ import { useData } from "../../session";
 import { EmptyState, OpenLeadButton } from "../../ds";
 import { Find, LevelChip, Load, NOT_FROM_PLATFORM } from "./shared";
 import { useCl, type ClParams } from "./data";
+import { scopeList } from "@/lib/scope-words";
 
 // Clients, Money: every client account with its plan, payment status, credit balance and whether SubSync is installed. Real data only. Sample rows appear ONLY with ?cl3fx in the address and say
 // "Sample data". Each count opens exactly its rows. Nothing here changes a plan, charges anyone or installs anything: where the platform has no way to do that, a link opens the platform screen.
@@ -52,7 +53,7 @@ export function MoneyTab({ onOpen, onPayments, showApps, showHistory }: Props) {
                 <p className="cl-sentence" data-testid="cl3-today">{s.today.headline}</p>
                 {s.today.bucket && <button type="button" className="s6-btn" data-kind="primary" onClick={() => setBucket(s.today.bucket as Cl3Bucket)}>Show these {s.counts[s.today.bucket].toLocaleString("en-US")}</button>}
               </section>
-              {perm.length > 0 && <p className="ap-fine" role="status" data-testid="cl3-needs-permission">Needs permission: reconnect and allow {perm.join(", ")}. Until then the plan or balance columns stay empty.</p>}
+              {perm.length > 0 && <p className="ap-fine" role="status" data-testid="cl3-needs-permission">Needs permission: reconnect to let SubSync {scopeList(perm)}. Until then the plan or balance columns stay empty.</p>}
               <div className="cl-tiles" aria-label="Money headline">
                 <div className="cl-tile" style={{ cursor: "default" }} title="Estimate: the plan price per month of every paid-up account. A yearly price is divided by 12. It is the price, not what was charged."><b>{s.expectedMonthly.length ? s.expectedMonthly.map((e) => cash(e.currency, e.monthly)).join(" + ") : "Not enough data"}</b><span>Expected each month (estimate)</span></div>
                 <button type="button" className="cl-tile" onClick={() => setBucket("unpaid")} title="Estimate: the monthly plan price of accounts that are not paid up."><b>{s.atRisk.length ? s.atRisk.map((e) => cash(e.currency, e.monthly)).join(" + ") : "$0"}</b><span>At risk each month (estimate)</span></button>
@@ -96,7 +97,7 @@ export function MoneyTab({ onOpen, onPayments, showApps, showHistory }: Props) {
                 <h3 className="mb-1 text-base font-semibold">Upcoming charges and apps</h3>
                 <p className="ap-fine">Next charge date, failed-payment reasons, other marketplace apps in each account, buying an app for every account and bulk install: {NOT_FROM_PLATFORM}. They stay in your CRM.
                   {home && <a className="ap-link" href={home} target="_blank" rel="noreferrer" data-testid="cl3-crm-home">Open your CRM (billing and apps)</a>}</p>
-                {showApps && <p className="ap-fine" data-testid="cl3-apps">SubSync: {s.apps.state === "ok" ? `${s.apps.installed} installed, ${s.apps.missing} not installed${s.apps.unknown ? `, ${s.apps.unknown} not read yet` : ""}.` : "not read yet. If this stays empty after the next hourly read, reconnect and allow oauth.readonly."}</p>}
+                {showApps && <p className="ap-fine" data-testid="cl3-apps">SubSync: {s.apps.state === "ok" ? `${s.apps.installed} installed, ${s.apps.missing} not installed${s.apps.unknown ? `, ${s.apps.unknown} not read yet` : ""}.` : "not read yet. If this stays empty after the next hourly read, reconnect to let SubSync read which apps are installed."}</p>}
               </section>
               {showHistory && !sample && <History onOpen={onOpen} />}
             </>
