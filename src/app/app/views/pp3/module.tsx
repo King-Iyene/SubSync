@@ -13,23 +13,26 @@ import { fixturesOn, usePp, type PpParams } from "./data";
 import { PersonPanel, type Drill } from "./panel";
 import { Scorecards, Today, Workload, type SecProps } from "./sections";
 import { Roles } from "./roles-tab";
+import { TeamView } from "../people";
 import { Access, Coaching, Leaderboard, Money, Proof } from "./sections2";
 import { ago, Load, money, Pager, RECONNECT, useCursor } from "./shared";
 
 // Team, one screen (the Clients module pattern): Today | Scorecards | Workload | Leaderboard | Money | Coaching | Access | Proof, and a panel for one person.
 // REAL synced data only; "idle" always reads "no activity recorded in your CRM". Reads only here; the actions builder mounts its pieces through actions-slot.tsx.
 // Every number is a count that opens its rows. Sample data appears ONLY with ?ppfx=1 and is labelled "Sample data".
-type TabKey = "today" | "scorecards" | "workload" | "leaderboard" | "money" | "coaching" | "access" | "proof" | "roles";
+type TabKey = "today" | "scorecards" | "workload" | "leaderboard" | "money" | "coaching" | "access" | "proof" | "roles" | "owners";
 const TIPS: Record<TabKey, [string, string]> = {
   today: ["Today", "What to do today, in one sentence."], scorecards: ["Scorecards", "One row per person: replies, appointments, shows, deals won."],
   workload: ["Workload", "Who has too much and who has room, against the team's own middle."], leaderboard: ["Leaderboard", "A fair ranking inside each account."],
   money: ["Money", "Deals won, open and at risk, per person."], coaching: ["Coaching", "One thing to work on for each person, and your notes."],
   access: ["Access", "Which accounts each person works in, and where one person does it all."], proof: ["Proof", "A summary for a client of how the team handled their leads."],
   roles: ["Roles", "Who is a setter, a closer or something else. Shown next to every name."],
+  // Restored from the earlier Team page (a revamp adds, never removes): open and won value, stale deals, win rate, reply pace and show rate per owner, and the rename.
+  owners: ["Pipeline owners", "Open and won value, stale deals, win rate, reply pace and show rate for each owner. You can rename a person."],
 };
-const FLAG_OF: Record<TabKey, string> = { today: "pp_today", scorecards: "pp_scorecards", workload: "pp_workload", leaderboard: "pp_leaderboard", money: "pp_money", coaching: "pp_coaching", access: "pp_access", proof: "pp_proof", roles: "pp_roles" };
+const FLAG_OF: Record<TabKey, string> = { today: "pp_today", scorecards: "pp_scorecards", workload: "pp_workload", leaderboard: "pp_leaderboard", money: "pp_money", coaching: "pp_coaching", access: "pp_access", proof: "pp_proof", roles: "pp_roles", owners: "pp_module" };
 const OWN_TABS: TabKey[] = ["today", "scorecards", "leaderboard", "coaching"];
-const NO_PERIOD: TabKey[] = ["today", "workload", "coaching", "access", "roles"];
+const NO_PERIOD: TabKey[] = ["today", "workload", "coaching", "access", "roles", "owners"];
 
 const KIND_WORD = { lead: "Lead waiting", deal: "Deal", appointment: "Appointment" } as const;
 function DrillList({ d, filters, onClose }: { d: Drill; filters: PpParams; onClose: () => void }) {
@@ -84,9 +87,10 @@ export function TeamModule({ go }: { go: GoFn }) {
       case "access": return <Access {...props} />;
       case "proof": return <Proof {...props} />;
       case "roles": return <Roles />;
+      case "owners": return <div className="[&_[data-testid=page-subtitle]]:hidden [&_h1]:sr-only"><TeamView /></div>;
     }
   })();
-  const showAccount = !own && accounts.length > 1 && active !== "access" && active !== "proof" && active !== "coaching" && active !== "roles";
+  const showAccount = !own && accounts.length > 1 && active !== "owners" && active !== "access" && active !== "proof" && active !== "coaching" && active !== "roles";
   const showPeriod = !NO_PERIOD.includes(active);
   return (
     <div className="s6 ap pp ds-enter" data-testid="pp-module">

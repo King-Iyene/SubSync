@@ -91,6 +91,8 @@ export type Td3Tile = {
   /** The number as text ("12 min", "37%", "$48,200"), or the reason there is none. */
   value: string;
   enough: boolean;
+  /** A small line under the number: what is needed when there is not enough yet ("Needs 5 answered leads (0 so far)"), else null. */
+  caption: string | null;
   /** One line of what it is and what it counts. */
   formula: string;
   /** "+12%" style change against the period before, only when both periods have enough. */

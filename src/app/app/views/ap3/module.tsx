@@ -20,6 +20,8 @@ import { ExportAll, TrendsPanel } from "./trends-panel";
 import { ApPanel, PersonPanel } from "./parts";
 import { BookingShare, Calendars, Health, Meetings, NeedsOutcome, Proof, Recovery, Sources } from "./sections2";
 import { ExecTab } from "./exec/exec-tab";
+import { AppointmentsView } from "../appointments";
+import { AppointmentInsights } from "../appointment-insights";
 import { execScopeOf } from "./exec/exec-types";
 import { Overview, type DrillReq, type SectionProps } from "./sections";
 import type { ApFlowTree, ApHealthRow, ApPersonRow, ApRow } from "./types";
@@ -30,7 +32,7 @@ import type { ApFlowTree, ApHealthRow, ApPersonRow, ApRow } from "./types";
 
 registerAbSlots(); // slice AB: the checked change tools and the Meetings area mount into the slots below
 
-type TabKey = "overview" | "needs" | "recover" | "share" | "flow" | "health" | "sources" | "calendars" | "meetings" | "proof" | "exec";
+type TabKey = "overview" | "needs" | "recover" | "share" | "flow" | "health" | "sources" | "calendars" | "meetings" | "proof" | "exec" | "classic" | "insights";
 const TABS: Array<{ key: TabKey; label: string; tip: string }> = [
   { key: "overview", label: "Overview", tip: "The one sentence, the numbers and where the leak is." }, { key: "needs", label: "Needs outcome", tip: "Past appointments nobody marked." },
   { key: "recover", label: "No-show recovery", tip: "No-shows not booked again." }, { key: "share", label: "Booking share", tip: "Who books and who takes the meeting." },
@@ -39,6 +41,9 @@ const TABS: Array<{ key: TabKey; label: string; tip: string }> = [
   { key: "meetings", label: "Meetings", tip: "Recorded meetings matched to appointments." },
   { key: "proof", label: "Proof", tip: "The weekly receipt per client." },
   { key: "exec", label: "Leadership", tip: "Pace, leaks, who converts and what to fix this week." },
+  // Restored from the earlier Appointments (a revamp adds, never removes): the true show rate card with copy, print and call-list shortcuts, and the Insights widgets.
+  { key: "classic", label: "Show rate and lists", tip: "The earlier page: true show rate, outcome chart, target, copy a summary and print." },
+  { key: "insights", label: "Insights", tip: "Best times to book, repeat no-shows, lead to customer funnel, what an appointment is worth, follow-up gaps and more." },
 ];
 type SavedView = { name: string; filters: ApFilters; tab: TabKey };
 const VIEWS_KEY = "ap3.views.v1";
@@ -103,6 +108,7 @@ export function AppointmentsModule({ go, flowTree = true, leadership = false }: 
 
   const index = tabs.findIndex((t) => t.key === tab);
   const isList = tab === "needs" || tab === "recover";
+  const embedded = tab === "classic" || tab === "insights"; // the restored earlier pages bring their own dates and filters
   const filtered = !isDefault(filters) || q !== "";
   // A number that opens a section starts that section's list without its own narrowing filters (owner, booker, status, age), so the number and the rows agree.
   const goTab = useCallback((k: string, f?: string) => {
@@ -145,6 +151,8 @@ export function AppointmentsModule({ go, flowTree = true, leadership = false }: 
       case "calendars": return <><Calendars {...sp} /><TrendsPanel filters={filters} by="calendar" onOpen={(title, count, extra) => openDrill({ title, count, extra })} /></>;
       case "meetings": return <Meetings {...sp} />;
       case "proof": return <Proof {...sp} />;
+      case "classic": return <div className="[&_[data-testid=page-subtitle]]:hidden [&_h1]:sr-only"><AppointmentsView go={go} /></div>;
+      case "insights": return <div className="[&_[data-testid=page-subtitle]]:hidden [&_h1]:sr-only"><AppointmentInsights /></div>;
       case "exec": return <ExecTab scope={execScopeOf(filters)} onOpenRow={openRow} />;
     }
   })();
@@ -160,7 +168,7 @@ export function AppointmentsModule({ go, flowTree = true, leadership = false }: 
   return (
     <div className="s6 ap ap3 ds-enter" ref={top} data-testid="ap-module" key={version}>
       <Page title="Appointments" subtitle="Who booked, who showed, and who is burning your leads." actions={null}>
-        <div className="ap-head" role="search" aria-label="Filter appointments">
+        <div className="ap-head" role="search" aria-label="Filter appointments" hidden={embedded}>
           <label className="ap-search"><Search aria-hidden className="size-4" /><span className="sr-only">Search by name</span><input ref={search} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search a name (press /)" data-testid="ap-search" /></label>
           <DateAxis filters={filters} set={set} />
           {accounts.length > 1 && <SearchSelect label="Account" value={filters.locationId} anyLabel="All accounts" options={accounts.map((a) => ({ value: a.locationId, label: a.name }))} onChange={(v) => set({ locationId: v, calendarId: "", groupId: "", userId: "", booker: "", owner: "" })} testId="ap-account" />}
@@ -184,8 +192,8 @@ export function AppointmentsModule({ go, flowTree = true, leadership = false }: 
           {naming ? <NameView onSave={saveView} onCancel={() => setNaming(false)} /> : <button type="button" className="s6-btn" onClick={() => setNaming(true)} data-testid="ap-save-view"><Bookmark aria-hidden className="size-4" />Save view</button>}
           {filtered && <button type="button" className="s6-btn" onClick={clear} data-testid="ap-clear"><X aria-hidden className="size-4" />Clear filters</button>}
         </div>
-        <QuickFilters filters={filters} set={set} people={people} />
-        <ResultLine filters={filters} />
+        {!embedded && <><QuickFilters filters={filters} set={set} people={people} />
+        <ResultLine filters={filters} /></>}
         {overridden && <p className="ap-fine mb-2" role="status" data-testid="ap-own-dates">This screen is showing {own.from} to {own.to} (its own date choice), not the dates in the bar above ({bar.label}). <button type="button" className="underline" onClick={() => setFilters((f) => ({ ...f, days: bar.spec.preset === "7d" ? 7 : bar.spec.preset === "90d" ? 90 : 30, from: bar.spec.preset === "custom" ? bar.from : "", to: bar.spec.preset === "custom" ? bar.to : "" }))}>Use the bar&apos;s dates</button></p>}
         <FilterChips filters={filters} opts={opts.data ?? null} accounts={accounts} onChange={(f) => { setFilters(f); setQ(f.q); }} listTab={isList ? tab : null} />
         {fixturesOn() && <p className="ap-fine mb-2" role="status">Showing sample appointments (apfx).</p>}

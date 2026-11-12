@@ -14,6 +14,7 @@ import { SidePopup } from "./speed-popup";
 import { LeadRows, useLeadActions, type LeadRow } from "./speed-rows";
 import { useListPopup } from "./speed6-base";
 import { RulesTab6 } from "./speed6-rules";
+import { AlertsTab } from "./speed-insights";
 import type { GoFn } from "../nav";
 import "./speed4.css";
 
@@ -194,7 +195,7 @@ function RoutingCard() {
 }
 
 export function RulesTab(p: { who: string; waiting: number; dollars: number | null; typical: string | null; canChange: boolean; targetMinutes: number; go: GoFn; multi?: boolean; seePeople?: boolean; accounts?: Array<{ id: string; name: string }> }) {
-  return <RulesTab6 {...p} multi={p.multi ?? false} rest={<><RoutingCard /><ProofReport /></>} />;
+  return <RulesTab6 {...p} multi={p.multi ?? false} rest={<><RoutingCard /><ProofReport />{/* Restored from the earlier Rules tab: the link to who is told and when, and the printable digest preview. */}<AlertsTab who={p.who} waiting={p.waiting} dollars={p.dollars} typical={p.typical} canChange={p.canChange} targetMinutes={p.targetMinutes} go={p.go} /></>} />;
 }
 
 /** The counts under the missed-call and overnight headlines, each a button that opens exactly those people. */

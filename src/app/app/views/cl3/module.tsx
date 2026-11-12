@@ -12,6 +12,9 @@ import { ClientPage } from "../clients/client-page";
 import { HealthTab } from "../clients/health-tab";
 import { IndustriesTab } from "../clients/industries";
 import { OnboardingTab } from "../clients/onboarding-tab";
+import { BookTab } from "../clients/book";
+import { CompareTab } from "../clients/compare";
+import { ReportsTab } from "../clients/reports-tab";
 import { ReviewsTab } from "../clients/reviews";
 import type { ClientsFeatures } from "../clients";
 import "../speed6.css";
@@ -35,8 +38,8 @@ import { ago, change, day, Find, LevelChip, Load, money, Pager, share } from "./
 // then the older Onboarding, Reviews (QBR) and Industries pages. Reads only; the only writes are SubSync's own quiet marks, reply targets and owner names (settings panel).
 // Every number is a count that opens its rows. Nothing here messages anyone or changes the CRM. Sample data appears ONLY with ?clfx=1 and is labelled "Sample data".
 type Drill = { title: string; reason: Cl3Reason; location: string | null; count: number } | null;
-type TabKey = "overview" | "money" | "wallet" | "accounts" | "plans" | "needs" | "trends" | "compare" | "reports" | "proof" | "people" | "setup" | "health" | "onboarding" | "reviews" | "industries";
-const OLDER: TabKey[] = ["health", "onboarding", "reviews", "industries"];
+type TabKey = "overview" | "money" | "wallet" | "accounts" | "plans" | "needs" | "trends" | "compare" | "reports" | "proof" | "people" | "setup" | "health" | "onboarding" | "reviews" | "industries" | "book" | "oldcompare" | "oldreports";
+const OLDER: TabKey[] = ["health", "onboarding", "reviews", "industries", "book", "oldcompare", "oldreports"];
 const TIPS: Record<TabKey, [string, string]> = {
   overview: ["Overview", "What to do today, in one sentence."], money: ["Money", "Plans, who has not paid, credit balances, and whether SubSync is installed, for every client account."], accounts: ["Accounts", "Every client account: paid plan, payment status, health, who looks after it."], plans: ["Plans", "Paid plans that are past due, cancelled or paused, with a note field."], needs: ["Needs attention", "Accounts ranked by what is wrong, with the count behind each reason."],
   wallet: ["Wallet", "Every client account's credit balance, lowest days left first, with alerts before it runs out."],
@@ -44,6 +47,8 @@ const TIPS: Record<TabKey, [string, string]> = {
   reports: ["Reports", "A weekly proof for each client to show them."], proof: ["Proof", "One branded page and a monthly report for each client, to send them yourself."], people: ["People", "Who works in which account, and who has gone quiet."],
   setup: ["Setup health", "Connection, permissions, how fresh the data is, and each client's plan."], health: ["Health and risk", "Overall health, who may be slipping, and the standard workflows each client has."],
   onboarding: ["Onboarding", "One checklist per client."], reviews: ["Reviews (QBR)", "The quarterly review of one client."], industries: ["Industries", "Clients grouped by industry, with playbooks and reply targets."],
+  // Restored from the earlier Clients (a revamp adds, never removes).
+  book: ["Client book", "Who may leave, renewals coming, and what each client pays you."], oldcompare: ["Compare clients", "The earlier compare page: scores, setups and a trend, side by side."], oldreports: ["Weekly reports", "The earlier weekly report for each client."],
 };
 // Clients v2 tabs show only when their flag is on (a missing flag means off); the older tabs hide only when their flag is explicitly off.
 const C2_FLAG_OF: Partial<Record<TabKey, string>> = { money: "cl3_money", wallet: "wg_wallet", accounts: "cl2_accounts", plans: "cl2_plans", proof: "pr_report" };
@@ -190,8 +195,8 @@ export function ClientsModule({ go, features = ALL_FEATURES, initialTab = "overv
   const tabs = useMemo(() => {
     const all: TabKey[] = ["overview", "money", "wallet", "accounts", "plans", "needs", "trends", "compare", "reports", "proof", "people", "setup", "health"];
     const keep = all.filter((k) => (C2_FLAG_OF[k] ? flags?.[C2_FLAG_OF[k] as string] === true || (k === "wallet" && wgfxOn()) : k === "people" && flags?.cl2_team_move === true ? false : !FLAG_OF[k] || flags === null || flags[FLAG_OF[k] as string] !== false));
-    return [...keep, ...(f.onboarding ? (["onboarding"] as TabKey[]) : []), ...(f.clients && f.reports ? (["reviews"] as TabKey[]) : []), ...(f.clients ? (["industries"] as TabKey[]) : [])];
-  }, [flags, f.onboarding, f.clients, f.reports]);
+    return [...keep, ...(f.onboarding ? (["onboarding"] as TabKey[]) : []), ...(f.clients && f.reports ? (["reviews"] as TabKey[]) : []), ...(f.clients ? (["industries"] as TabKey[]) : []), ...(f.health || f.clients ? (["book"] as TabKey[]) : []), ...(f.clients && f.reports ? (["oldcompare"] as TabKey[]) : []), ...(f.clients ? (["oldreports"] as TabKey[]) : [])];
+  }, [flags, f.onboarding, f.clients, f.reports, f.health]);
   const [tab, setTab] = useState<TabKey>(() => wantedTab() ?? initialTab);
   // The dates are the date bar's (one range for the whole app); every read below asks for exactly them.
   const filters = useMemo<ClParams>(() => ({ from: bar.ready ? bar.from : undefined, to: bar.ready ? bar.to : undefined, industry: industry || undefined }), [bar.ready, bar.from, bar.to, industry]);
@@ -202,7 +207,7 @@ export function ClientsModule({ go, features = ALL_FEATURES, initialTab = "overv
   const index = Math.max(0, mainTabs.indexOf(active));
   const open = (d: NonNullable<Drill>) => { setDrill(d); setTimeout(() => document.getElementById("cl-drill")?.scrollIntoView({ block: "nearest", behavior: "smooth" }), 50); };
   const goTab = (t: TabKey) => { setTab(t); setDrill(null); };
-  const readsAccounts = !["onboarding", "reviews", "industries", "health", "accounts", "plans", "money", "wallet", "proof"].includes(active);
+  const readsAccounts = !["onboarding", "reviews", "industries", "health", "accounts", "plans", "money", "wallet", "proof", "book", "oldcompare", "oldreports"].includes(active);
   // A deep link (?account=<id>) opens that account's page. The server checks the id again; an id that is not yours shows "not found".
   const openAccount = (id: string | null) => { setOpenId(id); setDrill(null); try { const u = new URL(window.location.href); if (id) u.searchParams.set("account", id); else u.searchParams.delete("account"); window.history.replaceState(null, "", u.toString()); } catch { /* ignore */ } };
   const tileTo = (t: Cl2Today["tiles"][number]) => { setAcctPreset({ status: t.filter.status ?? "", level: t.filter.level ?? "", quiet: t.filter.quiet === true, plan: t.filter.plan ?? "" }); goTab("accounts"); };
@@ -239,11 +244,14 @@ export function ClientsModule({ go, features = ALL_FEATURES, initialTab = "overv
       case "onboarding": return <OnboardingTab go={go} />;
       case "reviews": return <WithNames>{(a) => <ReviewsTab accounts={a} />}</WithNames>;
       case "industries": return <IndustriesTab go={go} showPlaybooks={f.playbooks} />;
+      case "book": return <BookTab go={go} onOpen={openAccount} />;
+      case "oldcompare": return <WithNames>{(a) => <CompareTab accounts={a} showSetups={f.setupCompare} />}</WithNames>;
+      case "oldreports": return <ReportsTab />;
     }
   })();
   return (
     <div className="s6 ap cl ds-enter" data-testid="cl-module">
-      <Page title="Clients" subtitle="Which client accounts are fine, which need you, and proof to show them." actions={sample ? null : <Btn onClick={() => api.download("clients3?part=export", "clients.csv")}>Export CSV</Btn>}>
+      <Page title="Clients" subtitle="Which client accounts are fine, which need you, and proof to show them." actions={sample ? null : <><Btn onClick={() => api.download("clients3?part=export", "clients.csv")}>Export CSV</Btn>{f.clients && <Btn onClick={() => api.download("export/clients", "subsync-clients.csv")}>Export fees and renewals</Btn>}</>}>
         {sample && <p className="ap-fine mb-2" role="status" data-testid="cl-sample">Sample data: these are not your real clients.</p>}
         {opt.data?.problem && <p className="ap-fine mb-2" role="status">{opt.data.problem}</p>}
         <ModuleTabs pill wrap label="Clients sections" tabs={mainTabs.map((k) => ({ label: TIPS[k][0], tip: TIPS[k][1], node: null }))} value={index} onChange={(i) => goTab(mainTabs[i])} noneActive={olderOpen}
