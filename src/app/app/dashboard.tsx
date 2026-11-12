@@ -34,6 +34,8 @@ import { AuditView } from "./views/audit";
 import { SpeedView } from "./views/speed";
 import { AppointmentsView } from "./views/appointments";
 import { CleanupModule } from "./views/cleanup-hub";
+import { DqModule } from "./views/dq/dq-module";
+import { sampleOn as dqSample } from "./views/dq/dq-data";
 import { MeetingsView } from "./views/meetings";
 import { WorkflowsView } from "./views/workflows";
 import { DataHealthView } from "./views/data-health";
@@ -339,6 +341,9 @@ export function Dashboard() {
   // Switched off for everyone: not shown. Locked by plan: shown with a Pro note, and the page explains.
   const locked = (feature: string) => auth.locked.includes(feature);
   const off = (feature: string) => auth.features[feature] === false && !locked(feature);
+  // Clean-up v2 (stage DQ): each switch is on when the feature is on for this account and not locked by the plan; ?cufx shows the labelled sample.
+  const dqFlag = (f: string) => (auth.features[f] === true && !auth.locked.includes(f)) || dqSample();
+  const dqOn = dqFlag("dq_module");
   // A page that lives inside a module as a tab (People holds Contact search, Leads and Call lists) has no menu entry of its own.
   // (A page that lives inside the Clients module has no entry of its own for an agency; a business and a client's staff have no Clients module, so their Setup stays in their menu.)
   // The Clean-up entry stays while either of its two features is on (a switched-off tab is left out inside it).
@@ -415,7 +420,8 @@ export function Dashboard() {
       case "inbox": return inboxTab ? <SpeedView go={go} unanswered start="unanswered" /> : <InboxView go={go} />;
       case "onboarding": return limited ? <ModuleTabs key="setup" start={0} tabs={setupTabs} /> : (auth.features.cl_module === true && !auth.locked.includes("cl_module")) || clSample() ? <ClientsModule key="cl3" go={go} features={clientFeatures} initialTab="onboarding" /> : <ClientsView key="onboarding" go={go} initialTab="onboarding" features={clientFeatures} />;
       case "email": return limited ? <ModuleTabs key="setup" start={1} tabs={setupTabs} /> : <EmailHealthView />;
-      case "duplicates": case "cleanup": return <CleanupModule key={viewId} kind={auth.kind} start={viewId === "cleanup" ? "quality" : "duplicates"} duplicatesOn={!off("duplicates") && NAV_FOR[auth.kind].has("duplicates")} cleanupOn={!off("cleanup") && NAV_FOR[auth.kind].has("cleanup")} fixOn={auth.features.cu_fix === true && !auth.locked.includes("cu_fix")} healthOn={auth.features.cu_health === true && !auth.locked.includes("cu_health")} legacyHealth={auth.features.cu_health === true && !off("data_health") ? <ApiProvider value={baseApi}><DataHealthView go={go} kind={auth.kind} /></ApiProvider> : null} />;
+      case "duplicates": case "cleanup": if (dqOn) return <DqModule key="dq" kind={auth.kind} start={viewId === "duplicates" ? "duplicates" : "overview"} duplicatesOn={dqFlag("dq_dupes")} intakeOn={dqFlag("dq_intake")} fixOn={auth.features.cu_fix === true && !auth.locked.includes("cu_fix")} cleanupOn={!off("cleanup") && NAV_FOR[auth.kind].has("cleanup")} />;
+        return <CleanupModule key={viewId} kind={auth.kind} start={viewId === "cleanup" ? "quality" : "duplicates"} duplicatesOn={!off("duplicates") && NAV_FOR[auth.kind].has("duplicates")} cleanupOn={!off("cleanup") && NAV_FOR[auth.kind].has("cleanup")} fixOn={auth.features.cu_fix === true && !auth.locked.includes("cu_fix")} healthOn={auth.features.cu_health === true && !auth.locked.includes("cu_health")} legacyHealth={auth.features.cu_health === true && !off("data_health") ? <ApiProvider value={baseApi}><DataHealthView go={go} kind={auth.kind} /></ApiProvider> : null} />;
       case "alerts": return <AlertsView go={go} />;
       case "settings": return auth.features.st_settings === true && !auth.locked.includes("st_settings") ? <SettingsHub go={go} features={auth.features} openOld={movedTo ?? undefined} /> : <SettingsView openSection={movedTo ?? undefined} />;
       case "connections": return <IntegrationsPage />;
@@ -427,7 +433,8 @@ export function Dashboard() {
       case "appointments": return auth.features.appt_module === true && !auth.locked.includes("appt_module") ? <AppointmentsModule key="appts3" go={go} flowTree={auth.features.appt_flow_tree === true} leadership={auth.features.ap_exec === true} /> : <ModuleTabs key="appts" start={0} tabs={[{ label: "Appointments", node: <AppointmentsView go={go} /> }, { label: "Insights", node: <AppointmentInsights /> }]} />;
       case "meetings": return <MeetingsView />;
       // Workflows reads with the unfiltered client and keeps its own account choice (like Today), so the shared filter never changes what it counts.
-      case "data-health": if (auth.features.cu_health === true && !auth.locked.includes("cu_health")) return <CleanupModule key="dh" kind={auth.kind} start="health" duplicatesOn={!off("duplicates") && NAV_FOR[auth.kind].has("duplicates")} cleanupOn={!off("cleanup") && NAV_FOR[auth.kind].has("cleanup")} fixOn={auth.features.cu_fix === true && !auth.locked.includes("cu_fix")} healthOn legacyHealth={<ApiProvider value={baseApi}><DataHealthView go={go} kind={auth.kind} /></ApiProvider>} />;
+      case "data-health": if (dqOn) return <DqModule key="dq" kind={auth.kind} start="overview" duplicatesOn={dqFlag("dq_dupes")} intakeOn={dqFlag("dq_intake")} fixOn={auth.features.cu_fix === true && !auth.locked.includes("cu_fix")} cleanupOn={!off("cleanup") && NAV_FOR[auth.kind].has("cleanup")} legacyHealth={<ApiProvider value={baseApi}><DataHealthView go={go} kind={auth.kind} /></ApiProvider>} />;
+        if (auth.features.cu_health === true && !auth.locked.includes("cu_health")) return <CleanupModule key="dh" kind={auth.kind} start="health" duplicatesOn={!off("duplicates") && NAV_FOR[auth.kind].has("duplicates")} cleanupOn={!off("cleanup") && NAV_FOR[auth.kind].has("cleanup")} fixOn={auth.features.cu_fix === true && !auth.locked.includes("cu_fix")} healthOn legacyHealth={<ApiProvider value={baseApi}><DataHealthView go={go} kind={auth.kind} /></ApiProvider>} />;
         return <ApiProvider value={baseApi}><DataHealthView go={go} kind={auth.kind} /></ApiProvider>;
       case "payments": return (auth.features.pm_module === true && !auth.locked.includes("pm_module")) || pmSample() ? <PaymentsModule key="pm" go={go} /> : <EmptyState title="Payments is not switched on yet" body="It will appear here as soon as it is ready for your account." />;
       case "workflows": return <ApiProvider value={baseApi}><WorkflowsView go={go} kind={auth.kind} /></ApiProvider>;
