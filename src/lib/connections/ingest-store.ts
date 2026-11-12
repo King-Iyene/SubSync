@@ -10,6 +10,7 @@ import type { Role } from "../identity";
 import { recordCrmWrite } from "./write-log";
 import { setupStore } from "./setup-store";
 import { cleanPriority } from "./source-priority";
+import { amNotify } from "./auto-notices";
 
 // The database side of ingest.ts: every statement is scoped by the installation id and, for a person, by their own user id. Webhook handlers have no
 // signed-in user, so they use this server-side layer after the provider's signature has been checked.
@@ -46,13 +47,14 @@ export function pgIngestStore(): IngestStore {
       return { agency, accounts };
     },
     async settings(installationId, userId): Promise<PersonSettings> {
-      const [r] = await sql()`select master_switch, unmatched_mode, preset, content_matrix, preview_confirmed_at, custom_template, preset_chosen, source_priority from meeting_note_settings where installation_id = ${installationId} and ghl_user_id = ${userId}`;
+      const [r] = await sql()`select master_switch, unmatched_mode, preset, content_matrix, preview_confirmed_at, custom_template, preset_chosen, source_priority, auto_add_notes, auto_add_accepted_at from meeting_note_settings where installation_id = ${installationId} and ghl_user_id = ${userId}`;
       if (!r) return DEFAULT_SETTINGS;
       return {
         masterSwitch: r.master_switch !== false, unmatchedMode: r.unmatched_mode === "discard" ? "discard" : "inbox",
         preset: r.preset === "full_record" || r.preset === "summary_only" || r.preset === "custom" ? r.preset : "recommended", custom: r.content_matrix,
         previewConfirmedAt: r.preview_confirmed_at instanceof Date ? r.preview_confirmed_at.getTime() : null,
         template: (r.custom_template as string | null) ?? null, presetChosen: r.preset_chosen === true, sourcePriority: cleanPriority(r.source_priority),
+        autoNotes: { on: r.auto_add_notes === true, acceptedAt: r.auto_add_accepted_at instanceof Date ? r.auto_add_accepted_at.getTime() : null },
       };
     },
     async writesToday(installationId, userId, locationIds) {
@@ -86,6 +88,7 @@ export function pgIngestStore(): IngestStore {
     },
     hasWriteScope: (installationId) => installationHasScope(installationId, "contacts.write"),
     ...setupStore,
+    notify: amNotify,
     async recordWrite(r) {
       const first = await recordCrmWrite({ ...r, partNo: r.partNo ?? 1 });
       // The audit log says who wrote what where (ids only, never any text of the call).

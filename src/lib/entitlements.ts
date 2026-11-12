@@ -223,6 +223,8 @@ export const FEATURES = [
   "mn_followups",
   "mn_tasks",
   "mn_coach",
+  "am_auto_notes",
+  "am_slack_auto",
   "dq_module",
   "dq_dupes",
   "dq_intake",

@@ -10,6 +10,7 @@ import { CallsToLog } from "./meeting-logged";
 import { CoachView, ConnectStrip, FollowUps, useMnHome } from "./meeting-extra";
 import { CallPanel, MeetingsList } from "./meeting-list";
 import { AccountSetup, MyMeetingSetup, type SetupData } from "./meeting-setup";
+import { AutoNotesCard, SlackAutoCard } from "./am-auto-card";
 
 type Hook = { id: string; locationId: string; locationName: string | null; label: string | null; createdAt: string | null; lastUsedAt: string | null };
 type Meeting = {
@@ -43,6 +44,7 @@ export function MeetingsView({ logged = false, outcomes = false, list = false, f
         ...(logged || outcomes ? [{ label: "Calls to log", node: <CallsToLog openInbox={() => setTab(inboxAt)} /> }] : []),
         { label: "What to save and where", node: <MyMeetingSetup data={setup.data} loading={setup.loading} error={setup.error} reload={setup.reload} /> },
         ...(setup.data?.admin.can ? [{ label: "Account setup", node: <AccountSetup setup={setup.data} /> }] : []),
+        { label: "Automatic notes", node: <><AutoNotesCard /><SlackAutoCard /></> },
         { label: "Older meeting notes", node: <OlderMeetings /> },
       ]} />
       {openCall && <CallPanel id={openCall} fx={home.fx} onClose={() => setOpenCall(null)} onChanged={() => void home.reload()} onOpenAppointment={go ? () => go("appointments") : undefined} />}
