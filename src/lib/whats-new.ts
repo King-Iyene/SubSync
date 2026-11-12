@@ -9,6 +9,7 @@ export type NewsEntry = {
 export const NEW_WINDOW_DAYS = 14;
 
 export const NEWS: readonly NewsEntry[] = [
+  { id: "dq-safe-merge", date: "2026-11-12", title: "Safer duplicate merging", line: "Merge all certain matches now lists what it will merge and what it skipped, and why. It skips anyone protected, any pair that looks like two people, and any pair it cannot rank with certainty. The comparison also shows each contact's last conversation, deals with pipeline and stage, and calendars.", view: "cleanup", feature: "dq_dupes" },
   { id: "sp-ignored", date: "2026-11-12", title: "Clients not answering leads", line: "See which client accounts are ignoring the leads you send them: leads nobody answered, customers with no reply or only an automatic one, and missed calls nobody returned. Every number opens the people, and you are told once.", view: "speed", feature: "sp_ignored_leads" },
   { id: "pl-history-funnel", date: "2026-11-12", title: "Step history and stuck deals", line: "How many deals entered each pipeline step, how many moved on, and the money stuck longer than usual for its step. Every number opens its deals.", view: "pipeline", feature: "pl_history_funnel" },
   { id: "mn-meetings", date: "2026-11-12", title: "Meeting notes, finished", line: "Your recorded calls in one list, each on the right contact or waiting for you to pick, with next steps, follow-up lists and coaching.", view: "meetings", feature: "mn_list" },
