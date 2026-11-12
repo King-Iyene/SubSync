@@ -56,7 +56,7 @@ export function DupesTab({ opts, account, setAccount }: { opts: Opts; account: s
           {opts.canChange && counts && counts.certain.groups > 0 && <button type="button" className={Q_BTN} onClick={() => setBulk((b) => !b)} data-testid="dq-bulk-open">Merge all certain matches ({fmtInt(counts.certain.groups)})</button>}
         </div>
       </div>
-      {bulk && <BulkMerge account={account} onClose={() => setBulk(false)} onDone={(m) => { setBulk(false); setNote(m); void load(null); }} />}
+      {bulk && <BulkMerge account={account} onClose={() => setBulk(false)} onDone={(m) => { setBulk(false); setNote(m); setNonce((n) => n + 1); }} />}
       {note && <p className="rounded-lg border bg-muted/40 px-3 py-2 text-sm" role="status" data-testid="dq-note">{note}</p>}
 
       <div role="tablist" aria-label="How sure" className="flex gap-1 border-b">

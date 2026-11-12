@@ -187,9 +187,11 @@ const T = (extra: string) => `t.installation_id = c.installation_id and t.locati
 const NEWER_THAN = "(o.date_added < c.date_added or (o.date_added = c.date_added and o.contact_id < c.contact_id))";
 export const LEAD_SQL = {
   /** An earlier contact in the same account has the same email or the same last ten phone digits. */
-  dup: `exists (select 1 from cached_contacts o where o.installation_id = c.installation_id and o.location_id = c.location_id and o.contact_id <> c.contact_id and ${NEWER_THAN}
-    and ((coalesce(c.email, '') <> '' and lower(btrim(c.email)) !~ '${NEVER_EMAIL}' and lower(btrim(o.email)) = lower(btrim(c.email)))
-      or (length(c.phone_digits) >= 10 and right(c.phone_digits, 10) !~ '${NEVER_PHONE}' and length(o.phone_digits) >= 10 and right(o.phone_digits, 10) = right(c.phone_digits, 10))))`,
+  // Two separate EXISTS (one per blocking key) so each is a probe of its own partial index, never a scan of the account.
+  dup: `((coalesce(c.email, '') <> '' and lower(btrim(c.email)) !~ '${NEVER_EMAIL}' and exists (select 1 from cached_contacts o where o.installation_id = c.installation_id and o.location_id = c.location_id
+      and coalesce(o.email, '') <> '' and lower(btrim(o.email)) = lower(btrim(c.email)) and o.contact_id <> c.contact_id and ${NEWER_THAN}))
+    or (length(c.phone_digits) >= 10 and right(c.phone_digits, 10) !~ '${NEVER_PHONE}' and exists (select 1 from cached_contacts o where o.installation_id = c.installation_id and o.location_id = c.location_id
+      and length(o.phone_digits) >= 10 and right(o.phone_digits, 10) = right(c.phone_digits, 10) and o.contact_id <> c.contact_id and ${NEWER_THAN})))`,
   junk: CONTACT_PREDICATE.junk,
   answered: `exists (select 1 from touch_events t where ${T("and t.direction = 'outbound' and not t.automated and t.at >= c.date_added")})`,
   booked: `exists (select 1 from cached_appointments a where a.installation_id = c.installation_id and a.location_id = c.location_id and a.contact_id = c.contact_id and lower(coalesce(a.status, '')) <> 'invalid')`,
