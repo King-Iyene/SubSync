@@ -76,7 +76,7 @@ export function EmptyGuideLink() {
   const [view] = useState<string | null>(() => (typeof window === "undefined" ? null : window.location.hash.replace(/^#/, "").split(/[?=]/)[0] || "today"));
   const g = view ? guideForView(view) : null;
   if (!guides || !g) return null;
-  return <p className="mt-3 text-sm"><a href="#help" className="font-medium underline underline-offset-4" data-testid="empty-guide-link" onClick={() => remember(GUIDE_REQUEST_KEY, g.id)}>How {g.title} works: 60-second guide</a></p>;
+  return <p className="mt-3 text-sm"><a href="#help" className="inline-flex min-h-11 items-center font-medium underline underline-offset-4 sm:min-h-0" data-testid="empty-guide-link" onClick={() => remember(GUIDE_REQUEST_KEY, g.id)}>How {g.title} works: 60-second guide</a></p>;
 }
 
 /** One menu entry: left out when the person hid that page, and a click anywhere on it dismisses its "New" badge. Takes no space of its own. */

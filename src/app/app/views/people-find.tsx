@@ -66,7 +66,7 @@ export function FindTab({ plus = false, bulk = false }: { plus?: boolean; bulk?:
   const [filtersOpen, setFiltersOpen] = useState(() => !isEmptyFilter(filter));
   const setFilter = (f: SmartFilter) => { setFilterState(f); remember("people-filter", isEmptyFilter(f) ? null : JSON.stringify(f)); };
   const replaceFilter = (f: SmartFilter) => { setFilter(f); setVersion((v) => v + 1); };
-  const term = searchTerm(debounced);
+  const term = useMemo(() => searchTerm(debounced), [debounced]);
   const effective: SmartFilter = useMemo(() => ({ ...filter, ...(term.ok ? { q: term.q } : {}) }), [filter, term]);
   const searching = !isEmptyFilter(effective);
 

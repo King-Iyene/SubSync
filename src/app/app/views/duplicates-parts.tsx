@@ -59,7 +59,7 @@ function TagList({ p }: { p: Person }) {
     <span>
       {p.tags.map((t, i) => {
         const at = p.tagDates?.[t];
-        return <span key={t}>{i > 0 ? ", " : ""}{t}{at ? <span className="text-muted-foreground"> (seen {shortDay(at)})</span> : null}</span>;
+        return <span key={`${t}:${i}`}>{i > 0 ? ", " : ""}{t}{at ? <span className="text-muted-foreground"> (seen {shortDay(at)})</span> : null}</span>;
       })}
     </span>
   );

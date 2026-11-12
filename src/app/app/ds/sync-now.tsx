@@ -58,7 +58,7 @@ export function SyncNow({ agency = false }: { agency?: boolean }) {
       <div className="flex items-center gap-2">
         <span className="sr-only" data-testid="sync-last" title={f?.text}>{f?.text ?? ""}</span>
         <button type="button" onClick={() => (running ? setOpen(true) : void start())} data-testid="sync-now-btn" aria-label="Sync now"
-          className="ds-press inline-flex min-h-9 items-center gap-1.5 rounded-lg border bg-card px-3 text-sm font-medium hover:border-primary/40 focus-visible:outline-2 focus-visible:outline-[var(--ring)]">
+          className="ds-press inline-flex min-h-11 items-center sm:min-h-9 gap-1.5 rounded-lg border bg-card px-3 text-sm font-medium hover:border-primary/40 focus-visible:outline-2 focus-visible:outline-[var(--ring)]">
           <RefreshCw aria-hidden className={`size-4 ${running ? "animate-spin" : ""}`} />{running ? "Syncing..." : "Sync now"}
         </button>
       </div>

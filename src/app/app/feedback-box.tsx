@@ -52,8 +52,8 @@ export function FeedbackBox({ page }: { page: string }) {
     <footer ref={box} className="mt-12 border-t pt-4 text-sm print:hidden" data-testid="feedback-box" aria-label="Feedback">
       <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-muted-foreground">
         <span>Something missing, or something wrong?</span>
-        <button type="button" className="min-h-9 underline underline-offset-4 hover:text-foreground" aria-expanded={mode === "feedback"} onClick={() => (mode === "feedback" ? close() : start("feedback"))}>Give feedback</button>
-        <button type="button" className="min-h-9 underline underline-offset-4 hover:text-foreground" aria-expanded={mode === "problem"} onClick={() => (mode === "problem" ? close() : start("problem"))}>Report a problem</button>
+        <button type="button" className="min-h-11 px-1 underline underline-offset-4 sm:min-h-9 hover:text-foreground" aria-expanded={mode === "feedback"} onClick={() => (mode === "feedback" ? close() : start("feedback"))}>Give feedback</button>
+        <button type="button" className="min-h-11 px-1 underline underline-offset-4 sm:min-h-9 hover:text-foreground" aria-expanded={mode === "problem"} onClick={() => (mode === "problem" ? close() : start("problem"))}>Report a problem</button>
       </div>
       {done && (
         <p className="mt-3 border-l-2 border-primary py-1 pl-3" role="status" data-testid="feedback-done">

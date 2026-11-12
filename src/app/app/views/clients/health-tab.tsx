@@ -53,8 +53,8 @@ function HealthAndRisk({ q }: { q: ReturnType<typeof useData<RiskData>> }) {
         <ul className="grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">{health?.parts.map((p) => <li key={p.id}><span className="font-medium">{p.label}:</span> {p.enough && p.value !== null ? `${Math.round(p.value)}%` : "not enough data"} <span className="text-xs text-muted-foreground">{p.detail}</span></li>)}</ul>
         {health && <Formula text={health.formula} />}
       </Section>
-      <Section title="Clients who may be slipping" hint={`Estimated from SubSync's own daily record. ${q.data.enough} of ${q.data.total} clients have the ${q.data.minHistoryDays} days of record it needs.`}>
-        {shown.length === 0 ? <p className="text-sm text-muted-foreground">{q.data.enough === 0 ? "Not enough data yet. SubSync needs about a month of its own record for each client." : "No client looks like they are slipping."}</p> : (
+      <Section title="Clients who may be slipping" hint={typeof q.data.enough === "number" && typeof q.data.total === "number" ? `Estimated from SubSync's own daily record. ${q.data.enough} of ${q.data.total} clients have the ${q.data.minHistoryDays} days of record it needs.` : `Estimated from SubSync's own daily record, which needs ${q.data.minHistoryDays} days for each client.`}>
+        {shown.length === 0 ? <p className="text-sm text-muted-foreground">{(q.data.enough ?? 0) === 0 ? "Not enough data yet. SubSync needs about a month of its own record for each client." : "No client looks like they are slipping."}</p> : (
           <ul className="divide-y rounded-md border">{shown.map((r) => (
             <li key={r.locationId} className="px-4 py-2 text-sm">
               <div className="flex flex-wrap items-baseline justify-between gap-2"><span className="font-medium">{r.name}</span><span>{WORDS[r.level]}{r.quieted ? " (quieted)" : ""}</span></div>

@@ -86,7 +86,11 @@ export function useFound(filter: SmartFilter | null) {
   const key = filter ? JSON.stringify(filter) : null;
   const [state, setState] = useState<{ key: string | null; rows: PersonRowOut[]; total: number | null; capped: boolean; next: string | null; loading: boolean; error: string | null; busy: boolean }>({ key: null, rows: [], total: null, capped: false, next: null, loading: false, error: null, busy: false });
   const live = useRef<string | null>(null);
+  // The newest choices are read from here, so the loader depends on the key (the text of the choices) only: a new object with the same choices must never start another read.
+  const latest = useRef(filter);
+  useEffect(() => { latest.current = filter; });
   const run = useCallback(async (after: string | null) => {
+    const filter = latest.current;
     if (!filter || !key) return;
     live.current = key;
     setState((s) => (after ? { ...s, busy: true } : { key, rows: [], total: null, capped: false, next: null, loading: true, error: null, busy: false }));
@@ -99,7 +103,7 @@ export function useFound(filter: SmartFilter | null) {
     } catch (e) {
       if (live.current === key) setState((s) => ({ ...s, loading: false, busy: false, error: (e as Error).message || "Could not load people." }));
     }
-  }, [api, filter, key]);
+  }, [api, key]);
   useEffect(() => { if (key) void run(null); else { live.current = null; setState((s) => (s.key === null ? s : { ...s, key: null, rows: [], next: null })); } }, [key, run]);
   return { ...state, more: () => void run(state.next), reload: () => void run(null) };
 }

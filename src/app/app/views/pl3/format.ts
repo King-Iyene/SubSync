@@ -5,4 +5,4 @@ export const moneyShort = (cents: number): string => {
   return a >= 1_000_000 ? `$${(d / 1_000_000).toFixed(a >= 10_000_000 ? 0 : 1)}M` : a >= 10_000 ? `$${Math.round(d / 1000)}k` : a >= 1000 ? `$${(d / 1000).toFixed(1)}k` : `$${Math.round(d)}`;
 };
 export const pct = (r: number | null): string => (r === null ? "Not enough data" : `${Math.round(r * 100)}%`);
-export const days = (d: number | null): string => (d === null ? "n/a" : `${d} d`);
+export const days = (d: number | null): string => (d === null ? "No data yet" : `${d} d`);
