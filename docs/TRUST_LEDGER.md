@@ -66,3 +66,21 @@ Still NOT opened in this pass: Appointments (all tabs after the first two), Spee
 | Today > Numbers | loads; 6 tiles | every tile has the same bold "How is this worked out?" pill (cluttered); Open deals shows 1 worth $1,000,000 estimate (same test deal) |
 | Today > Proof, Settings | not opened in this pass | |
 | Pipeline stale list (King's screenshot) | 500 deals, $1,400,000 | misleading: one $1,000,000 test deal, ~480 identical $2,000 deals in the first stage of a cold-email outreach pipeline (927 days stale); fix in progress (placeholder detection, pipeline inclusion setting, one shared function) |
+
+## Walk-through #3, live after the sale-setting migration and stale-value fix (13 Nov night, KD Squares Test)
+
+Seen live and clicked: Today money strip (test deal now left out, plain reason, "Show the deals left out"), Today > View appointments (23 on Today = 23 rows), Appointments > Booking share (new results strip, colour legend, three groups, calendars control), per-person "this week" drill, contact panel Deals tab (richer, New deal form with a preview-and-confirm step), Today > Proof "Show who" (46 = 46 rows), Today > Numbers leak click (19 = 19 rows) and "Waiting for a reply" (25 = 25 rows).
+
+### Found, not yet fixed
+| # | Where | What is wrong |
+|---|---|---|
+| 1 | Appointments > Booking share, "Bookings per person, week over week" | "This week: 2" for one person opens appointments dated 22-23 Sep (51 days ago). The week column is not this week. |
+| 2 | Same page | "Booking and selling: 0, nobody booked in the last 30 days" while the week table above shows people with bookings. Two answers on one screen. |
+| 3 | Appointments | Header said 36 appointments, then 35 after a click, same filters. |
+| 4 | Contact panel > Deals > New deal | The pipeline box starts on an unrelated pipeline instead of the pipeline this person already has a deal in. |
+| 5 | New deal > Create | Says "Done" and shows a $750 deal straight away. Not yet confirmed whether this was a practice run or reached the CRM; Today money still says "Not enough data" afterwards. |
+| 6 | Today > Numbers | Booking funnel says 21 new leads in 30 days; "New leads and growth" says 4 for the same dates (the second counts email leads only but does not say why). |
+| 7 | Today vs Proof | "Waiting for a reply" is 25 on Numbers and 23 on Proof (different rules, not explained). |
+
+### Not seen because of permissions (what King does)
+Payment, workflow, course and automation signals stay empty until the optional permissions in release 1.1.0 are granted (docs/RELEASE_1_1_0.md). Until then: bulk merge shows an empty list, "Sold" by payments shows "Not available (needs permission)", and the merge detail screen shows "Not available" for workflows, payments, courses and campaigns. King: reinstall or approve 1.1.0 in KD Squares Test, then I re-run these screens.
