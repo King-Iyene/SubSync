@@ -142,7 +142,7 @@ function Compare({ a, scope, local, cmp, value, people, accounts, labelA }: { a:
       {!d ? <p className="bf-fine">Loading...</p> : d.steps[0].count === 0 ? <p className="bf-fine">No leads in these dates.</p> : <>
         <p className="bf-cmp-big">{pctText(overall(d.steps), 1)} <span className="bf-fine">of leads won</span></p>
         <ol className="bf-cmp-steps">{d.steps.map((s) => <li key={s.key}><span>{s.label}</span><b>{fmtInt(s.count)}</b><span className="bf-fine">{s.passPct === null ? "" : `${s.passPct}%`}</span></li>)}</ol>
-        <p className="bf-fine">{d.leak ? `Biggest leak: ${d.leak.label.toLowerCase()} (${d.leak.dropPct}%)` : "No clear leak."}</p>
+        <p className="bf-fine">{d.leak ? `Biggest leak: before ${d.leak.label} (${d.leak.dropPct}%)` : "No clear leak."}</p>
       </>}
     </div>
   );

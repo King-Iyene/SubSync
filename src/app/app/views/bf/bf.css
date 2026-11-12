@@ -31,6 +31,7 @@
 .bf-step-n { font-size: 15px; font-weight: 650; fill: var(--foreground); font-variant-numeric: tabular-nums; }
 .bf-step-p { font-size: 11px; font-weight: 500; fill: var(--muted-foreground); }
 .bf-on { fill: #fff; }
+.bf-halo { paint-order: stroke; stroke: var(--background); stroke-width: 3px; stroke-linejoin: round; }
 .bf-on .bf-step-p, .bf-step-n.bf-on .bf-step-p { fill: rgba(255, 255, 255, 0.85); }
 .bf-stream { stroke: color-mix(in srgb, var(--bf-warm) 55%, transparent); stroke-linecap: round; }
 .bf-basin-box { fill: transparent; stroke: var(--bf-line); stroke-width: 1.2; }

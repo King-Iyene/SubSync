@@ -1,5 +1,6 @@
 "use client";
 
+import { BfMini } from "../bf/bf-mini";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import type { AccessKind } from "@/lib/access";
 import type { Td3Item, Td3List, Td3ListKind, Td3Module, Td3Numbers, Td3Options, Td3Proof, Td3Settings, Td3Today } from "@/lib/analytics/today3-types";
@@ -257,6 +258,7 @@ function NumbersTab({ location, go, open, fromOverview, level, nav, kind }: { lo
       <Load r={r} empty={(n) => n.tiles.length === 0}>
         {(n) => (
           <>
+            <BfMini location={location} days={days} go={nav} />
             <div className="td-tiles">
               {n.tiles.map((t) => (
                 <div key={t.id} className="td-tile" data-testid={`td-tile-${t.id}`}>

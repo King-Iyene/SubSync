@@ -13,6 +13,7 @@ import { useReducedMotion } from "../speed6-base";
 
 export type LadderPick = { step: StepKey; mode: "reached" | "dropped"; title: string; count: number };
 const BASIN: Record<string, string> = { answered: "Never got a reply", booked: "Replied, never booked", showed: "Booked, never showed", deal: "Showed, no deal opened", won: "Deal not won yet" };
+const SHORT: Record<string, string> = { answered: "No reply", booked: "Not booked", showed: "Did not show", deal: "No deal", won: "Not won" };
 const fmt = (n: number) => n.toLocaleString("en-US");
 const cut = (s: string, n: number) => (s.length > n ? s.slice(0, n - 1) + "…" : s);
 
@@ -61,7 +62,7 @@ export function BookingLadder({ steps, biggest = null, onPick, compact = false, 
         {L.chutes.map((c, i) => <rect key={`c${i}`} x={c.x} y={c.y} width={c.w} height={c.h} className="bf-chute" />)}
         {L.leaks.map((k, i) => {
           const cur = k.toKey === biggest, label = BASIN[k.toKey] ?? "Stopped here";
-          const level = k.lost > 0 ? Math.max(0.12, k.lost / maxLost) : 0, pick = () => onPick?.({ step: k.toKey as StepKey, mode: "dropped", title: `${label}: ${fmt(k.lost)} leads`, count: k.lost });
+          const level = k.lost > 0 ? Math.max(0.12, k.lost / maxLost) : 0, pick = () => onPick?.({ step: k.toKey as StepKey, mode: "dropped", title: label, count: k.lost });
           const say = `${label}: ${fmt(k.lost)} leads${steps[i].count > 0 ? ` (${Math.round((k.lost / steps[i].count) * 100)}% of those that reached the step before)` : ""}. Open the list.`;
           return (
             <g key={`k${i}`} className="bf-basin" data-hot={cur ? "1" : undefined} data-testid={`${testId}-basin-${k.toKey}`} aria-label={say} {...press(pick)} onMouseEnter={() => setHot(say)} onMouseLeave={() => setHot(null)} onFocus={() => setHot(say)} onBlur={() => setHot(null)}>
@@ -69,20 +70,20 @@ export function BookingLadder({ steps, biggest = null, onPick, compact = false, 
               <rect x={k.basin.x} y={k.basin.y} width={k.basin.w} height={k.basin.h} rx={8} className="bf-basin-box" />
               <rect x={k.basin.x + 1} y={k.basin.y + k.basin.h - 1 - (k.basin.h - 2) * level} width={k.basin.w - 2} height={Math.max(0, (k.basin.h - 2) * level)} rx={7} className="bf-basin-fill" />
               <text x={k.basin.x + 10} y={k.basin.y + (compact || L.narrow ? 14 : 18)} className="bf-basin-n">{fmt(k.lost)}</text>
-              <text x={k.basin.x + 10} y={k.basin.y + k.basin.h - (compact || L.narrow ? 5 : 8)} className="bf-basin-t">{cut(label, L.narrow ? 16 : 26)}</text>
-              {cur && <text x={k.basin.x + k.basin.w - 8} y={k.basin.y + (compact || L.narrow ? 14 : 18)} textAnchor="end" className="bf-tag">biggest leak</text>}
+              <text x={k.basin.x + 10} y={k.basin.y + k.basin.h - (compact || L.narrow ? 5 : 8)} className="bf-basin-t">{L.narrow ? SHORT[k.toKey] ?? cut(label, 14) : cut(label, 26)}</text>
+              {cur && <text x={k.basin.x + k.basin.w - 8} y={k.basin.y + (compact || L.narrow ? 14 : 18)} textAnchor="end" className="bf-tag">{L.narrow ? "top" : "biggest leak"}</text>}
             </g>
           );
         })}
         {L.steps.map((s, i) => {
-          const row = steps[i], inside = s.w >= 190, pick = () => onPick?.({ step: s.key as StepKey, mode: "reached", title: `${row.label}: ${fmt(row.count)} leads`, count: row.count });
+          const row = steps[i], inside = s.w >= 190, pick = () => onPick?.({ step: s.key as StepKey, mode: "reached", title: `Reached: ${row.label}`, count: row.count });
           const say = `${row.label}: ${fmt(row.count)} leads${row.passPct !== null ? `, ${row.passPct}% of the step before` : ""}. Open the list.`;
-          const tx = inside ? s.x + 12 : s.x + s.w + 10;
+          const tx = inside ? s.x + 12 : L.narrow ? s.x + 8 : s.x + s.w + 10, halo = !inside && L.narrow;
           return (
             <g key={s.key} className="bf-step" data-testid={`${testId}-step-${s.key}`} aria-label={say} {...press(pick)} onMouseEnter={() => setHot(say)} onMouseLeave={() => setHot(null)} onFocus={() => setHot(say)} onBlur={() => setHot(null)}>
               <rect x={s.x} y={s.y} width={s.w} height={s.h} rx={7} className="bf-ledge" data-last={i === L.steps.length - 1 ? "1" : undefined} />
-              <text x={tx} y={s.y + s.h / 2 - 2} className={inside ? "bf-step-l bf-on" : "bf-step-l"}>{row.label}</text>
-              <text x={tx} y={s.y + s.h / 2 + (compact || L.narrow ? 12 : 15)} className={inside ? "bf-step-n bf-on" : "bf-step-n"}>{fmt(row.count)}{row.passPct !== null ? <tspan className="bf-step-p">{`  ${row.passPct}% pass`}</tspan> : null}</text>
+              <text x={tx} y={s.y + s.h / 2 - 2} className={inside ? "bf-step-l bf-on" : halo ? "bf-step-l bf-halo" : "bf-step-l"}>{row.label}</text>
+              <text x={tx} y={s.y + s.h / 2 + (compact || L.narrow ? 12 : 15)} className={inside ? "bf-step-n bf-on" : halo ? "bf-step-n bf-halo" : "bf-step-n"}>{fmt(row.count)}{row.passPct !== null ? <tspan className="bf-step-p">{`  ${row.passPct}% pass`}</tspan> : null}</text>
             </g>
           );
         })}

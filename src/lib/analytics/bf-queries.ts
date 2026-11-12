@@ -219,7 +219,7 @@ export async function cells(s: Scope, f: BfFilters, stepIdx: number): Promise<Ar
   if (!locs.length || stepIdx < 1 || stepIdx > 5) return [];
   const db = sql(), { frag } = await facts(s, f, locs);
   const col = (i: number) => ["leads", "reach_answered", "reach_booked", "reach_showed", "reach_deal", "reach_won"][i];
-  const r = await db`select extract(dow from day)::int dow, hour::int hour, sum(${db.unsafe(col(stepIdx - 1))})::float8 b, sum(${db.unsafe(col(stepIdx))})::float8 a from (${frag}) f where ${where(db, f)} group by 1, 2`;
+  const r = await db`select extract(dow from day)::int as dow, hour::int as hour, sum(${db.unsafe(col(stepIdx - 1))})::float8 as b, sum(${db.unsafe(col(stepIdx))})::float8 as a from (${frag}) f where ${where(db, f)} group by 1, 2`;
   return r.map((x) => ({ dow: x.dow as number, hour: x.hour as number, before: num(x.b), after: num(x.a) }));
 }
 

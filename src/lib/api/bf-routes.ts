@@ -51,7 +51,7 @@ async function oneAccount(ctx: Ctx, allowed: string[] | null, v: string | null):
 export async function handleBfFunnel(ctx: Ctx, h: BfHelpers): Promise<Response> {
   const sp = ctx.url.searchParams, part = sp.get("part") as (typeof PARTS)[number] | null;
   if (!part || !PARTS.includes(part)) return json({ error: "Not found" }, 404);
-  if (!on(ctx, "bf_funnel")) return json({ error: "The booking funnel is not switched on yet." }, 404);
+  if (!on(ctx, "bf_funnel") || (sp.get("mini") === "1" && !on(ctx, "bf_today"))) return json({ error: "The booking funnel is not switched on yet." }, 404);
   const allowed = await h.allowed();
   const seePeople = ctx.kind !== "client", canSeeAccounts = ctx.limitTo === null;
   const acct = await oneAccount(ctx, allowed, sp.get("location"));

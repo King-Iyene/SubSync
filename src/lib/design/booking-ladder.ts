@@ -32,7 +32,7 @@ export function layoutLadder(steps: readonly LadderStepIn[], o: LadderOpts): Lad
     chutes.push({ x: b.x, y: a.y + a.h, w: b.w, h: gap });
     const lost = Math.max(0, a.count - b.count), basin: Rect = { x: reach, y: b.y, w: basinW, h: basinH };
     const x0 = a.x + a.w, y0 = a.y + a.h;
-    leaks.push({ toKey: b.key, lost, basin, x0, y0, cx: Math.min(reach + 6, x0 + (reach - x0) * 0.7 + 14), cy: y0 + 8, x1: basin.x + 12, y1: basin.y, stream: Math.max(2, Math.min(rowH - 8, Math.round((lost / first) * (rowH - 8) * 3))) });
+    leaks.push({ toKey: b.key, lost, basin, x0, y0, cx: Math.min(reach + 6, x0 + (reach - x0) * 0.7 + 14), cy: y0 + 8, x1: basin.x + 12, y1: basin.y, stream: Math.max(2, Math.min(16, Math.round((lost / first) * 40))) });
   }
   const last = out[out.length - 1];
   return { width: o.width, height: last ? last.y + last.h + pad : 0, steps: out, chutes, leaks, narrow };
