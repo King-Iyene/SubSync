@@ -3,6 +3,7 @@
 import { RotateCcw } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type React from "react";
+import { funnelLayout, bandWidthAt } from "@/lib/design/funnel-layout";
 import { layoutStacks, type Rect, type StackCol } from "@/lib/design/stack-layout";
 import type { PlDrain, PlMoneyFlow, PlStage } from "@/lib/analytics/pipeline3-types-interim";
 import { EmptyState, ErrorState, SkeletonRows } from "../../ds";
@@ -10,7 +11,8 @@ import { useReducedMotion } from "../speed6-base";
 import { usePl, type PlFilters } from "./data";
 import { money, moneyShort, pct } from "./format";
 
-// MONEY FLOW, "Coin stacks": one column per stage in the account's own order. Each stack is flat coins, height = the money in that stage (one coin = one value step, never more than 40 coins).
+// MONEY FLOW. Default view is the stage FUNNEL (tapered bands, width = money in the stage, drops fall down it, % between stages, biggest leak marked). The "Coins" toggle keeps the older view:
+// "Coin stacks": one column per stage in the account's own order. Each stack is flat coins, height = the money in that stage (one coin = one value step, never more than 40 coins).
 // Won is a tall stack in the one accent colour, lost is a muted grey stack, stuck money is the hatched top of a stack. Coins settle once on load.
 // Text lives in its own layer (stack-layout.test.ts proves it never overlaps the coins).
 
@@ -33,25 +35,26 @@ function applyView(f: PlMoneyFlow, person: string, day: number | null): { stages
 export function MoneyFlow({ filters, onPick }: { filters: PlFilters; onPick: (p: FlowPick) => void }) {
   const { data, error, loading, reload } = usePl<PlMoneyFlow>("money-flow", filters);
   const wrap = useRef<HTMLDivElement>(null);
-  const [width, setWidth] = useState(1000), [person, setPerson] = useState(""), [day, setDay] = useState<number | null>(null), [settle, setSettle] = useState(true), [run, setRun] = useState(0);
+  const [view2, setView2] = useState<"funnel" | "coins">("funnel"), [width, setWidth] = useState(1000), [person, setPerson] = useState(""), [day, setDay] = useState<number | null>(null), [settle, setSettle] = useState(true), [run, setRun] = useState(0);
   const reduced = useReducedMotion();
   const ready = data !== null && data.stages.length > 0;
   useEffect(() => {
     const el = wrap.current; if (!el) return;
     const ro = new ResizeObserver(() => setWidth(Math.floor(el.clientWidth))); ro.observe(el); setWidth(Math.floor(el.clientWidth));
     return () => ro.disconnect();
-  }, [ready]);
+  }, [ready, view2]);
   useEffect(() => { if (!settle) return; const t = setTimeout(() => setSettle(false), 1000); return () => clearTimeout(t); }, [settle, run]);
   const replayLen = data?.replay?.length ?? 0;
   const view = useMemo(() => (data ? applyView(data, person, day) : null), [data, person, day]);
   const layout = useMemo(() => (view && view.stages.length ? layoutStacks(view.stages.map((s) => ({ id: s.id, name: s.name, valueCents: s.valueCents, count: s.count, staleCount: s.staleCount, staleValueCents: s.staleValueCents })), view.wonCents, view.wonCount, view.drains, { width: Math.max(300, width) }) : null), [view, width]);
+  const fl = useMemo(() => (view && view.stages.length ? funnelLayout(view.stages.map((s) => ({ id: s.id, name: s.name, valueCents: s.valueCents, count: s.count, staleCount: s.staleCount, staleValueCents: s.staleValueCents, lostValueCents: s.lostValueCents })), view.wonCents) : null), [view]);
   const lostTotal = view ? view.drains.reduce((a, d) => a + d.valueCents, 0) : 0;
   const closed = data ? data.won.count + data.stages.reduce((a, s) => a + s.lostCount, 0) : 0;
   const enough = data ? closed >= data.minDeals : false;
 
   if (error) return <ErrorState error={error} onRetry={reload} />;
   if (!data || (loading && !data)) return <SkeletonRows rows={6} label="Loading the money by stage..." />;
-  if (!layout || !view) return <EmptyState title="No open deals in these dates" body="When deals are in your pipeline, the money in each stage shows here. Change the dates or the account above to look further back." />;
+  if (!layout || !view || !fl) return <EmptyState title="No open deals in these dates" body="When deals are in your pipeline, the money in each stage shows here. Change the dates or the account above to look further back." />;
 
   const stageOf = (id: string) => view.stages.find((s) => s.id === id)!;
   const pickStage = (s: PlStage, stale = false) => onPick({ title: stale ? `${s.name}, stuck deals` : `${s.name}, open deals`, count: stale ? s.staleCount : s.count, params: { stageId: s.id, stale, ownerId: person || undefined } });
@@ -84,8 +87,12 @@ export function MoneyFlow({ filters, onPick }: { filters: PlFilters; onPick: (p:
         <select id="pl-person" className="ap-field" value={person} onChange={(e) => { setPerson(e.target.value); setDay(null); }} data-testid="pl-person">
           <option value="">Everyone&apos;s deals</option>{data.people.map((p) => <option key={p.id} value={p.id}>{p.name}&apos;s deals</option>)}
         </select>
+        <div className="pl-viewtog" role="group" aria-label="How to show the money">
+          <button type="button" className="pl-vt" aria-pressed={view2 === "funnel"} onClick={() => { setView2("funnel"); setSettle(true); setRun((r) => r + 1); }} data-testid="pl-view-funnel">Funnel</button>
+          <button type="button" className="pl-vt" aria-pressed={view2 === "coins"} onClick={() => { setView2("coins"); setSettle(true); setRun((r) => r + 1); }} data-testid="pl-view-coins">Coins</button>
+        </div>
         <div className="pl-replay" data-testid="pl-replay">
-          <button type="button" className="s6-btn" onClick={() => { setDay(null); setRun((r) => r + 1); setSettle(true); }} aria-label="Replay the coins settling" data-testid="pl-play"><RotateCcw aria-hidden className="size-4" />Replay</button>
+          <button type="button" className="s6-btn" onClick={() => { setDay(null); setRun((r) => r + 1); setSettle(true); }} aria-label={view2 === "funnel" ? "Replay the money flowing down" : "Replay the coins settling"} data-testid="pl-play"><RotateCcw aria-hidden className="size-4" />Replay</button>
           {replayLen > 1 && <>
             <input type="range" min={0} max={replayLen - 1} value={day ?? replayLen - 1} onChange={(e) => setDay(Number(e.target.value))} aria-label="Pick a day to look at" data-testid="pl-scrub" />
             <span className="ap-fine tnum" aria-live="polite">{dayLabel ?? "Today"}</span>
@@ -93,8 +100,50 @@ export function MoneyFlow({ filters, onPick }: { filters: PlFilters; onPick: (p:
           </>}
         </div>
       </div>
-      <p className="ap-fine mb-2">One coin = {money(layout.step)}. Taller stack = more money in that stage. The hatched top is deals stuck longer than that stage&apos;s own normal. Click any stack to open exactly those deals.</p>
+      {view2 === "coins" ? <p className="ap-fine mb-2">One coin = {money(layout.step)}. Taller stack = more money in that stage. The hatched top is deals stuck longer than that stage&apos;s own normal. Click any stack to open exactly those deals.</p>
+        : <p className="ap-fine mb-2">Wider band = more money in that stage. The hatched part is deals stuck longer than that stage&apos;s own normal. The percentage is the share of the money that reached the next step (an estimate). Click a band to open exactly those deals.</p>}
 
+      {view2 === "funnel" ? <>
+      <ol className="pl-funnel" aria-label="Funnel of money by stage" data-testid="pl-funnel" data-settle={settle && !reduced ? "1" : "0"} key={`f${run}`}>
+        {fl.rows.map((r, i) => {
+          const s = stageOf(r.id), leak = enough && !!data.leak && i === fl.leakIndex && s.name === data.leak.fromStage;
+          const half = (t: number) => bandWidthAt(r, t) / 2;
+          const stuckClip = r.stuckFrac > 0 ? (() => { const t = 1 - r.stuckFrac, top = half(t), bot = half(1), w = Math.max(r.topW, r.bottomW) || 1; const x = (h: number) => ((50 + h - (50 - w / 2)) / w) * 100, xl = (h: number) => ((50 - h - (50 - w / 2)) / w) * 100; return `polygon(${xl(top)}% 0, ${x(top)}% 0, ${x(bot)}% 100%, ${xl(bot)}% 100%)`; })() : undefined;
+          const lab = `${s.name}: ${s.count} open deals worth ${money(s.valueCents)}`;
+          const nextName = i + 1 < fl.rows.length ? fl.rows[i + 1].name : "Won";
+          const wide = Math.max(r.topW, r.bottomW);
+          return <li key={r.id} className="fn-item" data-leak={leak ? "1" : "0"}>
+            <div className="fn-row">
+              <div className="fn-label"><b>{r.name}</b><span className="fn-val tnum">{moneyShort(r.valueCents)}</span><small>{r.count} deals{r.staleCount > 0 && <> · <u>{r.staleCount} stuck</u></>}</small></div>
+              <div className="fn-band">
+                <svg viewBox="0 0 100 40" preserveAspectRatio="none" aria-hidden className="fn-svg">
+                  {r.topW > 0 && <polygon className="fn-open" points={`${50 - half(0)},0 ${50 + half(0)},0 ${50 + half(1)},40 ${50 - half(1)},40`} vectorEffect="non-scaling-stroke" />}
+                </svg>
+                {r.topW > 0 && r.stuckFrac > 0 && <div className="fn-stuckfill" aria-hidden style={{ left: `${50 - wide / 2}%`, width: `${wide}%`, height: `${r.stuckFrac * 100}%`, clipPath: stuckClip }} />}
+                <div className="fn-drops" aria-hidden>{Array.from({ length: r.drops }, (_, k) => <i key={k} className="fn-drop" style={{ left: `${50 + (((k * 37) % 61) / 61 - 0.5) * wide * 0.7}%`, animationDelay: `${i * 140 + k * 170}ms` }} />)}</div>
+                {r.topW > 0 && <button type="button" className="fn-hit" style={{ left: `${50 - r.topW / 2}%`, width: `${r.topW}%`, top: 0, height: r.stuckFrac > 0 ? `${(1 - r.stuckFrac) * 100}%` : "100%" }} onClick={() => pickStage(s)} aria-label={`${lab}. Open them.`} title={lab} data-testid={`pl-seg-${r.id}`} />}
+                {r.topW > 0 && r.stuckFrac > 0 && <button type="button" className="fn-hit" style={{ left: `${50 - bandWidthAt(r, 1 - r.stuckFrac) / 2}%`, width: `${bandWidthAt(r, 1 - r.stuckFrac)}%`, bottom: 0, height: `${r.stuckFrac * 100}%` }} onClick={() => pickStage(s, true)} aria-label={`${r.staleCount} stuck deals in ${r.name}. Open them.`} title={`${r.staleCount} stuck in ${r.name}`} data-testid={`pl-stuck-${r.id}`} />}
+              </div>
+            </div>
+            <div className="fn-conv" data-leak={leak ? "1" : "0"} title="Money that reached the next step, divided by money that reached this step (open, lost and won from here on). An estimate.">
+              <span aria-hidden>↓</span>{r.conv === null ? <span>Not enough data</span> : <span className="tnum"><b>{Math.round(r.conv * 100)}%</b> reach {nextName}</span>}
+              {leak && <button type="button" className="fn-leaktag" onClick={() => pickStage(s)}>Biggest leak: {moneyShort(data.leak!.lostCents)} left here</button>}
+            </div>
+          </li>;
+        })}
+        <li className="fn-item fn-end">
+          <div className="fn-row">
+            <div className="fn-label fn-won"><b>Won</b><span className="fn-val tnum">{moneyShort(view.wonCents)}</span><small>{view.wonCount} deals</small></div>
+            <div className="fn-band"><svg viewBox="0 0 100 40" preserveAspectRatio="none" aria-hidden className="fn-svg"><rect className="fn-wonbar" x={50 - fl.wonW / 2} y="4" width={fl.wonW} height="32" /></svg>
+              {fl.wonW > 0 && <button type="button" className="fn-hit" style={{ left: `${50 - fl.wonW / 2}%`, width: `${fl.wonW}%`, top: 0, height: "100%" }} onClick={pickWon} aria-label={`Won: ${view.wonCount} deals worth ${money(view.wonCents)}. Open them.`} title={`Won: ${money(view.wonCents)}`} data-testid="pl-vault" />}</div>
+          </div>
+          <div className="fn-row fn-lostrow">
+            <div className="fn-label fn-lost"><b>Lost</b><span className="fn-val tnum">{moneyShort(lostTotal)}</span><small>{view.drains.reduce((a, d) => a + d.count, 0)} deals</small></div>
+            <div className="fn-band"><button type="button" className="fn-lostbar" onClick={() => pickLost()} aria-label={`Lost: ${money(lostTotal)}. Open them.`} title={`Lost: ${money(lostTotal)}`} data-testid="pl-lost">Left the funnel. Reasons below.</button></div>
+          </div>
+        </li>
+      </ol>
+      </> : <>
       <div className="pl-stackscroll" ref={wrap}><div className="pl-stacks" style={{ height: layout.height, width: layout.width }} data-settle={settle && !reduced ? "1" : "0"} data-vertical={layout.vertical ? "1" : "0"} key={`s${run}`}>
         <svg className="pl-svg" width={layout.width} height={layout.height} viewBox={`0 0 ${layout.width} ${layout.height}`} role="group" aria-label="Stacks of coins, one per stage, showing the money in each">
           <defs><pattern id="pl-hatch" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="5" height="5" className="pl-hatch-bg" /><rect width="1.6" height="5" className="pl-hatch-line" /></pattern></defs>
@@ -110,6 +159,8 @@ export function MoneyFlow({ filters, onPick }: { filters: PlFilters; onPick: (p:
           })}
         </div>
       </div></div>
+
+      </>}
 
       {view.drains.length > 0 && (
         <ul className="pl-reasons" aria-label="Why deals were lost">
