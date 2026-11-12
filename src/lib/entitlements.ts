@@ -144,6 +144,9 @@ export const FEATURES = [
   "cl2_notes",
   "cl2_bulk",
   "cl2_team_move",
+  "cl3_money",
+  "cl3_apps",
+  "cl3_history",
   "cl_onboarding",
   // Team (People) module (docs/features/PEOPLE_BRIEF.md): each behind its own flag, default off.
   "pp_module",
