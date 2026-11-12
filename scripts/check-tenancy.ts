@@ -156,6 +156,8 @@ async function main() {
       `/api/app/people/queue?list=stale&account=${other.locs[0]}&q=${other.marker}`, `/api/app/people/queue?list=noshows&mine=1&location=${other.locs[0]}`, `/api/app/people/queue?list=followups&q=${other.marker}`,
       `/api/app/people/person/${other.locs[0]}/${other.contacts[0]}`, `/api/app/people/person/${other.locs[0]}/%2e%2e%2f${other.contacts[0]}`, `/api/app/people/search?q=${other.marker}&location=${other.locs[0]}`,
       `/api/app/people/contact/${other.locs[0]}/${other.contacts[0]}`,
+      // The deals panel: another account's deal, history and context, by changing every id the request carries.
+      `/api/app/workbench/deal-history?locationId=${other.locs[0]}&contactId=${other.contacts[0]}&opportunityId=${other.opps[0]}`, `/api/app/workbench/deal-history?locationId=${other.locs[0]}&contactId=${other.contacts[0]}&opportunityId=${other.opps[1]}`, `/api/app/workbench/context?locationId=${other.locs[0]}&contactId=${other.contacts[0]}`,
       // Find a lead: the keyset page and the export, asked for the other side's account, owner, words and a cursor that names the other side's person.
       `/api/app/people/find?q=${other.marker}`, `/api/app/people/find?location=${other.locs[0]}`, `/api/app/people/find?owner=${other.marker}`, `/api/app/people/find?q=Tester&after=${Buffer.from(JSON.stringify([0, "-infinity", "-infinity", other.locs[0], other.contacts[0]])).toString("base64url")}`,
       `/api/app/people/export?location=${other.locs[0]}`, `/api/app/people/export?q=${other.marker}`, `/api/app/people/export?owner=${other.marker}`,
