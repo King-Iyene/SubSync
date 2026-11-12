@@ -19,6 +19,7 @@ import "../cl3/cl3.css";
 import "./td3.css";
 import { fixturesOn, notSwitchedOn, queryOf, useTd } from "./data";
 import { CashSettings, RecoverTab, SaveCard, useCashFlags } from "./cash";
+import { BriefCard, WalletCard } from "../wg/today-cards";
 
 // Today, one screen: Today | Proof | Numbers | Settings. Today is the ranked "what to do first" list with ONE button; Proof is the weekly receipt an agency shows its client; Numbers
 // replaces the old Overview (at most 6 tiles); Settings holds the daily email. Reads only: nothing here messages anyone or changes the CRM (the only writes are SubSync's own notes: a
@@ -124,7 +125,9 @@ function TodayTab({ location, level, go, open, setTab, saveOn, openRecover, nav 
         const openItem = (i: Td3Item) => { tap(i.kind, i.accounts === 1 ? i.top[0]?.locationId ?? null : null); open({ title: i.label, kind: i.kind, location: i.accounts === 1 ? i.top[0]?.locationId ?? null : null, count: i.count }); };
         return (
           <div className="cl-stack" data-testid="td-today">
+            {level === "all" && <BriefCard go={nav} openRecover={openRecover} />}
             {saveOn && level !== "self" && <SaveCard openList={openRecover} go={(v, loc) => nav(v, loc)} />}
+            {level === "all" && <WalletCard go={nav} />}
             <section className="cl-today" aria-label="What to do today">
               <h2 className="cl-h">What to do today</h2>
               <p className="cl-sentence" data-testid="td-sentence">{t.headline}</p>

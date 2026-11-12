@@ -8,6 +8,8 @@ export type NewsEntry = {
 export const NEW_WINDOW_DAYS = 21;
 
 export const NEWS: readonly NewsEntry[] = [
+  { id: "br-brief", date: "2026-11-11", title: "Your 7 am brief", line: "The five things that need you today, each with one line of why and a button to the exact list. By email at your hour, and at the top of Today.", view: "today", feature: "br_brief" },
+  { id: "wg-wallet", date: "2026-11-11", title: "Credit balance watchlist", line: "Every client account's credit balance, lowest days left first, with alerts before it runs out or spending jumps.", view: "clients", feature: "wg_wallet" },
   { id: "st-settings", date: "2026-11-11", title: "Settings, rearranged", line: "Ten plain sections with a search box, real tool logos, and a Permissions page that says what each permission is for.", view: "settings", feature: "st_settings" },
   { id: "st-guides", date: "2026-11-11", title: "Guides for every page", line: "A 60-second guide for each page, a checklist that tracks your real progress, and a ? button on every page.", view: "help", feature: "st_guides" },
   { id: "cf-save", date: "2026-11-10", title: "Save this account, every morning", line: "A short email listing the client accounts most likely to leave, with the reason for each.", view: "clients", feature: "cf_save" },
