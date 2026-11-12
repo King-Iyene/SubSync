@@ -201,3 +201,44 @@ export async function tagPossibleDuplicate(a: TagArgs, deps: GatewayDeps = {}): 
   );
   return done.live ? done.result : "switched_off";
 }
+
+// ---------------- bulk clean-up: tag or remove contacts (stage CU) ----------------
+//
+// The same gate as every other write here: the master switch AND the account's opt-in, spaced calls, one audit line per contact (ids and the operation only), a stop at the first refused
+// permission. The caller has ALREADY re-read every contact, left out the protected ones, applied the cap and checked the typed confirmation; this function never decides who is safe, it only
+// refuses to send when either switch is off. A removal cannot be undone on this platform; a tag can be removed by hand.
+
+export type BulkAction = "tag" | "remove";
+export type BulkArgs = {
+  installationId: string; locationId: string; actor: string | null; optedIn: boolean; action: BulkAction; tag?: string;
+  contactIds: readonly string[]; token: () => Promise<string>;
+};
+export type BulkResult = { mode: "dry_run" | "live"; done: number; failed: number; needsPermission: boolean; line: string | null };
+
+export async function bulkViaGateway(a: BulkArgs, deps: GatewayDeps = {}): Promise<BulkResult> {
+  if (!a.optedIn || a.contactIds.length === 0) return { mode: "dry_run", done: 0, failed: 0, needsPermission: false, line: null };
+  const op = a.action === "remove" ? "remove" : "tag";
+  const out = await outward<BulkResult>(
+    { flag: "WRITE_GHL_LIVE", verb: a.action === "remove" ? "DELETE" : "WRITE", what: a.action === "remove" ? "crm.contact.remove" : "crm.contact.tag", installationId: a.installationId, ids: { locationId: a.locationId, contacts: a.contactIds.length }, fields: [a.action === "remove" ? "contact" : "tags"] },
+    async (): Promise<BulkResult> => {
+      let done = 0, failed = 0, needsPermission = false;
+      const token = await a.token();
+      for (const id of a.contactIds) {
+        await (deps.sleep ?? wait)(SPACING_MS);
+        const url = a.action === "remove" ? `${GHL_API}/contacts/${encodeURIComponent(id)}` : `${GHL_API}/contacts/${encodeURIComponent(id)}/tags`;
+        const res = await ghlFetch(
+          url,
+          { method: a.action === "remove" ? "DELETE" : "POST", headers: { Authorization: `Bearer ${token}`, Version: VERSION, Accept: "application/json", "Content-Type": "application/json" }, ...(a.action === "tag" ? { body: JSON.stringify({ tags: [a.tag ?? "cleanup-review"] }) } : {}), cache: "no-store" },
+          { ...(deps.fetchImpl ? { fetchImpl: deps.fetchImpl } : {}), ...(deps.sleep ? { sleep: deps.sleep } : {}) },
+        );
+        const result = res.status === 401 || res.status === 403 ? "needs_permission" : res.ok || (a.action === "remove" && res.status === 404) ? "done" : "failed";
+        await recordWrite({ installationId: a.installationId, actor: a.actor, locationId: a.locationId, contactId: id, op, fields: [a.action === "remove" ? "contact" : "tags"], result }, deps);
+        if (result === "needs_permission") { needsPermission = true; break; }
+        if (result === "done") done++; else failed++;
+      }
+      return { mode: "live", done, failed, needsPermission, line: null };
+    },
+    deps,
+  );
+  return out.live ? out.result : { mode: "dry_run", done: 0, failed: 0, needsPermission: false, line: out.line };
+}

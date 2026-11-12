@@ -89,6 +89,9 @@ async function main() {
       "/api/app/duplicates?size=50", "/api/app/duplicates/obvious", `/api/app/duplicates?location=${other.locs[0]}&size=50`, `/api/app/duplicates?accounts=${other.locs[0]}&status=decided`, `/api/app/duplicates?focus=${other.locs[0]}:00000000-2`,
       // Clean-up (stage CLEANUP): the quality overview and one account, the list and CSV behind a finding, the rules, what-would-this-setting-find, the history, asked for the other side's account by every parameter.
       "/api/app/cleanup/quality", `/api/app/cleanup/quality?account=${other.locs[0]}`, `/api/app/cleanup/quality/list?account=${other.locs[0]}&finding=bad_email`, `/api/app/cleanup/quality/csv?account=${other.locs[0]}&finding=bad_email`,
+      // Clean-up fix lists, Health and bulk runs (stage CU), aimed at the other side's accounts by every parameter they take.
+      "/api/app/cu/options", "/api/app/cu/home", `/api/app/cu/home?account=${other.locs[0]}`, "/api/app/cu/accounts", `/api/app/cu/accounts?q=${other.marker}`, "/api/app/cu/actions",
+      "/api/app/cu/list?kind=junk", `/api/app/cu/list?kind=no_phone&account=${other.locs[0]}`, `/api/app/cu/list?kind=orphan_deals&account=${other.locs[0]}`, `/api/app/cu/csv?kind=no_owner&account=${other.locs[0]}`,
       "/api/app/cleanup/rules", `/api/app/cleanup/rules?account=${other.locs[0]}`, `/api/app/cleanup/rules/preview?account=${other.locs[0]}&preset=loose`, "/api/app/duplicates/history", `/api/app/duplicates/history?location=${other.locs[0]}`, "/api/app/duplicates/rules",
       // Speed to lead (stage SPEED): the first screen, the list behind a number and the comparisons, the other side's account asked for by every parameter they take.
       "/api/app/speed?part=home", `/api/app/speed?part=list&status=all&account=${other.locs[0]}`, `/api/app/speed?part=list&status=waiting&account=${other.locs.join(",")}`, `/api/app/speed?part=list&status=all&person=${other.marker}`, "/api/app/speed?part=compare&by=account", "/api/app/speed?part=compare&by=person",
@@ -305,6 +308,8 @@ async function main() {
       ["POST", "/api/app/duplicates/snooze", { locationId: B.locs[0], contactIds: [B.contacts[0], B.contacts[0] + "dup"] }],
       ["POST", "/api/app/duplicates/merge", { locationId: B.locs[0], contactIds: [B.contacts[0], B.contacts[0] + "dup"], keepContactId: B.contacts[0] }],
       // Clean-up: rules, the switch for changing contacts, a pasted file, a scan, a merge through the workflow and a take-back, all on the other agency's account.
+      ["POST", "/api/app/cu/bulk", { step: "preview", kind: "junk", action: "tag", account: B.locs[0] }],
+      ["POST", "/api/app/cu/bulk", { step: "do", kind: "junk", action: "remove", account: B.locs[0], typed: "remove 1 contact" }],
       ["POST", "/api/app/cleanup/rules", { scope: B.locs[0], match: { preset: "loose" } }],
       ["POST", "/api/app/cleanup/rules/clear", { locationId: B.locs[0] }],
       ["POST", "/api/app/cleanup/write", { locationId: B.locs[0], enabled: true }],
