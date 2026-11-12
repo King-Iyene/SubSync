@@ -44,7 +44,7 @@ test("the page is called Unanswered messages everywhere a person sees its name, 
   const nav = readFileSync(join(ROOT, "app/app/nav.ts"), "utf8");
   assert.match(nav, /id: "inbox", label: "Unanswered messages"/);
   assert.match(page, /<h1[^>]*>Unanswered messages<\/h1>/);
-  assert.ok(/label="Reply"/.test(rows) && rows.includes("the conversation in your CRM"), "the reply button says where it goes");
+  assert.ok(/label="Reply"/.test(rows) && rows.includes("open them here"), "the reply button says where it goes (inside SubSync; the panel keeps Open in your CRM)");
   assert.ok(!/Inbox zero|Inbox & SLA/.test(page));
   assert.ok(!/tel:/.test(page + rows + readFileSync(join(ROOT, "app/app/views/unanswered-all.tsx"), "utf8") + readFileSync(join(ROOT, "app/app/views/quiet-deals.tsx"), "utf8")), "no call goes to the phone's own dialer (KF-3)");
 });
