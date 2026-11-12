@@ -4,7 +4,7 @@ import type { AccountRow, AccountSettings, AlertDraft } from "./derive";
 import type { DomainReport } from "../dns/email-auth";
 import { DEFAULT_APP_DOMAIN } from "../links";
 import { effectiveLogo, validLogoUrl } from "../brand-logo";
-import { countedInScope, dealScopeJoins, outOfScope } from "./stage-rules-sql";
+import { countedInScope, dealIsStale, dealScopeJoins, daysInStepSql, outOfScope } from "./stage-rules-sql";
 import { currentSnapshotVersion, snapshotOk } from "./definitions-sql";
 
 // Every query is scoped by installation_id. Counts are cast to int/float8 so the driver does
@@ -210,12 +210,12 @@ export async function accountRows(installationId: string, s: AccountSettings): P
       select location_id,
         count(*) filter (where status = 'open' and counted)::int open_opps,
         coalesce(sum(monetary_value) filter (where status = 'open' and counted), 0)::float8 open_value,
-        count(*) filter (where status = 'open' and counted and act < now() - make_interval(days => ${s.staleDays}::int))::int stale_opps,
-        coalesce(sum(monetary_value) filter (where status = 'open' and counted and act < now() - make_interval(days => ${s.staleDays}::int)), 0)::float8 stale_value,
+        count(*) filter (where status = 'open' and counted and is_stale)::int stale_opps,
+        coalesce(sum(monetary_value) filter (where status = 'open' and counted and is_stale), 0)::float8 stale_value,
         count(*) filter (where status = 'open' and not counted)::int excluded_open,
         count(*) filter (where status = 'open' and out_scope)::int out_scope_open,
         coalesce(max(monetary_value) filter (where status = 'open' and counted), 0)::float8 top_deal,
-        coalesce(max(monetary_value) filter (where status = 'open' and counted and act < now() - make_interval(days => ${s.staleDays}::int)), 0)::float8 top_stale_deal,
+        coalesce(max(monetary_value) filter (where status = 'open' and counted and is_stale), 0)::float8 top_stale_deal,
         count(*) filter (where status = 'won')::int won_count,
         count(*) filter (where status = 'lost')::int lost_count,
         coalesce(sum(monetary_value) filter (where status = 'won'), 0)::float8 won_value,
@@ -224,7 +224,8 @@ export async function accountRows(installationId: string, s: AccountSettings): P
         select o.location_id, o.status, o.monetary_value,
           -- A deal counts toward dollar figures only with a value above zero, a person it belongs to, and a place in play: not in a closed-out or
           -- ignored stage and not in a pipeline marked not in use (stage-rules.ts). One rule, applied everywhere.
-          (coalesce(o.monetary_value, 0) > 0 and o.assigned_to is not null and not ${outOfScope()}) counted,
+          ${countedInScope()} counted,
+          ${dealIsStale()} is_stale,
           ${outOfScope()} out_scope,
           coalesce(greatest(o.last_stage_change_at, o.last_action_at, o.updated_remote_at, o.last_status_change_at), o.created_remote_at, o.synced_at) act
         from cached_opportunities o ${dealScopeJoins()}
@@ -434,37 +435,39 @@ export type DealRow = {
   daysStale: number;
 };
 
-export async function staleDeals(installationId: string, days: number, limit = 200, locationId?: string): Promise<DealRow[]> {
+export type StaleDealsPage = { rows: DealRow[]; total: number; totalValue: number };
+
+/**
+ * Deals past THEIR STEP's usual time (stage-rules-sql dealIsStale), counted deals only (a value above $0, an owner, in play, dollars you can trust: countedInScope), biggest first.
+ * `total` and `totalValue` are the true figures even when `limit` cuts the rows. `floorDays` (optional) also asks for at least that many days in the step; it is never the staleness rule.
+ * `ids` is the caller's own accounts (null = every account of the installation, for a caller that already limited by `locationId`).
+ */
+export async function staleDealsPage(installationId: string, o: { ids?: string[] | null; locationId?: string; limit?: number; floorDays?: number }): Promise<StaleDealsPage> {
   const db = sql();
-  const scope = locationId ? db`and o.location_id = ${locationId}` : db``;
+  const scope = o.locationId ? db`and o.location_id = ${o.locationId}` : db``;
+  const only = o.ids ? db`and o.location_id = any(${o.ids}::text[])` : db``;
+  const floor = o.floorDays && o.floorDays > 0 ? db`and ${daysInStepSql()} >= ${Math.floor(o.floorDays)}` : db``;
   const rows = await db`
-    select o.opportunity_id, o.location_id, l.name location_name, o.name, o.contact_name, o.monetary_value::float8 value,
-      pl.name pipeline_name, st.nm stage_name, o.act,
-      floor(extract(epoch from (now() - o.act)) / 86400)::int days_stale
-    from (
-      select o.*, coalesce(greatest(o.last_stage_change_at, o.last_action_at, o.updated_remote_at, o.last_status_change_at), o.created_remote_at, o.synced_at) act
-      from cached_opportunities o ${dealScopeJoins()} where o.installation_id = ${installationId} and o.status = 'open' and not ${outOfScope()}
-    ) o
+    select o.opportunity_id, o.location_id, l.name location_name, o.name, o.contact_name, o.monetary_value::float8 value, sc_pl.name pipeline_name, sc_st.nm stage_name,
+      coalesce(o.last_stage_change_at, o.created_remote_at, o.synced_at) act, ${daysInStepSql()} days_stale,
+      count(*) over ()::int total, coalesce(sum(o.monetary_value) over (), 0)::float8 total_value
+    from cached_opportunities o
     join locations l on l.installation_id = o.installation_id and l.location_id = o.location_id and not l.ignored
-    left join pipelines pl on pl.installation_id = o.installation_id and pl.location_id = o.location_id and pl.pipeline_id = o.pipeline_id
-    left join lateral (
-      select s->>'name' nm from jsonb_array_elements(coalesce(pl.stages, '[]'::jsonb)) s where s->>'id' = o.stage_id limit 1
-    ) st on true
-    where o.act < now() - make_interval(days => ${days}::int) ${scope}
-    order by o.monetary_value desc, o.act asc
-    limit ${limit}`;
-  return rows.map((r) => ({
-    opportunityId: r.opportunity_id,
-    locationId: r.location_id,
-    locationName: r.location_name,
-    name: r.name,
-    contactName: r.contact_name,
-    value: r.value,
-    pipelineName: r.pipeline_name,
-    stageName: r.stage_name,
-    lastActivityAt: toIso(r.act),
-    daysStale: r.days_stale,
-  }));
+    ${dealScopeJoins()}
+    where o.installation_id = ${installationId} and o.status = 'open' and ${countedInScope()} and ${dealIsStale()} ${scope} ${only} ${floor}
+    order by o.monetary_value desc, o.opportunity_id
+    limit ${o.limit ?? 200}`;
+  return {
+    total: rows[0] ? (rows[0].total as number) : 0, totalValue: rows[0] ? (rows[0].total_value as number) : 0,
+    rows: rows.map((r) => ({
+      opportunityId: r.opportunity_id, locationId: r.location_id, locationName: r.location_name, name: r.name, contactName: r.contact_name, value: r.value,
+      pipelineName: r.pipeline_name, stageName: r.stage_name, lastActivityAt: toIso(r.act), daysStale: r.days_stale,
+    })),
+  };
+}
+
+export async function staleDeals(installationId: string, floorDays: number, limit = 200, locationId?: string): Promise<DealRow[]> {
+  return (await staleDealsPage(installationId, { locationId, limit, floorDays })).rows;
 }
 
 export type PipelineCell = {

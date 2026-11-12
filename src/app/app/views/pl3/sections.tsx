@@ -7,6 +7,7 @@ import { CountUp } from "../speed6-base";
 import { usePl, type PlFilters } from "./data";
 import { days, money, moneyShort, pct } from "./format";
 import { Chip, DealList } from "./parts";
+import { TrustBasis } from "../td3/trust-basis";
 import type { PlDeal } from "@/lib/analytics/pipeline3-types-interim";
 
 export type SectionProps = { filters: PlFilters; onOpen: (d: PlDeal) => void; activeId: string | null; showAccount: boolean; go: (tab: string) => void; onDrill: (d: { title: string; count: number; extra: Record<string, string | number | undefined> }) => void };
@@ -38,6 +39,7 @@ export function Overview({ filters, go, onDrill }: SectionProps) {
                 <button type="button" className="ap-kpi" data-tone="green" onClick={() => onDrill({ title: "Won deals", count: 0, extra: { status: "won" } })}><span className="ap-kpi-n">{moneyShort(h.wonCents)}</span><span className="ap-kpi-l">Won in these dates</span></button>
                 <button type="button" className="ap-kpi" data-tone={h.winRate === null ? "violet" : "cyan"} onClick={() => go("wonlost")}><span className="ap-kpi-n">{h.winRate === null ? "Not enough data" : pct(h.winRate)}</span><span className="ap-kpi-l">{h.winRate === null ? `Needs ${d.minDeals} closed deals, you have ${h.winRateDeals}` : `Win rate, ${h.winRateDeals} closed deals`}</span></button>
               </div>
+              {d.trust && <TrustBasis t={d.trust} />}
               <div className="ap-act"><button type="button" className="s6-btn" data-kind="primary" onClick={() => go("flow")}>See the money flow</button><button type="button" className="s6-btn" onClick={() => go("needs")}>Unclog stuck deals</button></div>
             </section>
             {d.outlier && <p className="ap-fine">{d.outlier.name} is {pct(d.outlier.share)} of the money, so it is left out of the averages and shown on its own.</p>}

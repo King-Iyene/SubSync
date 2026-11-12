@@ -17,7 +17,8 @@ export async function loadDeals(installationId: string, allowed: string[] | null
       coalesce(sc_pl.name, 'Pipeline') pipeline_name, o.stage_id, coalesce(sc_st.nm, 'Unknown stage') stage_name, coalesce(sc_st.ord, 999)::int stage_order,
       o.name, o.contact_name, coalesce(o.monetary_value, 0)::float8 value, o.status, o.assigned_to,
       o.created_remote_at, o.last_stage_change_at, o.last_status_change_at,
-      greatest(o.last_action_at, o.updated_remote_at) last_activity_at
+      greatest(o.last_action_at, o.updated_remote_at) last_activity_at,
+      (case when sc_ss.stays >= 10 and sc_ss.p75_days is not null then greatest(3::numeric, least(60::numeric, sc_ss.p75_days)) end)::float8 stage_limit
     from cached_opportunities o
     join locations l on l.installation_id = o.installation_id and l.location_id = o.location_id and not l.ignored
     ${dealScopeJoins()}
@@ -29,7 +30,7 @@ export async function loadDeals(installationId: string, allowed: string[] | null
     opportunityId: r.opportunity_id, locationId: r.location_id, locationName: r.location_name, pipelineId: r.pipeline_id,
     pipelineName: r.pipeline_name, stageId: r.stage_id, stageName: r.stage_name, stageOrder: r.stage_order, name: r.name,
     contactName: r.contact_name, value: r.value, status: r.status, assignedTo: r.assigned_to ?? null, createdAt: ms(r.created_remote_at),
-    stageChangedAt: ms(r.last_stage_change_at), statusChangedAt: ms(r.last_status_change_at), lastActivityAt: ms(r.last_activity_at),
+    stageLimitDays: r.stage_limit === null || r.stage_limit === undefined ? null : Number(r.stage_limit), stageChangedAt: ms(r.last_stage_change_at), statusChangedAt: ms(r.last_status_change_at), lastActivityAt: ms(r.last_activity_at),
   }));
 }
 

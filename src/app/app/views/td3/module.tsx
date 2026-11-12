@@ -93,13 +93,20 @@ function Pager({ page, pages, total, set }: { page: number; pages: number; total
 
 /** The exact rows behind a count, with "Open in your CRM". The total equals the count that opened it. */
 function DrillList({ d, location, onClose }: { d: NonNullable<Drill>; location: string; onClose: () => void }) {
-  const [page, setPage] = useState(0);
+  const [page, setPage] = useState(0), [showLeft, setShowLeft] = useState(d.kind === "left_out");
+  const head = useRef<HTMLHeadingElement>(null);
   // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { setPage(0); }, [d.kind, d.location]);
-  const r = useTd<Td3List>("list", { kind: d.kind, location: d.location ?? (location || undefined), page, size: 20 });
+  useEffect(() => { setPage(0); setShowLeft(d.kind === "left_out"); }, [d.kind, d.location, d.title]);
+  // The list opens IN VIEW: scrolled to the top of the screen and focused (a screen reader hears the title), every time a number is chosen.
+  useEffect(() => { const el = head.current; if (!el) return; el.closest("section")?.scrollIntoView({ block: "start", behavior: "smooth" }); el.focus({ preventScroll: true }); }, [d]);
+  const canToggle = d.kind === "risk_all" || d.kind === "risk_stale" || d.kind === "open_deals" || d.kind === "left_out";
+  const kind: Td3ListKind = showLeft ? "left_out" : d.kind;
+  const r = useTd<Td3List>("list", { kind, location: d.location ?? (location || undefined), page, size: 20 });
   return (
-    <section id="td-drill" className="cl-drill" data-testid="td-drill" aria-label={d.title}>
-      <div className="mb-2 flex flex-wrap items-center gap-3"><h3 className="text-base font-semibold" data-testid="td-drill-title">{d.title}</h3><span className="ap-chip" data-tone="cyan">{num(d.count)}</span><button type="button" className="ap-link ml-auto" onClick={onClose}>Close</button></div>
+    <section id="td-drill" className="cl-drill" data-testid="td-drill" aria-label={d.title} style={{ scrollMarginTop: 12 }}>
+      <div className="mb-2 flex flex-wrap items-center gap-3"><h3 ref={head} tabIndex={-1} className="text-base font-semibold" data-testid="td-drill-title">{showLeft && d.kind !== "left_out" ? "Deals left out of the dollar figures" : d.title}</h3><span className="ap-chip" data-tone="cyan">{showLeft && d.kind !== "left_out" ? num(r.data?.total ?? 0) : num(d.count)}</span>
+        {canToggle && <label className="text-sm" style={{ display: "inline-flex", gap: 6, alignItems: "center" }}><input type="checkbox" checked={showLeft} onChange={(e) => { setShowLeft(e.target.checked); setPage(0); }} data-testid="td-drill-left-toggle" /> Show the deals left out</label>}
+        <button type="button" className="ap-link ml-auto" onClick={onClose}>Close</button></div>
       <Load r={r} empty={(x) => x.rows.length === 0 && "Nothing behind this one right now."}>
         {(x) => (
           <>
@@ -510,7 +517,8 @@ export function TodayModule({ go, kind, initialTab = "today", fromOverview = fal
     const view: ViewId = level !== "all" && m === "clients" ? "overview" : level === "self" && m === "settings" ? "help" : VIEW_OF[m];
     go(view, loc ?? undefined);
   };
-  const open = (d: NonNullable<Drill>) => { setDrill(d); setTimeout(() => document.getElementById("td-drill")?.scrollIntoView({ block: "nearest", behavior: "smooth" }), 50); };
+  // The list scrolls itself into view and takes focus when it appears (DrillList), so choosing a number always shows its rows.
+  const open = (d: NonNullable<Drill>) => { setDrill(d); };
   const goTab = (t: TabKey) => { setTab(t); setDrill(null); };
   if (!sample && opt.data && opt.data.canSee === false) return <div data-testid="page" className="td-page"><header className="td-head"><h1>Today</h1></header></div>;
   const body = (() => {

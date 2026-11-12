@@ -5,6 +5,8 @@ import { useApiClient, useData } from "../session";
 import type { Deal } from "../types";
 import { Btn, Card, Empty, ErrorBox, ExtLink, fmtInt, fmtMoney, fmtPct, Loading, PageHeader, Stat, Table, Td, Th } from "../ui";
 import { QuietDeals } from "./quiet-deals";
+import { TrustBasis, type TrustBasisData } from "./td3/trust-basis";
+import { DAYS_STALE_HEADER_TIP, LEFT_OUT_CHIP } from "@/lib/analytics/deal-trust";
 
 type Pipelines = {
   stages: Array<{ pipeline: string; stage: string; order: number; count: number; value: number }>;
@@ -67,35 +69,38 @@ function Hygiene() {
 
 function Stale() {
   const api = useApiClient();
-  const [days, setDays] = useState(30);
-  const { data, error, loading, reload } = useData<{ days: number; totalValue: number; deals: Deal[] }>(`stale?days=${days}`);
+  const [left, setLeft] = useState(false);
+  const { data, error, loading, reload } = useData<{ leftOut: boolean; total: number; totalValue: number; trust: TrustBasisData; deals: Array<Deal & { leftOutReason?: string }> }>(`stale?left=${left ? 1 : 0}`);
   return (
     <div>
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <span className="text-sm text-muted-foreground">No movement in at least</span>
-        {[14, 30, 45, 60, 90].map((d) => (
-          <button key={d} type="button" onClick={() => setDays(d)} aria-pressed={days === d} className={`rounded-full border px-3 py-1 text-sm ${days === d ? "bg-foreground text-background" : "hover:bg-muted"}`}>{d} days</button>
-        ))}
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <span className="text-sm text-muted-foreground">{left ? "Deals left out of the dollar figures (never deleted)." : "Open deals that have sat in their step longer than that step usually takes in the same account."}</span>
+        <label className="text-sm" style={{ display: "inline-flex", gap: 6, alignItems: "center" }}><input type="checkbox" checked={left} onChange={(e) => setLeft(e.target.checked)} data-testid="stale-left-toggle" /> Show the deals left out</label>
         <span className="ml-auto"><Btn onClick={() => api.download("export/stale", "subsync-stale-deals.csv")}>Export CSV</Btn></span>
       </div>
-      {loading && !data ? <Loading /> : error ? <ErrorBox error={error} onRetry={reload} /> : !data ? null : data.deals.length === 0 ? (
-        <Empty title="No stale deals" body={`Every open deal has moved in the last ${days} days.`} />
-      ) : (
+      {loading && !data ? <Loading /> : error ? <ErrorBox error={error} onRetry={reload} /> : !data ? null : (
         <>
-          <div className="mb-4 grid grid-cols-2 gap-3 sm:max-w-md"><Stat label="Deals" value={fmtInt(data.deals.length)} /><Stat label="Total value" value={fmtMoney(data.totalValue)} tone="warn" /></div>
-          <Table head={<tr><Th>Deal</Th><Th>Account</Th><Th>Stage</Th><Th className="text-right">Value</Th><Th className="text-right">Days stale</Th><Th>{" "}</Th></tr>}>
-            {data.deals.slice(0, 200).map((d) => (
-              <tr key={d.opportunityId} className="hover:bg-muted/40">
-                <Td>{d.name ?? "Untitled deal"}<div className="text-xs text-muted-foreground">{d.contactName}</div></Td>
-                <Td>{d.locationName ?? "Unnamed account"}</Td>
-                <Td>{d.pipelineName ? `${d.pipelineName} · ` : ""}{d.stageName ?? "n/a"}</Td>
-                <Td className="text-right tabular-nums">{fmtMoney(d.value)}</Td>
-                <Td className="text-right tabular-nums">{d.daysStale}</Td>
-                <Td><ExtLink href={d.url}>Open</ExtLink></Td>
-              </tr>
-            ))}
-          </Table>
-          {data.deals.length > 200 && <p className="mt-2 text-xs text-muted-foreground">Showing the 200 largest. Export the CSV for the full list.</p>}
+          <TrustBasis t={data.trust} onShowLeftOut={left ? null : () => setLeft(true)} />
+          {data.deals.length === 0 ? (
+            <Empty title={left ? "Nothing was left out" : "No stale deals"} body={left ? "Every open deal with a value and an owner is counted." : "No counted deal is past the usual time for its step."} />
+          ) : (
+            <>
+              <div className="mb-4 mt-3 grid grid-cols-2 gap-3 sm:max-w-md"><Stat label={left ? "Deals left out" : "Stale deals"} value={fmtInt(data.total)} /><Stat label={left ? "Value left out" : "Stale value (estimate)"} value={fmtMoney(data.totalValue)} tone={left ? undefined : "warn"} /></div>
+              <Table head={<tr><Th>Deal</Th><Th>Account</Th><Th>Stage</Th><Th className="text-right">Value</Th><Th className="text-right"><span title={DAYS_STALE_HEADER_TIP}>{left ? "Days in step" : "Days stale"} (i)</span></Th><Th>{" "}</Th></tr>}>
+                {data.deals.slice(0, 200).map((d) => (
+                  <tr key={d.opportunityId} className="hover:bg-muted/40">
+                    <Td>{d.name ?? "Untitled deal"}<div className="text-xs text-muted-foreground">{d.contactName}</div>{d.leftOutReason && <div className="text-xs" data-testid="stale-left-chip">{LEFT_OUT_CHIP[d.leftOutReason as keyof typeof LEFT_OUT_CHIP] ?? "Left out"}</div>}</Td>
+                    <Td>{d.locationName ?? "Unnamed account"}</Td>
+                    <Td>{d.pipelineName ? `${d.pipelineName} · ` : ""}{d.stageName ?? "n/a"}</Td>
+                    <Td className="text-right tabular-nums">{fmtMoney(d.value)}</Td>
+                    <Td className="text-right tabular-nums">{d.daysStale}</Td>
+                    <Td><ExtLink href={d.url}>Open</ExtLink></Td>
+                  </tr>
+                ))}
+              </Table>
+              {data.total > 200 && <p className="mt-2 text-xs text-muted-foreground">Showing the 200 largest of {fmtInt(data.total)}. Export the CSV for the full list.</p>}
+            </>
+          )}
         </>
       )}
     </div>

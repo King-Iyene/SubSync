@@ -9,6 +9,8 @@ export type Deal = {
   locationName: string | null;
   pipelineId: string;
   pipelineName: string;
+  /** Days this deal may sit in its step: the usual time from finished stays in this account. Null = too little history to judge. Undefined = not supplied (older rule). */
+  stageLimitDays?: number | null;
   stageId: string | null;
   stageName: string;
   stageOrder: number; // 1-based position in its pipeline, 999 when unknown

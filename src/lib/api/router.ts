@@ -1,10 +1,12 @@
 import { validLogoUrl } from "@/lib/brand-logo";
 import { sql } from "../db";
 import { safeError } from "../safe-log";
+import { dealTrust, leftOutRows, liveLocationIds } from "../analytics/deal-trust-queries";
+import { HOW_LEFT_OUT, HOW_STALE_WORKED_OUT, countingLine, leftOutLine } from "../analytics/deal-trust";
 import { buildDigest, onboardingChecklist, toCsv, type DerivedAccount } from "../analytics/derive";
 import {
   allManualTasks, conversationCoverage, dismissAlert, domainCandidates, duplicateGroups, inbox, listAlerts, listDomainChecks, manualTasks, metricsTrend,
-  dealHygiene, getSettings, pipelineCells, saveDomainCheck, searchContacts, setLocationFlags, setManualTask, staleDeals, updateSettings,
+  dealHygiene, getSettings, pipelineCells, saveDomainCheck, searchContacts, setLocationFlags, setManualTask, staleDeals, staleDealsPage, updateSettings,
   visibleLocationIds, type Settings,
 } from "../analytics/queries";
 import { loadAccounts, refreshInsights } from "../analytics/service";
@@ -266,8 +268,11 @@ async function overview(ctx: Ctx) {
     .map(({ a, reasons }) => ({ locationId: a.locationId, name: a.name, score: a.score, band: attentionBand(a.band), bandNote: a.bandNote, churn: a.churn.level, reasons, url: links.account(a.locationId) }));
   const liveIds = new Set(live.map((a) => a.locationId));
   const capped = coverage.filter((c) => liveIds.has(c.locationId) && c.stored >= CONVERSATIONS_READ_PER_ACCOUNT).length;
+  // The basis under the dollar tiles: the same shared function as Today and the Pipeline (deal-trust-queries.ts).
+  const trust = ctx.demo ? null : await dealTrust(ctx.installationId, [...liveIds]).catch(() => null);
   return json({
     demo: ctx.demo,
+    trust: trust ? { counting: countingLine(trust.counted.deals, trust.leftOut), leftOutLine: leftOutLine(trust.leftOut), leftOutDeals: trust.leftOut.deals, notJudged: trust.leftOut.notJudged, howStale: HOW_STALE_WORKED_OUT, howLeftOut: HOW_LEFT_OUT } : null,
     kind: ctx.kind,
     plan: ctx.plan,
     entitlements: ctx.entitlements,
@@ -966,7 +971,7 @@ async function accountDetail(ctx: Ctx, locationId: string) {
   if (!a) return json({ error: "Account not found" }, 404);
   const [trend, deals, manual, domains, alerts] = await Promise.all([
     metricsTrend(ctx.installationId, locationId, 60),
-    staleDeals(ctx.installationId, settings.staleDays, 10, locationId),
+    staleDeals(ctx.installationId, 0, 10, locationId),
     manualTasks(ctx.installationId, locationId),
     listDomainChecks(ctx.installationId),
     listAlerts(ctx.installationId, false, 200, undefined, ctx.session.userId),
@@ -999,13 +1004,25 @@ async function search(ctx: Ctx) {
 }
 
 async function stale(ctx: Ctx) {
-  const { settings, permits, links } = await scope(ctx);
-  const days = Math.min(365, Math.max(1, Number(ctx.url.searchParams.get("days")) || settings.staleDays));
-  const rows = (await staleDeals(ctx.installationId, days, 500, ctx.limitTo ?? undefined)).filter((d) => permits(d.locationId));
+  const { permits, links } = await scope(ctx);
+  // The caller's own accounts only (the same ids that every number on the page was counted from).
+  const ids = ((await allowedIds(ctx)) ?? (await liveLocationIds(ctx.installationId))).filter(permits);
+  const left = ctx.url.searchParams.get("left") === "1";
+  const [pg, trust, lo] = await Promise.all([
+    left ? null : staleDealsPage(ctx.installationId, { ids, limit: 500 }),
+    dealTrust(ctx.installationId, ids),
+    left ? leftOutRows(ctx.installationId, ids, null, 500, 0) : null,
+  ]);
+  const basis = { counting: countingLine(trust.counted.deals, trust.leftOut), leftOutLine: leftOutLine(trust.leftOut), leftOutDeals: trust.leftOut.deals, notJudged: trust.leftOut.notJudged, howStale: HOW_STALE_WORKED_OUT, howLeftOut: HOW_LEFT_OUT };
+  if (lo) {
+    return json({
+      leftOut: true, total: lo.total, totalValue: lo.rows.reduce((s, d) => s + d.value, 0), trust: basis,
+      deals: lo.rows.map((d) => ({ opportunityId: d.opportunityId, locationId: d.locationId, locationName: d.locationName, name: d.name, contactName: d.contactName, value: d.value, pipelineName: d.pipeline, stageName: d.stage, lastActivityAt: null, daysStale: d.daysInStep, leftOutReason: d.reason, url: links.opportunities(d.locationId) })),
+    });
+  }
   return json({
-    days,
-    totalValue: rows.reduce((s, d) => s + d.value, 0),
-    deals: rows.map((d) => ({ ...d, url: links.opportunities(d.locationId) })),
+    leftOut: false, total: pg?.total ?? 0, totalValue: pg?.totalValue ?? 0, trust: basis,
+    deals: (pg?.rows ?? []).map((d) => ({ ...d, url: links.opportunities(d.locationId) })),
   });
 }
 
@@ -1374,7 +1391,7 @@ async function exportCsv(ctx: Ctx, kind: string) {
       ]));
     }
     case "stale": {
-      const rows = (await staleDeals(ctx.installationId, settings.staleDays, 5000, ctx.limitTo ?? undefined)).filter((d) => permits(d.locationId));
+      const rows = (await staleDeals(ctx.installationId, 0, 5000, ctx.limitTo ?? undefined)).filter((d) => permits(d.locationId));
       return file("subsync-stale-deals", toCsv(rows, [
         { label: "Account", value: (d) => d.locationName }, { label: "Deal", value: (d) => d.name }, { label: "Contact", value: (d) => d.contactName },
         { label: "Value", value: (d) => d.value }, { label: "Pipeline", value: (d) => d.pipelineName }, { label: "Stage", value: (d) => d.stageName },
@@ -1608,7 +1625,11 @@ async function pipelineIntel(ctx: Ctx) {
 // who decided, and the win probability the owner set (if any).
 async function stageControlsFor(ctx: Ctx, allowed: string[] | null, rules: Awaited<ReturnType<typeof loadStageRules>>) {
   const inv = await stageInventory(ctx.installationId, allowed);
-  const pipelines = [...new Set(inv.map((r) => r.pipeline))].map((name) => ({ name, ...pipelineTreatment(name, rules) }));
+  const pipelines = [...new Set(inv.map((r) => r.pipeline))].map((name) => {
+    const t = pipelineTreatment(name, rules), rows = inv.filter((r) => r.pipeline === name), outreach = t.source !== 'owner' && rows.some((r) => r.outreach);
+    // A bulk outreach list is suggested as not counted (deal-trust.ts); the owner can mark it In use to count it.
+    return { name, ...t, notInUse: t.notInUse || outreach, outreach, counted: rows.reduce((a, r) => a + r.countedDeals, 0), why: outreach ? `Looks like a bulk outreach list (${Math.max(...rows.map((r) => r.pipeDeals)).toLocaleString('en-US')} deals, most in one step with the same amount), not a sales pipeline. Its deals are left out of every dollar figure until you mark it In use.` : t.why };
+  });
   const stages = inv.map((r) => {
     const t = treatmentOf(r.pipeline, r.stage, rules);
     const p = stageProbability(r.pipeline, r.stage, rules);

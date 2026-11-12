@@ -6,7 +6,7 @@ import { waitingPeopleByAccount, waitingPeoplePage, type ListScope } from "./una
 import { quietedMap } from "./clients-actions-queries";
 import { receiptLine } from "./mn2";
 import { meetingsOn, weekCountsByAccount } from "./mn2-queries";
-import { countedInScope, dealScopeJoins } from "./stage-rules-sql";
+import { countedInScope, dealIsStale, dealScopeJoins } from "./stage-rules-sql";
 import { byAttention, clampSize, DAY, delta, levelOf, mondayOf, rate, reasonsOf, receiptLines, STALE_DEAL_DAYS, summaryOf, todayOf, applyQuiet, QUIET_DAYS, SYNC_OLD_HOURS, WAIT_OLD_HOURS, type AccountSignals } from "./clients3-intel";
 import type {
   Cl3Account, Cl3Attention, Cl3Compare, Cl3Level, Cl3List, Cl3ListRow, Cl3Options, Cl3Overview, Cl3People, Cl3Person, Cl3Reason, Cl3Receipt, Cl3ReceiptList, Cl3Setup, Cl3SetupList, Cl3Side, Cl3Trends, Cl3TrendPoint,
@@ -194,7 +194,7 @@ export async function accountsCore(s: Scope, f: Filters, now = Date.now()): Prom
     waitScope(s, ids, now).then(waitingPeopleByAccount).then((m) => [...m].map(([location_id, v]) => ({ location_id, waiting: v.waiting, old: v.old }))),
     db`select location_id, count(*)::int unmarked from cached_appointments where installation_id = ${s.inst} and location_id = any(${ids}::text[])
        and status not in ('showed', 'noshow', 'cancelled', 'invalid') and start_at < now() - interval '3 hours' and start_at > now() - interval '90 days' group by 1`,
-    db`select o.location_id, count(*)::int open_n, count(*) filter (where coalesce(o.last_stage_change_at, o.created_remote_at) < now() - ${`${STALE_DEAL_DAYS} days`}::interval)::int stale, coalesce(sum(o.monetary_value), 0)::float8 open_value
+    db`select o.location_id, count(*)::int open_n, count(*) filter (where ${dealIsStale()})::int stale, coalesce(sum(o.monetary_value), 0)::float8 open_value
        from cached_opportunities o ${dealScopeJoins()} where o.installation_id = ${s.inst} and o.location_id = any(${ids}::text[]) and o.status = 'open' and ${countedInScope()} group by 1`,
     staffRows(s.inst, ids, f.from, f.to, now),
     quality(s.inst, ids),
@@ -465,7 +465,7 @@ export async function list(s: Scope, f: Filters, reason: Cl3Reason, o: { page: n
     }
     case "stale_deals": {
       const base = db`from cached_opportunities o ${dealScopeJoins()} where o.installation_id = ${s.inst} and o.location_id = any(${ids}::text[]) and o.status = 'open' and ${countedInScope()}
-        and coalesce(o.last_stage_change_at, o.created_remote_at) < now() - ${`${STALE_DEAL_DAYS} days`}::interval`;
+        and ${dealIsStale()}`;
       total = n((await db`select count(*)::int c ${base}`)[0]?.c);
       rows = (await db`select o.location_id, o.contact_id, coalesce(o.contact_name, o.name) contact_name, o.stage_name, o.monetary_value::float8 v, coalesce(o.last_stage_change_at, o.created_remote_at) at ${base} order by v desc, o.opportunity_id limit ${size} offset ${off}`)
         .map((r) => row(r, `${(r.stage_name as string | null) ?? "Open"}, no movement since ${String(iso(r.at) ?? "").slice(0, 10)}`, r.at, n(r.v)));

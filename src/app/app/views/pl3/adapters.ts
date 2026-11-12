@@ -20,7 +20,7 @@ export function overviewOf(o: Pl3Overview | null): PlOverview {
   return {
     headline: { openCount: o?.openCount ?? 0, openValueCents: c(o?.openValue?.value), staleCount: o?.stale?.count ?? 0, staleValueCents: c(o?.stale?.value), wonCents: c(o?.wonLast30?.value), lostCents: c(o?.lostLast30?.value), winRate: o?.winRate?.value ?? null, winRateDeals: o?.winRate?.of ?? 0 },
     bigUntouched: o?.bigUntouched ? { count: o.bigUntouched.count, valueCents: c(o.bigUntouched.value), days: o.bigUntouched.days } : undefined,
-    sentence: typeof o?.headline === "string" ? o.headline : "", leak: null, minDeals: 15, excluded: { zeroValue: h?.noValue ?? 0, noOwner: h?.noOwner ?? 0, test: h?.test ?? 0 }, outlier: null,
+    sentence: typeof o?.headline === "string" ? o.headline : "", leak: null, minDeals: 15, excluded: { zeroValue: h?.noValue ?? 0, noOwner: h?.noOwner ?? 0, test: h?.test ?? 0 }, outlier: null, trust: o?.trust ?? null,
   };
 }
 

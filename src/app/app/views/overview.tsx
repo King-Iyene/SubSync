@@ -9,6 +9,7 @@ import {
 } from "../ui";
 import type { GoFn } from "../nav";
 import { ExecSummary } from "./exec-summary";
+import { TrustBasis } from "./td3/trust-basis";
 
 export function OverviewView({ go }: { go: GoFn }) {
   const api = useApiClient();
@@ -60,6 +61,7 @@ export function OverviewView({ go }: { go: GoFn }) {
           sub={`${fmtInt(k.staleOpps)} of ${fmtInt(k.openOpps)} open deals have not moved`} /></div>
         <div data-testid="overview-metric"><Stat label="Waiting past your reply target" value={k.unanswered} tone={k.unanswered > 0 ? "warn" : undefined} sub="customer wrote last, no reply" /></div>
       </div>
+      {data.trust && <TrustBasis t={data.trust} />}
       {k.excludedDeals > 0 && (
         <p className="mt-2 text-xs text-muted-foreground">
           {fmtInt(k.excludedDeals)} open deal{k.excludedDeals === 1 ? " is" : "s are"} left out of every dollar figure: {(k.excludedByStage ?? 0) > 0 ? `${fmtInt(k.excludedByStage ?? 0)} in a closed-out stage or a pipeline not in use, and ${fmtInt(k.excludedDeals - (k.excludedByStage ?? 0))} with` : "they have"} no value or no owner.

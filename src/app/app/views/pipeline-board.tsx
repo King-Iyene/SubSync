@@ -72,7 +72,7 @@ function StageColumn({ s, pipe, onOpen }: { s: Stage; pipe: Pipe; onOpen: (c: Ca
             <button type="button" disabled={!c.contactId} onClick={() => onOpen(c, s.cards)} className="ds-press block w-full rounded-xl border bg-background p-3 text-left transition-shadow hover:shadow-md focus-visible:outline-2 focus-visible:outline-[var(--ring)] disabled:cursor-default disabled:opacity-80" data-testid="board-card" data-stuck={c.stuck ? "true" : "false"}>
               <span className="flex items-baseline justify-between gap-2"><span className="min-w-0 truncate text-[15px] font-medium">{c.name}</span><span className="shrink-0 text-[15px] font-semibold tabular-nums">{fmtMoney(c.value)}</span></span>
               <span className="mt-1 block text-sm text-muted-foreground">
-                {c.stuck ? <span className="font-medium text-warning">Stuck: {c.daysInStage} days here (limit for this stage: {s.limitDays})</span> : c.daysInStage !== null ? `${c.daysInStage} ${c.daysInStage === 1 ? "day" : "days"} in this stage` : "Time in stage unknown"}
+                {c.stuck ? <span className="font-medium text-warning">Stuck: {c.daysInStage} days here {s.limitDays > 0 ? ` (usual limit for this step: ${s.limitDays})` : ""}</span> : c.daysInStage !== null ? `${c.daysInStage} ${c.daysInStage === 1 ? "day" : "days"} in this stage` : "Time in stage unknown"}
                 {c.noNextStep && !c.stuck ? " · no next step" : ""}{pipe.locationName && c.locationName ? ` · ${c.locationName}` : ""}
               </span>
             </button>

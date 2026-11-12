@@ -146,7 +146,7 @@ export function AccountDetailView({ locationId, go, agency, limited = false }: {
       </div>
 
       <div className="mt-4">
-        <Card title={`Stale deals (no movement in ${data.settings.staleDays}+ days)`}>
+        <Card title="Stale deals (past their step's usual time)">
           {staleDeals.length === 0 ? <p className="text-sm text-muted-foreground">No stale deals.</p> : (
             <Table head={<tr><Th>Deal</Th><Th>Stage</Th><Th className="text-right">Value</Th><Th className="text-right">Days stale</Th></tr>}>
               {staleDeals.map((d) => (

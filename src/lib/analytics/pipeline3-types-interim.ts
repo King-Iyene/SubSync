@@ -35,6 +35,8 @@ export type PlOverview = {
   headline: { openCount: number; openValueCents: number; staleCount: number; staleValueCents: number; wonCents: number; lostCents: number; winRate: number | null; winRateDeals: number };
   bigUntouched?: { count: number; valueCents: number; days: number };
   sentence: string; leak: PlMoneyFlow["leak"]; minDeals: number; excluded: PlMoneyFlow["excluded"]; outlier: PlMoneyFlow["outlier"];
+  /** What was counted and what was left out under the dollar figures (one shared function). */
+  trust?: { counting: string; leftOutLine: string | null; leftOutDeals: number; notJudged: number; howStale: string; howLeftOut: string } | null;
 };
 export type PlForecast = { lowCents: number | null; midCents: number | null; highCents: number | null; closedDeals: number; minDeals: number; formula: string; byStage: Array<{ stage: string; openCents: number | null; winChance: number | null }> };
 export type PlWonLost = { won: number; lost: number; wonCents: number; lostCents: number; winRate: number | null; byReason: PlDrain[]; bookedToWon: number | null };
