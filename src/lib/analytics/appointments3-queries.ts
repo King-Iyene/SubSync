@@ -2,8 +2,8 @@ import { APPOINTMENT_PAST_DAYS } from "../sync/appointment-window";
 import { sql } from "../db";
 import { ttlCache } from "../ttl-cache";
 import {
-  buildFlowTree, buildPeople, clampSize, DAY, DEFAULT_DEAL_WINDOW_DAYS, fairness, headlineOf, leadTimeBand, MIN_SHOW, parseApptWindow, pickButton, rate, reportedShowRate, revenueAtRisk,
-  SPEED_LABELS, trueShowRate, type FlowAgg,
+  bookingState, buildFlowTree, buildPeople, clampSize, DAY, DEFAULT_DEAL_WINDOW_DAYS, fairness, headlineOf, leadTimeBand, MIN_SHOW, parseApptWindow, pickButton, rate, reportedShowRate, revenueAtRisk,
+  SPEED_LABELS, teamRoleLabel, trueShowRate, type FlowAgg,
 } from "./appointments3-intel.ts";
 import type {
   Appt3Bucket, Appt3BookingShare, Appt3Calendars, Appt3Conflict, Appt3Detail, Appt3FlowTree, Appt3Health, Appt3NeedsOutcome, Appt3Overview, Appt3PersonShare,
@@ -72,7 +72,7 @@ function base(s: Scope, f: Filters, dd: number, extra?: Frag): Frag {
   const like = f.q ? `%${f.q.replace(/[\\%_]/g, (m) => "\\" + m).slice(0, 60)}%` : null;
   return db`
     select a.location_id, a.appointment_id, a.calendar_id, a.calendar_name, a.contact_id, a.status, a.start_at, a.end_at, a.assigned_to owner, a.booked_by_user booker,
-      a.created_remote_at created_at, l.name account_name, l.tz,
+      a.created_remote_at created_at, l.name account_name, l.tz, cg0.name calendar_group,
       coalesce(nullif(c.full_name, ''), nullif(c.email, ''), 'Unnamed contact') contact_name, nullif(c.source, '') source, nullif(c.phone, '') phone, coalesce(c.dnd, false) dnd,
       d.opportunity_id deal_id, d.status deal_status, d.monetary_value deal_value,
       t.lead_at, t.touch_at,
@@ -83,6 +83,8 @@ function base(s: Scope, f: Filters, dd: number, extra?: Frag): Frag {
         and a.contact_id is not null and b.start_at > a.start_at and b.appointment_id <> a.appointment_id and b.status not in ('cancelled', 'invalid')) rebooked
     from cached_appointments a
     join (${locs(s, f.location)}) l on l.location_id = a.location_id
+    left join cached_calendars cc0 on cc0.installation_id = a.installation_id and cc0.location_id = a.location_id and cc0.calendar_id = a.calendar_id
+    left join calendar_groups cg0 on cg0.installation_id = cc0.installation_id and cg0.location_id = cc0.location_id and cg0.group_id = cc0.group_id
     left join appointment_facts fa on fa.installation_id = a.installation_id and fa.location_id = a.location_id and fa.appointment_id = a.appointment_id
     left join cached_contacts c on c.installation_id = a.installation_id and c.location_id = a.location_id and c.contact_id = a.contact_id and a.contact_id is not null
     left join lateral (
@@ -157,7 +159,7 @@ export function toRow(r: Record<string, unknown>, label: (id: string | null | un
     appointmentId: String(r.appointment_id), locationId: String(r.location_id), accountName: (r.account_name as string | null) ?? null,
     contactId: (r.contact_id as string | null) ?? null, contactName: (r.contact_name as string | null) ?? (r.contact_id ? "Contact not in the copy yet" : "No contact on this booking"),
     url: r.contact_id && link ? link(String(r.location_id), String(r.contact_id)) : null,
-    calendarId: (r.calendar_id as string | null) ?? null, calendarName: (r.calendar_name as string | null) ?? null,
+    calendarId: (r.calendar_id as string | null) ?? null, calendarName: (r.calendar_name as string | null) ?? null, calendarGroup: (r.calendar_group as string | null) ?? null,
     startAt: new Date(start).toISOString(), endAt: iso(r.end_at), status, bucket,
     ownerId: (r.owner as string | null) ?? null, ownerName: r.owner ? label(r.owner as string) : null, bookerId: (r.booker as string | null) ?? null, bookerName: r.booker ? label(r.booker as string) : null,
     phone: (r.phone as string | null) ?? null, source: (r.source as string | null) ?? null,
@@ -312,37 +314,102 @@ async function personStats(s: Scope, f: Filters, dd: number, by: "booker" | "own
     from ap group by 1`;
 }
 
-export async function bookingShare(s: Scope, f: Filters, p: number, size0: number, sort?: string | null): Promise<Appt3BookingShare> {
-  const db = sql(), dd = await dealDays(s.inst), size = clampSize(size0), label = await names(s.inst);
-  const [bk, ow] = await Promise.all([personStats(s, f, dd, "booker"), personStats(s, f, dd, "owner")]);
-  const ids = new Set<string | null>([...bk.map((r) => r.uid as string | null), ...ow.map((r) => r.uid as string | null)]);
+/** Everyone in the selected accounts' team lists, narrowed by the same filters as every number: account, calendar group, calendar, active, and a chosen person. Zero bookings is fine. */
+async function roster(s: Scope, f: Filters, withTeam = false) {
+  const db = sql(), L = locs(s, f.location);
+  const g = f.group && cleanId(f.group) ? f.group : null, c = f.calendar && cleanId(f.calendar) ? f.calendar : null, u = f.user && cleanId(f.user) ? f.user : null;
+  const narrow = !!(g || c || f.active);
+  const fromLists = await db`select u.location_id, u.user_id, max(u.name) name, max(t.role) role, bool_or(coalesce(t.deleted, false)) gone
+    from location_users u join (${L}) l on l.location_id = u.location_id
+    left join team_members t on t.installation_id = u.installation_id and t.user_id = u.user_id
+    where u.installation_id = ${s.inst} ${u ? db`and u.user_id = ${u}` : db``}
+    ${narrow ? db`and exists (select 1 from calendar_members cm join cached_calendars cc on cc.installation_id = cm.installation_id and cc.location_id = cm.location_id and cc.calendar_id = cm.calendar_id
+        where cm.installation_id = u.installation_id and cm.location_id = u.location_id and cm.user_id = u.user_id ${c ? db`and cc.calendar_id = ${c}` : db``} ${g ? db`and cc.group_id = ${g}` : db``}
+        ${f.active === "active" ? db`and cc.is_active` : f.active === "inactive" ? db`and not cc.is_active` : db``})` : db``}
+    group by 1, 2 limit 5000`.catch(() => [] as Array<Record<string, unknown>>);
+  if (narrow || !withTeam) return fromLists;
+  // The people list the Team screens keep (who can reach which accounts) fills in anyone an account's own list does not carry.
+  const fromTeam = await db`select coalesce(a.location_id, '') location_id, t.user_id, t.name, t.role, t.deleted gone from team_members t
+    left join team_member_access a on a.installation_id = t.installation_id and a.user_id = t.user_id
+    where t.installation_id = ${s.inst} ${u ? db`and t.user_id = ${u}` : db``} and (t.all_accounts or a.location_id in (select l2.location_id from (${L}) l2)) limit 5000`.catch(() => [] as Array<Record<string, unknown>>);
+  return [...fromLists, ...fromTeam];
+}
+
+export type ShareOpts = { teamRole?: string | null; has?: "yes" | "no" | null };
+
+export async function bookingShare(s: Scope, f: Filters, p: number, size0: number, sort?: string | null, opt: ShareOpts = {}): Promise<Appt3BookingShare> {
+  const db = sql(), dd = await dealDays(s.inst), size = clampSize(size0), label = await names(s.inst), L = locs(s, f.location);
+  const [bk, ow, ros] = await Promise.all([personStats(s, f, dd, "booker"), personStats(s, f, dd, "owner"), roster(s, f, true)]);
+  const R = new Map<string, { name: string; role: string; gone: boolean }>();
+  for (const r of ros) { const id = r.user_id as string; const e = R.get(id); R.set(id, { name: (e?.name || (r.name as string)) ?? "", role: e?.role && e.role !== "unknown" ? e.role : ((r.role as string | null) ?? "unknown"), gone: (e?.gone ?? true) && r.gone === true }); }
+  const ids = new Set<string | null>([...bk.map((r) => r.uid as string | null), ...ow.map((r) => r.uid as string | null), ...R.keys()]);
   const B = new Map(bk.map((r) => [r.uid as string | null, r])), O = new Map(ow.map((r) => [r.uid as string | null, r]));
+  const nameOf = (id: string) => (R.get(id)?.name || (label.has(id) ? label(id) : "Unknown user"));
   let people: Appt3PersonShare[] = [...ids].map((id) => {
     const b = B.get(id), o = O.get(id), booked = num(b?.booked), owned = num(o?.booked);
     const m = booked >= owned ? b : o; // the side this person mostly works on gives the outcome figures
     const showed = num(m?.showed), noshow = num(m?.noshow), unmarked = num(m?.unmarked), won = num(m?.won), lost = num(m?.lost);
+    const known = id !== null && R.has(id);
     return {
-      userId: id, name: id ? label(id) : "Not recorded", role: !id ? "none" : booked && owned ? "both" : booked ? "setter" : "closer",
+      userId: id, name: id ? nameOf(id) : "Not recorded", role: !id ? "none" : booked && owned ? "both" : booked ? "setter" : owned ? "closer" : "none",
       booked, owned, showed, noshow, unmarked, won, lost, showRate: trueShowRate(showed, noshow, unmarked), noshowRate: rate(noshow, showed + noshow + unmarked),
       closeRate: rate(won, won + lost, 10), wonValue: num(m?.won_value), leadToBookedMedianMinutes: b?.ltb === null || b?.ltb === undefined ? null : Math.round(Number(b.ltb)),
-      trend: [],
+      trend: [], roleLabel: id ? teamRoleLabel(R.get(id)?.role) : null, inTeam: id === null ? true : known, teamActive: id === null ? true : !(R.get(id)?.gone ?? false),
     };
   });
+  const rosterTotal = R.size;
+  const roleCount = new Map<string, number>();
+  for (const [, e] of R) roleCount.set(e.role, (roleCount.get(e.role) ?? 0) + 1);
+  const roles = [...roleCount].map(([key, n]) => ({ key, label: teamRoleLabel(key), n })).sort((x, y) => y.n - x.n);
   if (f.q) people = people.filter((x) => x.name.toLowerCase().includes(f.q!.toLowerCase()));
+  if (opt.teamRole) people = people.filter((x) => x.userId !== null && (R.get(x.userId)?.role ?? "unknown") === opt.teamRole);
+  const counts = { withBookings: people.filter((x) => x.userId !== null && x.booked + x.owned > 0).length, none: people.filter((x) => x.userId !== null && x.booked + x.owned === 0).length };
+  if (opt.has === "yes") people = people.filter((x) => x.booked + x.owned > 0);
+  if (opt.has === "no") people = people.filter((x) => x.userId !== null && x.booked + x.owned === 0);
   const key = (x: Appt3PersonShare) => (sort === "show" ? x.showRate.value ?? -1 : sort === "revenue" ? x.wonValue : sort === "owned" ? x.owned : x.booked);
-  people.sort((a, b) => key(b) - key(a));
+  people.sort((a, b) => (sort === "name" ? a.name.localeCompare(b.name) : key(b) - key(a) || (b.booked + b.owned) - (a.booked + a.owned) || a.name.localeCompare(b.name)));
   const total = people.length, off = offsetOf(p, size);
   const rows = people.slice(off, off + size);
   const uids = rows.map((r) => r.userId).filter((x): x is string => !!x);
-  if (uids.length) {
-    const tr = await db`with ap as (${base(s, { ...f, bucket: undefined }, dd)}) select booker uid, date_trunc('week', start_at)::date wk, count(*) filter (where status <> 'invalid')::int booked,
-        count(*) filter (where status = 'showed')::int showed, count(*) filter (where status in ('showed', 'noshow') or unmarked)::int decided from ap where booker = any(${uids}::text[]) group by 1, 2 order by 2`;
+  const wantNone = rows.some((r) => r.userId === null);
+  const keys = [...uids, ...(wantNone ? ["none"] : [])];
+  if (keys.length) {
+    const col = (c: "booker" | "owner") => (c === "booker" ? db`booker` : db`owner`);
+    const per = (c: "booker" | "owner") => db`with ap as (${base(s, { ...f, bucket: undefined }, dd)}) select coalesce(${col(c)}, 'none') uid, calendar_id cid, max(calendar_name) cname, max(calendar_group) gname, count(*) filter (where status <> 'invalid')::int n
+        from ap where coalesce(${col(c)}, 'none') = any(${keys}::text[]) group by 1, 2`;
+    const [tr, ever, mem, bkCal, owCal] = await Promise.all([
+      uids.length ? db`with ap as (${base(s, { ...f, bucket: undefined }, dd)}) select booker uid, date_trunc('week', start_at)::date wk, count(*) filter (where status <> 'invalid')::int booked,
+        count(*) filter (where status = 'showed')::int showed, count(*) filter (where status in ('showed', 'noshow') or unmarked)::int decided from ap where booker = any(${uids}::text[]) group by 1, 2 order by 2` : Promise.resolve([]),
+      uids.length ? db`select x.uid, count(*)::int n, max(a.start_at) filter (where a.start_at <= now()) last_at from cached_appointments a join (${L}) l on l.location_id = a.location_id,
+        lateral (values (a.assigned_to), (a.booked_by_user)) x(uid) where a.installation_id = ${s.inst} and x.uid = any(${uids}::text[]) and a.status <> 'invalid' group by 1` : Promise.resolve([]),
+      uids.length ? db`select cm.user_id uid, cc.calendar_id cid, max(cc.name) cname, max(g.name) gname, bool_and(cc.is_active) active from calendar_members cm join (${L}) l on l.location_id = cm.location_id
+        join cached_calendars cc on cc.installation_id = cm.installation_id and cc.location_id = cm.location_id and cc.calendar_id = cm.calendar_id
+        left join calendar_groups g on g.installation_id = cc.installation_id and g.location_id = cc.location_id and g.group_id = cc.group_id
+        where cm.installation_id = ${s.inst} and cm.user_id = any(${uids}::text[]) group by 1, 2 order by 3 limit 2000`.catch(() => []) : Promise.resolve([]),
+      per("booker"), per("owner"),
+    ]);
     for (const r of tr) { const x = rows.find((y) => y.userId === r.uid); x?.trend.push({ week: String(r.wk instanceof Date ? r.wk.toISOString().slice(0, 10) : r.wk), booked: num(r.booked), showRate: num(r.decided) >= MIN_SHOW ? num(r.showed) / num(r.decided) : null }); }
+    const everBy = new Map(ever.map((r) => [r.uid as string, r]));
+    for (const x of rows) {
+      const k = x.userId ?? "none";
+      const e = everBy.get(k);
+      x.everBooked = x.userId === null ? x.booked : num(e?.n); x.lastBookingAt = iso(e?.last_at);
+      x.state = bookingState(x.booked + x.owned, Math.max(x.everBooked, x.booked + x.owned));
+      x.calendars = mem.filter((r) => r.uid === k).map((r) => ({ calendarId: r.cid as string, name: (r.cname as string | null) ?? null, groupName: (r.gname as string | null) ?? null, active: r.active !== false }));
+      const by = new Map<string, { calendarId: string | null; name: string | null; groupName: string | null; booked: number; owned: number }>();
+      for (const [list, field] of [[bkCal, "booked"], [owCal, "owned"]] as const) for (const r of list.filter((y) => y.uid === k)) {
+        const ck = (r.cid as string | null) ?? "";
+        const e2 = by.get(ck) ?? { calendarId: (r.cid as string | null) ?? null, name: (r.cname as string | null) ?? null, groupName: (r.gname as string | null) ?? null, booked: 0, owned: 0 };
+        e2[field] += num(r.n); by.set(ck, e2);
+      }
+      x.byCalendar = [...by.values()].sort((m, n2) => n2.booked + n2.owned - (m.booked + m.owned)).slice(0, 30);
+    }
   }
   const owned = people.filter((x) => x.userId && x.owned > 0).map((x) => x.owned);
   return {
     rows, total, page: Math.max(0, Math.floor(p)), size, pages: Math.max(1, Math.ceil(total / size)), truncated: false,
     unassigned: num(B.get(null)?.booked), ownerless: num(O.get(null)?.booked), fairness: fairness(owned),
+    rosterTotal, roles, counts, historyStarts: new Date(Date.now() - APPOINTMENT_PAST_DAYS * DAY).toISOString().slice(0, 10),
   };
 }
 
@@ -463,7 +530,7 @@ export async function calendars(s: Scope, f: Filters, p: number, size0: number, 
     db`with seen as (
           select c.location_id, c.calendar_id, max(c.calendar_name) calendar_name, count(*) filter (where c.start_at >= ${from} and c.start_at < ${to} and c.status <> 'invalid')::int n,
             max(c.start_at) filter (where c.status <> 'invalid' and c.start_at <= now()) last_at
-          from cached_appointments c join (${L}) l on l.location_id = c.location_id where c.installation_id = ${s.inst} and c.calendar_id is not null group by 1, 2),
+          from cached_appointments c join (${L}) l on l.location_id = c.location_id where c.installation_id = ${s.inst} and c.calendar_id is not null ${f.user && cleanId(f.user) ? db`and (c.assigned_to = ${f.user} or c.booked_by_user = ${f.user})` : db``} group by 1, 2),
         listed as (select cc.location_id, cc.calendar_id, cc.name, cc.group_id, cc.is_active from cached_calendars cc join (${L}) l on l.location_id = cc.location_id where cc.installation_id = ${s.inst})
       select coalesce(x.location_id, y.location_id) location_id, l.name account_name, coalesce(x.calendar_id, y.calendar_id) calendar_id, coalesce(x.name, y.calendar_name) calendar_name,
         x.group_id, g.name group_name, coalesce(x.is_active, true) is_active, (x.calendar_id is not null) listed, coalesce(y.n, 0)::int n, y.last_at
@@ -471,15 +538,16 @@ export async function calendars(s: Scope, f: Filters, p: number, size0: number, 
       join (${L}) l on l.location_id = coalesce(x.location_id, y.location_id)
       left join calendar_groups g on g.installation_id = ${s.inst} and g.location_id = x.location_id and g.group_id = x.group_id
       where true ${f.calendar && cleanId(f.calendar) ? db`and coalesce(x.calendar_id, y.calendar_id) = ${f.calendar}` : db``}
+        ${f.user && cleanId(f.user) ? db`and (exists (select 1 from calendar_members cm where cm.installation_id = ${s.inst} and cm.location_id = coalesce(x.location_id, y.location_id) and cm.calendar_id = coalesce(x.calendar_id, y.calendar_id) and cm.user_id = ${f.user}) or y.calendar_id is not null and y.n > 0)` : db``}
         ${f.group && cleanId(f.group) ? db`and x.group_id = ${f.group}` : db``} ${f.active === "active" ? db`and coalesce(x.is_active, true)` : f.active === "inactive" ? db`and not coalesce(x.is_active, true)` : db``}
       order by 9 desc, 10 desc nulls last, 4 limit 500`.catch(async () => db`select l.location_id, l.name account_name, c.calendar_id, max(c.calendar_name) calendar_name, null::text group_id, null::text group_name, true is_active, false listed,
         count(*) filter (where c.start_at >= ${from} and c.start_at < ${to} and c.status <> 'invalid')::int n, max(c.start_at) filter (where c.status <> 'invalid' and c.start_at <= now()) last_at
        from cached_appointments c join (${L}) l on l.location_id = c.location_id where c.installation_id = ${s.inst} and c.calendar_id is not null group by 1, 2, 3 order by 9 desc, 10 desc nulls last limit 200`),
     // Team lists per account (location_users). A person is only ever idle in an account they belong to.
-    db`select u.location_id, u.user_id, u.name from location_users u join (${L}) l on l.location_id = u.location_id where u.installation_id = ${s.inst} limit 5000`.catch(() => []),
+    roster(s, f),
     db`select a.location_id, a.assigned_to uid, count(*) filter (where a.start_at >= ${from} and a.start_at < ${to} and a.status <> 'invalid' ${calF})::int n,
         max(a.start_at) filter (where a.status <> 'invalid' and a.start_at <= now()) last_at
-       from cached_appointments a join (${L}) l on l.location_id = a.location_id where a.installation_id = ${s.inst} and a.assigned_to is not null group by 1, 2 limit 5000`,
+       from cached_appointments a join (${L}) l on l.location_id = a.location_id where a.installation_id = ${s.inst} and a.assigned_to is not null ${calF} ${f.user && cleanId(f.user) ? db`and a.assigned_to = ${f.user}` : db``} group by 1, 2 limit 5000`,
     db`select l.location_id, l.name from (${L}) l`,
     db`select coalesce(sum(x.calendars_skipped), 0)::int n from locations x join (${L}) l on l.location_id = x.location_id where x.installation_id = ${s.inst}`.catch(() => [{ n: 0 }]),
   ]);
@@ -507,6 +575,16 @@ export async function calendars(s: Scope, f: Filters, p: number, size0: number, 
     bk.filter((r) => r.uid).map((r) => ({ locationId: r.location_id as string, userId: r.uid as string, n: num(r.n), lastAt: iso(r.last_at) })),
     accNames, (id) => label(id),
   );
+  // Role and calendars for each person on the list (one read each, for the first 500).
+  const pids = peopleAll.slice(0, 500).map((x) => x.userId);
+  if (pids.length) {
+    const [rl, cl] = await Promise.all([
+      db`select user_id, role from team_members where installation_id = ${s.inst} and user_id = any(${pids}::text[])`.catch(() => []),
+      db`select cm.user_id, cc.name from calendar_members cm join (${L}) l on l.location_id = cm.location_id join cached_calendars cc on cc.installation_id = cm.installation_id and cc.location_id = cm.location_id and cc.calendar_id = cm.calendar_id where cm.installation_id = ${s.inst} and cm.user_id = any(${pids}::text[]) order by cc.name limit 5000`.catch(() => []),
+    ]);
+    const roleBy = new Map(rl.map((r) => [r.user_id as string, r.role as string]));
+    for (const x of peopleAll.slice(0, 500)) { x.roleLabel = teamRoleLabel(roleBy.get(x.userId)); x.calendars = [...new Set(cl.filter((r) => r.user_id === x.userId).map((r) => (r.name as string | null) ?? "Calendar"))]; }
+  }
   const idleCal = calendarsAll.filter((c) => c.bookings === 0 || (c.daysSince !== null && c.daysSince >= 30)).length;
   const problems: NonNullable<Appt3Calendars["problems"]> = [
     { key: "double_booking", label: "Double bookings", tone: "red", count: num(cnt[0]?.n), why: "Two bookings overlap on the same calendar or for the same person. One of them will wait or not be seen.", available: true },

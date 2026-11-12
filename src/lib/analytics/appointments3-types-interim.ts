@@ -11,7 +11,7 @@ import type { PersonRollup } from "./appointments3-intel.ts";
 export type ApPage<T> = { total: number; page: number; pageSize: number; rows: T[] };
 
 export type ApRow = {
-  id: string; locationId: string; accountName: string; contactId: string; contactName: string; startAt: string; calendarName: string;
+  id: string; locationId: string; accountName: string; contactId: string; contactName: string; startAt: string; calendarName: string; calendarGroup?: string | null;
   status: ApStatus; ownerId: string | null; ownerName: string | null; bookerId: string | null; bookerName: string | null; source: string | null;
   dealValueCents: number | null; dealStatus: "open" | "won" | "lost" | "none"; phone?: string | null; hoursPast: number | null; url?: string | null; calendarId?: string | null; /** The contact asked not to be contacted. */ dnd?: boolean; flags: Array<"double-booked" | "no-deal">;
 };
@@ -42,7 +42,12 @@ export type ApFlowTree = {
   minBookings: number;
 };
 
-export type ApPersonRow = ApStats & { id: string; name: string; role: "setter" | "closer" | "both"; /** The row for bookings with no booker recorded. */ unassigned?: boolean; /** On that row: bookings with no owner. */ noOwner?: number; trend: number[] };
+export type ApPersonRow = ApStats & { id: string; name: string; role: "setter" | "closer" | "both"; /** The row for bookings with no booker recorded. */ unassigned?: boolean; /** On that row: bookings with no owner. */ noOwner?: number; trend: number[];
+  /** Plain team role, whether they have bookings in these dates, and the calendars they are on / booked into. */
+  roleLabel?: string | null; state?: "booked" | "none_this_period" | "never"; owned?: number; lastBookingAt?: string | null; inTeam?: boolean; teamActive?: boolean;
+  calendars?: Array<{ calendarId: string; name: string | null; groupName: string | null; active: boolean }>;
+  byCalendar?: Array<{ calendarId: string | null; name: string | null; groupName: string | null; booked: number; owned: number }> };
+export type ApShareView = { rows: ApPersonRow[]; total: number; rosterTotal: number; roles: Array<{ key: string; label: string; n: number }>; historyStarts?: string; counts?: { withBookings: number; none: number } };
 export type ApHealthRow = { locationId: string; name: string; booked: number; showRate: number | null; noShowRate: number | null; cancelRate: number | null; unmarked: number };
 export type ApSourceRow = { source: string; booked: number; showRate: number | null; medianFirstReplyMinutes: number | null; won: number };
 export type ApSpeedBand = { label: string; booked: number; showRate: number | null };

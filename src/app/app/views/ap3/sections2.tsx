@@ -1,16 +1,16 @@
 "use client";
 
 import { Copy } from "lucide-react";
-import { useMemo, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { money, pct } from "@/lib/design/appt-coach";
 import { EmptyState, InlineAlert } from "../../ds";
 import { CountUp, Q } from "../speed6-base";
 import { ApSlot, hasApSlot, useAp } from "./data";
 import { LinkBtn } from "./link-btn";
 import { ApWorklist } from "./list";
-import { Chip, when } from "./parts";
+import { CalChip, Chip, Pager, when } from "./parts";
 import { Hit, type SectionProps } from "./sections";
-import type { ApCalendarRow, ApCalendarsView, ApPersonCalRow, ApConflictRow, ApHealthRow, ApPersonRow, ApProof, ApSourceRow, ApSpeedBand } from "./types";
+import type { ApCalendarRow, ApCalendarsView, ApPersonCalRow, ApConflictRow, ApHealthRow, ApPersonRow, ApProof, ApShareView, ApSourceRow, ApSpeedBand } from "./types";
 
 type Col<T> = { h: string; num?: boolean; cell: (r: T) => ReactNode };
 function Grid<T extends { [k: string]: unknown }>({ rows, cols, onRow, testId, tone }: { rows: T[]; cols: Array<Col<T>>; onRow?: (r: T) => void; testId?: string; tone?: (r: T) => "amber" | "red" | undefined }) {
@@ -51,29 +51,56 @@ export function Recovery({ filters, onOpen, activeId, showAccount, clear, filter
 }
 
 // ---------- Booking share (setter vs closer) ----------
+const SHARE_SORTS: Array<[string, string]> = [["booked", "Most booked"], ["owned", "Most meetings taken"], ["show", "Best show rate"], ["revenue", "Most won"], ["name", "Name, A to Z"]];
+const calChip = (name: string | null, group?: string | null) => <CalChip name={name} group={group} />;
 export function BookingShare({ filters, onPerson, onDrill }: SectionProps & { onPerson: (p: ApPersonRow) => void }) {
-  const res = useAp<{ rows: ApPersonRow[] }>("booking-share", filters);
-  const total = useMemo(() => (res.data ? res.data.rows.reduce((a, r) => a + r.bookings, 0) : 0), [res.data]);
+  const [page, setPage] = useState(1), [size, setSize] = useState(20), [sort, setSort] = useState("booked"), [role, setRole] = useState(""), [has, setHas] = useState("");
+  const key = JSON.stringify(filters) + sort + role + has;
+  const [prev, setPrev] = useState(key), [now] = useState(() => Date.now());
+  if (prev !== key) { setPrev(key); setPage(1); }
+  const res = useAp<ApShareView>("booking-share", filters, { page, pageSize: size, sort, team_role: role || undefined, has: has || undefined });
   if (res.error) return <InlineAlert tone="warning" title="Could not load booking share">Try again in a moment. <button type="button" className="ap-link" onClick={res.reload}>Retry</button></InlineAlert>;
   if (!res.data) return <div className="ap-tablewrap p-6" role="status" aria-busy="true">Loading...</div>;
-  if (!res.data.rows.length) return <EmptyState title="No bookings in these dates" body="Who booked and who took each appointment appears here once there are bookings." />;
-  const un = res.data.rows.find((r) => r.unassigned);
+  const d = res.data, rows = d.rows;
+  const un = rows.find((r) => r.unassigned);
+  const period = filters.from && filters.to ? "these dates" : `the last ${filters.days} days`;
+  const wantFrom = filters.from || new Date(now - filters.days * 86_400_000).toISOString().slice(0, 10);
+  const total = rows.reduce((a2, r) => a2 + (r.role === "closer" ? (r.owned ?? 0) : r.bookings), 0);
+  const calOf = (r: ApPersonRow, cid: string | null, field: "booker" | "owner", n: number, nm: string | null) => onDrill({ title: `${r.name}, ${nm ?? "calendar"}`, count: n, extra: { [field]: r.id, ...(cid ? { calendar: cid } : {}), outcome: "booked", expect: n }, labels: { [field]: r.name } });
   return (
     <div data-testid="ap-share">
-      <p className="ap-fine mb-3">Who booked an appointment (the setter) and who took the meeting (the closer). Press a name for the coaching card, or a number to see those appointments.</p>
+      <p className="ap-headline" data-testid="ap-share-headline">{d.rosterTotal > 0 ? `${d.rosterTotal} team member${d.rosterTotal === 1 ? "" : "s"}: ${d.counts?.withBookings ?? 0} booked or took a meeting in ${period}, ${d.counts?.none ?? 0} had none. Press a count to see those appointments.` : "Who booked an appointment (the setter) and who took the meeting (the closer). Press a count to see those appointments."}</p>
+      {d.historyStarts && wantFrom < d.historyStarts && <p className="ap-fine mb-2" data-testid="ap-share-history">History starts {new Date(d.historyStarts + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}. Appointments before that day are not in SubSync yet, so older dates show less.</p>}
+      <div className="ap-sharebar" role="group" aria-label="Narrow this list">
+        <select className="ap-field" aria-label="Sort" value={sort} onChange={(e) => setSort(e.target.value)} data-testid="ap-share-sort">{SHARE_SORTS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
+        {d.roles.length > 1 && <select className="ap-field" aria-label="Role" value={role} onChange={(e) => setRole(e.target.value)} data-testid="ap-share-role"><option value="">Any role</option>{d.roles.map((r) => <option key={r.key} value={r.key}>{r.label} ({r.n})</option>)}</select>}
+        <select className="ap-field" aria-label="Bookings" value={has} onChange={(e) => setHas(e.target.value)} data-testid="ap-share-has"><option value="">With or without bookings</option><option value="yes">Has bookings in {period}</option><option value="no">No bookings in {period}</option></select>
+      </div>
       {un && (un.bookings > 0 || (un.noOwner ?? 0) > 0) && <InlineAlert tone="warning" className="mb-3" title="Some bookings are missing a person">
-        {un.bookings > 0 && <span className="block">{un.bookings.toLocaleString("en-US")} {un.bookings === 1 ? "booking has" : "bookings have"} no booker recorded, so nobody is credited for them. <LinkBtn onClick={() => onDrill({ title: "Bookings with no booker recorded", count: un.bookings, extra: { booker: "none", outcome: "booked", expect: un.bookings }, labels: { booker: "not recorded" } })} testId="ap-share-nobooker">Open them</LinkBtn></span>}
+        {un.bookings > 0 && <span className="block">{un.bookings.toLocaleString("en-US")} {un.bookings === 1 ? "booking was" : "bookings were"} made by the lead through a booking page (or no booker was recorded), so no team member is credited. <LinkBtn onClick={() => onDrill({ title: "Bookings with no booker recorded", count: un.bookings, extra: { booker: "none", outcome: "booked", expect: un.bookings }, labels: { booker: "not recorded" } })} testId="ap-share-nobooker">Open them</LinkBtn></span>}
         {(un.noOwner ?? 0) > 0 && <span className="block">{un.noOwner!.toLocaleString("en-US")} {un.noOwner === 1 ? "booking has" : "bookings have"} no owner, so nobody is held to the meeting. Give them an owner in your CRM. <LinkBtn onClick={() => onDrill({ title: "Bookings with no owner", count: un.noOwner!, extra: { owner: "none", outcome: "booked", expect: un.noOwner }, labels: { owner: "nobody" } })} testId="ap-share-noowner">Open them</LinkBtn></span>}
       </InlineAlert>}
-      <Grid rows={res.data.rows} testId="ap-share-table" tone={(r) => (r.unassigned ? "amber" : undefined)} onRow={onPerson}
+      {!rows.length ? <EmptyState title="Nobody matches" body="Nobody in the chosen accounts, calendars and roles matches. Clear a filter to see more people." /> : (
+      <Grid rows={rows} testId="ap-share-table" tone={(r) => (r.unassigned ? "amber" : undefined)} onRow={onPerson}
         cols={[
-          { h: "Person", cell: (r) => <><span className="ap-name">{r.name}</span> <Chip tone={r.unassigned ? "amber" : "grey"}>{r.unassigned ? "Not recorded" : r.role === "setter" ? "Books" : r.role === "closer" ? "Takes" : "Both"}</Chip></> },
-          { h: "Booked", num: true, cell: (r) => <>{r.bookings ? <Hit n={r.bookings} label={`Open the ${r.bookings} appointments of ${r.name}`} onClick={() => onDrill({ title: `${r.name}, appointments`, count: r.bookings, extra: { [r.role === "closer" ? "owner" : "booker"]: r.id, outcome: "booked", expect: r.bookings }, labels: { [r.role === "closer" ? "owner" : "booker"]: r.name } })} /> : 0}<span className="ap-bar" aria-hidden><i style={{ width: `${total ? (r.bookings / total) * 100 : 0}%` }} /></span></> },
+          { h: "Person", cell: (r) => <>
+              <span className="ap-name">{r.name}</span> {r.unassigned ? <Chip tone="amber">Not recorded</Chip> : <span className="ap-sub">{r.roleLabel ?? (r.role === "setter" ? "Books" : r.role === "closer" ? "Takes" : "Both")}</span>}
+              {r.inTeam === false && <> <Chip tone="grey">Not in the team list</Chip></>}{r.teamActive === false && <> <Chip tone="grey">Inactive</Chip></>}
+              {r.unassigned ? <span className="ap-sub block">Booked by the lead through a booking page, or no booker was recorded.</span> : (r.calendars?.length ?? 0) > 0 && <span className="ap-calrow">{r.calendars!.slice(0, 3).map((c) => <span key={c.calendarId}>{calChip(c.name, c.groupName)}</span>)}{r.calendars!.length > 3 && <span className="ap-sub">+{r.calendars!.length - 3} more</span>}</span>}
+            </> },
+          { h: "Booked", num: true, cell: (r) => (r.role === "closer" ? (r.owned ?? 0) : r.bookings) > 0 ? <><Hit n={r.role === "closer" ? (r.owned ?? 0) : r.bookings} label={`Open the ${r.role === "closer" ? r.owned : r.bookings} appointments of ${r.name}` } onClick={() => onDrill({ title: `${r.name}, appointments`, count: r.role === "closer" ? (r.owned ?? 0) : r.bookings, extra: { [r.role === "closer" ? "owner" : "booker"]: r.id, outcome: "booked", expect: r.role === "closer" ? (r.owned ?? 0) : r.bookings }, labels: { [r.role === "closer" ? "owner" : "booker"]: r.name } })} /><span className="ap-bar" aria-hidden><i style={{ width: `${total ? ((r.role === "closer" ? (r.owned ?? 0) : r.bookings) / total) * 100 : 0}%` }} /></span></>
+              : r.state === "never" ? <span className="ap-sub" title="No bookings in anything SubSync holds for this person.">No bookings yet</span> : <span className="ap-sub" title="Has bookings on other dates.">0 in {period}</span> },
           { h: "Show", num: true, cell: (r) => <Rate v={r.showRate} /> }, { h: "No-show", num: true, cell: (r) => <Rate v={r.noShowRate} /> }, { h: "Close", num: true, cell: (r) => <Rate v={r.closeRate} /> },
           { h: "Won", num: true, cell: (r) => money(r.revenueCents) },
-          { h: "Lead to booked", num: true, cell: (r) => (r.avgLeadToBookedHours === null ? "n/a" : `${r.avgLeadToBookedHours.toFixed(1)}h`) },
+          { h: "By calendar", cell: (r) => ((r.byCalendar?.length ?? 0) === 0 ? <span className="ap-sub">{r.state === "booked" || r.unassigned ? "-" : "none"}</span> : (
+              <details className="ap-bycal" onClick={(e) => e.stopPropagation()}><summary>{r.byCalendar!.length} calendar{r.byCalendar!.length === 1 ? "" : "s"}</summary>
+                <div>{r.byCalendar!.map((c) => <div key={c.calendarId ?? "none"} className="ap-bycal-row">{calChip(c.name, c.groupName)}
+                  {c.booked > 0 && <Hit n={c.booked} label={`Open ${c.booked} booked by ${r.name} on ${c.name ?? "this calendar"}` } onClick={() => calOf(r, c.calendarId, "booker", c.booked, c.name)} />}{c.booked > 0 && <span className="ap-sub"> booked</span>}
+                  {c.owned > 0 && <> <Hit n={c.owned} label={`Open ${c.owned} meetings taken by ${r.name} on ${c.name ?? "this calendar"}` } onClick={() => calOf(r, c.calendarId, "owner", c.owned, c.name)} /><span className="ap-sub"> taken</span></>}</div>)}</div>
+              </details>)) },
           { h: "Show trend", cell: (r) => <Spark values={r.trend} /> },
-        ]} />
+        ]} />)}
+      <Pager total={d.total} page={page} size={size} onPage={setPage} onSize={(n) => { setSize(n); setPage(1); }} />
     </div>
   );
 }
@@ -169,7 +196,7 @@ export function Calendars({ filters, onDrill, focus }: SectionProps) {
       {(show === "all" || show === "idle_person" || show === "not_in_list") && (
         <Q q="Who takes the meetings" tip="Everyone in the accounts&apos; team lists, plus anyone seen taking a meeting. A person is only called idle in accounts they belong to. Press a count to open those appointments; press a name to see each account." testId="ap-people-all">
           {pplRows.length ? <Grid rows={pplRows} testId="ap-people-table" tone={(r) => (r.idleEverywhere || !r.inTeamList ? "amber" : undefined)} onRow={(r) => setOpenPerson(openPerson === r.userId ? null : r.userId)}
-            cols={[{ h: "Person", cell: (r) => <><span className="ap-name">{r.name}</span>{!r.inTeamList && <> <Chip tone="amber">Not in the team list (left or no access)</Chip></>}{openPerson === r.userId && <span className="ap-sub block">{r.accounts.map((a) => `${a.accountName ?? "Account"}: ${a.bookings}${a.member ? "" : " (not a member)"}`).join(" · ")}</span>}</> },
+            cols={[{ h: "Person", cell: (r) => <><span className="ap-name">{r.name}</span>{r.roleLabel && <> <span className="ap-sub">{r.roleLabel}</span></>}{!r.inTeamList && <> <Chip tone="amber">Not in the team list (left or no access)</Chip></>}{(r.calendars?.length ?? 0) > 0 && <span className="ap-calrow">{r.calendars!.slice(0, 3).map((c) => <span key={c}><CalChip name={c} /></span>)}{r.calendars!.length > 3 && <span className="ap-sub">+{r.calendars!.length - 3} more</span>}</span>}{openPerson === r.userId && <span className="ap-sub block">{r.accounts.map((a) => `${a.accountName ?? "Account"}: ${a.bookings}${a.member ? "" : " (not a member)"}`).join(" · ")}</span>}</> },
               { h: "Bookings", num: true, cell: (r) => (r.bookings ? <Hit n={r.bookings} label={`Open the ${r.bookings} appointments of ${r.name}`} onClick={() => pplDrill(r)} /> : 0) },
               { h: "Share", num: true, cell: (r) => <>{r.sharePct}%<span className="ap-bar" aria-hidden><i style={{ width: `${r.sharePct}%` }} /></span></> }, { h: "Last booking", cell: (r) => (r.lastBookingAt ? when(r.lastBookingAt) : "-") },
               { h: "Flag", cell: (r) => (!r.inTeamList ? null : r.idleEverywhere ? <Chip tone="amber">No bookings in {r.accounts.length > 1 ? "any of their accounts" : "these dates"}</Chip> : r.idleIn.length ? <Chip tone="amber">Idle in {r.idleIn.join(", ")}</Chip> : null) }]} /> : <p className="ap-fine">Nobody to list for this problem. Team members appear here from each account&apos;s team list.</p>}

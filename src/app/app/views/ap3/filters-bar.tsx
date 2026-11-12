@@ -30,7 +30,7 @@ export function DateAxis({ filters, set }: { filters: ApFilters; set: Set }) {
           else if (lastN[v]) set({ days: lastN[v], from: "", to: "" });
           else set(presetRange(v as DatePreset, Date.now()));
         }}>
-        {DATE_PRESETS.map(([k, l]) => <option key={k} value={k}>{k === "next7" || lastN[k] ? l : `Happening: ${l.toLowerCase()}`}</option>)}
+        {DATE_PRESETS.map(([k, l]) => <option key={k} value={k}>{k === "next7" || /^lastd+$/.test(k) ? l : `Happening: ${l.toLowerCase()}`}</option>)}
         <option value="custom">Choose dates</option>
       </select>
       {custom && key === "custom" && <>
@@ -56,7 +56,7 @@ export function BookedAxis({ filters, set }: { filters: ApFilters; set: Set }) {
           else { const r = presetRange(v as DatePreset, Date.now()); set({ bookedFrom: r.from, bookedTo: r.to }); }
         }}>
         <option value="any">Booked any time</option>
-        {DATE_PRESETS.filter(([k]) => k !== "next7").map(([k, l]) => <option key={k} value={k}>{lastN[k] ? `Booked in the ${l.toLowerCase()}` : `Booked ${l.toLowerCase()}`}</option>)}
+        {DATE_PRESETS.filter(([k]) => k !== "next7").map(([k, l]) => <option key={k} value={k}>{/^lastd+$/.test(k) ? `Booked in the ${l.toLowerCase()}` : `Booked ${l.toLowerCase()}`}</option>)}
         <option value="custom">Booked between dates</option>
       </select>
       {on && key === "custom" && <>
