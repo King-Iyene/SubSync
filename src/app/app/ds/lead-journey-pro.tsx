@@ -179,16 +179,10 @@ export function LeadJourneyPro({ steps, onOpen, label = "Lead journey", pulseKey
   const replay = useCallback(() => { prog.current = 0; playing.current = true; if (slider.current) slider.current.value = "0"; setRun((r) => r + 1); kick.current(); }, []);
   const scrub = (v: number) => { playing.current = false; prog.current = v / 100; kick.current(); };
 
-  const onMove = (e: React.PointerEvent) => {
-    const st = stage.current, g = geo; if (!st || !g || g.n < 2) return;
-    const r = st.getBoundingClientRect(); const px = e.clientX - r.left, py = e.clientY - r.top;
-    if (e.pointerType === "mouse" && !reduced) {
-      const rx = ((py / r.height) - 0.5) * -2.2, ry = ((px / r.width) - 0.5) * 2.2;
-      st.style.setProperty("--ljp-rx", `${rx.toFixed(2)}deg`); st.style.setProperty("--ljp-ry", `${ry.toFixed(2)}deg`);
-      if (canvas.current) canvas.current.style.transform = `translate(${(-ry * 2.5).toFixed(1)}px, ${(rx * 2.5).toFixed(1)}px)`;
-    }
+  const hitAt = (px: number, py: number): Hot | undefined => {
+    const g = geo; if (!g || g.n < 2) return undefined;
     const inRiver = px >= g.riverRect.x && px <= g.riverRect.x + g.riverRect.w && py >= g.riverRect.y && py <= g.riverRect.y + g.riverRect.h;
-    if (!inRiver) { setHot(null); setTipAt(null); return; }
+    if (!inRiver) return undefined;
     const { m, c } = g.toAbstract(px, py);
     const i = Math.min(g.n - 2, Math.max(0, Math.floor((m - g.m[0]) / g.seg)));
     const s = (m - g.m[i]) / g.seg, th = thicknessAt(g.thick[i], g.thick[i + 1], s);
@@ -198,6 +192,18 @@ export function LeadJourneyPro({ steps, onOpen, label = "Lead journey", pulseKey
       if (c <= g.rT + th + 6 && c >= g.rT - 6) next = { kind: "seg", i };
       else if (br && s >= BRANCH_START - 0.02 && s <= 0.95 && c > g.rT + th) next = { kind: "drop", i: i + 1 };
     }
+    return next;
+  };
+  const onMove = (e: React.PointerEvent) => {
+    const st = stage.current, g = geo; if (!st || !g || g.n < 2) return;
+    const r = st.getBoundingClientRect(); const px = e.clientX - r.left, py = e.clientY - r.top;
+    if (e.pointerType === "mouse" && !reduced) {
+      const rx = ((py / r.height) - 0.5) * -2.2, ry = ((px / r.width) - 0.5) * 2.2;
+      st.style.setProperty("--ljp-rx", `${rx.toFixed(2)}deg`); st.style.setProperty("--ljp-ry", `${ry.toFixed(2)}deg`);
+      if (canvas.current) canvas.current.style.transform = `translate(${(-ry * 2.5).toFixed(1)}px, ${(rx * 2.5).toFixed(1)}px)`;
+    }
+    const next = hitAt(px, py);
+    if (next === undefined) { setHot(null); setTipAt(null); return; }
     setHot((h) => (h && next && h.kind === next.kind && h.i === next.i ? h : next)); setTipAt(next ? { x: px, y: py } : null);
   };
   const onLeave = () => { setHot(null); setTipAt(null); const st = stage.current; if (st) { st.style.setProperty("--ljp-rx", "0deg"); st.style.setProperty("--ljp-ry", "0deg"); } if (canvas.current) canvas.current.style.transform = ""; };
@@ -224,7 +230,7 @@ export function LeadJourneyPro({ steps, onOpen, label = "Lead journey", pulseKey
         </label>
         <button type="button" className="s6-btn" onClick={replay} data-testid="flow-replay">Replay</button>
       </div>
-      <div ref={stage} className="ljp-stage" style={{ height: geo ? geo.height : 360 }} role="group" aria-label={label} onPointerMove={onMove} onPointerLeave={onLeave} onClick={onClickStage} data-vertical={geo?.vertical ? 1 : 0} data-testid="flow" data-hot={hot ? `${hot.kind}${hot.i}` : ""}>
+      <div ref={stage} className="ljp-stage" style={{ height: geo ? geo.height : 360, cursor: hot ? "pointer" : undefined }} role="group" aria-label={label} onPointerMove={onMove} onPointerLeave={onLeave} onClick={onClickStage} data-vertical={geo?.vertical ? 1 : 0} data-testid="flow" data-hot={hot ? `${hot.kind}${hot.i}` : ""}>
         <div className="ljp-mesh" aria-hidden />
         <canvas ref={canvas} className="ljp-canvas" style={geo ? { width: geo.width, height: geo.height } : undefined} aria-hidden data-testid="ljp-canvas" />
         {geo && (

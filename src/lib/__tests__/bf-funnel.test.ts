@@ -17,10 +17,10 @@ test("step rows give pass share, leads lost and drop share, and only judge a ste
   assert.equal(stepRows(tot({ leads: 40, answered: 5, booked: 0 }))[3].enough, false, "5 leads before the step is too few to judge");
 });
 
-test("biggest leak: by dollars when there are 5 won deals, else by leads lost; none under 30 leads", () => {
+test("biggest leak: by dollars when there are 5 won deals, else by leads lost; none under 10 leads", () => {
   const leak = biggestLeak(T);
   assert.ok(leak && leak.dollars !== null && leak.dollars > 0);
-  assert.equal(biggestLeak(tot({ leads: 29, answered: 10 })), null);
+  assert.equal(biggestLeak(tot({ leads: 9, answered: 3 })), null);
   const noMoney = biggestLeak(tot({ leads: 100, answered: 90, booked: 20, showed: 15, deal: 10, won: 3, wonValue: 3000 }));
   assert.equal(noMoney?.key, "booked"); assert.equal(noMoney?.dollars, null, "3 won deals: no dollar line");
 });
@@ -35,7 +35,7 @@ test("dollar line is lost x win rate past the step x average won deal, and refus
 test("headline names the step in plain words and the hot spot when there is one", () => {
   const h = headlineOf(T);
   assert.match(h, /^Biggest leak: \d+% of /);
-  assert.match(headlineOf(tot({ leads: 5 })), /Not enough leads/);
+  assert.match(headlineOf(tot({ leads: 5 })), /Only 5 leads in these dates/);
   const cs = [{ dow: 2, hour: 9, before: 40, after: 10 }, { dow: 2, hour: 10, before: 40, after: 12 }, { dow: 3, hour: 9, before: 40, after: 36 }, { dow: 4, hour: 15, before: 40, after: 35 }, { dow: 5, hour: 20, before: 40, after: 37 }];
   const hot = hotspot(cs);
   assert.equal(hot?.dow, 2); assert.equal(hot?.part, "morning"); assert.match(hot?.text ?? "", /Tuesday mornings/);
@@ -43,7 +43,7 @@ test("headline names the step in plain words and the hot spot when there is one"
 });
 
 test("leak finder lists the worst account first and puts accounts with too few leads last", () => {
-  const out = leakFinder([{ id: "a", name: "Small", tot: tot({ leads: 10, answered: 2 }) }, { id: "b", name: "Big", tot: T }, { id: "c", name: "Mid", tot: tot({ leads: 100, answered: 50, booked: 20, showed: 10, deal: 5, won: 2 }) }]);
+  const out = leakFinder([{ id: "a", name: "Small", tot: tot({ leads: 9, answered: 2 }) }, { id: "b", name: "Big", tot: T }, { id: "c", name: "Mid", tot: tot({ leads: 100, answered: 50, booked: 20, showed: 10, deal: 5, won: 2 }) }]);
   assert.equal(out[0].id, "b"); assert.equal(out[out.length - 1].id, "a"); assert.equal(out[out.length - 1].leak, null);
 });
 

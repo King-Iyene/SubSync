@@ -1,5 +1,6 @@
 /* Appointments > Booking funnel. Calm and flat: ink, one accent, one warm colour for the leaks. Light and dark follow the app theme. No sideways scroll at 390 or 768. */
 .bf { --bf-accent: var(--s6-cyan, #0e7490); --bf-warm: var(--s6-amber, #b45309); --bf-line: color-mix(in srgb, var(--foreground) 14%, transparent); --bf-soft: color-mix(in srgb, var(--foreground) 5%, transparent); display: grid; gap: 16px; min-width: 0; }
+.bf { max-width: 100%; overflow-x: clip; }
 .bf * { box-sizing: border-box; }
 .bf-sample { margin: 0; padding: 8px 12px; border-radius: 8px; border: 1px dashed var(--bf-line); font-size: 0.8125rem; color: var(--muted-foreground); }
 .bf-controls { display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: center; }
@@ -20,7 +21,10 @@
 
 /* the ladder */
 .bf-ladder { width: 100%; min-width: 0; }
-.bf-ladder svg { display: block; max-width: 100%; height: auto; overflow: visible; }
+.bf-ladder { overflow: hidden; }
+.bf-ladder svg { display: block; max-width: 100%; height: auto; overflow: hidden; }
+.bf-step, .bf-step *, .bf-basin, .bf-basin * { pointer-events: auto; }
+.bf-step:hover .bf-step-l, .bf-basin:hover .bf-basin-n { text-decoration: underline; }
 .bf-chute { fill: color-mix(in srgb, var(--bf-accent) 14%, transparent); }
 .bf-ledge { fill: var(--bf-accent); fill-opacity: 0.82; stroke: color-mix(in srgb, var(--bf-accent) 70%, var(--foreground)); stroke-width: 1; transition: fill-opacity 0.2s; }
 .bf-ledge[data-last="1"] { fill: color-mix(in srgb, var(--bf-accent) 70%, #16a34a); }

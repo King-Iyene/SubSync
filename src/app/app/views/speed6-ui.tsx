@@ -36,7 +36,16 @@ export function FlowCard({ multi }: { multi: boolean }) {
     <Q sticky q="Where do my leads go?" span glow="active" testId="flow-card" tip="Each dot is a share of your leads, moving from arrived to first touch, replied, booked, showed and won. Dots that stop early fall into a drop-off bucket. Booked, showed and won come from your appointments and deals."
       sub={`${range?.sentence ?? "Last 30 days"}. Click a step or a drop-off to see the people.`}
       action={data.pro ? undefined : <button type="button" className="s6-btn" onClick={() => setRun((r) => r + 1)} data-testid="flow-replay"><RotateCcw aria-hidden className="size-4" />Replay</button>}>
-      {data.pro ? <LeadJourneyPro steps={data.steps} label="Lead journey" onOpen={(step, dropped) => setOpen({ step: step as Step, dropped })} /> : (<>
+      {data.pro ? <><LeadJourneyPro steps={data.steps} label="Lead journey" onOpen={(step, dropped) => setOpen({ step: step as Step, dropped })} />
+        <details className="mt-3" open data-testid="flow-breakdown"><summary className="ds-press min-h-9 cursor-pointer text-sm font-medium text-primary underline underline-offset-4">See breakdown: every step and where leads dropped</summary>
+          <table className="mt-2 w-full text-sm"><thead><tr className="text-left text-muted-foreground"><th className="py-1 font-medium">Step</th><th className="py-1 font-medium">Leads</th><th className="py-1 font-medium">Of the first step</th><th className="py-1 font-medium">Dropped before it</th></tr></thead>
+            <tbody>{data.steps.map((s, i) => {
+              const prev = i > 0 ? data.steps[i - 1].count : null; const lost = prev === null ? 0 : Math.max(0, prev - s.count); const first = data.steps[0].count;
+              return <tr key={s.step} className="border-t" data-testid="flow-breakdown-row"><td className="py-1.5">{s.label}</td>
+                <td className="py-1.5"><button type="button" className="tnum font-medium text-primary underline" aria-label={`${s.label}: ${s.count.toLocaleString("en-US")} leads. Open the people.`} onClick={() => setOpen({ step: s.step, dropped: false })}>{s.count.toLocaleString("en-US")}</button></td>
+                <td className="tnum py-1.5">{first > 0 ? `${Math.round((s.count / first) * 100)}%` : "-"}</td>
+                <td className="py-1.5">{i === 0 ? "-" : lost > 0 ? <button type="button" className="tnum text-primary underline" aria-label={`${lost.toLocaleString("en-US")} dropped before ${s.label}. Open the people.`} onClick={() => setOpen({ step: s.step, dropped: true })}>{lost.toLocaleString("en-US")}</button> : "0"}</td></tr>;
+            })}</tbody></table></details></> : (<>
       <div className="s6-flow" data-testid="flow" role="group" aria-label="Lead journey">
         <div className="s6-flow-line" aria-hidden />
         <div key={run} aria-hidden>

@@ -23,6 +23,10 @@ const MANIFEST: Record<string, Req[]> = {
     { file: `${V}/speed.tsx`, has: ['label: "Race"', 'label: "Pace"', 'label: "Coverage"', 'label: "Unanswered"', 'label: "Call mode"', 'label: "People"', 'label: "Capture"', 'label: "Rules"', 'label: "Log"', "Copy a summary", '"Print"'] },
     { file: `${V}/speed-coverage.tsx`, has: ["<RoutingCard", "<ProofReport", "<AlertsTab", "Missed calls nobody called back", "Lost at night and at weekends", "Best time to call or reply"] },
     { file: `${V}/speed-insights.tsx`, has: ["When to be told", "The digest, as a preview"] },
+    // Restored 12 Nov: every card and its breakdown is open by default (Fold starts open, hidden no-data cards can be shown), the lead journey keeps a "See breakdown" table, and the Pace, People, Log and Rules cards stay mounted.
+    { file: `${V}/speed6-base.tsx`, has: ["useState(true)", "s6-show-nodata", "See them"] },
+    { file: `${V}/speed6-ui.tsx`, has: ["flow-breakdown", "See breakdown", "<FlowCard", "<ReadyCard", "<WhoWasSlow", "<VelocityCard", "<ReasonCard", "<HistCards", "<PersonCard", "<LeadJourneyPro", "Replay"] },
+    { file: `${V}/speed.tsx`, has: ["<JourneyCard", "<BookingCard", "<PaceTab", "<PeopleTab", "<SourceCard", "More detail", "speed-money", "cost-formula", "reply-all", "<CaptureTab", "<DialMode", "<RaceTab", "<CoverageTab"] },
   ],
   "Unanswered messages": [
     { file: `${V}/inbox.tsx`, has: ["Download the list (CSV)", "Copy a summary", "WaitList", "WaitedSection", "WhereSection"] },
