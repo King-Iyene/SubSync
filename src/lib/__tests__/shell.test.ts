@@ -47,9 +47,8 @@ test("the bar's modes and account helpers", () => {
 test("menu order is money first", () => {
   const top = NAV.filter((n) => !n.parent).map((n) => n.id);
   assert.ok(!top.includes("inbox"), "Unanswered messages is a tab of Speed to lead, not a menu entry");
-  assert.deepEqual(top.slice(0, 13), ["today", "speed", "appointments", "clients", "payments", "people", "audit", "cleanup", "team", "pipeline", "meetings", "workflows", "overview"]);
-  // Overview lives inside Today: it is the LAST entry before Settings, and only shows while the merge into Today is off.
-  assert.equal(top[12], "overview");
+  assert.deepEqual(top.slice(0, 14), ["today", "speed", "appointments", "clients", "payments", "finance", "people", "audit", "cleanup", "team", "pipeline", "meetings", "workflows", "overview"]);
+  assert.equal(top[13], "overview");
 });
 
 import { summariseWaitingMoney, waitingMoneyLine, type CountedDeal } from "../analytics/waiting-money.ts";

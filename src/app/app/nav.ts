@@ -1,5 +1,5 @@
 export type ViewId =
-  | "data-health" | "today" | "myday" | "audit" | "speed" | "overview" | "accounts" | "account" | "search" | "deals" | "inbox" | "onboarding" | "email" | "duplicates" | "alerts" | "settings" | "help" | "pipeline" | "leads" | "calls" | "clients" | "team" | "appointments" | "meetings" | "cleanup" | "roadmap" | "people" | "connections" | "notifications" | "workflows" | "payments";
+  | "data-health" | "today" | "myday" | "audit" | "speed" | "overview" | "accounts" | "account" | "search" | "deals" | "inbox" | "onboarding" | "email" | "duplicates" | "alerts" | "settings" | "help" | "pipeline" | "leads" | "calls" | "clients" | "team" | "appointments" | "meetings" | "cleanup" | "roadmap" | "people" | "connections" | "notifications" | "workflows" | "payments" | "finance";
 
 export type GoFn = (view: ViewId, locationId?: string) => void;
 
@@ -30,6 +30,8 @@ export const NAV: NavItem[] = [
   { id: "appointments", label: "Appointments", feature: "appointments", group: "" },
   { id: "clients", label: "Clients", feature: "clients", group: "Clients and money" },
   { id: "payments", label: "Payments", feature: "pm_module", group: "Clients and money" },
+  // Finance (stage FN): the agency's own money (plans, revenue, who may leave, what it pays its people). Payments is what a client owes right now.
+  { id: "finance", label: "Finance", feature: "fn_module", group: "Clients and money" },
   { id: "people", label: "Find a lead", feature: "search", group: "Clients and money" },
   { id: "search", label: "Contact search", feature: "search", group: "Clients and money", parent: "people" },
   { id: "leads", label: "Leads", feature: "activity", group: "Clients and money", parent: "people" },

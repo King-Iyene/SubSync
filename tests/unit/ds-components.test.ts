@@ -235,7 +235,7 @@ describe("the menu structure", () => {
   });
   it("the pilot menu is on top, in order", () => {
     const top = NAV.filter((n) => !n.parent && n.group !== "Team and tools").map((n) => n.label);
-    expect(top).toEqual(["Today", "Speed to lead", "Appointments", "Clients", "Payments", "Find a lead", "Account audit", "Clean-up", "Settings", "Getting started", "What's new"]);
+    expect(top).toEqual(["Today", "Speed to lead", "Appointments", "Clients", "Payments", "Finance", "Find a lead", "Account audit", "Clean-up", "Settings", "Getting started", "What's new"]);
     // Connections (stage E0) is Settings, Integrations now (4 Nov 2026): not a menu entry of its own. A client's staff, who have no Settings, get an Integrations entry (tests/unit/connections-in-settings.test.ts).
   });
   it("nothing that was visible has gone: every page is still in the menu, under More, or a tab of its parent", () => {

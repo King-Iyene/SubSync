@@ -138,6 +138,8 @@ async function main() {
       // Team (people) round 3 (stage PD): every part, asked for the other side's account and people by every parameter the page takes (location, user, q, source, after).
       ...["today", "scorecards", "workload", "leaderboard", "money", "coaching", "access", "proof", "person", "handoff", "nextlead", "options", "export"].flatMap((part) => [`/api/app/people3?part=${part}`, `/api/app/people3?part=${part}&location=${other.locs[0]}`, `/api/app/people3?part=${part}&user=${other.marker}&q=${other.marker}&source=${other.marker}`, `/api/app/people3?part=${part}&location=${other.locs[0]}&user=${other.marker}&after=${other.marker}`]),
       ...["waiting", "waiting_old", "stale_deals", "open_deals", "needs_outcome", "upcoming", "no_owner"].flatMap((r) => [`/api/app/people3?part=list&reason=${r}`, `/api/app/people3?part=list&reason=${r}&location=${other.locs[0]}`, `/api/app/people3?part=list&reason=${r}&user=${other.marker}`]),
+      // Finance: every part, aimed at the other company's account, person and marker. None may answer with the other side's data.
+      ...["options", "headline", "overview", "movement", "revenue", "churn", "payouts", "statement", "periods", "ledger", "setup", "find", "export"].flatMap((part) => [`/api/app/finance?part=${part}&from=2026-10-01&to=2026-11-10`, `/api/app/finance?part=${part}&from=2026-10-01&to=2026-11-10&location=${other.locs[0]}&account=${other.locs[0]}&q=${other.marker}`, `/api/app/finance?part=${part}&from=2026-10-01&to=2026-11-10&person=${other.marker}&what=person&q=${other.marker}`, `/api/app/finance?part=${part}&what=statement&from=2026-10-01&to=2026-11-10&period=${other.marker}&cursor=${other.marker}`]),
       `/api/app/people3?part=proof&location=${other.locs[0]}&named=1`, `/api/app/people3?part=coaching&user=${other.marker}&location=${other.locs[0]}`, `/api/app/people3?part=nextlead&location=${other.locs[0]}&source=${other.marker}`,
       // Appointments actions and meetings (slice AB): the other side's account and appointment named in every way the endpoints take them (reads; the POST bodies are covered by the unit tests and the typed-delete guard).
       `/api/app/appointments/act/panel?locationId=${other.locs[0]}&id=anything`, `/api/app/appointments/act/slots?locationId=${other.locs[0]}&id=anything`, "/api/app/appointments/act/caps", "/api/app/appointments/meetings/home", "/api/app/appointments/meetings/matching", "/api/app/appointments/meetings/followup",
@@ -300,6 +302,16 @@ async function main() {
       ["POST", `/api/app/clients/${B.locs[0]}/notes`, { body: "hacked" }],
       // Clients v2: a note, a tag and a saved view aimed at the other agency's account.
       ["POST", "/api/app/clients2/note-add", { location: B.locs[0], kind: "note", body: "hacked" }],
+      // Finance: a churn choice, an ad spend, a rate, a billing note, a dispute and a freeze aimed at the other agency's account or person.
+      ["PUT", "/api/app/finance/churn", { locationId: B.locs[0], status: "lost", note: "hacked" }],
+      ["PUT", "/api/app/finance/spend", { locationId: B.locs[0], month: "2026-11", amount: 1, currency: "USD" }],
+      ["POST", "/api/app/finance/spend/remove", { locationId: B.locs[0], month: "2026-11", confirm: "x" }],
+      ["PUT", "/api/app/finance/rate", { role: "setter", locationId: B.locs[0], pct: 1, flat: 1 }],
+      ["PUT", "/api/app/finance/rate", { role: "closer", personId: B.marker, pct: 1, flat: 1 }],
+      ["POST", "/api/app/finance/ledger/add", { locationId: B.locs[0], label: "hacked", amount: 1, currency: "USD", dueOn: "2026-11-30" }],
+      ["POST", "/api/app/finance/ledger/mark", { id: "00000000-0000-0000-0000-000000000000", paid: true }],
+      ["POST", "/api/app/finance/dispute", { lineKey: `booked:${B.locs[0]}:x:setter`, note: "hacked", from: "2026-10-01", to: "2026-11-10", basis: "booked" }],
+      ["POST", "/api/app/finance/unfreeze", { id: "00000000-0000-0000-0000-000000000000", confirm: "x" }],
       ["POST", "/api/app/clients2/note-update", { location: B.locs[0], id: "00000000-0000-0000-0000-000000000000", body: "hacked" }],
       ["POST", "/api/app/clients2/note-delete", { location: B.locs[0], id: "00000000-0000-0000-0000-000000000000", confirm: "x" }],
       ["POST", "/api/app/clients2/tag", { locations: [B.locs[0]], vertical: "solar", step: "do" }],
