@@ -124,9 +124,9 @@ export function DuplicatesView({ embedded = false }: { embedded?: boolean } = {}
   const merged = (s: Step) => send("duplicates/review", { ...bodyOf(s), decision: "merged_in_platform", keepContactId: keepId }, "Marked as merged. It leaves the list after SubSync next refreshes from your CRM.", { path: "duplicates/undo", body: { locationId: s.locationId, key: s.key }, focus: `${s.locationId}:${s.key}` });
   const putBack = (s: Step) => (s.review ? send("duplicates/undo", { locationId: s.locationId, key: s.key }, "Put back in the list.") : send("duplicates/unsnooze", bodyOf(s), "Put back in the list."));
   // Start the merge through the customer's own merge workflow (the gateway checks the opt-in, the confirm, the guardrails and the master switch).
-  const mergeInCrm = async (s: Step): Promise<string> => {
+  const mergeInCrm = async (s: Step, typed = ""): Promise<string> => {
     try {
-      const r = await api.post<{ message?: string; requested?: boolean }>("duplicates/merge-workflow", { ...bodyOf(s), keepContactId: keepId, confirm: true });
+      const r = await api.post<{ message?: string; requested?: boolean }>("duplicates/merge-workflow", { ...bodyOf(s), keepContactId: keepId, confirm: true, typed });
       if (r.requested) void reload();
       return r.message ?? "Done.";
     } catch (e) {
@@ -332,7 +332,7 @@ export function DuplicatesView({ embedded = false }: { embedded?: boolean } = {}
               key={step.key + keepId}
               accountName={step.locationName} people={step.people} keepId={keepId} why={step.why} switchedOff={data.mergeSwitchedOff}
               onClose={() => setSheetKey(null)} onMerged={() => merged(step)} copy={copy}
-              picks={step.picks} workflow={step.workflow} onWorkflowMerge={() => mergeInCrm(step)}
+              picks={step.picks} workflow={step.workflow} onWorkflowMerge={(typed) => mergeInCrm(step, typed)}
             />
           )}
 

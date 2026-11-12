@@ -189,6 +189,10 @@ export const FEATURES = [
   "cf_deals",
   "cf_email",
   "cf_record",
+  "cu_fix",
+  "cu_health",
+  "cu_bulk",
+  "cu_confirm",
 ] as const;
 export type Feature = (typeof FEATURES)[number];
 

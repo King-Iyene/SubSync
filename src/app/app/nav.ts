@@ -45,7 +45,7 @@ export const NAV: NavItem[] = [
   { id: "pipeline", label: "Pipeline and deals", feature: "pipelines", group: "More" },
   { id: "meetings", label: "Meeting notes", feature: "meetings", group: "More" },
   { id: "workflows", label: "Workflows", feature: "workflows", group: "More" },
-  { id: "data-health", label: "Data health", feature: "data_health", group: "More" },
+  { id: "data-health", label: "Data health", feature: "data_health", group: "More", parent: "cleanup", showWhenParentOff: true, showWhenParentHidden: true },
   { id: "settings", label: "Settings", feature: "settings", group: "Settings and help" },
   // Connections moved into Settings, Integrations (4 Nov 2026). The id stays so every old address (#connections) and link still works: it opens Settings on Integrations.
   // A client's staff have no Settings, so for them it stays one menu entry, called Integrations (showWhenParentHidden).
@@ -57,7 +57,7 @@ export const NAV: NavItem[] = [
 ];
 
 // Where a page that lives inside another page highlights in the menu, and where "back" lands when there is no trail.
-export const PARENT: Partial<Record<ViewId, ViewId>> = { inbox: "speed", duplicates: "cleanup", account: "clients", accounts: "clients", onboarding: "clients", deals: "pipeline", email: "clients", alerts: "today", search: "people", leads: "people", calls: "people", notifications: "settings", connections: "settings" };
+export const PARENT: Partial<Record<ViewId, ViewId>> = { "data-health": "cleanup", inbox: "speed", duplicates: "cleanup", account: "clients", accounts: "clients", onboarding: "clients", deals: "pipeline", email: "clients", alerts: "today", search: "people", leads: "people", calls: "people", notifications: "settings", connections: "settings" };
 
 /**
  * The menu entries one kind of session sees. `allowed` is that kind's page list (NAV_FOR), `limited` is true for a business and a client's staff, `off` says whether a feature
