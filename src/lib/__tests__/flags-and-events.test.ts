@@ -97,6 +97,8 @@ test("pilot modules are on by default and a database row can still override the 
     "inbox_working_hours",
     "inbox_workload",
     "lead_journey_pro",
+    "mn_logged",
+    "mn_outcomes",
     "moat_alert_feedback",
     "moat_benchmark",
     "moat_curve",

@@ -171,6 +171,9 @@ export const DEFAULT_OFF: ReadonlySet<Feature> = new Set<Feature>([
   "cu_health",
   "cu_bulk",
   "cu_confirm",
+  // Meeting notes revamp (docs/features/MEETINGS_BRIEF.md): mn_logged is the calls held but not logged counts, mn_outcomes the history of what followed a call. Default off.
+  "mn_logged",
+  "mn_outcomes",
 ]);
 
 export function resolveFeatures(all: readonly Feature[], overrides: Record<string, boolean>, allOn = false): Record<Feature, boolean> {
