@@ -57,3 +57,4 @@
 .td-tile .td-top .td-ico { width: 24px; height: 24px; border-radius: 7px; }
 .td-tile .td-cap { font-size: 0.75rem; color: var(--muted-foreground); }
 .td-tile .td-chg { font-size: 0.75rem; font-variant-numeric: tabular-nums; border-radius: 999px; padding: 0 7px; border: 1px solid color-mix(in srgb, var(--s6-cyan) 45%, transparent); }
+.td-oldhead .t-display { font-size: 1.1rem; line-height: 1.4; } .td-oldhead section { margin-bottom: 8px; }

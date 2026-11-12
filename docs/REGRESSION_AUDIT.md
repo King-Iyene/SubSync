@@ -26,9 +26,9 @@ Checked with all flags on. Only reading and code review so far; the restored tab
 | Module | Feature | Where it is now | Status |
 |---|---|---|---|
 | Speed to lead | Race, Pace (old Journey, Booking, Pace cards kept as `old`), Coverage, Unanswered tab, Call mode, People or Owners (old kept), Capture, Rules (target, ladder, digest, routing, proof report), Log, Copy, Print, change target, how-to | `speed.tsx`, `speed6-*.tsx` | still present |
-| Unanswered messages | Copy summary, Print, CSV download, change reply target, how-to, cost formula, who is waiting, where it waits. The control room (`inbox_control_room`) replaces the old screen; the old screen stays in `inbox.tsx` | `unanswered-room.tsx`, `inbox.tsx` | still present. Two small notes of the old screen (reading-limit note, unread note) are not in the control room: needs King approval if he wants them back |
+| Unanswered messages | Copy summary, Print, CSV download, change reply target, how-to, cost formula, who is waiting, where it waits. The control room (`inbox_control_room`) replaces the old screen; the old screen stays in `inbox.tsx` | `unanswered-room.tsx`, `inbox.tsx` | still present. Two small notes of the old screen (reading-limit note, unread note) are now both in the control room (`unanswered-room.tsx`: the reading limit was already there; the unread note was added, test id `wait-unread-note`): restored |
 | Find a lead | Contact search, five call lists, tags with the day, going cold, sources, imports, data quality | `people-find.tsx`, `people-more.tsx` | still present |
-| Find a lead | Old Call lists page: log a call and "Call this person now" (`calls.tsx`) | no longer mounted | needs King approval (dialer and call logging were removed on purpose: "CRM calling only", commit af806c5 and PR 53). The code is kept |
+| Find a lead | Old Call lists page: log a call and "Call this person now" (`calls.tsx`) | no longer mounted | restored: `people-module.tsx` tab "Call lists" renders `CallsView` (King: nothing old is removed) |
 | Find a lead | Old Contact search page with timeline (`search.tsx`) | the Find tab and the lead panel carry the timeline | still present (functionally) |
 | Account audit | Where to start, share links, copy summary, print, run again, clients to look at first | `audit.tsx` | still present |
 | Clean-up | Duplicates, Fix lists, Health (old data health kept under "More data health tools"), Data quality, History, Rules | `cleanup-hub.tsx` | still present |
@@ -49,8 +49,8 @@ Checked with all flags on. Only reading and code review so far; the restored tab
 
 ## Needs King approval (summary)
 
-1. Call lists page with call logging (`calls.tsx`): removed on purpose with the dialer. Say "bring it back" and it is one tab.
-2. Unanswered control room: two small notes of the older screen (reading limit, unread note).
+1. (done) Call lists page with call logging: back as the tab "Call lists" in Find a lead.
+2. (done) Unanswered control room: the unread note is added; the reading limit was already there.
 
 ## Not done in this pass
 
@@ -67,6 +67,6 @@ PR #33 put the older Today charts behind a small "More numbers" link on a tab. T
 | Today | Do this first queue (reply list, or one row per client), "Where the work sits" bars, "This week" reply-time line and figures, "Since you were last here", insights, held items, My day (calls, appointments) | old Today page (`today-page.tsx`) | Today tab, section "More about today" (`td3/module.tsx` renders `TodayView mode="below"`) | restored |
 | Today | Break it down tabs: Forecast, Proof, People, Sources, Coverage, Growth, Lead flow, Clients coming and going | old Today, "Break it down" | still in "More about today" (`MoreDetail`), and each is also a card on Numbers | restored |
 | Today | More menu (Daily email preview, Print report, Share Today, Sync now, Saved views, Commands) and the command palette | old Today header | same, in "More about today" (title row only hides the duplicate "Today" word) | restored |
-| Today | Old one-sentence headline and its primary button | old Today | replaced by the new What to do today block (same job, ranked) | replaced: needs King approval if he wants both |
+| Today | Old one-sentence headline and its primary button | old Today | replaced by the new What to do today block (same job, ranked) | kept as "The older one-sentence summary" under the new block, in "More about today" | restored |
 | Overview | Executive summary, Stale deal value and Waiting tiles, excluded-deals note, Needs attention list, Account health bar, Print summary, Sync now | `overview.tsx` | Numbers, card "Accounts at a glance" (`<OverviewView>`, agency) | restored |
 | Numbers | Growth, lead flow (Where do my leads go?), sources, forecast, coverage, people, clients coming and going, pipeline, where the work sits | old Today tabs, Pipeline | Numbers dashboard cards (`today-dash.tsx`), one dates bar for all, accounts from the bar at the top | restored |

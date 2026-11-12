@@ -9,7 +9,7 @@ const V = "src/app/app/views";
 type Req = { file: string; has?: string[]; anyOf?: string[] };
 const MANIFEST: Record<string, Req[]> = {
   "Today (old front page)": [
-    { file: `${V}/today-page.tsx`, has: ['id="where-h"', "MoreDetail", "Forecast", "Proof", "People", "Sources", "Coverage", "Growth", "Lead flow", "Clients coming and going"] },
+    { file: `${V}/today-page.tsx`, has: ['id="where-h"', "The older one-sentence summary", "MoreDetail", "Forecast", "Proof", "People", "Sources", "Coverage", "Growth", "Lead flow", "Clients coming and going"] },
     // The new Today module must still render the old Today (TodayView or TodayPage), never replace it.
     { file: `${V}/td3/module.tsx`, anyOf: ["<TodayView", "<TodayPage"] },
     { file: `${V}/td3/module.tsx`, has: ["More about today", 'mode="below"', 'mode="dashboard"', "td-below", "DatesBar"] },
@@ -47,7 +47,7 @@ const MANIFEST: Record<string, Req[]> = {
     { file: `${V}/people.tsx`, has: ["Recent deal movement", "Contact timeline", "Unassigned"] },
   ],
   "Find a lead (People, Contact search, Leads, Call lists)": [
-    { file: `${V}/people-module.tsx`, has: ["Find and call", '"Tags"', '"Going cold"', '"Sources"', "More about your leads", 'part="more"'] },
+    { file: `${V}/people-module.tsx`, has: ["Find and call", '"Tags"', '"Going cold"', '"Sources"', "More about your leads", 'part="more"', "<CallsView embedded"] },
     { file: `${V}/leads.tsx`, has: ["Contact lifecycle", "Working leads: who has engaged", "Lead cohorts", "Best leads to work now", "Your most valuable contacts", "New contacts per week", "Growth by account", "Contact data quality", "Where leads come from", "Do not disturb", "Birthdays in the next 30 days", "Large imports", "Cold lists"] },
     { file: `${V}/people-more.tsx`, has: ['part="cold"', 'part="sources"'] },
   ],
