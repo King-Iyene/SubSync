@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { fmtMoney } from "@/lib/analytics/payments-format";
+import { tileRead } from "@/lib/analytics/pm-tile-read";
 import type { PmDispute, PmDisputes, PmHistory, PmOptions, PmSetup, PmToday, PmUpcoming } from "@/lib/analytics/payments-types";
 import { EmptyState } from "../../ds";
 import { useApiClient } from "../../session";
@@ -25,13 +26,16 @@ export function TodayTab({ go, openQueue, openDisputes }: { go: (tab: string) =>
           </section>
           {t.setupNote && <div className="pm-notice" role="status" data-testid="pm-setup-card"><b>Check your payment setup.</b> {t.setupNote} <button type="button" className="ap-link" onClick={() => go("setup")}>See the checks</button></div>}
           <div className="pm-tiles">
-            {t.tiles.map((x) => (
-              <button key={x.key} type="button" className="pm-tile" data-hot={x.count > 0 && x.key !== "refunds" ? "1" : undefined} data-testid={`pm-tile-${x.key}`} onClick={() => (x.filter.disputes ? openDisputes() : openQueue({ problem: x.filter.problem ?? "" }))}>
-                <b>{x.count.toLocaleString("en-US")}</b><span>{x.label}</span>
-                {x.money.length > 0 && <Money items={x.money} />}
-                {x.note && <span>{x.note}</span>}
-              </button>
-            ))}
+            {t.tiles.map((x) => {
+              // A zero from a read SubSync was never allowed to make means nothing: show a dash and say why, never "0".
+              const read = tileRead(x.key, t.sources);
+              return (
+                <button key={x.key} type="button" className="pm-tile" data-hot={read.readable && x.count > 0 && x.key !== "refunds" ? "1" : undefined} data-unavailable={read.readable ? undefined : "1"} data-testid={`pm-tile-${x.key}`} onClick={() => (x.filter.disputes ? openDisputes() : openQueue({ problem: x.filter.problem ?? "" }))}>
+                  <b>{read.readable ? x.count.toLocaleString("en-US") : "—"}</b><span>{x.label}</span>
+                  {read.readable ? <>{x.money.length > 0 && <Money items={x.money} />}{x.note && <span>{x.note}</span>}</> : <><span data-testid={`pm-tile-${x.key}-na`}>Not available</span><span>{read.note}</span></>}
+                </button>
+              );
+            })}
           </div>
           {t.atRisk.length > 0 && (
             <section className="pm-card" aria-label="Money at risk">

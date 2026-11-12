@@ -1,5 +1,6 @@
 import { headlineOf, rankItems } from "@/lib/analytics/today3-intel";
-import type { Td3List, Td3Numbers, Td3Options, Td3Proof, Td3ProofRow, Td3Row, Td3Settings, Td3Today } from "@/lib/analytics/today3-types";
+import { AT_RISK_FORMULA, PIPELINE_FORMULA, RECOVERED_FORMULA, biggestOf } from "@/lib/analytics/today3-money-core";
+import type { Td3List, Td3Money, Td3Numbers, Td3Options, Td3Proof, Td3ProofRow, Td3Row, Td3Settings, Td3Today } from "@/lib/analytics/today3-types";
 
 // SAMPLE DATA ONLY (open Today with ?tdfx=1, ?tdfx=empty or ?tdfx=error). No database, no real clients; the screen says "Sample data" whenever this is used.
 // The ranking, labels and sentence come from the same pure rules the server uses (today3-intel), so the sample behaves like the real thing.
@@ -60,6 +61,18 @@ export function sample(part: string, p: FxParams, empty: boolean): object {
     case "proof": return { ...proofSample(empty), ...META };
     case "numbers": return { ...numbersSample(), ...META };
     case "settings": { const s: Td3Settings = { emailOn: false, emailHour: 7, quietDays: [0, 6], recipients: [], timezone: "UTC", canEdit: true, sendingNote: null }; return { ...s, ...META }; }
+    case "money": {
+      const by = { stale: { deals: empty ? 0 : 11, dollars: empty ? null : 41000 }, waiting: { deals: empty ? 0 : 6, dollars: empty ? null : 18400 }, noshow: { deals: empty ? 0 : 2, dollars: empty ? null : 5200 } };
+      const total = empty ? null : 64600;
+      const m: Td3Money = {
+        hidden: false,
+        atRisk: { dollars: total, deals: empty ? 0 : 19, byCause: by, why: empty ? "Not enough data yet: no open deal has a dollar value and an owner. Add deal values in your CRM to see this." : null, formula: AT_RISK_FORMULA },
+        recovered: { dollars: empty ? null : 9800, deals: empty ? 0 : 4, people: empty ? 0 : 9, days: 30, previousDollars: empty ? null : 7600, previousDeals: empty ? null : 3, historyStarts: "2026-09-02", short: empty, why: null, formula: RECOVERED_FORMULA },
+        pipeline: { open: empty ? 0 : 184, dollars: empty ? null : 412300, expected: empty ? null : 98000, expectedWhy: empty ? "Not enough data yet." : "14 of 20 accounts have 20 won or lost deals; the others are not priced.", leftOut: 12, formula: PIPELINE_FORMULA },
+        biggest: empty ? null : biggestOf(by),
+      };
+      return { ...m, ...META };
+    }
     case "options": { const o: Td3Options = { accounts: NAMES.map((name, i) => ({ locationId: `loc${i}`, name })) }; return { ...o, ...META }; }
   }
   return { ...META };

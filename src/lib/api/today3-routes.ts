@@ -1,4 +1,5 @@
 import { exportProof, getSettings, listRows, markOpened, numbers, options, proof, saveSettings, snooze, today, todayCache, unsnooze, zoneForMeta, forgetToday, type Scope } from "../analytics/today3-queries";
+import { isMoneyList, moneyHero, moneyRows } from "../analytics/today3-money";
 import { accountsIn } from "../analytics/clients3-queries";
 import { cashReceiptLines } from "../analytics/cash-intel";
 import { receiptCash } from "../analytics/cash-queries";
@@ -20,7 +21,7 @@ type Ctx = AuthContext & { request: Request; url: URL; segments: string[] };
 export type Today3Helpers = { allowed: () => Promise<string[] | null>; links: () => Promise<ReturnType<typeof deepLinks>> };
 
 const PART_FLAG: Record<Td3Part, string[]> = {
-  today: ["td_today"], list: ["td_today", "td_numbers"], proof: ["td_proof"], numbers: ["td_numbers"], settings: ["td_module"], export: ["td_proof"], options: ["td_module", "td_today", "td_numbers", "td_proof"],
+  today: ["td_today"], list: ["td_today", "td_numbers"], proof: ["td_proof"], numbers: ["td_numbers"], money: ["td_today"], settings: ["td_module"], export: ["td_proof"], options: ["td_module", "td_today", "td_numbers", "td_proof"],
 };
 const KINDS = new Set<string>([...TD3_KINDS, ...TD3_LIST_ONLY]);
 const int = (v: string | null, d: number) => { const x = Number(v); return v !== null && Number.isFinite(x) ? Math.floor(x) : d; };
@@ -54,8 +55,10 @@ export async function handleToday3(ctx: Ctx, h: Today3Helpers): Promise<Response
     case "list": {
       const kind = sp.get("kind");
       if (!kind || !KINDS.has(kind)) return json({ error: "Not found" }, 404);
+      if (isMoneyList(kind)) return done(await moneyRows(scope, one, kind as Td3ListKind, { page, size }, links, now));
       return done(await listRows(scope, one, kind as Td3ListKind, { page, size }, links, now));
     }
+    case "money": return done(await moneyHero(scope, one, now));
     case "proof": {
       const p = await proof(scope, one, WEEK.test(sp.get("week") ?? "") ? sp.get("week") : null, { page, size }, now);
       // The cash features add their proof lines to the same weekly receipt: missed leads followed up and flagged deals that moved (estimates are labelled; a line with nothing behind it is left out).
