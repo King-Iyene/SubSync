@@ -20,6 +20,7 @@ import { ExportAll, TrendsPanel } from "./trends-panel";
 import { ApPanel, PersonPanel } from "./parts";
 import { BookingShare, Calendars, Health, Meetings, NeedsOutcome, Proof, Recovery, Sources } from "./sections2";
 import { ExecTab } from "./exec/exec-tab";
+import { BfTab, type BfFlags } from "../bf/bf-tab";
 import { AppointmentsView } from "../appointments";
 import { AppointmentInsights } from "../appointment-insights";
 import { execScopeOf } from "./exec/exec-types";
@@ -32,7 +33,7 @@ import type { ApFlowTree, ApHealthRow, ApPersonRow, ApRow } from "./types";
 
 registerAbSlots(); // slice AB: the checked change tools and the Meetings area mount into the slots below
 
-type TabKey = "overview" | "needs" | "recover" | "share" | "flow" | "health" | "sources" | "calendars" | "meetings" | "proof" | "exec" | "classic" | "insights";
+type TabKey = "overview" | "needs" | "recover" | "share" | "flow" | "health" | "sources" | "calendars" | "meetings" | "proof" | "exec" | "classic" | "insights" | "funnel";
 const TABS: Array<{ key: TabKey; label: string; tip: string }> = [
   { key: "overview", label: "Overview", tip: "The one sentence, the numbers and where the leak is." }, { key: "needs", label: "Needs outcome", tip: "Past appointments nobody marked." },
   { key: "recover", label: "No-show recovery", tip: "No-shows not booked again." }, { key: "share", label: "Booking share", tip: "Who books and who takes the meeting." },
@@ -44,6 +45,7 @@ const TABS: Array<{ key: TabKey; label: string; tip: string }> = [
   // Restored from the earlier Appointments (a revamp adds, never removes): the true show rate card with copy, print and call-list shortcuts, and the Insights widgets.
   { key: "classic", label: "Show rate and lists", tip: "The earlier page: true show rate, outcome chart, target, copy a summary and print." },
   { key: "insights", label: "Insights", tip: "Best times to book, repeat no-shows, lead to customer funnel, what an appointment is worth, follow-up gaps and more." },
+  { key: "funnel", label: "Booking funnel", tip: "From new lead to booked, showed up and won: where leads stop." },
 ];
 type SavedView = { name: string; filters: ApFilters; tab: TabKey };
 const VIEWS_KEY = "ap3.views.v1";
@@ -59,8 +61,8 @@ const OUTCOME_WORDS: Record<string, string> = { booked: "All booked", showed: "S
 const day = (iso: string) => { const d = new Date(`${iso}T12:00:00`); return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString("en-US", { month: "short", day: "numeric" }); };
 const isDefault = (f: ApFilters) => (Object.keys(DEFAULT_FILTERS) as Array<keyof ApFilters>).every((k) => f[k] === DEFAULT_FILTERS[k]);
 
-export function AppointmentsModule({ go, flowTree = true, leadership = false }: { go: GoFn; flowTree?: boolean; leadership?: boolean }) {
-  const tabs = useMemo(() => TABS.filter((t) => (flowTree || t.key !== "flow") && (leadership || t.key !== "exec")), [flowTree, leadership]);
+export function AppointmentsModule({ go, flowTree = true, leadership = false, funnel = null }: { go: GoFn; flowTree?: boolean; leadership?: boolean; funnel?: BfFlags | null }) {
+  const tabs = useMemo(() => TABS.filter((t) => (flowTree || t.key !== "flow") && (leadership || t.key !== "exec") && (funnel !== null || t.key !== "funnel")), [flowTree, leadership, funnel]);
   const [tab, setTab] = useState<TabKey>("overview");
   const [filters, setFilters] = useState<ApFilters>(DEFAULT_FILTERS);
   const [q, setQ] = useState("");
@@ -154,6 +156,7 @@ export function AppointmentsModule({ go, flowTree = true, leadership = false }: 
       case "classic": return <div className="[&_[data-testid=page-subtitle]]:hidden [&_h1]:sr-only"><AppointmentsView go={go} /></div>;
       case "insights": return <div className="[&_[data-testid=page-subtitle]]:hidden [&_h1]:sr-only"><AppointmentInsights /></div>;
       case "exec": return <ExecTab scope={execScopeOf(filters)} onOpenRow={openRow} />;
+      case "funnel": return funnel ? <BfTab scope={execScopeOf(filters)} people={(opts.data?.people ?? []).map((p) => ({ value: p.userId, label: p.name }))} accounts={accounts.map((a) => ({ value: a.locationId, label: a.name }))} sources={opts.data?.sources ?? []} flags={funnel} /> : null;
     }
   })();
   const people = opts.data?.people ?? [];

@@ -1,5 +1,6 @@
 "use client";
 
+import { BfMini } from "../bf/bf-mini";
 import { usePageRange } from "../../ds/page-range";
 import { historyLimitNote } from "@/lib/design/page-range";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
@@ -274,6 +275,7 @@ function NumbersTab({ location, go, open, fromOverview, level, nav, kind }: { lo
       <Load r={r} empty={(n) => n.tiles.length === 0}>
         {(n) => (
           <>
+            {bar.ready && <BfMini location={location} from={bar.from} to={bar.to} go={nav} />}
             <div className="td-tiles" data-testid="td-tiles">
               {n.tiles.map((t) => (
                 <div key={t.id} className="td-tile" data-testid={`td-tile-${t.id}`}>
