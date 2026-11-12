@@ -30,11 +30,11 @@ const rows = (kind: string, n: number): Td3Row[] => Array.from({ length: n }, (_
 const pageOf = <T,>(all: T[], page: number, size: number) => { const pages = Math.max(1, Math.ceil(all.length / size)), p = Math.min(Math.max(0, page), pages - 1); return { rows: all.slice(p * size, p * size + size), total: all.length, page: p, size, pages, truncated: false }; };
 
 function proofSample(empty: boolean): Td3Proof {
-  const all: Td3ProofRow[] = NAMES.map((name, i) => ({ locationId: `loc${i}`, name, found: empty ? 0 : 9 - i, cleared: empty ? 0 : 7 - i, stillOpen: empty ? 0 : 2, medianFixMinutes: empty ? null : 120 + i * 20, fixes: 5 }));
-  const total = empty ? { found: 0, cleared: 0, stillOpen: 0, medianFixMinutes: null, fixes: 0, enough: false } : { found: 31, cleared: 24, stillOpen: 7, medianFixMinutes: 180, fixes: 24, enough: true };
+  const all: Td3ProofRow[] = NAMES.map((name, i) => ({ locationId: `loc${i}`, name, found: empty ? 0 : 9 - i, cleared: empty ? 0 : 7 - i, stillOpen: empty ? 0 : 2, medianFixMinutes: empty ? null : 120 + i * 20, fixes: 5, openByKind: empty ? [] : [{ kind: "waiting_old", label: "people waited over a day for a reply", count: 2 }] }));
+  const total: Td3Proof["total"] = empty ? { found: 0, cleared: 0, stillOpen: 0, medianFixMinutes: null, fixes: 0, enough: false, openByKind: [] } : { found: 31, cleared: 24, stillOpen: 7, medianFixMinutes: 180, fixes: 24, enough: true, openByKind: [{ kind: "waiting_old", label: "people waited over a day for a reply", count: 4 }, { kind: "unmarked", label: "appointments with no outcome", count: 3 }] };
   return {
-    weekStart: "2026-11-02", weekEnd: "2026-11-08", weeks: ["2026-11-09", "2026-11-02", "2026-10-26"], total,
-    byKind: empty ? [] : [{ kind: "waiting_old", label: "people waited over a day for a reply", found: 14, cleared: 11 }, { kind: "unmarked", label: "appointments with no outcome", found: 9, cleared: 7 }],
+    weekStart: "2026-11-02", weekEnd: "2026-11-08", weeks: ["2026-11-09", "2026-11-02", "2026-10-26"], total, isCurrent: false,
+    byKind: empty ? [] : [{ kind: "waiting_old", label: "people waited over a day for a reply", found: 14, cleared: 11, stillOpen: 4 }, { kind: "unmarked", label: "appointments with no outcome", found: 9, cleared: 7, stillOpen: 3 }],
     rows: pageOf(all, 0, 20),
     lines: empty ? ["We started keeping this record on 2026-11-10, so there is not a full week to report yet."] : ["This week we found 31 problems in your client accounts.", "24 were fixed, usually within 3 hours.", "7 are still open."],
     clientLines: [], historyStarts: "2026-10-28", accountName: null,
