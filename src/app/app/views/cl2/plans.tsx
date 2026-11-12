@@ -58,7 +58,7 @@ export function Plans({ onOpen, onPayments }: { onOpen: (id: string) => void; on
       <p className="ap-fine mb-2">{d.total.toLocaleString("en-US")} {d.total === 1 ? "plan needs" : "plans need"} a look.{d.atRisk.length > 0 && <span title={FORMULA}> At risk (estimate): {d.atRisk.map((a) => `${money(a.monthly, a.currency)} a month`).join(", ")}.</span>} {d.sinceNote}</p>
       {msg && <p className="ap-fine mb-2" role="status">{msg}</p>}
       {empty ? (
-        <EmptyState title={d.needPermission ? "Needs permission: reconnect" : d.notChecked ? "Plans not read yet" : "No plan needs a look"} body={d.needPermission ? "SubSync cannot read your clients' paid plans. Reconnect and allow plan access." : d.notChecked ? "The next hourly read fills this in." : "Every client on a paid plan from you is paid up."} />
+        <EmptyState title={d.needPermission ? "Needs permission: reconnect" : d.notChecked ? "Plans not read yet" : "No plan needs a look"} body={d.needPermission ? "SubSync cannot read your clients' paid plans. Reconnect and allow plan access." : d.notChecked ? "The next hourly read fills this in." : "Every client plan SubSync could read is paid up."} />
       ) : (
         <ul className="cl2-cards" aria-label="Plans needing attention">
           {rows.map((x) => <PlanCard key={x.locationId} x={x} onOpen={onOpen} onPayments={onPayments} onSaved={() => { setCursors([null]); setRev((n) => n + 1); }} say={setMsg} api={api} />)}

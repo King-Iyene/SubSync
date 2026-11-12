@@ -8,7 +8,7 @@ import { Badge, Btn, Card, Empty, ErrorBox, ExtLink, inputClass, Loading, timeAg
 import { MeetingInbox } from "./meeting-inbox";
 import { CallsToLog } from "./meeting-logged";
 import { CoachView, ConnectStrip, FollowUps, useMnHome } from "./meeting-extra";
-import { CallPanel, MeetingsList } from "./meeting-list";
+import { CallPanel, lastSevenDays, MeetingsList } from "./meeting-list";
 import { AccountSetup, MyMeetingSetup, type SetupData } from "./meeting-setup";
 import { AutoNotesCard, SlackAutoCard } from "./am-auto-card";
 
@@ -29,15 +29,17 @@ export type MnFlags = { list?: boolean; followups?: boolean; coach?: boolean };
 export function MeetingsView({ logged = false, outcomes = false, list = false, followups = false, coach = false, go }: { logged?: boolean; outcomes?: boolean; go?: (view: "appointments") => void } & MnFlags = {}) {
   const [tab, setTab] = useState(0);
   const [openCall, setOpenCall] = useState<string | null>(null);
+  // The card counts the last 7 days. "Show these calls" opens the list on exactly those days, and the list says so plainly.
+  const [week, setWeek] = useState<{ from: string; to: string } | null>(null);
   // Stage E2b: what a person saves and where, and (for admins) the account's rules and contact fields. Read once, shared by both tabs.
   const setup = useData<SetupData>("meeting-setup");
   const home = useMnHome();
   const inboxAt = list ? 1 + (followups ? 1 : 0) + (coach ? 1 : 0) : 0;
   return (
     <Page title="Meeting notes" subtitle="After a recorded call, SubSync adds the summary and action items to the contact, written as you. A call it cannot place waits for you to pick the contact.">
-      {list && home.data && <div className="mb-4"><ConnectStrip home={home.data} reload={home.reload} fx={home.fx} /></div>}
+      {list && home.data && <div className="mb-4"><ConnectStrip home={home.data} reload={home.reload} fx={home.fx} onShowWeek={() => { setWeek(lastSevenDays()); setTab(0); }} /></div>}
       <ModuleTabs label="Meeting notes sections" pill wrap value={tab} onChange={setTab} tabs={[
-        ...(list ? [{ label: "Meetings", node: <MeetingsList onOpenAppointment={go ? () => go("appointments") : undefined} /> }] : []),
+        ...(list ? [{ label: "Meetings", node: <MeetingsList onOpenAppointment={go ? () => go("appointments") : undefined} week={week} onClearWeek={() => setWeek(null)} /> }] : []),
         ...(list && followups ? [{ label: "Follow-ups", node: <FollowUps home={home.data} onOpenCall={setOpenCall} /> }] : []),
         ...(list && coach ? [{ label: "Coaching", node: <CoachView /> }] : []),
         { label: "My Meeting inbox", node: <MeetingInbox /> },

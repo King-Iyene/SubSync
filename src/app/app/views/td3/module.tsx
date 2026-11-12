@@ -249,7 +249,7 @@ export function TodayTabBlocks({ location, level, go, open, setTab, saveOn, open
 
             {t.items.length === 0 && t.accounts > 0 ? (
               <section className="td-clear" data-testid="td-allclear" aria-label="All clear">
-                <h2 className="td-h2">Nothing needs you right now.</h2>
+                <h2 className="td-h2">{t.needsPermission > 0 ? `Nothing urgent in what SubSync can read. Not known for ${num(t.needsPermission)} ${t.needsPermission === 1 ? "account" : "accounts"}: needs permission.` : "Nothing needs you right now."}</h2>
                 <p className="ap-fine">{t.allClear && t.allClear.fixedSinceYesterday > 0 ? `${num(t.allClear.fixedSinceYesterday)} ${t.allClear.fixedSinceYesterday === 1 ? "thing was" : "things were"} fixed since yesterday${t.allClear.lastFixedAt ? `. The last one ${ago(t.allClear.lastFixedAt)}` : ""}.` : "We will tell you here the moment something needs someone."} <button type="button" className="ap-link" onClick={() => setTab("proof")}>Open Proof</button></p>
               </section>
             ) : (

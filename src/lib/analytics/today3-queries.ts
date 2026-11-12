@@ -166,7 +166,7 @@ export async function today(s: Scope, one: string | null, now = Date.now()): Pro
   const [extra, tz, ledger, mine, hist] = await Promise.all([oldestAndMoney(s.inst, byKindIds, now), zoneOf(s.inst, ids), doneToday(s.inst, ids, now), mineOf(s, ids), historyStartsOf(s.inst, ids)]);
   const ranked = rankItems(raw.map((r) => ({ ...r, ...(extra.get(r.kind) ?? {}) }))).map((it) => { const o = raw.find((r) => r.kind === it.kind)?.labelOverride; return o ? { ...it, label: o } : it; });
   const items = ranked.slice(0, MAX_ITEMS);
-  const { headline, button } = headlineOf(items, cores.length);
+  const { headline, button } = headlineOf(items, cores.length, cores.filter((c) => c.needsPermission.length > 0).length);
   const counts = await apptCounts(s.inst, ids);
   const needsPermission = cores.filter((c) => c.needsPermission.length > 0).length;
   void f;

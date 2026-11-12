@@ -255,12 +255,14 @@ export async function connectedPeople(installationId: string): Promise<Array<{ o
 }
 
 /** This week's counts for the proof receipt and Today: calls held in the last 7 days, how many are on a contact, how many have no next step, how many wait to be matched. Counts only. */
-export async function weekCounts(installationId: string, accounts: string[] | null): Promise<{ held: number; logged: number; noNextStep: number; waiting: number }> {
+/** With `ownerUserId` only that person's own calls are counted, the same calls the Meetings list shows. The window starts at the first moment of the day 7 days ago, so the list can use the same two dates. */
+export async function weekCounts(installationId: string, accounts: string[] | null, ownerUserId: string | null = null): Promise<{ held: number; logged: number; noNextStep: number; waiting: number }> {
   const db = sql();
   const [r] = await db`
     select count(*)::int held, (count(*) filter (where m.status in ('saved', 'dry_run')))::int logged, (count(*) filter (where jsonb_array_length(m.action_items) = 0))::int no_next,
       (count(*) filter (where m.status = 'needs_contact' and m.matched_contact_id is null))::int waiting
-    from meetings m where m.installation_id = ${installationId} and m.status = any(${LIVE}::text[]) and coalesce(m.started_at, m.created_at) >= now() - interval '7 days'
+    from meetings m where m.installation_id = ${installationId} and m.status = any(${LIVE}::text[]) and coalesce(m.started_at, m.created_at) >= (now() - interval '7 days')::date
+      ${ownerUserId ? db`and m.owner_ghl_user_id = ${ownerUserId}` : db``}
       ${accounts ? db`and (m.matched_location_id = any(${accounts}::text[]) or m.owner_ghl_user_id in (select u.ghl_user_id from user_connections u where u.installation_id = ${installationId} and u.provider = 'fathom' and u.home_location_id = any(${accounts}::text[])))` : db``}`.catch(() => [undefined]);
   return { held: Number(r?.held ?? 0), logged: Number(r?.logged ?? 0), noNextStep: Number(r?.no_next ?? 0), waiting: Number(r?.waiting ?? 0) };
 }

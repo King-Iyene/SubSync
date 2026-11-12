@@ -50,9 +50,11 @@ export function rankItems(raw: Raw[]): Td3Item[] {
 }
 
 /** The one sentence at the top and the one button. */
-export function headlineOf(items: readonly Td3Item[], accounts: number): { headline: string; button: Td3Today["button"] } {
+export function headlineOf(items: readonly Td3Item[], accounts: number, needsPermission = 0): { headline: string; button: Td3Today["button"] } {
   if (accounts === 0) return { headline: "No client accounts yet.", button: null };
   const first = items[0];
+  // Never say "nothing needs you" when part of the data could not be read.
+  if (!first && needsPermission > 0) return { headline: `Not known for ${needsPermission} ${needsPermission === 1 ? "account" : "accounts"}: needs permission. The rest shows nothing urgent.`, button: null };
   if (!first) return { headline: "Nothing needs you right now.", button: null };
   const t = KIND_TEXT[first.kind];
   const second = items[1];

@@ -178,7 +178,9 @@ export function todayOf(i: { rows: Cl2Row[]; planAccess: PlanAccess }): { headli
   const reconnect = rows.filter((r) => r.plan.state === "needs_permission").length;
   if (reconnect > 0 && i.planAccess === "needs_permission") return { headline: "SubSync cannot read your clients' paid plans yet. Reconnect and allow plan access.", button: { label: "See why", kind: "setup", count: reconnect } };
   const watch = rows.filter((r) => r.level === "watch").length;
+  if (i.planAccess === "not_checked" && watch === 0) return { headline: "Not known yet: the client plans have not been read. The next hourly read fills this in.", button: null };
   if (watch > 0) return { headline: `Nothing is urgent. ${plural(watch, "client account is", "client accounts are")} worth an eye.`, button: { label: "See them", kind: "attention", level: "watch", count: watch } };
+  if (reconnect > 0) return { headline: "Not known: needs permission. Some client plans cannot be read, so SubSync cannot call every account fine.", button: { label: "See why", kind: "setup", count: reconnect } };
   return { headline: "All client accounts look fine today.", button: { label: "Open accounts", kind: "accounts", count: rows.length } };
 }
 

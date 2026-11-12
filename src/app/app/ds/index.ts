@@ -38,3 +38,4 @@ export { ViewsMenu } from "./views-menu";
 export { PrintReport, type ReportInput } from "./print-report";
 export { PopMenu, type MenuItem } from "./pop-menu";
 export { useContactActions, ActionStrip, DialNote, type ActionPerson, type ContactActions } from "./contact-actions";
+export { GroupedTabs } from "./grouped-tabs";

@@ -26,10 +26,10 @@ export function MiniStack({ stages }: { stages: PipeCard["mini"] }) {
 function CardView({ c, onOpen }: { c: PipeCard; onOpen: (c: PipeCard) => void }) {
   return (
     <li className="pl-pcard-li">
-      <button type="button" className="pl-pcard" onClick={() => onOpen(c)} data-testid="pl-pcard" aria-label={`${c.accountName}, ${c.name}: ${d(c.openValue)} open. Open its stacks.`}>
+      <button type="button" className="pl-pcard" onClick={() => onOpen(c)} data-testid="pl-pcard" aria-label={`${c.accountName}, ${c.name}: ${d(c.openValue)} open${c.zeroValueCount > 0 ? `, ${c.zeroValueCount} deals without a value, not counted in money` : ""}. Open its stacks.`}>
         <span className="pl-pcard-name" title={c.name}>{c.name}</span>
         <span className="pl-pcard-acct" title={c.accountName}>{c.accountName}</span>
-        <span className="pl-pcard-open tnum">{d(c.openValue)}<small> open · {c.openCount.toLocaleString("en-US")} deals</small></span>
+        <span className="pl-pcard-open tnum">{d(c.openValue)}<small> open · {c.openCount.toLocaleString("en-US")} deals{c.zeroValueCount > 0 && ` · ${c.zeroValueCount.toLocaleString("en-US")} ${c.zeroValueCount === 1 ? "deal" : "deals"} without a value (not counted in money)`}</small></span>
         <MiniStack stages={c.mini} />
         <span className="pl-pcard-foot tnum">
           <span>Won {ds(c.wonValue)}</span>

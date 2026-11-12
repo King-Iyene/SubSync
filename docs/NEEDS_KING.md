@@ -230,3 +230,6 @@ S0.2b needs none (nothing new is read or written in the CRM). S0.4 needs none (i
 
 ## 33. REMINDER: all Unanswered and moat feature switches are ON (11 Nov 2026)
 For testing only. Before any pilot or outside install: run `node --env-file=.env.local --import tsx scripts/set-flags.ts off inbox_,moat_` (or switch off only unfinished ones), confirm the per-account write opt-in is off for non-test accounts (WRITE_GHL_LIVE is true), and add the `conversations.write` scope for Clear junk in the next version release.
+
+## 34. Test deals with values (for judging the pipeline funnel)
+Every test deal is $0, so the funnel cannot be judged. In KD Squares Test, create 5 test deals with a value and an owner (for example $500 to $20,000, spread over three steps, two different owners, one in a late step). Then open Pipeline, Money flow. Until then, click "See an example" there to see the shape with made-up numbers (marked Example).

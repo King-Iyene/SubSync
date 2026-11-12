@@ -3,7 +3,7 @@
 import { usePageRange } from "../../ds/page-range";
 import { useEffect, useMemo, useState } from "react";
 import type { Pp3List, Pp3Options } from "@/lib/analytics/people3-types";
-import { EmptyState, ModuleTabs, OpenLeadButton, Page } from "../../ds";
+import { EmptyState, GroupedTabs, OpenLeadButton, Page } from "../../ds";
 import type { GoFn } from "../../nav";
 import "../speed6.css";
 import "../speed-ui.css";
@@ -30,6 +30,13 @@ const TIPS: Record<TabKey, [string, string]> = {
   // Restored from the earlier Team page (a revamp adds, never removes): open and won value, stale deals, win rate, reply pace and show rate per owner, and the rename.
   owners: ["Pipeline owners", "Open and won value, stale deals, win rate, reply pace and show rate for each owner. You can rename a person."],
 };
+// Grouped under plain names; every page is in a group and none is removed.
+const PP_GROUPS = [
+  { label: "People", tip: "Who does what, and how they compare.", keys: ["today", "scorecards", "leaderboard", "workload", "owners"] },
+  { label: "Money", tip: "Deals won, open and at risk per person.", keys: ["money"] },
+  { label: "Coaching and access", tip: "Coaching notes, roles and who works where.", keys: ["coaching", "roles", "access"] },
+  { label: "Proof", tip: "A summary for a client.", keys: ["proof"] },
+];
 const FLAG_OF: Record<TabKey, string> = { today: "pp_today", scorecards: "pp_scorecards", workload: "pp_workload", leaderboard: "pp_leaderboard", money: "pp_money", coaching: "pp_coaching", access: "pp_access", proof: "pp_proof", roles: "pp_roles", owners: "pp_module" };
 const OWN_TABS: TabKey[] = ["today", "scorecards", "leaderboard", "coaching"];
 const NO_PERIOD: TabKey[] = ["today", "workload", "coaching", "access", "roles", "owners"];
@@ -65,7 +72,7 @@ export function TeamModule({ go }: { go: GoFn }) {
     const all = (Object.keys(TIPS) as TabKey[]).filter((k) => !own || OWN_TABS.includes(k));
     return all.filter((k) => flags === null || flags[FLAG_OF[k]] !== false);
   }, [flags, own]);
-  const [tab, setTab] = useState<TabKey>("today"), active = tabs.includes(tab) ? tab : tabs[0] ?? "today", index = Math.max(0, tabs.indexOf(active));
+  const [tab, setTab] = useState<TabKey>("today"), active = tabs.includes(tab) ? tab : tabs[0] ?? "today";
   // The dates are the date bar's (one range for the whole app): every read below asks for exactly them, and waits until they are known.
   const filters = useMemo<PpParams>(() => ({ from: bar.ready ? bar.from : undefined, to: bar.ready ? bar.to : undefined, location: location || undefined }), [bar.ready, bar.from, bar.to, location]);
   // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -99,7 +106,7 @@ export function TeamModule({ go }: { go: GoFn }) {
         {opt.data?.problem && <p className="ap-fine mb-2" role="status">{opt.data.problem}</p>}
         {opt.data?.usersState === "needs_permission" && <p className="ap-note mb-2" role="status" data-testid="pp-needs-permission"><b>{RECONNECT}.</b> We could not read the list of people in your CRM, so some names and roles are missing. Reconnect SubSync and approve it.</p>}
         <div className="pp-box">
-          <ModuleTabs pill label="Team sections" tabs={tabs.map((k) => ({ label: TIPS[k][0], tip: TIPS[k][1], node: null }))} value={index} onChange={(i) => { setCoachId(undefined); setTab(tabs[i]); }} />
+          <GroupedTabs testId="pp-groups" groups={PP_GROUPS} available={tabs} active={active} labels={Object.fromEntries(tabs.map((k) => [k, TIPS[k][0]]))} tips={Object.fromEntries(tabs.map((k) => [k, TIPS[k][1]]))} onSelect={(k) => { setCoachId(undefined); setTab(k as TabKey); }} label="Team sections" />
           {(showPeriod || showAccount) && (
             <div className="ap-head print:hidden" role="group" aria-label="Filters">
               {showPeriod && <span className="ap-fine" data-testid="pp-dates">Dates: {bar.label}, from the bar above.</span>}

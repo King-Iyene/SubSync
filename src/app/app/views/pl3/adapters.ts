@@ -42,7 +42,7 @@ export function flowOf(m: Pl3MoneyFlow | null, replay: Pl3Replay | null): PlMone
   return {
     pipelineName: pipe?.name ?? "Pipeline", periodLabel: m?.period ? `${m.period.from.slice(0, 10)} to ${m.period.to.slice(0, 10)}` : "",
     stages: stages.map((s, i) => ({
-      id: s.id, name: s.name, order: s.order, count: s.openCount, valueCents: c(s.openValue), staleCount: s.clog.count, staleValueCents: c(s.clog.value),
+      id: s.id, name: s.name, order: s.order, count: s.openCount, valueCents: c(s.openValue), noValueCount: s.noValueCount ?? 0, staleCount: s.clog.count, staleValueCents: c(s.clog.value),
       medianDwellDays: s.dwell.enough ? s.dwell.medianDays : null, normalDwellDays: s.dwell.enough ? s.dwell.normalDays : null, lostCount: lostBy[i].count, lostValueCents: c(lostBy[i].value),
     })),
     drains: [...reasons.entries()].map(([reason, x]) => ({ reason, count: x.count, valueCents: c(x.value) })).sort((a, b) => b.valueCents - a.valueCents),

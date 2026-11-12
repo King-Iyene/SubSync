@@ -34,14 +34,17 @@ const plural = (n: number, one: string, many: string) => `${n.toLocaleString("en
 const cash = (cur: string, n: number) => `${cur === "USD" ? "$" : `${cur} `}${Math.round(n).toLocaleString("en-US")}`;
 
 /** The one-sentence "what to do today" for money. Plain words, always from the counts. */
-export function todayLine(c: Record<Cl3Bucket, number>, atRisk: Array<{ currency: string; monthly: number }>): { headline: string; bucket: Cl3Bucket | null } {
+export function todayLine(c: Record<Cl3Bucket, number>, atRisk: Array<{ currency: string; monthly: number }>, read: "ok" | "needs_permission" | "not_checked" = "ok"): { headline: string; bucket: Cl3Bucket | null } {
   const risk = atRisk[0] && atRisk[0].monthly > 0 ? ` (about ${cash(atRisk[0].currency, atRisk[0].monthly)} a month at the plan price)` : "";
   if (c.failing > 0) return { headline: `${plural(c.failing, "client has", "clients have")} a payment that did not go through${risk}. Ask them to update their card.`, bucket: "failing" };
   if (c.unpaid > 0) return { headline: `${plural(c.unpaid, "client plan is", "client plans are")} cancelled, paused or in a state to check${risk}.`, bucket: "unpaid" };
   if (c.app_missing > 0) return { headline: `SubSync is missing on ${plural(c.app_missing, "client account", "client accounts")}. Install it from your CRM's app screen.`, bucket: "app_missing" };
   if (c.empty_wallet > 0) return { headline: `${plural(c.empty_wallet, "client account has", "client accounts have")} an empty credit balance, so texts and calls may stop.`, bucket: "empty_wallet" };
   if (c.no_plan > 0) return { headline: `${plural(c.no_plan, "client account is", "client accounts are")} not on a paid plan from you.`, bucket: "no_plan" };
-  return { headline: "Every client plan is paid up. Nothing to chase today.", bucket: null };
+  // Never reassure when the data could not be read.
+  if (read === "needs_permission") return { headline: "Not known: needs permission. SubSync cannot read the client plans yet, so it cannot say who is paid up. Reconnect and allow plan access.", bucket: null };
+  if (read === "not_checked") return { headline: "Not known yet: the plans have not been read. The next hourly read fills this in.", bucket: null };
+  return { headline: "Every client plan SubSync could read is paid up. Nothing to chase today.", bucket: null };
 }
 
 const word = (v: string | null) => (v ? v.replace(/_/g, " ") : "nothing");

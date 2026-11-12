@@ -109,8 +109,8 @@ test("a Fathom delivery gets a talk share only when the transcript was asked for
 
 test("the weekly line is counts only and says nothing when no call was held", () => {
   assert.equal(weeklyLine({ held: 0, logged: 0, noNextStep: 0, waiting: 0 }), null);
-  assert.equal(weeklyLine({ held: 1, logged: 1, noNextStep: 0, waiting: 0 }), "1 recorded call this week, 1 on a contact.");
-  assert.equal(weeklyLine({ held: 8, logged: 6, noNextStep: 3, waiting: 2 }), "8 recorded calls this week, 6 on a contact, 3 with no next step, 2 waiting to be matched.");
+  assert.equal(weeklyLine({ held: 1, logged: 1, noNextStep: 0, waiting: 0 }), "1 recorded call in the last 7 days, 1 on a contact.");
+  assert.equal(weeklyLine({ held: 8, logged: 6, noNextStep: 3, waiting: 2 }), "8 recorded calls in the last 7 days, 6 on a contact, 3 with no next step, 2 waiting to be matched.");
 });
 
 test("privacy and tenancy are in the SQL itself: every call read names the installation and the owner, a task needs a certain contact, and no screen text names the vendor", () => {

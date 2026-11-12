@@ -143,7 +143,7 @@ export function talkShare(turns: ReadonlyArray<{ speaker: string | null; email: 
 /** The one weekly line for the proof receipt and Today. Counts only; null when no call was held (nothing is said rather than "0 calls"). */
 export function weeklyLine(w: { held: number; logged: number; noNextStep: number; waiting: number }): string | null {
   if (w.held <= 0) return null;
-  const parts = [`${w.held} recorded ${w.held === 1 ? "call" : "calls"} this week, ${w.logged} on a contact`];
+  const parts = [`${w.held} recorded ${w.held === 1 ? "call" : "calls"} in the last 7 days, ${w.logged} on a contact`];
   if (w.noNextStep > 0) parts.push(`${w.noNextStep} with no next step`);
   if (w.waiting > 0) parts.push(`${w.waiting} waiting to be matched`);
   return `${parts.join(", ")}.`;

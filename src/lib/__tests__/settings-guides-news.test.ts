@@ -31,7 +31,7 @@ test("New badges: recent, feature on, not dismissed, one per page", () => {
   const all = newViews(now, () => true, new Set());
   assert.ok(all.has("settings") && all.has("payments"));
   assert.ok(!newViews(now, (f) => f !== "pm_module", new Set()).has("payments"));
-  assert.ok(!newViews(now, () => true, new Set(["st-settings"])).has("settings"));
+  assert.ok(!newViews(now, () => true, new Set(["st-settings", "st-sale-basis"])).has("settings"));
   assert.equal(newViews(Date.parse("2027-03-01T00:00:00Z"), () => true, new Set()).size, 0, "old news carries no badge");
   assert.ok(NEWS.every((e) => isFresh(e, now) || true));
 });

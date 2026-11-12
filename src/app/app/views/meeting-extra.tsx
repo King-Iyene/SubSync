@@ -29,7 +29,7 @@ export function useMnHome() {
   return { ...d, data: sample ?? d.data, loading: fx ? false : d.loading, fx };
 }
 
-export function ConnectStrip({ home, reload, fx }: { home: Home; reload: () => void | Promise<unknown>; fx: boolean }) {
+export function ConnectStrip({ home, reload, fx, onShowWeek }: { home: Home; reload: () => void | Promise<unknown>; fx: boolean; /** Opens the Meetings list on exactly the calls the card counts (the last 7 days). */ onShowWeek?: () => void }) {
   const api = useApiClient();
   const c = home.connection;
   const ok = c?.status === "connected";
@@ -81,7 +81,7 @@ export function ConnectStrip({ home, reload, fx }: { home: Home; reload: () => v
         </div>
       )}
       {msg && <p role={msg.ok ? "status" : "alert"} className={`mt-2 text-sm ${msg.ok ? "" : "text-destructive"}`}>{msg.text}</p>}
-      {home.week?.line && <p className="mt-2 text-xs text-muted-foreground" data-testid="mn-week">{home.week.line}</p>}
+      {home.week?.line && <p className="mt-2 text-xs text-muted-foreground" data-testid="mn-week">{home.week.line}{onShowWeek && home.week.held > 0 && <> <button type="button" className="underline" onClick={onShowWeek} data-testid="mn-week-show">Show these {home.week.held} {home.week.held === 1 ? "call" : "calls"}</button></>}</p>}
     </section>
   );
 }
