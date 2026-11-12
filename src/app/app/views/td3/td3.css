@@ -58,3 +58,64 @@
 .td-tile .td-cap { font-size: 0.75rem; color: var(--muted-foreground); }
 .td-tile .td-chg { font-size: 0.75rem; font-variant-numeric: tabular-nums; border-radius: 999px; padding: 0 7px; border: 1px solid color-mix(in srgb, var(--s6-cyan) 45%, transparent); }
 .td-oldhead .t-display { font-size: 1.1rem; line-height: 1.4; } .td-oldhead section { margin-bottom: 8px; }
+
+/* ---- Today, compact (Nov 12): slim header, hero strip, ranked rows with a status bar, two columns, tighter type. Flat; accent = app cyan; status colours only for a status. ---- */
+.td-page { display: flex; flex-direction: column; gap: 10px; }
+.td-head { display: flex; align-items: baseline; gap: 10px; margin: 0 0 2px; }
+.td-head h1 { margin: 0; font-size: 1.125rem; font-weight: 650; line-height: 1.3; }
+.td-head span { font-size: 0.8125rem; color: var(--muted-foreground); }
+.td-compact { gap: 12px; }
+.td-compact .cl-h, .td-h2 { margin: 0 0 6px; font-size: 0.8125rem; font-weight: 650; letter-spacing: 0.02em; color: var(--muted-foreground); text-transform: none; }
+.td-compact .cl-sentence { font-size: 0.9375rem; line-height: 1.45; margin: 0 0 6px; }
+.td-compact .ap-fine { font-size: 0.8125rem; }
+.td-compact .br-card, .td-compact .cf-card, .td-compact .fn-card, .td-compact .cl-today { padding: 12px 14px; margin: 0; border-radius: 12px; }
+.td-compact .br-item { padding: 6px 0; }
+.td-btns { display: flex; flex-wrap: wrap; gap: 8px; }
+.td-hero { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.td-hcard { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--s6-edgec) 26%, transparent); border-left: 3px solid var(--s6-line); border-radius: 10px; background: var(--s6-surf); }
+.td-hcard[data-tone="red"] { border-left-color: var(--s6-red); } .td-hcard[data-tone="amber"] { border-left-color: var(--s6-amber); } .td-hcard[data-tone="green"] { border-left-color: var(--s6-green); }
+.td-hlabel { font-size: 0.75rem; color: var(--muted-foreground); }
+.td-hnum { padding: 0; margin: 0; min-height: 0; text-align: left; align-self: flex-start; font-size: 1.5rem; font-weight: 650; line-height: 1.15; font-variant-numeric: tabular-nums; background: none; border: 0; padding: 0; color: var(--foreground); cursor: default; overflow-wrap: anywhere; }
+button.td-hnum { cursor: pointer; text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--s6-cyan) 55%, transparent); text-underline-offset: 4px; }
+button.td-hnum:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; border-radius: 4px; }
+.td-hnote { font-size: 0.75rem; color: var(--muted-foreground); line-height: 1.35; }
+.td-hgo { align-self: flex-start; font-size: 0.75rem; margin-top: 2px; }
+.td-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: start; }
+.td-col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.td-grid:empty, .td-col:empty { display: none; }
+.td-compact .td-list { gap: 6px; }
+.td-compact .td-item { grid-template-columns: 22px minmax(0, 1fr) auto; gap: 10px; padding: 8px 12px; border-radius: 10px; border-left: 3px solid var(--s6-line); align-items: center; }
+.td-compact .td-item[data-bar="red"] { border-left-color: var(--s6-red); } .td-compact .td-item[data-bar="amber"] { border-left-color: var(--s6-amber); }
+.td-compact .td-rank { font-size: 0.875rem; line-height: 1.4; }
+.td-compact .td-label { font-size: 0.9375rem; }
+.td-compact .td-side { flex-direction: row; align-items: center; gap: 12px; }
+.td-compact .td-side .s6-btn { min-height: 34px; padding-top: 0; padding-bottom: 0; }
+.td-compact .td-done { font-size: 0.8125rem; }
+.td-compact .td-clear { padding: 10px 14px; }
+.td-about { border: 1px solid color-mix(in srgb, var(--s6-line) 70%, transparent); border-radius: 10px; padding: 8px 12px; }
+.td-about > summary { cursor: pointer; font-size: 0.8125rem; font-weight: 600; color: var(--muted-foreground); }
+.td-about[open] > summary { margin-bottom: 6px; }
+.td-compact .td-more-below { margin-top: 4px; padding-top: 12px; }
+@media (max-width: 900px) { .td-grid { grid-template-columns: minmax(0, 1fr); } .td-hero { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 700px) {
+  .td-compact .td-item { grid-template-columns: 20px minmax(0, 1fr); } .td-compact .td-side { grid-column: 2; flex-wrap: wrap; gap: 4px 12px; }
+  .td-hnum { font-size: 1.25rem; }
+}
+
+/* Design spec for the four Today tabs: type 12 / 14 / 18 / 28 (0.75 / 0.875 / 1.125 / 1.75rem), 8px grid (gaps 8, 12, 16), ONE card (1px soft border, 10-12px radius, flat surface), accent = app cyan, status colours only
+   for a status (red late, amber needs a look, green done), one icon set (lucide), one primary button per card. Hierarchy: one hero number, supporting numbers, small charts. */
+.td-card2 { border: 1px solid color-mix(in srgb, var(--s6-edgec) 26%, transparent); border-radius: 12px; padding: 12px 14px; background: var(--s6-surf); }
+.td-settings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: start; }
+.td-settings > * { min-width: 0; }
+.td-settings .td-form { gap: 10px; max-width: none; }
+.td-settings .td-form label { font-size: 0.8125rem; }
+.td-compact .td-receipt { padding: 12px 14px; gap: 8px; border-radius: 12px; }
+.td-compact .td-big { gap: 6px 24px; } .td-compact .td-big b { font-size: 1.75rem; } .td-compact .td-big span { font-size: 0.75rem; }
+.td-compact .td-lines { font-size: 0.875rem; }
+.td-compact .td-tiles { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 8px; }
+.td-compact .td-tile { padding: 10px 12px; border-radius: 10px; gap: 2px; }
+.td-compact .td-tile b { font-size: 1.5rem; } .td-compact .td-tile .td-name { font-size: 0.75rem; }
+.td-compact .td-card { padding: 12px 14px 14px; border-radius: 12px; } .td-compact .td-card h3 { font-size: 0.875rem; } .td-compact .td-card header p { font-size: 0.75rem; }
+.td-compact .td-dash { gap: 12px; } .td-compact .td-card > header { margin-bottom: 8px; }
+.td-compact .cl-steps li { padding: 6px 0; font-size: 0.875rem; }
+@media (max-width: 900px) { .td-settings { grid-template-columns: minmax(0, 1fr); } }

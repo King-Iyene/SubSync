@@ -46,3 +46,11 @@ export function useTd<T>(part: string, p: TdParams = {}, off = false) {
 
 /** A 404 from the part's flag: the screen shows its own plain note instead of an error. */
 export const notSwitchedOn = (e: unknown) => /not switched on/i.test(String((e as { message?: string } | null)?.message ?? e ?? ""));
+
+/** True once a read has been loading for `ms` (default 12 s): the screen then says it is slow and offers Try again, so a loading block never sits there for the full minute the request waits. */
+export function useSlow(on: boolean, ms = 12_000): boolean {
+  const [slow, setSlow] = useState(false);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { if (!on) { setSlow(false); return; } const t = setTimeout(() => setSlow(true), ms); return () => clearTimeout(t); }, [on, ms]);
+  return on && slow;
+}

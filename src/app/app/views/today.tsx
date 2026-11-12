@@ -10,6 +10,7 @@ import { ApiProvider, RootApiProvider, useApiClient, useData } from "../session"
 import { EmptyState, Page, remember, remembered, Skeleton, SkeletonRows } from "../ds";
 import { Btn, ErrorBox } from "../ui";
 import { TodayPage } from "./today-page";
+import { useSlow } from "./td3/data";
 import { usePageRange } from "../ds/page-range";
 import "./today-theme.css";
 
@@ -70,6 +71,7 @@ function TodayBody({ go, kind, picked, setPicked, mode }: { go: GoFn; kind: Acce
   const growth = useData<GrowthData>(bar.ready ? `today/growth?${bar.qs}` : null);
   const seg = useData<Segments>(kind === "agency" ? "segments" : null);
   const [syncing, setSyncing] = useState(false);
+  const slow = useSlow(today.loading && !today.data);
 
   const options = useMemo(() => (seg.data?.accounts ?? []).filter((a) => !a.ignored).map((a) => ({ id: a.id, name: a.name })), [seg.data]);
   // A choice that names an account this company does not have (an old remembered choice, a typed address) is dropped; the server ignores it anyway.
@@ -85,8 +87,11 @@ function TodayBody({ go, kind, picked, setPicked, mode }: { go: GoFn; kind: Acce
   // "See all" next to "Showing KD Squares" also ends the shell's own one-account narrowing (the shell reads this), so every page shows every client account again.
   const clearShell = () => { try { window.dispatchEvent(new Event("subsync-clear-account-filter")); } catch { /* the page still shows every account */ } };
 
-  if (today.error && !t) return <Page title="Today"><ErrorBox error={today.error} onRetry={today.reload} /></Page>;
+  // Inside the new Today screen (modes "below" and "dashboard") there is no second "Today" heading and no tall block: a slim line, then "taking longer" with Try again after 12 seconds.
+  const inside = mode !== "full";
+  if (today.error && !t) return inside ? <ErrorBox error={today.error} onRetry={today.reload} /> : <Page title="Today"><ErrorBox error={today.error} onRetry={today.reload} /></Page>;
   if (!t) {
+    if (inside) return slow ? <EmptyState title="This is taking longer than usual" body="Nothing was lost. The numbers are still being worked out." action={<Btn onClick={() => void today.reload()}>Try again</Btn>} /> : <div role="status" aria-busy="true" aria-label="Working out what needs you today"><Skeleton className="h-10 w-full" /></div>;
     return (
       <Page title="Today">
         <div className="mb-8 space-y-3" role="status" aria-busy="true" aria-label="Working out what needs you today"><Skeleton className="h-14 w-3/4" /><Skeleton className="h-10 w-40" /></div>

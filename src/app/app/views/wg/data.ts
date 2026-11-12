@@ -2,7 +2,7 @@
 
 import type { WgAccount, WgBucket, WgList, WgRow, WgSettings, WgSummary, WgUsage } from "@/lib/analytics/wg-types";
 import { FORMULA_BURN, FORMULA_SPIKE, whyLine } from "@/lib/analytics/wg-core";
-import { SECTION_LABEL, SECTIONS, type Brief } from "@/lib/analytics/br-core";
+import { dayLabel, SECTION_LABEL, SECTIONS, type Brief } from "@/lib/analytics/br-core";
 import { useData } from "../../session";
 
 // The one place the wallet screens and the brief read. Real parts of GET /api/app/wg?part=... and GET /api/app/br?part=... Sample data appears ONLY when the address carries ?wgfx and every screen
@@ -57,7 +57,7 @@ export const sampleSettings = (): WgSettings => ({ canEdit: true, lowAmount: 25,
 export const sampleUsage = (): WgUsage => ({ state: "ok", days: 7, total: 42.18, byType: [{ type: "SMS", amount: 24.6, count: 310 }, { type: "Call", amount: 11.4, count: 38 }, { type: "Email", amount: 6.18, count: 912 }], byDay: [], note: "Sample data." });
 
 export const sampleBrief = (): Brief => ({
-  day: new Date().toISOString().slice(0, 10), headline: "5 of 7 things need you today.", more: 2, accounts: 6, formula: "Adds the estimates of missed leads, deals past their usual time in a stage, and failed or late payments. A deal that is in two lists may be counted twice, so read it as a ceiling, not a promise. Each part is an estimate from your own history.",
+  day: new Date().toISOString().slice(0, 10), dayText: dayLabel(new Date().toISOString().slice(0, 10)), headline: "5 of 7 things need you today.", more: 2, accounts: 6, formula: "Adds the estimates of missed leads, deals past their usual time in a stage, and failed or late payments. A deal that is in two lists may be counted twice, so read it as a ceiling, not a promise. Each part is an estimate from your own history.",
   dollar: { amount: 18200, text: "Up to about $18,200 could be at stake across these lists (estimate)." },
   bySection: Object.fromEntries(SECTIONS.map((s) => [s, 1])) as Brief["bySection"],
   items: [

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { SECTIONS, SECTION_LABEL, type Brief, type Section } from "@/lib/analytics/br-core";
 import type { WgSummary } from "@/lib/analytics/wg-types";
 import { usd } from "@/lib/analytics/wg-core";
@@ -125,11 +125,12 @@ function BriefSettings({ onClose }: { onClose: () => void }) {
   );
 }
 
-export function BriefCard({ go, openRecover }: { go: GoFn; openRecover?: (loc: string) => void }) {
+export function BriefCard({ go, openRecover, hide }: { go: GoFn; openRecover?: (loc: string) => void; hide?: (key: string) => boolean }) {
   const api = useApiClient(), sample = wgfxOn();
   const live = useData<BriefResp>(sample ? null : "br?part=brief");
   const [settings, setSettings] = useState(false), [toast, setToast] = useState<string | null>(null), [how, setHow] = useState(false);
-  const b = sample ? sampleBrief() : live.data?.brief ?? null;
+  const b0 = sample ? sampleBrief() : live.data?.brief ?? null;
+  const b = useMemo(() => (b0 && hide ? { ...b0, items: b0.items.filter((i) => !hide(i.key)) } : b0), [b0, hide]);
   const seen = useRef(false);
   // The brief was shown today: recorded once per person per day (the server also keeps it to one row).
   useEffect(() => {
@@ -150,7 +151,7 @@ export function BriefCard({ go, openRecover }: { go: GoFn; openRecover?: (loc: s
   };
   return (
     <section className="br-card" aria-label="Your 7 am brief" data-testid="br-card">
-      <h2 className="cl-h">Your brief for {b.day}</h2>
+      <h2 className="cl-h">Your brief for {b.dayText ?? b.day}</h2>
       {sample && <p className="ap-fine" role="status" data-testid="br-sample">Sample data: these are not your real clients.</p>}
       <p className="cl-sentence" data-testid="br-headline">{b.headline}</p>
       <ol className="br-list">
@@ -169,6 +170,34 @@ export function BriefCard({ go, openRecover }: { go: GoFn; openRecover?: (loc: s
         <button type="button" className="ap-link" onClick={() => void copyAs("text")} data-testid="br-copy-text">Copy as text</button>
         <button type="button" className="ap-link" onClick={() => void copyAs("slack")} data-testid="br-copy-slack">Copy for Slack</button>
         <button type="button" className="ap-link" aria-expanded={settings} onClick={() => setSettings(!settings)} data-testid="br-settings-open">Brief settings</button>
+        {toast && <span className="ap-fine" role="status">{toast}</span>}
+      </div>
+      {settings && <BriefSettings onClose={() => setSettings(false)} />}
+    </section>
+  );
+}
+
+/** The brief's tools, kept under Today > Settings now that the brief card is no longer drawn on the Today page: Copy as text, Copy for Slack and the brief settings (email, time, sections, test, history). The daily brief email job is unchanged. */
+export function BriefTools() {
+  const api = useApiClient(), sample = wgfxOn();
+  const live = useData<BriefResp>(sample ? null : "br?part=brief");
+  const [settings, setSettings] = useState(false), [toast, setToast] = useState<string | null>(null);
+  if (!sample && live.error && notOn(live.error)) return null;
+  const copyAs = async (kind: "text" | "slack") => {
+    if (sample) { setToast("This is sample data, so there is nothing to copy."); return; }
+    try {
+      const t = await api.get<{ text: string; slack: string }>("br?part=text");
+      setToast((await copy(kind === "text" ? t.text : t.slack)) ? (kind === "text" ? "Copied the brief as text." : "Copied for Slack.") : "Your browser would not copy. Select the text in the test email instead.");
+    } catch (e) { setToast(failText(e)); }
+  };
+  return (
+    <section aria-label="Your 7 am brief" data-testid="br-tools-settings">
+      <h2 className="cl-h mb-2">Your 7 am brief</h2>
+      <p className="ap-fine mb-2">{live.data?.brief ? `${live.data.brief.dayText ?? live.data.brief.day}: ${live.data.brief.headline}` : "One short brief a day. Copy it, or choose when it is emailed."}</p>
+      <div className="br-tools">
+        <button type="button" className="s6-btn" onClick={() => void copyAs("text")} data-testid="br-copy-text">Copy as text</button>
+        <button type="button" className="s6-btn" onClick={() => void copyAs("slack")} data-testid="br-copy-slack">Copy for Slack</button>
+        <button type="button" className="s6-btn" aria-expanded={settings} onClick={() => setSettings(!settings)} data-testid="br-settings-open">Brief settings</button>
         {toast && <span className="ap-fine" role="status">{toast}</span>}
       </div>
       {settings && <BriefSettings onClose={() => setSettings(false)} />}
