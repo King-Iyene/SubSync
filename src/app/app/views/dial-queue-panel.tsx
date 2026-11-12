@@ -1,5 +1,6 @@
 "use client";
 
+import { ExternalLink, ListPlus, SlidersHorizontal } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { useApiClient, useData } from "../session";
 import { WorkflowSetupCard } from "./workflow-setup-card";
@@ -16,7 +17,7 @@ type Item = { locationId: string; contactId: string };
 export const QUEUE_HONESTY = "SubSync cannot start a call itself. The call queue is your CRM's own dialer.";
 
 /** `primary` is the always-live main button of the screen (it can start the review below); `showSend` keeps the plain "Send to your CRM call queue" button when the main button is something else. */
-export function CallQueueCard({ list, items, onPickedDone, picked, primary, showSend = true }: { list: string; items: Item[]; picked?: string[]; onPickedDone?: () => void; primary?: (review: () => void, busy: boolean) => ReactNode; showSend?: boolean }) {
+export function CallQueueCard({ list, items, onPickedDone, picked, primary, tools, showSend = true }: { list: string; items: Item[]; picked?: string[]; onPickedDone?: () => void; primary?: (review: () => void, busy: boolean) => ReactNode; tools?: ReactNode; showSend?: boolean }) {
   const api = useApiClient();
   const st = useData<St>("dial/cq-status");
   const [open, setOpen] = useState(false);
@@ -49,18 +50,20 @@ export function CallQueueCard({ list, items, onPickedDone, picked, primary, show
   const lines = (st.data?.status ?? []).filter((s) => s.autoOn);
 
   return (
-    <div className="mt-4 border-t pt-4" data-testid="cq-card">
-      {primary && <div className="flex flex-wrap items-center gap-3" data-testid="cq-primary-row">{primary(() => void review(), busy)}</div>}
-      <div className={`flex flex-wrap items-center gap-2 ${primary ? "mt-3" : ""}`} role="group" aria-label="Your CRM call queue" data-testid="cq-group">
-        {showSend && <button type="button" className="s6-btn" data-testid="cq-send" disabled={busy || locs.length === 0} onClick={() => void review()}>{picked && picked.length ? "Send selected to CRM call queue" : "Send to your CRM call queue"}</button>}
-        {link && <a className="s6-btn" data-testid="cq-open" href={link} target="_blank" rel="noopener noreferrer">Open your call queue</a>}
-        <button type="button" className="s6-btn" data-testid="cq-setup-open" aria-expanded={open} onClick={() => setOpen(!open)}>{open ? "Hide call queue setup" : "Call queue setup"}</button>
+    <div data-testid="cq-card">
+      {primary && <div className="cm-sec"><div className="cm-primary-row" data-testid="cq-primary-row">{primary(() => void review(), busy)}</div></div>}
+      <div className="cm-toolbar" role="group" aria-label="Your CRM call queue" data-testid="cq-group">
+        {tools}
+        {tools && <span className="cm-tool-sep" aria-hidden />}
+        {showSend && <button type="button" className="cm-tool" data-tip="Adds these people to the call queue in your CRM. You see a preview first." data-testid="cq-send" disabled={busy || locs.length === 0} onClick={() => void review()}><ListPlus aria-hidden />{picked && picked.length ? "Send selected to CRM call queue" : "Send to your CRM call queue"}</button>}
+        {link && <a className="cm-tool" data-tip="Opens your CRM's call queue in a new tab." data-testid="cq-open" href={link} target="_blank" rel="noopener noreferrer"><ExternalLink aria-hidden />Open your call queue</a>}
+        <button type="button" className="cm-tool cm-tool-end" data-tip="Choose the tag or workflow your CRM uses, and turn on the auto queue." data-testid="cq-setup-open" aria-expanded={open} onClick={() => setOpen(!open)}><SlidersHorizontal aria-hidden />{open ? "Hide call queue setup" : "Call queue setup"}</button>
       </div>
-      <p className="s6-label mt-1">{QUEUE_HONESTY}</p>
-      {lines.map((s) => <p key={s.locationId} className="s6-label mt-1" data-testid="cq-status">{nameOf(s.locationId)}: {s.line}</p>)}
+      <div className="cm-sec" hidden={!(msg || lines.length > 0 || prev || open)} data-testid="cq-more">
+      {lines.map((s) => <p key={s.locationId} className="s6-label" data-testid="cq-status">{nameOf(s.locationId)}: {s.line}</p>)}
       {msg && <p className="mt-2 text-sm" role="status" data-testid="cq-msg">{msg}</p>}
       {prev && (
-        <div className="mt-3 rounded-lg border p-3 text-sm" role="dialog" aria-label="Add to your call queue" data-testid="cq-preview">
+        <div className="cm-panel" role="dialog" aria-label="Add to your call queue" data-testid="cq-preview">
           {prev.map((x) => (
             <div key={x.loc} className="mb-2"><p className="font-medium" data-testid="cq-would">{x.name}: {x.p.message}</p>
               {x.p.plan && <p className="s6-label">Skipped: {x.p.plan.skipped.dnd} asked not to be contacted, {x.p.plan.skipped.noPhone} with no phone, {x.p.plan.skipped.outsideHours} outside calling hours, {x.p.plan.skipped.recent} added in the last 24 hours.</p>}
@@ -73,6 +76,8 @@ export function CallQueueCard({ list, items, onPickedDone, picked, primary, show
         </div>
       )}
       {open && <Setup accounts={locs.length ? locs.map((id) => ({ id, name: nameOf(id) })) : accounts} canEdit={st.data?.canEdit === true} onChange={() => void st.reload()} />}
+      </div>
+      <p className="s6-label cm-sec !py-3">{QUEUE_HONESTY}</p>
     </div>
   );
 }
@@ -88,7 +93,7 @@ function Setup({ accounts, canEdit, onChange }: { accounts: Account[]; canEdit: 
   const check = async () => { try { const r = await api.post<{ message: string }>("dial/cq-check", { locationId: loc, route: s?.route, workflowId: s?.workflowId }); setNote(r.message); } catch { setNote("Could not check right now."); } };
   const would = async () => { try { const r = await api.post<Prev>("dial/cq-preview", { locationId: loc, auto: true }); setPv(r.message); } catch { setPv("Could not preview right now."); } };
   return (
-    <div className="mt-3 rounded-lg border p-3 text-sm" data-testid="cq-setup">
+    <div className="cm-panel" data-testid="cq-setup">
       <WorkflowSetupCard loc={loc} canEdit={canEdit} tag={s?.tag ?? "call-now"} />
       {accounts.length > 1 && <select aria-label="Account" className="mb-2 min-h-9 rounded-md border bg-card px-2" value={loc} onChange={(e) => setLoc(e.target.value)}>{accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select>}
       {!s ? <p className="s6-label">Loading...</p> : (

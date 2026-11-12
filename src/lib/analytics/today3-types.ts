@@ -2,7 +2,7 @@
 // REAL synced data only. Every count here is the same count the Clients screen holds for the same account and the same seven days, and every count opens exactly its rows
 // (part=list). Money figures are estimates and say so. History figures carry `historyStarts` (YYYY-MM-DD). Definitions: docs/METRICS.md "Today 3".
 
-export const TD3_PARTS = ["today", "list", "proof", "numbers", "settings", "export", "options"] as const;
+export const TD3_PARTS = ["today", "list", "proof", "numbers", "settings", "export", "options", "money"] as const;
 export type Td3Part = (typeof TD3_PARTS)[number];
 
 export const TD3_FLAGS = ["td_module", "td_today", "td_proof", "td_numbers", "td_email", "td_record"] as const;
@@ -15,7 +15,8 @@ export const TD3_KINDS = [
 export type Td3Kind = (typeof TD3_KINDS)[number];
 
 /** Lists that are not an item of the ranked list: the tiles of Numbers and "my queue". */
-export const TD3_LIST_ONLY = ["open_deals", "all_waiting", "all_noshows", "all_unmarked", "open_noshows", "all_stale", "mine_waiting", "mine_unmarked", "mine_stale"] as const;
+export const TD3_LIST_ONLY = ["open_deals", "all_waiting", "all_noshows", "all_unmarked", "open_noshows", "all_stale", "mine_waiting", "mine_unmarked", "mine_stale",
+  "risk_all", "risk_stale", "risk_waiting", "risk_noshow", "recovered_won"] as const;
 export type Td3ListKind = Td3Kind | (typeof TD3_LIST_ONLY)[number];
 
 /** Which screen of the app holds the full working list for a kind (the one button links there). */
@@ -113,3 +114,26 @@ export type Td3Settings = {
 };
 
 export type Td3Options = { accounts: { locationId: string; name: string }[] };
+
+// ---- the money row at the top of Today (GET ?part=money) ----
+// Every dollar figure is an estimate and says so. A figure that cannot be known is null with a plain `why` (never 0, never a guess). Each count equals the rows its list opens (part=list&kind=...).
+export type Td3RiskCause = "stale" | "waiting" | "noshow";
+export type Td3Money = {
+  /** True for a team member's own queue: the money row is not drawn. */
+  hidden: boolean;
+  atRisk: {
+    dollars: number | null; deals: number;
+    /** Exclusive: a deal is counted under the first cause that fits (quiet, then waiting, then no-show), so the three add up to the total. */
+    byCause: Record<Td3RiskCause, { deals: number; dollars: number | null }>;
+    why: string | null; formula: string;
+  };
+  recovered: {
+    dollars: number | null; deals: number; people: number; days: number;
+    /** Same figure for the 30 days before, only when our record covers them; else null (no change is drawn). */
+    previousDollars: number | null; previousDeals: number | null;
+    historyStarts: string | null; short: boolean; why: string | null; formula: string;
+  };
+  pipeline: { open: number; dollars: number | null; expected: number | null; expectedWhy: string | null; leftOut: number; formula: string };
+  /** The one action worth the most today, or null when nothing can be priced. */
+  biggest: { cause: Td3RiskCause; deals: number; dollars: number; label: string; why: string; list: Td3ListKind } | null;
+};

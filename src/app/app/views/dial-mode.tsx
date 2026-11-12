@@ -1,7 +1,7 @@
 "use client";
 
 import { hotkeyIgnored } from "@/lib/design/ui-logic";
-import { CalendarClock, Check, Copy, Flame, MessageSquareText, PhoneCall, SkipForward, Sparkles, Zap } from "lucide-react";
+import { CalendarClock, Check, ChevronRight, Copy, Flame, MessageSquareText, PhoneCall, SkipForward, Sparkles, Zap } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fmtWhen } from "@/lib/analytics/speed6";
 import { dialPlan } from "@/lib/people/dial";
@@ -21,6 +21,7 @@ import { PrefsCtx, useScripts, ActivityCard, AttemptCard, BestHourCard, Board6, 
 import { CountUp, Fold, TzNote } from "./speed6-base";
 import { useSpeedFilter } from "./speed-filter";
 import "./speed6.css";
+import "./call-cards.css";
 
 // Call mode (stages DIAL and SPEED6, docs/features/DIAL.md and SPEED6.md): a power dialer without telephony. The call is placed in the customer's own CRM phone; SubSync orders the list, feeds it one
 // lead at a time, tracks the redial plan and the lead's own clock, and logs how the call went (its own record, plus a short note, tags and tasks through the one write gateway: a dry run until writes are on).
@@ -45,6 +46,7 @@ function useNowEvery(ms: number) {
 
 const BIG = "ds-press inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-[color-mix(in_srgb,var(--s6-edgec)_25%,transparent)] bg-[color-mix(in_srgb,var(--s6-cyan)_6%,transparent)] px-4 text-[15px] font-medium hover:bg-[color-mix(in_srgb,var(--s6-cyan)_16%,transparent)] focus-visible:outline-2 focus-visible:outline-[var(--ring)] disabled:cursor-not-allowed disabled:opacity-50";
 const PRIMARY = "s6-btn !min-h-12 !px-6 !text-base";
+const initials = (name: string) => { const p = name.replace(/[^\p{L}\p{N} ]/gu, " ").trim().split(/\s+/).filter(Boolean); return ((p[0]?.[0] ?? "?") + (p.length > 1 ? p[p.length - 1][0] : "")).toUpperCase(); };
 const when = (ms: number) => new Date(ms).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 
 /** Provides the server-kept choices (redial plan, goals, scripts, outcome sets) to everything in Call mode; falls back to this browser until the database has them. */
@@ -133,19 +135,23 @@ function DialInner() {
   ) : null;
   const callbackItem = (c: SavedCallback): Item => ({ contactId: c.contactId, locationId: c.locationId, locationName: c.locationName, name: c.name, phone: c.phone, dnd: false, timeZone: c.timeZone, openValue: 0, ageHours: 0, priority: 90, reasons: ["Promised callback"], url: c.url });
   return (
-    <section aria-label="Call mode" data-testid="dial-pick" className="ds-enter">
+    <section aria-label="Call mode" data-testid="dial-pick" className="cm ds-enter">
       <div className="mb-1 flex flex-wrap items-center gap-2">
         <h2 className="text-xl font-semibold tracking-tight">Who do I call next?</h2>
         <InfoTip label="How calling works here" testId="dial-how" text="Calls go through your CRM's own phone, with your own number and provider. SubSync costs nothing extra for calling: it puts the people in order, feeds them to you one at a time, and writes down how each call went." />
       </div>
       <p className="s6-sub">Pick a list and press Start. SubSync never places a call.</p>
       <TzNote />
-      <div className="mb-6 flex flex-wrap gap-2" role="group" aria-label="Choose a list">
-        {(d?.lists ?? [{ id: "missed", label: "Missed calls, no callback", help: "" }]).map((l) => (
-          <button key={l.id} type="button" onClick={() => { setList(l.id); setView("lists"); }} aria-pressed={view === "lists" && list === l.id} title={l.help} data-testid={`dial-list-${l.id}`}
-            className={`ds-press min-h-11 rounded-full border px-4 text-sm font-medium sm:min-h-9 ${view === "lists" && list === l.id ? "border-[var(--s6-cyan)] bg-[color-mix(in_srgb,var(--s6-cyan)_18%,transparent)] text-[var(--s6-btn-ink)] shadow-[0_0_14px_-4px_color-mix(in_srgb,var(--s6-cyan)_70%,transparent)]" : "border-[color-mix(in_srgb,var(--s6-edgec)_20%,transparent)] bg-[color-mix(in_srgb,var(--s6-surf)_80%,transparent)] hover:bg-[color-mix(in_srgb,var(--s6-cyan)_10%,transparent)]"}`}>{l.label}</button>
-        ))}
-        <button type="button" onClick={() => setView("callbacks")} aria-pressed={view === "callbacks"} data-testid="dial-view-callbacks" className={`ds-press inline-flex min-h-11 items-center gap-2 rounded-full border px-4 text-sm font-medium sm:min-h-9 ${view === "callbacks" ? "border-[var(--s6-violet)] bg-[color-mix(in_srgb,var(--s6-violet)_20%,transparent)]" : "border-[color-mix(in_srgb,var(--s6-violet)_35%,transparent)] bg-[color-mix(in_srgb,var(--s6-surf)_80%,transparent)] hover:bg-[color-mix(in_srgb,var(--s6-violet)_12%,transparent)]"}`}><CalendarClock aria-hidden className="size-4" />Today&apos;s callbacks ({todays.length})</button>
+      <div className="cm-seg" role="group" aria-label="Choose a list">
+        {(d?.lists ?? [{ id: "missed", label: "Missed calls, no callback", help: "" }]).map((l) => {
+          const on = view === "lists" && list === l.id;
+          return (
+            <button key={l.id} type="button" onClick={() => { setList(l.id); setView("lists"); }} aria-pressed={on} title={l.help || undefined} data-testid={`dial-list-${l.id}`} className="cm-seg-i">
+              {l.label}{on && d && d.list === l.id && <span className="cm-n" data-testid={`dial-list-count-${l.id}`}>{d.total.toLocaleString("en-US")}</span>}
+            </button>
+          );
+        })}
+        <button type="button" onClick={() => setView("callbacks")} aria-pressed={view === "callbacks"} data-testid="dial-view-callbacks" className="cm-seg-i"><CalendarClock aria-hidden />Today&apos;s callbacks<span className="cm-n">{todays.length}</span></button>
       </div>
 
       {view === "callbacks" ? (
@@ -162,38 +168,41 @@ function DialInner() {
       ) : queue.error ? <ErrorState error={queue.error} onRetry={queue.reload} /> : !d ? <SkeletonRows rows={3} label="Building your call list..." /> : d.items.length === 0 ? (
         <EmptyState title={list === "missed" ? "No missed calls to call back" : list === "redial" ? "Nobody to try again" : "Nobody to call on this list"} body={d.ownOnly ? "Nobody assigned to you is waiting on this list. Pick another list." : list === "redial" ? "People who did not pick up show up here for another try. Call someone first." : "Nothing is waiting here right now. Pick another list, or check back after the next sync."} />
       ) : (
-        <div className="s6-card mb-8" data-glow="active" data-testid="dial-ready">
-          <p className="s6-big" data-testid="dial-count"><button type="button" className="s6-link text-left" data-testid="dial-count-open" onClick={() => setPop({ title: "Ready to call", note: d.total > d.items.length ? `${(page * pg.size + 1).toLocaleString("en-US")} to ${(page * pg.size + d.items.length).toLocaleString("en-US")} of ${d.total.toLocaleString("en-US")}, hottest first.` : undefined, rows: touches.filter((x) => readyKeys.has(x.t.key)).map(toPerson), selectable: true })}>{ready > 0 ? <><CountUp value={ready} /> {ready === 1 ? "person" : "people"} ready to call now</> : screen.headline}{d.total > d.items.length ? `, showing ${(page * pg.size + 1).toLocaleString("en-US")} to ${(page * pg.size + d.items.length).toLocaleString("en-US")} of ${d.total.toLocaleString("en-US")}` : ""}.</button></p>
-          <p className="s6-sub mt-2"><span data-testid="dial-next-step">{screen.line}</span>{blocked > 0 && <> <button type="button" className="s6-link" data-testid="dial-blocked-open" onClick={() => setPop({ title: "Will be skipped", note: "Asked not to be contacted, no number saved here, or already reached. Open them in your CRM if you need to.", rows: cls.skipped.map((x) => heldRow(x, x.block.kind === "dnd" ? "do not contact" : x.block.kind === "done" ? "already reached" : x.noRecord ? "no record yet" : "no number", "red", x.block.text)) })}>{blocked} will be skipped</button> (asked not to be contacted, no number saved, or already reached).</>}{d.ownOnly ? " Only people assigned to you." : ""}</p>
+        <div className="cm-card mb-8" data-testid="dial-ready">
+          <div className="cm-sec">
+          <p className="cm-eyebrow">{(d.lists.find((l) => l.id === list)?.label) ?? "Your list"}</p>
+          <p className="cm-count" data-testid="dial-count"><button type="button" className="s6-link text-left" data-testid="dial-count-open" onClick={() => setPop({ title: "Ready to call", note: d.total > d.items.length ? `${(page * pg.size + 1).toLocaleString("en-US")} to ${(page * pg.size + d.items.length).toLocaleString("en-US")} of ${d.total.toLocaleString("en-US")}, hottest first.` : undefined, rows: touches.filter((x) => readyKeys.has(x.t.key)).map(toPerson), selectable: true })}>{ready > 0 ? <><CountUp value={ready} /> {ready === 1 ? "person" : "people"} ready to call now</> : screen.headline}{d.total > d.items.length ? `, showing ${(page * pg.size + 1).toLocaleString("en-US")} to ${(page * pg.size + d.items.length).toLocaleString("en-US")} of ${d.total.toLocaleString("en-US")}` : ""}.</button></p>
+          <p className="cm-note"><span data-testid="dial-next-step">{screen.line}</span>{blocked > 0 && <> <button type="button" className="s6-link" data-testid="dial-blocked-open" onClick={() => setPop({ title: "Will be skipped", note: "Asked not to be contacted, no number saved here, or already reached. Open them in your CRM if you need to.", rows: cls.skipped.map((x) => heldRow(x, x.block.kind === "dnd" ? "do not contact" : x.block.kind === "done" ? "already reached" : x.noRecord ? "no record yet" : "no number", "red", x.block.text)) })}>{blocked} will be skipped</button> (asked not to be contacted, no number saved, or already reached).</>}{d.ownOnly ? " Only people assigned to you." : ""}</p>
           {waiting.length > 0 && (
             <p className="mt-2 text-sm" data-testid="dial-waiting" role="status"><span className="s6-chip mr-2" data-tone="amber">waiting</span><button type="button" className="s6-link text-left" data-testid="dial-waiting-open" onClick={() => setPop({ title: "Not callable yet", note: "They will be callable once their calling hours open, their next try is due, or the call they asked for is due. Calling hours are 9:00 to 20:00 their time.", rows: waiting.map(waitRow) })}>See who is waiting ({waiting.length})</button></p>
           )}
           {cls.texts.length > 0 && <p className="s6-label mt-1" data-testid="dial-texts"><button type="button" className="s6-link text-left" onClick={() => setPop({ title: "Used every try, now a text task", rows: cls.texts.map((x) => heldRow(x, "text instead", "red", "Every try used: a text task")) })}>{cls.texts.length} {cls.texts.length === 1 ? "person has" : "people have"} used every try: text instead</button>.</p>}
-          {notice && <p className="mt-2 rounded-lg border-l-4 border-warning bg-warning/10 p-3 text-sm" role="status" data-testid="dial-notice">{notice}</p>}
-          <div>
-            {/* The main button is always live: with people ready it starts calling; with nobody ready it does the useful thing (queue the waiting people in your CRM) or points to another list. */}
-            <CallQueueCard list={list} items={d.items.filter((i) => !skipReason(i))} picked={picked} onPickedDone={() => setPicked([])} showSend={screen.mode === "ready"}
-              primary={(review, busy) => (
-                <>
-                  {screen.mode === "ready" && <button type="button" className={PRIMARY} data-kind="primary" onClick={() => start(d.items, false)} data-testid="dial-start">{screen.primary}</button>}
-                  {screen.mode === "waiting" && <button type="button" className={PRIMARY} data-kind="primary" onClick={review} disabled={busy} data-testid="cq-send">{screen.primary}</button>}
-                  {screen.mode === "empty" && <button type="button" className={PRIMARY} data-kind="primary" onClick={() => { if (otherList) { setList(otherList); setView("lists"); } else void queue.reload(); }} data-testid="dial-start">{screen.primary}</button>}
-                  <button type="button" className="s6-btn !min-h-12" onClick={() => (go.enabled ? start(d.items, true) : setNotice(screen.powerNote))} data-testid="dial-start-power"><Zap aria-hidden className="size-4" />Power hour</button>
-                </>
-              )} />
+          {notice && <p className="cm-notice" role="status" data-testid="dial-notice">{notice}</p>}
           </div>
+          {/* The main button is always live: with people ready it starts calling; with nobody ready it does the useful thing (queue the waiting people in your CRM) or points to another list. */}
+          {screen.mode === "ready" && !pop && <EnterKey onEnter={() => start(d.items, false)} />}
+          <CallQueueCard list={list} items={d.items.filter((i) => !skipReason(i))} picked={picked} onPickedDone={() => setPicked([])} showSend={screen.mode === "ready"}
+            tools={<button type="button" className="cm-tool" data-tip="A timed hour of calling with goals for calls, people reached and bookings." onClick={() => (go.enabled ? start(d.items, true) : setNotice(screen.powerNote))} data-testid="dial-start-power"><Zap aria-hidden />Power hour</button>}
+            primary={(review, busy) => (
+              <>
+                {screen.mode === "ready" && <button type="button" className="cm-primary" data-kind="primary" onClick={() => start(d.items, false)} data-testid="dial-start" aria-keyshortcuts="Enter"><PhoneCall aria-hidden className="size-[18px]" />{screen.primary}<span className="cm-kbd" aria-hidden>↵</span></button>}
+                {screen.mode === "waiting" && <button type="button" className="cm-primary" data-kind="primary" onClick={review} disabled={busy} data-testid="cq-send">{screen.primary}</button>}
+                {screen.mode === "empty" && <button type="button" className="cm-primary" data-kind="primary" onClick={() => { if (otherList) { setList(otherList); setView("lists"); } else void queue.reload(); }} data-testid="dial-start">{screen.primary}</button>}
+              </>
+            )} />
           {(d.total > 20 || page > 0) && (
-            <div className="mb-3 flex flex-wrap items-center gap-2 text-sm" data-testid="dial-pager">
+            <div className="cm-sec flex flex-wrap items-center gap-2 text-sm" data-testid="dial-pager">
               <button type="button" className="s6-btn" disabled={page === 0} onClick={() => setPage(page - 1)} data-testid="dial-prev">Previous</button>
               <span className="s6-label" data-testid="dial-page-text">Page {page + 1} of {Math.max(1, Math.ceil(d.total / pg.size)).toLocaleString("en-US")}</span>
               <button type="button" className="s6-btn" disabled={(page + 1) * pg.size >= d.total} onClick={() => setPage(page + 1)} data-testid="dial-next">Next</button>
               <label className="s6-label ml-auto flex items-center gap-2">People per page<select className="s6-num !w-20" value={pg.size} onChange={(e) => setSize(Number(e.target.value))} data-testid="dial-size">{[20, 50, 100].map((n) => <option key={n} value={n}>{n}</option>)}</select></label>
             </div>
           )}
-          <div className="mt-4 flex items-center gap-3" data-testid="auto-row"><button type="button" role="switch" aria-checked={autoOn} aria-label="Auto-detect calls" className="s6-toggle" onClick={() => setAutoOn(!autoOn)} data-testid="auto-toggle" /><span className="text-sm font-medium">Auto-detect calls (recommended)</span><InfoTip label="What auto-detect does" text="When you call from your CRM, SubSync reads the call it records (answered, no answer, voicemail and how long) and the tag, appointment or do-not-disturb you set there, then logs the outcome and moves to the next lead. It only asks when it cannot tell." /></div>
-          <div className="mt-4 flex flex-wrap items-center gap-4 text-sm" data-testid="goal-row">
+          <div className="cm-sec cm-prefs"><div className="flex items-center gap-3" data-testid="auto-row"><button type="button" role="switch" aria-checked={autoOn} aria-label="Auto-detect calls" className="s6-toggle" onClick={() => setAutoOn(!autoOn)} data-testid="auto-toggle" /><span className="text-sm font-medium">Auto-detect calls (recommended)</span><InfoTip label="What auto-detect does" text="When you call from your CRM, SubSync reads the call it records (answered, no answer, voicemail and how long) and the tag, appointment or do-not-disturb you set there, then logs the outcome and moves to the next lead. It only asks when it cannot tell." /></div>
+          <div className="flex flex-wrap items-center gap-4" data-testid="goal-row">
             <span className="s6-label">Hour goals</span>
             {(["calls", "reached", "booked"] as const).map((k) => <label key={k} className="flex items-center gap-2"><span className="s6-label">{k}</span><input type="number" min={1} max={500} className="s6-num !w-16" value={goals[k]} onChange={(e) => setGoals({ ...goals, [k]: Math.max(1, Math.min(500, Number(e.target.value) || 1)) })} aria-label={`Goal for ${k}`} data-testid={`goal-${k}`} /></label>)}
+          </div>
           </div>
         </div>
       )}
@@ -221,6 +230,22 @@ function DialInner() {
       {pop && <PeoplePopup title={pop.title} note={pop.note} rows={pop.rows} onClose={() => setPop(null)} onSendSelected={pop.selectable ? (keys) => { setPicked(keys); setPop(null); } : undefined} />}
     </section>
   );
+}
+
+/** Enter starts calling when nothing else has the keyboard (the hint on the main button). Mounted only while the main button is "Start calling". */
+function EnterKey({ onEnter }: { onEnter: () => void }) {
+  const latest = useRef(onEnter);
+  useEffect(() => { latest.current = onEnter; });
+  useEffect(() => {
+    const on = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (e.key !== "Enter" || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey || (t && t !== document.body && /^(INPUT|TEXTAREA|SELECT|BUTTON|A|SUMMARY)$/.test(t.tagName)) || document.querySelector('[role="dialog"]:not([hidden])')) return;
+      e.preventDefault(); latest.current();
+    };
+    window.addEventListener("keydown", on);
+    return () => window.removeEventListener("keydown", on);
+  }, []);
+  return null;
 }
 
 type S = { skippedAtStart?: number; items: Card[]; idx: number; done: Set<string>; logged: Logged[]; skips: number; finished: boolean; later: Later[]; texts: Later[]; timed: { startedAt: number; minutes: number } | null; streak: number };
@@ -399,7 +424,7 @@ function Session({ s, setS, onExit, me, cadence, goals, cbs, setCbs }: {
   const sourceKey = (item.source ?? "").toLowerCase().trim();
 
   return (
-    <section aria-label="Calling" data-testid="dial-session" className="ds-enter mx-auto max-w-2xl">
+    <section aria-label="Calling" data-testid="dial-session" className="cm ds-enter mx-auto max-w-2xl">
       {hour && <PowerBar msLeft={hour.msLeft} over={hour.over} streak={s.streak} rings={hour.rings} goals={goals} calls={hour.calls} reached={hour.reached} booked={hour.booked} />}
       <div className="mb-3 flex items-center gap-3">
         <div className="min-w-0 flex-1">
@@ -417,47 +442,59 @@ function Session({ s, setS, onExit, me, cadence, goals, cbs, setCbs }: {
       )}
       {err && <InlineAlert tone="danger" className="mb-2">{err}</InlineAlert>}
 
-      <div className="s6-card !p-4 sm:!p-6" data-glow="active" data-testid="dial-card" key={key}>
-        <div className="flex flex-wrap items-center gap-2">
-          <p className="text-sm text-muted-foreground">{item.locationName ?? "Your account"}</p>
-          <span className="s6-chip" data-tone={item.step.state === "due" ? "amber" : "cyan"} data-testid="dial-touch">{item.step.label}</span>
-          {item.callbackDue && <span className="s6-chip" data-tone="red"><CalendarClock aria-hidden className="size-3" />Callback due</span>}
-          {item.source && <span className="s6-chip" data-tone="violet">{item.source}</span>}
+      <div className="cm-card" data-testid="dial-card" key={key}>
+        <div className="cm-sec">
+          <div className="cm-head">
+            <span className="cm-avatar" aria-hidden>{initials(item.name)}</span>
+            <div className="cm-who">
+              <h3 className="cm-name" data-testid="dial-name">{item.name}</h3>
+              <div className="cm-phone">
+                <span className="cm-phone-n" data-testid="dial-phone">{item.phone}</span>
+                <button type="button" onClick={() => void copy()} className="cm-tool cm-icon" aria-label={copied ? "Number copied" : "Copy number"} data-tip={copied ? "Copied" : "Copy number"} data-testid="dial-copy">{copied ? <Check aria-hidden /> : <Copy aria-hidden />}</button>
+              </div>
+            </div>
+            <span className="s6-chip cm-touch" data-tone={item.step.state === "due" ? "amber" : "cyan"} data-testid="dial-touch">{item.step.label}</span>
+          </div>
+          <div className="cm-meta">
+            {item.reasons[0] && <span className="s6-chip" data-tone="amber" data-testid="dial-status-pill">{item.reasons[0]}</span>}
+            {item.callbackDue && <span className="s6-chip" data-tone="red"><CalendarClock aria-hidden className="size-3" />Callback due</span>}
+            {item.source && <span className="s6-chip" data-tone="neutral">{item.source}</span>}
+            <span className="cm-acct">{item.locationName ?? "Your account"}</span>
+          </div>
+          <p className="cm-note" data-testid="dial-why" hidden={!(item.reasons.length > 1 || item.openValue > 0)}>{item.reasons.slice(1, 2).join(". ")}{item.openValue > 0 ? `${item.reasons.length > 1 ? ". " : ""}${fmtMoney(item.openValue)} in open deals.` : ""}</p>
         </div>
-        <h3 className="text-2xl font-semibold leading-tight tracking-tight sm:text-3xl" data-testid="dial-name">{item.name}</h3>
-        <div className="mt-2 flex flex-wrap items-center gap-3">
-          <span className="text-2xl font-semibold tabular-nums tracking-wide sm:text-3xl" data-testid="dial-phone">{item.phone}</span>
-          <button type="button" onClick={() => void copy()} className={BIG} data-testid="dial-copy">{copied ? <Check aria-hidden className="size-4" /> : <Copy aria-hidden className="size-4" />}{copied ? "Copied" : "Copy"}</button>
-        </div>
-        <p className="mt-2 text-sm text-muted-foreground" data-testid="dial-why">{item.reasons.slice(0, 2).join(". ")}{item.openValue > 0 ? `. ${fmtMoney(item.openValue)} in open deals.` : ""}</p>
 
         {warn && (
-          <div className="mt-3 rounded-lg border-l-4 border-warning bg-warning/10 p-3 text-sm" role="alert" data-testid="dial-quiet">
-            <p>{warn}</p>
-            {!okQuiet && <button type="button" onClick={() => setOkQuiet(true)} className="mt-1 min-h-9 font-medium underline" data-testid="dial-quiet-ok">I understand, show the call button</button>}
+          <div className="cm-sec">
+            <div className="cm-notice !mt-0" role="alert" data-testid="dial-quiet">
+              <p>{warn}</p>
+              {!okQuiet && <button type="button" onClick={() => setOkQuiet(true)} className="mt-1 min-h-9 font-medium underline" data-testid="dial-quiet-ok">I understand, show the call button</button>}
+            </div>
           </div>
         )}
-        <div className="mt-4">
-          {plan?.href ? (
-            <button type="button" onClick={callNow} disabled={!!warn && !okQuiet} className={`${PRIMARY} w-full sm:w-auto`} data-kind="primary" data-testid="dial-call"><PhoneCall aria-hidden className="size-5" />{plan.label}</button>
-          ) : <p className="text-sm text-muted-foreground">{plan?.note}</p>}
-          <p className="mt-1 text-xs text-muted-foreground" data-testid="dial-call-note">{plan?.note} <InfoTip label="How calling works here" text="Calls go through your CRM's own phone, with your own number and provider. SubSync costs nothing extra for calling." /></p>
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <button type="button" className="s6-btn" onClick={() => void textBooking()} data-testid="dial-text-link" data-kind={item.attempts > 0 ? "primary" : undefined}><MessageSquareText aria-hidden className="size-4" />Text the booking link</button>
-            {textMsg && <span role="status" className="s6-label" data-testid="dial-text-msg">{textMsg}</span>}
+        <div className="cm-sec">
+          <div className="cm-call-row">
+            {plan?.href ? (
+              <button type="button" onClick={callNow} disabled={!!warn && !okQuiet} className="cm-primary" data-kind="primary" data-testid="dial-call"><PhoneCall aria-hidden className="size-[18px]" />{plan.label}</button>
+            ) : <p className="text-sm text-muted-foreground">{plan?.note}</p>}
           </div>
-          {!link.trim() && <label className="mt-2 grid gap-1 text-xs"><span className="s6-label">Your booking link (kept in this browser)</span><input className="s6-num !w-full !text-left px-2" placeholder="https://" value={link} onChange={(e) => setLink(e.target.value)} data-testid="dial-link-input" /></label>}
+          <p className="cm-sub" data-testid="dial-call-note">{plan?.note} <InfoTip label="How calling works here" text="Calls go through your CRM's own phone, with your own number and provider. SubSync costs nothing extra for calling." /></p>
         </div>
+        <div className="cm-toolbar" role="group" aria-label="More ways to reach them">
+          <button type="button" className="cm-tool" data-tip="Texts them your booking link from your CRM." onClick={() => void textBooking()} data-testid="dial-text-link" data-kind={item.attempts > 0 ? "primary" : undefined}><MessageSquareText aria-hidden />Text the booking link</button>
+          {textMsg && <span role="status" className="s6-label px-2" data-testid="dial-text-msg">{textMsg}</span>}
+        </div>
+        {!link.trim() && <div className="cm-sec !py-3"><label className="cm-linkfield !mt-0"><span>Your booking link (kept in this browser)</span><input placeholder="https://" value={link} onChange={(e) => setLink(e.target.value)} data-testid="dial-link-input" /></label></div>}
 
-        <details className="mt-4 border-t border-[color-mix(in_srgb,var(--s6-line)_90%,transparent)] pt-3" open data-testid="dial-script">
-          <summary className="min-h-9 cursor-pointer text-sm font-medium">Call script{item.source ? ` for ${item.source}` : ""}</summary>
-          <p className="mt-1 whitespace-pre-wrap text-sm" data-testid="dial-script-text">{shown}</p>
+        <details className="cm-fold cm-sec" open data-testid="dial-script">
+          <summary><ChevronRight aria-hidden />Call script{item.source ? ` for ${item.source}` : ""}</summary>
+          <p className="mt-2 whitespace-pre-wrap text-sm" data-testid="dial-script-text">{shown}</p>
           <ScriptEditor loc={item.locationId} value={script} canEdit={scriptQ.data?.canEdit !== false} onChange={(t) => setDraft({ loc: item.locationId, text: t })}
             onSaved={(t) => { try { window.localStorage.setItem(localKey, t); } catch { /* the script stays on screen */ } void scriptQ.reload(); }}
             source={sourceKey || null} onSaveSource={(t) => { setScripts({ ...scripts, [sourceKey]: t }); setDraft(null); }} />
         </details>
 
-        <div className="mt-4 border-t border-[color-mix(in_srgb,var(--s6-line)_90%,transparent)] pt-3 text-sm" data-testid="dial-story">
+        <div className="cm-sec text-sm" data-testid="dial-story">
           <p className="mb-1 font-medium">Their story</p>
           {ctx.loading && !ctx.data ? <p className="text-muted-foreground">Loading...</p> : (
             <>
@@ -468,7 +505,7 @@ function Session({ s, setS, onExit, me, cadence, goals, cbs, setCbs }: {
           )}
         </div>
 
-        <div className="mt-5 border-t border-[color-mix(in_srgb,var(--s6-line)_90%,transparent)] pt-4">
+        <div className="cm-sec">
           {chips && (
             <div className="mb-3 rounded-xl border border-[color-mix(in_srgb,var(--s6-cyan)_50%,transparent)] p-3" data-testid="dial-chips" role="group" aria-label="How did it go?">
               <p className="mb-2 text-sm font-medium">{chips.correction ? `Change the outcome for ${chips.card?.name ?? "this lead"}` : "How did it go?"}</p>
