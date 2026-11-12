@@ -7,7 +7,7 @@ import { planFor, installOne } from "../workflows-setup/library-run";
 import { TEMPLATES } from "../workflows-setup/templates";
 import { capProblem, checkToken, makeToken, opKey } from "../workflows/guards";
 import { coverageFor } from "../workflows/health";
-import { EMPTY_COUNTS, FORMULA, GAPS, accountRow, dollarLine, filterRows, gapAlertDrafts, gapDef, pageOf, parseCursor, rankRows, todayLine, totalsOf, type AccountRow, type GapId, type OutcomeCounts } from "../workflows/outcomes";
+import { EMPTY_COUNTS, FORMULA, GAPS, accountRow, dollarLine, filterRows, gapDef, pageOf, parseCursor, rankRows, todayLine, totalsOf, type AccountRow, type GapId } from "../workflows/outcomes";
 import { gapPeoplePage, loadOutcomeTrend, outcomeCounts } from "../workflows/outcomes-db";
 import { accountNames, appendChange, finishChange, loadItems, todayCounts } from "../workflows/store";
 import { json } from "./auth";
