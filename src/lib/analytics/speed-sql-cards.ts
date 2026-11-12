@@ -132,7 +132,8 @@ export async function readySql(db: Db, s: Scope, f: LeadFilter, n: number) {
 
 export async function waitingCountSql(db: Db, s: Scope, f: LeadFilter) {
   const { set, where } = filtered(db, s, f);
-  return Number((await db`select count(*)::int n from ${set} where x.touch_at is null and ${where}`)[0]?.n ?? 0);
+  // The same people the "Waiting for a first reply" list opens (status waiting), so "See all N" and the rows agree.
+  return Number((await db`select count(*)::int n from ${set} where x.touch_at is null and x.status = 'waiting' and ${where}`)[0]?.n ?? 0);
 }
 
 // ---------------------------------------------------------------- the person table
@@ -187,13 +188,13 @@ export async function journeyMembersSql(db: Db, s: Scope, f: LeadFilter, recorde
 
 // ---------------------------------------------------------------- Race, booking, coverage, proof
 
-export type ScoreAgg = { loc: string | null; judged: number; within: number; secs: number | null };
+export type ScoreAgg = { loc: string | null; judged: number; within: number; secs: number | null; /** Leads that got a first reply (the typical reply time is worked out from these only). */ answered: number };
 /** The speed score inputs per account and overall (speed-v4 `speedScore`): judged leads, those answered in time, the typical first reply. */
 export async function scoresSql(db: Db, s: Scope, f: LeadFilter): Promise<ScoreAgg[]> {
   const { set, where } = filtered(db, s, f);
-  const rows = await db`select x.location_id, grouping(x.location_id)::int g, count(*) filter (where x.status is not null)::int judged, count(*) filter (where x.status = 'within')::int w_in,
+  const rows = await db`select x.location_id, grouping(x.location_id)::int g, count(*) filter (where x.status is not null)::int judged, count(*) filter (where x.status = 'within')::int w_in, count(*) filter (where x.resp_s is not null)::int answered,
     percentile_disc(0.5) within group (order by x.resp_s) filter (where x.status is not null) med from ${set} where ${where} group by grouping sets ((x.location_id), ())`;
-  return rows.map((r) => ({ loc: Number(r.g) === 1 ? null : (r.location_id as string), judged: Number(r.judged), within: Number(r.w_in), secs: r.med === null ? null : Number(r.med) }));
+  return rows.map((r) => ({ loc: Number(r.g) === 1 ? null : (r.location_id as string), judged: Number(r.judged), within: Number(r.w_in), secs: r.med === null ? null : Number(r.med), answered: Number(r.answered) }));
 }
 
 /** Leads past their target (late or still waiting) in the scope: the count, those nobody touched, per account, and the counted open deals of those people. */

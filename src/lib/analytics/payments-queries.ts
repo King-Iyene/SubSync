@@ -170,7 +170,8 @@ export async function today(s: Scope, f: Filters): Promise<PmToday> {
   const h = hist[0] ?? {};
   const noLive = n(live[0]?.c) === 0 && src.some((x) => x.state === "ok");
   return {
-    headline: headlineWords({ needAction: need, accountsWithProblems: accountsWith }), button: need > 0 ? { label: "Review them", count: need } : null, tiles, atRisk,
+    // Zeros from a read SubSync was never allowed to make are not good news: say it cannot see payments instead of "no payment needs action".
+    headline: need === 0 && src.length > 0 && !src.some((x) => x.state === "ok") ? "SubSync cannot see payments yet, so these zeros mean nothing. Reconnect to let it read them." : headlineWords({ needAction: need, accountsWithProblems: accountsWith }), button: need > 0 ? { label: "Review them", count: need } : null, tiles, atRisk,
     windowFrom: win.from, windowTo: win.to,
     recoveredLast30: recent.filter((r) => n(r.rc) > 0).map((r) => ({ currency: r.currency as string, count: n(r.rc), amount: n(r.ra) })),
     avgDaysToRecover: h.avg_days !== null && h.avg_days !== undefined ? Math.round(Number(h.avg_days) * 10) / 10 : null, recoveryRate: n(h.flagged) > 0 ? Math.round((n(h.fixed) / n(h.flagged)) * 100) : null,

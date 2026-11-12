@@ -94,7 +94,9 @@ export function AppointmentsModule({ go, flowTree = true, leadership = false, fu
     });
   }, [bar.key, bar.ready]); // eslint-disable-line react-hooks/exhaustive-deps
   const own = scopeOf(filters);
-  const overridden = bar.ready && (own.from !== bar.from || own.to !== bar.to);
+  const barDays = bar.spec.preset === "7d" ? 7 : bar.spec.preset === "30d" ? 30 : bar.spec.preset === "90d" ? 90 : 0;
+  // A preset (7, 30 or 90 days) that matches the bar is not an override, even when the two count the first day a few hours apart.
+  const overridden = bar.ready && (filters.from && filters.to ? filters.from !== bar.from || filters.to !== bar.to : filters.days !== barDays);
   useEffect(() => {
     try {
       const u = new URL(window.location.href);

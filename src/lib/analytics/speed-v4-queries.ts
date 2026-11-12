@@ -53,9 +53,10 @@ export async function speedRace(i: Input) {
   // Stage SPEED5: the money meter, the duplicate guard, repeat enquirers and the round-robin suggestion. A failure here never stops the Race.
   const ex = await raceExtras(i, feed.map((x) => ({ locationId: x.locationId, contactId: x.contactId, name: x.name, email: x.email, phone: x.phone, arrivedAt: x.arrivedAt, touchedAt: x.touchedAt, unassigned: x.unassigned, dollars: x.dollars })), losingNow0.reduce((n, x) => n + x.dollars, 0), { lk, facts, targetsReady: targets.ready }).catch(() => null);
   const feed5 = feed.map((x) => { const e = ex?.byKey.get(`${x.locationId}:${x.contactId}`); return { ...x, duplicateOf: e?.dup ?? null, repeat: (e?.boost ?? 0) > 0, roundRobin: e?.roundRobin ?? null }; });
-  const score = (r: { judged: number; within: number; secs: number | null } | undefined) => {
+  const score = (r: { judged: number; within: number; secs: number | null; answered: number } | undefined) => {
     const judged = r?.judged ?? 0, within = r?.within ?? 0, enough = judged >= MIN_FOR_MEDIAN;
-    return { judged, within, score: enough ? Math.round((within / judged) * 100) : null, medianSeconds: enough ? r?.secs ?? null : null, enough };
+    // The typical reply time comes from the leads that were answered, so one fast reply among many unanswered leads must not stand for the account.
+    return { judged, within, score: enough ? Math.round((within / judged) * 100) : null, medianSeconds: enough && (r?.answered ?? 0) >= MIN_FOR_MEDIAN ? r?.secs ?? null : null, enough };
   };
   const scores = scoreRows.filter((r) => r.loc !== null).map((r) => ({ locationId: r.loc as string, name: lk.locationNames.get(r.loc as string) ?? "Client account", ...score(r) })).sort((a, b) => (a.score ?? 101) - (b.score ?? 101));
   return {

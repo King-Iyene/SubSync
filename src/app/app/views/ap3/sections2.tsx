@@ -26,14 +26,15 @@ const Rate = ({ v, tone }: { v: number | null; tone?: "good" | "bad" }) => (v ==
 
 // ---------- Needs outcome / No-show recovery ----------
 const ORDER_WORDS: Record<string, string> = { value: "Biggest deal first.", oldest: "Oldest first.", newest: "Newest first.", name: "By name, A to Z." };
-export function NeedsOutcome({ filters, onOpen, activeId, showAccount, clear, filtered }: SectionProps) {
+export function NeedsOutcome({ filters, onOpen, activeId, showAccount, clear, widen, filtered }: SectionProps) {
   const [n, setN] = useState<number | null>(null);
   return (
     <div data-testid="ap-needs">
       {n !== null && <Lead n={n} label={n === 1 ? "past appointment has no outcome" : "past appointments have no outcome"} tone="amber" />}
       <p className="ap-fine mb-3">{ORDER_WORDS[filters.sort || "value"]} Marking them makes your show rate true. SubSync never marks one by itself: it can suggest, you confirm.</p>
       <ApWorklist part="needs-outcome" filters={filters} onOpen={onOpen} activeId={activeId} showAccount={showAccount} selectable onRows={(_, t) => setN(t)} testId="ap-needs-list" onClear={filtered ? clear : undefined}
-        empty={filtered ? "No past appointment without an outcome matches these filters." : "Every past appointment has an outcome. Your show rate is as true as it can be."} emptyBody={filtered ? undefined : "Nothing to mark right now. New ones appear here a few hours after an appointment ends."} />
+        empty={filtered ? "No past appointment without an outcome matches these filters." : "No appointment in these dates is missing an outcome."} emptyBody={filtered ? undefined : "Older appointments may still need marking: look back further to check. New ones appear here a few hours after an appointment ends."}
+        emptyAction={filtered ? undefined : <button type="button" className="s6-btn" onClick={widen} data-testid="ap-needs-widen">Look back 90 days</button>} />
       {!hasApSlot("BulkActions") && <p className="ap-fine mt-2">Marking Showed, No-show, Cancelled, Invalid or Completed from here arrives with the checked edit tools. Until then, open the appointment in your CRM.</p>}
     </div>
   );
