@@ -124,3 +124,14 @@ Opened and clicked, loads, no crash: Money (all 3 groups, 6 client-payment tabs)
 | 17 | Today | Mark outcome worked: "Appointments to confirm" went 23 to 22. |
 
 Needs King's permissions (no data until granted): payments, plans, wallet balances, workflows, campaigns (release 1.1.0 optional permissions). Not yet clicked: Settings sections one by one, light mode, 390 and 768 widths, bookings and deals on the 120 imported leads.
+
+### Walk-through #3, part 5: duplicates, Settings, light mode
+| # | Where | Finding |
+|---|---|---|
+| 18 | Clean-up > Duplicates "Certain" group | Group "jordan smith, Same email, 9 copies" holds different names (jordan smith, steve wonders, jayden anthony, mike steven) that share one email and phone. Labelled "Certain". Merging would join different people. Name mismatch must lower the label to "Likely". |
+| 19 | Same group | "Merge" on the Protected group does nothing visible and says nothing. Must either open the chooser or say why not. |
+| 20 | Settings search | Searching "sale" says "Nothing matches"; Appointments says the sale rule is under Settings > How do we count a sale?. Not found in Targets; not located in the nine sections. |
+
+Works: copies dropdown (names, emails, Open, Open in your CRM, hover preview), merge chooser on a clear group (user picks the master, says payments, automations and courses are not visible, asks to check the CRM first). All nine Settings sections open (Account and plan, Connections with Slack and Fathom connected, Permissions "18 not approved" with steps, Alerts, Team and roles, Targets, Data, Modules, Safety). Light mode renders correctly.
+
+Not tested: 390 and 768 widths; bookings and deals created on the imported leads (Create deal reports "Done" but no deal appears in Pipeline, so writes are practice-only); Settings "ten sections" (nine seen).
