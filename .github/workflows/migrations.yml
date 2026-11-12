@@ -69,6 +69,14 @@ jobs:
           DATABASE_SSL: "off"
           DB_POOL_MAX: "1"
         run: npx vitest run tests/unit/find-lead-scale-db.test.ts --disableConsoleIntercept
+      - name: Clean-up v2 at 1,000,000 contacts (throwaway schema on this CI database; duplicate scan, lists and lead intake under their limits; prints the size of the two new indexes)
+        env:
+          DQ_SCALE_DB: "1"
+          DQ_ROWS: "1000000"
+          DATABASE_URL: postgresql://postgres:ci@localhost:5432/postgres
+          DATABASE_SSL: "off"
+          DB_POOL_MAX: "1"
+        run: npx vitest run tests/unit/dq-scale-db.test.ts --disableConsoleIntercept
       - name: Generate the framework types (a clean checkout does not have them)
         run: npx next typegen
       - run: npx tsc --noEmit

@@ -317,3 +317,5 @@ Customer review test results (11 Nov, demo server, desktop-1440, one spec at a t
 
 | Wallet guard (wg_wallet, wg_record, wg_alerts) | built, flags default off | platform wallet balance (optional wallet.readonly) into our own append-only readings (wg_samples) | cross-tenant DB test and unit tests pass on a local database; platform call NOT yet probed with a real token (response shape per its docs) |
 | 7 am brief (br_brief, br_email, br_record) | built, flags default off | Today, missed leads, slipping deals, save-this-account, wallet, payments; own tables br_prefs, br_history | cross-tenant DB test and unit tests pass; email is a dry run until SEND_EMAIL_LIVE is on |
+
+| Clean-up v2: duplicates, Lead intake, sorting gate, quality score (dq_*) | built, flags default off | our synced contacts, touch events, appointments, deals; forms, surveys, funnels polled when permitted | tested on fixtures (tests/unit/dq-db.test.ts) and generated data; forms API shapes NOT verified live |
