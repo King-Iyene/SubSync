@@ -11,9 +11,9 @@ import type { ApPart, ApRow } from "./types";
  * Paging is by cursor: the server hands back where the next page starts, so page 50 costs the same as page 1. The count in the header is the number of rows behind it.
  * An empty list always says what to do next (clear the filters, or widen the dates), never just "nothing".
  */
-export function ApWorklist({ part, filters, extra, onOpen, activeId, showAccount, empty, emptyBody, testId, selectable, onRows, onClear }: {
+export function ApWorklist({ part, filters, extra, onOpen, activeId, showAccount, empty, emptyBody, testId, selectable, onRows, onClear, emptyAction }: {
   part: ApPart; filters: ApFilters; extra?: Record<string, string | number | undefined>; onOpen: (r: ApRow) => void; activeId?: string | null; showAccount: boolean;
-  empty: string; emptyBody?: string; testId: string; selectable?: boolean; onRows?: (rows: ApRow[], total: number) => void; onClear?: () => void;
+  empty: string; emptyBody?: string; testId: string; selectable?: boolean; onRows?: (rows: ApRow[], total: number) => void; onClear?: () => void; /** Shown under the empty message when no filter is on (for example "Look back 90 days"). */ emptyAction?: ReactNode;
 }) {
   const [page, setPage] = useState(1), [size, setSize] = useState(20);
   const [cursors, setCursors] = useState<Record<number, string>>({});
@@ -28,7 +28,7 @@ export function ApWorklist({ part, filters, extra, onOpen, activeId, showAccount
   if (error) return <ErrorState error={error} onRetry={reload} />;
   if (!data) return <SkeletonRows rows={6} label="Loading appointments..." />;
   if (data.total === 0) {
-    const action: ReactNode = onClear ? <button type="button" className="s6-btn" onClick={onClear} data-testid="ap-empty-clear">Clear filters</button> : undefined;
+    const action: ReactNode = onClear ? <button type="button" className="s6-btn" onClick={onClear} data-testid="ap-empty-clear">Clear filters</button> : emptyAction;
     return <EmptyState title={empty} body={emptyBody ?? (onClear ? "Nothing matches the filters you chose. Clear them to see everything again." : "Change the dates or filters above to look further back.")} action={action} />;
   }
   const unmarkedHere = data.rows.filter((r) => (r.status === "booked" || r.status === "confirmed") && r.hoursPast !== null && r.hoursPast > 0).length;
