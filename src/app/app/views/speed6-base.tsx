@@ -59,7 +59,8 @@ const NO_DATA = /not enough|no data yet|needs? (more|the latest|\d)|nothing to (
  */
 export function Fold({ keep = 3, children, testId = "fold" }: { keep?: number; children: ReactNode; testId?: string }) {
   const root = useRef<HTMLDivElement>(null);
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true); // every card and its breakdown is shown by default; "Fewer" is the choice, never the starting point (docs/REGRESSION_AUDIT.md)
+  const [showEmpty, setShowEmpty] = useState(false);
   const [counts, setCounts] = useState({ more: 0, noData: 0 });
   useEffect(() => {
     const el = root.current; if (!el) return;
@@ -69,7 +70,7 @@ export function Fold({ keep = 3, children, testId = "fold" }: { keep?: number; c
       for (const c of cards) {
         const body = (c.textContent ?? "").replace(c.querySelector("h2,h3")?.textContent ?? "", "");
         const empty = !c.hasAttribute("data-s6-keep") && body.trim().length < 170 && NO_DATA.test(body);
-        if (empty) { noData++; c.hidden = true; continue; }
+        if (empty) { noData++; c.hidden = !showEmpty; continue; }
         if (shown < keep || open) { c.hidden = false; shown++; } else { c.hidden = true; more++; }
       }
       setCounts((p) => (p.more === more && p.noData === noData ? p : { more, noData }));
@@ -78,7 +79,7 @@ export function Fold({ keep = 3, children, testId = "fold" }: { keep?: number; c
     const mo = new MutationObserver(apply);
     mo.observe(el, { childList: true, subtree: true, characterData: true });
     return () => mo.disconnect();
-  }, [open, keep]);
+  }, [open, keep, showEmpty]);
   const note = moreCardsNote(counts.noData);
   return (
     <div ref={root} data-testid={testId}>
@@ -86,7 +87,7 @@ export function Fold({ keep = 3, children, testId = "fold" }: { keep?: number; c
       {children}
       <div className="mb-6 mt-8 flex flex-wrap items-center gap-3" data-testid="fold-more-row">
         {(counts.more > 0 || open) && <button type="button" className="s6-btn" aria-expanded={open} onClick={() => setOpen(!open)} data-testid="s6-more">{open ? "Fewer" : "More"}<ChevronDown aria-hidden className={`size-4 transition-transform ${open ? "rotate-180" : ""}`} /></button>}
-        {note && <p className="s6-label" data-testid="s6-nodata">{note}</p>}
+        {note && <p className="s6-label" data-testid="s6-nodata">{note} <button type="button" className="font-medium text-primary underline" aria-expanded={showEmpty} onClick={() => setShowEmpty(!showEmpty)} data-testid="s6-show-nodata">{showEmpty ? "Hide them" : "See them"}</button></p>}
       </div>
     </div>
   );

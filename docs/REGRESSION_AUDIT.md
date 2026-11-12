@@ -70,3 +70,17 @@ PR #33 put the older Today charts behind a small "More numbers" link on a tab. T
 | Today | Old one-sentence headline and its primary button | old Today | replaced by the new What to do today block (same job, ranked) | kept as "The older one-sentence summary" under the new block, in "More about today" | restored |
 | Overview | Executive summary, Stale deal value and Waiting tiles, excluded-deals note, Needs attention list, Account health bar, Print summary, Sync now | `overview.tsx` | Numbers, card "Accounts at a glance" (`<OverviewView>`, agency) | restored |
 | Numbers | Growth, lead flow (Where do my leads go?), sources, forecast, coverage, people, clients coming and going, pipeline, where the work sits | old Today tabs, Pipeline | Numbers dashboard cards (`today-dash.tsx`), one dates bar for all, accounts from the bar at the top | restored |
+
+
+## Speed to lead and the sweep (12 Nov 2026)
+
+King said the extra breakdown in Speed to lead was gone. The cards were in the code, but the "Fold" that wraps Pace, People, Coverage, Capture, Rules, Call mode and Log showed only the first 3 cards and hid the rest behind a "More" button (and hid any card that said "no data yet"). That looked like removed breakdowns.
+
+| Module | Feature | Was where | Now where | Status |
+|---|---|---|---|---|
+| Speed to lead | Every card on Pace, People, Coverage, Capture, Rules, Call mode, Log (histograms, reasons, velocity, ready-to-act, who was slow, person table, sources, routing, proof report) | all cards shown before the 6 Nov "keep calm" Fold | all cards open by default; "Fewer" and "More" stay as the user's choice | restored |
+| Speed to lead | Cards that only said "needs more data" | hidden with a note | the note now has a "See them" button | restored |
+| Speed to lead | Lead journey step table and drop-offs under the river view | animated flow, steps and drop-off buckets | "See breakdown" table under the river view (flag lead_journey_pro), each count opens the people | restored |
+| Speed to lead | Required-sections guard | none for the new cards | `tests/unit/required-sections.test.ts` lists Fold, Pace cards, journey breakdown and the Log sections | added |
+
+Other modules (Clients, Pipeline, Appointments, Payments, Team, Meetings, Find a lead, Calls): checked their module tabs and sections against the manifest in `tests/unit/required-sections.test.ts`; none uses a card-hiding wrapper like Speed's Fold. Today is handled in a separate change.
