@@ -5,7 +5,8 @@ import { useId } from "react";
 import { PROTECTED_EXPLAINER, protectChips } from "@/lib/dq/dupe-copies";
 import { OpenLeadButton } from "../../ds/open-lead-button";
 import { InfoTip } from "../../ds/info-tip";
-import { sampleOn, useDq, type DupeDetail, type GroupRow } from "./dq-data";
+import type { GroupRow } from "./dq-data";
+import { useGroupDetail } from "./dq-merge-view";
 
 // "Show copies": every copy of one duplicate group, listed inside its row. The list already knows name, email, phone, owner and source, so the rows show AT ONCE; the rest (tags, deals,
 // coming appointment, last activity, which copy is kept) loads lazily from the same detail call Merge uses, only when the row is opened. Nothing is fetched for a closed row.
@@ -48,20 +49,15 @@ export function WhyDisabled({ disabled, why, children }: { disabled: boolean; wh
   const id = useId();
   if (!disabled) return <>{children}</>;
   return (
-    <span className="group/cp relative inline-flex rounded-lg focus-visible:outline-2 focus-visible:outline-primary" tabIndex={0} aria-describedby={id} data-testid="dq-why-disabled">
+    <span className="inline-flex flex-col items-start gap-0.5" data-testid="dq-why-disabled">
       {children}
-      <span id={id} role="tooltip" className={`${tip} left-auto right-0`} data-testid="dq-why-text">{why}</span>
+      <span id={id} className="text-xs text-muted-foreground" data-testid="dq-why-text">{why}</span>
     </span>
   );
 }
 
 export function CopiesPanel({ g, panelId }: { g: GroupRow; panelId: string }) {
-  const ids = g.people.map((p) => p.contactId);
-  const sample = sampleOn();
-  const d = useDq<DupeDetail>(sample ? null : `dq/dupe?account=${g.locationId}&ids=${ids.join(",")}`, () => ({
-    locationId: g.locationId, locationName: g.locationName, key: g.key, keepId: ids[0], different: false, guard: [], picks: [], workflow: { set: false, optedIn: false, canAsk: false, blockers: [], goneName: null, survivorId: ids[0], switchOn: false },
-    people: g.people.map((p, i) => ({ contactId: p.contactId, name: p.name, email: p.email, phone: p.phone, tags: i ? ["new"] : ["vip"], createdAt: p.createdAt, source: p.source, ownerName: p.owner, openDeals: p.openDeals, openValue: p.openDeals ? 1200 : 0, wonDeals: 0, hasConversation: false, dnd: p.dnd, url: p.url, protectWords: p.protectWords })),
-  }));
+  const d = useGroupDetail(g);
   const det = d.data;
   const byId = new Map((det?.people ?? []).map((p) => [p.contactId, p]));
   return (
@@ -70,14 +66,14 @@ export function CopiesPanel({ g, panelId }: { g: GroupRow; panelId: string }) {
         {g.people.map((lp) => {
           const p = byId.get(lp.contactId);
           const chips = protectChips({ dnd: p?.dnd ?? lp.dnd, openDeals: p?.openDeals ?? lp.openDeals, openValue: p?.openValue, appointments: p?.appointments, nextAppointmentAt: p?.nextAppointmentAt });
-          const kept = det?.keepId === lp.contactId;
+          const kept = d.pick?.suggestedId === lp.contactId, why = d.pick?.copies.find((c) => c.contactId === lp.contactId);
           const facts: Array<[string, string]> = [["Email", cell(lp.email)], ["Phone", cell(lp.phone)], ["Created", date(lp.createdAt)], ["Source", cell(lp.source)], ["Owner", cell(p?.ownerName ?? lp.owner)],
             ["Tags", p ? cell(p.tags.join(", ")) : "…"], ["Last activity", p ? date(p.lastActivityAt) : "…"]];
           return (
             <li key={lp.contactId} className="rounded-lg border bg-card p-3" data-testid="dq-copy">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="flex flex-wrap items-center gap-2 text-sm"><b>{lp.name}</b>
-                  {kept && <span className="rounded-md border border-primary/40 px-1.5 py-0.5 text-xs text-primary" data-testid="dq-copy-kept">Kept by default</span>}
+                  {kept && <span className="rounded-md border border-primary/40 px-1.5 py-0.5 text-xs text-primary" data-testid="dq-copy-kept">Suggested primary contact</span>}
                   {chips.map((c) => <span key={c.reason} title={c.title} className="inline-flex items-center gap-1 rounded-md border bg-muted/50 px-1.5 py-0.5 text-xs" data-testid="dq-copy-chip" data-reason={c.reason}><ShieldCheck aria-hidden className="size-3" />{c.text}</span>)}
                 </p>
                 <span className="inline-flex flex-wrap items-center gap-1">
@@ -89,13 +85,14 @@ export function CopiesPanel({ g, panelId }: { g: GroupRow; panelId: string }) {
                 {facts.map(([k, v]) => <div key={k} className="flex gap-2"><dt className="w-20 shrink-0 text-muted-foreground">{k}</dt><dd className="min-w-0 break-words">{v}</dd></div>)}
                 <div className="flex gap-2 sm:col-span-2 lg:col-span-3"><dt className="w-20 shrink-0 text-muted-foreground">Activity</dt>
                   <dd className="min-w-0">{p ? [p.openDeals > 0 ? `${p.openDeals} open ${p.openDeals === 1 ? "deal" : "deals"}` : "No open deals", p.nextAppointmentAt ? `Coming appointment ${date(p.nextAppointmentAt)}` : "No coming appointment"].join(" · ") : "…"}</dd></div>
+                <div className="flex gap-2 sm:col-span-2 lg:col-span-3" data-testid="dq-copy-why"><dt className="w-20 shrink-0 text-muted-foreground">Why this one</dt><dd className="min-w-0">{why?.line ?? "…"}</dd></div>
               </dl>
             </li>
           );
         })}
       </ul>
       {d.error && <p className="mt-2 text-xs text-muted-foreground" role="status">More details could not load. The copies above are still right.</p>}
-      <p className="mt-2 text-xs text-muted-foreground">The kept copy is only a suggestion. You choose in Merge.</p>
+      <p className="mt-2 text-xs text-muted-foreground">{d.pick?.mustChoose ? `${d.pick.why} ` : ""}The primary contact is only ever a suggestion. You choose in Merge.</p>
     </div>
   );
 }

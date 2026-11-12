@@ -30,7 +30,8 @@ test("explainer words are plain and vendor-free", () => {
 test("source guard: copies listed == people, lazy detail, ids kept, no hard-coded colours", () => {
   const ui = src("src/app/app/views/dq/dq-copies.tsx"), row = src("src/app/app/views/dq/dq-dupes.tsx");
   assert.match(ui, /g\.people\.map\(\(lp\)/);
-  assert.match(ui, /dq\/dupe\?account=/);
+  assert.match(src("src/app/app/views/dq/dq-merge-view.tsx"), /dq\/dupe\?account=/);
+  assert.match(ui, /useGroupDetail\(g\)/);
   assert.match(row, /\{show && <CopiesPanel/);
   for (const id of ["dq-dupe-row", "dq-badge", "dq-protected", "dq-merge", "dq-notsame", "dq-delete"]) assert.ok((row + ui).includes(`"${id}"`) || (row + ui).includes(`"${id}`), id);
   assert.match(ui, /OpenLeadButton/);
