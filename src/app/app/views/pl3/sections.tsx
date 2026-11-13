@@ -7,6 +7,7 @@ import { usePageRange } from "../../ds/page-range";
 import { zoneWord } from "@/lib/design/zone";
 import { CountUp } from "../speed6-base";
 import { usePl, type PlFilters } from "./data";
+import { overviewIsEmpty } from "./adapters";
 import { days, money, moneyShort, pct } from "./format";
 import { leftOutSentence } from "./pipe-list";
 import { Chip, DealList } from "./parts";
@@ -34,7 +35,7 @@ export function Overview({ filters, go, onDrill }: SectionProps) {
   const r = usePl<PlOverview>("overview", filters);
   const bar = usePageRange();
   return (
-    <Gate r={r} label="Loading the pipeline..." empty={(d) => (d.headline.openCount === 0 && d.headline.wonCents === 0 ? { title: "No deals to show yet", body: "When deals are in your pipeline, the money, the stuck deals and the biggest leak show up here." } : null)}>
+    <Gate r={r} label="Loading the pipeline..." empty={(d) => (overviewIsEmpty(d.headline) ? { title: "No deals to show yet", body: "When deals are in your pipeline, the money, the stuck deals and the biggest leak show up here." } : null)}>
       {(d) => {
         const h = d.headline;
         return (
@@ -49,6 +50,7 @@ export function Overview({ filters, go, onDrill }: SectionProps) {
                 <button type="button" className="ap-kpi" data-tone="green" onClick={() => onDrill({ title: "Won deals", count: 0, extra: { status: "won" } })}><span className="ap-kpi-n">{h.wonCents === 0 ? "None" : moneyShort(h.wonCents)}</span><span className="ap-kpi-l">{h.wonCents === 0 ? (h.lostCents === 0 ? "Nothing won or lost in these dates" : `Nothing won in these dates (lost ${moneyShort(h.lostCents)})`) : `Won between ${bar.label || "these dates"}, ${zoneWord()} time`}</span></button>
                 <button type="button" className="ap-kpi" data-tone={h.winRate === null ? "violet" : "cyan"} onClick={() => go("wonlost")}><span className="ap-kpi-n">{h.winRate === null ? "Not enough data" : pct(h.winRate)}</span><span className="ap-kpi-l">{h.winRate === null ? `Needs ${d.minDeals} closed deals, you have ${h.winRateDeals}` : `Win rate, ${h.winRateDeals} closed deals`}</span></button>
               </div>
+              {h.openCount === 0 && (h.openAll ?? 0) > 0 && <p className="ap-fine" data-testid="pl-nomoney-note">{(h.openAll ?? 0).toLocaleString("en-US")} open deals are in play, but none counts toward the money yet (no value or no owner). Give them a value and an owner to see the money here. The Money flow tab can count them by step.</p>}
               <Dates />
               {d.trust && <TrustBasis t={d.trust} />}
               <div className="ap-act"><button type="button" className="s6-btn" data-kind="primary" onClick={() => go("flow")}>See the money flow</button><button type="button" className="s6-btn" onClick={() => go("needs")}>Unclog stuck deals</button></div>

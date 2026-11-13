@@ -40,7 +40,7 @@ export type PlDeal = {
 };
 export type PlDeals = { total: number; page: number; pageSize: number; rows: PlDeal[]; next?: string | null };
 export type PlOverview = {
-  headline: { openCount: number; openValueCents: number; staleCount: number; staleValueCents: number; wonCents: number; lostCents: number; winRate: number | null; winRateDeals: number };
+  headline: { openCount: number; openAll?: number; openValueCents: number; staleCount: number; staleValueCents: number; wonCents: number; lostCents: number; winRate: number | null; winRateDeals: number };
   bigUntouched?: { count: number; valueCents: number; days: number };
   sentence: string; leak: PlMoneyFlow["leak"]; minDeals: number; excluded: PlMoneyFlow["excluded"]; outlier: PlMoneyFlow["outlier"];
   /** What was counted and what was left out under the dollar figures (one shared function). */

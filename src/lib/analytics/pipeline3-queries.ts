@@ -310,7 +310,7 @@ export async function overview(s: Scope, f: Filters, windowDays: number): Promis
   const o: Pl3Overview = {
     headline: headlineOf({ openCount: openN, staleCount: staleN, staleValue: staleV, winRate, won30: num(t.won_n), noOwner }),
     button: pickButton({ staleCount: staleN, staleValue: staleV, noOwner, noReason }),
-    openCount: openN, openValue: { value: num(t.open_v), n: openN }, weighted, atRisk, stale: { count: staleN, value: staleV },
+    openCount: openN, openAll: num(t.open_all), openValue: { value: num(t.open_v), n: openN }, weighted, atRisk, stale: { count: staleN, value: staleV },
     wonLast30: { value: num(t.won_v), n: num(t.won_n) }, lostLast30: { value: num(t.lost_v), n: num(t.lost_n) }, winRate,
     velocity: velocityEstimate(openN, b.closed >= MIN_CLOSED ? b.won / b.closed : null, b.avgWon, b.cycle, b.closed), medianWonCycleDays: b.cycle === null ? null : Math.round(b.cycle * 10) / 10,
     bigUntouched: { count: num(bigRow?.n), value: num(bigRow?.v), days: 14 },
