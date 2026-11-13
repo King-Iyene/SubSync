@@ -94,7 +94,7 @@ export function DataHealthView({ go, kind }: { go: GoFn; kind: AccessKind }) {
     <Page title="Data health" subtitle="A score out of 100 for the contacts in each client account, why it is what it is, and the records behind every number." actions={actions}>
       <div className="mb-5 flex flex-wrap items-center gap-3 print:hidden">
         {kind === "agency" && pickable.length >= 2 ? <LocalAccountPicker accounts={pickable} picked={picked} onChange={(ids) => { setPicked(ids); setDay(null); }} /> : null}
-        {kind === "agency" && pickable.length === 1 && data.needs.upgradePro ? <span className="text-sm text-muted-foreground" data-testid="dh-free-one">The free plan shows one client account.</span> : null}
+        {kind === "agency" && pickable.length === 1 && data.needs.upgradePro ? <span className="text-sm text-muted-foreground" data-testid="dh-free-one">Your trial has ended, so one client account is shown.</span> : null}
       </div>
       {note ? <InlineAlert tone={note.ok ? "success" : "warning"} onDismiss={() => setNote(null)} className="mb-4">{note.text}</InlineAlert> : null}
       <Tabs tabs={tabs} value={tab} onChange={(t) => { setTab(t); close(); }} />
@@ -159,7 +159,7 @@ export function DataHealthView({ go, kind }: { go: GoFn; kind: AccessKind }) {
                 </div>
               </Section>
             )}
-            {data.needs.upgradePro && staff ? <InlineAlert tone="info" title="More with the paid plan" className="mt-6">All your client accounts, quality alerts when an import goes wrong, the weekly digest, the finder lists and safe fixes are part of the paid plan.</InlineAlert> : null}
+            {data.needs.upgradePro && staff ? <InlineAlert tone="info" title="More with the Growth plan" className="mt-6">All your client accounts, quality alerts when an import goes wrong, the weekly digest, the finder lists and safe fixes are part of the Growth plan. Try it free for 14 days, then $11.50 per client account per month.</InlineAlert> : null}
           </div>
         )
       ) : null}

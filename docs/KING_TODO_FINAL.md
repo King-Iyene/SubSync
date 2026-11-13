@@ -17,8 +17,8 @@ Live version in the portal is **v2.1.0**. The next release is **2.2.0** (not 1.1
 - Descriptions and images: `docs/LISTING_PACK.md`. Screenshots: demo mode, shot list in `docs/DEMO_SCREENSHOTS.md` (when that builder finishes).
 
 ## C. Get the new permissions into KD Squares Test  ~5 min
-1. Press **Update** on SubSync in the app list of KD Squares Test and allow the new permissions. Keeps your install and your **Free Plan**.
-2. Only if there is no Update button: uninstall, reinstall and choose the **Free Plan** (not Pro, not the trial: it can be used once per 90 days then charges the card).
+1. Press **Update** on SubSync in the app list of KD Squares Test and allow the new permissions. Keeps your install (it sits on the old Free Plan id, which still works).
+2. Only if there is no Update button: uninstall and reinstall. New installs get the **Growth** plan with the 14-day trial (once per 90 days, then it charges the card).
 3. SubSync > Settings > Permissions: far fewer "needs permission". Money, Workflows, Clients plan tiles fill in.
 
 ## D. Test automatic call-queue workflow  ~5 min
@@ -40,9 +40,9 @@ Live version in the portal is **v2.1.0**. The next release is **2.2.0** (not 1.1
 - Details: `docs/KING_TODO_AI.md`.
 
 ## H. Before any outside agency installs (pre-pilot gate)
-1. Pricing tab > Add Plan: **Pro, monthly, $11.50 per client account, 14-day free trial**, honest feature lines (`docs/RELEASE_1_1_0.md` section 6). Free Plan lines: Instant Audit, overview, search.
-2. Delete the $5 plan ONLY when no install sits on it (your tests use the Free Plan).
-3. Send me the new plan id; I run `scripts/set-plan.ts` and switch to enforced, then run the tenant and entitlement tests.
+1. DONE 13 Nov 2026 (draft): Pricing is Paid, ONE plan **Growth**, monthly, $11.50 per client account, 14-day free trial, id `6af521842a5c6a72fd97d767`. No free plan. Old Free Plan and $5 plan are deleted from the draft; your own installs on the old Free Plan id keep full access (mapped as legacy in code).
+2. Publish the draft (release 1.1.0) so the Growth plan goes live.
+3. Growth is already mapped in code and in migration `20261231290000_growth_plan.sql` (applied through the normal GitHub apply). Then switch `ENTITLEMENTS_MODE` to enforced yourself when ready, and I run the tenant and entitlement tests.
 4. One real paid install on the final plan.
 5. Bigger database plan (Supabase Pro) before a large agency installs (about 715 MB per 1M contacts; current plan 500 MB).
 6. A person reviews the privacy policy and terms.

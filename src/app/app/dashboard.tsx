@@ -474,7 +474,7 @@ export function Dashboard() {
     }
     const feature = NAV.find((n) => n.id === viewId)?.feature;
     if (feature && off(feature)) return <Centered title="Not available" body="This page is switched off right now." />;
-    if (feature && locked(feature)) return <Centered title="Part of the paid plan" body="This page is included in the Pro plan. Ask whoever manages your SubSync plan to upgrade, and it appears here straight away." />;
+    if (feature && locked(feature)) return <Centered title="Part of the paid plan" body="This page is included in the Growth plan (try it free for 14 days, then $11.50 per client account per month). Ask whoever manages your SubSync plan to choose it, and it appears here straight away." />;
     switch (viewId) {
       // Today reads with the unfiltered client and applies its own account choice, so the shared filter never changes what Today counts.
       case "today": return <ApiProvider value={baseApi}><AskDataCard />{tdOn ? <TodayModule key="td3" go={go} kind={auth.kind} /> : <TodayView go={go} kind={auth.kind} />}</ApiProvider>;
