@@ -7,6 +7,7 @@ import { EmptyState, ErrorState, LeadDrawer, PanelBoundary, SkeletonRows } from 
 import { contactReason, contactSeed } from "./contact";
 import { ApSlot, hasApSlot, useAp, type ApFilters, type ApRows } from "./data";
 import type { ApPart, ApRow, ApStats } from "./types";
+import { saveBlob } from "../../download-note";
 
 // Shared pieces of the Appointments module: the 40px server-paged table, status chips, the right-side panel and the coaching card.
 
@@ -73,7 +74,7 @@ export function csvDownload(rows: ApRow[]) {
   const cell = (v: unknown) => { let t = String(v ?? ""); if (/^[=+-@]/.test(t)) t = "'" + t; return '"' + t.replace(/"/g, '""') + '"'; };
   const head = ["Name", "Phone", "Account", "Calendar", "Date", "Status", "Booked by", "Owner", "Deal value"];
   const lines = [head, ...rows.map((r) => [r.contactName, r.phone, r.accountName, r.calendarName, r.startAt, r.status, r.bookerName, r.ownerName, r.dealValueCents === null ? "" : r.dealValueCents / 100])];
-  const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([lines.map((l) => l.map(cell).join(",")).join("\n")], { type: "text/csv" })); a.download = "appointments.csv"; a.click(); URL.revokeObjectURL(a.href);
+  saveBlob(new Blob([lines.map((l) => l.map(cell).join(",")).join("\n")], { type: "text/csv" }), "appointments.csv");
 }
 
 export function Pager({ total, page, size, onPage, onSize }: { total: number; page: number; size: number; onPage: (p: number) => void; onSize: (s: number) => void }) {

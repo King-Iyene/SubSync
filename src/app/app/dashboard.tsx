@@ -572,7 +572,7 @@ export function Dashboard() {
               </button></StNavEntry>
             ))}
           </nav>
-          <main className="mx-auto w-full max-w-[1800px] flex-1 p-4 pb-24 sm:px-10 sm:py-8 md:pb-8">
+          <main className="mx-auto w-full max-w-[1800px] flex-1 p-4 pb-32 sm:px-10 sm:pt-8 sm:pb-28 md:pb-24">
             {fromAccount && view.id !== "today" && (
               <InlineAlert className="mb-3" action={<Btn variant="ghost" onClick={() => { setFilter(EMPTY_FILTER); try { window.history.replaceState(null, "", withTodayAccounts(window.location.hash, [])); window.dispatchEvent(new Event("subsync-today-accounts")); } catch { /* see above */ } }}>See all client accounts</Btn>}>
                 You opened this from inside a client account, so every page shows only that account.

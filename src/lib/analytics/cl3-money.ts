@@ -40,7 +40,6 @@ export async function money(s: Scope, links: Links, f: { bucket: Cl3Bucket; plan
   const expectedMonthly = [...expected.entries()].map(([currency, v]) => ({ currency, monthly: Math.round(v.monthly * 100) / 100, accounts: v.accounts })).sort((a, b) => b.monthly - a.monthly);
   const atRisk = atRiskOf(r.rows);
   const needs = new Set<string>();
-  if (r.rows.some((y) => y.plan.state === "needs_permission")) needs.add("saas/company.read");
   if ([...x.wallet.values()].some((v) => v.state === "needs_permission")) needs.add("wallet.readonly");
   const installRows = [...x.installs.values()];
   const hist = await sql()`select min(at) m from cl3_history where installation_id = ${s.inst}`.catch(() => []);
@@ -50,7 +49,7 @@ export async function money(s: Scope, links: Links, f: { bucket: Cl3Bucket; plan
       accounts: r.rows.length, counts, expectedMonthly, atRisk,
       plans: facetsOf(r.rows, (y) => y.plan.name),
       apps: { state: installRows.length ? "ok" : "not_read", installed: installRows.filter((v) => v.installed).length, missing: installRows.filter((v) => !v.installed).length, unknown: r.rows.filter((y) => !x.installs.has(y.locationId)).length },
-      needsPermission: [...needs], today: todayLine(counts, atRisk, r.rows.some((y) => y.plan.state === "needs_permission") ? "needs_permission" : r.rows.length > 0 && r.rows.every((y) => y.plan.state === "ok" || y.plan.state === "no_plan") ? "ok" : "not_checked"),
+      needsPermission: [...needs], today: todayLine(counts, atRisk, r.rows.length > 0 && r.rows.every((y) => y.plan.state === "ok" || y.plan.state === "no_plan") ? "ok" : "not_checked"),
       historyStarts: hist[0]?.m ? new Date(hist[0].m as string).toISOString().slice(0, 10) : null,
     },
   };

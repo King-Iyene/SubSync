@@ -1,6 +1,6 @@
 // Reads which plan each client account is on, from the platform's SaaS API. Pure logic (no database) so it can be tested with mocked responses.
-// One paged call lists every account that is in SaaS mode: GET /saas/saas-locations/{companyId}?page=N (agency token, scope saas/company.read, Version v3).
-// Three honest states per account: "ok" (plan found), "no_plan" (the platform answered and the account is not on a plan), "needs_permission" (ONLY when the platform answered 401 or 403).
+// One paged call lists every account that is in SaaS mode: GET /saas/saas-locations/{companyId}?page=N (agency token, Version v3; the platform gives plan details to agency-level apps only, so for this app it normally answers 401/403).
+// Three honest states per account: "ok" (plan found), "no_plan" (the platform answered and the account is not on a plan), never "needs_permission": the permission for this read is agency-only and can never be granted to this app, so 401/403 means "not_available".
 
 export type SaasState = "ok" | "no_plan" | "needs_permission" | "not_available";
 export type PlanDetail = { title: string | null; trialDays: number | null; userLimit: number | null; contactLimit: number | null; prices: Array<{ id: string | null; amount: number; currency: string | null; interval: string | null }> };
@@ -15,6 +15,8 @@ export type Getter = (path: string, version: string) => Promise<Resp>;
 const str = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim().slice(0, 120) : null);
 const dig = (o: unknown, ...keys: string[]): unknown => { let c = o; for (const k of keys) { if (c && typeof c === "object") c = (c as Record<string, unknown>)[k]; else return undefined; } return c; };
 
+/** Plain words shown wherever client plan details cannot be read (the platform gives them to agency-level apps only). */
+export const PLANS_AGENCY_ONLY = "Not available for this kind of app. The platform only gives plan details to company-level apps.";
 export const SAAS_VERSION = "v3";
 const OLD_VERSION = "2021-07-28";
 const MAX_PAGES = 200;
@@ -75,8 +77,7 @@ export async function readSaasPlans(get: Getter, companyId: string): Promise<{ f
 /** State for an account the list did not contain, or for every account when the call failed. */
 export function stateFor(result: { failed: number | null; rows: Map<string, SaasRow> }, locationId: string): SaasRow {
   if (result.failed !== null) {
-    const needs = result.failed === 401 || result.failed === 403;
-    return { state: needs ? "needs_permission" : "not_available", planId: null, planName: null, status: null };
+    return { state: "not_available", planId: null, planName: null, status: null };
   }
   return result.rows.get(locationId) ?? { state: "no_plan", planId: null, planName: null, status: null };
 }

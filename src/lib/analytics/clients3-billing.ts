@@ -2,12 +2,12 @@ import { sql } from "../db";
 import { GHL_API } from "../ghl/client";
 import { ghlFetch } from "../ghl/http";
 import { getCompanyAccessToken } from "../ghl/installations";
-import { readSaasPlans, stateFor, type Getter } from "./clients3-saas";
+import { PLANS_AGENCY_ONLY, readSaasPlans, stateFor, type Getter } from "./clients3-saas";
 import type { Cl3Billing } from "./clients3-types";
 import { accountsIn, type Scope } from "./clients3-queries";
 
 // The Billing view of Clients. REAL values only: the plan and subscription status the platform's SaaS endpoints return for each client account (agency token, optional
-// permission saas/company.read; one paged call lists every account on a plan). Payment failures, the next payment date and the apps installed in an account are NOT in that API (checked in the
+// agency-level apps only; one paged call lists every account on a plan). Payment failures, the next payment date and the apps installed in an account are NOT in that API (checked in the
 // public API description), so they are returned as null and the screen says "Not available from the platform yet". Never a guess.
 
 async function get(token: string): Promise<Getter> {
@@ -35,7 +35,7 @@ export async function refreshClientBilling(inst: string): Promise<number> {
     const p = await db`select location_id, subscription_status, status_since, plan_name from client_billing where installation_id = ${inst}`;
     before = new Map(p.map((x) => [x.location_id as string, { status: (x.subscription_status as string | null) ?? null, since: (x.status_since as Date | null) ?? null, plan: (x.plan_name as string | null) ?? null }]));
   } catch { /* the Clients v2 columns are not there yet: the older write below still works */ }
-  const reason = result.failed === null ? null : result.failed === 401 || result.failed === 403 ? "The platform refused the read (permission). Reconnect and allow plan access." : `The platform answered ${result.failed} when asked for plans.`;
+  const reason = result.failed === null ? null : result.failed === 401 || result.failed === 403 ? PLANS_AGENCY_ONLY : `The platform answered ${result.failed} when asked for plans.`;
   let written = 0;
   for (const a of accts) {
     const id = a.location_id as string;
@@ -120,11 +120,11 @@ export async function billing(s: Scope, f: { q?: string | null; industry?: strin
   const out: Cl3Billing[] = accts.map((a) => {
     const r = by.get(a.id);
     const st = (r?.state as string | undefined) ?? "unknown";
-    const state: Cl3Billing["state"] = st === "ok" ? "ok" : st === "needs_permission" ? "needs_permission" : st === "no_plan" ? "no_plan" : st === "unknown" ? "not_checked" : "not_available";
+    const state: Cl3Billing["state"] = st === "ok" ? "ok" : st === "no_plan" ? "no_plan" : st === "unknown" ? "not_checked" : "not_available";
     return {
       locationId: a.id, name: a.name, state, plan: (r?.plan_name as string | null) ?? (r?.plan_id as string | null) ?? null, subscriptionStatus: (r?.subscription_status as string | null) ?? null,
       paymentFailing: null, nextPaymentAt: null, appsInstalled: null, fetchedAt: r?.fetched_at ? new Date(r.fetched_at as string).toISOString() : null,
-      message: state === "needs_permission" ? "Needs permission: reconnect" : state === "no_plan" ? NO_PLAN : state === "not_checked" ? "Not checked yet" : state === "not_available" ? MISSING : null,
+      message: state === "no_plan" ? NO_PLAN : state === "not_checked" ? "Not checked yet" : state === "not_available" ? PLANS_AGENCY_ONLY : null,
     };
   });
   out.sort((a, b) => Number(b.state === "needs_permission") - Number(a.state === "needs_permission") || a.name.localeCompare(b.name));

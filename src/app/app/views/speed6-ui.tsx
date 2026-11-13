@@ -2,7 +2,7 @@
 
 import { CircleHelp, Play, RotateCcw, X } from "lucide-react";
 import { Band, CountUp, Fold, Q, useListPopup } from "./speed6-base";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { flowDots, rowId } from "@/lib/analytics/speed6";
 import { fmtDuration } from "@/lib/analytics/speed-intel";
 import { STEP_LABEL, type JourneyStep, type Step } from "@/lib/analytics/speed-v4-more";
@@ -250,12 +250,23 @@ const TOUR: Array<[string, string]> = [["Race", "Who is waiting for a reply righ
 /** A one-time 60-second tour. Remembered in this browser; the "?" button opens the guide again at any time. */
 export function Tour() {
   const [step, setStep] = useState<number | null>(null);
-  useEffect(() => { const t = setTimeout(() => { try { if (window.localStorage.getItem(TOUR_KEY) !== "1") setStep(0); } catch { /* shown once per visit */ } }, 0); return () => clearTimeout(t); }, []);
+  const box = useRef<HTMLDivElement>(null);
+  // Shown once: it is marked as seen the moment it appears, so it never comes back, however it is closed.
+  useEffect(() => { const t = setTimeout(() => { try { if (window.localStorage.getItem(TOUR_KEY) !== "1") { window.localStorage.setItem(TOUR_KEY, "1"); setStep(0); } } catch { /* shown once per visit */ } }, 0); return () => clearTimeout(t); }, []);
+  const open = step !== null;
+  // Never traps clicks: Esc or a click anywhere outside the card closes it, and the menu under it stays clickable.
+  useEffect(() => {
+    if (!open) return;
+    const key = (e: KeyboardEvent) => { if (e.key === "Escape") setStep(null); };
+    const away = (e: PointerEvent) => { if (box.current && !box.current.contains(e.target as Node)) setStep(null); };
+    window.addEventListener("keydown", key); document.addEventListener("pointerdown", away, true);
+    return () => { window.removeEventListener("keydown", key); document.removeEventListener("pointerdown", away, true); };
+  }, [open]);
   if (step === null) return null;
-  const done = () => { try { window.localStorage.setItem(TOUR_KEY, "1"); } catch { /* remembered next time */ } setStep(null); };
+  const done = () => setStep(null);
   const [t, d] = TOUR[step];
   return (
-    <div className="s6-tour" role="dialog" aria-modal="true" aria-label="Quick tour" data-testid="s6-tour">
+    <div className="s6-tourpop" ref={box} role="dialog" aria-modal="false" aria-label="Quick tour" data-testid="s6-tour">
       <div className="s6">
         <p className="s6-label mb-2">Quick tour, {step + 1} of {TOUR.length}</p>
         <h2 className="text-xl font-semibold">{t}</h2><p className="mt-2 text-[0.95rem]">{d}</p>

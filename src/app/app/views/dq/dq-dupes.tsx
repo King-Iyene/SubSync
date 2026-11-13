@@ -64,7 +64,7 @@ export function DupesTab({ opts, account, setAccount }: { opts: Opts; account: s
       {bulk && <BulkMerge account={account} onClose={() => setBulk(false)} onDone={(m) => { setBulk(false); setNote(m); setNonce((n) => n + 1); }} />}
       {note && <p className="rounded-lg border bg-muted/40 px-3 py-2 text-sm" role="status" data-testid="dq-note">{note}</p>}
 
-      <div role="tablist" aria-label="How sure" className="flex gap-1 border-b">
+      <div role="tablist" aria-label="How sure" className="flex flex-wrap gap-1 border-b">
         {tiers.map((t) => {
           const info = opts.tiers.find((x) => x.id === t);
           return (
