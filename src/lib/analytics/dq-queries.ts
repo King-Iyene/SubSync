@@ -6,7 +6,7 @@ import {
   type DayCount, type EdgeKind, type IntakeAlert, type Quality, type RawGroup, type SrcCounts, type Tier, BASELINE_DAYS, RECENT_DAYS,
 } from "../dq/dq-core";
 import { groupKey } from "./dedupe";
-import { DIFFERENT_NAMES_WHY, effectiveTier, namesConflict, withNameNote } from "../dq/dupe-tier";
+import { DIFFERENT_NAMES_WHY, effectiveTier, loweredGroups, namesConflict, withNameNote } from "../dq/dupe-tier";
 
 // Clean-up v2 (stage DQ): every read and write of the duplicate groups, the lead-intake record, the quality score and the history. It reads the contact, appointment, message-event and deal copies
 // SubSync already holds; nothing here talks to the CRM. Every query filters by the installation AND by the accounts the caller may see (`allowed`, null = all of that installation's).
@@ -100,7 +100,37 @@ export async function scanGroups(inst: string, loc: string): Promise<ScanGroups>
 const OPEN_SQL = (db: Db) => db`and not exists (select 1 from duplicate_reviews r where r.installation_id = g.installation_id and r.location_id = g.location_id and r.group_key = g.group_key)`;
 
 export type TierCounts = Record<Tier, { groups: number; extra: number }>;
+
+/** The read-time name rule, applied ONCE to the stored groups so the tab counts, each tab's rows, the headline split and the bulk merge all read the same stored tier (counts equal rows).
+ *  A stored-"certain" open group whose names clearly differ (a shared mailbox) becomes "likely" now, instead of waiting for the nightly scan. Our own table only; the CRM is never touched.
+ *  The database first keeps only groups with two or more different written names (cheap); the nickname-aware rule in dupe-tier.ts then decides. Capped per call; the next call continues. */
+const HEAL_CAP = 2000;
+const HEAL_EVERY_MS = 15_000; // one set-based pass per view and quarter minute: the stored tier is then read by every count and list
+const healedAt = new Map<string, number>();
+async function healTiers(s: Scope): Promise<void> {
+  const k = `${s.inst}|${s.location ?? ""}|${(s.allowed ?? []).join(",")}`;
+  const now = Date.now();
+  if (now - (healedAt.get(k) ?? 0) < HEAL_EVERY_MS) return;
+  if (healedAt.size > 500) healedAt.clear();
+  healedAt.set(k, now);
+  const db = sql();
+  const rows = await db`select g.location_id, g.group_key, g.size, array_agg(c.full_name) names
+    from dq_groups g join locations l on l.installation_id = g.installation_id and l.location_id = g.location_id and not l.ignored
+      cross join lateral unnest(g.contact_ids) as u(cid)
+      join cached_contacts c on c.installation_id = g.installation_id and c.location_id = g.location_id and c.contact_id = u.cid
+    where g.installation_id = ${s.inst} and g.tier = 'certain' ${scopeOf(db, "g", s.allowed)} ${locOf(db, "g", s.location)} ${OPEN_SQL(db)}
+    group by g.location_id, g.group_key, g.size
+    having count(distinct lower(btrim(c.full_name))) filter (where btrim(coalesce(c.full_name, '')) <> '') > 1
+    limit ${HEAL_CAP}`;
+  const low = [...loweredGroups(rows.map((r) => ({ loc: r.location_id as string, key: r.group_key as string, size: r.size as number, names: (r.names as Array<string | null> | null) ?? [] }))).keys()].map((k) => k.split("\u0000"));
+  if (low.length === 0) return;
+  await db`update dq_groups g set tier = 'likely', tier_rank = ${TIER_RANK.likely}
+    from unnest(${low.map((p) => p[0])}::text[], ${low.map((p) => p[1])}::text[]) w(l, k)
+    where g.installation_id = ${s.inst} and g.tier = 'certain' and g.location_id = w.l and g.group_key = w.k`;
+}
+
 export async function tierCounts(s: Scope): Promise<TierCounts> {
+  await healTiers(s);
   const db = sql();
   const rows = await db`select g.tier, count(*)::int groups, coalesce(sum(g.size - 1), 0)::int extra from dq_groups g join locations l on l.installation_id = g.installation_id and l.location_id = g.location_id and not l.ignored
     where g.installation_id = ${s.inst} ${scopeOf(db, "g", s.allowed)} ${locOf(db, "g", s.location)} ${OPEN_SQL(db)} group by g.tier`;
@@ -145,6 +175,7 @@ export type GroupPage = { rows: GroupRow[]; next: string | null };
 export async function listGroups(s: Scope, tier: Tier, after: Array<string | number> | null, limit = 25): Promise<GroupPage> {
   const db = sql();
   const lim = Math.min(Math.max(1, limit), 100);
+  if (!after && tier !== "possible") await healTiers(s); // same read-time rule as the tab counts: a mixed-name group is listed under Likely, never under Certain
   const rows = await db`select g.location_id, g.group_key, g.tier, g.kinds, g.contact_ids, g.trimmed, l.name loc_name
     from dq_groups g join locations l on l.installation_id = g.installation_id and l.location_id = g.location_id and not l.ignored
     where g.installation_id = ${s.inst} and g.tier = ${tier} ${scopeOf(db, "g", s.allowed)} ${locOf(db, "g", s.location)} ${OPEN_SQL(db)}
@@ -157,7 +188,7 @@ export async function listGroups(s: Scope, tier: Tier, after: Array<string | num
     const ps = (r.contact_ids as string[]).map((id) => people.get(`${r.location_id}:${id}`)).filter((p): p is GroupPerson => !!p);
     if (ps.length < 2) continue; // a contact was removed since the scan: the next scan drops the group
     const kinds = r.kinds as string[];
-    const lowered = tier === "certain" && namesConflict(ps.map((p) => p.name)); // stored before the name rule, or names edited since the scan
+    const lowered = tier === "certain" && namesConflict(ps.map((p) => p.name)); // fallback only: the heal above already moved these (cap or a name edited a moment ago)
     out.push({ key: r.group_key as string, locationId: r.location_id as string, locationName: (r.loc_name as string | null) ?? null, tier: lowered ? "likely" : tier, nameNote: lowered || (tier === "likely" && kinds.some((k) => k === "email" || k === "phone") && namesConflict(ps.map((p) => p.name))) ? DIFFERENT_NAMES_WHY : null, badge: lowered || (tier === "likely" && kinds.some((k) => k === "email" || k === "phone") && namesConflict(ps.map((p) => p.name))) ? withNameNote(badgeOf(kinds as EdgeKind[])) : badgeOf(kinds as EdgeKind[]), kinds, trimmed: r.trimmed === true, shared: sharedValue(kinds, ps), people: ps, protectedCount: ps.filter((p) => p.protect).length });
   }
   const last = page[page.length - 1];

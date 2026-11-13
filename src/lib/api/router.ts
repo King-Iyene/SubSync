@@ -24,7 +24,9 @@ import { SHARE_LINK_DAYS } from "../data-inventory";
 import { createKey, listKeys, MAX_KEYS, revokeKey } from "../mcp/store";
 import { postToSlack } from "../notify";
 import { changedLine, runState, stepRows, SYNC_THROTTLE_MS, throttle, type RunStatus } from "../sync/run-status";
-import { enqueueFullSync, enqueueLocationSync, runSlice, syncStatus } from "../sync/engine";
+import { enqueueFullSync, enqueueHardSync, enqueueJobs, enqueueLocationSync, enqueueQuickSync, runSlice, syncStatus } from "../sync/engine";
+import { autoKinds, mayCheck, orderAccounts } from "../sync/incremental";
+import { readDataVersion } from "../sync/data-version";
 import { freshnessFor, syncPanel } from "../sync/freshness-queries";
 import {
   abandonedDeals, accountSummaries, agingBuckets, avgCycleDays, coverage, deadPipeline, forecast, pipelineSummaries, riskyDeals, stageTable,
@@ -1560,7 +1562,21 @@ async function syncRunView(ctx: Ctx) {
     changed, changes, errors: fails.map((f) => ({ locationId: (f.location_id as string | null) ?? null, error: String(f.error ?? "A read failed").slice(0, 160) })),
     steps: stepRows(stepJobs as never, nameOf, Date.now()),
   };
-  return json({ ...out, line: changedLine(changed) });
+  return json({ ...out, line: changedLine(changed), version: await readDataVersion(ctx.installationId, allowed) });
+}
+
+// What a sync call asks for: `full` is the hard sync (re-read everything, in the background), `focus` is the account on screen (worked first).
+async function syncBody(ctx: Ctx): Promise<{ full: boolean; focus: string | null }> {
+  const b = (await ctx.request.json().catch(() => null)) as { full?: unknown; focus?: unknown } | null;
+  return { full: b?.full === true, focus: typeof b?.focus === "string" && LOCATION_ID.test(b.focus) ? b.focus : null };
+}
+
+// The accounts a sync may touch for this person: the ones they can see, not ignored.
+async function syncableIds(ctx: Ctx, only?: string): Promise<string[]> {
+  const allowed = await allowedIds(ctx);
+  const rows = await sql()`select location_id from locations where installation_id = ${ctx.installationId} and not ignored ${allowed ? sql()`and location_id = any(${allowed}::text[])` : sql()``}`;
+  const ids = rows.map((r) => r.location_id as string);
+  return only ? ids.filter((i) => i === only) : ids;
 }
 
 async function syncStart(ctx: Ctx) {
@@ -1568,12 +1584,58 @@ async function syncStart(ctx: Ctx) {
     await refreshInsights(ctx.installationId);
     return json({ ok: true, demo: true });
   }
-  const tooSoon = await syncTooSoon(ctx, ctx.limitTo ?? null);
-  if (tooSoon) return tooSoon;
-  await enqueueFullSync(ctx.installationId);
+  const { full, focus } = await syncBody(ctx);
+  const ids = await syncableIds(ctx);
+  if (full) {
+    // The hard sync re-reads everything. It is queued and works in the background: this call returns after a short first slice and never blocks a screen.
+    const tooSoon = await syncTooSoon(ctx, ctx.limitTo ?? null);
+    if (tooSoon) return tooSoon;
+    await enqueueHardSync(ctx.installationId, ids);
+    await enqueueFullSync(ctx.installationId);
+  } else {
+    // The normal sync reads only what changed since the last good read (contacts and deals), so a big account no longer holds everything else up.
+    await enqueueQuickSync(ctx.installationId, ids);
+    await enqueueJobs(ctx.installationId, [null], ["metrics"]);
+  }
   // Work now, side by side, on this install only; the popup keeps calling sync/work until nothing is left, and cron catches anything that is still open.
-  const slice = await runSlice(SYNC_SLICE_MS, { installationId: ctx.installationId, locationId: ctx.limitTo ?? null, concurrency: SYNC_WORKERS });
-  return json({ ok: true, ...slice, status: await syncStatus(ctx.installationId) });
+  const slice = await runSlice(full ? 4_000 : SYNC_SLICE_MS, { installationId: ctx.installationId, locationId: ctx.limitTo ?? null, focusLocationId: focus ?? ctx.limitTo ?? null, concurrency: SYNC_WORKERS });
+  return json({ ok: true, ...slice, full, status: await syncStatus(ctx.installationId) });
+}
+
+const AUTO_SLICE_MS = 6_000;
+// The automatic check: called when SubSync opens, when the tab comes back and about once a minute while it is visible. For the account on screen first (then the ones checked longest ago,
+// at most five) it queues the cheap incremental reads, never twice for one account (the queue refuses a duplicate while one is pending or running), and works them for a few seconds.
+// Nothing changed = one small read per kind and no refresh signal. Returns the data version: when it moves, the screen re-reads its own data.
+async function syncAuto(ctx: Ctx) {
+  if (ctx.demo) return json({ ok: true, state: "live", updatedAt: Date.now(), version: 0, pending: 0, failed: false });
+  const { focus: asked } = await syncBody(ctx);
+  const allowed = await allowedIds(ctx);
+  const db = sql();
+  const rows = await db`
+    select l.location_id, l.conversations_synced_at, w.last_checked_at from locations l
+    left join sync_watermarks w on w.installation_id = l.installation_id and w.location_id = l.location_id and w.kind = 'contacts'
+    where l.installation_id = ${ctx.installationId} and not l.ignored ${allowed ? sql()`and l.location_id = any(${allowed}::text[])` : sql()``}`;
+  const ids = rows.map((r) => r.location_id as string);
+  const focus = (asked && ids.includes(asked) ? asked : null) ?? (ctx.limitTo && ids.includes(ctx.limitTo) ? ctx.limitTo : null);
+  const ms = (v: unknown) => (v instanceof Date ? v.getTime() : null);
+  const checked = new Map(rows.map((r) => [r.location_id as string, ms(r.last_checked_at)]));
+  const busyRows = await db`select distinct location_id from sync_jobs where installation_id = ${ctx.installationId} and status in ('pending', 'running') and location_id is not null`;
+  const busy = new Set(busyRows.map((r) => r.location_id as string));
+  const now = Date.now();
+  const pick = orderAccounts(ids, focus, checked).filter((id) => mayCheck({ lastCheckedMs: checked.get(id) ?? null, nowMs: now, busy: busy.has(id) }));
+  for (const id of pick) {
+    const row = rows.find((r) => r.location_id === id);
+    await enqueueQuickSync(ctx.installationId, [id], autoKinds({ nowMs: now, conversationsSyncedMs: ms(row?.conversations_synced_at) }));
+  }
+  if (pick.length > 0) await runSlice(AUTO_SLICE_MS, { installationId: ctx.installationId, locationId: ctx.limitTo ?? null, focusLocationId: focus, concurrency: SYNC_WORKERS });
+  const scopeIds = focus ? [focus] : ids;
+  const [[p], [f], [u]] = await Promise.all([
+    db`select count(*)::int n from sync_jobs where installation_id = ${ctx.installationId} and status in ('pending', 'running') and location_id = any(${scopeIds}::text[])`,
+    db`select count(*)::int n from sync_jobs where installation_id = ${ctx.installationId} and status = 'failed' and finished_at > now() - interval '10 minutes' and location_id = any(${scopeIds}::text[])`,
+    db`select max(last_checked_at) t from sync_watermarks where installation_id = ${ctx.installationId} and kind = 'contacts' and location_id = any(${scopeIds}::text[])`,
+  ]);
+  const version = await readDataVersion(ctx.installationId, allowed);
+  return json({ ok: true, updatedAt: ms(u?.t) ?? 0, version, pending: p.n as number, failed: (f.n as number) > 0, focus, checkedAccounts: pick.length });
 }
 
 function allowedIds(ctx: Ctx): Promise<string[] | null> {
@@ -2050,9 +2112,14 @@ async function resyncOne(ctx: Ctx, locationId: string) {
   if (ctx.limitTo && ctx.limitTo !== locationId) return json({ error: "Account not found" }, 404);
   const known = await sql()`select 1 from locations where installation_id = ${ctx.installationId} and location_id = ${locationId}`;
   if (known.length === 0) return json({ error: "Account not found" }, 404);
-  const tooSoon = await syncTooSoon(ctx, locationId);
-  if (tooSoon) return tooSoon;
-  await enqueueLocationSync(ctx.installationId, locationId);
+  const { full } = await syncBody(ctx);
+  if (full) {
+    const tooSoon = await syncTooSoon(ctx, locationId);
+    if (tooSoon) return tooSoon;
+    await enqueueLocationSync(ctx.installationId, locationId); // a hard sync of one account: everything is read again
+  } else {
+    await enqueueQuickSync(ctx.installationId, [locationId]);
+  }
   // Only this account's steps, side by side: a small account is finished in well under 20 seconds, whoever else is queued.
   const slice = await runSlice(SYNC_SLICE_MS, { installationId: ctx.installationId, locationId, concurrency: SYNC_WORKERS });
   return json({ ok: true, ...slice });
@@ -2098,7 +2165,9 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
   if (isResponse(auth)) return auth;
   const ctx: Ctx = { ...auth, request, url: new URL(request.url), segments };
   if (request.method !== "GET") {
-    try { return await dispatch(ctx); } finally { forgetAllReads(); forgetAnswers(ctx.installationId); if (!DIRTY_EXEMPT.test(segments[0] ?? "")) await markRollupDirty(ctx.installationId).catch(() => undefined); }
+    // The automatic check runs every minute or so on every open tab: it must not empty the read caches or mark the rollup dirty (a sync that really changed rows does that itself, data-version.ts).
+    const auto = segments[0] === "sync" && segments[1] === "auto";
+    try { return await dispatch(ctx); } finally { if (!auto) { forgetAllReads(); forgetAnswers(ctx.installationId); if (!DIRTY_EXEMPT.test(segments[0] ?? "")) await markRollupDirty(ctx.installationId).catch(() => undefined); } }
   }
   // The race is "right now" (it refreshes itself), so it is always read fresh.
   const stored = storable(request.method, segments, ctx.url.searchParams);
@@ -2421,9 +2490,10 @@ async function dispatch(ctx: Ctx): Promise<Response> {
         await dismissAlert(ctx.installationId, b);
         return json({ ok: true });
       }
-      if (a === "sync" && b && b !== "work" && LOCATION_ID.test(b)) return await resyncOne(ctx, b);
+      if (a === "sync" && b && b !== "work" && b !== "auto" && LOCATION_ID.test(b)) return await resyncOne(ctx, b);
       if (a === "sync" && !b) return await syncStart(ctx);
       if (a === "sync" && b === "work") return await syncWork(ctx);
+      if (a === "sync" && b === "auto") return await syncAuto(ctx);
       if (a === "call-lists" && !b) return await callListCreate(ctx);
       if (a === "call-outcomes" && !b) return await callOutcomeCreate(ctx);
       if (a === "settings" && b === "test-slack") return await testSlack(ctx);

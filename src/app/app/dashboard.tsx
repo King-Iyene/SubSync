@@ -43,7 +43,7 @@ import { TodayModule } from "./views/td3/module";
 import { overviewMerged } from "@/lib/analytics/today3-intel";
 import { fixturesOn as tdSample } from "./views/td3/data";
 import { NotificationBell } from "./views/notification-bell";
-import { SyncNow } from "./ds/sync-now";
+import { LiveStatus, SyncNow } from "./ds/sync-now";
 
 import { TodayView } from "./views/today";
 
@@ -583,7 +583,7 @@ export function Dashboard() {
                 {view.id === "today" && strip}
               </div>
               <div className="ml-auto flex shrink-0 items-center">
-                {auth.kind !== "client" && <div className="mr-2"><SyncNow agency={auth.kind === "agency" && Boolean(baseApi)} /></div>}
+                {auth.kind !== "client" ? <div className="mr-2"><SyncNow agency={auth.kind === "agency" && Boolean(baseApi)} /></div> : <div className="mr-2"><LiveStatus /></div>}
                 <GuideHelpButton view={view.id} go={go} />
                 {NAV_FOR[auth.kind].has("search") && !off("search") && <GlobalSearch go={go} />}
                 <NotificationBell go={go} />
