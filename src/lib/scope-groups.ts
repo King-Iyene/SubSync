@@ -13,7 +13,7 @@ export type ScopeKind = "read" | "change";
 export type ScopeInfo = { scope: (typeof GHL_SCOPES)[number]; kind: ScopeKind; required: boolean; why: string };
 export type ScopeGroup = { id: string; title: string; summary: string; scopes: ScopeInfo[] };
 
-// Required or optional is as set in the marketplace listing (docs/SCOPE_PLAN.md: 7 required and 2 optional in version 1.0.0, then 12 more, all optional, in 2.0.0).
+// Required or optional is as set in the marketplace listing (docs/SCOPE_PLAN.md: 7 required and 2 optional in version 1.0.0, then 12 more, all optional, in 2.0.0, and more since (40 in all with release 1.1.0)).
 export const SCOPE_GROUPS: readonly ScopeGroup[] = [
   { id: "accounts", title: "Your client accounts", summary: "Which accounts SubSync is connected to, and the one-account-at-a-time access it reads them with.", scopes: [
     { scope: "locations.readonly", kind: "read", required: true, why: "Names, time zones and contact details of your client accounts, so every number is shown against the right account and clock." },
@@ -31,7 +31,7 @@ export const SCOPE_GROUPS: readonly ScopeGroup[] = [
   { id: "calls", title: "Conversations and calls", summary: "Who wrote to a lead, when, and whether a person or an automation did.", scopes: [
     { scope: "conversations.readonly", kind: "read", required: true, why: "The conversation list: last message, direction, channel and unread count, for unanswered messages. Message text is never copied." },
     { scope: "conversations/message.readonly", kind: "read", required: false, why: "The messages inside a conversation, only to see who sent each one and when (a person or an automation, a call or a text). This is the only way to measure true speed to lead. The text of a message is never stored." },
-    { scope: "conversations/reports.readonly", kind: "read", required: false, why: "Reserved for conversation reports. Not used yet." },
+    { scope: "conversations/reports.readonly", kind: "read", required: false, why: "For coming, richer response-time numbers (conversation reports). Not used yet: nothing in SubSync uses it today, and skipping it changes nothing." },
   ] },
   { id: "appointments", title: "Appointments", summary: "Bookings and what happened to them.", scopes: [
     { scope: "calendars.readonly", kind: "read", required: true, why: "Calendars, for the setup checklist and to know which calendars exist." },
@@ -46,9 +46,10 @@ export const SCOPE_GROUPS: readonly ScopeGroup[] = [
   { id: "tags", title: "Tags, fields and tasks", summary: "How your accounts label and follow up on contacts.", scopes: [
     { scope: "locations/tags.readonly", kind: "read", required: false, why: "Tag names, for hot-lead and cold-list rules." },
     { scope: "locations/customFields.readonly", kind: "read", required: false, why: "Reserved for lead-source detail. Not used yet." },
-    { scope: "locations/tasks.readonly", kind: "read", required: false, why: "Reserved for task follow-up checks. Not used yet." },
-    { scope: "locations/tags.write", kind: "change", required: false, why: "Reserved for tagging after a preview. Nothing in SubSync uses it today." },
-    { scope: "locations/tasks.write", kind: "change", required: false, why: "Reserved for creating follow-up tasks after a preview. Nothing in SubSync uses it today." },
+    { scope: "locations/tasks.readonly", kind: "read", required: false, why: "For coming follow-up checks on your team's tasks. Not used yet: nothing in SubSync uses it today, and skipping it changes nothing." },
+    { scope: "locations/customFields.write", kind: "change", required: false, why: "For coming data cleaning that fixes custom field values, always after a preview. Not used yet: nothing in SubSync uses it today, and skipping it changes nothing." },
+    { scope: "locations/tags.write", kind: "change", required: false, why: "For coming tagging help, always after a preview. Not used yet: nothing in SubSync uses it today, and skipping it changes nothing." },
+    { scope: "locations/tasks.write", kind: "change", required: false, why: "For coming follow-up tasks created for your team, always after a preview. Not used yet: nothing in SubSync uses it today, and skipping it changes nothing." },
   ] },
   { id: "workflows", title: "Workflows and campaigns", summary: "The automations and campaigns in your client accounts, and how they are doing.", scopes: [
     { scope: "workflows.readonly", kind: "read", required: false, why: "The list of workflows in each client account (name, state, last edited), for the Workflows page. Without it the page says: Needs permission, reconnect." },
@@ -84,6 +85,7 @@ export const NO_PERMISSION_GROUPS = [
 /** What SubSync does NOT ask for, and why (docs/CAPABILITIES.md). Asking for these would need a new release and a new approval from every install. */
 export const NOT_REQUESTED: ReadonlyArray<{ id: string; scope: string; why: string }> = [
   { id: "invoice_send", scope: "invoices.write", why: "Sending an invoice again. Not asked for: it would message your client's customer, and SubSync does not message anyone for you." },
+  { id: "conversation_delete", scope: "conversations.write", why: "Deleting a conversation. Not asked for: SubSync does not delete anyone's conversations." },
   { id: "send", scope: "conversations/message.write", why: "Sending messages. Never asked for: SubSync does not reply to anyone, it measures how fast your team does." },
 ];
 
@@ -95,13 +97,17 @@ export const groupOf = (scope: string): ScopeGroup | undefined => SCOPE_GROUPS.f
 /** The scopes the install granted, from the space-separated list the platform gave at install. */
 export const parseGranted = (raw: string | null | undefined): string[] => (raw ?? "").split(/\s+/).filter(Boolean);
 
-export type GroupStatus = { id: string; title: string; summary: string; scopes: Array<ScopeInfo & { granted: boolean }>; missing: number };
+export type GroupStatus = { id: string; title: string; summary: string; scopes: Array<ScopeInfo & { granted: boolean; comingSoon: boolean }>; missing: number };
+
+/** A permission asked for now, for a coming feature: nothing in SubSync reads or changes anything with it yet (its reason says "Not used yet"). */
+export const isComingSoon = (scope: string): boolean => /Not used yet/.test(infoFor(scope)?.why ?? "");
 
 /** Each group with what the install granted. `granted` null means not known (the demo): nothing is marked missing. */
 export function groupStatus(granted: string[] | null): GroupStatus[] {
   return SCOPE_GROUPS.map((g) => {
-    const scopes = g.scopes.map((s) => ({ ...s, granted: granted === null ? true : granted.includes(s.scope) }));
-    return { id: g.id, title: g.title, summary: g.summary, scopes, missing: scopes.filter((s) => !s.granted).length };
+    const scopes = g.scopes.map((s) => ({ ...s, granted: granted === null ? true : granted.includes(s.scope), comingSoon: isComingSoon(s.scope) }));
+    // A coming-feature permission that was skipped is not "missing": no screen waits on it, so it never raises the reconnect warning.
+    return { id: g.id, title: g.title, summary: g.summary, scopes, missing: scopes.filter((s) => !s.granted && !s.comingSoon).length };
   });
 }
 

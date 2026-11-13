@@ -1,12 +1,12 @@
 # Marketplace release: the one new version (called "1.1.0" in the brief)
 
-Plain words. Written 11 Nov 2026 from `src/lib/ghl/scopes.ts`, `src/lib/scope-groups.ts`, `docs/SCOPES.md`, `docs/SCOPE_PLAN.md`, `docs/NEEDS_KING.md`, `docs/features/PAYMENTS_BRIEF.md`, `CLIENTS_V2_BRIEF.md` and the code.
+Plain words. Written 11 Nov 2026, scope list updated 12 Nov 2026, from `src/lib/ghl/scopes.ts`, `src/lib/scope-groups.ts`, `docs/SCOPES.md`, `docs/SCOPE_PLAN.md`, `docs/NEEDS_KING.md`, `docs/features/PAYMENTS_BRIEF.md`, `CLIENTS_V2_BRIEF.md` and the code.
 
 **Version number warning (INFERENCE):** the docs disagree on the live number (1.0.0 in CLAUDE.md, 2.0.0 published 31 Oct in SCOPE_PLAN, "2.1.0" and "2.2.0" in NEEDS_KING). Open the portal, read the live number, and call the new one the next number. Everything below says "the new version".
 
 ## 1. Scopes for this release
 
-The app asks for 39 permissions today (7 required, 32 optional; the last three, `forms.readonly`, `surveys.readonly` and `funnels/funnel.readonly`, are the Lead intake ones added after the table below was written). Against the 21 published in 2.0.0, **18 are new** (marked NEW). The installed app has no workflows permission at all today. Anything already granted stays granted; only NEW ones make installs press Update.
+The app asks for 40 permissions today (7 required, 33 optional): the 30-row table, the 3 Lead intake scopes, the 5 coming-feature scopes and 2 still-unused ones below. Against the 21 published in 2.0.0, **19 are new** (marked NEW; 15 in the table, 3 Lead intake, plus `locations/customFields.write`). The installed app has no workflows permission at all today. Anything already granted stays granted; only NEW ones make installs press Update.
 
 Name check: the official scope page (marketplace.gohighlevel.com/docs/oauth/Scopes) loads with scripts, so it could not be read from here. "VERIFIED" below means a primary-source read recorded in our docs (SCOPE_PLAN, PAYMENTS_BRIEF); "INFERENCE" means not confirmed. Check each in the portal's scope picker: if the picker does not list it, do not tick it.
 
@@ -45,18 +45,34 @@ Name check: the official scope page (marketplace.gohighlevel.com/docs/oauth/Scop
 
 The table has 30 rows (14 NEW). The six unused scopes are listed separately below; one of them, `saas/location.read`, is also NEW vs 2.0.0, which makes 15 new in all.
 
-**Unused today (no feature calls them; brief 13A says remove):**
+**Lead intake (3 more optional read scopes, added after the table above was written):**
+
+| Tick | Scope (exact) | R/O | Name | Used by | If not granted the user sees |
+|---|---|---|---|---|---|
+| [ ] | `forms.readonly` | Opt | VERIFIED | Lead intake: submissions per form | Needs permission: reconnect |
+| [ ] | `surveys.readonly` | Opt | VERIFIED | Lead intake: submissions per survey | Needs permission: reconnect |
+| [ ] | `funnels/funnel.readonly` | Opt | VERIFIED | Lead intake: funnel names | Needs permission: reconnect |
+
+**Coming-feature permissions (King's decision, 12 Nov): five more OPTIONAL scopes, asked for now so no install has to approve again later.** None is used by any screen yet (the Permissions screen says so, and a skipped one never raises a reconnect warning). Rule kept: never `conversations/message.write`, `invoices.write` or `conversations.write` (delete).
+
+| Tick | Scope (exact) | R/O | Name | For (coming) | If not granted |
+|---|---|---|---|---|---|
+| [ ] | `locations/tasks.readonly` | Opt | VERIFIED | AI follow-up tasks: check which leads already have a task | Nothing changes (not used yet) |
+| [ ] | `locations/tasks.write` | Opt | VERIFIED | AI follow-up tasks: create an internal task after a preview | Nothing changes (not used yet) |
+| [ ] | `locations/customFields.write` NEW | Opt | INFERENCE (confirm the picker lists it) | AI data cleaning: fix custom field values after a preview | Nothing changes (not used yet) |
+| [ ] | `locations/tags.write` | Opt | VERIFIED | AI data cleaning: tidy tags after a preview | Nothing changes (not used yet) |
+| [ ] | `conversations/reports.readonly` | Opt | VERIFIED | Richer response-time numbers | Nothing changes (not used yet) |
+
+Only `locations/customFields.write` is NEW to the code in this change: the other four were already in `scopes.ts` (and in the 2.0.0 listing), so existing installs have them. Only the NEW ones make installs press Update.
+
+**Still unused, still asked for (your call, same as before):**
 
 | Tick | Scope | Name | Verdict |
 |---|---|---|---|
-| [ ] | `conversations/reports.readonly` | VERIFIED | Unused. Remove. |
-| [ ] | `locations/tasks.readonly` | VERIFIED | Unused. Remove. |
-| [ ] | `locations/tags.write` | VERIFIED | Unused (tags go through `contacts.write`). Remove. |
-| [ ] | `locations/tasks.write` | VERIFIED | Unused. Remove. |
-| [ ] | `calendars/resources.readonly` | VERIFIED | Only probed, no feature. Remove. |
-| [ ] | `saas/location.read` | INFERENCE, probably not an official scope | Unused. Remove (PAYMENTS_BRIEF says the same). |
+| [ ] | `calendars/resources.readonly` | VERIFIED | Only probed, no feature. Remove later if you like. |
+| [ ] | `saas/location.read` | INFERENCE, probably not an official scope | Unused. Remove later if you like (PAYMENTS_BRIEF says the same). |
 
-Removing needs a small code change first (`scopes.ts`, `scope-groups.ts`, regenerate `docs/SCOPES.md`) so the install link and the portal match, or the install fails. Removed scopes stay granted on existing installs, so this is cleanup, not urgent. **Decision for King: remove now (one extra small PR from me) or keep this release identical to the code.** If you keep them, tick them too so the portal matches `scopes.ts`.
+Removing needs a small code change first (`scopes.ts`, `scope-groups.ts`, regenerate `docs/SCOPES.md`) so the install link and the portal match, or the install fails. Removed scopes stay granted on existing installs, so this is cleanup, not urgent. If you keep them, tick them too so the portal matches `scopes.ts`.
 
 **Used by the code but NOT in `scopes.ts` (do not tick without King's decision):**
 
@@ -68,7 +84,7 @@ Removing needs a small code change first (`scopes.ts`, `scope-groups.ts`, regene
 | `forms.readonly` | Capabilities probe only | Not asked for. Leave off. |
 | `invoices.write` | Resend invoice (flag `pm_resend`, off) | Would message a customer. Leave off. |
 
-**Count for the portal: tick 30 scopes (7 required, 23 optional) from the first table; 14 of them are new vs 2.0.0 and need the Update; plus 6 to remove or keep (your call).** Total in `scopes.ts` today: 39.
+**Count for the portal: tick all 40 scopes (7 required, 33 optional): 30 from the first table, 3 Lead intake, 5 coming-feature, 2 still-unused. Set every one except the first 7 to Optional.** Total in `scopes.ts` today: 40.
 
 ## 2. Portal steps (King; about 10 minutes)
 
@@ -78,13 +94,15 @@ Needs your login. Do this on a quiet day: a published version goes live at once 
 2. Open **Versions**. Note the live version number and how many versions exist. **Limit: assume 5 versions total, and only one draft at a time.** If you already have 3 or more, deprecate an old one first. Warning: deprecation needs 3 days notice and the docs say installs on a deprecated version may be uninstalled. NEVER deprecate a version that has real installs (the 3 installs are yours; still, do not risk it). If unsure, stop and send me a screenshot.
 3. On the live version click **Clone as Draft**.
 4. In the draft open **Advanced Settings**, then **Auth**, then **Scopes**. For each NEW row in section 1, click **Add scope**, search the exact string, tick it, set it to **Optional** (never Required). If the picker does not show a name, skip it and tell me which one.
-5. Check no required scope changed (the 7 stay required).
+5. Check no required scope changed (the 7 stay required) and that all 33 others are Optional, including the five coming-feature ones.
 6. Do NOT touch **Modules**. We changed no module (the only module is the Custom Page, id 6ae2ba1906a8b3d7612d0292, unchanged). Module changes force Major and apply to every install at once.
 7. Open the listing, then **Getting Started** and the description. Paste the guide from `docs/GETTING_STARTED_GUIDE.md` and make sure it does not promise anything not live (no "exports", no "messages sent for you"). Do not use the vendor's name or logo.
 8. Click **Publish** (or **Create Version**). Choose the type: the portal usually offers **Major** when scopes are added (it did on 31 Oct). Choose **Minor** only if the portal lets you. Major means each install must press **Update** and confirm; that is what we want, because only an Update grants the new scopes.
 9. Paste into **Agency Release Notes** (mandatory):
 
 > Adds read-only visibility for payments and credit: failed payments, failed repeat payments, late invoices and each client account's credit balance. Adds workflow and campaign health checks and each client's plan status. Every new permission is optional and read only for payments. Workflow changes only happen after a preview and a confirm. Nothing here sends a message or charges anyone. Press Update and accept the new permissions to turn these on. Without them everything else keeps working and these screens say "Needs permission: reconnect".
+>
+> Five more optional permissions for coming features; skip them if you like.
 
 10. Click **Publish**. Send me a screenshot of the Scopes list and the version number.
 
