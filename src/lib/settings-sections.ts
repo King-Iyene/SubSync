@@ -21,7 +21,7 @@ export const SECTIONS: readonly Section[] = [
   { id: "integrations", title: "Integrations", hint: "Connect your own tools once, see who on your team has connected, and what SubSync may read.", kinds: ["agency", "business"] },
   { id: "team", title: "Team", hint: "Who can open SubSync, and which client accounts are left out of every number.", kinds: ["agency", "business"] },
   { id: "privacy", title: "Data", hint: "What SubSync stores, meeting notes, and deleting everything.", kinds: ["agency", "business"] },
-  { id: "sync", title: "Sync status", hint: "How fresh your data is and what runs when.", kinds: ["agency", "business"] },
+  { id: "sync", title: "Sync status", hint: "How fresh your data is and what runs when. SubSync syncs by itself.", kinds: ["agency", "business"] },
   { id: "advanced", title: "Advanced", hint: "Login address, your own checklist, AI connector keys and the history of settings changes.", kinds: ["agency", "business"] },
 ];
 

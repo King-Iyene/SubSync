@@ -9,6 +9,7 @@ export type NewsEntry = {
 export const NEW_WINDOW_DAYS = 14;
 
 export const NEWS: readonly NewsEntry[] = [
+  { id: "sy-auto", date: "2026-11-13", title: "Syncs by itself, in seconds", line: "SubSync now checks for new changes when you open it, when you come back to the tab and about once a minute, and shows Live and Updated seconds ago. Only what changed is read, so a big account no longer slows the rest. Sync now is still there, and so is a Full re-sync.", view: null, feature: null },
   { id: "st-sale-basis", date: "2026-11-12", title: "How a sale is counted", line: "Pick how your team counts a sale, including whether a sale with no dollar value counts. Every Sold figure follows your choice and says which one it used. It is in Settings.", view: "settings", feature: null },
   { id: "pl-trust-deals", date: "2026-11-12", title: "Deals you can trust", line: "Test deals, deals with no value and deals nobody owns are left out of the money, and the screen says how many and why. A quiet deal is judged against its own pipeline step.", view: "today", feature: null },
   { id: "pl-funnel", date: "2026-11-12", title: "Pipeline funnel", line: "Money flow is now a funnel: the money in each step, how much moved on, and the biggest leak. Click a band to open exactly those deals. Pipelines pages are grouped under five plain names.", view: "pipeline", feature: null },

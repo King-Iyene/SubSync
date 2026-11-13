@@ -51,7 +51,7 @@ test("Sync now: syncing, then what changed; a second press shows the wait; error
   await expect(page.getByTestId("sync-now-btn")).toBeVisible({ timeout: 90_000 });
   await page.getByTestId("sync-now-btn").click();
   await expect(page.getByTestId("sync-title")).toHaveText("Syncing...");
-  await expect(page.getByTestId("sync-title")).toHaveText("Synced just now", { timeout: 20_000 });
+  await expect(page.getByTestId("sync-title")).toHaveText("Done, page updated", { timeout: 20_000 });
   await expect(page.getByTestId("sync-line")).toContainText("12 contacts");
   await expect(page.getByTestId("sync-changes")).toContainText("Bright Smile");
   await page.getByTestId("sync-retry").click();

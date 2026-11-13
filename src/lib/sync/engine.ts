@@ -10,7 +10,7 @@ import { sql } from "../db";
 import { getInstalledLocations, getLocationToken } from "../ghl/client";
 import { getCompanyAccessToken, purgeLocationData } from "../ghl/installations";
 import {
-  fetchAppointments, fetchCalendarGroups, fetchCalendars, type CalendarRow, fetchConversationMessages, fetchUsers, isPermissionError, fetchCalendarCount, fetchContactsPage, fetchConversationsPage, fetchLocationDetails, fetchOpportunitiesPage, fetchPipelines,
+  fetchContactsUpdatedPage, fetchAppointments, fetchCalendarGroups, fetchCalendars, type CalendarRow, fetchConversationMessages, fetchUsers, isPermissionError, fetchCalendarCount, fetchContactsPage, fetchConversationsPage, fetchLocationDetails, fetchOpportunitiesPage, fetchPipelines,
   type ContactCursor, type ContactRow, type ConversationRow, type OpportunityRow,
 } from "./ghl-data";
 import { firstTouches, leadFromMessages } from "../analytics/speed-intel";
@@ -25,6 +25,8 @@ import { diffTagEvents } from "./tag-events";
 import { listAllInstalledLocations } from "./installed-locations";
 import { REFRESH_DUE_AFTER_MINUTES, REFRESH_EVERY_MINUTES } from "./schedule";
 import { OUR_WRITE_LEAD_MS, OUR_WRITE_WINDOW_MS } from "../connections/echo";
+import { chooseMode, isSortedNewestFirst, nextWatermark, takeFresh, type Kind, type Mode } from "./incremental";
+import { markDataChanged } from "./data-version";
 
 // Resumable sync. Work is a queue of jobs in `sync_jobs`; a cron route calls runSlice() which
 // claims jobs one at a time (FOR UPDATE SKIP LOCKED, so parallel invocations never collide),
@@ -47,15 +49,15 @@ type Job = {
 
 // ---------------- queueing ----------------
 
-export async function enqueueJobs(installationId: string, locationIds: Array<string | null>, types: JobType[]): Promise<number> {
+export async function enqueueJobs(installationId: string, locationIds: Array<string | null>, types: JobType[], startCursor: Record<string, unknown> | null = null): Promise<number> {
   if (maintenanceOn(process.env)) return 0; // kill switch: nothing is queued
   const db = sql();
   let created = 0;
   for (const type of types) {
     for (const loc of locationIds) {
       const rows = await db`
-        insert into sync_jobs (installation_id, location_id, type, status)
-        select ${installationId}, ${loc}, ${type}, 'pending'
+        insert into sync_jobs (installation_id, location_id, type, status, cursor)
+        select ${installationId}, ${loc}, ${type}, 'pending', ${startCursor && (type === "contacts" || type === "opportunities") ? JSON.stringify(startCursor) : null}::jsonb
         where not exists (
           select 1 from sync_jobs j
           where j.installation_id = ${installationId} and coalesce(j.location_id, '') = coalesce(${loc}::text, '')
@@ -73,8 +75,39 @@ export async function enqueueFullSync(installationId: string): Promise<number> {
 
 // Re-sync everything for one account (the "Resync" button). No-op while jobs are already queued.
 export async function enqueueLocationSync(installationId: string, locationId: string): Promise<number> {
-  return enqueueJobs(installationId, [locationId], PER_LOCATION);
+  return enqueueJobs(installationId, [locationId], PER_LOCATION, { mode: "full" });
 }
+
+// The normal "Sync now" and the automatic check: only what changed since the last good read (contacts and deals), plus the cheap kinds. Never walks a whole big account.
+export async function enqueueQuickSync(installationId: string, locationIds: string[], kinds: JobType[] = ["contacts", "opportunities", "conversations", "appointments", "speed"]): Promise<number> {
+  return enqueueJobs(installationId, locationIds, kinds);
+}
+
+// The hard sync: re-read everything for these accounts (the only pass that notices deletions the live events missed). Runs in the background.
+export async function enqueueHardSync(installationId: string, locationIds: string[]): Promise<number> {
+  return enqueueJobs(installationId, locationIds, PER_LOCATION, { mode: "full" });
+}
+
+// ---------------- watermarks ----------------
+
+export async function readWatermark(installationId: string, loc: string, kind: Kind): Promise<{ watermarkMs: number | null; lastFullMs: number | null }> {
+  const [r] = await sql()`select watermark, last_full_at from sync_watermarks where installation_id = ${installationId} and location_id = ${loc} and kind = ${kind}`;
+  return { watermarkMs: r?.watermark instanceof Date ? r.watermark.getTime() : null, lastFullMs: r?.last_full_at instanceof Date ? r.last_full_at.getTime() : null };
+}
+
+// A finished read stores where it got to. `changed` stamps the data version (the open screens then re-read) only when rows really changed.
+async function finishRead(job: Job, loc: string, kind: Kind, mode: Mode, changed: boolean): Promise<void> {
+  const wm = new Date(nextWatermark(job.startedAt.getTime()));
+  const full = mode === "full";
+  await sql()`
+    insert into sync_watermarks (installation_id, location_id, kind, watermark, last_full_at, last_checked_at)
+    values (${job.installationId}, ${loc}, ${kind}, ${wm}, ${full ? new Date() : null}, now())
+    on conflict (installation_id, location_id, kind) do update set watermark = excluded.watermark,
+      last_full_at = case when ${full} then now() else sync_watermarks.last_full_at end, last_checked_at = now()`;
+  if (changed) await markDataChanged(job.installationId, loc, kind).catch((e) => console.error("data version not stamped", safeError(e)));
+}
+const ms = (v: string | null): number | null => { const n = v ? Date.parse(v) : NaN; return Number.isFinite(n) ? n : null; };
+const hasKeys = (o: Record<string, unknown>) => Object.keys(o).length > 0;
 
 // Re-sync one area of one account (used by webhooks). Cheap to call repeatedly: it is a no-op
 // while an identical job is already queued.
@@ -228,9 +261,31 @@ async function handleContacts(job: Job, deadline: number): Promise<Outcome> {
   const db = sql();
   const loc = job.locationId as string;
   const token = await tokenForLocation(job.companyId, loc);
-  let cursor = (job.cursor ?? null) as ContactCursor;
+  const { mode: cm, page: cp, ...rest } = (job.cursor ?? {}) as { mode?: Mode; page?: number } & Record<string, unknown>;
+  const wmRow = await readWatermark(job.installationId, loc, "contacts");
+  // A fresh job decides its own pass; a resumed one keeps what it started as. A hard sync starts with mode "full".
+  let mode: Mode = cm ?? (hasKeys(rest) ? "full" : chooseMode({ ...wmRow, nowMs: Date.now() }));
+  let cursor = (hasKeys(rest) ? rest : null) as ContactCursor;
+  let incPage = cp ?? 1, rowsSeen = 0;
   for (let page = 0; page < PAGES_PER_SLICE; page++) {
-    const { contacts, next } = await fetchContactsPage(token, loc, cursor);
+    let contacts: ContactRow[], next: ContactCursor = null, incNext: number | null = null;
+    if (mode === "incremental" && wmRow.watermarkMs !== null) {
+      try {
+        const r = await fetchContactsUpdatedPage(token, loc, incPage);
+        if (!isSortedNewestFirst(r.contacts.map((c) => ms(c.updatedAt)))) throw new Error("the contact list did not come newest-change-first");
+        const t = takeFresh(r.contacts, (c) => ms(c.updatedAt), wmRow.watermarkMs);
+        contacts = t.fresh; incNext = r.more && !t.reachedOld ? incPage + 1 : null;
+      } catch (error) {
+        if (isPermissionError(error)) throw error;
+        // The incremental read is not available or not trustworthy here: read everything this once (safe, never misses a change).
+        console.error("incremental contacts fell back to a full read", { message: safeError(error) });
+        mode = "full"; cursor = null; continue;
+      }
+    } else {
+      mode = "full";
+      ({ contacts, next } = await fetchContactsPage(token, loc, cursor));
+    }
+    rowsSeen += contacts.length;
     const unique = [...new Map(contacts.map((c) => [c.contactId, c])).values()];
     if (unique.length > 0) {
       await recordTagEvents(job.installationId, loc, unique);
@@ -253,16 +308,17 @@ async function handleContacts(job: Job, deadline: number): Promise<Outcome> {
           updated_remote_at = excluded.updated_remote_at, synced_at = excluded.synced_at,
           source = excluded.source, dnd = excluded.dnd, birth_date = excluded.birth_date, assigned_to = excluded.assigned_to`;
     }
-    if (!next) {
-      // Finished a full pass: anything not seen during it was deleted upstream.
-      await db`delete from cached_contacts where installation_id = ${job.installationId} and location_id = ${loc} and synced_at < ${job.startedAt}`;
+    if (mode === "incremental" ? incNext === null : !next) {
+      // Finished a full pass: anything not seen during it was deleted upstream. An incremental pass never deletes (a full pass and the delete events do).
+      if (mode === "full") await db`delete from cached_contacts where installation_id = ${job.installationId} and location_id = ${loc} and synced_at < ${job.startedAt}`;
       await db`update locations set contacts_synced_at = now(), last_synced_at = now(), sync_error = null where installation_id = ${job.installationId} and location_id = ${loc}`;
+      await finishRead(job, loc, "contacts", mode, mode === "full" || rowsSeen > 0);
       return DONE;
     }
-    cursor = next;
+    if (mode === "incremental") incPage = incNext as number; else cursor = next;
     if (Date.now() > deadline) break;
   }
-  return { done: false, cursor: (cursor ?? {}) as Record<string, unknown> };
+  return { done: false, cursor: (mode === "incremental" ? { mode, page: incPage } : { mode, ...(cursor ?? {}) }) as Record<string, unknown> };
 }
 
 // Compare this page of contacts' tags with what we hold and keep a log of every tag seen added or removed (stage F10). The platform does not say when a tag was
@@ -316,9 +372,28 @@ async function handleOpportunities(job: Job, deadline: number): Promise<Outcome>
   const db = sql();
   const loc = job.locationId as string;
   const token = await tokenForLocation(job.companyId, loc);
-  let pageNo = Number((job.cursor as { page?: number } | null)?.page ?? 1);
+  const oc = (job.cursor ?? {}) as { mode?: Mode; page?: number };
+  const wmRow = await readWatermark(job.installationId, loc, "opportunities");
+  let mode: Mode = oc.mode ?? (oc.page ? "full" : chooseMode({ ...wmRow, nowMs: Date.now() }));
+  let pageNo = Number(oc.page ?? 1), rowsSeen = 0;
   for (let i = 0; i < PAGES_PER_SLICE; i++) {
-    const { opportunities, nextPage } = await fetchOpportunitiesPage(token, loc, pageNo);
+    let opportunities: OpportunityRow[], nextPage: number | null;
+    if (mode === "incremental" && wmRow.watermarkMs !== null) {
+      try {
+        const r = await fetchOpportunitiesPage(token, loc, pageNo, 100, true);
+        if (!isSortedNewestFirst(r.opportunities.map((o) => ms(o.updatedAt)))) throw new Error("the deal list did not come newest-change-first");
+        const t = takeFresh(r.opportunities, (o) => ms(o.updatedAt), wmRow.watermarkMs);
+        opportunities = t.fresh; nextPage = t.reachedOld ? null : r.nextPage;
+      } catch (error) {
+        if (isPermissionError(error)) throw error;
+        console.error("incremental deals fell back to a full read", { message: safeError(error) });
+        mode = "full"; pageNo = 1; continue;
+      }
+    } else {
+      mode = "full";
+      ({ opportunities, nextPage } = await fetchOpportunitiesPage(token, loc, pageNo));
+    }
+    rowsSeen += opportunities.length;
     const unique = [...new Map(opportunities.map((o) => [o.opportunityId, o])).values()];
     if (unique.length > 0) {
       await recordDealEvents(job.installationId, loc, unique);
@@ -342,15 +417,16 @@ async function handleOpportunities(job: Job, deadline: number): Promise<Outcome>
           assigned_to = excluded.assigned_to, source = excluded.source`;
     }
     if (nextPage === null) {
-      await db`delete from cached_opportunities where installation_id = ${job.installationId} and location_id = ${loc} and synced_at < ${job.startedAt}`;
+      if (mode === "full") await db`delete from cached_opportunities where installation_id = ${job.installationId} and location_id = ${loc} and synced_at < ${job.startedAt}`;
       await db`update locations set opportunities_synced_at = now(), last_synced_at = now() where installation_id = ${job.installationId} and location_id = ${loc}`;
+      await finishRead(job, loc, "opportunities", mode, mode === "full" || rowsSeen > 0);
       void refreshRollup(job.installationId, { locations: [loc] }).catch(() => undefined); // stored deal totals; the hourly sweep rebuilds them too
       return DONE;
     }
     pageNo = nextPage;
     if (Date.now() > deadline) break;
   }
-  return { done: false, cursor: { page: pageNo } };
+  return { done: false, cursor: { mode, page: pageNo } };
 }
 
 // Up to 500 conversations per account (the newest first). The limit is stated on every screen that counts conversations (waiting.ts).
@@ -620,10 +696,11 @@ async function runJob(job: Job, deadline: number): Promise<Outcome> {
 
 // ---------------- the worker loop ----------------
 
-export type SliceScope = { installationId?: string | null; locationId?: string | null };
+// `focusLocationId`: the account the person is looking at. Its jobs are claimed first, so its numbers land before the big accounts' reads even start.
+export type SliceScope = { installationId?: string | null; locationId?: string | null; focusLocationId?: string | null };
 
 async function claimJob(scope: SliceScope = {}): Promise<Job | null> {
-  const scopeInst = scope.installationId ?? null, scopeLoc = scope.locationId ?? null;
+  const scopeInst = scope.installationId ?? null, scopeLoc = scope.locationId ?? null, focus = scope.focusLocationId ?? null;
   const rows = await sql()`
     update sync_jobs set status = 'running', started_at = coalesce(started_at, now()), updated_at = now()
     where id = (
@@ -635,6 +712,7 @@ async function claimJob(scope: SliceScope = {}): Promise<Job | null> {
           select 1 from sync_jobs o
           where o.installation_id = j.installation_id and o.id <> j.id and o.type <> 'metrics' and o.status in ('pending', 'running')))
       order by (j.type = 'metrics'),
+        (j.location_id is distinct from ${focus}::text),
         -- Small jobs first, so a new permission shows results in minutes instead of waiting behind the big reads.
         -- Speed only jumps the queue where that account's conversations are already cached.
         case when j.type = 'appointments' then 0
@@ -691,7 +769,7 @@ export async function runSlice(budgetMs = 45_000, opts: SliceScope & { concurren
   if (maintenanceOn(process.env)) return { jobs: 0, failed: 0, moreWork: false }; // kill switch: nothing runs
   const db = sql();
   const deadline = Date.now() + budgetMs;
-  const scope: SliceScope = { installationId: opts.installationId ?? null, locationId: opts.locationId ?? null };
+  const scope: SliceScope = { installationId: opts.installationId ?? null, locationId: opts.locationId ?? null, focusLocationId: opts.focusLocationId ?? null };
   const counts = { jobs: 0, failed: 0 };
   const inScope = async () => {
     const [r] = await db`select count(*)::int n from sync_jobs where status in ('pending', 'running')
@@ -712,6 +790,8 @@ export async function runSlice(budgetMs = 45_000, opts: SliceScope & { concurren
         const outcome = await withJobTimeout(runJob(job, deadline), JOB_TIMEOUT_MS);
         if (outcome.done) {
           await db`update sync_jobs set status = 'done', cursor = null, error = null, finished_at = now(), updated_at = now() where id = ${job.id}`;
+          // The cheap kinds replace their rows wholesale, so a finished one is a possible change: the open screens re-read (contacts and deals stamp themselves, only when rows changed).
+          if (job.locationId && (job.type === "conversations" || job.type === "appointments" || job.type === "speed" || job.type === "structure")) await markDataChanged(job.installationId, job.locationId, job.type).catch(() => undefined);
           if (job.locationId) await clearResolvedError(job.installationId, job.locationId).catch((e) => console.error("Clearing a resolved sync error failed", safeError(e)));
         } else {
           await db`update sync_jobs set status = 'pending', cursor = ${db.json(outcome.cursor as never)}, updated_at = now() where id = ${job.id}`;

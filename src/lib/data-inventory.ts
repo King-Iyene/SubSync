@@ -184,6 +184,7 @@ export const INVENTORY: Record<string, TableInfo> = {
   },
   domain_checks: { noun: "email sending checks", line: "accounts", personal: { domain: "the email sending domain being checked" } },
   sync_jobs: { noun: "sync history", line: "accounts" },
+  sync_watermarks: { noun: "sync progress marks", line: "accounts" },
   onboarding_tasks: { noun: "checklist progress", line: "yours", personal: { task: "your checklist steps" } },
   call_outcomes: { noun: "call results you logged", line: "yours", personal: { note: "call notes you type" } },
   cleanup_runs: {
