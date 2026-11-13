@@ -62,3 +62,8 @@ export function pageProgress(loaded: Record<string, PageLoad | undefined>, rk: s
   const shownOfTotal = Math.min(shown, Math.max(total, shown));
   return { shown, next, loading: tail === undefined, label: `Showing ${n(shownOfTotal)} of ${n(Math.max(total, shown))}`, done: tail !== undefined && next === null };
 }
+
+/** The Deals column of a pipeline row: every open deal the person gets by clicking in, never only the deals inside the money. `inMoney` is the money-counted part. */
+export function dealsCell(c: Pick<PipeCard, "openCount" | "allOpenCount">): { total: number; inMoney: number } {
+  return { total: Math.max(c.allOpenCount ?? c.openCount, c.openCount), inMoney: c.openCount };
+}

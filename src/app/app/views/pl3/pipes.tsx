@@ -8,7 +8,7 @@ import { usePageRange } from "../../ds/page-range";
 import { usePl, type PlFilters } from "./data";
 import { money, moneyShort } from "./format";
 import { OwnerlessNote } from "./ownerless-note";
-import { PIPE_PAGE, pageProgress, rowNotes, testNamesNote } from "./pipe-list";
+import { PIPE_PAGE, dealsCell, pageProgress, rowNotes, testNamesNote } from "./pipe-list";
 
 // PIPELINE LIST: when no single pipeline is picked, one calm row per (account, pipeline). Columns line up (name, open money with its stage shape, deals, stuck, won, lost) and a row opens that
 // pipeline's river. Only stage-independent numbers are shown, so stages of different pipelines are never mixed. Paged with a keyset cursor: the rows of every page sit in one list and ONE
@@ -27,14 +27,14 @@ export function MiniStack({ stages }: { stages: PipeCard["mini"] }) {
 }
 
 function RowView({ c, onOpen, counted }: { c: PipeCard; onOpen: (c: PipeCard) => void; counted: { ownerCounted?: boolean; testsCounted?: boolean } }) {
-  const notes = rowNotes(c, counted);
+  const notes = rowNotes(c, counted), allOpen = dealsCell(c).total;
   return (
     <li className="pl-row-li">
-      <button type="button" className="pl-row" onClick={() => onOpen(c)} data-testid="pl-row" aria-label={`${c.accountName}, ${c.name}: ${d(c.openValue)} open, ${c.openCount} deals, ${c.staleCount} stuck, won ${d(c.wonValue)}, lost ${d(c.lostValue)}${notes.length ? `. Not counted in money: ${notes.join(", ")}` : ""}. Open its river.`}>
+      <button type="button" className="pl-row" onClick={() => onOpen(c)} data-testid="pl-row" aria-label={`${c.accountName}, ${c.name}: ${d(c.openValue)} open money from ${c.openCount} counted deals, ${allOpen} open deals in all, ${c.staleCount} stuck, won ${d(c.wonValue)}, lost ${d(c.lostValue)}${notes.length ? `. Not counted in money: ${notes.join(", ")}` : ""}. Open its river.`}>
         <span className="pl-c-name"><b title={c.name}>{c.name}</b><span className="pl-c-acct" title={c.accountName}>{c.accountName}</span>{c.empty ? <span className="pl-c-note">Nothing in this pipeline yet.</span> : notes.length > 0 && <span className="pl-c-note" data-testid="pl-row-notes">Not counted in money: {notes.join(" · ")}</span>}</span>
         {c.empty ? null : (<>
           <span className="pl-c pl-c-open tnum" data-label="Open money"><b>{d(c.openValue)}</b><MiniStack stages={c.mini} /></span>
-          <span className="pl-c tnum" data-label="Deals">{n(c.openCount)}</span>
+          <span className="pl-c tnum" data-label="Deals" data-testid="pl-row-deals">{n(allOpen)}{allOpen > c.openCount && <small className="pl-c-dim" data-testid="pl-row-counted"> · {n(c.openCount)} in money</small>}</span>
           <span className="pl-c tnum" data-label="Stuck">{c.staleCount > 0 ? <u>{n(c.staleCount)}</u> : <span className="pl-c-dim">None</span>}</span>
           <span className="pl-c tnum" data-label="Won">{c.wonCount > 0 ? <>{ds(c.wonValue)}<small> · {n(c.wonCount)}</small></> : <span className="pl-c-dim">None</span>}</span>
           <span className="pl-c tnum" data-label="Lost">{c.lostCount > 0 ? <>{ds(c.lostValue)}<small> · {n(c.lostCount)}</small></> : <span className="pl-c-dim">None</span>}</span>

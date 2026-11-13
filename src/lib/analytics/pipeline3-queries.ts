@@ -280,16 +280,16 @@ export async function overview(s: Scope, f: Filters, windowDays: number): Promis
   // The basis under every dollar figure: the same shared function as Today, the Account audit and the Overview (deal-trust-queries.ts).
   const trust = await trustFor(s, f.location);
   const db = sql(), sm = await stageMap(s, f.location), base = { ...f, bucket: null };
-  const w = deals(s, base), d30 = new Date(Math.floor((Date.now() - 30 * DAY) / DAY) * DAY); // whole days, so the rollup and the lists count the same deals
+  const w = deals(s, base), d30 = f.from, dTo = f.to; // the date bar's window (Lagos days, [from, next midnight)): won, lost and "no reason" count what closed inside it, never a fixed 30 days
   const fresh = await rollupFresh(s, f.location);
   const [[t0], trend, [acc], [since], b, open0, closes0, [bigRow0]] = await Promise.all([
-    fresh.fresh ? rollupHeadline(s, { location: f.location, pipeline: f.pipeline, d30 }).then((x) => [x]) : db`with ${w} select
+    fresh.fresh ? rollupHeadline(s, { location: f.location, pipeline: f.pipeline, d30, to: dTo }).then((x) => [x]) : db`with ${w} select
         count(*) filter (where ${P_OPEN(db)})::int open_n, coalesce(sum(d.value) filter (where ${P_OPEN(db)}), 0)::float8 open_v,
         count(*) filter (where ${P_STALE(db)})::int stale_n, coalesce(sum(d.value) filter (where ${P_STALE(db)}), 0)::float8 stale_v,
-        count(*) filter (where d.status = 'won' and not d.is_test and d.last_status_change_at >= ${d30})::int won_n, coalesce(sum(d.value) filter (where d.status = 'won' and not d.is_test and d.last_status_change_at >= ${d30}), 0)::float8 won_v,
-        count(*) filter (where d.status = 'lost' and not d.is_test and d.last_status_change_at >= ${d30})::int lost_n, coalesce(sum(d.value) filter (where d.status = 'lost' and not d.is_test and d.last_status_change_at >= ${d30}), 0)::float8 lost_v,
+        count(*) filter (where d.status = 'won' and not d.is_test and d.last_status_change_at >= ${d30} and d.last_status_change_at < ${dTo})::int won_n, coalesce(sum(d.value) filter (where d.status = 'won' and not d.is_test and d.last_status_change_at >= ${d30} and d.last_status_change_at < ${dTo}), 0)::float8 won_v,
+        count(*) filter (where d.status = 'lost' and not d.is_test and d.last_status_change_at >= ${d30} and d.last_status_change_at < ${dTo})::int lost_n, coalesce(sum(d.value) filter (where d.status = 'lost' and not d.is_test and d.last_status_change_at >= ${d30} and d.last_status_change_at < ${dTo}), 0)::float8 lost_v,
         count(*) filter (where ${P_NO_OWNER(db)})::int no_owner, count(*) filter (where ${P_NO_VALUE(db)})::int no_value, count(*) filter (where d.is_test and d.status = 'open' and not d.out_of_scope)::int test,
-        count(*) filter (where d.outlier)::int outliers, count(*) filter (where d.status = 'lost' and not d.is_test and d.last_status_change_at >= ${d30} and d.lost_reason_id is null and d.lost_reason is null)::int no_reason,
+        count(*) filter (where d.outlier)::int outliers, count(*) filter (where d.status = 'lost' and not d.is_test and d.last_status_change_at >= ${d30} and d.last_status_change_at < ${dTo} and d.lost_reason_id is null and d.lost_reason is null)::int no_reason,
         count(*) filter (where d.status = 'open' and not d.out_of_scope)::int open_all, count(*) filter (where ${P_FLAG(db)})::int flagged
       from d`,
     db`select m.day, sum(m.open_value)::float8 v, sum(m.open_opportunities)::int n from account_metrics_daily m join (${locs(s, f.location)}) l on l.location_id = m.location_id
@@ -320,7 +320,7 @@ export async function overview(s: Scope, f: Filters, windowDays: number): Promis
     cards: [
       { key: "stuck", title: "Which deals are stuck?", value: staleN, sub: staleN ? `${money(staleV)} waiting` : "Nothing past its limit", part: "attention", bucket: "stale" },
       { key: "flow", title: "Where does the money leak?", value: "Money Flow", sub: "Pipes, drain and vault", part: "money-flow", bucket: null },
-      { key: "won", title: "What did we win lately?", value: money(num(t.won_v)), sub: `${num(t.won_n)} won in 30 days`, part: "won-lost", bucket: "won" },
+      { key: "won", title: "What did we win lately?", value: money(num(t.won_v)), sub: `${num(t.won_n)} won in ${windowDays === 1 ? "1 day" : `${windowDays} days`}`, part: "won-lost", bucket: "won" },
     ],
     trend: trend.map((r) => { const c = closes.find((x) => day(x.dy) === day(r.day)); return { day: day(r.day), openValue: num(r.v), openCount: num(r.n), won: num(c?.won), lost: num(c?.lost) }; }),
     windowDays, accounts: num(acc.n), historySince: iso(since?.since), trust,

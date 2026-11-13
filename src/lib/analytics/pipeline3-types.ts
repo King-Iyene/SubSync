@@ -168,7 +168,7 @@ export type Pl3Flag = (typeof PL3_FLAGS)[number];
 /** part=pipelines: ranked cards, one per (account, pipeline). Only stage-independent measures, so stages of different pipelines are never mixed. Keyset paged: pass `after` = the previous `next`. */
 export type PipeCard = {
   locationId: string; pipelineId: string; accountName: string; name: string;
-  openCount: number; openValue: number; wonCount: number; wonValue: number; lostCount: number; lostValue: number;
+  openCount: number; /** Every open deal of the pipeline the person gets by clicking in (no value, no owner, test and outlier deals included). `openCount` counts only the deals inside the money. */ allOpenCount?: number; openValue: number; wonCount: number; wonValue: number; lostCount: number; lostValue: number;
   staleCount: number; noOwnerCount: number; zeroValueCount: number; outlierCount: number; outlierValue: number; empty: boolean;
   /** Open deals with a test-looking name (left out of the money unless counted; see Pl3Cards.totals.countsTests). */
   testCount?: number; testValue?: number;
@@ -178,7 +178,7 @@ export type Pl3Cards = {
   cards: PipeCard[]; next: string | null;
   /** True when the totals come from the live scan because the stored totals are empty or older than two hours (the screen says so). */
   refreshing?: boolean;
-  totals: { pipelines: number; emptyHidden: number; openValue: number; wonValue: number; lostValue: number; openCount: number; wonCount: number; lostCount: number; staleCount: number; noOwnerCount: number;
+  totals: { pipelines: number; emptyHidden: number; openValue: number; wonValue: number; lostValue: number; openCount: number; allOpenCount?: number; wonCount: number; lostCount: number; staleCount: number; noOwnerCount: number;
     /** Deals with a test-looking name, in money and count; how many pipelines in all (empty ones too); and whether they are counted now: by the company's setting, by this screen's toggle, or not. */
     testCount?: number; testValue?: number; all?: number; countsTests?: "setting" | "toggle" | null; /** "Count deals without an owner" is on (Settings, Targets): ownerless deals are inside the money. */ countsOwnerless?: boolean };
 };

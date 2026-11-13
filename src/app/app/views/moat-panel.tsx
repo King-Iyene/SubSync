@@ -5,6 +5,7 @@ import { durationText, FORMULA, notEnough, receiptLine, type ChannelMix, type Cu
 import { useApiClient, useData } from "../session";
 import { EmptyState, ErrorState, LeadDrawer, SkeletonRows, type LeadSeed } from "../ds";
 import { InfoTip } from "../ds/info-tip";
+import { usePageRange } from "../ds/page-range";
 import { CountUp } from "../ds/count-up";
 import { CurveChart } from "./moat-curve-chart";
 
@@ -142,11 +143,14 @@ export function CurveCard({ q }: { q: string }) {
 type ScoreCard = { userId: string; name: string; replies: number; medianMinutes: number | null; p90Minutes: number | null; unansweredShare: number | null; owned: number; afterHoursCoverage: number | null; trend: { dir: string; changePct: number | null }; enough: boolean };
 export function ScorecardsCard({ q }: { q: string }) {
   const [page, setPage] = useState(0);
-  const { data, error, loading, reload } = useData<{ rows: ScoreCard[]; total: number; pages: number; page: number; scope: string }>(`moat?part=scorecards&days=30&page=${page}${q}`);
+  const bar = usePageRange();
+  // The leads counted are the ones that arrived in the dates of the bar (nothing is asked until they are known).
+  const { data, error, loading, reload } = useData<{ rows: ScoreCard[]; total: number; pages: number; page: number; scope: string }>(bar.ready ? `moat?part=scorecards&${bar.qs}&page=${page}${q}` : null);
   const trend = (t: ScoreCard["trend"]) => (t.dir === "new" ? "not enough replies to compare" : t.dir === "same" ? "about the same as last week" : `${Math.abs(t.changePct ?? 0)}% ${t.dir} than last week`);
   return (
     <section className={card} data-testid="scorecards-card">
-      <h3 className={h3}>{data?.scope === "self" ? "How quickly do I reply?" : "Who replies fastest?"} <InfoTip text="Typical is the middle reply time; the slowest tenth is the time 9 in 10 replies beat. After hours is the share of after-hours leads answered within an hour. A person needs 5 replies to show speeds." /></h3>
+      <h3 className={h3}>{data?.scope === "self" ? "How quickly do I reply?" : "Who replies fastest?"} <InfoTip text="Leads that arrived in the dates of the bar. Typical is the middle reply time; the slowest tenth is the time 9 in 10 replies beat. After hours is the share of after-hours leads answered within an hour. A person needs 5 replies to show speeds." /></h3>
+      <p className="-mt-1 mb-2 text-xs text-muted-foreground" data-testid="moat-dates">Leads that arrived {bar.label || "in the dates above"}, Lagos time.</p>
       {loading ? <SkeletonRows rows={3} /> : error || !data ? <ErrorState error={error ?? new Error("Could not load")} onRetry={reload} /> : data.rows.length === 0 ? <EmptyState compact title="No replies yet" body="Cards appear once a person has replied to new leads." /> : (
         <ul className="divide-y">{data.rows.map((r) => (
           <li key={r.userId} className="grid gap-1 py-2 text-sm sm:grid-cols-[1fr_auto]" data-testid="scorecard-row">
@@ -167,11 +171,13 @@ export function ScorecardsCard({ q }: { q: string }) {
 // ---------------------------------------------------------------- E4
 
 export function ChannelsCard({ q }: { q: string }) {
-  const { data, error, loading, reload } = useData<ChannelMix>(`moat?part=channels&days=30${q}`);
+  const bar = usePageRange();
+  const { data, error, loading, reload } = useData<ChannelMix>(bar.ready ? `moat?part=channels&${bar.qs}${q}` : null);
   const label: Record<string, string> = { sms: "Text", email: "Email", whatsapp: "WhatsApp", chat: "Chat", social: "Social", call: "Call", other: "Other" };
   return (
     <section className={card} data-testid="channels-card">
-      <h3 className={h3}>Which channel gets answered fastest? <InfoTip text="The channel of each new lead's first message, last 30 days. Fastest needs 10 replies in a channel and two channels to compare." /></h3>
+      <h3 className={h3}>Which channel gets answered fastest? <InfoTip text="The channel of each new lead's first message, for leads that arrived in the dates of the bar. Fastest needs 10 replies in a channel and two channels to compare." /></h3>
+      <p className="-mt-1 mb-2 text-xs text-muted-foreground" data-testid="moat-dates">Leads that arrived {bar.label || "in the dates above"}, Lagos time.</p>
       {loading ? <SkeletonRows rows={3} /> : error || !data ? <ErrorState error={error ?? new Error("Could not load")} onRetry={reload} /> : data.rows.length === 0 ? <EmptyState compact title="No leads yet" /> : (
         <ul className="grid gap-2">{data.rows.map((r) => (
           <li key={r.channel} className="text-sm">
