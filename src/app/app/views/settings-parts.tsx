@@ -25,11 +25,11 @@ export function PermissionsPanel({ groups }: { groups: PermissionGroup[] | null 
       <ul className="divide-y rounded-lg border text-sm">
         {groups.map((g) => (
           <li key={g.id}>
-            <details className="group px-3 py-2">
-              <summary className="flex cursor-pointer flex-wrap items-center justify-between gap-2 font-medium">
+            <div className="px-3 py-2">
+              <div className="flex flex-wrap items-center justify-between gap-2 font-medium">
                 <span>{g.title} <span className="font-normal text-muted-foreground">: {g.summary}</span></span>
                 {g.missing > 0 ? <Badge tone="warn">{NEEDS_PERMISSION}</Badge> : <Badge tone="good">Approved</Badge>}
-              </summary>
+              </div>
               <ul className="mt-2 space-y-2 pb-1">
                 {g.scopes.map((s) => (
                   <li key={s.scope} className="leading-5">
@@ -39,7 +39,7 @@ export function PermissionsPanel({ groups }: { groups: PermissionGroup[] | null 
                   </li>
                 ))}
               </ul>
-            </details>
+            </div>
           </li>
         ))}
       </ul>

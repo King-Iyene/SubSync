@@ -80,7 +80,7 @@ export function IntegrationsContent({ nested = false }: { nested?: boolean }) {
           <>
             <MySection data={my.data} reload={my.reload} level={level} />
             {my.data.canAdmin && <TeamSection level={level} />}
-            <AiCard />
+            {!nested && <AiCard />}
             <WfmCard />
           </>
         ) : null}

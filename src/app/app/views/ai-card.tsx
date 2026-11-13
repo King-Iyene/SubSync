@@ -9,9 +9,9 @@ import { Badge, Btn } from "../ui";
 // Settings, Integrations: the AI connection and its usage panel. Bring your own AI: the customer connects their OWN AI account (OpenRouter sign-in, Sign in with ChatGPT when approved, or a pasted
 // API key for Anthropic, OpenAI, Google Gemini or any OpenAI-compatible service). SubSync never pays for AI. The key is never shown again (last four characters only). Only an administrator sees this.
 
-type Conn = { method: "key" | "openrouter" | "chatgpt"; provider: string; baseUrl: string | null; model: string; last4: string; status: "connected" | "needs_attention"; capUsd: number; paused: boolean; shareNames: boolean; jobs: Record<string, boolean> };
+export type Conn = { method: "key" | "openrouter" | "chatgpt"; provider: string; baseUrl: string | null; model: string; last4: string; status: "connected" | "needs_attention"; capUsd: number; paused: boolean; shareNames: boolean; jobs: Record<string, boolean> };
 type Usage = { runs: number; ok: number; rejected: number; errors: number; spendUsd: number; byJob: Record<string, { runs: number; spendUsd: number }>; lastErrors: Array<{ at: string; job: string; reason: string }>; thumbs: { up: number; down: number } };
-type Status = {
+export type Status = {
   canManage: boolean; level?: "company" | "account"; connection?: Conn | null; usage?: Usage; killed: boolean; flags: Record<string, boolean>;
   methods?: { key: boolean; openrouter: boolean; chatgpt: "off" | "coming" | "ready" };
   providers?: Array<{ id: string; name: string; steps: string; cost: string; keyHint: string }>; methodCost?: Record<string, string>;
@@ -29,9 +29,16 @@ const DEAL_JOB_HELP: Record<string, string> = {
 };
 const METHOD_NAME = { key: "your own API key", openrouter: "OpenRouter sign-in", chatgpt: "ChatGPT sign-in" } as const;
 
+/** The page-level card (a client's staff page): fetches its own status and shows the heading and the plain intro. */
 export function AiCard() {
-  const api = useApiClient();
   const { data, error, reload } = useData<Status>("ai?part=status");
+  if (error || !data || !data.canManage) return null;
+  return <AiPanel data={data} reload={reload} />;
+}
+
+/** The connection controls themselves. `bare` drops the heading and intro (the Your tools row already says what AI is for). */
+export function AiPanel({ data, reload, bare = false }: { data: Status; reload: () => Promise<void>; bare?: boolean }) {
+  const api = useApiClient();
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [waiting, setWaiting] = useState(false);
 
@@ -46,7 +53,6 @@ export function AiCard() {
     return () => window.removeEventListener("message", on);
   }, [reload]);
 
-  if (error || !data || !data.canManage) return null;
   const c = data.connection ?? null;
   const act = async (name: string, body?: unknown) => {
     setMsg(null);
@@ -61,12 +67,15 @@ export function AiCard() {
   };
 
   return (
-    <section className="mb-8" data-testid="ai-card" aria-labelledby="ai-h">
-      <h3 id="ai-h" className="text-sm font-semibold">AI <span className="font-normal text-muted-foreground">(optional, bring your own)</span></h3>
-      <p className="mt-0.5 text-sm text-muted-foreground">
-        AI can word your 7 am brief in plain English. SubSync works out every number itself; the AI only writes around them, and a check throws away any answer with a number we did not give it. It only suggests: it never messages a lead or changes your CRM.
-        You connect your own AI account, so SubSync never pays for AI and you control the spend. {data.note}
-      </p>
+    <section className={bare ? "" : "mb-8"} data-testid="ai-card" aria-labelledby={bare ? undefined : "ai-h"}>
+      {!bare && <>
+        <h3 id="ai-h" className="text-sm font-semibold">AI <span className="font-normal text-muted-foreground">(optional, bring your own)</span></h3>
+        <p className="mt-0.5 text-sm text-muted-foreground">
+          AI can word your 7 am brief in plain English. SubSync works out every number itself; the AI only writes around them, and a check throws away any answer with a number we did not give it. It only suggests: it never messages a lead or changes your CRM.
+          You connect your own AI account, so SubSync never pays for AI and you control the spend. {data.note}
+        </p>
+      </>}
+      {bare && data.note && <p className="text-xs text-muted-foreground">{data.note}</p>}
       {data.killed && <InlineAlert tone="warning">AI wording is switched off for everyone right now.</InlineAlert>}
       {msg && <p role="status" className={`mt-2 text-sm ${msg.ok ? "text-emerald-600" : "text-red-600"}`}>{msg.text}</p>}
       {c ? <Connected data={data} conn={c} act={act} /> : <Connect data={data} act={act} start={start} waiting={waiting} />}
