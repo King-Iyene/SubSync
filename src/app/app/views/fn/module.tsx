@@ -24,7 +24,7 @@ import type { FnHeadline, FnOptions } from "./types";
 type TabKey = "overview" | "revenue" | "churn" | "payouts" | "ledger" | "setup";
 const TIPS: Record<TabKey, [string, string]> = {
   overview: ["Overview", "Plans a month, what moved, and what is at risk."], revenue: ["Client revenue", "What each client made through your work."], churn: ["Churn watch", "Client accounts that may leave, and how to keep them."],
-  payouts: ["Payouts", "What your setters and closers earned, line by line."], ledger: ["Billing notes", "What you bill each client, and what is overdue."], setup: ["Setup", "Prices, ad spend and payout choices only you can give."],
+  payouts: ["Payouts", "What your setters and closers earned, line by line."], ledger: ["Billing notes", "What you bill each client, and what is overdue."], setup: ["Payout setup", "Prices, ad spend and payout choices only you can give."],
 };
 const FLAG_OF: Record<TabKey, string> = { overview: "fn_mrr", revenue: "fn_revenue", churn: "fn_churn", payouts: "fn_payouts", ledger: "fn_ledger", setup: "fn_module" };
 

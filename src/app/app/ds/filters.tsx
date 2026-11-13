@@ -185,7 +185,7 @@ export function FilterDrawer({ kind, value, onChange }: { kind: FilterKind; valu
     <div className="print:hidden" data-testid="filter-row">
       <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1 text-xs">
         <details className="open:order-last open:basis-full" data-testid="filter-drawer">
-          <summary className="ds-press -ml-2 inline-flex min-h-8 cursor-pointer select-none items-center rounded-lg px-2 text-sm font-medium hover:bg-muted">Filter accounts{isFiltered(value) ? " (on)" : ""}</summary>
+          <summary className="ds-press inline-flex min-h-9 cursor-pointer select-none items-center rounded-lg border bg-card px-3 text-sm font-medium hover:border-primary/40">Filter accounts{isFiltered(value) ? " (on)" : ""}</summary>
           <div className="mt-2 text-sm"><ScopeFilterBar kind={kind} options={options} value={value} onChange={onChange} hideScope /></div>
         </details>
         <AccountScope options={options} value={value} onChange={onChange} className="contents" />

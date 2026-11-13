@@ -177,7 +177,7 @@ export function QualityTab({ canFix }: { canFix: boolean }) {
 
       {canFix && (
         <Section title="Fix in bulk from SubSync" hint="Needs your say-so for each client first. You see every change before it happens and can undo it." id="quality-fix" className="mt-8">
-          <details data-testid="quality-bulk">
+          <details open data-testid="quality-bulk">
             <summary className="min-h-11 cursor-pointer text-sm font-medium">Open the bulk fixer</summary>
             <div className="mt-3"><CleanupView embedded /></div>
           </details>

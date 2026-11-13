@@ -5,7 +5,7 @@ import { useState } from "react";
 import { USER_ENTERED_LABEL } from "@/lib/analytics/clients-v2";
 import { useData } from "../../session";
 import type { GoFn } from "../../nav";
-import { ErrorState, PopMenu, SkeletonRows, type MenuItem } from "../../ds";
+import { ErrorState, ActionRow, SkeletonRows, type MenuItem } from "../../ds";
 import { ACTION_BUTTON } from "../../ds/queue";
 import { fmtMoney } from "../../ui";
 import { ClientTrends } from "./trends";
@@ -70,7 +70,7 @@ export function ClientPage({ id, onBack, onOpen, go, embedded = false }: { id: s
           </div>
           <div className="flex items-center gap-2">
             <a href={r.url} target="_blank" rel="noopener noreferrer" className={`${ACTION_BUTTON} !w-auto px-3`} data-testid="client-crm">Open in your CRM<ExternalLink aria-hidden className="size-3.5" /><span className="sr-only"> ({r.name}, opens in a new tab)</span></a>
-            <PopMenu label="More for this client" items={menu} testId="client-page-more" triggerClassName="ds-press inline-flex h-11 items-center gap-1 rounded-md border bg-card px-2.5 text-sm font-medium hover:border-primary/40 hover:bg-accent sm:h-8">More<ChevronDown aria-hidden className="size-3.5" /></PopMenu>
+            <ActionRow items={menu} testId="client-page-more" />
           </div>
         </header>
         {note && <p className="mb-4 text-sm text-muted-foreground" role="status" data-testid="client-note">{note}</p>}

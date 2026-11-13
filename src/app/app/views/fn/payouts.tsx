@@ -17,7 +17,7 @@ type Open = { personId: string; kind: PayBasis | null; role: Role | null; disput
 const KIND_WORD: Record<PayBasis, string> = { booked: "Booked", showed: "Showed", won: "Won" };
 
 export function PayoutsTab({ options, goTab }: { options: FnOptions; goTab: (t: string) => void }) {
-  void goTab;
+
   const win = useWindow(), api = useApiClient();
   const manager = options.manager;
   const [basis, setBasis] = useState<PayBasis>(options.settings.payoutBasis), [q, setQ] = useState(""), [dq, setDq] = useState(""), [open, setOpen] = useState<Open | null>(null), [freeze, setFreeze] = useState(false), [rev, setRev] = useState(0);
@@ -30,6 +30,7 @@ export function PayoutsTab({ options, goTab }: { options: FnOptions; goTab: (t: 
   const label = `${win.from} to ${win.to} (${basis})`;
   return (
     <div className="fn-stack" data-testid="fn-payouts">
+      {options.settings.saved === false && <p className="td-note" role="status" data-testid="fn-finish-setup"><b>Finish setup</b> <span>You have not chosen how payouts are worked out yet, so the numbers below use a standard choice.</span> <button type="button" className="ap-link" onClick={() => goTab("setup")}>Go to Payout setup</button></p>}
       {fnfxOn() && <SampleNote />}
       <section className="fn-card" aria-label="Payout basis">
         <h2 className="fn-h">What is a payout paid on?</h2>

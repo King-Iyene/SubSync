@@ -43,7 +43,7 @@ export function CopyCards({ people, primaryId, pick, onPick, name }: { people: A
               <span className={BADGE} data-testid="dq-card-unseen">Payments, automations, courses: not visible yet</span>
             </p>
             <p className="mt-2 text-xs" data-testid="dq-why"><b>Why this one:</b> {why?.line ?? "…"}</p>
-            <details className="mt-2 text-xs">
+            <details data-allow-collapsed="record details are information; the merge actions are visible" className="mt-2 text-xs">
               <summary className="min-h-8 cursor-pointer py-1 font-medium">All details</summary>
               <dl className="space-y-1">
                 {fieldRows(p).map((r) => (
