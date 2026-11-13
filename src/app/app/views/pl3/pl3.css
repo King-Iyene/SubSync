@@ -163,11 +163,10 @@
 .rv-sub { font-size: 11px; font-weight: 500; fill: var(--muted-foreground); }
 
 /* FUNNEL FLOW (funnel-flow-view.tsx): same palette as the river. Bars are the steps, bands the deals that got through, lost leaves upward, waiting sits low and hatched when stuck. */
-.ff-wrap { position: relative; width: 100%; }
-.ff-bar { fill: color-mix(in srgb, var(--primary) 30%, var(--background)); stroke: var(--primary); stroke-width: 1; }
-.ff-bar-won { fill: color-mix(in srgb, var(--primary) 62%, var(--background)); }
+.ff-wrap { position: relative; width: 100%; --ff-gold: #b8892a; --ff-gold2: #7d5a14; --ff-ember: #c4402f; }
+[data-theme="dark"] .ff-wrap { --ff-gold: #f0c35a; --ff-gold2: #b5862a; --ff-ember: #ef6a56; }
+.ff-bar { stroke: color-mix(in srgb, var(--primary) 70%, #ffffff); stroke-width: 1; }
 .ff-wait { fill: color-mix(in srgb, var(--foreground) 14%, var(--background)); stroke: none; }
-.ff-node[data-open="1"]:hover .ff-bar, .ff-node:focus-visible .ff-bar { fill: color-mix(in srgb, var(--primary) 44%, var(--background)); }
 .ff-waithit, .rv-stuckhit { cursor: pointer; }
 .ff-section { margin-top: 18px; padding-top: 12px; border-top: 1px solid var(--border); }
 .ff-h { margin: 0 0 6px; font-size: 0.9375rem; font-weight: 650; } .ff-h5 { margin: 10px 0 4px; font-size: 0.8125rem; font-weight: 600; color: var(--muted-foreground); }

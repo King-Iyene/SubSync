@@ -76,3 +76,21 @@ export function sampleFlowPaths(f: PlMoneyFlow = sampleRiver()): FlowPaths {
     lostElsewhere: 0, minDeals: f.minDeals,
   };
 }
+
+/** The SAMPLE funnel: a rich, fixed, fictional pipeline made to show every effect (a clear leak, stuck deals, several winners). Only ever shown when asked, always labelled SAMPLE, never mixed with real numbers. */
+let funnelCache: FlowPaths | null = null;
+export function sampleFunnelPaths(): FlowPaths { return (funnelCache ??= buildFunnelSample()); }
+function buildFunnelSample(): FlowPaths {
+  // name, open, stuck, lost, average deal in dollars
+  const rows: Array<[string, number, number, number, number]> = [
+    ["New lead", 120, 38, 140, 3200], ["Contacted", 64, 21, 70, 4100], ["Appointment booked", 41, 9, 52, 5800],
+    ["Proposal sent", 27, 11, 38, 7500], ["Negotiation", 14, 4, 21, 9200], ["Contract out", 6, 2, 9, 11000],
+  ];
+  const stages = rows.map(([name, open, stuck, lost, avg], i) => ({ id: `sample-${i}`, name, order: i, open, openCents: open * avg * 100, noValue: 0, stuck, stuckCents: stuck * avg * 100, lost, lostCents: lost * avg * 100 }));
+  const won = 73, wonCents = won * 960_000;
+  const split = (names: string[], parts: number[]) => names.map((name, i) => ({ key: `sample-${i}`, name, n: parts[i], cents: Math.round((wonCents * parts[i]) / won) }));
+  return {
+    pipelineName: "Sample sales pipeline", stages, minDeals: 15, lostElsewhere: 0,
+    won: { n: won, cents: wonCents, medianDays: 21, byOwner: split(["Ada (sample)", "Tunde (sample)", "Chi (sample)", "Zainab (sample)"], [28, 21, 16, 8]), bySource: split(["Ads (sample)", "Referral (sample)", "Website (sample)"], [34, 25, 14]) },
+  };
+}

@@ -1,0 +1,59 @@
+/* FUNNEL FLOW v2: depth, motion and a plain legend. Every effect is decoration; with reduced motion nothing moves and every number is still there. Loaded after pl3.css. */
+/* River view: a thin lit edge and a soft glow so the ribbons have depth too. */
+.rv-link:not(.ff-band) .rv-ribbon { stroke: color-mix(in srgb, var(--primary) 55%, #ffffff); stroke-opacity: .5; stroke-width: .8; filter: drop-shadow(0 0 5px color-mix(in srgb, var(--primary) 30%, transparent)); }
+.ff-s-band0 { stop-color: color-mix(in srgb, var(--primary) 62%, var(--background)); stop-opacity: .9; }
+.ff-s-band1 { stop-color: color-mix(in srgb, var(--primary) 34%, var(--background)); stop-opacity: .82; }
+.ff-s-gold { stop-color: var(--ff-gold); } .ff-s-gold2 { stop-color: var(--ff-gold2); }
+.ff-s-ember { stop-color: var(--ff-ember); stop-opacity: .75; }
+.ff-s-gate0 { stop-color: color-mix(in srgb, var(--primary) 78%, #ffffff); } .ff-s-gate1 { stop-color: color-mix(in srgb, var(--primary) 52%, var(--background)); }
+.ff-ribbon { stroke: color-mix(in srgb, var(--primary) 55%, #ffffff); stroke-opacity: .55; stroke-width: .8; transition: opacity 160ms, filter 160ms; }
+.ff-glow { fill: var(--primary); opacity: .22; pointer-events: none; }
+.ff-spine { opacity: .35 !important; animation: none !important; }
+.ff-drain { stroke: color-mix(in srgb, var(--ff-ember) 70%, transparent); stroke-width: .8; transition: opacity 160ms; }
+.rv-leak .ff-drain { stroke: var(--ff-ember); stroke-width: 1.4; }
+.ff-bar-won { stroke: var(--ff-gold); filter: drop-shadow(0 0 6px color-mix(in srgb, var(--ff-gold) 55%, transparent)); }
+.ff-shine { pointer-events: none; mix-blend-mode: soft-light; }
+.ff-headchip rect { fill: color-mix(in srgb, var(--background) 86%, var(--foreground) 6%); stroke: color-mix(in srgb, var(--primary) 40%, var(--border)); stroke-width: 1; }
+.ff-head { paint-order: normal; stroke: none; }
+.ff-svg[data-hot] .ff-item { opacity: .3; }
+.ff-svg[data-hot] .ff-item[data-on="1"] { opacity: 1; }
+.ff-item[data-on="1"] .ff-ribbon { filter: brightness(1.18) saturate(1.2); stroke-opacity: .9; }
+.ff-item[data-on="1"] .ff-glow { opacity: .45; }
+.ff-node[data-on="1"] .ff-bar { filter: brightness(1.15); }
+.ff-dot-core { fill: color-mix(in srgb, var(--ff-gold) 85%, #ffffff); } .ff-dot-glow { fill: var(--ff-gold); opacity: .55; }
+.ff-stuck { animation: ff-shimmer 2.4s ease-in-out infinite; }
+@keyframes ff-shimmer { 0%, 100% { opacity: .65; } 50% { opacity: 1; } }
+.ff-ring { fill: none; stroke: var(--ff-ember); stroke-width: 2; animation: ff-pulse 1.6s ease-out infinite; }
+@keyframes ff-pulse { 0% { stroke-opacity: 1; stroke-width: 1.5; } 100% { stroke-opacity: 0; stroke-width: 9; } }
+.ff-leaktag rect { fill: color-mix(in srgb, var(--ff-ember) 14%, var(--background)); stroke: var(--ff-ember); }
+.ff-leaktag text { fill: var(--ff-ember); }
+.ff-wipe { transform-box: fill-box; transform-origin: 0 0; animation: ff-wipe-x 1.3s cubic-bezier(.2, .7, .2, 1) both; }
+.ff-wrap[data-dir="v"] .ff-wipe { animation-name: ff-wipe-y; }
+@keyframes ff-wipe-x { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes ff-wipe-y { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+.ff-wrap[data-paused="1"] * { animation-play-state: paused !important; }
+.ff-leakline, .ff-howto { margin: 10px 0 0; font-size: .8125rem; }
+.ff-leakline { color: var(--foreground); padding: 8px 12px; border-radius: 10px; border: 1px solid color-mix(in srgb, var(--ff-ember) 35%, var(--border)); background: color-mix(in srgb, var(--ff-ember) 6%, transparent); }
+.ff-howto { padding: 10px 14px 12px; border-radius: 12px; border: 1px solid var(--border); background: color-mix(in srgb, var(--foreground) 3%, transparent); }
+.ff-keys { list-style: none; margin: 8px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 8px 22px; }
+.ff-keys li { display: flex; gap: 8px; align-items: flex-start; font-size: .8125rem; line-height: 1.35; }
+.ff-sw { flex: none; width: 22px; height: 12px; margin-top: 3px; border-radius: 4px; border: 1px solid color-mix(in srgb, var(--foreground) 25%, transparent); }
+.ff-sw-moved { background: linear-gradient(90deg, color-mix(in srgb, var(--primary) 62%, var(--background)), color-mix(in srgb, var(--primary) 34%, var(--background))); }
+.ff-sw-lost { background: linear-gradient(90deg, var(--ff-ember), color-mix(in srgb, var(--ff-ember) 12%, transparent)); }
+.ff-sw-won { background: linear-gradient(180deg, var(--ff-gold), var(--ff-gold2)); }
+.ff-sw-stuck { background: repeating-linear-gradient(45deg, color-mix(in srgb, var(--pl-stuck) 70%, transparent) 0 2px, color-mix(in srgb, var(--pl-stuck) 16%, var(--background)) 2px 5px); }
+.ff-sw-waiting { background: color-mix(in srgb, var(--foreground) 14%, var(--background)); }
+.ff-chips-wrap { display: flex; align-items: center; gap: 8px; margin: 8px 0; overflow-x: auto; }
+.ff-chips-arrow { flex: none; font-size: .75rem; font-weight: 700; padding: 3px 14px 3px 12px; color: #2b1d00; background: linear-gradient(90deg, var(--ff-gold2), var(--ff-gold)); clip-path: polygon(0 0, 88% 0, 100% 50%, 88% 100%, 0 100%); }
+.ff-chips { list-style: none; margin: 0; padding: 0; display: flex; gap: 8px; }
+.ff-chips[data-anim="1"] li { animation: ff-chip-in .6s cubic-bezier(.2, .7, .2, 1) both; animation-delay: calc(var(--i, 0) * 90ms + 400ms); }
+@keyframes ff-chip-in { from { opacity: 0; transform: translateX(-24px); } to { opacity: 1; transform: none; } }
+.ff-chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px 2px 2px; min-height: 32px; border-radius: 999px; border: 1px solid var(--border); background: var(--background); font-size: .75rem; cursor: pointer; white-space: nowrap; }
+span.ff-chip { cursor: default; }
+.ff-chip i { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; font-style: normal; font-weight: 700; font-size: .6875rem; color: #fff; text-shadow: 0 1px 1px rgba(0, 0, 0, .35); }
+.ff-chip:hover, .ff-chip:focus-visible { border-color: var(--ff-gold); outline: none; box-shadow: 0 0 0 2px color-mix(in srgb, var(--ff-gold) 40%, transparent); }
+@media (prefers-reduced-motion: reduce) {
+  .ff-wipe, .ff-stuck, .ff-ring, .ff-chips[data-anim="1"] li { animation: none !important; }
+  .ff-ring { stroke-opacity: .9; stroke-width: 2; }
+  .ff-ribbon, .ff-drain { transition: none; }
+}

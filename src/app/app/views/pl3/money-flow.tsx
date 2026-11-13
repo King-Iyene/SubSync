@@ -4,7 +4,7 @@ import { Pause, Play, RotateCcw, StepBack, StepForward } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { riverLayout } from "@/lib/design/river-layout";
 import { buildReplayFrames, nextFrame, REPLAY_SPEEDS, replayHasMovement } from "@/lib/design/river-replay";
-import { sampleFlowPaths, sampleRiver } from "@/lib/design/river-sample";
+import { sampleFlowPaths, sampleFunnelPaths, sampleRiver } from "@/lib/design/river-sample";
 import { dealsText, lostTotal as lostAllOf, pathSteps, type FlowPaths, type PathSeg, type PathStep } from "@/lib/design/flow-paths";
 import type { Measure } from "@/lib/design/funnel-flow-layout";
 import type { PlDrain, PlMoneyFlow, PlStage } from "@/lib/analytics/pipeline3-types-interim";
@@ -199,7 +199,7 @@ export function MoneyFlow({ filters, onPick: realPick }: { filters: PlFilters; o
           <p className="ap-fine mb-2"><b>As of now:</b> deals still waiting in each step. <b>Between {bar.label || "the dates above"}, {zoneWord()} time:</b> won, lost and how far deals got.</p>
           {pathsReq.error && !sample ? <ErrorState error={pathsReq.error} onRetry={pathsReq.reload} />
             : !paths ? (pathsReq.data ? <p className="ap-fine" role="status" data-testid="ff-nopipe">No steps were found for this pipeline, so there is no funnel to draw.</p> : <SkeletonRows rows={5} label="Loading the funnel..." />)
-            : <FunnelFlow paths={paths} measure={measure} width={Math.max(300, width)} reduced={reduced} settle={settle} sample={sample}
+            : <FunnelFlow paths={sample ? sampleFunnelPaths() : paths}measure={measure} width={Math.max(300, width)} reduced={reduced} settle={settle} sample={sample}
                 onReach={(i) => { const st = paths.stages[i]; const n = pathSteps(paths, measure === "deals"); if (i >= paths.stages.length) return pickWon(); onPick({ title: `${dealsText(n[i].fromN)} got to ${st.name} or further`, count: n[i].fromN, params: { reach: st.id, fc: measure === "deals", ownerId: person || undefined } }); }}
                 onWaiting={(i, stuck) => { const st = paths.stages[i], n = pathSteps(paths, measure === "deals")[i]; onPick(stuck ? { title: `${st.name}, stuck deals`, count: st.stuck, params: { stageId: st.id, stale: true, ownerId: person || undefined } } : { title: `${st.name}, still here`, count: n.stillHere, params: { stageId: st.id, flowOpen: true, fc: measure === "deals", ownerId: person || undefined } }); }}
                 onLost={(i) => { const st = paths.stages[i]; onPick({ title: `Lost from ${st.name}`, count: st.lost, params: { stageId: st.id, status: "lost", ownerId: person || undefined } }); }}
