@@ -63,3 +63,45 @@ test("source guard: Merge on a protected group opens the chooser with a visible 
   assert.match(q, /effectiveTier\("certain"/); // the nightly scan lowers the tier
   assert.match(q, /r\.tier === "certain"/); // and the bulk list only takes real certain groups
 });
+
+// ---- read-time lowering: tab counts, each tab's rows, headline split and bulk count all use one rule
+import { applyLowering, lowerKey, loweredGroups, type SureTier, type TierTally } from "../dq/dupe-tier.ts";
+type G = { loc: string; key: string; stored: SureTier; names: string[] };
+const GROUPS: G[] = [
+  { loc: "a", key: "1", stored: "certain", names: ["Ann Lee", "ann lee"] },
+  { loc: "a", key: "2", stored: "certain", names: JORDAN },
+  { loc: "b", key: "3", stored: "certain", names: ["Bob Smith", "Robert Smith", ""] },
+  { loc: "b", key: "4", stored: "likely", names: ["x y", "p q"] },
+  { loc: "b", key: "5", stored: "possible", names: ["x y", "p q"] },
+];
+const tally = (): TierTally => {
+  const t: TierTally = { certain: { groups: 0, extra: 0 }, likely: { groups: 0, extra: 0 }, possible: { groups: 0, extra: 0 } };
+  for (const g of GROUPS) { t[g.stored].groups++; t[g.stored].extra += g.names.length - 1; }
+  return t;
+};
+const lowered = () => loweredGroups(GROUPS.filter((g) => g.stored === "certain").map((g) => ({ loc: g.loc, key: g.key, size: g.names.length, names: g.names })));
+const rowsOf = (tier: SureTier) => GROUPS.filter((g) => (g.stored === "certain" && lowered().has(lowerKey(g.loc, g.key)) ? "likely" : g.stored) === tier);
+
+test("the mixed-name group lands in Likely and counts equal rows in every tab", () => {
+  const low = lowered();
+  assert.deepEqual([...low.keys()], [lowerKey("a", "2")]);
+  assert.equal(rowsOf("likely").some((g) => g.key === "2"), true);
+  assert.equal(rowsOf("certain").some((g) => g.key === "2"), false);
+  const c = applyLowering(tally(), low);
+  for (const t of ["certain", "likely", "possible"] as const) {
+    assert.equal(c[t].groups, rowsOf(t).length, `${t} groups`);
+    assert.equal(c[t].extra, rowsOf(t).reduce((s, g) => s + g.names.length - 1, 0), `${t} extra`);
+  }
+  assert.equal(c.certain.groups + c.likely.groups + c.possible.groups, GROUPS.length); // the headline total does not change, only the split
+});
+
+test("the bulk merge count excludes the lowered group", () => {
+  assert.equal(applyLowering(tally(), lowered()).certain.groups, 2);
+  assert.equal(BULK_BUTTON(rowsOf("certain").length), "Merge all certain matches (2)");
+});
+
+test("source guard: tab counts and the first page of each list apply the same name rule before reading", () => {
+  const q = src("src/lib/analytics/dq-queries.ts");
+  assert.match(q, /export async function tierCounts\(s: Scope\)[^{]*\{\s*await healTiers\(s\);/);
+  assert.match(q, /if \(!after && tier !== "possible"\) await healTiers\(s\)/);
+});
