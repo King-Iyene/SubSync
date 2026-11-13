@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from "react";
 import type React from "react";
 import { centerPath, particleCounts, pileCards, pileUnit, ribbonPath, riverLayout, MAX_PILE_CARDS, type Pt } from "@/lib/design/river-layout";
 import type { ReplayMover } from "@/lib/design/river-replay";
+import type { PathStep } from "@/lib/design/flow-paths";
 import type { PlStage } from "@/lib/analytics/pipeline3-types-interim";
 import { money, moneyShort } from "./format";
 
@@ -17,6 +18,8 @@ export type RiverProps = {
   /** Replay: the deals that moved on the day being shown (cards slide between piles for `flyMs`). Absent when not replaying. */
   movers?: ReplayMover[]; moverKey?: string; flyMs?: number;
   onStage: (s: PlStage, stale?: boolean) => void; onNoValue: (s: PlStage) => void; onWon: () => void; onLostFrom: (s: PlStage) => void;
+  /** What each ribbon says and opens ("53 of 57 moved on (93%)"), one per ribbon, counted by the same rule as the list behind the click. Absent (loading, replaying, no data): the ribbons carry no label and open nothing. */
+  steps?: Array<PathStep | undefined>; onPath?: (s: PathStep) => void;
 };
 type Tip = { x: number; y: number; title: string; lines: string[] };
 
@@ -87,12 +90,20 @@ export function River(p: RiverProps) {
         {L.links.map((l, i) => {
           const s = stages[l.from], to = L.nodes[l.to].kind === "won" ? null : stages[l.to];
           const mid = pt((l.al0 + l.al1) / 2, (l.ac0 + l.ac1) / 2 + l.th / 2);
-          const lines = [`${unit(l.amount)} reached ${to ? to.name : "Won"}`, l.conv === null ? "Not enough data for a percentage" : `${Math.round(l.conv * 100)}% of what reached ${s.name} got this far (an estimate)`];
-          const go = () => (to ? p.onStage(to) : p.onWon());
-          return <g key={`l${i}`} className="rv-link" {...hover(`${s.name} to ${to ? to.name : "Won"}`, lines)} {...press(go)} aria-label={`${s.name} to ${to ? to.name : "Won"}: ${lines.join(". ")}. Open the deals.`} data-testid={`pl-link-${i}`}>
+          // The label and the click come from ONE count (the server's, by the rule of the list that opens): "X of Y moved on", and the click opens exactly those X deals.
+          const ps = p.steps?.[l.from] && p.onPath ? p.steps[l.from] : null, canOpen = !!ps && ps.toN > 0;
+          const nm = `${s.name} to ${to ? to.name : "Won"}`;
+          const lines = ps
+            ? [`${ps.toN.toLocaleString("en-US")} of ${ps.fromN.toLocaleString("en-US")} deals that got to ${s.name} are now past it${ps.pct ? ` (${ps.pct})` : ""}`,
+              `${ps.stillHere.toLocaleString("en-US")} still in ${s.name}, ${ps.lostHere.toLocaleString("en-US")} lost there`,
+              ...(counts ? [] : [`${money(ps.toCents)} of ${money(ps.fromCents)} in money`]),
+              canOpen ? "Click to open exactly those deals" : "Nothing got past this step in these dates"]
+            : [`${unit(l.amount)} got as far as ${to ? to.name : "Won"}`];
+          const label = ps ? `${nm}: ${ps.label}. ${canOpen ? "Open the deals." : "Nothing to open."}` : nm;
+          return <g key={`l${i}`} className="rv-link" data-open={canOpen ? "1" : "0"} {...hover(nm, lines)} {...(canOpen ? press(() => p.onPath?.(ps as PathStep)) : {})} aria-label={label} data-testid={`pl-link-${i}`}>
             <path className="rv-ribbon" d={ribbonPath(l.al0, l.ac0, l.th, l.al1, l.ac1, l.th, pt)} style={{ animationDelay: `${i * 160}ms` }} />
             <path className="rv-flow" d={centerPath(l, pt)} style={{ strokeWidth: Math.max(1.5, Math.min(4, l.th / 6)) }} />
-            {l.conv !== null && <g className="rv-conv" transform={`translate(${mid[0]} ${mid[1]})`}><rect x={-20} y={-10} width={40} height={20} rx={10} /><text textAnchor="middle" dy="4">{Math.round(l.conv * 100)}%</text></g>}
+            {ps && ps.fromN > 0 && <g className="rv-conv" transform={`translate(${mid[0]} ${mid[1]})`} data-testid={`pl-link-label-${i}`}><rect x={-40} y={-15} width={80} height={30} rx={12} /><text textAnchor="middle" y={-2}>{ps.short[0]}</text><text textAnchor="middle" y={10} className="rv-conv-sub">{ps.short[1]}</text></g>}
           </g>;
         })}
         {L.tails.map((t) => {
@@ -106,11 +117,19 @@ export function River(p: RiverProps) {
           const s = nd.kind === "stage" ? stages[nd.index] : null;
           const top = nd.ac + nd.flowH, rows = pileCards(scaleOf(nd), cardUnit), step = rows ? Math.max(4, Math.min(12, nd.openH / rows)) : 0;
           const stuckRows = nd.kind === "stage" && nd.open > 0 && nd.stuck > 0 ? Math.min(rows, Math.max(1, Math.round((rows * nd.stuck) / nd.open))) : 0;
-          const tipLines = s ? stageTip(s) : [`${unit(nd.open)} won`, "Landed in the vault"];
-          const label = s ? `${s.name}: ${tipLines.join(". ")}. Open them.` : `Won: ${tipLines[0]}. Open them.`;
+          // A pile with nothing in it opens nothing, so it is not a button. An empty Won column is an empty vault, with no card drawn in it.
+          const nothing = nd.open <= 0, emptyVault = nd.kind === "won" && nothing;
+          const tipLines = s ? stageTip(s) : emptyVault ? ["No wins in these dates"] : [`${unit(nd.open)} won`, "Landed in the vault"];
+          const label = s ? `${s.name}: ${tipLines.join(". ")}.${nothing ? "" : " Open them."}` : emptyVault ? "Won: No wins in these dates." : `Won: ${tipLines[0]}. Open them.`;
           const go = s ? () => (counts && s.count === 0 && noVal(s) > 0 ? p.onNoValue(s) : p.onStage(s)) : p.onWon;
           const base = nd.kind === "won" ? nd.ac : top;
-          return <g key={nd.id} className={`rv-node rv-${nd.kind}`} {...hover(s ? s.name : "Won", tipLines)} {...press(go)} aria-label={label} data-testid={nd.kind === "won" ? "pl-vault" : `pl-seg-${nd.id}`}>
+          if (emptyVault) {
+            const [vx, vy] = pt(nd.al + nd.w / 2, base + 14);
+            return <g key={nd.id} className="rv-node rv-won rv-emptyvault" {...hover("Won", tipLines)} tabIndex={0} role="img" aria-label={label} data-testid="pl-vault" data-empty="1">
+              <g transform={`translate(${vx} ${vy})`} aria-hidden><rect x={-15} y={-14} width={30} height={28} rx={4} className="rv-vault-door" /><circle r={6} className="rv-vault-dial" /><path d="M0 -6v-3M0 6v3M-6 0h-3M6 0h3" className="rv-vault-dial" /></g>
+            </g>;
+          }
+          return <g key={nd.id} className={`rv-node rv-${nd.kind}`} data-open={nothing ? "0" : "1"} {...hover(s ? s.name : "Won", tipLines)} {...(nothing ? {} : press(go))} aria-label={label} data-testid={nd.kind === "won" ? "pl-vault" : `pl-seg-${nd.id}`}>
             {rows > 0 && <rect className="rv-slot" {...R(nd.al, base, nd.w, rows * step + 2)} rx={3} />}
             {Array.from({ length: rows }, (_, r) => {
               const j = ((r * 7) % 3 - 1) * 1.4, bad = r >= rows - stuckRows, h = Math.max(1.5, step - 1.1);
@@ -123,12 +142,13 @@ export function River(p: RiverProps) {
             {stuckRows > 0 && <rect className="rv-stuckmark" {...R(nd.al, base + (rows - stuckRows) * step, nd.w, stuckRows * step)} fill="url(#rv-hatch)" rx={2} pointerEvents="none" />}
             {stuckRows > 0 && s && <rect className="rv-stuckhit" {...R(nd.al, base + (rows - stuckRows) * step, nd.w, stuckRows * step)} fill="transparent" onClick={(e) => { e.stopPropagation(); p.onStage(s, true); }} onKeyDown={(e) => e.stopPropagation()} aria-label={`${s.staleCount} stuck deals in ${s.name}. Open them.`} data-testid={`pl-stuck-${nd.id}`}><title>{`${s.staleCount} stuck in ${s.name}`}</title></rect>}
             {stuckRows > 0 && (() => { const [x, y] = pt(nd.al + nd.w / 2, base + (rows - stuckRows) * step); return <g className="rv-stop" transform={`translate(${x} ${y})`} aria-hidden><rect x={-6} y={-8} width={12} height={14} rx={3} /><path d="M-2.5 -5v8M2.5 -5v8" /></g>; })()}
-            {nd.kind === "won" && <rect className="rv-vault" {...R(nd.al - 2, nd.ac - 2, nd.w + 4, Math.max(rows * step + 2, 14) + 4)} rx={4} fill="none" pointerEvents="none" />}
+            {nd.kind === "won" && !nothing && <rect className="rv-vault" {...R(nd.al - 2, nd.ac - 2, nd.w + 4, Math.max(rows * step + 2, 14) + 4)} rx={4} fill="none" pointerEvents="none" />}
           </g>;
         })}
         {L.nodes.map((nd) => {
           const s = nd.kind === "stage" ? stages[nd.index] : null, x = pt(nd.al + nd.w / 2, 0)[0];
-          const name = s ? s.name : "Won", val = !s && nd.open === 0 ? "None won" : unitShort(nd.open), sub = s ? `${nd.stuck > 0 ? `${s.staleCount} stuck` : ""}` : "";
+          const noWins = !s && nd.open === 0;
+          const name = s ? s.name : "Won", val = noWins ? (vertical ? "No wins in these dates" : "No wins") : unitShort(nd.open), sub = s ? `${nd.stuck > 0 ? `${s.staleCount} stuck` : ""}` : noWins && !vertical ? "in these dates" : "";
           if (vertical) { const ly = pt(nd.al, 0)[1]; return <text key={`x${nd.id}`} className="rv-text" x={6} y={ly - 9}><tspan className="rv-name">{trunc(name, 22)}</tspan><tspan className="rv-val" dx={8}>{val}</tspan>{sub && <tspan className="rv-stucktxt" dx={8}>{sub}</tspan>}<title>{`${name}: ${val}`}</title></text>; }
           return <text key={`x${nd.id}`} className="rv-text" x={x} y={16} textAnchor="middle"><tspan className="rv-name" x={x}>{trunc(name, Math.max(6, Math.floor((width - 24) / (n * 7.2))))}</tspan><tspan className="rv-val" x={x} dy={17}>{val}</tspan>{sub && <tspan className="rv-stucktxt" x={x} dy={14}>{sub}</tspan>}<title>{`${name}: ${val}`}</title></text>;
         })}

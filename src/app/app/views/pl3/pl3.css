@@ -114,6 +114,10 @@
 [data-settle="1"] .rv-ribbon { animation: rv-fade 700ms ease-out both; }
 @keyframes rv-fade { from { opacity: 0; } to { opacity: 1; } }
 .rv-link, .rv-node, .rv-tail, .rv-leaktag { cursor: pointer; outline: none; }
+.rv-link[data-open="0"], .rv-node[data-open="0"], .rv-emptyvault { cursor: default; }
+.rv-conv-sub { font-size: 10px !important; font-weight: 500 !important; fill: var(--muted-foreground) !important; }
+.rv-vault-door { fill: none; stroke: color-mix(in srgb, var(--foreground) 38%, transparent); stroke-width: 1.6; }
+.rv-vault-dial { fill: none; stroke: color-mix(in srgb, var(--foreground) 38%, transparent); stroke-width: 1.4; stroke-linecap: round; }
 .rv-link:focus-visible, .rv-node:focus-visible, .rv-tail:focus-visible, .rv-leaktag:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
 .rv-conv rect { fill: var(--background); stroke: color-mix(in srgb, var(--primary) 50%, transparent); }
 .rv-conv text { fill: var(--foreground); font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; }
@@ -153,6 +157,28 @@
 .rv-speed.is-on { background: color-mix(in srgb, var(--pl-gold) 22%, transparent); color: var(--foreground); }
 @media (prefers-reduced-motion: reduce) { .rv-ribbon { transition: none; } }
 @media (prefers-reduced-motion: reduce) { [data-settle="1"] .rv-flow, [data-settle="1"] .rv-ribbon, [data-settle="1"] .rv-bill { animation: none; } .rv-flow { stroke-dasharray: none; opacity: .4; } }
+/* The hatch for stuck piles (river and funnel flow): ochre stripes on a pale ochre ground. */
+.rv-hatch-bg { fill: color-mix(in srgb, var(--pl-stuck) 16%, var(--background)); }
+.rv-hatch-line { fill: color-mix(in srgb, var(--pl-stuck) 62%, transparent); }
+.rv-sub { font-size: 11px; font-weight: 500; fill: var(--muted-foreground); }
+
+/* FUNNEL FLOW (funnel-flow-view.tsx): same palette as the river. Bars are the steps, bands the deals that got through, lost leaves upward, waiting sits low and hatched when stuck. */
+.ff-wrap { position: relative; width: 100%; }
+.ff-bar { fill: color-mix(in srgb, var(--primary) 30%, var(--background)); stroke: var(--primary); stroke-width: 1; }
+.ff-bar-won { fill: color-mix(in srgb, var(--primary) 62%, var(--background)); }
+.ff-wait { fill: color-mix(in srgb, var(--foreground) 14%, var(--background)); stroke: none; }
+.ff-node[data-open="1"]:hover .ff-bar, .ff-node:focus-visible .ff-bar { fill: color-mix(in srgb, var(--primary) 44%, var(--background)); }
+.ff-waithit, .rv-stuckhit { cursor: pointer; }
+.ff-section { margin-top: 18px; padding-top: 12px; border-top: 1px solid var(--border); }
+.ff-h { margin: 0 0 6px; font-size: 0.9375rem; font-weight: 650; } .ff-h5 { margin: 10px 0 4px; font-size: 0.8125rem; font-weight: 600; color: var(--muted-foreground); }
+.ff-table td, .ff-table th { white-space: nowrap; } .ff-table tr[data-leak="1"] { background: color-mix(in srgb, var(--destructive) 6%, transparent); }
+.ff-stacks { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 8px 28px; }
+.ff-bar-row { display: flex; width: 100%; height: 26px; border-radius: 6px; overflow: hidden; border: 1px solid var(--border); background: var(--background); }
+.ff-seg { display: block; height: 100%; min-width: 4px; border: 0; padding: 0; margin: 0; cursor: pointer; opacity: .9; border-right: 1px solid var(--background); }
+.ff-seg:hover:not(:disabled), .ff-seg:focus-visible { opacity: 1; outline: 2px solid var(--ring); outline-offset: -2px; } .ff-seg:disabled { cursor: default; }
+.ff-seg-rest { background: color-mix(in srgb, var(--foreground) 22%, transparent); cursor: default; }
+.ff-legend { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 0.8125rem; }
+.ff-legend li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; } .ff-legend i { width: 10px; height: 10px; border-radius: 2px; flex: none; align-self: center; } .ff-legend .ff-rest { background: color-mix(in srgb, var(--foreground) 22%, transparent); }
 
 /* Pipeline list: one calm row per pipeline, aligned columns, rows stack on a phone. Flat, hairlines only, forest for the shape, ochre for stuck. */
 .pl-list { border: 1px solid color-mix(in srgb, var(--s6-edgec) 22%, transparent); border-radius: 8px; background: var(--s6-surf); overflow: hidden; }

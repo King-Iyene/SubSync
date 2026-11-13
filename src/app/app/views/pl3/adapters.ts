@@ -141,6 +141,10 @@ export function queryOf(part: PlPart, f: PlFiltersLike, extra: Record<string, st
   // A left-out reason (no value, no owner, test, big deal) opens exactly the deals that were counted under that name; otherwise stale, or the deal status.
   const reasonBucket = typeof extra.bucket === "string" && LEFT_OUT_BUCKETS.has(extra.bucket) ? extra.bucket : "";
   if (part === "list") { const bucket = reasonBucket || (extra.stale ? "stale" : status); if (bucket) p.set("bucket", bucket); }
+  // "Got to this step or further" (a ribbon or a funnel band): the step key, and whether open deals with no value count too (deal-count mode).
+  if (part === "list" && extra.reach) { p.set("bucket", "flow_reach"); p.set("reach", String(extra.reach)); }
+  if (part === "list" && extra.flowOpen) p.set("bucket", "flow_open");
+  if (part === "list" && extra.fc) p.set("fc", "1");
   if (extra.stage) p.set("stage", String(extra.stage));
   if (extra.after) p.set("after", String(extra.after));
   if (extra.total) p.set("total", String(extra.total));

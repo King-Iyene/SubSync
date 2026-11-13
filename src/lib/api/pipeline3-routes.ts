@@ -2,6 +2,7 @@ import { dayStartMs, isRealDay, localDay, mondayOfDay, nextMidnightMs } from "..
 import { atOf } from "../analytics/window-time";
 import { pipelineCards } from "../analytics/pipeline3-cards";
 import { attention, cleanId, dealList, detail, forecast, health, moneyFlow, overview, people, plCache, receipt, replay, sources, stageHistory, wonLost, type Filters, type Scope } from "../analytics/pipeline3-queries";
+import { flowPaths, reachOrdOf } from "../analytics/pipeline3-flow-paths";
 import { funnel, funnelDeals, historySettings, pipelineNames, saveHistorySettings, stuck } from "../analytics/pipeline3-funnel";
 import { clampSize, DAY, parsePlWindow } from "../analytics/pipeline3-intel";
 import { PL3_FLAGS, PL3_PARTS, type Pl3Bucket, type Pl3Part } from "../analytics/pipeline3-types";
@@ -21,9 +22,9 @@ export type Pl3Helpers = { allowed: () => Promise<string[] | null>; links: () =>
 const PART_FLAG: Record<Pl3Part, string> = {
   overview: "pl_overview", "money-flow": "pl_money_flow", attention: "pl_attention", "won-lost": "pl_won_lost", forecast: "pl_forecast", people: "pl_people", sources: "pl_sources",
   "stage-history": "pl_stage_history", health: "pl_health", receipt: "pl_proof", list: "pl_overview", detail: "pl_history", replay: "pl_money_flow", pipelines: "pl_money_flow",
-  funnel: "pl_history_funnel", "funnel-deals": "pl_history_funnel", stuck: "pl_history_funnel", "funnel-settings": "pl_history_funnel",
+  funnel: "pl_history_funnel", "funnel-deals": "pl_history_funnel", stuck: "pl_history_funnel", "funnel-settings": "pl_history_funnel", "flow-paths": "pl_money_flow",
 };
-const BUCKETS = new Set(["open", "won", "lost", "abandoned", "stale", "healthy", "outlier", "no_owner", "no_value", "test", "no_reason", "booked_appt", "no_appt"]);
+const BUCKETS = new Set(["open", "won", "lost", "abandoned", "stale", "healthy", "outlier", "no_owner", "no_value", "test", "no_reason", "booked_appt", "no_appt", "flow_reach", "flow_open"]);
 const int = (v: string | null, d: number) => { const n = Number(v); return v !== null && Number.isFinite(n) ? Math.floor(n) : d; };
 const text = (v: string | null, max: number) => (v ?? "").trim().slice(0, max) || null;
 const personParam = (v: string | null) => (v === "none" ? "none" : cleanId(v));
@@ -49,6 +50,9 @@ export async function handlePipeline3(ctx: Ctx, h: Pl3Helpers): Promise<Response
     from: wide.from, to: wide.to, location: one, pipeline: text(sp.get("pipeline"), 120), stage: cleanId(sp.get("stage")), stageKey: (sp.get("stage") ?? "").includes("|") ? text(sp.get("stage"), 200) : null, owner: seePeople ? personParam(sp.get("owner")) : null,
     source: text(sp.get("source"), 120), q: text(sp.get("q"), 60), bucket: bucketP && BUCKETS.has(bucketP) ? (bucketP as Pl3Bucket) : null, reason: text(sp.get("reason"), 120), includeTest: sp.get("test") === "1",
   };
+  // "Got to this step or further" (a ribbon or a funnel band): the step comes as its key, is turned into its position in the account's own pipeline, and only ever NARROWS the account's deals.
+  if (f.bucket === "flow_reach") f.reachOrd = await reachOrdOf(scope, one, f.pipeline, text(sp.get("reach"), 200));
+  f.flowDeals = sp.get("fc") === "1";
   const p = Math.max(0, int(sp.get("page"), 0)), size = clampSize(int(sp.get("size"), 20)), dir = sp.get("dir") === "asc" ? "asc" : "desc";
   const link = (loc: string, contact: string) => links.contact(loc, contact);
   const key = JSON.stringify([ctx.installationId, allowedAll, part, sp.toString(), ctx.kind]);
@@ -74,6 +78,7 @@ export async function handlePipeline3(ctx: Ctx, h: Pl3Helpers): Promise<Response
       const m = await moneyFlow(scope, f);
       return done(seePeople ? m : { ...m, people: [] });
     }
+    case "flow-paths": return done({ paths: await flowPaths(scope, f, { people: seePeople }) });
     case "funnel": return done(await funnel(scope, f, await historySettings(ctx.installationId)));
     case "funnel-deals": {
       const dr = sp.get("drill") ?? "entered", step = text(sp.get("step"), 120);
