@@ -4,6 +4,8 @@ import { SlidersHorizontal, X } from "lucide-react";
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 import { filterActive, filterQuery, type LeadFilter } from "@/lib/analytics/speed-v4-more";
 import { WhatIs } from "../ds/what-is";
+import { FilterPicker, type PickLoad } from "../ds/filter-picker";
+import { useApiClient } from "../session";
 
 // One set of lead filters for the Speed tabs it can change (Race, Pace, Coverage, People). It only narrows; the server still binds every read to the caller's own accounts.
 // The bar above the page sets accounts and dates; the dates reach every tab through this context (`query` carries them, `range` names them), so every tab follows the bar.
@@ -42,6 +44,9 @@ export function FilterProvider({ range, children }: { range: SpeedRange | null; 
   const [saved, setSaved] = useState<Record<string, LeadFilter>>(() => (typeof localStorage === "undefined" ? {} : read()));
   const set = useCallback(<K extends keyof LeadFilter>(k: K, v: LeadFilter[K] | "") => setFilter((f) => { const n = { ...f }; if (v === "" || v === undefined || (typeof v === "number" && Number.isNaN(v))) delete n[k]; else n[k] = v as LeadFilter[K]; return n; }), []);
   const unset = (k: keyof LeadFilter | "hours") => setFilter((f) => { const n = { ...f }; if (k === "hours") { delete n.hourFrom; delete n.hourTo; } else delete n[k]; return n; });
+  const api = useApiClient();
+  // The suggestions follow the bar's dates and accounts (the server binds them to the caller's own accounts).
+  const loadOptions = (kind: "source" | "tag"): PickLoad => (q) => api.get(`speed?part=options&kind=${kind}&q=${encodeURIComponent(q)}${rangeTail(range)}`);
   const num = (s: string) => (s === "" ? "" : Number(s));
   const chips = chipsOf(filter);
   const active = chips.length;
@@ -78,9 +83,9 @@ export function FilterProvider({ range, children }: { range: SpeedRange | null; 
               <label className={lab}>to<select className={`${SEL} mt-0.5 w-full`} value={filter.hourTo ?? ""} onChange={(e) => set("hourTo", num(e.target.value) as number | "")}><option value="">Any</option>{Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>{h}:59</option>)}</select></label>
             </div></fieldset>
           <fieldset className={group}><legend className="sr-only">Who</legend><p className={gh}>Who</p>
-            <div className="grid grid-cols-2 gap-2">
-              <label className={lab}>Source<input className={`${SEL} mt-0.5 w-full`} value={filter.source ?? ""} onChange={(e) => set("source", e.target.value)} placeholder="Exact name" /></label>
-              <label className={lab}>Tag<input className={`${SEL} mt-0.5 w-full`} value={filter.tag ?? ""} onChange={(e) => set("tag", e.target.value.toLowerCase())} placeholder="Exact tag" /></label>
+            <div className="grid grid-cols-1 gap-3">
+              <FilterPicker label="Source" value={filter.source ?? ""} onChange={(v) => set("source", v)} load={loadOptions("source")} refreshKey={range ? `${range.from}${range.to}` : ""} testId="pick-source" hint="Pick from what's in your account, or type an exact name." />
+              <FilterPicker label="Tag" value={filter.tag ?? ""} onChange={(v) => set("tag", v)} load={loadOptions("tag")} refreshKey={range ? `${range.from}${range.to}` : ""} testId="pick-tag" normalize={(v) => v.toLowerCase()} hint="Pick from what's in your account, or type an exact tag." />
             </div></fieldset>
           <fieldset className={group}><legend className="sr-only">How</legend><p className={gh}>How</p>
             <div className="grid grid-cols-2 gap-2">

@@ -15,6 +15,7 @@ import { buildMessage, destination, sanitizeDigest } from "../analytics/speed-di
 import { deliver, digestNumbers, loadDigest, saveDigest } from "../analytics/speed-digest-db";
 import { ignoredPage, ignoredReport } from "../analytics/ignored-leads-sql";
 import { isReason } from "../analytics/ignored-leads-core";
+import { filterOptions, isOptionKind } from "../analytics/filter-options";
 import { isLive } from "../live-flags";
 import { featureOn } from "../flags";
 import { isPrefKey, loadPrefs, savePref } from "../analytics/speed-prefs-db";
@@ -136,6 +137,14 @@ export async function handleSpeedPart(ctx: Ctx, h: SpeedHelpers): Promise<Respon
   // The bar's dates narrow every part that is about a period; the race is "right now" and ignores them. A bad pair of dates is ignored here (the home read already refuses it).
   const wp = sp.get("from") !== null && sp.get("to") !== null ? parseWindow(sp.get("from"), sp.get("to"), now, atOf(sp)) : null;
   const win = wp && wp.ok ? { winFrom: wp.win.fromMs, winTo: wp.win.toMs } : {};
+  // The suggestions for the Source and Tag filter boxes: values that exist on this caller's own leads (counts, most used first), narrowed by what was typed and by the bar's dates.
+  if (part === "options") {
+    const kind = sp.get("kind");
+    if (!isOptionKind(kind)) return json({ error: "Unknown filter" }, 400);
+    const allowed = narrowed(allowedAll, sp.get("account"));
+    if (allowed === "none") return json({ values: [], more: false });
+    return json(await filterOptions({ installationId: ctx.installationId, allowed: allowed as string[] | null, kind, q: sp.get("q") ?? "", fromMs: wp && wp.ok ? wp.win.fromMs : null, toMs: wp && wp.ok ? wp.win.toMs : null }));
+  }
   if (part === "zones") {
     const allowed = narrowed(allowedAll, sp.get("account"));
     if (allowed === "none") return json({ error: "Unknown account" }, 404);
