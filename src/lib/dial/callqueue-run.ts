@@ -179,7 +179,12 @@ const WF_NAMES = ["call queue (tag)", "call queue"];
 /** Is the call queue workflow in place for this account? Reads only. The workflow list needs the optional workflows permission; without it the answer rests on "Mark as set up" and on seeing a tagged lead lose its tag again. */
 export async function readyState(installationId: string, companyId: string, locationId: string, demo = false): Promise<{ state: SetupState; tag: string; marked: boolean; observed: boolean; listed: "published" | "draft" | "missing" | "unreadable"; canMark: boolean }> {
   const { s } = await getSettings(installationId, locationId);
-  if (demo) return { state: "not_sure", tag: s.tag, marked: false, observed: false, listed: "unreadable", canMark: false };
+  if (demo) {
+    // The demo never reads a CRM: "set up" is what the demo's own settings say (the demo company has the workflow marked as set up in every account).
+    const [r] = await sql()`select workflow_marked_at from call_queue_settings where installation_id = ${installationId} and location_id = ${locationId}`.catch(() => []);
+    const marked = !!r?.workflow_marked_at;
+    return { state: marked ? "set_up" : "not_sure", tag: s.tag, marked, observed: marked, listed: marked ? "published" : "unreadable", canMark: false };
+  }
   const db = sql();
   let marked = false, canMark = true;
   try { const [r] = await db`select workflow_marked_at from call_queue_settings where installation_id = ${installationId} and location_id = ${locationId}`; marked = !!r?.workflow_marked_at; } catch (e) { if (missing(e)) canMark = false; else throw e; }

@@ -38,21 +38,21 @@ async function accountNames(installationId: string, ids: string[]): Promise<Arra
 
 export async function meetingInboxView(ctx: Ctx): Promise<Response> {
   const empty = { demo: false, connected: false, canWrite: true, writeLive: false, settings: { masterSwitch: true, unmatchedMode: "inbox", previewConfirmed: true }, preview: null, waiting: [], recent: [], accounts: [] };
-  if (ctx.demo) return json({ ...empty, demo: true });
+  void empty;
   const person = personOf(ctx);
   if (!person) return NEED_SIGN_IN();
   const store = pgInboxStore();
   const now = Date.now();
   const [settings, waiting, recent, connection, canWrite, installed] = await Promise.all([
     store.settings(ctx.installationId, person.userId), store.listWaiting(ctx.installationId, person.userId), listRecent(ctx.installationId, person.userId),
-    store.getConnection(ctx.installationId, person.userId), installationHasScope(ctx.installationId, "contacts.write"), store.installed(ctx.installationId),
+    store.getConnection(ctx.installationId, person.userId), ctx.demo ? Promise.resolve(true) : installationHasScope(ctx.installationId, "contacts.write"), store.installed(ctx.installationId),
   ]);
   // What a note really becomes for this person: their choices under the rules of their own account (the company's rules for company staff), clipped like a real write (the preview ignores the master switch, so it always shows what notes would look like).
   const home = person.homeLocationId;
   const [rules, mappings, canComment] = await Promise.all([
     store.policies(ctx.installationId, home ? [home] : []),
     home ? loadFieldMappings(ctx.installationId, [home]).then((m) => m[home] ?? []) : Promise.resolve([]),
-    installationHasScope(ctx.installationId, COMMENT_SCOPE),
+    ctx.demo ? Promise.resolve(true) : installationHasScope(ctx.installationId, COMMENT_SCOPE),
   ]);
   const policy = effectivePolicy(rules.agency, home ? rules.accounts[home] : null);
   const choice = effectiveChoices(choicesOf(settings), policy).choices;

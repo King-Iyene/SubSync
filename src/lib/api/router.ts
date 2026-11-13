@@ -127,6 +127,7 @@ import { gatedWriter } from "../ghl/crm-gateway";
 import { writeEnabledFor } from "../analytics/cleanup-config";
 import { isLive } from "../live-flags";
 import { answerKey, cachedAnswer, forgetAllReads, forgetAnswers, readCacheOn } from "../read-cache";
+import { demoRead, forgetDemoAnswers } from "./demo-cache";
 import { answerStoreKey, judgeAnswer, storable } from "../analytics/read-answers";
 import { readAnswer, storeAnswer } from "../analytics/read-answers-db";
 import { handleSpeedPrefs, handleSpeedDigest, handleSpeedLadder, handleSpeedPart, handleSpeedTarget } from "./speed-routes";
@@ -2169,8 +2170,15 @@ export async function handle(request: Request, segments: string[]): Promise<Resp
   if (request.method !== "GET") {
     // The automatic check runs every minute or so on every open tab: it must not empty the read caches or mark the rollup dirty (a sync that really changed rows does that itself, data-version.ts).
     const auto = segments[0] === "sync" && segments[1] === "auto";
-    try { return await dispatch(ctx); } finally { if (!auto) { forgetAllReads(); forgetAnswers(ctx.installationId); if (!DIRTY_EXEMPT.test(segments[0] ?? "")) await markRollupDirty(ctx.installationId).catch(() => undefined); } }
+    try { return await dispatch(ctx); } finally { if (!auto) { forgetDemoAnswers(); forgetAllReads(); forgetAnswers(ctx.installationId); if (!DIRTY_EXEMPT.test(segments[0] ?? "")) await markRollupDirty(ctx.installationId).catch(() => undefined); } }
   }
+  // A demo session keeps its finished answers in memory (demo-cache.ts), so a screen opened twice is instant.
+  if (ctx.demo) return demoRead(`${ctx.installationId}|${ctx.kind}:${ctx.limitTo ?? ""}|${ctx.url.pathname}?${[...ctx.url.searchParams].filter(([k]) => k !== "_r").map(([k, v]) => `${k}=${v}`).join("&")}`, ctx.url.searchParams.has("_r"), () => readAnswerOrCompute(ctx));
+  return readAnswerOrCompute(ctx);
+}
+
+async function readAnswerOrCompute(ctx: Ctx): Promise<Response> {
+  const { request, segments } = ctx;
   // The race is "right now" (it refreshes itself), so it is always read fresh.
   const stored = storable(request.method, segments, ctx.url.searchParams);
   if ((HEAVY_READ.has(segments[0]) && ctx.url.searchParams.has("part") && ctx.url.searchParams.get("part") !== "race") || stored) {

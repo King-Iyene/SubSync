@@ -39,7 +39,7 @@ export async function myConnectionsView(ctx: Ctx): Promise<Response> {
   // Adding a note to a contact needs the optional permission to edit contacts. Without it the card says "Needs permission: reconnect" and nothing is written.
   const canWrite = ctx.demo ? true : await installationHasScope(ctx.installationId, "contacts.write");
   // The count of this person's own calls that wait in their Meeting inbox (a number, never any content). Shown with a link only while the Meeting notes page is on.
-  const [waiting] = ctx.demo ? [{ n: 0 }] : await sql()`select count(*)::int n from meetings where installation_id = ${ctx.installationId} and owner_ghl_user_id = ${person.userId} and status = 'needs_contact'`;
+  const [waiting] = await sql()`select count(*)::int n from meetings where installation_id = ${ctx.installationId} and owner_ghl_user_id = ${person.userId} and status = 'needs_contact'`;
   return json({ cards: cards(ctx), connections: mine, delivery, canAdmin: can(person.role, "see_status"), me: { name: person.name }, canWrite, inbox: { on: ctx.entitlements.features.meetings !== false, waiting: (waiting?.n as number) ?? 0 } });
 }
 

@@ -337,7 +337,6 @@ const int = (v: string | null, d: number) => { const n = Number(v); return v !==
 
 async function meetingsHome(ctx: Ctx, h: ApptActionHelpers): Promise<Response> {
   const bad = needUser(ctx); if (bad) return bad;
-  if (ctx.demo) return json({ demo: true, connection: null, counts: { linked: 0, needsMatching: 0, noFollowUp: 0 } });
   const userId = ctx.session.userId as string;
   const allowed = await h.allowed();
   const [connection, counts] = await Promise.all([connectionStatus(ctx.installationId, userId), homeCounts(ctx.installationId, userId, allowed)]);
@@ -346,13 +345,11 @@ async function meetingsHome(ctx: Ctx, h: ApptActionHelpers): Promise<Response> {
 }
 async function meetingsMatching(ctx: Ctx, h: ApptActionHelpers): Promise<Response> {
   const bad = needUser(ctx); if (bad) return bad;
-  if (ctx.demo) return json({ total: 0, rows: [], page: 0, size: 20 });
   const sp = ctx.url.searchParams;
   return json(await needsMatching(ctx.installationId, ctx.session.userId as string, await h.allowed(), Math.max(0, int(sp.get("page"), 0)), Math.min(50, Math.max(1, int(sp.get("size"), 20)))));
 }
 async function meetingsFollowUp(ctx: Ctx, h: ApptActionHelpers): Promise<Response> {
   const bad = needUser(ctx); if (bad) return bad;
-  if (ctx.demo) return json({ total: 0, rows: [], page: 0, size: 20 });
   const sp = ctx.url.searchParams;
   const r = await noFollowUp(ctx.installationId, ctx.session.userId as string, await h.allowed(), Math.max(0, int(sp.get("page"), 0)), Math.min(50, Math.max(1, int(sp.get("size"), 20))));
   const links = await h.links();
