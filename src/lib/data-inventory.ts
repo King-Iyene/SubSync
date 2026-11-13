@@ -349,6 +349,12 @@ export const INVENTORY: Record<string, TableInfo> = {
     personal: { label: "the Slack workspace and channel a notification channel is connected as", connected_by: "the name of the person who connected it" },
     secrets: { webhook_url_enc: "encrypted" },
   },
+  slack_chat_links: {
+    noun: "the Slack workspace linked to chat with the bot", line: "sign_in",
+    personal: { linked_by: "the name of the person who linked the workspace" },
+    secrets: { bot_token_enc: "encrypted" },
+  },
+  slack_chat_events: { noun: "a list of Slack chat events already handled (ids only, kept 2 days)", line: "sign_in" },
   meeting_hooks: { noun: "private meeting addresses", line: "sign_in", personal: { label: "the label you gave an address" }, secrets: { token_hash: "hashed" } },
 
   // ---- kept after an uninstall on purpose (no contacts, messages or credentials)

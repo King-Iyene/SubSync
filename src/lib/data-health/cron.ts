@@ -27,7 +27,7 @@ export async function raiseSpikes(installationId: string, accounts: Array<{ loca
       for (const r of results) for (const sp of r.spikes) {
         const key = spikeKey(r.locationId, sp.source, r.day), title = spikeTitle(name.get(r.locationId) ?? "A client account", sp);
         keys.push(key);
-        const [row] = await tx`insert into alerts (installation_id, location_id, kind, severity, title, detail, dedupe_key) values (${installationId}, ${r.locationId}, 'quality', 'warning', ${title}, ${tx.json({ source: sp.source, recent: sp.recent, usual: sp.baselinePerDay, kinds: sp.kinds, why: "Your own normal for this source is much lower. Check the import or form that sends these." } as never)}, ${key})
+        const [row] = await tx`insert into alerts (installation_id, location_id, kind, severity, title, detail, dedupe_key) values (${installationId}, ${r.locationId}, 'quality', 'warning', ${title}, ${tx.json({ source: sp.source, recent: sp.recent, usual: sp.baselinePerDay, created: sp.created, newestMinutes: sp.newestMinutes, kinds: sp.kinds, why: "Your own normal for this source is much lower. Check the import or form that sends these." } as never)}, ${key})
           on conflict (installation_id, dedupe_key) where resolved_at is null do update set title = excluded.title, detail = excluded.detail
           returning id, (xmax = 0) as inserted`;
         if (row?.inserted) created.push({ id: row.id as string, locationId: r.locationId, kind: "quality", severity: "warning", title, detail: {}, createdAt: new Date().toISOString(), resolvedAt: null });

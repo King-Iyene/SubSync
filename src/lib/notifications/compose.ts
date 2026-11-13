@@ -4,10 +4,10 @@
 import type { Severity } from "./catalog.ts";
 import { emailLogoHtml } from "../brand-logo.ts";
 
-export type Link = { view: string | null; locationId: string | null };
+export type Link = { view: string | null; locationId: string | null; /** Extra address parts that open the exact filter or list (no leading ? and no personal data). */ query?: string };
 
 /** The words of one notification, already rendered. This is what is stored in the delivery ledger and shown in the bell. */
-export type Item = { title: string; body: string; details: string[]; severity: Severity; link: Link };
+export type Item = { title: string; body: string; details: string[]; severity: Severity; link: Link; /** What the link opens, in words ("Open the bad records"). */ linkLabel?: string; /** What the repeat rules need to know about this message (alert-text.ts). */ meta?: Record<string, unknown> };
 
 export const MAX_ITEMS_SHOWN = 10;
 
@@ -17,7 +17,8 @@ const slackEsc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").r
 /** The part after # in a link into the app: a page name, or account=<id> for one client account. */
 export function hashFor(link: Link): string {
   if (!link.view) return "today";
-  return link.view === "account" && link.locationId ? `account=${encodeURIComponent(link.locationId)}` : link.view;
+  const head = link.view === "account" && link.locationId ? `account=${encodeURIComponent(link.locationId)}` : link.view;
+  return link.query && /^[A-Za-z0-9_.,=&%~-]{1,400}$/.test(link.query) ? `${head}?${link.query}` : head;
 }
 export const appLink = (appUrl: string, link: Link) => `${appUrl.replace(/\/+$/, "")}/app#${hashFor(link)}`;
 
@@ -71,9 +72,9 @@ export function composeSlack(input: Item[], o: SlackOptions): string {
     for (const d of i.details.slice(0, 16)) out.push(`• ${slackEsc(d)}`);
   } else {
     out.push(`*${slackEsc(o.company)}: ${n} new alerts*`);
-    for (const i of items.slice(0, MAX_ITEMS_SHOWN)) out.push(`• ${i.severity === "critical" ? ":red_circle:" : ":large_orange_circle:"} ${slackEsc(i.title)}`);
+    for (const i of items.slice(0, MAX_ITEMS_SHOWN)) out.push(`• ${i.severity === "critical" ? ":red_circle:" : ":large_orange_circle:"} ${slackEsc(i.title)} <${appLink(o.appUrl, i.link)}|${slackEsc(i.linkLabel ?? "Open it")}>`);
     if (n > MAX_ITEMS_SHOWN) out.push(`...and ${n - MAX_ITEMS_SHOWN} more`);
   }
-  out.push(`<${appLink(o.appUrl, items[0]?.link ?? { view: null, locationId: null })}|Open it>`);
+  if (n === 1) out.push(`<${appLink(o.appUrl, items[0].link)}|${slackEsc(items[0].linkLabel ?? "Open it")}>`);
   return out.join("\n");
 }

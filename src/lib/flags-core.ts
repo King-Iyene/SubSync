@@ -246,6 +246,10 @@ export const DEFAULT_OFF: ReadonlySet<Feature> = new Set<Feature>([
   "ai_deal_followup",
   "ai_deal_winloss",
   "ai_deal_forecast",
+  // Chat with the bot in Slack (docs/SLACK_CHAT_SETUP.md). Default off; also needs ai_byo and ai_ask_data.
+  "slack_chat",
+  // The AI writes the sentence under an alert in Slack from the alert's facts only (needs ai_byo and the account's switch). Default off.
+  "ai_slack_reports",
 ]);
 
 export function resolveFeatures(all: readonly Feature[], overrides: Record<string, boolean>, allOn = false): Record<Feature, boolean> {

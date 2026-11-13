@@ -24,6 +24,8 @@ export type AskArgs = {
   /** Re-checks a citation of a remembered answer. Defaults to running the tool again. */
   verify?: (tenant: Tenant, address: string, rowCount: number) => Promise<boolean>;
   now?: () => number;
+  /** True for Slack: names never go to the AI, whatever the account allowed, because the person asking is not matched to an app role. */
+  anonymous?: boolean;
 };
 
 export const cleanQuestion = (q: unknown): string => (typeof q === "string" ? q.replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, MAX_QUESTION) : "");
@@ -36,7 +38,7 @@ export async function askData(a: AskArgs): Promise<AskResult> {
   const now = (a.now ?? Date.now)();
   // Names go to the model only when the account's own connection allows it (the gateway enforces this again).
   let shareNames = false;
-  for (const scope of a.tenant.locationId ? [a.tenant.locationId, ""] : [""]) { const c = await a.deps.store.connection(a.tenant.installationId, scope); if (c) { shareNames = c.shareNames; break; } }
+  for (const scope of a.anonymous ? [] : a.tenant.locationId ? [a.tenant.locationId, ""] : [""]) { const c = await a.deps.store.connection(a.tenant.installationId, scope); if (c) { shareNames = c.shareNames; break; } }
   const aliases = new Map<string, string>();
   const tenant: Tenant = { ...a.tenant, shareNames, aliases };
   const w = windowOf(tenant, now);

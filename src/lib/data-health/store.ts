@@ -129,7 +129,7 @@ export async function flagTotals(installationId: string, allowed: string[] | nul
   return { found: Number(r?.found ?? 0), fixed: Number(r?.fixed ?? 0) };
 }
 
-export type FlagRow = { contactId: string; rule: RuleId; firstSeen: string; fixedAt: number | null; name: string; email: string | null; phone: string | null; source: string | null; gone: boolean };
+export type FlagRow = { contactId: string; rule: RuleId; firstSeen: string; fixedAt: number | null; name: string; email: string | null; phone: string | null; source: string | null; gone: boolean; addedAt: number | null };
 /** The records behind one number on one day. `day` null means now (open flags). A past day: first seen on or before it and not yet fixed that day. */
 export async function flagRecords(installationId: string, locationId: string, rule: string | null, day: string | null, limit: number): Promise<{ rows: FlagRow[]; total: number }> {
   const cond = day === null
@@ -137,14 +137,14 @@ export async function flagRecords(installationId: string, locationId: string, ru
     : sql()`f.first_seen_day <= ${day}::date and (f.fixed_at is null or f.fixed_at::date > ${day}::date)`;
   const [t] = await safe(() => sql()`select count(*)::int n from dh_flags f where f.installation_id = ${installationId} and f.location_id = ${locationId} and (${rule}::text is null or f.rule = ${rule}) and ${cond}
     and not exists (select 1 from dh_marks m where m.installation_id = f.installation_id and m.location_id = f.location_id and m.contact_id = f.contact_id and m.state = 'ignored')`, [{ n: 0 }] as never);
-  const rows = await safe(() => sql()`select f.contact_id, f.rule, to_char(f.first_seen_day, 'YYYY-MM-DD') fs, f.fixed_at, c.contact_id present, btrim(coalesce(c.first_name, '') || ' ' || coalesce(c.last_name, '')) nm, c.email, c.phone, c.source
+  const rows = await safe(() => sql()`select f.contact_id, f.rule, to_char(f.first_seen_day, 'YYYY-MM-DD') fs, f.fixed_at, c.contact_id present, btrim(coalesce(c.first_name, '') || ' ' || coalesce(c.last_name, '')) nm, c.email, c.phone, c.source, c.date_added
     from dh_flags f left join cached_contacts c on c.installation_id = f.installation_id and c.location_id = f.location_id and c.contact_id = f.contact_id
     where f.installation_id = ${installationId} and f.location_id = ${locationId} and (${rule}::text is null or f.rule = ${rule}) and ${cond}
     and not exists (select 1 from dh_marks m where m.installation_id = f.installation_id and m.location_id = f.location_id and m.contact_id = f.contact_id and m.state = 'ignored')
     order by f.first_seen_day desc, f.contact_id limit ${limit}`, [] as never);
   return {
     total: Number(t?.n ?? 0),
-    rows: rows.map((r) => ({ contactId: r.contact_id as string, rule: r.rule as RuleId, firstSeen: r.fs as string, fixedAt: ms(r.fixed_at), name: (r.nm as string) || "(no name)", email: r.email as string | null, phone: r.phone as string | null, source: r.source as string | null, gone: !r.present })),
+    rows: rows.map((r) => ({ contactId: r.contact_id as string, rule: r.rule as RuleId, firstSeen: r.fs as string, fixedAt: ms(r.fixed_at), name: (r.nm as string) || "(no name)", email: r.email as string | null, phone: r.phone as string | null, source: r.source as string | null, gone: !r.present, addedAt: ms(r.date_added) })),
   };
 }
 /** Bad records by where they came from: the import guard view. */

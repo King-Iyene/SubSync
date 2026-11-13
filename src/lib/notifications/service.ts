@@ -12,10 +12,13 @@ import { sql } from "../db";
 import { safeError } from "../safe-log";
 import { unsubscribeUrl } from "../unsubscribe";
 import { dailyLines, shortDate, weeklyLines } from "./brief-lines";
-import { CATALOG, type NotificationType } from "./catalog";
+import { CATALOG, typeForAlertKind, type NotificationType } from "./catalog";
 import { composeEmail, composeSlack, type Item } from "./compose";
 import { drain, intentFromAlert, plan, targetsFor, type Context, type DrainReport, type Intent, type PlanReport } from "./dispatcher";
-import { renderCopy, resolveCopy, sampleValues } from "./copy";
+import { cleanValue, renderCopy, resolveCopy, sampleValues } from "./copy";
+import { resolveEntitlements } from "../flags";
+import { aiAlertBody } from "../ai/team/alert-report";
+import { decideSend, factsFor, renderFacts, recoveryFor, specificFor, type AlertLink, type Extra, type Meta, type Prev } from "./alert-text";
 import type { Legacy, Pref } from "./prefs";
 import { asDispatchDestinations, dbLedger, listDestinations, loadPrefRows, prefsFrom, type DestinationView } from "./store";
 import { sendTestMail, type TestOutcome } from "./test-send";
@@ -34,6 +37,7 @@ export type Loaded = {
   lastWeeklyOn: string | null;
 };
 
+const num = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
 const appUrl = () => (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/+$/, "");
 
 function stopUrlFor(installationId: string): (email: string) => string | null {
@@ -90,17 +94,85 @@ async function accountNames(installationId: string, ids: string[]): Promise<Map<
   return new Map(rows.map((r) => [r.location_id as string, (r.name as string | null) ?? "Unnamed account"]));
 }
 
-/** Alerts raised in this refresh. Each becomes a message of the kind its alert type maps to, to everywhere that kind is routed. Info alerts stay in the Alerts page. */
+/** Alert kinds the refresh and the data-health job raise for everyone to see. Private per-person alerts have their own sender and are not touched here. */
+const SHARED_KINDS = ["speed", "appointments", "sla", "dormant", "churn", "leadflow", "stale", "quality", "sync", "email"];
+
+type Prior = Prev & { meta: Meta; link: AlertLink; linkLabel: string };
+
+/** The last message told about each problem (30 days back), so a repeat can say what changed and a clearing can be noticed. */
+async function priorBySubject(installationId: string): Promise<Map<string, Prior>> {
+  const rows = await sql()`
+    select distinct on (payload->'meta'->>'subject') payload, created_at from notification_deliveries
+    where installation_id = ${installationId} and payload->'meta'->>'subject' is not null and status not in ('skipped', 'failed') and created_at > now() - interval '30 days'
+    order by payload->'meta'->>'subject', created_at desc`.catch(() => []);
+  const out = new Map<string, Prior>();
+  for (const r of rows) {
+    const p = r.payload as Item | null;
+    const m = p?.meta as Meta | undefined;
+    if (!p || !m?.subject) continue;
+    const at = r.created_at instanceof Date ? r.created_at.getTime() : Date.parse(String(r.created_at));
+    out.set(m.subject, { fp: m.fp, count: m.count ?? null, at, state: m.state, meta: m, link: { view: p.link?.view ?? "alerts", locationId: p.link?.locationId ?? null, query: p.link?.query }, linkLabel: p.linkLabel ?? "Open it" });
+  }
+  return out;
+}
+
+/** The biggest places the waiting leads came from, by count, with no names. Failing to read it only leaves that line out. */
+async function speedExtra(installationId: string, locationId: string, targetMinutes: number): Promise<Extra> {
+  try {
+    const rows = await sql()`
+      select coalesce(nullif(btrim(c.source), ''), 'No source recorded') src, count(*)::int n
+      from lead_touches t left join cached_contacts c on c.installation_id = t.installation_id and c.location_id = t.location_id and c.contact_id = t.contact_id
+      where t.installation_id = ${installationId} and t.location_id = ${locationId} and t.touch_at is null and t.excluded is null
+        and t.lead_at > now() - interval '2 days' and coalesce(t.clock_start, t.lead_at) < now() - make_interval(mins => ${Math.round(targetMinutes)})
+      group by 1 order by 2 desc limit 3`;
+    return { sources: rows.map((r) => ({ name: r.src as string, count: Number(r.n) })) };
+  } catch { return {}; }
+}
+
+/**
+ * Tell people about alerts, once per real change. Every open shared alert is looked at (not only the ones created in this refresh): a new one is told at once,
+ * a changed one when its band moved, an unchanged one once a day with what changed, and one that cleared gets a single "back to normal" note.
+ */
 export async function dispatchAlerts(installationId: string, created: AlertRow[], now = Date.now()): Promise<RunReport | null> {
-  const worth = created.filter((a) => a.severity !== "info");
   const l = await loadContext(installationId);
-  if (worth.length === 0) return { plan: { planned: 0, held: 0, duplicates: 0, skipped: 0 }, drain: await drain(l.ctx, dbLedger(), realTransports(installationId, l.ctx.stopUrl), now) };
-  const names = await accountNames(installationId, [...new Set(worth.map((a) => a.locationId).filter((x): x is string => !!x))]);
-  const intents = worth.map((a) => {
-    const i = intentFromAlert(a, a.locationId ? names.get(a.locationId) ?? null : null);
-    const longest = a.detail.oldestWaitMinutes;
-    return a.kind === "speed" && typeof longest === "number" && longest > 0 ? { ...i, details: [`The longest wait is ${longest >= 60 ? `${Math.floor(longest / 60)} h ${Math.round(longest % 60)} min` : `${Math.round(longest)} min`}.`] } : i;
-  });
+  const open = await sql()`select id, location_id, kind, severity, title, detail from alerts
+    where installation_id = ${installationId} and resolved_at is null and recipient_user_key is null and severity <> 'info' and kind = any(${SHARED_KINDS}::text[])`.catch(() => []);
+  const cand = new Map<string, { id: string; kind: string; severity: AlertRow["severity"]; title: string; locationId: string | null; detail: Record<string, unknown> }>();
+  for (const r of open) cand.set(r.id as string, { id: r.id as string, kind: r.kind as string, severity: r.severity as AlertRow["severity"], title: r.title as string, locationId: (r.location_id as string | null) ?? null, detail: (r.detail ?? {}) as Record<string, unknown> });
+  for (const a of created) if (a.severity !== "info" && !cand.has(a.id)) cand.set(a.id, { id: a.id, kind: a.kind, severity: a.severity, title: a.title, locationId: a.locationId, detail: a.detail });
+  const names = await accountNames(installationId, [...new Set([...cand.values()].map((a) => a.locationId).filter((x): x is string => !!x))]);
+  const prior = await priorBySubject(installationId);
+  const targetMinutes = (await getSettings(installationId).catch(() => null))?.speedTargetMinutes ?? 15;
+  const intents: Intent[] = [];
+  const seen = new Set<string>();
+  const [instRow] = await sql()`select plan from installations where id = ${installationId}`.catch(() => []);
+  const ent = await resolveEntitlements((instRow?.plan as never) ?? "pro", installationId).catch(() => null);
+  const aiOn = ent?.features.ai_byo === true && ent.features.ai_slack_reports === true;
+  let aiCalls = 0;
+  const day = new Date(now).toISOString().slice(0, 10);
+  for (const a of cand.values()) {
+    const account = a.locationId ? names.get(a.locationId) ?? null : null;
+    // Read the extra facts only for a message that will really be sent.
+    let facts = factsFor(a, account);
+    let d = renderFacts(facts);
+    seen.add(d.subject);
+    const prev = prior.get(d.subject) ?? null;
+    const dec = decideSend(prev, d, now);
+    if (!dec.send) continue;
+    if (a.kind === "speed" && a.locationId) { facts = factsFor(a, account, await speedExtra(installationId, a.locationId, num(a.detail.targetMinutes) ?? targetMinutes)); d = renderFacts(facts); }
+    const specific = specificFor(d, cleanValue(account ?? "A client account"), dec.state, prev, now);
+    // When the account has AI connected and switched on for alert reports, the AI words the sentence under the headline from the same facts (number guard, caps and tenant pinning in the
+    // gateway). Off, failed or rejected: the data-specific template stays. At most 5 AI calls per refresh.
+    if (aiOn && aiCalls < 5 && a.locationId) { aiCalls++; const written = await aiAlertBody({ inst: installationId, locationId: a.locationId, featureOn: true }, facts); if (written) specific.body = written; }
+    intents.push({ ...intentFromAlert(a, account), dedupeKey: `alertfp:${d.subject}:${d.fp}:${dec.state}:${dec.state === "reminder" ? day : a.id}`, specific });
+  }
+  for (const [subject, p] of prior) {
+    const kind = subject.split(":")[0];
+    if (seen.has(subject) || p.state === "recovered" || !SHARED_KINDS.includes(kind)) continue;
+    const loc = subject.split(":")[1];
+    const rec = recoveryFor(p, now, p.at);
+    intents.push({ type: typeForAlertKind(kind), locationId: loc && loc !== "all" ? loc : null, severity: "info", dedupeKey: `alertfp:${subject}:recovered:${p.at}`, alertId: null, values: { account: p.meta.account, problem: rec.title }, specific: rec });
+  }
   return dispatchIntents(installationId, intents, now, l);
 }
 

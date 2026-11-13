@@ -1,7 +1,8 @@
 "use client";
 
 import { Printer, RefreshCw } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { takeBootParams } from "@/lib/design/boot-hash";
 import type { RecordsSpec } from "@/lib/analytics/today-records";
 import { EmptyState, InlineAlert, LocalAccountPicker, Page, RecordsPanel, Section, SkeletonCards } from "../ds";
 import { WfNumber, WfTrend } from "../ds/workflow-charts";
@@ -52,6 +53,21 @@ export function DataHealthView({ go, kind }: { go: GoFn; kind: AccessKind }) {
     } catch (e) { setNote({ ok: false, text: (e as Error).message }); }
   };
   const close = () => { setPanel(null); setMark(null); };
+  // A link from a message ("#data-health?loc=..&mode=source&src=..&since=24h") opens that account's bad records for one source, once.
+  const boot = useRef(false);
+  useEffect(() => {
+    if (!data || boot.current) return;
+    boot.current = true;
+    const p = takeBootParams("data-health");
+    const loc = p?.get("loc");
+    if (!p || !loc || !data.accounts.some((a) => a.locationId === loc)) return;
+    // Deferred one tick so the choices are set from an event, not inside the effect itself.
+    setTimeout(() => {
+      setPicked([loc]);
+      if (p.get("mode") === "source") { setTab("imports"); void openRecords(loc, null, null, `&mode=source&src=${encodeURIComponent((p.get("src") ?? "").slice(0, 120))}${p.get("since") === "24h" ? "&since=24h" : ""}`); }
+    }, 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data]);
   const refresh = async (loc: string) => {
     setBusy(true); setNote(null);
     try { await api.post("data-health/refresh", { locationId: loc }); await reload(); setNote({ ok: true, text: "Updated." }); } catch (e) { setNote({ ok: false, text: (e as Error).message }); } finally { setBusy(false); }

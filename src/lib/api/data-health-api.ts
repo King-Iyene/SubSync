@@ -117,7 +117,7 @@ async function records(ctx: Ctx, deps: Deps) {
   const mark = new Map(marks.map((m) => [m.contactId, m]));
   const account = names[0]?.name ?? "Client account";
   const seen = new Set<string>();
-  const wanted = mode === "queue" ? rows.filter((r) => mark.get(r.contactId)?.state === "todo") : mode === "fixed" ? rows.filter((r) => mark.get(r.contactId)?.state === "fixed") : mode === "source" ? uniqueContacts(rows.filter((r) => BAD_RULES.has(r.rule) && ((r.source ?? "").trim() || "Unknown source") === src)) : rows;
+  const wanted = mode === "queue" ? rows.filter((r) => mark.get(r.contactId)?.state === "todo") : mode === "fixed" ? rows.filter((r) => mark.get(r.contactId)?.state === "fixed") : mode === "source" ? uniqueContacts(rows.filter((r) => BAD_RULES.has(r.rule) && ((r.source ?? "").trim() || "Unknown source") === src && (q.get("since") !== "24h" || (r.addedAt !== null && Date.now() - r.addedAt <= 86_400_000)))) : rows;
   const recs: Rec[] = [];
   for (const r of wanted) {
     const m = mark.get(r.contactId), id = `${r.contactId}|${r.rule}`;

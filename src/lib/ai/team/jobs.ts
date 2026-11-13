@@ -3,7 +3,7 @@ import type { JobDef } from "../jobs";
 // The six team and client jobs (docs/AI_AGENTS_PLAN.md section 10). Each is suggest-only: our SQL works out every number, the model only writes words around them, the number guard in
 // safety.ts throws away any answer with a figure we did not give it, and an agency person reads and edits every client-facing text and sends it themselves. Registered in ../jobs.ts with one spread.
 
-export const TEAM_JOB_IDS = ["report_summary", "lead_story", "coach_note", "anomaly_explain", "meeting_summary", "one_thing"] as const;
+export const TEAM_JOB_IDS = ["report_summary", "lead_story", "coach_note", "anomaly_explain", "meeting_summary", "one_thing", "alert_report"] as const;
 export type TeamJobId = (typeof TEAM_JOB_IDS)[number];
 
 /** Jobs that stay off until the account switches them on (they read people's numbers or meeting text). The rest default on once the feature flag and the connection switch are on. */
@@ -54,5 +54,10 @@ export const TEAM_JOBS: Record<TeamJobId, JobDef> = {
     id: "one_thing", title: "Weekly one thing to fix", status: "live", approval: "suggest", privacy: "aggregate", costClass: "small",
     output: { kind: "text", maxChars: 420 }, tools: [], maxTokens: 220, maxToolRounds: 0,
     system: `You write the single most important thing to fix this week for one client account, in 1 or 2 sentences. You are given the top item (already chosen by our code, with its count and any dollar figure) and some other items for context. Say what it is, what it is worth if a dollar figure is given, and the first step to take. Mention only the top item. ${WORDS}`,
+  },
+  alert_report: {
+    id: "alert_report", title: "Alert reports in Slack", status: "live", approval: "suggest", privacy: "aggregate", costClass: "small",
+    output: { kind: "text", maxChars: 420 }, tools: [], maxTokens: 220, maxToolRounds: 0,
+    system: `You write the 2 sentences under the headline of one alert that a company's team reads in Slack. You are given the alert's facts already worked out: what happened, the client account, the figures, the biggest causes. Sentence 1: what is going on and how big it is, using only the figures given. Sentence 2: the first thing to do. Do not repeat the headline word for word and do not mention a link. ${WORDS}`,
   },
 };

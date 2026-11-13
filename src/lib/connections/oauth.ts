@@ -33,7 +33,10 @@ export function keysFor(provider: Provider, env: Record<string, string | undefin
 
 export const redirectUri = (appUrl: string, provider: Provider) => `${appUrl.replace(/\/+$/, "")}/api/integrations/${provider}/callback`;
 
-export function authorizeUrl(provider: Provider, p: { clientId: string; redirectUri: string; state: string }): string {
+/** The bot permissions chat needs, asked for only when chat is being launched (SLACK_CHAT_SCOPES=true). Smallest set that can hear a mention or a direct message and reply. */
+export const SLACK_CHAT_SCOPES = ["app_mentions:read", "chat:write", "im:history", "im:read", "im:write"] as const;
+
+export function authorizeUrl(provider: Provider, p: { clientId: string; redirectUri: string; state: string; chat?: boolean }): string {
   const u =
     provider === "slack" ? new URL("https://slack.com/oauth/v2/authorize")
     : provider === "fathom" ? new URL(FATHOM_AUTH)
@@ -41,7 +44,7 @@ export function authorizeUrl(provider: Provider, p: { clientId: string; redirect
   u.searchParams.set("client_id", p.clientId);
   u.searchParams.set("redirect_uri", p.redirectUri);
   u.searchParams.set("state", p.state);
-  if (provider === "slack") u.searchParams.set("scope", "incoming-webhook");
+  if (provider === "slack") u.searchParams.set("scope", p.chat ? ["incoming-webhook", ...SLACK_CHAT_SCOPES].join(",") : "incoming-webhook");
   else u.searchParams.set("response_type", "code");
   if (provider === "fathom") u.searchParams.set("scope", "public_api");
   return u.toString();
@@ -63,7 +66,7 @@ const form = (o: Record<string, string>) => new URLSearchParams(o).toString();
 const FORM = { "content-type": "application/x-www-form-urlencoded" };
 
 // ---- Slack: the person picks a channel on Slack's own page and Slack hands back its incoming webhook.
-export type SlackInstall = { ok: true; webhookUrl: string; team: string | null; channel: string | null };
+export type SlackInstall = { ok: true; webhookUrl: string; team: string | null; channel: string | null; /** Present only when chat scopes were granted: the workspace's bot (never logged or sent to a browser). */ bot?: { token: string; teamId: string; userId: string | null; channelId: string | null } };
 export async function exchangeSlack(code: string, keys: Keys, redirect: string, f: Fetch = fetch): Promise<SlackInstall | Failed> {
   try {
     const { status, json } = await call(f, "https://slack.com/api/oauth.v2.access", {
@@ -77,7 +80,9 @@ export async function exchangeSlack(code: string, keys: Keys, redirect: string, 
     const url = str(hook.url, 500);
     if (!url || !isSlackWebhook(url)) return { ok: false, error: "Slack did not give a channel to post to. Choose a channel and try again" };
     const team = (json.team ?? {}) as Record<string, unknown>;
-    return { ok: true, webhookUrl: url, team: str(team.name, 100), channel: str(hook.channel, 100) };
+    const botToken = str(json.access_token, 300), teamId = str(team.id, 40);
+    const bot = botToken && botToken.startsWith("xoxb-") && teamId ? { bot: { token: botToken, teamId, userId: str(json.bot_user_id, 40), channelId: str(hook.channel_id, 40) } } : {};
+    return { ok: true, webhookUrl: url, team: str(team.name, 100), channel: str(hook.channel, 100), ...bot };
   } catch {
     return connectError("P-NET", "Slack");
   }
