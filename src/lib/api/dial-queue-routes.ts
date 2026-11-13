@@ -1,8 +1,8 @@
 import { sql } from "../db";
-import { apply, checkSetup, getSettings, preview, saveSettings, status } from "../dial/callqueue-run";
+import { apply, checkSetup, getSettings, markSetup, preview, readyState, saveSettings, status, undoBatch } from "../dial/callqueue-run";
 import { isListId } from "../dial/dial";
 import { checkSetupNow, runSetup, saveSetupSettings, setupView } from "../workflows-setup/run";
-import { BATCH_MAX, statusLine } from "../dial/callqueue";
+import { CLICK_MAX, statusLine } from "../dial/callqueue";
 import type { deepLinks } from "../links";
 import { json, type AuthContext } from "./auth";
 
@@ -47,8 +47,15 @@ export async function handleCallQueue(ctx: Ctx, h: H): Promise<Response> {
     const a = await account(ctx, h, loc);
     if (!a) return json({ error: "Client account not found." }, 404);
     if (what === "cq-setup" && m === "GET") { const s = await getSettings(ctx.installationId, a.id); return json({ ready: s.ready, settings: s.s, canEdit: writer }); }
+    if (what === "cq-ready" && m === "GET") return json({ ...(await readyState(ctx.installationId, a.companyId, a.id, ctx.demo)), canEdit: writer });
     if (what === "cq-wf" && m === "GET") return json({ ...(await setupView(ctx.installationId, a.id)), canEdit: writer });
     if (!writer) return json({ error: "Ask your administrator to change the call queue." }, 403);
+    if (what === "cq-mark" && m === "POST") { const r = await markSetup(ctx.installationId, a.id, body?.done !== false); return json(r, r.ok ? 200 : 400); }
+    if (what === "cq-undo" && m === "POST") {
+      const ids = Array.isArray(body?.contactIds) ? (body.contactIds as unknown[]).filter((k): k is string => typeof k === "string" && ID.test(k)).slice(0, 100) : [];
+      const r = await undoBatch({ installationId: ctx.installationId, companyId: a.companyId, locationId: a.id, actor: ctx.session.userName ?? ctx.session.userId ?? null, contactIds: ids, demo: ctx.demo });
+      return json(r, r.ok ? 200 : 400);
+    }
     if (what === "cq-setup" && m === "PUT") {
       const r = await saveSettings(ctx.installationId, a.id, body ?? {});
       return json(r, r.ok ? 200 : 400);
@@ -67,7 +74,7 @@ export async function handleCallQueue(ctx: Ctx, h: H): Promise<Response> {
     if (what === "cq-preview" && m === "POST") {
       const keys = Array.isArray(body?.keys) ? (body.keys as unknown[]).filter((k): k is string => typeof k === "string").slice(0, 400) : undefined;
       const list = typeof body?.list === "string" && isListId(body.list) ? body.list : undefined;
-      const p = await preview(ctx.installationId, a.id, { auto: body?.auto === true, lists: list ? [list] : undefined, keys, limit: BATCH_MAX }, Date.now(), ctx.demo);
+      const p = await preview(ctx.installationId, a.id, { auto: body?.auto === true, lists: list ? [list] : undefined, keys, limit: CLICK_MAX }, Date.now(), ctx.demo);
       return json(p);
     }
     if (what === "cq-send" && m === "POST") {
@@ -76,10 +83,15 @@ export async function handleCallQueue(ctx: Ctx, h: H): Promise<Response> {
       const list = typeof body.list === "string" && isListId(body.list) ? body.list : undefined;
       if (!list && !keys) return json({ error: "Choose a list or some people." }, 400);
       const cur = await getSettings(ctx.installationId, a.id);
-      const p = await preview(ctx.installationId, a.id, { auto: false, lists: list ? [list] : undefined, keys, limit: BATCH_MAX }, Date.now(), ctx.demo);
+      const p = await preview(ctx.installationId, a.id, { auto: false, lists: list ? [list] : undefined, keys, limit: CLICK_MAX }, Date.now(), ctx.demo);
       if (!p.ok || !p.plan) return json({ ok: false, message: p.message }, 400);
       const done = await apply({ installationId: ctx.installationId, companyId: a.companyId, locationId: a.id, actor: ctx.session.userName ?? ctx.session.userId ?? null, source: "manual", plan: p.plan, settings: cur.s, demo: ctx.demo });
-      return json({ ok: true, ...done, message: done.live ? `Added ${done.added} to your call queue.${done.failed ? ` ${done.failed} could not be added.` : ""}${done.needsPermission ? " Your CRM did not allow it yet: the optional contacts permission is needed." : ""}` : `${p.plan.sendNote} Nothing was sent: writing to your CRM is switched off here.` });
+      const links = await h.links();
+      const nameOf = new Map(p.names.map((n) => [n.key.slice(n.key.indexOf(":") + 1), n.name]));
+      const lead = (id: string) => ({ contactId: id, name: nameOf.get(id) ?? "Lead", url: links.contact(a.id, id) });
+      const sent = done.live ? done.sentIds.map(lead) : [];
+      const wouldSend = done.live ? [] : p.plan.add.map((c) => lead(c.contactId));
+      return json({ ok: true, ...done, sent, wouldSend, queueUrl: links.manualActions(a.id), tag: cur.s.tag, message: done.live ? `Added ${done.added} to your call queue.${done.failed ? ` ${done.failed} could not be added.` : ""}${done.needsPermission ? " Your CRM did not allow it yet: the optional contacts permission is needed." : ""}` : `${p.plan.sendNote} Nothing was sent: writing to your CRM is switched off here.` });
     }
   } catch (e) { console.error("call queue", e instanceof Error ? e.message : "failed"); return json({ error: "The call queue could not be read right now." }, 500); }
   return json({ error: "Not found" }, 404);

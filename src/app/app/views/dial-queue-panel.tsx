@@ -4,6 +4,7 @@ import { ExternalLink, ListPlus, SlidersHorizontal } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { useApiClient, useData } from "../session";
 import { WorkflowSetupCard } from "./workflow-setup-card";
+import { usePowerDialer } from "./power-dialer";
 
 // "Send to your CRM call queue" and the Auto call queue card (docs/features/DIALQUEUE.md). SubSync cannot start a call itself; the call queue is your CRM's own dialer. SubSync adds a tag
 // (or enrols the lead in a workflow) that you set up once in your CRM, and your CRM's Manual Actions page fills itself. Everything is previewed first, and adding cannot be undone from SubSync.
@@ -18,35 +19,17 @@ export const QUEUE_HONESTY = "SubSync cannot start a call itself. The call queue
 
 /** `primary` is the always-live main button of the screen (it can start the review below); `showSend` keeps the plain "Send to your CRM call queue" button when the main button is something else. */
 export function CallQueueCard({ list, items, onPickedDone, picked, primary, tools, showSend = true }: { list: string; items: Item[]; picked?: string[]; onPickedDone?: () => void; primary?: (review: () => void, busy: boolean) => ReactNode; tools?: ReactNode; showSend?: boolean }) {
-  const api = useApiClient();
   const st = useData<St>("dial/cq-status");
   const [open, setOpen] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
-  const [prev, setPrev] = useState<Array<{ loc: string; name: string; p: Prev }> | null>(null);
-  const [busy, setBusy] = useState(false);
   const accounts = st.data?.accounts ?? [];
   const nameOf = (id: string) => accounts.find((a) => a.id === id)?.name ?? "Account";
   const locs = [...new Set(items.map((i) => i.locationId))];
   const keysFor = (loc: string) => (picked && picked.length ? picked.filter((k) => k.startsWith(`${loc}:`)) : items.filter((i) => i.locationId === loc).slice(0, 50).map((i) => `${i.locationId}:${i.contactId}`));
   const link = st.data?.queueLinks?.[locs[0] ?? ""];
 
-  async function review() {
-    setBusy(true); setMsg(null);
-    try {
-      const out = [];
-      for (const loc of locs.slice(0, 20)) { const ks = keysFor(loc); if (ks.length) out.push({ loc, name: nameOf(loc), p: await api.post<Prev>("dial/cq-preview", { locationId: loc, list, keys: ks }) }); }
-      setPrev(out);
-    } catch { setMsg("Could not check the call queue right now."); } finally { setBusy(false); }
-  }
-  async function confirm() {
-    setBusy(true);
-    try {
-      const lines: string[] = [];
-      for (const x of prev ?? []) { if (!x.p.ok) { lines.push(`${x.name}: ${x.p.message}`); continue; } const r = await api.post<{ message: string }>("dial/cq-send", { locationId: x.loc, list, keys: keysFor(x.loc), confirm: true }); lines.push(`${x.name}: ${r.message}`); }
-      setMsg(lines.join(" ")); setPrev(null); onPickedDone?.(); void st.reload();
-    } catch { setMsg("Could not add to the call queue. Nothing more was sent."); } finally { setBusy(false); }
-  }
-  const total = prev?.reduce((n, x) => n + (x.p.plan ? x.p.names.length : 0), 0) ?? 0;
+  const pd = usePowerDialer({ list, locs, nameOf, keysFor, onSent: () => { onPickedDone?.(); void st.reload(); } });
+  const review = () => void pd.start();
+  const busy = pd.busy;
   const lines = (st.data?.status ?? []).filter((s) => s.autoOn);
 
   return (
@@ -55,28 +38,15 @@ export function CallQueueCard({ list, items, onPickedDone, picked, primary, tool
       <div className="cm-toolbar" role="group" aria-label="Your CRM call queue" data-testid="cq-group">
         {tools}
         {tools && <span className="cm-tool-sep" aria-hidden />}
-        {showSend && <button type="button" className="cm-tool" data-tip="Adds these people to the call queue in your CRM. You see a preview first." data-testid="cq-send" disabled={busy || locs.length === 0} onClick={() => void review()}><ListPlus aria-hidden />{picked && picked.length ? "Send selected to CRM call queue" : "Send to your CRM call queue"}</button>}
+        {showSend && <button type="button" className="cm-tool" data-tip="Adds these people to the call queue in your CRM and opens its power dialer. You see a preview first." data-testid="cq-send" disabled={busy || locs.length === 0} onClick={review}><ListPlus aria-hidden />{picked && picked.length ? "Send selected to power dialer" : "Send to power dialer"}</button>}
         {link && <a className="cm-tool" data-tip="Opens your CRM's call queue in a new tab." data-testid="cq-open" href={link} target="_blank" rel="noopener noreferrer"><ExternalLink aria-hidden />Open your call queue</a>}
         <button type="button" className="cm-tool cm-tool-end" data-tip="Choose the tag or workflow your CRM uses, and turn on the auto queue." data-testid="cq-setup-open" aria-expanded={open} onClick={() => setOpen(!open)}><SlidersHorizontal aria-hidden />{open ? "Hide call queue setup" : "Call queue setup"}</button>
       </div>
-      <div className="cm-sec" hidden={!(msg || lines.length > 0 || prev || open)} data-testid="cq-more">
+      <div className="cm-sec" hidden={!(lines.length > 0 || open)} data-testid="cq-more">
       {lines.map((s) => <p key={s.locationId} className="s6-label" data-testid="cq-status">{nameOf(s.locationId)}: {s.line}</p>)}
-      {msg && <p className="mt-2 text-sm" role="status" data-testid="cq-msg">{msg}</p>}
-      {prev && (
-        <div className="cm-panel" role="dialog" aria-label="Add to your call queue" data-testid="cq-preview">
-          {prev.map((x) => (
-            <div key={x.loc} className="mb-2"><p className="font-medium" data-testid="cq-would">{x.name}: {x.p.message}</p>
-              {x.p.plan && <p className="s6-label">Skipped: {x.p.plan.skipped.dnd} asked not to be contacted, {x.p.plan.skipped.noPhone} with no phone, {x.p.plan.skipped.outsideHours} outside calling hours, {x.p.plan.skipped.recent} added in the last 24 hours.</p>}
-              {x.p.names.length > 0 && <p className="s6-label">{x.p.names.slice(0, 8).map((n) => n.name).join(", ")}{x.p.names.length > 8 ? `, and ${x.p.names.length - 8} more` : ""}</p>}
-              {x.p.plan && x.p.names.length === 0 && x.p.plan.skipped.outsideHours > 0 && <p className="s6-label" data-testid="cq-hours-note">Their calling hours have not opened yet, so none were added. Turn on Auto call queue in Call queue setup and they are added when hours open.</p>}
-              {!x.p.live && x.p.ok && <p className="s6-label">Writing to your CRM is off for this account, so nothing will be sent.</p>}</div>
-          ))}
-          <p className="s6-label">Adding to the queue cannot be undone from SubSync. Take a lead off in your CRM if needed.</p>
-          <div className="mt-2 flex gap-2"><button type="button" className="s6-btn" data-kind="primary" disabled={busy || total === 0} onClick={() => void confirm()} data-testid="cq-confirm">Confirm and add {total}</button><button type="button" className="s6-btn" onClick={() => setPrev(null)}>Cancel</button></div>
-        </div>
-      )}
       {open && <Setup accounts={locs.length ? locs.map((id) => ({ id, name: nameOf(id) })) : accounts} canEdit={st.data?.canEdit === true} onChange={() => void st.reload()} />}
       </div>
+      {pd.panel}
       <p className="s6-label cm-sec !py-3">{QUEUE_HONESTY}</p>
     </div>
   );

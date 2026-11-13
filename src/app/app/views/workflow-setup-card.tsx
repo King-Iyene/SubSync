@@ -66,7 +66,8 @@ export function WorkflowSetupCard({ loc, canEdit, tag }: { loc: string; canEdit:
           <li>Add the trigger <b>Contact Tag</b>, set it to &quot;Tag added&quot;, and choose the tag <b>{tag}</b><Copy text={tag} label="tag" />.</li>
           <li>Add the action <b>Manual Action</b>, choose &quot;Call&quot;, and assign it to one person or to everyone in turn (not &quot;contact owner&quot;, new leads have none). Then add the action <b>Remove Contact Tag</b> with the same tag.</li>
           <li>Publish the workflow, then come back here and press <b>I did it</b>.
-            <button type="button" className="s6-btn ml-2" data-testid="wf-did-it" disabled={busy} onClick={() => void run("dial/cq-wf-check", {})}>I did it</button></li>
+            <button type="button" className="s6-btn ml-2" data-testid="wf-did-it" disabled={busy} onClick={() => void run("dial/cq-wf-check", {})}>I did it</button>
+            <button type="button" className="s6-btn ml-2" data-testid="wf-mark" disabled={busy} onClick={() => { setBusy(true); void api.post("dial/cq-mark", { locationId: loc, done: true }).then(() => setOut({ state: "ready", message: "Marked as set up. Start calling now sends leads to your CRM call queue." })).catch(() => setOut({ state: "failed", message: "Could not save that. It needs the latest database update." })).finally(() => setBusy(false)); }}>Mark as set up</button></li>
         </ol>
       )}
     </div>
