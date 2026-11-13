@@ -213,6 +213,7 @@ export const FEATURES = [
   "br_email",
   "br_record",
   "ai_byo",
+  "wf_module",
   "ai_brief",
   "ai_chatgpt",
   // AI data jobs (docs/AI_AGENTS_PLAN.md section 9): each its own switch, all default off, and all need ai_byo.
