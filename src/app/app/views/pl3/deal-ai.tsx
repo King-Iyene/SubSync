@@ -4,7 +4,7 @@ import { useState, type ReactNode } from "react";
 import { bandOf, HEALTH_HOW, HEALTH_WORDS, type HealthBand } from "@/lib/ai/deal-health-band";
 import { useApiClient, useData } from "../../session";
 import { DealChangeFlow } from "../pipeline-actions-ui";
-import { Btn } from "../ui";
+import { Btn } from "../../ui";
 import type { PlFilters } from "./data";
 
 // The deal AI entry points (docs/AI_JOBS_SPEC.md, the four DEAL jobs). Each one asks the server what it may do (off: it shows nothing at all), shows numbers and the Health badge that our
