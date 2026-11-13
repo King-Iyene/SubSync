@@ -88,24 +88,24 @@ test("the digest goes once a day at the chosen local hour, never on quiet days o
 
 test("the email: evidence, dollar line, one button per account, a stop link, estimates labelled, and no vendor words", () => {
   const ranked = rankSave([calm({ locationId: "loc9", name: "Acme Roofing", waitingOld: 9, recoverValue: 4200, recoverCount: 9 })]);
-  const m = digestEmail({ scope: "12 client accounts checked", accounts: ranked.accounts, more: 0, appUrl: "https://app.example.com", stopUrl: "https://app.example.com/stop?t=abc", deals: null, monday: false });
+  const m = digestEmail({ scope: "12 client accounts checked", accounts: ranked.accounts, more: 0, crmDomain: "crm.myagency.com", stopUrl: "https://app.example.com/stop?t=abc", deals: null, monday: false });
   assert.match(m.subject, /1 client account to save today: Acme Roofing/);
   assert.match(m.text, /9 people have waited over a day/);
   assert.match(m.text, /\(estimate\)/);
-  assert.match(m.text, /#today\?tab=recover&account=loc9/);
+  assert.match(m.text, /Open the list in your CRM: https:\/\/crm\.myagency\.com\/v2\/location\/loc9\/conversations\/conversations/);
   assert.match(m.text, /Stop these emails: https:\/\/app\.example\.com\/stop/);
   assert.match(m.html, /Open the list/);
   for (const text of [m.subject, m.text, m.html]) assert.doesNotMatch(text, /gohighlevel|highlevel|\bghl\b|sub-account|subaccount/i);
   // html is escaped
-  const evil = digestEmail({ scope: "x", accounts: [{ ...ranked.accounts[0], name: "<script>alert(1)</script>" }], more: 0, appUrl: "https://a.test", stopUrl: "https://a.test/s", deals: null, monday: false });
+  const evil = digestEmail({ scope: "x", accounts: [{ ...ranked.accounts[0], name: "<script>alert(1)</script>" }], more: 0, crmDomain: "crm.myagency.com", stopUrl: "https://a.test/s", deals: null, monday: false });
   assert.doesNotMatch(evil.html, /<script>/);
   // Monday adds the deals line
-  const mon = digestEmail({ scope: "x", accounts: ranked.accounts, more: 0, appUrl: "https://a.test", stopUrl: "https://a.test/s", deals: { staleCount: 4, staleValue: 12000, soonCount: 2, lostNoReason: 1, lostCount: 3 }, monday: true });
+  const mon = digestEmail({ scope: "x", accounts: ranked.accounts, more: 0, crmDomain: "crm.myagency.com", stopUrl: "https://a.test/s", deals: { staleCount: 4, staleValue: 12000, soonCount: 2, lostNoReason: 1, lostCount: 3 }, monday: true });
   assert.match(mon.text, /Deals slipping this week: 4 past their usual time in a stage \(about \$12,000, estimate\), 2 about to go quiet, 3 lost in the last 2 weeks \(1 with no reason recorded\)/);
 });
 
 test("a calm morning with nothing at risk says so", () => {
-  const m = digestEmail({ scope: "3 client accounts checked", accounts: [], more: 0, appUrl: "https://a.test", stopUrl: "https://a.test/s", deals: null, monday: false });
+  const m = digestEmail({ scope: "3 client accounts checked", accounts: [], more: 0, crmDomain: "crm.myagency.com", stopUrl: "https://a.test/s", deals: null, monday: false });
   assert.match(m.subject, /nothing at risk today/);
 });
 

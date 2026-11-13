@@ -476,7 +476,7 @@ function SettingsTab({ level, cashOn, saveOn, nav }: { level: string; cashOn: bo
           {today.data && (
             <section className="td-card2" aria-label="Preview">
               <h2 className="td-h2">What today&apos;s email would say</h2>
-              <pre className="td-preview" data-testid="td-preview">{(() => { const m = emailText(today.data, "(link to your Today page)", "(link to stop these emails)"); return `Subject: ${m.subject}\n\n${m.text}`; })()}</pre>
+              <pre className="td-preview" data-testid="td-preview">{(() => { const m = emailText(today.data, "Open your CRM, then SubSync > Today: (link to your CRM)", "(link to stop these emails)"); return `Subject: ${m.subject}\n\n${m.text}`; })()}</pre>
             </section>
           )}
           {level === "all" && <div className="td-card2"><BriefTools /></div>}

@@ -157,12 +157,12 @@ export function emailDue(nowMs: number, tz: string, hour: number, quietDays: rea
   return { due, key };
 }
 
-export function emailText(t: Pick<Td3Today, "headline" | "items" | "scope" | "allClear">, appUrl: string, unsubscribeUrl: string): { subject: string; text: string } {
+export function emailText(t: Pick<Td3Today, "headline" | "items" | "scope" | "allClear">, openLine: string, unsubscribeUrl: string): { subject: string; text: string } {
   const lines = t.items.slice(0, MAX_ITEMS).map((i, n) => `${n + 1}. ${i.label}${i.money ? ` (about ${money(i.money)} in open deals, estimate)` : ""}`);
   const body = lines.length ? lines.join("\n") : t.allClear ? `Nothing needs you. ${t.allClear.fixedSinceYesterday} ${t.allClear.fixedSinceYesterday === 1 ? "thing was" : "things were"} fixed since yesterday.` : "Nothing needs you right now.";
   return {
     subject: t.items.length ? `Today: ${t.items[0].label}` : "Today: nothing needs you",
-    text: `${t.scope}\n\n${t.headline}\n\n${body}\n\nOpen your list: ${appUrl}\n\nYou get this once a day. Nothing on this page changes your CRM or messages your leads.\nStop these emails: ${unsubscribeUrl}\n`,
+    text: `${t.scope}\n\n${t.headline}\n\n${body}\n\n${openLine}\n\nYou get this once a day. Nothing on this page changes your CRM or messages your leads.\nStop these emails: ${unsubscribeUrl}\n`,
   };
 }
 

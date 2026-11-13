@@ -12,9 +12,9 @@ test("subject counts accounts, and a quiet week says so", () => {
 
 test("html is escaped, the list is capped at eight, and the platform is never named", () => {
   const many = Array.from({ length: 10 }, (_, i) => ({ name: `<b>${i}</b>`, title: "x & y" }));
-  const m = weeklyEmail({ ...base, attention: many });
+  const m = weeklyEmail({ ...base, crmDomain: "crm.myagency.com", attention: many });
   assert.ok(!m.html.includes("<b>0</b>") && m.html.includes("&lt;b&gt;0&lt;/b&gt;"));
-  assert.match(m.text, /and 2 more in the app/);
+  assert.match(m.text, /and 2 more\./);
   assert.ok(!/gohighlevel|highlevel|\bghl\b/i.test(m.text + m.html));
   assert.match(m.text, /\$12,000 \(-5% vs the last 7 days\)/);
 });
@@ -35,10 +35,11 @@ test("address check rejects lists and junk", () => {
 
 test("alert email names the count, flags a critical one, escapes titles", async () => {
   const { alertEmail } = await import("../analytics/weekly-email.ts");
-  const m = alertEmail("Acme", [{ severity: "critical", title: "<x> 5 leads waiting" }, { severity: "warning", title: "b" }], "https://x.test");
+  const m = alertEmail("Acme", [{ severity: "critical", title: "<x> 5 leads waiting" }, { severity: "warning", title: "b" }], "crm.myagency.com");
   assert.match(m.subject, /2 new alerts \(one is critical\)/);
   assert.ok(m.html.includes("&lt;x&gt;") && !m.html.includes("<x>"));
-  assert.match(m.text, /https:\/\/x.test\/app#alerts/);
+  assert.match(m.text, /Open your CRM, then SubSync > Today: https:\/\/crm\.myagency\.com\//);
+  assert.doesNotMatch(m.text + m.html, /subsync\.kdsquares\.com|\/app#/);
 });
 
 test("the note written into the CRM is capped so one long summary cannot flood a contact", async () => {

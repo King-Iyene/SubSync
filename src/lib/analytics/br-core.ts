@@ -1,4 +1,6 @@
 import { digestDue } from "./cash-intel.ts";
+import type { DomainSource } from "../links.ts";
+import { resolveTarget, wordsLink, viewOfHash, linkText, linkHtml, type Resolved } from "../notifications/crm-links.ts";
 
 // The 7 am brief, pure rules (no database, unit tested). ONE calm brief per agency owner: the five things that need attention today across the modules, each with a one-line why and a link to
 // the exact list, and one dollar line. Built only from numbers SubSync already computes; this file only chooses, ranks and words them. Definitions: docs/METRICS.md "The 7 am brief".
@@ -122,36 +124,50 @@ export function buildBrief(i: BriefInputs, on: ReadonlySet<Section>, day: string
 // ---- words ----
 
 const esc = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-const link = (base: string, it: BriefItem) => `${base.replace(/\/+$/, "")}/app${it.hash}`;
+const slackEsc = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+/**
+ * Where one brief item opens. SubSync opens only inside the CRM, so every item opens the CRM on the company's own domain: an account's item (a "save" item) opens that account's
+ * conversations, deals or dashboard; a cross-account item opens the CRM start page and names the SubSync menu to open next.
+ */
+export function briefTarget(crm: DomainSource, it: Pick<BriefItem, "key" | "hash">): Resolved {
+  const view = viewOfHash(it.hash);
+  const loc = /^save:([A-Za-z0-9_-]{1,64})$/.exec(it.key)?.[1] ?? null;
+  const mapped = view === "pipeline" ? "pipeline" : view === "clients" ? "clients" : "speed";
+  return loc ? resolveTarget(crm, { view: mapped, locationId: loc }, "Open the list") : wordsLink(crm, menuPath(view));
+}
+const menuPath = (view: string | null) => resolveTarget(null, { view, locationId: null }).label.replace(/^Open your CRM, then /, "");
+const moreTarget = (crm: DomainSource) => wordsLink(crm, "SubSync > Today");
 
-/** Plain text, for the email's text part, for pasting into a message or for a client. No links that carry anyone's data. */
-export function briefText(b: Brief, base: string): string {
+/** Plain text, for the email's text part, for pasting into a message or for a client. Every link opens the CRM (never SubSync) and carries no one's data. */
+export function briefText(b: Brief, crm: DomainSource): string {
   const out = [b.headline, ""];
-  b.items.forEach((it, n) => out.push(`${n + 1}. ${it.title}`, `   ${it.why}${it.dollars !== null && it.dollars > 0 ? ` About ${money(it.dollars)} (estimate).` : ""}`, `   Open the list: ${link(base, it)}`, ""));
-  if (b.more > 0) out.push(`And ${b.more} more in the app: ${base.replace(/\/+$/, "")}/app#today`, "");
+  b.items.forEach((it, n) => out.push(`${n + 1}. ${it.title}`, `   ${it.why}${it.dollars !== null && it.dollars > 0 ? ` About ${money(it.dollars)} (estimate).` : ""}`, `   ${linkText(briefTarget(crm, it))}`, ""));
+  if (b.more > 0) out.push(`And ${b.more} more.`, linkText(moreTarget(crm)), "");
   out.push(b.dollar.text);
   return out.join("\n");
 }
 
 /** The same brief as chat markup (bold with asterisks, links as <address|words>), to paste into Slack. */
-export function briefSlack(b: Brief, base: string): string {
+export function briefSlack(b: Brief, crm: DomainSource): string {
   const out = [`*${b.headline}*`, ""];
-  b.items.forEach((it, n) => out.push(`${n + 1}. *${it.title}*`, `${it.why}${it.dollars !== null && it.dollars > 0 ? ` About ${money(it.dollars)} (estimate).` : ""} <${link(base, it)}|Open the list>`, ""));
-  if (b.more > 0) out.push(`And ${b.more} more in the app.`);
+  b.items.forEach((it, n) => { const t = briefTarget(crm, it); out.push(`${n + 1}. *${it.title}*`, `${it.why}${it.dollars !== null && it.dollars > 0 ? ` About ${money(it.dollars)} (estimate).` : ""} <${t.url}|${slackEsc(t.label)}>`, ""); });
+  if (b.more > 0) { const t = moreTarget(crm); out.push(`And ${b.more} more. <${t.url}|${slackEsc(t.label)}>`); }
   out.push(`_${b.dollar.text}_`);
   return out.join("\n");
 }
 
-export function briefEmail(b: Brief, o: { appUrl: string; stopUrl: string; settingsUrl: string; /** AI wording (a suggestion around our numbers): only when the account connected its own AI and the number check passed. */ ai?: string | null }): { subject: string; text: string; html: string } {
+export function briefEmail(b: Brief, o: { /** The company's CRM domain (settings.appDomain / white-label); the default host is used only when none is known. */ crmDomain?: DomainSource; stopUrl: string; /** AI wording (a suggestion around our numbers): only when the account connected its own AI and the number check passed. */ ai?: string | null }): { subject: string; text: string; html: string } {
   const subject = b.items.length === 0 ? "Your 7 am brief: nothing needs you today" : `Your 7 am brief: ${b.headline.replace(/\.$/, "")}`;
   const html: string[] = [`<p style="margin:0 0 14px;font-size:16px"><b>${esc(b.headline)}</b></p>`];
   if (o.ai) html.push(`<p style="margin:0 0 14px;padding:10px;border-left:3px solid #888888;color:#333333"><b>AI wording (a suggestion):</b> ${esc(o.ai)}</p>`);
-  b.items.forEach((it, n) => html.push(`<div style="margin:0 0 12px;padding:12px;border:1px solid #dddddd;border-radius:8px"><b>${n + 1}. ${esc(it.title)}</b><p style="margin:6px 0;color:#444444">${esc(it.why)}${it.dollars !== null && it.dollars > 0 ? ` About ${esc(money(it.dollars))} (estimate).` : ""}</p><a href="${esc(link(o.appUrl, it))}" style="display:inline-block;padding:8px 14px;background:#5b789a;color:#ffffff;border-radius:6px;text-decoration:none">Open the list</a></div>`));
-  if (b.more > 0) html.push(`<p>And ${b.more} more. <a href="${esc(o.appUrl.replace(/\/+$/, ""))}/app#today">Open your list</a>.</p>`);
+  b.items.forEach((it, n) => html.push(`<div style="margin:0 0 12px;padding:12px;border:1px solid #dddddd;border-radius:8px"><b>${n + 1}. ${esc(it.title)}</b><p style="margin:6px 0;color:#444444">${esc(it.why)}${it.dollars !== null && it.dollars > 0 ? ` About ${esc(money(it.dollars))} (estimate).` : ""}</p>${linkHtml(briefTarget(o.crmDomain, it), "display:inline-block;padding:8px 14px;background:#5b789a;color:#ffffff;border-radius:6px;text-decoration:none")}</div>`));
+  if (b.more > 0) html.push(`<p>And ${b.more} more. ${linkHtml(moreTarget(o.crmDomain))}.</p>`);
   html.push(`<p style="margin:12px 0;color:#444444">${esc(b.dollar.text)}</p>`);
   const foot = "You get one brief a day, at the time you chose. Dollar figures are estimates. Nothing here changes your CRM or messages your leads.";
-  html.push(`<p style="color:#777777;font-size:12px">${esc(foot)} <a href="${esc(o.settingsUrl)}">Change the time or sections</a>. <a href="${esc(o.stopUrl)}">Stop these emails</a>.</p>`);
-  return { subject, text: `${o.ai ? `AI wording (a suggestion): ${o.ai}\n\n` : ""}${briefText(b, o.appUrl)}\n\n${foot}\nChange the time or sections: ${o.settingsUrl}\nStop these emails: ${o.stopUrl}`, html: html.join("") };
+  // The brief's settings live only inside SubSync, so the way there is the CRM plus words (a link to SubSync could not sign anyone in).
+  const settings = wordsLink(o.crmDomain, "SubSync > Today > Brief settings");
+  html.push(`<p style="color:#777777;font-size:12px">${esc(foot)} Change the time or sections: ${linkHtml(settings)}. <a href="${esc(o.stopUrl)}">Stop these emails</a>.</p>`);
+  return { subject, text: `${o.ai ? `AI wording (a suggestion): ${o.ai}\n\n` : ""}${briefText(b, o.crmDomain)}\n\n${foot}\nChange the time or sections: ${linkText(settings)}\nStop these emails: ${o.stopUrl}`, html: html.join("") };
 }
 
 // ---- when it goes ----

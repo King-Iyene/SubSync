@@ -58,16 +58,16 @@ test("nothing to say is said calmly, and counts by section equal the candidates"
 
 test("the words: no vendor terms, links go to the exact list, slack and plain versions match, estimates are labelled", () => {
   const b = buildBrief(base(), ALL, "d");
-  const text = briefText(b, "https://app.example.com/"), slack = briefSlack(b, "https://app.example.com");
-  const mail = briefEmail(b, { appUrl: "https://app.example.com", stopUrl: "https://app.example.com/stop", settingsUrl: "https://app.example.com/app#today?brief=settings" });
-  for (const s of [text, slack, mail.text, mail.html, mail.subject]) assert.doesNotMatch(s, /gohighlevel|highlevel|\bghl\b|sub-?account/i);
-  assert.match(text, /https:\/\/app\.example\.com\/app#clients\?tab=wallet/);
-  assert.match(slack, /<https:\/\/app\.example\.com\/app#clients\?tab=wallet\|Open the list>/);
+  const text = briefText(b, "crm.myagency.com"), slack = briefSlack(b, "crm.myagency.com");
+  const mail = briefEmail(b, { crmDomain: "crm.myagency.com", stopUrl: "https://app.example.com/stop" });
+  for (const s of [text, slack, mail.text, mail.html, mail.subject]) assert.doesNotMatch(s, /gohighlevel|highlevel|\bghl\b|sub-?account|subsync\.kdsquares|\/app#/i);
+  assert.match(text, /Open your CRM, then SubSync > Clients: https:\/\/crm\.myagency\.com\//);
+  assert.match(slack, /<https:\/\/crm\.myagency\.com\/\|Open your CRM, then SubSync &gt; Clients>/);
   assert.match(slack, /^\*/);
   assert.match(mail.html, /Stop these emails/);
   assert.match(mail.text, /Stop these emails: https:\/\/app\.example\.com\/stop/);
   assert.match(text, /\(estimate\)/);
-  assert.equal((text.match(/Open the list:/g) ?? []).length, b.items.length);
+  assert.equal((text.match(/Open your CRM, then SubSync > [^\n]*: https:\/\/crm\.myagency\.com\//g) ?? []).length, b.items.length + (b.more > 0 ? 1 : 0), "every item has its own link into the CRM");
 });
 
 test("when it goes: the chosen hour of the person's own day, once, not on quiet days", () => {
