@@ -10,6 +10,8 @@ export function throttle(lastStartedAt: number | null, now: number, windowMs = S
 export type AccountProgress = { locationId: string; name: string | null; pending: number; done: number; failed: number };
 export type RunState = "idle" | "syncing" | "done" | "error";
 export type RunStatus = {
+  /** The data version (newest change time, ms) when this was read; the screen re-reads its data when it moves. */
+  version?: number;
   state: RunState; startedAt: string | null; lastFinishedAt: string | null; accounts: AccountProgress[]; progress: { done: number; total: number };
   changed: { contacts: number; conversations: number; appointments: number };
   /** What changed, per account, biggest first (at most 10): "Bright Smile Dental: 12 contacts, 3 conversations". */

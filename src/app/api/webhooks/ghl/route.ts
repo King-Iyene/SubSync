@@ -6,7 +6,8 @@ import { getInstallation, purgeInstallation, purgeLocationData } from "@/lib/ghl
 import { actionFor, canonicalType, isForeignApp, parseWebhook, verifyWebhook } from "@/lib/ghl/webhook";
 import { recordPlanEvent } from "@/lib/entitlements-queries";
 import { captureWhitelabelDomain, captureWhitelabelLogo } from "@/lib/analytics/queries";
-import { enqueueAreaSync, enqueueFullSync, locationAccessToken } from "@/lib/sync/engine";
+import { enqueueAreaSync, enqueueFullSync, locationAccessToken, runSlice } from "@/lib/sync/engine";
+import { markDataChanged } from "@/lib/sync/data-version";
 import { applyLiveWebhook } from "@/lib/live/webhook-apply";
 import { isEchoOfOurWrite } from "@/lib/connections/write-log";
 import { eventFromWebhook, leadEventFromWebhook } from "@/lib/analytics/touch-events";
@@ -112,7 +113,15 @@ export async function POST(request: Request) {
           // Workflow setup runs only when this account switched automatic setup on; it never stops an install.
           if (event.locationId) await (await import("@/lib/workflows-setup/run")).autoSetupOnInstall(target.id, target.companyId, event.locationId);
         }
-        else if (action.kind === "resync" && event.locationId && !applied.skipResync) await enqueueAreaSync(target.id, event.locationId, action.scope);
+        else if (action.kind === "resync" && event.locationId && !applied.skipResync) {
+          await enqueueAreaSync(target.id, event.locationId, action.scope);
+          // A new appointment (or anything the live copy could not apply) is read right now, for this account only and for a few seconds, instead of waiting for the next scheduled run.
+          if (action.scope === "appointments" || action.scope === "contacts" || action.scope === "opportunities") {
+            await runSlice(5_000, { installationId: target.id, locationId: event.locationId, focusLocationId: event.locationId, concurrency: 2 }).catch((e) => console.error("quick read after an event failed", e instanceof Error ? e.message : "error"));
+          }
+        }
+        // Tell every open screen of this account that something changed (they re-read their own data quietly).
+        if (action.kind === "resync" && event.locationId) await markDataChanged(target.id, event.locationId, "live").catch(() => undefined);
         // A new contact: compare it with the account's contacts right now (bounded to a couple of seconds, never throws).
         // A message or call, a new contact, an owner change: keep its metadata (never the text) for the speed screens. A retry writes nothing new.
         if ((event.type === "InboundMessage" || event.type === "OutboundMessage") && event.locationId) {

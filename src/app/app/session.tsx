@@ -1,5 +1,6 @@
 "use client";
 
+import { onDataChanged } from "./data-changed";
 import { plainError } from "@/lib/design/plain-error";
 import { createContext, useCallback, useContext, useEffect, useRef, useState, useSyncExternalStore } from "react";
 
@@ -193,10 +194,18 @@ export function useData<T>(path: string | null) {
 
   // Only the newest request of this screen may answer: an older one that is still stuck must not overwrite a retry that came back.
   const seq = useRef(0);
-  const run = useCallback(async (fresh: boolean) => {
+  const run = useCallback(async (fresh: boolean, quiet = false) => {
     if (path === null) return;
     const mine = ++seq.current;
     const key = `${api.scope ?? ""}#${rangeKeyOfPath(path)}`;
+    // A quiet re-read (after a sync landed): ask the server again, keep what is on screen untouched until the answer arrives (no spinner, no skeleton, no jump), and keep it if the read fails.
+    if (quiet) {
+      try {
+        const data = await api.get<T>(path, { fresh: true });
+        if (current.current === path && mine === seq.current) setState({ data, error: null, loading: false, key });
+      } catch { /* the screen keeps the numbers it has */ }
+      return;
+    }
     // Last answer for exactly this read (same dates, same client filter): show it now, refresh quietly. A "Try again" always shows its loading state.
     const heldAnswer = fresh ? undefined : api.peek?.<T>(path);
     if (heldAnswer !== undefined) setState({ data: heldAnswer, error: null, loading: false, key });
@@ -211,6 +220,9 @@ export function useData<T>(path: string | null) {
   }, [api, path]);
   // `reload` is what "Try again" and every refresh after a change call: it always asks the server again.
   const load = useCallback(() => run(true), [run]);
+
+  // After any sync lands (automatic, real-time, manual or full) every open read of this screen is asked again quietly. Counts and lists come from the same answer, so they still agree.
+  useEffect(() => (path === null ? undefined : onDataChanged(() => { void run(true, true); })), [path, run]);
 
   useEffect(() => {
     // Subscribing to the server for this path; the result is stored when it arrives.

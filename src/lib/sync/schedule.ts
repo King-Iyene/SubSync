@@ -45,9 +45,9 @@ export function inSendWindow(localHour: number, chosenHour: number): boolean {
 /** The plain sentences the Sync status panel prints, so the screen says exactly what runs and when. */
 export function scheduleSentences(): string[] {
   return [
-    `Every ${REFRESH_EVERY_MINUTES} minutes SubSync reads conversations, appointments and reply times for every account, then re-checks your alerts.`,
-    "Once a day it reads the full contact and deal lists again.",
-    "When something changes in your CRM, that account is queued for a refresh straight away and it is picked up within a few minutes.",
+    "SubSync syncs by itself: when you open it, when you come back to the tab, about once a minute while it is open, and live when something changes in your CRM. It reads only what changed, so even a very big account is quick. You never need to press a button.",
+    `Every ${REFRESH_EVERY_MINUTES} minutes it also reads conversations, appointments and reply times for every account, then re-checks your alerts.`,
+    "Once a day it reads the full contact and deal lists again, to catch anything deleted. You can also run a Full re-sync yourself from the Sync now menu.",
     "The daily brief and the Monday email are checked every hour and go out at the hour and in the time zone you chose in Settings.",
   ];
 }

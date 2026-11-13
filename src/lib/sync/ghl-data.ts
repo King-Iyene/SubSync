@@ -289,6 +289,17 @@ async function getJson(path: string, params: Record<string, string>, token: stri
   return response.json();
 }
 
+async function postJson(path: string, body: unknown, token: string, version: string): Promise<unknown> {
+  const response = await ghlFetch(`${GHL_API}${path}`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, Version: version, Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+  if (!response.ok) throw new GhlError(response.status, `${path} returned ${response.status}`);
+  return response.json();
+}
+
 // A 401 or 403 on a newer endpoint means the install has not approved that permission yet. It is
 // reported as a state to show, not as a failure.
 export function isPermissionError(error: unknown): boolean {
@@ -410,10 +421,18 @@ export async function fetchContactsPage(token: string, locationId: string, curso
   return { contacts, next };
 }
 
-export async function fetchOpportunitiesPage(token: string, locationId: string, page: number, limit = 100) {
+// Contacts changed most recently first (incremental sync). CHECK (not verified live): the search endpoint's sort field name; the caller verifies the page really is newest-first
+// (isSortedNewestFirst) and falls back to a full read when it is not or when this call fails.
+export async function fetchContactsUpdatedPage(token: string, locationId: string, page: number, limit = 100) {
+  const body = rec(await postJson("/contacts/search", { locationId, page, pageLimit: limit, sort: [{ field: "dateUpdated", direction: "desc" }] }, token, "2021-07-28"));
+  const contacts = (Array.isArray(body.contacts) ? body.contacts : []).map(mapContact).filter((c): c is ContactRow => c !== null);
+  return { contacts, more: contacts.length >= limit };
+}
+
+export async function fetchOpportunitiesPage(token: string, locationId: string, page: number, limit = 100, newestChangeFirst = false) {
   const body = rec(await getJson(
     "/opportunities/search",
-    { location_id: locationId, status: "all", limit: String(limit), page: String(page) },
+    { location_id: locationId, status: "all", limit: String(limit), page: String(page), ...(newestChangeFirst ? { order: "updated_desc" } : {}) },
     token,
     "2021-07-28",
   ));
