@@ -1,6 +1,8 @@
 // The status words of the "Your tools" list in Settings, Connections. Pure: every word is worked out from recorded facts passed in, so each one can be tested.
 // Plain words only (no internal terms). "Needs permission: reconnect" is the one phrase for a missing permission.
 
+import { deepLinks, type DomainSource } from "../links.ts";
+
 export type Tone = "neutral" | "good" | "warn" | "bad" | "info";
 export type Status = { text: string; tone: Tone };
 
@@ -98,11 +100,31 @@ export function calendarStatus(f: CalendarFacts): Status {
   return { text: `${f.count} calendar${f.count === 1 ? "" : "s"}`, tone: "good" };
 }
 
+export const CALENDAR_WHAT = "These are the booking pages in your CRM, like \"Discovery call\". SubSync looks at them and their bookings, and can book an appointment when you press Book. Nothing to set up here.";
+export const CALENDAR_KEY = "Person assigned = someone takes these bookings. No person = nobody is assigned, so we cannot tell who an appointment belongs to. Switched off = turned off in your CRM, nobody can book it.";
+export const CALENDAR_FIX = "To fix: open the calendar in your CRM and add a team member.";
+
 export function calendarLine(f: CalendarFacts): string {
-  if (f.permissionMissing) return "SubSync cannot read your calendars yet, because this install has not approved the Calendars permission. Reconnect SubSync to allow it.";
-  if (f.count === 0) return "No calendars found yet. They appear after the first sync.";
-  if (f.mapped === 0) return `${f.count} calendar${f.count === 1 ? "" : "s"} found. None has a team member attached yet.`;
-  return `${f.count} calendar${f.count === 1 ? "" : "s"} found. ${f.mapped} ${f.mapped === 1 ? "has" : "have"} a team member attached.`;
+  if (f.permissionMissing) return "SubSync cannot see your calendars yet. Reconnect SubSync and approve the Calendars permission.";
+  if (f.count === 0) return "No booking calendars found yet. They appear after the first sync.";
+  const n = `${f.count} booking calendar${f.count === 1 ? "" : "s"} found in your CRM.`;
+  if (f.mapped === 0) return `${n} None has a person assigned.`;
+  return `${n} ${f.mapped} ${f.mapped === 1 ? "has" : "have"} a person assigned.`;
+}
+
+/** One calendar row with the CRM link it needs: the account's calendar settings list (CHECK path), built only through deepLinks and only when the account id is known. */
+export type CalendarItem = { name: string; active: boolean; mapped: boolean; locationId: string | null; crmUrl: string | null };
+export function calendarItems(source: DomainSource, rows: Array<{ name: string; active: boolean; mapped: boolean; locationId?: string | null }>): CalendarItem[] {
+  const links = deepLinks(source);
+  return rows.map((r) => {
+    const locationId = r.locationId ? r.locationId : null;
+    return { name: r.name, active: r.active, mapped: r.mapped, locationId, crmUrl: locationId ? links.calendarSettings(locationId) : null };
+  });
+}
+/** The account picker for "Connect Google or Outlook calendar": one entry per account with a known id. */
+export function calendarAccounts(source: DomainSource, rows: Array<{ locationId: string | null; name: string | null }>): Array<{ locationId: string; name: string; url: string }> {
+  const links = deepLinks(source);
+  return rows.filter((r) => r.locationId).map((r) => ({ locationId: r.locationId as string, name: r.name || "Unnamed account", url: links.calendarSettings(r.locationId as string) }));
 }
 
 // ---------------- Slack chat ----------------

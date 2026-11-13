@@ -42,3 +42,16 @@ test("checklist extras: roles and Slack only for managers, each ticks from a fac
   assert.ok(!p.some((s) => s.id === "x-roles" || s.id === "x-slack"));
   assert.equal(m.find((s) => s.id === "x-digest")?.done, false);
 });
+
+test("every connection card has a short plain guide, and the card links to it", async () => {
+  const { readFileSync } = await import("node:fs");
+  const section = readFileSync("src/app/app/views/connections-section.tsx", "utf8") + readFileSync("src/app/app/views/ai-tool-row.tsx", "utf8");
+  for (const id of ["conn-email", "conn-calendars", "conn-slack", "conn-fathom", "conn-ai"]) {
+    const g = GUIDES.find((x) => x.id === id);
+    assert.ok(g, id);
+    assert.ok(g.read.length >= 4 && g.read.length <= 6, `${id} has 4 to 6 bullets`);
+    assert.ok(section.includes(`guide="${id}"`), `${id} is linked from its card`);
+  }
+  assert.equal(GUIDES.find((x) => x.id === "conn-email")?.more?.title, "Alert and summary emails");
+  assert.equal(guideForView("settings")?.id, "settings", "the ? button on Settings still opens the Settings guide");
+});

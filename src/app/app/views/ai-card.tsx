@@ -110,13 +110,14 @@ function Connect({ data, act, start, waiting }: { data: Status; act: Act; start:
         <p className="text-xs text-muted-foreground">{cost.openrouter} One click: you approve on OpenRouter&apos;s own page.</p>
         <div className="mt-1"><Btn variant="primary" disabled={waiting} onClick={() => void start("openrouter")} testId="ai-openrouter">{waiting ? "Waiting for you..." : "Connect with OpenRouter"}</Btn></div>
       </div>
-      <div>
-        <h4 className="text-sm font-medium">Sign in with ChatGPT</h4>
-        <p className="text-xs text-muted-foreground">{cost.chatgpt}</p>
-        {data.methods?.chatgpt === "ready"
-          ? <div className="mt-1"><Btn variant="secondary" onClick={() => void start("chatgpt")}>Sign in with ChatGPT</Btn></div>
-          : <div className="mt-1"><Btn variant="secondary" disabled>Coming when OpenAI approves our app</Btn></div>}
-      </div>
+      {/* Sign in with ChatGPT stays hidden until it is live (flag ai_chatgpt plus our keys); the code and flag are kept. */}
+      {data.methods?.chatgpt === "ready" && (
+        <div>
+          <h4 className="text-sm font-medium">Sign in with ChatGPT</h4>
+          <p className="text-xs text-muted-foreground">{cost.chatgpt}</p>
+          <div className="mt-1"><Btn variant="secondary" onClick={() => void start("chatgpt")}>Sign in with ChatGPT</Btn></div>
+        </div>
+      )}
       <div>
         <h4 className="text-sm font-medium">Paste an API key</h4>
         <p className="text-xs text-muted-foreground">{cost.key}</p>

@@ -1,6 +1,6 @@
 // Short guides, one per page: what it shows, how to read it, what to do next. About 60 seconds each. Plain words for agency owners, setters and business owners.
 // Pure data. `view` is the menu page the guide belongs to (the ? button and the empty-state link find it from the address).
-export type Guide = { id: string; view: string; title: string; shows: string; read: string[]; next: string; tabs?: string[] };
+export type Guide = { id: string; view: string; title: string; shows: string; read: string[]; next: string; tabs?: string[]; more?: { title: string; read: string[] } };
 
 export const GUIDES: readonly Guide[] = [
   { id: "today", view: "today", title: "Today", shows: "What needs you first, ranked, with the reason and a link to the person or deal.", tabs: ["Today", "Proof", "Numbers"],
@@ -31,6 +31,23 @@ export const GUIDES: readonly Guide[] = [
     read: ["Each row says what is wrong and how many contacts it affects."], next: "Fix the largest group first." },
   { id: "settings", view: "settings", title: "Settings", shows: "Targets, alerts, connections, permissions and your data.", tabs: [],
     read: ["Use the search box at the top to jump to a setting.", "Changes that alter your numbers say so before you save."], next: "Set your reply target under Targets." },
+  // The "How this works" guides of the cards in Settings, Connections. They belong to the Settings page (the ? button there still opens the Settings guide above).
+  { id: "conn-email", view: "settings", title: "Connections: Email", shows: "Email sender health: will my clients' emails reach the inbox or land in spam? The backend works it out, with no sign-in.", tabs: [],
+    read: ["For each client account's sending domain, SubSync looks up the domain's public records: SPF, DKIM and DMARC. These are the three settings that tell Gmail and others the sender is genuine.", "If one is missing or wrong, you get an alert such as \"email sending needs attention on yourdomain.com\", in the app and in Slack.", "Check records runs that lookup now, for the domain of your saved address.", "It only reads public information. It never signs in to anyone's email."],
+    next: "If a record is missing, ask whoever manages that domain to add it, then press Check again.",
+    more: { title: "Alert and summary emails", read: ["They go to the address you save on the Email card.", "No address saved means no emails are sent.", "Send me a test shows what the email looks like. While sending is switched off, nothing is sent and you see a preview instead."] } },
+  { id: "conn-calendars", view: "settings", title: "Connections: Calendars", shows: "The booking calendars in your CRM, and which of them have a person assigned.", tabs: [],
+    read: ["SubSync looks at your calendars and their bookings. There is nothing to set up on this card.", "Person assigned: someone takes these bookings. No person assigned: nobody is, so we cannot tell who an appointment belongs to and show rate by person stays blank.", "Switched off: turned off in your CRM, so nobody can book it.", "SubSync can book an appointment only when you press Book, after a preview. It is logged."],
+    next: "To fix a calendar with no person: open it in your CRM and add a team member. The Fix in your CRM button opens that account's calendar settings." },
+  { id: "conn-slack", view: "settings", title: "Connections: Slack", shows: "One Slack channel for the whole team that receives alerts and the daily brief.", tabs: [],
+    read: ["An administrator connects it with a Slack sign-in. You can change the channel or disconnect on the same card.", "SubSync posts alerts and the daily brief there. It does not read your other Slack messages.", "A client's Slack never receives another client's data.", "Slack chat, when switched on, answers questions from your own numbers using your own AI. With no AI connected, the bot says so."],
+    next: "Connect Slack, then open the Alerts settings to choose what is posted." },
+  { id: "conn-fathom", view: "settings", title: "Connections: Fathom", shows: "The summary and action items of your own recorded calls, added to the right contact.", tabs: [],
+    read: ["Each person connects their own Fathom. Nobody else can see your tokens or your calls.", "A call goes onto a contact only when the match is certain. Otherwise it waits in your private inbox.", "Admins see how many people have connected, never the content of anyone's calls.", "Disconnect any time on the card."],
+    next: "Press Connect Fathom, sign in, then check the inbox for calls that did not match." },
+  { id: "conn-ai", view: "settings", title: "Connections: AI", shows: "Your own AI account, used to word briefs, reports and answers from your own numbers.", tabs: [],
+    read: ["You connect your own AI account, so SubSync never pays for AI and you control the spend. Only an administrator connects it.", "SubSync works out every number itself. The AI only writes around them.", "By default only counts and dollar estimates go to your AI provider. Names go only if you switch that on.", "The AI only suggests. Nothing changes in your CRM until a person previews and confirms it, and each change is logged.", "The Pause AI switch stops everything sent to your provider."],
+    next: "Connect your AI account, then switch on the helpers you want." },
 ];
 
 export const GUIDE_IDS: ReadonlySet<string> = new Set(GUIDES.map((g) => g.id));

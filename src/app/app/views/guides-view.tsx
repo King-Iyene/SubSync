@@ -50,7 +50,7 @@ export function GuidesView({ go }: { go: GoFn }) {
     go(r.view as ViewId);
   };
   const term = q.trim().toLowerCase();
-  const guides = GUIDES.filter((g) => !term || `${g.title} ${g.shows} ${g.read.join(" ")} ${g.next}`.toLowerCase().includes(term));
+  const guides = GUIDES.filter((g) => !term || `${g.title} ${g.shows} ${g.read.join(" ")} ${g.next} ${g.more ? g.more.read.join(" ") : ""}`.toLowerCase().includes(term));
 
   return (
     <div className="max-w-3xl">
@@ -85,6 +85,7 @@ export function GuidesView({ go }: { go: GoFn }) {
                   {g.tabs && g.tabs.length > 0 && <p className="text-muted-foreground">Screens: {g.tabs.join(", ")}.</p>}
                   <div><strong className="font-medium">How to read it.</strong><ul className="mt-1 list-disc space-y-0.5 pl-5 text-muted-foreground">{g.read.map((t) => <li key={t}>{t}</li>)}</ul></div>
                   <p><strong className="font-medium">Do next.</strong> {g.next}</p>
+                  {g.more && <div><strong className="font-medium">{g.more.title}.</strong><ul className="mt-1 list-disc space-y-0.5 pl-5 text-muted-foreground">{g.more.read.map((t) => <li key={t}>{t}</li>)}</ul></div>}
                   <div className="max-sm:[&_button]:min-h-11"><Btn onClick={() => go(g.view as ViewId)}>Open {g.title}</Btn></div>
                 </div>
               </details>

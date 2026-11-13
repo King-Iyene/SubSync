@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { aiStatus, calendarLine, calendarStatus, emailLine, emailStatus, summaryChips, type SlackChatFacts } from "@/lib/connections/tools-status";
+import { aiStatus, CALENDAR_WHAT, calendarLine, calendarStatus, emailLine, emailStatus, summaryChips, type SlackChatFacts } from "@/lib/connections/tools-status";
 import { PENDING_MS, STATUS_WORDS } from "@/lib/connections/messages";
 import { InlineAlert } from "../ds";
 import { useApiClient, useData } from "../session";
@@ -76,7 +76,7 @@ export function ConnectionsSection() {
           <AiToolRow data={ai.data ?? undefined} error={ai.error} reload={ai.reload} />
           <ToolRow id="slack" icon="slack" name="Slack" tone={data.slack.connected ? "good" : "neutral"} status={waitingNow === "slack" ? "Waiting for you" : data.slack.connected ? "Connected" : "Not connected"}
             line={data.slack.connected ? `Alerts and the daily brief go to ${data.slack.label ?? "your Slack channel"}.` : "No Slack channel yet."}
-            what="Posts alerts and the daily brief to one channel. SubSync only posts there; it never reads your Slack messages." owner="Your workspace. One channel for the whole team, set up by an administrator.">
+            what="Posts alerts and the daily brief to one channel. SubSync only posts there; it does not read your other Slack messages." owner="Your workspace. One channel for the whole team, set up by an administrator." guide="conn-slack">
             <div className="flex flex-wrap items-center gap-2">
               {data.slack.canChange ? (data.slack.connected ? <Btn onClick={manage}>Change or disconnect</Btn> : <Btn variant="primary" disabled={waitingNow === "slack"} onClick={() => void connect("slack")}>{waitingNow === "slack" ? "Waiting for you..." : "Connect Slack"}</Btn>) : !data.slack.connected && <span className="text-xs text-muted-foreground">Ask your administrator to connect it.</span>}
             </div>
@@ -85,15 +85,15 @@ export function ConnectionsSection() {
           <ToolRow id="fathom" icon="fathom" name="Fathom" tone={fOk ? "good" : f.status === "needs_reconnect" ? "warn" : "neutral"} status={waitingNow === "fathom" ? "Waiting for you" : fOk ? "Connected" : f.status === "needs_reconnect" ? "Reconnect" : "Not connected"}
             line={fOk ? (f.lastEventAt ? `Last call received ${timeAgo(f.lastEventAt)}. ${f.saved} added to contacts, ${f.waiting} waiting or not matched.` : "Connected. No calls received yet.") : "You have not connected your Fathom."}
             what="Receives the summary and action items of YOUR recorded calls and adds them to the right contact only when the match is certain. Otherwise they wait in your private inbox."
-            owner={`You. Each person connects their own; nobody else can see your tokens or your calls.${f.team ? ` ${f.team.working} of ${f.team.people} on your team ${f.team.people === 1 ? "has" : "have"} connected.` : ""}`}>
+            guide="conn-fathom" owner={`You. Each person connects their own; nobody else can see your tokens or your calls.${f.team ? ` ${f.team.working} of ${f.team.people} on your team ${f.team.people === 1 ? "has" : "have"} connected.` : ""}`}>
             {fOk ? <Btn onClick={manage}>Test or disconnect</Btn> : <Btn variant="primary" disabled={waitingNow === "fathom"} onClick={() => void connect("fathom")}>{waitingNow === "fathom" ? "Waiting for you..." : f.status === "needs_reconnect" ? "Reconnect Fathom" : "Connect Fathom"}</Btn>}
           </ToolRow>
-          <ToolRow id="gmail" icon="gmail" name="Email" tone={es.tone} status={es.text} line={emailLine(emailFacts)}
-            what="Alert emails and the weekly summary go to the address you save here. The sending domain's health (SPF, DKIM, DMARC) is checked from public records, with no sign-in." owner="Your company account.">
+          <ToolRow id="gmail" icon="mail" name="Email" tone={es.tone} status={es.text} line={emailLine(emailFacts)}
+            what="Where SubSync sends its own emails. Add your address to get alert emails and the weekly summary. Until you save one, no emails are sent." guide="conn-email">
             <EmailTool key={data.email.address ?? ""} email={data.email} check={liveCheck} onCheck={setCheck} reload={reload} />
           </ToolRow>
           <ToolRow id="calendars" icon="google_calendar" name="Calendars" tone={cs.tone} status={cs.text} line={calendarLine(data.calendars)}
-            what="SubSync reads the calendars and bookings in your CRM, whatever tool feeds them. Nothing to connect here. SubSync can also book and update appointments there, after a preview and a confirm." owner="Your company account.">
+            what={CALENDAR_WHAT} guide="conn-calendars">
             <CalendarList calendars={data.calendars} />
           </ToolRow>
         </ul>

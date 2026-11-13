@@ -36,6 +36,8 @@ export function deepLinks(source: DomainSource) {
     conversations: (loc: string) => `${base}/${loc}/conversations/conversations`,
     /** The CRM calendar of one account (CHECK). */
     calendar: (loc: string) => `${base}/${loc}/calendars/view`,
+    /** The CRM's calendar settings list for one account. CHECK: path unconfirmed against a live CRM. Never links to one calendar's id, only the list. */
+    calendarSettings: (loc: string) => `${base}/${loc}/settings/calendars`,
     /** The CRM contacts list of one account (CHECK). */
     contacts: (loc: string) => `${base}/${loc}/contacts/smart_list/All`,
     conversation: (loc: string, id: string) => `${base}/${loc}/conversations/conversations/${id}`,

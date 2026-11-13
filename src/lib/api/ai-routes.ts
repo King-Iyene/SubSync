@@ -77,7 +77,7 @@ export async function handleAi(ctx: Ctx, deps: Deps): Promise<Response> {
         canManage: true, level: m.level, connection: conn, usage: u, killed: killedGlobally(), flags: { ...jobFlags(on), ...dealFlags }, methods,
         providers: PROVIDERS.map((id) => ({ id, name: PROVIDER_NAME[id], ...PROVIDER_HELP[id] })), methodCost: METHOD_COST,
         jobs: liveJobs().filter((j) => jobEnabled(on, j.id) && (!isDealJobId(j.id) || on(DEAL_JOB_FLAG[j.id]))).map((j) => ({ id: j.id, title: j.title, approval: j.approval })), accountConnections: Number(own[0]?.n ?? 0),
-        note: "A ChatGPT or Claude chat subscription cannot be used with a key. Use an API key, OpenRouter, or (when OpenAI approves it) sign in with ChatGPT.",
+        note: "A ChatGPT or Claude chat subscription cannot be used with a key. Use an API key or OpenRouter.",
       });
     }
     if (!m) return json({ error: "Ask an administrator." }, 403);

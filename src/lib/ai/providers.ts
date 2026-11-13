@@ -180,6 +180,6 @@ export const PROVIDER_HELP: Record<ProviderId, { steps: string; cost: string; ke
 };
 export const METHOD_COST = {
   openrouter: "Uses your own OpenRouter credit. You can revoke the key on OpenRouter at any time.",
-  chatgpt: "Uses your ChatGPT plan allowance. Not available yet: it starts when OpenAI approves our app.",
+  chatgpt: "Uses your ChatGPT plan allowance.",
   key: "Uses your own provider account and is billed by that provider.",
 } as const;

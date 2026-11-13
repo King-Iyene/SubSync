@@ -51,8 +51,8 @@ test("Calendars: a missing permission is named, never blurred with an empty list
   assert.equal(calendarStatus({ count: 0, mapped: 0, permissionMissing: false }).text, "None read yet");
   assert.equal(calendarStatus({ count: 1, mapped: 0, permissionMissing: false }).text, "1 calendar");
   assert.equal(calendarStatus({ count: 4, mapped: 2, permissionMissing: false }).text, "4 calendars");
-  assert.match(calendarLine({ count: 4, mapped: 2, permissionMissing: false }), /2 have a team member attached/);
-  assert.match(calendarLine({ count: 4, mapped: 0, permissionMissing: false }), /None has a team member/);
+  assert.match(calendarLine({ count: 4, mapped: 2, permissionMissing: false }), /2 have a person assigned/);
+  assert.match(calendarLine({ count: 4, mapped: 0, permissionMissing: false }), /None has a person assigned/);
 });
 
 test("Slack chat: not set up, set up and waiting, connected, all from recorded facts", () => {
@@ -75,4 +75,25 @@ test("no vendor words in the new wording or screens", () => {
     const text = readFileSync(join(process.cwd(), f), "utf8");
     assert.doesNotMatch(text.replace(/\/\/.*$/gm, ""), /GoHighLevel|HighLevel|\bGHL\b/, f);
   }
+});
+
+// Calendars: the CRM buttons are links only, built through deepLinks with the stored domain and the row's own account id (path CHECK: unconfirmed against a live CRM).
+import { calendarAccounts, calendarItems } from "../connections/tools-status.ts";
+test("calendar buttons use the stored domain and the row's own account id", () => {
+  const items = calendarItems("crm.agency.com", [{ name: "Audit call", active: true, mapped: false, locationId: "locA" }, { name: "Old", active: false, mapped: true, locationId: "locB" }]);
+  assert.equal(items[0].crmUrl, "https://crm.agency.com/v2/location/locA/settings/calendars");
+  assert.equal(items[1].crmUrl, "https://crm.agency.com/v2/location/locB/settings/calendars");
+  const accounts = calendarAccounts({ appDomain: "crm.agency.com" }, [{ locationId: "locA", name: "A" }, { locationId: null, name: "Unknown" }]);
+  assert.deepEqual(accounts, [{ locationId: "locA", name: "A", url: "https://crm.agency.com/v2/location/locA/settings/calendars" }]);
+});
+test("calendar buttons are absent when the account id is unknown", () => {
+  const items = calendarItems("crm.agency.com", [{ name: "X", active: true, mapped: false, locationId: null }, { name: "Y", active: true, mapped: false }]);
+  assert.deepEqual(items.map((i) => i.crmUrl), [null, null]);
+  assert.deepEqual(calendarAccounts("crm.agency.com", [{ locationId: "", name: "Z" }]), []);
+});
+test("calendar and email card copy is plain and true", () => {
+  const src = readFileSync(join(process.cwd(), "src/app/app/views/connections-section.tsx"), "utf8") + readFileSync(join(process.cwd(), "src/app/app/views/email-tool.tsx"), "utf8");
+  assert.doesNotMatch(src, /Nothing to connect here|whatever tool|SubSync only reads/i);
+  assert.match(src, /Check if clients&apos; emails reach the inbox/);
+  assert.match(src, /Save an address first/);
 });
