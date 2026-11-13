@@ -188,6 +188,7 @@ test("pilot modules are on by default and a database row can still override the 
     "td_today",
     "wf_bulk",
     "wf_library",
+    "wf_module",
     "wf_outcomes",
     "wf_today",
     "wg_alerts",
