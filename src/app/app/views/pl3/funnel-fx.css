@@ -21,9 +21,9 @@
 .ff-item[data-on="1"] .ff-glow { opacity: .45; }
 .ff-node[data-on="1"] .ff-bar { filter: brightness(1.15); }
 .ff-dot-core { fill: color-mix(in srgb, var(--ff-gold) 85%, #ffffff); } .ff-dot-glow { fill: var(--ff-gold); opacity: .55; }
-.ff-stuck { animation: ff-shimmer 2.4s ease-in-out infinite; }
+.ff-stuck { animation: ff-shimmer 2.4s ease-in-out 3; }
 @keyframes ff-shimmer { 0%, 100% { opacity: .65; } 50% { opacity: 1; } }
-.ff-ring { fill: none; stroke: var(--ff-ember); stroke-width: 2; animation: ff-pulse 1.6s ease-out infinite; }
+.ff-ring { fill: none; stroke: var(--ff-ember); stroke-width: 2; animation: ff-pulse 1.6s ease-out 3; }
 @keyframes ff-pulse { 0% { stroke-opacity: 1; stroke-width: 1.5; } 100% { stroke-opacity: 0; stroke-width: 9; } }
 .ff-leaktag rect { fill: color-mix(in srgb, var(--ff-ember) 14%, var(--background)); stroke: var(--ff-ember); }
 .ff-leaktag text { fill: var(--ff-ember); }

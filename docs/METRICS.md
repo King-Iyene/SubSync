@@ -1044,3 +1044,11 @@ One definition per label; the basis is written in words wherever a rate appears.
 - **True show rate** (shown as "true show rate", the default on the Appointments tabs and their result line) = showed / (showed + no-show + past appointments nobody marked). Past appointments with no outcome count against it, because staff forgot to mark them. Needs 5 in the denominator.
 - **Show rate of marked appointments** (Insights, "Show rate (marked only)") = showed / (showed + no-show), only appointments someone marked. It is what the CRM would report. It is always the higher of the two when some are unmarked.
 - The two can differ a lot (86% against 21% when most past appointments were never marked). That gap is the point of the hygiene lists. A rate is never shown as a bare "show rate" next to the other without the words above.
+
+## Lead flow card ("Where do my leads go?")
+- Counts come LIVE from the contacts with the same WHERE and definitions as the lists behind each number (`leadWhere` + `LEAD_SQL` in `dq-queries.ts`). A scope of more than 5 accounts counts the last 2 days live and older days from the daily record (`dq_source_daily`).
+- duplicates + junk + clean = leads (junk never counts a duplicate twice). Good leads = the clean share. A source under 10 leads shows "not enough leads", never 0
+## Lead flow card ("Where do my leads go?")
+- Counts come LIVE from the contacts with the same WHERE and definitions as the lists behind each number (`leadWhere` + `LEAD_SQL` in `dq-queries.ts`). A scope of more than 5 accounts counts the last 2 days live and older days from the daily record (`dq_source_daily`).
+- duplicates + junk + clean = leads (junk never counts a duplicate twice). Good leads = the clean share. A source under 10 leads shows "not enough leads", never 0%. Best/Weakest needs two sources of 10+ leads.
+- The dots play one pass and rest (Pause/Play, Replay, reduced motion, off-screen and hidden-tab guards).

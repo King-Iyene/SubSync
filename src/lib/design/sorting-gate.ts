@@ -97,3 +97,6 @@ export function layoutGate(input: GateIn, opts: { width: number; compact?: boole
   });
   return { width, height, vertical, lanes, gate, outs, mergeCenter, dots, totals, maxLanes: MAX_LANES };
 }
+
+/** How long ONE pass of the dots takes: the last dot to start plus its own trip. The picture plays one pass, then rests; it never loops. */
+export const passSeconds = (dots: readonly Pick<GateDot, "begin" | "dur">[]): number => dots.reduce((m, d) => Math.max(m, d.begin + d.dur), 0);

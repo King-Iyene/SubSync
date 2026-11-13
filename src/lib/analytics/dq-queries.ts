@@ -2,7 +2,7 @@ import { sql, type Sql } from "../db";
 import { CONTACT_PREDICATE } from "../cleanup/cu-core";
 import { protectedReason, type ProtectReason } from "../cleanup/cu-core";
 import {
-  badgeOf, MAX_SHARED, MAX_SHARED_NAME, NAME_TOKENS_SQL, NEVER_EMAIL, NEVER_PHONE, SRC_KEY_SQL, TIER_RANK, ZERO, components, decodeCur, encodeCur, intakeAlerts, pairId, qualityOf, zeroFill,
+  badgeOf, MAX_SHARED, MAX_SHARED_NAME, NAME_TOKENS_SQL, NEVER_EMAIL, NEVER_PHONE, SRC_KEY_SQL, TIER_RANK, ZERO, add, components, decodeCur, encodeCur, intakeAlerts, pairId, qualityOf, zeroFill,
   type DayCount, type EdgeKind, type IntakeAlert, type Quality, type RawGroup, type SrcCounts, type Tier, BASELINE_DAYS, RECENT_DAYS,
 } from "../dq/dq-core";
 import { groupKey } from "./dedupe";
@@ -279,13 +279,51 @@ const sumCols = (db: Db) => db`sum(d.leads)::int leads, sum(d.dups)::int dups, s
 const countsOf = (r: Record<string, unknown>): SrcCounts => ({ ...ZERO, leads: Number(r.leads), dups: Number(r.dups), junk: Number(r.junk), answered: Number(r.answered), quality: Number(r.quality), booked: Number(r.booked), showed: Number(r.showed), won: Number(r.won), wonValue: Number(r.won_value), touchSecs: Number(r.touch_secs), touched: Number(r.touched) });
 const dayFilter = (db: Db, days: number) => db`d.day >= ${db.unsafe(TODAY)} - ${Math.max(1, days) - 1}::int`;
 
-/** Every source's totals over the window, biggest first, added across the accounts in scope. */
-export async function sourcesRollup(s: Scope, days: number, limit = 200): Promise<SourceAgg[]> {
+/** At most this many accounts in scope are counted live over the whole window; a bigger scope counts the last LIVE_TAIL_DAYS days live and the older days from the daily record. */
+export const LIVE_ACCOUNTS = 5;
+export const LIVE_TAIL_DAYS = 2;
+
+/** Counts straight from the contacts with the SAME where and definitions as listLeads/countLeads (leadWhere + LEAD_SQL), so a number and its rows are the same set. */
+async function sourcesLive(s: Scope, days: number): Promise<SourceAgg[]> {
+  const db = sql();
+  const f: LeadFilter = { src: null, flag: "all", days };
+  const rows = await db`
+    with w as (
+      select ${db.unsafe(SRC_KEY_SQL)} as src, left(btrim(coalesce(c.source, '')), 60) label, c.date_added,
+        ${db.unsafe(LEAD_SQL.dup)} is_dup, ${db.unsafe(LEAD_SQL.junk)} is_junk, ${db.unsafe(LEAD_SQL.answered)} ans, ${db.unsafe(LEAD_SQL.booked)} bk, ${db.unsafe(LEAD_SQL.showed)} sh,
+        ${db.unsafe(LEAD_SQL.won)} wn, ${db.unsafe(LEAD_SQL.wonValue)} wv, ${db.unsafe(LEAD_SQL.touchSecs)} ts
+      from cached_contacts c join locations l on l.installation_id = c.installation_id and l.location_id = c.location_id and not l.ignored
+      where ${leadWhere(db, s, f)})
+    select src, coalesce(nullif((array_agg(label order by date_added desc) filter (where label <> ''))[1], ''), 'No source') label, count(*)::int leads, count(*) filter (where is_dup)::int dups,
+      count(*) filter (where is_junk and not is_dup)::int junk, count(*) filter (where ans)::int answered, count(*) filter (where not is_dup and not is_junk and ans)::int quality,
+      count(*) filter (where bk)::int booked, count(*) filter (where sh)::int showed, count(*) filter (where wn)::int won, coalesce(sum(wv), 0)::float8 won_value,
+      coalesce(sum(ts) filter (where ts is not null), 0)::bigint touch_secs, count(ts)::int touched
+    from w group by src`;
+  return rows.map((r) => ({ key: r.src as string, label: r.label as string, ...countsOf(r) }));
+}
+async function sourcesHistory(s: Scope, days: number, olderThanDays: number): Promise<SourceAgg[]> {
   const db = sql();
   const rows = await db`select d.src, (array_agg(d.label order by d.day desc, d.leads desc))[1] label, ${sumCols(db)}
     from dq_source_daily d join locations l on l.installation_id = d.installation_id and l.location_id = d.location_id and not l.ignored
-    where d.installation_id = ${s.inst} and ${dayFilter(db, days)} ${scopeOf(db, "d", s.allowed)} ${locOf(db, "d", s.location)} group by d.src order by sum(d.leads) desc, d.src limit ${limit}`;
+    where d.installation_id = ${s.inst} and ${dayFilter(db, days)} and d.day < ${db.unsafe(TODAY)} - ${Math.max(0, olderThanDays - 1)}::int ${scopeOf(db, "d", s.allowed)} ${locOf(db, "d", s.location)} group by d.src`;
   return rows.map((r) => ({ key: r.src as string, label: r.label as string, ...countsOf(r) }));
+}
+async function accountsInScope(s: Scope): Promise<number> {
+  const db = sql();
+  const [r] = await db`select count(*)::int n from locations l where l.installation_id = ${s.inst} and not l.ignored ${scopeOf(db, "l", s.allowed)} ${locOf(db, "l", s.location)}`;
+  return Number(r?.n ?? 0);
+}
+/** Every source's totals over the window, biggest first, added across the accounts in scope. LIVE from the contacts (the same definition as the lists behind each number); a very large scope
+ *  counts only the last two days live and takes the older days from the daily record (rebuilt every day), so a big agency's overview stays fast. */
+export async function sourcesRollup(s: Scope, days: number, limit = 200): Promise<SourceAgg[]> {
+  const small = (await accountsInScope(s)) <= LIVE_ACCOUNTS;
+  const parts = small ? [await sourcesLive(s, days)] : (await Promise.all([sourcesLive(s, Math.min(days, LIVE_TAIL_DAYS)), sourcesHistory(s, days, Math.min(days, LIVE_TAIL_DAYS))]));
+  const by = new Map<string, SourceAgg>();
+  for (const p of parts) for (const r of p) {
+    const o = by.get(r.key);
+    by.set(r.key, o ? { ...add(o, r), key: o.key, label: o.label } : r);
+  }
+  return [...by.values()].sort((a, b) => b.leads - a.leads || a.key.localeCompare(b.key)).slice(0, limit);
 }
 export async function sourceDays(s: Scope, days: number, key: string | null): Promise<DayCount[]> {
   const db = sql();

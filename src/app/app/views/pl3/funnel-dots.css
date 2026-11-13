@@ -37,14 +37,14 @@
 .fv-wrap[data-motion="1"] .fv-layer-slab { transform: translate(calc(var(--fv-tx, 0) * -3px), calc(var(--fv-ty, 0) * -1.5px)); transition: transform .3s ease-out; }
 .fv-wrap[data-motion="1"] .fv-layer-dots { transform: translate(calc(var(--fv-tx, 0) * 3px), calc(var(--fv-ty, 0) * 2px)); transition: transform .3s ease-out; }
 .fv-wrap[data-motion="1"][data-hover="1"] .fv-svg { transform: rotateX(calc(var(--fv-ty, 0) * -5deg)) rotateY(calc(var(--fv-tx, 0) * 6deg)); transition: transform .25s ease-out; will-change: transform; }
-.fv-wrap[data-motion="1"][data-hover="0"] .fv-svg { animation: fv-sway 9s ease-in-out infinite alternate; animation-delay: calc(var(--fv-i, 0) * -0.7s); }
+.fv-wrap[data-motion="1"][data-hover="0"] .fv-svg { animation: fv-sway 9s ease-in-out 2 alternate; animation-delay: calc(var(--fv-i, 0) * -0.7s); }
 @keyframes fv-sway { from { transform: rotateY(-2.4deg) rotateX(.8deg); } to { transform: rotateY(2.4deg) rotateX(-.8deg); } }
 .fv-wrap[data-paused="1"] .fv-svg { animation-play-state: paused; }
 /* Time: the replay chip. */
 .fv-replayslot { min-height: 30px; }
 .fv-replaychip { display: inline-flex; align-items: center; gap: 8px; margin: 0 0 8px; padding: 3px 12px; border-radius: 999px; font-size: .75rem; border: 1px solid color-mix(in srgb, var(--primary) 45%, var(--border)); background: color-mix(in srgb, var(--primary) 10%, transparent); }
 .fv-replaychip i { width: 8px; height: 8px; border-radius: 50%; background: var(--primary); box-shadow: 0 0 8px var(--primary); animation: fv-pulse 1.2s ease-in-out infinite; }
-.fv-pt { fill: color-mix(in srgb, var(--fv-moved) 70%, #ffffff); opacity: 0; filter: drop-shadow(0 0 3px var(--fv-moved)); animation: fv-fall linear infinite; pointer-events: none; }
+.fv-pt { fill: color-mix(in srgb, var(--fv-moved) 70%, #ffffff); opacity: 0; filter: drop-shadow(0 0 3px var(--fv-moved)); animation: fv-fall linear 1; pointer-events: none; }
 @keyframes fv-fall { 0% { transform: translateY(0); opacity: 0; } 12% { opacity: .95; } 88% { opacity: .95; } 100% { transform: translateY(var(--fv-h, 60px)); opacity: 0; } }
 .fv-wrap[data-paused="1"] .fv-pt { animation-play-state: paused; }
 .fv-stats { display: flex; flex-direction: column; gap: 3px; min-width: 0; padding: 6px 0; font-size: .8125rem; }
