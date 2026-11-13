@@ -140,6 +140,18 @@
 .rv-name { font-weight: 600; } .rv-val { font-weight: 600; font-variant-numeric: tabular-nums; fill: var(--primary); } .rv-stucktxt { fill: var(--pl-stuck); font-size: 11px; font-weight: 600; }
 .rv-tip { position: absolute; z-index: 5; transform: translate(-50%, calc(-100% - 12px)); pointer-events: none; display: flex; flex-direction: column; gap: 2px; max-width: min(260px, 80vw); padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--card, var(--background)); color: var(--foreground); box-shadow: 0 2px 8px color-mix(in srgb, var(--foreground) 14%, transparent); font-size: 0.75rem; line-height: 1.35; }
 .rv-tip b { font-size: 0.8125rem; }
+.rv-legend { margin: 6px 0 0; font-size: 0.75rem; color: var(--muted-foreground); }
+.rv-fly-won { fill: var(--pl-gold); }
+.rv-fly-lost { fill: color-mix(in srgb, var(--foreground) 45%, transparent); }
+.rv-ribbon { transition: d 450ms ease; }
+.rv-quiet { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin: 0 0 10px; padding: 12px 14px; border-radius: 10px; border: 1px dashed color-mix(in srgb, var(--primary) 40%, var(--border)); background: color-mix(in srgb, var(--primary) 6%, transparent); }
+.rv-quiet p { margin: 0; font-size: 0.875rem; }
+.rv-sample { padding: 6px 10px; border-radius: 8px; border: 1px solid var(--pl-gold); background: color-mix(in srgb, var(--pl-gold) 10%, transparent); }
+.rv-note, .rv-daysum { padding: 2px 0; }
+.rv-speeds { display: inline-flex; gap: 2px; padding: 2px; border-radius: 8px; border: 1px solid var(--border); }
+.rv-speed { min-height: 28px; min-width: 36px; padding: 0 8px; border-radius: 6px; font-size: 0.75rem; font-weight: 600; color: var(--muted-foreground); background: transparent; border: 0; cursor: pointer; }
+.rv-speed.is-on { background: color-mix(in srgb, var(--pl-gold) 22%, transparent); color: var(--foreground); }
+@media (prefers-reduced-motion: reduce) { .rv-ribbon { transition: none; } }
 @media (prefers-reduced-motion: reduce) { [data-settle="1"] .rv-flow, [data-settle="1"] .rv-ribbon, [data-settle="1"] .rv-bill { animation: none; } .rv-flow { stroke-dasharray: none; opacity: .4; } }
 
 /* Pipeline list: one calm row per pipeline, aligned columns, rows stack on a phone. Flat, hairlines only, forest for the shape, ochre for stuck. */
