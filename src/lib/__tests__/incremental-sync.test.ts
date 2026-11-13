@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { agoWords, autoKinds, chooseMode, FULL_EVERY_MS, isSortedNewestFirst, liveStatus, mayCheck, nextWatermark, orderAccounts, SKEW_MS, takeFresh } from "../sync/incremental.ts";
+import { agoWords, autoKinds, chooseMode, FULL_EVERY_MS, isSortedNewestFirst, liveStatus, mayCheck, nextWatermark, orderAccounts, quietRefreshDelay, QUIET_REFRESH_GAP_MS, SKEW_MS, takeFresh } from "../sync/incremental.ts";
 import { emitDataChanged, noteVersion, onDataChanged, resetDataChangedForTests } from "../../app/app/data-changed.ts";
 
 const NOW = 1_800_000_000_000;
@@ -88,4 +88,12 @@ test("a subscriber that throws does not stop the others", () => {
   onDataChanged(() => { throw new Error("boom"); }); onDataChanged(() => { ok++; });
   emitDataChanged({ version: 1 });
   assert.equal(ok, 1);
+});
+
+test("a background change re-reads a screen at most once a minute, spread out; a person's sync is immediate", () => {
+  assert.equal(quietRefreshDelay({ force: true, nowMs: NOW, lastReadMs: NOW, spread01: 0.5 }), null);
+  assert.equal(quietRefreshDelay({ force: false, nowMs: NOW, lastReadMs: NOW - QUIET_REFRESH_GAP_MS - 1, spread01: 0 }), 0);
+  assert.equal(quietRefreshDelay({ force: false, nowMs: NOW, lastReadMs: NOW - 10_000, spread01: 0 }), QUIET_REFRESH_GAP_MS - 10_000);
+  const spread = quietRefreshDelay({ force: false, nowMs: NOW, lastReadMs: 0, spread01: 1 }) as number;
+  assert.ok(spread > 0 && spread <= 3_000);
 });

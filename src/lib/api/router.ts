@@ -2166,7 +2166,22 @@ const FEATURE_FOR: Record<string, Feature> = {
 // person's own marks are included because the key holds the person.
 const HEAVY_READ = new Set(["speed", "appointments"]);
 
+// Every answer carries how long it took (Server-Timing: visible in the browser's network panel), and a read that took SLOW_API_MS or more writes one log line with the route name only
+// (ids are masked; no query values, no names, no tokens), so the slow screens can be found in the host's logs.
+const SLOW_API_MS = 2_500;
 export async function handle(request: Request, segments: string[]): Promise<Response> {
+  const t0 = performance.now();
+  const res = await handleTimed(request, segments);
+  const ms = Math.round(performance.now() - t0);
+  try { res.headers.set("Server-Timing", `app;dur=${ms}`); } catch { /* an immutable response keeps no header */ }
+  if (ms >= SLOW_API_MS) {
+    const part = new URL(request.url).searchParams.get("part");
+    console.warn("slow_api", { route: segments.map((s) => (/^[A-Za-z0-9_-]{12,}$/.test(s) ? ":id" : s)).join("/"), part: part && /^[a-z0-9_-]{1,30}$/i.test(part) ? part : null, method: request.method, status: res.status, ms });
+  }
+  return res;
+}
+
+async function handleTimed(request: Request, segments: string[]): Promise<Response> {
   const auth = await authenticate(request, segments);
   if (isResponse(auth)) return auth;
   const ctx: Ctx = { ...auth, request, url: new URL(request.url), segments };
