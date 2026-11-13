@@ -13,6 +13,8 @@ import type { Feature } from "../entitlements";
 import { resolveEntitlements } from "../flags";
 import { json, type AuthContext } from "./auth";
 import { viewerOf } from "./people3-routes";
+import { handleAiDeals, isDealPart } from "./ai-deal-routes";
+import { DEAL_JOB_FLAG, DEAL_JOB_IDS, isDealJobId } from "../ai/deal-jobs";
 
 // /api/app/ai?part=status|usage|history|sent|brief-note and POST /api/app/ai/act/<models|connect|start|update|rotate|disconnect|preview|brief-note|feedback>.
 // Who the caller is, and which connection they manage, come ONLY from the signed session: the company's own connection (scope '') for a company owner or administrator and for a business
@@ -52,6 +54,9 @@ export async function handleAi(ctx: Ctx, deps: Deps): Promise<Response> {
   const m = manage(ctx), user = ctx.session.userId ?? null;
   if (!user) return json({ error: "Please sign in again" }, 401);
   const chatgpt = on("ai_chatgpt");
+  // The four deal jobs (health, follow-up plan, win and loss review, forecast in words) answer from their own file; each has its own flag on top of ai_byo.
+  if (isDealPart(part, isAct, ctx.segments[2])) return handleAiDeals(ctx, deps, on, user);
+  const dealFlags = Object.fromEntries(DEAL_JOB_IDS.map((j) => [j, on(DEAL_JOB_FLAG[j])]));
 
   if (!isAct) {
     if (part === "status" || !part) {
@@ -62,9 +67,9 @@ export async function handleAi(ctx: Ctx, deps: Deps): Promise<Response> {
         m.level === "company" ? sql()`select count(*)::int n from ai_connections where installation_id = ${ctx.installationId} and location_id <> ''` : Promise.resolve([{ n: 0 }]),
       ]);
       return json({
-        canManage: true, level: m.level, connection: conn, usage: u, killed: killedGlobally(), flags: { brief: on("ai_brief") }, methods,
+        canManage: true, level: m.level, connection: conn, usage: u, killed: killedGlobally(), flags: { brief: on("ai_brief"), ...dealFlags }, methods,
         providers: PROVIDERS.map((id) => ({ id, name: PROVIDER_NAME[id], ...PROVIDER_HELP[id] })), methodCost: METHOD_COST,
-        jobs: liveJobs().filter((j) => jobEnabled(on, j.id)).map((j) => ({ id: j.id, title: j.title, approval: j.approval })), accountConnections: Number(own[0]?.n ?? 0),
+        jobs: liveJobs().filter((j) => jobEnabled(on, j.id) && (!isDealJobId(j.id) || on(DEAL_JOB_FLAG[j.id]))).map((j) => ({ id: j.id, title: j.title, approval: j.approval })), accountConnections: Number(own[0]?.n ?? 0),
         note: "A ChatGPT or Claude chat subscription cannot be used with a key. Use an API key, OpenRouter, or (when OpenAI approves it) sign in with ChatGPT.",
       });
     }
