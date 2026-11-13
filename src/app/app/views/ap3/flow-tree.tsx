@@ -1,7 +1,10 @@
 "use client";
 
-import { ChevronDown, Play, Sparkles, Users } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { ChevronDown, Maximize2, Minimize2, Play, Sparkles, Users, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { canvasLayoutWidth, EXPANDED_PAGE } from "@/lib/design/flow-zoom";
+import { FlowCanvas, type CanvasHandle } from "./flow-canvas";
 import { closerTotals, findLeak, layoutFlow, LEAF_ORDER, OUTCOME_LABEL, OUTCOME_TONE, type FlowNode, type Tone } from "@/lib/design/appt-flow-layout";
 import { money, pct } from "@/lib/design/appt-coach";
 import { EmptyState, ErrorState, SkeletonRows } from "../../ds";
@@ -48,7 +51,43 @@ export function FlowTree({ filters, onOpen, go }: { filters: ApFilters; onOpen: 
     return () => ro.disconnect();
   }, [data !== null && data.booked > 0]); // eslint-disable-line react-hooks/exhaustive-deps
   const tree = data;
-  const layout = useMemo(() => (tree && width >= 700 ? layoutFlow(tree, { width: width - 18, maxSetters: setterLimit, maxClosers: 4 }) : null), [tree, width, setterLimit]);
+  // Full screen view: one dialog, the same tree on a bigger canvas, up to 12 people at once.
+  const [expanded, setExpanded] = useState(false);
+  const [ovW, setOvW] = useState(1400);
+  const openerRef = useRef<HTMLButtonElement>(null), dialogRef = useRef<HTMLDivElement>(null), canvasRef = useRef<CanvasHandle>(null);
+  const saved = useRef<{ y: number; els: Array<[HTMLElement, number]> }>({ y: 0, els: [] });
+  const openExpanded = () => {
+    const els: Array<[HTMLElement, number]> = [];
+    for (let n = openerRef.current?.parentElement ?? null; n; n = n.parentElement) if (n.scrollTop > 0) els.push([n, n.scrollTop]);
+    saved.current = { y: window.scrollY, els }; setExpanded(true);
+  };
+  const closeExpanded = useCallback(() => { setExpanded(false); setHot(null); }, []);
+  const onOvSize = useCallback((w: number) => setOvW(w), []);
+  useEffect(() => {
+    if (!expanded) return;
+    const dlg = dialogRef.current, prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    dlg?.querySelector<HTMLElement>('[data-testid="ap-expanded-close"]')?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") { e.preventDefault(); closeExpanded(); return; }
+      if (e.key !== "Tab" || !dlg) return;
+      const f = [...dlg.querySelectorAll<HTMLElement>('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')].filter((x) => !x.hasAttribute("disabled") && x.offsetParent !== null);
+      if (!f.length) return;
+      const first = f[0], last = f[f.length - 1], cur = document.activeElement;
+      if (e.shiftKey && (cur === first || !dlg.contains(cur))) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && (cur === last || !dlg.contains(cur))) { e.preventDefault(); first.focus(); }
+    };
+    document.addEventListener("keydown", onKey);
+    const s = saved.current;
+    return () => {
+      document.removeEventListener("keydown", onKey); document.body.style.overflow = prevOverflow;
+      window.scrollTo(0, s.y); for (const [el, t] of s.els) el.scrollTop = t;
+      openerRef.current?.focus({ preventScroll: true }); // eslint-disable-line react-hooks/exhaustive-deps -- the button is swapped when the view closes, we want the new one
+    };
+  }, [expanded, closeExpanded]);
+  const limit = expanded ? EXPANDED_PAGE : setterLimit;
+  const layoutW = expanded ? canvasLayoutWidth(ovW) : canvasLayoutWidth(width);
+  const layout = useMemo(() => (tree && (expanded || width >= 700) ? layoutFlow(tree, { width: layoutW, maxSetters: limit, maxClosers: 4 }) : null), [tree, width, expanded, layoutW, limit]);
   const leak = useMemo(() => (tree ? findLeak(tree) : null), [tree]);
   const people = useMemo(() => {
     if (!tree) return new Map<string, ApStats & { name: string }>();
@@ -83,35 +122,26 @@ export function FlowTree({ filters, onOpen, go }: { filters: ApFilters; onOpen: 
   const closerName = (id?: string) => tree.setters.flatMap((s) => s.closers).find((c) => c.id === id)?.name ?? "";
   const toggleCmp = (n: FlowNode) => { const role: CompareRole = n.kind === "setter" ? "booker" : "owner"; const id = (n.kind === "setter" ? n.setterId : n.closerId) ?? "none"; toggleCmpId(role, id); setTimeout(() => document.querySelector('[data-testid="ap-compare"]')?.scrollIntoView({ block: "nearest", behavior: "smooth" }), 80); };
   const preview = hot && layout ? layout.nodes.find((n) => n.id === hot) : null;
-  const showLeak = (leakNode: string) => { setLeakOn(true); setHot(leakNode); setTimeout(() => wrap.current?.querySelector<HTMLElement>(`[data-node="${CSS.escape(leakNode)}"] button`)?.scrollIntoView({ block: "center", behavior: reduced ? "auto" : "smooth" }), 50); };
+  const showLeak = (leakNode: string) => { setLeakOn(true); setHot(leakNode); const n = layout?.nodes.find((x) => x.id === leakNode); if (n) canvasRef.current?.centerOn(n.x + n.w / 2, n.y + 26 + n.h / 2, 1); };
 
-  return (
-    <div data-testid="ap-flow" aria-busy={loading}>
-      {leak ? (
-        <div className="ap-leak" data-testid="ap-leak">
-          <Sparkles aria-hidden className="size-4 text-[var(--s6-red)]" /><span><b>Biggest leak.</b> {leak.text} About {leak.excess} extra no-shows.</span>
-          {width >= 700 ? <button type="button" className="s6-btn" onClick={() => showLeak(leak.nodeId)} data-testid="ap-leak-show">Show me</button> : <button type="button" className="s6-btn" onClick={() => onOpen({ title: `${setterName(leak.setterId)} to ${closerName(leak.closerId ?? "")}, no-shows`, count: leak.excess, params: { booker: leak.setterId, owner: leak.closerId ?? undefined, outcome: "noshow" } })}>Open them</button>}
-        </div>
-      ) : <div className="ap-leak" data-ok="1" data-testid="ap-leak"><Sparkles aria-hidden className="size-4 text-[var(--s6-green)]" /><span>No single hand-off stands out. Nobody is far above your own no-show rate.</span></div>}
-
+  const barEl = (
       <div className="ap-tree-bar">
         <div className="ap-legend" aria-label="Colour key">{LEGEND.map(([t, l]) => <span key={t}><i style={{ background: COLOR[t] }} />{l}</span>)}<span><Sparkles aria-hidden className="mr-1 inline size-3 text-[var(--s6-cyan)]" />Glow: best converters</span></div>
         <span className="ml-auto inline-flex flex-wrap gap-2">
           <button type="button" className="s6-btn" onClick={() => setCmpOpen((o) => !o)} aria-expanded={cmpOpen || cmpIds.length > 0} data-testid="ap-compare-open"><Users aria-hidden className="size-4" />Compare people</button>
           {layout && !reduced && <button type="button" className="s6-btn" onClick={() => setRun((r) => r + 1)} data-testid="ap-replay"><Play aria-hidden className="size-4" />Replay</button>}
           {tree.setters.length > 4 && <label className="sr-only" htmlFor="ap-limit">People shown</label>}
-          {tree.setters.length > 4 && <select id="ap-limit" className="ap-field" value={setterLimit} onChange={(e) => setSetterLimit(Number(e.target.value))}><option value={4}>Top 4 bookers</option><option value={8}>Top 8 bookers</option><option value={12}>Top 12 bookers</option></select>}
+          {tree.setters.length > 4 && <select id="ap-limit" className="ap-field" disabled={expanded} value={setterLimit} onChange={(e) => setSetterLimit(Number(e.target.value))}><option value={4}>Top 4 bookers</option><option value={8}>Top 8 bookers</option><option value={12}>Top 12 bookers</option></select>}
         </span>
       </div>
-
+  );
+  const previewEl = (
       <div className="ap-preview" aria-live="polite" data-testid="ap-preview">
         {preview && preview.stats ? <><b>{preview.label}</b><span>{preview.stats.bookings} booked</span><span>{pct(preview.stats.showRate)} show</span><span>{pct(preview.stats.noShowRate)} no-show</span><span>{pct(preview.stats.closeRate)} close</span><span>{money(preview.stats.revenueCents)} won</span>{preview.stats.avgLeadToBookedHours !== null && <span>{preview.stats.avgLeadToBookedHours.toFixed(1)}h lead to booked</span>}<Chip tone={preview.tone}>{TONE_TEXT[preview.tone]}</Chip></>
           : preview ? <><b>{preview.label}</b><span>{preview.count} appointments. Press to open exactly those.</span></> : <span>Hover or focus a branch to preview it. Press it to open those appointments. Press Compare on two people to put them side by side.</span>}
       </div>
-
-      <div ref={wrap} className="w-full">
-        {layout ? (
-          <div className="ap-tree-scroll">
+  );
+  const treeEl = layout ? (
             <div key={run} className="ap-tree" data-hot={hot ? "1" : undefined} style={{ width: layout.width, height: layout.height + 34 }} data-testid="ap-tree" role="group" aria-label="Appointment flow tree">
               <div className="ap-tree-cols" aria-hidden>{layout.columns.map((c) => <span key={c.title} style={{ left: c.x }}>{c.title}</span>)}</div>
               <div className="ap-tree-body" style={{ width: layout.width, height: layout.height }}>
@@ -138,13 +168,48 @@ export function FlowTree({ filters, onOpen, go }: { filters: ApFilters; onOpen: 
                 })}
               </div>
             </div>
-          </div>
-        ) : <PhoneTree tree={tree} limit={setterLimit} onOpen={onOpen} isCmp={(id) => cmpRole === "booker" && cmpIds.includes(id)} onCmp={(id) => toggleCmpId("booker", id)} />}
-      </div>
-      <p className="mt-2 flex flex-wrap items-center gap-3 text-sm" data-testid="ap-tree-pager">{skip > 0 && <button type="button" className="ap-link" onClick={() => { setSkip(Math.max(0, skip - top)); setSetterLimit(5); }}>Previous {top} people</button>}<span className="ap-fine">Showing {skip + 1} to {skip + tree.setters.filter((x) => x.id !== "others").length} people, busiest first.</span>{tree.hiddenSetters > 0 && <><button type="button" className="ap-link" onClick={() => { setSkip(skip + top); setSetterLimit(5); }} data-testid="ap-tree-more">See the next {Math.min(top, tree.hiddenSetters)} people</button>{top < 30 && <button type="button" className="ap-link" onClick={() => setTop(30)}>Show 30 at a time</button>}</>}</p>
+  ) : null;
+  const phoneEl = <PhoneTree tree={tree} limit={setterLimit} onOpen={onOpen} isCmp={(id) => cmpRole === "booker" && cmpIds.includes(id)} onCmp={(id) => toggleCmpId("booker", id)} />;
+  const pagerEl = <p className="mt-2 flex flex-wrap items-center gap-3 text-sm" data-testid="ap-tree-pager">{skip > 0 && <button type="button" className="ap-link" onClick={() => { setSkip(Math.max(0, skip - top)); setSetterLimit(5); }}>Previous {top} people</button>}<span className="ap-fine">Showing {skip + 1} to {skip + tree.setters.filter((x) => x.id !== "others").length} people, busiest first.</span>{tree.hiddenSetters > 0 && <><button type="button" className="ap-link" onClick={() => { setSkip(skip + top); setSetterLimit(5); }} data-testid="ap-tree-more">See the next {Math.min(top, tree.hiddenSetters)} people</button>{top < 30 && <button type="button" className="ap-link" onClick={() => setTop(30)}>Show 30 at a time</button>}</>}</p>;
+  const compareEl = (cmpOpen || cmpIds.length > 0) && <ComparePanel filters={filters} ids={cmpIds} role={cmpRole} ranked={ranked} onIds={setCmpIds} onRole={(r) => { setCmpRole(r); setCmpIds([]); }} onClear={() => { setCmpIds([]); setCmpOpen(false); }} onOpen={onOpen} />;
+  const fineEl = <p className="ap-fine mt-3">Colours compare each person with your own team&apos;s average for these dates, never with an outside figure. Under {tree.minBookings} bookings a branch stays grey. {go && <button type="button" className="ap-link" onClick={() => go("help")}>How the numbers are worked out</button>}</p>;
+  const leakEl = leak ? (
+    <div className="ap-leak" data-testid="ap-leak">
+      <Sparkles aria-hidden className="size-4 text-[var(--s6-red)]" /><span><b>Biggest leak.</b> {leak.text} About {leak.excess} extra no-shows.</span>
+      {width >= 700 ? <button type="button" className="s6-btn" onClick={() => showLeak(leak.nodeId)} data-testid="ap-leak-show">Show me</button> : <button type="button" className="s6-btn" onClick={() => onOpen({ title: `${setterName(leak.setterId)} to ${closerName(leak.closerId ?? "")}, no-shows`, count: leak.excess, params: { booker: leak.setterId, owner: leak.closerId ?? undefined, outcome: "noshow" } })}>Open them</button>}
+    </div>
+  ) : <div className="ap-leak" data-ok="1" data-testid="ap-leak"><Sparkles aria-hidden className="size-4 text-[var(--s6-green)]" /><span>No single hand-off stands out. Nobody is far above your own no-show rate.</span></div>;
+  const fitKey = layout ? `${layout.width}x${layout.height}:${tree.booked}:${expanded ? "x" : "n"}` : "none";
+  const expandBtn = (
+    <button type="button" ref={openerRef} className="s6-btn ap-canvas-expand" onClick={openExpanded} aria-haspopup="dialog" title="Open the tree full screen" data-testid="ap-expand"><Maximize2 aria-hidden className="size-4" />Expand</button>
+  );
+  const shell = typeof document !== "undefined" ? document.querySelector<HTMLElement>("[data-theme]") : null;
 
-      {(cmpOpen || cmpIds.length > 0) && <ComparePanel filters={filters} ids={cmpIds} role={cmpRole} ranked={ranked} onIds={setCmpIds} onRole={(r) => { setCmpRole(r); setCmpIds([]); }} onClear={() => { setCmpIds([]); setCmpOpen(false); }} onOpen={onOpen} />}
-      <p className="ap-fine mt-3">Colours compare each person with your own team&apos;s average for these dates, never with an outside figure. Under {tree.minBookings} bookings a branch stays grey. {go && <button type="button" className="ap-link" onClick={() => go("help")}>How the numbers are worked out</button>}</p>
+  return (
+    <div data-testid="ap-flow" aria-busy={loading}>
+      {leakEl}
+      {!expanded && <>{barEl}{previewEl}</>}
+      <div ref={wrap} className="w-full">
+        {expanded ? <div className="ap-canvas ap-canvas-inline ap-canvas-ph" data-testid="ap-canvas-ph"><p>The tree is open full screen. Press Esc to come back.</p></div>
+          : layout ? <FlowCanvas ref={canvasRef} className="ap-canvas-inline" contentW={layout.width} contentH={layout.height + 34} fitKey={fitKey} wheelZoom={false} label="Appointment flow tree" extra={expandBtn}>{treeEl}</FlowCanvas>
+          : <><div className="mb-2 flex justify-end">{expandBtn}</div>{phoneEl}</>}
+      </div>
+      {!expanded && pagerEl}
+      {!expanded && compareEl}
+      {fineEl}
+      {expanded && shell && createPortal(
+        <div className={`ap3 ap-full ${shell.classList.contains("dark") ? "dark" : ""}`} data-theme={shell.getAttribute("data-theme") ?? undefined} ref={(el) => { if (el) el.style.cssText += shell.style.cssText; }} data-testid="ap-expanded-root">
+          <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Appointment flow tree, full screen" className="ap-full-box" data-testid="ap-expanded">
+            <header className="ap-full-head">
+              <div className="ap-full-title"><b>Appointment flow</b><span className="ap-fine">{tree.booked} booked, {tree.periodLabel.toLowerCase()}</span>
+                <button type="button" className="s6-btn ap-full-close" onClick={closeExpanded} data-testid="ap-expanded-close"><Minimize2 aria-hidden className="size-4" /><span>Close</span><X aria-hidden className="size-4 ap-x" /></button></div>
+              {barEl}
+              {previewEl}
+            </header>
+            <FlowCanvas ref={canvasRef} className="ap-canvas-full" contentW={layout?.width ?? 1000} contentH={(layout?.height ?? 600) + 34} fitKey={fitKey} wheelZoom globalKeys onViewSize={onOvSize} label="Appointment flow tree">{treeEl}</FlowCanvas>
+            <footer className="ap-full-foot">{pagerEl}{compareEl}</footer>
+          </div>
+        </div>, document.body)}
     </div>
   );
 }
