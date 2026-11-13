@@ -116,7 +116,8 @@ async function healTiers(s: Scope): Promise<void> {
   const db = sql();
   const rows = await db`select g.location_id, g.group_key, g.size, array_agg(c.full_name) names
     from dq_groups g join locations l on l.installation_id = g.installation_id and l.location_id = g.location_id and not l.ignored
-      join cached_contacts c on c.installation_id = g.installation_id and c.location_id = g.location_id and c.contact_id = any(g.contact_ids)
+      cross join lateral unnest(g.contact_ids) as u(cid)
+      join cached_contacts c on c.installation_id = g.installation_id and c.location_id = g.location_id and c.contact_id = u.cid
     where g.installation_id = ${s.inst} and g.tier = 'certain' ${scopeOf(db, "g", s.allowed)} ${locOf(db, "g", s.location)} ${OPEN_SQL(db)}
     group by g.location_id, g.group_key, g.size
     having count(distinct lower(btrim(c.full_name))) filter (where btrim(coalesce(c.full_name, '')) <> '') > 1
