@@ -219,6 +219,8 @@ export const DEFAULT_OFF: ReadonlySet<Feature> = new Set<Feature>([
   "bf_recover",
   "bf_today",
   // Bring your own AI (docs/AI_AGENTS_PLAN.md): ai_byo the connection card, usage panel and gateway; ai_brief the 7 am brief wording; ai_chatgpt the Sign in with ChatGPT entry (stays off until OpenAI approves our app). Default off.
+  // Workflow module (docs/features/WORKFLOW_MODULE.md): the blocks card, the trigger job and the action endpoint. Default off.
+  "wf_module",
   "ai_byo",
   "ai_brief",
   "ai_chatgpt",

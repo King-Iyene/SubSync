@@ -39,6 +39,9 @@ A person in one client account never sees another client account's data. An agen
 | `api/sso` | signature | Shared-secret decryption; role from the payload only; staff refused |
 | `api/webhooks/ghl` | signature | Ed25519 signature on the raw body; duplicate ids dropped; bad signature gets 401 and changes nothing |
 | `api/hooks/zoom` | signature | Zoom signature with a freshness window |
+| `api/hooks/workflow/action` | secret | Shared secret header (constant-time) from the CRM's custom action call; tenant resolved only from the verified body; per-account opt-in; contact must belong to the account |
+| `api/hooks/workflow/subscription` | secret | Same shared secret; target address must be https on the CRM's workflow host |
+| `api/cron/workflow-triggers` | secret | Bearer CRON_SECRET |
 | `api/hooks/fathom/[key]` | token | Long random key per connection plus the provider's signature; unknown key gets 404 |
 | `api/hooks/meeting/[token]` | token | Private address token, stored only as a hash; unknown token gets 404 |
 | `api/integrations/ai/callback` | state | Single-use random state (ten minutes, deleted when read) made by the signed-in administrator; the PKCE verifier stays on the server |
