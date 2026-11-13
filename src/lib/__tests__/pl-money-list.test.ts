@@ -26,7 +26,7 @@ test("the SQL scan and the stored totals state the test pattern once (pipeline3-
 });
 
 test("the company switch: left-out test names follow settings.count_test_deals in both rules (is_test and the value-suspect reason), default off", () => {
-  const sqlSrc = read("lib/analytics/stage-rules-sql.ts"), q = read("lib/analytics/pipeline3-queries.ts"), mig = read("../supabase/migrations/20261231130000_count_test_deals.sql");
+  const sqlSrc = read("lib/analytics/stage-rules-sql.ts"), q = read("lib/analytics/pipeline3-queries.ts"), mig = read("../supabase/migrations/20261231140000_count_test_deals.sql");
   assert.match(sqlSrc, /left join settings sc_cfg on sc_cfg\.installation_id = o\.installation_id/);
   assert.match(sqlSrc, /not coalesce\(sc_cfg\.count_test_deals, false\) and \(coalesce\(o\.name/);
   assert.match(q, /and not coalesce\(sc_cfg\.count_test_deals, false\)\) is_test/);
