@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { Pp3Access, Pp3AccessRow, Pp3Board, Pp3Coaching, Pp3Leaderboard, Pp3Money, Pp3Proof } from "@/lib/analytics/people3-types";
 import { RoleChip } from "../../roles";
 import { PersonActionsSlot, ProofActionsSlot } from "./actions-slot";
+import { CoachNoteCard } from "../ai-team/team-notes";
 import { fixturesOn, usePp } from "./data";
 import type { SecProps } from "./sections";
 import { ago, Find, Initials, Load, minutes, money, NOT_ENOUGH, NO_ACTIVITY, Note, Pager, RECONNECT, ROLE_LABEL, share, Status, subline, useCursor, useDebounced } from "./shared";
@@ -100,6 +101,7 @@ export function Coaching({ filters, accounts, coachUser, viewer }: SecProps & { 
           <section className="pp-stack" aria-label={`Coaching for ${x.person.name}`} data-testid="pp-coach-detail">
             <div className="pp-cell"><Initials p={x.person} /><h2 className="text-lg font-semibold">{x.person.name}</h2>{!self && <button type="button" className="ap-link ml-3" onClick={() => setSel("")}>Back to the list</button>}</div>
             <div className="pp-note-card"><h3 className="pp-h">One thing to work on</h3>{x.oneThing ? <><p className="text-sm"><b>{x.oneThing.line}</b></p><p className="ap-fine">{x.oneThing.evidence}</p></> : <p className="text-sm">{NOT_ENOUGH} history yet to suggest one thing.</p>}</div>
+            <CoachNoteCard userId={x.person.userId} locationId={(filters as { location?: string }).location} />
             {x.moves.length > 0 && <section><h3 className="pp-h mb-1">How their numbers moved</h3><ul className="grid gap-1 text-sm">{x.moves.map((m) => <li key={m.metric}><Status on={m.better === false}>{m.line}</Status></li>)}</ul></section>}
             <section><h3 className="pp-h mb-1">Targets</h3>{x.targets.length ? <ul className="grid gap-1 text-sm">{x.targets.map((t) => <li key={`${t.metric}:${t.locationId}`}>{t.label}</li>)}</ul> : <p className="ap-fine">None set.</p>}</section>
             <section><h3 className="pp-h mb-1">Notes</h3>{x.notes.length ? <ul className="grid gap-2">{x.notes.map((n) => <li key={n.id} className="ap-note"><span className="text-sm">{n.body}</span><br /><span className="ap-fine">{n.authorName}, {n.createdAt.slice(0, 10)}{n.shared ? ", shared with them" : ", private"}</span></li>)}</ul> : <p className="ap-fine">No notes yet.</p>}</section>

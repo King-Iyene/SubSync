@@ -58,8 +58,8 @@ function TrendChart({ title, months, values, fmt, pct, startsOn }: { title: stri
   );
 }
 
-export function ProofReport({ p, brand, intro, sections, nameStaff, sample = false, auto = false, children }: {
-  p: PrPayload; brand: Brand; intro: string | null; sections: Sections; nameStaff: boolean; sample?: boolean; auto?: boolean; children?: ReactNode;
+export function ProofReport({ p, brand, intro, summary = null, sections, nameStaff, sample = false, auto = false, children }: {
+  p: PrPayload; brand: Brand; intro: string | null; /** The summary the agency reviewed and chose to use (AI-written or not). Never an unreviewed draft. */ summary?: string | null; sections: Sections; nameStaff: boolean; sample?: boolean; auto?: boolean; children?: ReactNode;
 }) {
   const prev = monthName(p.prevLabel), noLeads = p.replyMedian.current === null && (p.leads.current ?? 0) < 5;
   const lead = p.leads;
@@ -80,6 +80,7 @@ export function ProofReport({ p, brand, intro, sections, nameStaff, sample = fal
         {children}
         {intro && <p className="pr-intro" data-testid="pr-intro">{intro}</p>}
         <p className="pr-lead" data-testid="pr-headline">{headline(p)}</p>
+        {summary && <section className="pr-summary" aria-label="Summary" data-testid="pr-summary"><p className="pr-kicker">Summary</p><div className="pr-summary-body">{summary}</div></section>}
 
         <section className="pr-sec" aria-label="Leads and reply speed">
           <h2>{sections.reply ? "Leads and reply speed" : "Leads"}</h2>

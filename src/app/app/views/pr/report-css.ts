@@ -17,6 +17,8 @@ export const PR_CSS = `
 .pr-eyebrow { font-size: 0.78rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--pr-accent-text); }
 .pr-doc h1 { font-size: clamp(1.55rem, 5vw, 2.1rem); line-height: 1.15; font-weight: 650; letter-spacing: -0.015em; overflow-wrap: anywhere; }
 .pr-meta { font-size: 0.86rem; color: var(--pr-muted); }
+.pr-summary { margin-top: 1rem; }
+.pr-summary-body { white-space: pre-line; color: var(--pr-fg); line-height: 1.55; }
 .pr-intro { margin-top: 1.25rem; color: var(--pr-fg); white-space: pre-line; }
 .pr-lead { margin-top: 1.25rem; font-size: clamp(1.05rem, 3.4vw, 1.25rem); line-height: 1.45; font-weight: 500; border-left: 3px solid var(--pr-accent); padding: 0.15rem 0 0.15rem 1rem; }
 .pr-sec { margin-top: 2.25rem; break-inside: avoid-page; }

@@ -4,6 +4,7 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { findPublic } from "@/lib/analytics/proof-queries";
+import { publicSummary } from "@/lib/analytics/proof-summary";
 import { defaultSections, MONTH_SHAPE, reportText, samplePayload, SAMPLE_TOKEN, TOKEN_SHAPE, type Brand } from "@/lib/analytics/proof-core";
 import { createLimiter } from "@/lib/rate-limit";
 import { ProofReport, accentVars } from "@/app/app/views/pr/report";
@@ -68,12 +69,12 @@ async function Body({ params, searchParams }: { params: Promise<{ id: string }>;
       </main>
     );
   }
-  const r = found.report;
+  const r = found.report, summary = await publicSummary(id, m);
   const cur = r.payload.month;
   return (
     <main className="pr-print-root" style={{ minHeight: "100vh", background: "var(--pr-bg, #ffffff)", ...accentVars(found.brand.color) }}>
-      <ProofReport p={r.payload} brand={found.brand} intro={r.intro} sections={r.sections} nameStaff={r.nameStaff} auto>
-        <ReportActions text={reportText(r.payload, found.brand, r.intro, r.sections)} />
+      <ProofReport p={r.payload} brand={found.brand} intro={r.intro} summary={summary} sections={r.sections} nameStaff={r.nameStaff} auto>
+        <ReportActions text={reportText(r.payload, found.brand, r.intro, r.sections, summary)} />
         {found.months.length > 1 && (
           <nav className="pr-switch pr-noprint" aria-label="Earlier reports">
             {found.months.map((x) => <a key={x.month} href={`?m=${x.month}`} aria-current={x.month === cur ? "page" : undefined}>{x.label}</a>)}

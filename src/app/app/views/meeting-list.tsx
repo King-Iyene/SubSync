@@ -11,6 +11,7 @@ import { ManualMatch, TranscriptBox } from "./meeting-call-parts";
 import { ApiError, useApiClient, useData } from "../session";
 import { BTN, ChangeFlow, PRIMARY } from "./appointment-actions-ui";
 import { FX_DETAIL, FX_LIST, mnFx } from "./meeting-fixtures";
+import { MeetingAiCard } from "./ai-team/team-notes";
 
 // The Meetings list of Meeting notes (docs/features/MEETINGS_BRIEF.md slices 1 and 2): the person's OWN recorded calls, searchable and filterable, each with where it is, its appointment
 // outcome and whether anybody followed up. A call opens in a side panel (never blank: it shows loading, an error with Try again, or the call). Only the person whose tool recorded a call reads
@@ -257,6 +258,7 @@ function CallBody({ d, fx, reload, onOpenAppointment }: { d: Detail; fx: boolean
         {d.summary ? <p className="mt-1 max-h-72 overflow-y-auto whitespace-pre-wrap break-words text-sm leading-6" data-testid="mn-summary">{d.summary}</p> : <p className="mt-1 text-sm text-muted-foreground">Your meeting tool sent no summary, or you chose not to keep it.</p>}
       </section>
 
+      {!d.id.startsWith("fx") && <MeetingAiCard meetingId={d.id} />}
       <section aria-label="Action items">
         <h3 className="text-sm font-semibold">Action items</h3>
         {d.actionItems.length === 0 ? <p className="mt-1 text-sm text-muted-foreground">None on this call.</p> : (
