@@ -1,11 +1,12 @@
 import { LEAD_JOBS, LEAD_JOB_IDS } from "./jobs-lead";
+import { DEAL_JOB_DEFS } from "./deal-jobs";
 import type { Schema } from "./safety";
 
 // The job registry: every AI job is one entry here. The gateway (gateway.ts) runs any live entry the same way: kill switches, the customer's spend cap, rate limit, idempotency,
 // tool whitelist, post-check and the run log. To add a job: add an entry, write its input builder (a pure function that builds the prompt from that tenant's own rows) and its
 // golden tests, and flip `status` to "live". The planned entries below are NOT built; their full specification is in docs/AI_JOBS_SPEC.md.
 
-export const JOB_IDS = ["brief", "data_review", "data_clean", "ask_data", "dup_adjudicate", "setup_audit", ...LEAD_JOB_IDS] as const;
+export const JOB_IDS = ["brief", "data_review", "data_clean", "ask_data", "dup_adjudicate", "setup_audit", ...LEAD_JOB_IDS, "deal_health", "deal_followup", "deal_winloss", "deal_forecast"] as const;
 export type JobId = (typeof JOB_IDS)[number];
 export const isJobId = (v: unknown): v is JobId => (JOB_IDS as readonly unknown[]).includes(v);
 
@@ -48,6 +49,7 @@ export const JOBS: Record<JobId, JobDef> = {
   dup_adjudicate: { id: "dup_adjudicate", title: "Duplicate adjudication", status: "planned", approval: "approve", privacy: "names_optin", costClass: "large", output: { kind: "json", schema: { type: "object", props: {} }, maxChars: 2000 }, tools: [], maxTokens: 600, maxToolRounds: 2, system: "" },
   ...LEAD_JOBS,
   setup_audit: { id: "setup_audit", title: "Setup auditor", status: "planned", approval: "suggest", privacy: "aggregate", costClass: "large", output: { kind: "json", schema: { type: "object", props: {} }, maxChars: 4000 }, tools: [], maxTokens: 1200, maxToolRounds: 6, system: "" },
+  ...DEAL_JOB_DEFS, // the four deal jobs live in deal-jobs.ts (health, follow-up plan, win/loss review, forecast in words)
 };
 
 export const liveJobs = (): JobDef[] => Object.values(JOBS).filter((j) => j.status === "live");

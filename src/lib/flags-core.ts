@@ -229,6 +229,10 @@ export const DEFAULT_OFF: ReadonlySet<Feature> = new Set<Feature>([
   "ai_call_first",
   "ai_cold_reasons",
   "ai_reply_draft",
+  "ai_deal_health",
+  "ai_deal_followup",
+  "ai_deal_winloss",
+  "ai_deal_forecast",
 ]);
 
 export function resolveFeatures(all: readonly Feature[], overrides: Record<string, boolean>, allOn = false): Record<Feature, boolean> {

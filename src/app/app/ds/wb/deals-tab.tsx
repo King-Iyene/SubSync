@@ -5,6 +5,7 @@ import { useState } from "react";
 import { tagColor } from "@/lib/people/tag-colors";
 import { cleanMoneyInput, defaultPipelineId, fmtMoneyExact, groupThousands, orderDeals, valueChangeWarning } from "@/lib/people/deal-view";
 import { fmtMoney } from "../../ui";
+import { DealHealthSection } from "../../views/pl3/deal-ai";
 import { DealFacts, DealGroup, DealHistory, DealSummary, MoveStage, StageSteps } from "./deals-rich";
 import { INPUT, wbButtons, type Runner } from "./runner";
 import type { WbContext, WbDeal } from "./types";
@@ -41,6 +42,7 @@ function DealCard({ d, ctx, runner, focus, now, contactId, locationId }: { d: Wb
       <p className="mt-1 text-sm text-muted-foreground"><span className={`mr-1.5 inline-block rounded-full border px-2 py-0.5 text-xs font-semibold ${STATUS_CHIP[d.status] ?? STATUS_CHIP.abandoned}`} data-testid="deal-status">{STATUS_WORD[d.status] ?? d.status}</span>{d.stageName && <span style={stageStyle(d.stageName)} className="tag-pill mr-1.5 inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold" data-testid="deal-stage">{d.stageName}</span>}{ctx.pipelines.find((x) => x.id === d.pipelineId)?.name ?? d.pipelineName ?? "Pipeline"} · {STATUS_WORD[d.status] ?? d.status}</p>
       <StageSteps stages={stages} stageId={d.stageId} />
       <DealFacts d={d} ctx={ctx} now={now} />
+      {d.status === "open" && <div className="mt-3"><DealHealthSection locationId={locationId} id={d.id} /></div>}
       <MoveStage d={d} ctx={ctx} runner={runner} />
       {d.status === "open" ? (
         <div className="mt-3 grid grid-cols-2 gap-2">

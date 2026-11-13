@@ -14,6 +14,8 @@ import { json, type AuthContext } from "./auth";
 import { handleAiLead } from "./ai-lead-routes";
 import { LEAD_JOB_FLAG, LEAD_JOB_IDS } from "../ai/jobs-lead";
 import { viewerOf } from "./people3-routes";
+import { handleAiDeals, isDealPart } from "./ai-deal-routes";
+import { DEAL_JOB_FLAG, DEAL_JOB_IDS, isDealJobId } from "../ai/deal-jobs";
 
 // /api/app/ai?part=status|usage|history|sent|brief-note and POST /api/app/ai/act/<models|connect|start|update|rotate|disconnect|preview|brief-note|feedback>.
 // Who the caller is, and which connection they manage, come ONLY from the signed session: the company's own connection (scope '') for a company owner or administrator and for a business
@@ -58,19 +60,22 @@ export async function handleAi(ctx: Ctx, deps: Deps): Promise<Response> {
     try { return await handleAiLead(ctx, { allowed: deps.allowed, locationToken: deps.locationToken, links: deps.links }, on, user); }
     catch (e) { console.error("ai lead", e instanceof Error ? e.message : "failed"); return json({ error: "AI help is unavailable right now. Nothing was changed." }, 503); }
   }
+  // The four deal jobs (health, follow-up plan, win and loss review, forecast in words) answer from their own file; each has its own flag on top of ai_byo.
+  if (isDealPart(part, isAct, ctx.segments[2])) return handleAiDeals(ctx, deps, on, user);
+  const dealFlags = Object.fromEntries(DEAL_JOB_IDS.map((j) => [j, on(DEAL_JOB_FLAG[j])]));
 
   if (!isAct) {
     if (part === "status" || !part) {
       const methods = { key: true, openrouter: true, chatgpt: !chatgpt ? "off" : chatgptKeys() ? "ready" : "coming" };
-      if (!m) return json({ canManage: false, flags: jobFlags(on), killed: killedGlobally() });
+      if (!m) return json({ canManage: false, flags: { ...jobFlags(on), ...dealFlags }, killed: killedGlobally() });
       const [conn, u, own] = await Promise.all([
         publicConnection(ctx.installationId, m.scope), usage(ctx.installationId, m.scope),
         m.level === "company" ? sql()`select count(*)::int n from ai_connections where installation_id = ${ctx.installationId} and location_id <> ''` : Promise.resolve([{ n: 0 }]),
       ]);
       return json({
-        canManage: true, level: m.level, connection: conn, usage: u, killed: killedGlobally(), flags: jobFlags(on), methods,
+        canManage: true, level: m.level, connection: conn, usage: u, killed: killedGlobally(), flags: { ...jobFlags(on), ...dealFlags }, methods,
         providers: PROVIDERS.map((id) => ({ id, name: PROVIDER_NAME[id], ...PROVIDER_HELP[id] })), methodCost: METHOD_COST,
-        jobs: liveJobs().map((j) => ({ id: j.id, title: j.title, approval: j.approval })), accountConnections: Number(own[0]?.n ?? 0),
+        jobs: liveJobs().filter((j) => !isDealJobId(j.id) || on(DEAL_JOB_FLAG[j.id])).map((j) => ({ id: j.id, title: j.title, approval: j.approval })), accountConnections: Number(own[0]?.n ?? 0),
         note: "A ChatGPT or Claude chat subscription cannot be used with a key. Use an API key, OpenRouter, or (when OpenAI approves it) sign in with ChatGPT.",
       });
     }

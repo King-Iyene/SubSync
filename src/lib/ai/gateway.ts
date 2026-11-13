@@ -56,8 +56,6 @@ const MESSAGE: Record<Refusal, string> = {
   cap: "Your monthly AI spend limit is reached, so AI is paused until next month or until you raise the limit.", rate: "Too many AI runs in a minute. Try again shortly.", rejected: "The AI answer did not pass our checks, so it was not shown.", error: "The AI run did not work.",
 };
 const refuse = (code: Refusal, message?: string): JobResult => ({ ok: false, code, message: message ?? MESSAGE[code] });
-/** The numeric VALUES of a JSON answer (numbers written inside strings, like "$4,000", are checked as part of the text instead). */
-const jsonNumbers = (v: unknown): number[] => (typeof v === "number" ? [v] : Array.isArray(v) ? v.flatMap(jsonNumbers) : v && typeof v === "object" ? Object.values(v).flatMap(jsonNumbers) : []);
 export const hashInput = (s: string) => createHash("sha256").update(s).digest("hex");
 const sha = (s: string) => createHash("sha256").update(s).digest("hex");
 export const idempotencyKey = (installationId: string, scope: string, job: string, inputHash: string, nonce = "") => sha(`${installationId}|${scope}|${job}|${inputHash}|${nonce}`);
@@ -138,10 +136,18 @@ export async function runJob(deps: Deps, req: JobRequest): Promise<JobResult> {
   if (def.output.kind === "json") {
     json = parseJsonAnswer(text);
     verdict = json === null ? { ok: false, reason: "The AI answer was not readable." } : validateJson(json, def.output.schema);
-    if (verdict.ok) { const flat = `${stringsOf(json)} ${jsonNumbers(json).join(" ")}`; verdict = checkWords(seenText, flat, def.output.maxChars * 2); }
+    if (verdict.ok) { const flat = `${stringsOf(json)} ${numberLeaves(json).join(" ")}`; verdict = checkWords(seenText, flat, def.output.maxChars * 2); }
   } else verdict = checkWords(seenText, text, def.output.maxChars);
   if (!verdict.ok) { await log("rejected", verdict.reason, text.slice(0, 2000)); return refuse("rejected", verdict.reason); }
   const runId = await log("ok", null, text);
   return { ok: true, runId, text, json, cached: false, tokensIn, tokensOut, costUsd: estimateCostUsd(conn.model, { tokensIn, tokensOut }), scope: conn.scope, model: conn.model, provider: conn.provider };
 }
 
+
+/** The numeric values (not the digits inside text) of a JSON answer: they go through the number check too. Text is checked as text, so "$12,000" is one number, not 12 and 0. */
+function numberLeaves(v: unknown): number[] {
+  if (typeof v === "number") return [v];
+  if (Array.isArray(v)) return v.flatMap(numberLeaves);
+  if (v && typeof v === "object") return Object.values(v).flatMap(numberLeaves);
+  return [];
+}

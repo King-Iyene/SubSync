@@ -10,6 +10,7 @@ import { usePl, type PlFilters } from "./data";
 import { days, money, moneyShort, pct } from "./format";
 import { leftOutSentence } from "./pipe-list";
 import { Chip, DealList } from "./parts";
+import { ForecastWords, FollowUpPlan, WinLossReview } from "./deal-ai";
 import { TrustBasis } from "../td3/trust-basis";
 import type { PlDeal } from "@/lib/analytics/pipeline3-types-interim";
 
@@ -65,6 +66,7 @@ export function NeedsAttention(p: SectionProps) {
   return (
     <div data-testid="pl-needs">
       <p className="ap-fine mb-2">Deals that sat in a step longer than that step normally takes in your own account. Worst first. Open one to move it, change the owner, or close it out.</p>
+      <FollowUpPlan filters={p.filters} />
       <DealList part="needs-attention" filters={p.filters} onOpen={p.onOpen} activeId={p.activeId} showAccount={p.showAccount} empty="Nothing is stuck right now" testId="pl-needs-list" selectable />
     </div>
   );
@@ -77,6 +79,7 @@ export function WonLost(p: SectionProps) {
       {(d) => (
         <div data-testid="pl-wonlost">
           <Dates />
+          <WinLossReview filters={p.filters} />
           <div className="ap-kpis">
             <button type="button" className="ap-kpi" data-tone="green" onClick={() => p.onDrill({ title: "Won deals", count: d.won, extra: { status: "won", expect: d.won } })}><span className="ap-kpi-n">{d.won}</span><span className="ap-kpi-l">Won, {moneyShort(d.wonCents)}</span></button>
             <button type="button" className="ap-kpi" data-tone="red" onClick={() => p.onDrill({ title: "Lost deals", count: d.lost, extra: { status: "lost", expect: d.lost } })}><span className="ap-kpi-n">{d.lost}</span><span className="ap-kpi-l">Lost, {moneyShort(d.lostCents)}</span></button>
@@ -97,6 +100,7 @@ export function Forecast({ filters }: SectionProps) {
     <Gate r={r} label="Loading the forecast...">
       {(d) => (
         <div data-testid="pl-forecast">
+          <ForecastWords filters={filters} />
           {d.midCents === null || d.lowCents === null || d.highCents === null ? (
             <section className="s6-card ap-hero"><p className="ap-sentence" data-testid="pl-forecast-none">Not enough closed deals to forecast honestly yet.</p><p className="ap-fine">You have {d.closedDeals} closed deals in these dates and a forecast needs {d.minDeals}. Until then, SubSync shows what is in the pipe and does not guess.</p></section>
           ) : (
