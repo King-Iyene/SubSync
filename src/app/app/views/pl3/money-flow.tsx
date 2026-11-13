@@ -3,7 +3,7 @@
 import { Pause, Play, RotateCcw, StepBack, StepForward } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { riverLayout } from "@/lib/design/river-layout";
-import { buildReplayFrames, nextFrame, REPLAY_SPEEDS, replayHasMovement } from "@/lib/design/river-replay";
+import { buildReplayFrames, pressPlay, REPLAY_SPEEDS, replayHasMovement, tickReplay } from "@/lib/design/river-replay";
 import { sampleFlowPaths, sampleFunnelPaths, sampleRiver } from "@/lib/design/river-sample";
 import { dealsText, lostTotal as lostAllOf, pathSteps, pathsAllNoValue, type FlowPaths, type PathSeg, type PathStep } from "@/lib/design/flow-paths";
 import type { Measure } from "@/lib/design/funnel-flow-layout";
@@ -60,7 +60,7 @@ export function MoneyFlow({ filters, onPick: realPick }: { filters: PlFilters; o
   const onPick = sample ? () => {} : realPick;
   const wrap = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(1000), [person, setPerson] = useState(""), [settle, setSettle] = useState(true), [run, setRun] = useState(0);
-  const [frame, setFrame] = useState<number | null>(null), [playing, setPlaying] = useState(false), [speed, setSpeed] = useState<string>("1"), [noMove, setNoMove] = useState(false);
+  const [frame, setFrame] = useState<number | null>(null), [playing, setPlaying] = useState(false), [speed, setSpeed] = useState<string>("1"), [, setNoMove] = useState(false);
   const reduced = useReducedMotion();
   // River or Funnel flow: the choice is remembered on this device.
   const [flowView, setFlowViewState] = useState<FlowView>("funnel"), [fm, setFm] = useState<Measure | null>(null);
@@ -92,7 +92,7 @@ export function MoneyFlow({ filters, onPick: realPick }: { filters: PlFilters; o
   // Play: one day at a time, slider moving with it. Reduced motion never auto-plays; the person steps through with the buttons.
   useEffect(() => {
     if (!playing || !frames || reduced) return;
-    const t = setTimeout(() => { const nx = nextFrame(frame ?? 0, frames.length); setFrame(nx.index); if (nx.done) setPlaying(false); }, ms);
+    const t = setTimeout(() => { const nx = tickReplay({ frame, playing: true }, frames.length); setFrame(nx.frame); if (!nx.playing) setPlaying(false); }, ms);
     return () => clearTimeout(t);
   }, [playing, frame, frames, ms, reduced]);
 
@@ -145,12 +145,14 @@ export function MoneyFlow({ filters, onPick: realPick }: { filters: PlFilters; o
   const openLine = view.stages.filter((s) => s.count + (s.noValueCount ?? 0) > 0).map((s) => `${s.name} ${(s.count + (counts ? s.noValueCount ?? 0 : 0)).toLocaleString("en-US")} ${(s.count + (counts ? s.noValueCount ?? 0 : 0)) === 1 ? "deal" : "deals"}`).join(" · ");
   const why = data.replay ? "No deal changed step in these dates." : "We have not recorded enough step changes yet to replay these dates.";
 
+  const replayWhy = person ? "Pick everyone's deals to replay: step history is recorded for the whole pipeline." : data.replay ? "No deal was created, moved or closed in these dates, so there is nothing to replay." : "Replay data is not available for these dates.";
+  const rebuilt = replayOn && data.replayInfo?.source === "deals";
+  const rebuiltSince = data.replayInfo?.since ? new Date(data.replayInfo.since).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : null;
   const play = () => {
-    if (!frames || person) { setNoMove(true); return; }
+    if (!frames || person) return;
     setNoMove(false);
-    if (playing) { setPlaying(false); return; }
-    if (reduced) { setFrame((f) => (f === null ? 0 : Math.min(frames.length - 1, f + 1))); return; }
-    setFrame((f) => (f === null || f >= frames.length - 1 ? 0 : f)); setPlaying(true); setSettle(false);
+    const nx = pressPlay({ frame, playing }, frames.length, reduced);
+    setFrame(nx.frame); setPlaying(nx.playing); if (nx.playing) setSettle(false);
   };
   const step = (dir: 1 | -1) => { if (!frames) return; setPlaying(false); setFrame((f) => Math.max(0, Math.min(frames.length - 1, (f ?? frames.length - 1) + dir))); };
   const backToNow = () => { setFrame(null); setPlaying(false); setRun((r) => r + 1); setSettle(true); };
@@ -177,8 +179,8 @@ export function MoneyFlow({ filters, onPick: realPick }: { filters: PlFilters; o
           <option value="">Everyone&apos;s deals</option>{data.people.map((p) => <option key={p.id} value={p.id}>{p.name}&apos;s deals</option>)}
         </select>
         {<div className="pl-replay" data-testid="pl-replay" role="group" aria-label="Replay how deals moved, day by day">
-          <button type="button" className="s6-btn" onClick={play} aria-label={playing ? "Pause the replay" : reduced && cur ? "Next day" : "Replay the flow"} data-testid="pl-play">
-            {playing ? <Pause aria-hidden className="size-4" /> : cur ? <Play aria-hidden className="size-4" /> : <RotateCcw aria-hidden className="size-4" />}{playing ? "Pause" : reduced && cur ? "Next day" : cur && frame !== null && frame < total - 1 ? "Play" : "Replay"}
+          <button type="button" className="s6-btn" onClick={play} disabled={!replayOn} title={replayOn ? undefined : replayWhy} aria-label={playing ? "Pause the replay" : reduced && cur ? "Next day" : "Replay the flow"} data-testid="pl-play">
+            {playing ? <Pause aria-hidden className="size-4" /> : cur ? <Play aria-hidden className="size-4" /> : <RotateCcw aria-hidden className="size-4" />}{playing ? "Pause" : reduced && cur ? "Next day" : cur && frame !== null && frame < total - 1 ? "Resume" : "Replay"}
           </button>
           {replayOn && total > 1 && <>
             <button type="button" className="s6-btn" onClick={() => step(-1)} aria-label="Back one day" data-testid="pl-step-back"><StepBack aria-hidden className="size-4" /></button>
@@ -190,9 +192,10 @@ export function MoneyFlow({ filters, onPick: realPick }: { filters: PlFilters; o
           </>}
         </div>}
       </div>
-      {noMove && !frames && (
-        <p className="ap-fine mb-2 rv-note" role="status" data-testid="pl-nomove">{person ? "Pick everyone's deals to replay: step history is recorded for the whole pipeline." : `Nothing real to replay: ${why.toLowerCase()}`} {flowView === "funnel" ? "The dots keep flowing gently, but nothing is replayed." : !person && <button type="button" className="ap-link" onClick={startSample} data-testid="pl-sample-on-replay">Play a sample replay</button>}</p>
+      {!replayOn && !sample && (
+        <p className="ap-fine mb-2 rv-note" role="status" data-testid="pl-nomove">Replay is off: {replayWhy} {flowView === "funnel" ? "The dots keep flowing gently." : !person && <button type="button" className="ap-link" onClick={startSample} data-testid="pl-sample-on-replay">Play a sample replay</button>}</p>
       )}
+      {rebuilt && <p className="ap-fine mb-2 rv-note" data-testid="pl-rebuilt">Rebuilt from deal dates; {rebuiltSince ? `stage-by-stage history started on ${rebuiltSince}` : "stage-by-stage history has not started yet"}.</p>}
       {cur && flowView === "river" && <p className="ap-fine mb-2 rv-daysum" aria-live="polite" data-testid="pl-daysum">{summary}</p>}
       {quiet && flowView === "river" && (
         <div className="rv-quiet" data-testid="pl-quiet">
