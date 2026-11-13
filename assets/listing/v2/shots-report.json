@@ -1,0 +1,86 @@
+[
+ {
+  "file": "01-today.png",
+  "extra": false,
+  "size": "1600x900",
+  "kB": 316,
+  "purpose": "Hero: Today with the money cards, accounts to save and win-back list across all client accounts"
+ },
+ {
+  "file": "02-speed-to-lead.png",
+  "extra": false,
+  "size": "1600x900",
+  "kB": 366,
+  "purpose": "Speed to lead race and pace, who to call next"
+ },
+ {
+  "file": "03-appointments.png",
+  "extra": false,
+  "size": "1600x900",
+  "kB": 327,
+  "purpose": "Appointments overview: show rate, no-show recovery, flow"
+ },
+ {
+  "file": "04-clients.png",
+  "extra": false,
+  "size": "1600x900",
+  "kB": 305,
+  "purpose": "Clients: health and plans across every account"
+ },
+ {
+  "file": "05-money.png",
+  "extra": false,
+  "size": "1600x900",
+  "kB": 260,
+  "purpose": "Money: failed payments, recovered money, payouts and commissions"
+ },
+ {
+  "file": "06-find-a-lead.png",
+  "extra": false,
+  "size": "1600x900",
+  "kB": 312,
+  "purpose": "Find a lead: search across all client accounts, hot leads gone quiet, call lists"
+ },
+ {
+  "file": "07-account-audit.png",
+  "extra": false,
+  "size": "1600x900",
+  "kB": 348,
+  "purpose": "Account audit with Send this audit to a client"
+ },
+ {
+  "file": "08-team.png",
+  "extra": false,
+  "size": "1600x900",
+  "kB": 272,
+  "purpose": "Team scoreboard across accounts"
+ },
+ {
+  "file": "09-cleanup-duplicates.png",
+  "extra": false,
+  "size": "1600x900",
+  "kB": 316,
+  "purpose": "Clean-up: duplicate groups (Certain, Likely, Possible) and the safe merge preview"
+ },
+ {
+  "file": "10-meeting-notes.png",
+  "extra": false,
+  "size": "1600x900",
+  "kB": 334,
+  "purpose": "Meeting notes: calls matched to contacts and appointments"
+ },
+ {
+  "file": "11-pipeline-funnel.png",
+  "extra": false,
+  "size": "1600x900",
+  "kB": 429,
+  "purpose": "Pipeline funnel flow with the biggest-leak callout and dollar values"
+ },
+ {
+  "file": "12-pipeline-river.png",
+  "extra": false,
+  "size": "1600x900",
+  "kB": 389,
+  "purpose": "Pipeline cash-flow river with dollars"
+ }
+]

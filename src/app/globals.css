@@ -425,3 +425,6 @@ html { scroll-padding-top: 5rem; }
   --color-rose-900: oklch(41% 0.064 10.272);
   --color-rose-950: oklch(27.1% 0.042 12.094);
 }
+
+/* Screenshot mode (listing images, demo only): hide the live/sample badge and any demo or sample tag. Set by src/lib/shots.ts. */
+html[data-shots] [data-testid="live-badge"], html[data-shots] [data-shots-hide] { display: none !important; }
