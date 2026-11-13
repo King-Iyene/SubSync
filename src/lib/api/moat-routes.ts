@@ -7,6 +7,7 @@ import { createProofPage, listProofPages, PROOF_ID, revokeProofPage } from "../a
 import { recordAlertFeedback, recordTargetChange } from "../analytics/moat-record";
 import { isVertical, monthWindow, VERTICALS, VERTICAL_LABEL } from "../analytics/moat-core";
 import { setAccountTarget } from "../analytics/speed-v2-queries";
+import { isRealDay, windowAtMs } from "../design/zone";
 import { json, type AuthContext } from "./auth";
 
 // The moat and proof endpoints (round 3, slice D and E): GET /api/app/moat?part=receipt|curve|scorecards|benchmark|channels|clock|setup|proofs and the small writes
@@ -30,6 +31,9 @@ const int = (v: string | null, d: number) => { const n = Number(v); return v !==
 
 const on = (ctx: Ctx, f: Feature) => ctx.entitlements.features[f] === true && !ctx.entitlements.locked.includes(f);
 const off = () => json({ error: "This is not switched on for your account" }, 404);
+
+/** The date bar's window (from, to and optional hours, Lagos time) when the screen sent one; null means the card's own fixed length. */
+const barWindow = (sp: URLSearchParams) => { const f = sp.get("from"), t = sp.get("to"); return isRealDay(f) && isRealDay(t) ? windowAtMs(f, t, sp.get("fromTime"), sp.get("toTime")) : null; };
 
 function narrowed(allowed: string[] | null, id: string | null): string[] | null | "none" {
   if (!id) return allowed;
@@ -58,7 +62,7 @@ export async function handleMoat(ctx: Ctx, h: MoatHelpers): Promise<Response> {
       if (staff && !meId) return json({ rows: [], total: 0, page: 0, pages: 1, scope: "self" });
       const out = await scorecards({
         installationId: ctx.installationId, allowed: scope, onlyUserId: staff ? meId : null, countAutomated: st.countAutomatedTouches,
-        openHour: st.speedOpenHour, closeHour: st.speedCloseHour, days: int(sp.get("days"), 30), page: int(sp.get("page"), 0), size: int(sp.get("size"), 20),
+        openHour: st.speedOpenHour, closeHour: st.speedCloseHour, days: int(sp.get("days"), 30), win: barWindow(sp), page: int(sp.get("page"), 0), size: int(sp.get("size"), 20),
       });
       return json({ ...out, scope: staff ? "self" : ctx.kind === "client" || ctx.kind === "business" ? "team" : "all" });
     }
@@ -85,7 +89,7 @@ export async function handleMoat(ctx: Ctx, h: MoatHelpers): Promise<Response> {
     }
     if (part === "channels") {
       if (!on(ctx, "inbox_channel_mix")) return off();
-      return json(await channelMix({ installationId: ctx.installationId, allowed: scope, days: int(sp.get("days"), 30) }));
+      return json(await channelMix({ installationId: ctx.installationId, allowed: scope, days: int(sp.get("days"), 30), win: barWindow(sp) }));
     }
     if (part === "clock") {
       if (!on(ctx, "inbox_wait_clock")) return off();

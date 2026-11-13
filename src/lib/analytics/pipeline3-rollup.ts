@@ -88,16 +88,16 @@ export async function refreshRollup(inst: string, o: { locations?: string[] | nu
 }
 
 /** Everything the Overview's headline row needs, from the rollup (the same names the live query returns). */
-export async function rollupHeadline(s: Scope, f: { location?: string | null; pipeline?: string | null; d30: Date }) {
+export async function rollupHeadline(s: Scope, f: { location?: string | null; pipeline?: string | null; d30: Date; to?: Date | null }) {
   const db = sql();
   const [t] = await db`
     select coalesce(sum(r.n) filter (where ${R.open(db)}), 0)::int open_n, coalesce(sum(r.value) filter (where ${R.open(db)}), 0)::float8 open_v,
       coalesce(sum(r.n) filter (where ${R.stale(db)}), 0)::int stale_n, coalesce(sum(r.value) filter (where ${R.stale(db)}), 0)::float8 stale_v,
-      coalesce(sum(r.n) filter (where ${R.closedIn(db, "won", f.d30, null)}), 0)::int won_n, coalesce(sum(r.value) filter (where ${R.closedIn(db, "won", f.d30, null)}), 0)::float8 won_v,
-      coalesce(sum(r.n) filter (where ${R.closedIn(db, "lost", f.d30, null)}), 0)::int lost_n, coalesce(sum(r.value) filter (where ${R.closedIn(db, "lost", f.d30, null)}), 0)::float8 lost_v,
+      coalesce(sum(r.n) filter (where ${R.closedIn(db, "won", f.d30, f.to ?? null)}), 0)::int won_n, coalesce(sum(r.value) filter (where ${R.closedIn(db, "won", f.d30, f.to ?? null)}), 0)::float8 won_v,
+      coalesce(sum(r.n) filter (where ${R.closedIn(db, "lost", f.d30, f.to ?? null)}), 0)::int lost_n, coalesce(sum(r.value) filter (where ${R.closedIn(db, "lost", f.d30, f.to ?? null)}), 0)::float8 lost_v,
       coalesce(sum(r.n) filter (where ${R.noOwner(db)}), 0)::int no_owner, coalesce(sum(r.n) filter (where ${R.noValue(db)}), 0)::int no_value,
       coalesce(sum(r.n) filter (where r.is_test and r.status = 'open' and not r.oos), 0)::int test, coalesce(sum(r.n) filter (where r.outlier), 0)::int outliers,
-      coalesce(sum(r.n) filter (where r.status = 'lost' and not r.is_test and r.closed_day >= ${rollupFromDay(f.d30.getTime())}::date and r.lost_reason = ''), 0)::int no_reason,
+      coalesce(sum(r.n) filter (where r.status = 'lost' and not r.is_test and r.closed_day >= ${rollupFromDay(f.d30.getTime())}::date ${f.to ? db`and r.closed_day < ${rollupUntilDay(f.to.getTime())}::date` : db``} and r.lost_reason = ''), 0)::int no_reason,
       coalesce(sum(r.n) filter (where r.status = 'open' and not r.oos), 0)::int open_all, coalesce(sum(r.n) filter (where ${R.flag(db)}), 0)::int flagged,
       coalesce(sum(r.n) filter (where r.big_untouched), 0)::int big_n, coalesce(sum(r.value) filter (where r.big_untouched), 0)::float8 big_v
     from pipeline_rollup r where r.installation_id = ${s.inst} and r.location_id in (${accountScope(db, s, f.location)}) ${pipeFilter(db, s, f.pipeline)}`;

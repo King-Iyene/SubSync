@@ -36,7 +36,7 @@ type Cov = {
 };
 
 export function CoverageTab({ multi }: { multi: boolean }) {
-  const { query } = useSpeedFilter();
+  const { query, range } = useSpeedFilter();
   const { data: d, error, reload } = useData<Cov>(`speed?part=coverage${query}`);
   const actions = useLeadActions(d?.missed.rows ?? []);
   if (error) return <ErrorState error={error} onRetry={reload} />;
@@ -55,7 +55,7 @@ export function CoverageTab({ multi }: { multi: boolean }) {
       </Card>
 
       <Card id="lost-night" title="Lost at night and at weekends" tip="Leads that arrived outside 8 to 18 on a weekday, or at a weekend, and had no person reply within 12 hours. The estimate uses each account's own average deal and win rate, only with 20 closed deals.">
-        <p className="t-display" data-testid="night-headline">{n.lost === 0 ? "No lead went unanswered overnight in the last 30 days." : `${n.lost} after-hours ${n.lost === 1 ? "lead" : "leads"} waited over 12 hours for a person${n.countedDollars > 0 ? `: ${usd(n.countedDollars)} of open deals (counted)` : ""}.`}</p>
+        <p className="t-display" data-testid="night-headline">{n.lost === 0 ? `No lead went unanswered overnight (${range?.label ?? "last 30 days"}).` : `${n.lost} after-hours ${n.lost === 1 ? "lead" : "leads"} waited over 12 hours for a person${n.countedDollars > 0 ? `: ${usd(n.countedDollars)} of open deals (counted)` : ""}.`}</p>
         {n.estimate && <p className="t-small t-quiet mt-1" data-testid="night-estimate">Estimated cost of that gap: <strong className="text-[var(--t-ink)]">{n.estimate.line}</strong> (estimate).</p>}
         {n.share !== null && <p className="t-small t-quiet">{n.share}% of {n.afterLeads} after-hours leads were answered within 12 hours.</p>}
         {n.hoursToCover.length > 0 && <p className="t-small mt-2" data-testid="hours-to-cover"><span className="font-medium">Hours to cover:</span> {n.hoursToCover.map((h) => `${DAY_NAMES[h.dow]} ${hourWords(h.hour)} (${h.leads})`).join(", ")}.</p>}

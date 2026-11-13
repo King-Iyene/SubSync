@@ -10,6 +10,9 @@ import {
 
 type Db = ReturnType<typeof sql>;
 const scopeOf = (db: Db, allowed: string[] | null, col = "location_id") => (allowed === null ? db`true` : db`${db.unsafe(col)} = any(${pgTextArray(allowed)}::text[])`);
+/** The leads counted: the date bar's window when the screen sent one (whole Lagos days, [from, next midnight)), otherwise the last `days` days. */
+export type LeadWin = { fromMs: number; toMs: number } | null;
+const leadIn = (db: Db, win: LeadWin | undefined, days: number) => (win ? db`t.lead_at >= ${new Date(win.fromMs).toISOString()}::timestamptz and t.lead_at < ${new Date(win.toMs).toISOString()}::timestamptz` : db`t.lead_at > now() - make_interval(days => ${days})`);
 const num = (v: unknown) => (v === null || v === undefined ? 0 : Number(v));
 
 /** Booking rate, close rate and deal value inputs, per account: leads of the last 90 days, those that booked, deals closed in the last year. */
@@ -131,7 +134,7 @@ export async function speedCurve(i: { installationId: string; allowed: string[] 
 export type ScorecardScope = { allowed: string[] | null; onlyUserId: string | null; countAutomated: boolean; openHour: number; closeHour: number };
 
 /** One card per person who replied to leads in the last `days` days. A client's own staff pass `onlyUserId` (themselves). */
-export async function scorecards(i: { installationId: string } & ScorecardScope & { days: number; page: number; size: number }) {
+export async function scorecards(i: { installationId: string } & ScorecardScope & { days: number; win?: LeadWin; page: number; size: number }) {
   const db = sql();
   if (i.allowed && i.allowed.length === 0) return { rows: [] as Scorecard[], total: 0, page: 0, pages: 1 };
   const days = Math.min(90, Math.max(7, Math.floor(i.days)));
@@ -154,14 +157,14 @@ export async function scorecards(i: { installationId: string } & ScorecardScope 
         or extract(hour from t.lead_at at time zone coalesce(nullif(l.timezone, ''), 'UTC')) < ${i.openHour}
         or extract(hour from t.lead_at at time zone coalesce(nullif(l.timezone, ''), 'UTC')) >= ${i.closeHour}) after_hours
       from lead_touches t join locations l on l.installation_id = t.installation_id and l.location_id = t.location_id
-      where t.installation_id = ${i.installationId} and t.excluded is null and t.lead_at > now() - make_interval(days => ${days}) and ${scopeOf(db, i.allowed, "t.location_id")}
+      where t.installation_id = ${i.installationId} and t.excluded is null and ${leadIn(db, i.win, days)} and ${scopeOf(db, i.allowed, "t.location_id")}
     ) t
     where ${reply} is not null and t.touch_user_id is not null and ${mine}
     group by t.touch_user_id`;
   const owned = await db`
     select c.assigned_to user_id, count(*)::int owned, count(*) filter (where t.human_touch_at is null)::int unanswered
     from lead_touches t join cached_contacts c on c.installation_id = t.installation_id and c.location_id = t.location_id and c.contact_id = t.contact_id
-    where t.installation_id = ${i.installationId} and t.excluded is null and t.lead_at > now() - make_interval(days => ${days}) and c.assigned_to is not null
+    where t.installation_id = ${i.installationId} and t.excluded is null and ${leadIn(db, i.win, days)} and c.assigned_to is not null
       and ${scopeOf(db, i.allowed, "t.location_id")} ${i.onlyUserId ? db`and c.assigned_to = ${i.onlyUserId}` : db``}
     group by c.assigned_to`;
   const names = await db`select user_id, max(name) name from location_users where installation_id = ${i.installationId} and ${scopeOf(db, i.allowed, "location_id")} group by user_id`;
@@ -187,7 +190,7 @@ export async function scorecards(i: { installationId: string } & ScorecardScope 
 
 // ---------------------------------------------------------------- E4. Channel mix
 
-export async function channelMix(i: { installationId: string; allowed: string[] | null; days: number }) {
+export async function channelMix(i: { installationId: string; allowed: string[] | null; days: number; win?: LeadWin }) {
   const db = sql();
   if (i.allowed && i.allowed.length === 0) return buildChannelMix([]);
   const days = Math.min(90, Math.max(7, Math.floor(i.days)));
@@ -197,7 +200,7 @@ export async function channelMix(i: { installationId: string; allowed: string[] 
     from lead_touches t
     left join lateral (select te.channel from touch_events te where te.installation_id = t.installation_id and te.location_id = t.location_id and te.contact_id = t.contact_id
       and te.conversation_id = t.conversation_id and te.direction = 'inbound' order by te.at asc limit 1) ch on true
-    where t.installation_id = ${i.installationId} and t.excluded is null and t.lead_at > now() - make_interval(days => ${days}) and ${scopeOf(db, i.allowed, "t.location_id")}
+    where t.installation_id = ${i.installationId} and t.excluded is null and ${leadIn(db, i.win, days)} and ${scopeOf(db, i.allowed, "t.location_id")}
     group by coalesce(ch.channel, 'other')`;
   return buildChannelMix(rows.map((r) => ({ channel: r.channel as string, leads: num(r.leads), replied: num(r.replied), medianMinutes: r.median_min === null ? null : Math.round(Number(r.median_min)) }) satisfies ChannelRow));
 }

@@ -27,7 +27,7 @@ export async function pipelineCards(s: CardScope, o: CardOpts): Promise<Pl3Cards
         coalesce(sum(r.n) filter (where ${R.closedIn(db, "lost", o.from, o.to)}), 0)::int lost_n, coalesce(sum(r.value) filter (where ${R.closedIn(db, "lost", o.from, o.to)}), 0)::float8 lost_v,
         coalesce(sum(r.n) filter (where ${R.noOwner(db)}), 0)::int no_owner_n, coalesce(sum(r.n) filter (where ${R.noValue(db)}), 0)::int zero_n,
         coalesce(sum(r.n) filter (where r.outlier), 0)::int out_n, coalesce(sum(r.value) filter (where r.outlier), 0)::float8 out_v, null::text any_name,
-        coalesce(sum(r.n) filter (where r.is_test and r.status = 'open' and not r.oos), 0)::int test_n, coalesce(sum(r.value) filter (where r.is_test and r.status = 'open' and not r.oos), 0)::float8 test_v
+        coalesce(sum(r.n) filter (where r.is_test and r.status = 'open' and not r.oos), 0)::int test_n, coalesce(sum(r.value) filter (where r.is_test and r.status = 'open' and not r.oos), 0)::float8 test_v, coalesce(sum(r.n) filter (where r.status = 'open' and not r.oos), 0)::int all_open_n
       from pipeline_rollup r where r.installation_id = ${s.inst} and r.location_id in (select location_id from scope) group by 1, 2, 3
     )` : db`sg as (
       select d.location_id, d.pipeline_id, d.stage_id,
@@ -37,19 +37,19 @@ export async function pipelineCards(s: CardScope, o: CardOpts): Promise<Pl3Cards
         count(*) filter (where d.status = 'lost' and ${win})::int lost_n, coalesce(sum(d.value) filter (where d.status = 'lost' and ${win}), 0)::float8 lost_v,
         count(*) filter (where ${P_NO_OWNER(db)})::int no_owner_n, count(*) filter (where ${P_NO_VALUE(db)})::int zero_n,
         count(*) filter (where d.outlier)::int out_n, coalesce(sum(d.value) filter (where d.outlier), 0)::float8 out_v, max(d.pipeline_name) any_name,
-        count(*) filter (where d.is_test and d.status = 'open' and not d.out_of_scope)::int test_n, coalesce(sum(d.value) filter (where d.is_test and d.status = 'open' and not d.out_of_scope), 0)::float8 test_v
+        count(*) filter (where d.is_test and d.status = 'open' and not d.out_of_scope)::int test_n, coalesce(sum(d.value) filter (where d.is_test and d.status = 'open' and not d.out_of_scope), 0)::float8 test_v, count(*) filter (where d.status = 'open' and not d.out_of_scope)::int all_open_n
       from d group by 1, 2, 3
     )`},
     agg as (
       select location_id, pipeline_id, max(any_name) any_name, sum(open_n)::int open_n, sum(open_v)::float8 open_v, sum(stale_n)::int stale_n, sum(won_n)::int won_n, sum(won_v)::float8 won_v,
-        sum(lost_n)::int lost_n, sum(lost_v)::float8 lost_v, sum(no_owner_n)::int no_owner_n, sum(zero_n)::int zero_n, sum(out_n)::int out_n, sum(out_v)::float8 out_v, sum(test_n)::int test_n, sum(test_v)::float8 test_v
+        sum(lost_n)::int lost_n, sum(lost_v)::float8 lost_v, sum(no_owner_n)::int no_owner_n, sum(zero_n)::int zero_n, sum(out_n)::int out_n, sum(out_v)::float8 out_v, sum(test_n)::int test_n, sum(test_v)::float8 test_v, sum(all_open_n)::int all_open_n
       from sg group by 1, 2
     ),
     keys as (select location_id, pipeline_id from agg union select p.location_id, p.pipeline_id from pipelines p join scope l on l.location_id = p.location_id where p.installation_id = ${s.inst}),
     cards as (
       select k.location_id, k.pipeline_id, l.name account_name, coalesce(nullif(btrim(p.name), ''), nullif(btrim(a.any_name), ''), 'Pipeline') name,
         coalesce(a.open_n, 0) open_n, round(coalesce(a.open_v, 0)::numeric, 2)::float8 open_v, coalesce(a.won_n, 0) won_n, coalesce(a.won_v, 0) won_v, coalesce(a.lost_n, 0) lost_n, coalesce(a.lost_v, 0) lost_v,
-        coalesce(a.stale_n, 0) stale_n, coalesce(a.no_owner_n, 0) no_owner_n, coalesce(a.zero_n, 0) zero_n, coalesce(a.out_n, 0) out_n, coalesce(a.out_v, 0) out_v, coalesce(a.test_n, 0) test_n, coalesce(a.test_v, 0) test_v,
+        coalesce(a.stale_n, 0) stale_n, coalesce(a.no_owner_n, 0) no_owner_n, coalesce(a.zero_n, 0) zero_n, coalesce(a.out_n, 0) out_n, coalesce(a.out_v, 0) out_v, coalesce(a.test_n, 0) test_n, coalesce(a.test_v, 0) test_v, coalesce(a.all_open_n, 0) all_open_n,
         (coalesce(a.open_n, 0) + coalesce(a.no_owner_n, 0) + coalesce(a.zero_n, 0) + coalesce(a.won_n, 0) + coalesce(a.lost_n, 0) + coalesce(a.out_n, 0) + coalesce(a.test_n, 0)) = 0 is_empty
       from keys k join scope l on l.location_id = k.location_id
       left join agg a on a.location_id = k.location_id and a.pipeline_id is not distinct from k.pipeline_id
@@ -60,7 +60,7 @@ export async function pipelineCards(s: CardScope, o: CardOpts): Promise<Pl3Cards
     tot as (
       select count(*) filter (where not is_empty)::int shown, count(*) filter (where is_empty)::int empty_n, coalesce(sum(open_v), 0)::float8 open_v, coalesce(sum(won_v), 0)::float8 won_v,
         coalesce(sum(lost_v), 0)::float8 lost_v, coalesce(sum(open_n), 0)::int open_n, coalesce(sum(won_n), 0)::int won_n, coalesce(sum(lost_n), 0)::int lost_n,
-        coalesce(sum(stale_n), 0)::int stale_n, coalesce(sum(no_owner_n), 0)::int no_owner_n, coalesce(sum(test_n), 0)::int test_n, coalesce(sum(test_v), 0)::float8 test_v, count(*)::int all_n
+        coalesce(sum(stale_n), 0)::int stale_n, coalesce(sum(no_owner_n), 0)::int no_owner_n, coalesce(sum(test_n), 0)::int test_n, coalesce(sum(test_v), 0)::float8 test_v, coalesce(sum(all_open_n), 0)::int all_open_n, count(*)::int all_n
       from found
     ),
     pg as (
@@ -95,13 +95,13 @@ export async function pipelineCards(s: CardScope, o: CardOpts): Promise<Pl3Cards
   }
   const cards: PipeCard[] = page.map((c) => ({
     locationId: c.location_id as string, pipelineId: c.pipeline_id as string, accountName: (c.account_name as string | null) ?? "Account", name: c.name as string,
-    openCount: Number(c.open_n), openValue: Math.round(Number(c.open_v)), wonCount: Number(c.won_n), wonValue: Math.round(Number(c.won_v)), lostCount: Number(c.lost_n), lostValue: Math.round(Number(c.lost_v)),
+    openCount: Number(c.open_n), allOpenCount: Number(c.all_open_n ?? c.open_n), openValue: Math.round(Number(c.open_v)), wonCount: Number(c.won_n), wonValue: Math.round(Number(c.won_v)), lostCount: Number(c.lost_n), lostValue: Math.round(Number(c.lost_v)),
     staleCount: Number(c.stale_n), noOwnerCount: Number(c.no_owner_n), outlierCount: Number(c.out_n), outlierValue: Math.round(Number(c.out_v)), zeroValueCount: Number(c.zero_n), testCount: Number(c.test_n ?? 0), testValue: Math.round(Number(c.test_v ?? 0)), empty: c.is_empty === true,
     mini: (minis.get(`${c.location_id}|${c.pipeline_id}`) ?? []).slice(0, 12).map((x) => ({ name: x.name, value: Math.round(x.value) })),
   }));
   const last = page[page.length - 1];
   return {
     refreshing: !fresh, cards, next: more && last ? `${Number(last.open_v).toFixed(2).replace(/\.00$/, "")}|${last.location_id}|${last.pipeline_id}` : null,
-    totals: { pipelines: t.shown, emptyHidden: o.showEmpty ? 0 : t.empty_n, openValue: Math.round(t.open_v), wonValue: Math.round(t.won_v), lostValue: Math.round(t.lost_v), openCount: t.open_n, wonCount: t.won_n, lostCount: t.lost_n, staleCount: t.stale_n, noOwnerCount: t.no_owner_n, testCount: Number(t.test_n ?? 0), testValue: Math.round(Number(t.test_v ?? 0)), all: Number(t.all_n ?? 0), countsTests: r.count_tests === true ? "setting" : inclTest ? "toggle" : null, countsOwnerless: r.count_ownerless === true },
+    totals: { pipelines: t.shown, emptyHidden: o.showEmpty ? 0 : t.empty_n, openValue: Math.round(t.open_v), wonValue: Math.round(t.won_v), lostValue: Math.round(t.lost_v), openCount: t.open_n, allOpenCount: Number(t.all_open_n ?? t.open_n), wonCount: t.won_n, lostCount: t.lost_n, staleCount: t.stale_n, noOwnerCount: t.no_owner_n, testCount: Number(t.test_n ?? 0), testValue: Math.round(Number(t.test_v ?? 0)), all: Number(t.all_n ?? 0), countsTests: r.count_tests === true ? "setting" : inclTest ? "toggle" : null, countsOwnerless: r.count_ownerless === true },
   };
 }
