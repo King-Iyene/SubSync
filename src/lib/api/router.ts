@@ -126,9 +126,10 @@ import { handleCleanupV2 } from "./cleanup-routes";
 import { gatedWriter } from "../ghl/crm-gateway";
 import { writeEnabledFor } from "../analytics/cleanup-config";
 import { isLive } from "../live-flags";
-import { answerKey, cachedAnswer, forgetAllReads, forgetAnswers, readCacheOn } from "../read-cache";
+import { answerKey, cachedAnswer, cachedRead, forgetAllReads, forgetAnswers, readCacheOn } from "../read-cache";
+import { runAfter } from "../run-after";
 import { demoRead, forgetDemoAnswers } from "./demo-cache";
-import { answerStoreKey, judgeAnswer, storable } from "../analytics/read-answers";
+import { answerStoreKey, answerStoreOn, judgeAnswer, storable } from "../analytics/read-answers";
 import { readAnswer, storeAnswer } from "../analytics/read-answers-db";
 import { handleSpeedPrefs, handleSpeedDigest, handleSpeedLadder, handleSpeedPart, handleSpeedTarget } from "./speed-routes";
 import { handleUnansweredOutcome, handleUnansweredPart } from "./unanswered-routes";
@@ -2171,9 +2172,12 @@ const HEAVY_READ = new Set(["speed", "appointments"]);
 const SLOW_API_MS = 2_500;
 export async function handle(request: Request, segments: string[]): Promise<Response> {
   const t0 = performance.now();
+  const q0 = (globalThis as { __subsyncQueries?: number }).__subsyncQueries ?? 0;
   const res = await handleTimed(request, segments);
   const ms = Math.round(performance.now() - t0);
-  try { res.headers.set("Server-Timing", `app;dur=${ms}`); } catch { /* an immutable response keeps no header */ }
+  // `stmts` is how many database statements this instance ran while the request was open (other requests on the same instance count too, so it is an upper bound under load). A number only: no names, no ids.
+  const stmts = Math.max(0, ((globalThis as { __subsyncQueries?: number }).__subsyncQueries ?? 0) - q0);
+  try { res.headers.set("Server-Timing", `app;dur=${ms}, stmts;desc="${stmts}"`); } catch { /* an immutable response keeps no header */ }
   if (ms >= SLOW_API_MS) {
     const part = new URL(request.url).searchParams.get("part");
     console.warn("slow_api", { route: segments.map((s) => (/^[A-Za-z0-9_-]{12,}$/.test(s) ? ":id" : s)).join("/"), part: part && /^[a-z0-9_-]{1,30}$/i.test(part) ? part : null, method: request.method, status: res.status, ms });
@@ -2200,22 +2204,23 @@ async function readAnswerOrCompute(ctx: Ctx): Promise<Response> {
   // The race is "right now" (it refreshes itself), so it is always read fresh.
   const stored = storable(request.method, segments, ctx.url.searchParams);
   if ((HEAVY_READ.has(segments[0]) && ctx.url.searchParams.has("part") && ctx.url.searchParams.get("part") !== "race") || stored) {
-    const who = `${ctx.kind}:${ctx.limitTo ?? ""}:${ctx.session.userId ?? ""}`;
+    const who = `${ctx.kind}:${ctx.limitTo ?? ""}:${ctx.session.userId ?? ""}:${ctx.session.personRole ?? ""}`;
     const key = answerKey(ctx.installationId, who, `${ctx.url.pathname}?${ctx.url.searchParams.toString()}`);
     const compute = async () => { const r = await dispatch(ctx); return { status: r.status, body: await r.text() }; };
     // Round 6: the finished answer is also kept in the database (read_answers), so the first click on a cold server instance is one lookup. Fresh for 5 minutes, shown while a new one is made for 30,
     // never used after a change was made through SubSync (dirty), never shared between people or installations (the key holds both). A "Try again" (_r) always recomputes.
     const make = async () => {
-      if (!stored || !readCacheOn()) return compute();
+      if (!stored || !readCacheOn() || !answerStoreOn()) return compute();
       const sk = answerStoreKey(who, ctx.url.pathname, ctx.url.searchParams);
-      const hit = ctx.url.searchParams.has("_r") ? null : await readAnswer(ctx.installationId, sk).catch(() => null);
-      const verdict = judgeAnswer(hit);
+      // The answer and the installation's "rows changed" time are asked together (one round trip, the second is held for seconds per instance): an answer made before the data last changed is shown at once and rebuilt behind it.
+      const [hit, changedAt] = ctx.url.searchParams.has("_r") ? [null, undefined] : await Promise.all([readAnswer(ctx.installationId, sk).catch(() => null), cachedRead(ctx.installationId, "dataversion", () => readDataVersion(ctx.installationId, null)).catch(() => undefined)]);
+      const verdict = judgeAnswer(hit, changedAt || undefined);
       if (hit && verdict !== "unusable") {
-        if (verdict === "stale") void compute().then((o) => o.status === 200 ? storeAnswer(ctx.installationId, sk, o.body) : undefined).catch(() => undefined);
+        if (verdict === "stale") runAfter(() => compute().then((o) => o.status === 200 ? storeAnswer(ctx.installationId, sk, o.body) : undefined));
         return { status: 200, body: hit.body };
       }
       const o = await compute();
-      if (o.status === 200) void storeAnswer(ctx.installationId, sk, o.body).catch(() => undefined);
+      if (o.status === 200) runAfter(() => storeAnswer(ctx.installationId, sk, o.body));
       return o;
     };
     const out = await cachedAnswer(key, make);

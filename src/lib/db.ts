@@ -34,13 +34,15 @@ export function sql(): Sql {
       prepare: false,
       // DB_POOL_MAX lets a deployment (or a dev server on a slow link) allow more parallel statements; the default is 8 (round 4: the busiest screens ask for 12 reads at once; with 5 connections they queued in three waves).
       max: Math.min(20, Math.max(1, Number(process.env.DB_POOL_MAX) || 8)),
-      idle_timeout: 20,
-      connect_timeout: 15,
+      // Perf round: every new connection costs a login through the pooler (pgbouncer.get_auth ran 37,000 times) and a type lookup. An instance that is quiet for 20 s used to drop them all and pay that again on the next click; keep them a minute, and renew each after 30 minutes.
+      idle_timeout: 60,
+      max_lifetime: 30 * 60,
+      connect_timeout: Math.max(5, Number(process.env.DB_CONNECT_TIMEOUT) || 15),
       // DATABASE_SSL=off is for the throwaway CI database (plain Postgres, no TLS). Never set it in production.
       ssl: process.env.DATABASE_SSL === "off" ? false : "require",
       onnotice: () => {},
-      // DB_QUERY_COUNT=1 counts statements on globalThis.__subsyncQueries (a profiling aid for scripts/profile-screens.ts; off in production).
-      ...(process.env.DB_QUERY_COUNT ? { debug: () => { const g = globalThis as unknown as { __subsyncQueries?: number }; g.__subsyncQueries = (g.__subsyncQueries ?? 0) + 1; } } : {}),
+      // Every statement is counted on globalThis.__subsyncQueries (a plain increment): the Server-Timing header reports how many a request used, and scripts/perf-measure.ts reads it.
+      debug: () => { const g = globalThis as unknown as { __subsyncQueries?: number }; g.__subsyncQueries = (g.__subsyncQueries ?? 0) + 1; },
     });
   }
   return globalForDb.__subsyncSql;

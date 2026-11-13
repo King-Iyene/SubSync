@@ -19,6 +19,7 @@
     "demo:fill": "node --env-file=.env.local --import tsx scripts/fill-demo.ts",
     "seed:demo": "node --env-file=.env.local --import tsx scripts/seed-demo.ts",
     "check:db": "node --env-file=.env.local --import tsx scripts/check-queries.ts",
+    "perf:measure": "node --env-file=.env.local --import tsx scripts/perf-measure.ts",
     "check:api": "node --env-file=.env.local --import tsx scripts/check-api.ts"
   },
   "dependencies": {
