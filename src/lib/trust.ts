@@ -27,7 +27,7 @@ export const CLAIMS: readonly Claim[] = [
   { id: "isolation_tests", text: "Automatic tests try to read one company's data while signed in as another, and must be refused." },
   { id: "owner_delete", text: "Only the owner of the company account can press Delete my data, they must type the word DELETE, and every attempt, allowed or refused, is written to a record that is kept." },
   { id: "settings_audit", text: "Every change to a setting is recorded, with who changed it and when. You can read the history under Settings, Advanced." },
-  { id: "ai_own", text: "No artificial-intelligence service receives your data unless an administrator connects their own AI account. SubSync does not choose or pay for one. By default only counts and dollar estimates are sent, never names, email addresses, phone numbers or messages, unless that account switches names on, and you can see exactly what was sent." },
+  { id: "ai_own", text: "No artificial-intelligence service receives your data unless an administrator connects their own AI account. SubSync does not choose or pay for one. By default only counts, dollar estimates and the labels you set up yourself (tags, lead sources, pipeline step names) are sent, never names, email addresses, phone numbers or messages, unless that account switches names on, and you can see exactly what was sent." },
   { id: "no_sending_permission", text: "SubSync cannot send messages to your contacts. It does not ask for that permission, and it measures how fast your team replies instead of replying itself." },
   { id: "never_stored", text: "The text of your customers' messages is never copied into SubSync." },
   { id: "kill_switch", text: "We can put SubSync into maintenance mode at once, which stops every sync, job and email." },

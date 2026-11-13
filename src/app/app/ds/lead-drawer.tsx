@@ -9,6 +9,7 @@ import { isEditableTarget, neighbours } from "@/lib/design/ui-logic";
 import { draftKey, getDraft } from "@/lib/design/drafts";
 import { withLive } from "@/lib/people/person";
 import { useApiClient, useData } from "../session";
+import { LeadAiSummary } from "./ai-lead";
 import { fmtMoney, timeAgo } from "../ui";
 import { ActionStrip, dialNoteText, useContactActions, type ActionPerson } from "./contact-actions";
 import { HeldNote } from "./held";
@@ -137,6 +138,7 @@ function Body({ seed, top, showAccount, wide, onLogged }: { seed: LeadSeed; top?
       {seed.note && <p className="mt-2 text-sm text-muted-foreground" data-testid="drawer-why">{seed.note}</p>}
       {!data && seed.pending && <p className="mt-2 text-sm text-muted-foreground" data-testid="drawer-pending">{seed.pending}</p>}
       {top}
+      <LeadAiSummary locationId={seed.locationId} contactId={seed.contactId} dnd={dnd} />
       <LiveExtras live={live} />
       {data?.changed && <p className="mt-2 text-xs text-muted-foreground" data-testid="drawer-changed">{data.changed.line}</p>}
 
@@ -180,7 +182,7 @@ function Body({ seed, top, showAccount, wide, onLogged }: { seed: LeadSeed; top?
             ))}
           </div>
           <div role="tabpanel" id="wb-panel" aria-labelledby={`wb-tab-${tab}`} className="pt-5">
-            {tab === "conversation" && <><Thread locationId={seed.locationId} contactId={seed.contactId} reloadKey={threadKey} crmUrl={wb.crmUrl ?? url} /><Composer ctx={wb} runner={runner} initial={channelPref} open={composerOpen} onOpenChange={setComposerOpen} focusOnMount={!!seed.reply} draftKey={draftKey(seed.locationId, seed.contactId)} /></>}
+            {tab === "conversation" && <><Thread locationId={seed.locationId} contactId={seed.contactId} reloadKey={threadKey} crmUrl={wb.crmUrl ?? url} /><Composer ctx={wb} runner={runner} initial={channelPref} open={composerOpen} onOpenChange={setComposerOpen} focusOnMount={!!seed.reply} draftKey={draftKey(seed.locationId, seed.contactId)} lead={{ locationId: seed.locationId, contactId: seed.contactId }} /></>}
             {tab === "update" && <UpdateTab ctx={wb} runner={runner} />}
             {tab === "timeline" && data && <TimelinePanel items={timeline} timeZone={tz} note={tlNote} className="max-h-[70vh]" />}
             {tab === "record" && <RecordTab locationId={seed.locationId} contactId={seed.contactId} name={name} account={c?.locationName ?? seed.locationName ?? null} fields={extra?.live.customFields ?? []} />}

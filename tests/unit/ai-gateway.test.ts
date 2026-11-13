@@ -146,7 +146,8 @@ describe("the gateway", () => {
     expect(await runJob(deps(memStore({ status: "needs_attention" }).store, never), request())).toMatchObject({ code: "needs_attention" });
   });
   it("a planned job cannot run", async () => {
-    expect(await runJob(deps(memStore({}).store, okFetch([])), request(undefined, { job: "ask_data" }))).toMatchObject({ code: "planned" });
+    const saved = JOBS.ask_data.status; JOBS.ask_data.status = "planned"; // ask_data is live now (PR data jobs): the check is that ANY planned job is refused
+    try { expect(await runJob(deps(memStore({}).store, okFetch([])), request(undefined, { job: "ask_data" }))).toMatchObject({ code: "planned" }); } finally { JOBS.ask_data.status = saved; }
   });
   it("retries a busy provider with backoff, then gives up in plain words without the provider's text", async () => {
     const { store, runs } = memStore({});

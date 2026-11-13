@@ -136,10 +136,18 @@ export async function runJob(deps: Deps, req: JobRequest): Promise<JobResult> {
   if (def.output.kind === "json") {
     json = parseJsonAnswer(text);
     verdict = json === null ? { ok: false, reason: "The AI answer was not readable." } : validateJson(json, def.output.schema);
-    if (verdict.ok) { const flat = `${stringsOf(json)} ${JSON.stringify(json).match(/-?\d[\d.]*/g)?.join(" ") ?? ""}`; verdict = checkWords(seenText, flat, def.output.maxChars * 2); }
+    if (verdict.ok) { const flat = `${stringsOf(json)} ${numberLeaves(json).join(" ")}`; verdict = checkWords(seenText, flat, def.output.maxChars * 2); }
   } else verdict = checkWords(seenText, text, def.output.maxChars);
   if (!verdict.ok) { await log("rejected", verdict.reason, text.slice(0, 2000)); return refuse("rejected", verdict.reason); }
   const runId = await log("ok", null, text);
   return { ok: true, runId, text, json, cached: false, tokensIn, tokensOut, costUsd: estimateCostUsd(conn.model, { tokensIn, tokensOut }), scope: conn.scope, model: conn.model, provider: conn.provider };
 }
 
+
+/** The numeric values (not the digits inside text) of a JSON answer: they go through the number check too. Text is checked as text, so "$12,000" is one number, not 12 and 0. */
+function numberLeaves(v: unknown): number[] {
+  if (typeof v === "number") return [v];
+  if (Array.isArray(v)) return v.flatMap(numberLeaves);
+  if (v && typeof v === "object") return Object.values(v).flatMap(numberLeaves);
+  return [];
+}

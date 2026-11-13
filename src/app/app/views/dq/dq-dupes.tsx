@@ -12,6 +12,7 @@ import { InfoTip } from "../../ds/info-tip";
 import { useApiClient } from "../../session";
 import { fmtInt } from "../../ui";
 import { BTN, FIELD, QUIET } from "../cleanup-parts";
+import { JudgeButton } from "../ai-data-cards";
 import { sampleOn, SAMPLE, useDq, type DupeDetail, type DupesRes, type GroupRow, type Opts, type Tier } from "./dq-data";
 
 // DUPLICATES, as data not prose. A group is one compact ROW: the person, what matched (a small badge, the reason on hover), how many copies, and three buttons: Merge, Not the same, Delete extras.
@@ -116,6 +117,7 @@ function GroupItem({ g, opts, onGone, multi }: { g: GroupRow; opts: Opts; onGone
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button type="button" className={P_BTN} aria-expanded={mode === "merge"} onClick={() => setMode(mode === "merge" ? null : "merge")} data-testid="dq-merge" title={g.protectedCount > 0 ? "Someone here is protected. You can merge them one at a time after checking." : "Choose which copy to keep, then merge"}>{ONE_BUTTON}</button>
+          <JudgeButton account={g.locationId} groupKey={g.key} tier={g.tier} />
           <button type="button" className={Q_BTN} disabled={busy} onClick={() => void notSame()} data-testid="dq-notsame">Not the same</button>
           {opts.canChange && <WhyDisabled disabled={allExtrasProtected} why={DELETE_BLOCKED_WHY}><button type="button" className={D_BTN} disabled={allExtrasProtected} title={allExtrasProtected ? DELETE_BLOCKED_WHY : "Delete the other copies"} aria-expanded={mode === "delete"} onClick={() => setMode(mode === "delete" ? null : "delete")} data-testid="dq-delete">Delete extras</button></WhyDisabled>}
         </div>

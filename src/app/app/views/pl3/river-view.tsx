@@ -2,7 +2,8 @@
 
 import { useMemo, useRef, useState } from "react";
 import type React from "react";
-import { centerPath, particleCounts, pileRows, ribbonPath, riverLayout, type Pt } from "@/lib/design/river-layout";
+import { centerPath, particleCounts, pileCards, pileUnit, ribbonPath, riverLayout, MAX_PILE_CARDS, type Pt } from "@/lib/design/river-layout";
+import type { ReplayMover } from "@/lib/design/river-replay";
 import type { PlStage } from "@/lib/analytics/pipeline3-types-interim";
 import { money, moneyShort } from "./format";
 
@@ -13,6 +14,8 @@ import { money, moneyShort } from "./format";
 export type RiverProps = {
   stages: PlStage[]; wonCount: number; wonCents: number; counts: boolean; enough: boolean; width: number;
   settle: boolean; runKey: number; reduced: boolean;
+  /** Replay: the deals that moved on the day being shown (cards slide between piles for `flyMs`). Absent when not replaying. */
+  movers?: ReplayMover[]; moverKey?: string; flyMs?: number;
   onStage: (s: PlStage, stale?: boolean) => void; onNoValue: (s: PlStage) => void; onWon: () => void; onLostFrom: (s: PlStage) => void;
 };
 type Tip = { x: number; y: number; title: string; lines: string[] };
@@ -67,6 +70,10 @@ export function River(p: RiverProps) {
     if (s.lostCount > 0) a.push(`${s.lostCount} left from here`);
     return a;
   };
+  // ONE scale for every pile: one card per deal (or per bill of money) until a pile would pass MAX_PILE_CARDS, then the scale steps up and the legend says so.
+  const scaleOf = (nd: { open: number }) => (counts ? nd.open : nd.open / 100);
+  const cardUnit = pileUnit(L.nodes.map(scaleOf), MAX_PILE_CARDS);
+  const legend = counts ? (cardUnit === 1 ? "1 card = 1 deal" : `1 card = about ${cardUnit.toLocaleString("en-US")} deals (a pile draws at most ${MAX_PILE_CARDS} cards)`) : `1 bill = about ${money(cardUnit * 100)} (the smallest piles still show one bill)`;
   const dls = particleCounts(L.links.map((l) => l.th), 60);
   const animate = settle && !reduced;
   const leakTail = L.tails.find((t) => t.leak);
@@ -97,14 +104,14 @@ export function River(p: RiverProps) {
         })}
         {L.nodes.map((nd) => {
           const s = nd.kind === "stage" ? stages[nd.index] : null;
-          const top = nd.ac + nd.flowH, rows = pileRows(nd.openH), step = rows ? nd.openH / rows : 0;
-          const stuckRows = nd.kind === "stage" && nd.openH > 0 ? Math.round((rows * nd.stuckH) / nd.openH) : 0;
+          const top = nd.ac + nd.flowH, rows = pileCards(scaleOf(nd), cardUnit), step = rows ? Math.max(4, Math.min(12, nd.openH / rows)) : 0;
+          const stuckRows = nd.kind === "stage" && nd.open > 0 && nd.stuck > 0 ? Math.min(rows, Math.max(1, Math.round((rows * nd.stuck) / nd.open))) : 0;
           const tipLines = s ? stageTip(s) : [`${unit(nd.open)} won`, "Landed in the vault"];
           const label = s ? `${s.name}: ${tipLines.join(". ")}. Open them.` : `Won: ${tipLines[0]}. Open them.`;
           const go = s ? () => (counts && s.count === 0 && noVal(s) > 0 ? p.onNoValue(s) : p.onStage(s)) : p.onWon;
           const base = nd.kind === "won" ? nd.ac : top;
           return <g key={nd.id} className={`rv-node rv-${nd.kind}`} {...hover(s ? s.name : "Won", tipLines)} {...press(go)} aria-label={label} data-testid={nd.kind === "won" ? "pl-vault" : `pl-seg-${nd.id}`}>
-            {rows > 0 && <rect className="rv-slot" {...R(nd.al, base, nd.w, nd.openH)} rx={3} />}
+            {rows > 0 && <rect className="rv-slot" {...R(nd.al, base, nd.w, rows * step + 2)} rx={3} />}
             {Array.from({ length: rows }, (_, r) => {
               const j = ((r * 7) % 3 - 1) * 1.4, bad = r >= rows - stuckRows, h = Math.max(1.5, step - 1.1);
               return <g key={r} className={`rv-bill${bad ? " rv-bill-stuck" : ""}${counts ? " rv-card" : ""}`} style={{ animationDelay: `${Math.min(900, 120 + r * 18)}ms` }}>
@@ -116,7 +123,7 @@ export function River(p: RiverProps) {
             {stuckRows > 0 && <rect className="rv-stuckmark" {...R(nd.al, base + (rows - stuckRows) * step, nd.w, stuckRows * step)} fill="url(#rv-hatch)" rx={2} pointerEvents="none" />}
             {stuckRows > 0 && s && <rect className="rv-stuckhit" {...R(nd.al, base + (rows - stuckRows) * step, nd.w, stuckRows * step)} fill="transparent" onClick={(e) => { e.stopPropagation(); p.onStage(s, true); }} onKeyDown={(e) => e.stopPropagation()} aria-label={`${s.staleCount} stuck deals in ${s.name}. Open them.`} data-testid={`pl-stuck-${nd.id}`}><title>{`${s.staleCount} stuck in ${s.name}`}</title></rect>}
             {stuckRows > 0 && (() => { const [x, y] = pt(nd.al + nd.w / 2, base + (rows - stuckRows) * step); return <g className="rv-stop" transform={`translate(${x} ${y})`} aria-hidden><rect x={-6} y={-8} width={12} height={14} rx={3} /><path d="M-2.5 -5v8M2.5 -5v8" /></g>; })()}
-            {nd.kind === "won" && <rect className="rv-vault" {...R(nd.al - 2, nd.ac - 2, nd.w + 4, nd.h + 4)} rx={4} fill="none" pointerEvents="none" />}
+            {nd.kind === "won" && <rect className="rv-vault" {...R(nd.al - 2, nd.ac - 2, nd.w + 4, Math.max(rows * step + 2, 14) + 4)} rx={4} fill="none" pointerEvents="none" />}
           </g>;
         })}
         {L.nodes.map((nd) => {
@@ -129,6 +136,28 @@ export function River(p: RiverProps) {
           const [x, y] = pt(leakTail.al1, leakTail.ac1 + 4), s = stages[leakTail.from];
           return <g className="rv-leaktag" transform={`translate(${vertical ? Math.min(x, geo.w - 118) : Math.min(x - 40, geo.w - 130)} ${y + 6})`} {...press(() => p.onLostFrom(s))} aria-label={`Biggest leak: ${unit(leakTail.amount)} left from ${s.name}. Open them.`} data-testid="pl-leaktag"><rect width={126} height={22} rx={11} /><text x={63} y={15} textAnchor="middle">Biggest leak: {unitShort(leakTail.amount)}</text></g>;
         })()}
+        {!reduced && p.movers && p.movers.length > 0 && (() => {
+          const dur = Math.max(0.25, ((p.flyMs ?? 900) / 1000) * 0.9);
+          const topOf = (i: number) => L.nodes[i].ac + L.nodes[i].flowH + 6;
+          const out: React.ReactNode[] = [];
+          p.movers.forEach((m, mi) => {
+            for (let k = 0; k < m.n; k++) {
+              const fromN = m.from !== null ? L.nodes[m.from] : null, toN = m.to === "won" ? L.nodes[n] : m.to === "lost" ? null : L.nodes[m.to];
+              if (m.from !== null && !fromN) continue;
+              const a = fromN ? pt(fromN.al + fromN.w, topOf(m.from as number)) : pt(toN?.al ?? 0, (toN?.ac ?? 0) - 24);
+              const lostTail = m.to === "lost" && m.from !== null ? L.tails.find((t) => t.from === m.from) : null;
+              const b = toN ? pt(toN.al, m.to === "won" ? toN.ac + 6 : topOf(m.to as number)) : lostTail ? pt(lostTail.al1, lostTail.ac1) : fromN ? pt(fromN.al + fromN.w + 24, fromN.ac + fromN.h + 24) : a;
+              const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2, d = `M${a[0]} ${a[1]} Q${vertical ? a[0] : mx} ${vertical ? my : a[1]} ${b[0]} ${b[1]}`;
+              const begin = ((mi * 0.07 + k * 0.1) % (dur * 0.5)).toFixed(2);
+              out.push(<g key={`m${p.moverKey}-${mi}-${k}`} opacity={0} aria-hidden>
+                <rect className={`rv-fly${m.to === "lost" ? " rv-fly-lost" : m.to === "won" ? " rv-fly-won" : ""}`} x={-6} y={-4} width={12} height={8} rx={1.6} />
+                <animateMotion path={d} dur={`${dur}s`} begin={`${begin}s`} fill="freeze" />
+                <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.1;0.85;1" dur={`${dur}s`} begin={`${begin}s`} fill="freeze" />
+              </g>);
+            }
+          });
+          return out;
+        })()}
         {animate && L.links.flatMap((l, i) => Array.from({ length: dls[i] }, (_, k) => {
           const dur = 2.4, begin = (i * 0.35 + k * (dur / Math.max(1, dls[i]))).toFixed(2);
           return <g key={`b${i}-${k}`} opacity={0} aria-hidden>
@@ -138,6 +167,7 @@ export function River(p: RiverProps) {
           </g>;
         }))}
       </svg>
+      <p className="rv-legend" data-testid="pl-legend" data-unit={cardUnit}>{legend}. Piles show what is there now; the ribbons show how much reached each step.</p>
       {tip && <div className="rv-tip" role="tooltip" style={{ left: tip.x, top: tip.y }} data-testid="pl-tip"><b>{tip.title}</b>{tip.lines.map((t, i) => <span key={i}>{t}</span>)}</div>}
     </div>
   );

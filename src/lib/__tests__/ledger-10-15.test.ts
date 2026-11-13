@@ -17,10 +17,10 @@ test("#12 money flow says deals without a value, not 0 deals", () => {
   assert.match(src("app/app/views/pl3/pipes.tsx"), /Not counted in money: /);
   assert.match(src("app/app/views/pl3/money-flow.tsx"), /without a value/);
 });
-test("#13 the funnel example is offered only with no valued deals, and is marked Example", () => {
+test("#13 the river sample is only shown on request, is marked SAMPLE, and its clicks open nothing", () => {
   const s = src("app/app/views/pl3/money-flow.tsx");
-  assert.match(s, /const showExample = example && noValued/);
-  assert.match(s, /<b>Example\.<\/b>/);
+  assert.match(s, /const onPick = sample \? \(\) => \{\} : realPick/);
+  assert.match(s, /<b>SAMPLE\.<\/b>/);
   assert.match(s, /See an example/);
 });
 test("#14 the Fathom card and the list count the same calls", () => {

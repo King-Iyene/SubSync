@@ -40,6 +40,8 @@ export type Facts = {
   meetingsPage: boolean; zoomOn: boolean;
   /** Stage C1: how many clients have a monthly fee typed in, and whether the Clients page is switched on. Left out means none and on. */
   clientFees?: number; clientsPage?: boolean;
+  /** The deal AI help (health explanations, follow-up plan, win and loss review, forecast in words): whether any of it is switched on for this company, and whether an AI account is connected. Left out means not on. */
+  dealAi?: { on: boolean; connected: boolean };
 };
 
 const TARGET_KEYS = ["slaHours", "speedTargetMinutes", "staleDays", "dormantDays", "speedBusinessHours", "countAutomatedTouches"] as const;
@@ -90,13 +92,16 @@ export function buildSteps(role: GuideRole, f: Facts): Step[] {
     body: "Type each client's monthly fee and renewal date on the Clients page, in the row itself. SubSync cannot read them from your CRM, so you enter them once and the revenue, renewal and value-created figures fill in." }];
   const meetings: Step[] = f.meetingsPage ? [{ id: "meetings", title: "Connect a meeting tool (optional)", done: seen("meetings"), ticksOn: ["meetings"], optional: true, art: "meeting", detail: null, view: "meetings", cta: "Open Meeting notes",
     body: `Connect ${f.zoomOn ? "Zoom or Fathom" : "Fathom"} and each meeting summary is saved in SubSync. When the guest matches one contact, it is also added to that contact's notes in your CRM, if you allow it.` }] : [];
+  // Only when the deal AI help is really switched on (never promised before it is live). Optional: SubSync works fully without it.
+  const dealAi: Step[] = f.dealAi?.on ? [{ id: "ai_deals", title: "Let AI explain your stuck deals (optional)", done: f.dealAi.connected, optional: true, art: "feedback", detail: null, view: "settings", section: "integrations", cta: "Open AI settings",
+    body: "Connect your own AI account in Settings, AI. Then, in Pipeline, each deal gets a plain-words explanation of what is stuck, stuck deals get a suggested next touch, and wins, losses and the forecast are explained. SubSync works out every number; the AI only writes the words, and nothing is sent to a lead." }] : [];
   const feedback: Step = { id: "feedback", title: "Tell us what would help", done: f.feedbackGiven > 0 || seen("roadmap"), ticksOn: ["roadmap"], art: "feedback", optional: true, detail: null, view: "roadmap", cta: "Open What's new",
     body: "Use Give feedback at the bottom of any page, or suggest something on the What's new page. It goes to the people who build SubSync." };
 
   switch (role) {
-    case "agency_owner": return [connected, synced, today, speed, search, targets, brief, email, tests, share, ...fees, clients, ...meetings, feedback];
+    case "agency_owner": return [connected, synced, today, speed, search, targets, brief, email, tests, share, ...fees, clients, ...meetings, ...dealAi, feedback];
     case "agency_staff": return [connected, today, speed, calendar, search, feedback];
-    case "account_admin": return [connected, synced, today, speed, calendar, search, targets, brief, email, ...meetings, feedback];
+    case "account_admin": return [connected, synced, today, speed, calendar, search, targets, brief, email, ...meetings, ...dealAi, feedback];
     case "account_user": return [connected, today, speed, calendar, feedback];
   }
 }

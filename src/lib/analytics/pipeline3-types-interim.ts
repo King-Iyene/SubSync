@@ -13,7 +13,13 @@ export type PlStage = {
   lostCount: number; lostValueCents: number; // deals that left the pipeline from this stage in the period
 };
 export type PlDrain = { reason: string; count: number; valueCents: number };
-export type PlReplayDay = { date: string; stageValueCents: number[]; stageCounts: number[]; wonCents: number; lostCents: number };
+/** One recorded move on a day: a deal changing step (from, to are step positions), or being won or lost (status set, from = the step it was in). */
+export type PlReplayMove = { from: number | null; to: number | null; status: "won" | "lost" | null; count: number; valueCents: number };
+export type PlReplayDay = {
+  date: string; stageValueCents: number[]; stageCounts: number[]; wonCents: number; lostCents: number;
+  /** Open deals with no value per step, at the end of this day. */ stageNoValue?: number[];
+  wonCount?: number; lostCount?: number; moves?: PlReplayMove[];
+};
 export type PlPersonFlow = { id: string; name: string; stages: Array<{ count: number; valueCents: number; staleCount: number; lostCount: number; lostValueCents: number }>; wonCents: number; wonCount: number };
 export type PlMoneyFlow = {
   pipelineName: string; periodLabel: string;

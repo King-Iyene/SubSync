@@ -9,6 +9,7 @@ import type { GoFn } from "../../nav";
 import { AccountSettings } from "../cl3/settings";
 import { agoText, c2post, c2q, copy, dayText, hasPayments, money, useC2 } from "./data";
 import { LevelDot, PayChip } from "./chips";
+import { MovedNumbers, OneThingCard } from "../ai-team/team-notes";
 
 // One client account, in SubSync: the paid plan you sell them, credit balance, last activity, health with its evidence, setup, team, pipeline, speed to lead, appointments, your own notes and
 // next steps, and the weekly proof to show them. Every card says exactly why a value is missing ("Needs permission: reconnect" only when the platform refused; "Not available from the
@@ -51,6 +52,7 @@ export function AccountPage({ id, onBack, flags, drill, onDrill, legacy, go, goT
           </div>
         </header>
         {msg && <p className="ap-fine mb-2" role="status" data-testid="cl2-msg">{msg}</p>}
+        <div className="mb-3 grid gap-3"><OneThingCard locationId={id} /><MovedNumbers locationId={id} /></div>
 
         <div className="cl2-grid">
           <Card title="Paid plan you sell this client" testId="cl2-plan" wide>

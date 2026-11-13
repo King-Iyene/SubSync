@@ -49,3 +49,11 @@ In **Settings, Integrations, AI** you can connect your own AI account: **Connect
 ## If something looks wrong
 
 Press **Sync now** on Today. If a number still looks wrong, tell us which account and which number: code@kdsquares.com.
+
+## 8. Optional: Ask your data, and AI help in Clean-up
+
+Once your own AI account is connected (section 7), switch the jobs on in **Settings, Integrations, AI** (each job has its own switch, off until you turn it on for the account).
+
+- **Ask your data** (Today, or press Ctrl K, type a question ending with a question mark, then Enter; Alt+Enter also works). Examples: "How many leads are waiting?", "Which client had the slowest first replies?", "What is my show rate?". The answer is short, says which dates it used (the date bar at the top sets them), and each number has a **Rows** button that opens exactly the rows it counted. If a question is not about your data, it says so. Your questions are private to you; **Show my earlier questions** lets you delete them (type delete to confirm). Client staff only ever see their own account.
+- **Clean-up, Overview, AI help with your data**: **Review my data** (a plain-English audit; each count opens its rows), **Suggest fixes** (needs "allow names" in the AI settings; shows a batch, then **Check these in Fix data** makes an ordinary preview that you confirm by typing the number, and can undo; the AI never applies, merges or deletes anything) and **Check this account's setup** (calendars with no owner, pipelines with too few stages, no call queue workflow, missing standard automations, missing permissions).
+- **Duplicates**: on a Likely or Possible group, **AI opinion** says same person, different people or not sure, with reasons. It never merges, and if the names are different people's names it can never say "same". You still pick.

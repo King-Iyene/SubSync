@@ -190,7 +190,8 @@ async function buildScheduled(installationId: string, type: "daily_brief" | "wee
     noShowsToRecover: ap ? ap.recoverTotal : null, unmarked: ap ? ap.unmarkedTotal : null,
   });
   const team = await (await import("../analytics/people-alerts")).weeklyTeamLines(installationId, now.getTime());
-  return { type, locationId: null, severity: "info", dedupeKey: `weekly_summary:${date}`, values, details: weeklyLines({ ...base, facts: [...facts, ...team] }) };
+  const one = await (await import("../ai/team/digest")).oneThingLines(installationId, now.getTime());
+  return { type, locationId: null, severity: "info", dedupeKey: `weekly_summary:${date}`, values, details: weeklyLines({ ...base, facts: [...facts, ...team, ...one] }) };
 }
 
 /** Work off what is waiting for every real company (the hourly job). */

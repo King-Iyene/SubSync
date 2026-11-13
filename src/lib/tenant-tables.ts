@@ -17,6 +17,7 @@ export const SYNCED_DELETE = [
   "fn_mrr_snapshot", // Finance: our own daily money record per client account
   "td_daily_items", "td_receipts", "td_snoozes", // Today: the daily record of what was found and cleared, the weekly receipts and the put-aside marks
   "cf_recover_items", "cf_deal_flags", "cf_mutes", "cf_state", // Cash features: the missed-lead ledger, deal flags, digest mutes and sweep state
+  "wfm_fired", "wfm_action_log", // Workflow module: what SubSync sent to and received from the customer's workflows (ids only)
   "ai_runs", // Bring your own AI: the log of each model call (counts and cost; prompt and answer encrypted)
   "wg_samples", "wg_state", "wg_events", "br_history", // Wallet guard: our readings of each credit balance, the working numbers and the events; the 7 am brief record
   "campaign_stats", "wf_outcome_daily", "mn_outcomes", "mn_tasks", "am_notices", "am_auto_adds", "am_slack_prefs", "workflow_snapshots", "workflow_changes", "workflow_daily", "workflow_items",
@@ -27,7 +28,9 @@ export const SYNCED_DELETE = [
 /** Settings, credentials and the agency's own notes. Kept by "delete my data" (the app keeps working), removed on uninstall. */
 export const CONFIG_DELETE_ON_UNINSTALL = [
   "call_lists", "account_profiles", "goals", "annotations", "usage_events", "team_names", "report_templates",
+  "wfm_settings", "wfm_subscriptions", // Workflow module: which blocks an account switched on, and where its CRM wants triggers sent
   "ai_connections", "ai_oauth_pending", // Bring your own AI: the customer's own key (encrypted) and a sign-in in progress
+  "ai_team_prefs", // Team and client AI jobs: which jobs are on for which client account, the tone, and whether lead names show
   "td_prefs", "cf_prefs", "wg_prefs", "wg_rules", "wg_watchers", "br_prefs", "st_user_state", "client_owners", "team_member_roles", "team_member_role_history", "client_alert_mutes", "coaching_notes", "user_targets", "user_away", "people_proof_prefs", // the agency's own choices and notes (Clients, Team)
   "pm_notes", "pm_disputes", "pr_settings",
   "fn_pay_lines", "fn_pay_periods", "fn_pay_disputes", "fn_pay_rates", "fn_churn_state", "fn_ad_spend", "fn_ledger", "fn_plan_prices", "fn_settings", // Finance: the agency's own entries
@@ -54,7 +57,7 @@ export const LOCATION_DELETE = [
   "pm_items", "pm_events", "pm_sync_state", "pm_rollup_daily", "pm_notes", "pm_disputes",
   "pm_notes", "pm_disputes",
   "fn_mrr_snapshot", "fn_pay_lines", "fn_pay_disputes", "fn_pay_rates", "fn_churn_state", "fn_ad_spend", "fn_ledger", "pr_reports", "pr_links", "td_daily_items", "td_receipts", "td_snoozes", "cf_recover_items", "cf_deal_flags", "cf_mutes", "wg_samples", "wg_state", "wg_events", "wg_rules", "notification_states", "notifications", "notification_deliveries", "notification_destinations", "client_departures", "client_rollup_state", "client_daily", "client_risk_history", "client_billing", "cl2_notes", "cl2_plan_events", "client_actions", "client_owners", "client_alert_mutes", "coaching_notes", "user_targets", "people_write_log", "people_proof_prefs",
-  "ai_runs", "ai_connections", "ai_oauth_pending",
+  "ai_runs", "ai_connections", "ai_oauth_pending", "ai_team_prefs", "wfm_fired", "wfm_action_log", "wfm_settings", "wfm_subscriptions",
   "crm_writes", "contact_writes", "field_write_state", "field_mappings", "meeting_policies", "meeting_notes", "meeting_hooks", "account_profiles", "client_notes", "today_actions", "growth_goals", "workflow_labels", "dh_snapshots", "dh_flags", "dh_changes", "dh_outcomes", "cu_scans", "cu_actions", "dh_marks", "dh_rules", "campaign_stats", "wf_outcome_daily", "mn_outcomes", "mn_tasks", "workflow_snapshots", "workflow_changes", "workflow_daily", "workflow_items", "feedback_items", "client_steps", "client_step_history", "workflow_setup", "workflow_setup_settings", "call_queue_settings", "call_queue_log", "sync_jobs", "locations",
 ] as const;
 

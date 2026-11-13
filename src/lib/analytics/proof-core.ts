@@ -177,10 +177,10 @@ export type Brand = { name: string; logoUrl: string | null; color: string | null
 
 const lines = (rows: Array<string | null>) => rows.filter((r): r is string => r !== null);
 /** The whole report as plain text, for pasting into an email. Only sections that are switched on, only figures that were measured. */
-export function reportText(p: PrPayload, brand: Brand, intro: string | null, sections: Sections): string {
+export function reportText(p: PrPayload, brand: Brand, intro: string | null, sections: Sections, summary: string | null = null): string {
   const pl = monthName(p.prevLabel);
   const m = (k: string, v: number | null, fmt: (n: number) => string, c: Change) => (v === null ? null : `- ${k}: ${fmt(v)}${c ? ` (${c.text})` : ""}`);
-  const out: Array<string | null> = [`${brand.name}: ${p.account}`, `${p.label}${p.partial ? ` (to ${p.to === p.from ? p.from : p.to})` : ""}`, "", intro, intro ? "" : null, headline(p), ""];
+  const out: Array<string | null> = [`${brand.name}: ${p.account}`, `${p.label}${p.partial ? ` (to ${p.to === p.from ? p.from : p.to})` : ""}`, "", intro, intro ? "" : null, headline(p), "", summary, summary ? "" : null];
   out.push(...lines([m("New leads", p.leads.current, int, changeOf("count", p.leads.current, p.leads.previous, pl))]));
   if (sections.reply) {
     out.push(...lines([

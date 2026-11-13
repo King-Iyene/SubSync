@@ -657,27 +657,48 @@ export async function replay(s: Scope, f: Filters, days: number): Promise<Pl3Rep
   const db = sql(), sm = await stageMap(s, f.location), n = Math.min(90, Math.max(2, Math.ceil(days) || 2));
   // The replay plays the bar's dates (its last 90 days at most), ending at the end of the window, never "the last N days from today".
   const end = f.to, from = new Date(end.getTime() - n * DAY), w = deals(s, { ...f, bucket: null });
-  const [cur, moves, [since]] = await Promise.all([
+  // Two sets of deals are replayed: deals with a value (counted in money) and deals with no value (counted as deals only), so the replay also works when no deal has a value.
+  const inH = db`h.installation_id = ${s.inst} and h.actor_kind <> 'subsync' and h.at >= ${from} and h.at < ${end} and ((h.kind in ('stage', 'created') and h.to_value is not null) or (h.kind = 'status' and h.to_value in ('won', 'lost')))`;
+  const [cur, moves, curNv, movesNv, [since]] = await Promise.all([
     db`with ${w} select d.location_id, d.stage_id, count(*)::int n, sum(d.value)::float8 v from d where ${P_OPEN(db)} group by 1, 2`,
     db`with ${w} select (h.at at time zone ${APP_TZ})::date dy, h.kind, h.location_id, h.from_value, h.to_value, d.stage_id cur_stage, count(*)::int n, coalesce(sum(h.value), 0)::float8 v
       from deal_history h join d on d.location_id = h.location_id and d.opportunity_id = h.opportunity_id
-      where h.installation_id = ${s.inst} and h.actor_kind <> 'subsync' and d.counted and h.at >= ${from} and h.at < ${end} and ((h.kind in ('stage', 'created') and h.to_value is not null) or (h.kind = 'status' and h.to_value in ('won', 'lost')))
+      where ${inH} and d.counted
+      group by 1, 2, 3, 4, 5, 6`,
+    db`with ${w} select d.location_id, d.stage_id, count(*)::int n, 0::float8 v from d where ${P_NO_VALUE(db)} group by 1, 2`,
+    db`with ${w} select (h.at at time zone ${APP_TZ})::date dy, h.kind, h.location_id, h.from_value, h.to_value, d.stage_id cur_stage, count(*)::int n, 0::float8 v
+      from deal_history h join d on d.location_id = h.location_id and d.opportunity_id = h.opportunity_id
+      where ${inH} and not d.out_of_scope and not d.is_test and d.value <= 0
       group by 1, 2, 3, 4, 5, 6`,
     db`select min(h.at) since, count(*)::int n from deal_history h join (${locs(s, f.location)}) l on l.location_id = h.location_id where h.installation_id = ${s.inst} and h.kind = 'stage'`,
   ]);
-  const stock = new Map<string, { stageId: string; count: number; value: number }>();
-  for (const r of cur) { const k = keyOf(sm, r.location_id, r.stage_id)?.key; if (!k) continue; const c = stock.get(k); stock.set(k, { stageId: k, count: (c?.count ?? 0) + num(r.n), value: (c?.value ?? 0) + num(r.v) }); }
-  const dm: DayMove[] = [];
-  for (const r of moves) {
-    const isStatus = r.kind === "status";
-    const from2 = isStatus ? keyOf(sm, r.location_id, r.cur_stage)?.key ?? null : r.from_value ? keyOf(sm, r.location_id, r.from_value)?.key ?? null : null;
-    const to2 = isStatus ? null : keyOf(sm, r.location_id, r.to_value)?.key ?? null;
-    if (!isStatus && !to2) continue;
-    dm.push({ day: day(r.dy), from: from2, to: to2, status: isStatus ? (r.to_value as "won" | "lost") : null, count: num(r.n), value: num(r.v) });
-  }
+  const stockOf = (rows: typeof cur) => {
+    const m = new Map<string, { stageId: string; count: number; value: number }>();
+    for (const r of rows) { const k = keyOf(sm, r.location_id, r.stage_id)?.key; if (!k) continue; const c = m.get(k); m.set(k, { stageId: k, count: (c?.count ?? 0) + num(r.n), value: (c?.value ?? 0) + num(r.v) }); }
+    return [...m.values()];
+  };
+  const movesOf = (rows: typeof moves) => {
+    const out: DayMove[] = [];
+    for (const r of rows) {
+      const isStatus = r.kind === "status";
+      const from2 = isStatus ? keyOf(sm, r.location_id, r.cur_stage)?.key ?? null : r.from_value ? keyOf(sm, r.location_id, r.from_value)?.key ?? null : null;
+      const to2 = isStatus ? null : keyOf(sm, r.location_id, r.to_value)?.key ?? null;
+      if (!isStatus && !to2) continue;
+      out.push({ day: day(r.dy), from: from2, to: to2, status: isStatus ? (r.to_value as "won" | "lost") : null, count: num(r.n), value: num(r.v) });
+    }
+    return out;
+  };
   const dayList: string[] = [];
   for (let i = n - 1; i >= 0; i--) dayList.push(localDay(end.getTime() - 1 - i * DAY));
-  const frames = buildReplay(dayList, [...stock.values()], dm);
+  const frames = buildReplay(dayList, stockOf(cur), movesOf(moves));
+  const framesNv = buildReplay(dayList, stockOf(curNv), movesOf(movesNv));
+  frames.forEach((fr, i) => {
+    const nv = framesNv[i]; if (!nv) return;
+    const nvBy = new Map(nv.stages.map((x) => [x.stageId, x.count]));
+    const ids = new Set([...fr.stages.map((x) => x.stageId), ...nv.stages.map((x) => x.stageId)]);
+    fr.stages = [...ids].map((id) => { const a = fr.stages.find((x) => x.stageId === id); return { stageId: id, count: a?.count ?? 0, value: a?.value ?? 0, noValueCount: nvBy.get(id) ?? 0 }; });
+    fr.wonCount += nv.wonCount; fr.lostCount += nv.lostCount; fr.moved = [...fr.moved, ...nv.moved]; fr.closed = [...fr.closed, ...nv.closed];
+  });
   return { days: n, frames, enough: num(since?.n) >= 20, historySince: iso(since?.since) };
 }
 

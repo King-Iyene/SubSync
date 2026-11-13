@@ -31,6 +31,7 @@ import { LeadDrawerHost } from "./ds/lead-drawer-host";
 const AppointmentInsights = dynamic(() => import("./views/appointment-insights").then((m) => m.AppointmentInsights), { ssr: false });
 import { sampleOn as dqSample } from "./views/dq/dq-data";
 import { GlobalSearch } from "./views/global-search";
+import { AskDataCard } from "./views/ask-data";
 import type { ClientsFeatures } from "./views/clients";
 import { GuideHelpButton, NewMark, StNavEntry, StProvider } from "./views/st-state";
 import { FreshnessStrip as StatusLine } from "./views/sync-status";
@@ -469,7 +470,7 @@ export function Dashboard() {
     if (feature && locked(feature)) return <Centered title="Part of the paid plan" body="This page is included in the Pro plan. Ask whoever manages your SubSync plan to upgrade, and it appears here straight away." />;
     switch (viewId) {
       // Today reads with the unfiltered client and applies its own account choice, so the shared filter never changes what Today counts.
-      case "today": return <ApiProvider value={baseApi}>{tdOn ? <TodayModule key="td3" go={go} kind={auth.kind} /> : <TodayView go={go} kind={auth.kind} />}</ApiProvider>;
+      case "today": return <ApiProvider value={baseApi}><AskDataCard />{tdOn ? <TodayModule key="td3" go={go} kind={auth.kind} /> : <TodayView go={go} kind={auth.kind} />}</ApiProvider>;
       // "My day" is Today now (one page, one menu item). The old address still opens it.
       case "myday": return <ApiProvider value={baseApi}>{tdOn ? <TodayModule key="td3" go={go} kind={auth.kind} /> : <TodayView go={go} kind={auth.kind} />}</ApiProvider>;
       case "people": case "search": case "leads": case "calls": return peopleOn ? <PeopleModule key={"people" + peopleStart} start={peopleStart} callsAllowed={callsAllowed} find={auth.features.fl_find === true && !auth.locked.includes("fl_find")} bulk={auth.features.fl_bulk === true && !auth.locked.includes("fl_bulk")} /> : <Centered title="Not available" body="This page is switched off right now." />;

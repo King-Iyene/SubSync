@@ -520,3 +520,21 @@ export async function dqAlertDrafts(inst: string): Promise<Array<{ dedupeKey: st
     dedupeKey: `dq:${a.kind}:${a.locationId}:${a.key}`.slice(0, 190), kind: "quality", severity: a.severity, locationId: a.locationId, title: `${a.locationName ?? "A client account"}: ${a.title}`, detail: { dq: a.kind, source: a.label, ...a.numbers },
   }));
 }
+
+/** ONE open group by its address (account and key), with its people, for the duplicate judge. Same visibility and read-time name rule as the list. Null when it is not open or not visible. */
+export async function groupByKey(s: Scope, loc: string, key: string): Promise<GroupRow | null> {
+  const db = sql();
+  const rows = await db`select g.location_id, g.group_key, g.tier, g.kinds, g.contact_ids, g.trimmed, l.name loc_name
+    from dq_groups g join locations l on l.installation_id = g.installation_id and l.location_id = g.location_id and not l.ignored
+    where g.installation_id = ${s.inst} and g.location_id = ${loc} and g.group_key = ${key} ${scopeOf(db, "g", s.allowed)} ${OPEN_SQL(db)} limit 1`;
+  const r = rows[0];
+  if (!r) return null;
+  const people = await peopleOf(s.inst, (r.contact_ids as string[]).map((id) => ({ loc: r.location_id as string, id })));
+  const ps = (r.contact_ids as string[]).map((id) => people.get(`${r.location_id}:${id}`)).filter((p): p is GroupPerson => !!p);
+  if (ps.length < 2) return null;
+  const kinds = r.kinds as string[], tier = r.tier as Tier;
+  const conflict = namesConflict(ps.map((p) => p.name));
+  const lowered = tier === "certain" && conflict;
+  return { key, locationId: loc, locationName: (r.loc_name as string | null) ?? null, tier: lowered ? "likely" : tier, nameNote: lowered || (tier === "likely" && kinds.some((k) => k === "email" || k === "phone") && conflict) ? DIFFERENT_NAMES_WHY : null,
+    badge: lowered ? withNameNote(badgeOf(kinds as EdgeKind[])) : badgeOf(kinds as EdgeKind[]), kinds, trimmed: r.trimmed === true, shared: sharedValue(kinds, ps), people: ps, protectedCount: ps.filter((p) => p.protect).length };
+}

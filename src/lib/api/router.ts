@@ -144,6 +144,7 @@ import { handleBfFunnel, handleBfRecover } from "./bf-routes";
 import { handlePipeline3, handlePipelineHistorySettings } from "./pipeline3-routes";
 import { handleClients3 } from "./clients3-routes";
 import { handleProof } from "./proof-routes";
+import { handleAiTeam } from "./ai-team-routes";
 import { handleFinance } from "./finance-routes";
 import { handleClients2 } from "./clients2-routes";
 import { handlePeople3 } from "./people3-routes";
@@ -155,6 +156,8 @@ import { handleCash, handleCashAct } from "./cash-routes";
 import { handleWg, handleWgAct } from "./wg-routes";
 import { handleBr } from "./br-routes";
 import { handleAi } from "./ai-routes";
+import { handleAiData } from "./ai-data-routes";
+import { handleWfm } from "./wfm-routes";
 import { handleApptActions } from "./appointment-actions-routes";
 import { handleMeetingList } from "./mn2-routes";
 import { handleAm } from "./am-routes";
@@ -904,6 +907,7 @@ async function startView(ctx: Ctx) {
     changedKeys: changed, sharedAudits: shares?.n ?? 0, feedbackGiven: given,
     meetingsPage: ctx.entitlements.features.meetings !== false, zoomOn: zoomOn(ctx),
     clientFees: feeOn?.n ?? 0, clientsPage: ctx.entitlements.features.clients !== false,
+    dealAi: { on: ctx.kind !== "client" && ctx.entitlements.features.ai_byo === true && (["ai_deal_health", "ai_deal_followup", "ai_deal_winloss", "ai_deal_forecast"] as const).some((k) => ctx.entitlements.features[k] === true), connected: ((await sql()`select count(*)::int n from ai_connections where installation_id = ${ctx.installationId} and status = 'connected'`.catch(() => []))[0]?.n ?? 0) > 0 },
   });
   // A client's staff never receive what the company set up in Settings (N84): their guide has no such step, and the facts above for it are empty.
   return json({ kind: ctx.kind, role, steps, doneCount: steps.filter((s) => s.done).length, total: steps.length });
@@ -2288,9 +2292,18 @@ async function dispatch(ctx: Ctx): Promise<Response> {
     if (a === "wg" && b === "act" && ctx.segments.length === 3) {
       return await handleWgAct(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links });
     }
+    // Workflow blocks: /api/app/wfm and /api/app/wfm/act/set. Administrators only (checked inside); flag wf_module.
+    if (a === "wfm" && ((method === "GET" && !b) || (b === "act" && ctx.segments.length === 3 && ctx.segments[2] === "set"))) {
+      return await handleWfm(ctx, { allowed: () => allowedIds(ctx) });
+    }
     // Bring your own AI: /api/app/ai?part=... and /api/app/ai/act/<name>. Administrators only for the connection (checked inside); flag ai_byo.
-    if (a === "ai" && ((method === "GET" && !b) || (b === "act" && ctx.segments.length === 3))) {
-      return await handleAi(ctx, { allowed: () => allowedIds(ctx) });
+    if (a === "ai-team" && ((method === "GET" && !b) || (b === "act" && ctx.segments.length === 3))) return await handleAiTeam(ctx, { allowed: () => allowedIds(ctx) });
+    if (a === "ai" && ((method === "GET" && !b) || (b === "act" && ctx.segments.length === 3) || (b === "lead" && ctx.segments.length === 3))) {
+      return await handleAi(ctx, { allowed: () => allowedIds(ctx), locationToken: (locationId) => locationAccessToken(ctx.session.companyId, locationId), links: async () => (await scope(ctx)).links });
+    }
+    // AI data jobs (Ask your data, data review, cleaning proposals, duplicate judge, setup auditor): /api/app/aid?part=... and /api/app/aid/act/<name>. Each job has its own flag; checked inside.
+    if (a === "aid" && ((method === "GET" && !b) || (b === "act" && ctx.segments.length === 3))) {
+      return await handleAiData(ctx, { allowed: () => allowedIds(ctx) });
     }
     // The 7 am brief: /api/app/br?part=brief|text|settings|history and /api/app/br/act/<settings|test|seen|acted>. Owners and admins only; every choice is the signed-in person's own.
     if (a === "br" && ((method === "GET" && !b && ctx.url.searchParams.has("part")) || (b === "act" && ctx.segments.length === 3))) {

@@ -11,6 +11,7 @@ import { Btn, fmtInt } from "../ui";
 import { LeadsView } from "./leads";
 import type { Options } from "./people-filters";
 import { PersonRows, toSeed, type SeedFrom } from "./people-rows";
+import { ColdCard } from "./ai-lead-cards";
 
 // The other three tabs of People: Tags (who has a tag, and how many were tagged each day), Going cold (who talked to you and then went quiet), and Sources. They answer "what is in my
 // list", not "who do I call now", so they sit behind the first tab. Every row is the same row as everywhere else in People, and every name opens the same lead panel.
@@ -103,6 +104,7 @@ export function GoingColdTab({ showAccount }: { showAccount: boolean }) {
   return (
     <div className="space-y-6">
       <HowTo id="people-cold" title="How to use this page">Press a bar to see the people behind it. Start with &quot;Engaged, then quiet&quot;: they have talked to you before. Contacts on a cold list are counted apart, so they never hide the people you are really working.</HowTo>
+      <ColdCard />
       <Section title="Who is going quiet" hint="Working leads only. Cold lists are counted apart.">
         {eg ? (
           <>

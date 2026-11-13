@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AiCard } from "./ai-card";
+import { WfmCard } from "./wfm-card";
 import { BrandIcon } from "../ds/brand-icon";
 import type { BrandId } from "@/lib/brand-marks";
 import { DataList, ErrorState, HowTo, InlineAlert, Page, Section, SkeletonRows } from "../ds";
@@ -80,6 +81,7 @@ export function IntegrationsContent({ nested = false }: { nested?: boolean }) {
             <MySection data={my.data} reload={my.reload} level={level} />
             {my.data.canAdmin && <TeamSection level={level} />}
             <AiCard />
+            <WfmCard />
           </>
         ) : null}
     </>

@@ -11,6 +11,8 @@ import { notSwitchedOn } from "../cl3/data";
 import { Pager } from "../cl3/shared";
 import { ProofReport } from "./report";
 import { printReport } from "./actions";
+import { DraftAll, SummaryBlock } from "../ai-team/summary-block";
+import { LeadStoriesButton } from "../ai-team/lead-stories";
 
 // Clients, Proof: for every client account, ONE branded report page the company sends to that client (a secret link, no sign-in) and a printable monthly report. The company reviews each draft and
 // shares it itself; SubSync never sends anything to a client. Real data only: sample rows appear ONLY with ?prfx in the address and say "Sample data". Every count opens exactly its rows.
@@ -86,6 +88,7 @@ export function ProofTab({ flags }: { flags: Record<string, boolean> }) {
         <p className="cl-sentence" data-testid="pr-sentence">One branded page and a monthly PDF for each client account, from its own records. You review each one and send it yourself: SubSync never contacts your clients.</p>
         <div className="flex flex-wrap items-center gap-2">
           <button type="button" className="s6-btn" data-kind="primary" disabled={busy || list === null || list.counts.none === 0} onClick={() => void prepareAll()} data-testid="pr-prepare-all">Prepare all drafts{list ? ` (${list.counts.none})` : ""}</button>
+          {!sample && <DraftAll month={month} onDone={bump} />}
           <button type="button" className="s6-btn" onClick={() => setSettingsOpen((v) => !v)} aria-expanded={settingsOpen} data-testid="pr-settings-btn">Name, logo and colour</button>
         </div>
       </section>
@@ -174,6 +177,7 @@ function ReviewPanel({ row, month, options, sample, canShare, onBack }: { row: P
   }, [sample, row, month, options.settings]);
   const d = sample ? fx : live.data;
   const [intro, setIntro] = useState<string | null>(null), [sections, setSections] = useState<Sections | null>(null), [note, setNote] = useState<string | null>(null), [busy, setBusy] = useState(false);
+  const [aiSummary, setAiSummary] = useState<string | null>(null);
   const [url, setUrl] = useState<string | null>(null), [confirmFor, setConfirmFor] = useState<"regenerate" | "revoke" | null>(null), [typed, setTyped] = useState("");
   const bump = () => setRev((n) => n + 1);
   if (!d && live.error) return <div className="cl-stack"><button type="button" className="ap-link" onClick={onBack}>Back to reports</button><EmptyState title="Could not load" body={msg(live.error)} /></div>;
@@ -188,7 +192,7 @@ function ReviewPanel({ row, month, options, sample, canShare, onBack }: { row: P
     try { const m = await fn(); if (m) setNote(m); bump(); } catch (e) { setNote(msg(e)); } finally { setBusy(false); }
   };
   const brand = { name: d.brand.name ?? "Monthly report", logoUrl: d.brand.logoUrl, color: d.brand.color };
-  const text = rp ? reportText(rp.payload, brand, introNow || null, secNow) : "";
+  const text = rp ? reportText(rp.payload, brand, introNow || null, secNow, aiSummary) : "";
   const nameOk = typed.trim().toLowerCase() === row.name.trim().toLowerCase();
   return (
     <div className="cl-stack" data-testid="pr-review-panel">
@@ -252,10 +256,12 @@ function ReviewPanel({ row, month, options, sample, canShare, onBack }: { row: P
             )}
             <div aria-live="polite" className="mt-2 min-h-5 text-sm" data-testid="pr-msg">{note}</div>
           </section>
+          <SummaryBlock locationId={row.locationId} month={month} sample={sample} refreshKey={rev} onChange={setAiSummary} />
+          <LeadStoriesButton locationId={row.locationId} accountName={row.name} sample={sample} />
           <div className="rounded-xl border" style={{ overflow: "hidden" }} data-testid="pr-preview">
-            <ProofReport p={rp.payload} brand={brand} intro={introNow || null} sections={secNow} nameStaff={rp.nameStaff} sample={sample} />
+            <ProofReport p={rp.payload} brand={brand} intro={introNow || null} summary={aiSummary} sections={secNow} nameStaff={rp.nameStaff} sample={sample} />
           </div>
-          <PrintCopy><ProofReport p={rp.payload} brand={brand} intro={introNow || null} sections={secNow} nameStaff={rp.nameStaff} sample={sample} /></PrintCopy>
+          <PrintCopy><ProofReport p={rp.payload} brand={brand} intro={introNow || null} summary={aiSummary} sections={secNow} nameStaff={rp.nameStaff} sample={sample} /></PrintCopy>
         </>
       )}
     </div>
