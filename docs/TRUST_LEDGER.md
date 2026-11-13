@@ -156,3 +156,11 @@ Not tested: 390 and 768 widths; bookings and deals created on the imported leads
 | 25 | River | Shows counts as cards because open money is $0 (no owners); the banknote view could not be judged. |
 
 **Not seen yet:** automatic workflow creation (needs reinstall and probe), Fathom link onto a lead, phone widths 390/768, "Mark as set up", the AI platform (not built yet).
+
+## Fixes for walk-through #3 (13 Nov night): PRs #102-#105 merged
+
+Seen working live: Clients tabs grouped into four with a page row (#11); Clients > Money says "Not known: needs permission... cannot say who is paid up" (#10); What's new and menu "New" badges present (#15); Duplicates: jordan smith group now shows "Same email, different names" and "Likely: names differ", button reads "Merge this person" (#16, #18); Merge on the protected group opens the chooser with a banner (#19).
+
+Merged, NOT yet seen live: #1 #2 #3 week table and one window per screen; #20 sale card in Settings > Targets and its search; #4 #5 #8 #9 contact panel and Find a lead; #6 #7 labelled (not merged into one definition); #12 "n deals without a value"; #13 example funnel (needs 5 valued test deals from King); #14 Meetings card.
+
+Left over: Duplicates tab counts and "Merge all certain matches (13)" still count the mixed-name group until the nightly scan runs; they should move to Likely at once.
